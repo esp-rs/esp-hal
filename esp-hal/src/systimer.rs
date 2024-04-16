@@ -1,29 +1,27 @@
 //! # System Timer peripheral driver
 //!
-//! ## Overview
-//! This software module provides an interface to interact with the system timer
-//! (SYSTIMER) peripheral on ESP microcontroller chips.
+//! The System Timer is a
+#![cfg_attr(esp32s2, doc = "`64-bit`")]
+#![cfg_attr(not(esp32s2), doc = "`54-bit`")]
+//! timer with three comparators capable of raising an alarm interupt on each.
 //!
-//! Each ESP chip provides a timer (`52-bit` or `64-bit`, depends on chip),
-//! which can be used to generate tick interrupts for operating system, or be
-//! used as a general timer to generate periodic interrupts or one-time
-//! interrupts. With the help of the RTC timer, system timer can be kept up to
-//! date after Light-sleep or Deep-sleep.
+//! To obtain the current timer value, call [`SystemTimer::now`].
 //!
-//! The driver supports features such as retrieving the current system time,
-//! setting alarms for specific time points or periodic intervals, enabling and
-//! clearing interrupts, configuring various settings of the system timer.
+//! [`Alarm`]'s can be configured into two different modes:
 //!
-//! By using the SYSTIMER peripheral driver, you can leverage the system timer
-//! functionality of ESP chips for accurate timing measurements, event
-//! triggering and synchronization in your applications.
+//! - [`Target`], for one-shot timer behaviour.
+//! - [`Periodic`], for alarm triggers at a repeated interval.
 //!
 //! ## Example
 //! ```no_run
 //! let peripherals = Peripherals::take();
 //!
-//! let syst = SystemTimer::new(peripherals.SYSTIMER);
+//! let systimer = SystemTimer::new(peripherals.SYSTIMER);
 //! println!("SYSTIMER Current value = {}", SystemTimer::now());
+//!
+//! let mut alarm0 = systimer.alarm0;
+//! // Block for a second
+//! alarm0.wait_until(SystemTimer::now().wrapping_add(SystemTimer::TICKS_PER_SECOND));
 //! ```
 
 use core::{marker::PhantomData, mem::transmute};
@@ -50,8 +48,6 @@ use crate::{
     },
 };
 
-// TODO this only handles unit0 of the systimer
-
 /// The SystemTimer
 pub struct SystemTimer<'d, DM: crate::Mode> {
     pub alarm0: Alarm<Target, DM, 0>,
@@ -69,7 +65,7 @@ impl<'d> SystemTimer<'d, crate::Blocking> {
 
     /// The ticks per second the underlying peripheral uses
     #[cfg(esp32s2)]
-    pub const TICKS_PER_SECOND: u64 = 80_000_000; // TODO this can change when we have support for changing APB frequency
+    pub const TICKS_PER_SECOND: u64 = 80_000_000;
     #[cfg(not(esp32s2))]
     pub const TICKS_PER_SECOND: u64 = 16_000_000;
 
@@ -86,8 +82,7 @@ impl<'d> SystemTimer<'d, crate::Blocking> {
         }
     }
 
-    // TODO use fugit types
-    /// Get the current count of the system-timer.
+    /// Get the current count of unit 0 in the system timer.
     pub fn now() -> u64 {
         // This should be safe to access from multiple contexts
         // worst case scenario the second accessor ends up reading
@@ -132,7 +127,7 @@ pub struct Target;
 
 /// A marker for a [Alarm] in periodic mode.
 #[derive(Debug)]
-pub struct Periodic; // TODO, also impl e-h timer traits
+pub struct Periodic;
 
 /// A single alarm.
 #[derive(Debug)]
@@ -252,11 +247,32 @@ impl<T, DM: crate::Mode, const CHANNEL: u8> Alarm<T, DM, CHANNEL> {
             _ => unreachable!(),
         }
     }
+
+    pub(crate) fn set_target_internal(&self, timestamp: u64) {
+        self.configure(|tconf, hi, lo| unsafe {
+            tconf.write(|w| w.target0_period_mode().clear_bit()); // target mode
+            hi.write(|w| w.timer_target0_hi().bits((timestamp >> 32) as u32));
+            lo.write(|w| w.timer_target0_lo().bits((timestamp & 0xFFFF_FFFF) as u32));
+        })
+    }
+
+    pub(crate) fn set_period_internal(&self, ticks: u32) {
+        self.configure(|tconf, hi, lo| unsafe {
+            tconf.write(|w| {
+                w.target0_period_mode()
+                    .set_bit()
+                    .target0_period()
+                    .bits(ticks)
+            });
+            hi.write(|w| w.timer_target0_hi().bits(0));
+            lo.write(|w| w.timer_target0_lo().bits(0));
+        });
+    }
 }
 
 impl<T, const CHANNEL: u8> Alarm<T, crate::Blocking, CHANNEL> {
     /// Set the interrupt handler for this alarm.
-    pub fn set_interrupt_handler(&self, handler: InterruptHandler) {
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         match CHANNEL {
             0 => unsafe {
                 crate::interrupt::bind_interrupt(
@@ -293,23 +309,39 @@ impl<T, const CHANNEL: u8> Alarm<T, crate::Blocking, CHANNEL> {
     }
 
     /// Enable the interrupt for this alarm.
-    pub fn enable_interrupt(&self, val: bool) {
+    pub fn enable_interrupt(&mut self, val: bool) {
         self.enable_interrupt_internal(val);
     }
 
     /// Enable the interrupt pending status for this alarm.
-    pub fn clear_interrupt(&self) {
+    pub fn clear_interrupt(&mut self) {
         self.clear_interrupt_internal();
     }
 }
 impl<DM: crate::Mode, const CHANNEL: u8> Alarm<Target, DM, CHANNEL> {
     /// Set the target value of this [Alarm]
-    pub fn set_target(&self, timestamp: u64) {
-        self.configure(|tconf, hi, lo| unsafe {
-            tconf.write(|w| w.target0_period_mode().clear_bit()); // target mode
-            hi.write(|w| w.timer_target0_hi().bits((timestamp >> 32) as u32));
-            lo.write(|w| w.timer_target0_lo().bits((timestamp & 0xFFFF_FFFF) as u32));
-        })
+    pub fn set_target(&mut self, timestamp: u64) {
+        self.set_target_internal(timestamp);
+    }
+
+    /// Block waiting until the timer reaches the `timestamp`
+    pub fn wait_until(&mut self, timestamp: u64) {
+        self.clear_interrupt_internal();
+        self.set_target(timestamp);
+        loop {
+            let r = unsafe { &*crate::peripherals::SYSTIMER::PTR }
+                .int_raw()
+                .read();
+
+            if match CHANNEL {
+                0 => r.target0().bit_is_set(),
+                1 => r.target1().bit_is_set(),
+                2 => r.target2().bit_is_set(),
+                _ => unreachable!(),
+            } {
+                break;
+            }
+        }
     }
 
     /// Converts this [Alarm] into [Periodic] mode
@@ -320,20 +352,11 @@ impl<DM: crate::Mode, const CHANNEL: u8> Alarm<Target, DM, CHANNEL> {
 
 impl<DM: crate::Mode, const CHANNEL: u8> Alarm<Periodic, DM, CHANNEL> {
     /// Set the period of this [Alarm]
-    pub fn set_period(&self, period: MicrosDurationU32) {
+    pub fn set_period(&mut self, period: MicrosDurationU32) {
         let us = period.ticks();
         let ticks = us * (SystemTimer::TICKS_PER_SECOND / 1_000_000) as u32;
 
-        self.configure(|tconf, hi, lo| unsafe {
-            tconf.write(|w| {
-                w.target0_period_mode()
-                    .set_bit()
-                    .target0_period()
-                    .bits(ticks)
-            });
-            hi.write(|w| w.timer_target0_hi().bits(0));
-            lo.write(|w| w.timer_target0_lo().bits(0));
-        });
+        self.set_period_internal(ticks);
     }
 
     /// Converts this [Alarm] into [Target] mode

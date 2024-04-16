@@ -35,21 +35,20 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
-
     println!("SYSTIMER Current value = {}", SystemTimer::now());
 
     critical_section::with(|cs| {
-        let alarm0 = systimer.alarm0.into_periodic();
+        let mut alarm0 = systimer.alarm0.into_periodic();
         alarm0.set_interrupt_handler(systimer_target0);
         alarm0.set_period(1u32.secs());
         alarm0.enable_interrupt(true);
 
-        let alarm1 = systimer.alarm1;
+        let mut alarm1 = systimer.alarm1;
         alarm1.set_interrupt_handler(systimer_target1);
         alarm1.set_target(SystemTimer::now() + (SystemTimer::TICKS_PER_SECOND * 2));
         alarm1.enable_interrupt(true);
 
-        let alarm2 = systimer.alarm2;
+        let mut alarm2 = systimer.alarm2;
         alarm2.set_interrupt_handler(systimer_target2);
         alarm2.set_target(SystemTimer::now() + (SystemTimer::TICKS_PER_SECOND * 3));
         alarm2.enable_interrupt(true);
