@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add mechanism to configure UART source clock (#1416)
 - `GpioPin` got a function `set_state(bool)` (#1462)
 - Add definitions of external USB PHY peripheral I/O signals
+- Expose e-hal ErrorKind::NoAcknowledge in I2C driver (#1454)
 
 ### Fixed
 
