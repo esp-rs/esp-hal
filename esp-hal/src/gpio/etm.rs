@@ -315,7 +315,7 @@ fn enable_event_channel(channel: u8, pin: u8) {
         .modify(|_, w| w.etm_ch0_event_en().clear_bit());
     gpio_sd
         .etm_event_ch_cfg(channel as usize)
-        .modify(|_, w| w.etm_ch0_event_sel().variant(pin));
+        .modify(|_, w| unsafe { w.etm_ch0_event_sel().bits(pin) });
     gpio_sd
         .etm_event_ch_cfg(channel as usize)
         .modify(|_, w| w.etm_ch0_event_en().set_bit());

@@ -40,21 +40,15 @@ impl<MODE, const PIN: u8> LowPowerPin<MODE, PIN> {
     #[doc(hidden)]
     pub fn output_enable(&self, enable: bool) {
         let rtc_io = unsafe { crate::peripherals::RTC_IO::steal() };
-        if enable {
-            // TODO align PAC
-            #[cfg(esp32s2)]
-            rtc_io
-                .rtc_gpio_enable_w1ts()
-                .write(|w| w.reg_rtcio_reg_gpio_enable_w1ts().variant(1 << PIN));
 
-            #[cfg(esp32s3)]
+        if enable {
             rtc_io
                 .rtc_gpio_enable_w1ts()
-                .write(|w| w.rtc_gpio_enable_w1ts().variant(1 << PIN));
+                .write(|w| unsafe { w.rtc_gpio_enable_w1ts().bits(1 << PIN) });
         } else {
             rtc_io
                 .enable_w1tc()
-                .write(|w| w.enable_w1tc().variant(1 << PIN));
+                .write(|w| unsafe { w.enable_w1tc().bits(1 << PIN) });
         }
     }
 
@@ -74,27 +68,14 @@ impl<MODE, const PIN: u8> LowPowerPin<MODE, PIN> {
     pub fn set_level(&mut self, level: bool) {
         let rtc_io = unsafe { &*crate::peripherals::RTC_IO::PTR };
 
-        // TODO align PACs
-        #[cfg(esp32s2)]
         if level {
             rtc_io
                 .rtc_gpio_out_w1ts()
-                .write(|w| w.gpio_out_data_w1ts().variant(1 << PIN));
+                .write(|w| unsafe { w.rtc_gpio_out_data_w1ts().bits(1 << PIN) });
         } else {
             rtc_io
                 .rtc_gpio_out_w1tc()
-                .write(|w| w.gpio_out_data_w1tc().variant(1 << PIN));
-        }
-
-        #[cfg(esp32s3)]
-        if level {
-            rtc_io
-                .rtc_gpio_out_w1ts()
-                .write(|w| w.rtc_gpio_out_data_w1ts().variant(1 << PIN));
-        } else {
-            rtc_io
-                .rtc_gpio_out_w1tc()
-                .write(|w| w.rtc_gpio_out_data_w1tc().variant(1 << PIN));
+                .write(|w| unsafe { w.rtc_gpio_out_data_w1tc().bits(1 << PIN) });
         }
     }
 

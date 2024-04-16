@@ -99,7 +99,7 @@ impl<const N: u8> RegisterAccess for Channel<N> {
     fn set_out_priority(priority: DmaPriority) {
         Self::ch()
             .out_pri()
-            .write(|w| w.tx_pri().variant(priority as u8));
+            .write(|w| unsafe { w.tx_pri().bits(priority as u8) });
     }
 
     fn clear_out_interrupts() {
@@ -145,7 +145,7 @@ impl<const N: u8> RegisterAccess for Channel<N> {
     fn set_out_peripheral(peripheral: u8) {
         Self::ch()
             .out_peri_sel()
-            .modify(|_, w| w.peri_out_sel().variant(peripheral));
+            .modify(|_, w| unsafe { w.peri_out_sel().bits(peripheral) });
     }
 
     fn start_out() {
@@ -212,7 +212,7 @@ impl<const N: u8> RegisterAccess for Channel<N> {
     fn set_in_priority(priority: DmaPriority) {
         Self::ch()
             .in_pri()
-            .write(|w| w.rx_pri().variant(priority as u8));
+            .write(|w| unsafe { w.rx_pri().bits(priority as u8) });
     }
 
     fn clear_in_interrupts() {
@@ -268,7 +268,7 @@ impl<const N: u8> RegisterAccess for Channel<N> {
     fn set_in_peripheral(peripheral: u8) {
         Self::ch()
             .in_peri_sel()
-            .modify(|_, w| w.peri_in_sel().variant(peripheral));
+            .modify(|_, w| unsafe { w.peri_in_sel().bits(peripheral) });
     }
 
     fn start_in() {

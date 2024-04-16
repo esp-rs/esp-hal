@@ -1218,22 +1218,24 @@ pub mod dma {
             // set cmd, address, dummy cycles
             let reg_block = self.spi.register_block();
             if !cmd.is_none() {
-                reg_block.user2().modify(|_, w| {
+                reg_block.user2().modify(|_, w| unsafe {
                     w.usr_command_bitlen()
-                        .variant((cmd.width() - 1) as u8)
+                        .bits((cmd.width() - 1) as u8)
                         .usr_command_value()
-                        .variant(cmd.value())
+                        .bits(cmd.value())
                 });
             }
 
             #[cfg(not(esp32))]
             if !address.is_none() {
-                reg_block
-                    .user1()
-                    .modify(|_, w| w.usr_addr_bitlen().variant((address.width() - 1) as u8));
+                reg_block.user1().modify(|_, w| unsafe {
+                    w.usr_addr_bitlen().bits((address.width() - 1) as u8)
+                });
 
                 let addr = address.value() << (32 - address.width());
-                reg_block.addr().write(|w| w.usr_addr_value().variant(addr));
+                reg_block
+                    .addr()
+                    .write(|w| unsafe { w.usr_addr_value().bits(addr) });
             }
 
             #[cfg(esp32)]
@@ -1249,7 +1251,7 @@ pub mod dma {
             if dummy > 0 {
                 reg_block
                     .user1()
-                    .modify(|_, w| w.usr_dummy_cyclelen().variant(dummy - 1));
+                    .modify(|_, w| unsafe { w.usr_dummy_cyclelen().bits(dummy - 1) });
             }
 
             self.spi
@@ -1289,22 +1291,24 @@ pub mod dma {
             // set cmd, address, dummy cycles
             let reg_block = self.spi.register_block();
             if !cmd.is_none() {
-                reg_block.user2().modify(|_, w| {
+                reg_block.user2().modify(|_, w| unsafe {
                     w.usr_command_bitlen()
-                        .variant((cmd.width() - 1) as u8)
+                        .bits((cmd.width() - 1) as u8)
                         .usr_command_value()
-                        .variant(cmd.value())
+                        .bits(cmd.value())
                 });
             }
 
             #[cfg(not(esp32))]
             if !address.is_none() {
-                reg_block
-                    .user1()
-                    .modify(|_, w| w.usr_addr_bitlen().variant((address.width() - 1) as u8));
+                reg_block.user1().modify(|_, w| unsafe {
+                    w.usr_addr_bitlen().bits((address.width() - 1) as u8)
+                });
 
                 let addr = address.value() << (32 - address.width());
-                reg_block.addr().write(|w| w.usr_addr_value().variant(addr));
+                reg_block
+                    .addr()
+                    .write(|w| unsafe { w.usr_addr_value().bits(addr) });
             }
 
             #[cfg(esp32)]
@@ -1320,7 +1324,7 @@ pub mod dma {
             if dummy > 0 {
                 reg_block
                     .user1()
-                    .modify(|_, w| w.usr_dummy_cyclelen().variant(dummy - 1));
+                    .modify(|_, w| unsafe { w.usr_dummy_cyclelen().bits(dummy - 1) });
             }
 
             self.spi
@@ -2857,11 +2861,11 @@ pub trait Instance: crate::private::Sealed {
         // set cmd, address, dummy cycles
         let reg_block = self.register_block();
         if !cmd.is_none() {
-            reg_block.user2().modify(|_, w| {
+            reg_block.user2().modify(|_, w| unsafe {
                 w.usr_command_bitlen()
-                    .variant((cmd.width() - 1) as u8)
+                    .bits((cmd.width() - 1) as u8)
                     .usr_command_value()
-                    .variant(cmd.value())
+                    .bits(cmd.value())
             });
         }
 
@@ -2869,10 +2873,12 @@ pub trait Instance: crate::private::Sealed {
         if !address.is_none() {
             reg_block
                 .user1()
-                .modify(|_, w| w.usr_addr_bitlen().variant((address.width() - 1) as u8));
+                .modify(|_, w| unsafe { w.usr_addr_bitlen().bits((address.width() - 1) as u8) });
 
             let addr = address.value() << (32 - address.width());
-            reg_block.addr().write(|w| w.usr_addr_value().variant(addr));
+            reg_block
+                .addr()
+                .write(|w| unsafe { w.usr_addr_value().bits(addr) });
         }
 
         #[cfg(esp32)]
@@ -2888,7 +2894,7 @@ pub trait Instance: crate::private::Sealed {
         if dummy > 0 {
             reg_block
                 .user1()
-                .modify(|_, w| w.usr_dummy_cyclelen().variant(dummy - 1));
+                .modify(|_, w| unsafe { w.usr_dummy_cyclelen().bits(dummy - 1) });
         }
 
         if !buffer.is_empty() {
@@ -2920,11 +2926,11 @@ pub trait Instance: crate::private::Sealed {
         // set cmd, address, dummy cycles
         let reg_block = self.register_block();
         if !cmd.is_none() {
-            reg_block.user2().modify(|_, w| {
+            reg_block.user2().modify(|_, w| unsafe {
                 w.usr_command_bitlen()
-                    .variant((cmd.width() - 1) as u8)
+                    .bits((cmd.width() - 1) as u8)
                     .usr_command_value()
-                    .variant(cmd.value())
+                    .bits(cmd.value())
             });
         }
 
@@ -2932,10 +2938,12 @@ pub trait Instance: crate::private::Sealed {
         if !address.is_none() {
             reg_block
                 .user1()
-                .modify(|_, w| w.usr_addr_bitlen().variant((address.width() - 1) as u8));
+                .modify(|_, w| unsafe { w.usr_addr_bitlen().bits((address.width() - 1) as u8) });
 
             let addr = address.value() << (32 - address.width());
-            reg_block.addr().write(|w| w.usr_addr_value().variant(addr));
+            reg_block
+                .addr()
+                .write(|w| unsafe { w.usr_addr_value().bits(addr) });
         }
 
         #[cfg(esp32)]
@@ -2951,7 +2959,7 @@ pub trait Instance: crate::private::Sealed {
         if dummy > 0 {
             reg_block
                 .user1()
-                .modify(|_, w| w.usr_dummy_cyclelen().variant(dummy - 1));
+                .modify(|_, w| unsafe { w.usr_dummy_cyclelen().bits(dummy - 1) });
         }
 
         self.configure_datalen(buffer.len() as u32 * 8);

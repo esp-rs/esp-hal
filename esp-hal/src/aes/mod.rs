@@ -520,7 +520,7 @@ pub mod dma {
             self.aes
                 .aes
                 .mode()
-                .modify(|_, w| w.mode().variant(mode as u8));
+                .modify(|_, w| unsafe { w.mode().bits(mode as u8) });
         }
 
         fn start_transform(&self) {
