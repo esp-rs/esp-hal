@@ -303,7 +303,6 @@ fn modem_lpcon_ll_set_wifi_lpclk_divisor_value(divider: u16) {
 }
 
 fn modem_clock_hal_enable_wifipwr_clock(enable: bool) {
-    // FIXME: esp-idf uses refcounting here for later revisions.
     unsafe {
         modem_lpcon()
             .clk_conf()
