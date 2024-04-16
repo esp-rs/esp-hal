@@ -537,7 +537,7 @@ pub mod dma {
         }
 
         #[cfg(any(esp32c3, esp32s3))]
-        pub fn reset_aes(&self) {
+        fn reset_aes(&self) {
             unsafe {
                 let s = crate::peripherals::SYSTEM::steal();
                 s.perip_rst_en1()
@@ -548,7 +548,7 @@ pub mod dma {
         }
 
         #[cfg(any(esp32c6, esp32h2))]
-        pub fn reset_aes(&self) {
+        fn reset_aes(&self) {
             unsafe {
                 let s = crate::peripherals::PCR::steal();
                 s.aes_conf().modify(|_, w| w.aes_rst_en().set_bit());
@@ -571,7 +571,7 @@ pub mod dma {
             self.aes.aes.int_ena().write(|w| w.int_ena().set_bit());
         }
 
-        pub fn set_cipher_mode(&self, mode: CipherMode) {
+        fn set_cipher_mode(&self, mode: CipherMode) {
             self.aes
                 .aes
                 .block_mode()
@@ -585,7 +585,7 @@ pub mod dma {
             }
         }
 
-        pub fn set_mode(&self, mode: Mode) {
+        fn set_mode(&self, mode: Mode) {
             self.aes
                 .aes
                 .mode()
@@ -596,7 +596,7 @@ pub mod dma {
             self.aes.aes.trigger().write(|w| w.trigger().set_bit());
         }
 
-        pub fn finish_transform(&self) {
+        fn finish_transform(&self) {
             self.aes.aes.dma_exit().write(|w| w.dma_exit().set_bit());
             self.enable_dma(false);
             self.reset_aes();
