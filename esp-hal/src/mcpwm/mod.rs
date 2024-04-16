@@ -22,7 +22,12 @@
 //!       registers with flexible updating methods.
 //! * Fault Detection Module (Not yet implemented)
 //! * Capture Module (Not yet implemented)
-//!
+#![doc = ""]
+#![cfg_attr(esp32, doc = "Clock source is PWM_CLOCK")]
+#![cfg_attr(esp32s3, doc = "Clock source is CRYPTO_PWM_CLOCK")]
+#![cfg_attr(esp32c6, doc = "Clock source is CRYPTO_CLOCK")]
+#![cfg_attr(esp32h2, doc = "Clock source is XTAL")]
+#![doc = ""]
 //! ## Example
 //! Uses timer0 and operator0 of the MCPWM0 peripheral to output a 50% duty
 //! signal at 20 kHz. The signal will be output to the pin assigned to `pin`.
@@ -126,8 +131,6 @@ impl<'d, PWM: PwmPeripheral> MCPWM<'d, PWM> {
                         .pwm_clkm_sel()
                         .bits(1)
                 });
-
-            // TODO: Add other clock sources
         }
 
         #[cfg(esp32h2)]
@@ -142,8 +145,6 @@ impl<'d, PWM: PwmPeripheral> MCPWM<'d, PWM> {
                         .pwm_clkm_sel()
                         .bits(0)
                 });
-
-            // TODO: Add other clock sources
         }
 
         Self {
