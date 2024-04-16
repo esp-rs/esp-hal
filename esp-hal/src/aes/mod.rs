@@ -37,10 +37,10 @@
 //!
 //! ```no_run
 //! let mut block = block_buf.clone();
-//! aes.process(&mut block, Mode::Encryption128, &keybuf);
+//! aes.process(&mut block, Mode::Encryption128, keybuf.into());
 //! let hw_encrypted = block.clone();
 //!
-//! aes.process(&mut block, Mode::Decryption128, &keybuf);
+//! aes.process(&mut block, Mode::Decryption128, keybuf.into());
 //! let hw_decrypted = block;
 //! ```
 //!
@@ -122,6 +122,49 @@ mod aes_spec_impl;
 
 const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 
+/// Represents the various key sizes allowed for AES encryption and decryption.
+pub enum Key {
+    /// 128-bit AES key
+    Key16([u8; 16]),
+    #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+    /// 192-bit AES key
+    Key24([u8; 24]),
+    /// 256-bit AES key
+    Key32([u8; 32]),
+}
+
+// Implementing From for easy conversion from array to Key enum.
+impl From<[u8; 16]> for Key {
+    fn from(key: [u8; 16]) -> Self {
+        Key::Key16(key)
+    }
+}
+
+#[cfg(any(feature = "esp32", feature = "esp32s2"))]
+impl From<[u8; 24]> for Key {
+    fn from(key: [u8; 24]) -> Self {
+        Key::Key24(key)
+    }
+}
+
+impl From<[u8; 32]> for Key {
+    fn from(key: [u8; 32]) -> Self {
+        Key::Key32(key)
+    }
+}
+
+impl Key {
+    /// Returns a slice representation of the AES key.
+    fn as_slice(&self) -> &[u8] {
+        match self {
+            Key::Key16(ref key) => key,
+            #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+            Key::Key24(ref key) => key,
+            Key::Key32(ref key) => key,
+        }
+    }
+}
+
 pub enum Mode {
     Encryption128 = 0,
     #[cfg(any(esp32, esp32s2))]
@@ -154,14 +197,9 @@ impl<'d> Aes<'d> {
     }
 
     /// Encrypts/Decrypts the given buffer based on `mode` parameter
-    pub fn process(&mut self, block: &mut [u8; 16], mode: Mode, key: &[u8]) {
-        assert!(
-            key.len() == 16
-                || (cfg!(any(feature = "esp32", feature = "esp32s2")) && key.len() == 24)
-                || key.len() == 32,
-            "Invalid key size"
-        );
-        self.write_key(key);
+    pub fn process(&mut self, block: &mut [u8; 16], mode: Mode, key: Key){
+        // Convert from Key enum to required byte slice
+        self.write_key(key.as_slice());
         self.set_mode(mode as u8);
         self.set_block(block);
         self.start();

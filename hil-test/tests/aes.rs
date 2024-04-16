@@ -53,7 +53,7 @@ mod tests {
         block_buf[..plaintext.len()].copy_from_slice(plaintext);
 
         let mut block = block_buf.clone();
-        ctx.aes.process(&mut block, Mode::Encryption128, &keybuf);
+        ctx.aes.process(&mut block, Mode::Encryption128, keybuf.into());
         assert_eq!(block, encrypted_message);
     }
 
@@ -70,7 +70,7 @@ mod tests {
         keybuf[..keytext.len()].copy_from_slice(keytext);
 
         ctx.aes
-            .process(&mut encrypted_message, Mode::Decryption128, &keybuf);
+            .process(&mut encrypted_message, Mode::Decryption128, keybuf.into());
         assert_eq!(&encrypted_message[..plaintext.len()], plaintext);
     }
 
@@ -91,7 +91,7 @@ mod tests {
         block_buf[..plaintext.len()].copy_from_slice(plaintext);
 
         let mut block = block_buf.clone();
-        ctx.aes.process(&mut block, Mode::Encryption192, &keybuf);
+        ctx.aes.process(&mut block, Mode::Encryption192, keybuf.into());
         assert_eq!(block, encrypted_message);
     }
 
@@ -109,7 +109,7 @@ mod tests {
         keybuf[..keytext.len()].copy_from_slice(keytext);
 
         ctx.aes
-            .process(&mut encrypted_message, Mode::Decryption192, &keybuf);
+            .process(&mut encrypted_message, Mode::Decryption192, keybuf.into());
         assert_eq!(&encrypted_message[..plaintext.len()], plaintext);
     }
 
@@ -129,7 +129,7 @@ mod tests {
         block_buf[..plaintext.len()].copy_from_slice(plaintext);
 
         let mut block = block_buf.clone();
-        ctx.aes.process(&mut block, Mode::Encryption256, &keybuf);
+        ctx.aes.process(&mut block, Mode::Encryption256, keybuf.into());
         assert_eq!(block, encrypted_message);
     }
 
@@ -146,7 +146,7 @@ mod tests {
         keybuf[..keytext.len()].copy_from_slice(keytext);
 
         ctx.aes
-            .process(&mut encrypted_message, Mode::Decryption256, &keybuf);
+            .process(&mut encrypted_message, Mode::Decryption256, keybuf.into());
         assert_eq!(&encrypted_message[..plaintext.len()], plaintext);
     }
 }
