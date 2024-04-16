@@ -37,7 +37,7 @@ fn main() -> ! {
 
     let mut block = block_buf.clone();
     let pre_hw_encrypt = cycles();
-    aes.process(&mut block, Mode::Encryption128, keybuf.into());
+    aes.process(&mut block, Mode::Encryption128, keybuf);
     let post_hw_encrypt = cycles();
     println!(
         "it took {} cycles for hw encrypt",
@@ -45,7 +45,7 @@ fn main() -> ! {
     );
     let hw_encrypted = block.clone();
     let pre_hw_decrypt = cycles();
-    aes.process(&mut block, Mode::Decryption128, keybuf.into());
+    aes.process(&mut block, Mode::Decryption128, keybuf);
     let post_hw_decrypt = cycles();
     println!(
         "it took {} cycles for hw decrypt",

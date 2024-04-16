@@ -50,7 +50,7 @@ fn main() -> ! {
             &mut output,
             Mode::Encryption128,
             CipherMode::Ecb,
-            keytext.into(),
+            keytext,
         )
         .unwrap();
     transfer.wait().unwrap();
@@ -72,7 +72,7 @@ fn main() -> ! {
             &mut output,
             Mode::Decryption128,
             CipherMode::Ecb,
-            keytext.into(),
+            keytext,
         )
         .unwrap();
     transfer.wait().unwrap();

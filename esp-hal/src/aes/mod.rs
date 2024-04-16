@@ -37,10 +37,10 @@
 //!
 //! ```no_run
 //! let mut block = block_buf.clone();
-//! aes.process(&mut block, Mode::Encryption128, keybuf.into());
+//! aes.process(&mut block, Mode::Encryption128, keybuf);
 //! let hw_encrypted = block.clone();
 //!
-//! aes.process(&mut block, Mode::Decryption128, keybuf.into());
+//! aes.process(&mut block, Mode::Decryption128, keybuf);
 //! let hw_decrypted = block;
 //! ```
 //!
@@ -97,7 +97,7 @@
 //!         hw_encrypted,
 //!         Mode::Encryption128,
 //!         CipherMode::Ecb,
-//!         keybuf.into(),
+//!         keybuf,
 //!     )
 //!     .unwrap();
 //! transfer.wait().unwrap();
@@ -205,9 +205,12 @@ impl<'d> Aes<'d> {
     }
 
     /// Encrypts/Decrypts the given buffer based on `mode` parameter
-    pub fn process(&mut self, block: &mut [u8; 16], mode: Mode, key: Key) {
-        // Convert from Key enum to required byte slice
-        self.write_key(key.as_slice());
+    pub fn process<K>(&mut self, block: &mut [u8; 16], mode: Mode, key: K)
+    where
+        K: Into<Key>,
+    {
+        // Convert from into Key enum
+        self.write_key(key.into().as_slice());
         self.set_mode(mode as u8);
         self.set_block(block);
         self.start();
@@ -441,7 +444,11 @@ pub mod dma {
     {
         /// Writes the encryption key to the AES hardware, checking that its
         /// length matches expected constraints.
-        pub fn write_key(&mut self, key: Key) {
+        pub fn write_key<K>(&mut self, key: K)
+        where
+            K: Into<Key>,
+        {
+            let key = key.into(); // Convert into Key enum
             debug_assert!(key.as_slice().len() <= 8 * ALIGN_SIZE);
             debug_assert_eq!(key.as_slice().len() % ALIGN_SIZE, 0);
             self.aes.write_key(key.as_slice());
@@ -459,15 +466,16 @@ pub mod dma {
         /// This will return a [AesDmaTransferRxTx] owning the buffer(s) and the
         /// AES instance. The maximum amount of data to be sent/received
         /// is 32736 bytes.
-        pub fn process<'t, TXBUF, RXBUF>(
+        pub fn process<'t, K, TXBUF, RXBUF>(
             &'t mut self,
             words: &'t TXBUF,
             read_buffer: &'t mut RXBUF,
             mode: Mode,
             cipher_mode: CipherMode,
-            key: Key,
+            key: K,
         ) -> Result<AesDmaTransferRxTx<'t, 'd, C>, crate::dma::DmaError>
         where
+            K: Into<Key>,
             TXBUF: ReadBuffer<Word = u8>,
             RXBUF: WriteBuffer<Word = u8>,
         {
@@ -481,14 +489,14 @@ pub mod dma {
                 read_len,
                 mode,
                 cipher_mode,
-                key,
+                key.into(),
             )?;
 
             Ok(AesDmaTransferRxTx { aes_dma: self })
         }
 
         #[allow(clippy::too_many_arguments)]
-        fn start_transfer_dma(
+        fn start_transfer_dma<K>(
             &mut self,
             write_buffer_ptr: *const u8,
             write_buffer_len: usize,
@@ -496,8 +504,11 @@ pub mod dma {
             read_buffer_len: usize,
             mode: Mode,
             cipher_mode: CipherMode,
-            key: Key,
-        ) -> Result<(), crate::dma::DmaError> {
+            key: K,
+        ) -> Result<(), crate::dma::DmaError>
+        where
+            K: Into<Key>,
+        {
             // AES has to be restarted after each calculation
             self.reset_aes();
 
@@ -526,7 +537,7 @@ pub mod dma {
             self.enable_interrupt();
             self.set_mode(mode);
             self.set_cipher_mode(cipher_mode);
-            self.write_key(key);
+            self.write_key(key.into());
 
             // TODO: verify 16?
             self.set_num_block(16);
