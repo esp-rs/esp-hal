@@ -101,6 +101,12 @@ pub enum Error {
     /// The RX FIFO overflowed
     #[cfg(feature = "async")]
     RxFifoOvf,
+    #[cfg(feature = "async")]
+    RxGlitchDetected,
+    #[cfg(feature = "async")]
+    RxFrameError,
+    #[cfg(feature = "async")]
+    RxParityError,
 }
 
 #[cfg(feature = "embedded-hal")]
@@ -544,6 +550,12 @@ where
             }
         }
 
+        // Setting err_wr_mask stops uart from storing data when data is wrong according
+        // to reference manual
+        T::register_block()
+            .conf0()
+            .modify(|_, w| w.err_wr_mask().set_bit());
+
         // Reset Tx/Rx FIFOs
         serial.txfifo_reset();
         serial.rxfifo_reset();
@@ -861,9 +873,8 @@ where
         // we force the clock source to be APB and don't use the decimal part of the
         // divider
         let clk = clocks.apb_clock.to_Hz();
-        let max_div = 0b1111_1111_1111 - 1;
+        let max_div = 0b1111_1111_1111; // 12 bit clkdiv
         let clk_div = ((clk) + (max_div * baudrate) - 1) / (max_div * baudrate);
-
         T::register_block().clk_conf().write(|w| unsafe {
             w.sclk_sel()
                 .bits(1) // APB
@@ -879,13 +890,12 @@ where
                 .bit(true)
         });
 
-        let clk = clk / clk_div;
-        let divider = clk / baudrate;
-        let divider = divider as u16;
-
+        let divider = (clk << 4) / (baudrate * clk_div);
+        let divider_integer = (divider >> 4) as u16;
+        let divider_frag = (divider & 0xf) as u8;
         T::register_block()
             .clkdiv()
-            .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
+            .write(|w| unsafe { w.clkdiv().bits(divider_integer).frag().bits(divider_frag) });
     }
 
     #[cfg(any(esp32c6, esp32h2))]
@@ -1579,6 +1589,9 @@ mod asynch {
         RxCmdCharDetected,
         RxFifoOvf,
         RxFifoTout,
+        RxGlitchDetected,
+        RxFrameError,
+        RxParityError,
     }
 
     /// A future that resolves when the passed interrupt is triggered,
@@ -1606,11 +1619,11 @@ mod asynch {
             }
         }
 
-        fn event_bit_is_clear(&self) -> bool {
+        fn get_triggered_events(&self) -> EnumSet<RxEvent> {
             let interrupts_enabled = T::register_block().int_ena().read();
-            let mut event_triggered = false;
+            let mut events_triggered = EnumSet::new();
             for event in self.events {
-                event_triggered |= match event {
+                let event_triggered = match event {
                     RxEvent::RxFifoFull => interrupts_enabled.rxfifo_full().bit_is_clear(),
                     RxEvent::RxCmdCharDetected => {
                         interrupts_enabled.at_cmd_char_det().bit_is_clear()
@@ -1618,14 +1631,20 @@ mod asynch {
 
                     RxEvent::RxFifoOvf => interrupts_enabled.rxfifo_ovf().bit_is_clear(),
                     RxEvent::RxFifoTout => interrupts_enabled.rxfifo_tout().bit_is_clear(),
+                    RxEvent::RxGlitchDetected => interrupts_enabled.glitch_det().bit_is_clear(),
+                    RxEvent::RxFrameError => interrupts_enabled.frm_err().bit_is_clear(),
+                    RxEvent::RxParityError => interrupts_enabled.parity_err().bit_is_clear(),
+                };
+                if event_triggered {
+                    events_triggered |= event;
                 }
             }
-            event_triggered
+            events_triggered
         }
     }
 
     impl<'d, T: Instance> core::future::Future for UartRxFuture<'d, T> {
-        type Output = ();
+        type Output = EnumSet<RxEvent>;
 
         fn poll(
             mut self: core::pin::Pin<&mut Self>,
@@ -1640,14 +1659,18 @@ mod asynch {
                             RxEvent::RxCmdCharDetected => w.at_cmd_char_det().set_bit(),
                             RxEvent::RxFifoOvf => w.rxfifo_ovf().set_bit(),
                             RxEvent::RxFifoTout => w.rxfifo_tout().set_bit(),
+                            RxEvent::RxGlitchDetected => w.glitch_det().set_bit(),
+                            RxEvent::RxFrameError => w.frm_err().set_bit(),
+                            RxEvent::RxParityError => w.parity_err().set_bit(),
                         };
                     }
                     w
                 });
                 self.registered = true;
             }
-            if self.event_bit_is_clear() {
-                Poll::Ready(())
+            let events = self.get_triggered_events();
+            if !events.is_empty() {
+                Poll::Ready(events)
             } else {
                 Poll::Pending
             }
@@ -1666,6 +1689,9 @@ mod asynch {
                     RxEvent::RxCmdCharDetected => {
                         int_ena.modify(|_, w| w.at_cmd_char_det().clear_bit())
                     }
+                    RxEvent::RxGlitchDetected => int_ena.modify(|_, w| w.glitch_det().clear_bit()),
+                    RxEvent::RxFrameError => int_ena.modify(|_, w| w.frm_err().clear_bit()),
+                    RxEvent::RxParityError => int_ena.modify(|_, w| w.parity_err().clear_bit()),
                     RxEvent::RxFifoOvf => int_ena.modify(|_, w| w.rxfifo_ovf().clear_bit()),
                     RxEvent::RxFifoTout => int_ena.modify(|_, w| w.rxfifo_tout().clear_bit()),
                 }
@@ -1682,7 +1708,7 @@ mod asynch {
             }
         }
 
-        fn event_bit_is_clear(&self) -> bool {
+        fn get_triggered_events(&self) -> bool {
             let interrupts_enabled = T::register_block().int_ena().read();
             let mut event_triggered = false;
             for event in self.events {
@@ -1716,7 +1742,7 @@ mod asynch {
                 self.registered = true;
             }
 
-            if self.event_bit_is_clear() {
+            if self.get_triggered_events() {
                 Poll::Ready(())
             } else {
                 Poll::Pending
@@ -1862,14 +1888,18 @@ mod asynch {
         ///
         /// # Ok
         /// When successful, returns the number of bytes written to buf.
-        /// This method will never return Ok(0), unless buf.len() == 0.
+        /// This method will never return Ok(0)
         pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
             if buf.len() == 0 {
-                return Ok(0);
+                return Err(Error::InvalidArgument);
             }
 
             loop {
-                let mut events = RxEvent::RxFifoFull | RxEvent::RxFifoOvf;
+                let mut events = RxEvent::RxFifoFull
+                    | RxEvent::RxFifoOvf
+                    | RxEvent::RxFrameError
+                    | RxEvent::RxGlitchDetected
+                    | RxEvent::RxParityError;
 
                 if self.at_cmd_config.is_some() {
                     events |= RxEvent::RxCmdCharDetected;
@@ -1878,18 +1908,30 @@ mod asynch {
                 if self.rx_timeout_config.is_some() {
                     events |= RxEvent::RxFifoTout;
                 }
-                UartRxFuture::<T>::new(events).await;
-
+                let events_happened = UartRxFuture::<T>::new(events).await;
+                // always drain the fifo, if an error has occurred the data is lost
                 let read_bytes = self.drain_fifo(buf);
-                if read_bytes > 0 {
-                    // Unfortunately, the uart's rx-timeout counter counts up whenever there is
-                    // data in the fifo, even if the interrupt is disabled and the status bit
-                    // cleared. Since we do not drain the fifo in the interrupt handler, we need to
-                    // reset the counter here, after draining the fifo.
-                    T::register_block()
-                        .int_clr()
-                        .write(|w| w.rxfifo_tout().clear_bit_by_one());
+                // check error events
+                for event_happened in events_happened {
+                    match event_happened {
+                        RxEvent::RxFifoOvf => return Err(Error::RxFifoOvf),
+                        RxEvent::RxGlitchDetected => return Err(Error::RxGlitchDetected),
+                        RxEvent::RxFrameError => return Err(Error::RxFrameError),
+                        RxEvent::RxParityError => return Err(Error::RxParityError),
+                        RxEvent::RxFifoFull | RxEvent::RxCmdCharDetected | RxEvent::RxFifoTout => {
+                            continue
+                        }
+                    }
+                }
+                // Unfortunately, the uart's rx-timeout counter counts up whenever there is
+                // data in the fifo, even if the interrupt is disabled and the status bit
+                // cleared. Since we do not drain the fifo in the interrupt handler, we need to
+                // reset the counter here, after draining the fifo.
+                T::register_block()
+                    .int_clr()
+                    .write(|w| w.rxfifo_tout().clear_bit_by_one());
 
+                if read_bytes > 0 {
                     return Ok(read_bytes);
                 }
             }
@@ -1959,7 +2001,10 @@ mod asynch {
         let rx_wake = interrupts.rxfifo_full().bit_is_set()
             || interrupts.rxfifo_ovf().bit_is_set()
             || interrupts.rxfifo_tout().bit_is_set()
-            || interrupts.at_cmd_char_det().bit_is_set();
+            || interrupts.at_cmd_char_det().bit_is_set()
+            || interrupts.glitch_det().bit_is_set()
+            || interrupts.frm_err().bit_is_set()
+            || interrupts.parity_err().bit_is_set();
         let tx_wake = interrupts.tx_done().bit_is_set() || interrupts.txfifo_empty().bit_is_set();
         uart.int_clr().write(|w| unsafe { w.bits(interrupt_bits) });
         uart.int_ena()
