@@ -97,7 +97,7 @@
 //!         hw_encrypted,
 //!         Mode::Encryption128,
 //!         CipherMode::Ecb,
-//!         &keybuf,
+//!         keybuf.into(),
 //!     )
 //!     .unwrap();
 //! transfer.wait().unwrap();
@@ -307,7 +307,7 @@ pub mod dma {
     use embedded_dma::{ReadBuffer, WriteBuffer};
 
     use crate::{
-        aes::Mode,
+        aes::{Key, Mode},
         dma::{
             AesPeripheral,
             Channel,
@@ -441,10 +441,10 @@ pub mod dma {
     {
         /// Writes the encryption key to the AES hardware, checking that its
         /// length matches expected constraints.
-        pub fn write_key(&mut self, key: &[u8]) {
-            debug_assert!(key.len() <= 8 * ALIGN_SIZE);
-            debug_assert_eq!(key.len() % ALIGN_SIZE, 0);
-            self.aes.write_key(key);
+        pub fn write_key(&mut self, key: Key) {
+            debug_assert!(key.as_slice().len() <= 8 * ALIGN_SIZE);
+            debug_assert_eq!(key.as_slice().len() % ALIGN_SIZE, 0);
+            self.aes.write_key(key.as_slice());
         }
 
         /// Writes a block of data to the AES hardware, ensuring the block's
@@ -465,7 +465,7 @@ pub mod dma {
             read_buffer: &'t mut RXBUF,
             mode: Mode,
             cipher_mode: CipherMode,
-            key: &[u8],
+            key: Key,
         ) -> Result<AesDmaTransferRxTx<'t, 'd, C>, crate::dma::DmaError>
         where
             TXBUF: ReadBuffer<Word = u8>,
@@ -496,7 +496,7 @@ pub mod dma {
             read_buffer_len: usize,
             mode: Mode,
             cipher_mode: CipherMode,
-            key: &[u8],
+            key: Key,
         ) -> Result<(), crate::dma::DmaError> {
             // AES has to be restarted after each calculation
             self.reset_aes();

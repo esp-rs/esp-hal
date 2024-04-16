@@ -66,7 +66,7 @@ mod tests {
                 &mut output,
                 Mode::Encryption128,
                 CipherMode::Ecb,
-                &keybuf,
+                keybuf.into(),
             )
             .unwrap();
         transfer.wait().unwrap();
@@ -111,7 +111,7 @@ mod tests {
                 &mut output,
                 Mode::Decryption128,
                 CipherMode::Ecb,
-                &keybuf,
+                keybuf.into(),
             )
             .unwrap();
         transfer.wait().unwrap();
@@ -157,7 +157,7 @@ mod tests {
                 &mut output,
                 Mode::Encryption256,
                 CipherMode::Ecb,
-                &keybuf,
+                keybuf.into(),
             )
             .unwrap();
         transfer.wait().unwrap();
@@ -202,7 +202,7 @@ mod tests {
                 &mut output,
                 Mode::Decryption256,
                 CipherMode::Ecb,
-                &keybuf,
+                keybuf.into(),
             )
             .unwrap();
         transfer.wait().unwrap();
