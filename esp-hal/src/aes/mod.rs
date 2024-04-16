@@ -126,8 +126,8 @@ const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 pub enum Key {
     /// 128-bit AES key
     Key16([u8; 16]),
-    #[cfg(any(feature = "esp32", feature = "esp32s2"))]
     /// 192-bit AES key
+    #[cfg(any(feature = "esp32", feature = "esp32s2"))]
     Key24([u8; 24]),
     /// 256-bit AES key
     Key32([u8; 32]),
@@ -165,14 +165,21 @@ impl Key {
     }
 }
 
+/// Defines the operating modes for AES encryption and decryption.
 pub enum Mode {
+    /// Encryption mode with 128-bit key
     Encryption128 = 0,
+    /// Encryption mode with 192-bit key
     #[cfg(any(esp32, esp32s2))]
     Encryption192 = 1,
+    /// Encryption mode with 256-bit key
     Encryption256 = 2,
+    /// Decryption mode with 128-bit key
     Decryption128 = 4,
+    /// Decryption mode with 192-bit key
     #[cfg(any(esp32, esp32s2))]
     Decryption192 = 5,
+    /// Decryption mode with 256-bit key
     Decryption256 = 6,
 }
 
@@ -184,6 +191,7 @@ pub struct Aes<'d> {
 }
 
 impl<'d> Aes<'d> {
+    /// Constructs a new `Aes` instance.
     pub fn new(aes: impl Peripheral<P = AES> + 'd) -> Self {
         crate::into_ref!(aes);
         let mut ret = Self {
@@ -288,6 +296,12 @@ pub enum Endianness {
     LittleEndian = 0,
 }
 
+/// Provides DMA (Direct Memory Access) support for AES operations.
+///
+/// This module enhances the AES capabilities by utilizing DMA to handle data
+/// transfer, which can significantly speed up operations when dealing with
+/// large data volumes. It supports various cipher modes such as ECB, CBC, OFB,
+/// CTR, CFB8, and CFB128.
 #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
 pub mod dma {
     use embedded_dma::{ReadBuffer, WriteBuffer};
@@ -308,12 +322,19 @@ pub mod dma {
 
     const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 
+    /// Specifies the block cipher modes available for AES operations.
     pub enum CipherMode {
+        /// Electronic Codebook Mode
         Ecb = 0,
+        /// Cipher Block Chaining Mode
         Cbc,
+        /// Output Feedback Mode
         Ofb,
+        /// Counter Mode.
         Ctr,
+        /// Cipher Feedback Mode with 8-bit shifting.
         Cfb8,
+        /// Cipher Feedback Mode with 128-bit shifting.
         Cfb128,
     }
 
@@ -418,12 +439,16 @@ pub mod dma {
         C: ChannelTypes,
         C::P: AesPeripheral,
     {
+        /// Writes the encryption key to the AES hardware, checking that its
+        /// length matches expected constraints.
         pub fn write_key(&mut self, key: &[u8]) {
             debug_assert!(key.len() <= 8 * ALIGN_SIZE);
             debug_assert_eq!(key.len() % ALIGN_SIZE, 0);
             self.aes.write_key(key);
         }
 
+        /// Writes a block of data to the AES hardware, ensuring the block's
+        /// length is properly aligned.
         pub fn write_block(&mut self, block: &[u8]) {
             debug_assert_eq!(block.len(), 4 * ALIGN_SIZE);
             self.aes.write_key(block);
