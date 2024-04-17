@@ -4,18 +4,52 @@
 //!
 //! Collection of struct which helps you write to registers.
 
+use core::marker::PhantomData;
+
 const U32_ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 
-// ESP32 does reversed order
-#[cfg(esp32)]
-const U32_FROM_BYTES: fn([u8; 4]) -> u32 = u32::from_be_bytes;
+pub(crate) trait EndianessConverter {
+    fn u32_from_bytes(bytes: [u8; 4]) -> u32;
+    fn u32_to_bytes(word: u32) -> [u8; 4];
+}
+
+/// Always use native endianess
+pub(crate) struct NativeEndianess;
+
+impl EndianessConverter for NativeEndianess {
+    fn u32_from_bytes(bytes: [u8; 4]) -> u32 {
+        u32::from_ne_bytes(bytes)
+    }
+
+    fn u32_to_bytes(word: u32) -> [u8; 4] {
+        u32::to_ne_bytes(word)
+    }
+}
+
+/// Use BE for ESP32, NE otherwise
+pub(crate) struct SocDependentEndianess;
+
 #[cfg(not(esp32))]
-const U32_FROM_BYTES: fn([u8; 4]) -> u32 = u32::from_ne_bytes;
+impl EndianessConverter for SocDependentEndianess {
+    fn u32_from_bytes(bytes: [u8; 4]) -> u32 {
+        u32::from_ne_bytes(bytes)
+    }
+
+    fn u32_to_bytes(word: u32) -> [u8; 4] {
+        u32::to_ne_bytes(word)
+    }
+}
 
 #[cfg(esp32)]
-const U32_TO_BYTES: fn(u32) -> [u8; 4] = u32::to_be_bytes;
-#[cfg(not(esp32))]
-const U32_TO_BYTES: fn(u32) -> [u8; 4] = u32::to_ne_bytes;
+impl EndianessConverter for SocDependentEndianess {
+    fn u32_from_bytes(bytes: [u8; 4]) -> u32 {
+        u32::from_be_bytes(bytes)
+    }
+
+    fn u32_to_bytes(word: u32) -> [u8; 4] {
+        u32::to_be_bytes(word)
+    }
+}
 
 // The alignment helper helps you write to registers that only accept u32
 // using regular u8s (bytes). It keeps a write buffer of 4 u8 (could in theory
@@ -27,19 +61,33 @@ const U32_TO_BYTES: fn(u32) -> [u8; 4] = u32::to_ne_bytes;
 // ptr.is_aligned can be used). It also assumes that writes are done in FIFO
 // order.
 #[derive(Debug)]
-pub(crate) struct AlignmentHelper {
+pub(crate) struct AlignmentHelper<E: EndianessConverter> {
     buf: [u8; U32_ALIGN_SIZE],
     buf_fill: usize,
+    phantom: PhantomData<E>,
 }
 
-impl AlignmentHelper {
-    pub fn default() -> AlignmentHelper {
+impl AlignmentHelper<SocDependentEndianess> {
+    pub fn default() -> AlignmentHelper<SocDependentEndianess> {
         AlignmentHelper {
             buf: [0u8; U32_ALIGN_SIZE],
             buf_fill: 0,
+            phantom: PhantomData,
         }
     }
+}
 
+impl AlignmentHelper<NativeEndianess> {
+    pub fn native_endianess() -> AlignmentHelper<NativeEndianess> {
+        AlignmentHelper {
+            buf: [0u8; U32_ALIGN_SIZE],
+            buf_fill: 0,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<E: EndianessConverter> AlignmentHelper<E> {
     pub fn reset(&mut self) {
         self.buf_fill = 0;
     }
@@ -59,7 +107,9 @@ impl AlignmentHelper {
             }
 
             unsafe {
-                dst_ptr.add(offset).write_volatile(U32_FROM_BYTES(self.buf));
+                dst_ptr
+                    .add(offset)
+                    .write_volatile(E::u32_from_bytes(self.buf));
             }
 
             let ret = self.align_size() - self.buf_fill;
@@ -88,7 +138,7 @@ impl AlignmentHelper {
             }
 
             unsafe {
-                dst_ptr.write_volatile(U32_FROM_BYTES(self.buf));
+                dst_ptr.write_volatile(E::u32_from_bytes(self.buf));
             }
 
             self.buf_fill = 0;
@@ -102,7 +152,7 @@ impl AlignmentHelper {
             unsafe {
                 dst_ptr
                     .add(cursor)
-                    .write_volatile(U32_FROM_BYTES([0_u8; 4]));
+                    .write_volatile(E::u32_from_bytes([0_u8; 4]));
             }
             cursor += 1;
         }
@@ -145,7 +195,7 @@ impl AlignmentHelper {
             }
 
             unsafe {
-                dst_ptr.write_volatile(U32_FROM_BYTES(self.buf));
+                dst_ptr.write_volatile(E::u32_from_bytes(self.buf));
             }
             cursor += 1;
 
@@ -166,7 +216,7 @@ impl AlignmentHelper {
                 unsafe {
                     dst_ptr
                         .add(i + cursor)
-                        .write_volatile(U32_FROM_BYTES(v.try_into().unwrap()));
+                        .write_volatile(E::u32_from_bytes(v.try_into().unwrap()));
                 }
             }
         }
@@ -195,7 +245,7 @@ impl AlignmentHelper {
                 unsafe {
                     dst_ptr
                         .add(i)
-                        .write_volatile(U32_FROM_BYTES(v.try_into().unwrap()));
+                        .write_volatile(E::u32_from_bytes(v.try_into().unwrap()));
                 }
             }
         }
@@ -207,7 +257,7 @@ impl AlignmentHelper {
         let chunks = dst.chunks_exact_mut(U32_ALIGN_SIZE);
         for (i, chunk) in chunks.enumerate() {
             let read_val: [u8; U32_ALIGN_SIZE] =
-                unsafe { U32_TO_BYTES(src_ptr.add(i).read_volatile()) };
+                unsafe { E::u32_to_bytes(src_ptr.add(i).read_volatile()) };
             chunk.copy_from_slice(&read_val);
         }
     }

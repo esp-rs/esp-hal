@@ -33,14 +33,14 @@ use crate::{
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::ECC,
-    reg_access::AlignmentHelper,
+    reg_access::{AlignmentHelper, SocDependentEndianess},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
 };
 
 /// The ECC Accelerator driver instance
 pub struct Ecc<'d, DM: crate::Mode> {
     ecc: PeripheralRef<'d, ECC>,
-    alignment_helper: AlignmentHelper,
+    alignment_helper: AlignmentHelper<SocDependentEndianess>,
     phantom: PhantomData<DM>,
 }
 
