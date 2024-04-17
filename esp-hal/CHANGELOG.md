@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Async uart now reports interrupt errors(overflow, glitch, frame error, parity) back to user of read/write. uart clock decimal part configured for c2,c3,s3 (#1168, #1445)
 - Add mechanism to configure UART source clock (#1416)
 - `GpioPin` got a function `set_state(bool)` (#1462)
+- Add definitions of external USB PHY peripheral I/O signals
 
 ### Fixed
 
