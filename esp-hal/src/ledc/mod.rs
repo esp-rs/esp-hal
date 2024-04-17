@@ -57,8 +57,7 @@
 //!     .unwrap();
 //! ```
 //!
-//! # TODO
-//!
+//! # Unsupported
 //! - Source clock selection
 //! - Interrupts
 
