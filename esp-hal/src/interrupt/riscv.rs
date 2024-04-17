@@ -12,9 +12,6 @@
 //! interrupt15() => Priority::Priority15
 //! ```
 
-// TODO: Add safety doc comments as needed and remove allow attribute
-#![allow(clippy::missing_safety_doc)]
-
 pub use esp_riscv_rt::TrapFrame;
 use riscv::register::{mcause, mtvec};
 
@@ -34,7 +31,9 @@ use crate::{
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
+    /// The priority is not valid
     InvalidInterruptPriority,
+    /// The CPU interrupt is a reserved interrupt
     CpuInterruptReserved,
 }
 
@@ -53,6 +52,7 @@ pub enum InterruptKind {
 #[repr(u32)]
 #[derive(Debug, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(missing_docs)]
 pub enum CpuInterrupt {
     Interrupt1 = 1,
     Interrupt2,
@@ -91,6 +91,7 @@ pub enum CpuInterrupt {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u8)]
+#[allow(missing_docs)]
 pub enum Priority {
     None = 0,
     Priority1,
@@ -119,6 +120,7 @@ pub enum Priority {
 }
 
 impl Priority {
+    /// Maximum interrupt priority
     pub const fn max() -> Priority {
         cfg_if::cfg_if! {
             if #[cfg(not(clic))] {
@@ -129,11 +131,13 @@ impl Priority {
         }
     }
 
+    /// Minimum interrupt priority
     pub const fn min() -> Priority {
         Priority::Priority1
     }
 }
 
+/// The interrupts reserved by the HAL
 pub const RESERVED_INTERRUPTS: &[usize] = INTERRUPT_TO_PRIORITY;
 
 /// # Safety
@@ -285,6 +289,8 @@ pub fn get_status(_core: Cpu) -> u128 {
 
 /// Assign a peripheral interrupt to an CPU interrupt.
 ///
+/// # Safety
+///
 /// Do not use CPU interrupts in the [`RESERVED_INTERRUPTS`].
 pub unsafe fn map(_core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
     let interrupt_number = interrupt as isize;
@@ -383,6 +389,10 @@ mod vectored {
     }
 
     /// Bind the given interrupt to the given handler
+    ///
+    /// # Safety
+    ///
+    /// This will replace any previously bound interrupt handler
     pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: unsafe extern "C" fn() -> ()) {
         let ptr = &peripherals::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler as *const _
             as *mut unsafe extern "C" fn() -> ();
@@ -567,6 +577,10 @@ mod classic {
         &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
     /// Enable a CPU interrupt
+    ///
+    /// # Safety
+    ///
+    /// Make sure there is an interrupt handler registered.
     pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
         let cpu_interrupt_number = which as isize;
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
@@ -597,6 +611,8 @@ mod classic {
     }
 
     /// Set the priority level of an CPU interrupt
+    ///
+    /// # Safety
     ///
     /// Great care must be taken when using this function; avoid changing the
     /// priority of interrupts 1 - 15.
@@ -696,6 +712,10 @@ mod plic {
     const PLIC_MXINT0_PRI_REG: u32 = DR_REG_PLIC_MX_BASE + 0x10;
     const PLIC_MXINT_THRESH_REG: u32 = DR_REG_PLIC_MX_BASE + 0x90;
     /// Enable a CPU interrupt
+    ///
+    /// # Safety
+    ///
+    /// Make sure there is an interrupt handler registered.
     pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
         let cpu_interrupt_number = which as isize;
         let mxint_enable = PLIC_MXINT_ENABLE_REG as *mut u32;
@@ -725,6 +745,8 @@ mod plic {
     }
 
     /// Set the priority level of an CPU interrupt
+    ///
+    /// # Safety
     ///
     /// Great care must be taken when using this function; avoid changing the
     /// priority of interrupts 1 - 15.
@@ -848,6 +870,10 @@ mod clic {
     }
 
     /// Enable a CPU interrupt on current core
+    ///
+    /// # Safety
+    ///
+    /// Make sure there is an interrupt handler registered.
     pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
         let cpu_interrupt_number = which as usize;
         let intr_cntrl = intr_cntrl(crate::get_core(), cpu_interrupt_number);
@@ -876,6 +902,8 @@ mod clic {
     }
 
     /// Set the priority level of an CPU interrupt
+    ///
+    /// # Safety
     ///
     /// Great care must be taken when using this function; avoid changing the
     /// priority of interrupts 1 - 15.
