@@ -884,8 +884,14 @@ where
         <Self as GpioProperties>::Bank::write_output_clear(1 << (GPIONUM % 32));
     }
 
-    // TODO: add `set_state(PinState)`
     // Drives the pin high or low depending on the provided value.
+    #[inline]
+    pub fn set_state(&mut self, state: bool) {
+        match state {
+            true => self.set_high(),
+            false => self.set_low(),
+        }
+    }
 
     /// Is the pin in drive high mode?
     #[inline]
@@ -1720,8 +1726,12 @@ impl<MODE, TYPE> AnyPin<Output<MODE>, TYPE> {
         handle_gpio_output!(inner, target, { target.set_high() })
     }
 
-    // TODO: add `set_state(PinState)`
     // Drives the pin high or low depending on the provided value.
+    #[inline]
+    pub fn set_state(&mut self, state: bool) {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, { target.set_state(state) })
+    }
 
     /// Is the pin in drive high mode?
     #[inline]
