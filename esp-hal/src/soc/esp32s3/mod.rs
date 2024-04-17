@@ -35,6 +35,8 @@ pub(crate) mod constants {
 
     pub const SOC_DRAM_LOW: u32 = 0x3FC8_8000;
     pub const SOC_DRAM_HIGH: u32 = 0x3FD0_0000;
+
+    pub const RC_FAST_CLK: fugit::HertzU32 = fugit::HertzU32::kHz(17500);
 }
 
 #[doc(hidden)]
