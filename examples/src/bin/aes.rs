@@ -37,7 +37,7 @@ fn main() -> ! {
 
     let mut block = block_buf.clone();
     let pre_hw_encrypt = cycles();
-    aes.process(&mut block, Mode::Encryption128, &keybuf);
+    aes.process(&mut block, Mode::Encryption128, keybuf);
     let post_hw_encrypt = cycles();
     println!(
         "it took {} cycles for hw encrypt",
@@ -45,7 +45,7 @@ fn main() -> ! {
     );
     let hw_encrypted = block.clone();
     let pre_hw_decrypt = cycles();
-    aes.process(&mut block, Mode::Decryption128, &keybuf);
+    aes.process(&mut block, Mode::Decryption128, keybuf);
     let post_hw_decrypt = cycles();
     println!(
         "it took {} cycles for hw decrypt",
@@ -73,14 +73,10 @@ fn main() -> ! {
     );
     let sw_decrypted = block;
 
-    assert!(eq(&sw_encrypted.into(), &hw_encrypted));
-    assert!(eq(&sw_decrypted.into(), &hw_decrypted));
+    assert!(&sw_encrypted as &[u8] == &hw_encrypted);
+    assert!(&sw_decrypted as &[u8] == &hw_decrypted);
 
     println!("done");
 
     loop {}
-}
-
-fn eq(slice1: &[u8; 16], slice2: &[u8; 16]) -> bool {
-    slice1.iter().zip(slice2.iter()).all(|(a, b)| a == b)
 }

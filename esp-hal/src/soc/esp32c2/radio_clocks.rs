@@ -118,7 +118,7 @@ fn ble_rtc_clk_init() {
     // assume 40MHz xtal
     modem_clkrst
         .modem_lp_timer_conf()
-        .modify(|_, w| w.lp_timer_clk_div_num().variant(249));
+        .modify(|_, w| unsafe { w.lp_timer_clk_div_num().bits(249) });
 
     modem_clkrst
         .etm_clk_conf()

@@ -39,13 +39,13 @@ use core::convert::Infallible;
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::HMAC,
-    reg_access::AlignmentHelper,
+    reg_access::{AlignmentHelper, SocDependentEndianess},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
 };
 
 pub struct Hmac<'d> {
     hmac: PeripheralRef<'d, HMAC>,
-    alignment_helper: AlignmentHelper,
+    alignment_helper: AlignmentHelper<SocDependentEndianess>,
     byte_written: usize,
     next_command: NextCommand,
 }

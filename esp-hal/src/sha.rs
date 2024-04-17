@@ -61,7 +61,7 @@ use core::{convert::Infallible, marker::PhantomData};
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::SHA,
-    reg_access::AlignmentHelper,
+    reg_access::{AlignmentHelper, SocDependentEndianess},
     system::PeripheralClockControl,
 };
 
@@ -82,7 +82,7 @@ use crate::{
 pub struct Sha<'d, DM: crate::Mode> {
     sha: PeripheralRef<'d, SHA>,
     mode: ShaMode,
-    alignment_helper: AlignmentHelper,
+    alignment_helper: AlignmentHelper<SocDependentEndianess>,
     cursor: usize,
     first_run: bool,
     finished: bool,

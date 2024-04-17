@@ -15,6 +15,8 @@
 //! Watchdog Timer(MSWDT). All general purpose timers are based on 16-bit
 //! prescalers and 54-bit auto-reload-capable up-down counters.
 //!
+//! The driver uses APB as it's clock source.
+//!
 //! ## Example
 //!
 //! ```no_run
@@ -381,9 +383,6 @@ where
 {
     /// Create a new timer instance.
     pub fn new(timg: T, apb_clk_freq: HertzU32) -> Self {
-        // TODO: this currently assumes APB_CLK is being used, as we don't yet have a
-        //       way to select the XTAL_CLK.
-
         timg.enable_peripheral();
 
         Self {
@@ -400,8 +399,6 @@ where
 
         self.timg.reset_counter();
 
-        // TODO: this currently assumes APB_CLK is being used, as we don't yet have a
-        //       way to select the XTAL_CLK.
         // TODO: can we cache the divider (only get it on initialization)?
         let ticks = timeout_to_ticks(timeout, self.apb_clk_freq, self.timg.divider());
         self.timg.load_alarm_value(ticks);

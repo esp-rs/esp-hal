@@ -41,7 +41,7 @@ rtc_slow = []
 has-lp-core = ["dep:object"]
 ## Indicate that the SoC contains a ULP core.
 has-ulp-core = ["dep:object"]
-## Provide an `#[entry]` macro for running applications on the ESP32-C6/P4's
+## Provide an `#[entry]` macro for running applications on the ESP32-C6's
 ## LP core.
 is-lp-core = []
 ## Provide an `#[entry]` macro for running applications on the ESP32-S2/S3's

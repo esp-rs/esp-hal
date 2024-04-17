@@ -38,11 +38,11 @@ impl<MODE, const PIN: u8> LowPowerPin<MODE, PIN> {
         if enable {
             lp_io
                 .out_enable_w1ts()
-                .write(|w| w.enable_w1ts().variant(1 << PIN));
+                .write(|w| unsafe { w.enable_w1ts().bits(1 << PIN) });
         } else {
             lp_io
                 .out_enable_w1tc()
-                .write(|w| w.enable_w1tc().variant(1 << PIN));
+                .write(|w| unsafe { w.enable_w1tc().bits(1 << PIN) });
         }
     }
 
@@ -64,11 +64,11 @@ impl<MODE, const PIN: u8> LowPowerPin<MODE, PIN> {
         if level {
             lp_io
                 .out_data_w1ts()
-                .write(|w| w.out_data_w1ts().variant(1 << PIN));
+                .write(|w| unsafe { w.out_data_w1ts().bits(1 << PIN) });
         } else {
             lp_io
                 .out_data_w1tc()
-                .write(|w| w.out_data_w1tc().variant(1 << PIN));
+                .write(|w| unsafe { w.out_data_w1tc().bits(1 << PIN) });
         }
     }
 
@@ -140,9 +140,9 @@ pub(crate) fn init_low_power_pin(pin: u8) {
 
     lp_aon
         .gpio_mux()
-        .modify(|r, w| w.sel().variant(r.sel().bits() | 1 << pin));
+        .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | 1 << pin) });
 
-    get_pin_reg(pin).modify(|_, w| w.mcu_sel().variant(0));
+    get_pin_reg(pin).modify(|_, w| unsafe { w.mcu_sel().bits(0) });
 }
 
 #[inline(always)]
@@ -159,6 +159,7 @@ fn get_pin_reg(pin: u8) -> &'static crate::peripherals::lp_io::GPIO0 {
 
 /// Configures a pin for use as a low power pin
 pub trait IntoLowPowerPin<const PIN: u8> {
+    /// Converts the pin into a low power pin
     fn into_low_power(self) -> LowPowerPin<Unknown, { PIN }>;
 }
 

@@ -45,17 +45,6 @@
 //! // When the master sends enough clock pulses, is_done() will be true.
 //! (tx_buf, rx_buf, spi) = transfer.wait();
 //! ```
-//!
-//! TODO:
-//! - Notify the Spi user when the master wants to send or receive data, if
-//!   possible
-//! - Blocking transfers
-//! - Half duplex
-//! - Segmented transfers
-//! - Interrupt support
-//! - Custom interrupts from segmented transfer commands
-//! - Dual and quad SPI
-//! - CPU mode
 
 use core::marker::PhantomData;
 

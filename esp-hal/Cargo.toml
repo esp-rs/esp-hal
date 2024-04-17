@@ -34,7 +34,7 @@ embedded-hal-nb      = { version = "1.0.0", optional = true }
 embedded-io          = { version = "0.6.1", optional = true }
 embedded-io-async    = { version = "0.6.1", optional = true }
 enumset              = "1.1.3"
-esp-synopsys-usb-otg = { version = "0.4.0", optional = true, features = ["fs", "esp32sx"] }
+esp-synopsys-usb-otg = { version = "0.4.1", optional = true, features = ["fs", "esp32sx"] }
 fugit                = "0.3.7"
 log                  = { version = "0.4.21", optional = true }
 nb                   = "1.1.0"
@@ -52,14 +52,13 @@ xtensa-lx            = { version = "0.9.0", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section", "rt"], optional = true }
-esp32c2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section", "rt"], optional = true }
-esp32c3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section", "rt"], optional = true }
-esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section", "rt"], optional = true }
-esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section", "rt"], optional = true }
-esp32p4 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section", "rt"], optional = true }
-esp32s2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section", "rt"], optional = true }
-esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section", "rt"], optional = true }
+esp32   = { git = "https://github.com/esp-rs/esp-pacs", rev = "f6b5e6b", features = ["critical-section", "rt"], optional = true }
+esp32c2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "f6b5e6b", features = ["critical-section", "rt"], optional = true }
+esp32c3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "f6b5e6b", features = ["critical-section", "rt"], optional = true }
+esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", rev = "f6b5e6b", features = ["critical-section", "rt"], optional = true }
+esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "f6b5e6b", features = ["critical-section", "rt"], optional = true }
+esp32s2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "f6b5e6b", features = ["critical-section", "rt"], optional = true }
+esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "f6b5e6b", features = ["critical-section", "rt"], optional = true }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 esp-riscv-rt = { version = "0.7.0", path = "../esp-riscv-rt" }
@@ -91,7 +90,6 @@ debug = [
     "esp32c3?/impl-register-debug",
     "esp32c6?/impl-register-debug",
     "esp32h2?/impl-register-debug",
-    "esp32p4?/impl-register-debug",
     "esp32s2?/impl-register-debug",
     "esp32s3?/impl-register-debug",
 ]
@@ -111,8 +109,6 @@ esp32c3 = ["dep:esp32c3", "riscv",  "portable-atomic/unsafe-assume-single-core",
 esp32c6 = ["dep:esp32c6", "riscv",  "procmacros/has-lp-core", "rv-zero-rtc-bss"]
 # Target the ESP32-H2.
 esp32h2 = ["dep:esp32h2", "riscv", "rv-zero-rtc-bss"]
-# Target the ESP32-P4.
-esp32p4 = ["dep:esp32p4", "riscv",  "procmacros/has-lp-core", "rv-zero-rtc-bss"]
 # Target the ESP32-S2.
 esp32s2 = ["dep:esp32s2", "xtensa", "portable-atomic/critical-section", "procmacros/has-ulp-core", "xtensa-lx-rt/esp32s2", "usb-otg"]
 # Target the ESP32-S3.
@@ -154,7 +150,6 @@ defmt = [
     "esp32c3?/defmt",
     "esp32c6?/defmt",
     "esp32h2?/defmt",
-    "esp32p4?/defmt",
     "esp32s2?/defmt",
     "esp32s3?/defmt",
 ]

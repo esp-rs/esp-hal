@@ -52,8 +52,6 @@ impl EmbassyTimer {
 
     pub fn init(clocks: &Clocks, mut timer: TimerType) {
         // set divider to get a 1mhz clock. APB (80mhz) / 80 = 1mhz...
-        // TODO: assert APB clock is the source and its at the correct speed for the
-        // divider
         timer.timer0.set_divider(clocks.apb_clock.to_MHz() as u16);
         timer.timer0.set_counter_active(true);
 

@@ -8,6 +8,8 @@
 //! The module allows precise and flexible control over timer configurations,
 //! duty cycles and frequencies, making it ideal for Pulse-Width Modulation
 //! (PWM) applications and LED lighting control.
+//!
+//! LEDC uses APB as clock source.
 
 use fugit::HertzU32;
 
@@ -303,7 +305,6 @@ impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
     /// Get the current source timer frequency from the HW
     fn get_freq_hw(&self) -> Option<HertzU32> {
         self.clock_source.map(|cs| match cs {
-            // TODO RefTick HSClockSource::RefTick => self.clock_control_config.apb_clock,
             HSClockSource::APBClk => self.clock_control_config.apb_clock,
         })
     }

@@ -703,7 +703,7 @@ pub(crate) mod utils {
             });
             dport
                 .pro_cache_ctrl1()
-                .modify(|_, w| w.pro_cmmu_sram_page_mode().variant(0));
+                .modify(|_, w| w.pro_cmmu_sram_page_mode().bits(0));
 
             // use Dram1 to visit ext sram. cache page mode : 1 -->16k  4 -->2k
             // 0-->32k,(accord with the settings in cache_sram_mmu_set)
@@ -715,7 +715,7 @@ pub(crate) mod utils {
             });
             dport
                 .app_cache_ctrl1()
-                .modify(|_, w| w.app_cmmu_sram_page_mode().variant(0));
+                .modify(|_, w| w.app_cmmu_sram_page_mode().bits(0));
         }
 
         // ENABLE SPI0 CS1 TO PSRAM(CS0--FLASH; CS1--SRAM)

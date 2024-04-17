@@ -37,6 +37,7 @@
 //!     critical_section::with(|cs| {
 //!         SWINT0.borrow_ref_mut(cs).as_mut().unwrap().reset();
 //!     });
+//! }
 //! ```
 //!
 //! There are additional ways to register interrupt handlers which are generally
@@ -50,6 +51,7 @@
 //!
 //! We reserve a number of CPU interrupts, which cannot be used; see
 //! [`RESERVED_INTERRUPTS`].
+#![warn(missing_docs)]
 
 #[cfg(riscv)]
 pub use self::riscv::*;
@@ -69,20 +71,25 @@ pub struct InterruptHandler {
 }
 
 impl InterruptHandler {
+    /// Creates a new [InterruptHandler] which will call the given function at
+    /// the given priority.
     pub const fn new(f: extern "C" fn(), prio: Priority) -> Self {
         Self { f, prio }
     }
 
+    /// The function to be called
     #[inline]
     pub fn handler(&self) -> extern "C" fn() {
         self.f
     }
 
+    /// Priority to be used when registering the interrupt
     #[inline]
     pub fn priority(&self) -> Priority {
         self.prio
     }
 
+    /// Call the function
     #[inline]
     pub(crate) extern "C" fn call(&self) {
         (self.f)()

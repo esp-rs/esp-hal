@@ -1172,25 +1172,25 @@ mod private {
             #[cfg(esp32)]
             i2s.clkm_conf().modify(|_, w| w.clka_ena().clear_bit());
 
-            i2s.clkm_conf().modify(|_, w| {
+            i2s.clkm_conf().modify(|_, w| unsafe {
                 w.clk_en()
                     .set_bit()
                     .clkm_div_num()
-                    .variant(clock_settings.mclk_divider as u8)
+                    .bits(clock_settings.mclk_divider as u8)
             });
 
-            i2s.clkm_conf().modify(|_, w| {
+            i2s.clkm_conf().modify(|_, w| unsafe {
                 w.clkm_div_a()
-                    .variant(clock_settings.denominator as u8)
+                    .bits(clock_settings.denominator as u8)
                     .clkm_div_b()
-                    .variant(clock_settings.numerator as u8)
+                    .bits(clock_settings.numerator as u8)
             });
 
-            i2s.sample_rate_conf().modify(|_, w| {
+            i2s.sample_rate_conf().modify(|_, w| unsafe {
                 w.tx_bck_div_num()
-                    .variant(clock_settings.bclk_divider as u8)
+                    .bits(clock_settings.bclk_divider as u8)
                     .rx_bck_div_num()
-                    .variant(clock_settings.bclk_divider as u8)
+                    .bits(clock_settings.bclk_divider as u8)
             });
         }
 
@@ -1203,9 +1203,9 @@ mod private {
             };
 
             i2s.sample_rate_conf()
-                .modify(|_, w| w.tx_bits_mod().variant(data_format.channel_bits()));
+                .modify(|_, w| unsafe { w.tx_bits_mod().bits(data_format.channel_bits()) });
             i2s.sample_rate_conf()
-                .modify(|_, w| w.rx_bits_mod().variant(data_format.channel_bits()));
+                .modify(|_, w| unsafe { w.rx_bits_mod().bits(data_format.channel_bits()) });
 
             i2s.conf().modify(|_, w| {
                 w.tx_slave_mod()
@@ -1217,9 +1217,9 @@ mod private {
                     .rx_msb_shift()
                     .set_bit() // ?
                     .tx_short_sync()
-                    .variant(false) //??
+                    .bit(false) //??
                     .rx_short_sync()
-                    .variant(false) //??
+                    .bit(false) //??
                     .tx_msb_right()
                     .clear_bit()
                     .rx_msb_right()
@@ -1236,21 +1236,21 @@ mod private {
                     .clear_bit()
             });
 
-            i2s.fifo_conf().modify(|_, w| {
+            i2s.fifo_conf().modify(|_, w| unsafe {
                 w.tx_fifo_mod()
-                    .variant(fifo_mod)
+                    .bits(fifo_mod)
                     .tx_fifo_mod_force_en()
                     .set_bit()
                     .dscr_en()
                     .set_bit()
                     .rx_fifo_mod()
-                    .variant(fifo_mod)
+                    .bits(fifo_mod)
                     .rx_fifo_mod_force_en()
                     .set_bit()
             });
 
             i2s.conf_chan()
-                .modify(|_, w| w.tx_chan_mod().variant(0).rx_chan_mod().variant(0)); // for now only stereo
+                .modify(|_, w| unsafe { w.tx_chan_mod().bits(0).rx_chan_mod().bits(0) }); // for now only stereo
 
             i2s.conf1()
                 .modify(|_, w| w.tx_pcm_bypass().set_bit().rx_pcm_bypass().set_bit());
@@ -1338,12 +1338,12 @@ mod private {
 
             #[cfg(not(esp32))]
             i2s.rxeof_num()
-                .modify(|_, w| w.rx_eof_num().variant(len as u32));
+                .modify(|_, w| unsafe { w.rx_eof_num().bits(len as u32) });
 
             // On ESP32, the eof_num count in words.
             #[cfg(esp32)]
             i2s.rxeof_num()
-                .modify(|_, w| w.rx_eof_num().variant((len / 4) as u32));
+                .modify(|_, w| unsafe { w.rx_eof_num().bits((len / 4) as u32) });
 
             i2s.conf().modify(|_, w| w.rx_start().set_bit());
         }
@@ -1489,58 +1489,58 @@ mod private {
                 clkm_div_yn1 = 0;
             }
 
-            i2s.tx_clkm_div_conf().modify(|_, w| {
+            i2s.tx_clkm_div_conf().modify(|_, w| unsafe {
                 w.tx_clkm_div_x()
-                    .variant(clkm_div_x as u16)
+                    .bits(clkm_div_x as u16)
                     .tx_clkm_div_y()
-                    .variant(clkm_div_y as u16)
+                    .bits(clkm_div_y as u16)
                     .tx_clkm_div_yn1()
-                    .variant(clkm_div_yn1 != 0)
+                    .bit(clkm_div_yn1 != 0)
                     .tx_clkm_div_z()
-                    .variant(clkm_div_z as u16)
+                    .bits(clkm_div_z as u16)
             });
 
-            i2s.tx_clkm_conf().modify(|_, w| {
+            i2s.tx_clkm_conf().modify(|_, w| unsafe {
                 w.clk_en()
                     .set_bit()
                     .tx_clk_active()
                     .set_bit()
                     .tx_clk_sel()
-                    .variant(crate::soc::constants::I2S_DEFAULT_CLK_SRC) // for now fixed at 160MHz
+                    .bits(crate::soc::constants::I2S_DEFAULT_CLK_SRC) // for now fixed at 160MHz
                     .tx_clkm_div_num()
-                    .variant(clock_settings.mclk_divider as u8)
+                    .bits(clock_settings.mclk_divider as u8)
             });
 
-            i2s.tx_conf1().modify(|_, w| {
+            i2s.tx_conf1().modify(|_, w| unsafe {
                 w.tx_bck_div_num()
-                    .variant((clock_settings.bclk_divider - 1) as u8)
+                    .bits((clock_settings.bclk_divider - 1) as u8)
             });
 
-            i2s.rx_clkm_div_conf().modify(|_, w| {
+            i2s.rx_clkm_div_conf().modify(|_, w| unsafe {
                 w.rx_clkm_div_x()
-                    .variant(clkm_div_x as u16)
+                    .bits(clkm_div_x as u16)
                     .rx_clkm_div_y()
-                    .variant(clkm_div_y as u16)
+                    .bits(clkm_div_y as u16)
                     .rx_clkm_div_yn1()
-                    .variant(clkm_div_yn1 != 0)
+                    .bit(clkm_div_yn1 != 0)
                     .rx_clkm_div_z()
-                    .variant(clkm_div_z as u16)
+                    .bits(clkm_div_z as u16)
             });
 
-            i2s.rx_clkm_conf().modify(|_, w| {
+            i2s.rx_clkm_conf().modify(|_, w| unsafe {
                 w.rx_clk_active()
                     .set_bit()
                     .rx_clk_sel()
-                    .variant(crate::soc::constants::I2S_DEFAULT_CLK_SRC) // for now fixed at 160MHz
+                    .bits(crate::soc::constants::I2S_DEFAULT_CLK_SRC) // for now fixed at 160MHz
                     .rx_clkm_div_num()
-                    .variant(clock_settings.mclk_divider as u8)
+                    .bits(clock_settings.mclk_divider as u8)
                     .mclk_sel()
-                    .variant(true)
+                    .bit(true)
             });
 
-            i2s.rx_conf1().modify(|_, w| {
+            i2s.rx_conf1().modify(|_, w| unsafe {
                 w.rx_bck_div_num()
-                    .variant((clock_settings.bclk_divider - 1) as u8)
+                    .bits((clock_settings.bclk_divider - 1) as u8)
             });
         }
 
@@ -1588,67 +1588,67 @@ mod private {
                 clkm_div_yn1 = 0;
             }
 
-            pcr.i2s_tx_clkm_div_conf().modify(|_, w| {
+            pcr.i2s_tx_clkm_div_conf().modify(|_, w| unsafe {
                 w.i2s_tx_clkm_div_x()
-                    .variant(clkm_div_x as u16)
+                    .bits(clkm_div_x as u16)
                     .i2s_tx_clkm_div_y()
-                    .variant(clkm_div_y as u16)
+                    .bits(clkm_div_y as u16)
                     .i2s_tx_clkm_div_yn1()
-                    .variant(clkm_div_yn1 != 0)
+                    .bit(clkm_div_yn1 != 0)
                     .i2s_tx_clkm_div_z()
-                    .variant(clkm_div_z as u16)
+                    .bits(clkm_div_z as u16)
             });
 
-            pcr.i2s_tx_clkm_conf().modify(|_, w| {
+            pcr.i2s_tx_clkm_conf().modify(|_, w| unsafe {
                 w.i2s_tx_clkm_en()
                     .set_bit()
                     .i2s_tx_clkm_sel()
-                    .variant(crate::soc::constants::I2S_DEFAULT_CLK_SRC) // for now fixed at 160MHz for C6 and 96MHz for H2
+                    .bits(crate::soc::constants::I2S_DEFAULT_CLK_SRC) // for now fixed at 160MHz for C6 and 96MHz for H2
                     .i2s_tx_clkm_div_num()
-                    .variant(clock_settings.mclk_divider as u8)
+                    .bits(clock_settings.mclk_divider as u8)
             });
 
             #[cfg(not(esp32h2))]
-            i2s.tx_conf1().modify(|_, w| {
+            i2s.tx_conf1().modify(|_, w| unsafe {
                 w.tx_bck_div_num()
-                    .variant((clock_settings.bclk_divider - 1) as u8)
+                    .bits((clock_settings.bclk_divider - 1) as u8)
             });
             #[cfg(esp32h2)]
-            i2s.tx_conf().modify(|_, w| {
+            i2s.tx_conf().modify(|_, w| unsafe {
                 w.tx_bck_div_num()
-                    .variant((clock_settings.bclk_divider - 1) as u8)
+                    .bits((clock_settings.bclk_divider - 1) as u8)
             });
 
-            pcr.i2s_rx_clkm_div_conf().modify(|_, w| {
+            pcr.i2s_rx_clkm_div_conf().modify(|_, w| unsafe {
                 w.i2s_rx_clkm_div_x()
-                    .variant(clkm_div_x as u16)
+                    .bits(clkm_div_x as u16)
                     .i2s_rx_clkm_div_y()
-                    .variant(clkm_div_y as u16)
+                    .bits(clkm_div_y as u16)
                     .i2s_rx_clkm_div_yn1()
-                    .variant(clkm_div_yn1 != 0)
+                    .bit(clkm_div_yn1 != 0)
                     .i2s_rx_clkm_div_z()
-                    .variant(clkm_div_z as u16)
+                    .bits(clkm_div_z as u16)
             });
 
-            pcr.i2s_rx_clkm_conf().modify(|_, w| {
+            pcr.i2s_rx_clkm_conf().modify(|_, w| unsafe {
                 w.i2s_rx_clkm_en()
                     .set_bit()
                     .i2s_rx_clkm_sel()
-                    .variant(crate::soc::constants::I2S_DEFAULT_CLK_SRC) // for now fixed at 160MHz for C6 and 96MHz for H2
+                    .bits(crate::soc::constants::I2S_DEFAULT_CLK_SRC) // for now fixed at 160MHz for C6 and 96MHz for H2
                     .i2s_rx_clkm_div_num()
-                    .variant(clock_settings.mclk_divider as u8)
+                    .bits(clock_settings.mclk_divider as u8)
                     .i2s_mclk_sel()
-                    .variant(true)
+                    .bit(true)
             });
             #[cfg(not(esp32h2))]
-            i2s.rx_conf1().modify(|_, w| {
+            i2s.rx_conf1().modify(|_, w| unsafe {
                 w.rx_bck_div_num()
-                    .variant((clock_settings.bclk_divider - 1) as u8)
+                    .bits((clock_settings.bclk_divider - 1) as u8)
             });
             #[cfg(esp32h2)]
-            i2s.rx_conf().modify(|_, w| {
+            i2s.rx_conf().modify(|_, w| unsafe {
                 w.rx_bck_div_num()
-                    .variant((clock_settings.bclk_divider - 1) as u8)
+                    .bits((clock_settings.bclk_divider - 1) as u8)
             });
         }
 
@@ -1656,21 +1656,21 @@ mod private {
             let i2s = Self::register_block();
 
             #[allow(clippy::useless_conversion)]
-            i2s.tx_conf1().modify(|_, w| {
+            i2s.tx_conf1().modify(|_, w| unsafe {
                 w.tx_tdm_ws_width()
-                    .variant((data_format.channel_bits() - 1).into())
+                    .bits((data_format.channel_bits() - 1).into())
                     .tx_bits_mod()
-                    .variant(data_format.data_bits() - 1)
+                    .bits(data_format.data_bits() - 1)
                     .tx_tdm_chan_bits()
-                    .variant(data_format.channel_bits() - 1)
+                    .bits(data_format.channel_bits() - 1)
                     .tx_half_sample_bits()
-                    .variant(data_format.channel_bits() - 1)
+                    .bits(data_format.channel_bits() - 1)
             });
             #[cfg(not(esp32h2))]
             i2s.tx_conf1().modify(|_, w| w.tx_msb_shift().set_bit());
             #[cfg(esp32h2)]
             i2s.tx_conf().modify(|_, w| w.tx_msb_shift().set_bit());
-            i2s.tx_conf().modify(|_, w| {
+            i2s.tx_conf().modify(|_, w| unsafe {
                 w.tx_mono()
                     .clear_bit()
                     .tx_mono_fst_vld()
@@ -1690,12 +1690,12 @@ mod private {
                     .tx_bit_order()
                     .clear_bit()
                     .tx_chan_mod()
-                    .variant(0)
+                    .bits(0)
             });
 
-            i2s.tx_tdm_ctrl().modify(|_, w| {
+            i2s.tx_tdm_ctrl().modify(|_, w| unsafe {
                 w.tx_tdm_tot_chan_num()
-                    .variant(1)
+                    .bits(1)
                     .tx_tdm_chan0_en()
                     .set_bit()
                     .tx_tdm_chan1_en()
@@ -1731,28 +1731,28 @@ mod private {
             });
 
             #[allow(clippy::useless_conversion)]
-            i2s.rx_conf1().modify(|_, w| {
+            i2s.rx_conf1().modify(|_, w| unsafe {
                 w.rx_tdm_ws_width()
-                    .variant((data_format.channel_bits() - 1).into())
+                    .bits((data_format.channel_bits() - 1).into())
                     .rx_bits_mod()
-                    .variant(data_format.data_bits() - 1)
+                    .bits(data_format.data_bits() - 1)
                     .rx_tdm_chan_bits()
-                    .variant(data_format.channel_bits() - 1)
+                    .bits(data_format.channel_bits() - 1)
                     .rx_half_sample_bits()
-                    .variant(data_format.channel_bits() - 1)
+                    .bits(data_format.channel_bits() - 1)
             });
             #[cfg(not(esp32h2))]
             i2s.rx_conf1().modify(|_, w| w.rx_msb_shift().set_bit());
             #[cfg(esp32h2)]
             i2s.rx_conf().modify(|_, w| w.rx_msb_shift().set_bit());
 
-            i2s.rx_conf().modify(|_, w| {
+            i2s.rx_conf().modify(|_, w| unsafe {
                 w.rx_mono()
                     .clear_bit()
                     .rx_mono_fst_vld()
                     .set_bit()
                     .rx_stop_mode()
-                    .variant(2)
+                    .bits(2)
                     .rx_tdm_en()
                     .set_bit()
                     .rx_pdm_en()
@@ -1765,9 +1765,9 @@ mod private {
                     .clear_bit()
             });
 
-            i2s.rx_tdm_ctrl().modify(|_, w| {
+            i2s.rx_tdm_ctrl().modify(|_, w| unsafe {
                 w.rx_tdm_tot_chan_num()
-                    .variant(1)
+                    .bits(1)
                     .rx_tdm_pdm_chan0_en()
                     .set_bit()
                     .rx_tdm_pdm_chan1_en()
@@ -1862,7 +1862,7 @@ mod private {
         fn rx_start(len: usize) {
             let i2s = Self::register_block();
             i2s.rxeof_num()
-                .write(|w| w.rx_eof_num().variant(len as u16));
+                .write(|w| unsafe { w.rx_eof_num().bits(len as u16) });
             i2s.rx_conf().modify(|_, w| w.rx_start().set_bit());
         }
 

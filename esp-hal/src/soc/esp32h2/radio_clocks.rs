@@ -125,11 +125,11 @@ fn init_clocks() {
         let pmu = &*esp32h2::PMU::PTR;
 
         pmu.hp_sleep_icg_modem()
-            .modify(|_, w| w.hp_sleep_dig_icg_modem_code().variant(0));
+            .modify(|_, w| w.hp_sleep_dig_icg_modem_code().bits(0));
         pmu.hp_modem_icg_modem()
-            .modify(|_, w| w.hp_modem_dig_icg_modem_code().variant(1));
+            .modify(|_, w| w.hp_modem_dig_icg_modem_code().bits(1));
         pmu.hp_active_icg_modem()
-            .modify(|_, w| w.hp_active_dig_icg_modem_code().variant(2));
+            .modify(|_, w| w.hp_active_dig_icg_modem_code().bits(2));
         pmu.imm_modem_icg()
             .as_ptr()
             .write_volatile(pmu.imm_modem_icg().as_ptr().read_volatile() | 1 << 31);

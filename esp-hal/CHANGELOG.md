@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `GpioPin::steal` unsafe API (#1363)
 - Inherent implementions of GPIO pin `set_low`, `is_low`, etc.
 - Warn users when attempting to build using the `dev` profile (#1420)
+- Async uart now reports interrupt errors(overflow, glitch, frame error, parity) back to user of read/write. uart clock decimal part configured for c2,c3,s3 (#1168, #1445)
+- Add mechanism to configure UART source clock (#1416)
+- `GpioPin` got a function `set_state(bool)` (#1462)
 - ESP32-PICO-V3-02: Initial support (#1155)
 
 ### Fixed
@@ -36,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed writes to SPI not flushing before attempting to write, causing corrupted writes (#1381)
 - fix AdcConfig::adc_calibrate for xtensa targets (#1379)
 - Fixed a divide by zero panic when setting the LEDC duty cycle to 0 with `SetDutyCycle::set_duty_cycle` (#1403)
+- Support 192 and 256-bit keys for AES (#1316)
+- Fixed MCPWM DeadTimeCfg bit values (#1378)
+- ESP32 LEDC `set_duty_cycle` used HighSpeedChannel for LowSpeedChannel (#1457)
 
 ### Changed
 
@@ -61,12 +67,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Runtime ISR binding for software interrupts, software interrupts are split now, interrupt-executor takes the software interrupt to use, interrupt-executor is easier to use (#1398)
 - PCNT: Runtime ISR binding (#1396)
 - Runtime ISR binding for RTC (#1405)
+- Improve MCPWM DeadTimeCfg API (#1378)
+- `SystemTimer`'s `Alarm` methods now require `&mut self` (#1455)
 
 ### Removed
 
 - Remove package-level type exports (#1275)
 - Removed `direct-vectoring` & `interrupt-preemption` features, as they are now enabled by default (#1310)
 - Removed the `rt` and `vectored` features (#1380)
+- Remove partial support for the ESP32-P4 (#1461)
 
 ## [0.16.1] - 2024-03-12
 

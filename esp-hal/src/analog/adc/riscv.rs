@@ -399,9 +399,7 @@ impl super::CalibrationAccess for crate::peripherals::ADC2 {
 /// Analog-to-Digital Converter peripheral driver.
 pub struct ADC<'d, ADCI> {
     _adc: PeripheralRef<'d, ADCI>,
-    #[allow(dead_code)] // FIXME
     attenuations: [Option<Attenuation>; NUM_ATTENS],
-    #[allow(dead_code)] // FIXME
     active_channel: Option<u8>,
 }
 

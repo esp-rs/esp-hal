@@ -1162,7 +1162,7 @@ pub trait Instance: crate::private::Sealed {
                         .to()
                         .write(|w| w.time_out_en().bit(time_out_en)
                         .time_out_value()
-                        .variant(time_out_value.try_into().unwrap())
+                        .bits(time_out_value.try_into().unwrap())
                     );
                 }
             }
@@ -1538,7 +1538,7 @@ pub trait Instance: crate::private::Sealed {
     #[cfg(not(esp32))]
     fn reset_fifo(&self) {
         // First, reset the fifo buffers
-        self.register_block().fifo_conf().modify(|_, w| {
+        self.register_block().fifo_conf().modify(|_, w| unsafe {
             w.tx_fifo_rst()
                 .set_bit()
                 .rx_fifo_rst()
@@ -1548,9 +1548,9 @@ pub trait Instance: crate::private::Sealed {
                 .fifo_prt_en()
                 .set_bit()
                 .rxfifo_wm_thrhd()
-                .variant(1)
+                .bits(1)
                 .txfifo_wm_thrhd()
-                .variant(8)
+                .bits(8)
         });
 
         self.register_block()
@@ -1571,7 +1571,7 @@ pub trait Instance: crate::private::Sealed {
     #[cfg(esp32)]
     fn reset_fifo(&self) {
         // First, reset the fifo buffers
-        self.register_block().fifo_conf().modify(|_, w| {
+        self.register_block().fifo_conf().modify(|_, w| unsafe {
             w.tx_fifo_rst()
                 .set_bit()
                 .rx_fifo_rst()
@@ -1579,9 +1579,9 @@ pub trait Instance: crate::private::Sealed {
                 .nonfifo_en()
                 .clear_bit()
                 .nonfifo_rx_thres()
-                .variant(1)
+                .bits(1)
                 .nonfifo_tx_thres()
-                .variant(32)
+                .bits(32)
         });
 
         self.register_block()
@@ -1983,9 +1983,9 @@ pub mod lp_i2c {
                 lp_aon
                     .gpio_mux()
                     .modify(|r, w| w.sel().bits(r.sel().bits() | (1 << 7)));
-                lp_io.gpio6().modify(|_, w| w.mcu_sel().variant(1)); // TODO
+                lp_io.gpio6().modify(|_, w| w.mcu_sel().bits(1)); // TODO
 
-                lp_io.gpio7().modify(|_, w| w.mcu_sel().variant(1));
+                lp_io.gpio7().modify(|_, w| w.mcu_sel().bits(1));
 
                 // Set output mode to Normal
                 lp_io.pin6().modify(|_, w| w.pad_driver().set_bit());
@@ -2169,7 +2169,7 @@ pub mod lp_i2c {
                     w.time_out_en()
                         .bit(time_out_en)
                         .time_out_value()
-                        .variant(time_out_value.try_into().unwrap())
+                        .bits(time_out_value.try_into().unwrap())
                 });
             }
 
