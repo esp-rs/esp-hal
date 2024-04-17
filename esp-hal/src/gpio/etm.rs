@@ -31,6 +31,7 @@ use crate::peripheral::{Peripheral, PeripheralRef};
 
 /// All the GPIO ETM channels
 #[non_exhaustive]
+#[allow(missing_docs)]
 pub struct GpioEtmChannels<'d> {
     _gpio_sd: PeripheralRef<'d, crate::peripherals::GPIO_SD>,
     pub channel0_task: GpioEtmTaskChannel<0>,
@@ -52,6 +53,7 @@ pub struct GpioEtmChannels<'d> {
 }
 
 impl<'d> GpioEtmChannels<'d> {
+    /// Create a new instance
     pub fn new(peripheral: impl Peripheral<P = crate::peripherals::GPIO_SD> + 'd) -> Self {
         crate::into_ref!(peripheral);
 

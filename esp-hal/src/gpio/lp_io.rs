@@ -159,6 +159,7 @@ fn get_pin_reg(pin: u8) -> &'static crate::peripherals::lp_io::GPIO0 {
 
 /// Configures a pin for use as a low power pin
 pub trait IntoLowPowerPin<const PIN: u8> {
+    /// Converts the pin into a low power pin
     fn into_low_power(self) -> LowPowerPin<Unknown, { PIN }>;
 }
 

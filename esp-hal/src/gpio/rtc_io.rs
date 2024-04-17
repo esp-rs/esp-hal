@@ -33,6 +33,7 @@ pub struct LowPowerPin<MODE, const PIN: u8> {
 
 /// Configures a pin for use as a low power pin
 pub trait IntoLowPowerPin<const PIN: u8> {
+    /// Convert into low power pin
     fn into_low_power(self) -> LowPowerPin<Unknown, { PIN }>;
 }
 
