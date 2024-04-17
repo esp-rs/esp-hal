@@ -105,8 +105,6 @@ pub struct SoftwareInterrupt<const NUM: u8> {}
 
 impl<const NUM: u8> SoftwareInterrupt<NUM> {
     /// Sets the interrupt handler for this software-interrupt
-    // TODO interrupts missing in PAC or named wrong for P4
-    #[cfg(not(esp32p4))]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         let interrupt = match NUM {
             0 => crate::peripherals::Interrupt::FROM_CPU_INTR0,
@@ -241,7 +239,7 @@ impl SoftwareInterruptControl {
 /// Controls the enablement of peripheral clocks.
 pub(crate) struct PeripheralClockControl;
 
-#[cfg(not(any(esp32c6, esp32h2, esp32p4)))]
+#[cfg(not(any(esp32c6, esp32h2)))]
 impl PeripheralClockControl {
     /// Enables and resets the given peripheral
     pub(crate) fn enable(peripheral: Peripheral) {
@@ -256,7 +254,7 @@ impl PeripheralClockControl {
                 &system.peri_rst_en(),
             )
         };
-        #[cfg(not(any(esp32, esp32p4)))]
+        #[cfg(not(esp32))]
         let (perip_clk_en0, perip_rst_en0) = { (&system.perip_clk_en0(), &system.perip_rst_en0()) };
 
         #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
@@ -465,7 +463,7 @@ impl PeripheralClockControl {
 
         #[cfg(esp32)]
         let (perip_rst_en0, peri_rst_en) = { (&system.perip_rst_en(), &system.peri_rst_en()) };
-        #[cfg(not(any(esp32, esp32p4)))]
+        #[cfg(not(esp32))]
         let perip_rst_en0 = { &system.perip_rst_en0() };
 
         #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
@@ -1072,12 +1070,6 @@ impl PeripheralClockControl {
             }
         }
     }
-}
-
-#[cfg(esp32p4)]
-impl PeripheralClockControl {
-    /// Enables and resets the given peripheral
-    pub(crate) fn enable(_peripheral: Peripheral) {}
 }
 
 /// Controls the configuration of the chip's clocks.

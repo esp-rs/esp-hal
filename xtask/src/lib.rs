@@ -34,7 +34,6 @@ pub enum Chip {
     Esp32c3,
     Esp32c6,
     Esp32h2,
-    Esp32p4,
     Esp32s2,
     Esp32s3,
 }
@@ -47,7 +46,6 @@ impl Chip {
             Esp32 => "xtensa-esp32-none-elf",
             Esp32c2 | Esp32c3 => "riscv32imc-unknown-none-elf",
             Esp32c6 | Esp32h2 => "riscv32imac-unknown-none-elf",
-            Esp32p4 => "riscv32imafc-unknown-none-elf",
             Esp32s2 => "xtensa-esp32s2-none-elf",
             Esp32s3 => "xtensa-esp32s3-none-elf",
         }
@@ -56,7 +54,7 @@ impl Chip {
     pub fn has_lp_core(&self) -> bool {
         use Chip::*;
 
-        matches!(self, Esp32c6 | Esp32p4 | Esp32s2 | Esp32s3)
+        matches!(self, Esp32c6 | Esp32s2 | Esp32s3)
     }
 
     pub fn lp_target(&self) -> Result<&str> {
@@ -76,7 +74,6 @@ impl Chip {
             Chip::Esp32c3 => "ESP32-C3",
             Chip::Esp32c6 => "ESP32-C6",
             Chip::Esp32h2 => "ESP32-H2",
-            Chip::Esp32p4 => "ESP32-P4",
             Chip::Esp32s2 => "ESP32-S2",
             Chip::Esp32s3 => "ESP32-S3",
         }
