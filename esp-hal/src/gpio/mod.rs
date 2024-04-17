@@ -829,22 +829,7 @@ where
             }
         }
 
-        #[cfg(not(any(esp32p4)))]
         unsafe {
-            (*GPIO::PTR).pin(GPIONUM as usize).modify(|_, w| {
-                w.int_ena()
-                    .bits(gpio_intr_enable(int_enable, nmi_enable))
-                    .int_type()
-                    .bits(event as u8)
-                    .wakeup_enable()
-                    .bit(wake_up_from_light_sleep)
-            });
-        }
-
-        #[cfg(esp32p4)]
-        unsafe {
-            // there is no NMI_ENABLE but P4 could trigger 4 interrupts
-            // we'll only support GPIO_INT0 for now
             (*GPIO::PTR).pin(GPIONUM as usize).modify(|_, w| {
                 w.int_ena()
                     .bits(gpio_intr_enable(int_enable, nmi_enable))
@@ -2385,7 +2370,7 @@ mod asynch {
     pub(super) fn handle_gpio_interrupt() {
         let intrs_bank0 = InterruptStatusRegisterAccessBank0::interrupt_status_read();
 
-        #[cfg(any(esp32, esp32s2, esp32s3, esp32p4))]
+        #[cfg(any(esp32, esp32s2, esp32s3))]
         let intrs_bank1 = InterruptStatusRegisterAccessBank1::interrupt_status_read();
 
         let mut intr_bits = intrs_bank0;
@@ -2399,7 +2384,7 @@ mod asynch {
         // clear interrupt bits
         Bank0GpioRegisterAccess::write_interrupt_status_clear(intrs_bank0);
 
-        #[cfg(any(esp32, esp32s2, esp32s3, esp32p4))]
+        #[cfg(any(esp32, esp32s2, esp32s3))]
         {
             let mut intr_bits = intrs_bank1;
             while intr_bits != 0 {

@@ -57,7 +57,6 @@ jobs:
             { soc: "esp32c3", target: "riscv32imc-unknown-none-elf" },
             { soc: "esp32c6", target: "riscv32imac-unknown-none-elf" },
             { soc: "esp32h2", target: "riscv32imac-unknown-none-elf" },
-            { soc: "esp32p4", target: "riscv32imafc-unknown-none-elf" },
             # Xtensa devices:
             { soc: "esp32", target: "xtensa-esp32-none-elf" },
             { soc: "esp32s2", target: "xtensa-esp32s2-none-elf" },
@@ -189,7 +188,6 @@ jobs:
           cargo xtask build-package --features=esp32c3 --target=riscv32imc-unknown-none-elf   esp-hal
           cargo xtask build-package --features=esp32c6 --target=riscv32imac-unknown-none-elf  esp-hal
           cargo xtask build-package --features=esp32h2 --target=riscv32imac-unknown-none-elf  esp-hal
-      #   cargo xtask build-package --features=esp32p4 --target=riscv32imafc-unknown-none-elf esp-hal
       - name: msrv (esp-lp-hal)
         run: |
           cargo xtask build-package --features=esp32c6 --target=riscv32imac-unknown-none-elf esp-lp-hal
@@ -244,9 +242,6 @@ jobs:
         run: cd esp-hal && cargo clippy --features=esp32c6 --target=riscv32imac-unknown-none-elf -- -D warnings
       - name: clippy (esp-hal, esp32h2)
         run: cd esp-hal && cargo clippy --features=esp32h2 --target=riscv32imac-unknown-none-elf -- -D warnings
-      # TODO: Re-enable when able
-      # - name: clippy (esp-hal, esp32p4)
-      #   run: cd esp-hal && cargo clippy --features=esp32p4 --target=riscv32imafc-unknown-none-elf -- -D warnings
       ## esp-hal-smartled:
       - name: clippy (esp-hal-smartled)
         run: cd esp-hal-smartled && cargo clippy --features=esp32c6 --target=riscv32imac-unknown-none-elf -- -D warnings

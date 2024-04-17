@@ -50,7 +50,7 @@ impl<const N: u8> Channel<N> {
         dma.int_ch(N as usize)
     }
     #[inline(always)]
-    #[cfg(any(esp32c6, esp32h2))] // also esp32p4 AHB_DMA
+    #[cfg(any(esp32c6, esp32h2))]
     fn in_int() -> &'static crate::peripherals::dma::in_int_ch::IN_INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.in_int_ch(N as usize)
@@ -69,7 +69,7 @@ impl<const N: u8> Channel<N> {
         dma.int_ch(N as usize)
     }
     #[inline(always)]
-    #[cfg(any(esp32c6, esp32h2))] // also esp32p4 AHB_DMA
+    #[cfg(any(esp32c6, esp32h2))]
     fn out_int() -> &'static crate::peripherals::dma::out_int_ch::OUT_INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.out_int_ch(N as usize)
