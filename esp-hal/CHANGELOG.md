@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a divide by zero panic when setting the LEDC duty cycle to 0 with `SetDutyCycle::set_duty_cycle` (#1403)
 - Support 192 and 256-bit keys for AES (#1316)
 - Fixed MCPWM DeadTimeCfg bit values (#1378)
+- ESP32 LEDC `set_duty_cycle` used HighSpeedChannel for LowSpeedChannel (#1457)
 
 ### Changed
 
