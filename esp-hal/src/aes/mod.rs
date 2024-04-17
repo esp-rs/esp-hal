@@ -103,13 +103,10 @@
 //! transfer.wait().unwrap();
 //! ```
 
-#[cfg(esp32)]
-use crate::peripherals::generic::{Readable, Reg, RegisterSpec};
-#[cfg(not(esp32))]
-use crate::reg_access::AlignmentHelper;
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::AES,
+    reg_access::{AlignmentHelper, NativeEndianess},
 };
 
 #[cfg_attr(esp32, path = "esp32.rs")]
@@ -186,8 +183,7 @@ pub enum Mode {
 /// AES peripheral container
 pub struct Aes<'d> {
     aes: PeripheralRef<'d, AES>,
-    #[cfg(not(esp32))]
-    alignment_helper: AlignmentHelper,
+    alignment_helper: AlignmentHelper<NativeEndianess>,
 }
 
 impl<'d> Aes<'d> {
@@ -196,8 +192,7 @@ impl<'d> Aes<'d> {
         crate::into_ref!(aes);
         let mut ret = Self {
             aes,
-            #[cfg(not(esp32))]
-            alignment_helper: AlignmentHelper::default(),
+            alignment_helper: AlignmentHelper::native_endianess(),
         };
         ret.init();
 
@@ -236,37 +231,6 @@ impl<'d> Aes<'d> {
 
     fn start(&mut self) {
         self.write_start();
-    }
-
-    // TODO: for some reason, the `volatile read/write` helpers from `reg_access`
-    // don't work for ESP32
-    #[cfg(esp32)]
-    fn write_to_regset(input: &[u8], n_offset: usize, reg_0: *mut u32) {
-        let chunks = input.chunks_exact(ALIGN_SIZE);
-        for (offset, chunk) in (0..n_offset).zip(chunks) {
-            let to_write = u32::from_ne_bytes(chunk.try_into().unwrap());
-            unsafe {
-                let p = reg_0.add(offset);
-                p.write_volatile(to_write);
-            }
-        }
-    }
-
-    // TODO: for some reason, the `volatile read/write` helpers from `reg_access`
-    // don't work for ESP32
-    #[cfg(esp32)]
-    fn read_from_regset<T>(out_buf: &mut [u8], n_offset: usize, reg_0: &Reg<T>)
-    where
-        T: RegisterSpec<Ux = u32> + Readable,
-    {
-        let chunks = out_buf.chunks_exact_mut(ALIGN_SIZE);
-        for (offset, chunk) in (0..n_offset).zip(chunks) {
-            unsafe {
-                let p = reg_0.as_ptr().add(offset);
-                let read_val: [u8; ALIGN_SIZE] = p.read_volatile().to_ne_bytes();
-                chunk.copy_from_slice(&read_val);
-            }
-        }
     }
 }
 
