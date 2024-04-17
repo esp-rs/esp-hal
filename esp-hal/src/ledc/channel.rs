@@ -615,7 +615,7 @@ where
                 .write(|w| unsafe { w.duty().bits(duty << 4) });
         } else {
             self.ledc
-                .hsch(self.number as usize)
+                .lsch(self.number as usize)
                 .duty()
                 .write(|w| unsafe { w.duty().bits(duty << 4) });
         }
