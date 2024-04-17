@@ -19,6 +19,7 @@ use crate::{
 };
 
 /// Input/Output Stream descriptor for each channel
+#[derive(Copy, Clone)]
 pub enum PWMStream {
     /// PWM Stream A
     PWMA,
@@ -28,17 +29,37 @@ pub enum PWMStream {
 
 /// Configuration for MCPWM Operator DeadTime
 /// It's recommended to reference the technical manual for configuration
+#[derive(Copy, Clone)]
 pub struct DeadTimeCfg {
     cfg_reg: u32,
-    rising_edge_delay: u16,
-    falling_edge_delay: u16,
 }
 
 #[allow(clippy::unusual_byte_groupings)]
 impl DeadTimeCfg {
     // NOTE: it's a bit difficult to make this typestate
     // due to the different interconnections (FED/RED vs PWMxA/PWMxB) and
-    // the many mode of operation
+    // the many modes of operation
+
+    /// B_OUTBYPASS
+    const S0: u32 = 0b01_0000_0000_0000_0000;
+    /// A_OUTBYPASS
+    const S1: u32 = 0b00_1000_0000_0000_0000;
+    /// RED_OUTINVERT
+    const S2: u32 = 0b00_0010_0000_0000_0000;
+    /// FED_OUTINVERT
+    const S3: u32 = 0b00_0100_0000_0000_0000;
+    /// RED_INSEL
+    const S4: u32 = 0b00_0000_1000_0000_0000;
+    /// FED_INSEL
+    const S5: u32 = 0b00_0001_0000_0000_0000;
+    /// A_OUTSWAP
+    const S6: u32 = 0b00_0000_0010_0000_0000;
+    /// B_OUTSWAP
+    const S7: u32 = 0b00_0000_0100_0000_0000;
+    /// DEB_MODE
+    const _S8: u32 = 0b00_0000_0001_0000_0000;
+    /// Use PT_clk instead of PWM_clk
+    const CLK_SEL: u32 = 0b10_0000_0000_0000_0000;
 
     /// Uses the following configuration:
     /// * Clock: PWM_clk
@@ -48,97 +69,91 @@ impl DeadTimeCfg {
     /// * No Dual-edge B
     /// * No Invert
     /// * FED/RED update mode = immediate
-    /// * FED/RED = 0
-    pub fn new_bypass() -> DeadTimeCfg {
+    pub const fn new_bypass() -> DeadTimeCfg {
         DeadTimeCfg {
-            cfg_reg: 0b0_11_00_00_00_0_000_000,
-            rising_edge_delay: 0,
-            falling_edge_delay: 0,
+            cfg_reg: Self::S0 | Self::S1,
         }
     }
 
     /// Active High Complementary (AHC) from Technical Reference manual
     ///
     /// Will generate a PWM from input PWMA, such that output PWMA & PWMB are
-    /// each others complement Except during a transition in which they will
+    /// each others complement except during a transition in which they will
     /// be both off (as deadtime) such that they should never overlap, useful
     /// for H-Bridge type scenarios
-    ///
-    /// Default delay on both rising (red) and falling (fed) edge is 16 cycles
-    pub fn new_ahc(red_delay: Option<u16>, fed_delay: Option<u16>) -> DeadTimeCfg {
-        DeadTimeCfg {
-            cfg_reg: 0b0_00_10_00_00_0_000_000,
-            rising_edge_delay: red_delay.unwrap_or(16u16),
-            falling_edge_delay: fed_delay.unwrap_or(16u16),
-        }
+    pub const fn new_ahc() -> DeadTimeCfg {
+        DeadTimeCfg { cfg_reg: Self::S3 }
     }
     // TODO: Add some common configurations ~AHC~,ALC,AH,AC
 
-    fn set_flag(&mut self, offset: u8, val: bool) {
-        let mask = !(1 << offset);
-        self.cfg_reg = self.cfg_reg & mask | ((val as u32) << offset);
-    }
-
-    /// Sets the delay for the FED/RED module
-    pub fn set_delay(&mut self, rising_edge: u16, falling_edge: u16) {
-        self.rising_edge_delay = rising_edge;
-        self.falling_edge_delay = falling_edge;
+    #[must_use]
+    const fn set_flag(mut self, flag: u32, val: bool) -> Self {
+        if val {
+            self.cfg_reg |= flag;
+        } else {
+            self.cfg_reg &= !flag;
+        }
+        self
     }
 
     /// Sets FED/RED output inverter
     /// Inverts the output of the FED/RED module (excl DEB mode feedback)
-    pub fn invert_output(&mut self, fed: bool, red: bool) {
-        self.set_flag(13, fed);
-        self.set_flag(14, red);
+    #[must_use]
+    pub const fn invert_output(self, fed: bool, red: bool) -> Self {
+        self.set_flag(Self::S3, fed).set_flag(Self::S2, red)
     }
 
     /// Swaps the output of a PWM Stream
-    /// i.e. If streams have output_swap enabled, the output of the module
+    /// i.e. If both streams have output_swap enabled, the output of the module
     /// is swapped, while if only one is enabled that one 'copies' from the
     /// other stream
-    pub fn set_output_swap(&mut self, stream: PWMStream, swap: bool) {
+    #[must_use]
+    pub const fn set_output_swap(self, stream: PWMStream, swap: bool) -> Self {
         self.set_flag(
             match stream {
-                PWMStream::PWMA => 9,
-                PWMStream::PWMB => 10,
+                PWMStream::PWMA => Self::S6,
+                PWMStream::PWMB => Self::S7,
             },
             swap,
-        );
+        )
     }
 
     /// Set PWMA/PWMB stream to bypass everything except output_swap
     /// This means no deadtime is applied when enabled
-    pub fn set_bypass(&mut self, stream: PWMStream, enable: bool) {
+    #[must_use]
+    pub const fn set_bypass(self, stream: PWMStream, enable: bool) -> Self {
         self.set_flag(
             match stream {
-                PWMStream::PWMA => 15,
-                PWMStream::PWMB => 16,
+                PWMStream::PWMA => Self::S1,
+                PWMStream::PWMB => Self::S0,
             },
             enable,
-        );
+        )
     }
 
     /// Select Between PWMClk & PT_Clk
-    pub fn select_clock(&mut self, pwm_clock: bool) {
-        self.set_flag(17, pwm_clock);
+    #[must_use]
+    pub const fn select_clock(self, pwm_clock: bool) -> Self {
+        self.set_flag(Self::CLK_SEL, pwm_clock)
     }
 
     /// Select which stream is used for the input of FED/RED
-    pub fn select_input(&mut self, fed: PWMStream, red: PWMStream) {
+    #[must_use]
+    pub const fn select_input(self, fed: PWMStream, red: PWMStream) -> Self {
         self.set_flag(
-            12,
+            Self::S5,
             match fed {
                 PWMStream::PWMA => false,
                 PWMStream::PWMB => true,
             },
-        );
-        self.set_flag(
-            11,
+        )
+        .set_flag(
+            Self::S4,
             match red {
                 PWMStream::PWMA => false,
                 PWMStream::PWMB => true,
             },
-        );
+        )
     }
 }
 
@@ -188,27 +203,6 @@ impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
         });
     }
 
-    /// Configures deadtime for this operator
-    pub fn set_deadtime(&mut self, cfg: &DeadTimeCfg) {
-        let ch = unsafe { &*PWM::block() }.ch(OP as usize);
-        #[cfg(esp32s3)]
-        {
-            ch.db_fed_cfg()
-                .write(|w| unsafe { w.bits(cfg.falling_edge_delay as u32) });
-            ch.db_red_cfg()
-                .write(|w| unsafe { w.bits(cfg.rising_edge_delay as u32) });
-            ch.db_cfg().write(|w| unsafe { w.bits(cfg.cfg_reg) });
-        }
-        #[cfg(not(esp32s3))]
-        {
-            ch.dt_fed_cfg()
-                .write(|w| unsafe { w.bits(cfg.falling_edge_delay as u32) });
-            ch.dt_red_cfg()
-                .write(|w| unsafe { w.bits(cfg.rising_edge_delay as u32) });
-            ch.dt_cfg().write(|w| unsafe { w.bits(cfg.cfg_reg) });
-        }
-    }
-
     /// Use the A output with the given pin and configuration
     pub fn with_pin_a<'d, Pin: OutputPin>(
         self,
@@ -240,6 +234,21 @@ impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
     ) {
         (PwmPin::new(pin_a, config_a), PwmPin::new(pin_b, config_b))
     }
+
+    /// Link two pins using the deadtime generator
+    ///
+    /// This is useful for complementary or mirrored signals with or without
+    /// configured deadtime
+    pub fn with_linked_pins<'d, PinA: OutputPin, PinB: OutputPin>(
+        self,
+        pin_a: impl Peripheral<P = PinA> + 'd,
+        config_a: PwmPinConfig<true>,
+        pin_b: impl Peripheral<P = PinB> + 'd,
+        config_b: PwmPinConfig<false>,
+        config_dt: DeadTimeCfg,
+    ) -> LinkedPins<'d, PinA, PinB, PWM, OP> {
+        LinkedPins::new(pin_a, config_a, pin_b, config_b, config_dt)
+    }
 }
 
 /// Configuration describing how the operator generates a signal on a connected
@@ -260,6 +269,9 @@ impl<const IS_A: bool> PwmPinConfig<IS_A> {
         PwmActions::UP_DOWN_ACTIVE_HIGH,
         PwmUpdateMethod::SYNC_ON_ZERO,
     );
+    /// A configuration using [`PwmActions::empty`] and
+    /// [`PwmUpdateMethod::empty`]
+    pub const EMPTY: Self = Self::new(PwmActions::empty(), PwmUpdateMethod::empty());
 
     /// Get a configuration using the given `PwmActions` and `PwmUpdateMethod`
     pub const fn new(actions: PwmActions<IS_A>, update_method: PwmUpdateMethod) -> Self {
@@ -272,7 +284,7 @@ impl<const IS_A: bool> PwmPinConfig<IS_A> {
 
 /// A pin driven by an MCPWM operator
 pub struct PwmPin<'d, Pin, PWM, const OP: u8, const IS_A: bool> {
-    _pin: PeripheralRef<'d, Pin>,
+    pin: PeripheralRef<'d, Pin>,
     phantom: PhantomData<PWM>,
 }
 
@@ -281,42 +293,18 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
 {
     fn new(pin: impl Peripheral<P = Pin> + 'd, config: PwmPinConfig<IS_A>) -> Self {
         crate::into_ref!(pin);
-        let output_signal = PWM::output_signal::<OP, IS_A>();
-        pin.enable_output(true)
-            .connect_peripheral_to_output(output_signal);
         let mut pin = PwmPin {
-            _pin: pin,
+            pin,
             phantom: PhantomData,
         };
         pin.set_actions(config.actions);
         pin.set_update_method(config.update_method);
+
+        let output_signal = PWM::output_signal::<OP, IS_A>();
+        pin.pin
+            .connect_peripheral_to_output(output_signal)
+            .enable_output(true);
         pin
-    }
-
-    /// Updates dead-time FED register
-    ///
-    /// WARNING: FED is connected to the operator, and could be connected to
-    /// another pin
-    #[inline]
-    pub fn update_fed(&self, cycles: u16) {
-        #[cfg(esp32s3)]
-        let dt_fed = unsafe { Self::ch() }.db_fed_cfg();
-        #[cfg(not(esp32s3))]
-        let dt_fed = unsafe { Self::ch() }.dt_fed_cfg();
-        dt_fed.write(|w| unsafe { w.bits(cycles as u32) });
-    }
-
-    /// Updates dead-time RED register
-    ///
-    /// WARNING: RED is connected to the operator, and could be connected to
-    /// another pin
-    #[inline]
-    pub fn update_red(&self, cycles: u16) {
-        #[cfg(esp32s3)]
-        let dt_red = unsafe { Self::ch() }.db_red_cfg();
-        #[cfg(not(esp32s3))]
-        let dt_red = unsafe { Self::ch() }.dt_red_cfg();
-        dt_red.write(|w| unsafe { w.bits(cycles as u32) });
     }
 
     /// Configure what actions should be taken on timing events
@@ -485,13 +473,132 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     }
 }
 
+/// Two pins driven by the same timer and operator
+///
+/// Useful for complementary or mirrored signals with or without
+/// configured deadtime.
+///
+/// # H-Bridge example
+/// ```no_run
+/// // active high complementary using PWMA input
+/// let bridge_active = DeadTimeCfg::new_ahc();
+/// // use PWMB as input for both outputs
+/// let bridge_off = DeadTimeCfg::new_bypass().set_output_swap(PWMStream::PWMA, true);
+/// let mut pins = mcpwm.operator0.with_linked_pins(
+///     pin_a,
+///     PwmPinConfig::UP_DOWN_ACTIVE_HIGH, // use PWMA as our main input
+///     pin_b,
+///     PwmPinConfig::EMPTY, // keep PWMB "low"
+///     bride_off,
+/// );
+///
+/// pins.set_falling_edge_deadtime(5);
+/// pins.set_rising_edge_deadtime(5);
+/// // pin_a: ________________________________________
+/// // pin_b: ________________________________________
+/// pins.set_timestamp_a(40); // 40% duty cycle if period configured to 100
+/// pins.set_deadtime_cfg(bridge_active);
+/// // pin_a: _______-------_____________-------______
+/// // pin_b: ------_________-----------_________-----
+/// ```
+pub struct LinkedPins<'d, PinA, PinB, PWM, const OP: u8> {
+    pin_a: PwmPin<'d, PinA, PWM, OP, true>,
+    pin_b: PwmPin<'d, PinB, PWM, OP, false>,
+}
+
+impl<'d, PinA: OutputPin, PinB: OutputPin, PWM: PwmPeripheral, const OP: u8>
+    LinkedPins<'d, PinA, PinB, PWM, OP>
+{
+    fn new(
+        pin_a: impl Peripheral<P = PinA> + 'd,
+        config_a: PwmPinConfig<true>,
+        pin_b: impl Peripheral<P = PinB> + 'd,
+        config_b: PwmPinConfig<false>,
+        config_dt: DeadTimeCfg,
+    ) -> Self {
+        // setup deadtime config before enabling the pins
+        #[cfg(esp32s3)]
+        let dt_cfg = unsafe { Self::ch() }.db_cfg();
+        #[cfg(not(esp32s3))]
+        let dt_cfg = unsafe { Self::ch() }.dt_cfg();
+        dt_cfg.write(|w| unsafe { w.bits(config_dt.cfg_reg) });
+
+        let pin_a = PwmPin::new(pin_a, config_a);
+        let pin_b = PwmPin::new(pin_b, config_b);
+
+        LinkedPins { pin_a, pin_b }
+    }
+
+    /// Configure what actions should be taken on timing events
+    pub fn set_actions_a(&mut self, value: PwmActions<true>) {
+        self.pin_a.set_actions(value)
+    }
+    /// Configure what actions should be taken on timing events
+    pub fn set_actions_b(&mut self, value: PwmActions<false>) {
+        self.pin_b.set_actions(value)
+    }
+
+    /// Set how a new timestamp syncs with the timer
+    pub fn set_update_method_a(&mut self, update_method: PwmUpdateMethod) {
+        self.pin_a.set_update_method(update_method)
+    }
+    /// Set how a new timestamp syncs with the timer
+    pub fn set_update_method_b(&mut self, update_method: PwmUpdateMethod) {
+        self.pin_b.set_update_method(update_method)
+    }
+
+    /// Write a new timestamp.
+    /// The written value will take effect according to the set
+    /// [`PwmUpdateMethod`].
+    pub fn set_timestamp_a(&mut self, value: u16) {
+        self.pin_a.set_timestamp(value)
+    }
+    /// Write a new timestamp.
+    /// The written value will take effect according to the set
+    /// [`PwmUpdateMethod`].
+    pub fn set_timestamp_b(&mut self, value: u16) {
+        self.pin_a.set_timestamp(value)
+    }
+
+    /// Configure the deadtime generator
+    pub fn set_deadtime_cfg(&mut self, config: DeadTimeCfg) {
+        #[cfg(esp32s3)]
+        let dt_cfg = unsafe { Self::ch() }.db_cfg();
+        #[cfg(not(esp32s3))]
+        let dt_cfg = unsafe { Self::ch() }.dt_cfg();
+        dt_cfg.write(|w| unsafe { w.bits(config.cfg_reg) });
+    }
+
+    /// Set the deadtime generator rising edge delay
+    pub fn set_rising_edge_deadtime(&mut self, dead_time: u16) {
+        #[cfg(esp32s3)]
+        let dt_red = unsafe { Self::ch() }.db_red_cfg();
+        #[cfg(not(esp32s3))]
+        let dt_red = unsafe { Self::ch() }.dt_red_cfg();
+        dt_red.write(|w| unsafe { w.red().bits(dead_time) });
+    }
+    /// Set the deadtime generator falling edge delay
+    pub fn set_falling_edge_deadtime(&mut self, dead_time: u16) {
+        #[cfg(esp32s3)]
+        let dt_fed = unsafe { Self::ch() }.db_fed_cfg();
+        #[cfg(not(esp32s3))]
+        let dt_fed = unsafe { Self::ch() }.dt_fed_cfg();
+        dt_fed.write(|w| unsafe { w.fed().bits(dead_time) });
+    }
+
+    unsafe fn ch() -> &'static crate::peripherals::mcpwm0::CH {
+        let block = unsafe { &*PWM::block() };
+        block.ch(OP as usize)
+    }
+}
+
 /// An action the operator applies to an output
 #[non_exhaustive]
 #[repr(u32)]
 pub enum UpdateAction {
     /// Clear the output by setting it to a low level.
     SetLow  = 1,
-    /// Set the to a high level.
+    /// Set the output to a high level.
     SetHigh = 2,
     /// Change the current output level to the opposite value.
     /// If it is currently pulled high, pull it low, or vice versa.

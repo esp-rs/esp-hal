@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix AdcConfig::adc_calibrate for xtensa targets (#1379)
 - Fixed a divide by zero panic when setting the LEDC duty cycle to 0 with `SetDutyCycle::set_duty_cycle` (#1403)
 - Support 192 and 256-bit keys for AES (#1316)
+- Fixed MCPWM DeadTimeCfg bit values (#1378)
 - ESP32 LEDC `set_duty_cycle` used HighSpeedChannel for LowSpeedChannel (#1457)
 
 ### Changed
@@ -63,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Runtime ISR binding for software interrupts, software interrupts are split now, interrupt-executor takes the software interrupt to use, interrupt-executor is easier to use (#1398)
 - PCNT: Runtime ISR binding (#1396)
 - Runtime ISR binding for RTC (#1405)
+- Improve MCPWM DeadTimeCfg API (#1378)
 
 ### Removed
 
