@@ -575,7 +575,7 @@ impl<'d, PinA: OutputPin, PinB: OutputPin, PWM: PwmPeripheral, const OP: u8>
         let dt_red = unsafe { Self::ch() }.db_red_cfg();
         #[cfg(not(esp32s3))]
         let dt_red = unsafe { Self::ch() }.dt_red_cfg();
-        dt_red.write(|w| unsafe {w.red().bits(dead_time)});
+        dt_red.write(|w| unsafe { w.red().bits(dead_time) });
     }
     /// Set the deadtime generator falling edge delay
     pub fn set_falling_edge_deadtime(&mut self, dead_time: u16) {
@@ -583,7 +583,7 @@ impl<'d, PinA: OutputPin, PinB: OutputPin, PWM: PwmPeripheral, const OP: u8>
         let dt_fed = unsafe { Self::ch() }.db_fed_cfg();
         #[cfg(not(esp32s3))]
         let dt_fed = unsafe { Self::ch() }.dt_fed_cfg();
-        dt_fed.write(|w|unsafe{ w.fed().bits(dead_time)});
+        dt_fed.write(|w| unsafe { w.fed().bits(dead_time) });
     }
 
     unsafe fn ch() -> &'static crate::peripherals::mcpwm0::CH {
