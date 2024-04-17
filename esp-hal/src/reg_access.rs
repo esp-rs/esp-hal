@@ -77,6 +77,8 @@ impl AlignmentHelper<SocDependentEndianess> {
     }
 }
 
+// only used by AES
+#[cfg(aes)]
 impl AlignmentHelper<NativeEndianess> {
     pub fn native_endianess() -> AlignmentHelper<NativeEndianess> {
         AlignmentHelper {
