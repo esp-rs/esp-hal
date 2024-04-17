@@ -65,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PCNT: Runtime ISR binding (#1396)
 - Runtime ISR binding for RTC (#1405)
 - Improve MCPWM DeadTimeCfg API (#1378)
+- `SystemTimer`'s `Alarm` methods now require `&mut self` (#1455)
 
 ### Removed
 
