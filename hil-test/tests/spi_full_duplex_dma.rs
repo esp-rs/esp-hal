@@ -120,6 +120,10 @@ mod tests {
         let transfer = spi.dma_transfer(&mut send, &mut receive).unwrap();
         transfer.wait().unwrap();
         assert_eq!(send[0], receive[0]);
+        assert_eq!(send[1], receive[1]);
+        // Read the 2 remaining bytes so it does not cause issues in the next test.
+        let transfer = spi.dma_transfer(&mut send, &mut receive).unwrap();
+        transfer.wait().unwrap();
     }
 
     #[test]
