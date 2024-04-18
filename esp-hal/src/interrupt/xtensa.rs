@@ -187,7 +187,7 @@ pub fn get_status(core: Cpu) -> u128 {
             }
         };
 
-        #[cfg(feature = "esp32s3")]
+        #[cfg(esp32s3)]
         let status = match core {
             Cpu::ProCpu => {
                 status
