@@ -16,13 +16,7 @@ use esp_hal::{
     gpio::IO,
     peripherals::{Peripherals, UART0},
     prelude::*,
-    uart::{
-        config::Config,
-        TxRxPins,
-        Uart,
-        UartRx,
-        UartTx,
-    },
+    uart::{config::Config, TxRxPins, Uart, UartRx, UartTx},
     Async,
 };
 
@@ -42,7 +36,8 @@ impl Context {
             io.pins.gpio4.into_floating_input(),
         );
 
-        let uart = Uart::new_async_with_config(peripherals.UART0, Config::default(), Some(pins), &clocks);
+        let uart =
+            Uart::new_async_with_config(peripherals.UART0, Config::default(), Some(pins), &clocks);
         let (tx, rx) = uart.split();
 
         Context { rx, tx }

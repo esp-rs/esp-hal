@@ -37,7 +37,13 @@ impl Context {
             io.pins.gpio4.into_floating_input(),
         );
 
-        let uart = Uart::new_with_config(peripherals.UART0, Config::default(), Some(pins), &clocks, None);
+        let uart = Uart::new_with_config(
+            peripherals.UART0,
+            Config::default(),
+            Some(pins),
+            &clocks,
+            None,
+        );
 
         Context { uart }
     }

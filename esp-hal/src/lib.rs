@@ -2,13 +2,65 @@
     docsrs,
     doc = "<div style='padding:30px;background:#810;color:#fff;text-align:center;'><p>You might want to <a href='https://docs.esp-rs.org/esp-hal/'>browse the <code>esp-hal</code> documentation on the esp-rs website</a> instead.</p><p>The documentation here on <a href='https://docs.rs'>docs.rs</a> is built for a single chip only (ESP32-C6, in particular), while on the esp-rs website you can select your exact chip from the list of supported devices. Available peripherals and their APIs change depending on the chip.</p></div>\n\n<br/>\n\n"
 )]
-//! Bare-metal (`no_std`) HAL for Espressif devices. Implements most of the
-//! traits defined by various packages in the [embedded-hal] repository.
+//! Bare-metal (`no_std`) HAL for all Espressif ESP32 devices.
+//! The HAL implements both blocking _and_ async
+//! APIs for many peripherals. Where applicable, driver implement
+//! the [embedded-hal] and [embedded-hal-async] traits.
 //!
-//! [embedded-hal]: https://github.com/rust-embedded/embedded-hal
+//! This documentation is built for the
+#![cfg_attr(esp32, doc = "**ESP32**")]
+#![cfg_attr(esp32s2, doc = "**ESP32-S2**")]
+#![cfg_attr(esp32s3, doc = "**ESP32-S3**")]
+#![cfg_attr(esp32c2, doc = "**ESP32-C2**")]
+#![cfg_attr(esp32c3, doc = "**ESP32-C3**")]
+#![cfg_attr(esp32c6, doc = "**ESP32-C6**")]
+#![cfg_attr(esp32h2, doc = "**ESP32-H2**")]
+//! please ensure you are reading the correct [documentation] for your target
+//! device.
+//!
+//! ## Choosing a device
+//!
+//! Depending on your target device, you need to enable the chip feature
+//! for that device. You may also need to do this on [ancillary esp crates].
+//!
+//! ## Examples
+//!
+//! We have a plethora of [examples] in the esp-hal repository. We use
+//! an [xtask] to automate the building, running, and testing of code and
+//! examples within esp-hal.
+//!
+//! Invoke the following command in the root of the esp-hal repository to get
+//! started.
+//!
+//! ```no_run
+//! cargo xtask help
+//! ```
+//!
+//! ## Creating a project
+//!
+//! We have a [book] that explains the full esp-rs ecosystem
+//! and how to get started, it's advisable to give that a read
+//! before proceeding.
+//!
+//! We have a template for quick starting bare-metal projects, [esp-template].
+//! The template uses [cargo-generate], so ensure that it is installed and run
+//!
+//! ```no_run
+//! cargo generate -a esp-rs/esp-template
+//! ```
+//!
+//! [documentation]: https://docs.esp-rs.org/esp-hal
+//! [examples]: https://github.com/esp-rs/esp-hal/tree/main/examples
+//! [embedded-hal]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-hal
+//! [embedded-hal-async]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-hal-async
+//! [xtask]: https://github.com/matklad/cargo-xtask
+//! [esp-template]: https://github.com/esp-rs/esp-template
+//! [cargo-generate]: https://github.com/cargo-generate/cargo-generate
+//! [ancillary esp crates]: https://github.com/esp-rs/esp-hal?tab=readme-ov-file#ancillary-crates
+//! [book]: https://docs.esp-rs.org/book/
 //!
 //! ## Feature Flags
-#![doc = document_features::document_features!()]
+#![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![allow(asm_sub_register)]
 #![cfg_attr(feature = "async", allow(stable_features, async_fn_in_trait))]
