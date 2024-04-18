@@ -426,7 +426,9 @@ pub(crate) mod utils {
             psram_io.psram_spiwp_sd3_io = PSRAM_HSPI_SPIWP_SD3_IO;
             psram_io.psram_spihd_sd2_io = PSRAM_HSPI_SPIHD_SD2_IO;
         } else if (chip == crate::efuse::ChipType::Esp32Picov302) {
-            //PS-RAM pins { flash_clk_io: 6, flash_cs_io: 11, psram_clk_io: 10, psram_cs_io: 9, psram_spiq_sd0_io: 17, psram_spid_sd1_io: 23, psram_spiwp_sd3_io: 18, psram_spihd_sd2_io: 16 },
+            // PS-RAM pins { flash_clk_io: 6, flash_cs_io: 11, psram_clk_io: 10,
+            // psram_cs_io: 9, psram_spiq_sd0_io: 17, psram_spid_sd1_io: 23,
+            // psram_spiwp_sd3_io: 18, psram_spihd_sd2_io: 16 },
             psram_io.flash_clk_io = EFUSE_SPICONFIG_RET_SPICLK(spiconfig);
             psram_io.flash_cs_io = EFUSE_SPICONFIG_RET_SPICS0(spiconfig);
             psram_io.psram_spiq_sd0_io = EFUSE_SPICONFIG_RET_SPIQ(spiconfig);
