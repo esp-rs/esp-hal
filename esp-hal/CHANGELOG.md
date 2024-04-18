@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- ESP32-PICO-V3-02: Initial support (#1155)
+
+### Added
+
+### Fixed
+
+### Changed
+
+### Removed
+
+## [0.17.0] - 2024-04-18
+
 ### Added
 
 - Add `ADC::read_blocking` to xtensa chips (#1293)
@@ -21,7 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Async uart now reports interrupt errors(overflow, glitch, frame error, parity) back to user of read/write. uart clock decimal part configured for c2,c3,s3 (#1168, #1445)
 - Add mechanism to configure UART source clock (#1416)
 - `GpioPin` got a function `set_state(bool)` (#1462)
-- ESP32-PICO-V3-02: Initial support (#1155)
+- Add definitions of external USB PHY peripheral I/O signals
+- Expose e-hal ErrorKind::NoAcknowledge in I2C driver (#1454)
+- Add remaining peripheral signals for LCD_CAM (#1466)
 
 ### Fixed
 
@@ -529,7 +543,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.16.1...HEAD
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/esp-rs/esp-hal/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/esp-rs/esp-hal/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/esp-rs/esp-hal/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/esp-rs/esp-hal/compare/v0.14.1...v0.15.0

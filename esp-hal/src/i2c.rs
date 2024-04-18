@@ -68,11 +68,12 @@ pub enum Error {
 #[cfg(feature = "embedded-hal")]
 impl embedded_hal::i2c::Error for Error {
     fn kind(&self) -> embedded_hal::i2c::ErrorKind {
-        use embedded_hal::i2c::ErrorKind;
+        use embedded_hal::i2c::{ErrorKind, NoAcknowledgeSource};
 
         match self {
             Self::ExceedingFifo => ErrorKind::Overrun,
             Self::ArbitrationLost => ErrorKind::ArbitrationLoss,
+            Self::AckCheckFailed => ErrorKind::NoAcknowledge(NoAcknowledgeSource::Unknown),
             _ => ErrorKind::Other,
         }
     }
