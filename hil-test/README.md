@@ -74,6 +74,11 @@ Our Virtual Machines have the following setup:
   - Devkit: `ESP32-S3-DevKitC-1` connected via USB-Serial-JTAG.
     - `GPIO2` and `GPIO4` are connected.
   - VM: Ubuntu 22.04.4 configured with the following [setup](#vm-setup)
+- ESP32-S2 (`esp32s2-jtag`):
+  - Devkit: `ESP32-S2-Saola-1` connected via UART.
+    - `GPIO2` and `GPIO4` are connected.
+  - Probe: `ESP-Prog` connected with the [following connections](https://docs.espressif.com/projects/esp-idf/en/stable/esp32s2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware)
+  - VM: Ubuntu 22.04.4 configured with the following [setup](#vm-setup)
 
 [`hil.yml`]: https://github.com/esp-rs/esp-hal/blob/main/.github/workflows/hil.yml
 
