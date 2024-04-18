@@ -397,13 +397,13 @@ impl super::CalibrationAccess for crate::peripherals::ADC2 {
 }
 
 /// Analog-to-Digital Converter peripheral driver.
-pub struct ADC<'d, ADCI> {
+pub struct Adc<'d, ADCI> {
     _adc: PeripheralRef<'d, ADCI>,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     active_channel: Option<u8>,
 }
 
-impl<'d, ADCI> ADC<'d, ADCI>
+impl<'d, ADCI> Adc<'d, ADCI>
 where
     ADCI: RegisterAccess + 'd,
 {
@@ -426,7 +426,7 @@ where
                 .bits(0b11)
         });
 
-        ADC {
+        Adc {
             _adc: adc_instance.into_ref(),
             attenuations: config.attenuations,
             active_channel: None,
@@ -540,7 +540,7 @@ impl super::AdcCalEfuse for crate::peripherals::ADC2 {
 
 #[cfg(feature = "embedded-hal-02")]
 impl<'d, ADCI, PIN, CS> embedded_hal_02::adc::OneShot<ADCI, u16, super::AdcPin<PIN, ADCI, CS>>
-    for ADC<'d, ADCI>
+    for Adc<'d, ADCI>
 where
     PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8> + super::AdcChannel,
     ADCI: RegisterAccess,

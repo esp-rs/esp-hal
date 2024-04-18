@@ -42,11 +42,11 @@ pub trait UsbDp: crate::private::Sealed {}
 #[doc(hidden)]
 pub trait UsbDm: crate::private::Sealed {}
 
-pub struct USB<'d> {
+pub struct Usb<'d> {
     _usb0: PeripheralRef<'d, peripherals::USB0>,
 }
 
-impl<'d> USB<'d> {
+impl<'d> Usb<'d> {
     pub fn new<P, M>(
         usb0: impl Peripheral<P = peripherals::USB0> + 'd,
         _usb_dp: impl Peripheral<P = P> + 'd,
@@ -64,9 +64,9 @@ impl<'d> USB<'d> {
     }
 }
 
-unsafe impl<'d> Sync for USB<'d> {}
+unsafe impl<'d> Sync for Usb<'d> {}
 
-unsafe impl<'d> UsbPeripheral for USB<'d> {
+unsafe impl<'d> UsbPeripheral for Usb<'d> {
     const REGISTERS: *const () = peripherals::USB0::ptr() as *const ();
 
     const HIGH_SPEED: bool = false;

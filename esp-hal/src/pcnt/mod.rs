@@ -34,7 +34,7 @@
 //!
 //! // setup a pulse couter
 //! println!("setup pulse counter unit 0");
-//! let pcnt = PCNT::new(peripherals.PCNT, Some(interrupt_handler));
+//! let pcnt = Pcnt::new(peripherals.PCNT, Some(interrupt_handler));
 //! let mut u0 = pcnt.get_unit(unit_number);
 //! u0.configure(unit::Config {
 //!     low_limit: -100,
@@ -46,7 +46,7 @@
 //!
 //! println!("setup channel 0");
 //! let mut ch0 = u0.get_channel(channel::Number::Channel0);
-//! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let mut pin_a = io.pins.gpio5.into_pull_up_input();
 //! let mut pin_b = io.pins.gpio6.into_pull_up_input();
 //!
@@ -141,11 +141,11 @@ use crate::{
 pub mod channel;
 pub mod unit;
 
-pub struct PCNT<'d> {
+pub struct Pcnt<'d> {
     _instance: PeripheralRef<'d, peripherals::PCNT>,
 }
 
-impl<'d> PCNT<'d> {
+impl<'d> Pcnt<'d> {
     /// Return a new PCNT
     pub fn new(
         _instance: impl Peripheral<P = peripherals::PCNT> + 'd,
@@ -162,7 +162,7 @@ impl<'d> PCNT<'d> {
             }
         }
 
-        PCNT { _instance }
+        Pcnt { _instance }
     }
 
     /// Return a unit

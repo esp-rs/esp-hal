@@ -7,7 +7,7 @@
 #![no_std]
 #![no_main]
 
-use core::{cell::RefCell, ptr::addr_of_mut};
+use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_backtrace as _;
@@ -31,6 +31,8 @@ fn main() -> ! {
 
     cfg_if::cfg_if! {
         if #[cfg(not(feature = "esp32s3"))] {
+            use core::ptr::addr_of_mut;
+
             extern "C" {
                 // top of stack
                 static mut _stack_start: u32;

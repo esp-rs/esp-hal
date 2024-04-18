@@ -15,7 +15,7 @@
 //!
 //! # Example
 //! ```no_run
-//! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // configure GPIO 1 as LP output pin
 //! let lp_pin = io.pins.gpio1.into_low_power().into_push_pull_output();
 //! ```
@@ -180,7 +180,7 @@ macro_rules! lp_gpio {
                     }
                 }
 
-                impl<MODE> $crate::gpio::RTCPin for GpioPin<MODE, $gpionum> {
+                impl<MODE> $crate::gpio::RtcPin for GpioPin<MODE, $gpionum> {
                     unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
                         let lp_io = &*$crate::peripherals::LP_IO::ptr();
                         lp_io.[< pin $gpionum >]().modify(|_, w| {
@@ -232,7 +232,7 @@ macro_rules! lp_gpio {
                     }
                 }
 
-                impl<MODE> $crate::gpio::RTCPinWithResistors for GpioPin<MODE, $gpionum> {
+                impl<MODE> $crate::gpio::RtcPinWithResistors for GpioPin<MODE, $gpionum> {
                     fn rtcio_pullup(&mut self, enable: bool) {
                         let lp_io = unsafe { &*$crate::peripherals::LP_IO::ptr() };
                         lp_io.[< gpio $gpionum >]().modify(|_, w| w.fun_wpu().bit(enable));

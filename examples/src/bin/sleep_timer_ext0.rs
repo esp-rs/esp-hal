@@ -12,7 +12,7 @@ use esp_hal::{
     clock::ClockControl,
     delay::Delay,
     entry,
-    gpio::IO,
+    gpio::Io,
     peripherals::Peripherals,
     prelude::*,
     rtc_cntl::{
@@ -34,7 +34,7 @@ fn main() -> ! {
 
     let mut rtc = Rtc::new(peripherals.LPWR, None);
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut ext0_pin = io.pins.gpio4;
 
     println!("up and runnning!");

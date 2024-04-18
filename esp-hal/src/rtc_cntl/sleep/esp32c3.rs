@@ -1,6 +1,6 @@
 use super::{TimerWakeupSource, WakeSource, WakeTriggers, WakeupLevel};
 use crate::{
-    gpio::{RTCPinWithResistors, RtcFunction},
+    gpio::{RtcFunction, RtcPinWithResistors},
     regi2c_write_mask,
     rtc_cntl::{sleep::RtcioWakeupSource, Clock, Rtc, RtcClock},
 };
@@ -116,7 +116,7 @@ impl WakeSource for TimerWakeupSource {
 }
 
 impl<'a, 'b> RtcioWakeupSource<'a, 'b> {
-    fn apply_pin(&self, pin: &mut dyn RTCPinWithResistors, level: WakeupLevel) {
+    fn apply_pin(&self, pin: &mut dyn RtcPinWithResistors, level: WakeupLevel) {
         // The pullup/pulldown part is like in gpio_deep_sleep_wakeup_prepare
         let level = match level {
             WakeupLevel::High => {

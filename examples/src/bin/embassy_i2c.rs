@@ -23,7 +23,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     embassy::{self},
-    gpio::IO,
+    gpio::Io,
     i2c::I2C,
     peripherals::Peripherals,
     prelude::*,
@@ -40,7 +40,7 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timg0);
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let i2c0 = I2C::new_async(
         peripherals.I2C0,

@@ -10,7 +10,7 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::{rtc_io::*, IO},
+    gpio::{rtc_io::*, Io},
     peripherals::Peripherals,
     prelude::*,
     ulp_core,
@@ -21,7 +21,7 @@ use esp_println::{print, println};
 fn main() -> ! {
     let peripherals = Peripherals::take();
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let pin = io.pins.gpio1.into_low_power().into_push_pull_output();
 
     let mut ulp_core = ulp_core::UlpCore::new(peripherals.ULP_RISCV_CORE);

@@ -8,7 +8,7 @@
 //!
 //! ## Example
 //! ```rust
-//! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let sclk = io.pins.gpio12;
 //! let miso = io.pins.gpio11;
 //! let mosi = io.pins.gpio13;

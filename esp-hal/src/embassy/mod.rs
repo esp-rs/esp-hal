@@ -41,7 +41,7 @@
 //! #[cfg(feature = "embassy-time-timg0")]
 //! embassy::init(&clocks, timer_group0.timer0);
 //!
-//! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // GPIO 9 as input
 //! let input = io.pins.gpio9.into_pull_down_input();
 //!
