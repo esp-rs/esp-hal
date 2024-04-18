@@ -33,8 +33,13 @@ use crate::{
 #[non_exhaustive]
 pub struct Channel<const N: u8> {}
 
+impl<const N: u8> crate::private::Sealed for Channel<N> {}
+
+#[doc(hidden)]
 #[non_exhaustive]
 pub struct ChannelInterruptBinder<const N: u8> {}
+
+impl<const N: u8> crate::private::Sealed for ChannelInterruptBinder<N> {}
 
 impl<const N: u8> Channel<N> {
     #[inline(always)]
@@ -336,10 +341,75 @@ impl<const N: u8> RegisterAccess for Channel<N> {
     fn is_listening_ch_in_done() -> bool {
         Self::in_int().ena().read().in_done().bit()
     }
+
+    fn listen_in_descriptor_error() {
+        Self::in_int()
+            .ena()
+            .modify(|_, w| w.in_dscr_err().set_bit())
+    }
+
+    fn unlisten_in_descriptor_error() {
+        Self::in_int()
+            .ena()
+            .modify(|_, w| w.in_dscr_err().clear_bit())
+    }
+
+    fn is_listening_in_descriptor_error() -> bool {
+        Self::in_int().ena().read().in_dscr_err().bit()
+    }
+
+    fn listen_in_descriptor_error_dscr_empty() {
+        Self::in_int()
+            .ena()
+            .modify(|_, w| w.in_dscr_empty().set_bit())
+    }
+
+    fn unlisten_in_descriptor_error_dscr_empty() {
+        Self::in_int()
+            .ena()
+            .modify(|_, w| w.in_dscr_empty().clear_bit())
+    }
+
+    fn is_listening_in_descriptor_error_dscr_empty() -> bool {
+        Self::in_int().ena().read().in_dscr_empty().bit()
+    }
+
+    fn listen_in_descriptor_error_err_eof() {
+        Self::in_int().ena().modify(|_, w| w.in_err_eof().set_bit())
+    }
+
+    fn unlisten_in_descriptor_error_err_eof() {
+        Self::in_int()
+            .ena()
+            .modify(|_, w| w.in_err_eof().clear_bit())
+    }
+
+    fn is_listening_in_descriptor_error_err_eof() -> bool {
+        Self::in_int().ena().read().in_err_eof().bit()
+    }
+
+    fn listen_out_descriptor_error() {
+        Self::out_int()
+            .ena()
+            .modify(|_, w| w.out_dscr_err().set_bit())
+    }
+
+    fn unlisten_out_descriptor_error() {
+        Self::out_int()
+            .ena()
+            .modify(|_, w| w.out_dscr_err().clear_bit())
+    }
+
+    fn is_listening_out_descriptor_error() -> bool {
+        Self::out_int().ena().read().out_dscr_err().bit()
+    }
 }
 
 #[non_exhaustive]
+#[doc(hidden)]
 pub struct ChannelTxImpl<const N: u8> {}
+
+impl<const N: u8> crate::private::Sealed for ChannelTxImpl<N> {}
 
 impl<const N: u8> TxChannel<Channel<N>> for ChannelTxImpl<N> {
     #[cfg(feature = "async")]
@@ -351,7 +421,10 @@ impl<const N: u8> TxChannel<Channel<N>> for ChannelTxImpl<N> {
 }
 
 #[non_exhaustive]
+#[doc(hidden)]
 pub struct ChannelRxImpl<const N: u8> {}
+
+impl<const N: u8> crate::private::Sealed for ChannelRxImpl<N> {}
 
 impl<const N: u8> RxChannel<Channel<N>> for ChannelRxImpl<N> {
     #[cfg(feature = "async")]
@@ -362,10 +435,12 @@ impl<const N: u8> RxChannel<Channel<N>> for ChannelRxImpl<N> {
     }
 }
 
+/// A Channel can be created from this
 #[non_exhaustive]
 pub struct ChannelCreator<const N: u8> {}
 
 #[non_exhaustive]
+#[doc(hidden)]
 pub struct SuitablePeripheral<const N: u8> {}
 impl<const N: u8> PeripheralMarker for SuitablePeripheral<N> {}
 
@@ -387,10 +462,19 @@ impl<const N: u8> LcdCamPeripheral for SuitablePeripheral<N> {}
 macro_rules! impl_channel {
     ($num: literal, $async_handler: path, $($interrupt: ident),* ) => {
         paste::paste! {
+            #[doc(hidden)]
             pub type [<Channel $num>] = Channel<$num>;
+
+            #[doc(hidden)]
             pub type [<Channel $num TxImpl>] = ChannelTxImpl<$num>;
+
+            #[doc(hidden)]
             pub type [<Channel $num RxImpl>] = ChannelRxImpl<$num>;
+
+            #[doc(hidden)]
             pub type [<ChannelCreator $num>] = ChannelCreator<$num>;
+
+            #[doc(hidden)]
             pub type [<Channel $num InterruptBinder>] = ChannelInterruptBinder<$num>;
 
             impl InterruptBinder for ChannelInterruptBinder<$num> {
@@ -491,13 +575,18 @@ cfg_if::cfg_if! {
 /// This offers the available DMA channels.
 pub struct Dma<'d> {
     _inner: PeripheralRef<'d, crate::peripherals::DMA>,
+    /// Channel 0
     pub channel0: ChannelCreator<0>,
+    /// Channel 1
     #[cfg(not(esp32c2))]
     pub channel1: ChannelCreator<1>,
+    /// Channel 2
     #[cfg(not(esp32c2))]
     pub channel2: ChannelCreator<2>,
+    /// Channel 3
     #[cfg(esp32s3)]
     pub channel3: ChannelCreator<3>,
+    /// Channel 4
     #[cfg(esp32s3)]
     pub channel4: ChannelCreator<4>,
 }

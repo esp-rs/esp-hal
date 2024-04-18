@@ -86,7 +86,7 @@ async fn main(_spawner: Spawner) {
     let mut data = [0u8; 5000];
     let mut transaction = i2s_rx.read_dma_circular_async(buffer).unwrap();
     loop {
-        let avail = transaction.available().await;
+        let avail = transaction.available().await.unwrap();
         println!("available {}", avail);
 
         let count = transaction.pop(&mut data).await.unwrap();

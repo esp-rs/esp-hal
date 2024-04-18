@@ -1139,8 +1139,10 @@ pub mod dma {
                 return Err(super::Error::MaxDmaTransferSizeExceeded);
             }
 
-            self.spi
-                .start_read_bytes_dma(ptr, len, &mut self.channel.rx, false)?;
+            unsafe {
+                self.spi
+                    .start_read_bytes_dma(ptr, len, &mut self.channel.rx, false)?;
+            }
             Ok(SpiDmaTransfer { spi_dma: self })
         }
 
@@ -1165,15 +1167,16 @@ pub mod dma {
                 return Err(super::Error::MaxDmaTransferSizeExceeded);
             }
 
-            self.spi.start_transfer_dma(
-                write_ptr,
-                write_len,
-                read_ptr,
-                read_len,
-                &mut self.channel.tx,
-                &mut self.channel.rx,
-                false,
-            )?;
+            unsafe {
+                self.spi.start_transfer_dma(
+                    write_ptr,
+                    write_len,
+                    read_ptr,
+                    read_len,
+                    &mut self.channel.tx,
+                    &mut self.channel.rx,
+                )?;
+            }
             Ok(SpiDmaTransferRxTx { spi_dma: self })
         }
     }
@@ -1254,8 +1257,10 @@ pub mod dma {
                     .modify(|_, w| unsafe { w.usr_dummy_cyclelen().bits(dummy - 1) });
             }
 
-            self.spi
-                .start_read_bytes_dma(ptr, len, &mut self.channel.rx, false)?;
+            unsafe {
+                self.spi
+                    .start_read_bytes_dma(ptr, len, &mut self.channel.rx, false)?;
+            }
             Ok(SpiDmaTransfer { spi_dma: self })
         }
 
@@ -1436,28 +1441,30 @@ pub mod dma {
             M: IsFullDuplex,
         {
             async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-                self.spi.start_read_bytes_dma(
-                    words.as_mut_ptr(),
-                    words.len(),
-                    &mut self.channel.rx,
-                    true,
-                )?;
-
-                crate::dma::asynch::DmaRxFuture::new(&mut self.channel.rx).await;
+                let mut future = crate::dma::asynch::DmaRxFuture::new(&mut self.channel.rx);
+                unsafe {
+                    self.spi.start_read_bytes_dma(
+                        words.as_mut_ptr(),
+                        words.len(),
+                        future.rx(),
+                        true,
+                    )?;
+                }
+                future.await?;
 
                 Ok(())
             }
 
             async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
                 for chunk in words.chunks(MAX_DMA_SIZE) {
+                    let mut future = crate::dma::asynch::DmaTxFuture::new(&mut self.channel.tx);
                     self.spi.start_write_bytes_dma(
                         chunk.as_ptr(),
                         chunk.len(),
-                        &mut self.channel.tx,
+                        future.tx(),
                         true,
                     )?;
-
-                    crate::dma::asynch::DmaTxFuture::new(&mut self.channel.tx).await;
+                    future.await?;
 
                     self.spi.flush()?;
                 }
@@ -1474,21 +1481,25 @@ pub mod dma {
                     let read_idx = isize::min(idx, read.len() as isize);
                     let read_len = usize::min(read.len() - idx as usize, MAX_DMA_SIZE);
 
-                    self.spi.start_transfer_dma(
-                        unsafe { write.as_ptr().offset(write_idx) },
-                        write_len,
-                        unsafe { read.as_mut_ptr().offset(read_idx) },
-                        read_len,
-                        &mut self.channel.tx,
-                        &mut self.channel.rx,
-                        true,
-                    )?;
+                    let mut tx_future = crate::dma::asynch::DmaTxFuture::new(&mut self.channel.tx);
+                    let mut rx_future = crate::dma::asynch::DmaRxFuture::new(&mut self.channel.rx);
 
-                    embassy_futures::join::join(
-                        crate::dma::asynch::DmaTxFuture::new(&mut self.channel.tx),
-                        crate::dma::asynch::DmaRxFuture::new(&mut self.channel.rx),
-                    )
-                    .await;
+                    unsafe {
+                        self.spi.start_transfer_dma(
+                            write.as_ptr().offset(write_idx),
+                            write_len,
+                            read.as_mut_ptr().offset(read_idx),
+                            read_len,
+                            tx_future.tx(),
+                            rx_future.rx(),
+                        )?;
+                    }
+                    match embassy_futures::join::join(tx_future, rx_future).await {
+                        (tx_res, rx_res) => {
+                            tx_res?;
+                            rx_res?;
+                        }
+                    }
 
                     self.spi.flush()?;
 
@@ -1503,21 +1514,26 @@ pub mod dma {
 
             async fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
                 for chunk in words.chunks_mut(MAX_DMA_SIZE) {
-                    self.spi.start_transfer_dma(
-                        chunk.as_ptr(),
-                        chunk.len(),
-                        chunk.as_mut_ptr(),
-                        chunk.len(),
-                        &mut self.channel.tx,
-                        &mut self.channel.rx,
-                        true,
-                    )?;
+                    let mut tx_future = crate::dma::asynch::DmaTxFuture::new(&mut self.channel.tx);
+                    let mut rx_future = crate::dma::asynch::DmaRxFuture::new(&mut self.channel.rx);
 
-                    embassy_futures::join::join(
-                        crate::dma::asynch::DmaTxFuture::new(&mut self.channel.tx),
-                        crate::dma::asynch::DmaRxFuture::new(&mut self.channel.rx),
-                    )
-                    .await;
+                    unsafe {
+                        self.spi.start_transfer_dma(
+                            chunk.as_ptr(),
+                            chunk.len(),
+                            chunk.as_mut_ptr(),
+                            chunk.len(),
+                            tx_future.tx(),
+                            rx_future.rx(),
+                        )?;
+                    }
+
+                    match embassy_futures::join::join(tx_future, rx_future).await {
+                        (tx_res, rx_res) => {
+                            tx_res?;
+                            rx_res?;
+                        }
+                    }
 
                     self.spi.flush()?;
                 }
@@ -1778,6 +1794,7 @@ mod ehal1 {
     }
 }
 
+#[doc(hidden)]
 pub trait InstanceDma<TX, RX>: Instance
 where
     TX: Tx,
@@ -1790,15 +1807,16 @@ where
         rx: &mut RX,
     ) -> Result<&'w [u8], Error> {
         for chunk in words.chunks_mut(MAX_DMA_SIZE) {
-            self.start_transfer_dma(
-                chunk.as_ptr(),
-                chunk.len(),
-                chunk.as_mut_ptr(),
-                chunk.len(),
-                tx,
-                rx,
-                false,
-            )?;
+            unsafe {
+                self.start_transfer_dma(
+                    chunk.as_ptr(),
+                    chunk.len(),
+                    chunk.as_mut_ptr(),
+                    chunk.len(),
+                    tx,
+                    rx,
+                )?;
+            }
 
             while !tx.is_done() && !rx.is_done() {}
             self.flush().unwrap();
@@ -1822,15 +1840,16 @@ where
             let read_idx = isize::min(idx, read_buffer.len() as isize);
             let read_len = usize::min(read_buffer.len() - idx as usize, MAX_DMA_SIZE);
 
-            self.start_transfer_dma(
-                unsafe { write_buffer.as_ptr().offset(write_idx) },
-                write_len,
-                unsafe { read_buffer.as_mut_ptr().offset(read_idx) },
-                read_len,
-                tx,
-                rx,
-                false,
-            )?;
+            unsafe {
+                self.start_transfer_dma(
+                    write_buffer.as_ptr().offset(write_idx),
+                    write_len,
+                    read_buffer.as_mut_ptr().offset(read_idx),
+                    read_len,
+                    tx,
+                    rx,
+                )?;
+            }
 
             while !tx.is_done() && !rx.is_done() {}
             self.flush().unwrap();
@@ -1845,7 +1864,7 @@ where
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn start_transfer_dma(
+    unsafe fn start_transfer_dma(
         &mut self,
         write_buffer_ptr: *const u8,
         write_buffer_len: usize,
@@ -1853,7 +1872,6 @@ where
         read_buffer_len: usize,
         tx: &mut TX,
         rx: &mut RX,
-        listen: bool,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
         self.configure_datalen(usize::max(read_buffer_len, write_buffer_len) as u32 * 8);
@@ -1872,21 +1890,19 @@ where
             write_buffer_len,
         )
         .and_then(|_| tx.start_transfer())?;
-        rx.prepare_transfer_without_start(
-            false,
-            self.dma_peripheral(),
-            read_buffer_ptr,
-            read_buffer_len,
-        )
-        .and_then(|_| rx.start_transfer())?;
+        unsafe {
+            rx.prepare_transfer_without_start(
+                false,
+                self.dma_peripheral(),
+                read_buffer_ptr,
+                read_buffer_len,
+            )
+            .and_then(|_| rx.start_transfer())?;
+        }
 
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
 
-        if listen {
-            tx.listen_eof();
-            rx.listen_eof();
-        }
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
 
         Ok(())
@@ -1935,7 +1951,7 @@ where
     }
 
     #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-    fn start_read_bytes_dma(
+    unsafe fn start_read_bytes_dma(
         &mut self,
         ptr: *mut u8,
         len: usize,
@@ -1951,8 +1967,10 @@ where
         self.update();
 
         reset_dma_before_load_dma_dscr(reg_block);
-        rx.prepare_transfer_without_start(false, self.dma_peripheral(), ptr, len)
-            .and_then(|_| rx.start_transfer())?;
+        unsafe {
+            rx.prepare_transfer_without_start(false, self.dma_peripheral(), ptr, len)
+                .and_then(|_| rx.start_transfer())?;
+        }
 
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
@@ -2087,6 +2105,7 @@ where
 {
 }
 
+#[doc(hidden)]
 pub trait ExtendedInstance: Instance {
     fn sio0_input_signal(&self) -> InputSignal;
 
@@ -2101,6 +2120,7 @@ pub trait ExtendedInstance: Instance {
     fn sio3_input_signal(&self) -> InputSignal;
 }
 
+#[doc(hidden)]
 pub trait Instance: crate::private::Sealed {
     fn register_block(&self) -> &RegisterBlock;
 
