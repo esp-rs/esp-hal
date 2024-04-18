@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `GpioPin` got a function `set_state(bool)` (#1462)
 - Add definitions of external USB PHY peripheral I/O signals
 - Expose e-hal ErrorKind::NoAcknowledge in I2C driver (#1454)
+- Add remaining peripheral signals for LCD_CAM (#1466)
 
 ### Fixed
 
