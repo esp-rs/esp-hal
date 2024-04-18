@@ -282,7 +282,7 @@ where
 mod ehal1 {
     use embedded_hal::pwm::{self, ErrorKind, ErrorType, SetDutyCycle};
 
-    use super::{Channel, ChannelHW, ChannelIFace, Error};
+    use super::{Channel, ChannelHW, Error};
     use crate::{gpio::OutputPin, ledc::timer::TimerSpeed};
 
     impl pwm::Error for Error {
