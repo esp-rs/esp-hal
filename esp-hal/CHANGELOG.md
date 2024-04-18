@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Fixed
+
+### Changed
+
+### Removed
+
+## [0.17.0] - 2024-04-18
+
+### Added
+
 - Add `ADC::read_blocking` to xtensa chips (#1293)
 - ESP32-C6 / ESP32-H2: Implement `ETM` for general purpose timers (#1274)
 - `interrupt::enable` now has a direct CPU enable counter part, `interrupt::enable_direct` (#1310)
@@ -18,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `GpioPin::steal` unsafe API (#1363)
 - Inherent implementions of GPIO pin `set_low`, `is_low`, etc.
 - Warn users when attempting to build using the `dev` profile (#1420)
+- Async uart now reports interrupt errors(overflow, glitch, frame error, parity) back to user of read/write. uart clock decimal part configured for c2,c3,s3 (#1168, #1445)
+- Add mechanism to configure UART source clock (#1416)
+- `GpioPin` got a function `set_state(bool)` (#1462)
+- Add definitions of external USB PHY peripheral I/O signals
+- Expose e-hal ErrorKind::NoAcknowledge in I2C driver (#1454)
+- Add remaining peripheral signals for LCD_CAM (#1466)
 
 ### Fixed
 
@@ -37,6 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a divide by zero panic when setting the LEDC duty cycle to 0 with `SetDutyCycle::set_duty_cycle` (#1403)
 - Fix for issue #1419. Removed ESP32 specific code for resolutions > 16 bit in ledc embedded_hal::pwm max_duty_cycle function. 
 - Fix for issue #1419. Fixed division by zero in ledc embedded_hal::pwm set_duty_cycle function and converted to set_duty_hw instead of set_duty to eliminate loss of granularity.
+- Support 192 and 256-bit keys for AES (#1316)
+- Fixed MCPWM DeadTimeCfg bit values (#1378)
+- ESP32 LEDC `set_duty_cycle` used HighSpeedChannel for LowSpeedChannel (#1457)
 
 ### Changed
 
@@ -62,12 +81,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Runtime ISR binding for software interrupts, software interrupts are split now, interrupt-executor takes the software interrupt to use, interrupt-executor is easier to use (#1398)
 - PCNT: Runtime ISR binding (#1396)
 - Runtime ISR binding for RTC (#1405)
+- Improve MCPWM DeadTimeCfg API (#1378)
+- `SystemTimer`'s `Alarm` methods now require `&mut self` (#1455)
 
 ### Removed
 
 - Remove package-level type exports (#1275)
 - Removed `direct-vectoring` & `interrupt-preemption` features, as they are now enabled by default (#1310)
 - Removed the `rt` and `vectored` features (#1380)
+- Remove partial support for the ESP32-P4 (#1461)
 
 ## [0.16.1] - 2024-03-12
 
@@ -521,7 +543,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.16.1...HEAD
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/esp-rs/esp-hal/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/esp-rs/esp-hal/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/esp-rs/esp-hal/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/esp-rs/esp-hal/compare/v0.14.1...v0.15.0

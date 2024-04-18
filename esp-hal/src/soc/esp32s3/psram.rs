@@ -731,7 +731,7 @@ pub(crate) mod utils {
                 let iomux = &*esp32s3::IO_MUX::PTR;
                 iomux
                     .gpio(cs1_io as usize)
-                    .modify(|_, w| w.mcu_sel().variant(FUNC_SPICS1_SPICS1))
+                    .modify(|_, w| w.mcu_sel().bits(FUNC_SPICS1_SPICS1))
             }
         } else {
             unsafe {
@@ -740,7 +740,7 @@ pub(crate) mod utils {
                 let iomux = &*esp32s3::IO_MUX::PTR;
                 iomux
                     .gpio(cs1_io as usize)
-                    .modify(|_, w| w.mcu_sel().variant(PIN_FUNC_GPIO))
+                    .modify(|_, w| w.mcu_sel().bits(PIN_FUNC_GPIO))
             }
         }
 
@@ -1375,7 +1375,7 @@ pub(crate) mod utils {
         for pin in pins {
             unsafe {
                 let iomux = &*esp32s3::IO_MUX::PTR;
-                iomux.gpio(*pin).modify(|_, w| w.fun_drv().variant(3))
+                iomux.gpio(*pin).modify(|_, w| w.fun_drv().bits(3))
             }
         }
     }
@@ -1474,7 +1474,7 @@ pub(crate) mod utils {
             let iomux = &*esp32s3::IO_MUX::PTR;
             iomux
                 .gpio(OCT_PSRAM_CS1_IO as usize)
-                .modify(|_, w| w.mcu_sel().variant(FUNC_SPICS1_SPICS1))
+                .modify(|_, w| w.mcu_sel().bits(FUNC_SPICS1_SPICS1))
         }
 
         // Set mspi cs1 drive strength
@@ -1482,7 +1482,7 @@ pub(crate) mod utils {
             let iomux = &*esp32s3::IO_MUX::PTR;
             iomux
                 .gpio(OCT_PSRAM_CS1_IO as usize)
-                .modify(|_, w| w.fun_drv().variant(3))
+                .modify(|_, w| w.fun_drv().bits(3))
         }
 
         // Set psram clock pin drive strength

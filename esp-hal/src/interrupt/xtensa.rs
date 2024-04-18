@@ -1,6 +1,3 @@
-// TODO: Add safety doc comments as needed and remove allow attribute
-#![allow(clippy::missing_safety_doc)]
-
 use xtensa_lx::interrupt::{self, InterruptNumber};
 use xtensa_lx_rt::exception::Context;
 
@@ -10,10 +7,13 @@ use crate::{
     Cpu,
 };
 
+/// Interrupt Error
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
+    /// The given interrupt is not a valid interrupt
     InvalidInterrupt,
+    /// The CPU interrupt is a reserved interrupt
     CpuInterruptReserved,
 }
 
@@ -21,10 +21,10 @@ pub enum Error {
 ///
 /// It's possible to create one handler per priority level. (e.g
 /// `level1_interrupt`)
-#[allow(unused)]
 #[derive(Debug, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u32)]
+#[allow(missing_docs)]
 pub enum CpuInterrupt {
     Interrupt0LevelPriority1 = 0,
     Interrupt1LevelPriority1,
@@ -60,6 +60,7 @@ pub enum CpuInterrupt {
     Interrupt31EdgePriority5,
 }
 
+/// The interrupts reserved by the HAL
 pub const RESERVED_INTERRUPTS: &[usize] = &[
     CpuInterrupt::Interrupt1LevelPriority1 as _,
     CpuInterrupt::Interrupt19LevelPriority2 as _,
@@ -105,12 +106,12 @@ pub fn enable_direct(interrupt: Interrupt, cpu_interrupt: CpuInterrupt) -> Resul
 
 /// Assign a peripheral interrupt to an CPU interrupt
 ///
-/// Great care **must** be taken when using this function with interrupt
-/// vectoring (enabled by default). Avoid the interrupts listed in
-/// [`RESERVED_INTERRUPTS`] as they are preallocated for interrupt vectoring.
-///
 /// Note: this only maps the interrupt to the CPU interrupt. The CPU interrupt
 /// still needs to be enabled afterwards
+///
+/// # Safety
+///
+/// Do not use CPU interrupts in the [`RESERVED_INTERRUPTS`].
 pub unsafe fn map(core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
     let interrupt_number = interrupt as isize;
     let cpu_interrupt_number = which as isize;
@@ -150,8 +151,7 @@ pub fn clear(_core: Cpu, which: CpuInterrupt) {
 /// Get status of peripheral interrupts
 pub fn get_status(core: Cpu) -> u128 {
     unsafe {
-        #[allow(unused_mut)]
-        let mut status = match core {
+        let status = match core {
             Cpu::ProCpu => {
                 ((*core0_interrupt_peripheral())
                     .pro_intr_status_0()
@@ -188,23 +188,25 @@ pub fn get_status(core: Cpu) -> u128 {
         };
 
         #[cfg(feature = "esp32s3")]
-        match core {
+        let status = match core {
             Cpu::ProCpu => {
-                status |= ((*core0_interrupt_peripheral())
-                    .pro_intr_status_3()
-                    .read()
-                    .bits() as u128)
-                    << 96;
+                status
+                    | ((*core0_interrupt_peripheral())
+                        .pro_intr_status_3()
+                        .read()
+                        .bits() as u128)
+                        << 96
             }
             #[cfg(multi_core)]
             Cpu::AppCpu => {
-                status |= ((*core1_interrupt_peripheral())
-                    .app_intr_status_3()
-                    .read()
-                    .bits() as u128)
-                    << 96;
+                status
+                    | ((*core1_interrupt_peripheral())
+                        .app_intr_status_3()
+                        .read()
+                        .bits() as u128)
+                        << 96
             }
-        }
+        };
 
         status
     }
@@ -242,6 +244,7 @@ mod vectored {
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     #[repr(u8)]
+    #[allow(missing_docs)]
     pub enum Priority {
         None = 0,
         Priority1,
@@ -250,10 +253,12 @@ mod vectored {
     }
 
     impl Priority {
+        /// Maximum interrupt priority
         pub const fn max() -> Priority {
             Priority::Priority3
         }
 
+        /// Minimum interrupt priority
         pub const fn min() -> Priority {
             Priority::Priority1
         }
@@ -349,6 +354,10 @@ mod vectored {
     }
 
     /// Bind the given interrupt to the given handler
+    ///
+    /// # Safety
+    ///
+    /// This will replace any previously bound interrupt handler
     pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: unsafe extern "C" fn() -> ()) {
         let ptr = &peripherals::__INTERRUPTS[interrupt as usize]._handler as *const _
             as *mut unsafe extern "C" fn() -> ();

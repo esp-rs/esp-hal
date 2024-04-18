@@ -21,6 +21,7 @@
 //! ```
 //!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
+#![warn(missing_docs)]
 
 use core::{cell::Cell, marker::PhantomData};
 
@@ -52,21 +53,30 @@ pub const NO_PIN: Option<NoPinType> = None;
 
 static USER_INTERRUPT_HANDLER: Mutex<Cell<Option<InterruptHandler>>> = Mutex::new(Cell::new(None));
 
+/// Event used to trigger interrupts.
 #[derive(Copy, Clone)]
 pub enum Event {
+    /// Interrupts trigger on rising pin edge.
     RisingEdge  = 1,
+    /// Interrupts trigger on falling pin edge.
     FallingEdge = 2,
+    /// Interrupts trigger on either rising or falling pin edges.
     AnyEdge     = 3,
+    /// Interrupts trigger on low level
     LowLevel    = 4,
+    /// Interrupts trigger on high level
     HighLevel   = 5,
 }
 
+/// Unknown pin mode
 pub struct Unknown {}
 
+/// Input pin mode
 pub struct Input<MODE> {
     _mode: PhantomData<MODE>,
 }
 
+/// Inverted input pin mode
 pub struct InvertedInput<MODE> {
     _mode: PhantomData<MODE>,
 }
@@ -89,20 +99,26 @@ impl InputMode for Unknown {
     const PIN_IS_INVERTED: bool = false;
 }
 
+/// RTC input pin mode
 pub struct RTCInput<MODE> {
     _mode: PhantomData<MODE>,
 }
 
+/// Floating mode
 pub struct Floating;
 
+/// Pull-down mode
 pub struct PullDown;
 
+/// Pull-up mode
 pub struct PullUp;
 
+/// Output pin mode
 pub struct Output<MODE> {
     _mode: PhantomData<MODE>,
 }
 
+/// Inverted output pin mode
 pub struct InvertedOutput<MODE> {
     _mode: PhantomData<MODE>,
 }
@@ -125,16 +141,21 @@ impl OutputMode for Unknown {
     const PIN_IS_INVERTED: bool = false;
 }
 
+/// RTC output pin mode
 pub struct RTCOutput<MODE> {
     _mode: PhantomData<MODE>,
 }
 
+/// Open-drain mode
 pub struct OpenDrain;
 
+/// Push-pull mode
 pub struct PushPull;
 
+/// Analog mode
 pub struct Analog;
 
+/// Alternate mode
 pub struct Alternate<MODE> {
     _mode: PhantomData<MODE>,
 }
@@ -148,6 +169,8 @@ pub struct AF1;
 #[doc(hidden)]
 pub struct AF2;
 
+/// Drive strength (values are approximates)
+#[allow(missing_docs)]
 pub enum DriveStrength {
     I5mA  = 0,
     I10mA = 1,
@@ -155,7 +178,9 @@ pub enum DriveStrength {
     I40mA = 3,
 }
 
+/// Alternate functions
 #[derive(PartialEq)]
+#[allow(missing_docs)]
 pub enum AlternateFunction {
     Function0 = 0,
     Function1 = 1,
@@ -165,19 +190,25 @@ pub enum AlternateFunction {
     Function5 = 5,
 }
 
+/// RTC function
 #[derive(PartialEq)]
+#[allow(missing_docs)]
 pub enum RtcFunction {
     Rtc     = 0,
     Digital = 1,
 }
 
+/// Trait implemented by RTC pins
 pub trait RTCPin: Pin {
+    /// RTC number of the pin
     #[cfg(xtensa)]
     fn rtc_number(&self) -> u8;
 
+    /// Configure the pin
     #[cfg(any(xtensa, esp32c6))]
     fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: RtcFunction);
 
+    /// Enable or disable PAD_HOLD
     fn rtcio_pad_hold(&mut self, enable: bool);
 
     /// # Safety
@@ -188,21 +219,32 @@ pub trait RTCPin: Pin {
     unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8);
 }
 
+/// Trait implemented by RTC pins which supporting internal pull-up / pull-down
+/// resistors.
 pub trait RTCPinWithResistors: RTCPin {
+    /// Enable/disable the internal pull-up resistor
     fn rtcio_pullup(&mut self, enable: bool);
+    /// Enable/disable the internal pull-down resistor
     fn rtcio_pulldown(&mut self, enable: bool);
 }
 
+/// Marker for RTC pins which support input mode
 pub trait RTCInputPin: RTCPin {}
+/// Marker for RTC pins which support output mode
 pub trait RTCOutputPin: RTCPin {}
 
+/// Marker for pins which support analog mode
 pub trait AnalogPin {}
 
+/// Common trait implemented by pins
 pub trait Pin {
+    /// GPIO number
     fn number(&self) -> u8;
 
+    /// Enable/disable sleep-mode
     fn sleep_mode(&mut self, on: bool);
 
+    /// Configure the alternate function
     fn set_alternate_function(&mut self, alternate: AlternateFunction);
 
     /// Listen for interrupts
@@ -232,17 +274,27 @@ pub trait Pin {
     fn clear_interrupt(&mut self);
 }
 
+/// Trait implemented by pins which can be used as inputs
 pub trait InputPin: Pin {
+    /// Set the pin to input mode without internal pull-up / pull-down resistors
     fn set_to_input(&mut self) -> &mut Self;
 
+    /// Enable input for the pin
     fn enable_input(&mut self, on: bool) -> &mut Self;
 
+    /// Enable input in sleep mode for the pin
     fn enable_input_in_sleep_mode(&mut self, on: bool) -> &mut Self;
 
+    /// The current state of the input
     fn is_input_high(&self) -> bool;
 
+    /// Connect the pin to a peripheral input signal
     fn connect_input_to_peripheral(&mut self, signal: InputSignal) -> &mut Self;
 
+    /// Connect the pin to a peripheral input signal.
+    ///
+    /// Optionally invert the signal. When `force_via_gpio_mux` is true it will
+    /// won't use the alternate function even if it matches
     fn connect_input_to_peripheral_with_options(
         &mut self,
         signal: InputSignal,
@@ -258,31 +310,59 @@ pub trait InputPin: Pin {
     fn disconnect_input_from_peripheral(&mut self, signal: InputSignal) -> &mut Self;
 }
 
+/// Trait implemented by pins which can be used as outputs
 pub trait OutputPin: Pin {
+    /// Configure open-drain mode
     fn set_to_open_drain_output(&mut self) -> &mut Self;
 
+    /// Configure output mode
     fn set_to_push_pull_output(&mut self) -> &mut Self;
 
+    /// Enable/disable the pin as output
     fn enable_output(&mut self, on: bool) -> &mut Self;
 
+    /// Set the pin's level to high or low
     fn set_output_high(&mut self, on: bool) -> &mut Self;
 
+    /// Configure the [DriveStrength] of the pin
     fn set_drive_strength(&mut self, strength: DriveStrength) -> &mut Self;
 
+    /// Enable/disable open-drain mode
     fn enable_open_drain(&mut self, on: bool) -> &mut Self;
 
+    /// Enable/disable output in sleep mode
     fn enable_output_in_sleep_mode(&mut self, on: bool) -> &mut Self;
 
+    /// Configure internal pull-up resistor in sleep mode
     fn internal_pull_up_in_sleep_mode(&mut self, on: bool) -> &mut Self;
 
+    /// Configure internal pull-down resistor in sleep mode
     fn internal_pull_down_in_sleep_mode(&mut self, on: bool) -> &mut Self;
 
+    /// Enable/disable internal pull-up resistor for normal operation
     fn internal_pull_up(&mut self, on: bool) -> &mut Self;
 
+    /// Enable/disable internal pull-down resistor for normal operation
     fn internal_pull_down(&mut self, on: bool) -> &mut Self;
 
+    /// Connect the pin to a peripheral output signal
     fn connect_peripheral_to_output(&mut self, signal: OutputSignal) -> &mut Self;
 
+    /// Connect the pin to a peripheral output signal.
+    ///
+    /// invert: Configures whether or not to invert the output value
+    ///
+    /// invert_enable: Configures whether or not to invert the output enable
+    /// signal
+    ///
+    /// enable_from_gpio: Configures to select the source of output enable
+    /// signal.
+    /// - false =  Use output enable signal from peripheral
+    /// - true = Force the output enable signal to be sourced from bit n of
+    ///   GPIO_ENABLE_REG
+    ///
+    /// force_via_gpio_mux: if true don't use the alternate function even if it
+    /// matches
     fn connect_peripheral_to_output_with_options(
         &mut self,
         signal: OutputSignal,
@@ -479,6 +559,7 @@ impl BankGpioRegisterAccess for Bank1GpioRegisterAccess {
     }
 }
 
+/// Connect an always-low signal to the peripheral input signal
 pub fn connect_low_to_peripheral(signal: InputSignal) {
     unsafe { &*GPIO::PTR }
         .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
@@ -492,6 +573,7 @@ pub fn connect_low_to_peripheral(signal: InputSignal) {
         });
 }
 
+/// Connect an always-high signal to the peripheral input signal
 pub fn connect_high_to_peripheral(signal: InputSignal) {
     unsafe { &*GPIO::PTR }
         .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
@@ -545,6 +627,7 @@ impl PinType for InputOnlyAnalogPinType {}
 impl IsInputPin for InputOnlyAnalogPinType {}
 impl IsAnalogPin for InputOnlyAnalogPinType {}
 
+/// GPIO pin
 pub struct GpioPin<MODE, const GPIONUM: u8> {
     _mode: PhantomData<MODE>,
 }
@@ -829,22 +912,7 @@ where
             }
         }
 
-        #[cfg(not(any(esp32p4)))]
         unsafe {
-            (*GPIO::PTR).pin(GPIONUM as usize).modify(|_, w| {
-                w.int_ena()
-                    .bits(gpio_intr_enable(int_enable, nmi_enable))
-                    .int_type()
-                    .bits(event as u8)
-                    .wakeup_enable()
-                    .bit(wake_up_from_light_sleep)
-            });
-        }
-
-        #[cfg(esp32p4)]
-        unsafe {
-            // there is no NMI_ENABLE but P4 could trigger 4 interrupts
-            // we'll only support GPIO_INT0 for now
             (*GPIO::PTR).pin(GPIONUM as usize).modify(|_, w| {
                 w.int_ena()
                     .bits(gpio_intr_enable(int_enable, nmi_enable))
@@ -899,8 +967,14 @@ where
         <Self as GpioProperties>::Bank::write_output_clear(1 << (GPIONUM % 32));
     }
 
-    // TODO: add `set_state(PinState)`
-    // Drives the pin high or low depending on the provided value.
+    /// Drives the pin high or low depending on the provided value.
+    #[inline]
+    pub fn set_state(&mut self, state: bool) {
+        match state {
+            true => self.set_high(),
+            false => self.set_low(),
+        }
+    }
 
     /// Is the pin in drive high mode?
     #[inline]
@@ -1397,6 +1471,7 @@ where
 }
 
 impl<MODE> AnyPin<MODE, InputOutputPinType> {
+    /// Convert the pin
     pub fn into_input_type(self) -> AnyPin<MODE, InputOnlyPinType> {
         AnyPin {
             inner: self.inner,
@@ -1406,6 +1481,7 @@ impl<MODE> AnyPin<MODE, InputOutputPinType> {
 }
 
 impl<MODE> AnyPin<MODE, InputOutputAnalogPinType> {
+    /// Convert the pin
     pub fn into_input_type(self) -> AnyPin<MODE, InputOnlyPinType> {
         AnyPin {
             inner: self.inner,
@@ -1413,6 +1489,7 @@ impl<MODE> AnyPin<MODE, InputOutputAnalogPinType> {
         }
     }
 
+    /// Convert the pin
     pub fn into_input_output_type(self) -> AnyPin<MODE, InputOutputPinType> {
         AnyPin {
             inner: self.inner,
@@ -1420,6 +1497,7 @@ impl<MODE> AnyPin<MODE, InputOutputAnalogPinType> {
         }
     }
 
+    /// Convert the pin
     pub fn into_input_only_analog_type(self) -> AnyPin<MODE, InputOnlyAnalogPinType> {
         AnyPin {
             inner: self.inner,
@@ -1429,6 +1507,7 @@ impl<MODE> AnyPin<MODE, InputOutputAnalogPinType> {
 }
 
 impl<MODE> AnyPin<MODE, InputOnlyAnalogPinType> {
+    /// Convert the pin
     pub fn into_input_type(self) -> AnyPin<MODE, InputOnlyPinType> {
         AnyPin {
             inner: self.inner,
@@ -1735,8 +1814,12 @@ impl<MODE, TYPE> AnyPin<Output<MODE>, TYPE> {
         handle_gpio_output!(inner, target, { target.set_high() })
     }
 
-    // TODO: add `set_state(PinState)`
-    // Drives the pin high or low depending on the provided value.
+    /// Drives the pin high or low depending on the provided value.
+    #[inline]
+    pub fn set_state(&mut self, state: bool) {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, { target.set_state(state) })
+    }
 
     /// Is the pin in drive high mode?
     #[inline]
@@ -1797,6 +1880,7 @@ impl<MODE, TYPE> AnyPin<Input<MODE>, TYPE> {
 /// General Purpose Input/Output driver
 pub struct IO {
     _io_mux: IO_MUX,
+    /// The pins available on this chip
     pub pins: Pins,
 }
 
@@ -1851,6 +1935,7 @@ extern "C" fn gpio_interrupt_handler() {
     asynch::handle_gpio_interrupt();
 }
 
+#[doc(hidden)]
 pub trait GpioProperties {
     type Bank: BankGpioRegisterAccess;
     type InterruptStatus: InterruptStatusRegisterAccess;
@@ -1899,6 +1984,7 @@ macro_rules! gpio {
                     type PinType = $crate::gpio::[<$type PinType>];
                 }
 
+                #[doc(hidden)]
                 pub struct [<Gpio $gpionum Signals>] {}
 
                 impl $crate::gpio::GpioSignal for [<Gpio $gpionum Signals>] {
@@ -1929,6 +2015,8 @@ macro_rules! gpio {
                 }
             )+
 
+            /// Pins available on this chip
+            #[allow(missing_docs)]
             pub struct Pins {
                 $(
                     pub [< gpio $gpionum >] : GpioPin<Unknown, $gpionum>,
@@ -1936,6 +2024,7 @@ macro_rules! gpio {
             }
 
             $(
+                #[doc = concat!("Alias for GpioPin<MODE, ", $gpionum, ">")]
                 pub type [<Gpio $gpionum >]<MODE> = GpioPin<MODE, $gpionum>;
             )+
 
@@ -1945,6 +2034,9 @@ macro_rules! gpio {
                 )+
             }
 
+            /// Generic pin
+            ///
+            /// This is useful e.g. if you need an array of pins.
             pub struct AnyPin<MODE, TYPE = ()> {
                 pub(crate) inner: ErasedPin<MODE>,
                 pub(crate) _type: core::marker::PhantomData<TYPE>,
@@ -2385,7 +2477,7 @@ mod asynch {
     pub(super) fn handle_gpio_interrupt() {
         let intrs_bank0 = InterruptStatusRegisterAccessBank0::interrupt_status_read();
 
-        #[cfg(any(esp32, esp32s2, esp32s3, esp32p4))]
+        #[cfg(any(esp32, esp32s2, esp32s3))]
         let intrs_bank1 = InterruptStatusRegisterAccessBank1::interrupt_status_read();
 
         let mut intr_bits = intrs_bank0;
@@ -2399,7 +2491,7 @@ mod asynch {
         // clear interrupt bits
         Bank0GpioRegisterAccess::write_interrupt_status_clear(intrs_bank0);
 
-        #[cfg(any(esp32, esp32s2, esp32s3, esp32p4))]
+        #[cfg(any(esp32, esp32s2, esp32s3))]
         {
             let mut intr_bits = intrs_bank1;
             while intr_bits != 0 {

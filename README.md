@@ -10,7 +10,6 @@ Bare-metal (`no_std`) hardware abstraction layer for Espressif devices. Currentl
 - ESP32 Series: _ESP32_
 - ESP32-C Series: _ESP32-C2 (aka ESP8684), ESP32-C3 (aka ESP8685), ESP32-C6_
 - ESP32-H Series: _ESP32-H2_
-- ESP32-P Series: _ESP32-P4_
 - ESP32-S Series: _ESP32-S2, ESP32-S3_
 
 Additionally provides limited support for programming the low-power RISC-V cores found on the _ESP32-C6_, _ESP32-S2_, and _ESP32-S3_ via the [esp-lp-hal] package.
@@ -56,7 +55,6 @@ There are a number of other crates within the [esp-rs organization] which can be
 
 |      Crate       |                                  Description                                   |
 | :--------------: | :----------------------------------------------------------------------------: |
-|   [esp-alloc]    |                        A simple `no_std` heap allocator                        |
 | [esp-backtrace]  |                 Backtrace support for bare-metal applications                  |
 | [esp-ieee802154] |          Low-level IEEE802.15.4 driver for the ESP32-C6 and ESP32-H2           |
 | [esp-openthread] |           A bare-metal Thread implementation using `esp-ieee802154`            |

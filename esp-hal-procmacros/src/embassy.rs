@@ -35,8 +35,7 @@ pub(crate) mod main {
         f: syn::ItemFn,
         main: TokenStream,
     ) -> Result<TokenStream, TokenStream> {
-        #[allow(unused_variables)]
-        let args = Args::from_list(args).map_err(|e| e.write_errors())?;
+        let _args = Args::from_list(args).map_err(|e| e.write_errors())?;
 
         let fargs = f.sig.inputs.clone();
 
@@ -131,12 +130,6 @@ pub(crate) mod main {
                 .unwrap()
                 // Curb monomorphization from generating too many identical methods.
                 .push(syn::Error::new_spanned(obj.into_token_stream(), msg));
-        }
-
-        /// Add one of Syn's parse errors.
-        #[allow(unused)]
-        pub fn syn_error(&self, err: syn::Error) {
-            self.errors.borrow_mut().as_mut().unwrap().push(err);
         }
 
         /// Consume this object, producing a formatted error string if there are

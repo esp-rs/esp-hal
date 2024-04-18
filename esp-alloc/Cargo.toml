@@ -1,0 +1,29 @@
+[package]
+name         = "esp-alloc"
+version      = "0.3.0"
+edition      = "2021"
+rust-version = "1.68"
+description  = "A heap allocator for Espressif devices"
+repository   = "https://github.com/esp-rs/esp-hal"
+license      = "MIT OR Apache-2.0"
+
+keywords = [
+    "allocator",
+    "esp32",
+    "riscv",
+    "xtensa",
+]
+categories = [
+    "memory-management",
+    "no-std",
+]
+
+[package.metadata.docs.rs]
+default-target = "riscv32imc-unknown-none-elf"
+
+[dependencies]
+critical-section      = "1.1.1"
+linked_list_allocator = { version = "0.10.5", default-features = false, features = ["const_mut_refs"] }
+
+[features]
+nightly = []

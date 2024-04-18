@@ -17,8 +17,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Test RISC-V targets:
-  riscv-hil:
+  hil:
     name: HIL Test | ${{ matrix.target.soc }}
     runs-on:
       labels: [self-hosted, "${{ matrix.target.runner }}"]
@@ -26,6 +25,7 @@ jobs:
       fail-fast: false
       matrix:
         target:
+          # RISC-V devices:
           - soc: esp32c3
             runner: rustboard
             rust-target: riscv32imc-unknown-none-elf
@@ -35,6 +35,9 @@ jobs:
           - soc: esp32h2
             runner: esp32h2-usb
             rust-target: riscv32imac-unknown-none-elf
+          # Xtensa devices:
+          - soc: esp32s3
+            runner: esp32s3-usb
     steps:
       - uses: actions/checkout@v4
         if: github.event_name != 'workflow_dispatch'
@@ -45,14 +48,20 @@ jobs:
           repository: ${{ github.event.inputs.repository }}
           ref: ${{ github.event.inputs.branch }}
 
-      - uses: dtolnay/rust-toolchain@v1
+      # Install the Rust toolchain for RISC-V devices:
+      - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.target.soc) }}
+        uses: dtolnay/rust-toolchain@v1
         with:
           target: ${{ matrix.target.rust-target }}
           toolchain: nightly
           components: rust-src
+      # Install the Rust toolchain for Xtensa devices:
+      - if: contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.target.soc)
+        uses: esp-rs/xtensa-toolchain@v1.5
+        with:
+          buildtargets: ${{ matrix.target.soc }}
+          default: true
+          ldproxy: false
 
       - name: Run tests
         run: cargo xtask run-tests ${{ matrix.target.soc }}
-
-  # Test Xtensa targets:
-  # TODO: Add jobs for Xtensa once supported by `probe-rs`

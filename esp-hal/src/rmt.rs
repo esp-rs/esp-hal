@@ -1,7 +1,7 @@
 //! # Remote Control Peripheral (RMT)
 //!
 //! ## Overview
-//! Some ESP32 variants include a remote control peripheral (RMT) that
+//! Some ESP32 bitss include a remote control peripheral (RMT) that
 //! is designed to handle infrared remote control signals. For that
 //! purpose, it can convert bitstreams of data (from the RAM) into
 //! pulse codes and even modulate those codes into a carrier wave.
@@ -1571,17 +1571,17 @@ mod chip_specific {
         #[cfg(not(pcr))]
         {
             let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-            rmt.sys_conf().modify(|_, w| {
+            rmt.sys_conf().modify(|_, w| unsafe {
                 w.clk_en()
                     .clear_bit()
                     .sclk_sel()
-                    .variant(crate::soc::constants::RMT_CLOCK_SRC)
+                    .bits(crate::soc::constants::RMT_CLOCK_SRC)
                     .sclk_div_num()
-                    .variant(div as u8)
+                    .bits(div as u8)
                     .sclk_div_a()
-                    .variant(0)
+                    .bits(0)
                     .sclk_div_b()
-                    .variant(0)
+                    .bits(0)
                     .apb_fifo_mask()
                     .set_bit()
             });
@@ -1590,16 +1590,21 @@ mod chip_specific {
         #[cfg(pcr)]
         {
             let pcr = unsafe { &*crate::peripherals::PCR::PTR };
-            pcr.rmt_sclk_conf().modify(|_, w| {
-                w.sclk_sel()
-                    .variant(crate::soc::constants::RMT_CLOCK_SRC)
-                    .sclk_div_num()
-                    .variant(div as u8)
+            pcr.rmt_sclk_conf().modify(|_, w| unsafe {
+                w.sclk_div_num()
+                    .bits(div as u8)
                     .sclk_div_a()
-                    .variant(0)
+                    .bits(0)
                     .sclk_div_b()
-                    .variant(0)
+                    .bits(0)
             });
+
+            #[cfg(esp32c6)]
+            pcr.rmt_sclk_conf()
+                .modify(|_, w| unsafe { w.sclk_sel().bits(crate::soc::constants::RMT_CLOCK_SRC) });
+            #[cfg(not(esp32c6))]
+            pcr.rmt_sclk_conf()
+                .modify(|_, w| w.sclk_sel().bit(crate::soc::constants::RMT_CLOCK_SRC));
 
             let rmt = unsafe { &*crate::peripherals::RMT::PTR };
             rmt.sys_conf().modify(|_, w| w.apb_fifo_mask().set_bit());
@@ -1670,7 +1675,7 @@ mod chip_specific {
 
                     fn set_divider(divider: u8) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                        rmt.ch_tx_conf0($ch_num).modify(|_, w| w.div_cnt().variant(divider));
+                        rmt.ch_tx_conf0($ch_num).modify(|_, w| unsafe { w.div_cnt().bits(divider) });
                     }
 
                     fn update() {
@@ -1681,22 +1686,22 @@ mod chip_specific {
                     fn set_generate_repeat_interrupt(repeats: u16) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
                         if repeats > 1 {
-                            rmt.ch_tx_lim($ch_num).modify(|_, w| {
+                            rmt.ch_tx_lim($ch_num).modify(|_, w| unsafe {
                                 w.loop_count_reset()
                                     .set_bit()
                                     .tx_loop_cnt_en()
                                     .set_bit()
                                     .tx_loop_num()
-                                    .variant(repeats)
+                                    .bits(repeats)
                             });
                         } else {
-                            rmt.ch_tx_lim($ch_num).modify(|_, w| {
+                            rmt.ch_tx_lim($ch_num).modify(|_, w| unsafe {
                                 w.loop_count_reset()
                                     .set_bit()
                                     .tx_loop_cnt_en()
                                     .clear_bit()
                                     .tx_loop_num()
-                                    .variant(0)
+                                    .bits(0)
                             });
                         }
 
@@ -1734,7 +1739,7 @@ mod chip_specific {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
 
                         rmt.chcarrier_duty($ch_num)
-                            .write(|w| w.carrier_high().variant(high).carrier_low().variant(low));
+                            .write(|w| unsafe { w.carrier_high().bits(high).carrier_low().bits(low) });
 
                         rmt.ch_tx_conf0($ch_num).modify(|_, w| {
                             w.carrier_en()
@@ -1754,7 +1759,7 @@ mod chip_specific {
                     fn set_memsize(memsize: u8) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
 
-                        rmt.ch_tx_conf0($ch_num).modify(|_, w| w.mem_size().variant(memsize));
+                        rmt.ch_tx_conf0($ch_num).modify(|_, w| unsafe { w.mem_size().bits(memsize) });
                     }
 
                     fn start_tx() {
@@ -1797,7 +1802,7 @@ mod chip_specific {
 
                     fn set_threshold(threshold: u8) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                        rmt.ch_tx_lim($ch_num).modify(|_, w| w.tx_lim().variant(threshold as u16));
+                        rmt.ch_tx_lim($ch_num).modify(|_, w| unsafe { w.tx_lim().bits(threshold as u16) });
                     }
 
                     fn is_loopcount_interrupt_set() -> bool {
@@ -1863,7 +1868,7 @@ mod chip_specific {
 
                     fn set_divider(divider: u8) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                        rmt.[< ch $ch_num _rx_conf0 >]().modify(|_, w| w.div_cnt().variant(divider));
+                        rmt.[< ch $ch_num _rx_conf0 >]().modify(|_, w| unsafe { w.div_cnt().bits(divider) });
                     }
 
                     fn update() {
@@ -1892,11 +1897,11 @@ mod chip_specific {
                     fn set_carrier(carrier: bool, high: u16, low: u16, level: bool) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
 
-                        rmt.ch_rx_carrier_rm($ch_index).write(|w| {
+                        rmt.ch_rx_carrier_rm($ch_index).write(|w| unsafe {
                             w.carrier_high_thres()
-                                .variant(high)
+                                .bits(high)
                                 .carrier_low_thres()
-                                .variant(low)
+                                .bits(low)
                         });
 
                         rmt.[< ch $ch_num _rx_conf0 >]()
@@ -1905,7 +1910,7 @@ mod chip_specific {
 
                     fn set_memsize(memsize: u8) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                        rmt.[< ch $ch_num _rx_conf0 >]().modify(|_, w| w.mem_size().variant(memsize));
+                        rmt.[< ch $ch_num _rx_conf0 >]().modify(|_, w| unsafe { w.mem_size().bits(memsize) });
                     }
 
                     fn start_rx() {
@@ -1940,18 +1945,18 @@ mod chip_specific {
                     fn set_filter_threshold(value: u8) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
 
-                        rmt.[< ch $ch_num _rx_conf1 >]().modify(|_, w| {
+                        rmt.[< ch $ch_num _rx_conf1 >]().modify(|_, w| unsafe {
                             w.rx_filter_en()
                                 .bit(value > 0)
                                 .rx_filter_thres()
-                                .variant(value)
+                                .bits(value)
                         });
                     }
 
                     fn set_idle_threshold(value: u16) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
 
-                        rmt.[< ch $ch_num _rx_conf0 >]().modify(|_, w| w.idle_thres().variant(value));
+                        rmt.[< ch $ch_num _rx_conf0 >]().modify(|_, w| unsafe { w.idle_thres().bits(value) });
                     }
 
                     fn listen_interrupt(event: $crate::rmt::private::Event) {
@@ -2079,7 +2084,7 @@ mod chip_specific {
 
                     fn set_divider(divider: u8) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                        rmt.[< ch $ch_num conf0 >]().modify(|_, w| w.div_cnt().variant(divider));
+                        rmt.[< ch $ch_num conf0 >]().modify(|_, w| unsafe { w.div_cnt().bits(divider) });
                     }
 
                     fn update() {
@@ -2090,9 +2095,9 @@ mod chip_specific {
                     fn set_generate_repeat_interrupt(repeats: u16) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
                         if repeats > 1 {
-                            rmt.ch_tx_lim($ch_num).modify(|_, w| w.tx_loop_num().variant(repeats));
+                            rmt.ch_tx_lim($ch_num).modify(|_, w| unsafe { w.tx_loop_num().bits(repeats) });
                         } else {
-                            rmt.ch_tx_lim($ch_num).modify(|_, w| w.tx_loop_num().variant(0));
+                            rmt.ch_tx_lim($ch_num).modify(|_, w| unsafe { w.tx_loop_num().bits(0) });
                         }
                     }
 
@@ -2130,7 +2135,7 @@ mod chip_specific {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
 
                         rmt.chcarrier_duty($ch_num)
-                            .write(|w| w.carrier_high().variant(high).carrier_low().variant(low));
+                            .write(|w| unsafe { w.carrier_high().bits(high).carrier_low().bits(low) });
 
                         rmt.[< ch $ch_num conf0 >]()
                             .modify(|_, w| w.carrier_en().bit(carrier).carrier_out_lv().bit(level));
@@ -2145,7 +2150,7 @@ mod chip_specific {
                     fn set_memsize(memsize: u8) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
 
-                        rmt.[< ch $ch_num conf0 >]().modify(|_, w| w.mem_size().variant(memsize));
+                        rmt.[< ch $ch_num conf0 >]().modify(|_, w| unsafe { w.mem_size().bits(memsize) });
                     }
 
                     fn start_tx() {
@@ -2184,7 +2189,7 @@ mod chip_specific {
 
                     fn set_threshold(threshold: u8) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                        rmt.ch_tx_lim($ch_num).modify(|_, w| w.tx_lim().variant(threshold as u16));
+                        rmt.ch_tx_lim($ch_num).modify(|_, w| unsafe { w.tx_lim().bits(threshold as u16) });
                     }
 
                     fn is_loopcount_interrupt_set() -> bool {
@@ -2252,7 +2257,7 @@ mod chip_specific {
 
                     fn set_divider(divider: u8) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                        rmt.[< ch $ch_num conf0 >]().modify(|_, w| w.div_cnt().variant(divider));
+                        rmt.[< ch $ch_num conf0 >]().modify(|_, w| unsafe { w.div_cnt().bits(divider) });
                     }
 
                     fn update() {
@@ -2292,7 +2297,7 @@ mod chip_specific {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
 
                         rmt.chcarrier_duty($ch_num)
-                            .write(|w| w.carrier_high().variant(high).carrier_low().variant(low));
+                            .write(|w| unsafe { w.carrier_high().bits(high).carrier_low().bits(low) });
 
                         rmt.[< ch $ch_num conf0 >]()
                             .modify(|_, w| w.carrier_en().bit(carrier).carrier_out_lv().bit(level));
@@ -2301,7 +2306,7 @@ mod chip_specific {
                     fn set_memsize(memsize: u8) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
 
-                        rmt.[< ch $ch_num conf0 >]().modify(|_, w| w.mem_size().variant(memsize));
+                        rmt.[< ch $ch_num conf0 >]().modify(|_, w| unsafe { w.mem_size().bits(memsize) });
                     }
 
                     fn start_rx() {
@@ -2336,18 +2341,18 @@ mod chip_specific {
 
                     fn set_filter_threshold(value: u8) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                        rmt.[< ch $ch_num conf1 >]().modify(|_, w| {
+                        rmt.[< ch $ch_num conf1 >]().modify(|_, w| unsafe {
                             w.rx_filter_en()
                                 .bit(value > 0)
                                 .rx_filter_thres()
-                                .variant(value)
+                                .bits(value)
                         });
                     }
 
                     fn set_idle_threshold(value: u16) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
 
-                        rmt.[< ch $ch_num conf0 >]().modify(|_, w| w.idle_thres().variant(value));
+                        rmt.[< ch $ch_num conf0 >]().modify(|_, w| unsafe { w.idle_thres().bits(value) });
                     }
 
                     fn listen_interrupt(event: $crate::rmt::private::Event) {

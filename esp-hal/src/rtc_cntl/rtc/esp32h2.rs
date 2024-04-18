@@ -618,11 +618,11 @@ impl RtcClock {
         let timg0 = unsafe { crate::peripherals::TIMG0::steal() };
         while timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_clear() {}
 
-        timg0.rtccalicfg().modify(|_, w| {
+        timg0.rtccalicfg().modify(|_, w| unsafe {
             w.rtc_cali_clk_sel()
-                .variant(0) // RTC_SLOW_CLK
+                .bits(0) // RTC_SLOW_CLK
                 .rtc_cali_max()
-                .variant(100)
+                .bits(100)
                 .rtc_cali_start_cycling()
                 .clear_bit()
                 .rtc_cali_start()

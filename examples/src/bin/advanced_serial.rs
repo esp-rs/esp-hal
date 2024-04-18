@@ -19,11 +19,7 @@ use esp_hal::{
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
-    uart::{
-        config::{Config, DataBits, Parity, StopBits},
-        TxRxPins,
-        Uart,
-    },
+    uart::{config::Config, TxRxPins, Uart},
 };
 use esp_println::println;
 use nb::block;
@@ -34,20 +30,19 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let config = Config {
-        baudrate: 115200,
-        data_bits: DataBits::DataBits8,
-        parity: Parity::ParityNone,
-        stop_bits: StopBits::STOP1,
-    };
-
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let pins = TxRxPins::new_tx_rx(
         io.pins.gpio4.into_push_pull_output(),
         io.pins.gpio5.into_floating_input(),
     );
 
-    let mut serial1 = Uart::new_with_config(peripherals.UART1, config, Some(pins), &clocks, None);
+    let mut serial1 = Uart::new_with_config(
+        peripherals.UART1,
+        Config::default(),
+        Some(pins),
+        &clocks,
+        None,
+    );
 
     let delay = Delay::new(&clocks);
 

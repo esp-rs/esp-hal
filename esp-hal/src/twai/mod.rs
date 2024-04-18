@@ -697,19 +697,16 @@ where
         let prescale = prescale as u8;
 
         // Set up the prescaler and sync jump width.
-        T::register_block().bus_timing_0().modify(|_, w| {
-            w.baud_presc()
-                .variant(prescale)
-                .sync_jump_width()
-                .variant(sjw)
-        });
+        T::register_block()
+            .bus_timing_0()
+            .modify(|_, w| unsafe { w.baud_presc().bits(prescale).sync_jump_width().bits(sjw) });
 
         // Set up the time segment 1, time segment 2, and triple sample.
-        T::register_block().bus_timing_1().modify(|_, w| {
+        T::register_block().bus_timing_1().modify(|_, w| unsafe {
             w.time_seg1()
-                .variant(tseg_1)
+                .bits(tseg_1)
                 .time_seg2()
-                .variant(tseg_2)
+                .bits(tseg_2)
                 .time_samp()
                 .bit(triple_sample)
         });
@@ -749,7 +746,7 @@ where
     pub fn set_error_warning_limit(&mut self, limit: u8) {
         T::register_block()
             .err_warning_limit()
-            .write(|w| w.err_warning_limit().variant(limit));
+            .write(|w| unsafe { w.err_warning_limit().bits(limit) });
     }
 
     /// Put the peripheral into Operation Mode, allowing the transmission and
@@ -1140,7 +1137,7 @@ pub trait OperationInstance: Instance {
 
         register_block
             .data_0()
-            .write(|w| w.tx_byte_0().variant(data_0));
+            .write(|w| unsafe { w.tx_byte_0().bits(data_0) });
 
         // Assemble the identifier information of the packet.
         match frame.id {
@@ -1149,27 +1146,27 @@ pub trait OperationInstance: Instance {
 
                 register_block
                     .data_1()
-                    .write(|w| w.tx_byte_1().variant((id >> 3) as u8));
+                    .write(|w| unsafe { w.tx_byte_1().bits((id >> 3) as u8) });
 
                 register_block
                     .data_2()
-                    .write(|w| w.tx_byte_2().variant((id << 5) as u8));
+                    .write(|w| unsafe { w.tx_byte_2().bits((id << 5) as u8) });
             }
             Id::Extended(id) => {
                 let id = id.as_raw();
 
                 register_block
                     .data_1()
-                    .write(|w| w.tx_byte_1().variant((id >> 21) as u8));
+                    .write(|w| unsafe { w.tx_byte_1().bits((id >> 21) as u8) });
                 register_block
                     .data_2()
-                    .write(|w| w.tx_byte_2().variant((id >> 13) as u8));
+                    .write(|w| unsafe { w.tx_byte_2().bits((id >> 13) as u8) });
                 register_block
                     .data_3()
-                    .write(|w| w.tx_byte_3().variant((id >> 5) as u8));
+                    .write(|w| unsafe { w.tx_byte_3().bits((id >> 5) as u8) });
                 register_block
                     .data_4()
-                    .write(|w| w.tx_byte_4().variant((id << 3) as u8));
+                    .write(|w| unsafe { w.tx_byte_4().bits((id << 3) as u8) });
             }
         }
 

@@ -351,12 +351,8 @@ where
 {
     fn configure(&mut self) {
         let pcr = unsafe { &*crate::peripherals::PCR::PTR };
-        pcr.parl_clk_tx_conf().modify(|_, w| {
-            w.parl_clk_tx_sel()
-                .variant(3)
-                .parl_clk_tx_div_num()
-                .variant(0)
-        }); // PAD_CLK_TX, no divider
+        pcr.parl_clk_tx_conf()
+            .modify(|_, w| unsafe { w.parl_clk_tx_sel().bits(3).parl_clk_tx_div_num().bits(0) }); // PAD_CLK_TX, no divider
 
         self.pin
             .set_to_input()
@@ -387,12 +383,8 @@ where
 {
     fn configure(&mut self) {
         let pcr = unsafe { &*crate::peripherals::PCR::PTR };
-        pcr.parl_clk_rx_conf().modify(|_, w| {
-            w.parl_clk_rx_sel()
-                .variant(3)
-                .parl_clk_rx_div_num()
-                .variant(0)
-        }); // PAD_CLK_TX, no divider
+        pcr.parl_clk_rx_conf()
+            .modify(|_, w| unsafe { w.parl_clk_rx_sel().bits(3).parl_clk_rx_div_num().bits(0) }); // PAD_CLK_TX, no divider
 
         self.pin
             .set_to_input()
@@ -1351,22 +1343,22 @@ where
     }
     let divider = divider as u16;
 
-    pcr.parl_clk_tx_conf().modify(|_, w| {
+    pcr.parl_clk_tx_conf().modify(|_, w| unsafe {
         w.parl_clk_tx_en()
             .set_bit()
             .parl_clk_tx_sel()
-            .variant(1) // PLL
+            .bits(1) // PLL
             .parl_clk_tx_div_num()
-            .variant(divider)
+            .bits(divider)
     });
 
-    pcr.parl_clk_rx_conf().modify(|_, w| {
+    pcr.parl_clk_rx_conf().modify(|_, w| unsafe {
         w.parl_clk_rx_en()
             .set_bit()
             .parl_clk_rx_sel()
-            .variant(1) // PLL
+            .bits(1) // PLL
             .parl_clk_rx_div_num()
-            .variant(divider)
+            .bits(divider)
     });
     Instance::set_rx_sw_en(true);
     Instance::set_rx_sample_mode(SampleMode::InternalSoftwareEnable);
@@ -1806,7 +1798,7 @@ mod private {
 
             reg_block
                 .tx_cfg0()
-                .modify(|_, w| w.tx_bus_wid_sel().variant(width as u8));
+                .modify(|_, w| unsafe { w.tx_bus_wid_sel().bits(width as u8) });
         }
 
         pub fn set_tx_idle_value(value: u16) {
@@ -1814,7 +1806,7 @@ mod private {
                 unsafe { crate::peripherals::PARL_IO::steal() };
             reg_block
                 .tx_cfg1()
-                .modify(|_, w| w.tx_idle_value().variant(value));
+                .modify(|_, w| unsafe { w.tx_idle_value().bits(value) });
         }
 
         pub fn set_tx_sample_edge(value: SampleEdge) {
@@ -1822,7 +1814,7 @@ mod private {
                 unsafe { crate::peripherals::PARL_IO::steal() };
             reg_block
                 .tx_cfg0()
-                .modify(|_, w| w.tx_smp_edge_sel().variant(value as u8 == 1));
+                .modify(|_, w| w.tx_smp_edge_sel().bit(value as u8 == 1));
         }
 
         pub fn set_tx_bit_order(value: BitPackOrder) {
@@ -1830,7 +1822,7 @@ mod private {
                 unsafe { crate::peripherals::PARL_IO::steal() };
             reg_block
                 .tx_cfg0()
-                .modify(|_, w| w.tx_bit_unpack_order().variant(value as u8 == 1));
+                .modify(|_, w| w.tx_bit_unpack_order().bit(value as u8 == 1));
         }
 
         pub fn clear_tx_interrupts() {
@@ -1851,7 +1843,7 @@ mod private {
 
             reg_block
                 .tx_cfg0()
-                .modify(|_, w| w.tx_bytelen().variant(len));
+                .modify(|_, w| unsafe { w.tx_bytelen().bits(len) });
         }
 
         pub fn is_tx_ready() -> bool {
@@ -1894,7 +1886,7 @@ mod private {
 
             reg_block
                 .rx_cfg0()
-                .modify(|_, w| w.rx_bus_wid_sel().variant(width as u8));
+                .modify(|_, w| unsafe { w.rx_bus_wid_sel().bits(width as u8) });
         }
 
         pub fn rx_valid_pin_signal() -> crate::gpio::InputSignal {
@@ -1923,7 +1915,7 @@ mod private {
 
             reg_block
                 .rx_cfg0()
-                .modify(|_, w| w.rx_data_bytelen().variant(len));
+                .modify(|_, w| unsafe { w.rx_data_bytelen().bits(len) });
         }
 
         pub fn set_rx_sample_mode(sample_mode: SampleMode) {
@@ -1932,7 +1924,7 @@ mod private {
 
             reg_block
                 .rx_cfg0()
-                .modify(|_, w| w.rx_smp_mode_sel().variant(sample_mode as u8));
+                .modify(|_, w| unsafe { w.rx_smp_mode_sel().bits(sample_mode as u8) });
         }
 
         pub fn set_eof_gen_sel(mode: EofMode) {
@@ -1941,7 +1933,7 @@ mod private {
 
             reg_block
                 .rx_cfg0()
-                .modify(|_, w| w.rx_eof_gen_sel().variant(mode == EofMode::EnableSignal));
+                .modify(|_, w| w.rx_eof_gen_sel().bit(mode == EofMode::EnableSignal));
         }
 
         pub fn set_rx_pulse_submode_sel(sel: u8) {
@@ -1950,7 +1942,7 @@ mod private {
 
             reg_block
                 .rx_cfg0()
-                .modify(|_, w| w.rx_pulse_submode_sel().variant(sel));
+                .modify(|_, w| unsafe { w.rx_pulse_submode_sel().bits(sel) });
         }
 
         pub fn set_rx_level_submode_sel(sel: u8) {
@@ -1959,7 +1951,7 @@ mod private {
 
             reg_block
                 .rx_cfg0()
-                .modify(|_, w| w.rx_level_submode_sel().variant(sel == 1));
+                .modify(|_, w| w.rx_level_submode_sel().bit(sel == 1));
         }
 
         pub fn set_rx_clk_edge_sel(edge: SampleEdge) {
@@ -1968,7 +1960,7 @@ mod private {
 
             reg_block
                 .rx_cfg0()
-                .modify(|_, w| w.rx_clk_edge_sel().variant(edge as u8 == 1));
+                .modify(|_, w| w.rx_clk_edge_sel().bit(edge as u8 == 1));
         }
 
         pub fn set_rx_start(value: bool) {
@@ -1992,17 +1984,17 @@ mod private {
                 unsafe { crate::peripherals::PARL_IO::steal() };
             reg_block
                 .rx_cfg0()
-                .modify(|_, w| w.rx_bit_pack_order().variant(value as u8 == 1));
+                .modify(|_, w| w.rx_bit_pack_order().bit(value as u8 == 1));
         }
 
         pub fn set_rx_timeout_ticks(value: Option<u16>) {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
-            reg_block.rx_cfg1().modify(|_, w| {
+            reg_block.rx_cfg1().modify(|_, w| unsafe {
                 w.rx_timeout_en()
                     .bit(value.is_some())
                     .rx_timeout_threshold()
-                    .variant(value.unwrap_or(0xfff))
+                    .bits(value.unwrap_or(0xfff))
             });
         }
 
@@ -2062,7 +2054,7 @@ mod private {
 
             reg_block
                 .tx_data_cfg()
-                .modify(|_, w| w.tx_bus_wid_sel().variant(width as u8));
+                .modify(|_, w| unsafe { w.tx_bus_wid_sel().bits(width as u8) });
         }
 
         pub fn set_tx_idle_value(value: u16) {
@@ -2070,7 +2062,7 @@ mod private {
                 unsafe { crate::peripherals::PARL_IO::steal() };
             reg_block
                 .tx_genrl_cfg()
-                .modify(|_, w| w.tx_idle_value().variant(value));
+                .modify(|_, w| unsafe { w.tx_idle_value().bits(value) });
         }
 
         pub fn set_tx_sample_edge(value: SampleEdge) {
@@ -2089,7 +2081,7 @@ mod private {
                 unsafe { crate::peripherals::PARL_IO::steal() };
             reg_block
                 .tx_data_cfg()
-                .modify(|_, w| w.tx_data_order_inv().variant(value as u8 == 1));
+                .modify(|_, w| w.tx_data_order_inv().bit(value as u8 == 1));
         }
 
         pub fn clear_tx_interrupts() {
@@ -2110,7 +2102,7 @@ mod private {
 
             reg_block
                 .tx_data_cfg()
-                .modify(|_, w| w.tx_bitlen().variant((len as u32) * 8));
+                .modify(|_, w| unsafe { w.tx_bitlen().bits((len as u32) * 8) });
         }
 
         pub fn is_tx_ready() -> bool {
@@ -2155,7 +2147,7 @@ mod private {
 
             reg_block
                 .rx_data_cfg()
-                .modify(|_, w| w.rx_bus_wid_sel().variant(width as u8));
+                .modify(|_, w| unsafe { w.rx_bus_wid_sel().bits(width as u8) });
         }
 
         pub fn rx_valid_pin_signal() -> crate::gpio::InputSignal {
@@ -2186,7 +2178,7 @@ mod private {
 
             reg_block
                 .rx_data_cfg()
-                .modify(|_, w| w.rx_bitlen().variant((len as u32) * 8));
+                .modify(|_, w| unsafe { w.rx_bitlen().bits((len as u32) * 8) });
         }
 
         pub fn set_rx_sample_mode(sample_mode: SampleMode) {
@@ -2195,7 +2187,7 @@ mod private {
 
             reg_block
                 .rx_mode_cfg()
-                .modify(|_, w| w.rx_smp_mode_sel().variant(sample_mode as u8));
+                .modify(|_, w| unsafe { w.rx_smp_mode_sel().bits(sample_mode as u8) });
         }
 
         pub fn set_eof_gen_sel(mode: EofMode) {
@@ -2204,7 +2196,7 @@ mod private {
 
             reg_block
                 .rx_genrl_cfg()
-                .modify(|_, w| w.rx_eof_gen_sel().variant(mode == EofMode::EnableSignal));
+                .modify(|_, w| w.rx_eof_gen_sel().bit(mode == EofMode::EnableSignal));
         }
 
         pub fn set_rx_pulse_submode_sel(sel: u8) {
@@ -2213,7 +2205,7 @@ mod private {
 
             reg_block
                 .rx_mode_cfg()
-                .modify(|_, w| w.rx_pulse_submode_sel().variant(sel));
+                .modify(|_, w| unsafe { w.rx_pulse_submode_sel().bits(sel) });
         }
 
         pub fn set_rx_level_submode_sel(_sel: u8) {
@@ -2255,17 +2247,17 @@ mod private {
                 unsafe { crate::peripherals::PARL_IO::steal() };
             reg_block
                 .rx_data_cfg()
-                .modify(|_, w| w.rx_data_order_inv().variant(value as u8 == 1));
+                .modify(|_, w| w.rx_data_order_inv().bit(value as u8 == 1));
         }
 
         pub fn set_rx_timeout_ticks(value: Option<u16>) {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
-            reg_block.rx_genrl_cfg().modify(|_, w| {
+            reg_block.rx_genrl_cfg().modify(|_, w| unsafe {
                 w.rx_timeout_en()
                     .bit(value.is_some())
                     .rx_timeout_thres()
-                    .variant(value.unwrap_or(0xfff))
+                    .bits(value.unwrap_or(0xfff))
             });
         }
 

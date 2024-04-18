@@ -1,6 +1,6 @@
 [package]
 name         = "esp-hal-procmacros"
-version      = "0.9.0"
+version      = "0.10.0"
 edition      = "2021"
 rust-version = "1.76.0"
 description  = "Procedural macros for esp-hal"
@@ -17,12 +17,12 @@ proc-macro = true
 darling           = "0.20.8"
 document-features = "0.2.8"
 litrs             = "0.4.1"
-object            = { version = "0.33.0", optional = true }
+object            = { version = "0.35.0", optional = true }
 proc-macro-crate  = "3.1.0"
 proc-macro-error  = "1.0.4"
-proc-macro2       = "1.0.78"
-quote             = "1.0.35"
-syn               = { version = "2.0.52", features = ["extra-traits", "full"] }
+proc-macro2       = "1.0.80"
+quote             = "1.0.36"
+syn               = { version = "2.0.59", features = ["extra-traits", "full"] }
 
 [features]
 ## Provide a `#[main]` procmacro to mark the entry point for Embassy applications.
@@ -41,7 +41,7 @@ rtc_slow = []
 has-lp-core = ["dep:object"]
 ## Indicate that the SoC contains a ULP core.
 has-ulp-core = ["dep:object"]
-## Provide an `#[entry]` macro for running applications on the ESP32-C6/P4's
+## Provide an `#[entry]` macro for running applications on the ESP32-C6's
 ## LP core.
 is-lp-core = []
 ## Provide an `#[entry]` macro for running applications on the ESP32-S2/S3's

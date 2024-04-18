@@ -172,7 +172,7 @@ fn isolate_digital_gpio() {
             // make pad work as gpio (otherwise, deep_sleep bottom current will rise)
             io_mux
                 .gpio(pin_num)
-                .modify(|_, w| w.mcu_sel().variant(RtcFunction::Digital as u8));
+                .modify(|_, w| unsafe { w.mcu_sel().bits(RtcFunction::Digital as u8) });
         }
     }
 }
