@@ -25,7 +25,7 @@ use esp_backtrace as _;
 use esp_println::{print, println};
 use esp_wifi::initialize;
 use esp_wifi::wifi::utils::create_network_interface;
-use hal::{clock::ClockControl, Rng};
+use hal::{clock::ClockControl, rng::Rng};
 use hal::{peripherals::Peripherals, prelude::*};
 use smoltcp::{iface::SocketStorage, wire::IpAddress, wire::Ipv4Address};
 
@@ -43,7 +43,7 @@ fn main() -> ! {
     let clocks = ClockControl::max(system.clock_control).freeze();
 
     #[cfg(target_arch = "xtensa")]
-    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks).timer0;
+    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
     #[cfg(target_arch = "riscv32")]
     let timer = hal::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
     let init = initialize(

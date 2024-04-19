@@ -1,7 +1,5 @@
 use core::cell::RefCell;
 
-use embedded_hal::timer::CountDown;
-
 use portable_atomic::{AtomicU32, Ordering};
 
 use critical_section::Mutex;
@@ -9,7 +7,6 @@ use critical_section::Mutex;
 use crate::{
     hal::{
         interrupt,
-        macros::interrupt,
         peripherals::{self, TIMG1},
         prelude::*,
         timer::{Timer, Timer0},
@@ -20,9 +17,10 @@ use crate::{
 };
 
 /// The timer responsible for time slicing.
-pub type TimeBase = Timer<Timer0<TIMG1>>;
+pub type TimeBase = Timer<Timer0<TIMG1>, esp_hal::Blocking>;
 static TIMER1: Mutex<RefCell<Option<TimeBase>>> = Mutex::new(RefCell::new(None));
-const TIMESLICE_FREQUENCY: fugit::HertzU32 = fugit::HertzU32::from_raw(crate::CONFIG.tick_rate_hz);
+const TIMESLICE_FREQUENCY: fugit::HertzU64 =
+    fugit::HertzU64::from_raw(crate::CONFIG.tick_rate_hz as u64);
 
 // Time keeping
 
@@ -50,6 +48,13 @@ pub fn get_systimer_count() -> u64 {
 }
 
 pub fn setup_timer(mut timer1: TimeBase) {
+    unsafe {
+        interrupt::bind_interrupt(
+            peripherals::Interrupt::TG1_T0_LEVEL,
+            core::mem::transmute(tg1_t0_level as *const ()),
+        );
+    }
+
     unwrap!(interrupt::enable(
         peripherals::Interrupt::TG1_T0_LEVEL,
         interrupt::Priority::Priority2,
@@ -96,8 +101,7 @@ fn do_task_switch(context: &mut TrapFrame) {
     task_switch(context);
 }
 
-#[interrupt]
-fn TG1_T0_LEVEL(context: &mut TrapFrame) {
+extern "C" fn tg1_t0_level(context: &mut TrapFrame) {
     do_task_switch(context);
 }
 

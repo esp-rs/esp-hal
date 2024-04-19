@@ -2,7 +2,7 @@
 #[allow(unused_imports)]
 use crate::{
     binary,
-    hal::{interrupt, macros::interrupt, peripherals::Interrupt},
+    hal::{interrupt, peripherals::Interrupt},
 };
 
 pub fn setup_radio_isr() {
@@ -21,8 +21,8 @@ pub fn setup_radio_isr() {
 }
 
 #[cfg(feature = "wifi")]
-#[interrupt]
-fn WIFI_MAC() {
+#[no_mangle]
+extern "C" fn WIFI_MAC() {
     unsafe {
         let (fnc, arg) = crate::wifi::os_adapter::ISR_INTERRUPT_1;
 
@@ -38,8 +38,8 @@ fn WIFI_MAC() {
 }
 
 #[cfg(feature = "wifi")]
-#[interrupt]
-fn WIFI_PWR() {
+#[no_mangle]
+extern "C" fn WIFI_PWR() {
     unsafe {
         let (fnc, arg) = crate::wifi::os_adapter::ISR_INTERRUPT_1;
 
@@ -55,8 +55,8 @@ fn WIFI_PWR() {
 }
 
 #[cfg(feature = "ble")]
-#[interrupt]
-fn LP_TIMER() {
+#[no_mangle]
+extern "C" fn LP_TIMER() {
     unsafe {
         trace!("LP_TIMER interrupt");
 
@@ -77,8 +77,8 @@ fn LP_TIMER() {
 }
 
 #[cfg(feature = "ble")]
-#[interrupt]
-fn BT_MAC() {
+#[no_mangle]
+extern "C" fn BT_MAC() {
     unsafe {
         trace!("BT_MAC interrupt");
 

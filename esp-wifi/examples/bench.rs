@@ -15,7 +15,8 @@ use esp_wifi::wifi::{WifiError, WifiStaDevice};
 use esp_wifi::wifi_interface::WifiStack;
 use esp_wifi::{current_millis, initialize, EspWifiInitFor};
 use hal::clock::ClockControl;
-use hal::Rng;
+use hal::delay::Delay;
+use hal::rng::Rng;
 use hal::{peripherals::Peripherals, prelude::*};
 use smoltcp::iface::SocketStorage;
 use smoltcp::wire::IpAddress;
@@ -46,7 +47,7 @@ fn main() -> ! {
     let server_address: Ipv4Address = HOST_IP.parse().expect("Invalid HOST_IP address");
 
     #[cfg(target_arch = "xtensa")]
-    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks).timer0;
+    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
     #[cfg(target_arch = "riscv32")]
     let timer = hal::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
     let init = initialize(
@@ -119,18 +120,18 @@ fn main() -> ! {
     let mut tx_buffer = [0u8; TX_BUFFER_SIZE];
     let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
 
-    let mut delay = hal::Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     loop {
         test_download(server_address, &mut socket);
-        delay.delay_ms(3_000u32);
+        delay.delay_millis(3_000u32);
         socket.work();
         test_upload(server_address, &mut socket);
         socket.work();
-        delay.delay_ms(3_000u32);
+        delay.delay_millis(3_000u32);
         test_upload_download(server_address, &mut socket);
         socket.work();
-        delay.delay_ms(3_000u32);
+        delay.delay_millis(3_000u32);
     }
 }
 

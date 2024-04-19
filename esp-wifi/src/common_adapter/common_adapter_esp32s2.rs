@@ -223,6 +223,6 @@ static mut g_log_mod: i32 = 0;
 static mut g_log_level: i32 = 0;
 
 #[no_mangle]
-pub static mut g_misc_nvs: &u32 = unsafe { &NVS };
+pub static mut g_misc_nvs: &u32 = unsafe { &*core::ptr::addr_of!(NVS) };
 
 pub static mut NVS: u32 = 0;

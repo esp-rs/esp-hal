@@ -17,7 +17,7 @@ use esp_wifi::wifi::{ClientConfiguration, Configuration, WifiStaDevice};
 use esp_wifi::wifi::{WifiController, WifiDevice, WifiEvent, WifiState};
 use esp_wifi::{initialize, EspWifiInitFor};
 use hal::clock::ClockControl;
-use hal::Rng;
+use hal::rng::Rng;
 use hal::{embassy, peripherals::Peripherals, prelude::*, timer::TimerGroup};
 use static_cell::make_static;
 
@@ -33,6 +33,10 @@ const DOWNLOAD_PORT: u16 = 4321;
 const UPLOAD_PORT: u16 = 4322;
 const UPLOAD_DOWNLOAD_PORT: u16 = 4323;
 
+// static buffers to not need a huge task-arena
+static mut RX_BUFFER: [u8; RX_BUFFER_SIZE] = [0; RX_BUFFER_SIZE];
+static mut TX_BUFFER: [u8; TX_BUFFER_SIZE] = [0; TX_BUFFER_SIZE];
+
 #[main]
 async fn main(spawner: Spawner) -> ! {
     #[cfg(feature = "log")]
@@ -46,7 +50,7 @@ async fn main(spawner: Spawner) -> ! {
     let server_address: Ipv4Address = HOST_IP.parse().expect("Invalid HOST_IP address");
 
     #[cfg(target_arch = "xtensa")]
-    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks).timer0;
+    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
     #[cfg(target_arch = "riscv32")]
     let timer = hal::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
     let init = initialize(
@@ -62,7 +66,7 @@ async fn main(spawner: Spawner) -> ! {
     let (wifi_interface, controller) =
         esp_wifi::wifi::new_with_mode(&init, wifi, WifiStaDevice).unwrap();
 
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timer_group0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timer_group0);
 
     let config = Config::dhcpv4(Default::default());
@@ -96,9 +100,11 @@ async fn main(spawner: Spawner) -> ! {
         Timer::after(Duration::from_millis(500)).await;
     }
 
-    let mut rx_buffer = [0; RX_BUFFER_SIZE];
-    let mut tx_buffer = [0; TX_BUFFER_SIZE];
-    let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
+    let mut socket = TcpSocket::new(
+        stack,
+        unsafe { &mut *core::ptr::addr_of_mut!(RX_BUFFER) },
+        unsafe { &mut *core::ptr::addr_of_mut!(TX_BUFFER) },
+    );
 
     loop {
         let _down = test_download(server_address, &mut socket).await;

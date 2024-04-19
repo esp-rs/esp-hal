@@ -14,7 +14,7 @@ use esp_println::println;
 use esp_wifi::esp_now::{PeerInfo, BROADCAST_ADDRESS};
 use esp_wifi::{initialize, EspWifiInitFor};
 use hal::clock::ClockControl;
-use hal::Rng;
+use hal::rng::Rng;
 use hal::{embassy, peripherals::Peripherals, prelude::*, timer::TimerGroup};
 
 #[main]
@@ -28,7 +28,7 @@ async fn main(_spawner: Spawner) -> ! {
     let clocks = ClockControl::max(system.clock_control).freeze();
 
     #[cfg(target_arch = "xtensa")]
-    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks).timer0;
+    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
     #[cfg(target_arch = "riscv32")]
     let timer = hal::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
     let init = initialize(
@@ -44,7 +44,7 @@ async fn main(_spawner: Spawner) -> ! {
     let mut esp_now = esp_wifi::esp_now::EspNow::new(&init, wifi).unwrap();
     println!("esp-now version {}", esp_now.get_version().unwrap());
 
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timer_group0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timer_group0);
 
     let mut ticker = Ticker::every(Duration::from_secs(5));

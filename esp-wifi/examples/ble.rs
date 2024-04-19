@@ -14,7 +14,7 @@ use esp_wifi::{ble::controller::BleConnector, initialize, EspWifiInitFor};
 #[path = "../../examples-util/util.rs"]
 mod examples_util;
 use examples_util::hal;
-use hal::{clock::ClockControl, peripherals::*, prelude::*, Rng, IO};
+use hal::{clock::ClockControl, gpio::IO, peripherals::*, prelude::*, rng::Rng};
 
 #[entry]
 fn main() -> ! {
@@ -27,7 +27,7 @@ fn main() -> ! {
     let clocks = ClockControl::max(system.clock_control).freeze();
 
     #[cfg(target_arch = "xtensa")]
-    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks).timer0;
+    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
     #[cfg(target_arch = "riscv32")]
     let timer = hal::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
     let init = initialize(
@@ -124,7 +124,7 @@ fn main() -> ! {
         loop {
             let mut notification = None;
 
-            if button.is_low().unwrap() && debounce_cnt > 0 {
+            if button.is_low() && debounce_cnt > 0 {
                 debounce_cnt -= 1;
                 if debounce_cnt == 0 {
                     let mut cccd = [0u8; 1];
@@ -144,7 +144,7 @@ fn main() -> ! {
                 }
             };
 
-            if button.is_high().unwrap() {
+            if button.is_high() {
                 debounce_cnt = 500;
             }
 

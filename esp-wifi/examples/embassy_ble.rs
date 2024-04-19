@@ -15,14 +15,15 @@ use bleps::{
     gatt,
 };
 use embassy_executor::Spawner;
-use embedded_hal_async::digital::Wait;
 use esp_backtrace as _;
 use esp_println::println;
 use esp_wifi::{ble::controller::asynch::BleConnector, initialize, EspWifiInitFor};
 #[path = "../../examples-util/util.rs"]
 mod examples_util;
 use examples_util::hal;
-use hal::{clock::ClockControl, embassy, peripherals::*, prelude::*, timer::TimerGroup, Rng, IO};
+use hal::{
+    clock::ClockControl, embassy, gpio::IO, peripherals::*, prelude::*, rng::Rng, timer::TimerGroup,
+};
 
 #[main]
 async fn main(_spawner: Spawner) -> ! {
@@ -35,7 +36,7 @@ async fn main(_spawner: Spawner) -> ! {
     let clocks = ClockControl::max(system.clock_control).freeze();
 
     #[cfg(target_arch = "xtensa")]
-    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks).timer0;
+    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
     #[cfg(target_arch = "riscv32")]
     let timer = hal::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
     let init = initialize(
@@ -65,7 +66,7 @@ async fn main(_spawner: Spawner) -> ! {
     )
     .unwrap();
 
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timer_group0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timer_group0);
 
     let mut bluetooth = peripherals.BT;
@@ -150,7 +151,7 @@ async fn main(_spawner: Spawner) -> ! {
             // probably passing in the attribute server won't work?
 
             async {
-                pin_ref.borrow_mut().wait_for_rising_edge().await.unwrap();
+                pin_ref.borrow_mut().wait_for_rising_edge().await;
                 let mut data = [0u8; 13];
                 data.copy_from_slice(b"Notification0");
                 {

@@ -2,7 +2,7 @@
 #[allow(unused_imports)]
 use crate::{
     binary,
-    hal::{interrupt, macros::interrupt, peripherals::Interrupt},
+    hal::{interrupt, peripherals::Interrupt},
 };
 
 pub fn setup_radio_isr() {
@@ -25,8 +25,8 @@ pub fn setup_radio_isr() {
 }
 
 #[cfg(feature = "wifi")]
-#[interrupt]
-fn WIFI_MAC() {
+#[no_mangle]
+extern "C" fn WIFI_MAC() {
     unsafe {
         let (fnc, arg) = crate::wifi::os_adapter::ISR_INTERRUPT_1;
 
@@ -42,8 +42,8 @@ fn WIFI_MAC() {
 }
 
 #[cfg(feature = "wifi")]
-#[interrupt]
-fn WIFI_PWR() {
+#[no_mangle]
+extern "C" fn WIFI_PWR() {
     unsafe {
         let (fnc, arg) = crate::wifi::os_adapter::ISR_INTERRUPT_1;
 
@@ -59,8 +59,8 @@ fn WIFI_PWR() {
 }
 
 #[cfg(feature = "ble")]
-#[interrupt]
-fn RWBT() {
+#[no_mangle]
+extern "C" fn RWBT() {
     unsafe {
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION5;
 
@@ -76,8 +76,8 @@ fn RWBT() {
 }
 
 #[cfg(feature = "ble")]
-#[interrupt]
-fn RWBLE() {
+#[no_mangle]
+extern "C" fn RWBLE() {
     unsafe {
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION5;
 
@@ -93,8 +93,8 @@ fn RWBLE() {
 }
 
 #[cfg(feature = "ble")]
-#[interrupt]
-fn BT_BB(_trap_frame: &mut crate::hal::interrupt::TrapFrame) {
+#[no_mangle]
+extern "C" fn BT_BB(_trap_frame: &mut crate::hal::interrupt::TrapFrame) {
     unsafe {
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION8;
 

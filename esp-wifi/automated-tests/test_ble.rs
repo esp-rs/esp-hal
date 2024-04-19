@@ -14,7 +14,7 @@ use esp_backtrace as _;
 use esp_println::println;
 use esp_wifi::{ble::controller::BleConnector, initialize, EspWifiInitFor};
 use examples_util::hal;
-use hal::{clock::ClockControl, peripherals::*, prelude::*, Rng};
+use hal::{clock::ClockControl, peripherals::*, prelude::*, rng::Rng};
 #[path = "../../examples-util/util.rs"]
 mod examples_util;
 
@@ -29,7 +29,7 @@ fn main() -> ! {
     let clocks = ClockControl::max(system.clock_control).freeze();
 
     #[cfg(target_arch = "xtensa")]
-    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks).timer0;
+    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
     #[cfg(target_arch = "riscv32")]
     let timer = hal::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
     let init = initialize(

@@ -42,14 +42,16 @@ pub(crate) unsafe fn phy_enable() {
 
                 let init_data = &PHY_INIT_DATA_DEFAULT;
 
-                #[cfg(feature = "phy-enable-usb")]
-                {
-                    extern "C" {
-                        pub fn phy_bbpll_en_usb(param: bool);
-                    }
+                // this would cause linker errors when the feature is activated - see https://github.com/esp-rs/esp-wifi/issues/457
 
-                    phy_bbpll_en_usb(true);
-                }
+                // #[cfg(feature = "phy-enable-usb")]
+                // {
+                //     extern "C" {
+                //         pub fn phy_bbpll_en_usb(param: bool);
+                //     }
+
+                //     phy_bbpll_en_usb(true);
+                // }
                 register_chipv7_phy(
                     init_data,
                     &mut cal_data as *mut _

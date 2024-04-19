@@ -6,7 +6,6 @@ use crate::{
     hal::{
         interrupt::{self, TrapFrame},
         peripherals::{self, Interrupt},
-        prelude::*,
         riscv,
         systimer::{Alarm, Periodic, SystemTimer, Target},
     },
@@ -19,8 +18,9 @@ use peripherals::INTPRI as SystemPeripheral;
 use peripherals::SYSTEM as SystemPeripheral;
 
 /// The timer responsible for time slicing.
-pub type TimeBase = Alarm<Target, 0>;
-static ALARM0: Mutex<RefCell<Option<Alarm<Periodic, 0>>>> = Mutex::new(RefCell::new(None));
+pub type TimeBase = Alarm<Target, esp_hal::Blocking, 0>;
+static ALARM0: Mutex<RefCell<Option<Alarm<Periodic, esp_hal::Blocking, 0>>>> =
+    Mutex::new(RefCell::new(None));
 const TIMESLICE_FREQUENCY: fugit::HertzU32 = fugit::HertzU32::from_raw(crate::CONFIG.tick_rate_hz);
 
 // Time keeping
@@ -31,12 +31,19 @@ pub fn setup_timer(systimer: TimeBase) {
     // make sure the scheduling won't start before everything is setup
     riscv::interrupt::disable();
 
-    let alarm0 = systimer.into_periodic();
+    let mut alarm0 = systimer.into_periodic();
     alarm0.set_period(TIMESLICE_FREQUENCY.into_duration());
     alarm0.clear_interrupt();
     alarm0.enable_interrupt(true);
 
     critical_section::with(|cs| ALARM0.borrow_ref_mut(cs).replace(alarm0));
+
+    unsafe {
+        interrupt::bind_interrupt(
+            Interrupt::SYSTIMER_TARGET0,
+            core::mem::transmute(systimer_target0 as *const ()),
+        );
+    }
 
     unwrap!(interrupt::enable(
         Interrupt::SYSTIMER_TARGET0,
@@ -55,8 +62,7 @@ pub fn setup_multitasking() {
     }
 }
 
-#[interrupt]
-fn SYSTIMER_TARGET0(trap_frame: &mut TrapFrame) {
+extern "C" fn systimer_target0(trap_frame: &mut TrapFrame) {
     // clear the systimer intr
     critical_section::with(|cs| {
         unwrap!(ALARM0.borrow_ref_mut(cs).as_mut()).clear_interrupt();
@@ -65,8 +71,8 @@ fn SYSTIMER_TARGET0(trap_frame: &mut TrapFrame) {
     task_switch(trap_frame);
 }
 
-#[interrupt]
-fn FROM_CPU_INTR3(trap_frame: &mut TrapFrame) {
+#[no_mangle]
+extern "C" fn FROM_CPU_INTR3(trap_frame: &mut TrapFrame) {
     unsafe {
         // clear FROM_CPU_INTR3
         (&*SystemPeripheral::PTR)

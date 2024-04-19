@@ -9,7 +9,7 @@ use esp_wifi::{initialize, EspWifiInitFor};
 mod examples_util;
 use examples_util::hal;
 use hal::clock::ClockControl;
-use hal::Rng;
+use hal::rng::Rng;
 use hal::{peripherals::Peripherals, prelude::*};
 
 #[entry]
@@ -23,7 +23,7 @@ fn main() -> ! {
     let clocks = ClockControl::max(system.clock_control).freeze();
 
     #[cfg(target_arch = "xtensa")]
-    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks).timer0;
+    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
     #[cfg(target_arch = "riscv32")]
     let timer = hal::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
     let init = initialize(

@@ -20,7 +20,7 @@ use esp_wifi::wifi::{
 };
 use esp_wifi::{initialize, EspWifiInitFor};
 use hal::clock::ClockControl;
-use hal::Rng;
+use hal::rng::Rng;
 use hal::{embassy, peripherals::Peripherals, prelude::*, timer::TimerGroup};
 use static_cell::make_static;
 
@@ -38,7 +38,7 @@ async fn main(spawner: Spawner) -> ! {
     let clocks = ClockControl::max(system.clock_control).freeze();
 
     #[cfg(target_arch = "xtensa")]
-    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks).timer0;
+    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
     #[cfg(target_arch = "riscv32")]
     let timer = hal::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
     let init = initialize(
@@ -54,7 +54,7 @@ async fn main(spawner: Spawner) -> ! {
     let (wifi_ap_interface, wifi_sta_interface, mut controller) =
         esp_wifi::wifi::new_ap_sta(&init, wifi).unwrap();
 
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timer_group0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timer_group0);
 
     let ap_config = Config::ipv4_static(StaticConfigV4 {

@@ -1,7 +1,7 @@
 #[cfg(any(feature = "ble"))]
 use crate::{
     binary,
-    hal::{interrupt, macros::interrupt, peripherals::Interrupt},
+    hal::{interrupt, peripherals::Interrupt},
 };
 
 pub fn setup_radio_isr() {
@@ -19,8 +19,8 @@ pub fn setup_radio_isr() {
 }
 
 #[cfg(feature = "ble")]
-#[interrupt]
-fn LP_BLE_TIMER() {
+#[no_mangle]
+extern "C" fn LP_BLE_TIMER() {
     unsafe {
         trace!("LP_TIMER interrupt");
 
@@ -41,8 +41,8 @@ fn LP_BLE_TIMER() {
 }
 
 #[cfg(feature = "ble")]
-#[interrupt]
-fn BT_MAC() {
+#[no_mangle]
+extern "C" fn BT_MAC() {
     unsafe {
         trace!("BT_MAC interrupt");
 
