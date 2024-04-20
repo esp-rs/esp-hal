@@ -31,7 +31,7 @@ impl<'d> LcdCam<'d> {
                 lcd_cam: unsafe { lcd_cam.clone_unchecked() },
             },
             cam: Cam {
-                _lcd_cam: unsafe { lcd_cam.clone_unchecked() },
+                lcd_cam: unsafe { lcd_cam.clone_unchecked() },
             },
         }
     }

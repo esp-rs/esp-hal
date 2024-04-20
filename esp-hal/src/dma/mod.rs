@@ -1308,7 +1308,7 @@ where
     MODE: Mode,
 {
     pub tx: C::Tx<'d>,
-    pub(crate) rx: C::Rx<'d>,
+    pub rx: C::Rx<'d>,
     phantom: PhantomData<MODE>,
 }
 
