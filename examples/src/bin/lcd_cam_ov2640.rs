@@ -1,4 +1,4 @@
-//! Drives the camera on a Freenove ESP32-S3 WROOM
+//! Drives the camera on a Freenove ESP32-S3 WROOM (also works as is on the ESP32S3-EYE)
 //!
 //! This example reads a JPEG from an OV2640 and writes it to the console as hex.
 //!
@@ -9,14 +9,14 @@
 //! VSYNC     GPIO6
 //! HREF      GPIO7
 //! PCLK      GPIO13
-//! D0        GPIO11
-//! D1        GPIO9
-//! D2        GPIO8
-//! D3        GPIO10
-//! D4        GPIO12
-//! D5        GPIO18
-//! D6        GPIO17
-//! D7        GPIO16
+//! D2        GPIO11
+//! D3        GPIO9
+//! D4        GPIO8
+//! D5        GPIO10
+//! D6        GPIO12
+//! D7        GPIO18
+//! D8        GPIO17
+//! D9        GPIO16
 
 //% CHIPS: esp32s3
 
