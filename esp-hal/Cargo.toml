@@ -170,11 +170,7 @@ ufmt = ["dep:ufmt-write"]
 
 #! ### Embassy Feature Flags
 ## Enable support for `embassy`, a modern asynchronous embedded framework.
-embassy = ["embassy-time-driver", "procmacros/embassy"]
-## Use the interrupt-mode embassy executor.
-embassy-executor-interrupt = ["embassy", "embassy-executor"]
-## Use the thread-mode embassy executor.
-embassy-executor-thread = ["embassy", "embassy-executor"]
+embassy = ["embassy-time-driver", "procmacros/embassy", "embassy-executor"]
 ## Uses hardware timers as alarms for the executors. Using this feature
 ## limits the number of executors to the number of hardware alarms provided
 ## by the time driver.
@@ -217,6 +213,8 @@ ci = [
     "embedded-hal-02",
     "ufmt",
     "async",
+    "embassy",
+    "embassy-time-timg0",
 ]
 
 [lints.clippy]

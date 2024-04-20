@@ -3,7 +3,7 @@
 //! Most dev-kits use a USB-UART-bridge - in that case you won't see any output.
 
 //% CHIPS: esp32c3 esp32c6 esp32h2 esp32s3
-//% FEATURES: async embassy embassy-executor-thread embassy-time-timg0 embassy-generic-timers
+//% FEATURES: async embassy embassy-time-timg0 embassy-generic-timers
 
 #![no_std]
 #![no_main]

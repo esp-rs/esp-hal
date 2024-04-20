@@ -16,7 +16,7 @@
 // The interrupt-executor is created in `main` and is used to spawn `high_prio`.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embassy embassy-executor-interrupt embassy-executor-thread embassy-time-timg0 embassy-generic-timers
+//% FEATURES: embassy embassy-time-timg0 embassy-generic-timers
 
 #![no_std]
 #![no_main]

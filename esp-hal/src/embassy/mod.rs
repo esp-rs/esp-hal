@@ -72,10 +72,6 @@
 //! For more embassy-related examples check out the [examples repo](https://github.com/esp-rs/esp-hal/tree/main/esp32-hal/examples)
 //! for a corresponding board.
 
-#[cfg(any(
-    feature = "embassy-executor-interrupt",
-    feature = "embassy-executor-thread"
-))]
 pub mod executor;
 
 use core::cell::Cell;
