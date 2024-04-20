@@ -88,7 +88,7 @@ p192                = { version = "0.13.0", default-features = false, features =
 p256                = { version = "0.13.2", default-features = false, features = ["arithmetic"] }
 
 [features]
-default = ["async", "embassy", "embassy-executor-thread", "embassy-time-timg0"]
+default = ["async", "embassy", "embassy-time-timg0"]
 
 # Device support (required!):
 esp32 = [
@@ -117,8 +117,6 @@ embassy = [
     "embedded-test/external-executor",
     "esp-hal?/embassy",
 ]
-embassy-executor-interrupt = ["esp-hal?/embassy-executor-interrupt"]
-embassy-executor-thread = ["esp-hal?/embassy-executor-thread"]
 embassy-time-systick-16mhz = ["esp-hal?/embassy-time-systick-16mhz"]
 embassy-time-systick-80mhz = ["esp-hal?/embassy-time-systick-80mhz"]
 embassy-time-timg0 = ["esp-hal?/embassy-time-timg0"]
