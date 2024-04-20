@@ -68,6 +68,7 @@ pub struct Executor {
 
 impl Executor {
     /// Create a new Executor.
+<<<<<<< HEAD
     #[cfg_attr(
         multi_core,
         doc = r#"
@@ -75,6 +76,11 @@ impl Executor {
     available for anything else to wake the other core(s).
     "#
     )]
+=======
+    ///
+    /// On multi_core systems this will use software-interrupt 3 which isn't
+    /// available for anything else.
+>>>>>>> 2d5150dc (Reserve sw interrupt 3 (4) instead of 0 for multicore systems with the embassy feature enabled)
     pub fn new() -> Self {
         #[cfg(multi_core)]
         unsafe {
