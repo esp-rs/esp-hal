@@ -15,7 +15,7 @@ fn __pender(context: *mut ()) {
     match context[0] {
         // 0 is reserved for thread mode executors
         0 => thread::pend_thread_mode(context[1] as usize),
-        // For interrupt executors, the context value is the 
+        // For interrupt executors, the context value is the
         // software interrupt number + `SW_OFFSET`
         16 => unsafe { SoftwareInterrupt::<0>::steal().raise() },
         17 => unsafe { SoftwareInterrupt::<1>::steal().raise() },
