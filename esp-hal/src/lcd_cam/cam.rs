@@ -19,7 +19,7 @@ use crate::{
     },
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
     i2s::Error,
-    lcd_cam::{cam::private::RxPins, private::calculate_clkm, BitOrder},
+    lcd_cam::{cam::private::RxPins, private::calculate_clkm, BitOrder, ByteOrder},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
 };
@@ -32,6 +32,20 @@ pub enum EofMode {
     ByteLen,
     /// Generate GDMA SUC EOF by the vsync signal
     VsyncSignal,
+}
+
+/// Vsync Filter Threshold
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum VsyncFilterThreshold {
+    One,
+    Two,
+    Three,
+    Four,
+    Five,
+    Six,
+    Seven,
+    Eight,
 }
 
 pub struct Cam<'d> {
@@ -83,11 +97,32 @@ where
                     .bits(0)
                     .cam_vs_eof_en()
                     .set_bit()
+                    .cam_line_int_en()
+                    .clear_bit()
+                    .cam_stop_en()
+                    .clear_bit()
             }
         });
-        lcd_cam
-            .cam_ctrl1()
-            .write(|w| w.cam_vh_de_mode_en().clear_bit());
+        lcd_cam.cam_ctrl1().write(|w| unsafe {
+            w.cam_vh_de_mode_en()
+                .set_bit()
+                .cam_rec_data_bytelen()
+                .bits(0)
+                .cam_line_int_num()
+                .bits(0)
+                .cam_vsync_filter_en()
+                .clear_bit()
+                .cam_2byte_en()
+                .clear_bit()
+                .cam_clk_inv()
+                .clear_bit()
+                .cam_de_inv()
+                .clear_bit()
+                .cam_hsync_inv()
+                .clear_bit()
+                .cam_vsync_inv()
+                .clear_bit()
+        });
 
         lcd_cam
             .cam_rgb_yuv()
@@ -106,11 +141,47 @@ where
     }
 }
 
+impl<'d, RX: Rx, P: RxPins<Word = u16>> Camera<'d, RX, P> {
+    pub fn set_byte_order(&mut self, byte_order: ByteOrder) -> &mut Self {
+        self.lcd_cam
+            .cam_ctrl()
+            .modify(|_, w| w.cam_byte_order().bit(byte_order != ByteOrder::default()));
+        self
+    }
+}
+
 impl<'d, RX: Rx, P: RxPins> Camera<'d, RX, P> {
     pub fn set_bit_order(&mut self, bit_order: BitOrder) -> &mut Self {
         self.lcd_cam
             .cam_ctrl()
             .modify(|_, w| w.cam_bit_order().bit(bit_order != BitOrder::default()));
+        self
+    }
+
+    pub fn set_vsync_filter(&mut self, threshold: Option<VsyncFilterThreshold>) -> &mut Self {
+        if let Some(threshold) = threshold {
+            let value = match threshold {
+                VsyncFilterThreshold::One => 0,
+                VsyncFilterThreshold::Two => 1,
+                VsyncFilterThreshold::Three => 2,
+                VsyncFilterThreshold::Four => 3,
+                VsyncFilterThreshold::Five => 4,
+                VsyncFilterThreshold::Six => 5,
+                VsyncFilterThreshold::Seven => 6,
+                VsyncFilterThreshold::Eight => 7,
+            };
+
+            self.lcd_cam
+                .cam_ctrl()
+                .modify(|_, w| unsafe { w.cam_vsync_filter_thres().bits(value) });
+            self.lcd_cam
+                .cam_ctrl1()
+                .modify(|_, w| w.cam_vsync_filter_en().set_bit());
+        } else {
+            self.lcd_cam
+                .cam_ctrl1()
+                .modify(|_, w| w.cam_vsync_filter_en().clear_bit());
+        }
         self
     }
 
@@ -161,6 +232,9 @@ impl<'d, RX: Rx, P: RxPins> Camera<'d, RX, P> {
 
     // Start the Camera unit to listen for incoming DVP stream.
     fn start_unit(&self) {
+        self.lcd_cam
+            .cam_ctrl()
+            .modify(|_, w| w.cam_update().set_bit());
         self.lcd_cam
             .cam_ctrl1()
             .modify(|_, w| w.cam_start().set_bit());
