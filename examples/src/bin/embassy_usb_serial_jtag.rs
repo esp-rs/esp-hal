@@ -21,7 +21,7 @@ use esp_hal::{
     usb_serial_jtag::{UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
     Async,
 };
-use static_cell::make_static;
+use static_cell::StaticCell;
 
 const MAX_BUFFER_SIZE: usize = 512;
 
@@ -75,7 +75,9 @@ async fn main(spawner: Spawner) -> () {
 
     let (tx, rx) = UsbSerialJtag::new_async(peripherals.USB_DEVICE).split();
 
-    let signal = &*make_static!(Signal::new());
+    static SIGNAL: StaticCell<Signal<NoopRawMutex, heapless::String<MAX_BUFFER_SIZE>>> =
+        StaticCell::new();
+    let signal = &*SIGNAL.init(Signal::new());
 
     spawner.spawn(reader(rx, &signal)).unwrap();
     spawner.spawn(writer(tx, &signal)).unwrap();

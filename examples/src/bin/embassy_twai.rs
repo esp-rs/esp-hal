@@ -32,7 +32,7 @@ use esp_hal::{
     twai::{self, EspTwaiFrame, TwaiRx, TwaiTx},
 };
 use esp_println::println;
-use static_cell::make_static;
+use static_cell::StaticCell;
 
 type TwaiOutbox = Channel<NoopRawMutex, EspTwaiFrame, 16>;
 
@@ -132,7 +132,8 @@ async fn main(spawner: Spawner) {
     )
     .unwrap();
 
-    let channel = &*make_static!(Channel::new());
+    static CHANNEL: StaticCell<TwaiOutbox> = StaticCell::new();
+    let channel = &*CHANNEL.init(Channel::new());
 
     spawner.spawn(receiver(rx, channel)).ok();
     spawner.spawn(transmitter(tx, channel)).ok();

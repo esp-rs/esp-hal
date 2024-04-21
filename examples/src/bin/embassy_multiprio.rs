@@ -34,7 +34,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use static_cell::make_static;
+use static_cell::StaticCell;
 
 /// Periodically print something.
 #[embassy_executor::task]
@@ -82,8 +82,9 @@ async fn main(low_prio_spawner: Spawner) {
     let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timg0);
 
+    static EXECUTOR: StaticCell<InterruptExecutor<2>> = StaticCell::new();
     let executor = InterruptExecutor::new(system.software_interrupt_control.software_interrupt2);
-    let executor = make_static!(executor);
+    let executor = EXECUTOR.init(executor);
 
     let spawner = executor.start(Priority::Priority3);
     spawner.must_spawn(high_prio());

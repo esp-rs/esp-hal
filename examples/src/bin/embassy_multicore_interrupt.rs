@@ -27,7 +27,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use static_cell::make_static;
+use static_cell::StaticCell;
 
 static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 
@@ -82,29 +82,31 @@ fn main() -> ! {
 
     let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 
-    let led_ctrl_signal = &*make_static!(Signal::new());
+    static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
+    let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
 
     let led = io.pins.gpio0.into_push_pull_output();
 
+    static EXECUTOR_CORE_1: StaticCell<InterruptExecutor<1>> = StaticCell::new();
     let executor_core1 =
         InterruptExecutor::new(system.software_interrupt_control.software_interrupt1);
-    let executor_core1 = make_static!(executor_core1);
+    let executor_core1 = EXECUTOR_CORE_1.init(executor_core1);
 
-    let cpu1_fnctn = move || {
-        let spawner = executor_core1.start(Priority::Priority1);
-
-        spawner.spawn(control_led(led, led_ctrl_signal)).ok();
-
-        // Just loop to show that the main thread does not need to poll the executor.
-        loop {}
-    };
     let _guard = cpu_control
-        .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, cpu1_fnctn)
+        .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {
+            let spawner = executor_core1.start(Priority::Priority1);
+
+            spawner.spawn(control_led(led, led_ctrl_signal)).ok();
+
+            // Just loop to show that the main thread does not need to poll the executor.
+            loop {}
+        })
         .unwrap();
 
+    static EXECUTOR_CORE_0: StaticCell<InterruptExecutor<0>> = StaticCell::new();
     let executor_core0 =
         InterruptExecutor::new(system.software_interrupt_control.software_interrupt0);
-    let executor_core0 = make_static!(executor_core0);
+    let executor_core0 = EXECUTOR_CORE_0.init(executor_core0);
 
     let spawner = executor_core0.start(Priority::Priority1);
     spawner.spawn(enable_disable_led(led_ctrl_signal)).ok();

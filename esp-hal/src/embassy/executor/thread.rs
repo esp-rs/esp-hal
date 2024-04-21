@@ -10,6 +10,8 @@ use crate::get_core;
 #[cfg(multi_core)]
 use crate::peripherals::SYSTEM;
 
+pub const THREAD_MODE_CONTEXT: u8 = 16;
+
 /// global atomic used to keep track of whether there is work to do since sev()
 /// is not available on either Xtensa or RISC-V
 #[cfg(not(multi_core))]
@@ -68,7 +70,12 @@ impl Executor {
         }
 
         Self {
-            inner: raw::Executor::new(usize::from_le_bytes([0, get_core() as u8, 0, 0]) as *mut ()),
+            inner: raw::Executor::new(usize::from_le_bytes([
+                THREAD_MODE_CONTEXT,
+                get_core() as u8,
+                0,
+                0,
+            ]) as *mut ()),
             not_send: PhantomData,
         }
     }

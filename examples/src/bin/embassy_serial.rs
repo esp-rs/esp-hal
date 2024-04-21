@@ -22,7 +22,7 @@ use esp_hal::{
     uart::{config::AtCmdConfig, Uart, UartRx, UartTx},
     Async,
 };
-use static_cell::make_static;
+use static_cell::StaticCell;
 
 // rx_fifo_full_threshold
 const READ_BUF_SIZE: usize = 64;
@@ -90,7 +90,8 @@ async fn main(spawner: Spawner) {
         .unwrap();
     let (tx, rx) = uart0.split();
 
-    let signal = &*make_static!(Signal::new());
+    static SIGNAL: StaticCell<Signal<NoopRawMutex, usize>> = StaticCell::new();
+    let signal = &*SIGNAL.init(Signal::new());
 
     spawner.spawn(reader(rx, &signal)).ok();
     spawner.spawn(writer(tx, &signal)).ok();

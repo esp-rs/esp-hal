@@ -247,14 +247,13 @@ pub struct SoftwareInterruptControl {
 
 impl SoftwareInterruptControl {
     fn new() -> Self {
-        // the thread-executor uses SW-INT0 when used on a multi-core system
-        // we cannot easily require `software_interrupt0` there since it's created
-        // before `main` via proc-macro
-
         SoftwareInterruptControl {
             software_interrupt0: SoftwareInterrupt {},
             software_interrupt1: SoftwareInterrupt {},
             software_interrupt2: SoftwareInterrupt {},
+            // the thread-executor uses SW-INT3 when used on a multi-core system
+            // we cannot easily require `software_interrupt3` there since it's created
+            // before `main` via proc-macro so we  cfg it away from users
             #[cfg(not(all(feature = "embassy", multi_core)))]
             software_interrupt3: SoftwareInterrupt {},
         }
