@@ -10,7 +10,11 @@ use crate::get_core;
 #[cfg(multi_core)]
 use crate::peripherals::SYSTEM;
 
+<<<<<<< HEAD
 pub(crate) const THREAD_MODE_CONTEXT: u8 = 16;
+=======
+pub const THREAD_MODE_CONTEXT: u8 = 16;
+>>>>>>> ded2562c (Add thread mode context id and fix up examples)
 
 /// global atomic used to keep track of whether there is work to do since sev()
 /// is not available on either Xtensa or RISC-V

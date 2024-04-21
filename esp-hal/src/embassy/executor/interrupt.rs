@@ -10,9 +10,6 @@ use crate::{
     system::SoftwareInterrupt,
 };
 
-/// The number to offset SW interrupts when passed through the pender context.
-pub const SW_OFFSET: u8 = 16;
-
 static mut EXECUTORS: [CallbackContext; 4] = [
     CallbackContext::new(),
     CallbackContext::new(),
@@ -123,7 +120,7 @@ impl<const SWI: u8> InterruptExecutor<SWI> {
         unsafe {
             (*self.executor.get())
                 .as_mut_ptr()
-                .write(raw::Executor::new((SWI + SW_OFFSET) as *mut ()));
+                .write(raw::Executor::new(SWI as *mut ()));
 
             EXECUTORS[SWI as usize].set((*self.executor.get()).as_mut_ptr());
         }
