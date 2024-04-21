@@ -1,3 +1,39 @@
+//! # Camera - Master or Slave Mode
+//!
+//! ## Overview
+//! The LCD_CAM peripheral supports receiving 8/16 bit DVP signals in either
+//! master or slave mode. In master mode, the peripheral provides the master
+//! clock to drive the camera, in slave mode it does not. This is configured
+//! with the `with_master_clock` method on the camera driver. The driver (due to
+//! the peripheral) mandates DMA (Direct Memory Access) for efficient data
+//! transfer.
+//!
+//! ## Examples
+//! Following code shows how to receive some bytes from an 8 bit DVP stream in
+//! master mode.
+//!
+//! ```no_run
+//! let mclk_pin = io.pins.gpio15;
+//! let vsync_pin = io.pins.gpio6;
+//! let href_pin = io.pins.gpio7;
+//! let pclk_pin = io.pins.gpio13;
+//! let data_pins = RxEightBits::new(
+//!     io.pins.gpio11,
+//!     io.pins.gpio9,
+//!     io.pins.gpio8,
+//!     io.pins.gpio10,
+//!     io.pins.gpio12,
+//!     io.pins.gpio18,
+//!     io.pins.gpio17,
+//!     io.pins.gpio16,
+//! );
+//!
+//! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
+//! let mut camera = Camera::new(lcd_cam.cam, channel.rx, data_pins, 20u32.MHz(), &clocks)
+//!     .with_master_clock(mclk_pin) // Remove this for slave mode.
+//!     .with_ctrl_pins(vsync_pin, href_pin, pclk_pin);
+//! ```
+
 use core::mem::size_of;
 
 use embedded_dma::WriteBuffer;
