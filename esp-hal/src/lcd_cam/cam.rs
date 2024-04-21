@@ -1,3 +1,5 @@
+use core::mem::size_of;
+
 use embedded_dma::WriteBuffer;
 use fugit::HertzU32;
 
@@ -169,15 +171,19 @@ impl<'d, RX: Rx, P: RxPins> Camera<'d, RX, P> {
         buf: &'t mut RXBUF,
     ) -> Result<Transfer<'t, 'd, RX, P>, DmaError>
     where
-        RXBUF: WriteBuffer<Word = u8>,
+        RXBUF: WriteBuffer<Word = P::Word>,
     {
         let (ptr, len) = unsafe { buf.write_buffer() };
 
         self.reset_unit_and_fifo();
 
         // Start DMA to receive incoming transfer.
-        self.rx_channel
-            .prepare_transfer_without_start(false, DmaPeripheral::LcdCam, ptr, len)?;
+        self.rx_channel.prepare_transfer_without_start(
+            false,
+            DmaPeripheral::LcdCam,
+            ptr as _,
+            len * size_of::<P::Word>(),
+        )?;
         self.rx_channel.start_transfer()?;
 
         self.start_unit();
@@ -190,15 +196,19 @@ impl<'d, RX: Rx, P: RxPins> Camera<'d, RX, P> {
         buf: &'t mut RXBUF,
     ) -> Result<Transfer<'t, 'd, RX, P>, DmaError>
     where
-        RXBUF: WriteBuffer<Word = u8>,
+        RXBUF: WriteBuffer<Word = P::Word>,
     {
         let (ptr, len) = unsafe { buf.write_buffer() };
 
         self.reset_unit_and_fifo();
 
         // Start DMA to receive incoming transfer.
-        self.rx_channel
-            .prepare_transfer_without_start(true, DmaPeripheral::LcdCam, ptr, len)?;
+        self.rx_channel.prepare_transfer_without_start(
+            true,
+            DmaPeripheral::LcdCam,
+            ptr as _,
+            len * size_of::<P::Word>(),
+        )?;
         self.rx_channel.start_transfer()?;
 
         self.start_unit();
