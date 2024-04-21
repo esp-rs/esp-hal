@@ -55,7 +55,7 @@ use crate::{
     },
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
     i2s::Error,
-    lcd_cam::{cam::private::RxPins, private::calculate_clkm, BitOrder, ByteOrder},
+    lcd_cam::{private::calculate_clkm, BitOrder, ByteOrder},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
 };
@@ -94,7 +94,7 @@ pub struct Camera<'d, RX, P> {
     _pins: P,
 }
 
-impl<'d, T, R, P: RxPins> Camera<'d, ChannelRx<'d, T, R>, P>
+impl<'d, T, R, P> Camera<'d, ChannelRx<'d, T, R>, P>
 where
     T: RxChannel<R>,
     R: ChannelTypes + RegisterAccess,
@@ -103,7 +103,7 @@ where
     pub fn new(
         cam: Cam<'d>,
         mut channel: ChannelRx<'d, T, R>,
-        mut pins: P,
+        pins: P,
         frequency: HertzU32,
         clocks: &Clocks,
     ) -> Self {
@@ -167,7 +167,6 @@ where
         lcd_cam.cam_ctrl().modify(|_, w| w.cam_update().set_bit());
 
         channel.init_channel();
-        pins.configure();
 
         Self {
             lcd_cam,
@@ -177,7 +176,7 @@ where
     }
 }
 
-impl<'d, RX: Rx, P: RxPins<Word = u16>> Camera<'d, RX, P> {
+impl<'d, RX: Rx> Camera<'d, RX, RxSixteenBits> {
     pub fn set_byte_order(&mut self, byte_order: ByteOrder) -> &mut Self {
         self.lcd_cam
             .cam_ctrl()
@@ -186,7 +185,7 @@ impl<'d, RX: Rx, P: RxPins<Word = u16>> Camera<'d, RX, P> {
     }
 }
 
-impl<'d, RX: Rx, P: RxPins> Camera<'d, RX, P> {
+impl<'d, RX: Rx, P> Camera<'d, RX, P> {
     pub fn set_bit_order(&mut self, bit_order: BitOrder) -> &mut Self {
         self.lcd_cam
             .cam_ctrl()
@@ -276,54 +275,88 @@ impl<'d, RX: Rx, P: RxPins> Camera<'d, RX, P> {
             .modify(|_, w| w.cam_start().set_bit());
     }
 
-    pub fn read_dma<'t, RXBUF>(
-        &'t mut self,
-        buf: &'t mut RXBUF,
-    ) -> Result<Transfer<'t, 'd, RX, P>, DmaError>
-    where
-        RXBUF: WriteBuffer<Word = P::Word>,
-    {
+    fn start_dma<RXBUF: WriteBuffer>(
+        &mut self,
+        circular: bool,
+        buf: &mut RXBUF,
+    ) -> Result<(), DmaError> {
         let (ptr, len) = unsafe { buf.write_buffer() };
 
-        self.reset_unit_and_fifo();
-
-        // Start DMA to receive incoming transfer.
         self.rx_channel.prepare_transfer_without_start(
-            false,
+            circular,
             DmaPeripheral::LcdCam,
             ptr as _,
-            len * size_of::<P::Word>(),
+            len * size_of::<RXBUF::Word>(),
         )?;
-        self.rx_channel.start_transfer()?;
+        self.rx_channel.start_transfer()
+    }
 
+    fn read_dma_impl<'t, RXBUF: WriteBuffer>(
+        &'t mut self,
+        buf: &'t mut RXBUF,
+    ) -> Result<Transfer<'t, 'd, RX, P>, DmaError> {
+        self.reset_unit_and_fifo();
+        // Start DMA to receive incoming transfer.
+        self.start_dma(false, buf)?;
         self.start_unit();
 
         Ok(Transfer { instance: self })
     }
 
-    pub fn read_dma_circular<'t, RXBUF>(
+    fn read_dma_circular_impl<'t, RXBUF: WriteBuffer>(
         &'t mut self,
         buf: &'t mut RXBUF,
-    ) -> Result<Transfer<'t, 'd, RX, P>, DmaError>
-    where
-        RXBUF: WriteBuffer<Word = P::Word>,
-    {
-        let (ptr, len) = unsafe { buf.write_buffer() };
-
+    ) -> Result<Transfer<'t, 'd, RX, P>, DmaError> {
         self.reset_unit_and_fifo();
-
         // Start DMA to receive incoming transfer.
-        self.rx_channel.prepare_transfer_without_start(
-            true,
-            DmaPeripheral::LcdCam,
-            ptr as _,
-            len * size_of::<P::Word>(),
-        )?;
-        self.rx_channel.start_transfer()?;
-
+        self.start_dma(true, buf)?;
         self.start_unit();
 
         Ok(Transfer { instance: self })
+    }
+}
+
+impl<'d, RX: Rx> Camera<'d, RX, RxEightBits> {
+    pub fn read_dma<'t, RXBUF>(
+        &'t mut self,
+        buf: &'t mut RXBUF,
+    ) -> Result<Transfer<'t, 'd, RX, RxEightBits>, DmaError>
+    where
+        RXBUF: WriteBuffer<Word = u8>,
+    {
+        self.read_dma_impl(buf)
+    }
+
+    pub fn read_dma_circular<'t, RXBUF>(
+        &'t mut self,
+        buf: &'t mut RXBUF,
+    ) -> Result<Transfer<'t, 'd, RX, RxEightBits>, DmaError>
+    where
+        RXBUF: WriteBuffer<Word = u8>,
+    {
+        self.read_dma_circular_impl(buf)
+    }
+}
+
+impl<'d, RX: Rx> Camera<'d, RX, RxSixteenBits> {
+    pub fn read_dma<'t, RXBUF>(
+        &'t mut self,
+        buf: &'t mut RXBUF,
+    ) -> Result<Transfer<'t, 'd, RX, RxSixteenBits>, DmaError>
+    where
+        RXBUF: WriteBuffer<Word = u16>,
+    {
+        self.read_dma_impl(buf)
+    }
+
+    pub fn read_dma_circular<'t, RXBUF>(
+        &'t mut self,
+        buf: &'t mut RXBUF,
+    ) -> Result<Transfer<'t, 'd, RX, RxSixteenBits>, DmaError>
+    where
+        RXBUF: WriteBuffer<Word = u16>,
+    {
+        self.read_dma_circular_impl(buf)
     }
 }
 
@@ -398,30 +431,13 @@ impl<'t, 'd, RX: Rx, P> Drop for Transfer<'t, 'd, RX, P> {
     }
 }
 
-pub struct RxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7> {
-    pin_0: PeripheralRef<'d, P0>,
-    pin_1: PeripheralRef<'d, P1>,
-    pin_2: PeripheralRef<'d, P2>,
-    pin_3: PeripheralRef<'d, P3>,
-    pin_4: PeripheralRef<'d, P4>,
-    pin_5: PeripheralRef<'d, P5>,
-    pin_6: PeripheralRef<'d, P6>,
-    pin_7: PeripheralRef<'d, P7>,
+pub struct RxEightBits {
+    _pins: (),
 }
 
-impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> RxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
-where
-    P0: InputPin,
-    P1: InputPin,
-    P2: InputPin,
-    P3: InputPin,
-    P4: InputPin,
-    P5: InputPin,
-    P6: InputPin,
-    P7: InputPin,
-{
+impl RxEightBits {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub fn new<'d, P0, P1, P2, P3, P4, P5, P6, P7>(
         pin_0: impl Peripheral<P = P0> + 'd,
         pin_1: impl Peripheral<P = P1> + 'd,
         pin_2: impl Peripheral<P = P2> + 'd,
@@ -430,7 +446,17 @@ where
         pin_5: impl Peripheral<P = P5> + 'd,
         pin_6: impl Peripheral<P = P6> + 'd,
         pin_7: impl Peripheral<P = P7> + 'd,
-    ) -> Self {
+    ) -> Self
+    where
+        P0: InputPin,
+        P1: InputPin,
+        P2: InputPin,
+        P3: InputPin,
+        P4: InputPin,
+        P5: InputPin,
+        P6: InputPin,
+        P7: InputPin,
+    {
         crate::into_ref!(pin_0);
         crate::into_ref!(pin_1);
         crate::into_ref!(pin_2);
@@ -440,101 +466,42 @@ where
         crate::into_ref!(pin_6);
         crate::into_ref!(pin_7);
 
-        Self {
-            pin_0,
-            pin_1,
-            pin_2,
-            pin_3,
-            pin_4,
-            pin_5,
-            pin_6,
-            pin_7,
-        }
-    }
-}
-
-impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> RxPins for RxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
-where
-    P0: InputPin,
-    P1: InputPin,
-    P2: InputPin,
-    P3: InputPin,
-    P4: InputPin,
-    P5: InputPin,
-    P6: InputPin,
-    P7: InputPin,
-{
-    type Word = u8;
-
-    fn configure(&mut self) {
-        self.pin_0
+        pin_0
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_0);
-        self.pin_1
+        pin_1
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_1);
-        self.pin_2
+        pin_2
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_2);
-        self.pin_3
+        pin_3
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_3);
-        self.pin_4
+        pin_4
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_4);
-        self.pin_5
+        pin_5
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_5);
-        self.pin_6
+        pin_6
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_6);
-        self.pin_7
+        pin_7
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_7);
+
+        Self { _pins: () }
     }
 }
 
-pub struct RxSixteenBits<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15> {
-    pin_0: PeripheralRef<'d, P0>,
-    pin_1: PeripheralRef<'d, P1>,
-    pin_2: PeripheralRef<'d, P2>,
-    pin_3: PeripheralRef<'d, P3>,
-    pin_4: PeripheralRef<'d, P4>,
-    pin_5: PeripheralRef<'d, P5>,
-    pin_6: PeripheralRef<'d, P6>,
-    pin_7: PeripheralRef<'d, P7>,
-    pin_8: PeripheralRef<'d, P8>,
-    pin_9: PeripheralRef<'d, P9>,
-    pin_10: PeripheralRef<'d, P10>,
-    pin_11: PeripheralRef<'d, P11>,
-    pin_12: PeripheralRef<'d, P12>,
-    pin_13: PeripheralRef<'d, P13>,
-    pin_14: PeripheralRef<'d, P14>,
-    pin_15: PeripheralRef<'d, P15>,
+pub struct RxSixteenBits {
+    _pins: (),
 }
 
-impl<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
-    RxSixteenBits<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
-where
-    P0: InputPin,
-    P1: InputPin,
-    P2: InputPin,
-    P3: InputPin,
-    P4: InputPin,
-    P5: InputPin,
-    P6: InputPin,
-    P7: InputPin,
-    P8: InputPin,
-    P9: InputPin,
-    P10: InputPin,
-    P11: InputPin,
-    P12: InputPin,
-    P13: InputPin,
-    P14: InputPin,
-    P15: InputPin,
-{
+impl RxSixteenBits {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub fn new<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>(
         pin_0: impl Peripheral<P = P0> + 'd,
         pin_1: impl Peripheral<P = P1> + 'd,
         pin_2: impl Peripheral<P = P2> + 'd,
@@ -551,7 +518,25 @@ where
         pin_13: impl Peripheral<P = P13> + 'd,
         pin_14: impl Peripheral<P = P14> + 'd,
         pin_15: impl Peripheral<P = P15> + 'd,
-    ) -> Self {
+    ) -> Self
+    where
+        P0: InputPin,
+        P1: InputPin,
+        P2: InputPin,
+        P3: InputPin,
+        P4: InputPin,
+        P5: InputPin,
+        P6: InputPin,
+        P7: InputPin,
+        P8: InputPin,
+        P9: InputPin,
+        P10: InputPin,
+        P11: InputPin,
+        P12: InputPin,
+        P13: InputPin,
+        P14: InputPin,
+        P15: InputPin,
+    {
         crate::into_ref!(pin_0);
         crate::into_ref!(pin_1);
         crate::into_ref!(pin_2);
@@ -569,103 +554,55 @@ where
         crate::into_ref!(pin_14);
         crate::into_ref!(pin_15);
 
-        Self {
-            pin_0,
-            pin_1,
-            pin_2,
-            pin_3,
-            pin_4,
-            pin_5,
-            pin_6,
-            pin_7,
-            pin_8,
-            pin_9,
-            pin_10,
-            pin_11,
-            pin_12,
-            pin_13,
-            pin_14,
-            pin_15,
-        }
-    }
-}
-
-impl<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15> RxPins
-    for RxSixteenBits<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
-where
-    P0: InputPin,
-    P1: InputPin,
-    P2: InputPin,
-    P3: InputPin,
-    P4: InputPin,
-    P5: InputPin,
-    P6: InputPin,
-    P7: InputPin,
-    P8: InputPin,
-    P9: InputPin,
-    P10: InputPin,
-    P11: InputPin,
-    P12: InputPin,
-    P13: InputPin,
-    P14: InputPin,
-    P15: InputPin,
-{
-    type Word = u16;
-    fn configure(&mut self) {
-        self.pin_0
+        pin_0
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_0);
-        self.pin_1
+        pin_1
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_1);
-        self.pin_2
+        pin_2
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_2);
-        self.pin_3
+        pin_3
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_3);
-        self.pin_4
+        pin_4
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_4);
-        self.pin_5
+        pin_5
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_5);
-        self.pin_6
+        pin_6
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_6);
-        self.pin_7
+        pin_7
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_7);
-        self.pin_8
+        pin_8
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_8);
-        self.pin_9
+        pin_9
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_9);
-        self.pin_10
+        pin_10
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_10);
-        self.pin_11
+        pin_11
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_11);
-        self.pin_12
+        pin_12
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_12);
-        self.pin_13
+        pin_13
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_13);
-        self.pin_14
+        pin_14
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_14);
-        self.pin_15
+        pin_15
             .set_to_input()
             .connect_input_to_peripheral(InputSignal::CAM_DATA_15);
-    }
-}
 
-mod private {
-    pub trait RxPins {
-        type Word: Copy;
-        fn configure(&mut self);
+        Self { _pins: () }
     }
 }

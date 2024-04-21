@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- ESP32-S3: Add LCD_CAM Camera driver (#0000)
+- ESP32-S3: Add LCD_CAM Camera driver (#1483)
 
 ### Fixed
 
