@@ -251,12 +251,9 @@ impl SoftwareInterruptControl {
             software_interrupt0: SoftwareInterrupt {},
             software_interrupt1: SoftwareInterrupt {},
             software_interrupt2: SoftwareInterrupt {},
-<<<<<<< HEAD
             // the thread-executor uses SW-INT3 when used on a multi-core system
             // we cannot easily require `software_interrupt3` there since it's created
             // before `main` via proc-macro so we  cfg it away from users
-=======
->>>>>>> 2d5150dc (Reserve sw interrupt 3 (4) instead of 0 for multicore systems with the embassy feature enabled)
             #[cfg(not(all(feature = "embassy", multi_core)))]
             software_interrupt3: SoftwareInterrupt {},
         }
