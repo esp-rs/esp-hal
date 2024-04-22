@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- ESP32-PICO-V3-02: Initial support (#1155)
-
 ### Added
+
+- ESP32-PICO-V3-02: Initial support (#1155)
 
 ### Fixed
 
