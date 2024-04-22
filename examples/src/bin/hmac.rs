@@ -65,7 +65,7 @@ use esp_hal::{
     prelude::*,
     rng::Rng,
     system::SystemControl,
-    systimer::SystemTimer,
+    timer::systimer::SystemTimer,
 };
 use esp_println::println;
 use hmac::{Hmac as HmacSw, Mac};

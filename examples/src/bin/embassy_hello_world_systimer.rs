@@ -21,7 +21,7 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
-    systimer::SystemTimer,
+    timer::systimer::SystemTimer,
 };
 
 #[embassy_executor::task]

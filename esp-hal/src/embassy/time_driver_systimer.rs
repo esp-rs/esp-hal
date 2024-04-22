@@ -5,7 +5,7 @@ use super::AlarmState;
 use crate::{
     clock::Clocks,
     peripherals,
-    systimer::{Alarm, SystemTimer, Target},
+    timer::systimer::{Alarm, SystemTimer, Target},
 };
 
 pub const ALARM_COUNT: usize = 3;

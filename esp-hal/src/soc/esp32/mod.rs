@@ -8,7 +8,7 @@
 use core::ptr::addr_of_mut;
 
 use self::peripherals::{LPWR, TIMG0, TIMG1};
-use crate::{rtc_cntl::Rtc, timer::Wdt};
+use crate::{rtc_cntl::Rtc, timer::timg::Wdt};
 
 pub mod cpu_control;
 pub mod efuse;

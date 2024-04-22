@@ -18,8 +18,7 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
-    systimer::SystemTimer,
-    timer::TimerGroup,
+    timer::{systimer::SystemTimer, timg::TimerGroup},
 };
 
 #[main]

@@ -11,7 +11,7 @@
 //!    * I2S_SCLK: 96_000_000 - I2S clock frequency
 
 use self::peripherals::{LPWR, TIMG0, TIMG1};
-use crate::{rtc_cntl::Rtc, timer::Wdt};
+use crate::{rtc_cntl::Rtc, timer::timg::Wdt};
 
 pub mod efuse;
 pub mod gpio;

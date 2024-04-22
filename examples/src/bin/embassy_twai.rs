@@ -29,7 +29,7 @@ use esp_hal::{
     peripherals::{self, Peripherals, TWAI0},
     prelude::*,
     system::SystemControl,
-    timer::TimerGroup,
+    timer::timg::TimerGroup,
     twai::{self, EspTwaiFrame, TwaiRx, TwaiTx},
 };
 use esp_println::println;

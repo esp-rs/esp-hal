@@ -20,7 +20,7 @@ use esp_hal::{
     prelude::*,
     rmt::{asynch::TxChannelAsync, PulseCode, Rmt, TxChannelConfig, TxChannelCreatorAsync},
     system::SystemControl,
-    timer::TimerGroup,
+    timer::timg::TimerGroup,
 };
 use esp_println::println;
 

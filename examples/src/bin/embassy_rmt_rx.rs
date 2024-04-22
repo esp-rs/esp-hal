@@ -45,7 +45,7 @@ async fn main(spawner: Spawner) {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timer_group0 = esp_hal::timer::TimerGroup::new_async(peripherals.TIMG0, &clocks);
+    let timer_group0 = esp_hal::timer::timg::TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timer_group0);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);

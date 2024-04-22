@@ -75,7 +75,7 @@ impl embedded_hal::delay::DelayNs for Delay {
 #[cfg(riscv)]
 mod implementation {
     use super::*;
-    use crate::{clock::Clocks, systimer::SystemTimer};
+    use crate::{clock::Clocks, timer::systimer::SystemTimer};
 
     impl Delay {
         /// Create a new `Delay` instance

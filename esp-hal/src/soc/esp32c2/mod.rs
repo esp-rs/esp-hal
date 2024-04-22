@@ -6,7 +6,7 @@
 //! for interacting with various system-related peripherals on `ESP32-C2` chip.
 
 use self::peripherals::{LPWR, TIMG0};
-use crate::{rtc_cntl::Rtc, timer::Wdt};
+use crate::{rtc_cntl::Rtc, timer::timg::Wdt};
 
 pub mod efuse;
 pub mod gpio;

@@ -17,7 +17,7 @@ use esp_hal::{
     peripherals::{Peripherals, TIMG0},
     prelude::*,
     system::SystemControl,
-    timer::{
+    timer::timg::{
         etm::{TimerEtmEvents, TimerEtmTasks},
         Timer,
         Timer0,

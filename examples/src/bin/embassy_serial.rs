@@ -19,7 +19,7 @@ use esp_hal::{
     peripherals::{Peripherals, UART0},
     prelude::*,
     system::SystemControl,
-    timer::TimerGroup,
+    timer::timg::TimerGroup,
     uart::{config::AtCmdConfig, Uart, UartRx, UartTx},
     Async,
 };

@@ -29,7 +29,7 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
-    timer::TimerGroup,
+    timer::timg::TimerGroup,
 };
 
 #[main]

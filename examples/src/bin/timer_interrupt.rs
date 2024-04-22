@@ -17,7 +17,7 @@ use esp_hal::{
     peripherals::{Interrupt, Peripherals, TIMG0},
     prelude::*,
     system::SystemControl,
-    timer::{Timer, Timer0, TimerGroup, TimerInterrupts},
+    timer::timg::{Timer, Timer0, TimerGroup, TimerInterrupts},
 };
 
 static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0>, esp_hal::Blocking>>>> =

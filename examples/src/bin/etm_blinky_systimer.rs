@@ -11,7 +11,7 @@ use esp_hal::{
     gpio::{etm::GpioEtmChannels, Io},
     peripherals::Peripherals,
     prelude::*,
-    systimer::{etm::SysTimerEtmEvent, SystemTimer},
+    timer::systimer::{etm::SysTimerEtmEvent, SystemTimer},
 };
 use fugit::ExtU32;
 

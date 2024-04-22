@@ -151,10 +151,8 @@ pub mod sha;
 pub mod spi;
 #[cfg(any(dport, hp_sys, pcr, system))]
 pub mod system;
-#[cfg(systimer)]
-pub mod systimer;
 pub mod time;
-#[cfg(any(timg0, timg1))]
+#[cfg(any(systimer, timg0, timg1))]
 pub mod timer;
 #[cfg(trace0)]
 pub mod trace;
