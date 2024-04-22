@@ -13,7 +13,7 @@
 //!
 //! let counter = Mutex::new(RefCell::new(0));
 //!
-//! let mut cpu_control = CpuControl::new(system.cpu_control);
+//! let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 //! let cpu1_fnctn = || {
 //!     cpu1_task(&mut timer1, &counter);
 //! };
@@ -53,7 +53,11 @@ use core::{
     mem::{ManuallyDrop, MaybeUninit},
 };
 
-use crate::Cpu;
+use crate::{
+    peripheral::{Peripheral, PeripheralRef},
+    peripherals::CPU_CTRL,
+    Cpu,
+};
 
 /// Data type for a properly aligned stack of N bytes
 // Xtensa ISA 10.5: [B]y default, the
@@ -125,8 +129,8 @@ pub enum Error {
 }
 
 /// Control CPU Cores
-pub struct CpuControl {
-    _cpu_control: crate::system::CpuControl,
+pub struct CpuControl<'d> {
+    _cpu_control: PeripheralRef<'d, CPU_CTRL>,
 }
 
 unsafe fn internal_park_core(core: Cpu) {
@@ -153,8 +157,10 @@ unsafe fn internal_park_core(core: Cpu) {
     }
 }
 
-impl CpuControl {
-    pub fn new(cpu_control: crate::system::CpuControl) -> CpuControl {
+impl<'d> CpuControl<'d> {
+    pub fn new(cpu_control: impl Peripheral<P = CPU_CTRL> + 'd) -> CpuControl<'d> {
+        crate::into_ref!(cpu_control);
+
         CpuControl {
             _cpu_control: cpu_control,
         }

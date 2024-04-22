@@ -57,6 +57,7 @@ crate::peripherals! {
     PAU <= PAU,
     PCNT <= PCNT,
     PMU <= PMU,
+    RADIO_CLK <= virtual,
     RMT <= RMT,
     RNG <= RNG,
     RSA <= RSA,
