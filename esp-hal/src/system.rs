@@ -101,7 +101,7 @@ pub enum Peripheral {
 
 /// A software interrupt can be triggered by software.
 #[non_exhaustive]
-pub struct SoftwareInterrupt<const NUM: u8> {}
+pub struct SoftwareInterrupt<const NUM: u8>;
 
 impl<const NUM: u8> SoftwareInterrupt<NUM> {
     /// Sets the interrupt handler for this software-interrupt
@@ -192,7 +192,7 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
     /// time.
     #[inline]
     pub unsafe fn steal() -> Self {
-        Self {}
+        Self
     }
 }
 
@@ -228,10 +228,10 @@ impl SoftwareInterruptControl {
 
         SoftwareInterruptControl {
             #[cfg(not(all(feature = "embassy-executor-thread", multi_core)))]
-            software_interrupt0: SoftwareInterrupt {},
-            software_interrupt1: SoftwareInterrupt {},
-            software_interrupt2: SoftwareInterrupt {},
-            software_interrupt3: SoftwareInterrupt {},
+            software_interrupt0: SoftwareInterrupt,
+            software_interrupt1: SoftwareInterrupt,
+            software_interrupt2: SoftwareInterrupt,
+            software_interrupt3: SoftwareInterrupt,
         }
     }
 }
