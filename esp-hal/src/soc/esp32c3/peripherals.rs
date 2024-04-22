@@ -39,6 +39,7 @@ crate::peripherals! {
     IO_MUX <= IO_MUX,
     LEDC <= LEDC,
     LPWR <= RTC_CNTL,
+    RADIO_CLK <= virtual,
     RMT <= RMT,
     RNG <= RNG,
     RSA <= RSA,

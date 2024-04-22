@@ -12,7 +12,7 @@ use esp_hal::{
     clock::ClockControl,
     delay::Delay,
     entry,
-    gpio::{RTCPinWithResistors, IO},
+    gpio::{Io, RtcPinWithResistors},
     peripherals::Peripherals,
     prelude::*,
     rtc_cntl::{
@@ -34,7 +34,7 @@ fn main() -> ! {
 
     let mut rtc = Rtc::new(peripherals.LPWR, None);
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut pin2 = io.pins.gpio2;
     let mut pin3 = io.pins.gpio3;
 
@@ -47,7 +47,7 @@ fn main() -> ! {
     let mut delay = Delay::new(&clocks);
     let timer = TimerWakeupSource::new(Duration::from_secs(10));
 
-    let wakeup_pins: &mut [(&mut dyn RTCPinWithResistors, WakeupLevel)] = &mut [
+    let wakeup_pins: &mut [(&mut dyn RtcPinWithResistors, WakeupLevel)] = &mut [
         (&mut pin2, WakeupLevel::Low),
         (&mut pin3, WakeupLevel::High),
     ];

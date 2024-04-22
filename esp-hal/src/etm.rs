@@ -22,7 +22,7 @@
 //!
 //! ## Example
 //! ```no_run
-//! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let mut led = io.pins.gpio1.into_push_pull_output();
 //! let button = io.pins.gpio9.into_pull_down_input();
 //!

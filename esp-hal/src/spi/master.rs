@@ -8,7 +8,7 @@
 //!
 //! ## Example
 //! ```rust
-//! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let sclk = io.pins.gpio12;
 //! let miso = io.pins.gpio11;
 //! let mosi = io.pins.gpio13;
@@ -2589,7 +2589,7 @@ pub trait Instance: crate::private::Sealed {
 
     fn ch_bus_freq(&mut self, frequency: HertzU32, clocks: &Clocks) {
         // Disable clock source
-        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
+        #[cfg(not(any(esp32, esp32s2)))]
         self.register_block().clk_gate().modify(|_, w| {
             w.clk_en()
                 .clear_bit()
@@ -2603,7 +2603,7 @@ pub trait Instance: crate::private::Sealed {
         self.setup(frequency, clocks);
 
         // Enable clock source
-        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
+        #[cfg(not(any(esp32, esp32s2)))]
         self.register_block().clk_gate().modify(|_, w| {
             w.clk_en()
                 .set_bit()

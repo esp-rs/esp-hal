@@ -14,7 +14,7 @@ use esp_hal::{
     delay::Delay,
     entry,
     gpio,
-    gpio::IO,
+    gpio::Io,
     peripherals::Peripherals,
     prelude::*,
     rtc_cntl::{
@@ -34,7 +34,7 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut rtc = Rtc::new(peripherals.LPWR, None);
 
     println!("up and runnning!");
@@ -47,13 +47,13 @@ fn main() -> ! {
     let timer = TimerWakeupSource::new(Duration::from_secs(10));
 
     #[cfg(feature = "esp32c3")]
-    let wakeup_pins: &mut [(&mut dyn gpio::RTCPinWithResistors, WakeupLevel)] = &mut [
+    let wakeup_pins: &mut [(&mut dyn gpio::RtcPinWithResistors, WakeupLevel)] = &mut [
         (&mut io.pins.gpio2, WakeupLevel::Low),
         (&mut io.pins.gpio3, WakeupLevel::High),
     ];
 
     #[cfg(feature = "esp32s3")]
-    let mut wakeup_pins: &mut [(&mut dyn gpio::RTCPin, WakeupLevel)] =
+    let wakeup_pins: &mut [(&mut dyn gpio::RtcPin, WakeupLevel)] =
         &mut [(&mut io.pins.gpio18, WakeupLevel::Low)];
 
     let rtcio = RtcioWakeupSource::new(wakeup_pins);

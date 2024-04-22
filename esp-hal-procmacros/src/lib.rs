@@ -507,7 +507,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
         FoundCrate::Itself => quote!(esp_lp_hal),
         FoundCrate::Name(name) => {
             let ident = Ident::new(&name, Span::call_site());
-            quote!( #ident::Something )
+            quote!( #ident )
         }
     };
 

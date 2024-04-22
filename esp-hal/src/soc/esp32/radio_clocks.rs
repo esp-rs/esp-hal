@@ -11,13 +11,13 @@
 //! `RadioClockControl` struct. This trait provides methods to enable, disable,
 //! reset the MAC, initialize clocks and perform other related operations.
 
-use crate::system::{RadioClockControl, RadioClockController, RadioPeripherals};
+use crate::system::{RadioClockController, RadioPeripherals};
 
 const DPORT_WIFI_CLK_WIFI_BT_COMMON_M: u32 = 0x000003c9;
 const DPORT_WIFI_CLK_WIFI_EN_M: u32 = 0x00000406;
 const DPORT_WIFI_CLK_BT_EN_M: u32 = 0x00030800;
 
-impl RadioClockController for RadioClockControl {
+impl RadioClockController for crate::peripherals::RADIO_CLK {
     fn enable(&mut self, peripheral: RadioPeripherals) {
         match peripheral {
             RadioPeripherals::Phy => enable_phy(),

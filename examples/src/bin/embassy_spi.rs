@@ -29,7 +29,7 @@ use esp_hal::{
     dma::*,
     dma_descriptors,
     embassy::{self},
-    gpio::IO,
+    gpio::Io,
     peripherals::Peripherals,
     prelude::*,
     spi::{
@@ -49,7 +49,7 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timg0);
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let sclk = io.pins.gpio0;
     let miso = io.pins.gpio2;
     let mosi = io.pins.gpio4;

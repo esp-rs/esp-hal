@@ -10,7 +10,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::IO,
+    gpio::Io,
     peripherals::Peripherals,
     prelude::*,
     rmt::{PulseCode, Rmt, RxChannel, RxChannelConfig, RxChannelCreator},
@@ -25,7 +25,7 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut out = io.pins.gpio5.into_push_pull_output();
 
     cfg_if::cfg_if! {

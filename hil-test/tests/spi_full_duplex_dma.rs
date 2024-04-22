@@ -19,7 +19,7 @@ use esp_hal::{
     clock::ClockControl,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::IO,
+    gpio::Io,
     peripherals::Peripherals,
     prelude::*,
     spi::{
@@ -44,7 +44,7 @@ mod tests {
         let system = peripherals.SYSTEM.split();
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-        let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
         let miso = io.pins.gpio2;
         let mosi = io.pins.gpio4;
@@ -87,7 +87,7 @@ mod tests {
         let system = peripherals.SYSTEM.split();
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-        let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
         let miso = io.pins.gpio2;
         let mosi = io.pins.gpio4;
@@ -131,7 +131,7 @@ mod tests {
         let system = peripherals.SYSTEM.split();
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-        let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
         let miso = io.pins.gpio2;
         let mosi = io.pins.gpio4;

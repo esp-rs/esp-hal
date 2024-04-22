@@ -15,7 +15,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     embassy,
-    gpio::IO,
+    gpio::Io,
     peripherals::Peripherals,
     prelude::*,
     rmt::{asynch::TxChannelAsync, PulseCode, Rmt, TxChannelConfig, TxChannelCreatorAsync},
@@ -33,7 +33,7 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timg0);
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32h2")] {

@@ -705,14 +705,12 @@ mod asynch {
 
     #[handler]
     pub(super) fn i2c0_handler() {
-        unsafe { &*crate::peripherals::I2C0::PTR }
-            .int_ena()
+        let regs = unsafe { &*crate::peripherals::I2C0::PTR };
+        regs.int_ena()
             .modify(|_, w| w.end_detect().clear_bit().trans_complete().clear_bit());
 
         #[cfg(not(any(esp32, esp32s2)))]
-        unsafe { &*crate::peripherals::I2C0::PTR }
-            .int_ena()
-            .modify(|_, w| w.txfifo_wm().clear_bit());
+        regs.int_ena().modify(|_, w| w.txfifo_wm().clear_bit());
 
         WAKERS[0].wake();
     }
@@ -720,14 +718,12 @@ mod asynch {
     #[cfg(i2c1)]
     #[handler]
     pub(super) fn i2c1_handler() {
-        unsafe { &*crate::peripherals::I2C1::PTR }
-            .int_ena()
+        let regs = unsafe { &*crate::peripherals::I2C1::PTR };
+        regs.int_ena()
             .modify(|_, w| w.end_detect().clear_bit().trans_complete().clear_bit());
 
         #[cfg(not(any(esp32, esp32s2)))]
-        unsafe { &*crate::peripherals::I2C0::PTR }
-            .int_ena()
-            .modify(|_, w| w.txfifo_wm().clear_bit());
+        regs.int_ena().modify(|_, w| w.txfifo_wm().clear_bit());
 
         WAKERS[1].wake();
     }
