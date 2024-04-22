@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- i2c: i2c1_handler used I2C0 register block by mistake (#1487)
+
 ### Changed
 
 ### Removed
