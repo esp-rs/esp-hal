@@ -97,10 +97,12 @@ impl EspHeap {
     ///
     /// # Safety
     ///
-    /// Obey these or Bad Stuff will happen.
-    ///
+    /// - The supplied memory region must be available for the entire program (a
+    ///   `'static` lifetime).
+    /// - The supplied memory region must be exclusively available to the heap
+    ///   only, no aliasing.
     /// - This function must be called exactly ONCE.
-    /// - `size > 0`
+    /// - `size > 0`.
     pub unsafe fn init(&self, heap_bottom: *mut u8, size: usize) {
         critical_section::with(|cs| self.heap.borrow(cs).borrow_mut().init(heap_bottom, size));
     }
