@@ -282,7 +282,7 @@ where
 mod ehal1 {
     use embedded_hal::pwm::{self, ErrorKind, ErrorType, SetDutyCycle};
 
-    use super::{Channel, ChannelHW, ChannelIFace, Error};
+    use super::{Channel, ChannelHW, Error};
     use crate::{gpio::OutputPin, ledc::timer::TimerSpeed};
 
     impl pwm::Error for Error {
@@ -310,25 +310,13 @@ mod ehal1 {
 
             let duty_range = 2u32.pow(duty_exp);
 
-            #[cfg(esp32)]
-            {
-                let duty_range_pct = 100 / (u32::MAX / duty_range);
-                (u16::MAX / 100) * duty_range_pct as u16
-            }
-            #[cfg(not(esp32))]
-            {
-                // Supports up to 14 bits
-                duty_range as u16
-            }
+            duty_range as u16
         }
 
-        fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
-            if duty == 0 {
-                self.set_duty(0)?;
-            } else {
-                let duty_pct = 100 / (self.max_duty_cycle() / duty);
-                self.set_duty(duty_pct as u8)?;
-            }
+        fn set_duty_cycle(&mut self, mut duty: u16) -> Result<(), Self::Error> {
+            let max = self.max_duty_cycle();
+            duty = if duty > max { max } else { duty };
+            self.set_duty_hw(duty.into());
             Ok(())
         }
     }
