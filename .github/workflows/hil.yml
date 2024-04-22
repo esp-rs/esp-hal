@@ -17,27 +17,23 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  hil:
-    name: HIL Test | ${{ matrix.target.soc }}
-    runs-on:
-      labels: [self-hosted, "${{ matrix.target.runner }}"]
+  build-tests:
+    name: Build Tests | ${{ matrix.target.soc }}
+    runs-on: ubuntu-latest
+
     strategy:
       fail-fast: false
       matrix:
         target:
           # RISC-V devices:
-          - soc: esp32c3
-            runner: rustboard
-            rust-target: riscv32imc-unknown-none-elf
+          # - soc: esp32c3
+          #   rust-target: riscv32imc-unknown-none-elf
           - soc: esp32c6
-            runner: esp32c6-usb
             rust-target: riscv32imac-unknown-none-elf
-          - soc: esp32h2
-            runner: esp32h2-usb
-            rust-target: riscv32imac-unknown-none-elf
-          # Xtensa devices:
-          - soc: esp32s3
-            runner: esp32s3-usb
+          # - soc: esp32h2
+          #   rust-target: riscv32imac-unknown-none-elf
+          # # Xtensa devices:
+          # - soc: esp32s3
     steps:
       - uses: actions/checkout@v4
         if: github.event_name != 'workflow_dispatch'
@@ -64,4 +60,59 @@ jobs:
           ldproxy: false
 
       - name: Run tests
-        run: cargo xtask run-tests ${{ matrix.target.soc }}
+        run: cargo xtask build-tests ${{ matrix.target.soc }}
+
+      - name: Prepare artifact
+        run: |
+          # Create the 'tests' directory if it doesn't exist
+          mkdir -p tests
+
+          # Find ELF files in the specified path and move them to 'tests'
+          find "hil-test/target/${{ matrix.target.rust-target }}/release/deps/" -type f -exec file {} + | \
+          grep ELF | \
+          awk -F: '{print $1}' | \
+          xargs -I {} mv {} tests
+
+          # Rename files in 'tests' by removing everything after the first dash
+          for file in tests/*-*; do
+            base_name="$(basename "$file" | cut -d'-' -f1)"
+            mv "$file" "tests/$base_name"
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tests-${{ matrix.target.soc }}
+          path: /home/runner/work/esp-hal/esp-hal/tests
+          if-no-files-found: error
+
+  hil:
+    name: HIL Test | ${{ matrix.target.soc }}
+    needs: build-tests
+    runs-on:
+      labels: [self-hosted, "${{ matrix.target.runner }}"]
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          # RISC-V devices:
+          # - soc: esp32c3
+          #   runner: rustboard
+          - soc: esp32c6
+            runner: esp32c6-usb
+          # - soc: esp32h2
+          #   runner: esp32h2-usb
+          # # Xtensa devices:
+          # - soc: esp32s3
+          #   runner: esp32s3-usb
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: tests-${{ matrix.target.soc }}
+          path: tests
+      - name: Run tests
+        run: |
+          export PATH=$PATH:/home/espressif/.cargo/bin
+          for file in "tests"/*; do
+            probe-rs run --chip ${{ matrix.target.soc }} "$file"
+          done
+
