@@ -8,7 +8,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     etm::Etm,
-    gpio::{etm::GpioEtmChannels, IO},
+    gpio::{etm::GpioEtmChannels, Io},
     peripherals::Peripherals,
     prelude::*,
     systimer::{etm::SysTimerEtmEvent, SystemTimer},
@@ -23,7 +23,7 @@ fn main() -> ! {
     let mut alarm0 = syst.alarm0.into_periodic();
     alarm0.set_period(1u32.secs());
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut led = io.pins.gpio1.into_push_pull_output();
 
     // setup ETM

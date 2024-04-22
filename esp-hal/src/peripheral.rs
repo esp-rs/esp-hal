@@ -32,7 +32,7 @@
 //! let mut rtc = Rtc::new(peripherals.LPWR, None);
 //! ```
 //! ```no_run
-//! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! ```
 
 use core::{

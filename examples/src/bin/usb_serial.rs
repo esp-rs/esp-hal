@@ -11,8 +11,8 @@ use core::ptr::addr_of_mut;
 
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::IO,
-    otg_fs::{UsbBus, USB},
+    gpio::Io,
+    otg_fs::{Usb, UsbBus},
     peripherals::Peripherals,
     prelude::*,
 };
@@ -25,9 +25,9 @@ static mut EP_MEMORY: [u32; 1024] = [0; 1024];
 fn main() -> ! {
     let peripherals = Peripherals::take();
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let usb = USB::new(peripherals.USB0, io.pins.gpio19, io.pins.gpio20);
+    let usb = Usb::new(peripherals.USB0, io.pins.gpio19, io.pins.gpio20);
     let usb_bus = UsbBus::new(usb, unsafe { &mut *addr_of_mut!(EP_MEMORY) });
 
     let mut serial = SerialPort::new(&usb_bus);

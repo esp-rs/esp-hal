@@ -16,7 +16,7 @@ use esp_hal::{
     clock::ClockControl,
     delay::Delay,
     embassy,
-    gpio::{GpioPin, Input, Output, OutputPin, PullDown, PushPull, Unknown, IO},
+    gpio::{GpioPin, Input, Io, Output, OutputPin, PullDown, PushPull, Unknown},
     macros::handler,
     peripherals::Peripherals,
     system::SystemExt,
@@ -39,7 +39,7 @@ impl Context {
         let system = peripherals.SYSTEM.split();
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-        let mut io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+        let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         io.set_interrupt_handler(interrupt_handler);
 
         let delay = Delay::new(&clocks);

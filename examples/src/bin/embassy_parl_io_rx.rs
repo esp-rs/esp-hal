@@ -18,7 +18,7 @@ use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
     embassy,
-    gpio::IO,
+    gpio::Io,
     parl_io::{BitPackOrder, NoClkPin, ParlIoRxOnly, RxFourBits},
     peripherals::Peripherals,
     prelude::*,
@@ -36,7 +36,7 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timg0);
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let (_, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(0, 32000);
 

@@ -12,12 +12,12 @@
 //! ## Example
 //!
 //! ```no_run
-//! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let gpio25 = io.pins.gpio25.into_analog();
 //! let gpio26 = io.pins.gpio26.into_analog();
 //!
-//! let mut dac1 = DAC1::new(peripherals.DAC1, gpio25);
-//! let mut dac2 = DAC2::new(peripherals.DAC2, gpio26);
+//! let mut dac1 = Dac1::new(peripherals.DAC1, gpio25);
+//! let mut dac2 = Dac2::new(peripherals.DAC2, gpio26);
 //!
 //! let mut delay = Delay::new(&clocks);
 //!
@@ -53,11 +53,11 @@ cfg_if::cfg_if! {
 }
 
 /// Digital-to-Analog Converter (DAC) Channel 1
-pub struct DAC1<'d> {
+pub struct Dac1<'d> {
     _inner: PeripheralRef<'d, peripherals::DAC1>,
 }
 
-impl<'d> DAC1<'d> {
+impl<'d> Dac1<'d> {
     /// Constructs a new DAC instance.
     pub fn new(dac: impl Peripheral<P = peripherals::DAC1> + 'd, _pin: Dac1Gpio) -> Self {
         crate::into_ref!(dac);
@@ -90,11 +90,11 @@ impl<'d> DAC1<'d> {
 }
 
 /// Digital-to-Analog Converter (DAC) Channel 2
-pub struct DAC2<'d> {
+pub struct Dac2<'d> {
     _inner: PeripheralRef<'d, peripherals::DAC2>,
 }
 
-impl<'d> DAC2<'d> {
+impl<'d> Dac2<'d> {
     /// Constructs a new DAC instance.
     pub fn new(dac: impl Peripheral<P = peripherals::DAC2> + 'd, _pin: Dac2Gpio) -> Self {
         crate::into_ref!(dac);

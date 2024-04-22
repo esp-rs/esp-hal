@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Created virtual peripherals for CPU control and radio clocks, rather than splitting them from `SYSTEM` (#1428)
+- `IO`, `ADC`, `DAC`, `RTC*`, `LEDC`, `PWM` and `PCNT` drivers have been converted to camel case format (#1473)
 
 ### Removed
 

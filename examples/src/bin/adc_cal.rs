@@ -9,11 +9,11 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    analog::adc::{AdcConfig, Attenuation, ADC},
+    analog::adc::{Adc, AdcConfig, Attenuation},
     clock::ClockControl,
     delay::Delay,
-    gpio::IO,
-    peripherals::{Peripherals, ADC1},
+    gpio::Io,
+    peripherals::Peripherals,
     prelude::*,
 };
 use esp_println::println;
@@ -24,7 +24,7 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32s3")] {
             let analog_pin = io.pins.gpio3.into_analog();
@@ -46,7 +46,7 @@ fn main() -> ! {
     let mut adc1_config = AdcConfig::new();
     let mut adc1_pin =
         adc1_config.enable_pin_with_cal::<_, AdcCal>(analog_pin, Attenuation::Attenuation11dB);
-    let mut adc1 = ADC::<ADC1>::new(peripherals.ADC1, adc1_config);
+    let mut adc1 = Adc::new(peripherals.ADC1, adc1_config);
 
     let delay = Delay::new(&clocks);
 

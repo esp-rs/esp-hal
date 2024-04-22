@@ -37,55 +37,36 @@ use crate::{
 };
 
 #[doc(hidden)]
-pub trait UsbDp {}
+pub trait UsbDp: crate::private::Sealed {}
 
 #[doc(hidden)]
-pub trait UsbDm {}
+pub trait UsbDm: crate::private::Sealed {}
 
-pub struct USB<'d, P, M>
-where
-    P: UsbDp + Send + Sync,
-    M: UsbDm + Send + Sync,
-{
+pub struct Usb<'d> {
     _usb0: PeripheralRef<'d, peripherals::USB0>,
-    _usb_dp: PeripheralRef<'d, P>,
-    _usb_dm: PeripheralRef<'d, M>,
 }
 
-impl<'d, P, M> USB<'d, P, M>
-where
-    P: UsbDp + Send + Sync,
-    M: UsbDm + Send + Sync,
-{
-    pub fn new(
+impl<'d> Usb<'d> {
+    pub fn new<P, M>(
         usb0: impl Peripheral<P = peripherals::USB0> + 'd,
-        usb_dp: impl Peripheral<P = P> + 'd,
-        usb_dm: impl Peripheral<P = M> + 'd,
-    ) -> Self {
-        crate::into_ref!(usb_dp, usb_dm);
-
+        _usb_dp: impl Peripheral<P = P> + 'd,
+        _usb_dm: impl Peripheral<P = M> + 'd,
+    ) -> Self
+    where
+        P: UsbDp + Send + Sync,
+        M: UsbDm + Send + Sync,
+    {
         PeripheralClockControl::enable(PeripheralEnable::Usb);
 
         Self {
             _usb0: usb0.into_ref(),
-            _usb_dp: usb_dp,
-            _usb_dm: usb_dm,
         }
     }
 }
 
-unsafe impl<'d, P, M> Sync for USB<'d, P, M>
-where
-    P: UsbDp + Send + Sync,
-    M: UsbDm + Send + Sync,
-{
-}
+unsafe impl<'d> Sync for Usb<'d> {}
 
-unsafe impl<'d, P, M> UsbPeripheral for USB<'d, P, M>
-where
-    P: UsbDp + Send + Sync,
-    M: UsbDm + Send + Sync,
-{
+unsafe impl<'d> UsbPeripheral for Usb<'d> {
     const REGISTERS: *const () = peripherals::USB0::ptr() as *const ();
 
     const HIGH_SPEED: bool = false;

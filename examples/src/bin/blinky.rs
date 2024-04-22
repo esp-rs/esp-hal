@@ -8,7 +8,7 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{clock::ClockControl, delay::Delay, gpio::IO, peripherals::Peripherals, prelude::*};
+use esp_hal::{clock::ClockControl, delay::Delay, gpio::Io, peripherals::Peripherals, prelude::*};
 
 #[entry]
 fn main() -> ! {
@@ -17,7 +17,7 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     // Set GPIO0 as an output, and set its state high initially.
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut led = io.pins.gpio8.into_push_pull_output();
 
     led.set_high();

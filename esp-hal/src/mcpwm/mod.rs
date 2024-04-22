@@ -38,7 +38,7 @@
 //!
 //! // initialize peripheral
 //! let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40.MHz()).unwrap();
-//! let mut mcpwm = MCPWM::new(peripherals.PWM0, clock_cfg);
+//! let mut mcpwm = McPwm::new(peripherals.PWM0, clock_cfg);
 //!
 //! // connect operator0 to timer0
 //! mcpwm.operator0.set_timer(&mcpwm.timer0);
@@ -81,7 +81,7 @@ type RegisterBlock = crate::peripherals::mcpwm0::RegisterBlock;
 
 /// The MCPWM peripheral
 #[non_exhaustive]
-pub struct MCPWM<'d, PWM> {
+pub struct McPwm<'d, PWM> {
     _inner: PeripheralRef<'d, PWM>,
     /// Timer0
     pub timer0: Timer<0, PWM>,
@@ -97,7 +97,7 @@ pub struct MCPWM<'d, PWM> {
     pub operator2: Operator<2, PWM>,
 }
 
-impl<'d, PWM: PwmPeripheral> MCPWM<'d, PWM> {
+impl<'d, PWM: PwmPeripheral> McPwm<'d, PWM> {
     /// `pwm_clk = clocks.crypto_pwm_clock / (prescaler + 1)`
     // clocks.crypto_pwm_clock normally is 160 MHz
     pub fn new(

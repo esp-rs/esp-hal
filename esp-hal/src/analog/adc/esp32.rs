@@ -192,13 +192,13 @@ impl RegisterAccess for ADC2 {
 }
 
 /// Analog-to-Digital Converter peripheral driver.
-pub struct ADC<'d, ADC> {
+pub struct Adc<'d, ADC> {
     _adc: PeripheralRef<'d, ADC>,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     active_channel: Option<u8>,
 }
 
-impl<'d, ADCI> ADC<'d, ADCI>
+impl<'d, ADCI> Adc<'d, ADCI>
 where
     ADCI: RegisterAccess,
 {
@@ -270,7 +270,7 @@ where
             .sar_read_ctrl2()
             .modify(|_, w| w.sar2_data_inv().set_bit());
 
-        ADC {
+        Adc {
             _adc: adc_instance.into_ref(),
             attenuations: config.attenuations,
             active_channel: None,
@@ -323,7 +323,7 @@ where
     }
 }
 
-impl<'d, ADC1> ADC<'d, ADC1> {
+impl<'d, ADC1> Adc<'d, ADC1> {
     pub fn enable_hall_sensor() {
         // Connect hall sensor
         unsafe { &*RTC_IO::ptr() }
@@ -341,7 +341,7 @@ impl<'d, ADC1> ADC<'d, ADC1> {
 
 #[cfg(feature = "embedded-hal-02")]
 impl<'d, ADCI, PIN> embedded_hal_02::adc::OneShot<ADCI, u16, super::AdcPin<PIN, ADCI>>
-    for ADC<'d, ADCI>
+    for Adc<'d, ADCI>
 where
     PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8> + super::AdcChannel,
     ADCI: RegisterAccess,
