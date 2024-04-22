@@ -124,7 +124,7 @@ pub enum Key {
     /// 128-bit AES key
     Key16([u8; 16]),
     /// 192-bit AES key
-    #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+    #[cfg(any(esp32, esp32s2))]
     Key24([u8; 24]),
     /// 256-bit AES key
     Key32([u8; 32]),
@@ -137,7 +137,7 @@ impl From<[u8; 16]> for Key {
     }
 }
 
-#[cfg(any(feature = "esp32", feature = "esp32s2"))]
+#[cfg(any(esp32, esp32s2))]
 impl From<[u8; 24]> for Key {
     fn from(key: [u8; 24]) -> Self {
         Key::Key24(key)
@@ -155,7 +155,7 @@ impl Key {
     fn as_slice(&self) -> &[u8] {
         match self {
             Key::Key16(ref key) => key,
-            #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+            #[cfg(any(esp32, esp32s2))]
             Key::Key24(ref key) => key,
             Key::Key32(ref key) => key,
         }
