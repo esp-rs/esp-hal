@@ -121,7 +121,7 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
     }
 
     /// Trigger this software-interrupt
-    pub fn raise(&mut self) {
+    pub fn raise(&self) {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let system = unsafe { &*SYSTEM::PTR };
         #[cfg(any(esp32c6, esp32h2))]
@@ -153,7 +153,7 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
     }
 
     /// Resets this software-interrupt
-    pub fn reset(&mut self) {
+    pub fn reset(&self) {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let system = unsafe { &*SYSTEM::PTR };
         #[cfg(any(esp32c6, esp32h2))]

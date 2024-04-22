@@ -74,7 +74,7 @@ fn main() -> ! {
 fn interrupt20() {
     unsafe { asm!("csrrwi x0, 0x7e1, 0 #disable timer") }
     critical_section::with(|cs| {
-        SWINT0.borrow_ref_mut(cs).as_mut().unwrap().reset();
+        SWINT0.borrow_ref(cs).as_ref().unwrap().reset();
     });
 
     let mut perf_counter: u32 = 0;
