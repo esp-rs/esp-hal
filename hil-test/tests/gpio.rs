@@ -19,7 +19,6 @@ use esp_hal::{
     gpio::{GpioPin, Input, Io, Output, OutputPin, PullDown, PushPull, Unknown},
     macros::handler,
     peripherals::Peripherals,
-    system::SystemExt,
     timer::TimerGroup,
     system::SystemControl,
 };

@@ -1104,6 +1104,12 @@ impl SystemClockControl {
     }
 }
 
+impl Default for SystemClockControl {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl crate::peripheral::Peripheral for SystemClockControl {
     type P = SystemClockControl;
 

@@ -10,7 +10,6 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     peripherals::Peripherals,
-    prelude::*,
     rtc_cntl::Rtc,
     system::SystemControl,
 };

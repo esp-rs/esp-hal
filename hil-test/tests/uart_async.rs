@@ -15,7 +15,6 @@ use esp_hal::{
     clock::ClockControl,
     gpio::Io,
     peripherals::{Peripherals, UART0},
-    prelude::*,
     uart::{config::Config, TxRxPins, Uart, UartRx, UartTx},
     Async,
     system::SystemControl,
