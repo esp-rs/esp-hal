@@ -21,12 +21,13 @@ use esp_hal::{
     },
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
 };
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);

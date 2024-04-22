@@ -7,7 +7,13 @@
 
 use defmt_rtt as _;
 use esp_backtrace as _;
-use esp_hal::{clock::ClockControl, peripherals::Peripherals, prelude::*, rtc_cntl::Rtc};
+use esp_hal::{
+    clock::ClockControl,
+    peripherals::Peripherals,
+    prelude::*,
+    rtc_cntl::Rtc,
+    system::SystemControl,
+};
 
 struct Context<'a> {
     rtc: Rtc<'a>,
@@ -16,7 +22,7 @@ struct Context<'a> {
 impl Context<'_> {
     pub fn init() -> Self {
         let peripherals = Peripherals::take();
-        let system = peripherals.SYSTEM.split();
+        let system = SystemControl::new(peripherals.SYSTEM);
         ClockControl::boot_defaults(system.clock_control).freeze();
 
         let rtc = Rtc::new(peripherals.LPWR, None);

@@ -16,6 +16,7 @@ use esp_hal::{
     clock::ClockControl,
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
 };
 use esp_println::println;
 
@@ -24,7 +25,7 @@ static DA: Mutex<RefCell<Option<DebugAssist>>> = Mutex::new(RefCell::new(None));
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut da = DebugAssist::new(peripherals.ASSIST_DEBUG, Some(interrupt_handler));

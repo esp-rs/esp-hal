@@ -44,6 +44,7 @@ use esp_hal::{
     i2s::{asynch::*, DataFormat, I2s, Standard},
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
     timer::TimerGroup,
 };
 use esp_println::println;
@@ -60,7 +61,7 @@ const SINE: [i16; 64] = [
 async fn main(_spawner: Spawner) {
     println!("Init!");
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);

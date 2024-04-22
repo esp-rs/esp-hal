@@ -30,13 +30,14 @@ use esp_hal::{
     i2c::I2C,
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
 };
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let delay = Delay::new(&clocks);

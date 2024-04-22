@@ -18,7 +18,7 @@ use esp_hal::{
     delay::Delay,
     peripherals::Peripherals,
     prelude::*,
-    system::SoftwareInterrupt,
+    system::{SoftwareInterrupt, SystemControl},
 };
 
 static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> = Mutex::new(RefCell::new(None));
@@ -29,7 +29,7 @@ static SWINT3: Mutex<RefCell<Option<SoftwareInterrupt<3>>>> = Mutex::new(RefCell
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut sw_int = system.software_interrupt_control;

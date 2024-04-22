@@ -19,6 +19,7 @@ use esp_hal::{
     macros::ram,
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
 };
 
 #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
@@ -31,7 +32,7 @@ static BUTTON: Mutex<RefCell<Option<gpio::Gpio9<Input<PullDown>>>>> =
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     // Set GPIO2 as an output, and set its state high initially.

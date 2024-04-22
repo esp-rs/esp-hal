@@ -18,6 +18,7 @@ use esp_hal::{
     embassy,
     peripherals::{Peripherals, UART0},
     prelude::*,
+    system::SystemControl,
     timer::TimerGroup,
     uart::{config::AtCmdConfig, Uart, UartRx, UartTx},
     Async,
@@ -77,7 +78,7 @@ async fn reader(
 async fn main(spawner: Spawner) {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);

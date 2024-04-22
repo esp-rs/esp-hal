@@ -20,6 +20,7 @@ use esp_hal::{
     embassy,
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
     systimer::SystemTimer,
 };
 
@@ -35,7 +36,7 @@ async fn run() {
 async fn main(spawner: Spawner) {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let systimer = SystemTimer::new_async(peripherals.SYSTIMER);
