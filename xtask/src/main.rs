@@ -6,7 +6,7 @@ use std::{
 use anyhow::{bail, Result};
 use clap::{Args, Parser};
 use strum::IntoEnumIterator;
-use xtask::{Chip, Package, Version};
+use xtask::{cargo::CargoAction, Chip, Package, Version};
 
 // ----------------------------------------------------------------------------
 // Command-line Interface
@@ -20,7 +20,7 @@ enum Cli {
     /// Build the specified package with the given options.
     BuildPackage(BuildPackageArgs),
     /// Build all applicable tests or the specified test for a specified chip.
-    BuildTests(RunTestsArgs),
+    BuildTests(TestsArgs),
     /// Bump the version of the specified package(s).
     BumpVersion(BumpVersionArgs),
     /// Generate the eFuse fields source file from a CSV.
@@ -28,7 +28,7 @@ enum Cli {
     /// Run the given example for the specified chip.
     RunExample(RunExampleArgs),
     /// Run all applicable tests or the specified test for a specified chip.
-    RunTests(RunTestsArgs),
+    RunTests(TestsArgs),
 }
 
 #[derive(Debug, Args)]
@@ -105,7 +105,7 @@ struct RunExampleArgs {
 }
 
 #[derive(Debug, Args)]
-struct RunTestsArgs {
+struct TestsArgs {
     /// Which chip to run the tests for.
     #[arg(value_enum)]
     chip: Chip,
@@ -129,11 +129,11 @@ fn main() -> Result<()> {
         Cli::BuildDocumentation(args) => build_documentation(&workspace, args),
         Cli::BuildExamples(args) => build_examples(&workspace, args),
         Cli::BuildPackage(args) => build_package(&workspace, args),
-        Cli::BuildTests(args) => build_tests(&workspace, args),
+        Cli::BuildTests(args) => execute_tests(&workspace, args, CargoAction::Build),
         Cli::BumpVersion(args) => bump_version(&workspace, args),
         Cli::GenerateEfuseFields(args) => generate_efuse_src(&workspace, args),
         Cli::RunExample(args) => run_example(&workspace, args),
-        Cli::RunTests(args) => run_tests(&workspace, args),
+        Cli::RunTests(args) => execute_tests(&workspace, args, CargoAction::Run),
     }
 }
 
@@ -240,7 +240,15 @@ fn build_examples(workspace: &Path, mut args: BuildExamplesArgs) -> Result<()> {
         // Filter down the examples to only those for which the specified chip is supported:
         .filter(|example| example.supports_chip(args.chip))
         // Attempt to build each supported example, with all required features enabled:
-        .try_for_each(|example| xtask::build_example(&package_path, args.chip, target, example))
+        .try_for_each(|example| {
+            xtask::execute_app(
+                &package_path,
+                args.chip,
+                target,
+                example,
+                &CargoAction::Build,
+            )
+        })
 }
 
 fn build_package(workspace: &Path, args: BuildPackageArgs) -> Result<()> {
@@ -329,7 +337,13 @@ fn run_example(workspace: &Path, mut args: RunExampleArgs) -> Result<()> {
         });
 
     if let Some(example) = example {
-        xtask::run_example(&package_path, args.chip, target, &example)?;
+        xtask::execute_app(
+            &package_path,
+            args.chip,
+            target,
+            &example,
+            &CargoAction::Run,
+        )?;
     } else {
         log::error!("Example not found or unsupported for the given chip");
     }
@@ -337,7 +351,11 @@ fn run_example(workspace: &Path, mut args: RunExampleArgs) -> Result<()> {
     Ok(())
 }
 
-fn build_tests(workspace: &Path, args: RunTestsArgs) -> Result<(), anyhow::Error> {
+fn execute_tests(
+    workspace: &Path,
+    args: TestsArgs,
+    action: CargoAction,
+) -> Result<(), anyhow::Error> {
     // Absolute path of the package's root:
     let package_path = xtask::windows_safe_path(&workspace.join("hil-test"));
 
@@ -359,55 +377,14 @@ fn build_tests(workspace: &Path, args: RunTestsArgs) -> Result<(), anyhow::Error
             }
         });
         if let Some(test) = test {
-            xtask::build_example(&package_path, args.chip, target, &test)?;
+            xtask::execute_app(&package_path, args.chip, target, &test, &action)?
         } else {
             log::error!("Test not found or unsupported for the given chip");
         }
     } else {
         let mut failed_tests: Vec<String> = Vec::new();
         for test in supported_tests {
-            if xtask::build_example(&package_path, args.chip, target, test).is_err() {
-                failed_tests.push(test.name());
-            }
-        }
-        if !failed_tests.is_empty() {
-            bail!("Failed tests: {:?}", failed_tests);
-        }
-    }
-
-    Ok(())
-}
-
-fn run_tests(workspace: &Path, args: RunTestsArgs) -> Result<(), anyhow::Error> {
-    // Absolute path of the package's root:
-    let package_path = xtask::windows_safe_path(&workspace.join("hil-test"));
-
-    // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(&Package::HilTest, &args.chip)?;
-
-    // Load all examples and parse their metadata:
-    let tests = xtask::load_examples(&package_path.join("tests"))?;
-    let mut supported_tests = tests
-        .iter()
-        // Filter down the examples to only those for which the specified chip is supported:
-        .filter(|example| example.supports_chip(args.chip));
-    if let Some(test_name) = &args.test {
-        let test = supported_tests.find_map(|example| {
-            if &example.name() == test_name {
-                Some(example.clone())
-            } else {
-                None
-            }
-        });
-        if let Some(test) = test {
-            xtask::run_example(&package_path, args.chip, target, &test)?;
-        } else {
-            log::error!("Test not found or unsupported for the given chip");
-        }
-    } else {
-        let mut failed_tests: Vec<String> = Vec::new();
-        for test in supported_tests {
-            if xtask::run_example(&package_path, args.chip, target, test).is_err() {
+            if xtask::execute_app(&package_path, args.chip, target, test, &action).is_err() {
                 failed_tests.push(test.name());
             }
         }

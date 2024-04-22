@@ -7,6 +7,7 @@ use std::{
 };
 
 use anyhow::{bail, Result};
+use cargo::CargoAction;
 use clap::ValueEnum;
 use strum::{Display, EnumIter, IntoEnumIterator as _};
 
@@ -228,82 +229,45 @@ pub fn load_examples(path: &Path) -> Result<Vec<Metadata>> {
     Ok(examples)
 }
 
-/// Build the specified example for the specified chip.
-pub fn build_example(
+/// Run or build the specified test or example for the specified chip.
+pub fn execute_app(
     package_path: &Path,
     chip: Chip,
     target: &str,
-    example: &Metadata,
+    app: &Metadata,
+    action: &CargoAction,
 ) -> Result<()> {
     log::info!(
         "Building example '{}' for '{}'",
-        example.example_path().display(),
+        app.example_path().display(),
         chip
     );
-    if !example.features().is_empty() {
-        log::info!("  Features: {}", example.features().join(","));
+    if !app.features().is_empty() {
+        log::info!("  Features: {}", app.features().join(","));
     }
 
-    let package = example.example_path().strip_prefix(package_path)?;
-    let bin = if package.starts_with("src/bin") {
-        format!("--bin={}", example.name())
-    } else if package.starts_with("tests") {
-        format!("--test={}", example.name())
-    } else {
-        format!("--example={}", example.name())
-    };
-
-    let mut features = example.features().to_vec();
-    features.push(chip.to_string());
-
-    let mut builder = CargoArgsBuilder::default()
-        .subcommand("build")
-        .arg("-Zbuild-std=alloc,core")
-        .arg("--release")
-        .target(target)
-        .features(&features)
-        .arg(bin);
-
-    // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
-    if target.starts_with("xtensa") {
-        builder = builder.toolchain("esp");
-    }
-
-    let args = builder.build();
-    log::debug!("{args:#?}");
-
-    cargo::run(&args, package_path)?;
-
-    Ok(())
-}
-
-/// Run the specified example for the specified chip.
-pub fn run_example(
-    package_path: &Path,
-    chip: Chip,
-    target: &str,
-    example: &Metadata,
-) -> Result<()> {
-    log::info!(
-        "Building example '{}' for '{}'",
-        example.example_path().display(),
-        chip
-    );
-    if !example.features().is_empty() {
-        log::info!("  Features: {}", example.features().join(","));
-    }
-
-    let package = example.example_path().strip_prefix(package_path)?;
+    let package = app.example_path().strip_prefix(package_path)?;
     log::info!("Package: {:?}", package);
-    let (bin, subcommand) = if package.starts_with("src/bin") {
-        (format!("--bin={}", example.name()), "run")
-    } else if package.starts_with("tests") {
-        (format!("--test={}", example.name()), "test")
+    let (bin, subcommand) = if action == &CargoAction::Build {
+        let bin = if package.starts_with("src/bin") {
+            format!("--bin={}", app.name())
+        } else if package.starts_with("tests") {
+            format!("--test={}", app.name())
+        } else {
+            format!("--example={}", app.name())
+        };
+        (bin, "build")
     } else {
-        (format!("--example={}", example.name()), "run")
+        if package.starts_with("src/bin") {
+            (format!("--bin={}", app.name()), "run")
+        } else if package.starts_with("tests") {
+            (format!("--test={}", app.name()), "test")
+        } else {
+            (format!("--example={}", app.name()), "run")
+        }
     };
 
-    let mut features = example.features().to_vec();
+    let mut features = app.features().to_vec();
     features.push(chip.to_string());
 
     let mut builder = CargoArgsBuilder::default()
