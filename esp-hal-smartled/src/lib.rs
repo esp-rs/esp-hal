@@ -12,10 +12,10 @@
 //!
 //! ```rust,ignore
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let rmt = Rmt::new(peripherals.RMT, 80.MHz(), &clocks).unwrap();
+//! let rmt = Rmt::new(peripherals.RMT, 80.MHz(), &clocks, None).unwrap();
 //!
 //! let rmt_buffer = smartLedBuffer!(1);
-//! let mut led = SmartLedsAdapter::new(rmt.channel0, io.pins.gpio2, rmt_buffer);
+//! let mut led = SmartLedsAdapter::new(rmt.channel0, io.pins.gpio2, rmt_buffer, &clocks);
 //! ```
 //!
 //! ## Feature Flags

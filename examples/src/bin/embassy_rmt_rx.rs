@@ -18,6 +18,7 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     rmt::{asynch::RxChannelAsync, PulseCode, Rmt, RxChannelConfig, RxChannelCreatorAsync},
+    system::SystemControl,
 };
 use esp_println::{print, println};
 
@@ -41,7 +42,7 @@ async fn signal_task(mut pin: Gpio5<Output<PushPull>>) {
 async fn main(spawner: Spawner) {
     println!("Init!");
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let timer_group0 = esp_hal::timer::TimerGroup::new_async(peripherals.TIMG0, &clocks);

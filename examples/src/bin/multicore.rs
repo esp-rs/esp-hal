@@ -18,6 +18,7 @@ use esp_hal::{
     delay::Delay,
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
 };
 use esp_println::println;
 
@@ -26,7 +27,7 @@ static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let delay = Delay::new(&clocks);

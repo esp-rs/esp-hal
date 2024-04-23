@@ -26,13 +26,14 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     spi::{master::Spi, SpiMode},
+    system::SystemControl,
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);

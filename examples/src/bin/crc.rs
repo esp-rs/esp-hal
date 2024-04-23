@@ -14,13 +14,14 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     rom::{crc, md5},
+    system::SystemControl,
     uart::Uart,
 };
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let delay = Delay::new(&clocks);

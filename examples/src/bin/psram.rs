@@ -13,7 +13,13 @@ extern crate alloc;
 use alloc::{string::String, vec::Vec};
 
 use esp_backtrace as _;
-use esp_hal::{clock::ClockControl, peripherals::Peripherals, prelude::*, psram};
+use esp_hal::{
+    clock::ClockControl,
+    peripherals::Peripherals,
+    prelude::*,
+    psram,
+    system::SystemControl,
+};
 use esp_println::println;
 
 #[global_allocator]
@@ -35,7 +41,7 @@ fn main() -> ! {
     psram::init_psram(peripherals.PSRAM);
     init_psram_heap();
 
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let _clocks = ClockControl::max(system.clock_control).freeze();
 
     println!("Going to access PSRAM");

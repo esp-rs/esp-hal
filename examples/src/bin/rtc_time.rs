@@ -12,12 +12,13 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     rtc_cntl::Rtc,
+    system::SystemControl,
 };
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let rtc = Rtc::new(peripherals.LPWR, None);

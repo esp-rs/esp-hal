@@ -22,6 +22,7 @@ use esp_hal::{
         Rtc,
         SocResetReason,
     },
+    system::SystemControl,
     Cpu,
 };
 use esp_println::println;
@@ -29,7 +30,7 @@ use esp_println::println;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc = Rtc::new(peripherals.LPWR, None);

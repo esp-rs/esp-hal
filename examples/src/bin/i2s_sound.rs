@@ -40,6 +40,7 @@ use esp_hal::{
     i2s::{DataFormat, I2s, I2sWriteDma, Standard},
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
 };
 
 const SINE: [i16; 64] = [
@@ -53,7 +54,7 @@ const SINE: [i16; 64] = [
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);

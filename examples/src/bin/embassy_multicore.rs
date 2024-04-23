@@ -24,6 +24,7 @@ use esp_hal::{
     gpio::{GpioPin, Io, Output, PushPull},
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
     timer::TimerGroup,
 };
 use esp_println::println;
@@ -53,7 +54,7 @@ async fn control_led(
 #[main]
 async fn main(_spawner: Spawner) {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);

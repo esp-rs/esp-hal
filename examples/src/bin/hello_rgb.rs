@@ -21,6 +21,7 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     rmt::Rmt,
+    system::SystemControl,
 };
 use esp_hal_smartled::{smartLedBuffer, SmartLedsAdapter};
 use smart_leds::{
@@ -33,7 +34,7 @@ use smart_leds::{
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);

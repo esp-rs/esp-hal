@@ -19,8 +19,8 @@ use esp_hal::{
     gpio::{GpioPin, Input, Io, Output, OutputPin, PullDown, PushPull, Unknown},
     macros::handler,
     peripherals::Peripherals,
-    system::SystemExt,
     timer::TimerGroup,
+    system::SystemControl,
 };
 
 static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
@@ -36,7 +36,7 @@ struct Context {
 impl Context {
     pub fn init() -> Self {
         let peripherals = Peripherals::take();
-        let system = peripherals.SYSTEM.split();
+        let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
         let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);

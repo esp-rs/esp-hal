@@ -36,8 +36,6 @@ pub use crate::ledc::{
     },
     timer::{TimerHW as _esp_hal_ledc_timer_TimerHW, TimerIFace as _esp_hal_ledc_timer_TimerIFace},
 };
-#[cfg(any(dport, pcr, system))]
-pub use crate::system::SystemExt as _esp_hal_system_SystemExt;
 #[cfg(any(timg0, timg1))]
 pub use crate::timer::{
     Instance as _esp_hal_timer_Instance,
