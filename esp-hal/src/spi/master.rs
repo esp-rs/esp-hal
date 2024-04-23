@@ -2647,7 +2647,7 @@ pub trait Instance: crate::private::Sealed {
         self.configure_datalen(8);
 
         let reg_block = self.register_block();
-        reg_block.w(0).write(|w| unsafe { w.bits(word.into()) });
+        reg_block.w(0).write(|w| w.buf().set(word.into()));
 
         self.update();
 
@@ -2677,31 +2677,31 @@ pub trait Instance: crate::private::Sealed {
         for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
             self.configure_datalen(chunk.len() as u32 * 8);
 
-            for (i, w_reg) in (0..chunk.len()).step_by(4).zip(self.register_block().w_iter()) {
-                let state = if chunk.len() - i < 4 {
-                    chunk.len() % 4
-                } else {
-                    0
-                };
-                let word = match state {
-                    0 => {
-                        (chunk[i] as u32)
-                            | (chunk[i + 1] as u32) << 8
-                            | (chunk[i + 2] as u32) << 16
-                            | (chunk[i + 3] as u32) << 24
+            {
+                // TODO: replace with `array_chunks` and `from_le_bytes`
+                let mut c_iter = chunk.chunks_exact(4);
+                let mut w_iter = self.register_block().w_iter();
+                for c in c_iter.by_ref() {
+                    if let Some(w_reg) = w_iter.next() {
+                        let word = (c[0] as u32)
+                            | (c[1] as u32) << 8
+                            | (c[2] as u32) << 16
+                            | (c[3] as u32) << 24;
+                        w_reg.write(|w| w.buf().set(word));
                     }
-
-                    3 => {
-                        (chunk[i] as u32) | (chunk[i + 1] as u32) << 8 | (chunk[i + 2] as u32) << 16
+                }
+                let rem = c_iter.remainder();
+                if !rem.is_empty() {
+                    if let Some(w_reg) = w_iter.next() {
+                        let word = match rem.len() {
+                            3 => (rem[0] as u32) | (rem[1] as u32) << 8 | (rem[2] as u32) << 16,
+                            2 => (rem[0] as u32) | (rem[1] as u32) << 8,
+                            1 => rem[0] as u32,
+                            _ => unreachable!(),
+                        };
+                        w_reg.write(|w| w.buf().set(word));
                     }
-
-                    2 => (chunk[i] as u32) | (chunk[i + 1] as u32) << 8,
-
-                    1 => chunk[i] as u32,
-
-                    _ => panic!(),
-                };
-                w_reg.write(|w| w.buf().set(word));
+                }
             }
 
             self.update();
