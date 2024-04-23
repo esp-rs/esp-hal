@@ -1908,7 +1908,7 @@ macro_rules! gpio {
     ) => {
         paste::paste! {
             impl GPIO {
-                pub(crate) fn pins(&self) -> Pins {
+                pub(crate) fn pins(self) -> Pins {
                     Pins {
                         $(
                             [< gpio $gpionum >]: {
