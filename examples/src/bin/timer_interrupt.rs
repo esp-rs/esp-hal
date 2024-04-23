@@ -53,7 +53,12 @@ fn main() -> ! {
 #[handler]
 fn tg0_t0_level() {
     critical_section::with(|cs| {
-        esp_println::println!("Interrupt 1");
+        esp_println::println!(
+            "Interrupt at {} ms",
+            esp_hal::time::current_time()
+                .duration_since_epoch()
+                .to_millis()
+        );
 
         let mut timer0 = TIMER0.borrow_ref_mut(cs);
         let timer0 = timer0.as_mut().unwrap();

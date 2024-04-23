@@ -153,6 +153,7 @@ pub mod spi;
 pub mod system;
 #[cfg(systimer)]
 pub mod systimer;
+pub mod time;
 #[cfg(any(timg0, timg1))]
 pub mod timer;
 #[cfg(trace0)]
