@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- i2c: implement `I2C:transaction` for  `embedded-hal` and `embedded-hal-async`
+
 ### Fixed
 
 - i2c: i2c1_handler used I2C0 register block by mistake (#1487)
