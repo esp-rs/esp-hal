@@ -19,8 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Removed unneeded generic parameters on `Usb` (#1469)
 - Created virtual peripherals for CPU control and radio clocks, rather than splitting them from `SYSTEM` (#1428)
 - `IO`, `ADC`, `DAC`, `RTC*`, `LEDC`, `PWM` and `PCNT` drivers have been converted to camel case format (#1473)
+- RNG is no longer TRNG, the `CryptoRng` implementation has been removed. To track this being re-added see #1499 (#1498)
+- Make software interrupts shareable (#1500)
 - The `SystemParts` struct has been renamed to `SystemControl`, and now has a constructor which takes the `SYSTEM` peripheral (#1495)
 
 ### Removed

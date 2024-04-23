@@ -70,17 +70,17 @@ fn main() -> ! {
         delay.delay_millis(500);
         match counter {
             0 => critical_section::with(|cs| {
-                SWINT0.borrow_ref_mut(cs).as_mut().unwrap().raise();
+                SWINT0.borrow_ref(cs).as_ref().unwrap().raise();
             }),
             1 => critical_section::with(|cs| {
-                SWINT1.borrow_ref_mut(cs).as_mut().unwrap().raise();
+                SWINT1.borrow_ref(cs).as_ref().unwrap().raise();
             }),
             2 => critical_section::with(|cs| {
-                SWINT2.borrow_ref_mut(cs).as_mut().unwrap().raise();
+                SWINT2.borrow_ref(cs).as_ref().unwrap().raise();
             }),
             3 => {
                 critical_section::with(|cs| {
-                    SWINT3.borrow_ref_mut(cs).as_mut().unwrap().raise();
+                    SWINT3.borrow_ref(cs).as_ref().unwrap().raise();
                 });
                 counter = -1
             }
@@ -94,7 +94,7 @@ fn main() -> ! {
 fn swint0_handler() {
     esp_println::println!("SW interrupt0");
     critical_section::with(|cs| {
-        SWINT0.borrow_ref_mut(cs).as_mut().unwrap().reset();
+        SWINT0.borrow_ref(cs).as_ref().unwrap().reset();
     });
 }
 
@@ -102,7 +102,7 @@ fn swint0_handler() {
 fn swint1_handler() {
     esp_println::println!("SW interrupt1");
     critical_section::with(|cs| {
-        SWINT1.borrow_ref_mut(cs).as_mut().unwrap().reset();
+        SWINT1.borrow_ref(cs).as_ref().unwrap().reset();
     });
 }
 
@@ -110,7 +110,7 @@ fn swint1_handler() {
 fn swint2_handler() {
     esp_println::println!("SW interrupt2");
     critical_section::with(|cs| {
-        SWINT2.borrow_ref_mut(cs).as_mut().unwrap().reset();
+        SWINT2.borrow_ref(cs).as_ref().unwrap().reset();
     });
 }
 
@@ -118,6 +118,6 @@ fn swint2_handler() {
 fn swint3_handler() {
     esp_println::println!("SW interrupt3");
     critical_section::with(|cs| {
-        SWINT3.borrow_ref_mut(cs).as_mut().unwrap().reset();
+        SWINT3.borrow_ref(cs).as_ref().unwrap().reset();
     });
 }

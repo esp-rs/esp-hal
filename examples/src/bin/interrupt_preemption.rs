@@ -67,7 +67,7 @@ fn main() -> ! {
     // exiting the handler Once the handler is exited we expect to see same
     // priority and low priority interrupts served in that order.
     critical_section::with(|cs| {
-        SWINT1.borrow_ref_mut(cs).as_mut().unwrap().raise();
+        SWINT1.borrow_ref(cs).as_ref().unwrap().raise();
     });
 
     loop {}
@@ -77,7 +77,7 @@ fn main() -> ! {
 fn swint0_handler() {
     esp_println::println!("SW interrupt0");
     critical_section::with(|cs| {
-        SWINT0.borrow_ref_mut(cs).as_mut().unwrap().reset();
+        SWINT0.borrow_ref(cs).as_ref().unwrap().reset();
     });
 }
 
@@ -85,10 +85,10 @@ fn swint0_handler() {
 fn swint1_handler() {
     esp_println::println!("SW interrupt1 entry");
     critical_section::with(|cs| {
-        SWINT1.borrow_ref_mut(cs).as_mut().unwrap().reset();
-        SWINT2.borrow_ref_mut(cs).as_mut().unwrap().raise(); // raise interrupt at same priority
-        SWINT3.borrow_ref_mut(cs).as_mut().unwrap().raise(); // raise interrupt at higher priority
-        SWINT0.borrow_ref_mut(cs).as_mut().unwrap().raise(); // raise interrupt at lower priority
+        SWINT1.borrow_ref(cs).as_ref().unwrap().reset();
+        SWINT2.borrow_ref(cs).as_ref().unwrap().raise(); // raise interrupt at same priority
+        SWINT3.borrow_ref(cs).as_ref().unwrap().raise(); // raise interrupt at higher priority
+        SWINT0.borrow_ref(cs).as_ref().unwrap().raise(); // raise interrupt at lower priority
     });
     esp_println::println!("SW interrupt1 exit");
 }
@@ -97,7 +97,7 @@ fn swint1_handler() {
 fn swint2_handler() {
     esp_println::println!("SW interrupt2");
     critical_section::with(|cs| {
-        SWINT2.borrow_ref_mut(cs).as_mut().unwrap().reset();
+        SWINT2.borrow_ref(cs).as_ref().unwrap().reset();
     });
 }
 
@@ -105,6 +105,6 @@ fn swint2_handler() {
 fn swint3_handler() {
     esp_println::println!("SW interrupt3");
     critical_section::with(|cs| {
-        SWINT3.borrow_ref_mut(cs).as_mut().unwrap().reset();
+        SWINT3.borrow_ref(cs).as_ref().unwrap().reset();
     });
 }
