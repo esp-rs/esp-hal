@@ -536,14 +536,12 @@ where
             write_buffer_ptr,
             write_buffer_len,
         )?;
-        unsafe {
-            rx.prepare_transfer_without_start(
-                false,
-                self.dma_peripheral(),
-                read_buffer_ptr,
-                read_buffer_len,
-            )?;
-        }
+        rx.prepare_transfer_without_start(
+            false,
+            self.dma_peripheral(),
+            read_buffer_ptr,
+            read_buffer_len,
+        )?;
 
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);

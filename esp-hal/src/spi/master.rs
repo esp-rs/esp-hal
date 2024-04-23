@@ -1890,15 +1890,13 @@ where
             write_buffer_len,
         )
         .and_then(|_| tx.start_transfer())?;
-        unsafe {
-            rx.prepare_transfer_without_start(
-                false,
-                self.dma_peripheral(),
-                read_buffer_ptr,
-                read_buffer_len,
-            )
-            .and_then(|_| rx.start_transfer())?;
-        }
+        rx.prepare_transfer_without_start(
+            false,
+            self.dma_peripheral(),
+            read_buffer_ptr,
+            read_buffer_len,
+        )
+        .and_then(|_| rx.start_transfer())?;
 
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
@@ -1967,10 +1965,8 @@ where
         self.update();
 
         reset_dma_before_load_dma_dscr(reg_block);
-        unsafe {
-            rx.prepare_transfer_without_start(false, self.dma_peripheral(), ptr, len)
-                .and_then(|_| rx.start_transfer())?;
-        }
+        rx.prepare_transfer_without_start(false, self.dma_peripheral(), ptr, len)
+            .and_then(|_| rx.start_transfer())?;
 
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);

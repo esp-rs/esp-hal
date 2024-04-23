@@ -695,10 +695,8 @@ where
         self.last_seen_handled_descriptor_ptr = core::ptr::null_mut();
         self.read_buffer_start = data;
 
-        unsafe {
-            self.rx_impl
-                .prepare_transfer_without_start(self.descriptors, circular, peri, data, len)
-        }
+        self.rx_impl
+            .prepare_transfer_without_start(self.descriptors, circular, peri, data, len)
     }
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
