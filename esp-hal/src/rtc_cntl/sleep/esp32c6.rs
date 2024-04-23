@@ -60,7 +60,7 @@ impl Ext1WakeupSource<'_, '_> {
         unsafe { lp_aon().ext_wakeup_cntl().read().ext_wakeup_sel().bits() }
     }
 
-    fn wake_io_reset(gpio: &mut Pins) {
+    fn wake_io_reset(pins: &mut Pins) {
         use crate::gpio::RtcPin;
 
         fn uninit_pin(pin: &mut impl RtcPin, wakeup_pins: u8) {
@@ -71,14 +71,14 @@ impl Ext1WakeupSource<'_, '_> {
         }
 
         let wakeup_pins = Ext1WakeupSource::wakeup_pins();
-        uninit_pin(&mut gpio.gpio0, wakeup_pins);
-        uninit_pin(&mut gpio.gpio1, wakeup_pins);
-        uninit_pin(&mut gpio.gpio2, wakeup_pins);
-        uninit_pin(&mut gpio.gpio3, wakeup_pins);
-        uninit_pin(&mut gpio.gpio4, wakeup_pins);
-        uninit_pin(&mut gpio.gpio5, wakeup_pins);
-        uninit_pin(&mut gpio.gpio6, wakeup_pins);
-        uninit_pin(&mut gpio.gpio7, wakeup_pins);
+        uninit_pin(&mut pins.gpio0, wakeup_pins);
+        uninit_pin(&mut pins.gpio1, wakeup_pins);
+        uninit_pin(&mut pins.gpio2, wakeup_pins);
+        uninit_pin(&mut pins.gpio3, wakeup_pins);
+        uninit_pin(&mut pins.gpio4, wakeup_pins);
+        uninit_pin(&mut pins.gpio5, wakeup_pins);
+        uninit_pin(&mut pins.gpio6, wakeup_pins);
+        uninit_pin(&mut pins.gpio7, wakeup_pins);
     }
 }
 
@@ -830,17 +830,15 @@ impl RtcSleepConfig {
     fn wake_io_reset() {
         // loosely based on esp_deep_sleep_wakeup_io_reset
 
-        use crate::gpio::GpioExt;
-
         let peripherals = unsafe {
             // We're stealing peripherals to do some uninitialization after waking up from
             // deep sleep. We have to be careful to only touch settings that were enabled
             // by deep sleep setup.
             Peripherals::steal()
         };
-        let mut gpio = peripherals.GPIO.split();
+        let mut pins = peripherals.GPIO.pins();
 
-        Ext1WakeupSource::wake_io_reset(&mut gpio);
+        Ext1WakeupSource::wake_io_reset(&mut pins);
     }
 
     /// Finalize power-down flags, apply configuration based on the flags.

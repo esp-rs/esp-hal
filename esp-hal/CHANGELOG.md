@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - Removed the `SystemExt` trait (#1495)
+- Removed the `GpioExt` trait (#1496)
 
 ## [0.17.0] - 2024-04-18
 
