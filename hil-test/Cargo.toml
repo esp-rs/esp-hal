@@ -53,6 +53,10 @@ required-features = ["async", "embassy"]
 name    = "ecc"
 harness = false
 
+[[test]]
+name    = "get_time"
+harness = false
+
 [dependencies]
 cfg-if             = "1.0.0"
 critical-section   = "1.1.2"
