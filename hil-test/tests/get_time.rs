@@ -7,7 +7,7 @@
 
 use defmt_rtt as _;
 use esp_backtrace as _;
-use esp_hal::{clock::ClockControl, delay::Delay, peripherals::Peripherals, prelude::*};
+use esp_hal::{clock::ClockControl, delay::Delay, peripherals::Peripherals, system::SystemControl};
 
 struct Context {
     delay: Delay,
@@ -16,7 +16,7 @@ struct Context {
 impl Context {
     pub fn init() -> Self {
         let peripherals = Peripherals::take();
-        let system = peripherals.SYSTEM.split();
+        let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
         let delay = Delay::new(&clocks);
