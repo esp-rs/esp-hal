@@ -26,6 +26,7 @@ use esp_hal::{
         master::{prelude::*, Spi},
         SpiMode,
     },
+    system::SystemControl,
 };
 
 #[cfg(test)]
@@ -41,7 +42,7 @@ mod tests {
         const DMA_BUFFER_SIZE: usize = 4;
 
         let peripherals = Peripherals::take();
-        let system = peripherals.SYSTEM.split();
+        let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -84,7 +85,7 @@ mod tests {
     #[timeout(3)]
     fn test_asymmetric_dma_transfer() {
         let peripherals = Peripherals::take();
-        let system = peripherals.SYSTEM.split();
+        let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -128,7 +129,7 @@ mod tests {
         const DMA_BUFFER_SIZE: usize = 4096;
 
         let peripherals = Peripherals::take();
-        let system = peripherals.SYSTEM.split();
+        let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);

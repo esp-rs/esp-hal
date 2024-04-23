@@ -16,6 +16,7 @@ use esp_hal::{
     etm::Etm,
     peripherals::{Peripherals, TIMG0},
     prelude::*,
+    system::SystemControl,
     timer::{
         etm::{TimerEtmEvents, TimerEtmTasks},
         Timer,
@@ -31,7 +32,7 @@ static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0>, esp_hal::Blocking>>>> =
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let timg0 = TimerGroup::new(

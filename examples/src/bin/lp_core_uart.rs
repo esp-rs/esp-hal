@@ -17,6 +17,7 @@ use esp_hal::{
     lp_core::{LpCore, LpCoreWakeupSource},
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
     uart::{config::Config, lp_uart::LpUart, TxRxPins, Uart},
 };
 use esp_println::println;
@@ -24,7 +25,7 @@ use esp_println::println;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);

@@ -14,6 +14,7 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     rmt::{PulseCode, Rmt, RxChannel, RxChannelConfig, RxChannelCreator},
+    system::SystemControl,
 };
 use esp_println::{print, println};
 
@@ -22,7 +23,7 @@ const WIDTH: usize = 80;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);

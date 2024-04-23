@@ -11,7 +11,7 @@ use esp_hal::{
     interrupt::{self, CpuInterrupt, Priority},
     peripherals::{Interrupt, Peripherals},
     prelude::*,
-    system::SoftwareInterrupt,
+    system::{SoftwareInterrupt, SystemControl},
 };
 
 static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> = Mutex::new(RefCell::new(None));
@@ -28,7 +28,7 @@ fn main() -> ! {
     }
     let sw0_trigger_addr = cpu_intr.cpu_intr_from_cpu_0() as *const _ as u32;
 
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let sw_int = system.software_interrupt_control;
 
     critical_section::with(|cs| {

@@ -15,9 +15,9 @@ use esp_hal::{
     clock::ClockControl,
     gpio::Io,
     peripherals::{Peripherals, UART0},
-    prelude::*,
     uart::{config::Config, TxRxPins, Uart, UartRx, UartTx},
     Async,
+    system::SystemControl,
 };
 
 struct Context {
@@ -28,7 +28,7 @@ struct Context {
 impl Context {
     pub fn init() -> Self {
         let peripherals = Peripherals::take();
-        let system = peripherals.SYSTEM.split();
+        let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let pins = TxRxPins::new_tx_rx(
