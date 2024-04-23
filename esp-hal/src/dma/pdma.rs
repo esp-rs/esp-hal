@@ -147,8 +147,7 @@ macro_rules! ImplSpiChannel {
 
                 fn is_out_done() -> bool {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    // FIXME this should be out_total_eof_int_raw? but on esp32 this interrupt doesn't seem to fire
-                    spi.dma_int_raw().read().out_eof().bit()
+                    spi.dma_int_raw().read().out_total_eof().bit()
                 }
 
                 fn last_out_dscr_address() -> usize {
