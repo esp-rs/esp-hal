@@ -10,10 +10,10 @@
 ///
 /// The counter won’t measure time in sleep-mode.
 ///
-/// The timer will wrap after:
-/// - ESP32 = 36_558 years,
-/// - ESP32-S2 = 7_311 years,
-/// - others = > 7 years
+/// The timer will wrap after
+#[cfg_attr(esp32, doc = "36_558 years")]
+#[cfg_attr(esp32s2, doc = "7_311 years")]
+#[cfg_attr(not(any(esp32, esp32s2)), doc = "more than 7 years")]
 pub fn current_time() -> fugit::Instant<u64, 1, 1_000_000> {
     #[cfg(esp32)]
     let (ticks, div) = {
