@@ -696,7 +696,6 @@ mod asynch {
             self.wait_for_completion().await?;
             Ok(())
         }
-
     }
 
     impl<'d, T> embedded_hal_async::i2c::I2c for I2C<'d, T, crate::Async>
