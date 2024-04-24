@@ -65,6 +65,17 @@ pub enum Error {
     CommandNrExceeded,
 }
 
+#[cfg(any(feature = "embedded-hal", feature = "async"))]
+#[derive(PartialEq)]
+// This enum is used to keep track of the last operation that was performed
+// in an embedded-hal(-async) I2C::transaction. It used to determine whether
+// a START condition should be issued at the start of the current operation.
+enum LastOpWas {
+    Write,
+    Read,
+    None,
+}
+
 #[cfg(feature = "embedded-hal")]
 impl embedded_hal::i2c::Error for Error {
     fn kind(&self) -> embedded_hal::i2c::ErrorKind {
@@ -280,13 +291,7 @@ where
         operations: &mut [embedded_hal::i2c::Operation<'_>],
     ) -> Result<(), Self::Error> {
         use embedded_hal::i2c::Operation;
-        #[derive(PartialEq)]
-        enum LastOp {
-            WasWrite,
-            WasRead,
-            WasNone,
-        }
-        let mut last_op = LastOp::WasNone;
+        let mut last_op = LastOpWas::None;
         let mut op_iter = operations.iter_mut().peekable();
         while let Some(op) = op_iter.next() {
             // Clear all I2C interrupts
@@ -299,40 +304,30 @@ where
             let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
             match op {
                 Operation::Write(bytes) => {
-                    // issue START/RSTART if op is different from previous
-                    if last_op != LastOp::WasWrite {
-                        add_cmd(cmd_iterator, Command::Start)?;
-                    }
-                    last_op = LastOp::WasWrite;
-
-                    self.peripheral.add_write(address, bytes, cmd_iterator)?;
-                    if op_iter.peek().is_none() {
-                        add_cmd(cmd_iterator, Command::Stop)?;
-                    } else {
-                        add_cmd(cmd_iterator, Command::End)?;
-                    }
-                    let index = self.peripheral.fill_tx_fifo(bytes);
-                    self.peripheral.start_transmission();
-
-                    // Fill the FIFO with the remaining bytes:
-                    self.peripheral.write_remaining_tx_fifo(index, bytes)?;
-                    self.peripheral.wait_for_completion()?;
+                    // execute a write operation:
+                    // - issue START/RSTART if op is different from previous
+                    // - issue STOP if op is the last one
+                    self.peripheral.write_operation(
+                        address,
+                        bytes,
+                        last_op != LastOpWas::Write,
+                        op_iter.peek().is_none(),
+                        cmd_iterator,
+                    )?;
+                    last_op = LastOpWas::Write;
                 }
                 Operation::Read(buffer) => {
-                    // issue START/RSTART if op is different from previous
-                    if last_op != LastOp::WasRead {
-                        add_cmd(cmd_iterator, Command::Start)?;
-                    }
-                    last_op = LastOp::WasRead;
-                    self.peripheral.add_read(address, buffer, cmd_iterator)?;
-                    if op_iter.peek().is_none() {
-                        add_cmd(cmd_iterator, Command::Stop)?;
-                    } else {
-                        add_cmd(cmd_iterator, Command::End)?;
-                    }
-                    self.peripheral.start_transmission();
-                    self.peripheral.read_all_from_fifo(buffer)?;
-                    self.peripheral.wait_for_completion()?;
+                    // execute a read operation:
+                    // - issue START/RSTART if op is different from previous
+                    // - issue STOP if op is the last one
+                    self.peripheral.read_operation(
+                        address,
+                        buffer,
+                        last_op != LastOpWas::Read,
+                        op_iter.peek().is_none(),
+                        cmd_iterator,
+                    )?;
+                    last_op = LastOpWas::Read;
                 }
             }
         }
@@ -565,7 +560,6 @@ mod asynch {
     where
         T: Instance,
     {
-
         #[cfg(any(esp32, esp32s2))]
         async fn read_all_from_fifo(&self, buffer: &mut [u8]) -> Result<(), Error> {
             if buffer.len() > 32 {
@@ -649,6 +643,60 @@ mod asynch {
 
             Ok(())
         }
+
+        async fn write_operation<'a, I>(
+            &self,
+            address: u8,
+            bytes: &[u8],
+            start: bool,
+            stop: bool,
+            cmd_iterator: &mut I,
+        ) -> Result<(), Error>
+        where
+            I: Iterator<Item = &'a COMD>,
+        {
+            if start {
+                add_cmd(cmd_iterator, Command::Start)?;
+            }
+            self.peripheral.setup_write(address, bytes, cmd_iterator)?;
+            add_cmd(
+                cmd_iterator,
+                if stop { Command::Stop } else { Command::End },
+            )?;
+            let index = self.peripheral.fill_tx_fifo(bytes);
+            self.peripheral.start_transmission();
+
+            // Fill the FIFO with the remaining bytes:
+            self.write_remaining_tx_fifo(index, bytes).await?;
+            self.wait_for_completion().await?;
+            Ok(())
+        }
+
+        async fn read_operation<'a, I>(
+            &self,
+            address: u8,
+            buffer: &mut [u8],
+            start: bool,
+            stop: bool,
+            cmd_iterator: &mut I,
+        ) -> Result<(), Error>
+        where
+            I: Iterator<Item = &'a COMD>,
+        {
+            if start {
+                add_cmd(cmd_iterator, Command::Start)?;
+            }
+            self.peripheral.setup_read(address, buffer, cmd_iterator)?;
+            add_cmd(
+                cmd_iterator,
+                if stop { Command::Stop } else { Command::End },
+            )?;
+            self.peripheral.start_transmission();
+            self.read_all_from_fifo(buffer).await?;
+            self.wait_for_completion().await?;
+            Ok(())
+        }
+
     }
 
     impl<'d, T> embedded_hal_async::i2c::I2c for I2C<'d, T, crate::Async>
@@ -660,13 +708,7 @@ mod asynch {
             address: u8,
             operations: &mut [Operation<'_>],
         ) -> Result<(), Self::Error> {
-            #[derive(PartialEq)]
-            enum LastOp {
-                WasWrite,
-                WasRead,
-                WasNone,
-            }
-            let mut last_op = LastOp::WasNone;
+            let mut last_op = LastOpWas::None;
             let mut op_iter = operations.iter_mut().peekable();
             while let Some(op) = op_iter.next() {
                 // Clear all I2C interrupts
@@ -679,40 +721,29 @@ mod asynch {
                 let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
                 match op {
                     Operation::Write(bytes) => {
-                        // issue START/RSTART if op is different from previous
-                        if last_op != LastOp::WasWrite {
-                            add_cmd(cmd_iterator, Command::Start)?;
-                        }
-                        last_op = LastOp::WasWrite;
-
-                        self.peripheral.add_write(address, bytes, cmd_iterator)?;
-                        if op_iter.peek().is_none() {
-                            add_cmd(cmd_iterator, Command::Stop)?;
-                        } else {
-                            add_cmd(cmd_iterator, Command::End)?;
-                        }
-                        let index = self.peripheral.fill_tx_fifo(bytes);
-                        self.peripheral.start_transmission();
-
-                        // Fill the FIFO with the remaining bytes:
-                        self.write_remaining_tx_fifo(index, bytes).await?;
-                        self.wait_for_completion().await?;
+                        self.write_operation(
+                            address,
+                            bytes,
+                            last_op != LastOpWas::Write,
+                            op_iter.peek().is_none(),
+                            cmd_iterator,
+                        )
+                        .await?;
+                        last_op = LastOpWas::Write;
                     }
                     Operation::Read(buffer) => {
-                        // issue START/RSTART if op is different from previous
-                        if last_op != LastOp::WasRead {
-                            add_cmd(cmd_iterator, Command::Start)?;
-                        }
-                        last_op = LastOp::WasRead;
-                        self.peripheral.add_read(address, buffer, cmd_iterator)?;
-                        if op_iter.peek().is_none() {
-                            add_cmd(cmd_iterator, Command::Stop)?;
-                        } else {
-                            add_cmd(cmd_iterator, Command::End)?;
-                        }
-                        self.peripheral.start_transmission();
-                        self.read_all_from_fifo(buffer).await?;
-                        self.wait_for_completion().await?;
+                        // execute a read operation:
+                        // - issue START/RSTART if op is different from previous
+                        // - issue STOP if op is the last one
+                        self.read_operation(
+                            address,
+                            buffer,
+                            last_op != LastOpWas::Read,
+                            op_iter.peek().is_none(),
+                            cmd_iterator,
+                        )
+                        .await?;
+                        last_op = LastOpWas::Read;
                     }
                 }
             }
@@ -1183,36 +1214,6 @@ pub trait Instance: crate::private::Sealed {
         }
     }
 
-    fn add_write<'a, I>(&self, addr: u8, bytes: &[u8], cmd_iterator: &mut I) -> Result<(), Error>
-    where
-        I: Iterator<Item = &'a COMD>,
-    {
-        if bytes.len() > 254 {
-            // we could support more by adding multiple write operations
-            return Err(Error::ExceedingFifo);
-        }
-
-        // WRITE command
-        add_cmd(
-            cmd_iterator,
-            Command::Write {
-                ack_exp: Ack::Ack,
-                ack_check_en: true,
-                length: 1 + bytes.len() as u8,
-            },
-        )?;
-
-        self.update_config();
-
-        // Load address and R/W bit into FIFO
-        write_fifo(
-            self.register_block(),
-            addr << 1 | OperationType::Write as u8,
-        );
-
-        Ok(())
-    }
-
     fn setup_write<'a, I>(&self, addr: u8, bytes: &[u8], cmd_iterator: &mut I) -> Result<(), Error>
     where
         I: Iterator<Item = &'a COMD>,
@@ -1222,12 +1223,6 @@ pub trait Instance: crate::private::Sealed {
             return Err(Error::ExceedingFifo);
         }
 
-        // Clear all I2C interrupts
-        self.clear_all_interrupts();
-
-        // RSTART command
-        add_cmd(cmd_iterator, Command::Start)?;
-
         // WRITE command
         add_cmd(
             cmd_iterator,
@@ -1238,8 +1233,6 @@ pub trait Instance: crate::private::Sealed {
             },
         )?;
 
-        add_cmd(cmd_iterator, Command::Stop)?;
-
         self.update_config();
 
         // Load address and R/W bit into FIFO
@@ -1247,78 +1240,6 @@ pub trait Instance: crate::private::Sealed {
             self.register_block(),
             addr << 1 | OperationType::Write as u8,
         );
-
-        Ok(())
-    }
-
-    fn perform_write<'a, I>(
-        &self,
-        addr: u8,
-        bytes: &[u8],
-        cmd_iterator: &mut I,
-    ) -> Result<(), Error>
-    where
-        I: Iterator<Item = &'a COMD>,
-    {
-        self.setup_write(addr, bytes, cmd_iterator)?;
-        let index = self.fill_tx_fifo(bytes);
-        self.start_transmission();
-
-        // Fill the FIFO with the remaining bytes:
-        self.write_remaining_tx_fifo(index, bytes)?;
-        self.wait_for_completion()?;
-
-        Ok(())
-    }
-
-    fn add_read<'a, I>(
-        &self,
-        addr: u8,
-        buffer: &mut [u8],
-        cmd_iterator: &mut I,
-    ) -> Result<(), Error>
-    where
-        I: Iterator<Item = &'a COMD>,
-    {
-        if buffer.len() > 254 {
-            // we could support more by adding multiple read operations
-            return Err(Error::ExceedingFifo);
-        }
-
-        // WRITE command
-        add_cmd(
-            cmd_iterator,
-            Command::Write {
-                ack_exp: Ack::Ack,
-                ack_check_en: true,
-                length: 1,
-            },
-        )?;
-
-        if buffer.len() > 1 {
-            // READ command (N - 1)
-            add_cmd(
-                cmd_iterator,
-                Command::Read {
-                    ack_value: Ack::Ack,
-                    length: buffer.len() as u8 - 1,
-                },
-            )?;
-        }
-
-        // READ w/o ACK
-        add_cmd(
-            cmd_iterator,
-            Command::Read {
-                ack_value: Ack::Nack,
-                length: 1,
-            },
-        )?;
-
-        self.update_config();
-
-        // Load address and R/W bit into FIFO
-        write_fifo(self.register_block(), addr << 1 | OperationType::Read as u8);
 
         Ok(())
     }
@@ -1337,12 +1258,6 @@ pub trait Instance: crate::private::Sealed {
             return Err(Error::ExceedingFifo);
         }
 
-        // Clear all I2C interrupts
-        self.clear_all_interrupts();
-
-        // RSTART command
-        add_cmd(cmd_iterator, Command::Start)?;
-
         // WRITE command
         add_cmd(
             cmd_iterator,
@@ -1373,29 +1288,10 @@ pub trait Instance: crate::private::Sealed {
             },
         )?;
 
-        add_cmd(cmd_iterator, Command::Stop)?;
-
         self.update_config();
 
         // Load address and R/W bit into FIFO
         write_fifo(self.register_block(), addr << 1 | OperationType::Read as u8);
-
-        Ok(())
-    }
-
-    fn perform_read<'a, I>(
-        &self,
-        addr: u8,
-        buffer: &mut [u8],
-        cmd_iterator: &mut I,
-    ) -> Result<(), Error>
-    where
-        I: Iterator<Item = &'a COMD>,
-    {
-        self.setup_read(addr, buffer, cmd_iterator)?;
-        self.start_transmission();
-        self.read_all_from_fifo(buffer)?;
-        self.wait_for_completion()?;
 
         Ok(())
     }
@@ -1689,13 +1585,72 @@ pub trait Instance: crate::private::Sealed {
             .write(|w| w.rxfifo_full().clear_bit_by_one());
     }
 
+    fn write_operation<'a, I>(
+        &self,
+        address: u8,
+        bytes: &[u8],
+        start: bool,
+        stop: bool,
+        cmd_iterator: &mut I,
+    ) -> Result<(), Error>
+    where
+        I: Iterator<Item = &'a COMD>,
+    {
+        if start {
+            add_cmd(cmd_iterator, Command::Start)?;
+        }
+        self.setup_write(address, bytes, cmd_iterator)?;
+        add_cmd(
+            cmd_iterator,
+            if stop { Command::Stop } else { Command::End },
+        )?;
+        let index = self.fill_tx_fifo(bytes);
+        self.start_transmission();
+
+        // Fill the FIFO with the remaining bytes:
+        self.write_remaining_tx_fifo(index, bytes)?;
+        self.wait_for_completion()?;
+        Ok(())
+    }
+
+    fn read_operation<'a, I>(
+        &self,
+        address: u8,
+        buffer: &mut [u8],
+        start: bool,
+        stop: bool,
+        cmd_iterator: &mut I,
+    ) -> Result<(), Error>
+    where
+        I: Iterator<Item = &'a COMD>,
+    {
+        if start {
+            add_cmd(cmd_iterator, Command::Start)?;
+        }
+        self.setup_read(address, buffer, cmd_iterator)?;
+        add_cmd(
+            cmd_iterator,
+            if stop { Command::Stop } else { Command::End },
+        )?;
+        self.start_transmission();
+        self.read_all_from_fifo(buffer)?;
+        self.wait_for_completion()?;
+        Ok(())
+    }
+
     /// Send data bytes from the `bytes` array to a target slave with the
     /// address `addr`
     fn master_write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
         // Reset FIFO and command list
         self.reset_fifo();
         self.reset_command_list();
-        self.perform_write(addr, bytes, &mut self.register_block().comd_iter())?;
+        self.write_operation(
+            addr,
+            bytes,
+            true,
+            true,
+            &mut self.register_block().comd_iter(),
+        )?;
         Ok(())
     }
 
@@ -1706,7 +1661,13 @@ pub trait Instance: crate::private::Sealed {
         // Reset FIFO and command list
         self.reset_fifo();
         self.reset_command_list();
-        self.perform_read(addr, buffer, &mut self.register_block().comd_iter())?;
+        self.read_operation(
+            addr,
+            buffer,
+            true,
+            true,
+            &mut self.register_block().comd_iter(),
+        )?;
         Ok(())
     }
 
@@ -1722,8 +1683,20 @@ pub trait Instance: crate::private::Sealed {
         // in one transaction but filling the tx fifo with
         // the current code is somewhat slow even in release mode
         // which can cause issues
-        self.master_write(addr, bytes)?;
-        self.master_read(addr, buffer)?;
+        self.write_operation(
+            addr,
+            bytes,
+            true,
+            false,
+            &mut self.register_block().comd_iter(),
+        )?;
+        self.read_operation(
+            addr,
+            buffer,
+            true,
+            true,
+            &mut self.register_block().comd_iter(),
+        )?;
         Ok(())
     }
 }
