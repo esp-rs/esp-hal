@@ -2636,7 +2636,7 @@ pub trait Instance: crate::private::Sealed {
         }
 
         let reg_block = self.register_block();
-        Ok(u32::try_into(reg_block.w0().read().bits()).unwrap_or_default())
+        Ok(u32::try_into(reg_block.w(0).read().bits()).unwrap_or_default())
     }
 
     fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
@@ -2647,7 +2647,7 @@ pub trait Instance: crate::private::Sealed {
         self.configure_datalen(8);
 
         let reg_block = self.register_block();
-        reg_block.w0().write(|w| unsafe { w.bits(word.into()) });
+        reg_block.w(0).write(|w| w.buf().set(word.into()));
 
         self.update();
 
@@ -2677,33 +2677,30 @@ pub trait Instance: crate::private::Sealed {
         for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
             self.configure_datalen(chunk.len() as u32 * 8);
 
-            let fifo_ptr = self.register_block().w0().as_ptr();
-            for i in (0..chunk.len()).step_by(4) {
-                let state = if chunk.len() - i < 4 {
-                    chunk.len() % 4
-                } else {
-                    0
-                };
-                let word = match state {
-                    0 => {
-                        (chunk[i] as u32)
-                            | (chunk[i + 1] as u32) << 8
-                            | (chunk[i + 2] as u32) << 16
-                            | (chunk[i + 3] as u32) << 24
+            {
+                // TODO: replace with `array_chunks` and `from_le_bytes`
+                let mut c_iter = chunk.chunks_exact(4);
+                let mut w_iter = self.register_block().w_iter();
+                for c in c_iter.by_ref() {
+                    if let Some(w_reg) = w_iter.next() {
+                        let word = (c[0] as u32)
+                            | (c[1] as u32) << 8
+                            | (c[2] as u32) << 16
+                            | (c[3] as u32) << 24;
+                        w_reg.write(|w| w.buf().set(word));
                     }
-
-                    3 => {
-                        (chunk[i] as u32) | (chunk[i + 1] as u32) << 8 | (chunk[i + 2] as u32) << 16
+                }
+                let rem = c_iter.remainder();
+                if !rem.is_empty() {
+                    if let Some(w_reg) = w_iter.next() {
+                        let word = match rem.len() {
+                            3 => (rem[0] as u32) | (rem[1] as u32) << 8 | (rem[2] as u32) << 16,
+                            2 => (rem[0] as u32) | (rem[1] as u32) << 8,
+                            1 => rem[0] as u32,
+                            _ => unreachable!(),
+                        };
+                        w_reg.write(|w| w.buf().set(word));
                     }
-
-                    2 => (chunk[i] as u32) | (chunk[i + 1] as u32) << 8,
-
-                    1 => chunk[i] as u32,
-
-                    _ => panic!(),
-                };
-                unsafe {
-                    fifo_ptr.add(i / 4).write_volatile(word);
                 }
             }
 
@@ -2751,17 +2748,12 @@ pub trait Instance: crate::private::Sealed {
         for chunk in words.chunks_mut(FIFO_SIZE) {
             self.configure_datalen(chunk.len() as u32 * 8);
 
-            let mut fifo_ptr = reg_block.w0().as_ptr();
-            for index in (0..chunk.len()).step_by(4) {
-                let reg_val = unsafe { core::ptr::read_volatile(fifo_ptr) };
+            for (index, w_reg) in (0..chunk.len()).step_by(4).zip(reg_block.w_iter()) {
+                let reg_val = w_reg.read().bits();
                 let bytes = reg_val.to_le_bytes();
 
                 let len = usize::min(chunk.len(), index + 4) - index;
                 chunk[index..(index + len)].clone_from_slice(&bytes[0..len]);
-
-                unsafe {
-                    fifo_ptr = fifo_ptr.offset(1);
-                };
             }
         }
 
