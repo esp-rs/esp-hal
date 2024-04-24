@@ -1604,7 +1604,6 @@ where
 }
 
 /// Creates a TX channel
-#[non_exhaustive]
 pub struct TxCreator<'d, CH, DM>
 where
     CH: ChannelTypes,
@@ -1615,7 +1614,6 @@ where
 }
 
 /// Creates a RX channel
-#[non_exhaustive]
 pub struct RxCreator<'d, CH, DM>
 where
     CH: ChannelTypes,
@@ -1626,7 +1624,6 @@ where
 }
 
 /// Creates a TX channel
-#[non_exhaustive]
 pub struct TxCreatorFullDuplex<'d, CH, DM>
 where
     CH: ChannelTypes,
@@ -1637,7 +1634,6 @@ where
 }
 
 /// Creates a RX channel
-#[non_exhaustive]
 pub struct RxCreatorFullDuplex<'d, CH, DM>
 where
     CH: ChannelTypes,
