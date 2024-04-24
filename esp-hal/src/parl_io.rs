@@ -1501,12 +1501,16 @@ where
             return Err(Error::MaxDmaTransferSizeExceeded);
         }
 
-        self.start_receive_bytes_dma(ptr, len)?;
+        Self::start_receive_bytes_dma(&mut self.rx_channel, ptr, len)?;
 
         Ok(RxDmaTransfer { instance: self })
     }
 
-    fn start_receive_bytes_dma(&mut self, ptr: *mut u8, len: usize) -> Result<(), Error> {
+    fn start_receive_bytes_dma(
+        rx_channel: &mut CH::Rx<'d>,
+        ptr: *mut u8,
+        len: usize,
+    ) -> Result<(), Error> {
         let pcr = unsafe { &*crate::peripherals::PCR::PTR };
         pcr.parl_clk_rx_conf()
             .modify(|_, w| w.parl_rx_rst_en().set_bit());
@@ -1516,9 +1520,11 @@ where
         Instance::clear_rx_interrupts();
         Instance::set_rx_bytes(len as u16);
 
-        self.rx_channel
-            .prepare_transfer_without_start(false, DmaPeripheral::ParlIo, ptr, len)
-            .and_then(|_| self.rx_channel.start_transfer())?;
+        unsafe {
+            rx_channel
+                .prepare_transfer_without_start(false, DmaPeripheral::ParlIo, ptr, len)
+                .and_then(|_| rx_channel.start_transfer())?;
+        }
 
         Instance::set_rx_reg_update();
 
@@ -1665,9 +1671,9 @@ pub mod asynch {
                 return Err(Error::MaxDmaTransferSizeExceeded);
             }
 
+            let future = TxDoneFuture::new();
             self.start_write_bytes_dma(ptr, len)?;
-
-            TxDoneFuture::new().await;
+            future.await;
 
             Ok(())
         }
@@ -1692,9 +1698,9 @@ pub mod asynch {
                 }
             }
 
-            self.start_receive_bytes_dma(ptr, len)?;
-
-            DmaRxDoneChFuture::new(&mut self.rx_channel).await;
+            let future = DmaRxDoneChFuture::new(&mut self.rx_channel);
+            Self::start_receive_bytes_dma(future.rx, ptr, len)?;
+            future.await?;
 
             Ok(())
         }

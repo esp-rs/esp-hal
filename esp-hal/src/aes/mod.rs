@@ -488,15 +488,17 @@ pub mod dma {
                     write_buffer_len,
                 )
                 .and_then(|_| self.channel.tx.start_transfer())?;
-            self.channel
-                .rx
-                .prepare_transfer_without_start(
-                    false,
-                    self.dma_peripheral(),
-                    read_buffer_ptr,
-                    read_buffer_len,
-                )
-                .and_then(|_| self.channel.rx.start_transfer())?;
+            unsafe {
+                self.channel
+                    .rx
+                    .prepare_transfer_without_start(
+                        false,
+                        self.dma_peripheral(),
+                        read_buffer_ptr,
+                        read_buffer_len,
+                    )
+                    .and_then(|_| self.channel.rx.start_transfer())?;
+            }
             self.enable_dma(true);
             self.enable_interrupt();
             self.set_mode(mode);

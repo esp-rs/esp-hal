@@ -679,31 +679,6 @@ where
 
         Ok(())
     }
-
-    #[cfg(feature = "async")]
-    fn start_tx_transfer_async(
-        &mut self,
-        ptr: *const u8,
-        len: usize,
-        circular: bool,
-    ) -> Result<(), Error> {
-        // Reset TX unit and TX FIFO
-        T::reset_tx();
-
-        // Enable corresponding interrupts if needed
-
-        // configure DMA outlink
-        self.tx_channel
-            .prepare_transfer_without_start(T::get_dma_peripheral(), circular, ptr, len)
-            .and_then(|_| self.tx_channel.start_transfer())?;
-
-        // set I2S_TX_STOP_EN if needed
-
-        // start: set I2S_TX_START
-        T::tx_start();
-
-        Ok(())
-    }
 }
 
 impl<'d, T, W, CH, DmaMode> I2sWrite<W> for I2sTx<'d, T, CH, DmaMode>
@@ -796,14 +771,16 @@ where
         // Enable corresponding interrupts if needed
 
         // configure DMA outlink
-        self.rx_channel
-            .prepare_transfer_without_start(false, T::get_dma_peripheral(), ptr, data.len())
-            .and_then(|_| self.rx_channel.start_transfer())?;
+        unsafe {
+            self.rx_channel
+                .prepare_transfer_without_start(false, T::get_dma_peripheral(), ptr, data.len())
+                .and_then(|_| self.rx_channel.start_transfer())?;
+        }
 
         // set I2S_TX_STOP_EN if needed
 
         // start: set I2S_TX_START
-        T::rx_start(data.len() - 1);
+        T::rx_start(data.len());
 
         // wait until I2S_TX_IDLE is 1
         T::wait_for_rx_done();
@@ -831,17 +808,15 @@ where
         // Enable corresponding interrupts if needed
 
         // configure DMA outlink
-        self.rx_channel
-            .prepare_transfer_without_start(circular, T::get_dma_peripheral(), ptr, len)
-            .and_then(|_| self.rx_channel.start_transfer())?;
+        unsafe {
+            self.rx_channel
+                .prepare_transfer_without_start(circular, T::get_dma_peripheral(), ptr, len)
+                .and_then(|_| self.rx_channel.start_transfer())?;
+        }
 
         // set I2S_TX_STOP_EN if needed
 
         // start: set I2S_RX_START
-        #[cfg(not(esp32))]
-        T::rx_start(len - 1);
-
-        #[cfg(esp32)]
         T::rx_start(len);
 
         Ok(I2sReadDmaTransfer { i2s_rx: self })
@@ -849,39 +824,6 @@ where
 
     fn wait_rx_dma_done(&self) -> Result<(), Error> {
         T::wait_for_rx_done();
-
-        Ok(())
-    }
-
-    #[cfg(feature = "async")]
-    fn start_rx_transfer_async(
-        &mut self,
-        ptr: *mut u8,
-        len: usize,
-        circular: bool,
-    ) -> Result<(), Error> {
-        if len % 4 != 0 {
-            return Err(Error::IllegalArgument);
-        }
-
-        // Reset TX unit and TX FIFO
-        T::reset_rx();
-
-        // Enable corresponding interrupts if needed
-
-        // configure DMA outlink
-        self.rx_channel
-            .prepare_transfer_without_start(circular, T::get_dma_peripheral(), ptr, len)
-            .and_then(|_| self.rx_channel.start_transfer())?;
-
-        // set I2S_TX_STOP_EN if needed
-
-        // start: set I2S_RX_START
-        #[cfg(not(esp32))]
-        T::rx_start(len - 1);
-
-        #[cfg(esp32)]
-        T::rx_start(len);
 
         Ok(())
     }
@@ -1332,6 +1274,9 @@ mod private {
         }
 
         fn rx_start(len: usize) {
+            #[cfg(not(esp32))]
+            let len = len - 1;
+
             let i2s = Self::register_block();
 
             i2s.int_clr().write(|w| w.in_suc_eof().clear_bit_by_one());
@@ -1860,6 +1805,8 @@ mod private {
         }
 
         fn rx_start(len: usize) {
+            let len = len - 1;
+
             let i2s = Self::register_block();
             i2s.rxeof_num()
                 .write(|w| unsafe { w.rx_eof_num().bits(len as u16) });
@@ -2271,13 +2218,15 @@ pub mod asynch {
         async fn write_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
             let (ptr, len) = (words.as_ptr(), words.len());
 
-            self.tx_channel.listen_eof();
-
-            self.start_tx_transfer_async(ptr, len, false)?;
-
-            DmaTxFuture::new(&mut self.tx_channel).await;
-
             T::reset_tx();
+
+            let future = DmaTxFuture::new(&mut self.tx_channel);
+            future
+                .tx
+                .prepare_transfer_without_start(T::get_dma_peripheral(), false, ptr, len)?;
+            future.tx.start_transfer()?;
+            T::tx_start();
+            future.await?;
 
             Ok(())
         }
@@ -2290,7 +2239,21 @@ pub mod asynch {
             TXBUF: ReadBuffer<Word = u8>,
         {
             let (ptr, len) = unsafe { words.read_buffer() };
-            self.start_tx_transfer_async(ptr, len, true)?;
+
+            // Reset TX unit and TX FIFO
+            T::reset_tx();
+
+            // Enable corresponding interrupts if needed
+
+            // configure DMA outlink
+            self.tx_channel
+                .prepare_transfer_without_start(T::get_dma_peripheral(), true, ptr, len)
+                .and_then(|_| self.tx_channel.start_transfer())?;
+
+            // set I2S_TX_STOP_EN if needed
+
+            // start: set I2S_TX_START
+            T::tx_start();
 
             Ok(I2sWriteDmaTransferAsync {
                 i2s_tx: self,
@@ -2318,22 +2281,21 @@ pub mod asynch {
     {
         /// How many bytes can be pushed into the DMA transaction.
         /// Will wait for more than 0 bytes available.
-        pub async fn available(&mut self) -> usize {
+        pub async fn available(&mut self) -> Result<usize, Error> {
             loop {
                 let res = self.i2s_tx.tx_channel.available();
 
                 if res != 0 {
-                    break res;
+                    break Ok(res);
                 }
 
-                let future = DmaTxDoneChFuture::new(&mut self.i2s_tx.tx_channel);
-                future.await;
+                DmaTxDoneChFuture::new(&mut self.i2s_tx.tx_channel).await?
             }
         }
 
         /// Push bytes into the DMA transaction.
         pub async fn push(&mut self, data: &[u8]) -> Result<usize, Error> {
-            let avail = self.available().await;
+            let avail = self.available().await?;
             let to_send = usize::min(avail, data.len());
             Ok(self.i2s_tx.tx_channel.push(&data[..to_send])?)
         }
@@ -2378,13 +2340,36 @@ pub mod asynch {
         async fn read_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
             let (ptr, len) = (words.as_mut_ptr(), words.len());
 
-            self.rx_channel.listen_eof();
+            if len % 4 != 0 {
+                return Err(Error::IllegalArgument);
+            }
 
-            self.start_rx_transfer_async(ptr, len, false)?;
+            // Reset TX unit and TX FIFO
+            T::reset_rx();
 
-            DmaRxFuture::new(&mut self.rx_channel).await;
+            let mut future = DmaRxFuture::new(&mut self.rx_channel);
 
-            // ??? T::reset_tx();
+            // configure DMA outlink
+            unsafe {
+                future.rx().prepare_transfer_without_start(
+                    false,
+                    T::get_dma_peripheral(),
+                    ptr,
+                    len,
+                )?;
+            }
+            future.rx().start_transfer()?;
+
+            // set I2S_TX_STOP_EN if needed
+
+            // start: set I2S_RX_START
+            #[cfg(not(esp32))]
+            T::rx_start(len - 1);
+
+            #[cfg(esp32)]
+            T::rx_start(len);
+
+            future.await?;
 
             Ok(())
         }
@@ -2397,7 +2382,31 @@ pub mod asynch {
             RXBUF: WriteBuffer<Word = u8>,
         {
             let (ptr, len) = unsafe { words.write_buffer() };
-            self.start_rx_transfer_async(ptr, len, true)?;
+
+            if len % 4 != 0 {
+                return Err(Error::IllegalArgument);
+            }
+
+            // Reset TX unit and TX FIFO
+            T::reset_rx();
+
+            // Enable corresponding interrupts if needed
+
+            // configure DMA outlink
+            unsafe {
+                self.rx_channel
+                    .prepare_transfer_without_start(true, T::get_dma_peripheral(), ptr, len)
+                    .and_then(|_| self.rx_channel.start_transfer())?;
+            }
+
+            // set I2S_TX_STOP_EN if needed
+
+            // start: set I2S_RX_START
+            #[cfg(not(esp32))]
+            T::rx_start(len - 1);
+
+            #[cfg(esp32)]
+            T::rx_start(len);
 
             Ok(I2sReadDmaTransferAsync {
                 i2s_rx: self,
@@ -2425,22 +2434,21 @@ pub mod asynch {
     {
         /// How many bytes can be popped from the DMA transaction.
         /// Will wait for more than 0 bytes available.
-        pub async fn available(&mut self) -> usize {
+        pub async fn available(&mut self) -> Result<usize, Error> {
             loop {
                 let res = self.i2s_rx.rx_channel.available();
 
                 if res != 0 {
-                    break res;
+                    break Ok(res);
                 }
 
-                let future = DmaRxDoneChFuture::new(&mut self.i2s_rx.rx_channel);
-                future.await;
+                DmaRxDoneChFuture::new(&mut self.i2s_rx.rx_channel).await?;
             }
         }
 
         /// Pop bytes from the DMA transaction.
         pub async fn pop(&mut self, data: &mut [u8]) -> Result<usize, Error> {
-            let avail = self.available().await;
+            let avail = self.available().await?;
             let to_rcv = usize::min(avail, data.len());
             Ok(self.i2s_rx.rx_channel.pop(&mut data[..to_rcv])?)
         }
