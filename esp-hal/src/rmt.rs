@@ -34,31 +34,8 @@
     doc = "4 channels, `Channel<0>` and `Channel<1>` hardcoded for transmitting signals and `Channel<2>` and `Channel<3>` hardcoded for receiving signals."
 )]
 #![doc = "  "]
-//! For more information, please refer to the ESP-IDF
-#![cfg_attr(
-    esp32,
-    doc = "[documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/rmt.html)"
-)]
-#![cfg_attr(
-    esp32s2,
-    doc = "[documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s2/api-reference/peripherals/rmt.html)"
-)]
-#![cfg_attr(
-    esp32s3,
-    doc = "[documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/api-reference/peripherals/rmt.html)"
-)]
-#![cfg_attr(
-    esp32c3,
-    doc = "[documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/api-reference/peripherals/rmt.html)"
-)]
-#![cfg_attr(
-    esp32c6,
-    doc = "[documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c6/api-reference/peripherals/rmt.html)"
-)]
-#![cfg_attr(
-    esp32h2,
-    doc = "[documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32h2/api-reference/peripherals/rmt.html)"
-)]
+//! For more information, please refer to the
+#![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", chip!(), "/api-reference/peripherals/rmt.html)")]
 //! ## Examples
 //!
 //! ### Initialization
@@ -842,6 +819,7 @@ mod impl_for_chip {
     use crate::peripheral::{Peripheral, PeripheralRef};
 
     /// RMT Instance
+    #[allow(missing_docs)]
     pub struct Rmt<'d, M>
     where
         M: crate::Mode,
@@ -916,6 +894,7 @@ mod impl_for_chip {
     use crate::peripheral::{Peripheral, PeripheralRef};
 
     /// RMT Instance
+    #[allow(missing_docs)]
     pub struct Rmt<'d, M>
     where
         M: crate::Mode,

@@ -70,6 +70,49 @@
 // MUST be the first module
 mod fmt;
 
+#[cfg(esp32)]
+macro_rules! chip {
+    () => {
+        "esp32"
+    };
+}
+#[cfg(esp32s2)]
+macro_rules! chip {
+    () => {
+        "esp32s2"
+    };
+}
+#[cfg(esp32s3)]
+macro_rules! chip {
+    () => {
+        "esp32s3"
+    };
+}
+#[cfg(esp32c2)]
+macro_rules! chip {
+    () => {
+        "esp32c2"
+    };
+}
+#[cfg(esp32c3)]
+macro_rules! chip {
+    () => {
+        "esp32c3"
+    };
+}
+#[cfg(esp32c6)]
+macro_rules! chip {
+    () => {
+        "esp32c6"
+    };
+}
+#[cfg(esp32h2)]
+macro_rules! chip {
+    () => {
+        "esp32h2"
+    };
+}
+
 #[cfg(riscv)]
 pub use esp_riscv_rt::{self, entry, riscv};
 pub use procmacros as macros;
