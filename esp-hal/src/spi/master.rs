@@ -417,7 +417,7 @@ where
     /// sequential transfers are performed. This function will return before
     /// all bytes of the last chunk to transmit have been sent to the wire. If
     /// you must ensure that the whole messages was written correctly, use
-    /// [`Self::flush`].
+    /// `flush`.
     pub fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
         self.spi.write_bytes(words)?;
         self.spi.flush()?;
