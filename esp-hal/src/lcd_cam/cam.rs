@@ -55,7 +55,7 @@ use crate::{
     },
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
     i2s::Error,
-    lcd_cam::{private::calculate_clkm, BitOrder, ByteOrder},
+    lcd_cam::{cam::private::RxPins, private::calculate_clkm, BitOrder, ByteOrder},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
 };
@@ -88,22 +88,23 @@ pub struct Cam<'d> {
     pub(crate) lcd_cam: PeripheralRef<'d, LCD_CAM>,
 }
 
-pub struct Camera<'d, RX, P> {
+pub struct Camera<'d, RX> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     rx_channel: RX,
-    _pins: P,
+    // 1 or 2
+    bus_width: usize,
 }
 
-impl<'d, T, R, P> Camera<'d, ChannelRx<'d, T, R>, P>
+impl<'d, T, R> Camera<'d, ChannelRx<'d, T, R>>
 where
     T: RxChannel<R>,
     R: ChannelTypes + RegisterAccess,
     R::P: LcdCamPeripheral,
 {
-    pub fn new(
+    pub fn new<P: RxPins>(
         cam: Cam<'d>,
         mut channel: ChannelRx<'d, T, R>,
-        pins: P,
+        _pins: P,
         frequency: HertzU32,
         clocks: &Clocks,
     ) -> Self {
@@ -171,21 +172,19 @@ where
         Self {
             lcd_cam,
             rx_channel: channel,
-            _pins: pins,
+            bus_width: P::BUS_WIDTH,
         }
     }
 }
 
-impl<'d, RX: Rx> Camera<'d, RX, RxSixteenBits> {
+impl<'d, RX: Rx> Camera<'d, RX> {
     pub fn set_byte_order(&mut self, byte_order: ByteOrder) -> &mut Self {
         self.lcd_cam
             .cam_ctrl()
             .modify(|_, w| w.cam_byte_order().bit(byte_order != ByteOrder::default()));
         self
     }
-}
 
-impl<'d, RX: Rx, P> Camera<'d, RX, P> {
     pub fn set_bit_order(&mut self, bit_order: BitOrder) -> &mut Self {
         self.lcd_cam
             .cam_ctrl()
@@ -282,6 +281,8 @@ impl<'d, RX: Rx, P> Camera<'d, RX, P> {
     ) -> Result<(), DmaError> {
         let (ptr, len) = unsafe { buf.write_buffer() };
 
+        assert_eq!(self.bus_width, size_of::<RXBUF::Word>());
+
         self.rx_channel.prepare_transfer_without_start(
             circular,
             DmaPeripheral::LcdCam,
@@ -291,10 +292,10 @@ impl<'d, RX: Rx, P> Camera<'d, RX, P> {
         self.rx_channel.start_transfer()
     }
 
-    fn read_dma_impl<'t, RXBUF: WriteBuffer>(
+    pub fn read_dma<'t, RXBUF: WriteBuffer>(
         &'t mut self,
         buf: &'t mut RXBUF,
-    ) -> Result<Transfer<'t, 'd, RX, P>, DmaError> {
+    ) -> Result<Transfer<'t, 'd, RX>, DmaError> {
         self.reset_unit_and_fifo();
         // Start DMA to receive incoming transfer.
         self.start_dma(false, buf)?;
@@ -303,10 +304,10 @@ impl<'d, RX: Rx, P> Camera<'d, RX, P> {
         Ok(Transfer { instance: self })
     }
 
-    fn read_dma_circular_impl<'t, RXBUF: WriteBuffer>(
+    pub fn read_dma_circular<'t, RXBUF: WriteBuffer>(
         &'t mut self,
         buf: &'t mut RXBUF,
-    ) -> Result<Transfer<'t, 'd, RX, P>, DmaError> {
+    ) -> Result<Transfer<'t, 'd, RX>, DmaError> {
         self.reset_unit_and_fifo();
         // Start DMA to receive incoming transfer.
         self.start_dma(true, buf)?;
@@ -316,57 +317,13 @@ impl<'d, RX: Rx, P> Camera<'d, RX, P> {
     }
 }
 
-impl<'d, RX: Rx> Camera<'d, RX, RxEightBits> {
-    pub fn read_dma<'t, RXBUF>(
-        &'t mut self,
-        buf: &'t mut RXBUF,
-    ) -> Result<Transfer<'t, 'd, RX, RxEightBits>, DmaError>
-    where
-        RXBUF: WriteBuffer<Word = u8>,
-    {
-        self.read_dma_impl(buf)
-    }
-
-    pub fn read_dma_circular<'t, RXBUF>(
-        &'t mut self,
-        buf: &'t mut RXBUF,
-    ) -> Result<Transfer<'t, 'd, RX, RxEightBits>, DmaError>
-    where
-        RXBUF: WriteBuffer<Word = u8>,
-    {
-        self.read_dma_circular_impl(buf)
-    }
-}
-
-impl<'d, RX: Rx> Camera<'d, RX, RxSixteenBits> {
-    pub fn read_dma<'t, RXBUF>(
-        &'t mut self,
-        buf: &'t mut RXBUF,
-    ) -> Result<Transfer<'t, 'd, RX, RxSixteenBits>, DmaError>
-    where
-        RXBUF: WriteBuffer<Word = u16>,
-    {
-        self.read_dma_impl(buf)
-    }
-
-    pub fn read_dma_circular<'t, RXBUF>(
-        &'t mut self,
-        buf: &'t mut RXBUF,
-    ) -> Result<Transfer<'t, 'd, RX, RxSixteenBits>, DmaError>
-    where
-        RXBUF: WriteBuffer<Word = u16>,
-    {
-        self.read_dma_circular_impl(buf)
-    }
-}
-
 /// An in-progress transfer
 #[must_use]
-pub struct Transfer<'t, 'd, RX: Rx, P> {
-    instance: &'t mut Camera<'d, RX, P>,
+pub struct Transfer<'t, 'd, RX: Rx> {
+    instance: &'t mut Camera<'d, RX>,
 }
 
-impl<'t, 'd, RX: Rx, P> Transfer<'t, 'd, RX, P> {
+impl<'t, 'd, RX: Rx> Transfer<'t, 'd, RX> {
     /// Amount of bytes which can be popped
     pub fn available(&mut self) -> usize {
         self.instance.rx_channel.available()
@@ -397,7 +354,7 @@ impl<'t, 'd, RX: Rx, P> Transfer<'t, 'd, RX, P> {
     }
 }
 
-impl<'t, 'd, RX: Rx, P> DmaTransfer for Transfer<'t, 'd, RX, P> {
+impl<'t, 'd, RX: Rx> DmaTransfer for Transfer<'t, 'd, RX> {
     fn wait(self) -> Result<(), DmaError> {
         // Wait for DMA transfer to finish.
         while !self.is_done() {}
@@ -421,7 +378,7 @@ impl<'t, 'd, RX: Rx, P> DmaTransfer for Transfer<'t, 'd, RX, P> {
     }
 }
 
-impl<'t, 'd, RX: Rx, P> Drop for Transfer<'t, 'd, RX, P> {
+impl<'t, 'd, RX: Rx> Drop for Transfer<'t, 'd, RX> {
     fn drop(&mut self) {
         self.instance
             .lcd_cam
@@ -493,6 +450,10 @@ impl RxEightBits {
 
         Self { _pins: () }
     }
+}
+
+impl RxPins for RxEightBits {
+    const BUS_WIDTH: usize = 1;
 }
 
 pub struct RxSixteenBits {
@@ -604,5 +565,15 @@ impl RxSixteenBits {
             .connect_input_to_peripheral(InputSignal::CAM_DATA_15);
 
         Self { _pins: () }
+    }
+}
+
+impl RxPins for RxSixteenBits {
+    const BUS_WIDTH: usize = 2;
+}
+
+mod private {
+    pub trait RxPins {
+        const BUS_WIDTH: usize;
     }
 }
