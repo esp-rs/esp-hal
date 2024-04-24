@@ -54,7 +54,7 @@ impl CallbackContext {
 }
 
 fn handle_interrupt<const NUM: u8>() {
-    let mut swi = unsafe { SoftwareInterrupt::<NUM>::steal() };
+    let swi = unsafe { SoftwareInterrupt::<NUM>::steal() };
     swi.reset();
 
     unsafe {
