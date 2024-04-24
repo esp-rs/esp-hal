@@ -39,9 +39,8 @@
 //! If none of the above conditions are true, the output of the RNG should be
 //! considered pseudo-random only.
 //!
-//! For more information, please refer to the ESP-IDF documentation:  
-//! <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/random.html>
-//!
+//! For more information, please refer to the
+#![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", chip!(), "/api-reference/system/random.html)")]
 //! # Examples
 //!
 //! ## Initialization
