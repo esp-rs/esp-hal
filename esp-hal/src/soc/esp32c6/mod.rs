@@ -19,6 +19,14 @@ pub mod lp_core;
 pub mod peripherals;
 pub mod radio_clocks;
 
+macro_rules! chip {
+    () => {
+        "esp32c6"
+    };
+}
+
+pub(crate) use chip;
+
 #[allow(unused)]
 pub(crate) mod registers {
     pub const INTERRUPT_MAP_BASE: u32 = 0x60010000;

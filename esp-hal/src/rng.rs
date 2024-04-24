@@ -40,7 +40,7 @@
 //! considered pseudo-random only.
 //!
 //! For more information, please refer to the
-#![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", chip!(), "/api-reference/system/random.html)")]
+#![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/system/random.html)")]
 //! # Examples
 //!
 //! ## Initialization
