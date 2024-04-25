@@ -26,18 +26,21 @@ jobs:
       matrix:
         target:
           # RISC-V devices:
-          # - soc: esp32c3
-          #   rust-target: riscv32imc-unknown-none-elf
+          - soc: esp32c3
+            rust-target: riscv32imc-unknown-none-elf
           - soc: esp32c6
             rust-target: riscv32imac-unknown-none-elf
-          # - soc: esp32h2
-          #   rust-target: riscv32imac-unknown-none-elf
+          - soc: esp32h2
+            rust-target: riscv32imac-unknown-none-elf
           # # Xtensa devices:
-          # - soc: esp32s3
+          - soc: esp32s2
+            rust-target: xtensa-esp32s2-none-elf
+          - soc: esp32s3
+            rust-target: xtensa-esp32s3-none-elf
+
     steps:
       - uses: actions/checkout@v4
         if: github.event_name != 'workflow_dispatch'
-
       - uses: actions/checkout@v4
         if: github.event_name == 'workflow_dispatch'
         with:
@@ -59,7 +62,7 @@ jobs:
           default: true
           ldproxy: false
 
-      - name: Run tests
+      - name: Build tests
         run: cargo xtask build-tests ${{ matrix.target.soc }}
 
       - name: Prepare artifact
@@ -78,7 +81,6 @@ jobs:
             base_name="$(basename "$file" | cut -d'-' -f1)"
             mv "$file" "tests/$base_name"
           done
-
       - uses: actions/upload-artifact@v4
         with:
           name: tests-${{ matrix.target.soc }}
@@ -95,24 +97,44 @@ jobs:
       matrix:
         target:
           # RISC-V devices:
-          # - soc: esp32c3
-          #   runner: rustboard
+          - soc: esp32c3
+            runner: esp32c3-usb
           - soc: esp32c6
             runner: esp32c6-usb
-          # - soc: esp32h2
-          #   runner: esp32h2-usb
-          # # Xtensa devices:
-          # - soc: esp32s3
-          #   runner: esp32s3-usb
+          - soc: esp32h2
+            runner: esp32h2-usb
+          # Xtensa devices:
+          - soc: esp32s2
+            runner: esp32s2-jtag
+          - soc: esp32s3
+            runner: esp32s3-usb
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: tests-${{ matrix.target.soc }}
-          path: tests
-      - name: Run tests
+          path: test-suite
+
+      - name: Run Tests
         run: |
           export PATH=$PATH:/home/espressif/.cargo/bin
-          for file in "tests"/*; do
-            probe-rs run --chip ${{ matrix.target.soc }} "$file"
+          # Print the content in the 'tests' directory
+          ls -l test-suite
+
+          failed_tests=() # Initialize an empty array to hold failed tests
+          for test_file in "test-suite"/*; do
+            echo "Running test: $test_file"
+            if ! probe-rs run --chip ${{ matrix.target.soc }} "$test_file"; then
+              failed_tests+=("$test_file") # Add failed test to the array
+            fi
           done
 
+          # Report all failed tests at the end
+          if [ ${#failed_tests[@]} -gt 0 ]; then
+            echo "The following tests failed:"
+            for failed_test in "${failed_tests[@]}"; do
+              echo "- $failed_test"
+            done
+            exit 1 # Return a non-zero exit code to indicate failure
+          else
+            echo "All tests passed!"
+          fi
