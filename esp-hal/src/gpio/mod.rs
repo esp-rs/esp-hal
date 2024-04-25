@@ -1851,7 +1851,7 @@ impl Io {
         gpio.bind_gpio_interrupt(gpio_interrupt_handler);
         crate::interrupt::enable(crate::peripherals::Interrupt::GPIO, prio).unwrap();
 
-        let pins = gpio.split();
+        let pins = gpio.pins();
 
         Io {
             _io_mux: io_mux,
@@ -1906,20 +1906,13 @@ macro_rules! gpio {
             )
         )+
     ) => {
-        #[doc(hidden)]
-        pub trait GpioExt {
-            type Parts;
-            fn split(self) -> Self::Parts;
-        }
-
         paste::paste! {
-            impl GpioExt for GPIO {
-                type Parts = Pins;
-                fn split(self) -> Self::Parts {
+            impl GPIO {
+                pub(crate) fn pins(self) -> Pins {
                     Pins {
                         $(
                             [< gpio $gpionum >]: {
-                                 GpioPin::new()
+                                GpioPin::new()
                             },
                         )+
                     }

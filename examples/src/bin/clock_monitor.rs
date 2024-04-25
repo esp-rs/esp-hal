@@ -11,7 +11,13 @@ use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_backtrace as _;
-use esp_hal::{clock::ClockControl, peripherals::Peripherals, prelude::*, rtc_cntl::Rtc};
+use esp_hal::{
+    clock::ClockControl,
+    peripherals::Peripherals,
+    prelude::*,
+    rtc_cntl::Rtc,
+    system::SystemControl,
+};
 use esp_println::println;
 
 static RTC: Mutex<RefCell<Option<Rtc>>> = Mutex::new(RefCell::new(None));
@@ -19,7 +25,7 @@ static RTC: Mutex<RefCell<Option<Rtc>>> = Mutex::new(RefCell::new(None));
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc = Rtc::new(peripherals.LPWR, Some(interrupt_handler));

@@ -27,6 +27,7 @@ use esp_hal::{
     i2c::I2C,
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
     timer::TimerGroup,
 };
 use lis3dh_async::{Lis3dh, Range, SlaveAddr};
@@ -34,7 +35,7 @@ use lis3dh_async::{Lis3dh, Range, SlaveAddr};
 #[main]
 async fn main(_spawner: Spawner) {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);

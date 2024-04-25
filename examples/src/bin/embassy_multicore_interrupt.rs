@@ -24,6 +24,7 @@ use esp_hal::{
     interrupt::Priority,
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
     timer::TimerGroup,
 };
 use esp_println::println;
@@ -72,7 +73,7 @@ async fn enable_disable_led(control: &'static Signal<CriticalSectionRawMutex, bo
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);

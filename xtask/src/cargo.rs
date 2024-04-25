@@ -7,6 +7,12 @@ use std::{
 
 use anyhow::{bail, Result};
 
+#[derive(Debug, PartialEq)]
+pub enum CargoAction {
+    Build,
+    Run,
+}
+
 /// Execute cargo with the given arguments and from the specified directory.
 pub fn run(args: &[String], cwd: &Path) -> Result<()> {
     if !cwd.is_dir() {

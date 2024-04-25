@@ -17,6 +17,7 @@ use esp_hal::{
     embassy,
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
     timer::TimerGroup,
     usb_serial_jtag::{UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
     Async,
@@ -68,7 +69,7 @@ async fn reader(
 async fn main(spawner: Spawner) -> () {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     embassy::init(&clocks, TimerGroup::new_async(peripherals.TIMG0, &clocks));

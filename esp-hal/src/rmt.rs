@@ -1,41 +1,41 @@
 //! # Remote Control Peripheral (RMT)
 //!
 //! ## Overview
-//! Some ESP32 bitss include a remote control peripheral (RMT) that
-//! is designed to handle infrared remote control signals. For that
-//! purpose, it can convert bitstreams of data (from the RAM) into
-//! pulse codes and even modulate those codes into a carrier wave.
+//! The RMT (Remote Control Transceiver) peripheral was designed to act as an
+//! infrared transceiver. However, due to the flexibility of its data format,
+//! RMT can be extended to a versatile and general-purpose transceiver,
+//! transmitting or receiving many other types of signals.
 //!
-//! It can also convert received pulse codes (again, with carrier
-//! wave support) into data bits.
 //!
-//! A secondary use case for this peripheral is to drive RGB(W) LEDs
-//! that bear an internal IC and use a pulse code protocol.
+//! Typically, the RMT peripheral can be used in the following scenarios:
+//! - Transmit or receive infrared signals, with any IR protocols, e.g., NEC
+//! - General-purpose sequence generator
+//! - Transmit signals in a hardware-controlled loop, with a finite or infinite
+//!   number of times
+//! - Modulate the carrier to the output signal or demodulate the carrier from
+//!   the input signal
 //!
 //! ## Channels
-//! The RMT peripheral has the following channels available
-//! on individual chips:
-//!
-//! * The **ESP32** has 8 channels, each of them can be either receiver or
-//!   transmitter
-//! * The **ESP32-C3** has 4 channels, `Channel<0>` and `Channel<1>` hardcoded
-//!   for transmitting signals and `Channel<2>` and `Channel<3>` hardcoded for
-//!   receiving signals.
-//! * The **ESP32-C6** has 4 channels, `Channel<0>` and `Channel<1>` hardcoded
-//!   for transmitting signals and `Channel<2>` and `Channel<3>` hardcoded for
-//!   receiving signals.
-//! * The **ESP32-H2** has 4 channels, `Channel<0>` and `Channel<1>` hardcoded
-//!   for transmitting signals and `Channel<2>` and `Channel<3>` hardcoded for
-//!   receiving signals.
-//! * The **ESP32-S2** has 4 channels, each of them can be either receiver or
-//!   transmitter.
-//! * The **ESP32-S3** has 8 channels, `Channel<0>`-`Channel<3>` hardcoded for
-//!   transmitting signals and `Channel<4>`-`Channel<7>` hardcoded for receiving
-//!   signals.
-//!
-//! For more information, please refer to the ESP-IDF documentation:
-//! <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/rmt.html>
-//!
+//! There are
+#![cfg_attr(
+    esp32,
+    doc = "8 channels, each of them can be either receiver or transmitter"
+)]
+#![cfg_attr(
+    esp32s2,
+    doc = "4 channels, each of them can be either receiver or transmitter"
+)]
+#![cfg_attr(
+    esp32s3,
+    doc = "8 channels, `Channel<0>`-`Channel<3>` hardcoded for transmitting signals and `Channel<4>`-`Channel<7>` hardcoded for receiving signals"
+)]
+#![cfg_attr(
+    any(esp32c3, esp32c6, esp32h2),
+    doc = "4 channels, `Channel<0>` and `Channel<1>` hardcoded for transmitting signals and `Channel<2>` and `Channel<3>` hardcoded for receiving signals."
+)]
+#![doc = "  "]
+//! For more information, please refer to the
+#![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/peripherals/rmt.html)")]
 //! ## Examples
 //!
 //! ### Initialization
@@ -82,6 +82,7 @@
 //! let transaction = channel.transmit(&data);
 //! channel = transaction.wait().unwrap();
 //! ```
+#![warn(missing_docs)]
 
 use core::marker::PhantomData;
 
@@ -97,12 +98,17 @@ use crate::{
     system::PeripheralClockControl,
 };
 
+/// Errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
+    /// The desired frequency is impossible to reach
     UnreachableTargetFrequency,
+    /// The amount of pulses exceeds the size of the FIFO
     Overflow,
+    /// An argument is invalid
     InvalidArgument,
+    /// An error occurred during transmission
     TransmissionError,
 }
 
@@ -211,7 +217,7 @@ impl<'d, M> Rmt<'d, M>
 where
     M: crate::Mode,
 {
-    pub fn new_internal(
+    pub(crate) fn new_internal(
         peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
         frequency: HertzU32,
         _clocks: &Clocks,
@@ -295,6 +301,7 @@ impl<'d> Rmt<'d, crate::Async> {
     }
 }
 
+/// Creates a TX channel
 pub trait TxChannelCreator<'d, T, P>
 where
     P: OutputPin,
@@ -325,6 +332,7 @@ where
     }
 }
 
+/// Creates a TX channel in async mode
 #[cfg(feature = "async")]
 pub trait TxChannelCreatorAsync<'d, T, P>
 where
@@ -356,6 +364,7 @@ where
     }
 }
 
+/// Creates a RX channel
 pub trait RxChannelCreator<'d, T, P>
 where
     P: InputPin,
@@ -401,6 +410,7 @@ where
     }
 }
 
+/// Creates a RX channel in async mode
 #[cfg(feature = "async")]
 pub trait RxChannelCreatorAsync<'d, T, P>
 where
@@ -573,6 +583,7 @@ where
         Ok(self.channel)
     }
 
+    /// Check if the `loopcount` interrupt bit is set
     pub fn is_loopcount_interrupt_set(&self) -> bool {
         <C as private::TxChannelInternal<crate::Blocking>>::is_loopcount_interrupt_set()
     }
@@ -634,6 +645,7 @@ mod impl_for_chip {
     use crate::peripheral::{Peripheral, PeripheralRef};
 
     /// RMT Instance
+    #[allow(missing_docs)]
     pub struct Rmt<'d, M>
     where
         M: crate::Mode,
@@ -700,6 +712,7 @@ mod impl_for_chip {
     use crate::peripheral::{Peripheral, PeripheralRef};
 
     /// RMT Instance
+    #[allow(missing_docs)]
     pub struct Rmt<'d, M>
     where
         M: crate::Mode,
@@ -806,6 +819,7 @@ mod impl_for_chip {
     use crate::peripheral::{Peripheral, PeripheralRef};
 
     /// RMT Instance
+    #[allow(missing_docs)]
     pub struct Rmt<'d, M>
     where
         M: crate::Mode,
@@ -880,6 +894,7 @@ mod impl_for_chip {
     use crate::peripheral::{Peripheral, PeripheralRef};
 
     /// RMT Instance
+    #[allow(missing_docs)]
     pub struct Rmt<'d, M>
     where
         M: crate::Mode,
@@ -972,6 +987,7 @@ where
     phantom: PhantomData<M>,
 }
 
+/// Channel in TX mode
 pub trait TxChannel: private::TxChannelInternal<crate::Blocking> {
     /// Start transmitting the given pulse code sequence.
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
@@ -1064,6 +1080,7 @@ where
     }
 }
 
+/// Channel is RX mode
 pub trait RxChannel: private::RxChannelInternal<crate::Blocking> {
     /// Start receiving pulse codes into the given buffer.
     /// This returns a [RxTransaction] which can be used to wait for receive to
@@ -1086,6 +1103,7 @@ pub trait RxChannel: private::RxChannelInternal<crate::Blocking> {
     }
 }
 
+/// Async functionality
 #[cfg(feature = "async")]
 pub mod asynch {
     use core::{
@@ -1141,6 +1159,7 @@ pub mod asynch {
         }
     }
 
+    /// TX channel in async mode
     pub trait TxChannelAsync: private::TxChannelInternal<crate::Async> {
         /// Start transmitting the given pulse code sequence.
         /// The length of sequence cannot exceed the size of the allocated RMT
@@ -1202,6 +1221,7 @@ pub mod asynch {
         }
     }
 
+    /// RX channel in async mode
     pub trait RxChannelAsync: private::RxChannelInternal<crate::Async> {
         /// Start receiving a pulse code sequence.
         /// The length of sequence cannot exceed the size of the allocated RMT

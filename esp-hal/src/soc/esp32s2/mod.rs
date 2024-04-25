@@ -23,6 +23,14 @@ pub mod radio_clocks;
 
 pub mod ulp_core;
 
+macro_rules! chip {
+    () => {
+        "esp32s2"
+    };
+}
+
+pub(crate) use chip;
+
 pub(crate) mod constants {
     pub const I2S_SCLK: u32 = 160_000_000;
     pub const I2S_DEFAULT_CLK_SRC: u32 = 2;
