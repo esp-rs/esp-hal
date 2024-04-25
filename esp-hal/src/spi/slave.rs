@@ -186,14 +186,6 @@ pub mod dma {
         ) -> SpiDma<'d, crate::peripherals::SPI2, C, DmaMode> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
-            #[cfg(esp32)]
-            match self.data_mode {
-                SpiMode::Mode0 | SpiMode::Mode2 => {
-                    self.spi.invert_i_edge();
-                }
-                _ => {}
-            }
-
             SpiDma {
                 spi: self.spi,
                 channel,
@@ -214,14 +206,6 @@ pub mod dma {
             mut channel: Channel<'d, C, DmaMode>,
         ) -> SpiDma<'d, crate::peripherals::SPI3, C, DmaMode> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
-
-            #[cfg(esp32)]
-            match self.data_mode {
-                SpiMode::Mode0 | SpiMode::Mode2 => {
-                    self.spi.invert_i_edge();
-                }
-                _ => {}
-            }
 
             SpiDma {
                 spi: self.spi,
@@ -423,20 +407,25 @@ where
         self.enable_dma();
 
         reset_dma_before_load_dma_dscr(reg_block);
-        tx.prepare_transfer_without_start(
-            self.dma_peripheral(),
-            false,
-            write_buffer_ptr,
-            write_buffer_len,
-        )?;
+
         rx.prepare_transfer_without_start(
             false,
             self.dma_peripheral(),
             read_buffer_ptr,
             read_buffer_len,
         )?;
+        #[cfg(any(esp32, esp32s2))]
+        rx.start_transfer()?;
 
-        self.clear_dma_interrupts();
+        tx.prepare_transfer_without_start(
+            self.dma_peripheral(),
+            false,
+            write_buffer_ptr,
+            write_buffer_len,
+        )?;
+        #[cfg(any(esp32, esp32s2))]
+        tx.start_transfer()?;
+
         reset_dma_before_usr_cmd(reg_block);
 
         // On the esp32, all full-duplex transfers are single, and all half-duplex
@@ -447,8 +436,31 @@ where
             .dma_conf()
             .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
 
-        tx.start_transfer()?;
-        Ok(rx.start_transfer()?)
+        #[cfg(esp32)]
+        {
+            reg_block
+                .slv_rdbuf_dlen()
+                .write(|w| w.slv_rdbuf_dbitlen().bits((read_buffer_len * 8 - 1) as u32));
+            reg_block.slv_wrbuf_dlen().write(|w| {
+                w.slv_wrbuf_dbitlen()
+                    .bits((write_buffer_len * 8 - 1) as u32)
+            });
+
+            reg_block.user().modify(|_, w| w.usr_mosi().set_bit());
+            reg_block.user().modify(|_, w| w.usr_miso().set_bit());
+        }
+
+        self.clear_dma_interrupts();
+        self.setup_for_flush();
+        reg_block.cmd().modify(|_, w| w.usr().set_bit());
+
+        #[cfg(not(any(esp32, esp32s2)))]
+        {
+            rx.start_transfer()?;
+            tx.start_transfer()?;
+        }
+
+        Ok(())
     }
 
     fn start_write_bytes_dma(
@@ -464,9 +476,11 @@ where
         self.enable_dma();
 
         reset_dma_before_load_dma_dscr(reg_block);
-        tx.prepare_transfer_without_start(self.dma_peripheral(), false, ptr, len)?;
 
-        self.clear_dma_interrupts();
+        tx.prepare_transfer_without_start(self.dma_peripheral(), false, ptr, len)?;
+        #[cfg(any(esp32, esp32s2))]
+        tx.start_transfer()?;
+
         reset_dma_before_usr_cmd(reg_block);
 
         // On the esp32, all full-duplex transfers are single, and all half-duplex
@@ -477,7 +491,25 @@ where
             .dma_conf()
             .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
 
-        Ok(tx.start_transfer()?)
+        #[cfg(esp32)]
+        {
+            reg_block
+                .slv_rdbuf_dlen()
+                .write(|w| unsafe { w.slv_rdbuf_dbitlen().bits((len * 8 - 1) as u32) });
+
+            reg_block.user().modify(|_, w| w.usr_mosi().set_bit());
+        }
+
+        self.clear_dma_interrupts();
+        self.setup_for_flush();
+        reg_block.cmd().modify(|_, w| w.usr().set_bit());
+
+        #[cfg(not(any(esp32, esp32s2)))]
+        {
+            tx.start_transfer()?;
+        }
+
+        Ok(())
     }
 
     unsafe fn start_read_bytes_dma(
@@ -493,11 +525,10 @@ where
         self.enable_dma();
 
         reset_dma_before_load_dma_dscr(reg_block);
-        unsafe {
-            rx.prepare_transfer_without_start(false, self.dma_peripheral(), ptr, len)?;
-        }
+        rx.prepare_transfer_without_start(false, self.dma_peripheral(), ptr, len)?;
+        #[cfg(any(esp32, esp32s2))]
+        rx.start_transfer()?;
 
-        self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
 
         // On the esp32, all full-duplex transfers are single, and all half-duplex
@@ -508,7 +539,29 @@ where
             .dma_conf()
             .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
 
-        Ok(rx.start_transfer()?)
+        #[cfg(esp32)]
+        {
+            reg_block
+                .slv_rdbuf_dlen()
+                .write(|w| unsafe { w.slv_rdbuf_dbitlen().bits((len * 8 - 1) as u32) });
+
+            reg_block
+                .slv_wrbuf_dlen()
+                .write(|w| w.slv_wrbuf_dbitlen().bits((len * 8 - 1) as u32));
+
+            reg_block.user().modify(|_, w| w.usr_miso().set_bit());
+        }
+
+        self.clear_dma_interrupts();
+        self.setup_for_flush();
+        reg_block.cmd().modify(|_, w| w.usr().set_bit());
+
+        #[cfg(not(any(esp32, esp32s2)))]
+        {
+            rx.start_transfer()?;
+        }
+
+        Ok(())
     }
 
     fn dma_peripheral(&self) -> DmaPeripheral {
@@ -558,7 +611,7 @@ where
     #[cfg(any(esp32, esp32s2))]
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
-        reg_block.dma_int_clr.write(|w| {
+        reg_block.dma_int_clr().write(|w| {
             w.inlink_dscr_empty()
                 .clear_bit_by_one()
                 .outlink_dscr_error()
@@ -593,15 +646,24 @@ fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
     });
 }
 
-#[cfg(any(esp32, esp32s2))]
-fn reset_dma_before_usr_cmd(_reg_block: &RegisterBlock) {}
+#[cfg(any(esp32))]
+fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
+    reg_block.slave().modify(|_, w| w.sync_reset().set_bit());
+    reg_block.slave().modify(|_, w| w.sync_reset().clear_bit());
+}
+
+#[cfg(any(esp32s2))]
+fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
+    reg_block.slave().modify(|_, w| w.soft_reset().set_bit());
+    reg_block.slave().modify(|_, w| w.soft_reset().clear_bit());
+}
 
 #[cfg(not(any(esp32, esp32s2)))]
 fn reset_dma_before_load_dma_dscr(_reg_block: &RegisterBlock) {}
 
 #[cfg(any(esp32, esp32s2))]
 fn reset_dma_before_load_dma_dscr(reg_block: &RegisterBlock) {
-    reg_block.dma_conf.modify(|_, w| {
+    reg_block.dma_conf().modify(|_, w| {
         w.out_rst()
             .set_bit()
             .in_rst()
@@ -611,6 +673,27 @@ fn reset_dma_before_load_dma_dscr(reg_block: &RegisterBlock) {
             .ahbm_rst()
             .set_bit()
     });
+
+    #[cfg(esp32s2)]
+    reg_block
+        .dma_conf()
+        .modify(|_, w| w.dma_infifo_full_clr().set_bit());
+
+    reg_block.dma_conf().modify(|_, w| {
+        w.out_rst()
+            .clear_bit()
+            .in_rst()
+            .clear_bit()
+            .ahbm_fifo_rst()
+            .clear_bit()
+            .ahbm_rst()
+            .clear_bit()
+    });
+
+    #[cfg(esp32s2)]
+    reg_block
+        .dma_conf()
+        .modify(|_, w| w.dma_infifo_full_clr().clear_bit());
 }
 
 impl<TX, RX> InstanceDma<TX, RX> for crate::peripherals::SPI2
@@ -647,6 +730,11 @@ pub trait Instance: private::Sealed {
     /// Initialize for full-duplex 1 bit mode
     fn init(&mut self) {
         let reg_block = self.register_block();
+
+        reg_block.clock().write(|w| unsafe { w.bits(0) });
+        reg_block.user().write(|w| unsafe { w.bits(0) });
+        reg_block.ctrl().write(|w| unsafe { w.bits(0) });
+
         reg_block.slave().write(|w| w.mode().set_bit());
 
         reg_block.user().modify(|_, w| {
@@ -655,14 +743,16 @@ pub trait Instance: private::Sealed {
                 .doutdin()
                 .set_bit()
                 .usr_miso()
-                .set_bit()
+                .clear_bit()
                 .usr_mosi()
-                .set_bit()
+                .clear_bit()
                 .usr_dummy_idle()
                 .clear_bit()
                 .usr_addr()
                 .clear_bit()
                 .usr_command()
+                .clear_bit()
+                .sio()
                 .clear_bit()
         });
 
@@ -708,7 +798,7 @@ pub trait Instance: private::Sealed {
                     .user()
                     .modify(|_, w| w.tsck_i_edge().clear_bit().rsck_i_edge().clear_bit());
                 #[cfg(esp32s2)]
-                reg_block.ctrl1.modify(|_, w| w.clk_mode_13().clear_bit());
+                reg_block.ctrl1().modify(|_, w| w.clk_mode_13().clear_bit());
                 #[cfg(not(esp32s2))]
                 reg_block.slave().modify(|_, w| w.clk_mode_13().clear_bit());
             }
@@ -746,40 +836,77 @@ pub trait Instance: private::Sealed {
     #[cfg(esp32)]
     fn set_data_mode(&mut self, data_mode: SpiMode) -> &mut Self {
         let reg_block = self.register_block();
-
         match data_mode {
             SpiMode::Mode0 => {
-                reg_block.pin.modify(|_, w| w.ck_idle_edge().set_bit());
-                reg_block.user.modify(|_, w| w.ck_i_edge().clear_bit());
+                reg_block.pin().modify(|_, w| w.ck_idle_edge().clear_bit());
+                reg_block.user().modify(|_, w| w.ck_i_edge().set_bit());
+                reg_block.ctrl2().modify(|_, w| unsafe {
+                    w.miso_delay_mode().bits(0);
+                    w.miso_delay_num().bits(0);
+                    w.mosi_delay_mode().bits(2);
+                    w.mosi_delay_num().bits(2)
+                });
             }
             SpiMode::Mode1 => {
-                reg_block.pin.modify(|_, w| w.ck_idle_edge().set_bit());
-                reg_block.user.modify(|_, w| w.ck_i_edge().set_bit());
+                reg_block.pin().modify(|_, w| w.ck_idle_edge().set_bit());
+                reg_block.user().modify(|_, w| w.ck_i_edge().set_bit());
+                reg_block.ctrl2().modify(|_, w| unsafe {
+                    w.miso_delay_mode().bits(2);
+                    w.miso_delay_num().bits(0);
+                    w.mosi_delay_mode().bits(0);
+                    w.mosi_delay_num().bits(0)
+                });
             }
             SpiMode::Mode2 => {
-                reg_block.pin.modify(|_, w| w.ck_idle_edge().clear_bit());
-                reg_block.user.modify(|_, w| w.ck_i_edge().set_bit());
+                reg_block.pin().modify(|_, w| w.ck_idle_edge().clear_bit());
+                reg_block.user().modify(|_, w| w.ck_i_edge().set_bit());
+                reg_block.ctrl2().modify(|_, w| unsafe {
+                    w.miso_delay_mode().bits(0);
+                    w.miso_delay_num().bits(0);
+                    w.mosi_delay_mode().bits(1);
+                    w.mosi_delay_num().bits(2)
+                });
             }
             SpiMode::Mode3 => {
-                reg_block.pin.modify(|_, w| w.ck_idle_edge().clear_bit());
-                reg_block.user.modify(|_, w| w.ck_i_edge().clear_bit());
+                reg_block.pin().modify(|_, w| w.ck_idle_edge().clear_bit());
+                reg_block.user().modify(|_, w| w.ck_i_edge().clear_bit());
+                reg_block.ctrl2().modify(|_, w| unsafe {
+                    w.miso_delay_mode().bits(1);
+                    w.miso_delay_num().bits(0);
+                    w.mosi_delay_mode().bits(0);
+                    w.mosi_delay_num().bits(0)
+                });
             }
         }
+
+        // Silicon issues exists in mode 0 and 2 with DMA, change clock phase to
+        // avoid dma issue. This will cause slave output to appear at most half a
+        // spi clock before
+        match data_mode {
+            SpiMode::Mode0 => {
+                reg_block.pin().modify(|_, w| w.ck_idle_edge().clear_bit());
+                reg_block.user().modify(|_, w| w.ck_i_edge().set_bit());
+                reg_block.ctrl2().modify(|_, w| unsafe {
+                    w.miso_delay_mode().bits(0);
+                    w.miso_delay_num().bits(2);
+                    w.mosi_delay_mode().bits(0);
+                    w.mosi_delay_num().bits(3)
+                });
+            }
+            SpiMode::Mode2 => {
+                reg_block.pin().modify(|_, w| w.ck_idle_edge().set_bit());
+                reg_block.user().modify(|_, w| w.ck_i_edge().clear_bit());
+                reg_block.ctrl2().modify(|_, w| unsafe {
+                    w.miso_delay_mode().bits(0);
+                    w.miso_delay_num().bits(2);
+                    w.mosi_delay_mode().bits(0);
+                    w.mosi_delay_num().bits(3)
+                });
+            }
+            _ => (),
+        }
+
         self
-    }
-
-    // The ESP32 needs its _edge bits inverted in DMA slave mode, when in mode 0 or
-    // 2. set_data_mode above sets the registers up for non-DMA mode.
-    #[cfg(esp32)]
-    fn invert_i_edge(&self) {
-        let reg_block = self.register_block();
-
-        reg_block
-            .pin
-            .modify(|r, w| w.ck_idle_edge().variant(r.ck_idle_edge().bit_is_clear()));
-        reg_block
-            .user
-            .modify(|r, w| w.ck_i_edge().variant(r.ck_i_edge().bit_is_clear()));
     }
 
     fn is_bus_busy(&self) -> bool {
@@ -787,7 +914,7 @@ pub trait Instance: private::Sealed {
 
         #[cfg(any(esp32, esp32s2))]
         {
-            reg_block.slave.read().trans_done().bit_is_clear()
+            reg_block.slave().read().trans_done().bit_is_clear()
         }
         #[cfg(not(any(esp32, esp32s2)))]
         {
