@@ -653,8 +653,8 @@ mod asynch {
             I: Iterator<Item = &'a COMD>,
         {
             // Reset FIFO and command list
-            self.reset_fifo();
-            self.reset_command_list();
+            self.peripheral.reset_fifo();
+            self.peripheral.reset_command_list();
             if start {
                 add_cmd(cmd_iterator, Command::Start)?;
             }
@@ -684,8 +684,8 @@ mod asynch {
             I: Iterator<Item = &'a COMD>,
         {
             // Reset FIFO and command list
-            self.reset_fifo();
-            self.reset_command_list();
+            self.peripheral.reset_fifo();
+            self.peripheral.reset_command_list();
             if start {
                 add_cmd(cmd_iterator, Command::Start)?;
             }
