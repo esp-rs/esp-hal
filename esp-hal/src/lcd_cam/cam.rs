@@ -283,12 +283,14 @@ impl<'d, RX: Rx> Camera<'d, RX> {
 
         assert_eq!(self.bus_width, size_of::<RXBUF::Word>());
 
-        self.rx_channel.prepare_transfer_without_start(
-            circular,
-            DmaPeripheral::LcdCam,
-            ptr as _,
-            len * size_of::<RXBUF::Word>(),
-        )?;
+        unsafe {
+            self.rx_channel.prepare_transfer_without_start(
+                circular,
+                DmaPeripheral::LcdCam,
+                ptr as _,
+                len * size_of::<RXBUF::Word>(),
+            )?;
+        }
         self.rx_channel.start_transfer()
     }
 
