@@ -106,22 +106,40 @@ mod tests {
         // working as expected. We will also using different clock sources
         // while we're at it.
 
-        // 9600 baud, RC FAST clock source:
-        ctx.uart.change_baud(9600, ClockSource::RcFast, &ctx.clocks);
-        ctx.uart.write(7).ok();
-        let read = block!(ctx.uart.read());
-        assert_eq!(read, Ok(7));
+        #[cfg(not(feature = "esp32s2"))]
+        {
+            // 9600 baud, RC FAST clock source:
+            ctx.uart.change_baud(9600, ClockSource::RcFast, &ctx.clocks);
+            ctx.uart.write(7).ok();
+            let read = block!(ctx.uart.read());
+            assert_eq!(read, Ok(7));
 
-        // 19,200 baud, XTAL clock source:
-        ctx.uart.change_baud(19_200, ClockSource::Xtal, &ctx.clocks);
-        ctx.uart.write(55).ok();
-        let read = block!(ctx.uart.read());
-        assert_eq!(read, Ok(55));
+            // 19,200 baud, XTAL clock source:
+            ctx.uart.change_baud(19_200, ClockSource::Xtal, &ctx.clocks);
+            ctx.uart.write(55).ok();
+            let read = block!(ctx.uart.read());
+            assert_eq!(read, Ok(55));
 
-        // 921,600 baud, APB clock source:
-        ctx.uart.change_baud(921_600, ClockSource::Apb, &ctx.clocks);
-        ctx.uart.write(253).ok();
-        let read = block!(ctx.uart.read());
-        assert_eq!(read, Ok(253));
+            // 921,600 baud, APB clock source:
+            ctx.uart.change_baud(921_600, ClockSource::Apb, &ctx.clocks);
+            ctx.uart.write(253).ok();
+            let read = block!(ctx.uart.read());
+            assert_eq!(read, Ok(253));
+        }
+        #[cfg(feature = "esp32s2")]
+        {
+            // 9600 baud, REF TICK clock source:
+            ctx.uart
+                .change_baud(9600, ClockSource::RefTick, &ctx.clocks);
+            ctx.uart.write(7).ok();
+            let read = block!(ctx.uart.read());
+            assert_eq!(read, Ok(7));
+
+            // 921,600 baud, APB clock source:
+            ctx.uart.change_baud(921_600, ClockSource::Apb, &ctx.clocks);
+            ctx.uart.write(253).ok();
+            let read = block!(ctx.uart.read());
+            assert_eq!(read, Ok(253));
+        }
     }
 }
