@@ -38,9 +38,9 @@ use esp_hal::{
     },
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
     Blocking,
 };
-use esp_hal::system::SystemControl;
 use esp_println::println;
 
 #[entry]
