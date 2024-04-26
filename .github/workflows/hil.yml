@@ -86,6 +86,7 @@ jobs:
           name: tests-${{ matrix.target.soc }}
           path: /home/runner/work/esp-hal/esp-hal/tests
           if-no-files-found: error
+          overwrite: true
 
   hil:
     name: HIL Test | ${{ matrix.target.soc }}
