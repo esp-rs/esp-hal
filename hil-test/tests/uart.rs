@@ -13,17 +13,18 @@ use defmt_rtt as _;
 use embedded_hal_02::serial::{Read, Write};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
+    clock::{ClockControl, Clocks},
     gpio::Io,
     peripherals::{Peripherals, UART0},
     prelude::*,
     system::SystemControl,
-    uart::{config::Config, TxRxPins, Uart},
+    uart::{config::Config, ClockSource, TxRxPins, Uart},
     Blocking,
 };
 use nb::block;
 
 struct Context {
+    clocks: Clocks<'static>,
     uart: Uart<'static, UART0, Blocking>,
 }
 
@@ -32,6 +33,7 @@ impl Context {
         let peripherals = Peripherals::take();
         let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let pins = TxRxPins::new_tx_rx(
             io.pins.gpio2.into_push_pull_output(),
@@ -46,7 +48,7 @@ impl Context {
             None,
         );
 
-        Context { uart }
+        Context { clocks, uart }
     }
 }
 
@@ -68,5 +70,58 @@ mod tests {
         ctx.uart.write(0x42).ok();
         let read = block!(ctx.uart.read());
         assert_eq!(read, Ok(0x42));
+    }
+
+    #[test]
+    #[timeout(3)]
+    fn test_send_receive_buffer(mut ctx: Context) {
+        const BUF_SIZE: usize = 128; // UART_FIFO_SIZE
+
+        let data = [13; BUF_SIZE];
+        let written = ctx.uart.write_bytes(&data).unwrap();
+        assert_eq!(written, BUF_SIZE);
+
+        let mut buffer = [0; BUF_SIZE];
+        let mut i = 0;
+
+        while i < BUF_SIZE {
+            match ctx.uart.read() {
+                Ok(byte) => {
+                    buffer[i] = byte;
+                    i += 1;
+                }
+                Err(nb::Error::WouldBlock) => continue,
+                Err(nb::Error::Other(_)) => panic!(),
+            }
+        }
+
+        assert_eq!(data, buffer);
+    }
+
+    #[test]
+    #[timeout(3)]
+    fn test_send_receive_different_baud_rates_and_clock_sources(mut ctx: Context) {
+        // The default baud rate for the UART is 115,200, so we will try to
+        // send/receive with some other common baud rates to ensure this is
+        // working as expected. We will also using different clock sources
+        // while we're at it.
+
+        // 9600 baud, RC FAST clock source:
+        ctx.uart.change_baud(9600, ClockSource::RcFast, &ctx.clocks);
+        ctx.uart.write(7).ok();
+        let read = block!(ctx.uart.read());
+        assert_eq!(read, Ok(7));
+
+        // 19,200 baud, XTAL clock source:
+        ctx.uart.change_baud(19_200, ClockSource::Xtal, &ctx.clocks);
+        ctx.uart.write(55).ok();
+        let read = block!(ctx.uart.read());
+        assert_eq!(read, Ok(55));
+
+        // 921,600 baud, APB clock source:
+        ctx.uart.change_baud(921_600, ClockSource::Apb, &ctx.clocks);
+        ctx.uart.write(253).ok();
+        let read = block!(ctx.uart.read());
+        assert_eq!(read, Ok(253));
     }
 }
