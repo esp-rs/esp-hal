@@ -39,9 +39,8 @@
 //! If none of the above conditions are true, the output of the RNG should be
 //! considered pseudo-random only.
 //!
-//! For more information, please refer to the ESP-IDF documentation:  
-//! <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/random.html>
-//!
+//! For more information, please refer to the
+#![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/system/random.html)")]
 //! # Examples
 //!
 //! ## Initialization
@@ -76,8 +75,6 @@ pub struct Rng {
 impl Rng {
     /// Create a new random number generator instance
     pub fn new(_rng: impl Peripheral<P = RNG>) -> Self {
-        crate::soc::trng::ensure_randomness();
-
         Self {
             _phantom: PhantomData,
         }
@@ -142,5 +139,3 @@ impl rand_core::RngCore for Rng {
         Ok(())
     }
 }
-
-impl rand_core::CryptoRng for Rng {}

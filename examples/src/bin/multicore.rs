@@ -18,6 +18,7 @@ use esp_hal::{
     delay::Delay,
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
 };
 use esp_println::println;
 
@@ -26,14 +27,14 @@ static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let delay = Delay::new(&clocks);
 
     let counter = Mutex::new(RefCell::new(0u32));
 
-    let mut cpu_control = CpuControl::new(system.cpu_control);
+    let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
     let _guard = cpu_control
         .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, || {
             println!("Hello World - Core 1!");

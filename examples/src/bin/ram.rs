@@ -24,6 +24,7 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     rtc_cntl::Rtc,
+    system::SystemControl,
 };
 use esp_println::println;
 
@@ -39,7 +40,7 @@ static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let delay = Delay::new(&clocks);

@@ -9,7 +9,7 @@
 //! ## Example
 //!
 //! ```rust
-//! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let sclk = io.pins.gpio12;
 //! let miso = io.pins.gpio11;
 //! let mosi = io.pins.gpio13;
@@ -460,9 +460,11 @@ pub mod dma {
                 return Err(Error::MaxDmaTransferSizeExceeded);
             }
 
-            self.spi
-                .start_read_bytes_dma(ptr, len, &mut self.channel.rx)
-                .map(move |_| SpiDmaTransferRx { spi_dma: self })
+            unsafe {
+                self.spi
+                    .start_read_bytes_dma(ptr, len, &mut self.channel.rx)
+                    .map(move |_| SpiDmaTransferRx { spi_dma: self })
+            }
         }
 
         /// Register buffers for a DMA transfer.
@@ -489,26 +491,29 @@ pub mod dma {
                 return Err(Error::MaxDmaTransferSizeExceeded);
             }
 
-            self.spi
-                .start_transfer_dma(
-                    write_ptr,
-                    write_len,
-                    read_ptr,
-                    read_len,
-                    &mut self.channel.tx,
-                    &mut self.channel.rx,
-                )
-                .map(move |_| SpiDmaTransferRxTx { spi_dma: self })
+            unsafe {
+                self.spi
+                    .start_transfer_dma(
+                        write_ptr,
+                        write_len,
+                        read_ptr,
+                        read_len,
+                        &mut self.channel.tx,
+                        &mut self.channel.rx,
+                    )
+                    .map(move |_| SpiDmaTransferRxTx { spi_dma: self })
+            }
         }
     }
 }
 
+#[doc(hidden)]
 pub trait InstanceDma<TX, RX>: Instance
 where
     TX: Tx,
     RX: Rx,
 {
-    fn start_transfer_dma(
+    unsafe fn start_transfer_dma(
         &mut self,
         write_buffer_ptr: *const u8,
         write_buffer_len: usize,
@@ -582,7 +587,12 @@ where
         Ok(tx.start_transfer()?)
     }
 
-    fn start_read_bytes_dma(&mut self, ptr: *mut u8, len: usize, rx: &mut RX) -> Result<(), Error> {
+    unsafe fn start_read_bytes_dma(
+        &mut self,
+        ptr: *mut u8,
+        len: usize,
+        rx: &mut RX,
+    ) -> Result<(), Error> {
         let reg_block = self.register_block();
 
         rx.is_done();
@@ -590,7 +600,9 @@ where
         self.enable_dma();
 
         reset_dma_before_load_dma_dscr(reg_block);
-        rx.prepare_transfer_without_start(false, self.dma_peripheral(), ptr, len)?;
+        unsafe {
+            rx.prepare_transfer_without_start(false, self.dma_peripheral(), ptr, len)?;
+        }
 
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
@@ -723,6 +735,7 @@ where
 {
 }
 
+#[doc(hidden)]
 pub trait Instance: crate::private::Sealed {
     fn register_block(&self) -> &RegisterBlock;
 

@@ -17,7 +17,14 @@ pub mod peripherals;
 #[cfg(psram)]
 pub mod psram;
 pub mod radio_clocks;
-pub mod trng;
+
+macro_rules! chip {
+    () => {
+        "esp32"
+    };
+}
+
+pub(crate) use chip;
 
 pub(crate) mod constants {
     pub const I2S_SCLK: u32 = 160_000_000;
@@ -78,6 +85,7 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
     }
 
     crate::interrupt::setup_interrupts();
+    crate::time::time_init();
 
     // continue with default reset handler
     xtensa_lx_rt::Reset();

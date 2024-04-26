@@ -17,10 +17,11 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::IO,
+    gpio::Io,
     peripherals::Peripherals,
     prelude::*,
     rmt::Rmt,
+    system::SystemControl,
 };
 use esp_hal_smartled::{smartLedBuffer, SmartLedsAdapter};
 use smart_leds::{
@@ -33,10 +34,10 @@ use smart_leds::{
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // Each devkit uses a unique GPIO for the RGB LED, so in order to support
     // all chips we must unfortunately use `#[cfg]`s:

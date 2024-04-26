@@ -15,7 +15,7 @@
 //!
 //! # Example
 //! ```no_run
-//! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // configure GPIO 1 as ULP output pin
 //! let lp_pin = io.pins.gpio1.into_low_power().into_push_pull_output();
 //! ```

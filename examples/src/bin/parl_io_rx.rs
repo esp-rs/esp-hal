@@ -14,20 +14,21 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::IO,
+    gpio::Io,
     parl_io::{BitPackOrder, NoClkPin, ParlIoRxOnly, RxFourBits},
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let (_, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(0, 32000);
 

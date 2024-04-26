@@ -19,7 +19,7 @@
 //! specified.
 //!
 //! ```no_run
-//! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let pins = TxRxPins::new_tx_rx(
 //!     io.pins.gpio1.into_push_pull_output(),
 //!     io.pins.gpio2.into_floating_input(),
@@ -465,12 +465,8 @@ where
     }
 
     fn read_byte(&mut self) -> nb::Result<u8, Error> {
-        #[allow(unused_variables)]
-        let offset = 0;
-
-        // on ESP32-S2 we need to use PeriBus2 to read the FIFO
-        #[cfg(esp32s2)]
-        let offset = 0x20c00000;
+        // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
+        let offset = if cfg!(esp32s2) { 0x20C00000 } else { 0 };
 
         if T::get_rx_fifo_count() > 0 {
             let value = unsafe {
@@ -488,12 +484,8 @@ where
     /// Read all available bytes from the RX FIFO into the provided buffer and
     /// returns the number of read bytes. Never blocks
     pub fn drain_fifo(&mut self, buf: &mut [u8]) -> usize {
-        #[allow(unused_variables)]
-        let offset = 0;
-
-        // on ESP32-S2 we need to use PeriBus2 to read the FIFO
-        #[cfg(esp32s2)]
-        let offset = 0x20c00000;
+        // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
+        let offset = if cfg!(esp32s2) { 0x20C00000 } else { 0 };
 
         let mut count = 0;
         while T::get_rx_fifo_count() > 0 && count < buf.len() {
@@ -982,7 +974,11 @@ where
                         .uart1_sclk_div_num()
                         .bits(clk_div as u8 - 1)
                         .uart1_sclk_sel()
-                        .bits(0x3) // TODO: this probably shouldn't be hard-coded
+                        .bits(match clock_source {
+                            ClockSource::Apb => 1,
+                            ClockSource::RcFast => 2,
+                            ClockSource::Xtal => 3,
+                        })
                         .uart1_sclk_en()
                         .set_bit()
                 });

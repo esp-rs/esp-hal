@@ -13,26 +13,22 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    gpio::{lp_io::IntoLowPowerPin, IO},
+    gpio::{lp_io::IntoLowPowerPin, Io},
     lp_core::{LpCore, LpCoreWakeupSource},
     peripherals::Peripherals,
     prelude::*,
-    uart::{
-        config::{Config, DataBits, Parity, StopBits},
-        lp_uart::LpUart,
-        TxRxPins,
-        Uart,
-    },
+    system::SystemControl,
+    uart::{config::Config, lp_uart::LpUart, TxRxPins, Uart},
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // Set up (HP) UART1:
 

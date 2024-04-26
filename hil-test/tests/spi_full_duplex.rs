@@ -16,10 +16,11 @@ use embedded_hal::spi::SpiBus;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    gpio::IO,
+    gpio::Io,
     peripherals::Peripherals,
     prelude::*,
     spi::{master::Spi, FullDuplexMode, SpiMode},
+    system::SystemControl,
 };
 
 struct Context {
@@ -29,10 +30,10 @@ struct Context {
 impl Context {
     pub fn init() -> Self {
         let peripherals = Peripherals::take();
-        let system = peripherals.SYSTEM.split();
+        let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-        let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
         let miso = io.pins.gpio2;
         let mosi = io.pins.gpio4;

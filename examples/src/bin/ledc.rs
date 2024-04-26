@@ -11,28 +11,29 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    gpio::IO,
+    gpio::Io,
     ledc::{
         channel::{self, ChannelIFace},
         timer::{self, TimerIFace},
         LSGlobalClkSource,
+        Ledc,
         LowSpeed,
-        LEDC,
     },
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
 };
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let led = io.pins.gpio0.into_push_pull_output();
 
-    let mut ledc = LEDC::new(peripherals.LEDC, &clocks);
+    let mut ledc = Ledc::new(peripherals.LEDC, &clocks);
 
     ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
 

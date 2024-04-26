@@ -49,6 +49,7 @@ pub enum ChipType {
     Esp32D2wdq5,
     Esp32Picod2,
     Esp32Picod4,
+    Esp32Picov302,
     Unknown,
 }
 
@@ -101,6 +102,7 @@ impl Efuse {
             2 => ChipType::Esp32D2wdq5,
             4 => ChipType::Esp32Picod2,
             5 => ChipType::Esp32Picod4,
+            6 => ChipType::Esp32Picov302,
             _ => ChipType::Unknown,
         }
     }

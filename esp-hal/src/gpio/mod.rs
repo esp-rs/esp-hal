@@ -12,11 +12,11 @@
 //! interface for GPIO pins.
 //!
 //! To get access to the pins, you first need to convert them into a HAL
-//! designed struct from the pac struct `GPIO` and `IO_MUX` using `IO::new`.
+//! designed struct from the pac struct `GPIO` and `IO_MUX` using `Io::new`.
 //!
 //! ## Example
 //! ```no_run
-//! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let mut led = io.pins.gpio5.into_push_pull_output();
 //! ```
 //!
@@ -100,7 +100,7 @@ impl InputMode for Unknown {
 }
 
 /// RTC input pin mode
-pub struct RTCInput<MODE> {
+pub struct RtcInput<MODE> {
     _mode: PhantomData<MODE>,
 }
 
@@ -142,7 +142,7 @@ impl OutputMode for Unknown {
 }
 
 /// RTC output pin mode
-pub struct RTCOutput<MODE> {
+pub struct RtcOutput<MODE> {
     _mode: PhantomData<MODE>,
 }
 
@@ -154,20 +154,6 @@ pub struct PushPull;
 
 /// Analog mode
 pub struct Analog;
-
-/// Alternate mode
-pub struct Alternate<MODE> {
-    _mode: PhantomData<MODE>,
-}
-
-#[doc(hidden)]
-pub struct AF0;
-
-#[doc(hidden)]
-pub struct AF1;
-
-#[doc(hidden)]
-pub struct AF2;
 
 /// Drive strength (values are approximates)
 #[allow(missing_docs)]
@@ -199,7 +185,7 @@ pub enum RtcFunction {
 }
 
 /// Trait implemented by RTC pins
-pub trait RTCPin: Pin {
+pub trait RtcPin: Pin {
     /// RTC number of the pin
     #[cfg(xtensa)]
     fn rtc_number(&self) -> u8;
@@ -221,7 +207,7 @@ pub trait RTCPin: Pin {
 
 /// Trait implemented by RTC pins which supporting internal pull-up / pull-down
 /// resistors.
-pub trait RTCPinWithResistors: RTCPin {
+pub trait RtcPinWithResistors: RtcPin {
     /// Enable/disable the internal pull-up resistor
     fn rtcio_pullup(&mut self, enable: bool);
     /// Enable/disable the internal pull-down resistor
@@ -229,15 +215,15 @@ pub trait RTCPinWithResistors: RTCPin {
 }
 
 /// Marker for RTC pins which support input mode
-pub trait RTCInputPin: RTCPin {}
+pub trait RtcInputPin: RtcPin {}
 /// Marker for RTC pins which support output mode
-pub trait RTCOutputPin: RTCPin {}
+pub trait RtcOutputPin: RtcPin {}
 
 /// Marker for pins which support analog mode
 pub trait AnalogPin {}
 
 /// Common trait implemented by pins
-pub trait Pin {
+pub trait Pin: crate::private::Sealed {
     /// GPIO number
     fn number(&self) -> u8;
 
@@ -304,7 +290,7 @@ pub trait InputPin: Pin {
 
     /// Remove a connected `signal` from this input pin.
     ///
-    /// Clears the entry in the GPIO matrix / IO mux that associates this input
+    /// Clears the entry in the GPIO matrix / Io mux that associates this input
     /// pin with the given [input `signal`](`InputSignal`). Any other
     /// connected signals remain intact.
     fn disconnect_input_from_peripheral(&mut self, signal: InputSignal) -> &mut Self;
@@ -374,7 +360,7 @@ pub trait OutputPin: Pin {
 
     /// Remove this output pin from a connected [signal](`InputSignal`).
     ///
-    /// Clears the entry in the GPIO matrix / IO mux that associates this output
+    /// Clears the entry in the GPIO matrix / Io mux that associates this output
     /// pin with a previously connected [signal](`InputSignal`). Any other
     /// outputs connected to the signal remain intact.
     fn disconnect_peripheral_from_output(&mut self) -> &mut Self;
@@ -1146,30 +1132,6 @@ where
     }
 }
 
-impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<Alternate<AF1>, GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
-    GpioPin<Unknown, GPIONUM>: GpioProperties,
-    <GpioPin<Unknown, GPIONUM> as GpioProperties>::PinType: IsOutputPin,
-{
-    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
-        pin.into_alternate_1()
-    }
-}
-
-impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<Alternate<AF2>, GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
-    GpioPin<Unknown, GPIONUM>: GpioProperties,
-    <GpioPin<Unknown, GPIONUM> as GpioProperties>::PinType: IsOutputPin,
-{
-    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
-        pin.into_alternate_2()
-    }
-}
-
 impl<MODE, const GPIONUM: u8> GpioPin<MODE, GPIONUM>
 where
     Self: GpioProperties,
@@ -1244,18 +1206,6 @@ where
     /// Only suitable to be passed into an peripheral driver
     pub fn into_inverted_open_drain_output(self) -> GpioPin<InvertedOutput<OpenDrain>, GPIONUM> {
         self.init_output(GPIO_FUNCTION, true);
-        GpioPin { _mode: PhantomData }
-    }
-
-    /// Configures the pin into alternate mode one.
-    pub fn into_alternate_1(self) -> GpioPin<Alternate<AF1>, GPIONUM> {
-        self.init_output(AlternateFunction::Function1, false);
-        GpioPin { _mode: PhantomData }
-    }
-
-    /// Configures the pin into alternate mode two.
-    pub fn into_alternate_2(self) -> GpioPin<Alternate<AF2>, GPIONUM> {
-        self.init_output(AlternateFunction::Function2, false);
         GpioPin { _mode: PhantomData }
     }
 }
@@ -1878,13 +1828,13 @@ impl<MODE, TYPE> AnyPin<Input<MODE>, TYPE> {
 }
 
 /// General Purpose Input/Output driver
-pub struct IO {
+pub struct Io {
     _io_mux: IO_MUX,
     /// The pins available on this chip
     pub pins: Pins,
 }
 
-impl IO {
+impl Io {
     /// Initialize the I/O driver.
     pub fn new(gpio: GPIO, io_mux: IO_MUX) -> Self {
         Self::new_with_priority(gpio, io_mux, crate::interrupt::Priority::min())
@@ -1901,9 +1851,9 @@ impl IO {
         gpio.bind_gpio_interrupt(gpio_interrupt_handler);
         crate::interrupt::enable(crate::peripherals::Interrupt::GPIO, prio).unwrap();
 
-        let pins = gpio.split();
+        let pins = gpio.pins();
 
-        IO {
+        Io {
             _io_mux: io_mux,
             pins,
         }
@@ -1956,20 +1906,13 @@ macro_rules! gpio {
             )
         )+
     ) => {
-        #[doc(hidden)]
-        pub trait GpioExt {
-            type Parts;
-            fn split(self) -> Self::Parts;
-        }
-
         paste::paste! {
-            impl GpioExt for GPIO {
-                type Parts = Pins;
-                fn split(self) -> Self::Parts {
+            impl GPIO {
+                pub(crate) fn pins(self) -> Pins {
                     Pins {
                         $(
                             [< gpio $gpionum >]: {
-                                 GpioPin::new()
+                                GpioPin::new()
                             },
                         )+
                     }
@@ -2112,7 +2055,7 @@ macro_rules! rtc_pins {
     (
         $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:ident, $rde:ident)?
     ) => {
-        impl<MODE> $crate::gpio::RTCPin for GpioPin<MODE, $pin_num>
+        impl<MODE> $crate::gpio::RtcPin for GpioPin<MODE, $pin_num>
         {
             fn rtc_number(&self) -> u8 {
                 $rtc_pin
@@ -2152,7 +2095,7 @@ macro_rules! rtc_pins {
         }
 
         $(
-            impl<MODE> $crate::gpio::RTCPinWithResistors for GpioPin<MODE, $pin_num>
+            impl<MODE> $crate::gpio::RtcPinWithResistors for GpioPin<MODE, $pin_num>
             {
                 fn rtcio_pullup(&mut self, enable: bool) {
                     let rtcio = unsafe { &*$crate::peripherals::RTC_IO::PTR };
@@ -2175,7 +2118,7 @@ macro_rules! rtc_pins {
             paste::paste!{
                 impl<MODE> $crate::gpio::rtc_io::IntoLowPowerPin<$pin_num> for GpioPin<MODE, $pin_num> {
                     fn into_low_power(mut self) -> $crate::gpio::rtc_io::LowPowerPin<Unknown, $pin_num> {
-                        use $crate::gpio::RTCPin;
+                        use $crate::gpio::RtcPin;
 
                         self.rtc_set_config(false, true, $crate::gpio::RtcFunction::Rtc);
 
@@ -2204,7 +2147,7 @@ macro_rules! rtc_pins {
     (
         $pin_num:expr
     ) => {
-        impl<MODE> $crate::gpio::RTCPin for GpioPin<MODE, $pin_num> {
+        impl<MODE> $crate::gpio::RtcPin for GpioPin<MODE, $pin_num> {
             unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
                 let rtc_cntl = unsafe { &*$crate::peripherals::RTC_CNTL::ptr() };
                 paste::paste! {
@@ -2221,7 +2164,7 @@ macro_rules! rtc_pins {
             }
         }
 
-        impl<MODE> $crate::gpio::RTCPinWithResistors for GpioPin<MODE, $pin_num> {
+        impl<MODE> $crate::gpio::RtcPinWithResistors for GpioPin<MODE, $pin_num> {
             fn rtcio_pullup(&mut self, enable: bool) {
                 let io_mux = unsafe { &*$crate::peripherals::IO_MUX::ptr() };
                 io_mux.gpio($pin_num).modify(|_, w| w.fun_wpu().bit(enable));

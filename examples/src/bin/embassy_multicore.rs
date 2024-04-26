@@ -21,9 +21,10 @@ use esp_hal::{
     cpu_control::{CpuControl, Stack},
     embassy::{self, executor::Executor},
     get_core,
-    gpio::{GpioPin, Output, PushPull, IO},
+    gpio::{GpioPin, Io, Output, PushPull},
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
     timer::TimerGroup,
 };
 use esp_println::println;
@@ -53,15 +54,15 @@ async fn control_led(
 #[main]
 async fn main(_spawner: Spawner) {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timg0);
 
-    let mut cpu_control = CpuControl::new(system.cpu_control);
+    let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 
     let led_ctrl_signal = &*make_static!(Signal::new());
 

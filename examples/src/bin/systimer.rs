@@ -17,6 +17,7 @@ use esp_hal::{
     interrupt::{self, Priority},
     peripherals::{Interrupt, Peripherals},
     prelude::*,
+    system::SystemControl,
     systimer::{Alarm, Periodic, SystemTimer, Target},
     Blocking,
 };
@@ -31,7 +32,7 @@ static ALARM2: Mutex<RefCell<Option<Alarm<Target, Blocking, 2>>>> = Mutex::new(R
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let systimer = SystemTimer::new(peripherals.SYSTIMER);

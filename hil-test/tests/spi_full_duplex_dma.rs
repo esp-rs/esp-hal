@@ -19,13 +19,14 @@ use esp_hal::{
     clock::ClockControl,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::IO,
+    gpio::Io,
     peripherals::Peripherals,
     prelude::*,
     spi::{
         master::{prelude::*, Spi},
         SpiMode,
     },
+    system::SystemControl,
 };
 
 #[cfg(test)]
@@ -41,10 +42,10 @@ mod tests {
         const DMA_BUFFER_SIZE: usize = 4;
 
         let peripherals = Peripherals::take();
-        let system = peripherals.SYSTEM.split();
+        let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-        let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
         let miso = io.pins.gpio2;
         let mosi = io.pins.gpio4;
@@ -84,10 +85,10 @@ mod tests {
     #[timeout(3)]
     fn test_asymmetric_dma_transfer() {
         let peripherals = Peripherals::take();
-        let system = peripherals.SYSTEM.split();
+        let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-        let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
         let miso = io.pins.gpio2;
         let mosi = io.pins.gpio4;
@@ -128,10 +129,10 @@ mod tests {
         const DMA_BUFFER_SIZE: usize = 4096;
 
         let peripherals = Peripherals::take();
-        let system = peripherals.SYSTEM.split();
+        let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-        let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
         let miso = io.pins.gpio2;
         let mosi = io.pins.gpio4;

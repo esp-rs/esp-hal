@@ -17,6 +17,7 @@ use esp_hal::{
     gpio,
     peripherals::{Peripherals, UART0},
     prelude::*,
+    system::SystemControl,
     uart::{
         config::{AtCmdConfig, Config},
         TxRxPins,
@@ -30,7 +31,7 @@ static SERIAL: Mutex<RefCell<Option<Uart<UART0, Blocking>>>> = Mutex::new(RefCel
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let delay = Delay::new(&clocks);

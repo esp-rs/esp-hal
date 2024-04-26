@@ -26,21 +26,22 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::IO,
+    gpio::Io,
     i2c::I2C,
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
 };
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let delay = Delay::new(&clocks);
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // Create a new peripheral object with the described wiring
     // and standard I2C clock speed

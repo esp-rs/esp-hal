@@ -21,20 +21,21 @@ use esp_hal::{
     clock::ClockControl,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::IO,
+    gpio::Io,
     i2s::{DataFormat, I2s, I2sReadDma, Standard},
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let dma = Dma::new(peripherals.DMA);
     #[cfg(any(feature = "esp32", feature = "esp32s2"))]

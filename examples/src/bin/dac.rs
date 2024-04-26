@@ -13,21 +13,22 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    analog::dac::{DAC1, DAC2},
+    analog::dac::{Dac1, Dac2},
     clock::ClockControl,
     delay::Delay,
-    gpio::IO,
+    gpio::Io,
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
 };
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
@@ -40,8 +41,8 @@ fn main() -> ! {
     }
 
     // Create DAC instances
-    let mut dac1 = DAC1::new(peripherals.DAC1, dac1_pin);
-    let mut dac2 = DAC2::new(peripherals.DAC2, dac2_pin);
+    let mut dac1 = Dac1::new(peripherals.DAC1, dac1_pin);
+    let mut dac2 = Dac2::new(peripherals.DAC2, dac2_pin);
 
     let delay = Delay::new(&clocks);
 

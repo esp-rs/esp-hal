@@ -14,10 +14,11 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     embassy::{self},
-    gpio::{Gpio5, Output, PushPull, IO},
+    gpio::{Gpio5, Io, Output, PushPull},
     peripherals::Peripherals,
     prelude::*,
     rmt::{asynch::RxChannelAsync, PulseCode, Rmt, RxChannelConfig, RxChannelCreatorAsync},
+    system::SystemControl,
 };
 use esp_println::{print, println};
 
@@ -41,13 +42,13 @@ async fn signal_task(mut pin: Gpio5<Output<PushPull>>) {
 async fn main(spawner: Spawner) {
     println!("Init!");
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let timer_group0 = esp_hal::timer::TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timer_group0);
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32h2")] {

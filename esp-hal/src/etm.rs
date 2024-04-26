@@ -18,11 +18,11 @@
 //! a particular Event to a particular Task. When an event is activated, the ETM
 //! channel will trigger the corresponding task automatically.
 //!
-//! More information: <https://docs.espressif.com/projects/esp-idf/en/latest/esp32c6/api-reference/peripherals/etm.html>
-//!
+//! For more information, please refer to the
+#![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/peripherals/etm.html)")]
 //! ## Example
 //! ```no_run
-//! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let mut led = io.pins.gpio1.into_push_pull_output();
 //! let button = io.pins.gpio9.into_pull_down_input();
 //!

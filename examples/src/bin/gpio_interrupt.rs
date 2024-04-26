@@ -15,10 +15,11 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::{self, Event, Input, PullDown, IO},
+    gpio::{self, Event, Input, Io, PullDown},
     macros::ram,
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
 };
 
 #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
@@ -31,11 +32,11 @@ static BUTTON: Mutex<RefCell<Option<gpio::Gpio9<Input<PullDown>>>>> =
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     // Set GPIO2 as an output, and set its state high initially.
-    let mut io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     io.set_interrupt_handler(handler);
     let mut led = io.pins.gpio2.into_push_pull_output();
 

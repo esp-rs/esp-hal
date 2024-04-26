@@ -16,6 +16,7 @@ use esp_hal::{
     interrupt::{self, Priority},
     peripherals::{Interrupt, Peripherals, TIMG0},
     prelude::*,
+    system::SystemControl,
     timer::{Timer, Timer0, TimerGroup, TimerInterrupts},
 };
 
@@ -25,7 +26,7 @@ static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0>, esp_hal::Blocking>>>> =
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let timg0 = TimerGroup::new(
@@ -52,7 +53,12 @@ fn main() -> ! {
 #[handler]
 fn tg0_t0_level() {
     critical_section::with(|cs| {
-        esp_println::println!("Interrupt 1");
+        esp_println::println!(
+            "Interrupt at {} ms",
+            esp_hal::time::current_time()
+                .duration_since_epoch()
+                .to_millis()
+        );
 
         let mut timer0 = TIMER0.borrow_ref_mut(cs);
         let timer0 = timer0.as_mut().unwrap();

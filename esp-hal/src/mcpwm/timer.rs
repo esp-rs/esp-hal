@@ -17,7 +17,7 @@ use crate::{
 
 /// A MCPWM timer
 ///
-/// Every timer of a particular [`MCPWM`](super::MCPWM) peripheral can be used
+/// Every timer of a particular [`MCPWM`](super::McPwm) peripheral can be used
 /// as a timing reference for every
 /// [`Operator`](super::operator::Operator) of that peripheral
 pub struct Timer<const TIM: u8, PWM> {

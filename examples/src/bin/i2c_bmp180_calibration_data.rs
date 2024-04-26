@@ -12,16 +12,23 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{clock::ClockControl, gpio::IO, i2c::I2C, peripherals::Peripherals, prelude::*};
+use esp_hal::{
+    clock::ClockControl,
+    gpio::Io,
+    i2c::I2C,
+    peripherals::Peripherals,
+    prelude::*,
+    system::SystemControl,
+};
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // Create a new peripheral object with the described wiring and standard
     // I2C clock speed:

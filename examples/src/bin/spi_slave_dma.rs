@@ -34,23 +34,24 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::IO,
+    gpio::Io,
     peripherals::Peripherals,
     prelude::*,
     spi::{
         slave::{prelude::*, Spi},
         SpiMode,
     },
+    system::SystemControl,
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let slave_sclk = io.pins.gpio0;
     let mut master_sclk = io.pins.gpio4.into_push_pull_output();
     let slave_miso = io.pins.gpio1;

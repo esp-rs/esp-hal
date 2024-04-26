@@ -21,9 +21,10 @@ const IS_FIRST_SENDER: bool = true;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    gpio::IO,
+    gpio::Io,
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
     twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId},
 };
 use esp_println::println;
@@ -32,10 +33,10 @@ use nb::block;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // Set the tx pin as open drain. Skip this if using transceivers.
     let can_tx_pin = io.pins.gpio0.into_open_drain_output();

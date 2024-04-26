@@ -7,7 +7,7 @@
 #![no_std]
 #![no_main]
 
-use core::{cell::RefCell, ptr::addr_of_mut};
+use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_backtrace as _;
@@ -16,6 +16,7 @@ use esp_hal::{
     clock::ClockControl,
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
 };
 use esp_println::println;
 
@@ -24,13 +25,15 @@ static DA: Mutex<RefCell<Option<DebugAssist>>> = Mutex::new(RefCell::new(None));
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut da = DebugAssist::new(peripherals.ASSIST_DEBUG, Some(interrupt_handler));
 
     cfg_if::cfg_if! {
         if #[cfg(not(feature = "esp32s3"))] {
+            use core::ptr::addr_of_mut;
+
             extern "C" {
                 // top of stack
                 static mut _stack_start: u32;

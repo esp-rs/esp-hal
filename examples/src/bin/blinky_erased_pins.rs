@@ -14,18 +14,19 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::{AnyPin, Input, Output, PullDown, PushPull, IO},
+    gpio::{AnyPin, Input, Io, Output, PullDown, PushPull},
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
 };
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // Set LED GPIOs as an output:
     let led1 = io.pins.gpio8.into_push_pull_output();

@@ -23,7 +23,7 @@
 //! ## Example
 //! ```no_run
 //! let peripherals = Peripherals::take();
-//! let system = peripherals.SYSTEM.split();
+//! let system = SystemControl::new(peripherals.SYSTEM);
 //! let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 //! ```
 
@@ -99,9 +99,30 @@ pub enum Peripheral {
     LcdCam,
 }
 
+/// The `DPORT`/`PCR`/`SYSTEM` peripheral split into its different logical
+/// components.
+pub struct SystemControl<'d> {
+    _inner: PeripheralRef<'d, SYSTEM>,
+    pub clock_control: SystemClockControl,
+    pub software_interrupt_control: SoftwareInterruptControl,
+}
+
+impl<'d> SystemControl<'d> {
+    /// Construct a new instance of [`SystemControl`].
+    pub fn new(system: impl crate::peripheral::Peripheral<P = SYSTEM> + 'd) -> Self {
+        crate::into_ref!(system);
+
+        Self {
+            _inner: system,
+            clock_control: SystemClockControl::new(),
+            software_interrupt_control: SoftwareInterruptControl::new(),
+        }
+    }
+}
+
 /// A software interrupt can be triggered by software.
 #[non_exhaustive]
-pub struct SoftwareInterrupt<const NUM: u8> {}
+pub struct SoftwareInterrupt<const NUM: u8>;
 
 impl<const NUM: u8> SoftwareInterrupt<NUM> {
     /// Sets the interrupt handler for this software-interrupt
@@ -121,7 +142,7 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
     }
 
     /// Trigger this software-interrupt
-    pub fn raise(&mut self) {
+    pub fn raise(&self) {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let system = unsafe { &*SYSTEM::PTR };
         #[cfg(any(esp32c6, esp32h2))]
@@ -153,7 +174,7 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
     }
 
     /// Resets this software-interrupt
-    pub fn reset(&mut self) {
+    pub fn reset(&self) {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let system = unsafe { &*SYSTEM::PTR };
         #[cfg(any(esp32c6, esp32h2))]
@@ -192,7 +213,7 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
     /// time.
     #[inline]
     pub unsafe fn steal() -> Self {
-        Self {}
+        Self
     }
 }
 
@@ -221,17 +242,17 @@ pub struct SoftwareInterruptControl {
 }
 
 impl SoftwareInterruptControl {
-    fn new_internal() -> Self {
+    fn new() -> Self {
         // the thread-executor uses SW-INT0 when used on a multi-core system
         // we cannot easily require `software_interrupt0` there since it's created
         // before `main` via proc-macro
 
         SoftwareInterruptControl {
             #[cfg(not(all(feature = "embassy-executor-thread", multi_core)))]
-            software_interrupt0: SoftwareInterrupt {},
-            software_interrupt1: SoftwareInterrupt {},
-            software_interrupt2: SoftwareInterrupt {},
-            software_interrupt3: SoftwareInterrupt {},
+            software_interrupt0: SoftwareInterrupt,
+            software_interrupt1: SoftwareInterrupt,
+            software_interrupt2: SoftwareInterrupt,
+            software_interrupt3: SoftwareInterrupt,
         }
     }
 }
@@ -1077,12 +1098,31 @@ pub struct SystemClockControl {
     _private: (),
 }
 
-/// Controls the configuration of the chip's clocks.
-pub struct CpuControl {
-    _private: (),
+impl SystemClockControl {
+    pub fn new() -> Self {
+        Self { _private: () }
+    }
 }
 
+impl Default for SystemClockControl {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl crate::peripheral::Peripheral for SystemClockControl {
+    type P = SystemClockControl;
+
+    #[inline]
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        SystemClockControl { _private: () }
+    }
+}
+
+impl crate::private::Sealed for SystemClockControl {}
+
 /// Enumeration of the available radio peripherals for this chip.
+#[cfg(any(bt, ieee802154, wifi))]
 pub enum RadioPeripherals {
     #[cfg(phy)]
     Phy,
@@ -1094,12 +1134,8 @@ pub enum RadioPeripherals {
     Ieee802154,
 }
 
-/// Functionality of clocks controlling the radio peripherals.
-pub struct RadioClockControl {
-    _private: (),
-}
-
 /// Control the radio peripheral clocks
+#[cfg(any(bt, ieee802154, wifi))]
 pub trait RadioClockController {
     /// Enable the peripheral
     fn enable(&mut self, peripheral: RadioPeripherals);
@@ -1118,46 +1154,3 @@ pub trait RadioClockController {
 
     fn reset_rpa(&mut self);
 }
-
-/// The SYSTEM/DPORT splitted into it's different logical parts.
-pub struct SystemParts<'d> {
-    _private: PeripheralRef<'d, SYSTEM>,
-    pub clock_control: SystemClockControl,
-    pub cpu_control: CpuControl,
-    pub radio_clock_control: RadioClockControl,
-    pub software_interrupt_control: SoftwareInterruptControl,
-}
-
-/// Extension trait to split a SYSTEM/DPORT peripheral in independent logical
-/// parts
-pub trait SystemExt<'d> {
-    type Parts;
-
-    /// Splits the SYSTEM/DPORT peripheral into it's parts.
-    fn split(self) -> Self::Parts;
-}
-
-impl<'d, T: crate::peripheral::Peripheral<P = SYSTEM> + 'd> SystemExt<'d> for T {
-    type Parts = SystemParts<'d>;
-
-    fn split(self) -> Self::Parts {
-        Self::Parts {
-            _private: self.into_ref(),
-            clock_control: SystemClockControl { _private: () },
-            cpu_control: CpuControl { _private: () },
-            radio_clock_control: RadioClockControl { _private: () },
-            software_interrupt_control: SoftwareInterruptControl::new_internal(),
-        }
-    }
-}
-
-impl crate::peripheral::Peripheral for SystemClockControl {
-    type P = SystemClockControl;
-
-    #[inline]
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
-        SystemClockControl { _private: () }
-    }
-}
-
-impl crate::private::Sealed for SystemClockControl {}

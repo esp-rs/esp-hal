@@ -25,10 +25,11 @@ use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
     embassy,
-    gpio::IO,
+    gpio::Io,
     i2s::{asynch::*, DataFormat, I2s, Standard},
     peripherals::Peripherals,
     prelude::*,
+    system::SystemControl,
     timer::TimerGroup,
 };
 use esp_println::println;
@@ -37,13 +38,13 @@ use esp_println::println;
 async fn main(_spawner: Spawner) {
     println!("Init!");
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timg0);
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let dma = Dma::new(peripherals.DMA);
     #[cfg(any(feature = "esp32", feature = "esp32s2"))]
@@ -85,7 +86,7 @@ async fn main(_spawner: Spawner) {
     let mut data = [0u8; 5000];
     let mut transaction = i2s_rx.read_dma_circular_async(buffer).unwrap();
     loop {
-        let avail = transaction.available().await;
+        let avail = transaction.available().await.unwrap();
         println!("available {}", avail);
 
         let count = transaction.pop(&mut data).await.unwrap();

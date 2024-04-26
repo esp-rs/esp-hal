@@ -18,7 +18,14 @@ pub mod gpio;
 pub mod lp_core;
 pub mod peripherals;
 pub mod radio_clocks;
-pub mod trng;
+
+macro_rules! chip {
+    () => {
+        "esp32c6"
+    };
+}
+
+pub(crate) use chip;
 
 #[allow(unused)]
 pub(crate) mod registers {

@@ -1,6 +1,6 @@
 use super::{Ext0WakeupSource, Ext1WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers};
 use crate::{
-    gpio::{RTCPin, RtcFunction},
+    gpio::{RtcFunction, RtcPin},
     rtc_cntl::{sleep::WakeupLevel, Clock, Rtc, RtcClock},
 };
 
@@ -66,7 +66,7 @@ impl WakeSource for TimerWakeupSource {
     }
 }
 
-impl<P: RTCPin> WakeSource for Ext0WakeupSource<'_, P> {
+impl<P: RtcPin> WakeSource for Ext0WakeupSource<'_, P> {
     fn apply(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig) {
         // don't power down RTC peripherals
         sleep_config.set_rtc_peri_pd_en(false);
@@ -92,7 +92,7 @@ impl<P: RTCPin> WakeSource for Ext0WakeupSource<'_, P> {
     }
 }
 
-impl<P: RTCPin> Drop for Ext0WakeupSource<'_, P> {
+impl<P: RtcPin> Drop for Ext0WakeupSource<'_, P> {
     fn drop(&mut self) {
         // should we have saved the pin configuration first?
         // set pin back to IO_MUX (input_enable and func have no effect when pin is sent
