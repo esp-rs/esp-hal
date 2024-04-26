@@ -296,9 +296,6 @@ where
         while let Some(op) = op_iter.next() {
             // Clear all I2C interrupts
             self.peripheral.clear_all_interrupts();
-            // Reset FIFO and command list
-            self.peripheral.reset_fifo();
-            self.peripheral.reset_command_list();
 
             // TODO somehow know that we can combine a write and a read into one transaction
             let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
@@ -655,6 +652,9 @@ mod asynch {
         where
             I: Iterator<Item = &'a COMD>,
         {
+            // Reset FIFO and command list
+            self.reset_fifo();
+            self.reset_command_list();
             if start {
                 add_cmd(cmd_iterator, Command::Start)?;
             }
@@ -683,6 +683,9 @@ mod asynch {
         where
             I: Iterator<Item = &'a COMD>,
         {
+            // Reset FIFO and command list
+            self.reset_fifo();
+            self.reset_command_list();
             if start {
                 add_cmd(cmd_iterator, Command::Start)?;
             }
@@ -712,9 +715,6 @@ mod asynch {
             while let Some(op) = op_iter.next() {
                 // Clear all I2C interrupts
                 self.peripheral.clear_all_interrupts();
-                // Reset FIFO and command list
-                self.peripheral.reset_fifo();
-                self.peripheral.reset_command_list();
 
                 // TODO somehow know that we can combine a write and a read into one transaction
                 let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
@@ -1354,8 +1354,17 @@ pub trait Instance: crate::private::Sealed {
             self.check_errors()?;
 
             // Handle completion cases
-            // A full transmission was completed
+            // A full transmission was completed (either a STOP condition or END was
+            // processed)
             if interrupts.trans_complete().bit_is_set() || interrupts.end_detect().bit_is_set() {
+                // clear the interrupt bits that were set
+                if interrupts.trans_complete().bit_is_set() {
+                    #[rustfmt::skip]
+                    self.register_block().int_clr().write(|w| w
+                        .trans_complete().clear_bit_by_one()
+                        .end_detect().clear_bit_by_one()
+                    );
+                }
                 break;
             }
         }
@@ -1595,6 +1604,10 @@ pub trait Instance: crate::private::Sealed {
     where
         I: Iterator<Item = &'a COMD>,
     {
+        // Reset FIFO and command list
+        self.reset_fifo();
+        self.reset_command_list();
+
         if start {
             add_cmd(cmd_iterator, Command::Start)?;
         }
@@ -1623,6 +1636,10 @@ pub trait Instance: crate::private::Sealed {
     where
         I: Iterator<Item = &'a COMD>,
     {
+        // Reset FIFO and command list
+        self.reset_fifo();
+        self.reset_command_list();
+
         if start {
             add_cmd(cmd_iterator, Command::Start)?;
         }
@@ -1640,9 +1657,8 @@ pub trait Instance: crate::private::Sealed {
     /// Send data bytes from the `bytes` array to a target slave with the
     /// address `addr`
     fn master_write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
-        // Reset FIFO and command list
-        self.reset_fifo();
-        self.reset_command_list();
+        // Clear all I2C interrupts
+        self.clear_all_interrupts();
         self.write_operation(
             addr,
             bytes,
@@ -1657,9 +1673,8 @@ pub trait Instance: crate::private::Sealed {
     /// The number of read bytes is deterimed by the size of the `buffer`
     /// argument
     fn master_read(&mut self, addr: u8, buffer: &mut [u8]) -> Result<(), Error> {
-        // Reset FIFO and command list
-        self.reset_fifo();
-        self.reset_command_list();
+        // Clear all I2C interrupts
+        self.clear_all_interrupts();
         self.read_operation(
             addr,
             buffer,
@@ -1682,6 +1697,9 @@ pub trait Instance: crate::private::Sealed {
         // in one transaction but filling the tx fifo with
         // the current code is somewhat slow even in release mode
         // which can cause issues
+
+        // Clear all I2C interrupts
+        self.clear_all_interrupts();
         self.write_operation(
             addr,
             bytes,
