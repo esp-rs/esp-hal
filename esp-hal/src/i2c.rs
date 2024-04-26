@@ -1357,14 +1357,6 @@ pub trait Instance: crate::private::Sealed {
             // A full transmission was completed (either a STOP condition or END was
             // processed)
             if interrupts.trans_complete().bit_is_set() || interrupts.end_detect().bit_is_set() {
-                // clear the interrupt bits that were set
-                if interrupts.trans_complete().bit_is_set() {
-                    #[rustfmt::skip]
-                    self.register_block().int_clr().write(|w| w
-                        .trans_complete().clear_bit_by_one()
-                        .end_detect().clear_bit_by_one()
-                    );
-                }
                 break;
             }
         }
@@ -1707,6 +1699,7 @@ pub trait Instance: crate::private::Sealed {
             false,
             &mut self.register_block().comd_iter(),
         )?;
+        self.clear_all_interrupts();
         self.read_operation(
             addr,
             buffer,
