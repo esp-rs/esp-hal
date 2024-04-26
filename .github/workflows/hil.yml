@@ -113,14 +113,14 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: tests-${{ matrix.target.soc }}
-          path: test-suite
+          path: tests-${{ matrix.target.soc }}
 
       - name: Run Tests
         run: |
           export PATH=$PATH:/home/espressif/.cargo/bin
 
           failed_tests=() # Initialize an empty array to hold failed tests
-          for test_file in "test-suite"/*; do
+          for test_file in "tests-${{ matrix.target.soc }}"/*; do
             echo "Running test: $test_file"
             if ! probe-rs run --chip ${{ matrix.target.soc }} "$test_file"; then
               failed_tests+=("$test_file") # Add failed test to the array
