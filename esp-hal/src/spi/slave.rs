@@ -753,13 +753,13 @@ fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
     });
 }
 
-#[cfg(any(esp32))]
+#[cfg(esp32)]
 fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
     reg_block.slave().modify(|_, w| w.sync_reset().set_bit());
     reg_block.slave().modify(|_, w| w.sync_reset().clear_bit());
 }
 
-#[cfg(any(esp32s2))]
+#[cfg(esp32s2)]
 fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
     reg_block.slave().modify(|_, w| w.soft_reset().set_bit());
     reg_block.slave().modify(|_, w| w.soft_reset().clear_bit());
