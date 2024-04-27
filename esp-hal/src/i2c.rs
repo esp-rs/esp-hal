@@ -23,6 +23,7 @@
 //!     io.pins.gpio2,
 //!     100.kHz(),
 //!     &clocks,
+//!     None,
 //! );
 //! loop {
 //!     let mut data = [0u8; 22];
@@ -98,8 +99,49 @@ bitfield::bitfield! {
     from into Opcode, opcode, set_opcode: 13, 11;
     from into Ack, ack_value, set_ack_value: 10, 10;
     from into Ack, ack_exp, set_ack_exp: 9, 9;
-    ack_check_en, set_ack_check_en: 8, 8;
+    ack_check_en, set_ack_check_en: 8;
     length, set_length: 7, 0;
+}
+
+impl CommandReg {
+    fn bits(&self) -> u32 {
+        self.0
+    }
+
+    fn new_start() -> Self {
+        let mut cmd = Self(0);
+        cmd.set_opcode(Opcode::RStart);
+        cmd
+    }
+
+    fn new_end() -> Self {
+        let mut cmd = Self(0);
+        cmd.set_opcode(Opcode::End);
+        cmd
+    }
+
+    fn new_stop() -> Self {
+        let mut cmd = Self(0);
+        cmd.set_opcode(Opcode::Stop);
+        cmd
+    }
+
+    fn new_write(ack_exp: Ack, ack_check_en: bool, length: u8) -> Self {
+        let mut cmd = Self(0);
+        cmd.set_opcode(Opcode::Write);
+        cmd.set_ack_exp(ack_exp);
+        cmd.set_ack_check_en(ack_check_en);
+        cmd.set_length(length as u32);
+        cmd
+    }
+
+    fn new_read(ack_value: Ack, length: u8) -> Self {
+        let mut cmd = Self(0);
+        cmd.set_opcode(Opcode::Read);
+        cmd.set_ack_value(ack_value);
+        cmd.set_length(length as u32);
+        cmd
+    }
 }
 
 #[cfg(feature = "debug")]
@@ -141,60 +183,19 @@ enum Command {
     },
 }
 
-impl From<Command> for u16 {
-    fn from(c: Command) -> u16 {
-        let opcode = match c {
-            Command::Start => Opcode::RStart,
-            Command::End => Opcode::End,
-            Command::Stop => Opcode::Stop,
-            Command::Write { .. } => Opcode::Write,
-            Command::Read { .. } => Opcode::Read,
-        };
-
-        let length = match c {
-            Command::Start | Command::End | Command::Stop => 0,
-            Command::Write { length: l, .. } | Command::Read { length: l, .. } => l,
-        };
-
-        let ack_exp = match c {
-            Command::Start | Command::End | Command::Stop | Command::Read { .. } => Ack::Nack,
-            Command::Write { ack_exp: exp, .. } => exp,
-        };
-
-        let ack_check_en = match c {
-            Command::Start | Command::End | Command::Stop | Command::Read { .. } => false,
+impl From<Command> for CommandReg {
+    fn from(c: Command) -> Self {
+        match c {
+            Command::Start => CommandReg::new_start(),
+            Command::End => CommandReg::new_end(),
+            Command::Stop => CommandReg::new_stop(),
             Command::Write {
-                ack_check_en: en, ..
-            } => en,
-        };
-
-        let ack_value = match c {
-            Command::Start | Command::End | Command::Stop | Command::Write { .. } => Ack::Nack,
-            Command::Read { ack_value: ack, .. } => ack,
-        };
-        let mut cmd: u16 = length.into();
-
-        if ack_check_en {
-            cmd |= 1 << 8;
-        } else {
-            cmd &= !(1 << 8);
+                ack_exp,
+                ack_check_en,
+                length,
+            } => CommandReg::new_write(ack_exp, ack_check_en, length),
+            Command::Read { ack_value, length } => CommandReg::new_read(ack_value, length),
         }
-
-        if ack_exp == Ack::Nack {
-            cmd |= 1 << 9;
-        } else {
-            cmd &= !(1 << 9);
-        }
-
-        if ack_value == Ack::Nack {
-            cmd |= 1 << 10;
-        } else {
-            cmd &= !(1 << 10);
-        }
-
-        cmd |= (opcode as u16) << 11;
-
-        cmd
     }
 }
 
@@ -224,87 +225,55 @@ impl From<Ack> for u32 {
     }
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
+cfg_if::cfg_if! {
+    if #[cfg(any(esp32, esp32s2))] {
+        const OPCODE_RSTART: u32 = 0;
+        const OPCODE_WRITE: u32  = 1;
+        const OPCODE_READ: u32   = 2;
+        const OPCODE_STOP: u32   = 3;
+        const OPCODE_END: u32    = 4;
+    } else if #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))] {
+        const OPCODE_RSTART: u32 = 6;
+        const OPCODE_WRITE: u32  = 1;
+        const OPCODE_READ: u32   = 3;
+        const OPCODE_STOP: u32   = 2;
+        const OPCODE_END: u32    = 4;
+    }
+}
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(PartialEq)]
 enum Opcode {
-    RStart = 6,
-    Write  = 1,
-    Read   = 3,
-    Stop   = 2,
-    End    = 4, // Check this for above chips!!!
+    RStart,
+    Write,
+    Read,
+    Stop,
+    End,
 }
 
-#[cfg(all(feature = "debug", any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3)))]
-impl From<u8> for Opcode {
-    fn from(opcode: u8) -> Self {
-        match opcode {
-            6 => Opcode::RStart,
-            1 => Opcode::Write,
-            3 => Opcode::Read,
-            2 => Opcode::Stop,
-            4 => Opcode::End,
-            _ => unreachable!(),
-        }
-    }
-}
-#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
-impl From<u32> for Opcode {
-    fn from(opcode: u32) -> Self {
-        match opcode {
-            6 => Opcode::RStart,
-            1 => Opcode::Write,
-            3 => Opcode::Read,
-            2 => Opcode::Stop,
-            4 => Opcode::End,
-            _ => unreachable!(),
-        }
-    }
-}
-
-#[cfg(any(esp32, esp32s2))]
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[derive(PartialEq)]
-enum Opcode {
-    RStart = 0,
-    Write  = 1,
-    Read   = 2,
-    Stop   = 3,
-    End    = 4, // Check this for above chips!!!
-}
-
-#[cfg(all(feature = "debug", any(esp32, esp32s2)))]
-impl From<u8> for Opcode {
-    fn from(opcode: u8) -> Self {
-        match opcode {
-            0 => Opcode::RStart,
-            1 => Opcode::Write,
-            2 => Opcode::Read,
-            3 => Opcode::Stop,
-            4 => Opcode::End,
-            _ => unreachable!(),
-        }
-    }
-}
-
-#[cfg(any(esp32, esp32s2))]
-impl From<u32> for Opcode {
-    fn from(opcode: u32) -> Self {
-        match opcode {
-            0 => Opcode::RStart,
-            1 => Opcode::Write,
-            2 => Opcode::Read,
-            3 => Opcode::Stop,
-            4 => Opcode::End,
-            _ => unreachable!(),
-        }
-    }
-}
 impl From<Opcode> for u32 {
     fn from(opcode: Opcode) -> u32 {
-        opcode as u32
+        match opcode {
+            Opcode::RStart => OPCODE_RSTART,
+            Opcode::Write => OPCODE_WRITE,
+            Opcode::Read => OPCODE_READ,
+            Opcode::Stop => OPCODE_STOP,
+            Opcode::End => OPCODE_END,
+        }
     }
 }
+impl From<u32> for Opcode {
+    fn from(opcode: u32) -> Self {
+        match opcode {
+            OPCODE_RSTART => Opcode::RStart,
+            OPCODE_WRITE => Opcode::Write,
+            OPCODE_READ => Opcode::Read,
+            OPCODE_STOP => Opcode::Stop,
+            OPCODE_END => Opcode::End,
+            _ => unreachable!(),
+        }
+    }
+}
+
 /// I2C peripheral container (I2C)
 pub struct I2C<'d, T, DM: crate::Mode> {
     peripheral: PeripheralRef<'d, T>,
@@ -1475,7 +1444,7 @@ pub trait Instance: crate::private::Sealed {
         //       of an end command
         for cmd_reg in self.register_block().comd_iter() {
             let cmd = CommandReg(cmd_reg.read().bits());
-            if cmd.0 != 0x0 && cmd.opcode() != Opcode::End && !cmd.cmd_done() {
+            if cmd.bits() != 0x0 && cmd.opcode() != Opcode::End && !cmd.cmd_done() {
                 #[cfg(all(feature = "log", feature = "debug"))]
                 self.log_comd("wait_for_completion");
                 return Err(Error::ExecIncomplete);
@@ -1874,7 +1843,8 @@ where
     I: Iterator<Item = &'a COMD>,
 {
     let cmd = cmd_iterator.next().ok_or(Error::CommandNrExceeded)?;
-    cmd.write(|w| unsafe { w.command().bits(command.into()) });
+    let cmd_reg: CommandReg = command.into();
+    cmd.write(|w| unsafe { w.bits(cmd_reg.bits()) });
     Ok(())
 }
 
