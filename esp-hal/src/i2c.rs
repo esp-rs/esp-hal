@@ -90,7 +90,34 @@ impl embedded_hal::i2c::Error for Error {
     }
 }
 
+// This should really be defined in the PAC, but the PAC only
+// defines the "command" field as a 16-bit field :-(
+bitfield::bitfield! {
+    struct CommandReg(u32);
+    cmd_done, _: 31;
+    from into Opcode, opcode, set_opcode: 13, 11;
+    from into Ack, ack_value, set_ack_value: 10, 10;
+    from into Ack, ack_exp, set_ack_exp: 9, 9;
+    ack_check_en, set_ack_check_en: 8, 8;
+    length, set_length: 7, 0;
+}
+
+#[cfg(feature = "debug")]
+impl core::fmt::Debug for CommandReg {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("CommandReg")
+            .field("cmd_done", &self.cmd_done())
+            .field("opcode", &self.opcode())
+            .field("ack_value", &self.ack_value())
+            .field("ack_exp", &self.ack_exp())
+            .field("ack_check_en", &self.ack_check_en())
+            .field("length", &self.length())
+            .finish()
+    }
+}
+
 /// A generic I2C Command
+#[cfg_attr(feature = "debug", derive(Debug))]
 enum Command {
     Start,
     Stop,
@@ -118,10 +145,10 @@ impl From<Command> for u16 {
     fn from(c: Command) -> u16 {
         let opcode = match c {
             Command::Start => Opcode::RStart,
+            Command::End => Opcode::End,
             Command::Stop => Opcode::Stop,
             Command::Write { .. } => Opcode::Write,
             Command::Read { .. } => Opcode::Read,
-            Command::End => Opcode::End,
         };
 
         let length = match c {
@@ -145,7 +172,6 @@ impl From<Command> for u16 {
             Command::Start | Command::End | Command::Stop | Command::Write { .. } => Ack::Nack,
             Command::Read { ack_value: ack, .. } => ack,
         };
-
         let mut cmd: u16 = length.into();
 
         if ack_check_en {
@@ -178,12 +204,29 @@ enum OperationType {
 }
 
 #[derive(Eq, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 enum Ack {
-    Ack,
-    Nack,
+    Ack = 0,
+    Nack = 1,
+}
+impl From<u32> for Ack {
+    fn from(ack: u32) -> Self {
+        match ack {
+            0 => Ack::Ack,
+            1 => Ack::Nack,
+            _ => unreachable!(),
+        }
+    }
+}
+impl From<Ack> for u32 {
+    fn from(ack: Ack) -> u32 {
+        ack as u32
+    }
 }
 
 #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(PartialEq)]
 enum Opcode {
     RStart = 6,
     Write  = 1,
@@ -192,7 +235,36 @@ enum Opcode {
     End    = 4, // Check this for above chips!!!
 }
 
+#[cfg(all(feature = "debug", any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3)))]
+impl From<u8> for Opcode {
+    fn from(opcode: u8) -> Self {
+        match opcode {
+            6 => Opcode::RStart,
+            1 => Opcode::Write,
+            3 => Opcode::Read,
+            2 => Opcode::Stop,
+            4 => Opcode::End,
+            _ => unreachable!(),
+        }
+    }
+}
+#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
+impl From<u32> for Opcode {
+    fn from(opcode: u32) -> Self {
+        match opcode {
+            6 => Opcode::RStart,
+            1 => Opcode::Write,
+            3 => Opcode::Read,
+            2 => Opcode::Stop,
+            4 => Opcode::End,
+            _ => unreachable!(),
+        }
+    }
+}
+
 #[cfg(any(esp32, esp32s2))]
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(PartialEq)]
 enum Opcode {
     RStart = 0,
     Write  = 1,
@@ -201,6 +273,38 @@ enum Opcode {
     End    = 4, // Check this for above chips!!!
 }
 
+#[cfg(all(feature = "debug", any(esp32, esp32s2)))]
+impl From<u8> for Opcode {
+    fn from(opcode: u8) -> Self {
+        match opcode {
+            0 => Opcode::RStart,
+            1 => Opcode::Write,
+            2 => Opcode::Read,
+            3 => Opcode::Stop,
+            4 => Opcode::End,
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[cfg(any(esp32, esp32s2))]
+impl From<u32> for Opcode {
+    fn from(opcode: u32) -> Self {
+        match opcode {
+            0 => Opcode::RStart,
+            1 => Opcode::Write,
+            2 => Opcode::Read,
+            3 => Opcode::Stop,
+            4 => Opcode::End,
+            _ => unreachable!(),
+        }
+    }
+}
+impl From<Opcode> for u32 {
+    fn from(opcode: Opcode) -> u32 {
+        opcode as u32
+    }
+}
 /// I2C peripheral container (I2C)
 pub struct I2C<'d, T, DM: crate::Mode> {
     peripheral: PeripheralRef<'d, T>,
@@ -1329,7 +1433,7 @@ pub trait Instance: crate::private::Sealed {
         // wait for completion - then we can just read the data from FIFO
         // once we change to non-fifo mode to support larger transfers that
         // won't work anymore
-        self.wait_for_completion()?;
+        self.wait_for_completion(false)?;
 
         // Read bytes from FIFO
         // FIXME: Handle case where less data has been provided by the slave than
@@ -1347,7 +1451,9 @@ pub trait Instance: crate::private::Sealed {
             .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
     }
 
-    fn wait_for_completion(&self) -> Result<(), Error> {
+    fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
+        #[cfg(feature = "log")]
+        log::trace!("wait_for_completion: end_only={}", end_only);
         loop {
             let interrupts = self.register_block().int_raw().read();
 
@@ -1356,12 +1462,20 @@ pub trait Instance: crate::private::Sealed {
             // Handle completion cases
             // A full transmission was completed (either a STOP condition or END was
             // processed)
-            if interrupts.trans_complete().bit_is_set() || interrupts.end_detect().bit_is_set() {
+            if (!end_only && interrupts.trans_complete().bit_is_set()) || interrupts.end_detect().bit_is_set() {
+                #[cfg(all(feature = "log", feature = "debug"))]
+                log::trace!("wait_for_completion: interrupts: {:?}", interrupts);
                 break;
             }
         }
-        for cmd in self.register_block().comd_iter() {
-            if cmd.read().command().bits() != 0x0 && cmd.read().command_done().bit_is_clear() {
+        // NOTE: on esp32 executing the end command generates the end_detect interrupt
+        //       but does not seem to clear the done bit! So we don't the done status
+        //       of an end command
+        for cmd_reg in self.register_block().comd_iter() {
+            let cmd = CommandReg(cmd_reg.read().bits());
+            if cmd.0 != 0x0 && cmd.opcode() != Opcode::End && !cmd.cmd_done() {
+                #[cfg(all(feature = "log", feature = "debug"))]
+                self.log_comd("wait_for_completion");
                 return Err(Error::ExecIncomplete);
             }
         }
@@ -1585,6 +1699,24 @@ pub trait Instance: crate::private::Sealed {
             .write(|w| w.rxfifo_full().clear_bit_by_one());
     }
 
+    #[cfg(all(feature = "log", feature = "debug"))]
+    fn log_comd(&self, msg: &str) {
+        log::info!("{}: {:?}", msg, self.register_block().int_raw().read());
+        for cmd in self.register_block().comd_iter() {
+            let command = CommandReg(cmd.read().bits());
+            log::info!("{}: {:?}", msg, command);
+            match command.opcode() {
+                Opcode::Stop => {
+                    break;
+                }
+                Opcode::End => {
+                    break;
+                }
+                _ => {}
+            }
+        }
+    }
+
     fn write_operation<'a, I>(
         &self,
         address: u8,
@@ -1596,6 +1728,8 @@ pub trait Instance: crate::private::Sealed {
     where
         I: Iterator<Item = &'a COMD>,
     {
+        #[cfg(feature = "log")]
+        log::trace!("write_operation: addr: {:0x}, bytes: {:0x?}, start: {:?}, stop: {:?}", address, bytes, start, stop);
         // Reset FIFO and command list
         self.reset_fifo();
         self.reset_command_list();
@@ -1608,12 +1742,13 @@ pub trait Instance: crate::private::Sealed {
             cmd_iterator,
             if stop { Command::Stop } else { Command::End },
         )?;
+        //self.log_comd("write_operation");
         let index = self.fill_tx_fifo(bytes);
         self.start_transmission();
 
         // Fill the FIFO with the remaining bytes:
         self.write_remaining_tx_fifo(index, bytes)?;
-        self.wait_for_completion()?;
+        self.wait_for_completion(!stop)?;
         Ok(())
     }
 
@@ -1628,6 +1763,8 @@ pub trait Instance: crate::private::Sealed {
     where
         I: Iterator<Item = &'a COMD>,
     {
+        #[cfg(feature = "log")]
+        log::trace!("read_operation: addr: {:0x}, read_len: {:?}, start: {:?}, stop: {:?}", address, buffer.len(), start, stop);
         // Reset FIFO and command list
         self.reset_fifo();
         self.reset_command_list();
@@ -1642,7 +1779,7 @@ pub trait Instance: crate::private::Sealed {
         )?;
         self.start_transmission();
         self.read_all_from_fifo(buffer)?;
-        self.wait_for_completion()?;
+        self.wait_for_completion(!stop)?;
         Ok(())
     }
 
@@ -1685,6 +1822,8 @@ pub trait Instance: crate::private::Sealed {
         bytes: &[u8],
         buffer: &mut [u8],
     ) -> Result<(), Error> {
+        #[cfg(feature = "log")]
+        log::trace!("master_write_read: addr: {:0x}, bytes: {:0x?}, read_len: {:?}", addr, bytes, buffer.len());
         // it would be possible to combine the write and read
         // in one transaction but filling the tx fifo with
         // the current code is somewhat slow even in release mode
@@ -1698,7 +1837,7 @@ pub trait Instance: crate::private::Sealed {
             true,
             false,
             &mut self.register_block().comd_iter(),
-        )?;
+        ).unwrap();
         self.clear_all_interrupts();
         self.read_operation(
             addr,
