@@ -206,7 +206,7 @@ enum OperationType {
 #[derive(Eq, PartialEq, Copy, Clone)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 enum Ack {
-    Ack = 0,
+    Ack  = 0,
     Nack = 1,
 }
 impl From<u32> for Ack {
@@ -1462,7 +1462,9 @@ pub trait Instance: crate::private::Sealed {
             // Handle completion cases
             // A full transmission was completed (either a STOP condition or END was
             // processed)
-            if (!end_only && interrupts.trans_complete().bit_is_set()) || interrupts.end_detect().bit_is_set() {
+            if (!end_only && interrupts.trans_complete().bit_is_set())
+                || interrupts.end_detect().bit_is_set()
+            {
                 #[cfg(all(feature = "log", feature = "debug"))]
                 log::trace!("wait_for_completion: interrupts: {:?}", interrupts);
                 break;
@@ -1729,7 +1731,13 @@ pub trait Instance: crate::private::Sealed {
         I: Iterator<Item = &'a COMD>,
     {
         #[cfg(feature = "log")]
-        log::trace!("write_operation: addr: {:0x}, bytes: {:0x?}, start: {:?}, stop: {:?}", address, bytes, start, stop);
+        log::trace!(
+            "write_operation: addr: {:0x}, bytes: {:0x?}, start: {:?}, stop: {:?}",
+            address,
+            bytes,
+            start,
+            stop
+        );
         // Reset FIFO and command list
         self.reset_fifo();
         self.reset_command_list();
@@ -1742,7 +1750,7 @@ pub trait Instance: crate::private::Sealed {
             cmd_iterator,
             if stop { Command::Stop } else { Command::End },
         )?;
-        //self.log_comd("write_operation");
+        // self.log_comd("write_operation");
         let index = self.fill_tx_fifo(bytes);
         self.start_transmission();
 
@@ -1764,7 +1772,13 @@ pub trait Instance: crate::private::Sealed {
         I: Iterator<Item = &'a COMD>,
     {
         #[cfg(feature = "log")]
-        log::trace!("read_operation: addr: {:0x}, read_len: {:?}, start: {:?}, stop: {:?}", address, buffer.len(), start, stop);
+        log::trace!(
+            "read_operation: addr: {:0x}, read_len: {:?}, start: {:?}, stop: {:?}",
+            address,
+            buffer.len(),
+            start,
+            stop
+        );
         // Reset FIFO and command list
         self.reset_fifo();
         self.reset_command_list();
@@ -1823,7 +1837,12 @@ pub trait Instance: crate::private::Sealed {
         buffer: &mut [u8],
     ) -> Result<(), Error> {
         #[cfg(feature = "log")]
-        log::trace!("master_write_read: addr: {:0x}, bytes: {:0x?}, read_len: {:?}", addr, bytes, buffer.len());
+        log::trace!(
+            "master_write_read: addr: {:0x}, bytes: {:0x?}, read_len: {:?}",
+            addr,
+            bytes,
+            buffer.len()
+        );
         // it would be possible to combine the write and read
         // in one transaction but filling the tx fifo with
         // the current code is somewhat slow even in release mode
@@ -1837,7 +1856,7 @@ pub trait Instance: crate::private::Sealed {
             true,
             false,
             &mut self.register_block().comd_iter(),
-        ).unwrap();
+        )?;
         self.clear_all_interrupts();
         self.read_operation(
             addr,
