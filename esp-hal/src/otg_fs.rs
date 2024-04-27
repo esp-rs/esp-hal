@@ -139,18 +139,21 @@ pub mod asynch {
         Out,
         PhyType,
         State,
-        MAX_EP_COUNT,
     };
     use procmacros::handler;
 
     use super::*;
     use crate::Cpu;
 
+    // From ESP32-S3 TRM:
+    // Six additional endpoints (endpoint numbers 1 to 6), configurable as IN or OUT
+    const MAX_EP_COUNT: usize = 7;
+
     static STATE: State<MAX_EP_COUNT> = State::new();
 
     /// Asynchronous USB driver.
     pub struct Driver<'d> {
-        inner: OtgDriver<'d>,
+        inner: OtgDriver<'d, MAX_EP_COUNT>,
     }
 
     impl<'d> Driver<'d> {
@@ -227,7 +230,7 @@ pub mod asynch {
 
     /// USB bus.
     pub struct Bus<'d> {
-        inner: OtgBus<'d>,
+        inner: OtgBus<'d, MAX_EP_COUNT>,
         inited: bool,
     }
 
