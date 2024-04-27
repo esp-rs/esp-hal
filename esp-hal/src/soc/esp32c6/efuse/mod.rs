@@ -20,7 +20,7 @@
 //!
 //! ### Read chip's MAC address from the eFuse storage.
 //! ```no_run
-//! let mac_address = Efuse::get_mac_address();
+//! let mac_address = Efuse::read_base_mac_address();
 //! writeln!(
 //!     serial_tx,
 //!     "MAC: {:#X}:{:#X}:{:#X}:{:#X}:{:#X}:{:#X}",
