@@ -18,36 +18,14 @@ use crate::{
 /// Channel number
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub enum Number {
-    Channel0,
-    Channel1,
+    Channel0 = 0,
+    Channel1 = 1,
 }
 
-/// PCNT channel action on signal edge
-#[derive(Debug, Copy, Clone, Default)]
-pub enum EdgeMode {
-    /// Hold current count value
-    Hold      = 0,
-    /// Increase count value
-    #[default]
-    Increment = 1,
-    /// Decrease count value
-    Decrement = 2,
-}
-
-/// PCNT channel action on control level
-#[derive(Debug, Copy, Clone, Default)]
-pub enum CtrlMode {
-    /// Keep current count mode
-    Keep    = 0,
-    /// Invert current count mode (increase -> decrease, decrease -> increase)
-    #[default]
-    Reverse = 1,
-    /// Hold current count value
-    Disable = 2,
-}
+pub use crate::peripherals::pcnt::unit::conf0::{CTRL_MODE as CtrlMode, EDGE_MODE as EdgeMode};
 
 /// Pulse Counter configuration for a single channel
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone)]
 pub struct Config {
     /// PCNT low control mode
     pub lctrl_mode: CtrlMode,
@@ -59,6 +37,19 @@ pub struct Config {
     pub neg_edge: EdgeMode,
     pub invert_ctrl: bool,
     pub invert_sig: bool,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            lctrl_mode: CtrlMode::Reverse,
+            hctrl_mode: CtrlMode::Reverse,
+            pos_edge: EdgeMode::Increment,
+            neg_edge: EdgeMode::Increment,
+            invert_ctrl: false,
+            invert_sig: false,
+        }
+    }
 }
 
 /// PcntPin can be always high, always low, or an actual pin
@@ -96,33 +87,16 @@ impl Channel {
     /// Configure the channel
     pub fn configure(&mut self, ctrl_signal: PcntSource, edge_signal: PcntSource, config: Config) {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
-        let conf0 = pcnt.u_conf0(self.unit as usize);
-        match self.channel {
-            Number::Channel0 => {
-                conf0.modify(|_, w| unsafe {
-                    w.ch0_hctrl_mode()
-                        .bits(config.hctrl_mode as u8)
-                        .ch0_lctrl_mode()
-                        .bits(config.lctrl_mode as u8)
-                        .ch0_neg_mode()
-                        .bits(config.neg_edge as u8)
-                        .ch0_pos_mode()
-                        .bits(config.pos_edge as u8)
-                });
-            }
-            Number::Channel1 => {
-                conf0.modify(|_, w| unsafe {
-                    w.ch1_hctrl_mode()
-                        .bits(config.hctrl_mode as u8)
-                        .ch1_lctrl_mode()
-                        .bits(config.lctrl_mode as u8)
-                        .ch1_neg_mode()
-                        .bits(config.neg_edge as u8)
-                        .ch1_pos_mode()
-                        .bits(config.pos_edge as u8)
-                });
-            }
-        }
+        let conf0 = pcnt.unit(self.unit as usize).conf0();
+
+        conf0.modify(|_, w| {
+            w.ch_hctrl_mode(self.channel as u8)
+                .variant(config.hctrl_mode);
+            w.ch_lctrl_mode(self.channel as u8)
+                .variant(config.lctrl_mode);
+            w.ch_neg_mode(self.channel as u8).variant(config.neg_edge);
+            w.ch_pos_mode(self.channel as u8).variant(config.pos_edge)
+        });
         self.set_ctrl_signal(ctrl_signal, config.invert_ctrl);
         self.set_edge_signal(edge_signal, config.invert_sig);
     }
@@ -172,12 +146,9 @@ impl Channel {
             unsafe { &*GPIO::PTR }
                 .func_in_sel_cfg(signal as usize)
                 .modify(|_, w| unsafe {
-                    w.sel()
-                        .set_bit()
-                        .in_inv_sel()
-                        .bit(invert)
-                        .in_sel()
-                        .bits(source.source)
+                    w.sel().set_bit();
+                    w.in_inv_sel().bit(invert);
+                    w.in_sel().bits(source.source)
                 });
         }
         self
@@ -228,12 +199,9 @@ impl Channel {
             unsafe { &*GPIO::PTR }
                 .func_in_sel_cfg(signal as usize)
                 .modify(|_, w| unsafe {
-                    w.sel()
-                        .set_bit()
-                        .in_inv_sel()
-                        .bit(invert)
-                        .in_sel()
-                        .bits(source.source)
+                    w.sel().set_bit();
+                    w.in_inv_sel().bit(invert);
+                    w.in_sel().bits(source.source)
                 });
         }
         self
