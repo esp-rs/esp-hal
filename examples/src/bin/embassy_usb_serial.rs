@@ -33,6 +33,7 @@ use esp_hal::{
 
 #[main]
 async fn main(_spawner: Spawner) -> () {
+    esp_println::logger::init_logger_from_env();
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
     let system = SystemControl::new(peripherals.SYSTEM);

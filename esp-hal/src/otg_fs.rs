@@ -237,6 +237,31 @@ pub mod asynch {
     impl<'d> Bus<'d> {
         fn init(&mut self) {
             Usb::_enable();
+
+            let r = unsafe { Otg::from_ptr(peripherals::USB0::ptr().cast_mut().cast::<()>()) };
+
+            // Wait for AHB ready.
+            while !r.grstctl().read().ahbidl() {}
+
+            // Configure as device.
+            r.gusbcfg().write(|w| {
+                // Force device mode
+                w.set_fdmod(true);
+                w.set_srpcap(false);
+                // Enable internal full-speed PHY
+                w.set_physel(true);
+            });
+            self.inner.config_v1();
+
+            // Perform core soft-reset
+            r.grstctl().modify(|w| w.set_csrst(true));
+            while r.grstctl().read().csrst() {}
+
+            r.pcgcctl().modify(|w| {
+                // Disable power down
+                w.set_stppclk(false);
+            });
+
             unsafe {
                 crate::interrupt::bind_interrupt(
                     crate::peripherals::Interrupt::USB,
