@@ -782,7 +782,8 @@ mod asynch {
                 true,
                 true,
                 &mut self.peripheral.register_block().comd_iter(),
-            ).await?;
+            )
+            .await?;
             Ok(())
         }
 
@@ -798,7 +799,8 @@ mod asynch {
                 true,
                 true,
                 &mut self.peripheral.register_block().comd_iter(),
-            ).await?;
+            )
+            .await?;
             Ok(())
         }
 
@@ -823,7 +825,8 @@ mod asynch {
                 true,
                 false,
                 &mut self.peripheral.register_block().comd_iter(),
-            ).await?;
+            )
+            .await?;
             self.peripheral.clear_all_interrupts();
             self.read_operation(
                 addr,
@@ -831,7 +834,8 @@ mod asynch {
                 true,
                 true,
                 &mut self.peripheral.register_block().comd_iter(),
-            ).await?;
+            )
+            .await?;
             Ok(())
         }
 
@@ -847,8 +851,8 @@ mod asynch {
             Ok(())
         }
 
-        /// Writes bytes to slave with address `address` and then reads enough bytes
-        /// to fill `buffer` *in a single transaction*
+        /// Writes bytes to slave with address `address` and then reads enough
+        /// bytes to fill `buffer` *in a single transaction*
         pub async fn write_read(
             &mut self,
             addr: u8,
