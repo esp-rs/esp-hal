@@ -280,10 +280,9 @@ pub struct I2C<'d, T, DM: crate::Mode> {
     phantom: PhantomData<DM>,
 }
 
-impl<T, DM> I2C<'_, T, DM>
+impl<T> I2C<'_, T, crate::Blocking>
 where
     T: Instance,
-    DM: crate::Mode,
 {
     /// Reads enough bytes from slave with `address` to fill `buffer`
     pub fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Error> {
@@ -308,31 +307,31 @@ where
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<T, DM: crate::Mode> embedded_hal_02::blocking::i2c::Read for I2C<'_, T, DM>
+impl<T> embedded_hal_02::blocking::i2c::Read for I2C<'_, T, crate::Blocking>
 where
     T: Instance,
 {
     type Error = Error;
 
     fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Self::Error> {
-        self.read(address, buffer)
+        self.peripheral.master_read(address, buffer)
     }
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<T, DM: crate::Mode> embedded_hal_02::blocking::i2c::Write for I2C<'_, T, DM>
+impl<T> embedded_hal_02::blocking::i2c::Write for I2C<'_, T, crate::Blocking>
 where
     T: Instance,
 {
     type Error = Error;
 
     fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Self::Error> {
-        self.write(addr, bytes)
+        self.peripheral.master_write(addr, bytes)
     }
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<T, DM: crate::Mode> embedded_hal_02::blocking::i2c::WriteRead for I2C<'_, T, DM>
+impl<T> embedded_hal_02::blocking::i2c::WriteRead for I2C<'_, T, crate::Blocking>
 where
     T: Instance,
 {
@@ -344,7 +343,7 @@ where
         bytes: &[u8],
         buffer: &mut [u8],
     ) -> Result<(), Self::Error> {
-        self.write_read(address, bytes, buffer)
+        self.peripheral.master_write_read(address, bytes, buffer)
     }
 }
 
@@ -636,7 +635,7 @@ mod asynch {
                 panic!("On ESP32 and ESP32-S2 the max I2C read is limited to 32 bytes");
             }
 
-            self.wait_for_completion().await?;
+            self.wait_for_completion(false).await?;
 
             for byte in buffer.iter_mut() {
                 *byte = read_fifo(self.peripheral.register_block());
@@ -696,20 +695,19 @@ mod asynch {
             }
         }
 
-        async fn wait_for_completion(&self) -> Result<(), Error> {
+        async fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
             self.peripheral.check_errors()?;
 
-            select(
-                I2cFuture::new(Event::TxComplete, self.inner()),
-                I2cFuture::new(Event::EndDetect, self.inner()),
-            )
-            .await;
-
-            for cmd in self.peripheral.register_block().comd_iter() {
-                if cmd.read().command().bits() != 0x0 && cmd.read().command_done().bit_is_clear() {
-                    return Err(Error::ExecIncomplete);
-                }
+            if end_only {
+                I2cFuture::new(Event::EndDetect, self.inner()).await;
+            } else {
+                select(
+                    I2cFuture::new(Event::TxComplete, self.inner()),
+                    I2cFuture::new(Event::EndDetect, self.inner()),
+                )
+                .await;
             }
+            self.peripheral.check_all_commands_done()?;
 
             Ok(())
         }
@@ -741,7 +739,7 @@ mod asynch {
 
             // Fill the FIFO with the remaining bytes:
             self.write_remaining_tx_fifo(index, bytes).await?;
-            self.wait_for_completion().await?;
+            self.wait_for_completion(!stop).await?;
             Ok(())
         }
 
@@ -769,11 +767,100 @@ mod asynch {
             )?;
             self.peripheral.start_transmission();
             self.read_all_from_fifo(buffer).await?;
-            self.wait_for_completion().await?;
+            self.wait_for_completion(!stop).await?;
+            Ok(())
+        }
+
+        /// Send data bytes from the `bytes` array to a target slave with the
+        /// address `addr`
+        async fn master_write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
+            // Clear all I2C interrupts
+            self.peripheral.clear_all_interrupts();
+            self.write_operation(
+                addr,
+                bytes,
+                true,
+                true,
+                &mut self.peripheral.register_block().comd_iter(),
+            ).await?;
+            Ok(())
+        }
+
+        /// Read bytes from a target slave with the address `addr`
+        /// The number of read bytes is deterimed by the size of the `buffer`
+        /// argument
+        async fn master_read(&mut self, addr: u8, buffer: &mut [u8]) -> Result<(), Error> {
+            // Clear all I2C interrupts
+            self.peripheral.clear_all_interrupts();
+            self.read_operation(
+                addr,
+                buffer,
+                true,
+                true,
+                &mut self.peripheral.register_block().comd_iter(),
+            ).await?;
+            Ok(())
+        }
+
+        /// Write bytes from the `bytes` array first and then read n bytes into
+        /// the `buffer` array with n being the size of the array.
+        async fn master_write_read(
+            &mut self,
+            addr: u8,
+            bytes: &[u8],
+            buffer: &mut [u8],
+        ) -> Result<(), Error> {
+            // it would be possible to combine the write and read
+            // in one transaction but filling the tx fifo with
+            // the current code is somewhat slow even in release mode
+            // which can cause issues
+
+            // Clear all I2C interrupts
+            self.peripheral.clear_all_interrupts();
+            self.write_operation(
+                addr,
+                bytes,
+                true,
+                false,
+                &mut self.peripheral.register_block().comd_iter(),
+            ).await?;
+            self.peripheral.clear_all_interrupts();
+            self.read_operation(
+                addr,
+                buffer,
+                true,
+                true,
+                &mut self.peripheral.register_block().comd_iter(),
+            ).await?;
+            Ok(())
+        }
+
+        /// Writes bytes to slave with address `address`
+        pub async fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
+            self.master_write(addr, bytes).await?;
+            Ok(())
+        }
+
+        /// Reads enough bytes from slave with `address` to fill `buffer`
+        pub async fn read(&mut self, addr: u8, buffer: &mut [u8]) -> Result<(), Error> {
+            self.master_read(addr, buffer).await?;
+            Ok(())
+        }
+
+        /// Writes bytes to slave with address `address` and then reads enough bytes
+        /// to fill `buffer` *in a single transaction*
+        pub async fn write_read(
+            &mut self,
+            addr: u8,
+            bytes: &[u8],
+            buffer: &mut [u8],
+        ) -> Result<(), Error> {
+            self.master_write_read(addr, bytes, buffer).await?;
             Ok(())
         }
     }
 
+    #[cfg(feature = "embedded-hal")]
     impl<'d, T> embedded_hal_async::i2c::I2c for I2C<'d, T, crate::Async>
     where
         T: Instance,
@@ -789,7 +876,6 @@ mod asynch {
                 // Clear all I2C interrupts
                 self.peripheral.clear_all_interrupts();
 
-                // TODO somehow know that we can combine a write and a read into one transaction
                 let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
                 match op {
                     Operation::Write(bytes) => {
@@ -1421,8 +1507,6 @@ pub trait Instance: crate::private::Sealed {
     }
 
     fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
-        #[cfg(feature = "log")]
-        log::trace!("wait_for_completion: end_only={}", end_only);
         loop {
             let interrupts = self.register_block().int_raw().read();
 
@@ -1434,26 +1518,26 @@ pub trait Instance: crate::private::Sealed {
             if (!end_only && interrupts.trans_complete().bit_is_set())
                 || interrupts.end_detect().bit_is_set()
             {
-                #[cfg(all(feature = "log", feature = "debug"))]
-                log::trace!("wait_for_completion: interrupts: {:?}", interrupts);
                 break;
             }
         }
+        self.check_all_commands_done()?;
+        Ok(())
+    }
+
+    fn check_all_commands_done(&self) -> Result<(), Error> {
         // NOTE: on esp32 executing the end command generates the end_detect interrupt
-        //       but does not seem to clear the done bit! So we don't the done status
-        //       of an end command
+        //       but does not seem to clear the done bit! So we don't check the done
+        //       status of an end command
         for cmd_reg in self.register_block().comd_iter() {
             let cmd = CommandReg(cmd_reg.read().bits());
             if cmd.bits() != 0x0 && cmd.opcode() != Opcode::End && !cmd.cmd_done() {
-                #[cfg(all(feature = "log", feature = "debug"))]
-                self.log_comd("wait_for_completion");
                 return Err(Error::ExecIncomplete);
             }
         }
 
         Ok(())
     }
-
     fn check_errors(&self) -> Result<(), Error> {
         let interrupts = self.register_block().int_raw().read();
 
@@ -1670,24 +1754,6 @@ pub trait Instance: crate::private::Sealed {
             .write(|w| w.rxfifo_full().clear_bit_by_one());
     }
 
-    #[cfg(all(feature = "log", feature = "debug"))]
-    fn log_comd(&self, msg: &str) {
-        log::info!("{}: {:?}", msg, self.register_block().int_raw().read());
-        for cmd in self.register_block().comd_iter() {
-            let command = CommandReg(cmd.read().bits());
-            log::info!("{}: {:?}", msg, command);
-            match command.opcode() {
-                Opcode::Stop => {
-                    break;
-                }
-                Opcode::End => {
-                    break;
-                }
-                _ => {}
-            }
-        }
-    }
-
     fn write_operation<'a, I>(
         &self,
         address: u8,
@@ -1699,14 +1765,6 @@ pub trait Instance: crate::private::Sealed {
     where
         I: Iterator<Item = &'a COMD>,
     {
-        #[cfg(feature = "log")]
-        log::trace!(
-            "write_operation: addr: {:0x}, bytes: {:0x?}, start: {:?}, stop: {:?}",
-            address,
-            bytes,
-            start,
-            stop
-        );
         // Reset FIFO and command list
         self.reset_fifo();
         self.reset_command_list();
@@ -1719,7 +1777,6 @@ pub trait Instance: crate::private::Sealed {
             cmd_iterator,
             if stop { Command::Stop } else { Command::End },
         )?;
-        // self.log_comd("write_operation");
         let index = self.fill_tx_fifo(bytes);
         self.start_transmission();
 
@@ -1740,14 +1797,6 @@ pub trait Instance: crate::private::Sealed {
     where
         I: Iterator<Item = &'a COMD>,
     {
-        #[cfg(feature = "log")]
-        log::trace!(
-            "read_operation: addr: {:0x}, read_len: {:?}, start: {:?}, stop: {:?}",
-            address,
-            buffer.len(),
-            start,
-            stop
-        );
         // Reset FIFO and command list
         self.reset_fifo();
         self.reset_command_list();
@@ -1805,13 +1854,6 @@ pub trait Instance: crate::private::Sealed {
         bytes: &[u8],
         buffer: &mut [u8],
     ) -> Result<(), Error> {
-        #[cfg(feature = "log")]
-        log::trace!(
-            "master_write_read: addr: {:0x}, bytes: {:0x?}, read_len: {:?}",
-            addr,
-            bytes,
-            buffer.len()
-        );
         // it would be possible to combine the write and read
         // in one transaction but filling the tx fifo with
         // the current code is somewhat slow even in release mode
