@@ -3,28 +3,24 @@
 //! ## Overview
 //! The USB OTG Full-speed peripheral driver provides support for the USB
 //! On-The-Go (OTG) full-speed functionality on ESP chips, allows communication
-//! with USB devices.
+//! with USB devices using either blocking (usb-device) or asynchronous (embassy-usb) APIs.
 //!
-//! The driver uses the `esp_synopsys_usb_otg` crate, which provides the `USB
-//! bus` implementation and `USB peripheral traits`. It also relies on other
-//! peripheral modules, such as `GPIO`, `system`, and `clock control`, to
-//! configure and enable the `USB` peripheral.
+//! The blocking driver uses the `esp_synopsys_usb_otg` crate, which provides the `USB
+//! bus` implementation and `USB peripheral traits`.
+//!
+//! The asynchronous driver uses the `embassy_usb_synopsys_otg` crate, which
+//! provides the `USB bus` and `USB device` implementations.
+//!
+//! The module also relies on other peripheral modules, such as `GPIO`, `system`, and
+//! `clock control`, to configure and enable the `USB` peripheral.
 //!
 //! To use the USB OTG Full-speed peripheral driver, you need to initialize the
-//! peripheral and configure its settings. The USB struct represents the USB
-//! peripheral and requires the implementation of the `UsbSel`, `UsbDp`, and
-//! `UsbDm` traits, which define the specific types used for USB pin selection
-//! and data pins.
+//! peripheral and configure its settings. The [`Usb`] struct represents the USB
+//! peripheral and requires the GPIO pins that implement [`UsbDp`], and [`UsbDm`],
+//! which define the specific types used for USB pin selection.
 //!
-//! The USB struct provides a `new` function for initialization.
-//! Inside the `new` function, the `into_ref!` macro is used to convert the
-//! peripheral references into `PeripheralRef` instances.
-//!
-//! The `USB` struct implements the `UsbPeripheral` trait from the
-//! `esp_synopsys_usb_otg` crate, which defines the required constants and
-//! functions for `USB peripheral` operation. The trait implementation includes
-//! enabling the `USB peripheral`, configuring the `USB` settings and connecting
-//! the appropriate `GPIO` pins to the `USB peripheral`.
+//! The returned `Usb` instance can be used with the `usb-device` crate, or it can be further
+//! configured with [`asynch::Driver`] to be used with the `embassy-usb` crate.
 
 pub use esp_synopsys_usb_otg::UsbBus;
 use esp_synopsys_usb_otg::UsbPeripheral;
@@ -157,7 +153,9 @@ pub mod asynch {
     }
 
     impl<'d> Driver<'d> {
-        /// Initializes USB OTG peripheral with internal Full-Speed PHY.
+        const REGISTERS: Otg = unsafe { Otg::from_ptr(Usb::REGISTERS.cast_mut()) };
+
+        /// Initializes USB OTG peripheral with internal Full-Speed PHY, for asynchronous operation.
         ///
         /// # Arguments
         ///
@@ -172,15 +170,14 @@ pub mod asynch {
             // The following numbers are pessimistic and were figured out empirically.
             const RX_FIFO_EXTRA_SIZE_WORDS: u16 = 30;
 
-            let regs = unsafe { Otg::from_ptr(Usb::REGISTERS.cast_mut()) };
             let instance = OtgInstance {
-                regs,
+                regs: Self::REGISTERS,
                 state: &STATE,
                 fifo_depth_words: Usb::FIFO_DEPTH_WORDS as u16,
                 extra_rx_fifo_words: RX_FIFO_EXTRA_SIZE_WORDS,
                 endpoint_count: Usb::ENDPOINT_COUNT,
                 phy_type: PhyType::InternalFullSpeed,
-                quirk_setup_late_cnak: quirk_setup_late_cnak(regs),
+                quirk_setup_late_cnak: quirk_setup_late_cnak(),
                 calculate_trdt_fn: |_| 5,
             };
             Self {
@@ -228,7 +225,8 @@ pub mod asynch {
         }
     }
 
-    /// USB bus.
+    /// Asynchronous USB bus mainly used internally by `embassy-usb`.
+    // We need a custom wrapper implementation to handle custom initialization.
     pub struct Bus<'d> {
         inner: OtgBus<'d, MAX_EP_COUNT>,
         inited: bool,
@@ -238,7 +236,7 @@ pub mod asynch {
         fn init(&mut self) {
             Usb::_enable();
 
-            let r = unsafe { Otg::from_ptr(peripherals::USB0::ptr().cast_mut().cast::<()>()) };
+            let r = Driver::REGISTERS;
 
             // Wait for AHB ready.
             while !r.grstctl().read().ahbidl() {}
@@ -326,19 +324,17 @@ pub mod asynch {
         }
     }
 
-    fn quirk_setup_late_cnak(r: Otg) -> bool {
+    fn quirk_setup_late_cnak() -> bool {
         // Our CID register is 4 bytes offset from what's in embassy-usb-synopsys-otg
-        let cid = unsafe { r.as_ptr().cast::<u32>().add(0x40).read_volatile() };
+        let cid = unsafe { Driver::REGISTERS.as_ptr().cast::<u32>().add(0x40).read_volatile() };
         // ESP32-Sx has a different CID register value, too
         cid == 0x4f54_400a || cid & 0xf000 == 0x1000
     }
 
     #[handler(priority = crate::interrupt::Priority::max())]
     fn interrupt_handler() {
-        let r = unsafe { Otg::from_ptr(peripherals::USB0::ptr().cast_mut().cast::<()>()) };
+        let setup_late_cnak = quirk_setup_late_cnak();
 
-        let setup_late_cnak = quirk_setup_late_cnak(r);
-
-        unsafe { on_interrupt(r, &STATE, Usb::ENDPOINT_COUNT, setup_late_cnak) }
+        unsafe { on_interrupt(Driver::REGISTERS, &STATE, Usb::ENDPOINT_COUNT, setup_late_cnak) }
     }
 }
