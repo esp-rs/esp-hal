@@ -19,8 +19,8 @@ use esp_hal::{
     gpio::{GpioPin, Input, Io, Output, OutputPin, PullDown, PushPull, Unknown},
     macros::handler,
     peripherals::Peripherals,
-    timer::TimerGroup,
     system::SystemControl,
+    timer::TimerGroup,
 };
 
 static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
