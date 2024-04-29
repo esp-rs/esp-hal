@@ -23,7 +23,6 @@ static mut EP_MEMORY: [u32; 1024] = [0; 1024];
 
 #[entry]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = Peripherals::take();
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
