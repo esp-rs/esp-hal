@@ -6,12 +6,7 @@
 use defmt_rtt as _;
 use embedded_hal::delay::DelayNs;
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    delay::Delay,
-    peripherals::Peripherals,
-    system::SystemControl,
-};
+use esp_hal::{clock::ClockControl, delay::Delay, peripherals::Peripherals, system::SystemControl};
 
 struct Context {
     delay: Delay,
