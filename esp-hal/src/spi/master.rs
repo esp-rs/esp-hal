@@ -900,6 +900,7 @@ pub mod dma {
             }
         }
     }
+
     /// An in-progress DMA transfer
     #[must_use]
     pub struct SpiDmaTransferRxTx<'t, 'd, T, C, M, DmaMode>
@@ -1108,14 +1109,9 @@ pub mod dma {
         where
             TXBUF: ReadBuffer<Word = u8>,
         {
-            let (ptr, len) = unsafe { words.read_buffer() };
-
-            if len > MAX_DMA_SIZE {
-                return Err(super::Error::MaxDmaTransferSizeExceeded);
+            unsafe {
+                self.dma_write_unchecked(words)?;
             }
-
-            self.spi
-                .start_write_bytes_dma(ptr, len, &mut self.channel.tx, false)?;
             Ok(SpiDmaTransfer { spi_dma: self })
         }
 
@@ -1132,15 +1128,8 @@ pub mod dma {
         where
             RXBUF: WriteBuffer<Word = u8>,
         {
-            let (ptr, len) = unsafe { words.write_buffer() };
-
-            if len > MAX_DMA_SIZE {
-                return Err(super::Error::MaxDmaTransferSizeExceeded);
-            }
-
             unsafe {
-                self.spi
-                    .start_read_bytes_dma(ptr, len, &mut self.channel.rx, false)?;
+                self.dma_read_unchecked(words)?;
             }
             Ok(SpiDmaTransfer { spi_dma: self })
         }
@@ -1155,6 +1144,81 @@ pub mod dma {
             words: &'t TXBUF,
             read_buffer: &'t mut RXBUF,
         ) -> Result<SpiDmaTransferRxTx<'t, 'd, T, C, M, DmaMode>, super::Error>
+        where
+            TXBUF: ReadBuffer<Word = u8>,
+            RXBUF: WriteBuffer<Word = u8>,
+        {
+            unsafe {
+                self.dma_transfer_unchecked(words, read_buffer)?;
+            }
+            Ok(SpiDmaTransferRxTx { spi_dma: self })
+        }
+
+        /// Perform a DMA write. Use [Self::wait] to await completion of the
+        /// current transfer.
+        ///
+        /// # Safety
+        /// - don't use the buffers while the DMA transaction is ongoing
+        /// - don't start a new transfer while the DMA transaction is ongoing
+        #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
+        pub unsafe fn dma_write_unchecked<TXBUF>(
+            &mut self,
+            words: &TXBUF,
+        ) -> Result<(), super::Error>
+        where
+            TXBUF: ReadBuffer<Word = u8>,
+        {
+            let (ptr, len) = unsafe { words.read_buffer() };
+
+            if len > MAX_DMA_SIZE {
+                return Err(super::Error::MaxDmaTransferSizeExceeded);
+            }
+
+            self.spi
+                .start_write_bytes_dma(ptr, len, &mut self.channel.tx, false)?;
+
+            Ok(())
+        }
+
+        /// Perform a DMA read. Use [Self::wait] to await completion of the
+        /// current transfer.
+        ///
+        /// # Safety
+        /// - don't use the buffers while the DMA transaction is ongoing
+        /// - don't start a new transfer while the DMA transaction is ongoing
+        #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
+        pub unsafe fn dma_read_unchecked<RXBUF>(
+            &mut self,
+            words: &mut RXBUF,
+        ) -> Result<(), super::Error>
+        where
+            RXBUF: WriteBuffer<Word = u8>,
+        {
+            let (ptr, len) = unsafe { words.write_buffer() };
+
+            if len > MAX_DMA_SIZE {
+                return Err(super::Error::MaxDmaTransferSizeExceeded);
+            }
+
+            unsafe {
+                self.spi
+                    .start_read_bytes_dma(ptr, len, &mut self.channel.rx, false)?;
+            }
+
+            Ok(())
+        }
+
+        /// Perform a DMA transfer. Use [Self::wait] to await completion of the
+        /// current transfer.
+        ///
+        /// # Safety
+        /// - don't use the buffers while the DMA transaction is ongoing
+        /// - don't start a new transfer while the DMA transaction is ongoing
+        pub unsafe fn dma_transfer_unchecked<TXBUF, RXBUF>(
+            &mut self,
+            words: &TXBUF,
+            read_buffer: &mut RXBUF,
+        ) -> Result<(), super::Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
             RXBUF: WriteBuffer<Word = u8>,
@@ -1176,7 +1240,21 @@ pub mod dma {
                     &mut self.channel.rx,
                 )?;
             }
-            Ok(SpiDmaTransferRxTx { spi_dma: self })
+
+            Ok(())
+        }
+
+        /// Wait for the DMA transfer to complete
+        pub fn wait(&mut self) -> Result<(), DmaError> {
+            // Waiting for the DMA transfer is not enough. We need to wait for the
+            // peripheral to finish flushing its buffers, too.
+            self.spi.flush().ok();
+
+            if self.channel.rx.has_error() || self.channel.tx.has_error() {
+                Err(DmaError::DescriptorError)
+            } else {
+                Ok(())
+            }
         }
     }
 
