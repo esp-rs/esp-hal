@@ -30,8 +30,8 @@ jobs:
             rust-target: riscv32imc-unknown-none-elf
           - soc: esp32c6
             rust-target: riscv32imac-unknown-none-elf
-          # - soc: esp32h2
-          #   rust-target: riscv32imac-unknown-none-elf
+          - soc: esp32h2
+            rust-target: riscv32imac-unknown-none-elf
           # # Xtensa devices:
           - soc: esp32s2
             rust-target: xtensa-esp32s2-none-elf
@@ -102,8 +102,8 @@ jobs:
             runner: esp32c3-usb
           - soc: esp32c6
             runner: esp32c6-usb
-          # - soc: esp32h2
-          #   runner: esp32h2-usb
+          - soc: esp32h2
+            runner: esp32h2-usb
           # Xtensa devices:
           - soc: esp32s2
             runner: esp32s2-jtag
