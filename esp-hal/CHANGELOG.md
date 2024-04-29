@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ESP32-PICO-V3-02: Initial support (#1155)
 - `time::current_time` API (#1503)
+- Add an unsafe API to SPI master enabling use-cases which are not possible using the safe API (#1523)
 
 ### Fixed
 
