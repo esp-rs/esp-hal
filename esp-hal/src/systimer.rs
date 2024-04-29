@@ -132,7 +132,7 @@ impl<T, DM: crate::Mode, const CHANNEL: u8> Alarm<T, DM, CHANNEL> {
             #[cfg(esp32s2)]
             systimer.step().write(|w| w.xtal_step().bits(0x1)); // run at XTAL freq, not 80 * XTAL freq
 
-            #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
+            #[cfg(not(esp32s2))]
             {
                 tconf.write(|w| w.timer_unit_sel().clear_bit()); // default, use unit 0
                 systimer
@@ -142,7 +142,7 @@ impl<T, DM: crate::Mode, const CHANNEL: u8> Alarm<T, DM, CHANNEL> {
 
             conf(tconf, target);
 
-            #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
+            #[cfg(not(esp32s2))]
             {
                 systimer
                     .comp_load(CHANNEL as usize)
