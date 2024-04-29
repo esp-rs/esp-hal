@@ -238,15 +238,7 @@ impl RegisterAccess for crate::peripherals::ADC1 {
         let adc = unsafe { &*APB_SARADC::ptr() };
         let sensors = unsafe { &*SENS::ptr() };
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s2)] {
-                adc.int_clr()
-                    .write(|w| w.adc1_done().clear_bit_by_one());
-            } else {
-                adc.int_clr()
-                    .write(|w| w.apb_saradc1_done().clear_bit_by_one());
-            }
-        }
+        adc.int_clr().write(|w| w.adc1_done().clear_bit_by_one());
 
         sensors
             .sar_meas1_ctrl2()
@@ -294,9 +286,7 @@ impl RegisterAccess for crate::peripherals::ADC2 {
             .modify(|_, w| w.sar2_rtc_force().set_bit());
 
         let sar_apb = unsafe { &*APB_SARADC::ptr() };
-        sar_apb
-            .arb_ctrl()
-            .modify(|_, w| w.adc_arb_rtc_force().set_bit());
+        sar_apb.arb_ctrl().modify(|_, w| w.rtc_force().set_bit());
     }
 
     fn set_start_force() {
@@ -362,15 +352,7 @@ impl RegisterAccess for crate::peripherals::ADC2 {
         let adc = unsafe { &*APB_SARADC::ptr() };
         let sensors = unsafe { &*SENS::ptr() };
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s2)] {
-                adc.int_clr()
-                    .write(|w| w.adc2_done().clear_bit_by_one());
-            } else {
-                adc.int_clr()
-                    .write(|w| w.apb_saradc2_done().clear_bit_by_one());
-            }
-        }
+        adc.int_clr().write(|w| w.adc2_done().clear_bit_by_one());
 
         sensors
             .sar_meas2_ctrl2()
