@@ -137,7 +137,6 @@ pub mod dma {
             ChannelTypes,
             DmaError,
             DmaTransfer,
-            DmaTransferRxTx,
             RxPrivate,
             Spi2Peripheral,
             SpiPeripheral,
@@ -239,7 +238,7 @@ pub mod dma {
         spi_dma: &'t mut SpiDma<'d, T, C, DmaMode>,
     }
 
-    impl<'t, 'd, T, C, DmaMode> DmaTransferRxTx for SpiDmaTransferRxTx<'t, 'd, T, C, DmaMode>
+    impl<'t, 'd, T, C, DmaMode> DmaTransfer for SpiDmaTransferRxTx<'t, 'd, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,

@@ -1504,16 +1504,6 @@ pub trait DmaTransfer: Drop {
     fn is_done(&self) -> bool;
 }
 
-/// Trait to be implemented for an in progress dma transfer.
-#[allow(clippy::type_complexity, drop_bounds)]
-#[doc(hidden)]
-pub trait DmaTransferRxTx: Drop {
-    /// Wait for the transfer to finish.
-    fn wait(self) -> Result<(), DmaError>;
-    /// Check if the transfer is finished.
-    fn is_done(&self) -> bool;
-}
-
 #[cfg(feature = "async")]
 pub(crate) mod asynch {
     use core::task::Poll;

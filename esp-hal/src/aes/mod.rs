@@ -281,7 +281,7 @@ pub mod dma {
             ChannelTypes,
             DmaError,
             DmaPeripheral,
-            DmaTransferRxTx,
+            DmaTransfer,
             RxPrivate,
             TxPrivate,
         },
@@ -346,7 +346,7 @@ pub mod dma {
         aes_dma: &'t mut AesDma<'d, C>,
     }
 
-    impl<'t, 'd, C> DmaTransferRxTx for AesDmaTransferRxTx<'t, 'd, C>
+    impl<'t, 'd, C> DmaTransfer for AesDmaTransferRxTx<'t, 'd, C>
     where
         C: ChannelTypes,
         C::P: AesPeripheral,

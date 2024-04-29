@@ -16,10 +16,7 @@ pub use nb;
 #[cfg(any(dport, pcr, system))]
 pub use crate::clock::Clock as _esp_hal_clock_Clock;
 #[cfg(any(gdma, pdma))]
-pub use crate::dma::{
-    DmaTransfer as _esp_hal_dma_DmaTransfer,
-    DmaTransferRxTx as _esp_hal_dma_DmaTransferRxTx,
-};
+pub use crate::dma::DmaTransfer as _esp_hal_dma_DmaTransfer;
 #[cfg(gpio)]
 pub use crate::gpio::{
     InputPin as _esp_hal_gpio_InputPin,
