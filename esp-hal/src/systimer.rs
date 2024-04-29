@@ -24,7 +24,7 @@
 //! alarm0.wait_until(SystemTimer::now().wrapping_add(SystemTimer::TICKS_PER_SECOND));
 //! ```
 
-use core::{marker::PhantomData, mem::transmute};
+use core::marker::PhantomData;
 
 use fugit::MicrosDurationU32;
 
@@ -32,18 +32,7 @@ use crate::{
     interrupt::InterruptHandler,
     peripheral::Peripheral,
     peripherals::{
-        generic::Reg,
-        systimer::{
-            target0_conf::TARGET0_CONF_SPEC,
-            target0_hi::TARGET0_HI_SPEC,
-            target0_lo::TARGET0_LO_SPEC,
-            target1_conf::TARGET1_CONF_SPEC,
-            target1_hi::TARGET1_HI_SPEC,
-            target1_lo::TARGET1_LO_SPEC,
-            target2_conf::TARGET2_CONF_SPEC,
-            target2_hi::TARGET2_HI_SPEC,
-            target2_lo::TARGET2_LO_SPEC,
-        },
+        systimer::{TARGET_CONF, TRGT},
         SYSTIMER,
     },
 };
@@ -88,19 +77,12 @@ impl<'d> SystemTimer<'d, crate::Blocking> {
         // worst case scenario the second accessor ends up reading
         // an older time stamp
         let systimer = unsafe { &*SYSTIMER::ptr() };
-        systimer
-            .unit0_op()
-            .modify(|_, w| w.timer_unit0_update().set_bit());
+        systimer.unit0_op().modify(|_, w| w.update().set_bit());
 
-        while !systimer
-            .unit0_op()
-            .read()
-            .timer_unit0_value_valid()
-            .bit_is_set()
-        {}
+        while !systimer.unit0_op().read().value_valid().bit_is_set() {}
 
-        let value_lo = systimer.unit0_value_lo().read().bits();
-        let value_hi = systimer.unit0_value_hi().read().bits();
+        let value_lo = systimer.unit0_value().lo().read().bits();
+        let value_hi = systimer.unit0_value().hi().read().bits();
 
         ((value_hi as u64) << 32) | value_lo as u64
     }
@@ -141,74 +123,30 @@ impl<T, DM: crate::Mode, const CHANNEL: u8> Alarm<T, DM, CHANNEL> {
         Self { _pd: PhantomData }
     }
 
-    fn configure(
-        &self,
-        conf: impl FnOnce(&Reg<TARGET0_CONF_SPEC>, &Reg<TARGET0_HI_SPEC>, &Reg<TARGET0_LO_SPEC>),
-    ) {
+    fn configure(&self, conf: impl FnOnce(&TARGET_CONF, &TRGT)) {
         unsafe {
             let systimer = &*SYSTIMER::ptr();
-            let (tconf, hi, lo): (
-                &Reg<TARGET0_CONF_SPEC>,
-                &Reg<TARGET0_HI_SPEC>,
-                &Reg<TARGET0_LO_SPEC>,
-            ) = match CHANNEL {
-                0 => (
-                    systimer.target0_conf(),
-                    systimer.target0_hi(),
-                    systimer.target0_lo(),
-                ),
-                1 => (
-                    transmute::<&Reg<TARGET1_CONF_SPEC>, &Reg<TARGET0_CONF_SPEC>>(
-                        systimer.target1_conf(),
-                    ),
-                    transmute::<&Reg<TARGET1_HI_SPEC>, &Reg<TARGET0_HI_SPEC>>(
-                        systimer.target1_hi(),
-                    ),
-                    transmute::<&Reg<TARGET1_LO_SPEC>, &Reg<TARGET0_LO_SPEC>>(
-                        systimer.target1_lo(),
-                    ),
-                ),
-                2 => (
-                    transmute::<&Reg<TARGET2_CONF_SPEC>, &Reg<TARGET0_CONF_SPEC>>(
-                        systimer.target2_conf(),
-                    ),
-                    transmute::<&Reg<TARGET2_HI_SPEC>, &Reg<TARGET0_HI_SPEC>>(
-                        systimer.target2_hi(),
-                    ),
-                    transmute::<&Reg<TARGET2_LO_SPEC>, &Reg<TARGET0_LO_SPEC>>(
-                        systimer.target2_lo(),
-                    ),
-                ),
-                _ => unreachable!(),
-            };
+            let tconf = systimer.target_conf(CHANNEL as usize);
+            let target = systimer.trgt(CHANNEL as usize);
 
             #[cfg(esp32s2)]
-            systimer.step().write(|w| w.timer_xtal_step().bits(0x1)); // run at XTAL freq, not 80 * XTAL freq
+            systimer.step().write(|w| w.xtal_step().bits(0x1)); // run at XTAL freq, not 80 * XTAL freq
 
             #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
             {
-                tconf.write(|w| w.target0_timer_unit_sel().clear_bit()); // default, use unit 0
+                tconf.write(|w| w.timer_unit_sel().clear_bit()); // default, use unit 0
                 systimer
                     .conf()
                     .modify(|_, w| w.timer_unit0_core0_stall_en().clear_bit());
             }
 
-            conf(tconf, hi, lo);
+            conf(tconf, target);
 
             #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
             {
-                match CHANNEL {
-                    0 => systimer
-                        .comp0_load()
-                        .write(|w| w.timer_comp0_load().set_bit()),
-                    1 => systimer
-                        .comp1_load()
-                        .write(|w| w.timer_comp1_load().set_bit()),
-                    2 => systimer
-                        .comp2_load()
-                        .write(|w| w.timer_comp2_load().set_bit()),
-                    _ => unreachable!(),
-                }
+                systimer
+                    .comp_load(CHANNEL as usize)
+                    .write(|w| w.load().set_bit());
 
                 systimer.conf().modify(|_r, w| match CHANNEL {
                     0 => w.target0_work_en().set_bit(),
@@ -219,53 +157,37 @@ impl<T, DM: crate::Mode, const CHANNEL: u8> Alarm<T, DM, CHANNEL> {
             }
 
             #[cfg(esp32s2)]
-            tconf.modify(|_r, w| match CHANNEL {
-                0 => w.target0_work_en().set_bit(),
-                1 => w.target0_work_en().set_bit(),
-                2 => w.target0_work_en().set_bit(),
-                _ => unreachable!(),
-            });
+            tconf.modify(|_r, w| w.work_en().set_bit());
         }
     }
 
     pub(crate) fn enable_interrupt_internal(&self, val: bool) {
         let systimer = unsafe { &*SYSTIMER::ptr() };
-        match CHANNEL {
-            0 => systimer.int_ena().modify(|_, w| w.target0().bit(val)),
-            1 => systimer.int_ena().modify(|_, w| w.target1().bit(val)),
-            2 => systimer.int_ena().modify(|_, w| w.target2().bit(val)),
-            _ => unreachable!(),
-        }
+        systimer.int_ena().modify(|_, w| w.target(CHANNEL).bit(val));
     }
 
     pub(crate) fn clear_interrupt_internal(&self) {
         let systimer = unsafe { &*SYSTIMER::ptr() };
-        match CHANNEL {
-            0 => systimer.int_clr().write(|w| w.target0().clear_bit_by_one()),
-            1 => systimer.int_clr().write(|w| w.target1().clear_bit_by_one()),
-            2 => systimer.int_clr().write(|w| w.target2().clear_bit_by_one()),
-            _ => unreachable!(),
-        }
+        systimer
+            .int_clr()
+            .write(|w| w.target(CHANNEL).clear_bit_by_one());
     }
 
     pub(crate) fn set_target_internal(&self, timestamp: u64) {
-        self.configure(|tconf, hi, lo| unsafe {
-            tconf.write(|w| w.target0_period_mode().clear_bit()); // target mode
-            hi.write(|w| w.timer_target0_hi().bits((timestamp >> 32) as u32));
-            lo.write(|w| w.timer_target0_lo().bits((timestamp & 0xFFFF_FFFF) as u32));
+        self.configure(|tconf, target| unsafe {
+            tconf.write(|w| w.period_mode().clear_bit()); // target mode
+            target.hi().write(|w| w.hi().bits((timestamp >> 32) as u32));
+            target
+                .lo()
+                .write(|w| w.lo().set((timestamp & 0xFFFF_FFFF) as u32));
         })
     }
 
     pub(crate) fn set_period_internal(&self, ticks: u32) {
-        self.configure(|tconf, hi, lo| unsafe {
-            tconf.write(|w| {
-                w.target0_period_mode()
-                    .set_bit()
-                    .target0_period()
-                    .bits(ticks)
-            });
-            hi.write(|w| w.timer_target0_hi().bits(0));
-            lo.write(|w| w.timer_target0_lo().bits(0));
+        self.configure(|tconf, target| {
+            tconf.write(|w| unsafe { w.period_mode().set_bit().period().bits(ticks) });
+            target.hi().write(|w| w.hi().set(0));
+            target.lo().write(|w| w.lo().set(0));
         });
     }
 }
@@ -328,17 +250,9 @@ impl<DM: crate::Mode, const CHANNEL: u8> Alarm<Target, DM, CHANNEL> {
     pub fn wait_until(&mut self, timestamp: u64) {
         self.clear_interrupt_internal();
         self.set_target(timestamp);
+        let r = unsafe { &*crate::peripherals::SYSTIMER::PTR }.int_raw();
         loop {
-            let r = unsafe { &*crate::peripherals::SYSTIMER::PTR }
-                .int_raw()
-                .read();
-
-            if match CHANNEL {
-                0 => r.target0().bit_is_set(),
-                1 => r.target1().bit_is_set(),
-                2 => r.target2().bit_is_set(),
-                _ => unreachable!(),
-            } {
+            if r.read().target(CHANNEL).bit_is_set() {
                 break;
             }
         }
@@ -455,16 +369,11 @@ mod asynch {
         }
 
         fn event_bit_is_clear(&self) -> bool {
-            let r = unsafe { &*crate::peripherals::SYSTIMER::PTR }
+            unsafe { &*crate::peripherals::SYSTIMER::PTR }
                 .int_ena()
-                .read();
-
-            match N {
-                0 => r.target0().bit_is_clear(),
-                1 => r.target1().bit_is_clear(),
-                2 => r.target2().bit_is_clear(),
-                _ => unreachable!(),
-            }
+                .read()
+                .target(N)
+                .bit_is_clear()
         }
     }
 
