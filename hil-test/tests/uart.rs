@@ -6,6 +6,8 @@
 //!
 //! Connect TX (GPIO2) and RX (GPIO4) pins.
 
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+
 #![no_std]
 #![no_main]
 
@@ -108,11 +110,15 @@ mod tests {
 
         #[cfg(not(feature = "esp32s2"))]
         {
-            // 9600 baud, RC FAST clock source:
-            ctx.uart.change_baud(9600, ClockSource::RcFast, &ctx.clocks);
-            ctx.uart.write(7).ok();
-            let read = block!(ctx.uart.read());
-            assert_eq!(read, Ok(7));
+            // TODO: Remove cfg once https://github.com/esp-rs/esp-hal/issues/1524 is solved
+            #[cfg(not(feature = "esp32c3"))]
+            {
+                // 9600 baud, RC FAST clock source:
+                ctx.uart.change_baud(9600, ClockSource::RcFast, &ctx.clocks);
+                ctx.uart.write(7).ok();
+                let read = block!(ctx.uart.read());
+                assert_eq!(read, Ok(7));
+            }
 
             // 19,200 baud, XTAL clock source:
             ctx.uart.change_baud(19_200, ClockSource::Xtal, &ctx.clocks);
