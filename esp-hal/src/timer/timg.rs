@@ -49,20 +49,14 @@ use crate::peripherals::TIMG1;
 use crate::soc::constants::TIMG_DEFAULT_CLK_SRC;
 use crate::{
     clock::Clocks,
-    interrupt::InterruptHandler,
+    interrupt::{self, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::{timg0::RegisterBlock, TIMG0},
-    system::PeripheralClockControl,
+    peripherals::{timg0::RegisterBlock, Interrupt, TIMG0},
+    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    Async,
+    Blocking,
+    Mode,
 };
-
-/// Custom timer error type
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Error {
-    TimerActive,
-    TimerInactive,
-    AlarmInactive,
-}
 
 /// Interrupts which can be registered in [crate::Blocking] mode
 #[derive(Debug, Default)]
@@ -83,7 +77,7 @@ pub struct TimerInterrupts {
 pub struct TimerGroup<'d, T, DM>
 where
     T: TimerGroupInstance,
-    DM: crate::Mode,
+    DM: Mode,
 {
     _timer_group: PeripheralRef<'d, T>,
     pub timer0: Timer<Timer0<T>, DM>,
@@ -199,7 +193,7 @@ impl TimerGroupInstance for TIMG1 {
     }
 }
 
-impl<'d, T> TimerGroup<'d, T, crate::Blocking>
+impl<'d, T> TimerGroup<'d, T, Blocking>
 where
     T: TimerGroupInstance,
 {
@@ -332,7 +326,7 @@ where
     }
 }
 
-impl<'d, T> TimerGroup<'d, T, crate::Async>
+impl<'d, T> TimerGroup<'d, T, Async>
 where
     T: TimerGroupInstance,
 {
@@ -371,15 +365,19 @@ where
 }
 
 /// General-purpose Timer driver
-pub struct Timer<T, DM: crate::Mode> {
+pub struct Timer<T, DM>
+where
+    DM: Mode,
+{
     timg: T,
     apb_clk_freq: HertzU32,
     phantom: PhantomData<DM>,
 }
 
-impl<T, DM: crate::Mode> Timer<T, DM>
+impl<T, DM> Timer<T, DM>
 where
     T: Instance,
+    DM: Mode,
 {
     /// Create a new timer instance.
     pub fn new(timg: T, apb_clk_freq: HertzU32) -> Self {
@@ -431,9 +429,10 @@ where
     }
 }
 
-impl<T, DM: crate::Mode> Deref for Timer<T, DM>
+impl<T, DM> Deref for Timer<T, DM>
 where
     T: Instance,
+    DM: Mode,
 {
     type Target = T;
 
@@ -442,44 +441,156 @@ where
     }
 }
 
-impl<T, DM: crate::Mode> DerefMut for Timer<T, DM>
+impl<T, DM> DerefMut for Timer<T, DM>
 where
     T: Instance,
+    DM: Mode,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.timg
     }
 }
 
-/// Timer peripheral instance
-pub trait Instance: crate::private::Sealed + Enable {
-    fn reset_counter(&mut self);
+impl<T, DM> crate::private::Sealed for Timer<T, DM>
+where
+    T: Instance,
+    DM: Mode,
+{
+}
 
-    fn set_counter_active(&mut self, state: bool);
+impl<T, DM> super::Timer for Timer<T, DM>
+where
+    T: Instance,
+    DM: Mode,
+{
+    fn start(&self) {
+        self.timg.set_counter_active(false);
+        self.timg.set_alarm_active(false);
+
+        self.timg.reset_counter();
+        self.timg.set_counter_decrementing(false);
+
+        self.timg.set_counter_active(true);
+        self.timg.set_alarm_active(true);
+    }
+
+    fn stop(&self) {
+        self.timg.set_counter_active(false);
+    }
+
+    fn reset(&self) {
+        let t = self.register_block().t(self.timer_number().into());
+
+        t.loadlo().write(|w| unsafe { w.load_lo().bits(0) });
+        t.loadhi().write(|w| unsafe { w.load_hi().bits(0) });
+
+        t.load().write(|w| unsafe { w.load().bits(1) });
+    }
+
+    fn is_running(&self) -> bool {
+        self.register_block()
+            .t(self.timer_number().into())
+            .config()
+            .read()
+            .en()
+            .bit_is_set()
+    }
+
+    fn now(&self) -> u64 {
+        let t = self.register_block().t(self.timer_number().into());
+
+        t.update().write(|w| w.update().set_bit());
+        while t.update().read().update().bit_is_set() {
+            // Wait for the update to complete
+        }
+
+        let value_lo = t.lo().read().bits() as u64;
+        let value_hi = (t.hi().read().bits() as u64) << 32;
+
+        value_lo | value_hi
+    }
+
+    fn load_value(&self, value: MicrosDurationU64) {
+        let ticks = timeout_to_ticks(value, self.apb_clk_freq, self.timg.divider());
+
+        let value = ticks & 0x3F_FFFF_FFFF_FFFF;
+        let high = (value >> 32) as u32;
+        let low = (value & 0xFFFF_FFFF) as u32;
+
+        let t = self.register_block().t(self.timer_number().into());
+
+        t.alarmlo().write(|w| unsafe { w.alarm_lo().bits(low) });
+        t.alarmhi().write(|w| unsafe { w.alarm_hi().bits(high) });
+    }
+
+    fn enable_auto_reload(&self, auto_reload: bool) {
+        self.register_block()
+            .t(self.timer_number().into())
+            .config()
+            .modify(|_, w| w.autoreload().bit(auto_reload));
+    }
+
+    fn enable_interrupt(&self, state: bool) {
+        self.register_block()
+            .int_ena_timers()
+            .write(|w| w.t(self.timer_number()).bit(state));
+    }
+
+    fn clear_interrupt(&self) {
+        self.register_block()
+            .int_clr_timers()
+            .write(|w| w.t(self.timer_number()).clear_bit_by_one());
+    }
+
+    fn is_interrupt_set(&self) -> bool {
+        self.register_block()
+            .int_raw_timers()
+            .read()
+            .t(self.timer_number())
+            .bit_is_set()
+    }
+
+    fn set_alarm_active(&self, state: bool) {
+        self.register_block()
+            .t(self.timer_number().into())
+            .config()
+            .modify(|_, w| w.alarm_en().bit(state));
+    }
+}
+
+/// Timer peripheral instance.
+pub trait Instance: crate::private::Sealed + Enable {
+    fn register_block(&self) -> &RegisterBlock;
+
+    fn timer_number(&self) -> u8;
+
+    fn reset_counter(&self);
+
+    fn set_counter_active(&self, state: bool);
 
     fn is_counter_active(&self) -> bool;
 
-    fn set_counter_decrementing(&mut self, decrementing: bool);
+    fn set_counter_decrementing(&self, decrementing: bool);
 
-    fn set_auto_reload(&mut self, auto_reload: bool);
+    fn set_auto_reload(&self, auto_reload: bool);
 
-    fn set_alarm_active(&mut self, state: bool);
+    fn set_alarm_active(&self, state: bool);
 
     fn is_alarm_active(&self) -> bool;
 
-    fn load_alarm_value(&mut self, value: u64);
+    fn load_alarm_value(&self, value: u64);
 
-    fn listen(&mut self);
+    fn listen(&self);
 
-    fn unlisten(&mut self);
+    fn unlisten(&self);
 
-    fn clear_interrupt(&mut self);
+    fn clear_interrupt(&self);
 
     fn now(&self) -> u64;
 
     fn divider(&self) -> u32;
 
-    fn set_divider(&mut self, divider: u16);
+    fn set_divider(&self, divider: u16);
 
     fn is_interrupt_set(&self) -> bool;
 }
@@ -521,7 +632,15 @@ where
     TG: TimerGroupInstance,
     Self: Enable,
 {
-    fn reset_counter(&mut self) {
+    fn register_block(&self) -> &RegisterBlock {
+        unsafe { &*TG::register_block() }
+    }
+
+    fn timer_number(&self) -> u8 {
+        T
+    }
+
+    fn reset_counter(&self) {
         let t = unsafe { Self::t() };
 
         t.loadlo().write(|w| unsafe { w.load_lo().bits(0) });
@@ -531,7 +650,7 @@ where
         t.load().write(|w| unsafe { w.load().bits(1) });
     }
 
-    fn set_counter_active(&mut self, state: bool) {
+    fn set_counter_active(&self, state: bool) {
         unsafe { Self::t() }
             .config()
             .modify(|_, w| w.en().bit(state));
@@ -541,19 +660,19 @@ where
         unsafe { Self::t() }.config().read().en().bit_is_set()
     }
 
-    fn set_counter_decrementing(&mut self, decrementing: bool) {
+    fn set_counter_decrementing(&self, decrementing: bool) {
         unsafe { Self::t() }
             .config()
             .modify(|_, w| w.increase().bit(!decrementing));
     }
 
-    fn set_auto_reload(&mut self, auto_reload: bool) {
+    fn set_auto_reload(&self, auto_reload: bool) {
         unsafe { Self::t() }
             .config()
             .modify(|_, w| w.autoreload().bit(auto_reload));
     }
 
-    fn set_alarm_active(&mut self, state: bool) {
+    fn set_alarm_active(&self, state: bool) {
         unsafe { Self::t() }
             .config()
             .modify(|_, w| w.alarm_en().bit(state));
@@ -563,7 +682,7 @@ where
         unsafe { Self::t() }.config().read().alarm_en().bit_is_set()
     }
 
-    fn load_alarm_value(&mut self, value: u64) {
+    fn load_alarm_value(&self, value: u64) {
         let value = value & 0x3F_FFFF_FFFF_FFFF;
         let high = (value >> 32) as u32;
         let low = (value & 0xFFFF_FFFF) as u32;
@@ -575,28 +694,26 @@ where
         t.alarmhi().write(|w| unsafe { w.alarm_hi().bits(high) });
     }
 
-    fn listen(&mut self) {
-        let reg_block = unsafe { &*TG::register_block() };
-
+    fn listen(&self) {
         // always use level interrupt
         #[cfg(any(esp32, esp32s2))]
         unsafe { Self::t() }
             .config()
             .modify(|_, w| w.level_int_en().set_bit());
 
-        reg_block.int_ena_timers().modify(|_, w| w.t(T).set_bit());
+        self.register_block()
+            .int_ena_timers()
+            .modify(|_, w| w.t(T).set_bit());
     }
 
-    fn unlisten(&mut self) {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block.int_ena_timers().modify(|_, w| w.t(T).clear_bit());
+    fn unlisten(&self) {
+        self.register_block()
+            .int_ena_timers()
+            .modify(|_, w| w.t(T).clear_bit());
     }
 
-    fn clear_interrupt(&mut self) {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block
+    fn clear_interrupt(&self) {
+        self.register_block()
             .int_clr_timers()
             .write(|w| w.t(T).clear_bit_by_one());
     }
@@ -630,12 +747,14 @@ where
     }
 
     fn is_interrupt_set(&self) -> bool {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block.int_raw_timers().read().t(T).bit_is_set()
+        self.register_block()
+            .int_raw_timers()
+            .read()
+            .t(T)
+            .bit_is_set()
     }
 
-    fn set_divider(&mut self, divider: u16) {
+    fn set_divider(&self, divider: u16) {
         unsafe { Self::t() }
             .config()
             .modify(|_, w| unsafe { w.divider().bits(divider) })
@@ -647,7 +766,7 @@ where
     TG: TimerGroupInstance,
 {
     fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(crate::system::Peripheral::Timg0);
+        PeripheralClockControl::enable(PeripheralEnable::Timg0);
     }
 }
 
@@ -657,7 +776,7 @@ where
     TG: TimerGroupInstance,
 {
     fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(crate::system::Peripheral::Timg1);
+        PeripheralClockControl::enable(PeripheralEnable::Timg1);
     }
 }
 
@@ -680,7 +799,7 @@ where
 impl<T, DM> embedded_hal_02::timer::CountDown for Timer<T, DM>
 where
     T: Instance,
-    DM: crate::Mode,
+    DM: Mode,
 {
     type Time = MicrosDurationU64;
 
@@ -704,15 +823,15 @@ where
 impl<T, DM> embedded_hal_02::timer::Cancel for Timer<T, DM>
 where
     T: Instance,
-    DM: crate::Mode,
+    DM: Mode,
 {
-    type Error = Error;
+    type Error = super::Error;
 
-    fn cancel(&mut self) -> Result<(), Error> {
+    fn cancel(&mut self) -> Result<(), super::Error> {
         if !self.timg.is_counter_active() {
-            return Err(Error::TimerInactive);
+            return Err(super::Error::TimerInactive);
         } else if !self.timg.is_alarm_active() {
-            return Err(Error::AlarmInactive);
+            return Err(super::Error::AlarmInactive);
         }
 
         self.timg.set_counter_active(false);
@@ -725,7 +844,7 @@ where
 impl<T, DM> embedded_hal_02::timer::Periodic for Timer<T, DM>
 where
     T: Instance,
-    DM: crate::Mode,
+    DM: Mode,
 {
 }
 
@@ -738,7 +857,7 @@ pub struct Wdt<TG, DM> {
 impl<TG, DM> Wdt<TG, DM>
 where
     TG: TimerGroupInstance,
-    DM: crate::Mode,
+    DM: Mode,
 {
     /// Create a new watchdog timer instance
     pub fn new() -> Self {
@@ -854,7 +973,7 @@ where
 impl<TG, DM> Default for Wdt<TG, DM>
 where
     TG: TimerGroupInstance,
-    DM: crate::Mode,
+    DM: Mode,
 {
     fn default() -> Self {
         Self::new()
@@ -865,7 +984,7 @@ where
 impl<TG, DM> embedded_hal_02::watchdog::WatchdogDisable for Wdt<TG, DM>
 where
     TG: TimerGroupInstance,
-    DM: crate::Mode,
+    DM: Mode,
 {
     fn disable(&mut self) {
         self.disable();
@@ -876,7 +995,7 @@ where
 impl<TG, DM> embedded_hal_02::watchdog::WatchdogEnable for Wdt<TG, DM>
 where
     TG: TimerGroupInstance,
-    DM: crate::Mode,
+    DM: Mode,
 {
     type Time = MicrosDurationU64;
 
@@ -893,7 +1012,7 @@ where
 impl<TG, DM> embedded_hal_02::watchdog::Watchdog for Wdt<TG, DM>
 where
     TG: TimerGroupInstance,
-    DM: crate::Mode,
+    DM: Mode,
 {
     fn feed(&mut self) {
         self.feed();
