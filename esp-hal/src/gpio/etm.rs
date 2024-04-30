@@ -314,11 +314,11 @@ fn enable_event_channel(channel: u8, pin: u8) {
     let gpio_sd = unsafe { crate::peripherals::GPIO_SD::steal() };
     gpio_sd
         .etm_event_ch_cfg(channel as usize)
-        .modify(|_, w| w.etm_ch0_event_en().clear_bit());
+        .modify(|_, w| w.event_en().clear_bit());
     gpio_sd
         .etm_event_ch_cfg(channel as usize)
-        .modify(|_, w| unsafe { w.etm_ch0_event_sel().bits(pin) });
+        .modify(|_, w| unsafe { w.event_sel().bits(pin) });
     gpio_sd
         .etm_event_ch_cfg(channel as usize)
-        .modify(|_, w| w.etm_ch0_event_en().set_bit());
+        .modify(|_, w| w.event_en().set_bit());
 }
