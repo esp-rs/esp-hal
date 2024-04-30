@@ -1,5 +1,5 @@
 use crate::{
-    aes::{Aes, Aes128, Aes192, Aes256, AesFlavour, Endianness, ALIGN_SIZE},
+    aes::{Aes, Endianness, ALIGN_SIZE},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
 };
 
@@ -20,15 +20,23 @@ impl<'d> Aes<'d> {
         let key_len = self.aes.key_iter().count();
         debug_assert!(key.len() <= key_len * ALIGN_SIZE);
         debug_assert_eq!(key.len() % ALIGN_SIZE, 0);
-        self.alignment_helper
-            .volatile_write_regset(self.aes.key(0).as_ptr(), key, key_len);
+
+        if !key.is_empty() {
+            for (v, reg) in key.chunks_exact(ALIGN_SIZE).zip(self.aes.key_iter()) {
+                reg.write(|w| unsafe { w.bits(u32::from_ne_bytes(v.try_into().unwrap())) })
+            }
+        }
     }
 
     pub(super) fn write_block(&mut self, block: &[u8]) {
         let text_len = self.aes.text_iter().count();
         debug_assert_eq!(block.len(), text_len * ALIGN_SIZE);
-        self.alignment_helper
-            .volatile_write_regset(self.aes.text(0).as_ptr(), block, text_len);
+
+        if !block.is_empty() {
+            for (v, reg) in block.chunks_exact(ALIGN_SIZE).zip(self.aes.text_iter()) {
+                reg.write(|w| unsafe { w.bits(u32::from_ne_bytes(v.try_into().unwrap())) })
+            }
+        }
     }
 
     pub(super) fn write_mode(&mut self, mode: u32) {
@@ -66,25 +74,10 @@ impl<'d> Aes<'d> {
     pub(super) fn read_block(&self, block: &mut [u8]) {
         let text_len = self.aes.text_iter().count();
         debug_assert_eq!(block.len(), text_len * ALIGN_SIZE);
-        self.alignment_helper
-            .volatile_read_regset(self.aes.text(0).as_ptr(), block, text_len);
+
+        for (chunk, reg) in block.chunks_exact_mut(ALIGN_SIZE).zip(self.aes.text_iter()) {
+            let read_val: [u8; 4] = reg.read().bits().to_ne_bytes();
+            chunk.copy_from_slice(&read_val);
+        }
     }
-}
-
-impl AesFlavour for Aes128 {
-    type KeyType<'b> = &'b [u8; 16];
-    const ENCRYPT_MODE: u32 = 0;
-    const DECRYPT_MODE: u32 = 4;
-}
-
-impl AesFlavour for Aes192 {
-    type KeyType<'b> = &'b [u8; 24];
-    const ENCRYPT_MODE: u32 = 1;
-    const DECRYPT_MODE: u32 = 5;
-}
-
-impl AesFlavour for Aes256 {
-    type KeyType<'b> = &'b [u8; 32];
-    const ENCRYPT_MODE: u32 = 2;
-    const DECRYPT_MODE: u32 = 6;
 }

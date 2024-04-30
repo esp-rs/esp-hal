@@ -77,18 +77,6 @@ impl AlignmentHelper<SocDependentEndianess> {
     }
 }
 
-// only used by AES
-#[cfg(aes)]
-impl AlignmentHelper<NativeEndianess> {
-    pub fn native_endianess() -> AlignmentHelper<NativeEndianess> {
-        AlignmentHelper {
-            buf: [0u8; U32_ALIGN_SIZE],
-            buf_fill: 0,
-            phantom: PhantomData,
-        }
-    }
-}
-
 impl<E: EndianessConverter> AlignmentHelper<E> {
     pub fn reset(&mut self) {
         self.buf_fill = 0;

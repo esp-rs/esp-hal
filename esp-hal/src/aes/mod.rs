@@ -106,12 +106,12 @@
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::AES,
-    reg_access::{AlignmentHelper, NativeEndianess},
 };
 
 #[cfg_attr(esp32, path = "esp32.rs")]
-#[cfg_attr(esp32s3, path = "esp32s3.rs")]
-#[cfg_attr(esp32s2, path = "esp32s2.rs")]
+#[cfg_attr(esp32s2, path = "esp32cX.rs")]
+// AES on `s3` is same as in `cX`
+#[cfg_attr(esp32s3, path = "esp32cX.rs")]
 #[cfg_attr(esp32c3, path = "esp32cX.rs")]
 #[cfg_attr(esp32c6, path = "esp32cX.rs")]
 #[cfg_attr(esp32h2, path = "esp32cX.rs")]
@@ -183,17 +183,13 @@ pub enum Mode {
 /// AES peripheral container
 pub struct Aes<'d> {
     aes: PeripheralRef<'d, AES>,
-    alignment_helper: AlignmentHelper<NativeEndianess>,
 }
 
 impl<'d> Aes<'d> {
     /// Constructs a new `Aes` instance.
     pub fn new(aes: impl Peripheral<P = AES> + 'd) -> Self {
         crate::into_ref!(aes);
-        let mut ret = Self {
-            aes,
-            alignment_helper: AlignmentHelper::native_endianess(),
-        };
+        let mut ret = Self { aes };
         ret.init();
 
         ret
@@ -255,6 +251,25 @@ impl crate::private::Sealed for Aes128 {}
 #[cfg(any(esp32, esp32s2))]
 impl crate::private::Sealed for Aes192 {}
 impl crate::private::Sealed for Aes256 {}
+
+impl AesFlavour for Aes128 {
+    type KeyType<'b> = &'b [u8; 16];
+    const ENCRYPT_MODE: u32 = 0;
+    const DECRYPT_MODE: u32 = 4;
+}
+
+#[cfg(any(esp32, esp32s2))]
+impl AesFlavour for Aes192 {
+    type KeyType<'b> = &'b [u8; 24];
+    const ENCRYPT_MODE: u32 = 1;
+    const DECRYPT_MODE: u32 = 5;
+}
+
+impl AesFlavour for Aes256 {
+    type KeyType<'b> = &'b [u8; 32];
+    const ENCRYPT_MODE: u32 = 2;
+    const DECRYPT_MODE: u32 = 6;
+}
 
 /// State matrix endianness
 #[cfg(any(esp32, esp32s2))]
