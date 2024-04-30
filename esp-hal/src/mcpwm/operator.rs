@@ -16,6 +16,7 @@ use crate::{
     gpio::OutputPin,
     mcpwm::{timer::Timer, PwmPeripheral},
     peripheral::{Peripheral, PeripheralRef},
+    private,
 };
 
 /// Input/Output Stream descriptor for each channel
@@ -302,8 +303,8 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
 
         let output_signal = PWM::output_signal::<OP, IS_A>();
         pin.pin
-            .connect_peripheral_to_output(output_signal)
-            .enable_output(true);
+            .connect_peripheral_to_output(output_signal, private::Internal);
+        pin.pin.enable_output(true, private::Internal);
         pin
     }
 

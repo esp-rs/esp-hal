@@ -42,7 +42,7 @@ pub struct SystemTimer<'d, DM: crate::Mode> {
     pub alarm0: Alarm<Target, DM, 0>,
     pub alarm1: Alarm<Target, DM, 1>,
     pub alarm2: Alarm<Target, DM, 2>,
-    _phantom: &'d PhantomData<()>,
+    _phantom: PhantomData<&'d ()>,
 }
 
 impl<'d> SystemTimer<'d, crate::Blocking> {
@@ -67,7 +67,7 @@ impl<'d> SystemTimer<'d, crate::Blocking> {
             alarm0: Alarm::new(),
             alarm1: Alarm::new(),
             alarm2: Alarm::new(),
-            _phantom: &PhantomData,
+            _phantom: PhantomData,
         }
     }
 
@@ -98,7 +98,7 @@ impl<'d> SystemTimer<'d, crate::Async> {
             alarm0: Alarm::new(),
             alarm1: Alarm::new(),
             alarm2: Alarm::new(),
-            _phantom: &PhantomData,
+            _phantom: PhantomData,
         }
     }
 }

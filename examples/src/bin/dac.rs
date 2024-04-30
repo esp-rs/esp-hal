@@ -32,11 +32,11 @@ fn main() -> ! {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
-            let dac1_pin = io.pins.gpio25.into_analog();
-            let dac2_pin = io.pins.gpio26.into_analog();
+            let dac1_pin = io.pins.gpio25;
+            let dac2_pin = io.pins.gpio26;
         } else if #[cfg(feature = "esp32s2")] {
-            let dac1_pin = io.pins.gpio17.into_analog();
-            let dac2_pin = io.pins.gpio18.into_analog();
+            let dac1_pin = io.pins.gpio17;
+            let dac2_pin = io.pins.gpio18;
         }
     }
 

@@ -20,10 +20,7 @@
 //!
 //! ```no_run
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let pins = TxRxPins::new_tx_rx(
-//!     io.pins.gpio1.into_push_pull_output(),
-//!     io.pins.gpio2.into_floating_input(),
-//! );
+//! let pins = TxRxPins::new_tx_rx(io.pins.gpio1, io.pins.gpio2);
 //!
 //! let mut uart1 =
 //!     Uart::new_with_config(peripherals.UART1, Config::default(), Some(pins), &clocks);
@@ -332,21 +329,23 @@ impl<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> UartPins
         rts_signal: OutputSignal,
     ) {
         if let Some(ref mut tx) = self.tx {
-            tx.set_to_push_pull_output()
-                .connect_peripheral_to_output(tx_signal);
+            tx.set_to_push_pull_output(crate::private::Internal);
+            tx.connect_peripheral_to_output(tx_signal, crate::private::Internal);
         }
 
         if let Some(ref mut rx) = self.rx {
-            rx.set_to_input().connect_input_to_peripheral(rx_signal);
+            rx.set_to_input(crate::private::Internal);
+            rx.connect_input_to_peripheral(rx_signal, crate::private::Internal);
         }
 
         if let Some(ref mut cts) = self.cts {
-            cts.set_to_input().connect_input_to_peripheral(cts_signal);
+            cts.set_to_input(crate::private::Internal);
+            cts.connect_input_to_peripheral(cts_signal, crate::private::Internal);
         }
 
         if let Some(ref mut rts) = self.rts {
-            rts.set_to_push_pull_output()
-                .connect_peripheral_to_output(rts_signal);
+            rts.set_to_push_pull_output(crate::private::Internal);
+            rts.connect_peripheral_to_output(rts_signal, crate::private::Internal);
         }
     }
 }
@@ -379,12 +378,14 @@ impl<TX: OutputPin, RX: InputPin> UartPins for TxRxPins<'_, TX, RX> {
         _rts_signal: OutputSignal,
     ) {
         if let Some(ref mut tx) = self.tx {
-            tx.set_to_push_pull_output()
-                .connect_peripheral_to_output(tx_signal);
+            tx.set_to_push_pull_output(crate::private::Internal);
+            tx.set_output_high(true, crate::private::Internal);
+            tx.connect_peripheral_to_output(tx_signal, crate::private::Internal);
         }
 
         if let Some(ref mut rx) = self.rx {
-            rx.set_to_input().connect_input_to_peripheral(rx_signal);
+            rx.set_to_input(crate::private::Internal);
+            rx.connect_input_to_peripheral(rx_signal, crate::private::Internal);
         }
     }
 }
@@ -586,9 +587,15 @@ where
             .modify(|_, w| w.err_wr_mask().set_bit());
 
         // Reset Tx/Rx FIFOs
-        serial.txfifo_reset();
         serial.rxfifo_reset();
+        serial.txfifo_reset();
         crate::rom::ets_delay_us(15);
+
+        // Make sure we are starting in a "clean state" - previous operations might have
+        // run into error conditions
+        T::register_block()
+            .int_clr()
+            .write(|w| unsafe { w.bits(u32::MAX) });
 
         serial
     }
@@ -2110,9 +2117,9 @@ mod asynch {
 #[cfg(lp_uart)]
 pub mod lp_uart {
     use crate::{
-        gpio::{lp_io::LowPowerPin, Floating, Input, Output, PushPull},
+        gpio::lp_io::{LowPowerInput, LowPowerOutput},
         peripherals::{LP_CLKRST, LP_UART},
-        uart::{config, config::Config},
+        uart::config::{self, Config},
     };
     /// LP-UART driver
     ///
@@ -2124,11 +2131,7 @@ pub mod lp_uart {
     impl LpUart {
         /// Initialize the UART driver using the default configuration
         // TODO: CTS and RTS pins
-        pub fn new(
-            uart: LP_UART,
-            _tx: LowPowerPin<Output<PushPull>, 5>,
-            _rx: LowPowerPin<Input<Floating>, 4>,
-        ) -> Self {
+        pub fn new(uart: LP_UART, _tx: LowPowerOutput<5>, _rx: LowPowerInput<4>) -> Self {
             let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
             let lp_aon = unsafe { &*crate::peripherals::LP_AON::PTR };
 

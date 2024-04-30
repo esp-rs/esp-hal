@@ -15,7 +15,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::{self, Event, Input, Io, PullDown},
+    gpio::{self, Event, Input, Io, Output, Pull},
     macros::ram,
     peripherals::Peripherals,
     prelude::*,
@@ -23,11 +23,9 @@ use esp_hal::{
 };
 
 #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
-static BUTTON: Mutex<RefCell<Option<gpio::Gpio0<Input<PullDown>>>>> =
-    Mutex::new(RefCell::new(None));
+static BUTTON: Mutex<RefCell<Option<Input<gpio::Gpio0>>>> = Mutex::new(RefCell::new(None));
 #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")))]
-static BUTTON: Mutex<RefCell<Option<gpio::Gpio9<Input<PullDown>>>>> =
-    Mutex::new(RefCell::new(None));
+static BUTTON: Mutex<RefCell<Option<Input<gpio::Gpio9>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -38,12 +36,14 @@ fn main() -> ! {
     // Set GPIO2 as an output, and set its state high initially.
     let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     io.set_interrupt_handler(handler);
-    let mut led = io.pins.gpio2.into_push_pull_output();
+    let mut led = Output::new(io.pins.gpio2, false);
 
     #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
-    let mut button = io.pins.gpio0.into_pull_down_input();
+    let button = io.pins.gpio0;
     #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")))]
-    let mut button = io.pins.gpio9.into_pull_down_input();
+    let button = io.pins.gpio9;
+
+    let mut button = Input::new(button, Pull::Up);
 
     critical_section::with(|cs| {
         button.listen(Event::FallingEdge);

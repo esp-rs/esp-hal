@@ -220,6 +220,8 @@ impl crate::private::Sealed for Async {}
 
 pub(crate) mod private {
     pub trait Sealed {}
+
+    pub struct Internal;
 }
 
 /// Available CPU cores

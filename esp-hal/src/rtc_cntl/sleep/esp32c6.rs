@@ -5,6 +5,7 @@ use crate::{
     efuse::Efuse,
     gpio::{Pins, RtcFunction},
     peripherals::Peripherals,
+    private,
     rtc_cntl::{
         rtc::{
             rtc_clk_cpu_freq_set_xtal,
@@ -64,7 +65,7 @@ impl Ext1WakeupSource<'_, '_> {
         use crate::gpio::RtcPin;
 
         fn uninit_pin(pin: &mut impl RtcPin, wakeup_pins: u8) {
-            if wakeup_pins & (1 << pin.number()) != 0 {
+            if wakeup_pins & (1 << pin.number(private::Internal)) != 0 {
                 pin.rtcio_pad_hold(false);
                 pin.rtc_set_config(false, false, RtcFunction::Rtc);
             }
@@ -92,9 +93,9 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         let mut pin_mask = 0u8;
         let mut level_mask = 0u8;
         for (pin, level) in pins.iter_mut() {
-            pin_mask |= 1 << pin.number();
+            pin_mask |= 1 << pin.number(private::Internal);
             level_mask |= match level {
-                WakeupLevel::High => 1 << pin.number(),
+                WakeupLevel::High => 1 << pin.number(private::Internal),
                 WakeupLevel::Low => 0,
             };
 

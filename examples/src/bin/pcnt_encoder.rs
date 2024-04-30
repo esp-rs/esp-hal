@@ -16,9 +16,13 @@ use core::{cell::RefCell, cmp::min, sync::atomic::Ordering};
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::Io,
+    gpio::{Io, Pull},
     interrupt::Priority,
-    pcnt::{channel, channel::PcntSource, unit, Pcnt},
+    pcnt::{
+        channel::{self, PcntInputConfig, PcntSource},
+        unit,
+        Pcnt,
+    },
     peripherals::Peripherals,
     prelude::*,
 };
@@ -48,12 +52,12 @@ fn main() -> ! {
 
     println!("setup channel 0");
     let mut ch0 = u0.get_channel(channel::Number::Channel0);
-    let mut pin_a = io.pins.gpio4.into_pull_up_input();
-    let mut pin_b = io.pins.gpio5.into_pull_up_input();
+    let mut pin_a = io.pins.gpio4;
+    let mut pin_b = io.pins.gpio5;
 
     ch0.configure(
-        PcntSource::from_pin(&mut pin_a),
-        PcntSource::from_pin(&mut pin_b),
+        PcntSource::from_pin(&mut pin_a, PcntInputConfig { pull: Pull::Up }),
+        PcntSource::from_pin(&mut pin_b, PcntInputConfig { pull: Pull::Up }),
         channel::Config {
             lctrl_mode: channel::CtrlMode::Reverse,
             hctrl_mode: channel::CtrlMode::Keep,
@@ -67,8 +71,8 @@ fn main() -> ! {
     println!("setup channel 1");
     let mut ch1 = u0.get_channel(channel::Number::Channel1);
     ch1.configure(
-        PcntSource::from_pin(&mut pin_b),
-        PcntSource::from_pin(&mut pin_a),
+        PcntSource::from_pin(&mut pin_b, PcntInputConfig { pull: Pull::Up }),
+        PcntSource::from_pin(&mut pin_a, PcntInputConfig { pull: Pull::Up }),
         channel::Config {
             lctrl_mode: channel::CtrlMode::Reverse,
             hctrl_mode: channel::CtrlMode::Keep,

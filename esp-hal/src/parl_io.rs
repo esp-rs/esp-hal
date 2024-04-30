@@ -331,9 +331,11 @@ where
     P: OutputPin,
 {
     fn configure(&mut self) {
-        self.pin
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(crate::gpio::OutputSignal::PARL_TX_CLK);
+        self.pin.set_to_push_pull_output(crate::private::Internal);
+        self.pin.connect_peripheral_to_output(
+            crate::gpio::OutputSignal::PARL_TX_CLK,
+            crate::private::Internal,
+        );
     }
 }
 
@@ -363,9 +365,11 @@ where
         pcr.parl_clk_tx_conf()
             .modify(|_, w| unsafe { w.parl_clk_tx_sel().bits(3).parl_clk_tx_div_num().bits(0) }); // PAD_CLK_TX, no divider
 
-        self.pin
-            .set_to_input()
-            .connect_input_to_peripheral(crate::gpio::InputSignal::PARL_TX_CLK);
+        self.pin.set_to_input(crate::private::Internal);
+        self.pin.connect_input_to_peripheral(
+            crate::gpio::InputSignal::PARL_TX_CLK,
+            crate::private::Internal,
+        );
     }
 }
 
@@ -396,9 +400,11 @@ where
         pcr.parl_clk_rx_conf()
             .modify(|_, w| unsafe { w.parl_clk_rx_sel().bits(3).parl_clk_rx_div_num().bits(0) }); // PAD_CLK_TX, no divider
 
-        self.pin
-            .set_to_input()
-            .connect_input_to_peripheral(crate::gpio::InputSignal::PARL_RX_CLK);
+        self.pin.set_to_input(crate::private::Internal);
+        self.pin.connect_input_to_peripheral(
+            crate::gpio::InputSignal::PARL_RX_CLK,
+            crate::private::Internal,
+        );
 
         Instance::set_rx_clk_edge_sel(self.sample_edge);
     }
@@ -441,8 +447,11 @@ where
     fn configure(&mut self) -> Result<(), Error> {
         self.tx_pins.configure()?;
         self.valid_pin
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(Instance::tx_valid_pin_signal());
+            .set_to_push_pull_output(crate::private::Internal);
+        self.valid_pin.connect_peripheral_to_output(
+            Instance::tx_valid_pin_signal(),
+            crate::private::Internal,
+        );
         Instance::set_tx_hw_valid_en(true);
         Ok(())
     }
@@ -516,9 +525,8 @@ macro_rules! tx_pins {
             {
                 fn configure(&mut self) -> Result<(), Error>{
                     $(
-                        self.[< pin_ $pin:lower >]
-                            .set_to_push_pull_output()
-                            .connect_peripheral_to_output(crate::gpio::OutputSignal::$signal);
+                        self.[< pin_ $pin:lower >].set_to_push_pull_output(crate::private::Internal);
+                        self.[< pin_ $pin:lower >].connect_peripheral_to_output(crate::gpio::OutputSignal::$signal, crate::private::Internal);
                     )+
 
                     private::Instance::set_tx_bit_width( private::WidSel::[< Bits $width >]);
@@ -659,9 +667,9 @@ where
 {
     fn configure(&mut self) -> Result<(), Error> {
         self.rx_pins.configure()?;
+        self.valid_pin.set_to_input(crate::private::Internal);
         self.valid_pin
-            .set_to_input()
-            .connect_input_to_peripheral(Instance::rx_valid_pin_signal());
+            .connect_input_to_peripheral(Instance::rx_valid_pin_signal(), crate::private::Internal);
         Instance::set_rx_sw_en(false);
         if let Some(sel) = self.enable_mode.pulse_submode_sel() {
             Instance::set_rx_pulse_submode_sel(sel);
@@ -763,9 +771,8 @@ macro_rules! rx_pins {
             {
                 fn configure(&mut self)  -> Result<(), Error> {
                     $(
-                        self.[< pin_ $pin:lower >]
-                            .set_to_input()
-                            .connect_input_to_peripheral(crate::gpio::InputSignal::$signal);
+                        self.[< pin_ $pin:lower >].set_to_input($crate::private::Internal);
+                        self.[< pin_ $pin:lower >].connect_input_to_peripheral(crate::gpio::InputSignal::$signal, $crate::private::Internal);
                     )+
 
                     private::Instance::set_rx_bit_width( private::WidSel::[< Bits $width >]);

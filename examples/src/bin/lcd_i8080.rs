@@ -28,7 +28,7 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::Io,
+    gpio::{Io, Output},
     lcd_cam::{
         lcd::i8080::{Config, TxEightBits, I8080},
         LcdCam,
@@ -67,8 +67,8 @@ fn main() -> ! {
 
     let delay = Delay::new(&clocks);
 
-    let mut backlight = lcd_backlight.into_push_pull_output();
-    let mut reset = lcd_reset.into_push_pull_output();
+    let mut backlight = Output::new(lcd_backlight, false);
+    let mut reset = Output::new(lcd_reset, false);
 
     let tx_pins = TxEightBits::new(
         io.pins.gpio9,

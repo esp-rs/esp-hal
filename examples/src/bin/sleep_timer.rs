@@ -13,7 +13,6 @@ use esp_hal::{
     delay::Delay,
     entry,
     peripherals::Peripherals,
-    prelude::*,
     rtc_cntl::{get_reset_reason, get_wakeup_cause, sleep::TimerWakeupSource, Rtc, SocResetReason},
     system::SystemControl,
     Cpu,

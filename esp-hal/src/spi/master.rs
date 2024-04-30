@@ -75,6 +75,7 @@ use crate::{
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
+    private,
     system::PeripheralClockControl,
 };
 
@@ -452,32 +453,32 @@ where
 
     pub fn with_sck<SCK: OutputPin>(self, sck: impl Peripheral<P = SCK> + 'd) -> Self {
         crate::into_ref!(sck);
-        sck.set_to_push_pull_output()
-            .connect_peripheral_to_output(self.spi.sclk_signal());
+        sck.set_to_push_pull_output(private::Internal);
+        sck.connect_peripheral_to_output(self.spi.sclk_signal(), private::Internal);
 
         self
     }
 
     pub fn with_mosi<MOSI: OutputPin>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
         crate::into_ref!(mosi);
-        mosi.set_to_push_pull_output()
-            .connect_peripheral_to_output(self.spi.mosi_signal());
+        mosi.set_to_push_pull_output(private::Internal);
+        mosi.connect_peripheral_to_output(self.spi.mosi_signal(), private::Internal);
 
         self
     }
 
     pub fn with_miso<MISO: InputPin>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
         crate::into_ref!(miso);
-        miso.set_to_input()
-            .connect_input_to_peripheral(self.spi.miso_signal());
+        miso.set_to_input(private::Internal);
+        miso.connect_input_to_peripheral(self.spi.miso_signal(), private::Internal);
 
         self
     }
 
     pub fn with_cs<CS: OutputPin>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_ref!(cs);
-        cs.set_to_push_pull_output()
-            .connect_peripheral_to_output(self.spi.cs_signal());
+        cs.set_to_push_pull_output(private::Internal);
+        cs.connect_peripheral_to_output(self.spi.cs_signal(), private::Internal);
 
         self
     }
@@ -503,26 +504,26 @@ where
     ) -> Self {
         if let Some(sck) = sck {
             crate::into_ref!(sck);
-            sck.set_to_push_pull_output()
-                .connect_peripheral_to_output(self.spi.sclk_signal());
+            sck.set_to_push_pull_output(private::Internal);
+            sck.connect_peripheral_to_output(self.spi.sclk_signal(), private::Internal);
         }
 
         if let Some(mosi) = mosi {
             crate::into_ref!(mosi);
-            mosi.set_to_push_pull_output()
-                .connect_peripheral_to_output(self.spi.mosi_signal());
+            mosi.set_to_push_pull_output(private::Internal);
+            mosi.connect_peripheral_to_output(self.spi.mosi_signal(), private::Internal);
         }
 
         if let Some(miso) = miso {
             crate::into_ref!(miso);
-            miso.set_to_input()
-                .connect_input_to_peripheral(self.spi.miso_signal());
+            miso.set_to_input(private::Internal);
+            miso.connect_input_to_peripheral(self.spi.miso_signal(), private::Internal);
         }
 
         if let Some(cs) = cs {
             crate::into_ref!(cs);
-            cs.set_to_push_pull_output()
-                .connect_peripheral_to_output(self.spi.cs_signal());
+            cs.set_to_push_pull_output(private::Internal);
+            cs.connect_peripheral_to_output(self.spi.cs_signal(), private::Internal);
         }
 
         self
@@ -572,8 +573,8 @@ where
 
     pub fn with_sck<SCK: OutputPin>(self, sck: impl Peripheral<P = SCK> + 'd) -> Self {
         crate::into_ref!(sck);
-        sck.set_to_push_pull_output()
-            .connect_peripheral_to_output(self.spi.sclk_signal());
+        sck.set_to_push_pull_output(private::Internal);
+        sck.connect_peripheral_to_output(self.spi.sclk_signal(), private::Internal);
 
         self
     }
@@ -583,10 +584,10 @@ where
         mosi: impl Peripheral<P = MOSI> + 'd,
     ) -> Self {
         crate::into_ref!(mosi);
-        mosi.enable_output(true);
-        mosi.connect_peripheral_to_output(self.spi.mosi_signal());
-        mosi.enable_input(true);
-        mosi.connect_input_to_peripheral(self.spi.sio0_input_signal());
+        mosi.enable_output(true, private::Internal);
+        mosi.connect_peripheral_to_output(self.spi.mosi_signal(), private::Internal);
+        mosi.enable_input(true, private::Internal);
+        mosi.connect_input_to_peripheral(self.spi.sio0_input_signal(), private::Internal);
 
         self
     }
@@ -596,10 +597,10 @@ where
         miso: impl Peripheral<P = MISO> + 'd,
     ) -> Self {
         crate::into_ref!(miso);
-        miso.enable_output(true);
-        miso.connect_peripheral_to_output(self.spi.sio1_output_signal());
-        miso.enable_input(true);
-        miso.connect_input_to_peripheral(self.spi.miso_signal());
+        miso.enable_output(true, private::Internal);
+        miso.connect_peripheral_to_output(self.spi.sio1_output_signal(), private::Internal);
+        miso.enable_input(true, private::Internal);
+        miso.connect_input_to_peripheral(self.spi.miso_signal(), private::Internal);
 
         self
     }
@@ -609,10 +610,10 @@ where
         sio2: impl Peripheral<P = SIO2> + 'd,
     ) -> Self {
         crate::into_ref!(sio2);
-        sio2.enable_output(true);
-        sio2.connect_peripheral_to_output(self.spi.sio2_output_signal());
-        sio2.enable_input(true);
-        sio2.connect_input_to_peripheral(self.spi.sio2_input_signal());
+        sio2.enable_output(true, private::Internal);
+        sio2.connect_peripheral_to_output(self.spi.sio2_output_signal(), private::Internal);
+        sio2.enable_input(true, private::Internal);
+        sio2.connect_input_to_peripheral(self.spi.sio2_input_signal(), private::Internal);
 
         self
     }
@@ -622,18 +623,18 @@ where
         sio3: impl Peripheral<P = SIO3> + 'd,
     ) -> Self {
         crate::into_ref!(sio3);
-        sio3.enable_output(true);
-        sio3.connect_peripheral_to_output(self.spi.sio3_output_signal());
-        sio3.enable_input(true);
-        sio3.connect_input_to_peripheral(self.spi.sio3_input_signal());
+        sio3.enable_output(true, private::Internal);
+        sio3.connect_peripheral_to_output(self.spi.sio3_output_signal(), private::Internal);
+        sio3.enable_input(true, private::Internal);
+        sio3.connect_input_to_peripheral(self.spi.sio3_input_signal(), private::Internal);
 
         self
     }
 
     pub fn with_cs<CS: OutputPin>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_ref!(cs);
-        cs.set_to_push_pull_output()
-            .connect_peripheral_to_output(self.spi.cs_signal());
+        cs.set_to_push_pull_output(private::Internal);
+        cs.connect_peripheral_to_output(self.spi.cs_signal(), private::Internal);
 
         self
     }
@@ -660,46 +661,46 @@ where
     ) -> Self {
         if let Some(sck) = sck {
             crate::into_ref!(sck);
-            sck.set_to_push_pull_output()
-                .connect_peripheral_to_output(self.spi.sclk_signal());
+            sck.set_to_push_pull_output(private::Internal);
+            sck.connect_peripheral_to_output(self.spi.sclk_signal(), private::Internal);
         }
 
         if let Some(mosi) = mosi {
             crate::into_ref!(mosi);
-            mosi.enable_output(true);
-            mosi.connect_peripheral_to_output(self.spi.mosi_signal());
-            mosi.enable_input(true);
-            mosi.connect_input_to_peripheral(self.spi.sio0_input_signal());
+            mosi.enable_output(true, private::Internal);
+            mosi.connect_peripheral_to_output(self.spi.mosi_signal(), private::Internal);
+            mosi.enable_input(true, private::Internal);
+            mosi.connect_input_to_peripheral(self.spi.sio0_input_signal(), private::Internal);
         }
 
         if let Some(miso) = miso {
             crate::into_ref!(miso);
-            miso.enable_output(true);
-            miso.connect_peripheral_to_output(self.spi.sio1_output_signal());
-            miso.enable_input(true);
-            miso.connect_input_to_peripheral(self.spi.miso_signal());
+            miso.enable_output(true, private::Internal);
+            miso.connect_peripheral_to_output(self.spi.sio1_output_signal(), private::Internal);
+            miso.enable_input(true, private::Internal);
+            miso.connect_input_to_peripheral(self.spi.miso_signal(), private::Internal);
         }
 
         if let Some(sio2) = sio2 {
             crate::into_ref!(sio2);
-            sio2.enable_output(true);
-            sio2.connect_peripheral_to_output(self.spi.sio2_output_signal());
-            sio2.enable_input(true);
-            sio2.connect_input_to_peripheral(self.spi.sio2_input_signal());
+            sio2.enable_output(true, private::Internal);
+            sio2.connect_peripheral_to_output(self.spi.sio2_output_signal(), private::Internal);
+            sio2.enable_input(true, private::Internal);
+            sio2.connect_input_to_peripheral(self.spi.sio2_input_signal(), private::Internal);
         }
 
         if let Some(sio3) = sio3 {
             crate::into_ref!(sio3);
-            sio3.enable_output(true);
-            sio3.connect_peripheral_to_output(self.spi.sio3_output_signal());
-            sio3.enable_input(true);
-            sio3.connect_input_to_peripheral(self.spi.sio3_input_signal());
+            sio3.enable_output(true, private::Internal);
+            sio3.connect_peripheral_to_output(self.spi.sio3_output_signal(), private::Internal);
+            sio3.enable_input(true, private::Internal);
+            sio3.connect_input_to_peripheral(self.spi.sio3_input_signal(), private::Internal);
         }
 
         if let Some(cs) = cs {
             crate::into_ref!(cs);
-            cs.set_to_push_pull_output()
-                .connect_peripheral_to_output(self.spi.cs_signal());
+            cs.set_to_push_pull_output(private::Internal);
+            cs.connect_peripheral_to_output(self.spi.cs_signal(), private::Internal);
         }
 
         self
@@ -2135,7 +2136,7 @@ pub trait ExtendedInstance: Instance {
 }
 
 #[doc(hidden)]
-pub trait Instance: crate::private::Sealed {
+pub trait Instance: private::Sealed {
     fn register_block(&self) -> &RegisterBlock;
 
     fn sclk_signal(&self) -> OutputSignal;

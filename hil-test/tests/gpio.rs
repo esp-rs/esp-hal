@@ -18,7 +18,7 @@ use esp_hal::{
     clock::ClockControl,
     delay::Delay,
     embassy,
-    gpio::{GpioPin, Input, Io, Output, OutputPin, PullDown, PushPull, Unknown},
+    gpio::{Gpio2, Gpio4, GpioPin, Input, Io, Output, Pull},
     macros::handler,
     peripherals::Peripherals,
     system::SystemControl,
@@ -26,16 +26,15 @@ use esp_hal::{
 };
 
 static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
-static INPUT_PIN: Mutex<RefCell<Option<esp_hal::gpio::Gpio2<Input<PullDown>>>>> =
-    Mutex::new(RefCell::new(None));
+static INPUT_PIN: Mutex<RefCell<Option<Input<'static, Gpio2>>>> = Mutex::new(RefCell::new(None));
 
-struct Context {
-    io2: GpioPin<Input<PullDown>, 2>,
-    io4: GpioPin<Output<PushPull>, 4>,
+struct Context<'d> {
+    io2: Input<'d, Gpio2>,
+    io4: Output<'d, Gpio4>,
     delay: Delay,
 }
 
-impl Context {
+impl<'d> Context<'d> {
     pub fn init() -> Self {
         let peripherals = Peripherals::take();
         let system = SystemControl::new(peripherals.SYSTEM);
@@ -50,8 +49,8 @@ impl Context {
         embassy::init(&clocks, timg0);
 
         Context {
-            io2: io.pins.gpio2.into_pull_down_input(),
-            io4: io.pins.gpio4.into_push_pull_output(),
+            io2: Input::new(io.pins.gpio2, Pull::Down),
+            io4: Output::new(io.pins.gpio4, false),
             delay,
         }
     }
@@ -60,8 +59,6 @@ impl Context {
 #[handler]
 pub fn interrupt_handler() {
     critical_section::with(|cs| {
-        use esp_hal::gpio::Pin;
-
         *COUNTER.borrow_ref_mut(cs) += 1;
         INPUT_PIN
             .borrow_ref_mut(cs)
@@ -75,13 +72,13 @@ pub fn interrupt_handler() {
 mod tests {
     use defmt::assert_eq;
     use embassy_time::{Duration, Timer};
-    use esp_hal::gpio::{Event, Pin};
+    use esp_hal::gpio::{Event, OutputOpenDrain};
     use portable_atomic::{AtomicUsize, Ordering};
 
     use super::*;
 
     #[init]
-    fn init() -> Context {
+    fn init() -> Context<'static> {
         let mut ctx = Context::init();
         // make sure tests don't interfere with each other
         ctx.io4.set_low();
@@ -89,7 +86,7 @@ mod tests {
     }
 
     #[test]
-    async fn test_async_edge(ctx: Context) {
+    async fn test_async_edge(ctx: Context<'static>) {
         let counter = AtomicUsize::new(0);
         let Context {
             mut io2, mut io4, ..
@@ -115,8 +112,8 @@ mod tests {
     }
 
     #[test]
-    async fn test_a_pin_can_wait(_ctx: Context) {
-        let mut first = unsafe { GpioPin::<Unknown, 0>::steal() }.into_pull_down_input();
+    async fn test_a_pin_can_wait(_ctx: Context<'static>) {
+        let mut first = Input::new( unsafe { GpioPin::<0>::steal() } , Pull::Down);
 
         embassy_futures::select::select(
             first.wait_for_rising_edge(),
@@ -128,14 +125,14 @@ mod tests {
     }
 
     #[test]
-    fn test_gpio_input(ctx: Context) {
+    fn test_gpio_input(ctx: Context<'static>) {
         // `InputPin`:
         assert_eq!(ctx.io2.is_low(), true);
         assert_eq!(ctx.io2.is_high(), false);
     }
 
     #[test]
-    fn test_gpio_output(mut ctx: Context) {
+    fn test_gpio_output(mut ctx: Context<'static>) {
         // `StatefulOutputPin`:
         assert_eq!(ctx.io4.is_set_low(), true);
         assert_eq!(ctx.io4.is_set_high(), false);
@@ -154,7 +151,7 @@ mod tests {
 
     #[test]
     #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")))]
-    fn test_gpio_interrupt(mut ctx: Context) {
+    fn test_gpio_interrupt(mut ctx: Context<'static>) {
         critical_section::with(|cs| {
             *COUNTER.borrow_ref_mut(cs) = 0;
             ctx.io2.listen(Event::AnyEdge);
@@ -187,14 +184,10 @@ mod tests {
     }
 
     #[test]
-    fn test_gpio_od(ctx: Context) {
-        let mut io2 = ctx.io2.into_open_drain_output();
-        io2.internal_pull_up(true);
-        let mut io4 = ctx.io4.into_open_drain_output();
-        io4.internal_pull_up(true);
+    fn test_gpio_od(ctx: Context<'static>) {
+        let mut io2 = OutputOpenDrain::new(unsafe { GpioPin::<2>::steal() }, true, Pull::Up);
+        let mut io4 = OutputOpenDrain::new(unsafe { GpioPin::<4>::steal() }, true, Pull::Up);
 
-        io2.set_high();
-        io4.set_high();
         ctx.delay.delay_millis(1);
 
         assert_eq!(io2.is_high(), true);
@@ -220,5 +213,20 @@ mod tests {
 
         assert_eq!(io2.is_low(), true);
         assert_eq!(io4.is_low(), true);
+
+        io2.set_high();
+        io4.set_high();
+        ctx.delay.delay_millis(1);
+
+        assert_eq!(io2.is_high(), true);
+        assert_eq!(io4.is_high(), true);
+
+        io2.set_low();
+        io4.set_low();
+        ctx.delay.delay_millis(1);
+
+        assert_eq!(io2.is_low(), true);
+        assert_eq!(io4.is_low(), true);
+
     }
 }

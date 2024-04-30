@@ -12,7 +12,7 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::{lp_io::IntoLowPowerPin, Io},
+    gpio::{lp_io::LowPowerOutput, Io},
     lp_core::{LpCore, LpCoreWakeupSource},
     peripherals::Peripherals,
     prelude::*,
@@ -25,7 +25,7 @@ fn main() -> ! {
 
     // configure GPIO 1 as LP output pin
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let lp_pin = io.pins.gpio1.into_low_power().into_push_pull_output();
+    let lp_pin = LowPowerOutput::new(io.pins.gpio1);
 
     let mut lp_core = LpCore::new(peripherals.LP_CORE);
     lp_core.stop();

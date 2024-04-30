@@ -11,7 +11,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::Io,
+    gpio::{Io, Output},
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
@@ -25,9 +25,7 @@ fn main() -> ! {
 
     // Set GPIO0 as an output, and set its state high initially.
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let mut led = io.pins.gpio8.into_push_pull_output();
-
-    led.set_high();
+    let mut led = Output::new(io.pins.gpio0, true);
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a
     // loop.

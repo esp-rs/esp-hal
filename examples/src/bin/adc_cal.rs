@@ -28,9 +28,9 @@ fn main() -> ! {
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32s3")] {
-            let analog_pin = io.pins.gpio3.into_analog();
+            let analog_pin = io.pins.gpio3;
         } else {
-            let analog_pin = io.pins.gpio2.into_analog();
+            let analog_pin = io.pins.gpio2;
         }
     }
 

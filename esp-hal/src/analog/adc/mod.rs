@@ -9,7 +9,7 @@
 //! ```no_run
 //! let mut adc1_config = AdcConfig::new();
 //! let mut adc1 = ADC::<ADC1>::new(peripherals.ADC1, adc1_config);
-//! let mut pin = adc1_config.enable_pin(io.pins.gpio2.into_analog(), Attenuation::Attenuation11dB);
+//! let mut pin = adc1_config.enable_pin(io.pins.gpio2, Attenuation::Attenuation11dB);
 //!
 //! let mut delay = Delay::new(&clocks);
 //!
@@ -206,12 +206,12 @@ macro_rules! impl_adc_interface {
         $( ($pin:ident, $channel:expr) ,)+
     ]) => {
         $(
-            impl $crate::analog::adc::AdcChannel for crate::gpio::$pin<crate::gpio::Analog> {
+            impl $crate::analog::adc::AdcChannel for crate::gpio::$pin {
                 const CHANNEL: u8 = $channel;
             }
 
             #[cfg(feature = "embedded-hal-02")]
-            impl embedded_hal_02::adc::Channel<crate::peripherals::$adc> for crate::gpio::$pin<crate::gpio::Analog> {
+            impl embedded_hal_02::adc::Channel<crate::peripherals::$adc> for crate::gpio::$pin {
                 type ID = u8;
 
                 fn channel() -> u8 { $channel }

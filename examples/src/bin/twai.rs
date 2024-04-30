@@ -38,16 +38,17 @@ fn main() -> ! {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    // Set the tx pin as open drain. Skip this if using transceivers.
-    let can_tx_pin = io.pins.gpio0.into_open_drain_output();
+    let can_tx_pin = io.pins.gpio0;
     let can_rx_pin = io.pins.gpio2;
 
     // The speed of the CAN bus.
     const CAN_BAUDRATE: twai::BaudRate = twai::BaudRate::B1000K;
 
+    // !!! Use `new` when using a transceiver. `new_no_transceiver` sets TX to open-drain
+
     // Begin configuring the TWAI peripheral. The peripheral is in a reset like
     // state that prevents transmission but allows configuration.
-    let mut can_config = twai::TwaiConfiguration::new(
+    let mut can_config = twai::TwaiConfiguration::new_no_transceiver(
         peripherals.TWAI0,
         can_tx_pin,
         can_rx_pin,

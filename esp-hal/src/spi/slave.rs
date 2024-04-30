@@ -54,6 +54,7 @@ use crate::{
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
+    private,
     system::PeripheralClockControl,
 };
 
@@ -92,17 +93,17 @@ where
         mode: SpiMode,
     ) -> Spi<'d, T, FullDuplexMode> {
         crate::into_ref!(spi, sck, mosi, miso, cs);
-        sck.set_to_input()
-            .connect_input_to_peripheral(spi.sclk_signal());
+        sck.set_to_input(private::Internal);
+        sck.connect_input_to_peripheral(spi.sclk_signal(), private::Internal);
 
-        mosi.set_to_input()
-            .connect_input_to_peripheral(spi.mosi_signal());
+        mosi.set_to_input(private::Internal);
+        mosi.connect_input_to_peripheral(spi.mosi_signal(), private::Internal);
 
-        miso.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.miso_signal());
+        miso.set_to_push_pull_output(private::Internal);
+        miso.connect_peripheral_to_output(spi.miso_signal(), private::Internal);
 
-        cs.set_to_input()
-            .connect_input_to_peripheral(spi.cs_signal());
+        cs.set_to_input(private::Internal);
+        cs.connect_input_to_peripheral(spi.cs_signal(), private::Internal);
 
         Self::new_internal(spi, mode)
     }
@@ -736,7 +737,7 @@ where
 }
 
 #[doc(hidden)]
-pub trait Instance: crate::private::Sealed {
+pub trait Instance: private::Sealed {
     fn register_block(&self) -> &RegisterBlock;
 
     fn sclk_signal(&self) -> InputSignal;

@@ -17,23 +17,112 @@
 //! ```no_run
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // configure GPIO 1 as LP output pin
-//! let lp_pin = io.pins.gpio1.into_low_power().into_push_pull_output();
+//! let lp_pin = LowPowerOutput::new(io.pins.gpio1);
 //! ```
 
 use core::marker::PhantomData;
 
-#[cfg(esp32c6)]
-use super::OpenDrain;
-use super::{Floating, Input, Output, PullDown, PullUp, PushPull, Unknown};
-
-/// A GPIO pin configured for low power operation
-pub struct LowPowerPin<MODE, const PIN: u8> {
-    pub(crate) private: PhantomData<MODE>,
+/// A GPIO output pin configured for low power operation
+pub struct LowPowerOutput<'d, const PIN: u8> {
+    phantom: PhantomData<&'d ()>,
 }
 
-impl<MODE, const PIN: u8> LowPowerPin<MODE, PIN> {
-    #[doc(hidden)]
-    pub fn output_enable(&self, enable: bool) {
+impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
+    /// Create a new output pin for use by the low-power core
+    pub fn new<P>(_pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
+    where
+        P: super::OutputPin + RtcPin,
+    {
+        crate::gpio::lp_io::init_low_power_pin(PIN);
+
+        let this = Self {
+            phantom: PhantomData,
+        };
+        this.output_enable(true);
+
+        this
+    }
+
+    fn output_enable(&self, enable: bool) {
+        let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
+        if enable {
+            lp_io
+                .out_enable_w1ts()
+                .write(|w| unsafe { w.enable_w1ts().bits(1 << PIN) });
+        } else {
+            lp_io
+                .out_enable_w1tc()
+                .write(|w| unsafe { w.enable_w1tc().bits(1 << PIN) });
+        }
+    }
+}
+
+/// A GPIO input pin configured for low power operation
+pub struct LowPowerInput<'d, const PIN: u8> {
+    phantom: PhantomData<&'d ()>,
+}
+
+impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
+    /// Create a new input pin for use by the low-power core
+    pub fn new<P>(_pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
+    where
+        P: super::InputPin + RtcPin,
+    {
+        crate::gpio::lp_io::init_low_power_pin(PIN);
+
+        let this = Self {
+            phantom: PhantomData,
+        };
+        this.input_enable(true);
+        this.pullup_enable(false);
+        this.pulldown_enable(false);
+
+        this
+    }
+
+    fn input_enable(&self, enable: bool) {
+        get_pin_reg(PIN).modify(|_, w| w.fun_ie().bit(enable));
+    }
+
+    /// Sets pull-up enable for the pin
+    pub fn pullup_enable(&self, enable: bool) {
+        get_pin_reg(PIN).modify(|_, w| w.fun_wpu().bit(enable));
+    }
+
+    /// Sets pull-down enable for the pin
+    pub fn pulldown_enable(&self, enable: bool) {
+        get_pin_reg(PIN).modify(|_, w| w.fun_wpd().bit(enable));
+    }
+}
+
+/// A GPIO open-drain output pin configured for low power operation
+pub struct LowPowerOutputOpenDrain<'d, const PIN: u8> {
+    phantom: PhantomData<&'d ()>,
+}
+
+impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
+    /// Create a new output pin for use by the low-power core
+    pub fn new<P>(_pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
+    where
+        P: super::InputPin + super::OutputPin + RtcPin,
+    {
+        crate::gpio::lp_io::init_low_power_pin(PIN);
+
+        let this = Self {
+            phantom: PhantomData,
+        };
+
+        this.set_open_drain_output(true);
+        this.pulldown_enable(false);
+        this.input_enable(true);
+        this.pullup_enable(true);
+        this.pulldown_enable(false);
+        this.output_enable(true);
+
+        this
+    }
+
+    fn output_enable(&self, enable: bool) {
         let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
         if enable {
             lp_io
@@ -50,88 +139,22 @@ impl<MODE, const PIN: u8> LowPowerPin<MODE, PIN> {
         get_pin_reg(PIN).modify(|_, w| w.fun_ie().bit(enable));
     }
 
-    fn pullup_enable(&self, enable: bool) {
+    /// Sets pull-up enable for the pin
+    pub fn pullup_enable(&self, enable: bool) {
         get_pin_reg(PIN).modify(|_, w| w.fun_wpu().bit(enable));
     }
 
-    fn pulldown_enable(&self, enable: bool) {
+    /// Sets pull-down enable for the pin
+    pub fn pulldown_enable(&self, enable: bool) {
         get_pin_reg(PIN).modify(|_, w| w.fun_wpd().bit(enable));
     }
 
-    #[doc(hidden)]
-    pub fn set_level(&mut self, level: bool) {
-        let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
-        if level {
-            lp_io
-                .out_data_w1ts()
-                .write(|w| unsafe { w.out_data_w1ts().bits(1 << PIN) });
-        } else {
-            lp_io
-                .out_data_w1tc()
-                .write(|w| unsafe { w.out_data_w1tc().bits(1 << PIN) });
-        }
-    }
-
-    #[doc(hidden)]
-    pub fn get_level(&self) -> bool {
-        let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
-        (lp_io.in_().read().data_next().bits() & 1 << PIN) != 0
-    }
-
-    /// Configures the pin as an input with the internal pull-up resistor
-    /// enabled.
-    pub fn into_pull_up_input(self) -> LowPowerPin<Input<PullUp>, PIN> {
-        self.input_enable(true);
-        self.pullup_enable(true);
-        self.pulldown_enable(false);
-        LowPowerPin {
-            private: PhantomData,
-        }
-    }
-
-    /// Configures the pin as an input with the internal pull-down resistor
-    /// enabled.
-    pub fn into_pull_down_input(self) -> LowPowerPin<Input<PullDown>, PIN> {
-        self.input_enable(true);
-        self.pullup_enable(false);
-        self.pulldown_enable(true);
-        LowPowerPin {
-            private: PhantomData,
-        }
-    }
-
-    /// Configures the pin as a floating input pin.
-    pub fn into_floating_input(self) -> LowPowerPin<Input<Floating>, PIN> {
-        self.input_enable(true);
-        self.pullup_enable(false);
-        self.pulldown_enable(false);
-        LowPowerPin {
-            private: PhantomData,
-        }
-    }
-
-    /// Configures the pin as a push-pull output pin.
-    pub fn into_push_pull_output(self) -> LowPowerPin<Output<PushPull>, PIN> {
-        self.output_enable(true);
-        LowPowerPin {
-            private: PhantomData,
-        }
-    }
-
-    /// Configures the pin as an open-drain output pin.
-    pub fn into_open_drain_output(self) -> LowPowerPin<OpenDrain, PIN> {
+    fn set_open_drain_output(&self, enable: bool) {
         use crate::peripherals::GPIO;
-
         let gpio = unsafe { &*GPIO::PTR };
 
         gpio.pin(PIN as usize)
-            .modify(|_, w| w.pad_driver().bit(true));
-        self.pulldown_enable(false);
-        self.into_pull_up_input().into_push_pull_output();
-
-        LowPowerPin {
-            private: PhantomData,
-        }
+            .modify(|_, w| w.pad_driver().bit(enable));
     }
 }
 
@@ -157,12 +180,6 @@ fn get_pin_reg(pin: u8) -> &'static crate::peripherals::lp_io::GPIO0 {
     }
 }
 
-/// Configures a pin for use as a low power pin
-pub trait IntoLowPowerPin<const PIN: u8> {
-    /// Converts the pin into a low power pin
-    fn into_low_power(self) -> LowPowerPin<Unknown, { PIN }>;
-}
-
 #[doc(hidden)]
 #[macro_export]
 macro_rules! lp_gpio {
@@ -171,16 +188,7 @@ macro_rules! lp_gpio {
     ) => {
         paste::paste!{
             $(
-                impl<MODE> $crate::gpio::lp_io::IntoLowPowerPin<$gpionum> for GpioPin<MODE, $gpionum> {
-                    fn into_low_power(self) -> $crate::gpio::lp_io::LowPowerPin<Unknown, $gpionum> {
-                        $crate::gpio::lp_io::init_low_power_pin($gpionum);
-                        $crate::gpio::lp_io::LowPowerPin {
-                            private: core::marker::PhantomData,
-                        }
-                    }
-                }
-
-                impl<MODE> $crate::gpio::RtcPin for GpioPin<MODE, $gpionum> {
+                impl $crate::gpio::RtcPin for GpioPin<$gpionum> {
                     unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
                         let lp_io = &*$crate::peripherals::LP_IO::ptr();
                         lp_io.[< pin $gpionum >]().modify(|_, w| {
@@ -232,7 +240,7 @@ macro_rules! lp_gpio {
                     }
                 }
 
-                impl<MODE> $crate::gpio::RtcPinWithResistors for GpioPin<MODE, $gpionum> {
+                impl $crate::gpio::RtcPinWithResistors for GpioPin<$gpionum> {
                     fn rtcio_pullup(&mut self, enable: bool) {
                         let lp_io = unsafe { &*$crate::peripherals::LP_IO::ptr() };
                         lp_io.[< gpio $gpionum >]().modify(|_, w| w.fun_wpu().bit(enable));
@@ -249,3 +257,5 @@ macro_rules! lp_gpio {
 }
 
 pub(crate) use lp_gpio;
+
+use super::RtcPin;

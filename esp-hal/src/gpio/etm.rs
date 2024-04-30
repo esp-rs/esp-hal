@@ -23,11 +23,24 @@
 //!
 //! ## Example
 //! ```no_run
-//! let led_task = gpio_ext.channel0_task.toggle(&mut led);
-//! let button_event = gpio_ext.channel0_event.falling_edge(button);
+//! let led_task = gpio_ext.channel0_task.toggle(
+//!     &mut led,
+//!     GpioEtmOutputConfig {
+//!         open_drain: false,
+//!         pull: Pull::None,
+//!         initial_state: false,
+//!     },
+//! );
+//! let button_event = gpio_ext
+//!     .channel0_event
+//!     .falling_edge(button, GpioEtmInputConfig { pull: Pull::Down });
 //! ```
 
-use crate::peripheral::{Peripheral, PeripheralRef};
+use crate::{
+    gpio::Pull,
+    peripheral::{Peripheral, PeripheralRef},
+    private,
+};
 
 /// All the GPIO ETM channels
 #[non_exhaustive]
@@ -79,6 +92,20 @@ impl<'d> GpioEtmChannels<'d> {
     }
 }
 
+/// Configuration for an ETM controlled GPIO input pin
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct GpioEtmInputConfig {
+    /// Configuration for the internal pull-up resistors
+    pub pull: Pull,
+}
+
+impl Default for GpioEtmInputConfig {
+    fn default() -> Self {
+        Self { pull: Pull::None }
+    }
+}
+
 /// An ETM controlled GPIO event
 pub struct GpioEtmEventChannel<const C: u8> {}
 
@@ -87,12 +114,20 @@ impl<const C: u8> GpioEtmEventChannel<C> {
     pub fn rising_edge<'d, PIN>(
         self,
         pin: impl Peripheral<P = PIN> + 'd,
+        pin_config: GpioEtmInputConfig,
     ) -> GpioEtmEventChannelRising<'d, PIN, C>
     where
-        PIN: super::Pin,
+        PIN: super::InputPin,
     {
         crate::into_ref!(pin);
-        enable_event_channel(C, pin.number());
+
+        pin.init_input(
+            pin_config.pull == Pull::Down,
+            pin_config.pull == Pull::Up,
+            private::Internal,
+        );
+
+        enable_event_channel(C, pin.number(private::Internal));
         GpioEtmEventChannelRising { _pin: pin }
     }
 
@@ -100,12 +135,20 @@ impl<const C: u8> GpioEtmEventChannel<C> {
     pub fn falling_edge<'d, PIN>(
         self,
         pin: impl Peripheral<P = PIN> + 'd,
+        pin_config: GpioEtmInputConfig,
     ) -> GpioEtmEventChannelFalling<'d, PIN, C>
     where
-        PIN: super::Pin,
+        PIN: super::InputPin,
     {
         crate::into_ref!(pin);
-        enable_event_channel(C, pin.number());
+
+        pin.init_input(
+            pin_config.pull == Pull::Down,
+            pin_config.pull == Pull::Up,
+            private::Internal,
+        );
+
+        enable_event_channel(C, pin.number(private::Internal));
         GpioEtmEventChannelFalling { _pin: pin }
     }
 
@@ -113,12 +156,20 @@ impl<const C: u8> GpioEtmEventChannel<C> {
     pub fn any_edge<'d, PIN>(
         self,
         pin: impl Peripheral<P = PIN> + 'd,
+        pin_config: GpioEtmInputConfig,
     ) -> GpioEtmEventChannelAny<'d, PIN, C>
     where
-        PIN: super::Pin,
+        PIN: super::InputPin,
     {
         crate::into_ref!(pin);
-        enable_event_channel(C, pin.number());
+
+        pin.init_input(
+            pin_config.pull == Pull::Down,
+            pin_config.pull == Pull::Up,
+            private::Internal,
+        );
+
+        enable_event_channel(C, pin.number(private::Internal));
         GpioEtmEventChannelAny { _pin: pin }
     }
 }
@@ -132,7 +183,7 @@ where
     _pin: PeripheralRef<'d, PIN>,
 }
 
-impl<'d, PIN, const C: u8> crate::private::Sealed for GpioEtmEventChannelRising<'d, PIN, C> where
+impl<'d, PIN, const C: u8> private::Sealed for GpioEtmEventChannelRising<'d, PIN, C> where
     PIN: super::Pin
 {
 }
@@ -155,7 +206,7 @@ where
     _pin: PeripheralRef<'d, PIN>,
 }
 
-impl<'d, PIN, const C: u8> crate::private::Sealed for GpioEtmEventChannelFalling<'d, PIN, C> where
+impl<'d, PIN, const C: u8> private::Sealed for GpioEtmEventChannelFalling<'d, PIN, C> where
     PIN: super::Pin
 {
 }
@@ -178,7 +229,7 @@ where
     _pin: PeripheralRef<'d, PIN>,
 }
 
-impl<'d, PIN, const C: u8> crate::private::Sealed for GpioEtmEventChannelAny<'d, PIN, C> where
+impl<'d, PIN, const C: u8> private::Sealed for GpioEtmEventChannelAny<'d, PIN, C> where
     PIN: super::Pin
 {
 }
@@ -192,6 +243,28 @@ where
     }
 }
 
+/// Configuration for an ETM controlled GPIO output pin
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct GpioEtmOutputConfig {
+    /// Set to open-drain output
+    pub open_drain: bool,
+    /// Only used when open-drain
+    pub pull: Pull,
+    /// Initial pin state
+    pub initial_state: bool,
+}
+
+impl Default for GpioEtmOutputConfig {
+    fn default() -> Self {
+        Self {
+            open_drain: false,
+            pull: Pull::None,
+            initial_state: false,
+        }
+    }
+}
+
 /// An ETM controlled GPIO task
 pub struct GpioEtmTaskChannel<const C: u8> {}
 
@@ -202,22 +275,50 @@ impl<const C: u8> GpioEtmTaskChannel<C> {
     // number is the pin-count
 
     /// Task to set a high level
-    pub fn set<'d, PIN>(self, pin: impl Peripheral<P = PIN> + 'd) -> GpioEtmTaskSet<'d, PIN, C>
+    pub fn set<'d, PIN>(
+        self,
+        pin: impl Peripheral<P = PIN> + 'd,
+        pin_config: GpioEtmOutputConfig,
+    ) -> GpioEtmTaskSet<'d, PIN, C>
     where
-        PIN: super::Pin,
+        PIN: super::OutputPin,
     {
         crate::into_ref!(pin);
-        enable_task_channel(C, pin.number());
+
+        pin.set_output_high(pin_config.initial_state, private::Internal);
+        if pin_config.open_drain {
+            pin.internal_pull_down(pin_config.pull == Pull::Down, private::Internal);
+            pin.internal_pull_up(pin_config.pull == Pull::Up, private::Internal);
+            pin.set_to_open_drain_output(private::Internal);
+        } else {
+            pin.set_to_push_pull_output(private::Internal);
+        }
+
+        enable_task_channel(C, pin.number(private::Internal));
         GpioEtmTaskSet { _pin: pin }
     }
 
     /// Task to set a low level
-    pub fn clear<'d, PIN>(self, pin: impl Peripheral<P = PIN> + 'd) -> GpioEtmTaskClear<'d, PIN, C>
+    pub fn clear<'d, PIN>(
+        self,
+        pin: impl Peripheral<P = PIN> + 'd,
+        pin_config: GpioEtmOutputConfig,
+    ) -> GpioEtmTaskClear<'d, PIN, C>
     where
-        PIN: super::Pin,
+        PIN: super::OutputPin,
     {
         crate::into_ref!(pin);
-        enable_task_channel(C, pin.number());
+
+        pin.set_output_high(pin_config.initial_state, private::Internal);
+        if pin_config.open_drain {
+            pin.internal_pull_down(pin_config.pull == Pull::Down, private::Internal);
+            pin.internal_pull_up(pin_config.pull == Pull::Up, private::Internal);
+            pin.set_to_open_drain_output(private::Internal);
+        } else {
+            pin.set_to_push_pull_output(private::Internal);
+        }
+
+        enable_task_channel(C, pin.number(private::Internal));
         GpioEtmTaskClear { _pin: pin }
     }
 
@@ -225,12 +326,23 @@ impl<const C: u8> GpioEtmTaskChannel<C> {
     pub fn toggle<'d, PIN>(
         self,
         pin: impl Peripheral<P = PIN> + 'd,
+        pin_config: GpioEtmOutputConfig,
     ) -> GpioEtmTaskToggle<'d, PIN, C>
     where
-        PIN: super::Pin,
+        PIN: super::OutputPin,
     {
         crate::into_ref!(pin);
-        enable_task_channel(C, pin.number());
+
+        pin.set_output_high(pin_config.initial_state, private::Internal);
+        if pin_config.open_drain {
+            pin.internal_pull_down(pin_config.pull == Pull::Down, private::Internal);
+            pin.internal_pull_up(pin_config.pull == Pull::Up, private::Internal);
+            pin.set_to_open_drain_output(private::Internal);
+        } else {
+            pin.set_to_push_pull_output(private::Internal);
+        }
+
+        enable_task_channel(C, pin.number(private::Internal));
         GpioEtmTaskToggle { _pin: pin }
     }
 }
@@ -244,10 +356,7 @@ where
     _pin: PeripheralRef<'d, PIN>,
 }
 
-impl<'d, PIN, const C: u8> crate::private::Sealed for GpioEtmTaskSet<'d, PIN, C> where
-    PIN: super::Pin
-{
-}
+impl<'d, PIN, const C: u8> private::Sealed for GpioEtmTaskSet<'d, PIN, C> where PIN: super::Pin {}
 
 impl<'d, PIN, const C: u8> crate::etm::EtmTask for GpioEtmTaskSet<'d, PIN, C>
 where
@@ -264,10 +373,7 @@ pub struct GpioEtmTaskClear<'d, PIN, const C: u8> {
     _pin: PeripheralRef<'d, PIN>,
 }
 
-impl<'d, PIN, const C: u8> crate::private::Sealed for GpioEtmTaskClear<'d, PIN, C> where
-    PIN: super::Pin
-{
-}
+impl<'d, PIN, const C: u8> private::Sealed for GpioEtmTaskClear<'d, PIN, C> where PIN: super::Pin {}
 
 impl<'d, PIN, const C: u8> crate::etm::EtmTask for GpioEtmTaskClear<'d, PIN, C>
 where
@@ -284,10 +390,7 @@ pub struct GpioEtmTaskToggle<'d, PIN, const C: u8> {
     _pin: PeripheralRef<'d, PIN>,
 }
 
-impl<'d, PIN, const C: u8> crate::private::Sealed for GpioEtmTaskToggle<'d, PIN, C> where
-    PIN: super::Pin
-{
-}
+impl<'d, PIN, const C: u8> private::Sealed for GpioEtmTaskToggle<'d, PIN, C> where PIN: super::Pin {}
 
 impl<'d, PIN, const C: u8> crate::etm::EtmTask for GpioEtmTaskToggle<'d, PIN, C>
 where

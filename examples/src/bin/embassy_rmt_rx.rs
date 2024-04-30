@@ -13,7 +13,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     embassy::{self},
-    gpio::{Gpio5, Io, Output, PushPull},
+    gpio::{Gpio5, Io, Output},
     peripherals::Peripherals,
     prelude::*,
     rmt::{asynch::RxChannelAsync, PulseCode, Rmt, RxChannelConfig, RxChannelCreatorAsync},
@@ -27,7 +27,7 @@ const WIDTH: usize = 80;
 compile_error!("Run this example in release mode");
 
 #[embassy_executor::task]
-async fn signal_task(mut pin: Gpio5<Output<PushPull>>) {
+async fn signal_task(mut pin: Output<'static, Gpio5>) {
     loop {
         for _ in 0..10 {
             pin.toggle();
@@ -75,7 +75,7 @@ async fn main(spawner: Spawner) {
     }
 
     spawner
-        .spawn(signal_task(io.pins.gpio5.into_push_pull_output()))
+        .spawn(signal_task(Output::new(io.pins.gpio5, false)))
         .unwrap();
 
     let mut data = [PulseCode {

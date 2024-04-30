@@ -13,7 +13,10 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    gpio::{lp_io::IntoLowPowerPin, Io},
+    gpio::{
+        lp_io::{LowPowerInput, LowPowerOutput},
+        Io,
+    },
     lp_core::{LpCore, LpCoreWakeupSource},
     peripherals::Peripherals,
     prelude::*,
@@ -32,10 +35,7 @@ fn main() -> ! {
 
     // Set up (HP) UART1:
 
-    let pins = TxRxPins::new_tx_rx(
-        io.pins.gpio6.into_push_pull_output(),
-        io.pins.gpio7.into_floating_input(),
-    );
+    let pins = TxRxPins::new_tx_rx(io.pins.gpio6, io.pins.gpio7);
 
     let mut uart1 = Uart::new_with_config(
         peripherals.UART1,
@@ -46,8 +46,8 @@ fn main() -> ! {
     );
 
     // Set up (LP) UART:
-    let lp_tx = io.pins.gpio5.into_low_power().into_push_pull_output();
-    let lp_rx = io.pins.gpio4.into_low_power().into_floating_input();
+    let lp_tx = LowPowerOutput::new(io.pins.gpio5);
+    let lp_rx = LowPowerInput::new(io.pins.gpio4);
     let lp_uart = LpUart::new(peripherals.LP_UART, lp_tx, lp_rx);
 
     let mut lp_core = LpCore::new(peripherals.LP_CORE);

@@ -254,8 +254,8 @@ where
 
     pub fn with_cs<CS: OutputPin>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_ref!(cs);
-        cs.set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_CS);
+        cs.set_to_push_pull_output(crate::private::Internal);
+        cs.connect_peripheral_to_output(OutputSignal::LCD_CS, crate::private::Internal);
 
         self
     }
@@ -268,11 +268,11 @@ where
         crate::into_ref!(dc);
         crate::into_ref!(wrx);
 
-        dc.set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DC);
+        dc.set_to_push_pull_output(crate::private::Internal);
+        dc.connect_peripheral_to_output(OutputSignal::LCD_DC, crate::private::Internal);
 
-        wrx.set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_PCLK);
+        wrx.set_to_push_pull_output(crate::private::Internal);
+        wrx.connect_peripheral_to_output(OutputSignal::LCD_PCLK, crate::private::Internal);
 
         self
     }
@@ -610,30 +610,30 @@ where
     type Word = u8;
 
     fn configure(&mut self) {
+        self.pin_0.set_to_push_pull_output(crate::private::Internal);
         self.pin_0
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_0);
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_0, crate::private::Internal);
+        self.pin_1.set_to_push_pull_output(crate::private::Internal);
         self.pin_1
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_1);
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_1, crate::private::Internal);
+        self.pin_2.set_to_push_pull_output(crate::private::Internal);
         self.pin_2
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_2);
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_2, crate::private::Internal);
+        self.pin_3.set_to_push_pull_output(crate::private::Internal);
         self.pin_3
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_3);
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_3, crate::private::Internal);
+        self.pin_4.set_to_push_pull_output(crate::private::Internal);
         self.pin_4
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_4);
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_4, crate::private::Internal);
+        self.pin_5.set_to_push_pull_output(crate::private::Internal);
         self.pin_5
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_5);
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_5, crate::private::Internal);
+        self.pin_6.set_to_push_pull_output(crate::private::Internal);
         self.pin_6
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_6);
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_6, crate::private::Internal);
+        self.pin_7.set_to_push_pull_output(crate::private::Internal);
         self.pin_7
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_7);
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_7, crate::private::Internal);
     }
 }
 
@@ -755,54 +755,60 @@ where
 {
     type Word = u16;
     fn configure(&mut self) {
+        self.pin_0.set_to_push_pull_output(crate::private::Internal);
         self.pin_0
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_0);
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_0, crate::private::Internal);
+        self.pin_1.set_to_push_pull_output(crate::private::Internal);
         self.pin_1
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_1);
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_1, crate::private::Internal);
+        self.pin_2.set_to_push_pull_output(crate::private::Internal);
         self.pin_2
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_2);
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_2, crate::private::Internal);
+        self.pin_3.set_to_push_pull_output(crate::private::Internal);
         self.pin_3
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_3);
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_3, crate::private::Internal);
+        self.pin_4.set_to_push_pull_output(crate::private::Internal);
         self.pin_4
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_4);
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_4, crate::private::Internal);
+        self.pin_5.set_to_push_pull_output(crate::private::Internal);
         self.pin_5
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_5);
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_5, crate::private::Internal);
+        self.pin_6.set_to_push_pull_output(crate::private::Internal);
         self.pin_6
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_6);
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_6, crate::private::Internal);
+        self.pin_7.set_to_push_pull_output(crate::private::Internal);
         self.pin_7
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_7);
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_7, crate::private::Internal);
+        self.pin_8.set_to_push_pull_output(crate::private::Internal);
         self.pin_8
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_8);
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_8, crate::private::Internal);
+        self.pin_9.set_to_push_pull_output(crate::private::Internal);
         self.pin_9
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_9);
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_9, crate::private::Internal);
         self.pin_10
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_10);
+            .set_to_push_pull_output(crate::private::Internal);
+        self.pin_10
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_10, crate::private::Internal);
         self.pin_11
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_11);
+            .set_to_push_pull_output(crate::private::Internal);
+        self.pin_11
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_11, crate::private::Internal);
         self.pin_12
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_12);
+            .set_to_push_pull_output(crate::private::Internal);
+        self.pin_12
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_12, crate::private::Internal);
         self.pin_13
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_13);
+            .set_to_push_pull_output(crate::private::Internal);
+        self.pin_13
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_13, crate::private::Internal);
         self.pin_14
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_14);
+            .set_to_push_pull_output(crate::private::Internal);
+        self.pin_14
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_14, crate::private::Internal);
         self.pin_15
-            .set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_15);
+            .set_to_push_pull_output(crate::private::Internal);
+        self.pin_15
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_15, crate::private::Internal);
     }
 }
 

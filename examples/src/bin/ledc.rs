@@ -31,7 +31,7 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let led = io.pins.gpio0.into_push_pull_output();
+    let led = io.pins.gpio0;
 
     let mut ledc = Ledc::new(peripherals.LEDC, &clocks);
 

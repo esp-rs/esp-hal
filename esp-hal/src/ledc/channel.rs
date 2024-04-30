@@ -536,8 +536,12 @@ where
             }
 
             match cfg {
-                config::PinConfig::PushPull => self.output_pin.set_to_push_pull_output(),
-                config::PinConfig::OpenDrain => self.output_pin.set_to_open_drain_output(),
+                config::PinConfig::PushPull => self
+                    .output_pin
+                    .set_to_push_pull_output(crate::private::Internal),
+                config::PinConfig::OpenDrain => self
+                    .output_pin
+                    .set_to_open_drain_output(crate::private::Internal),
             };
 
             let timer_number = timer.get_number() as u8;
@@ -585,7 +589,8 @@ where
                 #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
                 Number::Channel7 => OutputSignal::LEDC_LS_SIG7,
             };
-            self.output_pin.connect_peripheral_to_output(signal);
+            self.output_pin
+                .connect_peripheral_to_output(signal, crate::private::Internal);
         } else {
             return Err(Error::Timer);
         }

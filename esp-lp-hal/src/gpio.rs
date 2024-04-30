@@ -2,42 +2,24 @@
 //!
 //! It's assumed that GPIOs are already configured correctly by the HP core.
 
-use core::marker::PhantomData;
-
 #[cfg(feature = "esp32c6")]
 type LpIo = crate::pac::LP_IO;
 #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
 type LpIo = crate::pac::RTC_IO;
 
-pub struct Unknown {}
+#[non_exhaustive]
+pub struct Input<const PIN: u8> {}
 
-pub struct Input<MODE> {
-    _mode: PhantomData<MODE>,
-}
-
-pub struct Floating;
-
-pub struct PullDown;
-
-pub struct PullUp;
-
-pub struct Output<MODE> {
-    _mode: PhantomData<MODE>,
-}
-
-pub struct PushPull;
-
-pub struct GpioPin<MODE, const PIN: u8> {
-    phantom: PhantomData<MODE>,
-}
-
-impl<MODE, const PIN: u8> GpioPin<Input<MODE>, PIN> {
+impl<const PIN: u8> Input<PIN> {
     pub fn input_state(&self) -> bool {
         unsafe { &*LpIo::PTR }.in_().read().bits() >> PIN & 0x1 != 0
     }
 }
 
-impl<MODE, const PIN: u8> GpioPin<Output<MODE>, PIN> {
+#[non_exhaustive]
+pub struct Output<const PIN: u8> {}
+
+impl<const PIN: u8> Output<PIN> {
     pub fn output_state(&self) -> bool {
         unsafe { &*LpIo::PTR }.out().read().bits() >> PIN & 0x1 != 0
     }
@@ -57,18 +39,26 @@ impl<MODE, const PIN: u8> GpioPin<Output<MODE>, PIN> {
 
 // Used by the `entry` procmacro:
 #[doc(hidden)]
-pub unsafe fn conjure<MODE, const PIN: u8>() -> Option<GpioPin<MODE, PIN>> {
+pub unsafe fn conjure_output<const PIN: u8>() -> Option<Output<PIN>> {
     if PIN > 7 {
         None
     } else {
-        Some(GpioPin {
-            phantom: PhantomData,
-        })
+        Some(Output {})
+    }
+}
+
+// Used by the `entry` procmacro:
+#[doc(hidden)]
+pub unsafe fn conjure_input<const PIN: u8>() -> Option<Input<PIN>> {
+    if PIN > 7 {
+        None
+    } else {
+        Some(Input {})
     }
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<MODE, const PIN: u8> embedded_hal_02::digital::v2::InputPin for GpioPin<Input<MODE>, PIN> {
+impl<const PIN: u8> embedded_hal_02::digital::v2::InputPin for Input<PIN> {
     type Error = core::convert::Infallible;
 
     fn is_high(&self) -> Result<bool, Self::Error> {
@@ -81,7 +71,7 @@ impl<MODE, const PIN: u8> embedded_hal_02::digital::v2::InputPin for GpioPin<Inp
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<MODE, const PIN: u8> embedded_hal_02::digital::v2::OutputPin for GpioPin<Output<MODE>, PIN> {
+impl<const PIN: u8> embedded_hal_02::digital::v2::OutputPin for Output<PIN> {
     type Error = core::convert::Infallible;
 
     fn set_low(&mut self) -> Result<(), Self::Error> {
@@ -96,9 +86,7 @@ impl<MODE, const PIN: u8> embedded_hal_02::digital::v2::OutputPin for GpioPin<Ou
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<MODE, const PIN: u8> embedded_hal_02::digital::v2::StatefulOutputPin
-    for GpioPin<Output<MODE>, PIN>
-{
+impl<const PIN: u8> embedded_hal_02::digital::v2::StatefulOutputPin for Output<PIN> {
     fn is_set_high(&self) -> Result<bool, Self::Error> {
         Ok(self.output_state())
     }
@@ -109,18 +97,20 @@ impl<MODE, const PIN: u8> embedded_hal_02::digital::v2::StatefulOutputPin
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<MODE, const PIN: u8> embedded_hal_02::digital::v2::toggleable::Default
-    for GpioPin<Output<MODE>, PIN>
-{
-}
+impl<const PIN: u8> embedded_hal_02::digital::v2::toggleable::Default for Output<PIN> {}
 
 #[cfg(feature = "embedded-hal-1")]
-impl<MODE, const PIN: u8> embedded_hal_1::digital::ErrorType for GpioPin<MODE, PIN> {
+impl<const PIN: u8> embedded_hal_1::digital::ErrorType for Input<PIN> {
     type Error = core::convert::Infallible;
 }
 
 #[cfg(feature = "embedded-hal-1")]
-impl<MODE, const PIN: u8> embedded_hal_1::digital::InputPin for GpioPin<Input<MODE>, PIN> {
+impl<const PIN: u8> embedded_hal_1::digital::ErrorType for Output<PIN> {
+    type Error = core::convert::Infallible;
+}
+
+#[cfg(feature = "embedded-hal-1")]
+impl<const PIN: u8> embedded_hal_1::digital::InputPin for Input<PIN> {
     fn is_high(&mut self) -> Result<bool, Self::Error> {
         Ok(self.input_state())
     }
@@ -131,7 +121,7 @@ impl<MODE, const PIN: u8> embedded_hal_1::digital::InputPin for GpioPin<Input<MO
 }
 
 #[cfg(feature = "embedded-hal-1")]
-impl<MODE, const PIN: u8> embedded_hal_1::digital::OutputPin for GpioPin<Output<MODE>, PIN> {
+impl<const PIN: u8> embedded_hal_1::digital::OutputPin for Output<PIN> {
     fn set_low(&mut self) -> Result<(), Self::Error> {
         self.set_output(false);
         Ok(())
@@ -144,9 +134,7 @@ impl<MODE, const PIN: u8> embedded_hal_1::digital::OutputPin for GpioPin<Output<
 }
 
 #[cfg(feature = "embedded-hal-1")]
-impl<MODE, const PIN: u8> embedded_hal_1::digital::StatefulOutputPin
-    for GpioPin<Output<MODE>, PIN>
-{
+impl<const PIN: u8> embedded_hal_1::digital::StatefulOutputPin for Output<PIN> {
     fn is_set_high(&mut self) -> Result<bool, Self::Error> {
         Ok(self.output_state())
     }

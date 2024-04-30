@@ -13,8 +13,8 @@
 //!
 //! ```no_run
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let gpio25 = io.pins.gpio25.into_analog();
-//! let gpio26 = io.pins.gpio26.into_analog();
+//! let gpio25 = io.pins.gpio25;
+//! let gpio26 = io.pins.gpio26;
 //!
 //! let mut dac1 = Dac1::new(peripherals.DAC1, gpio25);
 //! let mut dac2 = Dac2::new(peripherals.DAC2, gpio26);
@@ -44,11 +44,11 @@ use crate::{
 
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
-        type Dac1Gpio = gpio::Gpio25<gpio::Analog>;
-        type Dac2Gpio = gpio::Gpio26<gpio::Analog>;
+        type Dac1Gpio = gpio::Gpio25;
+        type Dac2Gpio = gpio::Gpio26;
     } else if #[cfg(esp32s2)] {
-        type Dac1Gpio = gpio::Gpio17<gpio::Analog>;
-        type Dac2Gpio = gpio::Gpio18<gpio::Analog>;
+        type Dac1Gpio = gpio::Gpio17;
+        type Dac2Gpio = gpio::Gpio18;
     }
 }
 
