@@ -9,7 +9,6 @@
 //! Connect MISO (GPIO2) and MOSI (GPIO4) pins.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s3
-// TODO: esp32s2 is disabled due to https://github.com/esp-rs/esp-hal/issues/1524
 
 #![no_std]
 #![no_main]

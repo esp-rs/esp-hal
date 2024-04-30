@@ -110,7 +110,6 @@ mod tests {
 
         #[cfg(not(feature = "esp32s2"))]
         {
-            // TODO: Remove cfg once https://github.com/esp-rs/esp-hal/issues/1524 is solved
             #[cfg(not(feature = "esp32c3"))]
             {
                 // 9600 baud, RC FAST clock source:

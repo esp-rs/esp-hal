@@ -153,7 +153,6 @@ mod tests {
     }
 
     #[test]
-    // TODO: See https://github.com/esp-rs/esp-hal/issues/1413
     #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")))]
     fn test_gpio_interrupt(mut ctx: Context) {
         critical_section::with(|cs| {
