@@ -16,7 +16,7 @@ use esp_hal::{
     clock::ClockControl,
     delay::Delay,
     embassy,
-    gpio::{GpioPin, Input, Io, Output, OutputPin, PullDown, PushPull, Unknown},
+    gpio::{GpioPin, Input, Io, Output, OutputPin, Unknown},
     macros::handler,
     peripherals::Peripherals,
     system::SystemControl,
@@ -24,12 +24,12 @@ use esp_hal::{
 };
 
 static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
-static INPUT_PIN: Mutex<RefCell<Option<esp_hal::gpio::Gpio2<Input<PullDown>>>>> =
+static INPUT_PIN: Mutex<RefCell<Option<esp_hal::gpio::Gpio2<Input>>>> =
     Mutex::new(RefCell::new(None));
 
 struct Context {
-    io2: GpioPin<Input<PullDown>, 2>,
-    io4: GpioPin<Output<PushPull>, 4>,
+    io2: GpioPin<Input, 2>,
+    io4: GpioPin<Output, 4>,
     delay: Delay,
 }
 

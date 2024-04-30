@@ -72,14 +72,10 @@ pub enum Event {
 pub struct Unknown {}
 
 /// Input pin mode
-pub struct Input<MODE> {
-    _mode: PhantomData<MODE>,
-}
+pub struct Input {}
 
 /// Inverted input pin mode
-pub struct InvertedInput<MODE> {
-    _mode: PhantomData<MODE>,
-}
+pub struct InvertedInput {}
 
 /// Used to decide if the pin is inverted or not when the pin gets connected to
 /// a peripheral
@@ -87,11 +83,11 @@ trait InputMode {
     const PIN_IS_INVERTED: bool;
 }
 
-impl<MODE> InputMode for Input<MODE> {
+impl InputMode for Input {
     const PIN_IS_INVERTED: bool = false;
 }
 
-impl<MODE> InputMode for InvertedInput<MODE> {
+impl InputMode for InvertedInput {
     const PIN_IS_INVERTED: bool = true;
 }
 
@@ -100,28 +96,19 @@ impl InputMode for Unknown {
 }
 
 /// RTC input pin mode
-pub struct RtcInput<MODE> {
-    _mode: PhantomData<MODE>,
-}
-
-/// Floating mode
-pub struct Floating;
-
-/// Pull-down mode
-pub struct PullDown;
-
-/// Pull-up mode
-pub struct PullUp;
+pub struct RtcInput {}
 
 /// Output pin mode
-pub struct Output<MODE> {
-    _mode: PhantomData<MODE>,
-}
+pub struct Output {}
 
 /// Inverted output pin mode
-pub struct InvertedOutput<MODE> {
-    _mode: PhantomData<MODE>,
-}
+pub struct InvertedOutput {}
+
+/// Open-drain mode
+pub struct OpenDrain {}
+
+/// Inverted open-drain mode
+pub struct InvertedOpenDrain {}
 
 /// Used to decide if the pin is inverted or not when the pin gets connected to
 /// a peripheral
@@ -129,11 +116,19 @@ trait OutputMode {
     const PIN_IS_INVERTED: bool;
 }
 
-impl<MODE> OutputMode for Output<MODE> {
+impl OutputMode for Output {
     const PIN_IS_INVERTED: bool = false;
 }
 
-impl<MODE> OutputMode for InvertedOutput<MODE> {
+impl OutputMode for InvertedOutput {
+    const PIN_IS_INVERTED: bool = true;
+}
+
+impl OutputMode for OpenDrain {
+    const PIN_IS_INVERTED: bool = false;
+}
+
+impl OutputMode for InvertedOpenDrain {
     const PIN_IS_INVERTED: bool = true;
 }
 
@@ -142,15 +137,7 @@ impl OutputMode for Unknown {
 }
 
 /// RTC output pin mode
-pub struct RtcOutput<MODE> {
-    _mode: PhantomData<MODE>,
-}
-
-/// Open-drain mode
-pub struct OpenDrain;
-
-/// Push-pull mode
-pub struct PushPull;
+pub struct RtcOutput {}
 
 /// Analog mode
 pub struct Analog;
@@ -618,7 +605,7 @@ pub struct GpioPin<MODE, const GPIONUM: u8> {
     _mode: PhantomData<MODE>,
 }
 
-impl<MODE, const GPIONUM: u8> GpioPin<Input<MODE>, GPIONUM>
+impl<const GPIONUM: u8> GpioPin<Input, GPIONUM>
 where
     Self: GpioProperties,
 {
@@ -635,7 +622,7 @@ where
     }
 }
 
-impl<const GPIONUM: u8> GpioPin<Output<OpenDrain>, GPIONUM>
+impl<const GPIONUM: u8> GpioPin<OpenDrain, GPIONUM>
 where
     Self: GpioProperties,
 {
@@ -724,40 +711,40 @@ where
     }
 
     /// Configures the pin to operate as a floating input pin
-    pub fn into_floating_input(self) -> GpioPin<Input<Floating>, GPIONUM> {
+    pub fn into_floating_input(self) -> GpioPin<Input, GPIONUM> {
         self.init_input(false, false);
         GpioPin { _mode: PhantomData }
     }
 
     /// Configures the pin to operate as a pulled up input pin
-    pub fn into_pull_up_input(self) -> GpioPin<Input<PullUp>, GPIONUM> {
+    pub fn into_pull_up_input(self) -> GpioPin<Input, GPIONUM> {
         self.init_input(false, true);
         GpioPin { _mode: PhantomData }
     }
 
     /// Configures the pin to operate as a pulled down input pin
-    pub fn into_pull_down_input(self) -> GpioPin<Input<PullDown>, GPIONUM> {
+    pub fn into_pull_down_input(self) -> GpioPin<Input, GPIONUM> {
         self.init_input(true, false);
         GpioPin { _mode: PhantomData }
     }
 
     /// Configures the pin to operate as an inverted floating input pin.
     /// Only suitable to be passed into a peripheral driver.
-    pub fn into_inverted_floating_input(self) -> GpioPin<InvertedInput<Floating>, GPIONUM> {
+    pub fn into_inverted_floating_input(self) -> GpioPin<InvertedInput, GPIONUM> {
         self.init_input(false, false);
         GpioPin { _mode: PhantomData }
     }
 
     /// Configures the pin to operate as an inverted pulled up input pin.
     /// Only suitable to be passed into a peripheral driver.
-    pub fn into_inverted_pull_up_input(self) -> GpioPin<InvertedInput<PullUp>, GPIONUM> {
+    pub fn into_inverted_pull_up_input(self) -> GpioPin<InvertedInput, GPIONUM> {
         self.init_input(false, true);
         GpioPin { _mode: PhantomData }
     }
 
     /// Configures the pin to operate as an inverted pulled down input pin.
     /// Only suitable to be passed into a peripheral driver.
-    pub fn into_inverted_pull_down_input(self) -> GpioPin<InvertedInput<PullDown>, GPIONUM> {
+    pub fn into_inverted_pull_down_input(self) -> GpioPin<InvertedInput, GPIONUM> {
         self.init_input(true, false);
         GpioPin { _mode: PhantomData }
     }
@@ -936,7 +923,56 @@ where
     }
 }
 
-impl<MODE, const GPIONUM: u8> GpioPin<Output<MODE>, GPIONUM>
+impl<const GPIONUM: u8> GpioPin<Output, GPIONUM>
+where
+    Self: GpioProperties,
+    <Self as GpioProperties>::PinType: IsOutputPin,
+{
+    /// Drives the pin high.
+    #[inline]
+    pub fn set_high(&mut self) {
+        <Self as GpioProperties>::Bank::write_output_set(1 << (GPIONUM % 32));
+    }
+
+    /// Drives the pin low.
+    #[inline]
+    pub fn set_low(&mut self) {
+        <Self as GpioProperties>::Bank::write_output_clear(1 << (GPIONUM % 32));
+    }
+
+    /// Drives the pin high or low depending on the provided value.
+    #[inline]
+    pub fn set_state(&mut self, state: bool) {
+        match state {
+            true => self.set_high(),
+            false => self.set_low(),
+        }
+    }
+
+    /// Is the pin in drive high mode?
+    #[inline]
+    pub fn is_set_high(&self) -> bool {
+        <Self as GpioProperties>::Bank::read_output() & (1 << (GPIONUM % 32)) != 0
+    }
+
+    /// Is the pin in drive low mode?
+    #[inline]
+    pub fn is_set_low(&self) -> bool {
+        !self.is_set_high()
+    }
+
+    /// Toggle pin output.
+    #[inline]
+    pub fn toggle(&mut self) {
+        if self.is_set_high() {
+            self.set_low();
+        } else {
+            self.set_high();
+        }
+    }
+}
+
+impl<const GPIONUM: u8> GpioPin<OpenDrain, GPIONUM>
 where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsOutputPin,
@@ -1001,7 +1037,7 @@ impl<MODE, const GPIONUM: u8> crate::private::Sealed for GpioPin<MODE, GPIONUM> 
 {
 }
 
-impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<Input<Floating>, GPIONUM>
+impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<Input, GPIONUM>
 where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsOutputPin,
@@ -1012,8 +1048,7 @@ where
     }
 }
 
-impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>>
-    for GpioPin<InvertedInput<Floating>, GPIONUM>
+impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<InvertedInput, GPIONUM>
 where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsInputPin,
@@ -1024,52 +1059,7 @@ where
     }
 }
 
-impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<Input<PullUp>, GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
-    GpioPin<Unknown, GPIONUM>: GpioProperties,
-{
-    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
-        pin.into_pull_up_input()
-    }
-}
-
-impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<InvertedInput<PullUp>, GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
-    GpioPin<Unknown, GPIONUM>: GpioProperties,
-{
-    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
-        pin.into_inverted_pull_up_input()
-    }
-}
-
-impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<Input<PullDown>, GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsInputPin,
-    GpioPin<Unknown, GPIONUM>: GpioProperties,
-{
-    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
-        pin.into_pull_down_input()
-    }
-}
-
-impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>>
-    for GpioPin<InvertedInput<PullDown>, GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsInputPin,
-    GpioPin<Unknown, GPIONUM>: GpioProperties,
-{
-    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
-        pin.into_inverted_pull_down_input()
-    }
-}
-
-impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<Output<PushPull>, GPIONUM>
+impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<Output, GPIONUM>
 where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsOutputPin,
@@ -1081,8 +1071,7 @@ where
     }
 }
 
-impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>>
-    for GpioPin<InvertedOutput<PushPull>, GPIONUM>
+impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<InvertedOutput, GPIONUM>
 where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsOutputPin,
@@ -1107,7 +1096,7 @@ where
     }
 }
 
-impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<Output<OpenDrain>, GPIONUM>
+impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<OpenDrain, GPIONUM>
 where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsOutputPin,
@@ -1119,8 +1108,7 @@ where
     }
 }
 
-impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>>
-    for GpioPin<InvertedOutput<OpenDrain>, GPIONUM>
+impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<InvertedOpenDrain, GPIONUM>
 where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsOutputPin,
@@ -1184,27 +1172,27 @@ where
     }
 
     /// Configures the pin to operate as an push pull output pin
-    pub fn into_push_pull_output(self) -> GpioPin<Output<PushPull>, GPIONUM> {
+    pub fn into_push_pull_output(self) -> GpioPin<Output, GPIONUM> {
         self.init_output(GPIO_FUNCTION, false);
         GpioPin { _mode: PhantomData }
     }
 
     /// Configures the pin to operate as an open drain output pin
-    pub fn into_open_drain_output(self) -> GpioPin<Output<OpenDrain>, GPIONUM> {
+    pub fn into_open_drain_output(self) -> GpioPin<OpenDrain, GPIONUM> {
         self.init_output(GPIO_FUNCTION, true);
         GpioPin { _mode: PhantomData }
     }
 
     /// Configures the pin to operate as an inverted push pull output pin.
     /// Only suitable to be passed into an peripheral driver
-    pub fn into_inverted_push_pull_output(self) -> GpioPin<InvertedOutput<PushPull>, GPIONUM> {
+    pub fn into_inverted_push_pull_output(self) -> GpioPin<InvertedOutput, GPIONUM> {
         self.init_output(GPIO_FUNCTION, false);
         GpioPin { _mode: PhantomData }
     }
 
     /// Configures the pin to operate as an open drain output pin.
     /// Only suitable to be passed into an peripheral driver
-    pub fn into_inverted_open_drain_output(self) -> GpioPin<InvertedOutput<OpenDrain>, GPIONUM> {
+    pub fn into_inverted_open_drain_output(self) -> GpioPin<InvertedOpenDrain, GPIONUM> {
         self.init_output(GPIO_FUNCTION, true);
         GpioPin { _mode: PhantomData }
     }
@@ -1733,7 +1721,7 @@ where
     }
 }
 
-impl<MODE, TYPE> AnyPin<Input<MODE>, TYPE> {
+impl<TYPE> AnyPin<Input, TYPE> {
     /// Is the input pin high?
     #[inline]
     pub fn is_high(&self) -> bool {
@@ -1749,7 +1737,7 @@ impl<MODE, TYPE> AnyPin<Input<MODE>, TYPE> {
     }
 }
 
-impl<MODE, TYPE> AnyPin<Output<MODE>, TYPE> {
+impl<TYPE> AnyPin<Output, TYPE> {
     /// Drives the pin low.
     #[inline]
     pub fn set_low(&mut self) {
@@ -1794,7 +1782,7 @@ impl<MODE, TYPE> AnyPin<Output<MODE>, TYPE> {
 }
 
 #[cfg(feature = "async")]
-impl<MODE, TYPE> AnyPin<Input<MODE>, TYPE> {
+impl<TYPE> AnyPin<Input, TYPE> {
     /// Wait until the pin is high. If it is already high, return immediately.
     pub async fn wait_for_high(&mut self) {
         let inner = &mut self.inner;
@@ -2301,7 +2289,7 @@ mod asynch {
     const NEW_AW: AtomicWaker = AtomicWaker::new();
     static PIN_WAKERS: [AtomicWaker; NUM_PINS] = [NEW_AW; NUM_PINS];
 
-    impl<MODE, const GPIONUM: u8> GpioPin<Input<MODE>, GPIONUM>
+    impl<const GPIONUM: u8> GpioPin<Input, GPIONUM>
     where
         Self: GpioProperties,
         <Self as GpioProperties>::PinType: IsInputPin,
@@ -2334,7 +2322,7 @@ mod asynch {
         }
     }
 
-    impl<const GPIONUM: u8> GpioPin<Output<OpenDrain>, GPIONUM>
+    impl<const GPIONUM: u8> GpioPin<OpenDrain, GPIONUM>
     where
         Self: GpioProperties,
         <Self as GpioProperties>::PinType: IsInputPin + IsOutputPin,
@@ -2454,7 +2442,7 @@ mod embedded_hal_02_impls {
 
     use super::*;
 
-    impl<MODE, const GPIONUM: u8> digital::InputPin for GpioPin<Input<MODE>, GPIONUM>
+    impl<const GPIONUM: u8> digital::InputPin for GpioPin<Input, GPIONUM>
     where
         Self: GpioProperties,
     {
@@ -2467,7 +2455,7 @@ mod embedded_hal_02_impls {
         }
     }
 
-    impl<const GPIONUM: u8> digital::InputPin for GpioPin<Output<OpenDrain>, GPIONUM>
+    impl<const GPIONUM: u8> digital::InputPin for GpioPin<OpenDrain, GPIONUM>
     where
         Self: GpioProperties,
     {
@@ -2480,7 +2468,7 @@ mod embedded_hal_02_impls {
         }
     }
 
-    impl<MODE, const GPIONUM: u8> digital::OutputPin for GpioPin<Output<MODE>, GPIONUM>
+    impl<const GPIONUM: u8> digital::OutputPin for GpioPin<Output, GPIONUM>
     where
         Self: GpioProperties,
         <Self as GpioProperties>::PinType: IsOutputPin,
@@ -2496,7 +2484,7 @@ mod embedded_hal_02_impls {
         }
     }
 
-    impl<MODE, const GPIONUM: u8> digital::StatefulOutputPin for GpioPin<Output<MODE>, GPIONUM>
+    impl<const GPIONUM: u8> digital::StatefulOutputPin for GpioPin<Output, GPIONUM>
     where
         Self: GpioProperties,
         <Self as GpioProperties>::PinType: IsOutputPin,
@@ -2509,7 +2497,7 @@ mod embedded_hal_02_impls {
         }
     }
 
-    impl<MODE, const GPIONUM: u8> digital::ToggleableOutputPin for GpioPin<Output<MODE>, GPIONUM>
+    impl<const GPIONUM: u8> digital::ToggleableOutputPin for GpioPin<Output, GPIONUM>
     where
         Self: GpioProperties,
         <Self as GpioProperties>::PinType: IsOutputPin,
@@ -2521,7 +2509,7 @@ mod embedded_hal_02_impls {
         }
     }
 
-    impl<MODE, TYPE> digital::InputPin for AnyPin<Input<MODE>, TYPE> {
+    impl<TYPE> digital::InputPin for AnyPin<Input, TYPE> {
         type Error = core::convert::Infallible;
 
         fn is_high(&self) -> Result<bool, Self::Error> {
@@ -2533,7 +2521,7 @@ mod embedded_hal_02_impls {
         }
     }
 
-    impl<MODE, TYPE> digital::OutputPin for AnyPin<Output<MODE>, TYPE> {
+    impl<TYPE> digital::OutputPin for AnyPin<Output, TYPE> {
         type Error = core::convert::Infallible;
 
         fn set_low(&mut self) -> Result<(), Self::Error> {
@@ -2547,7 +2535,7 @@ mod embedded_hal_02_impls {
         }
     }
 
-    impl<MODE, TYPE> digital::StatefulOutputPin for AnyPin<Output<MODE>, TYPE> {
+    impl<TYPE> digital::StatefulOutputPin for AnyPin<Output, TYPE> {
         fn is_set_high(&self) -> Result<bool, Self::Error> {
             Ok(self.is_set_high())
         }
@@ -2557,7 +2545,7 @@ mod embedded_hal_02_impls {
         }
     }
 
-    impl<MODE, TYPE> digital::ToggleableOutputPin for AnyPin<Output<MODE>, TYPE> {
+    impl<TYPE> digital::ToggleableOutputPin for AnyPin<Output, TYPE> {
         type Error = core::convert::Infallible;
 
         fn toggle(&mut self) -> Result<(), Self::Error> {
@@ -2573,14 +2561,14 @@ mod embedded_hal_impls {
 
     use super::*;
 
-    impl<MODE, const GPIONUM: u8> digital::ErrorType for GpioPin<Input<MODE>, GPIONUM>
+    impl<const GPIONUM: u8> digital::ErrorType for GpioPin<Input, GPIONUM>
     where
         Self: GpioProperties,
     {
         type Error = core::convert::Infallible;
     }
 
-    impl<MODE, const GPIONUM: u8> digital::InputPin for GpioPin<Input<MODE>, GPIONUM>
+    impl<const GPIONUM: u8> digital::InputPin for GpioPin<Input, GPIONUM>
     where
         Self: GpioProperties,
     {
@@ -2592,7 +2580,14 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<const GPIONUM: u8> digital::InputPin for GpioPin<Output<OpenDrain>, GPIONUM>
+    impl<const GPIONUM: u8> digital::ErrorType for GpioPin<OpenDrain, GPIONUM>
+    where
+        Self: GpioProperties,
+    {
+        type Error = core::convert::Infallible;
+    }
+
+    impl<const GPIONUM: u8> digital::InputPin for GpioPin<OpenDrain, GPIONUM>
     where
         Self: GpioProperties,
         <Self as GpioProperties>::PinType: IsOutputPin,
@@ -2605,7 +2600,7 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<MODE, const GPIONUM: u8> digital::ErrorType for GpioPin<Output<MODE>, GPIONUM>
+    impl<const GPIONUM: u8> digital::ErrorType for GpioPin<Output, GPIONUM>
     where
         Self: GpioProperties,
         <Self as GpioProperties>::PinType: IsOutputPin,
@@ -2613,7 +2608,7 @@ mod embedded_hal_impls {
         type Error = core::convert::Infallible;
     }
 
-    impl<MODE, const GPIONUM: u8> digital::OutputPin for GpioPin<Output<MODE>, GPIONUM>
+    impl<const GPIONUM: u8> digital::OutputPin for GpioPin<Output, GPIONUM>
     where
         Self: GpioProperties,
         <Self as GpioProperties>::PinType: IsOutputPin,
@@ -2628,7 +2623,7 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<MODE, const GPIONUM: u8> digital::StatefulOutputPin for GpioPin<Output<MODE>, GPIONUM>
+    impl<const GPIONUM: u8> digital::StatefulOutputPin for GpioPin<Output, GPIONUM>
     where
         Self: GpioProperties,
         <Self as GpioProperties>::PinType: IsOutputPin,
@@ -2641,11 +2636,11 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<MODE, TYPE> digital::ErrorType for AnyPin<Input<MODE>, TYPE> {
+    impl<TYPE> digital::ErrorType for AnyPin<Input, TYPE> {
         type Error = core::convert::Infallible;
     }
 
-    impl<MODE, TYPE> digital::InputPin for AnyPin<Input<MODE>, TYPE> {
+    impl<TYPE> digital::InputPin for AnyPin<Input, TYPE> {
         fn is_high(&mut self) -> Result<bool, Self::Error> {
             Ok(Self::is_high(self))
         }
@@ -2655,11 +2650,11 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<MODE, TYPE> digital::ErrorType for AnyPin<Output<MODE>, TYPE> {
+    impl<TYPE> digital::ErrorType for AnyPin<Output, TYPE> {
         type Error = core::convert::Infallible;
     }
 
-    impl<MODE, TYPE> digital::OutputPin for AnyPin<Output<MODE>, TYPE> {
+    impl<TYPE> digital::OutputPin for AnyPin<Output, TYPE> {
         fn set_low(&mut self) -> Result<(), Self::Error> {
             self.set_low();
             Ok(())
@@ -2671,7 +2666,7 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<MODE, TYPE> digital::StatefulOutputPin for AnyPin<Output<MODE>, TYPE> {
+    impl<TYPE> digital::StatefulOutputPin for AnyPin<Output, TYPE> {
         fn is_set_high(&mut self) -> Result<bool, Self::Error> {
             Ok(Self::is_set_high(self))
         }
@@ -2689,7 +2684,7 @@ mod embedded_hal_async_impls {
 
     use super::*;
 
-    impl<MODE, const GPIONUM: u8> Wait for GpioPin<Input<MODE>, GPIONUM>
+    impl<const GPIONUM: u8> Wait for GpioPin<Input, GPIONUM>
     where
         Self: GpioProperties,
         <Self as GpioProperties>::PinType: IsInputPin,
@@ -2720,7 +2715,7 @@ mod embedded_hal_async_impls {
         }
     }
 
-    impl<const GPIONUM: u8> Wait for GpioPin<Output<OpenDrain>, GPIONUM>
+    impl<const GPIONUM: u8> Wait for GpioPin<OpenDrain, GPIONUM>
     where
         Self: GpioProperties,
         <Self as GpioProperties>::PinType: IsInputPin + IsOutputPin,
@@ -2751,7 +2746,7 @@ mod embedded_hal_async_impls {
         }
     }
 
-    impl<MODE, TYPE> embedded_hal_async::digital::Wait for AnyPin<Input<MODE>, TYPE> {
+    impl embedded_hal_async::digital::Wait for AnyPin<Input> {
         async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
             self.wait_for_high().await;
             Ok(())

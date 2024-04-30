@@ -24,7 +24,7 @@ use core::marker::PhantomData;
 
 #[cfg(esp32c6)]
 use super::OpenDrain;
-use super::{Floating, Input, Output, PullDown, PullUp, PushPull, Unknown};
+use super::{Input, Output, Unknown};
 
 /// A GPIO pin configured for low power operation
 pub struct LowPowerPin<MODE, const PIN: u8> {
@@ -88,7 +88,7 @@ impl<MODE, const PIN: u8> LowPowerPin<MODE, PIN> {
 
     /// Configures the pin as an input with the internal pull-up resistor
     /// enabled.
-    pub fn into_pull_up_input(self) -> LowPowerPin<Input<PullUp>, PIN> {
+    pub fn into_pull_up_input(self) -> LowPowerPin<Input, PIN> {
         self.input_enable(true);
         self.pullup_enable(true);
         self.pulldown_enable(false);
@@ -99,7 +99,7 @@ impl<MODE, const PIN: u8> LowPowerPin<MODE, PIN> {
 
     /// Configures the pin as an input with the internal pull-down resistor
     /// enabled.
-    pub fn into_pull_down_input(self) -> LowPowerPin<Input<PullDown>, PIN> {
+    pub fn into_pull_down_input(self) -> LowPowerPin<Input, PIN> {
         self.input_enable(true);
         self.pullup_enable(false);
         self.pulldown_enable(true);
@@ -109,7 +109,7 @@ impl<MODE, const PIN: u8> LowPowerPin<MODE, PIN> {
     }
 
     /// Configures the pin as a floating input pin.
-    pub fn into_floating_input(self) -> LowPowerPin<Input<Floating>, PIN> {
+    pub fn into_floating_input(self) -> LowPowerPin<Input, PIN> {
         self.input_enable(true);
         self.pullup_enable(false);
         self.pulldown_enable(false);
@@ -119,7 +119,7 @@ impl<MODE, const PIN: u8> LowPowerPin<MODE, PIN> {
     }
 
     /// Configures the pin as an output pin.
-    pub fn into_push_pull_output(self) -> LowPowerPin<Output<PushPull>, PIN> {
+    pub fn into_push_pull_output(self) -> LowPowerPin<Output, PIN> {
         self.output_enable(true);
         LowPowerPin {
             private: PhantomData,

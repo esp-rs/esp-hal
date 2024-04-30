@@ -2102,7 +2102,7 @@ mod asynch {
 #[cfg(lp_uart)]
 pub mod lp_uart {
     use crate::{
-        gpio::{lp_io::LowPowerPin, Floating, Input, Output, PushPull},
+        gpio::{lp_io::LowPowerPin, Input, Output},
         peripherals::{LP_CLKRST, LP_UART},
         uart::{config, config::Config},
     };
@@ -2116,11 +2116,7 @@ pub mod lp_uart {
     impl LpUart {
         /// Initialize the UART driver using the default configuration
         // TODO: CTS and RTS pins
-        pub fn new(
-            uart: LP_UART,
-            _tx: LowPowerPin<Output<PushPull>, 5>,
-            _rx: LowPowerPin<Input<Floating>, 4>,
-        ) -> Self {
+        pub fn new(uart: LP_UART, _tx: LowPowerPin<Output, 5>, _rx: LowPowerPin<Input, 4>) -> Self {
             let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
             let lp_aon = unsafe { &*crate::peripherals::LP_AON::PTR };
 

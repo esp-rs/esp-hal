@@ -15,7 +15,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::{self, Event, Input, Io, PullDown},
+    gpio::{self, Event, Input, Io},
     macros::ram,
     peripherals::Peripherals,
     prelude::*,
@@ -23,11 +23,9 @@ use esp_hal::{
 };
 
 #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
-static BUTTON: Mutex<RefCell<Option<gpio::Gpio0<Input<PullDown>>>>> =
-    Mutex::new(RefCell::new(None));
+static BUTTON: Mutex<RefCell<Option<gpio::Gpio0<Input>>>> = Mutex::new(RefCell::new(None));
 #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")))]
-static BUTTON: Mutex<RefCell<Option<gpio::Gpio9<Input<PullDown>>>>> =
-    Mutex::new(RefCell::new(None));
+static BUTTON: Mutex<RefCell<Option<gpio::Gpio9<Input>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {

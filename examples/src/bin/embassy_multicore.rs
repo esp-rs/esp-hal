@@ -21,7 +21,7 @@ use esp_hal::{
     cpu_control::{CpuControl, Stack},
     embassy::{self, executor::Executor},
     get_core,
-    gpio::{GpioPin, Io, Output, PushPull},
+    gpio::{GpioPin, Io, Output},
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
@@ -36,7 +36,7 @@ static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 /// duration of time.
 #[embassy_executor::task]
 async fn control_led(
-    mut led: GpioPin<Output<PushPull>, 0>,
+    mut led: GpioPin<Output, 0>,
     control: &'static Signal<CriticalSectionRawMutex, bool>,
 ) {
     println!("Starting control_led() on core {}", get_core() as usize);
