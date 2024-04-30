@@ -1,6 +1,6 @@
 //! General-purpose timers.
 
-use fugit::MicrosDurationU64;
+use fugit::{ExtU64, MicrosDurationU64};
 
 #[cfg(systimer)]
 pub mod systimer;
@@ -67,6 +67,74 @@ where
     /// Construct a new instance of [`OneShotTimer`].
     pub fn new(inner: T) -> Self {
         Self { inner }
+    }
+
+    /// Pauses execution for *at least* `ms` milliseconds.
+    pub fn delay_millis(&self, ms: u32) {
+        self.delay((ms as u64).millis());
+    }
+
+    /// Pauses execution for *at least* `us` microseconds.
+    pub fn delay_micros(&self, us: u32) {
+        self.delay((us as u64).micros());
+    }
+
+    /// Pauses execution for *at least* `ns` nanoseconds.
+    pub fn delay_nanos(&self, ns: u32) {
+        // TODO: Is the the best course of action? Should we just take nanos?
+        self.delay((ns.saturating_div(1000) as u64).micros())
+    }
+
+    fn delay(&self, us: MicrosDurationU64) {
+        if self.inner.is_running() {
+            self.inner.stop();
+        }
+
+        self.inner.clear_interrupt();
+        self.inner.reset();
+
+        self.inner.load_value(us);
+        self.inner.enable_interrupt(true);
+        self.inner.start();
+
+        while !self.inner.is_interrupt_set() {
+            // Wait
+        }
+
+        self.inner.stop();
+        self.inner.clear_interrupt();
+    }
+}
+
+#[cfg(feature = "embedded-hal-02")]
+impl<T, UXX> embedded_hal_02::blocking::delay::DelayMs<UXX> for OneShotTimer<T>
+where
+    T: Timer,
+    UXX: Into<u32>,
+{
+    fn delay_ms(&mut self, ms: UXX) {
+        self.delay_millis(ms.into());
+    }
+}
+
+#[cfg(feature = "embedded-hal-02")]
+impl<T, UXX> embedded_hal_02::blocking::delay::DelayUs<UXX> for OneShotTimer<T>
+where
+    T: Timer,
+    UXX: Into<u32>,
+{
+    fn delay_us(&mut self, us: UXX) {
+        self.delay_micros(us.into());
+    }
+}
+
+#[cfg(feature = "embedded-hal")]
+impl<T> embedded_hal::delay::DelayNs for OneShotTimer<T>
+where
+    T: Timer,
+{
+    fn delay_ns(&mut self, ns: u32) {
+        self.delay_nanos(ns.into());
     }
 }
 

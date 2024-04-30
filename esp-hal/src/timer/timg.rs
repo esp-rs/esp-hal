@@ -49,9 +49,9 @@ use crate::peripherals::TIMG1;
 use crate::soc::constants::TIMG_DEFAULT_CLK_SRC;
 use crate::{
     clock::Clocks,
-    interrupt::{self, InterruptHandler},
+    interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::{timg0::RegisterBlock, Interrupt, TIMG0},
+    peripherals::{timg0::RegisterBlock, TIMG0},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
     Async,
     Blocking,
