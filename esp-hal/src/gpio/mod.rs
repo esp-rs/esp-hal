@@ -69,13 +69,13 @@ pub enum Event {
 }
 
 /// Unknown pin mode
-pub struct Unknown {}
+pub struct Unknown;
 
 /// Input pin mode
-pub struct Input {}
+pub struct Input;
 
 /// Inverted input pin mode
-pub struct InvertedInput {}
+pub struct InvertedInput;
 
 /// Used to decide if the pin is inverted or not when the pin gets connected to
 /// a peripheral
@@ -96,19 +96,19 @@ impl InputMode for Unknown {
 }
 
 /// RTC input pin mode
-pub struct RtcInput {}
+pub struct RtcInput;
 
 /// Output pin mode
-pub struct Output {}
+pub struct Output;
 
 /// Inverted output pin mode
-pub struct InvertedOutput {}
+pub struct InvertedOutput;
 
 /// Open-drain mode
-pub struct OpenDrain {}
+pub struct OpenDrain;
 
 /// Inverted open-drain mode
-pub struct InvertedOpenDrain {}
+pub struct InvertedOpenDrain;
 
 /// Used to decide if the pin is inverted or not when the pin gets connected to
 /// a peripheral
@@ -137,7 +137,7 @@ impl OutputMode for Unknown {
 }
 
 /// RTC output pin mode
-pub struct RtcOutput {}
+pub struct RtcOutput;
 
 /// Analog mode
 pub struct Analog;
@@ -1916,7 +1916,7 @@ macro_rules! gpio {
                 }
 
                 #[doc(hidden)]
-                pub struct [<Gpio $gpionum Signals>] {}
+                pub struct [<Gpio $gpionum Signals>];
 
                 impl $crate::gpio::GpioSignal for [<Gpio $gpionum Signals>] {
                     fn output_signals() -> [Option<OutputSignal>; 6]{

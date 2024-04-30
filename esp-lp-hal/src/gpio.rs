@@ -9,11 +9,11 @@ type LpIo = crate::pac::LP_IO;
 #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
 type LpIo = crate::pac::RTC_IO;
 
-pub struct Unknown {}
+pub struct Unknown;
 
-pub struct Input {}
+pub struct Input;
 
-pub struct Output {}
+pub struct Output;
 
 pub struct GpioPin<MODE, const PIN: u8> {
     phantom: PhantomData<MODE>,
