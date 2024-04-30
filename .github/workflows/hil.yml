@@ -137,3 +137,6 @@ jobs:
           else
             echo "All tests passed!"
           fi
+
+      - name: Cleanup
+        run: rm -rf tests-${{ matrix.target.soc }}
