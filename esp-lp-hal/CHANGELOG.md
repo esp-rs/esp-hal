@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Renamed to `esp-ulp-riscv-hal` (#916)
+- Remove 2nd level generics from GPIO pin (#1526)
 
 ### Fixed
 
