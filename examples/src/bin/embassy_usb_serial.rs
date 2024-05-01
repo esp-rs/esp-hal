@@ -50,7 +50,7 @@ async fn main(_spawner: Spawner) -> () {
     let driver = Driver::new(usb, &mut ep_out_buffer, config);
 
     // Create embassy-usb Config
-    let mut config = embassy_usb::Config::new(0x16c0, 0x27dd);
+    let mut config = embassy_usb::Config::new(0x303A, 0x3001);
     config.manufacturer = Some("Espressif");
     config.product = Some("USB-serial example");
     config.serial_number = Some("12345678");
