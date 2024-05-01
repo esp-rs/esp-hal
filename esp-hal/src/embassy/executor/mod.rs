@@ -1,10 +1,8 @@
-pub mod thread;
-
-pub use thread::*;
-
-pub mod interrupt;
+mod interrupt;
+mod thread;
 
 pub use interrupt::*;
+pub use thread::*;
 
 #[export_name = "__pender"]
 fn __pender(context: *mut ()) {

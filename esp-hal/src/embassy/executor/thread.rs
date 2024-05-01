@@ -10,7 +10,7 @@ use crate::get_core;
 #[cfg(multi_core)]
 use crate::peripherals::SYSTEM;
 
-pub const THREAD_MODE_CONTEXT: u8 = 16;
+pub(crate) const THREAD_MODE_CONTEXT: u8 = 16;
 
 /// global atomic used to keep track of whether there is work to do since sev()
 /// is not available on either Xtensa or RISC-V
@@ -51,7 +51,16 @@ pub(crate) fn pend_thread_mode(core: usize) {
     }
 }
 
-/// Multi-core Xtensa Executor
+/// A thread aware Executor
+#[cfg_attr(
+    multi_core,
+    doc = r#"
+This executor is capable of waking an
+executor running on another core if work
+needs to be completed there for a task to
+progress on this core.
+"#
+)]
 pub struct Executor {
     inner: raw::Executor,
     not_send: PhantomData<*mut ()>,
@@ -59,9 +68,13 @@ pub struct Executor {
 
 impl Executor {
     /// Create a new Executor.
-    ///
-    /// On multi_core systems this will use software-interrupt 3 which isn't
-    /// available for anything else.
+    #[cfg_attr(
+        multi_core,
+        doc = r#"
+    This will use software-interrupt 3 which isn't
+    available for anything else to wake the other core(s).
+    "#
+    )]
     pub fn new() -> Self {
         #[cfg(multi_core)]
         unsafe {
