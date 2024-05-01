@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-PICO-V3-02: Initial support (#1155)
 - `time::current_time` API (#1503)
 - ESP32-S3: Add LCD_CAM Camera driver (#1483)
+- `embassy-usb` support (#1517)
 
 ### Fixed
 
