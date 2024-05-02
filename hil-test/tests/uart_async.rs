@@ -6,6 +6,8 @@
 //!
 //! Connect TX (GPIO2) and RX (GPIO4) pins.
 
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+
 #![no_std]
 #![no_main]
 

@@ -257,14 +257,12 @@ pub fn execute_app(
             format!("--example={}", app.name())
         };
         (bin, "build")
+    } else if package.starts_with("src/bin") {
+        (format!("--bin={}", app.name()), "run")
+    } else if package.starts_with("tests") {
+        (format!("--test={}", app.name()), "test")
     } else {
-        if package.starts_with("src/bin") {
-            (format!("--bin={}", app.name()), "run")
-        } else if package.starts_with("tests") {
-            (format!("--test={}", app.name()), "test")
-        } else {
-            (format!("--example={}", app.name()), "run")
-        }
+        (format!("--example={}", app.name()), "run")
     };
 
     let mut features = app.features().to_vec();

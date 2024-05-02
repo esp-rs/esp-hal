@@ -1,5 +1,7 @@
 //! Delay Test
 
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32s3
+
 #![no_std]
 #![no_main]
 

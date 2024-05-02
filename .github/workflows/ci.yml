@@ -318,6 +318,7 @@ jobs:
           - soc: esp32h2
             rust-target: riscv32imac-unknown-none-elf
           # Xtensa devices:
+          - soc: esp32s2
           - soc: esp32s3
 
     steps:
@@ -339,4 +340,4 @@ jobs:
           ldproxy: false
 
       - uses: Swatinem/rust-cache@v2
-      - run: cargo xtask build-examples hil-test ${{ matrix.target.soc }}
+      - run: cargo xtask build-tests ${{ matrix.target.soc }}

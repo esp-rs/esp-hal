@@ -1,6 +1,7 @@
 use std::{
     fs,
     path::{Path, PathBuf},
+    process::Command,
 };
 
 use anyhow::{bail, Result};
@@ -29,6 +30,8 @@ enum Cli {
     RunExample(RunExampleArgs),
     /// Run all applicable tests or the specified test for a specified chip.
     RunTests(TestsArgs),
+    /// Run all ELFs in a folder.
+    RunElfs(RunElfArgs),
 }
 
 #[derive(Debug, Args)]
@@ -114,6 +117,15 @@ struct TestsArgs {
     test: Option<String>,
 }
 
+#[derive(Debug, Args)]
+struct RunElfArgs {
+    /// Which chip to run the tests for.
+    #[arg(value_enum)]
+    chip: Chip,
+    /// Path to the ELFs.
+    path: PathBuf,
+}
+
 // ----------------------------------------------------------------------------
 // Application
 
@@ -134,6 +146,7 @@ fn main() -> Result<()> {
         Cli::GenerateEfuseFields(args) => generate_efuse_src(&workspace, args),
         Cli::RunExample(args) => run_example(&workspace, args),
         Cli::RunTests(args) => execute_tests(&workspace, args, CargoAction::Run),
+        Cli::RunElfs(args) => run_elfs(args),
     }
 }
 
@@ -396,6 +409,38 @@ fn execute_tests(
     Ok(())
 }
 
+fn run_elfs(args: RunElfArgs) -> Result<(), anyhow::Error> {
+    let elfs = fs::read_dir(&args.path)?;
+    let mut failed_elfs: Vec<String> = Vec::new();
+    for elf in elfs {
+        let elf = elf?;
+        let elf_path = elf.path();
+        let elf_name = elf_path.file_name().unwrap().to_str().unwrap();
+        let elf_name = elf_name.split('.').next().unwrap();
+        let elf_name = elf_name.to_string();
+        println!("Running '{}' test", elf_name);
+
+        let command = Command::new("probe-rs")
+            .arg("run")
+            .arg("--chip")
+            .arg(args.chip.to_string())
+            .arg(elf_path)
+            .output()
+            .expect("Failed to execute probe-rs run command");
+        let stdout = String::from_utf8_lossy(&command.stdout);
+        let stderr = String::from_utf8_lossy(&command.stderr);
+        println!("{}\n{}", stderr, stdout);
+        if !command.status.success() {
+            failed_elfs.push(elf_name);
+        }
+    }
+
+    if !failed_elfs.is_empty() {
+        bail!("Failed tests: {:?}", failed_elfs);
+    }
+
+    Ok(())
+}
 // ----------------------------------------------------------------------------
 // Helper Functions
 

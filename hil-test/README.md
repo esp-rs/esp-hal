@@ -19,11 +19,9 @@ We use [embedded-test] as our testing framework, which relies on [defmt] interna
 We use [probe-rs] for flashing and running the tests on a target device, however, this **MUST** be installed from the correct revision, and with the correct features enabled:
 
 ```text
-cargo install probe-rs \
-  --git=https://github.com/probe-rs/probe-rs \
-  --rev=ddd59fa \
-  --features=cli \
-  --bin=probe-rs
+cargo install probe-rs-tools \
+  --git https://github.com/probe-rs/probe-rs \
+  --rev 4dc1701 --force --locked
 ```
 
 Target device **MUST** connected via its USB-Serial-JTAG port, or if unavailable (eg. ESP32, ESP32-C2, ESP32-S2) then you must connect a compatible debug probe such as an [ESP-Prog].
@@ -61,7 +59,7 @@ Our Virtual Machines have the following setup:
 - ESP32-C3 (`rustboard`):
   - Devkit: `ESP32-C3-DevKit-RUST-1` connected via USB-Serial-JTAG.
     - `GPIO2` and `GPIO4` are connected.
-  - VM: Ubuntu 20.04.5 configured with the following [setup](#vm-setup)
+  - RPi: Raspbian 12 configured with the following [setup](#vm-setup)
 - ESP32-C6 (`esp32c6-usb`):
   - Devkit: `ESP32-C6-DevKitC-1 V1.2` connected via USB-Serial-JTAG (`USB` port).
     - `GPIO2` and `GPIO4` are connected.
@@ -69,11 +67,16 @@ Our Virtual Machines have the following setup:
 - ESP32-H2 (`esp32h2-usb`):
   - Devkit: `ESP32-H2-DevKitM-1` connected via USB-Serial-JTAG (`USB` port).
     - `GPIO2` and `GPIO4` are connected.
-  - VM: Ubuntu 20.04.5 configured with the following [setup](#vm-setup)
+  - RPi: Raspbian 12 configured with the following [setup](#vm-setup)
+- ESP32-S2 (`esp32s2-jtag`):
+  - Devkit: `ESP32-S2-Saola-1` connected via UART.
+    - `GPIO2` and `GPIO4` are connected.
+  - Probe: `ESP-Prog` connected with the [following connections](https://docs.espressif.com/projects/esp-idf/en/stable/esp32s2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware)
+  - RPi: Raspbian 12 configured with the following [setup](#vm-setup)
 - ESP32-S3 (`esp32s3-usb`):
   - Devkit: `ESP32-S3-DevKitC-1` connected via USB-Serial-JTAG.
     - `GPIO2` and `GPIO4` are connected.
-  - VM: Ubuntu 22.04.4 configured with the following [setup](#vm-setup)
+  - RPi: Raspbian 12 configured with the following [setup](#vm-setup)
 
 [`hil.yml`]: https://github.com/esp-rs/esp-hal/blob/main/.github/workflows/hil.yml
 
@@ -86,7 +89,7 @@ source "$HOME/.cargo/env"
 # Install dependencies
 sudo apt install -y pkg-config libudev-dev
 # Install probe-rs
-cargo install probe-rs --git=https://github.com/probe-rs/probe-rs --rev=ddd59fa --features=cli --bin=probe-rs --locked --force
+cargo install probe-rs-tools --git https://github.com/probe-rs/probe-rs --rev 4dc1701 --force
 # Add the udev rules
 wget -O - https://probe.rs/files/69-probe-rs.rules | sudo tee /etc/udev/rules.d/69-probe-rs.rules > /dev/null
 # Add the user to plugdev group

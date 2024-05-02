@@ -26,18 +26,21 @@ jobs:
       matrix:
         target:
           # RISC-V devices:
-          # - soc: esp32c3
-          #   rust-target: riscv32imc-unknown-none-elf
+          - soc: esp32c3
+            rust-target: riscv32imc-unknown-none-elf
           - soc: esp32c6
             rust-target: riscv32imac-unknown-none-elf
-          # - soc: esp32h2
-          #   rust-target: riscv32imac-unknown-none-elf
+          - soc: esp32h2
+            rust-target: riscv32imac-unknown-none-elf
           # # Xtensa devices:
-          # - soc: esp32s3
+          - soc: esp32s2
+            rust-target: xtensa-esp32s2-none-elf
+          - soc: esp32s3
+            rust-target: xtensa-esp32s3-none-elf
+
     steps:
       - uses: actions/checkout@v4
         if: github.event_name != 'workflow_dispatch'
-
       - uses: actions/checkout@v4
         if: github.event_name == 'workflow_dispatch'
         with:
@@ -59,7 +62,7 @@ jobs:
           default: true
           ldproxy: false
 
-      - name: Run tests
+      - name: Build tests
         run: cargo xtask build-tests ${{ matrix.target.soc }}
 
       - name: Prepare artifact
@@ -78,12 +81,12 @@ jobs:
             base_name="$(basename "$file" | cut -d'-' -f1)"
             mv "$file" "tests/$base_name"
           done
-
       - uses: actions/upload-artifact@v4
         with:
           name: tests-${{ matrix.target.soc }}
           path: /home/runner/work/esp-hal/esp-hal/tests
           if-no-files-found: error
+          overwrite: true
 
   hil:
     name: HIL Test | ${{ matrix.target.soc }}
@@ -95,24 +98,25 @@ jobs:
       matrix:
         target:
           # RISC-V devices:
-          # - soc: esp32c3
-          #   runner: rustboard
+          - soc: esp32c3
+            runner: esp32c3-usb
           - soc: esp32c6
             runner: esp32c6-usb
-          # - soc: esp32h2
-          #   runner: esp32h2-usb
-          # # Xtensa devices:
-          # - soc: esp32s3
-          #   runner: esp32s3-usb
+          - soc: esp32h2
+            runner: esp32h2-usb
+          # Xtensa devices:
+          - soc: esp32s2
+            runner: esp32s2-jtag
+          - soc: esp32s3
+            runner: esp32s3-usb
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: tests-${{ matrix.target.soc }}
-          path: tests
-      - name: Run tests
+          path: tests-${{ matrix.target.soc }}
+
+      - name: Run Tests
         run: |
           export PATH=$PATH:/home/espressif/.cargo/bin
-          for file in "tests"/*; do
-            probe-rs run --chip ${{ matrix.target.soc }} "$file"
-          done
-
+          cargo xtask run-elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
