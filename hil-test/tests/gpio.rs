@@ -20,7 +20,7 @@ use esp_hal::{
     macros::handler,
     peripherals::Peripherals,
     system::SystemControl,
-    timer::TimerGroup,
+    timer::timg::TimerGroup,
 };
 
 static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));

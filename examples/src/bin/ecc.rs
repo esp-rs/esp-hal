@@ -23,7 +23,7 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     rng::Rng,
-    systimer::SystemTimer,
+    timer::systimer::SystemTimer,
 };
 use esp_println::{print, println};
 use hex_literal::hex;

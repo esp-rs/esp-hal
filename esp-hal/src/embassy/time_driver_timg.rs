@@ -3,12 +3,12 @@ use peripherals::TIMG0;
 
 use super::AlarmState;
 #[cfg(any(esp32, esp32s2, esp32s3))]
-use crate::timer::Timer1;
+use crate::timer::timg::Timer1;
 use crate::{
     clock::Clocks,
     peripherals,
     prelude::*,
-    timer::{Instance, Timer0, TimerGroup},
+    timer::timg::{Instance, Timer0, TimerGroup},
 };
 
 #[cfg(not(any(esp32, esp32s2, esp32s3)))]

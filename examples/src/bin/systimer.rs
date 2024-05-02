@@ -18,7 +18,7 @@ use esp_hal::{
     peripherals::{Interrupt, Peripherals},
     prelude::*,
     system::SystemControl,
-    systimer::{Alarm, Periodic, SystemTimer, Target},
+    timer::systimer::{Alarm, Periodic, SystemTimer, Target},
     Blocking,
 };
 use esp_println::println;

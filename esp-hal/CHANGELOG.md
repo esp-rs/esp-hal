@@ -6,11 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
 - Updated example on i2c to use the new `interrupt_handler` parameter (#1376)
 
 ### Added
 
-- i2c: implement `I2C:transaction` for  `embedded-hal` and `embedded-hal-async`
+- i2c: implement `I2C:transaction` for `embedded-hal` and `embedded-hal-async`
 - ESP32-PICO-V3-02: Initial support (#1155)
 - `time::current_time` API (#1503)
 - ESP32-S3: Add LCD_CAM Camera driver (#1483)
@@ -30,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RNG is no longer TRNG, the `CryptoRng` implementation has been removed. To track this being re-added see #1499 (#1498)
 - Make software interrupts shareable (#1500)
 - The `SystemParts` struct has been renamed to `SystemControl`, and now has a constructor which takes the `SYSTEM` peripheral (#1495)
+- Timer abstraction: refactor `systimer` and `timer` modules into a common `timer` module (#1527)
 
 ### Removed
 

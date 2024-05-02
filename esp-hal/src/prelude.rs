@@ -37,9 +37,9 @@ pub use crate::ledc::{
     timer::{TimerHW as _esp_hal_ledc_timer_TimerHW, TimerIFace as _esp_hal_ledc_timer_TimerIFace},
 };
 #[cfg(any(timg0, timg1))]
-pub use crate::timer::{
-    Instance as _esp_hal_timer_Instance,
-    TimerGroupInstance as _esp_hal_timer_TimerGroupInstance,
+pub use crate::timer::timg::{
+    Instance as _esp_hal_timer_timg_Instance,
+    TimerGroupInstance as _esp_hal_timer_timg_TimerGroupInstance,
 };
 #[cfg(any(uart0, uart1, uart2))]
 pub use crate::uart::{Instance as _esp_hal_uart_Instance, UartPins as _esp_hal_uart_UartPins};

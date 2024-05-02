@@ -42,10 +42,10 @@ pub fn current_time() -> fugit::Instant<u64, 1, 1_000_000> {
     #[cfg(not(esp32))]
     let (ticks, div) = {
         // otherwise use SYSTIMER
-        let ticks = crate::systimer::SystemTimer::now();
+        let ticks = crate::timer::systimer::SystemTimer::now();
         (
             ticks,
-            (crate::systimer::SystemTimer::TICKS_PER_SECOND / 1_000_000),
+            (crate::timer::systimer::SystemTimer::TICKS_PER_SECOND / 1_000_000),
         )
     };
 

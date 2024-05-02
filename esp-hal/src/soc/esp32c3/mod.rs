@@ -10,7 +10,7 @@
 //!    * I2S_DEFAULT_CLK_SRC: 2 - I2S clock source
 
 use self::peripherals::{LPWR, TIMG0, TIMG1};
-use crate::{rtc_cntl::Rtc, timer::Wdt};
+use crate::{rtc_cntl::Rtc, timer::timg::Wdt};
 
 pub mod efuse;
 pub mod gpio;
