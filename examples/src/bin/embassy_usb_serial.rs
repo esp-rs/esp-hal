@@ -3,7 +3,7 @@
 //! This example should be built in release mode.
 
 //% CHIPS: esp32s2 esp32s3
-//% FEATURES: async embassy embassy-executor-thread embassy-time-timg0 embassy-generic-timers
+//% FEATURES: async embassy embassy-time-timg0 embassy-generic-timers
 
 #![no_std]
 #![no_main]
