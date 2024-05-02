@@ -48,6 +48,7 @@
 
 #![no_std]
 #![cfg_attr(feature = "nightly", feature(allocator_api))]
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
 pub mod macros;
 
