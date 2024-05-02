@@ -3,11 +3,10 @@
 //! Most dev-kits use a USB-UART-bridge - in that case you won't see any output.
 
 //% CHIPS: esp32c3 esp32c6 esp32h2 esp32s3
-//% FEATURES: async embassy embassy-executor-thread embassy-time-timg0 embassy-generic-timers
+//% FEATURES: async embassy embassy-time-timg0 embassy-generic-timers
 
 #![no_std]
 #![no_main]
-#![feature(type_alias_impl_trait)]
 
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
@@ -22,7 +21,7 @@ use esp_hal::{
     usb_serial_jtag::{UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
     Async,
 };
-use static_cell::make_static;
+use static_cell::StaticCell;
 
 const MAX_BUFFER_SIZE: usize = 512;
 
@@ -76,7 +75,9 @@ async fn main(spawner: Spawner) -> () {
 
     let (tx, rx) = UsbSerialJtag::new_async(peripherals.USB_DEVICE).split();
 
-    let signal = &*make_static!(Signal::new());
+    static SIGNAL: StaticCell<Signal<NoopRawMutex, heapless::String<MAX_BUFFER_SIZE>>> =
+        StaticCell::new();
+    let signal = &*SIGNAL.init(Signal::new());
 
     spawner.spawn(reader(rx, &signal)).unwrap();
     spawner.spawn(writer(tx, &signal)).unwrap();

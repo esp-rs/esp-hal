@@ -6,11 +6,10 @@
 //! It's not supported on ESP32, on ESP32-S2 the frequency of the systimer is different (so it's left out here)
 
 //% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32s3
-//% FEATURES: embassy embassy-time-systick-16mhz embassy-executor-thread embassy-generic-timers
+//% FEATURES: embassy embassy-time-systick-16mhz embassy-generic-timers
 
 #![no_std]
 #![no_main]
-#![feature(type_alias_impl_trait)]
 
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};

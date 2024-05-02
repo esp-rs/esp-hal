@@ -1,81 +1,27 @@
-//! # Embassy driver
+//! # Embassy
 //!
-//! ## Overview
-//! The `embassy` driver for ESP chips is an essential part of the Embassy
-//! embedded async/await runtime and is used by applications to perform
-//! time-based operations and schedule asynchronous tasks. It provides a
-//! high-level API for handling timers and alarms, abstracting the underlying
-//! hardware details, and allowing users to focus on application logic rather
-//! than low-level timer management.
+//! The [embassy](https://github.com/embassy-rs/embassy) project is a toolkit to leverage async Rust
+//! in embedded applications. This module adds the required
+//! support to use embassy on Espressif chips.
 //!
-//! Here are important details about the module:
-//!   * `time_driver` module (`time_driver_systimer` or `time_driver_timg`,
-//!     depends on enabled feature)
-//!     - This module contains the implementations of the timer drivers for
-//!       different ESP chips.<br> It includes the `EmbassyTimer` struct, which
-//!       is responsible for handling alarms and timer events.
-//!     - `EmbassyTimer` struct represents timer driver for ESP chips. It
-//!       contains `alarms` - an array of `AlarmState` structs, which describe
-//!       the state of alarms associated with the timer driver.
-//!   * `AlarmState` struct
-//!     - This struct represents the state of an alarm. It contains information
-//!       about the alarm's timestamp, a callback function to be executed when
-//!       the alarm triggers, and a context pointer for passing user-defined
-//!       data to the callback.
-//!   * `executor` module
-//!     - This module contains the implementations of a multi-core safe
-//!       thread-mode and an interrupt-mode executor for Xtensa-based ESP chips.
+//! ## Initialization
 //!
-//! ## Example
-//! The following example demonstrates how to use the `embassy` driver to
-//! schedule asynchronous tasks.<br> In this example, we use the `embassy`
-//! driver to wait for a GPIO 9 pin state to change.
+//! Embassy **must** be initialized by calling [`init`], before beginning any
+//! async operations.
 //!
-//! ```no_run
-//! #[cfg(feature = "embassy-time-systick")]
-//! embassy::init(
-//!     &clocks,
-//!     esp_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
-//! );
+//! [`init`] installs a [global time driver](https://github.com/embassy-rs/embassy/tree/main/embassy-time#global-time-driver)
+//! allowing users to use [embassy-time](https://docs.rs/embassy-time/latest/embassy_time/) APIs in any async context
+//! within their application. A time driver must be chosen by enabling the
+//! correct feature on esp-hal, see the crate level documentation for more
+//! details.
 //!
-//! #[cfg(feature = "embassy-time-timg0")]
-//! embassy::init(&clocks, timer_group0.timer0);
+//! ## Executors
 //!
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! // GPIO 9 as input
-//! let input = io.pins.gpio9.into_pull_down_input();
-//!
-//! // Async requires the GPIO interrupt to wake futures
-//! esp_hal::interrupt::enable(
-//!     esp_hal::peripherals::Interrupt::GPIO,
-//!     esp_hal::interrupt::Priority::Priority1,
-//! )
-//! .unwrap();
-//!
-//! let executor = make_static!(Executor::new());
-//! executor.run(|spawner| {
-//!     spawner.spawn(ping(input)).ok();
-//! });
-//! ```
-//!
-//! Where `ping` defined as:
-//! ```no_run
-//! async fn ping(mut pin: Gpio9<Input<PullDown>>) {
-//!     loop {
-//!         esp_println::println!("Waiting...");
-//!         pin.wait_for_rising_edge().await.unwrap();
-//!         esp_println::println!("Ping!");
-//!         Timer::after(Duration::from_millis(100)).await;
-//!     }
-//! }
-//! ```
-//! For more embassy-related examples check out the [examples repo](https://github.com/esp-rs/esp-hal/tree/main/esp32-hal/examples)
-//! for a corresponding board.
+//! We offer two executor types, a thread mode [`Executor`](executor::Executor)
+//! and [`InterruptExecutor`](executor::InterruptExecutor).
+//! An [`InterruptExecutor`](executor::InterruptExecutor) can be used to achieve
+//! preemptive multitasking in async applications, which is usually something reserved for more traditional RTOS systems, read more about it in [the embassy documentation](https://embassy.dev/book/dev/runtime.html).
 
-#[cfg(any(
-    feature = "embassy-executor-interrupt",
-    feature = "embassy-executor-thread"
-))]
 pub mod executor;
 
 use core::cell::Cell;
@@ -102,12 +48,12 @@ use time_driver::EmbassyTimer;
 
 use crate::clock::Clocks;
 
-/// Initialise embassy
-pub fn init(clocks: &Clocks, td: time_driver::TimerType) {
-    EmbassyTimer::init(clocks, td)
+/// Initialize embassy
+pub fn init(clocks: &Clocks, time_driver: time_driver::TimerType) {
+    EmbassyTimer::init(clocks, time_driver)
 }
 
-pub struct AlarmState {
+pub(crate) struct AlarmState {
     pub callback: Cell<Option<(fn(*mut ()), *mut ())>>,
     pub allocated: Cell<bool>,
 }

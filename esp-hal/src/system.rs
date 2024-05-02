@@ -229,30 +229,33 @@ impl<const NUM: u8> crate::peripheral::Peripheral for SoftwareInterrupt<NUM> {
 impl<const NUM: u8> crate::private::Sealed for SoftwareInterrupt<NUM> {}
 
 /// This gives access to the available software interrupts.
-///
-/// Please note: Software interrupt 0 is not available when using the
-/// `embassy-executor-thread` feature
+#[cfg_attr(
+    multi_core,
+    doc = r#"
+Please note: Software interrupt 3 is reserved
+for inter-processor communication when the `embassy`
+feature is enabled."#
+)]
 #[non_exhaustive]
 pub struct SoftwareInterruptControl {
-    #[cfg(not(all(feature = "embassy-executor-thread", multi_core)))]
     pub software_interrupt0: SoftwareInterrupt<0>,
     pub software_interrupt1: SoftwareInterrupt<1>,
     pub software_interrupt2: SoftwareInterrupt<2>,
+    #[cfg(not(all(feature = "embassy", multi_core)))]
     pub software_interrupt3: SoftwareInterrupt<3>,
 }
 
 impl SoftwareInterruptControl {
     fn new() -> Self {
-        // the thread-executor uses SW-INT0 when used on a multi-core system
-        // we cannot easily require `software_interrupt0` there since it's created
-        // before `main` via proc-macro
-
         SoftwareInterruptControl {
-            #[cfg(not(all(feature = "embassy-executor-thread", multi_core)))]
-            software_interrupt0: SoftwareInterrupt,
-            software_interrupt1: SoftwareInterrupt,
-            software_interrupt2: SoftwareInterrupt,
-            software_interrupt3: SoftwareInterrupt,
+            software_interrupt0: SoftwareInterrupt {},
+            software_interrupt1: SoftwareInterrupt {},
+            software_interrupt2: SoftwareInterrupt {},
+            // the thread-executor uses SW-INT3 when used on a multi-core system
+            // we cannot easily require `software_interrupt3` there since it's created
+            // before `main` via proc-macro so we  cfg it away from users
+            #[cfg(not(all(feature = "embassy", multi_core)))]
+            software_interrupt3: SoftwareInterrupt {},
         }
     }
 }

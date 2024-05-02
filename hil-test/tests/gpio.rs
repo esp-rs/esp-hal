@@ -71,7 +71,7 @@ pub fn interrupt_handler() {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal::embassy::executor::thread::Executor::new())]
+#[embedded_test::tests(executor = esp_hal::embassy::executor::Executor::new())]
 mod tests {
     use defmt::assert_eq;
     use embassy_time::{Duration, Timer};

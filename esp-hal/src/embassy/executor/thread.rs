@@ -10,6 +10,8 @@ use crate::get_core;
 #[cfg(multi_core)]
 use crate::peripherals::SYSTEM;
 
+pub(crate) const THREAD_MODE_CONTEXT: u8 = 16;
+
 /// global atomic used to keep track of whether there is work to do since sev()
 /// is not available on either Xtensa or RISC-V
 #[cfg(not(multi_core))]
@@ -19,15 +21,15 @@ static SIGNAL_WORK_THREAD_MODE: [AtomicBool; 2] = [AtomicBool::new(false), Atomi
 
 #[cfg(multi_core)]
 #[handler]
-fn software0_interrupt() {
+fn software3_interrupt() {
     // This interrupt is fired when the thread-mode executor's core needs to be
     // woken. It doesn't matter which core handles this interrupt first, the
     // point is just to wake up the core that is currently executing
     // `waiti`.
     let system = unsafe { &*SYSTEM::PTR };
     system
-        .cpu_intr_from_cpu_0()
-        .write(|w| w.cpu_intr_from_cpu_0().bit(false));
+        .cpu_intr_from_cpu_3()
+        .write(|w| w.cpu_intr_from_cpu_3().bit(false));
 }
 
 pub(crate) fn pend_thread_mode(core: usize) {
@@ -44,12 +46,21 @@ pub(crate) fn pend_thread_mode(core: usize) {
 
         let system = unsafe { &*SYSTEM::PTR };
         system
-            .cpu_intr_from_cpu_0()
-            .write(|w| w.cpu_intr_from_cpu_0().bit(true));
+            .cpu_intr_from_cpu_3()
+            .write(|w| w.cpu_intr_from_cpu_3().bit(true));
     }
 }
 
-/// Multi-core Xtensa Executor
+/// A thread aware Executor
+#[cfg_attr(
+    multi_core,
+    doc = r#"
+This executor is capable of waking an
+executor running on another core if work
+needs to be completed there for a task to
+progress on this core.
+"#
+)]
 pub struct Executor {
     inner: raw::Executor,
     not_send: PhantomData<*mut ()>,
@@ -57,18 +68,27 @@ pub struct Executor {
 
 impl Executor {
     /// Create a new Executor.
-    ///
-    /// On multi_core systems this will use software-interrupt 0 which isn't
-    /// available for anything else.
+    #[cfg_attr(
+        multi_core,
+        doc = r#"
+    This will use software-interrupt 3 which isn't
+    available for anything else to wake the other core(s).
+    "#
+    )]
     pub fn new() -> Self {
         #[cfg(multi_core)]
         unsafe {
-            crate::system::SoftwareInterrupt::<0>::steal()
-                .set_interrupt_handler(software0_interrupt)
+            crate::system::SoftwareInterrupt::<3>::steal()
+                .set_interrupt_handler(software3_interrupt)
         }
 
         Self {
-            inner: raw::Executor::new(usize::from_le_bytes([0, get_core() as u8, 0, 0]) as *mut ()),
+            inner: raw::Executor::new(usize::from_le_bytes([
+                THREAD_MODE_CONTEXT,
+                get_core() as u8,
+                0,
+                0,
+            ]) as *mut ()),
             not_send: PhantomData,
         }
     }

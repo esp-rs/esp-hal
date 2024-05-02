@@ -5,10 +5,9 @@
 
 #![no_std]
 #![no_main]
-#![feature(type_alias_impl_trait)]
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: async embassy embassy-executor-thread embassy-time-timg0 embassy-generic-timers
+//% FEATURES: async embassy embassy-time-timg0 embassy-generic-timers
 
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
@@ -23,7 +22,7 @@ use esp_hal::{
     uart::{config::AtCmdConfig, Uart, UartRx, UartTx},
     Async,
 };
-use static_cell::make_static;
+use static_cell::StaticCell;
 
 // rx_fifo_full_threshold
 const READ_BUF_SIZE: usize = 64;
@@ -91,7 +90,8 @@ async fn main(spawner: Spawner) {
         .unwrap();
     let (tx, rx) = uart0.split();
 
-    let signal = &*make_static!(Signal::new());
+    static SIGNAL: StaticCell<Signal<NoopRawMutex, usize>> = StaticCell::new();
+    let signal = &*SIGNAL.init(Signal::new());
 
     spawner.spawn(reader(rx, &signal)).ok();
     spawner.spawn(writer(tx, &signal)).ok();

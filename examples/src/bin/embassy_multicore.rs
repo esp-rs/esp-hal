@@ -4,11 +4,10 @@
 //! signal set by the task running on the other core.
 
 //% CHIPS: esp32 esp32s3
-//% FEATURES: embassy embassy-executor-thread embassy-time-timg0 embassy-generic-timers
+//% FEATURES: embassy embassy-time-timg0 embassy-generic-timers
 
 #![no_std]
 #![no_main]
-#![feature(type_alias_impl_trait)]
 
 use core::ptr::addr_of_mut;
 
@@ -28,7 +27,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use static_cell::make_static;
+use static_cell::StaticCell;
 
 static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 
@@ -64,13 +63,15 @@ async fn main(_spawner: Spawner) {
 
     let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 
-    let led_ctrl_signal = &*make_static!(Signal::new());
+    static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
+    let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
 
     let led = io.pins.gpio0.into_push_pull_output();
 
     let _guard = cpu_control
         .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {
-            let executor = make_static!(Executor::new());
+            static EXECUTOR: StaticCell<Executor> = StaticCell::new();
+            let executor = EXECUTOR.init(Executor::new());
             executor.run(|spawner| {
                 spawner.spawn(control_led(led, led_ctrl_signal)).ok();
             });

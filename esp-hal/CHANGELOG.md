@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - i2c: i2c1_handler used I2C0 register block by mistake (#1487)
 - Removed ESP32 specific code for resolutions > 16 bit in ledc embedded_hal::pwm max_duty_cycle function. (#1441)
 - Fixed division by zero in ledc embedded_hal::pwm set_duty_cycle function and converted to set_duty_hw instead of set_duty to eliminate loss of granularity. (#1441)
+- Embassy examples now build on stable (#1485)
 
 ### Changed
 
@@ -31,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RNG is no longer TRNG, the `CryptoRng` implementation has been removed. To track this being re-added see #1499 (#1498)
 - Make software interrupts shareable (#1500)
 - The `SystemParts` struct has been renamed to `SystemControl`, and now has a constructor which takes the `SYSTEM` peripheral (#1495)
+- Timer abstraction: refactor `systimer` and `timer` modules into a common `timer` module (#1527)
+- Removed the `embassy-executor-thread` and `embassy-executor-interrupt` features, they are now enabled by default when `embassy` is enabled. (#1485)
+- Software interrupt 3 is now used instead of software interrupt 0 on the thread aware executor on multicore systems (#1485)
 - Timer abstraction: refactor `systimer` and `timer` modules into a common `timer` module (#1527)
 
 ### Removed
