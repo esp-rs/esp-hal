@@ -110,6 +110,7 @@ jobs:
           - soc: esp32s3
             runner: esp32s3-usb
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: tests-${{ matrix.target.soc }}
@@ -118,25 +119,4 @@ jobs:
       - name: Run Tests
         run: |
           export PATH=$PATH:/home/espressif/.cargo/bin
-
-          failed_tests=() # Initialize an empty array to hold failed tests
-          for test_file in "tests-${{ matrix.target.soc }}"/*; do
-            echo "Running test: $test_file"
-            if ! probe-rs run --chip ${{ matrix.target.soc }} "$test_file"; then
-              failed_tests+=("$test_file") # Add failed test to the array
-            fi
-          done
-
-          # Cleanup
-          rm -rf tests-${{ matrix.target.soc }}
-
-          # Report all failed tests at the end
-          if [ ${#failed_tests[@]} -gt 0 ]; then
-            echo "The following tests failed:"
-            for failed_test in "${failed_tests[@]}"; do
-              echo "- $failed_test"
-            done
-            exit 1 # Return a non-zero exit code to indicate failure
-          else
-            echo "All tests passed!"
-          fi
+          cargo xtask run-elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
