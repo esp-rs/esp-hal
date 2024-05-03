@@ -84,7 +84,11 @@ mod implementation {
             // The average clock frequency is fXTAL_CLK/2.5, which is 16 MHz.
             // The timer counting is incremented by 1/16 μs on each `CNT_CLK` cycle.
             Self {
+                #[cfg(not(esp32h2))]
                 freq: HertzU64::MHz(clocks.xtal_clock.to_MHz() as u64 * 10 / 25),
+                #[cfg(esp32h2)]
+                // esp32h2 TRM, section 11.2 Clock Source Selection
+                freq: HertzU64::MHz(clocks.xtal_clock.to_MHz() as u64 * 10 / 20),
             }
         }
 
