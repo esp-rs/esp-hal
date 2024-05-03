@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed ESP32 specific code for resolutions > 16 bit in ledc embedded_hal::pwm max_duty_cycle function. (#1441)
 - Fixed division by zero in ledc embedded_hal::pwm set_duty_cycle function and converted to set_duty_hw instead of set_duty to eliminate loss of granularity. (#1441)
 - Embassy examples now build on stable (#1485)
+- Fix delay on esp32h2 (#1535)
 
 ### Changed
 
