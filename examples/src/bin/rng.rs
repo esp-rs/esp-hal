@@ -6,30 +6,32 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{prelude::*, rng::Trng,
-    analog::adc::{AdcConfig, Attenuation, ADC},
+use esp_hal::{
+    analog::adc::{Adc, AdcConfig, Attenuation},
     clock::ClockControl,
     delay::Delay,
-    gpio::IO,
-    peripherals::{Peripherals, ADC1}};
-
+    gpio::Io,
+    peripherals::{Peripherals, ADC1},
+    prelude::*,
+    rng::Trng,
+};
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let analog_pin = io.pins.gpio3.into_analog();
     let mut adc1_config = AdcConfig::new();
     let mut adc1_pin = adc1_config.enable_pin(analog_pin, Attenuation::Attenuation11dB);
-    let mut adc1 = ADC::<ADC1>::new(peripherals.ADC1, adc1_config);
+    let mut adc1 = Adc::<ADC1>::new(peripherals.ADC1, adc1_config);
     let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
-    
+
     let mut trng = Trng::new(peripherals.RNG, &mut adc1);
-    
+
     let (mut rng, adc1) = trng.downgrade();
-    
+
     // Fill a buffer with random bytes:
     let mut buf = [0u8; 16];
     // trng.read(&mut buf);
