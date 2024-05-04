@@ -66,21 +66,21 @@ const ADC_SAR2_INITIAL_CODE_LOW_ADDR: u8 = 0x3;
 const ADC_SAR2_INITIAL_CODE_LOW_ADDR_MSB: u8 = 0x7;
 const ADC_SAR2_INITIAL_CODE_LOW_ADDR_LSB: u8 = 0x0;
 
-const  ADC_SAR1_INITIAL_CODE_HIGH_ADDR: u8 = 0x1;
-const  ADC_SAR1_INITIAL_CODE_HIGH_ADDR_MSB: u8 = 0x3;
-const  ADC_SAR1_INITIAL_CODE_HIGH_ADDR_LSB: u8 = 0x0;
+const ADC_SAR1_INITIAL_CODE_HIGH_ADDR: u8 = 0x1;
+const ADC_SAR1_INITIAL_CODE_HIGH_ADDR_MSB: u8 = 0x3;
+const ADC_SAR1_INITIAL_CODE_HIGH_ADDR_LSB: u8 = 0x0;
 
 const ADC_SAR1_INITIAL_CODE_LOW_ADDR: u8 = 0x0;
 const ADC_SAR1_INITIAL_CODE_LOW_ADDR_MSB: u8 = 0x7;
 const ADC_SAR1_INITIAL_CODE_LOW_ADDR_LSB: u8 = 0x0;
 
-const ADC_SARADC2_ENCAL_REF_ADDR: u8 = 0x7;
-const ADC_SARADC2_ENCAL_REF_ADDR_MSB: u8 = 1;
-const ADC_SARADC2_ENCAL_REF_ADDR_LSB: u8 = 0;
+const ADC_SARADC_DTEST_RTC_ADDR: u8 = 0x7;
+const ADC_SARADC_DTEST_RTC_ADDR_MSB: u8 = 1;
+const ADC_SARADC_DTEST_RTC_ADDR_LSB: u8 = 0;
 
-const ADC_SARADC_ENT_RTC_ADDR: u8 = 0x7
+const ADC_SARADC_ENT_RTC_ADDR: u8 = 0x7;
 const ADC_SARADC_ENT_RTC_ADDR_MSB: u8 = 3;
-const  ADC_SARADC_ENT_RTC_ADDR_LSB: u8 = 3;
+const ADC_SARADC_ENT_RTC_ADDR_LSB: u8 = 3;
 
 const ADC_SARADC1_ENCAL_REF_ADDR: u8 = 0x7;
 const ADC_SARADC1_ENCAL_REF_ADDR_MSB: u8 = 4;
@@ -169,7 +169,7 @@ pub(crate) fn ensure_randomness() {
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,
-        ADC_SAR2_INITIAL_CODE_HIGH_ADDR
+        ADC_SAR2_INITIAL_CODE_HIGH_ADDR,
         ADC_SAR2_INITIAL_CODE_HIGH_ADDR_MSB,
         ADC_SAR2_INITIAL_CODE_HIGH_ADDR_LSB,
         0x60,
@@ -178,16 +178,16 @@ pub(crate) fn ensure_randomness() {
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,
-        ADC_SAR2_INITIAL_CODE_LOW_ADDR
+        ADC_SAR2_INITIAL_CODE_LOW_ADDR,
         ADC_SAR2_INITIAL_CODE_LOW_ADDR_MSB,
         ADC_SAR2_INITIAL_CODE_LOW_ADDR_LSB,
         0x66,
     );
-    
+
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,
-        ADC_SAR1_INITIAL_CODE_HIGH_ADDR
+        ADC_SAR1_INITIAL_CODE_HIGH_ADDR,
         ADC_SAR1_INITIAL_CODE_HIGH_ADDR_MSB,
         ADC_SAR1_INITIAL_CODE_HIGH_ADDR_LSB,
         0x08,
@@ -196,7 +196,7 @@ pub(crate) fn ensure_randomness() {
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,
-        ADC_SAR1_INITIAL_CODE_LOW_ADDR
+        ADC_SAR1_INITIAL_CODE_LOW_ADDR,
         ADC_SAR1_INITIAL_CODE_LOW_ADDR_MSB,
         ADC_SAR1_INITIAL_CODE_LOW_ADDR_LSB,
         0x66,
@@ -239,7 +239,7 @@ pub(crate) fn ensure_randomness() {
 }
 
 pub(crate) fn revert_trng() {
-    reg_clr_bit(APB_SARADC_CTRL2_REG, APB_SARADC_TIMER_EN);
+    reg_clr_bit(APB_SARADC_CTRL2_REG, APB_SARADC_SARADC_TIMER_EN);
     reg_write(APB_SARADC_SAR_PATT_TAB1_REG, 0xFFFFFF);
 
     regi2c_write_mask(
@@ -259,7 +259,7 @@ pub(crate) fn revert_trng() {
         ADC_SAR2_INITIAL_CODE_LOW_ADDR_LSB,
         0,
     );
-    
+
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,
@@ -431,4 +431,10 @@ pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, l
     while reg_get_bit(LP_I2C_ANA_MST_I2C0_CTRL_REG, LP_I2C_ANA_MST_I2C0_BUSY) != 0 {}
 
     regi2c_disable_block(block);
+}
+
+fn clear_peri_reg_mask(reg: u32, mask: u32) {
+    unsafe {
+        (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() & !mask);
+    }
 }

@@ -17,6 +17,7 @@ pub mod peripherals;
 #[cfg(psram)]
 pub mod psram;
 pub mod radio_clocks;
+pub mod trng;
 
 /// The name of the chip ("esp32") as `&str`
 #[macro_export]
