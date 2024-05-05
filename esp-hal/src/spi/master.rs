@@ -2647,7 +2647,7 @@ pub trait Instance: crate::private::Sealed {
         });
     }
 
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(any(esp32, esp32c3, esp32s2)))]
     fn set_bit_order(&mut self, read_order: SpiBitOrder, write_order: SpiBitOrder) {
         let reg_block = self.register_block();
 
@@ -2665,7 +2665,7 @@ pub trait Instance: crate::private::Sealed {
             w
         });
     }
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(any(esp32, esp32c3, esp32s2))]
     fn set_bit_order(&mut self, read_order: SpiBitOrder, write_order: SpiBitOrder) {
         let reg_block = self.register_block();
 
@@ -2677,7 +2677,7 @@ pub trait Instance: crate::private::Sealed {
             SpiBitOrder::MSBFirst => false,
             SpiBitOrder::LSBFirst => true,
         };
-        reg_block.ctrl().modify(|_, w| unsafe {
+        reg_block.ctrl().modify(|_, w| {
             w.rd_bit_order().bit(read_value);
             w.wr_bit_order().bit(write_value);
             w
