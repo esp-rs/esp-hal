@@ -183,8 +183,7 @@ pub(crate) fn ensure_randomness() {
     regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC_DTEST_RTC_ADDR, 1);
 }
 
-pub fn revert_trng()
-{
+pub fn revert_trng() {
     regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC_ENCAL_REF_ADDR, 0);
 
     regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC_ENT_TSENS_ADDR, 0);
@@ -193,7 +192,12 @@ pub fn revert_trng()
 
     regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC_DTEST_RTC_ADDR, 0);
 
-    reg_set_field(SENS_SAR_POWER_XPD_SAR_REG, SENS_FORCE_XPD_SAR_V, SENS_FORCE_XPD_SAR_S, 0);
+    reg_set_field(
+        SENS_SAR_POWER_XPD_SAR_REG,
+        SENS_FORCE_XPD_SAR_V,
+        SENS_FORCE_XPD_SAR_S,
+        0,
+    );
 
     clear_peri_reg_mask(APB_SARADC_CTRL2_REG, APB_SARADC_TIMER_EN);
 

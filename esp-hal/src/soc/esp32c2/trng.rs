@@ -173,11 +173,31 @@ pub(crate) fn revert_trng() {
     regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC2_ENCAL_REF_ADDR, 0);
     clear_peri_reg_mask(APB_SARADC_CTRL2_REG, APB_SARADC_TIMER_EN);
     clear_peri_reg_mask(APB_SARADC_DMA_CONF_REG, APB_SARADC_APB_ADC_TRANS_M);
-    reg_set_field(APB_SARADC_SAR_PATT_TAB1_REG, APB_SARADC_SAR_PATT_TAB1_V, APB_SARADC_SAR_PATT_TAB1_S, 0xffffff);
-    reg_set_field(APB_SARADC_SAR_PATT_TAB2_REG, APB_SARADC_SAR_PATT_TAB2_V, APB_SARADC_SAR_PATT_TAB2_S, 0xffffff);
+    reg_set_field(
+        APB_SARADC_SAR_PATT_TAB1_REG,
+        APB_SARADC_SAR_PATT_TAB1_V,
+        APB_SARADC_SAR_PATT_TAB1_S,
+        0xffffff,
+    );
+    reg_set_field(
+        APB_SARADC_SAR_PATT_TAB2_REG,
+        APB_SARADC_SAR_PATT_TAB2_V,
+        APB_SARADC_SAR_PATT_TAB2_S,
+        0xffffff,
+    );
     clear_peri_reg_mask(APB_SARADC_APB_ADC_CLKM_CONF_REG, APB_SARADC_CLK_EN_M);
-    reg_set_field(APB_SARADC_CTRL_REG, APB_SARADC_XPD_SAR_FORCE_V, APB_SARADC_XPD_SAR_FORCE_S, 0);
-    reg_set_field(RTC_CNTL_SENSOR_CTRL_REG, RTC_CNTL_FORCE_XPD_SAR_V, RTC_CNTL_FORCE_XPD_SAR_S, 0);
+    reg_set_field(
+        APB_SARADC_CTRL_REG,
+        APB_SARADC_XPD_SAR_FORCE_V,
+        APB_SARADC_XPD_SAR_FORCE_S,
+        0,
+    );
+    reg_set_field(
+        RTC_CNTL_SENSOR_CTRL_REG,
+        RTC_CNTL_FORCE_XPD_SAR_V,
+        RTC_CNTL_FORCE_XPD_SAR_S,
+        0,
+    );
 }
 
 fn reg_set_field(reg: u32, field_v: u32, field_s: u32, value: u32) {

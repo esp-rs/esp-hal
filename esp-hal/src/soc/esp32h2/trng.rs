@@ -243,7 +243,7 @@ pub(crate) fn revert_trng() {
         I2C_SARADC_SAR2_INIT_CODE_LSB_LSB,
         0,
     );
-    
+
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,
@@ -291,7 +291,7 @@ pub(crate) fn revert_trng() {
 
     // disable ADC_CTRL_CLK (SAR ADC function clock)
     reg_write(PCR_SARADC_CLKM_CONF_REG, 0x00404000);
-    
+
     // Set PCR_SARADC_CONF_REG to initial state
     reg_write(PCR_SARADC_CONF_REG, 0x5);
 }

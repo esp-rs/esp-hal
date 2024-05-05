@@ -138,8 +138,7 @@ pub fn ensure_randomness() {
     set_peri_reg_mask(DR_REG_I2S_BASE + 0x00a8, I2S_RX_START);
 }
 
-pub fn revert_trng()
-{
+pub fn revert_trng() {
     clear_peri_reg_mask(I2S_CONF_REG0, I2S_RX_START);
     set_peri_reg_mask(I2S_CONF_REG0, I2S_RX_RESET);
     clear_peri_reg_mask(I2S_CONF_REG0, I2S_RX_RESET);
@@ -152,11 +151,24 @@ pub fn revert_trng()
     clear_peri_reg_mask(SENS_SAR_READ_CTRL2_REG, SENS_SAR2_DIG_FORCE);
 
     clear_peri_reg_mask(SENS_SAR_START_FORCE_REG, SENS_SAR2_EN_TEST);
-    clear_peri_reg_mask(SYSCON_SARADC_CTRL_REG, SYSCON_SARADC_SAR2_MUX | SYSCON_SARADC_SAR_SEL | SYSCON_SARADC_DATA_TO_I2S);
+    clear_peri_reg_mask(
+        SYSCON_SARADC_CTRL_REG,
+        SYSCON_SARADC_SAR2_MUX | SYSCON_SARADC_SAR_SEL | SYSCON_SARADC_DATA_TO_I2S,
+    );
 
-    set_peri_reg_bits(SENS_SAR_MEAS_WAIT2_REG, SENS_FORCE_XPD_SAR, 0, SENS_FORCE_XPD_SAR_S);
+    set_peri_reg_bits(
+        SENS_SAR_MEAS_WAIT2_REG,
+        SENS_FORCE_XPD_SAR,
+        0,
+        SENS_FORCE_XPD_SAR_S,
+    );
 
-    set_peri_reg_bits(SYSCON_SARADC_FSM_REG, SYSCON_SARADC_START_WAIT, 8, SYSCON_SARADC_START_WAIT_S);
+    set_peri_reg_bits(
+        SYSCON_SARADC_FSM_REG,
+        SYSCON_SARADC_START_WAIT,
+        8,
+        SYSCON_SARADC_START_WAIT_S,
+    );
 }
 
 fn set_peri_reg_bits(reg: u32, bitmap: u32, value: u32, shift: u32) {
