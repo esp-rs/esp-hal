@@ -64,6 +64,7 @@ use super::{
     HalfDuplexMode,
     IsFullDuplex,
     IsHalfDuplex,
+    SpiBitOrder,
     SpiDataMode,
     SpiMode,
 };
@@ -481,6 +482,14 @@ where
         self
     }
 
+    /// Set the bit order for the SPI instance.
+    ///
+    /// The default is MSB first for both read and write.
+    pub fn with_bit_order(mut self, read_order: SpiBitOrder, write_order: SpiBitOrder) -> Self {
+        self.spi.set_bit_order(read_order, write_order);
+        self
+    }
+
     /// Setup pins for this SPI instance.
     ///
     /// All pins are optional. Pass [crate::gpio::NO_PIN] if you don't need the
@@ -717,6 +726,14 @@ where
 
     pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks) {
         self.spi.ch_bus_freq(frequency, clocks);
+    }
+
+    /// Set the bit order for the SPI instance.
+    ///
+    /// The default is MSB first for both read and write.
+    pub fn with_bit_order(mut self, read_order: SpiBitOrder, write_order: SpiBitOrder) -> Self {
+        self.spi.set_bit_order(read_order, write_order);
+        self
     }
 }
 
@@ -2627,6 +2644,43 @@ pub trait Instance: crate::private::Sealed {
                 .set_bit()
                 .mst_clk_sel()
                 .set_bit()
+        });
+    }
+
+    #[cfg(not(any(esp32, esp32s2)))]
+    fn set_bit_order(&mut self, read_order: SpiBitOrder, write_order: SpiBitOrder) {
+        let reg_block = self.register_block();
+
+        let read_value = match read_order {
+            SpiBitOrder::MSBFirst => 0,
+            SpiBitOrder::LSBFirst => 1,
+        };
+        let write_value = match write_order {
+            SpiBitOrder::MSBFirst => 0,
+            SpiBitOrder::LSBFirst => 1,
+        };
+        reg_block.ctrl().modify(|_, w| unsafe {
+            w.rd_bit_order().bits(read_value);
+            w.wr_bit_order().bits(write_value);
+            w
+        });
+    }
+    #[cfg(any(esp32, esp32s2))]
+    fn set_bit_order(&mut self, read_order: SpiBitOrder, write_order: SpiBitOrder) {
+        let reg_block = self.register_block();
+
+        let read_value = match read_order {
+            SpiBitOrder::MSBFirst => false,
+            SpiBitOrder::LSBFirst => true,
+        };
+        let write_value = match write_order {
+            SpiBitOrder::MSBFirst => false,
+            SpiBitOrder::LSBFirst => true,
+        };
+        reg_block.ctrl().modify(|_, w| unsafe {
+            w.rd_bit_order().bit(read_value);
+            w.wr_bit_order().bit(write_value);
+            w
         });
     }
 
