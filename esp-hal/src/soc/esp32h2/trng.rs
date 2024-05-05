@@ -283,7 +283,7 @@ pub(crate) fn revert_trng() {
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,
-        I2C_SARADC_EN_TOUT_SAR1_BUS
+        I2C_SARADC_EN_TOUT_SAR1_BUS,
         I2C_SARADC_EN_TOUT_SAR1_BUS_MSB,
         I2C_SARADC_EN_TOUT_SAR1_BUS_LSB,
         0,

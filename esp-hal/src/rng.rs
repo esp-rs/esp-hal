@@ -154,7 +154,7 @@ impl<'d> Trng<'d> {
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl embedded_hal_02::blocking::rng::Read for Trng {
+impl embedded_hal_02::blocking::rng::Read for Trng<'_> {
     type Error = core::convert::Infallible;
 
     fn read(&mut self, buffer: &mut [u8]) -> Result<(), Self::Error> {
