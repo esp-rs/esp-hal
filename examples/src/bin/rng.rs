@@ -6,40 +6,21 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{
-    analog::adc::{Adc, AdcConfig, Attenuation},
-    clock::ClockControl,
-    delay::Delay,
-    gpio::Io,
-    peripherals::{Peripherals, ADC1},
-    prelude::*,
-    rng::Trng,
-};
+use esp_hal::{peripherals::Peripherals, prelude::*, rng::Rng};
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let mut rng = Rng::new(peripherals.RNG);
 
-    let analog_pin = io.pins.gpio3.into_analog();
-    let mut adc1_config = AdcConfig::new();
-    let mut adc1_pin = adc1_config.enable_pin(analog_pin, Attenuation::Attenuation11dB);
-    let mut adc1 = Adc::<ADC1>::new(peripherals.ADC1, adc1_config);
-    let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
-
-    let mut trng = Trng::new(peripherals.RNG, &mut adc1);
-
-    let (mut rng, adc1) = trng.downgrade();
+    // Generate a random word (u32):
+    println!("Random u32:   {}", rng.random());
 
     // Fill a buffer with random bytes:
     let mut buf = [0u8; 16];
-    // trng.read(&mut buf);
+    rng.read(&mut buf);
     println!("Random bytes: {:?}", buf);
 
-    loop {
-        println!("Random u32:   {}", rng.random());
-        let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
-        println!("ADC reading = {}", pin_value);
-    }
+    loop {}
 }
