@@ -135,7 +135,7 @@ impl<'d> Trng<'d> {
     ) -> Self {
         let gen = Rng::new(rng);
         crate::soc::trng::ensure_randomness();
-        Self { rng: gen, adc: adc }
+        Self { rng: gen, adc }
     }
 
     pub fn random(&mut self) -> u32 {
