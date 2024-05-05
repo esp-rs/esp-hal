@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - i2c: implement `I2C:transaction` for `embedded-hal` and `embedded-hal-async`
+- spi: implement `with_bit_order` - #1537
 - ESP32-PICO-V3-02: Initial support (#1155)
 - `time::current_time` API (#1503)
 - ESP32-S3: Add LCD_CAM Camera driver (#1483)
