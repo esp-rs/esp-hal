@@ -387,34 +387,41 @@ fn generate_efuse_src(workspace: &Path, args: GenerateEfuseFieldsArgs) -> Result
     Ok(())
 }
 
-fn run_elfs(args: RunElfArgs) -> Result<(), anyhow::Error> {
-    let elfs = fs::read_dir(&args.path)?;
-    let mut failed_elfs: Vec<String> = Vec::new();
-    for elf in elfs {
-        let elf = elf?;
-        let elf_path = elf.path();
-        let elf_name = elf_path.file_name().unwrap().to_str().unwrap();
-        let elf_name = elf_name.split('.').next().unwrap();
-        let elf_name = elf_name.to_string();
-        println!("Running '{}' test", elf_name);
+fn run_elfs(args: RunElfArgs) -> Result<()> {
+    let mut failed: Vec<String> = Vec::new();
+    for elf in fs::read_dir(&args.path)? {
+        let entry = elf?;
+
+        let elf_path = entry.path();
+        let elf_name = elf_path
+            .with_extension("")
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+
+        log::info!("Running test '{}' for '{}'", elf_name, args.chip);
 
         let command = Command::new("probe-rs")
             .arg("run")
             .arg("--chip")
             .arg(args.chip.to_string())
             .arg(elf_path)
-            .output()
-            .expect("Failed to execute probe-rs run command");
-        let stdout = String::from_utf8_lossy(&command.stdout);
-        let stderr = String::from_utf8_lossy(&command.stderr);
-        println!("{}\n{}", stderr, stdout);
+            .output()?;
+
+        println!(
+            "{}\n{}",
+            String::from_utf8_lossy(&command.stderr),
+            String::from_utf8_lossy(&command.stdout)
+        );
+
         if !command.status.success() {
-            failed_elfs.push(elf_name);
+            failed.push(elf_name);
         }
     }
 
-    if !failed_elfs.is_empty() {
-        bail!("Failed tests: {:?}", failed_elfs);
+    if !failed.is_empty() {
+        bail!("Failed tests: {:?}", failed);
     }
 
     Ok(())
