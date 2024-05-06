@@ -219,3 +219,6 @@ ci = [
 
 [lints.clippy]
 mixed_attributes_style = "allow"
+
+[lints.rust]
+unexpected_cfgs = "allow"

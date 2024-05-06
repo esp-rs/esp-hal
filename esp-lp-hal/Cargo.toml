@@ -66,6 +66,9 @@ required-features = ["embedded-hal-02", "esp32c6"]
 name              = "i2c"
 required-features = ["embedded-hal-02", "esp32c6"]
 
+[lints.rust]
+unexpected_cfgs = "allow"
+
 [patch.crates-io]
 esp32s2-ulp = { git = "https://github.com/esp-rs/esp-pacs", rev = "bcab40a" }
 esp32s3-ulp = { git = "https://github.com/esp-rs/esp-pacs", rev = "bcab40a" }
