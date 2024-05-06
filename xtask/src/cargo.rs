@@ -22,8 +22,9 @@ pub fn run(args: &[String], cwd: &Path) -> Result<()> {
     let status = Command::new(get_cargo())
         .args(args)
         .current_dir(cwd)
-        .stdout(Stdio::piped())
+        .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
+        .stdin(Stdio::inherit())
         .status()?;
 
     // Make sure that we return an appropriate exit code here, as Github Actions
@@ -32,27 +33,6 @@ pub fn run(args: &[String], cwd: &Path) -> Result<()> {
         Ok(())
     } else {
         bail!("Failed to execute cargo subcommand")
-    }
-}
-
-/// Execute cargo with the given arguments and from the specified directory.
-pub fn run_with_input(args: &[String], cwd: &Path) -> Result<()> {
-    if !cwd.is_dir() {
-        bail!("The `cwd` argument MUST be a directory");
-    }
-
-    let status = Command::new(get_cargo())
-        .args(args)
-        .current_dir(cwd)
-        .stdout(std::process::Stdio::inherit())
-        .stderr(std::process::Stdio::inherit())
-        .stdin(std::process::Stdio::inherit())
-        .status()?;
-
-    if status.success() {
-        Ok(())
-    } else {
-        Err(anyhow::anyhow!("Failed to execute cargo subcommand"))
     }
 }
 

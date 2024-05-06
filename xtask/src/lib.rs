@@ -294,7 +294,7 @@ pub fn execute_app(
     let args = builder.build();
     log::debug!("{args:#?}");
 
-    cargo::run_with_input(&args, package_path)
+    cargo::run(&args, package_path)
 }
 
 /// Build the specified package, using the given toolchain/target/features if
