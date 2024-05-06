@@ -44,6 +44,14 @@ pub enum SpiMode {
     Mode3,
 }
 
+/// SPI Bit Order
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum SpiBitOrder {
+    MSBFirst,
+    LSBFirst,
+}
+
 pub trait DuplexMode {}
 pub trait IsFullDuplex: DuplexMode {}
 pub trait IsHalfDuplex: DuplexMode {}
