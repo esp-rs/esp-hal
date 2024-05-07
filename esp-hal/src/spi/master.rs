@@ -1614,7 +1614,7 @@ pub mod dma {
 
         use super::*;
 
-        impl<'d, T, C, M> ErrorType for SpiDma<'d, T, C, M, crate::Async>
+        impl<'d, T, C, M> ErrorType for SpiDma<'d, T, C, M, crate::Blocking>
         where
             T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
             C: ChannelTypes,
@@ -1624,7 +1624,7 @@ pub mod dma {
             type Error = Error;
         }
 
-        impl<'d, T, C, M> SpiBus for SpiDma<'d, T, C, M, crate::Async>
+        impl<'d, T, C, M> SpiBus for SpiDma<'d, T, C, M, crate::Blocking>
         where
             T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
             C: ChannelTypes,
