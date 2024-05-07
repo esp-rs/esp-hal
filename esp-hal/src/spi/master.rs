@@ -1448,9 +1448,21 @@ pub mod dma {
 
     #[cfg(feature = "async")]
     mod asynch {
+        use embedded_hal_async::spi::{ErrorType, SpiBus};
+
         use super::*;
 
-        impl<'d, T, C, M> embedded_hal_async::spi::SpiBus for SpiDma<'d, T, C, M, crate::Async>
+        impl<'d, T, C, M> ErrorType for SpiDma<'d, T, C, M, crate::Async>
+        where
+            T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
+            C: ChannelTypes,
+            C::P: SpiPeripheral,
+            M: IsFullDuplex,
+        {
+            type Error = Error;
+        }
+
+        impl<'d, T, C, M> SpiBus for SpiDma<'d, T, C, M, crate::Async>
         where
             T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
             C: ChannelTypes,
