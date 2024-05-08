@@ -81,8 +81,7 @@ where
 
     /// Pauses execution for *at least* `ns` nanoseconds.
     pub fn delay_nanos(&self, ns: u32) {
-        // TODO: Is the the best course of action? Should we just take nanos?
-        self.delay((ns.saturating_div(1000) as u64).micros())
+        self.delay((ns as u64 / 1000).micros())
     }
 
     fn delay(&self, us: MicrosDurationU64) {
@@ -93,6 +92,9 @@ where
         self.inner.clear_interrupt();
         self.inner.reset();
 
+        // NOTE: Auto-reload MUST be enabled before loading the value in order
+        //       for `SYSTIMER` to work correctly!
+        self.inner.enable_auto_reload(false);
         self.inner.load_value(us);
         self.inner.enable_interrupt(true);
         self.inner.start();
@@ -161,8 +163,10 @@ where
         self.inner.clear_interrupt();
         self.inner.reset();
 
-        self.inner.load_value(timeout);
+        // NOTE: Auto-reload MUST be enabled before loading the value in order
+        //       for `SYSTIMER` to work correctly!
         self.inner.enable_auto_reload(true);
+        self.inner.load_value(timeout);
         self.inner.enable_interrupt(true);
         self.inner.start();
     }
