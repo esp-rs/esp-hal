@@ -1614,17 +1614,18 @@ pub mod dma {
 
         use super::*;
 
-        impl<'d, T, C, M> ErrorType for SpiDma<'d, T, C, M, crate::Async>
+        impl<'d, T, C, M, DmaMode> ErrorType for SpiDma<'d, T, C, M, DmaMode>
         where
             T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
             C: ChannelTypes,
             C::P: SpiPeripheral,
             M: IsFullDuplex,
+            DmaMode: Mode,
         {
             type Error = Error;
         }
 
-        impl<'d, T, C, M> SpiBus for SpiDma<'d, T, C, M, crate::Async>
+        impl<'d, T, C, M> SpiBus for SpiDma<'d, T, C, M, crate::Blocking>
         where
             T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
             C: ChannelTypes,
