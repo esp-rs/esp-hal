@@ -619,7 +619,7 @@ mod classic {
     pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
         let cpu_interrupt_number = which as isize;
-        let intr_prio_base = intr.cpu_int_pri_0().as_ptr();
+        let intr_prio_base = intr.cpu_int_pri(0).as_ptr();
 
         intr_prio_base
             .offset(cpu_interrupt_number)
@@ -647,7 +647,7 @@ mod classic {
     #[inline]
     pub(super) unsafe extern "C" fn get_priority(cpu_interrupt: CpuInterrupt) -> Priority {
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
-        let intr_prio_base = intr.cpu_int_pri_0().as_ptr();
+        let intr_prio_base = intr.cpu_int_pri(0).as_ptr();
 
         let prio = intr_prio_base
             .offset(cpu_interrupt as isize)
@@ -661,7 +661,7 @@ mod classic {
         let interrupt_id: usize = mcause::read().code(); // MSB is whether its exception or interrupt.
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
         let interrupt_priority = intr
-            .cpu_int_pri_0()
+            .cpu_int_pri(0)
             .as_ptr()
             .add(interrupt_id)
             .read_volatile();
