@@ -1,0 +1,1 @@
+make uart::UartRx::read_byte public
