@@ -79,8 +79,7 @@ use crate::{
         Interrupt,
     },
     system::PeripheralClockControl,
-    Blocking,
-    Mode,
+    Blocking, Mode,
 };
 
 const CONSOLE_UART_NUM: usize = 0;
@@ -168,11 +167,11 @@ pub mod config {
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub enum StopBits {
         /// 1 stop bit
-        STOP1   = 1,
+        STOP1 = 1,
         /// 1.5 stop bits
         STOP1P5 = 2,
         /// 2 stop bits
-        STOP2   = 3,
+        STOP2 = 3,
     }
 
     /// UART Configuration
@@ -464,7 +463,7 @@ where
         }
     }
 
-    fn read_byte(&mut self) -> nb::Result<u8, Error> {
+    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
         // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
         let offset = if cfg!(esp32s2) { 0x20C00000 } else { 0 };
 
