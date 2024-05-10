@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Embassy examples now build on stable (#1485)
 - Fix delay on esp32h2 (#1535)
 - spi: fix dma wrong mode when using eh1 blocking api (#1541)
+- uart: make `uart::UartRx::read_byte` public (#1547)
 
 ### Changed
 

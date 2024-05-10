@@ -79,7 +79,8 @@ use crate::{
         Interrupt,
     },
     system::PeripheralClockControl,
-    Blocking, Mode,
+    Blocking,
+    Mode,
 };
 
 const CONSOLE_UART_NUM: usize = 0;
@@ -167,11 +168,11 @@ pub mod config {
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub enum StopBits {
         /// 1 stop bit
-        STOP1 = 1,
+        STOP1   = 1,
         /// 1.5 stop bits
         STOP1P5 = 2,
         /// 2 stop bits
-        STOP2 = 3,
+        STOP2   = 3,
     }
 
     /// UART Configuration
