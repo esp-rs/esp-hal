@@ -1613,6 +1613,8 @@ where
     }
 
     /// Get the current pin input level.
+    ///
+    /// true means high, false means low
     #[inline]
     pub fn get_level(&self) -> bool {
         self.is_high()
@@ -1645,8 +1647,8 @@ impl<'d, P> OutputOpenDrain<'d, P>
 where
     P: InputPin + OutputPin,
 {
-    /// Create GPIO input driver for a [Pin] with the provided initial
-    /// output-level and [Pull] configuration.
+    /// Create GPIO open-drain output driver for a [Pin] with the provided
+    /// initial output-level and [Pull] configuration.
     #[inline]
     pub fn new(
         pin: impl crate::peripheral::Peripheral<P = P> + 'd,
@@ -1675,6 +1677,8 @@ where
     }
 
     /// Get the current pin input level.
+    ///
+    /// true means high, false means low
     #[inline]
     pub fn get_level(&self) -> bool {
         self.is_high()
@@ -1847,6 +1851,8 @@ impl<'d> AnyInput<'d> {
     }
 
     /// Get the current pin input level.
+    ///
+    /// true means high, false means low
     #[inline]
     pub fn get_level(&self) -> bool {
         self.is_high()
@@ -1872,8 +1878,8 @@ pub struct AnyOutputOpenDrain<'d> {
 }
 
 impl<'d> AnyOutputOpenDrain<'d> {
-    /// Create GPIO input driver for a [Pin] with the provided initial
-    /// output-level and [Pull] configuration.
+    /// Create GPIO open-drain output driver for a [Pin] with the provided
+    /// initial output-level and [Pull] configuration.
     #[inline]
     pub fn new<P: OutputPin + InputPin + CreateErasedPin>(
         pin: impl crate::peripheral::Peripheral<P = P> + 'd,
@@ -1907,6 +1913,8 @@ impl<'d> AnyOutputOpenDrain<'d> {
     }
 
     /// Get the current pin input level.
+    ///
+    /// true means high, false means low
     #[inline]
     pub fn get_level(&self) -> bool {
         self.is_high()
@@ -2139,7 +2147,7 @@ pub(crate) mod internal {
 
         fn internal_pull_up_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
             handle_gpio_output!(self, target, {
-                OutputPin::internal_pull_down_in_sleep_mode(target, on, private::Internal)
+                OutputPin::internal_pull_up_in_sleep_mode(target, on, private::Internal)
             });
         }
 
@@ -2592,7 +2600,7 @@ mod embedded_hal_impls {
         }
 
         fn is_low(&mut self) -> Result<bool, Self::Error> {
-            Ok(!Input::is_low(self))
+            Ok(Input::is_low(self))
         }
     }
 

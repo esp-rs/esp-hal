@@ -779,6 +779,9 @@ impl<'d, T> TwaiConfiguration<'d, T, crate::Blocking>
 where
     T: Instance,
 {
+    /// Create a new instance of [TwaiConfiguration]
+    ///
+    /// You will need to use a transceiver to connect to the TWAI bus
     pub fn new<TX: OutputPin, RX: InputPin>(
         peripheral: impl Peripheral<P = T> + 'd,
         tx_pin: impl Peripheral<P = TX> + 'd,
@@ -792,6 +795,11 @@ where
         )
     }
 
+    /// Create a new instance of [TwaiConfiguration] meant to connect two ESP32s
+    /// directly
+    ///
+    /// You don't need a transceiver by following the description in the
+    /// `twai.rs` example
     pub fn new_no_transceiver<TX: OutputPin, RX: InputPin>(
         peripheral: impl Peripheral<P = T> + 'd,
         tx_pin: impl Peripheral<P = TX> + 'd,
@@ -811,6 +819,9 @@ impl<'d, T> TwaiConfiguration<'d, T, crate::Async>
 where
     T: Instance,
 {
+    /// Create a new instance of [TwaiConfiguration] in async mode
+    ///
+    /// You will need to use a transceiver to connect to the TWAI bus
     pub fn new_async<TX: OutputPin, RX: InputPin>(
         peripheral: impl Peripheral<P = T> + 'd,
         tx_pin: impl Peripheral<P = TX> + 'd,
@@ -830,6 +841,11 @@ where
         )
     }
 
+    /// Create a new instance of [TwaiConfiguration] meant to connect two ESP32s
+    /// directly in async mode
+    ///
+    /// You don't need a transceiver by following the description in the
+    /// `twai.rs` example
     pub fn new_async_no_transceiver<TX: OutputPin, RX: InputPin>(
         peripheral: impl Peripheral<P = T> + 'd,
         tx_pin: impl Peripheral<P = TX> + 'd,

@@ -122,7 +122,6 @@ impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
         };
 
         this.set_open_drain_output(true);
-        this.pulldown_enable(false);
         this.input_enable(true);
         this.pullup_enable(true);
         this.pulldown_enable(false);
