@@ -94,8 +94,8 @@ use crate::{
         ChannelTypes,
         DmaError,
         DmaPeripheral,
-        DmaTransferRxImpl,
-        DmaTransferTxImpl,
+        DmaTransferRx,
+        DmaTransferTx,
         ParlIoPeripheral,
         RxPrivate,
         TxPrivate,
@@ -1428,7 +1428,7 @@ where
     pub fn write_dma<'t, TXBUF>(
         &'t mut self,
         words: &'t TXBUF,
-    ) -> Result<DmaTransferTxImpl<Self>, Error>
+    ) -> Result<DmaTransferTx<Self>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>,
     {
@@ -1440,7 +1440,7 @@ where
 
         self.start_write_bytes_dma(ptr, len)?;
 
-        Ok(DmaTransferTxImpl::new(self))
+        Ok(DmaTransferTx::new(self))
     }
 
     fn start_write_bytes_dma(&mut self, ptr: *const u8, len: usize) -> Result<(), Error> {
@@ -1523,7 +1523,7 @@ where
     pub fn read_dma<'t, RXBUF>(
         &'t mut self,
         words: &'t mut RXBUF,
-    ) -> Result<DmaTransferRxImpl<Self>, Error>
+    ) -> Result<DmaTransferRx<Self>, Error>
     where
         RXBUF: WriteBuffer<Word = u8>,
     {
@@ -1535,7 +1535,7 @@ where
 
         Self::start_receive_bytes_dma(&mut self.rx_channel, ptr, len)?;
 
-        Ok(DmaTransferRxImpl::new(self))
+        Ok(DmaTransferRx::new(self))
     }
 
     fn start_receive_bytes_dma(
