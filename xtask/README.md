@@ -12,6 +12,7 @@ Commands:
   build-examples         Build all examples for the specified chip
   build-package          Build the specified package with the given options
   bump-version           Bump the version of the specified package(s)
+  fmt-packages           Format all packages in the workspace with rustfmt
   generate-efuse-fields  Generate the eFuse fields source file from a CSV
   run-example            Run the given example for the specified chip
   run-tests              Run all applicable tests or the specified test for a specified chip

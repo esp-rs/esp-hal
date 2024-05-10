@@ -5,6 +5,7 @@ To help us review it efficiently, please ensure you've gone through the followin
 
 ### Submission Checklist 📝
 - [ ] I have updated existing examples or added new ones (if applicable).
+- [ ] I have used `cargo xtask fmt-packages` command to ensure that all changed code is formatted correctly.
 - [ ] My changes were added to the [`CHANGELOG.md`](https://github.com/esp-rs/esp-hal/blob/main/esp-hal/CHANGELOG.md) in the **_proper_** section.
 #### Extra:
 - [ ] I have read the [CONTRIBUTING.md guide](https://github.com/esp-rs/esp-hal/blob/main/CONTRIBUTING.md) and followed its instructions.

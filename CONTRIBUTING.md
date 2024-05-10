@@ -69,15 +69,14 @@ rustup component add rustfmt
 rustup component add clippy
 ```
 
-We _strongly_ recommend that you use the supplied `pre-commit` Git hook, which will ensure that all source code has been formatted correctly prior to committing. See the [Git documentation] for more information on hooks.
-
-The `pre-commit` hook can be installed by running the following command in a terminal, from the root of the repository:
+We _strongly_ recommend that you format your code before committing to ensure consistency throughout the project.
+To format all packages in the workspace, run the following command in a terminal from the root of the repository:
 
 ```shell
-cp pre-commit .git/hooks/pre-commit
+cargo xtask fmt-workspace
 ```
 
-[Git documentation]: https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks
+This will use `rustfmt` to ensure that all source code is formatted correctly prior to committing.
 
 ### Pull Request
 
