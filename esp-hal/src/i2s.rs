@@ -76,10 +76,14 @@ use crate::dma::I2s1Peripheral;
 use crate::{
     clock::Clocks,
     dma::{
+        dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
         Channel,
         ChannelTypes,
         DmaError,
-        DmaTransfer,
+        DmaTransferRxCircularImpl,
+        DmaTransferRxImpl,
+        DmaTransferTxCircularImpl,
+        DmaTransferTxImpl,
         I2s0Peripheral,
         I2sPeripheral,
         RxPrivate,
@@ -210,93 +214,6 @@ impl DataFormat {
     }
 }
 
-/// An in-progress DMA write transfer.
-#[must_use]
-pub struct I2sWriteDmaTransfer<'t, 'd, T, CH, DmaMode>
-where
-    T: RegisterAccess,
-    CH: ChannelTypes,
-    DmaMode: Mode,
-{
-    i2s_tx: &'t mut I2sTx<'d, T, CH, DmaMode>,
-}
-
-impl<'t, 'd, T, CH, DmaMode> I2sWriteDmaTransfer<'t, 'd, T, CH, DmaMode>
-where
-    T: RegisterAccess,
-    CH: ChannelTypes,
-    DmaMode: Mode,
-{
-    /// Amount of bytes which can be pushed.
-    /// Only useful for circular DMA transfers
-    pub fn available(&mut self) -> usize {
-        self.i2s_tx.tx_channel.available()
-    }
-
-    /// Push bytes into the DMA buffer.
-    /// Only useful for circular DMA transfers
-    pub fn push(&mut self, data: &[u8]) -> Result<usize, Error> {
-        Ok(self.i2s_tx.tx_channel.push(data)?)
-    }
-
-    /// Push bytes into the DMA buffer via the given closure.
-    /// The closure *must* return the actual number of bytes written.
-    /// The closure *might* get called with a slice which is smaller than the
-    /// total available buffer. Only useful for circular DMA transfers
-    pub fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> Result<usize, Error> {
-        Ok(self.i2s_tx.tx_channel.push_with(f)?)
-    }
-
-    /// Stop for the DMA transfer and return the buffer and the
-    /// I2sTx instance.
-    #[allow(clippy::type_complexity)]
-    pub fn stop(self) -> Result<(), DmaError> {
-        T::tx_stop();
-
-        if self.i2s_tx.tx_channel.has_error() {
-            Err(DmaError::DescriptorError)
-        } else {
-            Ok(())
-        }
-    }
-}
-
-impl<'t, 'd, T, CH, DmaMode> DmaTransfer for I2sWriteDmaTransfer<'t, 'd, T, CH, DmaMode>
-where
-    T: RegisterAccess,
-    CH: ChannelTypes,
-    DmaMode: Mode,
-{
-    /// Wait for the DMA transfer to complete
-    fn wait(self) -> Result<(), DmaError> {
-        // Waiting for the DMA transfer is not enough. We need to wait for the
-        // peripheral to finish flushing its buffers, too.
-        self.i2s_tx.wait_tx_dma_done().ok();
-
-        if self.i2s_tx.tx_channel.has_error() {
-            Err(DmaError::DescriptorError)
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Check if the DMA transfer is complete
-    fn is_done(&self) -> bool {
-        self.i2s_tx.tx_channel.is_done()
-    }
-}
-
-impl<'t, 'd, T, CH, DmaMode> Drop for I2sWriteDmaTransfer<'t, 'd, T, CH, DmaMode>
-where
-    T: RegisterAccess,
-    CH: ChannelTypes,
-    DmaMode: Mode,
-{
-    fn drop(&mut self) {
-        self.i2s_tx.wait_tx_dma_done().ok();
-    }
-}
-
 /// Blocking I2s Write
 pub trait I2sWrite<W> {
     fn write(&mut self, words: &[W]) -> Result<(), Error>;
@@ -308,14 +225,12 @@ where
     T: RegisterAccess,
     CH: ChannelTypes,
     DmaMode: Mode,
+    Self: DmaSupportTx + Sized,
 {
     /// Write I2S.
     /// Returns [I2sWriteDmaTransfer] which represents the in-progress DMA
     /// transfer
-    fn write_dma<'t>(
-        &'t mut self,
-        words: &'t TXBUF,
-    ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH, DmaMode>, Error>
+    fn write_dma<'t>(&'t mut self, words: &'t TXBUF) -> Result<DmaTransferTxImpl<Self>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>;
 
@@ -324,88 +239,9 @@ where
     fn write_dma_circular<'t>(
         &'t mut self,
         words: &'t TXBUF,
-    ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH, DmaMode>, Error>
+    ) -> Result<DmaTransferTxCircularImpl<Self>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>;
-}
-
-/// An in-progress DMA read transfer.
-#[must_use]
-pub struct I2sReadDmaTransfer<'t, 'd, T, CH, DmaMode>
-where
-    T: RegisterAccess,
-    CH: ChannelTypes,
-    DmaMode: Mode,
-{
-    i2s_rx: &'t mut I2sRx<'d, T, CH, DmaMode>,
-}
-
-impl<'t, 'd, T, CH, DmaMode> I2sReadDmaTransfer<'t, 'd, T, CH, DmaMode>
-where
-    T: RegisterAccess,
-    CH: ChannelTypes,
-    DmaMode: Mode,
-{
-    /// Amount of bytes which can be popped
-    pub fn available(&mut self) -> usize {
-        self.i2s_rx.rx_channel.available()
-    }
-
-    pub fn pop(&mut self, data: &mut [u8]) -> Result<usize, Error> {
-        Ok(self.i2s_rx.rx_channel.pop(data)?)
-    }
-
-    /// Wait for the DMA transfer to complete.
-    /// Length of the received data is returned
-    #[allow(clippy::type_complexity)]
-    pub fn wait_receive(self, dst: &mut [u8]) -> Result<usize, (DmaError, usize)> {
-        // Waiting for the DMA transfer is not enough. We need to wait for the
-        // peripheral to finish flushing its buffers, too.
-        self.i2s_rx.wait_rx_dma_done().ok();
-        let len = self.i2s_rx.rx_channel.drain_buffer(dst).unwrap();
-
-        if self.i2s_rx.rx_channel.has_error() {
-            Err((DmaError::DescriptorError, len))
-        } else {
-            Ok(len)
-        }
-    }
-}
-
-impl<'t, 'd, T, CH, DmaMode> DmaTransfer for I2sReadDmaTransfer<'t, 'd, T, CH, DmaMode>
-where
-    T: RegisterAccess,
-    CH: ChannelTypes,
-    DmaMode: Mode,
-{
-    /// Wait for the DMA transfer to complete
-    fn wait(self) -> Result<(), DmaError> {
-        // Waiting for the DMA transfer is not enough. We need to wait for the
-        // peripheral to finish flushing its buffers, too.
-        self.i2s_rx.wait_rx_dma_done().ok();
-
-        if self.i2s_rx.rx_channel.has_error() {
-            Err(DmaError::DescriptorError)
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Check if the DMA transfer is complete
-    fn is_done(&self) -> bool {
-        self.i2s_rx.rx_channel.is_done()
-    }
-}
-
-impl<'t, T, CH, DmaMode> Drop for I2sReadDmaTransfer<'t, '_, T, CH, DmaMode>
-where
-    T: RegisterAccess,
-    CH: ChannelTypes,
-    DmaMode: Mode,
-{
-    fn drop(&mut self) {
-        self.i2s_rx.wait_rx_dma_done().ok();
-    }
 }
 
 /// Blocking I2S Read
@@ -419,14 +255,12 @@ where
     T: RegisterAccess,
     CH: ChannelTypes,
     DmaMode: Mode,
+    Self: DmaSupportRx + Sized,
 {
     /// Read I2S.
     /// Returns [I2sReadDmaTransfer] which represents the in-progress DMA
     /// transfer
-    fn read_dma<'t>(
-        &'t mut self,
-        words: &'t mut RXBUF,
-    ) -> Result<I2sReadDmaTransfer<'t, 'd, T, CH, DmaMode>, Error>
+    fn read_dma<'t>(&'t mut self, words: &'t mut RXBUF) -> Result<DmaTransferRxImpl<Self>, Error>
     where
         RXBUF: WriteBuffer<Word = u8>;
 
@@ -436,7 +270,7 @@ where
     fn read_dma_circular<'t>(
         &'t mut self,
         words: &'t mut RXBUF,
-    ) -> Result<I2sReadDmaTransfer<'t, 'd, T, CH, DmaMode>, Error>
+    ) -> Result<DmaTransferRxCircularImpl<Self>, Error>
     where
         RXBUF: WriteBuffer<Word = u8>;
 }
@@ -606,6 +440,34 @@ where
     }
 }
 
+impl<'d, T, CH, DmaMode> DmaSupport for I2sTx<'d, T, CH, DmaMode>
+where
+    T: RegisterAccess,
+    CH: ChannelTypes,
+    DmaMode: Mode,
+{
+    fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+        self.wait_tx_dma_done().ok();
+    }
+
+    fn peripheral_dma_stop(&mut self) {
+        T::tx_stop();
+    }
+}
+
+impl<'d, T, CH, DmaMode> DmaSupportTx for I2sTx<'d, T, CH, DmaMode>
+where
+    T: RegisterAccess,
+    CH: ChannelTypes,
+    DmaMode: Mode,
+{
+    type TX = CH::Tx<'d>;
+
+    fn with_tx<R, F: FnOnce(&mut Self::TX) -> R>(&mut self, f: F) -> R {
+        f(&mut self.tx_channel)
+    }
+}
+
 impl<'d, T, CH, DmaMode> I2sTx<'d, T, CH, DmaMode>
 where
     T: RegisterAccess,
@@ -648,7 +510,7 @@ where
         &'t mut self,
         words: &'t TXBUF,
         circular: bool,
-    ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH, DmaMode>, Error>
+    ) -> Result<(), Error>
     where
         TXBUF: ReadBuffer<Word = u8>,
         DmaMode: Mode,
@@ -670,7 +532,7 @@ where
         // start: set I2S_TX_START
         T::tx_start();
 
-        Ok(I2sWriteDmaTransfer { i2s_tx: self })
+        Ok(())
     }
 
     fn wait_tx_dma_done(&self) -> Result<(), Error> {
@@ -704,24 +566,23 @@ where
     CH: ChannelTypes,
     DmaMode: Mode,
 {
-    fn write_dma<'t>(
-        &'t mut self,
-        words: &'t TXBUF,
-    ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH, DmaMode>, Error>
+    fn write_dma<'t>(&'t mut self, words: &'t TXBUF) -> Result<DmaTransferTxImpl<Self>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>,
     {
-        self.start_tx_transfer(words, false)
+        self.start_tx_transfer(words, false)?;
+        Ok(DmaTransferTxImpl::new(self))
     }
 
     fn write_dma_circular<'t>(
         &'t mut self,
         words: &'t TXBUF,
-    ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH, DmaMode>, Error>
+    ) -> Result<DmaTransferTxCircularImpl<Self>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>,
     {
-        self.start_tx_transfer(words, true)
+        self.start_tx_transfer(words, true)?;
+        Ok(DmaTransferTxCircularImpl::new(self))
     }
 }
 
@@ -745,6 +606,34 @@ where
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("I2sRx").finish()
+    }
+}
+
+impl<'d, T, CH, DmaMode> DmaSupport for I2sRx<'d, T, CH, DmaMode>
+where
+    T: RegisterAccess,
+    CH: ChannelTypes,
+    DmaMode: Mode,
+{
+    fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+        T::wait_for_rx_done();
+    }
+
+    fn peripheral_dma_stop(&mut self) {
+        T::reset_rx();
+    }
+}
+
+impl<'d, T, CH, DmaMode> DmaSupportRx for I2sRx<'d, T, CH, DmaMode>
+where
+    T: RegisterAccess,
+    CH: ChannelTypes,
+    DmaMode: Mode,
+{
+    type RX = CH::Rx<'d>;
+
+    fn with_rx<R, F: FnOnce(&mut Self::RX) -> R>(&mut self, f: F) -> R {
+        f(&mut self.rx_channel)
     }
 }
 
@@ -792,7 +681,7 @@ where
         &'t mut self,
         words: &'t mut RXBUF,
         circular: bool,
-    ) -> Result<I2sReadDmaTransfer<'t, 'd, T, CH, DmaMode>, Error>
+    ) -> Result<(), Error>
     where
         RXBUF: WriteBuffer<Word = u8>,
     {
@@ -818,13 +707,6 @@ where
 
         // start: set I2S_RX_START
         T::rx_start(len);
-
-        Ok(I2sReadDmaTransfer { i2s_rx: self })
-    }
-
-    fn wait_rx_dma_done(&self) -> Result<(), Error> {
-        T::wait_for_rx_done();
-
         Ok(())
     }
 }
@@ -855,25 +737,25 @@ where
     T: RegisterAccess,
     CH: ChannelTypes,
     DmaMode: Mode,
+    Self: DmaSupportRx + Sized,
 {
-    fn read_dma<'t>(
-        &'t mut self,
-        words: &'t mut RXBUF,
-    ) -> Result<I2sReadDmaTransfer<'t, 'd, T, CH, DmaMode>, Error>
+    fn read_dma<'t>(&'t mut self, words: &'t mut RXBUF) -> Result<DmaTransferRxImpl<Self>, Error>
     where
         RXBUF: WriteBuffer<Word = u8>,
     {
-        self.start_rx_transfer(words, false)
+        self.start_rx_transfer(words, false)?;
+        Ok(DmaTransferRxImpl::new(self))
     }
 
     fn read_dma_circular<'t>(
         &'t mut self,
         words: &'t mut RXBUF,
-    ) -> Result<I2sReadDmaTransfer<'t, 'd, T, CH, DmaMode>, Error>
+    ) -> Result<DmaTransferRxCircularImpl<Self>, Error>
     where
         RXBUF: WriteBuffer<Word = u8>,
     {
-        self.start_rx_transfer(words, true)
+        self.start_rx_transfer(words, true)?;
+        Ok(DmaTransferRxCircularImpl::new(self))
     }
 }
 

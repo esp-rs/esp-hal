@@ -276,12 +276,12 @@ pub mod dma {
     use crate::{
         aes::{Key, Mode},
         dma::{
+            dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
             AesPeripheral,
             Channel,
             ChannelTypes,
-            DmaError,
             DmaPeripheral,
-            DmaTransferRxTx,
+            DmaTransferTxRxImpl,
             RxPrivate,
             TxPrivate,
         },
@@ -336,61 +336,6 @@ pub mod dma {
         }
     }
 
-    /// An in-progress DMA transfer
-    #[must_use]
-    pub struct AesDmaTransferRxTx<'t, 'd, C>
-    where
-        C: ChannelTypes,
-        C::P: AesPeripheral,
-    {
-        aes_dma: &'t mut AesDma<'d, C>,
-    }
-
-    impl<'t, 'd, C> DmaTransferRxTx for AesDmaTransferRxTx<'t, 'd, C>
-    where
-        C: ChannelTypes,
-        C::P: AesPeripheral,
-    {
-        /// Wait for the DMA transfer to complete
-        fn wait(self) -> Result<(), DmaError> {
-            // Waiting for the DMA transfer is not enough. We need to wait for the
-            // peripheral to finish flushing its buffers, too.
-            while self.aes_dma.aes.aes.state().read().state().bits() != 2 // DMA status DONE == 2
-                && !self.aes_dma.channel.tx.is_done()
-            {
-                // wait until done
-            }
-
-            self.aes_dma.finish_transform();
-
-            if self.aes_dma.channel.rx.has_error() || self.aes_dma.channel.tx.has_error() {
-                Err(DmaError::DescriptorError)
-            } else {
-                Ok(())
-            }
-        }
-
-        /// Check if the DMA transfer is complete
-        fn is_done(&self) -> bool {
-            let ch = &self.aes_dma.channel;
-            ch.tx.is_done() && ch.rx.is_done()
-        }
-    }
-
-    impl<'t, 'd, C> Drop for AesDmaTransferRxTx<'t, 'd, C>
-    where
-        C: ChannelTypes,
-        C::P: AesPeripheral,
-    {
-        fn drop(&mut self) {
-            self.aes_dma
-                .aes
-                .aes
-                .dma_exit()
-                .write(|w| w.dma_exit().set_bit());
-        }
-    }
-
     impl<'d, C> core::fmt::Debug for AesDma<'d, C>
     where
         C: ChannelTypes,
@@ -398,6 +343,50 @@ pub mod dma {
     {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             f.debug_struct("AesDma").finish()
+        }
+    }
+
+    impl<'d, C> DmaSupport for AesDma<'d, C>
+    where
+        C: ChannelTypes,
+        C::P: AesPeripheral,
+    {
+        fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+            while self.aes.aes.state().read().state().bits() != 2 // DMA status DONE == 2
+            && !self.channel.tx.is_done()
+            {
+                // wait until done
+            }
+
+            self.finish_transform();
+        }
+
+        fn peripheral_dma_stop(&mut self) {
+            unreachable!("unsupported")
+        }
+    }
+
+    impl<'d, C> DmaSupportTx for AesDma<'d, C>
+    where
+        C: ChannelTypes,
+        C::P: AesPeripheral,
+    {
+        type TX = C::Tx<'d>;
+
+        fn with_tx<R, F: FnOnce(&mut Self::TX) -> R>(&mut self, f: F) -> R {
+            f(&mut self.channel.tx)
+        }
+    }
+
+    impl<'d, C> DmaSupportRx for AesDma<'d, C>
+    where
+        C: ChannelTypes,
+        C::P: AesPeripheral,
+    {
+        type RX = C::Rx<'d>;
+
+        fn with_rx<R, F: FnOnce(&mut Self::RX) -> R>(&mut self, f: F) -> R {
+            f(&mut self.channel.rx)
         }
     }
 
@@ -427,7 +416,7 @@ pub mod dma {
 
         /// Perform a DMA transfer.
         ///
-        /// This will return a [AesDmaTransferRxTx] owning the buffer(s) and the
+        /// This will return a [AesDmaTransfer] owning the buffer(s) and the
         /// AES instance. The maximum amount of data to be sent/received
         /// is 32736 bytes.
         pub fn process<'t, K, TXBUF, RXBUF>(
@@ -437,7 +426,7 @@ pub mod dma {
             mode: Mode,
             cipher_mode: CipherMode,
             key: K,
-        ) -> Result<AesDmaTransferRxTx<'t, 'd, C>, crate::dma::DmaError>
+        ) -> Result<DmaTransferTxRxImpl<Self>, crate::dma::DmaError>
         where
             K: Into<Key>,
             TXBUF: ReadBuffer<Word = u8>,
@@ -456,7 +445,7 @@ pub mod dma {
                 key.into(),
             )?;
 
-            Ok(AesDmaTransferRxTx { aes_dma: self })
+            Ok(DmaTransferTxRxImpl::new(self))
         }
 
         #[allow(clippy::too_many_arguments)]

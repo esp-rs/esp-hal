@@ -81,7 +81,7 @@ fn main() -> ! {
         send[send.len() - 1] = i;
         i = i.wrapping_add(1);
 
-        let transfer = spi.dma_transfer(&mut send, &mut receive).unwrap();
+        let mut transfer = spi.dma_transfer(&mut send, &mut receive).unwrap();
         // here we could do something else while DMA transfer is in progress
         let mut n = 0;
         // Check is_done until the transfer is almost done (32000 bytes at 100kHz is
