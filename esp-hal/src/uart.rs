@@ -465,9 +465,9 @@ where
     }
 
     /// Read a byte from the UART
-    /// 
+    ///
     /// Example
-    /// 
+    ///
     /// ```rust
     /// let (_, mut rx) = serial.spilt();
     /// let byte = rx.read_byte().unwrap();
