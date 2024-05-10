@@ -48,7 +48,7 @@ use crate::{
         ChannelTypes,
         DmaError,
         DmaPeripheral,
-        DmaTransferTxImpl,
+        DmaTransferTx,
         LcdCamPeripheral,
         RegisterAccess,
         Tx,
@@ -324,7 +324,7 @@ where
         cmd: impl Into<Command<P::Word>>,
         dummy: u8,
         data: &'t TXBUF,
-    ) -> Result<DmaTransferTxImpl<Self>, DmaError>
+    ) -> Result<DmaTransferTx<Self>, DmaError>
     where
         TXBUF: ReadBuffer<Word = P::Word>,
     {
@@ -334,7 +334,7 @@ where
         self.start_write_bytes_dma(ptr as _, len * size_of::<P::Word>())?;
         self.start_send();
 
-        Ok(DmaTransferTxImpl::new(self))
+        Ok(DmaTransferTx::new(self))
     }
 }
 

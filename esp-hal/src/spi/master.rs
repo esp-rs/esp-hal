@@ -840,9 +840,9 @@ pub mod dma {
             dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
             Channel,
             ChannelTypes,
-            DmaTransferRxImpl,
-            DmaTransferTxImpl,
-            DmaTransferTxRxImpl,
+            DmaTransferRx,
+            DmaTransferTx,
+            DmaTransferTxRx,
             Spi2Peripheral,
             SpiPeripheral,
             TxPrivate,
@@ -1063,7 +1063,7 @@ pub mod dma {
         pub fn dma_write<'t, TXBUF>(
             &'t mut self,
             words: &'t TXBUF,
-        ) -> Result<DmaTransferTxImpl<Self>, super::Error>
+        ) -> Result<DmaTransferTx<Self>, super::Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
         {
@@ -1075,7 +1075,7 @@ pub mod dma {
 
             self.spi
                 .start_write_bytes_dma(ptr, len, &mut self.channel.tx, false)?;
-            Ok(DmaTransferTxImpl::new(self))
+            Ok(DmaTransferTx::new(self))
         }
 
         /// Perform a DMA read.
@@ -1087,7 +1087,7 @@ pub mod dma {
         pub fn dma_read<'t, RXBUF>(
             &'t mut self,
             words: &'t mut RXBUF,
-        ) -> Result<DmaTransferRxImpl<Self>, super::Error>
+        ) -> Result<DmaTransferRx<Self>, super::Error>
         where
             RXBUF: WriteBuffer<Word = u8>,
         {
@@ -1101,7 +1101,7 @@ pub mod dma {
                 self.spi
                     .start_read_bytes_dma(ptr, len, &mut self.channel.rx, false)?;
             }
-            Ok(DmaTransferRxImpl::new(self))
+            Ok(DmaTransferRx::new(self))
         }
 
         /// Perform a DMA transfer.
@@ -1113,7 +1113,7 @@ pub mod dma {
             &'t mut self,
             words: &'t TXBUF,
             read_buffer: &'t mut RXBUF,
-        ) -> Result<DmaTransferTxRxImpl<Self>, super::Error>
+        ) -> Result<DmaTransferTxRx<Self>, super::Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
             RXBUF: WriteBuffer<Word = u8>,
@@ -1135,7 +1135,7 @@ pub mod dma {
                     &mut self.channel.rx,
                 )?;
             }
-            Ok(DmaTransferTxRxImpl::new(self))
+            Ok(DmaTransferTxRx::new(self))
         }
     }
 
@@ -1155,7 +1155,7 @@ pub mod dma {
             address: Address,
             dummy: u8,
             buffer: &'t mut RXBUF,
-        ) -> Result<DmaTransferRxImpl<Self>, super::Error>
+        ) -> Result<DmaTransferRx<Self>, super::Error>
         where
             RXBUF: WriteBuffer<Word = u8>,
         {
@@ -1219,7 +1219,7 @@ pub mod dma {
                 self.spi
                     .start_read_bytes_dma(ptr, len, &mut self.channel.rx, false)?;
             }
-            Ok(DmaTransferRxImpl::new(self))
+            Ok(DmaTransferRx::new(self))
         }
 
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
@@ -1230,7 +1230,7 @@ pub mod dma {
             address: Address,
             dummy: u8,
             buffer: &'t TXBUF,
-        ) -> Result<DmaTransferTxImpl<Self>, super::Error>
+        ) -> Result<DmaTransferTx<Self>, super::Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
         {
@@ -1292,7 +1292,7 @@ pub mod dma {
 
             self.spi
                 .start_write_bytes_dma(ptr, len, &mut self.channel.tx, false)?;
-            Ok(DmaTransferTxImpl::new(self))
+            Ok(DmaTransferTx::new(self))
         }
     }
 

@@ -47,8 +47,8 @@ use crate::{
         ChannelTypes,
         DmaError,
         DmaPeripheral,
-        DmaTransferRxCircularImpl,
-        DmaTransferRxImpl,
+        DmaTransferRx,
+        DmaTransferRxCircular,
         LcdCamPeripheral,
         RegisterAccess,
         Rx,
@@ -321,25 +321,25 @@ impl<'d, RX: Rx> Camera<'d, RX> {
     pub fn read_dma<'t, RXBUF: WriteBuffer>(
         &'t mut self,
         buf: &'t mut RXBUF,
-    ) -> Result<DmaTransferRxImpl<Self>, DmaError> {
+    ) -> Result<DmaTransferRx<Self>, DmaError> {
         self.reset_unit_and_fifo();
         // Start DMA to receive incoming transfer.
         self.start_dma(false, buf)?;
         self.start_unit();
 
-        Ok(DmaTransferRxImpl::new(self))
+        Ok(DmaTransferRx::new(self))
     }
 
     pub fn read_dma_circular<'t, RXBUF: WriteBuffer>(
         &'t mut self,
         buf: &'t mut RXBUF,
-    ) -> Result<DmaTransferRxCircularImpl<Self>, DmaError> {
+    ) -> Result<DmaTransferRxCircular<Self>, DmaError> {
         self.reset_unit_and_fifo();
         // Start DMA to receive incoming transfer.
         self.start_dma(true, buf)?;
         self.start_unit();
 
-        Ok(DmaTransferRxCircularImpl::new(self))
+        Ok(DmaTransferRxCircular::new(self))
     }
 }
 

@@ -1523,14 +1523,14 @@ pub(crate) mod dma_private {
 /// DMA transaction for TX only transfers
 #[non_exhaustive]
 #[must_use]
-pub struct DmaTransferTxImpl<'a, I>
+pub struct DmaTransferTx<'a, I>
 where
     I: dma_private::DmaSupportTx,
 {
     instance: &'a mut I,
 }
 
-impl<'a, I> DmaTransferTxImpl<'a, I>
+impl<'a, I> DmaTransferTx<'a, I>
 where
     I: dma_private::DmaSupportTx,
 {
@@ -1555,7 +1555,7 @@ where
     }
 }
 
-impl<'a, I> Drop for DmaTransferTxImpl<'a, I>
+impl<'a, I> Drop for DmaTransferTx<'a, I>
 where
     I: dma_private::DmaSupportTx,
 {
@@ -1567,14 +1567,14 @@ where
 /// DMA transaction for RX only transfers
 #[non_exhaustive]
 #[must_use]
-pub struct DmaTransferRxImpl<'a, I>
+pub struct DmaTransferRx<'a, I>
 where
     I: dma_private::DmaSupportRx,
 {
     instance: &'a mut I,
 }
 
-impl<'a, I> DmaTransferRxImpl<'a, I>
+impl<'a, I> DmaTransferRx<'a, I>
 where
     I: dma_private::DmaSupportRx,
 {
@@ -1599,7 +1599,7 @@ where
     }
 }
 
-impl<'a, I> Drop for DmaTransferRxImpl<'a, I>
+impl<'a, I> Drop for DmaTransferRx<'a, I>
 where
     I: dma_private::DmaSupportRx,
 {
@@ -1611,14 +1611,14 @@ where
 /// DMA transaction for TX+RX transfers
 #[non_exhaustive]
 #[must_use]
-pub struct DmaTransferTxRxImpl<'a, I>
+pub struct DmaTransferTxRx<'a, I>
 where
     I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
 {
     instance: &'a mut I,
 }
 
-impl<'a, I> DmaTransferTxRxImpl<'a, I>
+impl<'a, I> DmaTransferTxRx<'a, I>
 where
     I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
 {
@@ -1644,7 +1644,7 @@ where
     }
 }
 
-impl<'a, I> Drop for DmaTransferTxRxImpl<'a, I>
+impl<'a, I> Drop for DmaTransferTxRx<'a, I>
 where
     I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
 {
@@ -1653,22 +1653,21 @@ where
     }
 }
 
-// ~~~~~~~~~~~~~~~~~~ circular
-
 /// DMA transaction for TX only circular transfers
 #[non_exhaustive]
 #[must_use]
-pub struct DmaTransferTxCircularImpl<'a, I>
+pub struct DmaTransferTxCircular<'a, I>
 where
     I: dma_private::DmaSupportTx,
 {
     instance: &'a mut I,
 }
 
-impl<'a, I> DmaTransferTxCircularImpl<'a, I>
+impl<'a, I> DmaTransferTxCircular<'a, I>
 where
     I: dma_private::DmaSupportTx,
 {
+    #[allow(unused)] // currently used by peripherals not available on all chips
     pub(crate) fn new(instance: &'a mut I) -> Self {
         Self { instance }
     }
@@ -1704,7 +1703,7 @@ where
     }
 }
 
-impl<'a, I> Drop for DmaTransferTxCircularImpl<'a, I>
+impl<'a, I> Drop for DmaTransferTxCircular<'a, I>
 where
     I: dma_private::DmaSupportTx,
 {
@@ -1716,17 +1715,18 @@ where
 /// DMA transaction for RX only circular transfers
 #[non_exhaustive]
 #[must_use]
-pub struct DmaTransferRxCircularImpl<'a, I>
+pub struct DmaTransferRxCircular<'a, I>
 where
     I: dma_private::DmaSupportRx,
 {
     instance: &'a mut I,
 }
 
-impl<'a, I> DmaTransferRxCircularImpl<'a, I>
+impl<'a, I> DmaTransferRxCircular<'a, I>
 where
     I: dma_private::DmaSupportRx,
 {
+    #[allow(unused)] // currently used by peripherals not available on all chips
     pub(crate) fn new(instance: &'a mut I) -> Self {
         Self { instance }
     }
@@ -1742,7 +1742,7 @@ where
     }
 }
 
-impl<'a, I> Drop for DmaTransferRxCircularImpl<'a, I>
+impl<'a, I> Drop for DmaTransferRxCircular<'a, I>
 where
     I: dma_private::DmaSupportRx,
 {

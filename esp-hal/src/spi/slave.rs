@@ -137,9 +137,9 @@ pub mod dma {
             dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
             Channel,
             ChannelTypes,
-            DmaTransferRxImpl,
-            DmaTransferTxImpl,
-            DmaTransferTxRxImpl,
+            DmaTransferRx,
+            DmaTransferTx,
+            DmaTransferTxRx,
             RxPrivate,
             Spi2Peripheral,
             SpiPeripheral,
@@ -318,7 +318,7 @@ pub mod dma {
         pub fn dma_write<'t, TXBUF>(
             &'t mut self,
             words: &'t TXBUF,
-        ) -> Result<DmaTransferTxImpl<Self>, Error>
+        ) -> Result<DmaTransferTx<Self>, Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
         {
@@ -330,7 +330,7 @@ pub mod dma {
 
             self.spi
                 .start_write_bytes_dma(ptr, len, &mut self.channel.tx)
-                .map(move |_| DmaTransferTxImpl::new(self))
+                .map(move |_| DmaTransferTx::new(self))
         }
 
         /// Register a buffer for a DMA read.
@@ -343,7 +343,7 @@ pub mod dma {
         pub fn dma_read<'t, RXBUF>(
             &'t mut self,
             words: &'t mut RXBUF,
-        ) -> Result<DmaTransferRxImpl<Self>, Error>
+        ) -> Result<DmaTransferRx<Self>, Error>
         where
             RXBUF: WriteBuffer<Word = u8>,
         {
@@ -356,7 +356,7 @@ pub mod dma {
             unsafe {
                 self.spi
                     .start_read_bytes_dma(ptr, len, &mut self.channel.rx)
-                    .map(move |_| DmaTransferRxImpl::new(self))
+                    .map(move |_| DmaTransferRx::new(self))
             }
         }
 
@@ -372,7 +372,7 @@ pub mod dma {
             &'t mut self,
             words: &'t TXBUF,
             read_buffer: &'t mut RXBUF,
-        ) -> Result<DmaTransferTxRxImpl<Self>, Error>
+        ) -> Result<DmaTransferTxRx<Self>, Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
             RXBUF: WriteBuffer<Word = u8>,
@@ -394,7 +394,7 @@ pub mod dma {
                         &mut self.channel.tx,
                         &mut self.channel.rx,
                     )
-                    .map(move |_| DmaTransferTxRxImpl::new(self))
+                    .map(move |_| DmaTransferTxRx::new(self))
             }
         }
     }

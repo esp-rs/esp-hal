@@ -281,7 +281,7 @@ pub mod dma {
             Channel,
             ChannelTypes,
             DmaPeripheral,
-            DmaTransferTxRxImpl,
+            DmaTransferTxRx,
             RxPrivate,
             TxPrivate,
         },
@@ -426,7 +426,7 @@ pub mod dma {
             mode: Mode,
             cipher_mode: CipherMode,
             key: K,
-        ) -> Result<DmaTransferTxRxImpl<Self>, crate::dma::DmaError>
+        ) -> Result<DmaTransferTxRx<Self>, crate::dma::DmaError>
         where
             K: Into<Key>,
             TXBUF: ReadBuffer<Word = u8>,
@@ -445,7 +445,7 @@ pub mod dma {
                 key.into(),
             )?;
 
-            Ok(DmaTransferTxRxImpl::new(self))
+            Ok(DmaTransferTxRx::new(self))
         }
 
         #[allow(clippy::too_many_arguments)]
