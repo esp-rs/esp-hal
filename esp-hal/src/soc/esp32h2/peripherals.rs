@@ -36,7 +36,7 @@ crate::peripherals! {
     I2C0 <= I2C0,
     I2C1 <= I2C1,
     I2S0 <= I2S0 (I2S0),
-    IEEE802154 <= virtual,
+    IEEE802154 <= IEEE802154,
     INTERRUPT_CORE0 <= INTERRUPT_CORE0,
     INTPRI <= INTPRI,
     IO_MUX <= IO_MUX,
