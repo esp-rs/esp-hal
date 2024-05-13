@@ -464,7 +464,15 @@ where
         }
     }
 
-    fn read_byte(&mut self) -> nb::Result<u8, Error> {
+    /// Read a byte from the UART
+    ///
+    /// Example
+    ///
+    /// ```rust
+    /// let (_, mut rx) = serial.spilt();
+    /// let byte = rx.read_byte().unwrap();
+    /// ```
+    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
         // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
         let offset = if cfg!(esp32s2) { 0x20C00000 } else { 0 };
 
