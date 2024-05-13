@@ -123,30 +123,29 @@ impl rand_core::RngCore for Rng {
 /// True Random Number Generator (TRNG) driver
 ///
 /// The `Trng` struct represents a true random number generator that combines
-/// the randomness from the hardware RNG and an ADC. This struct provides methods
-/// to generate random numbers and fill buffers with random bytes. 
-/// Due to pulling the entropy source from the ADC, it uses the associated regiters,
-/// so to use TRNG we need to "occupy" the ADC peripheral.
-/// 
+/// the randomness from the hardware RNG and an ADC. This struct provides
+/// methods to generate random numbers and fill buffers with random bytes.
+/// Due to pulling the entropy source from the ADC, it uses the associated
+/// regiters, so to use TRNG we need to "occupy" the ADC peripheral.
+///
 /// ```no_run
 /// let analog_pin = io.pins.gpio3.into_analog();
 /// let mut adc1_config = AdcConfig::new();
 /// let mut adc1_pin = adc1_config.enable_pin(analog_pin, Attenuation::Attenuation11dB);
 /// let mut adc1 = ADC::<ADC1>::new(peripherals.ADC1, adc1_config);
 /// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
-/// 
+///
 /// let mut trng = Trng::new(peripherals.RNG, &mut adc1);
-/// 
+///
 /// let (mut rng, adc1) = trng.downgrade();
-/// 
-///  // Fill a buffer with random bytes:
+///
+/// // Fill a buffer with random bytes:
 /// let mut buf = [0u8; 16];
 /// println!("Random bytes: {:?}", buf);
-/// 
+///
 /// println!("Random u32:   {}", rng.random());
 /// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
 /// println!("ADC reading = {}", pin_value);
-/// 
 /// ```
 #[cfg(not(esp32p4))]
 pub struct Trng<'d> {
@@ -187,8 +186,9 @@ impl<'d> Trng<'d> {
         self.rng.read(buffer)
     }
 
-    /// Downgrades the `Trng` instance to a `Rng` instance and releases the ADC1.
-    /// Returns a tuple containing the `Rng` instance and a mutable reference to the `Adc`.
+    /// Downgrades the `Trng` instance to a `Rng` instance and releases the
+    /// ADC1. Returns a tuple containing the `Rng` instance and a mutable
+    /// reference to the `Adc`.
     pub fn downgrade(&mut self) -> (Rng, &'d mut Adc<'_, crate::peripherals::ADC1>) {
         crate::soc::trng::revert_trng();
         (self.rng, self.adc)
@@ -224,6 +224,7 @@ impl rand_core::RngCore for Trng<'_> {
     }
 }
 
-/// Implementing a CryptoRng marker trait that indicates that the generator is cryptographically secure.
+/// Implementing a CryptoRng marker trait that indicates that the generator is
+/// cryptographically secure.
 #[cfg(not(esp32p4))]
 impl rand_core::CryptoRng for Trng<'_> {}
