@@ -59,6 +59,7 @@ static USER_INTERRUPT_HANDLER: Mutex<Cell<Option<InterruptHandler>>> = Mutex::ne
 
 /// Event used to trigger interrupts.
 #[derive(Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Event {
     /// Interrupts trigger on rising pin edge.
     RisingEdge  = 1,
@@ -70,6 +71,46 @@ pub enum Event {
     LowLevel    = 4,
     /// Interrupts trigger on high level
     HighLevel   = 5,
+}
+
+/// Digital input or output level.
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum Level {
+    /// Low
+    Low,
+    /// High
+    High,
+}
+
+impl From<bool> for Level {
+    fn from(val: bool) -> Self {
+        match val {
+            true => Self::High,
+            false => Self::Low,
+        }
+    }
+}
+
+impl From<Level> for bool {
+    fn from(level: Level) -> bool {
+        match level {
+            Level::Low => false,
+            Level::High => true,
+        }
+    }
+}
+
+/// Pull setting for an input.
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum Pull {
+    /// No pull
+    None,
+    /// Pull up
+    Up,
+    /// Pull down
+    Down,
 }
 
 /// RTC input pin mode
@@ -1536,8 +1577,8 @@ where
 
     /// Set the output level.
     #[inline]
-    pub fn set_level(&mut self, level: bool) {
-        self.pin.set_output_high(level, private::Internal);
+    pub fn set_level(&mut self, level: Level) {
+        self.pin.set_output_high(level.into(), private::Internal);
     }
 
     /// Is the output pin set as high?
@@ -1554,32 +1595,21 @@ where
 
     /// What level output is set to
     #[inline]
-    pub fn get_output_level(&self) -> bool {
-        self.pin.is_set_high(private::Internal)
+    pub fn get_output_level(&self) -> Level {
+        self.pin.is_set_high(private::Internal).into()
     }
 
     /// Toggle pin output
     #[inline]
     pub fn toggle(&mut self) {
-        self.set_level(!self.get_output_level());
+        let level = !self.pin.is_set_high(private::Internal);
+        self.pin.set_output_high(level, private::Internal);
     }
 
     /// Configure the [DriveStrength] of the pin
     pub fn set_drive_strength(&mut self, strength: DriveStrength) {
         self.pin.set_drive_strength(strength, private::Internal);
     }
-}
-
-/// Pull setting for an input.
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Pull {
-    /// No pull
-    None,
-    /// Pull up
-    Up,
-    /// Pull down
-    Down,
 }
 
 /// GPIO input driver.
@@ -1613,11 +1643,9 @@ where
     }
 
     /// Get the current pin input level.
-    ///
-    /// true means high, false means low
     #[inline]
-    pub fn get_level(&self) -> bool {
-        self.is_high()
+    pub fn get_level(&self) -> Level {
+        self.is_high().into()
     }
 
     /// Listen for interrupts
@@ -1677,11 +1705,9 @@ where
     }
 
     /// Get the current pin input level.
-    ///
-    /// true means high, false means low
     #[inline]
-    pub fn get_level(&self) -> bool {
-        self.is_high()
+    pub fn get_level(&self) -> Level {
+        self.is_high().into()
     }
 
     /// Listen for interrupts
@@ -1710,8 +1736,8 @@ where
 
     /// Set the output level.
     #[inline]
-    pub fn set_level(&mut self, level: bool) {
-        self.pin.set_output_high(level, private::Internal);
+    pub fn set_level(&mut self, level: Level) {
+        self.pin.set_output_high(level.into(), private::Internal);
     }
 
     /// Is the output pin set as high?
@@ -1728,14 +1754,15 @@ where
 
     /// What level output is set to
     #[inline]
-    pub fn get_output_level(&self) -> bool {
-        self.pin.is_set_high(private::Internal)
+    pub fn get_output_level(&self) -> Level {
+        self.pin.is_set_high(private::Internal).into()
     }
 
     /// Toggle pin output
     #[inline]
     pub fn toggle(&mut self) {
-        self.set_level(!self.get_output_level());
+        let level = !self.pin.is_set_high(private::Internal);
+        self.pin.set_output_high(level, private::Internal);
     }
 
     /// Configure the [DriveStrength] of the pin
@@ -1784,8 +1811,8 @@ impl<'d> AnyOutput<'d> {
 
     /// Set the output level.
     #[inline]
-    pub fn set_level(&mut self, level: bool) {
-        self.pin.set_output_high(level, private::Internal);
+    pub fn set_level(&mut self, level: Level) {
+        self.pin.set_output_high(level.into(), private::Internal);
     }
 
     /// Is the output pin set as high?
@@ -1802,14 +1829,15 @@ impl<'d> AnyOutput<'d> {
 
     /// What level output is set to
     #[inline]
-    pub fn get_output_level(&self) -> bool {
-        self.pin.is_set_high(private::Internal)
+    pub fn get_output_level(&self) -> Level {
+        self.pin.is_set_high(private::Internal).into()
     }
 
     /// Toggle pin output
     #[inline]
     pub fn toggle(&mut self) {
-        self.set_level(!self.get_output_level());
+        let pin = &mut self.pin;
+        pin.set_output_high(!pin.is_set_high(private::Internal), private::Internal);
     }
 }
 
@@ -1851,11 +1879,9 @@ impl<'d> AnyInput<'d> {
     }
 
     /// Get the current pin input level.
-    ///
-    /// true means high, false means low
     #[inline]
-    pub fn get_level(&self) -> bool {
-        self.is_high()
+    pub fn get_level(&self) -> Level {
+        self.is_high().into()
     }
 
     /// Listen for interrupts
@@ -1913,11 +1939,9 @@ impl<'d> AnyOutputOpenDrain<'d> {
     }
 
     /// Get the current pin input level.
-    ///
-    /// true means high, false means low
     #[inline]
-    pub fn get_level(&self) -> bool {
-        self.is_high()
+    pub fn get_level(&self) -> Level {
+        self.is_high().into()
     }
 
     /// Listen for interrupts
@@ -1946,8 +1970,8 @@ impl<'d> AnyOutputOpenDrain<'d> {
 
     /// Set the output level.
     #[inline]
-    pub fn set_level(&mut self, level: bool) {
-        self.pin.set_output_high(level, private::Internal);
+    pub fn set_level(&mut self, level: Level) {
+        self.pin.set_output_high(level.into(), private::Internal);
     }
 
     /// Is the output pin set as high?
@@ -1964,14 +1988,15 @@ impl<'d> AnyOutputOpenDrain<'d> {
 
     /// What level output is set to
     #[inline]
-    pub fn get_output_level(&self) -> bool {
-        self.pin.is_set_high(private::Internal)
+    pub fn get_output_level(&self) -> Level {
+        self.pin.is_set_high(private::Internal).into()
     }
 
     /// Toggle pin output
     #[inline]
     pub fn toggle(&mut self) {
-        self.set_level(!self.get_output_level());
+        let pin = &mut self.pin;
+        pin.set_output_high(!pin.is_set_high(private::Internal), private::Internal);
     }
 }
 
