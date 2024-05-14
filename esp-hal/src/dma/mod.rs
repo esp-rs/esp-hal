@@ -1499,8 +1499,12 @@ pub(crate) mod dma_private {
 
     pub trait DmaSupport {
         /// Wait until the transfer is done.
+        ///
         /// Depending on the peripheral this might include checking the DMA
-        /// channel.
+        /// channel and/or the peripheral.
+        ///
+        /// After this all data should be processed by the peripheral - i.e. the
+        /// peripheral should have processed it's FIFO(s)
         fn peripheral_wait_dma(&mut self, is_tx: bool, is_rx: bool);
 
         /// Only used by circular DMA transfers
@@ -1510,13 +1514,13 @@ pub(crate) mod dma_private {
     pub trait DmaSupportTx: DmaSupport {
         type TX: Tx;
 
-        fn with_tx<R, F: FnOnce(&mut Self::TX) -> R>(&mut self, f: F) -> R;
+        fn tx<'a>(&'a mut self) -> &'a mut Self::TX;
     }
 
     pub trait DmaSupportRx: DmaSupport {
         type RX: Rx;
 
-        fn with_rx<R, F: FnOnce(&mut Self::RX) -> R>(&mut self, f: F) -> R;
+        fn rx<'a>(&'a mut self) -> &'a mut Self::RX;
     }
 }
 
@@ -1542,7 +1546,7 @@ where
     pub fn wait(self) -> Result<(), DmaError> {
         self.instance.peripheral_wait_dma(true, false);
 
-        if self.instance.with_tx(|tx| tx.has_error()) {
+        if self.instance.tx().has_error() {
             Err(DmaError::DescriptorError)
         } else {
             Ok(())
@@ -1551,7 +1555,7 @@ where
 
     /// Check if the transfer is finished.
     pub fn is_done(&mut self) -> bool {
-        self.instance.with_tx(|tx| tx.is_done())
+        self.instance.tx().is_done()
     }
 }
 
@@ -1586,7 +1590,7 @@ where
     pub fn wait(self) -> Result<(), DmaError> {
         self.instance.peripheral_wait_dma(false, true);
 
-        if self.instance.with_rx(|rx| rx.has_error()) {
+        if self.instance.rx().has_error() {
             Err(DmaError::DescriptorError)
         } else {
             Ok(())
@@ -1595,7 +1599,7 @@ where
 
     /// Check if the transfer is finished.
     pub fn is_done(&mut self) -> bool {
-        self.instance.with_rx(|rx| rx.is_done())
+        self.instance.rx().is_done()
     }
 }
 
@@ -1630,8 +1634,7 @@ where
     pub fn wait(self) -> Result<(), DmaError> {
         self.instance.peripheral_wait_dma(true, true);
 
-        if self.instance.with_tx(|tx| tx.has_error()) || self.instance.with_rx(|rx| rx.has_error())
-        {
+        if self.instance.tx().has_error() || self.instance.rx().has_error() {
             Err(DmaError::DescriptorError)
         } else {
             Ok(())
@@ -1640,7 +1643,7 @@ where
 
     /// Check if the transfer is finished.
     pub fn is_done(&mut self) -> bool {
-        self.instance.with_tx(|tx| tx.is_done()) && self.instance.with_rx(|rx| rx.is_done())
+        self.instance.tx().is_done() && self.instance.rx().is_done()
     }
 }
 
@@ -1674,12 +1677,12 @@ where
 
     /// Amount of bytes which can be pushed.
     pub fn available(&mut self) -> usize {
-        self.instance.with_tx(|tx| tx.available())
+        self.instance.tx().available()
     }
 
     /// Push bytes into the DMA buffer.
     pub fn push(&mut self, data: &[u8]) -> Result<usize, DmaError> {
-        self.instance.with_tx(|tx| tx.push(data))
+        self.instance.tx().push(data)
     }
 
     /// Push bytes into the DMA buffer via the given closure.
@@ -1687,7 +1690,7 @@ where
     /// The closure *might* get called with a slice which is smaller than the
     /// total available buffer.
     pub fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> Result<usize, DmaError> {
-        self.instance.with_tx(|tx| tx.push_with(f))
+        self.instance.tx().push_with(f)
     }
 
     /// Stop the DMA transfer
@@ -1695,7 +1698,7 @@ where
     pub fn stop(self) -> Result<(), DmaError> {
         self.instance.peripheral_dma_stop();
 
-        if self.instance.with_tx(|tx| tx.has_error()) {
+        if self.instance.tx().has_error() {
             Err(DmaError::DescriptorError)
         } else {
             Ok(())
@@ -1733,12 +1736,12 @@ where
 
     /// Amount of bytes which can be popped
     pub fn available(&mut self) -> usize {
-        self.instance.with_rx(|rx| rx.available())
+        self.instance.rx().available()
     }
 
     /// Get available data
     pub fn pop(&mut self, data: &mut [u8]) -> Result<usize, DmaError> {
-        self.instance.with_rx(|rx| rx.pop(data))
+        self.instance.rx().pop(data)
     }
 }
 

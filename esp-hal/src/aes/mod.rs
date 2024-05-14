@@ -373,8 +373,8 @@ pub mod dma {
     {
         type TX = C::Tx<'d>;
 
-        fn with_tx<R, F: FnOnce(&mut Self::TX) -> R>(&mut self, f: F) -> R {
-            f(&mut self.channel.tx)
+        fn tx<'a>(&'a mut self) -> &'a mut Self::TX {
+            &mut self.channel.tx
         }
     }
 
@@ -385,8 +385,8 @@ pub mod dma {
     {
         type RX = C::Rx<'d>;
 
-        fn with_rx<R, F: FnOnce(&mut Self::RX) -> R>(&mut self, f: F) -> R {
-            f(&mut self.channel.rx)
+        fn rx<'a>(&'a mut self) -> &'a mut Self::RX {
+            &mut self.channel.rx
         }
     }
 

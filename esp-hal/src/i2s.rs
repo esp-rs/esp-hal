@@ -463,8 +463,8 @@ where
 {
     type TX = CH::Tx<'d>;
 
-    fn with_tx<R, F: FnOnce(&mut Self::TX) -> R>(&mut self, f: F) -> R {
-        f(&mut self.tx_channel)
+    fn tx<'a>(&'a mut self) -> &'a mut Self::TX {
+        &mut self.tx_channel
     }
 }
 
@@ -632,8 +632,8 @@ where
 {
     type RX = CH::Rx<'d>;
 
-    fn with_rx<R, F: FnOnce(&mut Self::RX) -> R>(&mut self, f: F) -> R {
-        f(&mut self.rx_channel)
+    fn rx<'a>(&'a mut self) -> &'a mut Self::RX {
+        &mut self.rx_channel
     }
 }
 
