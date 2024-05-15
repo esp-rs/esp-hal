@@ -1514,13 +1514,13 @@ pub(crate) mod dma_private {
     pub trait DmaSupportTx: DmaSupport {
         type TX: Tx;
 
-        fn tx<'a>(&'a mut self) -> &'a mut Self::TX;
+        fn tx(&mut self) -> &mut Self::TX;
     }
 
     pub trait DmaSupportRx: DmaSupport {
         type RX: Rx;
 
-        fn rx<'a>(&'a mut self) -> &'a mut Self::RX;
+        fn rx(&mut self) -> &mut Self::RX;
     }
 }
 

@@ -1499,7 +1499,7 @@ where
 {
     type TX = CH::Tx<'d>;
 
-    fn tx<'a>(&'a mut self) -> &'a mut Self::TX {
+    fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
     }
 }
@@ -1601,7 +1601,7 @@ where
 {
     type RX = CH::Rx<'d>;
 
-    fn rx<'a>(&'a mut self) -> &'a mut Self::RX {
+    fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
     }
 }

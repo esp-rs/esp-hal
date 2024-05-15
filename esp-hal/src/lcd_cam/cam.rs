@@ -198,7 +198,7 @@ impl<'d, RX: Rx> DmaSupport for Camera<'d, RX> {
 impl<'d, RX: Rx> DmaSupportRx for Camera<'d, RX> {
     type RX = RX;
 
-    fn rx<'a>(&'a mut self) -> &'a mut Self::RX {
+    fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
     }
 }

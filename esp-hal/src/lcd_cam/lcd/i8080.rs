@@ -247,7 +247,7 @@ impl<'d, TX: Tx, P: TxPins> DmaSupport for I8080<'d, TX, P> {
 impl<'d, TX: Tx, P: TxPins> DmaSupportTx for I8080<'d, TX, P> {
     type TX = TX;
 
-    fn tx<'a>(&'a mut self) -> &'a mut Self::TX {
+    fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
     }
 }

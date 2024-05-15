@@ -1026,7 +1026,7 @@ pub mod dma {
     {
         type TX = C::Tx<'d>;
 
-        fn tx<'a>(&'a mut self) -> &'a mut Self::TX {
+        fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
         }
     }
@@ -1041,7 +1041,7 @@ pub mod dma {
     {
         type RX = C::Rx<'d>;
 
-        fn rx<'a>(&'a mut self) -> &'a mut Self::RX {
+        fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx
         }
     }
