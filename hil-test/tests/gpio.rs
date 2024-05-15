@@ -150,7 +150,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")))]
     fn test_gpio_interrupt(mut ctx: Context<'static>) {
         critical_section::with(|cs| {
             *COUNTER.borrow_ref_mut(cs) = 0;
