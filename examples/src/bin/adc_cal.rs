@@ -39,8 +39,8 @@ fn main() -> ! {
     // them. Note that only AdcCalLine returns readings in mV; the other two
     // return raw readings in some unspecified scale.
     //
-    type AdcCal = ();
-    // type AdcCal = esp_hal::analog::adc::AdcCalBasic<ADC1>;
+    //type AdcCal = ();
+    type AdcCal = esp_hal::analog::adc::AdcCalBasic<esp_hal::peripherals::ADC1>;
     // type AdcCal = esp_hal::analog::adc::AdcCalLine<ADC1>;
     // type AdcCal = esp_hal::analog::adc::AdcCalCurve<ADC1>;
 

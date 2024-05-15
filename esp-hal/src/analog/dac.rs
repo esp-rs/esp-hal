@@ -37,7 +37,7 @@
 //! ```
 
 use crate::{
-    gpio,
+    gpio::{self, AnalogPin},
     peripheral::{Peripheral, PeripheralRef},
     peripherals,
 };
@@ -59,8 +59,10 @@ pub struct Dac1<'d> {
 
 impl<'d> Dac1<'d> {
     /// Constructs a new DAC instance.
-    pub fn new(dac: impl Peripheral<P = peripherals::DAC1> + 'd, _pin: Dac1Gpio) -> Self {
+    pub fn new(dac: impl Peripheral<P = peripherals::DAC1> + 'd, pin: Dac1Gpio) -> Self {
         crate::into_ref!(dac);
+        // TODO revert this on drop
+        pin.set_analog(crate::private::Internal);
 
         #[cfg(esp32s2)]
         unsafe { &*peripherals::SENS::PTR }
@@ -96,8 +98,10 @@ pub struct Dac2<'d> {
 
 impl<'d> Dac2<'d> {
     /// Constructs a new DAC instance.
-    pub fn new(dac: impl Peripheral<P = peripherals::DAC2> + 'd, _pin: Dac2Gpio) -> Self {
+    pub fn new(dac: impl Peripheral<P = peripherals::DAC2> + 'd, pin: Dac2Gpio) -> Self {
         crate::into_ref!(dac);
+        // TODO revert this on drop
+        pin.set_analog(crate::private::Internal);
 
         #[cfg(esp32s2)]
         unsafe { &*peripherals::SENS::PTR }

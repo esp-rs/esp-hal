@@ -24,6 +24,7 @@
 use core::marker::PhantomData;
 
 pub use self::implementation::*;
+use crate::gpio::AnalogPin;
 
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(riscv, path = "riscv.rs")]
@@ -93,8 +94,10 @@ impl<ADCI> AdcConfig<ADCI> {
     /// Enable the specified pin with the given attenuation
     pub fn enable_pin<PIN>(&mut self, pin: PIN, attenuation: Attenuation) -> AdcPin<PIN, ADCI>
     where
-        PIN: AdcChannel,
+        PIN: AdcChannel + AnalogPin,
     {
+        // TODO revert this on drop
+        pin.set_analog(crate::private::Internal);
         self.attenuations[PIN::CHANNEL as usize] = Some(attenuation);
 
         AdcPin {
@@ -104,7 +107,7 @@ impl<ADCI> AdcConfig<ADCI> {
         }
     }
 
-    /// Enable the specified pin with the given attentuation and calibration
+    /// Enable the specified pin with the given attenuation and calibration
     /// scheme
     #[cfg(not(esp32))]
     pub fn enable_pin_with_cal<PIN, CS>(
@@ -114,9 +117,11 @@ impl<ADCI> AdcConfig<ADCI> {
     ) -> AdcPin<PIN, ADCI, CS>
     where
         ADCI: CalibrationAccess,
-        PIN: AdcChannel,
+        PIN: AdcChannel + AnalogPin,
         CS: AdcCalScheme<ADCI>,
     {
+        // TODO revert this on drop
+        pin.set_analog(crate::private::Internal);
         self.attenuations[PIN::CHANNEL as usize] = Some(attenuation);
 
         AdcPin {

@@ -186,9 +186,6 @@ pub trait RtcInputPin: RtcPin {}
 /// Marker for RTC pins which support output mode
 pub trait RtcOutputPin: RtcPin {}
 
-/// Marker for pins which support analog mode
-pub trait AnalogPin {}
-
 /// Common trait implemented by pins
 pub trait Pin: private::Sealed {
     /// GPIO number
@@ -340,6 +337,12 @@ pub trait OutputPin: Pin {
 
     /// Is the output set to high
     fn is_set_high(&self, _: private::Internal) -> bool;
+}
+
+/// Trait implemented by pins which can be used as analog pins
+pub trait AnalogPin: Pin {
+    /// Configure the pin for analog operation
+    fn set_analog(&self, _: private::Internal);
 }
 
 #[doc(hidden)]
@@ -1114,13 +1117,13 @@ where
 }
 
 #[cfg(any(adc, dac))]
-impl<const GPIONUM: u8> GpioPin<GPIONUM>
+impl<const GPIONUM: u8> AnalogPin for GpioPin<GPIONUM>
 where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsAnalogPin,
 {
     /// Configures the pin for analog mode.
-    pub fn set_analog(&self) {
+    fn set_analog(&self, _: private::Internal) {
         crate::soc::gpio::internal_into_analog(GPIONUM);
     }
 }

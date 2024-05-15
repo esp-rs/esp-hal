@@ -37,7 +37,6 @@ fn main() -> ! {
             let analog_pin = io.pins.gpio2;
         }
     }
-    analog_pin.set_analog();
 
     // Create ADC instances
     let mut adc1_config = AdcConfig::new();
