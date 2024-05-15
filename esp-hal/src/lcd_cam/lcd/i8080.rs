@@ -43,10 +43,12 @@ use fugit::HertzU32;
 use crate::{
     clock::Clocks,
     dma::{
+        dma_private::{DmaSupport, DmaSupportTx},
         ChannelTx,
         ChannelTypes,
         DmaError,
         DmaPeripheral,
+        DmaTransferTx,
         LcdCamPeripheral,
         RegisterAccess,
         Tx,
@@ -229,6 +231,27 @@ where
     }
 }
 
+impl<'d, TX: Tx, P: TxPins> DmaSupport for I8080<'d, TX, P> {
+    fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+        let dma_int_raw = self.lcd_cam.lc_dma_int_raw();
+        // Wait until LCD_TRANS_DONE is set.
+        while dma_int_raw.read().lcd_trans_done_int_raw().bit_is_clear() {}
+        self.tear_down_send();
+    }
+
+    fn peripheral_dma_stop(&mut self) {
+        unreachable!("unsupported")
+    }
+}
+
+impl<'d, TX: Tx, P: TxPins> DmaSupportTx for I8080<'d, TX, P> {
+    type TX = TX;
+
+    fn tx(&mut self) -> &mut Self::TX {
+        &mut self.tx_channel
+    }
+}
+
 impl<'d, TX: Tx, P: TxPins> I8080<'d, TX, P>
 where
     P::Word: Into<u16>,
@@ -301,7 +324,7 @@ where
         cmd: impl Into<Command<P::Word>>,
         dummy: u8,
         data: &'t TXBUF,
-    ) -> Result<Transfer<'t, 'd, TX, P>, DmaError>
+    ) -> Result<DmaTransferTx<Self>, DmaError>
     where
         TXBUF: ReadBuffer<Word = P::Word>,
     {
@@ -311,9 +334,7 @@ where
         self.start_write_bytes_dma(ptr as _, len * size_of::<P::Word>())?;
         self.start_send();
 
-        Ok(Transfer {
-            instance: Some(self),
-        })
+        Ok(DmaTransferTx::new(self))
     }
 }
 
@@ -431,54 +452,6 @@ impl<'d, TX: Tx, P> I8080<'d, TX, P> {
 impl<'d, TX, P> core::fmt::Debug for I8080<'d, TX, P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("I8080").finish()
-    }
-}
-
-/// An in-progress transfer
-#[must_use]
-pub struct Transfer<'t, 'd, TX: Tx, P> {
-    instance: Option<&'t mut I8080<'d, TX, P>>,
-}
-
-impl<'t, 'd, TX: Tx, P> Transfer<'t, 'd, TX, P> {
-    #[allow(clippy::type_complexity)]
-    pub fn wait(mut self) -> Result<(), DmaError> {
-        let instance = self
-            .instance
-            .take()
-            .expect("instance must be available throughout object lifetime");
-
-        {
-            let dma_int_raw = instance.lcd_cam.lc_dma_int_raw();
-            // Wait until LCD_TRANS_DONE is set.
-            while dma_int_raw.read().lcd_trans_done_int_raw().bit_is_clear() {}
-            instance.tear_down_send();
-        }
-
-        if instance.tx_channel.has_error() {
-            Err(DmaError::DescriptorError)
-        } else {
-            Ok(())
-        }
-    }
-
-    pub fn is_done(&self) -> bool {
-        let int_raw = self
-            .instance
-            .as_ref()
-            .expect("instance must be available throughout object lifetime")
-            .lcd_cam
-            .lc_dma_int_raw();
-        int_raw.read().lcd_trans_done_int_raw().bit_is_set()
-    }
-}
-
-impl<'t, 'd, TX: Tx, P> Drop for Transfer<'t, 'd, TX, P> {
-    fn drop(&mut self) {
-        if let Some(instance) = self.instance.as_mut() {
-            // This will cancel the transfer.
-            instance.tear_down_send();
-        }
     }
 }
 

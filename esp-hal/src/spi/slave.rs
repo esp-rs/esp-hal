@@ -134,11 +134,12 @@ pub mod dma {
     use crate::dma::Spi3Peripheral;
     use crate::{
         dma::{
+            dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
             Channel,
             ChannelTypes,
-            DmaError,
-            DmaTransfer,
-            DmaTransferRxTx,
+            DmaTransferRx,
+            DmaTransferTx,
+            DmaTransferTxRx,
             RxPrivate,
             Spi2Peripheral,
             SpiPeripheral,
@@ -228,164 +229,6 @@ pub mod dma {
             }
         }
     }
-    /// An in-progress DMA transfer
-    #[must_use]
-    pub struct SpiDmaTransferRxTx<'t, 'd, T, C, DmaMode>
-    where
-        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-        C: ChannelTypes,
-        C::P: SpiPeripheral,
-        DmaMode: Mode,
-    {
-        spi_dma: &'t mut SpiDma<'d, T, C, DmaMode>,
-    }
-
-    impl<'t, 'd, T, C, DmaMode> DmaTransferRxTx for SpiDmaTransferRxTx<'t, 'd, T, C, DmaMode>
-    where
-        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-        C: ChannelTypes,
-        C::P: SpiPeripheral,
-        DmaMode: Mode,
-    {
-        /// Wait for the DMA transfer to complete
-        fn wait(self) -> Result<(), DmaError> {
-            // Waiting for the DMA transfer is not enough. We need to wait for the
-            // peripheral to finish flushing its buffers, too.
-            while !self.is_done() {}
-            self.spi_dma.spi.flush().ok();
-
-            if self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error() {
-                Err(DmaError::DescriptorError)
-            } else {
-                Ok(())
-            }
-        }
-
-        /// Check if the DMA transfer is complete
-        fn is_done(&self) -> bool {
-            let ch = &self.spi_dma.channel;
-            ch.tx.is_done() && ch.rx.is_done() && !self.spi_dma.spi.is_bus_busy()
-        }
-    }
-
-    impl<'t, 'd, T, C, DmaMode> Drop for SpiDmaTransferRxTx<'t, 'd, T, C, DmaMode>
-    where
-        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-        C: ChannelTypes,
-        C::P: SpiPeripheral,
-        DmaMode: Mode,
-    {
-        fn drop(&mut self) {
-            while !self.is_done() {}
-            self.spi_dma.spi.flush().ok();
-        }
-    }
-
-    /// An in-progress DMA transfer.
-    #[must_use]
-    pub struct SpiDmaTransferRx<'t, 'd, T, C, DmaMode>
-    where
-        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-        C: ChannelTypes,
-        C::P: SpiPeripheral,
-        DmaMode: Mode,
-    {
-        spi_dma: &'t mut SpiDma<'d, T, C, DmaMode>,
-    }
-
-    impl<'t, 'd, T, C, DmaMode> DmaTransfer for SpiDmaTransferRx<'t, 'd, T, C, DmaMode>
-    where
-        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-        C: ChannelTypes,
-        C::P: SpiPeripheral,
-        DmaMode: Mode,
-    {
-        /// Wait for the DMA transfer to complete
-        fn wait(self) -> Result<(), DmaError> {
-            while !self.is_done() {}
-            self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is not enough
-
-            if self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error() {
-                Err(DmaError::DescriptorError)
-            } else {
-                Ok(())
-            }
-        }
-
-        /// Check if the DMA transfer is complete
-        fn is_done(&self) -> bool {
-            let ch = &self.spi_dma.channel;
-            ch.rx.is_done()
-        }
-    }
-
-    impl<'t, 'd, T, C, DmaMode> Drop for SpiDmaTransferRx<'t, 'd, T, C, DmaMode>
-    where
-        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-        C: ChannelTypes,
-        C::P: SpiPeripheral,
-        DmaMode: Mode,
-    {
-        fn drop(&mut self) {
-            while !self.is_done() {}
-            self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is
-                                           // not enough
-        }
-    }
-
-    /// An in-progress DMA transfer.
-    #[must_use]
-    pub struct SpiDmaTransferTx<'t, 'd, T, C, DmaMode>
-    where
-        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-        C: ChannelTypes,
-        C::P: SpiPeripheral,
-        DmaMode: Mode,
-    {
-        spi_dma: &'t mut SpiDma<'d, T, C, DmaMode>,
-    }
-
-    impl<'t, 'd, T, C, DmaMode> DmaTransfer for SpiDmaTransferTx<'t, 'd, T, C, DmaMode>
-    where
-        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-        C: ChannelTypes,
-        C::P: SpiPeripheral,
-        DmaMode: Mode,
-    {
-        /// Wait for the DMA transfer to complete
-        fn wait(self) -> Result<(), DmaError> {
-            // Waiting for the DMA transfer is not enough. We need to wait for the
-            // peripheral to finish flushing its buffers, too.
-            while !self.is_done() {}
-            self.spi_dma.spi.flush().ok();
-
-            if self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error() {
-                Err(DmaError::DescriptorError)
-            } else {
-                Ok(())
-            }
-        }
-
-        /// Check if the DMA transfer is complete
-        fn is_done(&self) -> bool {
-            let ch = &self.spi_dma.channel;
-            ch.tx.is_done()
-        }
-    }
-
-    impl<'t, 'd, T, C, DmaMode> Drop for SpiDmaTransferTx<'t, 'd, T, C, DmaMode>
-    where
-        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-        C: ChannelTypes,
-        C::P: SpiPeripheral,
-        DmaMode: Mode,
-    {
-        fn drop(&mut self) {
-            while !self.is_done() {}
-            self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is
-                                           // not enough
-        }
-    }
 
     /// A DMA capable SPI instance.
     pub struct SpiDma<'d, T, C, DmaMode>
@@ -409,6 +252,55 @@ pub mod dma {
         }
     }
 
+    impl<'d, T, C, DmaMode> DmaSupport for SpiDma<'d, T, C, DmaMode>
+    where
+        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
+        C: ChannelTypes,
+        C::P: SpiPeripheral,
+        DmaMode: Mode,
+    {
+        fn peripheral_wait_dma(&mut self, is_tx: bool, is_rx: bool) {
+            while !((!is_tx || self.channel.tx.is_done())
+                && (!is_rx || self.channel.rx.is_done())
+                && !self.spi.is_bus_busy())
+            {}
+
+            self.spi.flush().ok();
+        }
+
+        fn peripheral_dma_stop(&mut self) {
+            unreachable!("unsupported")
+        }
+    }
+
+    impl<'d, T, C, DmaMode> DmaSupportTx for SpiDma<'d, T, C, DmaMode>
+    where
+        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
+        C: ChannelTypes,
+        C::P: SpiPeripheral,
+        DmaMode: Mode,
+    {
+        type TX = C::Tx<'d>;
+
+        fn tx(&mut self) -> &mut Self::TX {
+            &mut self.channel.tx
+        }
+    }
+
+    impl<'d, T, C, DmaMode> DmaSupportRx for SpiDma<'d, T, C, DmaMode>
+    where
+        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
+        C: ChannelTypes,
+        C::P: SpiPeripheral,
+        DmaMode: Mode,
+    {
+        type RX = C::Rx<'d>;
+
+        fn rx(&mut self) -> &mut Self::RX {
+            &mut self.channel.rx
+        }
+    }
+
     impl<'d, T, C, DmaMode> SpiDma<'d, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
@@ -426,7 +318,7 @@ pub mod dma {
         pub fn dma_write<'t, TXBUF>(
             &'t mut self,
             words: &'t TXBUF,
-        ) -> Result<SpiDmaTransferTx<'t, 'd, T, C, DmaMode>, Error>
+        ) -> Result<DmaTransferTx<Self>, Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
         {
@@ -438,7 +330,7 @@ pub mod dma {
 
             self.spi
                 .start_write_bytes_dma(ptr, len, &mut self.channel.tx)
-                .map(move |_| SpiDmaTransferTx { spi_dma: self })
+                .map(move |_| DmaTransferTx::new(self))
         }
 
         /// Register a buffer for a DMA read.
@@ -451,7 +343,7 @@ pub mod dma {
         pub fn dma_read<'t, RXBUF>(
             &'t mut self,
             words: &'t mut RXBUF,
-        ) -> Result<SpiDmaTransferRx<'t, 'd, T, C, DmaMode>, Error>
+        ) -> Result<DmaTransferRx<Self>, Error>
         where
             RXBUF: WriteBuffer<Word = u8>,
         {
@@ -464,7 +356,7 @@ pub mod dma {
             unsafe {
                 self.spi
                     .start_read_bytes_dma(ptr, len, &mut self.channel.rx)
-                    .map(move |_| SpiDmaTransferRx { spi_dma: self })
+                    .map(move |_| DmaTransferRx::new(self))
             }
         }
 
@@ -480,7 +372,7 @@ pub mod dma {
             &'t mut self,
             words: &'t TXBUF,
             read_buffer: &'t mut RXBUF,
-        ) -> Result<SpiDmaTransferRxTx<'t, 'd, T, C, DmaMode>, Error>
+        ) -> Result<DmaTransferTxRx<Self>, Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
             RXBUF: WriteBuffer<Word = u8>,
@@ -502,7 +394,7 @@ pub mod dma {
                         &mut self.channel.tx,
                         &mut self.channel.rx,
                     )
-                    .map(move |_| SpiDmaTransferRxTx { spi_dma: self })
+                    .map(move |_| DmaTransferTxRx::new(self))
             }
         }
     }

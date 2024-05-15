@@ -88,7 +88,18 @@ use private::*;
 
 use crate::{
     clock::Clocks,
-    dma::{Channel, ChannelTypes, DmaError, DmaPeripheral, ParlIoPeripheral, RxPrivate, TxPrivate},
+    dma::{
+        dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
+        Channel,
+        ChannelTypes,
+        DmaError,
+        DmaPeripheral,
+        DmaTransferRx,
+        DmaTransferTx,
+        ParlIoPeripheral,
+        RxPrivate,
+        TxPrivate,
+    },
     gpio::{InputPin, OutputPin},
     interrupt::InterruptHandler,
     peripheral::{self, Peripheral},
@@ -1417,7 +1428,7 @@ where
     pub fn write_dma<'t, TXBUF>(
         &'t mut self,
         words: &'t TXBUF,
-    ) -> Result<DmaTransfer<'t, 'd, CH, P, CP, DM>, Error>
+    ) -> Result<DmaTransferTx<Self>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>,
     {
@@ -1429,7 +1440,7 @@ where
 
         self.start_write_bytes_dma(ptr, len)?;
 
-        Ok(DmaTransfer { instance: self })
+        Ok(DmaTransferTx::new(self))
     }
 
     fn start_write_bytes_dma(&mut self, ptr: *const u8, len: usize) -> Result<(), Error> {
@@ -1459,47 +1470,37 @@ where
     }
 }
 
-/// An in-progress DMA transfer.
-#[must_use]
-pub struct DmaTransfer<'t, 'd, C, P, CP, DM>
+impl<'d, CH, P, CP, DM> DmaSupport for ParlIoTx<'d, CH, P, CP, DM>
 where
-    C: ChannelTypes,
-    C::P: ParlIoPeripheral,
+    CH: ChannelTypes,
+    CH::P: ParlIoPeripheral,
     P: TxPins + ConfigurePins,
     CP: TxClkPin,
     DM: Mode,
 {
-    instance: &'t mut ParlIoTx<'d, C, P, CP, DM>,
-}
-
-impl<'t, 'd, C, P, CP, DM> DmaTransfer<'t, 'd, C, P, CP, DM>
-where
-    C: ChannelTypes,
-    C::P: ParlIoPeripheral,
-    P: TxPins + ConfigurePins,
-    CP: TxClkPin,
-    DM: Mode,
-{
-    /// Wait for the DMA transfer to complete
-    #[allow(clippy::type_complexity)]
-    pub fn wait(self) -> Result<(), DmaError> {
-        // Waiting for the DMA transfer is not enough. We need to wait for the
-        // peripheral to finish flushing its buffers, too.
+    fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
         while !Instance::is_tx_eof() {}
 
         Instance::set_tx_start(false);
-
-        if self.instance.tx_channel.has_error() {
-            Err(DmaError::DescriptorError)
-        } else {
-            Ok(())
-        }
     }
 
-    /// Check if the DMA transfer is complete
-    pub fn is_done(&self) -> bool {
-        let ch = &self.instance.tx_channel;
-        ch.is_done()
+    fn peripheral_dma_stop(&mut self) {
+        unreachable!("unsupported")
+    }
+}
+
+impl<'d, CH, P, CP, DM> DmaSupportTx for ParlIoTx<'d, CH, P, CP, DM>
+where
+    CH: ChannelTypes,
+    CH::P: ParlIoPeripheral,
+    P: TxPins + ConfigurePins,
+    CP: TxClkPin,
+    DM: Mode,
+{
+    type TX = CH::Tx<'d>;
+
+    fn tx(&mut self) -> &mut Self::TX {
+        &mut self.tx_channel
     }
 }
 
@@ -1522,7 +1523,7 @@ where
     pub fn read_dma<'t, RXBUF>(
         &'t mut self,
         words: &'t mut RXBUF,
-    ) -> Result<RxDmaTransfer<'t, 'd, CH, P, CP, DM>, Error>
+    ) -> Result<DmaTransferRx<Self>, Error>
     where
         RXBUF: WriteBuffer<Word = u8>,
     {
@@ -1534,7 +1535,7 @@ where
 
         Self::start_receive_bytes_dma(&mut self.rx_channel, ptr, len)?;
 
-        Ok(RxDmaTransfer { instance: self })
+        Ok(DmaTransferRx::new(self))
     }
 
     fn start_receive_bytes_dma(
@@ -1564,55 +1565,44 @@ where
     }
 }
 
-/// An in-progress DMA transfer.
-pub struct RxDmaTransfer<'t, 'd, C, P, CP, DM>
+impl<'d, CH, P, CP, DM> DmaSupport for ParlIoRx<'d, CH, P, CP, DM>
 where
-    C: ChannelTypes,
-    C::P: ParlIoPeripheral,
+    CH: ChannelTypes,
+    CH::P: ParlIoPeripheral,
     P: RxPins + ConfigurePins,
     CP: RxClkPin,
     DM: Mode,
 {
-    instance: &'t mut ParlIoRx<'d, C, P, CP, DM>,
-}
-
-impl<'t, 'd, C, P, CP, DM> RxDmaTransfer<'t, 'd, C, P, CP, DM>
-where
-    C: ChannelTypes,
-    C::P: ParlIoPeripheral,
-    P: RxPins + ConfigurePins,
-    CP: RxClkPin,
-    DM: Mode,
-{
-    /// Wait for the DMA transfer to complete
-    #[allow(clippy::type_complexity)]
-    pub fn wait(self) -> Result<(), DmaError> {
+    fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
         loop {
-            if self.is_done() || self.is_eof_error() {
+            if self.rx_channel.is_done()
+                || self.rx_channel.has_eof_error()
+                || self.rx_channel.has_dscr_empty_error()
+            {
                 break;
             }
         }
 
         Instance::set_rx_start(false);
-
-        if self.instance.rx_channel.has_error() {
-            Err(DmaError::DescriptorError)
-        } else {
-            Ok(())
-        }
     }
 
-    /// Check if the DMA transfer is complete
-    pub fn is_done(&self) -> bool {
-        let ch = &self.instance.rx_channel;
-        ch.is_done()
+    fn peripheral_dma_stop(&mut self) {
+        unreachable!("unsupported")
     }
+}
 
-    /// Check if the DMA transfer is completed by buffer full or source EOF
-    /// error
-    pub fn is_eof_error(&self) -> bool {
-        let ch = &self.instance.rx_channel;
-        ch.has_eof_error() || ch.has_dscr_empty_error()
+impl<'d, CH, P, CP, DM> DmaSupportRx for ParlIoRx<'d, CH, P, CP, DM>
+where
+    CH: ChannelTypes,
+    CH::P: ParlIoPeripheral,
+    P: RxPins + ConfigurePins,
+    CP: RxClkPin,
+    DM: Mode,
+{
+    type RX = CH::Rx<'d>;
+
+    fn rx(&mut self) -> &mut Self::RX {
+        &mut self.rx_channel
     }
 }
 

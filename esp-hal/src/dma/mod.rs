@@ -1494,24 +1494,264 @@ where
     }
 }
 
-/// Trait to be implemented for an in progress dma transfer.
-#[allow(drop_bounds)]
-#[doc(hidden)]
-pub trait DmaTransfer: Drop {
-    /// Wait for the transfer to finish.
-    fn wait(self) -> Result<(), DmaError>;
-    /// Check if the transfer is finished.
-    fn is_done(&self) -> bool;
+pub(crate) mod dma_private {
+    use super::*;
+
+    pub trait DmaSupport {
+        /// Wait until the transfer is done.
+        ///
+        /// Depending on the peripheral this might include checking the DMA
+        /// channel and/or the peripheral.
+        ///
+        /// After this all data should be processed by the peripheral - i.e. the
+        /// peripheral should have processed it's FIFO(s)
+        fn peripheral_wait_dma(&mut self, is_tx: bool, is_rx: bool);
+
+        /// Only used by circular DMA transfers
+        fn peripheral_dma_stop(&mut self);
+    }
+
+    pub trait DmaSupportTx: DmaSupport {
+        type TX: Tx;
+
+        fn tx(&mut self) -> &mut Self::TX;
+    }
+
+    pub trait DmaSupportRx: DmaSupport {
+        type RX: Rx;
+
+        fn rx(&mut self) -> &mut Self::RX;
+    }
 }
 
-/// Trait to be implemented for an in progress dma transfer.
-#[allow(clippy::type_complexity, drop_bounds)]
-#[doc(hidden)]
-pub trait DmaTransferRxTx: Drop {
+/// DMA transaction for TX only transfers
+#[non_exhaustive]
+#[must_use]
+pub struct DmaTransferTx<'a, I>
+where
+    I: dma_private::DmaSupportTx,
+{
+    instance: &'a mut I,
+}
+
+impl<'a, I> DmaTransferTx<'a, I>
+where
+    I: dma_private::DmaSupportTx,
+{
+    pub(crate) fn new(instance: &'a mut I) -> Self {
+        Self { instance }
+    }
+
     /// Wait for the transfer to finish.
-    fn wait(self) -> Result<(), DmaError>;
+    pub fn wait(self) -> Result<(), DmaError> {
+        self.instance.peripheral_wait_dma(true, false);
+
+        if self.instance.tx().has_error() {
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok(())
+        }
+    }
+
     /// Check if the transfer is finished.
-    fn is_done(&self) -> bool;
+    pub fn is_done(&mut self) -> bool {
+        self.instance.tx().is_done()
+    }
+}
+
+impl<'a, I> Drop for DmaTransferTx<'a, I>
+where
+    I: dma_private::DmaSupportTx,
+{
+    fn drop(&mut self) {
+        self.instance.peripheral_wait_dma(true, false);
+    }
+}
+
+/// DMA transaction for RX only transfers
+#[non_exhaustive]
+#[must_use]
+pub struct DmaTransferRx<'a, I>
+where
+    I: dma_private::DmaSupportRx,
+{
+    instance: &'a mut I,
+}
+
+impl<'a, I> DmaTransferRx<'a, I>
+where
+    I: dma_private::DmaSupportRx,
+{
+    pub(crate) fn new(instance: &'a mut I) -> Self {
+        Self { instance }
+    }
+
+    /// Wait for the transfer to finish.
+    pub fn wait(self) -> Result<(), DmaError> {
+        self.instance.peripheral_wait_dma(false, true);
+
+        if self.instance.rx().has_error() {
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Check if the transfer is finished.
+    pub fn is_done(&mut self) -> bool {
+        self.instance.rx().is_done()
+    }
+}
+
+impl<'a, I> Drop for DmaTransferRx<'a, I>
+where
+    I: dma_private::DmaSupportRx,
+{
+    fn drop(&mut self) {
+        self.instance.peripheral_wait_dma(false, true);
+    }
+}
+
+/// DMA transaction for TX+RX transfers
+#[non_exhaustive]
+#[must_use]
+pub struct DmaTransferTxRx<'a, I>
+where
+    I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
+{
+    instance: &'a mut I,
+}
+
+impl<'a, I> DmaTransferTxRx<'a, I>
+where
+    I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
+{
+    pub(crate) fn new(instance: &'a mut I) -> Self {
+        Self { instance }
+    }
+
+    /// Wait for the transfer to finish.
+    pub fn wait(self) -> Result<(), DmaError> {
+        self.instance.peripheral_wait_dma(true, true);
+
+        if self.instance.tx().has_error() || self.instance.rx().has_error() {
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Check if the transfer is finished.
+    pub fn is_done(&mut self) -> bool {
+        self.instance.tx().is_done() && self.instance.rx().is_done()
+    }
+}
+
+impl<'a, I> Drop for DmaTransferTxRx<'a, I>
+where
+    I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
+{
+    fn drop(&mut self) {
+        self.instance.peripheral_wait_dma(true, true);
+    }
+}
+
+/// DMA transaction for TX only circular transfers
+#[non_exhaustive]
+#[must_use]
+pub struct DmaTransferTxCircular<'a, I>
+where
+    I: dma_private::DmaSupportTx,
+{
+    instance: &'a mut I,
+}
+
+impl<'a, I> DmaTransferTxCircular<'a, I>
+where
+    I: dma_private::DmaSupportTx,
+{
+    #[allow(unused)] // currently used by peripherals not available on all chips
+    pub(crate) fn new(instance: &'a mut I) -> Self {
+        Self { instance }
+    }
+
+    /// Amount of bytes which can be pushed.
+    pub fn available(&mut self) -> usize {
+        self.instance.tx().available()
+    }
+
+    /// Push bytes into the DMA buffer.
+    pub fn push(&mut self, data: &[u8]) -> Result<usize, DmaError> {
+        self.instance.tx().push(data)
+    }
+
+    /// Push bytes into the DMA buffer via the given closure.
+    /// The closure *must* return the actual number of bytes written.
+    /// The closure *might* get called with a slice which is smaller than the
+    /// total available buffer.
+    pub fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> Result<usize, DmaError> {
+        self.instance.tx().push_with(f)
+    }
+
+    /// Stop the DMA transfer
+    #[allow(clippy::type_complexity)]
+    pub fn stop(self) -> Result<(), DmaError> {
+        self.instance.peripheral_dma_stop();
+
+        if self.instance.tx().has_error() {
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl<'a, I> Drop for DmaTransferTxCircular<'a, I>
+where
+    I: dma_private::DmaSupportTx,
+{
+    fn drop(&mut self) {
+        self.instance.peripheral_dma_stop();
+    }
+}
+
+/// DMA transaction for RX only circular transfers
+#[non_exhaustive]
+#[must_use]
+pub struct DmaTransferRxCircular<'a, I>
+where
+    I: dma_private::DmaSupportRx,
+{
+    instance: &'a mut I,
+}
+
+impl<'a, I> DmaTransferRxCircular<'a, I>
+where
+    I: dma_private::DmaSupportRx,
+{
+    #[allow(unused)] // currently used by peripherals not available on all chips
+    pub(crate) fn new(instance: &'a mut I) -> Self {
+        Self { instance }
+    }
+
+    /// Amount of bytes which can be popped
+    pub fn available(&mut self) -> usize {
+        self.instance.rx().available()
+    }
+
+    /// Get available data
+    pub fn pop(&mut self, data: &mut [u8]) -> Result<usize, DmaError> {
+        self.instance.rx().pop(data)
+    }
+}
+
+impl<'a, I> Drop for DmaTransferRxCircular<'a, I>
+where
+    I: dma_private::DmaSupportRx,
+{
+    fn drop(&mut self) {
+        self.instance.peripheral_dma_stop();
+    }
 }
 
 #[cfg(feature = "async")]

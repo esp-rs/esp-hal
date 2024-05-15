@@ -42,11 +42,13 @@ use fugit::HertzU32;
 use crate::{
     clock::Clocks,
     dma::{
+        dma_private::{DmaSupport, DmaSupportRx},
         ChannelRx,
         ChannelTypes,
         DmaError,
         DmaPeripheral,
-        DmaTransfer,
+        DmaTransferRx,
+        DmaTransferRxCircular,
         LcdCamPeripheral,
         RegisterAccess,
         Rx,
@@ -54,7 +56,6 @@ use crate::{
         RxPrivate,
     },
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
-    i2s::Error,
     lcd_cam::{cam::private::RxPins, private::calculate_clkm, BitOrder, ByteOrder},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
@@ -177,6 +178,31 @@ where
     }
 }
 
+impl<'d, RX: Rx> DmaSupport for Camera<'d, RX> {
+    fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+        while !
+        // Wait for IN_SUC_EOF (i.e. VSYNC)
+        self.rx_channel.is_done() ||
+        // Or for IN_DSCR_EMPTY (i.e. No more buffer space)
+        self.rx_channel.has_dscr_empty_error() ||
+        // Or for IN_DSCR_ERR (i.e. bad descriptor)
+        self.rx_channel.has_error()
+        {}
+    }
+
+    fn peripheral_dma_stop(&mut self) {
+        // TODO: Stop DMA?? self.instance.rx_channel.stop_transfer();
+    }
+}
+
+impl<'d, RX: Rx> DmaSupportRx for Camera<'d, RX> {
+    type RX = RX;
+
+    fn rx(&mut self) -> &mut Self::RX {
+        &mut self.rx_channel
+    }
+}
+
 impl<'d, RX: Rx> Camera<'d, RX> {
     pub fn set_byte_order(&mut self, byte_order: ByteOrder) -> &mut Self {
         self.lcd_cam
@@ -295,96 +321,25 @@ impl<'d, RX: Rx> Camera<'d, RX> {
     pub fn read_dma<'t, RXBUF: WriteBuffer>(
         &'t mut self,
         buf: &'t mut RXBUF,
-    ) -> Result<Transfer<'t, 'd, RX>, DmaError> {
+    ) -> Result<DmaTransferRx<Self>, DmaError> {
         self.reset_unit_and_fifo();
         // Start DMA to receive incoming transfer.
         self.start_dma(false, buf)?;
         self.start_unit();
 
-        Ok(Transfer { instance: self })
+        Ok(DmaTransferRx::new(self))
     }
 
     pub fn read_dma_circular<'t, RXBUF: WriteBuffer>(
         &'t mut self,
         buf: &'t mut RXBUF,
-    ) -> Result<Transfer<'t, 'd, RX>, DmaError> {
+    ) -> Result<DmaTransferRxCircular<Self>, DmaError> {
         self.reset_unit_and_fifo();
         // Start DMA to receive incoming transfer.
         self.start_dma(true, buf)?;
         self.start_unit();
 
-        Ok(Transfer { instance: self })
-    }
-}
-
-/// An in-progress transfer
-#[must_use]
-pub struct Transfer<'t, 'd, RX: Rx> {
-    instance: &'t mut Camera<'d, RX>,
-}
-
-impl<'t, 'd, RX: Rx> Transfer<'t, 'd, RX> {
-    /// Amount of bytes which can be popped
-    pub fn available(&mut self) -> usize {
-        self.instance.rx_channel.available()
-    }
-
-    pub fn pop(&mut self, data: &mut [u8]) -> Result<usize, Error> {
-        Ok(self.instance.rx_channel.pop(data)?)
-    }
-
-    /// Wait for the DMA transfer to complete.
-    /// Length of the received data is returned
-    #[allow(clippy::type_complexity)]
-    pub fn wait_receive(self, dst: &mut [u8]) -> Result<usize, (DmaError, usize)> {
-        // Wait for DMA transfer to finish.
-        while !self.is_done() {}
-
-        let len = self
-            .instance
-            .rx_channel
-            .drain_buffer(dst)
-            .map_err(|e| (e, 0))?;
-
-        if self.instance.rx_channel.has_error() {
-            Err((DmaError::DescriptorError, len))
-        } else {
-            Ok(len)
-        }
-    }
-}
-
-impl<'t, 'd, RX: Rx> DmaTransfer for Transfer<'t, 'd, RX> {
-    fn wait(self) -> Result<(), DmaError> {
-        // Wait for DMA transfer to finish.
-        while !self.is_done() {}
-
-        let ch = &self.instance.rx_channel;
-        if ch.has_error() {
-            Err(DmaError::DescriptorError)
-        } else {
-            Ok(())
-        }
-    }
-
-    fn is_done(&self) -> bool {
-        let ch = &self.instance.rx_channel;
-        // Wait for IN_SUC_EOF (i.e. VSYNC)
-        ch.is_done() ||
-        // Or for IN_DSCR_EMPTY (i.e. No more buffer space)
-        ch.has_dscr_empty_error() ||
-        // Or for IN_DSCR_ERR (i.e. bad descriptor)
-        ch.has_error()
-    }
-}
-
-impl<'t, 'd, RX: Rx> Drop for Transfer<'t, 'd, RX> {
-    fn drop(&mut self) {
-        self.instance
-            .lcd_cam
-            .cam_ctrl1()
-            .modify(|_, w| w.cam_start().clear_bit());
-        // TODO: Stop DMA?? self.instance.rx_channel.stop_transfer();
+        Ok(DmaTransferRxCircular::new(self))
     }
 }
 

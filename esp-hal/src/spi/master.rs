@@ -837,12 +837,12 @@ pub mod dma {
     use crate::dma::Spi3Peripheral;
     use crate::{
         dma::{
+            dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
             Channel,
             ChannelTypes,
-            DmaError,
-            DmaTransfer,
-            DmaTransferRxTx,
-            RxPrivate,
+            DmaTransferRx,
+            DmaTransferTx,
+            DmaTransferTxRx,
             Spi2Peripheral,
             SpiPeripheral,
             TxPrivate,
@@ -917,113 +917,6 @@ pub mod dma {
                 channel,
                 _mode: PhantomData,
             }
-        }
-    }
-    /// An in-progress DMA transfer
-    #[must_use]
-    pub struct SpiDmaTransferRxTx<'t, 'd, T, C, M, DmaMode>
-    where
-        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-        C: ChannelTypes,
-        C::P: SpiPeripheral,
-        M: DuplexMode,
-        DmaMode: Mode,
-    {
-        spi_dma: &'t mut SpiDma<'d, T, C, M, DmaMode>,
-    }
-
-    impl<'t, 'd, T, C, M, DmaMode> DmaTransferRxTx for SpiDmaTransferRxTx<'t, 'd, T, C, M, DmaMode>
-    where
-        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-        C: ChannelTypes,
-        C::P: SpiPeripheral,
-        M: DuplexMode,
-        DmaMode: Mode,
-    {
-        /// Wait for the DMA transfer to complete
-        fn wait(self) -> Result<(), DmaError> {
-            // Waiting for the DMA transfer is not enough. We need to wait for the
-            // peripheral to finish flushing its buffers, too.
-            self.spi_dma.spi.flush().ok();
-
-            if self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error() {
-                Err(DmaError::DescriptorError)
-            } else {
-                Ok(())
-            }
-        }
-
-        /// Check if the DMA transfer is complete
-        fn is_done(&self) -> bool {
-            let ch = &self.spi_dma.channel;
-            ch.tx.is_done() && ch.rx.is_done()
-        }
-    }
-
-    impl<'t, 'd, T, C, M, DmaMode> Drop for SpiDmaTransferRxTx<'t, 'd, T, C, M, DmaMode>
-    where
-        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-        C: ChannelTypes,
-        C::P: SpiPeripheral,
-        M: DuplexMode,
-        DmaMode: Mode,
-    {
-        fn drop(&mut self) {
-            self.spi_dma.spi.flush().ok();
-        }
-    }
-
-    /// An in-progress DMA transfer.
-    #[must_use]
-    pub struct SpiDmaTransfer<'t, 'd, T, C, M, DmaMode>
-    where
-        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-        C: ChannelTypes,
-        C::P: SpiPeripheral,
-        M: DuplexMode,
-        DmaMode: Mode,
-    {
-        spi_dma: &'t mut SpiDma<'d, T, C, M, DmaMode>,
-    }
-
-    impl<'t, 'd, T, C, M, DmaMode> DmaTransfer for SpiDmaTransfer<'t, 'd, T, C, M, DmaMode>
-    where
-        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-        C: ChannelTypes,
-        C::P: SpiPeripheral,
-        M: DuplexMode,
-        DmaMode: Mode,
-    {
-        /// Wait for the DMA transfer to complete
-        fn wait(self) -> Result<(), DmaError> {
-            // Waiting for the DMA transfer is not enough. We need to wait for the
-            // peripheral to finish flushing its buffers, too.
-            self.spi_dma.spi.flush().ok();
-
-            if self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error() {
-                Err(DmaError::DescriptorError)
-            } else {
-                Ok(())
-            }
-        }
-
-        /// Check if the DMA transfer is complete
-        fn is_done(&self) -> bool {
-            let ch = &self.spi_dma.channel;
-            ch.tx.is_done() && ch.rx.is_done()
-        }
-    }
-
-    impl<'t, 'd, T, C, M, DmaMode> Drop for SpiDmaTransfer<'t, 'd, T, C, M, DmaMode>
-    where
-        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-        C: ChannelTypes,
-        C::P: SpiPeripheral,
-        M: DuplexMode,
-        DmaMode: Mode,
-    {
-        fn drop(&mut self) {
-            self.spi_dma.spi.flush().ok();
         }
     }
 
@@ -1106,6 +999,53 @@ pub mod dma {
         }
     }
 
+    impl<'d, T, C, M, DmaMode> DmaSupport for SpiDma<'d, T, C, M, DmaMode>
+    where
+        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
+        C: ChannelTypes,
+        C::P: SpiPeripheral,
+        M: DuplexMode,
+        DmaMode: Mode,
+    {
+        fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+            self.spi.flush().ok();
+        }
+
+        fn peripheral_dma_stop(&mut self) {
+            unreachable!("unsupported")
+        }
+    }
+
+    impl<'d, T, C, M, DmaMode> DmaSupportTx for SpiDma<'d, T, C, M, DmaMode>
+    where
+        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
+        C: ChannelTypes,
+        C::P: SpiPeripheral,
+        M: DuplexMode,
+        DmaMode: Mode,
+    {
+        type TX = C::Tx<'d>;
+
+        fn tx(&mut self) -> &mut Self::TX {
+            &mut self.channel.tx
+        }
+    }
+
+    impl<'d, T, C, M, DmaMode> DmaSupportRx for SpiDma<'d, T, C, M, DmaMode>
+    where
+        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
+        C: ChannelTypes,
+        C::P: SpiPeripheral,
+        M: DuplexMode,
+        DmaMode: Mode,
+    {
+        type RX = C::Rx<'d>;
+
+        fn rx(&mut self) -> &mut Self::RX {
+            &mut self.channel.rx
+        }
+    }
+
     impl<'d, T, C, M, DmaMode> SpiDma<'d, T, C, M, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
@@ -1123,7 +1063,7 @@ pub mod dma {
         pub fn dma_write<'t, TXBUF>(
             &'t mut self,
             words: &'t TXBUF,
-        ) -> Result<SpiDmaTransfer<'t, 'd, T, C, M, DmaMode>, super::Error>
+        ) -> Result<DmaTransferTx<Self>, super::Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
         {
@@ -1135,7 +1075,7 @@ pub mod dma {
 
             self.spi
                 .start_write_bytes_dma(ptr, len, &mut self.channel.tx, false)?;
-            Ok(SpiDmaTransfer { spi_dma: self })
+            Ok(DmaTransferTx::new(self))
         }
 
         /// Perform a DMA read.
@@ -1147,7 +1087,7 @@ pub mod dma {
         pub fn dma_read<'t, RXBUF>(
             &'t mut self,
             words: &'t mut RXBUF,
-        ) -> Result<SpiDmaTransfer<'t, 'd, T, C, M, DmaMode>, super::Error>
+        ) -> Result<DmaTransferRx<Self>, super::Error>
         where
             RXBUF: WriteBuffer<Word = u8>,
         {
@@ -1161,7 +1101,7 @@ pub mod dma {
                 self.spi
                     .start_read_bytes_dma(ptr, len, &mut self.channel.rx, false)?;
             }
-            Ok(SpiDmaTransfer { spi_dma: self })
+            Ok(DmaTransferRx::new(self))
         }
 
         /// Perform a DMA transfer.
@@ -1173,7 +1113,7 @@ pub mod dma {
             &'t mut self,
             words: &'t TXBUF,
             read_buffer: &'t mut RXBUF,
-        ) -> Result<SpiDmaTransferRxTx<'t, 'd, T, C, M, DmaMode>, super::Error>
+        ) -> Result<DmaTransferTxRx<Self>, super::Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
             RXBUF: WriteBuffer<Word = u8>,
@@ -1195,7 +1135,7 @@ pub mod dma {
                     &mut self.channel.rx,
                 )?;
             }
-            Ok(SpiDmaTransferRxTx { spi_dma: self })
+            Ok(DmaTransferTxRx::new(self))
         }
     }
 
@@ -1215,7 +1155,7 @@ pub mod dma {
             address: Address,
             dummy: u8,
             buffer: &'t mut RXBUF,
-        ) -> Result<SpiDmaTransfer<'t, 'd, T, C, M, DmaMode>, super::Error>
+        ) -> Result<DmaTransferRx<Self>, super::Error>
         where
             RXBUF: WriteBuffer<Word = u8>,
         {
@@ -1279,7 +1219,7 @@ pub mod dma {
                 self.spi
                     .start_read_bytes_dma(ptr, len, &mut self.channel.rx, false)?;
             }
-            Ok(SpiDmaTransfer { spi_dma: self })
+            Ok(DmaTransferRx::new(self))
         }
 
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
@@ -1290,7 +1230,7 @@ pub mod dma {
             address: Address,
             dummy: u8,
             buffer: &'t TXBUF,
-        ) -> Result<SpiDmaTransfer<'t, 'd, T, C, M, DmaMode>, super::Error>
+        ) -> Result<DmaTransferTx<Self>, super::Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
         {
@@ -1352,7 +1292,7 @@ pub mod dma {
 
             self.spi
                 .start_write_bytes_dma(ptr, len, &mut self.channel.tx, false)?;
-            Ok(SpiDmaTransfer { spi_dma: self })
+            Ok(DmaTransferTx::new(self))
         }
     }
 
