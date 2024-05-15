@@ -13,8 +13,8 @@
 //!
 //! ```no_run
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let gpio25 = io.pins.gpio25.into_analog();
-//! let gpio26 = io.pins.gpio26.into_analog();
+//! let gpio25 = io.pins.gpio25;
+//! let gpio26 = io.pins.gpio26;
 //!
 //! let mut dac1 = Dac1::new(peripherals.DAC1, gpio25);
 //! let mut dac2 = Dac2::new(peripherals.DAC2, gpio26);
@@ -37,18 +37,18 @@
 //! ```
 
 use crate::{
-    gpio,
+    gpio::{self, AnalogPin},
     peripheral::{Peripheral, PeripheralRef},
     peripherals,
 };
 
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
-        type Dac1Gpio = gpio::Gpio25<gpio::Analog>;
-        type Dac2Gpio = gpio::Gpio26<gpio::Analog>;
+        type Dac1Gpio = gpio::Gpio25;
+        type Dac2Gpio = gpio::Gpio26;
     } else if #[cfg(esp32s2)] {
-        type Dac1Gpio = gpio::Gpio17<gpio::Analog>;
-        type Dac2Gpio = gpio::Gpio18<gpio::Analog>;
+        type Dac1Gpio = gpio::Gpio17;
+        type Dac2Gpio = gpio::Gpio18;
     }
 }
 
@@ -59,8 +59,10 @@ pub struct Dac1<'d> {
 
 impl<'d> Dac1<'d> {
     /// Constructs a new DAC instance.
-    pub fn new(dac: impl Peripheral<P = peripherals::DAC1> + 'd, _pin: Dac1Gpio) -> Self {
+    pub fn new(dac: impl Peripheral<P = peripherals::DAC1> + 'd, pin: Dac1Gpio) -> Self {
         crate::into_ref!(dac);
+        // TODO revert this on drop
+        pin.set_analog(crate::private::Internal);
 
         #[cfg(esp32s2)]
         unsafe { &*peripherals::SENS::PTR }
@@ -96,8 +98,10 @@ pub struct Dac2<'d> {
 
 impl<'d> Dac2<'d> {
     /// Constructs a new DAC instance.
-    pub fn new(dac: impl Peripheral<P = peripherals::DAC2> + 'd, _pin: Dac2Gpio) -> Self {
+    pub fn new(dac: impl Peripheral<P = peripherals::DAC2> + 'd, pin: Dac2Gpio) -> Self {
         crate::into_ref!(dac);
+        // TODO revert this on drop
+        pin.set_analog(crate::private::Internal);
 
         #[cfg(esp32s2)]
         unsafe { &*peripherals::SENS::PTR }

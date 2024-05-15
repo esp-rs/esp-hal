@@ -16,7 +16,6 @@ use esp_hal::{
     gpio,
     gpio::Io,
     peripherals::Peripherals,
-    prelude::*,
     rtc_cntl::{
         get_reset_reason,
         get_wakeup_cause,

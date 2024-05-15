@@ -22,7 +22,7 @@ fn main() -> ! {
     let peripherals = Peripherals::take();
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let pin = io.pins.gpio1.into_low_power().into_push_pull_output();
+    let pin = LowPowerOutput::new(io.pins.gpio1);
 
     let mut ulp_core = ulp_core::UlpCore::new(peripherals.ULP_RISCV_CORE);
 

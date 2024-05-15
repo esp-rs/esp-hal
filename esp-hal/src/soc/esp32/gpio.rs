@@ -52,7 +52,6 @@ use crate::{
         InterruptStatusRegisterAccess,
         InterruptStatusRegisterAccessBank0,
         InterruptStatusRegisterAccessBank1,
-        Unknown,
     },
     peripherals::GPIO,
     Cpu,

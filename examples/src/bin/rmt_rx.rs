@@ -27,7 +27,7 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let mut out = io.pins.gpio5.into_push_pull_output();
+    let mut out = io.pins.gpio5;
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32h2")] {

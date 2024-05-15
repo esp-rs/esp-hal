@@ -646,14 +646,18 @@ where
         clocks: &Clocks,
         baud_rate: BaudRate,
         interrupt: Option<InterruptHandler>,
+        no_transceiver: bool,
     ) -> Self {
         // Enable the peripheral clock for the TWAI peripheral.
         T::enable_peripheral();
 
         // Set up the GPIO pins.
         crate::into_ref!(tx_pin, rx_pin);
-        tx_pin.connect_peripheral_to_output(T::OUTPUT_SIGNAL);
-        rx_pin.connect_input_to_peripheral(T::INPUT_SIGNAL);
+        if no_transceiver {
+            tx_pin.set_to_open_drain_output(crate::private::Internal);
+        }
+        tx_pin.connect_peripheral_to_output(T::OUTPUT_SIGNAL, crate::private::Internal);
+        rx_pin.connect_input_to_peripheral(T::INPUT_SIGNAL, crate::private::Internal);
 
         let mut cfg = TwaiConfiguration {
             peripheral: PhantomData,
@@ -775,6 +779,9 @@ impl<'d, T> TwaiConfiguration<'d, T, crate::Blocking>
 where
     T: Instance,
 {
+    /// Create a new instance of [TwaiConfiguration]
+    ///
+    /// You will need to use a transceiver to connect to the TWAI bus
     pub fn new<TX: OutputPin, RX: InputPin>(
         peripheral: impl Peripheral<P = T> + 'd,
         tx_pin: impl Peripheral<P = TX> + 'd,
@@ -783,7 +790,27 @@ where
         baud_rate: BaudRate,
         interrupt: Option<InterruptHandler>,
     ) -> Self {
-        Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, interrupt)
+        Self::new_internal(
+            peripheral, tx_pin, rx_pin, clocks, baud_rate, interrupt, false,
+        )
+    }
+
+    /// Create a new instance of [TwaiConfiguration] meant to connect two ESP32s
+    /// directly
+    ///
+    /// You don't need a transceiver by following the description in the
+    /// `twai.rs` example
+    pub fn new_no_transceiver<TX: OutputPin, RX: InputPin>(
+        peripheral: impl Peripheral<P = T> + 'd,
+        tx_pin: impl Peripheral<P = TX> + 'd,
+        rx_pin: impl Peripheral<P = RX> + 'd,
+        clocks: &Clocks,
+        baud_rate: BaudRate,
+        interrupt: Option<InterruptHandler>,
+    ) -> Self {
+        Self::new_internal(
+            peripheral, tx_pin, rx_pin, clocks, baud_rate, interrupt, true,
+        )
     }
 }
 
@@ -792,6 +819,9 @@ impl<'d, T> TwaiConfiguration<'d, T, crate::Async>
 where
     T: Instance,
 {
+    /// Create a new instance of [TwaiConfiguration] in async mode
+    ///
+    /// You will need to use a transceiver to connect to the TWAI bus
     pub fn new_async<TX: OutputPin, RX: InputPin>(
         peripheral: impl Peripheral<P = T> + 'd,
         tx_pin: impl Peripheral<P = TX> + 'd,
@@ -807,6 +837,31 @@ where
             clocks,
             baud_rate,
             Some(interrupt),
+            false,
+        )
+    }
+
+    /// Create a new instance of [TwaiConfiguration] meant to connect two ESP32s
+    /// directly in async mode
+    ///
+    /// You don't need a transceiver by following the description in the
+    /// `twai.rs` example
+    pub fn new_async_no_transceiver<TX: OutputPin, RX: InputPin>(
+        peripheral: impl Peripheral<P = T> + 'd,
+        tx_pin: impl Peripheral<P = TX> + 'd,
+        rx_pin: impl Peripheral<P = RX> + 'd,
+        clocks: &Clocks,
+        baud_rate: BaudRate,
+    ) -> Self {
+        let interrupt = T::async_handler();
+        Self::new_internal(
+            peripheral,
+            tx_pin,
+            rx_pin,
+            clocks,
+            baud_rate,
+            Some(interrupt),
+            true,
         )
     }
 }

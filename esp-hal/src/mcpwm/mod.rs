@@ -34,7 +34,7 @@
 //!
 //! ```no_run
 //! # use esp_hal::{mcpwm, prelude::*};
-//! use mcpwm::{operator::PwmPinConfig, timer::PwmWorkingMode, PeripheralClockConfig, MCPWM};
+//! use mcpwm::{operator::PwmPinConfig, timer::PwmWorkingMode, McPwm, PeripheralClockConfig};
 //!
 //! // initialize peripheral
 //! let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40.MHz()).unwrap();

@@ -432,20 +432,32 @@ where
         };
 
         // avoid SCL/SDA going low during configuration
-        scl.set_output_high(true);
-        sda.set_output_high(true);
+        scl.set_output_high(true, crate::private::Internal);
+        sda.set_output_high(true, crate::private::Internal);
 
-        scl.set_to_open_drain_output()
-            .enable_input(true)
-            .internal_pull_up(true)
-            .connect_peripheral_to_output(i2c.peripheral.scl_output_signal())
-            .connect_input_to_peripheral(i2c.peripheral.scl_input_signal());
+        scl.set_to_open_drain_output(crate::private::Internal);
+        scl.enable_input(true, crate::private::Internal);
+        scl.internal_pull_up(true, crate::private::Internal);
+        scl.connect_peripheral_to_output(
+            i2c.peripheral.scl_output_signal(),
+            crate::private::Internal,
+        );
+        scl.connect_input_to_peripheral(
+            i2c.peripheral.scl_input_signal(),
+            crate::private::Internal,
+        );
 
-        sda.set_to_open_drain_output()
-            .enable_input(true)
-            .internal_pull_up(true)
-            .connect_peripheral_to_output(i2c.peripheral.sda_output_signal())
-            .connect_input_to_peripheral(i2c.peripheral.sda_input_signal());
+        sda.set_to_open_drain_output(crate::private::Internal);
+        sda.enable_input(true, crate::private::Internal);
+        sda.internal_pull_up(true, crate::private::Internal);
+        sda.connect_peripheral_to_output(
+            i2c.peripheral.sda_output_signal(),
+            crate::private::Internal,
+        );
+        sda.connect_input_to_peripheral(
+            i2c.peripheral.sda_input_signal(),
+            crate::private::Internal,
+        );
 
         i2c.peripheral.setup(frequency, clocks, timeout);
 
@@ -2017,7 +2029,7 @@ pub mod lp_i2c {
     use fugit::HertzU32;
 
     use crate::{
-        gpio::{lp_io::LowPowerPin, OpenDrain},
+        gpio::lp_io::LowPowerOutputOpenDrain,
         peripherals::{LP_CLKRST, LP_I2C0},
     };
 
@@ -2217,8 +2229,8 @@ pub mod lp_i2c {
     impl LpI2c {
         pub fn new(
             i2c: LP_I2C0,
-            _sda: LowPowerPin<OpenDrain, 6>,
-            _scl: LowPowerPin<OpenDrain, 7>,
+            _sda: LowPowerOutputOpenDrain<6>,
+            _scl: LowPowerOutputOpenDrain<7>,
             frequency: HertzU32,
         ) -> Self {
             let me = Self { i2c };

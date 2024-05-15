@@ -47,7 +47,6 @@ use crate::{
         InterruptStatusRegisterAccess,
         InterruptStatusRegisterAccessBank0,
         InterruptStatusRegisterAccessBank1,
-        Unknown,
     },
     peripherals::GPIO,
 };
@@ -490,5 +489,5 @@ impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank1 {
 }
 
 // implement marker traits on USB pins
-impl<T> crate::otg_fs::UsbDp for Gpio19<T> {}
-impl<T> crate::otg_fs::UsbDm for Gpio20<T> {}
+impl crate::otg_fs::UsbDp for Gpio19 {}
+impl crate::otg_fs::UsbDm for Gpio20 {}

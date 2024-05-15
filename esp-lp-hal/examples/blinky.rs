@@ -11,11 +11,7 @@
 #![no_main]
 
 use embedded_hal_02::{blocking::delay::DelayMs, digital::v2::OutputPin};
-use esp_lp_hal::{
-    delay::Delay,
-    gpio::{GpioPin, Output, PushPull},
-    prelude::*,
-};
+use esp_lp_hal::{delay::Delay, gpio::Output, prelude::*};
 use panic_halt as _;
 
 cfg_if::cfg_if! {
@@ -27,7 +23,7 @@ cfg_if::cfg_if! {
 }
 
 #[entry]
-fn main(mut gpio1: GpioPin<Output<PushPull>, 1>) -> ! {
+fn main(mut gpio1: Output<1>) -> ! {
     let mut i: u32 = 0;
 
     let ptr = ADDRESS as *mut u32;

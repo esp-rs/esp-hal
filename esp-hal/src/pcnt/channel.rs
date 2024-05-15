@@ -10,10 +10,24 @@
 
 use super::unit;
 use crate::{
-    gpio::{InputPin, InputSignal, ONE_INPUT, ZERO_INPUT},
+    gpio::{InputPin, InputSignal, Pull, ONE_INPUT, ZERO_INPUT},
     peripheral::Peripheral,
     peripherals::GPIO,
 };
+
+/// Configuration for an PCNT input pin
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct PcntInputConfig {
+    /// Configuration for the internal pull-up resistors
+    pub pull: Pull,
+}
+
+impl Default for PcntInputConfig {
+    fn default() -> Self {
+        Self { pull: Pull::None }
+    }
+}
 
 /// Channel number
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
@@ -59,10 +73,20 @@ pub struct PcntSource {
 }
 
 impl PcntSource {
-    pub fn from_pin<'a, P: InputPin>(pin: impl Peripheral<P = P> + 'a) -> Self {
+    pub fn from_pin<'a, P: InputPin>(
+        pin: impl Peripheral<P = P> + 'a,
+        pin_config: PcntInputConfig,
+    ) -> Self {
         crate::into_ref!(pin);
+
+        pin.init_input(
+            pin_config.pull == Pull::Down,
+            pin_config.pull == Pull::Up,
+            crate::private::Internal,
+        );
+
         Self {
-            source: pin.number(),
+            source: pin.number(crate::private::Internal),
         }
     }
     pub fn always_high() -> Self {

@@ -45,7 +45,6 @@ use crate::{
         GpioPin,
         InterruptStatusRegisterAccess,
         InterruptStatusRegisterAccessBank0,
-        Unknown,
     },
     peripherals::GPIO,
 };

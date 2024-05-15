@@ -317,8 +317,8 @@ where
         Self: Sized,
     {
         crate::into_ref!(pin);
-        pin.set_to_push_pull_output()
-            .connect_peripheral_to_output(T::output_signal());
+        pin.set_to_push_pull_output(crate::private::Internal);
+        pin.connect_peripheral_to_output(T::output_signal(), crate::private::Internal);
         T::set_divider(config.clk_divider);
         T::set_carrier(
             config.carrier_modulation,
@@ -349,8 +349,8 @@ where
         Self: Sized,
     {
         crate::into_ref!(pin);
-        pin.set_to_push_pull_output()
-            .connect_peripheral_to_output(T::output_signal());
+        pin.set_to_push_pull_output(crate::private::Internal);
+        pin.connect_peripheral_to_output(T::output_signal(), crate::private::Internal);
         T::set_divider(config.clk_divider);
         T::set_carrier(
             config.carrier_modulation,
@@ -394,8 +394,8 @@ where
         }
 
         crate::into_ref!(pin);
-        pin.set_to_input()
-            .connect_input_to_peripheral(T::input_signal());
+        pin.set_to_input(crate::private::Internal);
+        pin.connect_input_to_peripheral(T::input_signal(), crate::private::Internal);
         T::set_divider(config.clk_divider);
         T::set_carrier(
             config.carrier_modulation,
@@ -441,8 +441,8 @@ where
         }
 
         crate::into_ref!(pin);
-        pin.set_to_input()
-            .connect_input_to_peripheral(T::input_signal());
+        pin.set_to_input(crate::private::Internal);
+        pin.connect_input_to_peripheral(T::input_signal(), crate::private::Internal);
         T::set_divider(config.clk_divider);
         T::set_carrier(
             config.carrier_modulation,

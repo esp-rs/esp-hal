@@ -578,8 +578,8 @@ where
 
     pub fn with_mclk<P: OutputPin>(self, pin: impl Peripheral<P = P> + 'd) -> Self {
         into_ref!(pin);
-        pin.set_to_push_pull_output()
-            .connect_peripheral_to_output(I::mclk_signal());
+        pin.set_to_push_pull_output(crate::private::Internal);
+        pin.connect_peripheral_to_output(I::mclk_signal(), crate::private::Internal);
         self
     }
 }
@@ -907,6 +907,7 @@ mod private {
         interrupt::InterruptHandler,
         into_ref,
         peripherals::I2S0,
+        private,
         system::Peripheral,
         Mode,
     };
@@ -937,8 +938,8 @@ mod private {
             P: OutputPin,
         {
             into_ref!(pin);
-            pin.set_to_push_pull_output()
-                .connect_peripheral_to_output(T::bclk_signal());
+            pin.set_to_push_pull_output(private::Internal);
+            pin.connect_peripheral_to_output(T::bclk_signal(), private::Internal);
             self
         }
 
@@ -947,8 +948,8 @@ mod private {
             P: OutputPin,
         {
             into_ref!(pin);
-            pin.set_to_push_pull_output()
-                .connect_peripheral_to_output(T::ws_signal());
+            pin.set_to_push_pull_output(private::Internal);
+            pin.connect_peripheral_to_output(T::ws_signal(), private::Internal);
             self
         }
 
@@ -957,8 +958,8 @@ mod private {
             P: OutputPin,
         {
             into_ref!(pin);
-            pin.set_to_push_pull_output()
-                .connect_peripheral_to_output(T::dout_signal());
+            pin.set_to_push_pull_output(private::Internal);
+            pin.connect_peripheral_to_output(T::dout_signal(), private::Internal);
             self
         }
     }
@@ -989,8 +990,8 @@ mod private {
             P: OutputPin,
         {
             into_ref!(pin);
-            pin.set_to_push_pull_output()
-                .connect_peripheral_to_output(T::bclk_rx_signal());
+            pin.set_to_push_pull_output(crate::private::Internal);
+            pin.connect_peripheral_to_output(T::bclk_rx_signal(), crate::private::Internal);
             self
         }
 
@@ -999,8 +1000,8 @@ mod private {
             P: OutputPin,
         {
             into_ref!(pin);
-            pin.set_to_push_pull_output()
-                .connect_peripheral_to_output(T::ws_rx_signal());
+            pin.set_to_push_pull_output(crate::private::Internal);
+            pin.connect_peripheral_to_output(T::ws_rx_signal(), crate::private::Internal);
             self
         }
 
@@ -1009,8 +1010,8 @@ mod private {
             P: InputPin,
         {
             into_ref!(pin);
-            pin.set_to_input()
-                .connect_input_to_peripheral(T::din_signal());
+            pin.set_to_input(crate::private::Internal);
+            pin.connect_input_to_peripheral(T::din_signal(), crate::private::Internal);
             self
         }
     }

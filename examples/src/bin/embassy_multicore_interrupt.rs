@@ -19,7 +19,7 @@ use esp_hal::{
     cpu_control::{CpuControl, Stack},
     embassy::{self, executor::InterruptExecutor},
     get_core,
-    gpio::{GpioPin, Io, Output, PushPull},
+    gpio::{AnyOutput, Io},
     interrupt::Priority,
     peripherals::Peripherals,
     prelude::*,
@@ -35,7 +35,7 @@ static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 /// duration of time.
 #[embassy_executor::task]
 async fn control_led(
-    mut led: GpioPin<Output<PushPull>, 0>,
+    mut led: AnyOutput<'static>,
     control: &'static Signal<CriticalSectionRawMutex, bool>,
 ) {
     println!("Starting control_led() on core {}", get_core() as usize);
@@ -85,7 +85,7 @@ fn main() -> ! {
     static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
     let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
 
-    let led = io.pins.gpio0.into_push_pull_output();
+    let led = AnyOutput::new(io.pins.gpio0, false);
 
     static EXECUTOR_CORE_1: StaticCell<InterruptExecutor<1>> = StaticCell::new();
     let executor_core1 =

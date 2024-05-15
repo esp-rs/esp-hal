@@ -48,7 +48,7 @@ async fn main(_spawner: Spawner) {
     let mut channel = rmt
         .channel0
         .configure(
-            io.pins.gpio4.into_push_pull_output(),
+            io.pins.gpio4,
             TxChannelConfig {
                 clk_divider: 255,
                 ..TxChannelConfig::default()

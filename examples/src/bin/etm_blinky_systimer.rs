@@ -8,7 +8,11 @@
 use esp_backtrace as _;
 use esp_hal::{
     etm::Etm,
-    gpio::{etm::GpioEtmChannels, Io},
+    gpio::{
+        etm::{GpioEtmChannels, GpioEtmOutputConfig},
+        Io,
+        Pull,
+    },
     peripherals::Peripherals,
     prelude::*,
     timer::systimer::{etm::SysTimerEtmEvent, SystemTimer},
@@ -24,11 +28,18 @@ fn main() -> ! {
     alarm0.set_period(1u32.secs());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let mut led = io.pins.gpio1.into_push_pull_output();
+    let mut led = io.pins.gpio1;
 
     // setup ETM
     let gpio_ext = GpioEtmChannels::new(peripherals.GPIO_SD);
-    let led_task = gpio_ext.channel0_task.toggle(&mut led);
+    let led_task = gpio_ext.channel0_task.toggle(
+        &mut led,
+        GpioEtmOutputConfig {
+            open_drain: false,
+            pull: Pull::None,
+            initial_state: true,
+        },
+    );
 
     let timer_event = SysTimerEtmEvent::new(&mut alarm0);
 

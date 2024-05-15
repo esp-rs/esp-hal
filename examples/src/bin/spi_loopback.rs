@@ -22,7 +22,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::Io,
+    gpio::{any_pin::AnyPin, Io},
     peripherals::Peripherals,
     prelude::*,
     spi::{master::Spi, SpiMode},
@@ -41,6 +41,9 @@ fn main() -> ! {
     let miso = io.pins.gpio2;
     let mosi = io.pins.gpio4;
     let cs = io.pins.gpio5;
+
+    let miso = AnyPin::new(miso);
+    let mosi = AnyPin::new(mosi);
 
     let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks).with_pins(
         Some(sclk),

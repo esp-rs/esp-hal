@@ -33,10 +33,7 @@ impl Context {
         let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let pins = TxRxPins::new_tx_rx(
-            io.pins.gpio2.into_push_pull_output(),
-            io.pins.gpio4.into_floating_input(),
-        );
+        let pins = TxRxPins::new_tx_rx(io.pins.gpio2, io.pins.gpio4);
 
         let uart =
             Uart::new_async_with_config(peripherals.UART0, Config::default(), Some(pins), &clocks);
