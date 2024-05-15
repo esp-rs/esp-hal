@@ -11,48 +11,49 @@ cfg-if              = "1.0.0"
 critical-section    = "1.1.2"
 crypto-bigint       = { version = "0.5.5", default-features = false }
 elliptic-curve      = { version = "0.13.8", default-features = false, features = ["sec1"] }
-# some examples use a huge amount of stack
 embassy-executor    = { version = "0.5.0", features = ["task-arena-size-40960"] }
-embassy-sync        = "0.5.0"
 embassy-futures     = "0.1.1"
+embassy-sync        = "0.5.0"
 embassy-time        = "0.3.0"
 embassy-time-driver = { version = "0.1.0", optional = true }
 embassy-usb         = { version = "0.1.0", default-features = false, optional = true }
+embedded-can        = "0.4.1"
 embedded-graphics   = "0.8.1"
 embedded-hal        = "1.0.0"
 embedded-hal-02     = { version = "0.2.7", package = "embedded-hal", features = ["unproven"] }
 embedded-hal-async  = "1.0.0"
 embedded-hal-bus    = "0.1.0"
 embedded-io-async   = "0.6.1"
-embedded-can        = "0.4.1"
 esp-alloc           = { version = "0.3.0", path = "../esp-alloc" }
 esp-backtrace       = { version = "0.11.1", features = ["exception-handler", "panic-handler", "println"] }
 esp-hal             = { version = "0.17.0", path = "../esp-hal", features = ["log"] }
-esp-hal-smartled    = { version = "0.10.0",  path = "../esp-hal-smartled", optional = true }
+esp-hal-smartled    = { version = "0.10.0", path = "../esp-hal-smartled", optional = true }
+esp-ieee802154      = { version = "0.1.0",  path = "../esp-ieee802154", optional = true }
 esp-println         = { version = "0.9.1", features = ["log"] }
 fugit               = "0.3.7"
 heapless            = "0.8.0"
 hex-literal         = "0.4.1"
 hmac                = { version = "0.12.1", default-features = false }
+ieee802154          = "0.6.1"
 lis3dh-async        = "0.9.2"
+log                 = "0.4.21"
 nb                  = "1.1.0"
 p192                = { version = "0.13.0", default-features = false, features = ["arithmetic"] }
 p256                = { version = "0.13.2", default-features = false, features = ["arithmetic"] }
-portable-atomic     = { version = "1.6.0", default-features = false }
+portable-atomic     = { version = "1.6.0",  default-features = false }
 sha2                = { version = "0.10.8", default-features = false }
 smart-leds          = "0.4.0"
 ssd1306             = "0.8.4"
 static_cell         = { version = "2.0.0", features = ["nightly"] }
 usb-device          = "0.3.2"
 usbd-serial         = "0.2.1"
-log                 = "0.4"
 
 [features]
 esp32   = ["esp-hal/esp32",   "esp-backtrace/esp32",   "esp-println/esp32",   "esp-hal-smartled/esp32"]
 esp32c2 = ["esp-hal/esp32c2", "esp-backtrace/esp32c2", "esp-println/esp32c2"]
 esp32c3 = ["esp-hal/esp32c3", "esp-backtrace/esp32c3", "esp-println/esp32c3", "esp-hal-smartled/esp32c3"]
-esp32c6 = ["esp-hal/esp32c6", "esp-backtrace/esp32c6", "esp-println/esp32c6", "esp-hal-smartled/esp32c6"]
-esp32h2 = ["esp-hal/esp32h2", "esp-backtrace/esp32h2", "esp-println/esp32h2", "esp-hal-smartled/esp32h2"]
+esp32c6 = ["esp-hal/esp32c6", "esp-backtrace/esp32c6", "esp-println/esp32c6", "esp-hal-smartled/esp32c6", "esp-ieee802154/esp32c6"]
+esp32h2 = ["esp-hal/esp32h2", "esp-backtrace/esp32h2", "esp-println/esp32h2", "esp-hal-smartled/esp32h2", "esp-ieee802154/esp32h2"]
 esp32s2 = ["esp-hal/esp32s2", "esp-backtrace/esp32s2", "esp-println/esp32s2", "esp-hal-smartled/esp32s2"]
 esp32s3 = ["esp-hal/esp32s3", "esp-backtrace/esp32s3", "esp-println/esp32s3", "esp-hal-smartled/esp32s3"]
 
