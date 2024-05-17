@@ -114,7 +114,7 @@ where
                     .ep1()
                     .write(|w| unsafe { w.rdwr_byte().bits(*byte) });
             }
-            reg_block.ep1_conf().write(|w| w.wr_done().set_bit());
+            reg_block.ep1_conf().modify(|_, w| w.wr_done().set_bit());
 
             while reg_block.ep1_conf().read().bits() & 0b011 == 0b000 {
                 // wait
@@ -149,7 +149,7 @@ where
     /// Flush the output FIFO and block until it has been sent
     pub fn flush_tx(&mut self) -> Result<(), Error> {
         let reg_block = USB_DEVICE::register_block();
-        reg_block.ep1_conf().write(|w| w.wr_done().set_bit());
+        reg_block.ep1_conf().modify(|_, w| w.wr_done().set_bit());
 
         while reg_block.ep1_conf().read().bits() & 0b011 == 0b000 {
             // wait
@@ -161,7 +161,7 @@ where
     /// Flush the output FIFO but don't block if it isn't ready immediately
     pub fn flush_tx_nb(&mut self) -> nb::Result<(), Error> {
         let reg_block = USB_DEVICE::register_block();
-        reg_block.ep1_conf().write(|w| w.wr_done().set_bit());
+        reg_block.ep1_conf().modify(|_, w| w.wr_done().set_bit());
 
         if reg_block.ep1_conf().read().bits() & 0b011 == 0b000 {
             Err(nb::Error::WouldBlock)
@@ -362,7 +362,7 @@ pub trait Instance: crate::private::Sealed {
     fn disable_tx_interrupts() {
         Self::register_block()
             .int_ena()
-            .write(|w| w.serial_in_empty().clear_bit());
+            .modify(|_, w| w.serial_in_empty().clear_bit());
 
         Self::register_block()
             .int_clr()
@@ -373,7 +373,7 @@ pub trait Instance: crate::private::Sealed {
     fn disable_rx_interrupts() {
         Self::register_block()
             .int_ena()
-            .write(|w| w.serial_out_recv_pkt().clear_bit());
+            .modify(|_, w| w.serial_out_recv_pkt().clear_bit());
 
         Self::register_block()
             .int_clr()
@@ -770,7 +770,7 @@ mod asynch {
                         .ep1()
                         .write(|w| unsafe { w.rdwr_byte().bits(*byte) });
                 }
-                reg_block.ep1_conf().write(|w| w.wr_done().set_bit());
+                reg_block.ep1_conf().modify(|_, w| w.wr_done().set_bit());
 
                 UsbSerialJtagWriteFuture::new().await;
             }
@@ -851,10 +851,11 @@ mod asynch {
         let rx = interrupts.serial_out_recv_pkt().bit_is_set();
 
         if tx {
-            usb.int_ena().write(|w| w.serial_in_empty().clear_bit());
+            usb.int_ena().modify(|_, w| w.serial_in_empty().clear_bit());
         }
         if rx {
-            usb.int_ena().write(|w| w.serial_out_recv_pkt().clear_bit());
+            usb.int_ena()
+                .modify(|_, w| w.serial_out_recv_pkt().clear_bit());
         }
 
         usb.int_clr().write(|w| {

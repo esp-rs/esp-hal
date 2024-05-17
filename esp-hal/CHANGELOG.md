@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix delay on esp32h2 (#1535)
 - spi: fix dma wrong mode when using eh1 blocking api (#1541)
 - uart: make `uart::UartRx::read_byte` public (#1547)
+- Fix async serial-usb-jtag (#1561)
 
 ### Changed
 
