@@ -21,6 +21,7 @@ pub enum Package {
     EspHal,
     EspHalProcmacros,
     EspHalSmartled,
+    EspIeee802154,
     EspLpHal,
     EspRiscvRt,
     Examples,
