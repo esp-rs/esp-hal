@@ -1460,12 +1460,10 @@ where
     }
 }
 
-impl<'d, CH, P, CP, DM> DmaSupport for ParlIoTx<'d, CH, P, CP, DM>
+impl<'d, CH, DM> DmaSupport for ParlIoTx<'d, CH, DM>
 where
     CH: ChannelTypes,
     CH::P: ParlIoPeripheral,
-    P: TxPins + ConfigurePins,
-    CP: TxClkPin,
     DM: Mode,
 {
     fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
@@ -1479,12 +1477,10 @@ where
     }
 }
 
-impl<'d, CH, P, CP, DM> DmaSupportTx for ParlIoTx<'d, CH, P, CP, DM>
+impl<'d, CH, DM> DmaSupportTx for ParlIoTx<'d, CH, DM>
 where
     CH: ChannelTypes,
     CH::P: ParlIoPeripheral,
-    P: TxPins + ConfigurePins,
-    CP: TxClkPin,
     DM: Mode,
 {
     type TX = CH::Tx<'d>;
@@ -1494,7 +1490,7 @@ where
     }
 }
 
-impl<'d, CH, P, CP, DM> ParlIoRx<'d, CH, P, CP, DM>
+impl<'d, CH, DM> ParlIoRx<'d, CH, DM>
 where
     CH: ChannelTypes,
     CH::P: ParlIoPeripheral,
@@ -1553,12 +1549,10 @@ where
     }
 }
 
-impl<'d, CH, P, CP, DM> DmaSupport for ParlIoRx<'d, CH, P, CP, DM>
+impl<'d, CH, DM> DmaSupport for ParlIoRx<'d, CH, DM>
 where
     CH: ChannelTypes,
     CH::P: ParlIoPeripheral,
-    P: RxPins + ConfigurePins,
-    CP: RxClkPin,
     DM: Mode,
 {
     fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
@@ -1579,12 +1573,10 @@ where
     }
 }
 
-impl<'d, CH, P, CP, DM> DmaSupportRx for ParlIoRx<'d, CH, P, CP, DM>
+impl<'d, CH, DM> DmaSupportRx for ParlIoRx<'d, CH, DM>
 where
     CH: ChannelTypes,
     CH::P: ParlIoPeripheral,
-    P: RxPins + ConfigurePins,
-    CP: RxClkPin,
     DM: Mode,
 {
     type RX = CH::Rx<'d>;
