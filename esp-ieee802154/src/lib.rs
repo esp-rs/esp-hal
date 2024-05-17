@@ -6,7 +6,7 @@
 //! [IEEE 802.15.4]: https://en.wikipedia.org/wiki/IEEE_802.15.4
 
 #![no_std]
-#![feature(c_variadic)]
+#![cfg_attr(feature = "binary-logs", feature(c_variadic))]
 
 use core::{cell::RefCell, marker::PhantomData};
 

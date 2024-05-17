@@ -7,20 +7,24 @@ use self::str_buf::StrBuf;
 mod str_buf;
 
 #[no_mangle]
-pub unsafe extern "C" fn phy_printf(format: *const u8, args: ...) {
-    syslog(format, args);
+pub unsafe extern "C" fn phy_printf(_format: *const u8, _args: ...) {
+    #[cfg(feature = "binary-logs")]
+    syslog(_format, _args);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn rtc_printf(format: *const u8, args: ...) {
-    syslog(format, args);
+pub unsafe extern "C" fn rtc_printf(_format: *const u8, _args: ...) {
+    #[cfg(feature = "binary-logs")]
+    syslog(_format, _args);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn coexist_printf(format: *const u8, args: ...) {
-    syslog(format, args);
+pub unsafe extern "C" fn coexist_printf(_format: *const u8, _args: ...) {
+    #[cfg(feature = "binary-logs")]
+    syslog(_format, _args);
 }
 
+#[cfg(feature = "binary-logs")]
 pub unsafe extern "C" fn syslog(format: *const u8, args: VaListImpl) {
     let mut buf = [0u8; 512];
     vsnprintf(&mut buf as *mut u8, 511, format, args);
@@ -28,6 +32,7 @@ pub unsafe extern "C" fn syslog(format: *const u8, args: VaListImpl) {
     info!("{}", res_str.as_str_ref());
 }
 
+#[cfg(feature = "binary-logs")]
 pub(crate) unsafe fn vsnprintf(
     dst: *mut u8,
     _n: u32,

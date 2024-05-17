@@ -29,3 +29,6 @@ vcell            = "0.1.3"
 default = []
 esp32c6 = ["esp-hal/esp32c6", "esp-wifi-sys/esp32c6"]
 esp32h2 = ["esp-hal/esp32h2", "esp-wifi-sys/esp32h2"]
+
+## Output logging from the phy blobs. Requires nightly
+binary-logs = []
