@@ -18,7 +18,7 @@ use esp_hal::{
     dma_buffers,
     embassy,
     gpio::Io,
-    parl_io::{BitPackOrder, NoClkPin, ParlIoRxOnly, RxFourBits},
+    parl_io::{no_clk_pin, BitPackOrder, ParlIoRxOnly, RxFourBits},
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
@@ -43,7 +43,7 @@ async fn main(_spawner: Spawner) {
     let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
-    let rx_pins = RxFourBits::new(io.pins.gpio1, io.pins.gpio2, io.pins.gpio3, io.pins.gpio4);
+    let mut rx_pins = RxFourBits::new(io.pins.gpio1, io.pins.gpio2, io.pins.gpio3, io.pins.gpio4);
 
     let parl_io = ParlIoRxOnly::new(
         peripherals.PARL_IO,
@@ -60,7 +60,7 @@ async fn main(_spawner: Spawner) {
 
     let mut parl_io_rx = parl_io
         .rx
-        .with_config(rx_pins, NoClkPin, BitPackOrder::Msb, Some(0xfff))
+        .with_config(&mut rx_pins, no_clk_pin(), BitPackOrder::Msb, Some(0xfff))
         .unwrap();
 
     let buffer = rx_buffer;

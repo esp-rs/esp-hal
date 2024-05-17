@@ -56,7 +56,7 @@ async fn main(_spawner: Spawner) {
 
     let tx_pins = TxFourBits::new(io.pins.gpio1, io.pins.gpio2, io.pins.gpio3, io.pins.gpio4);
 
-    let pin_conf = TxPinConfigWithValidPin::new(tx_pins, io.pins.gpio5);
+    let mut pin_conf = TxPinConfigWithValidPin::new(tx_pins, io.pins.gpio5);
 
     let parl_io = ParlIoTxOnly::new(
         peripherals.PARL_IO,
@@ -71,13 +71,13 @@ async fn main(_spawner: Spawner) {
     )
     .unwrap();
 
-    let clock_pin = ClkOutPin::new(io.pins.gpio8);
+    let mut clock_pin = ClkOutPin::new(io.pins.gpio8);
 
     let mut parl_io_tx = parl_io
         .tx
         .with_config(
-            pin_conf,
-            clock_pin,
+            &mut pin_conf,
+            &mut clock_pin,
             0,
             SampleEdge::Normal,
             BitPackOrder::Msb,

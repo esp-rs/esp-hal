@@ -17,7 +17,7 @@
 //! let tx_pins = TxFourBits::new(io.pins.gpio1, io.pins.gpio2, io.pins.gpio3, io.pins.gpio4);
 //!
 //! // configure the valid pin which will be driven high during a TX transfer
-//! let pin_conf = TxPinConfigWithValidPin::new(tx_pins, io.pins.gpio5);
+//! let mut pin_conf = TxPinConfigWithValidPin::new(tx_pins, io.pins.gpio5);
 //!
 //! let mut parl_io = ParlIoTxOnly::new(
 //!     peripherals.PARL_IO,
@@ -33,11 +33,17 @@
 //! .unwrap();
 //!
 //! // configure a pin for the clock signal
-//! let cp = ClkOutPin::new(io.pins.gpio6);
+//! let mut cp = ClkOutPin::new(io.pins.gpio6);
 //!
 //! let mut parl_io_tx = parl_io
 //!     .tx
-//!     .with_config(pin_conf, cp, 0, SampleEdge::Normal, BitPackOrder::Msb)
+//!     .with_config(
+//!         &mut pin_conf,
+//!         &mut cp,
+//!         0,
+//!         SampleEdge::Normal,
+//!         BitPackOrder::Msb,
+//!     )
 //!     .unwrap();
 //! ```
 //!
@@ -50,7 +56,7 @@
 //!
 //! ### Initialization for RX
 //! ```no_run
-//! let rx_pins = RxFourBits::new(io.pins.gpio1, io.pins.gpio2, io.pins.gpio3, io.pins.gpio4);
+//! let mut rx_pins = RxFourBits::new(io.pins.gpio1, io.pins.gpio2, io.pins.gpio3, io.pins.gpio4);
 //!
 //! let parl_io = ParlIoRxOnly::new(
 //!     peripherals.PARL_IO,
@@ -67,7 +73,7 @@
 //!
 //! let mut parl_io_rx = parl_io
 //!     .rx
-//!     .with_config(rx_pins, NoClkPin, BitPackOrder::Msb, Some(0xfff))
+//!     .with_config(&mut rx_pins, no_clk_pin(), BitPackOrder::Msb, Some(0xfff))
 //!     .unwrap();
 //! ```
 //!
@@ -318,6 +324,12 @@ impl RxClkPin for NoClkPin {
     fn configure(&mut self) {
         // nothing
     }
+}
+
+/// This can be used to pass to the `with_config` functions
+pub fn no_clk_pin() -> &'static mut NoClkPin {
+    static mut NO_CLK: NoClkPin = NoClkPin;
+    unsafe { &mut *core::ptr::addr_of_mut!(NO_CLK) }
 }
 
 /// Wraps a GPIO pin which will be used as the clock output signal
@@ -889,7 +901,7 @@ where
         idle_value: u16,
         sample_edge: SampleEdge,
         bit_order: BitPackOrder,
-    ) -> Result<ParlIoTx<'d, CH, P, CP, DM>, Error>
+    ) -> Result<ParlIoTx<'d, CH, DM>, Error>
     where
         P: FullDuplex + TxPins + ConfigurePins,
         CP: TxClkPin,
@@ -903,8 +915,6 @@ where
 
         Ok(ParlIoTx {
             tx_channel: self.tx_channel,
-            _pins: tx_pins,
-            _clk_pin: clk_pin,
             phantom: PhantomData,
         })
     }
@@ -918,12 +928,12 @@ where
     /// Configure TX to use the given pins and settings
     pub fn with_config<P, CP>(
         self,
-        mut tx_pins: P,
-        mut clk_pin: CP,
+        tx_pins: &'d mut P,
+        clk_pin: &'d mut CP,
         idle_value: u16,
         sample_edge: SampleEdge,
         bit_order: BitPackOrder,
-    ) -> Result<ParlIoTx<'d, CH, P, CP, DM>, Error>
+    ) -> Result<ParlIoTx<'d, CH, DM>, Error>
     where
         P: TxPins + ConfigurePins,
         CP: TxClkPin,
@@ -937,32 +947,24 @@ where
 
         Ok(ParlIoTx {
             tx_channel: self.tx_channel,
-            _pins: tx_pins,
-            _clk_pin: clk_pin,
             phantom: PhantomData,
         })
     }
 }
 
 /// Parallel IO TX channel
-pub struct ParlIoTx<'d, CH, P, CP, DM>
+pub struct ParlIoTx<'d, CH, DM>
 where
     CH: ChannelTypes,
-    P: TxPins + ConfigurePins,
-    CP: TxClkPin,
     DM: Mode,
 {
     tx_channel: CH::Tx<'d>,
-    _pins: P,
-    _clk_pin: CP,
     phantom: PhantomData<DM>,
 }
 
-impl<'d, CH, P, CP, DM> core::fmt::Debug for ParlIoTx<'d, CH, P, CP, DM>
+impl<'d, CH, DM> core::fmt::Debug for ParlIoTx<'d, CH, DM>
 where
     CH: ChannelTypes,
-    P: TxPins + ConfigurePins,
-    CP: TxClkPin,
     DM: Mode,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -978,11 +980,11 @@ where
     /// Configure RX to use the given pins and settings
     pub fn with_config<P, CP>(
         self,
-        mut rx_pins: P,
-        mut clk_pin: CP,
+        rx_pins: &'d mut P,
+        clk_pin: &'d mut CP,
         bit_order: BitPackOrder,
         timeout_ticks: Option<u16>,
-    ) -> Result<ParlIoRx<'d, CH, P, CP, DM>, Error>
+    ) -> Result<ParlIoRx<'d, CH, DM>, Error>
     where
         P: FullDuplex + RxPins + ConfigurePins,
         CP: RxClkPin,
@@ -995,8 +997,6 @@ where
 
         Ok(ParlIoRx {
             rx_channel: self.rx_channel,
-            _pins: rx_pins,
-            _clk_pin: clk_pin,
             phantom: PhantomData,
         })
     }
@@ -1010,11 +1010,11 @@ where
     /// Configure RX to use the given pins and settings
     pub fn with_config<P, CP>(
         self,
-        mut rx_pins: P,
-        mut clk_pin: CP,
+        rx_pins: &'d mut P,
+        clk_pin: &'d mut CP,
         bit_order: BitPackOrder,
         timeout_ticks: Option<u16>,
-    ) -> Result<ParlIoRx<'d, CH, P, CP, DM>, Error>
+    ) -> Result<ParlIoRx<'d, CH, DM>, Error>
     where
         P: RxPins + ConfigurePins,
         CP: RxClkPin,
@@ -1027,32 +1027,24 @@ where
 
         Ok(ParlIoRx {
             rx_channel: self.rx_channel,
-            _pins: rx_pins,
-            _clk_pin: clk_pin,
             phantom: PhantomData,
         })
     }
 }
 
 /// Parallel IO RX channel
-pub struct ParlIoRx<'d, CH, P, CP, DM>
+pub struct ParlIoRx<'d, CH, DM>
 where
     CH: ChannelTypes,
-    P: RxPins + ConfigurePins,
-    CP: RxClkPin,
     DM: Mode,
 {
     rx_channel: CH::Rx<'d>,
-    _pins: P,
-    _clk_pin: CP,
     phantom: PhantomData<DM>,
 }
 
-impl<'d, CH, P, CP, DM> core::fmt::Debug for ParlIoRx<'d, CH, P, CP, DM>
+impl<'d, CH, DM> core::fmt::Debug for ParlIoRx<'d, CH, DM>
 where
     CH: ChannelTypes,
-    P: RxPins + ConfigurePins,
-    CP: RxClkPin,
     DM: Mode,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -1412,12 +1404,10 @@ where
     Ok(())
 }
 
-impl<'d, CH, P, CP, DM> ParlIoTx<'d, CH, P, CP, DM>
+impl<'d, CH, DM> ParlIoTx<'d, CH, DM>
 where
     CH: ChannelTypes,
     CH::P: ParlIoPeripheral,
-    P: TxPins + ConfigurePins,
-    CP: TxClkPin,
     DM: Mode,
 {
     /// Perform a DMA write.
@@ -1470,12 +1460,10 @@ where
     }
 }
 
-impl<'d, CH, P, CP, DM> DmaSupport for ParlIoTx<'d, CH, P, CP, DM>
+impl<'d, CH, DM> DmaSupport for ParlIoTx<'d, CH, DM>
 where
     CH: ChannelTypes,
     CH::P: ParlIoPeripheral,
-    P: TxPins + ConfigurePins,
-    CP: TxClkPin,
     DM: Mode,
 {
     fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
@@ -1489,12 +1477,10 @@ where
     }
 }
 
-impl<'d, CH, P, CP, DM> DmaSupportTx for ParlIoTx<'d, CH, P, CP, DM>
+impl<'d, CH, DM> DmaSupportTx for ParlIoTx<'d, CH, DM>
 where
     CH: ChannelTypes,
     CH::P: ParlIoPeripheral,
-    P: TxPins + ConfigurePins,
-    CP: TxClkPin,
     DM: Mode,
 {
     type TX = CH::Tx<'d>;
@@ -1504,12 +1490,10 @@ where
     }
 }
 
-impl<'d, CH, P, CP, DM> ParlIoRx<'d, CH, P, CP, DM>
+impl<'d, CH, DM> ParlIoRx<'d, CH, DM>
 where
     CH: ChannelTypes,
     CH::P: ParlIoPeripheral,
-    P: RxPins + ConfigurePins,
-    CP: RxClkPin,
     DM: Mode,
 {
     /// Perform a DMA read.
@@ -1565,12 +1549,10 @@ where
     }
 }
 
-impl<'d, CH, P, CP, DM> DmaSupport for ParlIoRx<'d, CH, P, CP, DM>
+impl<'d, CH, DM> DmaSupport for ParlIoRx<'d, CH, DM>
 where
     CH: ChannelTypes,
     CH::P: ParlIoPeripheral,
-    P: RxPins + ConfigurePins,
-    CP: RxClkPin,
     DM: Mode,
 {
     fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
@@ -1591,12 +1573,10 @@ where
     }
 }
 
-impl<'d, CH, P, CP, DM> DmaSupportRx for ParlIoRx<'d, CH, P, CP, DM>
+impl<'d, CH, DM> DmaSupportRx for ParlIoRx<'d, CH, DM>
 where
     CH: ChannelTypes,
     CH::P: ParlIoPeripheral,
-    P: RxPins + ConfigurePins,
-    CP: RxClkPin,
     DM: Mode,
 {
     type RX = CH::Rx<'d>;
@@ -1654,13 +1634,7 @@ pub mod asynch {
     use embassy_sync::waitqueue::AtomicWaker;
     use procmacros::handler;
 
-    use super::{
-        private::{ConfigurePins, Instance, RxClkPin, RxPins, TxClkPin, TxPins},
-        Error,
-        ParlIoRx,
-        ParlIoTx,
-        MAX_DMA_SIZE,
-    };
+    use super::{private::Instance, Error, ParlIoRx, ParlIoTx, MAX_DMA_SIZE};
     use crate::{
         dma::{asynch::DmaRxDoneChFuture, ChannelTypes, ParlIoPeripheral},
         peripherals::Interrupt,
@@ -1716,12 +1690,10 @@ pub mod asynch {
         }
     }
 
-    impl<'d, CH, P, CP> ParlIoTx<'d, CH, P, CP, crate::Async>
+    impl<'d, CH> ParlIoTx<'d, CH, crate::Async>
     where
         CH: ChannelTypes,
         CH::P: ParlIoPeripheral,
-        P: TxPins + ConfigurePins,
-        CP: TxClkPin,
     {
         /// Perform a DMA write.
         ///
@@ -1741,12 +1713,10 @@ pub mod asynch {
         }
     }
 
-    impl<'d, CH, P, CP> ParlIoRx<'d, CH, P, CP, crate::Async>
+    impl<'d, CH> ParlIoRx<'d, CH, crate::Async>
     where
         CH: ChannelTypes,
         CH::P: ParlIoPeripheral,
-        P: RxPins + ConfigurePins,
-        CP: RxClkPin,
     {
         /// Perform a DMA write.
         ///
