@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `time::current_time` API (#1503)
 - ESP32-S3: Add LCD_CAM Camera driver (#1483)
 - `embassy-usb` support (#1517)
-- SPI Slave support for ESP32-S2 (#1514)
+- SPI Slave support for ESP32-S2 (#1562)
 
 ### Fixed
 
