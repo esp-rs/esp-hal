@@ -7,6 +7,7 @@
 use crate::dma::DmaError;
 
 pub mod master;
+#[cfg(not(esp32))]
 pub mod slave;
 
 /// SPI errors

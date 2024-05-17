@@ -414,7 +414,7 @@ where
             read_buffer_ptr,
             read_buffer_len,
         )?;
-        #[cfg(any(esp32, esp32s2))]
+        #[cfg(esp32s2)]
         rx.start_transfer()?;
 
         tx.prepare_transfer_without_start(
@@ -423,38 +423,23 @@ where
             write_buffer_ptr,
             write_buffer_len,
         )?;
-        #[cfg(any(esp32, esp32s2))]
+        #[cfg(esp32s2)]
         tx.start_transfer()?;
 
         reset_dma_before_usr_cmd(reg_block);
 
-        // On the esp32, all full-duplex transfers are single, and all half-duplex
+        // Note: On the esp32, all full-duplex transfers are single, and all half-duplex
         // transfers use the cmd/addr/dummy/data sequence (but are still
         // single).
-        #[cfg(not(esp32))]
         reg_block
             .dma_conf()
             .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
-
-        #[cfg(esp32)]
-        {
-            reg_block
-                .slv_rdbuf_dlen()
-                .write(|w| w.slv_rdbuf_dbitlen().bits((read_buffer_len * 8 - 1) as u32));
-            reg_block.slv_wrbuf_dlen().write(|w| {
-                w.slv_wrbuf_dbitlen()
-                    .bits((write_buffer_len * 8 - 1) as u32)
-            });
-
-            reg_block.user().modify(|_, w| w.usr_mosi().set_bit());
-            reg_block.user().modify(|_, w| w.usr_miso().set_bit());
-        }
 
         self.clear_dma_interrupts();
         self.setup_for_flush();
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
 
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(not(esp32s2))]
         {
             rx.start_transfer()?;
             tx.start_transfer()?;
@@ -478,33 +463,23 @@ where
         reset_dma_before_load_dma_dscr(reg_block);
 
         tx.prepare_transfer_without_start(self.dma_peripheral(), false, ptr, len)?;
-        #[cfg(any(esp32, esp32s2))]
+        #[cfg(esp32s2)]
         tx.start_transfer()?;
 
         reset_dma_before_usr_cmd(reg_block);
 
-        // On the esp32, all full-duplex transfers are single, and all half-duplex
+        // Note: On the esp32, all full-duplex transfers are single, and all half-duplex
         // transfers use the cmd/addr/dummy/data sequence (but are still
         // single).
-        #[cfg(not(esp32))]
         reg_block
             .dma_conf()
             .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
-
-        #[cfg(esp32)]
-        {
-            reg_block
-                .slv_rdbuf_dlen()
-                .write(|w| unsafe { w.slv_rdbuf_dbitlen().bits((len * 8 - 1) as u32) });
-
-            reg_block.user().modify(|_, w| w.usr_mosi().set_bit());
-        }
 
         self.clear_dma_interrupts();
         self.setup_for_flush();
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
 
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(not(esp32s2))]
         {
             tx.start_transfer()?;
         }
@@ -526,37 +501,23 @@ where
 
         reset_dma_before_load_dma_dscr(reg_block);
         rx.prepare_transfer_without_start(false, self.dma_peripheral(), ptr, len)?;
-        #[cfg(any(esp32, esp32s2))]
+        #[cfg(esp32s2)]
         rx.start_transfer()?;
 
         reset_dma_before_usr_cmd(reg_block);
 
-        // On the esp32, all full-duplex transfers are single, and all half-duplex
+        // Note: On the esp32, all full-duplex transfers are single, and all half-duplex
         // transfers use the cmd/addr/dummy/data sequence (but are still
         // single).
-        #[cfg(not(esp32))]
         reg_block
             .dma_conf()
             .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
-
-        #[cfg(esp32)]
-        {
-            reg_block
-                .slv_rdbuf_dlen()
-                .write(|w| unsafe { w.slv_rdbuf_dbitlen().bits((len * 8 - 1) as u32) });
-
-            reg_block
-                .slv_wrbuf_dlen()
-                .write(|w| w.slv_wrbuf_dbitlen().bits((len * 8 - 1) as u32));
-
-            reg_block.user().modify(|_, w| w.usr_miso().set_bit());
-        }
 
         self.clear_dma_interrupts();
         self.setup_for_flush();
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
 
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(not(esp32s2))]
         {
             rx.start_transfer()?;
         }
@@ -586,7 +547,7 @@ where
         });
     }
 
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(esp32s2)]
     fn enable_dma(&self) {
         // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
     }
@@ -608,7 +569,7 @@ where
         });
     }
 
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(esp32s2)]
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
         reg_block.dma_int_clr().write(|w| {
@@ -634,7 +595,7 @@ where
     }
 }
 
-#[cfg(not(any(esp32, esp32s2)))]
+#[cfg(not(esp32s2))]
 fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
     reg_block.dma_conf().modify(|_, w| {
         w.rx_afifo_rst()
@@ -646,22 +607,16 @@ fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
     });
 }
 
-#[cfg(esp32)]
-fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
-    reg_block.slave().modify(|_, w| w.sync_reset().set_bit());
-    reg_block.slave().modify(|_, w| w.sync_reset().clear_bit());
-}
-
 #[cfg(esp32s2)]
 fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
     reg_block.slave().modify(|_, w| w.soft_reset().set_bit());
     reg_block.slave().modify(|_, w| w.soft_reset().clear_bit());
 }
 
-#[cfg(not(any(esp32, esp32s2)))]
+#[cfg(not(esp32s2))]
 fn reset_dma_before_load_dma_dscr(_reg_block: &RegisterBlock) {}
 
-#[cfg(any(esp32, esp32s2))]
+#[cfg(esp32s2)]
 fn reset_dma_before_load_dma_dscr(reg_block: &RegisterBlock) {
     reg_block.dma_conf().modify(|_, w| {
         w.out_rst()
@@ -756,7 +711,7 @@ pub trait Instance: private::Sealed {
                 .clear_bit()
         });
 
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(not(esp32s2))]
         reg_block.clk_gate().modify(|_, w| {
             w.clk_en()
                 .clear_bit()
@@ -766,7 +721,7 @@ pub trait Instance: private::Sealed {
                 .clear_bit()
         });
 
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(not(esp32s2))]
         reg_block.ctrl().modify(|_, w| {
             w.q_pol()
                 .clear_bit()
@@ -781,14 +736,9 @@ pub trait Instance: private::Sealed {
             .ctrl()
             .modify(|_, w| w.q_pol().clear_bit().d_pol().clear_bit().wp().clear_bit());
 
-        #[cfg(esp32)]
-        reg_block.ctrl().modify(|_, w| w.wp().clear_bit());
-
-        #[cfg(not(esp32))]
         reg_block.misc().write(|w| unsafe { w.bits(0) });
     }
 
-    #[cfg(not(esp32))]
     fn set_data_mode(&mut self, data_mode: SpiMode) -> &mut Self {
         let reg_block = self.register_block();
 
@@ -830,93 +780,17 @@ pub trait Instance: private::Sealed {
                 reg_block.slave().modify(|_, w| w.clk_mode_13().set_bit());
             }
         }
-        self
-    }
-
-    #[cfg(esp32)]
-    fn set_data_mode(&mut self, data_mode: SpiMode) -> &mut Self {
-        let reg_block = self.register_block();
-        match data_mode {
-            SpiMode::Mode0 => {
-                reg_block.pin().modify(|_, w| w.ck_idle_edge().clear_bit());
-                reg_block.user().modify(|_, w| w.ck_i_edge().set_bit());
-                reg_block.ctrl2().modify(|_, w| unsafe {
-                    w.miso_delay_mode().bits(0);
-                    w.miso_delay_num().bits(0);
-                    w.mosi_delay_mode().bits(2);
-                    w.mosi_delay_num().bits(2)
-                });
-            }
-            SpiMode::Mode1 => {
-                reg_block.pin().modify(|_, w| w.ck_idle_edge().set_bit());
-                reg_block.user().modify(|_, w| w.ck_i_edge().set_bit());
-                reg_block.ctrl2().modify(|_, w| unsafe {
-                    w.miso_delay_mode().bits(2);
-                    w.miso_delay_num().bits(0);
-                    w.mosi_delay_mode().bits(0);
-                    w.mosi_delay_num().bits(0)
-                });
-            }
-            SpiMode::Mode2 => {
-                reg_block.pin().modify(|_, w| w.ck_idle_edge().clear_bit());
-                reg_block.user().modify(|_, w| w.ck_i_edge().set_bit());
-                reg_block.ctrl2().modify(|_, w| unsafe {
-                    w.miso_delay_mode().bits(0);
-                    w.miso_delay_num().bits(0);
-                    w.mosi_delay_mode().bits(1);
-                    w.mosi_delay_num().bits(2)
-                });
-            }
-            SpiMode::Mode3 => {
-                reg_block.pin().modify(|_, w| w.ck_idle_edge().clear_bit());
-                reg_block.user().modify(|_, w| w.ck_i_edge().clear_bit());
-                reg_block.ctrl2().modify(|_, w| unsafe {
-                    w.miso_delay_mode().bits(1);
-                    w.miso_delay_num().bits(0);
-                    w.mosi_delay_mode().bits(0);
-                    w.mosi_delay_num().bits(0)
-                });
-            }
-        }
-
-        // Silicon issues exists in mode 0 and 2 with DMA, change clock phase to
-        // avoid dma issue. This will cause slave output to appear at most half a
-        // spi clock before
-        match data_mode {
-            SpiMode::Mode0 => {
-                reg_block.pin().modify(|_, w| w.ck_idle_edge().clear_bit());
-                reg_block.user().modify(|_, w| w.ck_i_edge().set_bit());
-                reg_block.ctrl2().modify(|_, w| unsafe {
-                    w.miso_delay_mode().bits(0);
-                    w.miso_delay_num().bits(2);
-                    w.mosi_delay_mode().bits(0);
-                    w.mosi_delay_num().bits(3)
-                });
-            }
-            SpiMode::Mode2 => {
-                reg_block.pin().modify(|_, w| w.ck_idle_edge().set_bit());
-                reg_block.user().modify(|_, w| w.ck_i_edge().clear_bit());
-                reg_block.ctrl2().modify(|_, w| unsafe {
-                    w.miso_delay_mode().bits(0);
-                    w.miso_delay_num().bits(2);
-                    w.mosi_delay_mode().bits(0);
-                    w.mosi_delay_num().bits(3)
-                });
-            }
-            _ => (),
-        }
-
         self
     }
 
     fn is_bus_busy(&self) -> bool {
         let reg_block = self.register_block();
 
-        #[cfg(any(esp32, esp32s2))]
+        #[cfg(esp32s2)]
         {
             reg_block.slave().read().trans_done().bit_is_clear()
         }
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(not(esp32s2))]
         {
             reg_block.dma_int_raw().read().trans_done().bit_is_clear()
         }
@@ -933,11 +807,11 @@ pub trait Instance: private::Sealed {
     // Clear the transaction-done interrupt flag so flush() can work properly. Not
     // used in DMA mode.
     fn setup_for_flush(&self) {
-        #[cfg(any(esp32, esp32s2))]
+        #[cfg(esp32s2)]
         self.register_block()
             .slave()
             .modify(|_, w| w.trans_done().clear_bit());
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(not(esp32s2))]
         self.register_block()
             .dma_int_clr()
             .write(|w| w.trans_done().clear_bit_by_one());
@@ -979,82 +853,6 @@ impl Instance for crate::peripherals::SPI2 {
     #[inline(always)]
     fn spi_num(&self) -> u8 {
         2
-    }
-}
-
-#[cfg(esp32)]
-impl Instance for crate::peripherals::SPI2 {
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
-    }
-
-    #[inline(always)]
-    fn sclk_signal(&self) -> InputSignal {
-        InputSignal::HSPICLK
-    }
-
-    #[inline(always)]
-    fn mosi_signal(&self) -> InputSignal {
-        InputSignal::HSPID
-    }
-
-    #[inline(always)]
-    fn miso_signal(&self) -> OutputSignal {
-        OutputSignal::HSPIQ
-    }
-
-    #[inline(always)]
-    fn cs_signal(&self) -> InputSignal {
-        InputSignal::HSPICS0
-    }
-
-    #[inline(always)]
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(crate::system::Peripheral::Spi2);
-    }
-
-    #[inline(always)]
-    fn spi_num(&self) -> u8 {
-        2
-    }
-}
-
-#[cfg(esp32)]
-impl Instance for crate::peripherals::SPI3 {
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
-    }
-
-    #[inline(always)]
-    fn sclk_signal(&self) -> InputSignal {
-        InputSignal::VSPICLK
-    }
-
-    #[inline(always)]
-    fn mosi_signal(&self) -> InputSignal {
-        InputSignal::VSPID
-    }
-
-    #[inline(always)]
-    fn miso_signal(&self) -> OutputSignal {
-        OutputSignal::VSPIQ
-    }
-
-    #[inline(always)]
-    fn cs_signal(&self) -> InputSignal {
-        InputSignal::VSPICS0
-    }
-
-    #[inline(always)]
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(crate::system::Peripheral::Spi3)
-    }
-
-    #[inline(always)]
-    fn spi_num(&self) -> u8 {
-        3
     }
 }
 

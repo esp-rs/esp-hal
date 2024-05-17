@@ -1,19 +1,6 @@
 //! SPI slave loopback test using DMA
 //!
-//! ESP32 / ESP32-S2
-//! Following pins are used for the slave:
-//! SCLK    GPIO2
-//! MISO    GPIO4
-//! MOSI    GPIO15
-//! CS      GPIO17
-//!
-//! Following pins are used for the (bitbang) master:
-//! SCLK    GPIO0
-//! MISO    GPIO5
-//! MOSI    GPIO16
-//! CS      GPIO18
-//!
-//! Other chips:
+//! Following pins are used for the (bitbang) slave:
 //!
 //! SCLK    GPIO0
 //! MISO    GPIO1
@@ -37,7 +24,7 @@
 //! pins except SCLK. SCLK is between MOSI and VDD3P3_RTC on the barebones chip,
 //! so no immediate neighbor is available.
 
-//% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32s3 esp32 esp32s2
+//% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
@@ -49,7 +36,7 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::{Input, Io, Level, Output, Pull},
+    gpio::{Gpio4, Gpio5, Gpio8, Gpio9, Input, Io, Level, Output, Pull},
     peripherals::Peripherals,
     prelude::*,
     spi::{
@@ -59,20 +46,6 @@ use esp_hal::{
     system::SystemControl,
 };
 use esp_println::println;
-
-cfg_if::cfg_if! {
-    if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
-        const MASTER_CS: u8 = 18;
-        const MASTER_MOSI: u8 = 16;
-        const MASTER_SCLK: u8 = 0;
-        const MASTER_MISO: u8 = 5;
-    } else {
-        const MASTER_CS: u8 = 9;
-        const MASTER_MOSI: u8 = 8;
-        const MASTER_SCLK: u8 = 4;
-        const MASTER_MISO: u8 = 5;
-    }
-}
 
 #[entry]
 fn main() -> ! {
@@ -95,7 +68,7 @@ fn main() -> ! {
 
     let dma = Dma::new(peripherals.DMA);
     cfg_if::cfg_if! {
-        if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
+        if #[cfg(feature = "esp32s2")] {
             let dma_channel = dma.spi2channel;
         } else {
             let dma_channel = dma.channel0;
@@ -223,10 +196,10 @@ fn main() -> ! {
 fn bitbang_master(
     master_send: &[u8],
     master_receive: &mut [u8],
-    master_cs: &mut GpioPin<Output<PushPull>, MASTER_CS>,
-    master_mosi: &mut GpioPin<Output<PushPull>, MASTER_MOSI>,
-    master_sclk: &mut GpioPin<Output<PushPull>, MASTER_SCLK>,
-    master_miso: &GpioPin<Input<Floating>, MASTER_MISO>,
+    master_cs: &mut Output<Gpio9>,
+    master_mosi: &mut Output<Gpio8>,
+    master_sclk: &mut Output<Gpio4>,
+    master_miso: &Input<Gpio5>,
 ) {
     // Bit-bang out the contents of master_send and read into master_receive
     // as quickly as manageable. MSB first. Mode 0, so sampled on the rising
