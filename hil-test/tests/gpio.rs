@@ -113,7 +113,7 @@ mod tests {
 
     #[test]
     async fn test_a_pin_can_wait(_ctx: Context<'static>) {
-        let mut first = Input::new( unsafe { GpioPin::<0>::steal() } , Pull::Down);
+        let mut first = Input::new(unsafe { GpioPin::<0>::steal() }, Pull::Down);
 
         embassy_futures::select::select(
             first.wait_for_rising_edge(),
@@ -226,6 +226,5 @@ mod tests {
 
         assert_eq!(io2.is_low(), true);
         assert_eq!(io4.is_low(), true);
-
     }
 }

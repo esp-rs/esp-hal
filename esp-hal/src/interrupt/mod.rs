@@ -64,6 +64,10 @@ mod riscv;
 mod xtensa;
 
 /// An interrupt handler
+#[cfg_attr(
+    multi_core,
+    doc = "**Note**: Interrupts are handled on the core they were setup on, if a driver is initialized on core 0, and moved to core 1, core 0 will still handle the interrupt."
+)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct InterruptHandler {
     f: extern "C" fn(),
