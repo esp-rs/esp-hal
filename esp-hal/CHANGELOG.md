@@ -7,17 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Updated example on i2c to use the new `interrupt_handler` parameter (#1376)
-
 ### Added
 
-- i2c: implement `I2C:transaction` for `embedded-hal` and `embedded-hal-async`
-- spi: implement `with_bit_order` - #1537
+- i2c: implement `I2C:transaction` for `embedded-hal` and `embedded-hal-async` (#1505)
+- spi: implement `with_bit_order` (#1537)
 - ESP32-PICO-V3-02: Initial support (#1155)
 - `time::current_time` API (#1503)
 - ESP32-S3: Add LCD_CAM Camera driver (#1483)
 - `embassy-usb` support (#1517)
 - SPI Slave support for ESP32-S2 (#1562)
+- Add new generic `OneShotTimer` and `PeriodicTimer` drivers, plus new `Timer` trait which is implemented for `TIMGx` and `SYSTIMER` (#1570)
 
 ### Fixed
 
