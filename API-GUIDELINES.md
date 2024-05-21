@@ -1,4 +1,4 @@
-# ESP-RS API Guidelines
+# esp-rs API Guidelines
 
 ## About
 
@@ -7,7 +7,7 @@ This is a living document - make sure to check the latest version of this docume
 > [!NOTE]
 > Not all of the currently existing code follows this guideline, yet.
 
-In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines) apply to all projects in the ESP-RS GitHub organization where possible. (e.g. `C-SERDE` does not apply) 
+In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines) apply to all projects in the ESP-RS GitHub organization where possible. (`C-RW-VALUE` and `C-SERDE` do not apply) 
 
 Especially for public API but if possible also for internal APIs.
 
