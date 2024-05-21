@@ -23,6 +23,8 @@ To get an overview of the project, please read the [README]. Here are some resou
 
 ## Getting Started
 
+Before adding or changing code you might want to review the [esp-rs API guidelines](./API-GUIDELINES.md)
+
 ### Issues
 
 #### Create a New Issue
