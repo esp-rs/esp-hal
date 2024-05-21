@@ -408,29 +408,22 @@ where
 
         reset_dma_before_load_dma_dscr(reg_block);
 
-        rx.prepare_transfer_without_start(
-            false,
-            self.dma_peripheral(),
-            read_buffer_ptr,
-            read_buffer_len,
-        )?;
-        #[cfg(esp32s2)]
-        rx.start_transfer()?;
-
         tx.prepare_transfer_without_start(
             self.dma_peripheral(),
             false,
             write_buffer_ptr,
             write_buffer_len,
         )?;
-        #[cfg(esp32s2)]
-        tx.start_transfer()?;
+
+        rx.prepare_transfer_without_start(
+            false,
+            self.dma_peripheral(),
+            read_buffer_ptr,
+            read_buffer_len,
+        )?;
 
         reset_dma_before_usr_cmd(reg_block);
 
-        // Note: On the esp32, all full-duplex transfers are single, and all half-duplex
-        // transfers use the cmd/addr/dummy/data sequence (but are still
-        // single).
         reg_block
             .dma_conf()
             .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
@@ -439,11 +432,8 @@ where
         self.setup_for_flush();
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
 
-        #[cfg(not(esp32s2))]
-        {
-            rx.start_transfer()?;
-            tx.start_transfer()?;
-        }
+        rx.start_transfer()?;
+        tx.start_transfer()?;
 
         Ok(())
     }
@@ -463,14 +453,9 @@ where
         reset_dma_before_load_dma_dscr(reg_block);
 
         tx.prepare_transfer_without_start(self.dma_peripheral(), false, ptr, len)?;
-        #[cfg(esp32s2)]
-        tx.start_transfer()?;
 
         reset_dma_before_usr_cmd(reg_block);
 
-        // Note: On the esp32, all full-duplex transfers are single, and all half-duplex
-        // transfers use the cmd/addr/dummy/data sequence (but are still
-        // single).
         reg_block
             .dma_conf()
             .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
@@ -479,10 +464,7 @@ where
         self.setup_for_flush();
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
 
-        #[cfg(not(esp32s2))]
-        {
-            tx.start_transfer()?;
-        }
+        tx.start_transfer()?;
 
         Ok(())
     }
@@ -501,14 +483,9 @@ where
 
         reset_dma_before_load_dma_dscr(reg_block);
         rx.prepare_transfer_without_start(false, self.dma_peripheral(), ptr, len)?;
-        #[cfg(esp32s2)]
-        rx.start_transfer()?;
 
         reset_dma_before_usr_cmd(reg_block);
 
-        // Note: On the esp32, all full-duplex transfers are single, and all half-duplex
-        // transfers use the cmd/addr/dummy/data sequence (but are still
-        // single).
         reg_block
             .dma_conf()
             .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
@@ -517,10 +494,7 @@ where
         self.setup_for_flush();
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
 
-        #[cfg(not(esp32s2))]
-        {
-            rx.start_transfer()?;
-        }
+        rx.start_transfer()?;
 
         Ok(())
     }
