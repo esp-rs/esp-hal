@@ -347,38 +347,65 @@ where
     DM: Mode,
 {
     fn start(&self) {
-        unsafe { &*SYSTIMER::PTR }
-            .conf()
-            .modify(|_, w| match CHANNEL {
-                0 => w.target0_work_en().set_bit(),
-                1 => w.target1_work_en().set_bit(),
-                2 => w.target2_work_en().set_bit(),
-                _ => unreachable!(),
-            });
+        let systimer = unsafe { &*SYSTIMER::PTR };
+
+        #[cfg(esp32s2)]
+        match CHANNEL {
+            0 => systimer.target0_conf().modify(|_, w| w.work_en().set_bit()),
+            1 => systimer.target1_conf().modify(|_, w| w.work_en().set_bit()),
+            2 => systimer.target2_conf().modify(|_, w| w.work_en().set_bit()),
+            _ => unreachable!(),
+        }
+
+        #[cfg(not(esp32s2))]
+        systimer.conf().modify(|_, w| match CHANNEL {
+            0 => w.target0_work_en().set_bit(),
+            1 => w.target1_work_en().set_bit(),
+            2 => w.target2_work_en().set_bit(),
+            _ => unreachable!(),
+        });
     }
 
     fn stop(&self) {
-        unsafe { &*SYSTIMER::PTR }
-            .conf()
-            .modify(|_, w| match CHANNEL {
-                0 => w.target0_work_en().clear_bit(),
-                1 => w.target1_work_en().clear_bit(),
-                2 => w.target2_work_en().clear_bit(),
-                _ => unreachable!(),
-            });
+        let systimer = unsafe { &*SYSTIMER::PTR };
+
+        #[cfg(esp32s2)]
+        match CHANNEL {
+            0 => systimer
+                .target0_conf()
+                .modify(|_, w| w.work_en().clear_bit()),
+            1 => systimer
+                .target1_conf()
+                .modify(|_, w| w.work_en().clear_bit()),
+            2 => systimer
+                .target2_conf()
+                .modify(|_, w| w.work_en().clear_bit()),
+            _ => unreachable!(),
+        }
+
+        #[cfg(not(esp32s2))]
+        systimer.conf().modify(|_, w| match CHANNEL {
+            0 => w.target0_work_en().clear_bit(),
+            1 => w.target1_work_en().clear_bit(),
+            2 => w.target2_work_en().clear_bit(),
+            _ => unreachable!(),
+        });
     }
 
     fn reset(&self) {
         let systimer = unsafe { &*SYSTIMER::PTR };
 
         #[cfg(esp32s2)]
-        systimer.step().write(|w| w.xtal_step().bits(0x1)); // run at XTAL freq, not 80 * XTAL freq
+        // Run at XTAL freq, not 80 * XTAL freq:
+        systimer
+            .step()
+            .modify(|_, w| unsafe { w.xtal_step().bits(0x1) });
 
         #[cfg(not(esp32s2))]
         {
             systimer
                 .target_conf(CHANNEL as usize)
-                .write(|w| w.timer_unit_sel().clear_bit()); // default, use unit 0
+                .modify(|_, w| w.timer_unit_sel().clear_bit()); // default, use unit 0
             systimer
                 .conf()
                 .modify(|_, w| w.timer_unit0_core0_stall_en().clear_bit());
@@ -386,12 +413,21 @@ where
     }
 
     fn is_running(&self) -> bool {
-        let conf = unsafe { &*SYSTIMER::PTR }.conf().read();
+        let systimer = unsafe { &*SYSTIMER::PTR };
 
+        #[cfg(esp32s2)]
         match CHANNEL {
-            0 => conf.target0_work_en().bit_is_set(),
-            1 => conf.target1_work_en().bit_is_set(),
-            2 => conf.target2_work_en().bit_is_set(),
+            0 => systimer.target0_conf().read().work_en().bit_is_set(),
+            1 => systimer.target1_conf().read().work_en().bit_is_set(),
+            2 => systimer.target2_conf().read().work_en().bit_is_set(),
+            _ => unreachable!(),
+        }
+
+        #[cfg(not(esp32s2))]
+        match CHANNEL {
+            0 => systimer.conf().read().target0_work_en().bit_is_set(),
+            1 => systimer.conf().read().target1_work_en().bit_is_set(),
+            2 => systimer.conf().read().target2_work_en().bit_is_set(),
             _ => unreachable!(),
         }
     }
@@ -430,7 +466,9 @@ where
 
             systimer
                 .target_conf(CHANNEL as usize)
-                .write(|w| unsafe { w.period().bits(ticks as u32) });
+                .modify(|_, w| unsafe { w.period().bits(ticks as u32) });
+
+            #[cfg(not(esp32s2))]
             systimer
                 .comp_load(CHANNEL as usize)
                 .write(|w| w.load().set_bit());
@@ -456,6 +494,8 @@ where
                 .trgt(CHANNEL as usize)
                 .lo()
                 .write(|w| unsafe { w.lo().bits(t as u32) });
+
+            #[cfg(not(esp32s2))]
             systimer
                 .comp_load(CHANNEL as usize)
                 .write(|w| w.load().set_bit());
@@ -466,7 +506,7 @@ where
         // If `auto_reload` is true use Period Mode, otherwise use Target Mode:
         unsafe { &*SYSTIMER::PTR }
             .target_conf(CHANNEL as usize)
-            .write(|w| w.period_mode().bit(auto_reload));
+            .modify(|_, w| w.period_mode().bit(auto_reload));
     }
 
     fn enable_interrupt(&self, state: bool) {
@@ -483,7 +523,7 @@ where
 
     fn is_interrupt_set(&self) -> bool {
         unsafe { &*SYSTIMER::PTR }
-            .int_st()
+            .int_raw()
             .read()
             .target(CHANNEL)
             .bit_is_set()
