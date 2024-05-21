@@ -135,6 +135,7 @@ impl<T> embedded_hal::delay::DelayNs for OneShotTimer<T>
 where
     T: Timer,
 {
+    #[allow(clippy::useless_conversion)]
     fn delay_ns(&mut self, ns: u32) {
         self.delay_nanos(ns.into());
     }

@@ -449,6 +449,7 @@ where
         ((value_hi as u64) << 32) | value_lo as u64
     }
 
+    #[allow(clippy::unnecessary_cast)]
     fn load_value(&self, value: MicrosDurationU64) {
         let systimer = unsafe { &*SYSTIMER::PTR };
 
