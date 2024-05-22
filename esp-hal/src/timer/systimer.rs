@@ -473,6 +473,15 @@ where
             systimer
                 .comp_load(CHANNEL as usize)
                 .write(|w| w.load().set_bit());
+
+            // Clear and then set SYSTIMER_TARGETx_PERIOD_MODE to configure COMPx into
+            // period mode
+            systimer
+                .target_conf(CHANNEL as usize)
+                .modify(|_, w| w.period_mode().clear_bit());
+            systimer
+                .target_conf(CHANNEL as usize)
+                .modify(|_, w| w.period_mode().set_bit());
         } else {
             // Target mode
 

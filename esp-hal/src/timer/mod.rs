@@ -92,11 +92,8 @@ where
         self.inner.clear_interrupt();
         self.inner.reset();
 
-        // NOTE: Auto-reload MUST be enabled before loading the value in order
-        //       for `SYSTIMER` to work correctly!
         self.inner.enable_auto_reload(false);
         self.inner.load_value(us);
-        self.inner.enable_interrupt(true);
         self.inner.start();
 
         while !self.inner.is_interrupt_set() {
@@ -164,11 +161,8 @@ where
         self.inner.clear_interrupt();
         self.inner.reset();
 
-        // NOTE: Auto-reload MUST be enabled before loading the value in order
-        //       for `SYSTIMER` to work correctly!
         self.inner.enable_auto_reload(true);
         self.inner.load_value(timeout);
-        self.inner.enable_interrupt(true);
         self.inner.start();
     }
 
