@@ -18,11 +18,16 @@ pub mod cargo;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display, EnumIter, ValueEnum)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Package {
+    EspAlloc,
+    EspBacktrace,
+    EspBuild,
     EspHal,
     EspHalProcmacros,
     EspHalSmartled,
     EspIeee802154,
     EspLpHal,
+    EspMetadata,
+    EspPrintln,
     EspRiscvRt,
     Examples,
     HilTest,

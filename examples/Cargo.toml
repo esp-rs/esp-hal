@@ -25,7 +25,7 @@ embedded-hal-async  = "1.0.0"
 embedded-hal-bus    = "0.1.0"
 embedded-io-async   = "0.6.1"
 esp-alloc           = { version = "0.3.0",  path = "../esp-alloc" }
-esp-backtrace       = { version = "0.11.1", features = ["exception-handler", "panic-handler", "println"] }
+esp-backtrace       = { version = "0.11.1", path = "../esp-backtrace", features = ["exception-handler", "panic-handler", "println"] }
 esp-hal             = { version = "0.17.0", path = "../esp-hal", features = ["log"] }
 esp-hal-smartled    = { version = "0.10.0", path = "../esp-hal-smartled", optional = true }
 esp-ieee802154      = { version = "0.1.0",  path = "../esp-ieee802154", optional = true }
@@ -79,7 +79,3 @@ incremental      = false
 opt-level        = 3
 lto = 'fat'
 overflow-checks  = false
-
-# TODO: Remove patch once `esp-backtrace` package has been added to repository
-[patch.crates-io]
-esp-println = { version = "0.9.1",  path = "../esp-println" }
