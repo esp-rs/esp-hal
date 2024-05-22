@@ -18,7 +18,7 @@ use esp_hal::{
     clock::ClockControl,
     delay::Delay,
     embassy,
-    gpio::{Gpio2, Gpio4, GpioPin, Input, Io, Output, Pull},
+    gpio::{Gpio2, Gpio4, GpioPin, Input, Io, Level, Output, Pull},
     macros::handler,
     peripherals::Peripherals,
     system::SystemControl,
@@ -50,7 +50,7 @@ impl<'d> Context<'d> {
 
         Context {
             io2: Input::new(io.pins.gpio2, Pull::Down),
-            io4: Output::new(io.pins.gpio4, false),
+            io4: Output::new(io.pins.gpio4, Level::Low),
             delay,
         }
     }
@@ -184,8 +184,8 @@ mod tests {
 
     #[test]
     fn test_gpio_od(ctx: Context<'static>) {
-        let mut io2 = OutputOpenDrain::new(unsafe { GpioPin::<2>::steal() }, true, Pull::Up);
-        let mut io4 = OutputOpenDrain::new(unsafe { GpioPin::<4>::steal() }, true, Pull::Up);
+        let mut io2 = OutputOpenDrain::new(unsafe { GpioPin::<2>::steal() }, Level::High, Pull::Up);
+        let mut io4 = OutputOpenDrain::new(unsafe { GpioPin::<4>::steal() }, Level::High, Pull::Up);
 
         ctx.delay.delay_millis(1);
 

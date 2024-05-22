@@ -28,7 +28,7 @@
 //!     GpioEtmOutputConfig {
 //!         open_drain: false,
 //!         pull: Pull::None,
-//!         initial_state: false,
+//!         initial_state: Level::Low,
 //!     },
 //! );
 //! let button_event = gpio_ext
@@ -37,7 +37,7 @@
 //! ```
 
 use crate::{
-    gpio::Pull,
+    gpio::{Level, Pull},
     peripheral::{Peripheral, PeripheralRef},
     private,
 };
@@ -252,7 +252,7 @@ pub struct GpioEtmOutputConfig {
     /// Only used when open-drain
     pub pull: Pull,
     /// Initial pin state
-    pub initial_state: bool,
+    pub initial_state: Level,
 }
 
 impl Default for GpioEtmOutputConfig {
@@ -260,7 +260,7 @@ impl Default for GpioEtmOutputConfig {
         Self {
             open_drain: false,
             pull: Pull::None,
-            initial_state: false,
+            initial_state: Level::Low,
         }
     }
 }
@@ -285,7 +285,7 @@ impl<const C: u8> GpioEtmTaskChannel<C> {
     {
         crate::into_ref!(pin);
 
-        pin.set_output_high(pin_config.initial_state, private::Internal);
+        pin.set_output_high(pin_config.initial_state.into(), private::Internal);
         if pin_config.open_drain {
             pin.internal_pull_down(pin_config.pull == Pull::Down, private::Internal);
             pin.internal_pull_up(pin_config.pull == Pull::Up, private::Internal);
@@ -309,7 +309,7 @@ impl<const C: u8> GpioEtmTaskChannel<C> {
     {
         crate::into_ref!(pin);
 
-        pin.set_output_high(pin_config.initial_state, private::Internal);
+        pin.set_output_high(pin_config.initial_state.into(), private::Internal);
         if pin_config.open_drain {
             pin.internal_pull_down(pin_config.pull == Pull::Down, private::Internal);
             pin.internal_pull_up(pin_config.pull == Pull::Up, private::Internal);
@@ -333,7 +333,7 @@ impl<const C: u8> GpioEtmTaskChannel<C> {
     {
         crate::into_ref!(pin);
 
-        pin.set_output_high(pin_config.initial_state, private::Internal);
+        pin.set_output_high(pin_config.initial_state.into(), private::Internal);
         if pin_config.open_drain {
             pin.internal_pull_down(pin_config.pull == Pull::Down, private::Internal);
             pin.internal_pull_up(pin_config.pull == Pull::Up, private::Internal);

@@ -19,7 +19,7 @@ use esp_hal::{
     cpu_control::{CpuControl, Stack},
     embassy::{self, executor::InterruptExecutor},
     get_core,
-    gpio::{AnyOutput, Io},
+    gpio::{AnyOutput, Io, Level},
     interrupt::Priority,
     peripherals::Peripherals,
     prelude::*,
@@ -85,7 +85,7 @@ fn main() -> ! {
     static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
     let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
 
-    let led = AnyOutput::new(io.pins.gpio0, false);
+    let led = AnyOutput::new(io.pins.gpio0, Level::Low);
 
     static EXECUTOR_CORE_1: StaticCell<InterruptExecutor<1>> = StaticCell::new();
     let executor_core1 =

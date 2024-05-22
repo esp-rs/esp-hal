@@ -11,6 +11,7 @@ use esp_hal::{
     gpio::{
         etm::{GpioEtmChannels, GpioEtmInputConfig, GpioEtmOutputConfig},
         Io,
+        Level,
         Pull,
     },
     peripherals::Peripherals,
@@ -34,7 +35,7 @@ fn main() -> ! {
         GpioEtmOutputConfig {
             open_drain: false,
             pull: Pull::None,
-            initial_state: false,
+            initial_state: Level::Low,
         },
     );
     let button_event = gpio_ext

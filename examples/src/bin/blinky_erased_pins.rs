@@ -14,7 +14,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::{AnyInput, AnyOutput, Io, Pull},
+    gpio::{AnyInput, AnyOutput, Io, Level, Pull},
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
@@ -29,9 +29,9 @@ fn main() -> ! {
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // Set LED GPIOs as an output:
-    let led1 = AnyOutput::new(io.pins.gpio2, false);
-    let led2 = AnyOutput::new(io.pins.gpio4, false);
-    let led3 = AnyOutput::new(io.pins.gpio5, false);
+    let led1 = AnyOutput::new(io.pins.gpio2, Level::Low);
+    let led2 = AnyOutput::new(io.pins.gpio4, Level::Low);
+    let led3 = AnyOutput::new(io.pins.gpio5, Level::Low);
 
     // Use boot button as an input:
     #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
