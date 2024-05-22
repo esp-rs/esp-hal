@@ -13,7 +13,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     embassy::{self},
-    gpio::{Gpio5, Io, Output},
+    gpio::{Gpio5, Io, Level, Output},
     peripherals::Peripherals,
     prelude::*,
     rmt::{asynch::RxChannelAsync, PulseCode, Rmt, RxChannelConfig, RxChannelCreatorAsync},
@@ -75,7 +75,7 @@ async fn main(spawner: Spawner) {
     }
 
     spawner
-        .spawn(signal_task(Output::new(io.pins.gpio5, false)))
+        .spawn(signal_task(Output::new(io.pins.gpio5, Level::Low)))
         .unwrap();
 
     let mut data = [PulseCode {

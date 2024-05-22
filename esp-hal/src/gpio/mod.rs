@@ -1557,10 +1557,10 @@ where
 {
     /// Create GPIO output driver for a [GpioPin] with the provided level
     #[inline]
-    pub fn new(pin: impl crate::peripheral::Peripheral<P = P> + 'd, initial_output: bool) -> Self {
+    pub fn new(pin: impl crate::peripheral::Peripheral<P = P> + 'd, initial_output: Level) -> Self {
         crate::into_ref!(pin);
 
-        pin.set_output_high(initial_output, private::Internal);
+        pin.set_output_high(initial_output.into(), private::Internal);
         pin.set_to_push_pull_output(private::Internal);
 
         Self { pin }
@@ -1683,11 +1683,11 @@ where
     #[inline]
     pub fn new(
         pin: impl crate::peripheral::Peripheral<P = P> + 'd,
-        initial_output: bool,
+        initial_output: Level,
         pull: Pull,
     ) -> Self {
         crate::into_ref!(pin);
-        pin.set_output_high(initial_output, private::Internal);
+        pin.set_output_high(initial_output.into(), private::Internal);
         pin.set_to_open_drain_output(private::Internal);
         pin.internal_pull_down(pull == Pull::Down, private::Internal);
         pin.internal_pull_up(pull == Pull::Up, private::Internal);
@@ -1785,11 +1785,11 @@ impl<'d> AnyOutput<'d> {
     #[inline]
     pub fn new<P: OutputPin + CreateErasedPin>(
         pin: impl crate::peripheral::Peripheral<P = P> + 'd,
-        initial_output: bool,
+        initial_output: Level,
     ) -> Self {
         crate::into_ref!(pin);
 
-        pin.set_output_high(initial_output, private::Internal);
+        pin.set_output_high(initial_output.into(), private::Internal);
         pin.set_to_push_pull_output(private::Internal);
 
         let pin = pin.erased_pin(private::Internal);
@@ -1912,11 +1912,11 @@ impl<'d> AnyOutputOpenDrain<'d> {
     #[inline]
     pub fn new<P: OutputPin + InputPin + CreateErasedPin>(
         pin: impl crate::peripheral::Peripheral<P = P> + 'd,
-        initial_output: bool,
+        initial_output: Level,
         pull: Pull,
     ) -> Self {
         crate::into_ref!(pin);
-        pin.set_output_high(initial_output, private::Internal);
+        pin.set_output_high(initial_output.into(), private::Internal);
         pin.internal_pull_down(pull == Pull::Down, private::Internal);
         pin.internal_pull_up(pull == Pull::Up, private::Internal);
         pin.set_to_open_drain_output(private::Internal);

@@ -45,7 +45,7 @@
 //! let mut channel = rmt
 //!     .channel0
 //!     .configure(
-//!         io.pins.gpio1.into_push_pull_output(),
+//!         io.pins.gpio1,
 //!         TxChannelConfig {
 //!             clk_divider: 1,
 //!             idle_output_level: false,

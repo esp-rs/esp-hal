@@ -37,7 +37,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::{self, Io, Output},
+    gpio::{self, Io, Level, Output},
     peripherals::Peripherals,
     prelude::*,
     spi::{master::Spi, SpiMode},
@@ -63,19 +63,20 @@ fn main() -> ! {
         gpio::NO_PIN,
     );
     let spi_bus = RefCell::new(spi_bus);
-    let mut spi_device_1 = RefCellDevice::new_no_delay(&spi_bus, Output::new(io.pins.gpio5, false));
+    let mut spi_device_1 =
+        RefCellDevice::new_no_delay(&spi_bus, Output::new(io.pins.gpio5, Level::Low));
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
             let mut spi_device_2 =
-                RefCellDevice::new_no_delay(&spi_bus, Output::new(io.pins.gpio13, false));
+                RefCellDevice::new_no_delay(&spi_bus, Output::new(io.pins.gpio13, Level::Low));
             let mut spi_device_3 =
-                RefCellDevice::new_no_delay(&spi_bus, Output::new(io.pins.gpio14,false));
+                RefCellDevice::new_no_delay(&spi_bus, Output::new(io.pins.gpio14, Level::Low));
         } else {
             let mut spi_device_2 =
-                RefCellDevice::new_no_delay(&spi_bus, Output::new(io.pins.gpio6,false));
+                RefCellDevice::new_no_delay(&spi_bus, Output::new(io.pins.gpio6, Level::Low));
             let mut spi_device_3 =
-                RefCellDevice::new_no_delay(&spi_bus, Output::new(io.pins.gpio7, false));
+                RefCellDevice::new_no_delay(&spi_bus, Output::new(io.pins.gpio7, Level::Low));
         }
     }
 

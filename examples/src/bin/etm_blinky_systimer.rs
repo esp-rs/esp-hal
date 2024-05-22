@@ -11,6 +11,7 @@ use esp_hal::{
     gpio::{
         etm::{GpioEtmChannels, GpioEtmOutputConfig},
         Io,
+        Level,
         Pull,
     },
     peripherals::Peripherals,
@@ -37,7 +38,7 @@ fn main() -> ! {
         GpioEtmOutputConfig {
             open_drain: false,
             pull: Pull::None,
-            initial_state: true,
+            initial_state: Level::High,
         },
     );
 

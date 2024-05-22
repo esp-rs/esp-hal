@@ -20,7 +20,7 @@ use esp_hal::{
     cpu_control::{CpuControl, Stack},
     embassy::{self, executor::Executor},
     get_core,
-    gpio::{AnyOutput, Io},
+    gpio::{AnyOutput, Io, Level},
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
@@ -66,7 +66,7 @@ async fn main(_spawner: Spawner) {
     static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
     let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
 
-    let led = AnyOutput::new(io.pins.gpio0, false);
+    let led = AnyOutput::new(io.pins.gpio0, Level::Low);
 
     let _guard = cpu_control
         .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {

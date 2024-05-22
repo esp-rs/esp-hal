@@ -23,8 +23,8 @@
 //! ## Example
 //! ```no_run
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let mut led = io.pins.gpio1.into_push_pull_output();
-//! let button = io.pins.gpio9.into_pull_down_input();
+//! let mut led = io.pins.gpio1;
+//! let button = io.pins.gpio9;
 //!
 //! // setup ETM
 //! let gpio_ext = GpioEtmChannels::new(peripherals.GPIO_SD);
