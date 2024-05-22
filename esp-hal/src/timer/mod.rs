@@ -1,6 +1,6 @@
 //! General-purpose timers.
 
-use fugit::{ExtU64, MicrosDurationU64};
+use fugit::{ExtU64, Instant, MicrosDurationU64};
 
 #[cfg(systimer)]
 pub mod systimer;
@@ -34,7 +34,7 @@ pub trait Timer: crate::private::Sealed {
     fn is_running(&self) -> bool;
 
     /// The current timer value.
-    fn now(&self) -> u64;
+    fn now(&self) -> Instant<u64, 1, 1_000_000>;
 
     /// Load a target value into the timer.
     fn load_value(&self, value: MicrosDurationU64);

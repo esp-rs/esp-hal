@@ -41,7 +41,7 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use fugit::{HertzU32, MicrosDurationU64};
+use fugit::{HertzU32, Instant, MicrosDurationU64};
 
 #[cfg(timg1)]
 use crate::peripherals::TIMG1;
@@ -382,6 +382,7 @@ where
     /// Create a new timer instance.
     pub fn new(timg: T, apb_clk_freq: HertzU32) -> Self {
         timg.enable_peripheral();
+        timg.set_counter_active(true);
 
         Self {
             timg,
@@ -496,7 +497,7 @@ where
             .bit_is_set()
     }
 
-    fn now(&self) -> u64 {
+    fn now(&self) -> Instant<u64, 1, 1_000_000> {
         let t = self.register_block().t(self.timer_number().into());
 
         t.update().write(|w| w.update().set_bit());
@@ -505,9 +506,12 @@ where
         }
 
         let value_lo = t.lo().read().bits() as u64;
-        let value_hi = (t.hi().read().bits() as u64) << 32;
+        let value_hi = t.hi().read().bits() as u64;
 
-        value_lo | value_hi
+        let ticks = (value_hi << 32) | value_lo;
+        let micros = ticks_to_timeout(ticks, self.apb_clk_freq, self.timg.divider());
+
+        Instant::<u64, 1, 1_000_000>::from_ticks(micros)
     }
 
     fn load_value(&self, value: MicrosDurationU64) {
@@ -780,6 +784,18 @@ where
     }
 }
 
+fn ticks_to_timeout<F>(ticks: u64, clock: F, divider: u32) -> u64
+where
+    F: Into<HertzU32>,
+{
+    let clock: HertzU32 = clock.into();
+
+    // 1_000_000 is used to get rid of `float` calculations
+    let period: u64 = 1_000_000 * 1_000_000 / (clock.to_Hz() as u64 / divider as u64);
+
+    ticks * period / 1_000_000
+}
+
 fn timeout_to_ticks<T, F>(timeout: T, clock: F, divider: u32) -> u64
 where
     T: Into<MicrosDurationU64>,
@@ -792,6 +808,7 @@ where
 
     // 1_000_000 is used to get rid of `float` calculations
     let period: u64 = 1_000_000 * 1_000_000 / (clock.to_Hz() as u64 / divider as u64);
+
     (1_000_000 * micros / period as u64) as u64
 }
 

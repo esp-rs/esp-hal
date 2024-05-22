@@ -26,7 +26,7 @@
 
 use core::marker::PhantomData;
 
-use fugit::{MicrosDurationU32, MicrosDurationU64};
+use fugit::{Instant, MicrosDurationU32, MicrosDurationU64};
 
 use crate::{
     interrupt::{self, InterruptHandler},
@@ -432,7 +432,7 @@ where
         }
     }
 
-    fn now(&self) -> u64 {
+    fn now(&self) -> Instant<u64, 1, 1_000_000> {
         // This should be safe to access from multiple contexts; worst case
         // scenario the second accessor ends up reading an older time stamp.
 
@@ -446,7 +446,10 @@ where
         let value_lo = systimer.unit0_value().lo().read().bits();
         let value_hi = systimer.unit0_value().hi().read().bits();
 
-        ((value_hi as u64) << 32) | value_lo as u64
+        let ticks = ((value_hi as u64) << 32) | value_lo as u64;
+        let us = ticks / (SystemTimer::TICKS_PER_SECOND / 1_000_000);
+
+        Instant::<u64, 1, 1_000_000>::from_ticks(us)
     }
 
     #[allow(clippy::unnecessary_cast)]
