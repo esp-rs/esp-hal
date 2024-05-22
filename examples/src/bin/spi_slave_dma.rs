@@ -1,6 +1,7 @@
 //! SPI slave loopback test using DMA
 //!
-//! Following pins are used for the slave:
+//! Following pins are used for the (bitbang) slave:
+//!
 //! SCLK    GPIO0
 //! MISO    GPIO1
 //! MOSI    GPIO2
@@ -23,10 +24,11 @@
 //! pins except SCLK. SCLK is between MOSI and VDD3P3_RTC on the barebones chip,
 //! so no immediate neighbor is available.
 
-//% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32s3
+//% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
+#![feature(asm_experimental_arch)]
 
 use esp_backtrace as _;
 use esp_hal::{
@@ -34,7 +36,7 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::{Input, Io, Level, Output, Pull},
+    gpio::{Gpio4, Gpio5, Gpio8, Gpio9, Input, Io, Level, Output, Pull},
     peripherals::Peripherals,
     prelude::*,
     spi::{
@@ -65,7 +67,13 @@ fn main() -> ! {
     master_mosi.set_low();
 
     let dma = Dma::new(peripherals.DMA);
-    let dma_channel = dma.channel0;
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32s2")] {
+            let dma_channel = dma.spi2channel;
+        } else {
+            let dma_channel = dma.channel0;
+        }
+    }
 
     let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(32000);
 
@@ -108,39 +116,23 @@ fn main() -> ! {
         slave_receive.fill(0xff);
         i = i.wrapping_add(1);
 
+        println!("Iteration {i}");
+
+        println!("Do `dma_transfer`");
+
         let transfer = spi
             .dma_transfer(&mut slave_send, &mut slave_receive)
             .unwrap();
-        // Bit-bang out the contents of master_send and read into master_receive
-        // as quickly as manageable. MSB first. Mode 0, so sampled on the rising
-        // edge and set on the falling edge.
-        master_cs.set_low();
-        for (j, v) in master_send.iter().enumerate() {
-            let mut b = *v;
-            let mut rb = 0u8;
-            for _ in 0..8 {
-                if b & 128 != 0 {
-                    master_mosi.set_high();
-                } else {
-                    master_mosi.set_low();
-                }
-                master_sclk.set_low();
-                b <<= 1;
-                rb <<= 1;
-                // NB: adding about 24 NOPs here makes the clock's duty cycle
-                // run at about 50% ... but we don't strictly need the delay,
-                // either.
-                master_sclk.set_high();
-                if master_miso.is_high() {
-                    rb |= 1;
-                }
-            }
-            master_receive[j] = rb;
-        }
-        master_cs.set_high();
-        master_sclk.set_low();
-        // the buffers and spi is moved into the transfer and we can get it back via
-        // `wait`
+
+        bitbang_master(
+            master_send,
+            master_receive,
+            &mut master_cs,
+            &mut master_mosi,
+            &mut master_sclk,
+            &master_miso,
+        );
+
         transfer.wait().unwrap();
         println!(
             "slave got {:x?} .. {:x?}, master got {:x?} .. {:x?}",
@@ -152,25 +144,19 @@ fn main() -> ! {
 
         delay.delay_millis(250);
 
+        println!("Do `dma_read`");
         slave_receive.fill(0xff);
         let transfer = spi.dma_read(&mut slave_receive).unwrap();
-        master_cs.set_high();
 
-        master_cs.set_low();
-        for v in master_send.iter() {
-            let mut b = *v;
-            for _ in 0..8 {
-                if b & 128 != 0 {
-                    master_mosi.set_high();
-                } else {
-                    master_mosi.set_low();
-                }
-                b <<= 1;
-                master_sclk.set_low();
-                master_sclk.set_high();
-            }
-        }
-        master_cs.set_high();
+        bitbang_master(
+            master_send,
+            master_receive,
+            &mut master_cs,
+            &mut master_mosi,
+            &mut master_sclk,
+            &master_miso,
+        );
+
         transfer.wait().unwrap();
         println!(
             "slave got {:x?} .. {:x?}",
@@ -179,31 +165,70 @@ fn main() -> ! {
         );
 
         delay.delay_millis(250);
+
+        println!("Do `dma_write`");
         let transfer = spi.dma_write(&mut slave_send).unwrap();
 
         master_receive.fill(0);
 
-        master_cs.set_low();
-        for (j, _) in master_send.iter().enumerate() {
-            let mut rb = 0u8;
-            for _ in 0..8 {
-                master_sclk.set_low();
-                rb <<= 1;
-                master_sclk.set_high();
-                if master_miso.is_high() {
-                    rb |= 1;
-                }
-            }
-            master_receive[j] = rb;
-        }
-        master_cs.set_high();
-        transfer.wait().unwrap();
+        bitbang_master(
+            master_send,
+            master_receive,
+            &mut master_cs,
+            &mut master_mosi,
+            &mut master_sclk,
+            &master_miso,
+        );
 
+        transfer.wait().unwrap();
         println!(
             "master got {:x?} .. {:x?}",
             &master_receive[..10],
             &master_receive[master_receive.len() - 10..],
         );
+
+        delay.delay_millis(250);
+
         println!();
     }
+}
+
+fn bitbang_master(
+    master_send: &[u8],
+    master_receive: &mut [u8],
+    master_cs: &mut Output<Gpio9>,
+    master_mosi: &mut Output<Gpio8>,
+    master_sclk: &mut Output<Gpio4>,
+    master_miso: &Input<Gpio5>,
+) {
+    // Bit-bang out the contents of master_send and read into master_receive
+    // as quickly as manageable. MSB first. Mode 0, so sampled on the rising
+    // edge and set on the falling edge.
+    master_cs.set_low();
+    for (j, v) in master_send.iter().enumerate() {
+        let mut b = *v;
+        let mut rb = 0u8;
+        for _ in 0..8 {
+            if b & 128 != 0 {
+                master_mosi.set_high();
+            } else {
+                master_mosi.set_low();
+            }
+            master_sclk.set_low();
+            b <<= 1;
+            rb <<= 1;
+            // NB: adding about 24 NOPs here makes the clock's duty cycle
+            // run at about 50% ... but we don't strictly need the delay,
+            // either.
+            master_sclk.set_high();
+            if master_miso.is_high() {
+                rb |= 1;
+            }
+        }
+        master_receive[j] = rb;
+    }
+    master_sclk.set_low();
+
+    master_cs.set_high();
+    master_sclk.set_low();
 }
