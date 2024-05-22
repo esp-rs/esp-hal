@@ -96,7 +96,7 @@ pub(crate) mod utils {
 
     const PICO_V3_02_PSRAM_CLK_IO: u8 = 10;
     const PICO_V3_02_PSRAM_CS_IO: u8 = 9;
-    const ESP32_PICO_V3_GPIO: u8 = 18;
+    const PICO_V3_02_PSRAM_SPIWP_SD3_IO: u8 = 18;
 
     const ESP_ROM_EFUSE_FLASH_DEFAULT_SPI: u32 = 0;
     const ESP_ROM_EFUSE_FLASH_DEFAULT_HSPI: u32 = 1;
@@ -289,24 +289,8 @@ pub(crate) mod utils {
     const EFUSE_SPICONFIG_RET_SPIHD_MASK: u32 = 0x3f;
     const EFUSE_SPICONFIG_RET_SPIHD_SHIFT: u8 = 24;
 
-    fn EFUSE_SPICONFIG_RET_SPICLK(ret: u32) -> u8 {
-        (((ret) >> EFUSE_SPICONFIG_RET_SPICLK_SHIFT) & EFUSE_SPICONFIG_RET_SPICLK_MASK) as u8
-    }
-
-    fn EFUSE_SPICONFIG_RET_SPIQ(ret: u32) -> u8 {
-        (((ret) >> EFUSE_SPICONFIG_RET_SPIQ_SHIFT) & EFUSE_SPICONFIG_RET_SPIQ_MASK) as u8
-    }
-
-    fn EFUSE_SPICONFIG_RET_SPID(ret: u32) -> u8 {
-        (((ret) >> EFUSE_SPICONFIG_RET_SPID_SHIFT) & EFUSE_SPICONFIG_RET_SPID_MASK) as u8
-    }
-
-    fn EFUSE_SPICONFIG_RET_SPICS0(ret: u32) -> u8 {
-        (((ret) >> EFUSE_SPICONFIG_RET_SPICS0_SHIFT) & EFUSE_SPICONFIG_RET_SPICS0_MASK) as u8
-    }
-
-    fn EFUSE_SPICONFIG_RET_SPIHD(ret: u32) -> u8 {
-        (((ret) >> EFUSE_SPICONFIG_RET_SPIHD_SHIFT) & EFUSE_SPICONFIG_RET_SPIHD_MASK) as u8
+    fn efuse_spiconfig_ret(spi_config: u32, mask: u32, shift: u8) -> u8 {
+        (((spi_config) >> shift) & mask) as u8
     }
 
     #[derive(PartialEq, Eq, Clone, Copy, Debug)]
@@ -425,16 +409,33 @@ pub(crate) mod utils {
             psram_io.psram_spid_sd1_io = PSRAM_HSPI_SPID_SD1_IO;
             psram_io.psram_spiwp_sd3_io = PSRAM_HSPI_SPIWP_SD3_IO;
             psram_io.psram_spihd_sd2_io = PSRAM_HSPI_SPIHD_SD2_IO;
-        } else if (chip == crate::efuse::ChipType::Esp32Picov302) {
-            // PS-RAM pins { flash_clk_io: 6, flash_cs_io: 11, psram_clk_io: 10,
-            // psram_cs_io: 9, psram_spiq_sd0_io: 17, psram_spid_sd1_io: 23,
-            // psram_spiwp_sd3_io: 18, psram_spihd_sd2_io: 16 },
-            psram_io.flash_clk_io = EFUSE_SPICONFIG_RET_SPICLK(spiconfig);
-            psram_io.flash_cs_io = EFUSE_SPICONFIG_RET_SPICS0(spiconfig);
-            psram_io.psram_spiq_sd0_io = EFUSE_SPICONFIG_RET_SPIQ(spiconfig);
-            psram_io.psram_spid_sd1_io = EFUSE_SPICONFIG_RET_SPID(spiconfig);
-            psram_io.psram_spihd_sd2_io = EFUSE_SPICONFIG_RET_SPIHD(spiconfig);
-            psram_io.psram_spiwp_sd3_io = ESP32_PICO_V3_GPIO;
+        } else if chip == crate::efuse::ChipType::Esp32Picov302 {
+            psram_io.flash_clk_io = efuse_spiconfig_ret(
+                spiconfig,
+                EFUSE_SPICONFIG_RET_SPICLK_MASK,
+                EFUSE_SPICONFIG_RET_SPICLK_SHIFT,
+            );
+            psram_io.flash_cs_io = efuse_spiconfig_ret(
+                spiconfig,
+                EFUSE_SPICONFIG_RET_SPICS0_MASK,
+                EFUSE_SPICONFIG_RET_SPICS0_SHIFT,
+            );
+            psram_io.psram_spiq_sd0_io = efuse_spiconfig_ret(
+                spiconfig,
+                EFUSE_SPICONFIG_RET_SPIQ_MASK,
+                EFUSE_SPICONFIG_RET_SPIQ_SHIFT,
+            );
+            psram_io.psram_spid_sd1_io = efuse_spiconfig_ret(
+                spiconfig,
+                EFUSE_SPICONFIG_RET_SPID_MASK,
+                EFUSE_SPICONFIG_RET_SPID_SHIFT,
+            );
+            psram_io.psram_spihd_sd2_io = efuse_spiconfig_ret(
+                spiconfig,
+                EFUSE_SPICONFIG_RET_SPIHD_MASK,
+                EFUSE_SPICONFIG_RET_SPIHD_SHIFT,
+            );
+            psram_io.psram_spiwp_sd3_io = PICO_V3_02_PSRAM_SPIWP_SD3_IO;
         } else {
             panic!("Getting Flash/PSRAM pins from efuse is not supported");
             // psram_io.flash_clk_io = EFUSE_SPICONFIG_RET_SPICLK(spiconfig);
