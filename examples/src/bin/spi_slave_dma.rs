@@ -28,7 +28,6 @@
 
 #![no_std]
 #![no_main]
-#![feature(asm_experimental_arch)]
 
 use esp_backtrace as _;
 use esp_hal::{

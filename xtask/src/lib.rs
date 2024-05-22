@@ -21,6 +21,7 @@ pub enum Package {
     EspHal,
     EspHalProcmacros,
     EspHalSmartled,
+    EspIeee802154,
     EspLpHal,
     EspRiscvRt,
     Examples,
@@ -158,7 +159,6 @@ pub fn build_documentation(
     // Build up an array of command-line arguments to pass to `cargo`:
     let mut builder = CargoArgsBuilder::default()
         .subcommand("doc")
-        .arg("-Zbuild-std=core") // Required for Xtensa, for some reason
         .target(target)
         .features(&features);
 
@@ -169,6 +169,7 @@ pub fn build_documentation(
     // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
     if target.starts_with("xtensa") {
         builder = builder.toolchain("esp");
+        builder = builder.arg("-Zbuild-std=core,alloc")
     }
 
     let args = builder.build();
@@ -270,7 +271,6 @@ pub fn execute_app(
 
     let mut builder = CargoArgsBuilder::default()
         .subcommand(subcommand)
-        .arg("-Zbuild-std=alloc,core")
         .arg("--release")
         .target(target)
         .features(&features)
@@ -289,6 +289,7 @@ pub fn execute_app(
     // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
     if target.starts_with("xtensa") {
         builder = builder.toolchain("esp");
+        builder = builder.arg("-Zbuild-std=core,alloc")
     }
 
     let args = builder.build();
@@ -316,7 +317,6 @@ pub fn build_package(
 
     let mut builder = CargoArgsBuilder::default()
         .subcommand("build")
-        .arg("-Zbuild-std=core")
         .arg("--release");
 
     if let Some(toolchain) = toolchain {
@@ -324,6 +324,11 @@ pub fn build_package(
     }
 
     if let Some(target) = target {
+        // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
+        if target.starts_with("xtensa") {
+            builder = builder.toolchain("esp");
+            builder = builder.arg("-Zbuild-std=core,alloc")
+        }
         builder = builder.target(target);
     }
 

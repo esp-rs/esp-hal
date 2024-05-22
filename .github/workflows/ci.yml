@@ -71,7 +71,7 @@ jobs:
         uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
-          toolchain: nightly
+          toolchain: stable
           components: rust-src
       # Install the Rust toolchain for Xtensa devices:
       - if: contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc)
@@ -119,7 +119,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
-          toolchain: nightly
+          toolchain: stable
           components: rust-src
 
       - uses: Swatinem/rust-cache@v2
@@ -139,24 +139,24 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
-          toolchain: nightly
+          toolchain: stable
           components: rust-src
       - uses: Swatinem/rust-cache@v2
 
       # Build for all RISC-V targets (no features):
       - name: Build esp-riscv-rt (riscv32imc, no features)
-        run: cd esp-riscv-rt/ && cargo build -Zbuild-std=core --target=riscv32imc-unknown-none-elf
+        run: cd esp-riscv-rt/ && cargo build --target=riscv32imc-unknown-none-elf
       - name: Build esp-riscv-rt (riscv32imac, no features)
-        run: cd esp-riscv-rt/ && cargo build -Zbuild-std=core --target=riscv32imac-unknown-none-elf
+        run: cd esp-riscv-rt/ && cargo build --target=riscv32imac-unknown-none-elf
       - name: Build esp-riscv-rt (riscv32imafc, no features)
-        run: cd esp-riscv-rt/ && cargo build -Zbuild-std=core --target=riscv32imafc-unknown-none-elf
+        run: cd esp-riscv-rt/ && cargo build --target=riscv32imafc-unknown-none-elf
       # Build for all RISC-V targets (all features):
       - name: Build esp-riscv-rt (riscv32imc, all features)
-        run: cd esp-riscv-rt/ && cargo build -Zbuild-std=core --target=riscv32imc-unknown-none-elf --features=ci
+        run: cd esp-riscv-rt/ && cargo build --target=riscv32imc-unknown-none-elf --features=ci
       - name: Build esp-riscv-rt (riscv32imac, all features)
-        run: cd esp-riscv-rt/ && cargo build -Zbuild-std=core --target=riscv32imac-unknown-none-elf --features=ci
+        run: cd esp-riscv-rt/ && cargo build --target=riscv32imac-unknown-none-elf --features=ci
       - name: Build esp-riscv-rt (riscv32imafc, all features)
-        run: cd esp-riscv-rt/ && cargo build -Zbuild-std=core --target=riscv32imafc-unknown-none-elf --features=ci
+        run: cd esp-riscv-rt/ && cargo build --target=riscv32imafc-unknown-none-elf --features=ci
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp-riscv-rt/ && cargo doc
