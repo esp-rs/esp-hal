@@ -37,10 +37,11 @@ fn main() -> ! {
             ..Default::default()
         }),
     );
-    let mut timer0 = timg0.timer0;
+    let timer0 = timg0.timer0;
 
     interrupt::enable(Interrupt::TG0_T0_LEVEL, Priority::Priority1).unwrap();
-    timer0.start(500u64.millis());
+    timer0.load_value(500u64.millis());
+    timer0.start();
     timer0.listen();
 
     critical_section::with(|cs| {
