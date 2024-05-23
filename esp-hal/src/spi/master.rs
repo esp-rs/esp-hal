@@ -14,14 +14,17 @@
 //! let mosi = io.pins.gpio13;
 //! let cs = io.pins.gpio10;
 //!
-//! let mut spi = hal::spi::Spi::new(
+//! let (spi, mut fifo) = hal::spi::Spi::new(
 //!     peripherals.SPI2,
 //!     100.kHz(),
 //!     SpiMode::Mode0,
 //!     &mut peripheral_clock_control,
 //!     &mut clocks,
-//! )
-//! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs));
+//! );
+//! let mut spi = spi.with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs));
+//!
+//! // Convenience wrapper
+//! let spi_bus = hal::spi::SpiFifo::new(spi, fifo);
 //! ```
 //!
 //! ## Exclusive access to the SPI bus
@@ -47,7 +50,12 @@
 //! [`embedded-hal-bus`]: https://docs.rs/embedded-hal-bus/latest/embedded_hal_bus/spi/index.html
 //! [`embassy-embedded-hal`]: https://docs.embassy.dev/embassy-embedded-hal/git/default/shared_bus/index.html
 
-use core::marker::PhantomData;
+use core::{
+    fmt::{Debug, Formatter},
+    marker::PhantomData,
+    mem::replace,
+    ops::Range,
+};
 
 #[cfg(not(any(esp32, esp32s2)))]
 use enumset::EnumSet;
@@ -74,7 +82,7 @@ use crate::{
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::spi2::RegisterBlock,
+    peripherals::spi2::{RegisterBlock, W},
     private,
     system::PeripheralClockControl,
 };
@@ -95,15 +103,6 @@ pub mod prelude {
 pub enum SpiInterrupt {
     TransDone,
 }
-
-/// The size of the FIFO buffer for SPI
-#[cfg(not(esp32s2))]
-const FIFO_SIZE: usize = 64;
-#[cfg(esp32s2)]
-const FIFO_SIZE: usize = 72;
-
-/// Padding byte for empty write transfers
-const EMPTY_WRITE_PAD: u8 = 0x00u8;
 
 #[allow(unused)]
 const MAX_DMA_SIZE: usize = 32736;
@@ -362,6 +361,155 @@ impl Address {
     }
 }
 
+pub struct WholeFifo;
+pub struct HalfFifo {
+    is_high_part: bool,
+}
+
+pub trait FifoFraction: crate::private::Sealed {
+    const SIZE: usize;
+
+    fn range(&self) -> Range<usize>;
+}
+
+impl crate::private::Sealed for WholeFifo {}
+
+impl FifoFraction for WholeFifo {
+    #[cfg(not(esp32s2))]
+    const SIZE: usize = 64;
+    #[cfg(esp32s2)]
+    const SIZE: usize = 72;
+
+    fn range(&self) -> Range<usize> {
+        0..Self::SIZE
+    }
+}
+
+impl crate::private::Sealed for HalfFifo {}
+
+impl FifoFraction for HalfFifo {
+    const SIZE: usize = WholeFifo::SIZE / 2;
+
+    fn range(&self) -> Range<usize> {
+        if self.is_high_part {
+            Self::SIZE..WholeFifo::SIZE
+        } else {
+            0..Self::SIZE
+        }
+    }
+}
+
+pub struct Fifo<'d, T, S> {
+    spi: PeripheralRef<'d, T>,
+    state: S,
+}
+
+impl<'d, T: Instance, S: FifoFraction> Fifo<'d, T, S> {
+    fn fifo_slice(&self) -> impl Iterator<Item = &W> {
+        self.spi
+            .register_block()
+            .w_iter()
+            .skip(self.state.range().start / 4)
+            .take(S::SIZE / 4)
+    }
+
+    #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
+    pub fn read_iter(&self) -> impl Iterator<Item = u8> + '_ {
+        self.fifo_slice()
+            .flat_map(|w| w.read().buf().bits().to_le_bytes())
+    }
+
+    #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
+    pub fn read(&self, buf: &mut [u8]) {
+        if buf.len() > S::SIZE {
+            panic!("Cannot read more than fifo size");
+        }
+
+        for (chunk, w_reg) in buf.chunks_mut(4).zip(self.fifo_slice()) {
+            let word = w_reg.read().buf().bits();
+            let bytes = word.to_ne_bytes();
+            chunk.copy_from_slice(&bytes[0..chunk.len()]);
+        }
+    }
+
+    #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
+    pub fn fill(&mut self, value: u8) {
+        let word = u32::from_ne_bytes([value; 4]);
+        for w_reg in self.fifo_slice() {
+            w_reg.write(|w| w.buf().set(word));
+        }
+    }
+
+    #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
+    pub fn write(&mut self, data: &[u8]) {
+        if data.len() > S::SIZE {
+            panic!("Cannot write more than fifo size");
+        }
+
+        // TODO: replace with `array_chunks`
+        let mut c_iter = data.chunks_exact(4);
+
+        let mut w_iter = self.fifo_slice();
+
+        for c in c_iter.by_ref() {
+            let w_reg = w_iter.next().expect("Fifo size was confirmed");
+            let word = u32::from_le_bytes(c.try_into().unwrap());
+            w_reg.write(|w| w.buf().set(word));
+        }
+        let rem = c_iter.remainder();
+        if !rem.is_empty() {
+            let w_reg = w_iter.next().expect("Fifo size was confirmed");
+
+            w_reg.modify(|r, w| {
+                let old = r.bits().to_le_bytes();
+
+                let word = match rem.len() {
+                    3 => u32::from_le_bytes([rem[0], rem[1], rem[2], old[3]]),
+                    2 => u32::from_le_bytes([rem[0], rem[1], old[2], old[3]]),
+                    1 => u32::from_le_bytes([rem[0], old[1], old[2], old[3]]),
+                    _ => unreachable!(),
+                };
+
+                w.buf().set(word)
+            });
+        }
+    }
+}
+
+impl<'d, T: Peripheral<P = T>> Fifo<'d, T, WholeFifo> {
+    pub fn split(mut self) -> (Fifo<'d, T, HalfFifo>, Fifo<'d, T, HalfFifo>) {
+        (
+            Fifo {
+                spi: unsafe { self.spi.clone_unchecked() },
+                state: HalfFifo {
+                    is_high_part: false,
+                },
+            },
+            Fifo {
+                spi: self.spi,
+                state: HalfFifo { is_high_part: true },
+            },
+        )
+    }
+}
+
+impl<'d, T> Fifo<'d, T, HalfFifo> {
+    pub fn join(self, other_half: Fifo<'d, T, HalfFifo>) -> Fifo<'d, T, WholeFifo> {
+        debug_assert_ne!(self.state.is_high_part, other_half.state.is_high_part);
+
+        Fifo {
+            spi: self.spi,
+            state: WholeFifo,
+        }
+    }
+}
+
+impl<'d, T, S> Debug for Fifo<'d, T, S> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.write_str("SPI_FIFO")
+    }
+}
+
 /// Read and Write in half duplex mode.
 pub trait HalfDuplexReadWrite {
     type Error;
@@ -393,7 +541,32 @@ pub struct Spi<'d, T, M> {
     _mode: PhantomData<M>,
 }
 
-impl<'d, T, M> Spi<'d, T, M>
+impl<'d, T, M> Debug for Spi<'d, T, M> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.write_str("SpiDriver")
+    }
+}
+
+/// SPI peripheral driver
+pub struct SpiFifo<'d, T, M> {
+    state: FifoDriverState<'d, T, M>,
+}
+
+enum FifoDriverState<'d, T, M> {
+    Idle(Spi<'d, T, M>, Fifo<'d, T, WholeFifo>),
+    InProgress(FifoTransfer<'d, T, M, WholeFifo>),
+    InUse,
+}
+
+impl<'d, T, M> SpiFifo<'d, T, M> {
+    pub fn new(spi: Spi<'d, T, M>, fifo: Fifo<'d, T, WholeFifo>) -> Self {
+        Self {
+            state: FifoDriverState::Idle(spi, fifo),
+        }
+    }
+}
+
+impl<'d, T, M> SpiFifo<'d, T, M>
 where
     T: Instance,
     M: IsFullDuplex,
@@ -404,12 +577,53 @@ where
     /// perform flushing. If you want to read the response to something you
     /// have written before, consider using [`Self::transfer`] instead.
     pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
-        self.spi.read_byte()
+        match replace(&mut self.state, FifoDriverState::InUse) {
+            FifoDriverState::Idle(spi, fifo) => {
+                let byte = fifo.read_iter().nth(0).expect("Fifo is not size zero");
+                self.state = FifoDriverState::Idle(spi, fifo);
+                Ok(byte)
+            }
+            FifoDriverState::InProgress(transfer) => {
+                if transfer.is_done() {
+                    let (spi, fifo) = transfer.wait();
+                    let byte = fifo.read_iter().nth(0).expect("Fifo is not size zero");
+                    self.state = FifoDriverState::Idle(spi, fifo);
+                    Ok(byte)
+                } else {
+                    self.state = FifoDriverState::InProgress(transfer);
+                    Err(nb::Error::WouldBlock)
+                }
+            }
+            FifoDriverState::InUse => unreachable!(),
+        }
     }
 
     /// Write a byte to SPI.
     pub fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
-        self.spi.write_byte(word)
+        let (spi, mut fifo) = match replace(&mut self.state, FifoDriverState::InUse) {
+            FifoDriverState::Idle(spi, fifo) => (spi, fifo),
+            FifoDriverState::InProgress(transfer) => {
+                if transfer.is_done() {
+                    transfer.wait()
+                } else {
+                    self.state = FifoDriverState::InProgress(transfer);
+                    return Err(nb::Error::WouldBlock);
+                }
+            }
+            FifoDriverState::InUse => unreachable!(),
+        };
+
+        fifo.write(&[word]);
+        match spi.transfer(1, fifo) {
+            Ok(transfer) => {
+                self.state = FifoDriverState::InProgress(transfer);
+                Err(nb::Error::WouldBlock)
+            }
+            Err((err, spi, fifo)) => {
+                self.state = FifoDriverState::Idle(spi, fifo);
+                Err(nb::Error::Other(err))
+            }
+        }
     }
 
     /// Write bytes to SPI.
@@ -421,15 +635,65 @@ where
     /// you must ensure that the whole messages was written correctly, use
     /// `flush`.
     pub fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
-        self.spi.write_bytes(words)?;
-        self.spi.flush()?;
+        for chunk in words.chunks(WholeFifo::SIZE) {
+            let (spi, mut fifo) = match replace(&mut self.state, FifoDriverState::InUse) {
+                FifoDriverState::Idle(spi, fifo) => (spi, fifo),
+                FifoDriverState::InProgress(transfer) => transfer.wait(),
+                FifoDriverState::InUse => unreachable!(),
+            };
+
+            fifo.write(chunk);
+
+            match spi.transfer(chunk.len(), fifo) {
+                Ok(transfer) => self.state = FifoDriverState::InProgress(transfer),
+                Err((err, spi, fifo)) => {
+                    self.state = FifoDriverState::Idle(spi, fifo);
+                    return Err(err);
+                }
+            }
+        }
+
+        // Flush the last write from the loop above.
+        self.flush();
 
         Ok(())
     }
 
     /// Sends `words` to the slave. Returns the `words` received from the slave
     pub fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
-        self.spi.transfer(words)
+        let (mut spi, mut fifo) = match replace(&mut self.state, FifoDriverState::InUse) {
+            FifoDriverState::Idle(spi, fifo) => (spi, fifo),
+            FifoDriverState::InProgress(transfer) => transfer.wait(),
+            FifoDriverState::InUse => unreachable!(),
+        };
+
+        for chunk in words.chunks_mut(WholeFifo::SIZE) {
+            fifo.write(chunk);
+
+            (spi, fifo) = match spi.transfer(chunk.len(), fifo) {
+                Ok(transfer) => transfer.wait(),
+                Err((err, spi, fifo)) => {
+                    self.state = FifoDriverState::Idle(spi, fifo);
+                    return Err(err);
+                }
+            };
+
+            fifo.read(chunk);
+        }
+
+        self.state = FifoDriverState::Idle(spi, fifo);
+
+        Ok(words)
+    }
+
+    /// Wait for any remaining bytes in the fifo to be sent.
+    pub fn flush(&mut self) {
+        let (spi, fifo) = match replace(&mut self.state, FifoDriverState::InUse) {
+            FifoDriverState::Idle(spi, fifo) => (spi, fifo),
+            FifoDriverState::InProgress(transfer) => transfer.wait(),
+            FifoDriverState::InUse => unreachable!(),
+        };
+        self.state = FifoDriverState::Idle(spi, fifo);
     }
 }
 
@@ -446,9 +710,16 @@ where
         frequency: HertzU32,
         mode: SpiMode,
         clocks: &Clocks,
-    ) -> Spi<'d, T, FullDuplexMode> {
+    ) -> (Spi<'d, T, FullDuplexMode>, Fifo<'d, T, WholeFifo>)
+    where
+        T: Peripheral<P = T>,
+    {
         crate::into_ref!(spi);
-        Self::new_internal(spi, frequency, mode, clocks)
+        let fifo = Fifo {
+            spi: unsafe { spi.clone_unchecked() },
+            state: WholeFifo,
+        };
+        (Self::new_internal(spi, frequency, mode, clocks), fifo)
     }
 
     pub fn with_sck<SCK: OutputPin>(self, sck: impl Peripheral<P = SCK> + 'd) -> Self {
@@ -553,6 +824,40 @@ where
     }
 }
 
+impl<'d, T, M> Spi<'d, T, M>
+where
+    T: Instance,
+    M: IsFullDuplex,
+{
+    pub fn transfer<S: FifoFraction>(
+        self,
+        data_len: usize,
+        fifo: Fifo<'d, T, S>,
+    ) -> Result<FifoTransfer<'d, T, M, S>, (Error, Self, Fifo<'d, T, S>)> {
+        if data_len > S::SIZE {
+            return Err((Error::FifoSizeExeeded, self, fifo));
+        }
+
+        if data_len == 0 {
+            return Err((Error::Unsupported, self, fifo));
+        }
+
+        let is_high_part = fifo.state.range().start != 0;
+
+        self.spi.configure_datalen(data_len as u32 * 8);
+        self.spi.register_block().user().modify(|_, w| {
+            w.usr_miso_highpart()
+                .bit(is_high_part)
+                .usr_mosi_highpart()
+                .bit(is_high_part)
+        });
+
+        self.spi.start_operation();
+
+        Ok(FifoTransfer { spi: self, fifo })
+    }
+}
+
 impl<'d, T> Spi<'d, T, HalfDuplexMode>
 where
     T: ExtendedInstance,
@@ -566,9 +871,16 @@ where
         frequency: HertzU32,
         mode: SpiMode,
         clocks: &Clocks,
-    ) -> Spi<'d, T, HalfDuplexMode> {
+    ) -> (Spi<'d, T, HalfDuplexMode>, Fifo<'d, T, WholeFifo>)
+    where
+        T: Peripheral<P = T>,
+    {
         crate::into_ref!(spi);
-        Self::new_internal(spi, frequency, mode, clocks)
+        let fifo = Fifo {
+            spi: unsafe { spi.clone_unchecked() },
+            state: WholeFifo,
+        };
+        (Self::new_internal(spi, frequency, mode, clocks), fifo)
     }
 
     pub fn with_sck<SCK: OutputPin>(self, sck: impl Peripheral<P = SCK> + 'd) -> Self {
@@ -738,10 +1050,94 @@ where
     }
 }
 
-impl<T, M> HalfDuplexReadWrite for Spi<'_, T, M>
+impl<'d, T, M> Spi<'d, T, M>
 where
     T: Instance,
     M: IsHalfDuplex,
+{
+    pub fn read<S: FifoFraction>(
+        mut self,
+        data_mode: SpiDataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        data_len: usize,
+        fifo: Fifo<'d, T, S>,
+    ) -> Result<FifoTransfer<'d, T, M, S>, (Error, Self, Fifo<'d, T, S>)> {
+        if data_len > S::SIZE {
+            return Err((Error::FifoSizeExeeded, self, fifo));
+        }
+
+        if data_len == 0 {
+            return Err((Error::Unsupported, self, fifo));
+        }
+
+        let is_high_part = fifo.state.range().start != 0;
+
+        self.spi
+            .init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
+        self.spi
+            .start_half_duplex(false, cmd, address, dummy, data_len, is_high_part);
+
+        Ok(FifoTransfer { spi: self, fifo })
+    }
+
+    pub fn write<S: FifoFraction>(
+        mut self,
+        data_mode: SpiDataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        data_len: usize,
+        fifo: Fifo<'d, T, S>,
+    ) -> Result<FifoTransfer<'d, T, M, S>, (Error, Self, Fifo<'d, T, S>)> {
+        if data_len > S::SIZE {
+            return Err((Error::FifoSizeExeeded, self, fifo));
+        }
+
+        let is_high_part = fifo.state.range().start != 0;
+
+        self.spi
+            .init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
+        self.spi
+            .start_half_duplex(true, cmd, address, dummy, data_len, is_high_part);
+
+        Ok(FifoTransfer { spi: self, fifo })
+    }
+}
+
+pub struct FifoTransfer<'d, T, M, S> {
+    spi: Spi<'d, T, M>,
+    fifo: Fifo<'d, T, S>,
+}
+
+impl<'d, T, M, S> FifoTransfer<'d, T, M, S>
+where
+    T: Instance,
+{
+    pub fn is_done(&self) -> bool {
+        !self.spi.spi.busy()
+    }
+
+    pub fn wait(self) -> (Spi<'d, T, M>, Fifo<'d, T, S>) {
+        while self.spi.spi.busy() {
+            // wait for bus to be clear
+        }
+        (self.spi, self.fifo)
+    }
+}
+
+// No need to flush in Drop, the transfer can safely continue in the background
+// since the user no longer has access to the Spi or FIFO.
+//
+// impl<'d, T, M, S> Drop for Transfer<'d, T, M, S> {
+//     fn drop(&mut self) {
+//     }
+// }
+
+impl<T> HalfDuplexReadWrite for SpiFifo<'_, T, HalfDuplexMode>
+where
+    T: Instance,
 {
     type Error = Error;
 
@@ -753,7 +1149,7 @@ where
         dummy: u8,
         buffer: &mut [u8],
     ) -> Result<(), Self::Error> {
-        if buffer.len() > FIFO_SIZE {
+        if buffer.len() > WholeFifo::SIZE {
             return Err(Error::FifoSizeExeeded);
         }
 
@@ -761,9 +1157,24 @@ where
             return Err(Error::Unsupported);
         }
 
-        self.spi
-            .init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
-        self.spi.read_bytes_half_duplex(cmd, address, dummy, buffer)
+        let (spi, fifo) = match replace(&mut self.state, FifoDriverState::InUse) {
+            FifoDriverState::Idle(spi, fifo) => (spi, fifo),
+            FifoDriverState::InProgress(transfer) => transfer.wait(),
+            FifoDriverState::InUse => unreachable!(),
+        };
+
+        match spi.read(data_mode, cmd, address, dummy, buffer.len(), fifo) {
+            Ok(transfer) => {
+                let (spi, fifo) = transfer.wait();
+                fifo.read(buffer);
+                self.state = FifoDriverState::Idle(spi, fifo);
+                Ok(())
+            }
+            Err((err, spi, fifo)) => {
+                self.state = FifoDriverState::Idle(spi, fifo);
+                Err(err)
+            }
+        }
     }
 
     fn write(
@@ -774,19 +1185,34 @@ where
         dummy: u8,
         buffer: &[u8],
     ) -> Result<(), Self::Error> {
-        if buffer.len() > FIFO_SIZE {
+        if buffer.len() > WholeFifo::SIZE {
             return Err(Error::FifoSizeExeeded);
         }
 
-        self.spi
-            .init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
-        self.spi
-            .write_bytes_half_duplex(cmd, address, dummy, buffer)
+        let (spi, mut fifo) = match replace(&mut self.state, FifoDriverState::InUse) {
+            FifoDriverState::Idle(spi, fifo) => (spi, fifo),
+            FifoDriverState::InProgress(transfer) => transfer.wait(),
+            FifoDriverState::InUse => unreachable!(),
+        };
+
+        fifo.write(buffer);
+
+        match spi.write(data_mode, cmd, address, dummy, buffer.len(), fifo) {
+            Ok(transfer) => {
+                let (spi, fifo) = transfer.wait();
+                self.state = FifoDriverState::Idle(spi, fifo);
+                Ok(())
+            }
+            Err((err, spi, fifo)) => {
+                self.state = FifoDriverState::Idle(spi, fifo);
+                Err(err)
+            }
+        }
     }
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<T, M> embedded_hal_02::spi::FullDuplex<u8> for Spi<'_, T, M>
+impl<T, M> embedded_hal_02::spi::FullDuplex<u8> for SpiFifo<'_, T, M>
 where
     T: Instance,
     M: IsFullDuplex,
@@ -803,7 +1229,7 @@ where
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<T, M> embedded_hal_02::blocking::spi::Transfer<u8> for Spi<'_, T, M>
+impl<T, M> embedded_hal_02::blocking::spi::Transfer<u8> for SpiFifo<'_, T, M>
 where
     T: Instance,
     M: IsFullDuplex,
@@ -816,7 +1242,7 @@ where
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<T, M> embedded_hal_02::blocking::spi::Write<u8> for Spi<'_, T, M>
+impl<T, M> embedded_hal_02::blocking::spi::Write<u8> for SpiFifo<'_, T, M>
 where
     T: Instance,
     M: IsFullDuplex,
@@ -825,7 +1251,8 @@ where
 
     fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
         self.write_bytes(words)?;
-        self.spi.flush()
+        self.flush();
+        Ok(())
     }
 }
 
@@ -1172,6 +1599,7 @@ pub mod dma {
                 false,
                 dummy != 0,
                 len == 0,
+                false,
             );
             self.spi
                 .init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
@@ -1247,6 +1675,7 @@ pub mod dma {
                 false,
                 dummy != 0,
                 len == 0,
+                false,
             );
             self.spi
                 .init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
@@ -1661,35 +2090,53 @@ mod ehal1 {
 
     use super::*;
 
-    impl<T, M> embedded_hal::spi::ErrorType for Spi<'_, T, M> {
+    impl<T, M> embedded_hal::spi::ErrorType for SpiFifo<'_, T, M> {
         type Error = super::Error;
     }
 
-    impl<T, M> FullDuplex for Spi<'_, T, M>
+    impl<T, M> FullDuplex for SpiFifo<'_, T, M>
     where
         T: Instance,
         M: IsFullDuplex,
     {
         fn read(&mut self) -> nb::Result<u8, Self::Error> {
-            self.spi.read_byte()
+            self.read_byte()
         }
 
         fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-            self.spi.write_byte(word)
+            self.write_byte(word)
         }
     }
 
-    impl<T, M> SpiBus for Spi<'_, T, M>
+    impl<T, M> SpiBus for SpiFifo<'_, T, M>
     where
         T: Instance,
         M: IsFullDuplex,
     {
         fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-            self.spi.read_bytes(words)
+            let (mut spi, mut fifo) = match replace(&mut self.state, FifoDriverState::InUse) {
+                FifoDriverState::Idle(spi, fifo) => (spi, fifo),
+                FifoDriverState::InProgress(transfer) => transfer.wait(),
+                FifoDriverState::InUse => unreachable!(),
+            };
+
+            for chunk in words.chunks_mut(WholeFifo::SIZE) {
+                (spi, fifo) = match spi.transfer(chunk.len(), fifo) {
+                    Ok(transfer) => transfer.wait(),
+                    Err((err, spi, fifo)) => {
+                        self.state = FifoDriverState::Idle(spi, fifo);
+                        return Err(err);
+                    }
+                };
+                fifo.read(chunk);
+            }
+
+            self.state = FifoDriverState::Idle(spi, fifo);
+            Ok(())
         }
 
         fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-            self.spi.write_bytes(words)
+            self.write_bytes(words)
         }
 
         fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
@@ -1700,55 +2147,59 @@ mod ehal1 {
                 SpiBus::read(self, read)?;
             }
 
-            let mut write_from = 0;
-            let mut read_from = 0;
+            let (mut spi, mut fifo) = match replace(&mut self.state, FifoDriverState::InUse) {
+                FifoDriverState::Idle(spi, fifo) => (spi, fifo),
+                FifoDriverState::InProgress(transfer) => transfer.wait(),
+                FifoDriverState::InUse => unreachable!(),
+            };
 
+            let mut read_chunks = read.chunks_mut(WholeFifo::SIZE);
+            let mut write_chunks = write.chunks(WholeFifo::SIZE);
             loop {
-                // How many bytes we write in this chunk
-                let write_inc = core::cmp::min(FIFO_SIZE, write.len() - write_from);
-                let write_to = write_from + write_inc;
-                // How many bytes we read in this chunk
-                let read_inc = core::cmp::min(FIFO_SIZE, read.len() - read_from);
-                let read_to = read_from + read_inc;
+                let mut transfer_length = 0;
+                if let Some(chunk) = write_chunks.next() {
+                    fifo.write(chunk);
+                    transfer_length = chunk.len();
+                }
 
-                if (write_inc == 0) && (read_inc == 0) {
+                let read_chunk = if let Some(chunk) = read_chunks.next() {
+                    if chunk.len() > transfer_length {
+                        transfer_length = chunk.len();
+                    }
+                    Some(chunk)
+                } else {
+                    None
+                };
+
+                if transfer_length == 0 {
                     break;
                 }
 
-                if write_to < read_to {
-                    // Read more than we write, must pad writing part with zeros
-                    let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
-                    empty[0..write_inc].copy_from_slice(&write[write_from..write_to]);
-                    SpiBus::write(self, &empty)?;
-                } else {
-                    SpiBus::write(self, &write[write_from..write_to])?;
+                (spi, fifo) = match spi.transfer(transfer_length, fifo) {
+                    Ok(transfer) => transfer.wait(),
+                    Err((err, spi, fifo)) => {
+                        self.state = FifoDriverState::Idle(spi, fifo);
+                        return Err(err);
+                    }
+                };
+
+                if let Some(chunk) = read_chunk {
+                    fifo.read(chunk);
                 }
-
-                SpiBus::flush(self)?;
-
-                if read_inc > 0 {
-                    self.spi
-                        .read_bytes_from_fifo(&mut read[read_from..read_to])?;
-                }
-
-                write_from = write_to;
-                read_from = read_to;
             }
+
+            self.state = FifoDriverState::Idle(spi, fifo);
+
             Ok(())
         }
 
         fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-            // Since we have the traits so neatly implemented above, use them!
-            for chunk in words.chunks_mut(FIFO_SIZE) {
-                SpiBus::write(self, chunk)?;
-                SpiBus::flush(self)?;
-                self.spi.read_bytes_from_fifo(chunk)?;
-            }
-            Ok(())
+            self.transfer(words).map(|_| ())
         }
 
         fn flush(&mut self) -> Result<(), Self::Error> {
-            self.spi.flush()
+            self.flush();
+            Ok(())
         }
     }
 }
@@ -2097,7 +2548,7 @@ pub trait Instance: private::Sealed {
         reg_block.user().modify(|_, w| {
             w.usr_miso_highpart()
                 .clear_bit()
-                .usr_miso_highpart()
+                .usr_mosi_highpart()
                 .clear_bit()
                 .doutdin()
                 .set_bit()
@@ -2626,136 +3077,6 @@ pub trait Instance: private::Sealed {
         });
     }
 
-    fn read_byte(&mut self) -> nb::Result<u8, Error> {
-        if self.busy() {
-            return Err(nb::Error::WouldBlock);
-        }
-
-        let reg_block = self.register_block();
-        Ok(u32::try_into(reg_block.w(0).read().bits()).unwrap_or_default())
-    }
-
-    fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
-        if self.busy() {
-            return Err(nb::Error::WouldBlock);
-        }
-
-        self.configure_datalen(8);
-
-        let reg_block = self.register_block();
-        reg_block.w(0).write(|w| w.buf().set(word.into()));
-
-        self.update();
-
-        reg_block.cmd().modify(|_, w| w.usr().set_bit());
-
-        Ok(())
-    }
-
-    /// Write bytes to SPI.
-    ///
-    /// Copies the content of `words` in chunks of 64 bytes into the SPI
-    /// transmission FIFO. If `words` is longer than 64 bytes, multiple
-    /// sequential transfers are performed. This function will return before
-    /// all bytes of the last chunk to transmit have been sent to the wire. If
-    /// you must ensure that the whole messages was written correctly, use
-    /// [`Self::flush`].
-    #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-    fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
-        let num_chunks = words.len() / FIFO_SIZE;
-
-        // Flush in case previous writes have not completed yet, required as per
-        // embedded-hal documentation (#1369).
-        self.flush()?;
-
-        // The fifo has a limited fixed size, so the data must be chunked and then
-        // transmitted
-        for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
-            self.configure_datalen(chunk.len() as u32 * 8);
-
-            {
-                // TODO: replace with `array_chunks` and `from_le_bytes`
-                let mut c_iter = chunk.chunks_exact(4);
-                let mut w_iter = self.register_block().w_iter();
-                for c in c_iter.by_ref() {
-                    if let Some(w_reg) = w_iter.next() {
-                        let word = (c[0] as u32)
-                            | (c[1] as u32) << 8
-                            | (c[2] as u32) << 16
-                            | (c[3] as u32) << 24;
-                        w_reg.write(|w| w.buf().set(word));
-                    }
-                }
-                let rem = c_iter.remainder();
-                if !rem.is_empty() {
-                    if let Some(w_reg) = w_iter.next() {
-                        let word = match rem.len() {
-                            3 => (rem[0] as u32) | (rem[1] as u32) << 8 | (rem[2] as u32) << 16,
-                            2 => (rem[0] as u32) | (rem[1] as u32) << 8,
-                            1 => rem[0] as u32,
-                            _ => unreachable!(),
-                        };
-                        w_reg.write(|w| w.buf().set(word));
-                    }
-                }
-            }
-
-            self.update();
-
-            self.register_block().cmd().modify(|_, w| w.usr().set_bit());
-
-            // Wait for all chunks to complete except the last one.
-            // The function is allowed to return before the bus is idle.
-            // see [embedded-hal flushing](https://docs.rs/embedded-hal/1.0.0-alpha.8/embedded_hal/spi/blocking/index.html#flushing)
-            if i < num_chunks {
-                self.flush()?;
-            }
-        }
-        Ok(())
-    }
-
-    /// Read bytes from SPI.
-    ///
-    /// Sends out a stuffing byte for every byte to read. This function doesn't
-    /// perform flushing. If you want to read the response to something you
-    /// have written before, consider using [`Self::transfer`] instead.
-    #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-    fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
-
-        for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.write_bytes(&empty_array[0..chunk.len()])?;
-            self.flush()?;
-            self.read_bytes_from_fifo(chunk)?;
-        }
-        Ok(())
-    }
-
-    /// Read received bytes from SPI FIFO.
-    ///
-    /// Copies the contents of the SPI receive FIFO into `words`. This function
-    /// doesn't perform flushing. If you want to read the response to
-    /// something you have written before, consider using [`Self::transfer`]
-    /// instead.
-    #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-    fn read_bytes_from_fifo(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        let reg_block = self.register_block();
-
-        for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.configure_datalen(chunk.len() as u32 * 8);
-
-            for (index, w_reg) in (0..chunk.len()).step_by(4).zip(reg_block.w_iter()) {
-                let reg_val = w_reg.read().bits();
-                let bytes = reg_val.to_le_bytes();
-
-                let len = usize::min(chunk.len(), index + 4) - index;
-                chunk[index..(index + len)].clone_from_slice(&bytes[0..len]);
-            }
-        }
-
-        Ok(())
-    }
-
     fn busy(&self) -> bool {
         let reg_block = self.register_block();
         reg_block.cmd().read().usr().bit_is_set()
@@ -2767,17 +3088,6 @@ pub trait Instance: private::Sealed {
             // wait for bus to be clear
         }
         Ok(())
-    }
-
-    #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-    fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
-        for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.write_bytes(chunk)?;
-            self.flush()?;
-            self.read_bytes_from_fifo(chunk)?;
-        }
-
-        Ok(words)
     }
 
     fn start_operation(&self) {
@@ -2794,13 +3104,14 @@ pub trait Instance: private::Sealed {
         dummy_idle: bool,
         dummy_state: bool,
         no_mosi_miso: bool,
+        use_only_high_part: bool,
     ) {
         let reg_block = self.register_block();
         reg_block.user().modify(|_, w| {
             w.usr_miso_highpart()
-                .clear_bit()
-                .usr_miso_highpart()
-                .clear_bit()
+                .bit(use_only_high_part)
+                .usr_mosi_highpart()
+                .bit(use_only_high_part)
                 .doutdin()
                 .clear_bit()
                 .usr_miso()
@@ -2846,20 +3157,23 @@ pub trait Instance: private::Sealed {
         self.update();
     }
 
-    fn write_bytes_half_duplex(
+    fn start_half_duplex(
         &mut self,
+        is_write: bool,
         cmd: Command,
         address: Address,
         dummy: u8,
-        buffer: &[u8],
-    ) -> Result<(), Error> {
+        data_len: usize,
+        use_high_part_of_fifo: bool,
+    ) {
         self.init_half_duplex(
-            true,
+            is_write,
             !cmd.is_none(),
             !address.is_none(),
             false,
             dummy != 0,
-            buffer.is_empty(),
+            data_len == 0,
+            use_high_part_of_fifo,
         );
 
         // set cmd, address, dummy cycles
@@ -2901,76 +3215,9 @@ pub trait Instance: private::Sealed {
                 .modify(|_, w| unsafe { w.usr_dummy_cyclelen().bits(dummy - 1) });
         }
 
-        if !buffer.is_empty() {
-            // re-using the full-duplex write here
-            self.write_bytes(buffer)?;
-        } else {
-            self.start_operation();
-        }
+        self.configure_datalen(data_len as u32 * 8);
 
-        self.flush()
-    }
-
-    fn read_bytes_half_duplex(
-        &mut self,
-        cmd: Command,
-        address: Address,
-        dummy: u8,
-        buffer: &mut [u8],
-    ) -> Result<(), Error> {
-        self.init_half_duplex(
-            false,
-            !cmd.is_none(),
-            !address.is_none(),
-            false,
-            dummy != 0,
-            buffer.is_empty(),
-        );
-
-        // set cmd, address, dummy cycles
-        let reg_block = self.register_block();
-        if !cmd.is_none() {
-            reg_block.user2().modify(|_, w| unsafe {
-                w.usr_command_bitlen()
-                    .bits((cmd.width() - 1) as u8)
-                    .usr_command_value()
-                    .bits(cmd.value())
-            });
-        }
-
-        #[cfg(not(esp32))]
-        if !address.is_none() {
-            reg_block
-                .user1()
-                .modify(|_, w| unsafe { w.usr_addr_bitlen().bits((address.width() - 1) as u8) });
-
-            let addr = address.value() << (32 - address.width());
-            reg_block
-                .addr()
-                .write(|w| unsafe { w.usr_addr_value().bits(addr) });
-        }
-
-        #[cfg(esp32)]
-        if !address.is_none() {
-            reg_block.user1().modify(|r, w| unsafe {
-                w.bits(r.bits() & !(0x3f << 26) | (((address.width() - 1) as u32) & 0x3f) << 26)
-            });
-
-            let addr = address.value() << (32 - address.width());
-            reg_block.addr().write(|w| unsafe { w.bits(addr) });
-        }
-
-        if dummy > 0 {
-            reg_block
-                .user1()
-                .modify(|_, w| unsafe { w.usr_dummy_cyclelen().bits(dummy - 1) });
-        }
-
-        self.configure_datalen(buffer.len() as u32 * 8);
-        self.update();
-        reg_block.cmd().modify(|_, w| w.usr().set_bit());
-        self.flush()?;
-        self.read_bytes_from_fifo(buffer)
+        self.start_operation();
     }
 
     #[cfg(not(any(esp32, esp32s2)))]

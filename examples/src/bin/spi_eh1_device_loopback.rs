@@ -40,7 +40,10 @@ use esp_hal::{
     gpio::{self, Io, Level, Output},
     peripherals::Peripherals,
     prelude::*,
-    spi::{master::Spi, SpiMode},
+    spi::{
+        master::{Spi, SpiFifo},
+        SpiMode,
+    },
     system::SystemControl,
 };
 use esp_println::{print, println};
@@ -56,12 +59,9 @@ fn main() -> ! {
     let miso = io.pins.gpio2;
     let mosi = io.pins.gpio4;
 
-    let spi_bus = Spi::new(peripherals.SPI2, 1000.kHz(), SpiMode::Mode0, &clocks).with_pins(
-        Some(sclk),
-        Some(mosi),
-        Some(miso),
-        gpio::NO_PIN,
-    );
+    let (spi, fifo) = Spi::new(peripherals.SPI2, 1000.kHz(), SpiMode::Mode0, &clocks);
+    let spi = spi.with_pins(Some(sclk), Some(mosi), Some(miso), gpio::NO_PIN);
+    let spi_bus = SpiFifo::new(spi, fifo);
     let spi_bus = RefCell::new(spi_bus);
     let mut spi_device_1 =
         RefCellDevice::new_no_delay(&spi_bus, Output::new(io.pins.gpio5, Level::Low));

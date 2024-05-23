@@ -27,7 +27,10 @@ use esp_hal::{
     gpio::Io,
     peripherals::Peripherals,
     prelude::*,
-    spi::{master::Spi, SpiMode},
+    spi::{
+        master::{Spi, SpiFifo},
+        SpiMode,
+    },
     system::SystemControl,
 };
 use esp_println::{print, println};
@@ -44,12 +47,9 @@ fn main() -> ! {
     let mosi = io.pins.gpio4;
     let cs = io.pins.gpio5;
 
-    let mut spi = Spi::new(peripherals.SPI2, 1000.kHz(), SpiMode::Mode0, &clocks).with_pins(
-        Some(sclk),
-        Some(mosi),
-        Some(miso),
-        Some(cs),
-    );
+    let (spi, fifo) = Spi::new(peripherals.SPI2, 1000.kHz(), SpiMode::Mode0, &clocks);
+    let spi = spi.with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs));
+    let mut spi = SpiFifo::new(spi, fifo);
 
     let delay = Delay::new(&clocks);
     println!("=== SPI example with embedded-hal-1 traits ===");
