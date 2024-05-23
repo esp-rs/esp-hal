@@ -51,8 +51,6 @@ fn main() -> ! {
     });
     led.set_high();
 
-    // Initialize the Delay peripheral, and use it to toggle the LED state in a
-    // loop.
     let delay = Delay::new(&clocks);
 
     loop {

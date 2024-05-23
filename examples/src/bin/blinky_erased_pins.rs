@@ -41,11 +41,8 @@ fn main() -> ! {
 
     let button = AnyInput::new(button, Pull::Up);
 
-    // You can use `into` or `degrade`:
     let mut pins = [led1, led2, led3];
 
-    // Initialize the `Delay` peripheral, and use it to toggle the LED state
-    // in a loop:
     let delay = Delay::new(&clocks);
 
     loop {

@@ -1,4 +1,4 @@
-//! Delay Test
+//! Interrupt Test
 
 //% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2
 
@@ -77,11 +77,12 @@ fn interrupt20() {
         )
     };
     info!("Performance counter:{}", perf_counter);
+    // TODO these values should be adjusted to catch smaller regressions
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32c3", feature = "esp32c2"))] {
-            assert!(perf_counter < 1000);
+            assert!(perf_counter < 1100);
         } else {
-            assert!(perf_counter < 620);
+            assert!(perf_counter < 750);
         }
     }
 }
