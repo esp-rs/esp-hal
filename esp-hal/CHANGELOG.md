@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `embassy-usb` support (#1517)
 - SPI Slave support for ESP32-S2 (#1562)
 - Add new generic `OneShotTimer` and `PeriodicTimer` drivers, plus new `Timer` trait which is implemented for `TIMGx` and `SYSTIMER` (#1570)
+- New `persistent` option for the `ram` macro to replace the unsound `uninitialized` option. This requires wrapping the value in a `esp_hal::persistent::Persistent<T>`, which exposes a method that handles sound initialization before first use.
 
 ### Fixed
 
@@ -52,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed the `SystemExt` trait (#1495)
 - Removed the `GpioExt` trait (#1496)
+- Removed the unsound `uninitialized` option from the `ram` macro in favor of the new `persistent` option.
 
 ## [0.17.0] - 2024-04-18
 

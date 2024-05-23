@@ -4,8 +4,8 @@
 //!
 //! Initialized memory is always re-initialized on startup.
 //!
-//! Uninitialzed memory isn't initialized on startup and can be used to keep
-//! data during resets.
+//! Persistent memory isn't initialized after software requested resets.
+//! The boot button triggers such a reset.
 //!
 //! Zeroed memory is initialized to zero on startup.
 //!
@@ -20,19 +20,18 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
+    gpio::{self, Io},
     macros::ram,
     peripherals::Peripherals,
+    persistent::Persistent,
     prelude::*,
-    rtc_cntl::Rtc,
+    reset::software_reset,
     system::SystemControl,
 };
 use esp_println::println;
 
 #[ram(rtc_fast)]
 static mut SOME_INITED_DATA: [u8; 2] = [0xaa, 0xbb];
-
-#[ram(rtc_fast, uninitialized)]
-static mut SOME_UNINITED_DATA: [u8; 2] = [0; 2];
 
 #[ram(rtc_fast, zeroed)]
 static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
@@ -43,12 +42,26 @@ fn main() -> ! {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
+    let persistent = {
+        #[ram(rtc_fast, persistent)]
+        static SOME_PERSISTENT_DATA: Persistent<u8> = Persistent::new();
+
+        // SAFETY:
+        // - due to the restricted scope of the static, this is known to be the only place `.get()` is called
+        // - nothing before this resets the chip
+        unsafe { SOME_PERSISTENT_DATA.get(0) }
+    };
+
     let delay = Delay::new(&clocks);
 
-    // The RWDT flash boot protection must be enabled, as it is triggered as part of
-    // the example.
-    let mut rtc = Rtc::new(peripherals.LPWR, None);
-    rtc.rwdt.enable();
+    let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    io.set_interrupt_handler(handler);
+    #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+    let pin = io.pins.gpio0;
+    #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")))]
+    let pin = io.pins.gpio9;
+    let mut button = gpio::Input::new(pin, gpio::Pull::Up);
+    button.listen(gpio::Event::FallingEdge);
 
     println!(
         "IRAM function located at {:p}",
@@ -56,28 +69,17 @@ fn main() -> ! {
     );
     unsafe {
         println!("SOME_INITED_DATA {:x?}", SOME_INITED_DATA);
-        println!("SOME_UNINITED_DATA {:x?}", SOME_UNINITED_DATA);
         println!("SOME_ZEROED_DATA {:x?}", SOME_ZEROED_DATA);
 
         SOME_INITED_DATA[0] = 0xff;
         SOME_ZEROED_DATA[0] = 0xff;
 
         println!("SOME_INITED_DATA {:x?}", SOME_INITED_DATA);
-        println!("SOME_UNINITED_DATA {:x?}", SOME_UNINITED_DATA);
         println!("SOME_ZEROED_DATA {:x?}", SOME_ZEROED_DATA);
-
-        if SOME_UNINITED_DATA[0] != 0 {
-            SOME_UNINITED_DATA[0] = 0;
-            SOME_UNINITED_DATA[1] = 0;
-        }
-
-        if SOME_UNINITED_DATA[1] == 0xff {
-            SOME_UNINITED_DATA[1] = 0;
-        }
-
-        println!("Counter {}", SOME_UNINITED_DATA[1]);
-        SOME_UNINITED_DATA[1] += 1;
     }
+
+    *persistent = persistent.wrapping_add(1);
+    println!("Counter {}", persistent);
 
     println!(
         "RTC_FAST function located at {:p}",
@@ -99,4 +101,10 @@ fn function_in_ram() {
 #[ram(rtc_fast)]
 fn function_in_rtc_ram() -> u32 {
     42
+}
+
+#[handler]
+#[ram]
+fn handler() {
+    software_reset();
 }

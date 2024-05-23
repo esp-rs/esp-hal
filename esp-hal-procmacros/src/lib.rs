@@ -29,7 +29,7 @@
 //!    with different initialization options. Supported options are:
 //!      - `rtc_fast` - Use RTC fast RAM
 //!      - `rtc_slow` - Use RTC slow RAM (not all targets support slow RTC RAM)
-//!      - `uninitialized` - Skip initialization of the memory
+//!      - `persistent` - Skip initialization of the memory after reset
 //!      - `zeroed` - Initialize the memory to zero
 //!
 //! ## Examples
@@ -54,8 +54,9 @@
 //! #[ram(rtc_fast)]
 //! static mut SOME_INITED_DATA: [u8; 2] = [0xaa, 0xbb];
 //!
-//! #[ram(rtc_fast, uninitialized)]
-//! static mut SOME_UNINITED_DATA: [u8; 2] = [0; 2];
+//! #[ram(rtc_fast, persistent)]
+//! static SOME_PERSISTENT_DATA: esp_hal::Persistent<[u8; 2]> = esp_hal::Persistent::new();
+//! let some_persistent_data = unsafe { SOME_PERSISTENT_DATA.get([0; 2]) };
 //!
 //! #[ram(rtc_fast, zeroed)]
 //! static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
@@ -88,7 +89,7 @@ mod lp_core;
 struct RamArgs {
     rtc_fast: bool,
     rtc_slow: bool,
-    uninitialized: bool,
+    persistent: bool,
     zeroed: bool,
 }
 
@@ -97,8 +98,8 @@ struct RamArgs {
 /// Options that can be specified are rtc_slow or rtc_fast to use the
 /// RTC slow or RTC fast ram instead of the normal SRAM.
 ///
-/// The uninitialized option will skip initialization of the memory
-/// (e.g. to persist it across resets or deep sleep mode for the RTC RAM)
+/// The `persistent` option will skip initialization of the memory after resets
+/// caused by `software_reset()`.
 ///
 /// Not all targets support RTC slow ram.
 #[cfg(feature = "ram")]
@@ -120,7 +121,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     let RamArgs {
         rtc_fast,
         rtc_slow,
-        uninitialized,
+        persistent,
         zeroed,
     } = match FromMeta::from_list(&attr_args) {
         Ok(v) => v,
@@ -140,7 +141,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     }
 
     let is_fn = matches!(item, Item::Fn(_));
-    let section_name = match (is_fn, rtc_fast, rtc_slow, uninitialized, zeroed) {
+    let section_name = match (is_fn, rtc_fast, rtc_slow, persistent, zeroed) {
         (true, false, false, false, false) => Ok(".rwtext"),
         (true, true, false, false, false) => Ok(".rtc_fast.text"),
         (true, false, true, false, false) => Ok(".rtc_slow.text"),
@@ -171,9 +172,50 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     };
 
+    let persistent_wrapper_check = persistent.then(|| {
+        use proc_macro_crate::{crate_name, FoundCrate};
+
+        let hal = proc_macro2::Ident::new(
+            if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-hal") {
+                &name
+            } else {
+                "crate"
+            },
+            Span::call_site().into(),
+        );
+
+        let Item::Static(ref item) = item else {
+            abort!(item, "Expected a `static`");
+        };
+        let ty = item.ty.clone();
+        quote::quote! {
+            const _: () = {
+                trait NotPersistent {
+                    const IS_PERSISTENT: bool = false;
+                }
+                impl<T> NotPersistent for T {}
+
+                trait IsPersistent {}
+                impl<T> IsPersistent for #hal::persistent::Persistent<T> {}
+
+                struct Check<T>(T);
+                impl<T: IsPersistent> Check<T> {
+                    const IS_PERSISTENT: bool = true;
+                }
+
+                assert!(
+                    Check::<#ty>::IS_PERSISTENT,
+                    "persistent statics must be of type esp_hal::persistent::Persistent<T>"
+                )
+            };
+        }
+    });
+
     let output = quote::quote! {
         #section
         #item
+
+        #persistent_wrapper_check
     };
 
     output.into()

@@ -131,6 +131,7 @@ pub mod parl_io;
 #[cfg(pcnt)]
 pub mod pcnt;
 pub mod peripheral;
+pub mod persistent;
 pub mod prelude;
 #[cfg(any(hmac, sha))]
 mod reg_access;
