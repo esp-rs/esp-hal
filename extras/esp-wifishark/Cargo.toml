@@ -1,0 +1,11 @@
+[package]
+name = "esp-wifishark"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+r-extcap = { git = "https://github.com/bjoernQ/r-extcap.git", branch = "fix-open-pipe-windows" }
+pcap-file = "2.0.0"
+serialport = "4.2.1"
+clap = { version = "4.3.5", features = ["derive"] }
+lazy_static = "1.4.0"
