@@ -136,7 +136,3 @@ features = [
   "esp-hal/default",
 ]
 default-target = "riscv32imc-unknown-none-elf"
-
-# TODO: Remove patch once `esp-backtrace` package has been added to repository
-[patch.crates-io]
-esp-println = { version = "0.9.1", path = "../esp-println" }
