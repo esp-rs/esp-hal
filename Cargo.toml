@@ -3,6 +3,7 @@ resolver = "2"
 members  = ["xtask"]
 exclude  = [
     "esp-alloc",
+    "esp-backtrace",
     "esp-build",
     "esp-hal",
     "esp-hal-procmacros",

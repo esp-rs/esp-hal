@@ -1,0 +1,45 @@
+[package]
+name        = "esp-backtrace"
+version     = "0.11.1"
+edition     = "2021"
+description = "Bare-metal backtrace support for ESP32"
+repository  = "https://github.com/esp-rs/esp-hal"
+license     = "MIT OR Apache-2.0"
+
+[package.metadata.docs.rs]
+default-target = "riscv32imc-unknown-none-elf"
+features       = ["esp32c3", "panic-handler", "exception-handler", "println", "esp-println/uart"]
+
+[dependencies]
+defmt       = { version = "0.3.6", optional = true }
+esp-println = { version = "0.9.1", optional = true, default-features = false, path = "../esp-println" }
+semihosting = { version = "0.1.7", optional = true }
+
+[build-dependencies]
+esp-build = { version = "0.1.0", path = "../esp-build" }
+
+[features]
+default = ["colors"]
+
+# You must enable exactly one of the below features to support the correct chip:
+esp32   = ["esp-println?/esp32", "semihosting?/openocd-semihosting"]
+esp32c2 = ["esp-println?/esp32c2"]
+esp32c3 = ["esp-println?/esp32c3"]
+esp32c6 = ["esp-println?/esp32c6"]
+esp32h2 = ["esp-println?/esp32h2"]
+esp32p4 = ["esp-println?/esp32p4"]
+esp32s2 = ["esp-println?/esp32s2", "semihosting?/openocd-semihosting"]
+esp32s3 = ["esp-println?/esp32s3", "semihosting?/openocd-semihosting"]
+
+# Use esp-println
+println = ["dep:esp-println"]
+
+# Use defmt
+defmt = ["dep:defmt"]
+
+# You may optionally enable one or more of the below features to provide
+# additional functionality:
+colors            = []
+exception-handler = []
+halt-cores        = []
+panic-handler     = []
