@@ -3,38 +3,35 @@
 pub(crate) mod os_adapter;
 pub(crate) mod state;
 
-use core::ptr::addr_of;
-use core::time::Duration;
 use core::{
     cell::{RefCell, RefMut},
+    fmt::Debug,
+    mem,
     mem::MaybeUninit,
+    ptr::addr_of,
+    time::Duration,
 };
 
-use portable_atomic::{AtomicUsize, Ordering};
-
-use crate::common_adapter::*;
-use crate::esp_wifi_result;
-use crate::hal::macros::ram;
-use crate::hal::peripheral::Peripheral;
-use crate::hal::peripheral::PeripheralRef;
-use crate::EspWifiInitialization;
-
 use critical_section::{CriticalSection, Mutex};
-
-use enumset::EnumSet;
-use enumset::EnumSetType;
+use enumset::{EnumSet, EnumSetType};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
-
-use core::fmt::Debug;
-use core::mem;
-
 #[doc(hidden)]
 pub use os_adapter::*;
-pub use state::*;
-
+use portable_atomic::{AtomicUsize, Ordering};
 #[cfg(feature = "smoltcp")]
 use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
+pub use state::*;
+
+use crate::{
+    common_adapter::*,
+    esp_wifi_result,
+    hal::{
+        macros::ram,
+        peripheral::{Peripheral, PeripheralRef},
+    },
+    EspWifiInitialization,
+};
 
 const ETHERNET_FRAME_HEADER_SIZE: usize = 18;
 
@@ -50,23 +47,58 @@ use crate::{
     binary::{
         c_types,
         include::{
-            self, __BindgenBitfieldUnit, esp_err_t, esp_interface_t_ESP_IF_WIFI_AP,
-            esp_interface_t_ESP_IF_WIFI_STA, esp_supplicant_init, esp_wifi_connect,
-            esp_wifi_disconnect, esp_wifi_get_mode, esp_wifi_init_internal,
-            esp_wifi_internal_free_rx_buffer, esp_wifi_internal_reg_rxcb, esp_wifi_internal_tx,
-            esp_wifi_scan_start, esp_wifi_set_config, esp_wifi_set_country, esp_wifi_set_mode,
-            esp_wifi_set_protocol, esp_wifi_set_ps, esp_wifi_set_tx_done_cb, esp_wifi_start,
-            esp_wifi_stop, g_wifi_default_wpa_crypto_funcs, wifi_active_scan_time_t,
-            wifi_ap_config_t, wifi_auth_mode_t, wifi_cipher_type_t_WIFI_CIPHER_TYPE_CCMP,
-            wifi_config_t, wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL, wifi_country_t,
-            wifi_init_config_t, wifi_interface_t, wifi_interface_t_WIFI_IF_AP,
-            wifi_interface_t_WIFI_IF_STA, wifi_mode_t, wifi_mode_t_WIFI_MODE_AP,
-            wifi_mode_t_WIFI_MODE_APSTA, wifi_mode_t_WIFI_MODE_NULL, wifi_mode_t_WIFI_MODE_STA,
-            wifi_osi_funcs_t, wifi_pmf_config_t, wifi_scan_config_t, wifi_scan_threshold_t,
-            wifi_scan_time_t, wifi_scan_type_t_WIFI_SCAN_TYPE_ACTIVE,
-            wifi_scan_type_t_WIFI_SCAN_TYPE_PASSIVE, wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
-            wifi_sta_config_t, wpa_crypto_funcs_t, ESP_WIFI_OS_ADAPTER_MAGIC,
-            ESP_WIFI_OS_ADAPTER_VERSION, WIFI_INIT_CONFIG_MAGIC,
+            self,
+            __BindgenBitfieldUnit,
+            esp_err_t,
+            esp_interface_t_ESP_IF_WIFI_AP,
+            esp_interface_t_ESP_IF_WIFI_STA,
+            esp_supplicant_init,
+            esp_wifi_connect,
+            esp_wifi_disconnect,
+            esp_wifi_get_mode,
+            esp_wifi_init_internal,
+            esp_wifi_internal_free_rx_buffer,
+            esp_wifi_internal_reg_rxcb,
+            esp_wifi_internal_tx,
+            esp_wifi_scan_start,
+            esp_wifi_set_config,
+            esp_wifi_set_country,
+            esp_wifi_set_mode,
+            esp_wifi_set_protocol,
+            esp_wifi_set_ps,
+            esp_wifi_set_tx_done_cb,
+            esp_wifi_start,
+            esp_wifi_stop,
+            g_wifi_default_wpa_crypto_funcs,
+            wifi_active_scan_time_t,
+            wifi_ap_config_t,
+            wifi_auth_mode_t,
+            wifi_cipher_type_t_WIFI_CIPHER_TYPE_CCMP,
+            wifi_config_t,
+            wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
+            wifi_country_t,
+            wifi_init_config_t,
+            wifi_interface_t,
+            wifi_interface_t_WIFI_IF_AP,
+            wifi_interface_t_WIFI_IF_STA,
+            wifi_mode_t,
+            wifi_mode_t_WIFI_MODE_AP,
+            wifi_mode_t_WIFI_MODE_APSTA,
+            wifi_mode_t_WIFI_MODE_NULL,
+            wifi_mode_t_WIFI_MODE_STA,
+            wifi_osi_funcs_t,
+            wifi_pmf_config_t,
+            wifi_scan_config_t,
+            wifi_scan_threshold_t,
+            wifi_scan_time_t,
+            wifi_scan_type_t_WIFI_SCAN_TYPE_ACTIVE,
+            wifi_scan_type_t_WIFI_SCAN_TYPE_PASSIVE,
+            wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
+            wifi_sta_config_t,
+            wpa_crypto_funcs_t,
+            ESP_WIFI_OS_ADAPTER_MAGIC,
+            ESP_WIFI_OS_ADAPTER_VERSION,
+            WIFI_INIT_CONFIG_MAGIC,
         },
     },
     compat::queue::SimpleQueue,
@@ -159,7 +191,7 @@ impl Default for AccessPointConfiguration {
 pub struct ClientConfiguration {
     pub ssid: heapless::String<32>,
     pub bssid: Option<[u8; 6]>,
-    //pub protocol: Protocol,
+    // pub protocol: Protocol,
     pub auth_method: AuthMethod,
     pub password: heapless::String<64>,
     pub channel: Option<u8>,
@@ -296,8 +328,7 @@ impl Configuration {
 }
 
 pub mod ipv4 {
-    use core::fmt::Display;
-    use core::str::FromStr;
+    use core::{fmt::Display, str::FromStr};
 
     pub use no_std_net::*;
 
@@ -679,13 +710,13 @@ pub enum WifiEvent {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum InternalWifiError {
     /// Out of memory
-    EspErrNoMem = 0x101,
+    EspErrNoMem          = 0x101,
 
     /// Invalid argument
-    EspErrInvalidArg = 0x102,
+    EspErrInvalidArg     = 0x102,
 
     /// WiFi driver was not installed by esp_wifi_init
-    EspErrWifiNotInit = 0x3001,
+    EspErrWifiNotInit    = 0x3001,
 
     /// WiFi driver was not started by esp_wifi_start
     EspErrWifiNotStarted = 0x3002,
@@ -694,34 +725,34 @@ pub enum InternalWifiError {
     EspErrWifiNotStopped = 0x3003,
 
     /// WiFi interface error
-    EspErrWifiIf = 0x3004,
+    EspErrWifiIf         = 0x3004,
 
     /// WiFi mode error
-    EspErrWifiMode = 0x3005,
+    EspErrWifiMode       = 0x3005,
 
     /// WiFi internal state error
-    EspErrWifiState = 0x3006,
+    EspErrWifiState      = 0x3006,
 
     /// WiFi internal control block of station or soft-AP error
-    EspErrWifiConn = 0x3007,
+    EspErrWifiConn       = 0x3007,
 
     /// WiFi internal NVS module error
-    EspErrWifiNvs = 0x3008,
+    EspErrWifiNvs        = 0x3008,
 
     /// MAC address is invalid
-    EspErrWifiMac = 0x3009,
+    EspErrWifiMac        = 0x3009,
 
     /// SSID is invalid
-    EspErrWifiSsid = 0x300A,
+    EspErrWifiSsid       = 0x300A,
 
     /// Password is invalid
-    EspErrWifiPassword = 0x300B,
+    EspErrWifiPassword   = 0x300B,
 
     /// Timeout error
-    EspErrWifiTimeout = 0x300C,
+    EspErrWifiTimeout    = 0x300C,
 
     /// WiFi is in sleep state(RF closed) and wakeup fail
-    EspErrWifiWakeFail = 0x300D,
+    EspErrWifiWakeFail   = 0x300D,
 
     /// The caller would block
     EspErrWifiWouldBlock = 0x300E,
@@ -730,16 +761,16 @@ pub enum InternalWifiError {
     EspErrWifiNotConnect = 0x300F,
 
     /// Failed to post the event to WiFi task
-    EspErrWifiPost = 0x3012,
+    EspErrWifiPost       = 0x3012,
 
     /// Invalid WiFi state when init/deinit is called
-    EspErrWifiInitState = 0x3013,
+    EspErrWifiInitState  = 0x3013,
 
     /// Returned when WiFi is stopping
-    EspErrWifiStopState = 0x3014,
+    EspErrWifiStopState  = 0x3014,
 
     /// The WiFi connection is not associated
-    EspErrWifiNotAssoc = 0x3015,
+    EspErrWifiNotAssoc   = 0x3015,
 
     /// The WiFi TX is disallowed
     EspErrWifiTxDisallow = 0x3016,
@@ -1099,9 +1130,10 @@ unsafe extern "C" fn recv_cb_sta(
     let packet = EspWifiPacketBuffer { buffer, len, eb };
     // We must handle the result outside of the critical section because
     // EspWifiPacketBuffer::drop must not be called in a critical section.
-    // Dropping an EspWifiPacketBuffer will call `esp_wifi_internal_free_rx_buffer` which
-    // will try to lock an internal mutex. If the mutex is already taken, the function will
-    // try to trigger a context switch, which will fail if we are in a critical section.
+    // Dropping an EspWifiPacketBuffer will call `esp_wifi_internal_free_rx_buffer`
+    // which will try to lock an internal mutex. If the mutex is already taken,
+    // the function will try to trigger a context switch, which will fail if we
+    // are in a critical section.
     match critical_section::with(|cs| DATA_QUEUE_RX_STA.borrow_ref_mut(cs).enqueue(packet)) {
         Ok(_) => {
             #[cfg(feature = "embassy-net")]
@@ -1123,9 +1155,10 @@ unsafe extern "C" fn recv_cb_ap(
     let packet = EspWifiPacketBuffer { buffer, len, eb };
     // We must handle the result outside of the critical section because
     // EspWifiPacketBuffer::drop must not be called in a critical section.
-    // Dropping an EspWifiPacketBuffer will call `esp_wifi_internal_free_rx_buffer` which
-    // will try to lock an internal mutex. If the mutex is already taken, the function will
-    // try to trigger a context switch, which will fail if we are in a critical section.
+    // Dropping an EspWifiPacketBuffer will call `esp_wifi_internal_free_rx_buffer`
+    // which will try to lock an internal mutex. If the mutex is already taken,
+    // the function will try to trigger a context switch, which will fail if we
+    // are in a critical section.
     match critical_section::with(|cs| DATA_QUEUE_RX_AP.borrow_ref_mut(cs).enqueue(packet)) {
         Ok(_) => {
             #[cfg(feature = "embassy-net")]
@@ -1231,18 +1264,19 @@ unsafe extern "C" fn coex_register_start_cb(
 ///
 /// # Comparison of active and passive scan
 ///
-///|                                      | **Active** | **Passive** |
-///|--------------------------------------|------------|-------------|
-///| **Power consumption**                |    High    |     Low     |
-///| **Time required (typical behavior)** |     Low    |     High    |
+/// |                                      | **Active** | **Passive** |
+/// |--------------------------------------|------------|-------------|
+/// | **Power consumption**                |    High    |     Low     |
+/// | **Time required (typical behavior)** |     Low    |     High    |
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ScanTypeConfig {
-    /// Active scan with min and max scan time per channel. This is the default and recommended if
-    /// you are unsure.
+    /// Active scan with min and max scan time per channel. This is the default
+    /// and recommended if you are unsure.
     ///
     /// # Procedure
     /// 1. Send probe request on each channel.
-    /// 2. Wait for probe response. Wait at least `min` time, but if no response is received, wait up to `max` time.
+    /// 2. Wait for probe response. Wait at least `min` time, but if no response
+    ///    is received, wait up to `max` time.
     /// 3. Switch channel.
     /// 4. Repeat from 1.
     Active {
@@ -1259,8 +1293,8 @@ pub enum ScanTypeConfig {
     /// 3. Repeat from 1.
     ///
     /// # Note
-    /// It is recommended to avoid duration longer thean 1500ms, as it may cause a station to
-    /// disconnect from the AP.
+    /// It is recommended to avoid duration longer thean 1500ms, as it may cause
+    /// a station to disconnect from the AP.
     Passive(Duration),
 }
 
@@ -1286,15 +1320,18 @@ impl ScanTypeConfig {
 pub struct ScanConfig<'a> {
     /// SSID to filter for.
     /// If [`None`] is passed, all SSIDs will be returned.
-    /// If [`Some`] is passed, only the APs matching the given SSID will be returned.
+    /// If [`Some`] is passed, only the APs matching the given SSID will be
+    /// returned.
     pub ssid: Option<&'a str>,
     /// BSSID to filter for.
     /// If [`None`] is passed, all BSSIDs will be returned.
-    /// If [`Some`] is passed, only the APs matching the given BSSID will be returned.
+    /// If [`Some`] is passed, only the APs matching the given BSSID will be
+    /// returned.
     pub bssid: Option<[u8; 6]>,
     /// Channel to filter for.
     /// If [`None`] is passed, all channels will be returned.
-    /// If [`Some`] is passed, only the APs on the given channel will be returned.
+    /// If [`Some`] is passed, only the APs on the given channel will be
+    /// returned.
     pub channel: Option<u8>,
     /// Whether to show hidden networks.
     pub show_hidden: bool,
@@ -1361,8 +1398,8 @@ pub(crate) fn wifi_start_scan(
     unsafe { esp_wifi_scan_start(&scan_config, block) }
 }
 
-/// Creates a new [WifiDevice] and [WifiController] in either AP or STA mode with the given
-/// configuration.
+/// Creates a new [WifiDevice] and [WifiController] in either AP or STA mode
+/// with the given configuration.
 ///
 /// This function will panic if the configuration is not
 /// [`Configuration::Client`] or [`Configuration::AccessPoint`].
@@ -1381,8 +1418,8 @@ pub fn new_with_config<'d, MODE: WifiDeviceMode>(
     ))
 }
 
-/// Creates a new [WifiDevice] and [WifiController] in either AP or STA mode with a default
-/// configuration.
+/// Creates a new [WifiDevice] and [WifiController] in either AP or STA mode
+/// with a default configuration.
 ///
 /// This function will panic if the mode is [`WifiMode::ApSta`].
 /// If you want to use AP-STA mode, use `[new_ap_sta]`.
@@ -1394,7 +1431,8 @@ pub fn new_with_mode<'d, MODE: WifiDeviceMode>(
     new_with_config(inited, device, <MODE as Sealed>::Config::default())
 }
 
-/// Creates a new [WifiDevice] and [WifiController] in AP-STA mode, with a default configuration.
+/// Creates a new [WifiDevice] and [WifiController] in AP-STA mode, with a
+/// default configuration.
 ///
 /// Returns a tuple of `(AP device, STA device, controller)`.
 pub fn new_ap_sta<'d>(
@@ -1447,9 +1485,11 @@ mod sealed {
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     /// Take care not to drop this while in a critical section.
     ///
-    /// Dropping an EspWifiPacketBuffer will call `esp_wifi_internal_free_rx_buffer` which
-    /// will try to lock an internal mutex. If the mutex is already taken, the function will
-    /// try to trigger a context switch, which will fail if we are in a critical section.
+    /// Dropping an EspWifiPacketBuffer will call
+    /// `esp_wifi_internal_free_rx_buffer` which will try to lock an
+    /// internal mutex. If the mutex is already taken, the function will try
+    /// to trigger a context switch, which will fail if we are in a critical
+    /// section.
     pub struct EspWifiPacketBuffer {
         pub(crate) buffer: *mut c_types::c_void,
         pub(crate) len: u16,
@@ -1734,8 +1774,8 @@ impl<'d> WifiController<'d> {
         }
 
         // We set up the controller with the default config because we need to call
-        // `set_configuration` to apply the actual configuration, and it will update the stored
-        // configuration anyway.
+        // `set_configuration` to apply the actual configuration, and it will update the
+        // stored configuration anyway.
         let mut this = Self {
             _device,
             config: Default::default(),
@@ -1751,8 +1791,8 @@ impl<'d> WifiController<'d> {
 
     /// Set the wifi mode.
     ///
-    /// This will set the wifi protocol to the desired protocol, the default for this is:
-    /// `WIFI_PROTOCOL_11B|WIFI_PROTOCOL_11G|WIFI_PROTOCOL_11N`
+    /// This will set the wifi protocol to the desired protocol, the default for
+    /// this is: `WIFI_PROTOCOL_11B|WIFI_PROTOCOL_11G|WIFI_PROTOCOL_11N`
     ///
     /// # Arguments:
     ///
@@ -1761,8 +1801,7 @@ impl<'d> WifiController<'d> {
     /// # Example:
     ///
     /// ```
-    /// use esp_wifi::wifi::Protocol;
-    /// use esp_wifi::wifi::WifiController;
+    /// use esp_wifi::wifi::{Protocol, WifiController};
     /// let mut wifi = WifiController::new();
     /// wifi.set_mode(Protocol::P802D11BGNLR);
     /// ```
@@ -1889,9 +1928,10 @@ impl<MODE: Sealed> WifiRxToken<MODE> {
 
         // We handle the received data outside of the critical section because
         // EspWifiPacketBuffer::drop must not be called in a critical section.
-        // Dropping an EspWifiPacketBuffer will call `esp_wifi_internal_free_rx_buffer` which
-        // will try to lock an internal mutex. If the mutex is already taken, the function will
-        // try to trigger a context switch, which will fail if we are in a critical section.
+        // Dropping an EspWifiPacketBuffer will call `esp_wifi_internal_free_rx_buffer`
+        // which will try to lock an internal mutex. If the mutex is already
+        // taken, the function will try to trigger a context switch, which will
+        // fail if we are in a critical section.
         let buffer = data.as_slice_mut();
         dump_packet_info(&buffer);
 
@@ -1922,8 +1962,9 @@ impl<MODE: Sealed> WifiTxToken<MODE> {
     {
         self.mode.increase_in_flight_counter();
 
-        // (safety): creation of multiple WiFi devices with the same mode is impossible in safe Rust,
-        // therefore only smoltcp _or_ embassy-net can be used at one time
+        // (safety): creation of multiple WiFi devices with the same mode is impossible
+        // in safe Rust, therefore only smoltcp _or_ embassy-net can be used at
+        // one time
         static mut BUFFER: [u8; DATA_FRAME_SIZE] = [0u8; DATA_FRAME_SIZE];
 
         let buffer = unsafe { &mut BUFFER[..len] };
@@ -1946,9 +1987,10 @@ impl<MODE: Sealed> TxToken for WifiTxToken<MODE> {
     }
 }
 
-// FIXME data here has to be &mut because of `esp_wifi_internal_tx` signature, requiring a *mut ptr to the buffer
-// Casting const to mut is instant UB, even though in reality `esp_wifi_internal_tx` copies the buffer into its own memory and
-// does not modify
+// FIXME data here has to be &mut because of `esp_wifi_internal_tx` signature,
+// requiring a *mut ptr to the buffer Casting const to mut is instant UB, even
+// though in reality `esp_wifi_internal_tx` copies the buffer into its own
+// memory and does not modify
 pub(crate) fn esp_wifi_send_data(interface: wifi_interface_t, data: &mut [u8]) {
     trace!("sending... {} bytes", data.len());
     dump_packet_info(data);
@@ -2057,7 +2099,8 @@ impl WifiController<'_> {
         Ok(self.config.clone())
     }
 
-    /// Set the configuration, you need to use Wifi::connect() for connecting to an AP
+    /// Set the configuration, you need to use Wifi::connect() for connecting to
+    /// an AP
     pub fn set_configuration(&mut self, conf: &Configuration) -> Result<(), WifiError> {
         match self.config {
             Configuration::None => self.config = conf.clone(), // initial config
@@ -2137,7 +2180,7 @@ impl WifiController<'_> {
         match crate::wifi::get_sta_state() {
             crate::wifi::WifiState::StaConnected => Ok(true),
             crate::wifi::WifiState::StaDisconnected => Err(WifiError::Disconnected),
-            //FIXME: Should any other enum value trigger an error instead of returning false?
+            // FIXME: Should any other enum value trigger an error instead of returning false?
             _ => Ok(false),
         }
     }
@@ -2194,9 +2237,10 @@ macro_rules! esp_wifi_result {
 
 #[cfg(feature = "embassy-net")]
 pub(crate) mod embassy {
-    use super::*;
     use embassy_net_driver::{Capabilities, Driver, HardwareAddress, RxToken, TxToken};
     use embassy_sync::waitqueue::AtomicWaker;
+
+    use super::*;
 
     // We can get away with a single tx waker because the transmit queue is shared
     // between interfaces.
@@ -2363,7 +2407,8 @@ mod asynch {
             }
         }
 
-        /// Async version of [`crate::wifi::WifiController`]'s `Disconnect` method
+        /// Async version of [`crate::wifi::WifiController`]'s `Disconnect`
+        /// method
         pub async fn disconnect(&mut self) -> Result<(), WifiError> {
             Self::clear_events(WifiEvent::StaDisconnected);
             crate::wifi::WifiController::disconnect_impl(self)?;
@@ -2382,7 +2427,8 @@ mod asynch {
             WifiEventFuture::new(event).await
         }
 
-        /// Wait for one of multiple [`WifiEvent`]s. Returns the events that occurred while waiting.
+        /// Wait for one of multiple [`WifiEvent`]s. Returns the events that
+        /// occurred while waiting.
         pub async fn wait_for_events(
             &mut self,
             events: EnumSet<WifiEvent>,

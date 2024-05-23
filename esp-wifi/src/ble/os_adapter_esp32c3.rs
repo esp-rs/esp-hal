@@ -238,8 +238,8 @@ pub(crate) unsafe extern "C" fn interrupt_set(
         interrupt_prio
     );
 
-    /* Set the interrupt type (Edge or Level). */
-    /* Map the CPU interrupt ID to the peripheral. */
+    // Set the interrupt type (Edge or Level).
+    // Map the CPU interrupt ID to the peripheral.
 
     // NO-OP
 }

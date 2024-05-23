@@ -1,21 +1,20 @@
 use core::cell::RefCell;
 
 use critical_section::Mutex;
+#[cfg(any(feature = "esp32c6", feature = "esp32h2"))]
+use peripherals::INTPRI as SystemPeripheral;
+#[cfg(not(any(feature = "esp32c6", feature = "esp32h2")))]
+use peripherals::SYSTEM as SystemPeripheral;
 
 use crate::{
     hal::{
         interrupt::{self, TrapFrame},
         peripherals::{self, Interrupt},
         riscv,
-        systimer::{Alarm, Periodic, SystemTimer, Target},
+        timer::systimer::{Alarm, Periodic, Target},
     },
     preempt::preempt::task_switch,
 };
-
-#[cfg(any(feature = "esp32c6", feature = "esp32h2"))]
-use peripherals::INTPRI as SystemPeripheral;
-#[cfg(not(any(feature = "esp32c6", feature = "esp32h2")))]
-use peripherals::SYSTEM as SystemPeripheral;
 
 /// The timer responsible for time slicing.
 pub type TimeBase = Alarm<Target, esp_hal::Blocking, 0>;
@@ -24,8 +23,7 @@ static ALARM0: Mutex<RefCell<Option<Alarm<Periodic, esp_hal::Blocking, 0>>>> =
 const TIMESLICE_FREQUENCY: fugit::HertzU32 = fugit::HertzU32::from_raw(crate::CONFIG.tick_rate_hz);
 
 // Time keeping
-
-pub const TICKS_PER_SECOND: u64 = 16_000_000;
+pub const TICKS_PER_SECOND: u64 = 1_000_000;
 
 pub fn setup_timer(systimer: TimeBase) {
     // make sure the scheduling won't start before everything is setup
@@ -100,9 +98,9 @@ pub fn yield_task() {
 }
 
 /// Current systimer count value
-/// A tick is 1 / 16_000_000 seconds
+/// A tick is 1 / 1_000_000 seconds
 pub fn get_systimer_count() -> u64 {
-    SystemTimer::now()
+    esp_hal::time::current_time().ticks()
 }
 
 // TODO: use an Instance type instead...

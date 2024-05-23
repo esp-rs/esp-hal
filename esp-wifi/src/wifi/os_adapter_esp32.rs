@@ -65,21 +65,21 @@ pub(crate) unsafe extern "C" fn wifi_clock_disable() {
     ptr.write_volatile(old & !DPORT_WIFI_CLK_WIFI_EN_M);
 }
 
-/****************************************************************************
- * Name: esp_set_isr
- *
- * Description:
- *   Register interrupt function
- *
- * Input Parameters:
- *   n   - Interrupt ID
- *   f   - Interrupt function
- *   arg - Function private data
- *
- * Returned Value:
- *   None
- *
- ****************************************************************************/
+/// **************************************************************************
+/// Name: esp_set_isr
+///
+/// Description:
+///   Register interrupt function
+///
+/// Input Parameters:
+///   n   - Interrupt ID
+///   f   - Interrupt function
+///   arg - Function private data
+///
+/// Returned Value:
+///   None
+///
+/// *************************************************************************
 pub unsafe extern "C" fn set_isr(
     n: i32,
     f: *mut crate::binary::c_types::c_void,

@@ -3,13 +3,15 @@ use core::{cell::RefCell, ptr::addr_of};
 use critical_section::Mutex;
 use portable_atomic::{AtomicBool, Ordering};
 
-use crate::ble::btdm::ble_os_adapter_chip_specific::{osi_funcs_s, G_OSI_FUNCS};
-use crate::ble::HciOutCollector;
-use crate::ble::HCI_OUT_COLLECTOR;
-use crate::hal::macros::ram;
 use crate::{
     binary::include::*,
+    ble::{
+        btdm::ble_os_adapter_chip_specific::{osi_funcs_s, G_OSI_FUNCS},
+        HciOutCollector,
+        HCI_OUT_COLLECTOR,
+    },
     compat::{common::str_from_c, queue::SimpleQueue, task_runner::spawn_task},
+    hal::macros::ram,
     memory_fence::memory_fence,
     timer::yield_task,
 };
@@ -36,8 +38,11 @@ static PACKET_SENT: AtomicBool = AtomicBool::new(true);
 
 #[repr(C)]
 struct vhci_host_callback_s {
-    notify_host_send_available: extern "C" fn(), /* callback used to notify that the host can send packet to controller */
-    notify_host_recv: extern "C" fn(*mut u8, u16) -> i32, /* callback used to notify that the controller has a packet to send to the host */
+    notify_host_send_available: extern "C" fn(), /* callback used to notify that the host can
+                                                  * send packet to controller */
+    notify_host_recv: extern "C" fn(*mut u8, u16) -> i32, /* callback used to notify that the
+                                                           * controller has a packet to send to
+                                                           * the host */
 }
 
 extern "C" {

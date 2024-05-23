@@ -1,29 +1,29 @@
 //! Non-async Networking primitives for TCP/UDP communication.
 
-use core::cell::RefCell;
-use core::fmt::Display;
+use core::{borrow::BorrowMut, cell::RefCell, fmt::Display};
+
 #[cfg(feature = "tcp")]
 use embedded_io::ErrorType;
 #[cfg(feature = "tcp")]
 use embedded_io::{Read, Write};
-
-use crate::wifi::ipv4;
-use smoltcp::iface::{Interface, SocketHandle, SocketSet};
 #[cfg(feature = "dhcpv4")]
 use smoltcp::socket::dhcpv4::Socket as Dhcpv4Socket;
 #[cfg(feature = "tcp")]
 use smoltcp::socket::tcp::Socket as TcpSocket;
-use smoltcp::time::Instant;
 #[cfg(feature = "dns")]
 use smoltcp::wire::DnsQueryType;
 #[cfg(feature = "udp")]
 use smoltcp::wire::IpEndpoint;
-use smoltcp::wire::{IpAddress, IpCidr, Ipv4Address};
+use smoltcp::{
+    iface::{Interface, SocketHandle, SocketSet},
+    time::Instant,
+    wire::{IpAddress, IpCidr, Ipv4Address},
+};
 
-use crate::current_millis;
-use crate::wifi::{WifiDevice, WifiDeviceMode};
-
-use core::borrow::BorrowMut;
+use crate::{
+    current_millis,
+    wifi::{ipv4, WifiDevice, WifiDeviceMode},
+};
 
 #[cfg(feature = "tcp")]
 const LOCAL_PORT_MIN: u16 = 41000;
@@ -78,7 +78,7 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
             network_interface: RefCell::new(network_interface),
             network_config: RefCell::new(ipv4::Configuration::Client(
                 ipv4::ClientConfiguration::DHCP(ipv4::DHCPClientSettings {
-                    //FIXME: smoltcp currently doesn't have a way of giving a hostname through DHCP
+                    // FIXME: smoltcp currently doesn't have a way of giving a hostname through DHCP
                     hostname: Some(unwrap!("Espressif".try_into().ok())),
                 }),
             )),

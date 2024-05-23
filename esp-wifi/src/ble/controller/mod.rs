@@ -1,9 +1,10 @@
 use embedded_io::{Error, ErrorType, Read, Write};
 
-use crate::hal::peripheral::{Peripheral, PeripheralRef};
-use crate::EspWifiInitialization;
-
 use super::{read_hci, read_next, send_hci};
+use crate::{
+    hal::peripheral::{Peripheral, PeripheralRef},
+    EspWifiInitialization,
+};
 
 /// A blocking HCI connector
 pub struct BleConnector<'d> {
@@ -82,14 +83,15 @@ impl Write for BleConnector<'_> {
 pub mod asynch {
     use core::task::Poll;
 
-    use crate::ble::ble::have_hci_read_data;
-    use crate::EspWifiInitialization;
-
-    use super::BleConnectorError;
-    use super::{read_hci, send_hci};
-    use crate::hal::peripheral::{Peripheral, PeripheralRef};
     use embassy_sync::waitqueue::AtomicWaker;
     use embedded_io::ErrorType;
+
+    use super::{read_hci, send_hci, BleConnectorError};
+    use crate::{
+        ble::ble::have_hci_read_data,
+        hal::peripheral::{Peripheral, PeripheralRef},
+        EspWifiInitialization,
+    };
 
     static HCI_WAKER: AtomicWaker = AtomicWaker::new();
 

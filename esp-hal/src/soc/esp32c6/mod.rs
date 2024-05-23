@@ -19,13 +19,14 @@ pub mod lp_core;
 pub mod peripherals;
 pub mod radio_clocks;
 
+#[macro_export]
 macro_rules! chip {
     () => {
         "esp32c6"
     };
 }
 
-pub(crate) use chip;
+pub use chip;
 
 #[allow(unused)]
 pub(crate) mod registers {

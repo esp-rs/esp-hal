@@ -8,10 +8,8 @@ use smoltcp::{
     wire::{EthernetAddress, HardwareAddress},
 };
 
-use crate::current_millis;
-use crate::EspWifiInitialization;
-
 use super::{WifiApDevice, WifiController, WifiDevice, WifiDeviceMode, WifiError, WifiStaDevice};
+use crate::{current_millis, EspWifiInitialization};
 
 fn setup_iface<'a, MODE: WifiDeviceMode>(
     device: &mut WifiDevice<'_, MODE>,
@@ -42,7 +40,8 @@ fn setup_iface<'a, MODE: WifiDeviceMode>(
 }
 
 /// Convenient way to create an `smoltcp` ethernet interface
-/// You can use the provided macros to create and pass a suitable backing storage.
+/// You can use the provided macros to create and pass a suitable backing
+/// storage.
 pub fn create_network_interface<'a, 'd, MODE: WifiDeviceMode>(
     inited: &EspWifiInitialization,
     device: impl crate::hal::peripheral::Peripheral<P = crate::hal::peripherals::WIFI> + 'd,

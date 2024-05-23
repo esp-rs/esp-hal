@@ -3,18 +3,27 @@
 
 use bleps::{
     ad_structure::{
-        create_advertising_data, AdStructure, BR_EDR_NOT_SUPPORTED, LE_GENERAL_DISCOVERABLE,
+        create_advertising_data,
+        AdStructure,
+        BR_EDR_NOT_SUPPORTED,
+        LE_GENERAL_DISCOVERABLE,
     },
     attribute_server::{AttributeServer, NotificationData, WorkResult},
-    gatt, Ble, HciConnector,
+    gatt,
+    Ble,
+    HciConnector,
 };
 use esp_backtrace as _;
+use esp_hal::{
+    clock::ClockControl,
+    gpio::{Input, Io, Pull},
+    peripherals::*,
+    prelude::*,
+    rng::Rng,
+    system::SystemControl,
+};
 use esp_println::println;
 use esp_wifi::{ble::controller::BleConnector, initialize, EspWifiInitFor};
-#[path = "../../examples-util/util.rs"]
-mod examples_util;
-use examples_util::hal;
-use hal::{clock::ClockControl, gpio::IO, peripherals::*, prelude::*, rng::Rng};
 
 #[entry]
 fn main() -> ! {
@@ -23,23 +32,23 @@ fn main() -> ! {
 
     let peripherals = Peripherals::take();
 
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::max(system.clock_control).freeze();
 
     #[cfg(target_arch = "xtensa")]
-    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
+    let timer = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
     #[cfg(target_arch = "riscv32")]
-    let timer = hal::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
+    let timer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
     let init = initialize(
         EspWifiInitFor::Ble,
         timer,
         Rng::new(peripherals.RNG),
-        system.radio_clock_control,
+        peripherals.RADIO_CLK,
         &clocks,
     )
     .unwrap();
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
     let button = io.pins.gpio0.into_pull_down_input();
     #[cfg(any(
@@ -48,7 +57,7 @@ fn main() -> ! {
         feature = "esp32c6",
         feature = "esp32h2"
     ))]
-    let button = io.pins.gpio9.into_pull_down_input();
+    let button = Input::new(io.pins.gpio9, Pull::Down);
 
     let mut debounce_cnt = 500;
 
@@ -67,7 +76,7 @@ fn main() -> ! {
                 create_advertising_data(&[
                     AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
                     AdStructure::ServiceUuids16(&[Uuid::Uuid16(0x1809)]),
-                    AdStructure::CompleteLocalName(examples_util::SOC_NAME),
+                    AdStructure::CompleteLocalName(esp_hal::chip!()),
                 ])
                 .unwrap()
             )

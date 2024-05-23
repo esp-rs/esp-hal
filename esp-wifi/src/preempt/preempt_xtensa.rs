@@ -1,7 +1,6 @@
 use core::ptr::addr_of;
 
 use super::*;
-
 use crate::hal::trapframe::TrapFrame;
 
 #[derive(Debug, Clone, Copy)]

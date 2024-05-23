@@ -1,12 +1,13 @@
-use super::phy_init_data::PHY_INIT_DATA_DEFAULT;
-use crate::binary::include::*;
-use crate::common_adapter::RADIO_CLOCKS;
-use crate::compat::common::str_from_c;
-use crate::hal::system::RadioClockController;
-use crate::hal::system::RadioPeripherals;
-
 // use atomic_polyfill::AtomicU32;
 use portable_atomic::{AtomicU32, Ordering};
+
+use super::phy_init_data::PHY_INIT_DATA_DEFAULT;
+use crate::{
+    binary::include::*,
+    common_adapter::RADIO_CLOCKS,
+    compat::common::str_from_c,
+    hal::system::{RadioClockController, RadioPeripherals},
+};
 
 const SOC_PHY_DIG_REGS_MEM_SIZE: usize = 21 * 4;
 
@@ -17,8 +18,8 @@ static mut S_IS_PHY_REG_STORED: bool = false;
 static mut PHY_ACCESS_REF: AtomicU32 = AtomicU32::new(0);
 
 pub(crate) fn enable_wifi_power_domain() {
-    // In esp-idf, SOC_PMU_SUPPORTED is set which makes `esp_wifi_bt_power_domain_on`
-    // a no-op.
+    // In esp-idf, SOC_PMU_SUPPORTED is set which makes
+    // `esp_wifi_bt_power_domain_on` a no-op.
 }
 
 pub(crate) fn phy_mem_init() {
@@ -91,11 +92,12 @@ pub(crate) unsafe fn phy_disable() {
             phy_xpd_tsens();
 
             // #if CONFIG_IDF_TARGET_ESP32
-            //         // Update WiFi MAC time before disalbe WiFi/BT common peripheral clock
-            //         phy_update_wifi_mac_time(true, esp_timer_get_time());
-            // #endif
+            //         // Update WiFi MAC time before disalbe WiFi/BT common peripheral
+            // clock         phy_update_wifi_mac_time(true,
+            // esp_timer_get_time()); #endif
 
-            // Disable WiFi/BT common peripheral clock. Do not disable clock for hardware RNG
+            // Disable WiFi/BT common peripheral clock. Do not disable clock for hardware
+            // RNG
             phy_disable_clock();
             trace!("PHY DISABLE");
         });

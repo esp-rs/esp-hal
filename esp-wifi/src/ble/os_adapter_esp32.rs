@@ -1,14 +1,17 @@
+use core::ptr::addr_of_mut;
+
 use super::*;
 use crate::binary::{
     c_types,
     include::{
-        esp_bt_controller_config_t, esp_bt_mode_t, esp_bt_mode_t_ESP_BT_MODE_BLE,
-        esp_bt_mode_t_ESP_BT_MODE_BTDM, esp_bt_mode_t_ESP_BT_MODE_CLASSIC_BT,
+        esp_bt_controller_config_t,
+        esp_bt_mode_t,
+        esp_bt_mode_t_ESP_BT_MODE_BLE,
+        esp_bt_mode_t_ESP_BT_MODE_BTDM,
+        esp_bt_mode_t_ESP_BT_MODE_CLASSIC_BT,
         esp_bt_mode_t_ESP_BT_MODE_IDLE,
     },
 };
-
-use core::ptr::addr_of_mut;
 
 pub static mut ISR_INTERRUPT_5: (
     *mut crate::binary::c_types::c_void,
@@ -216,16 +219,17 @@ const SOC_MEM_BT_BSS_END: u32 = 0x3ffb9a20;
 const SOC_MEM_BT_MISC_START: u32 = 0x3ffbdb28;
 const SOC_MEM_BT_MISC_END: u32 = 0x3ffbdb5c;
 
-const SOC_MEM_BT_EM_BREDR_REAL_END: u32 = 0x3ffb6388; //  (SOC_MEM_BT_EM_BREDR_NO_SYNC_END + CONFIG_BTDM_CTRL_BR_EDR_MAX_SYNC_CONN_EFF * SOC_MEM_BT_EM_PER_SYNC_SIZE);
+const SOC_MEM_BT_EM_BREDR_REAL_END: u32 = 0x3ffb6388; //  (SOC_MEM_BT_EM_BREDR_NO_SYNC_END + CONFIG_BTDM_CTRL_BR_EDR_MAX_SYNC_CONN_EFF
+                                                      // * SOC_MEM_BT_EM_PER_SYNC_SIZE);
 
 static BTDM_DRAM_AVAILABLE_REGION: [btdm_dram_available_region_t; 7] = [
-    /* following is .data */
+    // following is .data
     btdm_dram_available_region_t {
         mode: esp_bt_mode_t_ESP_BT_MODE_BTDM,
         start: SOC_MEM_BT_DATA_START,
         end: SOC_MEM_BT_DATA_END,
     },
-    /* following is memory which HW will use */
+    // following is memory which HW will use
     btdm_dram_available_region_t {
         mode: esp_bt_mode_t_ESP_BT_MODE_BTDM,
         start: SOC_MEM_BT_EM_BTDM0_START,
@@ -246,7 +250,7 @@ static BTDM_DRAM_AVAILABLE_REGION: [btdm_dram_available_region_t; 7] = [
         start: SOC_MEM_BT_EM_BREDR_START,
         end: SOC_MEM_BT_EM_BREDR_REAL_END,
     },
-    /* following is .bss */
+    // following is .bss
     btdm_dram_available_region_t {
         mode: esp_bt_mode_t_ESP_BT_MODE_BTDM,
         start: SOC_MEM_BT_BSS_START,
@@ -299,7 +303,8 @@ pub(crate) fn btdm_controller_mem_init() {
         let data_start = addr_of_mut!(_data_start_btdm).cast::<u8>();
         let data_end = addr_of_mut!(_data_end_btdm).cast::<u8>();
 
-        // `_data_start_btdm_rom` is a pointer to the actual initialization data in the ROM.
+        // `_data_start_btdm_rom` is a pointer to the actual initialization data in the
+        // ROM.
         let data_start_rom = _data_start_btdm_rom as *const u8;
 
         let len = data_end as usize - data_start as usize;
@@ -547,21 +552,21 @@ const BTDM_ASYNC_WAKEUP_REQ_HCI: i32 = 0;
 #[cfg(coex)]
 const BTDM_ASYNC_WAKEUP_REQ_COEX: i32 = 1;
 
-//const BTDM_ASYNC_WAKEUP_REQMAX: i32 = 2;
+// const BTDM_ASYNC_WAKEUP_REQMAX: i32 = 2;
 
-/****************************************************************************
- * Name: async_wakeup_request
- *
- * Description:
- *   Request the BLE Controller to wakeup
- *
- * Input Parameters:
- *   event - the event that triggered the wakeup
- *
- * Returned Value:
- *   true if request lock is needed, false otherwise
- *
- ****************************************************************************/
+/// **************************************************************************
+/// Name: async_wakeup_request
+///
+/// Description:
+///   Request the BLE Controller to wakeup
+///
+/// Input Parameters:
+///   event - the event that triggered the wakeup
+///
+/// Returned Value:
+///   true if request lock is needed, false otherwise
+///
+/// *************************************************************************
 
 #[cfg(coex)]
 fn async_wakeup_request(event: i32) -> bool {
@@ -587,19 +592,19 @@ fn async_wakeup_request(event: i32) -> bool {
     return do_wakeup_request;
 }
 
-/****************************************************************************
- * Name: async_wakeup_request_end
- *
- * Description:
- *   Finish a wakeup request
- *
- * Input Parameters:
- *   event - the event that triggered the wakeup
- *
- * Returned Value:
- *   true if request lock is needed, false otherwise
- *
- ****************************************************************************/
+/// **************************************************************************
+/// Name: async_wakeup_request_end
+///
+/// Description:
+///   Finish a wakeup request
+///
+/// Input Parameters:
+///   event - the event that triggered the wakeup
+///
+/// Returned Value:
+///   true if request lock is needed, false otherwise
+///
+/// *************************************************************************
 
 #[cfg(coex)]
 fn async_wakeup_request_end(event: i32) {

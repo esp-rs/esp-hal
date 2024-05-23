@@ -2,22 +2,25 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
-use embassy_sync::blocking_mutex::raw::NoopRawMutex;
-use embassy_sync::mutex::Mutex;
-#[path = "../../examples-util/util.rs"]
-mod examples_util;
-use examples_util::hal;
-
 use embassy_executor::Spawner;
+use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Ticker};
 use esp_backtrace as _;
-
+use esp_hal::{
+    clock::ClockControl,
+    embassy,
+    peripherals::Peripherals,
+    prelude::*,
+    rng::Rng,
+    system::SystemControl,
+    timer::timg::TimerGroup,
+};
 use esp_println::println;
-use esp_wifi::esp_now::{EspNowManager, EspNowReceiver, EspNowSender, PeerInfo, BROADCAST_ADDRESS};
-use esp_wifi::{initialize, EspWifiInitFor};
-use hal::clock::ClockControl;
-use hal::rng::Rng;
-use hal::{embassy, peripherals::Peripherals, prelude::*, timer::TimerGroup};
+use esp_wifi::{
+    esp_now::{EspNowManager, EspNowReceiver, EspNowSender, PeerInfo, BROADCAST_ADDRESS},
+    initialize,
+    EspWifiInitFor,
+};
 use static_cell::make_static;
 
 #[main]
@@ -27,18 +30,18 @@ async fn main(spawner: Spawner) -> ! {
 
     let peripherals = Peripherals::take();
 
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::max(system.clock_control).freeze();
 
     #[cfg(target_arch = "xtensa")]
-    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
+    let timer = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
     #[cfg(target_arch = "riscv32")]
-    let timer = hal::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
+    let timer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
     let init = initialize(
         EspWifiInitFor::Wifi,
         timer,
         Rng::new(peripherals.RNG),
-        system.radio_clock_control,
+        peripherals.RADIO_CLK,
         &clocks,
     )
     .unwrap();

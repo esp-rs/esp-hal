@@ -1,11 +1,12 @@
-use super::phy_init_data::PHY_INIT_DATA_DEFAULT;
-use crate::binary::include::*;
-use crate::common_adapter::RADIO_CLOCKS;
-use crate::compat::common::str_from_c;
-use crate::hal::system::RadioClockController;
-use crate::hal::system::RadioPeripherals;
-
 use portable_atomic::{AtomicU32, Ordering};
+
+use super::phy_init_data::PHY_INIT_DATA_DEFAULT;
+use crate::{
+    binary::include::*,
+    common_adapter::RADIO_CLOCKS,
+    compat::common::str_from_c,
+    hal::system::{RadioClockController, RadioPeripherals},
+};
 
 const SOC_PHY_DIG_REGS_MEM_SIZE: usize = 21 * 4;
 
@@ -19,11 +20,11 @@ pub(crate) fn enable_wifi_power_domain() {
     const SYSTEM_WIFIBB_RST: u32 = 1 << 0;
     const SYSTEM_FE_RST: u32 = 1 << 1;
     const SYSTEM_WIFIMAC_RST: u32 = 1 << 2;
-    const SYSTEM_BTBB_RST: u32 = 1 << 3; /* Bluetooth Baseband */
-    const SYSTEM_BTMAC_RST: u32 = 1 << 4; /* deprecated */
-    const SYSTEM_RW_BTMAC_RST: u32 = 1 << 9; /* Bluetooth MAC */
-    const SYSTEM_RW_BTMAC_REG_RST: u32 = 1 << 11; /* Bluetooth MAC Regsiters */
-    const SYSTEM_BTBB_REG_RST: u32 = 1 << 13; /* Bluetooth Baseband Registers */
+    const SYSTEM_BTBB_RST: u32 = 1 << 3; // Bluetooth Baseband
+    const SYSTEM_BTMAC_RST: u32 = 1 << 4; // deprecated
+    const SYSTEM_RW_BTMAC_RST: u32 = 1 << 9; // Bluetooth MAC
+    const SYSTEM_RW_BTMAC_REG_RST: u32 = 1 << 11; // Bluetooth MAC Regsiters
+    const SYSTEM_BTBB_REG_RST: u32 = 1 << 13; // Bluetooth Baseband Registers
 
     const MODEM_RESET_FIELD_WHEN_PU: u32 = SYSTEM_WIFIBB_RST
         | SYSTEM_FE_RST
@@ -124,11 +125,12 @@ pub(crate) unsafe fn phy_disable() {
             phy_xpd_tsens();
 
             // #if CONFIG_IDF_TARGET_ESP32
-            //         // Update WiFi MAC time before disalbe WiFi/BT common peripheral clock
-            //         phy_update_wifi_mac_time(true, esp_timer_get_time());
-            // #endif
+            //         // Update WiFi MAC time before disalbe WiFi/BT common peripheral
+            // clock         phy_update_wifi_mac_time(true,
+            // esp_timer_get_time()); #endif
 
-            // Disable WiFi/BT common peripheral clock. Do not disable clock for hardware RNG
+            // Disable WiFi/BT common peripheral clock. Do not disable clock for hardware
+            // RNG
             phy_disable_clock();
             trace!("PHY DISABLE");
         });

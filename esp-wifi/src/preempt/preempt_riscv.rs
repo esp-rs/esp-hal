@@ -1,7 +1,7 @@
-use super::*;
-
-use crate::hal::interrupt::TrapFrame;
 use core::ptr::addr_of;
+
+use super::*;
+use crate::hal::interrupt::TrapFrame;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Context {

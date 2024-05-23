@@ -1,11 +1,14 @@
-use super::phy_init_data::PHY_INIT_DATA_DEFAULT;
-use crate::binary::include::*;
-use crate::common_adapter::RADIO_CLOCKS;
-use crate::hal::prelude::ram;
-use crate::hal::system::RadioClockController;
-use crate::hal::system::RadioPeripherals;
-
 use portable_atomic::{AtomicU32, Ordering};
+
+use super::phy_init_data::PHY_INIT_DATA_DEFAULT;
+use crate::{
+    binary::include::*,
+    common_adapter::RADIO_CLOCKS,
+    hal::{
+        prelude::ram,
+        system::{RadioClockController, RadioPeripherals},
+    },
+};
 
 const SOC_PHY_DIG_REGS_MEM_SIZE: usize = 21 * 4;
 
@@ -107,7 +110,8 @@ pub(crate) unsafe fn phy_disable() {
             // Disable PHY temperature sensor
             phy_xpd_tsens();
 
-            // Disable WiFi/BT common peripheral clock. Do not disable clock for hardware RNG
+            // Disable WiFi/BT common peripheral clock. Do not disable clock for hardware
+            // RNG
             phy_disable_clock();
         });
     }
@@ -153,19 +157,19 @@ pub(crate) unsafe fn phy_disable_clock() {
     }
 }
 
-/****************************************************************************
- * Name: phy_enter_critical
- *
- * Description:
- *   Enter critical state
- *
- * Input Parameters:
- *   None
- *
- * Returned Value:
- *   CPU PS value
- *
- ****************************************************************************/
+/// **************************************************************************
+/// Name: phy_enter_critical
+///
+/// Description:
+///   Enter critical state
+///
+/// Input Parameters:
+///   None
+///
+/// Returned Value:
+///   CPU PS value
+///
+/// *************************************************************************
 #[ram]
 #[no_mangle]
 unsafe extern "C" fn phy_enter_critical() -> u32 {
@@ -174,19 +178,19 @@ unsafe extern "C" fn phy_enter_critical() -> u32 {
     core::mem::transmute(critical_section::acquire())
 }
 
-/****************************************************************************
- * Name: phy_exit_critical
- *
- * Description:
- *   Exit from critical state
- *
- * Input Parameters:
- *   level - CPU PS value
- *
- * Returned Value:
- *   None
- *
- ****************************************************************************/
+/// **************************************************************************
+/// Name: phy_exit_critical
+///
+/// Description:
+///   Exit from critical state
+///
+/// Input Parameters:
+///   level - CPU PS value
+///
+/// Returned Value:
+///   None
+///
+/// *************************************************************************
 #[ram]
 #[no_mangle]
 unsafe extern "C" fn phy_exit_critical(level: u32) {

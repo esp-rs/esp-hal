@@ -1,23 +1,25 @@
-//! ESP-NOW is a kind of connectionless Wi-Fi communication protocol that is defined by Espressif.
+//! ESP-NOW is a kind of connectionless Wi-Fi communication protocol that is
+//! defined by Espressif.
 //!
-//! In ESP-NOW, application data is encapsulated in a vendor-specific action frame and then transmitted from
-//! one Wi-Fi device to another without connection. CTR with CBC-MAC Protocol(CCMP) is used to protect the action
-//! frame for security. ESP-NOW is widely used in smart light, remote controlling, sensor, etc.
+//! In ESP-NOW, application data is encapsulated in a vendor-specific action
+//! frame and then transmitted from one Wi-Fi device to another without
+//! connection. CTR with CBC-MAC Protocol(CCMP) is used to protect the action
+//! frame for security. ESP-NOW is widely used in smart light, remote
+//! controlling, sensor, etc.
 //!
 //! For more information see https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html
 
-use core::marker::PhantomData;
-use core::{cell::RefCell, fmt::Debug};
-
-use portable_atomic::{AtomicBool, AtomicU8, Ordering};
+use core::{cell::RefCell, fmt::Debug, marker::PhantomData};
 
 use critical_section::Mutex;
+use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
-use crate::compat::queue::SimpleQueue;
-use crate::hal::peripheral::{Peripheral, PeripheralRef};
-use crate::EspWifiInitialization;
-
-use crate::binary::include::*;
+use crate::{
+    binary::include::*,
+    compat::queue::SimpleQueue,
+    hal::peripheral::{Peripheral, PeripheralRef},
+    EspWifiInitialization,
+};
 
 /// Maximum payload length
 pub const ESP_NOW_MAX_DATA_LEN: usize = 250;
@@ -30,7 +32,8 @@ static RECEIVE_QUEUE: Mutex<RefCell<SimpleQueue<ReceivedData, 10>>> =
 /// This atomic behaves like a guard, so we need strict memory ordering when
 /// operating it.
 ///
-/// This flag indicates whether the send callback has been called after a sending.
+/// This flag indicates whether the send callback has been called after a
+/// sending.
 static ESP_NOW_SEND_CB_INVOKED: AtomicBool = AtomicBool::new(false);
 /// Status of esp now send, true for success, false for failure
 static ESP_NOW_SEND_STATUS: AtomicBool = AtomicBool::new(true);
@@ -48,14 +51,14 @@ macro_rules! check_error {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
-    NotInitialized = 12389,
+    NotInitialized  = 12389,
     InvalidArgument = 12390,
-    OutOfMemory = 12391,
-    PeerListFull = 12392,
-    UnknownPeer = 12393,
-    NotFound = 12394,
-    PeerExists = 12395,
-    InterfaceError = 12396,
+    OutOfMemory     = 12391,
+    PeerListFull    = 12392,
+    UnknownPeer     = 12393,
+    NotFound        = 12394,
+    PeerExists      = 12395,
+    InterfaceError  = 12396,
     Other(u32),
 }
 
@@ -345,8 +348,9 @@ impl<'d> EspNowManager<'d> {
 
     /// Fetch a peer from peer list
     ///
-    /// Only returns peers which address is unicast, for multicast/broadcast addresses, the function will
-    /// skip the entry and find the next in the peer list.
+    /// Only returns peers which address is unicast, for multicast/broadcast
+    /// addresses, the function will skip the entry and find the next in the
+    /// peer list.
     pub fn fetch_peer(&self, from_head: bool) -> Result<PeerInfo, EspNowError> {
         let mut raw_peer = esp_now_peer_info_t {
             peer_addr: [0u8; 6],
@@ -400,7 +404,8 @@ impl<'d> EspNowManager<'d> {
 
     /// Set wake window for esp_now to wake up in interval unit
     ///
-    /// Window is milliseconds the chip keep waked each interval, from 0 to 65535.
+    /// Window is milliseconds the chip keep waked each interval, from 0 to
+    /// 65535.
     pub fn set_wake_window(&self, wake_window: u16) -> Result<(), EspNowError> {
         check_error!({ esp_now_set_wake_window(wake_window) })
     }
@@ -437,23 +442,25 @@ impl<'d> EspNowSender<'d> {
     }
 }
 
-/// This struct is returned by a sync esp now send. Invoking `wait` method of this
-/// struct will block current task until the callback function of esp now send is called
-/// and return the status of previous sending.
+/// This struct is returned by a sync esp now send. Invoking `wait` method of
+/// this struct will block current task until the callback function of esp now
+/// send is called and return the status of previous sending.
 ///
-/// This waiter borrows the sender, so when used in multiple tasks, the lock will only be
-/// released when the waiter is dropped or consumed via `wait`.
+/// This waiter borrows the sender, so when used in multiple tasks, the lock
+/// will only be released when the waiter is dropped or consumed via `wait`.
 ///
-/// When using a lock that disables interrupts, the waiter will block forever since
-/// the callback which signals the completion of sending will never be invoked.
+/// When using a lock that disables interrupts, the waiter will block forever
+/// since the callback which signals the completion of sending will never be
+/// invoked.
 #[must_use]
 pub struct SendWaiter<'s>(PhantomData<&'s mut EspNowSender<'s>>);
 
 impl<'s> SendWaiter<'s> {
-    /// Wait for the previous sending to complete, i.e. the send callback is invoked with
-    /// status of the sending.
+    /// Wait for the previous sending to complete, i.e. the send callback is
+    /// invoked with status of the sending.
     pub fn wait(self) -> Result<(), EspNowError> {
-        // prevent redundant waiting since we waits for the callback in the Drop implementation
+        // prevent redundant waiting since we waits for the callback in the Drop
+        // implementation
         core::mem::forget(self);
         while !ESP_NOW_SEND_CB_INVOKED.load(Ordering::Acquire) {}
 
@@ -466,8 +473,8 @@ impl<'s> SendWaiter<'s> {
 }
 
 impl<'s> Drop for SendWaiter<'s> {
-    /// wait for the send to complete to prevent the lock on `EspNowSender` get unlocked
-    /// before a callback is invoked.
+    /// wait for the send to complete to prevent the lock on `EspNowSender` get
+    /// unlocked before a callback is invoked.
     fn drop(&mut self) {
         while !ESP_NOW_SEND_CB_INVOKED.load(Ordering::Acquire) {}
     }
@@ -488,7 +495,8 @@ impl<'d> EspNowReceiver<'d> {
     }
 }
 
-/// The reference counter for properly deinit espnow after all parts are dropped.
+/// The reference counter for properly deinit espnow after all parts are
+/// dropped.
 struct EspNowRc<'d> {
     rc: &'static AtomicU8,
     inner: PhantomData<EspNow<'d>>,
@@ -531,13 +539,15 @@ impl<'d> Drop for EspNowRc<'d> {
     }
 }
 
-/// ESP-NOW is a kind of connectionless Wi-Fi communication protocol that is defined by Espressif.
-/// In ESP-NOW, application data is encapsulated in a vendor-specific action frame and then transmitted from
-/// one Wi-Fi device to another without connection. CTR with CBC-MAC Protocol(CCMP) is used to protect the
-/// action frame for security. ESP-NOW is widely used in smart light, remote controlling, sensor, etc.
+/// ESP-NOW is a kind of connectionless Wi-Fi communication protocol that is
+/// defined by Espressif. In ESP-NOW, application data is encapsulated in a
+/// vendor-specific action frame and then transmitted from one Wi-Fi device to
+/// another without connection. CTR with CBC-MAC Protocol(CCMP) is used to
+/// protect the action frame for security. ESP-NOW is widely used in smart
+/// light, remote controlling, sensor, etc.
 ///
-/// Currently this implementation (when used together with traditional Wi-Fi) ONLY support STA mode.
-///
+/// Currently this implementation (when used together with traditional Wi-Fi)
+/// ONLY support STA mode.
 pub struct EspNow<'d> {
     _device: Option<PeripheralRef<'d, crate::hal::peripherals::WIFI>>,
     manager: EspNowManager<'d>,
@@ -657,8 +667,9 @@ impl<'d> EspNow<'d> {
 
     /// Fetch a peer from peer list
     ///
-    /// Only returns peers which address is unicast, for multicast/broadcast addresses, the function will
-    /// skip the entry and find the next in the peer list.
+    /// Only returns peers which address is unicast, for multicast/broadcast
+    /// addresses, the function will skip the entry and find the next in the
+    /// peer list.
     pub fn fetch_peer(&self, from_head: bool) -> Result<PeerInfo, EspNowError> {
         self.manager.fetch_peer(from_head)
     }
@@ -680,7 +691,8 @@ impl<'d> EspNow<'d> {
 
     /// Set wake window for esp_now to wake up in interval unit
     ///
-    /// Window is milliseconds the chip keep waked each interval, from 0 to 65535.
+    /// Window is milliseconds the chip keep waked each interval, from 0 to
+    /// 65535.
     pub fn set_wake_window(&self, wake_window: u16) -> Result<(), EspNowError> {
         self.manager.set_wake_window(wake_window)
     }
@@ -821,16 +833,19 @@ pub use asynch::SendFuture;
 
 #[cfg(feature = "async")]
 mod asynch {
-    use super::*;
     use core::task::{Context, Poll};
+
     use embassy_sync::waitqueue::AtomicWaker;
+
+    use super::*;
 
     pub(super) static ESP_NOW_TX_WAKER: AtomicWaker = AtomicWaker::new();
     pub(super) static ESP_NOW_RX_WAKER: AtomicWaker = AtomicWaker::new();
 
     impl<'d> EspNowReceiver<'d> {
-        /// This function takes mutable reference to self because the implementation of
-        /// `ReceiveFuture` is not logically thread safe.
+        /// This function takes mutable reference to self because the
+        /// implementation of `ReceiveFuture` is not logically thread
+        /// safe.
         pub fn receive_async<'r>(&'r mut self) -> ReceiveFuture<'r> {
             ReceiveFuture(PhantomData)
         }
@@ -852,15 +867,16 @@ mod asynch {
     }
 
     impl<'d> EspNow<'d> {
-        /// This function takes mutable reference to self because the implementation of
-        /// `ReceiveFuture` is not logically thread safe.
+        /// This function takes mutable reference to self because the
+        /// implementation of `ReceiveFuture` is not logically thread
+        /// safe.
         #[must_use]
         pub fn receive_async<'r>(&'r mut self) -> ReceiveFuture<'r> {
             self.receiver.receive_async()
         }
 
-        /// The returned future must not be dropped before it's ready to avoid getting wrong status
-        /// for sendings.
+        /// The returned future must not be dropped before it's ready to avoid
+        /// getting wrong status for sendings.
         #[must_use]
         pub fn send_async<'s, 'r>(
             &'s mut self,
@@ -905,8 +921,9 @@ mod asynch {
         }
     }
 
-    /// It's not logically safe to poll multiple instances of `ReceiveFuture` simultaneously
-    /// since the callback can only wake one future, leaving the rest of them unwakable.
+    /// It's not logically safe to poll multiple instances of `ReceiveFuture`
+    /// simultaneously since the callback can only wake one future, leaving
+    /// the rest of them unwakable.
     pub struct ReceiveFuture<'r>(PhantomData<&'r mut EspNowReceiver<'r>>);
 
     impl<'r> core::future::Future for ReceiveFuture<'r> {

@@ -15,8 +15,8 @@ pub fn setup_radio_isr() {
             interrupt::Priority::Priority1,
         ));
 
-        // It's a mystery why these interrupts are enabled now since it worked without this before
-        // Now at least without disabling these nothing will work
+        // It's a mystery why these interrupts are enabled now since it worked without
+        // this before Now at least without disabling these nothing will work
         interrupt::disable(crate::hal::Cpu::ProCpu, peripherals::Interrupt::ETH_MAC);
         interrupt::disable(crate::hal::Cpu::ProCpu, peripherals::Interrupt::UART0);
     }

@@ -7,38 +7,28 @@
 #![doc = include_str!("../README.md")]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![allow(rustdoc::bare_urls)]
-// allow until num-derive doesn't generate this warning anymore (unknown_lints because Xtensa toolchain doesn't know about that lint, yet)
+// allow until num-derive doesn't generate this warning anymore (unknown_lints because Xtensa
+// toolchain doesn't know about that lint, yet)
 #![allow(unknown_lints)]
 #![allow(non_local_definitions)]
 
 // MUST be the first module
 mod fmt;
 
-use core::cell::RefCell;
-use core::mem::MaybeUninit;
-use core::ptr::addr_of_mut;
+use core::{cell::RefCell, mem::MaybeUninit, ptr::addr_of_mut};
 
-use common_adapter::RADIO_CLOCKS;
+use common_adapter::{chip_specific::phy_mem_init, init_radio_clock_control, RADIO_CLOCKS};
 use critical_section::Mutex;
-
 use esp_hal as hal;
-
-#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
-use hal::systimer::{Alarm, Target};
-
-use common_adapter::init_radio_clock_control;
-use hal::system::RadioClockController;
-
 use fugit::MegahertzU32;
-use hal::clock::Clocks;
+#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
+use hal::timer::systimer::{Alarm, Target};
+use hal::{clock::Clocks, system::RadioClockController};
 use linked_list_allocator::Heap;
 #[cfg(feature = "wifi")]
 use wifi::WifiError;
 
-use crate::common_adapter::init_rng;
-use crate::tasks::init_tasks;
-use crate::timer::setup_timer_isr;
-use common_adapter::chip_specific::phy_mem_init;
+use crate::{common_adapter::init_rng, tasks::init_tasks, timer::setup_timer_isr};
 
 mod binary {
     pub use esp_wifi_sys::*;
@@ -133,7 +123,8 @@ struct Config {
 
 // Validate the configuration at compile time
 const _: () = {
-    // We explicitely use `core` assert here because this evaluation happens at compile time and won't bloat the binary
+    // We explicitely use `core` assert here because this evaluation happens at
+    // compile time and won't bloat the binary
     core::assert!(
         CONFIG.rx_ba_win < CONFIG.dynamic_rx_buf_num,
         "WiFi configuration check: rx_ba_win should not be larger than dynamic_rx_buf_num!"
@@ -165,7 +156,8 @@ pub(crate) type EspWifiTimer =
 #[derive(Debug, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-/// An internal struct designed to make [`EspWifiInitialization`] uncreatable outside of this crate.
+/// An internal struct designed to make [`EspWifiInitialization`] uncreatable
+/// outside of this crate.
 pub struct EspWifiInitializationInternal;
 
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -237,7 +229,7 @@ pub fn initialize(
     init_for: EspWifiInitFor,
     timer: EspWifiTimer,
     rng: hal::rng::Rng,
-    radio_clocks: hal::system::RadioClockControl,
+    radio_clocks: hal::peripherals::RADIO_CLK,
     clocks: &Clocks,
 ) -> Result<EspWifiInitialization, InitializationError> {
     #[cfg(any(esp32, esp32s3, esp32s2))]
@@ -265,7 +257,8 @@ pub fn initialize(
         let rom_ets_update_cpu_frequency: fn(ticks_per_us: u32) =
             core::mem::transmute(ETS_UPDATE_CPU_FREQUENCY as usize);
 
-        rom_ets_update_cpu_frequency(240); // we know it's 240MHz because of the check above
+        rom_ets_update_cpu_frequency(240); // we know it's 240MHz because of the
+                                           // check above
     }
 
     info!("esp-wifi configuration {:?}", crate::CONFIG);
@@ -297,8 +290,8 @@ pub fn initialize(
     #[cfg(feature = "ble")]
     if init_for.is_ble() {
         // ble init
-        // for some reason things don't work when initializing things the other way around
-        // while the original implementation in NuttX does it like that
+        // for some reason things don't work when initializing things the other way
+        // around while the original implementation in NuttX does it like that
         debug!("ble init");
         crate::ble::ble_init();
     }
@@ -338,7 +331,8 @@ pub fn wifi_set_log_verbose() {
     #[cfg(feature = "wifi-logs")]
     unsafe {
         use crate::binary::include::{
-            esp_wifi_internal_set_log_level, wifi_log_level_t_WIFI_LOG_VERBOSE,
+            esp_wifi_internal_set_log_level,
+            wifi_log_level_t_WIFI_LOG_VERBOSE,
         };
 
         esp_wifi_internal_set_log_level(wifi_log_level_t_WIFI_LOG_VERBOSE);

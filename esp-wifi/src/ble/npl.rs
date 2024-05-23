@@ -6,13 +6,15 @@ use core::{
 use critical_section::Mutex;
 
 use super::*;
-use crate::binary::c_types::{c_char, c_void};
-use crate::binary::include::*;
-use crate::compat;
-use crate::compat::common::str_from_c;
-use crate::compat::queue::SimpleQueue;
-use crate::compat::task_runner::spawn_task;
-use crate::timer::yield_task;
+use crate::{
+    binary::{
+        c_types::{c_char, c_void},
+        include::*,
+    },
+    compat,
+    compat::{common::str_from_c, queue::SimpleQueue, task_runner::spawn_task},
+    timer::yield_task,
+};
 
 #[cfg_attr(esp32c2, path = "os_adapter_esp32c2.rs")]
 #[cfg_attr(esp32c6, path = "os_adapter_esp32c6.rs")]
@@ -36,7 +38,7 @@ const SYSINIT_MSYS_2_MEMBLOCK_SIZE: i32 = 320;
 
 const BLE_HCI_TRANS_BUF_CMD: i32 = 3;
 
-/* ACL_DATA_MBUF_LEADINGSPCAE: The leadingspace in user info header for ACL data */
+// ACL_DATA_MBUF_LEADINGSPCAE: The leadingspace in user info header for ACL data
 const ACL_DATA_MBUF_LEADINGSPACE: usize = 4;
 
 #[derive(Copy, Clone)]
@@ -74,31 +76,29 @@ pub struct ReceivedPacket {
     pub data: [u8; 256],
 }
 
-/**
- * Memory pool
- */
+/// Memory pool
 #[repr(C)]
 pub(crate) struct OsMempool {
-    /** Size of the memory blocks, in bytes. */
+    /// Size of the memory blocks, in bytes.
     mp_block_size: u32,
-    /** The number of memory blocks. */
+    /// The number of memory blocks.
     mp_num_blocks: u16,
-    /** The number of free blocks left */
+    /// The number of free blocks left
     mp_num_free: u16,
-    /** The lowest number of free blocks seen */
+    /// The lowest number of free blocks seen
     mp_min_free: u16,
-    /** Bitmap of OS_MEMPOOL_F_[...] values. */
+    /// Bitmap of OS_MEMPOOL_F_[...] values.
     mp_flags: u8,
-    /** Address of memory buffer used by pool */
+    /// Address of memory buffer used by pool
     mp_membuf_addr: u32,
 
-    //STAILQ_ENTRY(os_mempool) mp_list;
+    // STAILQ_ENTRY(os_mempool) mp_list;
     next: *const OsMempool,
 
-    //SLIST_HEAD(,os_memblock);
+    // SLIST_HEAD(,os_memblock);
     first: *const c_void,
 
-    /** Name for memory block */
+    /// Name for memory block
     name: *const u8,
 }
 
@@ -119,26 +119,20 @@ impl OsMempool {
     }
 }
 
-/**
- * A mbuf pool from which to allocate mbufs. This contains a pointer to the os
- * mempool to allocate mbufs out of, the total number of elements in the pool,
- * and the amount of "user" data in a non-packet header mbuf. The total pool
- * size, in bytes, should be:
- *  os_mbuf_count * (omp_databuf_len + sizeof(struct os_mbuf))
- */
+/// A mbuf pool from which to allocate mbufs. This contains a pointer to the os
+/// mempool to allocate mbufs out of, the total number of elements in the pool,
+/// and the amount of "user" data in a non-packet header mbuf. The total pool
+/// size, in bytes, should be:
+///  os_mbuf_count * (omp_databuf_len + sizeof(struct os_mbuf))
 #[repr(C)]
 pub(crate) struct OsMbufPool {
-    /**
-     * Total length of the databuf in each mbuf.  This is the size of the
-     * mempool block, minus the mbuf header
-     */
+    /// Total length of the databuf in each mbuf.  This is the size of the
+    /// mempool block, minus the mbuf header
     omp_databuf_len: u16,
-    /**
-     * The memory pool which to allocate mbufs out of
-     */
+    /// The memory pool which to allocate mbufs out of
     omp_pool: *const OsMempool,
 
-    //STAILQ_ENTRY(os_mbuf_pool) omp_next;
+    // STAILQ_ENTRY(os_mbuf_pool) omp_next;
     next: *const OsMbufPool,
 }
 
@@ -153,39 +147,25 @@ impl OsMbufPool {
     }
 }
 
-/**
- * Chained memory buffer.
- */
+/// Chained memory buffer.
 #[repr(C)]
 pub struct OsMbuf {
-    /**
-     * Current pointer to data in the structure
-     */
+    /// Current pointer to data in the structure
     om_data: *const u8,
-    /**
-     * Flags associated with this buffer, see OS_MBUF_F_* defintions
-     */
+    /// Flags associated with this buffer, see OS_MBUF_F_* defintions
     om_flags: u8,
-    /**
-     * Length of packet header
-     */
+    /// Length of packet header
     om_pkthdr_len: u8,
-    /**
-     * Length of data in this buffer
-     */
+    /// Length of data in this buffer
     om_len: u16,
 
-    /**
-     * The mbuf pool this mbuf was allocated out of
-     */
+    /// The mbuf pool this mbuf was allocated out of
     om_omp: *const OsMbufPool,
 
-    //SLIST_ENTRY(os_mbuf) om_next;
+    // SLIST_ENTRY(os_mbuf) om_next;
     next: *const OsMbuf,
 
-    /**
-     * Pointer to the beginning of the data, after this buffer
-     */
+    /// Pointer to the beginning of the data, after this buffer
     om_databuf: u32,
 }
 
@@ -193,7 +173,7 @@ pub struct OsMbuf {
 pub struct OsMempoolExt {
     mpe_mp: OsMempool,
 
-    /* Callback that is executed immediately when a block is freed. */
+    // Callback that is executed immediately when a block is freed.
     mpe_put_cb: OsMempoolPutFn,
     mpe_put_arg: *const c_void,
 }
@@ -249,9 +229,9 @@ extern "C" {
     pub(crate) fn bt_bb_v2_init_cmplx(value: u8);
 
     pub(crate) fn r_ble_hci_trans_cfg_hs(
-        evt: Option<unsafe extern "C" fn(cmd: *const u8, arg: *const c_void)>, // ble_hci_trans_rx_cmd_fn
+        evt: Option<unsafe extern "C" fn(cmd: *const u8, arg: *const c_void)>, /* ble_hci_trans_rx_cmd_fn */
         evt_arg: *const c_void,
-        acl_cb: Option<unsafe extern "C" fn(om: *const OsMbuf, arg: *const c_void)>, // ble_hci_trans_rx_acl_fn
+        acl_cb: Option<unsafe extern "C" fn(om: *const OsMbuf, arg: *const c_void)>, /* ble_hci_trans_rx_acl_fn */
         acl_arg: *const c_void,
     );
 
@@ -1387,7 +1367,8 @@ pub fn send_hci(data: &[u8]) {
                             panic!("r_os_mbuf_append returned {}", res);
                         }
 
-                        // this modification of the ACL data packet makes it getting sent and received by the other side
+                        // this modification of the ACL data packet makes it getting sent and
+                        // received by the other side
                         *((*om).om_data as *mut u8).offset(1) = 0;
 
                         let res = unwrap!(ble_hci_trans_funcs_ptr.ble_hci_trans_hs_acl_tx)(om);

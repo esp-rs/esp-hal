@@ -2,83 +2,132 @@
 name = "esp-wifi"
 version = "0.5.1"
 edition = "2021"
-authors = [
-    "The ESP-RS team",
-]
-description  = "A WiFi, Bluetooth and ESP-NOW driver for use with Espressif chips and bare-metal Rust"
-repository   = "https://github.com/esp-rs/esp-wifi"
+authors = ["The ESP-RS team"]
+description = "A WiFi, Bluetooth and ESP-NOW driver for use with Espressif chips and bare-metal Rust"
+repository = "https://github.com/esp-rs/esp-wifi"
 license = "MIT OR Apache-2.0"
 
-keywords = [
-    "wifi",
-    "bluetooth",
-    "esp",
-    "no-std",
-]
-categories = [
-    "embedded",
-    "hardware-support",
-    "no-std",
-]
+keywords = ["wifi", "bluetooth", "esp", "no-std"]
+categories = ["embedded", "hardware-support", "no-std"]
 
 [dependencies]
-defmt = { workspace = true, optional = true }
-esp-hal = { workspace = true }
-smoltcp = { workspace = true, optional = true }
-critical-section.workspace = true
-log = { workspace = true, optional = true }
-embedded-svc = { workspace = true, optional = true }
-enumset = { workspace = true, optional = true }
-linked_list_allocator = { workspace = true }
-embedded-io.workspace = true
-embedded-io-async = { workspace = true, optional = true }
-fugit.workspace = true
-heapless = { workspace = true, default-features = false }
-num-derive = { workspace = true }
-num-traits = { workspace = true, default-features = false }
-no-std-net = { workspace = true, optional = true }
-esp-wifi-sys = { version = "0.3.0", path = "../esp-wifi-sys" }
-embassy-sync = { workspace = true, optional = true }
-embassy-futures = { workspace = true, optional = true }
-embassy-net-driver = { workspace = true, optional = true }
-toml-cfg.workspace = true
-libm.workspace = true
-cfg-if.workspace = true
-portable-atomic.workspace = true
-portable_atomic_enum.workspace = true
+defmt = { version = "0.3.6", optional = true }
+esp-hal = { version = "0.17.0", path = "../esp-hal", default-features = false }
+smoltcp = { version = "0.11.0", default-features = false, features = [
+  "medium-ethernet",
+  "socket-raw",
+], optional = true }
+critical-section = "1.1.1"
+log = { version = "0.4.20", optional = true }
+embedded-svc = { version = "0.27.0", default-features = false, features = [
+], optional = true }
+enumset = { version = "1.1.3", default-features = false, optional = true }
+linked_list_allocator = { version = "0.10.5", default-features = false, features = [
+  "const_mut_refs",
+] }
+embedded-io = { version = "0.6.1", default-features = false }
+embedded-io-async = { version = "0.6.0", optional = true }
+fugit = "0.3.7"
+heapless = { version = "0.8", default-features = false, features = [
+  "portable-atomic",
+] }
+num-derive = { version = "0.4" }
+num-traits = { version = "0.2", default-features = false }
+no-std-net = { version = "0.6.0", optional = true }
+esp-wifi-sys = { version = "0.3.0" }
+embassy-sync = { version = "0.5.0", optional = true }
+embassy-futures = { version = "0.1.0", optional = true }
+embassy-net-driver = { version = "0.2", optional = true }
+toml-cfg = "0.2.0"
+libm = "0.2.7"
+cfg-if = "1.0.0"
+portable-atomic = { version = "1.5", default-features = false }
+portable_atomic_enum = { version = "0.3.0", features = ["portable-atomic"] }
 
-futures-util.workspace = true
-atomic-waker.workspace = true
+futures-util = { version = "0.3.28", default-features = false, features = [
+  "portable-atomic",
+] }
+atomic-waker = { version = "1.1.2", default-features = false, features = [
+  "portable-atomic",
+] }
 
 [build-dependencies]
-toml-cfg.workspace = true
+toml-cfg = "0.2.0"
 
 [dev-dependencies]
-esp-println = { workspace = true, features = ["log", "uart"] }
-esp-backtrace = { workspace = true, features = [
-    "panic-handler",
-    "exception-handler",
-    "println",
+esp-println = { version = "0.9.1", path = "../esp-println", default-features = false, features = [
+  "log",
+  "uart",
 ] }
-embassy-executor.workspace = true
-embassy-time.workspace = true
-embassy-net.workspace = true
-bleps = { workspace = true, features = ["async"] }
-embedded-hal-async.workspace = true
-log.workspace = true
-static_cell.workspace = true
+esp-backtrace = { version = "0.11.0", features = [
+  "panic-handler",
+  "exception-handler",
+  "println",
+] }
+embassy-executor = { version = "0.5.0", package = "embassy-executor", features = [
+  "task-arena-size-12288",
+  "integrated-timers",
+] }
+embassy-time = { version = "0.3.0" }
+embassy-net = { version = "0.4.0", features = [
+  "tcp",
+  "udp",
+  "dhcpv4",
+  "medium-ethernet",
+] }
+bleps = { git = "https://github.com/bjoernQ/bleps", package = "bleps", rev = "9371d7d4d510ba5c936c1eef96674f8fd4f63e8a", features = [
+  "macros",
+  "async",
+] }
+log = { version = "0.4.20" }
+static_cell = { version = "2.0", features = ["nightly"] }
 
 [features]
-default = [ "log" ]
+default = ["log"]
 
 # chip features
-esp32c2 = [ "esp-hal/esp32c2", "esp-wifi-sys/esp32c2", "esp-println/esp32c2", "esp-backtrace/esp32c2" ]
-esp32c3 = [ "esp-hal/esp32c3", "esp-wifi-sys/esp32c3", "esp-println/esp32c3", "esp-backtrace/esp32c3" ]
-esp32c6 = [ "esp-hal/esp32c6", "esp-wifi-sys/esp32c6", "esp-println/esp32c6", "esp-backtrace/esp32c6" ]
-esp32h2 = [ "esp-hal/esp32h2", "esp-wifi-sys/esp32h2", "esp-println/esp32h2", "esp-backtrace/esp32h2" ]
-esp32   = [ "esp-hal/esp32",   "esp-wifi-sys/esp32",   "esp-println/esp32",   "esp-backtrace/esp32" ]
-esp32s2 = [ "esp-hal/esp32s2", "esp-wifi-sys/esp32s2", "esp-println/esp32s2", "esp-backtrace/esp32s2" ]
-esp32s3 = [ "esp-hal/esp32s3", "esp-wifi-sys/esp32s3", "esp-println/esp32s3", "esp-backtrace/esp32s3" ]
+esp32c2 = [
+  "esp-hal/esp32c2",
+  "esp-wifi-sys/esp32c2",
+  "esp-println/esp32c2",
+  "esp-backtrace/esp32c2",
+]
+esp32c3 = [
+  "esp-hal/esp32c3",
+  "esp-wifi-sys/esp32c3",
+  "esp-println/esp32c3",
+  "esp-backtrace/esp32c3",
+]
+esp32c6 = [
+  "esp-hal/esp32c6",
+  "esp-wifi-sys/esp32c6",
+  "esp-println/esp32c6",
+  "esp-backtrace/esp32c6",
+]
+esp32h2 = [
+  "esp-hal/esp32h2",
+  "esp-wifi-sys/esp32h2",
+  "esp-println/esp32h2",
+  "esp-backtrace/esp32h2",
+]
+esp32 = [
+  "esp-hal/esp32",
+  "esp-wifi-sys/esp32",
+  "esp-println/esp32",
+  "esp-backtrace/esp32",
+]
+esp32s2 = [
+  "esp-hal/esp32s2",
+  "esp-wifi-sys/esp32s2",
+  "esp-println/esp32s2",
+  "esp-backtrace/esp32s2",
+]
+esp32s3 = [
+  "esp-hal/esp32s3",
+  "esp-wifi-sys/esp32s3",
+  "esp-println/esp32s3",
+  "esp-backtrace/esp32s3",
+]
 
 # async features
 async = [
@@ -95,56 +144,41 @@ embassy-net = ["dep:embassy-net-driver", "async"]
 coex = []
 wifi-logs = []
 dump-packets = []
-smoltcp = [ "dep:smoltcp" ]
-utils = [ "smoltcp" ]
+smoltcp = ["dep:smoltcp"]
+utils = ["smoltcp"]
 enumset = []
-wifi = [ "dep:enumset", "dep:no-std-net" ]
-embedded-svc = [ "dep:embedded-svc" ]
-ble = [ "esp-hal/bluetooth" ]
+wifi = ["dep:enumset", "dep:no-std-net"]
+embedded-svc = ["dep:embedded-svc"]
+ble = ["esp-hal/bluetooth"]
 phy-enable-usb = []
 ps-min-modem = []
 ps-max-modem = []
-esp-now = [ "wifi" ]
-ipv6   = ["wifi", "utils", "smoltcp?/proto-ipv6"]
-ipv4   = ["wifi", "utils", "smoltcp?/proto-ipv4"]
-tcp    = ["ipv4", "smoltcp?/socket-tcp"]
-udp    = ["ipv4", "smoltcp?/socket-udp"]
-icmp   = ["ipv4", "smoltcp?/socket-icmp"]
-igmp   = ["ipv4", "smoltcp?/proto-igmp"]
-dns    = ["udp",  "smoltcp?/proto-dns", "smoltcp?/socket-dns"]
+esp-now = ["wifi"]
+ipv6 = ["wifi", "utils", "smoltcp?/proto-ipv6"]
+ipv4 = ["wifi", "utils", "smoltcp?/proto-ipv4"]
+tcp = ["ipv4", "smoltcp?/socket-tcp"]
+udp = ["ipv4", "smoltcp?/socket-udp"]
+icmp = ["ipv4", "smoltcp?/socket-icmp"]
+igmp = ["ipv4", "smoltcp?/proto-igmp"]
+dns = ["udp", "smoltcp?/proto-dns", "smoltcp?/socket-dns"]
 dhcpv4 = ["wifi", "utils", "smoltcp?/proto-dhcpv4", "smoltcp?/socket-dhcpv4"]
 wifi-default = ["ipv4", "tcp", "udp", "icmp", "igmp", "dns", "dhcpv4"]
-defmt = [
-  "dep:defmt",
-  "smoltcp?/defmt",
-  "esp-hal/defmt",
-]
-log = [
-  "dep:log",
-  "esp-hal/log",
-]
+defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt"]
+log = ["dep:log", "esp-hal/log"]
 
 [package.metadata.docs.rs]
-features = ["esp32c3", "wifi", "ble", "coex", "async", "embassy-net", "esp-hal/embassy-time-timg0", "esp-hal/default"]
+features = [
+  "esp32c3",
+  "wifi",
+  "ble",
+  "coex",
+  "async",
+  "embassy-net",
+  "esp-hal/embassy-time-timg0",
+  "esp-hal/default",
+]
 default-target = "riscv32imc-unknown-none-elf"
 
-# These examples are used in test automation
-[[example]]
-name = "test_esp_now"
-path = "automated-tests/test_esp_now.rs"
-
-[[example]]
-name = "esp_now_broadcaster"
-path = "automated-tests/esp_now_broadcaster.rs"
-
-[[example]]
-name = "open_access_point"
-path = "automated-tests/open_access_point.rs"
-
-[[example]]
-name = "test_connect"
-path = "automated-tests/test_connect.rs"
-
-[[example]]
-name = "test_ble"
-path = "automated-tests/test_ble.rs"
+# TODO: Remove patch once `esp-backtrace` package has been added to repository
+[patch.crates-io]
+esp-println = { version = "0.9.1", path = "../esp-println" }

@@ -1,21 +1,18 @@
 use core::ptr::addr_of;
 
-use crate::binary::include::esp_event_base_t;
-use crate::binary::include::esp_timer_create_args_t;
-use crate::binary::include::esp_timer_get_time;
-use crate::binary::include::esp_timer_handle_t;
-
-use crate::compat::common::*;
-use crate::compat::syslog::syslog;
-use crate::compat::timer_compat::*;
-
-use crate::hal;
-
 use esp_wifi_sys::include::timespec;
-use hal::rng::Rng;
-use hal::system::RadioClockControl;
+use hal::{macros::ram, rng::Rng};
 
-use hal::macros::ram;
+use crate::{
+    binary::include::{
+        esp_event_base_t,
+        esp_timer_create_args_t,
+        esp_timer_get_time,
+        esp_timer_handle_t,
+    },
+    compat::{common::*, syslog::syslog, timer_compat::*},
+    hal,
+};
 
 #[cfg_attr(esp32c3, path = "common_adapter_esp32c3.rs")]
 #[cfg_attr(esp32c2, path = "common_adapter_esp32c2.rs")]
@@ -37,69 +34,69 @@ pub(crate) mod phy_init_data;
 
 pub(crate) static mut RANDOM_GENERATOR: Option<Rng> = None;
 
-pub(crate) static mut RADIO_CLOCKS: Option<RadioClockControl> = None;
+pub(crate) static mut RADIO_CLOCKS: Option<hal::peripherals::RADIO_CLK> = None;
 
 pub(crate) fn init_rng(rng: Rng) {
     unsafe { RANDOM_GENERATOR = Some(core::mem::transmute(rng)) };
 }
 
-pub(crate) fn init_radio_clock_control(rcc: RadioClockControl) {
+pub(crate) fn init_radio_clock_control(rcc: hal::peripherals::RADIO_CLK) {
     unsafe { RADIO_CLOCKS = Some(core::mem::transmute(rcc)) };
 }
 
-/****************************************************************************
- * Name: esp_semphr_create
- *
- * Description:
- *   Create and initialize semaphore
- *
- * Input Parameters:
- *   max  - No mean
- *   init - semaphore initialization value
- *
- * Returned Value:
- *   Semaphore data pointer
- *
- ****************************************************************************/
+/// **************************************************************************
+/// Name: esp_semphr_create
+///
+/// Description:
+///   Create and initialize semaphore
+///
+/// Input Parameters:
+///   max  - No mean
+///   init - semaphore initialization value
+///
+/// Returned Value:
+///   Semaphore data pointer
+///
+/// *************************************************************************
 #[allow(unused)]
 pub unsafe extern "C" fn semphr_create(max: u32, init: u32) -> *mut crate::binary::c_types::c_void {
     trace!("semphr_create - max {} init {}", max, init);
     sem_create(max, init)
 }
 
-/****************************************************************************
- * Name: esp_semphr_delete
- *
- * Description:
- *   Delete semaphore
- *
- * Input Parameters:
- *   semphr - Semaphore data pointer
- *
- * Returned Value:
- *   None
- *
- ****************************************************************************/
+/// **************************************************************************
+/// Name: esp_semphr_delete
+///
+/// Description:
+///   Delete semaphore
+///
+/// Input Parameters:
+///   semphr - Semaphore data pointer
+///
+/// Returned Value:
+///   None
+///
+/// *************************************************************************
 #[allow(unused)]
 pub unsafe extern "C" fn semphr_delete(semphr: *mut crate::binary::c_types::c_void) {
     trace!("semphr_delete {:?}", semphr);
     sem_delete(semphr);
 }
 
-/****************************************************************************
- * Name: esp_semphr_take
- *
- * Description:
- *   Wait semaphore within a certain period of time
- *
- * Input Parameters:
- *   semphr - Semaphore data pointer
- *   ticks  - Wait system ticks
- *
- * Returned Value:
- *   True if success or false if fail
- *
- ****************************************************************************/
+/// **************************************************************************
+/// Name: esp_semphr_take
+///
+/// Description:
+///   Wait semaphore within a certain period of time
+///
+/// Input Parameters:
+///   semphr - Semaphore data pointer
+///   ticks  - Wait system ticks
+///
+/// Returned Value:
+///   True if success or false if fail
+///
+/// *************************************************************************
 #[ram]
 pub unsafe extern "C" fn semphr_take(
     semphr: *mut crate::binary::c_types::c_void,
@@ -108,27 +105,27 @@ pub unsafe extern "C" fn semphr_take(
     sem_take(semphr, tick)
 }
 
-/****************************************************************************
- * Name: esp_semphr_give
- *
- * Description:
- *   Post semaphore
- *
- * Input Parameters:
- *   semphr - Semaphore data pointer
- *
- * Returned Value:
- *   True if success or false if fail
- *
- ****************************************************************************/
+/// **************************************************************************
+/// Name: esp_semphr_give
+///
+/// Description:
+///   Post semaphore
+///
+/// Input Parameters:
+///   semphr - Semaphore data pointer
+///
+/// Returned Value:
+///   True if success or false if fail
+///
+/// *************************************************************************
 #[ram]
 pub unsafe extern "C" fn semphr_give(semphr: *mut crate::binary::c_types::c_void) -> i32 {
     sem_give(semphr)
 }
 
-/****************************************************************************
- * Name: esp_random_ulong
- ****************************************************************************/
+/// **************************************************************************
+/// Name: esp_random_ulong
+/// *************************************************************************
 #[allow(unused)]
 #[ram]
 #[no_mangle]
@@ -142,20 +139,20 @@ pub unsafe extern "C" fn random() -> crate::binary::c_types::c_ulong {
     }
 }
 
-/****************************************************************************
- * Name: esp_wifi_read_mac
- *
- * Description:
- *   Read MAC address from efuse
- *
- * Input Parameters:
- *   mac  - MAC address buffer pointer
- *   type - MAC address type
- *
- * Returned Value:
- *   0 if success or -1 if fail
- *
- ****************************************************************************/
+/// **************************************************************************
+/// Name: esp_wifi_read_mac
+///
+/// Description:
+///   Read MAC address from efuse
+///
+/// Input Parameters:
+///   mac  - MAC address buffer pointer
+///   type - MAC address type
+///
+/// Returned Value:
+///   0 if success or -1 if fail
+///
+/// *************************************************************************
 pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> crate::binary::c_types::c_int {
     trace!("read_mac {:?} {}", mac, type_);
 
@@ -165,7 +162,7 @@ pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> crate::binary::c_
         mac.offset(i as isize).write_volatile(base_mac[i]);
     }
 
-    /* ESP_MAC_WIFI_SOFTAP */
+    // ESP_MAC_WIFI_SOFTAP
     if type_ == 1 {
         let tmp = mac.offset(0).read_volatile();
         for i in 0..64 {

@@ -1,7 +1,8 @@
-use crate::binary::include::esp_bt_controller_config_t;
-use crate::common_adapter::RADIO_CLOCKS;
-use crate::hal::system::RadioClockController;
-use crate::hal::system::RadioPeripherals;
+use crate::{
+    binary::include::esp_bt_controller_config_t,
+    common_adapter::RADIO_CLOCKS,
+    hal::system::{RadioClockController, RadioPeripherals},
+};
 
 pub(crate) static mut ISR_INTERRUPT_15: (
     *mut crate::binary::c_types::c_void,
@@ -120,7 +121,8 @@ pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
 unsafe extern "C" fn jrand48(
     _xsubi: [crate::binary::c_types::c_ushort; 3],
 ) -> crate::binary::c_types::c_long {
-    // this is not very random but good enough for now - it's apparently not used for crypto
+    // this is not very random but good enough for now - it's apparently not used
+    // for crypto
     unsafe {
         static mut VALUE: u32 = 0;
         VALUE = VALUE.wrapping_add(3);

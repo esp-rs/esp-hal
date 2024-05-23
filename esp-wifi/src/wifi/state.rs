@@ -1,7 +1,8 @@
-use super::WifiEvent;
-
 use core::sync::atomic::Ordering;
+
 use portable_atomic_enum::atomic_enum;
+
+use super::WifiEvent;
 
 /// Wifi interface state
 #[atomic_enum]
@@ -73,7 +74,8 @@ pub(crate) fn reset_sta_state() {
 
 /// Returns the current state of the WiFi stack.
 ///
-/// This does not support AP-STA mode. Use one of `get_sta_state` or `get_ap_state` instead.
+/// This does not support AP-STA mode. Use one of `get_sta_state` or
+/// `get_ap_state` instead.
 pub fn get_wifi_state() -> WifiState {
     use super::WifiMode;
     match WifiMode::current() {

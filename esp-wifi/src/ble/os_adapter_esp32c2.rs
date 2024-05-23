@@ -1,6 +1,8 @@
-use crate::binary::include::esp_bt_controller_config_t;
-use crate::common_adapter::RADIO_CLOCKS;
-use crate::hal::system::RadioClockController;
+use crate::{
+    binary::include::esp_bt_controller_config_t,
+    common_adapter::RADIO_CLOCKS,
+    hal::system::RadioClockController,
+};
 
 pub(crate) static mut ISR_INTERRUPT_4: (
     *mut crate::binary::c_types::c_void,

@@ -1,6 +1,5 @@
-use crate::{binary::c_types, compat::common::str_from_c, timer::yield_task};
-
 use super::queue::SimpleQueue;
+use crate::{binary::c_types, compat::common::str_from_c, timer::yield_task};
 
 type TaskFunc = (extern "C" fn(*mut c_types::c_void), *mut c_types::c_void);
 

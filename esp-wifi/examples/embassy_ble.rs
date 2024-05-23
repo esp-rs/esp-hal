@@ -7,7 +7,10 @@ use core::cell::RefCell;
 
 use bleps::{
     ad_structure::{
-        create_advertising_data, AdStructure, BR_EDR_NOT_SUPPORTED, LE_GENERAL_DISCOVERABLE,
+        create_advertising_data,
+        AdStructure,
+        BR_EDR_NOT_SUPPORTED,
+        LE_GENERAL_DISCOVERABLE,
     },
     async_attribute_server::AttributeServer,
     asynch::Ble,
@@ -16,14 +19,18 @@ use bleps::{
 };
 use embassy_executor::Spawner;
 use esp_backtrace as _;
+use esp_hal::{
+    clock::ClockControl,
+    embassy,
+    gpio::{Input, Io, Pull},
+    peripherals::*,
+    prelude::*,
+    rng::Rng,
+    system::SystemControl,
+    timer::timg::TimerGroup,
+};
 use esp_println::println;
 use esp_wifi::{ble::controller::asynch::BleConnector, initialize, EspWifiInitFor};
-#[path = "../../examples-util/util.rs"]
-mod examples_util;
-use examples_util::hal;
-use hal::{
-    clock::ClockControl, embassy, gpio::IO, peripherals::*, prelude::*, rng::Rng, timer::TimerGroup,
-};
 
 #[main]
 async fn main(_spawner: Spawner) -> ! {
@@ -32,39 +39,32 @@ async fn main(_spawner: Spawner) -> ! {
 
     let peripherals = Peripherals::take();
 
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::max(system.clock_control).freeze();
 
     #[cfg(target_arch = "xtensa")]
-    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
+    let timer = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
     #[cfg(target_arch = "riscv32")]
-    let timer = hal::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
+    let timer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
     let init = initialize(
         EspWifiInitFor::Ble,
         timer,
         Rng::new(peripherals.RNG),
-        system.radio_clock_control,
+        peripherals.RADIO_CLK,
         &clocks,
     )
     .unwrap();
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
-    let button = io.pins.gpio0.into_pull_down_input();
+    let button = Input::new(io.pins.gpio0, Pull::Down);
     #[cfg(any(
         feature = "esp32c2",
         feature = "esp32c3",
         feature = "esp32c6",
         feature = "esp32h2"
     ))]
-    let button = io.pins.gpio9.into_pull_down_input();
-
-    // Async requires the GPIO interrupt to wake futures
-    hal::interrupt::enable(
-        hal::peripherals::Interrupt::GPIO,
-        hal::interrupt::Priority::Priority1,
-    )
-    .unwrap();
+    let button = Input::new(io.pins.gpio9, Pull::Down);
 
     let timer_group0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timer_group0);
@@ -87,7 +87,7 @@ async fn main(_spawner: Spawner) -> ! {
                 create_advertising_data(&[
                     AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
                     AdStructure::ServiceUuids16(&[Uuid::Uuid16(0x1809)]),
-                    AdStructure::CompleteLocalName(examples_util::SOC_NAME),
+                    AdStructure::CompleteLocalName(esp_hal::chip!()),
                 ])
                 .unwrap()
             )
@@ -147,8 +147,8 @@ async fn main(_spawner: Spawner) -> ! {
 
         let mut notifier = || {
             // TODO how to check if notifications are enabled for the characteristic?
-            // maybe pass something into the closure which just can query the characteristic value
-            // probably passing in the attribute server won't work?
+            // maybe pass something into the closure which just can query the characteristic
+            // value probably passing in the attribute server won't work?
 
             async {
                 pin_ref.borrow_mut().wait_for_rising_edge().await;

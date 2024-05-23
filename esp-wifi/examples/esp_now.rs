@@ -2,15 +2,20 @@
 #![no_main]
 
 use esp_backtrace as _;
+use esp_hal::{
+    clock::ClockControl,
+    peripherals::Peripherals,
+    prelude::*,
+    rng::Rng,
+    system::SystemControl,
+};
 use esp_println::println;
-use esp_wifi::esp_now::{PeerInfo, BROADCAST_ADDRESS};
-use esp_wifi::{current_millis, initialize, EspWifiInitFor};
-#[path = "../../examples-util/util.rs"]
-mod examples_util;
-use examples_util::hal;
-use hal::clock::ClockControl;
-use hal::rng::Rng;
-use hal::{peripherals::Peripherals, prelude::*};
+use esp_wifi::{
+    current_millis,
+    esp_now::{PeerInfo, BROADCAST_ADDRESS},
+    initialize,
+    EspWifiInitFor,
+};
 
 #[entry]
 fn main() -> ! {
@@ -19,18 +24,18 @@ fn main() -> ! {
 
     let peripherals = Peripherals::take();
 
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::max(system.clock_control).freeze();
 
     #[cfg(target_arch = "xtensa")]
-    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
+    let timer = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
     #[cfg(target_arch = "riscv32")]
-    let timer = hal::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
+    let timer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
     let init = initialize(
         EspWifiInitFor::Wifi,
         timer,
         Rng::new(peripherals.RNG),
-        system.radio_clock_control,
+        peripherals.RADIO_CLK,
         &clocks,
     )
     .unwrap();

@@ -1,33 +1,39 @@
 #![no_std]
 #![no_main]
 
-#[path = "../../examples-util/util.rs"]
-mod examples_util;
-use examples_util::hal;
-
 use bleps::{
     ad_structure::{
-        create_advertising_data, AdStructure, BR_EDR_NOT_SUPPORTED, LE_GENERAL_DISCOVERABLE,
+        create_advertising_data,
+        AdStructure,
+        BR_EDR_NOT_SUPPORTED,
+        LE_GENERAL_DISCOVERABLE,
     },
     att::Uuid,
-    Ble, HciConnector,
+    Ble,
+    HciConnector,
 };
-
+use embedded_io::*;
+use esp_backtrace as _;
+use esp_hal::{
+    clock::ClockControl,
+    peripherals::Peripherals,
+    prelude::*,
+    rng::Rng,
+    system::SystemControl,
+};
+use esp_println::{print, println};
 use esp_wifi::{
-    ble::controller::BleConnector, current_millis, wifi::WifiStaDevice, wifi_interface::WifiStack,
+    ble::controller::BleConnector,
+    current_millis,
+    initialize,
+    wifi::{utils::create_network_interface, ClientConfiguration, Configuration, WifiStaDevice},
+    wifi_interface::WifiStack,
     EspWifiInitFor,
 };
-
-use embedded_io::*;
-use esp_wifi::wifi::{ClientConfiguration, Configuration};
-
-use esp_backtrace as _;
-use esp_println::{print, println};
-use esp_wifi::initialize;
-use esp_wifi::wifi::utils::create_network_interface;
-use hal::{clock::ClockControl, rng::Rng};
-use hal::{peripherals::Peripherals, prelude::*};
-use smoltcp::{iface::SocketStorage, wire::IpAddress, wire::Ipv4Address};
+use smoltcp::{
+    iface::SocketStorage,
+    wire::{IpAddress, Ipv4Address},
+};
 
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
@@ -39,18 +45,18 @@ fn main() -> ! {
 
     let peripherals = Peripherals::take();
 
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::max(system.clock_control).freeze();
 
     #[cfg(target_arch = "xtensa")]
-    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
+    let timer = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
     #[cfg(target_arch = "riscv32")]
-    let timer = hal::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
+    let timer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
     let init = initialize(
         EspWifiInitFor::WifiBle,
         timer,
         Rng::new(peripherals.RNG),
-        system.radio_clock_control,
+        peripherals.RADIO_CLK,
         &clocks,
     )
     .unwrap();
@@ -117,7 +123,7 @@ fn main() -> ! {
             create_advertising_data(&[
                 AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
                 AdStructure::ServiceUuids16(&[Uuid::Uuid16(0x1809)]),
-                AdStructure::CompleteLocalName(examples_util::SOC_NAME),
+                AdStructure::CompleteLocalName(esp_hal::chip!()),
             ])
             .unwrap()
         )

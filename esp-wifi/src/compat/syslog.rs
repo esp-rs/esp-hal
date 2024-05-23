@@ -39,8 +39,9 @@ impl StrWriter {
     }
 
     pub fn append(&mut self, s: &str) {
-        // Write as many bytes as possible. We're writing a c string which means we don't have
-        // to deal with utf8 character boundaries, so this should be fine.
+        // Write as many bytes as possible. We're writing a c string which means we
+        // don't have to deal with utf8 character boundaries, so this should be
+        // fine.
         let len = s.len().min(self.space());
         for byte in &s.as_bytes()[..len] {
             self.write(*byte);
@@ -85,7 +86,8 @@ pub unsafe extern "C" fn syslog(_priority: u32, _format: *const u8, _args: VaLis
     }
 }
 
-/// Returns the number of character that would have been written if the buffer was big enough.
+/// Returns the number of character that would have been written if the buffer
+/// was big enough.
 pub(crate) unsafe fn vsnprintf(
     dst: *mut u8,
     capacity: u32,

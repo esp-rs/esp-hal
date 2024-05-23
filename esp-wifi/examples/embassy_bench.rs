@@ -4,21 +4,32 @@
 
 use embassy_executor::Spawner;
 use embassy_futures::join::join;
-use embassy_net::tcp::TcpSocket;
-use embassy_net::{Config, Ipv4Address, Stack, StackResources};
-#[path = "../../examples-util/util.rs"]
-mod examples_util;
-use examples_util::hal;
-
+use embassy_net::{tcp::TcpSocket, Config, Ipv4Address, Stack, StackResources};
 use embassy_time::{with_timeout, Duration, Timer};
 use esp_backtrace as _;
+use esp_hal::{
+    clock::ClockControl,
+    embassy,
+    peripherals::Peripherals,
+    prelude::*,
+    rng::Rng,
+    system::SystemControl,
+    timer::timg::TimerGroup,
+};
 use esp_println::println;
-use esp_wifi::wifi::{ClientConfiguration, Configuration, WifiStaDevice};
-use esp_wifi::wifi::{WifiController, WifiDevice, WifiEvent, WifiState};
-use esp_wifi::{initialize, EspWifiInitFor};
-use hal::clock::ClockControl;
-use hal::rng::Rng;
-use hal::{embassy, peripherals::Peripherals, prelude::*, timer::TimerGroup};
+use esp_wifi::{
+    initialize,
+    wifi::{
+        ClientConfiguration,
+        Configuration,
+        WifiController,
+        WifiDevice,
+        WifiEvent,
+        WifiStaDevice,
+        WifiState,
+    },
+    EspWifiInitFor,
+};
 use static_cell::make_static;
 
 const SSID: &str = env!("SSID");
@@ -44,20 +55,20 @@ async fn main(spawner: Spawner) -> ! {
 
     let peripherals = Peripherals::take();
 
-    let system = peripherals.SYSTEM.split();
+    let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::max(system.clock_control).freeze();
 
     let server_address: Ipv4Address = HOST_IP.parse().expect("Invalid HOST_IP address");
 
     #[cfg(target_arch = "xtensa")]
-    let timer = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
+    let timer = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
     #[cfg(target_arch = "riscv32")]
-    let timer = hal::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
+    let timer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
     let init = initialize(
         EspWifiInitFor::Wifi,
         timer,
         Rng::new(peripherals.RNG),
-        system.radio_clock_control,
+        peripherals.RADIO_CLK,
         &clocks,
     )
     .unwrap();
