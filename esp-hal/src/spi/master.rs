@@ -833,7 +833,7 @@ where
         self,
         data_len: usize,
         fifo: Fifo<'d, T, S>,
-    ) -> Result<FifoTransfer<'d, T, M, S>, (Error, Self, Fifo<'d, T, S>)> {
+    ) -> TransferResult<'d, T, M, S> {
         if data_len > S::SIZE {
             return Err((Error::FifoSizeExeeded, self, fifo));
         }
@@ -1065,7 +1065,7 @@ where
         dummy: u8,
         data_len: usize,
         fifo: Fifo<'d, T, S>,
-    ) -> Result<FifoTransfer<'d, T, M, S>, (Error, Self, Fifo<'d, T, S>)> {
+    ) -> TransferResult<'d, T, M, S> {
         if data_len > S::SIZE {
             return Err((Error::FifoSizeExeeded, self, fifo));
         }
@@ -1092,7 +1092,7 @@ where
         dummy: u8,
         data_len: usize,
         fifo: Fifo<'d, T, S>,
-    ) -> Result<FifoTransfer<'d, T, M, S>, (Error, Self, Fifo<'d, T, S>)> {
+    ) -> TransferResult<'d, T, M, S> {
         if data_len > S::SIZE {
             return Err((Error::FifoSizeExeeded, self, fifo));
         }
@@ -1136,6 +1136,9 @@ where
 //     fn drop(&mut self) {
 //     }
 // }
+
+pub type TransferResult<'d, T, M, S> =
+    Result<FifoTransfer<'d, T, M, S>, (Error, Spi<'d, T, M>, Fifo<'d, T, S>)>;
 
 impl<T> HalfDuplexReadWrite for SpiFifo<'_, T, HalfDuplexMode>
 where
@@ -3098,6 +3101,7 @@ pub trait Instance: private::Sealed {
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn init_half_duplex(
         &mut self,
         is_write: bool,
