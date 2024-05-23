@@ -13,7 +13,7 @@ logging capabilities for Espressif devices.
 # Usage
 
 ```toml
-esp-println = { version = "0.8.0", features = ["esp32c2"] }
+esp-println = { version = "0.9.1", features = ["esp32c2"] }
 ```
 
 or `cargo add esp-println --features esp32c2`
