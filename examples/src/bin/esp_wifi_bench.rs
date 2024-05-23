@@ -1,3 +1,14 @@
+//! Run a test of download, upload and download+upload in a blocking fashion.
+//!
+//! A prerequisite to running the benchmark examples is to run the benchmark server on your local machine. Simply run the following commands to do so.
+//! ```
+//! cd extras/bench-server
+//! cargo run --release
+//! ```
+//! Ensure you have set the IP of your local machine in the `HOST_IP` env variable. E.g `HOST_IP="192.168.0.24"` and also set SSID and PASSWORD env variable before running this example.
+
+//% FEATURES: esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
+
 #![no_std]
 #![no_main]
 

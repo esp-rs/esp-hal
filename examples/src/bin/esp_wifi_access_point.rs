@@ -1,3 +1,14 @@
+//! Access point
+//!
+//! Creates an open access-point with SSID `esp-wifi`.
+//! You can connect to it using a static IP in range 192.168.2.2 .. 192.168.2.255, gateway 192.168.2.1
+//!
+//! Open http://192.168.2.1:8080/ in your browser
+//!
+//! On Android you might need to choose _Keep Accesspoint_ when it tells you the WiFi has no internet connection, Chrome might not want to load the URL - you can use a shell and try `curl` and `ping`
+
+//% FEATURES: esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
+
 #![no_std]
 #![no_main]
 
@@ -16,21 +27,14 @@ use esp_wifi::{
     initialize,
     wifi::{
         utils::create_network_interface,
-        AccessPointInfo,
-        ClientConfiguration,
+        AccessPointConfiguration,
         Configuration,
-        WifiError,
-        WifiStaDevice,
+        WifiApDevice,
     },
     wifi_interface::WifiStack,
     EspWifiInitFor,
 };
 use smoltcp::iface::SocketStorage;
-
-const SSID: &str = env!("SSID");
-const PASSWORD: &str = env!("PASSWORD");
-const STATIC_IP: &str = env!("STATIC_IP");
-const GATEWAY_IP: &str = env!("GATEWAY_IP");
 
 #[entry]
 fn main() -> ! {
@@ -58,12 +62,11 @@ fn main() -> ! {
     let wifi = peripherals.WIFI;
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
     let (iface, device, mut controller, sockets) =
-        create_network_interface(&init, wifi, WifiStaDevice, &mut socket_set_entries).unwrap();
+        create_network_interface(&init, wifi, WifiApDevice, &mut socket_set_entries).unwrap();
     let mut wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
 
-    let client_config = Configuration::Client(ClientConfiguration {
-        ssid: SSID.try_into().unwrap(),
-        password: PASSWORD.try_into().unwrap(),
+    let client_config = Configuration::AccessPoint(AccessPointConfiguration {
+        ssid: "esp-wifi".try_into().unwrap(),
         ..Default::default()
     });
     let res = controller.set_configuration(&client_config);
@@ -72,44 +75,15 @@ fn main() -> ! {
     controller.start().unwrap();
     println!("is wifi started: {:?}", controller.is_started());
 
-    println!("Start Wifi Scan");
-    let res: Result<(heapless::Vec<AccessPointInfo, 10>, usize), WifiError> = controller.scan_n();
-    if let Ok((res, _count)) = res {
-        for ap in res {
-            println!("{:?}", ap);
-        }
-    }
-
     println!("{:?}", controller.get_capabilities());
-    println!("wifi_connect {:?}", controller.connect());
-
-    // wait to get connected
-    println!("Wait to get connected");
-    loop {
-        let res = controller.is_connected();
-        match res {
-            Ok(connected) => {
-                if connected {
-                    break;
-                }
-            }
-            Err(err) => {
-                println!("{:?}", err);
-                loop {}
-            }
-        }
-    }
-    println!("{:?}", controller.is_connected());
-
-    println!("Setting static IP {}", STATIC_IP);
 
     wifi_stack
         .set_iface_configuration(&esp_wifi::wifi::ipv4::Configuration::Client(
             esp_wifi::wifi::ipv4::ClientConfiguration::Fixed(
                 esp_wifi::wifi::ipv4::ClientSettings {
-                    ip: esp_wifi::wifi::ipv4::Ipv4Addr::from(parse_ip(STATIC_IP)),
+                    ip: esp_wifi::wifi::ipv4::Ipv4Addr::from(parse_ip("192.168.2.1")),
                     subnet: esp_wifi::wifi::ipv4::Subnet {
-                        gateway: esp_wifi::wifi::ipv4::Ipv4Addr::from(parse_ip(GATEWAY_IP)),
+                        gateway: esp_wifi::wifi::ipv4::Ipv4Addr::from(parse_ip("192.168.2.1")),
                         mask: esp_wifi::wifi::ipv4::Mask(24),
                     },
                     dns: None,
@@ -119,10 +93,8 @@ fn main() -> ! {
         ))
         .unwrap();
 
-    println!(
-        "Start busy loop on main. Point your browser to http://{}:8080/",
-        STATIC_IP
-    );
+    println!("Start busy loop on main. Connect to the AP `esp-wifi` and point your browser to http://192.168.2.1:8080/");
+    println!("Use a static IP in the range 192.168.2.2 .. 192.168.2.255, use gateway 192.168.2.1");
 
     let mut rx_buffer = [0u8; 1536];
     let mut tx_buffer = [0u8; 1536];
@@ -168,16 +140,17 @@ fn main() -> ! {
             }
 
             if !time_out {
-                socket.write_all(
-                    b"HTTP/1.0 200 OK\r\n\r\n\
+                socket
+                    .write_all(
+                        b"HTTP/1.0 200 OK\r\n\r\n\
                     <html>\
                         <body>\
                             <h1>Hello Rust! Hello esp-wifi!</h1>\
-                            <img src=\"https://rustacean.net/more-crabby-things/dancing-ferris.gif\"/>
                         </body>\
                     </html>\r\n\
-                    "
-                ).unwrap();
+                    ",
+                    )
+                    .unwrap();
 
                 socket.flush().unwrap();
             }

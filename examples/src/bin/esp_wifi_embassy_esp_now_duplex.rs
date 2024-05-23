@@ -1,3 +1,9 @@
+//! Embassy ESP-NOW Example (Duplex)
+//!
+//! Asynchronously broadcasts, receives and sends messages via esp-now in multiple embassy tasks
+
+//% FEATURES: async embassy embassy-time-timg0 embassy-generic-timers esp-wifi esp-wifi/async esp-wifi/embassy-net esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils esp-wifi/esp-now
+
 #![no_std]
 #![no_main]
 #![feature(type_alias_impl_trait)]

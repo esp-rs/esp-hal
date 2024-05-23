@@ -1,3 +1,15 @@
+//! Access point with station
+//!
+//! Set SSID and PASSWORD env variable before running this example.
+//!
+//! Gets an ip address via DHCP, creates an open access-point with SSID `esp-wifi`
+//! You can connect to it using a static IP in range 192.168.2.2 .. 192.168.2.255, gateway 192.168.2.1
+//! Open http://192.168.2.1:8080/ in your browser - the example will perform an HTTP get request to some "random" server
+//!
+//! On Android you might need to choose _Keep Accesspoint_ when it tells you the WiFi has no internet connection, Chrome might not want to load the URL - you can use a shell and try `curl` and `ping`
+
+//% FEATURES: esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
+
 #![no_std]
 #![no_main]
 

@@ -1,3 +1,16 @@
+//! Embassy access point with station
+//!
+//! Set SSID and PASSWORD env variable before running the example.
+//!
+//! - gets an ip address via DHCP
+//! - creates an open access-point with SSID `esp-wifi`
+//! - you can connect to it using a static IP in range 192.168.2.2 .. 192.168.2.255, gateway 192.168.2.1
+//! - open http://192.168.2.1:8080/ in your browser - the example will perform an HTTP get request to some "random" server
+//!
+//! On Android you might need to choose _Keep Accesspoint_ when it tells you the WiFi has no internet connection, Chrome might not want to load the URL - you can use a shell and try `curl` and `ping`
+
+//% FEATURES: async embassy embassy-time-timg0 embassy-generic-timers esp-wifi esp-wifi/async esp-wifi/embassy-net esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
+
 #![no_std]
 #![no_main]
 #![feature(type_alias_impl_trait)]

@@ -1,29 +1,30 @@
+//! ESP-NOW Example
+//!
+//! Broadcasts, receives and sends messages via esp-now
+
+//% FEATURES: esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils esp-wifi/esp-now
+
 #![no_std]
 #![no_main]
-#![feature(type_alias_impl_trait)]
 
-use embassy_executor::Spawner;
-use embassy_futures::select::{select, Either};
-use embassy_time::{Duration, Ticker};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    embassy,
     peripherals::Peripherals,
     prelude::*,
     rng::Rng,
     system::SystemControl,
-    timer::timg::TimerGroup,
 };
 use esp_println::println;
 use esp_wifi::{
+    current_millis,
     esp_now::{PeerInfo, BROADCAST_ADDRESS},
     initialize,
     EspWifiInitFor,
 };
 
-#[main]
-async fn main(_spawner: Spawner) -> ! {
+#[entry]
+fn main() -> ! {
     #[cfg(feature = "log")]
     esp_println::logger::init_logger(log::LevelFilter::Info);
 
@@ -47,16 +48,15 @@ async fn main(_spawner: Spawner) -> ! {
 
     let wifi = peripherals.WIFI;
     let mut esp_now = esp_wifi::esp_now::EspNow::new(&init, wifi).unwrap();
+
     println!("esp-now version {}", esp_now.get_version().unwrap());
 
-    let timer_group0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
-    embassy::init(&clocks, timer_group0);
-
-    let mut ticker = Ticker::every(Duration::from_secs(5));
+    let mut next_send_time = current_millis() + 5 * 1000;
     loop {
-        let res = select(ticker.next(), async {
-            let r = esp_now.receive_async().await;
+        let r = esp_now.receive();
+        if let Some(r) = r {
             println!("Received {:?}", r);
+
             if r.info.dst_address == BROADCAST_ADDRESS {
                 if !esp_now.peer_exists(&r.info.src_address) {
                     esp_now
@@ -68,19 +68,22 @@ async fn main(_spawner: Spawner) -> ! {
                         })
                         .unwrap();
                 }
-                let status = esp_now.send_async(&r.info.src_address, b"Hello Peer").await;
+                let status = esp_now
+                    .send(&r.info.src_address, b"Hello Peer")
+                    .unwrap()
+                    .wait();
                 println!("Send hello to peer status: {:?}", status);
             }
-        })
-        .await;
+        }
 
-        match res {
-            Either::First(_) => {
-                println!("Send");
-                let status = esp_now.send_async(&BROADCAST_ADDRESS, b"0123456789").await;
-                println!("Send broadcast status: {:?}", status)
-            }
-            Either::Second(_) => (),
+        if current_millis() >= next_send_time {
+            next_send_time = current_millis() + 5 * 1000;
+            println!("Send");
+            let status = esp_now
+                .send(&BROADCAST_ADDRESS, b"0123456789")
+                .unwrap()
+                .wait();
+            println!("Send broadcast status: {:?}", status)
         }
     }
 }

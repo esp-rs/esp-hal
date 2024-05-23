@@ -1,3 +1,12 @@
+//! WiFi and BLE COEXistence example
+//!
+//! - set SSID and PASSWORD env variable
+//! - gets an ip address via DHCP
+//! - performs an HTTP get request to some "random" server
+//! - does BLE advertising (you cannot connect to it - it's just not implemented in the example)
+
+//% FEATURES: esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils esp-wifi/ble esp-wifi/coex
+
 #![no_std]
 #![no_main]
 

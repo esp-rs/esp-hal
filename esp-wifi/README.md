@@ -101,13 +101,7 @@ For more information see [extras/esp-wifishark/README.md](../extras/esp-wifishar
 
 The defaults used by `esp-wifi` and the examples are rather conservative. It is possible to change a few of the important settings.
 
-See [Tuning](https://github.com/esp-rs/esp-wifi/blob/main/esp-wifi/docs/tuning.md) for details
-
-## Examples
-
-See [Examples] for details.
-
-[Examples]: https://github.com/esp-rs/esp-wifi/blob/main/esp-wifi/docs/examples.md
+See [Tuning](./tuning.md) for details
 
 ## Missing / To be done
 

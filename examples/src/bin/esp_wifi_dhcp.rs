@@ -1,3 +1,12 @@
+//! DHCP Example
+//!
+//!
+//! Set SSID and PASSWORD env variable before running this example.
+//!
+//! This gets an ip address via DHCP then performs an HTTP get request to some "random" server
+
+//% FEATURES: esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
+
 #![no_std]
 #![no_main]
 
