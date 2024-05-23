@@ -1,0 +1,47 @@
+[package]
+name        = "esp-println"
+version     = "0.9.1"
+edition     = "2021"
+description = "Provides `print!` and `println!` implementations various Espressif devices"
+repository  = "https://github.com/esp-rs/esp-hal"
+license     = "MIT OR Apache-2.0"
+
+[package.metadata.docs.rs]
+cargo-args     = ["-Z", "build-std=core"]
+default-target = "riscv32imc-unknown-none-elf"
+features       = ["esp32c3"]
+
+[dependencies]
+critical-section = { version = "1.1.2",  optional = true }
+defmt            = { version = "0.3.7",  optional = true }
+log              = { version = "0.4.21", optional = true }
+portable-atomic  = { version = "1.6.0",  optional = true, default-features = false }
+
+[build-dependencies]
+esp-build = { version = "0.1.0", path = "../esp-build" }
+
+[features]
+default = ["dep:critical-section", "colors", "uart"]
+log     = ["dep:log"]
+
+# You must enable exactly 1 of the below features to support the correct chip:
+esp32   = []
+esp32c2 = []
+esp32c3 = []
+esp32c6 = []
+esp32h2 = []
+esp32p4 = []
+esp32s2 = []
+esp32s3 = []
+
+# You must enable exactly 1 of the below features to enable to intended
+# communication method (note that "uart" is enabled by default):
+jtag-serial = ["dep:portable-atomic"] # C3, C6, H2, P4, and S3 only!
+no-op       = []
+uart        = []
+
+# Enables a `defmt` backend usable with espflash. We force rzcobs encoding to simplify implementation
+defmt-espflash = ["dep:defmt", "defmt?/encoding-rzcobs"]
+
+# logging sub-features
+colors = []

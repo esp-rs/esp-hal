@@ -10,6 +10,7 @@ exclude  = [
     "esp-ieee802154",
     "esp-lp-hal",
     "esp-metadata",
+    "esp-println",
     "esp-riscv-rt",
     "examples",
     "hil-test",
