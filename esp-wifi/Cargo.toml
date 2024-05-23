@@ -54,34 +54,6 @@ atomic-waker = { version = "1.1.2", default-features = false, features = [
 [build-dependencies]
 toml-cfg = "0.2.0"
 
-[dev-dependencies]
-esp-println = { version = "0.9.1", path = "../esp-println", default-features = false, features = [
-  "log",
-  "uart",
-] }
-esp-backtrace = { version = "0.11.0", features = [
-  "panic-handler",
-  "exception-handler",
-  "println",
-] }
-embassy-executor = { version = "0.5.0", package = "embassy-executor", features = [
-  "task-arena-size-12288",
-  "integrated-timers",
-] }
-embassy-time = { version = "0.3.0" }
-embassy-net = { version = "0.4.0", features = [
-  "tcp",
-  "udp",
-  "dhcpv4",
-  "medium-ethernet",
-] }
-bleps = { git = "https://github.com/bjoernQ/bleps", package = "bleps", rev = "9371d7d4d510ba5c936c1eef96674f8fd4f63e8a", features = [
-  "macros",
-  "async",
-] }
-log = { version = "0.4.20" }
-static_cell = { version = "2.0", features = ["nightly"] }
-
 [features]
 default = ["log"]
 
@@ -89,44 +61,30 @@ default = ["log"]
 esp32c2 = [
   "esp-hal/esp32c2",
   "esp-wifi-sys/esp32c2",
-  "esp-println/esp32c2",
-  "esp-backtrace/esp32c2",
 ]
 esp32c3 = [
   "esp-hal/esp32c3",
   "esp-wifi-sys/esp32c3",
-  "esp-println/esp32c3",
-  "esp-backtrace/esp32c3",
 ]
 esp32c6 = [
   "esp-hal/esp32c6",
   "esp-wifi-sys/esp32c6",
-  "esp-println/esp32c6",
-  "esp-backtrace/esp32c6",
 ]
 esp32h2 = [
   "esp-hal/esp32h2",
   "esp-wifi-sys/esp32h2",
-  "esp-println/esp32h2",
-  "esp-backtrace/esp32h2",
 ]
 esp32 = [
   "esp-hal/esp32",
   "esp-wifi-sys/esp32",
-  "esp-println/esp32",
-  "esp-backtrace/esp32",
 ]
 esp32s2 = [
   "esp-hal/esp32s2",
   "esp-wifi-sys/esp32s2",
-  "esp-println/esp32s2",
-  "esp-backtrace/esp32s2",
 ]
 esp32s3 = [
   "esp-hal/esp32s3",
   "esp-wifi-sys/esp32s3",
-  "esp-println/esp32s3",
-  "esp-backtrace/esp32s3",
 ]
 
 # async features
