@@ -21,12 +21,16 @@ use esp_hal::{
     gpio::Io,
     peripherals::Peripherals,
     prelude::*,
-    spi::{master::Spi, FullDuplexMode, SpiMode},
+    spi::{
+        master::{Spi, SpiFifo},
+        FullDuplexMode,
+        SpiMode,
+    },
     system::SystemControl,
 };
 
 struct Context {
-    spi: Spi<'static, esp_hal::peripherals::SPI2, FullDuplexMode>,
+    spi: SpiFifo<'static, esp_hal::peripherals::SPI2, FullDuplexMode>,
 }
 
 impl Context {
@@ -41,14 +45,12 @@ impl Context {
         let mosi = io.pins.gpio4;
         let cs = io.pins.gpio5;
 
-        let spi = Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0, &clocks).with_pins(
-            Some(sclk),
-            Some(mosi),
-            Some(miso),
-            Some(cs),
-        );
+        let (spi, fifo) = Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0, &clocks);
+        let spi = spi.with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs));
 
-        Context { spi }
+        Context {
+            spi: SpiFifo::new(spi, fifo),
+        }
     }
 }
 
