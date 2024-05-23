@@ -852,6 +852,15 @@ where
                 .bit(is_high_part)
         });
 
+        self.spi.register_block().dma_conf().modify(|_, w| {
+            w.rx_afifo_rst()
+                .set_bit()
+                .buf_afifo_rst()
+                .set_bit()
+                .dma_afifo_rst()
+                .set_bit()
+        });
+
         self.spi.start_operation();
 
         Ok(FifoTransfer { spi: self, fifo })
@@ -3216,6 +3225,15 @@ pub trait Instance: private::Sealed {
         }
 
         self.configure_datalen(data_len as u32 * 8);
+
+        self.register_block().dma_conf().modify(|_, w| {
+            w.rx_afifo_rst()
+                .set_bit()
+                .buf_afifo_rst()
+                .set_bit()
+                .dma_afifo_rst()
+                .set_bit()
+        });
 
         self.start_operation();
     }
