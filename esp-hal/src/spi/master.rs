@@ -852,14 +852,7 @@ where
                 .bit(is_high_part)
         });
 
-        self.spi.register_block().dma_conf().modify(|_, w| {
-            w.rx_afifo_rst()
-                .set_bit()
-                .buf_afifo_rst()
-                .set_bit()
-                .dma_afifo_rst()
-                .set_bit()
-        });
+        reset_afifo_before_usr_cmd(self.spi.register_block());
 
         self.spi.start_operation();
 
@@ -2318,7 +2311,7 @@ where
         .and_then(|_| rx.start_transfer())?;
 
         self.clear_dma_interrupts();
-        reset_dma_before_usr_cmd(reg_block);
+        reset_afifo_before_usr_cmd(reg_block);
 
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
 
@@ -2357,7 +2350,7 @@ where
             .and_then(|_| tx.start_transfer())?;
 
         self.clear_dma_interrupts();
-        reset_dma_before_usr_cmd(reg_block);
+        reset_afifo_before_usr_cmd(reg_block);
 
         if listen {
             tx.listen_eof();
@@ -2388,7 +2381,7 @@ where
             .and_then(|_| rx.start_transfer())?;
 
         self.clear_dma_interrupts();
-        reset_dma_before_usr_cmd(reg_block);
+        reset_afifo_before_usr_cmd(reg_block);
 
         if listen {
             rx.listen_eof();
@@ -2463,7 +2456,7 @@ where
 }
 
 #[cfg(not(any(esp32, esp32s2)))]
-fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
+fn reset_afifo_before_usr_cmd(reg_block: &RegisterBlock) {
     reg_block.dma_conf().modify(|_, w| {
         w.rx_afifo_rst()
             .set_bit()
@@ -2475,7 +2468,7 @@ fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
 }
 
 #[cfg(any(esp32, esp32s2))]
-fn reset_dma_before_usr_cmd(_reg_block: &RegisterBlock) {}
+fn reset_afifo_before_usr_cmd(_reg_block: &RegisterBlock) {}
 
 #[cfg(not(any(esp32, esp32s2)))]
 fn reset_dma_before_load_dma_dscr(_reg_block: &RegisterBlock) {}
@@ -3225,15 +3218,7 @@ pub trait Instance: private::Sealed {
         }
 
         self.configure_datalen(data_len as u32 * 8);
-
-        self.register_block().dma_conf().modify(|_, w| {
-            w.rx_afifo_rst()
-                .set_bit()
-                .buf_afifo_rst()
-                .set_bit()
-                .dma_afifo_rst()
-                .set_bit()
-        });
+        reset_afifo_before_usr_cmd(self.register_block());
 
         self.start_operation();
     }
