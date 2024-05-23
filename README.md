@@ -8,7 +8,7 @@
 Bare-metal (`no_std`) hardware abstraction layer for Espressif devices. Currently supports, to varying degrees, the following devices:
 
 - ESP32 Series: _ESP32_
-- ESP32-C Series: _ESP32-C2 (aka ESP8684), ESP32-C3 (aka ESP8685), ESP32-C6_
+- ESP32-C Series: _ESP32-C2, ESP32-C3, ESP32-C6_
 - ESP32-H Series: _ESP32-H2_
 - ESP32-S Series: _ESP32-S2, ESP32-S3_
 
@@ -49,29 +49,6 @@ For information about the HAL and how to use it in your own projects, please ref
 
 This repository is home to a number of different packages; for more information regarding a particular package, please refer to its `README.md` and/or documentation.
 
-## Ancillary Crates
-
-There are a number of other crates within the [esp-rs organization] which can be used in conjunction with `esp-hal`:
-
-|      Crate       |                                  Description                                   |
-| :--------------: | :----------------------------------------------------------------------------: |
-| [esp-backtrace]  |                 Backtrace support for bare-metal applications                  |
-| [esp-ieee802154] |          Low-level IEEE802.15.4 driver for the ESP32-C6 and ESP32-H2           |
-| [esp-openthread] |           A bare-metal Thread implementation using `esp-ieee802154`            |
-|  [esp-println]   |                Provides `print!` and `println!` implementations                |
-|  [esp-storage]   | Implementation of [embedded-storage] traits to access unencrypted flash memory |
-|    [esp-wifi]    |                       `no_std` Wi-Fi/BLE/ESP-NOW support                       |
-
-[esp-rs organization]: https://github.com/esp-rs
-[esp-alloc]: https://github.com/esp-rs/esp-alloc
-[esp-backtrace]: https://github.com/esp-rs/esp-backtrace
-[esp-ieee802154]: https://github.com/esp-rs/esp-ieee802154
-[esp-openthread]: https://github.com/esp-rs/esp-openthread
-[esp-println]: https://github.com/esp-rs/esp-println
-[esp-storage]: https://github.com/esp-rs/esp-storage
-[embedded-storage]: https://github.com/rust-embedded-community/embedded-storage
-[esp-wifi]: https://github.com/esp-rs/esp-wifi
-
 ## License
 
 Licensed under either of:
@@ -87,4 +64,4 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without
 any additional terms or conditions.
 
-If you consider to contribute please make sure you checked the [contributing guide](./CONTRIBUTING.md) and the [API guidelines](https://github.com/esp-rs/esp-hal/blob/main/API-GUIDELINES.md)
+If you consider contributing, please make sure you have read and understood our [contributing guide](./CONTRIBUTING.md) and [API guidelines](https://github.com/esp-rs/esp-hal/blob/main/API-GUIDELINES.md).
