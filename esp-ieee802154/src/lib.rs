@@ -112,8 +112,8 @@ impl<'a> Ieee802154<'a> {
         Self {
             _align: 0,
             transmit_buffer: [0u8; FRAME_SIZE],
-            _phantom1: PhantomData::default(),
-            //_phantom2: PhantomData::default(),
+            _phantom1: PhantomData,
+            //_phantom2: PhantomData,
         }
     }
 
@@ -206,7 +206,7 @@ impl<'a> Ieee802154<'a> {
             .unwrap();
         self.transmit_buffer[0] = (offset - 1) as u8;
 
-        ieee802154_transmit(self.transmit_buffer.as_ptr() as *const u8, false); // what about CCA?
+        ieee802154_transmit(self.transmit_buffer.as_ptr(), false); // what about CCA?
 
         Ok(())
     }
@@ -216,7 +216,7 @@ impl<'a> Ieee802154<'a> {
         self.transmit_buffer[1..][..frame.len()].copy_from_slice(frame);
         self.transmit_buffer[0] = frame.len() as u8;
 
-        ieee802154_transmit(self.transmit_buffer.as_ptr() as *const u8, false); // what about CCA?
+        ieee802154_transmit(self.transmit_buffer.as_ptr(), false); // what about CCA?
 
         Ok(())
     }
@@ -266,7 +266,7 @@ impl<'a> Ieee802154<'a> {
     pub fn set_rx_available_callback_fn(&mut self, callback: fn()) {
         critical_section::with(|cs| {
             let mut rx_available_callback_fn = RX_AVAILABLE_CALLBACK_FN.borrow_ref_mut(cs);
-            rx_available_callback_fn.replace(unsafe { core::mem::transmute(callback) });
+            rx_available_callback_fn.replace(callback);
         });
     }
 
@@ -304,8 +304,10 @@ static TX_DONE_CALLBACK: Mutex<RefCell<Option<&'static mut (dyn FnMut() + Send)>
 static RX_AVAILABLE_CALLBACK: Mutex<RefCell<Option<&'static mut (dyn FnMut() + Send)>>> =
     Mutex::new(RefCell::new(None));
 
+#[allow(clippy::type_complexity)]
 static TX_DONE_CALLBACK_FN: Mutex<RefCell<Option<fn()>>> = Mutex::new(RefCell::new(None));
 
+#[allow(clippy::type_complexity)]
 static RX_AVAILABLE_CALLBACK_FN: Mutex<RefCell<Option<fn()>>> = Mutex::new(RefCell::new(None));
 
 fn tx_done() {

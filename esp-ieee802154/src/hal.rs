@@ -277,7 +277,7 @@ pub(crate) fn set_multipan_enable_mask(mask: u8) {
 #[inline(always)]
 pub(crate) fn set_multipan_panid(index: MultipanIndex, panid: u16) {
     unsafe {
-        let pan_id = (&*IEEE802154::PTR)
+        let pan_id = (*IEEE802154::PTR)
             .inf0_pan_id()
             .as_ptr()
             .offset(4 * index as isize);
@@ -288,7 +288,7 @@ pub(crate) fn set_multipan_panid(index: MultipanIndex, panid: u16) {
 #[inline(always)]
 pub(crate) fn set_multipan_short_addr(index: MultipanIndex, value: u16) {
     unsafe {
-        let short_addr = (&*IEEE802154::PTR)
+        let short_addr = (*IEEE802154::PTR)
             .inf0_short_addr()
             .as_ptr()
             .offset(4 * index as isize);
@@ -299,7 +299,7 @@ pub(crate) fn set_multipan_short_addr(index: MultipanIndex, value: u16) {
 #[inline(always)]
 pub(crate) fn set_multipan_ext_addr(index: MultipanIndex, ext_addr: *const u8) {
     unsafe {
-        let mut ext_addr_ptr = (&*IEEE802154::PTR)
+        let mut ext_addr_ptr = (*IEEE802154::PTR)
             .inf0_extend_addr0()
             .as_ptr()
             .offset(4 * index as isize);

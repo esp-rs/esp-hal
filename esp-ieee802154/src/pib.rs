@@ -222,7 +222,7 @@ fn ieee802154_set_multipan_hal(pib: &Pib) {
         if (pib.multipan_mask & (1 << index)) != 0 {
             set_multipan_panid(index.into(), pib.panid[index]);
             set_multipan_short_addr(index.into(), pib.short_addr[index]);
-            set_multipan_ext_addr(index.into(), pib.ext_addr[index].as_ptr() as *const u8);
+            set_multipan_ext_addr(index.into(), pib.ext_addr[index].as_ptr());
         }
     }
 }
