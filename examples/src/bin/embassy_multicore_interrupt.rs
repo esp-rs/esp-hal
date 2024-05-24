@@ -17,7 +17,6 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     cpu_control::{CpuControl, Stack},
-    embassy::{self, executor::InterruptExecutor},
     get_core,
     gpio::{AnyOutput, Io, Level},
     interrupt::Priority,
@@ -26,6 +25,7 @@ use esp_hal::{
     system::SystemControl,
     timer::timg::TimerGroup,
 };
+use esp_hal_embassy::executor::InterruptExecutor;
 use esp_println::println;
 use static_cell::StaticCell;
 
@@ -78,7 +78,7 @@ fn main() -> ! {
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
-    embassy::init(&clocks, timg0);
+    esp_hal_embassy::init(&clocks, timg0);
 
     let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 

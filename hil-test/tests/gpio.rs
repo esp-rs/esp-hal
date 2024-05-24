@@ -17,7 +17,6 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    embassy,
     gpio::{Gpio2, Gpio4, GpioPin, Input, Io, Level, Output, Pull},
     macros::handler,
     peripherals::Peripherals,
@@ -46,7 +45,7 @@ impl<'d> Context<'d> {
         let delay = Delay::new(&clocks);
 
         let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
-        embassy::init(&clocks, timg0);
+        esp_hal_embassy::init(&clocks, timg0);
 
         Context {
             io2: Input::new(io.pins.gpio2, Pull::Down),
@@ -68,7 +67,7 @@ pub fn interrupt_handler() {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal::embassy::executor::Executor::new())]
+#[embedded_test::tests(executor = esp_hal_embassy::executor::Executor::new())]
 mod tests {
     use defmt::assert_eq;
     use embassy_time::{Duration, Timer};

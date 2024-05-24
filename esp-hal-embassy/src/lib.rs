@@ -42,6 +42,7 @@ pub fn init(clocks: &Clocks, time_driver: TimerType) {
     EmbassyTimer::init(clocks, time_driver)
 }
 
+#[allow(clippy::type_complexity)]
 pub(crate) struct AlarmState {
     pub callback: Cell<Option<(fn(*mut ()), *mut ())>>,
     pub allocated: Cell<bool>,

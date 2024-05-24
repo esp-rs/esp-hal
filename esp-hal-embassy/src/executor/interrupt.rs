@@ -43,7 +43,7 @@ impl CallbackContext {
     }
 
     fn get(&self) -> *mut raw::Executor {
-        unsafe { (*self.raw_executor.get()) as *mut raw::Executor }
+        unsafe { *self.raw_executor.get() }
     }
 
     fn set(&self, executor: *mut raw::Executor) {
@@ -151,7 +151,7 @@ impl<const SWI: u8> InterruptExecutor<SWI> {
         if self.core.load(Ordering::Acquire) == usize::MAX {
             panic!("InterruptExecutor::spawner() called on uninitialized executor.");
         }
-        let executor = unsafe { (&*self.executor.get()).assume_init_ref() };
+        let executor = unsafe { (*self.executor.get()).assume_init_ref() };
         executor.spawner().make_send()
     }
 }

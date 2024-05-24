@@ -13,6 +13,7 @@ categories = ["embedded", "hardware-support", "no-std"]
 [dependencies]
 defmt = { version = "0.3.6", optional = true }
 esp-hal = { version = "0.17.0", path = "../esp-hal", default-features = false }
+esp-hal-embassy = { version = "0.1.0", path = "../esp-hal-embassy", optional = true }
 smoltcp = { version = "0.11.0", default-features = false, features = [
   "medium-ethernet",
   "socket-raw",
@@ -61,30 +62,37 @@ default = ["log"]
 # chip features
 esp32c2 = [
   "esp-hal/esp32c2",
+  "esp-hal-embassy?/esp32c2",
   "esp-wifi-sys/esp32c2",
 ]
 esp32c3 = [
   "esp-hal/esp32c3",
+  "esp-hal-embassy?/esp32c3",
   "esp-wifi-sys/esp32c3",
 ]
 esp32c6 = [
   "esp-hal/esp32c6",
+  "esp-hal-embassy?/esp32c6",
   "esp-wifi-sys/esp32c6",
 ]
 esp32h2 = [
   "esp-hal/esp32h2",
+  "esp-hal-embassy?/esp32h2",
   "esp-wifi-sys/esp32h2",
 ]
 esp32 = [
   "esp-hal/esp32",
+  "esp-hal-embassy?/esp32",
   "esp-wifi-sys/esp32",
 ]
 esp32s2 = [
   "esp-hal/esp32s2",
+  "esp-hal-embassy?/esp32s2",
   "esp-wifi-sys/esp32s2",
 ]
 esp32s3 = [
   "esp-hal/esp32s3",
+  "esp-hal-embassy?/esp32s3",
   "esp-wifi-sys/esp32s3",
 ]
 
@@ -93,6 +101,8 @@ async = [
   "dep:embassy-sync",
   "dep:embassy-futures",
   "dep:embedded-io-async",
+  "dep:esp-hal-embassy",
+  "esp-hal/async",
 ]
 
 embassy-net = ["dep:embassy-net-driver", "async"]
@@ -131,7 +141,7 @@ features = [
   "coex",
   "async",
   "embassy-net",
-  "esp-hal/embassy-time-timg0",
+  "esp-hal-embassy/time-timg0",
   "esp-hal/default",
 ]
 default-target = "riscv32imc-unknown-none-elf"

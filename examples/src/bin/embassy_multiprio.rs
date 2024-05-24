@@ -25,13 +25,13 @@ use embassy_time::{Duration, Instant, Ticker, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    embassy::{self, executor::InterruptExecutor},
     interrupt::Priority,
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
     timer::timg::TimerGroup,
 };
+use esp_hal_embassy::executor::InterruptExecutor;
 use esp_println::println;
 use static_cell::StaticCell;
 
@@ -79,7 +79,7 @@ async fn main(low_prio_spawner: Spawner) {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
-    embassy::init(&clocks, timg0);
+    esp_hal_embassy::init(&clocks, timg0);
 
     static EXECUTOR: StaticCell<InterruptExecutor<2>> = StaticCell::new();
     let executor = InterruptExecutor::new(system.software_interrupt_control.software_interrupt2);

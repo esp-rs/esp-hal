@@ -28,7 +28,6 @@ use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    embassy,
     gpio::{Input, Io, Pull},
     peripherals::*,
     prelude::*,
@@ -73,7 +72,7 @@ async fn main(_spawner: Spawner) -> ! {
     let button = Input::new(io.pins.gpio9, Pull::Down);
 
     let timer_group0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
-    embassy::init(&clocks, timer_group0);
+    esp_hal_embassy::init(&clocks, timer_group0);
 
     let mut bluetooth = peripherals.BT;
 

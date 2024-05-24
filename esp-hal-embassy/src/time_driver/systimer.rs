@@ -3,12 +3,9 @@ use embassy_time_driver::AlarmHandle;
 use esp_hal::{
     clock::Clocks,
     interrupt,
-    peripherals::{self, Interrupt},
+    peripherals::Interrupt,
     prelude::*,
-    timer::{
-        systimer::{Alarm, SystemTimer, Target},
-        Timer as _,
-    },
+    timer::systimer::{Alarm, SystemTimer, Target},
     Async,
 };
 
@@ -25,6 +22,7 @@ pub struct EmbassyTimer {
     pub(crate) alarm2: Alarm<Target, Async, 2>,
 }
 
+#[allow(clippy::declare_interior_mutable_const)]
 const ALARM_STATE_NONE: AlarmState = AlarmState::new();
 
 embassy_time_driver::time_driver_impl!(static DRIVER: EmbassyTimer = EmbassyTimer {

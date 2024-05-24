@@ -24,6 +24,7 @@ pub struct EmbassyTimer {
     pub(crate) alarms: Mutex<[AlarmState; ALARM_COUNT]>,
 }
 
+#[allow(clippy::declare_interior_mutable_const)]
 const ALARM_STATE_NONE: AlarmState = AlarmState::new();
 
 embassy_time_driver::time_driver_impl!(static DRIVER: EmbassyTimer = EmbassyTimer {

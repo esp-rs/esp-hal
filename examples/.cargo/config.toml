@@ -28,6 +28,11 @@ rustflags = [
 
 [env]
 ESP_LOGLEVEL = "info"
+SSID = "SSID"
+PASSWORD = "PASSWORD"
+STATIC_IP = "1.1.1.1 "
+GATEWAY_IP = "1.1.1.1"
+HOST_IP = "1.1.1.1"
 
 [unstable]
 build-std = ["alloc", "core"]

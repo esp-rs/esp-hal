@@ -13,7 +13,6 @@ use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    embassy,
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
@@ -71,7 +70,7 @@ async fn main(spawner: Spawner) -> () {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    embassy::init(&clocks, TimerGroup::new_async(peripherals.TIMG0, &clocks));
+    esp_hal_embassy::init(&clocks, TimerGroup::new_async(peripherals.TIMG0, &clocks));
 
     let (tx, rx) = UsbSerialJtag::new_async(peripherals.USB_DEVICE).split();
 
