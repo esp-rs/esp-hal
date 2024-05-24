@@ -41,7 +41,11 @@ fn main() -> Result<(), String> {
     match std::env::var("OPT_LEVEL") {
         Ok(level) => {
             if level != "2" && level != "3" {
-                esp_build::warning! {"WARNING: esp-wifi should be built with optimization level 2 or 3. See https://github.com/esp-rs/esp-wifi"};
+                let message = format!(
+                    "esp-wifi should be built with optimization level 2 or 3 - yours is {level}.
+                    See https://github.com/esp-rs/esp-wifi",
+                );
+                print_warning(message);
             }
         }
         Err(_err) => (),
@@ -166,4 +170,8 @@ impl PartialOrd for Version4 {
         }
         self.3.partial_cmp(&other.3)
     }
+}
+
+fn print_warning(message: impl core::fmt::Display) {
+    println!("cargo:warning={}", message);
 }
