@@ -26,10 +26,8 @@
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let pins = TxRxPins::new_tx_rx(io.pins.gpio1, io.pins.gpio2);
 //!
-//! let mut uart1 =
-//!     Uart::new_with_config(peripherals.UART1, Config::default(), Some(pins),
-//! &clocks, None);
-//! # }
+//! let mut uart1 = Uart::new_with_config(peripherals.UART1, Config::default(),
+//! &clocks)     .with_tx_rx(&mut io.pins.gpio1, &mut io.pins.gpio2);
 //! ```
 //! 
 //! ## Usage
@@ -312,114 +310,6 @@ pub mod config {
     }
 }
 
-/// Pins used by the UART interface
-pub trait UartPins {
-    fn configure_pins(
-        &mut self,
-        tx_signal: OutputSignal,
-        rx_signal: InputSignal,
-        cts_signal: InputSignal,
-        rts_signal: OutputSignal,
-    );
-}
-
-/// All UART pins (TX, RX, CTS, RTS)
-pub struct AllPins<'d, TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> {
-    pub(crate) tx: Option<PeripheralRef<'d, TX>>,
-    pub(crate) rx: Option<PeripheralRef<'d, RX>>,
-    pub(crate) cts: Option<PeripheralRef<'d, CTS>>,
-    pub(crate) rts: Option<PeripheralRef<'d, RTS>>,
-}
-
-impl<'d, TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> AllPins<'d, TX, RX, CTS, RTS> {
-    pub fn new(
-        tx: impl Peripheral<P = TX> + 'd,
-        rx: impl Peripheral<P = RX> + 'd,
-        cts: impl Peripheral<P = CTS> + 'd,
-        rts: impl Peripheral<P = RTS> + 'd,
-    ) -> AllPins<'d, TX, RX, CTS, RTS> {
-        crate::into_ref!(tx, rx, cts, rts);
-        AllPins {
-            tx: Some(tx),
-            rx: Some(rx),
-            cts: Some(cts),
-            rts: Some(rts),
-        }
-    }
-}
-
-impl<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> UartPins
-    for AllPins<'_, TX, RX, CTS, RTS>
-{
-    fn configure_pins(
-        &mut self,
-        tx_signal: OutputSignal,
-        rx_signal: InputSignal,
-        cts_signal: InputSignal,
-        rts_signal: OutputSignal,
-    ) {
-        if let Some(ref mut tx) = self.tx {
-            tx.set_to_push_pull_output(crate::private::Internal);
-            tx.connect_peripheral_to_output(tx_signal, crate::private::Internal);
-        }
-
-        if let Some(ref mut rx) = self.rx {
-            rx.set_to_input(crate::private::Internal);
-            rx.connect_input_to_peripheral(rx_signal, crate::private::Internal);
-        }
-
-        if let Some(ref mut cts) = self.cts {
-            cts.set_to_input(crate::private::Internal);
-            cts.connect_input_to_peripheral(cts_signal, crate::private::Internal);
-        }
-
-        if let Some(ref mut rts) = self.rts {
-            rts.set_to_push_pull_output(crate::private::Internal);
-            rts.connect_peripheral_to_output(rts_signal, crate::private::Internal);
-        }
-    }
-}
-
-/// TX and RX pins
-pub struct TxRxPins<'d, TX: OutputPin, RX: InputPin> {
-    pub tx: Option<PeripheralRef<'d, TX>>,
-    pub rx: Option<PeripheralRef<'d, RX>>,
-}
-
-impl<'d, TX: OutputPin, RX: InputPin> TxRxPins<'d, TX, RX> {
-    pub fn new_tx_rx(
-        tx: impl Peripheral<P = TX> + 'd,
-        rx: impl Peripheral<P = RX> + 'd,
-    ) -> TxRxPins<'d, TX, RX> {
-        crate::into_ref!(tx, rx);
-        TxRxPins {
-            tx: Some(tx),
-            rx: Some(rx),
-        }
-    }
-}
-
-impl<TX: OutputPin, RX: InputPin> UartPins for TxRxPins<'_, TX, RX> {
-    fn configure_pins(
-        &mut self,
-        tx_signal: OutputSignal,
-        rx_signal: InputSignal,
-        _cts_signal: InputSignal,
-        _rts_signal: OutputSignal,
-    ) {
-        if let Some(ref mut tx) = self.tx {
-            tx.set_to_push_pull_output(crate::private::Internal);
-            tx.set_output_high(true, crate::private::Internal);
-            tx.connect_peripheral_to_output(tx_signal, crate::private::Internal);
-        }
-
-        if let Some(ref mut rx) = self.rx {
-            rx.set_to_input(crate::private::Internal);
-            rx.connect_input_to_peripheral(rx_signal, crate::private::Internal);
-        }
-    }
-}
-
 /// UART (Full-duplex)
 pub struct Uart<'d, T, M> {
     #[cfg(not(esp32))]
@@ -542,14 +432,10 @@ where
     pub fn new_with_config<P>(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        pins: Option<P>,
         clocks: &Clocks,
         interrupt: Option<InterruptHandler>,
-    ) -> Self
-    where
-        P: UartPins,
-    {
-        Self::new_with_config_inner(uart, config, pins, clocks, interrupt)
+    ) -> Self {
+        Self::new_with_config_inner(uart, config, clocks, interrupt)
     }
 
     /// Create a new UART instance with defaults in [`Blocking`] mode.
@@ -642,26 +528,13 @@ where
     T: Instance + 'd,
     M: Mode,
 {
-    fn new_with_config_inner<P>(
+    fn new_with_config_inner(
         _uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        mut pins: Option<P>,
         clocks: &Clocks,
         interrupt: Option<InterruptHandler>,
-    ) -> Self
-    where
-        P: UartPins,
-    {
+    ) -> Self {
         Self::init();
-
-        if let Some(ref mut pins) = pins {
-            pins.configure_pins(
-                T::tx_signal(),
-                T::rx_signal(),
-                T::cts_signal(),
-                T::rts_signal(),
-            );
-        }
 
         let mut serial = Uart {
             tx: UartTx::new_inner(),
@@ -703,13 +576,7 @@ where
     }
 
     fn new_inner(uart: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Self {
-        Self::new_with_config_inner(
-            uart,
-            Default::default(),
-            None::<TxRxPins<'_, NoPinType, NoPinType>>,
-            clocks,
-            None,
-        )
+        Self::new_with_config_inner(uart, Default::default(), clocks, None)
     }
 
     /// Split the UART into a transmitter and receiver
@@ -1945,7 +1812,6 @@ mod asynch {
             Self::new_with_config_inner(
                 uart,
                 config,
-                pins,
                 clocks,
                 Some(match T::uart_number() {
                     #[cfg(uart0)]

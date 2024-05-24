@@ -41,5 +41,5 @@ pub use crate::timer::timg::{
 #[cfg(any(systimer, timg0, timg1))]
 pub use crate::timer::Timer as _esp_hal_timer_Timer;
 #[cfg(any(uart0, uart1, uart2))]
-pub use crate::uart::{Instance as _esp_hal_uart_Instance, UartPins as _esp_hal_uart_UartPins};
+pub use crate::uart::Instance as _esp_hal_uart_Instance;
 pub use crate::{entry, macros::*};
