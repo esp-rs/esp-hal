@@ -18,6 +18,7 @@ pub mod gpio;
 pub mod peripherals;
 pub mod radio_clocks;
 
+/// The name of the chip ("esp32h2") as `&str`
 #[macro_export]
 macro_rules! chip {
     () => {

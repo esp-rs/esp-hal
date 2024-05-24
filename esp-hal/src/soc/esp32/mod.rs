@@ -18,6 +18,7 @@ pub mod peripherals;
 pub mod psram;
 pub mod radio_clocks;
 
+/// The name of the chip ("esp32") as `&str`
 #[macro_export]
 macro_rules! chip {
     () => {

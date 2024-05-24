@@ -24,6 +24,7 @@ pub mod radio_clocks;
 
 pub mod ulp_core;
 
+/// The name of the chip ("esp32s3") as `&str`
 #[macro_export]
 macro_rules! chip {
     () => {
