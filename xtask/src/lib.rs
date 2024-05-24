@@ -545,6 +545,24 @@ pub fn generate_efuse_table(
 // ----------------------------------------------------------------------------
 // Helper Functions
 
+/// Return a (sorted) list of paths to each valid Cargo package in the
+/// workspace.
+pub fn package_paths(workspace: &Path) -> Result<Vec<PathBuf>> {
+    let mut paths = Vec::new();
+    for entry in fs::read_dir(workspace)? {
+        let entry = entry?;
+        if entry.file_type()?.is_dir() {
+            if entry.path().join("Cargo.toml").exists() {
+                paths.push(entry.path());
+            }
+        }
+    }
+
+    paths.sort();
+
+    Ok(paths)
+}
+
 /// Parse the version from the specified package's Cargo manifest.
 pub fn package_version(workspace: &Path, package: Package) -> Result<semver::Version> {
     #[derive(Debug, serde::Deserialize)]

@@ -289,18 +289,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       # Check the formatting of all packages:
-      - name: rustfmt (esp-hal)
-        run: cargo fmt --all --manifest-path=esp-hal/Cargo.toml -- --check
-      - name: rustfmt (esp-hal-procmacros)
-        run: cargo fmt --all --manifest-path=esp-hal-procmacros/Cargo.toml -- --check
-      - name: rustfmt (esp-hal-smartled)
-        run: cargo fmt --all --manifest-path=esp-hal-smartled/Cargo.toml -- --check
-      - name: rustfmt (esp-lp-hal)
-        run: cargo fmt --all --manifest-path=esp-lp-hal/Cargo.toml -- --check
-      - name: rustfmt (esp-riscv-rt)
-        run: cargo fmt --all --manifest-path=esp-riscv-rt/Cargo.toml -- --check
-      - name: rustfmt (examples)
-        run: cargo fmt --all --manifest-path=examples/Cargo.toml -- --check
+      - run: cargo xtask fmt-packages --check
+
+  # --------------------------------------------------------------------------
+  # Tests
 
   hil:
     name: HIL Test | ${{ matrix.target.soc }}
