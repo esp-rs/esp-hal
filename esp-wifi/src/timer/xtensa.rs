@@ -30,7 +30,7 @@ pub fn get_systimer_count() -> u64 {
     esp_hal::time::current_time().ticks()
 }
 
-pub fn setup_timer(mut timer1: TimeBase) {
+pub fn setup_timer(timer1: TimeBase) {
     unsafe {
         interrupt::bind_interrupt(
             peripherals::Interrupt::TG1_T0_LEVEL,

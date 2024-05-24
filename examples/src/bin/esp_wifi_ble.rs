@@ -58,7 +58,7 @@ fn main() -> ! {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
-    let button = io.pins.gpio0.into_pull_down_input();
+    let button = Input::new(io.pins.gpio0, Pull::Down);
     #[cfg(any(
         feature = "esp32c2",
         feature = "esp32c3",

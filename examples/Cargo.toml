@@ -62,7 +62,7 @@ esp32h2 = ["esp-hal/esp32h2", "esp-backtrace/esp32h2", "esp-println/esp32h2", "e
 esp32s2 = ["esp-hal/esp32s2", "esp-backtrace/esp32s2", "esp-println/esp32s2", "esp-hal-smartled/esp32s2", "esp-wifi?/esp32s2"]
 esp32s3 = ["esp-hal/esp32s3", "esp-backtrace/esp32s3", "esp-println/esp32s3", "esp-hal-smartled/esp32s3", "esp-wifi?/esp32s3"]
 
-esp-wifi = ["dep:esp-wifi", "esp-wifi/wifi-default"]
+esp-wifi = ["dep:esp-wifi"]
 
 async = ["esp-hal/async", "embassy-usb"]
 

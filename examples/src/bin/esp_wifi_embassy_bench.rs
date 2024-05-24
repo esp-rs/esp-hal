@@ -6,9 +6,12 @@
 //! cargo run --release
 //! ```
 //! Ensure you have set the IP of your local machine in the `HOST_IP` env variable. E.g `HOST_IP="192.168.0.24"` and also set SSID and PASSWORD env variable before running this example.
+//!
+//! Because of the huge task-arena size configured this won't work on ESP32-S2 and ESP32-C2
+//!
 
 //% FEATURES: async embassy embassy-time-timg0 embassy-generic-timers esp-wifi esp-wifi/async esp-wifi/embassy-net esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
-//% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
+//% CHIPS: esp32 esp32s3 esp32c3 esp32c6
 
 #![no_std]
 #![no_main]
