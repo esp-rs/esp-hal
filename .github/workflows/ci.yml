@@ -48,11 +48,11 @@ jobs:
     name: esp-hal (${{ matrix.device.soc }})
     runs-on: ubuntu-latest
     env:
-      SSID=SSID
-      PASSWORD=PASSWORD
-      STATIC_IP=1.1.1.1 
-      GATEWAY_IP=1.1.1.1
-      HOST_IP=1.1.1.1
+      SSID: SSID
+      PASSWORD: PASSWORD
+      STATIC_IP: 1.1.1.1 
+      GATEWAY_IP: 1.1.1.1
+      HOST_IP: 1.1.1.1
 
     strategy:
       fail-fast: false
