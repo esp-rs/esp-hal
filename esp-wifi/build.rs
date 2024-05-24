@@ -1,13 +1,11 @@
-#[cfg(any(
-    feature = "esp32",
-    feature = "esp32c2",
-    feature = "esp32c3",
-    feature = "esp32c6",
-    feature = "esp32h2",
-    feature = "esp32s2",
-    feature = "esp32s3",
-))]
+use esp_build::assert_unique_used_features;
+
 fn main() -> Result<(), String> {
+    // Ensure that only a single chip is specified:
+    assert_unique_used_features!(
+        "esp32", "esp32c2", "esp32c3", "esp32c6", "esp32h2", "esp32s2", "esp32s3"
+    );
+
     #[cfg(all(feature = "ble", feature = "esp32s2"))]
     {
         panic!(
@@ -28,12 +26,12 @@ fn main() -> Result<(), String> {
         "#
         );
     }
-    #[cfg(all(feature = "coex", any(feature = "esp32s2")))]
+    #[cfg(all(feature = "coex", any(feature = "esp32s2", feature = "esp32h2")))]
     {
         panic!(
             r#"
 
-        COEX is not yet supported on this target.
+        COEX is not supported on this target.
 
         See https://github.com/esp-rs/esp-wifi/issues/92.
 
@@ -43,11 +41,7 @@ fn main() -> Result<(), String> {
     match std::env::var("OPT_LEVEL") {
         Ok(level) => {
             if level != "2" && level != "3" {
-                let message = format!(
-                    "esp-wifi should be built with optimization level 2 or 3 - yours is {level}.
-                    See https://github.com/esp-rs/esp-wifi",
-                );
-                print_warning(message);
+                esp_build::warning! {"WARNING: esp-wifi should be built with optimization level 2 or 3. See https://github.com/esp-rs/esp-wifi"};
             }
         }
         Err(_err) => (),
@@ -172,8 +166,4 @@ impl PartialOrd for Version4 {
         }
         self.3.partial_cmp(&other.3)
     }
-}
-
-fn print_warning(message: impl core::fmt::Display) {
-    println!("cargo:warning={}", message);
 }
