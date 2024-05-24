@@ -18,7 +18,7 @@ use esp_hal::{
     gpio::Io,
     peripherals::{Peripherals, UART0},
     system::SystemControl,
-    uart::{config::Config, TxRxPins, Uart, UartRx, UartTx},
+    uart::{config::Config, Uart, UartRx, UartTx},
     Async,
 };
 
@@ -33,10 +33,12 @@ impl Context {
         let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let pins = TxRxPins::new_tx_rx(io.pins.gpio2, io.pins.gpio4);
 
         let uart =
-            Uart::new_async_with_config(peripherals.UART0, Config::default(), Some(pins), &clocks);
+            Uart::new_async_with_config(peripherals.UART0, Config::default(), &clocks).with_tx_rx(
+                io.pins.gpio2,
+                io.pins.gpio4,
+            );
         let (tx, rx) = uart.split();
 
         Context { rx, tx }

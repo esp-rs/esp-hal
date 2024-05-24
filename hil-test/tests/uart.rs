@@ -20,7 +20,7 @@ use esp_hal::{
     peripherals::{Peripherals, UART0},
     prelude::*,
     system::SystemControl,
-    uart::{config::Config, ClockSource, TxRxPins, Uart},
+    uart::{config::Config, ClockSource, Uart},
     Blocking,
 };
 use nb::block;
@@ -37,15 +37,9 @@ impl Context {
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let pins = TxRxPins::new_tx_rx(io.pins.gpio2, io.pins.gpio4);
 
-        let uart = Uart::new_with_config(
-            peripherals.UART0,
-            Config::default(),
-            Some(pins),
-            &clocks,
-            None,
-        );
+        let uart = Uart::new_with_config(peripherals.UART0, Config::default(), &clocks, None)
+            .with_tx_rx(io.pins.gpio2, io.pins.gpio4);
 
         Context { clocks, uart }
     }

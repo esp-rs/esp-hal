@@ -21,7 +21,7 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
-    uart::{config::Config, lp_uart::LpUart, TxRxPins, Uart},
+    uart::{config::Config, lp_uart::LpUart, Uart},
 };
 use esp_println::println;
 
@@ -35,15 +35,8 @@ fn main() -> ! {
 
     // Set up (HP) UART1:
 
-    let pins = TxRxPins::new_tx_rx(io.pins.gpio6, io.pins.gpio7);
-
-    let mut uart1 = Uart::new_with_config(
-        peripherals.UART1,
-        Config::default(),
-        Some(pins),
-        &clocks,
-        None,
-    );
+    let mut uart1 = Uart::new_with_config(peripherals.UART1, Config::default(), &clocks, None)
+        .with_tx_rx(io.pins.gpio6, io.pins.gpio7);
 
     // Set up (LP) UART:
     let lp_tx = LowPowerOutput::new(io.pins.gpio5);

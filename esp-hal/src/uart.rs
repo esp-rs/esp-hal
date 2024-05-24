@@ -27,7 +27,7 @@
 //! let pins = TxRxPins::new_tx_rx(io.pins.gpio1, io.pins.gpio2);
 //!
 //! let mut uart1 = Uart::new_with_config(peripherals.UART1, Config::default(),
-//! &clocks)     .with_tx_rx(&mut io.pins.gpio1, &mut io.pins.gpio2);
+//! &clocks).with_tx_rx(&mut io.pins.gpio1, &mut io.pins.gpio2);
 //! ```
 //! 
 //! ## Usage
@@ -96,9 +96,9 @@ use core::marker::PhantomData;
 use self::config::Config;
 use crate::{
     clock::Clocks,
-    gpio::{InputPin, InputSignal, NoPinType, OutputPin, OutputSignal},
+    gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
     interrupt::InterruptHandler,
-    peripheral::{Peripheral, PeripheralRef},
+    peripheral::Peripheral,
     peripherals::{
         uart0::{fifo::FIFO_SPEC, RegisterBlock},
         Interrupt,
@@ -429,7 +429,7 @@ where
 {
     /// Create a new UART instance with configuration options in [`Blocking`]
     /// mode.
-    pub fn new_with_config<P>(
+    pub fn new_with_config(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
         clocks: &Clocks,
@@ -1800,15 +1800,11 @@ mod asynch {
     {
         /// Create a new UART instance with configuration options in [`Async`]
         /// mode.
-        pub fn new_async_with_config<P>(
+        pub fn new_async_with_config(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
-            pins: Option<P>,
             clocks: &Clocks,
-        ) -> Self
-        where
-            P: UartPins,
-        {
+        ) -> Self {
             Self::new_with_config_inner(
                 uart,
                 config,
@@ -1827,12 +1823,86 @@ mod asynch {
 
         /// Create a new UART instance with defaults in [`Async`] mode.
         pub fn new_async(uart: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Self {
-            Self::new_async_with_config(
-                uart,
-                Default::default(),
-                None::<TxRxPins<'_, NoPinType, NoPinType>>,
-                clocks,
-            )
+            Self::new_async_with_config(uart, Default::default(), clocks)
+        }
+
+        /// Configure TX and RX pins
+        pub fn with_tx_rx<TX: OutputPin, RX: InputPin>(
+            self,
+            tx: impl Peripheral<P = TX> + 'd,
+            rx: impl Peripheral<P = RX> + 'd,
+        ) -> Self {
+            crate::into_ref!(tx);
+            crate::into_ref!(rx);
+            tx.set_to_push_pull_output(crate::private::Internal);
+            tx.connect_peripheral_to_output(T::tx_signal(), crate::private::Internal);
+
+            rx.set_to_input(crate::private::Internal);
+            rx.connect_input_to_peripheral(T::rx_signal(), crate::private::Internal);
+            self
+        }
+
+        /// Configure TX and RX pins
+        pub fn with_pins<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin>(
+            self,
+            tx: impl Peripheral<P = TX> + 'd,
+            rx: impl Peripheral<P = RX> + 'd,
+            cts: impl Peripheral<P = CTS> + 'd,
+            rts: impl Peripheral<P = RTS> + 'd,
+        ) -> Self {
+            crate::into_ref!(tx);
+            crate::into_ref!(rx);
+            crate::into_ref!(cts);
+            crate::into_ref!(rts);
+
+            tx.set_to_push_pull_output(crate::private::Internal);
+            tx.connect_peripheral_to_output(T::tx_signal(), crate::private::Internal);
+
+            rx.set_to_input(crate::private::Internal);
+            rx.connect_input_to_peripheral(T::rx_signal(), crate::private::Internal);
+
+            cts.set_to_input(crate::private::Internal);
+            cts.connect_input_to_peripheral(T::cts_signal(), crate::private::Internal);
+
+            rts.set_to_push_pull_output(crate::private::Internal);
+            rts.connect_peripheral_to_output(T::rts_signal(), crate::private::Internal);
+            self
+        }
+
+        /// Configure TX pin
+        pub fn with_tx<TX: OutputPin>(self, tx: impl Peripheral<P = TX> + 'd) -> Self {
+            crate::into_ref!(tx);
+            tx.set_to_push_pull_output(crate::private::Internal);
+            tx.connect_peripheral_to_output(T::tx_signal(), crate::private::Internal);
+
+            self
+        }
+
+        /// Configure RX pin
+        pub fn with_rx<RX: InputPin>(self, rx: impl Peripheral<P = RX> + 'd) -> Self {
+            crate::into_ref!(rx);
+            rx.set_to_input(crate::private::Internal);
+            rx.connect_input_to_peripheral(T::rx_signal(), crate::private::Internal);
+
+            self
+        }
+
+        /// Configure CTS pin
+        pub fn with_cts<CTS: InputPin>(self, cts: impl Peripheral<P = CTS> + 'd) -> Self {
+            crate::into_ref!(cts);
+            cts.set_to_input(crate::private::Internal);
+            cts.connect_input_to_peripheral(T::cts_signal(), crate::private::Internal);
+
+            self
+        }
+
+        /// Configure RTS pin
+        pub fn with_rts<RTS: OutputPin>(self, rts: impl Peripheral<P = RTS> + 'd) -> Self {
+            crate::into_ref!(rts);
+            rts.set_to_push_pull_output(crate::private::Internal);
+            rts.connect_peripheral_to_output(T::rts_signal(), crate::private::Internal);
+
+            self
         }
     }
 

@@ -20,7 +20,7 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
-    uart::{config::Config, TxRxPins, Uart},
+    uart::{config::Config, Uart},
 };
 use esp_println::println;
 use nb::block;
@@ -32,15 +32,9 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let pins = TxRxPins::new_tx_rx(io.pins.gpio4, io.pins.gpio5);
 
-    let mut serial1 = Uart::new_with_config(
-        peripherals.UART1,
-        Config::default(),
-        Some(pins),
-        &clocks,
-        None,
-    );
+    let mut serial1 = Uart::new_with_config(peripherals.UART1, Config::default(), &clocks, None)
+        .with_tx_rx(io.pins.gpio4, io.pins.gpio5);
 
     let delay = Delay::new(&clocks);
 

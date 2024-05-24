@@ -20,7 +20,6 @@ use esp_hal::{
     system::SystemControl,
     uart::{
         config::{AtCmdConfig, Config},
-        TxRxPins,
         Uart,
     },
     Blocking,
@@ -39,7 +38,6 @@ fn main() -> ! {
     let mut uart0 = Uart::new_with_config(
         peripherals.UART0,
         Config::default(),
-        None::<TxRxPins<gpio::NoPinType, gpio::NoPinType>>,
         &clocks,
         Some(interrupt_handler),
     );
