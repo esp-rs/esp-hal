@@ -1,35 +1,37 @@
 use critical_section::{CriticalSection, Mutex};
-use procmacros::handler;
-
-use super::AlarmState;
-use crate::{
+use embassy_time_driver::AlarmHandle;
+use esp_hal::{
     clock::Clocks,
-    peripherals,
+    interrupt,
+    peripherals::{self, Interrupt},
     prelude::*,
     timer::{
         systimer::{Alarm, SystemTimer, Target},
         Timer as _,
     },
+    Async,
 };
+
+use crate::AlarmState;
 
 pub const ALARM_COUNT: usize = 3;
 
-pub type TimerType = SystemTimer<'static, crate::Async>;
+pub type TimerType = SystemTimer<'static, Async>;
 
 pub struct EmbassyTimer {
     pub(crate) alarms: Mutex<[AlarmState; ALARM_COUNT]>,
-    pub(crate) alarm0: Alarm<Target, crate::Async, 0>,
-    pub(crate) alarm1: Alarm<Target, crate::Async, 1>,
-    pub(crate) alarm2: Alarm<Target, crate::Async, 2>,
+    pub(crate) alarm0: Alarm<Target, Async, 0>,
+    pub(crate) alarm1: Alarm<Target, Async, 1>,
+    pub(crate) alarm2: Alarm<Target, Async, 2>,
 }
 
 const ALARM_STATE_NONE: AlarmState = AlarmState::new();
 
 embassy_time_driver::time_driver_impl!(static DRIVER: EmbassyTimer = EmbassyTimer {
     alarms: Mutex::new([ALARM_STATE_NONE; ALARM_COUNT]),
-    alarm0: unsafe { Alarm::<_, crate::Async, 0>::conjure() },
-    alarm1: unsafe { Alarm::<_, crate::Async, 1>::conjure() },
-    alarm2: unsafe { Alarm::<_, crate::Async, 2>::conjure() },
+    alarm0: unsafe { Alarm::<_, Async, 0>::conjure() },
+    alarm1: unsafe { Alarm::<_, Async, 1>::conjure() },
+    alarm2: unsafe { Alarm::<_, Async, 2>::conjure() },
 });
 
 impl EmbassyTimer {
@@ -45,7 +47,7 @@ impl EmbassyTimer {
         }
     }
 
-    pub(super) fn on_alarm_allocated(&self, n: usize) {
+    pub(crate) fn on_alarm_allocated(&self, n: usize) {
         match n {
             0 => self.alarm0.enable_interrupt(true),
             1 => self.alarm1.enable_interrupt(true),
@@ -62,33 +64,16 @@ impl EmbassyTimer {
     }
 
     pub fn init(_clocks: &Clocks, _systimer: TimerType) {
+        // FIXME: Revert calls to `unwrap()` function to `unwrap!()` macro
         unsafe {
-            crate::interrupt::bind_interrupt(
-                peripherals::Interrupt::SYSTIMER_TARGET0,
-                target0_handler.handler(),
-            );
-            unwrap!(crate::interrupt::enable(
-                peripherals::Interrupt::SYSTIMER_TARGET0,
-                target0_handler.priority()
-            ));
+            interrupt::bind_interrupt(Interrupt::SYSTIMER_TARGET0, target0_handler.handler());
+            interrupt::enable(Interrupt::SYSTIMER_TARGET0, target0_handler.priority()).unwrap();
 
-            crate::interrupt::bind_interrupt(
-                peripherals::Interrupt::SYSTIMER_TARGET1,
-                target1_handler.handler(),
-            );
-            unwrap!(crate::interrupt::enable(
-                peripherals::Interrupt::SYSTIMER_TARGET1,
-                target1_handler.priority()
-            ));
+            interrupt::bind_interrupt(Interrupt::SYSTIMER_TARGET1, target1_handler.handler());
+            interrupt::enable(Interrupt::SYSTIMER_TARGET1, target1_handler.priority()).unwrap();
 
-            crate::interrupt::bind_interrupt(
-                peripherals::Interrupt::SYSTIMER_TARGET2,
-                target2_handler.handler(),
-            );
-            unwrap!(crate::interrupt::enable(
-                peripherals::Interrupt::SYSTIMER_TARGET2,
-                target2_handler.priority()
-            ));
+            interrupt::bind_interrupt(Interrupt::SYSTIMER_TARGET2, target2_handler.handler());
+            interrupt::enable(Interrupt::SYSTIMER_TARGET2, target2_handler.priority()).unwrap();
         }
 
         #[handler]
@@ -107,11 +92,7 @@ impl EmbassyTimer {
         }
     }
 
-    pub(crate) fn set_alarm(
-        &self,
-        alarm: embassy_time_driver::AlarmHandle,
-        timestamp: u64,
-    ) -> bool {
+    pub(crate) fn set_alarm(&self, alarm: AlarmHandle, timestamp: u64) -> bool {
         critical_section::with(|_cs| {
             let n = alarm.id() as usize;
 

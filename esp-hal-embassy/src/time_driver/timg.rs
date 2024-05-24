@@ -1,22 +1,24 @@
 use critical_section::{CriticalSection, Mutex};
-use peripherals::TIMG0;
-
-use super::AlarmState;
+use embassy_time_driver::AlarmHandle;
 #[cfg(any(esp32, esp32s2, esp32s3))]
-use crate::timer::timg::Timer1;
-use crate::{
+use esp_hal::timer::timg::Timer1;
+use esp_hal::{
     clock::Clocks,
-    peripherals,
+    interrupt::{self, Priority},
+    peripherals::{Interrupt, TIMG0},
     prelude::*,
     timer::timg::{Instance, Timer0, TimerGroup},
+    Async,
 };
+
+use crate::AlarmState;
 
 #[cfg(not(any(esp32, esp32s2, esp32s3)))]
 pub const ALARM_COUNT: usize = 1;
 #[cfg(any(esp32, esp32s2, esp32s3))]
 pub const ALARM_COUNT: usize = 2;
 
-pub type TimerType = TimerGroup<'static, TIMG0, crate::Async>;
+pub type TimerType = TimerGroup<'static, TIMG0, Async>;
 
 pub struct EmbassyTimer {
     pub(crate) alarms: Mutex<[AlarmState; ALARM_COUNT]>,
@@ -41,7 +43,7 @@ impl EmbassyTimer {
         }
     }
 
-    pub(super) fn on_alarm_allocated(&self, _n: usize) {}
+    pub(crate) fn on_alarm_allocated(&self, _n: usize) {}
 
     fn on_interrupt<Timer: Instance>(&self, id: u8, timer: Timer) {
         critical_section::with(|cs| {
@@ -62,48 +64,30 @@ impl EmbassyTimer {
         }
 
         unsafe {
-            crate::interrupt::bind_interrupt(
-                crate::peripherals::Interrupt::TG0_T0_LEVEL,
-                tg0_t0_level.handler(),
-            );
-            crate::interrupt::enable(
-                crate::peripherals::Interrupt::TG0_T0_LEVEL,
-                tg0_t0_level.priority(),
-            )
-            .unwrap();
+            interrupt::bind_interrupt(Interrupt::TG0_T0_LEVEL, tg0_t0_level.handler());
+            interrupt::enable(Interrupt::TG0_T0_LEVEL, tg0_t0_level.priority()).unwrap();
         }
         #[cfg(any(esp32, esp32s2, esp32s3))]
         unsafe {
-            crate::interrupt::bind_interrupt(
-                crate::peripherals::Interrupt::TG0_T1_LEVEL,
-                tg0_t1_level.handler(),
-            );
-            crate::interrupt::enable(
-                crate::peripherals::Interrupt::TG0_T1_LEVEL,
-                tg0_t1_level.priority(),
-            )
-            .unwrap();
+            interrupt::bind_interrupt(Interrupt::TG0_T1_LEVEL, tg0_t1_level.handler());
+            interrupt::enable(Interrupt::TG0_T1_LEVEL, tg0_t1_level.priority()).unwrap();
         }
 
-        #[handler(priority = crate::interrupt::Priority::max())]
+        #[handler(priority = Priority::max())]
         fn tg0_t0_level() {
             let timer = unsafe { Timer0::<TIMG0>::steal() };
             DRIVER.on_interrupt(0, timer);
         }
 
         #[cfg(any(esp32, esp32s2, esp32s3))]
-        #[handler(priority = crate::interrupt::Priority::max())]
+        #[handler(priority = Priority::max())]
         fn tg0_t1_level() {
             let timer = unsafe { Timer1::<TIMG0>::steal() };
             DRIVER.on_interrupt(1, timer);
         }
     }
 
-    pub(crate) fn set_alarm(
-        &self,
-        _alarm: embassy_time_driver::AlarmHandle,
-        timestamp: u64,
-    ) -> bool {
+    pub(crate) fn set_alarm(&self, _alarm: AlarmHandle, timestamp: u64) -> bool {
         critical_section::with(|_cs| {
             // The hardware fires the alarm even if timestamp is lower than the current
             // time. In this case the interrupt handler will pend a wakeup when we exit the
@@ -122,7 +106,10 @@ impl EmbassyTimer {
         true
     }
 
-    fn arm<Timer: Instance>(tg: &mut Timer, timestamp: u64) {
+    fn arm<T>(tg: &mut T, timestamp: u64)
+    where
+        T: Instance,
+    {
         tg.load_alarm_value(timestamp);
         tg.listen();
         tg.set_counter_decrementing(false);

@@ -26,19 +26,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         "esp32", "esp32c2", "esp32c3", "esp32c6", "esp32h2", "esp32s2", "esp32s3"
     );
 
-    // If the `embassy` feature is enabled, ensure that a time driver implementation
-    // is available:
-    #[cfg(feature = "embassy")]
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32")] {
-            assert_unique_used_features!("embassy-time-timg0");
-        } else if #[cfg(feature = "esp32s2")] {
-            assert_unique_used_features!("embassy-time-systick-80mhz", "embassy-time-timg0");
-        } else {
-            assert_unique_used_features!("embassy-time-systick-16mhz", "embassy-time-timg0");
-        }
-    }
-
     #[cfg(all(
         feature = "flip-link",
         not(any(feature = "esp32c6", feature = "esp32h2"))

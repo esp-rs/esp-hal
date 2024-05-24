@@ -22,34 +22,23 @@
 //! An [`InterruptExecutor`](executor::InterruptExecutor) can be used to achieve
 //! preemptive multitasking in async applications, which is usually something reserved for more traditional RTOS systems, read more about it in [the embassy documentation](https://embassy.dev/book/dev/runtime.html).
 
-pub mod executor;
+#![cfg_attr(xtensa, feature(asm_experimental_arch))]
+#![deny(missing_docs)]
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+#![no_std]
 
 use core::cell::Cell;
 
 use embassy_time_driver::{AlarmHandle, Driver};
+use esp_hal::clock::Clocks;
 
-#[cfg_attr(
-    all(
-        systimer,
-        any(
-            feature = "embassy-time-systick-16mhz",
-            feature = "embassy-time-systick-80mhz"
-        )
-    ),
-    path = "time_driver_systimer.rs"
-)]
-#[cfg_attr(
-    all(timg0, feature = "embassy-time-timg0"),
-    path = "time_driver_timg.rs"
-)]
+pub mod executor;
 mod time_driver;
 
-use time_driver::EmbassyTimer;
-
-use crate::clock::Clocks;
+use self::time_driver::{EmbassyTimer, TimerType};
 
 /// Initialize embassy
-pub fn init(clocks: &Clocks, time_driver: time_driver::TimerType) {
+pub fn init(clocks: &Clocks, time_driver: TimerType) {
     EmbassyTimer::init(clocks, time_driver)
 }
 
@@ -88,12 +77,7 @@ impl Driver for EmbassyTimer {
         })
     }
 
-    fn set_alarm_callback(
-        &self,
-        alarm: embassy_time_driver::AlarmHandle,
-        callback: fn(*mut ()),
-        ctx: *mut (),
-    ) {
+    fn set_alarm_callback(&self, alarm: AlarmHandle, callback: fn(*mut ()), ctx: *mut ()) {
         let n = alarm.id() as usize;
         critical_section::with(|cs| {
             let alarm = &self.alarms.borrow(cs)[n];
@@ -101,7 +85,7 @@ impl Driver for EmbassyTimer {
         })
     }
 
-    fn set_alarm(&self, alarm: embassy_time_driver::AlarmHandle, timestamp: u64) -> bool {
+    fn set_alarm(&self, alarm: AlarmHandle, timestamp: u64) -> bool {
         self.set_alarm(alarm, timestamp)
     }
 }

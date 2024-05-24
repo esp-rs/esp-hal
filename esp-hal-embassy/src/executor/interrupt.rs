@@ -1,14 +1,14 @@
 //! Interrupt-mode executor.
+
 use core::{cell::UnsafeCell, mem::MaybeUninit};
 
 use embassy_executor::{raw, SendSpawner};
-use portable_atomic::{AtomicUsize, Ordering};
-
-use crate::{
+use esp_hal::{
     get_core,
     interrupt::{self, InterruptHandler},
     system::SoftwareInterrupt,
 };
+use portable_atomic::{AtomicUsize, Ordering};
 
 static mut EXECUTORS: [CallbackContext; 4] = [
     CallbackContext::new(),
