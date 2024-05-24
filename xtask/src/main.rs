@@ -7,7 +7,13 @@ use std::{
 use anyhow::{bail, Result};
 use clap::{Args, Parser};
 use strum::IntoEnumIterator;
-use xtask::{cargo::CargoAction, Chip, Metadata, Package, Version};
+use xtask::{
+    cargo::{CargoAction, CargoArgsBuilder},
+    Chip,
+    Metadata,
+    Package,
+    Version,
+};
 
 // ----------------------------------------------------------------------------
 // Command-line Interface
@@ -25,7 +31,7 @@ enum Cli {
     /// Bump the version of the specified package(s).
     BumpVersion(BumpVersionArgs),
     /// Format all packages in the workspace with rustfmt
-    FmtPackages,
+    FmtPackages(FmtPackagesArgs),
     /// Generate the eFuse fields source file from a CSV.
     GenerateEfuseFields(GenerateEfuseFieldsArgs),
     /// Run the given example for the specified chip.
@@ -101,6 +107,13 @@ struct BumpVersionArgs {
 }
 
 #[derive(Debug, Args)]
+struct FmtPackagesArgs {
+    /// Run in 'check' mode; exists with 0 if formatted correctly, 1 otherwise
+    #[arg(long)]
+    check: bool,
+}
+
+#[derive(Debug, Args)]
 struct GenerateEfuseFieldsArgs {
     /// Path to the local ESP-IDF repository.
     idf_path: PathBuf,
@@ -135,11 +148,11 @@ fn main() -> Result<()> {
         Cli::BuildPackage(args) => build_package(&workspace, args),
         Cli::BuildTests(args) => tests(&workspace, args, CargoAction::Build),
         Cli::BumpVersion(args) => bump_version(&workspace, args),
-        Cli::FmtPackages => fmt_packages(&workspace),
+        Cli::FmtPackages(args) => fmt_packages(&workspace, args),
         Cli::GenerateEfuseFields(args) => generate_efuse_src(&workspace, args),
+        Cli::RunElfs(args) => run_elfs(args),
         Cli::RunExample(args) => examples(&workspace, args, CargoAction::Run),
         Cli::RunTests(args) => tests(&workspace, args, CargoAction::Run),
-        Cli::RunElfs(args) => run_elfs(args),
     }
 }
 
@@ -390,6 +403,27 @@ fn generate_efuse_src(workspace: &Path, args: GenerateEfuseFieldsArgs) -> Result
     Ok(())
 }
 
+fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
+    for path in xtask::package_paths(workspace)? {
+        log::info!("Formatting package: {}", path.display());
+
+        let mut cargo_args = CargoArgsBuilder::default()
+            .toolchain("nightly")
+            .subcommand("fmt")
+            .arg("--all")
+            .build();
+
+        if args.check {
+            cargo_args.push("--".into());
+            cargo_args.push("--check".into());
+        }
+
+        xtask::cargo::run(&cargo_args, &path)?;
+    }
+
+    Ok(())
+}
+
 fn run_elfs(args: RunElfArgs) -> Result<()> {
     let mut failed: Vec<String> = Vec::new();
     for elf in fs::read_dir(&args.path)? {
@@ -425,37 +459,6 @@ fn run_elfs(args: RunElfArgs) -> Result<()> {
 
     if !failed.is_empty() {
         bail!("Failed tests: {:?}", failed);
-    }
-
-    Ok(())
-}
-
-fn fmt_packages(workspace: &Path) -> Result<()> {
-    // Ensure that `rustfmt` is installed
-    if Command::new("rustfmt").arg("--version").output().is_err() {
-        bail!("The 'rustfmt' command is not installed, exiting");
-    }
-
-    // Iterate over all Cargo.toml files in the workspace and format the projects
-    for entry in fs::read_dir(workspace)? {
-        let entry = entry?;
-        if entry.file_type()?.is_dir() {
-            let manifest_path = entry.path().join("Cargo.toml");
-            if manifest_path.exists() {
-                // Run `cargo fmt` on the project
-                let status = Command::new("cargo")
-                    .arg("+nightly")
-                    .arg("fmt")
-                    .arg("--all")
-                    .arg("--manifest-path")
-                    .arg(manifest_path.to_str().unwrap())
-                    .status()?;
-
-                if !status.success() {
-                    bail!("Formatting failed for {}", manifest_path.display());
-                }
-            }
-        }
     }
 
     Ok(())
