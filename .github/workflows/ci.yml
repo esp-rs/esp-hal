@@ -47,6 +47,12 @@ jobs:
   esp-hal:
     name: esp-hal (${{ matrix.device.soc }})
     runs-on: ubuntu-latest
+    env:
+      SSID=SSID
+      PASSWORD=PASSWORD
+      STATIC_IP=1.1.1.1 
+      GATEWAY_IP=1.1.1.1
+      HOST_IP=1.1.1.1
 
     strategy:
       fail-fast: false
@@ -99,7 +105,7 @@ jobs:
             esp-hal
       # Build all supported examples for the specified device:
       - name: Build (examples)
-        run: SSID=SSID; PASSWORD=PASSWORD; STATIC_IP=1.1.1.1; GATEWAY_IP=1.1.1.1; HOST_IP=1.1.1.1; cargo xtask build-examples esp-hal ${{ matrix.device.soc }}
+        run: cargo xtask build-examples esp-hal ${{ matrix.device.soc }}
       # Ensure we can build the documentation for the specified device:
       - name: Build (documentation)
         run: cargo xtask build-documentation esp-hal ${{ matrix.device.soc }}
