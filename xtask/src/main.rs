@@ -34,6 +34,8 @@ enum Cli {
     FmtPackages(FmtPackagesArgs),
     /// Generate the eFuse fields source file from a CSV.
     GenerateEfuseFields(GenerateEfuseFieldsArgs),
+    /// Lint all packages in the workspace with clippy
+    LintPackages(LintPackagesArgs),
     /// Run the given example for the specified chip.
     RunExample(ExampleArgs),
     /// Run all applicable tests or the specified test for a specified chip.
@@ -123,6 +125,9 @@ struct GenerateEfuseFieldsArgs {
 }
 
 #[derive(Debug, Args)]
+struct LintPackagesArgs {}
+
+#[derive(Debug, Args)]
 struct RunElfArgs {
     /// Which chip to run the tests for.
     #[arg(value_enum)]
@@ -150,6 +155,7 @@ fn main() -> Result<()> {
         Cli::BumpVersion(args) => bump_version(&workspace, args),
         Cli::FmtPackages(args) => fmt_packages(&workspace, args),
         Cli::GenerateEfuseFields(args) => generate_efuse_src(&workspace, args),
+        Cli::LintPackages(args) => lint_packages(&workspace, args),
         Cli::RunElfs(args) => run_elfs(args),
         Cli::RunExample(args) => examples(&workspace, args, CargoAction::Run),
         Cli::RunTests(args) => tests(&workspace, args, CargoAction::Run),
@@ -422,6 +428,94 @@ fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn lint_packages(workspace: &Path, _args: LintPackagesArgs) -> Result<()> {
+    let mut packages = Package::iter().collect::<Vec<_>>();
+    packages.sort();
+
+    for package in packages {
+        let path = workspace.join(package.to_string());
+
+        // Unfortunately each package has its own unique requirements for
+        // building, so we need to handle each individually (though there
+        // is *some* overlap)
+
+        match package {
+            Package::EspBacktrace => lint_package(
+                &path,
+                &[
+                    "-Zbuild-std=core",
+                    "--no-default-features",
+                    "--target=riscv32imc-unknown-none-elf",
+                    "--features=esp32c6,defmt",
+                ],
+            )?,
+
+            Package::EspHal => {
+                // Since different files/modules can be included/excluded
+                // depending on the target, we must lint *all* targets:
+                for chip in Chip::iter() {
+                    lint_package(
+                        &path,
+                        &[
+                            "-Zbuild-std=core",
+                            &format!("--target={}", chip.target()),
+                            &format!("--features={chip}"),
+                        ],
+                    )?;
+                }
+            }
+
+            Package::EspHalProcmacros | Package::EspRiscvRt => lint_package(
+                &path,
+                &["-Zbuild-std=core", "--target=riscv32imc-unknown-none-elf"],
+            )?,
+
+            Package::EspHalSmartled | Package::EspIeee802154 | Package::EspLpHal => lint_package(
+                &path,
+                &[
+                    "-Zbuild-std=core",
+                    "--target=riscv32imac-unknown-none-elf",
+                    "--features=esp32c6",
+                ],
+            )?,
+
+            Package::EspPrintln => lint_package(
+                &path,
+                &[
+                    "-Zbuild-std=core",
+                    "--target=riscv32imc-unknown-none-elf",
+                    "--features=esp32c6",
+                ],
+            )?,
+
+            // We will *not* check the following packages with `clippy`; this
+            // may or may not change in the future:
+            Package::Examples | Package::HilTest => {}
+
+            // By default, no `clippy` arguments are required:
+            _ => lint_package(&path, &[])?,
+        }
+    }
+
+    Ok(())
+}
+
+fn lint_package(path: &Path, args: &[&str]) -> Result<()> {
+    log::info!("Linting package: {}", path.display());
+
+    let mut builder = CargoArgsBuilder::default()
+        .toolchain("esp")
+        .subcommand("clippy"); // TODO: Is this still actually required?
+
+    for arg in args {
+        builder = builder.arg(arg.to_string());
+    }
+
+    let cargo_args = builder.arg("--").arg("-D").arg("warnings").build();
+
+    xtask::cargo::run(&cargo_args, &path)
 }
 
 fn run_elfs(args: RunElfArgs) -> Result<()> {
