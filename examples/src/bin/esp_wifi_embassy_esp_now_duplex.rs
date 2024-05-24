@@ -29,7 +29,15 @@ use esp_wifi::{
     initialize,
     EspWifiInitFor,
 };
-use static_cell::make_static;
+
+macro_rules! mk_static {
+    ($t:path,$val:expr) => {{
+        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
+        #[deny(unused_attributes)]
+        let x = STATIC_CELL.uninit().write(($val));
+        x
+    }};
+}
 
 #[main]
 async fn main(spawner: Spawner) -> ! {
@@ -61,8 +69,11 @@ async fn main(spawner: Spawner) -> ! {
     embassy::init(&clocks, timer_group0);
 
     let (manager, sender, receiver) = esp_now.split();
-    let manager = make_static!(manager);
-    let sender = make_static!(Mutex::<NoopRawMutex, _>::new(sender));
+    let manager = mk_static!(EspNowManager<'static>, manager);
+    let sender = mk_static!(
+        Mutex::<NoopRawMutex, EspNowSender<'static>>,
+        Mutex::<NoopRawMutex, _>::new(sender)
+    );
 
     spawner.spawn(listener(manager, receiver)).ok();
     spawner.spawn(broadcaster(sender)).ok();
