@@ -15,7 +15,7 @@ use self::cargo::CargoArgsBuilder;
 
 pub mod cargo;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, EnumIter, ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Display, EnumIter, ValueEnum)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Package {
     EspAlloc,
