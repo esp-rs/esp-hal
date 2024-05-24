@@ -9,6 +9,10 @@ fn main() {
     // Ensure that exactly a backend is selected:
     assert_unique_used_features!("defmt", "println");
 
+    if cfg!(feature = "custom-halt") && cfg!(feature = "halt-cores") {
+        panic!("Only one of `custom-halt` and `halt-cores` can be enabled");
+    }
+
     if is_nightly() {
         println!("cargo:rustc-cfg=nightly");
     }

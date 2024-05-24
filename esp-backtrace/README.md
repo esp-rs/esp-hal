@@ -12,7 +12,7 @@ When using the panic and/or exception handler make sure to include `use esp_back
 ## Features
 
 | Feature           | Description                                                                                                        |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------ |
+|-------------------| ------------------------------------------------------------------------------------------------------------------ |
 | esp32             | Target ESP32                                                                                                       |
 | esp32c2           | Target ESP32-C2                                                                                                    |
 | esp32c3           | Target ESP32-C3                                                                                                    |
@@ -26,8 +26,9 @@ When using the panic and/or exception handler make sure to include `use esp_back
 | println           | Use `esp-println` to print messages                                                                                |
 | defmt             | Use `defmt` logging to print messages\* (check [example](https://github.com/playfulFence/backtrace-defmt-example)) |
 | colors            | Print messages in red\*                                                                                            |
-| halt-cores        | Halt both CPUs on ESP32 / ESP32-S3 in case of a panic or exception                                                 |
+| halt-cores        | Halt both CPUs on ESP32 / ESP32-S3 instead of doing a `loop {}` in case of a panic or exception                    |
 | semihosting       | Call `semihosting::process::abort()` on panic.                                                                     |
+| custom-halt       | Invoke the extern function `custom_halt()` instead of doing a `loop {}` in case of a panic or exception            |
 
 \* _only used for panic and exception handlers_
 

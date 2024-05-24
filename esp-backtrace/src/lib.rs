@@ -279,13 +279,23 @@ fn is_valid_ram_address(address: u32) -> bool {
     true
 }
 
-#[cfg(any(
-    not(any(feature = "esp32", feature = "esp32p4", feature = "esp32s3")),
-    not(feature = "halt-cores")
+#[cfg(all(
+    any(
+        not(any(feature = "esp32", feature = "esp32p4", feature = "esp32s3")),
+        not(feature = "halt-cores")
+    ),
+    not(feature = "custom-halt")
 ))]
 #[allow(unused)]
 fn halt() -> ! {
     loop {}
+}
+#[cfg(feature = "custom-halt")]
+fn halt() -> ! {
+    extern "Rust" {
+        fn custom_halt() -> !;
+    }
+    unsafe { custom_halt() }
 }
 
 // TODO: Enable `halt` function for `esp32p4` feature once implemented

@@ -40,6 +40,10 @@ defmt = ["dep:defmt"]
 # You may optionally enable one or more of the below features to provide
 # additional functionality:
 colors            = []
+custom-halt       = []
 exception-handler = []
 halt-cores        = []
 panic-handler     = []
+
+[lints.rust]
+unexpected_cfgs = "allow"
