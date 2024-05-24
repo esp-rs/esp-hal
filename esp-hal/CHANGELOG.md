@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `embassy-usb` support (#1517)
 - SPI Slave support for ESP32-S2 (#1562)
 - Add new generic `OneShotTimer` and `PeriodicTimer` drivers, plus new `Timer` trait which is implemented for `TIMGx` and `SYSTIMER` (#1570)
+- uart: Add `with_pin`s methods to configure TX,RX, CTS, and RTS pins (#1592)
 
 ### Fixed
 
@@ -61,12 +62,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove unnecessary generics from PARL_IO driver (#1545)
 - Use `Level enum` in GPIO constructors instead of plain bools (#1574)
 - rmt: make ChannelCreator public (#1597)
+- Use `Level enum` in GPIO constructors instead of plain bools (#1574)
 
 ### Removed
 
 - Removed the `SystemExt` trait (#1495)
 - Removed the `GpioExt` trait (#1496)
 - Embassy support (and all related features) has been removed, now available in the `esp-hal-embassy` package instead (#1595)
+- uart: Removed `configure_pins` methods (#1592)
 
 ## [0.17.0] - 2024-04-18
 
