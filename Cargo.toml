@@ -13,6 +13,9 @@ exclude  = [
     "esp-metadata",
     "esp-println",
     "esp-riscv-rt",
+    "esp-wifi",
     "examples",
+    "extras/bench-server",
+    "extras/esp-wifishark",
     "hil-test",
 ]

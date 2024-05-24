@@ -1,0 +1,142 @@
+[package]
+name = "esp-wifi"
+version = "0.5.1"
+edition = "2021"
+authors = ["The ESP-RS team"]
+description = "A WiFi, Bluetooth and ESP-NOW driver for use with Espressif chips and bare-metal Rust"
+repository = "https://github.com/esp-rs/esp-wifi"
+license = "MIT OR Apache-2.0"
+
+keywords = ["wifi", "bluetooth", "esp", "no-std"]
+categories = ["embedded", "hardware-support", "no-std"]
+
+[dependencies]
+defmt = { version = "0.3.6", optional = true }
+esp-hal = { version = "0.17.0", path = "../esp-hal", default-features = false }
+smoltcp = { version = "0.11.0", default-features = false, features = [
+  "medium-ethernet",
+  "socket-raw",
+], optional = true }
+critical-section = "1.1.1"
+log = { version = "0.4.20", optional = true }
+embedded-svc = { version = "0.27.0", default-features = false, features = [
+], optional = true }
+enumset = { version = "1.1.3", default-features = false, optional = true }
+linked_list_allocator = { version = "0.10.5", default-features = false, features = [
+  "const_mut_refs",
+] }
+embedded-io = { version = "0.6.1", default-features = false }
+embedded-io-async = { version = "0.6.0", optional = true }
+fugit = "0.3.7"
+heapless = { version = "0.8", default-features = false, features = [
+  "portable-atomic",
+] }
+num-derive = { version = "0.4" }
+num-traits = { version = "0.2", default-features = false }
+no-std-net = { version = "0.6.0", optional = true }
+esp-wifi-sys = { version = "0.3.0" }
+embassy-sync = { version = "0.5.0", optional = true }
+embassy-futures = { version = "0.1.0", optional = true }
+embassy-net-driver = { version = "0.2", optional = true }
+toml-cfg = "0.2.0"
+libm = "0.2.7"
+cfg-if = "1.0.0"
+portable-atomic = { version = "1.5", default-features = false }
+portable_atomic_enum = { version = "0.3.0", features = ["portable-atomic"] }
+
+futures-util = { version = "0.3.28", default-features = false, features = [
+  "portable-atomic",
+] }
+atomic-waker = { version = "1.1.2", default-features = false, features = [
+  "portable-atomic",
+] }
+
+[build-dependencies]
+toml-cfg = "0.2.0"
+esp-build = { version = "0.1.0", path = "../esp-build" }
+
+[features]
+default = ["log"]
+
+# chip features
+esp32c2 = [
+  "esp-hal/esp32c2",
+  "esp-wifi-sys/esp32c2",
+]
+esp32c3 = [
+  "esp-hal/esp32c3",
+  "esp-wifi-sys/esp32c3",
+]
+esp32c6 = [
+  "esp-hal/esp32c6",
+  "esp-wifi-sys/esp32c6",
+]
+esp32h2 = [
+  "esp-hal/esp32h2",
+  "esp-wifi-sys/esp32h2",
+]
+esp32 = [
+  "esp-hal/esp32",
+  "esp-wifi-sys/esp32",
+]
+esp32s2 = [
+  "esp-hal/esp32s2",
+  "esp-wifi-sys/esp32s2",
+]
+esp32s3 = [
+  "esp-hal/esp32s3",
+  "esp-wifi-sys/esp32s3",
+]
+
+# async features
+async = [
+  "dep:embassy-sync",
+  "dep:embassy-futures",
+  "dep:embedded-io-async",
+  "esp-hal/embassy",
+  "esp-hal/async",
+]
+
+embassy-net = ["dep:embassy-net-driver", "async"]
+
+# misc features
+coex = []
+wifi-logs = []
+dump-packets = []
+smoltcp = ["dep:smoltcp"]
+utils = ["smoltcp"]
+enumset = []
+wifi = ["dep:enumset", "dep:no-std-net"]
+embedded-svc = ["dep:embedded-svc"]
+ble = ["esp-hal/bluetooth"]
+phy-enable-usb = []
+ps-min-modem = []
+ps-max-modem = []
+esp-now = ["wifi"]
+ipv6 = ["wifi", "utils", "smoltcp?/proto-ipv6"]
+ipv4 = ["wifi", "utils", "smoltcp?/proto-ipv4"]
+tcp = ["ipv4", "smoltcp?/socket-tcp"]
+udp = ["ipv4", "smoltcp?/socket-udp"]
+icmp = ["ipv4", "smoltcp?/socket-icmp"]
+igmp = ["ipv4", "smoltcp?/proto-igmp"]
+dns = ["udp", "smoltcp?/proto-dns", "smoltcp?/socket-dns"]
+dhcpv4 = ["wifi", "utils", "smoltcp?/proto-dhcpv4", "smoltcp?/socket-dhcpv4"]
+wifi-default = ["ipv4", "tcp", "udp", "icmp", "igmp", "dns", "dhcpv4"]
+defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt"]
+log = ["dep:log", "esp-hal/log"]
+
+[package.metadata.docs.rs]
+features = [
+  "esp32c3",
+  "wifi",
+  "ble",
+  "coex",
+  "async",
+  "embassy-net",
+  "esp-hal/embassy-time-timg0",
+  "esp-hal/default",
+]
+default-target = "riscv32imc-unknown-none-elf"
+
+[lints.rust]
+unexpected_cfgs = "allow"
