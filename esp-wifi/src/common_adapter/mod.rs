@@ -10,7 +10,7 @@ use crate::{
         esp_timer_get_time,
         esp_timer_handle_t,
     },
-    compat::{common::*, syslog::syslog, timer_compat::*},
+    compat::{common::*, timer_compat::*},
     hal,
 };
 
@@ -219,6 +219,7 @@ pub unsafe extern "C" fn puts(s: *const u8) {
     info!("{}", cstr);
 }
 
+#[cfg(any(feature = "wifi-logs", nightly))]
 #[no_mangle]
 pub unsafe extern "C" fn sprintf(dst: *mut u8, format: *const u8, args: ...) -> i32 {
     let str = str_from_c(format);
@@ -232,34 +233,79 @@ pub unsafe extern "C" fn sprintf(dst: *mut u8, format: *const u8, args: ...) -> 
     len
 }
 
+#[cfg(all(not(feature = "wifi-logs"), not(nightly)))]
 #[no_mangle]
-pub unsafe extern "C" fn printf(s: *const u8, args: ...) {
-    syslog(0, s, args);
+pub unsafe extern "C" fn sprintf(dst: *mut u8, format: *const u8, _args: *const ()) -> i32 {
+    let str = str_from_c(format);
+
+    let res = match str {
+        "ESP_%02X%02X%02X" => "ESP_0000",
+        "%d,%s,%s,%s" => "????",
+        "unknown id:%d" => "unknown id:??",
+        _ => {
+            warn!("Unexpected call to `sprintf`: {str}");
+            "???"
+        }
+    };
+
+    dst.copy_from_nonoverlapping(res.as_ptr(), res.len());
+    dst.add(res.len()).write_volatile(0);
+
+    res.len() as i32
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn rtc_printf(s: *const u8, args: ...) {
-    syslog(0, s, args);
+#[cfg(feature = "wifi-logs")]
+mod log {
+    #[no_mangle]
+    pub unsafe extern "C" fn printf(s: *const u8, args: ...) {
+        crate::compat::syslog::syslog(0, s, args);
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn rtc_printf(s: *const u8, args: ...) {
+        crate::compat::syslog::syslog(0, s, args);
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn phy_printf(s: *const u8, args: ...) {
+        crate::compat::syslog::syslog(0, s, args);
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn coexist_printf(s: *const u8, args: ...) {
+        crate::compat::syslog::syslog(0, s, args);
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn net80211_printf(s: *const u8, args: ...) {
+        crate::compat::syslog::syslog(0, s, args);
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn pp_printf(s: *const u8, args: ...) {
+        crate::compat::syslog::syslog(0, s, args);
+    }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn phy_printf(s: *const u8, args: ...) {
-    syslog(0, s, args);
-}
+#[cfg(not(feature = "wifi-logs"))]
+mod log {
+    #[no_mangle]
+    pub unsafe extern "C" fn printf(_s: *const u8, _args: *const ()) {}
 
-#[no_mangle]
-pub unsafe extern "C" fn coexist_printf(s: *const u8, args: ...) {
-    syslog(0, s, args);
-}
+    #[no_mangle]
+    pub unsafe extern "C" fn rtc_printf(_s: *const u8, _args: *const ()) {}
 
-#[no_mangle]
-pub unsafe extern "C" fn net80211_printf(s: *const u8, args: ...) {
-    syslog(0, s, args);
-}
+    #[no_mangle]
+    pub unsafe extern "C" fn phy_printf(_s: *const u8, _args: *const ()) {}
 
-#[no_mangle]
-pub unsafe extern "C" fn pp_printf(s: *const u8, args: ...) {
-    syslog(0, s, args);
+    #[no_mangle]
+    pub unsafe extern "C" fn coexist_printf(_s: *const u8, _args: *const ()) {}
+
+    #[no_mangle]
+    pub unsafe extern "C" fn net80211_printf(_s: *const u8, _args: *const ()) {}
+
+    #[no_mangle]
+    pub unsafe extern "C" fn pp_printf(_s: *const u8, _args: *const ()) {}
 }
 
 // #define ESP_EVENT_DEFINE_BASE(id) esp_event_base_t id = #id
@@ -380,8 +426,11 @@ pub unsafe extern "C" fn strrchr(_s: *const (), _c: u32) -> *const u8 {
     todo!("strrchr");
 }
 
+// this will result in a duplicate symbol error once `floor` is available
+// ideally we would use weak linkage but that is not stabilized
+// see https://github.com/esp-rs/esp-wifi/pull/191
+#[cfg(feature = "esp32c6")]
 #[no_mangle]
-#[linkage = "weak"]
 pub unsafe extern "C" fn floor(v: f64) -> f64 {
     libm::floor(v)
 }

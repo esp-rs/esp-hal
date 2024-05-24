@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 aes                 = "0.8.4"
-bleps               = { git = "https://github.com/bjoernQ/bleps", package = "bleps", rev = "9371d7d4d510ba5c936c1eef96674f8fd4f63e8a", features = [ "macros", "async"] }
+bleps               = { git = "https://github.com/bjoernQ/bleps", package = "bleps", rev = "a5148d8ae679e021b78f53fd33afb8bb35d0b62e", features = [ "macros", "async"] }
 cfg-if              = "1.0.0"
 critical-section    = "1.1.2"
 crypto-bigint       = { version = "0.5.5", default-features = false }
@@ -57,8 +57,8 @@ usbd-serial         = "0.2.1"
 esp32   = ["esp-hal/esp32",   "esp-backtrace/esp32",   "esp-println/esp32",   "esp-hal-smartled/esp32", "esp-wifi?/esp32"]
 esp32c2 = ["esp-hal/esp32c2", "esp-backtrace/esp32c2", "esp-println/esp32c2", "esp-wifi?/esp32c2"]
 esp32c3 = ["esp-hal/esp32c3", "esp-backtrace/esp32c3", "esp-println/esp32c3", "esp-hal-smartled/esp32c3", "esp-wifi?/esp32c3"]
-esp32c6 = ["esp-hal/esp32c6", "esp-backtrace/esp32c6", "esp-println/esp32c6", "esp-hal-smartled/esp32c6", "esp-ieee802154/esp32c6", "esp-wifi?/esp32c3"]
-esp32h2 = ["esp-hal/esp32h2", "esp-backtrace/esp32h2", "esp-println/esp32h2", "esp-hal-smartled/esp32h2", "esp-ieee802154/esp32h2", "esp-wifi?/esp32c6"]
+esp32c6 = ["esp-hal/esp32c6", "esp-backtrace/esp32c6", "esp-println/esp32c6", "esp-hal-smartled/esp32c6", "esp-ieee802154/esp32c6", "esp-wifi?/esp32c6"]
+esp32h2 = ["esp-hal/esp32h2", "esp-backtrace/esp32h2", "esp-println/esp32h2", "esp-hal-smartled/esp32h2", "esp-ieee802154/esp32h2", "esp-wifi?/esp32h2"]
 esp32s2 = ["esp-hal/esp32s2", "esp-backtrace/esp32s2", "esp-println/esp32s2", "esp-hal-smartled/esp32s2", "esp-wifi?/esp32s2"]
 esp32s3 = ["esp-hal/esp32s3", "esp-backtrace/esp32s3", "esp-println/esp32s3", "esp-hal-smartled/esp32s3", "esp-wifi?/esp32s3"]
 

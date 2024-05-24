@@ -7,7 +7,7 @@ use crate::{
         interrupt,
         peripherals::{self, TIMG1},
         prelude::*,
-        timer::{Timer, Timer0},
+        timer::timg::{Timer, Timer0},
         trapframe::TrapFrame,
         xtensa_lx,
         xtensa_lx_rt,
@@ -44,7 +44,8 @@ pub fn setup_timer(mut timer1: TimeBase) {
     ));
 
     timer1.listen();
-    timer1.start(TIMESLICE_FREQUENCY.into_duration());
+    timer1.load_value(TIMESLICE_FREQUENCY.into_duration());
+    timer1.start();
     critical_section::with(|cs| {
         TIMER1.borrow_ref_mut(cs).replace(timer1);
     });

@@ -1,9 +1,6 @@
 #![no_std]
-#![allow(async_fn_in_trait)]
 #![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
-#![feature(c_variadic)]
-#![feature(linkage)]
-#![cfg_attr(feature = "async", allow(incomplete_features))]
+#![cfg_attr(any(feature = "wifi-logs", nightly), feature(c_variadic))]
 #![doc = include_str!("../README.md")]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![allow(rustdoc::bare_urls)]
@@ -151,7 +148,7 @@ pub(crate) type EspWifiTimer = Alarm<Target, esp_hal::Blocking, 0>;
 
 #[cfg(any(esp32, esp32s3, esp32s2))]
 pub(crate) type EspWifiTimer =
-    hal::timer::Timer<hal::timer::Timer0<hal::peripherals::TIMG1>, esp_hal::Blocking>;
+    hal::timer::timg::Timer<hal::timer::timg::Timer0<hal::peripherals::TIMG1>, esp_hal::Blocking>;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]

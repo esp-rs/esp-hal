@@ -95,6 +95,10 @@ fn main() -> Result<(), String> {
     .stdout;
     let version_string = String::from_utf8_lossy(&version_output);
 
+    if version_string.contains("nightly") {
+        println!("cargo:rustc-cfg=nightly");
+    }
+
     // HACK: we detect the xtensa-enabled compiler by existence of the second
     // version string in parens
     // - upstream output format: rustc 1.75.0-nightly (cae0791da 2023-10-05)

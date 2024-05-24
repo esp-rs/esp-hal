@@ -69,7 +69,7 @@ Don't use this feature if you are _not_ using USB-SERIAL-JTAG as it might reduce
 
 | Feature        | Meaning                                                                                              |
 | -------------- | ---------------------------------------------------------------------------------------------------- |
-| wifi-logs      | logs the WiFi logs from the driver at log level `info`                                               |
+| wifi-logs      | logs the WiFi logs from the driver at log level `info` (needs a nightly-compiler)                    |
 | wifi-default   | A convenience feature to enable some reasonable defaults for wifi use.                               |
 | dump-packets   | dumps packet info at log level `info`                                                                |
 | smoltcp        | Provide implementations of `smoltcp` traits                                                          |

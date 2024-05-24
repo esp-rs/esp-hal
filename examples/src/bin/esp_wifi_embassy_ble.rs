@@ -5,6 +5,7 @@
 //! - pressing the boot-button on a dev-board will send a notification if it is subscribed
 
 //% FEATURES: async embassy embassy-time-timg0 embassy-generic-timers esp-wifi esp-wifi/async esp-wifi/ble
+//% CHIPS: esp32 esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
 
 #![no_std]
 #![no_main]
@@ -42,8 +43,7 @@ use esp_wifi::{ble::controller::asynch::BleConnector, initialize, EspWifiInitFor
 
 #[main]
 async fn main(_spawner: Spawner) -> ! {
-    #[cfg(feature = "log")]
-    esp_println::logger::init_logger(log::LevelFilter::Info);
+    esp_println::logger::init_logger_from_env();
 
     let peripherals = Peripherals::take();
 

@@ -945,8 +945,14 @@ static g_wifi_osi_funcs: wifi_osi_funcs_t = wifi_osi_funcs_t {
     _get_random: Some(get_random),
     _get_time: Some(get_time),
     _random: Some(random),
+    #[cfg(feature = "wifi-logs")]
     _log_write: Some(log_write),
+    #[cfg(not(feature = "wifi-logs"))]
+    _log_write: None,
+    #[cfg(feature = "wifi-logs")]
     _log_writev: Some(log_writev),
+    #[cfg(not(feature = "wifi-logs"))]
+    _log_writev: None,
     _log_timestamp: Some(log_timestamp),
     _malloc_internal: Some(malloc_internal),
     _realloc_internal: Some(realloc_internal),

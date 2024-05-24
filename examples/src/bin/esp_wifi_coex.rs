@@ -6,6 +6,7 @@
 //! - does BLE advertising (you cannot connect to it - it's just not implemented in the example)
 
 //% FEATURES: esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils esp-wifi/ble esp-wifi/coex
+//% CHIPS: esp32 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
 #![no_main]
@@ -49,8 +50,7 @@ const PASSWORD: &str = env!("PASSWORD");
 
 #[entry]
 fn main() -> ! {
-    #[cfg(feature = "log")]
-    esp_println::logger::init_logger(log::LevelFilter::Info);
+    esp_println::logger::init_logger_from_env();
 
     let peripherals = Peripherals::take();
 

@@ -1,7 +1,6 @@
 #![allow(unused)]
 
 use core::{
-    ffi::VaListImpl,
     fmt::Write,
     ptr::{addr_of, addr_of_mut},
 };

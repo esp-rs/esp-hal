@@ -3,6 +3,7 @@
 //! Asynchronously broadcasts, receives and sends messages via esp-now in multiple embassy tasks
 
 //% FEATURES: async embassy embassy-time-timg0 embassy-generic-timers esp-wifi esp-wifi/async esp-wifi/embassy-net esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils esp-wifi/esp-now
+//% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
 #![no_main]
@@ -31,8 +32,7 @@ use static_cell::make_static;
 
 #[main]
 async fn main(spawner: Spawner) -> ! {
-    #[cfg(feature = "log")]
-    esp_println::logger::init_logger(log::LevelFilter::Info);
+    esp_println::logger::init_logger_from_env();
 
     let peripherals = Peripherals::take();
 

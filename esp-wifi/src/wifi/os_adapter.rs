@@ -14,7 +14,6 @@ use enumset::EnumSet;
 
 use super::WifiEvent;
 use crate::{
-    binary::include::*,
     common_adapter::RADIO_CLOCKS,
     compat::{
         common::{
@@ -28,7 +27,6 @@ use crate::{
             unlock_mutex,
         },
         malloc::calloc,
-        syslog::syslog,
         task_runner::spawn_task,
     },
     hal::system::{RadioClockController, RadioPeripherals},
@@ -1429,6 +1427,7 @@ pub unsafe extern "C" fn get_time(
 ///   None
 ///
 /// *************************************************************************
+#[cfg(feature = "wifi-logs")]
 pub unsafe extern "C" fn log_write(
     level: u32,
     _tag: *const crate::binary::c_types::c_char,
@@ -1436,7 +1435,7 @@ pub unsafe extern "C" fn log_write(
     args: ...
 ) {
     let args = core::mem::transmute(args);
-    syslog(level, format as *const u8, args);
+    crate::compat::syslog::syslog(level, format as *const u8, args);
 }
 
 /// **************************************************************************
@@ -1455,6 +1454,7 @@ pub unsafe extern "C" fn log_write(
 ///   None
 ///
 /// *************************************************************************
+#[cfg(feature = "wifi-logs")]
 #[allow(improper_ctypes_definitions)]
 pub unsafe extern "C" fn log_writev(
     level: u32,
@@ -1463,7 +1463,7 @@ pub unsafe extern "C" fn log_writev(
     args: va_list,
 ) {
     let args = core::mem::transmute(args);
-    syslog(level, format as *const u8, args);
+    crate::compat::syslog::syslog(level, format as *const u8, args);
 }
 
 /// **************************************************************************

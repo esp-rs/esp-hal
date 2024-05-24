@@ -7,6 +7,7 @@
 //! - responds with some HTML content when connecting to port 8080
 
 //% FEATURES: esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
+//% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
 #![no_main]
@@ -44,8 +45,7 @@ const GATEWAY_IP: &str = env!("GATEWAY_IP");
 
 #[entry]
 fn main() -> ! {
-    #[cfg(feature = "log")]
-    esp_println::logger::init_logger(log::LevelFilter::Info);
+    esp_println::logger::init_logger_from_env();
 
     let peripherals = Peripherals::take();
 

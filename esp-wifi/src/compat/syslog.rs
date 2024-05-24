@@ -68,6 +68,7 @@ impl Write for StrWriter {
     }
 }
 
+#[allow(unused)]
 pub unsafe extern "C" fn syslog(_priority: u32, _format: *const u8, _args: VaListImpl) {
     #[cfg(feature = "wifi-logs")]
     cfg_if::cfg_if! {
