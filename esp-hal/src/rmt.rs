@@ -208,8 +208,7 @@ pub struct RxChannelConfig {
     pub idle_threshold: u16,
 }
 
-pub use impl_for_chip::Rmt;
-pub use impl_for_chip::ChannelCreator;
+pub use impl_for_chip::{ChannelCreator, Rmt};
 
 #[cfg(feature = "async")]
 use self::asynch::{RxChannelAsync, TxChannelAsync};
