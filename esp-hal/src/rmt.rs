@@ -209,6 +209,7 @@ pub struct RxChannelConfig {
 }
 
 pub use impl_for_chip::Rmt;
+pub use impl_for_chip::ChannelCreator;
 
 #[cfg(feature = "async")]
 use self::asynch::{RxChannelAsync, TxChannelAsync};
@@ -949,6 +950,8 @@ mod impl_for_chip {
         }
     }
 
+    /// RMT Channel Creator
+    #[allow(missing_docs)]
     pub struct ChannelCreator<M, const CHANNEL: u8>
     where
         M: crate::Mode,
