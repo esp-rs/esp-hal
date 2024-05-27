@@ -17,6 +17,8 @@ pub enum Error {
     TimerInactive,
     /// The alarm is not currently active.
     AlarmInactive,
+    /// The provided timeout is too large.
+    InvalidTimeout,
 }
 
 /// Functionality provided by any timer peripheral.
@@ -37,7 +39,7 @@ pub trait Timer: crate::private::Sealed {
     fn now(&self) -> Instant<u64, 1, 1_000_000>;
 
     /// Load a target value into the timer.
-    fn load_value(&self, value: MicrosDurationU64);
+    fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error>;
 
     /// Enable auto reload of the loaded value.
     fn enable_auto_reload(&self, auto_reload: bool);
@@ -93,7 +95,7 @@ where
         self.inner.reset();
 
         self.inner.enable_auto_reload(false);
-        self.inner.load_value(us);
+        self.inner.load_value(us).unwrap();
         self.inner.start();
 
         while !self.inner.is_interrupt_set() {
@@ -153,7 +155,7 @@ where
     }
 
     /// Start a new count down.
-    pub fn start(&mut self, timeout: MicrosDurationU64) {
+    pub fn start(&mut self, timeout: MicrosDurationU64) -> Result<(), Error> {
         if self.inner.is_running() {
             self.inner.stop();
         }
@@ -162,8 +164,10 @@ where
         self.inner.reset();
 
         self.inner.enable_auto_reload(true);
-        self.inner.load_value(timeout);
+        self.inner.load_value(timeout)?;
         self.inner.start();
+
+        Ok(())
     }
 
     /// "Wait" until the count down finishes without blocking.

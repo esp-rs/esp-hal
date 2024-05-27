@@ -28,6 +28,7 @@ use core::marker::PhantomData;
 
 use fugit::{Instant, MicrosDurationU32, MicrosDurationU64};
 
+use super::{Error, Timer as _};
 use crate::{
     interrupt::{self, InterruptHandler},
     peripheral::Peripheral,
@@ -452,8 +453,7 @@ where
         Instant::<u64, 1, 1_000_000>::from_ticks(us)
     }
 
-    #[allow(clippy::unnecessary_cast)]
-    fn load_value(&self, value: MicrosDurationU64) {
+    fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error> {
         let systimer = unsafe { &*SYSTIMER::PTR };
 
         let auto_reload = systimer
@@ -463,7 +463,13 @@ where
             .bit_is_set();
 
         let us = value.ticks();
-        let ticks = us * (SystemTimer::TICKS_PER_SECOND / 1_000_000) as u64;
+        let ticks = us * (SystemTimer::TICKS_PER_SECOND / 1_000_000);
+
+        // The `SYSTIMER_TARGETx_PERIOD` field is 26-bits wide, so we must
+        // ensure that the provide value is not too wide:
+        if (ticks as u32 & !0x3FF_FFFF) != 0 {
+            return Err(Error::InvalidTimeout);
+        }
 
         if auto_reload {
             // Period mode
@@ -513,6 +519,8 @@ where
                 .comp_load(CHANNEL as usize)
                 .write(|w| w.load().set_bit());
         }
+
+        Ok(())
     }
 
     fn enable_auto_reload(&self, auto_reload: bool) {

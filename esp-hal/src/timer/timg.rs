@@ -43,6 +43,7 @@ use core::{
 
 use fugit::{HertzU32, Instant, MicrosDurationU64};
 
+use super::Error;
 #[cfg(timg1)]
 use crate::peripherals::TIMG1;
 #[cfg(any(esp32c6, esp32h2))]
@@ -514,17 +515,24 @@ where
         Instant::<u64, 1, 1_000_000>::from_ticks(micros)
     }
 
-    fn load_value(&self, value: MicrosDurationU64) {
+    fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error> {
         let ticks = timeout_to_ticks(value, self.apb_clk_freq, self.timg.divider());
 
-        let value = ticks & 0x3F_FFFF_FFFF_FFFF;
-        let high = (value >> 32) as u32;
-        let low = (value & 0xFFFF_FFFF) as u32;
+        // The counter is 54-bits wide, so we must ensure that the provided
+        // value is not too wide:
+        if (ticks & !0x3F_FFFF_FFFF_FFFF) != 0 {
+            return Err(Error::InvalidTimeout);
+        }
+
+        let high = (ticks >> 32) as u32;
+        let low = (ticks & 0xFFFF_FFFF) as u32;
 
         let t = self.register_block().t(self.timer_number().into());
 
         t.alarmlo().write(|w| unsafe { w.alarm_lo().bits(low) });
         t.alarmhi().write(|w| unsafe { w.alarm_hi().bits(high) });
+
+        Ok(())
     }
 
     fn enable_auto_reload(&self, auto_reload: bool) {
