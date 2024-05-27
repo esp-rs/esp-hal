@@ -69,6 +69,7 @@ symbols = [
     "wifi",
     "psram",
     "ulp_riscv_core",
+    "timg_timer1",
 
     # ROM capabilities
     "rom_crc_le",
