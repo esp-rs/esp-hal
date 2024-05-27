@@ -55,13 +55,13 @@ xtensa-lx                = { version = "0.9.0", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { git = "https://github.com/esp-rs/esp-pacs", rev = "9a36a9375a1dfd1b51a559ee76f144935a7e8ed8", features = ["critical-section", "rt"], optional = true }
-esp32c2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "9a36a9375a1dfd1b51a559ee76f144935a7e8ed8", features = ["critical-section", "rt"], optional = true }
-esp32c3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "9a36a9375a1dfd1b51a559ee76f144935a7e8ed8", features = ["critical-section", "rt"], optional = true }
-esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", rev = "9a36a9375a1dfd1b51a559ee76f144935a7e8ed8", features = ["critical-section", "rt"], optional = true }
-esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "9a36a9375a1dfd1b51a559ee76f144935a7e8ed8", features = ["critical-section", "rt"], optional = true }
-esp32s2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "9a36a9375a1dfd1b51a559ee76f144935a7e8ed8", features = ["critical-section", "rt"], optional = true }
-esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "9a36a9375a1dfd1b51a559ee76f144935a7e8ed8", features = ["critical-section", "rt"], optional = true }
+esp32   = { version = "0.31.0", features = ["critical-section", "rt"], optional = true }
+esp32c2 = { version = "0.20.0", features = ["critical-section", "rt"], optional = true }
+esp32c3 = { version = "0.23.0", features = ["critical-section", "rt"], optional = true }
+esp32c6 = { version = "0.14.0", features = ["critical-section", "rt"], optional = true }
+esp32h2 = { version = "0.10.0", features = ["critical-section", "rt"], optional = true }
+esp32s2 = { version = "0.22.0", features = ["critical-section", "rt"], optional = true }
+esp32s3 = { version = "0.26.0", features = ["critical-section", "rt"], optional = true }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 esp-riscv-rt = { version = "0.8.0", path = "../esp-riscv-rt" }
