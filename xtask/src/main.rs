@@ -490,6 +490,15 @@ fn lint_packages(workspace: &Path, _args: LintPackagesArgs) -> Result<()> {
                 ],
             )?,
 
+            Package::EspStorage => lint_package(
+                &path,
+                &[
+                    "-Zbuild-std=core",
+                    "--target=riscv32imc-unknown-none-elf",
+                    "--features=esp32c6",
+                ],
+            )?,
+
             // We will *not* check the following packages with `clippy`; this
             // may or may not change in the future:
             Package::Examples | Package::HilTest => {}
