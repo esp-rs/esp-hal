@@ -235,7 +235,7 @@ where
     where
         Time: Into<Self::Time>,
     {
-        self.start(timeout.into());
+        self.start(timeout.into()).unwrap();
     }
 
     fn wait(&mut self) -> nb::Result<(), void::Void> {

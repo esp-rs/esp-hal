@@ -40,7 +40,7 @@ fn main() -> ! {
     let timer0 = timg0.timer0;
 
     interrupt::enable(Interrupt::TG0_T0_LEVEL, Priority::Priority1).unwrap();
-    timer0.load_value(500u64.millis());
+    timer0.load_value(500u64.millis()).unwrap();
     timer0.start();
     timer0.listen();
 
@@ -65,6 +65,7 @@ fn tg0_t0_level() {
         let timer0 = timer0.as_mut().unwrap();
 
         timer0.clear_interrupt();
-        timer0.start(500u64.millis());
+        timer0.load_value(500u64.millis()).unwrap();
+        timer0.start();
     });
 }

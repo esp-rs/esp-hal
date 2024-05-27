@@ -67,7 +67,10 @@ fn do_task_switch(context: &mut TrapFrame) {
         let mut timer = TIMER1.borrow_ref_mut(cs);
         let timer = unwrap!(timer.as_mut());
         timer.clear_interrupt();
-        timer.start(TIMESLICE_FREQUENCY.into_duration());
+        timer
+            .load_value(TIMESLICE_FREQUENCY.into_duration())
+            .unwrap();
+        timer.start();
     });
 
     task_switch(context);

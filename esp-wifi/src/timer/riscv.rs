@@ -10,6 +10,7 @@ use crate::{
     hal::{
         interrupt::{self, TrapFrame},
         peripherals::{self, Interrupt},
+        prelude::*,
         riscv,
         timer::systimer::{Alarm, Periodic, Target},
     },

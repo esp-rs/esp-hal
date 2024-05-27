@@ -807,7 +807,7 @@ where
 #[cfg(feature = "embedded-hal-02")]
 impl<T, DM> embedded_hal_02::timer::CountDown for Timer<T, DM>
 where
-    T: Instance,
+    T: Instance + super::Timer,
     DM: Mode,
 {
     type Time = MicrosDurationU64;
@@ -832,7 +832,7 @@ where
 #[cfg(feature = "embedded-hal-02")]
 impl<T, DM> embedded_hal_02::timer::Cancel for Timer<T, DM>
 where
-    T: Instance,
+    T: Instance + super::Timer,
     DM: Mode,
 {
     type Error = super::Error;
@@ -853,7 +853,7 @@ where
 #[cfg(feature = "embedded-hal-02")]
 impl<T, DM> embedded_hal_02::timer::Periodic for Timer<T, DM>
 where
-    T: Instance,
+    T: Instance + super::Timer,
     DM: Mode,
 {
 }
