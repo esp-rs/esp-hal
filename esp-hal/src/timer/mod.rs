@@ -1,4 +1,34 @@
-//! General-purpose timers.
+//! # General-purpose Timers
+//!
+//! The [OneShotTimer] and [PeriodicTimer] types can be backed by any hardware
+//! peripheral which implements the [Timer] trait.
+//!
+//! ## Usage
+//!
+//! ### Examples
+//!
+//! #### One-shot Timer
+//!
+//! ```no_run
+//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
+//! let one_shot = OneShotTimer::new(timg0.timer0);
+//!
+//! one_shot.delay_millis(500);
+//! ```
+//!
+//! #### Periodic Timer
+//!
+//! ```no_run
+//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
+//! let periodic = PeriodicTimer::new(timg0.timer0);
+//!
+//! periodic.start(1.secs());
+//! loop {
+//!     nb::block!(periodic.wait());
+//! }
+//! ```
+
+#![deny(missing_docs)]
 
 use fugit::{ExtU64, Instant, MicrosDurationU64};
 
@@ -53,7 +83,8 @@ pub trait Timer: crate::private::Sealed {
     /// Has the timer triggered?
     fn is_interrupt_set(&self) -> bool;
 
-    /// FIXME: This is (hopefully?) temporary...
+    // NOTE: This is an unfortunate implementation detail of `TIMGx`
+    #[doc(hidden)]
     fn set_alarm_active(&self, state: bool);
 }
 
@@ -134,9 +165,8 @@ impl<T> embedded_hal::delay::DelayNs for OneShotTimer<T>
 where
     T: Timer,
 {
-    #[allow(clippy::useless_conversion)]
     fn delay_ns(&mut self, ns: u32) {
-        self.delay_nanos(ns.into());
+        self.delay_nanos(ns);
     }
 }
 
@@ -174,7 +204,7 @@ where
     pub fn wait(&mut self) -> nb::Result<(), void::Void> {
         if self.inner.is_interrupt_set() {
             self.inner.clear_interrupt();
-            self.inner.set_alarm_active(true); // FIXME: Remove if/when able
+            self.inner.set_alarm_active(true);
 
             Ok(())
         } else {
