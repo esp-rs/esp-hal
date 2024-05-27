@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DMA transactions are now found in the `dma` module (#1550)
 - Remove unnecessary generics from PARL_IO driver (#1545)
 - Use `Level enum` in GPIO constructors instead of plain bools (#1574) 
+- rmt: make ChannelCreator public (#1597)
 
 ### Removed
 
