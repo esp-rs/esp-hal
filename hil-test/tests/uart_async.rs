@@ -34,11 +34,8 @@ impl Context {
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let uart =
-            Uart::new_async_with_config(peripherals.UART0, Config::default(), &clocks).with_tx_rx(
-                io.pins.gpio2,
-                io.pins.gpio4,
-            );
+        let uart = Uart::new_async_with_config(peripherals.UART0, Config::default(), &clocks)
+            .with_tx_rx(io.pins.gpio2, io.pins.gpio4);
         let (tx, rx) = uart.split();
 
         Context { rx, tx }
