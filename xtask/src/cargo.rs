@@ -7,6 +7,8 @@ use std::{
 
 use anyhow::{bail, Result};
 
+use crate::windows_safe_path;
+
 #[derive(Debug, PartialEq)]
 pub enum CargoAction {
     Build,
@@ -23,8 +25,7 @@ pub fn run(args: &[String], cwd: &Path) -> Result<()> {
     // That would make `OUT_DIR` a UNC which will trigger things like the one fixed in https://github.com/dtolnay/rustversion/pull/51
     // While it's fixed in `rustversion` it's not fixed for other crates we are
     // using now or in future!
-    #[cfg(target_os = "windows")]
-    let cwd = cwd.to_string_lossy().replace("\\\\?\\", "");
+    let cwd = windows_safe_path(cwd);
 
     let status = Command::new(get_cargo())
         .args(args)
