@@ -5,7 +5,7 @@ use crate::HEAP;
 pub unsafe extern "C" fn malloc(size: usize) -> *mut u8 {
     trace!("alloc {}", size);
 
-    let total_size = size as usize + 4;
+    let total_size = size + 4;
 
     let layout = Layout::from_size_align_unchecked(total_size, 4);
     let ptr = critical_section::with(|cs| {

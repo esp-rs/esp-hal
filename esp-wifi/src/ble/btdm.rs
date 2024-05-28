@@ -66,8 +66,8 @@ extern "C" {
 }
 
 static VHCI_HOST_CALLBACK: vhci_host_callback_s = vhci_host_callback_s {
-    notify_host_send_available: notify_host_send_available,
-    notify_host_recv: notify_host_recv,
+    notify_host_send_available,
+    notify_host_recv,
 };
 
 extern "C" fn notify_host_send_available() {
@@ -81,7 +81,7 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
 
     unsafe {
         let mut buf = [0u8; 256];
-        buf[..len as usize].copy_from_slice(&core::slice::from_raw_parts(data, len as usize));
+        buf[..len as usize].copy_from_slice(core::slice::from_raw_parts(data, len as usize));
 
         let packet = ReceivedPacket {
             len: len as u8,
@@ -95,10 +95,7 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
             }
         });
 
-        dump_packet_info(&core::slice::from_raw_parts(
-            data as *const u8,
-            len as usize,
-        ));
+        dump_packet_info(core::slice::from_raw_parts(data as *const u8, len as usize));
 
         #[cfg(feature = "async")]
         crate::ble::controller::asynch::hci_read_data_available();
@@ -191,8 +188,8 @@ unsafe extern "C" fn queue_send(queue: *const (), item: *const (), _block_time_m
             // assume the size is 8 - shouldn't rely on that
             let message = item as *const u8;
             let mut data = [0u8; 8];
-            for i in 0..8 as usize {
-                data[i] = *(message.offset(i as isize));
+            for i in 0..8_usize {
+                data[i] = *message.add(i);
             }
             trace!("queue posting {:?}", data);
 

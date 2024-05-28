@@ -291,8 +291,8 @@ impl<'d> EspNowManager<'d> {
     pub fn add_peer(&self, peer: PeerInfo) -> Result<(), EspNowError> {
         let raw_peer = esp_now_peer_info_t {
             peer_addr: peer.peer_address,
-            lmk: peer.lmk.unwrap_or_else(|| [0u8; 16]),
-            channel: peer.channel.unwrap_or_else(|| 0),
+            lmk: peer.lmk.unwrap_or([0u8; 16]),
+            channel: peer.channel.unwrap_or(0),
             ifidx: wifi_interface_t_WIFI_IF_STA,
             encrypt: peer.encrypt,
             priv_: core::ptr::null_mut(),
@@ -309,8 +309,8 @@ impl<'d> EspNowManager<'d> {
     pub fn modify_peer(&self, peer: PeerInfo) -> Result<(), EspNowError> {
         let raw_peer = esp_now_peer_info_t {
             peer_addr: peer.peer_address,
-            lmk: peer.lmk.unwrap_or_else(|| [0u8; 16]),
-            channel: peer.channel.unwrap_or_else(|| 0),
+            lmk: peer.lmk.unwrap_or([0u8; 16]),
+            channel: peer.channel.unwrap_or(0),
             ifidx: wifi_interface_t_WIFI_IF_STA,
             encrypt: peer.encrypt,
             priv_: core::ptr::null_mut(),
@@ -819,7 +819,7 @@ unsafe extern "C" fn rcv_cb(
 
         unwrap!(queue.enqueue(ReceivedData {
             len: slice.len() as u8,
-            data: data,
+            data,
             info,
         }));
 
@@ -846,7 +846,7 @@ mod asynch {
         /// This function takes mutable reference to self because the
         /// implementation of `ReceiveFuture` is not logically thread
         /// safe.
-        pub fn receive_async<'r>(&'r mut self) -> ReceiveFuture<'r> {
+        pub fn receive_async(&mut self) -> ReceiveFuture<'_> {
             ReceiveFuture(PhantomData)
         }
     }
@@ -871,7 +871,7 @@ mod asynch {
         /// implementation of `ReceiveFuture` is not logically thread
         /// safe.
         #[must_use]
-        pub fn receive_async<'r>(&'r mut self) -> ReceiveFuture<'r> {
+        pub fn receive_async(&mut self) -> ReceiveFuture<'_> {
             self.receiver.receive_async()
         }
 

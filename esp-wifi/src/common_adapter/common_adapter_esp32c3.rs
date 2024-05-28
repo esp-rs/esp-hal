@@ -68,7 +68,7 @@ pub(crate) unsafe fn phy_enable() {
         critical_section::with(|_| {
             phy_enable_clock();
 
-            if G_IS_PHY_CALIBRATED == false {
+            if !G_IS_PHY_CALIBRATED {
                 let mut cal_data: [u8; core::mem::size_of::<esp_phy_calibration_data_t>()] =
                     [0u8; core::mem::size_of::<esp_phy_calibration_data_t>()];
 
