@@ -71,11 +71,15 @@ impl<'d> SystemTimer<'d, Blocking> {
             pub const BIT_MASK: u64 = u64::MAX;
             /// The ticks per second the underlying peripheral uses.
             pub const TICKS_PER_SECOND: u64 = 80_000_000;
+            // Bitmask to be applied to the raw period register value.
+            const PERIOD_MASK: u64 = 0x1FFF_FFFF;
         } else {
             /// Bitmask to be applied to the raw register value.
             pub const BIT_MASK: u64 = 0xF_FFFF_FFFF_FFFF;
             /// The ticks per second the underlying peripheral uses.
             pub const TICKS_PER_SECOND: u64 = 16_000_000;
+            // Bitmask to be applied to the raw period register value.
+            const PERIOD_MASK: u64 = 0x3FF_FFFF;
         }
     }
 
@@ -435,9 +439,10 @@ where
         if auto_reload {
             // Period mode
 
-            // The `SYSTIMER_TARGETx_PERIOD` field is 26-bits wide, so we must
-            // ensure that the provide value is not too wide:
-            if (ticks & !0x3FF_FFFF) != 0 {
+            // The `SYSTIMER_TARGETx_PERIOD` field is 26-bits wide (or
+            // 29-bits on the ESP32-S2), so we must ensure that the provided
+            // value is not too wide:
+            if (ticks & !SystemTimer::PERIOD_MASK) != 0 {
                 return Err(Error::InvalidTimeout);
             }
 
