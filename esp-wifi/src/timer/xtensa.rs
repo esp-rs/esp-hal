@@ -30,7 +30,7 @@ pub fn get_systimer_count() -> u64 {
     esp_hal::time::current_time().ticks()
 }
 
-pub fn setup_timer(timer1: TimeBase) {
+pub fn setup_timer(timer1: TimeBase) -> Result<(), esp_hal::timer::Error> {
     unsafe {
         interrupt::bind_interrupt(
             peripherals::Interrupt::TG1_T0_LEVEL,
@@ -44,11 +44,12 @@ pub fn setup_timer(timer1: TimeBase) {
     ));
 
     timer1.listen();
-    timer1.load_value(TIMESLICE_FREQUENCY.into_duration());
+    timer1.load_value(TIMESLICE_FREQUENCY.into_duration())?;
     timer1.start();
     critical_section::with(|cs| {
         TIMER1.borrow_ref_mut(cs).replace(timer1);
     });
+    Ok(())
 }
 
 pub fn setup_multitasking() {
