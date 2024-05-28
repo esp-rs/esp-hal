@@ -466,9 +466,10 @@ where
                 // Wait for value registers to update
             }
 
-            // The counters/comparators are 52-bits wide (or, on ESP32-S2
-            // only, 64-bits), so we must ensure that the provided value is
-            // not too wide:
+            // The counters/comparators are 52-bits wide (except on ESP32-S2,
+            // which is 64-bits), so we must ensure that the provided value
+            // is not too wide:
+            #[cfg(not(esp32s2))]
             if (ticks & !SystemTimer::BIT_MASK) != 0 {
                 return Err(Error::InvalidTimeout);
             }
