@@ -14,14 +14,15 @@ mod arch_specific;
 pub use arch_specific::*;
 pub use chip_specific::*;
 
-pub fn setup_timer_isr(timebase: TimeBase) {
+pub fn setup_timer_isr(timebase: TimeBase) -> Result<(), esp_hal::timer::Error> {
     setup_radio_isr();
 
-    setup_timer(timebase);
+    setup_timer(timebase)?;
 
     setup_multitasking();
 
     yield_task();
+    Ok(())
 }
 
 #[allow(unused)]

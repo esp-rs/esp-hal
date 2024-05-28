@@ -268,7 +268,7 @@ pub fn initialize(
     init_radio_clock_control(radio_clocks);
     init_rng(rng);
     init_tasks();
-    setup_timer_isr(timer);
+    setup_timer_isr(timer)?;
     wifi_set_log_verbose();
     init_clocks();
 
@@ -314,6 +314,13 @@ pub enum InitializationError {
     #[cfg(feature = "wifi")]
     WifiError(WifiError),
     WrongClockConfig,
+    Timer(hal::timer::Error),
+}
+
+impl From<hal::timer::Error> for InitializationError {
+    fn from(value: hal::timer::Error) -> Self {
+        InitializationError::Timer(value)
+    }
 }
 
 #[cfg(feature = "wifi")]

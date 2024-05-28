@@ -26,7 +26,7 @@ const TIMESLICE_FREQUENCY: fugit::HertzU32 = fugit::HertzU32::from_raw(crate::CO
 // Time keeping
 pub const TICKS_PER_SECOND: u64 = 1_000_000;
 
-pub fn setup_timer(systimer: TimeBase) {
+pub fn setup_timer(systimer: TimeBase) -> Result<(), esp_hal::timer::Error> {
     // make sure the scheduling won't start before everything is setup
     riscv::interrupt::disable();
 
@@ -50,6 +50,7 @@ pub fn setup_timer(systimer: TimeBase) {
         Interrupt::SYSTIMER_TARGET0,
         interrupt::Priority::Priority1,
     ));
+    Ok(())
 }
 
 pub fn setup_multitasking() {
