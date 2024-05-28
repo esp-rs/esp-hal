@@ -58,7 +58,7 @@ fn handle_interrupt<const NUM: u8>() {
     swi.reset();
 
     unsafe {
-        let executor = EXECUTORS[NUM as usize].get().as_mut().unwrap();
+        let executor = unwrap!(EXECUTORS[NUM as usize].get().as_mut());
         executor.poll();
     }
 }

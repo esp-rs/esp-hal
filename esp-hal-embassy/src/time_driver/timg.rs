@@ -66,12 +66,18 @@ impl EmbassyTimer {
 
         unsafe {
             interrupt::bind_interrupt(Interrupt::TG0_T0_LEVEL, tg0_t0_level.handler());
-            interrupt::enable(Interrupt::TG0_T0_LEVEL, tg0_t0_level.priority()).unwrap();
+            unwrap!(interrupt::enable(
+                Interrupt::TG0_T0_LEVEL,
+                tg0_t0_level.priority()
+            ));
         }
         #[cfg(any(esp32, esp32s2, esp32s3))]
         unsafe {
             interrupt::bind_interrupt(Interrupt::TG0_T1_LEVEL, tg0_t1_level.handler());
-            interrupt::enable(Interrupt::TG0_T1_LEVEL, tg0_t1_level.priority()).unwrap();
+            unwrap!(interrupt::enable(
+                Interrupt::TG0_T1_LEVEL,
+                tg0_t1_level.priority()
+            ));
         }
 
         #[handler(priority = Priority::max())]

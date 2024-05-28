@@ -9,6 +9,7 @@ license      = "MIT OR Apache-2.0"
 
 [dependencies]
 critical-section    = "1.1.2"
+defmt               = { version = "0.3.8", optional = true }
 embassy-executor    = "0.5.0"
 embassy-time-driver = "0.1.0"
 esp-hal             = { version = "0.17.0", path = "../esp-hal" }
@@ -33,3 +34,5 @@ integrated-timers = ["embassy-executor/integrated-timers"]
 time-systimer-16mhz = ["embassy-time-driver/tick-hz-16_000_000"]
 time-systimer-80mhz = ["embassy-time-driver/tick-hz-80_000_000"]
 time-timg0          = ["embassy-time-driver/tick-hz-1_000_000"]
+
+defmt = ["dep:defmt", "embassy-executor/defmt", "esp-hal/defmt"]

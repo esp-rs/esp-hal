@@ -27,6 +27,9 @@
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
 
+// MUST be the first module
+mod fmt;
+
 use core::cell::Cell;
 
 use embassy_time_driver::{AlarmHandle, Driver};

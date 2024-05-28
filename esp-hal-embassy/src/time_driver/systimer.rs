@@ -62,16 +62,24 @@ impl EmbassyTimer {
     }
 
     pub fn init(_clocks: &Clocks, _systimer: TimerType) {
-        // FIXME: Revert calls to `unwrap()` function to `unwrap!()` macro
         unsafe {
             interrupt::bind_interrupt(Interrupt::SYSTIMER_TARGET0, target0_handler.handler());
-            interrupt::enable(Interrupt::SYSTIMER_TARGET0, target0_handler.priority()).unwrap();
+            unwrap!(interrupt::enable(
+                Interrupt::SYSTIMER_TARGET0,
+                target0_handler.priority()
+            ));
 
             interrupt::bind_interrupt(Interrupt::SYSTIMER_TARGET1, target1_handler.handler());
-            interrupt::enable(Interrupt::SYSTIMER_TARGET1, target1_handler.priority()).unwrap();
+            unwrap!(interrupt::enable(
+                Interrupt::SYSTIMER_TARGET1,
+                target1_handler.priority()
+            ));
 
             interrupt::bind_interrupt(Interrupt::SYSTIMER_TARGET2, target2_handler.handler());
-            interrupt::enable(Interrupt::SYSTIMER_TARGET2, target2_handler.priority()).unwrap();
+            unwrap!(interrupt::enable(
+                Interrupt::SYSTIMER_TARGET2,
+                target2_handler.priority()
+            ));
         }
 
         #[handler]
@@ -118,9 +126,9 @@ impl EmbassyTimer {
 
     fn arm(&self, id: usize, timestamp: u64) {
         match id {
-            0 => self.alarm0.load_value(timestamp.micros()).unwrap(),
-            1 => self.alarm1.load_value(timestamp.micros()).unwrap(),
-            2 => self.alarm2.load_value(timestamp.micros()).unwrap(),
+            0 => unwrap!(self.alarm0.load_value(timestamp.micros())),
+            1 => unwrap!(self.alarm1.load_value(timestamp.micros())),
+            2 => unwrap!(self.alarm2.load_value(timestamp.micros())),
             _ => {}
         }
     }
