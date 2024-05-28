@@ -19,6 +19,13 @@ pub fn run(args: &[String], cwd: &Path) -> Result<()> {
         bail!("The `cwd` argument MUST be a directory");
     }
 
+    // Make sure to not use a UNC as CWD!
+    // That would make `OUT_DIR` a UNC which will trigger things like the one fixed in https://github.com/dtolnay/rustversion/pull/51
+    // While it's fixed in `rustversion` it's not fixed for other crates we are
+    // using now or in future!
+    #[cfg(target_os = "windows")]
+    let cwd = cwd.to_string_lossy().replace("\\\\?\\", "");
+
     let status = Command::new(get_cargo())
         .args(args)
         .current_dir(cwd)
@@ -37,6 +44,9 @@ pub fn run(args: &[String], cwd: &Path) -> Result<()> {
 }
 
 fn get_cargo() -> String {
+    // On Windows when executed via `cargo run` (e.g. via the xtask alias) the
+    // `cargo` on the search path is NOT the cargo-wrapper but the `cargo` from the
+    // toolchain - that one doesn't understand `+toolchain`
     #[cfg(target_os = "windows")]
     let cargo = if let Ok(cargo) = std::env::var("CARGO_HOME") {
         format!("{cargo}/bin/cargo")
