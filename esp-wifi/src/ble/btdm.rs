@@ -105,10 +105,12 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
 }
 
 #[cfg(target_arch = "riscv32")]
-static mut G_INTER_FLAGS: [u8; 10] = [0; 10];
+type InterruptsFlagType = u8;
 
 #[cfg(target_arch = "xtensa")]
-static mut G_INTER_FLAGS: [u32; 10] = [0; 10];
+type InterruptsFlagType = u32;
+
+static mut G_INTER_FLAGS: [InterruptsFlagType; 10] = [0; 10];
 
 static mut INTERRUPT_DISABLE_CNT: usize = 0;
 
@@ -117,16 +119,18 @@ unsafe extern "C" fn interrupt_enable() {
     INTERRUPT_DISABLE_CNT -= 1;
     let flags = G_INTER_FLAGS[INTERRUPT_DISABLE_CNT];
     trace!("interrupt_enable {}", flags);
-    critical_section::release(core::mem::transmute::<u8, critical_section::RestoreState>(
-        flags,
-    ));
+    critical_section::release(core::mem::transmute::<
+        InterruptsFlagType,
+        critical_section::RestoreState,
+    >(flags));
 }
 
 #[ram]
 unsafe extern "C" fn interrupt_disable() {
     trace!("interrupt_disable");
-    let flags =
-        core::mem::transmute::<critical_section::RestoreState, u8>(critical_section::acquire());
+    let flags = core::mem::transmute::<critical_section::RestoreState, InterruptsFlagType>(
+        critical_section::acquire(),
+    );
     G_INTER_FLAGS[INTERRUPT_DISABLE_CNT] = flags;
     INTERRUPT_DISABLE_CNT += 1;
     trace!("interrupt_disable {}", flags);
@@ -191,8 +195,8 @@ unsafe extern "C" fn queue_send(queue: *const (), item: *const (), _block_time_m
             // assume the size is 8 - shouldn't rely on that
             let message = item as *const u8;
             let mut data = [0u8; 8];
-            for i in 0..8_usize {
-                data[i] = *message.add(i);
+            for (i, data) in data.iter_mut().enumerate() {
+                *data = *message.add(i);
             }
             trace!("queue posting {:?}", data);
 

@@ -590,7 +590,9 @@ unsafe extern "C" fn ble_npl_get_time_forever() -> u32 {
 
 unsafe extern "C" fn ble_npl_hw_exit_critical(mask: u32) {
     trace!("ble_npl_hw_exit_critical {}", mask);
-    critical_section::release(core::mem::transmute(mask as u8));
+    critical_section::release(core::mem::transmute::<u8, critical_section::RestoreState>(
+        mask as u8,
+    ));
 }
 
 unsafe extern "C" fn ble_npl_hw_enter_critical() -> u32 {

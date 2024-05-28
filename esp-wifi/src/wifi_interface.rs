@@ -427,7 +427,7 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
     /// Make sure to regularly call this function.
     pub fn work(&self) {
         loop {
-            if !self.with_mut(|interface, device, sockets| {
+            let did_work = self.with_mut(|interface, device, sockets| {
                 let network_config = self.network_config.borrow().clone();
                 if let ipv4::Configuration::Client(ipv4::ClientConfiguration::DHCP(_)) =
                     network_config
@@ -452,7 +452,9 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
                     device,
                     sockets,
                 )
-            }) {
+            });
+
+            if !did_work {
                 break;
             }
         }

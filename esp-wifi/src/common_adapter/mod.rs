@@ -158,8 +158,8 @@ pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> crate::binary::c_
 
     let base_mac = crate::hal::efuse::Efuse::get_mac_address();
 
-    for i in 0..6 {
-        mac.add(i).write_volatile(base_mac[i]);
+    for (i, &byte) in base_mac.iter().enumerate() {
+        mac.add(i).write_volatile(byte);
     }
 
     // ESP_MAC_WIFI_SOFTAP
