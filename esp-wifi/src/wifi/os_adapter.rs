@@ -1984,6 +1984,7 @@ pub unsafe extern "C" fn coex_schm_register_cb_wrapper(
 ///   The calibration value obtained using rtc_clk_cal
 ///
 /// *************************************************************************
+#[allow(unused)]
 pub unsafe extern "C" fn slowclk_cal_get() -> u32 {
     trace!("slowclk_cal_get");
 

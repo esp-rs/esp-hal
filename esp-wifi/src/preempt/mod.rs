@@ -45,4 +45,5 @@ task_stack!(8192, 8192);
 
 #[cfg_attr(target_arch = "riscv32", path = "preempt_riscv.rs")]
 #[cfg_attr(target_arch = "xtensa", path = "preempt_xtensa.rs")]
+#[allow(clippy::module_inception)]
 pub mod preempt;

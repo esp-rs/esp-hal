@@ -117,13 +117,16 @@ unsafe extern "C" fn interrupt_enable() {
     INTERRUPT_DISABLE_CNT -= 1;
     let flags = G_INTER_FLAGS[INTERRUPT_DISABLE_CNT];
     trace!("interrupt_enable {}", flags);
-    critical_section::release(core::mem::transmute(flags));
+    critical_section::release(core::mem::transmute::<u8, critical_section::RestoreState>(
+        flags,
+    ));
 }
 
 #[ram]
 unsafe extern "C" fn interrupt_disable() {
     trace!("interrupt_disable");
-    let flags = core::mem::transmute(critical_section::acquire());
+    let flags =
+        core::mem::transmute::<critical_section::RestoreState, u8>(critical_section::acquire());
     G_INTER_FLAGS[INTERRUPT_DISABLE_CNT] = flags;
     INTERRUPT_DISABLE_CNT += 1;
     trace!("interrupt_disable {}", flags);
@@ -589,7 +592,7 @@ pub fn send_hci(data: &[u8]) {
                 }
 
                 PACKET_SENT.store(false, Ordering::Relaxed);
-                API_vhci_host_send_packet(packet.as_ptr() as *const u8, packet.len() as u16);
+                API_vhci_host_send_packet(packet.as_ptr(), packet.len() as u16);
                 trace!("sent vhci host packet");
 
                 dump_packet_info(packet);

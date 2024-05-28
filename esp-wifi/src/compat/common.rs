@@ -163,7 +163,7 @@ pub fn thread_sem_get() -> *mut c_void {
 
 pub fn create_recursive_mutex() -> *mut c_void {
     critical_section::with(|_| unsafe {
-        let ptr = &mut MUTEXES[MUTEX_IDX_CURRENT] as *mut _ as *mut Mutex;
+        let ptr = &mut MUTEXES[MUTEX_IDX_CURRENT] as *mut Mutex;
         (*ptr).recursive = true;
         MUTEX_IDX_CURRENT += 1;
         memory_fence();

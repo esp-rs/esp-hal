@@ -202,7 +202,7 @@ pub struct RxControlInfo {
     pub rx_state: u32,
 }
 
-#[cfg(any(esp32c6))]
+#[cfg(esp32c6)]
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct RxControlInfo {
@@ -778,7 +778,7 @@ unsafe extern "C" fn rcv_cb(
         rx_state: (*rx_cntl).rx_state(),
     };
 
-    #[cfg(any(esp32c6))]
+    #[cfg(esp32c6)]
     let rx_control = RxControlInfo {
         rssi: (*rx_cntl).rssi(),
         rate: (*rx_cntl).rate(),

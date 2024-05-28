@@ -229,10 +229,10 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
         if let Some(dhcp_handle) = *dhcp_socket_handle_ref {
             let dhcp_socket = sockets.get_mut::<Dhcpv4Socket>(dhcp_handle);
 
-            let connected = match crate::wifi::get_sta_state() {
-                crate::wifi::WifiState::StaConnected => true,
-                _ => false,
-            };
+            let connected = matches!(
+                crate::wifi::get_sta_state(),
+                crate::wifi::WifiState::StaConnected
+            );
 
             if connected && !*self.old_connected.borrow() {
                 dhcp_socket.reset();
@@ -461,7 +461,7 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
     #[cfg(feature = "tcp")]
     fn next_local_port(&self) -> u16 {
         self.local_port.replace_with(|local_port| {
-            if *local_port >= LOCAL_PORT_MAX {
+            if *local_port == LOCAL_PORT_MAX {
                 LOCAL_PORT_MIN
             } else {
                 *local_port + 1

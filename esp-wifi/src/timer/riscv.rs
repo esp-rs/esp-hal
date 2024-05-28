@@ -39,7 +39,9 @@ pub fn setup_timer(systimer: TimeBase) {
     unsafe {
         interrupt::bind_interrupt(
             Interrupt::SYSTIMER_TARGET0,
-            core::mem::transmute(systimer_target0 as *const ()),
+            core::mem::transmute::<*const (), unsafe extern "C" fn()>(
+                systimer_target0 as *const (),
+            ),
         );
     }
 

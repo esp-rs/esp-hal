@@ -17,7 +17,7 @@ use enumset::{EnumSet, EnumSetType};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 #[doc(hidden)]
-pub use os_adapter::*;
+pub(crate) use os_adapter::*;
 use portable_atomic::{AtomicUsize, Ordering};
 #[cfg(feature = "smoltcp")]
 use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
@@ -989,19 +989,19 @@ static g_wifi_osi_funcs: wifi_osi_funcs_t = wifi_osi_funcs_t {
     _phy_common_clock_enable: Some(os_adapter_chip_specific::phy_common_clock_enable),
     _coex_register_start_cb: Some(coex_register_start_cb),
 
-    #[cfg(any(esp32c6))]
+    #[cfg(esp32c6)]
     _regdma_link_set_write_wait_content: Some(
         os_adapter_chip_specific::regdma_link_set_write_wait_content_dummy,
     ),
-    #[cfg(any(esp32c6))]
+    #[cfg(esp32c6)]
     _sleep_retention_find_link_by_id: Some(
         os_adapter_chip_specific::sleep_retention_find_link_by_id_dummy,
     ),
-    #[cfg(any(esp32c6))]
+    #[cfg(esp32c6)]
     _sleep_retention_entries_create: Some(
         os_adapter_chip_specific::sleep_retention_entries_create_dummy,
     ),
-    #[cfg(any(esp32c6))]
+    #[cfg(esp32c6)]
     _sleep_retention_entries_destroy: Some(
         os_adapter_chip_specific::sleep_retention_entries_destroy_dummy,
     ),
@@ -1243,7 +1243,7 @@ pub(crate) fn wifi_start() -> Result<(), WifiError> {
         cntry_code[2] = crate::CONFIG.country_code_operating_class;
 
         let country = wifi_country_t {
-            cc: core::mem::transmute(cntry_code), // [u8] -> [i8] conversion
+            cc: core::mem::transmute::<[u8; 3], [i8; 3]>(cntry_code), // [u8] -> [i8] conversion
             schan: 1,
             nchan: 13,
             max_tx_power: 20,
