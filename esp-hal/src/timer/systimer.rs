@@ -432,14 +432,14 @@ where
         let us = value.ticks();
         let ticks = us * (SystemTimer::TICKS_PER_SECOND / 1_000_000);
 
-        // The `SYSTIMER_TARGETx_PERIOD` field is 26-bits wide, so we must
-        // ensure that the provide value is not too wide:
-        if (ticks as u32 & !0x3FF_FFFF) != 0 {
-            return Err(Error::InvalidTimeout);
-        }
-
         if auto_reload {
             // Period mode
+
+            // The `SYSTIMER_TARGETx_PERIOD` field is 26-bits wide, so we must
+            // ensure that the provide value is not too wide:
+            if (ticks & !0x3FF_FFFF) != 0 {
+                return Err(Error::InvalidTimeout);
+            }
 
             systimer
                 .target_conf(CHANNEL as usize)
@@ -464,6 +464,13 @@ where
             systimer.unit0_op().modify(|_, w| w.update().set_bit());
             while !systimer.unit0_op().read().value_valid().bit_is_set() {
                 // Wait for value registers to update
+            }
+
+            // The counters/comparators are 52-bits wide (or, on ESP32-S2
+            // only, 64-bits), so we must ensure that the provided value is
+            // not too wide:
+            if (ticks & !SystemTimer::BIT_MASK) != 0 {
+                return Err(Error::InvalidTimeout);
             }
 
             let hi = systimer.unit0_value().hi().read().bits();
