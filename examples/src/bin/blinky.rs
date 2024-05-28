@@ -27,8 +27,6 @@ fn main() -> ! {
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut led = Output::new(io.pins.gpio0, Level::High);
 
-    // Initialize the Delay peripheral, and use it to toggle the LED state in a
-    // loop.
     let delay = Delay::new(&clocks);
 
     loop {
