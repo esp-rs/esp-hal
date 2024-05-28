@@ -5,7 +5,11 @@ use super::AlarmState;
 use crate::{
     clock::Clocks,
     peripherals,
-    timer::systimer::{Alarm, SystemTimer, Target},
+    prelude::*,
+    timer::{
+        systimer::{Alarm, SystemTimer, Target},
+        Timer as _,
+    },
 };
 
 pub const ALARM_COUNT: usize = 3;
@@ -43,9 +47,9 @@ impl EmbassyTimer {
 
     pub(super) fn on_alarm_allocated(&self, n: usize) {
         match n {
-            0 => self.alarm0.enable_interrupt_internal(true),
-            1 => self.alarm1.enable_interrupt_internal(true),
-            2 => self.alarm2.enable_interrupt_internal(true),
+            0 => self.alarm0.enable_interrupt(true),
+            1 => self.alarm1.enable_interrupt(true),
+            2 => self.alarm2.enable_interrupt(true),
             _ => {}
         }
     }
@@ -126,18 +130,18 @@ impl EmbassyTimer {
 
     fn clear_interrupt(&self, id: usize) {
         match id {
-            0 => self.alarm0.clear_interrupt_internal(),
-            1 => self.alarm1.clear_interrupt_internal(),
-            2 => self.alarm2.clear_interrupt_internal(),
+            0 => self.alarm0.clear_interrupt(),
+            1 => self.alarm1.clear_interrupt(),
+            2 => self.alarm2.clear_interrupt(),
             _ => {}
         }
     }
 
     fn arm(&self, id: usize, timestamp: u64) {
         match id {
-            0 => self.alarm0.set_target_internal(timestamp),
-            1 => self.alarm1.set_target_internal(timestamp),
-            2 => self.alarm2.set_target_internal(timestamp),
+            0 => self.alarm0.load_value(timestamp.micros()).unwrap(),
+            1 => self.alarm1.load_value(timestamp.micros()).unwrap(),
+            2 => self.alarm2.load_value(timestamp.micros()).unwrap(),
             _ => {}
         }
     }
