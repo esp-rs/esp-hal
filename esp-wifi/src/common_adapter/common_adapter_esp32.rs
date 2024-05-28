@@ -52,7 +52,7 @@ pub(crate) unsafe fn phy_enable() {
 
             phy_enable_clock();
 
-            if G_IS_PHY_CALIBRATED == false {
+            if !G_IS_PHY_CALIBRATED {
                 let mut cal_data: [u8; core::mem::size_of::<esp_phy_calibration_data_t>()] =
                     [0u8; core::mem::size_of::<esp_phy_calibration_data_t>()];
 
@@ -158,9 +158,8 @@ pub(crate) unsafe fn phy_disable_clock() {
 #[ram]
 #[no_mangle]
 unsafe extern "C" fn esp_dport_access_reg_read(reg: u32) -> u32 {
-    let res = (reg as *mut u32).read_volatile();
     // trace!("esp_dport_access_reg_read {:x} => {:x}", reg, res);
-    res
+    (reg as *mut u32).read_volatile()
 }
 
 /// **************************************************************************

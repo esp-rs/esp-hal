@@ -64,7 +64,7 @@ pub fn sem_create(max: u32, init: u32) -> *mut c_void {
         memory_fence();
         for (i, sem) in CURR_SEM.iter().enumerate() {
             memory_fence();
-            if let None = *sem {
+            if sem.is_none() {
                 res = i;
                 break;
             }
@@ -134,7 +134,7 @@ pub fn sem_give(semphr: *mut c_void) -> i32 {
     trace!("semphr_give {:?}", semphr);
     let sem_idx = semphr as usize - 1;
 
-    let res = critical_section::with(|_| unsafe {
+    critical_section::with(|_| unsafe {
         if let Some(cnt) = CURR_SEM[sem_idx] {
             CURR_SEM[sem_idx] = Some(cnt + 1);
             memory_fence();
@@ -142,9 +142,7 @@ pub fn sem_give(semphr: *mut c_void) -> i32 {
         } else {
             0
         }
-    });
-
-    res
+    })
 }
 
 pub fn thread_sem_get() -> *mut c_void {
@@ -165,7 +163,7 @@ pub fn thread_sem_get() -> *mut c_void {
 
 pub fn create_recursive_mutex() -> *mut c_void {
     critical_section::with(|_| unsafe {
-        let ptr = &mut MUTEXES[MUTEX_IDX_CURRENT] as *mut _ as *mut Mutex;
+        let ptr = &mut MUTEXES[MUTEX_IDX_CURRENT] as *mut Mutex;
         (*ptr).recursive = true;
         MUTEX_IDX_CURRENT += 1;
         memory_fence();

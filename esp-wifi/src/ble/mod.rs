@@ -77,10 +77,11 @@ impl HciOutCollector {
                 if self.index == self.data[3] as usize + 4 {
                     self.ready = true;
                 }
-            } else if self.kind == HciOutType::Acl && self.index >= 5 {
-                if self.index == (self.data[3] as usize) + ((self.data[4] as usize) << 8) + 5 {
-                    self.ready = true;
-                }
+            } else if self.kind == HciOutType::Acl
+                && self.index >= 5
+                && self.index == (self.data[3] as usize) + ((self.data[4] as usize) << 8) + 5
+            {
+                self.ready = true;
             }
         }
     }
@@ -92,6 +93,6 @@ impl HciOutCollector {
     }
 
     fn packet(&self) -> &[u8] {
-        &self.data[0..(self.index as usize)]
+        &self.data[0..self.index]
     }
 }

@@ -39,7 +39,9 @@ pub fn setup_timer(systimer: TimeBase) {
     unsafe {
         interrupt::bind_interrupt(
             Interrupt::SYSTIMER_TARGET0,
-            core::mem::transmute(systimer_target0 as *const ()),
+            core::mem::transmute::<*const (), unsafe extern "C" fn()>(
+                systimer_target0 as *const (),
+            ),
         );
     }
 
@@ -73,7 +75,7 @@ extern "C" fn systimer_target0(trap_frame: &mut TrapFrame) {
 extern "C" fn FROM_CPU_INTR3(trap_frame: &mut TrapFrame) {
     unsafe {
         // clear FROM_CPU_INTR3
-        (&*SystemPeripheral::PTR)
+        (*SystemPeripheral::PTR)
             .cpu_intr_from_cpu_3()
             .modify(|_, w| w.cpu_intr_from_cpu_3().clear_bit());
     }
@@ -91,7 +93,7 @@ extern "C" fn FROM_CPU_INTR3(trap_frame: &mut TrapFrame) {
 
 pub fn yield_task() {
     unsafe {
-        (&*SystemPeripheral::PTR)
+        (*SystemPeripheral::PTR)
             .cpu_intr_from_cpu_3()
             .modify(|_, w| w.cpu_intr_from_cpu_3().set_bit());
     }

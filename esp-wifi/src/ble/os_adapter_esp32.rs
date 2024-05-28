@@ -274,7 +274,7 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
         normal_adv_size: 200,
         mesh_adv_size: 0,
         send_adv_reserved_size: 1000,
-        controller_debug_flag: 0 << 0,
+        controller_debug_flag: 0,
         mode: 0x01, // BLE
         ble_max_conn: 3,
         bt_max_acl_conn: 0,
@@ -320,6 +320,7 @@ pub(crate) fn btdm_controller_mem_init() {
     // initialize em, .bss section
     let btdm_dram_regions = BTDM_DRAM_AVAILABLE_REGION.len();
 
+    #[allow(clippy::needless_range_loop)] // the alternative looks worse
     for i in 1..btdm_dram_regions {
         if BTDM_DRAM_AVAILABLE_REGION[i].mode != esp_bt_mode_t_ESP_BT_MODE_IDLE {
             unsafe {
@@ -487,7 +488,7 @@ pub(crate) unsafe extern "C" fn coex_schm_curr_phase_get() -> *const () {
     return crate::binary::include::coex_schm_curr_phase_get() as *const ();
 
     #[cfg(not(coex))]
-    return 0 as *const ();
+    return core::ptr::null::<()>();
 }
 
 #[allow(unused_variables)]

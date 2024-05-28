@@ -37,11 +37,11 @@ pub(crate) static mut RANDOM_GENERATOR: Option<Rng> = None;
 pub(crate) static mut RADIO_CLOCKS: Option<hal::peripherals::RADIO_CLK> = None;
 
 pub(crate) fn init_rng(rng: Rng) {
-    unsafe { RANDOM_GENERATOR = Some(core::mem::transmute(rng)) };
+    unsafe { RANDOM_GENERATOR = Some(rng) };
 }
 
 pub(crate) fn init_radio_clock_control(rcc: hal::peripherals::RADIO_CLK) {
-    unsafe { RADIO_CLOCKS = Some(core::mem::transmute(rcc)) };
+    unsafe { RADIO_CLOCKS = Some(rcc) };
 }
 
 /// **************************************************************************
@@ -158,8 +158,8 @@ pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> crate::binary::c_
 
     let base_mac = crate::hal::efuse::Efuse::get_mac_address();
 
-    for i in 0..6 {
-        mac.offset(i as isize).write_volatile(base_mac[i]);
+    for (i, &byte) in base_mac.iter().enumerate() {
+        mac.add(i).write_volatile(byte);
     }
 
     // ESP_MAC_WIFI_SOFTAP
@@ -351,7 +351,14 @@ pub unsafe extern "C" fn ets_timer_setfn(
     pfunction: *mut crate::binary::c_types::c_void,
     parg: *mut crate::binary::c_types::c_void,
 ) {
-    compat_timer_setfn(ptimer.cast(), core::mem::transmute(pfunction), parg);
+    compat_timer_setfn(
+        ptimer.cast(),
+        core::mem::transmute::<
+            *mut crate::binary::c_types::c_void,
+            unsafe extern "C" fn(*mut crate::binary::c_types::c_void),
+        >(pfunction),
+        parg,
+    );
 }
 
 #[no_mangle]

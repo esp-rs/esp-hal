@@ -229,10 +229,10 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
         if let Some(dhcp_handle) = *dhcp_socket_handle_ref {
             let dhcp_socket = sockets.get_mut::<Dhcpv4Socket>(dhcp_handle);
 
-            let connected = match crate::wifi::get_sta_state() {
-                crate::wifi::WifiState::StaConnected => true,
-                _ => false,
-            };
+            let connected = matches!(
+                crate::wifi::get_sta_state(),
+                crate::wifi::WifiState::StaConnected
+            );
 
             if connected && !*self.old_connected.borrow() {
                 dhcp_socket.reset();
@@ -248,7 +248,7 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
                         interface.routes_mut().remove_default_ipv4_route();
                     }
                     smoltcp::socket::dhcpv4::Event::Configured(config) => {
-                        let dns = config.dns_servers.get(0);
+                        let dns = config.dns_servers.first();
                         *self.ip_info.borrow_mut() = Some(ipv4::IpInfo {
                             ip: config.address.address().0.into(),
                             subnet: ipv4::Subnet {
@@ -402,7 +402,7 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
             sockets
                 .get_mut::<dns::Socket>(dns_handle)
                 .start_query(interface.context(), name, query_type)
-                .map_err(|e| WifiStackError::DnsQueryError(e))
+                .map_err(WifiStackError::DnsQueryError)
         })?;
 
         loop {
@@ -427,7 +427,7 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
     /// Make sure to regularly call this function.
     pub fn work(&self) {
         loop {
-            if let false = self.with_mut(|interface, device, sockets| {
+            let did_work = self.with_mut(|interface, device, sockets| {
                 let network_config = self.network_config.borrow().clone();
                 if let ipv4::Configuration::Client(ipv4::ClientConfiguration::DHCP(_)) =
                     network_config
@@ -452,7 +452,9 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
                     device,
                     sockets,
                 )
-            }) {
+            });
+
+            if !did_work {
                 break;
             }
         }
@@ -461,7 +463,7 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
     #[cfg(feature = "tcp")]
     fn next_local_port(&self) -> u16 {
         self.local_port.replace_with(|local_port| {
-            if *local_port >= LOCAL_PORT_MAX {
+            if *local_port == LOCAL_PORT_MAX {
                 LOCAL_PORT_MIN
             } else {
                 *local_port + 1
@@ -562,17 +564,13 @@ impl<'s, 'n: 's, MODE: WifiDeviceMode> Socket<'s, 'n, MODE> {
                 sock.connect(cx, remote_endpoint, self.network.next_local_port())
             });
 
-            res.map_err(|e| IoError::ConnectError(e))?;
+            res.map_err(IoError::ConnectError)?;
         }
 
         loop {
             let can_send = self.network.with_mut(|_interface, _device, sockets| {
                 let sock = sockets.get_mut::<TcpSocket>(self.socket_handle);
-                if sock.can_send() {
-                    true
-                } else {
-                    false
-                }
+                sock.can_send()
             });
 
             if can_send {
@@ -596,17 +594,13 @@ impl<'s, 'n: 's, MODE: WifiDeviceMode> Socket<'s, 'n, MODE> {
                 sock.listen(port)
             });
 
-            res.map_err(|e| IoError::ListenError(e))?;
+            res.map_err(IoError::ListenError)?;
         }
 
         loop {
             let can_send = self.network.with_mut(|_interface, _device, sockets| {
                 let sock = sockets.get_mut::<TcpSocket>(self.socket_handle);
-                if sock.can_send() {
-                    true
-                } else {
-                    false
-                }
+                sock.can_send()
             });
 
             if can_send {
@@ -630,7 +624,7 @@ impl<'s, 'n: 's, MODE: WifiDeviceMode> Socket<'s, 'n, MODE> {
                 sock.listen(port)
             });
 
-            res.map_err(|e| IoError::ListenError(e))?;
+            res.map_err(IoError::ListenError)?;
         }
 
         self.work();
@@ -796,7 +790,7 @@ impl<'s, 'n: 's, MODE: WifiDeviceMode> Write for Socket<'s, 'n, MODE> {
                 )
             });
 
-            if let false = res {
+            if !res {
                 break;
             }
         }
@@ -835,11 +829,7 @@ impl<'s, 'n: 's, MODE: WifiDeviceMode> UdpSocket<'s, 'n, MODE> {
         loop {
             let can_send = self.network.with_mut(|_interface, _device, sockets| {
                 let sock = sockets.get_mut::<smoltcp::socket::udp::Socket>(self.socket_handle);
-                if sock.can_send() {
-                    true
-                } else {
-                    false
-                }
+                sock.can_send()
             });
 
             if can_send {
@@ -892,7 +882,7 @@ impl<'s, 'n: 's, MODE: WifiDeviceMode> UdpSocket<'s, 'n, MODE> {
                     .get_mut::<smoltcp::socket::udp::Socket>(self.socket_handle)
                     .send_slice(data, endpoint)
             })
-            .map_err(|e| IoError::UdpSendError(e))?;
+            .map_err(IoError::UdpSendError)?;
 
         self.work();
 
@@ -933,7 +923,7 @@ impl<'s, 'n: 's, MODE: WifiDeviceMode> UdpSocket<'s, 'n, MODE> {
 
         self.work();
 
-        res.map_err(|e| IoError::MultiCastError(e))
+        res.map_err(IoError::MultiCastError)
     }
 
     /// Delegates to [WifiStack::work]

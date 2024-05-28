@@ -590,7 +590,9 @@ unsafe extern "C" fn ble_npl_get_time_forever() -> u32 {
 
 unsafe extern "C" fn ble_npl_hw_exit_critical(mask: u32) {
     trace!("ble_npl_hw_exit_critical {}", mask);
-    critical_section::release(core::mem::transmute(mask as u8));
+    critical_section::release(core::mem::transmute::<u8, critical_section::RestoreState>(
+        mask as u8,
+    ));
 }
 
 unsafe extern "C" fn ble_npl_hw_enter_critical() -> u32 {
@@ -1139,7 +1141,7 @@ fn os_msys_buf_alloc() -> bool {
     unsafe {
         OS_MSYS_INIT_1_DATA = crate::compat::malloc::calloc(
             1,
-            core::mem::size_of::<OsMembufT>() * SYSINIT_MSYS_1_MEMPOOL_SIZE as usize,
+            core::mem::size_of::<OsMembufT>() * SYSINIT_MSYS_1_MEMPOOL_SIZE,
         ) as *mut u32;
         OS_MSYS_INIT_2_DATA = crate::compat::malloc::calloc(
             1,
@@ -1223,7 +1225,7 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) {
             warn!("Dropping BLE packet");
         }
 
-        dump_packet_info(&data[..(len + 3) as usize]);
+        dump_packet_info(&data[..(len + 3)]);
     });
 
     r_ble_hci_trans_buf_free(cmd);
@@ -1332,54 +1334,48 @@ pub fn send_hci(data: &[u8]) {
         let packet = hci_out.packet();
 
         unsafe {
-            loop {
-                const DATA_TYPE_COMMAND: u8 = 1;
-                const DATA_TYPE_ACL: u8 = 2;
+            const DATA_TYPE_COMMAND: u8 = 1;
+            const DATA_TYPE_ACL: u8 = 2;
 
-                dump_packet_info(&packet);
+            dump_packet_info(packet);
 
-                critical_section::with(|_cs| {
-                    if packet[0] == DATA_TYPE_COMMAND {
-                        let cmd = r_ble_hci_trans_buf_alloc(BLE_HCI_TRANS_BUF_CMD);
-                        core::ptr::copy_nonoverlapping(
-                            &packet[1] as *const _ as *mut u8, // don't send the TYPE
-                            cmd as *mut u8,
-                            packet.len() - 1,
-                        );
+            critical_section::with(|_cs| {
+                if packet[0] == DATA_TYPE_COMMAND {
+                    let cmd = r_ble_hci_trans_buf_alloc(BLE_HCI_TRANS_BUF_CMD);
+                    core::ptr::copy_nonoverlapping(
+                        &packet[1] as *const _ as *mut u8, // don't send the TYPE
+                        cmd as *mut u8,
+                        packet.len() - 1,
+                    );
 
-                        let res = unwrap!(ble_hci_trans_funcs_ptr.ble_hci_trans_hs_cmd_tx)(cmd);
+                    let res = unwrap!(ble_hci_trans_funcs_ptr.ble_hci_trans_hs_cmd_tx)(cmd);
 
-                        if res != 0 {
-                            warn!("ble_hci_trans_hs_cmd_tx res == {}", res);
-                        }
-                    } else if packet[0] == DATA_TYPE_ACL {
-                        let om = r_os_msys_get_pkthdr(
-                            packet.len() as u16,
-                            ACL_DATA_MBUF_LEADINGSPACE as u16,
-                        );
-
-                        let res = r_os_mbuf_append(
-                            om,
-                            packet.as_ptr().offset(1),
-                            (packet.len() - 1) as u16,
-                        );
-                        if res != 0 {
-                            panic!("r_os_mbuf_append returned {}", res);
-                        }
-
-                        // this modification of the ACL data packet makes it getting sent and
-                        // received by the other side
-                        *((*om).om_data as *mut u8).offset(1) = 0;
-
-                        let res = unwrap!(ble_hci_trans_funcs_ptr.ble_hci_trans_hs_acl_tx)(om);
-                        if res != 0 {
-                            panic!("ble_hci_trans_hs_acl_tx returned {}", res);
-                        }
-                        trace!("ACL tx done");
+                    if res != 0 {
+                        warn!("ble_hci_trans_hs_cmd_tx res == {}", res);
                     }
-                });
-                break;
-            }
+                } else if packet[0] == DATA_TYPE_ACL {
+                    let om = r_os_msys_get_pkthdr(
+                        packet.len() as u16,
+                        ACL_DATA_MBUF_LEADINGSPACE as u16,
+                    );
+
+                    let res =
+                        r_os_mbuf_append(om, packet.as_ptr().offset(1), (packet.len() - 1) as u16);
+                    if res != 0 {
+                        panic!("r_os_mbuf_append returned {}", res);
+                    }
+
+                    // this modification of the ACL data packet makes it getting sent and
+                    // received by the other side
+                    *((*om).om_data as *mut u8).offset(1) = 0;
+
+                    let res = unwrap!(ble_hci_trans_funcs_ptr.ble_hci_trans_hs_acl_tx)(om);
+                    if res != 0 {
+                        panic!("ble_hci_trans_hs_acl_tx returned {}", res);
+                    }
+                    trace!("ACL tx done");
+                }
+            });
         }
 
         hci_out.reset();

@@ -119,6 +119,7 @@ struct Config {
 }
 
 // Validate the configuration at compile time
+#[allow(clippy::assertions_on_constants)]
 const _: () = {
     // We explicitely use `core` assert here because this evaluation happens at
     // compile time and won't bloat the binary

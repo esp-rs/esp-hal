@@ -66,8 +66,8 @@ extern "C" {
 }
 
 static VHCI_HOST_CALLBACK: vhci_host_callback_s = vhci_host_callback_s {
-    notify_host_send_available: notify_host_send_available,
-    notify_host_recv: notify_host_recv,
+    notify_host_send_available,
+    notify_host_recv,
 };
 
 extern "C" fn notify_host_send_available() {
@@ -81,7 +81,7 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
 
     unsafe {
         let mut buf = [0u8; 256];
-        buf[..len as usize].copy_from_slice(&core::slice::from_raw_parts(data, len as usize));
+        buf[..len as usize].copy_from_slice(core::slice::from_raw_parts(data, len as usize));
 
         let packet = ReceivedPacket {
             len: len as u8,
@@ -95,10 +95,7 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
             }
         });
 
-        dump_packet_info(&core::slice::from_raw_parts(
-            data as *const u8,
-            len as usize,
-        ));
+        dump_packet_info(core::slice::from_raw_parts(data as *const u8, len as usize));
 
         #[cfg(feature = "async")]
         crate::ble::controller::asynch::hci_read_data_available();
@@ -108,10 +105,12 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
 }
 
 #[cfg(target_arch = "riscv32")]
-static mut G_INTER_FLAGS: [u8; 10] = [0; 10];
+type InterruptsFlagType = u8;
 
 #[cfg(target_arch = "xtensa")]
-static mut G_INTER_FLAGS: [u32; 10] = [0; 10];
+type InterruptsFlagType = u32;
+
+static mut G_INTER_FLAGS: [InterruptsFlagType; 10] = [0; 10];
 
 static mut INTERRUPT_DISABLE_CNT: usize = 0;
 
@@ -120,13 +119,18 @@ unsafe extern "C" fn interrupt_enable() {
     INTERRUPT_DISABLE_CNT -= 1;
     let flags = G_INTER_FLAGS[INTERRUPT_DISABLE_CNT];
     trace!("interrupt_enable {}", flags);
-    critical_section::release(core::mem::transmute(flags));
+    critical_section::release(core::mem::transmute::<
+        InterruptsFlagType,
+        critical_section::RestoreState,
+    >(flags));
 }
 
 #[ram]
 unsafe extern "C" fn interrupt_disable() {
     trace!("interrupt_disable");
-    let flags = core::mem::transmute(critical_section::acquire());
+    let flags = core::mem::transmute::<critical_section::RestoreState, InterruptsFlagType>(
+        critical_section::acquire(),
+    );
     G_INTER_FLAGS[INTERRUPT_DISABLE_CNT] = flags;
     INTERRUPT_DISABLE_CNT += 1;
     trace!("interrupt_disable {}", flags);
@@ -191,8 +195,8 @@ unsafe extern "C" fn queue_send(queue: *const (), item: *const (), _block_time_m
             // assume the size is 8 - shouldn't rely on that
             let message = item as *const u8;
             let mut data = [0u8; 8];
-            for i in 0..8 as usize {
-                data[i] = *(message.offset(i as isize));
+            for (i, data) in data.iter_mut().enumerate() {
+                *data = *message.add(i);
             }
             trace!("queue posting {:?}", data);
 
@@ -592,7 +596,7 @@ pub fn send_hci(data: &[u8]) {
                 }
 
                 PACKET_SENT.store(false, Ordering::Relaxed);
-                API_vhci_host_send_packet(packet.as_ptr() as *const u8, packet.len() as u16);
+                API_vhci_host_send_packet(packet.as_ptr(), packet.len() as u16);
                 trace!("sent vhci host packet");
 
                 dump_packet_info(packet);

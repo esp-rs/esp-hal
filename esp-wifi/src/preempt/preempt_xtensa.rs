@@ -71,15 +71,14 @@ pub fn task_create(task: extern "C" fn()) {
     unsafe {
         let i = allocate_task();
 
-        CTX_TASKS[i].trap_frame.PC = task as u32;
+        CTX_TASKS[i].trap_frame.PC = task as usize as u32;
 
         let task_stack_size = TASK_STACK_SIZE[i];
 
         // stack must be aligned by 16
-        let task_stack_ptr = (addr_of!(TASK_STACK) as *const _ as usize
-            + (task_stack_size as usize * i as usize)
-            + task_stack_size as usize
-            - 4) as u32;
+        let task_stack_ptr =
+            (addr_of!(TASK_STACK) as *const _ as usize + (task_stack_size * i) + task_stack_size
+                - 4) as u32;
         let stack_ptr = task_stack_ptr - (task_stack_ptr % 0x10);
         CTX_TASKS[i].trap_frame.A1 = stack_ptr;
 

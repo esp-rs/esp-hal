@@ -165,6 +165,6 @@ pub fn compat_esp_timer_create(
         debug!("esp_timer_create {:x}", ets_timer as usize);
         *out_handle = ets_timer as _;
 
-        return 0;
+        0
     })
 }

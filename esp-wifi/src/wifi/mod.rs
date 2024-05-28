@@ -17,7 +17,7 @@ use enumset::{EnumSet, EnumSetType};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 #[doc(hidden)]
-pub use os_adapter::*;
+pub(crate) use os_adapter::*;
 use portable_atomic::{AtomicUsize, Ordering};
 #[cfg(feature = "smoltcp")]
 use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
@@ -640,13 +640,13 @@ impl TryFrom<wifi_mode_t> for WifiMode {
     }
 }
 
-impl Into<wifi_mode_t> for WifiMode {
-    fn into(self) -> wifi_mode_t {
+impl From<WifiMode> for wifi_mode_t {
+    fn from(val: WifiMode) -> Self {
         #[allow(non_upper_case_globals)]
-        match self {
-            Self::Sta => wifi_mode_t_WIFI_MODE_STA,
-            Self::Ap => wifi_mode_t_WIFI_MODE_AP,
-            Self::ApSta => wifi_mode_t_WIFI_MODE_APSTA,
+        match val {
+            WifiMode::Sta => wifi_mode_t_WIFI_MODE_STA,
+            WifiMode::Ap => wifi_mode_t_WIFI_MODE_AP,
+            WifiMode::ApSta => wifi_mode_t_WIFI_MODE_APSTA,
         }
     }
 }
@@ -989,19 +989,19 @@ static g_wifi_osi_funcs: wifi_osi_funcs_t = wifi_osi_funcs_t {
     _phy_common_clock_enable: Some(os_adapter_chip_specific::phy_common_clock_enable),
     _coex_register_start_cb: Some(coex_register_start_cb),
 
-    #[cfg(any(esp32c6))]
+    #[cfg(esp32c6)]
     _regdma_link_set_write_wait_content: Some(
         os_adapter_chip_specific::regdma_link_set_write_wait_content_dummy,
     ),
-    #[cfg(any(esp32c6))]
+    #[cfg(esp32c6)]
     _sleep_retention_find_link_by_id: Some(
         os_adapter_chip_specific::sleep_retention_find_link_by_id_dummy,
     ),
-    #[cfg(any(esp32c6))]
+    #[cfg(esp32c6)]
     _sleep_retention_entries_create: Some(
         os_adapter_chip_specific::sleep_retention_entries_create_dummy,
     ),
-    #[cfg(any(esp32c6))]
+    #[cfg(esp32c6)]
     _sleep_retention_entries_destroy: Some(
         os_adapter_chip_specific::sleep_retention_entries_destroy_dummy,
     ),
@@ -1059,8 +1059,8 @@ static mut G_CONFIG: wifi_init_config_t = wifi_init_config_t {
     tx_buf_type: 1,
     static_tx_buf_num: crate::CONFIG.static_tx_buf_num as i32,
     dynamic_tx_buf_num: crate::CONFIG.dynamic_tx_buf_num as i32,
-    rx_mgmt_buf_type: 0 as i32,
-    rx_mgmt_buf_num: 0 as i32,
+    rx_mgmt_buf_type: 0_i32,
+    rx_mgmt_buf_num: 0_i32,
     cache_tx_buf_num: 0,
     csi_enable: 1,
     ampdu_rx_enable: crate::CONFIG.ampdu_rx_enable as i32,
@@ -1223,16 +1223,15 @@ pub(crate) fn wifi_start() -> Result<(), WifiError> {
             ))?;
         };
 
-        let ps_mode;
         cfg_if::cfg_if! {
             if #[cfg(feature = "ps-min-modem")] {
-                ps_mode = include::wifi_ps_type_t_WIFI_PS_MIN_MODEM;
+                let ps_mode = include::wifi_ps_type_t_WIFI_PS_MIN_MODEM;
             } else if #[cfg(feature = "ps-max-modem")] {
-                ps_mode = include::wifi_ps_type_t_WIFI_PS_MAX_MODEM;
+                let ps_mode = include::wifi_ps_type_t_WIFI_PS_MAX_MODEM;
             } else if #[cfg(coex)] {
-                ps_mode = include::wifi_ps_type_t_WIFI_PS_MIN_MODEM;
+                let ps_mode = include::wifi_ps_type_t_WIFI_PS_MIN_MODEM;
             } else {
-                ps_mode = include::wifi_ps_type_t_WIFI_PS_NONE;
+                let ps_mode = include::wifi_ps_type_t_WIFI_PS_NONE;
             }
         };
 
@@ -1244,7 +1243,7 @@ pub(crate) fn wifi_start() -> Result<(), WifiError> {
         cntry_code[2] = crate::CONFIG.country_code_operating_class;
 
         let country = wifi_country_t {
-            cc: core::mem::transmute(cntry_code), // [u8] -> [i8] conversion
+            cc: core::mem::transmute::<[u8; 3], [i8; 3]>(cntry_code), // [u8] -> [i8] conversion
             schan: 1,
             nchan: 13,
             max_tx_power: 20,
@@ -1939,7 +1938,7 @@ impl<MODE: Sealed> WifiRxToken<MODE> {
         // taken, the function will try to trigger a context switch, which will
         // fail if we are in a critical section.
         let buffer = data.as_slice_mut();
-        dump_packet_info(&buffer);
+        dump_packet_info(buffer);
 
         f(buffer)
     }
@@ -2051,10 +2050,7 @@ fn apply_sta_config(config: &ClientConfiguration) -> Result<(), WifiError> {
             password: [0; 64],
             scan_method: crate::CONFIG.scan_method,
             bssid_set: config.bssid.is_some(),
-            bssid: match config.bssid {
-                Some(bssid_ref) => bssid_ref,
-                None => [0; 6],
-            },
+            bssid: config.bssid.unwrap_or_default(),
             channel: config.channel.unwrap_or(0),
             listen_interval: crate::CONFIG.listen_interval,
             sort_method: wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,

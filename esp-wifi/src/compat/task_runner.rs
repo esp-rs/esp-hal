@@ -26,7 +26,12 @@ pub fn spawn_task(
 
     critical_section::with(|_| unsafe {
         if TASK_SPAWN_QUEUE
-            .enqueue((core::mem::transmute(task_func), param))
+            .enqueue((
+                core::mem::transmute::<*mut c_types::c_void, extern "C" fn(*mut c_types::c_void)>(
+                    task_func,
+                ),
+                param,
+            ))
             .is_ok()
         {
             true
