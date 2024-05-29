@@ -1,30 +1,36 @@
-//! # Embassy
+//! Embassy support for [esp-hal].
 //!
-//! The [embassy](https://github.com/embassy-rs/embassy) project is a toolkit to leverage async Rust
-//! in embedded applications. This module adds the required
-//! support to use embassy on Espressif chips.
+//! [Embassy] is a modern asynchronous framework intended for use with embedded
+//! systems. This package provides support for building applications using
+//! Embassy with [esp-hal].
 //!
-//! ## Initialization
-//!
-//! Embassy **must** be initialized by calling [`init`], before beginning any
-//! async operations.
-//!
-//! [`init`] installs a [global time driver](https://github.com/embassy-rs/embassy/tree/main/embassy-time#global-time-driver)
-//! allowing users to use [embassy-time](https://docs.rs/embassy-time/latest/embassy_time/) APIs in any async context
-//! within their application. A time driver must be chosen by enabling the
-//! correct feature on esp-hal, see the crate level documentation for more
-//! details.
+//! [esp-hal]: https://github.com/esp-rs/esp-hal
+//! [embassy]: https://github.com/embassy-rs/embassy
 //!
 //! ## Executors
 //!
-//! We offer two executor types, a thread mode [`Executor`](executor::Executor)
-//! and [`InterruptExecutor`](executor::InterruptExecutor).
-//! An [`InterruptExecutor`](executor::InterruptExecutor) can be used to achieve
-//! preemptive multitasking in async applications, which is usually something reserved for more traditional RTOS systems, read more about it in [the embassy documentation](https://embassy.dev/book/dev/runtime.html).
-
-#![cfg_attr(xtensa, feature(asm_experimental_arch))]
-#![deny(missing_docs)]
+//! Two types of executors are provided:
+//!
+//! - [Executor]: A thread-mode executor
+//! - [InterruptExecutor]: An interrupt-mode executor
+//!
+//! [InterruptExecutor] can be used to achieve preemptive multitasking in
+//! asynchronous applications, which is typically something reserved for more
+//! traditional RTOS. More information can be found in the [Embassy
+//! documentation].
+//!
+//! [embassy documentation]: https://embassy.dev/book/dev/runtime.html
+//!
+//! ## Initialization
+//!
+//! Embassy **must** be initialized by calling the [init] function. This
+//! initialization must be performed *prior* to spawning any tasks.
+//!
+//! ## Feature Flags
+#![doc = document_features::document_features!()]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+#![deny(missing_docs)]
+#![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![no_std]
 
 // MUST be the first module
