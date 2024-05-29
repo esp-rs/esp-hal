@@ -1,5 +1,3 @@
-//! Executor
-
 pub use self::{interrupt::*, thread::*};
 
 mod interrupt;

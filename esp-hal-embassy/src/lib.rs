@@ -35,10 +35,11 @@ use core::cell::Cell;
 use embassy_time_driver::{AlarmHandle, Driver};
 use esp_hal::clock::Clocks;
 
-pub mod executor;
-mod time_driver;
-
+pub use self::executor::{Executor, InterruptExecutor};
 use self::time_driver::{EmbassyTimer, TimerType};
+
+mod executor;
+mod time_driver;
 
 /// Initialize embassy
 pub fn init(clocks: &Clocks, time_driver: TimerType) {

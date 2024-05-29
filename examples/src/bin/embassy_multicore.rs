@@ -25,7 +25,7 @@ use esp_hal::{
     system::SystemControl,
     timer::timg::TimerGroup,
 };
-use esp_hal_embassy::executor::Executor;
+use esp_hal_embassy::Executor;
 use esp_println::println;
 use static_cell::StaticCell;
 
