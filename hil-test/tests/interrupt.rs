@@ -100,6 +100,7 @@ mod tests {
     }
 
     #[test]
+    #[rustfmt::skip]
     fn interrupt_latency(_ctx: Context) {
         // unsafe {
         //     asm!(
