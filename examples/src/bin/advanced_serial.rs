@@ -33,8 +33,7 @@ fn main() -> ! {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let mut serial1 = Uart::new_with_config(peripherals.UART1, Config::default(), &clocks, None)
-        .with_tx_rx(io.pins.gpio4, io.pins.gpio5);
+    let mut serial1 = Uart::new(peripherals.UART1, &clocks, io.pins.gpio4, io.pins.gpio5);
 
     let delay = Delay::new(&clocks);
 

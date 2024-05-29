@@ -38,8 +38,7 @@ impl Context {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let uart = Uart::new_with_config(peripherals.UART0, Config::default(), &clocks, None)
-            .with_tx_rx(io.pins.gpio2, io.pins.gpio4);
+        let uart = Uart::new(peripherals.UART0, &clocks, io.pins.gpio2, io.pins.gpio4);
 
         Context { clocks, uart }
     }
