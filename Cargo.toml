@@ -18,5 +18,6 @@ exclude  = [
     "examples",
     "extras/bench-server",
     "extras/esp-wifishark",
+    "extras/ieee802154-sniffer",
     "hil-test",
 ]
