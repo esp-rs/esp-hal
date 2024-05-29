@@ -41,6 +41,10 @@ name    = "interrupt"
 harness = false
 
 [[test]]
+name    = "i2s"
+harness = false
+
+[[test]]
 name    = "spi_full_duplex"
 harness = false
 

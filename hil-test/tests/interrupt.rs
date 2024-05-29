@@ -1,4 +1,6 @@
 //! Interrupt Test
+//!
+//! "Disabled" for now - see https://github.com/esp-rs/esp-hal/pull/1635#issuecomment-2137405251
 
 //% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2
 
@@ -98,29 +100,30 @@ mod tests {
     }
 
     #[test]
-    fn interrupt_latency(ctx: Context) {
-        unsafe {
-            asm!(
-                "
-        csrrwi x0, 0x7e0, 1 #what to count, for cycles write 1 for instructions write 2
-        csrrwi x0, 0x7e1, 0 #disable counter
-        csrrwi x0, 0x7e2, 0 #reset counter
-        "
-            );
-        }
+    #[rustfmt::skip]
+    fn interrupt_latency(_ctx: Context) {
+        // unsafe {
+        //     asm!(
+        //         "
+        // csrrwi x0, 0x7e0, 1 #what to count, for cycles write 1 for instructions write 2
+        // csrrwi x0, 0x7e1, 0 #disable counter
+        // csrrwi x0, 0x7e2, 0 #reset counter
+        // "
+        //     );
+        // }
 
-        // interrupt is raised from assembly for max timer granularity.
-        unsafe {
-            asm!(
-                "
-        li {bit}, 1                   # Flip flag (bit 0)
-        csrrwi x0, 0x7e1, 1           # enable timer
-        sw {bit}, 0({addr})           # trigger FROM_CPU_INTR0
-        ",
-            options(nostack),
-            addr = in(reg) ctx.sw0_trigger_addr,
-            bit = out(reg) _,
-            )
-        }
+        // // interrupt is raised from assembly for max timer granularity.
+        // unsafe {
+        //     asm!(
+        //         "
+        // li {bit}, 1                   # Flip flag (bit 0)
+        // csrrwi x0, 0x7e1, 1           # enable timer
+        // sw {bit}, 0({addr})           # trigger FROM_CPU_INTR0
+        // ",
+        //     options(nostack),
+        //     addr = in(reg) ctx.sw0_trigger_addr,
+        //     bit = out(reg) _,
+        //     )
+        // }
     }
 }
