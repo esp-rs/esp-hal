@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed the `SystemExt` trait (#1495)
 - Removed the `GpioExt` trait (#1496)
+- Embassy support (and all related features) has been removed, now available in the `esp-hal-embassy` package instead (#1595)
 
 ## [0.17.0] - 2024-04-18
 
