@@ -102,6 +102,7 @@ use crate::{
         uart0::{fifo::FIFO_SPEC, RegisterBlock},
         Interrupt,
     },
+    private::Internal,
     system::PeripheralClockControl,
     Blocking,
     Mode,
@@ -369,8 +370,8 @@ where
     /// Configure RTS pin
     pub fn with_rts<RTS: OutputPin>(self, rts: impl Peripheral<P = RTS> + 'd) -> Self {
         crate::into_ref!(rts);
-        rts.set_to_push_pull_output(crate::private::Internal);
-        rts.connect_peripheral_to_output(T::rts_signal(), crate::private::Internal);
+        rts.set_to_push_pull_output(Internal);
+        rts.connect_peripheral_to_output(T::rts_signal(), Internal);
 
         self
     }
@@ -416,8 +417,8 @@ where
         tx: impl Peripheral<P = TX> + 'd,
     ) -> Self {
         crate::into_ref!(tx);
-        tx.set_to_push_pull_output(crate::private::Internal);
-        tx.connect_peripheral_to_output(T::tx_signal(), crate::private::Internal);
+        tx.set_to_push_pull_output(Internal);
+        tx.connect_peripheral_to_output(T::tx_signal(), Internal);
         Self::new_inner()
     }
 }
@@ -438,8 +439,8 @@ where
     /// Configure CTS pin
     pub fn with_cts<CTS: InputPin>(self, cts: impl Peripheral<P = CTS> + 'd) -> Self {
         crate::into_ref!(cts);
-        cts.set_to_input(crate::private::Internal);
-        cts.connect_input_to_peripheral(T::cts_signal(), crate::private::Internal);
+        cts.set_to_input(Internal);
+        cts.connect_input_to_peripheral(T::cts_signal(), Internal);
 
         self
     }
@@ -492,8 +493,8 @@ where
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Self {
         crate::into_ref!(rx);
-        rx.set_to_input(crate::private::Internal);
-        rx.connect_input_to_peripheral(T::rx_signal(), crate::private::Internal);
+        rx.set_to_input(Internal);
+        rx.connect_input_to_peripheral(T::rx_signal(), Internal);
         Self::new_inner()
     }
 }
@@ -514,11 +515,11 @@ where
     ) -> Self {
         crate::into_ref!(tx);
         crate::into_ref!(rx);
-        tx.set_to_push_pull_output(crate::private::Internal);
-        tx.connect_peripheral_to_output(T::tx_signal(), crate::private::Internal);
+        tx.set_to_push_pull_output(Internal);
+        tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
-        rx.set_to_input(crate::private::Internal);
-        rx.connect_input_to_peripheral(T::rx_signal(), crate::private::Internal);
+        rx.set_to_input(Internal);
+        rx.connect_input_to_peripheral(T::rx_signal(), Internal);
         Self::new_with_config_inner(uart, config, clocks, interrupt)
     }
 
@@ -531,11 +532,11 @@ where
     ) -> Self {
         crate::into_ref!(tx);
         crate::into_ref!(rx);
-        tx.set_to_push_pull_output(crate::private::Internal);
-        tx.connect_peripheral_to_output(T::tx_signal(), crate::private::Internal);
+        tx.set_to_push_pull_output(Internal);
+        tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
-        rx.set_to_input(crate::private::Internal);
-        rx.connect_input_to_peripheral(T::rx_signal(), crate::private::Internal);
+        rx.set_to_input(Internal);
+        rx.connect_input_to_peripheral(T::rx_signal(), Internal);
         Self::new_inner(uart, clocks)
     }
 
@@ -547,11 +548,11 @@ where
         tx: &mut DefaultTxPin,
         rx: &mut DefaultRxPin,
     ) -> Self {
-        tx.set_to_push_pull_output(crate::private::Internal);
-        tx.connect_peripheral_to_output(T::tx_signal(), crate::private::Internal);
+        tx.set_to_push_pull_output(Internal);
+        tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
-        rx.set_to_input(crate::private::Internal);
-        rx.connect_input_to_peripheral(T::rx_signal(), crate::private::Internal);
+        rx.set_to_input(Internal);
+        rx.connect_input_to_peripheral(T::rx_signal(), Internal);
         Self::new_inner(uart, clocks)
     }
 }
@@ -615,8 +616,8 @@ where
     /// Configure CTS pin
     pub fn with_cts<CTS: InputPin>(self, cts: impl Peripheral<P = CTS> + 'd) -> Self {
         crate::into_ref!(cts);
-        cts.set_to_input(crate::private::Internal);
-        cts.connect_input_to_peripheral(T::cts_signal(), crate::private::Internal);
+        cts.set_to_input(Internal);
+        cts.connect_input_to_peripheral(T::cts_signal(), Internal);
 
         self
     }
@@ -624,8 +625,8 @@ where
     /// Configure RTS pin
     pub fn with_rts<RTS: OutputPin>(self, rts: impl Peripheral<P = RTS> + 'd) -> Self {
         crate::into_ref!(rts);
-        rts.set_to_push_pull_output(crate::private::Internal);
-        rts.connect_peripheral_to_output(T::rts_signal(), crate::private::Internal);
+        rts.set_to_push_pull_output(Internal);
+        rts.connect_peripheral_to_output(T::rts_signal(), Internal);
 
         self
     }
@@ -1860,11 +1861,11 @@ mod asynch {
         ) -> Self {
             crate::into_ref!(tx);
             crate::into_ref!(rx);
-            tx.set_to_push_pull_output(crate::private::Internal);
-            tx.connect_peripheral_to_output(T::tx_signal(), crate::private::Internal);
+            tx.set_to_push_pull_output(Internal);
+            tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
-            rx.set_to_input(crate::private::Internal);
-            rx.connect_input_to_peripheral(T::rx_signal(), crate::private::Internal);
+            rx.set_to_input(Internal);
+            rx.connect_input_to_peripheral(T::rx_signal(), Internal);
             Self::new_with_config_inner(
                 uart,
                 config,
@@ -1930,8 +1931,8 @@ mod asynch {
             tx: impl Peripheral<P = TX> + 'd,
         ) -> Self {
             crate::into_ref!(tx);
-            tx.set_to_push_pull_output(crate::private::Internal);
-            tx.connect_peripheral_to_output(T::tx_signal(), crate::private::Internal);
+            tx.set_to_push_pull_output(Internal);
+            tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
             let interrupt = match T::uart_number() {
                 #[cfg(uart0)]
@@ -1995,8 +1996,8 @@ mod asynch {
             rx: impl Peripheral<P = RX> + 'd,
         ) -> Self {
             crate::into_ref!(rx);
-            rx.set_to_input(crate::private::Internal);
-            rx.connect_input_to_peripheral(T::rx_signal(), crate::private::Internal);
+            rx.set_to_input(Internal);
+            rx.connect_input_to_peripheral(T::rx_signal(), Internal);
 
             let interrupt = match T::uart_number() {
                 #[cfg(uart0)]
