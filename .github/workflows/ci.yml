@@ -182,29 +182,23 @@ jobs:
           components: rust-src
       - uses: Swatinem/rust-cache@v2
 
-      # TODO:
-      #  - Enable additional (all?) features for MSRV check
-
       # Verify the MSRV for all RISC-V chips.
       - name: msrv (esp-hal)
         run: |
-          cargo xtask build-package --features=esp32c2 --target=riscv32imc-unknown-none-elf   esp-hal
-          cargo xtask build-package --features=esp32c3 --target=riscv32imc-unknown-none-elf   esp-hal
-          cargo xtask build-package --features=esp32c6 --target=riscv32imac-unknown-none-elf  esp-hal
-          cargo xtask build-package --features=esp32h2 --target=riscv32imac-unknown-none-elf  esp-hal
+          cargo xtask build-package --features=esp32c2,ci --target=riscv32imc-unknown-none-elf   esp-hal
+          cargo xtask build-package --features=esp32c3,ci --target=riscv32imc-unknown-none-elf   esp-hal
+          cargo xtask build-package --features=esp32c6,ci --target=riscv32imac-unknown-none-elf  esp-hal
+          cargo xtask build-package --features=esp32h2,ci --target=riscv32imac-unknown-none-elf  esp-hal
       - name: msrv (esp-lp-hal)
         run: |
-          cargo xtask build-package --features=esp32c6 --target=riscv32imac-unknown-none-elf esp-lp-hal
-          cargo xtask build-package --features=esp32s2 --target=riscv32imc-unknown-none-elf  esp-lp-hal
-          cargo xtask build-package --features=esp32s3 --target=riscv32imc-unknown-none-elf  esp-lp-hal
+          cargo xtask build-package --features=esp32c6,ci --target=riscv32imac-unknown-none-elf esp-lp-hal
+          cargo xtask build-package --features=esp32s2,ci --target=riscv32imc-unknown-none-elf  esp-lp-hal
+          cargo xtask build-package --features=esp32s3,ci --target=riscv32imc-unknown-none-elf  esp-lp-hal
 
   msrv-xtensa:
     runs-on: ubuntu-latest
     env:
       RUSTC_BOOTSTRAP: 1
-
-      # TODO:
-      #  - Enable additional (all?) features for MSRV check
 
     steps:
       - uses: actions/checkout@v4
@@ -217,9 +211,9 @@ jobs:
       # Verify the MSRV for all Xtensa chips:
       - name: msrv (esp-hal)
         run: |
-          cargo xtask build-package --toolchain=esp --features=esp32   --target=xtensa-esp32-none-elf   esp-hal
-          cargo xtask build-package --toolchain=esp --features=esp32s2 --target=xtensa-esp32s2-none-elf esp-hal
-          cargo xtask build-package --toolchain=esp --features=esp32s3 --target=xtensa-esp32s3-none-elf esp-hal
+          cargo xtask build-package --toolchain=esp --features=esp32,ci   --target=xtensa-esp32-none-elf   esp-hal
+          cargo xtask build-package --toolchain=esp --features=esp32s2,ci --target=xtensa-esp32s2-none-elf esp-hal
+          cargo xtask build-package --toolchain=esp --features=esp32s3,ci --target=xtensa-esp32s3-none-elf esp-hal
 
   # --------------------------------------------------------------------------
   # Lint & Format

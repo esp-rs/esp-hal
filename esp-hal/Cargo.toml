@@ -216,6 +216,7 @@ ci = [
     "async",
     "embassy",
     "embassy-time-timg0",
+    "embedded-io"
 ]
 
 [lints.clippy]
