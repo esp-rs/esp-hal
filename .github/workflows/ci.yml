@@ -191,9 +191,9 @@ jobs:
           cargo xtask build-package --features=esp32h2,ci --target=riscv32imac-unknown-none-elf  esp-hal
       - name: msrv (esp-lp-hal)
         run: |
-          cargo xtask build-package --features=esp32c6,ci --target=riscv32imac-unknown-none-elf esp-lp-hal
-          cargo xtask build-package --features=esp32s2,ci --target=riscv32imc-unknown-none-elf  esp-lp-hal
-          cargo xtask build-package --features=esp32s3,ci --target=riscv32imc-unknown-none-elf  esp-lp-hal
+          cargo xtask build-package --features=esp32c6 --target=riscv32imac-unknown-none-elf esp-lp-hal
+          cargo xtask build-package --features=esp32s2 --target=riscv32imc-unknown-none-elf  esp-lp-hal
+          cargo xtask build-package --features=esp32s3 --target=riscv32imc-unknown-none-elf  esp-lp-hal
 
   msrv-xtensa:
     runs-on: ubuntu-latest
