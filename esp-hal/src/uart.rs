@@ -411,21 +411,13 @@ where
     T: Instance + 'd,
 {
     /// Create a new UART TX instance in [`Blocking`] mode.
-    ///
-    /// Use [crate::gpio::NO_PIN] for the `rts` parameter if RTS is not used.
-    pub fn new<TX: OutputPin, RTS: OutputPin>(
+    pub fn new<TX: OutputPin>(
         _uart: impl Peripheral<P = T> + 'd,
         tx: impl Peripheral<P = TX> + 'd,
-        rts: Option<impl Peripheral<P = RTS> + 'd>,
     ) -> Self {
         crate::into_ref!(tx);
         tx.set_to_push_pull_output(crate::private::Internal);
         tx.connect_peripheral_to_output(T::tx_signal(), crate::private::Internal);
-        if let Some(rts) = rts {
-            crate::into_ref!(rts);
-            rts.set_to_push_pull_output(crate::private::Internal);
-            rts.connect_peripheral_to_output(T::rts_signal(), crate::private::Internal);
-        }
         Self::new_inner()
     }
 }
@@ -495,21 +487,13 @@ where
     T: Instance + 'd,
 {
     /// Create a new UART RX instance in [`Blocking`] mode.
-    ///
-    /// Use [crate::gpio::NO_PIN] for the `cts` parameter if CTS is not used.
-    pub fn new<RX: InputPin, CTS: InputPin>(
+    pub fn new<RX: InputPin>(
         _uart: impl Peripheral<P = T> + 'd,
         rx: impl Peripheral<P = RX> + 'd,
-        cts: Option<impl Peripheral<P = CTS> + 'd>,
     ) -> Self {
         crate::into_ref!(rx);
         rx.set_to_input(crate::private::Internal);
         rx.connect_input_to_peripheral(T::rx_signal(), crate::private::Internal);
-        if let Some(cts) = cts {
-            crate::into_ref!(cts);
-            cts.set_to_input(crate::private::Internal);
-            cts.connect_input_to_peripheral(T::cts_signal(), crate::private::Internal);
-        }
         Self::new_inner()
     }
 }
