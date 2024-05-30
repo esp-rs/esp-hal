@@ -31,7 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `embassy-usb` support (#1517)
 - SPI Slave support for ESP32-S2 (#1562)
 - Add new generic `OneShotTimer` and `PeriodicTimer` drivers, plus new `Timer` trait which is implemented for `TIMGx` and `SYSTIMER` (#1570)
-- uart: Add `with_pin`s methods to configure TX,RX, CTS, and RTS pins (#1592)
+- uart: Add `with_cts`/`with_rts`s methods to configure CTS, and RTS pins (#1592)
+- uart: Constructors now require TX and RX pins (#1592)
+- uart: Added `new_with_default_pins` constructors (#1592)
 
 ### Fixed
 
