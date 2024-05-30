@@ -74,6 +74,9 @@
 //! # }
 //! ```
 
+#[cfg(esp32)]
+pub mod camera;
+
 use core::marker::PhantomData;
 
 use embedded_dma::{ReadBuffer, WriteBuffer};
@@ -931,6 +934,29 @@ mod private {
         fn din_signal() -> InputSignal;
     }
 
+    pub trait ExtendedSignals: Signals {
+        fn ws_in_signal() -> InputSignal;
+        fn h_sync_signal() -> InputSignal;
+        fn v_sync_signal() -> InputSignal;
+        fn h_enable_signal() -> InputSignal;
+        fn din0_signal() -> InputSignal;
+        fn din1_signal() -> InputSignal;
+        fn din2_signal() -> InputSignal;
+        fn din3_signal() -> InputSignal;
+        fn din4_signal() -> InputSignal;
+        fn din5_signal() -> InputSignal;
+        fn din6_signal() -> InputSignal;
+        fn din7_signal() -> InputSignal;
+        fn din8_signal() -> InputSignal;
+        fn din9_signal() -> InputSignal;
+        fn din10_signal() -> InputSignal;
+        fn din11_signal() -> InputSignal;
+        fn din12_signal() -> InputSignal;
+        fn din13_signal() -> InputSignal;
+        fn din14_signal() -> InputSignal;
+        fn din15_signal() -> InputSignal;
+    }
+
     pub trait RegBlock {
         fn register_block() -> &'static RegisterBlock;
     }
@@ -1187,6 +1213,11 @@ mod private {
                 .modify(|_, w| unsafe { w.rx_eof_num().bits((len / 4) as u32) });
 
             i2s.conf().modify(|_, w| w.rx_start().set_bit());
+        }
+
+        fn rx_stop() {
+            let i2s = Self::register_block();
+            i2s.conf().modify(|_, w| w.rx_start().clear_bit());
         }
 
         fn wait_for_rx_done() {
@@ -1876,6 +1907,89 @@ mod private {
     }
 
     #[cfg(esp32)]
+    impl ExtendedSignals for crate::peripherals::I2S0 {
+        fn ws_in_signal() -> InputSignal {
+            InputSignal::I2S0I_WS
+        }
+
+        fn h_sync_signal() -> InputSignal {
+            InputSignal::I2S0I_H_SYNC
+        }
+
+        fn v_sync_signal() -> InputSignal {
+            InputSignal::I2S0I_V_SYNC
+        }
+
+        fn h_enable_signal() -> InputSignal {
+            InputSignal::I2S0I_H_ENABLE
+        }
+
+        fn din0_signal() -> InputSignal {
+            InputSignal::I2S0I_DATA_0
+        }
+
+        fn din1_signal() -> InputSignal {
+            InputSignal::I2S0I_DATA_1
+        }
+
+        fn din2_signal() -> InputSignal {
+            InputSignal::I2S0I_DATA_2
+        }
+
+        fn din3_signal() -> InputSignal {
+            InputSignal::I2S0I_DATA_3
+        }
+
+        fn din4_signal() -> InputSignal {
+            InputSignal::I2S0I_DATA_4
+        }
+
+        fn din5_signal() -> InputSignal {
+            InputSignal::I2S0I_DATA_5
+        }
+
+        fn din6_signal() -> InputSignal {
+            InputSignal::I2S0I_DATA_6
+        }
+
+        fn din7_signal() -> InputSignal {
+            InputSignal::I2S0I_DATA_7
+        }
+
+        fn din8_signal() -> InputSignal {
+            InputSignal::I2S0I_DATA_8
+        }
+
+        fn din9_signal() -> InputSignal {
+            InputSignal::I2S0I_DATA_9
+        }
+
+        fn din10_signal() -> InputSignal {
+            InputSignal::I2S0I_DATA_10
+        }
+
+        fn din11_signal() -> InputSignal {
+            InputSignal::I2S0I_DATA_11
+        }
+
+        fn din12_signal() -> InputSignal {
+            InputSignal::I2S0I_DATA_12
+        }
+
+        fn din13_signal() -> InputSignal {
+            InputSignal::I2S0I_DATA_13
+        }
+
+        fn din14_signal() -> InputSignal {
+            InputSignal::I2S0I_DATA_14
+        }
+
+        fn din15_signal() -> InputSignal {
+            InputSignal::I2S0I_DATA_15
+        }
+    }
+
+    #[cfg(esp32)]
     impl Signals for crate::peripherals::I2S1 {
         fn get_peripheral() -> Peripheral {
             Peripheral::I2s1
@@ -1910,6 +2024,89 @@ mod private {
         }
 
         fn din_signal() -> InputSignal {
+            InputSignal::I2S1I_DATA_15
+        }
+    }
+
+    #[cfg(esp32)]
+    impl ExtendedSignals for crate::peripherals::I2S1 {
+        fn ws_in_signal() -> InputSignal {
+            InputSignal::I2S1I_WS
+        }
+
+        fn h_sync_signal() -> InputSignal {
+            InputSignal::I2S1I_H_SYNC
+        }
+
+        fn v_sync_signal() -> InputSignal {
+            InputSignal::I2S1I_V_SYNC
+        }
+
+        fn h_enable_signal() -> InputSignal {
+            InputSignal::I2S1I_H_ENABLE
+        }
+
+        fn din0_signal() -> InputSignal {
+            InputSignal::I2S1I_DATA_0
+        }
+
+        fn din1_signal() -> InputSignal {
+            InputSignal::I2S1I_DATA_1
+        }
+
+        fn din2_signal() -> InputSignal {
+            InputSignal::I2S1I_DATA_2
+        }
+
+        fn din3_signal() -> InputSignal {
+            InputSignal::I2S1I_DATA_3
+        }
+
+        fn din4_signal() -> InputSignal {
+            InputSignal::I2S1I_DATA_4
+        }
+
+        fn din5_signal() -> InputSignal {
+            InputSignal::I2S1I_DATA_5
+        }
+
+        fn din6_signal() -> InputSignal {
+            InputSignal::I2S1I_DATA_6
+        }
+
+        fn din7_signal() -> InputSignal {
+            InputSignal::I2S1I_DATA_7
+        }
+
+        fn din8_signal() -> InputSignal {
+            InputSignal::I2S1I_DATA_8
+        }
+
+        fn din9_signal() -> InputSignal {
+            InputSignal::I2S1I_DATA_9
+        }
+
+        fn din10_signal() -> InputSignal {
+            InputSignal::I2S1I_DATA_10
+        }
+
+        fn din11_signal() -> InputSignal {
+            InputSignal::I2S1I_DATA_11
+        }
+
+        fn din12_signal() -> InputSignal {
+            InputSignal::I2S1I_DATA_12
+        }
+
+        fn din13_signal() -> InputSignal {
+            InputSignal::I2S1I_DATA_13
+        }
+
+        fn din14_signal() -> InputSignal {
+            InputSignal::I2S1I_DATA_14
+        }
+
+        fn din15_signal() -> InputSignal {
             InputSignal::I2S1I_DATA_15
         }
     }
