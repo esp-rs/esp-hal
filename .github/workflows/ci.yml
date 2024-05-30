@@ -165,6 +165,25 @@ jobs:
       - name: rustdoc
         run: cd esp-riscv-rt/ && cargo doc
 
+  extras:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get -y install musl-tools libudev-dev pkg-config
+      # Build the extra crates
+      - name: Build the bench-server
+        run: cd extras/bench-server && cargo build
+      - name: Build esp-wifishark
+        run: cd extras/esp-wifishark && cargo build
+      - name: Build ieee802154-sniffer
+        run: cd extras/ieee802154-sniffer && cargo build
   # --------------------------------------------------------------------------
   # MSRV
 
