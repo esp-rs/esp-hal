@@ -18,13 +18,12 @@ use esp_hal::{
     gpio::Io,
     peripherals::{Peripherals, UART0},
     system::SystemControl,
-    uart::{config::Config, Uart, UartRx, UartTx},
+    uart::Uart,
     Async,
 };
 
 struct Context {
-    tx: UartTx<'static, UART0, Async>,
-    rx: UartRx<'static, UART0, Async>,
+    uart: Uart<'static, UART0, Async>,
 }
 
 impl Context {
@@ -35,9 +34,8 @@ impl Context {
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
         let uart = Uart::new_async(peripherals.UART0, &clocks, io.pins.gpio2, io.pins.gpio4);
-        let (tx, rx) = uart.split();
 
-        Context { rx, tx }
+        Context { uart }
     }
 }
 
@@ -59,14 +57,11 @@ mod tests {
         const SEND: &[u8] = &*b"Hello ESP32";
         let mut buf = [0u8; SEND.len()];
 
-        // Drain the FIFO to clear previous message:
-        ctx.tx.flush_async().await.unwrap();
-        while ctx.rx.drain_fifo(&mut buf[..]) > 0 {}
+        ctx.uart.flush_async().await.unwrap();
+        ctx.uart.write_async(&SEND).await.unwrap();
+        ctx.uart.flush_async().await.unwrap();
 
-        ctx.tx.write_async(&SEND).await.unwrap();
-        ctx.tx.flush_async().await.unwrap();
-
-        ctx.rx.read_async(&mut buf[..]).await.unwrap();
+        ctx.uart.read_async(&mut buf[..]).await.unwrap();
         assert_eq!(&buf[..], SEND);
     }
 }
