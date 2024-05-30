@@ -1932,6 +1932,21 @@ mod asynch {
             crate::into_ref!(tx);
             tx.set_to_push_pull_output(crate::private::Internal);
             tx.connect_peripheral_to_output(T::tx_signal(), crate::private::Internal);
+
+            let interrupt = match T::uart_number() {
+                #[cfg(uart0)]
+                0 => uart0,
+                #[cfg(uart1)]
+                1 => uart1,
+                #[cfg(uart2)]
+                2 => uart2,
+                _ => unreachable!(),
+            };
+            unsafe {
+                crate::interrupt::bind_interrupt(T::interrupt(), interrupt.handler());
+                crate::interrupt::enable(T::interrupt(), interrupt.priority()).unwrap();
+            }
+
             Self::new_inner()
         }
 
@@ -1982,6 +1997,21 @@ mod asynch {
             crate::into_ref!(rx);
             rx.set_to_input(crate::private::Internal);
             rx.connect_input_to_peripheral(T::rx_signal(), crate::private::Internal);
+
+            let interrupt = match T::uart_number() {
+                #[cfg(uart0)]
+                0 => uart0,
+                #[cfg(uart1)]
+                1 => uart1,
+                #[cfg(uart2)]
+                2 => uart2,
+                _ => unreachable!(),
+            };
+            unsafe {
+                crate::interrupt::bind_interrupt(T::interrupt(), interrupt.handler());
+                crate::interrupt::enable(T::interrupt(), interrupt.priority()).unwrap();
+            }
+
             Self::new_inner()
         }
 
