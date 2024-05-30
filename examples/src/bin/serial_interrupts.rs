@@ -14,7 +14,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio,
+    gpio::Io,
     peripherals::{Peripherals, UART0},
     prelude::*,
     system::SystemControl,
@@ -35,11 +35,31 @@ fn main() -> ! {
 
     let delay = Delay::new(&clocks);
 
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+
+    // Default pins for Uart/Serial communication
+    #[cfg(feature = "esp32")]
+    let (tx_pin, rx_pin) = (io.pins.gpio1, io.pins.gpio3);
+    #[cfg(feature = "esp32c2")]
+    let (tx_pin, rx_pin) = (io.pins.gpio20, io.pins.gpio19);
+    #[cfg(feature = "esp32c3")]
+    let (tx_pin, rx_pin) = (io.pins.gpio21, io.pins.gpio20);
+    #[cfg(feature = "esp32c6")]
+    let (tx_pin, rx_pin) = (io.pins.gpio16, io.pins.gpio17);
+    #[cfg(feature = "esp32h2")]
+    let (tx_pin, rx_pin) = (io.pins.gpio24, io.pins.gpio23);
+    #[cfg(feature = "esp32s2")]
+    let (tx_pin, rx_pin) = (io.pins.gpio43, io.pins.gpio44);
+    #[cfg(feature = "esp32s3")]
+    let (tx_pin, rx_pin) = (io.pins.gpio43, io.pins.gpio44);
+
     let mut uart0 = Uart::new_with_config(
         peripherals.UART0,
         Config::default(),
         &clocks,
         Some(interrupt_handler),
+        tx_pin,
+        rx_pin,
     );
 
     critical_section::with(|cs| {

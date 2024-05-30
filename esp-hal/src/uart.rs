@@ -115,6 +115,32 @@ use crate::soc::constants::RC_FAST_CLK;
 #[cfg(any(esp32, esp32s2))]
 use crate::soc::constants::REF_TICK;
 
+// Default pins for Uart/Serial communication
+cfg_if::cfg_if! {
+    if #[cfg(esp32)] {
+        pub type DefaultTxPin = crate::gpio::Gpio1;
+        pub type DefaultRxPin = crate::gpio::Gpio3;
+    } else if #[cfg(esp32c2)] {
+        pub type DefaultTxPin = crate::gpio::Gpio20;
+        pub type DefaultRxPin = crate::gpio::Gpio19;
+    } else if #[cfg(esp32c3)] {
+        pub type DefaultTxPin = crate::gpio::Gpio21;
+        pub type DefaultRxPin = crate::gpio::Gpio20;
+    }else if #[cfg(esp32c6)] {
+        pub type DefaultTxPin = crate::gpio::Gpio16;
+        pub type DefaultRxPin = crate::gpio::Gpio17;
+    }else if #[cfg(esp32h2)] {
+        pub type DefaultTxPin = crate::gpio::Gpio24;
+        pub type DefaultRxPin = crate::gpio::Gpio23;
+    } else if #[cfg(esp32s2)] {
+        pub type DefaultTxPin = crate::gpio::Gpio43;
+        pub type DefaultRxPin = crate::gpio::Gpio44;
+    } else if #[cfg(esp32s3)] {
+        pub type DefaultTxPin = crate::gpio::Gpio43;
+        pub type DefaultRxPin = crate::gpio::Gpio44;
+    }
+}
+
 /// UART Error
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -494,12 +520,21 @@ where
 {
     /// Create a new UART instance with configuration options in [`Blocking`]
     /// mode.
-    pub fn new_with_config(
+    pub fn new_with_config<TX: OutputPin, RX: InputPin>(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
         clocks: &Clocks,
         interrupt: Option<InterruptHandler>,
+        tx: impl Peripheral<P = TX> + 'd,
+        rx: impl Peripheral<P = RX> + 'd,
     ) -> Self {
+        crate::into_ref!(tx);
+        crate::into_ref!(rx);
+        tx.set_to_push_pull_output(crate::private::Internal);
+        tx.connect_peripheral_to_output(T::tx_signal(), crate::private::Internal);
+
+        rx.set_to_input(crate::private::Internal);
+        rx.connect_input_to_peripheral(T::rx_signal(), crate::private::Internal);
         Self::new_with_config_inner(uart, config, clocks, interrupt)
     }
 
@@ -512,6 +547,22 @@ where
     ) -> Self {
         crate::into_ref!(tx);
         crate::into_ref!(rx);
+        tx.set_to_push_pull_output(crate::private::Internal);
+        tx.connect_peripheral_to_output(T::tx_signal(), crate::private::Internal);
+
+        rx.set_to_input(crate::private::Internal);
+        rx.connect_input_to_peripheral(T::rx_signal(), crate::private::Internal);
+        Self::new_inner(uart, clocks)
+    }
+
+    /// Create a new UART instance with defaults in [`Blocking`] mode.
+    /// Verify that the default pins (DefaultTxPin and DefaultRxPin) are used.
+    pub fn new_with_default_pins(
+        uart: impl Peripheral<P = T> + 'd,
+        clocks: &Clocks,
+        tx: &mut DefaultTxPin,
+        rx: &mut DefaultRxPin,
+    ) -> Self {
         tx.set_to_push_pull_output(crate::private::Internal);
         tx.connect_peripheral_to_output(T::tx_signal(), crate::private::Internal);
 
@@ -1816,11 +1867,20 @@ mod asynch {
     {
         /// Create a new UART instance with configuration options in [`Async`]
         /// mode.
-        pub fn new_async_with_config(
+        pub fn new_async_with_config<TX: OutputPin, RX: InputPin>(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
             clocks: &Clocks,
+            tx: impl Peripheral<P = TX> + 'd,
+            rx: impl Peripheral<P = RX> + 'd,
         ) -> Self {
+            crate::into_ref!(tx);
+            crate::into_ref!(rx);
+            tx.set_to_push_pull_output(crate::private::Internal);
+            tx.connect_peripheral_to_output(T::tx_signal(), crate::private::Internal);
+
+            rx.set_to_input(crate::private::Internal);
+            rx.connect_input_to_peripheral(T::rx_signal(), crate::private::Internal);
             Self::new_with_config_inner(
                 uart,
                 config,
@@ -1844,14 +1904,17 @@ mod asynch {
             tx: impl Peripheral<P = TX> + 'd,
             rx: impl Peripheral<P = RX> + 'd,
         ) -> Self {
-            crate::into_ref!(tx);
-            crate::into_ref!(rx);
-            tx.set_to_push_pull_output(crate::private::Internal);
-            tx.connect_peripheral_to_output(T::tx_signal(), crate::private::Internal);
+            Self::new_async_with_config(uart, Default::default(), clocks, tx, rx)
+        }
 
-            rx.set_to_input(crate::private::Internal);
-            rx.connect_input_to_peripheral(T::rx_signal(), crate::private::Internal);
-            Self::new_async_with_config(uart, Default::default(), clocks)
+        /// Create a new UART instance with defaults in [`Async`] mode.
+        pub fn new_async_with_default_pins(
+            uart: impl Peripheral<P = T> + 'd,
+            clocks: &Clocks,
+            tx: DefaultTxPin,
+            rx: DefaultRxPin,
+        ) -> Self {
+            Self::new_async_with_config(uart, Default::default(), clocks, tx, rx)
         }
     }
 

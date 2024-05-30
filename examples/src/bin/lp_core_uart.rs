@@ -35,8 +35,14 @@ fn main() -> ! {
 
     // Set up (HP) UART1:
 
-    let mut uart1 = Uart::new_with_config(peripherals.UART1, Config::default(), &clocks, None)
-        .with_tx_rx(io.pins.gpio6, io.pins.gpio7);
+    let mut uart1 = Uart::new_with_config(
+        peripherals.UART1,
+        Config::default(),
+        &clocks,
+        None,
+        io.pins.gpio6,
+        io.pins.gpio7,
+    );
 
     // Set up (LP) UART:
     let lp_tx = LowPowerOutput::new(io.pins.gpio5);

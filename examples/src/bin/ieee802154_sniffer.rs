@@ -10,6 +10,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    gpio::Io,
     peripherals::Peripherals,
     prelude::*,
     reset::software_reset,
@@ -25,7 +26,16 @@ fn main() -> ! {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::max(system.clock_control).freeze();
 
-    let mut uart0 = Uart::new(peripherals.UART0, &clocks);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+
+    // Default pins for Uart/Serial communication
+    #[cfg(feature = "esp32c6")]
+    let (mut tx_pin, mut rx_pin) = (io.pins.gpio16, io.pins.gpio17);
+    #[cfg(feature = "esp32h2")]
+    let (mut tx_pin, mut rx_pin) = (io.pins.gpio24, io.pins.gpio23);
+
+    let mut uart0 =
+        Uart::new_with_default_pins(peripherals.UART0, &clocks, &mut tx_pin, &mut rx_pin);
 
     // read two characters which get parsed as the channel
     let mut cnt = 0;
