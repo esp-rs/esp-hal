@@ -1920,10 +1920,21 @@ mod asynch {
         }
     }
 
-    impl<T> UartTx<'_, T, Async>
+    impl<'d, T> UartTx<'d, T, Async>
     where
-        T: Instance,
+        T: Instance + 'd,
     {
+        /// Create a new UART TX instance in [`Async`] mode.
+        pub fn new_async<TX: OutputPin>(
+            _uart: impl Peripheral<P = T> + 'd,
+            tx: impl Peripheral<P = TX> + 'd,
+        ) -> Self {
+            crate::into_ref!(tx);
+            tx.set_to_push_pull_output(crate::private::Internal);
+            tx.connect_peripheral_to_output(T::tx_signal(), crate::private::Internal);
+            Self::new_inner()
+        }
+
         pub async fn write_async(&mut self, words: &[u8]) -> Result<usize, Error> {
             let mut count = 0;
             let mut offset: usize = 0;
@@ -1959,10 +1970,21 @@ mod asynch {
         }
     }
 
-    impl<T> UartRx<'_, T, Async>
+    impl<'d, T> UartRx<'d, T, Async>
     where
-        T: Instance,
+        T: Instance + 'd,
     {
+        /// Create a new UART RX instance in [`Async`] mode.
+        pub fn new_async<RX: InputPin>(
+            _uart: impl Peripheral<P = T> + 'd,
+            rx: impl Peripheral<P = RX> + 'd,
+        ) -> Self {
+            crate::into_ref!(rx);
+            rx.set_to_input(crate::private::Internal);
+            rx.connect_input_to_peripheral(T::rx_signal(), crate::private::Internal);
+            Self::new_inner()
+        }
+
         /// Read async to buffer slice `buf`.
         /// Waits until at least one byte is in the Rx FiFo
         /// and one of the following interrupts occurs:
