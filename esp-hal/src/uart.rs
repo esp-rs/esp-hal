@@ -398,7 +398,8 @@ where
         }
     }
 
-    fn flush_tx(&self) -> nb::Result<(), Error> {
+    /// Flush the transmit buffer of the UART
+    pub fn flush_tx(&self) -> nb::Result<(), Error> {
         if T::is_tx_idle() {
             Ok(())
         } else {
