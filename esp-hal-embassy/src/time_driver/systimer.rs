@@ -126,9 +126,9 @@ impl EmbassyTimer {
 
     fn arm(&self, id: usize, timestamp: u64) {
         match id {
-            0 => unwrap!(self.alarm0.load_value(timestamp.micros())),
-            1 => unwrap!(self.alarm1.load_value(timestamp.micros())),
-            2 => unwrap!(self.alarm2.load_value(timestamp.micros())),
+            0 => self.alarm0.set_target(timestamp),
+            1 => self.alarm1.set_target(timestamp),
+            2 => self.alarm2.set_target(timestamp),
             _ => {}
         }
     }
