@@ -1056,9 +1056,8 @@ pub mod dma {
     {
         /// Perform a DMA write.
         ///
-        /// This will return a [SpiDmaTransfer] owning the buffer(s) and the SPI
-        /// instance. The maximum amount of data to be sent is 32736
-        /// bytes.
+        /// This will return a [DmaTransferTx]. The maximum amount of data to be
+        /// sent is 32736 bytes.
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
         pub fn dma_write<'t, TXBUF>(
             &'t mut self,
@@ -1080,9 +1079,8 @@ pub mod dma {
 
         /// Perform a DMA read.
         ///
-        /// This will return a [SpiDmaTransfer] owning the buffer(s) and the SPI
-        /// instance. The maximum amount of data to be received is 32736
-        /// bytes.
+        /// This will return a [DmaTransferRx]. The maximum amount of data to be
+        /// received is 32736 bytes.
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
         pub fn dma_read<'t, RXBUF>(
             &'t mut self,
@@ -1106,9 +1104,9 @@ pub mod dma {
 
         /// Perform a DMA transfer.
         ///
-        /// This will return a [SpiDmaTransfer] owning the buffer(s) and the SPI
-        /// instance. The maximum amount of data to be sent/received is
-        /// 32736 bytes.
+        /// This will return a [DmaTransferTxRx] owning the buffer(s) and the
+        /// SPI instance. The maximum amount of data to be sent/received
+        /// is 32736 bytes.
         pub fn dma_transfer<'t, TXBUF, RXBUF>(
             &'t mut self,
             words: &'t TXBUF,

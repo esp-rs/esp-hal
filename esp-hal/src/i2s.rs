@@ -228,13 +228,13 @@ where
     Self: DmaSupportTx + Sized,
 {
     /// Write I2S.
-    /// Returns [I2sWriteDmaTransfer] which represents the in-progress DMA
+    /// Returns [DmaTransferTx] which represents the in-progress DMA
     /// transfer
     fn write_dma<'t>(&'t mut self, words: &'t TXBUF) -> Result<DmaTransferTx<Self>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>;
 
-    /// Continuously write to I2S. Returns [I2sWriteDmaTransfer] which
+    /// Continuously write to I2S. Returns [DmaTransferTxCircular] which
     /// represents the in-progress DMA transfer
     fn write_dma_circular<'t>(
         &'t mut self,
@@ -258,14 +258,14 @@ where
     Self: DmaSupportRx + Sized,
 {
     /// Read I2S.
-    /// Returns [I2sReadDmaTransfer] which represents the in-progress DMA
+    /// Returns [DmaTransferRx] which represents the in-progress DMA
     /// transfer
     fn read_dma<'t>(&'t mut self, words: &'t mut RXBUF) -> Result<DmaTransferRx<Self>, Error>
     where
         RXBUF: WriteBuffer<Word = u8>;
 
     /// Continuously read from I2S.
-    /// Returns [I2sReadDmaTransfer] which represents the in-progress DMA
+    /// Returns [DmaTransferRxCircular] which represents the in-progress DMA
     /// transfer
     fn read_dma_circular<'t>(
         &'t mut self,

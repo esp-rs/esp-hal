@@ -416,9 +416,8 @@ pub mod dma {
 
         /// Perform a DMA transfer.
         ///
-        /// This will return a [AesDmaTransfer] owning the buffer(s) and the
-        /// AES instance. The maximum amount of data to be sent/received
-        /// is 32736 bytes.
+        /// This will return a [DmaTransferTxRx]. The maximum amount of data to
+        /// be sent/received is 32736 bytes.
         pub fn process<'t, K, TXBUF, RXBUF>(
             &'t mut self,
             words: &'t TXBUF,
