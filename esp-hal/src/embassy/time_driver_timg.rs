@@ -43,14 +43,14 @@ impl EmbassyTimer {
 
     pub(super) fn on_alarm_allocated(&self, _n: usize) {}
 
-    fn on_interrupt<Timer: Instance>(&self, id: u8, mut timer: Timer) {
+    fn on_interrupt<Timer: Instance>(&self, id: u8, timer: Timer) {
         critical_section::with(|cs| {
             timer.clear_interrupt();
             self.trigger_alarm(id as usize, cs);
         });
     }
 
-    pub fn init(clocks: &Clocks, mut timer: TimerType) {
+    pub fn init(clocks: &Clocks, timer: TimerType) {
         // set divider to get a 1mhz clock. APB (80mhz) / 80 = 1mhz...
         timer.timer0.set_divider(clocks.apb_clock.to_MHz() as u16);
         timer.timer0.set_counter_active(true);

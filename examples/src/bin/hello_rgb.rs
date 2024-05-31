@@ -66,8 +66,6 @@ fn main() -> ! {
     let rmt_buffer = smartLedBuffer!(1);
     let mut led = SmartLedsAdapter::new(rmt.channel0, led_pin, rmt_buffer, &clocks);
 
-    // Initialize the Delay peripheral, and use it to toggle the LED state in a
-    // loop.
     let delay = Delay::new(&clocks);
 
     let mut color = Hsv {

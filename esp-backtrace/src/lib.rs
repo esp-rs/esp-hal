@@ -1,9 +1,9 @@
-#![no_std]
+#![allow(rustdoc::bare_urls, unused_macros)]
+#![cfg_attr(nightly, feature(panic_info_message))]
 #![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
-#![allow(rustdoc::bare_urls)]
 #![doc = include_str!("../README.md")]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
-#![cfg_attr(nightly, feature(panic_info_message))]
+#![no_std]
 
 #[cfg(feature = "defmt")]
 use defmt as _;
@@ -279,13 +279,26 @@ fn is_valid_ram_address(address: u32) -> bool {
     true
 }
 
-#[cfg(any(
-    not(any(feature = "esp32", feature = "esp32p4", feature = "esp32s3")),
-    not(feature = "halt-cores")
+#[cfg(all(
+    any(
+        not(any(feature = "esp32", feature = "esp32p4", feature = "esp32s3")),
+        not(feature = "halt-cores")
+    ),
+    not(feature = "custom-halt")
 ))]
 #[allow(unused)]
 fn halt() -> ! {
-    loop {}
+    loop {
+        continue;
+    }
+}
+
+#[cfg(feature = "custom-halt")]
+fn halt() -> ! {
+    extern "Rust" {
+        fn custom_halt() -> !;
+    }
+    unsafe { custom_halt() }
 }
 
 // TODO: Enable `halt` function for `esp32p4` feature once implemented

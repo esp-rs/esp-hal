@@ -1,4 +1,34 @@
-//! General-purpose timers.
+//! # General-purpose Timers
+//!
+//! The [OneShotTimer] and [PeriodicTimer] types can be backed by any hardware
+//! peripheral which implements the [Timer] trait.
+//!
+//! ## Usage
+//!
+//! ### Examples
+//!
+//! #### One-shot Timer
+//!
+//! ```no_run
+//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
+//! let one_shot = OneShotTimer::new(timg0.timer0);
+//!
+//! one_shot.delay_millis(500);
+//! ```
+//!
+//! #### Periodic Timer
+//!
+//! ```no_run
+//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
+//! let periodic = PeriodicTimer::new(timg0.timer0);
+//!
+//! periodic.start(1.secs());
+//! loop {
+//!     nb::block!(periodic.wait());
+//! }
+//! ```
+
+#![deny(missing_docs)]
 
 use fugit::{ExtU64, Instant, MicrosDurationU64};
 
@@ -17,6 +47,8 @@ pub enum Error {
     TimerInactive,
     /// The alarm is not currently active.
     AlarmInactive,
+    /// The provided timeout is too large.
+    InvalidTimeout,
 }
 
 /// Functionality provided by any timer peripheral.
@@ -37,7 +69,7 @@ pub trait Timer: crate::private::Sealed {
     fn now(&self) -> Instant<u64, 1, 1_000_000>;
 
     /// Load a target value into the timer.
-    fn load_value(&self, value: MicrosDurationU64);
+    fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error>;
 
     /// Enable auto reload of the loaded value.
     fn enable_auto_reload(&self, auto_reload: bool);
@@ -51,7 +83,8 @@ pub trait Timer: crate::private::Sealed {
     /// Has the timer triggered?
     fn is_interrupt_set(&self) -> bool;
 
-    /// FIXME: This is (hopefully?) temporary...
+    // NOTE: This is an unfortunate implementation detail of `TIMGx`
+    #[doc(hidden)]
     fn set_alarm_active(&self, state: bool);
 }
 
@@ -93,7 +126,7 @@ where
         self.inner.reset();
 
         self.inner.enable_auto_reload(false);
-        self.inner.load_value(us);
+        self.inner.load_value(us).unwrap();
         self.inner.start();
 
         while !self.inner.is_interrupt_set() {
@@ -132,9 +165,8 @@ impl<T> embedded_hal::delay::DelayNs for OneShotTimer<T>
 where
     T: Timer,
 {
-    #[allow(clippy::useless_conversion)]
     fn delay_ns(&mut self, ns: u32) {
-        self.delay_nanos(ns.into());
+        self.delay_nanos(ns);
     }
 }
 
@@ -153,7 +185,7 @@ where
     }
 
     /// Start a new count down.
-    pub fn start(&mut self, timeout: MicrosDurationU64) {
+    pub fn start(&mut self, timeout: MicrosDurationU64) -> Result<(), Error> {
         if self.inner.is_running() {
             self.inner.stop();
         }
@@ -162,15 +194,17 @@ where
         self.inner.reset();
 
         self.inner.enable_auto_reload(true);
-        self.inner.load_value(timeout);
+        self.inner.load_value(timeout)?;
         self.inner.start();
+
+        Ok(())
     }
 
     /// "Wait" until the count down finishes without blocking.
     pub fn wait(&mut self) -> nb::Result<(), void::Void> {
         if self.inner.is_interrupt_set() {
             self.inner.clear_interrupt();
-            self.inner.set_alarm_active(true); // FIXME: Remove if/when able
+            self.inner.set_alarm_active(true);
 
             Ok(())
         } else {
@@ -201,7 +235,7 @@ where
     where
         Time: Into<Self::Time>,
     {
-        self.start(timeout.into());
+        self.start(timeout.into()).unwrap();
     }
 
     fn wait(&mut self) -> nb::Result<(), void::Void> {

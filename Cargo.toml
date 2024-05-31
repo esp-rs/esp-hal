@@ -13,6 +13,11 @@ exclude  = [
     "esp-metadata",
     "esp-println",
     "esp-riscv-rt",
+    "esp-wifi",
+    "esp-storage",
     "examples",
+    "extras/bench-server",
+    "extras/esp-wifishark",
+    "extras/ieee802154-sniffer",
     "hil-test",
 ]

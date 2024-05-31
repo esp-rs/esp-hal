@@ -11,8 +11,7 @@
 //!    demonstrates that this task will continue to run even while the low
 //!    priority blocking task is running.
 
-// HINT: At first it looks a bit suspicious that we need *two* executor features enabled here but that's because we are really using
-// both together. The thread-executor is created by the `#[main]` macro and is used to spawn `low_prio_async` and `low_prio_blocking`.
+// The thread-executor is created by the `#[main]` macro and is used to spawn `low_prio_async` and `low_prio_blocking`.
 // The interrupt-executor is created in `main` and is used to spawn `high_prio`.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3

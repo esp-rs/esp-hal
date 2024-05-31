@@ -63,8 +63,6 @@ fn main() -> ! {
     interrupt::enable(Interrupt::SYSTIMER_TARGET1, Priority::Priority3).unwrap();
     interrupt::enable(Interrupt::SYSTIMER_TARGET2, Priority::Priority3).unwrap();
 
-    // Initialize the Delay peripheral, and use it to toggle the LED state in a
-    // loop.
     let delay = Delay::new(&clocks);
 
     loop {

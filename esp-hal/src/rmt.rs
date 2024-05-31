@@ -208,7 +208,7 @@ pub struct RxChannelConfig {
     pub idle_threshold: u16,
 }
 
-pub use impl_for_chip::Rmt;
+pub use impl_for_chip::{ChannelCreator, Rmt};
 
 #[cfg(feature = "async")]
 use self::asynch::{RxChannelAsync, TxChannelAsync};
@@ -684,6 +684,7 @@ mod impl_for_chip {
         }
     }
 
+    /// RMT Channel Creator
     pub struct ChannelCreator<M, const CHANNEL: u8>
     where
         M: crate::Mode,
@@ -767,6 +768,7 @@ mod impl_for_chip {
         }
     }
 
+    /// RMT Channel Creator
     pub struct ChannelCreator<M, const CHANNEL: u8>
     where
         M: crate::Mode,
@@ -858,6 +860,7 @@ mod impl_for_chip {
         }
     }
 
+    /// RMT Channel Creator
     pub struct ChannelCreator<M, const CHANNEL: u8>
     where
         M: crate::Mode,
@@ -949,6 +952,7 @@ mod impl_for_chip {
         }
     }
 
+    /// RMT Channel Creator
     pub struct ChannelCreator<M, const CHANNEL: u8>
     where
         M: crate::Mode,

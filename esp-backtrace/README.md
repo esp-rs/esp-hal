@@ -1,5 +1,11 @@
 # esp-backtrace - backtrace for ESP32 bare-metal
 
+[![Crates.io](https://img.shields.io/crates/v/esp-backtrace?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp-backtrace)
+[![docs.rs](https://img.shields.io/docsrs/esp-backtrace?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.rs/esp-backtrace)
+![MSRV](https://img.shields.io/badge/MSRV-1.76-blue?labelColor=1C2C2E&style=flat-square)
+![Crates.io](https://img.shields.io/crates/l/esp-backtrace?labelColor=1C2C2E&style=flat-square)
+[![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
+
 Supports the ESP32, ESP32-C2/C3/C6, ESP32-H2, ESP32-P4, and ESP32-S2/S3. Optional exception and panic handlers are included, both of which can be enabled via their respective features.
 
 Please note that when targeting a RISC-V device, you **need** to force frame pointers (i.e. `"-C", "force-frame-pointers",` in your `.cargo/config.toml`); this is **not** required for Xtensa.
@@ -26,8 +32,9 @@ When using the panic and/or exception handler make sure to include `use esp_back
 | println           | Use `esp-println` to print messages                                                                                |
 | defmt             | Use `defmt` logging to print messages\* (check [example](https://github.com/playfulFence/backtrace-defmt-example)) |
 | colors            | Print messages in red\*                                                                                            |
-| halt-cores        | Halt both CPUs on ESP32 / ESP32-S3 in case of a panic or exception                                                 |
+| halt-cores        | Halt both CPUs on ESP32 / ESP32-S3 instead of doing a `loop {}` in case of a panic or exception                    |
 | semihosting       | Call `semihosting::process::abort()` on panic.                                                                     |
+| custom-halt       | Invoke the extern function `custom_halt()` instead of doing a `loop {}` in case of a panic or exception            |
 
 \* _only used for panic and exception handlers_
 

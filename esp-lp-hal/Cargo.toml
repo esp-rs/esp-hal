@@ -42,7 +42,7 @@ esp-build = { version = "0.1.0", path = "../esp-build" }
 default = ["embedded-hal-02"]
 
 embedded-hal-02 = ["dep:embedded-hal-02"]
-embedded-hal-1  = ["dep:embedded-hal-1"]
+embedded-hal  = ["dep:embedded-hal-1"]
 
 esp32c6 = ["dep:esp32c6-lp",  "procmacros/is-lp-core", "dep:nb", "dep:paste"]
 esp32s2 = ["dep:esp32s2-ulp", "procmacros/is-ulp-core"]

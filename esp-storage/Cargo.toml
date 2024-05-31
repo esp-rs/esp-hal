@@ -1,0 +1,52 @@
+[package]
+name = "esp-storage"
+version = "0.3.0"
+edition = "2021"
+rust-version = "1.76.0"
+authors = [
+    "The ESP-RS team",
+    "Björn Quentin <bjoern.quentin@mobile-j.de>",
+]
+description  = "Implementation of embedded-storage traits to access unencrypted ESP32 flash"
+repository   = "https://github.com/esp-rs/esp-storage"
+license      = "MIT OR Apache-2.0"
+
+keywords = [
+    "embedded-storage",
+    "esp",
+    "no-std",
+]
+categories = [
+    "embedded",
+    "hardware-support",
+    "no-std",
+]
+
+[dependencies]
+embedded-storage = "0.3.0"
+critical-section = { version =  "1.1.1", optional = true }
+
+[build-dependencies]
+esp-build = { version = "0.1.0", path = "../esp-build" }
+
+[features]
+default = ["critical-section", "storage"]
+critical-section = ["dep:critical-section"]
+# ReadStorage/Storage traits
+storage = []
+# ReadNorFlash/NorFlash traits
+nor-flash = []
+# Bytewise read emulation
+bytewise-read = []
+esp32c2 = []
+esp32c3 = []
+esp32c6 = []
+esp32h2 = []
+esp32   = []
+esp32s2 = []
+esp32s3 = []
+# Enable flash emulation to run tests
+emulation = []
+
+# this feature is reserved for very specific use-cases - usually you don't want to use this!
+low-level = []

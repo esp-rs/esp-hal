@@ -8,8 +8,6 @@
 # 1a.) If the device has a low-power core (which is supported in
 #      `esp-lp-hal`), then update the `if` condition to build prerequisites.
 # 2.) In the 'msrv-riscv' job, add checks as needed for the new chip.
-# 3.) In the 'clippy-riscv' job, add checks as needed for the new chip.
-# 3.) In the 'rustfmt' job, add checks as needed for the new chip.
 
 name: CI
 
@@ -47,6 +45,12 @@ jobs:
   esp-hal:
     name: esp-hal (${{ matrix.device.soc }})
     runs-on: ubuntu-latest
+    env:
+      SSID: SSID
+      PASSWORD: PASSWORD
+      STATIC_IP: 1.1.1.1 
+      GATEWAY_IP: 1.1.1.1
+      HOST_IP: 1.1.1.1
 
     strategy:
       fail-fast: false
@@ -161,6 +165,25 @@ jobs:
       - name: rustdoc
         run: cd esp-riscv-rt/ && cargo doc
 
+  extras:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get -y install musl-tools libudev-dev pkg-config
+      # Build the extra crates
+      - name: Build the bench-server
+        run: cd extras/bench-server && cargo build
+      - name: Build esp-wifishark
+        run: cd extras/esp-wifishark && cargo build
+      - name: Build ieee802154-sniffer
+        run: cd extras/ieee802154-sniffer && cargo build
   # --------------------------------------------------------------------------
   # MSRV
 
@@ -178,16 +201,13 @@ jobs:
           components: rust-src
       - uses: Swatinem/rust-cache@v2
 
-      # TODO:
-      #  - Enable additional (all?) features for MSRV check
-
       # Verify the MSRV for all RISC-V chips.
       - name: msrv (esp-hal)
         run: |
-          cargo xtask build-package --features=esp32c2 --target=riscv32imc-unknown-none-elf   esp-hal
-          cargo xtask build-package --features=esp32c3 --target=riscv32imc-unknown-none-elf   esp-hal
-          cargo xtask build-package --features=esp32c6 --target=riscv32imac-unknown-none-elf  esp-hal
-          cargo xtask build-package --features=esp32h2 --target=riscv32imac-unknown-none-elf  esp-hal
+          cargo xtask build-package --features=esp32c2,ci --target=riscv32imc-unknown-none-elf   esp-hal
+          cargo xtask build-package --features=esp32c3,ci --target=riscv32imc-unknown-none-elf   esp-hal
+          cargo xtask build-package --features=esp32c6,ci --target=riscv32imac-unknown-none-elf  esp-hal
+          cargo xtask build-package --features=esp32h2,ci --target=riscv32imac-unknown-none-elf  esp-hal
       - name: msrv (esp-lp-hal)
         run: |
           cargo xtask build-package --features=esp32c6 --target=riscv32imac-unknown-none-elf esp-lp-hal
@@ -198,9 +218,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RUSTC_BOOTSTRAP: 1
-
-      # TODO:
-      #  - Enable additional (all?) features for MSRV check
 
     steps:
       - uses: actions/checkout@v4
@@ -213,67 +230,28 @@ jobs:
       # Verify the MSRV for all Xtensa chips:
       - name: msrv (esp-hal)
         run: |
-          cargo xtask build-package --toolchain=esp --features=esp32   --target=xtensa-esp32-none-elf   esp-hal
-          cargo xtask build-package --toolchain=esp --features=esp32s2 --target=xtensa-esp32s2-none-elf esp-hal
-          cargo xtask build-package --toolchain=esp --features=esp32s3 --target=xtensa-esp32s3-none-elf esp-hal
+          cargo xtask build-package --toolchain=esp --features=esp32,ci   --target=xtensa-esp32-none-elf   esp-hal
+          cargo xtask build-package --toolchain=esp --features=esp32s2,ci --target=xtensa-esp32s2-none-elf esp-hal
+          cargo xtask build-package --toolchain=esp --features=esp32s3,ci --target=xtensa-esp32s3-none-elf esp-hal
 
   # --------------------------------------------------------------------------
-  # Lint
+  # Lint & Format
 
-  clippy-riscv:
+  clippy:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: nightly
-          targets: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
-          components: clippy,rust-src
-      - uses: Swatinem/rust-cache@v2
-
-      # Run 'cargo clippy' on all packages targeting RISC-V:
-      ## esp-hal:
-      - name: clippy (esp-hal, esp32c2)
-        run: cd esp-hal && cargo clippy --features=esp32c2 --target=riscv32imc-unknown-none-elf -- -D warnings
-      - name: clippy (esp-hal, esp32c3)
-        run: cd esp-hal && cargo clippy --features=esp32c3 --target=riscv32imc-unknown-none-elf -- -D warnings
-      - name: clippy (esp-hal, esp32c6)
-        run: cd esp-hal && cargo clippy --features=esp32c6 --target=riscv32imac-unknown-none-elf -- -D warnings
-      - name: clippy (esp-hal, esp32h2)
-        run: cd esp-hal && cargo clippy --features=esp32h2 --target=riscv32imac-unknown-none-elf -- -D warnings
-      ## esp-hal-smartled:
-      - name: clippy (esp-hal-smartled)
-        run: cd esp-hal-smartled && cargo clippy --features=esp32c6 --target=riscv32imac-unknown-none-elf -- -D warnings
-      ## esp-lp-hal:
-      - name: clippy (esp-lp-hal, esp32c6)
-        run: cd esp-lp-hal && cargo clippy --features=esp32c6 --target=riscv32imac-unknown-none-elf -- -D warnings
-      - name: clippy (esp-lp-hal, esp32s2)
-        run: cd esp-lp-hal && cargo clippy --features=esp32s2 --target=riscv32imc-unknown-none-elf -- -D warnings
-      - name: clippy (esp-lp-hal, esp32s3)
-        run: cd esp-lp-hal && cargo clippy --features=esp32s3 --target=riscv32imc-unknown-none-elf -- -D warnings
-      # esp-riscv-rt:
-      - name: clippy (esp-riscv-rt)
-        run: cd esp-riscv-rt && cargo clippy --target=riscv32imc-unknown-none-elf -- -D warnings
-
-  clippy-xtensa:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
+      # We use the 'esp' toolchain for *all* targets, in order to get a
+      # semi-stable and consistent set of lints for all targets:
       - uses: esp-rs/xtensa-toolchain@v1.5
         with:
           default: true
           ldproxy: false
       - uses: Swatinem/rust-cache@v2
 
-      # Run 'cargo clippy' on all packages targeting Xtensa:
-      - name: clippy (esp-hal, esp32)
-        run: cd esp-hal && cargo clippy -Zbuild-std=core --features=esp32 --target=xtensa-esp32-none-elf -- -D warnings
-      - name: clippy (esp-hal, esp32s2)
-        run: cd esp-hal && cargo clippy -Zbuild-std=core --features=esp32s2 --target=xtensa-esp32s2-none-elf -- -D warnings
-      - name: clippy (esp-hal, esp32s3)
-        run: cd esp-hal && cargo clippy -Zbuild-std=core --features=esp32s3 --target=xtensa-esp32s3-none-elf -- -D warnings
+      # Lint all packages:
+      - run: cargo xtask lint-packages
 
   rustfmt:
     runs-on: ubuntu-latest
@@ -289,18 +267,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       # Check the formatting of all packages:
-      - name: rustfmt (esp-hal)
-        run: cargo fmt --all --manifest-path=esp-hal/Cargo.toml -- --check
-      - name: rustfmt (esp-hal-procmacros)
-        run: cargo fmt --all --manifest-path=esp-hal-procmacros/Cargo.toml -- --check
-      - name: rustfmt (esp-hal-smartled)
-        run: cargo fmt --all --manifest-path=esp-hal-smartled/Cargo.toml -- --check
-      - name: rustfmt (esp-lp-hal)
-        run: cargo fmt --all --manifest-path=esp-lp-hal/Cargo.toml -- --check
-      - name: rustfmt (esp-riscv-rt)
-        run: cargo fmt --all --manifest-path=esp-riscv-rt/Cargo.toml -- --check
-      - name: rustfmt (examples)
-        run: cargo fmt --all --manifest-path=examples/Cargo.toml -- --check
+      - run: cargo xtask fmt-packages --check
+
+  # --------------------------------------------------------------------------
+  # Tests
 
   hil:
     name: HIL Test | ${{ matrix.target.soc }}

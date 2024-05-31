@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - spi: fix dma wrong mode when using eh1 blocking api (#1541)
 - uart: make `uart::UartRx::read_byte` public (#1547)
 - Fix async serial-usb-jtag (#1561)
+- Feeding `RWDT` now actually works (#1645)
 
 ### Changed
 
@@ -46,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove unnecessary generics from PARL_IO driver (#1545)
 - Use `Level enum` in GPIO constructors instead of plain bools (#1574) 
 - Make the SPI FIFO a separate object from the master driver
+- Use `Level enum` in GPIO constructors instead of plain bools (#1574)
+- rmt: make ChannelCreator public (#1597)
 
 ### Removed
 

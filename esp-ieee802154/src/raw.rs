@@ -254,7 +254,7 @@ fn stop_current_operation() {
 
 fn set_next_rx_buffer() {
     unsafe {
-        set_rx_addr(RX_BUFFER.as_mut_ptr() as *mut u8);
+        set_rx_addr(RX_BUFFER.as_mut_ptr());
     }
 }
 
@@ -329,7 +329,7 @@ fn ieee802154_sec_update() {
 
 fn next_operation() {
     let previous_operation = critical_section::with(|cs| {
-        let state = STATE.borrow_ref(cs).clone();
+        let state = *STATE.borrow_ref(cs);
 
         if ieee802154_pib_get_rx_when_idle() {
             enable_rx();

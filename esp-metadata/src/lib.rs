@@ -1,13 +1,13 @@
 //! Metadata for Espressif devices, primarily intended for use in build scripts.
 
-const ESP32_TOML: &'static str = include_str!("../devices/esp32.toml");
-const ESP32C2_TOML: &'static str = include_str!("../devices/esp32c2.toml");
-const ESP32C3_TOML: &'static str = include_str!("../devices/esp32c3.toml");
-const ESP32C6_TOML: &'static str = include_str!("../devices/esp32c6.toml");
-const ESP32H2_TOML: &'static str = include_str!("../devices/esp32h2.toml");
-const ESP32P4_TOML: &'static str = include_str!("../devices/esp32p4.toml");
-const ESP32S2_TOML: &'static str = include_str!("../devices/esp32s2.toml");
-const ESP32S3_TOML: &'static str = include_str!("../devices/esp32s3.toml");
+const ESP32_TOML: &str = include_str!("../devices/esp32.toml");
+const ESP32C2_TOML: &str = include_str!("../devices/esp32c2.toml");
+const ESP32C3_TOML: &str = include_str!("../devices/esp32c3.toml");
+const ESP32C6_TOML: &str = include_str!("../devices/esp32c6.toml");
+const ESP32H2_TOML: &str = include_str!("../devices/esp32h2.toml");
+const ESP32P4_TOML: &str = include_str!("../devices/esp32p4.toml");
+const ESP32S2_TOML: &str = include_str!("../devices/esp32s2.toml");
+const ESP32S3_TOML: &str = include_str!("../devices/esp32s3.toml");
 
 lazy_static::lazy_static! {
     static ref ESP32_CFG: Config = basic_toml::from_str(ESP32_TOML).unwrap();

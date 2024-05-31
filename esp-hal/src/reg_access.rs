@@ -14,6 +14,7 @@ pub(crate) trait EndianessConverter {
 }
 
 /// Always use native endianess
+#[allow(unused)] // only used in AES driver for now
 pub(crate) struct NativeEndianess;
 
 impl EndianessConverter for NativeEndianess {

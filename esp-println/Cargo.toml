@@ -1,10 +1,11 @@
 [package]
-name        = "esp-println"
-version     = "0.9.1"
-edition     = "2021"
-description = "Provides `print!` and `println!` implementations various Espressif devices"
-repository  = "https://github.com/esp-rs/esp-hal"
-license     = "MIT OR Apache-2.0"
+name         = "esp-println"
+version      = "0.9.1"
+edition      = "2021"
+rust-version = "1.76.0"
+description  = "Provides `print!` and `println!` implementations various Espressif devices"
+repository   = "https://github.com/esp-rs/esp-hal"
+license      = "MIT OR Apache-2.0"
 
 [package.metadata.docs.rs]
 cargo-args     = ["-Z", "build-std=core"]

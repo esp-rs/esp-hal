@@ -146,7 +146,7 @@ ERROR: expected exactly one enabled feature from feature group:
 fn do_alert(color: Color, input: TokenStream) -> TokenStream {
     let message = parse_macro_input!(input as LitStr).value();
 
-    let ref mut stderr = StandardStream::stderr(ColorChoice::Auto);
+    let stderr = &mut StandardStream::stderr(ColorChoice::Auto);
     let color_spec = ColorSpec::new().set_fg(Some(color)).clone();
 
     let mut has_nonspace = false;
@@ -196,7 +196,7 @@ fn split_heading(s: &str) -> (Option<&str>, &str) {
     }
 }
 
-fn unique_pairs(features: &Vec<LitStr>) -> Vec<(&LitStr, &LitStr)> {
+fn unique_pairs(features: &[LitStr]) -> Vec<(&LitStr, &LitStr)> {
     let mut pairs = Vec::new();
 
     let mut i = 0;
