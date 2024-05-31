@@ -2,6 +2,7 @@
 name = "esp-storage"
 version = "0.3.0"
 edition = "2021"
+rust-version = "1.76.0"
 authors = [
     "The ESP-RS team",
     "Björn Quentin <bjoern.quentin@mobile-j.de>",

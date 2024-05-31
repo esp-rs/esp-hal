@@ -1,5 +1,11 @@
 # esp-wifi
 
+[![Crates.io](https://img.shields.io/crates/v/esp-wifi?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp-wifi)
+[![docs.rs](https://img.shields.io/docsrs/esp-wifi?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.esp-rs.org/esp-wifi)
+![MSRV](https://img.shields.io/badge/MSRV-1.76-blue?labelColor=1C2C2E&style=flat-square)
+![Crates.io](https://img.shields.io/crates/l/esp-wifi?labelColor=1C2C2E&style=flat-square)
+[![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
+
 A WiFi, BLE and ESP-NOW driver for Espressif microcontrollers.
 
 ## Current support
@@ -41,8 +47,8 @@ rustflags = [
     "-C", "link-arg=-Trom_functions.x",
 ]
 ```
-At the time of writing, you will already have the `linkall` flag if you used `cargo generate`. Generating from a template does not include the `rom_functions` flag.
 
+At the time of writing, you will already have the `linkall` flag if you used `cargo generate`. Generating from a template does not include the `rom_functions` flag.
 
 ### Optimization Level
 

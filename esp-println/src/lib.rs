@@ -214,7 +214,6 @@ mod uart_printer {
 
 #[cfg(all(feature = "uart", feature = "esp32s2"))]
 mod uart_printer {
-    const UART_TX_ONE_CHAR: usize = 0x4000_9200;
     impl super::Printer {
         pub fn write_bytes_assume_cs(&mut self, bytes: &[u8]) {
             // On ESP32-S2 the UART_TX_ONE_CHAR ROM-function seems to have some issues.
