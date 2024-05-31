@@ -363,12 +363,14 @@ impl Address {
 pub struct WholeBuf;
 
 #[derive(Eq, PartialEq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum HalfBuf {
     LowPart,
     HighPart,
 }
 
 #[derive(Eq, PartialEq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum AnyBuf {
     Whole,
     Half(HalfBuf),
