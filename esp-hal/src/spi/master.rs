@@ -54,7 +54,6 @@ use core::{
     fmt::{Debug, Formatter},
     marker::PhantomData,
     mem::replace,
-    ops::Range,
 };
 
 #[cfg(not(any(esp32, esp32s2)))]
@@ -361,56 +360,100 @@ impl Address {
     }
 }
 
-pub struct WholeFifo;
-pub struct HalfFifo {
-    is_high_part: bool,
+pub struct WholeBuf;
+
+#[derive(Eq, PartialEq, Debug)]
+pub enum HalfBuf {
+    LowPart,
+    HighPart,
 }
 
-pub trait FifoFraction: crate::private::Sealed {
-    const SIZE: usize;
-
-    fn range(&self) -> Range<usize>;
+#[derive(Eq, PartialEq, Debug)]
+pub enum AnyBuf {
+    Whole,
+    Half(HalfBuf),
 }
 
-impl crate::private::Sealed for WholeFifo {}
-
-impl FifoFraction for WholeFifo {
+impl WholeBuf {
     #[cfg(not(esp32s2))]
     const SIZE: usize = 64;
     #[cfg(esp32s2)]
     const SIZE: usize = 72;
+}
+impl HalfBuf {
+    const SIZE: usize = WholeBuf::SIZE / 2;
+}
 
-    fn range(&self) -> Range<usize> {
-        0..Self::SIZE
+pub trait BufFraction: crate::private::Sealed {
+    fn size(&self) -> usize;
+
+    fn offset(&self) -> usize;
+}
+
+impl crate::private::Sealed for WholeBuf {}
+impl crate::private::Sealed for HalfBuf {}
+impl crate::private::Sealed for AnyBuf {}
+
+impl BufFraction for WholeBuf {
+    fn size(&self) -> usize {
+        Self::SIZE
+    }
+
+    fn offset(&self) -> usize {
+        0
     }
 }
 
-impl crate::private::Sealed for HalfFifo {}
+impl BufFraction for HalfBuf {
+    fn size(&self) -> usize {
+        Self::SIZE
+    }
 
-impl FifoFraction for HalfFifo {
-    const SIZE: usize = WholeFifo::SIZE / 2;
-
-    fn range(&self) -> Range<usize> {
-        if self.is_high_part {
-            Self::SIZE..WholeFifo::SIZE
-        } else {
-            0..Self::SIZE
+    fn offset(&self) -> usize {
+        match self {
+            HalfBuf::LowPart => 0,
+            HalfBuf::HighPart => Self::SIZE,
         }
     }
 }
 
-pub struct Fifo<'d, T, S> {
+impl BufFraction for AnyBuf {
+    fn size(&self) -> usize {
+        match self {
+            AnyBuf::Whole => WholeBuf.size(),
+            AnyBuf::Half(half) => half.size(),
+        }
+    }
+
+    fn offset(&self) -> usize {
+        match self {
+            AnyBuf::Whole => WholeBuf.offset(),
+            AnyBuf::Half(half) => half.offset(),
+        }
+    }
+}
+
+/// CPU-Controlled Buffer
+pub struct SpiBuf<'d, T, S> {
     spi: PeripheralRef<'d, T>,
     state: S,
 }
 
-impl<'d, T: Instance, S: FifoFraction> Fifo<'d, T, S> {
+impl<'d, T: Instance, S: BufFraction> SpiBuf<'d, T, S> {
+    pub fn size(&self) -> usize {
+        self.state.size()
+    }
+
+    fn is_high_part(&self) -> bool {
+        self.state.offset() != 0
+    }
+
     fn fifo_slice(&self) -> impl Iterator<Item = &W> {
         self.spi
             .register_block()
             .w_iter()
-            .skip(self.state.range().start / 4)
-            .take(S::SIZE / 4)
+            .skip(self.state.offset() / 4)
+            .take(self.state.size() / 4)
     }
 
     #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
@@ -421,7 +464,7 @@ impl<'d, T: Instance, S: FifoFraction> Fifo<'d, T, S> {
 
     #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
     pub fn read(&self, buf: &mut [u8]) {
-        if buf.len() > S::SIZE {
+        if buf.len() > self.size() {
             panic!("Cannot read more than fifo size");
         }
 
@@ -442,7 +485,7 @@ impl<'d, T: Instance, S: FifoFraction> Fifo<'d, T, S> {
 
     #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
     pub fn write(&mut self, data: &[u8]) {
-        if data.len() > S::SIZE {
+        if data.len() > self.size() {
             panic!("Cannot write more than fifo size");
         }
 
@@ -476,35 +519,33 @@ impl<'d, T: Instance, S: FifoFraction> Fifo<'d, T, S> {
     }
 }
 
-impl<'d, T: Peripheral<P = T>> Fifo<'d, T, WholeFifo> {
-    pub fn split(mut self) -> (Fifo<'d, T, HalfFifo>, Fifo<'d, T, HalfFifo>) {
+impl<'d, T: Peripheral<P = T>> SpiBuf<'d, T, WholeBuf> {
+    pub fn split(mut self) -> (SpiBuf<'d, T, HalfBuf>, SpiBuf<'d, T, HalfBuf>) {
         (
-            Fifo {
+            SpiBuf {
                 spi: unsafe { self.spi.clone_unchecked() },
-                state: HalfFifo {
-                    is_high_part: false,
-                },
+                state: HalfBuf::LowPart,
             },
-            Fifo {
+            SpiBuf {
                 spi: self.spi,
-                state: HalfFifo { is_high_part: true },
+                state: HalfBuf::HighPart,
             },
         )
     }
 }
 
-impl<'d, T> Fifo<'d, T, HalfFifo> {
-    pub fn join(self, other_half: Fifo<'d, T, HalfFifo>) -> Fifo<'d, T, WholeFifo> {
-        debug_assert_ne!(self.state.is_high_part, other_half.state.is_high_part);
+impl<'d, T> SpiBuf<'d, T, HalfBuf> {
+    pub fn join(self, other_half: SpiBuf<'d, T, HalfBuf>) -> SpiBuf<'d, T, WholeBuf> {
+        debug_assert_ne!(self.state, other_half.state);
 
-        Fifo {
+        SpiBuf {
             spi: self.spi,
-            state: WholeFifo,
+            state: WholeBuf,
         }
     }
 }
 
-impl<'d, T, S> Debug for Fifo<'d, T, S> {
+impl<'d, T, S> Debug for SpiBuf<'d, T, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.write_str("SPI_FIFO")
     }
@@ -548,20 +589,20 @@ impl<'d, T, M> Debug for Spi<'d, T, M> {
 }
 
 /// SPI peripheral driver
-pub struct SpiFifo<'d, T, M> {
-    state: FifoDriverState<'d, T, M>,
+pub struct SpiFifo<'d, T: Instance, M> {
+    state: DriverState<'d, T, M>,
 }
 
-enum FifoDriverState<'d, T, M> {
-    Idle(Spi<'d, T, M>, Fifo<'d, T, WholeFifo>),
-    InProgress(FifoTransfer<'d, T, M, WholeFifo>),
+enum DriverState<'d, T: Instance, M> {
+    Idle(Spi<'d, T, M>, SpiBuf<'d, T, WholeBuf>),
+    InProgress(SpiTransfer<'d, T, M, WholeBuf>),
     InUse,
 }
 
-impl<'d, T, M> SpiFifo<'d, T, M> {
-    pub fn new(spi: Spi<'d, T, M>, fifo: Fifo<'d, T, WholeFifo>) -> Self {
+impl<'d, T: Instance, M> SpiFifo<'d, T, M> {
+    pub fn new(spi: Spi<'d, T, M>, fifo: SpiBuf<'d, T, WholeBuf>) -> Self {
         Self {
-            state: FifoDriverState::Idle(spi, fifo),
+            state: DriverState::Idle(spi, fifo),
         }
     }
 }
@@ -577,50 +618,50 @@ where
     /// perform flushing. If you want to read the response to something you
     /// have written before, consider using [`Self::transfer`] instead.
     pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
-        match replace(&mut self.state, FifoDriverState::InUse) {
-            FifoDriverState::Idle(spi, fifo) => {
+        match replace(&mut self.state, DriverState::InUse) {
+            DriverState::Idle(spi, fifo) => {
                 let byte = fifo.read_iter().nth(0).expect("Fifo is not size zero");
-                self.state = FifoDriverState::Idle(spi, fifo);
+                self.state = DriverState::Idle(spi, fifo);
                 Ok(byte)
             }
-            FifoDriverState::InProgress(transfer) => {
+            DriverState::InProgress(transfer) => {
                 if transfer.is_done() {
                     let (spi, fifo) = transfer.wait();
                     let byte = fifo.read_iter().nth(0).expect("Fifo is not size zero");
-                    self.state = FifoDriverState::Idle(spi, fifo);
+                    self.state = DriverState::Idle(spi, fifo);
                     Ok(byte)
                 } else {
-                    self.state = FifoDriverState::InProgress(transfer);
+                    self.state = DriverState::InProgress(transfer);
                     Err(nb::Error::WouldBlock)
                 }
             }
-            FifoDriverState::InUse => unreachable!(),
+            DriverState::InUse => unreachable!(),
         }
     }
 
     /// Write a byte to SPI.
     pub fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
-        let (spi, mut fifo) = match replace(&mut self.state, FifoDriverState::InUse) {
-            FifoDriverState::Idle(spi, fifo) => (spi, fifo),
-            FifoDriverState::InProgress(transfer) => {
+        let (spi, mut fifo) = match replace(&mut self.state, DriverState::InUse) {
+            DriverState::Idle(spi, fifo) => (spi, fifo),
+            DriverState::InProgress(transfer) => {
                 if transfer.is_done() {
                     transfer.wait()
                 } else {
-                    self.state = FifoDriverState::InProgress(transfer);
+                    self.state = DriverState::InProgress(transfer);
                     return Err(nb::Error::WouldBlock);
                 }
             }
-            FifoDriverState::InUse => unreachable!(),
+            DriverState::InUse => unreachable!(),
         };
 
         fifo.write(&[word]);
         match spi.transfer(1, fifo) {
             Ok(transfer) => {
-                self.state = FifoDriverState::InProgress(transfer);
+                self.state = DriverState::InProgress(transfer);
                 Err(nb::Error::WouldBlock)
             }
             Err((err, spi, fifo)) => {
-                self.state = FifoDriverState::Idle(spi, fifo);
+                self.state = DriverState::Idle(spi, fifo);
                 Err(nb::Error::Other(err))
             }
         }
@@ -635,19 +676,19 @@ where
     /// you must ensure that the whole messages was written correctly, use
     /// `flush`.
     pub fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
-        for chunk in words.chunks(WholeFifo::SIZE) {
-            let (spi, mut fifo) = match replace(&mut self.state, FifoDriverState::InUse) {
-                FifoDriverState::Idle(spi, fifo) => (spi, fifo),
-                FifoDriverState::InProgress(transfer) => transfer.wait(),
-                FifoDriverState::InUse => unreachable!(),
+        for chunk in words.chunks(WholeBuf::SIZE) {
+            let (spi, mut fifo) = match replace(&mut self.state, DriverState::InUse) {
+                DriverState::Idle(spi, fifo) => (spi, fifo),
+                DriverState::InProgress(transfer) => transfer.wait(),
+                DriverState::InUse => unreachable!(),
             };
 
             fifo.write(chunk);
 
             match spi.transfer(chunk.len(), fifo) {
-                Ok(transfer) => self.state = FifoDriverState::InProgress(transfer),
+                Ok(transfer) => self.state = DriverState::InProgress(transfer),
                 Err((err, spi, fifo)) => {
-                    self.state = FifoDriverState::Idle(spi, fifo);
+                    self.state = DriverState::Idle(spi, fifo);
                     return Err(err);
                 }
             }
@@ -661,19 +702,19 @@ where
 
     /// Sends `words` to the slave. Returns the `words` received from the slave
     pub fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
-        let (mut spi, mut fifo) = match replace(&mut self.state, FifoDriverState::InUse) {
-            FifoDriverState::Idle(spi, fifo) => (spi, fifo),
-            FifoDriverState::InProgress(transfer) => transfer.wait(),
-            FifoDriverState::InUse => unreachable!(),
+        let (mut spi, mut fifo) = match replace(&mut self.state, DriverState::InUse) {
+            DriverState::Idle(spi, fifo) => (spi, fifo),
+            DriverState::InProgress(transfer) => transfer.wait(),
+            DriverState::InUse => unreachable!(),
         };
 
-        for chunk in words.chunks_mut(WholeFifo::SIZE) {
+        for chunk in words.chunks_mut(WholeBuf::SIZE) {
             fifo.write(chunk);
 
             (spi, fifo) = match spi.transfer(chunk.len(), fifo) {
                 Ok(transfer) => transfer.wait(),
                 Err((err, spi, fifo)) => {
-                    self.state = FifoDriverState::Idle(spi, fifo);
+                    self.state = DriverState::Idle(spi, fifo);
                     return Err(err);
                 }
             };
@@ -681,19 +722,19 @@ where
             fifo.read(chunk);
         }
 
-        self.state = FifoDriverState::Idle(spi, fifo);
+        self.state = DriverState::Idle(spi, fifo);
 
         Ok(words)
     }
 
     /// Wait for any remaining bytes in the fifo to be sent.
     pub fn flush(&mut self) {
-        let (spi, fifo) = match replace(&mut self.state, FifoDriverState::InUse) {
-            FifoDriverState::Idle(spi, fifo) => (spi, fifo),
-            FifoDriverState::InProgress(transfer) => transfer.wait(),
-            FifoDriverState::InUse => unreachable!(),
+        let (spi, fifo) = match replace(&mut self.state, DriverState::InUse) {
+            DriverState::Idle(spi, fifo) => (spi, fifo),
+            DriverState::InProgress(transfer) => transfer.wait(),
+            DriverState::InUse => unreachable!(),
         };
-        self.state = FifoDriverState::Idle(spi, fifo);
+        self.state = DriverState::Idle(spi, fifo);
     }
 }
 
@@ -710,14 +751,14 @@ where
         frequency: HertzU32,
         mode: SpiMode,
         clocks: &Clocks,
-    ) -> (Spi<'d, T, FullDuplexMode>, Fifo<'d, T, WholeFifo>)
+    ) -> (Spi<'d, T, FullDuplexMode>, SpiBuf<'d, T, WholeBuf>)
     where
         T: Peripheral<P = T>,
     {
         crate::into_ref!(spi);
-        let fifo = Fifo {
+        let fifo = SpiBuf {
             spi: unsafe { spi.clone_unchecked() },
-            state: WholeFifo,
+            state: WholeBuf,
         };
         (Self::new_internal(spi, frequency, mode, clocks), fifo)
     }
@@ -829,34 +870,32 @@ where
     T: Instance,
     M: IsFullDuplex,
 {
-    pub fn transfer<S: FifoFraction>(
+    pub fn transfer<S: BufFraction>(
         self,
         data_len: usize,
-        fifo: Fifo<'d, T, S>,
+        buf: SpiBuf<'d, T, S>,
     ) -> TransferResult<'d, T, M, S> {
-        if data_len > S::SIZE {
-            return Err((Error::FifoSizeExeeded, self, fifo));
+        if data_len > buf.size() {
+            return Err((Error::FifoSizeExeeded, self, buf));
         }
 
         if data_len == 0 {
-            return Err((Error::Unsupported, self, fifo));
+            return Err((Error::Unsupported, self, buf));
         }
-
-        let is_high_part = fifo.state.range().start != 0;
 
         self.spi.configure_datalen(data_len as u32 * 8);
         self.spi.register_block().user().modify(|_, w| {
             w.usr_miso_highpart()
-                .bit(is_high_part)
+                .bit(buf.is_high_part())
                 .usr_mosi_highpart()
-                .bit(is_high_part)
+                .bit(buf.is_high_part())
         });
 
         reset_afifo_before_usr_cmd(self.spi.register_block());
 
         self.spi.start_operation();
 
-        Ok(FifoTransfer { spi: self, fifo })
+        Ok(SpiTransfer::new(self, buf))
     }
 }
 
@@ -873,14 +912,14 @@ where
         frequency: HertzU32,
         mode: SpiMode,
         clocks: &Clocks,
-    ) -> (Spi<'d, T, HalfDuplexMode>, Fifo<'d, T, WholeFifo>)
+    ) -> (Spi<'d, T, HalfDuplexMode>, SpiBuf<'d, T, WholeBuf>)
     where
         T: Peripheral<P = T>,
     {
         crate::into_ref!(spi);
-        let fifo = Fifo {
+        let fifo = SpiBuf {
             spi: unsafe { spi.clone_unchecked() },
-            state: WholeFifo,
+            state: WholeBuf,
         };
         (Self::new_internal(spi, frequency, mode, clocks), fifo)
     }
@@ -1057,88 +1096,97 @@ where
     T: Instance,
     M: IsHalfDuplex,
 {
-    pub fn read<S: FifoFraction>(
+    pub fn read<S: BufFraction>(
         mut self,
         data_mode: SpiDataMode,
         cmd: Command,
         address: Address,
         dummy: u8,
         data_len: usize,
-        fifo: Fifo<'d, T, S>,
+        buf: SpiBuf<'d, T, S>,
     ) -> TransferResult<'d, T, M, S> {
-        if data_len > S::SIZE {
-            return Err((Error::FifoSizeExeeded, self, fifo));
+        if data_len > buf.size() {
+            return Err((Error::FifoSizeExeeded, self, buf));
         }
 
         if data_len == 0 {
-            return Err((Error::Unsupported, self, fifo));
+            return Err((Error::Unsupported, self, buf));
         }
-
-        let is_high_part = fifo.state.range().start != 0;
 
         self.spi
             .init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
         self.spi
-            .start_half_duplex(false, cmd, address, dummy, data_len, is_high_part);
+            .start_half_duplex(false, cmd, address, dummy, data_len, buf.is_high_part());
 
-        Ok(FifoTransfer { spi: self, fifo })
+        Ok(SpiTransfer::new(self, buf))
     }
 
-    pub fn write<S: FifoFraction>(
+    pub fn write<S: BufFraction>(
         mut self,
         data_mode: SpiDataMode,
         cmd: Command,
         address: Address,
         dummy: u8,
         data_len: usize,
-        fifo: Fifo<'d, T, S>,
+        buf: SpiBuf<'d, T, S>,
     ) -> TransferResult<'d, T, M, S> {
-        if data_len > S::SIZE {
-            return Err((Error::FifoSizeExeeded, self, fifo));
+        if data_len > buf.size() {
+            return Err((Error::FifoSizeExeeded, self, buf));
         }
-
-        let is_high_part = fifo.state.range().start != 0;
 
         self.spi
             .init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
         self.spi
-            .start_half_duplex(true, cmd, address, dummy, data_len, is_high_part);
+            .start_half_duplex(true, cmd, address, dummy, data_len, buf.is_high_part());
 
-        Ok(FifoTransfer { spi: self, fifo })
+        Ok(SpiTransfer::new(self, buf))
     }
 }
 
-pub struct FifoTransfer<'d, T, M, S> {
-    spi: Spi<'d, T, M>,
-    fifo: Fifo<'d, T, S>,
+pub struct SpiTransfer<'d, T: Instance, M, S> {
+    spi: Option<Spi<'d, T, M>>,
+    buf: Option<SpiBuf<'d, T, S>>,
 }
 
-impl<'d, T, M, S> FifoTransfer<'d, T, M, S>
+impl<'d, T, M, S> SpiTransfer<'d, T, M, S>
 where
     T: Instance,
 {
-    pub fn is_done(&self) -> bool {
-        !self.spi.spi.busy()
+    fn new(spi: Spi<'d, T, M>, buf: SpiBuf<'d, T, S>) -> Self {
+        Self {
+            spi: Some(spi),
+            buf: Some(buf),
+        }
     }
 
-    pub fn wait(self) -> (Spi<'d, T, M>, Fifo<'d, T, S>) {
-        while self.spi.spi.busy() {
+    pub fn is_done(&self) -> bool {
+        !self.spi.as_ref().unwrap().spi.busy()
+    }
+
+    pub fn wait(mut self) -> (Spi<'d, T, M>, SpiBuf<'d, T, S>) {
+        let spi = self.spi.take().unwrap();
+        while !spi.spi.busy() {
             // wait for bus to be clear
         }
-        (self.spi, self.fifo)
+        (spi, self.buf.take().unwrap())
     }
 }
 
-// No need to flush in Drop, the transfer can safely continue in the background
-// since the user no longer has access to the Spi or FIFO.
-//
-// impl<'d, T, M, S> Drop for Transfer<'d, T, M, S> {
-//     fn drop(&mut self) {
-//     }
-// }
+impl<'d, T: Instance, M, S> Drop for SpiTransfer<'d, T, M, S> {
+    fn drop(&mut self) {
+        // There's no documented way to cancel or stop an SPI transfer
+        // so the only option is to wait here for it to finish.
+
+        if let Some(spi) = self.spi.as_ref() {
+            while spi.spi.busy() {
+                // wait for bus to be clear
+            }
+        }
+    }
+}
 
 pub type TransferResult<'d, T, M, S> =
-    Result<FifoTransfer<'d, T, M, S>, (Error, Spi<'d, T, M>, Fifo<'d, T, S>)>;
+    Result<SpiTransfer<'d, T, M, S>, (Error, Spi<'d, T, M>, SpiBuf<'d, T, S>)>;
 
 impl<T> HalfDuplexReadWrite for SpiFifo<'_, T, HalfDuplexMode>
 where
@@ -1154,7 +1202,7 @@ where
         dummy: u8,
         buffer: &mut [u8],
     ) -> Result<(), Self::Error> {
-        if buffer.len() > WholeFifo::SIZE {
+        if buffer.len() > WholeBuf::SIZE {
             return Err(Error::FifoSizeExeeded);
         }
 
@@ -1162,21 +1210,21 @@ where
             return Err(Error::Unsupported);
         }
 
-        let (spi, fifo) = match replace(&mut self.state, FifoDriverState::InUse) {
-            FifoDriverState::Idle(spi, fifo) => (spi, fifo),
-            FifoDriverState::InProgress(transfer) => transfer.wait(),
-            FifoDriverState::InUse => unreachable!(),
+        let (spi, fifo) = match replace(&mut self.state, DriverState::InUse) {
+            DriverState::Idle(spi, fifo) => (spi, fifo),
+            DriverState::InProgress(transfer) => transfer.wait(),
+            DriverState::InUse => unreachable!(),
         };
 
         match spi.read(data_mode, cmd, address, dummy, buffer.len(), fifo) {
             Ok(transfer) => {
                 let (spi, fifo) = transfer.wait();
                 fifo.read(buffer);
-                self.state = FifoDriverState::Idle(spi, fifo);
+                self.state = DriverState::Idle(spi, fifo);
                 Ok(())
             }
             Err((err, spi, fifo)) => {
-                self.state = FifoDriverState::Idle(spi, fifo);
+                self.state = DriverState::Idle(spi, fifo);
                 Err(err)
             }
         }
@@ -1190,14 +1238,14 @@ where
         dummy: u8,
         buffer: &[u8],
     ) -> Result<(), Self::Error> {
-        if buffer.len() > WholeFifo::SIZE {
+        if buffer.len() > WholeBuf::SIZE {
             return Err(Error::FifoSizeExeeded);
         }
 
-        let (spi, mut fifo) = match replace(&mut self.state, FifoDriverState::InUse) {
-            FifoDriverState::Idle(spi, fifo) => (spi, fifo),
-            FifoDriverState::InProgress(transfer) => transfer.wait(),
-            FifoDriverState::InUse => unreachable!(),
+        let (spi, mut fifo) = match replace(&mut self.state, DriverState::InUse) {
+            DriverState::Idle(spi, fifo) => (spi, fifo),
+            DriverState::InProgress(transfer) => transfer.wait(),
+            DriverState::InUse => unreachable!(),
         };
 
         fifo.write(buffer);
@@ -1205,11 +1253,11 @@ where
         match spi.write(data_mode, cmd, address, dummy, buffer.len(), fifo) {
             Ok(transfer) => {
                 let (spi, fifo) = transfer.wait();
-                self.state = FifoDriverState::Idle(spi, fifo);
+                self.state = DriverState::Idle(spi, fifo);
                 Ok(())
             }
             Err((err, spi, fifo)) => {
-                self.state = FifoDriverState::Idle(spi, fifo);
+                self.state = DriverState::Idle(spi, fifo);
                 Err(err)
             }
         }
@@ -2095,7 +2143,10 @@ mod ehal1 {
 
     use super::*;
 
-    impl<T, M> embedded_hal::spi::ErrorType for SpiFifo<'_, T, M> {
+    impl<T, M> embedded_hal::spi::ErrorType for SpiFifo<'_, T, M>
+    where
+        T: Instance,
+    {
         type Error = super::Error;
     }
 
@@ -2119,24 +2170,24 @@ mod ehal1 {
         M: IsFullDuplex,
     {
         fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-            let (mut spi, mut fifo) = match replace(&mut self.state, FifoDriverState::InUse) {
-                FifoDriverState::Idle(spi, fifo) => (spi, fifo),
-                FifoDriverState::InProgress(transfer) => transfer.wait(),
-                FifoDriverState::InUse => unreachable!(),
+            let (mut spi, mut fifo) = match replace(&mut self.state, DriverState::InUse) {
+                DriverState::Idle(spi, fifo) => (spi, fifo),
+                DriverState::InProgress(transfer) => transfer.wait(),
+                DriverState::InUse => unreachable!(),
             };
 
-            for chunk in words.chunks_mut(WholeFifo::SIZE) {
+            for chunk in words.chunks_mut(WholeBuf::SIZE) {
                 (spi, fifo) = match spi.transfer(chunk.len(), fifo) {
                     Ok(transfer) => transfer.wait(),
                     Err((err, spi, fifo)) => {
-                        self.state = FifoDriverState::Idle(spi, fifo);
+                        self.state = DriverState::Idle(spi, fifo);
                         return Err(err);
                     }
                 };
                 fifo.read(chunk);
             }
 
-            self.state = FifoDriverState::Idle(spi, fifo);
+            self.state = DriverState::Idle(spi, fifo);
             Ok(())
         }
 
@@ -2152,14 +2203,14 @@ mod ehal1 {
                 SpiBus::read(self, read)?;
             }
 
-            let (mut spi, mut fifo) = match replace(&mut self.state, FifoDriverState::InUse) {
-                FifoDriverState::Idle(spi, fifo) => (spi, fifo),
-                FifoDriverState::InProgress(transfer) => transfer.wait(),
-                FifoDriverState::InUse => unreachable!(),
+            let (mut spi, mut fifo) = match replace(&mut self.state, DriverState::InUse) {
+                DriverState::Idle(spi, fifo) => (spi, fifo),
+                DriverState::InProgress(transfer) => transfer.wait(),
+                DriverState::InUse => unreachable!(),
             };
 
-            let mut read_chunks = read.chunks_mut(WholeFifo::SIZE);
-            let mut write_chunks = write.chunks(WholeFifo::SIZE);
+            let mut read_chunks = read.chunks_mut(WholeBuf::SIZE);
+            let mut write_chunks = write.chunks(WholeBuf::SIZE);
             loop {
                 let mut transfer_length = 0;
                 if let Some(chunk) = write_chunks.next() {
@@ -2183,7 +2234,7 @@ mod ehal1 {
                 (spi, fifo) = match spi.transfer(transfer_length, fifo) {
                     Ok(transfer) => transfer.wait(),
                     Err((err, spi, fifo)) => {
-                        self.state = FifoDriverState::Idle(spi, fifo);
+                        self.state = DriverState::Idle(spi, fifo);
                         return Err(err);
                     }
                 };
@@ -2193,7 +2244,7 @@ mod ehal1 {
                 }
             }
 
-            self.state = FifoDriverState::Idle(spi, fifo);
+            self.state = DriverState::Idle(spi, fifo);
 
             Ok(())
         }
