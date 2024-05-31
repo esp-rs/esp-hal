@@ -294,9 +294,8 @@ pub mod dma {
     {
         /// Register a buffer for a DMA write.
         ///
-        /// This will return a [SpiDmaTransferTx] owning the buffer(s) and the
-        /// SPI instance. The maximum amount of data to be sent is 32736
-        /// bytes.
+        /// This will return a [DmaTransferTx]. The maximum amount of data to be
+        /// sent is 32736 bytes.
         ///
         /// The write is driven by the SPI master's sclk signal and cs line.
         pub fn dma_write<'t, TXBUF>(
@@ -319,9 +318,8 @@ pub mod dma {
 
         /// Register a buffer for a DMA read.
         ///
-        /// This will return a [SpiDmaTransferRx] owning the buffer(s) and the
-        /// SPI instance. The maximum amount of data to be received is
-        /// 32736 bytes.
+        /// This will return a [DmaTransferRx]. The maximum amount of data to be
+        /// received is 32736 bytes.
         ///
         /// The read is driven by the SPI master's sclk signal and cs line.
         pub fn dma_read<'t, RXBUF>(
@@ -346,9 +344,8 @@ pub mod dma {
 
         /// Register buffers for a DMA transfer.
         ///
-        /// This will return a [SpiDmaTransferRxTx] owning the buffer(s) and the
-        /// SPI instance. The maximum amount of data to be sent/received
-        /// is 32736 bytes.
+        /// This will return a [DmaTransferTxRx]. The maximum amount of data to
+        /// be sent/received is 32736 bytes.
         ///
         /// The data transfer is driven by the SPI master's sclk signal and cs
         /// line.

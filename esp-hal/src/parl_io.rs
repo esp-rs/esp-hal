@@ -1412,7 +1412,7 @@ where
 {
     /// Perform a DMA write.
     ///
-    /// This will return a [DmaTransfer]
+    /// This will return a [DmaTransferTx]
     ///
     /// The maximum amount of data to be sent is 32736 bytes.
     pub fn write_dma<'t, TXBUF>(
@@ -1498,7 +1498,7 @@ where
 {
     /// Perform a DMA read.
     ///
-    /// This will return a [RxDmaTransfer]
+    /// This will return a [DmaTransferRx]
     ///
     /// The maximum amount of data is 32736 bytes when using [EofMode::ByteLen].
     ///
