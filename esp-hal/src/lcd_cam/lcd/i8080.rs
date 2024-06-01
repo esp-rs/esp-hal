@@ -411,7 +411,7 @@ impl<'d, TX: Tx, P> I8080<'d, TX, P> {
 
         self.lcd_cam
             .lc_dma_int_clr()
-            .write(|w| w.lcd_trans_done_int_clr().clear_bit());
+            .write(|w| w.lcd_trans_done_int_clr().set_bit());
     }
 
     fn start_write_bytes_dma(&mut self, ptr: *const u8, len: usize) -> Result<(), DmaError> {
