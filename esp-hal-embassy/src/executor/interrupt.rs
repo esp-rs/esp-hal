@@ -1,14 +1,14 @@
 //! Interrupt-mode executor.
+
 use core::{cell::UnsafeCell, mem::MaybeUninit};
 
 use embassy_executor::{raw, SendSpawner};
-use portable_atomic::{AtomicUsize, Ordering};
-
-use crate::{
+use esp_hal::{
     get_core,
     interrupt::{self, InterruptHandler},
     system::SoftwareInterrupt,
 };
+use portable_atomic::{AtomicUsize, Ordering};
 
 static mut EXECUTORS: [CallbackContext; 4] = [
     CallbackContext::new(),
@@ -43,7 +43,7 @@ impl CallbackContext {
     }
 
     fn get(&self) -> *mut raw::Executor {
-        unsafe { (*self.raw_executor.get()) as *mut raw::Executor }
+        unsafe { *self.raw_executor.get() }
     }
 
     fn set(&self, executor: *mut raw::Executor) {
@@ -58,7 +58,7 @@ fn handle_interrupt<const NUM: u8>() {
     swi.reset();
 
     unsafe {
-        let executor = EXECUTORS[NUM as usize].get().as_mut().unwrap();
+        let executor = unwrap!(EXECUTORS[NUM as usize].get().as_mut());
         executor.poll();
     }
 }
@@ -151,7 +151,7 @@ impl<const SWI: u8> InterruptExecutor<SWI> {
         if self.core.load(Ordering::Acquire) == usize::MAX {
             panic!("InterruptExecutor::spawner() called on uninitialized executor.");
         }
-        let executor = unsafe { (&*self.executor.get()).assume_init_ref() };
+        let executor = unsafe { (*self.executor.get()).assume_init_ref() };
         executor.spawner().make_send()
     }
 }

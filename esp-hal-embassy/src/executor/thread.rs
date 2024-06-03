@@ -1,14 +1,14 @@
 //! Multicore-aware thread-mode embassy executor.
+
 use core::marker::PhantomData;
 
 use embassy_executor::{raw, Spawner};
+use esp_hal::get_core;
+#[cfg(multi_core)]
+use esp_hal::macros::handler;
+#[cfg(multi_core)]
+use esp_hal::peripherals::SYSTEM;
 use portable_atomic::{AtomicBool, Ordering};
-#[cfg(multi_core)]
-use procmacros::handler;
-
-use crate::get_core;
-#[cfg(multi_core)]
-use crate::peripherals::SYSTEM;
 
 pub(crate) const THREAD_MODE_CONTEXT: u8 = 16;
 
@@ -39,7 +39,7 @@ pub(crate) fn pend_thread_mode(core: usize) {
     // If we are pending a task on the current core, we're done. Otherwise, we
     // need to make sure the other core wakes up.
     #[cfg(multi_core)]
-    if core != crate::get_core() as usize {
+    if core != get_core() as usize {
         // We need to clear the interrupt from software. We don't actually
         // need it to trigger and run the interrupt handler, we just need to
         // kick waiti to return.
@@ -78,7 +78,7 @@ impl Executor {
     pub fn new() -> Self {
         #[cfg(multi_core)]
         unsafe {
-            crate::system::SoftwareInterrupt::<3>::steal()
+            esp_hal::system::SoftwareInterrupt::<3>::steal()
                 .set_interrupt_handler(software3_interrupt)
         }
 
@@ -177,5 +177,11 @@ impl Executor {
         });
         // if an interrupt occurred while waiting, it will be serviced
         // here
+    }
+}
+
+impl Default for Executor {
+    fn default() -> Self {
+        Self::new()
     }
 }

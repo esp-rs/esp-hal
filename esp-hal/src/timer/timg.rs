@@ -611,8 +611,14 @@ impl<TG, const T: u8> TimerX<TG, T>
 where
     TG: TimerGroupInstance,
 {
+    /// Unsafely create an instance of this peripheral out of thin air.
+    ///
+    /// # Safety
+    ///
+    /// You must ensure that you're only using one instance of this type at a
+    /// time.
     #[allow(unused)]
-    pub(crate) unsafe fn steal() -> Self {
+    pub unsafe fn steal() -> Self {
         Self {
             phantom: PhantomData,
         }

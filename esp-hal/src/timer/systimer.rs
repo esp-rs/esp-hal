@@ -227,7 +227,7 @@ where
     DM: Mode,
 {
     /// Set the target value of this [Alarm]
-    pub fn set_target(&mut self, timestamp: u64) {
+    pub fn set_target(&self, timestamp: u64) {
         self.configure(|tconf, target| unsafe {
             tconf.write(|w| w.period_mode().clear_bit()); // target mode
             target.hi().write(|w| w.hi().bits((timestamp >> 32) as u32));
@@ -238,7 +238,7 @@ where
     }
 
     /// Block waiting until the timer reaches the `timestamp`
-    pub fn wait_until(&mut self, timestamp: u64) {
+    pub fn wait_until(&self, timestamp: u64) {
         self.clear_interrupt();
         self.set_target(timestamp);
 
@@ -261,7 +261,7 @@ where
     DM: Mode,
 {
     /// Set the period of this [Alarm]
-    pub fn set_period(&mut self, period: MicrosDurationU32) {
+    pub fn set_period(&self, period: MicrosDurationU32) {
         let us = period.ticks();
         let ticks = us * (SystemTimer::TICKS_PER_SECOND / 1_000_000) as u32;
 

@@ -22,10 +22,8 @@ critical-section         = "1.1.2"
 defmt                    = { version = "0.3.6", optional = true }
 delegate                 = "0.12.0"
 document-features        = "0.2.8"
-embassy-executor         = { version = "0.5.0", optional = true }
 embassy-futures          = { version = "0.1.1", optional = true }
 embassy-sync             = { version = "0.5.0", optional = true }
-embassy-time-driver      = { version = "0.1.0", optional = true }
 embassy-usb-driver       = { version = "0.1.0", optional = true }
 embassy-usb-synopsys-otg = { version = "0.1.0", optional = true }
 embedded-can             = { version = "0.4.1", optional = true }
@@ -43,7 +41,7 @@ log                      = { version = "0.4.21", optional = true }
 nb                       = "1.1.0"
 paste                    = "1.0.14"
 portable-atomic          = { version = "1.6.0", default-features = false }
-procmacros               = { version = "0.10.0", features = ["enum-dispatch", "interrupt", "ram"], package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+procmacros               = { version = "0.10.0", features = ["embassy", "enum-dispatch", "interrupt", "ram"], package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 riscv                    = { version = "0.11.1", optional = true }
 strum                    = { version = "0.26.2", default-features = false, features = ["derive"] }
 void                     = { version = "1.0.2", default-features = false }
@@ -145,7 +143,6 @@ async = [
 ## Implement `defmt::Format` on certain types.
 defmt = [
     "dep:defmt",
-    "embassy-executor?/defmt",
     "embassy-futures?/defmt",
     "embassy-sync?/defmt",
     "embedded-hal?/defmt-03",
@@ -169,25 +166,6 @@ embedded-io = ["dep:embedded-io"]
 ## Implement the `ufmt_write::uWrite` trait for certain peripherals.
 ufmt = ["dep:ufmt-write"]
 
-#! ### Embassy Feature Flags
-## Enable support for `embassy`, a modern asynchronous embedded framework.
-embassy = ["embassy-time-driver", "procmacros/embassy", "embassy-executor"]
-## Uses hardware timers as alarms for the executors. Using this feature
-## limits the number of executors to the number of hardware alarms provided
-## by the time driver.
-embassy-integrated-timers = ["embassy-executor?/integrated-timers"]
-## Enable the embassy time driver using the `SYSTIMER` peripheral. The
-## `SYSTIMER` peripheral has three alarams available for use. Do **not**
-## use when targeting an `esp32s2`.
-embassy-time-systick-16mhz = ["embassy-time-driver/tick-hz-16_000_000"]
-## Enable the embassy time driver using the `SYSTIMER` peripheral. The
-## `SYSTIMER` peripheral has three alarams available for use. Must only
-## be used when targeting an `esp32s2`.
-embassy-time-systick-80mhz = ["embassy-time-driver/tick-hz-80_000_000"]
-## Enable the embassy time driver using the `TIMG0` peripheral. The `TIMG0`
-## peripheral has two alarms available for use.
-embassy-time-timg0 = ["embassy-time-driver/tick-hz-1_000_000"]
-
 #! ### PSRAM Feature Flags
 ## Use externally connected PSRAM (2MB).
 psram-2m = []
@@ -209,15 +187,7 @@ opsram-8m = []
 opsram-16m = []
 
 # This feature is intended for testing; you probably don't want to enable it:
-ci = [
-    "default",
-    "embedded-hal-02",
-    "ufmt",
-    "async",
-    "embassy",
-    "embassy-time-timg0",
-    "embedded-io"
-]
+ci = ["async", "embedded-hal-02", "embedded-io", "ufmt"]
 
 [lints.clippy]
 mixed_attributes_style = "allow"

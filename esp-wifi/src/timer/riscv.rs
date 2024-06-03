@@ -30,7 +30,7 @@ pub fn setup_timer(systimer: TimeBase) -> Result<(), esp_hal::timer::Error> {
     // make sure the scheduling won't start before everything is setup
     riscv::interrupt::disable();
 
-    let mut alarm0 = systimer.into_periodic();
+    let alarm0 = systimer.into_periodic();
     alarm0.set_period(TIMESLICE_FREQUENCY.into_duration());
     alarm0.clear_interrupt();
     alarm0.enable_interrupt(true);
@@ -83,8 +83,8 @@ extern "C" fn FROM_CPU_INTR3(trap_frame: &mut TrapFrame) {
     }
 
     critical_section::with(|cs| {
-        let mut alarm0 = ALARM0.borrow_ref_mut(cs);
-        let alarm0 = unwrap!(alarm0.as_mut());
+        let alarm0 = ALARM0.borrow_ref(cs);
+        let alarm0 = unwrap!(alarm0.as_ref());
 
         alarm0.set_period(TIMESLICE_FREQUENCY.into_duration());
         alarm0.clear_interrupt();
