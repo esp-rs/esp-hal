@@ -14,6 +14,7 @@
 use defmt_rtt as _;
 use esp_backtrace as _;
 use esp_hal::{
+    clock::ClockControl,
     gpio::Io,
     peripherals::{Peripherals, UART0, UART1},
     prelude::*,
@@ -31,12 +32,13 @@ struct Context {
 impl Context {
     pub fn init() -> Self {
         let peripherals = Peripherals::take();
-        let _system = SystemControl::new(peripherals.SYSTEM);
+        let system = SystemControl::new(peripherals.SYSTEM);
+        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let tx = UartTx::new(peripherals.UART0, io.pins.gpio2);
-        let rx = UartRx::new(peripherals.UART1, io.pins.gpio4);
+        let tx = UartTx::new(peripherals.UART0, &clocks, None, io.pins.gpio2);
+        let rx = UartRx::new(peripherals.UART1, &clocks, None, io.pins.gpio4);
 
         Context { tx, rx }
     }

@@ -414,12 +414,28 @@ where
 {
     /// Create a new UART TX instance in [`Blocking`] mode.
     pub fn new<TX: OutputPin>(
-        _uart: impl Peripheral<P = T> + 'd,
+        uart: impl Peripheral<P = T> + 'd,
+        clocks: &Clocks,
+        interrupt: Option<InterruptHandler>,
+        tx: impl Peripheral<P = TX> + 'd,
+    ) -> Self {
+        Self::new_with_config(uart, Default::default(), clocks, interrupt, tx)
+    }
+
+    /// Create a new UART TX instance with configuration options in
+    /// [`Blocking`] mode.
+    pub fn new_with_config<TX: OutputPin>(
+        uart: impl Peripheral<P = T> + 'd,
+        config: Config,
+        clocks: &Clocks,
+        interrupt: Option<InterruptHandler>,
         tx: impl Peripheral<P = TX> + 'd,
     ) -> Self {
         crate::into_ref!(tx);
         tx.set_to_push_pull_output(Internal);
         tx.connect_peripheral_to_output(T::tx_signal(), Internal);
+        Uart::<'d, T, Blocking>::new_with_config_inner(uart, config, clocks, interrupt);
+
         Self::new_inner()
     }
 }
@@ -490,12 +506,29 @@ where
 {
     /// Create a new UART RX instance in [`Blocking`] mode.
     pub fn new<RX: InputPin>(
-        _uart: impl Peripheral<P = T> + 'd,
+        uart: impl Peripheral<P = T> + 'd,
+        clocks: &Clocks,
+        interrupt: Option<InterruptHandler>,
+        rx: impl Peripheral<P = RX> + 'd,
+    ) -> Self {
+        Self::new_with_config(uart, Default::default(), clocks, interrupt, rx)
+    }
+
+    /// Create a new UART RX instance with configuration options in
+    /// [`Blocking`] mode.
+    pub fn new_with_config<RX: InputPin>(
+        uart: impl Peripheral<P = T> + 'd,
+        config: Config,
+        clocks: &Clocks,
+        interrupt: Option<InterruptHandler>,
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Self {
         crate::into_ref!(rx);
         rx.set_to_input(Internal);
         rx.connect_input_to_peripheral(T::rx_signal(), Internal);
+
+        Uart::<'d, T, Blocking>::new_with_config_inner(uart, config, clocks, interrupt);
+
         Self::new_inner()
     }
 }
@@ -563,7 +596,7 @@ where
     T: Instance + 'd,
     M: Mode,
 {
-    fn new_with_config_inner(
+    pub(crate) fn new_with_config_inner(
         _uart: impl Peripheral<P = T> + 'd,
         config: Config,
         clocks: &Clocks,
@@ -1928,26 +1961,39 @@ mod asynch {
     {
         /// Create a new UART TX instance in [`Async`] mode.
         pub fn new_async<TX: OutputPin>(
-            _uart: impl Peripheral<P = T> + 'd,
+            uart: impl Peripheral<P = T> + 'd,
+            clocks: &Clocks,
+            tx: impl Peripheral<P = TX> + 'd,
+        ) -> Self {
+            Self::new_async_with_config(uart, Default::default(), clocks, tx)
+        }
+
+        /// Create a new UART TX instance with configuration options in
+        /// [`Async`] mode.
+        pub fn new_async_with_config<TX: OutputPin>(
+            uart: impl Peripheral<P = T> + 'd,
+            config: Config,
+            clocks: &Clocks,
             tx: impl Peripheral<P = TX> + 'd,
         ) -> Self {
             crate::into_ref!(tx);
             tx.set_to_push_pull_output(Internal);
             tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
-            let interrupt = match T::uart_number() {
-                #[cfg(uart0)]
-                0 => uart0,
-                #[cfg(uart1)]
-                1 => uart1,
-                #[cfg(uart2)]
-                2 => uart2,
-                _ => unreachable!(),
-            };
-            unsafe {
-                crate::interrupt::bind_interrupt(T::interrupt(), interrupt.handler());
-                crate::interrupt::enable(T::interrupt(), interrupt.priority()).unwrap();
-            }
+            Uart::<'d, T, Async>::new_with_config_inner(
+                uart,
+                config,
+                clocks,
+                Some(match T::uart_number() {
+                    #[cfg(uart0)]
+                    0 => uart0,
+                    #[cfg(uart1)]
+                    1 => uart1,
+                    #[cfg(uart2)]
+                    2 => uart2,
+                    _ => unreachable!(),
+                }),
+            );
 
             Self::new_inner()
         }
@@ -1993,26 +2039,39 @@ mod asynch {
     {
         /// Create a new UART RX instance in [`Async`] mode.
         pub fn new_async<RX: InputPin>(
-            _uart: impl Peripheral<P = T> + 'd,
+            uart: impl Peripheral<P = T> + 'd,
+            clocks: &Clocks,
+            rx: impl Peripheral<P = RX> + 'd,
+        ) -> Self {
+            Self::new_async_with_config(uart, Default::default(), clocks, rx)
+        }
+
+        /// Create a new UART RX instance with configuration options in
+        /// [`Async`] mode.
+        pub fn new_async_with_config<RX: InputPin>(
+            uart: impl Peripheral<P = T> + 'd,
+            config: Config,
+            clocks: &Clocks,
             rx: impl Peripheral<P = RX> + 'd,
         ) -> Self {
             crate::into_ref!(rx);
             rx.set_to_input(Internal);
             rx.connect_input_to_peripheral(T::rx_signal(), Internal);
 
-            let interrupt = match T::uart_number() {
-                #[cfg(uart0)]
-                0 => uart0,
-                #[cfg(uart1)]
-                1 => uart1,
-                #[cfg(uart2)]
-                2 => uart2,
-                _ => unreachable!(),
-            };
-            unsafe {
-                crate::interrupt::bind_interrupt(T::interrupt(), interrupt.handler());
-                crate::interrupt::enable(T::interrupt(), interrupt.priority()).unwrap();
-            }
+            Uart::<'d, T, Async>::new_with_config_inner(
+                uart,
+                config,
+                clocks,
+                Some(match T::uart_number() {
+                    #[cfg(uart0)]
+                    0 => uart0,
+                    #[cfg(uart1)]
+                    1 => uart1,
+                    #[cfg(uart2)]
+                    2 => uart2,
+                    _ => unreachable!(),
+                }),
+            );
 
             Self::new_inner()
         }
