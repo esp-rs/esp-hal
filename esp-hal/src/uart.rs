@@ -338,8 +338,6 @@ pub mod config {
 
 /// UART (Full-duplex)
 pub struct Uart<'d, T, M> {
-    #[cfg(not(esp32))]
-    symbol_len: u8,
     tx: UartTx<'d, T, M>,
     rx: UartRx<'d, T, M>,
 }
@@ -354,6 +352,8 @@ pub struct UartRx<'d, T, M> {
     phantom: PhantomData<(&'d mut T, M)>,
     at_cmd_config: Option<config::AtCmdConfig>,
     rx_timeout_config: Option<u8>,
+    #[cfg(not(esp32))]
+    symbol_len: u8,
 }
 
 impl<'d, T, M> UartTx<'d, T, M>
@@ -445,7 +445,19 @@ where
     T: Instance,
     M: Mode,
 {
-    fn new_inner() -> Self {
+    #[cfg(not(esp32))]
+    fn new_inner(symbol_len: u8) -> Self {
+        Self {
+            phantom: PhantomData,
+            at_cmd_config: None,
+            rx_timeout_config: None,
+            #[cfg(not(esp32))]
+            symbol_len,
+        }
+    }
+
+    #[cfg(esp32)]
+    fn new_inner(_symbol_len: u8) -> Self {
         Self {
             phantom: PhantomData,
             at_cmd_config: None,
@@ -498,6 +510,96 @@ where
         }
         count
     }
+
+    /// Configures the RX-FIFO threshold
+    ///
+    /// # Errors
+    /// `Err(Error::InvalidArgument)` if provided value exceeds maximum value
+    /// for SOC :
+    /// - `esp32` **0x7F**
+    /// - `esp32c6`, `esp32h2` **0xFF**
+    /// - `esp32c3`, `esp32c2`, `esp32s2` **0x1FF**
+    /// - `esp32s3` **0x3FF**
+    pub fn set_rx_fifo_full_threshold(&mut self, threshold: u16) -> Result<(), Error> {
+        #[cfg(esp32)]
+        const MAX_THRHD: u16 = 0x7F;
+        #[cfg(any(esp32c6, esp32h2))]
+        const MAX_THRHD: u16 = 0xFF;
+        #[cfg(any(esp32c3, esp32c2, esp32s2))]
+        const MAX_THRHD: u16 = 0x1FF;
+        #[cfg(esp32s3)]
+        const MAX_THRHD: u16 = 0x3FF;
+
+        if threshold > MAX_THRHD {
+            return Err(Error::InvalidArgument);
+        }
+
+        #[cfg(any(esp32, esp32c6, esp32h2))]
+        let threshold: u8 = threshold as u8;
+
+        T::register_block()
+            .conf1()
+            .modify(|_, w| unsafe { w.rxfifo_full_thrhd().bits(threshold) });
+
+        Ok(())
+    }
+
+    /// Configures the Receive Timeout detection setting
+    ///
+    /// # Arguments
+    /// `timeout` - the number of symbols ("bytes") to wait for before
+    /// triggering a timeout. Pass None to disable the timeout.
+    ///
+    ///  # Errors
+    /// `Err(Error::InvalidArgument)` if the provided value exceeds the maximum
+    /// value for SOC :
+    /// - `esp32`: Symbol size is fixed to 8, do not pass a value > **0x7F**.
+    /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, esp32s2`, esp32s3`: The
+    ///   value you pass times the symbol size must be <= **0x3FF**
+    pub fn set_rx_timeout(&mut self, timeout: Option<u8>) -> Result<(), Error> {
+        #[cfg(esp32)]
+        const MAX_THRHD: u8 = 0x7F; // 7 bits
+        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s2, esp32s3))]
+        const MAX_THRHD: u16 = 0x3FF; // 10 bits
+
+        #[cfg(esp32)]
+        let reg_thrhd = &T::register_block().conf1();
+        #[cfg(any(esp32c6, esp32h2))]
+        let reg_thrhd = &T::register_block().tout_conf();
+        #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
+        let reg_thrhd = &T::register_block().mem_conf();
+
+        #[cfg(any(esp32c6, esp32h2))]
+        let reg_en = &T::register_block().tout_conf();
+        #[cfg(any(esp32, esp32c2, esp32c3, esp32s2, esp32s3))]
+        let reg_en = &T::register_block().conf1();
+
+        match timeout {
+            None => {
+                reg_en.modify(|_, w| w.rx_tout_en().clear_bit());
+            }
+            Some(timeout) => {
+                // the esp32 counts directly in number of symbols (symbol len fixed to 8)
+                #[cfg(esp32)]
+                let timeout_reg = timeout;
+                // all other count in bits, so we need to multiply by the symbol len.
+                #[cfg(not(esp32))]
+                let timeout_reg = timeout as u16 * self.symbol_len as u16;
+
+                if timeout_reg > MAX_THRHD {
+                    return Err(Error::InvalidArgument);
+                }
+
+                reg_thrhd.modify(|_, w| unsafe { w.rx_tout_thrhd().bits(timeout_reg) });
+                reg_en.modify(|_, w| w.rx_tout_en().set_bit());
+            }
+        }
+
+        self.rx_timeout_config = timeout;
+
+        Uart::<'d, T, M>::sync_regs();
+        Ok(())
+    }
 }
 
 impl<'d, T> UartRx<'d, T, Blocking>
@@ -529,7 +631,7 @@ where
 
         Uart::<'d, T, Blocking>::new_with_config_inner(uart, config, clocks, interrupt);
 
-        Self::new_inner()
+        Self::new_inner(config.symbol_length())
     }
 }
 
@@ -606,9 +708,7 @@ where
 
         let mut serial = Uart {
             tx: UartTx::new_inner(),
-            rx: UartRx::new_inner(),
-            #[cfg(not(esp32))]
-            symbol_len: config.symbol_length(),
+            rx: UartRx::new_inner(config.symbol_length()),
         };
 
         serial.change_baud_internal(config.baudrate, config.clock_source, clocks);
@@ -716,7 +816,7 @@ where
             .clk_conf()
             .modify(|_, w| w.sclk_en().set_bit());
 
-        self.sync_regs();
+        Self::sync_regs();
         self.rx.at_cmd_config = Some(config);
     }
 
@@ -733,48 +833,7 @@ where
     /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, esp32s2`, esp32s3`: The
     ///   value you pass times the symbol size must be <= **0x3FF**
     pub fn set_rx_timeout(&mut self, timeout: Option<u8>) -> Result<(), Error> {
-        #[cfg(esp32)]
-        const MAX_THRHD: u8 = 0x7F; // 7 bits
-        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s2, esp32s3))]
-        const MAX_THRHD: u16 = 0x3FF; // 10 bits
-
-        #[cfg(esp32)]
-        let reg_thrhd = &T::register_block().conf1();
-        #[cfg(any(esp32c6, esp32h2))]
-        let reg_thrhd = &T::register_block().tout_conf();
-        #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
-        let reg_thrhd = &T::register_block().mem_conf();
-
-        #[cfg(any(esp32c6, esp32h2))]
-        let reg_en = &T::register_block().tout_conf();
-        #[cfg(any(esp32, esp32c2, esp32c3, esp32s2, esp32s3))]
-        let reg_en = &T::register_block().conf1();
-
-        match timeout {
-            None => {
-                reg_en.modify(|_, w| w.rx_tout_en().clear_bit());
-            }
-            Some(timeout) => {
-                // the esp32 counts directly in number of symbols (symbol len fixed to 8)
-                #[cfg(esp32)]
-                let timeout_reg = timeout;
-                // all other count in bits, so we need to multiply by the symbol len.
-                #[cfg(not(esp32))]
-                let timeout_reg = timeout as u16 * self.symbol_len as u16;
-
-                if timeout_reg > MAX_THRHD {
-                    return Err(Error::InvalidArgument);
-                }
-
-                reg_thrhd.modify(|_, w| unsafe { w.rx_tout_thrhd().bits(timeout_reg) });
-                reg_en.modify(|_, w| w.rx_tout_en().set_bit());
-            }
-        }
-
-        self.rx.rx_timeout_config = timeout;
-
-        self.sync_regs();
-        Ok(())
+        self.rx.set_rx_timeout(timeout)
     }
 
     /// Configures the RX-FIFO threshold
@@ -787,27 +846,7 @@ where
     /// - `esp32c3`, `esp32c2`, `esp32s2` **0x1FF**
     /// - `esp32s3` **0x3FF**
     pub fn set_rx_fifo_full_threshold(&mut self, threshold: u16) -> Result<(), Error> {
-        #[cfg(esp32)]
-        const MAX_THRHD: u16 = 0x7F;
-        #[cfg(any(esp32c6, esp32h2))]
-        const MAX_THRHD: u16 = 0xFF;
-        #[cfg(any(esp32c3, esp32c2, esp32s2))]
-        const MAX_THRHD: u16 = 0x1FF;
-        #[cfg(esp32s3)]
-        const MAX_THRHD: u16 = 0x3FF;
-
-        if threshold > MAX_THRHD {
-            return Err(Error::InvalidArgument);
-        }
-
-        #[cfg(any(esp32, esp32c6, esp32h2))]
-        let threshold: u8 = threshold as u8;
-
-        T::register_block()
-            .conf1()
-            .modify(|_, w| unsafe { w.rxfifo_full_thrhd().bits(threshold) });
-
-        Ok(())
+        self.rx.set_rx_fifo_full_threshold(threshold)
     }
 
     /// Listen for AT-CMD interrupts
@@ -1064,7 +1103,7 @@ where
             .clkdiv()
             .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
 
-        self.sync_regs();
+        Self::sync_regs();
     }
 
     #[cfg(any(esp32, esp32s2))]
@@ -1166,7 +1205,7 @@ where
 
     #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))] // TODO introduce a cfg symbol for this
     #[inline(always)]
-    fn sync_regs(&self) {
+    fn sync_regs() {
         #[cfg(any(esp32c6, esp32h2))]
         let update_reg = T::register_block().reg_update();
 
@@ -1182,30 +1221,30 @@ where
 
     #[cfg(not(any(esp32c3, esp32c6, esp32h2, esp32s3)))]
     #[inline(always)]
-    fn sync_regs(&mut self) {}
+    fn sync_regs() {}
 
     fn rxfifo_reset(&mut self) {
         T::register_block()
             .conf0()
             .modify(|_, w| w.rxfifo_rst().set_bit());
-        self.sync_regs();
+        Self::sync_regs();
 
         T::register_block()
             .conf0()
             .modify(|_, w| w.rxfifo_rst().clear_bit());
-        self.sync_regs();
+        Self::sync_regs();
     }
 
     fn txfifo_reset(&mut self) {
         T::register_block()
             .conf0()
             .modify(|_, w| w.txfifo_rst().set_bit());
-        self.sync_regs();
+        Self::sync_regs();
 
         T::register_block()
             .conf0()
             .modify(|_, w| w.txfifo_rst().clear_bit());
-        self.sync_regs();
+        Self::sync_regs();
     }
 }
 
@@ -2073,7 +2112,7 @@ mod asynch {
                 }),
             );
 
-            Self::new_inner()
+            Self::new_inner(config.symbol_length())
         }
 
         /// Read async to buffer slice `buf`.
