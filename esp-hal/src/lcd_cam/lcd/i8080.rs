@@ -233,9 +233,9 @@ where
 
 impl<'d, TX: Tx, P: TxPins> DmaSupport for I8080<'d, TX, P> {
     fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
-        let dma_int_raw = self.lcd_cam.lc_dma_int_raw();
-        // Wait until LCD_TRANS_DONE is set.
-        while dma_int_raw.read().lcd_trans_done_int_raw().bit_is_clear() {}
+        let lcd_user = self.lcd_cam.lcd_user();
+        // Wait until LCD_START is cleared by hardware.
+        while lcd_user.read().lcd_start().bit_is_set() {}
         self.tear_down_send();
     }
 
@@ -310,9 +310,9 @@ where
         self.start_write_bytes_dma(data.as_ptr() as _, core::mem::size_of_val(data))?;
         self.start_send();
 
-        let dma_int_raw = self.lcd_cam.lc_dma_int_raw();
-        // Wait until LCD_TRANS_DONE is set.
-        while dma_int_raw.read().lcd_trans_done_int_raw().bit_is_clear() {}
+        let lcd_user = self.lcd_cam.lcd_user();
+        // Wait until LCD_START is cleared by hardware.
+        while lcd_user.read().lcd_start().bit_is_set() {}
 
         self.tear_down_send();
 
@@ -405,6 +405,8 @@ impl<'d, TX: Tx, P> I8080<'d, TX, P> {
     }
 
     fn tear_down_send(&mut self) {
+        // This will already be cleared unless the user is trying to cancel,
+        // which is why this is still here.
         self.lcd_cam
             .lcd_user()
             .modify(|_, w| w.lcd_start().clear_bit());
