@@ -43,6 +43,10 @@
       width: 900px;
     }
 
+    h2 {
+      margin-top: 3rem;
+    }
+
     .crate {
       display: flex;
       align-items: center;
@@ -92,16 +96,20 @@
       <div>esp-rs docs</div>
     </div>
 
-    {%- for crate in crates %}
+    {%- for (package, metadata) in packages|items %}
+    <h2>{{ package }}</h2>
+
+    {%- for meta in metadata %}
     <div class="crate">
       <span class="crate-name">
-        <a href="{{ crate.name }}/{{ crate.version }}/{{ crate.chip }}/{{ crate.package }}">
-          {{ crate.chip_pretty }}
+        <a href="{{ meta.name }}/{{ meta.version }}/{{ meta.chip }}/{{ meta.package }}">
+          {{ meta.chip_pretty }}
         </a>
       </span>
-      <span class="crate-description">{{ crate.description }}</span>
-      <span class="crate-version">{{ crate.version }}</span>
+      <span class="crate-description">{{ meta.description }}</span>
+      <span class="crate-version">{{ meta.version }}</span>
     </div>
+    {%- endfor %}
     {%- endfor %}
   </div>
 </body>
