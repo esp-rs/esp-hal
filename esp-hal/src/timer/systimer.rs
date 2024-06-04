@@ -19,17 +19,39 @@
 //!
 //! ```no_run
 #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::timer::systimer::SystemTimer;
+//! # use esp_hal::timer::timg::{TimerGroup, TimerInterrupts};
+//! # use crate::esp_hal::prelude::_esp_hal_timer_Timer;
+//! # use esp_hal::prelude::*;
 //! let systimer = SystemTimer::new(peripherals.SYSTIMER);
 //!
 //! // Get the current timestamp, in microseconds:
-//! let now = systimer.now();
+//! let now = SystemTimer::now();
+//! 
+//! let timg0 = TimerGroup::new(
+//!     peripherals.TIMG0,
+//!     &clocks,
+//!     Some(TimerInterrupts {
+//!         timer0_t0: Some(tg0_t0_level),
+//!         ..Default::default()
+//!     }),
+//! );
 //!
+//! # let timer0 = timg0.timer0;
+//! 
 //! // Wait for timeout:
-//! systimer.load_value(1.secs());
-//! systimer.start();
+//! timer0.load_value(1.secs());
+//! timer0.start();
 //!
-//! while !systimer.is_interrupt_set() {
+//! while !timer0.is_interrupt_set() {
 //!     // Wait
+//! }
+//! # }
+//! 
+//! # use procmacros::handler;
+//! #[handler]
+//! fn tg0_t0_level() {
+//!     /* */ 
 //! }
 //! ```
 

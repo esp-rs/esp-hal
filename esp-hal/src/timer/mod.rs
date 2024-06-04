@@ -10,22 +10,32 @@
 //! #### One-shot Timer
 //!
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::timer::{OneShotTimer, PeriodicTimer, timg::TimerGroup};
+//! # use esp_hal::prelude::*;
+//! # use core::option::Option::None;
 //! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
 //! let one_shot = OneShotTimer::new(timg0.timer0);
 //!
 //! one_shot.delay_millis(500);
+//! # }
 //! ```
 //!
 //! #### Periodic Timer
 //!
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::timer::{PeriodicTimer, timg::TimerGroup};
+//! # use esp_hal::prelude::*;
+//! # use core::option::Option::None;
 //! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
-//! let periodic = PeriodicTimer::new(timg0.timer0);
+//! let mut periodic = PeriodicTimer::new(timg0.timer0);
 //!
 //! periodic.start(1.secs());
 //! loop {
 //!     nb::block!(periodic.wait());
 //! }
+//! # }
 //! ```
 
 #![deny(missing_docs)]
