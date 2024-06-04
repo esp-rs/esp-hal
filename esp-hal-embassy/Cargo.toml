@@ -17,13 +17,13 @@ defmt               = { version = "0.3.8", optional = true }
 document-features   = "0.2.8"
 embassy-executor    = "0.5.0"
 embassy-time-driver = "0.1.0"
-esp-hal             = { version = "0.17.0", path = "../esp-hal" }
+esp-hal             = { version = "0.18.0", path = "../esp-hal" }
 portable-atomic     = "1.6.0"
 
 [build-dependencies]
 cfg-if       = "1.0.0"
 esp-build    = { version = "0.1.0", path = "../esp-build" }
-esp-metadata = { version = "0.1.0", path = "../esp-metadata" }
+esp-metadata = { version = "0.1.1", path = "../esp-metadata" }
 
 [features]
 esp32   = ["esp-hal/esp32"]

@@ -1,6 +1,6 @@
 [package]
 name          = "esp-hal"
-version       = "0.17.0"
+version       = "0.18.0"
 edition       = "2021"
 rust-version  = "1.76.0"
 description   = "Bare-metal HAL for Espressif devices"
@@ -19,11 +19,11 @@ bitflags                 = "2.5.0"
 bitfield                 = "0.15.0"
 cfg-if                   = "1.0.0"
 critical-section         = "1.1.2"
-defmt                    = { version = "0.3.6", optional = true }
+defmt                    = { version = "0.3.8", optional = true }
 delegate                 = "0.12.0"
 document-features        = "0.2.8"
 embassy-futures          = { version = "0.1.1", optional = true }
-embassy-sync             = { version = "0.5.0", optional = true }
+embassy-sync             = { version = "0.6.0", optional = true }
 embassy-usb-driver       = { version = "0.1.0", optional = true }
 embassy-usb-synopsys-otg = { version = "0.1.0", optional = true }
 embedded-can             = { version = "0.4.1", optional = true }
@@ -39,9 +39,9 @@ esp-synopsys-usb-otg     = { version = "0.4.1", optional = true, features = ["fs
 fugit                    = "0.3.7"
 log                      = { version = "0.4.21", optional = true }
 nb                       = "1.1.0"
-paste                    = "1.0.14"
+paste                    = "1.0.15"
 portable-atomic          = { version = "1.6.0", default-features = false }
-procmacros               = { version = "0.10.0", features = ["embassy", "enum-dispatch", "interrupt", "ram"], package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+procmacros               = { version = "0.11.0", features = ["embassy", "enum-dispatch", "interrupt", "ram"], package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 riscv                    = { version = "0.11.1", optional = true }
 strum                    = { version = "0.26.2", default-features = false, features = ["derive"] }
 void                     = { version = "1.0.2", default-features = false }
@@ -71,8 +71,8 @@ xtensa-lx-rt = "0.16.0"
 basic-toml   = "0.1.9"
 cfg-if       = "1.0.0"
 esp-build    = { version = "0.1.0", path = "../esp-build" }
-esp-metadata = { version = "0.1.0", path = "../esp-metadata" }
-serde        = { version = "1.0.197", features = ["derive"] }
+esp-metadata = { version = "0.1.1", path = "../esp-metadata" }
+serde        = { version = "1.0.203", features = ["derive"] }
 
 [features]
 default = ["embedded-hal"]

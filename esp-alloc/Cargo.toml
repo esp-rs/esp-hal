@@ -1,6 +1,6 @@
 [package]
 name         = "esp-alloc"
-version      = "0.3.0"
+version      = "0.4.0"
 edition      = "2021"
 rust-version = "1.68"
 description  = "A heap allocator for Espressif devices"
@@ -23,7 +23,7 @@ default-target = "riscv32imc-unknown-none-elf"
 features       = ["nightly"]
 
 [dependencies]
-critical-section      = "1.1.1"
+critical-section      = "1.1.2"
 linked_list_allocator = { version = "0.10.5", default-features = false, features = ["const_mut_refs"] }
 
 [features]
