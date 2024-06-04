@@ -63,10 +63,8 @@ fn main() -> ! {
         &clocks,
     );
 
-    #[cfg(esp32)]
-    {
-        i2s.with_mclk(io.pins.gpio0);
-    }
+    #[cfg(not(feature = "esp32"))]
+    let i2s = i2s.with_mclk(io.pins.gpio0);
 
     let mut i2s_rx = i2s
         .i2s_rx

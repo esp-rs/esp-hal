@@ -9,40 +9,48 @@
 //! ## Example
 //!
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::delay::Delay;
+//! # use esp_hal::cpu_control::{CpuControl, Stack};
+//! # use core::{cell::RefCell, ptr::addr_of_mut};
+//! # use critical_section::Mutex;
+//! # use esp_hal::prelude::*;
 //! static mut APP_CORE_STACK: Stack<8192> = Stack::new();
+//! 
+//! # let delay = Delay::new(&clocks);
 //!
 //! let counter = Mutex::new(RefCell::new(0));
 //!
 //! let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 //! let cpu1_fnctn = || {
-//!     cpu1_task(&mut timer1, &counter);
+//!     cpu1_task(&delay, &counter);
 //! };
 //! let _guard = cpu_control
-//!     .start_app_core(unsafe { &mut APP_CORE_STACK }, cpu1_fnctn)
+//!    .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, cpu1_fnctn)
 //!     .unwrap();
 //!
 //! loop {
-//!     block!(timer0.wait()).unwrap();
-//!
+//!     delay.delay(1.secs());
 //!     let count = critical_section::with(|cs| *counter.borrow_ref(cs));
-//!     println!("Hello World - Core 0! Counter is {}", count);
+//!     // println!("Hello World - Core 0! Counter is {}", count);
 //! }
-//! ```
-//!
-//! Where `cpu1_task()` may be defined as:
-//!
-//! ```no_run
+//! # }
+//! 
+//! // Where `cpu1_task()` may be defined as:
+//! # use esp_hal::delay::Delay;
+//! # use core::cell::RefCell;
+//! # use esp_hal::prelude::*;
 //! fn cpu1_task(
-//!     timer: &mut Timer<Timer0<TIMG1>>,
+//!     delay: &Delay,
 //!     counter: &critical_section::Mutex<RefCell<i32>>,
 //! ) -> ! {
-//!     println!("Hello World - Core 1!");
+//!     // println!("Hello World - Core 1!");
 //!     loop {
-//!         block!(timer.wait()).unwrap();
+//!         delay.delay(500.millis());
 //!
 //!         critical_section::with(|cs| {
-//!             let new_val = counter.borrow_ref_mut(cs).wrapping_add(1);
-//!             *counter.borrow_ref_mut(cs) = new_val;
+//!             let mut val = counter.borrow_ref_mut(cs);
+//!             *val = val.wrapping_add(1);
 //!         });
 //!     }
 //! }

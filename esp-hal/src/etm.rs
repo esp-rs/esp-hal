@@ -22,14 +22,32 @@
 #![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/peripherals/etm.html)")]
 //! ## Example
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::gpio::Io;
+//! # use esp_hal::gpio::etm::GpioEtmChannels;
+//! # use esp_hal::etm::Etm;
+//! # use esp_hal::gpio::etm::GpioEtmInputConfig;
+//! # use esp_hal::gpio::etm::GpioEtmOutputConfig;
+//! # use esp_hal::gpio::Pull;
+//! # use esp_hal::gpio::Level;
+//! 
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let mut led = io.pins.gpio1;
 //! let button = io.pins.gpio9;
 //!
 //! // setup ETM
 //! let gpio_ext = GpioEtmChannels::new(peripherals.GPIO_SD);
-//! let led_task = gpio_ext.channel0_task.toggle(&mut led);
-//! let button_event = gpio_ext.channel0_event.falling_edge(button);
+//! let led_task = gpio_ext.channel0_task.toggle(
+//! &mut led,
+//! GpioEtmOutputConfig {
+//!     open_drain: false,
+//!     pull: Pull::None,
+//!     initial_state: Level::Low,
+//! },
+//! );
+//! let button_event = gpio_ext
+//! .channel0_event
+//! .falling_edge(button, GpioEtmInputConfig { pull: Pull::Down });
 //!
 //! let etm = Etm::new(peripherals.SOC_ETM);
 //! let channel0 = etm.channel0;
@@ -40,6 +58,7 @@
 //!
 //! // the LED is controlled by the button without involving the CPU
 //! loop {}
+//! # }
 //! ```
 
 use crate::{

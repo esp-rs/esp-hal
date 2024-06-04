@@ -23,6 +23,25 @@
 //!
 //! ### initialization
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::i2s::I2s;
+//! # use esp_hal::i2s::Standard;
+//! # use esp_hal::i2s::DataFormat;
+//! # use esp_hal::gpio::Io;
+//! # use esp_hal::dma_buffers;
+//! # use esp_hal::dma::{Dma, DmaPriority};
+//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
+//! # use crate::esp_hal::peripherals::Peripherals;
+//! # use crate::esp_hal::i2s::I2sReadDma;
+//! # use core::ptr::addr_of_mut;
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let dma = Dma::new(peripherals.DMA);
+//!
+#![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.i2s0channel;")]
+#![cfg_attr(not(any(esp32, esp32s2)), doc = "let dma_channel = dma.channel0;")]
+//! 
+//! let (_, mut tx_descriptors, mut rx_buffer, mut rx_descriptors) = dma_buffers!(0, 4 * 4092);
+//! 
 //! let i2s = I2s::new(
 //!     peripherals.I2S0,
 //!     Standard::Philips,
@@ -35,34 +54,27 @@
 //!         DmaPriority::Priority0,
 //!     ),
 //!     &clocks,
-//! )
-//! .with_mclk(io.pins.gpio4);
-//! ```
+//! );
+#![cfg_attr(not(esp32), doc = "let i2s = i2s.with_mclk(io.pins.gpio0);")]
 //!
-//! ### Reading
-//! ```no_run
-//! let i2s_rx = i2s.i2s_rx.
+//! let mut i2s_rx = i2s.i2s_rx
 //!     .with_bclk(io.pins.gpio1)
 //!     .with_ws(io.pins.gpio2)
-//!     .with_dout(io.pins.gpio5)
+//!     .with_din(io.pins.gpio5)
 //!     .build();
 //!
-//! // Creating DMA buffer
-//! static mut BUFFER: [u8; 4092 * 4] = [0u8; 4092 * 4];
-//! let buffer: &'static mut [u8; 4092 * 4] = unsafe { &mut BUFFER };
-//!
-//! let mut transfer = i2s_rx.read_dma_circular(buffer).unwrap();
-//! println!("Started transfer");
-//!
+//! let mut transfer = i2s_rx.read_dma_circular(&mut rx_buffer).unwrap();
+//! 
 //! loop {
 //!     let avail = transfer.available();
 //!
 //!     if avail > 0 {
 //!         let mut rcv = [0u8; 5000];
 //!         transfer.pop(&mut rcv[..avail]).unwrap();
-//!         println!("Received {:x?}...", &rcv[..30]);
+//!         // println!("Received {:x?}...", &rcv[..30]);
 //!     }
 //! }
+//! # }
 //! ```
 
 use core::marker::PhantomData;

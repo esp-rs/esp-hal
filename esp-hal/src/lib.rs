@@ -32,7 +32,7 @@
 //! Invoke the following command in the root of the esp-hal repository to get
 //! started.
 //!
-//! ```no_run
+//! ```ignore
 //! cargo xtask help
 //! ```
 //!
@@ -45,7 +45,7 @@
 //! We have a template for quick starting bare-metal projects, [esp-template].
 //! The template uses [cargo-generate], so ensure that it is installed and run
 //!
-//! ```no_run
+//! ```ignore
 //! cargo generate -a esp-rs/esp-template
 //! ```
 //!
@@ -461,8 +461,8 @@ mod critical_section_impl {
 /// often a `const` variable.
 ///
 /// Example usage using [`spi::master::dma::SpiDma`]
-/// ```no_run
-/// const ARRAY_IN_FLASH = [0xAA; 128]
+/// ```ignore
+/// const ARRAY_IN_FLASH = [0xAA; 128];
 ///
 /// let spi = SpiDma::new(/* */);
 ///

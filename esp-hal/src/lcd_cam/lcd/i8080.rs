@@ -10,6 +10,27 @@
 //! protocol.
 //!
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::gpio::Io;
+//! # use esp_hal::lcd_cam::{LcdCam, lcd::i8080::{Config, I8080, TxEightBits}};
+//! # use esp_hal::dma_buffers;
+//! # use esp_hal::dma::{Dma, DmaPriority};
+//! # use fugit::RateExtU32;
+//! 
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! 
+//! # let dma = Dma::new(peripherals.DMA);
+//! # let channel = dma.channel0;
+//! 
+//! # let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(32678, 0);
+//! 
+//! # let channel = channel.configure(
+//! #     false,
+//! #     &mut tx_descriptors,
+//! #     &mut rx_descriptors,
+//! #     DmaPriority::Priority0,
+//! # );
+//! 
 //! let tx_pins = TxEightBits::new(
 //!     io.pins.gpio9,
 //!     io.pins.gpio46,
@@ -33,6 +54,7 @@
 //! .with_ctrl_pins(io.pins.gpio0, io.pins.gpio47);
 //!
 //! i8080.send(0x3A, 0, &[0x55]).unwrap(); // RGB565
+//! # }
 //! ```
 
 use core::{fmt::Formatter, mem::size_of};

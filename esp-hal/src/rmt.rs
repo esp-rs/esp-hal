@@ -41,7 +41,17 @@
 //! ### Initialization
 //!
 //! ```no_run
-//! let rmt = Rmt::new(peripherals.RMT, 80.MHz(), &mut clock_control, &clocks).unwrap();
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::peripherals::Peripherals;
+//! # use esp_hal::rmt::TxChannelConfig;
+//! # use esp_hal::rmt::Rmt;
+//! # use esp_hal::gpio::Io;
+//! # use esp_hal::clock::ClockControl;
+//! # use crate::esp_hal::rmt::TxChannelCreator;
+//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let freq = 80.MHz();
+//! let rmt = Rmt::new(peripherals.RMT, freq, &clocks, None).unwrap();
 //! let mut channel = rmt
 //!     .channel0
 //!     .configure(
@@ -57,31 +67,16 @@
 //!         },
 //!     )
 //!     .unwrap();
+//! # }
 //! ```
 //! (on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80
 //! MHz)
 //!
-//! ### Sending a pulse sequence
-//!
-//! ```no_run
-//! let data = [
-//!     PulseCode {
-//!         level1: true,
-//!         length1: 100,
-//!         level2: false,
-//!         length2: 300,
-//!     },
-//!     PulseCode {
-//!         level1: true,
-//!         length1: 100,
-//!         level2: false,
-//!         length2: 0, // a zero-length pulse marks the end of the sequence
-//!     },
-//! ];
-//!
-//! let transaction = channel.transmit(&data);
-//! channel = transaction.wait().unwrap();
-//! ```
+//! ⚠️: For a more detailed study of how to use this driver please visit [the repository
+//! with corresponding example].
+//! 
+//! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/esp32-hal/examples/rsa.rs
+
 #![warn(missing_docs)]
 
 use core::marker::PhantomData;

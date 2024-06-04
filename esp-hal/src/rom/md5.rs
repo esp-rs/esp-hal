@@ -28,19 +28,36 @@
 //!
 //! To compute a full digest from a single buffer, use the following:
 //!
-//! ```
+//! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::rom::md5;
+//! # use esp_hal::uart::Uart;
+//! # use core::writeln;
+//! # use core::fmt::Write;
+//! # let mut uart0 = Uart::new(peripherals.UART0, &clocks);
+//! # let data = "Dummy";
 //! let d: md5::Digest = md5::compute(&data);
 //! writeln!(uart0, "{}", d);
+//! # }
 //! ```
 //!
 //! To compute a digest over multiple buffers:
 //!
-//! ```
+//! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::rom::md5;
+//! # use esp_hal::uart::Uart;
+//! # use core::writeln;
+//! # use core::fmt::Write;
+//! # let mut uart0 = Uart::new(peripherals.UART0, &clocks);
+//! # let data0 = "Dummy";
+//! # let data1 = "Dummy";
 //! let mut ctx = md5::Context::new();
 //! ctx.consume(&data0);
 //! ctx.consume(&data1);
 //! let d: md5::Digest = ctx.compute();
 //! writeln!(uart0, "{}", d);
+//! # }
 //! ```
 //!
 //! [1]: <https://crates.io/crates/md5>

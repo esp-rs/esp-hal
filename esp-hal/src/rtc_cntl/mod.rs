@@ -20,53 +20,15 @@
 //! ## Examples
 //! ### Print time in milliseconds from the RTC Timer
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::delay::Delay;
 //! let mut delay = Delay::new(&clocks);
 //!
 //! loop {
-//!     esp_println::println!("rtc time in milliseconds is {}", rtc.get_time_ms());
-//!     delay.delay_ms(1000u32);
+//!     // esp_println::println!("rtc time in milliseconds is {}", rtc.get_time_ms());
+//!     delay.delay_millis(1000u32);
 //! }
-//! ```
-//!
-//! ### RTC Watchdog Timer
-//! ```no_run
-//! rtc.rwdt.start(2000u64.millis());
-//! rtc.rwdt.listen();
-//!
-//! interrupt::enable(
-//!     peripherals::Interrupt::LP_WDT,
-//!     interrupt::Priority::Priority1,
-//! )
-//! .unwrap();
-//!
-//! critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
-//!
-//! unsafe {
-//!     riscv::interrupt::enable();
-//! }
-//!
-//! loop {}
-//! ```
-//!
-//! Where the `LP_WDT` interrupt handler is defined as:
-//! ```no_run
-//! // Handle the corresponding interrupt
-//! #[handler]
-//! fn interrupt_handler() {
-//!     critical_section::with(|cs| {
-//!         esp_println::println!("RWDT Interrupt");
-//!
-//!         let mut rwdt = RWDT.borrow_ref_mut(cs);
-//!         let rwdt = rwdt.as_mut().unwrap();
-//!
-//!         rwdt.clear_interrupt();
-//!
-//!         esp_println::println!("Restarting in 5 seconds...");
-//!
-//!         rwdt.start(5000u64.millis());
-//!         rwdt.unlisten();
-//!     });
-//! }
+//! # }
 //! ```
 
 #[cfg(not(any(esp32c6, esp32h2)))]

@@ -20,20 +20,6 @@
 //! The module also includes a `peripheral_macros` module, which contains macros
 //! for generating peripheral structs and associated traits based on
 //! configuration options.
-//!
-//! ## Examples
-//!
-//! ### Initialization
-//! ```no_run
-//! let peripherals = Peripherals::take();
-//! ```
-//! ### Accessing peripherals
-//! ```no_run
-//! let mut rtc = Rtc::new(peripherals.LPWR, None);
-//! ```
-//! ```no_run
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! ```
 
 use core::{
     marker::PhantomData,

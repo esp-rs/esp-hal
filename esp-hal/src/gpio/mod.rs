@@ -16,8 +16,11 @@
 //!
 //! ## Example
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::gpio::{Io, Level, Output};
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let mut led = Output::new(io.pins.gpio5);
+//! let mut led = Output::new(io.pins.gpio5, Level::High);
+//! # }
 //! ```
 //!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/

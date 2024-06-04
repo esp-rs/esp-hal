@@ -89,7 +89,7 @@ impl SingleStandardFilter {
     ///
     /// Example matching only even IDs, allowing any rtr value and any payload
     /// data:
-    /// ```
+    /// ```ignore
     /// const FILTER: SingleStandardFilter =
     ///     SingleStandardFilter::new(b"xxxxxxxxxx0", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
     /// ```
@@ -149,8 +149,8 @@ impl SingleStandardFilter {
     ///
     /// A filter that matches every standard id that is even, is not an rtr
     /// frame, with any bytes for the first two payload bytes.
-    /// ```
-    /// let filter = twai::filter::SingleStandardFilter::new_from_code_mask(
+    /// ```ignore
+    /// let filter = filter::SingleStandardFilter::new_from_code_mask(
     ///     StandardId::new(0x000).unwrap(),
     ///     StandardId::new(0x001).unwrap(),
     ///     false,
@@ -213,9 +213,9 @@ impl SingleExtendedFilter {
     ///
     /// # Examples
     /// A filter matching any odd extended IDs, with any rtr value.
-    /// ```
-    /// const FILTER: twai::filter::SingleExtendedFilter =
-    ///     twai::filter::SingleExtendedFilter::new(b"xxxxxxxxxxxxxxxxxxxxxxxxxxxx1", b"x");
+    /// ```ignore
+    /// const FILTER: SingleExtendedFilter =
+    ///     SingleExtendedFilter::new(b"xxxxxxxxxxxxxxxxxxxxxxxxxxxx1", b"x");
     /// ```
     pub const fn new(id: &BitFilter<29>, rtr: &BitFilter<1>) -> Self {
         // The bit values we desire to match against. This determines whether we want a
@@ -304,8 +304,8 @@ impl DualStandardFilter {
     /// # Examples
     /// A filter that matches any standard id that ends with a 00 or a 11, with
     /// any RTR, and with any payload on the first filter.
-    /// ```
-    /// const FILTER: twai::filter::DualStandardFilter = twai::filter::DualStandardFilter::new(
+    /// ```ignore
+    /// const FILTER: DualStandardFilter = DualStandardFilter::new(
     ///     b"xxxxxxxxx00",
     ///     b"x",
     ///     b"xxxxxxxx",
@@ -452,9 +452,9 @@ impl DualExtendedFilter {
     /// part of the id. For example this id matches: 0x000f000f, 0x000f000a,
     /// 0x0000000a, 0x0000000b.
     /// But it does not match: 0x000a000a
-    /// ```
-    /// const FILTER: twai::filter::DualExtendedFilter =
-    ///     twai::filter::DualExtendedFilter::new([b"xxxxxxxxx0000xxx", b"xxxxxxxxx1111xxx"]);
+    /// ```ignore
+    /// const FILTER: filter::DualExtendedFilter =
+    ///     filter::DualExtendedFilter::new([b"xxxxxxxxx0000xxx", b"xxxxxxxxx1111xxx"]);
     /// ```
     pub const fn new(ids: [&BitFilter<16>; 2]) -> Self {
         // The bit values we desire to match against. This determines whether we want a

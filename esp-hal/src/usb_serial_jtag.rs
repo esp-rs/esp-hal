@@ -42,21 +42,29 @@
 //! ### Sending and Receiving Data
 //!
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! use esp_hal::usb_serial_jtag::UsbSerialJtag;
+//! use core::option::Option::None;
 //! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE, None);
 //!
 //! // Write bytes out over the USB Serial/JTAG:
-//! usb_serial.write_bytes("Hello, world!".as_bytes())?;
+//! usb_serial.write_bytes("Hello, world!".as_bytes()).expect("write error!");
+//! }
 //! ```
 //!
 //! ### Splitting the USB Serial/JTAG into TX and RX Components
 //!
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::usb_serial_jtag::UsbSerialJtag;
+//! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE, None);
 //! // The USB Serial/JTAG can be split into separate Transmit and Receive components:
-//! let (mut tx, rx) = usb_serial.split();
+//! let (mut tx, mut rx) = usb_serial.split();
 //!
 //! // Each component can be used individually to interact with the USB Serial/JTAG:
-//! tx.write_bytes(&[42u8])?;
-//! let byte = rx.read_byte()?;
+//! tx.write_bytes(&[42u8]).expect("write error!");
+//! let byte = rx.read_byte().expect("read error!");
+//! # }
 //! ```
 //!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/

@@ -21,6 +21,7 @@
 //! #### General-purpose Timer
 //!
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
 //! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
 //! let timer0 = timg0.timer0;
 //!

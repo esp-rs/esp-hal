@@ -12,10 +12,13 @@
 //!
 //! ## Example
 //! ```no_run
-//! let mut clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::delay::Delay;
+//! # use embedded_hal::delay::DelayNs;
 //! let mut delay = Delay::new(&clocks);
 //!
 //! delay.delay_ms(1000 as u32);
+//! # }
 //! ```
 //!
 //! [DelayMs]: embedded_hal_02::blocking::delay::DelayMs

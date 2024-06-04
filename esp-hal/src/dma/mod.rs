@@ -16,28 +16,33 @@
 //! ### Initialize and utilize DMA controller in `SPI`
 //!
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::dma_buffers;
+//! # use esp_hal::gpio::Io;
+//! # use esp_hal::spi::{master::{Spi, prelude::*}, SpiMode};
+//! # use esp_hal::dma::{Dma, DmaPriority};
+//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
 //! let dma = Dma::new(peripherals.DMA);
-//! let dma_channel = dma.channel0;
+#![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.spi2channel;")]
+#![cfg_attr(not(any(esp32, esp32s2)), doc = "let dma_channel = dma.channel0;")]
+//! 
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let sclk = io.pins.gpio0;
+//! let miso = io.pins.gpio2;
+//! let mosi = io.pins.gpio4;
+//! let cs = io.pins.gpio5;
 //!
-//! let mut descriptors = [DmaDescriptor::EMPTY; 8];
-//! let mut rx_descriptors = [DmaDescriptor::EMPTY; 8];
+//! let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(32000);
 //!
-//! let mut spi = Spi::new(
-//!     peripherals.SPI2,
-//!     sclk,
-//!     mosi,
-//!     miso,
-//!     cs,
-//!     100.kHz(),
-//!     SpiMode::Mode0,
-//!     &clocks,
-//! )
+//! let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+//! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
 //! .with_dma(dma_channel.configure(
 //!     false,
-//!     &mut descriptors,
+//!     &mut tx_descriptors,
 //!     &mut rx_descriptors,
 //!     DmaPriority::Priority0,
 //! ));
+//! # }
 //! ```
 //!
 //! ⚠️ Note: Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`.
@@ -139,7 +144,7 @@ const CHUNK_SIZE: usize = 4092;
 /// Convenience macro to create DMA buffers and descriptors
 ///
 /// ## Usage
-/// ```rust,no_run
+/// ```rust,ignore
 /// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX and RX the same size
 /// let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(32000, 32000);
 /// ```
@@ -179,7 +184,7 @@ macro_rules! dma_buffers {
 /// Convenience macro to create circular DMA buffers and descriptors
 ///
 /// ## Usage
-/// ```rust,no_run
+/// ```rust,ignore
 /// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX and RX the same size
 /// let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) =
 ///     dma_circular_buffers!(32000, 32000);
@@ -240,7 +245,7 @@ macro_rules! dma_circular_buffers {
 /// Convenience macro to create DMA descriptors
 ///
 /// ## Usage
-/// ```rust,no_run
+/// ```rust,ignore
 /// // Create TX and RX descriptors for transactions up to 32000 bytes - passing only one parameter assumes TX and RX are the same size
 /// let (mut tx_descriptors, mut rx_descriptors) = dma_descriptors!(32000, 32000);
 /// ```
@@ -262,7 +267,7 @@ macro_rules! dma_descriptors {
 /// Convenience macro to create circular DMA descriptors
 ///
 /// ## Usage
-/// ```rust,no_run
+/// ```rust,ignore
 /// // Create TX and RX descriptors for transactions up to 32000 bytes - passing only one parameter assumes TX and RX are the same size
 /// let (mut tx_descriptors, mut rx_descriptors) = dma_circular_descriptors!(32000, 32000);
 /// ```

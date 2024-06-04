@@ -24,12 +24,18 @@
 //! ongoing calculation over multiple buffers. To do this, the initial value
 //! passed in and the final value returned are one's complemented.
 //!
-//! ```
+//! ```no_run
 //! // CRC-32/MPEG-2
-//! const CRC_INITIAL: _ = 0xffffffff; // "init" or "xorin" of all ones
-//! let mut crc = crc32_be(!CRC_INITIAL, &data0); // start
-//! crc = crc32_be(crc, &data1);
-//! crc = !crc32_be(crc, &data2); // finish
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::rom::crc::crc32_be;
+//! # let data0 = "123456789";
+//! # let data1 = "123456789";
+//! # let data2 = "123456789";
+//! const CRC_INITIAL: u32 = 0xffffffff; // "init" or "xorin" of all ones
+//! let mut crc = crc32_be(!CRC_INITIAL, &data0.as_ref()); // start
+//! crc = crc32_be(crc, &data1.as_ref());
+//! crc = !crc32_be(crc, &data2.as_ref()); // finish
+//! # }
 //! ```
 //!
 //! ## Examples
@@ -40,35 +46,55 @@
 //! CRC-32/ISO-HDLC poly=0x04c11db7 init=0xffffffff refin=true refout=true
 //! xorout=0xffffffff
 //!
-//! ```
-//! let crc = crc32_le(!0xffffffff, &data);
+//! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::rom::crc::crc32_le;
+//! # let data = "123456789";
+//! let crc = crc32_le(!0xffffffff, &data.as_ref());
+//! # }
 //! ```
 //!
 //! CRC-32/BZIP2 poly=0x04c11db7 init=0xffffffff refin=false refout=false
 //! xorout=0xffffffff
 //!
-//! ```
-//! let crc = crc32_be(!0xffffffff, &data);
+//! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::rom::crc::crc32_be;
+//! # let data = "123456789";
+//! let crc = crc32_be(!0xffffffff, &data.as_ref());
+//! # }
 //! ```
 //!
 //! CRC-32/MPEG-2 poly=0x04c11db7 init=0xffffffff refin=false refout=false
 //! xorout=0x00000000
 //!
-//! ```
-//! let crc = !crc32_be(!0xffffffff, &data);
+//! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::rom::crc::crc32_be;
+//! # let data = "123456789";
+//! let crc = !crc32_be(!0xffffffff, &data.as_ref());
+//! # }
 //! ```
 //!
 //! CRC-32/CKSUM poly=0x04c11db7 init=0x00000000 refin=false refout=false
 //! xorout=0xffffffff
 //!
-//! ```
-//! let crc = crc32_be(!0, &data);
+//! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::rom::crc::crc32_be;
+//! # let data = "123456789";
+//! let crc = crc32_be(!0, &data.as_ref());
+//! # }
 //! ```
 //!
 //! CRC-16/KERMIT poly=0x1021 init=0x0000 refin=true refout=true xorout=0x0000
 //!
-//! ```
-//! let crc = !crc16_le(!0, &data);
+//! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::rom::crc::crc16_le;
+//! # let data = "123456789";
+//! let crc = !crc16_le(!0, &data.as_ref());
+//! # }
 //! ```
 
 // SAFETY: These functions are all implemented as table lookups. No locking is

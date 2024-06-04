@@ -21,14 +21,17 @@
 //!
 //! ## Example
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::trace::Trace;
 //! let mut trace = Trace::new(peripherals.TRACE0);
-//! let buffer = unsafe { &mut BUFFER[..] };
-//! trace.start_trace(buffer);
+//! let mut buffer = [0_u8; 1024];
+//! trace.start_trace(&mut buffer);
 //! // traced code
-//! println!("Hello");
+//! // println!("Hello");
 //! // end traced code
 //! let res = trace.stop_trace().unwrap();
 //! // transfer the trace result to the host and decode it there
+//! # }
 //! ```
 
 use crate::{

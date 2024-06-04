@@ -22,9 +22,11 @@
 //!
 //! ## Example
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
 //! let peripherals = Peripherals::take();
 //! let system = SystemControl::new(peripherals.SYSTEM);
 //! let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+//! # }
 //! ```
 
 use crate::{interrupt::InterruptHandler, peripheral::PeripheralRef, peripherals::SYSTEM};

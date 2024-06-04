@@ -12,51 +12,26 @@
 //!
 //! ## Example
 //!
-//! ### Initialization
+//! ### Encrypting and Decrypting
 //!
 //! ```no_run
-//! let mut aes = Aes::new(peripherals.AES);
-//! ```
-//!
-//! ### Creating key and block Buffer
-//!
-//! ```no_run
-//! let keytext = "SUp4SeCp@sSw0rd".as_bytes();
-//! let plaintext = "message".as_bytes();
-//!
-//! // create an array with aes128 key size
-//! let mut keybuf = [0_u8; 16];
-//! keybuf[..keytext.len()].copy_from_slice(keytext);
-//!
-//! // create an array with aes block size
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::aes::{Aes, Mode};
+//! # let keytext = "SUp4SeCp@sSw0rd".as_bytes();
+//! # let plaintext = "message".as_bytes();
+//! # let mut keybuf = [0_u8; 16];
+//! # keybuf[..keytext.len()].copy_from_slice(keytext);
 //! let mut block_buf = [0_u8; 16];
 //! block_buf[..plaintext.len()].copy_from_slice(plaintext);
-//! ```
-//!
-//! ### Encrypting and Decrypting (using hardware)
-//!
-//! ```no_run
 //! let mut block = block_buf.clone();
+//! 
+//! let mut aes = Aes::new(peripherals.AES);
 //! aes.process(&mut block, Mode::Encryption128, keybuf);
 //! let hw_encrypted = block.clone();
 //!
 //! aes.process(&mut block, Mode::Decryption128, keybuf);
 //! let hw_decrypted = block;
-//! ```
-//!
-//! ### Encrypting and Decrypting (using software)
-//!
-//! ```no_run
-//! let key = GenericArray::from(keybuf);
-//!
-//! let mut block = GenericArray::from(block_buf);
-//! let cipher = Aes128SW::new(&key);
-//! cipher.encrypt_block(&mut block);
-//!
-//! let sw_encrypted = block.clone();
-//! cipher.decrypt_block(&mut block);
-//!
-//! let sw_decrypted = block;
+//! # }
 //! ```
 //!
 //! ### Implementation State
@@ -69,39 +44,11 @@
 //!
 //! * Initialization vector (IV) is currently not supported ⚠️
 //!
-//! ## Example
-//!
-//! ### Initialization
-//!
-//! ```no_run
-//! let dma = Gdma::new(peripherals.DMA);
-//! let dma_channel = dma.channel0;
-//!
-//! let mut descriptors = [0u32; 8 * 3];
-//! let mut rx_descriptors = [0u32; 8 * 3];
-//!
-//! let aes = Aes::new(peripherals.AES).with_dma(dma_channel.configure(
-//!     false,
-//!     &mut descriptors,
-//!     &mut rx_descriptors,
-//!     DmaPriority::Priority0,
-//! ));
-//! ```
-//!
-//! ### Operation
-//!
-//! ```no_run
-//! let transfer = aes
-//!     .process(
-//!         plaintext,
-//!         hw_encrypted,
-//!         Mode::Encryption128,
-//!         CipherMode::Ecb,
-//!         keybuf,
-//!     )
-//!     .unwrap();
-//! transfer.wait().unwrap();
-//! ```
+//! ⚠️: The examples for AES with DMA peripheral are quite extensive, so for a more
+//! detailed study of how to use this driver please visit [the repository
+//! with corresponding example].
+//! 
+//! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/aes_dma.rs
 
 use crate::{
     peripheral::{Peripheral, PeripheralRef},

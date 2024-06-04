@@ -20,6 +20,12 @@
 //!
 //! ### Read chip's MAC address from the eFuse storage.
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::efuse::Efuse;
+//! # use esp_hal::uart::Uart;
+//! # use core::writeln;
+//! # use core::fmt::Write;
+//! # let mut serial_tx = Uart::new(peripherals.UART0, &clocks);
 //! let mac_address = Efuse::read_base_mac_address();
 //! writeln!(
 //!     serial_tx,
@@ -31,6 +37,7 @@
 //!     mac_address[4],
 //!     mac_address[5]
 //! );
+//! # }
 //! ```
 
 use fugit::{HertzU32, RateExtU32};

@@ -8,16 +8,6 @@
 //!
 //! ## Example
 //!
-//! ```rust
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let sclk = io.pins.gpio12;
-//! let miso = io.pins.gpio11;
-//! let mosi = io.pins.gpio13;
-//! let cs = io.pins.gpio10;
-//!
-//! let mut spi = hal::spi::slave::Spi::new(peripherals.SPI2, sclk, mosi, miso, cs, SpiMode::Mode0);
-//! ```
-//!
 //! There are several options for working with the SPI peripheral in slave mode,
 //! but the code currently only supports single transfers (not segmented
 //! transfers), full duplex, single bit (not dual or quad SPI), and DMA mode
@@ -26,24 +16,54 @@
 //! then the DmaTransfer trait instance can be wait()ed on or polled for
 //! is_done().
 //!
-//! ```rust
-//! let dma = Gdma::new(peripherals.DMA);
-//! const N: usize = (buffer_size + 4091) / 4092;
-//! let mut tx_descriptors = [0u32; N * 3];
-//! let mut rx_descriptors = [0u32; N * 3];
-//! let mut spi = spi.with_dma(dma.channel0.configure(
-//!     /* circular = */ false,
-//!     tx_descriptors,
-//!     rx_descriptors,
+//! ```rust, no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::dma::DmaPriority;
+//! # use esp_hal::dma_buffers;
+//! # use esp_hal::spi::SpiMode;
+//! # use esp_hal::spi::slave::{prelude::*, Spi};
+//! # use esp_hal::dma::Dma;
+//! # use esp_hal::gpio::Io;
+//! let dma = Dma::new(peripherals.DMA);
+//! cfg_if::cfg_if! {
+//!     if #[cfg(feature = "esp32s2")] {
+//!         let dma_channel = dma.spi2channel;
+//!     } else {
+//!         let dma_channel = dma.channel0;
+//!     }
+//! }
+//! 
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let slave_sclk = io.pins.gpio0;
+//! let slave_miso = io.pins.gpio1;
+//! let slave_mosi = io.pins.gpio2;
+//! let slave_cs = io.pins.gpio3;
+//! 
+//! let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(32000);
+//! let mut spi = Spi::new(
+//!     peripherals.SPI2,
+//!     slave_sclk,
+//!     slave_mosi,
+//!     slave_miso,
+//!     slave_cs,
+//!     SpiMode::Mode0,
+//! )
+//! .with_dma(dma_channel.configure(
+//!     false,
+//!     &mut tx_descriptors,
+//!     &mut rx_descriptors,
 //!     DmaPriority::Priority0,
 //! ));
-//! // This is not legal rust, but any method of getting a &mut 'static is good.
-//! let tx_buf = &'static [0u8; N * 4092];
-//! let rx_buf = &mut 'static [0u8; N * 4092];
-//! let transfer = spi.dma_transfer(tx_buf, rx_buf).unwrap();
-//! // Do other operations, checking transfer.is_done()
-//! // When the master sends enough clock pulses, is_done() will be true.
-//! (tx_buf, rx_buf, spi) = transfer.wait();
+//! 
+//! let mut slave_send = tx_buffer;
+//! let mut slave_receive = rx_buffer;
+//! 
+//! let transfer = spi
+//! .dma_transfer(&mut slave_send, &mut slave_receive)
+//! .unwrap();
+//! 
+//! transfer.wait().unwrap();
+//! # }
 //! ```
 
 use core::marker::PhantomData;

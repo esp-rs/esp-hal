@@ -19,11 +19,16 @@
 //! specified.
 //!
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use core::option::Option::Some;
+//! # use esp_hal::uart::{config::Config, TxRxPins, Uart};
+//! use esp_hal::gpio::Io;
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let pins = TxRxPins::new_tx_rx(io.pins.gpio1, io.pins.gpio2);
 //!
 //! let mut uart1 =
-//!     Uart::new_with_config(peripherals.UART1, Config::default(), Some(pins), &clocks);
+//!     Uart::new_with_config(peripherals.UART1, Config::default(), Some(pins), &clocks, None);
+//! # }
 //! ```
 //!
 //! ## Usage
@@ -43,19 +48,45 @@
 //! #### Sending and Receiving Data
 //!
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::uart::{config::Config, TxRxPins, Uart};
+//! use esp_hal::gpio::Io;
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! # let pins = TxRxPins::new_tx_rx(io.pins.gpio1, io.pins.gpio2);
+//! # let mut uart1 = Uart::new_with_config(
+//! #     peripherals.UART1,
+//! #     Config::default(),
+//! #     Some(pins),
+//! #     &clocks,
+//! #     None,
+//! # );
 //! // Write bytes out over the UART:
-//! uart1.write_bytes("Hello, world!".as_bytes())?;
+//! uart1.write_bytes("Hello, world!".as_bytes()).expect("write error!");
+//! # }
 //! ```
 //!
 //! #### Splitting the UART into TX and RX Components
 //!
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::uart::{config::Config, TxRxPins, Uart};
+//! use esp_hal::gpio::Io;
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! # let pins = TxRxPins::new_tx_rx(io.pins.gpio1, io.pins.gpio2);
+//! # let mut uart1 = Uart::new_with_config(
+//! #     peripherals.UART1,
+//! #     Config::default(),
+//! #     Some(pins),
+//! #     &clocks,
+//! #     None,
+//! # );
 //! // The UART can be split into separate Transmit and Receive components:
-//! let (mut tx, rx) = uart1.split();
+//! let (mut tx, mut rx) = uart1.split();
 //!
 //! // Each component can be used individually to interact with the UART:
-//! tx.write_bytes(&[42u8])?;
-//! let byte = rx.read_byte()?;
+//! tx.write_bytes(&[42u8]).expect("write error!");
+//! let byte = rx.read_byte().expect("read error!");
+//! # }
 //! ```
 //!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
@@ -466,13 +497,6 @@ where
     }
 
     /// Read a byte from the UART
-    ///
-    /// Example
-    ///
-    /// ```rust
-    /// let (_, mut rx) = serial.spilt();
-    /// let byte = rx.read_byte().unwrap();
-    /// ```
     pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
         // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
         let offset = if cfg!(esp32s2) { 0x20C00000 } else { 0 };

@@ -15,6 +15,12 @@
 //! Following code shows how to read data from a BMP180 sensor using I2C.
 //!
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::i2c::I2C;
+//! # use esp_hal::gpio::Io;
+//! # use core::option::Option::None;
+//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // Create a new peripheral object with the described wiring
 //! // and standard I2C clock speed
 //! let mut i2c = I2C::new(
@@ -29,8 +35,9 @@
 //!     let mut data = [0u8; 22];
 //!     i2c.write_read(0x77, &[0xaa], &mut data).ok();
 //!
-//!     println!("{:02x?}", data);
+//!     // println!("{:02x?}", data);
 //! }
+//! # }
 //! ```
 
 use core::marker::PhantomData;

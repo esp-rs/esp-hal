@@ -18,6 +18,7 @@
 //! #### General-purpose Timer
 //!
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
 //! let systimer = SystemTimer::new(peripherals.SYSTIMER);
 //!
 //! // Get the current timestamp, in microseconds:
@@ -663,11 +664,15 @@ pub mod etm {
     //!
     //! ## Example
     //! ```no_run
+    #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+    //! # use esp_hal::timer::systimer::{etm::SysTimerEtmEvent, SystemTimer};
+    //! # use fugit::ExtU32;
     //! let syst = SystemTimer::new(peripherals.SYSTIMER);
     //! let mut alarm0 = syst.alarm0.into_periodic();
     //! alarm0.set_period(1.secs());
     //!
     //! let timer_event = SysTimerEtmEvent::new(&mut alarm0);
+    //! # }
     //! ```
 
     use super::*;

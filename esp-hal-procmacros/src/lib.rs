@@ -223,7 +223,8 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
         if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-hal") {
             &name
         } else {
-            "crate"
+            // root "crate" doesn't work in doc-test
+            "esp_hal"
         },
         Span::call_site().into(),
     );

@@ -31,14 +31,20 @@
 //! ## Example
 //! Uses timer0 and operator0 of the MCPWM0 peripheral to output a 50% duty
 //! signal at 20 kHz. The signal will be output to the pin assigned to `pin`.
-//!
-//! ```no_run
+//!```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
 //! # use esp_hal::{mcpwm, prelude::*};
-//! use mcpwm::{operator::PwmPinConfig, timer::PwmWorkingMode, McPwm, PeripheralClockConfig};
+//! # use esp_hal::mcpwm::operator::{DeadTimeCfg, PWMStream};
+//! # use mcpwm::{operator::PwmPinConfig, timer::PwmWorkingMode, McPwm, PeripheralClockConfig};
+//! # use esp_hal::gpio::Io;
+//! 
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! # let pin = io.pins.gpio0;
 //!
 //! // initialize peripheral
-//! let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40.MHz()).unwrap();
-//! let mut mcpwm = McPwm::new(peripherals.PWM0, clock_cfg);
+#![cfg_attr(esp32h2, doc= "let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40.MHz()).unwrap();")]
+#![cfg_attr(not(esp32h2), doc="let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 32.MHz()).unwrap();")]
+//! let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
 //!
 //! // connect operator0 to timer0
 //! mcpwm.operator0.set_timer(&mcpwm.timer0);
@@ -55,6 +61,7 @@
 //!
 //! // pin will be high 50% of the time
 //! pwm_pin.set_timestamp(50);
+//! # }
 //! ```
 
 #![deny(missing_docs)]

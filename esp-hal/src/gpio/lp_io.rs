@@ -15,9 +15,13 @@
 //!
 //! # Example
 //! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! use esp_hal::gpio::Io;
+//! use esp_hal::gpio::lp_io::LowPowerOutput;
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // configure GPIO 1 as LP output pin
-//! let lp_pin = LowPowerOutput::new(io.pins.gpio1);
+//! let lp_pin: LowPowerOutput<'_, 1> = LowPowerOutput::new(io.pins.gpio1);
+//! # }
 //! ```
 
 use core::marker::PhantomData;

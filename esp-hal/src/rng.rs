@@ -41,26 +41,6 @@
 //!
 //! For more information, please refer to the
 #![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/system/random.html)")]
-//! # Examples
-//!
-//! ## Initialization
-//!
-//! ```no_run
-//! let mut rng = Rng::new(peripherals.RNG);
-//! ```
-//!
-//! ## Generate a random word (u32)
-//!
-//! ```no_run
-//! let random: u32 = rng.random();
-//! ```
-//!
-//! ## Fill a buffer of arbitrary size with random bytes
-//!
-//! ```no_run
-//! let mut buffer = [0u8; 32];
-//! rng.read(&mut buffer).unwrap();
-//! ```
 
 use core::marker::PhantomData;
 

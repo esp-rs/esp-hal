@@ -12,28 +12,29 @@
 //! ## Example
 //!
 //! ```no_run
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let gpio25 = io.pins.gpio25;
-//! let gpio26 = io.pins.gpio26;
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use esp_hal::gpio::Io;
+//! # use esp_hal::analog::dac::Dac1;
+//! # use esp_hal::delay::Delay;
+//! # use embedded_hal::delay::DelayNs;
 //!
-//! let mut dac1 = Dac::new(peripherals.DAC1, gpio25);
-//! let mut dac2 = Dac::new(peripherals.DAC2, gpio26);
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+#![cfg_attr(esp32, doc = "let dac1_pin = io.pins.gpio25;")]
+#![cfg_attr(esp32s2, doc = "let dac1_pin = io.pins.gpio17;")]
+//! let mut dac1 = Dac::new(peripherals.DAC, dac1_pin);
 //!
 //! let mut delay = Delay::new(&clocks);
 //!
 //! let mut voltage_dac1 = 200u8;
-//! let mut voltage_dac2 = 255u8;
 //!
 //! // Change voltage on the pins using write function:
 //! loop {
 //!     voltage_dac1 = voltage_dac1.wrapping_add(1);
 //!     dac1.write(voltage_dac1);
 //!
-//!     voltage_dac2 = voltage_dac2.wrapping_sub(1);
-//!     dac2.write(voltage_dac2);
-//!
 //!     delay.delay_ms(50u32);
 //! }
+//! # }
 //! ```
 
 #![deny(missing_docs)]
