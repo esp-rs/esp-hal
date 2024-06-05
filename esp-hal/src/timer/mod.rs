@@ -20,9 +20,8 @@
 //! one_shot.delay_millis(500);
 //! # }
 //! ```
-//!
+//! 
 //! #### Periodic Timer
-//!
 //! ```no_run
 #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
 //! # use esp_hal::timer::{PeriodicTimer, timg::TimerGroup};

@@ -24,7 +24,7 @@
 //! let mut block_buf = [0_u8; 16];
 //! block_buf[..plaintext.len()].copy_from_slice(plaintext);
 //! let mut block = block_buf.clone();
-//! 
+//!
 //! let mut aes = Aes::new(peripherals.AES);
 //! aes.process(&mut block, Mode::Encryption128, keybuf);
 //! let hw_encrypted = block.clone();
@@ -33,7 +33,7 @@
 //! let hw_decrypted = block;
 //! # }
 //! ```
-//!
+//! 
 //! ### Implementation State
 //!
 //! * DMA mode is currently not supported on ESP32 and ESP32S2 ⚠️
@@ -47,7 +47,7 @@
 //! ⚠️: The examples for AES with DMA peripheral are quite extensive, so for a more
 //! detailed study of how to use this driver please visit [the repository
 //! with corresponding example].
-//! 
+//!
 //! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/aes_dma.rs
 
 use crate::{

@@ -52,16 +52,14 @@
 //! # fn main() {
 //! #   let peripherals = Peripherals::take();
 //! #   let system = SystemControl::new(peripherals.SYSTEM);
-//! /* Initialize with the highest possible frequency for this chip
-//! let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-//! 
-//! Initialize with the highest possible frequency for this chip
+//! // Initialize with the highest possible frequency for this chip
 //! let clocks = ClockControl::max(system.clock_control).freeze();
-//! 
-//! Initialize with custom clock frequency
-//! let clocks = ClockControl::configure(system.clock_control, CpuClock::Clock160MHz).freeze();
-//!  */
-//! let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+//!
+//! // Initialize with custom clock frequency
+//! // let clocks = ClockControl::configure(system.clock_control, CpuClock::Clock160MHz).freeze();
+//! //
+//! // Initialize with default clock frequency for this chip
+//! // let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 //! # }
 //! ```
 

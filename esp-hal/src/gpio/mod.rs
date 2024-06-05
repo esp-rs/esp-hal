@@ -22,7 +22,7 @@
 //! let mut led = Output::new(io.pins.gpio5, Level::High);
 //! # }
 //! ```
-//!
+//! 
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 #![warn(missing_docs)]
 

@@ -25,27 +25,21 @@
 //! # use esp_hal::dma::Dma;
 //! # use esp_hal::gpio::Io;
 //! let dma = Dma::new(peripherals.DMA);
-//! cfg_if::cfg_if! {
-//!     if #[cfg(feature = "esp32s2")] {
-//!         let dma_channel = dma.spi2channel;
-//!     } else {
-//!         let dma_channel = dma.channel0;
-//!     }
-//! }
-//! 
+#![cfg_attr(esp32s2, doc = "let dma_channel = dma.spi2channel;")]
+#![cfg_attr(not(esp32s2), doc = "let dma_channel = dma.channel0;")]
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let slave_sclk = io.pins.gpio0;
-//! let slave_miso = io.pins.gpio1;
-//! let slave_mosi = io.pins.gpio2;
-//! let slave_cs = io.pins.gpio3;
-//! 
-//! let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(32000);
-//! let mut spi = Spi::new(
+//! let sclk = io.pins.gpio0;
+//! let miso = io.pins.gpio1;
+//! let mosi = io.pins.gpio2;
+//! let cs = io.pins.gpio3;
+//!
+//! let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) =
+//! dma_buffers!(32000); let mut spi = Spi::new(
 //!     peripherals.SPI2,
-//!     slave_sclk,
-//!     slave_mosi,
-//!     slave_miso,
-//!     slave_cs,
+//!     sclk,
+//!     mosi,
+//!     miso,
+//!     cs,
 //!     SpiMode::Mode0,
 //! )
 //! .with_dma(dma_channel.configure(
@@ -54,14 +48,14 @@
 //!     &mut rx_descriptors,
 //!     DmaPriority::Priority0,
 //! ));
-//! 
-//! let mut slave_send = tx_buffer;
-//! let mut slave_receive = rx_buffer;
-//! 
+//!
+//! let mut send = tx_buffer;
+//! let mut receive = rx_buffer;
+//!
 //! let transfer = spi
-//! .dma_transfer(&mut slave_send, &mut slave_receive)
+//! .dma_transfer(&mut send, &mut receive)
 //! .unwrap();
-//! 
+//!
 //! transfer.wait().unwrap();
 //! # }
 //! ```

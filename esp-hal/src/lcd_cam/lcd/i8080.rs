@@ -16,21 +16,21 @@
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::{Dma, DmaPriority};
 //! # use fugit::RateExtU32;
-//! 
+//!
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! 
+//!
 //! # let dma = Dma::new(peripherals.DMA);
 //! # let channel = dma.channel0;
-//! 
+//!
 //! # let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(32678, 0);
-//! 
+//!
 //! # let channel = channel.configure(
 //! #     false,
 //! #     &mut tx_descriptors,
 //! #     &mut rx_descriptors,
 //! #     DmaPriority::Priority0,
 //! # );
-//! 
+//!
 //! let tx_pins = TxEightBits::new(
 //!     io.pins.gpio9,
 //!     io.pins.gpio46,

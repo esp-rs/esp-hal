@@ -8,37 +8,23 @@
 //! This is the preferred way to register handlers.
 //!
 //! ## Example using the peripheral driver to register an interrupt handler
-//!
-//! 
 
-//!```no_run
-//! # #![no_std]
-//! # #![no_main]
-//! 
+//! ```no_run
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
 //! # use core::cell::RefCell;
-//! 
+//!
 //! # use critical_section::Mutex;
 //! # use esp_hal::{
-//! #    peripherals::Peripherals,
 //! #    prelude::*,
 //! #    system::{SoftwareInterrupt, SystemControl},
 //! # };
 //! # use esp_hal::interrupt::Priority;
 //! # use esp_hal::interrupt::InterruptHandler;
-//! 
-//! # #[panic_handler]
-//! # fn panic(_ : &core::panic::PanicInfo) -> ! {
-//! #  loop {}
-//! # }
-//! 
-//! static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> = Mutex::new(RefCell::new(None));
-//! 
-//! #[entry]
-//! fn main() -> ! {
-//!     let peripherals = Peripherals::take();
-//!     let system = SystemControl::new(peripherals.SYSTEM);
-//!     let mut sw_int = system.software_interrupt_control;
-//! 
+//!
+//! static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> =
+//! Mutex::new(RefCell::new(None));
+//!
+//! let mut sw_int = system.software_interrupt_control;
 //!     critical_section::with(|cs| {
 //!         sw_int
 //!             .software_interrupt0
@@ -47,16 +33,20 @@
 //!             .borrow_ref_mut(cs)
 //!             .replace(sw_int.software_interrupt0);
 //!     });
-//! 
+//!
 //!     critical_section::with(|cs| {
 //!         SWINT0.borrow_ref(cs).as_ref().unwrap().raise();
 //!     });
-//! 
+//!
 //!     loop {}
 //! }
-//! 
+//!
 //! # use procmacros::handler;
 //! # use esp_hal::interrupt;
+//! # use critical_section::Mutex;
+//! # use core::cell::RefCell;
+//! # use esp_hal::system::SoftwareInterrupt;
+//! # static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> = Mutex::new(RefCell::new(None));
 //! #[handler(priority = esp_hal::interrupt::Priority::Priority1)]
 //! fn swint0_handler() {
 //!     // esp_println::println!("SW interrupt0");
@@ -65,19 +55,6 @@
 //!     });
 //! }
 //! ```
-
-//! 
-//! 
-//! 
-//! 
-//! 
-//! 
-//! 
-//! 
-//! 
-//! 
-//! 
-//!
 //! There are additional ways to register interrupt handlers which are generally
 //! only meant to be used in very special situations (mostly internal to the HAL
 //! or the supporting libraries). Those are outside the scope of this

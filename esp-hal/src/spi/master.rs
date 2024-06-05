@@ -14,10 +14,10 @@
 //! # use esp_hal::spi::master::Spi;
 //! # use esp_hal::gpio::Io;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! # let sclk = io.pins.gpio0;
-//! # let miso = io.pins.gpio2;
-//! # let mosi = io.pins.gpio1;
-//! # let cs = io.pins.gpio5;
+//! let sclk = io.pins.gpio0;
+//! let miso = io.pins.gpio2;
+//! let mosi = io.pins.gpio1;
+//! let cs = io.pins.gpio5;
 //!
 //! let mut spi = Spi::new(
 //!     peripherals.SPI2,
@@ -28,7 +28,7 @@
 //! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs));
 //! # }
 //! ```
-//!
+//! 
 //! ## Exclusive access to the SPI bus
 //!
 //! If all you want to do is to communicate to a single device, and you initiate

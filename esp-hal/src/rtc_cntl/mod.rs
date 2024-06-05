@@ -21,14 +21,53 @@
 //! ### Print time in milliseconds from the RTC Timer
 //! ```no_run
 #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! # use core::cell::RefCell;
+//!
+//! # use critical_section::Mutex;
 //! # use esp_hal::delay::Delay;
+//! # use esp_hal::rtc_cntl::Rtc;
+//! # use esp_hal::rtc_cntl::Rwdt;
+//! # use crate::esp_hal::prelude::_fugit_ExtU64;
+//! static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
 //! let mut delay = Delay::new(&clocks);
 //!
-//! loop {
-//!     // esp_println::println!("rtc time in milliseconds is {}", rtc.get_time_ms());
-//!     delay.delay_millis(1000u32);
-//! }
+//! let mut rtc = Rtc::new(peripherals.LPWR, Some(interrupt_handler));
+//! rtc.rwdt.set_timeout(2000.millis());
+//! rtc.rwdt.listen();
+//!
+//! critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
+//!
+//!
+//! loop {}
 //! # }
+//!
+//! // Where the `LP_WDT` interrupt handler is defined as:
+//! // Handle the corresponding interrupt
+//! # use core::cell::RefCell;
+//!
+//! # use critical_section::Mutex;
+//! # use esp_hal::prelude::handler;
+//! # use esp_hal::interrupt::InterruptHandler;
+//! # use esp_hal::interrupt;
+//! # use esp_hal::interrupt::Priority;
+//! # use crate::esp_hal::prelude::_fugit_ExtU64;
+//! # use esp_hal::rtc_cntl::Rwdt;
+//! static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
+//! #[handler]
+//! fn interrupt_handler() {
+//!     critical_section::with(|cs| {
+//!         // esp_println::println!("RWDT Interrupt");
+//!
+//!         let mut rwdt = RWDT.borrow_ref_mut(cs);
+//!         let rwdt = rwdt.as_mut().unwrap();
+//!         rwdt.clear_interrupt();
+//!
+//!         // esp_println::println!("Restarting in 5 seconds...");
+//!
+//!         rwdt.set_timeout(5000u64.millis());
+//!         rwdt.unlisten();
+//!     });
+//! }
 //! ```
 
 #[cfg(not(any(esp32c6, esp32h2)))]

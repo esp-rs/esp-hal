@@ -25,14 +25,14 @@
 //! let dma = Dma::new(peripherals.DMA);
 #![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.spi2channel;")]
 #![cfg_attr(not(any(esp32, esp32s2)), doc = "let dma_channel = dma.channel0;")]
-//! 
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let sclk = io.pins.gpio0;
 //! let miso = io.pins.gpio2;
 //! let mosi = io.pins.gpio4;
 //! let cs = io.pins.gpio5;
 //!
-//! let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(32000);
+//! let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) =
+//! dma_buffers!(32000);
 //!
 //! let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
 //! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
@@ -44,7 +44,7 @@
 //! ));
 //! # }
 //! ```
-//!
+//! 
 //! ⚠️ Note: Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`.
 //! I.e., to transfer buffers of size `1..=4092`, you need 1 descriptor.
 //!

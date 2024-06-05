@@ -31,11 +31,11 @@
 //! # use esp_hal::gpio::etm::GpioEtmOutputConfig;
 //! # use esp_hal::gpio::Pull;
 //! # use esp_hal::gpio::Level;
-//! 
+//!
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let mut led = io.pins.gpio1;
 //! # let button = io.pins.gpio9;
-//! 
+//!
 //! let gpio_ext = GpioEtmChannels::new(peripherals.GPIO_SD);
 //! let led_task = gpio_ext.channel0_task.toggle(
 //!     &mut led,

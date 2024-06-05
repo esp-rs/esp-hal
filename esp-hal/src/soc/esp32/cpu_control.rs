@@ -16,7 +16,7 @@
 //! # use critical_section::Mutex;
 //! # use esp_hal::prelude::*;
 //! static mut APP_CORE_STACK: Stack<8192> = Stack::new();
-//! 
+//!
 //! # let delay = Delay::new(&clocks);
 //!
 //! let counter = Mutex::new(RefCell::new(0));
@@ -26,8 +26,8 @@
 //!     cpu1_task(&delay, &counter);
 //! };
 //! let _guard = cpu_control
-//!    .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, cpu1_fnctn)
-//!     .unwrap();
+//!    .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) },
+//! cpu1_fnctn)     .unwrap();
 //!
 //! loop {
 //!     delay.delay(1.secs());
@@ -35,7 +35,7 @@
 //!     // println!("Hello World - Core 0! Counter is {}", count);
 //! }
 //! # }
-//! 
+//!
 //! // Where `cpu1_task()` may be defined as:
 //! # use esp_hal::delay::Delay;
 //! # use core::cell::RefCell;

@@ -50,7 +50,8 @@
 //! # use crate::esp_hal::rmt::TxChannelCreator;
 //! # use crate::esp_hal::prelude::_fugit_RateExtU32;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let freq = 80.MHz();
+#![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
+#![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
 //! let rmt = Rmt::new(peripherals.RMT, freq, &clocks, None).unwrap();
 //! let mut channel = rmt
 //!     .channel0
@@ -71,11 +72,6 @@
 //! ```
 //! (on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80
 //! MHz)
-//!
-//! ⚠️: For a more detailed study of how to use this driver please visit [the repository
-//! with corresponding example].
-//! 
-//! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/esp32-hal/examples/rsa.rs
 
 #![warn(missing_docs)]
 

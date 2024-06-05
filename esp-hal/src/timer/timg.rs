@@ -40,9 +40,8 @@
 //! }
 //! # }
 //! ```
-//!
+//! 
 //! #### Watchdog Timer
-//!
 //! ```no_run
 #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
 //! # use esp_hal::timer::timg::TimerGroup;

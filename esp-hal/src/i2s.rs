@@ -36,12 +36,11 @@
 //! # use core::ptr::addr_of_mut;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let dma = Dma::new(peripherals.DMA);
-//!
 #![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.i2s0channel;")]
 #![cfg_attr(not(any(esp32, esp32s2)), doc = "let dma_channel = dma.channel0;")]
-//! 
-//! let (_, mut tx_descriptors, mut rx_buffer, mut rx_descriptors) = dma_buffers!(0, 4 * 4092);
-//! 
+//! let (_, mut tx_descriptors, mut rx_buffer, mut rx_descriptors) =
+//! dma_buffers!(0, 4 * 4092);
+//!
 //! let i2s = I2s::new(
 //!     peripherals.I2S0,
 //!     Standard::Philips,
@@ -56,7 +55,6 @@
 //!     &clocks,
 //! );
 #![cfg_attr(not(esp32), doc = "let i2s = i2s.with_mclk(io.pins.gpio0);")]
-//!
 //! let mut i2s_rx = i2s.i2s_rx
 //!     .with_bclk(io.pins.gpio1)
 //!     .with_ws(io.pins.gpio2)
@@ -64,7 +62,7 @@
 //!     .build();
 //!
 //! let mut transfer = i2s_rx.read_dma_circular(&mut rx_buffer).unwrap();
-//! 
+//!
 //! loop {
 //!     let avail = transfer.available();
 //!

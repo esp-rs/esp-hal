@@ -30,7 +30,7 @@
 //! # use esp_hal::gpio::etm::GpioEtmOutputConfig;
 //! # use esp_hal::gpio::Pull;
 //! # use esp_hal::gpio::Level;
-//! 
+//!
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let mut led = io.pins.gpio1;
 //! let button = io.pins.gpio9;

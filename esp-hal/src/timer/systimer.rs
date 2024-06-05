@@ -27,7 +27,7 @@
 //!
 //! // Get the current timestamp, in microseconds:
 //! let now = SystemTimer::now();
-//! 
+//!
 //! let timg0 = TimerGroup::new(
 //!     peripherals.TIMG0,
 //!     &clocks,
@@ -38,7 +38,7 @@
 //! );
 //!
 //! # let timer0 = timg0.timer0;
-//! 
+//!
 //! // Wait for timeout:
 //! timer0.load_value(1.secs());
 //! timer0.start();
@@ -47,13 +47,29 @@
 //!     // Wait
 //! }
 //! # }
-//! 
+//!
+//!
+//! # use core::cell::RefCell;
+//! # use critical_section::Mutex;
 //! # use procmacros::handler;
 //! # use esp_hal::interrupt::InterruptHandler;
 //! # use esp_hal::interrupt;
+//! # use esp_hal::peripherals::TIMG0;
+//! # use esp_hal::timer::timg::{Timer, Timer0};
+//! # use crate::esp_hal::prelude::_esp_hal_timer_Timer;
+//! # static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0>, esp_hal::Blocking>>>> = Mutex::new(RefCell::new(None));
 //! #[handler]
 //! fn tg0_t0_level() {
-//!     /* */ 
+//!     critical_section::with(|cs| {
+//!     let mut timer0 = TIMER0.borrow_ref_mut(cs);
+//!     let timer0 = timer0.as_mut().unwrap();
+//!     
+//!     timer0.clear_interrupt();
+//!     
+//!     // Counter value should be a very small number as the alarm triggered a
+//!     // counter reload to 0 and ETM stopped the counter quickly after
+//!     // esp_println::println!("counter in interrupt: {}", timer0.now());
+//!     });
 //! }
 //! ```
 

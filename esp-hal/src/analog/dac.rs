@@ -21,7 +21,7 @@
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 #![cfg_attr(esp32, doc = "let dac1_pin = io.pins.gpio25;")]
 #![cfg_attr(esp32s2, doc = "let dac1_pin = io.pins.gpio17;")]
-//! let mut dac1 = Dac::new(peripherals.DAC, dac1_pin);
+//! let mut dac1 = Dac::new(peripherals.DAC1, dac1_pin);
 //!
 //! let mut delay = Delay::new(&clocks);
 //!

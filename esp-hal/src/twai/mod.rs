@@ -49,14 +49,15 @@
 //!     None,
 //! );
 //!
-//! // Partially filter the incoming messages to reduce overhead of receiving undesired messages
+//! // Partially filter the incoming messages to reduce overhead of receiving
+//! // undesired messages
 //! const FILTER: twai::filter::SingleStandardFilter =
-//!     SingleStandardFilter::new(b"xxxxxxxxxx0", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
-//! can_config.set_filter(FILTER);
+//!     SingleStandardFilter::new(b"xxxxxxxxxx0", b"x", [b"xxxxxxxx",
+//! b"xxxxxxxx"]); can_config.set_filter(FILTER);
 //!
-//! // Start the peripheral. This locks the configuration settings of the peripheral
-//! // and puts it into operation mode, allowing packets to be sent and
-//! // received.
+//! // Start the peripheral. This locks the configuration settings of the
+//! // peripheral and puts it into operation mode, allowing packets to be sent
+//! // and received.
 //! let mut can = can_config.start();
 //!
 //! loop {
@@ -76,8 +77,8 @@
 //!         }
 //!     }
 //!
-//!     // Print out the frame data or the requested data length code for a remote
-//!     // transmission request frame.
+//!     // Print out the frame data or the requested data length code for a
+//! remote     // transmission request frame.
 //!     if frame.is_data_frame() {
 //!         println!("\tData: {:?}", frame.data());
 //!     } else {

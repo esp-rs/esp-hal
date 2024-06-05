@@ -21,7 +21,7 @@
 //!
 //! This peripheral supports `async` on every available chip except of `esp32`
 //! (to be solved).
-//! 
+//!
 //! ⚠️: The examples for RSA peripheral are quite extensive, so for a more
 //! detailed study of how to use this driver please visit [the repository
 //! with corresponding example].

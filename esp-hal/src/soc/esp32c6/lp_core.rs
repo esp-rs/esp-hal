@@ -16,7 +16,7 @@
 //! ⚠️: The examples for LP Core are quite extensive, so for a more
 //! detailed study of how to use this LP Core please visit [the repository
 //! with corresponding example].
-//! 
+//!
 //! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/lp_core_basic.rs
 
 use esp32c6 as pac;

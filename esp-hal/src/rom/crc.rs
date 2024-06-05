@@ -37,7 +37,7 @@
 //! crc = !crc32_be(crc, &data2.as_ref()); // finish
 //! # }
 //! ```
-//!
+//! 
 //! ## Examples
 //!
 //! A catalogue of these parameters can be found at
@@ -45,7 +45,6 @@
 //!
 //! CRC-32/ISO-HDLC poly=0x04c11db7 init=0xffffffff refin=true refout=true
 //! xorout=0xffffffff
-//!
 //! ```no_run
 #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
 //! # use esp_hal::rom::crc::crc32_le;
@@ -53,10 +52,9 @@
 //! let crc = crc32_le(!0xffffffff, &data.as_ref());
 //! # }
 //! ```
-//!
+//! 
 //! CRC-32/BZIP2 poly=0x04c11db7 init=0xffffffff refin=false refout=false
 //! xorout=0xffffffff
-//!
 //! ```no_run
 #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
 //! # use esp_hal::rom::crc::crc32_be;
@@ -64,10 +62,9 @@
 //! let crc = crc32_be(!0xffffffff, &data.as_ref());
 //! # }
 //! ```
-//!
+//! 
 //! CRC-32/MPEG-2 poly=0x04c11db7 init=0xffffffff refin=false refout=false
 //! xorout=0x00000000
-//!
 //! ```no_run
 #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
 //! # use esp_hal::rom::crc::crc32_be;
@@ -75,10 +72,9 @@
 //! let crc = !crc32_be(!0xffffffff, &data.as_ref());
 //! # }
 //! ```
-//!
+//! 
 //! CRC-32/CKSUM poly=0x04c11db7 init=0x00000000 refin=false refout=false
 //! xorout=0xffffffff
-//!
 //! ```no_run
 #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
 //! # use esp_hal::rom::crc::crc32_be;
@@ -86,9 +82,8 @@
 //! let crc = crc32_be(!0, &data.as_ref());
 //! # }
 //! ```
-//!
+//! 
 //! CRC-16/KERMIT poly=0x1021 init=0x0000 refin=true refout=true xorout=0x0000
-//!
 //! ```no_run
 #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
 //! # use esp_hal::rom::crc::crc16_le;

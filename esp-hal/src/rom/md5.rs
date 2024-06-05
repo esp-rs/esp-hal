@@ -40,9 +40,8 @@
 //! writeln!(uart0, "{}", d);
 //! # }
 //! ```
-//!
+//! 
 //! To compute a digest over multiple buffers:
-//!
 //! ```no_run
 #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
 //! # use esp_hal::rom::md5;
@@ -59,7 +58,7 @@
 //! writeln!(uart0, "{}", d);
 //! # }
 //! ```
-//!
+//! 
 //! [1]: <https://crates.io/crates/md5>
 
 #[allow(unused)]

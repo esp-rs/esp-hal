@@ -20,19 +20,19 @@
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::{Dma, DmaPriority};
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! 
+//!
 //! # let dma = Dma::new(peripherals.DMA);
 //! # let channel = dma.channel0;
-//! 
+//!
 //! # let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(32678, 0);
-//! 
+//!
 //! # let channel = channel.configure(
 //! #     false,
 //! #     &mut tx_descriptors,
 //! #     &mut rx_descriptors,
 //! #     DmaPriority::Priority0,
 //! # );
-//! 
+//!
 //! let mclk_pin = io.pins.gpio15;
 //! let vsync_pin = io.pins.gpio6;
 //! let href_pin = io.pins.gpio7;
@@ -49,9 +49,10 @@
 //! );
 //!
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-//! let mut camera = Camera::new(lcd_cam.cam, channel.rx, data_pins, 20u32.MHz(), &clocks)
-//!     .with_master_clock(mclk_pin) // Remove this for slave mode.
-//!     .with_ctrl_pins(vsync_pin, href_pin, pclk_pin);
+//! let mut camera =
+//!     Camera::new(lcd_cam.cam, channel.rx, data_pins, 20u32.MHz(), &clocks)
+//!         .with_master_clock(mclk_pin) // Remove this for slave mode.
+//!         .with_ctrl_pins(vsync_pin, href_pin, pclk_pin);
 //! # }
 //! ```
 

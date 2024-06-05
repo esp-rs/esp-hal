@@ -20,10 +20,10 @@
 //! # use crate::esp_hal::prelude::_esp_hal_ledc_timer_TimerIFace;
 //! # use crate::esp_hal::prelude::_fugit_RateExtU32;
 //! # use crate::esp_hal::prelude::_esp_hal_ledc_channel_ChannelIFace;
-//! 
+//!
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let led = io.pins.gpio0;
-//! 
+//!
 //! let mut ledc = Ledc::new(peripherals.LEDC, &clocks);
 //! ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
 //!
@@ -46,7 +46,7 @@
 //!     .unwrap();
 //! # }
 //! ```
-//!
+//! 
 //! # Unsupported
 //! - Source clock selection
 //! - Interrupts

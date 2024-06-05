@@ -27,10 +27,11 @@
 //! let pins = TxRxPins::new_tx_rx(io.pins.gpio1, io.pins.gpio2);
 //!
 //! let mut uart1 =
-//!     Uart::new_with_config(peripherals.UART1, Config::default(), Some(pins), &clocks, None);
+//!     Uart::new_with_config(peripherals.UART1, Config::default(), Some(pins),
+//! &clocks, None);
 //! # }
 //! ```
-//!
+//! 
 //! ## Usage
 //!
 //! The UART driver implements a number of third-party traits, with the
@@ -46,7 +47,6 @@
 //! ### Examples
 //!
 //! #### Sending and Receiving Data
-//!
 //! ```no_run
 #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
 //! # use esp_hal::uart::{config::Config, TxRxPins, Uart};
@@ -64,9 +64,8 @@
 //! uart1.write_bytes("Hello, world!".as_bytes()).expect("write error!");
 //! # }
 //! ```
-//!
+//! 
 //! #### Splitting the UART into TX and RX Components
-//!
 //! ```no_run
 #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
 //! # use esp_hal::uart::{config::Config, TxRxPins, Uart};
@@ -88,7 +87,7 @@
 //! let byte = rx.read_byte().expect("read error!");
 //! # }
 //! ```
-//!
+//! 
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 //! [embedded-io]: https://docs.rs/embedded-io/latest/embedded_io/
 //! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/
