@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Changed
+- Make the SPI FIFO a separate object from the master driver
 
 ### Removed
 
@@ -55,8 +56,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactoring of GPIO module, have drivers for Input,Output,OutputOpenDrain, all drivers setup their GPIOs correctly (#1542)
 - DMA transactions are now found in the `dma` module (#1550)
 - Remove unnecessary generics from PARL_IO driver (#1545)
-- Use `Level enum` in GPIO constructors instead of plain bools (#1574) 
-- Make the SPI FIFO a separate object from the master driver
 - Use `Level enum` in GPIO constructors instead of plain bools (#1574)
 - rmt: make ChannelCreator public (#1597)
 
