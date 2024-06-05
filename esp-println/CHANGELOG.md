@@ -9,13 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add `auto` feature to auto-detect Serial-JTAG/UART communication
+- Add `auto` feature to auto-detect Serial-JTAG/UART communication (#1658)
 
 ### Fixed
 
 ### Changed
 
-- `auto` is the default communication method
+- `auto` is the default communication method (#1658)
 
 ### Removed
 
