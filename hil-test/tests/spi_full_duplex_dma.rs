@@ -62,7 +62,7 @@ mod tests {
             dma_buffers!(DMA_BUFFER_SIZE);
 
         let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
-            .0
+            .spi
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
             .with_dma(dma_channel.configure(
                 false,
@@ -105,7 +105,7 @@ mod tests {
         let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(4, 2);
 
         let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
-            .0
+            .spi
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
             .with_dma(dma_channel.configure(
                 false,
@@ -151,7 +151,7 @@ mod tests {
             dma_buffers!(DMA_BUFFER_SIZE);
 
         let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
-            .0
+            .spi
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
             .with_dma(dma_channel.configure(
                 false,

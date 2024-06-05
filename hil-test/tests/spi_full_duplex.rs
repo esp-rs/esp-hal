@@ -22,7 +22,7 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     spi::{
-        master::{Spi, SpiFifo},
+        master::{Spi, SpiFifo, SpiParts},
         FullDuplexMode,
         SpiMode,
     },
@@ -45,11 +45,12 @@ impl Context {
         let mosi = io.pins.gpio4;
         let cs = io.pins.gpio5;
 
-        let (spi, fifo) = Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0, &clocks);
+        let SpiParts { spi, buf, .. } =
+            Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0, &clocks);
         let spi = spi.with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs));
 
         Context {
-            spi: SpiFifo::new(spi, fifo),
+            spi: SpiFifo::new(spi, buf),
         }
     }
 }

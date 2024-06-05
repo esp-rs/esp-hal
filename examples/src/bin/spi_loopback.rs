@@ -25,7 +25,10 @@ use esp_hal::{
     gpio::{any_pin::AnyPin, Io},
     peripherals::Peripherals,
     prelude::*,
-    spi::{master::Spi, SpiMode},
+    spi::{
+        master::{Spi, SpiParts},
+        SpiMode,
+    },
     system::SystemControl,
 };
 use esp_println::println;
@@ -45,16 +48,17 @@ fn main() -> ! {
     let miso = AnyPin::new(miso);
     let mosi = AnyPin::new(mosi);
 
-    let (spi, mut fifo) = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks);
+    let SpiParts { spi, mut buf, .. } =
+        Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks);
     let mut spi = spi.with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs));
 
     let delay = Delay::new(&clocks);
 
     loop {
         let mut data = [0xde, 0xca, 0xfb, 0xad];
-        fifo.write(&data);
-        (spi, fifo) = spi.transfer(data.len(), fifo).unwrap().wait();
-        fifo.read(&mut data);
+        buf.write(&data);
+        (spi, buf) = spi.transfer(data.len(), buf).unwrap().wait();
+        buf.read(&mut data);
         println!("{:x?}", data);
 
         delay.delay_millis(250);

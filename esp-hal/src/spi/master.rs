@@ -14,7 +14,7 @@
 //! let mosi = io.pins.gpio13;
 //! let cs = io.pins.gpio10;
 //!
-//! let (spi, mut fifo) = hal::spi::Spi::new(
+//! let SpiParts { spi, mut buf } = hal::spi::Spi::new(
 //!     peripherals.SPI2,
 //!     100.kHz(),
 //!     SpiMode::Mode0,
@@ -24,7 +24,7 @@
 //! let mut spi = spi.with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs));
 //!
 //! // Convenience wrapper
-//! let spi_bus = hal::spi::SpiFifo::new(spi, fifo);
+//! let spi_bus = hal::spi::SpiFifo::new(spi, buf);
 //! ```
 //!
 //! ## Exclusive access to the SPI bus
@@ -590,6 +590,12 @@ impl<'d, T, M> Debug for Spi<'d, T, M> {
     }
 }
 
+#[non_exhaustive]
+pub struct SpiParts<'d, T, M> {
+    pub spi: Spi<'d, T, M>,
+    pub buf: SpiBuf<'d, T, WholeBuf>,
+}
+
 /// SPI peripheral driver
 pub struct SpiFifo<'d, T: Instance, M> {
     state: DriverState<'d, T, M>,
@@ -753,16 +759,18 @@ where
         frequency: HertzU32,
         mode: SpiMode,
         clocks: &Clocks,
-    ) -> (Spi<'d, T, FullDuplexMode>, SpiBuf<'d, T, WholeBuf>)
+    ) -> SpiParts<'d, T, FullDuplexMode>
     where
         T: Peripheral<P = T>,
     {
         crate::into_ref!(spi);
-        let fifo = SpiBuf {
-            spi: unsafe { spi.clone_unchecked() },
-            state: WholeBuf,
-        };
-        (Self::new_internal(spi, frequency, mode, clocks), fifo)
+        SpiParts {
+            buf: SpiBuf {
+                spi: unsafe { spi.clone_unchecked() },
+                state: WholeBuf,
+            },
+            spi: Self::new_internal(spi, frequency, mode, clocks),
+        }
     }
 
     pub fn with_sck<SCK: OutputPin>(self, sck: impl Peripheral<P = SCK> + 'd) -> Self {
@@ -914,16 +922,18 @@ where
         frequency: HertzU32,
         mode: SpiMode,
         clocks: &Clocks,
-    ) -> (Spi<'d, T, HalfDuplexMode>, SpiBuf<'d, T, WholeBuf>)
+    ) -> SpiParts<'d, T, HalfDuplexMode>
     where
         T: Peripheral<P = T>,
     {
         crate::into_ref!(spi);
-        let fifo = SpiBuf {
-            spi: unsafe { spi.clone_unchecked() },
-            state: WholeBuf,
-        };
-        (Self::new_internal(spi, frequency, mode, clocks), fifo)
+        SpiParts {
+            buf: SpiBuf {
+                spi: unsafe { spi.clone_unchecked() },
+                state: WholeBuf,
+            },
+            spi: Self::new_internal(spi, frequency, mode, clocks),
+        }
     }
 
     pub fn with_sck<SCK: OutputPin>(self, sck: impl Peripheral<P = SCK> + 'd) -> Self {

@@ -79,7 +79,7 @@ fn main() -> ! {
     let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(256, 320);
 
     let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
-        .0
+        .spi
         .with_pins(
             Some(sclk),
             Some(mosi),
