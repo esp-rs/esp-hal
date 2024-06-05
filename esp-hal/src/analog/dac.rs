@@ -16,8 +16,8 @@
 //! let gpio25 = io.pins.gpio25;
 //! let gpio26 = io.pins.gpio26;
 //!
-//! let mut dac1 = Dac1::new(peripherals.DAC1, gpio25);
-//! let mut dac2 = Dac2::new(peripherals.DAC2, gpio26);
+//! let mut dac1 = Dac::new(peripherals.DAC1, gpio25);
+//! let mut dac2 = Dac::new(peripherals.DAC2, gpio26);
 //!
 //! let mut delay = Delay::new(&clocks);
 //!
