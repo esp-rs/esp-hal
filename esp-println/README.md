@@ -41,11 +41,11 @@ You can now `println!("Hello world")` as usual.
   - Only one of these features can be enabled at a time.
 - There is one feature for each supported communication method: `uart`, `jtag-serial` and `auto`.
   - Only one of these features can be enabled at a time.
-- `no-op`: don't print anything
+- `no-op`: Don't print anything.
 - `log`: Enables logging using [`log` crate].
-- `colors` enable colored logging.
+- `colors`: Enable colored logging.
   - Only effective when using the `log` feature.
-- `critical-section` enables critical sections.
+- `critical-section`: Enables critical sections.
 - `defmt-espflash`: This is intended to be used with [`espflash`], see `-L/--log-format` argument
   of `flash` or `monitor` subcommands of `espflash` and `cargo-espflash`. Uses [rzCOBS] encoding
   and adds framing.
