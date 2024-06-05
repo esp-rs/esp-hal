@@ -49,6 +49,8 @@
 //! # }
 //! 
 //! # use procmacros::handler;
+//! # use esp_hal::interrupt::InterruptHandler;
+//! # use esp_hal::interrupt;
 //! #[handler]
 //! fn tg0_t0_level() {
 //!     /* */ 

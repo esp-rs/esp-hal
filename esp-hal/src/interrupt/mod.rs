@@ -55,6 +55,8 @@
 //!     loop {}
 //! }
 //! 
+//! # use procmacros::handler;
+//! # use esp_hal::interrupt;
 //! #[handler(priority = esp_hal::interrupt::Priority::Priority1)]
 //! fn swint0_handler() {
 //!     // esp_println::println!("SW interrupt0");
