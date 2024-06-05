@@ -811,10 +811,10 @@ pub(crate) fn errata36(pin_num: u8, pull_up: Option<bool>, pull_down: Option<boo
         25 => {
             rtcio.pad_dac1().modify(|_, w| {
                 if let Some(pull_up) = pull_up {
-                    w.pdac1_rue().bit(pull_up);
+                    w.rue().bit(pull_up);
                 }
                 if let Some(pull_down) = pull_down {
-                    w.pdac1_rde().bit(pull_down);
+                    w.rde().bit(pull_down);
                 }
                 w
             });
@@ -822,10 +822,10 @@ pub(crate) fn errata36(pin_num: u8, pull_up: Option<bool>, pull_down: Option<boo
         26 => {
             rtcio.pad_dac2().modify(|_, w| {
                 if let Some(pull_up) = pull_up {
-                    w.pdac2_rue().bit(pull_up);
+                    w.rue().bit(pull_up);
                 }
                 if let Some(pull_down) = pull_down {
-                    w.pdac2_rde().bit(pull_down);
+                    w.rde().bit(pull_down);
                 }
                 w
             });
@@ -913,8 +913,8 @@ crate::gpio::analog! {
      (39, 3,  sensor_pads(),   sense4_mux_sel, sense4_fun_sel, sense4_fun_ie)
      (34, 4,  adc_pad(),         adc1_mux_sel,   adc1_fun_sel,   adc1_fun_ie)
      (35, 5,  adc_pad(),         adc2_mux_sel,   adc2_fun_sel,   adc1_fun_ie)
-     (25, 6,  pad_dac1(),       pdac1_mux_sel,  pdac1_fun_sel,  pdac1_fun_ie, pdac1_rue, pdac1_rde)
-     (26, 7,  pad_dac2(),       pdac2_mux_sel,  pdac2_fun_sel,  pdac2_fun_ie, pdac2_rue, pdac2_rde)
+     (25, 6,  pad_dac1(),             mux_sel,        fun_sel,        fun_ie, rue,       rde)
+     (26, 7,  pad_dac2(),             mux_sel,        fun_sel,        fun_ie, rue,       rde)
      (33, 8,  xtal_32k_pad(),    x32n_mux_sel,   x32n_fun_sel,   x32n_fun_ie, x32n_rue,  x32n_rde )
      (32, 9,  xtal_32k_pad(),    x32p_mux_sel,   x32p_fun_sel,   x32p_fun_ie, x32p_rue,  x32p_rde )
      (4,  10, touch_pad0(),           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
@@ -934,8 +934,8 @@ crate::gpio::rtc_pins! {
         (39, 3,  sensor_pads(),    sense4_, sense4_hold_force )
         (34, 4,  adc_pad(),        adc1_,   adc1_hold_force )
         (35, 5,  adc_pad(),        adc2_,   adc2_hold_force )
-        (25, 6,  pad_dac1(),       pdac1_,  pdac1_hold_force,      pdac1_rue, pdac1_rde )
-        (26, 7,  pad_dac2(),       pdac2_,  pdac2_hold_force,      pdac2_rue, pdac2_rde )
+        (25, 6,  pad_dac1(),       "",      pdac1_hold_force,      rue,       rde )
+        (26, 7,  pad_dac2(),       "",      pdac2_hold_force,      rue,       rde )
         (33, 8,  xtal_32k_pad(),   x32n_,   x32n_hold_force,       x32n_rue,  x32n_rde  )
         (32, 9,  xtal_32k_pad(),   x32p_,   x32p_hold_force,       x32p_rue,  x32p_rde  )
         (4,  10, touch_pad0(),     "",      touch_pad0_hold_force, rue,       rde       )
