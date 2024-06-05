@@ -68,26 +68,94 @@ macro_rules! dbg {
     };
 }
 
+#[cfg(any(feature = "jtag-serial", feature = "auto"))]
+pub struct PrinterSerialJtag;
+
+#[cfg(any(feature = "uart", feature = "auto"))]
+pub struct PrinterUart;
+
+#[cfg(feature = "jtag-serial")]
+pub type PrinterImpl = PrinterSerialJtag;
+
+#[cfg(feature = "uart")]
+pub type PrinterImpl = PrinterUart;
+
 pub struct Printer;
 
 impl core::fmt::Write for Printer {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        Printer.write_bytes(s.as_bytes());
+        Printer::write_bytes(s.as_bytes());
         Ok(())
     }
 }
 
 impl Printer {
-    pub fn write_bytes(&mut self, bytes: &[u8]) {
+    #[cfg(not(feature = "auto"))]
+    pub fn write_bytes(bytes: &[u8]) {
         with(|| {
-            self.write_bytes_assume_cs(bytes);
-            self.flush();
+            PrinterImpl::write_bytes_assume_cs(bytes);
+            PrinterImpl::flush();
+        })
+    }
+
+    #[cfg(feature = "auto")]
+    pub fn write_bytes(bytes: &[u8]) {
+        #[cfg(any(
+            feature = "esp32c3",
+            feature = "esp32c6",
+            feature = "esp32h2",
+            feature = "esp32s3"
+        ))]
+        {
+            // Decide if serial-jtag is used by checking SOF interrupt flag.
+            // SOF packet is sent by the HOST every 1ms on a full speed bus.
+            // Between two consecutive ticks, there will be at least 1ms (selectable tick
+            // rate range is 1 - 1000Hz).
+            // We don't reset the flag - if it was ever connected we assume serial-jtag is
+            // used
+
+            #[cfg(feature = "esp32c3")]
+            const USB_DEVICE_INT_RAW: *const u32 = 0x60043008 as *const u32;
+            #[cfg(feature = "esp32c6")]
+            const USB_DEVICE_INT_RAW: *const u32 = 0x6000f008 as *const u32;
+            #[cfg(feature = "esp32h2")]
+            const USB_DEVICE_INT_RAW: *const u32 = 0x6000f008 as *const u32;
+            #[cfg(feature = "esp32s3")]
+            const USB_DEVICE_INT_RAW: *const u32 = 0x60038000 as *const u32;
+
+            const SOF_INT_MASK: u32 = 0b10;
+
+            let is_serial_jtag =
+                unsafe { (USB_DEVICE_INT_RAW.read_volatile() & SOF_INT_MASK) != 0 };
+
+            if is_serial_jtag {
+                with(|| {
+                    PrinterSerialJtag::write_bytes_assume_cs(bytes);
+                    PrinterSerialJtag::flush();
+                })
+            } else {
+                with(|| {
+                    PrinterUart::write_bytes_assume_cs(bytes);
+                    PrinterUart::flush();
+                })
+            }
+        }
+
+        #[cfg(not(any(
+            feature = "esp32c3",
+            feature = "esp32c6",
+            feature = "esp32h2",
+            feature = "esp32s3"
+        )))]
+        with(|| {
+            PrinterUart::write_bytes_assume_cs(bytes);
+            PrinterUart::flush();
         })
     }
 }
 
 #[cfg(all(
-    feature = "jtag-serial",
+    any(feature = "jtag-serial", feature = "auto"),
     any(
         feature = "esp32c3",
         feature = "esp32c6",
@@ -154,8 +222,8 @@ mod serial_jtag_printer {
         true
     }
 
-    impl super::Printer {
-        pub fn write_bytes_assume_cs(&mut self, bytes: &[u8]) {
+    impl super::PrinterSerialJtag {
+        pub fn write_bytes_assume_cs(bytes: &[u8]) {
             if fifo_full() {
                 // The FIFO is full. Let's see if we can progress.
 
@@ -188,17 +256,17 @@ mod serial_jtag_printer {
             }
         }
 
-        pub fn flush(&mut self) {
+        pub fn flush() {
             fifo_flush();
         }
     }
 }
 
-#[cfg(all(feature = "uart", feature = "esp32"))]
+#[cfg(all(any(feature = "uart", feature = "auto"), feature = "esp32"))]
 mod uart_printer {
     const UART_TX_ONE_CHAR: usize = 0x4000_9200;
-    impl super::Printer {
-        pub fn write_bytes_assume_cs(&mut self, bytes: &[u8]) {
+    impl super::PrinterUart {
+        pub fn write_bytes_assume_cs(bytes: &[u8]) {
             for &b in bytes {
                 unsafe {
                     let uart_tx_one_char: unsafe extern "C" fn(u8) -> i32 =
@@ -208,14 +276,14 @@ mod uart_printer {
             }
         }
 
-        pub fn flush(&mut self) {}
+        pub fn flush() {}
     }
 }
 
-#[cfg(all(feature = "uart", feature = "esp32s2"))]
+#[cfg(all(any(feature = "uart", feature = "auto"), feature = "esp32s2"))]
 mod uart_printer {
-    impl super::Printer {
-        pub fn write_bytes_assume_cs(&mut self, bytes: &[u8]) {
+    impl super::PrinterUart {
+        pub fn write_bytes_assume_cs(bytes: &[u8]) {
             // On ESP32-S2 the UART_TX_ONE_CHAR ROM-function seems to have some issues.
             for chunk in bytes.chunks(64) {
                 for &b in chunk {
@@ -234,11 +302,14 @@ mod uart_printer {
             }
         }
 
-        pub fn flush(&mut self) {}
+        pub fn flush() {}
     }
 }
 
-#[cfg(all(feature = "uart", not(any(feature = "esp32", feature = "esp32s2"))))]
+#[cfg(all(
+    any(feature = "uart", feature = "auto"),
+    not(any(feature = "esp32", feature = "esp32s2"))
+))]
 mod uart_printer {
     trait Functions {
         const TX_ONE_CHAR: usize;
@@ -350,8 +421,8 @@ mod uart_printer {
         }
     }
 
-    impl super::Printer {
-        pub fn write_bytes_assume_cs(&mut self, bytes: &[u8]) {
+    impl super::PrinterUart {
+        pub fn write_bytes_assume_cs(bytes: &[u8]) {
             for chunk in bytes.chunks(Device::CHUNK_SIZE) {
                 for &b in chunk {
                     Device::tx_byte(b);
@@ -361,7 +432,7 @@ mod uart_printer {
             }
         }
 
-        pub fn flush(&mut self) {}
+        pub fn flush() {}
     }
 }
 

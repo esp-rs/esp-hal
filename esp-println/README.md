@@ -39,22 +39,23 @@ You can now `println!("Hello world")` as usual.
   `esp32c3`, `esp32c6`, `esp32h2`, `esp32s2`, and `esp32s3`.
   - One of these features must be enabled.
   - Only one of these features can be enabled at a time.
-- There is one feature for each supported communication method: `uart`, `jtag-serial` and `no-op`.
+- There is one feature for each supported communication method: `uart`, `jtag-serial` and `auto`.
   - Only one of these features can be enabled at a time.
+- `no-op`: Don't print anything.
 - `log`: Enables logging using [`log` crate].
-- `colors` enable colored logging.
+- `colors`: Enable colored logging.
   - Only effective when using the `log` feature.
-- `critical-section` enables critical sections.
+- `critical-section`: Enables critical sections.
 - `defmt-espflash`: This is intended to be used with [`espflash`], see `-L/--log-format` argument
   of `flash` or `monitor` subcommands of `espflash` and `cargo-espflash`. Uses [rzCOBS] encoding
   and adds framing.
 
 ## Default Features
 
-By default, we use the `uart`, `critial-section` and `colors` features.
-Which means that it will print to the UART, use critical sections and output
+By default, we use the `auto`, `critial-section` and `colors` features.
+Which means that it will auto-detect if it needs to print to the UART or JTAG-Serial, use critical sections and output
 messages will be colored.
-If we want to use a communication method that is not `uart`, the default
+If we want to use a communication method that is not `auto`, the default
 one, we need to [disable the default features].
 
 ## Logging
