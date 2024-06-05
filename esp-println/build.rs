@@ -7,7 +7,7 @@ fn main() {
     );
 
     // Ensure that only a single communication method is specified
-    assert_unique_used_features!("jtag-serial", "uart");
+    assert_unique_used_features!("jtag-serial", "uart", "auto");
 
     // Ensure that, if the `jtag-serial` communication method feature is enabled,
     // either the `esp32c3`, `esp32c6`, `esp32h2`, or `esp32s3` chip feature is
