@@ -13,7 +13,7 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    analog::dac::{Dac1, Dac2},
+    analog::dac::Dac,
     clock::ClockControl,
     delay::Delay,
     gpio::Io,
@@ -41,8 +41,8 @@ fn main() -> ! {
     }
 
     // Create DAC instances
-    let mut dac1 = Dac1::new(peripherals.DAC1, dac1_pin);
-    let mut dac2 = Dac2::new(peripherals.DAC2, dac2_pin);
+    let mut dac1 = Dac::new(peripherals.DAC1, dac1_pin);
+    let mut dac2 = Dac::new(peripherals.DAC2, dac2_pin);
 
     let delay = Delay::new(&clocks);
 
