@@ -152,6 +152,53 @@ jobs:
       - name: Build esp-riscv-rt (riscv32imac, all features)
         run: cd esp-riscv-rt/ && cargo build --target=riscv32imac-unknown-none-elf --features=ci
 
+  esp-println:
+    name: esp-println (${{ matrix.device.soc }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        device: [
+            # RISC-V devices:
+            { soc: "esp32c2", target: "riscv32imc-unknown-none-elf" },
+            { soc: "esp32c3", target: "riscv32imc-unknown-none-elf" },
+            { soc: "esp32c6", target: "riscv32imac-unknown-none-elf" },
+            { soc: "esp32h2", target: "riscv32imac-unknown-none-elf" },
+            # Xtensa devices:
+            { soc: "esp32", target: "xtensa-esp32-none-elf" },
+            { soc: "esp32s2", target: "xtensa-esp32s2-none-elf" },
+            { soc: "esp32s3", target: "xtensa-esp32s3-none-elf" },
+          ]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install the Rust toolchain for RISC-V devices:
+      - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc) }}
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          toolchain: stable
+          components: rust-src
+      # Install the Rust toolchain for Xtensa devices:
+      - if: contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc)
+        uses: esp-rs/xtensa-toolchain@v1.5
+        with:
+          buildtargets: ${{ matrix.device.soc }}
+          default: true
+          ldproxy: false
+
+      - uses: Swatinem/rust-cache@v2
+
+      # Make sure we're able to build with the default features and most common features enabled
+      - name: Build (no features)
+        run: |
+          cargo xtask build-package \
+            --features=${{ matrix.device.soc }},log \
+            --target=${{ matrix.device.target }} \
+            esp-println
+        
   extras:
     runs-on: ubuntu-latest
 
