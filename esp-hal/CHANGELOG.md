@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Fixed
+
+### Changed
+
+### Removed
+
+## [0.18.0] - 2024-06-04
+
+### Added
+
 - i2c: implement `I2C:transaction` for `embedded-hal` and `embedded-hal-async` (#1505)
 - spi: implement `with_bit_order` (#1537)
 - ESP32-PICO-V3-02: Initial support (#1155)
@@ -54,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed the `SystemExt` trait (#1495)
 - Removed the `GpioExt` trait (#1496)
+- Embassy support (and all related features) has been removed, now available in the `esp-hal-embassy` package instead (#1595)
 
 ## [0.17.0] - 2024-04-18
 
@@ -581,7 +592,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/esp-rs/esp-hal/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/esp-rs/esp-hal/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/esp-rs/esp-hal/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/esp-rs/esp-hal/compare/v0.15.0...v0.16.0

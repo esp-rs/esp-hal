@@ -17,7 +17,7 @@ jobs:
           ldproxy: false
 
       - name: Build documentation
-        run: cargo xtask build-documentation esp-hal
+        run: cargo xtask build-documentation --packages=esp-hal,esp-wifi
 
       # https://github.com/actions/deploy-pages/issues/303#issuecomment-1951207879
       - name: Remove problematic '.lock' files

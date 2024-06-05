@@ -1,12 +1,11 @@
+pub use self::{interrupt::*, thread::*};
+
 mod interrupt;
 mod thread;
 
-pub use interrupt::*;
-pub use thread::*;
-
 #[export_name = "__pender"]
 fn __pender(context: *mut ()) {
-    use crate::system::SoftwareInterrupt;
+    use esp_hal::system::SoftwareInterrupt;
 
     let context = (context as usize).to_le_bytes();
 

@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs,
     path::{Path, PathBuf},
     process::Command,
@@ -6,6 +7,7 @@ use std::{
 
 use anyhow::{bail, Result};
 use clap::{Args, Parser};
+use minijinja::Value;
 use strum::IntoEnumIterator;
 use xtask::{
     cargo::{CargoAction, CargoArgsBuilder},
@@ -68,14 +70,11 @@ struct TestArgs {
 
 #[derive(Debug, Args)]
 struct BuildDocumentationArgs {
-    /// Open the documentation in the default browser once built.
-    #[arg(long)]
-    open: bool,
     /// Package to build documentation for.
-    #[arg(value_enum)]
-    package: Package,
+    #[arg(long, value_enum, value_delimiter(','))]
+    packages: Vec<Package>,
     /// Which chip to build the documentation for.
-    #[arg(value_enum, default_values_t = Chip::iter())]
+    #[arg(long, value_enum, value_delimiter(','), default_values_t = Chip::iter())]
     chips: Vec<Chip>,
 }
 
@@ -301,50 +300,12 @@ fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result
     let output_path = workspace.join("docs");
     let resources = workspace.join("resources");
 
-    let package = args.package.to_string();
-    let version = xtask::package_version(workspace, args.package)?;
-
-    let mut crates = Vec::new();
-
-    for chip in args.chips {
-        // Ensure that the package/chip combination provided are valid:
-        validate_package_chip(&args.package, &chip)?;
-
-        // Determine the appropriate build target for the given package and chip:
-        let target = target_triple(&args.package, &chip)?;
-
-        // Build the documentation for the specified package, targeting the
-        // specified chip:
-        xtask::build_documentation(workspace, args.package, chip, target, args.open)?;
-
-        let docs_path = xtask::windows_safe_path(
-            &workspace
-                .join(package.clone())
-                .join("target")
-                .join(target)
-                .join("doc"),
+    let mut packages = HashMap::new();
+    for package in args.packages {
+        packages.insert(
+            package,
+            build_documentation_for_package(workspace, package, &args.chips)?,
         );
-
-        let output_path = output_path
-            .join(package.clone())
-            .join(version.to_string())
-            .join(chip.to_string());
-        let output_path = xtask::windows_safe_path(&output_path);
-
-        // Create the output directory, and copy the built documentation into it:
-        fs::create_dir_all(&output_path)?;
-        copy_dir_all(&docs_path, &output_path)?;
-
-        // Build the context object required for rendering this particular build's
-        // information on the documentation index:
-        crates.push(minijinja::context! {
-            name => package,
-            version => version,
-            chip => chip.to_string(),
-            chip_pretty => chip.pretty_name(),
-            package => package.replace('-', "_"),
-            description => format!("{} (targeting {})", package, chip.pretty_name()),
-        });
     }
 
     // Copy any additional assets to the documentation's output path:
@@ -357,11 +318,66 @@ fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result
     env.add_template("index", &source)?;
 
     let tmpl = env.get_template("index")?;
-    let html = tmpl.render(minijinja::context! { crates => crates })?;
+    let html = tmpl.render(minijinja::context! { packages => packages })?;
 
     fs::write(output_path.join("index.html"), html)?;
 
     Ok(())
+}
+
+fn build_documentation_for_package(
+    workspace: &Path,
+    package: Package,
+    chips: &[Chip],
+) -> Result<Vec<Value>> {
+    let output_path = workspace.join("docs");
+
+    let version = xtask::package_version(workspace, package)?;
+
+    let mut metadata = Vec::new();
+
+    for chip in chips {
+        // Ensure that the package/chip combination provided are valid:
+        validate_package_chip(&package, chip)?;
+
+        // Determine the appropriate build target for the given package and chip:
+        let target = target_triple(&package, &chip)?;
+
+        // Build the documentation for the specified package, targeting the
+        // specified chip:
+        xtask::build_documentation(workspace, package, *chip, target)?;
+
+        let docs_path = xtask::windows_safe_path(
+            &workspace
+                .join(package.to_string())
+                .join("target")
+                .join(target)
+                .join("doc"),
+        );
+
+        let output_path = output_path
+            .join(package.to_string())
+            .join(version.to_string())
+            .join(chip.to_string());
+        let output_path = xtask::windows_safe_path(&output_path);
+
+        // Create the output directory, and copy the built documentation into it:
+        fs::create_dir_all(&output_path)?;
+        copy_dir_all(&docs_path, &output_path)?;
+
+        // Build the context object required for rendering this particular build's
+        // information on the documentation index:
+        metadata.push(minijinja::context! {
+            name => package,
+            version => version,
+            chip => chip.to_string(),
+            chip_pretty => chip.pretty_name(),
+            package => package.to_string().replace('-', "_"),
+            description => format!("{} (targeting {})", package, chip.pretty_name()),
+        });
+    }
+
+    Ok(metadata)
 }
 
 fn build_package(workspace: &Path, args: BuildPackageArgs) -> Result<()> {
@@ -467,6 +483,21 @@ fn lint_packages(workspace: &Path, _args: LintPackagesArgs) -> Result<()> {
                 }
             }
 
+            Package::EspHalEmbassy => {
+                // We need to specify a time driver, so we will check all
+                // options here (as the modules themselves are feature-gated):
+                for feature in ["time-systimer-16mhz", "time-timg0"] {
+                    lint_package(
+                        &path,
+                        &[
+                            "-Zbuild-std=core",
+                            "--target=riscv32imac-unknown-none-elf",
+                            &format!("--features=esp32c6,{feature}"),
+                        ],
+                    )?;
+                }
+            }
+
             Package::EspHalProcmacros | Package::EspRiscvRt => lint_package(
                 &path,
                 &["-Zbuild-std=core", "--target=riscv32imc-unknown-none-elf"],
@@ -504,7 +535,7 @@ fn lint_packages(workspace: &Path, _args: LintPackagesArgs) -> Result<()> {
                 &[
                     "-Zbuild-std=core",
                     "--target=riscv32imc-unknown-none-elf",
-                    "--features=esp32c3,wifi-default,ble,esp-now,async,embassy-net",
+                    "--features=esp32c3,wifi-default,ble,esp-now,async,embassy-net,esp-hal-embassy/time-timg0",
                 ],
             )?,
 

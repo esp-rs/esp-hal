@@ -48,7 +48,7 @@ jobs:
     env:
       SSID: SSID
       PASSWORD: PASSWORD
-      STATIC_IP: 1.1.1.1 
+      STATIC_IP: 1.1.1.1
       GATEWAY_IP: 1.1.1.1
       HOST_IP: 1.1.1.1
 
@@ -74,7 +74,7 @@ jobs:
       - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc) }}
         uses: dtolnay/rust-toolchain@v1
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: stable
           components: rust-src
       # Install the Rust toolchain for Xtensa devices:
@@ -104,9 +104,6 @@ jobs:
       # Build all supported examples for the specified device:
       - name: Build (examples)
         run: cargo xtask build-examples esp-hal ${{ matrix.device.soc }}
-      # Ensure we can build the documentation for the specified device:
-      - name: Build (documentation)
-        run: cargo xtask build-documentation esp-hal ${{ matrix.device.soc }}
 
   esp-lp-hal:
     runs-on: ubuntu-latest
@@ -131,9 +128,6 @@ jobs:
       # Build all supported examples for the specified device:
       - name: Build examples
         run: cargo xtask build-examples esp-lp-hal ${{ matrix.soc }}
-      # Ensure we can build the documentation for the specified device:
-      - name: Build documentation
-        run: cargo xtask build-documentation esp-lp-hal ${{ matrix.soc }}
 
   esp-riscv-rt:
     runs-on: ubuntu-latest
@@ -142,7 +136,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: stable
           components: rust-src
       - uses: Swatinem/rust-cache@v2
@@ -152,19 +146,59 @@ jobs:
         run: cd esp-riscv-rt/ && cargo build --target=riscv32imc-unknown-none-elf
       - name: Build esp-riscv-rt (riscv32imac, no features)
         run: cd esp-riscv-rt/ && cargo build --target=riscv32imac-unknown-none-elf
-      - name: Build esp-riscv-rt (riscv32imafc, no features)
-        run: cd esp-riscv-rt/ && cargo build --target=riscv32imafc-unknown-none-elf
       # Build for all RISC-V targets (all features):
       - name: Build esp-riscv-rt (riscv32imc, all features)
         run: cd esp-riscv-rt/ && cargo build --target=riscv32imc-unknown-none-elf --features=ci
       - name: Build esp-riscv-rt (riscv32imac, all features)
         run: cd esp-riscv-rt/ && cargo build --target=riscv32imac-unknown-none-elf --features=ci
-      - name: Build esp-riscv-rt (riscv32imafc, all features)
-        run: cd esp-riscv-rt/ && cargo build --target=riscv32imafc-unknown-none-elf --features=ci
-      # Ensure documentation can be built
-      - name: rustdoc
-        run: cd esp-riscv-rt/ && cargo doc
 
+  esp-println:
+    name: esp-println (${{ matrix.device.soc }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        device: [
+            # RISC-V devices:
+            { soc: "esp32c2", target: "riscv32imc-unknown-none-elf" },
+            { soc: "esp32c3", target: "riscv32imc-unknown-none-elf" },
+            { soc: "esp32c6", target: "riscv32imac-unknown-none-elf" },
+            { soc: "esp32h2", target: "riscv32imac-unknown-none-elf" },
+            # Xtensa devices:
+            { soc: "esp32", target: "xtensa-esp32-none-elf" },
+            { soc: "esp32s2", target: "xtensa-esp32s2-none-elf" },
+            { soc: "esp32s3", target: "xtensa-esp32s3-none-elf" },
+          ]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install the Rust toolchain for RISC-V devices:
+      - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc) }}
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          toolchain: stable
+          components: rust-src
+      # Install the Rust toolchain for Xtensa devices:
+      - if: contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc)
+        uses: esp-rs/xtensa-toolchain@v1.5
+        with:
+          buildtargets: ${{ matrix.device.soc }}
+          default: true
+          ldproxy: false
+
+      - uses: Swatinem/rust-cache@v2
+
+      # Make sure we're able to build with the default features and most common features enabled
+      - name: Build (no features)
+        run: |
+          cargo xtask build-package \
+            --features=${{ matrix.device.soc }},log \
+            --target=${{ matrix.device.target }} \
+            esp-println
+        
   extras:
     runs-on: ubuntu-latest
 
@@ -184,6 +218,7 @@ jobs:
         run: cd extras/esp-wifishark && cargo build
       - name: Build ieee802154-sniffer
         run: cd extras/ieee802154-sniffer && cargo build
+
   # --------------------------------------------------------------------------
   # MSRV
 

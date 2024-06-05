@@ -18,7 +18,7 @@ test  = false
 [dependencies]
 byte             = "0.2.7"
 critical-section = "1.1.2"
-esp-hal          = { version = "0.17.0", path = "../esp-hal" }
+esp-hal          = { version = "0.18.0", path = "../esp-hal" }
 esp-wifi-sys     = { git = "https://github.com/esp-rs/esp-wifi", rev = "2ceb4b3" }
 heapless         = "0.8.0"
 ieee802154       = "0.6.1"

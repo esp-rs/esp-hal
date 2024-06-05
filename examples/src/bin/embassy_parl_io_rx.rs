@@ -16,7 +16,6 @@ use esp_hal::{
     clock::ClockControl,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    embassy,
     gpio::Io,
     parl_io::{no_clk_pin, BitPackOrder, ParlIoRxOnly, RxFourBits},
     peripherals::Peripherals,
@@ -34,7 +33,7 @@ async fn main(_spawner: Spawner) {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
-    embassy::init(&clocks, timg0);
+    esp_hal_embassy::init(&clocks, timg0);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

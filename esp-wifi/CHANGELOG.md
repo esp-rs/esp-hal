@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Removed
+
+## [0.6.0] - 2024-06-04
+
+### Removed
+
 - Removed embedded-hal v0.2 dependency
 
 ## [0.5.1] - 2024-04-22
@@ -22,27 +27,17 @@ Patch release to fix docs.rs build
 
 ## [0.5.0] - 2024-04-19
 
-### Added
-
 ### Fixed
+
 - Fix compile error when using smoltcp `DNS_MAX_RESULT_COUNT` values other than 1
-
-### Changed
-
-### Removed
 
 ## [0.4.0] - 2024-03-12
 
-### Added
-
-### Fixed
-
 ### Changed
+
 - Users don't need embedded-svc to control wifi anymore. The wifi trait is optionally implemented now. (#429)
 - Better network performance by forced yielding of the task when buffers are full / empty. (#430)
 - Depend on esp-hal 0.16.1, update other dependencies
-
-### Removed
 
 ## [0.3.0] - 2024-01-29
 

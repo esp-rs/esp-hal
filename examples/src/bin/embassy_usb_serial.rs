@@ -18,7 +18,6 @@ use embassy_usb::{
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    embassy,
     gpio::Io,
     otg_fs::{
         asynch::{Config, Driver},
@@ -37,7 +36,7 @@ async fn main(_spawner: Spawner) -> () {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    embassy::init(&clocks, TimerGroup::new_async(peripherals.TIMG0, &clocks));
+    esp_hal_embassy::init(&clocks, TimerGroup::new_async(peripherals.TIMG0, &clocks));
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let usb = Usb::new(peripherals.USB0, io.pins.gpio19, io.pins.gpio20);

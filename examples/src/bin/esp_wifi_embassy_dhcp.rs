@@ -19,7 +19,6 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    embassy,
     peripherals::Peripherals,
     prelude::*,
     rng::Rng,
@@ -80,7 +79,7 @@ async fn main(spawner: Spawner) -> ! {
         esp_wifi::wifi::new_with_mode(&init, wifi, WifiStaDevice).unwrap();
 
     let timer_group0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
-    embassy::init(&clocks, timer_group0);
+    esp_hal_embassy::init(&clocks, timer_group0);
 
     let config = Config::dhcpv4(Default::default());
 

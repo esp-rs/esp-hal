@@ -1,0 +1,48 @@
+[package]
+name         = "esp-hal-embassy"
+version      = "0.1.0"
+edition      = "2021"
+rust-version = "1.76.0"
+description  = "Embassy support for esp-hal"
+repository   = "https://github.com/esp-rs/esp-hal"
+license      = "MIT OR Apache-2.0"
+
+[package.metadata.docs.rs]
+default-target = "riscv32imac-unknown-none-elf"
+features       = ["esp32c6", "time-timg0"]
+
+[dependencies]
+critical-section    = "1.1.2"
+defmt               = { version = "0.3.8", optional = true }
+document-features   = "0.2.8"
+embassy-executor    = "0.5.0"
+embassy-time-driver = "0.1.0"
+esp-hal             = { version = "0.18.0", path = "../esp-hal" }
+portable-atomic     = "1.6.0"
+
+[build-dependencies]
+cfg-if       = "1.0.0"
+esp-build    = { version = "0.1.0", path = "../esp-build" }
+esp-metadata = { version = "0.1.1", path = "../esp-metadata" }
+
+[features]
+esp32   = ["esp-hal/esp32"]
+esp32c2 = ["esp-hal/esp32c2"]
+esp32c3 = ["esp-hal/esp32c3"]
+esp32c6 = ["esp-hal/esp32c6"]
+esp32h2 = ["esp-hal/esp32h2"]
+esp32s2 = ["esp-hal/esp32s2"]
+esp32s3 = ["esp-hal/esp32s3"]
+
+## Implement `defmt::Format` on certain types.
+defmt = ["dep:defmt", "embassy-executor/defmt", "esp-hal/defmt"]
+## Use the executor-integrated `embassy-time` timer queue.
+integrated-timers = ["embassy-executor/integrated-timers"]
+
+#! ### Time Driver Feature Flags
+## SYSTIMER (16MHz)
+time-systimer-16mhz = ["embassy-time-driver/tick-hz-16_000_000"]
+## SYSTIMER (80MHz)
+time-systimer-80mhz = ["embassy-time-driver/tick-hz-80_000_000"]
+## TIMG0 (1MHz)
+time-timg0 = ["embassy-time-driver/tick-hz-1_000_000"]

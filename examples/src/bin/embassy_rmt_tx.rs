@@ -13,7 +13,6 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    embassy,
     gpio::Io,
     peripherals::Peripherals,
     prelude::*,
@@ -31,7 +30,7 @@ async fn main(_spawner: Spawner) {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
-    embassy::init(&clocks, timg0);
+    esp_hal_embassy::init(&clocks, timg0);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

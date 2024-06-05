@@ -15,13 +15,28 @@ use self::cargo::CargoArgsBuilder;
 
 pub mod cargo;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Display, EnumIter, ValueEnum)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Display,
+    EnumIter,
+    ValueEnum,
+    serde::Serialize,
+)]
+#[serde(rename_all = "kebab-case")]
 #[strum(serialize_all = "kebab-case")]
 pub enum Package {
     EspAlloc,
     EspBacktrace,
     EspBuild,
     EspHal,
+    EspHalEmbassy,
     EspHalProcmacros,
     EspHalSmartled,
     EspIeee802154,
@@ -36,6 +51,7 @@ pub enum Package {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display, EnumIter, ValueEnum, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
 #[strum(serialize_all = "kebab-case")]
 pub enum Chip {
     Esp32,
@@ -150,7 +166,6 @@ pub fn build_documentation(
     package: Package,
     chip: Chip,
     target: &str,
-    open: bool,
 ) -> Result<()> {
     let package_name = package.to_string();
     let package_path = windows_safe_path(&workspace.join(&package_name));
@@ -164,20 +179,11 @@ pub fn build_documentation(
     }
 
     // Build up an array of command-line arguments to pass to `cargo`:
-    let mut builder = CargoArgsBuilder::default()
+    let builder = CargoArgsBuilder::default()
         .subcommand("doc")
         .target(target)
-        .features(&features);
-
-    if open {
-        builder = builder.arg("--open");
-    }
-
-    // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
-    if target.starts_with("xtensa") {
-        builder = builder.toolchain("esp");
-        builder = builder.arg("-Zbuild-std=core,alloc")
-    }
+        .features(&features)
+        .arg("-Zbuild-std=alloc,core");
 
     let args = builder.build();
     log::debug!("{args:#?}");

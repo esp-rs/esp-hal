@@ -16,7 +16,6 @@ use embassy_time::{Duration, Ticker};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    embassy,
     peripherals::Peripherals,
     prelude::*,
     rng::Rng,
@@ -66,7 +65,7 @@ async fn main(spawner: Spawner) -> ! {
     println!("esp-now version {}", esp_now.get_version().unwrap());
 
     let timer_group0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
-    embassy::init(&clocks, timer_group0);
+    esp_hal_embassy::init(&clocks, timer_group0);
 
     let (manager, sender, receiver) = esp_now.split();
     let manager = mk_static!(EspNowManager<'static>, manager);

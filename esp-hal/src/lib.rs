@@ -104,8 +104,6 @@ pub mod delay;
 pub mod dma;
 #[cfg(ecc)]
 pub mod ecc;
-#[cfg(feature = "embassy")]
-pub mod embassy;
 #[cfg(soc_etm)]
 pub mod etm;
 #[cfg(gpio)]
