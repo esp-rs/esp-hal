@@ -19,7 +19,9 @@ We use [embedded-test] as our testing framework, which relies on [defmt] interna
 We use [probe-rs] for flashing and running the tests on a target device, however, this **MUST** be installed from the correct revision, and with the correct features enabled:
 
 ```text
-cargo install probe-rs-tools@0.24.0 --git https://github.com/probe-rs/probe-rs --locked
+cargo install probe-rs-tools \
+  --git https://github.com/probe-rs/probe-rs \
+  --rev a6dd038 --force --locked
 ```
 
 Target device **MUST** connected via its USB-Serial-JTAG port, or if unavailable (eg. ESP32, ESP32-C2, ESP32-S2) then you must connect a compatible debug probe such as an [ESP-Prog].
@@ -87,7 +89,7 @@ source "$HOME/.cargo/env"
 # Install dependencies
 sudo apt install -y pkg-config libudev-dev
 # Install probe-rs
-cargo install probe-rs-tools@0.24.0 --git https://github.com/probe-rs/probe-rs --locked
+cargo install probe-rs-tools --git https://github.com/probe-rs/probe-rs --rev a6dd038 --force
 # Add the udev rules
 wget -O - https://probe.rs/files/69-probe-rs.rules | sudo tee /etc/udev/rules.d/69-probe-rs.rules > /dev/null
 # Add the user to plugdev group
