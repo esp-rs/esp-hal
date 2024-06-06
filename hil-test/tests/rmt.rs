@@ -14,23 +14,13 @@ use esp_hal::{
     gpio::Io,
     peripherals::Peripherals,
     prelude::*,
-    rmt::RxChannelCreator,
+    rmt::{PulseCode, Rmt, RxChannel, RxChannelConfig, TxChannel, TxChannelConfig},
     system::SystemControl,
 };
 
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    use esp_hal::rmt::{
-        PulseCode,
-        Rmt,
-        RxChannel,
-        RxChannelConfig,
-        TxChannel,
-        TxChannelConfig,
-        TxChannelCreator,
-    };
-
     use super::*;
 
     #[init]
@@ -60,7 +50,10 @@ mod tests {
             ..TxChannelConfig::default()
         };
 
-        let tx_channel = rmt.channel0.configure(io.pins.gpio2, tx_config).unwrap();
+        let tx_channel = {
+            use esp_hal::rmt::TxChannelCreator;
+            rmt.channel0.configure(io.pins.gpio2, tx_config).unwrap()
+        };
 
         let rx_config = RxChannelConfig {
             clk_divider: 255,
@@ -70,11 +63,20 @@ mod tests {
 
         cfg_if::cfg_if! {
             if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
-                let  rx_channel = rmt.channel0.configure(io.pins.gpio4, rx_config).unwrap();
+                let  rx_channel = {
+                    use esp_hal::rmt::RxChannelCreator;
+                    rmt.channel1.configure(io.pins.gpio4, rx_config).unwrap()
+                };
             } else if #[cfg(feature = "esp32s3")] {
-                let  rx_channel = rmt.channel7.configure(io.pins.gpio4, rx_config).unwrap();
+                let  rx_channel = {
+                    use esp_hal::rmt::RxChannelCreator;
+                    rmt.channel7.configure(io.pins.gpio4, rx_config).unwrap()
+                };
             } else {
-                let  rx_channel = rmt.channel2.configure(io.pins.gpio4, rx_config).unwrap();
+                let  rx_channel = {
+                    use esp_hal::rmt::RxChannelCreator;
+                    rmt.channel2.configure(io.pins.gpio4, rx_config).unwrap()
+                };
             }
         }
 
