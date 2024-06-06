@@ -20,7 +20,7 @@ use esp_hal::{
     peripherals::{Peripherals, UART0},
     prelude::*,
     system::SystemControl,
-    uart::{config::Config, ClockSource, Uart},
+    uart::{ClockSource, Uart},
     Blocking,
 };
 use nb::block;

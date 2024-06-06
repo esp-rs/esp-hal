@@ -195,6 +195,12 @@ pub enum ClockSource {
 
 /// UART Configuration
 pub mod config {
+
+    // see <https://github.com/espressif/esp-idf/blob/8760e6d2a/components/esp_driver_uart/src/uart.c#L61>
+    const UART_FULL_THRESH_DEFAULT: u16 = 120;
+    // see <https://github.com/espressif/esp-idf/blob/8760e6d2a/components/esp_driver_uart/src/uart.c#L63>
+    const UART_TOUT_THRESH_DEFAULT: u8 = 10;
+
     /// Number of data bits
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -235,6 +241,8 @@ pub mod config {
         pub parity: Parity,
         pub stop_bits: StopBits,
         pub clock_source: super::ClockSource,
+        pub rx_fifo_full_threshold: u16,
+        pub rx_timeout: u8,
     }
 
     impl Config {
@@ -291,6 +299,16 @@ pub mod config {
             };
             length
         }
+
+        pub fn rx_fifo_full_threshold(mut self, threshold: u16) -> Self {
+            self.rx_fifo_full_threshold = threshold;
+            self
+        }
+
+        pub fn rx_timeout(mut self, timeout: u8) -> Self {
+            self.rx_timeout = timeout;
+            self
+        }
     }
 
     impl Default for Config {
@@ -304,6 +322,8 @@ pub mod config {
                 clock_source: super::ClockSource::Xtal,
                 #[cfg(not(any(esp32c6, esp32h2, lp_uart)))]
                 clock_source: super::ClockSource::Apb,
+                rx_fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
+                rx_timeout: UART_TOUT_THRESH_DEFAULT,
             }
         }
     }
@@ -434,9 +454,11 @@ where
         crate::into_ref!(tx);
         tx.set_to_push_pull_output(Internal);
         tx.connect_peripheral_to_output(T::tx_signal(), Internal);
-        Uart::<'d, T, Blocking>::new_with_config_inner(uart, config, clocks, interrupt);
 
-        Self::new_inner()
+        let (uart_tx, _) =
+            Uart::<'d, T, Blocking>::new_with_config_inner(uart, config, clocks, interrupt).split();
+
+        uart_tx
     }
 }
 
@@ -451,7 +473,6 @@ where
             phantom: PhantomData,
             at_cmd_config: None,
             rx_timeout_config: None,
-            #[cfg(not(esp32))]
             symbol_len,
         }
     }
@@ -629,9 +650,10 @@ where
         rx.set_to_input(Internal);
         rx.connect_input_to_peripheral(T::rx_signal(), Internal);
 
-        Uart::<'d, T, Blocking>::new_with_config_inner(uart, config, clocks, interrupt);
+        let (_, uart_rx) =
+            Uart::<'d, T, Blocking>::new_with_config_inner(uart, config, clocks, interrupt).split();
 
-        Self::new_inner(config.symbol_length())
+        uart_rx
     }
 }
 
@@ -711,6 +733,10 @@ where
             rx: UartRx::new_inner(config.symbol_length()),
         };
 
+        serial
+            .set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)
+            .unwrap();
+        serial.set_rx_timeout(Some(config.rx_timeout)).unwrap();
         serial.change_baud_internal(config.baudrate, config.clock_source, clocks);
         serial.change_data_bits(config.data_bits);
         serial.change_parity(config.parity);
@@ -2019,7 +2045,7 @@ mod asynch {
             tx.set_to_push_pull_output(Internal);
             tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
-            Uart::<'d, T, Async>::new_with_config_inner(
+            let (uart_tx, _) = Uart::<'d, T, Async>::new_with_config_inner(
                 uart,
                 config,
                 clocks,
@@ -2032,9 +2058,10 @@ mod asynch {
                     2 => uart2,
                     _ => unreachable!(),
                 }),
-            );
+            )
+            .split();
 
-            Self::new_inner()
+            uart_tx
         }
 
         pub async fn write_async(&mut self, words: &[u8]) -> Result<usize, Error> {
@@ -2097,7 +2124,7 @@ mod asynch {
             rx.set_to_input(Internal);
             rx.connect_input_to_peripheral(T::rx_signal(), Internal);
 
-            Uart::<'d, T, Async>::new_with_config_inner(
+            let (_, uart_rx) = Uart::<'d, T, Async>::new_with_config_inner(
                 uart,
                 config,
                 clocks,
@@ -2110,9 +2137,10 @@ mod asynch {
                     2 => uart2,
                     _ => unreachable!(),
                 }),
-            );
+            )
+            .split();
 
-            Self::new_inner(config.symbol_length())
+            uart_rx
         }
 
         /// Read async to buffer slice `buf`.
