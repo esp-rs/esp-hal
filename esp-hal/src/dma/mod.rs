@@ -748,13 +748,11 @@ where
 
     fn available(&mut self) -> usize {
         let last_in_dscr_ptr = self.rx_impl.last_in_dscr_address() as *mut DmaDescriptor;
-        let mut last_in_descr = unsafe { last_in_dscr_ptr.read_volatile() };
+        let last_in_descr = unsafe { last_in_dscr_ptr.read_volatile() };
 
         if !last_in_descr.is_empty() && last_in_descr.owner() == Owner::Cpu {
             let len = last_in_descr.len();
 
-            last_in_descr.set_owner(Owner::Dma);
-            last_in_descr.set_suc_eof(false);
             unsafe {
                 last_in_dscr_ptr.write_volatile(last_in_descr);
             }
@@ -790,6 +788,8 @@ where
                 let count = descr.len();
                 core::ptr::copy_nonoverlapping(src, dst, count);
 
+                descr.set_owner(Owner::Dma);
+                descr.set_suc_eof(false);
                 descr.set_length(0);
                 descr_ptr.write_volatile(descr);
 
@@ -806,7 +806,7 @@ where
 
         self.last_seen_handled_descriptor_ptr = core::ptr::null_mut();
         self.available = avail;
-        Ok(data.len())
+        Ok(offset)
     }
 
     fn drain_buffer(&mut self, mut dst: &mut [u8]) -> Result<usize, DmaError> {
