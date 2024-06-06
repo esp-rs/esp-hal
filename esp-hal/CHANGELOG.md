@@ -8,9 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- uart: Add `with_cts`/`with_rts`s methods to configure CTS, and RTS pins (#1592)
+- uart: Added `with_cts`/`with_rts`s methods to configure CTS, and RTS pins (#1592)
 - uart: Constructors now require TX and RX pins (#1592)
-- uart: Added `new_with_default_pins` constructors (#1592)
+- uart: Added `Uart::new_with_default_pins` constructor (#1592)
+- uart: Added `UartTx` and `UartRx` constructors (#1592)
 
 - Add Flex / AnyFlex GPIO pin driver (#1659)
 
