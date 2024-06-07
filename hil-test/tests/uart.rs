@@ -17,7 +17,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::{ClockControl, Clocks},
     gpio::Io,
-    peripherals::{Peripherals, UART0},
+    peripherals::{Peripherals, UART1},
     prelude::*,
     system::SystemControl,
     uart::{ClockSource, Uart},
@@ -27,7 +27,7 @@ use nb::block;
 
 struct Context {
     clocks: Clocks<'static>,
-    uart: Uart<'static, UART0, Blocking>,
+    uart: Uart<'static, UART1, Blocking>,
 }
 
 impl Context {
@@ -38,7 +38,7 @@ impl Context {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let uart = Uart::new(peripherals.UART0, &clocks, io.pins.gpio2, io.pins.gpio4);
+        let uart = Uart::new(peripherals.UART1, &clocks, io.pins.gpio2, io.pins.gpio4);
 
         Context { clocks, uart }
     }
