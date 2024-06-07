@@ -640,7 +640,7 @@ where
     pub(crate) read_descr_ptr: *mut DmaDescriptor,
     pub(crate) available: usize,
     pub(crate) last_seen_handled_descriptor_ptr: *mut DmaDescriptor,
-    pub(crate) read_buffer_start: *mut u8,
+    pub(crate) read_descriptor_ptr: *mut DmaDescriptor,
     pub(crate) _phantom: PhantomData<R>,
 }
 
@@ -657,7 +657,7 @@ where
             read_descr_ptr: core::ptr::null_mut(),
             available: 0,
             last_seen_handled_descriptor_ptr: core::ptr::null_mut(),
-            read_buffer_start: core::ptr::null_mut(),
+            read_descriptor_ptr: core::ptr::null_mut(),
             _phantom: PhantomData,
         }
     }
@@ -708,7 +708,7 @@ where
         self.available = 0;
         self.read_descr_ptr = self.descriptors.as_mut_ptr();
         self.last_seen_handled_descriptor_ptr = core::ptr::null_mut();
-        self.read_buffer_start = data;
+        self.read_descriptor_ptr = core::ptr::null_mut();
 
         self.rx_impl
             .prepare_transfer_without_start(self.descriptors, circular, peri, data, len)
@@ -754,8 +754,7 @@ where
             let len = last_in_descr.len();
 
             if self.last_seen_handled_descriptor_ptr.is_null() {
-                self.last_seen_handled_descriptor_ptr = last_in_dscr_ptr;
-                self.read_buffer_start = last_in_descr.buffer;
+                self.read_descriptor_ptr = last_in_dscr_ptr;
                 self.available = len;
             } else if self.last_seen_handled_descriptor_ptr != last_in_dscr_ptr {
                 self.available += len;
@@ -769,18 +768,23 @@ where
     fn pop(&mut self, data: &mut [u8]) -> Result<usize, DmaError> {
         let mut avail = self.available;
 
-        let mut remaining = data.len();
-        let mut offset = 0;
-        let mut descr_ptr = self.last_seen_handled_descriptor_ptr;
+        if avail > data.len() {
+            return Err(DmaError::BufferTooSmall);
+        }
+
+        let len = data.len();
+        let mut remaining_buffer = data;
+        let mut descr_ptr = self.read_descr_ptr;
 
         if descr_ptr.is_null() {
             return Ok(0);
         }
 
-        while remaining != 0 && remaining >= avail {
+        let mut descr = unsafe { descr_ptr.read_volatile() };
+
+        while avail > 0 && !remaining_buffer.is_empty() && remaining_buffer.len() >= descr.len() {
             unsafe {
-                let mut descr = descr_ptr.read_volatile();
-                let dst = data.as_mut_ptr().add(offset);
+                let dst = remaining_buffer.as_mut_ptr();
                 let src = descr.buffer;
                 let count = descr.len();
                 core::ptr::copy_nonoverlapping(src, dst, count);
@@ -790,8 +794,7 @@ where
                 descr.set_length(0);
                 descr_ptr.write_volatile(descr);
 
-                remaining -= count;
-                offset += count;
+                remaining_buffer = &mut remaining_buffer[count..];
                 avail -= count;
                 descr_ptr = descr.next;
             }
@@ -799,15 +802,13 @@ where
             if descr_ptr.is_null() {
                 break;
             }
+
+            descr = unsafe { descr_ptr.read_volatile() };
         }
 
-        if avail > 0 {
-            return Err(DmaError::BufferTooSmall);
-        }
-
-        self.last_seen_handled_descriptor_ptr = core::ptr::null_mut();
+        self.read_descr_ptr = descr_ptr;
         self.available = avail;
-        Ok(offset)
+        Ok(len - remaining_buffer.len())
     }
 
     fn drain_buffer(&mut self, mut dst: &mut [u8]) -> Result<usize, DmaError> {

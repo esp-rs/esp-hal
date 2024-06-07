@@ -138,8 +138,10 @@ mod tests {
                 );
 
                 rcv.fill(0);
-                rx_transfer.pop(&mut rcv[..rx_avail]).unwrap();
-                for &b in &rcv[..rx_avail] {
+                let len = rx_transfer.pop(&mut rcv).unwrap();
+                assert!(len > 0);
+
+                for &b in &rcv[..len] {
                     if b != check_i {
                         failed = true;
                         break 'outer;
