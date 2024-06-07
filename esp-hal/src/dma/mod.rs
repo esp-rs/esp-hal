@@ -753,23 +753,16 @@ where
         if !last_in_descr.is_empty() && last_in_descr.owner() == Owner::Cpu {
             let len = last_in_descr.len();
 
-            unsafe {
-                last_in_dscr_ptr.write_volatile(last_in_descr);
-            }
-
             if self.last_seen_handled_descriptor_ptr.is_null() {
                 self.last_seen_handled_descriptor_ptr = last_in_dscr_ptr;
                 self.read_buffer_start = last_in_descr.buffer;
                 self.available = len;
-                return self.available;
-            }
-
-            if self.last_seen_handled_descriptor_ptr != last_in_dscr_ptr {
+            } else if self.last_seen_handled_descriptor_ptr != last_in_dscr_ptr {
                 self.available += len;
-                return self.available;
             }
         }
 
+        self.last_seen_handled_descriptor_ptr = last_in_dscr_ptr;
         self.available
     }
 
@@ -779,6 +772,10 @@ where
         let mut remaining = data.len();
         let mut offset = 0;
         let mut descr_ptr = self.last_seen_handled_descriptor_ptr;
+
+        if descr_ptr.is_null() {
+            return Ok(0);
+        }
 
         while remaining != 0 && remaining >= avail {
             unsafe {
@@ -802,6 +799,10 @@ where
             if descr_ptr.is_null() {
                 break;
             }
+        }
+
+        if avail > 0 {
+            return Err(DmaError::BufferTooSmall);
         }
 
         self.last_seen_handled_descriptor_ptr = core::ptr::null_mut();
@@ -1770,12 +1771,22 @@ where
         Self { instance }
     }
 
-    /// Amount of bytes which can be popped
+    /// Amount of bytes which can be popped.
+    ///
+    /// It's expected to call this before trying to [DmaTransferRxCircular::pop]
+    /// data.
     pub fn available(&mut self) -> usize {
         self.instance.rx().available()
     }
 
-    /// Get available data
+    /// Get available data.
+    ///
+    /// It's expected that the amount of available data is checked before by
+    /// calling [DmaTransferRxCircular::available] and that the buffer can hold
+    /// all available data.
+    ///
+    /// Fails with [DmaError::BufferTooSmall] if the given buffer is too small
+    /// to hold all available data
     pub fn pop(&mut self, data: &mut [u8]) -> Result<usize, DmaError> {
         self.instance.rx().pop(data)
     }

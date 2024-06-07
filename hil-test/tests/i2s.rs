@@ -99,15 +99,20 @@ mod tests {
             i = i.wrapping_add(1);
         }
 
-        let mut rcv = [0u8; 5000];
+        let mut rcv = [0u8; 15000];
         let mut filler = [0x1u8; 10000];
 
         let mut rx_transfer = i2s_rx.read_dma_circular(&mut rx_buffer).unwrap();
+        // trying to pop data before calling `available` should just do nothing
+        assert_eq!(0, rx_transfer.pop(&mut rcv[..100]).unwrap());
+
         let mut tx_transfer = i2s_tx.write_dma_circular(&tx_buffer).unwrap();
 
         'outer: loop {
             let tx_avail = tx_transfer.available();
-            if tx_avail > 0 {
+
+            // make sure there are more than one descriptor buffers ready to push
+            if tx_avail > 5000 {
                 for b in &mut filler[0..tx_avail].iter_mut() {
                     *b = i;
                     i = i.wrapping_add(1);
@@ -115,8 +120,24 @@ mod tests {
                 tx_transfer.push(&filler[0..tx_avail]).unwrap();
             }
 
+            // test calling available multiple times doesn't break anything
+            rx_transfer.available();
+            rx_transfer.available();
+            rx_transfer.available();
+            rx_transfer.available();
+            rx_transfer.available();
+            rx_transfer.available();
             let rx_avail = rx_transfer.available();
-            if rx_avail > 0 {
+
+            // make sure there are more than one descriptor buffers ready to pop
+            if rx_avail > 5000 {
+                // trying to pop less data than available is an error
+                assert_eq!(
+                    Err(esp_hal::dma::DmaError::BufferTooSmall),
+                    rx_transfer.pop(&mut rcv[..rx_avail / 2])
+                );
+
+                rcv.fill(0);
                 rx_transfer.pop(&mut rcv[..rx_avail]).unwrap();
                 for &b in &rcv[..rx_avail] {
                     if b != check_i {
