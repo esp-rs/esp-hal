@@ -53,6 +53,10 @@ name    = "spi_full_duplex_dma"
 harness = false
 
 [[test]]
+name    = "rmt"
+harness = false
+
+[[test]]
 name    = "rsa"
 harness = false
 

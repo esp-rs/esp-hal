@@ -115,7 +115,7 @@ pub enum Error {
 /// Convenience representation of a pulse code entry.
 ///
 /// Allows for the assignment of two levels and their lengths
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PulseCode {
     /// Logical output level in the first pulse code interval
