@@ -110,6 +110,7 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     #[cfg(feature = "semihosting")]
     semihosting::process::abort();
 
+    #[cfg(not(feature = "semihosting"))]
     halt();
 }
 
@@ -221,6 +222,7 @@ fn exception_handler(context: &arch::TrapFrame) -> ! {
     #[cfg(feature = "semihosting")]
     semihosting::process::abort();
 
+    #[cfg(not(feature = "semihosting"))]
     halt();
 }
 
