@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Refactor `Dac1`/`Dac2` drivers into a single `Dac` driver (#1661)
+
 ### Removed
 
 ## [0.18.0] - 2024-06-04

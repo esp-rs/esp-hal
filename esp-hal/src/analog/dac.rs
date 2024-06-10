@@ -16,8 +16,8 @@
 //! let gpio25 = io.pins.gpio25;
 //! let gpio26 = io.pins.gpio26;
 //!
-//! let mut dac1 = Dac1::new(peripherals.DAC1, gpio25);
-//! let mut dac2 = Dac2::new(peripherals.DAC2, gpio26);
+//! let mut dac1 = Dac::new(peripherals.DAC1, gpio25);
+//! let mut dac2 = Dac::new(peripherals.DAC2, gpio26);
 //!
 //! let mut delay = Delay::new(&clocks);
 //!
@@ -36,12 +36,16 @@
 //! }
 //! ```
 
+#![deny(missing_docs)]
+
 use crate::{
     gpio::{self, AnalogPin},
     peripheral::{Peripheral, PeripheralRef},
-    peripherals,
 };
 
+// Only specific pins can be used with each DAC peripheral, and of course
+// these pins are different depending on which chip you are using; for this
+// reason, we will type alias the pins for ease of use later in this module:
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
         type Dac1Gpio = gpio::Gpio25;
@@ -52,26 +56,33 @@ cfg_if::cfg_if! {
     }
 }
 
-/// Digital-to-Analog Converter (DAC) Channel 1
-pub struct Dac1<'d> {
-    _inner: PeripheralRef<'d, peripherals::DAC1>,
+/// Digital-to-Analog Converter (DAC) Channel
+pub struct Dac<'d, T>
+where
+    T: Instance,
+    T::Pin: AnalogPin,
+{
+    _inner: PeripheralRef<'d, T>,
 }
 
-impl<'d> Dac1<'d> {
-    /// Constructs a new DAC instance.
-    pub fn new(dac: impl Peripheral<P = peripherals::DAC1> + 'd, pin: Dac1Gpio) -> Self {
+impl<'d, T> Dac<'d, T>
+where
+    T: Instance,
+    T::Pin: AnalogPin,
+{
+    /// Construct a new instance of [`Dac`].
+    pub fn new(dac: impl Peripheral<P = T> + 'd, pin: T::Pin) -> Self {
         crate::into_ref!(dac);
-        // TODO revert this on drop
+
+        // TODO: Revert on drop.
         pin.set_analog(crate::private::Internal);
 
         #[cfg(esp32s2)]
-        unsafe { &*peripherals::SENS::PTR }
+        unsafe { &*crate::peripherals::SENS::PTR }
             .sar_dac_ctrl1()
             .modify(|_, w| w.dac_clkgate_en().set_bit());
 
-        unsafe { &*peripherals::RTC_IO::PTR }
-            .pad_dac1()
-            .modify(|_, w| w.pdac1_dac_xpd_force().set_bit().pdac1_xpd_dac().set_bit());
+        T::enable_xpd();
 
         Self { _inner: dac }
     }
@@ -81,51 +92,44 @@ impl<'d> Dac1<'d> {
     /// For each DAC channel, the output analog voltage can be calculated as
     /// follows: DACn_OUT = VDD3P3_RTC * PDACn_DAC/256
     pub fn write(&mut self, value: u8) {
-        unsafe { &*crate::peripherals::SENS::PTR }
-            .sar_dac_ctrl2()
-            .modify(|_, w| w.dac_cw_en1().clear_bit());
-
-        unsafe { &*crate::peripherals::RTC_IO::PTR }
-            .pad_dac1()
-            .modify(|_, w| unsafe { w.pdac1_dac().bits(value) });
+        T::set_pad_source();
+        T::write_byte(value);
     }
 }
 
-/// Digital-to-Analog Converter (DAC) Channel 2
-pub struct Dac2<'d> {
-    _inner: PeripheralRef<'d, peripherals::DAC2>,
-}
+#[doc(hidden)]
+pub trait Instance: crate::private::Sealed {
+    const INDEX: usize;
 
-impl<'d> Dac2<'d> {
-    /// Constructs a new DAC instance.
-    pub fn new(dac: impl Peripheral<P = peripherals::DAC2> + 'd, pin: Dac2Gpio) -> Self {
-        crate::into_ref!(dac);
-        // TODO revert this on drop
-        pin.set_analog(crate::private::Internal);
+    type Pin;
 
-        #[cfg(esp32s2)]
-        unsafe { &*peripherals::SENS::PTR }
-            .sar_dac_ctrl1()
-            .modify(|_, w| w.dac_clkgate_en().set_bit());
-
-        unsafe { &*peripherals::RTC_IO::PTR }
-            .pad_dac2()
-            .modify(|_, w| w.pdac2_dac_xpd_force().set_bit().pdac2_xpd_dac().set_bit());
-
-        Self { _inner: dac }
+    fn enable_xpd() {
+        unsafe { &*crate::peripherals::RTC_IO::PTR }
+            .pad_dac(Self::INDEX)
+            .modify(|_, w| w.dac_xpd_force().set_bit().xpd_dac().set_bit());
     }
 
-    /// Writes the given value.
-    ///
-    /// For each DAC channel, the output analog voltage can be calculated as
-    /// follows: DACn_OUT = VDD3P3_RTC * PDACn_DAC/256
-    pub fn write(&mut self, value: u8) {
+    fn set_pad_source() {
         unsafe { &*crate::peripherals::SENS::PTR }
             .sar_dac_ctrl2()
-            .modify(|_, w| w.dac_cw_en2().clear_bit());
-
-        unsafe { &*crate::peripherals::RTC_IO::PTR }
-            .pad_dac2()
-            .modify(|_, w| unsafe { w.pdac2_dac().bits(value) });
+            .modify(|_, w| w.dac_cw_en(Self::INDEX as u8).clear_bit());
     }
+
+    fn write_byte(value: u8) {
+        unsafe { &*crate::peripherals::RTC_IO::PTR }
+            .pad_dac(Self::INDEX)
+            .modify(|_, w| unsafe { w.dac().bits(value) });
+    }
+}
+
+impl Instance for crate::peripherals::DAC1 {
+    const INDEX: usize = 0;
+
+    type Pin = Dac1Gpio;
+}
+
+impl Instance for crate::peripherals::DAC2 {
+    const INDEX: usize = 1;
+
+    type Pin = Dac2Gpio;
 }

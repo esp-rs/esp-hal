@@ -13,6 +13,8 @@ pub use embedded_dma::{
 pub use fugit::{ExtU64 as _fugit_ExtU64, RateExtU32 as _fugit_RateExtU32};
 pub use nb;
 
+#[cfg(dac)]
+pub use crate::analog::dac::Instance as _esp_hal_analog_dac_Instance;
 #[cfg(any(dport, pcr, system))]
 pub use crate::clock::Clock as _esp_hal_clock_Clock;
 #[cfg(gpio)]

@@ -788,9 +788,6 @@ impl Rwdt {
         let rtc_cntl = unsafe { &*LP_WDT::PTR };
 
         self.set_write_protection(false);
-        #[cfg(any(esp32c6, esp32h2))]
-        rtc_cntl.wdtfeed().write(|w| w.rtc_wdt_feed().set_bit());
-        #[cfg(not(any(esp32c6, esp32h2)))]
         rtc_cntl.wdtfeed().write(|w| w.wdt_feed().set_bit());
         self.set_write_protection(true);
     }
