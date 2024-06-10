@@ -282,10 +282,6 @@ impl<const N: u8> RegisterAccess for Channel<N> {
         Self::in_int().raw().read().in_suc_eof().bit()
     }
 
-    fn last_in_dscr_address() -> usize {
-        Self::ch().in_dscr_bf0().read().inlink_dscr_bf0().bits() as _
-    }
-
     fn is_listening_in_eof() -> bool {
         Self::in_int().ena().read().in_suc_eof().bit_is_set()
     }

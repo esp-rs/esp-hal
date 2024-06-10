@@ -618,10 +618,6 @@ where
         R::is_in_done()
     }
 
-    fn last_in_dscr_address(&self) -> usize {
-        R::last_in_dscr_address()
-    }
-
     #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
 }
@@ -1419,7 +1415,6 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn set_in_peripheral(peripheral: u8);
     fn start_in();
     fn is_in_done() -> bool;
-    fn last_in_dscr_address() -> usize;
 
     fn is_listening_in_eof() -> bool;
     fn is_listening_out_eof() -> bool;
