@@ -34,8 +34,6 @@
 //! loop {
 //!     let mut data = [0u8; 22];
 //!     i2c.write_read(0x77, &[0xaa], &mut data).ok();
-//!
-//!     // println!("{:02x?}", data);
 //! }
 //! # }
 //! ```

@@ -22,24 +22,19 @@
 //! let mut ulp_core =
 //! esp_hal::ulp_core::UlpCore::new(peripherals.ULP_RISCV_CORE);
 //! ulp_core.stop();
-//! // println!("ulp core stopped");
 //!
 //! // copy code to RTC ram
 //! let lp_ram = 0x5000_0000 as *mut u8;
 //! unsafe {
 //!     core::ptr::copy_nonoverlapping(CODE as *const _ as *const u8, lp_ram,
 //! CODE.len()); }
-//! // println!("copied code (len {})", CODE.len());
 //!
 //! // start ULP core
 //! ulp_core.run(esp_hal::ulp_core::UlpCoreWakeupSource::HpCpu);
-//! // println!("ulpcore run");
 //!
 //! unsafe {
 //!     let data = 0x5000_0010 as *mut u32;
-//!     loop {
-//!         // println!("Current {}", unsafe { data.read_volatile() });
-//!     }
+//!     loop {}
 //! }
 //! # }
 //! ```

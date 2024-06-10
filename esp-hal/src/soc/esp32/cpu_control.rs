@@ -32,7 +32,6 @@
 //! loop {
 //!     delay.delay(1.secs());
 //!     let count = critical_section::with(|cs| *counter.borrow_ref(cs));
-//!     // println!("Hello World - Core 0! Counter is {}", count);
 //! }
 //! # }
 //!
@@ -44,7 +43,6 @@
 //!     delay: &Delay,
 //!     counter: &critical_section::Mutex<RefCell<i32>>,
 //! ) -> ! {
-//!     // println!("Hello World - Core 1!");
 //!     loop {
 //!         delay.delay(500.millis());
 //!

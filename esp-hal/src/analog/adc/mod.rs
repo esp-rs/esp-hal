@@ -32,7 +32,6 @@
 //!
 //! loop {
 //!     let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut pin)).unwrap();
-//!     // println!("PIN2 ADC reading = {}", pin_value);
 //!
 //!     delay.delay_millis(1500);
 //! }

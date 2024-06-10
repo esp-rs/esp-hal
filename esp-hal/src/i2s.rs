@@ -69,7 +69,6 @@
 //!     if avail > 0 {
 //!         let mut rcv = [0u8; 5000];
 //!         transfer.pop(&mut rcv[..avail]).unwrap();
-//!         // println!("Received {:x?}...", &rcv[..30]);
 //!     }
 //! }
 //! # }

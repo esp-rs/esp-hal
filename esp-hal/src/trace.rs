@@ -27,7 +27,7 @@
 //! let mut buffer = [0_u8; 1024];
 //! trace.start_trace(&mut buffer);
 //! // traced code
-//! // println!("Hello");
+//!
 //! // end traced code
 //! let res = trace.stop_trace().unwrap();
 //! // transfer the trace result to the host and decode it there

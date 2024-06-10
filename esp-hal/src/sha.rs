@@ -58,7 +58,6 @@
 //! // the output.
 //! block!(hasher.finish(output.as_mut_slice())).unwrap();
 //!
-//! // println!("SHA256 Hash output {:02x?}", output);
 //! # }
 //! ```
 
