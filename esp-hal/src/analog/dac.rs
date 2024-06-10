@@ -123,13 +123,13 @@ pub trait Instance: crate::private::Sealed {
 }
 
 impl Instance for crate::peripherals::DAC1 {
-    const INDEX: usize = 1;
+    const INDEX: usize = 0;
 
     type Pin = Dac1Gpio;
 }
 
 impl Instance for crate::peripherals::DAC2 {
-    const INDEX: usize = 2;
+    const INDEX: usize = 1;
 
     type Pin = Dac2Gpio;
 }
