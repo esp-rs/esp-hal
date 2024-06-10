@@ -40,7 +40,7 @@
 //! ## Examples
 //!
 //! #### Initialize with default clock frequency for this chip
-//! ```no_run
+//! ```rust, no_run
 //! # #![no_std]
 //! # use esp_hal::peripherals::Peripherals;
 //! # use esp_hal::clock::ClockControl;

@@ -19,8 +19,8 @@
 //!
 //! ## Examples
 //! ### Print time in milliseconds from the RTC Timer
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use core::cell::RefCell;
 //!
 //! # use critical_section::Mutex;

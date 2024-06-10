@@ -32,7 +32,7 @@
 //! Invoke the following command in the root of the esp-hal repository to get
 //! started.
 //!
-//! ```ignore
+//! ```bash
 //! cargo xtask help
 //! ```
 //!
@@ -45,7 +45,7 @@
 //! We have a template for quick starting bare-metal projects, [esp-template].
 //! The template uses [cargo-generate], so ensure that it is installed and run
 //!
-//! ```ignore
+//! ```bash
 //! cargo generate -a esp-rs/esp-template
 //! ```
 //!
@@ -461,7 +461,7 @@ mod critical_section_impl {
 /// often a `const` variable.
 ///
 /// Example usage using [`spi::master::dma::SpiDma`]
-/// ```ignore
+/// ```rust, ignore
 /// const ARRAY_IN_FLASH = [0xAA; 128];
 ///
 /// let spi = SpiDma::new(/* */);
@@ -524,4 +524,22 @@ fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
 #[export_name = "__stack_chk_fail"]
 unsafe extern "C" fn stack_chk_fail() {
     panic!("Stack corruption detected");
+}
+
+/// Helper macro for checking doctest code snippets
+#[cfg(not(host_os = "windows"))]
+#[macro_export]
+macro_rules! before_snippet {
+    () => {
+        core::include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))
+    };
+}
+
+/// Helper macro for checking doctest code snippets
+#[cfg(host_os = "windows")]
+#[macro_export]
+macro_rules! before_snippet {
+    () => {
+        core::include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "\\doc-helper\\before"))
+    };
 }

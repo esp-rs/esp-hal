@@ -480,7 +480,7 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
 /// configured deadtime.
 ///
 /// # H-Bridge example
-/// ```no_run
+/// ```rust, no_run
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
 /// # use esp_hal::{mcpwm, prelude::*};
 /// # use esp_hal::mcpwm::{McPwm, PeripheralClockConfig};

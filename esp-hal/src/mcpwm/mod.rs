@@ -31,8 +31,8 @@
 //! ## Example
 //! Uses timer0 and operator0 of the MCPWM0 peripheral to output a 50% duty
 //! signal at 20 kHz. The signal will be output to the pin assigned to `pin`.
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::{mcpwm, prelude::*};
 //! # use esp_hal::mcpwm::operator::{DeadTimeCfg, PWMStream};
 //! # use mcpwm::{operator::PwmPinConfig, timer::PwmWorkingMode, McPwm, PeripheralClockConfig};

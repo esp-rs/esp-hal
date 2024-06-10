@@ -11,8 +11,8 @@
 //!
 //! ## Example
 //!
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::Io;
 //! # use esp_hal::analog::dac::Dac1;
 //! # use esp_hal::delay::Delay;

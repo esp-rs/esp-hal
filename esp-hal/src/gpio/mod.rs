@@ -15,8 +15,8 @@
 //! designed struct from the pac struct `GPIO` and `IO_MUX` using `Io::new`.
 //!
 //! ## Example
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::{Io, Level, Output};
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let mut led = Output::new(io.pins.gpio5, Level::High);

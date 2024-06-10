@@ -8,8 +8,8 @@
 //!
 //! ## Example
 //!
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::cpu_control::{CpuControl, Stack};
 //! # use core::{cell::RefCell, ptr::addr_of_mut};

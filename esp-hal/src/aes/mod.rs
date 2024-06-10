@@ -12,10 +12,8 @@
 //!
 //! ## Example
 //!
-//! ### Encrypting and Decrypting
-//!
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::aes::{Aes, Mode};
 //! # let keytext = "SUp4SeCp@sSw0rd".as_bytes();
 //! # let plaintext = "message".as_bytes();

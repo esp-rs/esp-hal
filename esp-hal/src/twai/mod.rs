@@ -17,8 +17,8 @@
 //! Format (29-bit) frame identifiers.
 //!
 //! ## Example
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::twai;
 //! # use embedded_can::Id;
 //! # use esp_hal::twai::filter::SingleStandardFilter;

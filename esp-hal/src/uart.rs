@@ -18,8 +18,8 @@
 //! configured. Additionally, the transmit (TX) and receive (RX) pins can be
 //! specified.
 //!
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use core::option::Option::Some;
 //! # use esp_hal::uart::{config::Config, TxRxPins, Uart};
 //! use esp_hal::gpio::Io;
@@ -47,8 +47,8 @@
 //! ### Examples
 //!
 //! #### Sending and Receiving Data
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, TxRxPins, Uart};
 //! use esp_hal::gpio::Io;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -66,8 +66,8 @@
 //! ```
 //! 
 //! #### Splitting the UART into TX and RX Components
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, TxRxPins, Uart};
 //! use esp_hal::gpio::Io;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);

@@ -12,8 +12,8 @@
 //! Following code shows how to receive some bytes from an 8 bit DVP stream in
 //! master mode.
 //!
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::Io;
 //! # use esp_hal::lcd_cam::{cam::{Camera, RxEightBits}, LcdCam};
 //! # use fugit::RateExtU32;

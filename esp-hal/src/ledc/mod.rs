@@ -9,8 +9,8 @@
 //! The following will configure the Low Speed Channel0 to 24kHz output with
 //! 10% duty using the ABPClock
 //!
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::ledc::Ledc;
 //! # use esp_hal::ledc::LSGlobalClkSource;
 //! # use esp_hal::ledc::timer;

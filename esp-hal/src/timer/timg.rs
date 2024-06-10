@@ -20,8 +20,8 @@
 //!
 //! #### General-purpose Timer
 //!
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::timg::TimerGroup;
 //! # use crate::esp_hal::prelude::_esp_hal_timer_Timer;
 //! # use esp_hal::prelude::*;
@@ -42,8 +42,8 @@
 //! ```
 //! 
 //! #### Watchdog Timer
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::timg::TimerGroup;
 //! # use esp_hal::prelude::*;
 //! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);

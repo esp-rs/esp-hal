@@ -11,8 +11,8 @@
 //! affected by many factors, including interrupt usage.
 //!
 //! ## Example
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
 //! # use embedded_hal::delay::DelayNs;
 //! let mut delay = Delay::new(&clocks);

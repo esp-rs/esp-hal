@@ -12,8 +12,8 @@
 //! ## Examples
 //!
 //! ### Initialization for TX
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::Io;
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::{Dma, DmaPriority};
@@ -69,8 +69,8 @@
 //! ```
 //! 
 //! ### Initialization for RX
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::Io;
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::{Dma, DmaPriority};

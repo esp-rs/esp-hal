@@ -9,8 +9,8 @@
 //! Following code show how to send a command to a MIPI-DSI display over I8080
 //! protocol.
 //!
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::Io;
 //! # use esp_hal::lcd_cam::{LcdCam, lcd::i8080::{Config, I8080, TxEightBits}};
 //! # use esp_hal::dma_buffers;

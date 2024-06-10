@@ -28,8 +28,8 @@
 //!
 //! To compute a full digest from a single buffer, use the following:
 //!
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::rom::md5;
 //! # use esp_hal::uart::Uart;
 //! # use core::writeln;
@@ -42,8 +42,8 @@
 //! ```
 //! 
 //! To compute a digest over multiple buffers:
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::rom::md5;
 //! # use esp_hal::uart::Uart;
 //! # use core::writeln;

@@ -17,8 +17,8 @@
 //!
 //! #### General-purpose Timer
 //!
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::systimer::SystemTimer;
 //! # use esp_hal::timer::timg::{TimerGroup, TimerInterrupts};
 //! # use crate::esp_hal::prelude::_esp_hal_timer_Timer;
@@ -703,8 +703,8 @@ pub mod etm {
     //!      COMPx
     //!
     //! ## Example
-    //! ```no_run
-    #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+    //! ```rust, no_run
+    #![doc = crate::before_snippet!()]
     //! # use esp_hal::timer::systimer::{etm::SysTimerEtmEvent, SystemTimer};
     //! # use fugit::ExtU32;
     //! let syst = SystemTimer::new(peripherals.SYSTIMER);

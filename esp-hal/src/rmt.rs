@@ -40,8 +40,8 @@
 //!
 //! ### Initialization
 //!
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::peripherals::Peripherals;
 //! # use esp_hal::rmt::TxChannelConfig;
 //! # use esp_hal::rmt::Rmt;

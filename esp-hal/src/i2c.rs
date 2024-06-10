@@ -14,8 +14,8 @@
 //! ## Example
 //! Following code shows how to read data from a BMP180 sensor using I2C.
 //!
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::i2c::I2C;
 //! # use esp_hal::gpio::Io;
 //! # use core::option::Option::None;

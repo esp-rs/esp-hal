@@ -21,8 +21,8 @@
 //! The available peripherals are represented by the `Peripheral` enum
 //!
 //! ## Example
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! let peripherals = Peripherals::take();
 //! let system = SystemControl::new(peripherals.SYSTEM);
 //! let clocks = ClockControl::boot_defaults(system.clock_control).freeze();

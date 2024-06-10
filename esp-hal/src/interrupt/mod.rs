@@ -9,8 +9,8 @@
 //!
 //! ## Example using the peripheral driver to register an interrupt handler
 
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use core::cell::RefCell;
 //!
 //! # use critical_section::Mutex;

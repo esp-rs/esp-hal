@@ -39,7 +39,7 @@
 //!
 //! Requires the `embassy` feature to be enabled.
 //!
-//! ```no_run
+//! ```rust, no_run
 //! #[main]
 //! async fn main(spawner: Spawner) {
 //!     // Your application's entry point
@@ -50,7 +50,7 @@
 //!
 //! Requires the `ram` feature to be enabled.
 //!
-//! ```no_run
+//! ```rust, no_run
 //! #[ram(rtc_fast)]
 //! static mut SOME_INITED_DATA: [u8; 2] = [0xaa, 0xbb];
 //!
@@ -316,7 +316,7 @@ pub fn make_gpio_enum_dispatch_macro(input: TokenStream) -> TokenStream {
 /// Load code to be run on the LP/ULP core.
 ///
 /// ## Example
-/// ```no_run
+/// ```rust, no_run
 /// let lp_core_code = load_lp_code!("path.elf");
 /// lp_core_code.run(&mut lp_core, lp_core::LpCoreWakeupSource::HpCpu, lp_pin);
 /// ````

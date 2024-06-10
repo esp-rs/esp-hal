@@ -17,7 +17,7 @@
 //! is_done().
 //!
 //! ```rust, no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::dma::DmaPriority;
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::spi::SpiMode;

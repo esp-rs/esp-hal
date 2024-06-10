@@ -21,8 +21,8 @@
 //! For more information, please refer to the
 #![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/peripherals/etm.html)")]
 //! ## Example
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::Io;
 //! # use esp_hal::gpio::etm::GpioEtmChannels;
 //! # use esp_hal::etm::Etm;

@@ -9,8 +9,8 @@
 //!
 //! #### One-shot Timer
 //!
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::{OneShotTimer, PeriodicTimer, timg::TimerGroup};
 //! # use esp_hal::prelude::*;
 //! # use core::option::Option::None;
@@ -22,8 +22,8 @@
 //! ```
 //! 
 //! #### Periodic Timer
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::{PeriodicTimer, timg::TimerGroup};
 //! # use esp_hal::prelude::*;
 //! # use core::option::Option::None;

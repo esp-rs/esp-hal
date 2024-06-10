@@ -19,8 +19,8 @@
 //! ## Example
 //!
 //! ### Read chip's MAC address from the eFuse storage.
-//! ```no_run
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! # use esp_hal::efuse::Efuse;
 //! # use esp_hal::uart::Uart;
 //! # use core::writeln;
