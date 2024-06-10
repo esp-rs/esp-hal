@@ -1774,6 +1774,122 @@ where
     }
 }
 
+/// GPIO flexible pin driver.
+pub struct Flex<'d, P> {
+    pin: PeripheralRef<'d, P>,
+}
+
+impl<'d, P> Flex<'d, P>
+where
+    P: InputPin + OutputPin,
+{
+    /// Create GPIO flexible pin driver for a [Pin].
+    /// No mode change happens.
+    #[inline]
+    pub fn new(pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self {
+        crate::into_ref!(pin);
+        Self { pin }
+    }
+
+    /// Set the GPIO to open-drain mode.
+    pub fn set_as_open_drain(&mut self, pull: Pull) {
+        self.pin.set_to_open_drain_output(private::Internal);
+        self.pin
+            .internal_pull_down(pull == Pull::Down, private::Internal);
+        self.pin
+            .internal_pull_up(pull == Pull::Up, private::Internal);
+    }
+
+    /// Set the GPIO to input mode.
+    pub fn set_as_input(&mut self, pull: Pull) {
+        self.pin
+            .init_input(pull == Pull::Down, pull == Pull::Up, private::Internal);
+    }
+
+    /// Set the GPIO to output mode.
+    pub fn set_as_output(&mut self) {
+        self.pin.set_to_push_pull_output(private::Internal);
+    }
+
+    /// Get whether the pin input level is high.
+    #[inline]
+    pub fn is_high(&self) -> bool {
+        self.pin.is_input_high(private::Internal)
+    }
+
+    /// Get whether the pin input level is low.
+    #[inline]
+    pub fn is_low(&self) -> bool {
+        !self.is_high()
+    }
+
+    /// Get the current pin input level.
+    #[inline]
+    pub fn get_level(&self) -> Level {
+        self.is_high().into()
+    }
+
+    /// Listen for interrupts
+    #[inline]
+    pub fn listen(&mut self, event: Event) {
+        self.pin.listen(event, private::Internal);
+    }
+
+    /// Clear the interrupt status bit for this Pin
+    #[inline]
+    pub fn clear_interrupt(&mut self) {
+        self.pin.clear_interrupt(private::Internal);
+    }
+
+    /// Set the output as high.
+    #[inline]
+    pub fn set_high(&mut self) {
+        self.pin.set_output_high(true, private::Internal);
+    }
+
+    /// Set the output as low.
+    #[inline]
+    pub fn set_low(&mut self) {
+        self.pin.set_output_high(false, private::Internal);
+    }
+
+    /// Set the output level.
+    #[inline]
+    pub fn set_level(&mut self, level: Level) {
+        self.pin.set_output_high(level.into(), private::Internal);
+    }
+
+    /// Is the output pin set as high?
+    #[inline]
+    pub fn is_set_high(&self) -> bool {
+        self.pin.is_set_high(private::Internal)
+    }
+
+    /// Is the output pin set as low?
+    #[inline]
+    pub fn is_set_low(&self) -> bool {
+        !self.pin.is_set_high(private::Internal)
+    }
+
+    /// What level output is set to
+    #[inline]
+    pub fn get_output_level(&self) -> Level {
+        self.pin.is_set_high(private::Internal).into()
+    }
+
+    /// Toggle pin output
+    #[inline]
+    pub fn toggle(&mut self) {
+        let level = !self.pin.is_set_high(private::Internal);
+        self.pin.set_output_high(level, private::Internal);
+    }
+
+    /// Configure the [DriveStrength] of the pin
+    pub fn set_drive_strength(&mut self, strength: DriveStrength) {
+        self.pin.set_drive_strength(strength, private::Internal);
+    }
+}
+
 /// Generic GPIO output driver.
 pub struct AnyOutput<'d> {
     pin: ErasedPin,
@@ -1927,6 +2043,121 @@ impl<'d> AnyOutputOpenDrain<'d> {
             pin,
             _phantom: PhantomData,
         }
+    }
+
+    /// Get whether the pin input level is high.
+    #[inline]
+    pub fn is_high(&self) -> bool {
+        self.pin.is_input_high(private::Internal)
+    }
+
+    /// Get whether the pin input level is low.
+    #[inline]
+    pub fn is_low(&self) -> bool {
+        !self.is_high()
+    }
+
+    /// Get the current pin input level.
+    #[inline]
+    pub fn get_level(&self) -> Level {
+        self.is_high().into()
+    }
+
+    /// Listen for interrupts
+    #[inline]
+    pub fn listen(&mut self, event: Event) {
+        self.pin.listen(event, private::Internal);
+    }
+
+    /// Clear the interrupt status bit for this Pin
+    #[inline]
+    pub fn clear_interrupt(&mut self) {
+        self.pin.clear_interrupt(private::Internal);
+    }
+
+    /// Set the output as high.
+    #[inline]
+    pub fn set_high(&mut self) {
+        self.pin.set_output_high(true, private::Internal);
+    }
+
+    /// Set the output as low.
+    #[inline]
+    pub fn set_low(&mut self) {
+        self.pin.set_output_high(false, private::Internal);
+    }
+
+    /// Set the output level.
+    #[inline]
+    pub fn set_level(&mut self, level: Level) {
+        self.pin.set_output_high(level.into(), private::Internal);
+    }
+
+    /// Is the output pin set as high?
+    #[inline]
+    pub fn is_set_high(&self) -> bool {
+        self.pin.is_set_high(private::Internal)
+    }
+
+    /// Is the output pin set as low?
+    #[inline]
+    pub fn is_set_low(&self) -> bool {
+        !self.pin.is_set_high(private::Internal)
+    }
+
+    /// What level output is set to
+    #[inline]
+    pub fn get_output_level(&self) -> Level {
+        self.pin.is_set_high(private::Internal).into()
+    }
+
+    /// Toggle pin output
+    #[inline]
+    pub fn toggle(&mut self) {
+        let pin = &mut self.pin;
+        pin.set_output_high(!pin.is_set_high(private::Internal), private::Internal);
+    }
+}
+
+/// Generic GPIO flexible pin driver.
+pub struct AnyFlex<'d> {
+    pin: ErasedPin,
+    _phantom: PhantomData<&'d ()>,
+}
+
+impl<'d> AnyFlex<'d> {
+    /// Create GPIO flexible pin driver for a [Pin].
+    /// No mode change happens.
+    #[inline]
+    pub fn new<P: OutputPin + InputPin + CreateErasedPin>(
+        pin: impl crate::peripheral::Peripheral<P = P> + 'd,
+    ) -> Self {
+        crate::into_ref!(pin);
+        let pin = pin.erased_pin(private::Internal);
+        Self {
+            pin,
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Set the GPIO to open-drain mode.
+    pub fn set_as_open_drain(&mut self, pull: Pull) {
+        self.pin.set_to_open_drain_output(private::Internal);
+        self.pin
+            .internal_pull_down(pull == Pull::Down, private::Internal);
+        self.pin
+            .internal_pull_up(pull == Pull::Up, private::Internal);
+    }
+
+    /// Set the GPIO to input mode.
+    pub fn set_as_input(&mut self, pull: Pull) {
+        self.pin
+            .init_input(pull == Pull::Down, pull == Pull::Up, private::Internal);
+    }
+
+    /// Set the GPIO to output mode.
+    pub fn set_as_output(&mut self) {
+        self.pin.set_to_push_pull_output(private::Internal);
     }
 
     /// Get whether the pin input level is high.
@@ -2519,7 +2750,59 @@ mod embedded_hal_02_impls {
         }
     }
 
-    // TODO AnyInput, AnyOutput, AnyOpenDrainOutput
+    impl<'d, P> digital::InputPin for Flex<'d, P>
+    where
+        P: InputPin + OutputPin,
+    {
+        type Error = core::convert::Infallible;
+
+        fn is_high(&self) -> Result<bool, Self::Error> {
+            Ok(self.pin.is_input_high(private::Internal))
+        }
+        fn is_low(&self) -> Result<bool, Self::Error> {
+            Ok(!self.pin.is_input_high(private::Internal))
+        }
+    }
+
+    impl<'d, P> digital::OutputPin for Flex<'d, P>
+    where
+        P: InputPin + OutputPin,
+    {
+        type Error = core::convert::Infallible;
+
+        fn set_high(&mut self) -> Result<(), Self::Error> {
+            self.pin.set_output_high(true, private::Internal);
+            Ok(())
+        }
+        fn set_low(&mut self) -> Result<(), Self::Error> {
+            self.pin.set_output_high(false, private::Internal);
+            Ok(())
+        }
+    }
+
+    impl<'d, P> digital::StatefulOutputPin for Flex<'d, P>
+    where
+        P: InputPin + OutputPin,
+    {
+        fn is_set_high(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_set_high())
+        }
+        fn is_set_low(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_set_low())
+        }
+    }
+
+    impl<'d, P> digital::ToggleableOutputPin for Flex<'d, P>
+    where
+        P: InputPin + OutputPin,
+    {
+        type Error = core::convert::Infallible;
+
+        fn toggle(&mut self) -> Result<(), Self::Error> {
+            self.toggle();
+            Ok(())
+        }
+    }
 
     impl<'d> digital::InputPin for AnyInput<'d> {
         type Error = core::convert::Infallible;
@@ -2597,6 +2880,48 @@ mod embedded_hal_02_impls {
     }
 
     impl<'d> digital::ToggleableOutputPin for AnyOutputOpenDrain<'d> {
+        type Error = core::convert::Infallible;
+
+        fn toggle(&mut self) -> Result<(), Self::Error> {
+            self.toggle();
+            Ok(())
+        }
+    }
+
+    impl<'d> digital::InputPin for AnyFlex<'d> {
+        type Error = core::convert::Infallible;
+
+        fn is_high(&self) -> Result<bool, Self::Error> {
+            Ok(self.pin.is_input_high(private::Internal))
+        }
+        fn is_low(&self) -> Result<bool, Self::Error> {
+            Ok(!self.pin.is_input_high(private::Internal))
+        }
+    }
+
+    impl<'d> digital::OutputPin for AnyFlex<'d> {
+        type Error = core::convert::Infallible;
+
+        fn set_high(&mut self) -> Result<(), Self::Error> {
+            self.pin.set_output_high(true, private::Internal);
+            Ok(())
+        }
+        fn set_low(&mut self) -> Result<(), Self::Error> {
+            self.pin.set_output_high(false, private::Internal);
+            Ok(())
+        }
+    }
+
+    impl<'d> digital::StatefulOutputPin for AnyFlex<'d> {
+        fn is_set_high(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_set_high())
+        }
+        fn is_set_low(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_set_low())
+        }
+    }
+
+    impl<'d> digital::ToggleableOutputPin for AnyFlex<'d> {
         type Error = core::convert::Infallible;
 
         fn toggle(&mut self) -> Result<(), Self::Error> {
@@ -2715,6 +3040,54 @@ mod embedded_hal_impls {
         }
     }
 
+    impl<'d, P> digital::InputPin for Flex<'d, P>
+    where
+        P: InputPin + OutputPin,
+    {
+        fn is_high(&mut self) -> Result<bool, Self::Error> {
+            Ok(Flex::is_high(self))
+        }
+
+        fn is_low(&mut self) -> Result<bool, Self::Error> {
+            Ok(Flex::is_low(self))
+        }
+    }
+
+    impl<'d, P> digital::ErrorType for Flex<'d, P>
+    where
+        P: InputPin + OutputPin,
+    {
+        type Error = core::convert::Infallible;
+    }
+
+    impl<'d, P> digital::OutputPin for Flex<'d, P>
+    where
+        P: InputPin + OutputPin,
+    {
+        fn set_low(&mut self) -> Result<(), Self::Error> {
+            self.set_low();
+            Ok(())
+        }
+
+        fn set_high(&mut self) -> Result<(), Self::Error> {
+            self.set_high();
+            Ok(())
+        }
+    }
+
+    impl<'d, P> digital::StatefulOutputPin for Flex<'d, P>
+    where
+        P: InputPin + OutputPin,
+    {
+        fn is_set_high(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_set_high(self))
+        }
+
+        fn is_set_low(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_set_low(self))
+        }
+    }
+
     impl<'d> digital::ErrorType for AnyInput<'d> {
         type Error = core::convert::Infallible;
     }
@@ -2772,6 +3145,32 @@ mod embedded_hal_impls {
     }
 
     impl<'d> digital::StatefulOutputPin for AnyOutputOpenDrain<'d> {
+        fn is_set_high(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_set_high(self))
+        }
+
+        fn is_set_low(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_set_low(self))
+        }
+    }
+
+    impl<'d> digital::ErrorType for AnyFlex<'d> {
+        type Error = core::convert::Infallible;
+    }
+
+    impl<'d> digital::OutputPin for AnyFlex<'d> {
+        fn set_low(&mut self) -> Result<(), Self::Error> {
+            self.set_low();
+            Ok(())
+        }
+
+        fn set_high(&mut self) -> Result<(), Self::Error> {
+            self.set_high();
+            Ok(())
+        }
+    }
+
+    impl<'d> digital::StatefulOutputPin for AnyFlex<'d> {
         fn is_set_high(&mut self) -> Result<bool, Self::Error> {
             Ok(Self::is_set_high(self))
         }

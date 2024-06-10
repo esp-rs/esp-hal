@@ -71,7 +71,7 @@ pub fn interrupt_handler() {
 mod tests {
     use defmt::assert_eq;
     use embassy_time::{Duration, Timer};
-    use esp_hal::gpio::{Event, OutputOpenDrain};
+    use esp_hal::gpio::{Event, Flex, OutputOpenDrain};
     use portable_atomic::{AtomicUsize, Ordering};
 
     use super::*;
@@ -225,5 +225,45 @@ mod tests {
 
         assert_eq!(io2.is_low(), true);
         assert_eq!(io4.is_low(), true);
+    }
+
+    #[test]
+    fn test_gpio_flex(ctx: Context<'static>) {
+        let mut io2 = Flex::new(unsafe { GpioPin::<2>::steal() });
+        let mut io4 = Flex::new(unsafe { GpioPin::<4>::steal() });
+
+        io2.set_high();
+        io2.set_as_output();
+        io4.set_as_input(Pull::None);
+
+        ctx.delay.delay_millis(1);
+
+        assert_eq!(io2.is_set_high(), true);
+        assert_eq!(io4.is_high(), true);
+
+        io2.set_low();
+        ctx.delay.delay_millis(1);
+
+        assert_eq!(io2.is_set_high(), false);
+        assert_eq!(io4.is_high(), false);
+
+        io2.set_as_input(Pull::None);
+        io4.set_as_output();
+        ctx.delay.delay_millis(1);
+
+        assert_eq!(io2.is_high(), false);
+        assert_eq!(io4.is_set_high(), false);
+
+        io4.set_high();
+        ctx.delay.delay_millis(1);
+
+        assert_eq!(io2.is_high(), true);
+        assert_eq!(io4.is_set_high(), true);
+
+        io4.set_low();
+        ctx.delay.delay_millis(1);
+
+        assert_eq!(io2.is_low(), true);
+        assert_eq!(io4.is_set_low(), true);
     }
 }
