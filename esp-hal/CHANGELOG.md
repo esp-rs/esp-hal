@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Changed
+- Make the SPI FIFO a separate object from the master driver
 
 - Refactor `Dac1`/`Dac2` drivers into a single `Dac` driver (#1661)
 
