@@ -14,7 +14,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::Io;
-//! # use esp_hal::analog::dac::Dac1;
+//! # use esp_hal::analog::dac::Dac;
 //! # use esp_hal::delay::Delay;
 //! # use embedded_hal::delay::DelayNs;
 //!
