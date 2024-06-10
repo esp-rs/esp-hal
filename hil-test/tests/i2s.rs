@@ -16,6 +16,7 @@ use defmt_rtt as _;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::Io,
@@ -26,9 +27,14 @@ use esp_hal::{
     system::SystemControl,
 };
 
+// choose values which DON'T restart on every descriptor buffer's start
+const ADD: u8 = 5;
+const CUT_OFF: u8 = 113;
+
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
+
     use super::*;
 
     #[init]
@@ -42,17 +48,19 @@ mod tests {
 
         let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
+        let delay = Delay::new(&clocks);
+
         let dma = Dma::new(peripherals.DMA);
         let dma_channel = dma.channel0;
 
         let (tx_buffer, mut tx_descriptors, mut rx_buffer, mut rx_descriptors) =
-            dma_buffers!(32000, 32000);
+            dma_buffers!(16000, 16000);
 
         let i2s = I2s::new(
             peripherals.I2S0,
             Standard::Philips,
             DataFormat::Data16Channel16,
-            441000.Hz(),
+            16000.Hz(),
             dma_channel.configure(
                 false,
                 &mut tx_descriptors,
@@ -96,15 +104,18 @@ mod tests {
         let mut i = 0;
         for b in tx_buffer.iter_mut() {
             *b = i;
-            i = i.wrapping_add(1);
+            i = (i + ADD) % CUT_OFF;
         }
 
-        let mut rcv = [0u8; 15000];
-        let mut filler = [0x1u8; 10000];
+        let mut rcv = [0u8; 11000];
+        let mut filler = [0x1u8; 12000];
 
         let mut rx_transfer = i2s_rx.read_dma_circular(&mut rx_buffer).unwrap();
         // trying to pop data before calling `available` should just do nothing
         assert_eq!(0, rx_transfer.pop(&mut rcv[..100]).unwrap());
+
+        // no data available yet
+        assert_eq!(0, rx_transfer.available());
 
         let mut tx_transfer = i2s_tx.write_dma_circular(&tx_buffer).unwrap();
 
@@ -115,7 +126,7 @@ mod tests {
             if tx_avail > 5000 {
                 for b in &mut filler[0..tx_avail].iter_mut() {
                     *b = i;
-                    i = i.wrapping_add(1);
+                    i = (i + ADD) % CUT_OFF;
                 }
                 tx_transfer.push(&filler[0..tx_avail]).unwrap();
             }
@@ -130,14 +141,14 @@ mod tests {
             let rx_avail = rx_transfer.available();
 
             // make sure there are more than one descriptor buffers ready to pop
-            if rx_avail > 5000 {
+            if rx_avail > 0 {
                 // trying to pop less data than available is an error
                 assert_eq!(
                     Err(esp_hal::dma::DmaError::BufferTooSmall),
                     rx_transfer.pop(&mut rcv[..rx_avail / 2])
                 );
 
-                rcv.fill(0);
+                rcv.fill(0xff);
                 let len = rx_transfer.pop(&mut rcv).unwrap();
                 assert!(len > 0);
 
@@ -146,12 +157,19 @@ mod tests {
                         failed = true;
                         break 'outer;
                     }
-                    check_i = check_i.wrapping_add(1);
+                    check_i = (check_i + ADD) % CUT_OFF;
                 }
+
                 iteration += 1;
+
+                if iteration == 1 {
+                    // delay to make it likely `available` will need to handle more than one
+                    // descriptor next time
+                    delay.delay_millis(160);
+                }
             }
 
-            if iteration > 100 {
+            if iteration > 30 {
                 break;
             }
         }

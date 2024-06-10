@@ -747,32 +747,37 @@ where
     }
 
     fn available(&mut self) -> usize {
-        let last_in_dscr_ptr = self.rx_impl.last_in_dscr_address() as *mut DmaDescriptor;
-        let last_in_descr = unsafe { last_in_dscr_ptr.read_volatile() };
-
-        if !last_in_descr.is_empty() && last_in_descr.owner() == Owner::Cpu {
-            let len = last_in_descr.len();
-
-            if self.last_seen_handled_descriptor_ptr.is_null() {
-                self.read_descriptor_ptr = last_in_dscr_ptr;
-                self.available = len;
-            } else if self.last_seen_handled_descriptor_ptr != last_in_dscr_ptr {
-                self.available += len;
-            }
+        if self.last_seen_handled_descriptor_ptr.is_null() {
+            // initially start at last descriptor (so that next will be the first
+            // descriptor)
+            self.last_seen_handled_descriptor_ptr =
+                addr_of_mut!(self.descriptors[self.descriptors.len() - 1]);
         }
 
-        self.last_seen_handled_descriptor_ptr = last_in_dscr_ptr;
+        let mut current_in_descr_ptr =
+            unsafe { self.last_seen_handled_descriptor_ptr.read_volatile() }.next;
+        let mut current_in_descr = unsafe { current_in_descr_ptr.read_volatile() };
+
+        while !current_in_descr.is_empty() && current_in_descr.owner() == Owner::Cpu {
+            self.available += current_in_descr.len();
+            self.last_seen_handled_descriptor_ptr = current_in_descr_ptr;
+
+            current_in_descr_ptr =
+                unsafe { self.last_seen_handled_descriptor_ptr.read_volatile() }.next;
+            current_in_descr = unsafe { current_in_descr_ptr.read_volatile() };
+        }
+
         self.available
     }
 
     fn pop(&mut self, data: &mut [u8]) -> Result<usize, DmaError> {
+        let len = data.len();
         let mut avail = self.available;
 
-        if avail > data.len() {
+        if avail > len {
             return Err(DmaError::BufferTooSmall);
         }
 
-        let len = data.len();
         let mut remaining_buffer = data;
         let mut descr_ptr = self.read_descr_ptr;
 
