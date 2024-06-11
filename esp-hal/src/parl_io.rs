@@ -1474,9 +1474,11 @@ where
 
         self.tx_channel.is_done();
 
-        self.tx_channel
-            .prepare_transfer_without_start(DmaPeripheral::ParlIo, false, ptr, len)
-            .and_then(|_| self.tx_channel.start_transfer())?;
+        unsafe {
+            self.tx_channel
+                .prepare_transfer_without_start(DmaPeripheral::ParlIo, false, ptr, len)
+                .and_then(|_| self.tx_channel.start_transfer())?;
+        }
 
         loop {
             if Instance::is_tx_ready() {

@@ -1077,8 +1077,10 @@ pub mod dma {
                 return Err(super::Error::MaxDmaTransferSizeExceeded);
             }
 
-            self.spi
-                .start_write_bytes_dma(ptr, len, &mut self.channel.tx, false)?;
+            unsafe {
+                self.spi
+                    .start_write_bytes_dma(ptr, len, &mut self.channel.tx, false)?;
+            }
             Ok(DmaTransferTx::new(self))
         }
 
@@ -1293,8 +1295,10 @@ pub mod dma {
                     .modify(|_, w| unsafe { w.usr_dummy_cyclelen().bits(dummy - 1) });
             }
 
-            self.spi
-                .start_write_bytes_dma(ptr, len, &mut self.channel.tx, false)?;
+            unsafe {
+                self.spi
+                    .start_write_bytes_dma(ptr, len, &mut self.channel.tx, false)?;
+            }
             Ok(DmaTransferTx::new(self))
         }
     }
@@ -1419,12 +1423,14 @@ pub mod dma {
             async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
                 for chunk in words.chunks(MAX_DMA_SIZE) {
                     let mut future = crate::dma::asynch::DmaTxFuture::new(&mut self.channel.tx);
-                    self.spi.start_write_bytes_dma(
-                        chunk.as_ptr(),
-                        chunk.len(),
-                        future.tx(),
-                        true,
-                    )?;
+                    unsafe {
+                        self.spi.start_write_bytes_dma(
+                            chunk.as_ptr(),
+                            chunk.len(),
+                            future.tx(),
+                            true,
+                        )?;
+                    }
                     future.await?;
 
                     self.spi.flush()?;
@@ -1870,7 +1876,9 @@ where
 
     fn write_bytes_dma<'w>(&mut self, words: &'w [u8], tx: &mut TX) -> Result<&'w [u8], Error> {
         for chunk in words.chunks(MAX_DMA_SIZE) {
-            self.start_write_bytes_dma(chunk.as_ptr(), chunk.len(), tx, false)?;
+            unsafe {
+                self.start_write_bytes_dma(chunk.as_ptr(), chunk.len(), tx, false)?;
+            }
 
             while !tx.is_done() {}
             self.flush().unwrap(); // seems "is_done" doesn't work as intended?
@@ -1880,7 +1888,7 @@ where
     }
 
     #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-    fn start_write_bytes_dma(
+    unsafe fn start_write_bytes_dma(
         &mut self,
         ptr: *const u8,
         len: usize,
@@ -1896,8 +1904,10 @@ where
         self.update();
 
         reset_dma_before_load_dma_dscr(reg_block);
-        tx.prepare_transfer_without_start(self.dma_peripheral(), false, ptr, len)
-            .and_then(|_| tx.start_transfer())?;
+        unsafe {
+            tx.prepare_transfer_without_start(self.dma_peripheral(), false, ptr, len)
+                .and_then(|_| tx.start_transfer())?;
+        }
 
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);

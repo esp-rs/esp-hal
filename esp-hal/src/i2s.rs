@@ -500,9 +500,11 @@ where
         // Enable corresponding interrupts if needed
 
         // configure DMA outlink
-        self.tx_channel
-            .prepare_transfer_without_start(T::get_dma_peripheral(), false, ptr, data.len())
-            .and_then(|_| self.tx_channel.start_transfer())?;
+        unsafe {
+            self.tx_channel
+                .prepare_transfer_without_start(T::get_dma_peripheral(), false, ptr, data.len())
+                .and_then(|_| self.tx_channel.start_transfer())?;
+        }
 
         // set I2S_TX_STOP_EN if needed
 
@@ -532,9 +534,11 @@ where
         // Enable corresponding interrupts if needed
 
         // configure DMA outlink
-        self.tx_channel
-            .prepare_transfer_without_start(T::get_dma_peripheral(), circular, ptr, len)
-            .and_then(|_| self.tx_channel.start_transfer())?;
+        unsafe {
+            self.tx_channel
+                .prepare_transfer_without_start(T::get_dma_peripheral(), circular, ptr, len)
+                .and_then(|_| self.tx_channel.start_transfer())?;
+        }
 
         // set I2S_TX_STOP_EN if needed
 
@@ -2113,9 +2117,16 @@ pub mod asynch {
             T::reset_tx();
 
             let future = DmaTxFuture::new(&mut self.tx_channel);
-            future
-                .tx
-                .prepare_transfer_without_start(T::get_dma_peripheral(), false, ptr, len)?;
+
+            unsafe {
+                future.tx.prepare_transfer_without_start(
+                    T::get_dma_peripheral(),
+                    false,
+                    ptr,
+                    len,
+                )?;
+            }
+
             future.tx.start_transfer()?;
             T::tx_start();
             future.await?;
@@ -2138,9 +2149,11 @@ pub mod asynch {
             // Enable corresponding interrupts if needed
 
             // configure DMA outlink
-            self.tx_channel
-                .prepare_transfer_without_start(T::get_dma_peripheral(), true, ptr, len)
-                .and_then(|_| self.tx_channel.start_transfer())?;
+            unsafe {
+                self.tx_channel
+                    .prepare_transfer_without_start(T::get_dma_peripheral(), true, ptr, len)
+                    .and_then(|_| self.tx_channel.start_transfer())?;
+            }
 
             // set I2S_TX_STOP_EN if needed
 

@@ -325,9 +325,11 @@ pub mod dma {
                 return Err(Error::MaxDmaTransferSizeExceeded);
             }
 
-            self.spi
-                .start_write_bytes_dma(ptr, len, &mut self.channel.tx)
-                .map(move |_| DmaTransferTx::new(self))
+            unsafe {
+                self.spi
+                    .start_write_bytes_dma(ptr, len, &mut self.channel.tx)
+                    .map(move |_| DmaTransferTx::new(self))
+            }
         }
 
         /// Register a buffer for a DMA read.
@@ -449,7 +451,7 @@ where
         Ok(())
     }
 
-    fn start_write_bytes_dma(
+    unsafe fn start_write_bytes_dma(
         &mut self,
         ptr: *const u8,
         len: usize,
