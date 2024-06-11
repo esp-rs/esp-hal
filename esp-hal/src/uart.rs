@@ -455,7 +455,7 @@ where
     }
 
     /// Flush the transmit buffer of the UART
-    pub fn flush_tx(&self) -> nb::Result<(), Error> {
+    pub fn flush_tx(&mut self) -> nb::Result<(), Error> {
         if T::is_tx_idle() {
             Ok(())
         } else {
@@ -503,22 +503,13 @@ where
     T: Instance,
     M: Mode,
 {
-    #[cfg(not(esp32))]
-    fn new_inner(symbol_len: u8) -> Self {
+    fn new_inner(#[cfg(not(esp32))] symbol_len: u8) -> Self {
         Self {
             phantom: PhantomData,
             at_cmd_config: None,
             rx_timeout_config: None,
+            #[cfg(not(esp32))]
             symbol_len,
-        }
-    }
-
-    #[cfg(esp32)]
-    fn new_inner(_symbol_len: u8) -> Self {
-        Self {
-            phantom: PhantomData,
-            at_cmd_config: None,
-            rx_timeout_config: None,
         }
     }
 
@@ -577,7 +568,7 @@ where
     /// - `esp32c6`, `esp32h2` **0xFF**
     /// - `esp32c3`, `esp32c2`, `esp32s2` **0x1FF**
     /// - `esp32s3` **0x3FF**
-    pub fn set_rx_fifo_full_threshold(&mut self, threshold: u16) -> Result<(), Error> {
+    fn set_rx_fifo_full_threshold(&mut self, threshold: u16) -> Result<(), Error> {
         #[cfg(esp32)]
         const MAX_THRHD: u16 = 0x7F;
         #[cfg(any(esp32c6, esp32h2))]
@@ -613,7 +604,7 @@ where
     /// - `esp32`: Symbol size is fixed to 8, do not pass a value > **0x7F**.
     /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, esp32s2`, esp32s3`: The
     ///   value you pass times the symbol size must be <= **0x3FF**
-    pub fn set_rx_timeout(&mut self, timeout: Option<u8>) -> Result<(), Error> {
+    fn set_rx_timeout(&mut self, timeout: Option<u8>) -> Result<(), Error> {
         #[cfg(esp32)]
         const MAX_THRHD: u8 = 0x7F; // 7 bits
         #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s2, esp32s3))]
@@ -766,13 +757,17 @@ where
 
         let mut serial = Uart {
             tx: UartTx::new_inner(),
-            rx: UartRx::new_inner(config.symbol_length()),
+            rx: UartRx::new_inner(
+                #[cfg(not(esp32))]
+                config.symbol_length(),
+            ),
         };
 
         serial
+            .rx
             .set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)
             .unwrap();
-        serial.set_rx_timeout(Some(config.rx_timeout)).unwrap();
+        serial.rx.set_rx_timeout(Some(config.rx_timeout)).unwrap();
         serial.change_baud_internal(config.baudrate, config.clock_source, clocks);
         serial.change_data_bits(config.data_bits);
         serial.change_parity(config.parity);
@@ -882,35 +877,6 @@ where
         self.rx.at_cmd_config = Some(config);
     }
 
-    /// Configures the Receive Timeout detection setting
-    ///
-    /// # Arguments
-    /// `timeout` - the number of symbols ("bytes") to wait for before
-    /// triggering a timeout. Pass None to disable the timeout.
-    ///
-    ///  # Errors
-    /// `Err(Error::InvalidArgument)` if the provided value exceeds the maximum
-    /// value for SOC :
-    /// - `esp32`: Symbol size is fixed to 8, do not pass a value > **0x7F**.
-    /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, esp32s2`, esp32s3`: The
-    ///   value you pass times the symbol size must be <= **0x3FF**
-    pub fn set_rx_timeout(&mut self, timeout: Option<u8>) -> Result<(), Error> {
-        self.rx.set_rx_timeout(timeout)
-    }
-
-    /// Configures the RX-FIFO threshold
-    ///
-    /// # Errors
-    /// `Err(Error::InvalidArgument)` if provided value exceeds maximum value
-    /// for SOC :
-    /// - `esp32` **0x7F**
-    /// - `esp32c6`, `esp32h2` **0xFF**
-    /// - `esp32c3`, `esp32c2`, `esp32s2` **0x1FF**
-    /// - `esp32s3` **0x3FF**
-    pub fn set_rx_fifo_full_threshold(&mut self, threshold: u16) -> Result<(), Error> {
-        self.rx.set_rx_fifo_full_threshold(threshold)
-    }
-
     /// Listen for AT-CMD interrupts
     pub fn listen_at_cmd(&mut self) {
         T::register_block()
@@ -1003,7 +969,7 @@ where
     }
 
     /// Flush the transmit buffer of the UART
-    pub fn flush_tx(&self) -> nb::Result<(), Error> {
+    pub fn flush_tx(&mut self) -> nb::Result<(), Error> {
         self.tx.flush_tx()
     }
 
