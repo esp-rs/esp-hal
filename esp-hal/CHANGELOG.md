@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- uart: Added `with_cts`/`with_rts`s methods to configure CTS, and RTS pins (#1592)
+- uart: Constructors now require TX and RX pins (#1592)
+- uart: Added `Uart::new_with_default_pins` constructor (#1592)
+- uart: Added `UartTx` and `UartRx` constructors (#1592)
 
 - Add Flex / AnyFlex GPIO pin driver (#1659)
 
@@ -18,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactor `Dac1`/`Dac2` drivers into a single `Dac` driver (#1661)
 
 ### Removed
+- uart: Removed `configure_pins` methods (#1592)
 
 ## [0.18.0] - 2024-06-04
 

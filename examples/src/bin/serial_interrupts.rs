@@ -13,14 +13,14 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    default_uart0_pins,
     delay::Delay,
-    gpio,
+    gpio::Io,
     peripherals::{Peripherals, UART0},
     prelude::*,
     system::SystemControl,
     uart::{
         config::{AtCmdConfig, Config},
-        TxRxPins,
         Uart,
     },
     Blocking,
@@ -36,17 +36,26 @@ fn main() -> ! {
 
     let delay = Delay::new(&clocks);
 
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+
+    // Default pins for Uart/Serial communication
+    let (tx_pin, rx_pin) = default_uart0_pins!(io);
+
+    let config = Config::default();
+    config.rx_fifo_full_threshold(30);
+
     let mut uart0 = Uart::new_with_config(
         peripherals.UART0,
-        Config::default(),
-        None::<TxRxPins<gpio::NoPinType, gpio::NoPinType>>,
+        config,
         &clocks,
         Some(interrupt_handler),
-    );
+        tx_pin,
+        rx_pin,
+    )
+    .unwrap();
 
     critical_section::with(|cs| {
         uart0.set_at_cmd(AtCmdConfig::new(None, None, None, b'#', None));
-        uart0.set_rx_fifo_full_threshold(30).unwrap();
         uart0.listen_at_cmd();
         uart0.listen_rx_fifo_full();
 

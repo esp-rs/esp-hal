@@ -17,7 +17,9 @@ use core::fmt::Write;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    default_uart0_pins,
     delay::Delay,
+    gpio::Io,
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
@@ -32,7 +34,13 @@ fn main() -> ! {
 
     let delay = Delay::new(&clocks);
 
-    let mut uart0 = Uart::new(peripherals.UART0, &clocks);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+
+    // Default pins for Uart/Serial communication
+    let (mut tx_pin, mut rx_pin) = default_uart0_pins!(io);
+
+    let mut uart0 =
+        Uart::new_with_default_pins(peripherals.UART0, &clocks, &mut tx_pin, &mut rx_pin).unwrap();
 
     loop {
         writeln!(uart0, "Hello world!").unwrap();

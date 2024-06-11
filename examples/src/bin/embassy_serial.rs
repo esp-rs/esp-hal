@@ -14,11 +14,18 @@ use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    default_uart0_pins,
+    gpio::Io,
     peripherals::{Peripherals, UART0},
     prelude::*,
     system::SystemControl,
     timer::timg::TimerGroup,
-    uart::{config::AtCmdConfig, Uart, UartRx, UartTx},
+    uart::{
+        config::{AtCmdConfig, Config},
+        Uart,
+        UartRx,
+        UartTx,
+    },
     Async,
 };
 use static_cell::StaticCell;
@@ -82,11 +89,18 @@ async fn main(spawner: Spawner) {
     let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     esp_hal_embassy::init(&clocks, timg0);
 
-    let mut uart0 = Uart::new_async(peripherals.UART0, &clocks);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+
+    // Default pins for Uart/Serial communication
+    let (tx_pin, rx_pin) = default_uart0_pins!(io);
+
+    let config = Config::default();
+    config.rx_fifo_full_threshold(READ_BUF_SIZE as u16);
+
+    let mut uart0 =
+        Uart::new_async_with_config(peripherals.UART0, config, &clocks, tx_pin, rx_pin).unwrap();
     uart0.set_at_cmd(AtCmdConfig::new(None, None, None, AT_CMD, None));
-    uart0
-        .set_rx_fifo_full_threshold(READ_BUF_SIZE as u16)
-        .unwrap();
+
     let (tx, rx) = uart0.split();
 
     static SIGNAL: StaticCell<Signal<NoopRawMutex, usize>> = StaticCell::new();

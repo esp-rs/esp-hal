@@ -1,4 +1,4 @@
-//! UART Test
+//! UART TX/RX Test
 //!
 //! Folowing pins are used:
 //! TX    GPIP2
@@ -16,14 +16,17 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     gpio::Io,
-    peripherals::{Peripherals, UART0},
+    peripherals::{Peripherals, UART0, UART1},
+    prelude::*,
     system::SystemControl,
-    uart::Uart,
-    Async,
+    uart::{UartRx, UartTx},
+    Blocking,
 };
+use nb::block;
 
 struct Context {
-    uart: Uart<'static, UART0, Async>,
+    tx: UartTx<'static, UART0, Blocking>,
+    rx: UartRx<'static, UART1, Blocking>,
 }
 
 impl Context {
@@ -31,38 +34,37 @@ impl Context {
         let peripherals = Peripherals::take();
         let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let uart =
-            Uart::new_async(peripherals.UART0, &clocks, io.pins.gpio2, io.pins.gpio4).unwrap();
+        let tx = UartTx::new(peripherals.UART0, &clocks, None, io.pins.gpio2).unwrap();
+        let rx = UartRx::new(peripherals.UART1, &clocks, None, io.pins.gpio4).unwrap();
 
-        Context { uart }
+        Context { tx, rx }
     }
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests]
 mod tests {
     use defmt::assert_eq;
 
     use super::*;
 
     #[init]
-    async fn init() -> Context {
+    fn init() -> Context {
         Context::init()
     }
 
     #[test]
     #[timeout(3)]
-    async fn test_send_receive(mut ctx: Context) {
-        const SEND: &[u8] = &*b"Hello ESP32";
-        let mut buf = [0u8; SEND.len()];
+    fn test_send_receive(mut ctx: Context) {
+        let byte = [0x42];
 
-        ctx.uart.flush_async().await.unwrap();
-        ctx.uart.write_async(&SEND).await.unwrap();
-        ctx.uart.flush_async().await.unwrap();
+        ctx.tx.flush_tx().unwrap();
+        ctx.tx.write_bytes(&byte).unwrap();
+        let read = block!(ctx.rx.read_byte());
 
-        ctx.uart.read_async(&mut buf[..]).await.unwrap();
-        assert_eq!(&buf[..], SEND);
+        assert_eq!(read, Ok(0x42));
     }
 }

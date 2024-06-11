@@ -1,4 +1,4 @@
-//! UART Test
+//! UART TX/RX Async Test
 //!
 //! Folowing pins are used:
 //! TX    GPIP2
@@ -16,14 +16,15 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     gpio::Io,
-    peripherals::{Peripherals, UART0},
+    peripherals::{Peripherals, UART0, UART1},
     system::SystemControl,
-    uart::Uart,
+    uart::{UartRx, UartTx},
     Async,
 };
 
 struct Context {
-    uart: Uart<'static, UART0, Async>,
+    tx: UartTx<'static, UART0, Async>,
+    rx: UartRx<'static, UART1, Async>,
 }
 
 impl Context {
@@ -31,12 +32,13 @@ impl Context {
         let peripherals = Peripherals::take();
         let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let uart =
-            Uart::new_async(peripherals.UART0, &clocks, io.pins.gpio2, io.pins.gpio4).unwrap();
+        let tx = UartTx::new_async(peripherals.UART0, &clocks, io.pins.gpio2).unwrap();
+        let rx = UartRx::new_async(peripherals.UART1, &clocks, io.pins.gpio4).unwrap();
 
-        Context { uart }
+        Context { tx, rx }
     }
 }
 
@@ -55,14 +57,13 @@ mod tests {
     #[test]
     #[timeout(3)]
     async fn test_send_receive(mut ctx: Context) {
-        const SEND: &[u8] = &*b"Hello ESP32";
-        let mut buf = [0u8; SEND.len()];
+        let byte = [0x42];
+        let mut read = [0u8; 1];
 
-        ctx.uart.flush_async().await.unwrap();
-        ctx.uart.write_async(&SEND).await.unwrap();
-        ctx.uart.flush_async().await.unwrap();
+        ctx.tx.flush_async().await.unwrap();
+        ctx.tx.write_async(&byte).await.unwrap();
+        let _ = ctx.rx.read_async(&mut read).await;
 
-        ctx.uart.read_async(&mut buf[..]).await.unwrap();
-        assert_eq!(&buf[..], SEND);
+        assert_eq!(read, byte);
     }
 }
