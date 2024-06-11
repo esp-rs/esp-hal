@@ -116,7 +116,7 @@ use crate::soc::constants::RC_FAST_CLK;
 #[cfg(any(esp32, esp32s2))]
 use crate::soc::constants::REF_TICK;
 
-// Default pins for Uart/Serial communication
+// Default TX and RX pins for Uart/Serial communication (UART0)
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
         pub type DefaultTxPin = crate::gpio::Gpio1;
@@ -140,6 +140,42 @@ cfg_if::cfg_if! {
         pub type DefaultTxPin = crate::gpio::Gpio43;
         pub type DefaultRxPin = crate::gpio::Gpio44;
     }
+}
+
+/// Returns the default TX and RX pins for Uart/Serial communication (UART0)
+#[macro_export]
+macro_rules! default_uart0_pins {
+    ($io:expr) => {{
+        let io = $io;
+        #[cfg(feature = "esp32")]
+        {
+            (io.pins.gpio1, io.pins.gpio3)
+        }
+        #[cfg(feature = "esp32c2")]
+        {
+            (io.pins.gpio20, io.pins.gpio19)
+        }
+        #[cfg(feature = "esp32c3")]
+        {
+            (io.pins.gpio21, io.pins.gpio20)
+        }
+        #[cfg(feature = "esp32c6")]
+        {
+            (io.pins.gpio16, io.pins.gpio17)
+        }
+        #[cfg(feature = "esp32h2")]
+        {
+            (io.pins.gpio24, io.pins.gpio23)
+        }
+        #[cfg(feature = "esp32s2")]
+        {
+            (io.pins.gpio43, io.pins.gpio44)
+        }
+        #[cfg(feature = "esp32s3")]
+        {
+            (io.pins.gpio43, io.pins.gpio44)
+        }
+    }};
 }
 
 /// UART Error
