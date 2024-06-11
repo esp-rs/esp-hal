@@ -21,12 +21,13 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use core::option::Option::Some;
-//! # use esp_hal::uart::{config::Config, TxRxPins, Uart};
+//! # use esp_hal::uart::{config::Config, Uart};
 //! use esp_hal::gpio::Io;
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
 //! let mut uart1 = Uart::new(peripherals.UART1, &clocks, io.pins.gpio1,
-//! io.pins.gpio2).unwrap();
+//!     io.pins.gpio2).unwrap();
+//! # }
 //! ```
 //! 
 //! ## Usage
@@ -46,17 +47,17 @@
 //! #### Sending and Receiving Data
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{config::Config, TxRxPins, Uart};
+//! # use esp_hal::uart::{config::Config, Uart};
 //! use esp_hal::gpio::Io;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! # let pins = TxRxPins::new_tx_rx(io.pins.gpio1, io.pins.gpio2);
 //! # let mut uart1 = Uart::new_with_config(
 //! #     peripherals.UART1,
 //! #     Config::default(),
-//! #     Some(pins),
 //! #     &clocks,
 //! #     None,
-//! # );
+//! #     io.pins.gpio1,
+//! #     io.pins.gpio2,
+//! # ).unwrap();
 //! // Write bytes out over the UART:
 //! uart1.write_bytes("Hello, world!".as_bytes()).expect("write error!");
 //! # }
@@ -65,17 +66,17 @@
 //! #### Splitting the UART into TX and RX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{config::Config, TxRxPins, Uart};
+//! # use esp_hal::uart::{config::Config, Uart};
 //! use esp_hal::gpio::Io;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! # let pins = TxRxPins::new_tx_rx(io.pins.gpio1, io.pins.gpio2);
 //! # let mut uart1 = Uart::new_with_config(
 //! #     peripherals.UART1,
 //! #     Config::default(),
-//! #     Some(pins),
 //! #     &clocks,
 //! #     None,
-//! # );
+//! #     io.pins.gpio1,
+//! #     io.pins.gpio2,
+//! # ).unwrap();
 //! // The UART can be split into separate Transmit and Receive components:
 //! let (mut tx, mut rx) = uart1.split();
 //!

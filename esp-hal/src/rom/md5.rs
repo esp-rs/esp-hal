@@ -32,9 +32,11 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::rom::md5;
 //! # use esp_hal::uart::Uart;
+//! # use esp_hal::gpio::Io;
 //! # use core::writeln;
 //! # use core::fmt::Write;
-//! # let mut uart0 = Uart::new(peripherals.UART0, &clocks);
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! # let mut uart0 = Uart::new(peripherals.UART0, &clocks, io.pins.gpio1, io.pins.gpio2).unwrap();
 //! # let data = "Dummy";
 //! let d: md5::Digest = md5::compute(&data);
 //! writeln!(uart0, "{}", d);
@@ -46,9 +48,11 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::rom::md5;
 //! # use esp_hal::uart::Uart;
+//! # use esp_hal::gpio::Io;
 //! # use core::writeln;
 //! # use core::fmt::Write;
-//! # let mut uart0 = Uart::new(peripherals.UART0, &clocks);
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! # let mut uart0 = Uart::new(peripherals.UART0, &clocks, io.pins.gpio1, io.pins.gpio2).unwrap();
 //! # let data0 = "Dummy";
 //! # let data1 = "Dummy";
 //! let mut ctx = md5::Context::new();
