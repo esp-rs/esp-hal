@@ -526,6 +526,7 @@ unsafe extern "C" fn stack_chk_fail() {
     panic!("Stack corruption detected");
 }
 
+#[doc(hidden)]
 /// Helper macro for checking doctest code snippets
 #[cfg(not(host_os = "windows"))]
 #[macro_export]
@@ -535,6 +536,7 @@ macro_rules! before_snippet {
     };
 }
 
+#[doc(hidden)]
 /// Helper macro for checking doctest code snippets
 #[cfg(host_os = "windows")]
 #[macro_export]

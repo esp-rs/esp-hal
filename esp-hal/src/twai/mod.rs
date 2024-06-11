@@ -64,28 +64,6 @@
 //!     // Wait for a frame to be received.
 //!     let frame = block!(can.receive()).unwrap();
 //!
-//!     /*
-//!     println!("Received a frame:");
-//!
-//!     // Print different messages based on the frame id type.
-//!     match frame.id() {
-//!         Id::Standard(id) => {
-//!             println!("\tStandard Id: {:?}", id);
-//!         }
-//!         Id::Extended(id) => {
-//!             println!("\tExtended Id: {:?}", id);
-//!         }
-//!     }
-//!
-//!     // Print out the frame data or the requested data length code for a
-//! remote     // transmission request frame.
-//!     if frame.is_data_frame() {
-//!         println!("\tData: {:?}", frame.data());
-//!     } else {
-//!         println!("\tRemote Frame. Data Length Code: {}", frame.dlc());
-//!     }
-//!     */
-//!
 //!     // Transmit the frame back.
 //!     let _result = block!(can.transmit(&frame)).unwrap();
 //! }
