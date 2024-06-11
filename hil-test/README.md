@@ -90,7 +90,7 @@ Our Virtual Machines have the following setup:
 # Install Rust:
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y --profile minimal
 # Source the current shell:
-source "$HOME/.cargo/env"
+. "$HOME/.cargo/env"
 # Install dependencies
 sudo apt install -y pkg-config libudev-dev
 # Install probe-rs
