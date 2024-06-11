@@ -11,13 +11,16 @@
 //! affected by many factors, including interrupt usage.
 //!
 //! ## Example
-//! ```no_run
-//! let mut clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::delay::Delay;
+//! # use embedded_hal::delay::DelayNs;
 //! let mut delay = Delay::new(&clocks);
 //!
 //! delay.delay_ms(1000 as u32);
+//! # }
 //! ```
-//!
+//! 
 //! [DelayMs]: embedded_hal_02::blocking::delay::DelayMs
 //! [DelayUs]: embedded_hal_02::blocking::delay::DelayUs
 //! [embedded-hal]: https://docs.rs/embedded-hal/0.2.7/embedded_hal/index.html

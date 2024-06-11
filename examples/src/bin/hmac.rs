@@ -89,7 +89,6 @@ fn main() -> ! {
 
     let mut src = [0_u8; 1024];
     rng.read(src.as_mut_slice());
-    // println!("HMAC input {:02X?}", src);
 
     let mut output = [0u8; 32];
 

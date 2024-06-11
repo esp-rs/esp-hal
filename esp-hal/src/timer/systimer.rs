@@ -17,18 +17,59 @@
 //!
 //! #### General-purpose Timer
 //!
-//! ```no_run
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::timer::systimer::SystemTimer;
+//! # use esp_hal::timer::timg::{TimerGroup, TimerInterrupts};
+//! # use crate::esp_hal::prelude::_esp_hal_timer_Timer;
+//! # use esp_hal::prelude::*;
 //! let systimer = SystemTimer::new(peripherals.SYSTIMER);
 //!
 //! // Get the current timestamp, in microseconds:
-//! let now = systimer.now();
+//! let now = SystemTimer::now();
+//!
+//! let timg0 = TimerGroup::new(
+//!     peripherals.TIMG0,
+//!     &clocks,
+//!     Some(TimerInterrupts {
+//!         timer0_t0: Some(tg0_t0_level),
+//!         ..Default::default()
+//!     }),
+//! );
+//!
+//! # let timer0 = timg0.timer0;
 //!
 //! // Wait for timeout:
-//! systimer.load_value(1.secs());
-//! systimer.start();
+//! timer0.load_value(1.secs());
+//! timer0.start();
 //!
-//! while !systimer.is_interrupt_set() {
+//! while !timer0.is_interrupt_set() {
 //!     // Wait
+//! }
+//! # }
+//!
+//!
+//! # use core::cell::RefCell;
+//! # use critical_section::Mutex;
+//! # use procmacros::handler;
+//! # use esp_hal::interrupt::InterruptHandler;
+//! # use esp_hal::interrupt;
+//! # use esp_hal::peripherals::TIMG0;
+//! # use esp_hal::timer::timg::{Timer, Timer0};
+//! # use crate::esp_hal::prelude::_esp_hal_timer_Timer;
+//! # static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0>, esp_hal::Blocking>>>> = Mutex::new(RefCell::new(None));
+//! #[handler]
+//! fn tg0_t0_level() {
+//!     critical_section::with(|cs| {
+//!     let mut timer0 = TIMER0.borrow_ref_mut(cs);
+//!     let timer0 = timer0.as_mut().unwrap();
+//!     
+//!     timer0.clear_interrupt();
+//!     
+//!     // Counter value should be a very small number as the alarm triggered a
+//!     // counter reload to 0 and ETM stopped the counter quickly after
+//!     // esp_println::println!("counter in interrupt: {}", timer0.now());
+//!     });
 //! }
 //! ```
 
@@ -662,12 +703,16 @@ pub mod etm {
     //!      COMPx
     //!
     //! ## Example
-    //! ```no_run
+    //! ```rust, no_run
+    #![doc = crate::before_snippet!()]
+    //! # use esp_hal::timer::systimer::{etm::SysTimerEtmEvent, SystemTimer};
+    //! # use fugit::ExtU32;
     //! let syst = SystemTimer::new(peripherals.SYSTIMER);
     //! let mut alarm0 = syst.alarm0.into_periodic();
     //! alarm0.set_period(1.secs());
     //!
     //! let timer_event = SysTimerEtmEvent::new(&mut alarm0);
+    //! # }
     //! ```
 
     use super::*;

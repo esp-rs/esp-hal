@@ -23,7 +23,7 @@ macro_rules! heap_allocator {
 /// and the psram module path.
 ///
 /// # Usage
-/// ```no_run
+/// ```rust, no_run
 /// esp_alloc::psram_allocator!(peripherals.PSRAM, hal::psram);
 /// ```
 #[macro_export]

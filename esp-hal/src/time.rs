@@ -1,8 +1,11 @@
 //! The `time` module offers a way to get the system uptime.
 //!
 //! ### Example
-//! ```no_run
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::time;
 //! let time = time::current_time();
+//! # }
 //! ```
 #![warn(missing_docs)]
 

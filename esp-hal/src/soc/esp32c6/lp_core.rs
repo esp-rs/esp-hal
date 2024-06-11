@@ -13,30 +13,11 @@
 //!
 //! The `run` method starts the low power core and specifies the wakeup source.
 //!
-//! ## Example
-//! ```no_run
-//! // configure GPIO 1 as LP output pin
-//! let lp_pin = LowPowerOutput::new(io.pins.gpio1);
+//! ⚠️: The examples for LP Core are quite extensive, so for a more
+//! detailed study of how to use this LP Core please visit [the repository
+//! with corresponding example].
 //!
-//! let mut lp_core = esp_hal::lp_core::LpCore::new(peripherals.LP_CORE);
-//! lp_core.stop();
-//! println!("lp core stopped");
-//!
-//! // load code to LP core
-//! let lp_core_code =
-//!     load_lp_code!("../esp-lp-hal/target/riscv32imac-unknown-none-elf/release/examples/blinky");
-//!
-//! // start LP core
-//! lp_core.run(lp_core::LpCoreWakeupSource::HpCpu);
-//! println!("lpcore run");
-//!
-//! let data = (0x5000_2000) as *mut u32;
-//! loop {
-//!     print!("Current {:x}           \u{000d}", unsafe {
-//!         data.read_volatile()
-//!     });
-//! }
-//! ```
+//! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/lp_core_basic.rs
 
 use esp32c6 as pac;
 

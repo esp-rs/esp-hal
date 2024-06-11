@@ -15,11 +15,14 @@
 //! designed struct from the pac struct `GPIO` and `IO_MUX` using `Io::new`.
 //!
 //! ## Example
-//! ```no_run
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::gpio::{Io, Level, Output};
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let mut led = Output::new(io.pins.gpio5);
+//! let mut led = Output::new(io.pins.gpio5, Level::High);
+//! # }
 //! ```
-//!
+//! 
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 #![warn(missing_docs)]
 

@@ -9,8 +9,22 @@
 //! The following will configure the Low Speed Channel0 to 24kHz output with
 //! 10% duty using the ABPClock
 //!
-//! ```no_run
-//! let mut ledc = Ledc::new(peripherals.LEDC, &clock_control);
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::ledc::Ledc;
+//! # use esp_hal::ledc::LSGlobalClkSource;
+//! # use esp_hal::ledc::timer;
+//! # use esp_hal::ledc::LowSpeed;
+//! # use esp_hal::ledc::channel;
+//! # use esp_hal::gpio::Io;
+//! # use crate::esp_hal::prelude::_esp_hal_ledc_timer_TimerIFace;
+//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
+//! # use crate::esp_hal::prelude::_esp_hal_ledc_channel_ChannelIFace;
+//!
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! # let led = io.pins.gpio0;
+//!
+//! let mut ledc = Ledc::new(peripherals.LEDC, &clocks);
 //! ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
 //!
 //! let mut lstimer0 = ledc.get_timer::<LowSpeed>(timer::Number::Timer0);
@@ -26,37 +40,13 @@
 //! channel0
 //!     .configure(channel::config::Config {
 //!         timer: &lstimer0,
-//!         duty: 10,
+//!         duty_pct: 10,
+//!         pin_config: channel::config::PinConfig::PushPull,
 //!     })
 //!     .unwrap();
+//! # }
 //! ```
-//!
-//! # HighSpeed Example (ESP32 only):
-//!
-//! The following will configure the High Speed Channel0 to 24kHz output with
-//! 10% duty using the ABPClock
-//!
-//! ```no_run
-//! let ledc = Ledc::new(peripherals.LEDC, &clock_control);
-//!
-//! let mut hstimer0 = ledc.get_timer::<HighSpeed>(timer::Number::Timer0);
-//! hstimer0
-//!     .configure(timer::config::Config {
-//!         duty: timer::config::Duty::Duty5Bit,
-//!         clock_source: timer::HSClockSource::APBClk,
-//!         frequency: 24.kHz(),
-//!     })
-//!     .unwrap();
-//!
-//! let mut channel0 = ledc.get_channel(channel::Number::Channel0, led);
-//! channel0
-//!     .configure(channel::config::Config {
-//!         timer: &hstimer0,
-//!         duty: 10,
-//!     })
-//!     .unwrap();
-//! ```
-//!
+//! 
 //! # Unsupported
 //! - Source clock selection
 //! - Interrupts

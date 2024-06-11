@@ -7,23 +7,28 @@
 //! [`Spi::new`].
 //!
 //! ## Example
-//! ```rust
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let sclk = io.pins.gpio12;
-//! let miso = io.pins.gpio11;
-//! let mosi = io.pins.gpio13;
-//! let cs = io.pins.gpio10;
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
+//! # use esp_hal::spi::SpiMode;
+//! # use esp_hal::spi::master::Spi;
+//! # use esp_hal::gpio::Io;
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let sclk = io.pins.gpio0;
+//! let miso = io.pins.gpio2;
+//! let mosi = io.pins.gpio1;
+//! let cs = io.pins.gpio5;
 //!
-//! let mut spi = hal::spi::Spi::new(
+//! let mut spi = Spi::new(
 //!     peripherals.SPI2,
 //!     100.kHz(),
 //!     SpiMode::Mode0,
-//!     &mut peripheral_clock_control,
 //!     &mut clocks,
 //! )
 //! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs));
+//! # }
 //! ```
-//!
+//! 
 //! ## Exclusive access to the SPI bus
 //!
 //! If all you want to do is to communicate to a single device, and you initiate

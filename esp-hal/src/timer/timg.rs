@@ -20,8 +20,12 @@
 //!
 //! #### General-purpose Timer
 //!
-//! ```no_run
-//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::timer::timg::TimerGroup;
+//! # use crate::esp_hal::prelude::_esp_hal_timer_Timer;
+//! # use esp_hal::prelude::*;
+//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
 //! let timer0 = timg0.timer0;
 //!
 //! // Get the current timestamp, in microseconds:
@@ -34,12 +38,15 @@
 //! while !timer0.is_interrupt_set() {
 //!     // Wait
 //! }
+//! # }
 //! ```
-//!
+//! 
 //! #### Watchdog Timer
-//!
-//! ```no_run
-//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::timer::timg::TimerGroup;
+//! # use esp_hal::prelude::*;
+//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
 //! let mut wdt = timg0.wdt;
 //!
 //! wdt.set_timeout(5_000.millis());
@@ -48,6 +55,7 @@
 //! loop {
 //!     wdt.feed();
 //! }
+//! # }
 //! ```
 
 use core::{

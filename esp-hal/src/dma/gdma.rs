@@ -18,10 +18,6 @@
 //! GDMA peripheral can be initializes using the `new` function, which requires
 //! a DMA peripheral instance and a clock control reference.
 //!
-//! ```no_run
-//! let dma = Gdma::new(peripherals.DMA);
-//! ```
-//!
 //! <em>PS: Note that the number of DMA channels is chip-specific.</em>
 
 use crate::{

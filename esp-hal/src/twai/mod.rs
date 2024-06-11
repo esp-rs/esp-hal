@@ -17,14 +17,26 @@
 //! Format (29-bit) frame identifiers.
 //!
 //! ## Example
-//! ```no_run
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::twai;
+//! # use embedded_can::Id;
+//! # use esp_hal::twai::filter::SingleStandardFilter;
+//! # use esp_hal::twai::filter;
+//! # use esp_hal::twai::TwaiConfiguration;
+//! # use esp_hal::twai::BaudRate;
+//! # use esp_hal::gpio::Io;
+//! # use embedded_can::Frame;
+//! # use core::option::Option::None;
+//! # use nb::block;
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the CAN
 //! // transceiver.
 //! let can_tx_pin = io.pins.gpio2;
 //! let can_rx_pin = io.pins.gpio3;
 //!
 //! // The speed of the CAN bus.
-//! const CAN_BAUDRATE: twai::BaudRate = twai::BaudRate::B1000K;
+//! const CAN_BAUDRATE: twai::BaudRate = BaudRate::B1000K;
 //!
 //! // Begin configuring the TWAI peripheral. The peripheral is in a reset like
 //! // state that prevents transmission but allows configuration.
@@ -37,43 +49,25 @@
 //!     None,
 //! );
 //!
-//! // Partially filter the incoming messages to reduce overhead of receiving undesired messages
+//! // Partially filter the incoming messages to reduce overhead of receiving
+//! // undesired messages
 //! const FILTER: twai::filter::SingleStandardFilter =
-//!     twai::filter::SingleStandardFilter::new(b"xxxxxxxxxx0", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
-//! can_config.set_filter(FILTER);
+//!     SingleStandardFilter::new(b"xxxxxxxxxx0", b"x", [b"xxxxxxxx",
+//! b"xxxxxxxx"]); can_config.set_filter(FILTER);
 //!
-//! // Start the peripheral. This locks the configuration settings of the peripheral
-//! // and puts it into operation mode, allowing packets to be sent and
-//! // received.
+//! // Start the peripheral. This locks the configuration settings of the
+//! // peripheral and puts it into operation mode, allowing packets to be sent
+//! // and received.
 //! let mut can = can_config.start();
 //!
 //! loop {
 //!     // Wait for a frame to be received.
 //!     let frame = block!(can.receive()).unwrap();
 //!
-//!     println!("Received a frame:");
-//!
-//!     // Print different messages based on the frame id type.
-//!     match frame.id() {
-//!         Id::Standard(id) => {
-//!             println!("\tStandard Id: {:?}", id);
-//!         }
-//!         Id::Extended(id) => {
-//!             println!("\tExtended Id: {:?}", id);
-//!         }
-//!     }
-//!
-//!     // Print out the frame data or the requested data length code for a remote
-//!     // transmission request frame.
-//!     if frame.is_data_frame() {
-//!         println!("\tData: {:?}", frame.data());
-//!     } else {
-//!         println!("\tRemote Frame. Data Length Code: {}", frame.dlc());
-//!     }
-//!
 //!     // Transmit the frame back.
 //!     let _result = block!(can.transmit(&frame)).unwrap();
 //! }
+//! # }
 //! ```
 
 use core::marker::PhantomData;

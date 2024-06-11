@@ -38,6 +38,8 @@ enum Cli {
     GenerateEfuseFields(GenerateEfuseFieldsArgs),
     /// Lint all packages in the workspace with clippy
     LintPackages(LintPackagesArgs),
+    /// Run doctests for specified chip and package.
+    RunDocTest(ExampleArgs),
     /// Run the given example for the specified chip.
     RunExample(ExampleArgs),
     /// Run all applicable tests or the specified test for a specified chip.
@@ -155,6 +157,7 @@ fn main() -> Result<()> {
         Cli::FmtPackages(args) => fmt_packages(&workspace, args),
         Cli::GenerateEfuseFields(args) => generate_efuse_src(&workspace, args),
         Cli::LintPackages(args) => lint_packages(&workspace, args),
+        Cli::RunDocTest(args) => run_doctests(&workspace, args),
         Cli::RunElfs(args) => run_elfs(args),
         Cli::RunExample(args) => examples(&workspace, args, CargoAction::Run),
         Cli::RunTests(args) => tests(&workspace, args, CargoAction::Run),
@@ -603,6 +606,33 @@ fn run_elfs(args: RunElfArgs) -> Result<()> {
     if !failed.is_empty() {
         bail!("Failed tests: {:?}", failed);
     }
+
+    Ok(())
+}
+
+fn run_doctests(workspace: &Path, args: ExampleArgs) -> Result<()> {
+    let package_name = args.package.to_string();
+    let package_path = xtask::windows_safe_path(&workspace.join(&package_name));
+
+    // Determine the appropriate build target for the given package and chip:
+    let target = target_triple(&args.package, &args.chip)?;
+    let features = vec![args.chip.to_string()];
+
+    // Build up an array of command-line arguments to pass to `cargo`:
+    let builder = CargoArgsBuilder::default()
+        .subcommand("test")
+        .arg("--doc")
+        .arg("-Zdoctest-xcompile")
+        .arg("-Zbuild-std=core,panic_abort")
+        .target(target)
+        .features(&features)
+        .arg("--release");
+
+    let args = builder.build();
+    log::debug!("{args:#?}");
+
+    // Execute `cargo doc` from the package root:
+    xtask::cargo::run(&args, &package_path)?;
 
     Ok(())
 }

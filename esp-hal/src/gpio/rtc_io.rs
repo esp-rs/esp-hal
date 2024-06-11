@@ -14,7 +14,7 @@
 //! chip from Deep-sleep.
 //!
 //! # Example
-//! ```no_run
+//! ```rust, ignore
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // configure GPIO 1 as ULP output pin
 //! let lp_pin = LowPowerOutput::new(io.pins.gpio1);

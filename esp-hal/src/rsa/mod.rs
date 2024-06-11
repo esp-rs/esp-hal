@@ -19,38 +19,6 @@
 //!      cryptographic operations on `ESP` chips, allowing developers to
 //!      leverage the `RSA accelerator` for improved performance.
 //!
-//! ## Examples
-//! ### Initialization
-//! ```no_run
-//! let peripherals = Peripherals::take();
-//!
-//! let mut rsa = Rsa::new(peripherals.RSA, None);
-//! ```
-//!
-//! ### Async (modular exponentiation)
-//! ```no_run
-//! #[embassy_executor::task]
-//! async fn mod_exp_example(mut rsa: Rsa<'static>) {
-//!     let mut outbuf = [0_u32; U512::LIMBS];
-//!     let mut mod_exp = RsaModularExponentiation::<operand_sizes::Op512>::new(
-//!         &mut rsa,
-//!         BIGNUM_2.as_words(),
-//!         BIGNUM_3.as_words(),
-//!         compute_mprime(&BIGNUM_3),
-//!     );
-//!     let r = compute_r(&BIGNUM_3);
-//!     let base = &BIGNUM_1.as_words();
-//!     mod_exp
-//!         .exponentiation(base, r.as_words(), &mut outbuf)
-//!         .await;
-//!     let residue_params = DynResidueParams::new(&BIGNUM_3);
-//!     let residue = DynResidue::new(&BIGNUM_1, residue_params);
-//!     let sw_out = residue.pow(&BIGNUM_2);
-//!     assert_eq!(U512::from_words(outbuf), sw_out.retrieve());
-//!     println!("modular exponentiation done");
-//! }
-//! ```
-
 //! This peripheral supports `async` on every available chip except of `esp32`
 //! (to be solved).
 //!
@@ -59,7 +27,7 @@
 //! with corresponding example].
 //!
 //! [nb]: https://docs.rs/nb/1.1.0/nb/
-//! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/esp32-hal/examples/rsa.rs
+//! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/rsa.rs
 
 use core::{marker::PhantomData, ptr::copy_nonoverlapping};
 

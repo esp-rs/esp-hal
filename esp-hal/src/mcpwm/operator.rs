@@ -480,17 +480,34 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
 /// configured deadtime.
 ///
 /// # H-Bridge example
-/// ```no_run
+/// ```rust, no_run
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))]
+/// # use esp_hal::{mcpwm, prelude::*};
+/// # use esp_hal::mcpwm::{McPwm, PeripheralClockConfig};
+/// # use esp_hal::mcpwm::operator::{DeadTimeCfg, PwmPinConfig, PWMStream};
+/// # use esp_hal::gpio::Io;
+/// # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 /// // active high complementary using PWMA input
 /// let bridge_active = DeadTimeCfg::new_ahc();
 /// // use PWMB as input for both outputs
-/// let bridge_off = DeadTimeCfg::new_bypass().set_output_swap(PWMStream::PWMA, true);
+/// let bridge_off = DeadTimeCfg::new_bypass().set_output_swap(PWMStream::PWMA,
+/// true);
+#[cfg_attr(
+    esp32h2,
+    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40.MHz()).unwrap();"
+)]
+#[cfg_attr(
+    not(esp32h2),
+    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 32.MHz()).unwrap();"
+)]
+/// let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
+///
 /// let mut pins = mcpwm.operator0.with_linked_pins(
-///     pin_a,
+///     io.pins.gpio0,
 ///     PwmPinConfig::UP_DOWN_ACTIVE_HIGH, // use PWMA as our main input
-///     pin_b,
+///     io.pins.gpio1,
 ///     PwmPinConfig::EMPTY, // keep PWMB "low"
-///     bride_off,
+///     bridge_off,
 /// );
 ///
 /// pins.set_falling_edge_deadtime(5);
@@ -501,6 +518,7 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
 /// pins.set_deadtime_cfg(bridge_active);
 /// // pin_a: _______-------_____________-------______
 /// // pin_b: ------_________-----------_________-----
+/// # }
 /// ```
 pub struct LinkedPins<'d, PinA, PinB, PWM, const OP: u8> {
     pin_a: PwmPin<'d, PinA, PWM, OP, true>,

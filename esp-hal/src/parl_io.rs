@@ -12,9 +12,25 @@
 //! ## Examples
 //!
 //! ### Initialization for TX
-//! ```no_run
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::gpio::Io;
+//! # use esp_hal::dma_buffers;
+//! # use esp_hal::dma::{Dma, DmaPriority};
+//! # use esp_hal::parl_io::{ClkOutPin, no_clk_pin, BitPackOrder, ParlIoTxOnly, SampleEdge, TxFourBits, TxPinConfigWithValidPin};
+//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
+//!
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//!
+//! # let dma = Dma::new(peripherals.DMA);
+//! # let dma_channel = dma.channel0;
+//!
+//! let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) =
+//! dma_buffers!(32000, 0); let buffer = tx_buffer;
+//!
 //! // configure the data pins to use
-//! let tx_pins = TxFourBits::new(io.pins.gpio1, io.pins.gpio2, io.pins.gpio3, io.pins.gpio4);
+//! let tx_pins = TxFourBits::new(io.pins.gpio1, io.pins.gpio2, io.pins.gpio3,
+//! io.pins.gpio4);
 //!
 //! // configure the valid pin which will be driven high during a TX transfer
 //! let mut pin_conf = TxPinConfigWithValidPin::new(tx_pins, io.pins.gpio5);
@@ -45,18 +61,32 @@
 //!         BitPackOrder::Msb,
 //!     )
 //!     .unwrap();
-//! ```
 //!
-//! ### Start TX transfer
-//! ```no_run
-//! let mut transfer = parl_io_tx.write_dma(buffer).unwrap();
+//! let mut transfer = parl_io_tx.write_dma(&buffer).unwrap();
 //!
 //! transfer.wait().unwrap();
+//! # }
 //! ```
-//!
+//! 
 //! ### Initialization for RX
-//! ```no_run
-//! let mut rx_pins = RxFourBits::new(io.pins.gpio1, io.pins.gpio2, io.pins.gpio3, io.pins.gpio4);
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::gpio::Io;
+//! # use esp_hal::dma_buffers;
+//! # use esp_hal::dma::{Dma, DmaPriority};
+//! # use esp_hal::parl_io::{no_clk_pin, BitPackOrder, ParlIoRxOnly, RxFourBits};
+//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
+//!
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//!
+//! # let dma = Dma::new(peripherals.DMA);
+//! # let dma_channel = dma.channel0;
+//!
+//! let mut rx_pins = RxFourBits::new(io.pins.gpio1, io.pins.gpio2,
+//! io.pins.gpio3, io.pins.gpio4);
+//!
+//! let (_, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(0,
+//! 32000); let mut buffer = rx_buffer;
 //!
 //! let parl_io = ParlIoRxOnly::new(
 //!     peripherals.PARL_IO,
@@ -75,13 +105,12 @@
 //!     .rx
 //!     .with_config(&mut rx_pins, no_clk_pin(), BitPackOrder::Msb, Some(0xfff))
 //!     .unwrap();
-//! ```
 //!
-//! ### Start RX transfer
-//! ```no_run
-//! let mut transfer = parl_io_rx.read_dma(buffer).unwrap();
+//! let mut transfer = parl_io_rx.read_dma(&mut buffer).unwrap();
 //! transfer.wait().unwrap();
+//! # }
 //! ```
+
 #![warn(missing_docs)]
 
 use core::marker::PhantomData;

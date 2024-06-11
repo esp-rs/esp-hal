@@ -5,7 +5,7 @@
 //!
 //! On chips with a PLIC CPU interrupts 1,2,5,6,9 .. 19 are used.
 //!
-//! ```rust
+//! ```rust, ignore
 //! interrupt1() => Priority::Priority1
 //! interrupt2() => Priority::Priority2
 //! ...

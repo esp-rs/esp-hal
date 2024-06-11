@@ -20,20 +20,6 @@
 //! The module also includes a `peripheral_macros` module, which contains macros
 //! for generating peripheral structs and associated traits based on
 //! configuration options.
-//!
-//! ## Examples
-//!
-//! ### Initialization
-//! ```no_run
-//! let peripherals = Peripherals::take();
-//! ```
-//! ### Accessing peripherals
-//! ```no_run
-//! let mut rtc = Rtc::new(peripherals.LPWR, None);
-//! ```
-//! ```no_run
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! ```
 
 use core::{
     marker::PhantomData,
@@ -139,7 +125,7 @@ impl<'a, T> DerefMut for PeripheralRef<'a, T> {
 ///
 /// For example, if you have a driver with a constructor like this:
 ///
-/// ```ignore
+/// ```rust, ignore
 /// impl<'d, T: Instance> Twim<'d, T> {
 ///     pub fn new(
 ///         twim: impl Peripheral<P = T> + 'd,
@@ -154,14 +140,14 @@ impl<'a, T> DerefMut for PeripheralRef<'a, T> {
 /// You may call it with owned peripherals, which yields an instance that can
 /// live forever (`'static`):
 ///
-/// ```ignore
+/// ```rust, ignore
 /// let mut twi: Twim<'static, ...> = Twim::new(p.TWISPI0, irq, p.P0_03, p.P0_04, config);
 /// ```
 ///
 /// Or you may call it with borrowed peripherals, which yields an instance that
 /// can only live for as long as the borrows last:
 ///
-/// ```ignore
+/// ```rust, ignore
 /// let mut twi: Twim<'_, ...> = Twim::new(&mut p.TWISPI0, &mut irq, &mut p.P0_03, &mut p.P0_04, config);
 /// ```
 ///

@@ -28,32 +28,37 @@
 //! if needed.
 //!
 //! ## Example
-//! ```no_run
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::sha::Sha;
+//! # use esp_hal::sha::ShaMode;
+//! # use core::option::Option::None;
+//! # use nb::block;
 //! let source_data = "HELLO, ESPRESSIF!".as_bytes();
 //! let mut remaining = source_data;
-//! let mut hasher = Sha::new(peripherals.SHA, ShaMode::SHA256);
-//!
-//! // Short hashes can be created by decreasing the output buffer to the desired
-//! // length
+#![cfg_attr(
+    not(esp32),
+    doc = "let mut hasher = Sha::new(peripherals.SHA, ShaMode::SHA256, None);"
+)]
+#![cfg_attr(
+    esp32,
+    doc = "let mut hasher = Sha::new(peripherals.SHA, ShaMode::SHA256);"
+)]
+//! // Short hashes can be created by decreasing the output buffer to the
+//! // desired length
 //! let mut output = [0u8; 32];
 //!
 //! while remaining.len() > 0 {
-//!     // All the HW Sha functions are infallible so unwrap is fine to use if you use
-//!     // block!
+//!     // All the HW Sha functions are infallible so unwrap is fine to use if
+//!     // you use block!
 //!     remaining = block!(hasher.update(remaining)).unwrap();
 //! }
 //!
-//! // Finish can be called as many times as desired to get multiple copies of the
-//! // output.
+//! // Finish can be called as many times as desired to get multiple copies of
+//! // the output.
 //! block!(hasher.finish(output.as_mut_slice())).unwrap();
 //!
-//! println!("SHA256 Hash output {:02x?}", output);
-//!
-//! let mut hasher = Sha256::new();
-//! hasher.update(source_data);
-//! let soft_result = hasher.finalize();
-//!
-//! println!("SHA256 Hash output {:02x?}", soft_result);
+//! # }
 //! ```
 
 use core::{convert::Infallible, marker::PhantomData};
