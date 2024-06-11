@@ -170,4 +170,101 @@ mod tests {
         transfer.wait().unwrap();
         assert_eq!(send, receive);
     }
+
+    #[test]
+    #[timeout(3)]
+    fn test_try_using_non_dma_memory_tx_buffer() {
+        const DMA_BUFFER_SIZE: usize = 4096;
+
+        let peripherals = Peripherals::take();
+        let system = SystemControl::new(peripherals.SYSTEM);
+        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let sclk = io.pins.gpio0;
+        let miso = io.pins.gpio2;
+        let mosi = io.pins.gpio4;
+        let cs = io.pins.gpio5;
+
+        let dma = Dma::new(peripherals.DMA);
+
+        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+        let dma_channel = dma.spi2channel;
+        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
+        let dma_channel = dma.channel0;
+
+        let (_, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
+
+        let tx_buffer = {
+            // using `static`, not `static mut`, places the array in .rodata
+            static TX_BUFFER: [u8; DMA_BUFFER_SIZE] = [42u8; DMA_BUFFER_SIZE];
+            unsafe { &mut *(core::ptr::addr_of!(TX_BUFFER) as *mut u8) }
+        };
+
+        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+            .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
+            .with_dma(dma_channel.configure(
+                false,
+                &mut tx_descriptors,
+                &mut rx_descriptors,
+                DmaPriority::Priority0,
+            ));
+
+        let mut receive = rx_buffer;
+
+        assert!(matches!(
+            spi.dma_transfer(&tx_buffer, &mut receive),
+            Err(esp_hal::spi::Error::DmaError(
+                esp_hal::dma::DmaError::UnsupportedMemoryRegion
+            ))
+        ));
+    }
+
+    #[test]
+    #[timeout(3)]
+    fn test_try_using_non_dma_memory_rx_buffer() {
+        const DMA_BUFFER_SIZE: usize = 4096;
+
+        let peripherals = Peripherals::take();
+        let system = SystemControl::new(peripherals.SYSTEM);
+        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let sclk = io.pins.gpio0;
+        let miso = io.pins.gpio2;
+        let mosi = io.pins.gpio4;
+        let cs = io.pins.gpio5;
+
+        let dma = Dma::new(peripherals.DMA);
+
+        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+        let dma_channel = dma.spi2channel;
+        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
+        let dma_channel = dma.channel0;
+
+        let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
+
+        let rx_buffer = {
+            // using `static`, not `static mut`, places the array in .rodata
+            static RX_BUFFER: [u8; DMA_BUFFER_SIZE] = [42u8; DMA_BUFFER_SIZE];
+            unsafe { &mut *(core::ptr::addr_of!(RX_BUFFER) as *mut u8) }
+        };
+
+        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+            .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
+            .with_dma(dma_channel.configure(
+                false,
+                &mut tx_descriptors,
+                &mut rx_descriptors,
+                DmaPriority::Priority0,
+            ));
+
+        let mut receive = rx_buffer;
+        assert!(matches!(
+            spi.dma_transfer(&tx_buffer, &mut receive),
+            Err(esp_hal::spi::Error::DmaError(
+                esp_hal::dma::DmaError::UnsupportedMemoryRegion
+            ))
+        ));
+    }
 }
