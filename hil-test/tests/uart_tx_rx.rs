@@ -37,8 +37,8 @@ impl Context {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let tx = UartTx::new(peripherals.UART0, &clocks, None, io.pins.gpio2);
-        let rx = UartRx::new(peripherals.UART1, &clocks, None, io.pins.gpio4);
+        let tx = UartTx::new(peripherals.UART0, &clocks, None, io.pins.gpio2).unwrap();
+        let rx = UartRx::new(peripherals.UART1, &clocks, None, io.pins.gpio4).unwrap();
 
         Context { tx, rx }
     }

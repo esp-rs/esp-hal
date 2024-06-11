@@ -38,7 +38,7 @@ impl Context {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let uart = Uart::new(peripherals.UART1, &clocks, io.pins.gpio2, io.pins.gpio4);
+        let uart = Uart::new(peripherals.UART1, &clocks, io.pins.gpio2, io.pins.gpio4).unwrap();
 
         Context { clocks, uart }
     }

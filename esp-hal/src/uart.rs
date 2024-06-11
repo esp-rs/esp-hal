@@ -24,10 +24,10 @@
 //! # use esp_hal::uart::{config::Config, TxRxPins, Uart};
 //! use esp_hal::gpio::Io;
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let pins = TxRxPins::new_tx_rx(io.pins.gpio1, io.pins.gpio2);
 //!
-//! let mut uart1 = Uart::new(peripherals.UART1, &clocks, io.pins.gpio4,
-//! io.pins.gpio5); ```
+//! let mut uart1 = Uart::new(peripherals.UART1, &clocks, io.pins.gpio1,
+//! io.pins.gpio2).unwrap();
+//! ```
 //! 
 //! ## Usage
 //!
@@ -474,7 +474,7 @@ where
         clocks: &Clocks,
         interrupt: Option<InterruptHandler>,
         tx: impl Peripheral<P = TX> + 'd,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         Self::new_with_config(uart, Default::default(), clocks, interrupt, tx)
     }
 
@@ -486,15 +486,16 @@ where
         clocks: &Clocks,
         interrupt: Option<InterruptHandler>,
         tx: impl Peripheral<P = TX> + 'd,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         crate::into_ref!(tx);
         tx.set_to_push_pull_output(Internal);
         tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
         let (uart_tx, _) =
-            Uart::<'d, T, Blocking>::new_with_config_inner(uart, config, clocks, interrupt).split();
+            Uart::<'d, T, Blocking>::new_with_config_inner(uart, config, clocks, interrupt)?
+                .split();
 
-        uart_tx
+        Ok(uart_tx)
     }
 }
 
@@ -660,7 +661,7 @@ where
         clocks: &Clocks,
         interrupt: Option<InterruptHandler>,
         rx: impl Peripheral<P = RX> + 'd,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         Self::new_with_config(uart, Default::default(), clocks, interrupt, rx)
     }
 
@@ -672,15 +673,16 @@ where
         clocks: &Clocks,
         interrupt: Option<InterruptHandler>,
         rx: impl Peripheral<P = RX> + 'd,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         crate::into_ref!(rx);
         rx.set_to_input(Internal);
         rx.connect_input_to_peripheral(T::rx_signal(), Internal);
 
         let (_, uart_rx) =
-            Uart::<'d, T, Blocking>::new_with_config_inner(uart, config, clocks, interrupt).split();
+            Uart::<'d, T, Blocking>::new_with_config_inner(uart, config, clocks, interrupt)?
+                .split();
 
-        uart_rx
+        Ok(uart_rx)
     }
 }
 
@@ -697,7 +699,7 @@ where
         interrupt: Option<InterruptHandler>,
         tx: impl Peripheral<P = TX> + 'd,
         rx: impl Peripheral<P = RX> + 'd,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         crate::into_ref!(tx);
         crate::into_ref!(rx);
         tx.set_to_push_pull_output(Internal);
@@ -714,7 +716,7 @@ where
         clocks: &Clocks,
         tx: impl Peripheral<P = TX> + 'd,
         rx: impl Peripheral<P = RX> + 'd,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         crate::into_ref!(tx);
         crate::into_ref!(rx);
         tx.set_to_push_pull_output(Internal);
@@ -732,7 +734,7 @@ where
         clocks: &Clocks,
         tx: &mut DefaultTxPin,
         rx: &mut DefaultRxPin,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         tx.set_to_push_pull_output(Internal);
         tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
@@ -752,7 +754,7 @@ where
         config: Config,
         clocks: &Clocks,
         interrupt: Option<InterruptHandler>,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         Self::init();
 
         let mut serial = Uart {
@@ -765,9 +767,8 @@ where
 
         serial
             .rx
-            .set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)
-            .unwrap();
-        serial.rx.set_rx_timeout(Some(config.rx_timeout)).unwrap();
+            .set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)?;
+        serial.rx.set_rx_timeout(Some(config.rx_timeout))?;
         serial.change_baud_internal(config.baudrate, config.clock_source, clocks);
         serial.change_data_bits(config.data_bits);
         serial.change_parity(config.parity);
@@ -797,10 +798,10 @@ where
             .int_clr()
             .write(|w| unsafe { w.bits(u32::MAX) });
 
-        serial
+        Ok(serial)
     }
 
-    fn new_inner(uart: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Self {
+    fn new_inner(uart: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Result<Self, Error> {
         Self::new_with_config_inner(uart, Default::default(), clocks, None)
     }
 
@@ -1959,7 +1960,7 @@ mod asynch {
             clocks: &Clocks,
             tx: impl Peripheral<P = TX> + 'd,
             rx: impl Peripheral<P = RX> + 'd,
-        ) -> Self {
+        ) -> Result<Self, Error> {
             crate::into_ref!(tx);
             crate::into_ref!(rx);
             tx.set_to_push_pull_output(Internal);
@@ -1989,7 +1990,7 @@ mod asynch {
             clocks: &Clocks,
             tx: impl Peripheral<P = TX> + 'd,
             rx: impl Peripheral<P = RX> + 'd,
-        ) -> Self {
+        ) -> Result<Self, Error> {
             Self::new_async_with_config(uart, Default::default(), clocks, tx, rx)
         }
 
@@ -1999,7 +2000,7 @@ mod asynch {
             clocks: &Clocks,
             tx: DefaultTxPin,
             rx: DefaultRxPin,
-        ) -> Self {
+        ) -> Result<Self, Error> {
             Self::new_async_with_config(uart, Default::default(), clocks, tx, rx)
         }
     }
@@ -2031,7 +2032,7 @@ mod asynch {
             uart: impl Peripheral<P = T> + 'd,
             clocks: &Clocks,
             tx: impl Peripheral<P = TX> + 'd,
-        ) -> Self {
+        ) -> Result<Self, Error> {
             Self::new_async_with_config(uart, Default::default(), clocks, tx)
         }
 
@@ -2042,7 +2043,7 @@ mod asynch {
             config: Config,
             clocks: &Clocks,
             tx: impl Peripheral<P = TX> + 'd,
-        ) -> Self {
+        ) -> Result<Self, Error> {
             crate::into_ref!(tx);
             tx.set_to_push_pull_output(Internal);
             tx.connect_peripheral_to_output(T::tx_signal(), Internal);
@@ -2060,10 +2061,10 @@ mod asynch {
                     2 => uart2,
                     _ => unreachable!(),
                 }),
-            )
+            )?
             .split();
 
-            uart_tx
+            Ok(uart_tx)
         }
 
         pub async fn write_async(&mut self, words: &[u8]) -> Result<usize, Error> {
@@ -2110,7 +2111,7 @@ mod asynch {
             uart: impl Peripheral<P = T> + 'd,
             clocks: &Clocks,
             rx: impl Peripheral<P = RX> + 'd,
-        ) -> Self {
+        ) -> Result<Self, Error> {
             Self::new_async_with_config(uart, Default::default(), clocks, rx)
         }
 
@@ -2121,7 +2122,7 @@ mod asynch {
             config: Config,
             clocks: &Clocks,
             rx: impl Peripheral<P = RX> + 'd,
-        ) -> Self {
+        ) -> Result<Self, Error> {
             crate::into_ref!(rx);
             rx.set_to_input(Internal);
             rx.connect_input_to_peripheral(T::rx_signal(), Internal);
@@ -2139,10 +2140,10 @@ mod asynch {
                     2 => uart2,
                     _ => unreachable!(),
                 }),
-            )
+            )?
             .split();
 
-            uart_rx
+            Ok(uart_rx)
         }
 
         /// Read async to buffer slice `buf`.

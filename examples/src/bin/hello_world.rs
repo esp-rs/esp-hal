@@ -40,7 +40,7 @@ fn main() -> ! {
     let (mut tx_pin, mut rx_pin) = default_uart0_pins!(io);
 
     let mut uart0 =
-        Uart::new_with_default_pins(peripherals.UART0, &clocks, &mut tx_pin, &mut rx_pin);
+        Uart::new_with_default_pins(peripherals.UART0, &clocks, &mut tx_pin, &mut rx_pin).unwrap();
 
     loop {
         writeln!(uart0, "Hello world!").unwrap();

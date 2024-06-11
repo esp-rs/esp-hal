@@ -20,7 +20,7 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
-    uart::{config::Config, Uart},
+    uart::Uart,
 };
 use esp_println::println;
 use nb::block;
@@ -33,7 +33,7 @@ fn main() -> ! {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let mut serial1 = Uart::new(peripherals.UART1, &clocks, io.pins.gpio4, io.pins.gpio5);
+    let mut serial1 = Uart::new(peripherals.UART1, &clocks, io.pins.gpio4, io.pins.gpio5).unwrap();
 
     let delay = Delay::new(&clocks);
 

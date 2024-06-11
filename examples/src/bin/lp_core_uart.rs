@@ -42,7 +42,8 @@ fn main() -> ! {
         None,
         io.pins.gpio6,
         io.pins.gpio7,
-    );
+    )
+    .unwrap();
 
     // Set up (LP) UART:
     let lp_tx = LowPowerOutput::new(io.pins.gpio5);

@@ -20,7 +20,12 @@ use esp_hal::{
     prelude::*,
     system::SystemControl,
     timer::timg::TimerGroup,
-    uart::{config::AtCmdConfig, Uart, UartRx, UartTx},
+    uart::{
+        config::{AtCmdConfig, Config},
+        Uart,
+        UartRx,
+        UartTx,
+    },
     Async,
 };
 use static_cell::StaticCell;
@@ -89,11 +94,13 @@ async fn main(spawner: Spawner) {
     // Default pins for Uart/Serial communication
     let (tx_pin, rx_pin) = default_uart0_pins!(io);
 
-    let mut uart0 = Uart::new_async_with_default_pins(peripherals.UART0, &clocks, tx_pin, rx_pin);
+    let config = Config::default();
+    config.rx_fifo_full_threshold(READ_BUF_SIZE as u16);
+
+    let mut uart0 =
+        Uart::new_async_with_config(peripherals.UART0, config, &clocks, tx_pin, rx_pin).unwrap();
     uart0.set_at_cmd(AtCmdConfig::new(None, None, None, AT_CMD, None));
-    uart0
-        .set_rx_fifo_full_threshold(READ_BUF_SIZE as u16)
-        .unwrap();
+
     let (tx, rx) = uart0.split();
 
     static SIGNAL: StaticCell<Signal<NoopRawMutex, usize>> = StaticCell::new();

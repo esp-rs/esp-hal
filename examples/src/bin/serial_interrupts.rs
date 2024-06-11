@@ -41,18 +41,21 @@ fn main() -> ! {
     // Default pins for Uart/Serial communication
     let (tx_pin, rx_pin) = default_uart0_pins!(io);
 
+    let config = Config::default();
+    config.rx_fifo_full_threshold(30);
+
     let mut uart0 = Uart::new_with_config(
         peripherals.UART0,
-        Config::default(),
+        config,
         &clocks,
         Some(interrupt_handler),
         tx_pin,
         rx_pin,
-    );
+    )
+    .unwrap();
 
     critical_section::with(|cs| {
         uart0.set_at_cmd(AtCmdConfig::new(None, None, None, b'#', None));
-        uart0.set_rx_fifo_full_threshold(30).unwrap();
         uart0.listen_at_cmd();
         uart0.listen_rx_fifo_full();
 
