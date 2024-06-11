@@ -93,10 +93,6 @@ impl DmaDescriptor {
         self.flags.length() as usize
     }
 
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
     fn set_suc_eof(&mut self, suc_eof: bool) {
         self.flags.set_suc_eof(suc_eof)
     }
