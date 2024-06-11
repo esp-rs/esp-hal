@@ -461,12 +461,14 @@ impl<'d, TX: Tx, P> I8080<'d, TX, P> {
                 .set_bit()
             });
 
-            self.tx_channel.prepare_transfer_without_start(
-                DmaPeripheral::LcdCam,
-                false,
-                ptr,
-                len,
-            )?;
+            unsafe {
+                self.tx_channel.prepare_transfer_without_start(
+                    DmaPeripheral::LcdCam,
+                    false,
+                    ptr,
+                    len,
+                )?;
+            }
             self.tx_channel.start_transfer()?;
         }
         Ok(())

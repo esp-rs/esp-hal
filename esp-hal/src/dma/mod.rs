@@ -912,7 +912,7 @@ pub trait TxPrivate: crate::private::Sealed {
 
     fn init_channel(&mut self);
 
-    fn prepare_transfer_without_start(
+    unsafe fn prepare_transfer_without_start(
         &mut self,
         peri: DmaPeripheral,
         circular: bool,
@@ -970,7 +970,7 @@ where
         R::set_out_priority(priority);
     }
 
-    fn prepare_transfer_without_start(
+    unsafe fn prepare_transfer_without_start(
         &mut self,
         descriptors: &mut [DmaDescriptor],
         circular: bool,
@@ -983,7 +983,7 @@ where
                 descriptors[descriptors.len() - 1]
             ) as u32)
             || !crate::soc::is_valid_ram_address(data as u32)
-            || !crate::soc::is_valid_ram_address(unsafe { data.add(len) } as u32)
+            || !crate::soc::is_valid_ram_address(data.add(len) as u32)
         {
             return Err(DmaError::UnsupportedMemoryRegion);
         }
@@ -1166,7 +1166,7 @@ where
         R::init_channel();
     }
 
-    fn prepare_transfer_without_start(
+    unsafe fn prepare_transfer_without_start(
         &mut self,
         peri: DmaPeripheral,
         circular: bool,
