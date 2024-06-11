@@ -754,7 +754,7 @@ where
             unsafe { self.last_seen_handled_descriptor_ptr.read_volatile() }.next;
         let mut current_in_descr = unsafe { current_in_descr_ptr.read_volatile() };
 
-        while !current_in_descr.is_empty() && current_in_descr.owner() == Owner::Cpu {
+        while current_in_descr.owner() == Owner::Cpu {
             self.available += current_in_descr.len();
             self.last_seen_handled_descriptor_ptr = current_in_descr_ptr;
 
