@@ -323,6 +323,8 @@ pub enum DmaError {
     Exhausted,
     /// The given buffer is too small
     BufferTooSmall,
+    /// Descriptors or buffers are not located in a supported memory region
+    UnsupportedMemoryRegion,
 }
 
 /// DMA Priorities
@@ -538,6 +540,16 @@ where
         data: *mut u8,
         len: usize,
     ) -> Result<(), DmaError> {
+        if !crate::soc::is_valid_ram_address(descriptors.as_ptr() as u32)
+            || !crate::soc::is_valid_ram_address(core::ptr::addr_of!(
+                descriptors[descriptors.len() - 1]
+            ) as u32)
+            || !crate::soc::is_valid_ram_address(data as u32)
+            || !crate::soc::is_valid_ram_address(data.add(len) as u32)
+        {
+            return Err(DmaError::UnsupportedMemoryRegion);
+        }
+
         descriptors.fill(DmaDescriptor::EMPTY);
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
@@ -966,6 +978,16 @@ where
         data: *const u8,
         len: usize,
     ) -> Result<(), DmaError> {
+        if !crate::soc::is_valid_ram_address(descriptors.as_ptr() as u32)
+            || !crate::soc::is_valid_ram_address(core::ptr::addr_of!(
+                descriptors[descriptors.len() - 1]
+            ) as u32)
+            || !crate::soc::is_valid_ram_address(data as u32)
+            || !crate::soc::is_valid_ram_address(unsafe { data.add(len) } as u32)
+        {
+            return Err(DmaError::UnsupportedMemoryRegion);
+        }
+
         descriptors.fill(DmaDescriptor::EMPTY);
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
