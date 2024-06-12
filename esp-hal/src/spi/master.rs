@@ -846,8 +846,11 @@ pub mod dma {
             Channel,
             ChannelTypes,
             DmaTransferRx,
+            DmaTransferRxOwned,
             DmaTransferTx,
+            DmaTransferTxOwned,
             DmaTransferTxRx,
+            DmaTransferTxRxOwned,
             Spi2Peripheral,
             SpiPeripheral,
             TxPrivate,
@@ -1071,6 +1074,32 @@ pub mod dma {
         where
             TXBUF: ReadBuffer<Word = u8>,
         {
+            self.dma_write_start(words)?;
+            Ok(DmaTransferTx::new(self))
+        }
+
+        /// Perform a DMA write.
+        ///
+        /// This will return a [DmaTransferTxOwned] owning the buffer and the
+        /// SPI instance. The maximum amount of data to be sent is 32736
+        /// bytes.
+        #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
+        pub fn dma_write_owned<TXBUF>(
+            mut self,
+            words: TXBUF,
+        ) -> Result<DmaTransferTxOwned<Self, TXBUF>, super::Error>
+        where
+            TXBUF: ReadBuffer<Word = u8>,
+        {
+            self.dma_write_start(&words)?;
+            Ok(DmaTransferTxOwned::new(self, words))
+        }
+
+        #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
+        fn dma_write_start<'t, TXBUF>(&'t mut self, words: &'t TXBUF) -> Result<(), super::Error>
+        where
+            TXBUF: ReadBuffer<Word = u8>,
+        {
             let (ptr, len) = unsafe { words.read_buffer() };
 
             if len > MAX_DMA_SIZE {
@@ -1081,7 +1110,7 @@ pub mod dma {
                 self.spi
                     .start_write_bytes_dma(ptr, len, &mut self.channel.tx, false)?;
             }
-            Ok(DmaTransferTx::new(self))
+            Ok(())
         }
 
         /// Perform a DMA read.
@@ -1096,6 +1125,32 @@ pub mod dma {
         where
             RXBUF: WriteBuffer<Word = u8>,
         {
+            self.dma_read_start(words)?;
+            Ok(DmaTransferRx::new(self))
+        }
+
+        /// Perform a DMA read.
+        ///
+        /// This will return a [DmaTransferRxOwned] owning the buffer and
+        /// the SPI instance. The maximum amount of data to be
+        /// received is 32736 bytes.
+        #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
+        pub fn dma_read_owned<RXBUF>(
+            mut self,
+            mut words: RXBUF,
+        ) -> Result<DmaTransferRxOwned<Self, RXBUF>, super::Error>
+        where
+            RXBUF: WriteBuffer<Word = u8>,
+        {
+            self.dma_read_start(&mut words)?;
+            Ok(DmaTransferRxOwned::new(self, words))
+        }
+
+        #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
+        fn dma_read_start<'t, RXBUF>(&'t mut self, words: &'t mut RXBUF) -> Result<(), super::Error>
+        where
+            RXBUF: WriteBuffer<Word = u8>,
+        {
             let (ptr, len) = unsafe { words.write_buffer() };
 
             if len > MAX_DMA_SIZE {
@@ -1106,19 +1161,50 @@ pub mod dma {
                 self.spi
                     .start_read_bytes_dma(ptr, len, &mut self.channel.rx, false)?;
             }
-            Ok(DmaTransferRx::new(self))
+
+            Ok(())
         }
 
         /// Perform a DMA transfer.
         ///
-        /// This will return a [DmaTransferTxRx] owning the buffer(s) and the
-        /// SPI instance. The maximum amount of data to be sent/received
-        /// is 32736 bytes.
+        /// This will return a [DmaTransferTxRx].
+        /// The maximum amount of data to be sent/received is 32736 bytes.
         pub fn dma_transfer<'t, TXBUF, RXBUF>(
             &'t mut self,
             words: &'t TXBUF,
             read_buffer: &'t mut RXBUF,
         ) -> Result<DmaTransferTxRx<Self>, super::Error>
+        where
+            TXBUF: ReadBuffer<Word = u8>,
+            RXBUF: WriteBuffer<Word = u8>,
+        {
+            self.dma_transfer_start(words, read_buffer)?;
+            Ok(DmaTransferTxRx::new(self))
+        }
+
+        /// Perform a DMA transfer
+        ///
+        /// This will return a [DmaTransferTxRxOwned] owning the buffers and
+        /// the SPI instance. The maximum amount of data to be
+        /// sent/received is 32736 bytes.
+        pub fn dma_transfer_owned<TXBUF, RXBUF>(
+            mut self,
+            words: TXBUF,
+            mut read_buffer: RXBUF,
+        ) -> Result<DmaTransferTxRxOwned<Self, TXBUF, RXBUF>, super::Error>
+        where
+            TXBUF: ReadBuffer<Word = u8>,
+            RXBUF: WriteBuffer<Word = u8>,
+        {
+            self.dma_transfer_start(&words, &mut read_buffer)?;
+            Ok(DmaTransferTxRxOwned::new(self, words, read_buffer))
+        }
+
+        fn dma_transfer_start<'t, TXBUF, RXBUF>(
+            &'t mut self,
+            words: &'t TXBUF,
+            read_buffer: &'t mut RXBUF,
+        ) -> Result<(), super::Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
             RXBUF: WriteBuffer<Word = u8>,
@@ -1140,7 +1226,8 @@ pub mod dma {
                     &mut self.channel.rx,
                 )?;
             }
-            Ok(DmaTransferTxRx::new(self))
+
+            Ok(())
         }
     }
 

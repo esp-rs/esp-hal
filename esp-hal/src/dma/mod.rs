@@ -117,6 +117,7 @@ impl DmaDescriptor {
     }
 }
 
+use embedded_dma::{ReadBuffer, WriteBuffer};
 use enumset::{EnumSet, EnumSetType};
 
 #[cfg(gdma)]
@@ -1677,6 +1678,227 @@ where
 impl<'a, I> Drop for DmaTransferTxRx<'a, I>
 where
     I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
+{
+    fn drop(&mut self) {
+        self.instance.peripheral_wait_dma(true, true);
+    }
+}
+
+/// DMA transaction for TX transfers with moved-in/moved-out peripheral and
+/// buffer
+#[non_exhaustive]
+#[must_use]
+pub struct DmaTransferTxOwned<I, T>
+where
+    I: dma_private::DmaSupportTx,
+    T: ReadBuffer<Word = u8>,
+{
+    instance: I,
+    tx_buffer: T,
+}
+
+impl<I, T> DmaTransferTxOwned<I, T>
+where
+    I: dma_private::DmaSupportTx,
+    T: ReadBuffer<Word = u8>,
+{
+    pub(crate) fn new(instance: I, tx_buffer: T) -> Self {
+        Self {
+            instance,
+            tx_buffer,
+        }
+    }
+
+    /// Wait for the transfer to finish and return the peripheral and the
+    /// buffer.
+    #[must_use]
+    pub fn wait(mut self) -> Result<(I, T), (DmaError, I, T)> {
+        self.instance.peripheral_wait_dma(true, false);
+
+        let err = self.instance.tx().has_error();
+
+        // We need to have a `Drop` implementation, because we accept
+        // managed buffers that can free their memory on drop. Because of that
+        // we can't move out of the `Transfer`'s fields, so we use `ptr::read`
+        // and `mem::forget`.
+        //
+        // NOTE(unsafe) There is no panic branch between getting the resources
+        // and forgetting `self`.
+
+        let (instance, tx_buffer) = unsafe {
+            let instance = core::ptr::read(&self.instance);
+            let tx_buffer = core::ptr::read(&self.tx_buffer);
+            core::mem::forget(self);
+
+            (instance, tx_buffer)
+        };
+
+        if err {
+            Err((DmaError::DescriptorError, instance, tx_buffer))
+        } else {
+            Ok((instance, tx_buffer))
+        }
+    }
+
+    /// Check if the transfer is finished.
+    pub fn is_done(&mut self) -> bool {
+        self.instance.tx().is_done()
+    }
+}
+
+impl<I, T> Drop for DmaTransferTxOwned<I, T>
+where
+    I: dma_private::DmaSupportTx,
+    T: ReadBuffer<Word = u8>,
+{
+    fn drop(&mut self) {
+        self.instance.peripheral_wait_dma(true, false);
+    }
+}
+
+/// DMA transaction for RX transfers with moved-in/moved-out peripheral and
+/// buffer
+#[non_exhaustive]
+#[must_use]
+pub struct DmaTransferRxOwned<I, R>
+where
+    I: dma_private::DmaSupportRx,
+    R: WriteBuffer<Word = u8>,
+{
+    instance: I,
+    rx_buffer: R,
+}
+
+impl<I, R> DmaTransferRxOwned<I, R>
+where
+    I: dma_private::DmaSupportRx,
+    R: WriteBuffer<Word = u8>,
+{
+    pub(crate) fn new(instance: I, rx_buffer: R) -> Self {
+        Self {
+            instance,
+            rx_buffer,
+        }
+    }
+
+    /// Wait for the transfer to finish and return the peripheral and the
+    /// buffers.
+    pub fn wait(mut self) -> Result<(I, R), (DmaError, I, R)> {
+        self.instance.peripheral_wait_dma(false, true);
+
+        let err = self.instance.rx().has_error();
+
+        // We need to have a `Drop` implementation, because we accept
+        // managed buffers that can free their memory on drop. Because of that
+        // we can't move out of the `Transfer`'s fields, so we use `ptr::read`
+        // and `mem::forget`.
+        //
+        // NOTE(unsafe) There is no panic branch between getting the resources
+        // and forgetting `self`.
+
+        let (instance, rx_buffer) = unsafe {
+            let instance = core::ptr::read(&self.instance);
+            let rx_buffer = core::ptr::read(&self.rx_buffer);
+            core::mem::forget(self);
+
+            (instance, rx_buffer)
+        };
+
+        if err {
+            Err((DmaError::DescriptorError, instance, rx_buffer))
+        } else {
+            Ok((instance, rx_buffer))
+        }
+    }
+
+    /// Check if the transfer is finished.
+    pub fn is_done(&mut self) -> bool {
+        self.instance.rx().is_done()
+    }
+}
+
+impl<I, R> Drop for DmaTransferRxOwned<I, R>
+where
+    I: dma_private::DmaSupportRx,
+    R: WriteBuffer<Word = u8>,
+{
+    fn drop(&mut self) {
+        self.instance.peripheral_wait_dma(false, true);
+    }
+}
+
+/// DMA transaction for TX+RX transfers with moved-in/moved-out peripheral and
+/// buffers
+#[non_exhaustive]
+#[must_use]
+pub struct DmaTransferTxRxOwned<I, T, R>
+where
+    I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
+    T: ReadBuffer<Word = u8>,
+    R: WriteBuffer<Word = u8>,
+{
+    instance: I,
+    tx_buffer: T,
+    rx_buffer: R,
+}
+
+impl<I, T, R> DmaTransferTxRxOwned<I, T, R>
+where
+    I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
+    T: ReadBuffer<Word = u8>,
+    R: WriteBuffer<Word = u8>,
+{
+    pub(crate) fn new(instance: I, tx_buffer: T, rx_buffer: R) -> Self {
+        Self {
+            instance,
+            tx_buffer,
+            rx_buffer,
+        }
+    }
+
+    /// Wait for the transfer to finish and return the peripheral and the
+    /// buffers.
+    #[must_use]
+    pub fn wait(mut self) -> Result<(I, T, R), (DmaError, I, T, R)> {
+        self.instance.peripheral_wait_dma(true, true);
+
+        let err = self.instance.tx().has_error() || self.instance.rx().has_error();
+
+        // We need to have a `Drop` implementation, because we accept
+        // managed buffers that can free their memory on drop. Because of that
+        // we can't move out of the `Transfer`'s fields, so we use `ptr::read`
+        // and `mem::forget`.
+        //
+        // NOTE(unsafe) There is no panic branch between getting the resources
+        // and forgetting `self`.
+
+        let (instance, tx_buffer, rx_buffer) = unsafe {
+            let instance = core::ptr::read(&self.instance);
+            let tx_buffer = core::ptr::read(&self.tx_buffer);
+            let rx_buffer = core::ptr::read(&self.rx_buffer);
+            core::mem::forget(self);
+
+            (instance, tx_buffer, rx_buffer)
+        };
+
+        if err {
+            Err((DmaError::DescriptorError, instance, tx_buffer, rx_buffer))
+        } else {
+            Ok((instance, tx_buffer, rx_buffer))
+        }
+    }
+
+    /// Check if the transfer is finished.
+    pub fn is_done(&mut self) -> bool {
+        self.instance.tx().is_done() && self.instance.rx().is_done()
+    }
+}
+
+impl<I, T, R> Drop for DmaTransferTxRxOwned<I, T, R>
+where
+    I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
+    T: ReadBuffer<Word = u8>,
+    R: WriteBuffer<Word = u8>,
 {
     fn drop(&mut self) {
         self.instance.peripheral_wait_dma(true, true);
