@@ -25,10 +25,10 @@ SECTIONS {
     . = ALIGN(4);
   } > rtc_slow_seg
 
- .rtc_slow.noinit (NOLOAD) :
+ .rtc_slow.persistent (NOLOAD) :
   {
     . = ALIGN(4);
-    *(.rtc_slow.noinit .rtc_slow.noinit.*)
+    *(.rtc_slow.persistent .rtc_slow.persistent.*)
     . = ALIGN(4);
   } > rtc_slow_seg
 }

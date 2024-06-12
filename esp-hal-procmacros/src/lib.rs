@@ -29,7 +29,8 @@
 //!    with different initialization options. Supported options are:
 //!      - `rtc_fast` - Use RTC fast RAM
 //!      - `rtc_slow` - Use RTC slow RAM (not all targets support slow RTC RAM)
-//!      - `uninitialized` - Skip initialization of the memory
+//!      - `persistent` - Skip initialization of the memory after user initiated
+//!        core or cpu resets and after deep sleep
 //!      - `zeroed` - Initialize the memory to zero
 //!
 //! ## Examples
@@ -54,8 +55,8 @@
 //! #[ram(rtc_fast)]
 //! static mut SOME_INITED_DATA: [u8; 2] = [0xaa, 0xbb];
 //!
-//! #[ram(rtc_fast, uninitialized)]
-//! static mut SOME_UNINITED_DATA: [u8; 2] = [0; 2];
+//! #[ram(rtc_fast, persistent)]
+//! static mut SOME_PERSISTENT_DATA: [u8; 2] = [0; 2];
 //!
 //! #[ram(rtc_fast, zeroed)]
 //! static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
@@ -88,7 +89,7 @@ mod lp_core;
 struct RamArgs {
     rtc_fast: bool,
     rtc_slow: bool,
-    uninitialized: bool,
+    persistent: bool,
     zeroed: bool,
 }
 
@@ -97,8 +98,9 @@ struct RamArgs {
 /// Options that can be specified are rtc_slow or rtc_fast to use the
 /// RTC slow or RTC fast ram instead of the normal SRAM.
 ///
-/// The uninitialized option will skip initialization of the memory
-/// (e.g. to persist it across resets or deep sleep mode for the RTC RAM)
+/// The persistent option will skip initialization of the memory after
+/// resets caused by `software_reset()`, `software_reset_cpu()`, or
+/// deep sleep.
 ///
 /// Not all targets support RTC slow ram.
 #[cfg(feature = "ram")]
@@ -120,7 +122,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     let RamArgs {
         rtc_fast,
         rtc_slow,
-        uninitialized,
+        persistent,
         zeroed,
     } = match FromMeta::from_list(&attr_args) {
         Ok(v) => v,
@@ -140,7 +142,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     }
 
     let is_fn = matches!(item, Item::Fn(_));
-    let section_name = match (is_fn, rtc_fast, rtc_slow, uninitialized, zeroed) {
+    let section_name = match (is_fn, rtc_fast, rtc_slow, persistent, zeroed) {
         (true, false, false, false, false) => Ok(".rwtext"),
         (true, true, false, false, false) => Ok(".rtc_fast.text"),
         (true, false, true, false, false) => Ok(".rtc_slow.text"),
@@ -148,11 +150,11 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         (false, false, false, false, false) => Ok(".data"),
 
         (false, true, false, false, false) => Ok(".rtc_fast.data"),
-        (false, true, false, true, false) => Ok(".rtc_fast.noinit"),
+        (false, true, false, true, false) => Ok(".rtc_fast.persistent"),
         (false, true, false, false, true) => Ok(".rtc_fast.bss"),
 
         (false, false, true, false, false) => Ok(".rtc_slow.data"),
-        (false, false, true, true, false) => Ok(".rtc_slow.noinit"),
+        (false, false, true, true, false) => Ok(".rtc_slow.persistent"),
         (false, false, true, false, true) => Ok(".rtc_slow.bss"),
 
         _ => Err(()),

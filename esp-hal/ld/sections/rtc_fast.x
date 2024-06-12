@@ -25,10 +25,10 @@ SECTIONS {
     . = ALIGN(4);
   } > RTC_FAST_RWDATA
 
- .rtc_fast.noinit (NOLOAD) :
+ .rtc_fast.persistent (NOLOAD) :
   {
     . = ALIGN(4);
-    *(.rtc_fast.noinit .rtc_fast.noinit.*)
+    *(.rtc_fast.persistent .rtc_fast.persistent.*)
     . = ALIGN(4);
   } > RTC_FAST_RWDATA
 }
