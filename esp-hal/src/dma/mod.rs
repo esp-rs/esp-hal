@@ -1711,7 +1711,6 @@ where
 
     /// Wait for the transfer to finish and return the peripheral and the
     /// buffer.
-    #[must_use]
     pub fn wait(mut self) -> Result<(I, T), (DmaError, I, T)> {
         self.instance.peripheral_wait_dma(true, false);
 
@@ -1858,7 +1857,7 @@ where
 
     /// Wait for the transfer to finish and return the peripheral and the
     /// buffers.
-    #[must_use]
+    #[allow(clippy::type_complexity)]
     pub fn wait(mut self) -> Result<(I, T, R), (DmaError, I, T, R)> {
         self.instance.peripheral_wait_dma(true, true);
 
