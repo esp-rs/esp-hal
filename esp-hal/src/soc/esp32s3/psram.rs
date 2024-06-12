@@ -1,18 +1,18 @@
-//! # PSRAM "virtual peripheral" driver (ESP32-S2)
+//! # PSRAM "virtual peripheral" driver (ESP32-S3)
 //!
 //! ## Overview
 //!
 //! The `PSRAM` module provides support for accessing and controlling the
-//! `Pseudo Static Random Access Memory (PSRAM)` on the `ESP32-S2`.
+//! `Pseudo Static Random Access Memory (PSRAM)` on the `ESP32-S3`.
 //!
 //! The `PSRAM` module enables users to interface with the `PSRAM` memory
-//! present on the `ESP32-S2` chip. `PSRAM` provides additional external memory
-//! to supplement the internal memory of the `ESP32-S2`, allowing for increased
+//! present on the `ESP32-S3` chip. `PSRAM` provides additional external memory
+//! to supplement the internal memory of the `ESP32-S3`, allowing for increased
 //! storage capacity and improved performance in certain applications.
 //!
 //! The `PSRAM` module is accessed through a virtual address, defined as
 //! `PSRAM_VADDR`. The starting virtual address for the PSRAM module is
-//! 0x3f500000. The `PSRAM` module size depends on the configuration specified
+//! 0x3c000000. The `PSRAM` module size depends on the configuration specified
 //! during the compilation process. The available `PSRAM` sizes are `2MB`,
 //! `4MB`, and `8MB`.
 
@@ -45,8 +45,6 @@ cfg_if::cfg_if! {
 pub const PSRAM_BYTES: usize = PSRAM_SIZE as usize * 1024 * 1024;
 
 /// Initialize PSRAM to be used for data.
-///
-/// Currently only QSPI is supported.
 #[cfg(any(
     feature = "psram-2m",
     feature = "psram-4m",
