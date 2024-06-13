@@ -28,7 +28,9 @@ SECTIONS {
  .rtc_fast.persistent (NOLOAD) :
   {
     . = ALIGN(4);
+    _rtc_fast_persistent_start = ABSOLUTE(.);
     *(.rtc_fast.persistent .rtc_fast.persistent.*)
+    _rtc_fast_persistent_end = ABSOLUTE(.);
     . = ALIGN(4);
   } > RTC_FAST_RWDATA
 }

@@ -28,7 +28,9 @@ SECTIONS {
  .rtc_slow.persistent (NOLOAD) :
   {
     . = ALIGN(4);
+    _rtc_slow_persistent_start = ABSOLUTE(.);
     *(.rtc_slow.persistent .rtc_slow.persistent.*)
+    _rtc_slow_persistent_end = ABSOLUTE(.);
     . = ALIGN(4);
   } > rtc_slow_seg
 }
