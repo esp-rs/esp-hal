@@ -3,10 +3,10 @@
 //! Folowing pins are used:
 //! SCLK    GPIO0
 //! MISO    GPIO2
-//! MOSI    GPIO4
-//! CS      GPIO5
+//! MOSI    GPIO3
+//! CS      GPIO8
 //!
-//! Connect MISO (GPIO2) and MOSI (GPIO4) pins.
+//! Connect MISO (GPIO2) and MOSI (GPIO3) pins.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -38,8 +38,8 @@ impl Context {
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
         let miso = io.pins.gpio2;
-        let mosi = io.pins.gpio4;
-        let cs = io.pins.gpio5;
+        let mosi = io.pins.gpio3;
+        let cs = io.pins.gpio8;
 
         let spi = Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0, &clocks).with_pins(
             Some(sclk),

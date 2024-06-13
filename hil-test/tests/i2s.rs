@@ -1,6 +1,6 @@
 //! I2S Loopback Test
 //!
-//! It's assumed GPIO2 is connected to GPIO4
+//! It's assumed GPIO2 is connected to GPIO3
 //!
 //! This test uses I2S TX to transmit known data to I2S RX (forced to slave mode
 //! with loopback mode enabled). It's using circular DMA mode
@@ -81,7 +81,7 @@ mod tests {
             .i2s_rx
             .with_bclk(io.pins.gpio0)
             .with_ws(io.pins.gpio1)
-            .with_din(io.pins.gpio4)
+            .with_din(io.pins.gpio3)
             .build();
 
         // enable loopback testing
