@@ -173,9 +173,31 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     };
 
+    let zeroable_check = (persistent || zeroed).then(|| {
+        use proc_macro_crate::{crate_name, FoundCrate};
+
+        let hal = proc_macro2::Ident::new(
+            if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-hal") {
+                &name
+            } else {
+                "crate"
+            },
+            Span::call_site().into(),
+        );
+
+        let Item::Static(ref item) = item else {
+            abort!(item, "Expected a `static`");
+        };
+        let ty = &item.ty;
+        quote::quote! {
+            const _: () = #hal::__macro_implementation::assert_is_zeroable::<#ty>();
+        }
+    });
+
     let output = quote::quote! {
         #section
         #item
+        #zeroable_check
     };
 
     output.into()
