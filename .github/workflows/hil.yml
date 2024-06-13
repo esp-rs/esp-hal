@@ -27,6 +27,8 @@ jobs:
       matrix:
         target:
           # RISC-V devices:
+          - soc: esp32c2
+            rust-target: riscv32imc-unknown-none-elf
           - soc: esp32c3
             rust-target: riscv32imc-unknown-none-elf
           - soc: esp32c6
