@@ -29,6 +29,7 @@
 use core::{cell::Cell, marker::PhantomData};
 
 use critical_section::Mutex;
+use procmacros::ram;
 
 #[cfg(any(adc, dac))]
 pub(crate) use crate::analog;
@@ -1179,6 +1180,7 @@ impl Io {
     }
 }
 
+#[ram]
 extern "C" fn gpio_interrupt_handler() {
     if let Some(user_handler) = critical_section::with(|cs| USER_INTERRUPT_HANDLER.borrow(cs).get())
     {
@@ -2608,6 +2610,7 @@ mod asynch {
         });
     }
 
+    #[ram]
     pub(super) fn handle_gpio_interrupt() {
         let intrs_bank0 = InterruptStatusRegisterAccessBank0::interrupt_status_read();
 

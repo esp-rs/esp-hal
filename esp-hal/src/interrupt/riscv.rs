@@ -12,6 +12,8 @@
 //! interrupt15() => Priority::Priority15
 //! ```
 
+use core::ops::BitAnd;
+
 pub use esp_riscv_rt::TrapFrame;
 use riscv::register::{mcause, mtvec};
 
@@ -229,61 +231,187 @@ pub fn disable(_core: Cpu, interrupt: Interrupt) {
     }
 }
 
+#[cfg(large_intr_status)]
+const STATUS_WORDS: usize = 3;
+
+#[cfg(very_large_intr_status)]
+const STATUS_WORDS: usize = 4;
+
+#[cfg(not(any(large_intr_status, very_large_intr_status)))]
+const STATUS_WORDS: usize = 2;
+
+/// Representation of peripheral-interrupt status bits.
+#[derive(Clone, Copy, Default, Debug)]
+pub struct InterruptStatus {
+    status: [u32; STATUS_WORDS],
+}
+
+impl InterruptStatus {
+    const fn empty() -> Self {
+        InterruptStatus {
+            #[cfg(large_intr_status)]
+            status: [0, 0, 0],
+            #[cfg(very_large_intr_status)]
+            status: [0, 0, 0, 0],
+            #[cfg(not(any(large_intr_status, very_large_intr_status)))]
+            status: [0, 0],
+        }
+    }
+
+    #[cfg(large_intr_status)]
+    fn from(w0: u32, w1: u32, w2: u32) -> Self {
+        Self {
+            status: [w0, w1, w2],
+        }
+    }
+
+    #[cfg(very_large_intr_status)]
+    fn from(w0: u32, w1: u32, w2: u32, w3: u32) -> Self {
+        Self {
+            status: [w0, w1, w2, w3],
+        }
+    }
+
+    #[cfg(not(any(large_intr_status, very_large_intr_status)))]
+    fn from(w0: u32, w1: u32) -> Self {
+        Self { status: [w0, w1] }
+    }
+
+    /// Is the given interrupt bit set
+    pub fn is_set(&self, interrupt: u16) -> bool {
+        (self.status[interrupt as usize / 32] & (1 << interrupt as u32 % 32)) != 0
+    }
+
+    /// Set the given interrupt status bit
+    pub fn set(&mut self, interrupt: u16) {
+        self.status[interrupt as usize / 32] =
+            self.status[interrupt as usize / 32] | (1 << interrupt as u32 % 32);
+    }
+
+    /// Return an iterator over the set interrupt status bits
+    pub fn iterator(&self) -> InterruptStatusIterator {
+        InterruptStatusIterator {
+            status: self.clone(),
+            idx: 0,
+        }
+    }
+}
+
+impl BitAnd for InterruptStatus {
+    type Output = InterruptStatus;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        #[cfg(large_intr_status)]
+        return Self::Output {
+            status: [
+                self.status[0] & rhs.status[0],
+                self.status[1] & rhs.status[1],
+                self.status[2] & rhs.status[2],
+            ],
+        };
+
+        #[cfg(very_large_intr_status)]
+        return Self::Output {
+            status: [
+                self.status[0] & rhs.status[0],
+                self.status[1] & rhs.status[1],
+                self.status[2] & rhs.status[2],
+                self.status[3] & rhs.status[3],
+            ],
+        };
+
+        #[cfg(not(any(large_intr_status, very_large_intr_status)))]
+        return Self::Output {
+            status: [
+                self.status[0] & rhs.status[0],
+                self.status[1] & rhs.status[1],
+            ],
+        };
+    }
+}
+
+/// Iterator over set interrupt status bits
+pub struct InterruptStatusIterator {
+    status: InterruptStatus,
+    idx: usize,
+}
+
+impl Iterator for InterruptStatusIterator {
+    type Item = u8;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.idx == usize::MAX {
+            return None;
+        }
+
+        for i in self.idx..STATUS_WORDS {
+            if self.status.status[i] != 0 {
+                let bit = self.status.status[i].trailing_zeros();
+                self.idx = i;
+                self.status.status[i] &= !1 << bit;
+                return Some((bit + 32 * i as u32) as u8);
+            }
+        }
+        self.idx = usize::MAX;
+        None
+    }
+}
+
 /// Get status of peripheral interrupts
 #[inline]
-pub fn get_status(_core: Cpu) -> u128 {
+pub fn get_status(_core: Cpu) -> InterruptStatus {
     #[cfg(large_intr_status)]
     unsafe {
-        ((*crate::peripherals::INTERRUPT_CORE0::PTR)
-            .intr_status_reg_0()
-            .read()
-            .bits() as u128)
-            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+        InterruptStatus::from(
+            (*crate::peripherals::INTERRUPT_CORE0::PTR)
+                .intr_status_reg_0()
+                .read()
+                .bits(),
+            (*crate::peripherals::INTERRUPT_CORE0::PTR)
                 .intr_status_reg_1()
                 .read()
-                .bits() as u128)
-                << 32
-            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+                .bits(),
+            (*crate::peripherals::INTERRUPT_CORE0::PTR)
                 .int_status_reg_2()
                 .read()
-                .bits() as u128)
-                << 64
+                .bits(),
+        )
     }
 
     #[cfg(very_large_intr_status)]
     unsafe {
-        ((*crate::peripherals::INTERRUPT_CORE0::PTR)
-            .intr_status_reg_0()
-            .read()
-            .bits() as u128)
-            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+        InterruptStatus::from(
+            (*crate::peripherals::INTERRUPT_CORE0::PTR)
+                .intr_status_reg_0()
+                .read()
+                .bits(),
+            (*crate::peripherals::INTERRUPT_CORE0::PTR)
                 .intr_status_reg_1()
                 .read()
-                .bits() as u128)
-                << 32
-            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+                .bits(),
+            (*crate::peripherals::INTERRUPT_CORE0::PTR)
                 .intr_status_reg_2()
                 .read()
-                .bits() as u128)
-                << 64
-            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+                .bits(),
+            (*crate::peripherals::INTERRUPT_CORE0::PTR)
                 .intr_status_reg_3()
                 .read()
-                .bits() as u128)
-                << 96
+                .bits(),
+        )
     }
 
     #[cfg(not(any(large_intr_status, very_large_intr_status)))]
     unsafe {
-        ((*crate::peripherals::INTERRUPT_CORE0::PTR)
-            .intr_status_reg_0()
-            .read()
-            .bits() as u128)
-            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+        InterruptStatus::from(
+            (*crate::peripherals::INTERRUPT_CORE0::PTR)
+                .intr_status_reg_0()
+                .read()
+                .bits(),
+            (*crate::peripherals::INTERRUPT_CORE0::PTR)
                 .intr_status_reg_1()
                 .read()
-                .bits() as u128)
-                << 32
+                .bits(),
+        )
     }
 }
 
@@ -347,26 +475,30 @@ mod vectored {
         }
     }
 
-    /// Get the interrupts configured for the core
+    /// Get the interrupts configured for the core at the given priority
+    /// matching the given status
     #[inline]
-    fn get_configured_interrupts(core: Cpu, mut status: u128) -> [u128; 16] {
+    fn get_configured_interrupts(
+        core: Cpu,
+        status: InterruptStatus,
+        priority: Priority,
+    ) -> InterruptStatus {
         unsafe {
-            let mut prios = [0u128; 16];
+            let mut res = InterruptStatus::empty();
 
-            while status != 0 {
-                let interrupt_nr = status.trailing_zeros() as u16;
+            for interrupt_nr in status.iterator() {
                 // safety: cast is safe because of repr(u16)
                 if let Some(cpu_interrupt) =
-                    get_assigned_cpu_interrupt(core::mem::transmute::<u16, Interrupt>(interrupt_nr))
+                    get_assigned_cpu_interrupt(core::mem::transmute::<u16, Interrupt>(
+                        interrupt_nr as u16,
+                    ))
                 {
-                    let prio = get_priority_by_core(core, cpu_interrupt);
-                    prios[prio as usize] |= 1 << (interrupt_nr as usize);
+                    if get_priority_by_core(core, cpu_interrupt) == priority {
+                        res.set(interrupt_nr as u16);
+                    }
                 }
-
-                status &= !(1u128 << interrupt_nr);
             }
-
-            prios
+            res
         }
     }
 
@@ -399,29 +531,28 @@ mod vectored {
         ptr.write_volatile(handler);
     }
 
+    #[no_mangle]
     #[ram]
     unsafe fn handle_interrupts(cpu_intr: CpuInterrupt, context: &mut TrapFrame) {
-        let status = get_status(crate::get_core());
+        let core = crate::get_core();
+        let status = get_status(core);
 
         // this has no effect on level interrupts, but the interrupt may be an edge one
         // so we clear it anyway
         clear(crate::get_core(), cpu_intr);
 
-        let configured_interrupts = get_configured_interrupts(crate::get_core(), status);
-        let mut interrupt_mask =
-            status & configured_interrupts[INTERRUPT_TO_PRIORITY[cpu_intr as usize - 1]];
-        while interrupt_mask != 0 {
-            let interrupt_nr = interrupt_mask.trailing_zeros();
-            // Interrupt::try_from can fail if interrupt already de-asserted:
-            // silently ignore
-            if let Ok(interrupt) = peripherals::Interrupt::try_from(interrupt_nr as u8) {
-                handle_interrupt(interrupt, context)
-            }
-            interrupt_mask &= !(1u128 << interrupt_nr);
+        let configured_interrupts = get_configured_interrupts(core, status, unsafe {
+            core::mem::transmute(INTERRUPT_TO_PRIORITY[cpu_intr as usize - 1] as u8)
+        });
+
+        for interrupt_nr in configured_interrupts.iterator() {
+            // Don't use `Interrupt::try_from`. It's slower and placed in flash
+            let interrupt = unsafe { core::mem::transmute(interrupt_nr as u16) };
+            handle_interrupt(interrupt, context);
         }
     }
 
-    #[ram]
+    #[inline(always)]
     unsafe fn handle_interrupt(interrupt: Interrupt, save_frame: &mut TrapFrame) {
         extern "C" {
             // defined in each hal
@@ -442,123 +573,74 @@ mod vectored {
         }
     }
 
-    #[no_mangle]
-    #[ram]
-    unsafe fn interrupt1(context: &mut TrapFrame) {
-        handle_interrupts(CpuInterrupt::Interrupt1, context)
+    // The compiler generates quite unfortunate code for
+    // ```rust,ignore
+    // #[no_mangle]
+    // #[ram]
+    // unsafe fn interrupt1(context: &mut TrapFrame) {
+    //    handle_interrupts(CpuInterrupt::Interrupt1, context)
+    // }
+    // ```
+    //
+    // Resulting in
+    // ```asm,ignore
+    // interrupt1:
+    // add	sp,sp,-16
+    // sw	ra,12(sp)
+    // sw	s0,8(sp)
+    // add	s0,sp,16
+    // mv	a1,a0
+    // li	a0,1
+    // lw	ra,12(sp)
+    // lw	s0,8(sp)
+    // add	sp,sp,16
+    // auipc	t1,0x0
+    // jr	handle_interrupts
+    // ```
+    //
+    // We can do better manually - use Rust again once/if that changes
+    macro_rules! interrupt_handler {
+        ($num:literal) => {
+            core::arch::global_asm! {
+                concat!(
+                r#"
+                    .section .rwtext, "ax"
+                    .global interrupt"#,$num,r#"
+
+                interrupt"#,$num,r#":
+                    mv a1, a0
+                    li a0,"#,$num,r#"
+                    j handle_interrupts
+                "#
+            )
+            }
+        };
     }
 
-    #[no_mangle]
-    #[ram]
-    unsafe fn interrupt2(context: &mut TrapFrame) {
-        handle_interrupts(CpuInterrupt::Interrupt2, context)
-    }
-
-    #[no_mangle]
-    #[ram]
-    unsafe fn interrupt3(context: &mut TrapFrame) {
-        handle_interrupts(CpuInterrupt::Interrupt3, context)
-    }
-
-    #[no_mangle]
-    #[ram]
-    unsafe fn interrupt4(context: &mut TrapFrame) {
-        handle_interrupts(CpuInterrupt::Interrupt4, context)
-    }
-
-    #[no_mangle]
-    #[ram]
-    unsafe fn interrupt5(context: &mut TrapFrame) {
-        handle_interrupts(CpuInterrupt::Interrupt5, context)
-    }
-
-    #[no_mangle]
-    #[ram]
-    unsafe fn interrupt6(context: &mut TrapFrame) {
-        handle_interrupts(CpuInterrupt::Interrupt6, context)
-    }
-
-    #[no_mangle]
-    #[ram]
-    unsafe fn interrupt7(context: &mut TrapFrame) {
-        handle_interrupts(CpuInterrupt::Interrupt7, context)
-    }
-
-    #[no_mangle]
-    #[ram]
-    unsafe fn interrupt8(context: &mut TrapFrame) {
-        handle_interrupts(CpuInterrupt::Interrupt8, context)
-    }
-
-    #[no_mangle]
-    #[ram]
-    unsafe fn interrupt9(context: &mut TrapFrame) {
-        handle_interrupts(CpuInterrupt::Interrupt9, context)
-    }
-
-    #[no_mangle]
-    #[ram]
-    unsafe fn interrupt10(context: &mut TrapFrame) {
-        handle_interrupts(CpuInterrupt::Interrupt10, context)
-    }
-
-    #[no_mangle]
-    #[ram]
-    unsafe fn interrupt11(context: &mut TrapFrame) {
-        handle_interrupts(CpuInterrupt::Interrupt11, context)
-    }
-
-    #[no_mangle]
-    #[ram]
-    unsafe fn interrupt12(context: &mut TrapFrame) {
-        handle_interrupts(CpuInterrupt::Interrupt12, context)
-    }
-
-    #[no_mangle]
-    #[ram]
-    unsafe fn interrupt13(context: &mut TrapFrame) {
-        handle_interrupts(CpuInterrupt::Interrupt13, context)
-    }
-
-    #[no_mangle]
-    #[ram]
-    unsafe fn interrupt14(context: &mut TrapFrame) {
-        handle_interrupts(CpuInterrupt::Interrupt14, context)
-    }
-
-    #[no_mangle]
-    #[ram]
-    unsafe fn interrupt15(context: &mut TrapFrame) {
-        handle_interrupts(CpuInterrupt::Interrupt15, context)
-    }
+    interrupt_handler!(1);
+    interrupt_handler!(2);
+    interrupt_handler!(3);
+    interrupt_handler!(4);
+    interrupt_handler!(5);
+    interrupt_handler!(6);
+    interrupt_handler!(7);
+    interrupt_handler!(8);
+    interrupt_handler!(9);
+    interrupt_handler!(10);
+    interrupt_handler!(11);
+    interrupt_handler!(12);
+    interrupt_handler!(13);
+    interrupt_handler!(14);
+    interrupt_handler!(15);
 
     #[cfg(plic)]
-    #[no_mangle]
-    #[ram]
-    unsafe fn interrupt16(context: &mut TrapFrame) {
-        handle_interrupts(CpuInterrupt::Interrupt16, context)
-    }
-
+    interrupt_handler!(16);
     #[cfg(plic)]
-    #[no_mangle]
-    #[ram]
-    unsafe fn interrupt17(context: &mut TrapFrame) {
-        handle_interrupts(CpuInterrupt::Interrupt17, context)
-    }
-
+    interrupt_handler!(17);
     #[cfg(plic)]
-    #[no_mangle]
-    #[ram]
-    unsafe fn interrupt18(context: &mut TrapFrame) {
-        handle_interrupts(CpuInterrupt::Interrupt18, context)
-    }
-
+    interrupt_handler!(18);
     #[cfg(plic)]
-    #[no_mangle]
-    #[ram]
-    unsafe fn interrupt19(context: &mut TrapFrame) {
-        handle_interrupts(CpuInterrupt::Interrupt19, context)
-    }
+    interrupt_handler!(19);
 }
 
 #[cfg(not(any(plic, clic)))]
