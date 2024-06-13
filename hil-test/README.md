@@ -55,31 +55,36 @@ Some tests will require physical connections, please see the current [configurat
 ### Running Tests Remotes (ie. On Self-Hosted Runners)
 The [`hil.yml`] workflow builds the test suite for all our available targets and executes them.
 
-Our Virtual Machines have the following setup:
+Our self hosted runners have the following setup:
+- ESP32-C2 (`esp32c2-jtag`):
+  - Devkit: `ESP8684-DevKitM-1` connected via UART.
+    - `GPIO2` and `GPIO3` are connected.
+  - Probe: `ESP-Prog` connected with the [following connections](https://docs.espressif.com/projects/esp-idf/en/stable/esp32c2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware)
+  - RPi: Raspbian 12 configured with the following [setup](#vm-setup)
 - ESP32-C3 (`rustboard`):
   - Devkit: `ESP32-C3-DevKit-RUST-1` connected via USB-Serial-JTAG.
-    - `GPIO2` and `GPIO4` are connected.
+    - `GPIO2` and `GPIO3` are connected.
     - `GPIO5` and `GPIO6` are connected.
   - RPi: Raspbian 12 configured with the following [setup](#vm-setup)
 - ESP32-C6 (`esp32c6-usb`):
   - Devkit: `ESP32-C6-DevKitC-1 V1.2` connected via USB-Serial-JTAG (`USB` port).
-    - `GPIO2` and `GPIO4` are connected.
+    - `GPIO2` and `GPIO3` are connected.
     - `GPIO5` and `GPIO6` are connected.
   - RPi: Raspbian 12 configured with the following [setup](#vm-setup)
 - ESP32-H2 (`esp32h2-usb`):
   - Devkit: `ESP32-H2-DevKitM-1` connected via USB-Serial-JTAG (`USB` port).
-    - `GPIO2` and `GPIO4` are connected.
+    - `GPIO2` and `GPIO3` are connected.
     - `GPIO5` and `GPIO8` are connected.
   - RPi: Raspbian 12 configured with the following [setup](#vm-setup)
 - ESP32-S2 (`esp32s2-jtag`):
   - Devkit: `ESP32-S2-Saola-1` connected via UART.
-    - `GPIO2` and `GPIO4` are connected.
+    - `GPIO2` and `GPIO3` are connected.
     - `GPIO5` and `GPIO6` are connected.
   - Probe: `ESP-Prog` connected with the [following connections](https://docs.espressif.com/projects/esp-idf/en/stable/esp32s2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware)
   - RPi: Raspbian 12 configured with the following [setup](#vm-setup)
 - ESP32-S3 (`esp32s3-usb`):
   - Devkit: `ESP32-S3-DevKitC-1` connected via USB-Serial-JTAG.
-    - `GPIO2` and `GPIO4` are connected.
+    - `GPIO2` and `GPIO3` are connected.
     - `GPIO5` and `GPIO6` are connected.
   - RPi: Raspbian 12 configured with the following [setup](#vm-setup)
 
