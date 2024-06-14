@@ -13,7 +13,7 @@ categories = ["embedded", "hardware-support", "no-std"]
 [dependencies]
 defmt = { version = "0.3.8", optional = true }
 esp-hal = { version = "0.18.0", path = "../esp-hal", default-features = false }
-esp-hal-embassy = { version = "0.1.0", path = "../esp-hal-embassy", optional = true }
+esp-hal-embassy = { version = "0.1.0", path = "../esp-hal-embassy", default-features = false, optional = true }
 smoltcp = { version = "0.11.0", default-features = false, features = [
   "medium-ethernet",
   "socket-raw",
