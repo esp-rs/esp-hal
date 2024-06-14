@@ -16,7 +16,7 @@ fn main() {
     check_nightly();
 }
 
-#[rustversion::before(2024-06-12)]
+#[rustversion::all(not(stable),not(since(2024-06-12)))]
 fn check_nightly() {
     println!("cargo:rustc-cfg=nightly_before_2024_06_12");
 }
