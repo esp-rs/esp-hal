@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Refactor `Dac1`/`Dac2` drivers into a single `Dac` driver (#1661)
+- esp-hal-embassy: make executor code optional (but default) again
 
 ### Removed
 - uart: Removed `configure_pins` methods (#1592)
