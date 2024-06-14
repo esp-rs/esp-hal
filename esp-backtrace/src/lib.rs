@@ -95,7 +95,7 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
         println!("{}", message);
 
         #[cfg(feature = "defmt")]
-        println!("{}", defmt::Display2Format(message));
+        println!("{}", defmt::Display2Format(&message));
     }
 
     println!("");
