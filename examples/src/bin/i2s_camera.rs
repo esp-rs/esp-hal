@@ -1,5 +1,23 @@
-//! This shows how to continuously receive data from a Camera via I2S.
+//! This shows how to continuously receive data from a Camera via I2S,
+//! using a "Makerfabs ESP32 3.2" TFT LCD with Camera"
 //!
+//! This example reads a JPEG from an OV2640 and writes it to the console as hex.
+//!
+//! Pins used:
+//! XCLK    GPIO32
+//! SIOD    GPIO26
+//! SIOC    GPIO27
+//! PCLK    GPIO22
+//! VSYNC   GPIO25
+//! HREF    GPIO23
+//! Y2      GPIO5
+//! Y3      GPIO18
+//! Y4      GPIO19
+//! Y5      GPIO21
+//! Y6      GPIO36
+//! Y7      GPIO39
+//! Y8      GPIO34
+//! Y9      GPIO35
 
 //% CHIPS: esp32
 

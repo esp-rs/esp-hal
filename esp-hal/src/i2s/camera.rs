@@ -1,3 +1,14 @@
+//! # I2S in Camera Slave receiving mode.
+//!
+//! ## Overview
+//! The I2S peripheral supports a camera slave mode for high-speed data
+//! transfer from external camera modules.
+//! The driver mandates DMA for efficient data transfer.
+//!
+//! ## Examples
+//! ```rust, no_run
+//! ```
+
 use embedded_dma::WriteBuffer;
 
 use crate::{
@@ -56,10 +67,10 @@ where
             // Enable slave receiver mode
             w.rx_slave_mod()
                 .set_bit()
-                // Do not receive right-channel data first.
+                // Receive left-channel data first.
                 .rx_right_first()
                 .clear_bit()
-                // Do not place right-channel data at the MSB in the FIFO
+                // Place left-channel data at the MSB in the FIFO
                 .rx_msb_right()
                 .clear_bit()
                 // Do not enable receiver in Philips standard mode

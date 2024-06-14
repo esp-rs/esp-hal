@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - uart: Added `Uart::new_with_default_pins` constructor (#1592)
 - uart: Added `UartTx` and `UartRx` constructors (#1592)
 - Add Flex / AnyFlex GPIO pin driver (#1659)
+- ESP32: Add I2S Camera mode driver (#1646)
 - Add new `DmaError::UnsupportedMemoryRegion` - used memory regions are checked when preparing a transfer now (#1670)
 - Add DmaTransactionTxOwned, DmaTransactionRxOwned, DmaTransactionTxRxOwned, functions to do owning transfers added to SPI half-duplex (#1672)
 
@@ -40,7 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `embassy-usb` support (#1517)
 - SPI Slave support for ESP32-S2 (#1562)
 - Add new generic `OneShotTimer` and `PeriodicTimer` drivers, plus new `Timer` trait which is implemented for `TIMGx` and `SYSTIMER` (#1570)
-- ESP32: Add I2S Camera mode driver (#0000)
 
 ### Fixed
 
