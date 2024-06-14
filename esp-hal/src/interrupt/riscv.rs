@@ -279,19 +279,18 @@ impl InterruptStatus {
 
     /// Is the given interrupt bit set
     pub fn is_set(&self, interrupt: u16) -> bool {
-        (self.status[interrupt as usize / 32] & (1 << interrupt as u32 % 32)) != 0
+        (self.status[interrupt as usize / 32] & (1 << (interrupt as u32 % 32))) != 0
     }
 
     /// Set the given interrupt status bit
     pub fn set(&mut self, interrupt: u16) {
-        self.status[interrupt as usize / 32] =
-            self.status[interrupt as usize / 32] | (1 << interrupt as u32 % 32);
+        self.status[interrupt as usize / 32] |= 1 << (interrupt as u32 % 32);
     }
 
     /// Return an iterator over the set interrupt status bits
     pub fn iterator(&self) -> InterruptStatusIterator {
         InterruptStatusIterator {
-            status: self.clone(),
+            status: *self,
             idx: 0,
         }
     }
