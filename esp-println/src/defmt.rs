@@ -4,7 +4,7 @@
 #[cfg(feature = "critical-section")]
 use critical_section::RestoreState;
 
-use super::Printer;
+use super::PrinterImpl;
 
 /// Global logger lock.
 #[cfg(feature = "critical-section")]
@@ -52,7 +52,7 @@ unsafe impl defmt::Logger for Logger {
         // section.
         ENCODER.end_frame(do_write);
 
-        Printer.flush();
+        Self::flush();
 
         #[cfg(feature = "critical-section")]
         {
@@ -74,7 +74,7 @@ unsafe impl defmt::Logger for Logger {
     }
 
     unsafe fn flush() {
-        Printer.flush();
+        PrinterImpl::flush();
     }
 
     unsafe fn write(bytes: &[u8]) {
@@ -85,5 +85,5 @@ unsafe impl defmt::Logger for Logger {
 }
 
 fn do_write(bytes: &[u8]) {
-    Printer.write_bytes_assume_cs(bytes)
+    PrinterImpl::write_bytes_assume_cs(bytes)
 }

@@ -89,67 +89,90 @@ impl core::fmt::Write for Printer {
     }
 }
 
-impl Printer {
-    #[cfg(not(feature = "auto"))]
-    pub fn write_bytes(bytes: &[u8]) {
-        with(|| {
-            PrinterImpl::write_bytes_assume_cs(bytes);
-            PrinterImpl::flush();
-        })
-    }
+#[cfg(feature="auto")]
+pub struct PrinterAuto;
 
-    #[cfg(feature = "auto")]
-    pub fn write_bytes(bytes: &[u8]) {
-        #[cfg(any(
-            feature = "esp32c3",
-            feature = "esp32c6",
-            feature = "esp32h2",
-            feature = "esp32s3"
-        ))]
-        {
-            // Decide if serial-jtag is used by checking SOF interrupt flag.
-            // SOF packet is sent by the HOST every 1ms on a full speed bus.
-            // Between two consecutive ticks, there will be at least 1ms (selectable tick
-            // rate range is 1 - 1000Hz).
-            // We don't reset the flag - if it was ever connected we assume serial-jtag is
-            // used
+#[cfg(feature = "auto")]
+type PrinterImpl = PrinterAuto;
 
-            #[cfg(feature = "esp32c3")]
-            const USB_DEVICE_INT_RAW: *const u32 = 0x60043008 as *const u32;
-            #[cfg(feature = "esp32c6")]
-            const USB_DEVICE_INT_RAW: *const u32 = 0x6000f008 as *const u32;
-            #[cfg(feature = "esp32h2")]
-            const USB_DEVICE_INT_RAW: *const u32 = 0x6000f008 as *const u32;
-            #[cfg(feature = "esp32s3")]
-            const USB_DEVICE_INT_RAW: *const u32 = 0x60038000 as *const u32;
+#[cfg(feature="auto")]
+mod auto_printer {
+    use super::{ with, PrinterSerialJtag, PrinterUart };
 
-            const SOF_INT_MASK: u32 = 0b10;
+    impl super::PrinterAuto {
+        fn use_jtag() -> bool {
+            #[cfg(any(
+                feature = "esp32c3",
+                feature = "esp32c6",
+                feature = "esp32h2",
+                feature = "esp32p4",    // as mentioned in 'build.rs'
+                feature = "esp32s3"
+            ))]
+            {
+                // Decide if serial-jtag is used by checking SOF interrupt flag.
+                // SOF packet is sent by the HOST every 1ms on a full speed bus.
+                // Between two consecutive ticks, there will be at least 1ms (selectable tick
+                // rate range is 1 - 1000Hz).
+                // We don't reset the flag - if it was ever connected we assume serial-jtag is
+                // used
+                #[cfg(feature = "esp32c3")]
+                const USB_DEVICE_INT_RAW: *const u32 = 0x60043008 as *const u32;
+                #[cfg(feature = "esp32c6")]
+                const USB_DEVICE_INT_RAW: *const u32 = 0x6000f008 as *const u32;
+                #[cfg(feature = "esp32h2")]
+                const USB_DEVICE_INT_RAW: *const u32 = 0x6000f008 as *const u32;
+                #[cfg(feature = "esp32p4")]
+                const USB_DEVICE_INT_RAW: *const u32 = unimplemented!();
+                #[cfg(feature = "esp32s3")]
+                const USB_DEVICE_INT_RAW: *const u32 = 0x60038000 as *const u32;
 
-            let is_serial_jtag =
-                unsafe { (USB_DEVICE_INT_RAW.read_volatile() & SOF_INT_MASK) != 0 };
+                const SOF_INT_MASK: u32 = 0b10;
 
-            if is_serial_jtag {
+                unsafe { (USB_DEVICE_INT_RAW.read_volatile() & SOF_INT_MASK) != 0 }
+            }
+
+            #[cfg(not(any(
+                feature = "esp32c3",
+                feature = "esp32c6",
+                feature = "esp32h2",
+                feature = "esp32p4",
+                feature = "esp32s3"
+            )))]
+            { false }
+        }
+
+        pub fn write_bytes_assume_cs(bytes: &[u8]) {
+            if Self::use_jtag() {
                 with(|| {
                     PrinterSerialJtag::write_bytes_assume_cs(bytes);
-                    PrinterSerialJtag::flush();
                 })
             } else {
                 with(|| {
                     PrinterUart::write_bytes_assume_cs(bytes);
+                })
+            }
+        }
+
+        pub fn flush() {
+            if Self::use_jtag() {
+                with(|| {
+                    PrinterSerialJtag::flush();
+                })
+            } else {
+                with(|| {
                     PrinterUart::flush();
                 })
             }
         }
 
-        #[cfg(not(any(
-            feature = "esp32c3",
-            feature = "esp32c6",
-            feature = "esp32h2",
-            feature = "esp32s3"
-        )))]
+    }
+}
+
+impl Printer {
+    pub fn write_bytes(bytes: &[u8]) {
         with(|| {
-            PrinterUart::write_bytes_assume_cs(bytes);
-            PrinterUart::flush();
+            PrinterImpl::write_bytes_assume_cs(bytes);
+            PrinterImpl::flush();
         })
     }
 }
