@@ -89,15 +89,15 @@ impl core::fmt::Write for Printer {
     }
 }
 
-#[cfg(feature="auto")]
+#[cfg(feature = "auto")]
 pub struct PrinterAuto;
 
 #[cfg(feature = "auto")]
 type PrinterImpl = PrinterAuto;
 
-#[cfg(feature="auto")]
+#[cfg(feature = "auto")]
 mod auto_printer {
-    use super::{ with, PrinterSerialJtag, PrinterUart };
+    use super::{with, PrinterSerialJtag, PrinterUart};
 
     impl super::PrinterAuto {
         fn use_jtag() -> bool {
@@ -138,7 +138,9 @@ mod auto_printer {
                 feature = "esp32p4",
                 feature = "esp32s3"
             )))]
-            { false }
+            {
+                false
+            }
         }
 
         pub fn write_bytes_assume_cs(bytes: &[u8]) {
@@ -164,7 +166,6 @@ mod auto_printer {
                 })
             }
         }
-
     }
 }
 
