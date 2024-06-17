@@ -1,5 +1,8 @@
 #![allow(rustdoc::bare_urls, unused_macros)]
-#![cfg_attr(nightly, feature(panic_info_message))]
+#![cfg_attr(
+    any(nightly_before_2024_06_12, nightly_since_2024_06_12),
+    feature(panic_info_message)
+)]
 #![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
 #![doc = include_str!("../README.md")]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
@@ -65,7 +68,7 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
         println!("!! A panic occured at an unknown location:");
     }
 
-    #[cfg(not(nightly))]
+    #[cfg(not(any(nightly_before_2024_06_12, nightly_since_2024_06_12)))]
     {
         #[cfg(not(feature = "defmt"))]
         println!("{:#?}", info);
@@ -74,7 +77,7 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
         println!("{:#?}", defmt::Display2Format(info));
     }
 
-    #[cfg(nightly)]
+    #[cfg(nightly_before_2024_06_12)]
     {
         if let Some(message) = info.message() {
             #[cfg(not(feature = "defmt"))]
@@ -83,6 +86,16 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
             #[cfg(feature = "defmt")]
             println!("{}", defmt::Display2Format(message));
         }
+    }
+
+    #[cfg(nightly_since_2024_06_12)]
+    {
+        let message = info.message();
+        #[cfg(not(feature = "defmt"))]
+        println!("{}", message);
+
+        #[cfg(feature = "defmt")]
+        println!("{}", defmt::Display2Format(&message));
     }
 
     println!("");

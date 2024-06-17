@@ -13,20 +13,18 @@ fn main() {
         panic!("Only one of `custom-halt` and `halt-cores` can be enabled");
     }
 
-    if is_nightly() {
-        println!("cargo:rustc-cfg=nightly");
-    }
+    check_nightly();
 }
 
-fn is_nightly() -> bool {
-    let version_output = std::process::Command::new(
-        std::env::var_os("RUSTC").unwrap_or_else(|| std::ffi::OsString::from("rustc")),
-    )
-    .arg("-V")
-    .output()
-    .unwrap()
-    .stdout;
-    let version_string = String::from_utf8_lossy(&version_output);
-
-    version_string.contains("nightly")
+#[rustversion::all(not(stable),not(since(2024-06-12)))]
+fn check_nightly() {
+    println!("cargo:rustc-cfg=nightly_before_2024_06_12");
 }
+
+#[rustversion::since(2024-06-12)]
+fn check_nightly() {
+    println!("cargo:rustc-cfg=nightly_since_2024_06_12");
+}
+
+#[rustversion::stable]
+fn check_nightly() {}
