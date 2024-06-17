@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactor `Dac1`/`Dac2` drivers into a single `Dac` driver (#1661)
 - esp-hal-embassy: make executor code optional (but default) again
 - Improved interrupt latency on RISC-V based chips (#1679)
+- `esp_wifi::initialize` no longer requires running maximum CPU clock, instead check it runs above 80MHz. (#1688)
 
 ### Removed
 - uart: Removed `configure_pins` methods (#1592)
