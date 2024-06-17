@@ -41,9 +41,11 @@ use core::cell::Cell;
 use embassy_time_driver::{AlarmHandle, Driver};
 use esp_hal::clock::Clocks;
 
+#[cfg(feature = "executors")]
 pub use self::executor::{Executor, InterruptExecutor};
 use self::time_driver::{EmbassyTimer, TimerType};
 
+#[cfg(feature = "executors")]
 mod executor;
 mod time_driver;
 
