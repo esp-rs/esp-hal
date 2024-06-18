@@ -82,7 +82,7 @@ extern crate alloc;
 static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
 
 fn init_heap() {
-    const HEAP_SIZE: usize = 8 * 1024;
+    const HEAP_SIZE: usize = 1 * 1024;
     static mut HEAP: MaybeUninit<[u8; HEAP_SIZE]> = MaybeUninit::uninit();
 
     unsafe {
@@ -126,7 +126,7 @@ impl Entry {
 
 type Color = Rgb888;
 // const COLOR_DEPTH: usize = 8;
-const BRIGHTNESS_BITS: u8 = 3; // must be less than 8!!!!
+const BRIGHTNESS_BITS: u8 = 4; // must be less than 8!!!!
 const BRIGHTNESS_COUNT: u8 = (1 << BRIGHTNESS_BITS) - 1;
 const BRIGHTNESS_STEP: u8 = 1 << (8 - BRIGHTNESS_BITS);
 
@@ -275,12 +275,24 @@ async fn display_task() {
     let mut fb: Framebuffer<Color, _, LittleEndian, MATRIX_COLS, MATRIX_ROWS, FRAMEBUFFER_SIZE> =
         Framebuffer::new();
 
-    const STEP: u8 = MATRIX_COLS as u8 / BRIGHTNESS_STEP;
+    const STEP: u8 = (256 / MATRIX_COLS) as u8;
     for x in 0..MATRIX_COLS {
         let brightness = (x as u8) * STEP;
         fb.set_pixel(Point::new(x as i32, 0), Color::new(brightness, 0, 0));
-        fb.set_pixel(Point::new(x as i32, 1), Color::new(0, brightness, 0));
-        fb.set_pixel(Point::new(x as i32, 2), Color::new(0, 0, brightness));
+        fb.set_pixel(Point::new(x as i32, 1), Color::new(brightness, 0, 0));
+        fb.set_pixel(Point::new(x as i32, 2), Color::new(brightness, 0, 0));
+        fb.set_pixel(Point::new(x as i32, 3), Color::new(brightness, 0, 0));
+        fb.set_pixel(Point::new(x as i32, 4), Color::new(brightness, 0, 0));
+        fb.set_pixel(Point::new(x as i32, 5), Color::new(0, brightness, 0));
+        fb.set_pixel(Point::new(x as i32, 6), Color::new(0, brightness, 0));
+        fb.set_pixel(Point::new(x as i32, 7), Color::new(0, brightness, 0));
+        fb.set_pixel(Point::new(x as i32, 8), Color::new(0, brightness, 0));
+        fb.set_pixel(Point::new(x as i32, 9), Color::new(0, brightness, 0));
+        fb.set_pixel(Point::new(x as i32, 10), Color::new(0, 0, brightness));
+        fb.set_pixel(Point::new(x as i32, 11), Color::new(0, 0, brightness));
+        fb.set_pixel(Point::new(x as i32, 12), Color::new(0, 0, brightness));
+        fb.set_pixel(Point::new(x as i32, 13), Color::new(0, 0, brightness));
+        fb.set_pixel(Point::new(x as i32, 14), Color::new(0, 0, brightness));
     }
 
     let fps_style = MonoTextStyleBuilder::new()
@@ -473,7 +485,7 @@ async fn main(spawner: Spawner) {
         }
     };
 
-    const DISPLAY_STACK_SIZE: usize = 8192;
+    const DISPLAY_STACK_SIZE: usize = 4096;
     static APP_CORE_STACK: StaticCell<Stack<DISPLAY_STACK_SIZE>> = StaticCell::new();
     let app_core_stack = APP_CORE_STACK.init(Stack::new());
     let mut _cpu_control = cpu_control;
