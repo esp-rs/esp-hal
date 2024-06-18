@@ -207,7 +207,15 @@ jobs:
             --features=${{ matrix.device.soc }},log \
             --target=${{ matrix.device.target }} \
             esp-println
-        
+
+      # So #1678 doesn't reoccur ('defmt-espflash,auto')
+      - name: Build (with feature 'defmt-espflash')
+        run: |
+          cargo xtask build-package \
+            --features=${{ matrix.device.soc }},log,defmt-espflash \
+            --target=${{ matrix.device.target }} \
+            esp-println
+
   extras:
     runs-on: ubuntu-latest
 
