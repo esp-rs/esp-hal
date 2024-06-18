@@ -137,26 +137,47 @@ pub struct Context {
     pub M1: u32,
     pub M2: u32,
     pub M3: u32,
+    #[cfg(feature = "print-float-registers")]
     pub F64R_LO: u32,
+    #[cfg(feature = "print-float-registers")]
     pub F64R_HI: u32,
+    #[cfg(feature = "print-float-registers")]
     pub F64S: u32,
+    #[cfg(feature = "print-float-registers")]
     pub FCR: u32,
+    #[cfg(feature = "print-float-registers")]
     pub FSR: u32,
+    #[cfg(feature = "print-float-registers")]
     pub F0: u32,
+    #[cfg(feature = "print-float-registers")]
     pub F1: u32,
+    #[cfg(feature = "print-float-registers")]
     pub F2: u32,
+    #[cfg(feature = "print-float-registers")]
     pub F3: u32,
+    #[cfg(feature = "print-float-registers")]
     pub F4: u32,
+    #[cfg(feature = "print-float-registers")]
     pub F5: u32,
+    #[cfg(feature = "print-float-registers")]
     pub F6: u32,
+    #[cfg(feature = "print-float-registers")]
     pub F7: u32,
+    #[cfg(feature = "print-float-registers")]
     pub F8: u32,
+    #[cfg(feature = "print-float-registers")]
     pub F9: u32,
+    #[cfg(feature = "print-float-registers")]
     pub F10: u32,
+    #[cfg(feature = "print-float-registers")]
     pub F11: u32,
+    #[cfg(feature = "print-float-registers")]
     pub F12: u32,
+    #[cfg(feature = "print-float-registers")]
     pub F13: u32,
+    #[cfg(feature = "print-float-registers")]
     pub F14: u32,
+    #[cfg(feature = "print-float-registers")]
     pub F15: u32,
 }
 
@@ -178,12 +199,6 @@ SCOMPARE1=0x{:08x}
 BR=0x{:08x}
 ACCLO=0x{:08x}    ACCHI=0x{:08x}
 M0=0x{:08x}       M1=0x{:08x}       M2=0x{:08x}       M3=0x{:08x}
-F64R_LO=0x{:08x}  F64R_HI=0x{:08x}  F64S=0x{:08x}
-FCR=0x{:08x}      FSR=0x{:08x}
-F0=0x{:08x}       F1=0x{:08x}       F2=0x{:08x}       F3=0x{:08x}       F4=0x{:08x}
-F5=0x{:08x}       F6=0x{:08x}       F7=0x{:08x}       F8=0x{:08x}       F9=0x{:08x}
-F10=0x{:08x}      F11=0x{:08x}      F12=0x{:08x}      F13=0x{:08x}      F14=0x{:08x}
-F15=0x{:08x}
 ",
             self.PC,
             self.PS,
@@ -218,6 +233,16 @@ F15=0x{:08x}
             self.M1,
             self.M2,
             self.M3,
+        )?;
+        #[cfg(feature = "print-float-registers")]
+        write!(
+            fmt,
+            "F64R_LO=0x{:08x}  F64R_HI=0x{:08x}  F64S=0x{:08x}
+FCR=0x{:08x}      FSR=0x{:08x}
+F0=0x{:08x}       F1=0x{:08x}       F2=0x{:08x}       F3=0x{:08x}       F4=0x{:08x}
+F5=0x{:08x}       F6=0x{:08x}       F7=0x{:08x}       F8=0x{:08x}       F9=0x{:08x}
+F10=0x{:08x}      F11=0x{:08x}      F12=0x{:08x}      F13=0x{:08x}      F14=0x{:08x}
+F15=0x{:08x}",
             self.F64R_LO,
             self.F64R_HI,
             self.F64S,
@@ -239,7 +264,9 @@ F15=0x{:08x}
             self.F13,
             self.F14,
             self.F15,
-        )
+        )?;
+
+        Ok(())
     }
 }
 

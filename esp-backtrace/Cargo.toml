@@ -24,20 +24,22 @@ rustversion = "1.0.17"
 default = ["colors"]
 
 # You must enable exactly one of the below features to support the correct chip:
-esp32   = ["esp-println?/esp32", "semihosting?/openocd-semihosting"]
+esp32   = ["esp-println?/esp32", "semihosting?/openocd-semihosting", "print-float-registers"]
 esp32c2 = ["esp-println?/esp32c2"]
 esp32c3 = ["esp-println?/esp32c3"]
 esp32c6 = ["esp-println?/esp32c6"]
 esp32h2 = ["esp-println?/esp32h2"]
 esp32p4 = ["esp-println?/esp32p4"]
 esp32s2 = ["esp-println?/esp32s2", "semihosting?/openocd-semihosting"]
-esp32s3 = ["esp-println?/esp32s3", "semihosting?/openocd-semihosting"]
+esp32s3 = ["esp-println?/esp32s3", "semihosting?/openocd-semihosting", "print-float-registers"]
 
 # Use esp-println
 println = ["dep:esp-println"]
 
 # Use defmt
 defmt = ["dep:defmt"]
+
+print-float-registers = [] # TODO support esp32p4
 
 # You may optionally enable one or more of the below features to provide
 # additional functionality:
