@@ -243,7 +243,7 @@ pub unsafe extern "C" fn sprintf(dst: *mut u8, format: *const u8, _args: *const 
         "%d,%s,%s,%s" => "????",
         "unknown id:%d" => "unknown id:??",
         _ => {
-            warn!("Unexpected call to `sprintf`: {str}");
+            warn!("Unexpected call to `sprintf`: {}", str);
             "???"
         }
     };
