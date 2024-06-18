@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add Flex / AnyFlex GPIO pin driver (#1659)
 - Add new `DmaError::UnsupportedMemoryRegion` - used memory regions are checked when preparing a transfer now (#1670)
+- ESP32-S3: Add RtcI2c driver (#0000)
 
 ### Fixed
 

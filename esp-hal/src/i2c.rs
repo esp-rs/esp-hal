@@ -2493,3 +2493,532 @@ pub mod lp_i2c {
         }
     }
 }
+
+// TODO: Use #[cfg(rtc_i2c)] when S2 support is added.
+#[cfg(esp32s3)]
+pub mod rtc_i2c {
+    use core::time::Duration;
+
+    use crate::{
+        gpio::{InputPin, OutputPin, RtcPin},
+        peripheral::{Peripheral, PeripheralRef},
+        peripherals::{RTC_I2C, SENS},
+    };
+
+    #[doc(hidden)]
+    pub trait RtcI2cSda: RtcPin + OutputPin + InputPin + crate::private::Sealed {
+        fn selector(&self) -> u8;
+    }
+
+    #[doc(hidden)]
+    pub trait RtcI2cScl: RtcPin + OutputPin + InputPin + crate::private::Sealed {
+        fn selector(&self) -> u8;
+    }
+
+    pub struct RtcI2c<'d> {
+        rtc_i2c: PeripheralRef<'d, RTC_I2C>,
+        sens: SENS,
+    }
+
+    impl<'d> RtcI2c<'d> {
+        pub fn new<SDA: RtcI2cSda, SCL: RtcI2cScl>(
+            rtc_i2c: impl Peripheral<P = RTC_I2C> + 'd,
+            sda: impl Peripheral<P = SDA> + 'd,
+            scl: impl Peripheral<P = SCL> + 'd,
+            timing: Timing,
+            timeout: Duration,
+        ) -> Self {
+            crate::into_ref!(rtc_i2c);
+            crate::into_ref!(sda);
+            crate::into_ref!(scl);
+
+            let sens = unsafe { SENS::steal() };
+
+            sda.rtc_set_config(true, true, crate::gpio::RtcFunction::I2c);
+            sda.enable_open_drain(true, crate::private::Internal);
+            sda.enable_input(true, crate::private::Internal);
+            sda.internal_pull_up(true, crate::private::Internal);
+            sda.internal_pull_down(false, crate::private::Internal);
+            sda.enable_output(true, crate::private::Internal);
+
+            let rtc_io = unsafe { esp32s3::RTC_IO::steal() };
+            rtc_io.sar_i2c_io().write(|w| unsafe {
+                w.sar_i2c_sda_sel()
+                    .bits(sda.selector())
+                    .sar_i2c_scl_sel()
+                    .bits(scl.selector())
+            });
+
+            // Reset RTC I2C
+            sens.sar_peri_reset_conf()
+                .modify(|_, w| w.sar_rtc_i2c_reset().set_bit());
+            rtc_i2c.ctrl().modify(|_, w| w.i2c_reset().set_bit());
+            rtc_i2c.ctrl().modify(|_, w| w.i2c_reset().clear_bit());
+            sens.sar_peri_reset_conf()
+                .modify(|_, w| w.sar_rtc_i2c_reset().clear_bit());
+
+            // Enable internal open-drain for SDA and SCL
+            rtc_i2c
+                .ctrl()
+                .modify(|_, w| w.sda_force_out().clear_bit().scl_force_out().clear_bit());
+
+            // Enable clock gate.
+            sens.sar_peri_clk_gate_conf()
+                .modify(|_, w| w.rtc_i2c_clk_en().set_bit());
+
+            // Configure the RTC I2C controller into master mode.
+            rtc_i2c.ctrl().modify(|_, w| w.ms_mode().set_bit());
+            rtc_i2c
+                .ctrl()
+                .modify(|_, w| w.i2c_ctrl_clk_gate_en().set_bit());
+
+            let driver = Self { rtc_i2c, sens };
+
+            driver.set_timing(timing);
+            driver.set_timeout(timeout);
+
+            driver
+        }
+
+        pub fn set_timeout(&self, value: Duration) {
+            let ticks = duration_to_clock(value);
+            let ticks = ticks.max(2u32.pow(19) - 1);
+            self.rtc_i2c
+                .to()
+                .write(|w| unsafe { w.time_out().bits(ticks) });
+        }
+
+        pub fn set_timing(&self, timing: Timing) {
+            self.rtc_i2c
+                .scl_low()
+                .write(|w| unsafe { w.period().bits(timing.scl_low_period) });
+            self.rtc_i2c
+                .scl_high()
+                .write(|w| unsafe { w.period().bits(timing.scl_high_period) });
+            self.rtc_i2c
+                .sda_duty()
+                .write(|w| unsafe { w.num().bits(timing.sda_duty) });
+            self.rtc_i2c
+                .scl_start_period()
+                .write(|w| unsafe { w.scl_start_period().bits(timing.scl_start_period) });
+            self.rtc_i2c
+                .scl_stop_period()
+                .write(|w| unsafe { w.scl_stop_period().bits(timing.scl_stop_period) });
+        }
+
+        pub fn write(&self, address: u8, register: u8, data: &[u8]) -> Result<(), Error> {
+            if data.len() > u8::MAX as usize - 2 {
+                return Err(Error::ExceededTransactionSize);
+            }
+
+            self.write_cmd(
+                0,
+                Command::Write {
+                    ack_exp: Ack::Ack,
+                    ack_check_en: true,
+                    // Slave addr + Reg addr + data
+                    length: 2 + (data.len() as u8),
+                },
+            );
+            self.write_cmd(1, Command::Stop);
+
+            self.clear_interrupts();
+
+            let ctrl = {
+                let mut result = 0;
+                // Configure slave address.
+                result |= address as u32;
+                // Set slave register.
+                result |= (register as u32) << 11;
+                // Set first data
+                result |= (data[0] as u32) << 19;
+                result |= 1u32 << 27; // Write
+                result
+            };
+            self.sens
+                .sar_i2c_ctrl()
+                .write(|w| unsafe { w.sar_i2c_ctrl().bits(ctrl) });
+
+            // Start transmission.
+            self.sens
+                .sar_i2c_ctrl()
+                .modify(|_, w| w.sar_i2c_start_force().set_bit().sar_i2c_start().set_bit());
+
+            for &byte in data.iter().skip(1) {
+                match self.wait_for_tx_interrupt() {
+                    Ok(is_tx) => {
+                        if is_tx {
+                            self.sens.sar_i2c_ctrl().modify(|r, w| {
+                                let mut value = r.sar_i2c_ctrl().bits();
+                                value &= !(0xFF << 19);
+                                value |= (byte as u32) << 19;
+                                value |= 1 << 27;
+                                unsafe { w.sar_i2c_ctrl().bits(value) }
+                            });
+                            self.rtc_i2c
+                                .int_clr()
+                                .write(|w| w.tx_data().clear_bit_by_one());
+                        } else {
+                            core::panic!("Peripheral didn't wait for data");
+                        }
+                    }
+                    Err(err) => {
+                        // Stop transmission.
+                        self.sens.sar_i2c_ctrl().modify(|_, w| {
+                            w.sar_i2c_start_force()
+                                .clear_bit()
+                                .sar_i2c_start()
+                                .clear_bit()
+                        });
+
+                        return Err(err);
+                    }
+                }
+            }
+
+            let result = self.wait_for_complete_interrupt();
+
+            // Stop transmission.
+            self.sens.sar_i2c_ctrl().write(|w| {
+                w.sar_i2c_start_force()
+                    .clear_bit()
+                    .sar_i2c_start()
+                    .clear_bit()
+            });
+
+            result
+        }
+
+        pub fn read(&self, address: u8, register: u8, data: &mut [u8]) -> Result<(), Error> {
+            if data.len() > u8::MAX as usize {
+                return Err(Error::ExceededTransactionSize);
+            }
+
+            // Slave addr + Reg addr
+            self.write_cmd(
+                2,
+                Command::Write {
+                    ack_exp: Ack::Ack,
+                    ack_check_en: true,
+                    length: 2,
+                },
+            );
+            // Restart
+            self.write_cmd(3, Command::Start);
+            self.write_cmd(
+                4,
+                Command::Write {
+                    ack_exp: Ack::Ack,
+                    ack_check_en: true,
+                    // Reg addr
+                    length: 1,
+                },
+            );
+            if data.len() > 1 {
+                self.write_cmd(
+                    5,
+                    Command::Read {
+                        ack_value: Ack::Ack,
+                        length: (data.len() - 1) as _,
+                    },
+                );
+                self.write_cmd(
+                    6,
+                    Command::Read {
+                        ack_value: Ack::Nack,
+                        length: 1,
+                    },
+                );
+                self.write_cmd(7, Command::Stop);
+            } else {
+                self.write_cmd(
+                    5,
+                    Command::Read {
+                        ack_value: Ack::Nack,
+                        length: 1,
+                    },
+                );
+                self.write_cmd(6, Command::Stop);
+            }
+
+            self.clear_interrupts();
+
+            // Start transmission.
+            let ctrl = {
+                let mut result = 0;
+                result |= address as u32;
+                result |= (register as u32) << 11;
+                result |= 0u32 << 27; // Read
+                result
+            };
+            self.sens.sar_i2c_ctrl().write(|w| {
+                unsafe { w.sar_i2c_ctrl().bits(ctrl) }
+                    .sar_i2c_start_force()
+                    .set_bit()
+                    .sar_i2c_start()
+                    .set_bit()
+            });
+
+            for byte in data {
+                match self.wait_for_rx_interrupt() {
+                    Ok(is_rx) => {
+                        if is_rx {
+                            *byte = self.rtc_i2c.data().read().i2c_rdata().bits();
+                            self.rtc_i2c
+                                .int_clr()
+                                .write(|w| w.rx_data().clear_bit_by_one());
+                        } else {
+                            core::panic!("Peripheral didn't wait for data to be read");
+                        }
+                    }
+                    Err(err) => {
+                        // Stop transmission.
+                        self.sens.sar_i2c_ctrl().modify(|_, w| {
+                            w.sar_i2c_start_force()
+                                .clear_bit()
+                                .sar_i2c_start()
+                                .clear_bit()
+                        });
+
+                        return Err(err);
+                    }
+                }
+            }
+
+            let result = self.wait_for_complete_interrupt();
+
+            // Stop transmission.
+            self.sens.sar_i2c_ctrl().modify(|_, w| {
+                w.sar_i2c_start_force()
+                    .clear_bit()
+                    .sar_i2c_start()
+                    .clear_bit()
+            });
+
+            result
+        }
+
+        fn clear_interrupts(&self) {
+            self.rtc_i2c.int_clr().write(|w| {
+                w.trans_complete()
+                    .clear_bit_by_one()
+                    .tx_data()
+                    .clear_bit_by_one()
+                    .rx_data()
+                    .clear_bit_by_one()
+                    .ack_err()
+                    .clear_bit_by_one()
+                    .time_out()
+                    .clear_bit_by_one()
+                    .arbitration_lost()
+                    .clear_bit_by_one()
+            });
+        }
+
+        fn wait_for_tx_interrupt(&self) -> Result<bool, Error> {
+            loop {
+                let int_raw = self.rtc_i2c.int_raw().read();
+                if int_raw.tx_data().bit_is_set() {
+                    break Ok(true);
+                } else if int_raw.trans_complete().bit_is_set() {
+                    break Ok(false);
+                } else if int_raw.time_out().bit_is_set() {
+                    break Err(Error::TimeOut);
+                } else if int_raw.ack_err().bit_is_set() {
+                    break Err(Error::AckCheckFailed);
+                } else if int_raw.arbitration_lost().bit_is_set() {
+                    break Err(Error::ArbitrationLost);
+                }
+            }
+        }
+
+        fn wait_for_rx_interrupt(&self) -> Result<bool, Error> {
+            loop {
+                let int_raw = self.rtc_i2c.int_raw().read();
+                if int_raw.rx_data().bit_is_set() {
+                    break Ok(true);
+                } else if int_raw.trans_complete().bit_is_set() {
+                    break Ok(false);
+                } else if int_raw.time_out().bit_is_set() {
+                    break Err(Error::TimeOut);
+                } else if int_raw.ack_err().bit_is_set() {
+                    break Err(Error::AckCheckFailed);
+                } else if int_raw.arbitration_lost().bit_is_set() {
+                    break Err(Error::ArbitrationLost);
+                }
+            }
+        }
+
+        fn wait_for_complete_interrupt(&self) -> Result<(), Error> {
+            loop {
+                let int_raw = self.rtc_i2c.int_raw().read();
+                if int_raw.trans_complete().bit_is_set() {
+                    break Ok(());
+                } else if int_raw.time_out().bit_is_set() {
+                    break Err(Error::TimeOut);
+                } else if int_raw.ack_err().bit_is_set() {
+                    break Err(Error::AckCheckFailed);
+                } else if int_raw.arbitration_lost().bit_is_set() {
+                    break Err(Error::ArbitrationLost);
+                }
+            }
+        }
+
+        fn write_cmd(&self, idx: usize, command: Command) {
+            let cmd = command.into();
+            self.rtc_i2c
+                .cmd(idx)
+                .write(|w| unsafe { w.command().bits(cmd) });
+        }
+    }
+
+    /// I2C-specific transmission errors
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    pub enum Error {
+        ExceededTransactionSize,
+        AckCheckFailed,
+        TimeOut,
+        ArbitrationLost,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    pub struct Timing {
+        scl_low_period: u32,
+        scl_high_period: u32,
+        sda_duty: u32,
+        scl_start_period: u32,
+        scl_stop_period: u32,
+    }
+
+    impl Timing {
+        pub fn from_config(
+            scl_low_period: Duration,
+            scl_high_period: Duration,
+            sda_duty: Duration,
+            scl_start_period: Duration,
+            scl_stop_period: Duration,
+        ) -> Self {
+            Self {
+                scl_low_period: duration_to_clock(scl_low_period),
+                scl_high_period: duration_to_clock(scl_high_period),
+                sda_duty: duration_to_clock(sda_duty),
+                scl_start_period: duration_to_clock(scl_start_period),
+                scl_stop_period: duration_to_clock(scl_stop_period),
+            }
+        }
+
+        pub fn standard_mode() -> Self {
+            Self::from_config(
+                Duration::from_micros(5),
+                Duration::from_micros(5),
+                Duration::from_micros(2),
+                Duration::from_micros(3),
+                Duration::from_micros(6),
+            )
+        }
+
+        pub fn fast_mode() -> Self {
+            Self::from_config(
+                Duration::from_nanos(1_400),
+                Duration::from_nanos(300),
+                Duration::from_nanos(1_000),
+                Duration::from_nanos(2_000),
+                Duration::from_nanos(1_300),
+            )
+        }
+    }
+
+    const RTC_FAST_CLK: usize = 17_500_000;
+    fn duration_to_clock(value: Duration) -> u32 {
+        ((value.as_nanos() * RTC_FAST_CLK as u128) / 1_000_000_000) as u32
+    }
+
+    /// A generic I2C Command
+    enum Command {
+        Start,
+        Stop,
+        Write {
+            /// This bit is to set an expected ACK value for the transmitter.
+            ack_exp: Ack,
+            /// Enables checking the ACK value received against the ack_exp
+            /// value.
+            ack_check_en: bool,
+            /// Length of data (in bytes) to be written. The maximum length is
+            /// 255, while the minimum is 1.
+            length: u8,
+        },
+        Read {
+            /// Indicates whether the receiver will send an ACK after this byte
+            /// has been received.
+            ack_value: Ack,
+            /// Length of data (in bytes) to be read. The maximum length is 255,
+            /// while the minimum is 1.
+            length: u8,
+        },
+    }
+
+    #[derive(Eq, PartialEq, Copy, Clone)]
+    enum Ack {
+        Ack,
+        Nack,
+    }
+
+    impl From<Command> for u16 {
+        fn from(c: Command) -> u16 {
+            let opcode = match c {
+                Command::Start => 0,
+                Command::Stop => 3,
+                Command::Write { .. } => 1,
+                Command::Read { .. } => 2,
+            };
+
+            let length = match c {
+                Command::Start | Command::Stop => 0,
+                Command::Write { length: l, .. } | Command::Read { length: l, .. } => l,
+            };
+
+            let ack_exp = match c {
+                Command::Start | Command::Stop | Command::Read { .. } => Ack::Nack,
+                Command::Write { ack_exp: exp, .. } => exp,
+            };
+
+            let ack_check_en = match c {
+                Command::Start | Command::Stop | Command::Read { .. } => false,
+                Command::Write {
+                    ack_check_en: en, ..
+                } => en,
+            };
+
+            let ack_value = match c {
+                Command::Start | Command::Stop | Command::Write { .. } => Ack::Nack,
+                Command::Read { ack_value: ack, .. } => ack,
+            };
+
+            let mut cmd: u16 = length.into();
+
+            if ack_check_en {
+                cmd |= 1 << 8;
+            } else {
+                cmd &= !(1 << 8);
+            }
+
+            if ack_exp == Ack::Nack {
+                cmd |= 1 << 9;
+            } else {
+                cmd &= !(1 << 9);
+            }
+
+            if ack_value == Ack::Nack {
+                cmd |= 1 << 10;
+            } else {
+                cmd &= !(1 << 10);
+            }
+
+            cmd |= opcode << 11;
+
+            cmd
+        }
+    }
+}
