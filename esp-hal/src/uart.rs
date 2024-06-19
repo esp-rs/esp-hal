@@ -507,6 +507,27 @@ where
     }
 
     /// Read all available bytes from the RX FIFO into the provided buffer and
+    /// returns the number of read bytes.
+    pub fn read_bytes(&mut self, buf: &mut [u8], written: usize) -> usize {
+        // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
+        let offset = if cfg!(esp32s2) { 0x20C00000 } else { 0 };
+
+        while T::get_rx_fifo_count() != written as u16 {}
+
+        let mut count = 0;
+        while T::get_rx_fifo_count() > 0 && count < buf.len() {
+            let value = unsafe {
+                let fifo = (T::register_block().fifo().as_ptr() as *mut u8).offset(offset)
+                    as *mut crate::peripherals::generic::Reg<FIFO_SPEC>;
+                (*fifo).read().rxfifo_rd_byte().bits()
+            };
+            buf[count] = value;
+            count += 1;
+        }
+        count
+    }
+
+    /// Read all available bytes from the RX FIFO into the provided buffer and
     /// returns the number of read bytes. Never blocks
     pub fn drain_fifo(&mut self, buf: &mut [u8]) -> usize {
         // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
@@ -942,6 +963,11 @@ where
     /// Read a byte from the UART
     pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
         self.rx.read_byte()
+    }
+
+    /// Read bytes from the UART
+    pub fn read_bytes(&mut self, buf: &mut [u8], written: usize) -> usize {
+        self.rx.read_bytes(buf, written)
     }
 
     /// Change the number of stop bits
