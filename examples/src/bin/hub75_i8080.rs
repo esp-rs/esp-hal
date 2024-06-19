@@ -126,7 +126,7 @@ impl Entry {
 
 type Color = Rgb888;
 // const COLOR_DEPTH: usize = 8;
-const BRIGHTNESS_BITS: u8 = 4; // must be less than 8!!!!
+const BRIGHTNESS_BITS: u8 = 3; // must be less than 8!!!!
 const BRIGHTNESS_COUNT: u8 = (1 << BRIGHTNESS_BITS) - 1;
 const BRIGHTNESS_STEP: u8 = 1 << (8 - BRIGHTNESS_BITS);
 
@@ -185,11 +185,12 @@ fn render_frame<C, BO, const WIDTH: usize, const HEIGHT: usize, const N: usize>(
     let mut prev_addr = 0u8;
     for y in 0..(HEIGHT / 2) as u8 {
         // we render in reverse order because when the lcd_cam device finishes renering
-        // it sets the address lines back to 0
+        // it sets the address lines back to 0 causing ghosting
         let addr = HEIGHT as u8 / 2 - 1 - y;
         let start = y as usize * DMA_ROW_SIZE;
         let mut entry = Entry::new();
-        // rander pixels first
+        // render pixels first
+        // each pixel pair (2 rows) takes 2 Entries, one with the clock low and one with the clock high
         for x in 0..WIDTH {
             let color0 = fb.pixel(Point::new(x as i32, addr as i32)).unwrap();
             let color1 = fb
@@ -211,30 +212,31 @@ fn render_frame<C, BO, const WIDTH: usize, const HEIGHT: usize, const N: usize>(
 
         let mut i = start + WIDTH * 2;
 
-        // diable output
+        // one entry to set the clock low and disable output
+        // output is disabled to prevent ghosting when the address lines are changed
         entry.set_clock(false);
         entry.set_output_enable(false);
         buffer[i] = entry;
         i += 1;
 
-        // delay for blanking
+        // delay for blanking, without some delay there would be ghosting
         for _ in 0..BLANKING_DELAY {
             buffer[i] = entry;
             i += 1;
         }
 
-        // open latch, set new address
+        // open latch to grab the new values shifted in above and set the new address
         entry.set_latch(true);
         entry.set_addr(addr as u16);
         buffer[i] = entry; // unlatch
         i += 1;
 
-        // close latch
+        // close latch to lock in the values
         entry.set_latch(false);
         buffer[i] = entry;
         i += 1;
 
-        // delay for latch
+        // another delay to prevent ghosting
         for _ in 0..LATCH_DELAY {
             buffer[i] = entry;
             i += 1;
@@ -432,9 +434,15 @@ async fn hub75_task(paripherals: DisplayPeripherals, clocks: Clocks<'static>) {
     }
 }
 
+extern "C" {
+    static _stack_end_cpu0: u32;
+    static _stack_start_cpu0: u32;
+}
+
 #[main]
 async fn main(spawner: Spawner) {
     println!("Init!");
+    println!("stack size:  {}", unsafe{core::ptr::addr_of!(_stack_start_cpu0).offset_from(core::ptr::addr_of!(_stack_end_cpu0))});
     println!("FRAMEBUFFER_SIZE: {}", FRAMEBUFFER_SIZE);
     println!("DMA_ROW_SIZE: {}", DMA_ROW_SIZE);
     println!("DMA_FRAME_SIZE: {}", DMA_FRAME_SIZE);
