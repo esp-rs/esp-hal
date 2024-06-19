@@ -231,11 +231,6 @@ macro_rules! ImplSpiChannel {
                     spi.dma_int_raw().read().in_done().bit()
                 }
 
-                fn last_in_dscr_address() -> usize {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.inlink_dscr_bf0().read().dma_inlink_dscr_bf0().bits() as usize
-                }
-
                 fn is_listening_in_eof() -> bool {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
                     spi.dma_int_ena().read().in_suc_eof().bit_is_set()
@@ -631,11 +626,6 @@ macro_rules! ImplI2sChannel {
                 fn is_in_done() -> bool {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
                     reg_block.int_raw().read().in_done().bit()
-                }
-
-                fn last_in_dscr_address() -> usize {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.inlink_dscr_bf0().read().inlink_dscr_bf0().bits() as usize
                 }
 
                 fn is_listening_in_eof() -> bool {

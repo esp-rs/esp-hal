@@ -93,10 +93,6 @@ impl DmaDescriptor {
         self.flags.length() as usize
     }
 
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
     fn set_suc_eof(&mut self, suc_eof: bool) {
         self.flags.set_suc_eof(suc_eof)
     }
@@ -319,8 +315,6 @@ pub enum DmaError {
     DescriptorError,
     /// The available free buffer is less than the amount of data to push
     Overflow,
-    /// The available amount of data is less than requested
-    Exhausted,
     /// The given buffer is too small
     BufferTooSmall,
     /// Descriptors or buffers are not located in a supported memory region
@@ -620,10 +614,6 @@ where
         R::is_in_done()
     }
 
-    fn last_in_dscr_address(&self) -> usize {
-        R::last_in_dscr_address()
-    }
-
     #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
 }
@@ -642,7 +632,7 @@ where
     pub(crate) read_descr_ptr: *mut DmaDescriptor,
     pub(crate) available: usize,
     pub(crate) last_seen_handled_descriptor_ptr: *mut DmaDescriptor,
-    pub(crate) read_buffer_start: *mut u8,
+    pub(crate) read_descriptor_ptr: *mut DmaDescriptor,
     pub(crate) _phantom: PhantomData<R>,
 }
 
@@ -659,7 +649,7 @@ where
             read_descr_ptr: core::ptr::null_mut(),
             available: 0,
             last_seen_handled_descriptor_ptr: core::ptr::null_mut(),
-            read_buffer_start: core::ptr::null_mut(),
+            read_descriptor_ptr: core::ptr::null_mut(),
             _phantom: PhantomData,
         }
     }
@@ -710,7 +700,7 @@ where
         self.available = 0;
         self.read_descr_ptr = self.descriptors.as_mut_ptr();
         self.last_seen_handled_descriptor_ptr = core::ptr::null_mut();
-        self.read_buffer_start = data;
+        self.read_descriptor_ptr = core::ptr::null_mut();
 
         self.rx_impl
             .prepare_transfer_without_start(self.descriptors, circular, peri, data, len)
@@ -750,58 +740,72 @@ where
 
     fn available(&mut self) -> usize {
         if self.last_seen_handled_descriptor_ptr.is_null() {
-            self.last_seen_handled_descriptor_ptr = self.descriptors.as_mut_ptr();
-            return 0;
+            // initially start at last descriptor (so that next will be the first
+            // descriptor)
+            self.last_seen_handled_descriptor_ptr =
+                addr_of_mut!(self.descriptors[self.descriptors.len() - 1]);
         }
 
-        if self.available != 0 {
-            return self.available;
-        }
+        let mut current_in_descr_ptr =
+            unsafe { self.last_seen_handled_descriptor_ptr.read_volatile() }.next;
+        let mut current_in_descr = unsafe { current_in_descr_ptr.read_volatile() };
 
-        let descr_address = self.last_seen_handled_descriptor_ptr;
-        let mut dw0 = unsafe { descr_address.read_volatile() };
+        while current_in_descr.owner() == Owner::Cpu {
+            self.available += current_in_descr.len();
+            self.last_seen_handled_descriptor_ptr = current_in_descr_ptr;
 
-        if dw0.owner() == Owner::Cpu && !dw0.is_empty() {
-            let descriptor_buffer = dw0.buffer;
-            let next_descriptor = dw0.next;
-
-            self.read_buffer_start = descriptor_buffer;
-            self.available = dw0.len();
-
-            dw0.set_owner(Owner::Dma);
-            dw0.set_length(0);
-            dw0.set_suc_eof(false);
-
-            unsafe {
-                descr_address.write_volatile(dw0);
-            }
-
-            self.last_seen_handled_descriptor_ptr = if next_descriptor.is_null() {
-                self.descriptors.as_mut_ptr()
-            } else {
-                next_descriptor
-            };
+            current_in_descr_ptr =
+                unsafe { self.last_seen_handled_descriptor_ptr.read_volatile() }.next;
+            current_in_descr = unsafe { current_in_descr_ptr.read_volatile() };
         }
 
         self.available
     }
 
     fn pop(&mut self, data: &mut [u8]) -> Result<usize, DmaError> {
-        let avail = self.available;
+        let len = data.len();
+        let mut avail = self.available;
 
-        if avail < data.len() {
-            return Err(DmaError::Exhausted);
+        if avail > len {
+            return Err(DmaError::BufferTooSmall);
         }
 
-        unsafe {
-            let dst = data.as_mut_ptr();
-            let src = self.read_buffer_start;
-            let count = self.available;
-            core::ptr::copy_nonoverlapping(src, dst, count);
+        let mut remaining_buffer = data;
+        let mut descr_ptr = self.read_descr_ptr;
+
+        if descr_ptr.is_null() {
+            return Ok(0);
         }
 
-        self.available = 0;
-        Ok(data.len())
+        let mut descr = unsafe { descr_ptr.read_volatile() };
+
+        while avail > 0 && !remaining_buffer.is_empty() && remaining_buffer.len() >= descr.len() {
+            unsafe {
+                let dst = remaining_buffer.as_mut_ptr();
+                let src = descr.buffer;
+                let count = descr.len();
+                core::ptr::copy_nonoverlapping(src, dst, count);
+
+                descr.set_owner(Owner::Dma);
+                descr.set_suc_eof(false);
+                descr.set_length(0);
+                descr_ptr.write_volatile(descr);
+
+                remaining_buffer = &mut remaining_buffer[count..];
+                avail -= count;
+                descr_ptr = descr.next;
+            }
+
+            if descr_ptr.is_null() {
+                break;
+            }
+
+            descr = unsafe { descr_ptr.read_volatile() };
+        }
+
+        self.read_descr_ptr = descr_ptr;
+        self.available = avail;
+        Ok(len - remaining_buffer.len())
     }
 
     fn drain_buffer(&mut self, mut dst: &mut [u8]) -> Result<usize, DmaError> {
@@ -1407,7 +1411,6 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn set_in_peripheral(peripheral: u8);
     fn start_in();
     fn is_in_done() -> bool;
-    fn last_in_dscr_address() -> usize;
 
     fn is_listening_in_eof() -> bool;
     fn is_listening_out_eof() -> bool;
@@ -1532,9 +1535,13 @@ pub(crate) mod dma_private {
         ///
         /// After this all data should be processed by the peripheral - i.e. the
         /// peripheral should have processed it's FIFO(s)
+        ///
+        /// Please note: This is called in the transfer's `wait` function _and_
+        /// by it's [Drop] implementation.
         fn peripheral_wait_dma(&mut self, is_tx: bool, is_rx: bool);
 
-        /// Only used by circular DMA transfers
+        /// Only used by circular DMA transfers in both, the `stop` function
+        /// _and_ it's [Drop] implementation
         fn peripheral_dma_stop(&mut self);
     }
 
@@ -1761,12 +1768,22 @@ where
         Self { instance }
     }
 
-    /// Amount of bytes which can be popped
+    /// Amount of bytes which can be popped.
+    ///
+    /// It's expected to call this before trying to [DmaTransferRxCircular::pop]
+    /// data.
     pub fn available(&mut self) -> usize {
         self.instance.rx().available()
     }
 
-    /// Get available data
+    /// Get available data.
+    ///
+    /// It's expected that the amount of available data is checked before by
+    /// calling [DmaTransferRxCircular::available] and that the buffer can hold
+    /// all available data.
+    ///
+    /// Fails with [DmaError::BufferTooSmall] if the given buffer is too small
+    /// to hold all available data
     pub fn pop(&mut self, data: &mut [u8]) -> Result<usize, DmaError> {
         self.instance.rx().pop(data)
     }

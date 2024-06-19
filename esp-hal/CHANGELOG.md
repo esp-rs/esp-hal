@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - uart: Removed `configure_pins` methods (#1592)
+- Removed `DmaError::Exhausted` error by improving the implementation of the `pop` function (#1664)
 
 ## [0.18.0] - 2024-06-04
 
