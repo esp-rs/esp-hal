@@ -442,7 +442,9 @@ extern "C" {
 #[main]
 async fn main(spawner: Spawner) {
     println!("Init!");
-    println!("stack size:  {}", unsafe{core::ptr::addr_of!(_stack_start_cpu0).offset_from(core::ptr::addr_of!(_stack_end_cpu0))});
+    println!("stack size:  {}", unsafe {
+        core::ptr::addr_of!(_stack_start_cpu0).offset_from(core::ptr::addr_of!(_stack_end_cpu0))
+    });
     println!("FRAMEBUFFER_SIZE: {}", FRAMEBUFFER_SIZE);
     println!("DMA_ROW_SIZE: {}", DMA_ROW_SIZE);
     println!("DMA_FRAME_SIZE: {}", DMA_FRAME_SIZE);
