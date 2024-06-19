@@ -267,4 +267,52 @@ mod tests {
             ))
         ));
     }
+
+    #[test]
+    #[timeout(3)]
+    fn test_symmetric_dma_transfer_owned() {
+        const DMA_BUFFER_SIZE: usize = 4096;
+
+        let peripherals = Peripherals::take();
+        let system = SystemControl::new(peripherals.SYSTEM);
+        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let sclk = io.pins.gpio0;
+        let miso = io.pins.gpio2;
+        let mosi = io.pins.gpio4;
+        let cs = io.pins.gpio5;
+
+        let dma = Dma::new(peripherals.DMA);
+
+        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+        let dma_channel = dma.spi2channel;
+        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
+        let dma_channel = dma.channel0;
+
+        let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) =
+            dma_buffers!(DMA_BUFFER_SIZE);
+
+        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+            .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
+            .with_dma(dma_channel.configure(
+                false,
+                &mut tx_descriptors,
+                &mut rx_descriptors,
+                DmaPriority::Priority0,
+            ));
+
+        // DMA buffer require a static life-time
+        let send = tx_buffer;
+        let receive = rx_buffer;
+
+        send.copy_from_slice(&[0x55u8; 4096]);
+        for byte in 0..send.len() {
+            send[byte] = byte as u8;
+        }
+
+        let transfer = spi.dma_transfer_owned(send, receive).unwrap();
+        let (_, send, receive) = transfer.wait().unwrap();
+        assert_eq!(send, receive);
+    }
 }
