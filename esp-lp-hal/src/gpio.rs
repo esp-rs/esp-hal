@@ -7,6 +7,11 @@ type LpIo = crate::pac::LP_IO;
 #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
 type LpIo = crate::pac::RTC_IO;
 
+#[cfg(feature = "esp32c6")]
+const MAX_GPIO_PIN: u8 = 7;
+#[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
+const MAX_GPIO_PIN: u8 = 21;
+
 #[non_exhaustive]
 pub struct Input<const PIN: u8> {}
 
@@ -40,7 +45,7 @@ impl<const PIN: u8> Output<PIN> {
 // Used by the `entry` procmacro:
 #[doc(hidden)]
 pub unsafe fn conjure_output<const PIN: u8>() -> Option<Output<PIN>> {
-    if PIN > 7 {
+    if PIN > MAX_GPIO_PIN {
         None
     } else {
         Some(Output {})
@@ -50,7 +55,7 @@ pub unsafe fn conjure_output<const PIN: u8>() -> Option<Output<PIN>> {
 // Used by the `entry` procmacro:
 #[doc(hidden)]
 pub unsafe fn conjure_input<const PIN: u8>() -> Option<Input<PIN>> {
-    if PIN > 7 {
+    if PIN > MAX_GPIO_PIN {
         None
     } else {
         Some(Input {})
