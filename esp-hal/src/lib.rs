@@ -237,6 +237,7 @@ pub enum Cpu {
 }
 
 /// Which core the application is currently executing on
+#[inline(always)]
 pub fn get_core() -> Cpu {
     // This works for both RISCV and Xtensa because both
     // get_raw_core functions return zero, _or_ something
@@ -256,8 +257,15 @@ pub fn get_core() -> Cpu {
 ///
 /// Safety: This method should never return UNUSED_THREAD_ID_VALUE
 #[cfg(riscv)]
+#[inline(always)]
 fn get_raw_core() -> usize {
-    riscv::register::mhartid::read()
+    #[cfg(multi_core)]
+    {
+        riscv::register::mhartid::read()
+    }
+
+    #[cfg(not(multi_core))]
+    0
 }
 
 /// Returns the result of reading the PRID register logically ANDed with 0x2000,
@@ -268,6 +276,7 @@ fn get_raw_core() -> usize {
 ///
 /// Safety: This method should never return UNUSED_THREAD_ID_VALUE
 #[cfg(xtensa)]
+#[inline(always)]
 fn get_raw_core() -> usize {
     (xtensa_lx::get_processor_id() & 0x2000) as usize
 }
