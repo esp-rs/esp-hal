@@ -152,6 +152,8 @@ pub enum AlternateFunction {
 pub enum RtcFunction {
     Rtc     = 0,
     Digital = 1,
+    #[cfg(rtc_i2c)]
+    I2c     = 3,
 }
 
 /// Trait implemented by RTC pins

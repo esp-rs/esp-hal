@@ -491,3 +491,25 @@ impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank1 {
 // implement marker traits on USB pins
 impl crate::otg_fs::UsbDp for Gpio19 {}
 impl crate::otg_fs::UsbDm for Gpio20 {}
+
+impl crate::i2c::rtc_i2c::RtcI2cSda for Gpio1 {
+    fn selector(&self) -> u8 {
+        0
+    }
+}
+impl crate::i2c::rtc_i2c::RtcI2cSda for Gpio3 {
+    fn selector(&self) -> u8 {
+        1
+    }
+}
+
+impl crate::i2c::rtc_i2c::RtcI2cScl for Gpio0 {
+    fn selector(&self) -> u8 {
+        0
+    }
+}
+impl crate::i2c::rtc_i2c::RtcI2cScl for Gpio2 {
+    fn selector(&self) -> u8 {
+        1
+    }
+}
