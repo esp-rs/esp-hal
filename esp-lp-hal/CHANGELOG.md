@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add the `ulp-riscv-hal` package (#840)
 - Add LP_UART basic driver (#1113)
 - Added basic `LP-I2C` driver for C6 (#1185)
+- Add remaining GPIO pins for ESP32-S2/S3 (#1695)
 
 ### Changed
 
