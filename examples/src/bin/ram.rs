@@ -4,9 +4,8 @@
 //!
 //! Initialized memory is always re-initialized on startup.
 //!
-//! Persistent memory is not initialized after some kinds of resets.
-//! See the documentation for `#[ram]` for the full list. The boot
-//! button triggers one of these.
+//! Persistent memory is not re-initialized after resets that preserve
+//! RTC ram. See the documentation for `#[ram]` for the full list.
 //!
 //! Zeroed memory is initialized to zero on startup.
 //!
@@ -21,11 +20,10 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::{self, Io},
     macros::ram,
     peripherals::Peripherals,
     prelude::*,
-    reset::software_reset,
+    rtc_cntl::Rtc,
     system::SystemControl,
 };
 use esp_println::println;
@@ -47,14 +45,10 @@ fn main() -> ! {
 
     let delay = Delay::new(&clocks);
 
-    let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    io.set_interrupt_handler(handler);
-    #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
-    let pin = io.pins.gpio0;
-    #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")))]
-    let pin = io.pins.gpio9;
-    let mut button = gpio::Input::new(pin, gpio::Pull::Up);
-    button.listen(gpio::Event::FallingEdge);
+    // The RWDT flash boot protection must be enabled, as it is triggered as part of
+    // the example.
+    let mut rtc = Rtc::new(peripherals.LPWR, None);
+    rtc.rwdt.enable();
 
     println!(
         "IRAM function located at {:p}",
@@ -100,10 +94,4 @@ fn function_in_ram() {
 #[ram(rtc_fast)]
 fn function_in_rtc_ram() -> u32 {
     42
-}
-
-#[handler]
-#[ram]
-fn handler() {
-    software_reset();
 }
