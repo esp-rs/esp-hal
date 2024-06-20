@@ -194,6 +194,16 @@ pub enum ClockSource {
     RefTick,
 }
 
+/// UART Signals to be inverted
+#[derive(Debug, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct InvertedSignals {
+    pub rx: bool,
+    pub tx: bool,
+    pub cts: bool,
+    pub rts: bool,
+}
+
 /// UART Configuration
 pub mod config {
 
@@ -427,6 +437,23 @@ where
             Err(nb::Error::WouldBlock)
         }
     }
+
+    /// Configure the inverted signals
+    pub fn set_inverted_signals(&mut self, inverted_signals: InvertedSignals) {
+        T::register_block()
+            .conf0()
+            .write(|w| w.txd_inv().bit(inverted_signals.tx));
+        #[cfg(not(any(esp32c6, esp32h2)))]
+        T::register_block()
+            .conf0()
+            .write(|w| w.rts_inv().bit(inverted_signals.rts));
+        #[cfg(any(esp32c6, esp32h2))]
+        T::register_block()
+            .conf1()
+            .write(|w| w.rts_inv().bit(inverted_signals.rts));
+
+        Uart::<'d, T, M>::sync_regs();
+    }
 }
 
 impl<'d, T> UartTx<'d, T, Blocking>
@@ -613,6 +640,23 @@ where
 
         Uart::<'d, T, M>::sync_regs();
         Ok(())
+    }
+
+    /// Configure the inverted signals
+    pub fn set_inverted_signals(&mut self, inverted_signals: InvertedSignals) {
+        T::register_block()
+            .conf0()
+            .write(|w| w.rxd_inv().bit(inverted_signals.rx));
+        #[cfg(not(any(esp32c6, esp32h2)))]
+        T::register_block()
+            .conf0()
+            .write(|w| w.cts_inv().bit(inverted_signals.cts));
+        #[cfg(any(esp32c6, esp32h2))]
+        T::register_block()
+            .conf1()
+            .write(|w| w.cts_inv().bit(inverted_signals.cts));
+
+        Uart::<'d, T, M>::sync_regs();
     }
 }
 
@@ -1239,6 +1283,11 @@ where
             .conf0()
             .modify(|_, w| w.txfifo_rst().clear_bit());
         Self::sync_regs();
+    }
+
+    pub fn set_inverted_signals(&mut self, inverted_signals: InvertedSignals) {
+        self.rx.set_inverted_signals(inverted_signals);
+        self.tx.set_inverted_signals(inverted_signals);
     }
 }
 
