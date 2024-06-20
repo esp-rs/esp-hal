@@ -1,3 +1,6 @@
+#![feature(coroutines)]
+#![feature(iter_from_coroutine)]
+
 //! This shows how to continuously receive data from a Camera via I2S,
 //! using a "Makerfabs ESP32 3.2" TFT LCD with Camera"
 //!
@@ -63,7 +66,7 @@ fn main() -> ! {
     let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.i2s0channel;
 
-    let (_, mut tx_descriptors, mut rx_buffer, mut rx_descriptors) = dma_buffers!(0, 18 * 4092);
+    let (_, mut tx_descriptors, mut rx_buffer, mut rx_descriptors) = dma_buffers!(0, 8 * 4092);
 
     let channel = dma_channel.configure(
         true,
@@ -135,10 +138,6 @@ fn main() -> ! {
 
     rx_buffer.fill(0);
 
-    // Start waiting for camera before initialising it to prevent missing the first few bytes.
-    // This can be improved with a VSYNC interrupt but would complicate this example.
-    let transfer = camera.read_dma(&mut rx_buffer).unwrap();
-
     for (reg, value) in FIRST_BLOCK {
         sccb.write(OV2640_ADDRESS, *reg, *value).unwrap();
     }
@@ -150,30 +149,94 @@ fn main() -> ! {
         }
     }
 
-    transfer.wait().unwrap();
+    let mut transfer = camera.read_dma_circular(&mut rx_buffer).unwrap();
 
-    // Convert [FF, 00, FF, 00, D8, 00, D8, 00, FF, 00, FF, 00, E0, 00, E0] to [FF, D8, FF, E0]
-    for i in 0..rx_buffer.len() / 4 {
-        let byte = rx_buffer[i * 4];
-        rx_buffer[i] = byte;
+    let mut byte_stream = core::iter::from_coroutine(|| {
+        let mut frame_data = [0; 12276];
+        loop {
+            // Wait for data to be available.
+            while transfer.available() == 0 {}
+
+            let amount = transfer.pop(&mut frame_data).unwrap();
+
+            // Convert [FF, 00, FF, 00, D8, 00, D8, 00, FF, 00, FF, 00, E0, 00, E0] to [FF, D8, FF, E0]
+            for i in 0..amount / 4 {
+                yield frame_data[i * 4]
+            }
+        }
+    });
+
+    let mut jpegs_skipped = 0;
+    let mut bytes_skipped = 0;
+    loop {
+        let byte: u8 = byte_stream.next().unwrap();
+        if byte != 0xFF {
+            bytes_skipped += 1;
+            continue;
+        }
+        let byte: u8 = byte_stream.next().unwrap();
+        if byte != 0xD8 {
+            bytes_skipped += 2;
+            continue;
+        }
+        let byte: u8 = byte_stream.next().unwrap();
+        if byte != 0xFF {
+            bytes_skipped += 3;
+            continue;
+        }
+        let byte: u8 = byte_stream.next().unwrap();
+        if byte != 0xE0 {
+            bytes_skipped += 4;
+            continue;
+        }
+
+        // We've found the starting JPEG marker of FF, D8, FF, E0.
+
+        // We want to skip the first 10 of these as they're likely to be garbage.
+        if jpegs_skipped < 10 {
+            bytes_skipped += 4;
+            jpegs_skipped += 1;
+            continue;
+        }
+
+        // Read the rest of the JPEG below
+        break;
     }
-    let len = rx_buffer.len();
-    let rx_buffer = &rx_buffer[0..len / 4];
 
     // Note: JPEGs starts with "FF, D8, FF, E0" and end with "FF, D9"
 
-    let index_of_end = rx_buffer
-        .windows(2)
-        .position(|c| c[0] == 0xFF && c[1] == 0xD9);
-    let index_of_end = if let Some(idx) = index_of_end {
-        idx + 2
-    } else {
-        println!("Failed to find JPEG terminator");
-        rx_buffer.len()
-    };
-
+    println!("Skipped {} bytes worth of image data", bytes_skipped);
     println!("Frame data (parse with `xxd -r -p <uart>.txt image.jpg`):");
-    println!("{:02X?}", &rx_buffer[..index_of_end]);
+
+    let mut frame = [0; 65472];
+    frame[0] = 0xFF;
+    frame[1] = 0xD8;
+    frame[2] = 0xFF;
+    frame[3] = 0xE0;
+    let mut idx = 4;
+
+    loop {
+        let byte: u8 = byte_stream.next().unwrap();
+        frame[idx] = byte;
+        idx += 1;
+        if byte != 0xFF {
+            continue;
+        }
+        let byte: u8 = byte_stream.next().unwrap();
+        frame[idx] = byte;
+        idx += 1;
+        if byte != 0xD9 {
+            continue;
+        }
+
+        // We've found the ending JPEG marker of FF, D9.
+        break;
+    }
+
+    println!("{:02X?}", &frame[..idx]);
+
+    // Cancel transfer before halting.
+    drop(transfer);
 
     loop {}
 }
