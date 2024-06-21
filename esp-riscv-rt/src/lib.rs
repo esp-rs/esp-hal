@@ -322,6 +322,22 @@ _abs_start:
     blt a0, a1, 1b
     2:
 "#,
+    // Zero .rtc_fast.persistent iff the chip just powered on
+    r#"
+    mv a0, zero
+    call rtc_get_reset_reason
+    addi a1, zero, 1
+    bne a0, a1, 2f
+    la a0, _rtc_fast_persistent_start
+    la a1, _rtc_fast_persistent_end
+    bge a0, a1, 2f
+    mv a3, x0
+    1:
+    sw a3, 0(a0)
+    addi a0, a0, 4
+    blt a0, a1, 1b
+    2:
+"#,
 #[cfg(feature = "init-data")]
     r#"
     la a0, _data_start
