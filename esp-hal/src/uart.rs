@@ -1663,6 +1663,28 @@ where
 }
 
 #[cfg(feature = "embedded-io")]
+impl<T, M> embedded_io::ReadReady for Uart<'_, T, M>
+where
+    T: Instance,
+    M: Mode,
+{
+    fn read_ready(&mut self) -> Result<bool, Self::Error> {
+        self.rx.read_ready()
+    }
+}
+
+#[cfg(feature = "embedded-io")]
+impl<T, M> embedded_io::ReadReady for UartRx<'_, T, M>
+where
+    T: Instance,
+    M: Mode,
+{
+    fn read_ready(&mut self) -> Result<bool, Self::Error> {
+        Ok(T::get_rx_fifo_count() > 0)
+    }
+}
+
+#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::Write for Uart<'_, T, M>
 where
     T: Instance,
