@@ -145,7 +145,7 @@ fn init_heap() {
 }
 
 #[cfg(any(esp32c3, esp32c2, esp32c6, esp32h2))]
-pub(crate) type EspWifiTimer = Alarm<Target, esp_hal::Blocking, 0>;
+pub(crate) type EspWifiTimer = Alarm<'static, Target, esp_hal::Blocking, 0, 0>;
 
 #[cfg(any(esp32, esp32s3, esp32s2))]
 pub(crate) type EspWifiTimer =

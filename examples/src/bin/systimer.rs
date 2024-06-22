@@ -24,10 +24,12 @@ use esp_hal::{
 use esp_println::println;
 use fugit::ExtU32;
 
-static ALARM0: Mutex<RefCell<Option<Alarm<Periodic, Blocking, 0>>>> =
+static ALARM0: Mutex<RefCell<Option<Alarm<Periodic, Blocking, 0, 0>>>> =
     Mutex::new(RefCell::new(None));
-static ALARM1: Mutex<RefCell<Option<Alarm<Target, Blocking, 1>>>> = Mutex::new(RefCell::new(None));
-static ALARM2: Mutex<RefCell<Option<Alarm<Target, Blocking, 2>>>> = Mutex::new(RefCell::new(None));
+static ALARM1: Mutex<RefCell<Option<Alarm<Target, Blocking, 1, 0>>>> =
+    Mutex::new(RefCell::new(None));
+static ALARM2: Mutex<RefCell<Option<Alarm<Target, Blocking, 2, 0>>>> =
+    Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -38,18 +40,20 @@ fn main() -> ! {
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
     println!("SYSTIMER Current value = {}", SystemTimer::now());
 
+    let alarms = systimer.split();
+
     critical_section::with(|cs| {
-        let mut alarm0 = systimer.alarm0.into_periodic();
+        let mut alarm0 = alarms.alarm0.into_periodic();
         alarm0.set_interrupt_handler(systimer_target0);
         alarm0.set_period(1u32.secs());
         alarm0.enable_interrupt(true);
 
-        let mut alarm1 = systimer.alarm1;
+        let mut alarm1 = alarms.alarm1;
         alarm1.set_interrupt_handler(systimer_target1);
         alarm1.set_target(SystemTimer::now() + (SystemTimer::TICKS_PER_SECOND * 2));
         alarm1.enable_interrupt(true);
 
-        let mut alarm2 = systimer.alarm2;
+        let mut alarm2 = alarms.alarm2;
         alarm2.set_interrupt_handler(systimer_target2);
         alarm2.set_target(SystemTimer::now() + (SystemTimer::TICKS_PER_SECOND * 3));
         alarm2.enable_interrupt(true);

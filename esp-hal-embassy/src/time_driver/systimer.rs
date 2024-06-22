@@ -1,3 +1,5 @@
+use core::cell::OnceCell;
+
 use critical_section::{CriticalSection, Mutex};
 use embassy_time_driver::AlarmHandle;
 use esp_hal::{
@@ -13,13 +15,13 @@ use crate::AlarmState;
 
 pub const ALARM_COUNT: usize = 3;
 
-pub type TimerType = SystemTimer<'static, Async>;
+pub type TimerType = SystemTimer<'static>;
 
 pub struct EmbassyTimer {
     pub(crate) alarms: Mutex<[AlarmState; ALARM_COUNT]>,
-    pub(crate) alarm0: Alarm<Target, Async, 0>,
-    pub(crate) alarm1: Alarm<Target, Async, 1>,
-    pub(crate) alarm2: Alarm<Target, Async, 2>,
+    pub(crate) alarm0: Mutex<OnceCell<Alarm<'static, Target, Async, 0, 0>>>,
+    pub(crate) alarm1: Mutex<OnceCell<Alarm<'static, Target, Async, 1, 0>>>,
+    pub(crate) alarm2: Mutex<OnceCell<Alarm<'static, Target, Async, 2, 0>>>,
 }
 
 #[allow(clippy::declare_interior_mutable_const)]
@@ -27,9 +29,9 @@ const ALARM_STATE_NONE: AlarmState = AlarmState::new();
 
 embassy_time_driver::time_driver_impl!(static DRIVER: EmbassyTimer = EmbassyTimer {
     alarms: Mutex::new([ALARM_STATE_NONE; ALARM_COUNT]),
-    alarm0: unsafe { Alarm::<_, Async, 0>::conjure() },
-    alarm1: unsafe { Alarm::<_, Async, 1>::conjure() },
-    alarm2: unsafe { Alarm::<_, Async, 2>::conjure() },
+    alarm0: Mutex::new(OnceCell::new()),
+    alarm1: Mutex::new(OnceCell::new()),
+    alarm2: Mutex::new(OnceCell::new()),
 });
 
 impl EmbassyTimer {
@@ -46,12 +48,12 @@ impl EmbassyTimer {
     }
 
     pub(crate) fn on_alarm_allocated(&self, n: usize) {
-        match n {
-            0 => self.alarm0.enable_interrupt(true),
-            1 => self.alarm1.enable_interrupt(true),
-            2 => self.alarm2.enable_interrupt(true),
+        critical_section::with(|cs| match n {
+            0 => self.alarm0.borrow(cs).get().unwrap().enable_interrupt(true),
+            1 => self.alarm1.borrow(cs).get().unwrap().enable_interrupt(true),
+            2 => self.alarm2.borrow(cs).get().unwrap().enable_interrupt(true),
             _ => {}
-        }
+        })
     }
 
     fn on_interrupt(&self, id: usize) {
@@ -61,7 +63,15 @@ impl EmbassyTimer {
         })
     }
 
-    pub fn init(_clocks: &Clocks, _systimer: TimerType) {
+    pub fn init(_clocks: &Clocks, systimer: TimerType) {
+        let alarms = systimer.split_async();
+
+        critical_section::with(|cs| {
+            DRIVER.alarm0.borrow(cs).set(alarms.alarm0).unwrap();
+            DRIVER.alarm1.borrow(cs).set(alarms.alarm1).unwrap();
+            DRIVER.alarm2.borrow(cs).set(alarms.alarm2).unwrap();
+        });
+
         unsafe {
             interrupt::bind_interrupt(Interrupt::SYSTIMER_TARGET0, target0_handler.handler());
             unwrap!(interrupt::enable(
@@ -116,20 +126,20 @@ impl EmbassyTimer {
     }
 
     fn clear_interrupt(&self, id: usize) {
-        match id {
-            0 => self.alarm0.clear_interrupt(),
-            1 => self.alarm1.clear_interrupt(),
-            2 => self.alarm2.clear_interrupt(),
+        critical_section::with(|cs| match id {
+            0 => self.alarm0.borrow(cs).get().unwrap().clear_interrupt(),
+            1 => self.alarm1.borrow(cs).get().unwrap().clear_interrupt(),
+            2 => self.alarm2.borrow(cs).get().unwrap().clear_interrupt(),
             _ => {}
-        }
+        })
     }
 
     fn arm(&self, id: usize, timestamp: u64) {
-        match id {
-            0 => self.alarm0.set_target(timestamp),
-            1 => self.alarm1.set_target(timestamp),
-            2 => self.alarm2.set_target(timestamp),
+        critical_section::with(|cs| match id {
+            0 => self.alarm0.borrow(cs).get().unwrap().set_target(timestamp),
+            1 => self.alarm1.borrow(cs).get().unwrap().set_target(timestamp),
+            2 => self.alarm2.borrow(cs).get().unwrap().set_target(timestamp),
             _ => {}
-        }
+        })
     }
 }
