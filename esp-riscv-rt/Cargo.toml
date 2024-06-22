@@ -34,6 +34,8 @@ init-rw-text = []
 zero-bss = []
 ## Zero the `.rtc_fast.bss` section.
 zero-rtc-fast-bss = []
+## Conditionally zero the `.rtc_fast.persistent` section.
+zero-rtc-fast-persistent = []
 
 # This feature is intended for testing; you probably don't want to enable it:
 ci = [

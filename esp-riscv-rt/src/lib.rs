@@ -323,6 +323,7 @@ _abs_start:
     2:
 "#,
     // Zero .rtc_fast.persistent iff the chip just powered on
+#[cfg(feature = "zero-rtc-fast-persistent")]
     r#"
     mv a0, zero
     call rtc_get_reset_reason
