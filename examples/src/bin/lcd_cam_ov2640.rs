@@ -83,7 +83,8 @@ fn main() -> ! {
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
     let mut camera = Camera::new(lcd_cam.cam, channel.rx, cam_data_pins, 20u32.MHz(), &clocks)
         .with_master_clock(cam_xclk)
-        .with_ctrl_pins(cam_vsync, cam_href, cam_pclk);
+        .with_pixel_clock(cam_pclk)
+        .with_ctrl_pins(cam_vsync, cam_href);
 
     let delay = Delay::new(&clocks);
 

@@ -52,7 +52,8 @@
 //! let mut camera =
 //!     Camera::new(lcd_cam.cam, channel.rx, data_pins, 20u32.MHz(), &clocks)
 //!         .with_master_clock(mclk_pin) // Remove this for slave mode.
-//!         .with_ctrl_pins(vsync_pin, href_pin, pclk_pin);
+//!         .with_pixel_clock(pclk_pin)
+//!         .with_ctrl_pins(vsync_pin, href_pin);
 //! # }
 //! ```
 
@@ -274,22 +275,55 @@ impl<'d, RX: Rx> Camera<'d, RX> {
         self
     }
 
-    pub fn with_ctrl_pins<VSYNC: InputPin, HENABLE: InputPin, PCLK: InputPin>(
+    pub fn with_pixel_clock<PCLK: InputPin>(self, pclk: impl Peripheral<P = PCLK> + 'd) -> Self {
+        crate::into_ref!(pclk);
+
+        pclk.set_to_input(crate::private::Internal);
+        pclk.connect_input_to_peripheral(InputSignal::CAM_PCLK, crate::private::Internal);
+
+        self
+    }
+
+    pub fn with_ctrl_pins<VSYNC: InputPin, HENABLE: InputPin>(
         self,
         vsync: impl Peripheral<P = VSYNC> + 'd,
         h_enable: impl Peripheral<P = HENABLE> + 'd,
-        pclk: impl Peripheral<P = PCLK> + 'd,
     ) -> Self {
         crate::into_ref!(vsync);
         crate::into_ref!(h_enable);
-        crate::into_ref!(pclk);
 
         vsync.set_to_input(crate::private::Internal);
         vsync.connect_input_to_peripheral(InputSignal::CAM_V_SYNC, crate::private::Internal);
         h_enable.set_to_input(crate::private::Internal);
         h_enable.connect_input_to_peripheral(InputSignal::CAM_H_ENABLE, crate::private::Internal);
-        pclk.set_to_input(crate::private::Internal);
-        pclk.connect_input_to_peripheral(InputSignal::CAM_PCLK, crate::private::Internal);
+
+        self.lcd_cam
+            .cam_ctrl1()
+            .modify(|_, w| w.cam_vh_de_mode_en().clear_bit());
+
+        self
+    }
+
+    pub fn with_ctrl_pins_and_de<VSYNC: InputPin, HSYNC: InputPin, HENABLE: InputPin>(
+        self,
+        vsync: impl Peripheral<P = VSYNC> + 'd,
+        hsync: impl Peripheral<P = HSYNC> + 'd,
+        h_enable: impl Peripheral<P = HENABLE> + 'd,
+    ) -> Self {
+        crate::into_ref!(vsync);
+        crate::into_ref!(hsync);
+        crate::into_ref!(h_enable);
+
+        vsync.set_to_input(crate::private::Internal);
+        vsync.connect_input_to_peripheral(InputSignal::CAM_V_SYNC, crate::private::Internal);
+        hsync.set_to_input(crate::private::Internal);
+        hsync.connect_input_to_peripheral(InputSignal::CAM_H_SYNC, crate::private::Internal);
+        h_enable.set_to_input(crate::private::Internal);
+        h_enable.connect_input_to_peripheral(InputSignal::CAM_H_ENABLE, crate::private::Internal);
+
+        self.lcd_cam
+            .cam_ctrl1()
+            .modify(|_, w| w.cam_vh_de_mode_en().set_bit());
 
         self
     }

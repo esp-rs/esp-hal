@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add new `DmaError::UnsupportedMemoryRegion` - used memory regions are checked when preparing a transfer now (#1670)
 - Add DmaTransactionTxOwned, DmaTransactionRxOwned, DmaTransactionTxRxOwned, functions to do owning transfers added to SPI half-duplex (#1672)
 - uart: Implement `embedded_io::ReadReady` for `Uart` and `UartRx` (#1702)
+- ESP32-S3: Expose optional HSYNC input in LCD_CAM (#1707)
 
 ### Fixed
 
