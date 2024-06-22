@@ -203,14 +203,22 @@ where
 
 impl<'d, RX: Rx> DmaSupport for Camera<'d, RX> {
     fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
-        while !
-        // Wait for IN_SUC_EOF (i.e. VSYNC)
-        self.rx_channel.is_done() ||
-        // Or for IN_DSCR_EMPTY (i.e. No more buffer space)
-        self.rx_channel.has_dscr_empty_error() ||
-        // Or for IN_DSCR_ERR (i.e. bad descriptor)
-        self.rx_channel.has_error()
-        {}
+        loop {
+            // Wait for IN_SUC_EOF (i.e. VSYNC)
+            if self.rx_channel.is_done() {
+                break;
+            }
+
+            // Or for IN_DSCR_EMPTY (i.e. No more buffer space)
+            if self.rx_channel.has_dscr_empty_error() {
+                break;
+            }
+
+            // Or for IN_DSCR_ERR (i.e. bad descriptor)
+            if self.rx_channel.has_error() {
+                break;
+            }
+        }
     }
 
     fn peripheral_dma_stop(&mut self) {

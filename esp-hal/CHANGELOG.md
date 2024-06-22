@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- ESP32-S3: Fix DMA waiting check in LCD_CAM (#1707)
+
 ### Changed
 
 - Refactor `Dac1`/`Dac2` drivers into a single `Dac` driver (#1661)
