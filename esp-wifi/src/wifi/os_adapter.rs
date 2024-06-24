@@ -1460,7 +1460,7 @@ pub unsafe extern "C" fn log_writev(
     level: u32,
     _tag: *const crate::binary::c_types::c_char,
     format: *const crate::binary::c_types::c_char,
-    args: va_list,
+    args: esp_wifi_sys::include::va_list,
 ) {
     let args = core::mem::transmute(args);
     crate::compat::syslog::syslog(level, format as *const u8, args);
