@@ -28,7 +28,7 @@ const IEEE802154_MULTIPAN_MAX: usize = 4;
 static PIB: Mutex<RefCell<Option<Pib>>> = Mutex::new(RefCell::new(None));
 
 /// Frame pending mode
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum PendingMode {
     /// Frame pending bit always set to 1 in the ack to Data Request
     #[default]
@@ -44,7 +44,7 @@ pub enum PendingMode {
 }
 
 /// CCA mode
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum CcaMode {
     /// Carrier only
     #[default]

@@ -39,7 +39,7 @@ extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
 }
 
 /// IEEE 802.15.4 errors
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
     /// The requested data is bigger than available range, and/or the offset is
     /// invalid
@@ -58,7 +58,7 @@ impl From<byte::Error> for Error {
 }
 
 /// IEEE 802.15.4 driver configuration
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Config {
     pub auto_ack_tx: bool,
     pub auto_ack_rx: bool,
