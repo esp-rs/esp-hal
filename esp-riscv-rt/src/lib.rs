@@ -298,7 +298,6 @@ _abs_start:
     csrw mie, 0
     csrw mip, 0
 "#,
-#[cfg(feature = "zero-bss")]
     r#"
     la a0, _bss_start
     la a1, _bss_end
@@ -310,7 +309,7 @@ _abs_start:
     blt a0, a1, 1b
     2:
 "#,
-#[cfg(feature = "zero-rtc-fast-bss")]
+#[cfg(feature = "rtc-ram")]
     r#"
     la a0, _rtc_fast_bss_start
     la a1, _rtc_fast_bss_end
@@ -323,7 +322,7 @@ _abs_start:
     2:
 "#,
     // Zero .rtc_fast.persistent iff the chip just powered on
-#[cfg(feature = "zero-rtc-fast-persistent")]
+#[cfg(feature = "rtc-ram")]
     r#"
     mv a0, zero
     call rtc_get_reset_reason
@@ -359,34 +358,6 @@ _abs_start:
     la a1, _erwtext
     bge a0, a1, 2f
     la a2, _irwtext
-    1:
-    lw a3, 0(a2)
-    sw a3, 0(a0)
-    addi a0, a0, 4
-    addi a2, a2, 4
-    blt a0, a1, 1b
-    2:
-"#,
-#[cfg(feature = "init-rtc-fast-data")]
-    r#"
-    la a0, _rtc_fast_data_start
-    la a1, _rtc_fast_data_end
-    bge a0, a1, 2f
-    la a2, _irtc_fast_data
-    1:
-    lw a3, 0(a2)
-    sw a3, 0(a0)
-    addi a0, a0, 4
-    addi a2, a2, 4
-    blt a0, a1, 1b
-    2:
-"#,
-#[cfg(feature = "init-rtc-fast-text")]
-    r#"
-    la a0, _srtc_fast_text
-    la a1, _ertc_fast_text
-    bge a0, a1, 2f
-    la a2, _irtc_fast_text
     1:
     lw a3, 0(a2)
     sw a3, 0(a0)
