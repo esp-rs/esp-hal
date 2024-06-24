@@ -103,6 +103,14 @@ impl Chip {
             Chip::Esp32s3 => "ESP32-S3",
         }
     }
+
+    pub fn is_xtensa(&self) -> bool {
+        matches!(self, Chip::Esp32 | Chip::Esp32s2 | Chip::Esp32s3)
+    }
+
+    pub fn is_riscv(&self) -> bool {
+        !self.is_xtensa()
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -180,10 +188,14 @@ pub fn build_documentation(
 
     // Build up an array of command-line arguments to pass to `cargo`:
     let builder = CargoArgsBuilder::default()
+        .toolchain(if chip.is_xtensa() { "esp" } else { "nightly" })
         .subcommand("doc")
         .target(target)
         .features(&features)
-        .arg("-Zbuild-std=alloc,core");
+        .arg("-Zbuild-std=alloc,core")
+        .arg("-Zrustdoc-map")
+        .arg("--lib")
+        .arg("--no-deps");
 
     let args = builder.build();
     log::debug!("{args:#?}");
