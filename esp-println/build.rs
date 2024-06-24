@@ -10,8 +10,7 @@ fn main() {
     assert_unique_used_features!("jtag-serial", "uart", "auto");
 
     // Ensure that, if the `jtag-serial` communication method feature is enabled,
-    // either the `esp32c3`, `esp32c6`, `esp32h2`, or `esp32s3` chip feature is
-    // enabled.
+    // a compatible chip feature is also enabled.
     if cfg!(feature = "jtag-serial")
         && !(cfg!(feature = "esp32c3")
             || cfg!(feature = "esp32c6")
