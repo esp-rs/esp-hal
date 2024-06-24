@@ -4,8 +4,8 @@
 //!
 //! Initialized memory is always re-initialized on startup.
 //!
-//! Persistent memory is not re-initialized after resets that preserve
-//! RTC ram. See the documentation for `#[ram]` for the full list.
+//! Persistent memory is not zeroed after resets that preserve RTC ram. See the
+//! documentation for `esp-hal-procmacros` for the full list.
 //!
 //! Zeroed memory is initialized to zero on startup.
 //!

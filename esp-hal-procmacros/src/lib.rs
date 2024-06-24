@@ -29,8 +29,9 @@
 //!    with different initialization options. Supported options are:
 //!      - `rtc_fast` - Use RTC fast RAM
 //!      - `rtc_slow` - Use RTC slow RAM (not all targets support slow RTC RAM)
-//!      - `persistent` - Skip initialization of the memory after user initiated
-//!        core or cpu resets and after deep sleep
+//!      - `persistent` - Initialize the memory to zero only after the initial
+//!        boot. Otherwise, persist the previous value to allow communication
+//!        across `software_reset()`, `software_reset_cpu()`, deep sleep, etc.
 //!      - `zeroed` - Initialize the memory to zero
 //!
 //! ## Examples
@@ -95,14 +96,8 @@ struct RamArgs {
 
 /// This attribute allows placing statics and functions into ram.
 ///
-/// Options that can be specified are rtc_slow or rtc_fast to use the
-/// RTC slow or RTC fast ram instead of the normal SRAM.
-///
-/// The persistent option will skip initialization of the memory after
-/// resets caused by `software_reset()`, `software_reset_cpu()`, or
-/// deep sleep.
-///
-/// Not all targets support RTC slow ram.
+/// See the crate root documentation for a list of supported options and
+/// examples.
 #[cfg(feature = "ram")]
 #[proc_macro_attribute]
 #[proc_macro_error::proc_macro_error]
