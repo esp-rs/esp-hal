@@ -85,21 +85,13 @@ use crate::{
 /// Interrupts which can be registered in [Blocking] mode
 #[derive(Debug, Default)]
 pub struct TimerInterrupts {
-    /// T0 Interrupt for [`Timer0`]
-    pub timer0_t0: Option<InterruptHandler>,
-    /// T1 Interrupt for [`Timer0`]
-    pub timer0_t1: Option<InterruptHandler>,
-    /// WDT Interrupt for [`Timer0`]
-    pub timer0_wdt: Option<InterruptHandler>,
-    /// T0 Interrupt for [`Timer1`]
+    /// Interrupt for [`Timer0`]
+    pub timer0: Option<InterruptHandler>,
     #[cfg(timg_timer1)]
-    pub timer1_t0: Option<InterruptHandler>,
-    /// T1 Interrupt for [`Timer1`]
-    #[cfg(timg_timer1)]
-    pub timer1_t1: Option<InterruptHandler>,
-    /// WDT Interrupt for [`Timer1`]
-    #[cfg(timg_timer1)]
-    pub timer1_wdt: Option<InterruptHandler>,
+    /// Interrupt for [`Timer1`]
+    pub timer1: Option<InterruptHandler>,
+    /// WDT Interrupt
+    pub wdt: Option<InterruptHandler>,
 }
 
 /// A timer group consisting of up to 2 timers (chip dependent) and a watchdog
@@ -274,50 +266,43 @@ where
         );
 
         if let Some(isr) = isr {
-            if let Some(handler) = isr.timer0_t0 {
+            if let Some(handler) = isr.timer0 {
+                let interrupt = match T::id() {
+                    0 => Interrupt::TG0_T0_LEVEL,
+                    #[cfg(timg1)]
+                    1 => Interrupt::TG1_T0_LEVEL,
+                    _ => unreachable!(),
+                };
                 unsafe {
-                    interrupt::bind_interrupt(Interrupt::TG0_T0_LEVEL, handler.handler());
-                    interrupt::enable(Interrupt::TG0_T0_LEVEL, handler.priority()).unwrap();
-                }
-            }
-
-            #[cfg(any(esp32, esp32s2, esp32s3))]
-            if let Some(handler) = isr.timer0_t1 {
-                unsafe {
-                    interrupt::bind_interrupt(Interrupt::TG0_T1_LEVEL, handler.handler());
-                    interrupt::enable(Interrupt::TG0_T1_LEVEL, handler.priority()).unwrap();
-                }
-            }
-
-            if let Some(handler) = isr.timer0_wdt {
-                unsafe {
-                    interrupt::bind_interrupt(Interrupt::TG0_WDT_LEVEL, handler.handler());
-                    interrupt::enable(Interrupt::TG0_WDT_LEVEL, handler.priority()).unwrap();
+                    interrupt::bind_interrupt(interrupt, handler.handler());
+                    interrupt::enable(interrupt, handler.priority()).unwrap();
                 }
             }
 
             #[cfg(timg_timer1)]
-            {
-                if let Some(handler) = isr.timer1_t0 {
-                    unsafe {
-                        interrupt::bind_interrupt(Interrupt::TG1_T0_LEVEL, handler.handler());
-                        interrupt::enable(Interrupt::TG1_T0_LEVEL, handler.priority()).unwrap();
-                    }
+            if let Some(handler) = isr.timer1 {
+                let interrupt = match T::id() {
+                    0 => Interrupt::TG0_T1_LEVEL,
+                    #[cfg(timg1)]
+                    1 => Interrupt::TG1_T1_LEVEL,
+                    _ => unreachable!(),
+                };
+                unsafe {
+                    interrupt::bind_interrupt(interrupt, handler.handler());
+                    interrupt::enable(interrupt, handler.priority()).unwrap();
                 }
+            }
 
-                #[cfg(any(esp32, esp32s2, esp32s3))]
-                if let Some(handler) = isr.timer1_t1 {
-                    unsafe {
-                        interrupt::bind_interrupt(Interrupt::TG1_T1_LEVEL, handler.handler());
-                        interrupt::enable(Interrupt::TG1_T1_LEVEL, handler.priority()).unwrap();
-                    }
-                }
-
-                if let Some(handler) = isr.timer1_wdt {
-                    unsafe {
-                        interrupt::bind_interrupt(Interrupt::TG1_WDT_LEVEL, handler.handler());
-                        interrupt::enable(Interrupt::TG1_WDT_LEVEL, handler.priority()).unwrap();
-                    }
+            if let Some(handler) = isr.wdt {
+                let interrupt = match T::id() {
+                    0 => Interrupt::TG0_WDT_LEVEL,
+                    #[cfg(timg1)]
+                    1 => Interrupt::TG1_WDT_LEVEL,
+                    _ => unreachable!(),
+                };
+                unsafe {
+                    interrupt::bind_interrupt(interrupt, handler.handler());
+                    interrupt::enable(interrupt, handler.priority()).unwrap();
                 }
             }
         }

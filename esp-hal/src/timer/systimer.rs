@@ -32,7 +32,7 @@
 //!     peripherals.TIMG0,
 //!     &clocks,
 //!     Some(TimerInterrupts {
-//!         timer0_t0: Some(tg0_t0_level),
+//!         timer0: Some(tg0_t0_level),
 //!         ..Default::default()
 //!     }),
 //! );
