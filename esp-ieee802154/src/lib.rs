@@ -4,9 +4,12 @@
 //! supports sending and receiving of raw frames.
 //!
 //! [IEEE 802.15.4]: https://en.wikipedia.org/wiki/IEEE_802.15.4
-
-#![no_std]
+//!
+//! ## Feature Flags
+#![doc = document_features::document_features!()]
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![cfg_attr(feature = "binary-logs", feature(c_variadic))]
+#![no_std]
 
 use core::{cell::RefCell, marker::PhantomData};
 
