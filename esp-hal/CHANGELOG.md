@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - uart: Added `Uart::new_with_default_pins` constructor (#1592)
 - uart: Added `UartTx` and `UartRx` constructors (#1592)
 - Add Flex / AnyFlex GPIO pin driver (#1659)
+- ESP32: Add I2S Camera mode driver (#1646)
 - Add new `DmaError::UnsupportedMemoryRegion` - used memory regions are checked when preparing a transfer now (#1670)
 - Add DmaTransactionTxOwned, DmaTransactionRxOwned, DmaTransactionTxRxOwned, functions to do owning transfers added to SPI half-duplex (#1672)
 - uart: Implement `embedded_io::ReadReady` for `Uart` and `UartRx` (#1702)
