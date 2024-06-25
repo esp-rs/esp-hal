@@ -50,19 +50,16 @@ async fn main(_spawner: Spawner) {
     #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
     let dma_channel = dma.channel0;
 
-    let (_, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(0, 4092 * 4);
+    let (_, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(0, 4092 * 4);
 
     let i2s = I2s::new(
         peripherals.I2S0,
         Standard::Philips,
         DataFormat::Data16Channel16,
         44100u32.Hz(),
-        dma_channel.configure_for_async(
-            false,
-            &mut tx_descriptors,
-            &mut rx_descriptors,
-            DmaPriority::Priority0,
-        ),
+        dma_channel.configure_for_async(false, DmaPriority::Priority0),
+        tx_descriptors,
+        rx_descriptors,
         &clocks,
     );
 

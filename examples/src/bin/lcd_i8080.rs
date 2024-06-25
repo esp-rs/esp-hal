@@ -56,14 +56,9 @@ fn main() -> ! {
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0;
 
-    let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(32678, 0);
+    let (tx_buffer, tx_descriptors, _, _) = dma_buffers!(32678, 0);
 
-    let channel = channel.configure(
-        false,
-        &mut tx_descriptors,
-        &mut rx_descriptors,
-        DmaPriority::Priority0,
-    );
+    let channel = channel.configure(false, DmaPriority::Priority0);
 
     let delay = Delay::new(&clocks);
 
@@ -85,6 +80,7 @@ fn main() -> ! {
     let mut i8080 = I8080::new(
         lcd_cam.lcd,
         channel.tx,
+        tx_descriptors,
         tx_pins,
         20.MHz(),
         Config::default(),

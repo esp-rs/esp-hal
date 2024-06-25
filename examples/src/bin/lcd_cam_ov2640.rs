@@ -54,14 +54,9 @@ fn main() -> ! {
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0;
 
-    let (_, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(0, 32678);
+    let (_, _, rx_buffer, rx_descriptors) = dma_buffers!(0, 32678);
 
-    let channel = channel.configure(
-        false,
-        &mut tx_descriptors,
-        &mut rx_descriptors,
-        DmaPriority::Priority0,
-    );
+    let channel = channel.configure(false, DmaPriority::Priority0);
 
     let cam_siod = io.pins.gpio4;
     let cam_sioc = io.pins.gpio5;
@@ -81,9 +76,16 @@ fn main() -> ! {
     );
 
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-    let mut camera = Camera::new(lcd_cam.cam, channel.rx, cam_data_pins, 20u32.MHz(), &clocks)
-        .with_master_clock(cam_xclk)
-        .with_ctrl_pins(cam_vsync, cam_href, cam_pclk);
+    let mut camera = Camera::new(
+        lcd_cam.cam,
+        channel.rx,
+        rx_descriptors,
+        cam_data_pins,
+        20u32.MHz(),
+        &clocks,
+    )
+    .with_master_clock(cam_xclk)
+    .with_ctrl_pins(cam_vsync, cam_href, cam_pclk);
 
     let delay = Delay::new(&clocks);
 

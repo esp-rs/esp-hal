@@ -38,15 +38,13 @@ mod tests {
         let dma = Dma::new(peripherals.DMA);
         let dma_channel = dma.channel0;
 
-        let (input, mut tx_descriptors, mut output, mut rx_descriptors) =
-            dma_buffers!(DMA_BUFFER_SIZE);
+        let (input, tx_descriptors, mut output, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 
-        let mut aes = Aes::new(peripherals.AES).with_dma(dma_channel.configure(
-            false,
-            &mut tx_descriptors,
-            &mut rx_descriptors,
-            DmaPriority::Priority0,
-        ));
+        let mut aes = Aes::new(peripherals.AES).with_dma(
+            dma_channel.configure(false, DmaPriority::Priority0),
+            tx_descriptors,
+            rx_descriptors,
+        );
 
         let keytext = "SUp4SeCp@sSw0rd".as_bytes();
         let mut keybuf = [0_u8; 16];
@@ -84,15 +82,13 @@ mod tests {
         let dma = Dma::new(peripherals.DMA);
         let dma_channel = dma.channel0;
 
-        let (input, mut tx_descriptors, mut output, mut rx_descriptors) =
-            dma_buffers!(DMA_BUFFER_SIZE);
+        let (input, tx_descriptors, mut output, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 
-        let mut aes = Aes::new(peripherals.AES).with_dma(dma_channel.configure(
-            false,
-            &mut tx_descriptors,
-            &mut rx_descriptors,
-            DmaPriority::Priority0,
-        ));
+        let mut aes = Aes::new(peripherals.AES).with_dma(
+            dma_channel.configure(false, DmaPriority::Priority0),
+            tx_descriptors,
+            rx_descriptors,
+        );
 
         let keytext = "SUp4SeCp@sSw0rd".as_bytes();
         let mut keybuf = [0_u8; 16];
@@ -129,15 +125,13 @@ mod tests {
         let dma = Dma::new(peripherals.DMA);
         let dma_channel = dma.channel0;
 
-        let (input, mut tx_descriptors, mut output, mut rx_descriptors) =
-            dma_buffers!(DMA_BUFFER_SIZE);
+        let (input, tx_descriptors, mut output, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 
-        let mut aes = Aes::new(peripherals.AES).with_dma(dma_channel.configure(
-            false,
-            &mut tx_descriptors,
-            &mut rx_descriptors,
-            DmaPriority::Priority0,
-        ));
+        let mut aes = Aes::new(peripherals.AES).with_dma(
+            dma_channel.configure(false, DmaPriority::Priority0),
+            tx_descriptors,
+            rx_descriptors,
+        );
 
         let keytext = "SUp4SeCp@sSw0rd".as_bytes();
         let mut keybuf = [0_u8; 16];
@@ -175,15 +169,13 @@ mod tests {
         let dma = Dma::new(peripherals.DMA);
         let dma_channel = dma.channel0;
 
-        let (input, mut tx_descriptors, mut output, mut rx_descriptors) =
-            dma_buffers!(DMA_BUFFER_SIZE);
+        let (input, tx_descriptors, mut output, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 
-        let mut aes = Aes::new(peripherals.AES).with_dma(dma_channel.configure(
-            false,
-            &mut tx_descriptors,
-            &mut rx_descriptors,
-            DmaPriority::Priority0,
-        ));
+        let mut aes = Aes::new(peripherals.AES).with_dma(
+            dma_channel.configure(false, DmaPriority::Priority0),
+            tx_descriptors,
+            rx_descriptors,
+        );
 
         let keytext = "SUp4SeCp@sSw0rd".as_bytes();
         let mut keybuf = [0_u8; 16];

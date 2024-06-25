@@ -53,20 +53,16 @@ mod tests {
         let dma = Dma::new(peripherals.DMA);
         let dma_channel = dma.channel0;
 
-        let (tx_buffer, mut tx_descriptors, mut rx_buffer, mut rx_descriptors) =
-            dma_buffers!(16000, 16000);
+        let (tx_buffer, tx_descriptors, mut rx_buffer, rx_descriptors) = dma_buffers!(16000, 16000);
 
         let i2s = I2s::new(
             peripherals.I2S0,
             Standard::Philips,
             DataFormat::Data16Channel16,
             16000.Hz(),
-            dma_channel.configure(
-                false,
-                &mut tx_descriptors,
-                &mut rx_descriptors,
-                DmaPriority::Priority0,
-            ),
+            dma_channel.configure(false, DmaPriority::Priority0),
+            tx_descriptors,
+            rx_descriptors,
             &clocks,
         );
 

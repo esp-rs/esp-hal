@@ -494,8 +494,6 @@ macro_rules! impl_channel {
                 pub fn configure<'a>(
                     self,
                     burst_mode: bool,
-                    tx_descriptors: &'a mut [DmaDescriptor],
-                    rx_descriptors: &'a mut [DmaDescriptor],
                     priority: DmaPriority,
                 ) -> crate::dma::Channel<'a, Channel<$num>, crate::Blocking> {
                     let mut tx_impl = ChannelTxImpl {};
@@ -504,12 +502,9 @@ macro_rules! impl_channel {
                     let mut rx_impl = ChannelRxImpl {};
                     rx_impl.init(burst_mode, priority);
 
-                    let tx_chain = DescriptorChain::new(tx_descriptors);
-                    let rx_chain = DescriptorChain::new(rx_descriptors);
-
                     crate::dma::Channel {
-                        tx: ChannelTx::new(tx_chain, tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_chain, rx_impl, burst_mode),
+                        tx: ChannelTx::new(tx_impl, burst_mode),
+                        rx: ChannelRx::new(rx_impl, burst_mode),
                         phantom: PhantomData,
                     }
                 }
@@ -522,8 +517,6 @@ macro_rules! impl_channel {
                 pub fn configure_for_async<'a>(
                     self,
                     burst_mode: bool,
-                    tx_descriptors: &'a mut [DmaDescriptor],
-                    rx_descriptors: &'a mut [DmaDescriptor],
                     priority: DmaPriority,
                 ) -> crate::dma::Channel<'a, Channel<$num>, $crate::Async> {
                     let mut tx_impl = ChannelTxImpl {};
@@ -532,14 +525,11 @@ macro_rules! impl_channel {
                     let mut rx_impl = ChannelRxImpl {};
                     rx_impl.init(burst_mode, priority);
 
-                    let tx_chain = DescriptorChain::new(tx_descriptors);
-                    let rx_chain = DescriptorChain::new(rx_descriptors);
-
                     <Channel<$num> as ChannelTypes>::Binder::set_isr($async_handler);
 
                     crate::dma::Channel {
-                        tx: ChannelTx::new(tx_chain, tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_chain, rx_impl, burst_mode),
+                        tx: ChannelTx::new(tx_impl, burst_mode),
+                        rx: ChannelRx::new(rx_impl, burst_mode),
                         phantom: PhantomData,
                     }
                 }

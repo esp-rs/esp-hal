@@ -37,7 +37,7 @@ async fn main(_spawner: Spawner) {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let (_, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(0, 32000);
+    let (_, _, rx_buffer, rx_descriptors) = dma_buffers!(0, 32000);
 
     let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
@@ -46,12 +46,8 @@ async fn main(_spawner: Spawner) {
 
     let parl_io = ParlIoRxOnly::new(
         peripherals.PARL_IO,
-        dma_channel.configure_for_async(
-            false,
-            &mut tx_descriptors,
-            &mut rx_descriptors,
-            DmaPriority::Priority0,
-        ),
+        dma_channel.configure_for_async(false, DmaPriority::Priority0),
+        rx_descriptors,
         1.MHz(),
         &clocks,
     )
