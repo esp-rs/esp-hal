@@ -504,9 +504,12 @@ macro_rules! impl_channel {
                     let mut rx_impl = ChannelRxImpl {};
                     rx_impl.init(burst_mode, priority);
 
+                    let tx_chain = DescriptorChain::new(tx_descriptors);
+                    let rx_chain = DescriptorChain::new(rx_descriptors);
+
                     crate::dma::Channel {
-                        tx: ChannelTx::new(tx_descriptors, tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_descriptors, rx_impl, burst_mode),
+                        tx: ChannelTx::new(tx_chain, tx_impl, burst_mode),
+                        rx: ChannelRx::new(rx_chain, rx_impl, burst_mode),
                         phantom: PhantomData,
                     }
                 }
@@ -529,11 +532,14 @@ macro_rules! impl_channel {
                     let mut rx_impl = ChannelRxImpl {};
                     rx_impl.init(burst_mode, priority);
 
+                    let tx_chain = DescriptorChain::new(tx_descriptors);
+                    let rx_chain = DescriptorChain::new(rx_descriptors);
+
                     <Channel<$num> as ChannelTypes>::Binder::set_isr($async_handler);
 
                     crate::dma::Channel {
-                        tx: ChannelTx::new(tx_descriptors, tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_descriptors, rx_impl, burst_mode),
+                        tx: ChannelTx::new(tx_chain, tx_impl, burst_mode),
+                        rx: ChannelRx::new(rx_chain, rx_impl, burst_mode),
                         phantom: PhantomData,
                     }
                 }

@@ -443,6 +443,448 @@ pub trait Tx: TxPrivate {}
 #[doc(hidden)]
 pub trait PeripheralMarker {}
 
+#[doc(hidden)]
+pub struct DescriptorChain<'a> {
+    pub(crate) descriptors: &'a mut [DmaDescriptor],
+}
+
+impl<'a> DescriptorChain<'a> {
+    pub fn new(descriptors: &'a mut [DmaDescriptor]) -> Self {
+        Self { descriptors }
+    }
+
+    pub fn first_mut(&mut self) -> *mut DmaDescriptor {
+        self.descriptors.as_mut_ptr()
+    }
+
+    pub fn first(&self) -> *const DmaDescriptor {
+        self.descriptors.as_ptr()
+    }
+
+    pub fn last_mut(&mut self) -> *mut DmaDescriptor {
+        self.descriptors.last_mut().unwrap()
+    }
+
+    pub fn last(&self) -> *const DmaDescriptor {
+        self.descriptors.last().unwrap()
+    }
+
+    #[allow(clippy::not_unsafe_ptr_arg_deref)]
+    pub fn fill_for_rx(
+        &mut self,
+        circular: bool,
+        data: *mut u8,
+        len: usize,
+    ) -> Result<(), DmaError> {
+        if !crate::soc::is_valid_ram_address(self.first() as u32)
+            || !crate::soc::is_valid_ram_address(self.last() as u32)
+            || !crate::soc::is_valid_ram_address(data as u32)
+            || !crate::soc::is_valid_ram_address(unsafe { data.add(len) } as u32)
+        {
+            return Err(DmaError::UnsupportedMemoryRegion);
+        }
+
+        if self.descriptors.len() < len.div_ceil(CHUNK_SIZE) {
+            return Err(DmaError::OutOfDescriptors);
+        }
+
+        if circular && len <= 3 {
+            return Err(DmaError::BufferTooSmall);
+        }
+
+        self.descriptors.fill(DmaDescriptor::EMPTY);
+
+        let max_chunk_size = if !circular || len > CHUNK_SIZE * 2 {
+            CHUNK_SIZE
+        } else {
+            len / 3 + len % 3
+        };
+
+        let mut processed = 0;
+        let mut descr = 0;
+        loop {
+            let chunk_size = usize::min(max_chunk_size, len - processed);
+            let last = processed + chunk_size >= len;
+
+            let next = if last {
+                if circular {
+                    addr_of_mut!(self.descriptors[0])
+                } else {
+                    core::ptr::null_mut()
+                }
+            } else {
+                addr_of_mut!(self.descriptors[descr + 1])
+            };
+
+            // buffer flags
+            let dw0 = &mut self.descriptors[descr];
+
+            dw0.set_suc_eof(false);
+            dw0.set_owner(Owner::Dma);
+            dw0.set_size(chunk_size); // align to 32 bits?
+            dw0.set_length(0); // hardware will fill in the received number of bytes
+
+            // pointer to current data
+            dw0.buffer = unsafe { data.add(processed) };
+
+            // pointer to next descriptor
+            dw0.next = next;
+
+            if last {
+                break;
+            }
+
+            processed += chunk_size;
+            descr += 1;
+        }
+
+        Ok(())
+    }
+
+    #[allow(clippy::not_unsafe_ptr_arg_deref)]
+    pub fn fill_for_tx(
+        &mut self,
+        circular: bool,
+        data: *const u8,
+        len: usize,
+    ) -> Result<(), DmaError> {
+        if !crate::soc::is_valid_ram_address(self.first() as u32)
+            || !crate::soc::is_valid_ram_address(self.last() as u32)
+            || !crate::soc::is_valid_ram_address(data as u32)
+            || !crate::soc::is_valid_ram_address(unsafe { data.add(len) } as u32)
+        {
+            return Err(DmaError::UnsupportedMemoryRegion);
+        }
+
+        if circular && len <= 3 {
+            return Err(DmaError::BufferTooSmall);
+        }
+
+        if self.descriptors.len() < len.div_ceil(CHUNK_SIZE) {
+            return Err(DmaError::OutOfDescriptors);
+        }
+
+        self.descriptors.fill(DmaDescriptor::EMPTY);
+
+        let max_chunk_size = if !circular || len > CHUNK_SIZE * 2 {
+            CHUNK_SIZE
+        } else {
+            len / 3 + len % 3
+        };
+
+        let mut processed = 0;
+        let mut descr = 0;
+        loop {
+            let chunk_size = usize::min(max_chunk_size, len - processed);
+            let last = processed + chunk_size >= len;
+
+            let next = if last {
+                if circular {
+                    addr_of_mut!(self.descriptors[0])
+                } else {
+                    core::ptr::null_mut()
+                }
+            } else {
+                addr_of_mut!(self.descriptors[descr + 1])
+            };
+
+            // buffer flags
+            let dw0 = &mut self.descriptors[descr];
+
+            // The `suc_eof` bit doesn't affect the transfer itself, but signals when the
+            // hardware should trigger an interrupt request. In circular mode,
+            // we set the `suc_eof` bit for every buffer we send. We use this for
+            // I2S to track progress of a transfer by checking OUTLINK_DSCR_ADDR.
+            dw0.set_suc_eof(circular || last);
+            dw0.set_owner(Owner::Dma);
+            dw0.set_size(chunk_size); // align to 32 bits?
+            dw0.set_length(chunk_size); // the hardware will transmit this many bytes
+
+            // pointer to current data
+            dw0.buffer = unsafe { data.cast_mut().add(processed) };
+
+            // pointer to next descriptor
+            dw0.next = next;
+
+            if last {
+                break;
+            }
+
+            processed += chunk_size;
+            descr += 1;
+        }
+
+        Ok(())
+    }
+}
+
+pub(crate) struct TxCircularState {
+    write_offset: usize,
+    write_descr_ptr: *mut DmaDescriptor,
+    available: usize,
+    last_seen_handled_descriptor_ptr: *mut DmaDescriptor,
+    buffer_start: *const u8,
+    buffer_len: usize,
+}
+
+impl TxCircularState {
+    fn new(
+        write_descr_ptr: *mut DmaDescriptor,
+        last_seen_handled_descriptor_ptr: *mut DmaDescriptor,
+        buffer_start: *const u8,
+        buffer_len: usize,
+    ) -> Self {
+        Self {
+            write_offset: 0,
+            write_descr_ptr,
+            available: 0,
+            last_seen_handled_descriptor_ptr,
+            buffer_start,
+            buffer_len,
+        }
+    }
+
+    fn update<T, R>(&mut self, channel: &T, chain: &mut DescriptorChain)
+    where
+        T: TxChannel<R>,
+        R: RegisterAccess,
+    {
+        if channel.descriptors_handled() {
+            channel.reset_descriptors_handled();
+            let descr_address = channel.last_out_dscr_address() as *mut DmaDescriptor;
+
+            let mut ptr = self.last_seen_handled_descriptor_ptr;
+            if descr_address >= self.last_seen_handled_descriptor_ptr {
+                unsafe {
+                    while ptr < descr_address {
+                        let dw0 = ptr.read_volatile();
+                        self.available += dw0.len();
+                        ptr = ptr.offset(1);
+                    }
+                }
+            } else {
+                unsafe {
+                    while !((*ptr).next.is_null() || (*ptr).next == chain.first_mut()) {
+                        let dw0 = ptr.read_volatile();
+                        self.available += dw0.len();
+                        ptr = ptr.offset(1);
+                    }
+
+                    // add bytes pointed to by the last descriptor
+                    let dw0 = ptr.read_volatile();
+                    self.available += dw0.len();
+
+                    // in circular mode we need to honor the now available bytes at start
+                    if (*ptr).next == chain.first_mut() {
+                        ptr = chain.first_mut();
+                        while ptr < descr_address {
+                            let dw0 = ptr.read_volatile();
+                            self.available += dw0.len();
+                            ptr = ptr.offset(1);
+                        }
+                    }
+                }
+            }
+
+            if self.available >= self.buffer_len {
+                unsafe {
+                    let dw0 = self.write_descr_ptr.read_volatile();
+                    let segment_len = dw0.len();
+                    let next_descriptor = dw0.next;
+                    self.available -= segment_len;
+                    self.write_offset = (self.write_offset + segment_len) % self.buffer_len;
+
+                    self.write_descr_ptr = if next_descriptor.is_null() {
+                        chain.first_mut()
+                    } else {
+                        next_descriptor
+                    }
+                }
+            }
+
+            self.last_seen_handled_descriptor_ptr = descr_address;
+        }
+    }
+
+    fn push(&mut self, chain: &mut DescriptorChain, data: &[u8]) -> Result<usize, DmaError> {
+        let avail = self.available;
+
+        if avail < data.len() {
+            return Err(DmaError::Overflow);
+        }
+
+        let mut remaining = data.len();
+        let mut offset = 0;
+        while self.available >= remaining && remaining > 0 {
+            let written = self.push_with(chain, |buffer| {
+                let len = usize::min(buffer.len(), data.len() - offset);
+                buffer[..len].copy_from_slice(&data[offset..][..len]);
+                len
+            })?;
+            offset += written;
+            remaining -= written;
+        }
+
+        Ok(data.len())
+    }
+
+    fn push_with(
+        &mut self,
+        chain: &mut DescriptorChain,
+        f: impl FnOnce(&mut [u8]) -> usize,
+    ) -> Result<usize, DmaError> {
+        let written = unsafe {
+            let dst = self.buffer_start.add(self.write_offset).cast_mut();
+            let block_size = usize::min(self.available, self.buffer_len - self.write_offset);
+            let buffer = core::slice::from_raw_parts_mut(dst, block_size);
+            f(buffer)
+        };
+
+        let mut forward = written;
+        loop {
+            unsafe {
+                let dw0 = self.write_descr_ptr.read_volatile();
+                let segment_len = dw0.len();
+                self.write_descr_ptr = if dw0.next.is_null() {
+                    chain.first_mut()
+                } else {
+                    dw0.next
+                };
+
+                if forward <= segment_len {
+                    break;
+                }
+
+                forward -= segment_len;
+            }
+        }
+
+        self.write_offset = (self.write_offset + written) % self.buffer_len;
+        self.available -= written;
+
+        Ok(written)
+    }
+}
+
+pub(crate) struct RxCircularState {
+    read_descr_ptr: *mut DmaDescriptor,
+    available: usize,
+    last_seen_handled_descriptor_ptr: *mut DmaDescriptor,
+}
+
+impl RxCircularState {
+    fn new(read_descr_ptr: *mut DmaDescriptor) -> Self {
+        Self {
+            read_descr_ptr,
+            available: 0,
+            last_seen_handled_descriptor_ptr: core::ptr::null_mut(),
+        }
+    }
+
+    fn update(&mut self, chain: &mut DescriptorChain) {
+        if self.last_seen_handled_descriptor_ptr.is_null() {
+            // initially start at last descriptor (so that next will be the first
+            // descriptor)
+            self.last_seen_handled_descriptor_ptr = chain.last_mut();
+        }
+
+        let mut current_in_descr_ptr =
+            unsafe { self.last_seen_handled_descriptor_ptr.read_volatile() }.next;
+        let mut current_in_descr = unsafe { current_in_descr_ptr.read_volatile() };
+
+        while current_in_descr.owner() == Owner::Cpu {
+            self.available += current_in_descr.len();
+            self.last_seen_handled_descriptor_ptr = current_in_descr_ptr;
+
+            current_in_descr_ptr =
+                unsafe { self.last_seen_handled_descriptor_ptr.read_volatile() }.next;
+            current_in_descr = unsafe { current_in_descr_ptr.read_volatile() };
+        }
+    }
+
+    fn pop(&mut self, data: &mut [u8]) -> Result<usize, DmaError> {
+        let len = data.len();
+        let mut avail = self.available;
+
+        if avail > len {
+            return Err(DmaError::BufferTooSmall);
+        }
+
+        let mut remaining_buffer = data;
+        let mut descr_ptr = self.read_descr_ptr;
+
+        if descr_ptr.is_null() {
+            return Ok(0);
+        }
+
+        let mut descr = unsafe { descr_ptr.read_volatile() };
+
+        while avail > 0 && !remaining_buffer.is_empty() && remaining_buffer.len() >= descr.len() {
+            unsafe {
+                let dst = remaining_buffer.as_mut_ptr();
+                let src = descr.buffer;
+                let count = descr.len();
+                core::ptr::copy_nonoverlapping(src, dst, count);
+
+                descr.set_owner(Owner::Dma);
+                descr.set_suc_eof(false);
+                descr.set_length(0);
+                descr_ptr.write_volatile(descr);
+
+                remaining_buffer = &mut remaining_buffer[count..];
+                avail -= count;
+                descr_ptr = descr.next;
+            }
+
+            if descr_ptr.is_null() {
+                break;
+            }
+
+            descr = unsafe { descr_ptr.read_volatile() };
+        }
+
+        self.read_descr_ptr = descr_ptr;
+        self.available = avail;
+        Ok(len - remaining_buffer.len())
+    }
+
+    fn drain_buffer(
+        &mut self,
+        chain: &DescriptorChain,
+        mut dst: &mut [u8],
+    ) -> Result<usize, DmaError> {
+        let mut len = 0;
+        let mut idx = 0;
+        loop {
+            let descriptor = &chain.descriptors[idx];
+            let chunk_len = dst.len().min(descriptor.len());
+            if chunk_len == 0 {
+                break;
+            }
+
+            let buffer_ptr = descriptor.buffer;
+            let next_dscr = descriptor.next;
+
+            // Copy data to destination
+            let (dst_chunk, dst_remaining) = dst.split_at_mut(chunk_len);
+            dst = dst_remaining;
+
+            dst_chunk
+                .copy_from_slice(unsafe { core::slice::from_raw_parts(buffer_ptr, chunk_len) });
+
+            len += chunk_len;
+
+            if next_dscr.is_null() {
+                break;
+            }
+
+            idx += 3;
+        }
+
+        Ok(len)
+    }
+}
+
 /// The functions here are not meant to be used outside the HAL
 #[doc(hidden)]
 pub trait RxPrivate: crate::private::Sealed {
@@ -529,73 +971,14 @@ where
 
     unsafe fn prepare_transfer_without_start(
         &mut self,
-        descriptors: &mut [DmaDescriptor],
-        circular: bool,
+        descriptors: &DescriptorChain,
         peri: DmaPeripheral,
-        data: *mut u8,
-        len: usize,
     ) -> Result<(), DmaError> {
-        if !crate::soc::is_valid_ram_address(descriptors.as_ptr() as u32)
-            || !crate::soc::is_valid_ram_address(core::ptr::addr_of!(
-                descriptors[descriptors.len() - 1]
-            ) as u32)
-            || !crate::soc::is_valid_ram_address(data as u32)
-            || !crate::soc::is_valid_ram_address(data.add(len) as u32)
-        {
-            return Err(DmaError::UnsupportedMemoryRegion);
-        }
-
-        descriptors.fill(DmaDescriptor::EMPTY);
-
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
-
-        let max_chunk_size = if !circular || len > CHUNK_SIZE * 2 {
-            CHUNK_SIZE
-        } else {
-            len / 3 + len % 3
-        };
-
-        let mut processed = 0;
-        let mut descr = 0;
-        loop {
-            let chunk_size = usize::min(max_chunk_size, len - processed);
-            let last = processed + chunk_size >= len;
-
-            let next = if last {
-                if circular {
-                    addr_of_mut!(descriptors[0])
-                } else {
-                    core::ptr::null_mut()
-                }
-            } else {
-                addr_of_mut!(descriptors[descr + 1])
-            };
-
-            // buffer flags
-            let dw0 = &mut descriptors[descr];
-
-            dw0.set_suc_eof(false);
-            dw0.set_owner(Owner::Dma);
-            dw0.set_size(chunk_size); // align to 32 bits?
-            dw0.set_length(0); // hardware will fill in the received number of bytes
-
-            // pointer to current data
-            dw0.buffer = unsafe { data.add(processed) };
-
-            // pointer to next descriptor
-            dw0.next = next;
-
-            if last {
-                break;
-            }
-
-            processed += chunk_size;
-            descr += 1;
-        }
 
         R::clear_in_interrupts();
         R::reset_in();
-        R::set_in_descriptors(descriptors.as_ptr() as u32);
+        R::set_in_descriptors(descriptors.first() as u32);
         R::set_in_peripheral(peri as u8);
 
         Ok(())
@@ -627,13 +1010,10 @@ where
     T: RxChannel<R>,
     R: RegisterAccess,
 {
-    pub(crate) descriptors: &'a mut [DmaDescriptor],
+    pub(crate) chain: DescriptorChain<'a>,
     pub(crate) burst_mode: bool,
     pub(crate) rx_impl: T,
-    pub(crate) read_descr_ptr: *mut DmaDescriptor,
-    pub(crate) available: usize,
-    pub(crate) last_seen_handled_descriptor_ptr: *mut DmaDescriptor,
-    pub(crate) read_descriptor_ptr: *mut DmaDescriptor,
+    pub(crate) circular_state: Option<RxCircularState>,
     pub(crate) _phantom: PhantomData<R>,
 }
 
@@ -642,15 +1022,12 @@ where
     T: RxChannel<R>,
     R: RegisterAccess,
 {
-    fn new(descriptors: &'a mut [DmaDescriptor], rx_impl: T, burst_mode: bool) -> Self {
+    fn new(chain: DescriptorChain<'a>, rx_impl: T, burst_mode: bool) -> Self {
         Self {
-            descriptors,
+            chain,
             burst_mode,
             rx_impl,
-            read_descr_ptr: core::ptr::null_mut(),
-            available: 0,
-            last_seen_handled_descriptor_ptr: core::ptr::null_mut(),
-            read_descriptor_ptr: core::ptr::null_mut(),
+            circular_state: None,
             _phantom: PhantomData,
         }
     }
@@ -686,25 +1063,16 @@ where
         data: *mut u8,
         len: usize,
     ) -> Result<(), DmaError> {
-        if self.descriptors.len() < (len + CHUNK_SIZE - 1) / CHUNK_SIZE {
-            return Err(DmaError::OutOfDescriptors);
-        }
-
         if self.burst_mode && (len % 4 != 0 || data as u32 % 4 != 0) {
             return Err(DmaError::InvalidAlignment);
         }
 
-        if circular && len <= 3 {
-            return Err(DmaError::BufferTooSmall);
-        }
+        self.chain.fill_for_rx(circular, data, len)?;
 
-        self.available = 0;
-        self.read_descr_ptr = self.descriptors.as_mut_ptr();
-        self.last_seen_handled_descriptor_ptr = core::ptr::null_mut();
-        self.read_descriptor_ptr = core::ptr::null_mut();
+        self.circular_state = Some(RxCircularState::new(self.chain.first_mut()));
 
         self.rx_impl
-            .prepare_transfer_without_start(self.descriptors, circular, peri, data, len)
+            .prepare_transfer_without_start(&self.chain, peri)
     }
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
@@ -740,104 +1108,19 @@ where
     }
 
     fn available(&mut self) -> usize {
-        if self.last_seen_handled_descriptor_ptr.is_null() {
-            // initially start at last descriptor (so that next will be the first
-            // descriptor)
-            self.last_seen_handled_descriptor_ptr =
-                addr_of_mut!(self.descriptors[self.descriptors.len() - 1]);
-        }
-
-        let mut current_in_descr_ptr =
-            unsafe { self.last_seen_handled_descriptor_ptr.read_volatile() }.next;
-        let mut current_in_descr = unsafe { current_in_descr_ptr.read_volatile() };
-
-        while current_in_descr.owner() == Owner::Cpu {
-            self.available += current_in_descr.len();
-            self.last_seen_handled_descriptor_ptr = current_in_descr_ptr;
-
-            current_in_descr_ptr =
-                unsafe { self.last_seen_handled_descriptor_ptr.read_volatile() }.next;
-            current_in_descr = unsafe { current_in_descr_ptr.read_volatile() };
-        }
-
-        self.available
+        let state = self.circular_state.as_mut().unwrap();
+        state.update(&mut self.chain);
+        state.available
     }
 
     fn pop(&mut self, data: &mut [u8]) -> Result<usize, DmaError> {
-        let len = data.len();
-        let mut avail = self.available;
-
-        if avail > len {
-            return Err(DmaError::BufferTooSmall);
-        }
-
-        let mut remaining_buffer = data;
-        let mut descr_ptr = self.read_descr_ptr;
-
-        if descr_ptr.is_null() {
-            return Ok(0);
-        }
-
-        let mut descr = unsafe { descr_ptr.read_volatile() };
-
-        while avail > 0 && !remaining_buffer.is_empty() && remaining_buffer.len() >= descr.len() {
-            unsafe {
-                let dst = remaining_buffer.as_mut_ptr();
-                let src = descr.buffer;
-                let count = descr.len();
-                core::ptr::copy_nonoverlapping(src, dst, count);
-
-                descr.set_owner(Owner::Dma);
-                descr.set_suc_eof(false);
-                descr.set_length(0);
-                descr_ptr.write_volatile(descr);
-
-                remaining_buffer = &mut remaining_buffer[count..];
-                avail -= count;
-                descr_ptr = descr.next;
-            }
-
-            if descr_ptr.is_null() {
-                break;
-            }
-
-            descr = unsafe { descr_ptr.read_volatile() };
-        }
-
-        self.read_descr_ptr = descr_ptr;
-        self.available = avail;
-        Ok(len - remaining_buffer.len())
+        let state = self.circular_state.as_mut().unwrap();
+        state.pop(data)
     }
 
-    fn drain_buffer(&mut self, mut dst: &mut [u8]) -> Result<usize, DmaError> {
-        let mut len = 0;
-        let mut idx = 0;
-        loop {
-            let chunk_len = dst.len().min(self.descriptors[idx].len());
-            if chunk_len == 0 {
-                break;
-            }
-
-            let buffer_ptr = self.descriptors[idx].buffer;
-            let next_dscr = self.descriptors[idx].next;
-
-            // Copy data to destination
-            let (dst_chunk, dst_remaining) = dst.split_at_mut(chunk_len);
-            dst = dst_remaining;
-
-            dst_chunk
-                .copy_from_slice(unsafe { core::slice::from_raw_parts(buffer_ptr, chunk_len) });
-
-            len += chunk_len;
-
-            if next_dscr.is_null() {
-                break;
-            }
-
-            idx += 3;
-        }
-
-        Ok(len)
+    fn drain_buffer(&mut self, dst: &mut [u8]) -> Result<usize, DmaError> {
+        let state = self.circular_state.as_mut().unwrap();
+        state.drain_buffer(&self.chain, dst)
     }
 
     fn is_listening_eof(&self) -> bool {
@@ -977,77 +1260,14 @@ where
 
     unsafe fn prepare_transfer_without_start(
         &mut self,
-        descriptors: &mut [DmaDescriptor],
-        circular: bool,
+        descriptors: &DescriptorChain,
         peri: DmaPeripheral,
-        data: *const u8,
-        len: usize,
     ) -> Result<(), DmaError> {
-        if !crate::soc::is_valid_ram_address(descriptors.as_ptr() as u32)
-            || !crate::soc::is_valid_ram_address(core::ptr::addr_of!(
-                descriptors[descriptors.len() - 1]
-            ) as u32)
-            || !crate::soc::is_valid_ram_address(data as u32)
-            || !crate::soc::is_valid_ram_address(data.add(len) as u32)
-        {
-            return Err(DmaError::UnsupportedMemoryRegion);
-        }
-
-        descriptors.fill(DmaDescriptor::EMPTY);
-
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
-
-        let max_chunk_size = if !circular || len > CHUNK_SIZE * 2 {
-            CHUNK_SIZE
-        } else {
-            len / 3 + len % 3
-        };
-
-        let mut processed = 0;
-        let mut descr = 0;
-        loop {
-            let chunk_size = usize::min(max_chunk_size, len - processed);
-            let last = processed + chunk_size >= len;
-
-            let next = if last {
-                if circular {
-                    addr_of_mut!(descriptors[0])
-                } else {
-                    core::ptr::null_mut()
-                }
-            } else {
-                addr_of_mut!(descriptors[descr + 1])
-            };
-
-            // buffer flags
-            let dw0 = &mut descriptors[descr];
-
-            // The `suc_eof` bit doesn't affect the transfer itself, but signals when the
-            // hardware should trigger an interrupt request. In circular mode,
-            // we set the `suc_eof` bit for every buffer we send. We use this for
-            // I2S to track progress of a transfer by checking OUTLINK_DSCR_ADDR.
-            dw0.set_suc_eof(circular || last);
-            dw0.set_owner(Owner::Dma);
-            dw0.set_size(chunk_size); // align to 32 bits?
-            dw0.set_length(chunk_size); // the hardware will transmit this many bytes
-
-            // pointer to current data
-            dw0.buffer = unsafe { data.cast_mut().add(processed) };
-
-            // pointer to next descriptor
-            dw0.next = next;
-
-            if last {
-                break;
-            }
-
-            processed += chunk_size;
-            descr += 1;
-        }
 
         R::clear_out_interrupts();
         R::reset_out();
-        R::set_out_descriptors(addr_of_mut!(descriptors[0]) as u32);
+        R::set_out_descriptors(descriptors.first() as u32);
         R::set_out_peripheral(peri as u8);
 
         Ok(())
@@ -1110,16 +1330,11 @@ where
     T: TxChannel<R>,
     R: RegisterAccess,
 {
-    pub(crate) descriptors: &'a mut [DmaDescriptor],
+    pub(crate) chain: DescriptorChain<'a>,
     #[allow(unused)]
     pub(crate) burst_mode: bool,
     pub(crate) tx_impl: T,
-    pub(crate) write_offset: usize,
-    pub(crate) write_descr_ptr: *mut DmaDescriptor,
-    pub(crate) available: usize,
-    pub(crate) last_seen_handled_descriptor_ptr: *mut DmaDescriptor,
-    pub(crate) buffer_start: *const u8,
-    pub(crate) buffer_len: usize,
+    pub(crate) circular_state: Option<TxCircularState>,
     pub(crate) _phantom: PhantomData<R>,
 }
 
@@ -1128,17 +1343,12 @@ where
     T: TxChannel<R>,
     R: RegisterAccess,
 {
-    fn new(descriptors: &'a mut [DmaDescriptor], tx_impl: T, burst_mode: bool) -> Self {
+    fn new(chain: DescriptorChain<'a>, tx_impl: T, burst_mode: bool) -> Self {
         Self {
-            descriptors,
+            chain,
             burst_mode,
             tx_impl,
-            write_offset: 0,
-            write_descr_ptr: core::ptr::null_mut(),
-            available: 0,
-            last_seen_handled_descriptor_ptr: core::ptr::null_mut(),
-            buffer_start: core::ptr::null_mut(),
-            buffer_len: 0,
+            circular_state: None,
             _phantom: PhantomData,
         }
     }
@@ -1178,23 +1388,17 @@ where
         data: *const u8,
         len: usize,
     ) -> Result<(), DmaError> {
-        if self.descriptors.len() < (len + CHUNK_SIZE - 1) / CHUNK_SIZE {
-            return Err(DmaError::OutOfDescriptors);
-        }
+        self.chain.fill_for_tx(circular, data, len)?;
 
-        if circular && len <= 3 {
-            return Err(DmaError::BufferTooSmall);
-        }
-
-        self.write_offset = 0;
-        self.available = 0;
-        self.write_descr_ptr = self.descriptors.as_mut_ptr();
-        self.last_seen_handled_descriptor_ptr = self.descriptors.as_mut_ptr();
-        self.buffer_start = data;
-        self.buffer_len = len;
+        self.circular_state = Some(TxCircularState::new(
+            self.chain.first_mut(),
+            self.chain.first_mut(),
+            data,
+            len,
+        ));
 
         self.tx_impl
-            .prepare_transfer_without_start(self.descriptors, circular, peri, data, len)
+            .prepare_transfer_without_start(&self.chain, peri)
     }
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
@@ -1226,120 +1430,21 @@ where
     }
 
     fn available(&mut self) -> usize {
-        if self.tx_impl.descriptors_handled() {
-            self.tx_impl.reset_descriptors_handled();
-            let descr_address = self.tx_impl.last_out_dscr_address() as *mut DmaDescriptor;
-
-            let mut ptr = self.last_seen_handled_descriptor_ptr;
-            if descr_address >= self.last_seen_handled_descriptor_ptr {
-                unsafe {
-                    while ptr < descr_address {
-                        let dw0 = ptr.read_volatile();
-                        self.available += dw0.len();
-                        ptr = ptr.offset(1);
-                    }
-                }
-            } else {
-                unsafe {
-                    while !((*ptr).next.is_null()
-                        || (*ptr).next == addr_of_mut!(self.descriptors[0]))
-                    {
-                        let dw0 = ptr.read_volatile();
-                        self.available += dw0.len();
-                        ptr = ptr.offset(1);
-                    }
-
-                    // add bytes pointed to by the last descriptor
-                    let dw0 = ptr.read_volatile();
-                    self.available += dw0.len();
-
-                    // in circular mode we need to honor the now available bytes at start
-                    if (*ptr).next == addr_of_mut!(self.descriptors[0]) {
-                        ptr = addr_of_mut!(self.descriptors[0]);
-                        while ptr < descr_address {
-                            let dw0 = ptr.read_volatile();
-                            self.available += dw0.len();
-                            ptr = ptr.offset(1);
-                        }
-                    }
-                }
-            }
-
-            if self.available >= self.buffer_len {
-                unsafe {
-                    let dw0 = self.write_descr_ptr.read_volatile();
-                    let segment_len = dw0.len();
-                    let next_descriptor = dw0.next;
-                    self.available -= segment_len;
-                    self.write_offset = (self.write_offset + segment_len) % self.buffer_len;
-
-                    self.write_descr_ptr = if next_descriptor.is_null() {
-                        self.descriptors.as_mut_ptr()
-                    } else {
-                        next_descriptor
-                    }
-                }
-            }
-
-            self.last_seen_handled_descriptor_ptr = descr_address;
-        }
-
-        self.available
+        let state = self.circular_state.as_mut().unwrap();
+        state.update(&self.tx_impl, &mut self.chain);
+        state.available
     }
 
     fn push(&mut self, data: &[u8]) -> Result<usize, DmaError> {
-        let avail = self.available();
-
-        if avail < data.len() {
-            return Err(DmaError::Overflow);
-        }
-
-        let mut remaining = data.len();
-        let mut offset = 0;
-        while self.available() >= remaining && remaining > 0 {
-            let written = self.push_with(|buffer| {
-                let len = usize::min(buffer.len(), data.len() - offset);
-                buffer[..len].copy_from_slice(&data[offset..][..len]);
-                len
-            })?;
-            offset += written;
-            remaining -= written;
-        }
-
-        Ok(data.len())
+        let state = self.circular_state.as_mut().unwrap();
+        state.update(&self.tx_impl, &mut self.chain);
+        state.push(&mut self.chain, data)
     }
 
     fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> Result<usize, DmaError> {
-        let written = unsafe {
-            let dst = self.buffer_start.add(self.write_offset).cast_mut();
-            let block_size = usize::min(self.available(), self.buffer_len - self.write_offset);
-            let buffer = core::slice::from_raw_parts_mut(dst, block_size);
-            f(buffer)
-        };
-
-        let mut forward = written;
-        loop {
-            unsafe {
-                let dw0 = self.write_descr_ptr.read_volatile();
-                let segment_len = dw0.len();
-                self.write_descr_ptr = if dw0.next.is_null() {
-                    self.descriptors.as_mut_ptr()
-                } else {
-                    dw0.next
-                };
-
-                if forward <= segment_len {
-                    break;
-                }
-
-                forward -= segment_len;
-            }
-        }
-
-        self.write_offset = (self.write_offset + written) % self.buffer_len;
-        self.available -= written;
-
-        Ok(written)
+        let state = self.circular_state.as_mut().unwrap();
+        state.update(&self.tx_impl, &mut self.chain);
+        state.push_with(&mut self.chain, f)
     }
 
     fn is_listening_eof(&self) -> bool {
