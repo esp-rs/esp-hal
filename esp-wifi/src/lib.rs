@@ -230,33 +230,10 @@ pub fn initialize(
     radio_clocks: hal::peripherals::RADIO_CLK,
     clocks: &Clocks,
 ) -> Result<EspWifiInitialization, InitializationError> {
-    #[cfg(any(esp32, esp32s3, esp32s2))]
-    const MAX_CLOCK: u32 = 240;
-
-    #[cfg(any(esp32c3, esp32c6))]
-    const MAX_CLOCK: u32 = 160;
-
-    #[cfg(esp32c2)]
-    const MAX_CLOCK: u32 = 120;
-
-    #[cfg(esp32h2)]
-    const MAX_CLOCK: u32 = 96;
-
-    if clocks.cpu_clock != MegahertzU32::MHz(MAX_CLOCK) {
+    // A minimum clock of 80MHz is required to operate WiFi module.
+    const MIN_CLOCK: u32 = 80;
+    if clocks.cpu_clock < MegahertzU32::MHz(MIN_CLOCK) {
         return Err(InitializationError::WrongClockConfig);
-    }
-
-    #[cfg(esp32s3)]
-    unsafe {
-        // should be done by the HAL in `ClockControl::configure`
-        const ETS_UPDATE_CPU_FREQUENCY: u32 = 0x40001a4c;
-
-        // cast to usize is just needed because of the way we run clippy in CI
-        let rom_ets_update_cpu_frequency: fn(ticks_per_us: u32) =
-            core::mem::transmute(ETS_UPDATE_CPU_FREQUENCY as usize);
-
-        rom_ets_update_cpu_frequency(240); // we know it's 240MHz because of the
-                                           // check above
     }
 
     info!("esp-wifi configuration {:?}", crate::CONFIG);

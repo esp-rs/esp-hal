@@ -670,7 +670,6 @@ pub(crate) static DATA_QUEUE_RX_STA: Mutex<
 pub enum WifiError {
     NotInitialized,
     InternalError(InternalWifiError),
-    WrongClockConfig,
     Disconnected,
     UnknownWifiMode,
 }
