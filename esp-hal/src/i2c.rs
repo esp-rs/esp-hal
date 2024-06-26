@@ -1,18 +1,22 @@
-//! # I2C Driver
+//! Inter-Integrated Circuit (I2C)
 //!
-//! ## Overview
-//! The I2C Peripheral Driver for ESP chips is a software module that
-//! facilitates communication with I2C devices using ESP microcontroller chips.
-//! It provides an interface to initialize, configure, and perform read and
-//! write operations over the I2C bus.
+//! I2C is a serial, synchronous, multi-device, half-duplex communication
+//! protocol that allows co-existence of multiple masters and slaves on the
+//! same bus. I2C uses two bidirectional open-drain lines: serial data line
+//! (SDA) and serial clock line (SCL), pulled up by resistors.
 //!
-//! The driver supports features such as handling transmission errors,
-//! asynchronous operations, and interrupt-based communication, also supports
-//! multiple I2C peripheral instances on `ESP32`, `ESP32H2`, `ESP32S2`, and
-//! `ESP32S3` chips
+//! Espressif devices sometimes have more than one I2C controller (also called
+//! port), responsible for handling communication on the I2C bus. A single I2C
+//! controller can be a master or a slave.
 //!
-//! ## Example
-//! Following code shows how to read data from a BMP180 sensor using I2C.
+//! Typically, an I2C slave device has a 7-bit address or 10-bit address.
+//! Espressif devices supports both I2C Standard-mode (Sm) and Fast-mode
+//! (Fm) which can go up to 100KHz and 400KHz respectively.
+//!
+//! ## Configuration
+//!
+//! Each I2C controller is individually configurable, and the usual setting
+//! such as frequency, timeout, and SDA/SCL pins can easily be configured.
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -20,7 +24,38 @@
 //! # use esp_hal::gpio::Io;
 //! # use core::option::Option::None;
 //! # use crate::esp_hal::prelude::_fugit_RateExtU32;
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! // Create a new peripheral object with the described wiring
+//! // and standard I2C clock speed
+//! let mut i2c = I2C::new(
+//!     peripherals.I2C0,
+//!     io.pins.gpio1,
+//!     io.pins.gpio2,
+//!     100.kHz(),
+//!     &clocks,
+//!     None,
+//! );
+//! # }
+//! ```
+//!
+//! ## Usage
+//!
+//! The I2C driver implements a number of third-party traits, with the
+//! intention of making the HAL inter-compatible with various device drivers
+//! from the community. This includes the [embedded-hal] for both 0.2.x and
+//! 1.x.x versions.
+//!
+//! ### Examples
+//!
+//! #### Read Data from a BMP180 Sensor
+//!
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::i2c::I2C;
+//! # use esp_hal::gpio::Io;
+//! # use core::option::Option::None;
+//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // Create a new peripheral object with the described wiring
 //! // and standard I2C clock speed
 //! let mut i2c = I2C::new(
