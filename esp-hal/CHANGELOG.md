@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - TIMG: Fix interrupt handler setup (#1714)
+- ROM Functions: Fix address of `ets_update_cpu_frequency_rom` (#1722)
 
 ### Changed
 
