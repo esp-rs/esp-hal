@@ -387,8 +387,6 @@ macro_rules! ImplSpiChannel {
                 pub fn configure<'a>(
                     self,
                     burst_mode: bool,
-                    tx_descriptors: &'a mut [DmaDescriptor],
-                    rx_descriptors: &'a mut [DmaDescriptor],
                     priority: DmaPriority,
                 ) -> Channel<'a, [<Spi $num DmaChannel>], $crate::Blocking> {
                     let mut tx_impl = [<Spi $num DmaChannelTxImpl>] {};
@@ -397,12 +395,9 @@ macro_rules! ImplSpiChannel {
                     let mut rx_impl = [<Spi $num DmaChannelRxImpl>] {};
                     rx_impl.init(burst_mode, priority);
 
-                    let tx_chain = DescriptorChain::new(tx_descriptors);
-                    let rx_chain = DescriptorChain::new(rx_descriptors);
-
                     Channel {
-                        tx: ChannelTx::new(tx_chain, tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_chain, rx_impl, burst_mode),
+                        tx: ChannelTx::new(tx_impl, burst_mode),
+                        rx: ChannelRx::new(rx_impl, burst_mode),
                         phantom: PhantomData,
                     }
                 }
@@ -415,8 +410,6 @@ macro_rules! ImplSpiChannel {
                 pub fn configure_for_async<'a>(
                     self,
                     burst_mode: bool,
-                    tx_descriptors: &'a mut [DmaDescriptor],
-                    rx_descriptors: &'a mut [DmaDescriptor],
                     priority: DmaPriority,
                 ) -> Channel<'a, [<Spi $num DmaChannel>], $crate::Async> {
                     let mut tx_impl = [<Spi $num DmaChannelTxImpl>] {};
@@ -425,14 +418,11 @@ macro_rules! ImplSpiChannel {
                     let mut rx_impl = [<Spi $num DmaChannelRxImpl>] {};
                     rx_impl.init(burst_mode, priority);
 
-                    let tx_chain = DescriptorChain::new(tx_descriptors);
-                    let rx_chain = DescriptorChain::new(rx_descriptors);
-
                     <[<Spi $num DmaChannel>] as ChannelTypes>::Binder::set_isr(super::asynch::interrupt::[< interrupt_handler_spi $num _dma >]);
 
                     Channel {
-                        tx: ChannelTx::new(tx_chain, tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_chain, rx_impl, burst_mode),
+                        tx: ChannelTx::new(tx_impl, burst_mode),
+                        rx: ChannelRx::new(rx_impl, burst_mode),
                         phantom: PhantomData,
                     }
                 }
@@ -787,8 +777,6 @@ macro_rules! ImplI2sChannel {
                 pub fn configure<'a>(
                     self,
                     burst_mode: bool,
-                    tx_descriptors: &'a mut [DmaDescriptor],
-                    rx_descriptors: &'a mut [DmaDescriptor],
                     priority: DmaPriority,
                 ) -> Channel<'a, [<I2s $num DmaChannel>], $crate::Blocking> {
                     let mut tx_impl = [<I2s $num DmaChannelTxImpl>] {};
@@ -797,12 +785,9 @@ macro_rules! ImplI2sChannel {
                     let mut rx_impl = [<I2s $num DmaChannelRxImpl>] {};
                     rx_impl.init(burst_mode, priority);
 
-                    let tx_chain = DescriptorChain::new(tx_descriptors);
-                    let rx_chain = DescriptorChain::new(rx_descriptors);
-
                     Channel {
-                        tx: ChannelTx::new(tx_chain, tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_chain, rx_impl, burst_mode),
+                        tx: ChannelTx::new(tx_impl, burst_mode),
+                        rx: ChannelRx::new(rx_impl, burst_mode),
                         phantom: PhantomData,
                     }
                 }
@@ -815,8 +800,6 @@ macro_rules! ImplI2sChannel {
                 pub fn configure_for_async<'a>(
                     self,
                     burst_mode: bool,
-                    tx_descriptors: &'a mut [DmaDescriptor],
-                    rx_descriptors: &'a mut [DmaDescriptor],
                     priority: DmaPriority,
                 ) -> Channel<'a, [<I2s $num DmaChannel>], $crate::Async> {
                     let mut tx_impl = [<I2s $num DmaChannelTxImpl>] {};
@@ -825,14 +808,11 @@ macro_rules! ImplI2sChannel {
                     let mut rx_impl = [<I2s $num DmaChannelRxImpl>] {};
                     rx_impl.init(burst_mode, priority);
 
-                    let tx_chain = DescriptorChain::new(tx_descriptors);
-                    let rx_chain = DescriptorChain::new(rx_descriptors);
-
                     <[<I2s $num DmaChannel>] as ChannelTypes>::Binder::set_isr(super::asynch::interrupt::[< interrupt_handler_i2s $num >]);
 
                     Channel {
-                        tx: ChannelTx::new(tx_chain, tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_chain, rx_impl, burst_mode),
+                        tx: ChannelTx::new(tx_impl, burst_mode),
+                        rx: ChannelRx::new(rx_impl, burst_mode),
                         phantom: PhantomData,
                     }
                 }

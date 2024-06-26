@@ -225,6 +225,8 @@ pub mod dma {
             AesPeripheral,
             Channel,
             ChannelTypes,
+            DescriptorChain,
+            DmaDescriptor,
             DmaPeripheral,
             DmaTransferTxRx,
             RxPrivate,
@@ -259,6 +261,8 @@ pub mod dma {
         pub aes: super::Aes<'d>,
 
         pub(crate) channel: Channel<'d, C, crate::Blocking>,
+        tx_chain: DescriptorChain,
+        rx_chain: DescriptorChain,
     }
 
     pub trait WithDmaAes<'d, C>
@@ -266,7 +270,12 @@ pub mod dma {
         C: ChannelTypes,
         C::P: AesPeripheral,
     {
-        fn with_dma(self, channel: Channel<'d, C, crate::Blocking>) -> AesDma<'d, C>;
+        fn with_dma(
+            self,
+            channel: Channel<'d, C, crate::Blocking>,
+            tx_descriptors: &'static mut [DmaDescriptor],
+            rx_descriptors: &'static mut [DmaDescriptor],
+        ) -> AesDma<'d, C>;
     }
 
     impl<'d, C> WithDmaAes<'d, C> for crate::aes::Aes<'d>
@@ -274,10 +283,20 @@ pub mod dma {
         C: ChannelTypes,
         C::P: AesPeripheral,
     {
-        fn with_dma(self, mut channel: Channel<'d, C, crate::Blocking>) -> AesDma<'d, C> {
+        fn with_dma(
+            self,
+            mut channel: Channel<'d, C, crate::Blocking>,
+            tx_descriptors: &'static mut [DmaDescriptor],
+            rx_descriptors: &'static mut [DmaDescriptor],
+        ) -> AesDma<'d, C> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
-            AesDma { aes: self, channel }
+            AesDma {
+                aes: self,
+                channel,
+                tx_chain: DescriptorChain::new(tx_descriptors),
+                rx_chain: DescriptorChain::new(rx_descriptors),
+            }
         }
     }
 
@@ -321,6 +340,10 @@ pub mod dma {
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
         }
+
+        fn chain(&mut self) -> &mut DescriptorChain {
+            &mut self.tx_chain
+        }
     }
 
     impl<'d, C> DmaSupportRx for AesDma<'d, C>
@@ -332,6 +355,10 @@ pub mod dma {
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx
+        }
+
+        fn chain(&mut self) -> &mut DescriptorChain {
+            &mut self.rx_chain
         }
     }
 
@@ -413,24 +440,18 @@ pub mod dma {
             self.channel.rx.is_done();
 
             unsafe {
+                self.tx_chain
+                    .fill_for_tx(false, write_buffer_ptr, write_buffer_len)?;
                 self.channel
                     .tx
-                    .prepare_transfer_without_start(
-                        self.dma_peripheral(),
-                        false,
-                        write_buffer_ptr,
-                        write_buffer_len,
-                    )
+                    .prepare_transfer_without_start(self.dma_peripheral(), &self.tx_chain)
                     .and_then(|_| self.channel.tx.start_transfer())?;
 
+                self.rx_chain
+                    .fill_for_rx(false, read_buffer_ptr, read_buffer_len)?;
                 self.channel
                     .rx
-                    .prepare_transfer_without_start(
-                        false,
-                        self.dma_peripheral(),
-                        read_buffer_ptr,
-                        read_buffer_len,
-                    )
+                    .prepare_transfer_without_start(self.dma_peripheral(), &self.rx_chain)
                     .and_then(|_| self.channel.rx.start_transfer())?;
             }
             self.enable_dma(true);

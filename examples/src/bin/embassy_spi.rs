@@ -61,16 +61,15 @@ async fn main(_spawner: Spawner) {
     #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
     let dma_channel = dma.channel0;
 
-    let (mut descriptors, mut rx_descriptors) = dma_descriptors!(32000);
+    let (descriptors, rx_descriptors) = dma_descriptors!(32000);
 
     let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
         .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-        .with_dma(dma_channel.configure_for_async(
-            false,
-            &mut descriptors,
-            &mut rx_descriptors,
-            DmaPriority::Priority0,
-        ));
+        .with_dma(
+            dma_channel.configure_for_async(false, DmaPriority::Priority0),
+            descriptors,
+            rx_descriptors,
+        );
 
     let send_buffer = [0, 1, 2, 3, 4, 5, 6, 7];
     loop {

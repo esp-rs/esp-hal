@@ -22,12 +22,10 @@
 //! # let dma = Dma::new(peripherals.DMA);
 //! # let channel = dma.channel0;
 //!
-//! # let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(32678, 0);
+//! # let (tx_buffer, tx_descriptors, _, rx_descriptors) = dma_buffers!(32678, 0);
 //!
 //! # let channel = channel.configure(
 //! #     false,
-//! #     &mut tx_descriptors,
-//! #     &mut rx_descriptors,
 //! #     DmaPriority::Priority0,
 //! # );
 //!
@@ -46,6 +44,7 @@
 //! let mut i8080 = I8080::new(
 //!     lcd_cam.lcd,
 //!     channel.tx,
+//!     tx_descriptors,
 //!     tx_pins,
 //!     20.MHz(),
 //!     Config::default(),
@@ -68,6 +67,8 @@ use crate::{
         dma_private::{DmaSupport, DmaSupportTx},
         ChannelTx,
         ChannelTypes,
+        DescriptorChain,
+        DmaDescriptor,
         DmaError,
         DmaPeripheral,
         DmaTransferTx,
@@ -92,6 +93,7 @@ use crate::{
 pub struct I8080<'d, TX, P> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     tx_channel: TX,
+    tx_chain: DescriptorChain,
     _pins: P,
 }
 
@@ -105,6 +107,7 @@ where
     pub fn new(
         lcd: Lcd<'d>,
         mut channel: ChannelTx<'d, T, R>,
+        descriptors: &'static mut [DmaDescriptor],
         mut pins: P,
         frequency: HertzU32,
         config: Config,
@@ -248,6 +251,7 @@ where
         Self {
             lcd_cam,
             tx_channel: channel,
+            tx_chain: DescriptorChain::new(descriptors),
             _pins: pins,
         }
     }
@@ -271,6 +275,10 @@ impl<'d, TX: Tx, P: TxPins> DmaSupportTx for I8080<'d, TX, P> {
 
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
+    }
+
+    fn chain(&mut self) -> &mut DescriptorChain {
+        &mut self.tx_chain
     }
 }
 
@@ -462,12 +470,9 @@ impl<'d, TX: Tx, P> I8080<'d, TX, P> {
             });
 
             unsafe {
-                self.tx_channel.prepare_transfer_without_start(
-                    DmaPeripheral::LcdCam,
-                    false,
-                    ptr,
-                    len,
-                )?;
+                self.tx_chain.fill_for_tx(false, ptr, len)?;
+                self.tx_channel
+                    .prepare_transfer_without_start(DmaPeripheral::LcdCam, &self.tx_chain)?;
             }
             self.tx_channel.start_transfer()?;
         }

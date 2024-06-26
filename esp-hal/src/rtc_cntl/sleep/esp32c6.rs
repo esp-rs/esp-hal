@@ -715,21 +715,7 @@ impl Default for RtcSleepConfig {
 
         Self {
             deep: false,
-            pd_flags: {
-                let mut pd_flags = PowerDownFlags(0);
-
-                pd_flags.set_pd_lp_periph(true);
-                pd_flags.set_pd_cpu(true);
-                pd_flags.set_pd_xtal32k(true);
-                pd_flags.set_pd_rc32k(true);
-                pd_flags.set_pd_rc_fast(true);
-                pd_flags.set_pd_xtal(true);
-                pd_flags.set_pd_top(true);
-                pd_flags.set_pd_modem(true);
-                pd_flags.set_pd_vddsdio(true);
-
-                pd_flags
-            },
+            pd_flags: PowerDownFlags(0),
         }
     }
 }
@@ -854,6 +840,10 @@ impl RtcSleepConfig {
             self.pd_flags.set_pd_mem(true);
             self.pd_flags.set_pd_xtal(true);
             self.pd_flags.set_pd_hp_aon(true);
+            self.pd_flags.set_pd_lp_periph(true);
+            self.pd_flags.set_pd_xtal32k(true);
+            self.pd_flags.set_pd_rc32k(true);
+            self.pd_flags.set_pd_rc_fast(true);
         }
     }
 

@@ -58,17 +58,15 @@ mod tests {
         #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
         let dma_channel = dma.channel0;
 
-        let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) =
-            dma_buffers!(DMA_BUFFER_SIZE);
+        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 
         let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(dma_channel.configure(
-                false,
-                &mut tx_descriptors,
-                &mut rx_descriptors,
-                DmaPriority::Priority0,
-            ));
+            .with_dma(
+                dma_channel.configure(false, DmaPriority::Priority0),
+                tx_descriptors,
+                rx_descriptors,
+            );
 
         // DMA buffer require a static life-time
         let mut send = tx_buffer;
@@ -101,16 +99,15 @@ mod tests {
         #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
         let dma_channel = dma.channel0;
 
-        let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(4, 2);
+        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(4, 2);
 
         let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(dma_channel.configure(
-                false,
-                &mut tx_descriptors,
-                &mut rx_descriptors,
-                DmaPriority::Priority0,
-            ));
+            .with_dma(
+                dma_channel.configure(false, DmaPriority::Priority0),
+                tx_descriptors,
+                rx_descriptors,
+            );
 
         // DMA buffer require a static life-time
         let mut send = tx_buffer;
@@ -145,17 +142,15 @@ mod tests {
         #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
         let dma_channel = dma.channel0;
 
-        let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) =
-            dma_buffers!(DMA_BUFFER_SIZE);
+        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 
         let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(dma_channel.configure(
-                false,
-                &mut tx_descriptors,
-                &mut rx_descriptors,
-                DmaPriority::Priority0,
-            ));
+            .with_dma(
+                dma_channel.configure(false, DmaPriority::Priority0),
+                tx_descriptors,
+                rx_descriptors,
+            );
 
         // DMA buffer require a static life-time
         let mut send = tx_buffer;
@@ -193,7 +188,7 @@ mod tests {
         #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
         let dma_channel = dma.channel0;
 
-        let (_, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
+        let (_, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 
         let tx_buffer = {
             // using `static`, not `static mut`, places the array in .rodata
@@ -203,12 +198,11 @@ mod tests {
 
         let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(dma_channel.configure(
-                false,
-                &mut tx_descriptors,
-                &mut rx_descriptors,
-                DmaPriority::Priority0,
-            ));
+            .with_dma(
+                dma_channel.configure(false, DmaPriority::Priority0),
+                tx_descriptors,
+                rx_descriptors,
+            );
 
         let mut receive = rx_buffer;
 
@@ -242,7 +236,7 @@ mod tests {
         #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
         let dma_channel = dma.channel0;
 
-        let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
+        let (tx_buffer, tx_descriptors, _, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 
         let rx_buffer = {
             // using `static`, not `static mut`, places the array in .rodata
@@ -252,12 +246,11 @@ mod tests {
 
         let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(dma_channel.configure(
-                false,
-                &mut tx_descriptors,
-                &mut rx_descriptors,
-                DmaPriority::Priority0,
-            ));
+            .with_dma(
+                dma_channel.configure(false, DmaPriority::Priority0),
+                tx_descriptors,
+                rx_descriptors,
+            );
 
         let mut receive = rx_buffer;
         assert!(matches!(
@@ -290,17 +283,15 @@ mod tests {
         #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
         let dma_channel = dma.channel0;
 
-        let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) =
-            dma_buffers!(DMA_BUFFER_SIZE);
+        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 
         let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(dma_channel.configure(
-                false,
-                &mut tx_descriptors,
-                &mut rx_descriptors,
-                DmaPriority::Priority0,
-            ));
+            .with_dma(
+                dma_channel.configure(false, DmaPriority::Priority0),
+                tx_descriptors,
+                rx_descriptors,
+            );
 
         // DMA buffer require a static life-time
         let send = tx_buffer;

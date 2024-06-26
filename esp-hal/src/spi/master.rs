@@ -75,7 +75,7 @@ use super::{
 };
 use crate::{
     clock::Clocks,
-    dma::{DmaPeripheral, Rx, Tx},
+    dma::{DescriptorChain, DmaPeripheral, Rx, Tx},
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
@@ -845,6 +845,8 @@ pub mod dma {
             dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
             Channel,
             ChannelTypes,
+            DescriptorChain,
+            DmaDescriptor,
             DmaTransferRx,
             DmaTransferRxOwned,
             DmaTransferTx,
@@ -868,6 +870,8 @@ pub mod dma {
         fn with_dma(
             self,
             channel: Channel<'d, C, DmaMode>,
+            tx_descriptors: &'static mut [DmaDescriptor],
+            rx_descriptors: &'static mut [DmaDescriptor],
         ) -> SpiDma<'d, crate::peripherals::SPI2, C, M, DmaMode>;
     }
 
@@ -882,6 +886,8 @@ pub mod dma {
         fn with_dma(
             self,
             channel: Channel<'d, C, DmaMode>,
+            tx_descriptors: &'static mut [DmaDescriptor],
+            rx_descriptors: &'static mut [DmaDescriptor],
         ) -> SpiDma<'d, crate::peripherals::SPI3, C, M, DmaMode>;
     }
 
@@ -895,12 +901,16 @@ pub mod dma {
         fn with_dma(
             self,
             mut channel: Channel<'d, C, DmaMode>,
+            tx_descriptors: &'static mut [DmaDescriptor],
+            rx_descriptors: &'static mut [DmaDescriptor],
         ) -> SpiDma<'d, crate::peripherals::SPI2, C, M, DmaMode> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             SpiDma {
                 spi: self.spi,
                 channel,
+                tx_chain: DescriptorChain::new(tx_descriptors),
+                rx_chain: DescriptorChain::new(rx_descriptors),
                 _mode: PhantomData,
             }
         }
@@ -917,12 +927,16 @@ pub mod dma {
         fn with_dma(
             self,
             mut channel: Channel<'d, C, DmaMode>,
+            tx_descriptors: &'static mut [DmaDescriptor],
+            rx_descriptors: &'static mut [DmaDescriptor],
         ) -> SpiDma<'d, crate::peripherals::SPI3, C, M, DmaMode> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             SpiDma {
                 spi: self.spi,
                 channel,
+                tx_chain: DescriptorChain::new(tx_descriptors),
+                rx_chain: DescriptorChain::new(rx_descriptors),
                 _mode: PhantomData,
             }
         }
@@ -938,6 +952,8 @@ pub mod dma {
     {
         pub(crate) spi: PeripheralRef<'d, T>,
         pub(crate) channel: Channel<'d, C, DmaMode>,
+        tx_chain: DescriptorChain,
+        rx_chain: DescriptorChain,
         _mode: PhantomData<M>,
     }
 
@@ -1037,6 +1053,10 @@ pub mod dma {
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
         }
+
+        fn chain(&mut self) -> &mut DescriptorChain {
+            &mut self.tx_chain
+        }
     }
 
     impl<'d, T, C, M, DmaMode> DmaSupportRx for SpiDma<'d, T, C, M, DmaMode>
@@ -1051,6 +1071,10 @@ pub mod dma {
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx
+        }
+
+        fn chain(&mut self) -> &mut DescriptorChain {
+            &mut self.rx_chain
         }
     }
 
@@ -1107,8 +1131,13 @@ pub mod dma {
             }
 
             unsafe {
-                self.spi
-                    .start_write_bytes_dma(ptr, len, &mut self.channel.tx, false)?;
+                self.spi.start_write_bytes_dma(
+                    &mut self.tx_chain,
+                    ptr,
+                    len,
+                    &mut self.channel.tx,
+                    false,
+                )?;
             }
             Ok(())
         }
@@ -1158,8 +1187,13 @@ pub mod dma {
             }
 
             unsafe {
-                self.spi
-                    .start_read_bytes_dma(ptr, len, &mut self.channel.rx, false)?;
+                self.spi.start_read_bytes_dma(
+                    &mut self.rx_chain,
+                    ptr,
+                    len,
+                    &mut self.channel.rx,
+                    false,
+                )?;
             }
 
             Ok(())
@@ -1218,6 +1252,8 @@ pub mod dma {
 
             unsafe {
                 self.spi.start_transfer_dma(
+                    &mut self.tx_chain,
+                    &mut self.rx_chain,
                     write_ptr,
                     write_len,
                     read_ptr,
@@ -1308,8 +1344,13 @@ pub mod dma {
             }
 
             unsafe {
-                self.spi
-                    .start_read_bytes_dma(ptr, len, &mut self.channel.rx, false)?;
+                self.spi.start_read_bytes_dma(
+                    &mut self.rx_chain,
+                    ptr,
+                    len,
+                    &mut self.channel.rx,
+                    false,
+                )?;
             }
             Ok(DmaTransferRx::new(self))
         }
@@ -1383,8 +1424,13 @@ pub mod dma {
             }
 
             unsafe {
-                self.spi
-                    .start_write_bytes_dma(ptr, len, &mut self.channel.tx, false)?;
+                self.spi.start_write_bytes_dma(
+                    &mut self.tx_chain,
+                    ptr,
+                    len,
+                    &mut self.channel.tx,
+                    false,
+                )?;
             }
             Ok(DmaTransferTx::new(self))
         }
@@ -1403,8 +1449,13 @@ pub mod dma {
         type Error = super::Error;
 
         fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Self::Error> {
-            self.spi
-                .transfer_in_place_dma(words, &mut self.channel.tx, &mut self.channel.rx)
+            self.spi.transfer_in_place_dma(
+                &mut self.tx_chain,
+                &mut self.rx_chain,
+                words,
+                &mut self.channel.tx,
+                &mut self.channel.rx,
+            )
         }
     }
 
@@ -1421,7 +1472,8 @@ pub mod dma {
         type Error = super::Error;
 
         fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-            self.spi.write_bytes_dma(words, &mut self.channel.tx)?;
+            self.spi
+                .write_bytes_dma(&mut self.tx_chain, words, &mut self.channel.tx)?;
             self.spi.flush()?;
             Ok(())
         }
@@ -1496,6 +1548,7 @@ pub mod dma {
                 let mut future = crate::dma::asynch::DmaRxFuture::new(&mut self.channel.rx);
                 unsafe {
                     self.spi.start_read_bytes_dma(
+                        &mut self.rx_chain,
                         words.as_mut_ptr(),
                         words.len(),
                         future.rx(),
@@ -1512,6 +1565,7 @@ pub mod dma {
                     let mut future = crate::dma::asynch::DmaTxFuture::new(&mut self.channel.tx);
                     unsafe {
                         self.spi.start_write_bytes_dma(
+                            &mut self.tx_chain,
                             chunk.as_ptr(),
                             chunk.len(),
                             future.tx(),
@@ -1540,6 +1594,8 @@ pub mod dma {
 
                     unsafe {
                         self.spi.start_transfer_dma(
+                            &mut self.tx_chain,
+                            &mut self.rx_chain,
                             write.as_ptr().offset(write_idx),
                             write_len,
                             read.as_mut_ptr().offset(read_idx),
@@ -1573,6 +1629,8 @@ pub mod dma {
 
                     unsafe {
                         self.spi.start_transfer_dma(
+                            &mut self.tx_chain,
+                            &mut self.rx_chain,
                             chunk.as_ptr(),
                             chunk.len(),
                             chunk.as_mut_ptr(),
@@ -1670,19 +1728,32 @@ pub mod dma {
             M: IsFullDuplex,
         {
             fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-                self.spi
-                    .transfer_dma(&[], words, &mut self.channel.tx, &mut self.channel.rx)?;
+                self.spi.transfer_dma(
+                    &mut self.tx_chain,
+                    &mut self.rx_chain,
+                    &[],
+                    words,
+                    &mut self.channel.tx,
+                    &mut self.channel.rx,
+                )?;
                 self.flush()
             }
 
             fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-                self.spi.write_bytes_dma(words, &mut self.channel.tx)?;
+                self.spi
+                    .write_bytes_dma(&mut self.tx_chain, words, &mut self.channel.tx)?;
                 self.flush()
             }
 
             fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-                self.spi
-                    .transfer_dma(write, read, &mut self.channel.tx, &mut self.channel.rx)?;
+                self.spi.transfer_dma(
+                    &mut self.tx_chain,
+                    &mut self.rx_chain,
+                    write,
+                    read,
+                    &mut self.channel.tx,
+                    &mut self.channel.rx,
+                )?;
                 self.flush()
             }
 
@@ -1694,6 +1765,8 @@ pub mod dma {
             /// [`read`](SpiBus::read).
             fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
                 self.spi.transfer_in_place_dma(
+                    &mut self.tx_chain,
+                    &mut self.rx_chain,
                     words,
                     &mut self.channel.tx,
                     &mut self.channel.rx,
@@ -1857,6 +1930,8 @@ where
 {
     fn transfer_in_place_dma<'w>(
         &mut self,
+        tx_chain: &mut DescriptorChain,
+        rx_chain: &mut DescriptorChain,
         words: &'w mut [u8],
         tx: &mut TX,
         rx: &mut RX,
@@ -1864,6 +1939,8 @@ where
         for chunk in words.chunks_mut(MAX_DMA_SIZE) {
             unsafe {
                 self.start_transfer_dma(
+                    tx_chain,
+                    rx_chain,
                     chunk.as_ptr(),
                     chunk.len(),
                     chunk.as_mut_ptr(),
@@ -1882,6 +1959,8 @@ where
 
     fn transfer_dma<'w>(
         &mut self,
+        tx_chain: &mut DescriptorChain,
+        rx_chain: &mut DescriptorChain,
         write_buffer: &'w [u8],
         read_buffer: &'w mut [u8],
         tx: &mut TX,
@@ -1897,6 +1976,8 @@ where
 
             unsafe {
                 self.start_transfer_dma(
+                    tx_chain,
+                    rx_chain,
                     write_buffer.as_ptr().offset(write_idx),
                     write_len,
                     read_buffer.as_mut_ptr().offset(read_idx),
@@ -1921,6 +2002,8 @@ where
     #[allow(clippy::too_many_arguments)]
     unsafe fn start_transfer_dma(
         &mut self,
+        tx_chain: &mut DescriptorChain,
+        rx_chain: &mut DescriptorChain,
         write_buffer_ptr: *const u8,
         write_buffer_len: usize,
         read_buffer_ptr: *mut u8,
@@ -1938,20 +2021,12 @@ where
         self.update();
 
         reset_dma_before_load_dma_dscr(reg_block);
-        tx.prepare_transfer_without_start(
-            self.dma_peripheral(),
-            false,
-            write_buffer_ptr,
-            write_buffer_len,
-        )
-        .and_then(|_| tx.start_transfer())?;
-        rx.prepare_transfer_without_start(
-            false,
-            self.dma_peripheral(),
-            read_buffer_ptr,
-            read_buffer_len,
-        )
-        .and_then(|_| rx.start_transfer())?;
+        tx_chain.fill_for_tx(false, write_buffer_ptr, write_buffer_len)?;
+        tx.prepare_transfer_without_start(self.dma_peripheral(), tx_chain)
+            .and_then(|_| tx.start_transfer())?;
+        rx_chain.fill_for_rx(false, read_buffer_ptr, read_buffer_len)?;
+        rx.prepare_transfer_without_start(self.dma_peripheral(), rx_chain)
+            .and_then(|_| rx.start_transfer())?;
 
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
@@ -1961,10 +2036,15 @@ where
         Ok(())
     }
 
-    fn write_bytes_dma<'w>(&mut self, words: &'w [u8], tx: &mut TX) -> Result<&'w [u8], Error> {
+    fn write_bytes_dma<'w>(
+        &mut self,
+        chain: &mut DescriptorChain,
+        words: &'w [u8],
+        tx: &mut TX,
+    ) -> Result<&'w [u8], Error> {
         for chunk in words.chunks(MAX_DMA_SIZE) {
             unsafe {
-                self.start_write_bytes_dma(chunk.as_ptr(), chunk.len(), tx, false)?;
+                self.start_write_bytes_dma(chain, chunk.as_ptr(), chunk.len(), tx, false)?;
             }
 
             while !tx.is_done() {}
@@ -1977,6 +2057,7 @@ where
     #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
     unsafe fn start_write_bytes_dma(
         &mut self,
+        chain: &mut DescriptorChain,
         ptr: *const u8,
         len: usize,
         tx: &mut TX,
@@ -1991,8 +2072,9 @@ where
         self.update();
 
         reset_dma_before_load_dma_dscr(reg_block);
+        chain.fill_for_tx(false, ptr, len)?;
         unsafe {
-            tx.prepare_transfer_without_start(self.dma_peripheral(), false, ptr, len)
+            tx.prepare_transfer_without_start(self.dma_peripheral(), chain)
                 .and_then(|_| tx.start_transfer())?;
         }
 
@@ -2010,6 +2092,7 @@ where
     #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
     unsafe fn start_read_bytes_dma(
         &mut self,
+        chain: &mut DescriptorChain,
         ptr: *mut u8,
         len: usize,
         rx: &mut RX,
@@ -2024,7 +2107,8 @@ where
         self.update();
 
         reset_dma_before_load_dma_dscr(reg_block);
-        rx.prepare_transfer_without_start(false, self.dma_peripheral(), ptr, len)
+        chain.fill_for_rx(false, ptr, len)?;
+        rx.prepare_transfer_without_start(self.dma_peripheral(), chain)
             .and_then(|_| rx.start_transfer())?;
 
         self.clear_dma_interrupts();

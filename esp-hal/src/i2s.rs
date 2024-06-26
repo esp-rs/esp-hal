@@ -38,7 +38,7 @@
 //! let dma = Dma::new(peripherals.DMA);
 #![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.i2s0channel;")]
 #![cfg_attr(not(any(esp32, esp32s2)), doc = "let dma_channel = dma.channel0;")]
-//! let (_, mut tx_descriptors, mut rx_buffer, mut rx_descriptors) =
+//! let (_, tx_descriptors, mut rx_buffer, rx_descriptors) =
 //! dma_buffers!(0, 4 * 4092);
 //!
 //! let i2s = I2s::new(
@@ -48,10 +48,10 @@
 //!     44100.Hz(),
 //!     dma_channel.configure(
 //!         false,
-//!         &mut tx_descriptors,
-//!         &mut rx_descriptors,
 //!         DmaPriority::Priority0,
 //!     ),
+//!     tx_descriptors,
+//!     rx_descriptors,
 //!     &clocks,
 //! );
 #![cfg_attr(not(esp32), doc = "let i2s = i2s.with_mclk(io.pins.gpio0);")]
@@ -88,6 +88,8 @@ use crate::{
         dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
         Channel,
         ChannelTypes,
+        DescriptorChain,
+        DmaDescriptor,
         DmaError,
         DmaTransferRx,
         DmaTransferRxCircular,
@@ -302,12 +304,15 @@ where
     CH: ChannelTypes,
     DmaMode: Mode,
 {
+    #[allow(clippy::too_many_arguments)]
     fn new_internal(
         _i2s: impl Peripheral<P = I> + 'd,
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
         mut channel: Channel<'d, CH, DmaMode>,
+        tx_descriptors: &'static mut [DmaDescriptor],
+        rx_descriptors: &'static mut [DmaDescriptor],
         clocks: &Clocks,
     ) -> Self {
         // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
@@ -330,11 +335,13 @@ where
             i2s_tx: TxCreator {
                 register_access: PhantomData,
                 tx_channel: channel.tx,
+                descriptors: tx_descriptors,
                 phantom: PhantomData,
             },
             i2s_rx: RxCreator {
                 register_access: PhantomData,
                 rx_channel: channel.rx,
+                descriptors: rx_descriptors,
                 phantom: PhantomData,
             },
             phantom: PhantomData,
@@ -385,12 +392,15 @@ where
 {
     /// Construct a new I2S peripheral driver instance for the first I2S
     /// peripheral
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         i2s: impl Peripheral<P = I> + 'd,
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
         channel: Channel<'d, CH, DmaMode>,
+        tx_descriptors: &'static mut [DmaDescriptor],
+        rx_descriptors: &'static mut [DmaDescriptor],
         clocks: &Clocks,
     ) -> Self
     where
@@ -398,11 +408,21 @@ where
         CH::P: I2sPeripheral + I2s0Peripheral,
         DmaMode: Mode,
     {
-        Self::new_internal(i2s, standard, data_format, sample_rate, channel, clocks)
+        Self::new_internal(
+            i2s,
+            standard,
+            data_format,
+            sample_rate,
+            channel,
+            tx_descriptors,
+            rx_descriptors,
+            clocks,
+        )
     }
 
     /// Construct a new I2S peripheral driver instance for the second I2S
     /// peripheral
+    #[allow(clippy::too_many_arguments)]
     #[cfg(any(esp32s3, esp32))]
     pub fn new_i2s1(
         i2s: impl Peripheral<P = I> + 'd,
@@ -410,13 +430,24 @@ where
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
         channel: Channel<'d, CH, DmaMode>,
+        tx_descriptors: &'static mut [DmaDescriptor],
+        rx_descriptors: &'static mut [DmaDescriptor],
         clocks: &Clocks,
     ) -> Self
     where
         I: I2s1Instance,
         CH::P: I2sPeripheral + I2s1Peripheral,
     {
-        Self::new_internal(i2s, standard, data_format, sample_rate, channel, clocks)
+        Self::new_internal(
+            i2s,
+            standard,
+            data_format,
+            sample_rate,
+            channel,
+            tx_descriptors,
+            rx_descriptors,
+            clocks,
+        )
     }
 
     pub fn with_mclk<P: OutputPin>(self, pin: impl Peripheral<P = P> + 'd) -> Self {
@@ -435,6 +466,7 @@ where
 {
     register_access: PhantomData<T>,
     tx_channel: CH::Tx<'d>,
+    tx_chain: DescriptorChain,
     phantom: PhantomData<DmaMode>,
 }
 
@@ -475,6 +507,10 @@ where
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
     }
+
+    fn chain(&mut self) -> &mut DescriptorChain {
+        &mut self.tx_chain
+    }
 }
 
 impl<'d, T, CH, DmaMode> I2sTx<'d, T, CH, DmaMode>
@@ -483,10 +519,11 @@ where
     CH: ChannelTypes,
     DmaMode: Mode,
 {
-    fn new(tx_channel: CH::Tx<'d>) -> Self {
+    fn new(tx_channel: CH::Tx<'d>, descriptors: &'static mut [DmaDescriptor]) -> Self {
         Self {
             register_access: PhantomData,
             tx_channel,
+            tx_chain: DescriptorChain::new(descriptors),
             phantom: PhantomData,
         }
     }
@@ -501,8 +538,9 @@ where
 
         // configure DMA outlink
         unsafe {
+            self.tx_chain.fill_for_tx(false, ptr, data.len())?;
             self.tx_channel
-                .prepare_transfer_without_start(T::get_dma_peripheral(), false, ptr, data.len())
+                .prepare_transfer_without_start(T::get_dma_peripheral(), &self.tx_chain)
                 .and_then(|_| self.tx_channel.start_transfer())?;
         }
 
@@ -535,8 +573,9 @@ where
 
         // configure DMA outlink
         unsafe {
+            self.tx_chain.fill_for_tx(circular, ptr, len)?;
             self.tx_channel
-                .prepare_transfer_without_start(T::get_dma_peripheral(), circular, ptr, len)
+                .prepare_transfer_without_start(T::get_dma_peripheral(), &self.tx_chain)
                 .and_then(|_| self.tx_channel.start_transfer())?;
         }
 
@@ -608,6 +647,7 @@ where
 {
     register_access: PhantomData<T>,
     rx_channel: CH::Rx<'d>,
+    rx_chain: DescriptorChain,
     phantom: PhantomData<DmaMode>,
 }
 
@@ -648,6 +688,10 @@ where
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
     }
+
+    fn chain(&mut self) -> &mut DescriptorChain {
+        &mut self.rx_chain
+    }
 }
 
 impl<'d, T, CH, DmaMode> I2sRx<'d, T, CH, DmaMode>
@@ -656,10 +700,11 @@ where
     CH: ChannelTypes,
     DmaMode: Mode,
 {
-    fn new(rx_channel: CH::Rx<'d>) -> Self {
+    fn new(rx_channel: CH::Rx<'d>, descriptors: &'static mut [DmaDescriptor]) -> Self {
         Self {
             register_access: PhantomData,
             rx_channel,
+            rx_chain: DescriptorChain::new(descriptors),
             phantom: PhantomData,
         }
     }
@@ -674,8 +719,9 @@ where
 
         // configure DMA outlink
         unsafe {
+            self.rx_chain.fill_for_rx(false, ptr, data.len())?;
             self.rx_channel
-                .prepare_transfer_without_start(false, T::get_dma_peripheral(), ptr, data.len())
+                .prepare_transfer_without_start(T::get_dma_peripheral(), &self.rx_chain)
                 .and_then(|_| self.rx_channel.start_transfer())?;
         }
 
@@ -711,8 +757,9 @@ where
 
         // configure DMA outlink
         unsafe {
+            self.rx_chain.fill_for_rx(circular, ptr, len)?;
             self.rx_channel
-                .prepare_transfer_without_start(circular, T::get_dma_peripheral(), ptr, len)
+                .prepare_transfer_without_start(T::get_dma_peripheral(), &self.rx_chain)
                 .and_then(|_| self.rx_channel.start_transfer())?;
         }
 
@@ -797,7 +844,7 @@ mod private {
     use crate::peripherals::{i2s1::RegisterBlock, I2S1};
     use crate::{
         clock::Clocks,
-        dma::{ChannelTypes, DmaPeripheral},
+        dma::{ChannelTypes, DmaDescriptor, DmaPeripheral},
         gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
         interrupt::InterruptHandler,
         into_ref,
@@ -815,6 +862,7 @@ mod private {
     {
         pub register_access: PhantomData<T>,
         pub tx_channel: CH::Tx<'d>,
+        pub descriptors: &'static mut [DmaDescriptor],
         pub(crate) phantom: PhantomData<DmaMode>,
     }
 
@@ -825,7 +873,7 @@ mod private {
         DmaMode: Mode,
     {
         pub fn build(self) -> I2sTx<'d, T, CH, DmaMode> {
-            I2sTx::new(self.tx_channel)
+            I2sTx::new(self.tx_channel, self.descriptors)
         }
 
         pub fn with_bclk<P>(self, pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
@@ -867,6 +915,7 @@ mod private {
     {
         pub register_access: PhantomData<T>,
         pub rx_channel: CH::Rx<'d>,
+        pub descriptors: &'static mut [DmaDescriptor],
         pub(crate) phantom: PhantomData<DmaMode>,
     }
 
@@ -877,7 +926,7 @@ mod private {
         DmaMode: Mode,
     {
         pub fn build(self) -> I2sRx<'d, T, CH, DmaMode> {
-            I2sRx::new(self.rx_channel)
+            I2sRx::new(self.rx_channel, self.descriptors)
         }
 
         pub fn with_bclk<P>(self, pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
@@ -2082,7 +2131,9 @@ pub mod asynch {
         dma::{
             asynch::{DmaRxDoneChFuture, DmaRxFuture, DmaTxDoneChFuture, DmaTxFuture},
             ChannelTypes,
+            RxCircularState,
             RxPrivate,
+            TxCircularState,
             TxPrivate,
         },
         Async,
@@ -2119,12 +2170,10 @@ pub mod asynch {
             let future = DmaTxFuture::new(&mut self.tx_channel);
 
             unsafe {
-                future.tx.prepare_transfer_without_start(
-                    T::get_dma_peripheral(),
-                    false,
-                    ptr,
-                    len,
-                )?;
+                self.tx_chain.fill_for_tx(false, ptr, len)?;
+                future
+                    .tx
+                    .prepare_transfer_without_start(T::get_dma_peripheral(), &self.tx_chain)?;
             }
 
             future.tx.start_transfer()?;
@@ -2150,8 +2199,9 @@ pub mod asynch {
 
             // configure DMA outlink
             unsafe {
+                self.tx_chain.fill_for_tx(true, ptr, len)?;
                 self.tx_channel
-                    .prepare_transfer_without_start(T::get_dma_peripheral(), true, ptr, len)
+                    .prepare_transfer_without_start(T::get_dma_peripheral(), &self.tx_chain)
                     .and_then(|_| self.tx_channel.start_transfer())?;
             }
 
@@ -2160,8 +2210,10 @@ pub mod asynch {
             // start: set I2S_TX_START
             T::tx_start();
 
+            let state = TxCircularState::new(&mut self.tx_chain);
             Ok(I2sWriteDmaTransferAsync {
                 i2s_tx: self,
+                state,
                 _buffer: words,
             })
         }
@@ -2176,6 +2228,7 @@ pub mod asynch {
         CH: ChannelTypes,
     {
         i2s_tx: I2sTx<'d, T, CH, Async>,
+        state: TxCircularState,
         _buffer: BUFFER,
     }
 
@@ -2188,7 +2241,8 @@ pub mod asynch {
         /// Will wait for more than 0 bytes available.
         pub async fn available(&mut self) -> Result<usize, Error> {
             loop {
-                let res = self.i2s_tx.tx_channel.available();
+                self.state.update(&mut self.i2s_tx.tx_channel);
+                let res = self.state.available;
 
                 if res != 0 {
                     break Ok(res);
@@ -2202,7 +2256,7 @@ pub mod asynch {
         pub async fn push(&mut self, data: &[u8]) -> Result<usize, Error> {
             let avail = self.available().await?;
             let to_send = usize::min(avail, data.len());
-            Ok(self.i2s_tx.tx_channel.push(&data[..to_send])?)
+            Ok(self.state.push(&data[..to_send])?)
         }
 
         /// Push bytes into the DMA buffer via the given closure.
@@ -2215,7 +2269,7 @@ pub mod asynch {
             f: impl FnOnce(&mut [u8]) -> usize,
         ) -> Result<usize, Error> {
             let _avail = self.available().await;
-            Ok(self.i2s_tx.tx_channel.push_with(f)?)
+            Ok(self.state.push_with(f)?)
         }
     }
 
@@ -2256,12 +2310,10 @@ pub mod asynch {
 
             // configure DMA outlink
             unsafe {
-                future.rx().prepare_transfer_without_start(
-                    false,
-                    T::get_dma_peripheral(),
-                    ptr,
-                    len,
-                )?;
+                self.rx_chain.fill_for_rx(false, ptr, len)?;
+                future
+                    .rx()
+                    .prepare_transfer_without_start(T::get_dma_peripheral(), &self.rx_chain)?;
             }
             future.rx().start_transfer()?;
 
@@ -2299,8 +2351,9 @@ pub mod asynch {
 
             // configure DMA outlink
             unsafe {
+                self.rx_chain.fill_for_rx(true, ptr, len)?;
                 self.rx_channel
-                    .prepare_transfer_without_start(true, T::get_dma_peripheral(), ptr, len)
+                    .prepare_transfer_without_start(T::get_dma_peripheral(), &self.rx_chain)
                     .and_then(|_| self.rx_channel.start_transfer())?;
             }
 
@@ -2313,8 +2366,10 @@ pub mod asynch {
             #[cfg(esp32)]
             T::rx_start(len);
 
+            let state = RxCircularState::new(&mut self.rx_chain);
             Ok(I2sReadDmaTransferAsync {
                 i2s_rx: self,
+                state,
                 _buffer: words,
             })
         }
@@ -2329,6 +2384,7 @@ pub mod asynch {
         CH: ChannelTypes,
     {
         i2s_rx: I2sRx<'d, T, CH, Async>,
+        state: RxCircularState,
         _buffer: BUFFER,
     }
 
@@ -2341,7 +2397,9 @@ pub mod asynch {
         /// Will wait for more than 0 bytes available.
         pub async fn available(&mut self) -> Result<usize, Error> {
             loop {
-                let res = self.i2s_rx.rx_channel.available();
+                self.state.update();
+
+                let res = self.state.available;
 
                 if res != 0 {
                     break Ok(res);
@@ -2355,7 +2413,7 @@ pub mod asynch {
         pub async fn pop(&mut self, data: &mut [u8]) -> Result<usize, Error> {
             let avail = self.available().await?;
             let to_rcv = usize::min(avail, data.len());
-            Ok(self.i2s_rx.rx_channel.pop(&mut data[..to_rcv])?)
+            Ok(self.state.pop(&mut data[..to_rcv])?)
         }
     }
 }

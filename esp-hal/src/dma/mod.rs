@@ -31,17 +31,15 @@
 //! let mosi = io.pins.gpio4;
 //! let cs = io.pins.gpio5;
 //!
-//! let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) =
+//! let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) =
 //! dma_buffers!(32000);
 //!
 //! let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
 //! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
 //! .with_dma(dma_channel.configure(
 //!     false,
-//!     &mut tx_descriptors,
-//!     &mut rx_descriptors,
 //!     DmaPriority::Priority0,
-//! ));
+//! ), tx_descriptors, rx_descriptors);
 //! # }
 //! ```
 //! 
@@ -143,21 +141,23 @@ const CHUNK_SIZE: usize = 4092;
 /// ## Usage
 /// ```rust,ignore
 /// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX and RX the same size
-/// let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(32000, 32000);
+/// let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(32000, 32000);
 /// ```
 #[macro_export]
 macro_rules! dma_buffers {
     ($tx_size:expr, $rx_size:expr) => {{
         static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
         static mut RX_BUFFER: [u8; $rx_size] = [0u8; $rx_size];
-        let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; ($tx_size + 4091) / 4092];
-        let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; ($rx_size + 4091) / 4092];
+        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; ($tx_size + 4091) / 4092] =
+            [$crate::dma::DmaDescriptor::EMPTY; ($tx_size + 4091) / 4092];
+        static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor; ($rx_size + 4091) / 4092] =
+            [$crate::dma::DmaDescriptor::EMPTY; ($rx_size + 4091) / 4092];
         unsafe {
             (
                 &mut TX_BUFFER,
-                tx_descriptors,
+                &mut TX_DESCRIPTORS,
                 &mut RX_BUFFER,
-                rx_descriptors,
+                &mut RX_DESCRIPTORS,
             )
         }
     }};
@@ -165,14 +165,16 @@ macro_rules! dma_buffers {
     ($size:expr) => {{
         static mut TX_BUFFER: [u8; $size] = [0u8; $size];
         static mut RX_BUFFER: [u8; $size] = [0u8; $size];
-        let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; ($size + 4091) / 4092];
-        let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; ($size + 4091) / 4092];
+        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; ($size + 4091) / 4092] =
+            [$crate::dma::DmaDescriptor::EMPTY; ($size + 4091) / 4092];
+        static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor; ($size + 4091) / 4092] =
+            [$crate::dma::DmaDescriptor::EMPTY; ($size + 4091) / 4092];
         unsafe {
             (
                 &mut TX_BUFFER,
-                tx_descriptors,
+                &mut TX_DESCRIPTORS,
                 &mut RX_BUFFER,
-                rx_descriptors,
+                &mut RX_DESCRIPTORS,
             )
         }
     }};
@@ -183,7 +185,7 @@ macro_rules! dma_buffers {
 /// ## Usage
 /// ```rust,ignore
 /// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX and RX the same size
-/// let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) =
+/// let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) =
 ///     dma_circular_buffers!(32000, 32000);
 /// ```
 #[macro_export]
@@ -204,14 +206,16 @@ macro_rules! dma_circular_buffers {
             3
         };
 
-        let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; tx_descriptor_len];
-        let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; rx_descriptor_len];
+        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; tx_descriptor_len] =
+            [$crate::dma::DmaDescriptor::EMPTY; tx_descriptor_len];
+        static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor; rx_descriptor_len] =
+            [$crate::dma::DmaDescriptor::EMPTY; rx_descriptor_len];
         unsafe {
             (
                 &mut TX_BUFFER,
-                tx_descriptors,
+                &mut TX_DESCRIPTORS,
                 &mut RX_BUFFER,
-                rx_descriptors,
+                &mut RX_DESCRIPTORS,
             )
         }
     }};
@@ -226,14 +230,16 @@ macro_rules! dma_circular_buffers {
             3
         };
 
-        let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; descriptor_len];
-        let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; descriptor_len];
+        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; descriptor_len] =
+            [$crate::dma::DmaDescriptor::EMPTY; descriptor_len];
+        static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor; descriptor_len] =
+            [$crate::dma::DmaDescriptor::EMPTY; descriptor_len];
         unsafe {
             (
                 &mut TX_BUFFER,
-                tx_descriptors,
+                &mut TX_DESCRIPTORS,
                 &mut RX_BUFFER,
-                rx_descriptors,
+                &mut RX_DESCRIPTORS,
             )
         }
     }};
@@ -244,20 +250,24 @@ macro_rules! dma_circular_buffers {
 /// ## Usage
 /// ```rust,ignore
 /// // Create TX and RX descriptors for transactions up to 32000 bytes - passing only one parameter assumes TX and RX are the same size
-/// let (mut tx_descriptors, mut rx_descriptors) = dma_descriptors!(32000, 32000);
+/// let (tx_descriptors, rx_descriptors) = dma_descriptors!(32000, 32000);
 /// ```
 #[macro_export]
 macro_rules! dma_descriptors {
     ($tx_size:expr, $rx_size:expr) => {{
-        let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; ($tx_size + 4091) / 4092];
-        let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; ($rx_size + 4091) / 4092];
-        (tx_descriptors, rx_descriptors)
+        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; ($tx_size + 4091) / 4092] =
+            [$crate::dma::DmaDescriptor::EMPTY; ($tx_size + 4091) / 4092];
+        static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor; ($rx_size + 4091) / 4092] =
+            [$crate::dma::DmaDescriptor::EMPTY; ($rx_size + 4091) / 4092];
+        unsafe { (&mut TX_DESCRIPTORS, &mut RX_DESCRIPTORS) }
     }};
 
     ($size:expr) => {{
-        let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; ($size + 4091) / 4092];
-        let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; ($size + 4091) / 4092];
-        (tx_descriptors, rx_descriptors)
+        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; ($size + 4091) / 4092] =
+            [$crate::dma::DmaDescriptor::EMPTY; ($size + 4091) / 4092];
+        static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor; ($size + 4091) / 4092] =
+            [$crate::dma::DmaDescriptor::EMPTY; ($size + 4091) / 4092];
+        unsafe { (&mut TX_DESCRIPTORS, &mut RX_DESCRIPTORS) }
     }};
 }
 
@@ -266,7 +276,7 @@ macro_rules! dma_descriptors {
 /// ## Usage
 /// ```rust,ignore
 /// // Create TX and RX descriptors for transactions up to 32000 bytes - passing only one parameter assumes TX and RX are the same size
-/// let (mut tx_descriptors, mut rx_descriptors) = dma_circular_descriptors!(32000, 32000);
+/// let (tx_descriptors, rx_descriptors) = dma_circular_descriptors!(32000, 32000);
 /// ```
 #[macro_export]
 macro_rules! dma_circular_descriptors {
@@ -283,9 +293,11 @@ macro_rules! dma_circular_descriptors {
             3
         };
 
-        let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; tx_descriptor_len];
-        let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; rx_descriptor_len];
-        (tx_descriptors, rx_descriptors)
+        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; tx_descriptor_len] =
+            [$crate::dma::DmaDescriptor::EMPTY; tx_descriptor_len];
+        static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor; rx_descriptor_len] =
+            [$crate::dma::DmaDescriptor::EMPTY; rx_descriptor_len];
+        unsafe { (&mut TX_DESCRIPTORS, &mut RX_DESCRIPTORS) }
     }};
 
     ($size:expr) => {{
@@ -295,9 +307,11 @@ macro_rules! dma_circular_descriptors {
             3
         };
 
-        let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; descriptor_len];
-        let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; descriptor_len];
-        (tx_descriptors, rx_descriptors)
+        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; descriptor_len] =
+            [$crate::dma::DmaDescriptor::EMPTY; descriptor_len];
+        static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor; descriptor_len] =
+            [$crate::dma::DmaDescriptor::EMPTY; descriptor_len];
+        unsafe { (&mut TX_DESCRIPTORS, &mut RX_DESCRIPTORS) }
     }};
 }
 
@@ -444,12 +458,12 @@ pub trait Tx: TxPrivate {}
 pub trait PeripheralMarker {}
 
 #[doc(hidden)]
-pub struct DescriptorChain<'a> {
-    pub(crate) descriptors: &'a mut [DmaDescriptor],
+pub struct DescriptorChain {
+    pub(crate) descriptors: &'static mut [DmaDescriptor],
 }
 
-impl<'a> DescriptorChain<'a> {
-    pub fn new(descriptors: &'a mut [DmaDescriptor]) -> Self {
+impl DescriptorChain {
+    pub fn new(descriptors: &'static mut [DmaDescriptor]) -> Self {
         Self { descriptors }
     }
 
@@ -621,33 +635,31 @@ impl<'a> DescriptorChain<'a> {
 pub(crate) struct TxCircularState {
     write_offset: usize,
     write_descr_ptr: *mut DmaDescriptor,
-    available: usize,
+    pub(crate) available: usize,
     last_seen_handled_descriptor_ptr: *mut DmaDescriptor,
     buffer_start: *const u8,
     buffer_len: usize,
+
+    first_desc_ptr: *mut DmaDescriptor,
 }
 
 impl TxCircularState {
-    fn new(
-        write_descr_ptr: *mut DmaDescriptor,
-        last_seen_handled_descriptor_ptr: *mut DmaDescriptor,
-        buffer_start: *const u8,
-        buffer_len: usize,
-    ) -> Self {
+    pub(crate) fn new(chain: &mut DescriptorChain) -> Self {
         Self {
             write_offset: 0,
-            write_descr_ptr,
+            write_descr_ptr: chain.first_mut(),
             available: 0,
-            last_seen_handled_descriptor_ptr,
-            buffer_start,
-            buffer_len,
+            last_seen_handled_descriptor_ptr: chain.first_mut(),
+            buffer_start: chain.descriptors[0].buffer as _,
+            buffer_len: chain.descriptors.iter().map(|d| d.len()).sum(),
+
+            first_desc_ptr: chain.first_mut(),
         }
     }
 
-    fn update<T, R>(&mut self, channel: &T, chain: &mut DescriptorChain)
+    pub(crate) fn update<T>(&mut self, channel: &T)
     where
-        T: TxChannel<R>,
-        R: RegisterAccess,
+        T: TxPrivate,
     {
         if channel.descriptors_handled() {
             channel.reset_descriptors_handled();
@@ -664,7 +676,7 @@ impl TxCircularState {
                 }
             } else {
                 unsafe {
-                    while !((*ptr).next.is_null() || (*ptr).next == chain.first_mut()) {
+                    while !((*ptr).next.is_null() || (*ptr).next == self.first_desc_ptr) {
                         let dw0 = ptr.read_volatile();
                         self.available += dw0.len();
                         ptr = ptr.offset(1);
@@ -675,8 +687,8 @@ impl TxCircularState {
                     self.available += dw0.len();
 
                     // in circular mode we need to honor the now available bytes at start
-                    if (*ptr).next == chain.first_mut() {
-                        ptr = chain.first_mut();
+                    if (*ptr).next == self.first_desc_ptr {
+                        ptr = self.first_desc_ptr;
                         while ptr < descr_address {
                             let dw0 = ptr.read_volatile();
                             self.available += dw0.len();
@@ -695,7 +707,7 @@ impl TxCircularState {
                     self.write_offset = (self.write_offset + segment_len) % self.buffer_len;
 
                     self.write_descr_ptr = if next_descriptor.is_null() {
-                        chain.first_mut()
+                        self.first_desc_ptr
                     } else {
                         next_descriptor
                     }
@@ -706,7 +718,7 @@ impl TxCircularState {
         }
     }
 
-    fn push(&mut self, chain: &mut DescriptorChain, data: &[u8]) -> Result<usize, DmaError> {
+    pub(crate) fn push(&mut self, data: &[u8]) -> Result<usize, DmaError> {
         let avail = self.available;
 
         if avail < data.len() {
@@ -716,7 +728,7 @@ impl TxCircularState {
         let mut remaining = data.len();
         let mut offset = 0;
         while self.available >= remaining && remaining > 0 {
-            let written = self.push_with(chain, |buffer| {
+            let written = self.push_with(|buffer| {
                 let len = usize::min(buffer.len(), data.len() - offset);
                 buffer[..len].copy_from_slice(&data[offset..][..len]);
                 len
@@ -728,9 +740,8 @@ impl TxCircularState {
         Ok(data.len())
     }
 
-    fn push_with(
+    pub(crate) fn push_with(
         &mut self,
-        chain: &mut DescriptorChain,
         f: impl FnOnce(&mut [u8]) -> usize,
     ) -> Result<usize, DmaError> {
         let written = unsafe {
@@ -746,7 +757,7 @@ impl TxCircularState {
                 let dw0 = self.write_descr_ptr.read_volatile();
                 let segment_len = dw0.len();
                 self.write_descr_ptr = if dw0.next.is_null() {
-                    chain.first_mut()
+                    self.first_desc_ptr
                 } else {
                     dw0.next
                 };
@@ -768,24 +779,26 @@ impl TxCircularState {
 
 pub(crate) struct RxCircularState {
     read_descr_ptr: *mut DmaDescriptor,
-    available: usize,
+    pub(crate) available: usize,
     last_seen_handled_descriptor_ptr: *mut DmaDescriptor,
+    last_descr_ptr: *mut DmaDescriptor,
 }
 
 impl RxCircularState {
-    fn new(read_descr_ptr: *mut DmaDescriptor) -> Self {
+    pub(crate) fn new(chain: &mut DescriptorChain) -> Self {
         Self {
-            read_descr_ptr,
+            read_descr_ptr: chain.first_mut(),
             available: 0,
             last_seen_handled_descriptor_ptr: core::ptr::null_mut(),
+            last_descr_ptr: chain.last_mut(),
         }
     }
 
-    fn update(&mut self, chain: &mut DescriptorChain) {
+    pub(crate) fn update(&mut self) {
         if self.last_seen_handled_descriptor_ptr.is_null() {
             // initially start at last descriptor (so that next will be the first
             // descriptor)
-            self.last_seen_handled_descriptor_ptr = chain.last_mut();
+            self.last_seen_handled_descriptor_ptr = self.last_descr_ptr;
         }
 
         let mut current_in_descr_ptr =
@@ -802,7 +815,7 @@ impl RxCircularState {
         }
     }
 
-    fn pop(&mut self, data: &mut [u8]) -> Result<usize, DmaError> {
+    pub(crate) fn pop(&mut self, data: &mut [u8]) -> Result<usize, DmaError> {
         let len = data.len();
         let mut avail = self.available;
 
@@ -847,42 +860,6 @@ impl RxCircularState {
         self.available = avail;
         Ok(len - remaining_buffer.len())
     }
-
-    fn drain_buffer(
-        &mut self,
-        chain: &DescriptorChain,
-        mut dst: &mut [u8],
-    ) -> Result<usize, DmaError> {
-        let mut len = 0;
-        let mut idx = 0;
-        loop {
-            let descriptor = &chain.descriptors[idx];
-            let chunk_len = dst.len().min(descriptor.len());
-            if chunk_len == 0 {
-                break;
-            }
-
-            let buffer_ptr = descriptor.buffer;
-            let next_dscr = descriptor.next;
-
-            // Copy data to destination
-            let (dst_chunk, dst_remaining) = dst.split_at_mut(chunk_len);
-            dst = dst_remaining;
-
-            dst_chunk
-                .copy_from_slice(unsafe { core::slice::from_raw_parts(buffer_ptr, chunk_len) });
-
-            len += chunk_len;
-
-            if next_dscr.is_null() {
-                break;
-            }
-
-            idx += 3;
-        }
-
-        Ok(len)
-    }
 }
 
 /// The functions here are not meant to be used outside the HAL
@@ -894,10 +871,8 @@ pub trait RxPrivate: crate::private::Sealed {
 
     unsafe fn prepare_transfer_without_start(
         &mut self,
-        circular: bool,
         peri: DmaPeripheral,
-        data: *mut u8,
-        len: usize,
+        chain: &DescriptorChain,
     ) -> Result<(), DmaError>;
 
     fn start_transfer(&mut self) -> Result<(), DmaError>;
@@ -919,12 +894,6 @@ pub trait RxPrivate: crate::private::Sealed {
     fn listen_eof(&self);
 
     fn unlisten_eof(&self);
-
-    fn available(&mut self) -> usize;
-
-    fn pop(&mut self, data: &mut [u8]) -> Result<usize, DmaError>;
-
-    fn drain_buffer(&mut self, dst: &mut [u8]) -> Result<usize, DmaError>;
 
     /// Descriptor error detected
     fn has_error(&self) -> bool;
@@ -1010,11 +979,9 @@ where
     T: RxChannel<R>,
     R: RegisterAccess,
 {
-    pub(crate) chain: DescriptorChain<'a>,
     pub(crate) burst_mode: bool,
     pub(crate) rx_impl: T,
-    pub(crate) circular_state: Option<RxCircularState>,
-    pub(crate) _phantom: PhantomData<R>,
+    pub(crate) _phantom: PhantomData<&'a R>,
 }
 
 impl<'a, T, R> ChannelRx<'a, T, R>
@@ -1022,12 +989,10 @@ where
     T: RxChannel<R>,
     R: RegisterAccess,
 {
-    fn new(chain: DescriptorChain<'a>, rx_impl: T, burst_mode: bool) -> Self {
+    fn new(rx_impl: T, burst_mode: bool) -> Self {
         Self {
-            chain,
             burst_mode,
             rx_impl,
-            circular_state: None,
             _phantom: PhantomData,
         }
     }
@@ -1058,21 +1023,19 @@ where
 
     unsafe fn prepare_transfer_without_start(
         &mut self,
-        circular: bool,
         peri: DmaPeripheral,
-        data: *mut u8,
-        len: usize,
+        chain: &DescriptorChain,
     ) -> Result<(), DmaError> {
-        if self.burst_mode && (len % 4 != 0 || data as u32 % 4 != 0) {
+        if self.burst_mode
+            && chain
+                .descriptors
+                .iter()
+                .any(|d| d.len() % 4 != 0 || d.buffer as u32 % 4 != 0)
+        {
             return Err(DmaError::InvalidAlignment);
         }
 
-        self.chain.fill_for_rx(circular, data, len)?;
-
-        self.circular_state = Some(RxCircularState::new(self.chain.first_mut()));
-
-        self.rx_impl
-            .prepare_transfer_without_start(&self.chain, peri)
+        self.rx_impl.prepare_transfer_without_start(chain, peri)
     }
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
@@ -1105,22 +1068,6 @@ where
 
     fn init_channel(&mut self) {
         R::init_channel();
-    }
-
-    fn available(&mut self) -> usize {
-        let state = self.circular_state.as_mut().unwrap();
-        state.update(&mut self.chain);
-        state.available
-    }
-
-    fn pop(&mut self, data: &mut [u8]) -> Result<usize, DmaError> {
-        let state = self.circular_state.as_mut().unwrap();
-        state.pop(data)
-    }
-
-    fn drain_buffer(&mut self, dst: &mut [u8]) -> Result<usize, DmaError> {
-        let state = self.circular_state.as_mut().unwrap();
-        state.drain_buffer(&self.chain, dst)
     }
 
     fn is_listening_eof(&self) -> bool {
@@ -1203,9 +1150,7 @@ pub trait TxPrivate: crate::private::Sealed {
     unsafe fn prepare_transfer_without_start(
         &mut self,
         peri: DmaPeripheral,
-        circular: bool,
-        data: *const u8,
-        len: usize,
+        chain: &DescriptorChain,
     ) -> Result<(), DmaError>;
 
     fn start_transfer(&mut self) -> Result<(), DmaError>;
@@ -1234,18 +1179,18 @@ pub trait TxPrivate: crate::private::Sealed {
 
     fn unlisten_out_descriptor_error(&self);
 
-    fn available(&mut self) -> usize;
-
     fn has_error(&self) -> bool;
-
-    fn push(&mut self, data: &[u8]) -> Result<usize, DmaError>;
-
-    fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> Result<usize, DmaError>;
 
     fn clear_interrupts(&self);
 
     #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
+
+    fn descriptors_handled(&self) -> bool;
+
+    fn reset_descriptors_handled(&self);
+
+    fn last_out_dscr_address(&self) -> usize;
 }
 
 #[doc(hidden)]
@@ -1330,12 +1275,10 @@ where
     T: TxChannel<R>,
     R: RegisterAccess,
 {
-    pub(crate) chain: DescriptorChain<'a>,
     #[allow(unused)]
     pub(crate) burst_mode: bool,
     pub(crate) tx_impl: T,
-    pub(crate) circular_state: Option<TxCircularState>,
-    pub(crate) _phantom: PhantomData<R>,
+    pub(crate) _phantom: PhantomData<(&'a (), R)>,
 }
 
 impl<'a, T, R> ChannelTx<'a, T, R>
@@ -1343,12 +1286,10 @@ where
     T: TxChannel<R>,
     R: RegisterAccess,
 {
-    fn new(chain: DescriptorChain<'a>, tx_impl: T, burst_mode: bool) -> Self {
+    fn new(tx_impl: T, burst_mode: bool) -> Self {
         Self {
-            chain,
             burst_mode,
             tx_impl,
-            circular_state: None,
             _phantom: PhantomData,
         }
     }
@@ -1384,21 +1325,9 @@ where
     unsafe fn prepare_transfer_without_start(
         &mut self,
         peri: DmaPeripheral,
-        circular: bool,
-        data: *const u8,
-        len: usize,
+        chain: &DescriptorChain,
     ) -> Result<(), DmaError> {
-        self.chain.fill_for_tx(circular, data, len)?;
-
-        self.circular_state = Some(TxCircularState::new(
-            self.chain.first_mut(),
-            self.chain.first_mut(),
-            data,
-            len,
-        ));
-
-        self.tx_impl
-            .prepare_transfer_without_start(&self.chain, peri)
+        self.tx_impl.prepare_transfer_without_start(chain, peri)
     }
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
@@ -1427,24 +1356,6 @@ where
 
     fn is_done(&self) -> bool {
         self.tx_impl.is_done()
-    }
-
-    fn available(&mut self) -> usize {
-        let state = self.circular_state.as_mut().unwrap();
-        state.update(&self.tx_impl, &mut self.chain);
-        state.available
-    }
-
-    fn push(&mut self, data: &[u8]) -> Result<usize, DmaError> {
-        let state = self.circular_state.as_mut().unwrap();
-        state.update(&self.tx_impl, &mut self.chain);
-        state.push(&mut self.chain, data)
-    }
-
-    fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> Result<usize, DmaError> {
-        let state = self.circular_state.as_mut().unwrap();
-        state.update(&self.tx_impl, &mut self.chain);
-        state.push_with(&mut self.chain, f)
     }
 
     fn is_listening_eof(&self) -> bool {
@@ -1482,6 +1393,18 @@ where
 
     fn clear_interrupts(&self) {
         R::clear_out_interrupts();
+    }
+
+    fn descriptors_handled(&self) -> bool {
+        self.tx_impl.descriptors_handled()
+    }
+
+    fn reset_descriptors_handled(&self) {
+        self.tx_impl.reset_descriptors_handled()
+    }
+
+    fn last_out_dscr_address(&self) -> usize {
+        self.tx_impl.last_out_dscr_address()
     }
 }
 
@@ -1655,12 +1578,16 @@ pub(crate) mod dma_private {
         type TX: Tx;
 
         fn tx(&mut self) -> &mut Self::TX;
+
+        fn chain(&mut self) -> &mut DescriptorChain;
     }
 
     pub trait DmaSupportRx: DmaSupport {
         type RX: Rx;
 
         fn rx(&mut self) -> &mut Self::RX;
+
+        fn chain(&mut self) -> &mut DescriptorChain;
     }
 }
 
@@ -2024,6 +1951,7 @@ where
     I: dma_private::DmaSupportTx,
 {
     instance: &'a mut I,
+    state: TxCircularState,
 }
 
 impl<'a, I> DmaTransferTxCircular<'a, I>
@@ -2032,17 +1960,20 @@ where
 {
     #[allow(unused)] // currently used by peripherals not available on all chips
     pub(crate) fn new(instance: &'a mut I) -> Self {
-        Self { instance }
+        let state = TxCircularState::new(instance.chain());
+        Self { instance, state }
     }
 
     /// Amount of bytes which can be pushed.
     pub fn available(&mut self) -> usize {
-        self.instance.tx().available()
+        self.state.update(self.instance.tx());
+        self.state.available
     }
 
     /// Push bytes into the DMA buffer.
     pub fn push(&mut self, data: &[u8]) -> Result<usize, DmaError> {
-        self.instance.tx().push(data)
+        self.state.update(self.instance.tx());
+        self.state.push(data)
     }
 
     /// Push bytes into the DMA buffer via the given closure.
@@ -2050,7 +1981,8 @@ where
     /// The closure *might* get called with a slice which is smaller than the
     /// total available buffer.
     pub fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> Result<usize, DmaError> {
-        self.instance.tx().push_with(f)
+        self.state.update(self.instance.tx());
+        self.state.push_with(f)
     }
 
     /// Stop the DMA transfer
@@ -2083,6 +2015,7 @@ where
     I: dma_private::DmaSupportRx,
 {
     instance: &'a mut I,
+    state: RxCircularState,
 }
 
 impl<'a, I> DmaTransferRxCircular<'a, I>
@@ -2091,7 +2024,8 @@ where
 {
     #[allow(unused)] // currently used by peripherals not available on all chips
     pub(crate) fn new(instance: &'a mut I) -> Self {
-        Self { instance }
+        let state = RxCircularState::new(instance.chain());
+        Self { instance, state }
     }
 
     /// Amount of bytes which can be popped.
@@ -2099,7 +2033,8 @@ where
     /// It's expected to call this before trying to [DmaTransferRxCircular::pop]
     /// data.
     pub fn available(&mut self) -> usize {
-        self.instance.rx().available()
+        self.state.update();
+        self.state.available
     }
 
     /// Get available data.
@@ -2111,7 +2046,8 @@ where
     /// Fails with [DmaError::BufferTooSmall] if the given buffer is too small
     /// to hold all available data
     pub fn pop(&mut self, data: &mut [u8]) -> Result<usize, DmaError> {
-        self.instance.rx().pop(data)
+        self.state.update();
+        self.state.pop(data)
     }
 }
 
