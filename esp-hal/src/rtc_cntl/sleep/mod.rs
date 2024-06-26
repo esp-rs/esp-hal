@@ -146,6 +146,13 @@ impl WakeFromLpCoreWakeupSource {
     }
 }
 
+#[cfg(esp32c6)]
+impl Default for WakeFromLpCoreWakeupSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(not(pmu))]
 bitfield::bitfield! {
     #[derive(Default, Clone, Copy)]
