@@ -510,43 +510,43 @@ impl LpI2c {
         match *command_register {
             CommandRegister::COMD0 => {
                 self.i2c
-                    .comd0()
-                    .write(|w| unsafe { w.command0().bits(command.into()) });
+                    .comd(0)
+                    .write(|w| unsafe { w.command().bits(command.into()) });
             }
             CommandRegister::COMD1 => {
                 self.i2c
-                    .comd1()
-                    .write(|w| unsafe { w.command1().bits(command.into()) });
+                    .comd(1)
+                    .write(|w| unsafe { w.command().bits(command.into()) });
             }
             CommandRegister::COMD2 => {
                 self.i2c
-                    .comd2()
-                    .write(|w| unsafe { w.command2().bits(command.into()) });
+                    .comd(2)
+                    .write(|w| unsafe { w.command().bits(command.into()) });
             }
             CommandRegister::COMD3 => {
                 self.i2c
-                    .comd3()
-                    .write(|w| unsafe { w.command3().bits(command.into()) });
+                    .comd(3)
+                    .write(|w| unsafe { w.command().bits(command.into()) });
             }
             CommandRegister::COMD4 => {
                 self.i2c
-                    .comd4()
-                    .write(|w| unsafe { w.command4().bits(command.into()) });
+                    .comd(4)
+                    .write(|w| unsafe { w.command().bits(command.into()) });
             }
             CommandRegister::COMD5 => {
                 self.i2c
-                    .comd5()
-                    .write(|w| unsafe { w.command5().bits(command.into()) });
+                    .comd(5)
+                    .write(|w| unsafe { w.command().bits(command.into()) });
             }
             CommandRegister::COMD6 => {
                 self.i2c
-                    .comd6()
-                    .write(|w| unsafe { w.command6().bits(command.into()) });
+                    .comd(6)
+                    .write(|w| unsafe { w.command().bits(command.into()) });
             }
             CommandRegister::COMD7 => {
                 self.i2c
-                    .comd7()
-                    .write(|w| unsafe { w.command7().bits(command.into()) });
+                    .comd(7)
+                    .write(|w| unsafe { w.command().bits(command.into()) });
             }
         }
         command_register.advance();
