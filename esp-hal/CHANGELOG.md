@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - TIMG: Fix interrupt handler setup (#1714)
 - Fix `sleep_light` for ESP32-C6 (#1720)
+- ROM Functions: Fix address of `ets_update_cpu_frequency_rom` (#1722)
 
 ### Changed
 
