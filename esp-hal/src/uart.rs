@@ -15,8 +15,8 @@
 //!
 //! Each UART controller is individually configurable, and the usual setting
 //! such as baud rate, data bits, parity, and stop bits can easily be
-//! configured. Additionally, the transmit (TX) and receive (RX) pins can be
-//! specified.
+//! configured. Additionally, the transmit (TX) and receive (RX) pins need to
+//! be specified.
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -29,7 +29,11 @@
 //!     io.pins.gpio2).unwrap();
 //! # }
 //! ```
-//! 
+//!
+//! The UART controller can be configured to invert the polarity of the pins.
+//! This is achived by inverting the dessired pins, and then constucting the
+//! UART instance using the inverted pins.
+//!
 //! ## Usage
 //!
 //! The UART driver implements a number of third-party traits, with the
@@ -62,7 +66,7 @@
 //! uart1.write_bytes("Hello, world!".as_bytes()).expect("write error!");
 //! # }
 //! ```
-//! 
+//!
 //! #### Splitting the UART into TX and RX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -85,7 +89,34 @@
 //! let byte = rx.read_byte().expect("read error!");
 //! # }
 //! ```
-//! 
+//!
+//! #### Inverting TX and RX Pins
+//!
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::uart::{config::Config, Uart};
+//! use esp_hal::gpio::{Io, any_pin::AnyPin};
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//!
+//! let tx = AnyPin::new_inverted(io.pins.gpio1);
+//! let rx = AnyPin::new_inverted(io.pins.gpio2);
+//! let mut uart1 = Uart::new(peripherals.UART1, &clocks, tx, rx).unwrap();
+//! # }
+//! ```
+//!
+//! #### Constructing TX and RX Components
+//!
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::uart::{config::Config, UartTx, UartRx};
+//! use esp_hal::gpio::{Io, any_pin::AnyPin};
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//!
+//! let tx = UartTx::new(peripherals.UART0, &clocks, None, io.pins.gpio1).unwrap();
+//! let rx = UartRx::new(peripherals.UART1, &clocks, None, io.pins.gpio2).unwrap();
+//! # }
+//! ```
+//!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 //! [embedded-io]: https://docs.rs/embedded-io/latest/embedded_io/
 //! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/
