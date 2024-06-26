@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - TIMG: Fix interrupt handler setup (#1714)
+- Fix `sleep_light` for ESP32-C6 (#1720)
 
 ### Changed
 
