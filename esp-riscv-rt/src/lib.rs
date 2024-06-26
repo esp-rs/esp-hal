@@ -338,34 +338,6 @@ _abs_start:
     blt a0, a1, 1b
     2:
 "#,
-#[cfg(feature = "init-data")]
-    r#"
-    la a0, _data_start
-    la a1, _data_end
-    bge a0, a1, 2f
-    la a2, _sidata
-    1:
-    lw a3, 0(a2)
-    sw a3, 0(a0)
-    addi a0, a0, 4
-    addi a2, a2, 4
-    blt a0, a1, 1b
-    2:
-"#,
-#[cfg(feature = "init-rw-text")]
-    r#"
-    la a0, _srwtext
-    la a1, _erwtext
-    bge a0, a1, 2f
-    la a2, _irwtext
-    1:
-    lw a3, 0(a2)
-    sw a3, 0(a0)
-    addi a0, a0, 4
-    addi a2, a2, 4
-    blt a0, a1, 1b
-    2:
-"#,
     r#"
     li  x1, 0
     li  x2, 0
