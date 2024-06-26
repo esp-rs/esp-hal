@@ -25,8 +25,8 @@
 //! # let dma = Dma::new(peripherals.DMA);
 //! # let dma_channel = dma.channel0;
 //!
-//! let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) =
-//! dma_buffers!(32000, 0); let buffer = tx_buffer;
+//! let (tx_buffer, tx_descriptors, _, _) = dma_buffers!(32000, 0);
+//! let buffer = tx_buffer;
 //!
 //! // configure the data pins to use
 //! let tx_pins = TxFourBits::new(io.pins.gpio1, io.pins.gpio2, io.pins.gpio3,
@@ -39,10 +39,9 @@
 //!     peripherals.PARL_IO,
 //!     dma_channel.configure(
 //!         false,
-//!         &mut tx_descriptors,
-//!         &mut rx_descriptors,
 //!         DmaPriority::Priority0,
 //!     ),
+//!     tx_descriptors,
 //!     1.MHz(),
 //!     &clocks,
 //! )
@@ -85,17 +84,16 @@
 //! let mut rx_pins = RxFourBits::new(io.pins.gpio1, io.pins.gpio2,
 //! io.pins.gpio3, io.pins.gpio4);
 //!
-//! let (_, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(0,
-//! 32000); let mut buffer = rx_buffer;
+//! let (_, _, rx_buffer, rx_descriptors) = dma_buffers!(0, 32000);
+//! let mut buffer = rx_buffer;
 //!
 //! let parl_io = ParlIoRxOnly::new(
 //!     peripherals.PARL_IO,
 //!     dma_channel.configure(
 //!         false,
-//!         &mut tx_descriptors,
-//!         &mut rx_descriptors,
 //!         DmaPriority::Priority0,
 //!     ),
+//!     rx_descriptors,
 //!     1.MHz(),
 //!     &clocks,
 //! )
@@ -127,6 +125,8 @@ use crate::{
         dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
         Channel,
         ChannelTypes,
+        DescriptorChain,
+        DmaDescriptor,
         DmaError,
         DmaPeripheral,
         DmaTransferRx,
@@ -944,6 +944,7 @@ where
 
         Ok(ParlIoTx {
             tx_channel: self.tx_channel,
+            tx_chain: DescriptorChain::new(self.descriptors),
             phantom: PhantomData,
         })
     }
@@ -976,6 +977,7 @@ where
 
         Ok(ParlIoTx {
             tx_channel: self.tx_channel,
+            tx_chain: DescriptorChain::new(self.descriptors),
             phantom: PhantomData,
         })
     }
@@ -988,6 +990,7 @@ where
     DM: Mode,
 {
     tx_channel: CH::Tx<'d>,
+    tx_chain: DescriptorChain,
     phantom: PhantomData<DM>,
 }
 
@@ -1026,6 +1029,7 @@ where
 
         Ok(ParlIoRx {
             rx_channel: self.rx_channel,
+            rx_chain: DescriptorChain::new(self.descriptors),
             phantom: PhantomData,
         })
     }
@@ -1056,6 +1060,7 @@ where
 
         Ok(ParlIoRx {
             rx_channel: self.rx_channel,
+            rx_chain: DescriptorChain::new(self.descriptors),
             phantom: PhantomData,
         })
     }
@@ -1068,6 +1073,7 @@ where
     DM: Mode,
 {
     rx_channel: CH::Rx<'d>,
+    rx_chain: DescriptorChain,
     phantom: PhantomData<DM>,
 }
 
@@ -1195,6 +1201,8 @@ where
     pub fn new(
         _parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
         mut dma_channel: Channel<'d, CH, DM>,
+        tx_descriptors: &'static mut [DmaDescriptor],
+        rx_descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
         _clocks: &Clocks,
     ) -> Result<Self, Error> {
@@ -1203,10 +1211,12 @@ where
         Ok(Self {
             tx: TxCreatorFullDuplex {
                 tx_channel: dma_channel.tx,
+                descriptors: tx_descriptors,
                 phantom: PhantomData,
             },
             rx: RxCreatorFullDuplex {
                 rx_channel: dma_channel.rx,
+                descriptors: rx_descriptors,
                 phantom: PhantomData,
             },
         })
@@ -1268,6 +1278,7 @@ where
     pub fn new(
         _parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
         mut dma_channel: Channel<'d, CH, DM>,
+        descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
         _clocks: &Clocks,
     ) -> Result<Self, Error> {
@@ -1276,6 +1287,7 @@ where
         Ok(Self {
             tx: TxCreator {
                 tx_channel: dma_channel.tx,
+                descriptors,
                 phantom: PhantomData,
             },
         })
@@ -1337,6 +1349,7 @@ where
     pub fn new(
         _parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
         mut dma_channel: Channel<'d, CH, DM>,
+        descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
         _clocks: &Clocks,
     ) -> Result<Self, Error> {
@@ -1345,6 +1358,7 @@ where
         Ok(Self {
             rx: RxCreator {
                 rx_channel: dma_channel.rx,
+                descriptors,
                 phantom: PhantomData,
             },
         })
@@ -1475,8 +1489,9 @@ where
         self.tx_channel.is_done();
 
         unsafe {
+            self.tx_chain.fill_for_tx(false, ptr, len)?;
             self.tx_channel
-                .prepare_transfer_without_start(DmaPeripheral::ParlIo, false, ptr, len)
+                .prepare_transfer_without_start(DmaPeripheral::ParlIo, &self.tx_chain)
                 .and_then(|_| self.tx_channel.start_transfer())?;
         }
 
@@ -1519,6 +1534,10 @@ where
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
     }
+
+    fn chain(&mut self) -> &mut DescriptorChain {
+        &mut self.tx_chain
+    }
 }
 
 impl<'d, CH, DM> ParlIoRx<'d, CH, DM>
@@ -1548,13 +1567,14 @@ where
             return Err(Error::MaxDmaTransferSizeExceeded);
         }
 
-        Self::start_receive_bytes_dma(&mut self.rx_channel, ptr, len)?;
+        Self::start_receive_bytes_dma(&mut self.rx_channel, &mut self.rx_chain, ptr, len)?;
 
         Ok(DmaTransferRx::new(self))
     }
 
     fn start_receive_bytes_dma(
         rx_channel: &mut CH::Rx<'d>,
+        rx_chain: &mut DescriptorChain,
         ptr: *mut u8,
         len: usize,
     ) -> Result<(), Error> {
@@ -1568,8 +1588,9 @@ where
         Instance::set_rx_bytes(len as u16);
 
         unsafe {
+            rx_chain.fill_for_rx(false, ptr, len)?;
             rx_channel
-                .prepare_transfer_without_start(false, DmaPeripheral::ParlIo, ptr, len)
+                .prepare_transfer_without_start(DmaPeripheral::ParlIo, rx_chain)
                 .and_then(|_| rx_channel.start_transfer())?;
         }
 
@@ -1615,6 +1636,10 @@ where
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
     }
+
+    fn chain(&mut self) -> &mut DescriptorChain {
+        &mut self.rx_chain
+    }
 }
 
 /// Creates a TX channel
@@ -1624,6 +1649,7 @@ where
     DM: Mode,
 {
     tx_channel: CH::Tx<'d>,
+    descriptors: &'static mut [DmaDescriptor],
     phantom: PhantomData<DM>,
 }
 
@@ -1634,6 +1660,7 @@ where
     DM: Mode,
 {
     rx_channel: CH::Rx<'d>,
+    descriptors: &'static mut [DmaDescriptor],
     phantom: PhantomData<DM>,
 }
 
@@ -1644,6 +1671,7 @@ where
     DM: Mode,
 {
     tx_channel: CH::Tx<'d>,
+    descriptors: &'static mut [DmaDescriptor],
     phantom: PhantomData<DM>,
 }
 
@@ -1654,6 +1682,7 @@ where
     DM: Mode,
 {
     rx_channel: CH::Rx<'d>,
+    descriptors: &'static mut [DmaDescriptor],
     phantom: PhantomData<DM>,
 }
 
@@ -1762,7 +1791,7 @@ pub mod asynch {
             }
 
             let future = DmaRxDoneChFuture::new(&mut self.rx_channel);
-            Self::start_receive_bytes_dma(future.rx, ptr, len)?;
+            Self::start_receive_bytes_dma(future.rx, &mut self.rx_chain, ptr, len)?;
             future.await?;
 
             Ok(())
