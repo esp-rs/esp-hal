@@ -1,6 +1,6 @@
 //! RMT Loopback Test
 //!
-//! It's assumed GPIO2 is connected to GPIO4
+//! It's assumed GPIO2 is connected to GPIO3
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -65,17 +65,17 @@ mod tests {
             if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
                 let  rx_channel = {
                     use esp_hal::rmt::RxChannelCreator;
-                    rmt.channel1.configure(io.pins.gpio4, rx_config).unwrap()
+                    rmt.channel1.configure(io.pins.gpio3, rx_config).unwrap()
                 };
             } else if #[cfg(feature = "esp32s3")] {
                 let  rx_channel = {
                     use esp_hal::rmt::RxChannelCreator;
-                    rmt.channel7.configure(io.pins.gpio4, rx_config).unwrap()
+                    rmt.channel7.configure(io.pins.gpio3, rx_config).unwrap()
                 };
             } else {
                 let  rx_channel = {
                     use esp_hal::rmt::RxChannelCreator;
-                    rmt.channel2.configure(io.pins.gpio4, rx_config).unwrap()
+                    rmt.channel2.configure(io.pins.gpio3, rx_config).unwrap()
                 };
             }
         }

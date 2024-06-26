@@ -2,9 +2,9 @@
 //!
 //! Folowing pins are used:
 //! TX    GPIP2
-//! RX    GPIO4
+//! RX    GPIO3
 //!
-//! Connect TX (GPIO2) and RX (GPIO4) pins.
+//! Connect TX (GPIO2) and RX (GPIO3) pins.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -38,7 +38,7 @@ impl Context {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let uart = Uart::new(peripherals.UART1, &clocks, io.pins.gpio2, io.pins.gpio4).unwrap();
+        let uart = Uart::new(peripherals.UART1, &clocks, io.pins.gpio2, io.pins.gpio3).unwrap();
 
         Context { clocks, uart }
     }
@@ -100,7 +100,7 @@ mod tests {
 
         #[cfg(not(feature = "esp32s2"))]
         {
-            #[cfg(not(feature = "esp32c3"))]
+            #[cfg(not(any(feature = "esp32c3", feature = "esp32c2")))]
             {
                 // 9600 baud, RC FAST clock source:
                 ctx.uart.change_baud(9600, ClockSource::RcFast, &ctx.clocks);

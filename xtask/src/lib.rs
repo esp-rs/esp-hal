@@ -306,6 +306,13 @@ pub fn execute_app(
     if subcommand == "test" {
         if chip == Chip::Esp32 {
             builder = builder.arg("--").arg("--chip").arg("esp32-3.3v");
+        } else if chip == Chip::Esp32c2 {
+            builder = builder
+                .arg("--")
+                .arg("--chip")
+                .arg("esp32c2")
+                .arg("--speed")
+                .arg("15000");
         } else {
             builder = builder.arg("--").arg("--chip").arg(format!("{}", chip));
         }
