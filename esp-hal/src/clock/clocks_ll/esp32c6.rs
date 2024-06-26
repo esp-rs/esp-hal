@@ -1,7 +1,3 @@
-use core::cell::Cell;
-
-use critical_section::{CriticalSection, Mutex};
-
 use crate::{
     clock::{ApbClock, Clock, CpuClock, PllClock, XtalClock},
     rtc_cntl::rtc::CpuClockSource,
@@ -39,85 +35,12 @@ const I2C_MST_BBPLL_STOP_FORCE_HIGH: u32 = 1 << 2;
 const I2C_MST_BBPLL_STOP_FORCE_LOW: u32 = 1 << 3;
 const I2C_MST_BBPLL_CAL_DONE: u32 = 1 << 24;
 
-bitfield::bitfield! {
-    #[derive(Clone, Copy, Default)]
-    // `modem_clock_device_t`
-    pub struct ModemClockDevice(u32);
-
-    pub bool, adc_common_fe, set_adc_common_fe: 0;
-    pub bool, private_fe   , set_private_fe   : 1;
-    pub bool, coexist      , set_coexist      : 2;
-    pub bool, i2c_master   , set_i2c_master   : 3;
-    pub bool, wifi_mac     , set_wifi_mac     : 4;
-    pub bool, wifi_bb      , set_wifi_bb      : 5;
-    pub bool, etm          , set_etm          : 6;
-    pub bool, ble_mac      , set_ble_mac      : 7;
-    pub bool, ble_bb       , set_ble_bb       : 8;
-    pub bool, _802154_mac  , set_802154_mac   : 9;
-    pub bool, datadump     , set_datadump     : 10;
-}
-
-struct Refcounted {
-    refcount: Mutex<Cell<u32>>,
-    on_enabled: fn(),
-    on_disabled: fn(),
-}
-
-impl Refcounted {
-    const fn new(on_enabled: fn(), on_disabled: fn()) -> Self {
-        Refcounted {
-            refcount: Mutex::new(Cell::new(0)),
-            on_enabled,
-            on_disabled,
-        }
-    }
-
-    fn enable(&self, enable: bool, cs: CriticalSection) {
-        let refcount = self.refcount.borrow(cs);
-        let count = refcount.get();
-
-        if enable {
-            refcount.set(count + 1);
-            if count == 1 {
-                (self.on_enabled)();
-            }
-        } else {
-            if count == 1 {
-                (self.on_disabled)();
-            }
-            refcount.set(count - 1);
-        }
-    }
-}
-
 unsafe fn modem_lpcon<'a>() -> &'a esp32c6::modem_lpcon::RegisterBlock {
     &*esp32c6::MODEM_LPCON::ptr()
 }
 
 unsafe fn pcr<'a>() -> &'a esp32c6::pcr::RegisterBlock {
     &*esp32c6::PCR::ptr()
-}
-
-fn modem_clock_device_enable(sources: ModemClockDevice, enable: bool) {
-    // TODO: implement the rest
-    static I2C_MASTER: Refcounted = Refcounted::new(
-        || unsafe {
-            modem_lpcon()
-                .clk_conf()
-                .modify(|_, w| w.clk_i2c_mst_en().set_bit());
-        },
-        || unsafe {
-            modem_lpcon()
-                .clk_conf()
-                .modify(|_, w| w.clk_i2c_mst_en().clear_bit());
-        },
-    );
-
-    critical_section::with(|cs| {
-        if sources.i2c_master() {
-            I2C_MASTER.enable(enable, cs);
-        }
-    });
 }
 
 // rtc_clk_bbpll_configure
@@ -131,13 +54,12 @@ pub(crate) fn esp32c6_rtc_bbpll_configure_raw(_xtal_freq: u32, pll_freq: u32) {
     // Do nothing
     debug_assert!(pll_freq == 480);
 
-    unsafe {
-        // enable i2c mst clk by force on temporarily
-        let mut i2c_clock = ModemClockDevice::default();
-        i2c_clock.set_i2c_master(true);
-        let i2c_clock = i2c_clock;
-
-        modem_clock_device_enable(i2c_clock, true);
+    critical_section::with(|_| unsafe {
+        // enable i2c mst clk by force on (temporarily)
+        let was_i2c_mst_en = modem_lpcon().clk_conf().read().clk_i2c_mst_en().bit();
+        modem_lpcon()
+            .clk_conf()
+            .modify(|_, w| w.clk_i2c_mst_en().set_bit());
 
         modem_lpcon()
             .i2c_mst_clk_conf()
@@ -211,16 +133,21 @@ pub(crate) fn esp32c6_rtc_bbpll_configure_raw(_xtal_freq: u32, pll_freq: u32) {
         // WAIT CALIBRATION DONE
         while (i2c_mst_ana_conf0_reg_ptr.read_volatile() & I2C_MST_BBPLL_CAL_DONE) == 0 {}
 
+        // workaround bbpll calibration might stop early
+        crate::rom::ets_delay_us(10);
+
         // BBPLL CALIBRATION STOP
-        i2c_mst_ana_conf0_reg_ptr.write_volatile(
-            i2c_mst_ana_conf0_reg_ptr.read_volatile() | I2C_MST_BBPLL_STOP_FORCE_HIGH,
-        );
         i2c_mst_ana_conf0_reg_ptr.write_volatile(
             i2c_mst_ana_conf0_reg_ptr.read_volatile() & !I2C_MST_BBPLL_STOP_FORCE_LOW,
         );
+        i2c_mst_ana_conf0_reg_ptr.write_volatile(
+            i2c_mst_ana_conf0_reg_ptr.read_volatile() | I2C_MST_BBPLL_STOP_FORCE_HIGH,
+        );
 
-        modem_clock_device_enable(i2c_clock, false);
-    }
+        modem_lpcon()
+            .clk_conf()
+            .modify(|_, w| w.clk_i2c_mst_en().bit(was_i2c_mst_en));
+    });
 }
 
 pub(crate) fn esp32c6_rtc_bbpll_enable() {
