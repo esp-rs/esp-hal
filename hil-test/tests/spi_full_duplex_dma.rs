@@ -280,8 +280,8 @@ mod tests {
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
         let miso = io.pins.gpio2;
-        let mosi = io.pins.gpio4;
-        let cs = io.pins.gpio5;
+        let mosi = io.pins.gpio3;
+        let cs = io.pins.gpio8;
 
         let dma = Dma::new(peripherals.DMA);
 

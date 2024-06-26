@@ -101,6 +101,8 @@ jobs:
       matrix:
         target:
           # RISC-V devices:
+          - soc: esp32c2
+            runner: esp32c2-jtag
           - soc: esp32c3
             runner: esp32c3-usb
           - soc: esp32c6
