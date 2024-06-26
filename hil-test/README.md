@@ -86,6 +86,8 @@ Our self hosted runners have the following setup:
   - Devkit: `ESP32-S3-DevKitC-1` connected via USB-Serial-JTAG.
     - `GPIO2` and `GPIO3` are connected.
     - `GPIO5` and `GPIO6` are connected.
+    - `GPIO1` and `GPIO21` are connected.
+    - `GPIO43 (TX)` and `GPIO45` are connected.
   - RPi: Raspbian 12 configured with the following [setup](#vm-setup)
 
 [`hil.yml`]: https://github.com/esp-rs/esp-hal/blob/main/.github/workflows/hil.yml
