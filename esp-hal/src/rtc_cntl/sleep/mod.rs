@@ -131,6 +131,21 @@ impl<'a, 'b> RtcioWakeupSource<'a, 'b> {
     }
 }
 
+/// LP Core wakeup source
+///
+/// Wake up from LP core. This wakeup source
+/// can be used to wake up from both light and deep sleep.
+#[cfg(esp32c6)]
+pub struct WakeFromLpCoreWakeupSource {}
+
+#[cfg(esp32c6)]
+impl WakeFromLpCoreWakeupSource {
+    /// Create a new instance of [LpCoreWakeupSource]
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
 #[cfg(not(pmu))]
 bitfield::bitfield! {
     #[derive(Default, Clone, Copy)]

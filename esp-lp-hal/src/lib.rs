@@ -37,6 +37,16 @@ cfg_if::cfg_if! {
 
 pub static mut CPU_CLOCK: u32 = LP_FAST_CLK_HZ;
 
+/// Wake up the HP core
+#[cfg(feature = "esp32c6")]
+pub fn wake_hp_core() {
+    // TODO add PMU to the SVD
+    let hp_lp_cpu_comm = 0x600b0184 as *mut u32;
+    unsafe {
+        hp_lp_cpu_comm.write_volatile(1 << 30);
+    }
+}
+
 #[cfg(feature = "esp32c6")]
 global_asm!(
     r#"
