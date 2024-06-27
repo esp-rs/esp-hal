@@ -1,4 +1,4 @@
-//! Universal Asynchronous Receiver/Transmitter (UART)
+//! # Universal Asynchronous Receiver/Transmitter (UART)
 //!
 //! The UART is a hardware peripheral which handles communication using serial
 //! communication interfaces, such as RS232 and RS485. This peripheral provides
@@ -15,8 +15,8 @@
 //!
 //! Each UART controller is individually configurable, and the usual setting
 //! such as baud rate, data bits, parity, and stop bits can easily be
-//! configured. Additionally, the transmit (TX) and receive (RX) pins can be
-//! specified.
+//! configured. Additionally, the transmit (TX) and receive (RX) pins need to
+//! be specified.
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -30,6 +30,10 @@
 //! # }
 //! ```
 //! 
+//! The UART controller can be configured to invert the polarity of the pins.
+//! This is achived by inverting the desired pins, and then constucting the
+//! UART instance using the inverted pins.
+//!
 //! ## Usage
 //!
 //! The UART driver implements a number of third-party traits, with the
@@ -83,6 +87,33 @@
 //! // Each component can be used individually to interact with the UART:
 //! tx.write_bytes(&[42u8]).expect("write error!");
 //! let byte = rx.read_byte().expect("read error!");
+//! # }
+//! ```
+//! 
+//! #### Inverting TX and RX Pins
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::uart::{config::Config, Uart};
+//! use esp_hal::gpio::{Io, any_pin::AnyPin};
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//!
+//! let tx = AnyPin::new_inverted(io.pins.gpio1);
+//! let rx = AnyPin::new_inverted(io.pins.gpio2);
+//! let mut uart1 = Uart::new(peripherals.UART1, &clocks, tx, rx).unwrap();
+//! # }
+//! ```
+//! 
+//! #### Constructing TX and RX Components
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::uart::{config::Config, UartTx, UartRx};
+//! use esp_hal::gpio::{Io, any_pin::AnyPin};
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//!
+//! let tx = UartTx::new(peripherals.UART0, &clocks, None,
+//!     io.pins.gpio1).unwrap();
+//! let rx = UartRx::new(peripherals.UART1, &clocks, None,
+//!     io.pins.gpio2).unwrap();
 //! # }
 //! ```
 //! 

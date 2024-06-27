@@ -1,6 +1,5 @@
 //! # Parallel IO
 //!
-//! ## Overview
 //! The Parallel IO peripheral is a general purpose parallel interface that can
 //! be used to connect to external devices such as LED matrix, LCD display,
 //! Printer and Camera. The peripheral has independent TX and RX units. Each
