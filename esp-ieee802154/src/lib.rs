@@ -1,9 +1,13 @@
-//! Low-level [IEEE 802.15.4] driver for the ESP32-C6 and ESP32-H2
+//! Low-level [IEEE 802.15.4] driver for the ESP32-C6 and ESP32-H2.
 //!
 //! Implements the PHY/MAC layers of the IEEE 802.15.4 protocol stack, and
 //! supports sending and receiving of raw frames.
 //!
+//! This library is intended to be used to implement support for higher-level
+//! communication protocols, for example [esp-openthread].
+//!
 //! [IEEE 802.15.4]: https://en.wikipedia.org/wiki/IEEE_802.15.4
+//! [esp-openthread]: https://github.com/esp-rs/esp-openthread
 //!
 //! ## Feature Flags
 #![doc = document_features::document_features!()]
@@ -35,11 +39,6 @@ mod frame;
 mod hal;
 mod pib;
 mod raw;
-
-#[no_mangle]
-extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
-    0
-}
 
 /// IEEE 802.15.4 errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,7 +103,6 @@ pub struct Ieee802154<'a> {
     _align: u32,
     transmit_buffer: [u8; FRAME_SIZE],
     _phantom1: PhantomData<&'a ()>,
-    //_phantom2:PhantomData< &'b ()>,
 }
 
 impl<'a> Ieee802154<'a> {
@@ -116,7 +114,6 @@ impl<'a> Ieee802154<'a> {
             _align: 0,
             transmit_buffer: [0u8; FRAME_SIZE],
             _phantom1: PhantomData,
-            //_phantom2: PhantomData,
         }
     }
 
@@ -224,6 +221,7 @@ impl<'a> Ieee802154<'a> {
         Ok(())
     }
 
+    /// Set the transmit done callback function.
     pub fn set_tx_done_callback(&mut self, callback: &'a mut (dyn FnMut() + Send)) {
         critical_section::with(|cs| {
             let mut tx_done_callback = TX_DONE_CALLBACK.borrow_ref_mut(cs);
@@ -231,6 +229,7 @@ impl<'a> Ieee802154<'a> {
         });
     }
 
+    /// Clear the transmit done callback function.
     pub fn clear_tx_done_callback(&mut self) {
         critical_section::with(|cs| {
             let mut tx_done_callback = TX_DONE_CALLBACK.borrow_ref_mut(cs);
@@ -238,6 +237,7 @@ impl<'a> Ieee802154<'a> {
         });
     }
 
+    /// Set the receive available callback function.
     pub fn set_rx_available_callback(&mut self, callback: &'a mut (dyn FnMut() + Send)) {
         critical_section::with(|cs| {
             let mut rx_available_callback = RX_AVAILABLE_CALLBACK.borrow_ref_mut(cs);
@@ -245,6 +245,7 @@ impl<'a> Ieee802154<'a> {
         });
     }
 
+    /// Clear the receive available callback function.
     pub fn clear_rx_available_callback(&mut self) {
         critical_section::with(|cs| {
             let mut rx_available_callback = RX_AVAILABLE_CALLBACK.borrow_ref_mut(cs);
@@ -252,6 +253,7 @@ impl<'a> Ieee802154<'a> {
         });
     }
 
+    /// Set the transmit done callback function.
     pub fn set_tx_done_callback_fn(&mut self, callback: fn()) {
         critical_section::with(|cs| {
             let mut tx_done_callback_fn = TX_DONE_CALLBACK_FN.borrow_ref_mut(cs);
@@ -259,6 +261,7 @@ impl<'a> Ieee802154<'a> {
         });
     }
 
+    /// Clear the transmit done callback function.
     pub fn clear_tx_done_callback_fn(&mut self) {
         critical_section::with(|cs| {
             let mut tx_done_callback_fn = TX_DONE_CALLBACK_FN.borrow_ref_mut(cs);
@@ -266,6 +269,7 @@ impl<'a> Ieee802154<'a> {
         });
     }
 
+    /// Set the receive available callback function.
     pub fn set_rx_available_callback_fn(&mut self, callback: fn()) {
         critical_section::with(|cs| {
             let mut rx_available_callback_fn = RX_AVAILABLE_CALLBACK_FN.borrow_ref_mut(cs);
@@ -273,6 +277,7 @@ impl<'a> Ieee802154<'a> {
         });
     }
 
+    /// Clear the receive available callback function.
     pub fn clear_rx_available_callback_fn(&mut self) {
         critical_section::with(|cs| {
             let mut rx_available_callback_fn = RX_AVAILABLE_CALLBACK_FN.borrow_ref_mut(cs);
@@ -290,6 +295,11 @@ impl<'a> Drop for Ieee802154<'a> {
     }
 }
 
+/// Convert from RSSI (Received Signal Strength Indicator) to LQI (Link Quality
+/// Indication)
+///
+/// RSSI is a measure of incoherent (raw) RF power in a channel. LQI is a
+/// cumulative value used in multi-hop networks to assess the cost of a link.
 pub fn rssi_to_lqi(rssi: i8) -> u8 {
     if rssi < -80 {
         0
@@ -351,4 +361,9 @@ fn rx_available() {
             rx_available_callback_fn();
         }
     });
+}
+
+#[no_mangle]
+extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
+    0
 }
