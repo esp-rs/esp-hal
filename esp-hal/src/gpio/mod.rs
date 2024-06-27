@@ -77,6 +77,15 @@ pub enum Event {
     HighLevel   = 5,
 }
 
+impl From<WakeEvent> for Event {
+    fn from(value: WakeEvent) -> Self {
+        match value {
+            WakeEvent::LowLevel => Event::LowLevel,
+            WakeEvent::HighLevel => Event::HighLevel,
+        }
+    }
+}
+
 /// Event used to wake up from light sleep.
 #[derive(Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -85,15 +94,6 @@ pub enum WakeEvent {
     LowLevel  = 4,
     /// Wake on high level
     HighLevel = 5,
-}
-
-impl Into<Event> for WakeEvent {
-    fn into(self) -> Event {
-        match self {
-            WakeEvent::LowLevel => Event::LowLevel,
-            WakeEvent::HighLevel => Event::HighLevel,
-        }
-    }
 }
 
 /// Digital input or output level.
