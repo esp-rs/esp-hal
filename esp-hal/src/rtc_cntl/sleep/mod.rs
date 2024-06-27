@@ -163,7 +163,7 @@ impl Default for WakeFromLpCoreWakeupSource {
 pub struct GpioWakeupSource {}
 
 impl GpioWakeupSource {
-    /// Create a new instance of [LpCoreWakeupSource]
+    /// Create a new instance of [GpioWakeupSource]
     pub fn new() -> Self {
         Self {}
     }
