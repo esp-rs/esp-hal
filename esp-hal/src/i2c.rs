@@ -1,4 +1,4 @@
-//! Inter-Integrated Circuit (I2C)
+//! # Inter-Integrated Circuit (I2C)
 //!
 //! I2C is a serial, synchronous, multi-device, half-duplex communication
 //! protocol that allows co-existence of multiple masters and slaves on the
@@ -37,7 +37,7 @@
 //! );
 //! # }
 //! ```
-//!
+//! 
 //! ## Usage
 //!
 //! The I2C driver implements a number of third-party traits, with the
@@ -48,7 +48,6 @@
 //! ### Examples
 //!
 //! #### Read Data from a BMP180 Sensor
-//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::i2c::I2C;

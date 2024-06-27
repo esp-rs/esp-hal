@@ -1,4 +1,4 @@
-//! Universal Asynchronous Receiver/Transmitter (UART)
+//! # Universal Asynchronous Receiver/Transmitter (UART)
 //!
 //! The UART is a hardware peripheral which handles communication using serial
 //! communication interfaces, such as RS232 and RS485. This peripheral provides
@@ -29,7 +29,7 @@
 //!     io.pins.gpio2).unwrap();
 //! # }
 //! ```
-//!
+//! 
 //! The UART controller can be configured to invert the polarity of the pins.
 //! This is achived by inverting the dessired pins, and then constucting the
 //! UART instance using the inverted pins.
@@ -66,7 +66,7 @@
 //! uart1.write_bytes("Hello, world!".as_bytes()).expect("write error!");
 //! # }
 //! ```
-//!
+//! 
 //! #### Splitting the UART into TX and RX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -89,9 +89,8 @@
 //! let byte = rx.read_byte().expect("read error!");
 //! # }
 //! ```
-//!
+//! 
 //! #### Inverting TX and RX Pins
-//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, Uart};
@@ -103,20 +102,21 @@
 //! let mut uart1 = Uart::new(peripherals.UART1, &clocks, tx, rx).unwrap();
 //! # }
 //! ```
-//!
+//! 
 //! #### Constructing TX and RX Components
-//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, UartTx, UartRx};
 //! use esp_hal::gpio::{Io, any_pin::AnyPin};
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
-//! let tx = UartTx::new(peripherals.UART0, &clocks, None, io.pins.gpio1).unwrap();
-//! let rx = UartRx::new(peripherals.UART1, &clocks, None, io.pins.gpio2).unwrap();
+//! let tx = UartTx::new(peripherals.UART0, &clocks, None,
+//!     io.pins.gpio1).unwrap();
+//! let rx = UartRx::new(peripherals.UART1, &clocks, None,
+//!     io.pins.gpio2).unwrap();
 //! # }
 //! ```
-//!
+//! 
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 //! [embedded-io]: https://docs.rs/embedded-io/latest/embedded_io/
 //! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/
