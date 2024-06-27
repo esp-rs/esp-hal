@@ -31,7 +31,7 @@
 //! ```
 //! 
 //! The UART controller can be configured to invert the polarity of the pins.
-//! This is achived by inverting the dessired pins, and then constucting the
+//! This is achived by inverting the desired pins, and then constucting the
 //! UART instance using the inverted pins.
 //!
 //! ## Usage
