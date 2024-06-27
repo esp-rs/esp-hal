@@ -65,3 +65,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## 0.2.0 - 2023-03-14
 
 ## 0.1.0 - 2023-01-26
+
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-riscv-rt?since=2024-04-19

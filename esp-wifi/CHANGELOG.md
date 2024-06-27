@@ -17,23 +17,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-## [0.6.0] - 2024-06-04
+## 0.6.0 - 2024-06-04
 
 ### Removed
 
 - Removed embedded-hal v0.2 dependency
 
-## [0.5.1] - 2024-04-22
+## 0.5.1 - 2024-04-22
 
 Patch release to fix docs.rs build
 
-## [0.5.0] - 2024-04-19
+## 0.5.0 - 2024-04-19
 
 ### Fixed
 
 - Fix compile error when using smoltcp `DNS_MAX_RESULT_COUNT` values other than 1
 
-## [0.4.0] - 2024-03-12
+## 0.4.0 - 2024-03-12
 
 ### Changed
 
@@ -41,7 +41,7 @@ Patch release to fix docs.rs build
 - Better network performance by forced yielding of the task when buffers are full / empty. (#430)
 - Depend on esp-hal 0.16.1, update other dependencies
 
-## [0.3.0] - 2024-01-29
+## 0.3.0 - 2024-01-29
 
 ### Added
 
@@ -59,10 +59,12 @@ Patch release to fix docs.rs build
 
 ### Removed
 
-## [0.2.0] - 2024-01-05
+## 0.2.0 - 2024-01-05
 
 Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6, supporting BLE on WiFi on ESP32, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6, ESP32-H2
 
-## [0.1.0] - 2023-11-27
+## 0.1.0 - 2023-11-27
 
 Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6, supporting BLE on WiFi on ESP32, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6
+
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-wifi?since=2024-06-05
