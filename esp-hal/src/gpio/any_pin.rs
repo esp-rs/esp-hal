@@ -93,6 +93,7 @@ impl<'d> Pin for AnyPin<'d> {
             fn unlisten(&mut self, _internal: private::Internal);
             fn is_interrupt_set(&self, _internal: private::Internal) -> bool;
             fn clear_interrupt(&mut self, _internal: private::Internal);
+            fn wakeup_enable(&mut self, enable: bool, event: WakeEvent, _internal: private::Internal);
         }
     }
 }
@@ -260,6 +261,7 @@ impl<'d> Pin for AnyInputOnlyPin<'d> {
             fn unlisten(&mut self, _internal: private::Internal);
             fn is_interrupt_set(&self, _internal: private::Internal) -> bool;
             fn clear_interrupt(&mut self, _internal: private::Internal);
+            fn wakeup_enable(&mut self, enable: bool, event: WakeEvent, _internal: private::Internal);
         }
     }
 }

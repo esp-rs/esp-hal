@@ -77,6 +77,25 @@ pub enum Event {
     HighLevel   = 5,
 }
 
+/// Event used to wake up from light sleep.
+#[derive(Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum WakeEvent {
+    /// Wake on low level
+    LowLevel  = 4,
+    /// Wake on high level
+    HighLevel = 5,
+}
+
+impl Into<Event> for WakeEvent {
+    fn into(self) -> Event {
+        match self {
+            WakeEvent::LowLevel => Event::LowLevel,
+            WakeEvent::HighLevel => Event::HighLevel,
+        }
+    }
+}
+
 /// Digital input or output level.
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -227,6 +246,9 @@ pub trait Pin: private::Sealed {
 
     /// Clear the interrupt status bit for this Pin
     fn clear_interrupt(&mut self, _: private::Internal);
+
+    /// Enable this pin as a wake up source
+    fn wakeup_enable(&mut self, enable: bool, event: WakeEvent, _: private::Internal);
 }
 
 /// Trait implemented by pins which can be used as inputs
@@ -861,6 +883,10 @@ where
 
     fn clear_interrupt(&mut self, _: private::Internal) {
         <Self as GpioProperties>::Bank::write_interrupt_status_clear(1 << (GPIONUM % 32));
+    }
+
+    fn wakeup_enable(&mut self, enable: bool, event: WakeEvent, _: private::Internal) {
+        self.listen_with_options(event.into(), false, false, enable, private::Internal);
     }
 }
 
@@ -1672,6 +1698,14 @@ where
     pub fn clear_interrupt(&mut self) {
         self.pin.clear_interrupt(private::Internal);
     }
+
+    /// Enable as a wake-up source.
+    ///
+    /// This will unlisten for interrupts
+    #[inline]
+    pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
+        self.pin.wakeup_enable(enable, event, private::Internal);
+    }
 }
 
 /// GPIO open-drain output driver.
@@ -2300,6 +2334,12 @@ pub(crate) mod internal {
         fn clear_interrupt(&mut self, _: private::Internal) {
             handle_gpio_input!(self, target, {
                 Pin::clear_interrupt(target, private::Internal)
+            })
+        }
+
+        fn wakeup_enable(&mut self, enable: bool, event: WakeEvent, _: private::Internal) {
+            handle_gpio_input!(self, target, {
+                Pin::wakeup_enable(target, enable, event, private::Internal)
             })
         }
     }
