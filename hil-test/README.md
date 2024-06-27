@@ -85,7 +85,7 @@ Our Virtual Machines have the following setup:
 
 [`hil.yml`]: https://github.com/esp-rs/esp-hal/blob/main/.github/workflows/hil.yml
 
-#### VM Setup
+#### RPi Setup
 ```bash
 # Install Rust:
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y --profile minimal
@@ -116,4 +116,5 @@ sudo reboot
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 ```
 If the test is supported by all the targets, you can omit the header.
+
 6. Write some documentation at the top of the `tests/$PERIPHERAL.rs` file with the pins being used and the required connections, if applicable.
