@@ -680,8 +680,6 @@ mod m2m {
         {
             let (tx_ptr, tx_len) = unsafe { tx_buffer.read_buffer() };
             let (rx_ptr, rx_len) = unsafe { rx_buffer.write_buffer() };
-            debug!("tx_ptr: {:p}, tx_len: {}", tx_ptr, tx_len);
-            debug!("rx_ptr: {:p}, rx_len: {}", rx_ptr, rx_len);
             self.tx_chain.fill_for_tx(false, tx_ptr, tx_len)?;
             self.rx_chain.fill_for_rx(false, rx_ptr, rx_len)?;
             unsafe {
@@ -693,43 +691,12 @@ mod m2m {
                     .prepare_transfer_without_start(DmaPeripheral::Mem2Mem, &self.rx_chain)?;
             }
             let result = self.channel.tx.start_transfer();
-            #[cfg(feature = "debug")]
-            self.dump_info();
             if result.is_err() {
                 return Err(result.unwrap_err());
             }
             self.channel.rx.start_transfer()?;
             Ok(DmaTransferRx::new(self))
         }
-
-        /// Dump register info
-        #[cfg(feature = "debug")]
-        pub fn dump_info(&self) {
-            debug!("TX Chain{:?}", self.tx_chain);
-            debug!("RX Chain{:?}", self.rx_chain);
-            dump_registers();
-        }
-    }
-
-    /// Dump register info
-    #[cfg(feature = "debug")]
-    pub fn dump_registers() {
-        let r = unsafe { &*esp32s3::DMA::ptr() };
-        debug!("{:?}", r.ch(0).in_conf0());
-        debug!("{:?}", r.ch(0).in_peri_sel());
-        debug!("IN_INT_{:?}", r.ch(0).in_int().raw());
-        debug!("{:?}", r.ch(0).in_link());
-        debug!("{:?}", r.ch(0).out_conf0());
-        debug!("{:?}", r.ch(0).out_peri_sel());
-        debug!("OUT_INT_{:?}", r.ch(0).out_int().raw());
-        debug!("{:?}", r.ch(0).out_link());
-        debug!("{:?}", r.ch(0).outfifo_status());
-        debug!("{:?}", r.ch(0).out_state());
-        debug!("{:?}", r.ch(0).out_eof_des_addr());
-        debug!("{:?}", r.ch(0).out_eof_bfr_des_addr());
-        debug!("{:?}", r.ch(0).out_dscr());
-        debug!("{:?}", r.ch(0).out_dscr_bf0());
-        debug!("{:?}", r.ch(0).out_dscr_bf1());
     }
 
     #[cfg(esp32s3)]
@@ -740,9 +707,6 @@ mod m2m {
     {
         fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
             while !self.channel.rx.is_done() {}
-
-            #[cfg(feature = "debug")]
-            dump_registers();
         }
 
         fn peripheral_dma_stop(&mut self) {
