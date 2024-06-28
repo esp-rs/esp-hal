@@ -88,6 +88,14 @@ impl<const N: u8> RegisterAccess for Channel<N> {
         // nothing special to be done here
     }
 
+    #[cfg(esp32s3)]
+    fn set_mem2mem_mode() {
+        debug!("set_mem2mem_mode");
+        Self::ch()
+            .in_conf0()
+            .modify(|_, w| w.mem_trans_en().set_bit());
+    }
+
     fn set_out_burstmode(burst_mode: bool) {
         Self::ch().out_conf0().modify(|_, w| {
             w.out_data_burst_en()
@@ -603,6 +611,159 @@ impl<'d> Dma<'d> {
             channel3: ChannelCreator {},
             #[cfg(esp32s3)]
             channel4: ChannelCreator {},
+        }
+    }
+}
+
+pub use m2m::*;
+mod m2m {
+    use embedded_dma::{ReadBuffer, WriteBuffer};
+
+    use super::dma_private::{DmaSupport, DmaSupportRx};
+    use crate::dma::{
+        ChannelTypes,
+        DescriptorChain,
+        DmaDescriptor,
+        DmaError,
+        DmaPeripheral,
+        DmaTransferRx,
+        RxPrivate,
+        TxPrivate,
+    };
+
+    /// DMA Memory to Memory pseudo-Peripheral
+    ///
+    /// This is a pseudo-peripheral that allows for memory to memory transfers.
+    /// It is not a real peripheral, but a way to use the DMA engine for memory
+    /// to memory transfers.
+    #[cfg(esp32s3)]
+    pub struct Mem2Mem<'d, C, MODE>
+    where
+        C: ChannelTypes,
+        MODE: crate::Mode,
+    {
+        channel: crate::dma::Channel<'d, C, MODE>,
+        tx_chain: DescriptorChain,
+        rx_chain: DescriptorChain,
+    }
+
+    #[cfg(esp32s3)]
+    impl<'d, C, MODE> Mem2Mem<'d, C, MODE>
+    where
+        C: ChannelTypes,
+        MODE: crate::Mode,
+    {
+        /// Create a new Mem2Mem instance.
+        pub fn new(
+            mut channel: crate::dma::Channel<'d, C, MODE>,
+            tx_descriptors: &'static mut [DmaDescriptor],
+            rx_descriptors: &'static mut [DmaDescriptor],
+        ) -> Self {
+            channel.tx.init_channel();
+            channel.rx.init_channel();
+            Mem2Mem {
+                channel,
+                tx_chain: DescriptorChain::new(tx_descriptors),
+                rx_chain: DescriptorChain::new(rx_descriptors),
+            }
+        }
+
+        /// Start a memory to memory transfer.
+        pub fn start_transfer<'t, TXBUF, RXBUF>(
+            &mut self,
+            tx_buffer: &'t TXBUF,
+            rx_buffer: &'t mut RXBUF,
+        ) -> Result<DmaTransferRx<Self>, DmaError>
+        where
+            TXBUF: ReadBuffer<Word = u8>,
+            RXBUF: WriteBuffer<Word = u8>,
+        {
+            let (tx_ptr, tx_len) = unsafe { tx_buffer.read_buffer() };
+            let (rx_ptr, rx_len) = unsafe { rx_buffer.write_buffer() };
+            debug!("tx_ptr: {:p}, tx_len: {}", tx_ptr, tx_len);
+            debug!("rx_ptr: {:p}, rx_len: {}", rx_ptr, rx_len);
+            self.tx_chain.fill_for_tx(false, tx_ptr, tx_len)?;
+            self.rx_chain.fill_for_rx(false, rx_ptr, rx_len)?;
+            unsafe {
+                self.channel
+                    .tx
+                    .prepare_transfer_without_start(DmaPeripheral::Mem2Mem, &self.tx_chain)?;
+                self.channel
+                    .rx
+                    .prepare_transfer_without_start(DmaPeripheral::Mem2Mem, &self.rx_chain)?;
+            }
+            let result = self.channel.tx.start_transfer();
+            #[cfg(feature = "debug")]
+            self.dump_info();
+            if result.is_err() {
+                return Err(result.unwrap_err());
+            }
+            self.channel.rx.start_transfer()?;
+            Ok(DmaTransferRx::new(self))
+        }
+
+        /// Dump register info
+        #[cfg(feature = "debug")]
+        pub fn dump_info(&self) {
+            debug!("TX Chain{:?}", self.tx_chain);
+            debug!("RX Chain{:?}", self.rx_chain);
+            dump_registers();
+        }
+    }
+
+    /// Dump register info
+    #[cfg(feature = "debug")]
+    pub fn dump_registers() {
+        let r = unsafe { &*esp32s3::DMA::ptr() };
+        debug!("{:?}", r.ch(0).in_conf0());
+        debug!("{:?}", r.ch(0).in_peri_sel());
+        debug!("IN_INT_{:?}", r.ch(0).in_int().raw());
+        debug!("{:?}", r.ch(0).in_link());
+        debug!("{:?}", r.ch(0).out_conf0());
+        debug!("{:?}", r.ch(0).out_peri_sel());
+        debug!("OUT_INT_{:?}", r.ch(0).out_int().raw());
+        debug!("{:?}", r.ch(0).out_link());
+        debug!("{:?}", r.ch(0).outfifo_status());
+        debug!("{:?}", r.ch(0).out_state());
+        debug!("{:?}", r.ch(0).out_eof_des_addr());
+        debug!("{:?}", r.ch(0).out_eof_bfr_des_addr());
+        debug!("{:?}", r.ch(0).out_dscr());
+        debug!("{:?}", r.ch(0).out_dscr_bf0());
+        debug!("{:?}", r.ch(0).out_dscr_bf1());
+    }
+
+    #[cfg(esp32s3)]
+    impl<'d, C, MODE> DmaSupport for Mem2Mem<'d, C, MODE>
+    where
+        C: ChannelTypes,
+        MODE: crate::Mode,
+    {
+        fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+            while !self.channel.rx.is_done() {}
+
+            #[cfg(feature = "debug")]
+            dump_registers();
+        }
+
+        fn peripheral_dma_stop(&mut self) {
+            unreachable!("unsupported")
+        }
+    }
+
+    #[cfg(esp32s3)]
+    impl<'d, C, MODE> DmaSupportRx for Mem2Mem<'d, C, MODE>
+    where
+        C: ChannelTypes,
+        MODE: crate::Mode,
+    {
+        type RX = C::Rx<'d>;
+
+        fn rx(&mut self) -> &mut Self::RX {
+            &mut self.channel.rx
+        }
+
+        fn chain(&mut self) -> &mut DescriptorChain {
+            &mut self.tx_chain
         }
     }
 }
