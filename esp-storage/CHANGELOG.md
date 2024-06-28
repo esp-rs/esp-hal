@@ -15,10 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-## 0.12.1 - 2024-06-19
+## 0.3.0 - 2023-08-16
 
-### Fixed
-- Fix compilation for nightly after 2024-06-12. (#1681)
-- Only prints float registers on targets which have them. (#1690)
+## 0.2.0 - 2023-07-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-backtrace?since=2024-06-20
+## 0.1.0 - 2022-09-26
+
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-storage?since=2023-08-17
