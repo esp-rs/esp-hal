@@ -44,7 +44,10 @@
 
 use core::marker::PhantomData;
 
-use crate::{analog::adc::Adc, peripheral::Peripheral, peripherals::RNG};
+use crate::{
+    peripheral::{Peripheral, PeripheralRef},
+    peripherals::{ADC1, RNG},
+};
 
 /// Random number generator driver
 #[derive(Clone, Copy)]
@@ -135,27 +138,29 @@ impl rand_core::RngCore for Rng {
 /// let mut adc1 = ADC::<ADC1>::new(peripherals.ADC1, adc1_config);
 /// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
 ///
-/// let mut trng = Trng::new(peripherals.RNG, &mut adc1);
-///
-/// let (mut rng, adc1) = trng.downgrade();
-///
-/// // Fill a buffer with random bytes:
 /// let mut buf = [0u8; 16];
+/// let mut trng = Trng::new(peripherals.RNG, &mut adc1);
+/// trng.read(&mut buf);
+///
+/// println!("TRNG: Random bytes: {:?}", buf);
+/// println!("TRNG: Random u32:   {}", rng.random());
+///
+/// let mut rng = trng.downgrade();
+///
+/// rng.read(&mut buf);
 /// println!("Random bytes: {:?}", buf);
 ///
 /// println!("Random u32:   {}", rng.random());
 /// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
 /// println!("ADC reading = {}", pin_value);
 /// ```
-#[cfg(not(esp32p4))]
 pub struct Trng<'d> {
     /// The hardware random number generator instance.
     pub rng: Rng,
     /// A mutable reference to the ADC1 instance.
-    adc: &'d mut Adc<'d, crate::peripherals::ADC1>,
+    _adc: PeripheralRef<'d, ADC1>,
 }
 
-#[cfg(not(esp32p4))]
 impl<'d> Trng<'d> {
     /// Creates a new True Random Number Generator (TRNG) instance.
     ///
@@ -167,13 +172,15 @@ impl<'d> Trng<'d> {
     /// # Returns
     ///
     /// Returns a new `Trng` instance.
-    pub fn new(
-        rng: impl Peripheral<P = RNG>,
-        adc: &'d mut Adc<'d, crate::peripherals::ADC1>,
-    ) -> Self {
+    pub fn new(rng: impl Peripheral<P = RNG>, adc: impl Peripheral<P = ADC1> + 'd) -> Self {
+        crate::into_ref!(adc);
+
         let gen = Rng::new(rng);
         crate::soc::trng::ensure_randomness();
-        Self { rng: gen, adc }
+        Self {
+            rng: gen,
+            _adc: adc,
+        }
     }
 
     /// Reads currently available `u32` integer from `TRNG`
@@ -183,15 +190,18 @@ impl<'d> Trng<'d> {
 
     /// Fills the provided buffer with random bytes.
     pub fn read(&mut self, buffer: &mut [u8]) {
-        self.rng.read(buffer)
+        self.rng.read(buffer);
     }
 
     /// Downgrades the `Trng` instance to a `Rng` instance and releases the
-    /// ADC1. Returns a tuple containing the `Rng` instance and a mutable
-    /// reference to the `Adc`.
-    pub fn downgrade(&mut self) -> (Rng, &'d mut Adc<'_, crate::peripherals::ADC1>) {
+    /// ADC1.
+    pub fn downgrade(self) -> Rng {
+        self.rng
+    }
+}
+impl<'d> Drop for Trng<'d> {
+    fn drop(&mut self) {
         crate::soc::trng::revert_trng();
-        (self.rng, self.adc)
     }
 }
 
@@ -226,5 +236,4 @@ impl rand_core::RngCore for Trng<'_> {
 
 /// Implementing a CryptoRng marker trait that indicates that the generator is
 /// cryptographically secure.
-#[cfg(not(esp32p4))]
 impl rand_core::CryptoRng for Trng<'_> {}
