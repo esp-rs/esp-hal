@@ -49,6 +49,67 @@
 //! cargo generate -a esp-rs/esp-template
 //! ```
 //!
+//! ## Commonly used setup
+//!
+//! Some minimal code to blink an LED looks like this
+//!
+//! ```rust, no_run
+//! #![no_std]
+//! #![no_main]
+//!
+//! // A panic - handler e.g. `use esp_backtrace as _;`
+//!
+//! use esp_hal::{
+//!     clock::ClockControl,
+//!     delay::Delay,
+//!     gpio::{Io, Level, Output},
+//!     peripherals::Peripherals,
+//!     prelude::*,
+//!     system::SystemControl,
+//! };
+//! # #[panic_handler]
+//! # fn panic(_ : &core::panic::PanicInfo) -> ! {
+//! #     loop {}
+//! # }
+//!
+//! #[entry]
+//! fn main() -> ! {
+//!     let peripherals = Peripherals::take();
+//!     let system = SystemControl::new(peripherals.SYSTEM);
+//!     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+//!
+//!     // Set GPIO0 as an output, and set its state high initially.
+//!     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//!     let mut led = Output::new(io.pins.gpio0, Level::High);
+//!
+//!     let delay = Delay::new(&clocks);
+//!
+//!     loop {
+//!         led.toggle();
+//!         delay.delay_millis(1000);
+//!     }
+//! }
+//! ```
+//!
+//! The steps here are:
+//! - take all the peripherals from the PAC to pass them to the HAL drivers
+//!   later
+//! - create [system::SystemControl]
+//! - configure the system clocks - in this case use the boot defaults
+//! - create [gpio::Io] which provides access to the GPIO pins
+//! - create an [gpio::Output] pin driver which lets us control the logical
+//!   level of an output pin
+//! - create a [delay::Delay] driver
+//! - in a loop, toggle the output pin's logical level with a delay of 1000 ms
+//!
+//! ## PeripheralRef Pattern
+//!
+//! Generally drivers take pins as [peripheral::PeripheralRef]. This
+//! means you can pass the pin or a mutable reference to the pin.
+//!
+//! The later can be used to regain access to the pin when the driver gets
+//! dropped. Then it's possible to reuse the pin for a different purpose.
+//!
 //! [documentation]: https://docs.esp-rs.org/esp-hal
 //! [examples]: https://github.com/esp-rs/esp-hal/tree/main/examples
 //! [embedded-hal]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-hal
