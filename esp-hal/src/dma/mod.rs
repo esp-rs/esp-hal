@@ -891,6 +891,9 @@ pub trait RxPrivate: crate::private::Sealed {
 
     fn start_transfer(&mut self) -> Result<(), DmaError>;
 
+    #[cfg(gdma)]
+    fn set_mem2mem_mode(&mut self);
+
     fn listen_ch_in_done(&self);
 
     fn clear_ch_in_done(&self);
@@ -962,19 +965,6 @@ where
         R::clear_in_interrupts();
         R::reset_in();
         R::set_in_descriptors(descriptors.first() as u32);
-        #[cfg(gdma)]
-        if peri == DmaPeripheral::Mem2Mem {
-            // Mem2Mem mode does not require a peripheral but if we leave this set to the
-            // default reset value (63) the DMA will not start and issues a
-            // descriptor error. So we set it to 0 to avoid this.
-            // TODO: we need to find safe a way to pass this value in.
-            //       see: https://github.com/esp-rs/esp-hal/pull/1738
-            R::set_in_peripheral(0);
-            R::set_mem2mem_mode();
-        } else {
-            R::set_out_peripheral(peri as u8);
-        }
-        #[cfg(not(gdma))]
         R::set_in_peripheral(peri as u8);
 
         Ok(())
@@ -1067,6 +1057,11 @@ where
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
         self.rx_impl.start_transfer()
+    }
+
+    #[cfg(gdma)]
+    fn set_mem2mem_mode(&mut self) {
+        R::set_mem2mem_mode();
     }
 
     fn listen_ch_in_done(&self) {
@@ -1240,18 +1235,6 @@ where
         R::clear_out_interrupts();
         R::reset_out();
         R::set_out_descriptors(descriptors.first() as u32);
-        #[cfg(gdma)]
-        if peri == DmaPeripheral::Mem2Mem {
-            // Mem2Mem mode does not require a peripheral but if we leave this set to the
-            // default reset value (63) the DMA will not start and issues a
-            // descriptor error. So we set it to 0 to avoid this.
-            // TODO: we need to find safe a way to pass this value in.
-            //       see: https://github.com/esp-rs/esp-hal/pull/1738
-            R::set_out_peripheral(0);
-        } else {
-            R::set_out_peripheral(peri as u8);
-        }
-        #[cfg(not(gdma))]
         R::set_out_peripheral(peri as u8);
 
         Ok(())

@@ -11,7 +11,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    dma::{Dma, DmaPriority, Mem2Mem},
+    dma::{Dma, DmaPeripheral, DmaPriority, Mem2Mem},
     dma_buffers,
     peripherals::Peripherals,
     prelude::*,
@@ -34,7 +34,7 @@ fn main() -> ! {
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0.configure(false, DmaPriority::Priority0);
 
-    let mut mem2mem = Mem2Mem::new(channel, tx_descriptors, rx_descriptors);
+    let mut mem2mem = Mem2Mem::new(channel, DmaPeripheral::Adc, tx_descriptors, rx_descriptors);
 
     for i in 0..core::mem::size_of_val(tx_buffer) {
         tx_buffer[i] = (i % 256) as u8;

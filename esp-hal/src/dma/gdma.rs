@@ -621,6 +621,7 @@ mod m2m {
 
     use super::dma_private::{DmaSupport, DmaSupportRx};
     use crate::dma::{
+        Channel,
         ChannelTypes,
         DescriptorChain,
         DmaDescriptor,
@@ -641,9 +642,10 @@ mod m2m {
         C: ChannelTypes,
         MODE: crate::Mode,
     {
-        channel: crate::dma::Channel<'d, C, MODE>,
+        channel: Channel<'d, C, MODE>,
         tx_chain: DescriptorChain,
         rx_chain: DescriptorChain,
+        peripheral: DmaPeripheral,
     }
 
     impl<'d, C, MODE> Mem2Mem<'d, C, MODE>
@@ -652,8 +654,14 @@ mod m2m {
         MODE: crate::Mode,
     {
         /// Create a new Mem2Mem instance.
+        ///
+        /// SAFTEY:
+        ///
+        /// TODO: Add safety requirements dealing with the DmaPeripheral value
+        /// chosen on the esp32s3 (and maybe others)
         pub fn new(
-            mut channel: crate::dma::Channel<'d, C, MODE>,
+            mut channel: Channel<'d, C, MODE>,
+            peripheral: DmaPeripheral,
             tx_descriptors: &'static mut [DmaDescriptor],
             rx_descriptors: &'static mut [DmaDescriptor],
         ) -> Self {
@@ -661,6 +669,7 @@ mod m2m {
             channel.rx.init_channel();
             Mem2Mem {
                 channel,
+                peripheral,
                 tx_chain: DescriptorChain::new(tx_descriptors),
                 rx_chain: DescriptorChain::new(rx_descriptors),
             }
@@ -683,15 +692,13 @@ mod m2m {
             unsafe {
                 self.channel
                     .tx
-                    .prepare_transfer_without_start(DmaPeripheral::Mem2Mem, &self.tx_chain)?;
+                    .prepare_transfer_without_start(self.peripheral, &self.tx_chain)?;
                 self.channel
                     .rx
-                    .prepare_transfer_without_start(DmaPeripheral::Mem2Mem, &self.rx_chain)?;
+                    .prepare_transfer_without_start(self.peripheral, &self.rx_chain)?;
+                self.channel.rx.set_mem2mem_mode();
             }
-            let result = self.channel.tx.start_transfer();
-            if let Err(err) = result {
-                return Err(err);
-            }
+            self.channel.tx.start_transfer()?;
             self.channel.rx.start_transfer()?;
             Ok(DmaTransferRx::new(self))
         }
