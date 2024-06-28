@@ -1,198 +1,155 @@
-const DR_REG_RTCCNTL_BASE: u32 = 0x3ff48000;
-const RTC_CNTL_TEST_MUX_REG: u32 = DR_REG_RTCCNTL_BASE + 0xa8;
-const RTC_CNTL_DTEST_RTC: u32 = 0x00000003;
-const RTC_CNTL_DTEST_RTC_S: u32 = 30;
-const RTC_CNTL_ENT_RTC: u32 = 1 << 29;
-const SENS_SAR_START_FORCE_REG: u32 = 0x3ff48800 + 0x002c;
-const SENS_SAR2_EN_TEST: u32 = 1 << 4;
-const DPORT_PERIP_CLK_EN_REG: u32 = 0x3ff00000 + 0x0c0;
-const DPORT_I2C_EXT0_CLK_EN: u32 = 1 << 7;
-
-const DPORT_PERIP_RST_EN_REG: u32 = 0x3ff00000 + 0x0c4;
-const DPORT_I2C_EXT0_RST: u32 = 1 << 7;
-
-const SENS_ULP_CP_FORCE_START_TOP: u32 = 1 << 8;
-const SENS_ULP_CP_START_TOP: u32 = 1 << 9;
-
-const DR_REG_I2S_BASE: u32 = 0x3ff4f000;
-
-const DR_REG_SYSCON_BASE: u32 = 0x3ff66000;
-const SYSCON_SARADC_CTRL_REG: u32 = DR_REG_SYSCON_BASE + 0x10;
-const SYSCON_SARADC_FSM_REG: u32 = DR_REG_SYSCON_BASE + 0x18;
-const SYSCON_SARADC_SAR2_PATT_TAB1_REG: u32 = DR_REG_SYSCON_BASE + 0x2c;
-const SYSCON_SARADC_SAR2_PATT_TAB2_REG: u32 = DR_REG_SYSCON_BASE + 0x30;
-const SYSCON_SARADC_SAR2_PATT_TAB3_REG: u32 = DR_REG_SYSCON_BASE + 0x34;
-const SYSCON_SARADC_SAR2_PATT_TAB4_REG: u32 = DR_REG_SYSCON_BASE + 0x38;
-const SYSCON_SARADC_SAR2_MUX: u32 = 1 << 2;
-const SYSCON_SARADC_SAR_CLK_DIV: u32 = 0x000000FF;
-const SYSCON_SARADC_SAR_CLK_DIV_S: u32 = 7;
-const SYSCON_SARADC_RSTB_WAIT: u32 = 0x000000FF;
-const SYSCON_SARADC_RSTB_WAIT_S: u32 = 0;
-const SYSCON_SARADC_START_WAIT: u32 = 1 << 2;
-const SYSCON_SARADC_START_WAIT_S: u32 = 1 << 2;
-const SYSCON_SARADC_WORK_MODE: u32 = 0x00000003;
-const SYSCON_SARADC_WORK_MODE_S: u32 = 3;
-const SYSCON_SARADC_SAR_SEL: u32 = 1 << 5;
-const I2S_RX_BCK_DIV_NUM: u32 = 0x0000003F;
-const I2S_RX_BCK_DIV_NUM_S: u32 = 6;
-const SYSCON_SARADC_DATA_TO_I2S: u32 = 1 << 16;
-const SYSCON_SARADC_DATA_SAR_SEL: u32 = 1 << 25;
-
-const I2S_CAMERA_EN: u32 = 1 << 0;
-const I2S_LCD_EN: u32 = 1 << 5;
-const I2S_DATA_ENABLE: u32 = 1 << 4;
-const I2S_DATA_ENABLE_TEST_EN: u32 = 1 << 3;
-const I2S_RX_START: u32 = 1 << 5;
-const I2S_RX_RESET: u32 = 1 << 1;
-
-const DR_REG_SENS_BASE: u32 = 0x3ff48800;
-const SENS_SAR_MEAS_WAIT2_REG: u32 = DR_REG_SENS_BASE + 0x000c;
-const SENS_SAR_READ_CTRL_REG: u32 = DR_REG_SENS_BASE;
-const SENS_SAR_READ_CTRL2_REG: u32 = DR_REG_SENS_BASE + 0x0090;
-const SENS_FORCE_XPD_SAR: u32 = 0x00000003;
-const SENS_FORCE_XPD_SAR_S: u32 = 18;
-const SENS_SAR1_DIG_FORCE: u32 = 1 << 27;
-const SENS_SAR2_DIG_FORCE: u32 = 1 << 28;
-
-const I2S_CONF_REG0: u32 = DR_REG_I2S_BASE + 0x00a8;
+//! Helper functions for TRNG functionality
 
 pub fn ensure_randomness() {
-    set_peri_reg_bits(
-        RTC_CNTL_TEST_MUX_REG,
-        RTC_CNTL_DTEST_RTC,
-        2,
-        RTC_CNTL_DTEST_RTC_S,
-    );
+    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+    let sens = unsafe { &*crate::peripherals::SENS::ptr() };
+    let dport = unsafe { &*crate::peripherals::DPORT::ptr() };
+    let apb_ctrl = unsafe { &*crate::peripherals::APB_CTRL::ptr() };
+    let i2s0 = unsafe { &*crate::peripherals::I2S0::ptr() };
 
-    set_peri_reg_mask(RTC_CNTL_TEST_MUX_REG, RTC_CNTL_ENT_RTC);
-    set_peri_reg_mask(SENS_SAR_START_FORCE_REG, SENS_SAR2_EN_TEST);
+    unsafe {
+        rtc_cntl.test_mux().modify(|_, w| w.dtest_rtc().bits(2));
 
-    // periph_module_enable(PERIPH_I2S0_MODULE);
-    set_peri_reg_mask(DPORT_PERIP_CLK_EN_REG, DPORT_I2C_EXT0_CLK_EN);
-    clear_peri_reg_mask(DPORT_PERIP_RST_EN_REG, DPORT_I2C_EXT0_RST);
+        rtc_cntl.test_mux().modify(|_, w| w.ent_rtc().set_bit());
 
-    clear_peri_reg_mask(SENS_SAR_START_FORCE_REG, SENS_ULP_CP_FORCE_START_TOP);
-    clear_peri_reg_mask(SENS_SAR_START_FORCE_REG, SENS_ULP_CP_START_TOP);
+        sens.sar_start_force()
+            .modify(|_, w| w.sar2_en_test().set_bit());
 
-    // Test pattern configuration byte 0xAD:
-    //--[7:4] channel_sel: 10-->en_test
-    //--[3:2] bit_width  : 3-->12bit
-    //--[1:0] atten      : 1-->3dB attenuation
-    write_peri_reg(SYSCON_SARADC_SAR2_PATT_TAB1_REG, 0xADADADAD);
-    write_peri_reg(SYSCON_SARADC_SAR2_PATT_TAB2_REG, 0xADADADAD);
-    write_peri_reg(SYSCON_SARADC_SAR2_PATT_TAB3_REG, 0xADADADAD);
-    write_peri_reg(SYSCON_SARADC_SAR2_PATT_TAB4_REG, 0xADADADAD);
+        // periph_module_enable(PERIPH_I2S0_MODULE);
+        dport
+            .perip_clk_en()
+            .modify(|_, w| w.i2c0_ext0_clk_en().set_bit());
 
-    set_peri_reg_bits(
-        SENS_SAR_MEAS_WAIT2_REG,
-        SENS_FORCE_XPD_SAR,
-        3,
-        SENS_FORCE_XPD_SAR_S,
-    );
+        dport
+            .perip_rst_en()
+            .modify(|_, w| w.i2c0_ext0_rst().clear_bit());
 
-    set_peri_reg_mask(SENS_SAR_READ_CTRL_REG, SENS_SAR1_DIG_FORCE);
-    set_peri_reg_mask(SENS_SAR_READ_CTRL2_REG, SENS_SAR2_DIG_FORCE);
+        sens.sar_start_force()
+            .modify(|_, w| w.ulp_cp_force_start_top().clear_bit());
 
-    set_peri_reg_mask(SYSCON_SARADC_CTRL_REG, SYSCON_SARADC_SAR2_MUX);
-    set_peri_reg_bits(
-        SYSCON_SARADC_CTRL_REG,
-        SYSCON_SARADC_SAR_CLK_DIV,
-        4,
-        SYSCON_SARADC_SAR_CLK_DIV_S,
-    );
-    set_peri_reg_bits(
-        SYSCON_SARADC_FSM_REG,
-        SYSCON_SARADC_RSTB_WAIT,
-        8,
-        SYSCON_SARADC_RSTB_WAIT_S,
-    );
-    set_peri_reg_bits(
-        SYSCON_SARADC_FSM_REG,
-        SYSCON_SARADC_START_WAIT,
-        10,
-        SYSCON_SARADC_START_WAIT_S,
-    );
-    set_peri_reg_bits(
-        SYSCON_SARADC_CTRL_REG,
-        SYSCON_SARADC_WORK_MODE,
-        0,
-        SYSCON_SARADC_WORK_MODE_S,
-    );
+        sens.sar_start_force()
+            .modify(|_, w| w.ulp_cp_start_top().clear_bit());
 
-    set_peri_reg_mask(SYSCON_SARADC_CTRL_REG, SYSCON_SARADC_SAR_SEL);
-    clear_peri_reg_mask(SYSCON_SARADC_CTRL_REG, SYSCON_SARADC_DATA_SAR_SEL);
+        // Test pattern configuration byte 0xAD:
+        //--[7:4] channel_sel: 10-->en_test
+        //--[3:2] bit_width  : 3-->12bit
+        //--[1:0] atten      : 1-->3dB attenuation
+        apb_ctrl
+            .apb_saradc_sar2_patt_tab1()
+            .write(|w| w.bits(0xADADADAD));
+        apb_ctrl
+            .apb_saradc_sar2_patt_tab2()
+            .write(|w| w.bits(0xADADADAD));
+        apb_ctrl
+            .apb_saradc_sar2_patt_tab3()
+            .write(|w| w.bits(0xADADADAD));
+        apb_ctrl
+            .apb_saradc_sar2_patt_tab4()
+            .write(|w| w.bits(0xADADADAD));
 
-    set_peri_reg_bits(
-        DR_REG_I2S_BASE + 0x00b0,
-        I2S_RX_BCK_DIV_NUM,
-        20,
-        I2S_RX_BCK_DIV_NUM_S,
-    );
+        sens.sar_meas_wait2()
+            .modify(|_, w| w.force_xpd_sar().bits(3));
 
-    set_peri_reg_mask(SYSCON_SARADC_CTRL_REG, SYSCON_SARADC_DATA_TO_I2S);
+        sens.sar_read_ctrl()
+            .modify(|_, w| w.sar1_dig_force().set_bit());
 
-    clear_peri_reg_mask(DR_REG_I2S_BASE + 0x00a8, I2S_CAMERA_EN);
-    set_peri_reg_mask(DR_REG_I2S_BASE + 0x00a8, I2S_LCD_EN);
-    set_peri_reg_mask(DR_REG_I2S_BASE + 0x00a8, I2S_DATA_ENABLE);
-    set_peri_reg_mask(DR_REG_I2S_BASE + 0x00a8, I2S_DATA_ENABLE_TEST_EN);
-    set_peri_reg_mask(DR_REG_I2S_BASE + 0x00a8, I2S_RX_START);
+        sens.sar_read_ctrl2()
+            .modify(|_, w| w.sar2_dig_force().set_bit());
+
+        apb_ctrl
+            .apb_saradc_ctrl()
+            .modify(|_, w| w.saradc_sar2_mux().set_bit());
+
+        apb_ctrl
+            .apb_saradc_ctrl()
+            .modify(|_, w| w.saradc_sar_clk_div().bits(4));
+
+        apb_ctrl
+            .apb_saradc_fsm()
+            .modify(|_, w| w.saradc_rstb_wait().bits(8));
+
+        apb_ctrl
+            .apb_saradc_fsm()
+            .modify(|_, w| w.saradc_start_wait().bits(10));
+
+        apb_ctrl
+            .apb_saradc_ctrl()
+            .modify(|_, w| w.saradc_work_mode().bits(0));
+
+        apb_ctrl
+            .apb_saradc_ctrl()
+            .modify(|_, w| w.saradc_sar_sel().set_bit());
+
+        apb_ctrl
+            .apb_saradc_ctrl()
+            .modify(|_, w| w.saradc_data_sar_sel().clear_bit());
+
+        i2s0.sample_rate_conf()
+            .modify(|_, w| w.rx_bck_div_num().bits(20));
+
+        apb_ctrl
+            .apb_saradc_ctrl()
+            .modify(|_, w| w.saradc_data_to_i2s().set_bit());
+
+        i2s0.conf2().modify(|_, w| w.camera_en().set_bit());
+
+        i2s0.conf2().modify(|_, w| w.lcd_en().set_bit());
+
+        i2s0.conf2().modify(|_, w| w.data_enable().set_bit());
+
+        i2s0.conf2()
+            .modify(|_, w| w.data_enable_test_en().set_bit());
+
+        i2s0.conf().modify(|_, w| w.rx_start().set_bit());
+    }
 }
 
 pub fn revert_trng() {
-    clear_peri_reg_mask(I2S_CONF_REG0, I2S_RX_START);
-    set_peri_reg_mask(I2S_CONF_REG0, I2S_RX_RESET);
-    clear_peri_reg_mask(I2S_CONF_REG0, I2S_RX_RESET);
-    clear_peri_reg_mask(I2S_CONF_REG0, I2S_CAMERA_EN);
-    clear_peri_reg_mask(I2S_CONF_REG0, I2S_LCD_EN);
-    clear_peri_reg_mask(I2S_CONF_REG0, I2S_DATA_ENABLE_TEST_EN);
-    clear_peri_reg_mask(I2S_CONF_REG0, I2S_DATA_ENABLE);
+    let sens = unsafe { &*crate::peripherals::SENS::ptr() };
+    let i2s0 = unsafe { &*crate::peripherals::I2S0::ptr() };
+    let apb_ctrl = unsafe { &*crate::peripherals::APB_CTRL::ptr() };
 
-    clear_peri_reg_mask(SENS_SAR_READ_CTRL_REG, SENS_SAR1_DIG_FORCE);
-    clear_peri_reg_mask(SENS_SAR_READ_CTRL2_REG, SENS_SAR2_DIG_FORCE);
-
-    clear_peri_reg_mask(SENS_SAR_START_FORCE_REG, SENS_SAR2_EN_TEST);
-    clear_peri_reg_mask(
-        SYSCON_SARADC_CTRL_REG,
-        SYSCON_SARADC_SAR2_MUX | SYSCON_SARADC_SAR_SEL | SYSCON_SARADC_DATA_TO_I2S,
-    );
-
-    set_peri_reg_bits(
-        SENS_SAR_MEAS_WAIT2_REG,
-        SENS_FORCE_XPD_SAR,
-        0,
-        SENS_FORCE_XPD_SAR_S,
-    );
-
-    set_peri_reg_bits(
-        SYSCON_SARADC_FSM_REG,
-        SYSCON_SARADC_START_WAIT,
-        8,
-        SYSCON_SARADC_START_WAIT_S,
-    );
-}
-
-fn set_peri_reg_bits(reg: u32, bitmap: u32, value: u32, shift: u32) {
     unsafe {
-        (reg as *mut u32).write_volatile(
-            ((reg as *mut u32).read_volatile() & !(bitmap << shift)) | ((value & bitmap) << shift),
-        );
-    }
-}
+        i2s0.conf().modify(|_, w| w.rx_start().clear_bit());
 
-fn set_peri_reg_mask(reg: u32, mask: u32) {
-    unsafe {
-        (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() | mask);
-    }
-}
+        i2s0.conf().modify(|_, w| w.rx_reset().set_bit());
 
-fn clear_peri_reg_mask(reg: u32, mask: u32) {
-    unsafe {
-        (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() & !mask);
-    }
-}
+        i2s0.conf().modify(|_, w| w.rx_reset().clear_bit());
 
-fn write_peri_reg(reg: u32, val: u32) {
-    unsafe {
-        (reg as *mut u32).write_volatile(val);
+        i2s0.conf2().modify(|_, w| {
+            w.camera_en()
+                .clear_bit()
+                .lcd_en()
+                .clear_bit()
+                .data_enable_test_en()
+                .clear_bit()
+                .data_enable()
+                .clear_bit()
+        });
+
+        sens.sar_read_ctrl()
+            .modify(|_, w| w.sar1_dig_force().clear_bit());
+
+        sens.sar_read_ctrl2()
+            .modify(|_, w| w.sar2_dig_force().clear_bit());
+
+        sens.sar_start_force()
+            .modify(|_, w| w.sar2_en_test().clear_bit());
+
+        apb_ctrl.apb_saradc_ctrl().modify(|_, w| {
+            w.saradc_sar2_mux()
+                .clear_bit()
+                .saradc_sar_sel()
+                .clear_bit()
+                .saradc_data_to_i2s()
+                .clear_bit()
+        });
+
+        sens.sar_meas_wait2()
+            .modify(|_, w| w.force_xpd_sar().bits(0));
+
+        apb_ctrl
+            .apb_saradc_fsm()
+            .modify(|_, w| w.saradc_start_wait().bits(8));
     }
 }

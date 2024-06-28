@@ -1,17 +1,3 @@
-const DR_REG_RTCCNTL_BASE: u32 = 0x3f408000;
-const DR_REG_SYSTEM_BASE: u32 = 0x3f4c0000;
-const DR_REG_SENS_BASE: u32 = 0x3f408800;
-const DR_REG_APB_SARADC_BASE: u32 = 0x3f440000;
-const DPORT_APB_SARADC_CLK_EN: u32 = 1 << 28;
-const RTC_CNTL_CLK_CONF_REG: u32 = DR_REG_RTCCNTL_BASE + 0x0074;
-const RTC_CNTL_DIG_CLK8M_EN: u32 = 1 << 10;
-const DPORT_PERIP_CLK_EN0_REG: u32 = DR_REG_SYSTEM_BASE + 0x040;
-const APB_SARADC_APB_ADC_CLKM_CONF_REG: u32 = DR_REG_APB_SARADC_BASE + 0x05c;
-const APB_SARADC_CLK_SEL_V: u32 = 0x3;
-const APB_SARADC_CLK_SEL_S: u32 = 21;
-const RTC_CNTL_ANA_CONF_REG: u32 = DR_REG_RTCCNTL_BASE + 0x0034;
-const RTC_CNTL_SAR_I2C_FORCE_PD_M: u32 = 1 << 21;
-const RTC_CNTL_SAR_I2C_FORCE_PU_M: u32 = 1 << 22;
 const ANA_CONFIG_REG: u32 = 0x6000E044;
 const ANA_CONFIG2_REG: u32 = 0x6000E048;
 const I2C_SAR_ADC: u8 = 0x69;
@@ -31,29 +17,6 @@ const ADC_SARADC_ENT_TSENS_ADDR_LSB: u8 = 2;
 const ADC_SARADC_ENT_RTC_ADDR: u8 = 0x7;
 const ADC_SARADC_ENT_RTC_ADDR_MSB: u8 = 3;
 const ADC_SARADC_ENT_RTC_ADDR_LSB: u8 = 3;
-const APB_SARADC_CTRL_REG: u32 = DR_REG_APB_SARADC_BASE;
-const APB_SARADC_SAR1_PATT_LEN_V: u32 = 0xF;
-const APB_SARADC_SAR1_PATT_LEN_S: u32 = 15;
-const APB_SARADC_SAR1_PATT_TAB1_REG: u32 = DR_REG_APB_SARADC_BASE + 0x018;
-const APB_SARADC_SAR2_PATT_LEN_V: u32 = 0xF;
-const APB_SARADC_SAR2_PATT_LEN_S: u32 = 19;
-const APB_SARADC_SAR2_PATT_TAB1_REG: u32 = DR_REG_APB_SARADC_BASE + 0x028;
-const SENS_SAR_MEAS1_MUX_REG: u32 = DR_REG_SENS_BASE + 0x0010;
-const SENS_SAR1_DIG_FORCE: u32 = 1 << 31;
-const APB_SARADC_WORK_MODE_V: u32 = 0x3;
-const APB_SARADC_WORK_MODE_S: u32 = 3;
-
-const APB_SARADC_CTRL2_REG: u32 = DR_REG_APB_SARADC_BASE + 0x004;
-const APB_SARADC_MEAS_NUM_LIMIT: u32 = 1 << 0;
-const SENS_SAR_POWER_XPD_SAR_REG: u32 = DR_REG_SENS_BASE + 0x003c;
-const SENS_FORCE_XPD_SAR: u32 = 0x00000003;
-const SENS_FORCE_XPD_SAR_V: u32 = 0x3;
-const SENS_FORCE_XPD_SAR_S: u32 = 29;
-const APB_SARADC_TIMER_SEL: u32 = 1 << 11;
-const APB_SARADC_TIMER_TARGET_V: u32 = 0xFFF;
-const APB_SARADC_TIMER_TARGET_S: u32 = 12;
-const APB_SARADC_START_FORCE: u32 = 1 << 0;
-const APB_SARADC_TIMER_EN: u32 = 1 << 24;
 
 const I2C_RTC_SLAVE_ID_V: u8 = 0xFF;
 const I2C_RTC_SLAVE_ID_S: u8 = 0;
@@ -83,204 +46,184 @@ const I2C_RTC_SAR_MASK: u32 = 1 << 18;
 const I2C_RTC_BOD_MASK: u32 = 1 << 22;
 
 pub(crate) fn ensure_randomness() {
-    // Enable 8M clock source for RNG (this is actually enough to produce strong
-    // random results, but enabling the SAR ADC as well adds some insurance.)
-    reg_set_bit(RTC_CNTL_CLK_CONF_REG, RTC_CNTL_DIG_CLK8M_EN);
+    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+    let dport = unsafe { &*crate::peripherals::SYSTEM::ptr() };
+    let apb_saradc = unsafe { &*crate::peripherals::APB_SARADC::ptr() };
+    let sens = unsafe { &*crate::peripherals::SENS::ptr() };
 
-    // Enable SAR ADC to read a disconnected input for additional entropy
-    set_peri_reg_mask(DPORT_PERIP_CLK_EN0_REG, DPORT_APB_SARADC_CLK_EN);
+    unsafe {
+        // Enable 8M clock source for RNG (this is actually enough to produce strong
+        // random results, but enabling the SAR ADC as well adds some insurance.)
+        rtc_cntl
+            .clk_conf()
+            .modify(|_, w| w.dig_clk8m_en().set_bit());
 
-    reg_set_field(
-        APB_SARADC_APB_ADC_CLKM_CONF_REG,
-        APB_SARADC_CLK_SEL_V,
-        APB_SARADC_CLK_SEL_S,
-        2,
-    );
+        // Enable SAR ADC to read a disconnected input for additional entropy
+        dport
+            .perip_clk_en0()
+            .modify(|_, w| w.apb_saradc_clk_en().set_bit());
 
-    clear_peri_reg_mask(RTC_CNTL_ANA_CONF_REG, RTC_CNTL_SAR_I2C_FORCE_PD_M);
-    set_peri_reg_mask(RTC_CNTL_ANA_CONF_REG, RTC_CNTL_SAR_I2C_FORCE_PU_M);
-    clear_peri_reg_mask(ANA_CONFIG_REG, 1 << 18);
-    set_peri_reg_mask(ANA_CONFIG2_REG, 1 << 16);
+        apb_saradc.clkm_conf().modify(|_, w| w.clk_sel().bits(2));
 
-    regi2c_write_mask(
-        I2C_SAR_ADC,
-        I2C_SAR_ADC_HOSTID,
-        ADC_SAR1_DREF_ADDR,
-        ADC_SAR1_DREF_ADDR_MSB,
-        ADC_SAR1_DREF_ADDR_LSB,
-        0x4,
-    );
+        rtc_cntl
+            .ana_conf()
+            .modify(|_, w| w.sar_i2c_force_pd().clear_bit());
 
-    regi2c_write_mask(
-        I2C_SAR_ADC,
-        I2C_SAR_ADC_HOSTID,
-        ADC_SAR2_DREF_ADDR,
-        ADC_SAR2_DREF_ADDR_MSB,
-        ADC_SAR2_DREF_ADDR_LSB,
-        0x4,
-    );
+        rtc_cntl
+            .ana_conf()
+            .modify(|_, w| w.sar_i2c_force_pu().set_bit());
 
-    regi2c_write_mask(
-        I2C_SAR_ADC,
-        I2C_SAR_ADC_HOSTID,
-        ADC_SARADC_ENCAL_REF_ADDR,
-        ADC_SARADC_ENCAL_REF_ADDR_MSB,
-        ADC_SARADC_ENCAL_REF_ADDR_LSB,
-        1,
-    );
+        // Temporarily not in PACs
+        // esp-idf/components/soc/esp32s2/include/soc/regi2c_defs.h
+        clear_peri_reg_mask(ANA_CONFIG_REG, 1 << 18);
+        set_peri_reg_mask(ANA_CONFIG2_REG, 1 << 16);
 
-    regi2c_write_mask(
-        I2C_SAR_ADC,
-        I2C_SAR_ADC_HOSTID,
-        ADC_SARADC_ENT_TSENS_ADDR,
-        ADC_SARADC_ENT_TSENS_ADDR_MSB,
-        ADC_SARADC_ENT_TSENS_ADDR_LSB,
-        1,
-    );
+        regi2c_write_mask(
+            I2C_SAR_ADC,
+            I2C_SAR_ADC_HOSTID,
+            ADC_SAR1_DREF_ADDR,
+            ADC_SAR1_DREF_ADDR_MSB,
+            ADC_SAR1_DREF_ADDR_LSB,
+            0x4,
+        );
 
-    regi2c_write_mask(
-        I2C_SAR_ADC,
-        I2C_SAR_ADC_HOSTID,
-        ADC_SARADC_ENT_RTC_ADDR,
-        ADC_SARADC_ENT_RTC_ADDR_MSB,
-        ADC_SARADC_ENT_RTC_ADDR_LSB,
-        0,
-    );
+        regi2c_write_mask(
+            I2C_SAR_ADC,
+            I2C_SAR_ADC_HOSTID,
+            ADC_SAR2_DREF_ADDR,
+            ADC_SAR2_DREF_ADDR_MSB,
+            ADC_SAR2_DREF_ADDR_LSB,
+            0x4,
+        );
 
-    reg_set_field(
-        APB_SARADC_CTRL_REG,
-        APB_SARADC_SAR1_PATT_LEN_V,
-        APB_SARADC_SAR1_PATT_LEN_S,
-        0,
-    );
+        regi2c_write_mask(
+            I2C_SAR_ADC,
+            I2C_SAR_ADC_HOSTID,
+            ADC_SARADC_ENCAL_REF_ADDR,
+            ADC_SARADC_ENCAL_REF_ADDR_MSB,
+            ADC_SARADC_ENCAL_REF_ADDR_LSB,
+            1,
+        );
 
-    write_peri_reg(APB_SARADC_SAR1_PATT_TAB1_REG, 0xafffffff);
+        regi2c_write_mask(
+            I2C_SAR_ADC,
+            I2C_SAR_ADC_HOSTID,
+            ADC_SARADC_ENT_TSENS_ADDR,
+            ADC_SARADC_ENT_TSENS_ADDR_MSB,
+            ADC_SARADC_ENT_TSENS_ADDR_LSB,
+            1,
+        );
 
-    reg_set_field(
-        APB_SARADC_CTRL_REG,
-        APB_SARADC_SAR2_PATT_LEN_V,
-        APB_SARADC_SAR2_PATT_LEN_S,
-        0,
-    );
+        regi2c_write_mask(
+            I2C_SAR_ADC,
+            I2C_SAR_ADC_HOSTID,
+            ADC_SARADC_ENT_RTC_ADDR,
+            ADC_SARADC_ENT_RTC_ADDR_MSB,
+            ADC_SARADC_ENT_RTC_ADDR_LSB,
+            0,
+        );
 
-    write_peri_reg(APB_SARADC_SAR2_PATT_TAB1_REG, 0xafffffff);
+        apb_saradc.ctrl().modify(|_, w| w.sar1_patt_len().bits(0));
 
-    set_peri_reg_mask(SENS_SAR_MEAS1_MUX_REG, SENS_SAR1_DIG_FORCE);
+        apb_saradc
+            .sar1_patt_tab1()
+            .modify(|_, w| w.bits(0xafffffff));
 
-    reg_set_field(
-        APB_SARADC_CTRL_REG,
-        APB_SARADC_WORK_MODE_V,
-        APB_SARADC_WORK_MODE_S,
-        1,
-    );
+        apb_saradc.ctrl().modify(|_, w| w.sar2_patt_len().bits(0));
 
-    clear_peri_reg_mask(APB_SARADC_CTRL2_REG, APB_SARADC_MEAS_NUM_LIMIT);
+        apb_saradc
+            .sar2_patt_tab1()
+            .modify(|_, w| w.bits(0xafffffff));
 
-    reg_set_field(
-        SENS_SAR_POWER_XPD_SAR_REG,
-        SENS_FORCE_XPD_SAR_V,
-        SENS_FORCE_XPD_SAR_S,
-        3,
-    );
+        sens.sar_meas1_mux()
+            .modify(|_, w| w.sar1_dig_force().set_bit());
 
-    set_peri_reg_mask(APB_SARADC_CTRL2_REG, APB_SARADC_TIMER_SEL);
+        apb_saradc.ctrl().modify(|_, w| w.work_mode().bits(1));
 
-    reg_set_field(
-        APB_SARADC_CTRL2_REG,
-        APB_SARADC_TIMER_TARGET_V,
-        APB_SARADC_TIMER_TARGET_S,
-        100,
-    );
+        apb_saradc
+            .ctrl2()
+            .modify(|_, w| w.meas_num_limit().clear_bit());
 
-    clear_peri_reg_mask(APB_SARADC_CTRL_REG, APB_SARADC_START_FORCE);
-    set_peri_reg_mask(APB_SARADC_CTRL2_REG, APB_SARADC_TIMER_EN);
+        sens.sar_power_xpd_sar()
+            .modify(|_, w| w.force_xpd_sar().bits(3));
+
+        apb_saradc.ctrl2().modify(|_, w| w.timer_sel().set_bit());
+
+        apb_saradc.ctrl2().modify(|_, w| w.timer_target().bits(100));
+
+        apb_saradc.ctrl().modify(|_, w| w.start_force().clear_bit());
+
+        apb_saradc.ctrl2().modify(|_, w| w.timer_en().set_bit());
+    }
 }
 
 pub fn revert_trng() {
-    // Restore internal I2C bus state
-    regi2c_write_mask(
-        I2C_SAR_ADC,
-        I2C_SAR_ADC_HOSTID,
-        ADC_SAR1_DREF_ADDR,
-        ADC_SAR1_DREF_ADDR_MSB,
-        ADC_SAR1_DREF_ADDR_LSB,
-        0x1,
-    );
+    let dport = unsafe { &*crate::peripherals::SYSTEM::ptr() };
+    let apb_saradc = unsafe { &*crate::peripherals::APB_SARADC::ptr() };
+    let sens = unsafe { &*crate::peripherals::SENS::ptr() };
 
-    regi2c_write_mask(
-        I2C_SAR_ADC,
-        I2C_SAR_ADC_HOSTID,
-        ADC_SAR2_DREF_ADDR,
-        ADC_SAR2_DREF_ADDR_MSB,
-        ADC_SAR2_DREF_ADDR_LSB,
-        0x1,
-    );
-
-    regi2c_write_mask(
-        I2C_SAR_ADC,
-        I2C_SAR_ADC_HOSTID,
-        ADC_SARADC_ENCAL_REF_ADDR,
-        ADC_SARADC_ENCAL_REF_ADDR_MSB,
-        ADC_SARADC_ENCAL_REF_ADDR_LSB,
-        0,
-    );
-
-    regi2c_write_mask(
-        I2C_SAR_ADC,
-        I2C_SAR_ADC_HOSTID,
-        ADC_SARADC_ENT_TSENS_ADDR,
-        ADC_SARADC_ENT_TSENS_ADDR_MSB,
-        ADC_SARADC_ENT_TSENS_ADDR_LSB,
-        0,
-    );
-
-    regi2c_write_mask(
-        I2C_SAR_ADC,
-        I2C_SAR_ADC_HOSTID,
-        ADC_SARADC_ENT_RTC_ADDR,
-        ADC_SARADC_ENT_RTC_ADDR_MSB,
-        ADC_SARADC_ENT_RTC_ADDR_LSB,
-        0,
-    );
-
-    // Restore SARADC to default mode
-    clear_peri_reg_mask(SENS_SAR_MEAS1_MUX_REG, SENS_SAR1_DIG_FORCE);
-    set_peri_reg_mask(DPORT_PERIP_CLK_EN0_REG, DPORT_APB_SARADC_CLK_EN);
-    set_peri_reg_bits(
-        SENS_SAR_POWER_XPD_SAR_REG,
-        SENS_FORCE_XPD_SAR,
-        0,
-        SENS_FORCE_XPD_SAR_S,
-    );
-    clear_peri_reg_mask(APB_SARADC_CTRL2_REG, APB_SARADC_TIMER_EN);
-}
-
-fn reg_set_bit(reg: u32, bit: u32) {
     unsafe {
-        (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() | bit);
+        // Restore internal I2C bus state
+        regi2c_write_mask(
+            I2C_SAR_ADC,
+            I2C_SAR_ADC_HOSTID,
+            ADC_SAR1_DREF_ADDR,
+            ADC_SAR1_DREF_ADDR_MSB,
+            ADC_SAR1_DREF_ADDR_LSB,
+            0x1,
+        );
+
+        regi2c_write_mask(
+            I2C_SAR_ADC,
+            I2C_SAR_ADC_HOSTID,
+            ADC_SAR2_DREF_ADDR,
+            ADC_SAR2_DREF_ADDR_MSB,
+            ADC_SAR2_DREF_ADDR_LSB,
+            0x1,
+        );
+
+        regi2c_write_mask(
+            I2C_SAR_ADC,
+            I2C_SAR_ADC_HOSTID,
+            ADC_SARADC_ENCAL_REF_ADDR,
+            ADC_SARADC_ENCAL_REF_ADDR_MSB,
+            ADC_SARADC_ENCAL_REF_ADDR_LSB,
+            0,
+        );
+
+        regi2c_write_mask(
+            I2C_SAR_ADC,
+            I2C_SAR_ADC_HOSTID,
+            ADC_SARADC_ENT_TSENS_ADDR,
+            ADC_SARADC_ENT_TSENS_ADDR_MSB,
+            ADC_SARADC_ENT_TSENS_ADDR_LSB,
+            0,
+        );
+
+        regi2c_write_mask(
+            I2C_SAR_ADC,
+            I2C_SAR_ADC_HOSTID,
+            ADC_SARADC_ENT_RTC_ADDR,
+            ADC_SARADC_ENT_RTC_ADDR_MSB,
+            ADC_SARADC_ENT_RTC_ADDR_LSB,
+            0,
+        );
+
+        // Restore SARADC to default mode
+        sens.sar_meas1_mux()
+            .modify(|_, w| w.sar1_dig_force().clear_bit());
+
+        dport
+            .perip_clk_en0()
+            .modify(|_, w| w.apb_saradc_clk_en().set_bit());
+
+        sens.sar_power_xpd_sar()
+            .modify(|_, w| w.force_xpd_sar().bits(0));
+
+        apb_saradc.ctrl2().modify(|_, w| w.timer_en().clear_bit());
     }
 }
-
-fn reg_write(reg: u32, v: u32) {
-    unsafe {
-        (reg as *mut u32).write_volatile(v);
-    }
-}
-
-fn reg_get_bit(reg: u32, b: u32) -> u32 {
-    unsafe { (reg as *mut u32).read_volatile() & b }
-}
-
-fn reg_get_field(reg: u32, s: u32, v: u32) -> u32 {
-    unsafe { ((reg as *mut u32).read_volatile() >> s) & v }
-}
-
-fn reg_clr_bit(reg: u32, bit: u32) {
-    unsafe {
-        (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() & !bit);
-    }
-}
-
+// Temporarily not in PACs
 fn regi2c_enable_block(block: u8) {
     reg_set_field(
         I2C_RTC_CONFIG0,
@@ -356,6 +299,26 @@ pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, l
     regi2c_disable_block(block);
 }
 
+fn reg_write(reg: u32, v: u32) {
+    unsafe {
+        (reg as *mut u32).write_volatile(v);
+    }
+}
+
+fn reg_get_bit(reg: u32, b: u32) -> u32 {
+    unsafe { (reg as *mut u32).read_volatile() & b }
+}
+
+fn reg_get_field(reg: u32, s: u32, v: u32) -> u32 {
+    unsafe { ((reg as *mut u32).read_volatile() >> s) & v }
+}
+
+fn reg_clr_bit(reg: u32, bit: u32) {
+    unsafe {
+        (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() & !bit);
+    }
+}
+
 fn reg_set_field(reg: u32, field_v: u32, field_s: u32, value: u32) {
     unsafe {
         (reg as *mut u32).write_volatile(
@@ -365,28 +328,20 @@ fn reg_set_field(reg: u32, field_v: u32, field_s: u32, value: u32) {
     }
 }
 
+fn reg_set_bit(reg: u32, bit: u32) {
+    unsafe {
+        (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() | bit);
+    }
+}
+
 fn set_peri_reg_mask(reg: u32, mask: u32) {
     unsafe {
         (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() | mask);
     }
 }
 
-fn set_peri_reg_bits(reg: u32, bitmap: u32, value: u32, shift: u32) {
-    unsafe {
-        (reg as *mut u32).write_volatile(
-            ((reg as *mut u32).read_volatile() & !(bitmap << shift)) | ((value & bitmap) << shift),
-        );
-    }
-}
-
 fn clear_peri_reg_mask(reg: u32, mask: u32) {
     unsafe {
         (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() & !mask);
-    }
-}
-
-fn write_peri_reg(reg: u32, val: u32) {
-    unsafe {
-        (reg as *mut u32).write_volatile(val);
     }
 }
