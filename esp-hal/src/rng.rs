@@ -131,29 +131,29 @@ impl rand_core::RngCore for Rng {
 /// Due to pulling the entropy source from the ADC, it uses the associated
 /// regiters, so to use TRNG we need to "occupy" the ADC peripheral.
 ///
-/// ```no_run
-/// let analog_pin = io.pins.gpio3.into_analog();
-/// let mut adc1_config = AdcConfig::new();
-/// let mut adc1_pin = adc1_config.enable_pin(analog_pin, Attenuation::Attenuation11dB);
-/// let mut adc1 = ADC::<ADC1>::new(peripherals.ADC1, adc1_config);
-/// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
-///
+/// ```rust, ignore
 /// let mut buf = [0u8; 16];
-/// let mut trng = Trng::new(peripherals.RNG, &mut adc1);
+/// let mut trng = Trng::new(peripherals.RNG, &mut peripherals.ADC1);
 /// trng.read(&mut buf);
 ///
 /// println!("TRNG: Random bytes: {:?}", buf);
-/// println!("TRNG: Random u32:   {}", rng.random());
+/// println!("TRNG: Random u32:  {}", rng.random());
 ///
 /// let mut rng = trng.downgrade();
 ///
+/// let analog_pin = io.pins.gpio3;
+/// let mut adc1_config = AdcConfig::new();
+/// let mut adc1_pin = adc1_config.enable_pin(analog_pin, Attenuation::Attenuation11dB);
+/// let mut adc1 = Adc::<ADC1>::new(peripherals.ADC1, adc1_config);
+/// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
+///
 /// rng.read(&mut buf);
 /// println!("Random bytes: {:?}", buf);
-///
-/// println!("Random u32:   {}", rng.random());
+/// println!("Random u32:  {}", rng.random());
 /// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
 /// println!("ADC reading = {}", pin_value);
 /// ```
+
 pub struct Trng<'d> {
     /// The hardware random number generator instance.
     pub rng: Rng,

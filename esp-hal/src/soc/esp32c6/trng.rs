@@ -408,7 +408,6 @@ pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, l
             .read()
             .lp_i2c_ana_mast_i2c0_busy()
             .bit()
-            != false
         {}
 
         temp = lp_i2c_ana
@@ -434,7 +433,6 @@ pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, l
             .read()
             .lp_i2c_ana_mast_i2c0_busy()
             .bit()
-            != false
         {}
 
         regi2c_disable_block(block);
