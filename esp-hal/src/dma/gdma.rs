@@ -88,7 +88,7 @@ impl<const N: u8> RegisterAccess for Channel<N> {
         // nothing special to be done here
     }
 
-    #[cfg(esp32s3)]
+    #[cfg(gdma)]
     fn set_mem2mem_mode() {
         debug!("set_mem2mem_mode");
         Self::ch()
@@ -636,7 +636,6 @@ mod m2m {
     /// This is a pseudo-peripheral that allows for memory to memory transfers.
     /// It is not a real peripheral, but a way to use the DMA engine for memory
     /// to memory transfers.
-    #[cfg(esp32s3)]
     pub struct Mem2Mem<'d, C, MODE>
     where
         C: ChannelTypes,
@@ -647,7 +646,6 @@ mod m2m {
         rx_chain: DescriptorChain,
     }
 
-    #[cfg(esp32s3)]
     impl<'d, C, MODE> Mem2Mem<'d, C, MODE>
     where
         C: ChannelTypes,
@@ -699,7 +697,6 @@ mod m2m {
         }
     }
 
-    #[cfg(esp32s3)]
     impl<'d, C, MODE> DmaSupport for Mem2Mem<'d, C, MODE>
     where
         C: ChannelTypes,
@@ -714,7 +711,6 @@ mod m2m {
         }
     }
 
-    #[cfg(esp32s3)]
     impl<'d, C, MODE> DmaSupportRx for Mem2Mem<'d, C, MODE>
     where
         C: ChannelTypes,
