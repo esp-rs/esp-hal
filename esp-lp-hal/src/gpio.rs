@@ -33,11 +33,11 @@ impl<const PIN: u8> Output<PIN> {
         if on {
             unsafe { &*LpIo::PTR }
                 .out_w1ts()
-                .write(|w| w.out_data_w1ts().variant(1 << PIN));
+                .write(|w| unsafe { w.out_data_w1ts().bits(1 << PIN) });
         } else {
             unsafe { &*LpIo::PTR }
                 .out_w1tc()
-                .write(|w| w.out_data_w1tc().variant(1 << PIN));
+                .write(|w| unsafe { w.out_data_w1tc().bits(1 << PIN) });
         }
     }
 }
