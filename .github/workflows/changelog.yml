@@ -2,9 +2,16 @@ name: Changelog check
 
 on:
   pull_request:
-    # We will not track changes for the `xtask` package.
+    # We will not track changes for the following packages.
     paths-ignore:
       - "/xtask/"
+      - "/esp-build/"
+      - "/esp-hal-procmacros/"
+      - "/esp-metadata/"
+      - "/examples/"
+      - "/hil-tests/"
+      - "/extras/"
+      - "/resources/"
     # Run on labeled/unlabeled in addition to defaults to detect
     # adding/removing skip-changelog labels.
     types: [opened, reopened, labeled, unlabeled, synchronize]
@@ -15,10 +22,122 @@ jobs:
 
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - uses: dangoslen/changelog-enforcer@v3
+      - name: Check which package is modified
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            esp-alloc:
+              - 'esp-alloc/**'
+            esp-backtrace:
+              - 'esp-backtrace/**'
+            esp-hal:
+              - 'esp-hal/**'
+            esp-hal-embassy:
+              - 'esp-hal-embassy/**'
+            esp-hal-smartled:
+              - 'esp-hal-smartled/**'
+            esp-ieee802154:
+              - 'esp-ieee802154/**'
+            esp-lp-hal:
+              - 'esp-lp-hal/**'
+            esp-println:
+              - 'esp-println/**'
+            esp-riscv-rt:
+              - 'esp-riscv-rt/**'
+            esp-storage:
+              - 'esp-storage/**'
+            esp-wifi:
+              - 'esp-wifi/**'
+
+      - name: Check that changelog updated (esp-alloc)
+        if: steps.changes.outputs.esp-alloc == 'true'
+        uses: dangoslen/changelog-enforcer@v3
+        with:
+          changeLogPath: esp-alloc/CHANGELOG.md
+          skipLabels: "skip-changelog"
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-alloc/CHANGELOG.md file."
+
+      - name: Check that changelog updated (esp-backtrace)
+        if: steps.changes.outputs.esp-backtrace == 'true'
+        uses: dangoslen/changelog-enforcer@v3
+        with:
+          changeLogPath: esp-backtrace/CHANGELOG.md
+          skipLabels: "skip-changelog"
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-backtrace/CHANGELOG.md file."
+
+      - name: Check that changelog updated (esp-hal)
+        if: steps.changes.outputs.esp-hal == 'true'
+        uses: dangoslen/changelog-enforcer@v3
         with:
           changeLogPath: esp-hal/CHANGELOG.md
           skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the CHANGELOG.md file."
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-hal/CHANGELOG.md file."
+
+      - name: Check that changelog updated (esp-hal-embassy)
+        if: steps.changes.outputs.esp-hal-embassy == 'true'
+        uses: dangoslen/changelog-enforcer@v3
+        with:
+          changeLogPath: esp-hal-embassy/CHANGELOG.md
+          skipLabels: "skip-changelog"
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-hal-embassy/CHANGELOG.md file."
+
+      - name: Check that changelog updated (esp-hal-smartled)
+        if: steps.changes.outputs.esp-hal-smartled == 'true'
+        uses: dangoslen/changelog-enforcer@v3
+        with:
+          changeLogPath: esp-hal-smartled/CHANGELOG.md
+          skipLabels: "skip-changelog"
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-hal-smartled/CHANGELOG.md file."
+
+      - name: Check that changelog updated (esp-ieee802154)
+        if: steps.changes.outputs.esp-ieee802154 == 'true'
+        uses: dangoslen/changelog-enforcer@v3
+        with:
+          changeLogPath: esp-ieee802154/CHANGELOG.md
+          skipLabels: "skip-changelog"
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-ieee802154/CHANGELOG.md file."
+
+      - name: Check that changelog updated (esp-lp-hal)
+        if: steps.changes.outputs.esp-lp-hal == 'true'
+        uses: dangoslen/changelog-enforcer@v3
+        with:
+          changeLogPath: esp-lp-hal/CHANGELOG.md
+          skipLabels: "skip-changelog"
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-lp-hal/CHANGELOG.md file."
+
+      - name: Check that changelog updated (esp-println)
+        if: steps.changes.outputs.esp-println == 'true'
+        uses: dangoslen/changelog-enforcer@v3
+        with:
+          changeLogPath: esp-println/CHANGELOG.md
+          skipLabels: "skip-changelog"
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-println/CHANGELOG.md file."
+
+      - name: Check that changelog updated (esp-riscv-rt)
+        if: steps.changes.outputs.esp-riscv-rt == 'true'
+        uses: dangoslen/changelog-enforcer@v3
+        with:
+          changeLogPath: esp-riscv-rt/CHANGELOG.md
+          skipLabels: "skip-changelog"
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-riscv-rt/CHANGELOG.md file."
+
+      - name: Check that changelog updated (esp-storage)
+        if: steps.changes.outputs.esp-storage == 'true'
+        uses: dangoslen/changelog-enforcer@v3
+        with:
+          changeLogPath: esp-storage/CHANGELOG.md
+          skipLabels: "skip-changelog"
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-storage/CHANGELOG.md file."
+
+      - name: Check that changelog updated (esp-wifi)
+        if: steps.changes.outputs.esp-wifi == 'true'
+        uses: dangoslen/changelog-enforcer@v3
+        with:
+          changeLogPath: esp-wifi/CHANGELOG.md
+          skipLabels: "skip-changelog"
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-wifi/CHANGELOG.md file."
+
+

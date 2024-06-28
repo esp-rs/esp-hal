@@ -19,13 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-## [0.9.1] - 2024-03-11
+## 0.9.1 - 2024-03-11
 
 ### Changed
 
 - Un-pinned the defmt package's version number
 
-## [0.9.0] - 2024-02-07
+## 0.9.0 - 2024-02-07
 
 ### Added
 
@@ -35,9 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Remove ESP 8266 support
 
-## [0.8.0] - 2023-12-21
+## 0.8.0 - 2023-12-21
 
 ### Removed
 
 - Remove RTT and defmt-raw support
 
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-println?since=2024-03-12
