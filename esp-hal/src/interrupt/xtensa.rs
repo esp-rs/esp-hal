@@ -442,24 +442,10 @@ mod vectored {
         })
     }
 
-    #[no_mangle]
-    #[link_section = ".rwtext"]
-    unsafe fn __level_1_interrupt(level: u32, save_frame: &mut Context) {
-        handle_interrupts(level, save_frame)
-    }
+    // The linker script defines `__level_1_interrupt`, `__level_2_interrupt` and
+    // `__level_3_interrupt` as `handle_interrupts`
 
     #[no_mangle]
-    #[link_section = ".rwtext"]
-    unsafe fn __level_2_interrupt(level: u32, save_frame: &mut Context) {
-        handle_interrupts(level, save_frame)
-    }
-
-    #[no_mangle]
-    #[link_section = ".rwtext"]
-    unsafe fn __level_3_interrupt(level: u32, save_frame: &mut Context) {
-        handle_interrupts(level, save_frame)
-    }
-
     #[ram]
     unsafe fn handle_interrupts(level: u32, save_frame: &mut Context) {
         let core = crate::get_core();
