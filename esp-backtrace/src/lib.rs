@@ -1,3 +1,4 @@
+// Test to see if changelog CI fails
 #![allow(rustdoc::bare_urls, unused_macros)]
 #![cfg_attr(
     any(nightly_before_2024_06_12, nightly_since_2024_06_12),
