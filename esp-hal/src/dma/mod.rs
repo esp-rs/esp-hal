@@ -972,6 +972,7 @@ where
             R::set_in_peripheral(0);
             R::set_mem2mem_mode();
         } else {
+            R::set_out_peripheral(peri as u8);
         }
         #[cfg(not(gdma))]
         R::set_in_peripheral(peri as u8);
