@@ -689,8 +689,8 @@ mod m2m {
                     .prepare_transfer_without_start(DmaPeripheral::Mem2Mem, &self.rx_chain)?;
             }
             let result = self.channel.tx.start_transfer();
-            if result.is_err() {
-                return Err(result.unwrap_err());
+            if let Err(err) = result {
+                return Err(err);
             }
             self.channel.rx.start_transfer()?;
             Ok(DmaTransferRx::new(self))
