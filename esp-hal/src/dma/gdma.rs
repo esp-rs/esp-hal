@@ -657,7 +657,8 @@ mod m2m {
         ///
         /// # Safety
         ///
-        /// You must insure that your not using DMA for the same peripheral and that your the only one using the DmaPeripheral.
+        /// You must insure that your not using DMA for the same peripheral and
+        /// that your the only one using the DmaPeripheral.
         pub unsafe fn new(
             mut channel: Channel<'d, C, MODE>,
             peripheral: DmaPeripheral,
