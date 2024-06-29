@@ -655,11 +655,10 @@ mod m2m {
     {
         /// Create a new Mem2Mem instance.
         ///
-        /// SAFTEY:
+        /// # Safety
         ///
-        /// TODO: Add safety requirements dealing with the DmaPeripheral value
-        /// chosen on the esp32s3 (and maybe others)
-        pub fn new(
+        /// You must insure that your not using DMA for the same peripheral and that your the only one using the DmaPeripheral.
+        pub unsafe fn new(
             mut channel: Channel<'d, C, MODE>,
             peripheral: DmaPeripheral,
             tx_descriptors: &'static mut [DmaDescriptor],

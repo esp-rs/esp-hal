@@ -34,7 +34,8 @@ fn main() -> ! {
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0.configure(false, DmaPriority::Priority0);
 
-    let mut mem2mem = Mem2Mem::new(channel, DmaPeripheral::Adc, tx_descriptors, rx_descriptors);
+    let mut mem2mem =
+        unsafe { Mem2Mem::new(channel, DmaPeripheral::Adc, tx_descriptors, rx_descriptors) };
 
     for i in 0..core::mem::size_of_val(tx_buffer) {
         tx_buffer[i] = (i % 256) as u8;
