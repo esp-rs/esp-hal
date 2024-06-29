@@ -2,7 +2,7 @@
 //!
 
 //% FEATURES: esp-hal/log
-//% CHIPS: esp32s3
+//% CHIPS: esp32s3 esp32c3 esp32c6 esp32h2
 
 #![no_std]
 #![no_main]
@@ -19,6 +19,12 @@ use esp_hal::{
 };
 use log::{error, info};
 
+const DATA_SIZE: usize = 1024 * 100;
+#[cfg(feature = "esp32s3")]
+const DMA_PERIPHERAL: DmaPeripheral = DmaPeripheral::Adc;
+#[cfg(not(feature = "esp32s3"))]
+const DMA_PERIPHERAL: DmaPeripheral = DmaPeripheral::Mem2Mem1;
+
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger(log::LevelFilter::Info);
@@ -28,14 +34,13 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
     let delay = Delay::new(&clocks);
 
-    const DATA_SIZE: usize = 1024 * 100;
     let (tx_buffer, tx_descriptors, mut rx_buffer, rx_descriptors) = dma_buffers!(DATA_SIZE);
 
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0.configure(false, DmaPriority::Priority0);
 
     let mut mem2mem =
-        unsafe { Mem2Mem::new(channel, DmaPeripheral::Adc, tx_descriptors, rx_descriptors) };
+        unsafe { Mem2Mem::new(channel, DMA_PERIPHERAL, tx_descriptors, rx_descriptors) };
 
     for i in 0..core::mem::size_of_val(tx_buffer) {
         tx_buffer[i] = (i % 256) as u8;

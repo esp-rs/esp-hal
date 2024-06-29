@@ -381,29 +381,45 @@ pub enum DmaPriority {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum DmaPeripheral {
-    Spi2    = 0,
+    Spi2      = 0,
     #[cfg(any(pdma, esp32s3))]
-    Spi3    = 1,
+    Spi3      = 1,
+    #[cfg(any(esp32c3, esp32c6, esp32h2))]
+    Mem2Mem1  = 1,
     #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
-    Uhci0   = 2,
+    Uhci0     = 2,
     #[cfg(any(esp32, esp32s2, esp32c3, esp32c6, esp32h2, esp32s3))]
-    I2s0    = 3,
+    I2s0      = 3,
     #[cfg(any(esp32, esp32s3))]
-    I2s1    = 4,
+    I2s1      = 4,
+    #[cfg(any(esp32c3, esp32c6, esp32h2))]
+    Mem2Mem4  = 4,
     #[cfg(esp32s3)]
-    LcdCam  = 5,
+    LcdCam    = 5,
+    #[cfg(any(esp32c3, esp32c6, esp32h2))]
+    Mem2Mem5  = 5,
     #[cfg(not(esp32c2))]
-    Aes     = 6,
+    Aes       = 6,
     #[cfg(gdma)]
-    Sha     = 7,
+    Sha       = 7,
     #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
-    Adc     = 8,
+    Adc       = 8,
     #[cfg(esp32s3)]
-    Rmt     = 9,
+    Rmt       = 9,
     #[cfg(parl_io)]
-    ParlIo  = 9,
-    #[cfg(gdma)]
-    Mem2Mem = 10, // taken from esp32c6 TRM
+    ParlIo    = 9,
+    #[cfg(any(esp32c6, esp32h2))]
+    Mem2Mem10 = 10,
+    #[cfg(any(esp32c6, esp32h2))]
+    Mem2Mem11 = 11,
+    #[cfg(any(esp32c6, esp32h2))]
+    Mem2Mem12 = 12,
+    #[cfg(any(esp32c6, esp32h2))]
+    Mem2Mem13 = 13,
+    #[cfg(any(esp32c6, esp32h2))]
+    Mem2Mem14 = 14,
+    #[cfg(any(esp32c6, esp32h2))]
+    Mem2Mem15 = 15,
 }
 
 #[derive(PartialEq, PartialOrd)]
