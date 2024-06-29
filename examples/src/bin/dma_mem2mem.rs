@@ -2,7 +2,7 @@
 //!
 
 //% FEATURES: esp-hal/log
-//% CHIPS: esp32s3 esp32c3 esp32c6 esp32h2
+//% CHIPS: esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
 
 #![no_std]
 #![no_main]
@@ -19,7 +19,7 @@ use esp_hal::{
 };
 use log::{error, info};
 
-const DATA_SIZE: usize = 1024 * 100;
+const DATA_SIZE: usize = 1024 * 10;
 #[cfg(feature = "esp32s3")]
 const DMA_PERIPHERAL: DmaPeripheral = DmaPeripheral::Adc;
 #[cfg(not(feature = "esp32s3"))]

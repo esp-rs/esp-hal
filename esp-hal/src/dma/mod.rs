@@ -384,26 +384,34 @@ pub enum DmaPeripheral {
     Spi2      = 0,
     #[cfg(any(pdma, esp32s3))]
     Spi3      = 1,
-    #[cfg(any(esp32c3, esp32c6, esp32h2))]
+    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
     Mem2Mem1  = 1,
     #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
     Uhci0     = 2,
+    #[cfg(esp32c2)]
+    Mem2Mem2  = 2,
     #[cfg(any(esp32, esp32s2, esp32c3, esp32c6, esp32h2, esp32s3))]
     I2s0      = 3,
+    #[cfg(esp32c2)]
+    Mem2Mem3  = 3,
     #[cfg(any(esp32, esp32s3))]
     I2s1      = 4,
-    #[cfg(any(esp32c3, esp32c6, esp32h2))]
+    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
     Mem2Mem4  = 4,
     #[cfg(esp32s3)]
     LcdCam    = 5,
-    #[cfg(any(esp32c3, esp32c6, esp32h2))]
+    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
     Mem2Mem5  = 5,
     #[cfg(not(esp32c2))]
     Aes       = 6,
+    #[cfg(esp32c2)]
+    Mem2Mem6  = 6,
     #[cfg(gdma)]
     Sha       = 7,
     #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
     Adc       = 8,
+    #[cfg(esp32c2)]
+    Mem2Mem8  = 8,
     #[cfg(esp32s3)]
     Rmt       = 9,
     #[cfg(parl_io)]
