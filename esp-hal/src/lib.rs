@@ -104,11 +104,13 @@
 //!
 //! ## PeripheralRef Pattern
 //!
-//! Generally drivers take pins as [peripheral::PeripheralRef]. This
-//! means you can pass the pin or a mutable reference to the pin.
+//! Generally drivers take pins and peripherals as [peripheral::PeripheralRef].
+//! This means you can pass the pin/peripheral or a mutable reference to the
+//! pin/peripheral.
 //!
 //! The later can be used to regain access to the pin when the driver gets
-//! dropped. Then it's possible to reuse the pin for a different purpose.
+//! dropped. Then it's possible to reuse the pin/peripheral for a different
+//! purpose.
 //!
 //! [documentation]: https://docs.esp-rs.org/esp-hal
 //! [examples]: https://github.com/esp-rs/esp-hal/tree/main/examples
