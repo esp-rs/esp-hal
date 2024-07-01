@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - uart: Implement `embedded_io::ReadReady` for `Uart` and `UartRx` (#1702)
 - ESP32-C6: Support lp-core as wake-up source (#1723)
 - Add support for GPIO wake-up source (#1724)
+- Add `uart` wake source (#1727)
 
 ### Fixed
 
