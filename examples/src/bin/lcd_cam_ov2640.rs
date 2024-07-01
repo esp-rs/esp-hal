@@ -85,7 +85,8 @@ fn main() -> ! {
         &clocks,
     )
     .with_master_clock(cam_xclk)
-    .with_ctrl_pins(cam_vsync, cam_href, cam_pclk);
+    .with_pixel_clock(cam_pclk)
+    .with_ctrl_pins(cam_vsync, cam_href);
 
     let delay = Delay::new(&clocks);
 
