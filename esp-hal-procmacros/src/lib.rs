@@ -26,11 +26,7 @@
 //!    async task.
 //!  - [ram](attr.ram.html) - Attribute macro for placing statics and functions
 //!    into specific memory sections, such as SRAM or RTC RAM (slow or fast)
-//!    with different initialization options. Supported options are:
-//!      - `rtc_fast` - Use RTC fast RAM
-//!      - `rtc_slow` - Use RTC slow RAM (not all targets support slow RTC RAM)
-//!      - `uninitialized` - Skip initialization of the memory
-//!      - `zeroed` - Initialize the memory to zero
+//!    with different initialization options. See its documentation for details.
 //!
 //! ## Examples
 //!
@@ -44,21 +40,6 @@
 //! async fn main(spawner: Spawner) {
 //!     // Your application's entry point
 //! }
-//! ```
-//!
-//! #### `ram` macro
-//!
-//! Requires the `ram` feature to be enabled.
-//!
-//! ```rust, no_run
-//! #[ram(rtc_fast)]
-//! static mut SOME_INITED_DATA: [u8; 2] = [0xaa, 0xbb];
-//!
-//! #[ram(rtc_fast, uninitialized)]
-//! static mut SOME_UNINITED_DATA: [u8; 2] = [0; 2];
-//!
-//! #[ram(rtc_fast, zeroed)]
-//! static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
 //! ```
 //!
 //! ## Feature Flags
@@ -88,19 +69,64 @@ mod lp_core;
 struct RamArgs {
     rtc_fast: bool,
     rtc_slow: bool,
-    uninitialized: bool,
+    persistent: bool,
     zeroed: bool,
 }
 
 /// This attribute allows placing statics and functions into ram.
 ///
-/// Options that can be specified are rtc_slow or rtc_fast to use the
-/// RTC slow or RTC fast ram instead of the normal SRAM.
+/// Supported options:
+/// - `rtc_fast` - Use RTC fast RAM
+/// - `rtc_slow` - Use RTC slow RAM (not all targets support slow RTC RAM)
+/// - `persistent` - Skip initializing the memory to zero after some kinds of
+///   resets. See the table below for the full list.
+/// - `zeroed` - Initialize the memory to zero
 ///
-/// The uninitialized option will skip initialization of the memory
-/// (e.g. to persist it across resets or deep sleep mode for the RTC RAM)
+/// Requires the `ram` feature to be enabled.
 ///
-/// Not all targets support RTC slow ram.
+/// # Examples
+///
+/// ```rust, no_run
+/// #[ram(rtc_fast)]
+/// static mut SOME_INITED_DATA: [u8; 2] = [0xaa, 0xbb];
+///
+/// #[ram(rtc_fast, persistent)]
+/// static mut SOME_PERSISTENT_DATA: [u8; 2] = [0; 2];
+///
+/// #[ram(rtc_fast, zeroed)]
+/// static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
+/// ```
+///
+/// See the `ram` example in the esp-hal repository for a full usage example.
+///
+/// # Persistent resets
+///
+/// |    | ESP32           | ESP32-C2        | ESP32-C3        | ESP32-C6        | ESP32-H2        | ESP32-S2        | ESP32-S3        | Persists |
+/// | -: | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | -------- |
+/// |  1 | `ChipPowerOn`   | `ChipPowerOn`   | `ChipPowerOn`   | `ChipPowerOn`   | `ChipPowerOn`   | `ChipPowerOn`   | `ChipPowerOn`   |          |
+/// |  2 |                 |                 |                 |                 |                 |                 |                 |          |
+/// |  3 | `CoreSw`        | `CoreSw`        | `CoreSw`        | `CoreSw`        | `CoreSw`        | `CoreSw`        | `CoreSw`        | yes      |
+/// |  4 |                 |                 |                 |                 |                 |                 |                 | yes      |
+/// |  5 | `CoreDeepSleep` | `CoreDeepSleep` | `CoreDeepSleep` | `CoreDeepSleep` | `CoreDeepSleep` | `CoreDeepSleep` | `CoreDeepSleep` | yes      |
+/// |  6 | `CoreSdio`      |                 |                 | `CoreSDIO`      |                 |                 |                 | yes      |
+/// |  7 | `CoreMwdt0`     | `CoreMwdt0`     | `CoreMwdt0`     | `CoreMwdt0`     | `CoreMwdt0`     | `CoreMwdt0`     | `CoreMwdt0`     | yes      |
+/// |  8 | `CoreMwdt1`     |                 | `CoreMwdt1`     | `CoreMwdt1`     | `CoreMwdt1`     | `CoreMwdt1`     | `CoreMwdt1`     | yes      |
+/// |  9 | `CoreRtcWdt`    | `CoreRtcWdt`    | `CoreRtcWdt`    | `CoreRtcWdt`    | `CoreRtcWdt`    | `CoreRtcWdt`    | `CoreRtcWdt`    | yes      |
+/// | 10 |                 |                 |                 |                 |                 |                 |                 | yes      |
+/// | 11 | `CpuMwdt0`      | `Cpu0Mwdt0`     | `Cpu0Mwdt0`     | `Cpu0Mwdt0`     | `Cpu0Mwdt0`     | `Cpu0Mwdt0`     | `CpuMwdt0`      | yes      |
+/// | 12 | `Cpu0Sw`        | `Cpu0Sw`        | `Cpu0Sw`        | `Cpu0Sw`        | `Cpu0Sw`        | `Cpu0Sw`        | `CpuSw`         | yes      |
+/// | 13 | `Cpu0RtcWdt`    | `Cpu0RtcWdt`    | `Cpu0RtcWdt`    | `Cpu0RtcWdt`    | `Cpu0RtcWdt`    | `Cpu0RtcWdt`    | `CpuRtcWdt`     | yes      |
+/// | 14 | `Cpu1Cpu0`      |                 |                 |                 |                 |                 |                 | yes      |
+/// | 15 | `SysBrownOut`   | `SysBrownOut`   | `SysBrownOut`   | `SysBrownOut`   | `SysBrownOut`   | `SysBrownOut`   | `SysBrownOut`   |          |
+/// | 16 | `SysRtcWdt`     | `SysRtcWdt`     | `SysRtcWdt`     | `SysRtcWdt`     | `SysRtcWdt`     | `SysRtcWdt`     | `SysRtcWdt`     |          |
+/// | 17 |                 |                 | `Cpu0Mwdt1`     | `Cpu0Mwdt1`     | `Cpu0Mwdt1`     | `Cpu0Mwdt1`     | `CpuMwdt1`      | yes      |
+/// | 18 |                 | `SysSuperWdt`   | `SysSuperWdt`   | `SysSuperWdt`   | `SysSuperWdt`   | `SysSuperWdt`   | `SysSuperWdt`   |          |
+/// | 19 |                 | `SysClkGlitch`  | `SysClkGlitch`  |                 | `SysClkGlitch`  | `SysClkGlitch`  | `SysClkGlitch`  |          |
+/// | 20 |                 | `CoreEfuseCrc`  | `CoreEfuseCrc`  | `CoreEfuseCrc`  | `CoreEfuseCrc`  | `CoreEfuseCrc`  | `CoreEfuseCrc`  |          |
+/// | 21 |                 |                 | `CoreUsbUart`   | `CoreUsbUart`   | `CoreUsbUart`   | `CoreEfuseCrc`  | `CoreUsbUart`   |          |
+/// | 22 |                 |                 | `CoreUsbJtag`   | `CoreUsbJtag`   | `CoreUsbJtag`   |                 | `CoreUsbJtag`   |          |
+/// | 23 |                 |                 | `CorePwrGlitch` |                 | `CorePwrGlitch` |                 | `CorePwrGlitch` |          |
+/// | 24 |                 | `Cpu0Jtag`      |                 | `Cpu0JtagCpu`   |                 |                 |                 |          |
 #[cfg(feature = "ram")]
 #[proc_macro_attribute]
 #[proc_macro_error::proc_macro_error]
@@ -120,7 +146,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     let RamArgs {
         rtc_fast,
         rtc_slow,
-        uninitialized,
+        persistent,
         zeroed,
     } = match FromMeta::from_list(&attr_args) {
         Ok(v) => v,
@@ -140,7 +166,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     }
 
     let is_fn = matches!(item, Item::Fn(_));
-    let section_name = match (is_fn, rtc_fast, rtc_slow, uninitialized, zeroed) {
+    let section_name = match (is_fn, rtc_fast, rtc_slow, persistent, zeroed) {
         (true, false, false, false, false) => Ok(".rwtext"),
         (true, true, false, false, false) => Ok(".rtc_fast.text"),
         (true, false, true, false, false) => Ok(".rtc_slow.text"),
@@ -148,11 +174,11 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         (false, false, false, false, false) => Ok(".data"),
 
         (false, true, false, false, false) => Ok(".rtc_fast.data"),
-        (false, true, false, true, false) => Ok(".rtc_fast.noinit"),
+        (false, true, false, true, false) => Ok(".rtc_fast.persistent"),
         (false, true, false, false, true) => Ok(".rtc_fast.bss"),
 
         (false, false, true, false, false) => Ok(".rtc_slow.data"),
-        (false, false, true, true, false) => Ok(".rtc_slow.noinit"),
+        (false, false, true, true, false) => Ok(".rtc_slow.persistent"),
         (false, false, true, false, true) => Ok(".rtc_slow.bss"),
 
         _ => Err(()),
@@ -171,9 +197,31 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     };
 
+    let zeroable_check = (persistent || zeroed).then(|| {
+        use proc_macro_crate::{crate_name, FoundCrate};
+
+        let hal = proc_macro2::Ident::new(
+            if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-hal") {
+                &name
+            } else {
+                "crate"
+            },
+            Span::call_site().into(),
+        );
+
+        let Item::Static(ref item) = item else {
+            abort!(item, "Expected a `static`");
+        };
+        let ty = &item.ty;
+        quote::quote! {
+            const _: () = #hal::__macro_implementation::assert_is_zeroable::<#ty>();
+        }
+    });
+
     let output = quote::quote! {
         #section
         #item
+        #zeroable_check
     };
 
     output.into()

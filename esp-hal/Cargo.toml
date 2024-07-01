@@ -16,6 +16,7 @@ rustdoc-args   = ["--cfg", "docsrs"]
 
 [dependencies]
 bitflags                 = "2.5.0"
+bytemuck                 = "1.0.0"
 bitfield                 = "0.15.0"
 cfg-if                   = "1.0.0"
 critical-section         = "1.1.2"
@@ -77,7 +78,7 @@ serde        = { version = "1.0.203", features = ["derive"] }
 [features]
 default = ["embedded-hal"]
 
-riscv  = ["dep:riscv",     "critical-section/restore-state-u8",  "esp-riscv-rt/zero-bss"]
+riscv  = ["dep:riscv",     "critical-section/restore-state-u8"]
 xtensa = ["dep:xtensa-lx", "critical-section/restore-state-u32"]
 
 bluetooth = []
@@ -105,11 +106,11 @@ esp32   = ["dep:esp32",   "xtensa", "xtensa-lx/spin", "xtensa-lx-rt/esp32"]
 # Target the ESP32-C2.
 esp32c2 = ["dep:esp32c2", "riscv",  "portable-atomic/unsafe-assume-single-core"]
 # Target the ESP32-C3.
-esp32c3 = ["dep:esp32c3", "riscv",  "portable-atomic/unsafe-assume-single-core", "rv-zero-rtc-bss"]
+esp32c3 = ["dep:esp32c3", "riscv",  "portable-atomic/unsafe-assume-single-core", "esp-riscv-rt/rtc-ram"]
 # Target the ESP32-C6.
-esp32c6 = ["dep:esp32c6", "riscv",  "procmacros/has-lp-core", "rv-zero-rtc-bss"]
+esp32c6 = ["dep:esp32c6", "riscv",  "procmacros/has-lp-core", "esp-riscv-rt/rtc-ram"]
 # Target the ESP32-H2.
-esp32h2 = ["dep:esp32h2", "riscv", "rv-zero-rtc-bss"]
+esp32h2 = ["dep:esp32h2", "riscv", "esp-riscv-rt/rtc-ram"]
 # Target the ESP32-S2.
 esp32s2 = ["dep:esp32s2", "xtensa", "portable-atomic/critical-section", "procmacros/has-ulp-core", "xtensa-lx-rt/esp32s2", "usb-otg"]
 # Target the ESP32-S3.
@@ -119,12 +120,6 @@ esp32s3 = ["dep:esp32s3", "xtensa", "procmacros/has-ulp-core", "xtensa-lx/spin",
 ## Move the stack to start of RAM to get zero-cost stack overflow protection
 ## (ESP32-C6 and ESPS32-H2 only!).
 flip-link = ["esp-riscv-rt/fix-sp"]
-## Initialize the `.data` section of memory.
-rv-init-data = ["esp-riscv-rt/init-data", "esp-riscv-rt/init-rw-text"]
-## Zero the `.bss` section of low-power memory.
-rv-zero-rtc-bss = ["esp-riscv-rt/zero-rtc-fast-bss"]
-## Initialize the `.data` section of low-power memory.
-rv-init-rtc-data = ["esp-riscv-rt/init-rtc-fast-data", "esp-riscv-rt/init-rtc-fast-text"]
 
 #! ### Trait Implementation Feature Flags
 ## Enable support for asynchronous operation, with interfaces provided by

@@ -20,29 +20,12 @@ riscv-rt-macros   = "0.2.1"
 fix-sp = []
 ## Indicate that the device supports `mie` and `mip` instructions.
 has-mie-mip = []
-
-#! ### Memory Initialization Feature Flags
-## Initialize the `data` section.
-init-data = []
-## Initialize the `.rtc_fast.data` section.
-init-rtc-fast-data = []
-## Initialize the `.rtc_fast.text` section.
-init-rtc-fast-text = []
-## Initialize the `.rwtext` section.
-init-rw-text = []
-## Zero the `.bss` section.
-zero-bss = []
-## Zero the `.rtc_fast.bss` section.
-zero-rtc-fast-bss = []
+## Indicate that the device has RTC RAM.
+rtc-ram = []
 
 # This feature is intended for testing; you probably don't want to enable it:
 ci = [
     "fix-sp",
     "has-mie-mip",
-    "init-data",
-    "init-rtc-fast-data",
-    "init-rtc-fast-text",
-    "init-rw-text",
-    "zero-bss",
-    "zero-rtc-fast-bss",
+    "rtc-ram",
 ]

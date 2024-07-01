@@ -222,6 +222,13 @@ pub(crate) mod private {
     pub struct Internal;
 }
 
+#[doc(hidden)]
+pub mod __macro_implementation {
+    //! Unstable private implementation details of esp-hal-procmacros.
+
+    pub const fn assert_is_zeroable<T: bytemuck::Zeroable>() {}
+}
+
 /// Available CPU cores
 ///
 /// The actual number of available cores depends on the target.

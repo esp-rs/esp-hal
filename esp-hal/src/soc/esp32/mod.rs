@@ -54,9 +54,13 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
     extern "C" {
         static mut _rtc_fast_bss_start: u32;
         static mut _rtc_fast_bss_end: u32;
+        static mut _rtc_fast_persistent_start: u32;
+        static mut _rtc_fast_persistent_end: u32;
 
         static mut _rtc_slow_bss_start: u32;
         static mut _rtc_slow_bss_end: u32;
+        static mut _rtc_slow_persistent_start: u32;
+        static mut _rtc_slow_persistent_end: u32;
 
         static mut _stack_start_cpu0: u32;
 
@@ -78,6 +82,19 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
         addr_of_mut!(_rtc_slow_bss_start),
         addr_of_mut!(_rtc_slow_bss_end),
     );
+
+    // Initialize .persistent RTC RAM if it might not have been already
+    let reason = crate::rom::rtc_get_reset_reason(0);
+    if !((reason > 2 && reason < 15) || reason == 17) {
+        xtensa_lx_rt::zero_bss(
+            addr_of_mut!(_rtc_fast_persistent_start),
+            addr_of_mut!(_rtc_fast_persistent_end),
+        );
+        xtensa_lx_rt::zero_bss(
+            addr_of_mut!(_rtc_slow_persistent_start),
+            addr_of_mut!(_rtc_slow_persistent_end),
+        );
+    }
 
     unsafe {
         let stack_chk_guard = core::ptr::addr_of_mut!(__stack_chk_guard);

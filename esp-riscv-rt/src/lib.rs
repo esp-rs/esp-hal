@@ -298,7 +298,6 @@ _abs_start:
     csrw mie, 0
     csrw mip, 0
 "#,
-#[cfg(feature = "zero-bss")]
     r#"
     la a0, _bss_start
     la a1, _bss_end
@@ -310,7 +309,8 @@ _abs_start:
     blt a0, a1, 1b
     2:
 "#,
-#[cfg(feature = "zero-rtc-fast-bss")]
+    // Zero .rtc_fast.bss
+#[cfg(feature = "rtc-ram")]
     r#"
     la a0, _rtc_fast_bss_start
     la a1, _rtc_fast_bss_end
@@ -322,61 +322,27 @@ _abs_start:
     blt a0, a1, 1b
     2:
 "#,
-#[cfg(feature = "init-data")]
+    // Zero .rtc_fast.persistent if it might not have been already
+#[cfg(feature = "rtc-ram")]
     r#"
-    la a0, _data_start
-    la a1, _data_end
-    bge a0, a1, 2f
-    la a2, _sidata
+    mv a0, zero // core 0
+    call rtc_get_reset_reason
+    addi a1, zero, 3
+    bltu a0, a1, 1f // Init if reset reason < 3
+    addi a1, zero, 14
+    bltu a0, a1, 3f // Skip init if reset reason < 15
+    addi a1, zero, 17
+    beq a0, a1, 3f // Skip init if reset reason == 17
     1:
-    lw a3, 0(a2)
+    la a0, _rtc_fast_persistent_start
+    la a1, _rtc_fast_persistent_end
+    bge a0, a1, 3f
+    mv a3, x0
+    2:
     sw a3, 0(a0)
     addi a0, a0, 4
-    addi a2, a2, 4
-    blt a0, a1, 1b
-    2:
-"#,
-#[cfg(feature = "init-rw-text")]
-    r#"
-    la a0, _srwtext
-    la a1, _erwtext
-    bge a0, a1, 2f
-    la a2, _irwtext
-    1:
-    lw a3, 0(a2)
-    sw a3, 0(a0)
-    addi a0, a0, 4
-    addi a2, a2, 4
-    blt a0, a1, 1b
-    2:
-"#,
-#[cfg(feature = "init-rtc-fast-data")]
-    r#"
-    la a0, _rtc_fast_data_start
-    la a1, _rtc_fast_data_end
-    bge a0, a1, 2f
-    la a2, _irtc_fast_data
-    1:
-    lw a3, 0(a2)
-    sw a3, 0(a0)
-    addi a0, a0, 4
-    addi a2, a2, 4
-    blt a0, a1, 1b
-    2:
-"#,
-#[cfg(feature = "init-rtc-fast-text")]
-    r#"
-    la a0, _srtc_fast_text
-    la a1, _ertc_fast_text
-    bge a0, a1, 2f
-    la a2, _irtc_fast_text
-    1:
-    lw a3, 0(a2)
-    sw a3, 0(a0)
-    addi a0, a0, 4
-    addi a2, a2, 4
-    blt a0, a1, 1b
-    2:
+    blt a0, a1, 2b
+    3:
 "#,
     r#"
     li  x1, 0
