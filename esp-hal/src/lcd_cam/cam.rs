@@ -24,12 +24,10 @@
 //! # let dma = Dma::new(peripherals.DMA);
 //! # let channel = dma.channel0;
 //!
-//! # let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(32678, 0);
+//! # let (tx_buffer, tx_descriptors, _, rx_descriptors) = dma_buffers!(32678, 0);
 //!
 //! # let channel = channel.configure(
 //! #     false,
-//! #     &mut tx_descriptors,
-//! #     &mut rx_descriptors,
 //! #     DmaPriority::Priority0,
 //! # );
 //!
@@ -49,11 +47,18 @@
 //! );
 //!
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-//! let mut camera =
-//!     Camera::new(lcd_cam.cam, channel.rx, data_pins, 20u32.MHz(), &clocks)
-//!         .with_master_clock(mclk_pin) // Remove this for slave mode.
-//!         .with_pixel_clock(pclk_pin)
-//!         .with_ctrl_pins(vsync_pin, href_pin);
+//! let mut camera = Camera::new(
+//!     lcd_cam.cam,
+//!     channel.rx,
+//!     rx_descriptors,
+//!     data_pins,
+//!     20u32.MHz(),
+//!     &clocks
+//! )
+//! // Remove this for slave mode.
+//! .with_master_clock(mclk_pin)
+//! .with_pixel_clock(pclk_pin)
+//! .with_ctrl_pins(vsync_pin, href_pin);
 //! # }
 //! ```
 
@@ -68,6 +73,8 @@ use crate::{
         dma_private::{DmaSupport, DmaSupportRx},
         ChannelRx,
         ChannelTypes,
+        DescriptorChain,
+        DmaDescriptor,
         DmaError,
         DmaPeripheral,
         DmaTransferRx,
@@ -115,6 +122,7 @@ pub struct Cam<'d> {
 pub struct Camera<'d, RX> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     rx_channel: RX,
+    rx_chain: DescriptorChain,
     // 1 or 2
     bus_width: usize,
 }
@@ -128,6 +136,7 @@ where
     pub fn new<P: RxPins>(
         cam: Cam<'d>,
         mut channel: ChannelRx<'d, T, R>,
+        descriptors: &'static mut [DmaDescriptor],
         _pins: P,
         frequency: HertzU32,
         clocks: &Clocks,
@@ -196,6 +205,7 @@ where
         Self {
             lcd_cam,
             rx_channel: channel,
+            rx_chain: DescriptorChain::new(descriptors),
             bus_width: P::BUS_WIDTH,
         }
     }
@@ -231,6 +241,10 @@ impl<'d, RX: Rx> DmaSupportRx for Camera<'d, RX> {
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
+    }
+
+    fn chain(&mut self) -> &mut DescriptorChain {
+        &mut self.rx_chain
     }
 }
 
@@ -372,12 +386,10 @@ impl<'d, RX: Rx> Camera<'d, RX> {
         assert_eq!(self.bus_width, size_of::<RXBUF::Word>());
 
         unsafe {
-            self.rx_channel.prepare_transfer_without_start(
-                circular,
-                DmaPeripheral::LcdCam,
-                ptr as _,
-                len * size_of::<RXBUF::Word>(),
-            )?;
+            self.rx_chain
+                .fill_for_rx(circular, ptr as _, len * size_of::<RXBUF::Word>())?;
+            self.rx_channel
+                .prepare_transfer_without_start(DmaPeripheral::LcdCam, &self.rx_chain)?;
         }
         self.rx_channel.start_transfer()
     }

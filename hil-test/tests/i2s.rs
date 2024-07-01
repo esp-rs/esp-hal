@@ -1,6 +1,6 @@
 //! I2S Loopback Test
 //!
-//! It's assumed GPIO2 is connected to GPIO4
+//! It's assumed GPIO2 is connected to GPIO3
 //!
 //! This test uses I2S TX to transmit known data to I2S RX (forced to slave mode
 //! with loopback mode enabled). It's using circular DMA mode
@@ -53,20 +53,16 @@ mod tests {
         let dma = Dma::new(peripherals.DMA);
         let dma_channel = dma.channel0;
 
-        let (tx_buffer, mut tx_descriptors, mut rx_buffer, mut rx_descriptors) =
-            dma_buffers!(16000, 16000);
+        let (tx_buffer, tx_descriptors, mut rx_buffer, rx_descriptors) = dma_buffers!(16000, 16000);
 
         let i2s = I2s::new(
             peripherals.I2S0,
             Standard::Philips,
             DataFormat::Data16Channel16,
             16000.Hz(),
-            dma_channel.configure(
-                false,
-                &mut tx_descriptors,
-                &mut rx_descriptors,
-                DmaPriority::Priority0,
-            ),
+            dma_channel.configure(false, DmaPriority::Priority0),
+            tx_descriptors,
+            rx_descriptors,
             &clocks,
         );
 
@@ -81,7 +77,7 @@ mod tests {
             .i2s_rx
             .with_bclk(io.pins.gpio0)
             .with_ws(io.pins.gpio1)
-            .with_din(io.pins.gpio4)
+            .with_din(io.pins.gpio3)
             .build();
 
         // enable loopback testing

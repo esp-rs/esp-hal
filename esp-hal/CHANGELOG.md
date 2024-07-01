@@ -17,16 +17,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add DmaTransactionTxOwned, DmaTransactionRxOwned, DmaTransactionTxRxOwned, functions to do owning transfers added to SPI half-duplex (#1672)
 - uart: Implement `embedded_io::ReadReady` for `Uart` and `UartRx` (#1702)
 - ESP32-S3: Expose optional HSYNC input in LCD_CAM (#1707)
+- ESP32-C6: Support lp-core as wake-up source (#1723)
+- Add support for GPIO wake-up source (#1724)
+- Add `uart` wake source (#1727)
 
 ### Fixed
 
 - ESP32-S3: Fix DMA waiting check in LCD_CAM (#1707)
+- TIMG: Fix interrupt handler setup (#1714)
+- Fix `sleep_light` for ESP32-C6 (#1720)
+- ROM Functions: Fix address of `ets_update_cpu_frequency_rom` (#1722)
+- Fix `regi2c_*` functions for `esp32h2` (#1737)
 
 ### Changed
 
 - Refactor `Dac1`/`Dac2` drivers into a single `Dac` driver (#1661)
 - esp-hal-embassy: make executor code optional (but default) again
 - Improved interrupt latency on RISC-V based chips (#1679)
+- `esp_wifi::initialize` no longer requires running maximum CPU clock, instead check it runs above 80MHz. (#1688)
+- Move DMA descriptors from DMA Channel to each individual peripheral driver. (#1719)
 
 ### Removed
 - uart: Removed `configure_pins` methods (#1592)

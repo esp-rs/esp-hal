@@ -494,8 +494,6 @@ macro_rules! impl_channel {
                 pub fn configure<'a>(
                     self,
                     burst_mode: bool,
-                    tx_descriptors: &'a mut [DmaDescriptor],
-                    rx_descriptors: &'a mut [DmaDescriptor],
                     priority: DmaPriority,
                 ) -> crate::dma::Channel<'a, Channel<$num>, crate::Blocking> {
                     let mut tx_impl = ChannelTxImpl {};
@@ -505,8 +503,8 @@ macro_rules! impl_channel {
                     rx_impl.init(burst_mode, priority);
 
                     crate::dma::Channel {
-                        tx: ChannelTx::new(tx_descriptors, tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_descriptors, rx_impl, burst_mode),
+                        tx: ChannelTx::new(tx_impl, burst_mode),
+                        rx: ChannelRx::new(rx_impl, burst_mode),
                         phantom: PhantomData,
                     }
                 }
@@ -519,8 +517,6 @@ macro_rules! impl_channel {
                 pub fn configure_for_async<'a>(
                     self,
                     burst_mode: bool,
-                    tx_descriptors: &'a mut [DmaDescriptor],
-                    rx_descriptors: &'a mut [DmaDescriptor],
                     priority: DmaPriority,
                 ) -> crate::dma::Channel<'a, Channel<$num>, $crate::Async> {
                     let mut tx_impl = ChannelTxImpl {};
@@ -532,8 +528,8 @@ macro_rules! impl_channel {
                     <Channel<$num> as ChannelTypes>::Binder::set_isr($async_handler);
 
                     crate::dma::Channel {
-                        tx: ChannelTx::new(tx_descriptors, tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_descriptors, rx_impl, burst_mode),
+                        tx: ChannelTx::new(tx_impl, burst_mode),
+                        rx: ChannelRx::new(rx_impl, burst_mode),
                         phantom: PhantomData,
                     }
                 }

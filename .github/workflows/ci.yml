@@ -207,7 +207,15 @@ jobs:
             --features=${{ matrix.device.soc }},log \
             --target=${{ matrix.device.target }} \
             esp-println
-        
+
+      # So #1678 doesn't reoccur ('defmt-espflash,auto')
+      - name: Build (with feature 'defmt-espflash')
+        run: |
+          cargo xtask build-package \
+            --features=${{ matrix.device.soc }},log,defmt-espflash \
+            --target=${{ matrix.device.target }} \
+            esp-println
+
   extras:
     runs-on: ubuntu-latest
 
@@ -325,6 +333,8 @@ jobs:
       matrix:
         target:
           # RISC-V devices:
+          - soc: esp32c2
+            rust-target: riscv32imc-unknown-none-elf
           - soc: esp32c3
             rust-target: riscv32imc-unknown-none-elf
           - soc: esp32c6

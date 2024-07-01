@@ -1,4 +1,9 @@
-use crate::clock::CpuClock;
+use core::ops::Div;
+
+use crate::{
+    clock::{Clock, CpuClock},
+    rom,
+};
 
 pub(crate) fn set_cpu_clock(cpu_clock_speed: CpuClock) {
     let system_control = unsafe { &*crate::peripherals::SYSTEM::PTR };
@@ -18,4 +23,7 @@ pub(crate) fn set_cpu_clock(cpu_clock_speed: CpuClock) {
                 })
         });
     }
+
+    let ticks_per_us = cpu_clock_speed.frequency().div(1_000_000);
+    rom::ets_update_cpu_frequency_rom(ticks_per_us.raw());
 }

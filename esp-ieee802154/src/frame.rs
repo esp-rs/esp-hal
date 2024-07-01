@@ -11,7 +11,7 @@ const FRAME_VERSION_OFFSET: usize = 2;
 const FRAME_VERSION_MASK: u8 = 0x30;
 
 /// IEEE 802.15.4 MAC frame
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Frame {
     /// Header
     pub header: Header,
@@ -24,7 +24,7 @@ pub struct Frame {
 }
 
 /// IEEE 802.15.4 MAC frame which has been received
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReceivedFrame {
     /// Frame
     pub frame: Frame,

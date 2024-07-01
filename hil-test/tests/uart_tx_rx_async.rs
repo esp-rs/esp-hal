@@ -2,9 +2,9 @@
 //!
 //! Folowing pins are used:
 //! TX    GPIP2
-//! RX    GPIO4
+//! RX    GPIO3
 //!
-//! Connect TX (GPIO2) and RX (GPIO4) pins.
+//! Connect TX (GPIO2) and RX (GPIO3) pins.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -36,7 +36,7 @@ impl Context {
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
         let tx = UartTx::new_async(peripherals.UART0, &clocks, io.pins.gpio2).unwrap();
-        let rx = UartRx::new_async(peripherals.UART1, &clocks, io.pins.gpio4).unwrap();
+        let rx = UartRx::new_async(peripherals.UART1, &clocks, io.pins.gpio3).unwrap();
 
         Context { tx, rx }
     }

@@ -37,6 +37,13 @@ cfg_if::cfg_if! {
 
 pub static mut CPU_CLOCK: u32 = LP_FAST_CLK_HZ;
 
+/// Wake up the HP core
+#[cfg(feature = "esp32c6")]
+pub fn wake_hp_core() {
+    let pmu = unsafe { esp32c6_lp::PMU::steal() };
+    pmu.hp_lp_cpu_comm().write(|w| w.lp_trigger_hp().set_bit());
+}
+
 #[cfg(feature = "esp32c6")]
 global_asm!(
     r#"
@@ -139,12 +146,9 @@ unsafe extern "C" fn ulp_riscv_rescue_from_monitor() {
 #[link_section = ".init.rust"]
 #[no_mangle]
 unsafe extern "C" fn ulp_riscv_halt() {
-    unsafe { &*pac::RTC_CNTL::PTR }.cocpu_ctrl().modify(|_, w| {
-        w.cocpu_shut_2_clk_dis()
-            .variant(0x3f)
-            .cocpu_done()
-            .set_bit()
-    });
+    unsafe { &*pac::RTC_CNTL::PTR }
+        .cocpu_ctrl()
+        .modify(|_, w| unsafe { w.cocpu_shut_2_clk_dis().bits(0x3f).cocpu_done().set_bit() });
 
     loop {
         riscv::asm::wfi();

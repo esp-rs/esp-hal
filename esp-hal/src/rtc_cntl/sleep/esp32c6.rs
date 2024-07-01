@@ -17,7 +17,14 @@ use crate::{
             RtcCalSel,
             SavedClockConfig,
         },
-        sleep::{Ext1WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers, WakeupLevel},
+        sleep::{
+            Ext1WakeupSource,
+            TimerWakeupSource,
+            WakeFromLpCoreWakeupSource,
+            WakeSource,
+            WakeTriggers,
+            WakeupLevel,
+        },
         Rtc,
         RtcClock,
     },
@@ -29,7 +36,7 @@ impl WakeSource for TimerWakeupSource {
 
         let lp_timer = unsafe { &*esp32c6::LP_TIMER::ptr() };
         let clock_freq = RtcClock::get_slow_freq();
-        // TODO: maybe add sleep time adjustlemnt like idf
+        // TODO: maybe add sleep time adjustment like idf
         // TODO: maybe add check to prevent overflow?
         let clock_hz = clock_freq.frequency().to_Hz() as u64;
         let ticks = self.duration.as_micros() as u64 * clock_hz / 1_000_000u64;
@@ -129,6 +136,12 @@ impl Drop for Ext1WakeupSource<'_, '_> {
         for (pin, _level) in pins.iter_mut() {
             pin.rtc_set_config(true, false, RtcFunction::Rtc);
         }
+    }
+}
+
+impl WakeSource for WakeFromLpCoreWakeupSource {
+    fn apply(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
+        triggers.set_lp_core(true);
     }
 }
 
@@ -715,21 +728,7 @@ impl Default for RtcSleepConfig {
 
         Self {
             deep: false,
-            pd_flags: {
-                let mut pd_flags = PowerDownFlags(0);
-
-                pd_flags.set_pd_lp_periph(true);
-                pd_flags.set_pd_cpu(true);
-                pd_flags.set_pd_xtal32k(true);
-                pd_flags.set_pd_rc32k(true);
-                pd_flags.set_pd_rc_fast(true);
-                pd_flags.set_pd_xtal(true);
-                pd_flags.set_pd_top(true);
-                pd_flags.set_pd_modem(true);
-                pd_flags.set_pd_vddsdio(true);
-
-                pd_flags
-            },
+            pd_flags: PowerDownFlags(0),
         }
     }
 }
@@ -854,6 +853,10 @@ impl RtcSleepConfig {
             self.pd_flags.set_pd_mem(true);
             self.pd_flags.set_pd_xtal(true);
             self.pd_flags.set_pd_hp_aon(true);
+            self.pd_flags.set_pd_lp_periph(true);
+            self.pd_flags.set_pd_xtal32k(true);
+            self.pd_flags.set_pd_rc32k(true);
+            self.pd_flags.set_pd_rc_fast(true);
         }
     }
 

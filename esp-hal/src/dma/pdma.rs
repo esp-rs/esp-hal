@@ -387,8 +387,6 @@ macro_rules! ImplSpiChannel {
                 pub fn configure<'a>(
                     self,
                     burst_mode: bool,
-                    tx_descriptors: &'a mut [DmaDescriptor],
-                    rx_descriptors: &'a mut [DmaDescriptor],
                     priority: DmaPriority,
                 ) -> Channel<'a, [<Spi $num DmaChannel>], $crate::Blocking> {
                     let mut tx_impl = [<Spi $num DmaChannelTxImpl>] {};
@@ -398,8 +396,8 @@ macro_rules! ImplSpiChannel {
                     rx_impl.init(burst_mode, priority);
 
                     Channel {
-                        tx: ChannelTx::new(tx_descriptors, tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_descriptors, rx_impl, burst_mode),
+                        tx: ChannelTx::new(tx_impl, burst_mode),
+                        rx: ChannelRx::new(rx_impl, burst_mode),
                         phantom: PhantomData,
                     }
                 }
@@ -412,8 +410,6 @@ macro_rules! ImplSpiChannel {
                 pub fn configure_for_async<'a>(
                     self,
                     burst_mode: bool,
-                    tx_descriptors: &'a mut [DmaDescriptor],
-                    rx_descriptors: &'a mut [DmaDescriptor],
                     priority: DmaPriority,
                 ) -> Channel<'a, [<Spi $num DmaChannel>], $crate::Async> {
                     let mut tx_impl = [<Spi $num DmaChannelTxImpl>] {};
@@ -425,8 +421,8 @@ macro_rules! ImplSpiChannel {
                     <[<Spi $num DmaChannel>] as ChannelTypes>::Binder::set_isr(super::asynch::interrupt::[< interrupt_handler_spi $num _dma >]);
 
                     Channel {
-                        tx: ChannelTx::new(tx_descriptors, tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_descriptors, rx_impl, burst_mode),
+                        tx: ChannelTx::new(tx_impl, burst_mode),
+                        rx: ChannelRx::new(rx_impl, burst_mode),
                         phantom: PhantomData,
                     }
                 }
@@ -781,8 +777,6 @@ macro_rules! ImplI2sChannel {
                 pub fn configure<'a>(
                     self,
                     burst_mode: bool,
-                    tx_descriptors: &'a mut [DmaDescriptor],
-                    rx_descriptors: &'a mut [DmaDescriptor],
                     priority: DmaPriority,
                 ) -> Channel<'a, [<I2s $num DmaChannel>], $crate::Blocking> {
                     let mut tx_impl = [<I2s $num DmaChannelTxImpl>] {};
@@ -792,8 +786,8 @@ macro_rules! ImplI2sChannel {
                     rx_impl.init(burst_mode, priority);
 
                     Channel {
-                        tx: ChannelTx::new(tx_descriptors, tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_descriptors, rx_impl, burst_mode),
+                        tx: ChannelTx::new(tx_impl, burst_mode),
+                        rx: ChannelRx::new(rx_impl, burst_mode),
                         phantom: PhantomData,
                     }
                 }
@@ -806,8 +800,6 @@ macro_rules! ImplI2sChannel {
                 pub fn configure_for_async<'a>(
                     self,
                     burst_mode: bool,
-                    tx_descriptors: &'a mut [DmaDescriptor],
-                    rx_descriptors: &'a mut [DmaDescriptor],
                     priority: DmaPriority,
                 ) -> Channel<'a, [<I2s $num DmaChannel>], $crate::Async> {
                     let mut tx_impl = [<I2s $num DmaChannelTxImpl>] {};
@@ -819,8 +811,8 @@ macro_rules! ImplI2sChannel {
                     <[<I2s $num DmaChannel>] as ChannelTypes>::Binder::set_isr(super::asynch::interrupt::[< interrupt_handler_i2s $num >]);
 
                     Channel {
-                        tx: ChannelTx::new(tx_descriptors, tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_descriptors, rx_impl, burst_mode),
+                        tx: ChannelTx::new(tx_impl, burst_mode),
+                        rx: ChannelRx::new(rx_impl, burst_mode),
                         phantom: PhantomData,
                     }
                 }
