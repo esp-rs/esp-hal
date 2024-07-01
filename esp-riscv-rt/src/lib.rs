@@ -309,6 +309,7 @@ _abs_start:
     blt a0, a1, 1b
     2:
 "#,
+    // Zero .rtc_fast.bss
 #[cfg(feature = "rtc-ram")]
     r#"
     la a0, _rtc_fast_bss_start
@@ -321,22 +322,27 @@ _abs_start:
     blt a0, a1, 1b
     2:
 "#,
-    // Zero .rtc_fast.persistent iff the chip just powered on
+    // Zero .rtc_fast.persistent if it might not have been already
 #[cfg(feature = "rtc-ram")]
     r#"
-    mv a0, zero
+    mv a0, zero // core 0
     call rtc_get_reset_reason
-    addi a1, zero, 1
-    bne a0, a1, 2f
+    addi a1, zero, 3
+    bltu a0, a1, 1f // Init if reset reason < 3
+    addi a1, zero, 14
+    bltu a0, a1, 3f // Skip init if reset reason < 15
+    addi a1, zero, 17
+    beq a0, a1, 3f // Skip init if reset reason == 17
+    1:
     la a0, _rtc_fast_persistent_start
     la a1, _rtc_fast_persistent_end
-    bge a0, a1, 2f
+    bge a0, a1, 3f
     mv a3, x0
-    1:
+    2:
     sw a3, 0(a0)
     addi a0, a0, 4
-    blt a0, a1, 1b
-    2:
+    blt a0, a1, 2b
+    3:
 "#,
     r#"
     li  x1, 0

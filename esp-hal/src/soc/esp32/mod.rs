@@ -85,10 +85,10 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
         addr_of_mut!(_rtc_slow_bss_start),
         addr_of_mut!(_rtc_slow_bss_end),
     );
-    if matches!(
-        crate::reset::get_reset_reason(),
-        None | Some(SocResetReason::ChipPowerOn)
-    ) {
+
+    // Initialize .persistent RTC RAM if it might not have been already
+    let reason = crate::rom::rtc_get_reset_reason(0);
+    if !((reason > 2 && reason < 15) || reason == 17) {
         xtensa_lx_rt::zero_bss(
             addr_of_mut!(_rtc_fast_persistent_start),
             addr_of_mut!(_rtc_fast_persistent_end),

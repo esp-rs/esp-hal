@@ -26,13 +26,7 @@
 //!    async task.
 //!  - [ram](attr.ram.html) - Attribute macro for placing statics and functions
 //!    into specific memory sections, such as SRAM or RTC RAM (slow or fast)
-//!    with different initialization options. Supported options are:
-//!      - `rtc_fast` - Use RTC fast RAM
-//!      - `rtc_slow` - Use RTC slow RAM (not all targets support slow RTC RAM)
-//!      - `persistent` - Initialize the memory to zero only after the initial
-//!        boot. Otherwise, persist the previous value to allow communication
-//!        across `software_reset()`, `software_reset_cpu()`, deep sleep, etc.
-//!      - `zeroed` - Initialize the memory to zero
+//!    with different initialization options. See its documentation for details.
 //!
 //! ## Examples
 //!
@@ -46,21 +40,6 @@
 //! async fn main(spawner: Spawner) {
 //!     // Your application's entry point
 //! }
-//! ```
-//!
-//! #### `ram` macro
-//!
-//! Requires the `ram` feature to be enabled.
-//!
-//! ```rust, no_run
-//! #[ram(rtc_fast)]
-//! static mut SOME_INITED_DATA: [u8; 2] = [0xaa, 0xbb];
-//!
-//! #[ram(rtc_fast, persistent)]
-//! static mut SOME_PERSISTENT_DATA: [u8; 2] = [0; 2];
-//!
-//! #[ram(rtc_fast, zeroed)]
-//! static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
 //! ```
 //!
 //! ## Feature Flags
@@ -96,8 +75,58 @@ struct RamArgs {
 
 /// This attribute allows placing statics and functions into ram.
 ///
-/// See the crate root documentation for a list of supported options and
-/// examples.
+/// Supported options:
+/// - `rtc_fast` - Use RTC fast RAM
+/// - `rtc_slow` - Use RTC slow RAM (not all targets support slow RTC RAM)
+/// - `persistent` - Skip initializing the memory to zero after some kinds of
+///   resets. See the table below for the full list.
+/// - `zeroed` - Initialize the memory to zero
+///
+/// Requires the `ram` feature to be enabled.
+///
+/// # Examples
+///
+/// ```rust, no_run
+/// #[ram(rtc_fast)]
+/// static mut SOME_INITED_DATA: [u8; 2] = [0xaa, 0xbb];
+///
+/// #[ram(rtc_fast, persistent)]
+/// static mut SOME_PERSISTENT_DATA: [u8; 2] = [0; 2];
+///
+/// #[ram(rtc_fast, zeroed)]
+/// static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
+/// ```
+///
+/// See the `ram` example in the esp-hal repository for a full usage example.
+///
+/// # Persistent resets
+///
+/// |    | ESP32           | ESP32-C2        | ESP32-C3        | ESP32-C6        | ESP32-H2        | ESP32-S2        | ESP32-S3        | Persists |
+/// | -: | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | -------- |
+/// |  1 | `ChipPowerOn`   | `ChipPowerOn`   | `ChipPowerOn`   | `ChipPowerOn`   | `ChipPowerOn`   | `ChipPowerOn`   | `ChipPowerOn`   |          |
+/// |  2 |                 |                 |                 |                 |                 |                 |                 |          |
+/// |  3 | `CoreSw`        | `CoreSw`        | `CoreSw`        | `CoreSw`        | `CoreSw`        | `CoreSw`        | `CoreSw`        | yes      |
+/// |  4 |                 |                 |                 |                 |                 |                 |                 | yes      |
+/// |  5 | `CoreDeepSleep` | `CoreDeepSleep` | `CoreDeepSleep` | `CoreDeepSleep` | `CoreDeepSleep` | `CoreDeepSleep` | `CoreDeepSleep` | yes      |
+/// |  6 | `CoreSdio`      |                 |                 | `CoreSDIO`      |                 |                 |                 | yes      |
+/// |  7 | `CoreMwdt0`     | `CoreMwdt0`     | `CoreMwdt0`     | `CoreMwdt0`     | `CoreMwdt0`     | `CoreMwdt0`     | `CoreMwdt0`     | yes      |
+/// |  8 | `CoreMwdt1`     |                 | `CoreMwdt1`     | `CoreMwdt1`     | `CoreMwdt1`     | `CoreMwdt1`     | `CoreMwdt1`     | yes      |
+/// |  9 | `CoreRtcWdt`    | `CoreRtcWdt`    | `CoreRtcWdt`    | `CoreRtcWdt`    | `CoreRtcWdt`    | `CoreRtcWdt`    | `CoreRtcWdt`    | yes      |
+/// | 10 |                 |                 |                 |                 |                 |                 |                 | yes      |
+/// | 11 | `CpuMwdt0`      | `Cpu0Mwdt0`     | `Cpu0Mwdt0`     | `Cpu0Mwdt0`     | `Cpu0Mwdt0`     | `Cpu0Mwdt0`     | `CpuMwdt0`      | yes      |
+/// | 12 | `Cpu0Sw`        | `Cpu0Sw`        | `Cpu0Sw`        | `Cpu0Sw`        | `Cpu0Sw`        | `Cpu0Sw`        | `CpuSw`         | yes      |
+/// | 13 | `Cpu0RtcWdt`    | `Cpu0RtcWdt`    | `Cpu0RtcWdt`    | `Cpu0RtcWdt`    | `Cpu0RtcWdt`    | `Cpu0RtcWdt`    | `CpuRtcWdt`     | yes      |
+/// | 14 | `Cpu1Cpu0`      |                 |                 |                 |                 |                 |                 | yes      |
+/// | 15 | `SysBrownOut`   | `SysBrownOut`   | `SysBrownOut`   | `SysBrownOut`   | `SysBrownOut`   | `SysBrownOut`   | `SysBrownOut`   |          |
+/// | 16 | `SysRtcWdt`     | `SysRtcWdt`     | `SysRtcWdt`     | `SysRtcWdt`     | `SysRtcWdt`     | `SysRtcWdt`     | `SysRtcWdt`     |          |
+/// | 17 |                 |                 | `Cpu0Mwdt1`     | `Cpu0Mwdt1`     | `Cpu0Mwdt1`     | `Cpu0Mwdt1`     | `CpuMwdt1`      | yes      |
+/// | 18 |                 | `SysSuperWdt`   | `SysSuperWdt`   | `SysSuperWdt`   | `SysSuperWdt`   | `SysSuperWdt`   | `SysSuperWdt`   |          |
+/// | 19 |                 | `SysClkGlitch`  | `SysClkGlitch`  |                 | `SysClkGlitch`  | `SysClkGlitch`  | `SysClkGlitch`  |          |
+/// | 20 |                 | `CoreEfuseCrc`  | `CoreEfuseCrc`  | `CoreEfuseCrc`  | `CoreEfuseCrc`  | `CoreEfuseCrc`  | `CoreEfuseCrc`  |          |
+/// | 21 |                 |                 | `CoreUsbUart`   | `CoreUsbUart`   | `CoreUsbUart`   | `CoreEfuseCrc`  | `CoreUsbUart`   |          |
+/// | 22 |                 |                 | `CoreUsbJtag`   | `CoreUsbJtag`   | `CoreUsbJtag`   |                 | `CoreUsbJtag`   |          |
+/// | 23 |                 |                 | `CorePwrGlitch` |                 | `CorePwrGlitch` |                 | `CorePwrGlitch` |          |
+/// | 24 |                 | `Cpu0Jtag`      |                 | `Cpu0JtagCpu`   |                 |                 |                 |          |
 #[cfg(feature = "ram")]
 #[proc_macro_attribute]
 #[proc_macro_error::proc_macro_error]
