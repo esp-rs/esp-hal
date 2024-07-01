@@ -151,7 +151,8 @@ impl rand_core::RngCore for Rng {
 /// let mut rng = trng.downgrade();
 ///
 /// // ADC is available now
-/// let analog_pin = io.pins.gpio3;
+#[cfg_attr(esp32, doc = "let analog_pin = io.pins.gpio32;")]
+#[cfg_attr(not(esp32), doc = "let analog_pin = io.pins.gpio3;")]
 /// let mut adc1_config = AdcConfig::new();
 /// let mut adc1_pin = adc1_config.enable_pin(analog_pin,
 /// Attenuation::Attenuation11dB); let mut adc1 =
