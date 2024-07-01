@@ -71,7 +71,9 @@ async fn main(spawner: Spawner) -> ! {
     #[cfg(target_arch = "xtensa")]
     let timer = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
     #[cfg(target_arch = "riscv32")]
-    let timer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
+    let timer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER)
+        .split()
+        .alarm0;
     let init = initialize(
         EspWifiInitFor::Wifi,
         timer,

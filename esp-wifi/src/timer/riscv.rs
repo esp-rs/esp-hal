@@ -18,8 +18,8 @@ use crate::{
 };
 
 /// The timer responsible for time slicing.
-pub type TimeBase = Alarm<Target, esp_hal::Blocking, 0>;
-static ALARM0: Mutex<RefCell<Option<Alarm<Periodic, esp_hal::Blocking, 0>>>> =
+pub type TimeBase = Alarm<'static, Target, esp_hal::Blocking, 0, 0>;
+static ALARM0: Mutex<RefCell<Option<Alarm<'static, Periodic, esp_hal::Blocking, 0, 0>>>> =
     Mutex::new(RefCell::new(None));
 const TIMESLICE_FREQUENCY: fugit::HertzU32 = fugit::HertzU32::from_raw(crate::CONFIG.tick_rate_hz);
 
