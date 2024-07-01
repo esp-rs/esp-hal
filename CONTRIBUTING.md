@@ -1,70 +1,91 @@
-# Welcome to the `esp-hal` contributing guide
 
-Thank you for investing your time in contributing to our project!
+# Welcome to the `esp-hal` Contributing Guide
 
-In this guide you will get an overview of the contribution workflow from opening an issue, creating a PR, reviewing, and merging the PR.
+Thank you for considering contributing to our project! Your efforts help make `esp-hal` a better ecosystem for everyone.
 
-Use the table of contents icon (<img src="resources/table-of-contents.png" width="24" height="24" />) in the top right corner of this document to get to a specific section of this guide quickly.
+This guide outlines the contribution workflow, from reporting issues and submitting pull requests, to the review process and eventual merger of contributions.
 
-## New Contributor Guide
+# Quick Navigation
 
-To get an overview of the project, please read the [README]. Here are some resources to help you get started with open source contributions:
+*   [New Contributor Guide]
+*   [Getting Started]
+    *   [Issues: Reporting and Resolving]
+    *   [Making Changes: Fork, Edit, and Pull Request]
+    *   [Testing Your Contributions]
+    *   [Commit Your Updates]
+*   [Pull Request: From Submission to Merge]
+*   [Your PR is merged!]
 
-- [Finding ways to contribute to open source on GitHub]
-- [Set up Git]
-- [GitHub flow]
-- [Collaborating with pull requests]
+[New Contributor Guide]: #new-contributor-guide
+[Getting Started]: #getting-started
+[Issues: Reporting and Resolving]: #issues-reporting-and-resolving
+[Making Changes: Fork, Edit, and Pull Request]: #making-changes-fork-edit-and-pull-request
+[Testing Your Contributions]: #testing-your-contributions
+[Commit your updates]: #commit-your-updates
+[Pull Request: From Submission to Merge]: #pull-request-from-submission-to-merge
+[Your PR is merged!]: #your-pr-is-merged
 
-[README]: README.md
-[Finding ways to contribute to open source on GitHub]: https://docs.github.com/en/get-started/exploring-projects-on-github/finding-ways-to-contribute-to-open-source-on-github
-[Set up Git]: https://docs.github.com/en/get-started/quickstart/set-up-git
-[GitHub flow]: https://docs.github.com/en/get-started/quickstart/github-flow
-[Collaborating with pull requests]: https://docs.github.com/en/github/collaborating-with-pull-requests
+# New Contributor Guide
 
-## Getting Started
+Welcome aboard! If you're new to `esp-hal` or open-source contribution, here are some resources to get you started:
+
+*   [Understanding the Project]: A high-level overview of `esp-hal`.
+*   Intro to Open Source Contribution: [GitHub's Guide]
+*   [Setting Up Git]
+*   Workflow Insights: [GitHub Flow]
+*   Collaborating via [Pull Requests]
+
+[Understanding the Project]: README.md
+[GitHub's Guide]: https://docs.github.com/en/get-started/exploring-projects-on-github/finding-ways-to-contribute-to-open-source-on-github
+[Setting Up Git]: https://docs.github.com/en/get-started/quickstart/set-up-git
+[GitHub Flow]: https://docs.github.com/en/get-started/quickstart/github-flow
+[Pull Requests]: https://docs.github.com/en/github/collaborating-with-pull-requests
 
 Before adding or changing code you might want to review the [esp-rs API guidelines](./API-GUIDELINES.md)
 
+# Getting Started
+
 ### Issues
 
-#### Create a New Issue
+### Issues: Reporting and Resolving
 
-If you spot a problem with the docs, [search if an issue already exists]. If a related issue doesn't exist, you can open a new issue using the [issue form].
+#### Reporting a New Issue
 
-[search if an issue already exists]: https://docs.github.com/en/github/searching-for-information-on-github/searching-on-github/searching-issues-and-pull-requests#search-by-the-title-body-or-comments
+Encountered a problem or have an idea? First, [check existing issues] to avoid duplicates. If your concern is new, use our [issue form] to submit it.
+
+[check existing issues]: https://github.com/esp-rs/esp-hal/issues
 [issue form]: https://github.com/esp-rs/esp-hal/issues/new/
 
-#### Solve an Issue
+#### Working on an Issue
 
-Scan through our [existing issues] to find one that interests you. You can narrow down the search using labels as filters. If you find an issue to work on, you are welcome to open a PR with a fix.
-
-It's recommended that you comment in the relevant issue, mentioning that you are actively working on it, however this is not a requirement.
-
-If somebody is already assigned to an issue, this does not necessarily mean they are actively working on it; don't be afraid to comment in these issues asking if you can take over the work if you're interested.
+Browse [existing issues] to find one that resonates with you. Use labels for easier filtering. If you decide to tackle an issue, it's courteous (but not mandatory) to let others know by commenting.
 
 [existing issues]: https://github.com/esp-rs/esp-hal/issues
 
-### Make Changes
+### Making Changes: Fork, Edit, and Pull Request
 
-1. Fork the repository.
-   - Using GitHub Desktop:
-     - [Getting started with GitHub Desktop] will guide you through setting up Desktop.
-     - Once Desktop is set up, you can use it to [fork the repo!]
-   - Using the command line:
-     - [Fork the repo] so that you can make your changes without affecting the original project until you're ready to merge them.
-2. Install or update to the latest version of Rust. See [rustup.rs] for more information.
-3. Create a working branch and start with your changes!
+1.  **Fork**: Start by [forking the repository]. This keeps the main project safe while you make your changes.
+2.  **Setup**: Ensure you have the latest Rust toolchain via [rustup.rs].
+3.  **Branch**: Create a branch in your fork for your changes. Keep your changes focused and limited to a single issue or feature.
 
-[Getting started with GitHub Desktop]: https://docs.github.com/en/desktop/installing-and-configuring-github-desktop/getting-started-with-github-desktop
-[fork the repo!]: https://docs.github.com/en/desktop/contributing-and-collaborating-using-github-desktop/cloning-and-forking-repositories-from-github-desktop
-[Fork the repo]: https://docs.github.com/en/github/getting-started-with-github/fork-a-repo#fork-an-example-repository
+[forking the repository]: https://docs.github.com/en/github/getting-started-with-github/fork-a-repo
 [rustup.rs]: https://rustup.rs/
 
-### Commit Your Update
+### Testing Your Contributions
 
-Commit the changes once you are happy with them. Don't forget to self-review to speed up the review process.
+Ensuring the quality and reliability of `esp-hal` is a shared responsibility, and testing plays a critical role in this process. Our GitHub CI automatically checks the buildability of all examples and drivers within the project. However, automated tests can't catch everything, especially when it comes to the nuanced behavior of hardware interactions.
 
-We ask that you ensure all source code files has been properly formatted with `rustfmt`, and that you have linted your changes by running `cargo clippy`. These tools can be installed by running the following commands:
+#### What You Should Do:
+
+*   **API changes**: If your contribution changes the API, please take care to adapt the driver and examples to these changes.
+*   **Run Related Examples**: After making changes, please run any examples that are affected by your contributions. This helps verify that not only do they build successfully, but they also perform as expected.
+*   **Manual Testing**: For hardware-related changes, manually test your changes on the actual devices when possible. If not - please write about it in the corresponding issue, someone from our team will definitely take the time to do it! This is crucial because hardware behavior can sometimes differ from what's simulated or expected.
+
+By taking these extra steps to test your contributions, you help maintain the high quality and reliability of `esp-hal`, ensuring it remains a robust platform for everyone
+
+### Commit Your Updates
+
+Commit your changes once you're satisfied. Review your own work to streamline the review process later. Use `rustfmt` and `cargo clippy` to ensure your code adheres to Rust's conventions. 
 
 ```shell
 rustup component add rustfmt
@@ -80,23 +101,26 @@ cargo xtask fmt-workspace
 
 This will use `rustfmt` to ensure that all source code is formatted correctly prior to committing.
 
-### Pull Request
+## Pull Request: From Submission to Merge
 
-When you're finished with the changes, create a pull request, also known as a PR.
+*   Fill the pull request template so that we can review your PR. This template helps reviewers understand your changes as well as the purpose of your pull request.
+*   [Link your PR] to any relevant issues it addresses.
+*   [Allow edits from maintainers] so the branch can be updated for a merge. Once you submit your PR, a Docs team member will review your proposal. We may ask questions or request additional information.
+*   Make sure you add an entry with your changes to the [Changelog]. Also make sure that it is in the appropriate section of the document.
+*   We may ask for changes to be made before a PR can be merged, either using [suggested changes] or pull request comments. You can apply suggested changes directly through the UI. You can make any other changes in your fork, then commit them to your branch.
+*   As you update your PR and apply changes, mark each conversation as [resolved].
+*   Resolve merge conflicts if they arise, using resources like [this git tutorial] for help.
 
-- Fill the pull request template so that we can review your PR. This template helps reviewers understand your changes as well as the purpose of your pull request.
-- Don't forget to [link PR to issue] if you are solving one.
-- Enable the checkbox to [allow maintainer edits] so the branch can be updated for a merge. Once you submit your PR, a Docs team member will review your proposal. We may ask questions or request additional information.
-- We may ask for changes to be made before a PR can be merged, either using [suggested changes] or pull request comments. You can apply suggested changes directly through the UI. You can make any other changes in your fork, then commit them to your branch.
-- As you update your PR and apply changes, mark each conversation as [resolved].
-- If you run into any merge issues, checkout this [git tutorial] to help you resolve merge conflicts and other issues.
+[Link your PR]: https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue
+[Allow edits from maintainers]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/allowing-changes-to-a-pull-request-branch-created-from-a-forkmember
+[change log]: esp-hal/CHANGELOG.md
+[suggested changes]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/incorporating-feedback-in-your-pull-request
+[resolved]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/commenting-on-a-pull-request#resolving-conversations
+[this git tutorial]: https://github.com/skills/resolve-merge-conflicts
 
-[link PR to issue]: https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue
-[allow maintainer edits]: https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/allowing-changes-to-a-pull-request-branch-created-from-a-fork
-[suggested changes]: https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/incorporating-feedback-in-your-pull-request
-[resolved]: https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/commenting-on-a-pull-request#resolving-conversations
-[git tutorial]: https://github.com/skills/resolve-merge-conflicts
 
-### Your PR is Merged!
+## Your PR is Merged!
 
-Congratulations! The esp-rs team thanks you for your contributions!
+Congratulations! The `esp-rs` team thanks you for your contributions!
+
+Contributing to open source extends beyond just code! Each contribution, regardless of size, plays a significant role. We appreciate your involvement in this collective endeavor.
