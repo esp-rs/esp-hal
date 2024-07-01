@@ -31,26 +31,21 @@ const MODEM_LPCON_I2C_CLK_CONF_REG: u32 = DR_REG_MODEM_LPCON_BASE + 0x8;
 const MODEM_LPCON_CLK_I2C_SEL_96M: u32 = 1 << 0;
 
 const DR_REG_MODEM_LPCON_BASE: u32 = 0x600AD000;
-const MODEM_LPCON_CLK_CONF_REG: u32 = DR_REG_MODEM_LPCON_BASE + 0x8;
-const MODEM_LPCON_CLK_I2C_MST_EN: u32 = 1 << 2;
-
-const DR_REG_I2C_ANA_MST_BASE: u32 = 0x600AD800;
-const I2C_MST_DATE_REG: u32 = DR_REG_I2C_ANA_MST_BASE + 0x34;
-const I2C_MST_ANA_CONF2_REG: u32 = DR_REG_I2C_ANA_MST_BASE + 0x20;
-const I2C_MST_ANA_CONF2: u32 = 0x00FFFFFF;
-const I2C_MST_CLK_EN: u32 = 1 << 28;
 
 const REGI2C_BBPLL: u8 = 0x66;
 const REGI2C_BIAS: u8 = 0x6a;
-const REGI2C_PMU_REG: u8 = 0x6d;
+const REGI2C_PMU: u8 = 0x6d;
 const REGI2C_ULP_CAL: u8 = 0x61;
 const REGI2C_SAR_I2C: u8 = 0x69;
 
-const REGI2C_BBPLL_DEVICE_EN: u32 = 1 << 9; // (1 << 5) << 4;
-const REGI2C_BIAS_DEVICE_EN: u32 = 1 << 8; // (1 << 4) << 4;
-const REGI2C_PMU_DEVICE_EN: u32 = 1 << 12; // (1 << 8) << 4;
-const REGI2C_ULP_CAL_DEVICE_EN: u32 = 1 << 10; // (1 << 6) << 4;
-const REGI2C_SAR_I2C_DEVICE_EN: u32 = 1 << 11; // (1 << 7) << 4;
+const I2C_MST_ANA_CONF1_M: u32 = 0x00FFFFFF;
+const I2C_MST_ANA_CONF1_REG: u32 = I2C_MST_I2C0_CTRL_REG + 0x1c;
+
+const REGI2C_BBPLL_RD_MASK: u32 = !(1 << 7) & I2C_MST_ANA_CONF1_M;
+const REGI2C_BIAS_RD_MASK: u32 = !(1 << 6) & I2C_MST_ANA_CONF1_M;
+const REGI2C_DIG_REG_RD_MASK: u32 = !(1 << 10) & I2C_MST_ANA_CONF1_M;
+const REGI2C_ULP_CAL_RD_MASK: u32 = !(1 << 8) & I2C_MST_ANA_CONF1_M;
+const REGI2C_SAR_I2C_RD_MASK: u32 = !(1 << 9) & I2C_MST_ANA_CONF1_M;
 
 const REGI2C_RTC_SLAVE_ID_V: u8 = 0xFF;
 const REGI2C_RTC_SLAVE_ID_S: u8 = 0;
@@ -61,7 +56,7 @@ const REGI2C_RTC_WR_CNTL_S: u8 = 24;
 const REGI2C_RTC_DATA_V: u8 = 0xFF;
 const REGI2C_RTC_DATA_S: u8 = 16;
 
-const I2C_MST_I2C0_CTRL_REG: u32 = DR_REG_I2C_ANA_MST_BASE;
+const I2C_MST_I2C0_CTRL_REG: u32 = 0x600AD800;
 const REGI2C_RTC_BUSY: u32 = 1 << 25;
 
 pub(crate) fn esp32h2_rtc_bbpll_configure(_xtal_freq: XtalClock, _pll_freq: PllClock) {
@@ -239,33 +234,28 @@ fn clk_ll_bus_update() {
 }
 
 fn regi2c_enable_block(block: u8) {
-    reg_set_bit(MODEM_LPCON_CLK_CONF_REG, MODEM_LPCON_CLK_I2C_MST_EN);
-    reg_set_bit(I2C_MST_DATE_REG, I2C_MST_CLK_EN);
+    let modem_lpcon = unsafe { &*crate::peripherals::MODEM_LPCON::ptr() };
 
-    // Make I2C_MST_ANA_CONF2 in I2C_MST_ANA_CONF2_REG be 0
-    unsafe {
-        (I2C_MST_ANA_CONF2_REG as *mut u32).write_volatile(
-            // (1 << 18)
-            (I2C_MST_ANA_CONF2_REG as *mut u32).read_volatile() & !I2C_MST_ANA_CONF2,
-        );
-    }
+    modem_lpcon
+        .clk_conf()
+        .modify(|_, w| w.clk_i2c_mst_en().set_bit());
 
     // Before config I2C register, enable corresponding slave.
     match block {
-        REGI2C_BBPLL => {
-            reg_set_bit(I2C_MST_ANA_CONF2_REG, REGI2C_BBPLL_DEVICE_EN);
+        v if v == REGI2C_BBPLL => {
+            reg_set_bit(I2C_MST_ANA_CONF1_REG, REGI2C_BBPLL_RD_MASK);
         }
-        REGI2C_BIAS => {
-            reg_set_bit(I2C_MST_ANA_CONF2_REG, REGI2C_BIAS_DEVICE_EN);
+        v if v == REGI2C_BIAS => {
+            reg_set_bit(I2C_MST_ANA_CONF1_REG, REGI2C_BIAS_RD_MASK);
         }
-        REGI2C_PMU_REG => {
-            reg_set_bit(I2C_MST_ANA_CONF2_REG, REGI2C_PMU_DEVICE_EN);
+        v if v == REGI2C_PMU => {
+            reg_set_bit(I2C_MST_ANA_CONF1_REG, REGI2C_DIG_REG_RD_MASK);
         }
-        REGI2C_ULP_CAL => {
-            reg_set_bit(I2C_MST_ANA_CONF2_REG, REGI2C_ULP_CAL_DEVICE_EN);
+        v if v == REGI2C_ULP_CAL => {
+            reg_set_bit(I2C_MST_ANA_CONF1_REG, REGI2C_ULP_CAL_RD_MASK);
         }
-        REGI2C_SAR_I2C => {
-            reg_set_bit(I2C_MST_ANA_CONF2_REG, REGI2C_SAR_I2C_DEVICE_EN);
+        v if v == REGI2C_SAR_I2C => {
+            reg_set_bit(I2C_MST_ANA_CONF1_REG, REGI2C_SAR_I2C_RD_MASK);
         }
         _ => (),
     }
@@ -273,20 +263,20 @@ fn regi2c_enable_block(block: u8) {
 
 fn regi2c_disable_block(block: u8) {
     match block {
-        REGI2C_BBPLL => {
-            reg_clr_bit(I2C_MST_ANA_CONF2_REG, REGI2C_BBPLL_DEVICE_EN);
+        v if v == REGI2C_BBPLL => {
+            reg_clr_bit(I2C_MST_ANA_CONF1_REG, REGI2C_BBPLL_RD_MASK);
         }
-        REGI2C_BIAS => {
-            reg_clr_bit(I2C_MST_ANA_CONF2_REG, REGI2C_BIAS_DEVICE_EN);
+        v if v == REGI2C_BIAS => {
+            reg_clr_bit(I2C_MST_ANA_CONF1_REG, REGI2C_BIAS_RD_MASK);
         }
-        REGI2C_PMU_REG => {
-            reg_clr_bit(I2C_MST_ANA_CONF2_REG, REGI2C_PMU_DEVICE_EN);
+        v if v == REGI2C_PMU => {
+            reg_clr_bit(I2C_MST_ANA_CONF1_REG, REGI2C_DIG_REG_RD_MASK);
         }
-        REGI2C_ULP_CAL => {
-            reg_clr_bit(I2C_MST_ANA_CONF2_REG, REGI2C_ULP_CAL_DEVICE_EN);
+        v if v == REGI2C_ULP_CAL => {
+            reg_clr_bit(I2C_MST_ANA_CONF1_REG, REGI2C_ULP_CAL_RD_MASK);
         }
-        REGI2C_SAR_I2C => {
-            reg_clr_bit(I2C_MST_ANA_CONF2_REG, REGI2C_SAR_I2C_DEVICE_EN);
+        v if v == REGI2C_SAR_I2C => {
+            reg_clr_bit(I2C_MST_ANA_CONF1_REG, REGI2C_SAR_I2C_RD_MASK);
         }
         _ => (),
     }
@@ -323,6 +313,8 @@ pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, l
     regi2c_enable_block(block);
 
     // Read the i2c bus register
+    while reg_get_bit(I2C_MST_I2C0_CTRL_REG, REGI2C_RTC_BUSY) != 0 {}
+
     let mut temp: u32 = ((block as u32 & REGI2C_RTC_SLAVE_ID_V as u32)
         << REGI2C_RTC_SLAVE_ID_S as u32)
         | (reg_add as u32 & REGI2C_RTC_ADDR_V as u32) << REGI2C_RTC_ADDR_S as u32;
