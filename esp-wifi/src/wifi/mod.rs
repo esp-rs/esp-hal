@@ -1845,12 +1845,12 @@ impl<'d> WifiController<'d> {
 
         if mode == wifi_mode_t_WIFI_MODE_STA || mode == wifi_mode_t_WIFI_MODE_APSTA {
             esp_wifi_result!(unsafe {
-                esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_STA, protocol as u8)
+                esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_STA, protocol)
             })?;
         }
         if mode == wifi_mode_t_WIFI_MODE_AP || mode == wifi_mode_t_WIFI_MODE_APSTA {
             esp_wifi_result!(unsafe {
-                esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_AP, protocol as u8)
+                esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_AP, protocol)
             })?;
         }
 

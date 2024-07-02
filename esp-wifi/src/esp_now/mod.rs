@@ -312,10 +312,10 @@ impl<'d> EspNowManager<'d> {
         check_error!({ esp_wifi_get_mode(&mut mode) })?;
 
         if mode == wifi_mode_t_WIFI_MODE_STA || mode == wifi_mode_t_WIFI_MODE_APSTA {
-            check_error!({ esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_STA, protocol as u8) })?;
+            check_error!({ esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_STA, protocol) })?;
         }
         if mode == wifi_mode_t_WIFI_MODE_AP || mode == wifi_mode_t_WIFI_MODE_APSTA {
-            check_error!({ esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_AP, protocol as u8) })?;
+            check_error!({ esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_AP, protocol) })?;
         }
 
         Ok(())
