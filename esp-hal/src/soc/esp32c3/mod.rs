@@ -16,6 +16,7 @@ pub mod efuse;
 pub mod gpio;
 pub mod peripherals;
 pub mod radio_clocks;
+pub mod trng;
 
 /// The name of the chip ("esp32c3") as `&str`
 #[macro_export]
