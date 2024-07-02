@@ -12,12 +12,14 @@
 use core::{cell::RefCell, fmt::Debug, marker::PhantomData};
 
 use critical_section::Mutex;
+use enumset::EnumSet;
 use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
 use crate::{
     binary::include::*,
     compat::queue::SimpleQueue,
     hal::peripheral::{Peripheral, PeripheralRef},
+    wifi::Protocol,
     EspWifiInitialization,
 };
 
@@ -274,6 +276,51 @@ pub struct EspNowManager<'d> {
 }
 
 impl<'d> EspNowManager<'d> {
+    /// Set the wifi protocol.
+    ///
+    /// This will set the wifi protocol to the desired protocol
+    ///
+    /// # Arguments:
+    ///
+    /// * `protocols` - The desired protocols
+    pub fn set_protocol(&self, protocols: EnumSet<Protocol>) -> Result<(), EspNowError> {
+        let mut protocol = 0u8;
+
+        protocols.into_iter().for_each(|v| match v {
+            Protocol::P802D11B => protocol |= WIFI_PROTOCOL_11B as u8,
+            Protocol::P802D11BG => protocol |= WIFI_PROTOCOL_11B as u8 | WIFI_PROTOCOL_11G as u8,
+            Protocol::P802D11BGN => {
+                protocol |=
+                    WIFI_PROTOCOL_11B as u8 | WIFI_PROTOCOL_11G as u8 | WIFI_PROTOCOL_11N as u8
+            }
+            Protocol::P802D11BGNLR => {
+                protocol |= WIFI_PROTOCOL_11B as u8
+                    | WIFI_PROTOCOL_11G as u8
+                    | WIFI_PROTOCOL_11N as u8
+                    | WIFI_PROTOCOL_LR as u8
+            }
+            Protocol::P802D11LR => protocol |= WIFI_PROTOCOL_LR as u8,
+            Protocol::P802D11BGNAX => {
+                protocol |= WIFI_PROTOCOL_11B as u8
+                    | WIFI_PROTOCOL_11G as u8
+                    | WIFI_PROTOCOL_11N as u8
+                    | WIFI_PROTOCOL_11AX as u8
+            }
+        });
+
+        let mut mode = wifi_mode_t_WIFI_MODE_NULL;
+        check_error!({ esp_wifi_get_mode(&mut mode) })?;
+
+        if mode == wifi_mode_t_WIFI_MODE_STA || mode == wifi_mode_t_WIFI_MODE_APSTA {
+            check_error!({ esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_STA, protocol as u8) })?;
+        }
+        if mode == wifi_mode_t_WIFI_MODE_AP || mode == wifi_mode_t_WIFI_MODE_APSTA {
+            check_error!({ esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_AP, protocol as u8) })?;
+        }
+
+        Ok(())
+    }
+
     /// Set primary WiFi channel
     /// Should only be used when using ESP-NOW without AP or STA
     pub fn set_channel(&self, channel: u8) -> Result<(), EspNowError> {
@@ -632,6 +679,17 @@ impl<'d> EspNow<'d> {
 
     pub fn split(self) -> (EspNowManager<'d>, EspNowSender<'d>, EspNowReceiver<'d>) {
         (self.manager, self.sender, self.receiver)
+    }
+
+    /// Set the wifi protocol.
+    ///
+    /// This will set the wifi protocol to the desired protocol
+    ///
+    /// # Arguments:
+    ///
+    /// * `protocols` - The desired protocols
+    pub fn set_protocol(&self, protocols: EnumSet<Protocol>) -> Result<(), EspNowError> {
+        self.manager.set_protocol(protocols)
     }
 
     /// Set primary WiFi channel

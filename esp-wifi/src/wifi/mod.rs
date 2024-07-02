@@ -14,6 +14,13 @@ use core::{
 
 use critical_section::{CriticalSection, Mutex};
 use enumset::{EnumSet, EnumSetType};
+use esp_wifi_sys::include::{
+    WIFI_PROTOCOL_11AX,
+    WIFI_PROTOCOL_11B,
+    WIFI_PROTOCOL_11G,
+    WIFI_PROTOCOL_11N,
+    WIFI_PROTOCOL_LR,
+};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 #[doc(hidden)]
@@ -130,6 +137,7 @@ pub enum Protocol {
     P802D11BGN,
     P802D11BGNLR,
     P802D11LR,
+    P802D11BGNAX,
 }
 
 #[derive(EnumSetType, Debug, PartialOrd)]
@@ -1793,26 +1801,59 @@ impl<'d> WifiController<'d> {
         Ok(this)
     }
 
-    /// Set the wifi mode.
+    /// Set the wifi protocol.
     ///
     /// This will set the wifi protocol to the desired protocol, the default for
     /// this is: `WIFI_PROTOCOL_11B|WIFI_PROTOCOL_11G|WIFI_PROTOCOL_11N`
     ///
     /// # Arguments:
     ///
-    /// * `protocol` - The desired protocol
+    /// * `protocols` - The desired protocols
     ///
     /// # Example:
     ///
     /// ```
-    /// use esp_wifi::wifi::{Protocol, WifiController};
-    /// let mut wifi = WifiController::new();
-    /// wifi.set_mode(Protocol::P802D11BGNLR);
+    /// wifi_controller.set_protocol(Protocol::P802D11BGNLR.into());
     /// ```
-    pub fn set_mode(&mut self, protocol: Protocol) -> Result<(), WifiError> {
+    pub fn set_protocol(&mut self, protocols: EnumSet<Protocol>) -> Result<(), WifiError> {
+        let mut protocol = 0u8;
+
+        protocols.into_iter().for_each(|v| match v {
+            Protocol::P802D11B => protocol |= WIFI_PROTOCOL_11B as u8,
+            Protocol::P802D11BG => protocol |= WIFI_PROTOCOL_11B as u8 | WIFI_PROTOCOL_11G as u8,
+            Protocol::P802D11BGN => {
+                protocol |=
+                    WIFI_PROTOCOL_11B as u8 | WIFI_PROTOCOL_11G as u8 | WIFI_PROTOCOL_11N as u8
+            }
+            Protocol::P802D11BGNLR => {
+                protocol |= WIFI_PROTOCOL_11B as u8
+                    | WIFI_PROTOCOL_11G as u8
+                    | WIFI_PROTOCOL_11N as u8
+                    | WIFI_PROTOCOL_LR as u8
+            }
+            Protocol::P802D11LR => protocol |= WIFI_PROTOCOL_LR as u8,
+            Protocol::P802D11BGNAX => {
+                protocol |= WIFI_PROTOCOL_11B as u8
+                    | WIFI_PROTOCOL_11G as u8
+                    | WIFI_PROTOCOL_11N as u8
+                    | WIFI_PROTOCOL_11AX as u8
+            }
+        });
+
         let mut mode = wifi_mode_t_WIFI_MODE_NULL;
         esp_wifi_result!(unsafe { esp_wifi_get_mode(&mut mode) })?;
-        esp_wifi_result!(unsafe { esp_wifi_set_protocol(mode, protocol as u8) })?;
+
+        if mode == wifi_mode_t_WIFI_MODE_STA || mode == wifi_mode_t_WIFI_MODE_APSTA {
+            esp_wifi_result!(unsafe {
+                esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_STA, protocol as u8)
+            })?;
+        }
+        if mode == wifi_mode_t_WIFI_MODE_AP || mode == wifi_mode_t_WIFI_MODE_APSTA {
+            esp_wifi_result!(unsafe {
+                esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_AP, protocol as u8)
+            })?;
+        }
+
         Ok(())
     }
 
@@ -2684,6 +2725,8 @@ mod embedded_svc_compat {
                 Protocol::P802D11BGN => embedded_svc::wifi::Protocol::P802D11BGN,
                 Protocol::P802D11BGNLR => embedded_svc::wifi::Protocol::P802D11BGNLR,
                 Protocol::P802D11LR => embedded_svc::wifi::Protocol::P802D11LR,
+                // not in embedded-svc currently
+                Protocol::P802D11BGNAX => embedded_svc::wifi::Protocol::P802D11BGN,
             }
         }
     }
