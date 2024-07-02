@@ -8,12 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Add support for `Protocol::P802D11BGNAX` (#1742)
 
 ### Fixed
+- Fixed `set_mode` functionality (#1742)
 
 ### Changed
-
 - `esp_wifi::initialize` no longer requires running maximum CPU clock, instead check it runs above 80MHz. (#1688)
+- Rename `set_mode` to `set_protocol`, also available in esp-now API (#1742)
 
 ### Removed
 
