@@ -1,0 +1,56 @@
+//! DMA Mem2Mem Tests
+
+//% CHIPS: esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
+
+#![no_std]
+#![no_main]
+
+use defmt_rtt as _;
+use esp_backtrace as _;
+use esp_hal::{
+    clock::ClockControl,
+    dma::{Dma, DmaPriority, Mem2Mem},
+    dma_buffers,
+    peripherals::Peripherals,
+    system::SystemControl,
+};
+
+const DATA_SIZE: usize = 1024 * 10;
+
+#[cfg(test)]
+#[embedded_test::tests]
+mod tests {
+    use defmt::assert_eq;
+
+    use super::*;
+
+    #[init]
+    fn init() {}
+
+    #[test]
+    fn test_internal_mem2mem() {
+        let peripherals = Peripherals::take();
+        let system = SystemControl::new(peripherals.SYSTEM);
+        let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    
+        let (tx_buffer, tx_descriptors, mut rx_buffer, rx_descriptors) = dma_buffers!(DATA_SIZE);
+    
+        let dma = Dma::new(peripherals.DMA);
+        let channel = dma.channel0.configure(false, DmaPriority::Priority0);
+        #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))]
+        let dma_peripheral = peripherals.SPI2;
+        #[cfg(not(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3")))]
+        let dma_peripheral = peripherals.MEM2MEM1;
+    
+        let mut mem2mem = Mem2Mem::new(channel, dma_peripheral, tx_descriptors, rx_descriptors);
+    
+        for i in 0..core::mem::size_of_val(tx_buffer) {
+            tx_buffer[i] = (i % 256) as u8;
+        }
+        let dma_wait = mem2mem.start_transfer(&tx_buffer, &mut rx_buffer).unwrap();
+        dma_wait.wait().unwrap();
+        for i in 0..core::mem::size_of_val(tx_buffer) {
+            assert_eq!(rx_buffer[i], tx_buffer[i]);
+        }
+    }
+}
