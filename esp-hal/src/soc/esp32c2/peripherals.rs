@@ -48,4 +48,11 @@ crate::peripherals! {
     UART1 <= UART1,
     WIFI <= virtual,
     XTS_AES <= XTS_AES,
+    MEM2MEM1 <= virtual,
+    MEM2MEM2 <= virtual,
+    MEM2MEM3 <= virtual,
+    MEM2MEM4 <= virtual,
+    MEM2MEM5 <= virtual,
+    MEM2MEM6 <= virtual,
+    MEM2MEM8 <= virtual,
 }

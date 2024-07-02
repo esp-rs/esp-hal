@@ -87,4 +87,13 @@ crate::peripherals! {
     UHCI0 <= UHCI0,
     USB_DEVICE <= USB_DEVICE,
     WIFI <= virtual,
+    MEM2MEM1 <= virtual,
+    MEM2MEM4 <= virtual,
+    MEM2MEM5 <= virtual,
+    MEM2MEM10 <= virtual,
+    MEM2MEM11 <= virtual,
+    MEM2MEM12 <= virtual,
+    MEM2MEM13 <= virtual,
+    MEM2MEM14 <= virtual,
+    MEM2MEM15 <= virtual,
 }
