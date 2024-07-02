@@ -231,11 +231,8 @@ where
             tconf.modify(|_r, w| w.work_en().set_bit());
         }
     }
-}
 
-impl<T, const CHANNEL: u8> Alarm<T, Blocking, CHANNEL> {
-    /// Set the interrupt handler for this alarm.
-    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+    fn set_interrupt_handler_internal(&self, handler: InterruptHandler) {
         match CHANNEL {
             0 => unsafe {
                 interrupt::bind_interrupt(Interrupt::SYSTIMER_TARGET0, handler.handler());
@@ -260,6 +257,13 @@ impl<T, const CHANNEL: u8> Alarm<T, Blocking, CHANNEL> {
             },
             _ => unreachable!(),
         }
+    }
+}
+
+impl<T, const CHANNEL: u8> Alarm<T, Blocking, CHANNEL> {
+    /// Set the interrupt handler for this alarm.
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.set_interrupt_handler_internal(handler)
     }
 }
 
@@ -573,6 +577,10 @@ where
 
     fn set_alarm_active(&self, _active: bool) {
         // Nothing to do
+    }
+
+    fn set_interrupt_handler(&self, handler: InterruptHandler) {
+        Alarm::set_interrupt_handler_internal(self, handler);
     }
 }
 

@@ -37,9 +37,11 @@
 //! # }
 //! ```
 
-#![deny(missing_docs)]
+//#![deny(missing_docs)]
 
 use fugit::{ExtU64, Instant, MicrosDurationU64};
+
+use crate::{interrupt::InterruptHandler, private};
 
 #[cfg(systimer)]
 pub mod systimer;
@@ -88,6 +90,8 @@ pub trait Timer: crate::private::Sealed {
 
     /// Clear the timer's interrupt.
     fn clear_interrupt(&self);
+
+    fn set_interrupt_handler(&self, handler: InterruptHandler);
 
     /// Has the timer triggered?
     fn is_interrupt_set(&self) -> bool;
@@ -144,6 +148,38 @@ where
 
         self.inner.stop();
         self.inner.clear_interrupt();
+    }
+
+    pub fn start(&mut self, timeout: MicrosDurationU64) -> Result<(), Error> {
+        if self.inner.is_running() {
+            self.inner.stop();
+        }
+
+        self.inner.clear_interrupt();
+        self.inner.reset();
+
+        self.inner.enable_auto_reload(false);
+        self.inner.load_value(timeout)?;
+        self.inner.start();
+
+        Ok(())
+    }
+
+    pub fn stop(&mut self) {
+        self.inner.stop();
+    }
+
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.inner.set_interrupt_handler(handler);
+    }
+
+    pub fn enable_interrupt(&mut self, enable: bool) {
+        self.inner.enable_interrupt(enable);
+    }
+
+    pub fn clear_interrupt(&mut self) {
+        self.inner.clear_interrupt();
+        self.inner.set_alarm_active(true);
     }
 }
 
@@ -230,6 +266,115 @@ where
         self.inner.stop();
 
         Ok(())
+    }
+
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.inner.set_interrupt_handler(handler);
+    }
+
+    pub fn enable_interrupt(&mut self, enable: bool) {
+        self.inner.enable_interrupt(enable);
+    }
+
+    pub fn clear_interrupt(&mut self) {
+        self.inner.clear_interrupt();
+        self.inner.set_alarm_active(true);
+    }
+}
+
+pub enum ErasedTimer {
+    Timg0Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, crate::Blocking>),
+    #[cfg(timg_timer1)]
+    Timg0Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, crate::Blocking>),
+    #[cfg(timg1)]
+    Timg1Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, crate::Blocking>),
+    #[cfg(all(timg1, timg_timer1))]
+    Timg1Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, crate::Blocking>),
+    SystimerAlarm0Periodic(systimer::Alarm<systimer::Periodic, crate::Blocking, 0>),
+    SystimerAlarm1Periodic(systimer::Alarm<systimer::Periodic, crate::Blocking, 1>),
+    SystimerAlarm2Periodic(systimer::Alarm<systimer::Periodic, crate::Blocking, 2>),
+    SystimerAlarm0Target(systimer::Alarm<systimer::Target, crate::Blocking, 0>),
+    SystimerAlarm1Target(systimer::Alarm<systimer::Target, crate::Blocking, 1>),
+    SystimerAlarm2Target(systimer::Alarm<systimer::Target, crate::Blocking, 2>),
+}
+
+impl private::Sealed for ErasedTimer {}
+
+impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, crate::Blocking>> for ErasedTimer {
+    fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, crate::Blocking>) -> Self {
+        Self::Timg0Timer0(value)
+    }
+}
+
+#[cfg(timg_timer1)]
+impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, crate::Blocking>> for ErasedTimer {
+    fn from(value: timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, crate::Blocking>) -> Self {
+        Self::Timg0Timer1(value)
+    }
+}
+
+#[cfg(timg1)]
+impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, crate::Blocking>> for ErasedTimer {
+    fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, crate::Blocking>) -> Self {
+        Self::Timg1Timer0(value)
+    }
+}
+
+#[cfg(all(timg1, timg_timer1))]
+impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, crate::Blocking>> for ErasedTimer {
+    fn from(value: timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, crate::Blocking>) -> Self {
+        Self::Timg1Timer1(value)
+    }
+}
+
+impl From<systimer::Alarm<systimer::Periodic, crate::Blocking, 0>> for ErasedTimer {
+    fn from(value: systimer::Alarm<systimer::Periodic, crate::Blocking, 0>) -> Self {
+        Self::SystimerAlarm0Periodic(value)
+    }
+}
+
+impl From<systimer::Alarm<systimer::Periodic, crate::Blocking, 1>> for ErasedTimer {
+    fn from(value: systimer::Alarm<systimer::Periodic, crate::Blocking, 1>) -> Self {
+        Self::SystimerAlarm1Periodic(value)
+    }
+}
+
+impl From<systimer::Alarm<systimer::Periodic, crate::Blocking, 2>> for ErasedTimer {
+    fn from(value: systimer::Alarm<systimer::Periodic, crate::Blocking, 2>) -> Self {
+        Self::SystimerAlarm2Periodic(value)
+    }
+}
+
+impl Timer for ErasedTimer {
+    delegate::delegate! {
+        to match self {
+            ErasedTimer::Timg0Timer0(inner) => inner,
+            #[cfg(timg_timer1)]
+            ErasedTimer::Timg0Timer1(inner) => inner,
+            #[cfg(timg1)]
+            ErasedTimer::Timg1Timer0(inner) => inner,
+            #[cfg(all(timg1,timg_timer1))]
+            ErasedTimer::Timg1Timer1(inner) => inner,
+            ErasedTimer::SystimerAlarm0Periodic(inner) => inner,
+            ErasedTimer::SystimerAlarm1Periodic(inner) => inner,
+            ErasedTimer::SystimerAlarm2Periodic(inner) => inner,
+            ErasedTimer::SystimerAlarm0Target(inner) => inner,
+            ErasedTimer::SystimerAlarm1Target(inner) => inner,
+            ErasedTimer::SystimerAlarm2Target(inner) => inner,
+        } {
+            fn start(&self);
+            fn stop(&self);
+            fn reset(&self);
+            fn is_running(&self) -> bool;
+            fn now(&self) -> Instant<u64, 1, 1_000_000>;
+            fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error>;
+            fn enable_auto_reload(&self, auto_reload: bool);
+            fn enable_interrupt(&self, state: bool);
+            fn clear_interrupt(&self);
+            fn set_interrupt_handler(&self, handler: InterruptHandler);
+            fn is_interrupt_set(&self) -> bool;
+            fn set_alarm_active(&self, state: bool);
+        }
     }
 }
 

@@ -528,6 +528,24 @@ where
             .write(|w| w.t(self.timer_number()).clear_bit_by_one());
     }
 
+    fn set_interrupt_handler(&self, handler: InterruptHandler) {
+        let interrupt = match (self.timer_group(), self.timer_number()) {
+            (0, 0) => Interrupt::TG0_T0_LEVEL,
+            #[cfg(timg1)]
+            (0, 1) => Interrupt::TG0_T1_LEVEL,
+            #[cfg(timg_timer1)]
+            (1, 0) => Interrupt::TG1_T0_LEVEL,
+            #[cfg(all(timg_timer1, timg1))]
+            (1, 1) => Interrupt::TG1_T1_LEVEL,
+            _ => unreachable!(),
+        };
+
+        unsafe {
+            interrupt::bind_interrupt(interrupt, handler.handler());
+        }
+        interrupt::enable(interrupt, handler.priority()).unwrap();
+    }
+
     fn is_interrupt_set(&self) -> bool {
         self.register_block()
             .int_raw_timers()
@@ -547,6 +565,8 @@ where
 #[doc(hidden)]
 pub trait Instance: Sealed + Enable {
     fn register_block(&self) -> &RegisterBlock;
+
+    fn timer_group(&self) -> u8;
 
     fn timer_number(&self) -> u8;
 
@@ -630,6 +650,10 @@ where
 {
     fn register_block(&self) -> &RegisterBlock {
         unsafe { &*TG::register_block() }
+    }
+
+    fn timer_group(&self) -> u8 {
+        TG::id()
     }
 
     fn timer_number(&self) -> u8 {
