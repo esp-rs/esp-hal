@@ -19,12 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-C6: Support lp-core as wake-up source (#1723)
 - Add support for GPIO wake-up source (#1724)
 - dma: add Mem2Mem to support memory to memory transfer (#1738)
+- Add `uart` wake source (#1727)
 
 ### Fixed
 
 - TIMG: Fix interrupt handler setup (#1714)
 - Fix `sleep_light` for ESP32-C6 (#1720)
 - ROM Functions: Fix address of `ets_update_cpu_frequency_rom` (#1722)
+- Fix `regi2c_*` functions for `esp32h2` (#1737)
 
 ### Changed
 
