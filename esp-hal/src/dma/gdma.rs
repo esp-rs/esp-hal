@@ -619,12 +619,13 @@ pub use m2m::*;
 mod m2m {
     use embedded_dma::{ReadBuffer, WriteBuffer};
 
-    use super::dma_private::{DmaSupport, DmaSupportRx};
     use crate::dma::{
+        dma_private::{DmaSupport, DmaSupportRx},
         Channel,
         ChannelTypes,
         DescriptorChain,
         DmaDescriptor,
+        DmaEligible,
         DmaError,
         DmaPeripheral,
         DmaTransferRx,
@@ -654,12 +655,29 @@ mod m2m {
         MODE: crate::Mode,
     {
         /// Create a new Mem2Mem instance.
+        pub fn new(
+            mut channel: Channel<'d, C, MODE>,
+            peripheral: impl DmaEligible,
+            tx_descriptors: &'static mut [DmaDescriptor],
+            rx_descriptors: &'static mut [DmaDescriptor],
+        ) -> Self {
+            channel.tx.init_channel();
+            channel.rx.init_channel();
+            Mem2Mem {
+                channel,
+                peripheral: peripheral.dma_peripheral(),
+                tx_chain: DescriptorChain::new(tx_descriptors),
+                rx_chain: DescriptorChain::new(rx_descriptors),
+            }
+        }
+
+        /// Create a new Mem2Mem instance.
         ///
         /// # Safety
         ///
         /// You must insure that your not using DMA for the same peripheral and
         /// that your the only one using the DmaPeripheral.
-        pub unsafe fn new(
+        pub unsafe fn new_unsafe(
             mut channel: Channel<'d, C, MODE>,
             peripheral: DmaPeripheral,
             tx_descriptors: &'static mut [DmaDescriptor],

@@ -1,5 +1,4 @@
 //! Uses DMA to copy memory to memory.
-//!
 
 //% FEATURES: esp-hal/log
 //% CHIPS: esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
@@ -11,7 +10,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    dma::{Dma, DmaPeripheral, DmaPriority, Mem2Mem},
+    dma::{Dma, DmaPriority, Mem2Mem},
     dma_buffers,
     peripherals::Peripherals,
     prelude::*,
@@ -20,10 +19,6 @@ use esp_hal::{
 use log::{error, info};
 
 const DATA_SIZE: usize = 1024 * 10;
-#[cfg(feature = "esp32s3")]
-const DMA_PERIPHERAL: DmaPeripheral = DmaPeripheral::Adc;
-#[cfg(not(feature = "esp32s3"))]
-const DMA_PERIPHERAL: DmaPeripheral = DmaPeripheral::Mem2Mem1;
 
 #[entry]
 fn main() -> ! {
@@ -38,9 +33,12 @@ fn main() -> ! {
 
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0.configure(false, DmaPriority::Priority0);
+    #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))]
+    let dma_peripheral = peripherals.SPI2;
+    #[cfg(not(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3")))]
+    let dma_peripheral = peripherals.MEM2MEM1;
 
-    let mut mem2mem =
-        unsafe { Mem2Mem::new(channel, DMA_PERIPHERAL, tx_descriptors, rx_descriptors) };
+    let mut mem2mem = Mem2Mem::new(channel, dma_peripheral, tx_descriptors, rx_descriptors);
 
     for i in 0..core::mem::size_of_val(tx_buffer) {
         tx_buffer[i] = (i % 256) as u8;
