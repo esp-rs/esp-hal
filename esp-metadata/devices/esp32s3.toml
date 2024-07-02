@@ -70,6 +70,7 @@ symbols = [
     "psram",
     "ulp_riscv_core",
     "timg_timer1",
+    "very_large_intr_status",
 
     # ROM capabilities
     "rom_crc_le",
