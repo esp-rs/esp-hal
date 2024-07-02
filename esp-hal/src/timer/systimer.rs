@@ -173,6 +173,10 @@ impl<'d> SystemTimer<'d> {
 
 impl SystemTimer<'static> {
     /// Split the System Timer into three alarms.
+    ///
+    /// This is a convenience method to create `'static` alarms of the same
+    /// type. You are encouraged to use [Alarm::new] over this very specific
+    /// helper.
     pub fn split<MODE>(self) -> SysTimerAlarms<MODE, Blocking> {
         static CONFIG: Mutex<Cell<Option<Config>>> = Mutex::new(Cell::new(None));
         static mut UNIT0: Option<Unit<'static, 0>> = None;
@@ -193,6 +197,10 @@ impl SystemTimer<'static> {
     }
 
     /// Split the System Timer into three alarms.
+    ///
+    /// This is a convenience method to create `'static` alarms of the same
+    /// type. You are encouraged to use [Alarm::new_async] over this very
+    /// specific helper.
     pub fn split_async<MODE>(self) -> SysTimerAlarms<MODE, Async> {
         static CONFIG: Mutex<Cell<Option<Config>>> = Mutex::new(Cell::new(None));
         static mut UNIT0: Option<Unit<'static, 0>> = None;
