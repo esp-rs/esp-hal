@@ -52,6 +52,8 @@ PROBE_RS_CHIP=esp32c6 \
 
 Some tests will require physical connections, please see the current [configuration in our runners](#running-tests-remotes-ie-on-self-hosted-runners).
 
+[ESP-Prog]: https://docs.espressif.com/projects/esp-dev-kits/en/latest/other/esp-prog/user_guide.html
+
 ### Running Tests Remotes (ie. On Self-Hosted Runners)
 The [`hil.yml`] workflow builds the test suite for all our available targets and executes them.
 
