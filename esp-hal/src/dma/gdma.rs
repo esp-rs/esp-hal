@@ -90,7 +90,6 @@ impl<const N: u8> RegisterAccess for Channel<N> {
 
     #[cfg(gdma)]
     fn set_mem2mem_mode() {
-        debug!("set_mem2mem_mode");
         Self::ch()
             .in_conf0()
             .modify(|_, w| w.mem_trans_en().set_bit());
