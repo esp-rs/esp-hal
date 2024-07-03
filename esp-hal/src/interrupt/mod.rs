@@ -135,12 +135,7 @@ pub struct InterruptStatus {
 impl InterruptStatus {
     const fn empty() -> Self {
         InterruptStatus {
-            #[cfg(large_intr_status)]
-            status: [0, 0, 0],
-            #[cfg(very_large_intr_status)]
-            status: [0, 0, 0, 0],
-            #[cfg(not(any(large_intr_status, very_large_intr_status)))]
-            status: [0, 0],
+            status: [0u32; STATUS_WORDS],
         }
     }
 
