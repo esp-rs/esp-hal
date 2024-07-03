@@ -50,9 +50,11 @@ PROBE_RS_CHIP=esp32c6 \
 - The build target **MUST** be specified via the `CARGO_BUILD_TARGET` environment variable or as an argument (`--target`).
 - The chip **MUST** be specified via the `PROBE_RS_CHIP` environment variable or as an argument of `probe-rs` (`--chip`).
 
-Some tests will require physical connections, please see the current [configuration in our runners](#running-tests-remotes-ie-on-self-hosted-runners).
+Some tests will require physical connections, please see the current [configuration in our runners].
 
+[probe-rs]: https://probe.rs
 [ESP-Prog]: https://docs.espressif.com/projects/esp-dev-kits/en/latest/other/esp-prog/user_guide.html
+[configuration in our runners]: #running-tests-remotes-ie-on-self-hosted-runners
 
 ### Running Tests Remotes (ie. On Self-Hosted Runners)
 The [`hil.yml`] workflow builds the test suite for all our available targets and executes them.
@@ -61,38 +63,41 @@ Our self hosted runners have the following setup:
 - ESP32-C2 (`esp32c2-jtag`):
   - Devkit: `ESP8684-DevKitM-1` connected via UART.
     - `GPIO2` and `GPIO3` are connected.
-  - Probe: `ESP-Prog` connected with the [following connections](https://docs.espressif.com/projects/esp-idf/en/stable/esp32c2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware)
-  - RPi: Raspbian 12 configured with the following [setup](#vm-setup)
+  - Probe: `ESP-Prog` connected with the [following connections][connection_c2]
+  - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-C3 (`rustboard`):
   - Devkit: `ESP32-C3-DevKit-RUST-1` connected via USB-Serial-JTAG.
     - `GPIO2` and `GPIO3` are connected.
     - `GPIO5` and `GPIO6` are connected.
-  - RPi: Raspbian 12 configured with the following [setup](#vm-setup)
+  - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-C6 (`esp32c6-usb`):
   - Devkit: `ESP32-C6-DevKitC-1 V1.2` connected via USB-Serial-JTAG (`USB` port).
     - `GPIO2` and `GPIO3` are connected.
     - `GPIO5` and `GPIO6` are connected.
-  - RPi: Raspbian 12 configured with the following [setup](#vm-setup)
+  - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-H2 (`esp32h2-usb`):
   - Devkit: `ESP32-H2-DevKitM-1` connected via USB-Serial-JTAG (`USB` port).
     - `GPIO2` and `GPIO3` are connected.
     - `GPIO5` and `GPIO8` are connected.
-  - RPi: Raspbian 12 configured with the following [setup](#vm-setup)
+  - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-S2 (`esp32s2-jtag`):
   - Devkit: `ESP32-S2-Saola-1` connected via UART.
     - `GPIO2` and `GPIO3` are connected.
     - `GPIO5` and `GPIO6` are connected.
-  - Probe: `ESP-Prog` connected with the [following connections](https://docs.espressif.com/projects/esp-idf/en/stable/esp32s2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware)
-  - RPi: Raspbian 12 configured with the following [setup](#vm-setup)
+  - Probe: `ESP-Prog` connected with the [following connections][connection_s2]
+  - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-S3 (`esp32s3-usb`):
   - Devkit: `ESP32-S3-DevKitC-1` connected via USB-Serial-JTAG.
     - `GPIO2` and `GPIO3` are connected.
     - `GPIO5` and `GPIO6` are connected.
     - `GPIO1` and `GPIO21` are connected.
     - `GPIO43 (TX)` and `GPIO45` are connected.
-  - RPi: Raspbian 12 configured with the following [setup](#vm-setup)
+  - RPi: Raspbian 12 configured with the following [setup]
 
+[connection_c2]: (https://docs.espressif.com/projects/esp-idf/en/stable/esp32c2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware)
+[connection_s2]: (https://docs.espressif.com/projects/esp-idf/en/stable/esp32s2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware)
 [`hil.yml`]: https://github.com/esp-rs/esp-hal/blob/main/.github/workflows/hil.yml
+[setup]: #vm-setup
 
 #### RPi Setup
 ```bash
