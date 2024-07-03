@@ -49,6 +49,9 @@ mod tests {
         }
         let dma_wait = mem2mem.start_transfer(&tx_buffer, &mut rx_buffer).unwrap();
         dma_wait.wait().unwrap();
+        // explicitly drop to insure the mem2mem bit is not left set as this causes
+        // subsequent dma tests to fail.
+        drop(mem2mem);
         for i in 0..core::mem::size_of_val(tx_buffer) {
             assert_eq!(rx_buffer[i], tx_buffer[i]);
         }

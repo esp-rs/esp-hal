@@ -918,7 +918,7 @@ pub trait RxPrivate: crate::private::Sealed {
     fn start_transfer(&mut self) -> Result<(), DmaError>;
 
     #[cfg(gdma)]
-    fn set_mem2mem_mode(&mut self);
+    fn set_mem2mem_mode(&mut self, value: bool);
 
     fn listen_ch_in_done(&self);
 
@@ -1086,8 +1086,8 @@ where
     }
 
     #[cfg(gdma)]
-    fn set_mem2mem_mode(&mut self) {
-        R::set_mem2mem_mode();
+    fn set_mem2mem_mode(&mut self, value: bool) {
+        R::set_mem2mem_mode(value);
     }
 
     fn listen_ch_in_done(&self) {
@@ -1460,7 +1460,7 @@ where
 pub trait RegisterAccess: crate::private::Sealed {
     fn init_channel();
     #[cfg(gdma)]
-    fn set_mem2mem_mode();
+    fn set_mem2mem_mode(value: bool);
     fn set_out_burstmode(burst_mode: bool);
     fn set_out_priority(priority: DmaPriority);
     fn clear_out_interrupts();

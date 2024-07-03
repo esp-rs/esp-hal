@@ -89,10 +89,10 @@ impl<const N: u8> RegisterAccess for Channel<N> {
     }
 
     #[cfg(gdma)]
-    fn set_mem2mem_mode() {
+    fn set_mem2mem_mode(value: bool) {
         Self::ch()
             .in_conf0()
-            .modify(|_, w| w.mem_trans_en().set_bit());
+            .modify(|_, w| w.mem_trans_en().bit(value));
     }
 
     fn set_out_burstmode(burst_mode: bool) {
@@ -713,11 +713,21 @@ mod m2m {
                 self.channel
                     .rx
                     .prepare_transfer_without_start(self.peripheral, &self.rx_chain)?;
-                self.channel.rx.set_mem2mem_mode();
+                self.channel.rx.set_mem2mem_mode(true);
             }
             self.channel.tx.start_transfer()?;
             self.channel.rx.start_transfer()?;
             Ok(DmaTransferRx::new(self))
+        }
+    }
+
+    impl<'d, C, MODE> Drop for Mem2Mem<'d, C, MODE>
+    where
+        C: ChannelTypes,
+        MODE: crate::Mode,
+    {
+        fn drop(&mut self) {
+            self.channel.rx.set_mem2mem_mode(false);
         }
     }
 
