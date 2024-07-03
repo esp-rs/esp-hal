@@ -10,18 +10,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         "esp32", "esp32c2", "esp32c3", "esp32c6", "esp32h2", "esp32s2", "esp32s3"
     );
 
-    // If the `embassy` feature is enabled, ensure that a time driver implementation
-    // is available:
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32")] {
-            assert_unique_used_features!("time-timg0");
-        } else if #[cfg(feature = "esp32s2")] {
-            assert_unique_used_features!("time-systimer-80mhz", "time-timg0");
-        } else {
-            assert_unique_used_features!("time-systimer-16mhz", "time-timg0");
-        }
-    }
-
     // NOTE: update when adding new device support!
     // Determine the name of the configured device:
     let device_name = if cfg!(feature = "esp32") {

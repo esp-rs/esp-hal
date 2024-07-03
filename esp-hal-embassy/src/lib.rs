@@ -50,7 +50,7 @@ mod executor;
 mod time_driver;
 
 /// Initialize embassy
-pub fn init(clocks: &Clocks, time_driver: TimerType) {
+pub fn init(clocks: &Clocks, time_driver: &'static mut [TimerType]) {
     EmbassyTimer::init(clocks, time_driver)
 }
 

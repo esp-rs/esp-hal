@@ -150,7 +150,7 @@ where
         self.inner.clear_interrupt();
     }
 
-    pub fn start(&mut self, timeout: MicrosDurationU64) -> Result<(), Error> {
+    pub fn schedule(&mut self, timeout: MicrosDurationU64) -> Result<(), Error> {
         if self.inner.is_running() {
             self.inner.stop();
         }
@@ -179,7 +179,7 @@ where
 
     pub fn clear_interrupt(&mut self) {
         self.inner.clear_interrupt();
-        self.inner.set_alarm_active(true);
+        self.inner.set_alarm_active(false);
     }
 }
 
