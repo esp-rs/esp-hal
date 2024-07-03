@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S3: Expose optional HSYNC input in LCD_CAM (#1707)
 - ESP32-C6: Support lp-core as wake-up source (#1723)
 - Add support for GPIO wake-up source (#1724)
+- dma: add Mem2Mem to support memory to memory transfer (#1738)
 - Add `uart` wake source (#1727)
 
 ### Fixed

@@ -49,7 +49,7 @@
 //! For convenience you can use the [crate::dma_buffers] macro.
 #![warn(missing_docs)]
 
-use core::{marker::PhantomData, ptr::addr_of_mut, sync::atomic::compiler_fence};
+use core::{fmt::Debug, marker::PhantomData, ptr::addr_of_mut, sync::atomic::compiler_fence};
 
 bitfield::bitfield! {
     #[doc(hidden)]
@@ -63,8 +63,19 @@ bitfield::bitfield! {
     owner, set_owner: 31;
 }
 
+impl Debug for DmaDescriptorFlags {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("DmaDescriptorFlags")
+            .field("size", &self.size())
+            .field("length", &self.length())
+            .field("suc_eof", &self.suc_eof())
+            .field("owner", &self.owner())
+            .finish()
+    }
+}
+
 /// A DMA transfer descriptor.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct DmaDescriptor {
     pub(crate) flags: DmaDescriptorFlags,
     pub(crate) buffer: *mut u8,
@@ -370,27 +381,45 @@ pub enum DmaPriority {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum DmaPeripheral {
-    Spi2   = 0,
+    Spi2      = 0,
     #[cfg(any(pdma, esp32s3))]
-    Spi3   = 1,
+    Spi3      = 1,
+    #[cfg(any(esp32c6, esp32h2))]
+    Mem2Mem1  = 1,
     #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
-    Uhci0  = 2,
+    Uhci0     = 2,
     #[cfg(any(esp32, esp32s2, esp32c3, esp32c6, esp32h2, esp32s3))]
-    I2s0   = 3,
+    I2s0      = 3,
     #[cfg(any(esp32, esp32s3))]
-    I2s1   = 4,
+    I2s1      = 4,
+    #[cfg(any(esp32c6, esp32h2))]
+    Mem2Mem4  = 4,
     #[cfg(esp32s3)]
-    LcdCam = 5,
+    LcdCam    = 5,
+    #[cfg(any(esp32c6, esp32h2))]
+    Mem2Mem5  = 5,
     #[cfg(not(esp32c2))]
-    Aes    = 6,
+    Aes       = 6,
     #[cfg(gdma)]
-    Sha    = 7,
+    Sha       = 7,
     #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
-    Adc    = 8,
+    Adc       = 8,
     #[cfg(esp32s3)]
-    Rmt    = 9,
+    Rmt       = 9,
     #[cfg(parl_io)]
-    ParlIo = 9,
+    ParlIo    = 9,
+    #[cfg(any(esp32c6, esp32h2))]
+    Mem2Mem10 = 10,
+    #[cfg(any(esp32c6, esp32h2))]
+    Mem2Mem11 = 11,
+    #[cfg(any(esp32c6, esp32h2))]
+    Mem2Mem12 = 12,
+    #[cfg(any(esp32c6, esp32h2))]
+    Mem2Mem13 = 13,
+    #[cfg(any(esp32c6, esp32h2))]
+    Mem2Mem14 = 14,
+    #[cfg(any(esp32c6, esp32h2))]
+    Mem2Mem15 = 15,
 }
 
 #[derive(PartialEq, PartialOrd)]
@@ -405,6 +434,16 @@ impl From<u32> for Owner {
             0 => Owner::Cpu,
             _ => Owner::Dma,
         }
+    }
+}
+
+/// Marks channels as useable for SPI
+#[doc(hidden)]
+pub trait DmaEligible {
+    /// The DMA peripheral
+    const DMA_PERIPHERAL: DmaPeripheral;
+    fn dma_peripheral(&self) -> DmaPeripheral {
+        Self::DMA_PERIPHERAL
     }
 }
 
@@ -458,6 +497,7 @@ pub trait Tx: TxPrivate {}
 pub trait PeripheralMarker {}
 
 #[doc(hidden)]
+#[derive(Debug)]
 pub struct DescriptorChain {
     pub(crate) descriptors: &'static mut [DmaDescriptor],
 }
@@ -877,6 +917,9 @@ pub trait RxPrivate: crate::private::Sealed {
 
     fn start_transfer(&mut self) -> Result<(), DmaError>;
 
+    #[cfg(gdma)]
+    fn set_mem2mem_mode(&mut self, value: bool);
+
     fn listen_ch_in_done(&self);
 
     fn clear_ch_in_done(&self);
@@ -1040,6 +1083,11 @@ where
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
         self.rx_impl.start_transfer()
+    }
+
+    #[cfg(gdma)]
+    fn set_mem2mem_mode(&mut self, value: bool) {
+        R::set_mem2mem_mode(value);
     }
 
     fn listen_ch_in_done(&self) {
@@ -1411,6 +1459,8 @@ where
 #[doc(hidden)]
 pub trait RegisterAccess: crate::private::Sealed {
     fn init_channel();
+    #[cfg(gdma)]
+    fn set_mem2mem_mode(value: bool);
     fn set_out_burstmode(burst_mode: bool);
     fn set_out_priority(priority: DmaPriority);
     fn clear_out_interrupts();

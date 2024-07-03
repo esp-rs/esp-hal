@@ -25,6 +25,10 @@ name    = "delay"
 harness = false
 
 [[test]]
+name    = "dma_mem2mem"
+harness = false
+
+[[test]]
 name    = "ecc"
 harness = false
 
