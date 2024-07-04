@@ -5,9 +5,7 @@
 //! This test uses I2S TX to transmit known data to I2S RX (forced to slave mode
 //! with loopback mode enabled). It's using circular DMA mode
 
-//! H2 is disabled because of https://github.com/esp-rs/esp-hal/issues/1637
-
-//% CHIPS: esp32c3 esp32c6 esp32s3
+//% CHIPS: esp32c3 esp32c6 esp32s3 esp32h2
 
 #![no_std]
 #![no_main]
