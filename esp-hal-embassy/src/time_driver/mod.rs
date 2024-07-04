@@ -1,7 +1,7 @@
-use core::cell::RefCell;
+use core::cell::{Cell, RefCell};
 
 use critical_section::Mutex;
-use embassy_time_driver::AlarmHandle;
+use embassy_time_driver::{AlarmHandle, Driver};
 use esp_hal::{
     clock::Clocks,
     interrupt::{InterruptHandler, Priority},
@@ -10,13 +10,28 @@ use esp_hal::{
     timer::{ErasedTimer, OneShotTimer},
 };
 
-use crate::AlarmState;
-
 pub const MAX_SUPPORTED_ALARM_COUNT: usize = 7;
 
 pub type TimerType = OneShotTimer<ErasedTimer>;
 
 static TIMERS: Mutex<RefCell<Option<&'static mut [TimerType]>>> = Mutex::new(RefCell::new(None));
+
+#[allow(clippy::type_complexity)]
+pub(crate) struct AlarmState {
+    pub callback: Cell<Option<(fn(*mut ()), *mut ())>>,
+    pub allocated: Cell<bool>,
+}
+
+unsafe impl Send for AlarmState {}
+
+impl AlarmState {
+    pub const fn new() -> Self {
+        Self {
+            callback: Cell::new(None),
+            allocated: Cell::new(false),
+        }
+    }
+}
 
 pub struct EmbassyTimer {
     pub(crate) alarms: Mutex<[AlarmState; MAX_SUPPORTED_ALARM_COUNT]>,
@@ -61,6 +76,13 @@ impl EmbassyTimer {
     }
 
     pub fn init(_clocks: &Clocks, timers: &'static mut [TimerType]) {
+        if timers.len() > MAX_SUPPORTED_ALARM_COUNT {
+            panic!(
+                "Maximum of {} timers can be used.",
+                MAX_SUPPORTED_ALARM_COUNT
+            );
+        }
+
         static HANDLERS: [InterruptHandler; MAX_SUPPORTED_ALARM_COUNT] = [
             handler0, handler1, handler2, handler3, handler4, handler5, handler6,
         ];
@@ -129,5 +151,37 @@ impl EmbassyTimer {
         let timeout = if ts > now { ts - now } else { now };
         timer.schedule(timeout).unwrap();
         timer.enable_interrupt(true);
+    }
+}
+
+impl Driver for EmbassyTimer {
+    fn now(&self) -> u64 {
+        EmbassyTimer::now()
+    }
+
+    unsafe fn allocate_alarm(&self) -> Option<AlarmHandle> {
+        critical_section::with(|cs| {
+            for (i, alarm) in self.alarms.borrow(cs).iter().enumerate() {
+                if !alarm.allocated.get() {
+                    // set alarm so it is not overwritten
+                    alarm.allocated.set(true);
+                    self.on_alarm_allocated(i);
+                    return Some(AlarmHandle::new(i as u8));
+                }
+            }
+            None
+        })
+    }
+
+    fn set_alarm_callback(&self, alarm: AlarmHandle, callback: fn(*mut ()), ctx: *mut ()) {
+        let n = alarm.id() as usize;
+        critical_section::with(|cs| {
+            let alarm = &self.alarms.borrow(cs)[n];
+            alarm.callback.set(Some((callback, ctx)));
+        })
+    }
+
+    fn set_alarm(&self, alarm: AlarmHandle, timestamp: u64) -> bool {
+        self.set_alarm(alarm, timestamp)
     }
 }
