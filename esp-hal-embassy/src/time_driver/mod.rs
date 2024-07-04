@@ -127,8 +127,14 @@ impl EmbassyTimer {
     }
 
     pub(crate) fn set_alarm(&self, alarm: AlarmHandle, timestamp: u64) -> bool {
+        // we sometimes get called with `u64::MAX` for apparently not yet initialized
+        // timers which would fail later on
+        if timestamp == u64::MAX {
+            return false;
+        }
+
         // The hardware fires the alarm even if timestamp is lower than the current
-        // time. In this case the interrupt handler will pend a wakeup when we exit the
+        // time. In this case the interrupt handler will pend a wake-up when we exit the
         // critical section.
         //
         // This is correct behavior. See https://docs.rs/embassy-time-driver/0.1.0/embassy_time_driver/trait.Driver.html#tymethod.set_alarm
