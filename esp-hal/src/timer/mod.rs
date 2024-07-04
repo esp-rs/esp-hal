@@ -37,7 +37,7 @@
 //! # }
 //! ```
 
-//#![deny(missing_docs)]
+#![deny(missing_docs)]
 
 use fugit::{ExtU64, Instant, MicrosDurationU64};
 
@@ -91,6 +91,9 @@ pub trait Timer: crate::private::Sealed {
     /// Clear the timer's interrupt.
     fn clear_interrupt(&self);
 
+    /// Set the interrupt handler
+    ///
+    /// Note that this will replace any previously set interrupt handler
     fn set_interrupt_handler(&self, handler: InterruptHandler);
 
     /// Has the timer triggered?
@@ -150,6 +153,7 @@ where
         self.inner.clear_interrupt();
     }
 
+    /// Start counting until the given timeout and raise an interrupt
     pub fn schedule(&mut self, timeout: MicrosDurationU64) -> Result<(), Error> {
         if self.inner.is_running() {
             self.inner.stop();
@@ -165,18 +169,24 @@ where
         Ok(())
     }
 
+    /// Stop the timer
     pub fn stop(&mut self) {
         self.inner.stop();
     }
 
+    /// Set the interrupt handler
+    ///
+    /// Note that this will replace any previously set interrupt handler    
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.inner.set_interrupt_handler(handler);
     }
 
+    /// Enable listening for interrupts
     pub fn enable_interrupt(&mut self, enable: bool) {
         self.inner.enable_interrupt(enable);
     }
 
+    /// Clear the interrupt flag
     pub fn clear_interrupt(&mut self) {
         self.inner.clear_interrupt();
         self.inner.set_alarm_active(false);
@@ -268,20 +278,29 @@ where
         Ok(())
     }
 
+    /// Set the interrupt handler
+    ///
+    /// Note that this will replace any previously set interrupt handler    
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.inner.set_interrupt_handler(handler);
     }
 
+    /// Enable/disable listening for interrupts
     pub fn enable_interrupt(&mut self, enable: bool) {
         self.inner.enable_interrupt(enable);
     }
 
+    /// Clear the interrupt flag
     pub fn clear_interrupt(&mut self) {
         self.inner.clear_interrupt();
         self.inner.set_alarm_active(true);
     }
 }
 
+/// A type-erased timer
+///
+/// You can create an instance of this by just calling `.into()` on a timer.
+#[allow(missing_docs)]
 pub enum ErasedTimer {
     Timg0Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, crate::Blocking>),
     #[cfg(timg_timer1)]
