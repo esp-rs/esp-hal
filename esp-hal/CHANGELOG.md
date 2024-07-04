@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add support for GPIO wake-up source (#1724)
 - dma: add Mem2Mem to support memory to memory transfer (#1738)
 - Add `uart` wake source (#1727)
+- Add interrupt related functions to `PeriodicTimer`/`OneShotTimer`, added `ErasedTimer` (#1753)
 
 ### Fixed
 
