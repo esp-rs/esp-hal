@@ -1,4 +1,4 @@
-//! Low-power UART driver
+//! # Universal Asynchronous Receiver/Transmitter (UART)
 
 use crate::pac::LP_UART;
 
@@ -11,74 +11,91 @@ pub unsafe fn conjure() -> LpUart {
     }
 }
 
+/// UART Error
 #[derive(Debug)]
 pub enum Error {}
 
 /// UART configuration
 pub mod config {
     /// Number of data bits
-    #[derive(PartialEq, Eq, Copy, Clone, Debug)]
+    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
     pub enum DataBits {
+        /// 5 data bits
         DataBits5 = 0,
+        /// 6 data bits
         DataBits6 = 1,
+        /// 7 data bits
         DataBits7 = 2,
+        /// 8 data bits
+        #[default]
         DataBits8 = 3,
     }
 
     /// Parity check
-    #[derive(PartialEq, Eq, Copy, Clone, Debug)]
+    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
     pub enum Parity {
+        /// No parity
+        #[default]
         ParityNone = 0,
+        /// Even parity
         ParityEven = 1,
+        /// Odd parity
         ParityOdd  = 2,
     }
 
     /// Number of stop bits
-    #[derive(PartialEq, Eq, Copy, Clone, Debug)]
+    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
     pub enum StopBits {
         /// 1 stop bit
-        STOP1   = 1,
+        #[default]
+        Stop1   = 1,
         /// 1.5 stop bits
-        STOP1P5 = 2,
+        Stop1p5 = 2,
         /// 2 stop bits
-        STOP2   = 3,
+        Stop2   = 3,
     }
 
     /// UART configuration
-    #[derive(Debug, Copy, Clone)]
+    #[derive(Debug, Clone, Copy)]
     pub struct Config {
-        pub baudrate: u32,
-        pub data_bits: DataBits,
-        pub parity: Parity,
-        pub stop_bits: StopBits,
+        baudrate: u32,
+        data_bits: DataBits,
+        parity: Parity,
+        stop_bits: StopBits,
     }
 
     impl Config {
+        /// Configure the UART's baud rate
         pub fn baudrate(mut self, baudrate: u32) -> Self {
             self.baudrate = baudrate;
             self
         }
 
+        /// Configure the UART to use no parity
         pub fn parity_none(mut self) -> Self {
             self.parity = Parity::ParityNone;
             self
         }
 
+        /// Configure the UART to use even parity
         pub fn parity_even(mut self) -> Self {
             self.parity = Parity::ParityEven;
             self
         }
 
+        /// Configure the UART to use odd parity
         pub fn parity_odd(mut self) -> Self {
             self.parity = Parity::ParityOdd;
             self
         }
 
+        /// Configure the UART's data bits
         pub fn data_bits(mut self, data_bits: DataBits) -> Self {
             self.data_bits = data_bits;
             self
         }
 
+        /// Configure the UART's stop bits
         pub fn stop_bits(mut self, stop_bits: StopBits) -> Self {
             self.stop_bits = stop_bits;
             self
@@ -88,10 +105,10 @@ pub mod config {
     impl Default for Config {
         fn default() -> Config {
             Config {
-                baudrate: 115200,
-                data_bits: DataBits::DataBits8,
-                parity: Parity::ParityNone,
-                stop_bits: StopBits::STOP1,
+                baudrate: 115_200,
+                data_bits: Default::default(),
+                parity: Default::default(),
+                stop_bits: Default::default(),
             }
         }
     }
