@@ -670,6 +670,24 @@ mod m2m {
             }
         }
 
+        /// Create a new Mem2Mem instance with specific chunk size.
+        pub fn new_with_chunk_size(
+            mut channel: Channel<'d, C, MODE>,
+            peripheral: impl DmaEligible,
+            tx_descriptors: &'static mut [DmaDescriptor],
+            rx_descriptors: &'static mut [DmaDescriptor],
+            chunk_size: usize,
+        ) -> Self {
+            channel.tx.init_channel();
+            channel.rx.init_channel();
+            Mem2Mem {
+                channel,
+                peripheral: peripheral.dma_peripheral(),
+                tx_chain: DescriptorChain::new_with_chunk_size(tx_descriptors, chunk_size),
+                rx_chain: DescriptorChain::new_with_chunk_size(rx_descriptors, chunk_size),
+            }
+        }
+
         /// Create a new Mem2Mem instance.
         ///
         /// # Safety
