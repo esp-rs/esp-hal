@@ -7,6 +7,8 @@
 //!
 //! Make sure the LP RAM is cleared before loading the code.
 
+//% FEATURES: embedded-hal-02
+
 #![no_std]
 #![no_main]
 

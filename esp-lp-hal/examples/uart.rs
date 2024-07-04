@@ -6,6 +6,7 @@
 //! logs from LP_UART. Make sure the LP RAM is cleared before loading the code.
 
 //% CHIPS: esp32c6
+//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
