@@ -131,6 +131,9 @@ impl rand_core::RngCore for Rng {
 /// Due to pulling the entropy source from the ADC, it uses the associated
 /// regiters, so to use TRNG we need to "occupy" the ADC peripheral.
 ///
+/// For now, even after calling `core::mem::drop()` on `TRNG` ADC1 will not be
+/// usable (details in esp-hal/#1750)
+///
 /// ```rust, no_run
 #[doc = crate::before_snippet!()]
 /// # use esp_hal::rng::Trng;
