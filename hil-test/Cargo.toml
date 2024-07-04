@@ -57,6 +57,10 @@ name    = "spi_full_duplex_dma"
 harness = false
 
 [[test]]
+name    = "pcnt"
+harness = false
+
+[[test]]
 name    = "rmt"
 harness = false
 
