@@ -517,9 +517,16 @@ where
     }
 
     fn enable_interrupt(&self, state: bool) {
+        // always use level interrupt
+        #[cfg(any(esp32, esp32s2))]
+        self.register_block()
+            .t(self.timer_number().into())
+            .config()
+            .modify(|_, w| w.level_int_en().set_bit());
+
         self.register_block()
             .int_ena_timers()
-            .write(|w| w.t(self.timer_number()).bit(state));
+            .modify(|_, w| w.t(self.timer_number()).bit(state));
     }
 
     fn clear_interrupt(&self) {
@@ -531,9 +538,9 @@ where
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
         let interrupt = match (self.timer_group(), self.timer_number()) {
             (0, 0) => Interrupt::TG0_T0_LEVEL,
-            #[cfg(timg1)]
-            (0, 1) => Interrupt::TG0_T1_LEVEL,
             #[cfg(timg_timer1)]
+            (0, 1) => Interrupt::TG0_T1_LEVEL,
+            #[cfg(timg1)]
             (1, 0) => Interrupt::TG1_T0_LEVEL,
             #[cfg(all(timg_timer1, timg1))]
             (1, 1) => Interrupt::TG1_T1_LEVEL,
