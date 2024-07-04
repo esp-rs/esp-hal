@@ -18,6 +18,7 @@ pub mod gpio;
 pub mod lp_core;
 pub mod peripherals;
 pub mod radio_clocks;
+pub mod trng;
 
 /// The name of the chip ("esp32c6") as `&str`
 #[macro_export]

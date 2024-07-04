@@ -44,7 +44,10 @@
 
 use core::marker::PhantomData;
 
-use crate::{peripheral::Peripheral, peripherals::RNG};
+use crate::{
+    peripheral::{Peripheral, PeripheralRef},
+    peripherals::{ADC1, RNG},
+};
 
 /// Random number generator driver
 #[derive(Clone, Copy)]
@@ -119,3 +122,134 @@ impl rand_core::RngCore for Rng {
         Ok(())
     }
 }
+
+/// True Random Number Generator (TRNG) driver
+///
+/// The `Trng` struct represents a true random number generator that combines
+/// the randomness from the hardware RNG and an ADC. This struct provides
+/// methods to generate random numbers and fill buffers with random bytes.
+/// Due to pulling the entropy source from the ADC, it uses the associated
+/// regiters, so to use TRNG we need to "occupy" the ADC peripheral.
+///
+/// For now, even after calling `core::mem::drop()` on `TRNG` ADC1 will not be
+/// usable (details in esp-hal/#1750)
+///
+/// ```rust, no_run
+#[doc = crate::before_snippet!()]
+/// # use esp_hal::rng::Trng;
+/// # use esp_hal::peripherals::Peripherals;
+/// # use esp_hal::peripherals::ADC1;
+/// # use esp_hal::analog::adc::{AdcConfig, Attenuation, Adc};
+/// # use esp_hal::gpio::Io;
+///
+/// let mut peripherals = Peripherals::take();
+/// let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+/// let mut buf = [0u8; 16];
+///
+/// // ADC is not available from now
+/// let mut trng = Trng::new(peripherals.RNG, &mut peripherals.ADC1);
+/// trng.read(&mut buf);
+/// let mut true_rand = trng.random();
+#[cfg_attr(not(esp32c6), doc = "let mut rng = trng.downgrade();")]
+/// // ADC is available now
+#[cfg_attr(esp32, doc = "let analog_pin = io.pins.gpio32;")]
+#[cfg_attr(not(esp32), doc = "let analog_pin = io.pins.gpio3;")]
+/// let mut adc1_config = AdcConfig::new();
+/// let mut adc1_pin = adc1_config.enable_pin(analog_pin,
+/// Attenuation::Attenuation11dB); let mut adc1 =
+/// Adc::<ADC1>::new(peripherals.ADC1, adc1_config); let pin_value: u16 =
+/// nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
+#[cfg_attr(not(esp32c6), doc = "rng.read(&mut buf);")]
+#[cfg_attr(not(esp32c6), doc = "true_rand = rng.random();")]
+/// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
+/// # }
+/// ```
+
+pub struct Trng<'d> {
+    /// The hardware random number generator instance.
+    pub rng: Rng,
+    /// A mutable reference to the ADC1 instance.
+    _adc: PeripheralRef<'d, ADC1>,
+}
+
+impl<'d> Trng<'d> {
+    /// Creates a new True Random Number Generator (TRNG) instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `rng` - A peripheral instance implementing the `RNG` trait.
+    /// * `adc` - A mutable reference to an `Adc` instance.
+    ///
+    /// # Returns
+    ///
+    /// Returns a new `Trng` instance.
+    pub fn new(rng: impl Peripheral<P = RNG>, adc: impl Peripheral<P = ADC1> + 'd) -> Self {
+        crate::into_ref!(adc);
+
+        let gen = Rng::new(rng);
+        crate::soc::trng::ensure_randomness();
+        Self {
+            rng: gen,
+            _adc: adc,
+        }
+    }
+
+    /// Reads currently available `u32` integer from `TRNG`
+    pub fn random(&mut self) -> u32 {
+        self.rng.random()
+    }
+
+    /// Fills the provided buffer with random bytes.
+    pub fn read(&mut self, buffer: &mut [u8]) {
+        self.rng.read(buffer);
+    }
+
+    /// Downgrades the `Trng` instance to a `Rng` instance and releases the
+    /// ADC1.
+    /// For esp32c6 - blocked on https://github.com/espressif/esp-idf/issues/14124
+    #[cfg(not(esp32c6))]
+    pub fn downgrade(self) -> Rng {
+        self.rng
+    }
+}
+
+/// For esp32c6 - blocked on https://github.com/espressif/esp-idf/issues/14124
+#[cfg(not(esp32c6))]
+impl<'d> Drop for Trng<'d> {
+    fn drop(&mut self) {
+        crate::soc::trng::revert_trng();
+    }
+}
+
+#[cfg(feature = "embedded-hal-02")]
+impl embedded_hal_02::blocking::rng::Read for Trng<'_> {
+    type Error = core::convert::Infallible;
+    /// Fills the provided buffer with random bytes.
+    fn read(&mut self, buffer: &mut [u8]) -> Result<(), Self::Error> {
+        self.rng.read(buffer);
+        Ok(())
+    }
+}
+
+/// Implementing RngCore trait from rand_core for `Trng` structure
+impl rand_core::RngCore for Trng<'_> {
+    fn next_u32(&mut self) -> u32 {
+        self.rng.next_u32()
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.rng.next_u64()
+    }
+
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        self.rng.fill_bytes(dest)
+    }
+
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
+        self.rng.try_fill_bytes(dest)
+    }
+}
+
+/// Implementing a CryptoRng marker trait that indicates that the generator is
+/// cryptographically secure.
+impl rand_core::CryptoRng for Trng<'_> {}
