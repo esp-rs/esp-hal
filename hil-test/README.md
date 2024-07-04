@@ -59,7 +59,7 @@ Some tests will require physical connections, please see the current [configurat
 ### Running Tests Remotes (ie. On Self-Hosted Runners)
 The [`hil.yml`] workflow builds the test suite for all our available targets and executes them.
 
-Our self hosted runners have the following setup:
+Our self-hosted runners have the following setup:
 - ESP32-C2 (`esp32c2-jtag`):
   - Devkit: `ESP8684-DevKitM-1` connected via UART.
     - `GPIO2` and `GPIO3` are connected.
@@ -94,10 +94,10 @@ Our self hosted runners have the following setup:
     - `GPIO43 (TX)` and `GPIO45` are connected.
   - RPi: Raspbian 12 configured with the following [setup]
 
-[connection_c2]: (https://docs.espressif.com/projects/esp-idf/en/stable/esp32c2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware)
-[connection_s2]: (https://docs.espressif.com/projects/esp-idf/en/stable/esp32s2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware)
+[connection_c2]: https://docs.espressif.com/projects/esp-idf/en/stable/esp32c2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware
+[connection_s2]: https://docs.espressif.com/projects/esp-idf/en/stable/esp32s2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware
 [`hil.yml`]: https://github.com/esp-rs/esp-hal/blob/main/.github/workflows/hil.yml
-[setup]: #vm-setup
+[setup]: #rpi-setup
 
 #### RPi Setup
 ```bash
@@ -113,6 +113,12 @@ cargo install probe-rs-tools --git https://github.com/probe-rs/probe-rs --rev a6
 wget -O - https://probe.rs/files/69-probe-rs.rules | sudo tee /etc/udev/rules.d/69-probe-rs.rules > /dev/null
 # Add the user to plugdev group
 sudo usermod -a -G plugdev $USER
+# Install espflash
+ARCH=$($HOME/.cargo/bin/rustup show | grep "Default host" | sed -e 's/.* //')
+curl -L "https://github.com/esp-rs/espflash/releases/latest/download/espflash-${ARCH}.zip" -o "${HOME}/.cargo/bin/espflash.zip"
+unzip "${HOME}/.cargo/bin/espflash.zip" -d "${HOME}/.cargo/bin/"
+rm "${HOME}/.cargo/bin/espflash.zip"
+chmod u+x "${HOME}/.cargo/bin/espflash"
 # Reboot the VM
 sudo reboot
 ```

@@ -122,6 +122,11 @@ jobs:
           path: tests-${{ matrix.target.soc }}
 
       - name: Run Tests
+        id: run-tests
         run: |
           export PATH=$PATH:/home/espressif/.cargo/bin
           cargo xtask run-elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
+
+      - name: Erase Flash on Failure
+        if: steps.run-tests.conclusion == 'failure'
+        run: espflash erase-flash
