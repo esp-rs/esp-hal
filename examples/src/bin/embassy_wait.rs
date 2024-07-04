@@ -37,12 +37,12 @@ async fn main(_spawner: Spawner) {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks, None);
+    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
     esp_hal_embassy::init(
         &clocks,
         mk_static!(
             [OneShotTimer<ErasedTimer>; 1],
-            [OneShotTimer::new(timg1.timer0.into())]
+            [OneShotTimer::new(timg0.timer0.into())]
         ),
     );
 

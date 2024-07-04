@@ -534,7 +534,7 @@ fn lint_packages(workspace: &Path, _args: LintPackagesArgs) -> Result<()> {
                 &[
                     "-Zbuild-std=core",
                     "--target=riscv32imc-unknown-none-elf",
-                    "--features=esp32c3,wifi-default,ble,esp-now,async,embassy-net,esp-hal-embassy/time-timg0",
+                    "--features=esp32c3,wifi-default,ble,esp-now,async,embassy-net",
                 ],
             )?,
 

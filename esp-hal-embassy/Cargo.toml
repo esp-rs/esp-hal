@@ -9,7 +9,7 @@ license      = "MIT OR Apache-2.0"
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
-features       = ["esp32c6", "time-timg0"]
+features       = ["esp32c6"]
 
 [dependencies]
 critical-section    = "1.1.2"

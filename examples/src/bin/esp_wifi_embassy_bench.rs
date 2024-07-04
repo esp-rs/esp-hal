@@ -27,7 +27,7 @@ use esp_hal::{
     prelude::*,
     rng::Rng,
     system::SystemControl,
-    timer::{timg::TimerGroup, ErasedTimer, OneShotTimer, PeriodicTimer},
+    timer::{ErasedTimer, OneShotTimer, PeriodicTimer},
 };
 use esp_println::println;
 use esp_wifi::{
@@ -100,14 +100,29 @@ async fn main(spawner: Spawner) -> ! {
     let (wifi_interface, controller) =
         esp_wifi::wifi::new_with_mode(&init, wifi, WifiStaDevice).unwrap();
 
-    let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks, None);
-    esp_hal_embassy::init(
-        &clocks,
-        mk_static!(
-            [OneShotTimer<ErasedTimer>; 1],
-            [OneShotTimer::new(timg1.timer0.into())]
-        ),
-    );
+    #[cfg(feature = "esp32")]
+    {
+        let timg1 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1, &clocks, None);
+        esp_hal_embassy::init(
+            &clocks,
+            mk_static!(
+                [OneShotTimer<ErasedTimer>; 1],
+                [OneShotTimer::new(timg1.timer0.into())]
+            ),
+        );
+    }
+
+    #[cfg(not(feature = "esp32"))]
+    {
+        let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER);
+        esp_hal_embassy::init(
+            &clocks,
+            mk_static!(
+                [OneShotTimer<ErasedTimer>; 1],
+                [OneShotTimer::new(systimer.alarm0.into())]
+            ),
+        );
+    }
 
     let config = Config::dhcpv4(Default::default());
 
