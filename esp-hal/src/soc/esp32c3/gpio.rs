@@ -55,11 +55,16 @@ pub const NUM_PINS: usize = 22;
 
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
 
+#[doc(hidden)]
 pub type OutputSignalType = u8;
+#[doc(hidden)]
 pub const OUTPUT_SIGNAL_MAX: u8 = 128;
+#[doc(hidden)]
 pub const INPUT_SIGNAL_MAX: u8 = 100;
 
+#[doc(hidden)]
 pub const ONE_INPUT: u8 = 0x1e;
+#[doc(hidden)]
 pub const ZERO_INPUT: u8 = 0x1f;
 
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function1;
@@ -75,6 +80,7 @@ pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, PartialEq)]
+#[doc(hidden)]
 pub enum InputSignal {
     SPIQ             = 0,
     SPID             = 1,
@@ -123,6 +129,7 @@ pub enum InputSignal {
 /// Peripheral output signals for the GPIO mux
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, PartialEq)]
+#[doc(hidden)]
 pub enum OutputSignal {
     SPIQ             = 0,
     SPID             = 1,
