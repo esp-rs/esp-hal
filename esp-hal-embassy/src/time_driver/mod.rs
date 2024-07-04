@@ -12,12 +12,12 @@ use esp_hal::{
 
 pub const MAX_SUPPORTED_ALARM_COUNT: usize = 7;
 
-pub type TimerType = OneShotTimer<ErasedTimer>;
+pub type Timer = OneShotTimer<ErasedTimer>;
 
-static TIMERS: Mutex<RefCell<Option<&'static mut [TimerType]>>> = Mutex::new(RefCell::new(None));
+static TIMERS: Mutex<RefCell<Option<&'static mut [Timer]>>> = Mutex::new(RefCell::new(None));
 
 #[allow(clippy::type_complexity)]
-pub(crate) struct AlarmState {
+struct AlarmState {
     pub callback: Cell<Option<(fn(*mut ()), *mut ())>>,
     pub allocated: Cell<bool>,
 }
@@ -33,8 +33,8 @@ impl AlarmState {
     }
 }
 
-pub struct EmbassyTimer {
-    pub(crate) alarms: Mutex<[AlarmState; MAX_SUPPORTED_ALARM_COUNT]>,
+pub(super) struct EmbassyTimer {
+    alarms: Mutex<[AlarmState; MAX_SUPPORTED_ALARM_COUNT]>,
 }
 
 #[allow(clippy::declare_interior_mutable_const)]
@@ -45,37 +45,7 @@ embassy_time_driver::time_driver_impl!(static DRIVER: EmbassyTimer = EmbassyTime
 });
 
 impl EmbassyTimer {
-    pub(crate) fn now() -> u64 {
-        current_time().ticks()
-    }
-
-    pub(crate) fn on_alarm_allocated(&self, _n: usize) {
-        info!("on_alarm_allocated {}", _n);
-    }
-
-    fn on_interrupt(&self, id: usize) {
-        let cb = critical_section::with(|cs| {
-            let mut timers = TIMERS.borrow_ref_mut(cs);
-            let timers = timers.as_mut().unwrap();
-            let timer = &mut timers[id];
-
-            timer.clear_interrupt();
-
-            let alarm = &self.alarms.borrow(cs)[id];
-
-            if let Some((f, ctx)) = alarm.callback.get() {
-                Some((f, ctx))
-            } else {
-                None
-            }
-        });
-
-        if let Some((f, ctx)) = cb {
-            f(ctx);
-        }
-    }
-
-    pub fn init(_clocks: &Clocks, timers: &'static mut [TimerType]) {
+    pub(super) fn init(_clocks: &Clocks, timers: &'static mut [Timer]) {
         if timers.len() > MAX_SUPPORTED_ALARM_COUNT {
             panic!(
                 "Maximum of {} timers can be used.",
@@ -126,7 +96,64 @@ impl EmbassyTimer {
         }
     }
 
-    pub(crate) fn set_alarm(&self, alarm: AlarmHandle, timestamp: u64) -> bool {
+    fn on_interrupt(&self, id: usize) {
+        let cb = critical_section::with(|cs| {
+            let mut timers = TIMERS.borrow_ref_mut(cs);
+            let timers = timers.as_mut().unwrap();
+            let timer = &mut timers[id];
+
+            timer.clear_interrupt();
+
+            let alarm = &self.alarms.borrow(cs)[id];
+
+            if let Some((f, ctx)) = alarm.callback.get() {
+                Some((f, ctx))
+            } else {
+                None
+            }
+        });
+
+        if let Some((f, ctx)) = cb {
+            f(ctx);
+        }
+    }
+
+    fn arm(timer: &mut Timer, timestamp: u64) {
+        let now = current_time().duration_since_epoch();
+        let ts = timestamp.micros();
+        let timeout = if ts > now { ts - now } else { now };
+        timer.schedule(timeout).unwrap();
+        timer.enable_interrupt(true);
+    }
+}
+
+impl Driver for EmbassyTimer {
+    fn now(&self) -> u64 {
+        current_time().ticks()
+    }
+
+    unsafe fn allocate_alarm(&self) -> Option<AlarmHandle> {
+        critical_section::with(|cs| {
+            for (i, alarm) in self.alarms.borrow(cs).iter().enumerate() {
+                if !alarm.allocated.get() {
+                    // set alarm so it is not overwritten
+                    alarm.allocated.set(true);
+                    return Some(AlarmHandle::new(i as u8));
+                }
+            }
+            None
+        })
+    }
+
+    fn set_alarm_callback(&self, alarm: AlarmHandle, callback: fn(*mut ()), ctx: *mut ()) {
+        let n = alarm.id() as usize;
+        critical_section::with(|cs| {
+            let alarm = &self.alarms.borrow(cs)[n];
+            alarm.callback.set(Some((callback, ctx)));
+        })
+    }
+
+    fn set_alarm(&self, alarm: AlarmHandle, timestamp: u64) -> bool {
         // we sometimes get called with `u64::MAX` for apparently not yet initialized
         // timers which would fail later on
         if timestamp == u64::MAX {
@@ -149,45 +176,5 @@ impl EmbassyTimer {
         });
 
         true
-    }
-
-    fn arm(timer: &mut TimerType, timestamp: u64) {
-        let now = current_time().duration_since_epoch();
-        let ts = timestamp.micros();
-        let timeout = if ts > now { ts - now } else { now };
-        timer.schedule(timeout).unwrap();
-        timer.enable_interrupt(true);
-    }
-}
-
-impl Driver for EmbassyTimer {
-    fn now(&self) -> u64 {
-        EmbassyTimer::now()
-    }
-
-    unsafe fn allocate_alarm(&self) -> Option<AlarmHandle> {
-        critical_section::with(|cs| {
-            for (i, alarm) in self.alarms.borrow(cs).iter().enumerate() {
-                if !alarm.allocated.get() {
-                    // set alarm so it is not overwritten
-                    alarm.allocated.set(true);
-                    self.on_alarm_allocated(i);
-                    return Some(AlarmHandle::new(i as u8));
-                }
-            }
-            None
-        })
-    }
-
-    fn set_alarm_callback(&self, alarm: AlarmHandle, callback: fn(*mut ()), ctx: *mut ()) {
-        let n = alarm.id() as usize;
-        critical_section::with(|cs| {
-            let alarm = &self.alarms.borrow(cs)[n];
-            alarm.callback.set(Some((callback, ctx)));
-        })
-    }
-
-    fn set_alarm(&self, alarm: AlarmHandle, timestamp: u64) -> bool {
-        self.set_alarm(alarm, timestamp)
     }
 }

@@ -40,13 +40,13 @@ use esp_hal::clock::Clocks;
 
 #[cfg(feature = "executors")]
 pub use self::executor::{Executor, InterruptExecutor};
-use self::time_driver::{EmbassyTimer, TimerType};
+use self::time_driver::{EmbassyTimer, Timer};
 
 #[cfg(feature = "executors")]
 mod executor;
 mod time_driver;
 
 /// Initialize embassy
-pub fn init(clocks: &Clocks, time_driver: &'static mut [TimerType]) {
+pub fn init(clocks: &Clocks, time_driver: &'static mut [Timer]) {
     EmbassyTimer::init(clocks, time_driver)
 }
