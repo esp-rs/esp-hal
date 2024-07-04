@@ -7,6 +7,10 @@ description  = "HAL for low-power RISC-V coprocessors found in ESP32 devices"
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
 
+[lib]
+bench = false
+test  = false
+
 keywords = [
     "embedded",
     "embedded-hal",
@@ -25,6 +29,8 @@ cfg-if            = "1.0.0"
 document-features = "0.2.8"
 embedded-hal      = { version = "1.0.0",  optional = true }
 embedded-hal-02   = { version = "0.2.7",  optional = true, features = ["unproven"], package = "embedded-hal" }
+embedded-hal-nb   = { version = "1.0.0",  optional = true }
+embedded-io       = { version = "0.6.1",  optional = true }
 esp32c6-lp        = { git = "https://github.com/esp-rs/esp-pacs", rev = "9c76169", features = ["critical-section"], optional = true }
 esp32s2-ulp       = { git = "https://github.com/esp-rs/esp-pacs", rev = "9c76169", features = ["critical-section"], optional = true }
 esp32s3-ulp       = { git = "https://github.com/esp-rs/esp-pacs", rev = "9c76169", features = ["critical-section"], optional = true }
@@ -60,9 +66,11 @@ esp32s3 = ["dep:esp32s3-ulp", "procmacros/is-ulp-core"]
 #! ### Trait Implementation Feature Flags
 ## Implement the traits defined in the `0.2.x` release of `embedded-hal`.
 embedded-hal-02 = ["dep:embedded-hal-02"]
-## Implement the traits defined in the `1.0.0` releases of `embedded-hal`
-## for the relevant peripherals.
-embedded-hal = ["dep:embedded-hal"]
+## Implement the traits defined in the `1.0.0` releases of `embedded-hal` and
+## `embedded-hal-nb` for the relevant peripherals.
+embedded-hal = ["dep:embedded-hal", "dep:embedded-hal-nb"]
+## Implement the traits defined in `embedded-io` for the relevant peripherals.
+embedded-io = ["dep:embedded-io"]
 
 [[example]]
 name              = "blinky"

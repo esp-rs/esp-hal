@@ -15,6 +15,20 @@ pub unsafe fn conjure() -> LpUart {
 #[derive(Debug)]
 pub enum Error {}
 
+#[cfg(feature = "embedded-hal")]
+impl embedded_hal_nb::serial::Error for Error {
+    fn kind(&self) -> embedded_hal_nb::serial::ErrorKind {
+        embedded_hal_nb::serial::ErrorKind::Other
+    }
+}
+
+#[cfg(feature = "embedded-io")]
+impl embedded_io::Error for Error {
+    fn kind(&self) -> embedded_io::ErrorKind {
+        embedded_io::ErrorKind::Other
+    }
+}
+
 /// UART configuration
 pub mod config {
     /// Number of data bits
@@ -140,8 +154,13 @@ impl LpUart {
         }
     }
 
-    fn write_bytes(&mut self, data: &[u8]) -> nb::Result<(), Error> {
-        data.iter().try_for_each(|c| self.write_byte(*c))
+    fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
+        let count = data.len();
+
+        data.iter()
+            .try_for_each(|c| nb::block!(self.write_byte(*c)))?;
+
+        Ok(count)
     }
 
     fn flush_tx(&mut self) -> nb::Result<(), Error> {
@@ -167,7 +186,9 @@ impl LpUart {
 
 impl core::fmt::Write for LpUart {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        self.write_bytes(s.as_bytes()).map_err(|_| core::fmt::Error)
+        self.write_bytes(s.as_bytes())
+            .map_err(|_| core::fmt::Error)?;
+        Ok(())
     }
 }
 
@@ -190,5 +211,80 @@ impl embedded_hal_02::serial::Write<u8> for LpUart {
 
     fn flush(&mut self) -> nb::Result<(), Self::Error> {
         self.flush_tx()
+    }
+}
+
+#[cfg(feature = "embedded-hal")]
+impl embedded_hal_nb::serial::ErrorType for LpUart {
+    type Error = Error;
+}
+
+#[cfg(feature = "embedded-hal")]
+impl embedded_hal_nb::serial::Read for LpUart {
+    fn read(&mut self) -> nb::Result<u8, Self::Error> {
+        self.read_byte()
+    }
+}
+
+#[cfg(feature = "embedded-hal")]
+impl embedded_hal_nb::serial::Write for LpUart {
+    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
+        self.write_byte(word)
+    }
+
+    fn flush(&mut self) -> nb::Result<(), Self::Error> {
+        self.flush_tx()
+    }
+}
+
+#[cfg(feature = "embedded-io")]
+impl embedded_io::ErrorType for LpUart {
+    type Error = Error;
+}
+
+#[cfg(feature = "embedded-io")]
+impl embedded_io::Read for LpUart {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+        if buf.len() == 0 {
+            return Ok(0);
+        }
+
+        while self.get_rx_fifo_count() == 0 {
+            // Block until we have received at least one byte
+        }
+
+        let mut count = 0;
+        while self.get_rx_fifo_count() > 0 && count < buf.len() {
+            buf[count] = self.uart.fifo().read().rxfifo_rd_byte().bits();
+            count += 1;
+        }
+
+        Ok(count)
+    }
+}
+
+#[cfg(feature = "embedded-io")]
+impl embedded_io::ReadReady for LpUart {
+    fn read_ready(&mut self) -> Result<bool, Self::Error> {
+        Ok(self.get_rx_fifo_count() > 0)
+    }
+}
+
+#[cfg(feature = "embedded-io")]
+impl embedded_io::Write for LpUart {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+        self.write_bytes(buf)
+    }
+
+    fn flush(&mut self) -> Result<(), Self::Error> {
+        loop {
+            match self.flush_tx() {
+                Ok(_) => break,
+                Err(nb::Error::WouldBlock) => { /* Wait */ }
+                Err(nb::Error::Other(e)) => return Err(e),
+            }
+        }
+
+        Ok(())
     }
 }
