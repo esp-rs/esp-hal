@@ -29,7 +29,7 @@
 //!     io.pins.gpio2).unwrap();
 //! # }
 //! ```
-//! 
+//!
 //! The UART controller can be configured to invert the polarity of the pins.
 //! This is achived by inverting the desired pins, and then constucting the
 //! UART instance using the inverted pins.
@@ -66,7 +66,7 @@
 //! uart1.write_bytes("Hello, world!".as_bytes()).expect("write error!");
 //! # }
 //! ```
-//! 
+//!
 //! #### Splitting the UART into TX and RX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -89,7 +89,7 @@
 //! let byte = rx.read_byte().expect("read error!");
 //! # }
 //! ```
-//! 
+//!
 //! #### Inverting TX and RX Pins
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -102,7 +102,7 @@
 //! let mut uart1 = Uart::new(peripherals.UART1, &clocks, tx, rx).unwrap();
 //! # }
 //! ```
-//! 
+//!
 //! #### Constructing TX and RX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -116,7 +116,7 @@
 //!     io.pins.gpio2).unwrap();
 //! # }
 //! ```
-//! 
+//!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 //! [embedded-io]: https://docs.rs/embedded-io/latest/embedded_io/
 //! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/
@@ -274,7 +274,7 @@ pub mod config {
         pub stop_bits: StopBits,
         pub clock_source: super::ClockSource,
         pub rx_fifo_full_threshold: u16,
-        pub rx_timeout: u8,
+        pub rx_timeout: Option<u8>,
     }
 
     impl Config {
@@ -337,7 +337,7 @@ pub mod config {
             self
         }
 
-        pub fn rx_timeout(mut self, timeout: u8) -> Self {
+        pub fn rx_timeout(mut self, timeout: Option<u8>) -> Self {
             self.rx_timeout = timeout;
             self
         }
@@ -355,7 +355,7 @@ pub mod config {
                 #[cfg(not(any(esp32c6, esp32h2, lp_uart)))]
                 clock_source: super::ClockSource::Apb,
                 rx_fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
-                rx_timeout: UART_TOUT_THRESH_DEFAULT,
+                rx_timeout: Some(UART_TOUT_THRESH_DEFAULT),
             }
         }
     }
@@ -764,7 +764,7 @@ where
         serial
             .rx
             .set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)?;
-        serial.rx.set_rx_timeout(Some(config.rx_timeout))?;
+        serial.rx.set_rx_timeout(config.rx_timeout)?;
         serial.change_baud_internal(config.baudrate, config.clock_source, clocks);
         serial.change_data_bits(config.data_bits);
         serial.change_parity(config.parity);
