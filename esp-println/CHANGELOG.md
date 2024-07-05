@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `auto` is the default communication method (#1658)
+- Add the `links` field to Cargo.toml so that only one version of the package can be included (#1761)
 
 ### Removed
 
