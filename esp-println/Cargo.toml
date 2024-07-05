@@ -6,6 +6,7 @@ rust-version = "1.76.0"
 description  = "Provides `print!` and `println!` implementations various Espressif devices"
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
+links        = "esp-println"
 
 [package.metadata.docs.rs]
 cargo-args     = ["-Z", "build-std=core"]
