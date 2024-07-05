@@ -1,4 +1,4 @@
-//! # MD5 Message-Digest Algorithm
+//! # MD5 Message-Digest Algorithm (MD5)
 //!
 //! ## ⚠️ Security Warning ⚠️
 //!
@@ -25,8 +25,7 @@
 //! than it would be if you included an MD5 implementation in your project.
 //!
 //! ## Example
-//!
-//! To compute a full digest from a single buffer, use the following:
+//! ## Compute a Full Digest From a Single Buffer
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -42,8 +41,7 @@
 //! writeln!(uart0, "{}", d);
 //! # }
 //! ```
-//! 
-//! To compute a digest over multiple buffers:
+//! ## Compute a Digest Over Multiple Buffers:
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::rom::md5;
