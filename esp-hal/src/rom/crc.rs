@@ -37,7 +37,7 @@
 //! # }
 //! ```
 //! 
-//! ## Example
+//! ## Examples
 //! A catalogue of these parameters can be found at
 //! <https://reveng.sourceforge.io/crc-catalogue/all.htm>
 //!

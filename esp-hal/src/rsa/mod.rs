@@ -27,7 +27,7 @@
 //! This peripheral supports `async` on every available chip except of `esp32`
 //! (to be solved).
 //!
-//! ## Example
+//! ## Examples
 //! ### Modular Exponentiation, Modular Multiplication, and Multiplication
 //! Visit the [RSA] test for an example of using the peripheral.
 //!

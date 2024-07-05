@@ -13,7 +13,7 @@
 //! When using AES-DMA, the peripheral can be configured to use different block
 //! cipher modes such as ECB, CBC, OFB, CTR, CFB8, and CFB128.
 //!
-//! ## Example
+//! ## Examples
 //! ### Encrypting and Decrypting a Message
 //! Simple example of encrypting and decrypting a message using AES-128:
 //! ```rust, no_run

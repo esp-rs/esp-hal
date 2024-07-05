@@ -6,8 +6,7 @@
 //! and managing the APP (second) CPU core on the `ESP32-S3` chip. It is used to
 //! start and stop program execution on the APP core.
 //!
-//! ## Example
-//!
+//! ## Examples
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;

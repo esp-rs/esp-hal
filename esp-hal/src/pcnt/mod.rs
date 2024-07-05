@@ -12,7 +12,7 @@
 //!    * [channel]
 //!    * [unit]
 //!
-//! ## Example
+//! ## Examples
 //! ### Decoding a quadrature encoder
 //! Visit the [PCNT Encoder] example for an example of using the peripheral.
 //!

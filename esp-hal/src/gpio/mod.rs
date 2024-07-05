@@ -26,7 +26,7 @@
 //!    - It supports inverting the pin, so the peripheral signal can be
 //!      inverted.
 //!
-//! ## Example
+//! ## Examples
 //! ### Set up a GPIO as an Output
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -35,6 +35,7 @@
 //! let mut led = Output::new(io.pins.gpio5, Level::High);
 //! # }
 //! ```
+//! 
 //! ### Blink an LED
 //! See the [Commonly Used Setup] section of the crate documentation.
 //!

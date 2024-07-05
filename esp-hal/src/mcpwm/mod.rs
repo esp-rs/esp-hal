@@ -39,7 +39,7 @@
 #![cfg_attr(esp32c6, doc = "Clock source is CRYPTO_CLOCK")]
 #![cfg_attr(esp32h2, doc = "Clock source is XTAL")]
 #![doc = ""]
-//! ## Example
+//! ## Examples
 //! ### Output a 20 kHz signal
 //! Uses timer0 and operator0 of the MCPWM0 peripheral to output a 50% duty
 //! signal at 20 kHz. The signal will be output to the pin assigned to `pin`.

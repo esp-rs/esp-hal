@@ -10,7 +10,7 @@
 //! block for at least the amount of time specified, but accuracy can be
 //! affected by many factors, including interrupt usage.
 //!
-//! ## Example
+//! ## Examples
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
@@ -20,7 +20,7 @@
 //! delay.delay_ms(1000 as u32);
 //! # }
 //! ```
-//! 
+//!
 //! [DelayMs]: embedded_hal_02::blocking::delay::DelayMs
 //! [DelayUs]: embedded_hal_02::blocking::delay::DelayUs
 //! [embedded-hal]: https://docs.rs/embedded-hal/0.2.7/embedded_hal/index.html

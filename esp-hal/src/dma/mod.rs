@@ -10,7 +10,7 @@
 //! `ESP32-S2` are using older `PDMA` controller, whenever other chips are using
 //! newer `GDMA` controller.
 //!
-//! ## Example
+//! ## Examples
 //! ### Initialize and Utilize DMA Controller in `SPI`
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]

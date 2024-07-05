@@ -21,7 +21,7 @@
 //! - ANY_EDGE: Indicates that the output signal of the corresponding GPIO is
 //!   reversed
 //!
-//! ## Example
+//! ## Examples
 //! ### Toogle an LED When a Button is Pressed
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
