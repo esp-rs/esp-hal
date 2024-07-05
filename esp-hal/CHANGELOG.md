@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix `sleep_light` for ESP32-C6 (#1720)
 - ROM Functions: Fix address of `ets_update_cpu_frequency_rom` (#1722)
 - Fix `regi2c_*` functions for `esp32h2` (#1737)
+- EESP32-S2 / ESP32-S3: Fix UsbDm and UsbDp for Gpio19 and Gpio20
 
 ### Changed
 
