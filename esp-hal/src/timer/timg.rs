@@ -1,12 +1,16 @@
 //! # Timer Group (TIMG)
 //!
+//! ## Overview
 //! The Timer Group (TIMG) peripherals contain one or more general-purpose
 //! timers, plus one or more watchdog timers.
 //!
 //! The general-purpose timers are based on a 16-bit pre-scaler and a 54-bit
-//! auto-reload-capable up-down counter. The timers have configurable alarms,
-//! which are triggered when the internal counter of the timers reaches a
-//! specific target value. The timers are clocked using the APB clock source.
+//! auto-reload-capable up-down counter.
+//!
+//! ## Configuration
+//! The timers have configurable alarms, which are triggered when the internal
+//! counter of the timers reaches a  specific target value. The timers are
+//! clocked using the APB clock source.
 //!
 //! Typically, a general-purpose timer can be used in scenarios such as:
 //!
@@ -14,12 +18,9 @@
 //! - Generate one-shot alarms; trigger events once
 //! - Free-running; fetching a high-resolution timestamp on demand
 //!
-//! ## Usage
 //!
-//! ### Examples
-//!
-//! #### General-purpose Timer
-//!
+//! ## Examples
+//! ### General-purpose Timer
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::timg::TimerGroup;
