@@ -29,7 +29,7 @@
 //!     io.pins.gpio2).unwrap();
 //! # }
 //! ```
-//!
+//! 
 //! The UART controller can be configured to invert the polarity of the pins.
 //! This is achived by inverting the desired pins, and then constucting the
 //! UART instance using the inverted pins.
@@ -66,7 +66,7 @@
 //! uart1.write_bytes("Hello, world!".as_bytes()).expect("write error!");
 //! # }
 //! ```
-//!
+//! 
 //! #### Splitting the UART into TX and RX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -89,7 +89,7 @@
 //! let byte = rx.read_byte().expect("read error!");
 //! # }
 //! ```
-//!
+//! 
 //! #### Inverting TX and RX Pins
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -102,7 +102,7 @@
 //! let mut uart1 = Uart::new(peripherals.UART1, &clocks, tx, rx).unwrap();
 //! # }
 //! ```
-//!
+//! 
 //! #### Constructing TX and RX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -116,7 +116,7 @@
 //!     io.pins.gpio2).unwrap();
 //! # }
 //! ```
-//!
+//! 
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 //! [embedded-io]: https://docs.rs/embedded-io/latest/embedded_io/
 //! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/
