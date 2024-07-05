@@ -1,7 +1,6 @@
 //! Low Power IO (LP_IO)
 //!
 //! # Overview
-//!
 //! The hardware provides a couple of GPIO pins with low power (LP)
 //! capabilities and analog functions.
 //!
