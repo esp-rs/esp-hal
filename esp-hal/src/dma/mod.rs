@@ -293,7 +293,7 @@ macro_rules! dma_descriptors_chunk_size {
     ($tx_size:expr, $rx_size:expr, $chunk_size:expr) => {{
         // these will check for size at compile time
         const _: () = assert!($chunk_size <= 4092, "chunk size must be <= 4092");
-        const _: () = assert!($chunk_size > 9, "chunk size must be > 0");
+        const _: () = assert!($chunk_size > 0, "chunk size must be > 0");
 
         static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor;
             ($tx_size + $chunk_size - 1) / $chunk_size] =
