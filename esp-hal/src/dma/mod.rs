@@ -194,11 +194,11 @@ macro_rules! dma_circular_buffers {
 #[macro_export]
 macro_rules! dma_descriptors {
     ($tx_size:expr, $rx_size:expr) => {
-        $crate::dma_descriptors_chunk_size!($tx_size, $rx_size, CHUNK_SIZE)
+        $crate::dma_descriptors_chunk_size!($tx_size, $rx_size, $crate::dma::CHUNK_SIZE)
     };
 
     ($size:expr) => {
-        $crate::dma_descriptors_chunk_size!($size, $size, CHUNK_SIZE)
+        $crate::dma_descriptors_chunk_size!($size, $size, $crate::dma::CHUNK_SIZE)
     };
 }
 
@@ -322,7 +322,7 @@ macro_rules! dma_circular_descriptors_chunk_size {
     ($tx_size:expr, $rx_size:expr, $chunk_size:expr) => {{
         // these will check for size at compile time
         const _: () = assert!($chunk_size <= 4092, "chunk size must be <= 4092");
-        const _: () = assert!($chunk_size > 9, "chunk size must be > 0");
+        const _: () = assert!($chunk_size > 0, "chunk size must be > 0");
 
         const tx_descriptor_len: usize = if $tx_size > $chunk_size * 2 {
             ($tx_size + $chunk_size - 1) / $chunk_size
@@ -367,6 +367,8 @@ pub enum DmaError {
     BufferTooSmall,
     /// Descriptors or buffers are not located in a supported memory region
     UnsupportedMemoryRegion,
+    /// Invalid DMA chunk size
+    InvalidChunkSize,
 }
 
 /// DMA Priorities

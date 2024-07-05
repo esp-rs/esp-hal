@@ -11,12 +11,12 @@ use esp_backtrace as _;
 const DATA_SIZE: usize = 1024 * 10;
 
 pub(crate) const fn compute_size(size: usize, chunk_size: usize) -> usize {
-    (size + chunk_size - 1) / chunk_size
+    size.div_ceil(chunk_size)
 }
 
 pub(crate) const fn compute_circular_size(size: usize, chunk_size: usize) -> usize {
     if size > chunk_size * 2 {
-        (size + chunk_size - 1) / chunk_size
+        size.div_ceil(chunk_size)
     } else {
         3
     }

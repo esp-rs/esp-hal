@@ -655,36 +655,38 @@ mod m2m {
     {
         /// Create a new Mem2Mem instance.
         pub fn new(
-            mut channel: Channel<'d, C, MODE>,
+            channel: Channel<'d, C, MODE>,
             peripheral: impl DmaEligible,
             tx_descriptors: &'static mut [DmaDescriptor],
             rx_descriptors: &'static mut [DmaDescriptor],
-        ) -> Self {
-            channel.tx.init_channel();
-            channel.rx.init_channel();
-            Mem2Mem {
-                channel,
-                peripheral: peripheral.dma_peripheral(),
-                tx_chain: DescriptorChain::new(tx_descriptors),
-                rx_chain: DescriptorChain::new(rx_descriptors),
+        ) -> Result<Self, DmaError> {
+            unsafe {
+                Self::new_unsafe(
+                    channel,
+                    peripheral.dma_peripheral(),
+                    tx_descriptors,
+                    rx_descriptors,
+                    crate::dma::CHUNK_SIZE,
+                )
             }
         }
 
         /// Create a new Mem2Mem instance with specific chunk size.
         pub fn new_with_chunk_size(
-            mut channel: Channel<'d, C, MODE>,
+            channel: Channel<'d, C, MODE>,
             peripheral: impl DmaEligible,
             tx_descriptors: &'static mut [DmaDescriptor],
             rx_descriptors: &'static mut [DmaDescriptor],
             chunk_size: usize,
-        ) -> Self {
-            channel.tx.init_channel();
-            channel.rx.init_channel();
-            Mem2Mem {
-                channel,
-                peripheral: peripheral.dma_peripheral(),
-                tx_chain: DescriptorChain::new_with_chunk_size(tx_descriptors, chunk_size),
-                rx_chain: DescriptorChain::new_with_chunk_size(rx_descriptors, chunk_size),
+        ) -> Result<Self, DmaError> {
+            unsafe {
+                Self::new_unsafe(
+                    channel,
+                    peripheral.dma_peripheral(),
+                    tx_descriptors,
+                    rx_descriptors,
+                    chunk_size,
+                )
             }
         }
 
@@ -699,15 +701,22 @@ mod m2m {
             peripheral: DmaPeripheral,
             tx_descriptors: &'static mut [DmaDescriptor],
             rx_descriptors: &'static mut [DmaDescriptor],
-        ) -> Self {
+            chunk_size: usize,
+        ) -> Result<Self, DmaError> {
+            if !(1..=4092).contains(&chunk_size) {
+                return Err(DmaError::InvalidChunkSize);
+            }
+            if tx_descriptors.is_empty() || rx_descriptors.is_empty() {
+                return Err(DmaError::OutOfDescriptors);
+            }
             channel.tx.init_channel();
             channel.rx.init_channel();
-            Mem2Mem {
+            Ok(Mem2Mem {
                 channel,
                 peripheral,
-                tx_chain: DescriptorChain::new(tx_descriptors),
-                rx_chain: DescriptorChain::new(rx_descriptors),
-            }
+                tx_chain: DescriptorChain::new_with_chunk_size(tx_descriptors, chunk_size),
+                rx_chain: DescriptorChain::new_with_chunk_size(rx_descriptors, chunk_size),
+            })
         }
 
         /// Start a memory to memory transfer.
