@@ -280,21 +280,15 @@ async fn display_task() {
     const STEP: u8 = (256 / MATRIX_COLS) as u8;
     for x in 0..MATRIX_COLS {
         let brightness = (x as u8) * STEP;
-        fb.set_pixel(Point::new(x as i32, 0), Color::new(brightness, 0, 0));
-        fb.set_pixel(Point::new(x as i32, 1), Color::new(brightness, 0, 0));
-        fb.set_pixel(Point::new(x as i32, 2), Color::new(brightness, 0, 0));
-        fb.set_pixel(Point::new(x as i32, 3), Color::new(brightness, 0, 0));
-        fb.set_pixel(Point::new(x as i32, 4), Color::new(brightness, 0, 0));
-        fb.set_pixel(Point::new(x as i32, 5), Color::new(0, brightness, 0));
-        fb.set_pixel(Point::new(x as i32, 6), Color::new(0, brightness, 0));
-        fb.set_pixel(Point::new(x as i32, 7), Color::new(0, brightness, 0));
-        fb.set_pixel(Point::new(x as i32, 8), Color::new(0, brightness, 0));
-        fb.set_pixel(Point::new(x as i32, 9), Color::new(0, brightness, 0));
-        fb.set_pixel(Point::new(x as i32, 10), Color::new(0, 0, brightness));
-        fb.set_pixel(Point::new(x as i32, 11), Color::new(0, 0, brightness));
-        fb.set_pixel(Point::new(x as i32, 12), Color::new(0, 0, brightness));
-        fb.set_pixel(Point::new(x as i32, 13), Color::new(0, 0, brightness));
-        fb.set_pixel(Point::new(x as i32, 14), Color::new(0, 0, brightness));
+        for y in 0..8 {
+            fb.set_pixel(Point::new(x as i32, y), Color::new(brightness, 0, 0));
+        }
+        for y in 8..16 {
+            fb.set_pixel(Point::new(x as i32, y), Color::new(0, brightness, 0));
+        }
+        for y in 16..24 {
+            fb.set_pixel(Point::new(x as i32, y), Color::new(0, 0, brightness));
+        }
     }
 
     let fps_style = MonoTextStyleBuilder::new()
@@ -375,16 +369,9 @@ struct DisplayPeripherals {
 #[task]
 async fn hub75_task(paripherals: DisplayPeripherals, clocks: Clocks<'static>) {
     let channel: esp_hal::dma::ChannelCreator<0> = paripherals.dma_channel;
-    let mut tx_descriptors =
-        [esp_hal::dma::DmaDescriptor::EMPTY; (DMA_BUFFER_SIZE * 2 + 4091) / 4092];
-    let mut rx_descriptors = [esp_hal::dma::DmaDescriptor::EMPTY; 0];
+    let (tx_descriptors, _) = esp_hal::dma_descriptors!(DMA_BUFFER_SIZE * 2, 0);
 
-    let channel = channel.configure(
-        false,
-        &mut tx_descriptors,
-        &mut rx_descriptors,
-        DmaPriority::Priority0,
-    );
+    let channel = channel.configure(false, DmaPriority::Priority0);
     let pins = TxSixteenBits::new(
         paripherals.addr0,
         paripherals.addr1,
@@ -409,6 +396,7 @@ async fn hub75_task(paripherals: DisplayPeripherals, clocks: Clocks<'static>) {
     let mut i8080 = I8080::new(
         lcd_cam.lcd,
         channel.tx,
+        tx_descriptors,
         pins,
         40.MHz(),
         i8080::Config::default(),
