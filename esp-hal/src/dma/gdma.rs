@@ -748,16 +748,6 @@ mod m2m {
         }
     }
 
-    impl<'d, C, MODE> Drop for Mem2Mem<'d, C, MODE>
-    where
-        C: ChannelTypes,
-        MODE: crate::Mode,
-    {
-        fn drop(&mut self) {
-            self.channel.rx.set_mem2mem_mode(false);
-        }
-    }
-
     impl<'d, C, MODE> DmaSupport for Mem2Mem<'d, C, MODE>
     where
         C: ChannelTypes,

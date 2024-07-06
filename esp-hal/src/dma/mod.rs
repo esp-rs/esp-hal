@@ -1017,6 +1017,10 @@ where
     fn init(&mut self, burst_mode: bool, priority: DmaPriority) {
         R::set_in_burstmode(burst_mode);
         R::set_in_priority(priority);
+        // clear the mem2mem mode to avoid failed DMA if this
+        // channel was previously used for a mem2mem transfer.
+        #[cfg(gdma)]
+        R::set_mem2mem_mode(false);
     }
 
     unsafe fn prepare_transfer_without_start(
