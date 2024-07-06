@@ -201,7 +201,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     let trait_check = if zeroed {
         Some("zeroable")
     } else if persistent {
-        Some("any_bit_pattern")
+        Some("persistable")
     } else {
         None
     };
