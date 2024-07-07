@@ -493,9 +493,6 @@ macro_rules! impl_channel {
             }
 
             impl ChannelTypes for Channel<$num> {
-                type P = SuitablePeripheral<$num>;
-                type Tx<'a> = ChannelTx<'a, GdmaCh<$num>>;
-                type Rx<'a> = ChannelRx<'a, GdmaCh<$num>>;
                 type Binder = ChannelInterruptBinder<$num>;
             }
 

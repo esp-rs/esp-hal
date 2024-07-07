@@ -55,9 +55,6 @@ macro_rules! ImplSpiChannel {
             impl $crate::private::Sealed for [<Spi $num DmaChannel>] {}
 
             impl ChannelTypes for [<Spi $num DmaChannel>] {
-                type P = [<Spi $num DmaSuitablePeripheral>];
-                type Tx<'a> = ChannelTx<'a, [<Spi $num DmaCh>]>;
-                type Rx<'a> = ChannelRx<'a, [<Spi $num DmaCh>]>;
                 type Binder = [<Channel $num InterruptBinder>];
             }
 
@@ -478,9 +475,6 @@ macro_rules! ImplI2sChannel {
             impl $crate::private::Sealed for [<I2s $num DmaChannel>] {}
 
             impl ChannelTypes for [<I2s $num DmaChannel>] {
-                type P = [<I2s $num DmaSuitablePeripheral>];
-                type Tx<'a> = ChannelTx<'a, [<I2s $num DmaCh>]>;
-                type Rx<'a> = ChannelRx<'a, [<I2s $num DmaCh>]>;
                 type Binder = [<Channel $num InterruptBinder>];
             }
 

@@ -1513,9 +1513,6 @@ pub trait RegisterAccess: crate::private::Sealed {
 
 #[doc(hidden)]
 pub trait ChannelTypes: crate::private::Sealed {
-    type P: PeripheralMarker;
-    type Tx<'a>: Tx;
-    type Rx<'a>: Rx;
     type Binder: InterruptBinder;
 }
 
