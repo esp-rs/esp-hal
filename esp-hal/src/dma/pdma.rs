@@ -36,6 +36,18 @@ macro_rules! ImplSpiChannel {
                 }
             }
 
+            #[doc = concat!("A description of the SPI", $num, " DMA channel")]
+            #[non_exhaustive]
+            pub struct [<Spi $num DmaCh>] {}
+
+            impl $crate::private::Sealed for [<Spi $num DmaCh>] {}
+            impl DmaChannel for [<Spi $num DmaCh>] {
+                type Channel = [<Spi $num DmaChannel>];
+                type Rx = [<Spi $num DmaChannelRxImpl>];
+                type Tx = [<Spi $num DmaChannelTxImpl>];
+                type P = [<Spi $num DmaSuitablePeripheral>];
+            }
+
             #[doc = concat!("DMA channel suitable for SPI", $num)]
             #[non_exhaustive]
             pub struct [<Spi $num DmaChannel>] {}
@@ -44,8 +56,8 @@ macro_rules! ImplSpiChannel {
 
             impl ChannelTypes for [<Spi $num DmaChannel>] {
                 type P = [<Spi $num DmaSuitablePeripheral>];
-                type Tx<'a> = ChannelTx<'a,[<Spi $num DmaChannelTxImpl>], [<Spi $num DmaChannel>]>;
-                type Rx<'a> = ChannelRx<'a,[<Spi $num DmaChannelRxImpl>], [<Spi $num DmaChannel>]>;
+                type Tx<'a> = ChannelTx<'a, [<Spi $num DmaCh>]>;
+                type Rx<'a> = ChannelRx<'a, [<Spi $num DmaCh>]>;
                 type Binder = [<Channel $num InterruptBinder>];
             }
 
@@ -448,6 +460,18 @@ macro_rules! ImplI2sChannel {
                 }
             }
 
+            #[doc = concat!("A description of the SPI", $num, " DMA channel")]
+            #[non_exhaustive]
+            pub struct [<I2s $num DmaCh>] {}
+
+            impl $crate::private::Sealed for [<I2s $num DmaCh>] {}
+            impl DmaChannel for [<I2s $num DmaCh>] {
+                type Channel = [<I2s $num DmaChannel>];
+                type Rx = [<I2s $num DmaChannelRxImpl>];
+                type Tx = [<I2s $num DmaChannelTxImpl>];
+                type P = [<I2s $num DmaSuitablePeripheral>];
+            }
+
             #[doc = concat!("DMA channel suitable for I2S", $num)]
             pub struct [<I2s $num DmaChannel>] {}
 
@@ -455,8 +479,8 @@ macro_rules! ImplI2sChannel {
 
             impl ChannelTypes for [<I2s $num DmaChannel>] {
                 type P = [<I2s $num DmaSuitablePeripheral>];
-                type Tx<'a> = ChannelTx<'a,[<I2s $num DmaChannelTxImpl>], [<I2s $num DmaChannel>]>;
-                type Rx<'a> = ChannelRx<'a,[<I2s $num DmaChannelRxImpl>], [<I2s $num DmaChannel>]>;
+                type Tx<'a> = ChannelTx<'a, [<I2s $num DmaCh>]>;
+                type Rx<'a> = ChannelRx<'a, [<I2s $num DmaCh>]>;
                 type Binder = [<Channel $num InterruptBinder>];
             }
 

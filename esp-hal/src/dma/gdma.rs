@@ -26,6 +26,19 @@ use crate::{
     system::{Peripheral, PeripheralClockControl},
 };
 
+/// A description of a GDMA channel
+#[non_exhaustive]
+pub struct GdmaCh<const N: u8> {}
+
+impl<const N: u8> crate::private::Sealed for GdmaCh<N> {}
+
+impl<const N: u8> DmaChannel for GdmaCh<N> {
+    type Channel = Channel<N>;
+    type Rx = ChannelRxImpl<N>;
+    type Tx = ChannelTxImpl<N>;
+    type P = SuitablePeripheral<N>;
+}
+
 #[non_exhaustive]
 pub struct Channel<const N: u8> {}
 
@@ -488,8 +501,8 @@ macro_rules! impl_channel {
 
             impl ChannelTypes for Channel<$num> {
                 type P = SuitablePeripheral<$num>;
-                type Tx<'a> = ChannelTx<'a, ChannelTxImpl<$num>, Channel<$num>>;
-                type Rx<'a> = ChannelRx<'a, ChannelRxImpl<$num>, Channel<$num>>;
+                type Tx<'a> = ChannelTx<'a, GdmaCh<$num>>;
+                type Rx<'a> = ChannelRx<'a, GdmaCh<$num>>;
                 type Binder = ChannelInterruptBinder<$num>;
             }
 

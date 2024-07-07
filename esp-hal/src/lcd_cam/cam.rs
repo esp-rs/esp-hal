@@ -72,17 +72,14 @@ use crate::{
     dma::{
         dma_private::{DmaSupport, DmaSupportRx},
         ChannelRx,
-        ChannelTypes,
         DescriptorChain,
+        DmaChannel,
         DmaDescriptor,
         DmaError,
         DmaPeripheral,
         DmaTransferRx,
         DmaTransferRxCircular,
         LcdCamPeripheral,
-        RegisterAccess,
-        Rx,
-        RxChannel,
         RxPrivate,
     },
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
@@ -119,23 +116,21 @@ pub struct Cam<'d> {
     pub(crate) lcd_cam: PeripheralRef<'d, LCD_CAM>,
 }
 
-pub struct Camera<'d, RX> {
+pub struct Camera<'d, CH: DmaChannel> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
-    rx_channel: RX,
+    rx_channel: ChannelRx<'d, CH>,
     rx_chain: DescriptorChain,
     // 1 or 2
     bus_width: usize,
 }
 
-impl<'d, T, R> Camera<'d, ChannelRx<'d, T, R>>
+impl<'d, CH: DmaChannel> Camera<'d, CH>
 where
-    T: RxChannel<R>,
-    R: ChannelTypes + RegisterAccess,
-    R::P: LcdCamPeripheral,
+    CH::P: LcdCamPeripheral,
 {
     pub fn new<P: RxPins>(
         cam: Cam<'d>,
-        mut channel: ChannelRx<'d, T, R>,
+        mut channel: ChannelRx<'d, CH>,
         descriptors: &'static mut [DmaDescriptor],
         _pins: P,
         frequency: HertzU32,
@@ -211,7 +206,7 @@ where
     }
 }
 
-impl<'d, RX: Rx> DmaSupport for Camera<'d, RX> {
+impl<'d, CH: DmaChannel> DmaSupport for Camera<'d, CH> {
     fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
         loop {
             // Wait for IN_SUC_EOF (i.e. VSYNC)
@@ -236,8 +231,8 @@ impl<'d, RX: Rx> DmaSupport for Camera<'d, RX> {
     }
 }
 
-impl<'d, RX: Rx> DmaSupportRx for Camera<'d, RX> {
-    type RX = RX;
+impl<'d, CH: DmaChannel> DmaSupportRx for Camera<'d, CH> {
+    type RX = ChannelRx<'d, CH>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
@@ -248,7 +243,7 @@ impl<'d, RX: Rx> DmaSupportRx for Camera<'d, RX> {
     }
 }
 
-impl<'d, RX: Rx> Camera<'d, RX> {
+impl<'d, CH: DmaChannel> Camera<'d, CH> {
     pub fn set_byte_order(&mut self, byte_order: ByteOrder) -> &mut Self {
         self.lcd_cam
             .cam_ctrl()
