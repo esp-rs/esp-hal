@@ -123,8 +123,10 @@ use crate::{
     dma::{
         dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
         Channel,
-        ChannelTypes,
+        ChannelRx,
+        ChannelTx,
         DescriptorChain,
+        DmaChannel,
         DmaDescriptor,
         DmaError,
         DmaPeripheral,
@@ -918,7 +920,7 @@ impl<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
 
 impl<'d, CH, DM> TxCreatorFullDuplex<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     DM: Mode,
 {
     /// Configure TX to use the given pins and settings
@@ -951,7 +953,7 @@ where
 
 impl<'d, CH, DM> TxCreator<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     DM: Mode,
 {
     /// Configure TX to use the given pins and settings
@@ -985,17 +987,17 @@ where
 /// Parallel IO TX channel
 pub struct ParlIoTx<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     DM: Mode,
 {
-    tx_channel: CH::Tx<'d>,
+    tx_channel: ChannelTx<'d, CH>,
     tx_chain: DescriptorChain,
     phantom: PhantomData<DM>,
 }
 
 impl<'d, CH, DM> core::fmt::Debug for ParlIoTx<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     DM: Mode,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -1005,7 +1007,7 @@ where
 
 impl<'d, CH, DM> RxCreatorFullDuplex<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     DM: Mode,
 {
     /// Configure RX to use the given pins and settings
@@ -1036,7 +1038,7 @@ where
 
 impl<'d, CH, DM> RxCreator<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     DM: Mode,
 {
     /// Configure RX to use the given pins and settings
@@ -1068,17 +1070,17 @@ where
 /// Parallel IO RX channel
 pub struct ParlIoRx<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     DM: Mode,
 {
-    rx_channel: CH::Rx<'d>,
+    rx_channel: ChannelRx<'d, CH>,
     rx_chain: DescriptorChain,
     phantom: PhantomData<DM>,
 }
 
 impl<'d, CH, DM> core::fmt::Debug for ParlIoRx<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     DM: Mode,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -1182,7 +1184,7 @@ fn internal_clear_interrupts(interrupts: EnumSet<ParlIoInterrupt>) {
 #[allow(missing_docs)]
 pub struct ParlIoFullDuplex<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
@@ -1192,7 +1194,7 @@ where
 
 impl<'d, CH, DM> ParlIoFullDuplex<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
@@ -1224,7 +1226,7 @@ where
 
 impl<'d, CH> ParlIoFullDuplex<'d, CH, Blocking>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     CH::P: ParlIoPeripheral,
 {
     /// Sets the interrupt handler, enables it with
@@ -1260,7 +1262,7 @@ where
 #[allow(missing_docs)]
 pub struct ParlIoTxOnly<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
@@ -1269,7 +1271,7 @@ where
 
 impl<'d, CH, DM> ParlIoTxOnly<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
@@ -1295,7 +1297,7 @@ where
 
 impl<'d, CH> ParlIoTxOnly<'d, CH, Blocking>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     CH::P: ParlIoPeripheral,
 {
     /// Sets the interrupt handler, enables it with
@@ -1331,7 +1333,7 @@ where
 #[allow(missing_docs)]
 pub struct ParlIoRxOnly<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
@@ -1340,7 +1342,7 @@ where
 
 impl<'d, CH, DM> ParlIoRxOnly<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
@@ -1366,7 +1368,7 @@ where
 
 impl<'d, CH> ParlIoRxOnly<'d, CH, Blocking>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     CH::P: ParlIoPeripheral,
 {
     /// Sets the interrupt handler, enables it with
@@ -1403,7 +1405,7 @@ fn internal_init<CH, DM>(
     frequency: HertzU32,
 ) -> Result<(), Error>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
@@ -1448,7 +1450,7 @@ where
 
 impl<'d, CH, DM> ParlIoTx<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
@@ -1507,7 +1509,7 @@ where
 
 impl<'d, CH, DM> DmaSupport for ParlIoTx<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
@@ -1524,11 +1526,11 @@ where
 
 impl<'d, CH, DM> DmaSupportTx for ParlIoTx<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
-    type TX = CH::Tx<'d>;
+    type TX = ChannelTx<'d, CH>;
 
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
@@ -1541,7 +1543,7 @@ where
 
 impl<'d, CH, DM> ParlIoRx<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
@@ -1572,7 +1574,7 @@ where
     }
 
     fn start_receive_bytes_dma(
-        rx_channel: &mut CH::Rx<'d>,
+        rx_channel: &mut ChannelRx<'d, CH>,
         rx_chain: &mut DescriptorChain,
         ptr: *mut u8,
         len: usize,
@@ -1602,7 +1604,7 @@ where
 
 impl<'d, CH, DM> DmaSupport for ParlIoRx<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
@@ -1626,11 +1628,11 @@ where
 
 impl<'d, CH, DM> DmaSupportRx for ParlIoRx<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
-    type RX = CH::Rx<'d>;
+    type RX = ChannelRx<'d, CH>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
@@ -1644,10 +1646,10 @@ where
 /// Creates a TX channel
 pub struct TxCreator<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     DM: Mode,
 {
-    tx_channel: CH::Tx<'d>,
+    tx_channel: ChannelTx<'d, CH>,
     descriptors: &'static mut [DmaDescriptor],
     phantom: PhantomData<DM>,
 }
@@ -1655,10 +1657,10 @@ where
 /// Creates a RX channel
 pub struct RxCreator<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     DM: Mode,
 {
-    rx_channel: CH::Rx<'d>,
+    rx_channel: ChannelRx<'d, CH>,
     descriptors: &'static mut [DmaDescriptor],
     phantom: PhantomData<DM>,
 }
@@ -1666,10 +1668,10 @@ where
 /// Creates a TX channel
 pub struct TxCreatorFullDuplex<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     DM: Mode,
 {
-    tx_channel: CH::Tx<'d>,
+    tx_channel: ChannelTx<'d, CH>,
     descriptors: &'static mut [DmaDescriptor],
     phantom: PhantomData<DM>,
 }
@@ -1677,10 +1679,10 @@ where
 /// Creates a RX channel
 pub struct RxCreatorFullDuplex<'d, CH, DM>
 where
-    CH: ChannelTypes,
+    CH: DmaChannel,
     DM: Mode,
 {
-    rx_channel: CH::Rx<'d>,
+    rx_channel: ChannelRx<'d, CH>,
     descriptors: &'static mut [DmaDescriptor],
     phantom: PhantomData<DM>,
 }
@@ -1695,7 +1697,7 @@ pub mod asynch {
 
     use super::{private::Instance, Error, ParlIoRx, ParlIoTx, MAX_DMA_SIZE};
     use crate::{
-        dma::{asynch::DmaRxDoneChFuture, ChannelTypes, ParlIoPeripheral},
+        dma::{asynch::DmaRxDoneChFuture, DmaChannel, ParlIoPeripheral},
         peripherals::Interrupt,
     };
 
@@ -1751,7 +1753,7 @@ pub mod asynch {
 
     impl<'d, CH> ParlIoTx<'d, CH, crate::Async>
     where
-        CH: ChannelTypes,
+        CH: DmaChannel,
         CH::P: ParlIoPeripheral,
     {
         /// Perform a DMA write.
@@ -1774,7 +1776,7 @@ pub mod asynch {
 
     impl<'d, CH> ParlIoRx<'d, CH, crate::Async>
     where
-        CH: ChannelTypes,
+        CH: DmaChannel,
         CH::P: ParlIoPeripheral,
     {
         /// Perform a DMA write.

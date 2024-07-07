@@ -224,8 +224,10 @@ pub mod dma {
             dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
             AesPeripheral,
             Channel,
-            ChannelTypes,
+            ChannelRx,
+            ChannelTx,
             DescriptorChain,
+            DmaChannel,
             DmaDescriptor,
             DmaPeripheral,
             DmaTransferTxRx,
@@ -255,7 +257,7 @@ pub mod dma {
     /// A DMA capable AES instance.
     pub struct AesDma<'d, C>
     where
-        C: ChannelTypes,
+        C: DmaChannel,
         C::P: AesPeripheral,
     {
         pub aes: super::Aes<'d>,
@@ -267,7 +269,7 @@ pub mod dma {
 
     pub trait WithDmaAes<'d, C>
     where
-        C: ChannelTypes,
+        C: DmaChannel,
         C::P: AesPeripheral,
     {
         fn with_dma(
@@ -280,7 +282,7 @@ pub mod dma {
 
     impl<'d, C> WithDmaAes<'d, C> for crate::aes::Aes<'d>
     where
-        C: ChannelTypes,
+        C: DmaChannel,
         C::P: AesPeripheral,
     {
         fn with_dma(
@@ -302,7 +304,7 @@ pub mod dma {
 
     impl<'d, C> core::fmt::Debug for AesDma<'d, C>
     where
-        C: ChannelTypes,
+        C: DmaChannel,
         C::P: AesPeripheral,
     {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -312,7 +314,7 @@ pub mod dma {
 
     impl<'d, C> DmaSupport for AesDma<'d, C>
     where
-        C: ChannelTypes,
+        C: DmaChannel,
         C::P: AesPeripheral,
     {
         fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
@@ -332,10 +334,10 @@ pub mod dma {
 
     impl<'d, C> DmaSupportTx for AesDma<'d, C>
     where
-        C: ChannelTypes,
+        C: DmaChannel,
         C::P: AesPeripheral,
     {
-        type TX = C::Tx<'d>;
+        type TX = ChannelTx<'d, C>;
 
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
@@ -348,10 +350,10 @@ pub mod dma {
 
     impl<'d, C> DmaSupportRx for AesDma<'d, C>
     where
-        C: ChannelTypes,
+        C: DmaChannel,
         C::P: AesPeripheral,
     {
-        type RX = C::Rx<'d>;
+        type RX = ChannelRx<'d, C>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx
@@ -364,7 +366,7 @@ pub mod dma {
 
     impl<'d, C> AesDma<'d, C>
     where
-        C: ChannelTypes,
+        C: DmaChannel,
         C::P: AesPeripheral,
     {
         /// Writes the encryption key to the AES hardware, checking that its

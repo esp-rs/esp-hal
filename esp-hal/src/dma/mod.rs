@@ -905,7 +905,7 @@ impl RxCircularState {
 /// A description of a DMA Channel.
 pub trait DmaChannel: crate::private::Sealed {
     #[doc(hidden)]
-    type Channel: RegisterAccess;
+    type Channel: ChannelTypes + RegisterAccess;
 
     /// A description of the RX half of a DMA Channel.
     type Rx: RxChannel<Self::Channel>;
@@ -1038,7 +1038,7 @@ where
 {
     pub(crate) burst_mode: bool,
     pub(crate) rx_impl: CH::Rx,
-    pub(crate) _phantom: PhantomData<&'a CH>,
+    pub(crate) _phantom: PhantomData<(&'a (), CH)>,
 }
 
 impl<'a, CH> ChannelRx<'a, CH>
@@ -1525,28 +1525,28 @@ pub trait InterruptBinder: crate::private::Sealed {
 }
 
 /// DMA Channel
-pub struct Channel<'d, C, MODE>
+pub struct Channel<'d, CH, MODE>
 where
-    C: ChannelTypes,
+    CH: DmaChannel,
     MODE: Mode,
 {
     /// TX half of the channel
-    pub tx: C::Tx<'d>,
+    pub tx: ChannelTx<'d, CH>,
     /// RX half of the channel
-    pub rx: C::Rx<'d>,
+    pub rx: ChannelRx<'d, CH>,
     phantom: PhantomData<MODE>,
 }
 
 impl<'d, C> Channel<'d, C, crate::Blocking>
 where
-    C: ChannelTypes,
+    C: DmaChannel,
 {
     /// Sets the interrupt handler for TX and RX interrupts, enables them
     /// with [crate::interrupt::Priority::max()]
     ///
     /// Interrupts are not enabled at the peripheral level here.
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        C::Binder::set_isr(handler);
+        <C::Channel as ChannelTypes>::Binder::set_isr(handler);
     }
 
     /// Listen for the given interrupts
