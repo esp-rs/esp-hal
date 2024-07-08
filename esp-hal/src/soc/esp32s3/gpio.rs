@@ -489,5 +489,5 @@ impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank1 {
 }
 
 // implement marker traits on USB pins
-impl crate::otg_fs::UsbDp for Gpio19 {}
-impl crate::otg_fs::UsbDm for Gpio20 {}
+impl crate::otg_fs::UsbDm for Gpio19 {}
+impl crate::otg_fs::UsbDp for Gpio20 {}
