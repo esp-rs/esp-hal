@@ -2,7 +2,7 @@
 //!
 //! ## Overview
 //! The PCNT module is designed to count the number of rising
-//! and/or falling edges of input signals. The may contain multiple pulse
+//! and/or falling edges of input signals. They may contain multiple pulse
 //! counter units in the module. Each unit is in effect an independent counter
 //! with multiple channels, where each channel can increment/decrement the
 //! counter on a rising/falling edge. Furthermore, each channel can be
