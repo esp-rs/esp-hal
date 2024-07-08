@@ -1,16 +1,21 @@
-//! # Delay driver
+//! # Delay
 //!
 //! ## Overview
 //! The Delay driver provides blocking delay functionalities using the
 //! `SYSTIMER` peripheral for RISC-V devices and the built-in Xtensa timer for
-//! Xtensa devices. This module implements the blocking [DelayMs] and [DelayUs]
-//! traits from [embedded-hal].
+//! Xtensa devices.
 //!
+//! ## Configuration
 //! The delays are implemented in a "best-effort" way, meaning that the CPU will
 //! block for at least the amount of time specified, but accuracy can be
 //! affected by many factors, including interrupt usage.
 //!
-//! ## Example
+//! ## Usage
+//! This module implements the blocking [DelayMs] and [DelayUs] traits from
+//! [embedded-hal], both 0.2.x and 1.x.x.
+//!
+//! ## Examples
+//! ### Delay for 1 second
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
@@ -23,7 +28,7 @@
 //! 
 //! [DelayMs]: embedded_hal_02::blocking::delay::DelayMs
 //! [DelayUs]: embedded_hal_02::blocking::delay::DelayUs
-//! [embedded-hal]: https://docs.rs/embedded-hal/0.2.7/embedded_hal/index.html
+//! [embedded-hal]: https://docs.rs/embedded-hal/1.0.0/embedded_hal/delay/index.html
 
 use fugit::HertzU64;
 pub use fugit::MicrosDurationU64;
