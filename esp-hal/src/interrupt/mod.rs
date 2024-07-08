@@ -1,7 +1,7 @@
 //! # Interrupt support
 //!
 //! ## Overview
-//! This modules routes one or multiple peripheral interrupt sources to any one
+//! This module routes one or multiple peripheral interrupt sources to any one
 //! of the CPU’s peripheral interrupts.
 //!
 //! ## Configuration
