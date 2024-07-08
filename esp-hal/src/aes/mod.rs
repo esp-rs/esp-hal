@@ -42,7 +42,7 @@
 //!
 //! [AES-DMA]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/aes_dma.rs
 //!
-//! ### Implementation State
+//! ## Implementation State
 //! * AES-DMA mode is currently not supported on ESP32 and ESP32S2
 //! * AES-DMA Initialization Vector (IV) is currently not supported
 
