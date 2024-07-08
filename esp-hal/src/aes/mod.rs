@@ -1,7 +1,7 @@
 //! # Advanced Encryption Standard (AES).
 //!
 //! ## Overview
-//! The AES accelerator is a a hardware device that speeds up computation
+//! The AES accelerator is a hardware device that speeds up computation
 //! using AES algorithm significantly, compared to AES algorithms implemented
 //! solely in software.  The AES accelerator has two working modes, which are
 //! Typical AES and AES-DMA.
