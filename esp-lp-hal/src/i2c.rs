@@ -1,8 +1,8 @@
 //! # Inter-Integrated Circuit (I2C)
 
-use esp32c6_lp::lp_i2c0::COMD;
+#![allow(unused)] // TODO: Remove me when `embedded_hal::i2c::I2c` is implemented
 
-use crate::pac::LP_I2C0;
+use crate::pac::{lp_i2c0::COMD, LP_I2C0};
 
 const LP_I2C_TRANS_COMPLETE_INT_ST_S: u32 = 7;
 const LP_I2C_END_DETECT_INT_ST_S: u32 = 3;
