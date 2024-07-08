@@ -274,7 +274,7 @@ pub mod config {
         pub stop_bits: StopBits,
         pub clock_source: super::ClockSource,
         pub rx_fifo_full_threshold: u16,
-        pub rx_timeout: u8,
+        pub rx_timeout: Option<u8>,
     }
 
     impl Config {
@@ -337,7 +337,7 @@ pub mod config {
             self
         }
 
-        pub fn rx_timeout(mut self, timeout: u8) -> Self {
+        pub fn rx_timeout(mut self, timeout: Option<u8>) -> Self {
             self.rx_timeout = timeout;
             self
         }
@@ -355,7 +355,7 @@ pub mod config {
                 #[cfg(not(any(esp32c6, esp32h2, lp_uart)))]
                 clock_source: super::ClockSource::Apb,
                 rx_fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
-                rx_timeout: UART_TOUT_THRESH_DEFAULT,
+                rx_timeout: Some(UART_TOUT_THRESH_DEFAULT),
             }
         }
     }
@@ -764,7 +764,7 @@ where
         serial
             .rx
             .set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)?;
-        serial.rx.set_rx_timeout(Some(config.rx_timeout))?;
+        serial.rx.set_rx_timeout(config.rx_timeout)?;
         serial.change_baud_internal(config.baudrate, config.clock_source, clocks);
         serial.change_data_bits(config.data_bits);
         serial.change_parity(config.parity);
