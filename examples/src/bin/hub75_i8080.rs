@@ -3,7 +3,7 @@
 //! This example draws a color gradient on the top 24 rors of the matrx
 //! and displays the refresh and render rates on the bottom.
 //!
-//! Pins used:
+//! Pins used: (Level convcerters are usuallu required 3.3v->5v)
 //!
 //! R1     GPIO38
 //! G1     GPIO42
@@ -19,8 +19,6 @@
 //! OE     GPIO11
 //! CLK    GPIO12
 //! LAT    GPIO10
-//! DUMMY1 GPIO6
-//! DUMMY2 GPIO7
 
 //% CHIPS: esp32s3
 //% FEATURES: async embassy embassy-time-timg0 embassy-generic-timers bitfield
@@ -144,6 +142,7 @@ const DMA_BUFFER_SIZE: usize = DMA_FRAME_SIZE * DMA_FRAMES_PER_BUFFER;
 
 type DmaBufferType = Mutex<CriticalSectionRawMutex, [Entry; DMA_BUFFER_SIZE]>;
 
+// we double buffer, while one us displayed on the panel the other is used to render the next display
 static BUFFER0: DmaBufferType = Mutex::new([Entry::new(); DMA_BUFFER_SIZE]);
 static BUFFER1: DmaBufferType = Mutex::new([Entry::new(); DMA_BUFFER_SIZE]);
 static DISPLAY_BUFFER: AtomicBool = AtomicBool::new(false);
@@ -378,8 +377,8 @@ async fn hub75_task(peripherals: DisplayPeripherals, clocks: Clocks<'static>) {
         AnyPin::new(peripherals.latch),
         AnyPin::new(peripherals.clock),
         AnyPin::new_inverted(peripherals.blank),
-        DummyPin::new(), // TODO: there should be a way to specify no pin
-        DummyPin::new(), // TODO: there should be a way to specify no pin
+        DummyPin::new(),
+        DummyPin::new(),
         AnyPin::new(peripherals.red1),
         AnyPin::new(peripherals.grn1),
         AnyPin::new(peripherals.blu1),
