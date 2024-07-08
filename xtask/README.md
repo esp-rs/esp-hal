@@ -17,6 +17,7 @@ Commands:
   generate-efuse-fields  Generate the eFuse fields source file from a CSV
   lint-packages          Lint all packages in the workspace with clippy
   run-example            Run the given example for the specified chip
+  run-doc-test           Run doctests for specified chip and package
   run-tests              Run all applicable tests or the specified test for a specified chip
   run-elfs               Run all ELFs in a folder
   help                   Print this message or the help of the given subcommand(s)
