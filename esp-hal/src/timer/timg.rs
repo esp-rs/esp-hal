@@ -9,7 +9,7 @@
 //!
 //! ## Configuration
 //! The timers have configurable alarms, which are triggered when the internal
-//! counter of the timers reaches a  specific target value. The timers are
+//! counter of the timers reaches a specific target value. The timers are
 //! clocked using the APB clock source.
 //!
 //! Typically, a general-purpose timer can be used in scenarios such as:
