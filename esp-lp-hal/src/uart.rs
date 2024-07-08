@@ -1,4 +1,36 @@
 //! # Universal Asynchronous Receiver/Transmitter (UART)
+//!
+//! The UART is a hardware peripheral which handles communication using serial
+//! interfaces. This peripheral provides a cheap and ubiquitous method for full-
+//! and half-duplex communication between devices.
+//!
+//! ## Configuration
+//!
+//! The usual setting such as baud rate, data bits, parity, and stop bits can
+//! easily be configured. See the [config] module documentation for more
+//! information.
+//!
+//! ## Usage
+//!
+//! The UART driver implements a number of third-party traits, with the
+//! intention of making the HAL inter-compatible with various device drivers
+//! from the community. This includes the [embedded-hal], [embedded-hal-nb], and
+//! [embedded-io] traits.
+//!
+//! ## Examples
+//!
+//! ```rust
+//! fn main(mut uart: LpUart) -> ! {
+//!     loop {
+//!         writeln!(uart, "Hello, world!").ok();
+//!         esp_lp_hal::delay::Delay.delay_ms(1000);
+//!     }
+//! }
+//! ```
+//!
+//! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
+//! [embedded-hal-nb]: https://docs.rs/embedded-hal-nb/latest/embedded_hal_nb/
+//! [embedded-io]: https://docs.rs/embedded-io/latest/embedded_io/
 
 use crate::pac::LP_UART;
 
