@@ -59,6 +59,9 @@
 //! transfer is controlled by the SPI master; if these are necessary,
 //! then the DmaTransfer trait instance can be wait()ed on or polled for
 //! is_done().
+//! - ESP32 does not support SPI Slave. See [tracking issue].
+//!
+//! [tracking issue]: https://github.com/esp-rs/esp-hal/issues/469
 
 use core::marker::PhantomData;
 
