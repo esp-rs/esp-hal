@@ -3,7 +3,7 @@
 //! ## Overview
 //! The TWAI is a multi-master, multi-cast communication protocol with error
 //! detection and signaling and inbuilt message priorities and arbitration. The
-//! TWAI protocol is suited for automotive and industrial applications
+//! TWAI protocol is suited for automotive and industrial applications.
 //!
 //! See ESP-IDF's
 #![doc = concat!("[TWAI documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/peripherals/twai.html#twai-protocol-summary)")]
