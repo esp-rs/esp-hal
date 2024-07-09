@@ -1,4 +1,4 @@
-//! Interrupt handling - RISC-V
+//! Interrupt handling
 //!
 //! CPU interrupts 1 through 15 are reserved for each of the possible interrupt
 //! priorities.

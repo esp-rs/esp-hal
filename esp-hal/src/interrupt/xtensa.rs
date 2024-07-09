@@ -1,4 +1,4 @@
-//! Interrupt handling - Xtensa
+//! Interrupt handling
 
 use xtensa_lx::interrupt::{self, InterruptNumber};
 use xtensa_lx_rt::exception::Context;
