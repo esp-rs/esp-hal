@@ -1,5 +1,6 @@
 //! # Universal Asynchronous Receiver/Transmitter (UART)
 //!
+//! ## Overview
 //! The UART is a hardware peripheral which handles communication using serial
 //! communication interfaces, such as RS232 and RS485. This peripheral provides
 //! a cheap and ubiquitous method for full- and half-duplex communication
@@ -12,7 +13,6 @@
 //! protocols.
 //!
 //! ## Configuration
-//!
 //! Each UART controller is individually configurable, and the usual setting
 //! such as baud rate, data bits, parity, and stop bits can easily be
 //! configured. Additionally, the transmit (TX) and receive (RX) pins need to
@@ -35,7 +35,6 @@
 //! UART instance using the inverted pins.
 //!
 //! ## Usage
-//!
 //! The UART driver implements a number of third-party traits, with the
 //! intention of making the HAL inter-compatible with various device drivers
 //! from the community. This includes, but is not limited to, the [embedded-hal]
@@ -46,9 +45,8 @@
 //! available. See the examples below for more information on how to interact
 //! with this driver.
 //!
-//! ### Examples
-//!
-//! #### Sending and Receiving Data
+//! ## Examples
+//! ### Sending and Receiving Data
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, Uart};
@@ -67,7 +65,7 @@
 //! # }
 //! ```
 //! 
-//! #### Splitting the UART into TX and RX Components
+//! ### Splitting the UART into TX and RX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, Uart};
@@ -90,7 +88,7 @@
 //! # }
 //! ```
 //! 
-//! #### Inverting TX and RX Pins
+//! ### Inverting TX and RX Pins
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, Uart};
@@ -103,7 +101,7 @@
 //! # }
 //! ```
 //! 
-//! #### Constructing TX and RX Components
+//! ### Constructing TX and RX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, UartTx, UartRx};
