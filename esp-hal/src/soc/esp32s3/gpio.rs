@@ -55,17 +55,12 @@ pub const NUM_PINS: usize = 49;
 
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
 
-#[doc(hidden)]
-pub type OutputSignalType = u16;
-#[doc(hidden)]
-pub const OUTPUT_SIGNAL_MAX: u16 = 256;
-#[doc(hidden)]
-pub const INPUT_SIGNAL_MAX: u16 = 189;
+pub(crate) type OutputSignalType = u16;
+pub(crate) const OUTPUT_SIGNAL_MAX: u16 = 256;
+pub(crate) const INPUT_SIGNAL_MAX: u16 = 189;
 
-#[doc(hidden)]
-pub const ONE_INPUT: u8 = 0x38;
-#[doc(hidden)]
-pub const ZERO_INPUT: u8 = 0x3c;
+pub(crate) const ONE_INPUT: u8 = 0x38;
+pub(crate) const ZERO_INPUT: u8 = 0x3c;
 
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function1;
 

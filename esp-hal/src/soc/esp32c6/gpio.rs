@@ -57,8 +57,7 @@ pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
 
 pub(crate) type OutputSignalType = u8;
 pub(crate) const OUTPUT_SIGNAL_MAX: u8 = 128;
-#[doc(hidden)]
-pub const INPUT_SIGNAL_MAX: u8 = 124;
+pub(crate) const INPUT_SIGNAL_MAX: u8 = 124;
 
 pub(crate) const ONE_INPUT: u8 = 0x1e;
 pub(crate) const ZERO_INPUT: u8 = 0x1f;
