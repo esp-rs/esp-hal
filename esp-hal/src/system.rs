@@ -20,7 +20,7 @@
 //! It provides an `enable()` method to enable and reset specific peripherals.
 //! The available peripherals are represented by the `Peripheral` enum
 //!
-//! ## Example
+//! ## Examples
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! let peripherals = Peripherals::take();
