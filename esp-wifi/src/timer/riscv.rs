@@ -32,10 +32,8 @@ pub fn setup_timer(mut alarm0: TimeBase) -> Result<(), esp_hal::timer::Error> {
     // make sure the scheduling won't start before everything is setup
     riscv::interrupt::disable();
 
-    alarm0.set_interrupt_handler(InterruptHandler::new(
-        unsafe { core::mem::transmute(handler as *const ()) },
-        interrupt::Priority::Priority1,
-    ));
+    let cb: extern "C" fn() = unsafe { core::mem::transmute(handler as *const ()) };
+    alarm0.set_interrupt_handler(InterruptHandler::new(cb, interrupt::Priority::Priority1));
     alarm0.start(TIMESLICE_FREQUENCY.into_duration())?;
     critical_section::with(|cs| {
         alarm0.enable_interrupt(true);

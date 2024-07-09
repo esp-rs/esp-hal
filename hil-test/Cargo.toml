@@ -119,9 +119,6 @@ nb                  = "1.1.0"
 p192                = { version = "0.13.0", default-features = false, features = ["arithmetic"] }
 p256                = { version = "0.13.2", default-features = false, features = ["arithmetic"] }
 
-[patch.crates-io]
-semihosting = { git = "https://github.com/taiki-e/semihosting", tag = "v0.1.10" }
-
 [features]
 default = ["async", "embassy"]
 
