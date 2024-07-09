@@ -1,5 +1,7 @@
 //! # Delay driver
 //!
+//! ## Overview
+//!
 //! The delay driver provides blocking delay functionality. The driver
 //! implements the relevant traits from `embedded-hal`.
 //!

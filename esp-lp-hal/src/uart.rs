@@ -1,5 +1,7 @@
 //! # Universal Asynchronous Receiver/Transmitter (UART)
 //!
+//! ## Overview
+//!
 //! The UART is a hardware peripheral which handles communication using serial
 //! interfaces. This peripheral provides a cheap and ubiquitous method for full-
 //! and half-duplex communication between devices.

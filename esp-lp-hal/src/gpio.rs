@@ -1,5 +1,7 @@
 //! # General Purpose Input/Output
 //!
+//! ## Overview
+//!
 //! It's assumed that GPIOs are already configured correctly by the HP core.
 //!
 //! This driver supports various operations on GPIO pins, primarily manipulating
