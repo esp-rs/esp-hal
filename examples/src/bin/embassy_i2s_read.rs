@@ -63,7 +63,7 @@ async fn main(_spawner: Spawner) {
         &clocks,
     );
 
-    #[cfg(not(features = "esp32"))]
+    #[cfg(not(feature = "esp32"))]
     let i2s = i2s.with_mclk(io.pins.gpio0);
 
     let i2s_rx = i2s
