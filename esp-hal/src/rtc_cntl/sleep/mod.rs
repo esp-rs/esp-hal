@@ -134,7 +134,7 @@ pub struct WakeFromLpCoreWakeupSource {}
 
 #[cfg(esp32c6)]
 impl WakeFromLpCoreWakeupSource {
-    /// Create a new instance of LpCoreWakeupSource
+    /// Create a new instance of `WakeFromLpCoreWakeupSource`
     pub fn new() -> Self {
         Self {}
     }
