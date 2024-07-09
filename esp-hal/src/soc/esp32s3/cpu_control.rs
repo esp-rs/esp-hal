@@ -84,6 +84,12 @@ pub struct Stack<const SIZE: usize> {
     pub mem: MaybeUninit<[u8; SIZE]>,
 }
 
+impl<const SIZE: usize> Default for Stack<SIZE> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[allow(clippy::len_without_is_empty)]
 impl<const SIZE: usize> Stack<SIZE> {
     /// Construct a stack of length SIZE, uninitialized
