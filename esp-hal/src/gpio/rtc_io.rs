@@ -1,10 +1,11 @@
 //! RTC IO
 //!
 //! # Overview
-//!
 //! The hardware provides a couple of GPIO pins with low power (LP)
-//! capabilities and analog functions. These pins can be controlled by
-//! either IO MUX or RTC IO.
+//! capabilities and analog functions.
+//!
+//! ## Configuration
+//! These pins can be controlled by either IO MUX or RTC IO.
 //!
 //! If controlled by RTC IO, these pins will bypass IO MUX and GPIO
 //! matrix for the use by ULP and peripherals in RTC system.
@@ -14,6 +15,7 @@
 //! chip from Deep-sleep.
 //!
 //! # Example
+//! ## Configure a ULP Pin as Output
 //! ```rust, ignore
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // configure GPIO 1 as ULP output pin

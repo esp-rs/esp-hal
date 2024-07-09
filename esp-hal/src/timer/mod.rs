@@ -1,14 +1,15 @@
 //! # General-purpose Timers
 //!
+//! ## Overview
 //! The [OneShotTimer] and [PeriodicTimer] types can be backed by any hardware
-//! peripheral which implements the [Timer] trait.
+//! peripheral which implements the [Timer] trait. This means that the same API
+//! can be used to interact with different hardware timers, like the `TIMG` and
+//! SYSTIMER.
 //!
-//! ## Usage
+//! See the [timg] and [systimer] modules for more information.
 //!
-//! ### Examples
-//!
-//! #### One-shot Timer
-//!
+//! ## Examples
+//! ### One-shot Timer
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::{OneShotTimer, PeriodicTimer, timg::TimerGroup};
@@ -21,7 +22,7 @@
 //! # }
 //! ```
 //! 
-//! #### Periodic Timer
+//! ### Periodic Timer
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::{PeriodicTimer, timg::TimerGroup};

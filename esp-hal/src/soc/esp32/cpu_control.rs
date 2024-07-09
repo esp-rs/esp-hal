@@ -1,13 +1,11 @@
 //! # Control CPU Cores (ESP32)
 //!
 //! ## Overview
-//!
 //! This module provides essential functionality for controlling
 //! and managing the APP (second) CPU core on the `ESP32` chip. It is used to
 //! start and stop program execution on the APP core.
 //!
-//! ## Example
-//!
+//! ## Examples
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;

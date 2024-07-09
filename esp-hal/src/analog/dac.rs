@@ -1,16 +1,20 @@
 //! # Digital to Analog Converter (DAC)
 //!
-//! The `dac` module enables users to generate analog output signals with
-//! precise control over voltage levels using one of the onboard
-//! digital-to-analog converters (DAC).
+//! ## Overview
+//! Espressif devices usually have multiple DAC channels. Each DAC channel can
+//! convert the digital value 0~255 to the analog voltage 0~Vref (The reference
+//! voltage 'Vref' here is input from an input pin)
 //!
-//! Two 8-bit DAC channels are available. Each DAC channel can convert the
-//! digital value 0-255 to the analog voltage 0-3.3v. Developers can choose the
-//! DAC channel they want to use based on the GPIO pin assignments for each
-//! channel.
+//! The DAC peripheral supports outputting analog signal in the multiple ways.
 //!
-//! ## Example
+//! Two 8-bit DAC channels are available.
 //!
+//! ## Configuration
+//! Developers can choose the  DAC channel they want to use based on the GPIO
+//! pin assignments for each channel.
+//!
+//! ## Examples
+//! ### Write a value to a DAC channel
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::Io;

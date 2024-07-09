@@ -1,12 +1,11 @@
-//! # Cyclic Redundancy Check
+//! # Cyclic Redundancy Check (CRC)
 //!
 //! ## Overview
 //! These are safe abstractions to the CRC functions in the ESP32 ROM.
 //! Some chips may not include all of these functions so they will be compiled
 //! into the program binary in those cases.
 //!
-//! ## Parameters
-//!
+//! ## Configuration
 //! The ROM provides the following polynomials for each CRC width:
 //!
 //! | CRC Width | Polynomial  |
@@ -39,12 +38,10 @@
 //! ```
 //! 
 //! ## Examples
-//!
 //! A catalogue of these parameters can be found at
 //! <https://reveng.sourceforge.io/crc-catalogue/all.htm>
 //!
-//! CRC-32/ISO-HDLC poly=0x04c11db7 init=0xffffffff refin=true refout=true
-//! xorout=0xffffffff
+//! ### CRC-32/ISO-HDLC poly=0x04c11db7 init=0xffffffff refin=true refout=true xorout=0xffffffff
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::rom::crc::crc32_le;
@@ -53,8 +50,7 @@
 //! # }
 //! ```
 //! 
-//! CRC-32/BZIP2 poly=0x04c11db7 init=0xffffffff refin=false refout=false
-//! xorout=0xffffffff
+//! ### CRC-32/BZIP2 poly=0x04c11db7 init=0xffffffff refin=false refout=false xorout=0xffffffff
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::rom::crc::crc32_be;
@@ -63,8 +59,7 @@
 //! # }
 //! ```
 //! 
-//! CRC-32/MPEG-2 poly=0x04c11db7 init=0xffffffff refin=false refout=false
-//! xorout=0x00000000
+//! ### CRC-32/MPEG-2 poly=0x04c11db7 init=0xffffffff refin=false refout=false xorout=0x00000000
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::rom::crc::crc32_be;
@@ -73,8 +68,7 @@
 //! # }
 //! ```
 //! 
-//! CRC-32/CKSUM poly=0x04c11db7 init=0x00000000 refin=false refout=false
-//! xorout=0xffffffff
+//! ### CRC-32/CKSUM poly=0x04c11db7 init=0x00000000 refin=false refout=false xorout=0xffffffff
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::rom::crc::crc32_be;
@@ -83,7 +77,7 @@
 //! # }
 //! ```
 //! 
-//! CRC-16/KERMIT poly=0x1021 init=0x0000 refin=true refout=true xorout=0x0000
+//! ### CRC-16/KERMIT poly=0x1021 init=0x0000 refin=true refout=true xorout=0x0000
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::rom::crc::crc16_le;

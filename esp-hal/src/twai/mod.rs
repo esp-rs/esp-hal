@@ -1,22 +1,25 @@
 //! # Two-wire Automotive Interface (TWAI)
 //!
 //! ## Overview
-//! The TWAI peripheral driver provides functions and structs specifically
-//! designed for the Two-Wire Automotive Interface (TWAI) on ESP chips. TWAI is
-//! a communication protocol commonly used in automotive applications for
-//! sending and receiving messages between electronic control units (ECUs) in a
-//! vehicle.
+//! The TWAI is a multi-master, multi-cast communication protocol with error
+//! detection and signaling and inbuilt message priorities and arbitration. The
+//! TWAI protocol is suited for automotive and industrial applications.
 //!
-//! The driver enables you to configure and utilize the TWAI module on ESP
-//! chips. It offers functions for initializing the TWAI peripheral, setting up
-//! the timing parameters, configuring acceptance filters, handling interrupts,
-//! and transmitting/receiving messages on the TWAI bus.
+//! See ESP-IDF's
+#![doc = concat!("[TWAI documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/peripherals/twai.html#twai-protocol-summary)")]
+//! for a summary on the protocol.
+//!
+//! ## Configuration
+//! The driver  offers functions for initializing the TWAI peripheral, setting
+//! up the timing parameters, configuring acceptance filters, handling
+//! interrupts, and transmitting/receiving messages on the TWAI bus.
 //!
 //! This driver manages the ISO 11898-1 (CAN Specification 2.0) compatible TWAI
 //! controllers. It supports Standard Frame Format (11-bit) and Extended Frame
 //! Format (29-bit) frame identifiers.
 //!
 //! ## Example
+//! ### Transmitting and Receiving Messages
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::twai;

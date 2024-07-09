@@ -1,7 +1,6 @@
 //! Control the ULP core
 //!
 //! ## Overview
-//!
 //! The `ULP CORE` peripheral allows control over the `Ultra-Low Power
 //! (ULP) core` in `ESP` chips. The ULP core is a low-power processor
 //! designed for executing tasks in deep sleep mode, enabling efficient power
@@ -12,7 +11,7 @@
 //! operation. The `UlpCore` struct is initialized with a peripheral reference
 //! to the `ULP CORE` instance.
 //!
-//! ## Example
+//! ## Examples
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! const CODE: &[u8] = &[
