@@ -1,11 +1,13 @@
 //! # Remote Control Peripheral (RMT)
 //!
 //! ## Overview
-//! The RMT (Remote Control Transceiver) peripheral was designed to act as an
-//! infrared transceiver. However, due to the flexibility of its data format,
-//! RMT can be extended to a versatile and general-purpose transceiver,
-//! transmitting or receiving many other types of signals.
-//!
+//! The RMT (Remote Control) module is designed to send and receive infrared
+//! remote control signals. A variety of remote control protocols can be
+//! encoded/decoded via software based on the RMT module. The RMT module
+//! converts pulse codes stored in the module’s built-in RAM into output
+//! signals, or converts input signals into pulse codes and stores them in RAM.
+//! In addition, the RMT module optionally modulates its output signals with a
+//! carrier wave, or optionally demodulates and filters its input signals.
 //!
 //! Typically, the RMT peripheral can be used in the following scenarios:
 //! - Transmit or receive infrared signals, with any IR protocols, e.g., NEC
@@ -15,7 +17,7 @@
 //! - Modulate the carrier to the output signal or demodulate the carrier from
 //!   the input signal
 //!
-//! ## Channels
+//! ### Channels
 //! There are
 #![cfg_attr(
     esp32,
@@ -36,10 +38,14 @@
 #![doc = "  "]
 //! For more information, please refer to the
 #![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/peripherals/rmt.html)")]
+//! ## Configuration
+//! Each TX/RX channel has the same functionality controlled by a dedicated set
+//! of registers and is able to independently transmit or receive data. TX
+//! channels are indicated by n which is used as a placeholder for the channel
+//! number, and by m for RX channels.
+//!
 //! ## Examples
-//!
 //! ### Initialization
-//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::peripherals::Peripherals;
