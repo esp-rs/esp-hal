@@ -1,11 +1,12 @@
-//! # Secure Hash Algorithm peripheral driver
+//! # Secure Hash Algorithm (SHA) Accelerator
 //!
 //! ## Overview
-//! This SHA (Secure Hash Algorithm) driver for ESP chips is a software module
-//! that provides an interface to interact with the SHA peripheral on ESP
-//! microcontroller chips. This driver allows you to perform cryptographic hash
-//! operations using various hash algorithms supported by the SHA peripheral,
-//! such as:
+//! This SHA accelerator is a hardware device that speeds up the SHA algorithm
+//! significantly, compared to a SHA algorithm implemented solely in software
+//!
+//! ## Configuration
+//! This driver allows you to perform cryptographic hash operations using
+//! various hash algorithms supported by the SHA peripheral, such as:
 //!    * SHA-1
 //!    * SHA-224
 //!    * SHA-256
@@ -14,7 +15,7 @@
 //!
 //! The driver supports two working modes:
 //!    * Typical SHA
-//!    * DMA-SHA (Direct Memory Access SHA is NOT implemented yet).
+//!    * DMA-SHA
 //!
 //! It provides functions to update the hash calculation with input data, finish
 //! the hash calculation and retrieve the resulting hash value. The SHA
@@ -27,7 +28,7 @@
 //! to retrieve the hash value and repeat the process for a new hash calculation
 //! if needed.
 //!
-//! ## Example
+//! ## Examples
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::sha::Sha;
@@ -60,6 +61,8 @@
 //!
 //! # }
 //! ```
+//! ## Implementation State
+//! - DMA-SHA Mode is not supported.
 
 use core::{convert::Infallible, marker::PhantomData};
 
