@@ -1,32 +1,19 @@
 //! # Hardware and Software Reset
 //!
 //! ## Overview
-//! The Hardware and Software Reset module provides functions for performing
-//! hardware and software resets on ESP chips. It also includes functions for
+//! Espressif chips provide four types of reset that occur at different levels,
+//! namely CPU Reset, Core Reset, System Reset, and Chip Reset. All reset types
+//! mentioned above (except Chip Reset) preserve the data stored in internal
+//! memory.
+//!
+//! The Hardware and Software Reset module provides functions for
+//! performing hardware and software resets and includes functions for
 //! retrieving the reset reason and the wakeup cause after a reset.
 //!
 //! The module defines a set of sleep sources (`SleepSource`) that indicate the
-//! source of the wakeup event. These sources include:
-//!     - external signals
-//!     - timers
-//!     - touchpads
-//!     - ULP programs
-//!     - GPIOs
-//!     - UART
-//!     - Wi-Fi
-//!     - COCPU interrupts
-//!     - BT (Bluetooth)
-//!
-//! The module also includes a set of flags (`WakeupReason`) that represent
-//! different wakeup sources and enable/disable wakeup triggers for specific
-//! events such as:
-//!     - GPIO
-//!     - timers
-//!     - UART
-//!     - touch sensors
-//!     - ULP
-//!     - Wi-Fi
-//!     - BT
+//! source of the wakeup event. It also includes a set of flags (`WakeupReason`)
+//! that represent different wakeup sources and enable/disable wakeup triggers
+//! for specific events.
 
 use crate::rtc_cntl::SocResetReason;
 
