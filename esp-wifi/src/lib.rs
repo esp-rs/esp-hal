@@ -18,8 +18,6 @@ use common_adapter::{chip_specific::phy_mem_init, init_radio_clock_control, RADI
 use critical_section::Mutex;
 use esp_hal as hal;
 use fugit::MegahertzU32;
-#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
-use hal::timer::systimer::{Alarm, Target};
 use hal::{clock::Clocks, system::RadioClockController};
 use linked_list_allocator::Heap;
 #[cfg(feature = "wifi")]
@@ -144,12 +142,7 @@ fn init_heap() {
     });
 }
 
-#[cfg(any(esp32c3, esp32c2, esp32c6, esp32h2))]
-pub(crate) type EspWifiTimer = Alarm<Target, esp_hal::Blocking, 0>;
-
-#[cfg(any(esp32, esp32s3, esp32s2))]
-pub(crate) type EspWifiTimer =
-    hal::timer::timg::Timer<hal::timer::timg::Timer0<hal::peripherals::TIMG1>, esp_hal::Blocking>;
+pub(crate) type EspWifiTimer = crate::timer::TimeBase;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]

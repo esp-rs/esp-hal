@@ -3,7 +3,7 @@
 //! This is an example of asynchronously `Wait`ing for a pin state to change.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: async embassy embassy-time-timg0 embassy-generic-timers
+//% FEATURES: async embassy embassy-generic-timers
 
 #![no_std]
 #![no_main]
@@ -17,8 +17,18 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
-    timer::timg::TimerGroup,
+    timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
 };
+
+// When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
+macro_rules! mk_static {
+    ($t:ty,$val:expr) => {{
+        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
+        #[deny(unused_attributes)]
+        let x = STATIC_CELL.uninit().write(($val));
+        x
+    }};
+}
 
 #[main]
 async fn main(_spawner: Spawner) {
@@ -27,8 +37,14 @@ async fn main(_spawner: Spawner) {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
+    esp_hal_embassy::init(
+        &clocks,
+        mk_static!(
+            [OneShotTimer<ErasedTimer>; 1],
+            [OneShotTimer::new(timg0.timer0.into())]
+        ),
+    );
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]

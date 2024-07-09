@@ -141,7 +141,6 @@ features = [
   "coex",
   "async",
   "embassy-net",
-  "esp-hal-embassy/time-timg0",
   "esp-hal/default",
 ]
 default-target = "riscv32imc-unknown-none-elf"

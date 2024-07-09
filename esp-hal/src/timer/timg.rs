@@ -518,15 +518,40 @@ where
     }
 
     fn enable_interrupt(&self, state: bool) {
+        // always use level interrupt
+        #[cfg(any(esp32, esp32s2))]
+        self.register_block()
+            .t(self.timer_number().into())
+            .config()
+            .modify(|_, w| w.level_int_en().set_bit());
+
         self.register_block()
             .int_ena_timers()
-            .write(|w| w.t(self.timer_number()).bit(state));
+            .modify(|_, w| w.t(self.timer_number()).bit(state));
     }
 
     fn clear_interrupt(&self) {
         self.register_block()
             .int_clr_timers()
             .write(|w| w.t(self.timer_number()).clear_bit_by_one());
+    }
+
+    fn set_interrupt_handler(&self, handler: InterruptHandler) {
+        let interrupt = match (self.timer_group(), self.timer_number()) {
+            (0, 0) => Interrupt::TG0_T0_LEVEL,
+            #[cfg(timg_timer1)]
+            (0, 1) => Interrupt::TG0_T1_LEVEL,
+            #[cfg(timg1)]
+            (1, 0) => Interrupt::TG1_T0_LEVEL,
+            #[cfg(all(timg_timer1, timg1))]
+            (1, 1) => Interrupt::TG1_T1_LEVEL,
+            _ => unreachable!(),
+        };
+
+        unsafe {
+            interrupt::bind_interrupt(interrupt, handler.handler());
+        }
+        interrupt::enable(interrupt, handler.priority()).unwrap();
     }
 
     fn is_interrupt_set(&self) -> bool {
@@ -548,6 +573,8 @@ where
 #[doc(hidden)]
 pub trait Instance: Sealed + Enable {
     fn register_block(&self) -> &RegisterBlock;
+
+    fn timer_group(&self) -> u8;
 
     fn timer_number(&self) -> u8;
 
@@ -631,6 +658,10 @@ where
 {
     fn register_block(&self) -> &RegisterBlock {
         unsafe { &*TG::register_block() }
+    }
+
+    fn timer_group(&self) -> u8 {
+        TG::id()
     }
 
     fn timer_number(&self) -> u8 {

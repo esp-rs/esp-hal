@@ -21,8 +21,17 @@ use esp_hal::{
     macros::handler,
     peripherals::Peripherals,
     system::SystemControl,
-    timer::timg::TimerGroup,
+    timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
 };
+
+macro_rules! mk_static {
+    ($t:ty,$val:expr) => {{
+        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
+        #[deny(unused_attributes)]
+        let x = STATIC_CELL.uninit().write(($val));
+        x
+    }};
+}
 
 static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
 static INPUT_PIN: Mutex<RefCell<Option<Input<'static, Gpio2>>>> = Mutex::new(RefCell::new(None));
@@ -44,8 +53,14 @@ impl<'d> Context<'d> {
 
         let delay = Delay::new(&clocks);
 
-        let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
-        esp_hal_embassy::init(&clocks, timg0);
+        let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
+        esp_hal_embassy::init(
+            &clocks,
+            mk_static!(
+                [OneShotTimer<ErasedTimer>; 1],
+                [OneShotTimer::new(timg0.timer0.into())]
+            ),
+        );
 
         Context {
             io2: Input::new(io.pins.gpio2, Pull::Down),

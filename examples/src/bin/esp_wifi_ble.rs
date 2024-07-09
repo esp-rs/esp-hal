@@ -30,6 +30,7 @@ use esp_hal::{
     prelude::*,
     rng::Rng,
     system::SystemControl,
+    timer::PeriodicTimer,
 };
 use esp_println::println;
 use esp_wifi::{ble::controller::BleConnector, initialize, EspWifiInitFor};
@@ -43,10 +44,12 @@ fn main() -> ! {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::max(system.clock_control).freeze();
 
-    #[cfg(target_arch = "xtensa")]
-    let timer = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
-    #[cfg(target_arch = "riscv32")]
-    let timer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
+    let timer = PeriodicTimer::new(
+        esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0, &clocks, None)
+            .timer0
+            .into(),
+    );
+
     let init = initialize(
         EspWifiInitFor::Ble,
         timer,

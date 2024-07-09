@@ -40,7 +40,7 @@ To demonstrated, in `src/bin/embassy_hello_world.rs` you will see the following:
 
 ```rust
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embassy embassy-generic-timers embassy-time-timg0
+//% FEATURES: embassy esp-hal-embassy/integrated-timers
 ```
 
 Another thing to be aware of is the GPIO pins being used. We have tried to use pins available the DevKit-C boards from Espressif, however this is being done on a best-effort basis.
