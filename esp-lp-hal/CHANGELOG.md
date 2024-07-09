@@ -17,11 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added basic `LP-I2C` driver for C6 (#1185)
 - Add remaining GPIO pins for ESP32-S2/S3 (#1695)
 - Add `wake_hp_core` for ESP32-C6 (#1723)
+- Implement `embedded-hal@1.x.x` traits by default instead of `embedded-hal@0.2.x` (#1754)
+- Implement `embedded-hal-nb` and `embedded-io` traits for UART driver (#1754)
 
 ### Changed
 
 - Renamed to `esp-ulp-riscv-hal` (#916)
 - Remove 2nd level generics from GPIO pin (#1526)
+- GPIO Input/Output types have been converted to unit structs (#1754)
 
 ### Fixed
 
