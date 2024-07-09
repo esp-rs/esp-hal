@@ -119,8 +119,7 @@ async fn main(spawner: Spawner) {
     #[cfg(feature = "esp32s3")]
     let (tx_pin, rx_pin) = (io.pins.gpio43, io.pins.gpio44);
 
-    let config = Config::default();
-    config.rx_fifo_full_threshold(READ_BUF_SIZE as u16);
+    let config = Config::default().rx_fifo_full_threshold(READ_BUF_SIZE as u16);
 
     let mut uart0 =
         Uart::new_async_with_config(peripherals.UART0, config, &clocks, tx_pin, rx_pin).unwrap();

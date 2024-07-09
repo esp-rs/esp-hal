@@ -57,7 +57,7 @@ async fn main(_spawner: Spawner) -> () {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let usb = Usb::new(peripherals.USB0, io.pins.gpio19, io.pins.gpio20);
+    let usb = Usb::new(peripherals.USB0, io.pins.gpio20, io.pins.gpio19);
 
     // Create the driver, from the HAL.
     let mut ep_out_buffer = [0u8; 1024];

@@ -19,7 +19,7 @@
 //! traditional RTOS. More information can be found in the [Embassy
 //! documentation].
 //!
-//! [embassy documentation]: https://embassy.dev/book/dev/runtime.html
+//! [embassy documentation]: https://embassy.dev/book/
 //!
 //! ## Initialization
 //!
