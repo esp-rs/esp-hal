@@ -74,8 +74,6 @@ embedded-hal = ["esp-hal/embedded-hal"]
 
 embassy = ["dep:esp-hal-embassy"]
 
-embassy-time-systimer-16mhz = ["esp-hal-embassy/time-systimer-16mhz"]
-embassy-time-timg0 = ["esp-hal-embassy/time-timg0"]
 embassy-generic-timers = ["embassy-time/generic-queue-8"]
 
 opsram-2m = ["esp-hal/opsram-2m"]

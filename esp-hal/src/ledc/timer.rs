@@ -1,10 +1,10 @@
 //! # LEDC timer
 //!
 //! ## Overview
-//! The `LEDC Timer` module is a part of the `LED Controller (LEDC)` driver
-//! designed for ESP microcontrollers. It provides a high-level interface to
-//! configure and control individual timers of the `LEDC` peripheral.
+//! The LEDC Timer provides a high-level interface to configure and control
+//! individual timers of the `LEDC` peripheral.
 //!
+//! ## Configuration
 //! The module allows precise and flexible control over timer configurations,
 //! duty cycles and frequencies, making it ideal for Pulse-Width Modulation
 //! (PWM) applications and LED lighting control.

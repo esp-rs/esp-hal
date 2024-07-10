@@ -1,17 +1,25 @@
 //! # Clock Control
 //!
 //! ## Overview
-//! This `Clock` driver provides an interface for configuring and managing
-//! various clocks present on the `ESP` microcontrollers.
+//! Clocks are mainly sourced from oscillator (OSC), RC, and PLL circuits, and
+//! then processed by the dividers or selectors, which allows most functional
+//! modules to select their working clock according to their power consumption
+//! and performance requirements.
 //!
+//! The clock subsystem  is used to source and distribute system/module clocks
+//! from a range of root clocks. The clock tree driver maintains the basic
+//! functionality of the system clock and the intricate relationship among
+//! module clocks.
+//!
+//! ## Configuration
 //! Proper clock configuration is essential for the correct functioning of the
 //! microcontroller and its peripherals.
 //!
 //! The `Clock` driver supports configuring multiple clocks, including:
 //!   * CPU clock
 //!   * APB (Advanced Peripheral Bus) clock
-//!   * XTAL clock
-//!   * PLL clock
+//!   * XTAL (External Crystal) clock
+//!   * PLL (Phase Lock Loop) clock
 //!
 //! and other specific clocks based on the ESP microcontroller's architecture.
 //!
@@ -26,20 +34,19 @@
 //!
 //! and others, depending on the microcontroller model.
 //!
-//! #### Clock Control
+//! ### Clock Control
 //! The `ClockControl` struct allows users to configure the desired clock
 //! frequencies before applying them. It offers flexibility in selecting
 //! appropriate clock frequencies based on specific application requirements.
 //!
-//! #### Frozen clock frequencies
+//! ### Frozen Clock Frequencies
 //! Once the clock configuration is applied using the `freeze` function of the
 //! ClockControl struct, the clock frequencies become `frozen` and cannot be
 //! changed. The `Clocks` struct is returned after freezing, providing read-only
 //! access to the configured clock frequencies.
 //!
 //! ## Examples
-//!
-//! #### Initialize with default clock frequency for this chip
+//! ### Initialize With Different Clock Frequencies
 //! ```rust, no_run
 //! # #![no_std]
 //! # use esp_hal::peripherals::Peripherals;

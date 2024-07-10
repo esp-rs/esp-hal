@@ -6,7 +6,7 @@ use quote::quote;
 pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
     use proc_macro2::{Ident, Span};
     use proc_macro_crate::{crate_name, FoundCrate};
-    use quote::{format_ident, quote};
+    use quote::format_ident;
     use syn::{
         parse::Error,
         parse_macro_input,

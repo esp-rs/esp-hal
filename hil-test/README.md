@@ -1,4 +1,4 @@
-# hil-test
+# `hil-test`
 
 Hardware-in-loop testing for `esp-hal`.
 
@@ -56,7 +56,7 @@ Some tests will require physical connections, please see the current [configurat
 [ESP-Prog]: https://docs.espressif.com/projects/esp-dev-kits/en/latest/other/esp-prog/user_guide.html
 [configuration in our runners]: #running-tests-remotes-ie-on-self-hosted-runners
 
-### Running Tests Remotes (ie. On Self-Hosted Runners)
+### Running Tests Remotes (ie. on Self-Hosted Runners)
 The [`hil.yml`] workflow builds the test suite for all our available targets and executes them.
 
 Our self-hosted runners have the following setup:

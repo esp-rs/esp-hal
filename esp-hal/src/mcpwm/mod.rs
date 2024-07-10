@@ -1,7 +1,18 @@
-//! # MCPWM (Motor Control Pulse Width Modulator) peripheral
+//! # Motor Control Pulse Width Modulator (MCPWM)
 //!
 //! ## Overview
-//! #### Peripheral capabilities
+//! The MCPWM peripheral is a versatile PWM generator, which contains various
+//! submodules to make it a key element in power electronic applications like
+//! motor control, digital power, and so on. Typically, the MCPWM peripheral can
+//! be used in the following scenarios:
+//! - Digital motor control, e.g., brushed/brushless DC motor, RC servo motor
+//! - Switch mode-based digital power conversion
+//! - Power DAC, where the duty cycle is equivalent to a DAC analog value
+//! - Calculate external pulse width, and convert it into other analog values
+//!   like speed, distance
+//! - Generate Space Vector PWM (SVPWM) signals for Field Oriented Control (FOC)
+//!
+//! ## Configuration
 //! * PWM Timers 0, 1 and 2
 //!     * Every PWM timer has a dedicated 8-bit clock prescaler.
 //!     * The 16-bit counter in the PWM timer can work in count-up mode,
@@ -28,7 +39,8 @@
 #![cfg_attr(esp32c6, doc = "Clock source is CRYPTO_CLOCK")]
 #![cfg_attr(esp32h2, doc = "Clock source is XTAL")]
 #![doc = ""]
-//! ## Example
+//! ## Examples
+//! ### Output a 20 kHz signal
 //! Uses timer0 and operator0 of the MCPWM0 peripheral to output a 50% duty
 //! signal at 20 kHz. The signal will be output to the pin assigned to `pin`.
 //! ```rust, no_run

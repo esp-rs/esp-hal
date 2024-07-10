@@ -12,7 +12,7 @@
 //! The `UlpCore` struct is initialized with a peripheral reference to the `ULP
 //! CORE` instance.
 //!
-//! ## Example
+//! ## Examples
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! const CODE: &[u8] = &[

@@ -1,3 +1,5 @@
+//! Interrupt handling
+
 use xtensa_lx::interrupt::{self, InterruptNumber};
 use xtensa_lx_rt::exception::Context;
 
@@ -476,7 +478,7 @@ mod vectored {
 
             for interrupt_nr in configured_interrupts.iterator() {
                 // Don't use `Interrupt::try_from`. It's slower and placed in flash
-                let interrupt = unsafe { core::mem::transmute(interrupt_nr as u16) };
+                let interrupt: Interrupt = unsafe { core::mem::transmute(interrupt_nr as u16) };
                 handle_interrupt(level, interrupt, save_frame);
             }
         } else {
@@ -487,7 +489,7 @@ mod vectored {
 
             for interrupt_nr in configured_interrupts.iterator() {
                 // Don't use `Interrupt::try_from`. It's slower and placed in flash
-                let interrupt = unsafe { core::mem::transmute(interrupt_nr as u16) };
+                let interrupt: Interrupt = unsafe { core::mem::transmute(interrupt_nr as u16) };
                 handle_interrupt(level, interrupt, save_frame);
             }
         }

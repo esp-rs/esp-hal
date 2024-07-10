@@ -1,12 +1,17 @@
-//! # RSA Accelerator support.
+//! # Rivest–Shamir–Adleman (RSA) Accelerator.
 //!
 //! ## Overview
-//! The `RSA` driver provides a set of functions to accelerate `RSA
-//! (Rivest–Shamir–Adleman)` cryptographic operations on ESP chips. `RSA` is a
-//! widely used `public-key` cryptographic algorithm that involves complex
-//! mathematical computations, and the `RSA` accelerator on `ESP` chips is
-//! designed to optimize these computations for faster performance.
+//! The RSA Accelerator provides hardware support for high precision computation
+//! used in various RSA asymmetric cipher algorithms by significantly reducing
+//! their software complexity. Compared with RSA algorithms implemented solely
+//! in software, this hardware accelerator can speed up RSA algorithms
+//! significantly.
 //!
+//! ## Configuration
+//! The RSA Accelerator also supports operands of different lengths, which
+//! provides more flexibility during the computation.
+//!
+//! ## Usage
 //! Implementation details;
 //!    * The driver uses low-level peripheral access to read and write data
 //!      from/to the `RSA` peripheral.
@@ -22,9 +27,9 @@
 //! This peripheral supports `async` on every available chip except of `esp32`
 //! (to be solved).
 //!
-//! ⚠️: The examples for RSA peripheral are quite extensive, so for a more
-//! detailed study of how to use this driver please visit [the repository
-//! with corresponding example].
+//! ## Examples
+//! ### Modular Exponentiation, Modular Multiplication, and Multiplication
+//! Visit the [RSA] test for an example of using the peripheral.
 //!
 //! [nb]: https://docs.rs/nb/1.1.0/nb/
 //! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/rsa.rs

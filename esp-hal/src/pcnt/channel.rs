@@ -1,12 +1,11 @@
-//! # PCNT - channel configuration
+//! # PCNT - Channel Configuration
 //!
 //! ## Overview
-//! The `channel` module is part of the `PCNT` peripheral driver
-//! for `ESP` chips.
-//!
-//! It provides a convenient and efficient way to configure and use
-//! individual channels of the `PCNT` peripheral of pulse counting and signal
-//! edge detection on ESP chips.
+//! The `channel` module allows users to configure and manage individual
+//! channels of the `PCNT` peripheral. It provides methods to set various
+//! parameters for each channel, such as control modes for signal edges, action
+//! on control level, and configurations for positive and negative edge count
+//! modes.
 
 use super::unit;
 use crate::{

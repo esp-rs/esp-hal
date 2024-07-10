@@ -225,7 +225,8 @@ impl<'a> Ieee802154<'a> {
     pub fn set_tx_done_callback(&mut self, callback: &'a mut (dyn FnMut() + Send)) {
         critical_section::with(|cs| {
             let mut tx_done_callback = TX_DONE_CALLBACK.borrow_ref_mut(cs);
-            tx_done_callback.replace(unsafe { core::mem::transmute(callback) });
+            let cb: &'static mut (dyn FnMut() + Send) = unsafe { core::mem::transmute(callback) };
+            tx_done_callback.replace(cb);
         });
     }
 
@@ -241,7 +242,8 @@ impl<'a> Ieee802154<'a> {
     pub fn set_rx_available_callback(&mut self, callback: &'a mut (dyn FnMut() + Send)) {
         critical_section::with(|cs| {
             let mut rx_available_callback = RX_AVAILABLE_CALLBACK.borrow_ref_mut(cs);
-            rx_available_callback.replace(unsafe { core::mem::transmute(callback) });
+            let cb: &'static mut (dyn FnMut() + Send) = unsafe { core::mem::transmute(callback) };
+            rx_available_callback.replace(cb);
         });
     }
 

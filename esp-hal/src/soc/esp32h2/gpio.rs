@@ -56,12 +56,12 @@ pub const NUM_PINS: usize = 28;
 
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
 
-pub type OutputSignalType = u8;
-pub const OUTPUT_SIGNAL_MAX: u8 = 128;
-pub const INPUT_SIGNAL_MAX: u8 = 124;
+pub(crate) type OutputSignalType = u8;
+pub(crate) const OUTPUT_SIGNAL_MAX: u8 = 128;
+pub(crate) const INPUT_SIGNAL_MAX: u8 = 124;
 
-pub const ONE_INPUT: u8 = 0x1e;
-pub const ZERO_INPUT: u8 = 0x1f;
+pub(crate) const ONE_INPUT: u8 = 0x1e;
+pub(crate) const ZERO_INPUT: u8 = 0x1f;
 
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function1;
 
@@ -76,6 +76,7 @@ pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
 #[derive(PartialEq, Copy, Clone)]
+#[doc(hidden)]
 pub enum InputSignal {
     EXT_ADC_START       = 0,
     U0RXD               = 6,
@@ -160,6 +161,7 @@ pub enum InputSignal {
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
 #[derive(PartialEq, Copy, Clone)]
+#[doc(hidden)]
 pub enum OutputSignal {
     LEDC_LS_SIG0     = 0,
     LEDC_LS_SIG1     = 1,

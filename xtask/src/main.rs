@@ -487,18 +487,14 @@ fn lint_packages(workspace: &Path, _args: LintPackagesArgs) -> Result<()> {
             }
 
             Package::EspHalEmbassy => {
-                // We need to specify a time driver, so we will check all
-                // options here (as the modules themselves are feature-gated):
-                for feature in ["time-systimer-16mhz", "time-timg0"] {
-                    lint_package(
-                        &path,
-                        &[
-                            "-Zbuild-std=core",
-                            "--target=riscv32imac-unknown-none-elf",
-                            &format!("--features=esp32c6,{feature}"),
-                        ],
-                    )?;
-                }
+                lint_package(
+                    &path,
+                    &[
+                        "-Zbuild-std=core",
+                        "--target=riscv32imac-unknown-none-elf",
+                        "--features=esp32c6",
+                    ],
+                )?;
             }
 
             Package::EspHalProcmacros | Package::EspRiscvRt => lint_package(
@@ -538,7 +534,7 @@ fn lint_packages(workspace: &Path, _args: LintPackagesArgs) -> Result<()> {
                 &[
                     "-Zbuild-std=core",
                     "--target=riscv32imc-unknown-none-elf",
-                    "--features=esp32c3,wifi-default,ble,esp-now,async,embassy-net,esp-hal-embassy/time-timg0",
+                    "--features=esp32c3,wifi-default,ble,esp-now,async,embassy-net",
                 ],
             )?,
 

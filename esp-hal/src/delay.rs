@@ -10,7 +10,7 @@
 //! block for at least the amount of time specified, but accuracy can be
 //! affected by many factors, including interrupt usage.
 //!
-//! ## Example
+//! ## Examples
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;

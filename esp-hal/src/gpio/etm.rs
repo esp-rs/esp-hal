@@ -1,18 +1,18 @@
-//! # Event Task Matrix Function
+//! # Event Task Matrix (ETM)
 //!
 //! ## Overview
-//!
 //! GPIO supports ETM function, that is, the ETM task of GPIO can be
 //! triggered by the ETM event of any peripheral, or the ETM task of any
 //! peripheral can be triggered by the ETM event of GPIO.
 //!
-//! The GPIO ETM provides eight task channels. The ETM tasks that each task
+//! ## Configuration
+//! The GPIO ETM provides several task channels. The ETM tasks that each task
 //! channel can receive are:
 //! - SET: GPIO goes high when triggered
 //! - CLEAR: GPIO goes low when triggered
 //! - TOGGLE: GPIO toggle level when triggered.
 //!
-//! GPIO has eight event channels, and the ETM events that each event
+//! GPIO has several event channels, and the ETM events that each event
 //! channel can generate are:
 //! - RISE_EDGE: Indicates that the output signal of the corresponding GPIO has
 //!   a rising edge
@@ -21,7 +21,8 @@
 //! - ANY_EDGE: Indicates that the output signal of the corresponding GPIO is
 //!   reversed
 //!
-//! ## Example
+//! ## Examples
+//! ### Toogle an LED When a Button is Pressed
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::Io;

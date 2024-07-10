@@ -1,9 +1,7 @@
 //! # Direct Memory Access
 //!
 //! ## Overview
-//!
-//! The `pdma` module is part of the DMA (Direct Memory Access) driver of
-//! `ESP32` and `ESP32-S2`.
+//! The `pdma` module is part of the DMA driver of `ESP32` and `ESP32-S2`.
 //!
 //! This module provides efficient direct data transfer capabilities between
 //! peripherals and memory without involving the CPU. It enables bidirectional

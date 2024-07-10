@@ -7,7 +7,7 @@
 #![no_main]
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: async embassy embassy-time-timg0 embassy-generic-timers
+//% FEATURES: async embassy embassy-generic-timers
 
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
@@ -18,7 +18,7 @@ use esp_hal::{
     peripherals::{Peripherals, UART0},
     prelude::*,
     system::SystemControl,
-    timer::timg::TimerGroup,
+    timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
     uart::{
         config::{AtCmdConfig, Config},
         Uart,
@@ -33,6 +33,16 @@ use static_cell::StaticCell;
 const READ_BUF_SIZE: usize = 64;
 // EOT (CTRL-D)
 const AT_CMD: u8 = 0x04;
+
+// When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
+macro_rules! mk_static {
+    ($t:ty,$val:expr) => {{
+        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
+        #[deny(unused_attributes)]
+        let x = STATIC_CELL.uninit().write(($val));
+        x
+    }};
+}
 
 #[embassy_executor::task]
 async fn writer(
@@ -85,8 +95,11 @@ async fn main(spawner: Spawner) {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
+    let timer0 = OneShotTimer::new(timg0.timer0.into());
+    let timers = [timer0];
+    let timers = mk_static!([OneShotTimer<ErasedTimer>; 1], timers);
+    esp_hal_embassy::init(&clocks, timers);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -106,8 +119,7 @@ async fn main(spawner: Spawner) {
     #[cfg(feature = "esp32s3")]
     let (tx_pin, rx_pin) = (io.pins.gpio43, io.pins.gpio44);
 
-    let config = Config::default();
-    config.rx_fifo_full_threshold(READ_BUF_SIZE as u16);
+    let config = Config::default().rx_fifo_full_threshold(READ_BUF_SIZE as u16);
 
     let mut uart0 =
         Uart::new_async_with_config(peripherals.UART0, config, &clocks, tx_pin, rx_pin).unwrap();

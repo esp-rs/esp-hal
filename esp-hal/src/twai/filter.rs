@@ -1,7 +1,15 @@
 //! Two-wire Automotive Interface (TWAI) Filters
 //!
-//! These are acceptance filters that limit which packets are received by the
-//! TWAI peripheral.
+//! ## Overview
+//! The TWAI controller contains a hardware acceptance filter which can be used
+//! to filter messages of a particular ID. A node that filters out a message
+//! does not receive the message, but will still acknowledge it. Acceptance
+//! filters can make a node more efficient by filtering out messages sent over
+//! the bus that are irrelevant to the node.
+//!
+//! ## Configuration
+//! The acceptance filters are configured using two 32-bit values known as the
+//! acceptance code and the acceptance mask.
 
 use super::{ExtendedId, StandardId};
 

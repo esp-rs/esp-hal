@@ -1,22 +1,20 @@
 //! # System Timer (SYSTIMER)
 //!
+//! ## Overview
 //! The System Timer is a
 #![cfg_attr(esp32s2, doc = "64-bit")]
 #![cfg_attr(not(esp32s2), doc = "52-bit")]
 //! timer which can be used, for example, to generate tick interrupts for an
 //! operating system, or simply as a general-purpose timer.
 //!
+//! ## Configuration
 //! The timer consists of two counters, `UNIT0` and `UNIT1`. The counter values
 //! can be monitored by 3 comparators, `COMP0`, `COMP1`, and `COMP2`.
 //!
 //! [Alarm]s can be configured in two modes: [Target] (one-shot) and [Periodic].
 //!
-//! ## Usage
-//!
-//! ### Examples
-//!
-//! #### General-purpose Timer
-//!
+//! ## Examples
+//! ### General-purpose Timer
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::systimer::SystemTimer;
@@ -63,9 +61,9 @@
 //!     critical_section::with(|cs| {
 //!     let mut timer0 = TIMER0.borrow_ref_mut(cs);
 //!     let timer0 = timer0.as_mut().unwrap();
-//!     
+//!
 //!     timer0.clear_interrupt();
-//!     
+//!
 //!     // Counter value should be a very small number as the alarm triggered a
 //!     // counter reload to 0 and ETM stopped the counter quickly after
 //!     // esp_println::println!("counter in interrupt: {}", timer0.now());
@@ -231,11 +229,8 @@ where
             tconf.modify(|_r, w| w.work_en().set_bit());
         }
     }
-}
 
-impl<T, const CHANNEL: u8> Alarm<T, Blocking, CHANNEL> {
-    /// Set the interrupt handler for this alarm.
-    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+    fn set_interrupt_handler_internal(&self, handler: InterruptHandler) {
         match CHANNEL {
             0 => unsafe {
                 interrupt::bind_interrupt(Interrupt::SYSTIMER_TARGET0, handler.handler());
@@ -260,6 +255,13 @@ impl<T, const CHANNEL: u8> Alarm<T, Blocking, CHANNEL> {
             },
             _ => unreachable!(),
         }
+    }
+}
+
+impl<T, const CHANNEL: u8> Alarm<T, Blocking, CHANNEL> {
+    /// Set the interrupt handler for this alarm.
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.set_interrupt_handler_internal(handler)
     }
 }
 
@@ -573,6 +575,10 @@ where
 
     fn set_alarm_active(&self, _active: bool) {
         // Nothing to do
+    }
+
+    fn set_interrupt_handler(&self, handler: InterruptHandler) {
+        Alarm::set_interrupt_handler_internal(self, handler);
     }
 }
 
