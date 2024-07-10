@@ -288,6 +288,39 @@ pub(crate) mod private {
     pub struct Internal;
 }
 
+/// Marker trait for types that can be safely used in `#[ram(persistent)]`.
+///
+/// # Safety
+///
+/// - The type must be inhabited
+/// - The type must be valid for any bit pattern of its backing memory in case a
+///   reset occurs during a write or a reset interrupts the zero initialization
+///   on first boot.
+/// - Structs must contain only `Persistable` fields and padding
+pub unsafe trait Persistable: Sized {}
+
+macro_rules! impl_persistable {
+    ($($t:ty),+) => {$(
+        unsafe impl Persistable for $t {}
+    )+};
+    (atomic $($t:ident),+) => {$(
+        unsafe impl Persistable for portable_atomic::$t {}
+    )+};
+}
+
+impl_persistable!(u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, usize, isize, f32, f64);
+impl_persistable!(atomic AtomicU8, AtomicI8, AtomicU16, AtomicI16, AtomicU32, AtomicI32, AtomicUsize, AtomicIsize);
+
+unsafe impl<T: Persistable, const N: usize> Persistable for [T; N] {}
+
+#[doc(hidden)]
+pub mod __macro_implementation {
+    //! Unstable private implementation details of esp-hal-procmacros.
+
+    pub const fn assert_is_zeroable<T: bytemuck::Zeroable>() {}
+    pub const fn assert_is_persistable<T: super::Persistable>() {}
+}
+
 /// Available CPU cores
 ///
 /// The actual number of available cores depends on the target.
