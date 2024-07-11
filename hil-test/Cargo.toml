@@ -65,6 +65,10 @@ name    = "spi_half_duplex_read"
 harness = false
 
 [[test]]
+name    = "spi_half_duplex_write"
+harness = false
+
+[[test]]
 name    = "pcnt"
 harness = false
 
