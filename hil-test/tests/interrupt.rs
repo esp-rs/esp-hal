@@ -22,6 +22,7 @@ use esp_hal::{
 
 static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> = Mutex::new(RefCell::new(None));
 
+#[allow(unused)] // TODO: Remove attribute when interrupt latency test re-enabled
 struct Context {
     sw0_trigger_addr: u32,
 }

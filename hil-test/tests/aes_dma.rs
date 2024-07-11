@@ -16,7 +16,6 @@ use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
     peripherals::Peripherals,
-    prelude::*,
 };
 
 const DMA_BUFFER_SIZE: usize = 16;

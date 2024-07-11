@@ -159,6 +159,7 @@ unsafe fn __user_exception(cause: arch::ExceptionCause, context: arch::Context) 
     #[cfg(feature = "semihosting")]
     semihosting::process::abort();
 
+    #[cfg(not(feature = "semihosting"))]
     halt();
 }
 
