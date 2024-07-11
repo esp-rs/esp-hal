@@ -519,6 +519,30 @@ where
         self
     }
 
+    /// Fill a buffer with received bytes
+    pub fn read_bytes(&mut self, mut buf: &mut [u8]) -> Result<(), Error> {
+        if buf.is_empty() {
+            return Ok(());
+        }
+        let cap = buf.len();
+        let mut total = 0;
+        loop {
+            while T::get_rx_fifo_count() == 0 {
+                // Block until we received at least one byte
+            }
+            let read = self.drain_fifo(buf);
+            total += read;
+            // drain_fifo only drains bytes that will fit in buf,
+            // so we will always have an exact total
+            if total == cap {
+                break;
+            }
+            // update the buffer position based on the bytes read
+            buf = &mut buf[read..];
+        }
+        Ok(())
+    }
+
     /// Read a byte from the UART
     pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
         // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
@@ -830,6 +854,11 @@ where
     /// Write bytes out over the UART
     pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
         self.tx.write_bytes(data)
+    }
+
+    /// Fill a buffer with received bytes
+    pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<(), Error> {
+        self.rx.read_bytes(buf)
     }
 
     /// Configures the AT-CMD detection settings
@@ -1681,7 +1710,7 @@ where
     M: Mode,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        if buf.len() == 0 {
+        if buf.is_empty() {
             return Ok(0);
         }
 
