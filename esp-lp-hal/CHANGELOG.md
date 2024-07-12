@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `wake_hp_core` for ESP32-C6 (#1723)
 - Implement `embedded-hal@1.x.x` traits by default instead of `embedded-hal@0.2.x` (#1754)
 - Implement `embedded-hal-nb` and `embedded-io` traits for UART driver (#1754)
+- Add `Delay.delay_millis` function (#1789)
+- Make some UART functions public, allowing it to be used without `embedded-hal`/`embedded-io` traits (#1789)
 
 ### Changed
 

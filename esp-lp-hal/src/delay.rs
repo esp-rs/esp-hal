@@ -8,7 +8,7 @@
 //! ## Examples
 //!
 //! ```rust
-//! esp_lp_hal::delay::Delay.delay_micros(500);
+//! esp_lp_hal::delay::Delay.delay_millis(500);
 //! ```
 
 /// Delay driver
@@ -16,6 +16,20 @@
 pub struct Delay;
 
 impl Delay {
+    /// Delay for at least the number of specific milliseconds.
+    pub fn delay_millis(&self, mut ms: u32) {
+        const MICROS_PER_MILLI: u32 = 1_000;
+        const MAX_MILLIS: u32 = u32::MAX / MICROS_PER_MILLI;
+
+        // Avoid potential overflow if milli -> micro conversion is too large
+        while ms > MAX_MILLIS {
+            ms -= MAX_MILLIS;
+            self.delay_micros(MAX_MILLIS * MICROS_PER_MILLI);
+        }
+
+        self.delay_micros(ms * MICROS_PER_MILLI);
+    }
+
     /// Delay for at least the number of specific microseconds.
     pub fn delay_micros(&self, mut us: u32) {
         const NANOS_PER_MICRO: u32 = 1_000;
@@ -80,7 +94,7 @@ impl embedded_hal_02::blocking::delay::DelayUs<u32> for Delay {
 impl embedded_hal_02::blocking::delay::DelayMs<u32> for Delay {
     #[inline(always)]
     fn delay_ms(&mut self, ms: u32) {
-        self.delay_micros(ms * 1000);
+        self.delay_millis(ms);
     }
 }
 
