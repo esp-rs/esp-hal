@@ -1,7 +1,6 @@
-//! # RISC­V Trace Encoder (TRACE)
+//! # RISC-­V Trace Encoder (TRACE)
 //!
 //! ## Overview
-//!
 //! The high-performance CPU supports instruction trace interface through the
 //! trace encoder. The trace encoder connects to HP CPU’s instruction trace
 //! interface, compresses the information into smaller packets, and then stores
@@ -19,7 +18,7 @@
 //! That is where instruction trace comes in, which provides trace of the
 //! program execution.
 //!
-//! ## Example
+//! ## Examples
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::trace::Trace;

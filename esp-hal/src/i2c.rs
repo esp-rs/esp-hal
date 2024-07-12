@@ -45,9 +45,8 @@
 //! from the community. This includes the [embedded-hal] for both 0.2.x and
 //! 1.x.x versions.
 //!
-//! ### Examples
-//!
-//! #### Read Data from a BMP180 Sensor
+//! ## Examples
+//! ### Read Data from a BMP180 Sensor
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::i2c::I2C;

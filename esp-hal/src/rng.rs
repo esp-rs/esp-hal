@@ -1,25 +1,10 @@
-//! # Random Number Generator
+//! # Random Number Generator (RNG)
 //!
 //! ## Overview
-//! The Random Number Generator (RNG) Driver for ESP chips is a software module
-//! that provides an interface to generate random numbers using the RNG
-//! peripheral on ESP chips. This driver allows you to generate random numbers
-//! that can be used for various cryptographic, security, or general-purpose
-//! applications.
-//!
-//! The RNG peripheral on ESP chips produces random numbers based on physical
-//! noise sources, which provide true random numbers under specific conditions
-//! (see conditions below).
-//!
-//! To use the [Rng] Driver, you need to initialize it with the RNG peripheral.
-//! Once initialized, you can generate random numbers by calling the `random`
-//! method, which returns a 32-bit unsigned integer.
-//!
-//! Additionally, this driver implements the
-//! [Read](embedded_hal_02::blocking::rng::Read) trait from the `embedded_hal`
-//! crate, allowing you to generate random bytes by calling the `read` method.
-//
-//! # Important Note
+//! The Random Number Generator (RNG) module provides an interface to generate
+//! random numbers using the RNG peripheral on ESP chips. This driver allows you
+//! to generate random numbers that can be used for various cryptographic,
+//! security, or general-purpose applications.
 //!
 //! There are certain pre-conditions which must be met in order for the RNG to
 //! produce *true* random numbers. The hardware RNG produces true random numbers
@@ -41,6 +26,23 @@
 //!
 //! For more information, please refer to the
 #![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/system/random.html)")]
+//! ## Configuration
+//! To use the [Rng] Driver, you need to initialize it with the RNG peripheral.
+//! Once initialized, you can generate random numbers by calling the `random`
+//! method, which returns a 32-bit unsigned integer.
+//!
+//! ## Usage
+//! This driver implements the [Read](embedded_hal_02::blocking::rng::Read)
+//! trait from the `embedded_hal` crate, allowing you to generate random bytes
+//! by calling the `read` method. The driver also implements the traits from the
+//! [`rand_core`] crate.
+//!
+//! [`rand_core`]: https://crates.io/crates/rand_core
+//!
+//! ## Examples
+//! Visit the [RNG] example for an example of using the RNG peripheral.
+//!
+//! [RNG]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/rng.rs
 
 use core::marker::PhantomData;
 

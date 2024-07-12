@@ -1,7 +1,10 @@
-//! The prelude
+//! # The `esp-hal` Prelude
 //!
-//! Re-exports all traits required for interacting with the various peripheral
-//! drivers implemented in this crate.
+//! ## Overview
+//! The prelude is the list of things that `esp-hal` automatically imports into
+//! every program. It’s kept as small as possible, and is focused on
+//! things, particularly traits, which are used in almost every single Rust
+//! program.
 
 pub use embedded_dma::{
     ReadBuffer as _embedded_dma_ReadBuffer,
