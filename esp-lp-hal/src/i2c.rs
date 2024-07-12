@@ -21,7 +21,9 @@ pub unsafe fn conjure() -> LpI2c {
     }
 }
 
+// TODO: Document enum variants
 /// I2C-specific transmission errors
+#[allow(missing_docs)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
     ExceedingFifo,
@@ -179,6 +181,7 @@ impl CommandRegister {
 // Configure LP_EXT_I2C_CK_EN high to enable the clock source of I2C_SCLK.
 // Adjust the timing registers accordingly when the clock frequency changes.
 
+/// LP-I2C driver
 pub struct LpI2c {
     i2c: LP_I2C0,
 }
