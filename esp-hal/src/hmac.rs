@@ -30,7 +30,7 @@
 //! for deriving the AES key for the DS module.
 //!
 //! ## Examples
-//! Visit the [HMAC] example for an example of using the HMAC accelerator.
+//! Visit the [HMAC] example to learn how to use the HMAC accelerator
 //!
 //! [HMAC]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/hmac.rs
 

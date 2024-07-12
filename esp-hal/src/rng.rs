@@ -34,7 +34,10 @@
 //! ## Usage
 //! This driver implements the [Read](embedded_hal_02::blocking::rng::Read)
 //! trait from the `embedded_hal` crate, allowing you to generate random bytes
-//! by calling the `read` method.
+//! by calling the `read` method. The driver also implements the traits from the
+//! [`rand_core`] crate.
+//!
+//! [`rand_core`]: https://crates.io/crates/rand_core
 //!
 //! ## Examples
 //! Visit the [RNG] example for an example of using the RNG peripheral.

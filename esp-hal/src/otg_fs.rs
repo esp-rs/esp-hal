@@ -5,7 +5,7 @@
 //! with USB devices using either blocking (usb-device) or asynchronous
 //! (embassy-usb) APIs.
 //!
-//! It can operate as either a USB Host or Device, and supports fusll-speed (FS)
+//! It can operate as either a USB Host or Device, and supports full-speed (FS)
 //! and low-speed (LS) data rates of the USB 2.0 specification.
 //!
 //! The blocking driver uses the `esp_synopsys_usb_otg` crate, which provides
@@ -34,7 +34,7 @@
 //! [USB Serial]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/usb_serial.rs
 //!
 //! ## Implementation State
-//! - Low-speed (LS) not supported.
+//! - Low-speed (LS) is not supported.
 
 pub use esp_synopsys_usb_otg::UsbBus;
 use esp_synopsys_usb_otg::UsbPeripheral;
