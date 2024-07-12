@@ -342,6 +342,7 @@ jobs:
           - soc: esp32h2
             rust-target: riscv32imac-unknown-none-elf
           # Xtensa devices:
+          - soc: esp32
           - soc: esp32s2
           - soc: esp32s3
 

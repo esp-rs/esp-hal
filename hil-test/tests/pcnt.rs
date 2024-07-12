@@ -7,8 +7,6 @@
 #![no_std]
 #![no_main]
 
-use core::ops::Deref;
-
 use defmt_rtt as _;
 use esp_backtrace as _;
 use esp_hal::{delay::Delay, gpio::GpioPin, pcnt::Pcnt};
@@ -44,7 +42,7 @@ mod tests {
         let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-        let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
         Context {
             pcnt: Pcnt::new(peripherals.PCNT, None),

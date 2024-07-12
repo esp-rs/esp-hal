@@ -39,17 +39,17 @@ fn main() -> ! {
     println!("SYSTIMER Current value = {}", SystemTimer::now());
 
     critical_section::with(|cs| {
-        let mut alarm0 = systimer.alarm0.into_periodic();
+        let alarm0 = systimer.alarm0.into_periodic();
         alarm0.set_interrupt_handler(systimer_target0);
         alarm0.set_period(1u32.secs());
         alarm0.enable_interrupt(true);
 
-        let mut alarm1 = systimer.alarm1;
+        let alarm1 = systimer.alarm1;
         alarm1.set_interrupt_handler(systimer_target1);
         alarm1.set_target(SystemTimer::now() + (SystemTimer::TICKS_PER_SECOND * 2));
         alarm1.enable_interrupt(true);
 
-        let mut alarm2 = systimer.alarm2;
+        let alarm2 = systimer.alarm2;
         alarm2.set_interrupt_handler(systimer_target2);
         alarm2.set_target(SystemTimer::now() + (SystemTimer::TICKS_PER_SECOND * 3));
         alarm2.enable_interrupt(true);

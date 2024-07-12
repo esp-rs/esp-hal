@@ -18,8 +18,8 @@ document-features   = "0.2.8"
 embassy-executor    = { version = "0.5.0", optional = true }
 embassy-time-driver = { version = "0.1.0", features = [ "tick-hz-1_000_000" ] }
 esp-hal             = { version = "0.18.0", path = "../esp-hal" }
+log                 = { version = "0.4.22", optional = true }
 portable-atomic     = "1.6.0"
-log = { version = "0.4.22", optional = true }
 
 [build-dependencies]
 cfg-if       = "1.0.0"
@@ -45,3 +45,6 @@ log = ["dep:log"]
 executors = ["dep:embassy-executor"]
 ## Use the executor-integrated `embassy-time` timer queue.
 integrated-timers = ["embassy-executor?/integrated-timers"]
+
+[lints.rust]
+unexpected_cfgs = "allow"

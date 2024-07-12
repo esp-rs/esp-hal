@@ -47,7 +47,6 @@ const PASSWORD: &str = env!("PASSWORD");
 
 #[entry]
 fn main() -> ! {
-    #[cfg(feature = "log")]
     esp_println::logger::init_logger(log::LevelFilter::Info);
 
     let peripherals = Peripherals::take();

@@ -1,9 +1,9 @@
 #![allow(rustdoc::bare_urls, unused_macros)]
 #![cfg_attr(
-    any(nightly_before_2024_06_12, nightly_since_2024_06_12),
+    target_arch = "xtensa",
+    feature(asm_experimental_arch),
     feature(panic_info_message)
 )]
-#![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
 #![doc = include_str!("../README.md")]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
@@ -159,6 +159,7 @@ unsafe fn __user_exception(cause: arch::ExceptionCause, context: arch::Context) 
     #[cfg(feature = "semihosting")]
     semihosting::process::abort();
 
+    #[cfg(not(feature = "semihosting"))]
     halt();
 }
 

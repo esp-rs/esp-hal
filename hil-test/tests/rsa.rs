@@ -148,7 +148,7 @@ mod tests {
         #[cfg(feature = "esp32")]
         {
             let mut rsamulti =
-                RsaMultiplication::<operand_sizes::Op512, esp_hal::Blocking>::new(ctx.rsa);
+                RsaMultiplication::<operand_sizes::Op512, esp_hal::Blocking>::new(&mut ctx.rsa);
             rsamulti.start_multiplication(operand_a, operand_b);
             rsamulti.read_results(&mut outbuf);
         }
