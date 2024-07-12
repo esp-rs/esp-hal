@@ -168,7 +168,8 @@ pub struct LpUart {
 }
 
 impl LpUart {
-    fn read_byte(&mut self) -> nb::Result<u8, Error> {
+    /// Read a single byte from the UART in a non-blocking manner.
+    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
         if self.get_rx_fifo_count() > 0 {
             let byte = self.uart.fifo().read().rxfifo_rd_byte().bits();
             Ok(byte)
@@ -177,7 +178,8 @@ impl LpUart {
         }
     }
 
-    fn write_byte(&mut self, byte: u8) -> nb::Result<(), Error> {
+    /// Write a single byte to the UART in a non-blocking manner.
+    pub fn write_byte(&mut self, byte: u8) -> nb::Result<(), Error> {
         if self.get_tx_fifo_count() < UART_FIFO_SIZE {
             self.uart
                 .fifo()
@@ -188,7 +190,9 @@ impl LpUart {
         }
     }
 
-    fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
+    /// Write one or more byte to the UART, blocking until the write has
+    /// completed.
+    pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
         let count = data.len();
 
         data.iter()
@@ -197,7 +201,8 @@ impl LpUart {
         Ok(count)
     }
 
-    fn flush_tx(&mut self) -> nb::Result<(), Error> {
+    /// Flush the UART's transmit buffer in a non-blocking manner.
+    pub fn flush_tx(&mut self) -> nb::Result<(), Error> {
         if self.is_tx_idle() {
             Ok(())
         } else {
