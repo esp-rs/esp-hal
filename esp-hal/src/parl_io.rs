@@ -12,12 +12,14 @@
 //!
 //! ## Examples
 //! ### Initialization for RX
-//! See the [Parallel IO RX] example to learn how to initialize the RX and reading data.
+//! See the [Parallel IO RX] example to learn how to initialize the RX and
+//! reading data.
 //!
 //! [Parallel IO RX]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/parl_io_rx.rs
 //!
 //! ### Initialization for TX
-//! See the [Parallel IO TX] example to learn how to initialize the TX and transferring data.
+//! See the [Parallel IO TX] example to learn how to initialize the TX and
+//! transferring data.
 //!
 //! [Parallel IO TX]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/parl_io_tx.rs
 
