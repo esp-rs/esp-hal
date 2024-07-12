@@ -2,7 +2,7 @@
 //! These are useful to pass them into peripheral drivers.
 //!
 //! If you want a generic pin for GPIO input/output look into
-//! [Output],[OutputOpenDrain] and [Input]
+//! [Output],[OutputOpenDrain], [Input] and [Flex].
 
 use super::*;
 

@@ -12,7 +12,10 @@
 use core::ptr::addr_of_mut;
 
 use self::peripherals::{LPWR, TIMG0, TIMG1};
-use crate::{rtc_cntl::Rtc, timer::timg::Wdt};
+use crate::{
+    rtc_cntl::{Rtc, SocResetReason},
+    timer::timg::Wdt,
+};
 
 pub mod cpu_control;
 pub mod efuse;
@@ -94,9 +97,13 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
     extern "C" {
         static mut _rtc_fast_bss_start: u32;
         static mut _rtc_fast_bss_end: u32;
+        static mut _rtc_fast_persistent_start: u32;
+        static mut _rtc_fast_persistent_end: u32;
 
         static mut _rtc_slow_bss_start: u32;
         static mut _rtc_slow_bss_end: u32;
+        static mut _rtc_slow_persistent_start: u32;
+        static mut _rtc_slow_persistent_end: u32;
 
         static mut _stack_start_cpu0: u32;
 
@@ -118,6 +125,19 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
         addr_of_mut!(_rtc_slow_bss_start),
         addr_of_mut!(_rtc_slow_bss_end),
     );
+    if matches!(
+        crate::reset::get_reset_reason(),
+        None | Some(SocResetReason::ChipPowerOn)
+    ) {
+        xtensa_lx_rt::zero_bss(
+            addr_of_mut!(_rtc_fast_persistent_start),
+            addr_of_mut!(_rtc_fast_persistent_end),
+        );
+        xtensa_lx_rt::zero_bss(
+            addr_of_mut!(_rtc_slow_persistent_start),
+            addr_of_mut!(_rtc_slow_persistent_end),
+        );
+    }
 
     unsafe {
         let stack_chk_guard = core::ptr::addr_of_mut!(__stack_chk_guard);

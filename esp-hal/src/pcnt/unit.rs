@@ -1,14 +1,13 @@
-//! # PCNT - Unit module
+//! # PCNT - Unit Module
 //!
 //! ## Overview
-//! The `unit` module is a part of the `PCNT` peripheral driver
-//! for ESP chips. It offers functionalities for configuring and utilizing
-//! specific units of the PCNT peripheral.
-//!
-//! Each unit is identified by a unit number, such as `Unit0`, `Unit1`, `Unit2`,
-//! and so on. This module provides methods to configure a unit with specific
-//! settings, like low and high limits, thresholds, and optional filtering.
-//! Users can easily configure these units based on their requirements.
+//! The `unit` module is responsible for configuring and handling individual
+//! units of the `PCNT` peripheral. Each unit represents a separate instance of
+//! the `PCNT` module, identified by unit numbers like `Unit0`, `Unit1`, and so
+//! on. Users can interact with these units to configure settings such as low
+//! and high limits, thresholds, and optional filtering. The unit module also
+//! enables users to pause, resume, and clear the counter, as well as enable or
+//! disable interrupts for specific events associated with the unit.
 
 use critical_section::CriticalSection;
 

@@ -1,5 +1,6 @@
-//! LCD and Camera
+//! # LCD and Camera
 //!
+//! ## Overview
 //! This peripheral consists of an LCD module and a Camera module, which can be
 //! used simultaneously. For more information on these modules, please refer to
 //! the documentation in their respective modules.

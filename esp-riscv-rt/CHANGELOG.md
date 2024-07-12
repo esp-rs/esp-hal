@@ -9,11 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `rtc-ram` feature used by `esp-hal` to control rtc ram initialization (#1677)
+
 ### Fixed
 
 ### Changed
 
 ### Removed
+
+- All existing features controlling ram initialization. Most (`init-data`, `init-rw-text`,
+  `init-rtc-fast-data`, and `init-rtc-fast-text`) were only used for the (already removed) direct
+  boot support. `zero-bss` is now enabled unconditionally. `zero-rtc-fast-bss` was merged into the
+  new `rtc-ram` feature. (#1677)
 
 ## 0.8.0 - 2024-04-18
 

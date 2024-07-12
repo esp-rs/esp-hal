@@ -8,6 +8,7 @@
 //! - SCL => GPIO7
 
 //% CHIPS: esp32c6
+//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]

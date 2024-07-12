@@ -1,12 +1,6 @@
 //! # RTC Control Sleep Module
 //!
 //! ## Overview
-//!
-//! The `sleep` module in the `RTC CNTL (Real-Time Control)` driver
-//! provides functionality to manage sleep and wakeup sources for `ESP` chips.
-//! The `RTC_CNTL` is responsible for controlling the power and sleep behavior
-//! of the chip.
-//!
 //! The `sleep` module allows configuring various wakeup sources and setting up
 //! the sleep behavior based on those sources. The supported wakeup sources
 //! include:
@@ -140,7 +134,7 @@ pub struct WakeFromLpCoreWakeupSource {}
 
 #[cfg(esp32c6)]
 impl WakeFromLpCoreWakeupSource {
-    /// Create a new instance of [LpCoreWakeupSource]
+    /// Create a new instance of `WakeFromLpCoreWakeupSource`
     pub fn new() -> Self {
         Self {}
     }

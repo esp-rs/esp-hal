@@ -1,17 +1,21 @@
-//! # Advanced Encryption Standard (AES) support.
+//! # Advanced Encryption Standard (AES).
 //!
 //! ## Overview
+//! The AES accelerator is a hardware device that speeds up computation
+//! using AES algorithm significantly, compared to AES algorithms implemented
+//! solely in software.  The AES accelerator has two working modes, which are
+//! Typical AES and AES-DMA.
 //!
-//! The AES module provides an interface to interact with the AES peripheral,
-//! provides encryption and decryption capabilities for ESP chips using the AES
-//! algorithm. We currently support the following AES encryption modes:
+//! ## Configuration
+//! The AES peripheral can be configured to encrypt or decrypt data using
+//! different encryption/decryption modes.
 //!
-//! * AES-128
-//! * AES-192
-//! * AES-256
+//! When using AES-DMA, the peripheral can be configured to use different block
+//! cipher modes such as ECB, CBC, OFB, CTR, CFB8, and CFB128.
 //!
-//! ## Example
-//!
+//! ## Examples
+//! ### Encrypting and Decrypting a Message
+//! Simple example of encrypting and decrypting a message using AES-128:
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::aes::{Aes, Mode};
@@ -32,21 +36,15 @@
 //! # }
 //! ```
 //! 
-//! ### Implementation State
+//! ### AES-DMA
+//! Visit the [AES-DMA] test for a more advanced example of using AES-DMA
+//! mode.
 //!
-//! * DMA mode is currently not supported on ESP32 and ESP32S2 ⚠️
+//! [AES-DMA]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/aes_dma.rs
 //!
-//! ## DMA-AES Mode
-//!
-//! Supports 6 block cipher modes including `ECB/CBC/OFB/CTR/CFB8/CFB128`.
-//!
-//! * Initialization vector (IV) is currently not supported ⚠️
-//!
-//! ⚠️: The examples for AES with DMA peripheral are quite extensive, so for a more
-//! detailed study of how to use this driver please visit [the repository
-//! with corresponding example].
-//!
-//! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/aes_dma.rs
+//! ## Implementation State
+//! * AES-DMA mode is currently not supported on ESP32 and ESP32S2
+//! * AES-DMA Initialization Vector (IV) is currently not supported
 
 use crate::{
     peripheral::{Peripheral, PeripheralRef},

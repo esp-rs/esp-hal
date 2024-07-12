@@ -1,26 +1,23 @@
 //! # LED Controller (LEDC)
 //!
-//! The LED control (LEDC) peripheral is primarily designed to control the
-//! intensity of LEDs, although it can also be used to generate PWM signals for
-//! other purposes. It has multiple channels which can generate independent
-//! waveforms that can be used, for example, to drive RGB LED devices.
+//! ## Overview
+//! The LEDC peripheral is primarily designed to control the intensity of LEDs,
+//! although it can also be used to generate PWM signals for other purposes. It
+//! has multiple channels which can generate independent waveforms that can be
+//! used, for example, to drive RGB LED devices.
 //!
 //! The PWM controller can automatically increase or decrease the duty cycle
 //! gradually, allowing for fades without any processor interference.
 //!
 //! ## Configuration
-//!
 //! Currently only supports fixed-frequency output. High Speed channels are
 //! available for the ESP32 only, while Low Speed channels are available for all
 //! supported chips.
 //!
-//! ### Examples
-//!
-//! #### Low Speed Channel
-//!
+//! ## Examples
+//! ### Low Speed Channel
 //! The following will configure the Low Speed Channel0 to 24kHz output with
 //! 10% duty using the ABPClock
-//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::ledc::Ledc;
@@ -59,10 +56,9 @@
 //! # }
 //! ```
 //! 
-//! ## Unsupported
-//!
-//! - Source clock selection
-//! - Interrupts
+//! ## Implementation State
+//! - Source clock selection is not supported
+//! - Interrupts are not supported
 
 use self::{
     channel::Channel,

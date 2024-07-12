@@ -36,69 +36,17 @@
 // MUST be the first module
 mod fmt;
 
-use core::cell::Cell;
-
-use embassy_time_driver::{AlarmHandle, Driver};
 use esp_hal::clock::Clocks;
 
 #[cfg(feature = "executors")]
 pub use self::executor::{Executor, InterruptExecutor};
-use self::time_driver::{EmbassyTimer, TimerType};
+use self::time_driver::{EmbassyTimer, Timer};
 
 #[cfg(feature = "executors")]
 mod executor;
 mod time_driver;
 
 /// Initialize embassy
-pub fn init(clocks: &Clocks, time_driver: TimerType) {
+pub fn init(clocks: &Clocks, time_driver: &'static mut [Timer]) {
     EmbassyTimer::init(clocks, time_driver)
-}
-
-#[allow(clippy::type_complexity)]
-pub(crate) struct AlarmState {
-    pub callback: Cell<Option<(fn(*mut ()), *mut ())>>,
-    pub allocated: Cell<bool>,
-}
-
-unsafe impl Send for AlarmState {}
-
-impl AlarmState {
-    pub const fn new() -> Self {
-        Self {
-            callback: Cell::new(None),
-            allocated: Cell::new(false),
-        }
-    }
-}
-
-impl Driver for EmbassyTimer {
-    fn now(&self) -> u64 {
-        EmbassyTimer::now()
-    }
-
-    unsafe fn allocate_alarm(&self) -> Option<AlarmHandle> {
-        critical_section::with(|cs| {
-            for (i, alarm) in self.alarms.borrow(cs).iter().enumerate() {
-                if !alarm.allocated.get() {
-                    // set alarm so it is not overwritten
-                    alarm.allocated.set(true);
-                    self.on_alarm_allocated(i);
-                    return Some(AlarmHandle::new(i as u8));
-                }
-            }
-            None
-        })
-    }
-
-    fn set_alarm_callback(&self, alarm: AlarmHandle, callback: fn(*mut ()), ctx: *mut ()) {
-        let n = alarm.id() as usize;
-        critical_section::with(|cs| {
-            let alarm = &self.alarms.borrow(cs)[n];
-            alarm.callback.set(Some((callback, ctx)));
-        })
-    }
-
-    fn set_alarm(&self, alarm: AlarmHandle, timestamp: u64) -> bool {
-        self.set_alarm(alarm, timestamp)
-    }
 }

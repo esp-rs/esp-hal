@@ -33,7 +33,7 @@ enum-dispatch = []
 interrupt = []
 ## Provide a `#[ram]` procmacro to place functions in RAM instead of flash.
 ram = []
-## Indicates the target devices has RTC slow memory available.
+## Indicates the target device has RTC slow memory available.
 rtc_slow = []
 
 #! ### Low-power Core Feature Flags

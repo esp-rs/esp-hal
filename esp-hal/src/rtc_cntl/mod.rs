@@ -1,16 +1,13 @@
-//! # RTC_CNTL (Real-Time Clock Control) and Low-power Management
+//! # Real-Time Clock Control and Low-power Management (RTC_CNTL)
 //!
 //! ## Overview
-//! The `rtc_cntl` module provides a driver for the `RTC_CNTL` peripheral on ESP
-//! chips.
+//! The RTC_CNTL peripheral is responsible for managing the real-time clock and
+//! low-power modes on the chip.
 //!
-//! The `Real-Time Clock Control (RTC_CNTL)` peripheral is responsible for
-//! managing the real-time clock and low-power modes on the chip.
-//!
-//! The `rtc_cntl` driver module contains functions and data structures to
-//! interact with the `RTC_CNTL` peripheral on ESP chips. It also includes the
-//! necessary configurations and constants for clock sources and low-power
-//! management. The driver provides the following features and functionalities:
+//! ## Configuration
+//!  It also includes the necessary configurations and constants for clock
+//! sources and low-power management. The driver provides the following features
+//! and functionalities:
 //!    * Clock Configuration
 //!    * Calibration
 //!    * Low-Power Management
@@ -18,7 +15,7 @@
 //!    * Handling Watchdog Timers
 //!
 //! ## Examples
-//! ### Print time in milliseconds from the RTC Timer
+//! ### Print Time in Milliseconds From the RTC Timer
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use core::cell::RefCell;
