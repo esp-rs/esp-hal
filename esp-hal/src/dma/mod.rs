@@ -129,7 +129,7 @@ pub use self::pdma::*;
 use crate::{interrupt::InterruptHandler, Mode};
 
 #[cfg(gdma)]
-mod gdma;
+pub mod gdma;
 #[cfg(pdma)]
 mod pdma;
 
