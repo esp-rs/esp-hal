@@ -1,9 +1,11 @@
 //! Drives a 64x64 LED matrix using the Hub75e protocol
 //!
 //! This example draws a color gradient on the top 24 rors of the matrx
-//! and displays the refresh and render rates on the bottom.
+//! and displays the refresh and render rates on the bottom. The main core
+//! renders the display into a set of DMA buffers and the second
+//! core is dedicated to managing dma transactions with the i8080 peripheral.
 //!
-//! Pins used: (Level convcerters are usuallu required 3.3v->5v)
+//! Pins used: (Level converters are usually required 3.3v->5v)
 //!
 //! R1     GPIO38
 //! G1     GPIO42
@@ -21,7 +23,7 @@
 //! LAT    GPIO10
 
 //% CHIPS: esp32s3
-//% FEATURES: async embassy embassy-time-timg0 embassy-generic-timers bitfield
+//% FEATURES: async embassy embassy-generic-timers bitfield
 
 #![no_std]
 #![no_main]
@@ -69,7 +71,7 @@ use esp_hal::{
     peripherals::{Peripherals, LCD_CAM},
     prelude::*,
     system::SystemControl,
-    timer::timg::TimerGroup,
+    timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
 };
 use esp_println::println;
 use heapless::String;
@@ -396,6 +398,16 @@ extern "C" {
     static _stack_start_cpu0: u32;
 }
 
+// When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
+macro_rules! mk_static {
+    ($t:ty,$val:expr) => {{
+        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
+        #[deny(unused_attributes)]
+        let x = STATIC_CELL.uninit().write(($val));
+        x
+    }};
+}
+
 #[main]
 async fn main(spawner: Spawner) {
     println!("Init!");
@@ -414,11 +426,15 @@ async fn main(spawner: Spawner) {
     let cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 
     let clocks = ClockControl::max(system.clock_control).freeze();
-    let timer_group0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
+    let timer0 = OneShotTimer::new(timer_group0.timer0.into());
+    let timer1 = OneShotTimer::new(timer_group0.timer1.into());
+    let timers = [timer0, timer1];
+    let timers = mk_static!([OneShotTimer<ErasedTimer>; 2], timers);
+    esp_hal_embassy::init(&clocks, timers);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let dma = Dma::new(peripherals.DMA);
-    esp_hal_embassy::init(&clocks, timer_group0);
 
     spawner.spawn(display_task()).ok();
 
