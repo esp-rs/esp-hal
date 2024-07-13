@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - uart: Added `with_cts`/`with_rts`s methods to configure CTS, and RTS pins (#1592)
 - uart: Constructors now require TX and RX pins (#1592)
 - uart: Added `Uart::new_with_default_pins` constructor (#1592)
@@ -35,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix `regi2c_*` functions for `esp32h2` (#1737)
 - Improved `#[ram(zeroed)]` soundness by adding a `bytemuck::Zeroable` type bound (#1677)
 - EESP32-S2 / ESP32-S3: Fix UsbDm and UsbDp for Gpio19 and Gpio20
+- dma: Make gdma module public
 
 ### Changed
 
@@ -46,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved interrupt latency on Xtensa based chips (#1735)
 
 ### Removed
+
 - uart: Removed `configure_pins` methods (#1592)
 - Removed `DmaError::Exhausted` error by improving the implementation of the `pop` function (#1664)
 - Unsound `#[ram(uninitialized)]` option in favor of the new `persistent` option (#1677)
