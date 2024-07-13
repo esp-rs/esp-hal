@@ -101,8 +101,8 @@ bitfield! {
     red1, set_red1: 10;
     dummy2, set_dummy2: 9;
     dummy1, set_dummy1: 8;
-    output_enable, set_output_enable: 7;
-    clock, set_clock: 6;
+    dummy0, set_dummy0: 7;
+    output_enable, set_output_enable: 6;
     latch, set_latch: 5;
     addr, set_addr: 4, 0;
 }
@@ -123,7 +123,7 @@ impl Entry {
 }
 
 type Color = Rgb888;
-const BRIGHTNESS_BITS: u8 = 3; // must be < the number of bits per pixel!!!!
+const BRIGHTNESS_BITS: u8 = 4; // must be < the number of bits per pixel!!!!
 const BRIGHTNESS_COUNT: u8 = (1 << BRIGHTNESS_BITS) - 1;
 const BRIGHTNESS_STEP: u8 = 1 << (8 - BRIGHTNESS_BITS);
 
@@ -132,10 +132,9 @@ const MATRIX_COLS: usize = 64;
 const MATRIX_ROWS: usize = 64;
 const FRAMEBUFFER_SIZE: usize = buffer_size::<Color>(MATRIX_COLS, MATRIX_ROWS);
 
-const BLANKING_DELAY: usize = 7;
-const LATCH_DELAY: usize = 4;
+const BLANKING_DELAY: usize = 1;
 // sizing for DMA buffers
-const DMA_ROW_SIZE: usize = 64 * 2 + BLANKING_DELAY + LATCH_DELAY + 3; // 64 pixels blank and latch delay + + 1 for blank, 1 for unlatch, 1 for latch
+const DMA_ROW_SIZE: usize = MATRIX_COLS;
 const DMA_FRAME_SIZE: usize = DMA_ROW_SIZE * MATRIX_ROWS / 2; // Each "row" in the DMA buffer is 2 rows of the matrix
 const DMA_FRAMES_PER_BUFFER: usize = 1 << BRIGHTNESS_BITS; // Multiple frames for BCM ()
 const DMA_BUFFER_SIZE: usize = DMA_FRAME_SIZE * DMA_FRAMES_PER_BUFFER;
@@ -183,61 +182,32 @@ fn render_frame<C, BO, const WIDTH: usize, const HEIGHT: usize, const N: usize>(
     let mut prev_addr = 0u8;
     for y in 0..(HEIGHT / 2) as u8 {
         // we render in reverse order because when the lcd_cam device finishes renering
-        // it sets the address lines back to 0 causing ghosting
+        // it sets the address lines back to 0
         let addr = HEIGHT as u8 / 2 - 1 - y;
         let start = y as usize * DMA_ROW_SIZE;
         let mut entry = Entry::new();
-        // render pixels first
-        // each pixel pair (2 rows) takes 2 Entries, one with the clock low and one with the clock high
+        entry.set_addr(prev_addr as u16);
+        entry.set_output_enable(false);
+        // rander pixels first
         for x in 0..WIDTH {
             let color0 = fb.pixel(Point::new(x as i32, addr as i32)).unwrap();
             let color1 = fb
                 .pixel(Point::new(x as i32, (addr + HEIGHT as u8 / 2) as i32))
                 .unwrap();
-            entry.set_addr(prev_addr as u16);
-            entry.set_output_enable(true);
-            entry.set_latch(false);
             entry.set_colors(color0, color1, brightness);
 
-            let i2 = start + x * 2;
-
-            entry.set_clock(false);
-            buffer[i2] = entry;
-
-            entry.set_clock(true);
-            buffer[i2 + 1] = entry;
-        }
-
-        let mut i = start + WIDTH * 2;
-
-        // one entry to set the clock low and disable output
-        // output is disabled to prevent ghosting when the address lines are changed
-        entry.set_clock(false);
-        entry.set_output_enable(false);
-        buffer[i] = entry;
-        i += 1;
-
-        // delay for blanking, without some delay there would be ghosting
-        for _ in 0..BLANKING_DELAY {
-            buffer[i] = entry;
-            i += 1;
-        }
-
-        // open latch to grab the new values shifted in above and set the new address
-        entry.set_latch(true);
-        entry.set_addr(addr as u16);
-        buffer[i] = entry; // unlatch
-        i += 1;
-
-        // close latch to lock in the values
-        entry.set_latch(false);
-        buffer[i] = entry;
-        i += 1;
-
-        // another delay to prevent ghosting
-        for _ in 0..LATCH_DELAY {
-            buffer[i] = entry;
-            i += 1;
+            // if we enable display too soon then we will have ghosting
+            if x >= BLANKING_DELAY {
+                entry.set_output_enable(true);
+            }
+            // last pixel, blank the display, open the latch, set the new row address
+            // the latch will be closed on the first pixel of the next row.
+            if x == WIDTH - 1 {
+                entry.set_output_enable(false);
+                entry.set_latch(true);
+                entry.set_addr(addr as u16);
+            }
+            buffer[start + x] = entry;
         }
 
         // next address
@@ -368,6 +338,9 @@ async fn hub75_task(peripherals: DisplayPeripherals, clocks: Clocks<'static>) {
     let (tx_descriptors, _) = esp_hal::dma_descriptors!(DMA_BUFFER_SIZE * 2, 0);
 
     let channel = channel.configure(false, DmaPriority::Priority0);
+    // Note that the blank pin is inverted, this is because the pin would be set
+    // low when the i8080 is idle (between DMA transactiuons).  This would enable
+    // the display and cause ghosting.
     let pins = TxSixteenBits::new(
         AnyPin::new(peripherals.addr0),
         AnyPin::new(peripherals.addr1),
@@ -375,8 +348,8 @@ async fn hub75_task(peripherals: DisplayPeripherals, clocks: Clocks<'static>) {
         AnyPin::new(peripherals.addr3),
         AnyPin::new(peripherals.addr4),
         AnyPin::new(peripherals.latch),
-        AnyPin::new(peripherals.clock),
         AnyPin::new_inverted(peripherals.blank),
+        DummyPin::new(),
         DummyPin::new(),
         DummyPin::new(),
         AnyPin::new(peripherals.red1),
@@ -393,10 +366,11 @@ async fn hub75_task(peripherals: DisplayPeripherals, clocks: Clocks<'static>) {
         channel.tx,
         tx_descriptors,
         pins,
-        40.MHz(),
+        20.MHz(),
         i8080::Config::default(),
         &clocks,
-    );
+    )
+    .with_ctrl_pins(DummyPin::new(), peripherals.clock);
 
     let mut count = 0u32;
     let mut start = Instant::now();
