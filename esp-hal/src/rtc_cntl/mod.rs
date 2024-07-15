@@ -286,36 +286,23 @@ impl<'d> Rtc<'d> {
 
     /// Enter deep sleep and wake with the provided `wake_sources`.
     #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
-    pub fn sleep_deep(
-        &mut self,
-        wake_sources: &[&dyn WakeSource],
-        delay: &mut crate::delay::Delay,
-    ) -> ! {
+    pub fn sleep_deep(&mut self, wake_sources: &[&dyn WakeSource]) -> ! {
         let config = RtcSleepConfig::deep();
-        self.sleep(&config, wake_sources, delay);
+        self.sleep(&config, wake_sources);
         unreachable!();
     }
 
     /// Enter light sleep and wake with the provided `wake_sources`.
     #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
-    pub fn sleep_light(
-        &mut self,
-        wake_sources: &[&dyn WakeSource],
-        delay: &mut crate::delay::Delay,
-    ) {
+    pub fn sleep_light(&mut self, wake_sources: &[&dyn WakeSource]) {
         let config = RtcSleepConfig::default();
-        self.sleep(&config, wake_sources, delay);
+        self.sleep(&config, wake_sources);
     }
 
     /// Enter sleep with the provided `config` and wake with the provided
     /// `wake_sources`.
     #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
-    pub fn sleep(
-        &mut self,
-        config: &RtcSleepConfig,
-        wake_sources: &[&dyn WakeSource],
-        delay: &mut crate::delay::Delay,
-    ) {
+    pub fn sleep(&mut self, config: &RtcSleepConfig, wake_sources: &[&dyn WakeSource]) {
         let mut config = *config;
         let mut wakeup_triggers = WakeTriggers::default();
         for wake_source in wake_sources {

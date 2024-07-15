@@ -37,5 +37,5 @@ fn main() -> ! {
     let timer = TimerWakeupSource::new(Duration::from_secs(5));
     println!("sleeping!");
     delay.delay_millis(100);
-    rtc.sleep_deep(&[&timer], &mut delay);
+    rtc.sleep_deep(&[&timer]);
 }
