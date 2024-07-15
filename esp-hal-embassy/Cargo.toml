@@ -1,6 +1,6 @@
 [package]
 name         = "esp-hal-embassy"
-version      = "0.1.0"
+version      = "0.2.0"
 edition      = "2021"
 rust-version = "1.76.0"
 description  = "Embassy support for esp-hal"
@@ -24,7 +24,7 @@ portable-atomic     = "1.6.0"
 [build-dependencies]
 cfg-if       = "1.0.0"
 esp-build    = { version = "0.1.0", path = "../esp-build" }
-esp-metadata = { version = "0.1.1", path = "../esp-metadata" }
+esp-metadata = { version = "0.2.0", path = "../esp-metadata" }
 
 [features]
 default = ["executors"]
