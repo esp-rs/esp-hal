@@ -10,7 +10,7 @@ keywords     = ["esp32", "riscv", "runtime", "startup"]
 categories   = ["embedded", "no-std"]
 
 [dependencies]
-document-features = "0.2.8"
+document-features = "0.2.10"
 riscv             = "0.11.1"
 riscv-rt-macros   = "0.2.1"
 

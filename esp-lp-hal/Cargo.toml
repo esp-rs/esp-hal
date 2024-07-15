@@ -26,14 +26,14 @@ categories = [
 
 [dependencies]
 cfg-if            = "1.0.0"
-document-features = "0.2.8"
+document-features = "0.2.10"
 embedded-hal      = { version = "1.0.0",  optional = true }
 embedded-hal-02   = { version = "0.2.7",  optional = true, features = ["unproven"], package = "embedded-hal" }
 embedded-hal-nb   = { version = "1.0.0",  optional = true }
 embedded-io       = { version = "0.6.1",  optional = true }
-esp32c6-lp        = { git = "https://github.com/esp-rs/esp-pacs", rev = "9c76169", features = ["critical-section"], optional = true }
-esp32s2-ulp       = { git = "https://github.com/esp-rs/esp-pacs", rev = "9c76169", features = ["critical-section"], optional = true }
-esp32s3-ulp       = { git = "https://github.com/esp-rs/esp-pacs", rev = "9c76169", features = ["critical-section"], optional = true }
+esp32c6-lp        = { version = "0.3.0", features = ["critical-section"], optional = true }
+esp32s2-ulp       = { version = "0.3.0", features = ["critical-section"], optional = true }
+esp32s3-ulp       = { version = "0.3.0", features = ["critical-section"], optional = true }
 nb                = { version = "1.1.0",  optional = true }
 paste             = { version = "1.0.15", optional = true }
 procmacros        = { version = "0.11.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
