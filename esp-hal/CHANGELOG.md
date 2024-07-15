@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp_wifi::initialize` no longer requires running maximum CPU clock, instead check it runs above 80MHz. (#1688)
 - Move DMA descriptors from DMA Channel to each individual peripheral driver. (#1719)
 - Improved interrupt latency on Xtensa based chips (#1735)
+- Improve PCNT api (#1765)
 
 ### Removed
 - uart: Removed `configure_pins` methods (#1592)
