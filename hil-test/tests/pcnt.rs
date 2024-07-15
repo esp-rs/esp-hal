@@ -25,11 +25,7 @@ mod tests {
         clock::ClockControl,
         delay::Delay,
         gpio::{Io, Level, Output, Pull},
-        pcnt::{
-            channel,
-            channel::{CtrlMode, EdgeMode, PcntInputConfig, PcntSource},
-            unit,
-        },
+        pcnt::channel::{EdgeMode, PcntInputConfig, PcntSource},
         peripherals::Peripherals,
         system::SystemControl,
     };
