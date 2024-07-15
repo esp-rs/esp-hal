@@ -5,9 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.19.0] - 2024-07-15
 
 ### Added
+
 - uart: Added `with_cts`/`with_rts`s methods to configure CTS, and RTS pins (#1592)
 - uart: Constructors now require TX and RX pins (#1592)
 - uart: Added `Uart::new_with_default_pins` constructor (#1592)
@@ -51,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improve PCNT api (#1765)
 
 ### Removed
+
 - uart: Removed `configure_pins` methods (#1592)
 - Removed `DmaError::Exhausted` error by improving the implementation of the `pop` function (#1664)
 - Unsound `#[ram(uninitialized)]` option in favor of the new `persistent` option (#1677)
@@ -631,7 +633,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.18.0...HEAD
+[0.19.0]: https://github.com/esp-rs/esp-hal/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/esp-rs/esp-hal/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/esp-rs/esp-hal/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/esp-rs/esp-hal/compare/v0.16.0...v0.16.1
