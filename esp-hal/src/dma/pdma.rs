@@ -390,7 +390,7 @@ macro_rules! ImplSpiChannel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> Channel<'a, [<Spi $num DmaCh>], $crate::Blocking> {
+                ) -> Channel<'a, [<Spi $num DmaChannel>], $crate::Blocking> {
                     let mut tx_impl = [<Spi $num DmaChannelTxImpl>] {};
                     tx_impl.init(burst_mode, priority);
 
@@ -413,7 +413,7 @@ macro_rules! ImplSpiChannel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> Channel<'a, [<Spi $num DmaCh>], $crate::Async> {
+                ) -> Channel<'a, [<Spi $num DmaChannel>], $crate::Async> {
                     let mut tx_impl = [<Spi $num DmaChannelTxImpl>] {};
                     tx_impl.init(burst_mode, priority);
 
@@ -449,8 +449,6 @@ macro_rules! ImplI2sChannel {
                     $crate::interrupt::enable($crate::peripherals::Interrupt::[< I2S $num  >], handler.priority()).unwrap();
                 }
             }
-
-            impl $crate::private::Sealed for [<I2s $num DmaCh>] {}
 
             #[doc = concat!("DMA channel suitable for I2S", $num)]
             pub struct [<I2s $num DmaChannel>] {}
@@ -786,7 +784,7 @@ macro_rules! ImplI2sChannel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> Channel<'a, [<I2s $num DmaCh>], $crate::Blocking> {
+                ) -> Channel<'a, [<I2s $num DmaChannel>], $crate::Blocking> {
                     let mut tx_impl = [<I2s $num DmaChannelTxImpl>] {};
                     tx_impl.init(burst_mode, priority);
 
@@ -809,7 +807,7 @@ macro_rules! ImplI2sChannel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> Channel<'a, [<I2s $num DmaCh>], $crate::Async> {
+                ) -> Channel<'a, [<I2s $num DmaChannel>], $crate::Async> {
                     let mut tx_impl = [<I2s $num DmaChannelTxImpl>] {};
                     tx_impl.init(burst_mode, priority);
 
