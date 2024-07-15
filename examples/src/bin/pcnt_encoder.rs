@@ -41,14 +41,14 @@ fn main() -> ! {
     // Set up a pulse counter:
     println!("setup pulse counter unit 0");
     let pcnt = Pcnt::new(peripherals.PCNT, Some(interrupt_handler));
-    let mut u0 = pcnt.unit1;
+    let u0 = pcnt.unit1;
     u0.set_low_limit(Some(-100)).unwrap();
     u0.set_high_limit(Some(100)).unwrap();
     u0.set_filter(Some(min(10u16 * 80, 1023u16))).unwrap();
     u0.clear();
 
     println!("setup channel 0");
-    let mut ch0 = &u0.channel0;
+    let ch0 = &u0.channel0;
     let mut pin_a = io.pins.gpio4;
     let mut pin_b = io.pins.gpio5;
 
@@ -64,7 +64,7 @@ fn main() -> ! {
     ch0.set_input_mode(channel::EdgeMode::Increment, channel::EdgeMode::Decrement);
 
     println!("setup channel 1");
-    let mut ch1 = &u0.channel1;
+    let ch1 = &u0.channel1;
     ch1.set_ctrl_signal(PcntSource::from_pin(
         &mut pin_b,
         PcntInputConfig { pull: Pull::Up },
