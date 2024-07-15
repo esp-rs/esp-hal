@@ -323,7 +323,6 @@ impl<'d> Rtc<'d> {
         }
 
         config.apply();
-        delay.delay_millis(100);
 
         config.start_sleep(wakeup_triggers);
         config.finish_sleep();
