@@ -40,8 +40,8 @@
 //! # }
 //! ```
 //! 
-//! ⚠️ Note: Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`.
-//! I.e., to transfer buffers of size `1..=4092`, you need 1 descriptor.
+//! ⚠️ Note: Descriptors should be sized as `(max_transfer_size + CHUNK_SIZE - 1) / CHUNK_SIZE`.
+//! I.e., to transfer buffers of size `1..=CHUNK_SIZE`, you need 1 descriptor.
 //!
 //! For convenience you can use the [crate::dma_buffers] macro.
 #![warn(missing_docs)]
@@ -142,7 +142,8 @@ pub enum DmaInterrupt {
     RxDone,
 }
 
-const CHUNK_SIZE: usize = 4092;
+/// The default CHUNK_SIZE used for DMA transfers
+pub const CHUNK_SIZE: usize = 4092;
 
 /// Convenience macro to create DMA buffers and descriptors
 ///
@@ -153,39 +154,12 @@ const CHUNK_SIZE: usize = 4092;
 /// ```
 #[macro_export]
 macro_rules! dma_buffers {
-    ($tx_size:expr, $rx_size:expr) => {{
-        static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
-        static mut RX_BUFFER: [u8; $rx_size] = [0u8; $rx_size];
-        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; ($tx_size + 4091) / 4092] =
-            [$crate::dma::DmaDescriptor::EMPTY; ($tx_size + 4091) / 4092];
-        static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor; ($rx_size + 4091) / 4092] =
-            [$crate::dma::DmaDescriptor::EMPTY; ($rx_size + 4091) / 4092];
-        unsafe {
-            (
-                &mut TX_BUFFER,
-                &mut TX_DESCRIPTORS,
-                &mut RX_BUFFER,
-                &mut RX_DESCRIPTORS,
-            )
-        }
-    }};
-
-    ($size:expr) => {{
-        static mut TX_BUFFER: [u8; $size] = [0u8; $size];
-        static mut RX_BUFFER: [u8; $size] = [0u8; $size];
-        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; ($size + 4091) / 4092] =
-            [$crate::dma::DmaDescriptor::EMPTY; ($size + 4091) / 4092];
-        static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor; ($size + 4091) / 4092] =
-            [$crate::dma::DmaDescriptor::EMPTY; ($size + 4091) / 4092];
-        unsafe {
-            (
-                &mut TX_BUFFER,
-                &mut TX_DESCRIPTORS,
-                &mut RX_BUFFER,
-                &mut RX_DESCRIPTORS,
-            )
-        }
-    }};
+    ($tx_size:expr, $rx_size:expr) => {
+        $crate::dma_buffers_chunk_size!($tx_size, $rx_size, $crate::dma::CHUNK_SIZE)
+    };
+    ($size:expr) => {
+        $crate::dma_buffers_chunk_size!($size, $crate::dma::CHUNK_SIZE)
+    };
 }
 
 /// Convenience macro to create circular DMA buffers and descriptors
@@ -198,59 +172,13 @@ macro_rules! dma_buffers {
 /// ```
 #[macro_export]
 macro_rules! dma_circular_buffers {
-    ($tx_size:expr, $rx_size:expr) => {{
-        static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
-        static mut RX_BUFFER: [u8; $rx_size] = [0u8; $rx_size];
+    ($tx_size:expr, $rx_size:expr) => {
+        $crate::dma_circular_buffers_chunk_size!($tx_size, $rx_size, $crate::dma::CHUNK_SIZE)
+    };
 
-        const tx_descriptor_len: usize = if $tx_size > 4092 * 2 {
-            ($tx_size + 4091) / 4092
-        } else {
-            3
-        };
-
-        const rx_descriptor_len: usize = if $rx_size > 4092 * 2 {
-            ($rx_size + 4091) / 4092
-        } else {
-            3
-        };
-
-        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; tx_descriptor_len] =
-            [$crate::dma::DmaDescriptor::EMPTY; tx_descriptor_len];
-        static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor; rx_descriptor_len] =
-            [$crate::dma::DmaDescriptor::EMPTY; rx_descriptor_len];
-        unsafe {
-            (
-                &mut TX_BUFFER,
-                &mut TX_DESCRIPTORS,
-                &mut RX_BUFFER,
-                &mut RX_DESCRIPTORS,
-            )
-        }
-    }};
-
-    ($size:expr) => {{
-        static mut TX_BUFFER: [u8; $size] = [0u8; $size];
-        static mut RX_BUFFER: [u8; $size] = [0u8; $size];
-
-        const descriptor_len: usize = if $size > 4092 * 2 {
-            ($size + 4091) / 4092
-        } else {
-            3
-        };
-
-        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; descriptor_len] =
-            [$crate::dma::DmaDescriptor::EMPTY; descriptor_len];
-        static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor; descriptor_len] =
-            [$crate::dma::DmaDescriptor::EMPTY; descriptor_len];
-        unsafe {
-            (
-                &mut TX_BUFFER,
-                &mut TX_DESCRIPTORS,
-                &mut RX_BUFFER,
-                &mut RX_DESCRIPTORS,
-            )
-        }
-    }};
+    ($size:expr) => {
+        $crate::dma_circular_buffers_chunk_size!($size, $size, $crate::dma::CHUNK_SIZE)
+    };
 }
 
 /// Convenience macro to create DMA descriptors
@@ -262,21 +190,13 @@ macro_rules! dma_circular_buffers {
 /// ```
 #[macro_export]
 macro_rules! dma_descriptors {
-    ($tx_size:expr, $rx_size:expr) => {{
-        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; ($tx_size + 4091) / 4092] =
-            [$crate::dma::DmaDescriptor::EMPTY; ($tx_size + 4091) / 4092];
-        static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor; ($rx_size + 4091) / 4092] =
-            [$crate::dma::DmaDescriptor::EMPTY; ($rx_size + 4091) / 4092];
-        unsafe { (&mut TX_DESCRIPTORS, &mut RX_DESCRIPTORS) }
-    }};
+    ($tx_size:expr, $rx_size:expr) => {
+        $crate::dma_descriptors_chunk_size!($tx_size, $rx_size, $crate::dma::CHUNK_SIZE)
+    };
 
-    ($size:expr) => {{
-        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; ($size + 4091) / 4092] =
-            [$crate::dma::DmaDescriptor::EMPTY; ($size + 4091) / 4092];
-        static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor; ($size + 4091) / 4092] =
-            [$crate::dma::DmaDescriptor::EMPTY; ($size + 4091) / 4092];
-        unsafe { (&mut TX_DESCRIPTORS, &mut RX_DESCRIPTORS) }
-    }};
+    ($size:expr) => {
+        $crate::dma_descriptors_chunk_size!($size, $size, $crate::dma::CHUNK_SIZE)
+    };
 }
 
 /// Convenience macro to create circular DMA descriptors
@@ -288,15 +208,127 @@ macro_rules! dma_descriptors {
 /// ```
 #[macro_export]
 macro_rules! dma_circular_descriptors {
-    ($tx_size:expr, $rx_size:expr) => {{
-        const tx_descriptor_len: usize = if $tx_size > 4092 * 2 {
-            ($tx_size + 4091) / 4092
+    ($tx_size:expr, $rx_size:expr) => {
+        $crate::dma_circular_descriptors_chunk_size!($tx_size, $rx_size, $crate::dma::CHUNK_SIZE)
+    };
+
+    ($size:expr) => {
+        $crate::dma_circular_descriptors_chunk_size!($size, $size, $crate::dma::CHUNK_SIZE)
+    };
+}
+
+/// Convenience macro to create DMA buffers and descriptors with specific chunk
+/// size
+///
+/// ## Usage
+/// ```rust,ignore
+/// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX and RX the same size
+/// let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(32000, 32000, 4032);
+/// ```
+#[macro_export]
+macro_rules! dma_buffers_chunk_size {
+    ($tx_size:expr, $rx_size:expr, $chunk_size:expr) => {{
+        static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
+        static mut RX_BUFFER: [u8; $rx_size] = [0u8; $rx_size];
+        let (mut tx_descriptors, mut rx_descriptors) =
+            $crate::dma_descriptors_chunk_size!($tx_size, $rx_size, $chunk_size);
+        unsafe {
+            (
+                &mut TX_BUFFER,
+                tx_descriptors,
+                &mut RX_BUFFER,
+                rx_descriptors,
+            )
+        }
+    }};
+
+    ($size:expr, $chunk_size:expr) => {
+        $crate::dma_buffers_chunk_size!($size, $size, $chunk_size)
+    };
+}
+
+/// Convenience macro to create circular DMA buffers and descriptors with
+/// specific chunk size
+///
+/// ## Usage
+/// ```rust,ignore
+/// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX and RX the same size
+/// let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) =
+///     dma_circular_buffers!(32000, 32000, 4032);
+/// ```
+#[macro_export]
+macro_rules! dma_circular_buffers_chunk_size {
+    ($tx_size:expr, $rx_size:expr, $chunk_size:expr) => {{
+        static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
+        static mut RX_BUFFER: [u8; $rx_size] = [0u8; $rx_size];
+        let (mut tx_descriptors, mut rx_descriptors) =
+            $crate::dma_circular_descriptors_chunk_size!($tx_size, $rx_size, $chunk_size);
+        unsafe {
+            (
+                &mut TX_BUFFER,
+                tx_descriptors,
+                &mut RX_BUFFER,
+                rx_descriptors,
+            )
+        }
+    }};
+
+    ($size:expr, $chunk_size:expr) => {{
+        $crate::dma_circular_buffers_chunk_size!($size, $size, $chunk_size)
+    }};
+}
+
+/// Convenience macro to create DMA descriptors with specific chunk size
+///
+/// ## Usage
+/// ```rust,ignore
+/// // Create TX and RX descriptors for transactions up to 32000 bytes - passing only one parameter assumes TX and RX are the same size
+/// let (tx_descriptors, rx_descriptors) = dma_descriptors_chunk_size!(32000, 32000, 4032);
+/// ```
+#[macro_export]
+macro_rules! dma_descriptors_chunk_size {
+    ($tx_size:expr, $rx_size:expr, $chunk_size:expr) => {{
+        // these will check for size at compile time
+        const _: () = assert!($chunk_size <= 4092, "chunk size must be <= 4092");
+        const _: () = assert!($chunk_size > 0, "chunk size must be > 0");
+
+        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor;
+            ($tx_size + $chunk_size - 1) / $chunk_size] =
+            [$crate::dma::DmaDescriptor::EMPTY; ($tx_size + $chunk_size - 1) / $chunk_size];
+        static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor;
+            ($rx_size + $chunk_size - 1) / $chunk_size] =
+            [$crate::dma::DmaDescriptor::EMPTY; ($rx_size + $chunk_size - 1) / $chunk_size];
+        unsafe { (&mut TX_DESCRIPTORS, &mut RX_DESCRIPTORS) }
+    }};
+
+    ($size:expr, $chunk_size:expr) => {
+        $crate::dma_descriptors_chunk_size!($size, $size, $chunk_size)
+    };
+}
+
+/// Convenience macro to create circular DMA descriptors with specific chunk
+/// size
+///
+/// ## Usage
+/// ```rust,ignore
+/// // Create TX and RX descriptors for transactions up to 32000 bytes - passing only one parameter assumes TX and RX are the same size
+/// let (tx_descriptors, rx_descriptors) = dma_circular_descriptors!(32000, 32000, 4032);
+/// ```
+#[macro_export]
+macro_rules! dma_circular_descriptors_chunk_size {
+    ($tx_size:expr, $rx_size:expr, $chunk_size:expr) => {{
+        // these will check for size at compile time
+        const _: () = assert!($chunk_size <= 4092, "chunk size must be <= 4092");
+        const _: () = assert!($chunk_size > 0, "chunk size must be > 0");
+
+        const tx_descriptor_len: usize = if $tx_size > $chunk_size * 2 {
+            ($tx_size + $chunk_size - 1) / $chunk_size
         } else {
             3
         };
 
-        const rx_descriptor_len: usize = if $rx_size > 4092 * 2 {
-            ($rx_size + 4091) / 4092
+        const rx_descriptor_len: usize = if $rx_size > $chunk_size * 2 {
+            ($rx_size + $chunk_size - 1) / $chunk_size
         } else {
             3
         };
@@ -308,19 +340,9 @@ macro_rules! dma_circular_descriptors {
         unsafe { (&mut TX_DESCRIPTORS, &mut RX_DESCRIPTORS) }
     }};
 
-    ($size:expr) => {{
-        const descriptor_len: usize = if $size > 4092 * 2 {
-            ($size + 4091) / 4092
-        } else {
-            3
-        };
-
-        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; descriptor_len] =
-            [$crate::dma::DmaDescriptor::EMPTY; descriptor_len];
-        static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor; descriptor_len] =
-            [$crate::dma::DmaDescriptor::EMPTY; descriptor_len];
-        unsafe { (&mut TX_DESCRIPTORS, &mut RX_DESCRIPTORS) }
-    }};
+    ($size:expr, $chunk_size:expr) => {
+        $crate::dma_circular_descriptors_chunk_size!($size, $size, $chunk_size)
+    };
 }
 
 /// DMA Errors
@@ -342,6 +364,8 @@ pub enum DmaError {
     BufferTooSmall,
     /// Descriptors or buffers are not located in a supported memory region
     UnsupportedMemoryRegion,
+    /// Invalid DMA chunk size
+    InvalidChunkSize,
 }
 
 /// DMA Priorities
@@ -497,11 +521,25 @@ pub trait PeripheralMarker {}
 #[derive(Debug)]
 pub struct DescriptorChain {
     pub(crate) descriptors: &'static mut [DmaDescriptor],
+    chunk_size: usize,
 }
 
 impl DescriptorChain {
     pub fn new(descriptors: &'static mut [DmaDescriptor]) -> Self {
-        Self { descriptors }
+        Self {
+            descriptors,
+            chunk_size: CHUNK_SIZE,
+        }
+    }
+
+    pub fn new_with_chunk_size(
+        descriptors: &'static mut [DmaDescriptor],
+        chunk_size: usize,
+    ) -> Self {
+        Self {
+            descriptors,
+            chunk_size,
+        }
     }
 
     pub fn first_mut(&mut self) -> *mut DmaDescriptor {
@@ -535,7 +573,7 @@ impl DescriptorChain {
             return Err(DmaError::UnsupportedMemoryRegion);
         }
 
-        if self.descriptors.len() < len.div_ceil(CHUNK_SIZE) {
+        if self.descriptors.len() < len.div_ceil(self.chunk_size) {
             return Err(DmaError::OutOfDescriptors);
         }
 
@@ -545,8 +583,8 @@ impl DescriptorChain {
 
         self.descriptors.fill(DmaDescriptor::EMPTY);
 
-        let max_chunk_size = if !circular || len > CHUNK_SIZE * 2 {
-            CHUNK_SIZE
+        let max_chunk_size = if !circular || len > self.chunk_size * 2 {
+            self.chunk_size
         } else {
             len / 3 + len % 3
         };
@@ -611,14 +649,14 @@ impl DescriptorChain {
             return Err(DmaError::BufferTooSmall);
         }
 
-        if self.descriptors.len() < len.div_ceil(CHUNK_SIZE) {
+        if self.descriptors.len() < len.div_ceil(self.chunk_size) {
             return Err(DmaError::OutOfDescriptors);
         }
 
         self.descriptors.fill(DmaDescriptor::EMPTY);
 
-        let max_chunk_size = if !circular || len > CHUNK_SIZE * 2 {
-            CHUNK_SIZE
+        let max_chunk_size = if !circular || len > self.chunk_size * 2 {
+            self.chunk_size
         } else {
             len / 3 + len % 3
         };
@@ -976,6 +1014,10 @@ where
     fn init(&mut self, burst_mode: bool, priority: DmaPriority) {
         R::set_in_burstmode(burst_mode);
         R::set_in_priority(priority);
+        // clear the mem2mem mode to avoid failed DMA if this
+        // channel was previously used for a mem2mem transfer.
+        #[cfg(gdma)]
+        R::set_mem2mem_mode(false);
     }
 
     unsafe fn prepare_transfer_without_start(
