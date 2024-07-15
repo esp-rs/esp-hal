@@ -44,7 +44,7 @@ fn main() -> ! {
     let wake_reason = get_wakeup_cause();
     println!("wake reason: {:?}", wake_reason);
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     let timer = TimerWakeupSource::new(Duration::from_secs(30));
     let mut wakeup_pins: [&mut dyn RtcPin; 2] = [&mut pin_0, &mut pin_2];

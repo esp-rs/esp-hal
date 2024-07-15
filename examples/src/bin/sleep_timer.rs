@@ -25,7 +25,7 @@ fn main() -> ! {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
     let mut rtc = Rtc::new(peripherals.LPWR, None);
 
     println!("up and runnning!");
