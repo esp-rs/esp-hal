@@ -5,15 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## 0.9.0 - 2024-07-15
 
 ### Added
 
-### Fixed
-
-### Changed
+- `rtc-ram` feature used by `esp-hal` to control rtc ram initialization (#1677)
 
 ### Removed
+
+- All existing features controlling ram initialization. Most (`init-data`, `init-rw-text`,
+  `init-rtc-fast-data`, and `init-rtc-fast-text`) were only used for the (already removed) direct
+  boot support. `zero-bss` is now enabled unconditionally. `zero-rtc-fast-bss` was merged into the
+  new `rtc-ram` feature. (#1677)
 
 ## 0.8.0 - 2024-04-18
 
@@ -65,5 +68,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## 0.2.0 - 2023-03-14
 
 ## 0.1.0 - 2023-01-26
-
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-riscv-rt?since=2024-04-19

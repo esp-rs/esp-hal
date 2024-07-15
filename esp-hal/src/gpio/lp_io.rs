@@ -1,10 +1,11 @@
 //! Low Power IO (LP_IO)
 //!
 //! # Overview
-//!
 //! The hardware provides a couple of GPIO pins with low power (LP)
-//! capabilities and analog functions. These pins can be controlled by
-//! either IO MUX or LP IO MUX.
+//! capabilities and analog functions.
+//!
+//! ## Configuration
+//! These pins can be controlled by either IO MUX or LP IO MUX.
 //!
 //! If controlled by LP IO MUX, these pins will bypass IO MUX and GPIO
 //! matrix for the use by ULP and peripherals in LP system.
@@ -14,6 +15,7 @@
 //! chip from Deep-sleep.
 //!
 //! # Example
+//! ## Configure a LP Pin as Output
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! use esp_hal::gpio::Io;

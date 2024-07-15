@@ -1,47 +1,34 @@
-//! # PCNT - Unit module
+//! # PCNT - Unit Module
 //!
 //! ## Overview
-//! The `unit` module is a part of the `PCNT` peripheral driver
-//! for ESP chips. It offers functionalities for configuring and utilizing
-//! specific units of the PCNT peripheral.
-//!
-//! Each unit is identified by a unit number, such as `Unit0`, `Unit1`, `Unit2`,
-//! and so on. This module provides methods to configure a unit with specific
-//! settings, like low and high limits, thresholds, and optional filtering.
-//! Users can easily configure these units based on their requirements.
+//! The `unit` module is responsible for configuring and handling individual
+//! units of the `PCNT` peripheral. Each unit represents a separate instance of
+//! the `PCNT` module, identified by unit numbers like `Unit0`, `Unit1`, and so
+//! on. Users can interact with these units to configure settings such as low
+//! and high limits, thresholds, and optional filtering. The unit module also
+//! enables users to pause, resume, and clear the counter, as well as enable or
+//! disable interrupts for specific events associated with the unit.
+
+use core::marker::PhantomData;
 
 use critical_section::CriticalSection;
 
-use super::channel;
+use crate::pcnt::channel::Channel;
 
-/// Unit number
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
-pub enum Number {
-    Unit0 = 0,
-    Unit1 = 1,
-    Unit2 = 2,
-    Unit3 = 3,
-    #[cfg(esp32)]
-    Unit4 = 4,
-    #[cfg(esp32)]
-    Unit5 = 5,
-    #[cfg(esp32)]
-    Unit6 = 6,
-    #[cfg(esp32)]
-    Unit7 = 7,
-}
-
-/// Unit errors
+/// Invalid filter threshold value
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Error {
-    /// Invalid filter threshold value
-    InvalidFilterThresh,
-    /// Invalid low limit - must be < 0
-    InvalidLowLimit,
-    /// Invalid high limit - must be > 0
-    InvalidHighLimit,
-}
+pub struct InvalidFilterThreshold;
+
+/// Invalid low limit - must be < 0
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct InvalidLowLimit;
+
+/// Invalid high limit - must be > 0
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct InvalidHighLimit;
 
 /// the current status of the counter.
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
@@ -53,7 +40,7 @@ pub enum ZeroMode {
     /// pulse counter increases from negative to 0
     NegZero  = 1,
     /// pulse counter is negative (not implemented?)
-    Negitive = 2,
+    Negative = 2,
     /// pulse counter is positive (not implemented?)
     Positive = 3,
 }
@@ -63,9 +50,9 @@ impl From<u8> for ZeroMode {
         match value {
             0 => Self::PosZero,
             1 => Self::NegZero,
-            2 => Self::Negitive,
+            2 => Self::Negative,
             3 => Self::Positive,
-            _ => unreachable!(), // TODO: is this good enoough?  should we use some default?
+            _ => unreachable!(), // TODO: is this good enough?  should we use some default?
         }
     }
 }
@@ -76,95 +63,155 @@ impl From<u8> for ZeroMode {
 pub struct Events {
     pub low_limit: bool,
     pub high_limit: bool,
-    pub thresh0: bool,
-    pub thresh1: bool,
+    pub threshold0: bool,
+    pub threshold1: bool,
     pub zero: bool,
 }
 
-/// Unit configuration
-#[derive(Copy, Clone, Default)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Config {
-    pub low_limit: i16,
-    pub high_limit: i16,
-    pub thresh0: i16,
-    pub thresh1: i16,
-    pub filter: Option<u16>,
+#[non_exhaustive]
+pub struct Unit<'d, const NUM: usize> {
+    pub counter: Counter<'d, NUM>,
+    pub channel0: Channel<'d, NUM, 0>,
+    pub channel1: Channel<'d, NUM, 1>,
 }
 
-pub struct Unit {
-    number: Number,
-}
-
-impl Unit {
+impl<'d, const NUM: usize> Unit<'d, NUM> {
     /// return a new Unit
-    pub(super) fn new(number: Number) -> Self {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
-        // disable filter and all events
-        pcnt.unit(number as usize).conf0().modify(|_, w| {
-            w.filter_en().clear_bit();
-            unsafe {
-                w.filter_thres().bits(0);
-            }
-            w.thr_l_lim_en().clear_bit();
-            w.thr_h_lim_en().clear_bit();
-            w.thr_thres0_en().clear_bit();
-            w.thr_thres1_en().clear_bit();
-            w.thr_zero_en().clear_bit()
-        });
-        Self { number }
+    pub(super) fn new() -> Self {
+        Self {
+            counter: Counter::new(),
+            channel0: Channel::new(),
+            channel1: Channel::new(),
+        }
     }
 
-    pub fn configure(&mut self, config: Config) -> Result<(), Error> {
-        // low limit must be >= or the limit is -32768 and when thats
-        // hit the event status claims it was the high limit.
-        // tested on an esp32s3
-        if config.low_limit >= 0 {
-            return Err(Error::InvalidLowLimit);
-        }
-        if config.high_limit <= 0 {
-            return Err(Error::InvalidHighLimit);
-        }
-        let (filter_en, filter) = match config.filter {
-            Some(filter) => (true, filter),
-            None => (false, 0),
-        };
-        // filter must be less than 1024
-        if filter > 1023 {
-            return Err(Error::InvalidFilterThresh);
-        }
-
+    /// Configures a lower limit to the count value.
+    ///
+    /// When the count drops to this value:
+    /// - A low limit interrupt is triggered.
+    /// - The count is reset to 0.
+    ///
+    /// If None is specified, then no interrupt is triggered and
+    /// the count wraps around after [i16::MIN].
+    ///
+    /// Note: The specified value must be negative.
+    pub fn set_low_limit(&self, value: Option<i16>) -> Result<(), InvalidLowLimit> {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
-        let unit = pcnt.unit(self.number as usize);
-        unit.conf2().write(|w| unsafe {
-            w.cnt_l_lim().bits(config.low_limit as u16);
-            w.cnt_h_lim().bits(config.high_limit as u16)
-        });
-        unit.conf1().write(|w| unsafe {
-            w.cnt_thres0().bits(config.thresh0 as u16);
-            w.cnt_thres1().bits(config.thresh1 as u16)
-        });
-        unit.conf0().modify(|_, w| unsafe {
-            w.filter_thres().bits(filter);
-            w.filter_en().bit(filter_en)
-        });
-        self.pause();
-        self.clear();
+        let unit = pcnt.unit(NUM);
+
+        if let Some(value) = value {
+            // low limit must be >= or the limit is -32768 and when that's
+            // hit the event status claims it was the high limit.
+            // tested on an esp32s3
+            if !value.is_negative() {
+                return Err(InvalidLowLimit);
+            } else {
+                unit.conf2()
+                    .modify(|_, w| unsafe { w.cnt_l_lim().bits(value as u16) });
+                unit.conf0().modify(|_, w| w.thr_l_lim_en().set_bit());
+            }
+        } else {
+            unit.conf0().modify(|_, w| w.thr_l_lim_en().clear_bit());
+        }
         Ok(())
     }
 
-    pub fn get_channel(&self, number: channel::Number) -> super::channel::Channel {
-        super::channel::Channel::new(self.number, number)
+    /// Configures a high limit to the count value.
+    ///
+    /// When the count rises to this value:
+    /// - A high limit interrupt is triggered.
+    /// - The count is reset to 0.
+    ///
+    /// If None is specified, then no interrupt is triggered and
+    /// the count wraps around after [i16::MAX].
+    ///
+    /// Note: The specified value must be positive.
+    pub fn set_high_limit(&self, value: Option<i16>) -> Result<(), InvalidHighLimit> {
+        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let unit = pcnt.unit(NUM);
+
+        if let Some(value) = value {
+            if !value.is_positive() {
+                return Err(InvalidHighLimit);
+            } else {
+                unit.conf2()
+                    .modify(|_, w| unsafe { w.cnt_h_lim().bits(value as u16) });
+                unit.conf0().modify(|_, w| w.thr_h_lim_en().set_bit());
+            }
+        } else {
+            unit.conf0().modify(|_, w| w.thr_h_lim_en().clear_bit());
+        }
+        Ok(())
     }
 
+    /// Configures a threshold value to trigger an interrupt.
+    ///
+    /// When the count equals this value a threshold0 interrupt is triggered.
+    /// If None is specified, then no interrupt is triggered.
+    pub fn set_threshold0(&self, value: Option<i16>) {
+        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let unit = pcnt.unit(NUM);
+
+        if let Some(value) = value {
+            unit.conf1()
+                .modify(|_, w| unsafe { w.cnt_thres0().bits(value as u16) });
+            unit.conf0().modify(|_, w| w.thr_thres0_en().set_bit());
+        } else {
+            unit.conf0().modify(|_, w| w.thr_thres0_en().clear_bit());
+        }
+    }
+
+    /// Configures a threshold value to trigger an interrupt.
+    ///
+    /// When the count equals this value a threshold1 interrupt is triggered.
+    /// If None is specified, then no interrupt is triggered.
+    pub fn set_threshold1(&self, value: Option<i16>) {
+        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let unit = pcnt.unit(NUM);
+
+        if let Some(value) = value {
+            unit.conf1()
+                .modify(|_, w| unsafe { w.cnt_thres1().bits(value as u16) });
+            unit.conf0().modify(|_, w| w.thr_thres1_en().set_bit());
+        } else {
+            unit.conf0().modify(|_, w| w.thr_thres1_en().clear_bit());
+        }
+    }
+
+    /// Configures the glitch filter hardware of the unit.
+    ///
+    /// `threshold` is the minimum number of APB_CLK cycles for a pulse to be
+    /// considered valid. If it is None, the filter is disabled.
+    ///
+    /// Note: This maximum possible threshold is 1023.
+    pub fn set_filter(&self, threshold: Option<u16>) -> Result<(), InvalidFilterThreshold> {
+        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let unit = pcnt.unit(NUM);
+
+        match threshold {
+            None => {
+                unit.conf0().modify(|_, w| w.filter_en().clear_bit());
+            }
+            Some(threshold) => {
+                if threshold > 1023 {
+                    return Err(InvalidFilterThreshold);
+                }
+                unit.conf0().modify(|_, w| unsafe {
+                    w.filter_thres().bits(threshold).filter_en().set_bit()
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Resets the counter value to zero.
     pub fn clear(&self) {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
         critical_section::with(|_cs| {
-            pcnt.ctrl()
-                .modify(|_, w| w.cnt_rst_u(self.number as u8).set_bit());
+            pcnt.ctrl().modify(|_, w| w.cnt_rst_u(NUM as u8).set_bit());
             // TODO: does this need a delay? (liebman / Jan 2 2023)
             pcnt.ctrl()
-                .modify(|_, w| w.cnt_rst_u(self.number as u8).clear_bit());
+                .modify(|_, w| w.cnt_rst_u(NUM as u8).clear_bit());
         });
     }
 
@@ -173,7 +220,7 @@ impl Unit {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
         critical_section::with(|_cs| {
             pcnt.ctrl()
-                .modify(|_, w| w.cnt_pause_u(self.number as u8).set_bit());
+                .modify(|_, w| w.cnt_pause_u(NUM as u8).set_bit());
         });
     }
 
@@ -182,32 +229,20 @@ impl Unit {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
         critical_section::with(|_cs| {
             pcnt.ctrl()
-                .modify(|_, w| w.cnt_pause_u(self.number as u8).clear_bit());
-        });
-    }
-
-    /// Enable which events generate interrupts on this unit.
-    pub fn events(&self, events: Events) {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
-        pcnt.unit(self.number as usize).conf0().modify(|_, w| {
-            w.thr_l_lim_en().bit(events.low_limit);
-            w.thr_h_lim_en().bit(events.high_limit);
-            w.thr_thres0_en().bit(events.thresh0);
-            w.thr_thres1_en().bit(events.thresh1);
-            w.thr_zero_en().bit(events.zero)
+                .modify(|_, w| w.cnt_pause_u(NUM as u8).clear_bit());
         });
     }
 
     /// Get the latest events for this unit.
     pub fn get_events(&self) -> Events {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
-        let status = pcnt.u_status(self.number as usize).read();
+        let status = pcnt.u_status(NUM).read();
 
         Events {
             low_limit: status.l_lim().bit(),
             high_limit: status.h_lim().bit(),
-            thresh0: status.thres0().bit(),
-            thresh1: status.thres1().bit(),
+            threshold0: status.thres0().bit(),
+            threshold1: status.thres1().bit(),
             zero: status.zero().bit(),
         }
     }
@@ -215,11 +250,7 @@ impl Unit {
     /// Get the mode of the last zero crossing
     pub fn get_zero_mode(&self) -> ZeroMode {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
-        pcnt.u_status(self.number as usize)
-            .read()
-            .zero_mode()
-            .bits()
-            .into()
+        pcnt.u_status(NUM).read().zero_mode().bits().into()
     }
 
     /// Enable interrupts for this unit.
@@ -227,7 +258,7 @@ impl Unit {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
         critical_section::with(|_cs| {
             pcnt.int_ena()
-                .modify(|_, w| w.cnt_thr_event_u(self.number as u8).set_bit());
+                .modify(|_, w| w.cnt_thr_event_u(NUM as u8).set_bit());
         });
     }
 
@@ -236,17 +267,14 @@ impl Unit {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
         critical_section::with(|_cs| {
             pcnt.int_ena()
-                .write(|w| w.cnt_thr_event_u(self.number as u8).clear_bit());
+                .modify(|_, w| w.cnt_thr_event_u(NUM as u8).clear_bit());
         });
     }
 
     /// Returns true if an interrupt is active for this unit.
-    pub fn interrupt_set(&self) -> bool {
+    pub fn interrupt_is_set(&self) -> bool {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
-        pcnt.int_st()
-            .read()
-            .cnt_thr_event_u(self.number as u8)
-            .bit()
+        pcnt.int_raw().read().cnt_thr_event_u(NUM as u8).bit()
     }
 
     /// Clear the interrupt bit for this unit.
@@ -254,13 +282,40 @@ impl Unit {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
         critical_section::with(|_cs| {
             pcnt.int_clr()
-                .write(|w| w.cnt_thr_event_u(self.number as u8).set_bit());
+                .write(|w| w.cnt_thr_event_u(NUM as u8).set_bit());
         });
     }
 
     /// Get the current counter value.
     pub fn get_value(&self) -> i16 {
+        self.counter.get()
+    }
+}
+
+impl<'d, const NUM: usize> Drop for Unit<'d, NUM> {
+    fn drop(&mut self) {
+        // This is here to prevent the destructuring of Unit.
+    }
+}
+
+// The entire Unit is Send but the individual channels are not.
+unsafe impl<'d, const NUM: usize> Send for Unit<'d, NUM> {}
+
+#[derive(Clone)]
+pub struct Counter<'d, const NUM: usize> {
+    _phantom: PhantomData<&'d ()>,
+}
+
+impl<'d, const NUM: usize> Counter<'d, NUM> {
+    fn new() -> Self {
+        Self {
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Get the current counter value.
+    pub fn get(&self) -> i16 {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
-        pcnt.u_cnt(self.number as usize).read().cnt().bits() as i16
+        pcnt.u_cnt(NUM).read().cnt().bits() as i16
     }
 }

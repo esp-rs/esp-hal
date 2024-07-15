@@ -1,4 +1,4 @@
-//! Interrupt handling - RISC-V
+//! Interrupt handling
 //!
 //! CPU interrupts 1 through 15 are reserved for each of the possible interrupt
 //! priorities.
@@ -413,14 +413,13 @@ mod vectored {
         // this has no effect on level interrupts, but the interrupt may be an edge one
         // so we clear it anyway
         clear(core, cpu_intr);
-
-        let configured_interrupts = get_configured_interrupts(core, status, unsafe {
-            core::mem::transmute(INTERRUPT_TO_PRIORITY[cpu_intr as usize - 1] as u8)
-        });
+        let prio: Priority =
+            unsafe { core::mem::transmute(INTERRUPT_TO_PRIORITY[cpu_intr as usize - 1] as u8) };
+        let configured_interrupts = get_configured_interrupts(core, status, prio);
 
         for interrupt_nr in configured_interrupts.iterator() {
             // Don't use `Interrupt::try_from`. It's slower and placed in flash
-            let interrupt = unsafe { core::mem::transmute(interrupt_nr as u16) };
+            let interrupt: Interrupt = unsafe { core::mem::transmute(interrupt_nr as u16) };
             handle_interrupt(interrupt, context);
         }
     }

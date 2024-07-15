@@ -15,19 +15,19 @@ elliptic-curve      = { version = "0.13.8", default-features = false, features =
 embassy-executor    = { version = "0.5.0", features = ["task-arena-size-40960"] }
 embassy-futures     = "0.1.1"
 embassy-net = { version = "0.4.0", features = [ "tcp", "udp", "dhcpv4", "medium-ethernet"] }
-embassy-sync        = "0.5.0"
-embassy-time        = "0.3.0"
+embassy-sync        = "0.6.0"
+embassy-time        = "0.3.1"
 embassy-time-driver = { version = "0.1.0", optional = true }
-embassy-usb         = { version = "0.1.0", default-features = false, optional = true }
+embassy-usb         = { version = "0.2.0", default-features = false, optional = true }
 embedded-can        = "0.4.1"
 embedded-graphics   = "0.8.1"
 embedded-hal        = "1.0.0"
 embedded-hal-02     = { version = "0.2.7", package = "embedded-hal", features = ["unproven"] }
 embedded-hal-async  = "1.0.0"
-embedded-hal-bus    = "0.1.0"
+embedded-hal-bus    = "0.2.0"
 embedded-io         = { version = "0.6.1", default-features = false }
 embedded-io-async   = "0.6.1"
-embedded-storage    = "0.3.0"
+embedded-storage    = "0.3.1"
 esp-alloc           = { path = "../esp-alloc" }
 esp-backtrace       = { path = "../esp-backtrace", features = ["exception-handler", "panic-handler", "println"] }
 esp-hal             = { path = "../esp-hal", features = ["log"] }
@@ -42,8 +42,8 @@ heapless            = "0.8.0"
 hex-literal         = "0.4.1"
 hmac                = { version = "0.12.1", default-features = false }
 ieee802154          = "0.6.1"
-lis3dh-async        = "0.9.2"
-log                 = "0.4.21"
+lis3dh-async        = "0.9.3"
+log                 = "0.4.22"
 nb                  = "1.1.0"
 p192                = { version = "0.13.0", default-features = false, features = ["arithmetic"] }
 p256                = { version = "0.13.2", default-features = false, features = ["arithmetic"] }
@@ -52,9 +52,9 @@ sha2                = { version = "0.10.8", default-features = false }
 smart-leds          = "0.4.0"
 smoltcp             = { version = "0.11.0", default-features = false, features = [ "medium-ethernet", "socket-raw"] }
 ssd1306             = "0.8.4"
-static_cell         = { version = "2.0.0", features = ["nightly"] }
+static_cell         = { version = "2.1.0", features = ["nightly"] }
 usb-device          = "0.3.2"
-usbd-serial         = "0.2.1"
+usbd-serial         = "0.2.2"
 
 [features]
 esp32   = ["esp-hal/esp32",   "esp-backtrace/esp32",   "esp-hal-embassy?/esp32",   "esp-println/esp32",   "esp-storage?/esp32",   "esp-wifi?/esp32",   "esp-hal-smartled/esp32"]
@@ -74,8 +74,6 @@ embedded-hal = ["esp-hal/embedded-hal"]
 
 embassy = ["dep:esp-hal-embassy"]
 
-embassy-time-systimer-16mhz = ["esp-hal-embassy/time-systimer-16mhz"]
-embassy-time-timg0 = ["esp-hal-embassy/time-timg0"]
 embassy-generic-timers = ["embassy-time/generic-queue-8"]
 
 opsram-2m = ["esp-hal/opsram-2m"]

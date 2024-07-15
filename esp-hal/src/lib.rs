@@ -2,7 +2,9 @@
     docsrs,
     doc = "<div style='padding:30px;background:#810;color:#fff;text-align:center;'><p>You might want to <a href='https://docs.esp-rs.org/esp-hal/'>browse the <code>esp-hal</code> documentation on the esp-rs website</a> instead.</p><p>The documentation here on <a href='https://docs.rs'>docs.rs</a> is built for a single chip only (ESP32-C6, in particular), while on the esp-rs website you can select your exact chip from the list of supported devices. Available peripherals and their APIs change depending on the chip.</p></div>\n\n<br/>\n\n"
 )]
-//! Bare-metal (`no_std`) HAL for all Espressif ESP32 devices.
+//! # Bare-metal (`no_std`) HAL for all Espressif ESP32 devices.
+//!
+//! ## Overview
 //! The HAL implements both blocking _and_ async
 //! APIs for many peripherals. Where applicable, driver implement
 //! the [embedded-hal] and [embedded-hal-async] traits.
@@ -18,10 +20,10 @@
 //! please ensure you are reading the correct [documentation] for your target
 //! device.
 //!
-//! ## Choosing a device
+//! ## Choosing a Device
 //!
 //! Depending on your target device, you need to enable the chip feature
-//! for that device. You may also need to do this on [ancillary esp crates].
+//! for that device. You may also need to do this on ancillary esp-hal crates.
 //!
 //! ## Examples
 //!
@@ -30,28 +32,29 @@
 //! examples within esp-hal.
 //!
 //! Invoke the following command in the root of the esp-hal repository to get
-//! started.
+//! started:
 //!
 //! ```bash
 //! cargo xtask help
 //! ```
 //!
-//! ## Creating a project
+//! ## Creating a Project
 //!
 //! We have a [book] that explains the full esp-rs ecosystem
 //! and how to get started, it's advisable to give that a read
-//! before proceeding.
+//! before proceeding. We also have a [training] that covers some common
+//! scenarios with examples.
 //!
 //! We have a template for quick starting bare-metal projects, [esp-template].
-//! The template uses [cargo-generate], so ensure that it is installed and run
+//! The template uses [cargo-generate], so ensure that it is installed and run:
 //!
 //! ```bash
 //! cargo generate -a esp-rs/esp-template
 //! ```
 //!
-//! ## Commonly used setup
+//! ## Commonly Used Setup
 //!
-//! Some minimal code to blink an LED looks like this
+//! Some minimal code to blink an LED looks like this:
 //!
 //! ```rust, no_run
 //! #![no_std]
@@ -92,17 +95,17 @@
 //! ```
 //!
 //! The steps here are:
-//! - take all the peripherals from the PAC to pass them to the HAL drivers
+//! - Take all the peripherals from the PAC to pass them to the HAL drivers
 //!   later
-//! - create [system::SystemControl]
-//! - configure the system clocks - in this case use the boot defaults
-//! - create [gpio::Io] which provides access to the GPIO pins
-//! - create an [gpio::Output] pin driver which lets us control the logical
+//! - Create [system::SystemControl]
+//! - Configure the system clocks - in this case use the boot defaults
+//! - Create [gpio::Io] which provides access to the GPIO pins
+//! - Create an [gpio::Output] pin driver which lets us control the logical
 //!   level of an output pin
-//! - create a [delay::Delay] driver
-//! - in a loop, toggle the output pin's logical level with a delay of 1000 ms
+//! - Create a [delay::Delay] driver
+//! - In a loop, toggle the output pin's logical level with a delay of 1000 ms
 //!
-//! ## PeripheralRef Pattern
+//! ## `PeripheralRef` Pattern
 //!
 //! Generally drivers take pins and peripherals as [peripheral::PeripheralRef].
 //! This means you can pass the pin/peripheral or a mutable reference to the
@@ -119,8 +122,8 @@
 //! [xtask]: https://github.com/matklad/cargo-xtask
 //! [esp-template]: https://github.com/esp-rs/esp-template
 //! [cargo-generate]: https://github.com/cargo-generate/cargo-generate
-//! [ancillary esp crates]: https://github.com/esp-rs/esp-hal?tab=readme-ov-file#ancillary-crates
 //! [book]: https://docs.esp-rs.org/book/
+//! [training]: https://docs.esp-rs.org/no_std-training/
 //!
 //! ## Feature Flags
 #![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
@@ -283,6 +286,39 @@ pub(crate) mod private {
     pub trait Sealed {}
 
     pub struct Internal;
+}
+
+/// Marker trait for types that can be safely used in `#[ram(persistent)]`.
+///
+/// # Safety
+///
+/// - The type must be inhabited
+/// - The type must be valid for any bit pattern of its backing memory in case a
+///   reset occurs during a write or a reset interrupts the zero initialization
+///   on first boot.
+/// - Structs must contain only `Persistable` fields and padding
+pub unsafe trait Persistable: Sized {}
+
+macro_rules! impl_persistable {
+    ($($t:ty),+) => {$(
+        unsafe impl Persistable for $t {}
+    )+};
+    (atomic $($t:ident),+) => {$(
+        unsafe impl Persistable for portable_atomic::$t {}
+    )+};
+}
+
+impl_persistable!(u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, usize, isize, f32, f64);
+impl_persistable!(atomic AtomicU8, AtomicI8, AtomicU16, AtomicI16, AtomicU32, AtomicI32, AtomicUsize, AtomicIsize);
+
+unsafe impl<T: Persistable, const N: usize> Persistable for [T; N] {}
+
+#[doc(hidden)]
+pub mod __macro_implementation {
+    //! Unstable private implementation details of esp-hal-procmacros.
+
+    pub const fn assert_is_zeroable<T: bytemuck::Zeroable>() {}
+    pub const fn assert_is_persistable<T: super::Persistable>() {}
 }
 
 /// Available CPU cores

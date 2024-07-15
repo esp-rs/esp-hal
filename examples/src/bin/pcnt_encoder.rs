@@ -29,7 +29,7 @@ use esp_hal::{
 use esp_println::println;
 use portable_atomic::AtomicI32;
 
-static UNIT0: Mutex<RefCell<Option<unit::Unit>>> = Mutex::new(RefCell::new(None));
+static UNIT0: Mutex<RefCell<Option<unit::Unit<'static, 1>>>> = Mutex::new(RefCell::new(None));
 static VALUE: AtomicI32 = AtomicI32::new(0);
 
 #[entry]
@@ -41,74 +41,57 @@ fn main() -> ! {
     // Set up a pulse counter:
     println!("setup pulse counter unit 0");
     let pcnt = Pcnt::new(peripherals.PCNT, Some(interrupt_handler));
-    let mut u0 = pcnt.get_unit(unit::Number::Unit1);
-    u0.configure(unit::Config {
-        low_limit: -100,
-        high_limit: 100,
-        filter: Some(min(10u16 * 80, 1023u16)),
-        ..Default::default()
-    })
-    .unwrap();
+    let u0 = pcnt.unit1;
+    u0.set_low_limit(Some(-100)).unwrap();
+    u0.set_high_limit(Some(100)).unwrap();
+    u0.set_filter(Some(min(10u16 * 80, 1023u16))).unwrap();
+    u0.clear();
 
     println!("setup channel 0");
-    let mut ch0 = u0.get_channel(channel::Number::Channel0);
+    let ch0 = &u0.channel0;
     let mut pin_a = io.pins.gpio4;
     let mut pin_b = io.pins.gpio5;
 
-    ch0.configure(
-        PcntSource::from_pin(&mut pin_a, PcntInputConfig { pull: Pull::Up }),
-        PcntSource::from_pin(&mut pin_b, PcntInputConfig { pull: Pull::Up }),
-        channel::Config {
-            lctrl_mode: channel::CtrlMode::Reverse,
-            hctrl_mode: channel::CtrlMode::Keep,
-            pos_edge: channel::EdgeMode::Decrement,
-            neg_edge: channel::EdgeMode::Increment,
-            invert_ctrl: false,
-            invert_sig: false,
-        },
-    );
+    ch0.set_ctrl_signal(PcntSource::from_pin(
+        &mut pin_a,
+        PcntInputConfig { pull: Pull::Up },
+    ));
+    ch0.set_edge_signal(PcntSource::from_pin(
+        &mut pin_b,
+        PcntInputConfig { pull: Pull::Up },
+    ));
+    ch0.set_ctrl_mode(channel::CtrlMode::Reverse, channel::CtrlMode::Keep);
+    ch0.set_input_mode(channel::EdgeMode::Increment, channel::EdgeMode::Decrement);
 
     println!("setup channel 1");
-    let mut ch1 = u0.get_channel(channel::Number::Channel1);
-    ch1.configure(
-        PcntSource::from_pin(&mut pin_b, PcntInputConfig { pull: Pull::Up }),
-        PcntSource::from_pin(&mut pin_a, PcntInputConfig { pull: Pull::Up }),
-        channel::Config {
-            lctrl_mode: channel::CtrlMode::Reverse,
-            hctrl_mode: channel::CtrlMode::Keep,
-            pos_edge: channel::EdgeMode::Increment,
-            neg_edge: channel::EdgeMode::Decrement,
-            invert_ctrl: false,
-            invert_sig: false,
-        },
-    );
-    println!("subscribing to events");
-    u0.events(unit::Events {
-        low_limit: true,
-        high_limit: true,
-        thresh0: false,
-        thresh1: false,
-        zero: false,
-    });
+    let ch1 = &u0.channel1;
+    ch1.set_ctrl_signal(PcntSource::from_pin(
+        &mut pin_b,
+        PcntInputConfig { pull: Pull::Up },
+    ));
+    ch1.set_edge_signal(PcntSource::from_pin(
+        &mut pin_a,
+        PcntInputConfig { pull: Pull::Up },
+    ));
+    ch1.set_ctrl_mode(channel::CtrlMode::Reverse, channel::CtrlMode::Keep);
+    ch1.set_input_mode(channel::EdgeMode::Decrement, channel::EdgeMode::Increment);
 
     println!("enabling interrupts");
     u0.listen();
     println!("resume pulse counter unit 0");
     u0.resume();
 
+    let counter = u0.counter.clone();
+
     critical_section::with(|cs| UNIT0.borrow_ref_mut(cs).replace(u0));
 
     let mut last_value: i32 = 0;
     loop {
-        critical_section::with(|cs| {
-            let mut u0 = UNIT0.borrow_ref_mut(cs);
-            let u0 = u0.as_mut().unwrap();
-            let value: i32 = u0.get_value() as i32 + VALUE.load(Ordering::SeqCst);
-            if value != last_value {
-                println!("value: {value}");
-                last_value = value;
-            }
-        });
+        let value: i32 = counter.get() as i32 + VALUE.load(Ordering::SeqCst);
+        if value != last_value {
+            println!("value: {value}");
+            last_value = value;
+        }
     }
 }
 
@@ -117,7 +100,7 @@ fn interrupt_handler() {
     critical_section::with(|cs| {
         let mut u0 = UNIT0.borrow_ref_mut(cs);
         let u0 = u0.as_mut().unwrap();
-        if u0.interrupt_set() {
+        if u0.interrupt_is_set() {
             let events = u0.get_events();
             if events.high_limit {
                 VALUE.fetch_add(100, Ordering::SeqCst);

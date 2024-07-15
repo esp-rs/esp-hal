@@ -1,5 +1,6 @@
 //! # Universal Asynchronous Receiver/Transmitter (UART)
 //!
+//! ## Overview
 //! The UART is a hardware peripheral which handles communication using serial
 //! communication interfaces, such as RS232 and RS485. This peripheral provides
 //! a cheap and ubiquitous method for full- and half-duplex communication
@@ -12,7 +13,6 @@
 //! protocols.
 //!
 //! ## Configuration
-//!
 //! Each UART controller is individually configurable, and the usual setting
 //! such as baud rate, data bits, parity, and stop bits can easily be
 //! configured. Additionally, the transmit (TX) and receive (RX) pins need to
@@ -35,7 +35,6 @@
 //! UART instance using the inverted pins.
 //!
 //! ## Usage
-//!
 //! The UART driver implements a number of third-party traits, with the
 //! intention of making the HAL inter-compatible with various device drivers
 //! from the community. This includes, but is not limited to, the [embedded-hal]
@@ -46,9 +45,8 @@
 //! available. See the examples below for more information on how to interact
 //! with this driver.
 //!
-//! ### Examples
-//!
-//! #### Sending and Receiving Data
+//! ## Examples
+//! ### Sending and Receiving Data
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, Uart};
@@ -67,7 +65,7 @@
 //! # }
 //! ```
 //! 
-//! #### Splitting the UART into TX and RX Components
+//! ### Splitting the UART into TX and RX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, Uart};
@@ -90,7 +88,7 @@
 //! # }
 //! ```
 //! 
-//! #### Inverting TX and RX Pins
+//! ### Inverting TX and RX Pins
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, Uart};
@@ -103,7 +101,7 @@
 //! # }
 //! ```
 //! 
-//! #### Constructing TX and RX Components
+//! ### Constructing TX and RX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, UartTx, UartRx};
@@ -274,7 +272,7 @@ pub mod config {
         pub stop_bits: StopBits,
         pub clock_source: super::ClockSource,
         pub rx_fifo_full_threshold: u16,
-        pub rx_timeout: u8,
+        pub rx_timeout: Option<u8>,
     }
 
     impl Config {
@@ -337,7 +335,7 @@ pub mod config {
             self
         }
 
-        pub fn rx_timeout(mut self, timeout: u8) -> Self {
+        pub fn rx_timeout(mut self, timeout: Option<u8>) -> Self {
             self.rx_timeout = timeout;
             self
         }
@@ -355,7 +353,7 @@ pub mod config {
                 #[cfg(not(any(esp32c6, esp32h2, lp_uart)))]
                 clock_source: super::ClockSource::Apb,
                 rx_fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
-                rx_timeout: UART_TOUT_THRESH_DEFAULT,
+                rx_timeout: Some(UART_TOUT_THRESH_DEFAULT),
             }
         }
     }
@@ -517,6 +515,30 @@ where
         cts.connect_input_to_peripheral(T::cts_signal(), Internal);
 
         self
+    }
+
+    /// Fill a buffer with received bytes
+    pub fn read_bytes(&mut self, mut buf: &mut [u8]) -> Result<(), Error> {
+        if buf.is_empty() {
+            return Ok(());
+        }
+        let cap = buf.len();
+        let mut total = 0;
+        loop {
+            while T::get_rx_fifo_count() == 0 {
+                // Block until we received at least one byte
+            }
+            let read = self.drain_fifo(buf);
+            total += read;
+            // drain_fifo only drains bytes that will fit in buf,
+            // so we will always have an exact total
+            if total == cap {
+                break;
+            }
+            // update the buffer position based on the bytes read
+            buf = &mut buf[read..];
+        }
+        Ok(())
     }
 
     /// Read a byte from the UART
@@ -764,7 +786,7 @@ where
         serial
             .rx
             .set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)?;
-        serial.rx.set_rx_timeout(Some(config.rx_timeout))?;
+        serial.rx.set_rx_timeout(config.rx_timeout)?;
         serial.change_baud_internal(config.baudrate, config.clock_source, clocks);
         serial.change_data_bits(config.data_bits);
         serial.change_parity(config.parity);
@@ -830,6 +852,11 @@ where
     /// Write bytes out over the UART
     pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
         self.tx.write_bytes(data)
+    }
+
+    /// Fill a buffer with received bytes
+    pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<(), Error> {
+        self.rx.read_bytes(buf)
     }
 
     /// Configures the AT-CMD detection settings
@@ -1681,7 +1708,7 @@ where
     M: Mode,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        if buf.len() == 0 {
+        if buf.is_empty() {
             return Ok(0);
         }
 

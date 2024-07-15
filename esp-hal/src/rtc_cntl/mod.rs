@@ -1,16 +1,13 @@
-//! # RTC_CNTL (Real-Time Clock Control) and Low-power Management
+//! # Real-Time Clock Control and Low-power Management (RTC_CNTL)
 //!
 //! ## Overview
-//! The `rtc_cntl` module provides a driver for the `RTC_CNTL` peripheral on ESP
-//! chips.
+//! The RTC_CNTL peripheral is responsible for managing the real-time clock and
+//! low-power modes on the chip.
 //!
-//! The `Real-Time Clock Control (RTC_CNTL)` peripheral is responsible for
-//! managing the real-time clock and low-power modes on the chip.
-//!
-//! The `rtc_cntl` driver module contains functions and data structures to
-//! interact with the `RTC_CNTL` peripheral on ESP chips. It also includes the
-//! necessary configurations and constants for clock sources and low-power
-//! management. The driver provides the following features and functionalities:
+//! ## Configuration
+//!  It also includes the necessary configurations and constants for clock
+//! sources and low-power management. The driver provides the following features
+//! and functionalities:
 //!    * Clock Configuration
 //!    * Calibration
 //!    * Low-Power Management
@@ -18,7 +15,7 @@
 //!    * Handling Watchdog Timers
 //!
 //! ## Examples
-//! ### Print time in milliseconds from the RTC Timer
+//! ### Print Time in Milliseconds From the RTC Timer
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use core::cell::RefCell;
@@ -289,36 +286,23 @@ impl<'d> Rtc<'d> {
 
     /// Enter deep sleep and wake with the provided `wake_sources`.
     #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
-    pub fn sleep_deep(
-        &mut self,
-        wake_sources: &[&dyn WakeSource],
-        delay: &mut crate::delay::Delay,
-    ) -> ! {
+    pub fn sleep_deep(&mut self, wake_sources: &[&dyn WakeSource]) -> ! {
         let config = RtcSleepConfig::deep();
-        self.sleep(&config, wake_sources, delay);
+        self.sleep(&config, wake_sources);
         unreachable!();
     }
 
     /// Enter light sleep and wake with the provided `wake_sources`.
     #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
-    pub fn sleep_light(
-        &mut self,
-        wake_sources: &[&dyn WakeSource],
-        delay: &mut crate::delay::Delay,
-    ) {
+    pub fn sleep_light(&mut self, wake_sources: &[&dyn WakeSource]) {
         let config = RtcSleepConfig::default();
-        self.sleep(&config, wake_sources, delay);
+        self.sleep(&config, wake_sources);
     }
 
     /// Enter sleep with the provided `config` and wake with the provided
     /// `wake_sources`.
     #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
-    pub fn sleep(
-        &mut self,
-        config: &RtcSleepConfig,
-        wake_sources: &[&dyn WakeSource],
-        delay: &mut crate::delay::Delay,
-    ) {
+    pub fn sleep(&mut self, config: &RtcSleepConfig, wake_sources: &[&dyn WakeSource]) {
         let mut config = *config;
         let mut wakeup_triggers = WakeTriggers::default();
         for wake_source in wake_sources {
@@ -326,7 +310,6 @@ impl<'d> Rtc<'d> {
         }
 
         config.apply();
-        delay.delay_millis(100);
 
         config.start_sleep(wakeup_triggers);
         config.finish_sleep();

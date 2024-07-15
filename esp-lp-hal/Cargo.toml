@@ -7,6 +7,10 @@ description  = "HAL for low-power RISC-V coprocessors found in ESP32 devices"
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
 
+[lib]
+bench = false
+test  = false
+
 keywords = [
     "embedded",
     "embedded-hal",
@@ -21,16 +25,19 @@ categories = [
 ]
 
 [dependencies]
-cfg-if          = "1.0.0"
-embedded-hal-02 = { version = "0.2.7", package = "embedded-hal", optional = true, features = ["unproven"] }
-embedded-hal-1  = { version = "1.0.0", package = "embedded-hal", optional = true }
-esp32c6-lp      = { git = "https://github.com/esp-rs/esp-pacs", rev = "f5429637f079337eb77bad44fb80bded58478619", features = ["critical-section"], optional = true }
-esp32s2-ulp     = { git = "https://github.com/esp-rs/esp-pacs", rev = "f5429637f079337eb77bad44fb80bded58478619", features = ["critical-section"], optional = true }
-esp32s3-ulp     = { git = "https://github.com/esp-rs/esp-pacs", rev = "f5429637f079337eb77bad44fb80bded58478619", features = ["critical-section"], optional = true }
-nb              = { version = "1.1.0",  optional = true }
-paste           = { version = "1.0.14", optional = true }
-procmacros      = { package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
-riscv           = { version = "0.11.0", features = ["critical-section-single-hart"] }
+cfg-if            = "1.0.0"
+document-features = "0.2.10"
+embedded-hal      = { version = "1.0.0",  optional = true }
+embedded-hal-02   = { version = "0.2.7",  optional = true, features = ["unproven"], package = "embedded-hal" }
+embedded-hal-nb   = { version = "1.0.0",  optional = true }
+embedded-io       = { version = "0.6.1",  optional = true }
+esp32c6-lp        = { version = "0.3.0", features = ["critical-section"], optional = true }
+esp32s2-ulp       = { version = "0.3.0", features = ["critical-section"], optional = true }
+esp32s3-ulp       = { version = "0.3.0", features = ["critical-section"], optional = true }
+nb                = { version = "1.1.0",  optional = true }
+paste             = { version = "1.0.15", optional = true }
+procmacros        = { version = "0.12.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+riscv             = { version = "0.11.1", features = ["critical-section-single-hart"] }
 
 [dev-dependencies]
 panic-halt = "0.2.0"
@@ -39,31 +46,42 @@ panic-halt = "0.2.0"
 esp-build = { version = "0.1.0", path = "../esp-build" }
 
 [features]
-default = ["embedded-hal-02"]
+default = ["embedded-hal"]
 
-embedded-hal-02 = ["dep:embedded-hal-02"]
-embedded-hal  = ["dep:embedded-hal-1"]
-
-esp32c6 = ["dep:esp32c6-lp",  "procmacros/is-lp-core", "dep:nb", "dep:paste"]
-esp32s2 = ["dep:esp32s2-ulp", "procmacros/is-ulp-core"]
-esp32s3 = ["dep:esp32s3-ulp", "procmacros/is-ulp-core"]
-
+## Enable debug features in the HAL (used for development).
 debug = [
     "esp32c6-lp?/impl-register-debug",
     "esp32s2-ulp?/impl-register-debug",
     "esp32s3-ulp?/impl-register-debug",
 ]
 
+# Chip Support Feature Flags
+# Target the ESP32-C6.
+esp32c6 = ["dep:esp32c6-lp",  "procmacros/is-lp-core", "dep:nb", "dep:paste"]
+# Target the ESP32-S2.
+esp32s2 = ["dep:esp32s2-ulp", "procmacros/is-ulp-core"]
+# Target the ESP32-S3.
+esp32s3 = ["dep:esp32s3-ulp", "procmacros/is-ulp-core"]
+
+#! ### Trait Implementation Feature Flags
+## Implement the traits defined in the `0.2.x` release of `embedded-hal`.
+embedded-hal-02 = ["dep:embedded-hal-02"]
+## Implement the traits defined in the `1.0.0` releases of `embedded-hal` and
+## `embedded-hal-nb` for the relevant peripherals.
+embedded-hal = ["dep:embedded-hal", "dep:embedded-hal-nb"]
+## Implement the traits defined in `embedded-io` for the relevant peripherals.
+embedded-io = ["dep:embedded-io"]
+
 [[example]]
 name              = "blinky"
 required-features = ["embedded-hal-02"]
 
 [[example]]
-name              = "uart"
+name              = "i2c"
 required-features = ["embedded-hal-02", "esp32c6"]
 
 [[example]]
-name              = "i2c"
+name              = "uart"
 required-features = ["embedded-hal-02", "esp32c6"]
 
 [lints.rust]

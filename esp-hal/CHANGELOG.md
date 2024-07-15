@@ -5,9 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.19.0] - 2024-07-15
 
 ### Added
+
 - uart: Added `with_cts`/`with_rts`s methods to configure CTS, and RTS pins (#1592)
 - uart: Constructors now require TX and RX pins (#1592)
 - uart: Added `Uart::new_with_default_pins` constructor (#1592)
@@ -19,8 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S3: Expose optional HSYNC input in LCD_CAM (#1707)
 - ESP32-C6: Support lp-core as wake-up source (#1723)
 - Add support for GPIO wake-up source (#1724)
+- gpio: add DummyPin (#1769)
 - dma: add Mem2Mem to support memory to memory transfer (#1738)
 - Add `uart` wake source (#1727)
+- `#[ram(persistent)]` option to replace the unsound `uninitialized` option (#1677)
+- uart: Make `rx_timeout` optional in Config struct (#1759)
+- Add interrupt related functions to `PeriodicTimer`/`OneShotTimer`, added `ErasedTimer` (#1753)
+- Added blocking `read_bytes` method to `Uart` and `UartRx` (#1784)
 
 ### Fixed
 
@@ -29,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix `sleep_light` for ESP32-C6 (#1720)
 - ROM Functions: Fix address of `ets_update_cpu_frequency_rom` (#1722)
 - Fix `regi2c_*` functions for `esp32h2` (#1737)
+- Improved `#[ram(zeroed)]` soundness by adding a `bytemuck::Zeroable` type bound (#1677)
+- EESP32-S2 / ESP32-S3: Fix UsbDm and UsbDp for Gpio19 and Gpio20
+- Fix reading/writing small buffers via SPI master async dma (#1760)
+- Remove unnecessary delay in rtc_ctnl (#1794)
 
 ### Changed
 
@@ -38,11 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp_wifi::initialize` no longer requires running maximum CPU clock, instead check it runs above 80MHz. (#1688)
 - Move DMA descriptors from DMA Channel to each individual peripheral driver. (#1719)
 - Allow users to easily name DMA channels (#1770)
+- Support DMA chunk sizes other than the default 4092 (#1758)
 - Improved interrupt latency on Xtensa based chips (#1735)
+- Improve PCNT api (#1765)
 
 ### Removed
+
 - uart: Removed `configure_pins` methods (#1592)
 - Removed `DmaError::Exhausted` error by improving the implementation of the `pop` function (#1664)
+- Unsound `#[ram(uninitialized)]` option in favor of the new `persistent` option (#1677)
 
 ## [0.18.0] - 2024-06-04
 
@@ -620,7 +634,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.18.0...HEAD
+[0.19.0]: https://github.com/esp-rs/esp-hal/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/esp-rs/esp-hal/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/esp-rs/esp-hal/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/esp-rs/esp-hal/compare/v0.16.0...v0.16.1

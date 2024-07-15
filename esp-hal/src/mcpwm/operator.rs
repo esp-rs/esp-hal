@@ -1,11 +1,10 @@
-//! # MCPWM peripheral - operator module
+//! # MCPWM Operator Module
 //!
 //! ## Overview
-//! The `operator` module is part of the `MCPWM` peripheral driver for
-//! `ESP` chips. It is responsible for
-//! generating `PWM (Pulse Width Modulation)` signals and handling various
-//! aspects related to `PWM` signal generation.
+//! The `operator` is responsible for generating `PWM (Pulse Width Modulation)`
+//! signals and handling various aspects related to `PWM` signal generation.
 //!
+//! ## Configuration
 //! This module provides flexibility in configuring the PWM outputs. Its
 //! implementation allows for motor control and other applications that demand
 //! accurate pulse timing and sophisticated modulation techniques.

@@ -1,12 +1,36 @@
 //! # Serial Peripheral Interface - Master Mode
 //!
 //! ## Overview
+//! In this mode, the SPI acts as master and initiates the SPI transactions.
 //!
-//! There are multiple ways to use SPI, depending on your needs. Regardless of
-//! which way you choose, you must first create an SPI instance with
-//! [`Spi::new`].
+//! ## Configuration
+//! The peripheral can be used in full-duplex and half-duplex mode and can
+//! leverage DMA for data transfers. It can also be used in blocking or async.
+//!
+//! ### Exclusive access to the SPI bus
+//! If all you want to do is to communicate to a single device, and you initiate
+//! transactions yourself, there are a number of ways to achieve this:
+//!
+//! - Use the [`FullDuplex`](embedded_hal_02::spi::FullDuplex) trait to
+//!   read/write single bytes at a time,
+//! - Use the [`SpiBus`](embedded_hal::spi::SpiBus) trait (requires the
+//!   "embedded-hal" feature) and its associated functions to initiate
+//!   transactions with simultaneous reads and writes, or
+//! - Use the `ExclusiveDevice` struct from [`embedded-hal-bus`] or `SpiDevice`
+//!   from [`embassy-embedded-hal`].
+//!
+//!
+//! ### Shared SPI access
+//! If you have multiple devices on the same SPI bus that each have their own CS
+//! line, you may want to have a look at the implementations provided by
+//! [`embedded-hal-bus`] and [`embassy-embedded-hal`].
+//!
+//! ## Usage
+//! The module implements several third-party traits from embedded-hal@0.2.x,
+//! embedded-hal@1.x.x and embassy-embedded-hal
 //!
 //! ## Example
+//! ### SPI Initialization
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use crate::esp_hal::prelude::_fugit_RateExtU32;
@@ -29,26 +53,6 @@
 //! # }
 //! ```
 //! 
-//! ## Exclusive access to the SPI bus
-//!
-//! If all you want to do is to communicate to a single device, and you initiate
-//! transactions yourself, there are a number of ways to achieve this:
-//!
-//! - Use the [`FullDuplex`](embedded_hal_02::spi::FullDuplex) trait to
-//!   read/write single bytes at a time,
-//! - Use the [`SpiBus`](embedded_hal::spi::SpiBus) trait (requires the
-//!   "embedded-hal" feature) and its associated functions to initiate
-//!   transactions with simultaneous reads and writes, or
-//! - Use the `ExclusiveDevice` struct from [`embedded-hal-bus`] or `SpiDevice`
-//!   from [`embassy-embedded-hal`].
-//!
-//!
-//! ## Shared SPI access
-//!
-//! If you have multiple devices on the same SPI bus that each have their own CS
-//! line, you may want to have a look at the implementations provided by
-//! [`embedded-hal-bus`] and [`embassy-embedded-hal`].
-//!
 //! [`embedded-hal-bus`]: https://docs.rs/embedded-hal-bus/latest/embedded_hal_bus/spi/index.html
 //! [`embassy-embedded-hal`]: https://docs.embassy.dev/embassy-embedded-hal/git/default/shared_bus/index.html
 
@@ -1138,7 +1142,6 @@ pub mod dma {
                     ptr,
                     len,
                     &mut self.channel.tx,
-                    false,
                 )?;
             }
             Ok(())
@@ -1194,7 +1197,6 @@ pub mod dma {
                     ptr,
                     len,
                     &mut self.channel.rx,
-                    false,
                 )?;
             }
 
@@ -1351,7 +1353,6 @@ pub mod dma {
                     ptr,
                     len,
                     &mut self.channel.rx,
-                    false,
                 )?;
             }
             Ok(DmaTransferRx::new(self))
@@ -1431,7 +1432,6 @@ pub mod dma {
                     ptr,
                     len,
                     &mut self.channel.tx,
-                    false,
                 )?;
             }
             Ok(DmaTransferTx::new(self))
@@ -1554,7 +1554,6 @@ pub mod dma {
                         words.as_mut_ptr(),
                         words.len(),
                         future.rx(),
-                        true,
                     )?;
                 }
                 future.await?;
@@ -1571,7 +1570,6 @@ pub mod dma {
                             chunk.as_ptr(),
                             chunk.len(),
                             future.tx(),
-                            true,
                         )?;
                     }
                     future.await?;
@@ -2046,7 +2044,7 @@ where
     ) -> Result<&'w [u8], Error> {
         for chunk in words.chunks(MAX_DMA_SIZE) {
             unsafe {
-                self.start_write_bytes_dma(chain, chunk.as_ptr(), chunk.len(), tx, false)?;
+                self.start_write_bytes_dma(chain, chunk.as_ptr(), chunk.len(), tx)?;
             }
 
             while !tx.is_done() {}
@@ -2063,7 +2061,6 @@ where
         ptr: *const u8,
         len: usize,
         tx: &mut TX,
-        listen: bool,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
         self.configure_datalen(len as u32 * 8);
@@ -2083,9 +2080,6 @@ where
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
 
-        if listen {
-            tx.listen_eof();
-        }
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
 
         Ok(())
@@ -2098,7 +2092,6 @@ where
         ptr: *mut u8,
         len: usize,
         rx: &mut RX,
-        listen: bool,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
         self.configure_datalen(len as u32 * 8);
@@ -2116,9 +2109,6 @@ where
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
 
-        if listen {
-            rx.listen_eof();
-        }
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
 
         Ok(())

@@ -100,7 +100,7 @@ mod tests {
 
         #[cfg(not(feature = "esp32s2"))]
         {
-            #[cfg(not(any(feature = "esp32c3", feature = "esp32c2")))]
+            #[cfg(not(any(feature = "esp32", feature = "esp32c3", feature = "esp32c2")))]
             {
                 // 9600 baud, RC FAST clock source:
                 ctx.uart.change_baud(9600, ClockSource::RcFast, &ctx.clocks);
@@ -110,10 +110,13 @@ mod tests {
             }
 
             // 19,200 baud, XTAL clock source:
-            ctx.uart.change_baud(19_200, ClockSource::Xtal, &ctx.clocks);
-            ctx.uart.write(55).ok();
-            let read = block!(ctx.uart.read());
-            assert_eq!(read, Ok(55));
+            #[cfg(not(feature = "esp32"))]
+            {
+                ctx.uart.change_baud(19_200, ClockSource::Xtal, &ctx.clocks);
+                ctx.uart.write(55).ok();
+                let read = block!(ctx.uart.read());
+                assert_eq!(read, Ok(55));
+            }
 
             // 921,600 baud, APB clock source:
             ctx.uart.change_baud(921_600, ClockSource::Apb, &ctx.clocks);
@@ -121,6 +124,7 @@ mod tests {
             let read = block!(ctx.uart.read());
             assert_eq!(read, Ok(253));
         }
+
         #[cfg(feature = "esp32s2")]
         {
             // 9600 baud, REF TICK clock source:

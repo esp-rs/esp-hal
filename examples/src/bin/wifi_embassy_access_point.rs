@@ -8,7 +8,7 @@
 //!
 //! Because of the huge task-arena size configured this won't work on ESP32-S2
 
-//% FEATURES: async embassy embassy-time-timg0 embassy-generic-timers esp-wifi esp-wifi/async esp-wifi/embassy-net esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
+//% FEATURES: async embassy embassy-generic-timers esp-wifi esp-wifi/async esp-wifi/embassy-net esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
 //% CHIPS: esp32 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -33,7 +33,7 @@ use esp_hal::{
     prelude::*,
     rng::Rng,
     system::SystemControl,
-    timer::timg::TimerGroup,
+    timer::{ErasedTimer, OneShotTimer, PeriodicTimer},
 };
 use esp_println::{print, println};
 use esp_wifi::{
@@ -50,6 +50,7 @@ use esp_wifi::{
     EspWifiInitFor,
 };
 
+// When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
         static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
@@ -68,10 +69,12 @@ async fn main(spawner: Spawner) -> ! {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::max(system.clock_control).freeze();
 
-    #[cfg(target_arch = "xtensa")]
-    let timer = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
-    #[cfg(target_arch = "riscv32")]
-    let timer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
+    let timer = PeriodicTimer::new(
+        esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0, &clocks, None)
+            .timer0
+            .into(),
+    );
+
     let init = initialize(
         EspWifiInitFor::Wifi,
         timer,
@@ -85,8 +88,29 @@ async fn main(spawner: Spawner) -> ! {
     let (wifi_interface, controller) =
         esp_wifi::wifi::new_with_mode(&init, wifi, WifiApDevice).unwrap();
 
-    let timer_group0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timer_group0);
+    #[cfg(feature = "esp32")]
+    {
+        let timg1 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1, &clocks, None);
+        esp_hal_embassy::init(
+            &clocks,
+            mk_static!(
+                [OneShotTimer<ErasedTimer>; 1],
+                [OneShotTimer::new(timg1.timer0.into())]
+            ),
+        );
+    }
+
+    #[cfg(not(feature = "esp32"))]
+    {
+        let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER);
+        esp_hal_embassy::init(
+            &clocks,
+            mk_static!(
+                [OneShotTimer<ErasedTimer>; 1],
+                [OneShotTimer::new(systimer.alarm0.into())]
+            ),
+        );
+    }
 
     let config = Config::ipv4_static(StaticConfigV4 {
         address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 2, 1), 24),

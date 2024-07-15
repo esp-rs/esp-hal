@@ -1,22 +1,27 @@
-//! # Debug Assistant
+//! # Debug Assistant (ASSIST_DEBUG)
 //!
 //! ## Overview
-//! The Assist Debug driver provides functionality for debugging and monitoring
-//! features on ESP chips. It includes capabilities such as monitoring stack
-//! pointer (SP), monitoring memory regions, and handling interrupts related to
-//! debugging.
-//!
 //! Debug Assistant is an auxiliary module that features a set of functions to
-//! help locate bugs and issues during software debugging.
+//! help locate bugs and issues during software debugging. It includes
+//! capabilities such as monitoring stack pointer (SP), monitoring memory
+//! regions, and handling interrupts related to debugging.
 //!
+//!
+//! ## Configuration
 //! While all the targets support program counter (PC) logging it's API is not
 //! exposed here. Instead the ROM bootloader will always enable it and print the
 //! last seen PC (e.g. _Saved PC:0x42002ff2_). Make sure the reset was triggered
 //! by a TIMG watchdog. Not an RTC or SWD watchdog.
 //!
-//! ⚠️ Bus write access logging is not available via this API. ⚠️
+//! ## Examples
+//! Visit the [Debug Assist] example for an example of using the Debug
+//! Assistant.
 //!
-//! ⚠️ This driver has only blocking API. ⚠️
+//! [Debug Assist]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/debug_assist.rs
+//!
+//! ## Implmentation State
+//! - Bus write access logging is not available via this API
+//! - This driver has only blocking API
 
 use crate::{
     interrupt::InterruptHandler,

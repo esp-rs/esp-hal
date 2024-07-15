@@ -1,17 +1,19 @@
 //! # Camera - Master or Slave Mode
 //!
 //! ## Overview
-//! The LCD_CAM peripheral supports receiving 8/16 bit DVP signals in either
-//! master or slave mode. In master mode, the peripheral provides the master
-//! clock to drive the camera, in slave mode it does not. This is configured
-//! with the `with_master_clock` method on the camera driver. The driver (due to
-//! the peripheral) mandates DMA (Direct Memory Access) for efficient data
-//! transfer.
+//! The camera module is designed to receive parallel video data signals, and
+//! its bus supports DVP 8-/16-bit modes in master or slave mode.
+//!
+//! ## Configuration
+//! In master mode, the peripheral provides the master clock to drive the
+//! camera, in slave mode it does not. This is configured with the
+//! `with_master_clock` method on the camera driver. The driver (due to the
+//! peripheral) mandates DMA (Direct Memory Access) for efficient data transfer.
 //!
 //! ## Examples
+//! ## Master Mode
 //! Following code shows how to receive some bytes from an 8 bit DVP stream in
 //! master mode.
-//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::Io;

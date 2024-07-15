@@ -43,7 +43,7 @@ fn main() -> ! {
             ..Default::default()
         }),
     );
-    let mut timer0 = timg0.timer0;
+    let timer0 = timg0.timer0;
 
     // Configure ETM to stop timer0 when alarm is triggered
     let event = timer0.on_alarm();

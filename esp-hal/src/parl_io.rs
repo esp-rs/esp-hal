@@ -1,112 +1,27 @@
-//! # Parallel IO
+//! # Parallel IO (PARL_IO)
 //!
+//! ## Overview
 //! The Parallel IO peripheral is a general purpose parallel interface that can
 //! be used to connect to external devices such as LED matrix, LCD display,
 //! Printer and Camera. The peripheral has independent TX and RX units. Each
 //! unit can have up to 8 or 16 data signals (depending on your target hardware)
 //! plus 1 or 2 clock signals.
 //!
+//! ## Configuration
 //! The driver uses DMA (Direct Memory Access) for efficient data transfer.
 //!
 //! ## Examples
+//! ### Initialization for RX
+//! See the [Parallel IO RX] example to learn how to initialize the RX and
+//! reading data.
+//!
+//! [Parallel IO RX]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/parl_io_rx.rs
 //!
 //! ### Initialization for TX
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! # use esp_hal::gpio::Io;
-//! # use esp_hal::dma_buffers;
-//! # use esp_hal::dma::{Dma, DmaPriority};
-//! # use esp_hal::parl_io::{ClkOutPin, no_clk_pin, BitPackOrder, ParlIoTxOnly, SampleEdge, TxFourBits, TxPinConfigWithValidPin};
-//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
+//! See the [Parallel IO TX] example to learn how to initialize the TX and
+//! transferring data.
 //!
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//!
-//! # let dma = Dma::new(peripherals.DMA);
-//! # let dma_channel = dma.channel0;
-//!
-//! let (tx_buffer, tx_descriptors, _, _) = dma_buffers!(32000, 0);
-//! let buffer = tx_buffer;
-//!
-//! // configure the data pins to use
-//! let tx_pins = TxFourBits::new(io.pins.gpio1, io.pins.gpio2, io.pins.gpio3,
-//! io.pins.gpio4);
-//!
-//! // configure the valid pin which will be driven high during a TX transfer
-//! let mut pin_conf = TxPinConfigWithValidPin::new(tx_pins, io.pins.gpio5);
-//!
-//! let mut parl_io = ParlIoTxOnly::new(
-//!     peripherals.PARL_IO,
-//!     dma_channel.configure(
-//!         false,
-//!         DmaPriority::Priority0,
-//!     ),
-//!     tx_descriptors,
-//!     1.MHz(),
-//!     &clocks,
-//! )
-//! .unwrap();
-//!
-//! // configure a pin for the clock signal
-//! let mut cp = ClkOutPin::new(io.pins.gpio6);
-//!
-//! let mut parl_io_tx = parl_io
-//!     .tx
-//!     .with_config(
-//!         &mut pin_conf,
-//!         &mut cp,
-//!         0,
-//!         SampleEdge::Normal,
-//!         BitPackOrder::Msb,
-//!     )
-//!     .unwrap();
-//!
-//! let mut transfer = parl_io_tx.write_dma(&buffer).unwrap();
-//!
-//! transfer.wait().unwrap();
-//! # }
-//! ```
-//! 
-//! ### Initialization for RX
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! # use esp_hal::gpio::Io;
-//! # use esp_hal::dma_buffers;
-//! # use esp_hal::dma::{Dma, DmaPriority};
-//! # use esp_hal::parl_io::{no_clk_pin, BitPackOrder, ParlIoRxOnly, RxFourBits};
-//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
-//!
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//!
-//! # let dma = Dma::new(peripherals.DMA);
-//! # let dma_channel = dma.channel0;
-//!
-//! let mut rx_pins = RxFourBits::new(io.pins.gpio1, io.pins.gpio2,
-//! io.pins.gpio3, io.pins.gpio4);
-//!
-//! let (_, _, rx_buffer, rx_descriptors) = dma_buffers!(0, 32000);
-//! let mut buffer = rx_buffer;
-//!
-//! let parl_io = ParlIoRxOnly::new(
-//!     peripherals.PARL_IO,
-//!     dma_channel.configure(
-//!         false,
-//!         DmaPriority::Priority0,
-//!     ),
-//!     rx_descriptors,
-//!     1.MHz(),
-//!     &clocks,
-//! )
-//! .unwrap();
-//!
-//! let mut parl_io_rx = parl_io
-//!     .rx
-//!     .with_config(&mut rx_pins, no_clk_pin(), BitPackOrder::Msb, Some(0xfff))
-//!     .unwrap();
-//!
-//! let mut transfer = parl_io_rx.read_dma(&mut buffer).unwrap();
-//! transfer.wait().unwrap();
-//! # }
-//! ```
+//! [Parallel IO TX]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/parl_io_tx.rs
 
 #![warn(missing_docs)]
 

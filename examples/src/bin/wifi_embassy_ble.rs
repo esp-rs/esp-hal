@@ -1,14 +1,16 @@
-//! BLE Example
+//! Embassy BLE Example
 //!
 //! - starts Bluetooth advertising
 //! - offers one service with three characteristics (one is read/write, one is write only, one is read/write/notify)
 //! - pressing the boot-button on a dev-board will send a notification if it is subscribed
 
-//% FEATURES: esp-wifi esp-wifi/ble
+//% FEATURES: async embassy embassy-generic-timers esp-wifi esp-wifi/async esp-wifi/ble
 //% CHIPS: esp32 esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
 
 #![no_std]
 #![no_main]
+
+use core::cell::RefCell;
 
 use bleps::{
     ad_structure::{
@@ -17,11 +19,12 @@ use bleps::{
         BR_EDR_NOT_SUPPORTED,
         LE_GENERAL_DISCOVERABLE,
     },
-    attribute_server::{AttributeServer, NotificationData, WorkResult},
+    async_attribute_server::AttributeServer,
+    asynch::Ble,
+    attribute_server::NotificationData,
     gatt,
-    Ble,
-    HciConnector,
 };
+use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
@@ -30,12 +33,23 @@ use esp_hal::{
     prelude::*,
     rng::Rng,
     system::SystemControl,
+    timer::{ErasedTimer, OneShotTimer, PeriodicTimer},
 };
 use esp_println::println;
-use esp_wifi::{ble::controller::BleConnector, initialize, EspWifiInitFor};
+use esp_wifi::{ble::controller::asynch::BleConnector, initialize, EspWifiInitFor};
 
-#[entry]
-fn main() -> ! {
+// When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
+macro_rules! mk_static {
+    ($t:ty,$val:expr) => {{
+        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
+        #[deny(unused_attributes)]
+        let x = STATIC_CELL.uninit().write(($val));
+        x
+    }};
+}
+
+#[main]
+async fn main(_spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
 
     let peripherals = Peripherals::take();
@@ -43,10 +57,12 @@ fn main() -> ! {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::max(system.clock_control).freeze();
 
-    #[cfg(target_arch = "xtensa")]
-    let timer = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
-    #[cfg(target_arch = "riscv32")]
-    let timer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER).alarm0;
+    let timer = PeriodicTimer::new(
+        esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0, &clocks, None)
+            .timer0
+            .into(),
+    );
+
     let init = initialize(
         EspWifiInitFor::Ble,
         timer,
@@ -67,17 +83,42 @@ fn main() -> ! {
     ))]
     let button = Input::new(io.pins.gpio9, Pull::Down);
 
-    let mut debounce_cnt = 500;
+    #[cfg(feature = "esp32")]
+    {
+        let timg1 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1, &clocks, None);
+        esp_hal_embassy::init(
+            &clocks,
+            mk_static!(
+                [OneShotTimer<ErasedTimer>; 1],
+                [OneShotTimer::new(timg1.timer0.into())]
+            ),
+        );
+    }
+
+    #[cfg(not(feature = "esp32"))]
+    {
+        let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER);
+        esp_hal_embassy::init(
+            &clocks,
+            mk_static!(
+                [OneShotTimer<ErasedTimer>; 1],
+                [OneShotTimer::new(systimer.alarm0.into())]
+            ),
+        );
+    }
 
     let mut bluetooth = peripherals.BT;
 
-    loop {
-        let connector = BleConnector::new(&init, &mut bluetooth);
-        let hci = HciConnector::new(connector, esp_wifi::current_millis);
-        let mut ble = Ble::new(&hci);
+    let connector = BleConnector::new(&init, &mut bluetooth);
+    let mut ble = Ble::new(connector, esp_wifi::current_millis);
+    println!("Connector created");
 
-        println!("{:?}", ble.init());
-        println!("{:?}", ble.cmd_set_le_advertising_parameters());
+    let pin_ref = RefCell::new(button);
+    let pin_ref = &pin_ref;
+
+    loop {
+        println!("{:?}", ble.init().await);
+        println!("{:?}", ble.cmd_set_le_advertising_parameters().await);
         println!(
             "{:?}",
             ble.cmd_set_le_advertising_data(
@@ -88,8 +129,9 @@ fn main() -> ! {
                 ])
                 .unwrap()
             )
+            .await
         );
-        println!("{:?}", ble.cmd_set_le_advertise_enable(true));
+        println!("{:?}", ble.cmd_set_le_advertise_enable(true).await);
 
         println!("started advertising");
 
@@ -138,43 +180,27 @@ fn main() -> ! {
         let mut rng = bleps::no_rng::NoRng;
         let mut srv = AttributeServer::new(&mut ble, &mut gatt_attributes, &mut rng);
 
-        loop {
-            let mut notification = None;
+        let counter = RefCell::new(0u8);
+        let counter = &counter;
 
-            if button.is_low() && debounce_cnt > 0 {
-                debounce_cnt -= 1;
-                if debounce_cnt == 0 {
-                    let mut cccd = [0u8; 1];
-                    if let Some(1) = srv.get_characteristic_value(
-                        my_characteristic_notify_enable_handle,
-                        0,
-                        &mut cccd,
-                    ) {
-                        // if notifications enabled
-                        if cccd[0] == 1 {
-                            notification = Some(NotificationData::new(
-                                my_characteristic_handle,
-                                &b"Notification"[..],
-                            ));
-                        }
-                    }
+        let mut notifier = || {
+            // TODO how to check if notifications are enabled for the characteristic?
+            // maybe pass something into the closure which just can query the characteristic
+            // value probably passing in the attribute server won't work?
+
+            async {
+                pin_ref.borrow_mut().wait_for_rising_edge().await;
+                let mut data = [0u8; 13];
+                data.copy_from_slice(b"Notification0");
+                {
+                    let mut counter = counter.borrow_mut();
+                    data[data.len() - 1] += *counter;
+                    *counter = (*counter + 1) % 10;
                 }
-            };
-
-            if button.is_high() {
-                debounce_cnt = 500;
+                NotificationData::new(my_characteristic_handle, &data)
             }
+        };
 
-            match srv.do_work_with_notification(notification) {
-                Ok(res) => {
-                    if let WorkResult::GotDisconnected = res {
-                        break;
-                    }
-                }
-                Err(err) => {
-                    println!("{:?}", err);
-                }
-            }
-        }
+        srv.run(&mut notifier).await.unwrap();
     }
 }

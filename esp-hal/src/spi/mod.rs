@@ -1,5 +1,10 @@
-//! Serial Peripheral Interface
+//! Serial Peripheral Interface (SPI)
 //!
+//! ## Overview
+//! The Serial Peripheral Interface (SPI) is a synchronous serial interface
+//! useful for communication with external peripherals.
+//!
+//! ## Configuration
 //! This peripheral is capable of operating in either master or slave mode. For
 //! more information on these modes, please refer to the documentation in their
 //! respective modules.

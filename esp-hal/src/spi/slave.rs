@@ -1,21 +1,14 @@
 //! # Serial Peripheral Interface - Slave Mode
 //!
 //! ## Overview
+//! In this mode, the SPI acts as slave and transfers data with its master when
+//! its CS is asserted.
 //!
-//! There are multiple ways to use SPI, depending on your needs. Regardless of
-//! which way you choose, you must first create an SPI instance with
-//! [`Spi::new`].
+//! ## Configuration
+//! The SPI slave driver allows using full-duplex and can only be used with DMA.
 //!
 //! ## Example
-//!
-//! There are several options for working with the SPI peripheral in slave mode,
-//! but the code currently only supports single transfers (not segmented
-//! transfers), full duplex, single bit (not dual or quad SPI), and DMA mode
-//! (not CPU mode). It also does not support blocking operations, as the actual
-//! transfer is controlled by the SPI master; if these are necessary,
-//! then the DmaTransfer trait instance can be wait()ed on or polled for
-//! is_done().
-//!
+//! ### SPI Slave with DMA
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::dma::DmaPriority;
@@ -57,6 +50,18 @@
 //! transfer.wait().unwrap();
 //! # }
 //! ```
+//! 
+//! ## Implementation State
+//! There are several options for working with the SPI peripheral in slave mode,
+//! but the code currently only supports single transfers (not segmented
+//! transfers), full duplex, single bit (not dual or quad SPI), and DMA mode
+//! (not CPU mode). It also does not support blocking operations, as the actual
+//! transfer is controlled by the SPI master; if these are necessary,
+//! then the DmaTransfer trait instance can be wait()ed on or polled for
+//! is_done().
+//! - ESP32 does not support SPI Slave. See [tracking issue].
+//!
+//! [tracking issue]: https://github.com/esp-rs/esp-hal/issues/469
 
 use core::marker::PhantomData;
 

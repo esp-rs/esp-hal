@@ -1,4 +1,4 @@
-# esp-rs API Guidelines
+# `esp-rs` API Guidelines
 
 ## About
 
@@ -7,7 +7,7 @@ This is a living document - make sure to check the latest version of this docume
 > [!NOTE]
 > Not all of the currently existing code follows this guideline, yet.
 
-In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines) apply to all projects in the ESP-RS GitHub organization where possible. (`C-RW-VALUE` and `C-SERDE` do not apply) 
+In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines) apply to all projects in the ESP-RS GitHub organization where possible. (`C-RW-VALUE` and `C-SERDE` do not apply)
 
 Especially for public API but if possible also for internal APIs.
 
@@ -42,13 +42,47 @@ The following paragraphs contain additional recommendations.
 - Avoid type states and extraneous generics whenever possible
     - These often lead to usability problems, and tend to just complicate things needlessly - sometimes it can be a good tradeoff to make a type not ZST
     - Common cases of useless type info is storing pin information - this is usually not required after configuring the pins and will bloat the complexity of the type massively. When following the `PeripheralRef` pattern it's not needed in order to keep users from re-using the pin while in use
-- Avoiding `&mut self` when `&self` is safe to use. `&self` is generally easier to use as an API. Typical applications of this are where the methods just do writes to registers which don't have side effects. 
+- Avoiding `&mut self` when `&self` is safe to use. `&self` is generally easier to use as an API. Typical applications of this are where the methods just do writes to registers which don't have side effects.
     - For example starting a timer is fine for `&self`, worst case a timer will be started twice if two parts of the program call it. You can see a real example of this [here](https://github.com/esp-rs/esp-hal/pull/1500#pullrequestreview-2015911974)
 
 ## Maintainability
 
 - Avoid excessive use of macros unless there is no other option; modification of the PAC crates should be considered before resorting to macros.
 - Every line of code is a liability. Take some time to see if your implementation can be simplified before opening a PR.
-- If your are porting code from ESP-IDF (or anything else), please include a link WITH the commit hash in it, and please highlight the relevant line(s) of code
+- If you are porting code from ESP-IDF (or anything else), please include a link WITH the commit hash in it, and please highlight the relevant line(s) of code
 - If necessary provide further context as comments (consider linking to code, PRs, TRM - make sure to use permanent links, e.g. include the hash when linking to a Git repository, include the revision, page number etc. when linking to TRMs)
-- Generally follow common "good practices" and idiomatic Rust style
+- Generally, follow common "good practices" and idiomatic Rust style
+
+## Modules Documentation
+
+Modules should have the following documentation format:
+```rust
+//! # Peripheral Name (Peripheral Acronym)
+//!
+//! ## Overview
+//! Small description of the peripheral, see ESP-IDF docs or TRM
+//!
+//! ## Configuration
+//! Explain how can the peripheral be configured, and which parameters can be configured
+//!
+//! ## Usage
+//! Explain if we implement any external traits
+//!
+//! ## Examples
+//!
+//! ### Name of the Example
+//! Small description of the example if needed
+//! ```rust, no_run
+//! ...
+//! ```
+//!
+//! ## Implementation State
+//! List unsuported features
+```
+- If any of the headers is empty, remove it
+- When possible, use ESP-IDF docs and TRM as references and include links if possible.
+  - In case of referencing an ESP-IDF link make it chip-specific, for example:
+    ```
+    #![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/peripherals/etm.html)")]
+    ```
+- Documentation examples should be short and basic, for more complex scenarios, create an example.

@@ -38,7 +38,8 @@ fn main() -> ! {
     #[cfg(not(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3")))]
     let dma_peripheral = peripherals.MEM2MEM1;
 
-    let mut mem2mem = Mem2Mem::new(channel, dma_peripheral, tx_descriptors, rx_descriptors);
+    let mut mem2mem =
+        Mem2Mem::new(channel, dma_peripheral, tx_descriptors, rx_descriptors).unwrap();
 
     for i in 0..core::mem::size_of_val(tx_buffer) {
         tx_buffer[i] = (i % 256) as u8;

@@ -1,6 +1,8 @@
-//! Low-power I2C driver
+//! # Inter-Integrated Circuit (I2C)
 
-use esp32c6_lp::LP_I2C0;
+#![allow(unused)] // TODO: Remove me when `embedded_hal::i2c::I2c` is implemented
+
+use crate::pac::{lp_i2c0::COMD, LP_I2C0};
 
 const LP_I2C_TRANS_COMPLETE_INT_ST_S: u32 = 7;
 const LP_I2C_END_DETECT_INT_ST_S: u32 = 3;
@@ -19,9 +21,10 @@ pub unsafe fn conjure() -> LpI2c {
     }
 }
 
+// TODO: Document enum variants
 /// I2C-specific transmission errors
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(missing_docs)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
     ExceedingFifo,
     AckCheckFailed,
@@ -32,17 +35,19 @@ pub enum Error {
     InvalidResponse,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum OperationType {
     Write = 0,
     Read  = 1,
 }
 
-#[derive(Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Ack {
     Ack,
     Nack,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Opcode {
     RStart = 6,
     Write  = 1,
@@ -51,7 +56,7 @@ enum Opcode {
     End    = 4,
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Command {
     Start,
     Stop,
@@ -135,62 +140,11 @@ impl From<Command> for u16 {
 
 impl From<Command> for u32 {
     fn from(c: Command) -> u32 {
-        let opcode = match c {
-            Command::Start => Opcode::RStart,
-            Command::Stop => Opcode::Stop,
-            Command::End => Opcode::End,
-            Command::Write { .. } => Opcode::Write,
-            Command::Read { .. } => Opcode::Read,
-        };
-
-        let length = match c {
-            Command::Start | Command::Stop | Command::End => 0,
-            Command::Write { length: l, .. } | Command::Read { length: l, .. } => l,
-        };
-
-        let ack_exp = match c {
-            Command::Start | Command::Stop | Command::End | Command::Read { .. } => Ack::Nack,
-            Command::Write { ack_exp: exp, .. } => exp,
-        };
-
-        let ack_check_en = match c {
-            Command::Start | Command::Stop | Command::End | Command::Read { .. } => false,
-            Command::Write {
-                ack_check_en: en, ..
-            } => en,
-        };
-
-        let ack_value = match c {
-            Command::Start | Command::Stop | Command::End | Command::Write { .. } => Ack::Nack,
-            Command::Read { ack_value: ack, .. } => ack,
-        };
-
-        let mut cmd: u32 = length.into();
-
-        if ack_check_en {
-            cmd |= 1 << 8;
-        } else {
-            cmd &= !(1 << 8);
-        }
-
-        if ack_exp == Ack::Nack {
-            cmd |= 1 << 9;
-        } else {
-            cmd &= !(1 << 9);
-        }
-
-        if ack_value == Ack::Nack {
-            cmd |= 1 << 10;
-        } else {
-            cmd &= !(1 << 10);
-        }
-
-        cmd |= (opcode as u32) << 11;
-
-        cmd
+        u16::from(c) as u32
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CommandRegister {
     COMD0,
     COMD1,
@@ -227,13 +181,12 @@ impl CommandRegister {
 // Configure LP_EXT_I2C_CK_EN high to enable the clock source of I2C_SCLK.
 // Adjust the timing registers accordingly when the clock frequency changes.
 
+/// LP-I2C driver
 pub struct LpI2c {
     i2c: LP_I2C0,
 }
 
 impl LpI2c {
-    /// Send data bytes from the `bytes` array to a target slave with the
-    /// address `addr`
     fn master_write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
         let mut cmd_iterator = CommandRegister::COMD0;
 
@@ -423,16 +376,15 @@ impl LpI2c {
         bytes: &[u8],
         buffer: &mut [u8],
     ) -> Result<(), Error> {
-        // it would be possible to combine the write and read
-        // in one transaction but filling the tx fifo with
-        // the current code is somewhat slow even in release mode
-        // which can cause issues
+        // It would be possible to combine the write and read in one transaction, but
+        // filling the tx fifo with the current code is somewhat slow even in release
+        // mode which can cause issues.
         self.master_write(addr, bytes)?;
         self.master_read(addr, buffer)?;
+
         Ok(())
     }
 
-    /// Update I2C configuration
     fn lp_i2c_update(&self) {
         self.i2c.ctr().modify(|_, w| w.conf_upgate().set_bit());
     }
@@ -507,49 +459,12 @@ impl LpI2c {
         command_register: &mut CommandRegister,
         command: Command,
     ) -> Result<(), Error> {
-        match *command_register {
-            CommandRegister::COMD0 => {
-                self.i2c
-                    .comd(0)
-                    .write(|w| unsafe { w.command().bits(command.into()) });
-            }
-            CommandRegister::COMD1 => {
-                self.i2c
-                    .comd(1)
-                    .write(|w| unsafe { w.command().bits(command.into()) });
-            }
-            CommandRegister::COMD2 => {
-                self.i2c
-                    .comd(2)
-                    .write(|w| unsafe { w.command().bits(command.into()) });
-            }
-            CommandRegister::COMD3 => {
-                self.i2c
-                    .comd(3)
-                    .write(|w| unsafe { w.command().bits(command.into()) });
-            }
-            CommandRegister::COMD4 => {
-                self.i2c
-                    .comd(4)
-                    .write(|w| unsafe { w.command().bits(command.into()) });
-            }
-            CommandRegister::COMD5 => {
-                self.i2c
-                    .comd(5)
-                    .write(|w| unsafe { w.command().bits(command.into()) });
-            }
-            CommandRegister::COMD6 => {
-                self.i2c
-                    .comd(6)
-                    .write(|w| unsafe { w.command().bits(command.into()) });
-            }
-            CommandRegister::COMD7 => {
-                self.i2c
-                    .comd(7)
-                    .write(|w| unsafe { w.command().bits(command.into()) });
-            }
-        }
+        self.i2c
+            .comd(*command_register as usize)
+            .write(|w| unsafe { w.command().bits(command.into()) });
+
         command_register.advance();
+
         Ok(())
     }
 }

@@ -1,19 +1,12 @@
-//! HMAC Accelerator
+//! # Hash-based Message Authentication Code (HMAC) Accelerator
 //!
-//! # Overview
+//! ## Overview
+//! HMAC is a secure authentication technique that verifies the authenticity and
+//! integrity of a message with a pre-shared key. This module provides hardware
+//! acceleration for SHA256-HMAC generation using a key burned into an eFuse
+//! block.
 //!
-//! The Hash-based Message Authentication Code (HMAC) module computes Message
-//! Authentication Codes (MACs) using Hash algorithm and keys as described in
-//! RFC 2104. The hash algorithm is SHA-256, the 256-bit HMAC key is stored in
-//! an eFuse key block and can be set as read-protected, i. e., the key is not
-//! accessible from outside the HMAC accelerator itself.
-//!
-//! The HMAC module can be used in two modes - in ”upstream” mode the HMAC
-//! message is supplied by the user and the calculation result is read back by
-//! the user. In ”downstream” mode the HMAC module is used as a Key Derivation
-//! Function (KDF) for other internal hardwares.
-//!
-//! # Main features
+//! Main features:
 //!
 //! - Standard HMAC-SHA-256 algorithm.
 //! - Hash result only accessible by configurable hardware peripheral (in
@@ -23,16 +16,23 @@
 //!   downstream mode).
 //! - Re-enables soft-disabled JTAG (in downstream mode).
 //!
-//! # Availability on ESP32 family
+//! ## Configuration
+//! The HMAC module can be used in two modes - in ”upstream” mode the HMAC
+//! message is supplied by the user and the calculation result is read back by
+//! the user. In ”downstream” mode the HMAC module is used as a Key Derivation
+//! Function (KDF) for other internal hardwares.
 //!
-//! The accelerator is available on ESP32-S2, ESP32-S3, ESP32-C3 and ESP32-C6.
+//! ### HMAC padding
 //!
-//! # HMAC padding
+//! The HMAC padding is handled by the driver. In downstream mode, users do not
+//! need to input any message or apply padding. The HMAC module uses a default
+//! 32-byte pattern of 0x00 for re-enabling JTAG and a 32-byte pattern of 0xff
+//! for deriving the AES key for the DS module.
 //!
-//! The HMAC padding is handled by the driver. In
-//! downstream mode, users do not need to input any message or apply padding.
-//! The HMAC module uses a default 32-byte pattern of 0x00 for re-enabling JTAG
-//! and a 32-byte pattern of 0xff for deriving the AES key for the DS module.
+//! ## Examples
+//! Visit the [HMAC] example to learn how to use the HMAC accelerator
+//!
+//! [HMAC]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/hmac.rs
 
 use core::convert::Infallible;
 

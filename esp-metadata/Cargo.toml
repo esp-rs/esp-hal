@@ -1,6 +1,6 @@
 [package]
 name         = "esp-metadata"
-version      = "0.1.1"
+version      = "0.2.0"
 edition      = "2021"
 rust-version = "1.60.0"
 description  = "Metadata for Espressif devices"
@@ -9,6 +9,6 @@ license      = "MIT OR Apache-2.0"
 
 [dependencies]
 basic-toml  = "0.1.9"
-lazy_static = "1.4.0"
-serde       = { version = "1.0.203", features = ["derive"] }
-strum       = { version = "0.26.2",  features = ["derive"] }
+lazy_static = "1.5.0"
+serde       = { version = "1.0.204", features = ["derive"] }
+strum       = { version = "0.26.3",  features = ["derive"] }

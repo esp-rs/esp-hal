@@ -25,6 +25,10 @@ name    = "delay"
 harness = false
 
 [[test]]
+name    = "dma_macros"
+harness = false
+
+[[test]]
 name    = "dma_mem2mem"
 harness = false
 
@@ -54,6 +58,10 @@ harness = false
 
 [[test]]
 name    = "spi_full_duplex_dma"
+harness = false
+
+[[test]]
+name    = "spi_half_duplex_read"
 harness = false
 
 [[test]]
@@ -94,10 +102,10 @@ harness = false
 [dependencies]
 cfg-if             = "1.0.0"
 critical-section   = "1.1.2"
-defmt              = "0.3.6"
-defmt-rtt          = "0.4.0"
+defmt              = "0.3.8"
+defmt-rtt          = "0.4.1"
 embassy-futures    = "0.1.1"
-embassy-time       = { version = "0.3.0", features = ["generic-queue-64"] }
+embassy-time       = { version = "0.3.1", features = ["generic-queue-64"] }
 embedded-hal       = "1.0.0"
 embedded-hal-02    = { version = "0.2.7", package = "embedded-hal", features = ["unproven"] }
 embedded-hal-async = { version = "1.0.0", optional = true }
@@ -106,6 +114,7 @@ esp-backtrace      = { path = "../esp-backtrace", default-features = false, feat
 esp-hal            = { path = "../esp-hal", features = ["defmt", "embedded-hal", "embedded-hal-02"], optional = true }
 esp-hal-embassy    = { path = "../esp-hal-embassy", optional = true }
 portable-atomic    = "1.6.0"
+static_cell        = { version = "2.1.0", features = ["nightly"] }
 
 [dev-dependencies]
 crypto-bigint       = { version = "0.5.5", default-features = false }
@@ -119,7 +128,7 @@ p192                = { version = "0.13.0", default-features = false, features =
 p256                = { version = "0.13.2", default-features = false, features = ["arithmetic"] }
 
 [features]
-default = ["async", "embassy", "embassy-time-timg0"]
+default = ["async", "embassy"]
 
 # Device support (required!):
 esp32 = [
@@ -151,9 +160,6 @@ embassy = [
     "embedded-test/external-executor",
     "dep:esp-hal-embassy",
 ]
-embassy-time-systimer-16mhz = ["esp-hal-embassy/time-systimer-16mhz"]
-embassy-time-systimer-80mhz = ["esp-hal-embassy/time-systimer-80mhz"]
-embassy-time-timg0 = ["esp-hal-embassy/time-timg0"]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html#test
 # Test and bench profiles inherit from dev and release respectively.

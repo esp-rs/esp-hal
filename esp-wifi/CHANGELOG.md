@@ -5,19 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## 0.7.0 - 2024-07-15
 
 ### Added
+
 - Add support for `Protocol::P802D11BGNAX` (#1742)
 
 ### Fixed
+
 - Fixed `set_mode` functionality (#1742)
 
 ### Changed
+
 - `esp_wifi::initialize` no longer requires running maximum CPU clock, instead check it runs above 80MHz. (#1688)
 - Rename `set_mode` to `set_protocol`, also available in esp-now API (#1742)
-
-### Removed
+- `esp_wifi::initialize` now takes a `PeriodicTimer<ErasedTimer>` (#1753)
 
 ## 0.6.0 - 2024-06-04
 
@@ -68,5 +70,3 @@ Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2
 ## 0.1.0 - 2023-11-27
 
 Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6, supporting BLE on WiFi on ESP32, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6
-
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-wifi?since=2024-06-05

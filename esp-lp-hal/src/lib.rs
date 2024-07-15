@@ -1,4 +1,17 @@
+//! Bare-metal (`no_std`) HAL for the low power and ultra-low power cores found
+//! in some Espressif devices. Where applicable, drivers implement the
+//! [embedded-hal] traits.
+//!
+//! ## Choosing a device
+//!
+//! Depending on your target device, you need to enable the chip feature
+//! for that device.
+//!
+//! ## Feature Flags
+#![doc = document_features::document_features!()]
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![allow(asm_sub_register)]
+#![deny(missing_docs)]
 #![no_std]
 
 use core::arch::global_asm;
@@ -10,15 +23,14 @@ pub mod i2c;
 #[cfg(esp32c6)]
 pub mod uart;
 
-pub mod pac {
-    #[cfg(feature = "esp32c6")]
-    pub use esp32c6_lp::*;
-    #[cfg(feature = "esp32s2")]
-    pub use esp32s2_ulp::*;
-    #[cfg(feature = "esp32s3")]
-    pub use esp32s3_ulp::*;
-}
+#[cfg(feature = "esp32c6")]
+pub use esp32c6_lp as pac;
+#[cfg(feature = "esp32s2")]
+pub use esp32s2_ulp as pac;
+#[cfg(feature = "esp32s3")]
+pub use esp32s3_ulp as pac;
 
+/// The prelude
 pub mod prelude {
     pub use procmacros::entry;
 }
@@ -35,13 +47,14 @@ cfg_if::cfg_if! {
     }
 }
 
-pub static mut CPU_CLOCK: u32 = LP_FAST_CLK_HZ;
+pub(crate) static mut CPU_CLOCK: u32 = LP_FAST_CLK_HZ;
 
 /// Wake up the HP core
 #[cfg(feature = "esp32c6")]
 pub fn wake_hp_core() {
-    let pmu = unsafe { esp32c6_lp::PMU::steal() };
-    pmu.hp_lp_cpu_comm().write(|w| w.lp_trigger_hp().set_bit());
+    unsafe { &*esp32c6_lp::PMU::PTR }
+        .hp_lp_cpu_comm()
+        .write(|w| w.lp_trigger_hp().set_bit());
 }
 
 #[cfg(feature = "esp32c6")]
@@ -49,8 +62,8 @@ global_asm!(
     r#"
     .section    .init.vector, "ax"
     /* This is the vector table. It is currently empty, but will be populated
-        * with exception and interrupt handlers when this is supported
-    */
+     * with exception and interrupt handlers when this is supported
+     */
 
     .align  0x4, 0xff
     .global _vector_table

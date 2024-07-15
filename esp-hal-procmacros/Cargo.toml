@@ -1,6 +1,6 @@
 [package]
 name         = "esp-hal-procmacros"
-version      = "0.11.0"
+version      = "0.12.0"
 edition      = "2021"
 rust-version = "1.76.0"
 description  = "Procedural macros for esp-hal"
@@ -14,15 +14,15 @@ features = ["embassy", "has-ulp-core", "interrupt", "ram", "is-ulp-core"]
 proc-macro = true
 
 [dependencies]
-darling           = "0.20.9"
-document-features = "0.2.8"
+darling           = "0.20.10"
+document-features = "0.2.10"
 litrs             = "0.4.1"
-object            = { version = "0.36.0", optional = true }
+object            = { version = "0.36.1", optional = true }
 proc-macro-crate  = "3.1.0"
 proc-macro-error  = "1.0.4"
-proc-macro2       = "1.0.84"
+proc-macro2       = "1.0.86"
 quote             = "1.0.36"
-syn               = { version = "2.0.66", features = ["extra-traits", "full"] }
+syn               = { version = "2.0.71", features = ["extra-traits", "full"] }
 
 [features]
 ## Provide a `#[main]` procmacro to mark the entry point for Embassy applications.
@@ -33,7 +33,7 @@ enum-dispatch = []
 interrupt = []
 ## Provide a `#[ram]` procmacro to place functions in RAM instead of flash.
 ram = []
-## Indicates the target devices has RTC slow memory available.
+## Indicates the target device has RTC slow memory available.
 rtc_slow = []
 
 #! ### Low-power Core Feature Flags

@@ -6,6 +6,7 @@
 //! efficient data transfer.
 //!
 //! ## Examples
+//! ### MIPI-DSI Display
 //! Following code show how to send a command to a MIPI-DSI display over I8080
 //! protocol.
 //!
