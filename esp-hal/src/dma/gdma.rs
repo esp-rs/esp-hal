@@ -26,12 +26,6 @@ use crate::{
     system::{Peripheral, PeripheralClockControl},
 };
 
-/// A description of a GDMA channel
-#[non_exhaustive]
-pub struct GdmaCh<const N: u8> {}
-
-impl<const N: u8> crate::private::Sealed for GdmaCh<N> {}
-
 #[non_exhaustive]
 pub struct Channel<const N: u8> {}
 
@@ -496,7 +490,13 @@ macro_rules! impl_channel {
                 type Binder = ChannelInterruptBinder<$num>;
             }
 
-            impl DmaChannel for GdmaCh<$num> {
+            /// A description of a GDMA channel
+            #[non_exhaustive]
+            pub struct [<DmaChannel $num>] {}
+
+            impl crate::private::Sealed for [<DmaChannel $num>] {}
+
+            impl DmaChannel for [<DmaChannel $num>] {
                 type Channel = Channel<$num>;
                 type Rx = ChannelRxImpl<$num>;
                 type Tx = ChannelTxImpl<$num>;
@@ -512,7 +512,7 @@ macro_rules! impl_channel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> crate::dma::Channel<'a, GdmaCh<$num>, crate::Blocking> {
+                ) -> crate::dma::Channel<'a, [<DmaChannel $num>], crate::Blocking> {
                     let mut tx_impl = ChannelTxImpl {};
                     tx_impl.init(burst_mode, priority);
 
@@ -535,7 +535,7 @@ macro_rules! impl_channel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> crate::dma::Channel<'a, GdmaCh<$num>, $crate::Async> {
+                ) -> crate::dma::Channel<'a, [<DmaChannel $num>], $crate::Async> {
                     let mut tx_impl = ChannelTxImpl {};
                     tx_impl.init(burst_mode, priority);
 
