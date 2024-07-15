@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved `#[ram(zeroed)]` soundness by adding a `bytemuck::Zeroable` type bound (#1677)
 - EESP32-S2 / ESP32-S3: Fix UsbDm and UsbDp for Gpio19 and Gpio20
 - Fix reading/writing small buffers via SPI master async dma (#1760)
+- Remove unnecessary delay in rtc_ctnl (#1794)
 
 ### Changed
 
