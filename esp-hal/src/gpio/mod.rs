@@ -67,6 +67,7 @@ use crate::{
 };
 
 pub mod any_pin;
+pub mod dummy_pin;
 
 #[cfg(soc_etm)]
 pub mod etm;
