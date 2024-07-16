@@ -38,3 +38,6 @@ esp32   = []
 esp32s2 = []
 ## Target the ESP32-S3
 esp32s3 = []
+
+[lints.rust]
+unexpected_cfgs = "allow"

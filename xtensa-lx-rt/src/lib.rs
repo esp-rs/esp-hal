@@ -75,7 +75,7 @@ pub unsafe extern "C" fn Reset() -> ! {
     reset_internal_timers();
 
     // move vec table
-    set_vecbase(addr_of!(_init_start) as *const u32);
+    set_vecbase(addr_of!(_init_start));
 
     __post_init();
 

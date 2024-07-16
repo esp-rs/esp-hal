@@ -25,6 +25,11 @@ const DCR_ENABLEOCD: u32 = 0x01;
 const XDM_OCD_DCR_SET: u32 = 0x10200C;
 
 /// Move the vector base
+///
+/// # Safety
+///
+/// *This is highly unsafe!*
+/// It should be used with care, `base` MUST be a valid pointer
 #[inline(always)]
 pub unsafe fn set_vecbase(base: *const u32) {
     asm!("wsr.vecbase {0}", in(reg) base, options(nostack));
@@ -40,12 +45,14 @@ pub fn get_stack_pointer() -> *const u32 {
 
 /// Set the core stack pointer
 ///
+/// `stack` pointer to the non-inclusive end of the stack (must be 16-byte
+/// aligned)
+///
+/// # Safety
+///
 /// *This is highly unsafe!*
 /// It should be used with care at e.g. program start or when building a task
 /// scheduler
-///
-/// `stack` pointer to the non-inclusive end of the stack (must be 16-byte
-/// aligned)
 #[inline(always)]
 pub unsafe fn set_stack_pointer(stack: *mut u32) {
     // FIXME: this function relies on it getting inlined - if it doesn't inline it

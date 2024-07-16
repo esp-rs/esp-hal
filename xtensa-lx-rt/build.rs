@@ -3,7 +3,7 @@ use std::{
     env,
     fs::{self, File},
     io::Write,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use anyhow::Result;
@@ -85,16 +85,13 @@ fn handle_esp32() -> Result<()> {
     let target_flags = rustflags
         .split(0x1f as char)
         .filter(|s| s.starts_with("target-feature="))
-        .map(|s| s.strip_prefix("target-feature="))
-        .flatten();
+        .filter_map(|s| s.strip_prefix("target-feature="));
     for tf in target_flags {
-        tf.split(",")
+        tf.split(',')
             .map(|s| s.trim())
             .filter(|s| s.starts_with('-'))
-            .map(|s| s.strip_prefix('-'))
-            .flatten()
-            .map(rustc_feature_to_xchal_have)
-            .flatten()
+            .filter_map(|s| s.strip_prefix('-'))
+            .filter_map(rustc_feature_to_xchal_have)
             .for_each(|s| {
                 features_to_disable.insert(s.to_owned());
             })
@@ -116,17 +113,14 @@ fn handle_esp32() -> Result<()> {
 
     inject_cfgs(&isa_config, &features_to_disable);
     inject_cpu_cfgs(&isa_config);
-    generate_exception_x(&out, &isa_config)?;
-    generate_interrupt_level_masks(&out, &isa_config)?;
+    generate_exception_x(out, &isa_config)?;
+    generate_interrupt_level_masks(out, &isa_config)?;
 
     Ok(())
 }
 
-fn generate_interrupt_level_masks(
-    out: &PathBuf,
-    isa_config: &HashMap<String, Value>,
-) -> Result<()> {
-    let exception_source_template = &include_str!("interrupt_level_masks.rs.jinja")[..];
+fn generate_interrupt_level_masks(out: &Path, isa_config: &HashMap<String, Value>) -> Result<()> {
+    let exception_source_template = include_str!("interrupt_level_masks.rs.jinja");
 
     let mut env = Environment::new();
     env.add_template("interrupt_level_masks.rs", exception_source_template)?;
@@ -147,8 +141,8 @@ fn generate_interrupt_level_masks(
     Ok(())
 }
 
-fn generate_exception_x(out: &PathBuf, isa_config: &HashMap<String, Value>) -> Result<()> {
-    let exception_source_template = &include_str!("exception-esp32.x.jinja")[..];
+fn generate_exception_x(out: &Path, isa_config: &HashMap<String, Value>) -> Result<()> {
+    let exception_source_template = include_str!("exception-esp32.x.jinja");
 
     let mut env = Environment::new();
     env.add_template("exception.x", exception_source_template)?;
@@ -181,32 +175,31 @@ fn generate_exception_x(out: &PathBuf, isa_config: &HashMap<String, Value>) -> R
 
 fn inject_cfgs(isa_config: &HashMap<String, Value>, disabled_features: &HashSet<String>) {
     for (key, value) in isa_config {
-        if key.starts_with("XCHAL_HAVE") && *value.as_integer().unwrap_or(&0) != 0 {
-            if !disabled_features.contains(key) {
-                println!("cargo:rustc-cfg={}", key);
-            }
+        if key.starts_with("XCHAL_HAVE")
+            && *value.as_integer().unwrap_or(&0) != 0
+            && !disabled_features.contains(key)
+        {
+            println!("cargo:rustc-cfg={}", key);
         }
     }
 }
 
 fn inject_cpu_cfgs(isa_config: &HashMap<String, Value>) {
     for (key, value) in isa_config {
-        if key.starts_with("XCHAL_TIMER")
+        if (key.starts_with("XCHAL_TIMER")
             || key.starts_with("XCHAL_PROFILING")
-            || key.starts_with("XCHAL_NMI")
+            || key.starts_with("XCHAL_NMI"))
+            && value.as_integer().is_some()
         {
-            if let Some(_) = value.as_integer() {
-                let mut s = String::from(key.trim_end_matches("_INTERRUPT"));
-                let first = s.chars().position(|c| c == '_').unwrap() + 1;
-                s.insert_str(first, "HAVE_");
-                println!("cargo:rustc-cfg={}", s);
-            }
+            let mut s = String::from(key.trim_end_matches("_INTERRUPT"));
+            let first = s.chars().position(|c| c == '_').unwrap() + 1;
+            s.insert_str(first, "HAVE_");
+            println!("cargo:rustc-cfg={}", s);
         }
     }
     if let Some(value) = isa_config
         .get("XCHAL_INTTYPE_MASK_SOFTWARE")
-        .map(|v| v.as_integer())
-        .flatten()
+        .and_then(|v| v.as_integer())
     {
         for i in 0..value.count_ones() {
             println!("cargo:rustc-cfg=XCHAL_HAVE_SOFTWARE{}", i);

@@ -114,6 +114,8 @@ pub fn get() -> u32 {
 
 /// Set interrupt
 ///
+/// # Safety
+///
 /// Only valid for software interrupts
 #[inline]
 pub unsafe fn set(mask: u32) {
@@ -126,6 +128,8 @@ pub unsafe fn set(mask: u32) {
 }
 
 /// Clear interrupt
+///
+/// # Safety
 ///
 /// Only valid for software and edge-triggered interrupts
 #[inline]
