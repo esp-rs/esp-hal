@@ -17,7 +17,7 @@ use esp_hal::{
     peripherals::{Interrupt, Peripherals, TIMG0},
     prelude::*,
     system::SystemControl,
-    timer::timg::{Timer, Timer0, TimerGroup, TimerInterrupts},
+    timer::timg::{Timer, Timer0, TimerGroup},
 };
 
 static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0>, esp_hal::Blocking>>>> =
@@ -29,15 +29,9 @@ fn main() -> ! {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        Some(TimerInterrupts {
-            timer0: Some(tg0_t0_level),
-            ..Default::default()
-        }),
-    );
+    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let timer0 = timg0.timer0;
+    timer0.set_interrupt_handler(tg0_t0_level);
 
     interrupt::enable(Interrupt::TG0_T0_LEVEL, Priority::Priority1).unwrap();
     timer0.load_value(500u64.millis()).unwrap();

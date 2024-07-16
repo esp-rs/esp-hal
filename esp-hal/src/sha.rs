@@ -71,6 +71,7 @@ use crate::{
     peripherals::SHA,
     reg_access::{AlignmentHelper, SocDependentEndianess},
     system::PeripheralClockControl,
+    InterruptConfigurable,
 };
 
 // All the hash algorithms introduced in FIPS PUB 180-4 Spec.
@@ -140,11 +141,7 @@ fn mode_as_bits(mode: ShaMode) -> u8 {
 impl<'d> Sha<'d, crate::Blocking> {
     /// Create a new instance in [crate::Blocking] mode.
     #[cfg_attr(not(esp32), doc = "Optionally an interrupt handler can be bound.")]
-    pub fn new(
-        sha: impl Peripheral<P = SHA> + 'd,
-        mode: ShaMode,
-        #[cfg(not(esp32))] interrupt: Option<crate::interrupt::InterruptHandler>,
-    ) -> Self {
+    pub fn new(sha: impl Peripheral<P = SHA> + 'd, mode: ShaMode) -> Self {
         crate::into_ref!(sha);
 
         PeripheralClockControl::enable(crate::system::Peripheral::Sha);
@@ -153,18 +150,6 @@ impl<'d> Sha<'d, crate::Blocking> {
         #[cfg(not(esp32))]
         sha.mode()
             .write(|w| unsafe { w.mode().bits(mode_as_bits(mode)) });
-
-        #[cfg(not(esp32))]
-        if let Some(interrupt) = interrupt {
-            unsafe {
-                crate::interrupt::bind_interrupt(
-                    crate::peripherals::Interrupt::SHA,
-                    interrupt.handler(),
-                );
-                crate::interrupt::enable(crate::peripherals::Interrupt::SHA, interrupt.priority())
-                    .unwrap();
-            }
-        }
 
         Self {
             sha,
@@ -178,7 +163,20 @@ impl<'d> Sha<'d, crate::Blocking> {
     }
 }
 
-// TODO: Allow/Implemenet SHA512_(u16)
+impl<'d> crate::private::Sealed for Sha<'d, crate::Blocking> {}
+
+#[cfg(not(esp32))]
+impl<'d> InterruptConfigurable for Sha<'d, crate::Blocking> {
+    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        unsafe {
+            crate::interrupt::bind_interrupt(crate::peripherals::Interrupt::SHA, handler.handler());
+            crate::interrupt::enable(crate::peripherals::Interrupt::SHA, handler.priority())
+                .unwrap();
+        }
+    }
+}
+
+// TODO: Allow/Implement SHA512_(u16)
 
 // A few notes on this implementation with regards to 'memcpy',
 // - It seems that ptr::write_bytes already acts as volatile, while ptr::copy_*

@@ -28,7 +28,8 @@ fn main() -> ! {
     let system = SystemControl::new(peripherals.SYSTEM);
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut da = DebugAssist::new(peripherals.ASSIST_DEBUG, Some(interrupt_handler));
+    let mut da = DebugAssist::new(peripherals.ASSIST_DEBUG);
+    da.set_interrupt_handler(interrupt_handler);
 
     cfg_if::cfg_if! {
         if #[cfg(not(feature = "esp32s3"))] {

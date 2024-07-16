@@ -86,6 +86,7 @@ use crate::{
     },
     Async,
     Blocking,
+    InterruptConfigurable,
     Mode,
 };
 
@@ -261,6 +262,12 @@ where
 impl<T, const CHANNEL: u8> Alarm<T, Blocking, CHANNEL> {
     /// Set the interrupt handler for this alarm.
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.set_interrupt_handler_internal(handler)
+    }
+}
+
+impl<T, const CHANNEL: u8> InterruptConfigurable for Alarm<T, Blocking, CHANNEL> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.set_interrupt_handler_internal(handler)
     }
 }

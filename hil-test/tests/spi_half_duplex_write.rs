@@ -51,7 +51,7 @@ mod tests {
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let pcnt = Pcnt::new(peripherals.PCNT, None);
+        let pcnt = Pcnt::new(peripherals.PCNT);
         let dma = Dma::new(peripherals.DMA);
 
         let sclk = io.pins.gpio0;

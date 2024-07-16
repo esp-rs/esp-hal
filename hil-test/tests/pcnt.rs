@@ -41,7 +41,7 @@ mod tests {
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
         Context {
-            pcnt: Pcnt::new(peripherals.PCNT, None),
+            pcnt: Pcnt::new(peripherals.PCNT),
             gpio2: io.pins.gpio2,
             gpio3: io.pins.gpio3,
             delay: Delay::new(&clocks),

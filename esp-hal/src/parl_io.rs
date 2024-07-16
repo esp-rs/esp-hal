@@ -57,6 +57,7 @@ use crate::{
     peripherals,
     system::PeripheralClockControl,
     Blocking,
+    InterruptConfigurable,
     Mode,
 };
 
@@ -1173,6 +1174,23 @@ where
     }
 }
 
+impl<'d, CH> crate::private::Sealed for ParlIoFullDuplex<'d, CH, Blocking>
+where
+    CH: DmaChannel,
+    CH::P: ParlIoPeripheral,
+{
+}
+
+impl<'d, CH> InterruptConfigurable for ParlIoFullDuplex<'d, CH, Blocking>
+where
+    CH: DmaChannel,
+    CH::P: ParlIoPeripheral,
+{
+    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        ParlIoFullDuplex::set_interrupt_handler(self, handler);
+    }
+}
+
 /// Parallel IO in half duplex / TX only mode
 #[allow(missing_docs)]
 pub struct ParlIoTxOnly<'d, CH, DM>
@@ -1244,6 +1262,23 @@ where
     }
 }
 
+impl<'d, CH> crate::private::Sealed for ParlIoTxOnly<'d, CH, Blocking>
+where
+    CH: DmaChannel,
+    CH::P: ParlIoPeripheral,
+{
+}
+
+impl<'d, CH> InterruptConfigurable for ParlIoTxOnly<'d, CH, Blocking>
+where
+    CH: DmaChannel,
+    CH::P: ParlIoPeripheral,
+{
+    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        ParlIoTxOnly::set_interrupt_handler(self, handler);
+    }
+}
+
 /// Parallel IO in half duplex / RX only mode
 #[allow(missing_docs)]
 pub struct ParlIoRxOnly<'d, CH, DM>
@@ -1312,6 +1347,23 @@ where
     /// Resets asserted interrupts
     pub fn clear_interrupts(&mut self, interrupts: EnumSet<ParlIoInterrupt>) {
         internal_clear_interrupts(interrupts);
+    }
+}
+
+impl<'d, CH> crate::private::Sealed for ParlIoRxOnly<'d, CH, Blocking>
+where
+    CH: DmaChannel,
+    CH::P: ParlIoPeripheral,
+{
+}
+
+impl<'d, CH> InterruptConfigurable for ParlIoRxOnly<'d, CH, Blocking>
+where
+    CH: DmaChannel,
+    CH::P: ParlIoPeripheral,
+{
+    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        ParlIoRxOnly::set_interrupt_handler(self, handler);
     }
 }
 

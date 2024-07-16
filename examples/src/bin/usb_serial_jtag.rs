@@ -33,7 +33,8 @@ fn main() -> ! {
 
     let delay = Delay::new(&clocks);
 
-    let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE, Some(usb_device));
+    let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
+    usb_serial.set_interrupt_handler(usb_device);
     usb_serial.listen_rx_packet_recv_interrupt();
 
     critical_section::with(|cs| USB_SERIAL.borrow_ref_mut(cs).replace(usb_serial));

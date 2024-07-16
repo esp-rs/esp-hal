@@ -22,6 +22,7 @@ use esp_hal::{
     peripherals::Peripherals,
     system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
+    InterruptConfigurable,
 };
 
 macro_rules! mk_static {
@@ -53,7 +54,7 @@ impl<'d> Context<'d> {
 
         let delay = Delay::new(&clocks);
 
-        let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
+        let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
         esp_hal_embassy::init(
             &clocks,
             mk_static!(

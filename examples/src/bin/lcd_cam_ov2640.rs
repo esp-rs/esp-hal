@@ -95,14 +95,7 @@ fn main() -> ! {
 
     delay.delay_millis(500u32);
 
-    let i2c = I2C::new(
-        peripherals.I2C0,
-        cam_siod,
-        cam_sioc,
-        100u32.kHz(),
-        &clocks,
-        None,
-    );
+    let i2c = I2C::new(peripherals.I2C0, cam_siod, cam_sioc, 100u32.kHz(), &clocks);
 
     let mut sccb = Sccb::new(i2c);
 

@@ -43,7 +43,7 @@ mod tests {
             }
         };
 
-        let rmt = Rmt::new(peripherals.RMT, freq, &clocks, None).unwrap();
+        let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
 
         let tx_config = TxChannelConfig {
             clk_divider: 255,

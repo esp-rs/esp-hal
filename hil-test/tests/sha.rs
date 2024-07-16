@@ -27,9 +27,6 @@ mod tests {
     #[test]
     fn test_sha_1() {
         let peripherals = Peripherals::take();
-        #[cfg(not(feature = "esp32"))]
-        let mut sha = Sha::new(peripherals.SHA, ShaMode::SHA1, None);
-        #[cfg(feature = "esp32")]
         let mut sha = Sha::new(peripherals.SHA, ShaMode::SHA1);
 
         let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
@@ -53,7 +50,7 @@ mod tests {
     #[cfg(not(feature = "esp32"))]
     fn test_sha_224() {
         let peripherals = Peripherals::take();
-        let mut sha = Sha::new(peripherals.SHA, ShaMode::SHA224, None);
+        let mut sha = Sha::new(peripherals.SHA, ShaMode::SHA224);
 
         let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
         let mut remaining = source_data;
@@ -75,9 +72,6 @@ mod tests {
     #[test]
     fn test_sha_256() {
         let peripherals = Peripherals::take();
-        #[cfg(not(feature = "esp32"))]
-        let mut sha = Sha::new(peripherals.SHA, ShaMode::SHA256, None);
-        #[cfg(feature = "esp32")]
         let mut sha = Sha::new(peripherals.SHA, ShaMode::SHA256);
 
         let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
@@ -101,9 +95,6 @@ mod tests {
     #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
     fn test_sha_384() {
         let peripherals = Peripherals::take();
-        #[cfg(not(feature = "esp32"))]
-        let mut sha = Sha::new(peripherals.SHA, ShaMode::SHA384, None);
-        #[cfg(feature = "esp32")]
         let mut sha = Sha::new(peripherals.SHA, ShaMode::SHA384);
 
         let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
@@ -127,9 +118,6 @@ mod tests {
     #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
     fn test_sha_512() {
         let peripherals = Peripherals::take();
-        #[cfg(not(feature = "esp32"))]
-        let mut sha = Sha::new(peripherals.SHA, ShaMode::SHA512, None);
-        #[cfg(feature = "esp32")]
         let mut sha = Sha::new(peripherals.SHA, ShaMode::SHA512);
 
         let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
@@ -153,7 +141,7 @@ mod tests {
     #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
     fn test_sha_512_224() {
         let peripherals = Peripherals::take();
-        let mut sha = Sha::new(peripherals.SHA, ShaMode::SHA512_224, None);
+        let mut sha = Sha::new(peripherals.SHA, ShaMode::SHA512_224);
 
         let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
         let mut remaining = source_data;
@@ -176,7 +164,7 @@ mod tests {
     #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
     fn test_sha_512_256() {
         let peripherals = Peripherals::take();
-        let mut sha = Sha::new(peripherals.SHA, ShaMode::SHA512_256, None);
+        let mut sha = Sha::new(peripherals.SHA, ShaMode::SHA512_256);
 
         let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
         let mut remaining = source_data;

@@ -68,7 +68,7 @@ fn main() -> ! {
     let server_address: Ipv4Address = HOST_IP.parse().expect("Invalid HOST_IP address");
 
     let timer = PeriodicTimer::new(
-        esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0, &clocks, None)
+        esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0, &clocks)
             .timer0
             .into(),
     );

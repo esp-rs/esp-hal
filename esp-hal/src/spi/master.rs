@@ -863,6 +863,7 @@ pub mod dma {
             SpiPeripheral,
             TxPrivate,
         },
+        InterruptConfigurable,
         Mode,
     };
 
@@ -983,8 +984,7 @@ pub mod dma {
         M: DuplexMode,
         DmaMode: Mode,
     {
-        /// Sets the interrupt handler, enables it with
-        /// [crate::interrupt::Priority::min()]
+        /// Sets the interrupt handler
         ///
         /// Interrupts are not enabled at the peripheral level here.
         pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
@@ -1013,6 +1013,29 @@ pub mod dma {
         #[cfg(not(any(esp32, esp32s2)))]
         pub fn clear_interrupts(&mut self, interrupts: EnumSet<SpiInterrupt>) {
             self.spi.clear_interrupts(interrupts);
+        }
+    }
+
+    impl<'d, T, C, M, DmaMode> crate::private::Sealed for SpiDma<'d, T, C, M, DmaMode>
+    where
+        T: InstanceDma<ChannelTx<'d, C>, ChannelRx<'d, C>>,
+        C: DmaChannel,
+        C::P: SpiPeripheral,
+        M: DuplexMode,
+        DmaMode: Mode,
+    {
+    }
+
+    impl<'d, T, C, M, DmaMode> InterruptConfigurable for SpiDma<'d, T, C, M, DmaMode>
+    where
+        T: InstanceDma<ChannelTx<'d, C>, ChannelRx<'d, C>>,
+        C: DmaChannel,
+        C::P: SpiPeripheral,
+        M: DuplexMode,
+        DmaMode: Mode,
+    {
+        fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+            SpiDma::set_interrupt_handler(self, handler);
         }
     }
 

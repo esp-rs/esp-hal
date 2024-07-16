@@ -42,7 +42,7 @@ fn main() -> ! {
         }
     };
 
-    let rmt = Rmt::new(peripherals.RMT, freq, &clocks, None).unwrap();
+    let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
 
     let rx_config = RxChannelConfig {
         clk_divider: 1,

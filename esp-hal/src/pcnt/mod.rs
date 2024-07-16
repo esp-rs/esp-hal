@@ -26,6 +26,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{self, Interrupt},
     system::PeripheralClockControl,
+    InterruptConfigurable,
 };
 
 pub mod channel;
@@ -58,21 +59,11 @@ pub struct Pcnt<'d> {
 
 impl<'d> Pcnt<'d> {
     /// Return a new PCNT
-    pub fn new(
-        _instance: impl Peripheral<P = peripherals::PCNT> + 'd,
-        interrupt: Option<InterruptHandler>,
-    ) -> Self {
+    pub fn new(_instance: impl Peripheral<P = peripherals::PCNT> + 'd) -> Self {
         crate::into_ref!(_instance);
         // Enable the PCNT peripherals clock in the system peripheral
         PeripheralClockControl::reset(crate::system::Peripheral::Pcnt);
         PeripheralClockControl::enable(crate::system::Peripheral::Pcnt);
-
-        if let Some(interrupt) = interrupt {
-            unsafe {
-                interrupt::bind_interrupt(Interrupt::PCNT, interrupt.handler());
-                interrupt::enable(Interrupt::PCNT, interrupt.priority()).unwrap();
-            }
-        }
 
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
 
@@ -112,6 +103,17 @@ impl<'d> Pcnt<'d> {
             unit6: Unit::new(),
             #[cfg(esp32)]
             unit7: Unit::new(),
+        }
+    }
+}
+
+impl<'d> crate::private::Sealed for Pcnt<'d> {}
+
+impl<'d> InterruptConfigurable for Pcnt<'d> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        unsafe {
+            interrupt::bind_interrupt(Interrupt::PCNT, handler.handler());
+            interrupt::enable(Interrupt::PCNT, handler.priority()).unwrap();
         }
     }
 }

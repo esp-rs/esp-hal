@@ -29,7 +29,12 @@
 //! # }
 //! ```
 
-use crate::{interrupt::InterruptHandler, peripheral::PeripheralRef, peripherals::SYSTEM};
+use crate::{
+    interrupt::InterruptHandler,
+    peripheral::PeripheralRef,
+    peripherals::SYSTEM,
+    InterruptConfigurable,
+};
 
 /// Peripherals which can be enabled via `PeripheralClockControl`
 pub enum Peripheral {
@@ -229,6 +234,12 @@ impl<const NUM: u8> crate::peripheral::Peripheral for SoftwareInterrupt<NUM> {
 }
 
 impl<const NUM: u8> crate::private::Sealed for SoftwareInterrupt<NUM> {}
+
+impl<const NUM: u8> InterruptConfigurable for SoftwareInterrupt<NUM> {
+    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        SoftwareInterrupt::set_interrupt_handler(self, handler);
+    }
+}
 
 /// This gives access to the available software interrupts.
 #[cfg_attr(

@@ -33,6 +33,7 @@ use crate::{
     peripherals::ECC,
     reg_access::{AlignmentHelper, SocDependentEndianess},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    InterruptConfigurable,
 };
 
 /// The ECC Accelerator driver instance
@@ -81,28 +82,27 @@ pub enum WorkMode {
 
 impl<'d> Ecc<'d, crate::Blocking> {
     /// Create a new instance in [crate::Blocking] mode.
-    ///
-    /// Optionally an interrupt handler can be bound.
-    pub fn new(ecc: impl Peripheral<P = ECC> + 'd, interrupt: Option<InterruptHandler>) -> Self {
+    pub fn new(ecc: impl Peripheral<P = ECC> + 'd) -> Self {
         crate::into_ref!(ecc);
 
         PeripheralClockControl::enable(PeripheralEnable::Ecc);
-
-        if let Some(interrupt) = interrupt {
-            unsafe {
-                crate::interrupt::bind_interrupt(
-                    crate::peripherals::Interrupt::ECC,
-                    interrupt.handler(),
-                );
-                crate::interrupt::enable(crate::peripherals::Interrupt::ECC, interrupt.priority())
-                    .unwrap();
-            }
-        }
 
         Self {
             ecc,
             alignment_helper: AlignmentHelper::default(),
             phantom: PhantomData,
+        }
+    }
+}
+
+impl<'d> crate::private::Sealed for Ecc<'d, crate::Blocking> {}
+
+impl<'d> InterruptConfigurable for Ecc<'d, crate::Blocking> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        unsafe {
+            crate::interrupt::bind_interrupt(crate::peripherals::Interrupt::ECC, handler.handler());
+            crate::interrupt::enable(crate::peripherals::Interrupt::ECC, handler.priority())
+                .unwrap();
         }
     }
 }

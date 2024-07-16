@@ -113,6 +113,7 @@ use crate::{
     into_ref,
     peripheral::Peripheral,
     system::PeripheralClockControl,
+    InterruptConfigurable,
     Mode,
 };
 
@@ -363,8 +364,7 @@ where
     CH: DmaChannel,
     DmaMode: Mode,
 {
-    /// Sets the interrupt handler, enables it with
-    /// [crate::interrupt::Priority::min()]
+    /// Sets the interrupt handler
     ///
     /// Interrupts are not enabled at the peripheral level here.
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
@@ -389,6 +389,25 @@ where
     /// Resets asserted interrupts
     pub fn clear_interrupts(&mut self, interrupts: EnumSet<I2sInterrupt>) {
         I::clear_interrupts(interrupts);
+    }
+}
+
+impl<'d, I, CH, DmaMode> crate::private::Sealed for I2s<'d, I, CH, DmaMode>
+where
+    I: RegisterAccess,
+    CH: DmaChannel,
+    DmaMode: Mode,
+{
+}
+
+impl<'d, I, CH, DmaMode> InterruptConfigurable for I2s<'d, I, CH, DmaMode>
+where
+    I: RegisterAccess,
+    CH: DmaChannel,
+    DmaMode: Mode,
+{
+    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        I2s::set_interrupt_handler(self, handler);
     }
 }
 
