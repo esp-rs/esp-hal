@@ -2074,6 +2074,12 @@ fn apply_ap_config(config: &AccessPointConfiguration) -> Result<(), WifiError> {
         },
     };
 
+    if config.auth_method == AuthMethod::None && !config.password.is_empty() {
+        return Err(WifiError::InternalError(
+            InternalWifiError::EspErrInvalidArg,
+        ));
+    }
+
     unsafe {
         cfg.ap.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
         cfg.ap.ssid_len = config.ssid.len() as u8;
@@ -2112,6 +2118,12 @@ fn apply_sta_config(config: &ClientConfiguration) -> Result<(), WifiError> {
             sae_h2e_identifier: [0; 32],
         },
     };
+
+    if config.auth_method == AuthMethod::None && !config.password.is_empty() {
+        return Err(WifiError::InternalError(
+            InternalWifiError::EspErrInvalidArg,
+        ));
+    }
 
     unsafe {
         cfg.sta.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
