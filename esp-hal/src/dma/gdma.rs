@@ -485,10 +485,20 @@ macro_rules! impl_channel {
             }
 
             impl ChannelTypes for Channel<$num> {
-                type P = SuitablePeripheral<$num>;
-                type Tx<'a> = ChannelTx<'a, ChannelTxImpl<$num>, Channel<$num>>;
-                type Rx<'a> = ChannelRx<'a, ChannelRxImpl<$num>, Channel<$num>>;
                 type Binder = ChannelInterruptBinder<$num>;
+            }
+
+            /// A description of a GDMA channel
+            #[non_exhaustive]
+            pub struct [<DmaChannel $num>] {}
+
+            impl crate::private::Sealed for [<DmaChannel $num>] {}
+
+            impl DmaChannel for [<DmaChannel $num>] {
+                type Channel = Channel<$num>;
+                type Rx = ChannelRxImpl<$num>;
+                type Tx = ChannelTxImpl<$num>;
+                type P = SuitablePeripheral<$num>;
             }
 
             impl ChannelCreator<$num> {
@@ -500,7 +510,7 @@ macro_rules! impl_channel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> crate::dma::Channel<'a, Channel<$num>, crate::Blocking> {
+                ) -> crate::dma::Channel<'a, [<DmaChannel $num>], crate::Blocking> {
                     let mut tx_impl = ChannelTxImpl {};
                     tx_impl.init(burst_mode, priority);
 
@@ -523,7 +533,7 @@ macro_rules! impl_channel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> crate::dma::Channel<'a, Channel<$num>, $crate::Async> {
+                ) -> crate::dma::Channel<'a, [<DmaChannel $num>], $crate::Async> {
                     let mut tx_impl = ChannelTxImpl {};
                     tx_impl.init(burst_mode, priority);
 
@@ -619,8 +629,9 @@ mod m2m {
     use crate::dma::{
         dma_private::{DmaSupport, DmaSupportRx},
         Channel,
-        ChannelTypes,
+        ChannelRx,
         DescriptorChain,
+        DmaChannel,
         DmaDescriptor,
         DmaEligible,
         DmaError,
@@ -637,7 +648,7 @@ mod m2m {
     /// to memory transfers.
     pub struct Mem2Mem<'d, C, MODE>
     where
-        C: ChannelTypes,
+        C: DmaChannel,
         MODE: crate::Mode,
     {
         channel: Channel<'d, C, MODE>,
@@ -648,7 +659,7 @@ mod m2m {
 
     impl<'d, C, MODE> Mem2Mem<'d, C, MODE>
     where
-        C: ChannelTypes,
+        C: DmaChannel,
         MODE: crate::Mode,
     {
         /// Create a new Mem2Mem instance.
@@ -748,7 +759,7 @@ mod m2m {
 
     impl<'d, C, MODE> DmaSupport for Mem2Mem<'d, C, MODE>
     where
-        C: ChannelTypes,
+        C: DmaChannel,
         MODE: crate::Mode,
     {
         fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
@@ -762,10 +773,10 @@ mod m2m {
 
     impl<'d, C, MODE> DmaSupportRx for Mem2Mem<'d, C, MODE>
     where
-        C: ChannelTypes,
+        C: DmaChannel,
         MODE: crate::Mode,
     {
-        type RX = C::Rx<'d>;
+        type RX = ChannelRx<'d, C>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx

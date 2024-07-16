@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved interrupt latency on RISC-V based chips (#1679)
 - `esp_wifi::initialize` no longer requires running maximum CPU clock, instead check it runs above 80MHz. (#1688)
 - Move DMA descriptors from DMA Channel to each individual peripheral driver. (#1719)
+- Allow users to easily name DMA channels (#1770)
 - Support DMA chunk sizes other than the default 4092 (#1758)
 - Improved interrupt latency on Xtensa based chips (#1735)
 - Improve PCNT api (#1765)

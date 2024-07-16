@@ -153,8 +153,10 @@ pub mod dma {
         dma::{
             dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
             Channel,
-            ChannelTypes,
+            ChannelRx,
+            ChannelTx,
             DescriptorChain,
+            DmaChannel,
             DmaDescriptor,
             DmaTransferRx,
             DmaTransferTx,
@@ -169,7 +171,7 @@ pub mod dma {
 
     pub trait WithDmaSpi2<'d, C, DmaMode>
     where
-        C: ChannelTypes,
+        C: DmaChannel,
         C::P: SpiPeripheral,
         DmaMode: Mode,
     {
@@ -184,7 +186,7 @@ pub mod dma {
     #[cfg(spi3)]
     pub trait WithDmaSpi3<'d, C, DmaMode>
     where
-        C: ChannelTypes,
+        C: DmaChannel,
         C::P: SpiPeripheral,
         DmaMode: Mode,
     {
@@ -199,7 +201,7 @@ pub mod dma {
     impl<'d, C, DmaMode> WithDmaSpi2<'d, C, DmaMode>
         for Spi<'d, crate::peripherals::SPI2, FullDuplexMode>
     where
-        C: ChannelTypes,
+        C: DmaChannel,
         C::P: SpiPeripheral + Spi2Peripheral,
         DmaMode: Mode,
     {
@@ -224,7 +226,7 @@ pub mod dma {
     impl<'d, C, DmaMode> WithDmaSpi3<'d, C, DmaMode>
         for Spi<'d, crate::peripherals::SPI3, FullDuplexMode>
     where
-        C: ChannelTypes,
+        C: DmaChannel,
         C::P: SpiPeripheral + Spi3Peripheral,
         DmaMode: Mode,
     {
@@ -248,7 +250,7 @@ pub mod dma {
     /// A DMA capable SPI instance.
     pub struct SpiDma<'d, T, C, DmaMode>
     where
-        C: ChannelTypes,
+        C: DmaChannel,
         C::P: SpiPeripheral,
         DmaMode: Mode,
     {
@@ -260,7 +262,7 @@ pub mod dma {
 
     impl<'d, T, C, DmaMode> core::fmt::Debug for SpiDma<'d, T, C, DmaMode>
     where
-        C: ChannelTypes,
+        C: DmaChannel,
         C::P: SpiPeripheral,
         DmaMode: Mode,
     {
@@ -271,8 +273,8 @@ pub mod dma {
 
     impl<'d, T, C, DmaMode> DmaSupport for SpiDma<'d, T, C, DmaMode>
     where
-        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-        C: ChannelTypes,
+        T: InstanceDma<ChannelTx<'d, C>, ChannelRx<'d, C>>,
+        C: DmaChannel,
         C::P: SpiPeripheral,
         DmaMode: Mode,
     {
@@ -292,12 +294,12 @@ pub mod dma {
 
     impl<'d, T, C, DmaMode> DmaSupportTx for SpiDma<'d, T, C, DmaMode>
     where
-        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-        C: ChannelTypes,
+        T: InstanceDma<ChannelTx<'d, C>, ChannelRx<'d, C>>,
+        C: DmaChannel,
         C::P: SpiPeripheral,
         DmaMode: Mode,
     {
-        type TX = C::Tx<'d>;
+        type TX = ChannelTx<'d, C>;
 
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
@@ -310,12 +312,12 @@ pub mod dma {
 
     impl<'d, T, C, DmaMode> DmaSupportRx for SpiDma<'d, T, C, DmaMode>
     where
-        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-        C: ChannelTypes,
+        T: InstanceDma<ChannelTx<'d, C>, ChannelRx<'d, C>>,
+        C: DmaChannel,
         C::P: SpiPeripheral,
         DmaMode: Mode,
     {
-        type RX = C::Rx<'d>;
+        type RX = ChannelRx<'d, C>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx
@@ -328,8 +330,8 @@ pub mod dma {
 
     impl<'d, T, C, DmaMode> SpiDma<'d, T, C, DmaMode>
     where
-        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-        C: ChannelTypes,
+        T: InstanceDma<ChannelTx<'d, C>, ChannelRx<'d, C>>,
+        C: DmaChannel,
         C::P: SpiPeripheral,
         DmaMode: Mode,
     {

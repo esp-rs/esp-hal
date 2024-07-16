@@ -67,16 +67,13 @@ use crate::{
     dma::{
         dma_private::{DmaSupport, DmaSupportTx},
         ChannelTx,
-        ChannelTypes,
         DescriptorChain,
+        DmaChannel,
         DmaDescriptor,
         DmaError,
         DmaPeripheral,
         DmaTransferTx,
         LcdCamPeripheral,
-        RegisterAccess,
-        Tx,
-        TxChannel,
         TxPrivate,
     },
     gpio::{OutputPin, OutputSignal},
@@ -91,23 +88,21 @@ use crate::{
     peripherals::LCD_CAM,
 };
 
-pub struct I8080<'d, TX, P> {
+pub struct I8080<'d, CH: DmaChannel, P> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
-    tx_channel: TX,
+    tx_channel: ChannelTx<'d, CH>,
     tx_chain: DescriptorChain,
     _pins: P,
 }
 
-impl<'d, T, R, P: TxPins> I8080<'d, ChannelTx<'d, T, R>, P>
+impl<'d, CH: DmaChannel, P: TxPins> I8080<'d, CH, P>
 where
-    T: TxChannel<R>,
-    R: ChannelTypes + RegisterAccess,
-    R::P: LcdCamPeripheral,
+    CH::P: LcdCamPeripheral,
     P::Word: Into<u16>,
 {
     pub fn new(
         lcd: Lcd<'d>,
-        mut channel: ChannelTx<'d, T, R>,
+        mut channel: ChannelTx<'d, CH>,
         descriptors: &'static mut [DmaDescriptor],
         mut pins: P,
         frequency: HertzU32,
@@ -258,7 +253,7 @@ where
     }
 }
 
-impl<'d, TX: Tx, P: TxPins> DmaSupport for I8080<'d, TX, P> {
+impl<'d, CH: DmaChannel, P: TxPins> DmaSupport for I8080<'d, CH, P> {
     fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
         let lcd_user = self.lcd_cam.lcd_user();
         // Wait until LCD_START is cleared by hardware.
@@ -271,8 +266,8 @@ impl<'d, TX: Tx, P: TxPins> DmaSupport for I8080<'d, TX, P> {
     }
 }
 
-impl<'d, TX: Tx, P: TxPins> DmaSupportTx for I8080<'d, TX, P> {
-    type TX = TX;
+impl<'d, CH: DmaChannel, P: TxPins> DmaSupportTx for I8080<'d, CH, P> {
+    type TX = ChannelTx<'d, CH>;
 
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
@@ -283,7 +278,7 @@ impl<'d, TX: Tx, P: TxPins> DmaSupportTx for I8080<'d, TX, P> {
     }
 }
 
-impl<'d, TX: Tx, P: TxPins> I8080<'d, TX, P>
+impl<'d, CH: DmaChannel, P: TxPins> I8080<'d, CH, P>
 where
     P::Word: Into<u16>,
 {
@@ -369,7 +364,7 @@ where
     }
 }
 
-impl<'d, TX: Tx, P> I8080<'d, TX, P> {
+impl<'d, CH: DmaChannel, P> I8080<'d, CH, P> {
     fn setup_send<T: Copy + Into<u16>>(&mut self, cmd: Command<T>, dummy: u8) {
         // Reset LCD control unit and Async Tx FIFO
         self.lcd_cam
@@ -481,7 +476,7 @@ impl<'d, TX: Tx, P> I8080<'d, TX, P> {
     }
 }
 
-impl<'d, TX, P> core::fmt::Debug for I8080<'d, TX, P> {
+impl<'d, CH: DmaChannel, P> core::fmt::Debug for I8080<'d, CH, P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("I8080").finish()
     }

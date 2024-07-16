@@ -937,6 +937,21 @@ impl RxCircularState {
     }
 }
 
+/// A description of a DMA Channel.
+pub trait DmaChannel: crate::private::Sealed {
+    #[doc(hidden)]
+    type Channel: ChannelTypes + RegisterAccess;
+
+    /// A description of the RX half of a DMA Channel.
+    type Rx: RxChannel<Self::Channel>;
+
+    /// A description of the TX half of a DMA Channel.
+    type Tx: TxChannel<Self::Channel>;
+
+    /// A suitable peripheral for this DMA channel.
+    type P: PeripheralMarker;
+}
+
 /// The functions here are not meant to be used outside the HAL
 #[doc(hidden)]
 pub trait RxPrivate: crate::private::Sealed {
@@ -1056,22 +1071,20 @@ where
 // DMA receive channel
 #[non_exhaustive]
 #[doc(hidden)]
-pub struct ChannelRx<'a, T, R>
+pub struct ChannelRx<'a, CH>
 where
-    T: RxChannel<R>,
-    R: RegisterAccess,
+    CH: DmaChannel,
 {
     pub(crate) burst_mode: bool,
-    pub(crate) rx_impl: T,
-    pub(crate) _phantom: PhantomData<&'a R>,
+    pub(crate) rx_impl: CH::Rx,
+    pub(crate) _phantom: PhantomData<(&'a (), CH)>,
 }
 
-impl<'a, T, R> ChannelRx<'a, T, R>
+impl<'a, CH> ChannelRx<'a, CH>
 where
-    T: RxChannel<R>,
-    R: RegisterAccess,
+    CH: DmaChannel,
 {
-    fn new(rx_impl: T, burst_mode: bool) -> Self {
+    fn new(rx_impl: CH::Rx, burst_mode: bool) -> Self {
         Self {
             burst_mode,
             rx_impl,
@@ -1080,24 +1093,13 @@ where
     }
 }
 
-impl<'a, T, R> Rx for ChannelRx<'a, T, R>
-where
-    T: RxChannel<R>,
-    R: RegisterAccess,
-{
-}
+impl<'a, CH> Rx for ChannelRx<'a, CH> where CH: DmaChannel {}
 
-impl<'a, T, R> crate::private::Sealed for ChannelRx<'a, T, R>
-where
-    T: RxChannel<R>,
-    R: RegisterAccess,
-{
-}
+impl<'a, CH> crate::private::Sealed for ChannelRx<'a, CH> where CH: DmaChannel {}
 
-impl<'a, T, R> RxPrivate for ChannelRx<'a, T, R>
+impl<'a, CH> RxPrivate for ChannelRx<'a, CH>
 where
-    T: RxChannel<R>,
-    R: RegisterAccess,
+    CH: DmaChannel,
 {
     fn init(&mut self, burst_mode: bool, priority: DmaPriority) {
         self.rx_impl.init(burst_mode, priority);
@@ -1126,27 +1128,27 @@ where
 
     #[cfg(gdma)]
     fn set_mem2mem_mode(&mut self, value: bool) {
-        R::set_mem2mem_mode(value);
+        CH::Channel::set_mem2mem_mode(value);
     }
 
     fn listen_ch_in_done(&self) {
-        R::listen_ch_in_done();
+        CH::Channel::listen_ch_in_done();
     }
 
     fn clear_ch_in_done(&self) {
-        R::clear_ch_in_done();
+        CH::Channel::clear_ch_in_done();
     }
 
     fn is_ch_in_done_set(&self) -> bool {
-        R::is_ch_in_done_set()
+        CH::Channel::is_ch_in_done_set()
     }
 
     fn unlisten_ch_in_done(&self) {
-        R::unlisten_ch_in_done();
+        CH::Channel::unlisten_ch_in_done();
     }
 
     fn is_listening_ch_in_done(&self) -> bool {
-        R::is_listening_ch_in_done()
+        CH::Channel::is_listening_ch_in_done()
     }
 
     fn is_done(&self) -> bool {
@@ -1154,76 +1156,76 @@ where
     }
 
     fn init_channel(&mut self) {
-        R::init_channel();
+        CH::Channel::init_channel();
     }
 
     fn is_listening_eof(&self) -> bool {
-        R::is_listening_in_eof()
+        CH::Channel::is_listening_in_eof()
     }
 
     fn listen_eof(&self) {
-        R::listen_in_eof()
+        CH::Channel::listen_in_eof()
     }
 
     fn unlisten_eof(&self) {
-        R::unlisten_in_eof()
+        CH::Channel::unlisten_in_eof()
     }
 
     fn has_error(&self) -> bool {
-        R::has_in_descriptor_error()
+        CH::Channel::has_in_descriptor_error()
     }
 
     fn has_dscr_empty_error(&self) -> bool {
-        R::has_in_descriptor_error_dscr_empty()
+        CH::Channel::has_in_descriptor_error_dscr_empty()
     }
 
     fn has_eof_error(&self) -> bool {
-        R::has_in_descriptor_error_err_eof()
+        CH::Channel::has_in_descriptor_error_err_eof()
     }
 
     fn is_listening_in_descriptor_error(&self) -> bool {
-        R::is_listening_in_descriptor_error()
+        CH::Channel::is_listening_in_descriptor_error()
     }
 
     fn listen_in_descriptor_error(&self) {
-        R::listen_in_descriptor_error();
+        CH::Channel::listen_in_descriptor_error();
     }
 
     fn unlisten_in_descriptor_error(&self) {
-        R::unlisten_in_descriptor_error();
+        CH::Channel::unlisten_in_descriptor_error();
     }
 
     fn is_listening_in_descriptor_error_dscr_empty(&self) -> bool {
-        R::is_listening_in_descriptor_error_dscr_empty()
+        CH::Channel::is_listening_in_descriptor_error_dscr_empty()
     }
 
     fn listen_in_descriptor_error_dscr_empty(&self) {
-        R::listen_in_descriptor_error_dscr_empty();
+        CH::Channel::listen_in_descriptor_error_dscr_empty();
     }
 
     fn unlisten_in_descriptor_error_dscr_empty(&self) {
-        R::unlisten_in_descriptor_error_dscr_empty();
+        CH::Channel::unlisten_in_descriptor_error_dscr_empty();
     }
 
     fn is_listening_in_descriptor_error_err_eof(&self) -> bool {
-        R::is_listening_in_descriptor_error_err_eof()
+        CH::Channel::is_listening_in_descriptor_error_err_eof()
     }
 
     fn listen_in_descriptor_error_err_eof(&self) {
-        R::listen_in_descriptor_error_err_eof();
+        CH::Channel::listen_in_descriptor_error_err_eof();
     }
 
     fn unlisten_in_descriptor_error_err_eof(&self) {
-        R::unlisten_in_descriptor_error_err_eof();
+        CH::Channel::unlisten_in_descriptor_error_err_eof();
     }
 
     fn clear_interrupts(&self) {
-        R::clear_in_interrupts();
+        CH::Channel::clear_in_interrupts();
     }
 
     #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
-        T::waker()
+        CH::Rx::waker()
     }
 }
 
@@ -1357,23 +1359,21 @@ where
 
 /// DMA transmit channel
 #[doc(hidden)]
-pub struct ChannelTx<'a, T, R>
+pub struct ChannelTx<'a, CH>
 where
-    T: TxChannel<R>,
-    R: RegisterAccess,
+    CH: DmaChannel,
 {
     #[allow(unused)]
     pub(crate) burst_mode: bool,
-    pub(crate) tx_impl: T,
-    pub(crate) _phantom: PhantomData<(&'a (), R)>,
+    pub(crate) tx_impl: CH::Tx,
+    pub(crate) _phantom: PhantomData<(&'a (), CH)>,
 }
 
-impl<'a, T, R> ChannelTx<'a, T, R>
+impl<'a, CH> ChannelTx<'a, CH>
 where
-    T: TxChannel<R>,
-    R: RegisterAccess,
+    CH: DmaChannel,
 {
-    fn new(tx_impl: T, burst_mode: bool) -> Self {
+    fn new(tx_impl: CH::Tx, burst_mode: bool) -> Self {
         Self {
             burst_mode,
             tx_impl,
@@ -1382,31 +1382,20 @@ where
     }
 }
 
-impl<'a, T, R> Tx for ChannelTx<'a, T, R>
-where
-    T: TxChannel<R>,
-    R: RegisterAccess,
-{
-}
+impl<'a, CH> Tx for ChannelTx<'a, CH> where CH: DmaChannel {}
 
-impl<'a, T, R> crate::private::Sealed for ChannelTx<'a, T, R>
-where
-    T: TxChannel<R>,
-    R: RegisterAccess,
-{
-}
+impl<'a, CH> crate::private::Sealed for ChannelTx<'a, CH> where CH: DmaChannel {}
 
-impl<'a, T, R> TxPrivate for ChannelTx<'a, T, R>
+impl<'a, CH> TxPrivate for ChannelTx<'a, CH>
 where
-    T: TxChannel<R>,
-    R: RegisterAccess,
+    CH: DmaChannel,
 {
     fn init(&mut self, burst_mode: bool, priority: DmaPriority) {
         self.tx_impl.init(burst_mode, priority);
     }
 
     fn init_channel(&mut self) {
-        R::init_channel();
+        CH::Channel::init_channel();
     }
 
     unsafe fn prepare_transfer_without_start(
@@ -1446,40 +1435,40 @@ where
     }
 
     fn is_listening_eof(&self) -> bool {
-        R::is_listening_out_eof()
+        CH::Channel::is_listening_out_eof()
     }
 
     fn listen_eof(&self) {
-        R::listen_out_eof()
+        CH::Channel::listen_out_eof()
     }
 
     fn unlisten_eof(&self) {
-        R::unlisten_out_eof()
+        CH::Channel::unlisten_out_eof()
     }
 
     fn has_error(&self) -> bool {
-        R::has_out_descriptor_error()
+        CH::Channel::has_out_descriptor_error()
     }
 
     #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
-        T::waker()
+        CH::Rx::waker()
     }
 
     fn is_listening_out_descriptor_error(&self) -> bool {
-        R::is_listening_out_descriptor_error()
+        CH::Channel::is_listening_out_descriptor_error()
     }
 
     fn listen_out_descriptor_error(&self) {
-        R::listen_out_descriptor_error();
+        CH::Channel::listen_out_descriptor_error();
     }
 
     fn unlisten_out_descriptor_error(&self) {
-        R::unlisten_out_descriptor_error();
+        CH::Channel::unlisten_out_descriptor_error();
     }
 
     fn clear_interrupts(&self) {
-        R::clear_out_interrupts();
+        CH::Channel::clear_out_interrupts();
     }
 
     fn descriptors_handled(&self) -> bool {
@@ -1563,9 +1552,6 @@ pub trait RegisterAccess: crate::private::Sealed {
 
 #[doc(hidden)]
 pub trait ChannelTypes: crate::private::Sealed {
-    type P: PeripheralMarker;
-    type Tx<'a>: Tx;
-    type Rx<'a>: Rx;
     type Binder: InterruptBinder;
 }
 
@@ -1575,28 +1561,28 @@ pub trait InterruptBinder: crate::private::Sealed {
 }
 
 /// DMA Channel
-pub struct Channel<'d, C, MODE>
+pub struct Channel<'d, CH, MODE>
 where
-    C: ChannelTypes,
+    CH: DmaChannel,
     MODE: Mode,
 {
     /// TX half of the channel
-    pub tx: C::Tx<'d>,
+    pub tx: ChannelTx<'d, CH>,
     /// RX half of the channel
-    pub rx: C::Rx<'d>,
+    pub rx: ChannelRx<'d, CH>,
     phantom: PhantomData<MODE>,
 }
 
 impl<'d, C> Channel<'d, C, crate::Blocking>
 where
-    C: ChannelTypes,
+    C: DmaChannel,
 {
     /// Sets the interrupt handler for TX and RX interrupts, enables them
     /// with [crate::interrupt::Priority::max()]
     ///
     /// Interrupts are not enabled at the peripheral level here.
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        C::Binder::set_isr(handler);
+        <C::Channel as ChannelTypes>::Binder::set_isr(handler);
     }
 
     /// Listen for the given interrupts
