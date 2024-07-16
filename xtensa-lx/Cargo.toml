@@ -1,0 +1,24 @@
+[package]
+name         = "xtensa-lx"
+version      = "0.9.0"
+edition      = "2021"
+rust-version = "1.65"
+description  = "Low-level access to Xtensa LX processors and peripherals"
+repository   = "https://github.com/esp-rs/esp-hal"
+license      = "MIT OR Apache-2.0"
+categories   = ["embedded", "hardware-support", "no-std"]
+keywords     = ["lx", "peripheral", "register", "xtensa"]
+links        = "xtensa-lx"
+
+[package.metadata.docs.rs]
+features = ["spin"]
+
+[dependencies]
+bare-metal        = "1.0.0"
+document-features = "0.2.8"
+mutex-trait       = "0.2.0"
+spin              = { version = "0.9.8", optional = true }
+
+[features]
+## Use the [spin] package for synchronization
+spin = ["dep:spin"]
