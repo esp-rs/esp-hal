@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+- make panic_handler, user_exception and exception_handler public (#1814)
 
 ### Changed
 

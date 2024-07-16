@@ -51,7 +51,11 @@ pub mod arch;
 
 #[cfg(feature = "panic-handler")]
 #[panic_handler]
-fn panic_handler(info: &core::panic::PanicInfo) -> ! {
+fn __panic_handler(info: &core::panic::PanicInfo) -> ! {
+    panic_handler(info)
+}
+
+pub fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     #[cfg(feature = "colors")]
     set_color_code(RED);
 
@@ -107,14 +111,12 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     if backtrace.iter().filter(|e| e.is_some()).count() == 0 {
         println!("No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)");
     }
-    for e in backtrace {
-        if let Some(addr) = e {
-            #[cfg(all(feature = "colors", feature = "println"))]
-            println!("{}0x{:x}", RED, addr - crate::arch::RA_OFFSET);
+    for addr in backtrace.into_iter().flatten() {
+        #[cfg(all(feature = "colors", feature = "println"))]
+        println!("{}0x{:x}", RED, addr - crate::arch::RA_OFFSET);
 
-            #[cfg(not(all(feature = "colors", feature = "println")))]
-            println!("0x{:x}", addr - crate::arch::RA_OFFSET);
-        }
+        #[cfg(not(all(feature = "colors", feature = "println")))]
+        println!("0x{:x}", addr - crate::arch::RA_OFFSET);
     }
 
     #[cfg(feature = "colors")]
@@ -131,6 +133,11 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
 #[no_mangle]
 #[link_section = ".rwtext"]
 unsafe fn __user_exception(cause: arch::ExceptionCause, context: arch::Context) {
+    user_exception(cause, context)
+}
+
+#[cfg(target_arch = "xtensa")]
+pub fn user_exception(cause: arch::ExceptionCause, context: arch::Context) {
     #[cfg(feature = "colors")]
     set_color_code(RED);
 
@@ -215,14 +222,12 @@ fn exception_handler(context: &arch::TrapFrame) -> ! {
         if backtrace.iter().filter(|e| e.is_some()).count() == 0 {
             println!("No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)");
         }
-        for e in backtrace {
-            if let Some(addr) = e {
-                #[cfg(all(feature = "colors", feature = "println"))]
-                println!("{}0x{:x}", RED, addr - crate::arch::RA_OFFSET);
+        for addr in backtrace.into_iter().flatten() {
+            #[cfg(all(feature = "colors", feature = "println"))]
+            println!("{}0x{:x}", RED, addr - crate::arch::RA_OFFSET);
 
-                #[cfg(not(all(feature = "colors", feature = "println")))]
-                println!("0x{:x}", addr - crate::arch::RA_OFFSET);
-            }
+            #[cfg(not(all(feature = "colors", feature = "println")))]
+            println!("0x{:x}", addr - crate::arch::RA_OFFSET);
         }
     }
 
