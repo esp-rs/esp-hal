@@ -1,15 +1,15 @@
 //! This shows how to continously receive data via I2S.
 //!
-//! Pins used:
-//! MCLK    GPIO0 (not ESP32)
-//! BCLK    GPIO2
-//! WS      GPIO4
-//! DIN     GPIO5
-//!
 //! Without an additional I2S source device you can connect 3V3 or GND to DIN
 //! to read 0 or 0xFF or connect DIN to WS to read two different values.
 //!
 //! You can also inspect the MCLK, BCLK and WS with a logic analyzer.
+//!
+//! The following wiring is assumed:
+//! - MCLK =>  GPIO0 (not supported on ESP32)
+//! - BCLK =>  GPIO2
+//! - WS   =>  GPIO4
+//! - DIN  =>  GPIO5
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 

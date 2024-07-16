@@ -1,5 +1,11 @@
-//! Demonstrates deep sleep with timer, using GPIO2 (low) and GPIO3 (high) as
+//! Demonstrates deep sleep with timer, using RTC pins as
 //! wakeup.
+//!
+//! The following wiring is assumed for ESP32C3:
+//! - RTC wakeup pin => GPIO2 (low level)
+//! - RTC wakeup pin => GPIO3 (high level)
+//! The following wiring is assumed for ESP32S3:
+//! - RTC wakeup pin => GPIO18 (low level)
 
 //% CHIPS: esp32c3 esp32s3
 

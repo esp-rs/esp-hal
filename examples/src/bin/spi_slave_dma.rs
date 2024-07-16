@@ -1,17 +1,17 @@
 //! SPI slave loopback test using DMA
 //!
-//! Following pins are used for the (bitbang) slave:
+//! The following wiring is assumed for the (bitbang) slave:
 //!
-//! SCLK    GPIO0
-//! MISO    GPIO1
-//! MOSI    GPIO2
-//! CS      GPIO3
+//! - SCLK => GPIO0
+//! - MISO => GPIO1
+//! - MOSI => GPIO2
+//! - CS   => GPIO3
 //!
-//! Following pins are used for the (bitbang) master:
-//! SCLK    GPIO4
-//! MISO    GPIO5
-//! MOSI    GPIO8
-//! CS      GPIO9
+//! The following wiring is assumed for the (bitbang) master:
+//! - SCLK => GPIO4
+//! - MISO => GPIO5
+//! - MOSI => GPIO8
+//! - CS   => GPIO9
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.

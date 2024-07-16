@@ -1,5 +1,7 @@
 //! Demonstrates decoding pulse sequences with RMT
-//! Connect GPIO5 to GPIO4
+//!
+//! The following wiring is assumed:
+//! - Connect GPIO4 and GPIO5
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: async embassy embassy-generic-timers

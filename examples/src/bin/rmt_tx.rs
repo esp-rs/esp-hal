@@ -1,6 +1,9 @@
 //! Demonstrates generating pulse sequences with RMT
 //!
 //! Connect a logic analyzer to GPIO4 to see the generated pulses.
+//!
+//! The following wiring is assumed:
+//! - generated pulses => GPIO4
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 

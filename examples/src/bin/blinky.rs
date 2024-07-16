@@ -1,6 +1,7 @@
 //! Blinks an LED
 //!
-//! This assumes that a LED is connected to the pin assigned to `led`. (GPIO0)
+//! The following wiring is assumed:
+//! - LED => GPIO0
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 

@@ -1,9 +1,12 @@
 //! This shows a very basic example of running code on the LP core.
 //!
-//! Code on LP core increments a counter and continuously toggles GPIO1. The
+//! Code on LP core increments a counter and continuously toggles LED. The
 //! current value is printed by the HP core.
 //!
 //! Make sure to first compile the `esp-lp-hal/examples/blinky.rs` example
+//!
+//! The following wiring is assumed:
+//! - LED => GPIO1
 
 //% CHIPS: esp32c6
 

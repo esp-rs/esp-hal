@@ -9,6 +9,10 @@
 //!
 //! This example should work with another ESP board running the `twai` example
 //! with `IS_SENDER` set to `true`.
+//!
+//! The following wiring is assumed:
+//! - TX => GPIO0
+//! - RX => GPIO2
 
 //% CHIPS: esp32c3 esp32c6 esp32s2 esp32s3
 //% FEATURES: async embassy embassy-generic-timers

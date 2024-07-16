@@ -1,13 +1,16 @@
 //! This example sends a CAN message to another ESP and receives it back.
 //!
-//! Wiring:
 //! This example works without CAN Transceivers by:
 //! * setting the tx pins to open drain
 //! * connecting all rx and tx pins together
 //! * adding a pull-up to the signal pins
 //!
+//! The following wiring is assumed:
+//! - TX => GPIO0
+//! - RX => GPIO2
+//!
 //! ESP1/GND --- ESP2/GND
-//! ESP1/IO0 --- ESP1/IO2 --- ESP2/IO0 --- ESP2/IO2 --- 4.8kOhm --- ESP1/5V
+//! ESP1/GPIO0 --- ESP1/GPIO2 --- ESP2/GPIO0 --- ESP2/GPIO2 --- 4.8kOhm --- ESP1/5V
 //!
 //! `IS_FIRST_SENDER` below must be set to false on one of the ESP's
 

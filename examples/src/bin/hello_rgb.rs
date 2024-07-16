@@ -7,6 +7,17 @@
 //! crate functionality to circle through the HSV hue color space (with
 //! saturation and value both at 255). Additionally, we apply a gamma correction
 //! and limit the brightness to 10 (out of 255).
+//!
+//! The following wiring is assumed for ESP32:
+//! - LED => GPIO33
+//! The following wiring is assumed for ESP32C3:
+//! - LED => GPIO8
+//! The following wiring is assumed for ESP32C6, ESP32H2:
+//! - LED => GPIO8
+//! The following wiring is assumed for ESP32S2:
+//! - LED => GPIO18
+//! The following wiring is assumed for ESP32S3:
+//! - LED => GPIO48
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 

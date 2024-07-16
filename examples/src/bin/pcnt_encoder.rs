@@ -5,6 +5,10 @@
 //! Since the PCNT units reset to zero when they reach their limits
 //! we enable an interrupt on the upper and lower limits and
 //! track the overflow in an AtomicI32
+//!
+//! The following wiring is assumed:
+//! - Control signal => GPIO4
+//! - Edge signal    => GPIO5
 
 //% CHIPS: esp32 esp32c6 esp32h2 esp32s2 esp32s3
 

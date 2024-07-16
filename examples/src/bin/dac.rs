@@ -5,6 +5,13 @@
 //!
 //! When targeting the ESP32, the pins for `DAC1` and `DAC2` are GPIO25 and
 //! GPIO26 respectively; for the ESP32-S2, they are GPIO17 and GPIO18.
+//!
+//! The following wiring is assumed for ESP32:
+//! - DAC1 => GPIO25
+//! - DAC2 => GPIO26
+//! The following wiring is assumed for ESP32S2:
+//! - DAC1 => GPIO17
+//! - DAC2 => GPIO18
 
 //% CHIPS: esp32 esp32s2
 

@@ -1,9 +1,10 @@
 //! Blinks 3 LEDs
 //!
-//! This assumes that LEDs are connected to GPIO2, 4 and 5.
+//! The boot button is treated as an input, and will print a message when pressed.
+//! This additionally demonstrates passing GPIO to a function in a generic way.
 //!
-//! GPIO1 is treated as an input, and will print a message when pressed. This
-//! Additionally demonstrates passing GPIO to a function in a generic way.
+//! The following wiring is assumed:
+//! - LEDs => GPIO2, GPIO4, GPIO5
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 

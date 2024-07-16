@@ -1,4 +1,7 @@
-//! Control LED on GPIO1 by the BOOT-BUTTON via ETM
+//! Control LED by the boot button via ETM without involving the CPU.
+
+//! The following wiring is assumed:
+//! - LED => GPIO1
 
 //% CHIPS: esp32c6 esp32h2
 

@@ -1,7 +1,10 @@
 //! This shows a very basic example of running code on the ULP RISCV core.
 //!
-//! Code on ULP core just increments a counter and blinks GPIO 1. The current
+//! Code on ULP core just increments a counter and blinks with LED. The current
 //! value is printed by the HP core.
+//!
+//! The following wiring is assumed:
+//! - LED => GPIO1
 
 //% CHIPS: esp32s2 esp32s3
 
