@@ -861,6 +861,7 @@ pub(crate) unsafe extern "C" fn coex_init() -> i32 {
     #[cfg(coex)]
     {
         debug!("coex-init");
+        #[allow(clippy::needless_return)]
         return include::coex_init();
     }
 
@@ -2687,6 +2688,7 @@ impl Drop for FreeApListOnDrop {
 mod embedded_svc_compat {
     use super::*;
 
+    #[allow(clippy::from_over_into)]
     impl Into<embedded_svc::wifi::Capability> for Capability {
         fn into(self) -> embedded_svc::wifi::Capability {
             match self {
@@ -2697,6 +2699,7 @@ mod embedded_svc_compat {
         }
     }
 
+    #[allow(clippy::from_over_into)]
     impl Into<embedded_svc::wifi::AuthMethod> for AuthMethod {
         fn into(self) -> embedded_svc::wifi::AuthMethod {
             match self {
@@ -2729,6 +2732,7 @@ mod embedded_svc_compat {
         }
     }
 
+    #[allow(clippy::from_over_into)]
     impl Into<embedded_svc::wifi::Protocol> for Protocol {
         fn into(self) -> embedded_svc::wifi::Protocol {
             match self {
@@ -2755,6 +2759,7 @@ mod embedded_svc_compat {
         }
     }
 
+    #[allow(clippy::from_over_into)]
     impl Into<embedded_svc::wifi::Configuration> for Configuration {
         fn into(self) -> embedded_svc::wifi::Configuration {
             match self {
@@ -2823,10 +2828,10 @@ mod embedded_svc_compat {
                 embedded_svc::wifi::Configuration::Client(conf) => {
                     Configuration::Client(ClientConfiguration {
                         ssid: conf.ssid.clone(),
-                        bssid: conf.bssid.clone(),
+                        bssid: conf.bssid,
                         auth_method: conf.auth_method.into(),
                         password: conf.password.clone(),
-                        channel: conf.channel.clone(),
+                        channel: conf.channel,
                     })
                 }
                 embedded_svc::wifi::Configuration::AccessPoint(conf) => {
@@ -2850,14 +2855,14 @@ mod embedded_svc_compat {
                 embedded_svc::wifi::Configuration::Mixed(client, ap) => Configuration::Mixed(
                     ClientConfiguration {
                         ssid: client.ssid.clone(),
-                        bssid: client.bssid.clone(),
+                        bssid: client.bssid,
                         auth_method: client.auth_method.into(),
                         password: client.password.clone(),
                         channel: client.channel,
                     },
                     AccessPointConfiguration {
                         ssid: ap.ssid.clone(),
-                        ssid_hidden: ap.ssid_hidden.clone(),
+                        ssid_hidden: ap.ssid_hidden,
                         channel: ap.channel,
                         secondary_channel: ap.secondary_channel,
                         protocols: {
@@ -2876,11 +2881,12 @@ mod embedded_svc_compat {
         }
     }
 
+    #[allow(clippy::from_over_into)]
     impl Into<embedded_svc::wifi::AccessPointInfo> for AccessPointInfo {
         fn into(self) -> embedded_svc::wifi::AccessPointInfo {
             embedded_svc::wifi::AccessPointInfo {
                 ssid: self.ssid.clone(),
-                bssid: self.bssid.clone(),
+                bssid: self.bssid,
                 channel: self.channel,
                 secondary_channel: self.secondary_channel.into(),
                 signal_strength: self.signal_strength,
@@ -2896,6 +2902,7 @@ mod embedded_svc_compat {
         }
     }
 
+    #[allow(clippy::from_over_into)]
     impl Into<embedded_svc::wifi::SecondaryChannel> for SecondaryChannel {
         fn into(self) -> embedded_svc::wifi::SecondaryChannel {
             match self {
@@ -2906,6 +2913,7 @@ mod embedded_svc_compat {
         }
     }
 
+    #[allow(clippy::from_over_into)]
     impl Into<embedded_svc::ipv4::Subnet> for crate::wifi::ipv4::Subnet {
         fn into(self) -> embedded_svc::ipv4::Subnet {
             embedded_svc::ipv4::Subnet {
@@ -2924,6 +2932,7 @@ mod embedded_svc_compat {
         }
     }
 
+    #[allow(clippy::from_over_into)]
     impl Into<embedded_svc::ipv4::IpInfo> for super::ipv4::IpInfo {
         fn into(self) -> embedded_svc::ipv4::IpInfo {
             embedded_svc::ipv4::IpInfo {
@@ -2979,6 +2988,7 @@ mod embedded_svc_compat {
         }
     }
 
+    #[allow(clippy::from_over_into)]
     impl Into<embedded_svc::ipv4::Configuration> for super::ipv4::Configuration {
         fn into(self) -> embedded_svc::ipv4::Configuration {
             match self {

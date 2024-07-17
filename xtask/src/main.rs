@@ -486,6 +486,9 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     if device.contains(&"usb0".to_owned()) {
                         features.push_str(",usb-otg")
                     }
+                    if device.contains(&"bt".to_owned()) {
+                        features.push_str(",bluetooth")
+                    }
                     if device.contains(&"psram".to_owned()) {
                         // TODO this doesn't test octal psram as it would require a separate build
                         features.push_str(",psram-4m,psram-80mhz")
@@ -584,14 +587,25 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 // Since different files/modules can be included/excluded
                 // depending on the target, we must lint *all* targets:
                 for chip in Chip::iter() {
+                    let mut features = format!("--features={chip},async,ps-min-modem");
+                    let device = Config::for_chip(&chip);
+
+                    if device.contains(&"wifi".to_owned()) {
+                        features
+                            .push_str(",wifi-default,esp-now,embedded-svc,embassy-net,dump-packets")
+                    }
+                    if device.contains(&"bt".to_owned()) {
+                        features.push_str(",ble")
+                    }
+                    if device.contains(&"coex".to_owned()) {
+                        features.push_str(",coex")
+                    }
                     lint_package(
                         &path,
                         &[
                             "-Zbuild-std=core",
                             &format!("--target={}", chip.target()),
-                            &format!(
-                                "--features={chip},wifi-default,ble,esp-now,async,embassy-net,embedded-svc,coex,ps-min-modem,dump-packets"
-                            ),
+                            &features,
                         ],
                     )?;
                 }
