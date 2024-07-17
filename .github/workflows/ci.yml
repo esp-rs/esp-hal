@@ -105,12 +105,6 @@ jobs:
       - name: Build (examples)
         run: cargo xtask build-examples esp-hal ${{ matrix.device.soc }}
       # Check doc-tests
-      - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc) }}
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
-          toolchain: nightly
-          components: rust-src
       - name: Check doc-tests
         run: cargo xtask run-doc-test esp-hal ${{ matrix.device.soc }}
       - name: Check documentation
