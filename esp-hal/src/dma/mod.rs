@@ -66,7 +66,7 @@ impl Debug for DmaDescriptorFlags {
             .field("size", &self.size())
             .field("length", &self.length())
             .field("suc_eof", &self.suc_eof())
-            .field("owner", &self.owner())
+            .field("owner", &(if self.owner() { "DMA" } else { "CPU" }))
             .finish()
     }
 }
@@ -567,8 +567,8 @@ impl DescriptorChain {
     ) -> Result<(), DmaError> {
         if !crate::soc::is_valid_ram_address(self.first() as u32)
             || !crate::soc::is_valid_ram_address(self.last() as u32)
-            || !crate::soc::is_valid_ram_address(data as u32)
-            || !crate::soc::is_valid_ram_address(unsafe { data.add(len) } as u32)
+            || !crate::soc::is_valid_memory_address(data as u32)
+            || !crate::soc::is_valid_memory_address(unsafe { data.add(len) } as u32)
         {
             return Err(DmaError::UnsupportedMemoryRegion);
         }
@@ -639,8 +639,8 @@ impl DescriptorChain {
     ) -> Result<(), DmaError> {
         if !crate::soc::is_valid_ram_address(self.first() as u32)
             || !crate::soc::is_valid_ram_address(self.last() as u32)
-            || !crate::soc::is_valid_ram_address(data as u32)
-            || !crate::soc::is_valid_ram_address(unsafe { data.add(len) } as u32)
+            || !crate::soc::is_valid_memory_address(data as u32)
+            || !crate::soc::is_valid_memory_address(unsafe { data.add(len) } as u32)
         {
             return Err(DmaError::UnsupportedMemoryRegion);
         }
@@ -705,6 +705,15 @@ impl DescriptorChain {
 
         Ok(())
     }
+}
+
+/// Block size for transfers to/from psram
+#[derive(Copy, Clone, Debug, PartialEq)]
+#[allow(missing_docs)]
+pub enum DmaExtMemBKSize {
+    Size16 = 0,
+    Size32 = 1,
+    Size64 = 2,
 }
 
 pub(crate) struct TxCircularState {
@@ -967,6 +976,9 @@ pub trait RxPrivate: crate::private::Sealed {
 
     fn start_transfer(&mut self) -> Result<(), DmaError>;
 
+    #[cfg(esp32s3)]
+    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
+
     #[cfg(gdma)]
     fn set_mem2mem_mode(&mut self, value: bool);
 
@@ -1126,6 +1138,11 @@ where
         self.rx_impl.start_transfer()
     }
 
+    #[cfg(esp32s3)]
+    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
+        CH::Channel::set_in_ext_mem_block_size(size);
+    }
+
     #[cfg(gdma)]
     fn set_mem2mem_mode(&mut self, value: bool) {
         CH::Channel::set_mem2mem_mode(value);
@@ -1243,6 +1260,9 @@ pub trait TxPrivate: crate::private::Sealed {
     ) -> Result<(), DmaError>;
 
     fn start_transfer(&mut self) -> Result<(), DmaError>;
+
+    #[cfg(esp32s3)]
+    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
 
     fn clear_ch_out_done(&self);
 
@@ -1410,6 +1430,11 @@ where
         self.tx_impl.start_transfer()
     }
 
+    #[cfg(esp32s3)]
+    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
+        CH::Channel::set_out_ext_mem_block_size(size);
+    }
+
     fn clear_ch_out_done(&self) {
         self.tx_impl.clear_ch_out_done();
     }
@@ -1489,6 +1514,8 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn init_channel();
     #[cfg(gdma)]
     fn set_mem2mem_mode(value: bool);
+    #[cfg(esp32s3)]
+    fn set_out_ext_mem_block_size(size: DmaExtMemBKSize);
     fn set_out_burstmode(burst_mode: bool);
     fn set_out_priority(priority: DmaPriority);
     fn clear_out_interrupts();
@@ -1507,6 +1534,8 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn reset_out_eof_interrupt();
     fn last_out_dscr_address() -> usize;
 
+    #[cfg(esp32s3)]
+    fn set_in_ext_mem_block_size(size: DmaExtMemBKSize);
     fn set_in_burstmode(burst_mode: bool);
     fn set_in_priority(priority: DmaPriority);
     fn clear_in_interrupts();
