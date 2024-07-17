@@ -607,6 +607,12 @@ impl<T, const SIZE: usize> FlashSafeDma<T, SIZE> {
     }
 }
 
+/// Default (unhandled) interrupt handler
+pub const DEFAULT_INTERRUPT_HANDLER: interrupt::InterruptHandler = interrupt::InterruptHandler::new(
+    unsafe { core::mem::transmute(EspDefaultHandler as *const ()) },
+    crate::interrupt::Priority::min(),
+);
+
 /// Trait implemented by drivers which allow the user to set an
 /// [InterruptHandler]
 pub trait InterruptConfigurable: private::Sealed {
@@ -615,6 +621,9 @@ pub trait InterruptConfigurable: private::Sealed {
     /// Note that this will replace any previously registered interrupt handler.
     /// Some peripherals offer a shared interrupt handler for multiple purposes.
     /// It's the users duty to honor this.
+    ///
+    /// You can restore the default/unhandled interrupt handler by using
+    /// [DEFAULT_INTERRUPT_HANDLER]
     fn set_interrupt_handler(&mut self, handler: interrupt::InterruptHandler);
 }
 
