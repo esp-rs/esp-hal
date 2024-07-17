@@ -11,9 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Improve panic message printing (#1823)
+
 ### Fixed
 
 ### Removed
+
+## 0.13.0 - 2024-07-16
+
+No changes - published to avoid conflicts with `esp-println`
 
 ## 0.12.2 - 2024-07-15
 
