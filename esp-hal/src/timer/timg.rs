@@ -518,7 +518,7 @@ where
     T: Instance,
 {
     fn set_interrupt_handler(&mut self, handler: interrupt::InterruptHandler) {
-        <Self as super::Timer>::set_interrupt_handler(&self, handler);
+        <Self as super::Timer>::set_interrupt_handler(self, handler);
     }
 }
 

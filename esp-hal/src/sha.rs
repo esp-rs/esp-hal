@@ -64,7 +64,6 @@ use crate::{
     peripherals::SHA,
     reg_access::{AlignmentHelper, SocDependentEndianess},
     system::PeripheralClockControl,
-    InterruptConfigurable,
 };
 
 // All the hash algorithms introduced in FIPS PUB 180-4 Spec.
@@ -159,7 +158,7 @@ impl<'d> Sha<'d, crate::Blocking> {
 impl<'d> crate::private::Sealed for Sha<'d, crate::Blocking> {}
 
 #[cfg(not(esp32))]
-impl<'d> InterruptConfigurable for Sha<'d, crate::Blocking> {
+impl<'d> crate::InterruptConfigurable for Sha<'d, crate::Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         unsafe {
             crate::interrupt::bind_interrupt(crate::peripherals::Interrupt::SHA, handler.handler());
