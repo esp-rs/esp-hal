@@ -208,14 +208,14 @@ impl<'d> Trng<'d> {
 
     /// Downgrades the `Trng` instance to a `Rng` instance and releases the
     /// ADC1.
-    /// For esp32c6 - blocked on https://github.com/espressif/esp-idf/issues/14124
+    /// For esp32c6 - blocked on <https://github.com/espressif/esp-idf/issues/14124>
     #[cfg(not(esp32c6))]
     pub fn downgrade(self) -> Rng {
         self.rng
     }
 }
 
-/// For esp32c6 - blocked on https://github.com/espressif/esp-idf/issues/14124
+/// For esp32c6 - blocked on <https://github.com/espressif/esp-idf/issues/14124>
 #[cfg(not(esp32c6))]
 impl<'d> Drop for Trng<'d> {
     fn drop(&mut self) {

@@ -5,9 +5,11 @@
 //! peripheral which implements the [Timer] trait. This means that the same API
 //! can be used to interact with different hardware timers, like the `TIMG` and
 //! SYSTIMER.
-//!
-//! See the [timg] and [systimer] modules for more information.
-//!
+#![cfg_attr(
+    not(feature = "esp32"),
+    doc = "See the [timg] and [systimer] modules for more information."
+)]
+#![cfg_attr(feature = "esp32", doc = "See the [timg] module for more information.")]
 //! ## Examples
 //! ### One-shot Timer
 //! ```rust, no_run
@@ -177,7 +179,7 @@ where
 
     /// Set the interrupt handler
     ///
-    /// Note that this will replace any previously set interrupt handler    
+    /// Note that this will replace any previously set interrupt handler
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.inner.set_interrupt_handler(handler);
     }
@@ -281,7 +283,7 @@ where
 
     /// Set the interrupt handler
     ///
-    /// Note that this will replace any previously set interrupt handler    
+    /// Note that this will replace any previously set interrupt handler
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.inner.set_interrupt_handler(handler);
     }
