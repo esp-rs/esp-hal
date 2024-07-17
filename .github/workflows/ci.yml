@@ -114,7 +114,7 @@ jobs:
       - name: Check doc-tests
         run: cargo xtask run-doc-test esp-hal ${{ matrix.device.soc }}
       - name: Check documentation
-        run:  cargo xtask build-documentation --packages esp-hal --chips ${{ matrix.device.soc }}
+        run:  RUSTDOCFLAGS="-D warnings" cargo xtask build-documentation --packages esp-hal --chips ${{ matrix.device.soc }}
 
   esp-lp-hal:
     runs-on: ubuntu-latest
@@ -154,7 +154,7 @@ jobs:
       - name: Build examples
         run: cargo xtask build-examples esp-lp-hal ${{ matrix.soc }}
       - name: Check documentation
-        run:  cargo xtask build-documentation --packages esp-lp-hal --chips ${{ matrix.soc }}
+        run:  RUSTDOCFLAGS="-D warnings" cargo xtask build-documentation --packages esp-lp-hal --chips ${{ matrix.soc }}
   esp-riscv-rt:
     runs-on: ubuntu-latest
 
@@ -239,7 +239,7 @@ jobs:
             --target=${{ matrix.device.target }} \
             esp-println
       - name: Check documentation
-        run:  cargo xtask build-documentation --packages esp-println --chips ${{ matrix.device.soc }}
+        run:  RUSTDOCFLAGS="-D warnings" cargo xtask build-documentation --packages esp-println --chips ${{ matrix.device.soc }}
   extras:
     runs-on: ubuntu-latest
 
