@@ -58,7 +58,7 @@
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 #![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
 #![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
-//! let rmt = Rmt::new(peripherals.RMT, freq, &clocks, None).unwrap();
+//! let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
 //! let mut channel = rmt
 //!     .channel0
 //!     .configure(

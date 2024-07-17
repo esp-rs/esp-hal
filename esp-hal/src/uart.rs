@@ -56,7 +56,6 @@
 //! #     peripherals.UART1,
 //! #     Config::default(),
 //! #     &clocks,
-//! #     None,
 //! #     io.pins.gpio1,
 //! #     io.pins.gpio2,
 //! # ).unwrap();
@@ -75,7 +74,6 @@
 //! #     peripherals.UART1,
 //! #     Config::default(),
 //! #     &clocks,
-//! #     None,
 //! #     io.pins.gpio1,
 //! #     io.pins.gpio2,
 //! # ).unwrap();
@@ -108,9 +106,9 @@
 //! use esp_hal::gpio::{Io, any_pin::AnyPin};
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
-//! let tx = UartTx::new(peripherals.UART0, &clocks, None,
+//! let tx = UartTx::new(peripherals.UART0, &clocks,
 //!     io.pins.gpio1).unwrap();
-//! let rx = UartRx::new(peripherals.UART1, &clocks, None,
+//! let rx = UartRx::new(peripherals.UART1, &clocks,
 //!     io.pins.gpio2).unwrap();
 //! # }
 //! ```

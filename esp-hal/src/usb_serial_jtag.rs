@@ -42,8 +42,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! use esp_hal::usb_serial_jtag::UsbSerialJtag;
-//! use core::option::Option::None;
-//! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE, None);
+//! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 //!
 //! // Write bytes out over the USB Serial/JTAG:
 //! usb_serial.write_bytes("Hello, world!".as_bytes()).expect("write error!");
@@ -54,7 +53,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::usb_serial_jtag::UsbSerialJtag;
-//! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE, None);
+//! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 //! // The USB Serial/JTAG can be split into separate Transmit and Receive
 //! // components:
 //! let (mut tx, mut rx) = usb_serial.split();

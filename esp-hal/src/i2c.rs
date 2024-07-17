@@ -33,7 +33,6 @@
 //!     io.pins.gpio2,
 //!     100.kHz(),
 //!     &clocks,
-//!     None,
 //! );
 //! # }
 //! ```
@@ -62,7 +61,6 @@
 //!     io.pins.gpio2,
 //!     100.kHz(),
 //!     &clocks,
-//!     None,
 //! );
 //! loop {
 //!     let mut data = [0u8; 22];

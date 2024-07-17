@@ -37,14 +37,7 @@
 //! # use nb::block;
 //! let source_data = "HELLO, ESPRESSIF!".as_bytes();
 //! let mut remaining = source_data;
-#![cfg_attr(
-    not(esp32),
-    doc = "let mut hasher = Sha::new(peripherals.SHA, ShaMode::SHA256, None);"
-)]
-#![cfg_attr(
-    esp32,
-    doc = "let mut hasher = Sha::new(peripherals.SHA, ShaMode::SHA256);"
-)]
+//! let mut hasher = Sha::new(peripherals.SHA, ShaMode::SHA256);
 //! // Short hashes can be created by decreasing the output buffer to the
 //! // desired length
 //! let mut output = [0u8; 32];
