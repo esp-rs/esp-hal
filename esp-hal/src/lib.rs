@@ -609,7 +609,7 @@ impl<T, const SIZE: usize> FlashSafeDma<T, SIZE> {
 
 /// Default (unhandled) interrupt handler
 pub const DEFAULT_INTERRUPT_HANDLER: interrupt::InterruptHandler = interrupt::InterruptHandler::new(
-    unsafe { core::mem::transmute(EspDefaultHandler as *const ()) },
+    unsafe { core::mem::transmute::<*const (), extern "C" fn()>(EspDefaultHandler as *const ()) },
     crate::interrupt::Priority::min(),
 );
 
