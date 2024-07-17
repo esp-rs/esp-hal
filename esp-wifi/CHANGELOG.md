@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Downgrade `embedded-svc` to 0.27.1
+- Downgrade `embedded-svc` to 0.27.1 (#1820)
 
 ### Removed
 
