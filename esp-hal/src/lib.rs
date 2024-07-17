@@ -614,7 +614,7 @@ pub const DEFAULT_INTERRUPT_HANDLER: interrupt::InterruptHandler = interrupt::In
 );
 
 /// Trait implemented by drivers which allow the user to set an
-/// [InterruptHandler]
+/// [interrupt::InterruptHandler]
 pub trait InterruptConfigurable: private::Sealed {
     /// Set the interrupt handler
     ///
