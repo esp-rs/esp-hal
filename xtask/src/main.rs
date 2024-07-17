@@ -7,14 +7,12 @@ use std::{
 
 use anyhow::{bail, Result};
 use clap::{Args, Parser};
+use esp_metadata::{Chip, Config};
 use minijinja::Value;
 use strum::IntoEnumIterator;
 use xtask::{
     cargo::{CargoAction, CargoArgsBuilder},
-    Chip,
-    Metadata,
-    Package,
-    Version,
+    Metadata, Package, Version,
 };
 
 // ----------------------------------------------------------------------------
@@ -479,6 +477,56 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 // Since different files/modules can be included/excluded
                 // depending on the target, we must lint *all* targets:
                 for chip in Chip::iter() {
+                    let device = Config::for_chip(&chip);
+                    let mut features = format!("--features={chip},ci");
+
+                    // Cover all esp-hal features where a device is supported
+                    if device.contains(&"usb0".to_owned()) {
+                        features.push_str(",usb-otg")
+                    }
+                    if device.contains(&"psram".to_owned()) {
+                        // TODO this doesn't test octal psram as it would require a separate build
+                        features.push_str(",psram-4m,psram-80mhz")
+                    }
+                    if matches!(chip, Chip::Esp32c6 | Chip::Esp32h2) {
+                        features.push_str(",flip-link")
+                    }
+
+                    lint_package(
+                        &path,
+                        &[
+                            "-Zbuild-std=core",
+                            &format!("--target={}", chip.target()),
+                            &features,
+                        ],
+                    )?;
+                }
+            }
+
+            Package::EspHalEmbassy => {
+                // Since different files/modules can be included/excluded
+                // depending on the target, we must lint *all* targets:
+                for chip in Chip::iter() {
+                    lint_package(
+                        &path,
+                        &[
+                            "-Zbuild-std=core",
+                            &format!("--target={}", chip.target()),
+                            &format!("--features={chip},executors,defmt,integrated-timers"),
+                        ],
+                    )?;
+                }
+            }
+
+            Package::EspHalProcmacros | Package::EspRiscvRt => lint_package(
+                &path,
+                &["-Zbuild-std=core", "--target=riscv32imc-unknown-none-elf"],
+            )?,
+
+            Package::EspIeee802154 => {
+                for chip in Chip::iter()
+                    .filter(|chip| Config::for_chip(chip).contains(&"ieee802154".to_owned()))
+                {
                     lint_package(
                         &path,
                         &[
@@ -489,24 +537,21 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     )?;
                 }
             }
-
-            Package::EspHalEmbassy => {
-                lint_package(
-                    &path,
-                    &[
-                        "-Zbuild-std=core",
-                        "--target=riscv32imac-unknown-none-elf",
-                        "--features=esp32c6",
-                    ],
-                )?;
+            Package::EspLpHal => {
+                for chip in Chip::iter()
+                    .filter(|chip| Config::for_chip(chip).contains(&"lp_core".to_owned()))
+                {
+                    lint_package(
+                        &path,
+                        &[
+                            "-Zbuild-std=core",
+                            &format!("--target={}", chip.lp_target().unwrap()),
+                            &format!("--features={chip},embedded-io,embedded-hal-02"),
+                        ],
+                    )?;
+                }
             }
-
-            Package::EspHalProcmacros | Package::EspRiscvRt => lint_package(
-                &path,
-                &["-Zbuild-std=core", "--target=riscv32imc-unknown-none-elf"],
-            )?,
-
-            Package::EspHalSmartled | Package::EspIeee802154 | Package::EspLpHal => lint_package(
+            Package::EspHalSmartled => lint_package(
                 &path,
                 &[
                     "-Zbuild-std=core",
@@ -533,14 +578,22 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 ],
             )?,
 
-            Package::EspWifi => lint_package(
-                &path,
-                &[
-                    "-Zbuild-std=core",
-                    "--target=riscv32imc-unknown-none-elf",
-                    "--features=esp32c3,wifi-default,ble,esp-now,async,embassy-net",
-                ],
-            )?,
+            Package::EspWifi => {
+                // Since different files/modules can be included/excluded
+                // depending on the target, we must lint *all* targets:
+                for chip in Chip::iter() {
+                    lint_package(
+                        &path,
+                        &[
+                            "-Zbuild-std=core",
+                            &format!("--target={}", chip.target()),
+                            &format!(
+                                "--features={chip},wifi-default,ble,esp-now,async,embassy-net,embedded-svc,coex,ps-min-modem,defmt,dump-packets"
+                            ),
+                        ],
+                    )?;
+                }
+            }
 
             Package::XtensaLxRt => {
                 for chip in [Chip::Esp32, Chip::Esp32s2, Chip::Esp32s3] {
