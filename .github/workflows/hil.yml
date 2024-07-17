@@ -128,5 +128,5 @@ jobs:
           cargo xtask run-elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
 
       - name: Erase Flash on Failure
-        if: steps.run-tests.conclusion == 'failure'
+        if: ${{ failure() && steps.run-tests.conclusion == 'failure' }}
         run: espflash erase-flash

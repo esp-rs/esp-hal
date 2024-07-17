@@ -202,13 +202,12 @@ pub trait AdcCalScheme<ADCI>: Sized + crate::private::Sealed {
     /// Create a new calibration scheme for the given attenuation.
     fn new_cal(atten: Attenuation) -> Self;
 
-    /// Return the basic ADC bias value. See [`AdcCalBasic`] for
-    /// details.
+    /// Return the basic ADC bias value.
     fn adc_cal(&self) -> u16 {
         0
     }
 
-    /// Convert ADC value
+    /// Convert ADC value.
     fn adc_val(&self, val: u16) -> u16 {
         val
     }

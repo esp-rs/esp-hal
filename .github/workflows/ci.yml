@@ -13,15 +13,9 @@ name: CI
 
 on:
   pull_request:
-    paths-ignore:
-      - "**/CHANGELOG.md"
-      - "**/README.md"
   push:
     branches-ignore:
       - "gh-readonly-queue/**"
-    paths-ignore:
-      - "**/CHANGELOG.md"
-      - "**/README.md"
   merge_group:
   workflow_dispatch:
 
@@ -70,12 +64,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install the Rust toolchain for RISC-V devices:
+      # Install the Rust stable and nightly toolchains for RISC-V devices:
       - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc) }}
         uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: stable
+          components: rust-src
+      - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc) }}
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          toolchain: nightly
           components: rust-src
       # Install the Rust toolchain for Xtensa devices:
       - if: contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc)
@@ -105,14 +105,10 @@ jobs:
       - name: Build (examples)
         run: cargo xtask build-examples esp-hal ${{ matrix.device.soc }}
       # Check doc-tests
-      - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc) }}
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
-          toolchain: nightly
-          components: rust-src
       - name: Check doc-tests
         run: cargo xtask run-doc-test esp-hal ${{ matrix.device.soc }}
+      - name: Check documentation
+        run:  RUSTDOCFLAGS="-D warnings" cargo xtask build-documentation --packages esp-hal --chips ${{ matrix.device.soc }}
 
   esp-lp-hal:
     runs-on: ubuntu-latest
@@ -125,19 +121,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install the Rust toolchain for RISC-V devices:
+      # Install the Rust stable and nightly toolchains for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: stable
           components: rust-src
+      - uses: dtolnay/rust-toolchain@v1
+        if: ${{ !contains(fromJson('["esp32s2", "esp32s3"]'), matrix.soc) }}
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          toolchain: nightly
+          components: rust-src
+      # Install the Rust toolchain for Xtensa devices:
+      - if: contains(fromJson('["esp32s2", "esp32s3"]'), matrix.soc)
+        uses: esp-rs/xtensa-toolchain@v1.5
+        with:
+          buildtargets: ${{ matrix.soc }}
+          default: true
+          ldproxy: false
+
 
       - uses: Swatinem/rust-cache@v2
 
       # Build all supported examples for the specified device:
       - name: Build examples
         run: cargo xtask build-examples esp-lp-hal ${{ matrix.soc }}
-
+      - name: Check documentation
+        run:  RUSTDOCFLAGS="-D warnings" cargo xtask build-documentation --packages esp-lp-hal --chips ${{ matrix.soc }}
   esp-riscv-rt:
     runs-on: ubuntu-latest
 
@@ -183,12 +194,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install the Rust toolchain for RISC-V devices:
+      # Install the Rust stable and nightly toolchains for RISC-V devices:
       - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc) }}
         uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: stable
+          components: rust-src
+      - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc) }}
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          toolchain: nightly
           components: rust-src
       # Install the Rust toolchain for Xtensa devices:
       - if: contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc)
@@ -215,7 +232,8 @@ jobs:
             --features=${{ matrix.device.soc }},log,defmt-espflash \
             --target=${{ matrix.device.target }} \
             esp-println
-
+      - name: Check documentation
+        run:  RUSTDOCFLAGS="-D warnings" cargo xtask build-documentation --packages esp-println --chips ${{ matrix.device.soc }}
   extras:
     runs-on: ubuntu-latest
 
