@@ -4,6 +4,10 @@
 //! check `lp_core_i2c` example in the `esp-lp-hal`.
 //!
 //! Make sure to first compile the `esp-lp-hal/examples/i2c.rs` example
+//!
+//! The following wiring is assumed:
+//! - SDA => GPIO6
+//! - SCL => GPIO7
 
 //% CHIPS: esp32c6
 

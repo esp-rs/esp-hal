@@ -1,20 +1,20 @@
 //! SPI read manufacturer id from flash chip
 //!
-//! Folowing pins are used:
-//! SCLK            GPIO0
-//! MISO/IO0        GPIO1
-//! MOSI/IO1        GPIO2
-//! IO2             GPIO3
-//! IO3             GPIO4
-//! CS              GPIO5
+//! The following wiring is assumed:
+//! - SCLK        =>  GPIO0
+//! - MISO/IO0    =>  GPIO1
+//! - MOSI/IO1    =>  GPIO2
+//! - IO2         =>  GPIO3
+//! - IO3         =>  GPIO4
+//! - CS          =>  GPIO5
 //!
-//! Folowing pins are used for ESP32:
-//! SCLK            GPIO0
-//! MISO/IO0        GPIO2
-//! MOSI/IO1        GPIO4
-//! IO2             GPIO5
-//! IO3             GPIO13
-//! CS              GPIO14
+//! The following wiring is assumed for ESP32:
+//! - SCLK        =>  GPIO0
+//! - MISO/IO0    =>  GPIO2
+//! - MOSI/IO1    =>  GPIO4
+//! - IO2         =>  GPIO5
+//! - IO3         =>  GPIO13
+//! - CS          =>  GPIO14
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.

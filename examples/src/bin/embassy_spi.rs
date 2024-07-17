@@ -1,18 +1,16 @@
 //! Embassy SPI
 //!
-//! Folowing pins are used:
-//! SCLK    GPIO0
-//! MISO    GPIO2
-//! MOSI    GPIO4
-//! CS      GPIO5
-//!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
 //!
 //! Connect MISO and MOSI pins to see the outgoing data is read as incoming
 //! data.
 //!
-//! This is an example of running the embassy executor with SPI.
+//! The following wiring is assumed:
+//! SCLK => GPIO0
+//! MISO => GPIO2
+//! MOSI => GPIO4
+//! CS   => GPIO5
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: async embassy embassy-generic-timers

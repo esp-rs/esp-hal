@@ -1,7 +1,8 @@
 //! Uses timer0 and operator0 of the MCPWM0 peripheral to output a 50% duty
 //! signal at 20 kHz.
 //!
-//! The signal will be output to the pin assigned to `pin`. (GPIO0)
+//! The following wiring is assumed:
+//! - Output pin => GPIO0
 
 //% CHIPS: esp32 esp32c6 esp32h2 esp32s3
 

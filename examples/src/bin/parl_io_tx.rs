@@ -1,9 +1,10 @@
 //! This shows using Parallel IO to output 4 bit parallel data at 1MHz clock
 //! rate.
 //!
-//! Uses GPIO 1, 2, 3 and 4 as the data pins.
-//! GPIO 5 as the "valid pin" (driven high during an active transfer) and GPIO
-//! 6 as the clock signal output.
+//! The following wiring is assumed:
+//! - Data pins => GPIO1, GPIO2, GPIO3, and GPIO4
+//! - Valid pin => GPIO5 (driven high during an active transfer)
+//! - Clock output pin => GPIO6
 //!
 //! You can use a logic analyzer to see how the pins are used.
 

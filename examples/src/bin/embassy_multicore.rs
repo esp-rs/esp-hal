@@ -2,6 +2,9 @@
 //!
 //! The second core runs a simple LED blinking task, that is controlled by a
 //! signal set by the task running on the other core.
+//!
+//! The following wiring is assumed:
+//! - LED => GPIO0
 
 //% CHIPS: esp32 esp32s3
 //% FEATURES: embassy embassy-generic-timers

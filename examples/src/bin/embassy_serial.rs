@@ -3,11 +3,11 @@
 //! This is an example of running the embassy executor and asynchronously
 //! writing to and reading from uart
 
-#![no_std]
-#![no_main]
-
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: async embassy embassy-generic-timers
+
+#![no_std]
+#![no_main]
 
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};

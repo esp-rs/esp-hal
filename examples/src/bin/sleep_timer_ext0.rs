@@ -1,4 +1,7 @@
-//! Demonstrates deep sleep with timer and ext0 (using gpio4) wakeup
+//! Demonstrates deep sleep with timer and ext0 wakeup
+//!
+//! The following wiring is assumed:
+//! - ext0 wakeup pin => GPIO4
 
 //% CHIPS: esp32 esp32s3
 

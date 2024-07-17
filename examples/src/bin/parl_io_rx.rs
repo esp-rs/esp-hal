@@ -1,7 +1,8 @@
 //! This shows using Parallel IO to input 4 bit parallel data at 1MHz clock
 //! rate.
 //!
-//! Uses GPIO 1, 2, 3 and 4 as the data pins.
+//! The following wiring is assumed:
+//! - Data pins => GPIO1, GPIO2, GPIO3, and GPIO4.
 
 //% CHIPS: esp32c6 esp32h2
 

@@ -1,18 +1,17 @@
 //! This shows how to transmit data continously via I2S.
 //!
-//! Pins used:
-//! BCLK    GPIO2
-//! WS      GPIO4
-//! DOUT    GPIO5
-//!
 //! Without an additional I2S sink device you can inspect the MCLK, BCLK, WS
 //!  andDOUT with a logic analyzer.
 //!
 //! You can also connect e.g. a PCM510x to hear an annoying loud sine tone (full
 //! scale), so turn down the volume before running this example.
 //!
-//! Wiring is like this:
+//! The following wiring is assumed:
+//! - BCLK => GPIO2
+//! - WS   => GPIO4
+//! - DOUT => GPIO5
 //!
+//! PCM510x:
 //! | Pin   | Connected to    |
 //! |-------|-----------------|
 //! | BCK   | GPIO0           |

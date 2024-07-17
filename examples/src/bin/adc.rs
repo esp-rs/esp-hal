@@ -3,6 +3,13 @@
 //!
 //! Alternatively, you could also connect the IO pin to GND or 3V3 to see the
 //! maximum and minimum raw values read.
+//!
+//! The following wiring is assumed for ESP32:
+//! - Analog pin => GPIO32
+//! The following wiring is assumed for ESP32S2/S3:
+//! - Analog pin => GPIO3
+//! The following wiring is assumed for others:
+//! - Analog pin => GPIO2
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 

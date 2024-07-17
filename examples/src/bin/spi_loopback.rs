@@ -1,10 +1,10 @@
 //! SPI loopback test
 //!
-//! Folowing pins are used:
-//! SCLK    GPIO0
-//! MISO    GPIO2
-//! MOSI    GPIO4
-//! CS      GPIO5
+//! The following wiring is assumed:
+//! - SCLK => GPIO0
+//! - MISO => GPIO2
+//! - MOSI => GPIO4
+//! - CS   => GPIO5
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.

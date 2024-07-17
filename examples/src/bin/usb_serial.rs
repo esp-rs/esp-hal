@@ -1,6 +1,10 @@
 //! CDC-ACM serial port example using polling in a busy loop.
 //!
 //! This example should be built in release mode.
+//!
+//! The following wiring is assumed:
+//! - DP => GPIO20
+//! - DM => GPIO19
 
 //% CHIPS: esp32s2 esp32s3
 

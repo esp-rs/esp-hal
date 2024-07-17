@@ -1,4 +1,9 @@
 //! Demonstrates decoding pulse sequences with RMT
+//!
+//! The following wiring is assumed:
+//! - Input pin  => GPIO4
+//! - Output pin => GPIO5
+//!
 //! Connect GPIO5 to GPIO4
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
