@@ -21,4 +21,7 @@ exclude  = [
     "extras/esp-wifishark",
     "extras/ieee802154-sniffer",
     "hil-test",
+    "xtensa-lx",
+    "xtensa-lx-rt",
+    "xtensa-lx-rt/procmacros",
 ]

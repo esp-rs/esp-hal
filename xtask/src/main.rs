@@ -126,7 +126,11 @@ struct GenerateEfuseFieldsArgs {
 }
 
 #[derive(Debug, Args)]
-struct LintPackagesArgs {}
+struct LintPackagesArgs {
+    /// Package(s) to target.
+    #[arg(value_enum, default_values_t = Package::iter())]
+    packages: Vec<Package>,
+}
 
 #[derive(Debug, Args)]
 struct RunElfArgs {
@@ -449,8 +453,8 @@ fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
     Ok(())
 }
 
-fn lint_packages(workspace: &Path, _args: LintPackagesArgs) -> Result<()> {
-    let mut packages = Package::iter().collect::<Vec<_>>();
+fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
+    let mut packages = args.packages;
     packages.sort();
 
     for package in packages {
@@ -537,6 +541,19 @@ fn lint_packages(workspace: &Path, _args: LintPackagesArgs) -> Result<()> {
                     "--features=esp32c3,wifi-default,ble,esp-now,async,embassy-net",
                 ],
             )?,
+
+            Package::XtensaLxRt => {
+                for chip in [Chip::Esp32, Chip::Esp32s2, Chip::Esp32s3] {
+                    lint_package(
+                        &path,
+                        &[
+                            "-Zbuild-std=core",
+                            &format!("--target=xtensa-{chip}-none-elf"),
+                            &format!("--features={chip}"),
+                        ],
+                    )?
+                }
+            }
 
             // We will *not* check the following packages with `clippy`; this
             // may or may not change in the future:

@@ -48,6 +48,8 @@ pub enum Package {
     EspWifi,
     Examples,
     HilTest,
+    XtensaLx,
+    XtensaLxRt,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display, EnumIter, ValueEnum, serde::Serialize)]
