@@ -43,7 +43,6 @@ fn main() -> ! {
         peripherals.UART1,
         Config::default(),
         &clocks,
-        None,
         io.pins.gpio6,
         io.pins.gpio7,
     )
