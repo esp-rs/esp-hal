@@ -1,9 +1,5 @@
 #![allow(rustdoc::bare_urls, unused_macros)]
-#![cfg_attr(
-    target_arch = "xtensa",
-    feature(asm_experimental_arch),
-    feature(panic_info_message)
-)]
+#![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
 #![doc = include_str!("../README.md")]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
@@ -56,47 +52,13 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     set_color_code(RED);
 
     println!("");
-    println!("");
+    println!("====================== PANIC ======================");
 
-    if let Some(location) = info.location() {
-        let (file, line, column) = (location.file(), location.line(), location.column());
-        println!(
-            "!! A panic occured in '{}', at line {}, column {}:",
-            file, line, column
-        );
-    } else {
-        println!("!! A panic occured at an unknown location:");
-    }
+    #[cfg(not(feature = "defmt"))]
+    println!("{}", info);
 
-    #[cfg(not(any(nightly_before_2024_06_12, nightly_since_2024_06_12)))]
-    {
-        #[cfg(not(feature = "defmt"))]
-        println!("{:#?}", info);
-
-        #[cfg(feature = "defmt")]
-        println!("{:#?}", defmt::Display2Format(info));
-    }
-
-    #[cfg(nightly_before_2024_06_12)]
-    {
-        if let Some(message) = info.message() {
-            #[cfg(not(feature = "defmt"))]
-            println!("{}", message);
-
-            #[cfg(feature = "defmt")]
-            println!("{}", defmt::Display2Format(message));
-        }
-    }
-
-    #[cfg(nightly_since_2024_06_12)]
-    {
-        let message = info.message();
-        #[cfg(not(feature = "defmt"))]
-        println!("{}", message);
-
-        #[cfg(feature = "defmt")]
-        println!("{}", defmt::Display2Format(&message));
-    }
+    #[cfg(feature = "defmt")]
+    println!("{}", defmt::Display2Format(info));
 
     println!("");
     println!("Backtrace:");
