@@ -64,12 +64,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install the Rust toolchain for RISC-V devices:
+      # Install the Rust stable and nightly toolchains for RISC-V devices:
       - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc) }}
         uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: stable
+          components: rust-src
+      - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc) }}
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          toolchain: nightly
           components: rust-src
       # Install the Rust toolchain for Xtensa devices:
       - if: contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc)
@@ -121,12 +127,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install the Rust toolchain for RISC-V devices:
+      # Install the Rust stable and nightly toolchains for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: stable
           components: rust-src
+      - uses: dtolnay/rust-toolchain@v1
+        if: ${{ !contains(fromJson('["esp32s2", "esp32s3"]'), matrix.soc) }}
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          toolchain: nightly
+          components: rust-src
+      # Install the Rust toolchain for Xtensa devices:
+      - if: contains(fromJson('["esp32s2", "esp32s3"]'), matrix.soc)
+        uses: esp-rs/xtensa-toolchain@v1.5
+        with:
+          buildtargets: ${{ matrix.soc }}
+          default: true
+          ldproxy: false
+
 
       - uses: Swatinem/rust-cache@v2
 
@@ -180,7 +200,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install the Rust toolchain for RISC-V devices:
+      # Install the Rust stable and nightly toolchains for RISC-V devices:
       - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc) }}
         uses: dtolnay/rust-toolchain@v1
         with:
