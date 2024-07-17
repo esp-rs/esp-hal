@@ -363,7 +363,7 @@ pub(crate) mod asynch {
             r: &T::InputType,
             outbuf: &mut T::InputType,
         ) {
-            self.start_exponentiation(&base, &r);
+            self.start_exponentiation(base, r);
             RsaFuture::new(&self.rsa.rsa).await;
             self.read_results(outbuf);
         }

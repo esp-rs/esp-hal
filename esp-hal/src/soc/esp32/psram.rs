@@ -130,7 +130,7 @@ pub(crate) mod utils {
     const SPI1_USER1_REG: u32 = DR_REG_SPI1_BASE + 0x20;
     const SPI1_W0_REG: u32 = DR_REG_SPI1_BASE + 0x80;
     const SPI1_CTRL2_REG: u32 = DR_REG_SPI1_BASE + 0x14;
-    const SPI1_CMD_REG: u32 = DR_REG_SPI1_BASE + 0x0;
+    const SPI1_CMD_REG: u32 = DR_REG_SPI1_BASE;
     const SPI1_USER2_REG: u32 = DR_REG_SPI1_BASE + 0x24;
     const SPI1_MOSI_DLEN_REG: u32 = DR_REG_SPI1_BASE + 0x28;
     const SPI1_MISO_DLEN_REG: u32 = DR_REG_SPI1_BASE + 0x2C;
@@ -523,17 +523,9 @@ pub(crate) mod utils {
         psram_set_cs_timing_spi0(mode, clk_mode); // SPI_CACHE_PORT
         psram_enable_qio_mode_spi1(clk_mode, mode);
 
-        info!(
-            "PS-RAM vaddrmode = {:?}",
-            PsramVaddrMode::PsramVaddrModeLowhigh
-        );
+        info!("PS-RAM vaddrmode = {:?}", PsramVaddrMode::Lowhigh);
 
-        psram_cache_init(
-            mode,
-            PsramVaddrMode::PsramVaddrModeLowhigh,
-            clk_mode,
-            extra_dummy,
-        );
+        psram_cache_init(mode, PsramVaddrMode::Lowhigh, clk_mode, extra_dummy);
     }
 
     #[allow(unused)]
@@ -541,13 +533,13 @@ pub(crate) mod utils {
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     enum PsramVaddrMode {
         /// App and pro CPU use their own flash cache for external RAM access
-        PsramVaddrModeNormal = 0,
+        Normal = 0,
         /// App and pro CPU share external RAM caches: pro CPU has low * 2M, app
         /// CPU has high 2M
-        PsramVaddrModeLowhigh,
+        Lowhigh,
         ///  App and pro CPU share external RAM caches: pro CPU does even 32yte
         /// ranges, app does odd ones.
-        PsramVaddrModeEvenodd,
+        Evenodd,
     }
 
     // register initialization for sram cache params and r/w commands
@@ -680,14 +672,14 @@ pub(crate) mod utils {
             dport
                 .app_cache_ctrl()
                 .modify(|_, w| w.app_dram_hl().clear_bit().app_dram_split().clear_bit());
-            if vaddrmode == PsramVaddrMode::PsramVaddrModeLowhigh {
+            if vaddrmode == PsramVaddrMode::Lowhigh {
                 dport
                     .pro_cache_ctrl()
                     .modify(|_, w| w.pro_dram_hl().set_bit());
                 dport
                     .app_cache_ctrl()
                     .modify(|_, w| w.app_dram_hl().set_bit());
-            } else if vaddrmode == PsramVaddrMode::PsramVaddrModeEvenodd {
+            } else if vaddrmode == PsramVaddrMode::Evenodd {
                 dport
                     .pro_cache_ctrl()
                     .modify(|_, w| w.pro_dram_split().set_bit());
@@ -820,7 +812,7 @@ pub(crate) mod utils {
     #[ram]
     fn psram_enable_qio_mode_spi1(clk_mode: PsramClkMode, psram_mode: PsramCacheSpeed) {
         let mut ps_cmd: PsramCmd = PsramCmd::default();
-        let addr: u32 = (PSRAM_ENTER_QMODE << 24) | 0;
+        let addr: u32 = PSRAM_ENTER_QMODE << 24;
 
         ps_cmd.cmd_bit_len = 0;
         if clk_mode == PsramClkMode::PsramClkModeDclk {
@@ -1129,6 +1121,8 @@ pub(crate) mod utils {
 
         let spi_cache_dummy;
         let rd_mode_reg = read_peri_reg(SPI0_CTRL_REG);
+        #[allow(clippy::if_same_then_else)]
+        // TODO/FIXME: https://github.com/esp-rs/esp-hal/issues/1825
         if (rd_mode_reg & SPI_FREAD_QIO_M) != 0 {
             spi_cache_dummy = SPI0_R_QIO_DUMMY_CYCLELEN;
         } else if (rd_mode_reg & SPI_FREAD_DIO_M) != 0 {

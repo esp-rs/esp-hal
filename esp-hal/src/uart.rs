@@ -1804,6 +1804,7 @@ mod asynch {
         }
     }
 
+    #[allow(clippy::declare_interior_mutable_const)]
     const INIT: AtomicWaker = AtomicWaker::new();
     static TX_WAKERS: [AtomicWaker; NUM_UART] = [INIT; NUM_UART];
     static RX_WAKERS: [AtomicWaker; NUM_UART] = [INIT; NUM_UART];
@@ -1815,13 +1816,13 @@ mod asynch {
     }
     #[derive(EnumSetType, Debug)]
     pub(crate) enum RxEvent {
-        RxFifoFull,
-        RxCmdCharDetected,
-        RxFifoOvf,
-        RxFifoTout,
-        RxGlitchDetected,
-        RxFrameError,
-        RxParityError,
+        FifoFull,
+        CmdCharDetected,
+        FifoOvf,
+        FifoTout,
+        GlitchDetected,
+        FrameError,
+        ParityError,
     }
 
     /// A future that resolves when the passed interrupt is triggered,
@@ -1854,16 +1855,14 @@ mod asynch {
             let mut events_triggered = EnumSet::new();
             for event in self.events {
                 let event_triggered = match event {
-                    RxEvent::RxFifoFull => interrupts_enabled.rxfifo_full().bit_is_clear(),
-                    RxEvent::RxCmdCharDetected => {
-                        interrupts_enabled.at_cmd_char_det().bit_is_clear()
-                    }
+                    RxEvent::FifoFull => interrupts_enabled.rxfifo_full().bit_is_clear(),
+                    RxEvent::CmdCharDetected => interrupts_enabled.at_cmd_char_det().bit_is_clear(),
 
-                    RxEvent::RxFifoOvf => interrupts_enabled.rxfifo_ovf().bit_is_clear(),
-                    RxEvent::RxFifoTout => interrupts_enabled.rxfifo_tout().bit_is_clear(),
-                    RxEvent::RxGlitchDetected => interrupts_enabled.glitch_det().bit_is_clear(),
-                    RxEvent::RxFrameError => interrupts_enabled.frm_err().bit_is_clear(),
-                    RxEvent::RxParityError => interrupts_enabled.parity_err().bit_is_clear(),
+                    RxEvent::FifoOvf => interrupts_enabled.rxfifo_ovf().bit_is_clear(),
+                    RxEvent::FifoTout => interrupts_enabled.rxfifo_tout().bit_is_clear(),
+                    RxEvent::GlitchDetected => interrupts_enabled.glitch_det().bit_is_clear(),
+                    RxEvent::FrameError => interrupts_enabled.frm_err().bit_is_clear(),
+                    RxEvent::ParityError => interrupts_enabled.parity_err().bit_is_clear(),
                 };
                 if event_triggered {
                     events_triggered |= event;
@@ -1885,13 +1884,13 @@ mod asynch {
                 T::register_block().int_ena().modify(|_, w| {
                     for event in self.events {
                         match event {
-                            RxEvent::RxFifoFull => w.rxfifo_full().set_bit(),
-                            RxEvent::RxCmdCharDetected => w.at_cmd_char_det().set_bit(),
-                            RxEvent::RxFifoOvf => w.rxfifo_ovf().set_bit(),
-                            RxEvent::RxFifoTout => w.rxfifo_tout().set_bit(),
-                            RxEvent::RxGlitchDetected => w.glitch_det().set_bit(),
-                            RxEvent::RxFrameError => w.frm_err().set_bit(),
-                            RxEvent::RxParityError => w.parity_err().set_bit(),
+                            RxEvent::FifoFull => w.rxfifo_full().set_bit(),
+                            RxEvent::CmdCharDetected => w.at_cmd_char_det().set_bit(),
+                            RxEvent::FifoOvf => w.rxfifo_ovf().set_bit(),
+                            RxEvent::FifoTout => w.rxfifo_tout().set_bit(),
+                            RxEvent::GlitchDetected => w.glitch_det().set_bit(),
+                            RxEvent::FrameError => w.frm_err().set_bit(),
+                            RxEvent::ParityError => w.parity_err().set_bit(),
                         };
                     }
                     w
@@ -1915,15 +1914,15 @@ mod asynch {
             let int_ena = &T::register_block().int_ena();
             for event in self.events {
                 match event {
-                    RxEvent::RxFifoFull => int_ena.modify(|_, w| w.rxfifo_full().clear_bit()),
-                    RxEvent::RxCmdCharDetected => {
+                    RxEvent::FifoFull => int_ena.modify(|_, w| w.rxfifo_full().clear_bit()),
+                    RxEvent::CmdCharDetected => {
                         int_ena.modify(|_, w| w.at_cmd_char_det().clear_bit())
                     }
-                    RxEvent::RxGlitchDetected => int_ena.modify(|_, w| w.glitch_det().clear_bit()),
-                    RxEvent::RxFrameError => int_ena.modify(|_, w| w.frm_err().clear_bit()),
-                    RxEvent::RxParityError => int_ena.modify(|_, w| w.parity_err().clear_bit()),
-                    RxEvent::RxFifoOvf => int_ena.modify(|_, w| w.rxfifo_ovf().clear_bit()),
-                    RxEvent::RxFifoTout => int_ena.modify(|_, w| w.rxfifo_tout().clear_bit()),
+                    RxEvent::GlitchDetected => int_ena.modify(|_, w| w.glitch_det().clear_bit()),
+                    RxEvent::FrameError => int_ena.modify(|_, w| w.frm_err().clear_bit()),
+                    RxEvent::ParityError => int_ena.modify(|_, w| w.parity_err().clear_bit()),
+                    RxEvent::FifoOvf => int_ena.modify(|_, w| w.rxfifo_ovf().clear_bit()),
+                    RxEvent::FifoTout => int_ena.modify(|_, w| w.rxfifo_tout().clear_bit()),
                 }
             }
         }
@@ -2207,23 +2206,23 @@ mod asynch {
         /// When successful, returns the number of bytes written to buf.
         /// This method will never return Ok(0)
         pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
-            if buf.len() == 0 {
+            if buf.is_empty() {
                 return Err(Error::InvalidArgument);
             }
 
             loop {
-                let mut events = RxEvent::RxFifoFull
-                    | RxEvent::RxFifoOvf
-                    | RxEvent::RxFrameError
-                    | RxEvent::RxGlitchDetected
-                    | RxEvent::RxParityError;
+                let mut events = RxEvent::FifoFull
+                    | RxEvent::FifoOvf
+                    | RxEvent::FrameError
+                    | RxEvent::GlitchDetected
+                    | RxEvent::ParityError;
 
                 if self.at_cmd_config.is_some() {
-                    events |= RxEvent::RxCmdCharDetected;
+                    events |= RxEvent::CmdCharDetected;
                 }
 
                 if self.rx_timeout_config.is_some() {
-                    events |= RxEvent::RxFifoTout;
+                    events |= RxEvent::FifoTout;
                 }
                 let events_happened = UartRxFuture::<T>::new(events).await;
                 // always drain the fifo, if an error has occurred the data is lost
@@ -2231,11 +2230,11 @@ mod asynch {
                 // check error events
                 for event_happened in events_happened {
                     match event_happened {
-                        RxEvent::RxFifoOvf => return Err(Error::RxFifoOvf),
-                        RxEvent::RxGlitchDetected => return Err(Error::RxGlitchDetected),
-                        RxEvent::RxFrameError => return Err(Error::RxFrameError),
-                        RxEvent::RxParityError => return Err(Error::RxParityError),
-                        RxEvent::RxFifoFull | RxEvent::RxCmdCharDetected | RxEvent::RxFifoTout => {
+                        RxEvent::FifoOvf => return Err(Error::RxFifoOvf),
+                        RxEvent::GlitchDetected => return Err(Error::RxGlitchDetected),
+                        RxEvent::FrameError => return Err(Error::RxFrameError),
+                        RxEvent::ParityError => return Err(Error::RxParityError),
+                        RxEvent::FifoFull | RxEvent::CmdCharDetected | RxEvent::FifoTout => {
                             continue
                         }
                     }

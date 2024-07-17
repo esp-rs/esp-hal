@@ -41,11 +41,11 @@ pub const PSRAM_VADDR_START: usize = PSRAM_VADDR as usize;
 pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::peripherals::PSRAM>) {
     #[allow(unused)]
     enum CacheLayout {
-        CacheMemoryInvalid    = 0,
-        CacheMemoryICacheLow  = 1 << 0,
-        CacheMemoryICacheHigh = 1 << 1,
-        CacheMemoryDCacheLow  = 1 << 2,
-        CacheMemoryDCacheHigh = 1 << 3,
+        Invalid    = 0,
+        ICacheLow  = 1 << 0,
+        ICacheHigh = 1 << 1,
+        DCacheLow  = 1 << 2,
+        DCacheHigh = 1 << 3,
     }
 
     const MMU_ACCESS_SPIRAM: u32 = 1 << 16;
@@ -102,10 +102,10 @@ pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::per
 
     unsafe {
         Cache_Allocate_SRAM(
-            CacheLayout::CacheMemoryICacheLow as u32,
-            CacheLayout::CacheMemoryDCacheLow as u32,
-            CacheLayout::CacheMemoryInvalid as u32,
-            CacheLayout::CacheMemoryInvalid as u32,
+            CacheLayout::ICacheLow as u32,
+            CacheLayout::DCacheLow as u32,
+            CacheLayout::Invalid as u32,
+            CacheLayout::Invalid as u32,
         );
         Cache_Set_DCache_Mode(CACHE_SIZE_8KB, CACHE_4WAYS_ASSOC, CACHE_LINE_SIZE_16B);
         Cache_Invalidate_DCache_All();
@@ -149,10 +149,7 @@ pub(crate) mod utils {
         psram_reset_mode();
         psram_enable_qio_mode();
 
-        psram_cache_init(
-            PsramCacheSpeed::PsramCacheMax,
-            PsramVaddrMode::PsramVaddrModeNormal,
-        );
+        psram_cache_init(PsramCacheSpeed::PsramCacheMax, PsramVaddrMode::Normal);
     }
 
     // send reset command to psram, in spi mode
@@ -220,6 +217,7 @@ pub(crate) mod utils {
         PsramCmdSpi = 1,
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn psram_exec_cmd(
         mode: CommandMode,
         cmd: u16,
@@ -284,6 +282,7 @@ pub(crate) mod utils {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn _psram_exec_cmd(
         cmd: u16,
         cmd_bit_len: u16,
@@ -443,13 +442,13 @@ pub(crate) mod utils {
     #[allow(unused)]
     enum PsramVaddrMode {
         /// App and pro CPU use their own flash cache for external RAM access
-        PsramVaddrModeNormal = 0,
+        Normal = 0,
         /// App and pro CPU share external RAM caches: pro CPU has low2M, app
         /// CPU has high 2M
-        PsramVaddrModeLowhigh,
+        Lowhigh,
         /// App and pro CPU share external RAM caches: pro CPU does even 32yte
         /// ranges, app does odd ones.
-        PsramVaddrModeEvenodd,
+        Evenodd,
     }
 
     const PSRAM_IO_MATRIX_DUMMY_20M: u32 = 0;

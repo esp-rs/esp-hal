@@ -1627,12 +1627,9 @@ pub mod dma {
                             rx_future.rx(),
                         )?;
                     }
-                    match embassy_futures::join::join(tx_future, rx_future).await {
-                        (tx_res, rx_res) => {
-                            tx_res?;
-                            rx_res?;
-                        }
-                    }
+                    let (tx_res, rx_res) = embassy_futures::join::join(tx_future, rx_future).await;
+                    tx_res?;
+                    rx_res?;
 
                     self.spi.flush()?;
 
@@ -1663,12 +1660,9 @@ pub mod dma {
                         )?;
                     }
 
-                    match embassy_futures::join::join(tx_future, rx_future).await {
-                        (tx_res, rx_res) => {
-                            tx_res?;
-                            rx_res?;
-                        }
-                    }
+                    let (tx_res, rx_res) = embassy_futures::join::join(tx_future, rx_future).await;
+                    tx_res?;
+                    rx_res?;
 
                     self.spi.flush()?;
                 }
@@ -1689,16 +1683,15 @@ pub mod dma {
             }
 
             async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-                Ok(
-                    if !crate::soc::is_valid_ram_address(&words[0] as *const _ as u32) {
-                        for chunk in words.chunks(SIZE) {
-                            self.buffer[..chunk.len()].copy_from_slice(chunk);
-                            self.inner.write(&self.buffer[..chunk.len()]).await?;
-                        }
-                    } else {
-                        self.inner.write(words).await?;
-                    },
-                )
+                if !crate::soc::is_valid_ram_address(&words[0] as *const _ as u32) {
+                    for chunk in words.chunks(SIZE) {
+                        self.buffer[..chunk.len()].copy_from_slice(chunk);
+                        self.inner.write(&self.buffer[..chunk.len()]).await?;
+                    }
+                } else {
+                    self.inner.write(words).await?;
+                }
+                Ok(())
             }
 
             async fn flush(&mut self) -> Result<(), Self::Error> {
@@ -1710,18 +1703,17 @@ pub mod dma {
             }
 
             async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-                Ok(
-                    if !crate::soc::is_valid_ram_address(&write[0] as *const _ as u32) {
-                        for (read, write) in read.chunks_mut(SIZE).zip(write.chunks(SIZE)) {
-                            self.buffer[..write.len()].copy_from_slice(write);
-                            self.inner
-                                .transfer(read, &self.buffer[..write.len()])
-                                .await?;
-                        }
-                    } else {
-                        self.inner.transfer(read, write).await?;
-                    },
-                )
+                if !crate::soc::is_valid_ram_address(&write[0] as *const _ as u32) {
+                    for (read, write) in read.chunks_mut(SIZE).zip(write.chunks(SIZE)) {
+                        self.buffer[..write.len()].copy_from_slice(write);
+                        self.inner
+                            .transfer(read, &self.buffer[..write.len()])
+                            .await?;
+                    }
+                } else {
+                    self.inner.transfer(read, write).await?;
+                }
+                Ok(())
             }
         }
     }

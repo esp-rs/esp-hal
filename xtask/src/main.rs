@@ -12,7 +12,9 @@ use minijinja::Value;
 use strum::IntoEnumIterator;
 use xtask::{
     cargo::{CargoAction, CargoArgsBuilder},
-    Metadata, Package, Version,
+    Metadata,
+    Package,
+    Version,
 };
 
 // ----------------------------------------------------------------------------
@@ -588,7 +590,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             "-Zbuild-std=core",
                             &format!("--target={}", chip.target()),
                             &format!(
-                                "--features={chip},wifi-default,ble,esp-now,async,embassy-net,embedded-svc,coex,ps-min-modem,defmt,dump-packets"
+                                "--features={chip},wifi-default,ble,esp-now,async,embassy-net,embedded-svc,coex,ps-min-modem,dump-packets"
                             ),
                         ],
                     )?;

@@ -1752,10 +1752,8 @@ pub mod asynch {
         pub async fn read_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
             let (ptr, len) = (words.as_mut_ptr(), words.len());
 
-            if !Instance::is_suc_eof_generated_externally() {
-                if len > MAX_DMA_SIZE {
-                    return Err(Error::MaxDmaTransferSizeExceeded);
-                }
+            if !Instance::is_suc_eof_generated_externally() && len > MAX_DMA_SIZE {
+                return Err(Error::MaxDmaTransferSizeExceeded);
             }
 
             let future = DmaRxDoneChFuture::new(&mut self.rx_channel);
