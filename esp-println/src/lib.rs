@@ -8,6 +8,7 @@ pub mod defmt;
 #[cfg(feature = "log")]
 pub mod logger;
 
+/// Prints to the selected output, with a newline.
 #[cfg(not(feature = "no-op"))]
 #[macro_export]
 macro_rules! println {
@@ -19,6 +20,7 @@ macro_rules! println {
     }};
 }
 
+/// Prints to the selected output.
 #[cfg(not(feature = "no-op"))]
 #[macro_export]
 macro_rules! print {
@@ -30,18 +32,22 @@ macro_rules! print {
     }};
 }
 
+/// Prints to the configured output, with a newline.
 #[cfg(feature = "no-op")]
 #[macro_export]
 macro_rules! println {
     ($($arg:tt)*) => {{}};
 }
 
+/// Prints to the configured output.
 #[cfg(feature = "no-op")]
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => {{}};
 }
 
+/// Prints and returns the value of a given expression for quick and dirty
+/// debugging.
 // implementation adapted from `std::dbg`
 #[macro_export]
 macro_rules! dbg {
@@ -68,6 +74,7 @@ macro_rules! dbg {
     };
 }
 
+/// The printer that is used by the `print!` and `println!` macros.
 pub struct Printer;
 
 impl core::fmt::Write for Printer {
@@ -78,7 +85,8 @@ impl core::fmt::Write for Printer {
 }
 
 impl Printer {
-    fn write_bytes(bytes: &[u8]) {
+    /// Writes a byte slice to the configured output.
+    pub fn write_bytes(bytes: &[u8]) {
         with(|| {
             PrinterImpl::write_bytes_assume_cs(bytes);
             PrinterImpl::flush();
