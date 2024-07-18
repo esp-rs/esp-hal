@@ -73,7 +73,7 @@ async fn reader(
     }
 }
 
-#[main]
+#[esp_hal_embassy::main]
 async fn main(spawner: Spawner) -> () {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();

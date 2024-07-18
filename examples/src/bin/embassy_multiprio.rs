@@ -11,7 +11,7 @@
 //!    demonstrates that this task will continue to run even while the low
 //!    priority blocking task is running.
 
-// The thread-executor is created by the `#[main]` macro and is used to spawn `low_prio_async` and `low_prio_blocking`.
+// The thread-executor is created by the `#[esp_hal_embassy::main]` macro and is used to spawn `low_prio_async` and `low_prio_blocking`.
 // The interrupt-executor is created in `main` and is used to spawn `high_prio`.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
@@ -80,7 +80,7 @@ async fn low_prio_async() {
     }
 }
 
-#[main]
+#[esp_hal_embassy::main]
 async fn main(low_prio_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     println!("Init!");

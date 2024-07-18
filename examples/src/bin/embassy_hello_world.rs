@@ -15,7 +15,6 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     peripherals::Peripherals,
-    prelude::*,
     system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
 };
@@ -38,7 +37,7 @@ async fn run() {
     }
 }
 
-#[main]
+#[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
 

@@ -42,7 +42,7 @@ macro_rules! mk_static {
     }};
 }
 
-#[main]
+#[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
     println!("Init!");
     let peripherals = Peripherals::take();

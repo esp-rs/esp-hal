@@ -48,7 +48,7 @@ macro_rules! mk_static {
     }};
 }
 
-#[main]
+#[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
 

@@ -49,7 +49,7 @@ async fn signal_task(mut pin: Output<'static, Gpio5>) {
     }
 }
 
-#[main]
+#[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
     println!("Init!");
     let peripherals = Peripherals::take();

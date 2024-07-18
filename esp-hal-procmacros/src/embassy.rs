@@ -157,7 +157,7 @@ pub(crate) mod main {
 
     pub fn main() -> TokenStream {
         quote! {
-            #[entry]
+            #[esp_hal::entry]
             fn main() -> ! {
                 let mut executor = ::esp_hal_embassy::Executor::new();
                 let executor = unsafe { __make_static(&mut executor) };
