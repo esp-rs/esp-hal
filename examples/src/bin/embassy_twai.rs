@@ -29,7 +29,6 @@ use esp_hal::{
     gpio::Io,
     interrupt,
     peripherals::{self, Peripherals, TWAI0},
-    prelude::*,
     system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
     twai::{self, EspTwaiFrame, TwaiRx, TwaiTx},

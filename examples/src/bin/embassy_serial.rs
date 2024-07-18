@@ -16,7 +16,6 @@ use esp_hal::{
     clock::ClockControl,
     gpio::Io,
     peripherals::{Peripherals, UART0},
-    prelude::*,
     system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
     uart::{

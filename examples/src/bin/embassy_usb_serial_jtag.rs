@@ -14,7 +14,6 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     peripherals::Peripherals,
-    prelude::*,
     system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
     usb_serial_jtag::{UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},

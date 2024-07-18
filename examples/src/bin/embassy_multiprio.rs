@@ -27,7 +27,6 @@ use esp_hal::{
     clock::ClockControl,
     interrupt::Priority,
     peripherals::Peripherals,
-    prelude::*,
     system::SystemControl,
     timer::{/*systimer::SystemTimer,*/ timg::TimerGroup, ErasedTimer, OneShotTimer},
 };

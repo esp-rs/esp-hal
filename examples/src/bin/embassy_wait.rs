@@ -15,7 +15,6 @@ use esp_hal::{
     clock::ClockControl,
     gpio::{Input, Io, Pull},
     peripherals::Peripherals,
-    prelude::*,
     system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
 };

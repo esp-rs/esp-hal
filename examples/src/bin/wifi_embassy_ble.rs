@@ -30,7 +30,6 @@ use esp_hal::{
     clock::ClockControl,
     gpio::{Input, Io, Pull},
     peripherals::*,
-    prelude::*,
     rng::Rng,
     system::SystemControl,
     timer::{ErasedTimer, OneShotTimer, PeriodicTimer},
