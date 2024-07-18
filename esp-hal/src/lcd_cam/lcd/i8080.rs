@@ -57,7 +57,7 @@
 //! # }
 //! ```
 
-use core::{fmt::Formatter, mem::size_of};
+use core::{fmt::Formatter, marker::PhantomData, mem::size_of};
 
 use fugit::HertzU32;
 
@@ -86,21 +86,41 @@ use crate::{
     },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
+    Mode,
 };
 
-pub struct I8080<'d, CH: DmaChannel, P> {
+pub struct I8080<'d, CH: DmaChannel, P, DM: Mode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     tx_channel: ChannelTx<'d, CH>,
     tx_chain: DescriptorChain,
     _pins: P,
+    _phantom: PhantomData<DM>,
 }
 
-impl<'d, CH: DmaChannel, P: TxPins> I8080<'d, CH, P>
+impl<'d, CH: DmaChannel, P: TxPins> I8080<'d, CH, P, crate::Blocking>
 where
     CH::P: LcdCamPeripheral,
     P::Word: Into<u16>,
 {
     pub fn new(
+        lcd: Lcd<'d>,
+        channel: ChannelTx<'d, CH>,
+        descriptors: &'static mut [DmaDescriptor],
+        pins: P,
+        frequency: HertzU32,
+        config: Config,
+        clocks: &Clocks,
+    ) -> Self {
+        Self::new_internal(lcd, channel, descriptors, pins, frequency, config, clocks)
+    }
+}
+
+impl<'d, CH: DmaChannel, P: TxPins, DM: Mode> I8080<'d, CH, P, DM>
+where
+    CH::P: LcdCamPeripheral,
+    P::Word: Into<u16>,
+{
+    fn new_internal(
         lcd: Lcd<'d>,
         mut channel: ChannelTx<'d, CH>,
         descriptors: &'static mut [DmaDescriptor],
@@ -249,11 +269,12 @@ where
             tx_channel: channel,
             tx_chain: DescriptorChain::new(descriptors),
             _pins: pins,
+            _phantom: PhantomData,
         }
     }
 }
 
-impl<'d, CH: DmaChannel, P: TxPins> DmaSupport for I8080<'d, CH, P> {
+impl<'d, CH: DmaChannel, P: TxPins, DM: Mode> DmaSupport for I8080<'d, CH, P, DM> {
     fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
         let lcd_user = self.lcd_cam.lcd_user();
         // Wait until LCD_START is cleared by hardware.
@@ -266,7 +287,7 @@ impl<'d, CH: DmaChannel, P: TxPins> DmaSupport for I8080<'d, CH, P> {
     }
 }
 
-impl<'d, CH: DmaChannel, P: TxPins> DmaSupportTx for I8080<'d, CH, P> {
+impl<'d, CH: DmaChannel, P: TxPins, DM: Mode> DmaSupportTx for I8080<'d, CH, P, DM> {
     type TX = ChannelTx<'d, CH>;
 
     fn tx(&mut self) -> &mut Self::TX {
@@ -278,7 +299,7 @@ impl<'d, CH: DmaChannel, P: TxPins> DmaSupportTx for I8080<'d, CH, P> {
     }
 }
 
-impl<'d, CH: DmaChannel, P: TxPins> I8080<'d, CH, P>
+impl<'d, CH: DmaChannel, P: TxPins, DM: Mode> I8080<'d, CH, P, DM>
 where
     P::Word: Into<u16>,
 {
@@ -364,7 +385,46 @@ where
     }
 }
 
-impl<'d, CH: DmaChannel, P> I8080<'d, CH, P> {
+#[cfg(feature = "async")]
+impl<'d, CH: DmaChannel, P: TxPins> I8080<'d, CH, P, crate::Async>
+where
+    P::Word: Into<u16>,
+{
+    pub fn new_async(
+        lcd: Lcd<'d>,
+        channel: ChannelTx<'d, CH>,
+        descriptors: &'static mut [DmaDescriptor],
+        pins: P,
+        frequency: HertzU32,
+        config: Config,
+        clocks: &Clocks,
+    ) -> Self
+    where
+        <CH as crate::dma::DmaChannel>::P: crate::dma::LcdCamPeripheral,
+    {
+        I8080::new_internal(lcd, channel, descriptors, pins, frequency, config, clocks)
+    }
+
+    pub async fn send_dma_async<'t, TXBUF>(
+        &'t mut self,
+        cmd: impl Into<Command<P::Word>>,
+        dummy: u8,
+        data: &'t TXBUF,
+    ) -> Result<(), DmaError>
+    where
+        TXBUF: ReadBuffer<Word = P::Word>,
+    {
+        let (ptr, len) = unsafe { data.read_buffer() };
+
+        self.setup_send(cmd.into(), dummy);
+        self.start_write_bytes_dma(ptr as _, len * size_of::<P::Word>())?;
+        self.start_send();
+        crate::dma::asynch::DmaTxFuture::new(&mut self.tx_channel).await?;
+        Ok(())
+    }
+}
+
+impl<'d, CH: DmaChannel, P, DM: Mode> I8080<'d, CH, P, DM> {
     fn setup_send<T: Copy + Into<u16>>(&mut self, cmd: Command<T>, dummy: u8) {
         // Reset LCD control unit and Async Tx FIFO
         self.lcd_cam
@@ -476,7 +536,7 @@ impl<'d, CH: DmaChannel, P> I8080<'d, CH, P> {
     }
 }
 
-impl<'d, CH: DmaChannel, P> core::fmt::Debug for I8080<'d, CH, P> {
+impl<'d, CH: DmaChannel, P, DM: Mode> core::fmt::Debug for I8080<'d, CH, P, DM> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("I8080").finish()
     }
