@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Peripheral driver constructors don't take `InterruptHandler`s anymore. Use `set_interrupt_handler` to explicitly set the interrupt handler now. (#1819)
 
+- Allow DMA to/from psram for esp32s3 (#1827)
+
 ### Fixed
 
 - Fix I2S async-tx (#1833)
