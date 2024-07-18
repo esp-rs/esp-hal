@@ -42,11 +42,12 @@ print-float-registers = [] # TODO support esp32p4
 
 # You may optionally enable one or more of the below features to provide
 # additional functionality:
-colors            = []
-custom-halt       = []
-exception-handler = []
-halt-cores        = []
-panic-handler     = []
+colors               = []
+custom-halt          = []
+custom-pre-backtrace = []
+exception-handler    = []
+halt-cores           = []
+panic-handler        = []
 
 [lints.rust]
 unexpected_cfgs = "allow"
