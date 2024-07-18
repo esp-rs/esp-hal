@@ -182,3 +182,13 @@ pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
     }
     Cache_WriteBack_Addr(addr, size);
 }
+
+#[cfg(esp32s3)]
+#[doc(hidden)]
+#[link_section = ".rwtext"]
+pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
+    extern "C" {
+        fn Cache_Invalidate_Addr(addr: u32, size: u32);
+    }
+    Cache_Invalidate_Addr(addr, size);
+}

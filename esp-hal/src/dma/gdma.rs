@@ -785,7 +785,7 @@ mod m2m {
                 // TODO: this is in the wrong place, maybe it should be in
                 // prepare_transfer_without_start and should do this for the adderss for each
                 // descriptor
-                unsafe { crate::soc::cache_writeback_addr(rx_ptr as u32, rx_len as u32) };
+                unsafe { crate::soc::cache_invalidate_addr(rx_ptr as u32, rx_len as u32) };
             }
             self.channel.tx.start_transfer()?;
             self.channel.rx.start_transfer()?;
