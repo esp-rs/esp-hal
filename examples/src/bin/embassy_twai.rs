@@ -29,7 +29,6 @@ use esp_hal::{
     gpio::Io,
     interrupt,
     peripherals::{self, Peripherals, TWAI0},
-    prelude::*,
     system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
     twai::{self, EspTwaiFrame, TwaiRx, TwaiTx},
@@ -93,7 +92,7 @@ async fn transmitter(
     }
 }
 
-#[main]
+#[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
     let peripherals = Peripherals::take();
     let system = SystemControl::new(peripherals.SYSTEM);

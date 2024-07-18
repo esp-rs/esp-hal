@@ -37,6 +37,7 @@
 mod fmt;
 
 use esp_hal::clock::Clocks;
+pub use macros::main;
 
 #[cfg(feature = "executors")]
 pub use self::executor::{Executor, InterruptExecutor};

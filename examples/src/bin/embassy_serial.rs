@@ -16,7 +16,6 @@ use esp_hal::{
     clock::ClockControl,
     gpio::Io,
     peripherals::{Peripherals, UART0},
-    prelude::*,
     system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
     uart::{
@@ -88,7 +87,7 @@ async fn reader(
     }
 }
 
-#[main]
+#[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();

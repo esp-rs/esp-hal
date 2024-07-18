@@ -97,12 +97,14 @@ impl<const SWI: u8> InterruptExecutor<SWI> {
     /// The executor keeps running in the background through the interrupt.
     ///
     /// This returns a [`SendSpawner`] you can use to spawn tasks on it. A
-    /// [`SendSpawner`] is returned instead of a [`Spawner`] because the
+    /// [`SendSpawner`] is returned instead of a
+    /// [`Spawner`](embassy_executor::Spawner) because the
     /// executor effectively runs in a different "thread" (the interrupt),
     /// so spawning tasks on it is effectively sending them.
     ///
-    /// To obtain a [`Spawner`] for this executor, use
-    /// [`Spawner::for_current_executor()`] from a task running in it.
+    /// To obtain a [`Spawner`](embassy_executor::Spawner) for this executor,
+    /// use [`Spawner::for_current_executor`](embassy_executor::Spawner::for_current_executor)
+    /// from a task running in it.
     pub fn start(&'static mut self, priority: interrupt::Priority) -> SendSpawner {
         if self
             .core

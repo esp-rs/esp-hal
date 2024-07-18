@@ -30,7 +30,6 @@ use esp_hal::{
     clock::ClockControl,
     gpio::{Input, Io, Pull},
     peripherals::*,
-    prelude::*,
     rng::Rng,
     system::SystemControl,
     timer::{ErasedTimer, OneShotTimer, PeriodicTimer},
@@ -48,7 +47,7 @@ macro_rules! mk_static {
     }};
 }
 
-#[main]
+#[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
 
