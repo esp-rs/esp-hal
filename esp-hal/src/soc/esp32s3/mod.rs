@@ -170,3 +170,15 @@ unsafe fn post_init() {
     Wdt::<TIMG0, crate::Blocking>::set_wdt_enabled(false);
     Wdt::<TIMG1, crate::Blocking>::set_wdt_enabled(false);
 }
+
+// TODO: This need to implement eratta workarrounds:
+// https://github.com/espressif/esp-idf/blob/master/components/esp_rom/patches/esp_rom_cache_esp32s2_esp32s3.c#L92-L102
+#[cfg(esp32s3)]
+#[doc(hidden)]
+#[link_section = ".rwtext"]
+pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
+    extern "C" {
+        fn Cache_WriteBack_Addr(addr: u32, size: u32);
+    }
+    Cache_WriteBack_Addr(addr, size);
+}

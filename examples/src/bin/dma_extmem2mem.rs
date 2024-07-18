@@ -71,8 +71,8 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
     let delay = Delay::new(&clocks);
 
-    let mut rx_buffer: &mut [u8] = dma_alloc_buffer!(DATA_SIZE, 64);
-    let tx_buffer = dma_buffer_aligned!(DATA_SIZE, A64);
+    let mut extram_buffer: &mut [u8] = dma_alloc_buffer!(DATA_SIZE, 64);
+    let mut intram_buffer = dma_buffer_aligned!(DATA_SIZE, A64);
     let (tx_descriptors, rx_descriptors) = dma_descriptors_chunk_size!(DATA_SIZE, CHUNK_SIZE);
 
     let dma = Dma::new(peripherals.DMA);
@@ -88,23 +88,55 @@ fn main() -> ! {
     )
     .unwrap();
 
-    for i in 0..core::mem::size_of_val(tx_buffer) {
-        tx_buffer[i] = (i % 256) as u8;
+    for i in 0..core::mem::size_of_val(extram_buffer) {
+        extram_buffer[i] = (i % 256) as u8;
+        intram_buffer[i] = 255 - extram_buffer[i];
     }
 
-    info!("Starting transfer of {} bytes", DATA_SIZE);
-    let result = mem2mem.start_transfer(&tx_buffer, &mut rx_buffer);
-    match result {
+    info!(" ext2int: Starting transfer of {} bytes", DATA_SIZE);
+    match mem2mem.start_transfer(&extram_buffer, &mut intram_buffer) {
         Ok(dma_wait) => {
             info!("Transfer started");
             dma_wait.wait().unwrap();
             info!("Transfer completed, comparing buffer");
             let mut error = false;
-            for i in 0..core::mem::size_of_val(tx_buffer) {
-                if rx_buffer[i] != tx_buffer[i] {
+            for i in 0..core::mem::size_of_val(extram_buffer) {
+                if intram_buffer[i] != extram_buffer[i] {
                     error!(
-                        "Error: tx_buffer[{}] = {}, rx_buffer[{}] = {}",
-                        i, tx_buffer[i], i, rx_buffer[i]
+                        "Error: extram_buffer[{}] = {}, intram_buffer[{}] = {}",
+                        i, extram_buffer[i], i, intram_buffer[i]
+                    );
+                    error = true;
+                    break;
+                }
+            }
+            if !error {
+                info!("Buffers are equal");
+            }
+            info!("Done");
+        }
+        Err(e) => {
+            error!("start_transfer: Error: {:?}", e);
+        }
+    }
+
+    for i in 0..core::mem::size_of_val(extram_buffer) {
+        intram_buffer[i] = (i % 256) as u8;
+        extram_buffer[i] = 255 - intram_buffer[i];
+    }
+
+    info!(" int2ext: Starting transfer of {} bytes", DATA_SIZE);
+    match mem2mem.start_transfer(&intram_buffer, &mut extram_buffer) {
+        Ok(dma_wait) => {
+            info!("Transfer started");
+            dma_wait.wait().unwrap();
+            info!("Transfer completed, comparing buffer");
+            let mut error = false;
+            for i in 0..core::mem::size_of_val(extram_buffer) {
+                if intram_buffer[i] != extram_buffer[i] {
+                    error!(
+                        "Error: extram_buffer[{}] = {}, intram_buffer[{}] = {}",
+                        i, extram_buffer[i], i, intram_buffer[i]
                     );
                     error = true;
                     break;

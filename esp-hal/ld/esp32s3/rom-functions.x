@@ -16,6 +16,7 @@ PROVIDE(esp_rom_spi_cmd_start = 0x40000888);
 PROVIDE(esp_rom_spi_cmd_config = 0x4000087c);
 PROVIDE(Cache_Suspend_DCache = 0x400018b4 );
 PROVIDE(Cache_Resume_DCache = 0x400018c0 );
+PROVIDE(Cache_WriteBack_Addr = 0x400016c8 );
 PROVIDE(rom_config_data_cache_mode = 0x40001a28 );
 PROVIDE(rom_config_instruction_cache_mode = 0x40001a1c );
 PROVIDE(ets_efuse_get_wp_pad = 0x40001fa4);
