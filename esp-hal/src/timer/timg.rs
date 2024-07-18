@@ -965,6 +965,31 @@ where
     }
 }
 
+impl<TG, DM> crate::private::Sealed for Wdt<TG, DM>
+where
+    TG: TimerGroupInstance,
+    DM: Mode,
+{
+}
+
+impl<TG> InterruptConfigurable for Wdt<TG, Blocking>
+where
+    TG: TimerGroupInstance,
+{
+    fn set_interrupt_handler(&mut self, handler: interrupt::InterruptHandler) {
+        let interrupt = match TG::id() {
+            0 => Interrupt::TG0_WDT_LEVEL,
+            #[cfg(timg1)]
+            1 => Interrupt::TG1_WDT_LEVEL,
+            _ => unreachable!(),
+        };
+        unsafe {
+            interrupt::bind_interrupt(interrupt, handler.handler());
+            interrupt::enable(interrupt, handler.priority()).unwrap();
+        }
+    }
+}
+
 impl<TG, DM> Default for Wdt<TG, DM>
 where
     TG: TimerGroupInstance,
