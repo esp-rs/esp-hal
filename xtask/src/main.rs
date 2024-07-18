@@ -639,7 +639,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 }
 
 fn lint_package(path: &Path, args: &[&str]) -> Result<()> {
-    log::info!("Linting package: {} with args: {:?}", path.display(), args);
+    log::info!("Linting package: {}", path.display());
 
     let mut builder = CargoArgsBuilder::default()
         .toolchain("esp")
