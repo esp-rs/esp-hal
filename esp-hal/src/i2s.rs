@@ -82,7 +82,6 @@
 
 use core::marker::PhantomData;
 
-use embedded_dma::{ReadBuffer, WriteBuffer};
 use enumset::{EnumSet, EnumSetType};
 use private::*;
 
@@ -105,8 +104,10 @@ use crate::{
         DmaTransferTxCircular,
         I2s0Peripheral,
         I2sPeripheral,
+        ReadBuffer,
         RxPrivate,
         TxPrivate,
+        WriteBuffer,
     },
     gpio::OutputPin,
     interrupt::InterruptHandler,
@@ -252,7 +253,7 @@ where
     /// transfer
     fn write_dma<'t>(&'t mut self, words: &'t TXBUF) -> Result<DmaTransferTx<Self>, Error>
     where
-        TXBUF: ReadBuffer<Word = u8>;
+        TXBUF: ReadBuffer;
 
     /// Continuously write to I2S. Returns [DmaTransferTxCircular] which
     /// represents the in-progress DMA transfer
@@ -261,7 +262,7 @@ where
         words: &'t TXBUF,
     ) -> Result<DmaTransferTxCircular<Self>, Error>
     where
-        TXBUF: ReadBuffer<Word = u8>;
+        TXBUF: ReadBuffer;
 }
 
 /// Blocking I2S Read
@@ -282,7 +283,7 @@ where
     /// transfer
     fn read_dma<'t>(&'t mut self, words: &'t mut RXBUF) -> Result<DmaTransferRx<Self>, Error>
     where
-        RXBUF: WriteBuffer<Word = u8>;
+        RXBUF: WriteBuffer;
 
     /// Continuously read from I2S.
     /// Returns [DmaTransferRxCircular] which represents the in-progress DMA
@@ -292,7 +293,7 @@ where
         words: &'t mut RXBUF,
     ) -> Result<DmaTransferRxCircular<Self>, Error>
     where
-        RXBUF: WriteBuffer<Word = u8>;
+        RXBUF: WriteBuffer;
 }
 
 /// Instance of the I2S peripheral driver
@@ -588,7 +589,7 @@ where
         circular: bool,
     ) -> Result<(), Error>
     where
-        TXBUF: ReadBuffer<Word = u8>,
+        TXBUF: ReadBuffer,
         DmaMode: Mode,
     {
         let (ptr, len) = unsafe { words.read_buffer() };
@@ -647,7 +648,7 @@ where
 {
     fn write_dma<'t>(&'t mut self, words: &'t TXBUF) -> Result<DmaTransferTx<Self>, Error>
     where
-        TXBUF: ReadBuffer<Word = u8>,
+        TXBUF: ReadBuffer,
     {
         self.start_tx_transfer(words, false)?;
         Ok(DmaTransferTx::new(self))
@@ -658,7 +659,7 @@ where
         words: &'t TXBUF,
     ) -> Result<DmaTransferTxCircular<Self>, Error>
     where
-        TXBUF: ReadBuffer<Word = u8>,
+        TXBUF: ReadBuffer,
     {
         self.start_tx_transfer(words, true)?;
         Ok(DmaTransferTxCircular::new(self))
@@ -769,7 +770,7 @@ where
         circular: bool,
     ) -> Result<(), Error>
     where
-        RXBUF: WriteBuffer<Word = u8>,
+        RXBUF: WriteBuffer,
     {
         let (ptr, len) = unsafe { words.write_buffer() };
 
@@ -828,7 +829,7 @@ where
 {
     fn read_dma<'t>(&'t mut self, words: &'t mut RXBUF) -> Result<DmaTransferRx<Self>, Error>
     where
-        RXBUF: WriteBuffer<Word = u8>,
+        RXBUF: WriteBuffer,
     {
         self.start_rx_transfer(words, false)?;
         Ok(DmaTransferRx::new(self))
@@ -839,7 +840,7 @@ where
         words: &'t mut RXBUF,
     ) -> Result<DmaTransferRxCircular<Self>, Error>
     where
-        RXBUF: WriteBuffer<Word = u8>,
+        RXBUF: WriteBuffer,
     {
         self.start_rx_transfer(words, true)?;
         Ok(DmaTransferRxCircular::new(self))
@@ -2151,17 +2152,17 @@ mod private {
 
 #[cfg(feature = "async")]
 pub mod asynch {
-    use embedded_dma::{ReadBuffer, WriteBuffer};
-
     use super::{Error, I2sRx, I2sTx, RegisterAccess};
     use crate::{
         dma::{
             asynch::{DmaRxDoneChFuture, DmaRxFuture, DmaTxDoneChFuture, DmaTxFuture},
             DmaChannel,
+            ReadBuffer,
             RxCircularState,
             RxPrivate,
             TxCircularState,
             TxPrivate,
+            WriteBuffer,
         },
         Async,
     };
@@ -2181,7 +2182,7 @@ pub mod asynch {
             words: TXBUF,
         ) -> Result<I2sWriteDmaTransferAsync<'d, T, CH, TXBUF>, Error>
         where
-            TXBUF: ReadBuffer<Word = u8>;
+            TXBUF: ReadBuffer;
     }
 
     impl<'d, T, CH> I2sWriteDmaAsync<'d, T, CH> for super::I2sTx<'d, T, CH, Async>
@@ -2215,7 +2216,7 @@ pub mod asynch {
             words: TXBUF,
         ) -> Result<I2sWriteDmaTransferAsync<'d, T, CH, TXBUF>, Error>
         where
-            TXBUF: ReadBuffer<Word = u8>,
+            TXBUF: ReadBuffer,
         {
             let (ptr, len) = unsafe { words.read_buffer() };
 
@@ -2315,7 +2316,7 @@ pub mod asynch {
             words: RXBUF,
         ) -> Result<I2sReadDmaTransferAsync<'d, T, CH, RXBUF>, Error>
         where
-            RXBUF: WriteBuffer<Word = u8>;
+            RXBUF: WriteBuffer;
     }
 
     impl<'d, T, CH> I2sReadDmaAsync<'d, T, CH> for super::I2sRx<'d, T, CH, Async>
@@ -2363,7 +2364,7 @@ pub mod asynch {
             mut words: RXBUF,
         ) -> Result<I2sReadDmaTransferAsync<'d, T, CH, RXBUF>, Error>
         where
-            RXBUF: WriteBuffer<Word = u8>,
+            RXBUF: WriteBuffer,
         {
             let (ptr, len) = unsafe { words.write_buffer() };
 

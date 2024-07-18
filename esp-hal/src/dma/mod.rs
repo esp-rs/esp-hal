@@ -54,6 +54,137 @@
 
 use core::{fmt::Debug, marker::PhantomData, ptr::addr_of_mut, sync::atomic::compiler_fence};
 
+trait Word {}
+
+impl Word for u8 {}
+impl Word for u16 {}
+impl Word for u32 {}
+impl Word for i8 {}
+impl Word for i16 {}
+impl Word for i32 {}
+
+impl<W, const S: usize> crate::private::Sealed for [W; S] where W: Word {}
+
+impl<W, const S: usize> crate::private::Sealed for &[W; S] where W: Word {}
+
+impl<W> crate::private::Sealed for &[W] where W: Word {}
+
+impl<W> crate::private::Sealed for &mut [W] where W: Word {}
+
+/// Trait for buffers that can be given to DMA for reading.
+pub trait ReadBuffer: crate::private::Sealed {
+    /// Provide a buffer usable for DMA reads.
+    ///
+    /// The return value is:
+    ///
+    /// - pointer to the start of the buffer
+    /// - buffer size in bytes
+    ///
+    /// # Safety
+    ///
+    /// Once this method has been called, it is unsafe to call any `&mut self`
+    /// methods on this object as long as the returned value is in use (by DMA).
+    unsafe fn read_buffer(&self) -> (*const u8, usize);
+}
+
+impl<W, const S: usize> ReadBuffer for [W; S]
+where
+    W: Word,
+{
+    unsafe fn read_buffer(&self) -> (*const u8, usize) {
+        (self.as_ptr() as *const u8, core::mem::size_of::<W>() * S)
+    }
+}
+
+impl<W, const S: usize> ReadBuffer for &[W; S]
+where
+    W: Word,
+{
+    unsafe fn read_buffer(&self) -> (*const u8, usize) {
+        (self.as_ptr() as *const u8, core::mem::size_of::<W>() * S)
+    }
+}
+
+impl<W, const S: usize> ReadBuffer for &mut [W; S]
+where
+    W: Word,
+{
+    unsafe fn read_buffer(&self) -> (*const u8, usize) {
+        (self.as_ptr() as *const u8, core::mem::size_of::<W>() * S)
+    }
+}
+
+impl<W> ReadBuffer for &[W]
+where
+    W: Word,
+{
+    unsafe fn read_buffer(&self) -> (*const u8, usize) {
+        (
+            self.as_ptr() as *const u8,
+            core::mem::size_of::<W>() * self.len(),
+        )
+    }
+}
+
+impl<W> ReadBuffer for &mut [W]
+where
+    W: Word,
+{
+    unsafe fn read_buffer(&self) -> (*const u8, usize) {
+        (
+            self.as_ptr() as *const u8,
+            core::mem::size_of::<W>() * self.len(),
+        )
+    }
+}
+
+/// Trait for buffers that can be given to DMA for writing.
+pub trait WriteBuffer: crate::private::Sealed {
+    /// Provide a buffer usable for DMA writes.
+    ///
+    /// The return value is:
+    ///
+    /// - pointer to the start of the buffer
+    /// - buffer size in bytes
+    ///
+    /// # Safety
+    ///
+    /// Once this method has been called, it is unsafe to call any `&mut self`
+    /// methods, except for `write_buffer`, on this object as long as the
+    /// returned value is in use (by DMA).    
+    unsafe fn write_buffer(&mut self) -> (*mut u8, usize);
+}
+
+impl<W, const S: usize> WriteBuffer for [W; S]
+where
+    W: Word,
+{
+    unsafe fn write_buffer(&mut self) -> (*mut u8, usize) {
+        (self.as_mut_ptr() as *mut u8, core::mem::size_of::<W>() * S)
+    }
+}
+
+impl<W, const S: usize> WriteBuffer for &mut [W; S]
+where
+    W: Word,
+{
+    unsafe fn write_buffer(&mut self) -> (*mut u8, usize) {
+        (self.as_mut_ptr() as *mut u8, core::mem::size_of::<W>() * S)
+    }
+}
+
+impl<W> WriteBuffer for &mut [W]
+where
+    W: Word,
+{
+    unsafe fn write_buffer(&mut self) -> (*mut u8, usize) {
+        (
+            self.as_mut_ptr() as *mut u8,
+            core::mem::size_of::<W>() * self.len(),
+        )
+    }
+}
+
 bitfield::bitfield! {
     #[doc(hidden)]
     #[derive(Clone, Copy)]
@@ -130,7 +261,6 @@ impl DmaDescriptor {
     }
 }
 
-use embedded_dma::{ReadBuffer, WriteBuffer};
 use enumset::{EnumSet, EnumSetType};
 
 #[cfg(gdma)]
@@ -1741,6 +1871,8 @@ pub(crate) mod dma_private {
 }
 
 /// DMA transaction for TX only transfers
+///
+/// Never use [core::mem::forget] on an in-progress transfer
 #[non_exhaustive]
 #[must_use]
 pub struct DmaTransferTx<'a, I>
@@ -1785,6 +1917,8 @@ where
 }
 
 /// DMA transaction for RX only transfers
+///
+/// Never use [core::mem::forget] on an in-progress transfer
 #[non_exhaustive]
 #[must_use]
 pub struct DmaTransferRx<'a, I>
@@ -1829,6 +1963,8 @@ where
 }
 
 /// DMA transaction for TX+RX transfers
+///
+/// Never use [core::mem::forget] on an in-progress transfer
 #[non_exhaustive]
 #[must_use]
 pub struct DmaTransferTxRx<'a, I>
@@ -1874,12 +2010,14 @@ where
 
 /// DMA transaction for TX transfers with moved-in/moved-out peripheral and
 /// buffer
+///
+/// Never use [core::mem::forget] on an in-progress transfer
 #[non_exhaustive]
 #[must_use]
 pub struct DmaTransferTxOwned<I, T>
 where
     I: dma_private::DmaSupportTx,
-    T: ReadBuffer<Word = u8>,
+    T: ReadBuffer,
 {
     instance: I,
     tx_buffer: T,
@@ -1888,7 +2026,7 @@ where
 impl<I, T> DmaTransferTxOwned<I, T>
 where
     I: dma_private::DmaSupportTx,
-    T: ReadBuffer<Word = u8>,
+    T: ReadBuffer,
 {
     pub(crate) fn new(instance: I, tx_buffer: T) -> Self {
         Self {
@@ -1936,7 +2074,7 @@ where
 impl<I, T> Drop for DmaTransferTxOwned<I, T>
 where
     I: dma_private::DmaSupportTx,
-    T: ReadBuffer<Word = u8>,
+    T: ReadBuffer,
 {
     fn drop(&mut self) {
         self.instance.peripheral_wait_dma(true, false);
@@ -1945,12 +2083,14 @@ where
 
 /// DMA transaction for RX transfers with moved-in/moved-out peripheral and
 /// buffer
+///
+/// Never use [core::mem::forget] on an in-progress transfer
 #[non_exhaustive]
 #[must_use]
 pub struct DmaTransferRxOwned<I, R>
 where
     I: dma_private::DmaSupportRx,
-    R: WriteBuffer<Word = u8>,
+    R: WriteBuffer,
 {
     instance: I,
     rx_buffer: R,
@@ -1959,7 +2099,7 @@ where
 impl<I, R> DmaTransferRxOwned<I, R>
 where
     I: dma_private::DmaSupportRx,
-    R: WriteBuffer<Word = u8>,
+    R: WriteBuffer,
 {
     pub(crate) fn new(instance: I, rx_buffer: R) -> Self {
         Self {
@@ -2007,7 +2147,7 @@ where
 impl<I, R> Drop for DmaTransferRxOwned<I, R>
 where
     I: dma_private::DmaSupportRx,
-    R: WriteBuffer<Word = u8>,
+    R: WriteBuffer,
 {
     fn drop(&mut self) {
         self.instance.peripheral_wait_dma(false, true);
@@ -2016,13 +2156,15 @@ where
 
 /// DMA transaction for TX+RX transfers with moved-in/moved-out peripheral and
 /// buffers
+///
+/// Never use [core::mem::forget] on an in-progress transfer
 #[non_exhaustive]
 #[must_use]
 pub struct DmaTransferTxRxOwned<I, T, R>
 where
     I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
-    T: ReadBuffer<Word = u8>,
-    R: WriteBuffer<Word = u8>,
+    T: ReadBuffer,
+    R: WriteBuffer,
 {
     instance: I,
     tx_buffer: T,
@@ -2032,8 +2174,8 @@ where
 impl<I, T, R> DmaTransferTxRxOwned<I, T, R>
 where
     I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
-    T: ReadBuffer<Word = u8>,
-    R: WriteBuffer<Word = u8>,
+    T: ReadBuffer,
+    R: WriteBuffer,
 {
     pub(crate) fn new(instance: I, tx_buffer: T, rx_buffer: R) -> Self {
         Self {
@@ -2084,8 +2226,8 @@ where
 impl<I, T, R> Drop for DmaTransferTxRxOwned<I, T, R>
 where
     I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
-    T: ReadBuffer<Word = u8>,
-    R: WriteBuffer<Word = u8>,
+    T: ReadBuffer,
+    R: WriteBuffer,
 {
     fn drop(&mut self) {
         self.instance.peripheral_wait_dma(true, true);
@@ -2093,6 +2235,8 @@ where
 }
 
 /// DMA transaction for TX only circular transfers
+///
+/// Never use [core::mem::forget] on an in-progress transfer
 #[non_exhaustive]
 #[must_use]
 pub struct DmaTransferTxCircular<'a, I>
@@ -2157,6 +2301,8 @@ where
 }
 
 /// DMA transaction for RX only circular transfers
+///
+/// Never use [core::mem::forget] on an in-progress transfer
 #[non_exhaustive]
 #[must_use]
 pub struct DmaTransferRxCircular<'a, I>

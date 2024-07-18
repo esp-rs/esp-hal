@@ -638,8 +638,6 @@ impl<'d> Dma<'d> {
 
 pub use m2m::*;
 mod m2m {
-    use embedded_dma::{ReadBuffer, WriteBuffer};
-
     #[cfg(esp32s3)]
     use crate::dma::DmaExtMemBKSize;
     use crate::dma::{
@@ -653,8 +651,10 @@ mod m2m {
         DmaError,
         DmaPeripheral,
         DmaTransferRx,
+        ReadBuffer,
         RxPrivate,
         TxPrivate,
+        WriteBuffer,
     };
 
     /// DMA Memory to Memory pseudo-Peripheral
@@ -751,8 +751,8 @@ mod m2m {
             rx_buffer: &'t mut RXBUF,
         ) -> Result<DmaTransferRx<Self>, DmaError>
         where
-            TXBUF: ReadBuffer<Word = u8>,
-            RXBUF: WriteBuffer<Word = u8>,
+            TXBUF: ReadBuffer,
+            RXBUF: WriteBuffer,
         {
             let (tx_ptr, tx_len) = unsafe { tx_buffer.read_buffer() };
             let (rx_ptr, rx_len) = unsafe { rx_buffer.write_buffer() };
