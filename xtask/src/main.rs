@@ -589,7 +589,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 }
 
                 Package::EspWifi => {
-                    let mut features = format!("--features={chip},async,ps-min-modem");
+                    let mut features = format!("--features={chip},async,ps-min-modem,defmt");
 
                     if device.contains(&"wifi".to_owned()) {
                         features
@@ -606,6 +606,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         &[
                             "-Zbuild-std=core",
                             &format!("--target={}", chip.target()),
+                            "--no-default-features",
                             &features,
                         ],
                     )?;
