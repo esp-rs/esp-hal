@@ -1121,8 +1121,6 @@ pub(crate) mod utils {
 
         let spi_cache_dummy;
         let rd_mode_reg = read_peri_reg(SPI0_CTRL_REG);
-        #[allow(clippy::if_same_then_else)]
-        // TODO/FIXME: https://github.com/esp-rs/esp-hal/issues/1825
         if (rd_mode_reg & SPI_FREAD_QIO_M) != 0 {
             spi_cache_dummy = SPI0_R_QIO_DUMMY_CYCLELEN;
         } else if (rd_mode_reg & SPI_FREAD_DIO_M) != 0 {
