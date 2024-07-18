@@ -26,7 +26,7 @@
 //! # use esp_hal::timer::timg::TimerGroup;
 //! # use crate::esp_hal::prelude::_esp_hal_timer_Timer;
 //! # use esp_hal::prelude::*;
-//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
+//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
 //! let timer0 = timg0.timer0;
 //!
 //! // Get the current timestamp, in microseconds:
@@ -47,7 +47,7 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::timg::TimerGroup;
 //! # use esp_hal::prelude::*;
-//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
+//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
 //! let mut wdt = timg0.wdt;
 //!
 //! wdt.set_timeout(5_000.millis());
@@ -80,20 +80,9 @@ use crate::{
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
     Async,
     Blocking,
+    InterruptConfigurable,
     Mode,
 };
-
-/// Interrupts which can be registered in [Blocking] mode
-#[derive(Debug, Default)]
-pub struct TimerInterrupts {
-    /// Interrupt for [`Timer0`]
-    pub timer0: Option<InterruptHandler>,
-    #[cfg(timg_timer1)]
-    /// Interrupt for [`Timer1`]
-    pub timer1: Option<InterruptHandler>,
-    /// WDT Interrupt
-    pub wdt: Option<InterruptHandler>,
-}
 
 /// A timer group consisting of up to 2 timers (chip dependent) and a watchdog
 /// timer.
@@ -238,11 +227,7 @@ where
     T: TimerGroupInstance,
 {
     /// Construct a new instance of [`TimerGroup`] in blocking mode
-    pub fn new(
-        _timer_group: impl Peripheral<P = T> + 'd,
-        clocks: &Clocks,
-        isr: Option<TimerInterrupts>,
-    ) -> Self {
+    pub fn new(_timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Self {
         crate::into_ref!(_timer_group);
 
         T::configure_src_clk();
@@ -265,48 +250,6 @@ where
             },
             clocks.apb_clock,
         );
-
-        if let Some(isr) = isr {
-            if let Some(handler) = isr.timer0 {
-                let interrupt = match T::id() {
-                    0 => Interrupt::TG0_T0_LEVEL,
-                    #[cfg(timg1)]
-                    1 => Interrupt::TG1_T0_LEVEL,
-                    _ => unreachable!(),
-                };
-                unsafe {
-                    interrupt::bind_interrupt(interrupt, handler.handler());
-                    interrupt::enable(interrupt, handler.priority()).unwrap();
-                }
-            }
-
-            #[cfg(timg_timer1)]
-            if let Some(handler) = isr.timer1 {
-                let interrupt = match T::id() {
-                    0 => Interrupt::TG0_T1_LEVEL,
-                    #[cfg(timg1)]
-                    1 => Interrupt::TG1_T1_LEVEL,
-                    _ => unreachable!(),
-                };
-                unsafe {
-                    interrupt::bind_interrupt(interrupt, handler.handler());
-                    interrupt::enable(interrupt, handler.priority()).unwrap();
-                }
-            }
-
-            if let Some(handler) = isr.wdt {
-                let interrupt = match T::id() {
-                    0 => Interrupt::TG0_WDT_LEVEL,
-                    #[cfg(timg1)]
-                    1 => Interrupt::TG1_WDT_LEVEL,
-                    _ => unreachable!(),
-                };
-                unsafe {
-                    interrupt::bind_interrupt(interrupt, handler.handler());
-                    interrupt::enable(interrupt, handler.priority()).unwrap();
-                }
-            }
-        }
 
         Self {
             _timer_group,
@@ -567,6 +510,15 @@ where
             .t(self.timer_number().into())
             .config()
             .modify(|_, w| w.alarm_en().bit(state));
+    }
+}
+
+impl<T> InterruptConfigurable for Timer<T, Blocking>
+where
+    T: Instance,
+{
+    fn set_interrupt_handler(&mut self, handler: interrupt::InterruptHandler) {
+        <Self as super::Timer>::set_interrupt_handler(self, handler);
     }
 }
 
@@ -1010,6 +962,31 @@ where
         reg_block
             .wdtwprotect()
             .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
+    }
+}
+
+impl<TG, DM> crate::private::Sealed for Wdt<TG, DM>
+where
+    TG: TimerGroupInstance,
+    DM: Mode,
+{
+}
+
+impl<TG> InterruptConfigurable for Wdt<TG, Blocking>
+where
+    TG: TimerGroupInstance,
+{
+    fn set_interrupt_handler(&mut self, handler: interrupt::InterruptHandler) {
+        let interrupt = match TG::id() {
+            0 => Interrupt::TG0_WDT_LEVEL,
+            #[cfg(timg1)]
+            1 => Interrupt::TG1_WDT_LEVEL,
+            _ => unreachable!(),
+        };
+        unsafe {
+            interrupt::bind_interrupt(interrupt, handler.handler());
+            interrupt::enable(interrupt, handler.priority()).unwrap();
+        }
     }
 }
 

@@ -33,7 +33,6 @@
 //!     io.pins.gpio2,
 //!     100.kHz(),
 //!     &clocks,
-//!     None,
 //! );
 //! # }
 //! ```
@@ -62,7 +61,6 @@
 //!     io.pins.gpio2,
 //!     100.kHz(),
 //!     &clocks,
-//!     None,
 //! );
 //! loop {
 //!     let mut data = [0u8; 22];
@@ -82,6 +80,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::i2c0::{RegisterBlock, COMD},
     system::PeripheralClockControl,
+    InterruptConfigurable,
 };
 
 cfg_if::cfg_if! {
@@ -453,7 +452,6 @@ where
         frequency: HertzU32,
         clocks: &Clocks,
         timeout: Option<u32>,
-        isr: Option<InterruptHandler>,
     ) -> Self {
         crate::into_ref!(i2c, sda, scl);
 
@@ -498,15 +496,14 @@ where
         );
 
         i2c.peripheral.setup(frequency, clocks, timeout);
-
-        if let Some(interrupt) = isr {
-            unsafe {
-                crate::interrupt::bind_interrupt(T::interrupt(), interrupt.handler());
-                crate::interrupt::enable(T::interrupt(), interrupt.priority()).unwrap();
-            }
-        }
-
         i2c
+    }
+
+    fn internal_set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        unsafe {
+            crate::interrupt::bind_interrupt(T::interrupt(), handler.handler());
+            crate::interrupt::enable(T::interrupt(), handler.priority()).unwrap();
+        }
     }
 }
 
@@ -523,9 +520,8 @@ where
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
         clocks: &Clocks,
-        isr: Option<InterruptHandler>,
     ) -> Self {
-        Self::new_with_timeout(i2c, sda, scl, frequency, clocks, None, isr)
+        Self::new_with_timeout(i2c, sda, scl, frequency, clocks, None)
     }
 
     /// Create a new I2C instance with a custom timeout value.
@@ -538,9 +534,19 @@ where
         frequency: HertzU32,
         clocks: &Clocks,
         timeout: Option<u32>,
-        isr: Option<InterruptHandler>,
     ) -> Self {
-        Self::new_internal(i2c, sda, scl, frequency, clocks, timeout, isr)
+        Self::new_internal(i2c, sda, scl, frequency, clocks, timeout)
+    }
+}
+
+impl<'d, T> crate::private::Sealed for I2C<'d, T, crate::Blocking> where T: Instance {}
+
+impl<'d, T> InterruptConfigurable for I2C<'d, T, crate::Blocking>
+where
+    T: Instance,
+{
+    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        self.internal_set_interrupt_handler(handler);
     }
 }
 
@@ -573,13 +579,17 @@ where
         clocks: &Clocks,
         timeout: Option<u32>,
     ) -> Self {
-        let handler = Some(match T::I2C_NUMBER {
+        let mut this = Self::new_internal(i2c, sda, scl, frequency, clocks, timeout);
+
+        let handler = match T::I2C_NUMBER {
             0 => asynch::i2c0_handler,
             #[cfg(i2c1)]
             1 => asynch::i2c1_handler,
             _ => panic!("Unexpected I2C peripheral"),
-        });
-        Self::new_internal(i2c, sda, scl, frequency, clocks, timeout, handler)
+        };
+        this.internal_set_interrupt_handler(handler);
+
+        this
     }
 
     pub(crate) fn inner(&self) -> &T {

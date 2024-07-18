@@ -22,7 +22,6 @@ use esp_hal::{
         Timer,
         Timer0,
         TimerGroup,
-        TimerInterrupts,
     },
 };
 
@@ -35,15 +34,9 @@ fn main() -> ! {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        Some(TimerInterrupts {
-            timer0: Some(tg0_t0_level),
-            ..Default::default()
-        }),
-    );
+    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let timer0 = timg0.timer0;
+    timer0.set_interrupt_handler(tg0_t0_level);
 
     // Configure ETM to stop timer0 when alarm is triggered
     let event = timer0.on_alarm();

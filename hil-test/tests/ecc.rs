@@ -51,7 +51,7 @@ struct Context<'a> {
 impl Context<'_> {
     pub fn init() -> Self {
         let peripherals = Peripherals::take();
-        let ecc = Ecc::new(peripherals.ECC, None);
+        let ecc = Ecc::new(peripherals.ECC);
         let rng = Rng::new(peripherals.RNG);
 
         Context { ecc, rng }

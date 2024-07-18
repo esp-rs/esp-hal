@@ -40,7 +40,7 @@ struct Context<'a> {
 impl Context<'_> {
     pub fn init() -> Self {
         let peripherals = Peripherals::take();
-        let mut rsa = Rsa::new(peripherals.RSA, None);
+        let mut rsa = Rsa::new(peripherals.RSA);
         nb::block!(rsa.ready()).unwrap();
 
         Context { rsa }

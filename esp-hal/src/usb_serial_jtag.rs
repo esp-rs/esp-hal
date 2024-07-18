@@ -42,8 +42,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! use esp_hal::usb_serial_jtag::UsbSerialJtag;
-//! use core::option::Option::None;
-//! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE, None);
+//! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 //!
 //! // Write bytes out over the USB Serial/JTAG:
 //! usb_serial.write_bytes("Hello, world!".as_bytes()).expect("write error!");
@@ -54,7 +53,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::usb_serial_jtag::UsbSerialJtag;
-//! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE, None);
+//! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 //! // The USB Serial/JTAG can be split into separate Transmit and Receive
 //! // components:
 //! let (mut tx, mut rx) = usb_serial.split();
@@ -79,6 +78,7 @@ use crate::{
     peripherals::{usb_device::RegisterBlock, Interrupt, USB_DEVICE},
     system::PeripheralClockControl,
     Blocking,
+    InterruptConfigurable,
     Mode,
 };
 
@@ -255,11 +255,16 @@ where
 
 impl<'d> UsbSerialJtag<'d, Blocking> {
     /// Create a new USB serial/JTAG instance with defaults
-    pub fn new(
-        usb_device: impl Peripheral<P = USB_DEVICE> + 'd,
-        interrupt: Option<InterruptHandler>,
-    ) -> Self {
-        Self::new_inner(usb_device, interrupt)
+    pub fn new(usb_device: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
+        Self::new_inner(usb_device)
+    }
+}
+
+impl<'d> crate::private::Sealed for UsbSerialJtag<'d, Blocking> {}
+
+impl<'d> InterruptConfigurable for UsbSerialJtag<'d, Blocking> {
+    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        self.inner_set_interrupt_handler(handler);
     }
 }
 
@@ -267,10 +272,7 @@ impl<'d, M> UsbSerialJtag<'d, M>
 where
     M: Mode,
 {
-    fn new_inner(
-        _usb_device: impl Peripheral<P = USB_DEVICE> + 'd,
-        interrupt: Option<InterruptHandler>,
-    ) -> Self {
+    fn new_inner(_usb_device: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
         PeripheralClockControl::enable(crate::system::Peripheral::UsbDevice);
 
         USB_DEVICE::disable_tx_interrupts();
@@ -294,16 +296,16 @@ where
             }
         }
 
-        if let Some(interrupt) = interrupt {
-            unsafe {
-                crate::interrupt::bind_interrupt(Interrupt::USB_DEVICE, interrupt.handler());
-                crate::interrupt::enable(Interrupt::USB_DEVICE, interrupt.priority()).unwrap();
-            }
-        }
-
         Self {
             tx: UsbSerialJtagTx::new_inner(),
             rx: UsbSerialJtagRx::new_inner(),
+        }
+    }
+
+    fn inner_set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        unsafe {
+            crate::interrupt::bind_interrupt(Interrupt::USB_DEVICE, handler.handler());
+            crate::interrupt::enable(Interrupt::USB_DEVICE, handler.priority()).unwrap();
         }
     }
 
@@ -763,7 +765,9 @@ mod asynch {
     impl<'d> UsbSerialJtag<'d, Async> {
         /// Create a new USB serial/JTAG instance in asynchronous mode
         pub fn new_async(usb_device: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
-            Self::new_inner(usb_device, Some(async_interrupt_handler))
+            let mut this = Self::new_inner(usb_device);
+            this.inner_set_interrupt_handler(async_interrupt_handler);
+            this
         }
     }
 

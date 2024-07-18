@@ -87,11 +87,11 @@ async fn main(low_prio_spawner: Spawner) {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
+    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let timer0 = OneShotTimer::new(timg0.timer0.into());
     #[cfg(not(feature = "esp32c2"))]
     let timer1 = {
-        let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks, None);
+        let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
         OneShotTimer::new(timg1.timer0.into())
     };
     #[cfg(feature = "esp32c2")]

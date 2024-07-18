@@ -44,7 +44,8 @@ fn main() -> ! {
 
     // Set up a pulse counter:
     println!("setup pulse counter unit 0");
-    let pcnt = Pcnt::new(peripherals.PCNT, Some(interrupt_handler));
+    let mut pcnt = Pcnt::new(peripherals.PCNT);
+    pcnt.set_interrupt_handler(interrupt_handler);
     let u0 = pcnt.unit1;
     u0.set_low_limit(Some(-100)).unwrap();
     u0.set_high_limit(Some(100)).unwrap();

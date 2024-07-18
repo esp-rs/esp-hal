@@ -98,7 +98,7 @@ async fn main(spawner: Spawner) {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
+    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let timers = mk_static!(
         [OneShotTimer<ErasedTimer>; 1],
         [OneShotTimer::new(timg0.timer0.into())]

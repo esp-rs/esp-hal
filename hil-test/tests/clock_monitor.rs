@@ -24,7 +24,7 @@ impl Context<'_> {
         let system = SystemControl::new(peripherals.SYSTEM);
         ClockControl::boot_defaults(system.clock_control).freeze();
 
-        let rtc = Rtc::new(peripherals.LPWR, None);
+        let rtc = Rtc::new(peripherals.LPWR);
 
         Context { rtc }
     }

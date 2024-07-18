@@ -16,8 +16,7 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::{OneShotTimer, PeriodicTimer, timg::TimerGroup};
 //! # use esp_hal::prelude::*;
-//! # use core::option::Option::None;
-//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
+//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
 //! let one_shot = OneShotTimer::new(timg0.timer0);
 //!
 //! one_shot.delay_millis(500);
@@ -29,8 +28,7 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::{PeriodicTimer, timg::TimerGroup};
 //! # use esp_hal::prelude::*;
-//! # use core::option::Option::None;
-//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
+//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
 //! let mut periodic = PeriodicTimer::new(timg0.timer0);
 //!
 //! periodic.start(1.secs());
@@ -44,7 +42,7 @@
 
 use fugit::{ExtU64, Instant, MicrosDurationU64};
 
-use crate::{interrupt::InterruptHandler, private};
+use crate::{interrupt::InterruptHandler, private, InterruptConfigurable};
 
 #[cfg(systimer)]
 pub mod systimer;
@@ -196,6 +194,17 @@ where
     }
 }
 
+impl<T> crate::private::Sealed for OneShotTimer<T> where T: Timer {}
+
+impl<T> InterruptConfigurable for OneShotTimer<T>
+where
+    T: Timer,
+{
+    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        OneShotTimer::set_interrupt_handler(self, handler);
+    }
+}
+
 #[cfg(feature = "embedded-hal-02")]
 impl<T, UXX> embedded_hal_02::blocking::delay::DelayMs<UXX> for OneShotTimer<T>
 where
@@ -297,6 +306,17 @@ where
     pub fn clear_interrupt(&mut self) {
         self.inner.clear_interrupt();
         self.inner.set_alarm_active(true);
+    }
+}
+
+impl<T> crate::private::Sealed for PeriodicTimer<T> where T: Timer {}
+
+impl<T> InterruptConfigurable for PeriodicTimer<T>
+where
+    T: Timer,
+{
+    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        PeriodicTimer::set_interrupt_handler(self, handler);
     }
 }
 

@@ -58,7 +58,7 @@
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 #![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
 #![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
-//! let rmt = Rmt::new(peripherals.RMT, freq, &clocks, None).unwrap();
+//! let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
 //! let mut channel = rmt
 //!     .channel0
 //!     .configure(
@@ -93,6 +93,7 @@ use crate::{
     rmt::private::CreateInstance,
     soc::constants,
     system::PeripheralClockControl,
+    InterruptConfigurable,
 };
 
 /// Errors
@@ -218,7 +219,6 @@ where
         peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
         frequency: HertzU32,
         _clocks: &Clocks,
-        interrupt: Option<InterruptHandler>,
     ) -> Result<Self, Error> {
         let me = Rmt::create(peripheral);
 
@@ -235,18 +235,15 @@ where
         #[cfg(any(esp32, esp32s2))]
         self::chip_specific::configure_clock();
 
-        if let Some(interrupt) = interrupt {
-            unsafe {
-                crate::interrupt::bind_interrupt(
-                    crate::peripherals::Interrupt::RMT,
-                    interrupt.handler(),
-                );
-                crate::interrupt::enable(crate::peripherals::Interrupt::RMT, interrupt.priority())
-                    .unwrap();
-            }
-        }
-
         Ok(me)
+    }
+
+    pub(crate) fn internal_set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        unsafe {
+            crate::interrupt::bind_interrupt(crate::peripherals::Interrupt::RMT, handler.handler());
+            crate::interrupt::enable(crate::peripherals::Interrupt::RMT, handler.priority())
+                .unwrap();
+        }
     }
 
     #[cfg(not(any(esp32, esp32s2)))]
@@ -275,9 +272,16 @@ impl<'d> Rmt<'d, crate::Blocking> {
         peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
         frequency: HertzU32,
         _clocks: &Clocks,
-        interrupt: Option<InterruptHandler>,
     ) -> Result<Self, Error> {
-        Self::new_internal(peripheral, frequency, _clocks, interrupt)
+        Self::new_internal(peripheral, frequency, _clocks)
+    }
+}
+
+impl<'d> crate::private::Sealed for Rmt<'d, crate::Blocking> {}
+
+impl<'d> InterruptConfigurable for Rmt<'d, crate::Blocking> {
+    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        self.internal_set_interrupt_handler(handler);
     }
 }
 
@@ -289,12 +293,9 @@ impl<'d> Rmt<'d, crate::Async> {
         frequency: HertzU32,
         _clocks: &Clocks,
     ) -> Result<Self, Error> {
-        Self::new_internal(
-            peripheral,
-            frequency,
-            _clocks,
-            Some(asynch::async_interrupt_handler),
-        )
+        let mut this = Self::new_internal(peripheral, frequency, _clocks)?;
+        this.internal_set_interrupt_handler(asynch::async_interrupt_handler);
+        Ok(this)
     }
 }
 

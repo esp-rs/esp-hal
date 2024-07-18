@@ -126,7 +126,7 @@ pub extern "Rust" fn __init_data() -> bool {
 #[export_name = "__post_init"]
 unsafe fn post_init() {
     // RTC domain must be enabled before we try to disable
-    let mut rtc = Rtc::new(LPWR::steal(), None);
+    let mut rtc = Rtc::new(LPWR::steal());
     rtc.rwdt.disable();
 
     Wdt::<TIMG0, crate::Blocking>::set_wdt_enabled(false);

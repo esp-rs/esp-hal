@@ -64,6 +64,7 @@ use crate::{
     peripheral::PeripheralRef,
     peripherals::{GPIO, IO_MUX},
     private,
+    InterruptConfigurable,
 };
 
 pub mod any_pin;
@@ -1212,7 +1213,11 @@ impl Io {
             pins,
         }
     }
+}
 
+impl crate::private::Sealed for Io {}
+
+impl InterruptConfigurable for Io {
     /// Install the given interrupt handler replacing any previously set
     /// handler.
     ///
@@ -1220,7 +1225,7 @@ impl Io {
     /// the internal async handler will run after. In that case it's
     /// important to not reset the interrupt status when mixing sync and
     /// async (i.e. using async wait) interrupt handling.
-    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         critical_section::with(|cs| {
             crate::interrupt::enable(crate::peripherals::Interrupt::GPIO, handler.priority())
                 .unwrap();

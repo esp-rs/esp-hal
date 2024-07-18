@@ -71,7 +71,7 @@ async fn main(_spawner: Spawner) {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
+    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let timer0 = OneShotTimer::new(timg0.timer0.into());
     let timer1 = OneShotTimer::new(timg0.timer1.into());
     let timers = [timer0, timer1];

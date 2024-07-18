@@ -41,6 +41,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::RSA,
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    InterruptConfigurable,
 };
 
 #[cfg_attr(esp32s2, path = "esp32sX.rs")]
@@ -59,12 +60,30 @@ pub struct Rsa<'d, DM: crate::Mode> {
     phantom: PhantomData<DM>,
 }
 
+impl<'d, DM: crate::Mode> Rsa<'d, DM> {
+    fn internal_set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        unsafe {
+            crate::interrupt::bind_interrupt(crate::peripherals::Interrupt::RSA, handler.handler());
+            crate::interrupt::enable(crate::peripherals::Interrupt::RSA, handler.priority())
+                .unwrap();
+        }
+    }
+}
+
 impl<'d> Rsa<'d, crate::Blocking> {
     /// Create a new instance in [crate::Blocking] mode.
     ///
     /// Optionally an interrupt handler can be bound.
-    pub fn new(rsa: impl Peripheral<P = RSA> + 'd, interrupt: Option<InterruptHandler>) -> Self {
-        Self::new_internal(rsa, interrupt)
+    pub fn new(rsa: impl Peripheral<P = RSA> + 'd) -> Self {
+        Self::new_internal(rsa)
+    }
+}
+
+impl<'d> crate::private::Sealed for Rsa<'d, crate::Blocking> {}
+
+impl<'d> InterruptConfigurable for Rsa<'d, crate::Blocking> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.internal_set_interrupt_handler(handler);
     }
 }
 
@@ -72,29 +91,17 @@ impl<'d> Rsa<'d, crate::Blocking> {
 impl<'d> Rsa<'d, crate::Async> {
     /// Create a new instance in [crate::Blocking] mode.
     pub fn new_async(rsa: impl Peripheral<P = RSA> + 'd) -> Self {
-        Self::new_internal(rsa, Some(asynch::rsa_interrupt_handler))
+        let mut this = Self::new_internal(rsa);
+        this.internal_set_interrupt_handler(asynch::rsa_interrupt_handler);
+        this
     }
 }
 
 impl<'d, DM: crate::Mode> Rsa<'d, DM> {
-    fn new_internal(
-        rsa: impl Peripheral<P = RSA> + 'd,
-        interrupt: Option<InterruptHandler>,
-    ) -> Self {
+    fn new_internal(rsa: impl Peripheral<P = RSA> + 'd) -> Self {
         crate::into_ref!(rsa);
 
         PeripheralClockControl::enable(PeripheralEnable::Rsa);
-
-        if let Some(interrupt) = interrupt {
-            unsafe {
-                crate::interrupt::bind_interrupt(
-                    crate::peripherals::Interrupt::RSA,
-                    interrupt.handler(),
-                );
-                crate::interrupt::enable(crate::peripherals::Interrupt::RSA, interrupt.priority())
-                    .unwrap();
-            }
-        }
 
         Self {
             rsa,

@@ -56,7 +56,6 @@
 //! #     peripherals.UART1,
 //! #     Config::default(),
 //! #     &clocks,
-//! #     None,
 //! #     io.pins.gpio1,
 //! #     io.pins.gpio2,
 //! # ).unwrap();
@@ -75,7 +74,6 @@
 //! #     peripherals.UART1,
 //! #     Config::default(),
 //! #     &clocks,
-//! #     None,
 //! #     io.pins.gpio1,
 //! #     io.pins.gpio2,
 //! # ).unwrap();
@@ -108,9 +106,9 @@
 //! use esp_hal::gpio::{Io, any_pin::AnyPin};
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
-//! let tx = UartTx::new(peripherals.UART0, &clocks, None,
+//! let tx = UartTx::new(peripherals.UART0, &clocks,
 //!     io.pins.gpio1).unwrap();
-//! let rx = UartRx::new(peripherals.UART1, &clocks, None,
+//! let rx = UartRx::new(peripherals.UART1, &clocks,
 //!     io.pins.gpio2).unwrap();
 //! # }
 //! ```
@@ -135,6 +133,7 @@ use crate::{
     private::Internal,
     system::PeripheralClockControl,
     Blocking,
+    InterruptConfigurable,
     Mode,
 };
 
@@ -466,10 +465,9 @@ where
     pub fn new<TX: OutputPin>(
         uart: impl Peripheral<P = T> + 'd,
         clocks: &Clocks,
-        interrupt: Option<InterruptHandler>,
         tx: impl Peripheral<P = TX> + 'd,
     ) -> Result<Self, Error> {
-        Self::new_with_config(uart, Default::default(), clocks, interrupt, tx)
+        Self::new_with_config(uart, Default::default(), clocks, tx)
     }
 
     /// Create a new UART TX instance with configuration options in
@@ -478,7 +476,6 @@ where
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
         clocks: &Clocks,
-        interrupt: Option<InterruptHandler>,
         tx: impl Peripheral<P = TX> + 'd,
     ) -> Result<Self, Error> {
         crate::into_ref!(tx);
@@ -486,8 +483,7 @@ where
         tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
         let (uart_tx, _) =
-            Uart::<'d, T, Blocking>::new_with_config_inner(uart, config, clocks, interrupt)?
-                .split();
+            Uart::<'d, T, Blocking>::new_with_config_inner(uart, config, clocks)?.split();
 
         Ok(uart_tx)
     }
@@ -677,10 +673,9 @@ where
     pub fn new<RX: InputPin>(
         uart: impl Peripheral<P = T> + 'd,
         clocks: &Clocks,
-        interrupt: Option<InterruptHandler>,
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Result<Self, Error> {
-        Self::new_with_config(uart, Default::default(), clocks, interrupt, rx)
+        Self::new_with_config(uart, Default::default(), clocks, rx)
     }
 
     /// Create a new UART RX instance with configuration options in
@@ -689,7 +684,6 @@ where
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
         clocks: &Clocks,
-        interrupt: Option<InterruptHandler>,
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Result<Self, Error> {
         crate::into_ref!(rx);
@@ -697,8 +691,7 @@ where
         rx.connect_input_to_peripheral(T::rx_signal(), Internal);
 
         let (_, uart_rx) =
-            Uart::<'d, T, Blocking>::new_with_config_inner(uart, config, clocks, interrupt)?
-                .split();
+            Uart::<'d, T, Blocking>::new_with_config_inner(uart, config, clocks)?.split();
 
         Ok(uart_rx)
     }
@@ -714,7 +707,6 @@ where
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
         clocks: &Clocks,
-        interrupt: Option<InterruptHandler>,
         tx: impl Peripheral<P = TX> + 'd,
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Result<Self, Error> {
@@ -725,7 +717,7 @@ where
 
         rx.set_to_input(Internal);
         rx.connect_input_to_peripheral(T::rx_signal(), Internal);
-        Self::new_with_config_inner(uart, config, clocks, interrupt)
+        Self::new_with_config_inner(uart, config, clocks)
     }
 
     /// Create a new UART instance with defaults in [`Blocking`] mode.
@@ -771,7 +763,6 @@ where
         _uart: impl Peripheral<P = T> + 'd,
         config: Config,
         clocks: &Clocks,
-        interrupt: Option<InterruptHandler>,
     ) -> Result<Self, Error> {
         Self::init();
 
@@ -791,13 +782,6 @@ where
         serial.change_data_bits(config.data_bits);
         serial.change_parity(config.parity);
         serial.change_stop_bits(config.stop_bits);
-
-        if let Some(interrupt) = interrupt {
-            unsafe {
-                crate::interrupt::bind_interrupt(T::interrupt(), interrupt.handler());
-                crate::interrupt::enable(T::interrupt(), interrupt.priority()).unwrap();
-            }
-        }
 
         // Setting err_wr_mask stops uart from storing data when data is wrong according
         // to reference manual
@@ -819,8 +803,15 @@ where
         Ok(serial)
     }
 
+    fn inner_set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        unsafe {
+            crate::interrupt::bind_interrupt(T::interrupt(), handler.handler());
+            crate::interrupt::enable(T::interrupt(), handler.priority()).unwrap();
+        }
+    }
+
     fn new_inner(uart: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Result<Self, Error> {
-        Self::new_with_config_inner(uart, Default::default(), clocks, None)
+        Self::new_with_config_inner(uart, Default::default(), clocks)
     }
 
     /// Configure CTS pin
@@ -1297,6 +1288,17 @@ where
             .conf0()
             .modify(|_, w| w.txfifo_rst().clear_bit());
         Self::sync_regs();
+    }
+}
+
+impl<'d, T> crate::private::Sealed for Uart<'d, T, Blocking> where T: Instance + 'd {}
+
+impl<'d, T> InterruptConfigurable for Uart<'d, T, Blocking>
+where
+    T: Instance + 'd,
+{
+    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        self.inner_set_interrupt_handler(handler);
     }
 }
 
@@ -2013,20 +2015,19 @@ mod asynch {
 
             rx.set_to_input(Internal);
             rx.connect_input_to_peripheral(T::rx_signal(), Internal);
-            Self::new_with_config_inner(
-                uart,
-                config,
-                clocks,
-                Some(match T::uart_number() {
-                    #[cfg(uart0)]
-                    0 => uart0,
-                    #[cfg(uart1)]
-                    1 => uart1,
-                    #[cfg(uart2)]
-                    2 => uart2,
-                    _ => unreachable!(),
-                }),
-            )
+            let mut this = Self::new_with_config_inner(uart, config, clocks)?;
+
+            this.inner_set_interrupt_handler(match T::uart_number() {
+                #[cfg(uart0)]
+                0 => uart0,
+                #[cfg(uart1)]
+                1 => uart1,
+                #[cfg(uart2)]
+                2 => uart2,
+                _ => unreachable!(),
+            });
+
+            Ok(this)
         }
 
         /// Create a new UART instance with defaults in [`Async`] mode.
@@ -2093,22 +2094,19 @@ mod asynch {
             tx.set_to_push_pull_output(Internal);
             tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
-            let (uart_tx, _) = Uart::<'d, T, Async>::new_with_config_inner(
-                uart,
-                config,
-                clocks,
-                Some(match T::uart_number() {
-                    #[cfg(uart0)]
-                    0 => uart0,
-                    #[cfg(uart1)]
-                    1 => uart1,
-                    #[cfg(uart2)]
-                    2 => uart2,
-                    _ => unreachable!(),
-                }),
-            )?
-            .split();
+            let mut uart = Uart::<'d, T, Async>::new_with_config_inner(uart, config, clocks)?;
 
+            uart.inner_set_interrupt_handler(match T::uart_number() {
+                #[cfg(uart0)]
+                0 => uart0,
+                #[cfg(uart1)]
+                1 => uart1,
+                #[cfg(uart2)]
+                2 => uart2,
+                _ => unreachable!(),
+            });
+
+            let (uart_tx, _) = uart.split();
             Ok(uart_tx)
         }
 
@@ -2172,22 +2170,19 @@ mod asynch {
             rx.set_to_input(Internal);
             rx.connect_input_to_peripheral(T::rx_signal(), Internal);
 
-            let (_, uart_rx) = Uart::<'d, T, Async>::new_with_config_inner(
-                uart,
-                config,
-                clocks,
-                Some(match T::uart_number() {
-                    #[cfg(uart0)]
-                    0 => uart0,
-                    #[cfg(uart1)]
-                    1 => uart1,
-                    #[cfg(uart2)]
-                    2 => uart2,
-                    _ => unreachable!(),
-                }),
-            )?
-            .split();
+            let mut uart = Uart::<'d, T, Async>::new_with_config_inner(uart, config, clocks)?;
 
+            uart.inner_set_interrupt_handler(match T::uart_number() {
+                #[cfg(uart0)]
+                0 => uart0,
+                #[cfg(uart1)]
+                1 => uart1,
+                #[cfg(uart2)]
+                2 => uart2,
+                _ => unreachable!(),
+            });
+
+            let (_, uart_rx) = uart.split();
             Ok(uart_rx)
         }
 

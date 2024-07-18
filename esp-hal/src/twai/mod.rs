@@ -49,7 +49,6 @@
 //!     can_rx_pin,
 //!     &clocks,
 //!     CAN_BAUDRATE,
-//!     None,
 //! );
 //!
 //! // Partially filter the incoming messages to reduce overhead of receiving
@@ -83,6 +82,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::twai0::RegisterBlock,
     system::{self, PeripheralClockControl},
+    InterruptConfigurable,
 };
 
 pub mod filter;
@@ -642,7 +642,6 @@ where
         rx_pin: impl Peripheral<P = RX> + 'd,
         clocks: &Clocks,
         baud_rate: BaudRate,
-        interrupt: Option<InterruptHandler>,
         no_transceiver: bool,
     ) -> Self {
         // Enable the peripheral clock for the TWAI peripheral.
@@ -662,15 +661,14 @@ where
         };
 
         cfg.set_baud_rate(baud_rate, clocks);
-
-        if let Some(interrupt) = interrupt {
-            unsafe {
-                crate::interrupt::bind_interrupt(T::INTERRUPT, interrupt.handler());
-                crate::interrupt::enable(T::INTERRUPT, interrupt.priority()).unwrap();
-            }
-        }
-
         cfg
+    }
+
+    fn internal_set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        unsafe {
+            crate::interrupt::bind_interrupt(T::INTERRUPT, handler.handler());
+            crate::interrupt::enable(T::INTERRUPT, handler.priority()).unwrap();
+        }
     }
 
     /// Set the bitrate of the bus.
@@ -785,11 +783,8 @@ where
         rx_pin: impl Peripheral<P = RX> + 'd,
         clocks: &Clocks,
         baud_rate: BaudRate,
-        interrupt: Option<InterruptHandler>,
     ) -> Self {
-        Self::new_internal(
-            peripheral, tx_pin, rx_pin, clocks, baud_rate, interrupt, false,
-        )
+        Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, false)
     }
 
     /// Create a new instance of [TwaiConfiguration] meant to connect two ESP32s
@@ -803,11 +798,19 @@ where
         rx_pin: impl Peripheral<P = RX> + 'd,
         clocks: &Clocks,
         baud_rate: BaudRate,
-        interrupt: Option<InterruptHandler>,
     ) -> Self {
-        Self::new_internal(
-            peripheral, tx_pin, rx_pin, clocks, baud_rate, interrupt, true,
-        )
+        Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, true)
+    }
+}
+
+impl<'d, T> crate::private::Sealed for TwaiConfiguration<'d, T, crate::Blocking> where T: Instance {}
+
+impl<'d, T> InterruptConfigurable for TwaiConfiguration<'d, T, crate::Blocking>
+where
+    T: Instance,
+{
+    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        self.internal_set_interrupt_handler(handler);
     }
 }
 
@@ -826,16 +829,9 @@ where
         clocks: &Clocks,
         baud_rate: BaudRate,
     ) -> Self {
-        let interrupt = T::async_handler();
-        Self::new_internal(
-            peripheral,
-            tx_pin,
-            rx_pin,
-            clocks,
-            baud_rate,
-            Some(interrupt),
-            false,
-        )
+        let mut this = Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, false);
+        this.internal_set_interrupt_handler(T::async_handler());
+        this
     }
 
     /// Create a new instance of [TwaiConfiguration] meant to connect two ESP32s
@@ -850,16 +846,9 @@ where
         clocks: &Clocks,
         baud_rate: BaudRate,
     ) -> Self {
-        let interrupt = T::async_handler();
-        Self::new_internal(
-            peripheral,
-            tx_pin,
-            rx_pin,
-            clocks,
-            baud_rate,
-            Some(interrupt),
-            true,
-        )
+        let mut this = Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, true);
+        this.internal_set_interrupt_handler(T::async_handler());
+        this
     }
 }
 

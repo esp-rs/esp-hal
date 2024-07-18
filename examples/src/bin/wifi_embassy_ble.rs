@@ -57,7 +57,7 @@ async fn main(_spawner: Spawner) -> ! {
     let clocks = ClockControl::max(system.clock_control).freeze();
 
     let timer = PeriodicTimer::new(
-        esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0, &clocks, None)
+        esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0, &clocks)
             .timer0
             .into(),
     );
@@ -84,7 +84,7 @@ async fn main(_spawner: Spawner) -> ! {
 
     #[cfg(feature = "esp32")]
     {
-        let timg1 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1, &clocks, None);
+        let timg1 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1, &clocks);
         esp_hal_embassy::init(
             &clocks,
             mk_static!(

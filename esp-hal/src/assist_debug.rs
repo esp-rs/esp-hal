@@ -19,7 +19,7 @@
 //!
 //! [Debug Assist]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/debug_assist.rs
 //!
-//! ## Implmentation State
+//! ## Implementation State
 //! - Bus write access logging is not available via this API
 //! - This driver has only blocking API
 
@@ -27,6 +27,7 @@ use crate::{
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::ASSIST_DEBUG,
+    InterruptConfigurable,
 };
 
 /// The debug assist driver instance.
@@ -36,32 +37,31 @@ pub struct DebugAssist<'d> {
 
 impl<'d> DebugAssist<'d> {
     /// Create a new instance in [crate::Blocking] mode.
-    ///
-    /// Optionally an interrupt handler can be bound.
-    pub fn new(
-        debug_assist: impl Peripheral<P = ASSIST_DEBUG> + 'd,
-        interrupt: Option<InterruptHandler>,
-    ) -> Self {
+    pub fn new(debug_assist: impl Peripheral<P = ASSIST_DEBUG> + 'd) -> Self {
         crate::into_ref!(debug_assist);
 
         // NOTE: We should enable the debug assist, however, it's always enabled in ROM
         //       code already.
 
-        if let Some(interrupt) = interrupt {
-            unsafe {
-                crate::interrupt::bind_interrupt(
-                    crate::peripherals::Interrupt::ASSIST_DEBUG,
-                    interrupt.handler(),
-                );
-                crate::interrupt::enable(
-                    crate::peripherals::Interrupt::ASSIST_DEBUG,
-                    interrupt.priority(),
-                )
-                .unwrap();
-            }
-        }
-
         DebugAssist { debug_assist }
+    }
+}
+
+impl<'d> crate::private::Sealed for DebugAssist<'d> {}
+
+impl<'d> InterruptConfigurable for DebugAssist<'d> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        unsafe {
+            crate::interrupt::bind_interrupt(
+                crate::peripherals::Interrupt::ASSIST_DEBUG,
+                handler.handler(),
+            );
+            crate::interrupt::enable(
+                crate::peripherals::Interrupt::ASSIST_DEBUG,
+                handler.priority(),
+            )
+            .unwrap();
+        }
     }
 }
 

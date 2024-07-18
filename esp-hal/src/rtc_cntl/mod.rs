@@ -25,10 +25,12 @@
 //! # use esp_hal::rtc_cntl::Rtc;
 //! # use esp_hal::rtc_cntl::Rwdt;
 //! # use crate::esp_hal::prelude::_fugit_ExtU64;
+//! # use crate::esp_hal::InterruptConfigurable;
 //! static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
 //! let mut delay = Delay::new(&clocks);
 //!
-//! let mut rtc = Rtc::new(peripherals.LPWR, Some(interrupt_handler));
+//! let mut rtc = Rtc::new(peripherals.LPWR);
+//! rtc.set_interrupt_handler(interrupt_handler);
 //! rtc.rwdt.set_timeout(2000.millis());
 //! rtc.rwdt.listen();
 //!
@@ -89,6 +91,7 @@ use crate::{
     peripherals::Interrupt,
     reset::{SleepSource, WakeupReason},
     Cpu,
+    InterruptConfigurable,
 };
 // only include sleep where its been implemented
 #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
@@ -190,10 +193,7 @@ impl<'d> Rtc<'d> {
     /// Create a new instance in [crate::Blocking] mode.
     ///
     /// Optionally an interrupt handler can be bound.
-    pub fn new(
-        rtc_cntl: impl Peripheral<P = crate::peripherals::LPWR> + 'd,
-        interrupt: Option<InterruptHandler>,
-    ) -> Self {
+    pub fn new(rtc_cntl: impl Peripheral<P = crate::peripherals::LPWR> + 'd) -> Self {
         rtc::init();
         rtc::configure_clock();
 
@@ -206,26 +206,6 @@ impl<'d> Rtc<'d> {
 
         #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
         RtcSleepConfig::base_settings(&this);
-
-        if let Some(interrupt) = interrupt {
-            unsafe {
-                interrupt::bind_interrupt(
-                    #[cfg(any(esp32c6, esp32h2))]
-                    Interrupt::LP_WDT,
-                    #[cfg(not(any(esp32c6, esp32h2)))]
-                    Interrupt::RTC_CORE,
-                    interrupt.handler(),
-                );
-                interrupt::enable(
-                    #[cfg(any(esp32c6, esp32h2))]
-                    Interrupt::LP_WDT,
-                    #[cfg(not(any(esp32c6, esp32h2)))]
-                    Interrupt::RTC_CORE,
-                    interrupt.priority(),
-                )
-                .unwrap();
-            }
-        }
 
         this
     }
@@ -313,6 +293,29 @@ impl<'d> Rtc<'d> {
 
         config.start_sleep(wakeup_triggers);
         config.finish_sleep();
+    }
+}
+impl<'d> crate::private::Sealed for Rtc<'d> {}
+
+impl<'d> InterruptConfigurable for Rtc<'d> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        unsafe {
+            interrupt::bind_interrupt(
+                #[cfg(any(esp32c6, esp32h2))]
+                Interrupt::LP_WDT,
+                #[cfg(not(any(esp32c6, esp32h2)))]
+                Interrupt::RTC_CORE,
+                handler.handler(),
+            );
+            interrupt::enable(
+                #[cfg(any(esp32c6, esp32h2))]
+                Interrupt::LP_WDT,
+                #[cfg(not(any(esp32c6, esp32h2)))]
+                Interrupt::RTC_CORE,
+                handler.priority(),
+            )
+            .unwrap();
+        }
     }
 }
 

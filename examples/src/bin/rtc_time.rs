@@ -21,7 +21,7 @@ fn main() -> ! {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let rtc = Rtc::new(peripherals.LPWR, None);
+    let rtc = Rtc::new(peripherals.LPWR);
     let delay = Delay::new(&clocks);
 
     loop {

@@ -18,7 +18,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::systimer::SystemTimer;
-//! # use esp_hal::timer::timg::{TimerGroup, TimerInterrupts};
+//! # use esp_hal::timer::timg::TimerGroup;
 //! # use crate::esp_hal::prelude::_esp_hal_timer_Timer;
 //! # use esp_hal::prelude::*;
 //! let systimer = SystemTimer::new(peripherals.SYSTIMER);
@@ -29,13 +29,10 @@
 //! let timg0 = TimerGroup::new(
 //!     peripherals.TIMG0,
 //!     &clocks,
-//!     Some(TimerInterrupts {
-//!         timer0: Some(tg0_t0_level),
-//!         ..Default::default()
-//!     }),
 //! );
 //!
-//! # let timer0 = timg0.timer0;
+//! let mut timer0 = timg0.timer0;
+//! timer0.set_interrupt_handler(tg0_t0_level);
 //!
 //! // Wait for timeout:
 //! timer0.load_value(1.secs());
@@ -86,6 +83,7 @@ use crate::{
     },
     Async,
     Blocking,
+    InterruptConfigurable,
     Mode,
 };
 
@@ -261,6 +259,12 @@ where
 impl<T, const CHANNEL: u8> Alarm<T, Blocking, CHANNEL> {
     /// Set the interrupt handler for this alarm.
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.set_interrupt_handler_internal(handler)
+    }
+}
+
+impl<T, const CHANNEL: u8> InterruptConfigurable for Alarm<T, Blocking, CHANNEL> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.set_interrupt_handler_internal(handler)
     }
 }
