@@ -151,7 +151,7 @@ async fn writer(
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests]
 mod tests {
     #[init]
     fn init() {}
