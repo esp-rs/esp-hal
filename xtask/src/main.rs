@@ -565,23 +565,32 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 ],
             )?,
 
-            Package::EspPrintln => lint_package(
-                &path,
-                &[
-                    "-Zbuild-std=core",
-                    "--target=riscv32imc-unknown-none-elf",
-                    "--features=esp32c6",
-                ],
-            )?,
+            Package::EspPrintln => {
+                for chip in Chip::iter() {
+                    lint_package(
+                        &path,
+                        &[
+                            "-Zbuild-std=core",
+                            &format!("--target={}", chip.target()),
+                            &format!("--features={chip},defmt-espflash"),
+                        ],
+                    )?;
+                }
+            }
 
-            Package::EspStorage => lint_package(
-                &path,
-                &[
-                    "-Zbuild-std=core",
-                    "--target=riscv32imc-unknown-none-elf",
-                    "--features=esp32c6",
-                ],
-            )?,
+            Package::EspStorage => {
+                for chip in Chip::iter() {
+                    lint_package(
+                        &path,
+                        &[
+                            "-Zbuild-std=core",
+                            &format!("--target={}", chip.target()),
+                            &format!("--features={chip},storage,nor-flash,low-level"),
+                            "--release",
+                        ],
+                    )?;
+                }
+            }
 
             Package::EspWifi => {
                 // Since different files/modules can be included/excluded
