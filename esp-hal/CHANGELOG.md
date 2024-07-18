@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix I2S async-tx (#1833)
+
 ### Removed
 
 - This package no longer re-exports the `esp_hal_procmacros::main` macro (#1828)
