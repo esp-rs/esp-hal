@@ -6,6 +6,7 @@ use crate::MAX_BACKTRACE_ADDRESSES;
 // the return address is the address following the callxN
 // we get better results (especially if the caller was the last function in the
 // calling function) if we report the address of callxN itself
+#[cfg(feature = "panic-handler")]
 pub(super) const RA_OFFSET: usize = 3;
 
 #[doc(hidden)]
