@@ -2141,7 +2141,10 @@ pub(crate) mod asynch {
 
     use super::*;
 
-    pub struct DmaTxFuture<'a, TX> {
+    pub struct DmaTxFuture<'a, TX>
+    where
+        TX: Tx,
+    {
         pub(crate) tx: &'a mut TX,
         _a: (),
     }
@@ -2172,20 +2175,32 @@ pub(crate) mod asynch {
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
             TX::waker().register(cx.waker());
-            if self.tx.is_listening_eof() {
-                Poll::Pending
+            if self.tx.is_done() {
+                self.tx.clear_interrupts();
+                Poll::Ready(Ok(()))
+            } else if self.tx.has_error() {
+                self.tx.clear_interrupts();
+                Poll::Ready(Err(DmaError::DescriptorError))
             } else {
-                if self.tx.has_error() {
-                    self.tx.clear_interrupts();
-                    Poll::Ready(Err(DmaError::DescriptorError))
-                } else {
-                    Poll::Ready(Ok(()))
-                }
+                Poll::Pending
             }
         }
     }
 
-    pub struct DmaRxFuture<'a, RX> {
+    impl<'a, TX> Drop for DmaTxFuture<'a, TX>
+    where
+        TX: Tx,
+    {
+        fn drop(&mut self) {
+            self.tx.unlisten_eof();
+            self.tx.unlisten_out_descriptor_error();
+        }
+    }
+
+    pub struct DmaRxFuture<'a, RX>
+    where
+        RX: Rx,
+    {
         pub(crate) rx: &'a mut RX,
         _a: (),
     }
@@ -2218,22 +2233,38 @@ pub(crate) mod asynch {
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
             RX::waker().register(cx.waker());
-            if self.rx.is_listening_eof() {
-                Poll::Pending
+            if self.rx.is_done() {
+                self.rx.clear_interrupts();
+                Poll::Ready(Ok(()))
+            } else if self.rx.has_error()
+                || self.rx.has_dscr_empty_error()
+                || self.rx.has_eof_error()
+            {
+                self.rx.clear_interrupts();
+                Poll::Ready(Err(DmaError::DescriptorError))
             } else {
-                if self.rx.has_error() || self.rx.has_dscr_empty_error() || self.rx.has_eof_error()
-                {
-                    self.rx.clear_interrupts();
-                    Poll::Ready(Err(DmaError::DescriptorError))
-                } else {
-                    Poll::Ready(Ok(()))
-                }
+                Poll::Pending
             }
         }
     }
 
+    impl<'a, RX> Drop for DmaRxFuture<'a, RX>
+    where
+        RX: Rx,
+    {
+        fn drop(&mut self) {
+            self.rx.unlisten_eof();
+            self.rx.unlisten_in_descriptor_error();
+            self.rx.unlisten_in_descriptor_error_dscr_empty();
+            self.rx.unlisten_in_descriptor_error_err_eof();
+        }
+    }
+
     #[cfg(any(i2s0, i2s1))]
-    pub struct DmaTxDoneChFuture<'a, TX> {
+    pub struct DmaTxDoneChFuture<'a, TX>
+    where
+        TX: Tx,
+    {
         pub(crate) tx: &'a mut TX,
         _a: (),
     }
@@ -2262,21 +2293,34 @@ pub(crate) mod asynch {
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
             TX::waker().register(cx.waker());
-            if self.tx.is_listening_ch_out_done() {
-                Poll::Pending
+            if self.tx.is_ch_out_done_set() {
+                self.tx.clear_interrupts();
+                Poll::Ready(Ok(()))
+            } else if self.tx.has_error() {
+                self.tx.clear_interrupts();
+                Poll::Ready(Err(DmaError::DescriptorError))
             } else {
-                if self.tx.has_error() {
-                    self.tx.clear_interrupts();
-                    Poll::Ready(Err(DmaError::DescriptorError))
-                } else {
-                    Poll::Ready(Ok(()))
-                }
+                Poll::Pending
             }
         }
     }
 
     #[cfg(any(i2s0, i2s1))]
-    pub struct DmaRxDoneChFuture<'a, RX> {
+    impl<'a, TX> Drop for DmaTxDoneChFuture<'a, TX>
+    where
+        TX: Tx,
+    {
+        fn drop(&mut self) {
+            self.tx.unlisten_ch_out_done();
+            self.tx.unlisten_out_descriptor_error();
+        }
+    }
+
+    #[cfg(any(i2s0, i2s1))]
+    pub struct DmaRxDoneChFuture<'a, RX>
+    where
+        RX: Rx,
+    {
         pub(crate) rx: &'a mut RX,
         _a: (),
     }
@@ -2307,17 +2351,31 @@ pub(crate) mod asynch {
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
             RX::waker().register(cx.waker());
-            if self.rx.is_listening_ch_in_done() {
-                Poll::Pending
+            if self.rx.is_ch_in_done_set() {
+                self.rx.clear_interrupts();
+                Poll::Ready(Ok(()))
+            } else if self.rx.has_error()
+                || self.rx.has_dscr_empty_error()
+                || self.rx.has_eof_error()
+            {
+                self.rx.clear_interrupts();
+                Poll::Ready(Err(DmaError::DescriptorError))
             } else {
-                if self.rx.has_error() || self.rx.has_dscr_empty_error() || self.rx.has_eof_error()
-                {
-                    self.rx.clear_interrupts();
-                    Poll::Ready(Err(DmaError::DescriptorError))
-                } else {
-                    Poll::Ready(Ok(()))
-                }
+                Poll::Pending
             }
+        }
+    }
+
+    #[cfg(any(i2s0, i2s1))]
+    impl<'a, RX> Drop for DmaRxDoneChFuture<'a, RX>
+    where
+        RX: Rx,
+    {
+        fn drop(&mut self) {
+            self.rx.unlisten_ch_in_done();
+            self.rx.unlisten_in_descriptor_error();
+            self.rx.unlisten_in_descriptor_error_dscr_empty();
+            self.rx.unlisten_in_descriptor_error_err_eof();
         }
     }
 
@@ -2342,25 +2400,21 @@ pub(crate) mod asynch {
         }
 
         if Channel::is_in_done() && Channel::is_listening_in_eof() {
-            Channel::clear_in_interrupts();
             Channel::unlisten_in_eof();
             Rx::waker().wake()
         }
 
         if Channel::is_ch_in_done_set() {
-            Channel::clear_ch_in_done();
             Channel::unlisten_ch_in_done();
             Rx::waker().wake()
         }
 
         if Channel::is_out_done() && Channel::is_listening_out_eof() {
-            Channel::clear_out_interrupts();
             Channel::unlisten_out_eof();
             Tx::waker().wake()
         }
 
         if Channel::is_ch_out_done_set() {
-            Channel::clear_ch_out_done();
             Channel::unlisten_ch_out_done();
             Tx::waker().wake()
         }
