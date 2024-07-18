@@ -2688,10 +2688,9 @@ impl Drop for FreeApListOnDrop {
 mod embedded_svc_compat {
     use super::*;
 
-    #[allow(clippy::from_over_into)]
-    impl Into<embedded_svc::wifi::Capability> for Capability {
-        fn into(self) -> embedded_svc::wifi::Capability {
-            match self {
+    impl From<Capability> for embedded_svc::wifi::Capability {
+        fn from(s: Capability) -> embedded_svc::wifi::Capability {
+            match s {
                 Capability::Client => embedded_svc::wifi::Capability::Client,
                 Capability::AccessPoint => embedded_svc::wifi::Capability::AccessPoint,
                 Capability::Mixed => embedded_svc::wifi::Capability::Mixed,
@@ -2699,10 +2698,9 @@ mod embedded_svc_compat {
         }
     }
 
-    #[allow(clippy::from_over_into)]
-    impl Into<embedded_svc::wifi::AuthMethod> for AuthMethod {
-        fn into(self) -> embedded_svc::wifi::AuthMethod {
-            match self {
+    impl From<AuthMethod> for embedded_svc::wifi::AuthMethod {
+        fn from(s: AuthMethod) -> embedded_svc::wifi::AuthMethod {
+            match s {
                 AuthMethod::None => embedded_svc::wifi::AuthMethod::None,
                 AuthMethod::WEP => embedded_svc::wifi::AuthMethod::WEP,
                 AuthMethod::WPA => embedded_svc::wifi::AuthMethod::WPA,
@@ -2732,10 +2730,9 @@ mod embedded_svc_compat {
         }
     }
 
-    #[allow(clippy::from_over_into)]
-    impl Into<embedded_svc::wifi::Protocol> for Protocol {
-        fn into(self) -> embedded_svc::wifi::Protocol {
-            match self {
+    impl From<Protocol> for embedded_svc::wifi::Protocol {
+        fn from(s: Protocol) -> embedded_svc::wifi::Protocol {
+            match s {
                 Protocol::P802D11B => embedded_svc::wifi::Protocol::P802D11B,
                 Protocol::P802D11BG => embedded_svc::wifi::Protocol::P802D11BG,
                 Protocol::P802D11BGN => embedded_svc::wifi::Protocol::P802D11BGN,
@@ -2759,10 +2756,9 @@ mod embedded_svc_compat {
         }
     }
 
-    #[allow(clippy::from_over_into)]
-    impl Into<embedded_svc::wifi::Configuration> for Configuration {
-        fn into(self) -> embedded_svc::wifi::Configuration {
-            match self {
+    impl From<Configuration> for embedded_svc::wifi::Configuration {
+        fn from(s: Configuration) -> embedded_svc::wifi::Configuration {
+            match s {
                 Configuration::None => embedded_svc::wifi::Configuration::None,
                 Configuration::Client(conf) => embedded_svc::wifi::Configuration::Client(
                     embedded_svc::wifi::ClientConfiguration {
@@ -2881,31 +2877,29 @@ mod embedded_svc_compat {
         }
     }
 
-    #[allow(clippy::from_over_into)]
-    impl Into<embedded_svc::wifi::AccessPointInfo> for AccessPointInfo {
-        fn into(self) -> embedded_svc::wifi::AccessPointInfo {
+    impl From<AccessPointInfo> for embedded_svc::wifi::AccessPointInfo {
+        fn from(s: AccessPointInfo) -> embedded_svc::wifi::AccessPointInfo {
             embedded_svc::wifi::AccessPointInfo {
-                ssid: self.ssid.clone(),
-                bssid: self.bssid,
-                channel: self.channel,
-                secondary_channel: self.secondary_channel.into(),
-                signal_strength: self.signal_strength,
+                ssid: s.ssid.clone(),
+                bssid: s.bssid,
+                channel: s.channel,
+                secondary_channel: s.secondary_channel.into(),
+                signal_strength: s.signal_strength,
                 protocols: {
                     let mut res = EnumSet::<embedded_svc::wifi::Protocol>::new();
-                    self.protocols.into_iter().for_each(|v| {
+                    s.protocols.into_iter().for_each(|v| {
                         res.insert(v.into());
                     });
                     res
                 },
-                auth_method: self.auth_method.map(|v| v.into()),
+                auth_method: s.auth_method.map(|v| v.into()),
             }
         }
     }
 
-    #[allow(clippy::from_over_into)]
-    impl Into<embedded_svc::wifi::SecondaryChannel> for SecondaryChannel {
-        fn into(self) -> embedded_svc::wifi::SecondaryChannel {
-            match self {
+    impl From<SecondaryChannel> for embedded_svc::wifi::SecondaryChannel {
+        fn from(s: SecondaryChannel) -> embedded_svc::wifi::SecondaryChannel {
+            match s {
                 SecondaryChannel::None => embedded_svc::wifi::SecondaryChannel::None,
                 SecondaryChannel::Above => embedded_svc::wifi::SecondaryChannel::Above,
                 SecondaryChannel::Below => embedded_svc::wifi::SecondaryChannel::Below,
@@ -2913,12 +2907,11 @@ mod embedded_svc_compat {
         }
     }
 
-    #[allow(clippy::from_over_into)]
-    impl Into<embedded_svc::ipv4::Subnet> for crate::wifi::ipv4::Subnet {
-        fn into(self) -> embedded_svc::ipv4::Subnet {
+    impl From<crate::wifi::ipv4::Subnet> for embedded_svc::ipv4::Subnet {
+        fn from(s: crate::wifi::ipv4::Subnet) -> embedded_svc::ipv4::Subnet {
             embedded_svc::ipv4::Subnet {
-                gateway: embedded_svc::ipv4::Ipv4Addr::from(self.gateway.octets()),
-                mask: embedded_svc::ipv4::Mask(self.mask.0),
+                gateway: embedded_svc::ipv4::Ipv4Addr::from(s.gateway.octets()),
+                mask: embedded_svc::ipv4::Mask(s.mask.0),
             }
         }
     }
@@ -2932,16 +2925,15 @@ mod embedded_svc_compat {
         }
     }
 
-    #[allow(clippy::from_over_into)]
-    impl Into<embedded_svc::ipv4::IpInfo> for super::ipv4::IpInfo {
-        fn into(self) -> embedded_svc::ipv4::IpInfo {
+    impl From<super::ipv4::IpInfo> for embedded_svc::ipv4::IpInfo {
+        fn from(s: super::ipv4::IpInfo) -> embedded_svc::ipv4::IpInfo {
             embedded_svc::ipv4::IpInfo {
-                ip: embedded_svc::ipv4::Ipv4Addr::from(self.ip.octets()),
-                subnet: self.subnet.into(),
-                dns: self
+                ip: embedded_svc::ipv4::Ipv4Addr::from(s.ip.octets()),
+                subnet: s.subnet.into(),
+                dns: s
                     .dns
                     .map(|v| embedded_svc::ipv4::Ipv4Addr::from(v.octets())),
-                secondary_dns: self
+                secondary_dns: s
                     .secondary_dns
                     .map(|v| embedded_svc::ipv4::Ipv4Addr::from(v.octets())),
             }
@@ -2988,10 +2980,9 @@ mod embedded_svc_compat {
         }
     }
 
-    #[allow(clippy::from_over_into)]
-    impl Into<embedded_svc::ipv4::Configuration> for super::ipv4::Configuration {
-        fn into(self) -> embedded_svc::ipv4::Configuration {
-            match self {
+    impl From<super::ipv4::Configuration> for embedded_svc::ipv4::Configuration {
+        fn from(s: super::ipv4::Configuration) -> embedded_svc::ipv4::Configuration {
+            match s {
                 super::ipv4::Configuration::Client(client) => {
                     let config = match client {
                         super::ipv4::ClientConfiguration::DHCP(dhcp) => {
