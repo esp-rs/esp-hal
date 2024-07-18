@@ -1139,8 +1139,6 @@ pub(crate) mod utils {
                 SPI0_R_DIO_ADDR_BITSLEN,
                 SPI_USR_ADDR_BITLEN_S,
             );
-        } else if (rd_mode_reg & (SPI_FREAD_QUAD_M | SPI_FREAD_DUAL_M)) != 0 {
-            spi_cache_dummy = SPI0_R_FAST_DUMMY_CYCLELEN;
         } else {
             spi_cache_dummy = SPI0_R_FAST_DUMMY_CYCLELEN;
         }
