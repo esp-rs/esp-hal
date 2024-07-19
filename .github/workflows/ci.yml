@@ -89,8 +89,11 @@ jobs:
 
       # Build all supported examples for the low-power core first (if present):
       - if: contains(fromJson('["esp32c6", "esp32s2", "esp32s3"]'), matrix.device.soc)
-        name: Build prerequisites (esp-lp-hal)
+        name: Build prerequisite examples (esp-lp-hal)
         run: cargo xtask build-examples esp-lp-hal ${{ matrix.device.soc }}
+      - if: contains(fromJson('["esp32c6", "esp32s2", "esp32s3"]'), matrix.device.soc)
+        name: Check esp-lp-hal documentation
+        run: RUSTDOCFLAGS="-D warnings" cargo xtask build-documentation --packages esp-lp-hal --chips ${{ matrix.device.soc }}
 
       # Make sure we're able to build the HAL without the default features
       # enabled:
@@ -108,132 +111,8 @@ jobs:
       - name: Check doc-tests
         run: cargo xtask run-doc-test esp-hal ${{ matrix.device.soc }}
       - name: Check documentation
-        run:  RUSTDOCFLAGS="-D warnings" cargo xtask build-documentation --packages esp-hal --chips ${{ matrix.device.soc }}
+        run: RUSTDOCFLAGS="-D warnings" cargo xtask build-documentation --packages esp-hal --chips ${{ matrix.device.soc }}
 
-  esp-lp-hal:
-    runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        soc: ["esp32c6", "esp32s2", "esp32s3"]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      # Install the Rust stable and nightly toolchains for RISC-V devices:
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
-          toolchain: stable
-          components: rust-src
-      - uses: dtolnay/rust-toolchain@v1
-        if: ${{ !contains(fromJson('["esp32s2", "esp32s3"]'), matrix.soc) }}
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
-          toolchain: nightly
-          components: rust-src
-      # Install the Rust toolchain for Xtensa devices:
-      - if: contains(fromJson('["esp32s2", "esp32s3"]'), matrix.soc)
-        uses: esp-rs/xtensa-toolchain@v1.5
-        with:
-          buildtargets: ${{ matrix.soc }}
-          default: true
-          ldproxy: false
-
-
-      - uses: Swatinem/rust-cache@v2
-
-      # Build all supported examples for the specified device:
-      - name: Build examples
-        run: cargo xtask build-examples esp-lp-hal ${{ matrix.soc }}
-      - name: Check documentation
-        run:  RUSTDOCFLAGS="-D warnings" cargo xtask build-documentation --packages esp-lp-hal --chips ${{ matrix.soc }}
-  esp-riscv-rt:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
-          toolchain: stable
-          components: rust-src
-      - uses: Swatinem/rust-cache@v2
-
-      # Build for all RISC-V targets (no features):
-      - name: Build esp-riscv-rt (riscv32imc, no features)
-        run: cd esp-riscv-rt/ && cargo build --target=riscv32imc-unknown-none-elf
-      - name: Build esp-riscv-rt (riscv32imac, no features)
-        run: cd esp-riscv-rt/ && cargo build --target=riscv32imac-unknown-none-elf
-      # Build for all RISC-V targets (all features):
-      - name: Build esp-riscv-rt (riscv32imc, all features)
-        run: cd esp-riscv-rt/ && cargo build --target=riscv32imc-unknown-none-elf --features=ci
-      - name: Build esp-riscv-rt (riscv32imac, all features)
-        run: cd esp-riscv-rt/ && cargo build --target=riscv32imac-unknown-none-elf --features=ci
-
-  esp-println:
-    name: esp-println (${{ matrix.device.soc }})
-    runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        device: [
-            # RISC-V devices:
-            { soc: "esp32c2", target: "riscv32imc-unknown-none-elf" },
-            { soc: "esp32c3", target: "riscv32imc-unknown-none-elf" },
-            { soc: "esp32c6", target: "riscv32imac-unknown-none-elf" },
-            { soc: "esp32h2", target: "riscv32imac-unknown-none-elf" },
-            # Xtensa devices:
-            { soc: "esp32", target: "xtensa-esp32-none-elf" },
-            { soc: "esp32s2", target: "xtensa-esp32s2-none-elf" },
-            { soc: "esp32s3", target: "xtensa-esp32s3-none-elf" },
-          ]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      # Install the Rust stable and nightly toolchains for RISC-V devices:
-      - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc) }}
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
-          toolchain: stable
-          components: rust-src
-      - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc) }}
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
-          toolchain: nightly
-          components: rust-src
-      # Install the Rust toolchain for Xtensa devices:
-      - if: contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc)
-        uses: esp-rs/xtensa-toolchain@v1.5
-        with:
-          buildtargets: ${{ matrix.device.soc }}
-          default: true
-          ldproxy: false
-
-      - uses: Swatinem/rust-cache@v2
-
-      # Make sure we're able to build with the default features and most common features enabled
-      - name: Build (no features)
-        run: |
-          cargo xtask build-package \
-            --features=${{ matrix.device.soc }},log \
-            --target=${{ matrix.device.target }} \
-            esp-println
-
-      # So #1678 doesn't reoccur ('defmt-espflash,auto')
-      - name: Build (with feature 'defmt-espflash')
-        run: |
-          cargo xtask build-package \
-            --features=${{ matrix.device.soc }},log,defmt-espflash \
-            --target=${{ matrix.device.target }} \
-            esp-println
-      - name: Check documentation
-        run:  RUSTDOCFLAGS="-D warnings" cargo xtask build-documentation --packages esp-println --chips ${{ matrix.device.soc }}
   extras:
     runs-on: ubuntu-latest
 
@@ -257,13 +136,19 @@ jobs:
   # --------------------------------------------------------------------------
   # MSRV
 
-  msrv-riscv:
+  msrv:
     runs-on: ubuntu-latest
     env:
       RUSTC_BOOTSTRAP: 1
 
     steps:
       - uses: actions/checkout@v4
+      # install esp toolchain first so it isn't set as the default
+      - uses: esp-rs/xtensa-toolchain@v1.5
+        with:
+          default: true
+          ldproxy: false
+          version: ${{ env.MSRV }}
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
@@ -272,37 +157,25 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       # Verify the MSRV for all RISC-V chips.
-      - name: msrv (esp-hal)
+      - name: msrv RISCV (esp-hal)
         run: |
           cargo xtask build-package --features=esp32c2,ci --target=riscv32imc-unknown-none-elf   esp-hal
           cargo xtask build-package --features=esp32c3,ci --target=riscv32imc-unknown-none-elf   esp-hal
           cargo xtask build-package --features=esp32c6,ci --target=riscv32imac-unknown-none-elf  esp-hal
           cargo xtask build-package --features=esp32h2,ci --target=riscv32imac-unknown-none-elf  esp-hal
+
+      # Verify the MSRV for all Xtensa chips:
+      - name: msrv RISCV (esp-hal)
+        run: |
+          cargo xtask build-package --toolchain=esp --features=esp32,ci   --target=xtensa-esp32-none-elf   esp-hal
+          cargo xtask build-package --toolchain=esp --features=esp32s2,ci --target=xtensa-esp32s2-none-elf esp-hal
+          cargo xtask build-package --toolchain=esp --features=esp32s3,ci --target=xtensa-esp32s3-none-elf esp-hal
+
       - name: msrv (esp-lp-hal)
         run: |
           cargo xtask build-package --features=esp32c6 --target=riscv32imac-unknown-none-elf esp-lp-hal
           cargo xtask build-package --features=esp32s2 --target=riscv32imc-unknown-none-elf  esp-lp-hal
           cargo xtask build-package --features=esp32s3 --target=riscv32imc-unknown-none-elf  esp-lp-hal
-
-  msrv-xtensa:
-    runs-on: ubuntu-latest
-    env:
-      RUSTC_BOOTSTRAP: 1
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: esp-rs/xtensa-toolchain@v1.5
-        with:
-          ldproxy: false
-          version: ${{ env.MSRV }}
-      - uses: Swatinem/rust-cache@v2
-
-      # Verify the MSRV for all Xtensa chips:
-      - name: msrv (esp-hal)
-        run: |
-          cargo xtask build-package --toolchain=esp --features=esp32,ci   --target=xtensa-esp32-none-elf   esp-hal
-          cargo xtask build-package --toolchain=esp --features=esp32s2,ci --target=xtensa-esp32s2-none-elf esp-hal
-          cargo xtask build-package --toolchain=esp --features=esp32s3,ci --target=xtensa-esp32s3-none-elf esp-hal
 
   # --------------------------------------------------------------------------
   # Lint & Format
