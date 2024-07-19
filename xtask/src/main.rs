@@ -130,6 +130,10 @@ struct LintPackagesArgs {
     /// Package(s) to target.
     #[arg(value_enum, default_values_t = Package::iter())]
     packages: Vec<Package>,
+
+    /// Lint for a specific chip
+    #[arg(long, value_enum, default_values_t = Chip::iter())]
+    chips: Vec<Chip>,
 }
 
 #[derive(Debug, Args)]
@@ -464,7 +468,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
         // building, so we need to handle each individually (though there
         // is *some* overlap)
 
-        for chip in Chip::iter() {
+        for chip in &args.chips {
             let device = Config::for_chip(&chip);
 
             match package {
@@ -583,7 +587,6 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             "-Zbuild-std=core",
                             &format!("--target={}", chip.target()),
                             &format!("--features={chip},storage,nor-flash,low-level"),
-                            "--release",
                         ],
                     )?;
                 }
@@ -649,7 +652,13 @@ fn lint_package(path: &Path, args: &[&str]) -> Result<()> {
         builder = builder.arg(arg.to_string());
     }
 
-    let cargo_args = builder.arg("--").arg("-D").arg("warnings").build();
+    // build in release to reuse example artifacts
+    let cargo_args = builder
+        .arg("--release")
+        .arg("--")
+        .arg("-D")
+        .arg("warnings")
+        .build();
 
     xtask::cargo::run(&cargo_args, &path)
 }

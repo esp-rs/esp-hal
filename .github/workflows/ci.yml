@@ -64,26 +64,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Install the Rust toolchain for Xtensa devices:
+      - uses: esp-rs/xtensa-toolchain@v1.5
+        with:
+          default: true
+          ldproxy: false
       # Install the Rust stable and nightly toolchains for RISC-V devices:
-      - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc) }}
-        uses: dtolnay/rust-toolchain@v1
+      - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: stable
           components: rust-src
-      - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc) }}
-        uses: dtolnay/rust-toolchain@v1
+      - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: nightly
           components: rust-src
-      # Install the Rust toolchain for Xtensa devices:
-      - if: contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.device.soc)
-        uses: esp-rs/xtensa-toolchain@v1.5
-        with:
-          buildtargets: ${{ matrix.device.soc }}
-          default: true
-          ldproxy: false
 
       - uses: Swatinem/rust-cache@v2
 
@@ -109,9 +105,14 @@ jobs:
         run: cargo xtask build-examples esp-hal ${{ matrix.device.soc }}
       # Check doc-tests
       - name: Check doc-tests
-        run: cargo xtask run-doc-test esp-hal ${{ matrix.device.soc }}
+        run: cargo +esp xtask run-doc-test esp-hal ${{ matrix.device.soc }}
       - name: Check documentation
         run: RUSTDOCFLAGS="-D warnings" cargo xtask build-documentation --packages esp-hal --chips ${{ matrix.device.soc }}
+      # Run clippy
+      - name: Clippy
+        # We use the 'esp' toolchain for *all* targets, in order to get a
+        # semi-stable and consistent set of lints for all targets:
+        run: cargo +esp xtask lint-packages --chips ${{ matrix.device.soc }}
 
   extras:
     runs-on: ubuntu-latest
@@ -165,7 +166,7 @@ jobs:
           cargo xtask build-package --features=esp32h2,ci --target=riscv32imac-unknown-none-elf  esp-hal
 
       # Verify the MSRV for all Xtensa chips:
-      - name: msrv RISCV (esp-hal)
+      - name: msrv Xtensa (esp-hal)
         run: |
           cargo xtask build-package --toolchain=esp --features=esp32,ci   --target=xtensa-esp32-none-elf   esp-hal
           cargo xtask build-package --toolchain=esp --features=esp32s2,ci --target=xtensa-esp32s2-none-elf esp-hal
@@ -178,23 +179,7 @@ jobs:
           cargo xtask build-package --features=esp32s3 --target=riscv32imc-unknown-none-elf  esp-lp-hal
 
   # --------------------------------------------------------------------------
-  # Lint & Format
-
-  clippy:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      # We use the 'esp' toolchain for *all* targets, in order to get a
-      # semi-stable and consistent set of lints for all targets:
-      - uses: esp-rs/xtensa-toolchain@v1.5
-        with:
-          default: true
-          ldproxy: false
-      - uses: Swatinem/rust-cache@v2
-
-      # Lint all packages:
-      - run: cargo xtask lint-packages
+  # Format
 
   rustfmt:
     runs-on: ubuntu-latest
