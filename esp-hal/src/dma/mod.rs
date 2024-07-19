@@ -126,7 +126,7 @@ where
     W: Word,
 {
     unsafe fn read_buffer(&self) -> (*const u8, usize) {
-        (self.as_ptr() as *const u8, core::mem::size_of_val(self))
+        (self.as_ptr() as *const u8, core::mem::size_of_val(*self))
     }
 }
 
@@ -135,7 +135,7 @@ where
     W: Word,
 {
     unsafe fn read_buffer(&self) -> (*const u8, usize) {
-        (self.as_ptr() as *const u8, core::mem::size_of_val(self))
+        (self.as_ptr() as *const u8, core::mem::size_of_val(*self))
     }
 }
 
@@ -179,7 +179,7 @@ where
     W: Word,
 {
     unsafe fn write_buffer(&mut self) -> (*mut u8, usize) {
-        (self.as_mut_ptr() as *mut u8, core::mem::size_of_val(self))
+        (self.as_mut_ptr() as *mut u8, core::mem::size_of_val(*self))
     }
 }
 
