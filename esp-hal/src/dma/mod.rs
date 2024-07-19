@@ -54,14 +54,21 @@
 
 use core::{fmt::Debug, marker::PhantomData, ptr::addr_of_mut, sync::atomic::compiler_fence};
 
-trait Word {}
+trait Word: crate::private::Sealed {}
 
-impl Word for u8 {}
-impl Word for u16 {}
-impl Word for u32 {}
-impl Word for i8 {}
-impl Word for i16 {}
-impl Word for i32 {}
+macro_rules! impl_word {
+    ($w:ty) => {
+        impl $crate::private::Sealed for $w {}
+        impl Word for $w {}
+    };
+}
+
+impl_word!(u8);
+impl_word!(u16);
+impl_word!(u32);
+impl_word!(i8);
+impl_word!(i16);
+impl_word!(i32);
 
 impl<W, const S: usize> crate::private::Sealed for [W; S] where W: Word {}
 
@@ -92,7 +99,7 @@ where
     W: Word,
 {
     unsafe fn read_buffer(&self) -> (*const u8, usize) {
-        (self.as_ptr() as *const u8, core::mem::size_of::<W>() * S)
+        (self.as_ptr() as *const u8, core::mem::size_of_val(self))
     }
 }
 
@@ -101,7 +108,7 @@ where
     W: Word,
 {
     unsafe fn read_buffer(&self) -> (*const u8, usize) {
-        (self.as_ptr() as *const u8, core::mem::size_of::<W>() * S)
+        (self.as_ptr() as *const u8, core::mem::size_of_val(*self))
     }
 }
 
@@ -110,7 +117,7 @@ where
     W: Word,
 {
     unsafe fn read_buffer(&self) -> (*const u8, usize) {
-        (self.as_ptr() as *const u8, core::mem::size_of::<W>() * S)
+        (self.as_ptr() as *const u8, core::mem::size_of_val(*self))
     }
 }
 
@@ -119,10 +126,7 @@ where
     W: Word,
 {
     unsafe fn read_buffer(&self) -> (*const u8, usize) {
-        (
-            self.as_ptr() as *const u8,
-            core::mem::size_of::<W>() * self.len(),
-        )
+        (self.as_ptr() as *const u8, core::mem::size_of_val(self))
     }
 }
 
@@ -131,10 +135,7 @@ where
     W: Word,
 {
     unsafe fn read_buffer(&self) -> (*const u8, usize) {
-        (
-            self.as_ptr() as *const u8,
-            core::mem::size_of::<W>() * self.len(),
-        )
+        (self.as_ptr() as *const u8, core::mem::size_of_val(self))
     }
 }
 
@@ -160,7 +161,7 @@ where
     W: Word,
 {
     unsafe fn write_buffer(&mut self) -> (*mut u8, usize) {
-        (self.as_mut_ptr() as *mut u8, core::mem::size_of::<W>() * S)
+        (self.as_mut_ptr() as *mut u8, core::mem::size_of_val(self))
     }
 }
 
@@ -169,7 +170,7 @@ where
     W: Word,
 {
     unsafe fn write_buffer(&mut self) -> (*mut u8, usize) {
-        (self.as_mut_ptr() as *mut u8, core::mem::size_of::<W>() * S)
+        (self.as_mut_ptr() as *mut u8, core::mem::size_of_val(*self))
     }
 }
 
@@ -178,10 +179,7 @@ where
     W: Word,
 {
     unsafe fn write_buffer(&mut self) -> (*mut u8, usize) {
-        (
-            self.as_mut_ptr() as *mut u8,
-            core::mem::size_of::<W>() * self.len(),
-        )
+        (self.as_mut_ptr() as *mut u8, core::mem::size_of_val(self))
     }
 }
 
