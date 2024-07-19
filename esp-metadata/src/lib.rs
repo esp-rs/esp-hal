@@ -7,7 +7,6 @@ const ESP32C2_TOML: &str = include_str!("../devices/esp32c2.toml");
 const ESP32C3_TOML: &str = include_str!("../devices/esp32c3.toml");
 const ESP32C6_TOML: &str = include_str!("../devices/esp32c6.toml");
 const ESP32H2_TOML: &str = include_str!("../devices/esp32h2.toml");
-const ESP32P4_TOML: &str = include_str!("../devices/esp32p4.toml");
 const ESP32S2_TOML: &str = include_str!("../devices/esp32s2.toml");
 const ESP32S3_TOML: &str = include_str!("../devices/esp32s3.toml");
 
@@ -17,7 +16,6 @@ lazy_static::lazy_static! {
     static ref ESP32C3_CFG: Config = basic_toml::from_str(ESP32C3_TOML).unwrap();
     static ref ESP32C6_CFG: Config = basic_toml::from_str(ESP32C6_TOML).unwrap();
     static ref ESP32H2_CFG: Config = basic_toml::from_str(ESP32H2_TOML).unwrap();
-    static ref ESP32P4_CFG: Config = basic_toml::from_str(ESP32P4_TOML).unwrap();
     static ref ESP32S2_CFG: Config = basic_toml::from_str(ESP32S2_TOML).unwrap();
     static ref ESP32S3_CFG: Config = basic_toml::from_str(ESP32S3_TOML).unwrap();
 }
