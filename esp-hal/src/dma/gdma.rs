@@ -768,24 +768,19 @@ mod m2m {
                 self.channel.rx.set_mem2mem_mode(true);
             }
             #[cfg(esp32s3)]
-            if crate::soc::is_valid_psram_address(tx_ptr as u32) {
-                self.channel
-                    .tx
-                    .set_ext_mem_block_size(DmaExtMemBKSize::Size32);
-                // TODO: this is in the wrong place, maybe it should be in
-                // prepare_transfer_without_start and should do this for the adderss for each
-                // descriptor
-                unsafe { crate::soc::cache_writeback_addr(tx_ptr as u32, tx_len as u32) };
-            }
-            #[cfg(esp32s3)]
-            if crate::soc::is_valid_psram_address(rx_ptr as u32) {
-                self.channel
-                    .rx
-                    .set_ext_mem_block_size(DmaExtMemBKSize::Size32);
-                // TODO: this is in the wrong place, maybe it should be in
-                // prepare_transfer_without_start and should do this for the adderss for each
-                // descriptor
-                unsafe { crate::soc::cache_invalidate_addr(rx_ptr as u32, rx_len as u32) };
+            {
+                let align = match unsafe { crate::soc::cache_get_dcache_line_size() } {
+                    16 => DmaExtMemBKSize::Size16,
+                    32 => DmaExtMemBKSize::Size32,
+                    64 => DmaExtMemBKSize::Size64,
+                    _ => panic!("unsupported cache line size"),
+                };
+                if crate::soc::is_valid_psram_address(tx_ptr as u32) {
+                    self.channel.tx.set_ext_mem_block_size(align);
+                }
+                if crate::soc::is_valid_psram_address(rx_ptr as u32) {
+                    self.channel.rx.set_ext_mem_block_size(align);
+                }
             }
             self.channel.tx.start_transfer()?;
             self.channel.rx.start_transfer()?;

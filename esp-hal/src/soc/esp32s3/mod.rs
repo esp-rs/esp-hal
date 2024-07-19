@@ -192,3 +192,12 @@ pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
     }
     Cache_Invalidate_Addr(addr, size);
 }
+
+#[doc(hidden)]
+#[link_section = ".rwtext"]
+pub unsafe fn cache_get_dcache_line_size() -> u32 {
+    extern "C" {
+        fn Cache_Get_DCache_Line_Size() -> u32;
+    }
+    Cache_Get_DCache_Line_Size()
+}

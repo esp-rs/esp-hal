@@ -14,6 +14,7 @@ PROVIDE(esp_rom_spiflash_select_qio_pins = 0x40000a68 );
 PROVIDE(esp_rom_spi_set_op_mode = 0x400008a0 );
 PROVIDE(esp_rom_spi_cmd_start = 0x40000888);
 PROVIDE(esp_rom_spi_cmd_config = 0x4000087c);
+PROVIDE(Cache_Get_DCache_Line_Size = 0x40001608 );
 PROVIDE(Cache_Invalidate_Addr = 0x400016b0 );
 PROVIDE(Cache_Suspend_DCache = 0x400018b4 );
 PROVIDE(Cache_Resume_DCache = 0x400018c0 );

@@ -95,6 +95,11 @@ impl DmaDescriptor {
         self.flags.set_length(len as u16)
     }
 
+    #[allow(unused)]
+    fn size(&self) -> usize {
+        self.flags.size() as usize
+    }
+
     fn len(&self) -> usize {
         self.flags.length() as usize
     }
@@ -1131,6 +1136,25 @@ where
             return Err(DmaError::InvalidAlignment);
         }
 
+        // for esp32s3 we check each descriptor buffer that points to psram for
+        // alignment and invalidate the cache for that buffer
+        // NOTE: for RX the `buffer` and `size`` need to be aligned but the `len` does
+        // not. TRM section 3.4.9
+        #[cfg(esp32s3)]
+        for des in chain.descriptors.iter() {
+            // we are forcing the DMA alignment to the cache line size
+            // required when we are using dcache
+            let alignment = crate::soc::cache_get_dcache_line_size() as usize;
+            if crate::soc::is_valid_psram_address(des.buffer as u32) {
+                // both the size and address of the buffer must be aligned
+                if des.buffer as usize % alignment != 0 && des.size() % alignment != 0 {
+                    return Err(DmaError::InvalidAlignment);
+                }
+                // TODO: make this optional?
+                crate::soc::cache_invalidate_addr(des.buffer as u32, des.size() as u32);
+            }
+        }
+
         self.rx_impl.prepare_transfer_without_start(chain, peri)
     }
 
@@ -1423,6 +1447,21 @@ where
         peri: DmaPeripheral,
         chain: &DescriptorChain,
     ) -> Result<(), DmaError> {
+        // for esp32s3 we check each descriptor buffer that points to psram for
+        // alignment and writeback the cache for that buffer
+        #[cfg(esp32s3)]
+        for des in chain.descriptors.iter() {
+            // we are forcing the DMA alignment to the cache line size
+            // required when we are using dcache
+            let alignment = crate::soc::cache_get_dcache_line_size() as usize;
+            if crate::soc::is_valid_psram_address(des.buffer as u32) {
+                // both the size and address of the buffer must be aligned
+                if des.buffer as usize % alignment != 0 && des.size() % alignment != 0 {
+                    return Err(DmaError::InvalidAlignment);
+                }
+                crate::soc::cache_writeback_addr(des.buffer as u32, des.size() as u32);
+            }
+        }
         self.tx_impl.prepare_transfer_without_start(chain, peri)
     }
 
