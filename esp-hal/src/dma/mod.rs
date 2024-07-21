@@ -2294,7 +2294,7 @@ pub(crate) mod asynch {
         ) -> Poll<Self::Output> {
             TX::waker().register(cx.waker());
             if self.tx.is_ch_out_done_set() {
-                self.tx.clear_interrupts();
+                self.tx.clear_ch_out_done();
                 Poll::Ready(Ok(()))
             } else if self.tx.has_error() {
                 self.tx.clear_interrupts();
@@ -2352,7 +2352,7 @@ pub(crate) mod asynch {
         ) -> Poll<Self::Output> {
             RX::waker().register(cx.waker());
             if self.rx.is_ch_in_done_set() {
-                self.rx.clear_interrupts();
+                self.rx.clear_ch_in_done();
                 Poll::Ready(Ok(()))
             } else if self.rx.has_error()
                 || self.rx.has_dscr_empty_error()
