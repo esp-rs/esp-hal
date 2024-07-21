@@ -141,18 +141,25 @@ pub mod asynch {
             .unwrap();
 
             TX_WAKER.register(cx.waker());
-            if Instance::is_listening_lcd_done() {
-                Poll::Pending
-            } else {
+            if Instance::is_lcd_done_set() {
+                Instance::clear_lcd_done();
                 Poll::Ready(())
+            } else {
+                Poll::Pending
             }
         }
     }
+
+    impl Drop for LcdDoneFuture {
+        fn drop(&mut self) {
+            Instance::unlisten_lcd_done();
+        }
+    }
+
     #[handler]
     fn interrupt_handler() {
         // TODO: this is a shared interrupt with Camera and here we ignore that!
         if Instance::is_lcd_done_set() {
-            Instance::clear_lcd_done();
             Instance::unlisten_lcd_done();
             TX_WAKER.wake()
         }
