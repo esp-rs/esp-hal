@@ -106,18 +106,6 @@ where
 {
     pub fn new(
         lcd: Lcd<'d, DM>,
-        channel: ChannelTx<'d, CH>,
-        descriptors: &'static mut [DmaDescriptor],
-        pins: P,
-        frequency: HertzU32,
-        config: Config,
-        clocks: &Clocks,
-    ) -> Self {
-        Self::new_internal(lcd, channel, descriptors, pins, frequency, config, clocks)
-    }
-
-    fn new_internal(
-        lcd: Lcd<'d, DM>,
         mut channel: ChannelTx<'d, CH>,
         descriptors: &'static mut [DmaDescriptor],
         mut pins: P,
@@ -386,21 +374,6 @@ impl<'d, CH: DmaChannel, P: TxPins> I8080<'d, CH, P, crate::Async>
 where
     P::Word: Into<u16>,
 {
-    pub fn new_async(
-        lcd: Lcd<'d, crate::Async>,
-        channel: ChannelTx<'d, CH>,
-        descriptors: &'static mut [DmaDescriptor],
-        pins: P,
-        frequency: HertzU32,
-        config: Config,
-        clocks: &Clocks,
-    ) -> Self
-    where
-        <CH as crate::dma::DmaChannel>::P: crate::dma::LcdCamPeripheral,
-    {
-        I8080::new_internal(lcd, channel, descriptors, pins, frequency, config, clocks)
-    }
-
     pub async fn send_dma_async<'t, TXBUF>(
         &'t mut self,
         cmd: impl Into<Command<P::Word>>,
