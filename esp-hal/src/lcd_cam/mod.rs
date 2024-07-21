@@ -170,7 +170,7 @@ mod private {
     pub(crate) struct Instance;
 
     // NOTE: the LCD_CAM interrupt registers are shared between LCD and Camera and
-    // this is only implemented for the LCD side, the Camera is implemented a
+    // this is only implemented for the LCD side, when the Camera is implemented a
     // CriticalSection will be needed to protect these shared registers.
     #[cfg(feature = "async")]
     impl Instance {
