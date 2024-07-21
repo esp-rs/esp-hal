@@ -65,6 +65,18 @@ impl<'d> LcdCam<'d, crate::Async> {
 
         PeripheralClockControl::enable(system::Peripheral::LcdCam);
 
+        unsafe {
+            crate::interrupt::bind_interrupt(
+                crate::peripherals::Interrupt::LCD_CAM,
+                asynch::interrupt_handler.handler(),
+            );
+        }
+        crate::interrupt::enable(
+            crate::peripherals::Interrupt::LCD_CAM,
+            asynch::interrupt_handler.priority(),
+        )
+        .unwrap();
+
         Self {
             lcd: Lcd {
                 lcd_cam: unsafe { lcd_cam.clone_unchecked() },
@@ -127,19 +139,6 @@ pub mod asynch {
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> core::task::Poll<Self::Output> {
-            unsafe {
-                // TODO: this is a shared interrupt with Camera and here we ignore that!
-                crate::interrupt::bind_interrupt(
-                    crate::peripherals::Interrupt::LCD_CAM,
-                    interrupt_handler.handler(),
-                );
-            }
-            crate::interrupt::enable(
-                crate::peripherals::Interrupt::LCD_CAM,
-                interrupt_handler.priority(),
-            )
-            .unwrap();
-
             TX_WAKER.register(cx.waker());
             if Instance::is_lcd_done_set() {
                 Instance::clear_lcd_done();
@@ -157,7 +156,7 @@ pub mod asynch {
     }
 
     #[handler]
-    fn interrupt_handler() {
+    pub(crate) fn interrupt_handler() {
         // TODO: this is a shared interrupt with Camera and here we ignore that!
         if Instance::is_lcd_done_set() {
             Instance::unlisten_lcd_done();
