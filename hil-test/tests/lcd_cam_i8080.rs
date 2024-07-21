@@ -8,8 +8,8 @@
 use defmt_rtt as _;
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
-    dma::{Dma, DmaPriority},
+    clock::{ClockControl, Clocks},
+    dma::{Dma, DmaDescriptor, DmaPriority},
     dma_buffers,
     gpio::dummy_pin::DummyPin,
     lcd_cam::{
@@ -23,8 +23,6 @@ use esp_hal::{
     prelude::*,
     system::SystemControl,
 };
-use esp_hal::clock::Clocks;
-use esp_hal::dma::DmaDescriptor;
 
 const DATA_SIZE: usize = 1024 * 10;
 
@@ -45,7 +43,13 @@ impl<'d> Context<'d> {
         let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
         let (tx_buffer, tx_descriptors, _, _) = dma_buffers!(DATA_SIZE, 0);
 
-        Self { lcd_cam, clocks, dma, tx_buffer, tx_descriptors }
+        Self {
+            lcd_cam,
+            clocks,
+            dma,
+            tx_buffer,
+            tx_descriptors,
+        }
     }
 }
 
@@ -62,7 +66,7 @@ mod tests {
     #[test]
     fn test_i8080_8bit(ctx: Context<'static>) {
         let channel = ctx.dma.channel0.configure(false, DmaPriority::Priority0);
- 
+
         let pins = TxEightBits::new(
             DummyPin::new(),
             DummyPin::new(),
@@ -84,7 +88,9 @@ mod tests {
             &ctx.clocks,
         );
 
-        let xfer = i8080.send_dma(Command::<u8>::None, 0, &ctx.tx_buffer).unwrap();
+        let xfer = i8080
+            .send_dma(Command::<u8>::None, 0, &ctx.tx_buffer)
+            .unwrap();
         xfer.wait().unwrap();
     }
 
@@ -115,7 +121,9 @@ mod tests {
             &ctx.clocks,
         );
 
-        let xfer = i8080.send_dma(Command::<u8>::None, 0, &ctx.tx_buffer).unwrap();
+        let xfer = i8080
+            .send_dma(Command::<u8>::None, 0, &ctx.tx_buffer)
+            .unwrap();
         xfer.wait().unwrap();
     }
 }
