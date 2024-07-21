@@ -61,6 +61,8 @@ use core::{fmt::Formatter, marker::PhantomData, mem::size_of};
 
 use fugit::HertzU32;
 
+#[cfg(feature = "async")]
+use crate::lcd_cam::asynch::LcdDoneFuture;
 use crate::{
     clock::Clocks,
     dma::{
@@ -88,8 +90,6 @@ use crate::{
     peripherals::LCD_CAM,
     Mode,
 };
-#[cfg(feature = "async")]
-use crate::{dma::asynch::DmaTxFuture, lcd_cam::asynch::LcdDoneFuture};
 
 pub struct I8080<'d, CH: DmaChannel, P, DM: Mode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
@@ -389,8 +389,10 @@ where
         self.start_write_bytes_dma(ptr as _, len * size_of::<P::Word>())?;
         self.start_send();
 
-        DmaTxFuture::new(&mut self.tx_channel).await?;
         LcdDoneFuture::new().await;
+        if self.tx_channel.has_error() {
+            return Err(DmaError::DescriptorError);
+        }
         Ok(())
     }
 }
