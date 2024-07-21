@@ -23,8 +23,31 @@ use esp_hal::{
     prelude::*,
     system::SystemControl,
 };
+use esp_hal::clock::Clocks;
+use esp_hal::dma::DmaDescriptor;
 
 const DATA_SIZE: usize = 1024 * 10;
+
+struct Context<'d> {
+    lcd_cam: LcdCam<'d, esp_hal::Blocking>,
+    clocks: Clocks<'d>,
+    dma: Dma<'d>,
+    tx_buffer: &'static [u8],
+    tx_descriptors: &'static mut [DmaDescriptor],
+}
+
+impl<'d> Context<'d> {
+    pub fn init() -> Self {
+        let peripherals = Peripherals::take();
+        let system = SystemControl::new(peripherals.SYSTEM);
+        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let dma = Dma::new(peripherals.DMA);
+        let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
+        let (tx_buffer, tx_descriptors, _, _) = dma_buffers!(DATA_SIZE, 0);
+
+        Self { lcd_cam, clocks, dma, tx_buffer, tx_descriptors }
+    }
+}
 
 #[cfg(test)]
 #[embedded_test::tests]
@@ -32,18 +55,14 @@ mod tests {
     use super::*;
 
     #[init]
-    fn init() {}
+    fn init() -> Context<'static> {
+        Context::init()
+    }
 
     #[test]
-    fn test_i8080_8bit() {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-        let (tx_buffer, tx_descriptors, _, _) = dma_buffers!(DATA_SIZE, 0);
-
-        let dma = Dma::new(peripherals.DMA);
-        let channel = dma.channel0.configure(false, DmaPriority::Priority0);
+    fn test_i8080_8bit(ctx: Context<'static>) {
+        let channel = ctx.dma.channel0.configure(false, DmaPriority::Priority0);
+ 
         let pins = TxEightBits::new(
             DummyPin::new(),
             DummyPin::new(),
@@ -54,19 +73,49 @@ mod tests {
             DummyPin::new(),
             DummyPin::new(),
         );
-        let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 
         let mut i8080 = I8080::new(
-            lcd_cam.lcd,
+            ctx.lcd_cam.lcd,
             channel.tx,
-            tx_descriptors,
+            ctx.tx_descriptors,
             pins,
             20.MHz(),
             i8080::Config::default(),
-            &clocks,
+            &ctx.clocks,
         );
 
-        let xfer = i8080.send_dma(Command::<u8>::None, 0, &tx_buffer).unwrap();
+        let xfer = i8080.send_dma(Command::<u8>::None, 0, &ctx.tx_buffer).unwrap();
+        xfer.wait().unwrap();
+    }
+
+    #[test]
+    fn test_i8080_8bit_async_channel(ctx: Context<'static>) {
+        let channel = ctx
+            .dma
+            .channel0
+            .configure_for_async(false, DmaPriority::Priority0);
+        let pins = TxEightBits::new(
+            DummyPin::new(),
+            DummyPin::new(),
+            DummyPin::new(),
+            DummyPin::new(),
+            DummyPin::new(),
+            DummyPin::new(),
+            DummyPin::new(),
+            DummyPin::new(),
+        );
+
+        let mut i8080 = I8080::new(
+            ctx.lcd_cam.lcd,
+            channel.tx,
+            ctx.tx_descriptors,
+            pins,
+            20.MHz(),
+            i8080::Config::default(),
+            &ctx.clocks,
+        );
+
+        let xfer = i8080.send_dma(Command::<u8>::None, 0, &ctx.tx_buffer).unwrap();
         xfer.wait().unwrap();
     }
 }
