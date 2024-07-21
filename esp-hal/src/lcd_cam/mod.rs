@@ -188,15 +188,6 @@ mod private {
                 .modify(|_, w| w.lcd_trans_done_int_ena().clear_bit());
         }
 
-        pub(crate) fn is_listening_lcd_done() -> bool {
-            let lcd_cam = unsafe { crate::peripherals::LCD_CAM::steal() };
-            lcd_cam
-                .lc_dma_int_ena()
-                .read()
-                .lcd_trans_done_int_ena()
-                .bit()
-        }
-
         pub(crate) fn is_lcd_done_set() -> bool {
             let lcd_cam = unsafe { crate::peripherals::LCD_CAM::steal() };
             lcd_cam
