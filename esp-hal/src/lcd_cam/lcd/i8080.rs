@@ -88,6 +88,8 @@ use crate::{
     peripherals::LCD_CAM,
     Mode,
 };
+#[cfg(feature = "async")]
+use crate::{dma::asynch::DmaTxFuture, lcd_cam::asynch::LcdDoneFuture};
 
 pub struct I8080<'d, CH: DmaChannel, P, DM: Mode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
@@ -97,13 +99,13 @@ pub struct I8080<'d, CH: DmaChannel, P, DM: Mode> {
     _phantom: PhantomData<DM>,
 }
 
-impl<'d, CH: DmaChannel, P: TxPins> I8080<'d, CH, P, crate::Blocking>
+impl<'d, CH: DmaChannel, P: TxPins, DM: Mode> I8080<'d, CH, P, DM>
 where
     CH::P: LcdCamPeripheral,
     P::Word: Into<u16>,
 {
     pub fn new(
-        lcd: Lcd<'d>,
+        lcd: Lcd<'d, DM>,
         channel: ChannelTx<'d, CH>,
         descriptors: &'static mut [DmaDescriptor],
         pins: P,
@@ -113,15 +115,9 @@ where
     ) -> Self {
         Self::new_internal(lcd, channel, descriptors, pins, frequency, config, clocks)
     }
-}
 
-impl<'d, CH: DmaChannel, P: TxPins, DM: Mode> I8080<'d, CH, P, DM>
-where
-    CH::P: LcdCamPeripheral,
-    P::Word: Into<u16>,
-{
     fn new_internal(
-        lcd: Lcd<'d>,
+        lcd: Lcd<'d, DM>,
         mut channel: ChannelTx<'d, CH>,
         descriptors: &'static mut [DmaDescriptor],
         mut pins: P,
@@ -391,7 +387,7 @@ where
     P::Word: Into<u16>,
 {
     pub fn new_async(
-        lcd: Lcd<'d>,
+        lcd: Lcd<'d, crate::Async>,
         channel: ChannelTx<'d, CH>,
         descriptors: &'static mut [DmaDescriptor],
         pins: P,
@@ -419,7 +415,9 @@ where
         self.setup_send(cmd.into(), dummy);
         self.start_write_bytes_dma(ptr as _, len * size_of::<P::Word>())?;
         self.start_send();
-        crate::dma::asynch::DmaTxFuture::new(&mut self.tx_channel).await?;
+
+        DmaTxFuture::new(&mut self.tx_channel).await?;
+        LcdDoneFuture::new().await;
         Ok(())
     }
 }
