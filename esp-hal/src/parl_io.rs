@@ -1758,9 +1758,8 @@ pub mod asynch {
                 }
             }
 
-            let future = DmaRxDoneChFuture::new(&mut self.rx_channel);
-            Self::start_receive_bytes_dma(future.rx, &mut self.rx_chain, ptr, len)?;
-            future.await?;
+            Self::start_receive_bytes_dma(&mut self.rx_channel, &mut self.rx_chain, ptr, len)?;
+            DmaRxDoneChFuture::new(&mut self.rx_channel).await?;
 
             Ok(())
         }
