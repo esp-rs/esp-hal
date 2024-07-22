@@ -1870,6 +1870,8 @@ pub(crate) mod dma_private {
 
 /// DMA transaction for TX only transfers
 ///
+/// # Safety
+///
 /// Never use [core::mem::forget] on an in-progress transfer
 #[non_exhaustive]
 #[must_use]
@@ -1915,6 +1917,8 @@ where
 }
 
 /// DMA transaction for RX only transfers
+///
+/// # Safety
 ///
 /// Never use [core::mem::forget] on an in-progress transfer
 #[non_exhaustive]
@@ -1962,6 +1966,8 @@ where
 
 /// DMA transaction for TX+RX transfers
 ///
+/// # Safety
+///
 /// Never use [core::mem::forget] on an in-progress transfer
 #[non_exhaustive]
 #[must_use]
@@ -2008,6 +2014,8 @@ where
 
 /// DMA transaction for TX transfers with moved-in/moved-out peripheral and
 /// buffer
+///
+/// # Safety
 ///
 /// Never use [core::mem::forget] on an in-progress transfer
 #[non_exhaustive]
@@ -2082,6 +2090,8 @@ where
 /// DMA transaction for RX transfers with moved-in/moved-out peripheral and
 /// buffer
 ///
+/// # Safety
+///
 /// Never use [core::mem::forget] on an in-progress transfer
 #[non_exhaustive]
 #[must_use]
@@ -2154,6 +2164,8 @@ where
 
 /// DMA transaction for TX+RX transfers with moved-in/moved-out peripheral and
 /// buffers
+///
+/// # Safety
 ///
 /// Never use [core::mem::forget] on an in-progress transfer
 #[non_exhaustive]
@@ -2234,6 +2246,8 @@ where
 
 /// DMA transaction for TX only circular transfers
 ///
+/// # Safety
+///
 /// Never use [core::mem::forget] on an in-progress transfer
 #[non_exhaustive]
 #[must_use]
@@ -2299,6 +2313,8 @@ where
 }
 
 /// DMA transaction for RX only circular transfers
+///
+/// # Safety
 ///
 /// Never use [core::mem::forget] on an in-progress transfer
 #[non_exhaustive]
