@@ -115,6 +115,17 @@
 //! dropped. Then it's possible to reuse the pin/peripheral for a different
 //! purpose.
 //!
+//! ## Don't use [core::mem::forget]
+//!
+//! In general drivers are _NOT_ safe to use with [core::mem::forget]
+//!
+//! You should never use [core::mem::forget] on any type defined in the HAL.
+//!
+//! Some types heavily rely on their [Drop] implementation to not leave the
+//! hardware in undefined state and causing UB.
+//!
+//! You might want to consider using [`#[deny(clippy::mem_forget)`](https://rust-lang.github.io/rust-clippy/v0.0.212/index.html#mem_forget) in your project.
+//!
 //! [documentation]: https://docs.esp-rs.org/esp-hal
 //! [examples]: https://github.com/esp-rs/esp-hal/tree/main/examples
 //! [embedded-hal]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-hal
