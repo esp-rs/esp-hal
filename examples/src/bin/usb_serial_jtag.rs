@@ -2,6 +2,10 @@
 //!
 //! You need to connect via the Serial/JTAG interface to see any output.
 //! Most dev-kits use a USB-UART-bridge - in that case you won't see any output.
+//!
+//! Windows Users: Flashing and then monitoring via espflash will result in any keypress freezing the application.
+//! Please use another serial monitor (e.g. `putty`) on Windows
+//! See https://github.com/esp-rs/espflash/issues/654
 
 //% CHIPS: esp32c3 esp32c6 esp32h2 esp32s3
 
