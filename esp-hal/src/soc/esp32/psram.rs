@@ -448,8 +448,13 @@ pub(crate) mod utils {
         }
         info!("PS-RAM pins {:?}", &psram_io);
 
-        write_peri_reg(SPI0_EXT3_REG, 0x1);
-        clear_peri_reg_mask(SPI1_USER_REG, SPI_USR_PREP_HOLD_M);
+        unsafe {
+            let spi0 = &*crate::peripherals::SPI0::PTR;
+            let spi1 = &*crate::peripherals::SPI1::PTR;
+
+            spi0.ext3().modify(|_, w| w.bits(0x1))
+            spi1.user().modify(|_, w| w.usr_prep_hold().clear_bit())
+        }
 
         psram_spi_init(mode, clk_mode);
 
@@ -549,6 +554,7 @@ pub(crate) mod utils {
         clk_mode: PsramClkMode,
         extra_dummy: u32,
     ) {
+        let spi0 = unsafe { &*crate::peripherals::SPI0::PTR }; 
         info!(
             "PS-RAM cache_init, psram_cache_mode={:?}, extra_dummy={}, clk_mode={:?}",
             psram_cache_mode, extra_dummy, clk_mode
@@ -556,7 +562,8 @@ pub(crate) mod utils {
         match psram_cache_mode {
             PsramCacheSpeed::PsramCacheF80mS80m => {
                 // flash 1 div clk,80+40;
-                clear_peri_reg_mask(SPI0_DATE_REG, 1 << 31);
+                spi.date().modify()
+                // clear_peri_reg_mask(SPI0_DATE_REG, 1 << 31);
 
                 // pre clk div , ONLY IF SPI/ SRAM@ DIFFERENT SPEED,JUST FOR SPI0. FLASH DIV
                 // 2+SRAM DIV4
