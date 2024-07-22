@@ -2154,8 +2154,6 @@ pub(crate) mod asynch {
         TX: Tx,
     {
         pub fn new(tx: &'a mut TX) -> Self {
-            tx.listen_eof();
-            tx.listen_out_descriptor_error();
             Self { tx, _a: () }
         }
 
@@ -2182,6 +2180,8 @@ pub(crate) mod asynch {
                 self.tx.clear_interrupts();
                 Poll::Ready(Err(DmaError::DescriptorError))
             } else {
+                self.tx.listen_eof();
+                self.tx.listen_out_descriptor_error();
                 Poll::Pending
             }
         }
@@ -2210,10 +2210,6 @@ pub(crate) mod asynch {
         RX: Rx,
     {
         pub fn new(rx: &'a mut RX) -> Self {
-            rx.listen_eof();
-            rx.listen_in_descriptor_error();
-            rx.listen_in_descriptor_error_dscr_empty();
-            rx.listen_in_descriptor_error_err_eof();
             Self { rx, _a: () }
         }
 
@@ -2243,6 +2239,10 @@ pub(crate) mod asynch {
                 self.rx.clear_interrupts();
                 Poll::Ready(Err(DmaError::DescriptorError))
             } else {
+                self.rx.listen_eof();
+                self.rx.listen_in_descriptor_error();
+                self.rx.listen_in_descriptor_error_dscr_empty();
+                self.rx.listen_in_descriptor_error_err_eof();
                 Poll::Pending
             }
         }
@@ -2275,8 +2275,6 @@ pub(crate) mod asynch {
         TX: Tx,
     {
         pub fn new(tx: &'a mut TX) -> Self {
-            tx.listen_ch_out_done();
-            tx.listen_out_descriptor_error();
             Self { tx, _a: () }
         }
     }
@@ -2300,6 +2298,8 @@ pub(crate) mod asynch {
                 self.tx.clear_interrupts();
                 Poll::Ready(Err(DmaError::DescriptorError))
             } else {
+                self.tx.listen_ch_out_done();
+                self.tx.listen_out_descriptor_error();
                 Poll::Pending
             }
         }
@@ -2331,10 +2331,6 @@ pub(crate) mod asynch {
         RX: Rx,
     {
         pub fn new(rx: &'a mut RX) -> Self {
-            rx.listen_ch_in_done();
-            rx.listen_in_descriptor_error();
-            rx.listen_in_descriptor_error_dscr_empty();
-            rx.listen_in_descriptor_error_err_eof();
             Self { rx, _a: () }
         }
     }
@@ -2361,6 +2357,10 @@ pub(crate) mod asynch {
                 self.rx.clear_interrupts();
                 Poll::Ready(Err(DmaError::DescriptorError))
             } else {
+                self.rx.listen_ch_in_done();
+                self.rx.listen_in_descriptor_error();
+                self.rx.listen_in_descriptor_error_dscr_empty();
+                self.rx.listen_in_descriptor_error_err_eof();
                 Poll::Pending
             }
         }
