@@ -46,6 +46,8 @@
 //! * AES-DMA mode is currently not supported on ESP32 and ESP32S2
 //! * AES-DMA Initialization Vector (IV) is currently not supported
 
+#![deny(missing_docs)]
+
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::AES,
@@ -179,6 +181,10 @@ impl<'d> Aes<'d> {
 
 /// Specifications for AES flavours
 pub trait AesFlavour: crate::private::Sealed {
+    /// Type of the AES key, a fixed-size array of bytes
+    ///
+    /// The size of this type depends on various factors, such as the device
+    /// being targeted and the desired key size.
     type KeyType<'b>;
 }
 
@@ -200,7 +206,9 @@ impl crate::private::Sealed for Aes256 {}
 /// State matrix endianness
 #[cfg(any(esp32, esp32s2))]
 pub enum Endianness {
+    /// Big endian (most-significant byte at the smallest address)
     BigEndian    = 1,
+    /// Little endian (least-significant byte at the smallest address)
     LittleEndian = 0,
 }
 
@@ -256,6 +264,7 @@ pub mod dma {
         C: DmaChannel,
         C::P: AesPeripheral,
     {
+        /// The underlying [`Aes`](super::Aes) driver
         pub aes: super::Aes<'d>,
 
         pub(crate) channel: Channel<'d, C, crate::Blocking>,
@@ -263,11 +272,13 @@ pub mod dma {
         rx_chain: DescriptorChain,
     }
 
+    /// Functionality for using AES with DMA.
     pub trait WithDmaAes<'d, C>
     where
         C: DmaChannel,
         C::P: AesPeripheral,
     {
+        /// Enable DMA for the current instance of the AES driver
         fn with_dma(
             self,
             channel: Channel<'d, C, crate::Blocking>,
