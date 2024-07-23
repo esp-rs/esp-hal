@@ -646,15 +646,32 @@ mod asynch {
         T: Instance,
     {
         pub fn new(event: Event, instance: &'a T) -> Self {
-            instance
-                .register_block()
-                .int_ena()
-                .modify(|_, w| match event {
+            instance.register_block().int_ena().modify(|_, w| {
+                let w = match event {
                     Event::EndDetect => w.end_detect().set_bit(),
                     Event::TxComplete => w.trans_complete().set_bit(),
                     #[cfg(not(any(esp32, esp32s2)))]
                     Event::TxFifoWatermark => w.txfifo_wm().set_bit(),
-                });
+                };
+
+                #[cfg(not(esp32))]
+                w.arbitration_lost()
+                    .set_bit()
+                    .time_out()
+                    .set_bit()
+                    .nack()
+                    .set_bit();
+
+                #[cfg(esp32)]
+                w.arbitration_lost()
+                    .set_bit()
+                    .time_out()
+                    .set_bit()
+                    .ack_err()
+                    .set_bit();
+
+                w
+            });
 
             Self { event, instance }
         }
@@ -669,19 +686,62 @@ mod asynch {
                 Event::TxFifoWatermark => r.txfifo_wm().bit_is_clear(),
             }
         }
+
+        fn check_error(&self) -> Result<(), Error> {
+            let r = self.instance.register_block().int_raw().read();
+
+            if r.arbitration_lost().bit_is_set() {
+                return Err(Error::ArbitrationLost);
+            }
+
+            if r.time_out().bit_is_set() {
+                return Err(Error::TimeOut);
+            }
+
+            #[cfg(not(esp32))]
+            if r.nack().bit_is_set() {
+                return Err(Error::AckCheckFailed);
+            }
+
+            #[cfg(esp32)]
+            if r.ack_err().bit_is_set() {
+                return Err(Error::AckCheckFailed);
+            }
+
+            #[cfg(not(esp32))]
+            if r.trans_complete().bit_is_set()
+                && self
+                    .instance
+                    .register_block()
+                    .sr()
+                    .read()
+                    .resp_rec()
+                    .bit_is_clear()
+            {
+                return Err(Error::AckCheckFailed);
+            }
+
+            Ok(())
+        }
     }
 
     impl<'a, T> core::future::Future for I2cFuture<'a, T>
     where
         T: Instance,
     {
-        type Output = ();
+        type Output = Result<(), Error>;
 
         fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
             WAKERS[self.instance.i2c_number()].register(ctx.waker());
 
+            let error = self.check_error();
+
+            if error.is_err() {
+                return Poll::Ready(error);
+            }
+
             if self.event_bit_is_clear() {
-                Poll::Ready(())
+                Poll::Ready(Ok(()))
             } else {
                 Poll::Pending
             }
@@ -740,14 +800,14 @@ mod asynch {
             loop {
                 self.peripheral.check_errors()?;
 
-                I2cFuture::new(Event::TxFifoWatermark, self.inner()).await;
+                I2cFuture::new(Event::TxFifoWatermark, self.inner()).await?;
 
                 self.peripheral
                     .register_block()
                     .int_clr()
                     .write(|w| w.txfifo_wm().clear_bit_by_one());
 
-                I2cFuture::new(Event::TxFifoWatermark, self.inner()).await;
+                I2cFuture::new(Event::TxFifoWatermark, self.inner()).await?;
 
                 if index >= bytes.len() {
                     break Ok(());
@@ -761,14 +821,21 @@ mod asynch {
         async fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
             self.peripheral.check_errors()?;
 
+            // ideally we should have a timeout here like we have for the blocking case
+
             if end_only {
-                I2cFuture::new(Event::EndDetect, self.inner()).await;
+                I2cFuture::new(Event::EndDetect, self.inner()).await?;
             } else {
-                select(
+                let res = select(
                     I2cFuture::new(Event::TxComplete, self.inner()),
                     I2cFuture::new(Event::EndDetect, self.inner()),
                 )
                 .await;
+
+                match res {
+                    embassy_futures::select::Either::First(res) => res?,
+                    embassy_futures::select::Either::Second(res) => res?,
+                }
             }
             self.peripheral.check_all_commands_done()?;
 
@@ -979,11 +1046,25 @@ mod asynch {
     #[handler]
     pub(super) fn i2c0_handler() {
         let regs = unsafe { &*crate::peripherals::I2C0::PTR };
-        regs.int_ena()
-            .modify(|_, w| w.end_detect().clear_bit().trans_complete().clear_bit());
+        regs.int_ena().modify(|_, w| {
+            w.end_detect()
+                .clear_bit()
+                .trans_complete()
+                .clear_bit()
+                .arbitration_lost()
+                .clear_bit()
+                .time_out()
+                .clear_bit()
+        });
 
         #[cfg(not(any(esp32, esp32s2)))]
         regs.int_ena().modify(|_, w| w.txfifo_wm().clear_bit());
+
+        #[cfg(not(esp32))]
+        regs.int_ena().modify(|_, w| w.nack().clear_bit());
+
+        #[cfg(esp32)]
+        regs.int_ena().modify(|_, w| w.ack_err().clear_bit());
 
         WAKERS[0].wake();
     }
@@ -992,11 +1073,25 @@ mod asynch {
     #[handler]
     pub(super) fn i2c1_handler() {
         let regs = unsafe { &*crate::peripherals::I2C1::PTR };
-        regs.int_ena()
-            .modify(|_, w| w.end_detect().clear_bit().trans_complete().clear_bit());
+        regs.int_ena().modify(|_, w| {
+            w.end_detect()
+                .clear_bit()
+                .trans_complete()
+                .clear_bit()
+                .arbitration_lost()
+                .clear_bit()
+                .time_out()
+                .clear_bit()
+        });
 
         #[cfg(not(any(esp32, esp32s2)))]
         regs.int_ena().modify(|_, w| w.txfifo_wm().clear_bit());
+
+        #[cfg(not(esp32))]
+        regs.int_ena().modify(|_, w| w.nack().clear_bit());
+
+        #[cfg(esp32)]
+        regs.int_ena().modify(|_, w| w.ack_err().clear_bit());
 
         WAKERS[1].wake();
     }
