@@ -41,8 +41,6 @@
 //! # }
 //! ```
 
-#![deny(missing_docs)]
-
 use crate::{
     gpio::{self, AnalogPin},
     peripheral::{Peripheral, PeripheralRef},
