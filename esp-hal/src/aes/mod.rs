@@ -180,8 +180,6 @@ impl<'d> Aes<'d> {
 /// Specifications for AES flavours
 pub trait AesFlavour: crate::private::Sealed {
     type KeyType<'b>;
-    const ENCRYPT_MODE: u32;
-    const DECRYPT_MODE: u32;
 }
 
 /// Marker type for AES-128
