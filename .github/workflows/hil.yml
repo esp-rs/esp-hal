@@ -129,4 +129,6 @@ jobs:
 
       - name: Erase Flash on Failure
         if: ${{ failure() && steps.run-tests.conclusion == 'failure' }}
-        run: espflash erase-flash
+        run: |
+          export PATH=$PATH:/home/espressif/.cargo/bin
+          espflash erase-flash
