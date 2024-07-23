@@ -1699,7 +1699,9 @@ pub trait Instance: crate::private::Sealed {
                 .read()
                 .txfifo_wm()
                 .bit_is_set()
-            {}
+            {
+                self.check_errors()?;
+            }
 
             self.register_block()
                 .int_clr()
@@ -1711,7 +1713,9 @@ pub trait Instance: crate::private::Sealed {
                 .read()
                 .txfifo_wm()
                 .bit_is_set()
-            {}
+            {
+                self.check_errors()?;
+            }
 
             if index >= bytes.len() {
                 break Ok(());
