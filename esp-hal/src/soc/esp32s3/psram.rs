@@ -440,8 +440,7 @@ pub(crate) mod utils {
         let spi = unsafe { &*crate::peripherals::SPI0::PTR };
         if freqdiv == 1 {
             unsafe {
-                spi.sram_clk()
-                    .modify(|_, w| w.sclk_equ_sysclk().set_bit());
+                spi.sram_clk().modify(|_, w| w.sclk_equ_sysclk().set_bit());
             }
         } else {
             let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_SCLKCNT_N_S)
@@ -823,7 +822,7 @@ pub(crate) mod utils {
 
     const SPI_CS1_GPIO_NUM: u8 = 26;
     const FUNC_SPICS1_SPICS1: u8 = 0;
-    
+
     const SPI_MEM_CLKCNT_N_S: u32 = 16;
     const SPI_MEM_SCLKCNT_N_S: u32 = 16;
     const SPI_MEM_CLKCNT_H_S: u32 = 8;
@@ -1643,8 +1642,7 @@ pub(crate) mod utils {
         let spi = unsafe { &*crate::peripherals::SPI0::PTR };
         if freqdiv == 1 {
             unsafe {
-                spi.sram_clk()
-                    .modify(|_, w| w.sclk_equ_sysclk().set_bit());
+                spi.sram_clk().modify(|_, w| w.sclk_equ_sysclk().set_bit());
             }
         } else {
             let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_SCLKCNT_N_S)

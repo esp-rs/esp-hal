@@ -514,8 +514,10 @@ pub(crate) mod utils {
                     .bits(PSRAM_QUAD_WRITE as u8)
             });
 
-            spi.sram_dwr_cmd()
-                .modify(|_, w| w.cache_sram_usr_wr_cmd_value().bits(PSRAM_QUAD_WRITE as u16));
+            spi.sram_dwr_cmd().modify(|_, w| {
+                w.cache_sram_usr_wr_cmd_value()
+                    .bits(PSRAM_QUAD_WRITE as u16)
+            });
 
             spi.sram_drd_cmd()
                 .modify(|_, w| w.cache_sram_usr_rd_cmd_bitlen().bits(7));
@@ -547,8 +549,7 @@ pub(crate) mod utils {
         let spi = unsafe { &*crate::peripherals::SPI0::PTR };
 
         if 1 >= freqdiv {
-                spi.sram_clk()
-                    .modify(|_, w| w.sclk_equ_sysclk().set_bit());
+            spi.sram_clk().modify(|_, w| w.sclk_equ_sysclk().set_bit());
         } else {
             let freqbits: u32 = (((freqdiv - 1) as u32) << SPI_MEM_SCLKCNT_N_S)
                 | (((freqdiv / 2 - 1) as u32) << SPI_MEM_SCLKCNT_H_S)
