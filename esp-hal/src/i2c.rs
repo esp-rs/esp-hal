@@ -91,6 +91,9 @@ cfg_if::cfg_if! {
     }
 }
 
+// on ESP32 there is a chance to get trapped in `wait_for_completion` forever
+const MAX_ITERATIONS: u32 = 1_000_000;
+
 /// I2C-specific transmission errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1571,6 +1574,7 @@ pub trait Instance: crate::private::Sealed {
     }
 
     fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
+        let mut tout = MAX_ITERATIONS;
         loop {
             let interrupts = self.register_block().int_raw().read();
 
@@ -1583,6 +1587,11 @@ pub trait Instance: crate::private::Sealed {
                 || interrupts.end_detect().bit_is_set()
             {
                 break;
+            }
+
+            tout -= 1;
+            if tout == 0 {
+                return Err(Error::TimeOut);
             }
         }
         self.check_all_commands_done()?;
