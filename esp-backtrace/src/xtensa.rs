@@ -307,7 +307,8 @@ pub(crate) fn backtrace_internal(
 
             old_address = address;
 
-            if address == 0 {
+            // the address is 0 but we sanitized the address - then 0 becomes 0x40000000
+            if address == 0x40000000 {
                 break;
             }
 
