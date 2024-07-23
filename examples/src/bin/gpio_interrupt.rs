@@ -73,6 +73,18 @@ fn handler() {
     #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")))]
     esp_println::println!("GPIO Interrupt");
 
+    if critical_section::with(|cs| {
+        BUTTON
+            .borrow_ref_mut(cs)
+            .as_mut()
+            .unwrap()
+            .is_interrupt_set()
+    }) {
+        esp_println::println!("Button was the source of the interrupt");
+    } else {
+        esp_println::println!("Button was not the source of the interrupt");
+    }
+
     critical_section::with(|cs| {
         BUTTON
             .borrow_ref_mut(cs)

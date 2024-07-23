@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - uart: Make `rx_timeout` optional in Config struct (#1759)
 - Add interrupt related functions to `PeriodicTimer`/`OneShotTimer`, added `ErasedTimer` (#1753)
 - Added blocking `read_bytes` method to `Uart` and `UartRx` (#1784)
+- Add method to expose `InputPin::is_interrupt_set` in `Input<InputPin>` for use in interrupt handlers (#1829)
 
 ### Fixed
 

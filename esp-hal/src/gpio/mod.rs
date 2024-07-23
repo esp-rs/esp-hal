@@ -1727,6 +1727,12 @@ where
         self.pin.clear_interrupt(private::Internal);
     }
 
+    /// Checks if the interrupt status bit for this Pin is set
+    #[inline]
+    pub fn is_interrupt_set(&self) -> bool {
+        self.pin.is_interrupt_set(private::Internal)
+    }
+
     /// Enable as a wake-up source.
     ///
     /// This will unlisten for interrupts
