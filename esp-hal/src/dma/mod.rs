@@ -1452,7 +1452,7 @@ where
 
     #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
-        CH::Rx::waker()
+        CH::Tx::waker()
     }
 
     fn is_listening_out_descriptor_error(&self) -> bool {
