@@ -458,6 +458,13 @@ where
     ) -> Self {
         crate::into_ref!(i2c, sda, scl);
 
+        PeripheralClockControl::reset(match i2c.i2c_number() {
+            0 => crate::system::Peripheral::I2cExt0,
+            #[cfg(i2c1)]
+            1 => crate::system::Peripheral::I2cExt1,
+            _ => unreachable!(), // will never happen
+        });
+
         PeripheralClockControl::enable(match i2c.i2c_number() {
             0 => crate::system::Peripheral::I2cExt0,
             #[cfg(i2c1)]
@@ -818,10 +825,9 @@ mod asynch {
             }
         }
 
+        #[cfg(not(esp32))]
         async fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
             self.peripheral.check_errors()?;
-
-            // ideally we should have a timeout here like we have for the blocking case
 
             if end_only {
                 I2cFuture::new(Event::EndDetect, self.inner()).await?;
@@ -839,6 +845,78 @@ mod asynch {
             }
             self.peripheral.check_all_commands_done()?;
 
+            Ok(())
+        }
+
+        #[cfg(esp32)]
+        async fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
+            // for ESP32 we need a timeout here but wasting a timer seems to unnecessary
+            // given the short time we spend here
+
+            static VTABLE: core::task::RawWakerVTable = core::task::RawWakerVTable::new(
+                |_| core::task::RawWaker::new(core::ptr::null(), &VTABLE),
+                |_| {},
+                |_| {},
+                |_| {},
+            );
+
+            pub fn poll_once<F: core::future::Future>(fut: &mut F) -> Poll<F::Output> {
+                let mut fut = unsafe { core::pin::Pin::new_unchecked(fut) };
+
+                let raw_waker = core::task::RawWaker::new(core::ptr::null(), &VTABLE);
+                let waker = unsafe { core::task::Waker::from_raw(raw_waker) };
+                let mut cx = core::task::Context::from_waker(&waker);
+
+                fut.as_mut().poll(&mut cx)
+            }
+
+            self.peripheral.check_errors()?;
+
+            let mut tout = MAX_ITERATIONS / 10; // we do much more than just busy looping in the async case
+            if end_only {
+                let mut future = I2cFuture::new(Event::EndDetect, self.inner());
+                loop {
+                    match poll_once(&mut future) {
+                        Poll::Ready(result) => match result {
+                            Ok(_) => break,
+                            Err(err) => return Err(err),
+                        },
+                        Poll::Pending => (),
+                    }
+
+                    tout -= 1;
+                    if tout == 0 {
+                        return Err(Error::TimeOut);
+                    }
+
+                    embassy_futures::yield_now().await;
+                }
+            } else {
+                let mut future = select(
+                    I2cFuture::new(Event::TxComplete, self.inner()),
+                    I2cFuture::new(Event::EndDetect, self.inner()),
+                );
+                loop {
+                    match embassy_futures::poll_once(&mut future) {
+                        Poll::Ready(result) => match result {
+                            embassy_futures::select::Either::First(Ok(_))
+                            | embassy_futures::select::Either::Second(Ok(_)) => break,
+                            embassy_futures::select::Either::First(Err(err))
+                            | embassy_futures::select::Either::Second(Err(err)) => return Err(err),
+                        },
+                        Poll::Pending => (),
+                    }
+
+                    tout -= 1;
+                    if tout == 0 {
+                        return Err(Error::TimeOut);
+                    }
+
+                    embassy_futures::yield_now().await;
+                }
+            }
+
+            self.peripheral.check_all_commands_done()?;
             Ok(())
         }
 
