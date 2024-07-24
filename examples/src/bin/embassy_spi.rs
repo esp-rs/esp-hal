@@ -24,12 +24,12 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     dma::*,
-    dma_descriptors,
+    dma_buffers,
     gpio::Io,
     peripherals::Peripherals,
     prelude::*,
     spi::{
-        master::{prelude::*, Spi},
+        master::{dma::asynch::SpiDmaAsyncBus, prelude::*, Spi},
         SpiMode,
     },
     system::SystemControl,
@@ -73,21 +73,21 @@ async fn main(_spawner: Spawner) {
     #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
     let dma_channel = dma.channel0;
 
-    let (descriptors, rx_descriptors) = dma_descriptors!(32000);
+    let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(32000);
+    let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+    let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
-    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+    let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
         .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-        .with_dma(
-            dma_channel.configure_for_async(false, DmaPriority::Priority0),
-            descriptors,
-            rx_descriptors,
-        );
+        .with_dma(dma_channel.configure_for_async(false, DmaPriority::Priority0));
+
+    let mut spi_bus = SpiDmaAsyncBus::new(spi, dma_tx_buf, dma_rx_buf);
 
     let send_buffer = [0, 1, 2, 3, 4, 5, 6, 7];
     loop {
         let mut buffer = [0; 8];
         esp_println::println!("Sending bytes");
-        embedded_hal_async::spi::SpiBus::transfer(&mut spi, &mut buffer, &send_buffer)
+        embedded_hal_async::spi::SpiBus::transfer(&mut spi_bus, &mut buffer, &send_buffer)
             .await
             .unwrap();
         esp_println::println!("Bytes received: {:?}", buffer);

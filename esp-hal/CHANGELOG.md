@@ -8,9 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Introduce DMA buffer objects (#1856)
 
 ### Changed
 - Peripheral driver constructors don't take `InterruptHandler`s anymore. Use `set_interrupt_handler` to explicitly set the interrupt handler now. (#1819)
+- Migrate SPI driver to use DMA buffer objects (#1856)
 
 ### Fixed
 - Improve error detection in the I2C driver (#1847)

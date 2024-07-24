@@ -21,7 +21,7 @@ use esp_backtrace as _;
 mod tests {
     use esp_hal::{
         clock::ClockControl,
-        dma::{Dma, DmaPriority},
+        dma::{Dma, DmaPriority, DmaTxBuf},
         dma_buffers,
         gpio::{Io, Pull},
         pcnt::{
@@ -63,16 +63,13 @@ mod tests {
         #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
         let dma_channel = dma.channel0;
 
-        let (tx_buffer, tx_descriptors, _, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE, 0);
+        let (buffer, descriptors, _, _) = dma_buffers!(DMA_BUFFER_SIZE, 0);
+        let mut dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
 
         let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_sck(sclk)
             .with_mosi(mosi)
-            .with_dma(
-                dma_channel.configure(false, DmaPriority::Priority0),
-                tx_descriptors,
-                rx_descriptors,
-            );
+            .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
         let unit = pcnt.unit0;
         unit.channel0.set_edge_signal(PcntSource::from_pin(
@@ -83,7 +80,7 @@ mod tests {
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
         // Fill the buffer where each byte 3 pos edges.
-        tx_buffer.fill(0b0110_1010);
+        dma_tx_buf.fill(&[0b0110_1010; DMA_BUFFER_SIZE]);
 
         let transfer = spi
             .write(
@@ -91,10 +88,11 @@ mod tests {
                 Command::None,
                 Address::None,
                 0,
-                &tx_buffer,
+                dma_tx_buf,
             )
+            .map_err(|e| e.0)
             .unwrap();
-        transfer.wait().unwrap();
+        (spi, dma_tx_buf) = transfer.wait();
 
         assert_eq!(unit.get_value(), (3 * DMA_BUFFER_SIZE) as _);
 
@@ -104,10 +102,11 @@ mod tests {
                 Command::None,
                 Address::None,
                 0,
-                &tx_buffer,
+                dma_tx_buf,
             )
+            .map_err(|e| e.0)
             .unwrap();
-        transfer.wait().unwrap();
+        transfer.wait();
 
         assert_eq!(unit.get_value(), (6 * DMA_BUFFER_SIZE) as _);
     }
