@@ -28,7 +28,7 @@ pub fn get_systimer_count() -> u64 {
 
 pub fn setup_timer(mut timer1: TimeBase) -> Result<(), esp_hal::timer::Error> {
     timer1.set_interrupt_handler(InterruptHandler::new(
-        unsafe { core::mem::transmute(handler as *const ()) },
+        unsafe { core::mem::transmute::<*const (), extern "C" fn()>(handler as *const ()) },
         interrupt::Priority::Priority2,
     ));
     timer1.start(TIMESLICE_FREQUENCY.into_duration())?;

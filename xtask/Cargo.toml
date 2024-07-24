@@ -17,3 +17,4 @@ semver     = { version = "1.0.23",  features = ["serde"] }
 serde      = { version = "1.0.203", features = ["derive"] }
 strum      = { version = "0.26.2",  features = ["derive"] }
 toml_edit  = "0.22.13"
+esp-metadata = { path = "../esp-metadata" }

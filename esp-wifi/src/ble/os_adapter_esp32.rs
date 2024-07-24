@@ -475,7 +475,7 @@ pub(crate) unsafe extern "C" fn coex_schm_curr_period_get() -> u8 {
     debug!("coex_schm_curr_period_get");
 
     #[cfg(coex)]
-    return crate::binary::include::coex_schm_curr_period_get() as u8;
+    return crate::binary::include::coex_schm_curr_period_get();
 
     #[cfg(not(coex))]
     0
@@ -571,14 +571,13 @@ const BTDM_ASYNC_WAKEUP_REQ_COEX: i32 = 1;
 
 #[cfg(coex)]
 fn async_wakeup_request(event: i32) -> bool {
-    let request_lock: bool;
     let mut do_wakeup_request = false;
 
-    match event {
-        e if e == BTDM_ASYNC_WAKEUP_REQ_HCI => request_lock = true,
-        e if e == BTDM_ASYNC_WAKEUP_REQ_COEX => request_lock = false,
+    let request_lock = match event {
+        e if e == BTDM_ASYNC_WAKEUP_REQ_HCI => true,
+        e if e == BTDM_ASYNC_WAKEUP_REQ_COEX => false,
         _ => return false,
-    }
+    };
 
     extern "C" {
         fn btdm_power_state_active() -> bool;
@@ -590,7 +589,7 @@ fn async_wakeup_request(event: i32) -> bool {
         unsafe { btdm_wakeup_request(request_lock) };
     }
 
-    return do_wakeup_request;
+    do_wakeup_request
 }
 
 /// **************************************************************************
@@ -609,13 +608,11 @@ fn async_wakeup_request(event: i32) -> bool {
 
 #[cfg(coex)]
 fn async_wakeup_request_end(event: i32) {
-    let request_lock: bool;
-
-    match event {
-        e if e == BTDM_ASYNC_WAKEUP_REQ_HCI => request_lock = true,
-        e if e == BTDM_ASYNC_WAKEUP_REQ_COEX => request_lock = false,
+    let request_lock = match event {
+        e if e == BTDM_ASYNC_WAKEUP_REQ_HCI => true,
+        e if e == BTDM_ASYNC_WAKEUP_REQ_COEX => false,
         _ => return,
-    }
+    };
 
     extern "C" {
         // this isn't found anywhere ... not a ROM function
@@ -626,6 +623,4 @@ fn async_wakeup_request_end(event: i32) {
     if request_lock {
         // unsafe { btdm_wakeup_request_end() };
     }
-
-    return;
 }

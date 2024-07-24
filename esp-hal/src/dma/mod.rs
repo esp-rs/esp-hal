@@ -2174,13 +2174,11 @@ pub(crate) mod asynch {
             TX::waker().register(cx.waker());
             if self.tx.is_listening_eof() {
                 Poll::Pending
+            } else if self.tx.has_error() {
+                self.tx.clear_interrupts();
+                Poll::Ready(Err(DmaError::DescriptorError))
             } else {
-                if self.tx.has_error() {
-                    self.tx.clear_interrupts();
-                    Poll::Ready(Err(DmaError::DescriptorError))
-                } else {
-                    Poll::Ready(Ok(()))
-                }
+                Poll::Ready(Ok(()))
             }
         }
     }
@@ -2220,14 +2218,14 @@ pub(crate) mod asynch {
             RX::waker().register(cx.waker());
             if self.rx.is_listening_eof() {
                 Poll::Pending
+            } else if self.rx.has_error()
+                || self.rx.has_dscr_empty_error()
+                || self.rx.has_eof_error()
+            {
+                self.rx.clear_interrupts();
+                Poll::Ready(Err(DmaError::DescriptorError))
             } else {
-                if self.rx.has_error() || self.rx.has_dscr_empty_error() || self.rx.has_eof_error()
-                {
-                    self.rx.clear_interrupts();
-                    Poll::Ready(Err(DmaError::DescriptorError))
-                } else {
-                    Poll::Ready(Ok(()))
-                }
+                Poll::Ready(Ok(()))
             }
         }
     }
@@ -2264,13 +2262,11 @@ pub(crate) mod asynch {
             TX::waker().register(cx.waker());
             if self.tx.is_listening_ch_out_done() {
                 Poll::Pending
+            } else if self.tx.has_error() {
+                self.tx.clear_interrupts();
+                Poll::Ready(Err(DmaError::DescriptorError))
             } else {
-                if self.tx.has_error() {
-                    self.tx.clear_interrupts();
-                    Poll::Ready(Err(DmaError::DescriptorError))
-                } else {
-                    Poll::Ready(Ok(()))
-                }
+                Poll::Ready(Ok(()))
             }
         }
     }
@@ -2309,14 +2305,14 @@ pub(crate) mod asynch {
             RX::waker().register(cx.waker());
             if self.rx.is_listening_ch_in_done() {
                 Poll::Pending
+            } else if self.rx.has_error()
+                || self.rx.has_dscr_empty_error()
+                || self.rx.has_eof_error()
+            {
+                self.rx.clear_interrupts();
+                Poll::Ready(Err(DmaError::DescriptorError))
             } else {
-                if self.rx.has_error() || self.rx.has_dscr_empty_error() || self.rx.has_eof_error()
-                {
-                    self.rx.clear_interrupts();
-                    Poll::Ready(Err(DmaError::DescriptorError))
-                } else {
-                    Poll::Ready(Ok(()))
-                }
+                Poll::Ready(Ok(()))
             }
         }
     }

@@ -182,7 +182,7 @@ opsram-8m = []
 opsram-16m = []
 
 # This feature is intended for testing; you probably don't want to enable it:
-ci = ["async", "embedded-hal-02", "embedded-io", "ufmt"]
+ci = ["async", "embedded-hal-02", "embedded-io", "ufmt", "defmt", "bluetooth", "place-spi-driver-in-ram"]
 
 [lints.clippy]
 mixed_attributes_style = "allow"

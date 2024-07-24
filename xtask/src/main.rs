@@ -7,11 +7,11 @@ use std::{
 
 use anyhow::{bail, Result};
 use clap::{Args, Parser};
+use esp_metadata::{Arch, Chip, Config};
 use minijinja::Value;
 use strum::IntoEnumIterator;
 use xtask::{
     cargo::{CargoAction, CargoArgsBuilder},
-    Chip,
     Metadata,
     Package,
     Version,
@@ -130,6 +130,10 @@ struct LintPackagesArgs {
     /// Package(s) to target.
     #[arg(value_enum, default_values_t = Package::iter())]
     packages: Vec<Package>,
+
+    /// Lint for a specific chip
+    #[arg(long, value_enum, default_values_t = Chip::iter())]
+    chips: Vec<Chip>,
 }
 
 #[derive(Debug, Args)]
@@ -464,103 +468,173 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
         // building, so we need to handle each individually (though there
         // is *some* overlap)
 
-        match package {
-            Package::EspBacktrace => lint_package(
-                &path,
-                &[
-                    "-Zbuild-std=core",
-                    "--no-default-features",
-                    "--target=riscv32imc-unknown-none-elf",
-                    "--features=esp32c6,defmt",
-                ],
-            )?,
+        for chip in &args.chips {
+            let device = Config::for_chip(&chip);
 
-            Package::EspHal => {
-                // Since different files/modules can be included/excluded
-                // depending on the target, we must lint *all* targets:
-                for chip in Chip::iter() {
+            match package {
+                Package::EspBacktrace => {
+                    lint_package(
+                        &path,
+                        &[
+                            "-Zbuild-std=core",
+                            "--no-default-features",
+                            &format!("--target={}", chip.target()),
+                            &format!("--features={chip},defmt"),
+                        ],
+                    )?;
+                }
+
+                Package::EspHal => {
+                    let mut features = format!("--features={chip},ci");
+
+                    // Cover all esp-hal features where a device is supported
+                    if device.contains(&"usb0".to_owned()) {
+                        features.push_str(",usb-otg")
+                    }
+                    if device.contains(&"bt".to_owned()) {
+                        features.push_str(",bluetooth")
+                    }
+                    if device.contains(&"psram".to_owned()) {
+                        // TODO this doesn't test octal psram as it would require a separate build
+                        features.push_str(",psram-4m,psram-80mhz")
+                    }
+                    if matches!(chip, Chip::Esp32c6 | Chip::Esp32h2) {
+                        features.push_str(",flip-link")
+                    }
+
                     lint_package(
                         &path,
                         &[
                             "-Zbuild-std=core",
                             &format!("--target={}", chip.target()),
-                            &format!("--features={chip}"),
+                            &features,
                         ],
                     )?;
                 }
-            }
 
-            Package::EspHalEmbassy => {
-                lint_package(
-                    &path,
-                    &[
-                        "-Zbuild-std=core",
-                        "--target=riscv32imac-unknown-none-elf",
-                        "--features=esp32c6",
-                    ],
-                )?;
-            }
-
-            Package::EspHalProcmacros | Package::EspRiscvRt => lint_package(
-                &path,
-                &["-Zbuild-std=core", "--target=riscv32imc-unknown-none-elf"],
-            )?,
-
-            Package::EspHalSmartled | Package::EspIeee802154 | Package::EspLpHal => lint_package(
-                &path,
-                &[
-                    "-Zbuild-std=core",
-                    "--target=riscv32imac-unknown-none-elf",
-                    "--features=esp32c6",
-                ],
-            )?,
-
-            Package::EspPrintln => lint_package(
-                &path,
-                &[
-                    "-Zbuild-std=core",
-                    "--target=riscv32imc-unknown-none-elf",
-                    "--features=esp32c6",
-                ],
-            )?,
-
-            Package::EspStorage => lint_package(
-                &path,
-                &[
-                    "-Zbuild-std=core",
-                    "--target=riscv32imc-unknown-none-elf",
-                    "--features=esp32c6",
-                ],
-            )?,
-
-            Package::EspWifi => lint_package(
-                &path,
-                &[
-                    "-Zbuild-std=core",
-                    "--target=riscv32imc-unknown-none-elf",
-                    "--features=esp32c3,wifi-default,ble,esp-now,async,embassy-net",
-                ],
-            )?,
-
-            Package::XtensaLxRt => {
-                for chip in [Chip::Esp32, Chip::Esp32s2, Chip::Esp32s3] {
+                Package::EspHalEmbassy => {
                     lint_package(
                         &path,
                         &[
                             "-Zbuild-std=core",
-                            &format!("--target=xtensa-{chip}-none-elf"),
-                            &format!("--features={chip}"),
+                            &format!("--target={}", chip.target()),
+                            &format!("--features={chip},executors,defmt,integrated-timers"),
                         ],
-                    )?
+                    )?;
                 }
+
+                Package::EspIeee802154 => {
+                    if device.contains(&"ieee802154".to_owned()) {
+                        lint_package(
+                            &path,
+                            &[
+                                "-Zbuild-std=core",
+                                &format!("--target={}", chip.target()),
+                                &format!("--features={chip}"),
+                            ],
+                        )?;
+                    }
+                }
+                Package::EspLpHal => {
+                    if device.contains(&"lp_core".to_owned()) {
+                        lint_package(
+                            &path,
+                            &[
+                                "-Zbuild-std=core",
+                                &format!("--target={}", chip.lp_target().unwrap()),
+                                &format!("--features={chip},embedded-io,embedded-hal-02"),
+                            ],
+                        )?;
+                    }
+                }
+                Package::EspHalSmartled => {
+                    if device.contains(&"rmt".to_owned()) {
+                        lint_package(
+                            &path,
+                            &[
+                                "-Zbuild-std=core",
+                                &format!("--target={}", chip.target()),
+                                &format!("--features={chip}"),
+                            ],
+                        )?;
+                    }
+                }
+
+                Package::EspPrintln => {
+                    lint_package(
+                        &path,
+                        &[
+                            "-Zbuild-std=core",
+                            &format!("--target={}", chip.target()),
+                            &format!("--features={chip},defmt-espflash"),
+                        ],
+                    )?;
+                }
+
+                Package::EspRiscvRt => {
+                    if matches!(device.arch(), Arch::RiscV) {
+                        lint_package(
+                            &path,
+                            &["-Zbuild-std=core", &format!("--target={}", chip.target())],
+                        )?;
+                    }
+                }
+
+                Package::EspStorage => {
+                    lint_package(
+                        &path,
+                        &[
+                            "-Zbuild-std=core",
+                            &format!("--target={}", chip.target()),
+                            &format!("--features={chip},storage,nor-flash,low-level"),
+                        ],
+                    )?;
+                }
+
+                Package::EspWifi => {
+                    let mut features = format!("--features={chip},async,ps-min-modem,defmt");
+
+                    if device.contains(&"wifi".to_owned()) {
+                        features
+                            .push_str(",wifi-default,esp-now,embedded-svc,embassy-net,dump-packets")
+                    }
+                    if device.contains(&"bt".to_owned()) {
+                        features.push_str(",ble")
+                    }
+                    if device.contains(&"coex".to_owned()) {
+                        features.push_str(",coex")
+                    }
+                    lint_package(
+                        &path,
+                        &[
+                            "-Zbuild-std=core",
+                            &format!("--target={}", chip.target()),
+                            "--no-default-features",
+                            &features,
+                        ],
+                    )?;
+                }
+
+                Package::XtensaLxRt => {
+                    if matches!(device.arch(), Arch::Xtensa) {
+                        lint_package(
+                            &path,
+                            &[
+                                "-Zbuild-std=core",
+                                &format!("--target={}", chip.target()),
+                                &format!("--features={chip}"),
+                            ],
+                        )?
+                    }
+                }
+
+                // We will *not* check the following packages with `clippy`; this
+                // may or may not change in the future:
+                Package::Examples | Package::HilTest => {}
+
+                // By default, no `clippy` arguments are required:
+                _ => lint_package(&path, &[])?,
             }
-
-            // We will *not* check the following packages with `clippy`; this
-            // may or may not change in the future:
-            Package::Examples | Package::HilTest => {}
-
-            // By default, no `clippy` arguments are required:
-            _ => lint_package(&path, &[])?,
         }
     }
 
@@ -578,7 +652,13 @@ fn lint_package(path: &Path, args: &[&str]) -> Result<()> {
         builder = builder.arg(arg.to_string());
     }
 
-    let cargo_args = builder.arg("--").arg("-D").arg("warnings").build();
+    // build in release to reuse example artifacts
+    let cargo_args = builder
+        .arg("--release")
+        .arg("--")
+        .arg("-D")
+        .arg("warnings")
+        .build();
 
     xtask::cargo::run(&cargo_args, &path)
 }

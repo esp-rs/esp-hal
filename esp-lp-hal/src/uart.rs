@@ -284,7 +284,7 @@ impl embedded_io::ErrorType for LpUart {
 #[cfg(feature = "embedded-io")]
 impl embedded_io::Read for LpUart {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        if buf.len() == 0 {
+        if buf.is_empty() {
             return Ok(0);
         }
 

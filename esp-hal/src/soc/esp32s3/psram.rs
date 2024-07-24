@@ -539,6 +539,7 @@ pub(crate) mod utils {
         PsramCmdSpi = 1,
     }
 
+    #[allow(clippy::too_many_arguments)]
     #[ram]
     fn psram_exec_cmd(
         mode: CommandMode,
@@ -604,6 +605,7 @@ pub(crate) mod utils {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     #[ram]
     fn _psram_exec_cmd(
         cmd: u16,

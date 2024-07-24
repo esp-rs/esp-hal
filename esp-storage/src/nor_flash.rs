@@ -1,7 +1,4 @@
-use core::{
-    mem::MaybeUninit,
-    ops::{Deref, DerefMut},
-};
+use core::mem::MaybeUninit;
 
 use embedded_storage::nor_flash::{
     ErrorType,
@@ -13,6 +10,7 @@ use embedded_storage::nor_flash::{
 
 use crate::{FlashSectorBuffer, FlashStorage, FlashStorageError};
 
+#[cfg(feature = "bytewise-read")]
 #[repr(C, align(4))]
 struct FlashWordBuffer {
     // NOTE: Ensure that no unaligned fields are added above `data` to maintain its required
@@ -20,7 +18,8 @@ struct FlashWordBuffer {
     data: [u8; FlashStorage::WORD_SIZE as usize],
 }
 
-impl Deref for FlashWordBuffer {
+#[cfg(feature = "bytewise-read")]
+impl core::ops::Deref for FlashWordBuffer {
     type Target = [u8; FlashStorage::WORD_SIZE as usize];
 
     fn deref(&self) -> &Self::Target {
@@ -28,7 +27,8 @@ impl Deref for FlashWordBuffer {
     }
 }
 
-impl DerefMut for FlashWordBuffer {
+#[cfg(feature = "bytewise-read")]
+impl core::ops::DerefMut for FlashWordBuffer {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.data
     }
