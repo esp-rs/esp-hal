@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fix I2S async-tx (#1833)
+- Fix PARL_IO async-rx (#1851)
 
 ### Removed
 

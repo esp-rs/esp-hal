@@ -74,7 +74,11 @@ async fn main(_spawner: Spawner) {
     let buffer = rx_buffer;
     loop {
         parl_io_rx.read_dma_async(buffer).await.unwrap();
-        println!("Received: {:02x?} ...", &buffer[..30]);
+        println!(
+            "Received: {:02x?} ... {:02x?}",
+            &buffer[..30],
+            &buffer[(buffer.len() - 30)..]
+        );
 
         Timer::after(Duration::from_millis(500)).await;
     }
