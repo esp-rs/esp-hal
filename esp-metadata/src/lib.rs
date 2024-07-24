@@ -1,11 +1,12 @@
 //! Metadata for Espressif devices, primarily intended for use in build scripts.
 
+use anyhow::{bail, Result};
+
 const ESP32_TOML: &str = include_str!("../devices/esp32.toml");
 const ESP32C2_TOML: &str = include_str!("../devices/esp32c2.toml");
 const ESP32C3_TOML: &str = include_str!("../devices/esp32c3.toml");
 const ESP32C6_TOML: &str = include_str!("../devices/esp32c6.toml");
 const ESP32H2_TOML: &str = include_str!("../devices/esp32h2.toml");
-const ESP32P4_TOML: &str = include_str!("../devices/esp32p4.toml");
 const ESP32S2_TOML: &str = include_str!("../devices/esp32s2.toml");
 const ESP32S3_TOML: &str = include_str!("../devices/esp32s3.toml");
 
@@ -15,7 +16,6 @@ lazy_static::lazy_static! {
     static ref ESP32C3_CFG: Config = basic_toml::from_str(ESP32C3_TOML).unwrap();
     static ref ESP32C6_CFG: Config = basic_toml::from_str(ESP32C6_TOML).unwrap();
     static ref ESP32H2_CFG: Config = basic_toml::from_str(ESP32H2_TOML).unwrap();
-    static ref ESP32P4_CFG: Config = basic_toml::from_str(ESP32P4_TOML).unwrap();
     static ref ESP32S2_CFG: Config = basic_toml::from_str(ESP32S2_TOML).unwrap();
     static ref ESP32S3_CFG: Config = basic_toml::from_str(ESP32S3_TOML).unwrap();
 }
@@ -84,9 +84,10 @@ pub enum Cores {
     strum::Display,
     strum::EnumIter,
     strum::EnumString,
+    clap::ValueEnum,
 )]
-#[serde(rename_all = "lowercase")]
-#[strum(serialize_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
+#[strum(serialize_all = "kebab-case")]
 pub enum Chip {
     /// ESP32
     Esp32,
@@ -98,12 +99,60 @@ pub enum Chip {
     Esp32c6,
     /// ESP32-H2
     Esp32h2,
-    /// ESP32-P4
-    Esp32p4,
     /// ESP32-S2
     Esp32s2,
     /// ESP32-S3
     Esp32s3,
+}
+
+impl Chip {
+    pub fn target(&self) -> &str {
+        use Chip::*;
+
+        match self {
+            Esp32 => "xtensa-esp32-none-elf",
+            Esp32c2 | Esp32c3 => "riscv32imc-unknown-none-elf",
+            Esp32c6 | Esp32h2 => "riscv32imac-unknown-none-elf",
+            Esp32s2 => "xtensa-esp32s2-none-elf",
+            Esp32s3 => "xtensa-esp32s3-none-elf",
+        }
+    }
+
+    pub fn has_lp_core(&self) -> bool {
+        use Chip::*;
+
+        matches!(self, Esp32c6 | Esp32s2 | Esp32s3)
+    }
+
+    pub fn lp_target(&self) -> Result<&str> {
+        use Chip::*;
+
+        match self {
+            Esp32c6 => Ok("riscv32imac-unknown-none-elf"),
+            Esp32s2 | Esp32s3 => Ok("riscv32imc-unknown-none-elf"),
+            _ => bail!("Chip does not contain an LP core: '{}'", self),
+        }
+    }
+
+    pub fn pretty_name(&self) -> &str {
+        match self {
+            Chip::Esp32 => "ESP32",
+            Chip::Esp32c2 => "ESP32-C2",
+            Chip::Esp32c3 => "ESP32-C3",
+            Chip::Esp32c6 => "ESP32-C6",
+            Chip::Esp32h2 => "ESP32-H2",
+            Chip::Esp32s2 => "ESP32-S2",
+            Chip::Esp32s3 => "ESP32-S3",
+        }
+    }
+
+    pub fn is_xtensa(&self) -> bool {
+        matches!(self, Chip::Esp32 | Chip::Esp32s2 | Chip::Esp32s3)
+    }
+
+    pub fn is_riscv(&self) -> bool {
+        !self.is_xtensa()
+    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -130,7 +179,6 @@ impl Config {
             Chip::Esp32c3 => ESP32C3_CFG.clone(),
             Chip::Esp32c6 => ESP32C6_CFG.clone(),
             Chip::Esp32h2 => ESP32H2_CFG.clone(),
-            Chip::Esp32p4 => ESP32P4_CFG.clone(),
             Chip::Esp32s2 => ESP32S2_CFG.clone(),
             Chip::Esp32s3 => ESP32S3_CFG.clone(),
         }

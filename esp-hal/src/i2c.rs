@@ -619,7 +619,7 @@ mod asynch {
             const NUM_I2C: usize = 1;
         }
     }
-
+    #[allow(clippy::declare_interior_mutable_const)]
     const INIT: AtomicWaker = AtomicWaker::new();
     static WAKERS: [AtomicWaker; NUM_I2C] = [INIT; NUM_I2C];
 

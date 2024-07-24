@@ -22,7 +22,9 @@ pub(crate) unsafe extern "C" fn wifi_int_restore(
     wifi_int_mux: *mut crate::binary::c_types::c_void,
     tmp: u32,
 ) {
-    critical_section::release(core::mem::transmute(tmp))
+    critical_section::release(core::mem::transmute::<u32, critical_section::RestoreState>(
+        tmp,
+    ))
 }
 
 pub(crate) unsafe extern "C" fn set_intr(

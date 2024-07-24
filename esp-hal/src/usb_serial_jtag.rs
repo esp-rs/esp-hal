@@ -805,7 +805,7 @@ mod asynch {
 
     impl UsbSerialJtagRx<'_, Async> {
         async fn read_bytes_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
-            if buf.len() == 0 {
+            if buf.is_empty() {
                 return Ok(0);
             }
 

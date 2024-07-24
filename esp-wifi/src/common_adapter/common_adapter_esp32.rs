@@ -201,7 +201,9 @@ unsafe extern "C" fn phy_enter_critical() -> u32 {
 unsafe extern "C" fn phy_exit_critical(level: u32) {
     trace!("phy_exit_critical {}", level);
 
-    critical_section::release(core::mem::transmute(level));
+    critical_section::release(core::mem::transmute::<u32, critical_section::RestoreState>(
+        level,
+    ));
 }
 
 #[ram]

@@ -1461,6 +1461,12 @@ mod asynch {
         pub rx_queue: Channel<CriticalSectionRawMutex, Result<EspTwaiFrame, EspTwaiError>, 32>,
     }
 
+    impl Default for TwaiAsyncState {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     impl TwaiAsyncState {
         pub const fn new() -> Self {
             Self {
@@ -1472,6 +1478,7 @@ mod asynch {
     }
 
     const NUM_TWAI: usize = 2;
+    #[allow(clippy::declare_interior_mutable_const)]
     const NEW_STATE: TwaiAsyncState = TwaiAsyncState::new();
     pub(crate) static TWAI_STATE: [TwaiAsyncState; NUM_TWAI] = [NEW_STATE; NUM_TWAI];
 
@@ -1511,7 +1518,7 @@ mod asynch {
 
                 T::write_frame(frame);
 
-                return Poll::Ready(Ok(()));
+                Poll::Ready(Ok(()))
             })
             .await
         }

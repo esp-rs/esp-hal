@@ -601,6 +601,7 @@ mod asynch {
 
     const NUM_ALARMS: usize = 3;
 
+    #[allow(clippy::declare_interior_mutable_const)]
     const INIT: AtomicWaker = AtomicWaker::new();
     static WAKERS: [AtomicWaker; NUM_ALARMS] = [INIT; NUM_ALARMS];
 

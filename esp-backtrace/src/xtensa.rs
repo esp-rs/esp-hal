@@ -6,6 +6,7 @@ use crate::MAX_BACKTRACE_ADDRESSES;
 // the return address is the address following the callxN
 // we get better results (especially if the caller was the last function in the
 // calling function) if we report the address of callxN itself
+#[cfg(feature = "panic-handler")]
 pub(super) const RA_OFFSET: usize = 3;
 
 #[doc(hidden)]
@@ -307,7 +308,8 @@ pub(crate) fn backtrace_internal(
 
             old_address = address;
 
-            if address == 0 {
+            // the address is 0 but we sanitized the address - then 0 becomes 0x40000000
+            if address == 0x40000000 {
                 break;
             }
 

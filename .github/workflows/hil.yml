@@ -103,24 +103,29 @@ jobs:
           # RISC-V devices:
           - soc: esp32c2
             runner: esp32c2-jtag
+            usb: ACM0
           - soc: esp32c3
             runner: esp32c3-usb
+            usb: ACM0
           - soc: esp32c6
             runner: esp32c6-usb
+            usb: ACM0
           - soc: esp32h2
             runner: esp32h2-usb
+            usb: ACM0
           # Xtensa devices:
           - soc: esp32s2
             runner: esp32s2-jtag
+            usb: USB0
           - soc: esp32s3
             runner: esp32s3-usb
+            usb: USB0
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: tests-${{ matrix.target.soc }}
           path: tests-${{ matrix.target.soc }}
-
       - name: Run Tests
         id: run-tests
         run: |
@@ -129,4 +134,8 @@ jobs:
 
       - name: Erase Flash on Failure
         if: ${{ failure() && steps.run-tests.conclusion == 'failure' }}
-        run: espflash erase-flash
+        env:
+          ESPFLASH_PORT: /dev/tty${{ matrix.target.usb }}
+        run: |
+          export PATH=$PATH:/home/espressif/.cargo/bin
+          espflash erase-flash
