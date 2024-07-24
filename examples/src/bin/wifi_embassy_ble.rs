@@ -32,7 +32,7 @@ use esp_hal::{
     peripherals::*,
     rng::Rng,
     system::SystemControl,
-    timer::{ErasedTimer, OneShotTimer, PeriodicTimer},
+    timer::{timg::TimerGroup, ErasedTimer, OneShotTimer, PeriodicTimer},
 };
 use esp_println::println;
 use esp_wifi::{ble::controller::asynch::BleConnector, initialize, EspWifiInitFor};
@@ -56,11 +56,9 @@ async fn main(_spawner: Spawner) -> ! {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::max(system.clock_control).freeze();
 
-    let timer = PeriodicTimer::new(
-        esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0, &clocks)
-            .timer0
-            .into(),
-    );
+    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timer0: ErasedTimer = timg0.timer0.into();
+    let timer = PeriodicTimer::new(timer0);
 
     let init = initialize(
         EspWifiInitFor::Ble,
@@ -84,26 +82,20 @@ async fn main(_spawner: Spawner) -> ! {
 
     #[cfg(feature = "esp32")]
     {
-        let timg1 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1, &clocks);
-        esp_hal_embassy::init(
-            &clocks,
-            mk_static!(
-                [OneShotTimer<ErasedTimer>; 1],
-                [OneShotTimer::new(timg1.timer0.into())]
-            ),
-        );
+        let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
+        let timer0: ErasedTimer = timg1.timer0.into();
+        let timers = [OneShotTimer::new(timer0)];
+        let timers = mk_static!([OneShotTimer<ErasedTimer>; 1], timers);
+        esp_hal_embassy::init(&clocks, timers);
     }
 
     #[cfg(not(feature = "esp32"))]
     {
         let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER);
-        esp_hal_embassy::init(
-            &clocks,
-            mk_static!(
-                [OneShotTimer<ErasedTimer>; 1],
-                [OneShotTimer::new(systimer.alarm0.into())]
-            ),
-        );
+        let alarm0: ErasedTimer = systimer.alarm0.into();
+        let timers = [OneShotTimer::new(alarm0)];
+        let timers = mk_static!([OneShotTimer<ErasedTimer>; 1], timers);
+        esp_hal_embassy::init(&clocks, timers);
     }
 
     let mut bluetooth = peripherals.BT;
