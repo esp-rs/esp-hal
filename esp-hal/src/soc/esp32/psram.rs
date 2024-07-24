@@ -18,8 +18,7 @@
 //!
 //! NOTE: If you want to use `PSRAM` on `ESP32` or `ESP32-S3`, it'll work only
 //! in `release` mode.
-
-const PSRAM_VADDR: u32 = 0x3F800000;
+pub const PSRAM_VADDR_START: usize = 0x3F800000 as usize;
 
 pub fn psram_vaddr_start() -> usize {
     PSRAM_VADDR_START
@@ -39,12 +38,10 @@ cfg_if::cfg_if! {
 
 pub const PSRAM_BYTES: usize = PSRAM_SIZE as usize * 1024 * 1024;
 
-pub const PSRAM_VADDR_START: usize = PSRAM_VADDR as usize;
-
 #[cfg(any(feature = "psram-2m", feature = "psram-4m", feature = "psram-8m"))]
 pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::peripherals::PSRAM>) {
     utils::psram_init();
-    utils::s_mapping(PSRAM_VADDR, PSRAM_BYTES as u32);
+    utils::s_mapping(PSRAM_VADDR_START as u32, PSRAM_BYTES as u32);
 }
 
 #[cfg(any(feature = "psram-2m", feature = "psram-4m", feature = "psram-8m"))]
@@ -890,13 +887,12 @@ pub(crate) mod utils {
                     break;
                 }
             }
-            
-                // DPORT_SET_PERI_REG_MASK(DPORT_HOST_INF_SEL_REG, 1 << 14);
-                let dport = &*esp32::DPORT::PTR;
-                dport
-                    .host_inf_sel()
-                    .modify(|r, w| w.bits(r.bits() | 1 << 14));
-            
+
+            // DPORT_SET_PERI_REG_MASK(DPORT_HOST_INF_SEL_REG, 1 << 14);
+            let dport = &*esp32::DPORT::PTR;
+            dport
+                .host_inf_sel()
+                .modify(|r, w| w.bits(r.bits() | 1 << 14));
 
             // Start send data
             spi.cmd().modify(|_, w| w.usr().set_bit());
@@ -913,14 +909,11 @@ pub(crate) mod utils {
                 .modify(|r, w| w.bits(r.bits() & !(1 << 14)));
 
             // recover spi mode
-
-            // TODO: get back to this
             // if !p_rx_data.is_null() {
             //     spi.user().modify(|_, w| w.fwrite_dual().bits(mode_backup));
             // } else {
             //     0xf
             // }
-
             // TODO: get back to this
             set_peri_reg_bits(
                 SPI1_USER_REG,
@@ -946,10 +939,8 @@ pub(crate) mod utils {
 
             if !p_rx_data.is_null() {
                 // Read data out
-                // TODO: works?
                 loop {
-                    p_rx_data
-                        .write_volatile(spi.w(0).read().bits());
+                    p_rx_data.write_volatile(spi.w(0).read().bits());
                 }
             }
         }
@@ -1004,63 +995,27 @@ pub(crate) mod utils {
     fn psram_gpio_config(psram_io: &PsramIo, mode: PsramCacheSpeed) -> u32 {
         unsafe {
             let spi = &*crate::peripherals::SPI0::PTR;
-            let g_rom_spiflash_dummy_len_plus_ptr =
-                addr_of_mut!(g_rom_spiflash_dummy_len_plus);
+            let g_rom_spiflash_dummy_len_plus_ptr = addr_of_mut!(g_rom_spiflash_dummy_len_plus);
 
-            fn set_drive_ability(gpio: u8, bits: u8) {
-                unsafe {
-                    let io_mux = &*crate::peripherals::IO_MUX::PTR;
-                    match gpio {
-                        0 => io_mux.gpio0().modify(|_, w| w.fun_drv().bits(bits)),
-                        1 => io_mux.gpio1().modify(|_, w| w.fun_drv().bits(bits)),
-                        2 => io_mux.gpio2().modify(|_, w| w.fun_drv().bits(bits)),
-                        3 => io_mux.gpio3().modify(|_, w| w.fun_drv().bits(bits)),
-                        4 => io_mux.gpio4().modify(|_, w| w.fun_drv().bits(bits)),
-                        5 => io_mux.gpio5().modify(|_, w| w.fun_drv().bits(bits)),
-                        6 => io_mux.gpio6().modify(|_, w| w.fun_drv().bits(bits)),
-                        7 => io_mux.gpio7().modify(|_, w| w.fun_drv().bits(bits)),
-                        8 => io_mux.gpio8().modify(|_, w| w.fun_drv().bits(bits)),
-                        9 => io_mux.gpio9().modify(|_, w| w.fun_drv().bits(bits)),
-                        10 => io_mux.gpio10().modify(|_, w| w.fun_drv().bits(bits)),
-                        11 => io_mux.gpio11().modify(|_, w| w.fun_drv().bits(bits)),
-                        12 => io_mux.gpio12().modify(|_, w| w.fun_drv().bits(bits)),
-                        13 => io_mux.gpio13().modify(|_, w| w.fun_drv().bits(bits)),
-                        14 => io_mux.gpio14().modify(|_, w| w.fun_drv().bits(bits)),
-                        15 => io_mux.gpio15().modify(|_, w| w.fun_drv().bits(bits)),
-                        16 => io_mux.gpio16().modify(|_, w| w.fun_drv().bits(bits)),
-                        17 => io_mux.gpio17().modify(|_, w| w.fun_drv().bits(bits)),
-                        18 => io_mux.gpio18().modify(|_, w| w.fun_drv().bits(bits)),
-                        19 => io_mux.gpio19().modify(|_, w| w.fun_drv().bits(bits)),
-                        20 => io_mux.gpio20().modify(|_, w| w.fun_drv().bits(bits)),
-                        21 => io_mux.gpio21().modify(|_, w| w.fun_drv().bits(bits)),
-                        22 => io_mux.gpio22().modify(|_, w| w.fun_drv().bits(bits)),
-                        23 => io_mux.gpio23().modify(|_, w| w.fun_drv().bits(bits)),
-                        24 => io_mux.gpio24().modify(|_, w| w.fun_drv().bits(bits)),
-                        25 => io_mux.gpio25().modify(|_, w| w.fun_drv().bits(bits)),
-                        26 => io_mux.gpio26().modify(|_, w| w.fun_drv().bits(bits)),
-                        27 => io_mux.gpio27().modify(|_, w| w.fun_drv().bits(bits)),
-                        32 => io_mux.gpio32().modify(|_, w| w.fun_drv().bits(bits)),
-                        33 => io_mux.gpio33().modify(|_, w| w.fun_drv().bits(bits)),
-                        34 => io_mux.gpio34().modify(|_, w| w.fun_drv().bits(bits)),
-                        35 => io_mux.gpio35().modify(|_, w| w.fun_drv().bits(bits)),
-                        36 => io_mux.gpio36().modify(|_, w| w.fun_drv().bits(bits)),
-                        37 => io_mux.gpio37().modify(|_, w| w.fun_drv().bits(bits)),
-                        38 => io_mux.gpio38().modify(|_, w| w.fun_drv().bits(bits)),
-                        39 => io_mux.gpio39().modify(|_, w| w.fun_drv().bits(bits)),
-                        _ => panic!("Invalid GPIO number"),
+            #[derive(Debug, Clone, Copy)]
+            enum Field {
+                McuSel,
+                FunDrv,
+            }
+
+            macro_rules! apply_to_field {
+                ($w:ident, $field:expr, $bits:expr) => {
+                    match $field {
+                        Field::McuSel => $w.mcu_sel().bits($bits),
+                        Field::FunDrv => $w.fun_drv().bits($bits),
                     }
-                }
+                };
             }
 
-            fn gpio_pin_mux_reg(gpio: u8) -> u32 {
-                crate::gpio::get_io_mux_reg(gpio).as_ptr() as u32
-            }
-
-            fn gpio_hal_iomux_func_sel(reg: u32, function: u32) {
+            fn configure_gpio(gpio: u8, field: Field, bits: u8) {
                 unsafe {
-                    let ptr = reg as *mut u32;
-                    let old = ptr.read_volatile();
-                    ptr.write_volatile((old & !(0b111 << 12)) | (function << 12));
+                    let ptr = crate::gpio::get_io_mux_reg(gpio);
+                    ptr.modify(|_, w| apply_to_field!(w, field, bits));
                 }
             }
 
@@ -1101,8 +1056,8 @@ pub(crate) mod utils {
 
                     // set drive ability for clock
 
-                    set_drive_ability(psram_io.flash_clk_io, 3);
-                    set_drive_ability(psram_io.psram_clk_io, 2);
+                    configure_gpio(psram_io.flash_clk_io, Field::FunDrv, 3);
+                    configure_gpio(psram_io.psram_clk_io, Field::FunDrv, 2);
                 }
                 PsramCacheSpeed::PsramCacheF80mS80m => {
                     extra_dummy = PSRAM_IO_MATRIX_DUMMY_80M;
@@ -1122,8 +1077,8 @@ pub(crate) mod utils {
                     esp_rom_spiflash_config_clk(_SPI_80M_CLK_DIV, _SPI_FLASH_PORT);
 
                     // set drive ability for clock
-                    set_drive_ability(psram_io.flash_clk_io, 3);
-                    set_drive_ability(psram_io.psram_clk_io, 3);
+                    configure_gpio(psram_io.flash_clk_io, Field::FunDrv, 3);
+                    configure_gpio(psram_io.psram_clk_io, Field::FunDrv, 3);
                 }
                 PsramCacheSpeed::PsramCacheF40mS40m => {
                     extra_dummy = PSRAM_IO_MATRIX_DUMMY_40M;
@@ -1144,8 +1099,8 @@ pub(crate) mod utils {
                     esp_rom_spiflash_config_clk(_SPI_40M_CLK_DIV, _SPI_FLASH_PORT);
 
                     // set drive ability for clock
-                    set_drive_ability(psram_io.flash_clk_io, 2);
-                    set_drive_ability(psram_io.psram_clk_io, 2);
+                    configure_gpio(psram_io.flash_clk_io, Field::FunDrv, 2);
+                    configure_gpio(psram_io.psram_clk_io, Field::FunDrv, 2);
                 }
             }
 
@@ -1200,35 +1155,52 @@ pub(crate) mod utils {
                 && (psram_io.flash_clk_io != psram_io.psram_clk_io)
             {
                 // flash clock signal should come from IO MUX.
-                gpio_hal_iomux_func_sel(
-                    gpio_pin_mux_reg(psram_io.flash_clk_io),
-                    FUNC_SD_CLK_SPICLK,
+                configure_gpio(
+                    psram_io.flash_clk_io,
+                    Field::McuSel,
+                    FUNC_SD_CLK_SPICLK as u8,
                 );
             } else {
                 // flash clock signal should come from GPIO matrix.
-                gpio_hal_iomux_func_sel(gpio_pin_mux_reg(psram_io.flash_clk_io), PIN_FUNC_GPIO);
+                configure_gpio(psram_io.flash_clk_io, Field::McuSel, PIN_FUNC_GPIO as u8);
             }
-            gpio_hal_iomux_func_sel(gpio_pin_mux_reg(psram_io.flash_cs_io), PIN_FUNC_GPIO);
-            gpio_hal_iomux_func_sel(gpio_pin_mux_reg(psram_io.psram_cs_io), PIN_FUNC_GPIO);
-            gpio_hal_iomux_func_sel(gpio_pin_mux_reg(psram_io.psram_clk_io), PIN_FUNC_GPIO);
-            gpio_hal_iomux_func_sel(gpio_pin_mux_reg(psram_io.psram_spiq_sd0_io), PIN_FUNC_GPIO);
-            gpio_hal_iomux_func_sel(gpio_pin_mux_reg(psram_io.psram_spid_sd1_io), PIN_FUNC_GPIO);
-            gpio_hal_iomux_func_sel(gpio_pin_mux_reg(psram_io.psram_spihd_sd2_io), PIN_FUNC_GPIO);
-            gpio_hal_iomux_func_sel(gpio_pin_mux_reg(psram_io.psram_spiwp_sd3_io), PIN_FUNC_GPIO);
+            configure_gpio(psram_io.flash_cs_io, Field::McuSel, PIN_FUNC_GPIO as u8);
+            configure_gpio(psram_io.psram_cs_io, Field::McuSel, PIN_FUNC_GPIO as u8);
+            configure_gpio(psram_io.psram_clk_io, Field::McuSel, PIN_FUNC_GPIO as u8);
+            configure_gpio(
+                psram_io.psram_spiq_sd0_io,
+                Field::McuSel,
+                PIN_FUNC_GPIO as u8,
+            );
+            configure_gpio(
+                psram_io.psram_spid_sd1_io,
+                Field::McuSel,
+                PIN_FUNC_GPIO as u8,
+            );
+            configure_gpio(
+                psram_io.psram_spihd_sd2_io,
+                Field::McuSel,
+                PIN_FUNC_GPIO as u8,
+            );
+            configure_gpio(
+                psram_io.psram_spiwp_sd3_io,
+                Field::McuSel,
+                PIN_FUNC_GPIO as u8,
+            );
 
             let flash_id: u32 = g_rom_flashchip.device_id;
             info!("Flash-ID = {}", flash_id);
 
             if flash_id == FLASH_ID_GD25LQ32C {
                 // Set drive ability for 1.8v flash in 80Mhz.
-                set_drive_ability(psram_io.flash_cs_io, 3);
-                set_drive_ability(psram_io.flash_clk_io, 3);
-                set_drive_ability(psram_io.psram_cs_io, 3);
-                set_drive_ability(psram_io.psram_clk_io, 3);
-                set_drive_ability(psram_io.psram_spiq_sd0_io, 3);
-                set_drive_ability(psram_io.psram_spid_sd1_io, 3);
-                set_drive_ability(psram_io.psram_spihd_sd2_io, 3);
-                set_drive_ability(psram_io.psram_spiwp_sd3_io, 3);
+                configure_gpio(psram_io.flash_cs_io, Field::FunDrv, 3);
+                configure_gpio(psram_io.flash_clk_io, Field::FunDrv, 3);
+                configure_gpio(psram_io.psram_cs_io, Field::FunDrv, 3);
+                configure_gpio(psram_io.psram_clk_io, Field::FunDrv, 3);
+                configure_gpio(psram_io.psram_spiq_sd0_io, Field::FunDrv, 3);
+                configure_gpio(psram_io.psram_spid_sd1_io, Field::FunDrv, 3);
+                configure_gpio(psram_io.psram_spihd_sd2_io, Field::FunDrv, 3);
+                configure_gpio(psram_io.psram_spiwp_sd3_io, Field::FunDrv, 3);
             }
 
             extra_dummy as u32
