@@ -615,7 +615,6 @@ mod asynch {
     };
 
     use cfg_if::cfg_if;
-    use embassy_futures::select::select;
     use embassy_sync::waitqueue::AtomicWaker;
     use embedded_hal::i2c::Operation;
     use procmacros::handler;
@@ -633,6 +632,7 @@ mod asynch {
     const INIT: AtomicWaker = AtomicWaker::new();
     static WAKERS: [AtomicWaker; NUM_I2C] = [INIT; NUM_I2C];
 
+    #[cfg_attr(esp32, allow(dead_code))]
     pub(crate) enum Event {
         EndDetect,
         TxComplete,
@@ -832,7 +832,7 @@ mod asynch {
             if end_only {
                 I2cFuture::new(Event::EndDetect, self.inner()).await?;
             } else {
-                let res = select(
+                let res = embassy_futures::select::select(
                     I2cFuture::new(Event::TxComplete, self.inner()),
                     I2cFuture::new(Event::EndDetect, self.inner()),
                 )
@@ -850,72 +850,31 @@ mod asynch {
 
         #[cfg(esp32)]
         async fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
-            // for ESP32 we need a timeout here but wasting a timer seems to unnecessary
+            // for ESP32 we need a timeout here but wasting a timer seems unnecessary
             // given the short time we spend here
 
-            static VTABLE: core::task::RawWakerVTable = core::task::RawWakerVTable::new(
-                |_| core::task::RawWaker::new(core::ptr::null(), &VTABLE),
-                |_| {},
-                |_| {},
-                |_| {},
-            );
+            let mut tout = MAX_ITERATIONS / 10; // adjust the timeout because we are yielding in the loop
+            loop {
+                let interrupts = self.inner().register_block().int_raw().read();
 
-            pub fn poll_once<F: core::future::Future>(fut: &mut F) -> Poll<F::Output> {
-                let mut fut = unsafe { core::pin::Pin::new_unchecked(fut) };
+                self.inner().check_errors()?;
 
-                let raw_waker = core::task::RawWaker::new(core::ptr::null(), &VTABLE);
-                let waker = unsafe { core::task::Waker::from_raw(raw_waker) };
-                let mut cx = core::task::Context::from_waker(&waker);
-
-                fut.as_mut().poll(&mut cx)
-            }
-
-            self.peripheral.check_errors()?;
-
-            let mut tout = MAX_ITERATIONS / 10; // we do much more than just busy looping in the async case
-            if end_only {
-                let mut future = I2cFuture::new(Event::EndDetect, self.inner());
-                loop {
-                    match poll_once(&mut future) {
-                        Poll::Ready(result) => match result {
-                            Ok(_) => break,
-                            Err(err) => return Err(err),
-                        },
-                        Poll::Pending => (),
-                    }
-
-                    tout -= 1;
-                    if tout == 0 {
-                        return Err(Error::TimeOut);
-                    }
-
-                    embassy_futures::yield_now().await;
+                // Handle completion cases
+                // A full transmission was completed (either a STOP condition or END was
+                // processed)
+                if (!end_only && interrupts.trans_complete().bit_is_set())
+                    || interrupts.end_detect().bit_is_set()
+                {
+                    break;
                 }
-            } else {
-                let mut future = select(
-                    I2cFuture::new(Event::TxComplete, self.inner()),
-                    I2cFuture::new(Event::EndDetect, self.inner()),
-                );
-                loop {
-                    match embassy_futures::poll_once(&mut future) {
-                        Poll::Ready(result) => match result {
-                            embassy_futures::select::Either::First(Ok(_))
-                            | embassy_futures::select::Either::Second(Ok(_)) => break,
-                            embassy_futures::select::Either::First(Err(err))
-                            | embassy_futures::select::Either::Second(Err(err)) => return Err(err),
-                        },
-                        Poll::Pending => (),
-                    }
 
-                    tout -= 1;
-                    if tout == 0 {
-                        return Err(Error::TimeOut);
-                    }
-
-                    embassy_futures::yield_now().await;
+                tout -= 1;
+                if tout == 0 {
+                    return Err(Error::TimeOut);
                 }
-            }
 
+                embassy_futures::yield_now().await;
+            }
             self.peripheral.check_all_commands_done()?;
             Ok(())
         }
