@@ -43,6 +43,11 @@
 //! ⚠️ Note: Descriptors should be sized as `(max_transfer_size + CHUNK_SIZE - 1) / CHUNK_SIZE`.
 //! I.e., to transfer buffers of size `1..=CHUNK_SIZE`, you need 1 descriptor.
 //!
+//! ⚠️ Note: For chips that support DMA to/from PSRAM (esp32s3) DMA trasfers to/from PSRAM
+//! have extra alignment requirements. The address and size of the buffer pointed to by
+//! each descriptor must be a multiple of the cacheline (block) size. This is 32 bytes
+//! on esp32s3.
+//!
 //! For convenience you can use the [crate::dma_buffers] macro.
 #![warn(missing_docs)]
 
