@@ -28,7 +28,6 @@ use esp_hal::{
         Usb,
     },
     peripherals::Peripherals,
-    prelude::*,
     system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
 };
