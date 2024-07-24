@@ -609,6 +609,7 @@ where
 
 #[cfg(feature = "async")]
 mod asynch {
+    #[cfg(not(esp32))]
     use core::{
         pin::Pin,
         task::{Context, Poll},
@@ -640,6 +641,7 @@ mod asynch {
         TxFifoWatermark,
     }
 
+    #[cfg(not(esp32))]
     pub(crate) struct I2cFuture<'a, T>
     where
         T: Instance,
@@ -648,6 +650,7 @@ mod asynch {
         instance: &'a T,
     }
 
+    #[cfg(not(esp32))]
     impl<'a, T> I2cFuture<'a, T>
     where
         T: Instance,
@@ -732,6 +735,7 @@ mod asynch {
         }
     }
 
+    #[cfg(not(esp32))]
     impl<'a, T> core::future::Future for I2cFuture<'a, T>
     where
         T: Instance,
