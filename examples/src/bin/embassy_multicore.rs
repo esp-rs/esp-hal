@@ -24,7 +24,6 @@ use esp_hal::{
     get_core,
     gpio::{AnyOutput, Io, Level},
     peripherals::Peripherals,
-    prelude::*,
     system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
 };

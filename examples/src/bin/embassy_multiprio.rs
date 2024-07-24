@@ -28,7 +28,7 @@ use esp_hal::{
     interrupt::Priority,
     peripherals::Peripherals,
     system::SystemControl,
-    timer::{/*systimer::SystemTimer,*/ timg::TimerGroup, ErasedTimer, OneShotTimer},
+    timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
 };
 use esp_hal_embassy::InterruptExecutor;
 use esp_println::println;
