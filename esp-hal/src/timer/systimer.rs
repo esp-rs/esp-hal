@@ -586,6 +586,18 @@ where
     }
 }
 
+impl<T, DM, const CHANNEL: u8> Peripheral for Alarm<T, DM, CHANNEL>
+where
+    DM: Mode,
+{
+    type P = Self;
+
+    #[inline]
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        core::ptr::read(self as *const _)
+    }
+}
+
 // Async functionality of the system timer.
 #[cfg(feature = "async")]
 mod asynch {
