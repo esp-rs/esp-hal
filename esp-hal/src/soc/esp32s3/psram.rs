@@ -393,12 +393,6 @@ pub(crate) mod utils {
                 })
             });
         }
-        // let reg_val = match core_clock {
-        //     SpiTimingConfigCoreClock::SpiTimingConfigCoreClock80m => 0,
-        //     SpiTimingConfigCoreClock::SpiTimingConfigCoreClock120m => 1,
-        //     SpiTimingConfigCoreClock::SpiTimingConfigCoreClock160m => 2,
-        //     SpiTimingConfigCoreClock::SpiTimingConfigCoreClock240m => 3,
-        // };
     }
 
     #[ram]
@@ -1595,12 +1589,6 @@ pub(crate) mod utils {
                 })
             });
         }
-        // let reg_val = match core_clock {
-        //     SpiTimingConfigCoreClock::SpiTimingConfigCoreClock80m => 0,
-        //     SpiTimingConfigCoreClock::SpiTimingConfigCoreClock120m => 1,
-        //     SpiTimingConfigCoreClock::SpiTimingConfigCoreClock160m => 2,
-        //     SpiTimingConfigCoreClock::SpiTimingConfigCoreClock240m => 3,
-        // };
     }
 
     #[ram]
