@@ -127,7 +127,6 @@ pub mod asynch {
 
     impl LcdDoneFuture {
         pub(crate) fn new() -> Self {
-            Instance::listen_lcd_done();
             Self {}
         }
     }
@@ -144,6 +143,7 @@ pub mod asynch {
                 Instance::clear_lcd_done();
                 Poll::Ready(())
             } else {
+                Instance::listen_lcd_done();
                 Poll::Pending
             }
         }
