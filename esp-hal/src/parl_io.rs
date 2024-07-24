@@ -1664,7 +1664,7 @@ pub mod asynch {
 
     use super::{private::Instance, Error, ParlIoRx, ParlIoTx, MAX_DMA_SIZE};
     use crate::{
-        dma::{asynch::DmaRxDoneChFuture, DmaChannel, ParlIoPeripheral},
+        dma::{asynch::DmaRxFuture, DmaChannel, ParlIoPeripheral},
         peripherals::Interrupt,
     };
 
@@ -1756,7 +1756,7 @@ pub mod asynch {
                 return Err(Error::MaxDmaTransferSizeExceeded);
             }
 
-            let future = DmaRxDoneChFuture::new(&mut self.rx_channel);
+            let future = DmaRxFuture::new(&mut self.rx_channel);
             Self::start_receive_bytes_dma(future.rx, &mut self.rx_chain, ptr, len)?;
             future.await?;
 
