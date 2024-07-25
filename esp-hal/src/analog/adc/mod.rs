@@ -87,13 +87,17 @@ pub enum Attenuation {
 #[cfg(not(esp32))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AdcCalSource {
+    /// Use Ground as the calibration source
     Gnd,
+    /// Use Vref as the calibration source
     Ref,
 }
 
 /// An I/O pin which can be read using the ADC.
 pub struct AdcPin<PIN, ADCI, CS = ()> {
+    /// The underlying GPIO pin
     pub pin: PIN,
+    /// Calibration scheme used for the configured ADC pin
     #[cfg_attr(esp32, allow(unused))]
     pub cal_scheme: CS,
     _phantom: PhantomData<ADCI>,
@@ -113,8 +117,9 @@ where
 
 /// Configuration for the ADC.
 pub struct AdcConfig<ADCI> {
-    pub resolution: Resolution,
-    pub attenuations: [Option<Attenuation>; NUM_ATTENS],
+    #[cfg_attr(not(esp32), allow(unused))]
+    resolution: Resolution,
+    attenuations: [Option<Attenuation>; NUM_ATTENS],
     _phantom: PhantomData<ADCI>,
 }
 
@@ -190,6 +195,7 @@ pub trait CalibrationAccess: RegisterAccess {
 
 /// A helper trait to get the ADC channel of a compatible GPIO pin.
 pub trait AdcChannel {
+    /// Channel number used by the ADC
     const CHANNEL: u8;
 }
 

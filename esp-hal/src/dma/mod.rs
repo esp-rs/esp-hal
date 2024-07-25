@@ -49,7 +49,8 @@
 //! on esp32s3.
 //!
 //! For convenience you can use the [crate::dma_buffers] macro.
-#![warn(missing_docs)]
+
+#![deny(missing_docs)]
 
 use core::{fmt::Debug, marker::PhantomData, ptr::addr_of_mut, sync::atomic::compiler_fence};
 
