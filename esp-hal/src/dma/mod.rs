@@ -43,6 +43,11 @@
 //! ⚠️ Note: Descriptors should be sized as `(max_transfer_size + CHUNK_SIZE - 1) / CHUNK_SIZE`.
 //! I.e., to transfer buffers of size `1..=CHUNK_SIZE`, you need 1 descriptor.
 //!
+//! ⚠️ Note: For chips that support DMA to/from PSRAM (esp32s3) DMA transfers to/from PSRAM
+//! have extra alignment requirements. The address and size of the buffer pointed to by
+//! each descriptor must be a multiple of the cache line (block) size. This is 32 bytes
+//! on esp32s3.
+//!
 //! For convenience you can use the [crate::dma_buffers] macro.
 #![warn(missing_docs)]
 
@@ -66,7 +71,7 @@ impl Debug for DmaDescriptorFlags {
             .field("size", &self.size())
             .field("length", &self.length())
             .field("suc_eof", &self.suc_eof())
-            .field("owner", &self.owner())
+            .field("owner", &(if self.owner() { "DMA" } else { "CPU" }))
             .finish()
     }
 }
@@ -93,6 +98,11 @@ impl DmaDescriptor {
 
     fn set_length(&mut self, len: usize) {
         self.flags.set_length(len as u16)
+    }
+
+    #[allow(unused)]
+    fn size(&self) -> usize {
+        self.flags.size() as usize
     }
 
     fn len(&self) -> usize {
@@ -567,8 +577,8 @@ impl DescriptorChain {
     ) -> Result<(), DmaError> {
         if !crate::soc::is_valid_ram_address(self.first() as u32)
             || !crate::soc::is_valid_ram_address(self.last() as u32)
-            || !crate::soc::is_valid_ram_address(data as u32)
-            || !crate::soc::is_valid_ram_address(unsafe { data.add(len) } as u32)
+            || !crate::soc::is_valid_memory_address(data as u32)
+            || !crate::soc::is_valid_memory_address(unsafe { data.add(len) } as u32)
         {
             return Err(DmaError::UnsupportedMemoryRegion);
         }
@@ -639,8 +649,8 @@ impl DescriptorChain {
     ) -> Result<(), DmaError> {
         if !crate::soc::is_valid_ram_address(self.first() as u32)
             || !crate::soc::is_valid_ram_address(self.last() as u32)
-            || !crate::soc::is_valid_ram_address(data as u32)
-            || !crate::soc::is_valid_ram_address(unsafe { data.add(len) } as u32)
+            || !crate::soc::is_valid_memory_address(data as u32)
+            || !crate::soc::is_valid_memory_address(unsafe { data.add(len) } as u32)
         {
             return Err(DmaError::UnsupportedMemoryRegion);
         }
@@ -705,6 +715,15 @@ impl DescriptorChain {
 
         Ok(())
     }
+}
+
+/// Block size for transfers to/from psram
+#[derive(Copy, Clone, Debug, PartialEq)]
+#[allow(missing_docs)]
+pub enum DmaExtMemBKSize {
+    Size16 = 0,
+    Size32 = 1,
+    Size64 = 2,
 }
 
 pub(crate) struct TxCircularState {
@@ -967,6 +986,9 @@ pub trait RxPrivate: crate::private::Sealed {
 
     fn start_transfer(&mut self) -> Result<(), DmaError>;
 
+    #[cfg(esp32s3)]
+    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
+
     #[cfg(gdma)]
     fn set_mem2mem_mode(&mut self, value: bool);
 
@@ -1119,11 +1141,35 @@ where
             return Err(DmaError::InvalidAlignment);
         }
 
+        // for esp32s3 we check each descriptor buffer that points to psram for
+        // alignment and invalidate the cache for that buffer
+        // NOTE: for RX the `buffer` and `size` need to be aligned but the `len` does
+        // not. TRM section 3.4.9
+        #[cfg(esp32s3)]
+        for des in chain.descriptors.iter() {
+            // we are forcing the DMA alignment to the cache line size
+            // required when we are using dcache
+            let alignment = crate::soc::cache_get_dcache_line_size() as usize;
+            if crate::soc::is_valid_psram_address(des.buffer as u32) {
+                // both the size and address of the buffer must be aligned
+                if des.buffer as usize % alignment != 0 && des.size() % alignment != 0 {
+                    return Err(DmaError::InvalidAlignment);
+                }
+                // TODO: make this optional?
+                crate::soc::cache_invalidate_addr(des.buffer as u32, des.size() as u32);
+            }
+        }
+
         self.rx_impl.prepare_transfer_without_start(chain, peri)
     }
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
         self.rx_impl.start_transfer()
+    }
+
+    #[cfg(esp32s3)]
+    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
+        CH::Channel::set_in_ext_mem_block_size(size);
     }
 
     #[cfg(gdma)]
@@ -1243,6 +1289,9 @@ pub trait TxPrivate: crate::private::Sealed {
     ) -> Result<(), DmaError>;
 
     fn start_transfer(&mut self) -> Result<(), DmaError>;
+
+    #[cfg(esp32s3)]
+    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
 
     fn clear_ch_out_done(&self);
 
@@ -1403,11 +1452,31 @@ where
         peri: DmaPeripheral,
         chain: &DescriptorChain,
     ) -> Result<(), DmaError> {
+        // for esp32s3 we check each descriptor buffer that points to psram for
+        // alignment and writeback the cache for that buffer
+        #[cfg(esp32s3)]
+        for des in chain.descriptors.iter() {
+            // we are forcing the DMA alignment to the cache line size
+            // required when we are using dcache
+            let alignment = crate::soc::cache_get_dcache_line_size() as usize;
+            if crate::soc::is_valid_psram_address(des.buffer as u32) {
+                // both the size and address of the buffer must be aligned
+                if des.buffer as usize % alignment != 0 && des.size() % alignment != 0 {
+                    return Err(DmaError::InvalidAlignment);
+                }
+                crate::soc::cache_writeback_addr(des.buffer as u32, des.size() as u32);
+            }
+        }
         self.tx_impl.prepare_transfer_without_start(chain, peri)
     }
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
         self.tx_impl.start_transfer()
+    }
+
+    #[cfg(esp32s3)]
+    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
+        CH::Channel::set_out_ext_mem_block_size(size);
     }
 
     fn clear_ch_out_done(&self) {
@@ -1489,6 +1558,8 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn init_channel();
     #[cfg(gdma)]
     fn set_mem2mem_mode(value: bool);
+    #[cfg(esp32s3)]
+    fn set_out_ext_mem_block_size(size: DmaExtMemBKSize);
     fn set_out_burstmode(burst_mode: bool);
     fn set_out_priority(priority: DmaPriority);
     fn clear_out_interrupts();
@@ -1507,6 +1578,8 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn reset_out_eof_interrupt();
     fn last_out_dscr_address() -> usize;
 
+    #[cfg(esp32s3)]
+    fn set_in_ext_mem_block_size(size: DmaExtMemBKSize);
     fn set_in_burstmode(burst_mode: bool);
     fn set_in_priority(priority: DmaPriority);
     fn clear_in_interrupts();

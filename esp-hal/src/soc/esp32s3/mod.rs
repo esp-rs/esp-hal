@@ -170,3 +170,35 @@ unsafe fn post_init() {
     Wdt::<TIMG0, crate::Blocking>::set_wdt_enabled(false);
     Wdt::<TIMG1, crate::Blocking>::set_wdt_enabled(false);
 }
+
+#[doc(hidden)]
+#[link_section = ".rwtext"]
+pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
+    extern "C" {
+        fn Cache_WriteBack_Addr(addr: u32, size: u32);
+        fn Cache_Suspend_DCache_Autoload() -> u32;
+        fn Cache_Resume_DCache_Autoload(value: u32);
+    }
+    // suspend autoload, avoid load cachelines being written back
+    let autoload = Cache_Suspend_DCache_Autoload();
+    Cache_WriteBack_Addr(addr, size);
+    Cache_Resume_DCache_Autoload(autoload);
+}
+
+#[doc(hidden)]
+#[link_section = ".rwtext"]
+pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
+    extern "C" {
+        fn Cache_Invalidate_Addr(addr: u32, size: u32);
+    }
+    Cache_Invalidate_Addr(addr, size);
+}
+
+#[doc(hidden)]
+#[link_section = ".rwtext"]
+pub unsafe fn cache_get_dcache_line_size() -> u32 {
+    extern "C" {
+        fn Cache_Get_DCache_Line_Size() -> u32;
+    }
+    Cache_Get_DCache_Line_Size()
+}
