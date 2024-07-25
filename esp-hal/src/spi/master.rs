@@ -839,8 +839,6 @@ where
 }
 
 pub mod dma {
-    use embedded_dma::{ReadBuffer, WriteBuffer};
-
     use super::*;
     #[cfg(spi3)]
     use crate::dma::Spi3Peripheral;
@@ -859,9 +857,11 @@ pub mod dma {
             DmaTransferTxOwned,
             DmaTransferTxRx,
             DmaTransferTxRxOwned,
+            ReadBuffer,
             Spi2Peripheral,
             SpiPeripheral,
             TxPrivate,
+            WriteBuffer,
         },
         InterruptConfigurable,
         Mode,
@@ -1125,7 +1125,7 @@ pub mod dma {
             words: &'t TXBUF,
         ) -> Result<DmaTransferTx<Self>, super::Error>
         where
-            TXBUF: ReadBuffer<Word = u8>,
+            TXBUF: ReadBuffer,
         {
             self.dma_write_start(words)?;
             Ok(DmaTransferTx::new(self))
@@ -1142,7 +1142,7 @@ pub mod dma {
             words: TXBUF,
         ) -> Result<DmaTransferTxOwned<Self, TXBUF>, super::Error>
         where
-            TXBUF: ReadBuffer<Word = u8>,
+            TXBUF: ReadBuffer,
         {
             self.dma_write_start(&words)?;
             Ok(DmaTransferTxOwned::new(self, words))
@@ -1151,7 +1151,7 @@ pub mod dma {
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
         fn dma_write_start<'t, TXBUF>(&'t mut self, words: &'t TXBUF) -> Result<(), super::Error>
         where
-            TXBUF: ReadBuffer<Word = u8>,
+            TXBUF: ReadBuffer,
         {
             let (ptr, len) = unsafe { words.read_buffer() };
 
@@ -1180,7 +1180,7 @@ pub mod dma {
             words: &'t mut RXBUF,
         ) -> Result<DmaTransferRx<Self>, super::Error>
         where
-            RXBUF: WriteBuffer<Word = u8>,
+            RXBUF: WriteBuffer,
         {
             self.dma_read_start(words)?;
             Ok(DmaTransferRx::new(self))
@@ -1197,7 +1197,7 @@ pub mod dma {
             mut words: RXBUF,
         ) -> Result<DmaTransferRxOwned<Self, RXBUF>, super::Error>
         where
-            RXBUF: WriteBuffer<Word = u8>,
+            RXBUF: WriteBuffer,
         {
             self.dma_read_start(&mut words)?;
             Ok(DmaTransferRxOwned::new(self, words))
@@ -1206,7 +1206,7 @@ pub mod dma {
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
         fn dma_read_start<'t, RXBUF>(&'t mut self, words: &'t mut RXBUF) -> Result<(), super::Error>
         where
-            RXBUF: WriteBuffer<Word = u8>,
+            RXBUF: WriteBuffer,
         {
             let (ptr, len) = unsafe { words.write_buffer() };
 
@@ -1236,8 +1236,8 @@ pub mod dma {
             read_buffer: &'t mut RXBUF,
         ) -> Result<DmaTransferTxRx<Self>, super::Error>
         where
-            TXBUF: ReadBuffer<Word = u8>,
-            RXBUF: WriteBuffer<Word = u8>,
+            TXBUF: ReadBuffer,
+            RXBUF: WriteBuffer,
         {
             self.dma_transfer_start(words, read_buffer)?;
             Ok(DmaTransferTxRx::new(self))
@@ -1254,8 +1254,8 @@ pub mod dma {
             mut read_buffer: RXBUF,
         ) -> Result<DmaTransferTxRxOwned<Self, TXBUF, RXBUF>, super::Error>
         where
-            TXBUF: ReadBuffer<Word = u8>,
-            RXBUF: WriteBuffer<Word = u8>,
+            TXBUF: ReadBuffer,
+            RXBUF: WriteBuffer,
         {
             self.dma_transfer_start(&words, &mut read_buffer)?;
             Ok(DmaTransferTxRxOwned::new(self, words, read_buffer))
@@ -1267,8 +1267,8 @@ pub mod dma {
             read_buffer: &'t mut RXBUF,
         ) -> Result<(), super::Error>
         where
-            TXBUF: ReadBuffer<Word = u8>,
-            RXBUF: WriteBuffer<Word = u8>,
+            TXBUF: ReadBuffer,
+            RXBUF: WriteBuffer,
         {
             let (write_ptr, write_len) = unsafe { words.read_buffer() };
             let (read_ptr, read_len) = unsafe { read_buffer.write_buffer() };
@@ -1312,7 +1312,7 @@ pub mod dma {
             buffer: &'t mut RXBUF,
         ) -> Result<DmaTransferRx<Self>, super::Error>
         where
-            RXBUF: WriteBuffer<Word = u8>,
+            RXBUF: WriteBuffer,
         {
             let (ptr, len) = unsafe { buffer.write_buffer() };
 
@@ -1391,7 +1391,7 @@ pub mod dma {
             buffer: &'t TXBUF,
         ) -> Result<DmaTransferTx<Self>, super::Error>
         where
-            TXBUF: ReadBuffer<Word = u8>,
+            TXBUF: ReadBuffer,
         {
             let (ptr, len) = unsafe { buffer.read_buffer() };
 

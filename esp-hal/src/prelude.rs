@@ -6,13 +6,6 @@
 //! things, particularly traits, which are used in almost every single Rust
 //! program.
 
-pub use embedded_dma::{
-    ReadBuffer as _embedded_dma_ReadBuffer,
-    ReadTarget as _embedded_dma_ReadTarget,
-    Word as _embedded_dma_Word,
-    WriteBuffer as _embedded_dma_WriteBuffer,
-    WriteTarget as _embedded_dma_WriteTarget,
-};
 pub use fugit::{ExtU64 as _fugit_ExtU64, RateExtU32 as _fugit_RateExtU32};
 pub use nb;
 

@@ -220,8 +220,6 @@ pub enum Endianness {
 /// CTR, CFB8, and CFB128.
 #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
 pub mod dma {
-    use embedded_dma::{ReadBuffer, WriteBuffer};
-
     use crate::{
         aes::{Key, Mode},
         dma::{
@@ -235,8 +233,10 @@ pub mod dma {
             DmaDescriptor,
             DmaPeripheral,
             DmaTransferTxRx,
+            ReadBuffer,
             RxPrivate,
             TxPrivate,
+            WriteBuffer,
         },
     };
 
@@ -409,8 +409,8 @@ pub mod dma {
         ) -> Result<DmaTransferTxRx<Self>, crate::dma::DmaError>
         where
             K: Into<Key>,
-            TXBUF: ReadBuffer<Word = u8>,
-            RXBUF: WriteBuffer<Word = u8>,
+            TXBUF: ReadBuffer,
+            RXBUF: WriteBuffer,
         {
             let (write_ptr, write_len) = unsafe { words.read_buffer() };
             let (read_ptr, read_len) = unsafe { read_buffer.write_buffer() };
