@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improve error detection in the I2C driver (#1847)
 - Fix I2S async-tx (#1833)
 - Fix PARL_IO async-rx (#1851)
+- SPI: Clear DMA interrupts before (not after) DMA starts (#1859)
 
 ### Removed
 
