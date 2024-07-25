@@ -42,7 +42,12 @@
 
 use fugit::{ExtU64, Instant, MicrosDurationU64};
 
-use crate::{interrupt::InterruptHandler, private, InterruptConfigurable};
+use crate::{
+    interrupt::InterruptHandler,
+    peripheral::{Peripheral, PeripheralRef},
+    Blocking,
+    InterruptConfigurable,
+};
 
 #[cfg(systimer)]
 pub mod systimer;
@@ -106,16 +111,18 @@ pub trait Timer: crate::private::Sealed {
 }
 
 /// A one-shot timer.
-pub struct OneShotTimer<T> {
-    inner: T,
+pub struct OneShotTimer<'d, T> {
+    inner: PeripheralRef<'d, T>,
 }
 
-impl<T> OneShotTimer<T>
+impl<'d, T> OneShotTimer<'d, T>
 where
     T: Timer,
 {
     /// Construct a new instance of [`OneShotTimer`].
-    pub fn new(inner: T) -> Self {
+    pub fn new(inner: impl Peripheral<P = T> + 'd) -> Self {
+        crate::into_ref!(inner);
+
         Self { inner }
     }
 
@@ -194,9 +201,9 @@ where
     }
 }
 
-impl<T> crate::private::Sealed for OneShotTimer<T> where T: Timer {}
+impl<'d, T> crate::private::Sealed for OneShotTimer<'d, T> where T: Timer {}
 
-impl<T> InterruptConfigurable for OneShotTimer<T>
+impl<'d, T> InterruptConfigurable for OneShotTimer<'d, T>
 where
     T: Timer,
 {
@@ -206,7 +213,7 @@ where
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<T, UXX> embedded_hal_02::blocking::delay::DelayMs<UXX> for OneShotTimer<T>
+impl<'d, T, UXX> embedded_hal_02::blocking::delay::DelayMs<UXX> for OneShotTimer<'d, T>
 where
     T: Timer,
     UXX: Into<u32>,
@@ -217,7 +224,7 @@ where
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<T, UXX> embedded_hal_02::blocking::delay::DelayUs<UXX> for OneShotTimer<T>
+impl<'d, T, UXX> embedded_hal_02::blocking::delay::DelayUs<UXX> for OneShotTimer<'d, T>
 where
     T: Timer,
     UXX: Into<u32>,
@@ -228,7 +235,7 @@ where
 }
 
 #[cfg(feature = "embedded-hal")]
-impl<T> embedded_hal::delay::DelayNs for OneShotTimer<T>
+impl<'d, T> embedded_hal::delay::DelayNs for OneShotTimer<'d, T>
 where
     T: Timer,
 {
@@ -238,16 +245,18 @@ where
 }
 
 /// A periodic timer.
-pub struct PeriodicTimer<T> {
-    inner: T,
+pub struct PeriodicTimer<'d, T> {
+    inner: PeripheralRef<'d, T>,
 }
 
-impl<T> PeriodicTimer<T>
+impl<'d, T> PeriodicTimer<'d, T>
 where
     T: Timer,
 {
     /// Construct a new instance of [`PeriodicTimer`].
-    pub fn new(inner: T) -> Self {
+    pub fn new(inner: impl Peripheral<P = T> + 'd) -> Self {
+        crate::into_ref!(inner);
+
         Self { inner }
     }
 
@@ -309,9 +318,9 @@ where
     }
 }
 
-impl<T> crate::private::Sealed for PeriodicTimer<T> where T: Timer {}
+impl<'d, T> crate::private::Sealed for PeriodicTimer<'d, T> where T: Timer {}
 
-impl<T> InterruptConfigurable for PeriodicTimer<T>
+impl<'d, T> InterruptConfigurable for PeriodicTimer<'d, T>
 where
     T: Timer,
 {
@@ -320,104 +329,142 @@ where
     }
 }
 
+#[cfg(feature = "embedded-hal-02")]
+impl<'d, T> embedded_hal_02::timer::CountDown for PeriodicTimer<'d, T>
+where
+    T: Timer,
+{
+    type Time = MicrosDurationU64;
+
+    fn start<Time>(&mut self, timeout: Time)
+    where
+        Time: Into<Self::Time>,
+    {
+        self.start(timeout.into()).unwrap();
+    }
+
+    fn wait(&mut self) -> nb::Result<(), void::Void> {
+        self.wait()
+    }
+}
+
+#[cfg(feature = "embedded-hal-02")]
+impl<'d, T> embedded_hal_02::timer::Cancel for PeriodicTimer<'d, T>
+where
+    T: Timer,
+{
+    type Error = Error;
+
+    fn cancel(&mut self) -> Result<(), Self::Error> {
+        self.cancel()
+    }
+}
+
+#[cfg(feature = "embedded-hal-02")]
+impl<'d, T> embedded_hal_02::timer::Periodic for PeriodicTimer<'d, T> where T: Timer {}
+
 /// A type-erased timer
 ///
 /// You can create an instance of this by just calling `.into()` on a timer.
 #[allow(missing_docs)]
 pub enum ErasedTimer {
-    Timg0Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, crate::Blocking>),
+    Timg0Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>),
     #[cfg(timg_timer1)]
-    Timg0Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, crate::Blocking>),
+    Timg0Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking>),
     #[cfg(timg1)]
-    Timg1Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, crate::Blocking>),
+    Timg1Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking>),
     #[cfg(all(timg1, timg_timer1))]
-    Timg1Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, crate::Blocking>),
+    Timg1Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>),
     #[cfg(systimer)]
-    SystimerAlarm0Periodic(systimer::Alarm<systimer::Periodic, crate::Blocking, 0>),
+    SystimerAlarm0Periodic(systimer::Alarm<systimer::Periodic, Blocking, 0>),
     #[cfg(systimer)]
-    SystimerAlarm1Periodic(systimer::Alarm<systimer::Periodic, crate::Blocking, 1>),
+    SystimerAlarm1Periodic(systimer::Alarm<systimer::Periodic, Blocking, 1>),
     #[cfg(systimer)]
-    SystimerAlarm2Periodic(systimer::Alarm<systimer::Periodic, crate::Blocking, 2>),
+    SystimerAlarm2Periodic(systimer::Alarm<systimer::Periodic, Blocking, 2>),
     #[cfg(systimer)]
-    SystimerAlarm0Target(systimer::Alarm<systimer::Target, crate::Blocking, 0>),
+    SystimerAlarm0Target(systimer::Alarm<systimer::Target, Blocking, 0>),
     #[cfg(systimer)]
-    SystimerAlarm1Target(systimer::Alarm<systimer::Target, crate::Blocking, 1>),
+    SystimerAlarm1Target(systimer::Alarm<systimer::Target, Blocking, 1>),
     #[cfg(systimer)]
-    SystimerAlarm2Target(systimer::Alarm<systimer::Target, crate::Blocking, 2>),
+    SystimerAlarm2Target(systimer::Alarm<systimer::Target, Blocking, 2>),
 }
 
-impl private::Sealed for ErasedTimer {}
+impl crate::private::Sealed for ErasedTimer {}
 
-impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, crate::Blocking>> for ErasedTimer {
-    fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, crate::Blocking>) -> Self {
+impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>> for ErasedTimer {
+    fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>) -> Self {
         Self::Timg0Timer0(value)
     }
 }
 
 #[cfg(timg_timer1)]
-impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, crate::Blocking>> for ErasedTimer {
-    fn from(value: timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, crate::Blocking>) -> Self {
+impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking>> for ErasedTimer {
+    fn from(value: timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking>) -> Self {
         Self::Timg0Timer1(value)
     }
 }
 
 #[cfg(timg1)]
-impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, crate::Blocking>> for ErasedTimer {
-    fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, crate::Blocking>) -> Self {
+impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking>> for ErasedTimer {
+    fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking>) -> Self {
         Self::Timg1Timer0(value)
     }
 }
 
 #[cfg(all(timg1, timg_timer1))]
-impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, crate::Blocking>> for ErasedTimer {
-    fn from(value: timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, crate::Blocking>) -> Self {
+impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>> for ErasedTimer {
+    fn from(value: timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>) -> Self {
         Self::Timg1Timer1(value)
     }
 }
 
 #[cfg(systimer)]
-impl From<systimer::Alarm<systimer::Periodic, crate::Blocking, 0>> for ErasedTimer {
-    fn from(value: systimer::Alarm<systimer::Periodic, crate::Blocking, 0>) -> Self {
+impl From<systimer::Alarm<systimer::Periodic, Blocking, 0>> for ErasedTimer {
+    fn from(value: systimer::Alarm<systimer::Periodic, Blocking, 0>) -> Self {
         Self::SystimerAlarm0Periodic(value)
     }
 }
 
 #[cfg(systimer)]
-impl From<systimer::Alarm<systimer::Periodic, crate::Blocking, 1>> for ErasedTimer {
-    fn from(value: systimer::Alarm<systimer::Periodic, crate::Blocking, 1>) -> Self {
+impl From<systimer::Alarm<systimer::Periodic, Blocking, 1>> for ErasedTimer {
+    fn from(value: systimer::Alarm<systimer::Periodic, Blocking, 1>) -> Self {
         Self::SystimerAlarm1Periodic(value)
     }
 }
 
 #[cfg(systimer)]
-impl From<systimer::Alarm<systimer::Periodic, crate::Blocking, 2>> for ErasedTimer {
-    fn from(value: systimer::Alarm<systimer::Periodic, crate::Blocking, 2>) -> Self {
+impl From<systimer::Alarm<systimer::Periodic, Blocking, 2>> for ErasedTimer {
+    fn from(value: systimer::Alarm<systimer::Periodic, Blocking, 2>) -> Self {
         Self::SystimerAlarm2Periodic(value)
     }
 }
 
 #[cfg(systimer)]
-impl From<systimer::Alarm<systimer::Target, crate::Blocking, 0>> for ErasedTimer {
-    fn from(value: systimer::Alarm<systimer::Target, crate::Blocking, 0>) -> Self {
+impl From<systimer::Alarm<systimer::Target, Blocking, 0>> for ErasedTimer {
+    fn from(value: systimer::Alarm<systimer::Target, Blocking, 0>) -> Self {
         Self::SystimerAlarm0Target(value)
     }
 }
 
 #[cfg(systimer)]
-impl From<systimer::Alarm<systimer::Target, crate::Blocking, 1>> for ErasedTimer {
-    fn from(value: systimer::Alarm<systimer::Target, crate::Blocking, 1>) -> Self {
+impl From<systimer::Alarm<systimer::Target, Blocking, 1>> for ErasedTimer {
+    fn from(value: systimer::Alarm<systimer::Target, Blocking, 1>) -> Self {
         Self::SystimerAlarm1Target(value)
     }
 }
 
 #[cfg(systimer)]
-impl From<systimer::Alarm<systimer::Target, crate::Blocking, 2>> for ErasedTimer {
-    fn from(value: systimer::Alarm<systimer::Target, crate::Blocking, 2>) -> Self {
+impl From<systimer::Alarm<systimer::Target, Blocking, 2>> for ErasedTimer {
+    fn from(value: systimer::Alarm<systimer::Target, Blocking, 2>) -> Self {
         Self::SystimerAlarm2Target(value)
     }
 }
 
 impl Timer for ErasedTimer {
+    // Rather than manually implementing `Timer` for each variant of `ErasedTimer`,
+    // we use `delegate::delegate!{}` to do this for us. Otherwise, each function
+    // implementation would require its own `match` block for each enum variant,
+    // which would very quickly result in a large amount of duplicated code.
     delegate::delegate! {
         to match self {
             ErasedTimer::Timg0Timer0(inner) => inner,
@@ -456,36 +503,11 @@ impl Timer for ErasedTimer {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
-impl<T> embedded_hal_02::timer::CountDown for PeriodicTimer<T>
-where
-    T: Timer,
-{
-    type Time = MicrosDurationU64;
+impl Peripheral for ErasedTimer {
+    type P = Self;
 
-    fn start<Time>(&mut self, timeout: Time)
-    where
-        Time: Into<Self::Time>,
-    {
-        self.start(timeout.into()).unwrap();
-    }
-
-    fn wait(&mut self) -> nb::Result<(), void::Void> {
-        self.wait()
+    #[inline]
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        core::ptr::read(self as *const _)
     }
 }
-
-#[cfg(feature = "embedded-hal-02")]
-impl<T> embedded_hal_02::timer::Cancel for PeriodicTimer<T>
-where
-    T: Timer,
-{
-    type Error = Error;
-
-    fn cancel(&mut self) -> Result<(), Self::Error> {
-        self.cancel()
-    }
-}
-
-#[cfg(feature = "embedded-hal-02")]
-impl<T> embedded_hal_02::timer::Periodic for PeriodicTimer<T> where T: Timer {}

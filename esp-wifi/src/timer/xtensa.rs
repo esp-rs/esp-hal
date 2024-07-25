@@ -12,7 +12,7 @@ use crate::{
 };
 
 /// The timer responsible for time slicing.
-pub type TimeBase = PeriodicTimer<ErasedTimer>;
+pub type TimeBase = PeriodicTimer<'static, ErasedTimer>;
 static TIMER1: Mutex<RefCell<Option<TimeBase>>> = Mutex::new(RefCell::new(None));
 const TIMESLICE_FREQUENCY: fugit::HertzU64 =
     fugit::HertzU64::from_raw(crate::CONFIG.tick_rate_hz as u64);

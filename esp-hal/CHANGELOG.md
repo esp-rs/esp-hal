@@ -10,13 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+
 - Peripheral driver constructors don't take `InterruptHandler`s anymore. Use `set_interrupt_handler` to explicitly set the interrupt handler now. (#1819)
+- Use the peripheral ref pattern for `OneShotTimer` and `PeriodicTimer` (#1855)
 
 - Allow DMA to/from psram for esp32s3 (#1827)
 
 ### Fixed
-- Improve error detection in the I2C driver (#1847)
 
+- Improve error detection in the I2C driver (#1847)
 - Fix I2S async-tx (#1833)
 - Fix PARL_IO async-rx (#1851)
 
