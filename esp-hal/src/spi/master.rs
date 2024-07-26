@@ -2036,6 +2036,7 @@ where
         self.update();
 
         reset_dma_before_load_dma_dscr(reg_block);
+        self.clear_dma_interrupts();
         tx_chain.fill_for_tx(false, write_buffer_ptr, write_buffer_len)?;
         tx.prepare_transfer_without_start(self.dma_peripheral(), tx_chain)
             .and_then(|_| tx.start_transfer())?;
@@ -2043,7 +2044,6 @@ where
         rx.prepare_transfer_without_start(self.dma_peripheral(), rx_chain)
             .and_then(|_| rx.start_transfer())?;
 
-        self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
 
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
@@ -2086,13 +2086,13 @@ where
         self.update();
 
         reset_dma_before_load_dma_dscr(reg_block);
+        self.clear_dma_interrupts();
         chain.fill_for_tx(false, ptr, len)?;
         unsafe {
             tx.prepare_transfer_without_start(self.dma_peripheral(), chain)
                 .and_then(|_| tx.start_transfer())?;
         }
 
-        self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
 
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
@@ -2117,11 +2117,11 @@ where
         self.update();
 
         reset_dma_before_load_dma_dscr(reg_block);
+        self.clear_dma_interrupts();
         chain.fill_for_rx(false, ptr, len)?;
         rx.prepare_transfer_without_start(self.dma_peripheral(), chain)
             .and_then(|_| rx.start_transfer())?;
 
-        self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
 
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
