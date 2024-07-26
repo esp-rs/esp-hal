@@ -1213,6 +1213,21 @@ impl Io {
             pins,
         }
     }
+
+    /// Initialize the I/O driver without enabling the GPIO interrupt or
+    /// binding an interrupt handler to it.
+    ///
+    /// *Note:* You probably don't want to use this, it is intended to be used
+    /// in very specific use cases. Async GPIO functionality will not work
+    /// when instantiating `Io` using this constructor.
+    pub fn new_no_bind_interrupt(gpio: GPIO, io_mux: IO_MUX) -> Self {
+        let pins = gpio.pins();
+
+        Io {
+            _io_mux: io_mux,
+            pins,
+        }
+    }
 }
 
 impl crate::private::Sealed for Io {}
