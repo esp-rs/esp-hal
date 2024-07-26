@@ -60,6 +60,7 @@ symbols = [
     "wifi",
     "psram",
     "timg_timer1",
+    "touch",
     "large_intr_status",
 
     # ROM capabilities

@@ -229,6 +229,8 @@ pub mod system;
 pub mod time;
 #[cfg(any(systimer, timg0, timg1))]
 pub mod timer;
+#[cfg(touch)]
+pub mod touch;
 #[cfg(trace0)]
 pub mod trace;
 #[cfg(any(twai0, twai1))]
