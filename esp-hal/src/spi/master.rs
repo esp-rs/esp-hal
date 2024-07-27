@@ -1046,6 +1046,9 @@ pub mod dma {
         dma_buf: Buf,
         is_rx: bool,
         is_tx: bool,
+
+        rx_future_awaited: bool,
+        tx_future_awaited: bool,
     }
 
     impl<'d, T, C, M, DmaMode, Buf> SpiDmaTransfer<'d, T, C, M, DmaMode, Buf>
@@ -1056,14 +1059,30 @@ pub mod dma {
         M: DuplexMode,
         DmaMode: Mode,
     {
+        fn new(
+            spi_dma: SpiDma<'d, T, C, M, DmaMode>,
+            dma_buf: Buf,
+            is_rx: bool,
+            is_tx: bool,
+        ) -> Self {
+            Self {
+                spi_dma,
+                dma_buf,
+                is_rx,
+                is_tx,
+                rx_future_awaited: false,
+                tx_future_awaited: false,
+            }
+        }
+
         pub fn is_done(&self) -> bool {
-            if self.is_tx && !self.spi_dma.channel.tx.is_done() {
+            if self.is_tx && !self.tx_future_awaited && !self.spi_dma.channel.tx.is_done() {
                 return false;
             }
             if self.spi_dma.spi.busy() {
                 return false;
             }
-            if self.is_rx {
+            if self.is_rx && !self.rx_future_awaited {
                 // If this is an asymmetric transfer and the RX side is smaller, the RX channel
                 // will never be "done" as it won't have enough descriptors/buffer to receive
                 // the EOF bit from the SPI. So instead the RX channel will hit
@@ -1096,14 +1115,16 @@ pub mod dma {
         M: DuplexMode,
     {
         pub async fn wait_for_done(&mut self) {
-            if self.is_tx {
+            if self.is_tx && !self.tx_future_awaited {
                 let _ = DmaTxFuture::new(&mut self.spi_dma.channel.tx).await;
+                self.tx_future_awaited = true;
             }
 
             // As a future enhancement, setup Spi Future in here as well.
 
-            if self.is_rx {
+            if self.is_rx && !self.rx_future_awaited {
                 let _ = DmaRxFuture::new(&mut self.spi_dma.channel.rx).await;
+                self.rx_future_awaited = true;
             }
         }
     }
@@ -1141,12 +1162,7 @@ pub mod dma {
                 return Err((e, self, buffer));
             }
 
-            Ok(SpiDmaTransfer {
-                spi_dma: self,
-                dma_buf: buffer,
-                is_tx: true,
-                is_rx: false,
-            })
+            Ok(SpiDmaTransfer::new(self, buffer, true, false))
         }
 
         /// Perform a DMA read.
@@ -1161,7 +1177,7 @@ pub mod dma {
             buffer: DmaRxBuf,
         ) -> Result<SpiDmaTransfer<'d, T, C, M, DmaMode, DmaRxBuf>, (Error, Self, DmaRxBuf)>
         {
-            let bytes_to_read = buffer.capacity();
+            let bytes_to_read = buffer.len();
             if bytes_to_read > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
@@ -1174,12 +1190,7 @@ pub mod dma {
                 return Err((e, self, buffer));
             }
 
-            Ok(SpiDmaTransfer {
-                spi_dma: self,
-                dma_buf: buffer,
-                is_tx: false,
-                is_rx: true,
-            })
+            Ok(SpiDmaTransfer::new(self, buffer, false, true))
         }
 
         /// Perform a DMA transfer
@@ -1197,7 +1208,7 @@ pub mod dma {
             (Error, Self, DmaTxBuf, DmaRxBuf),
         > {
             let bytes_to_write = tx_buffer.len();
-            let bytes_to_read = rx_buffer.capacity();
+            let bytes_to_read = rx_buffer.len();
 
             if bytes_to_write > MAX_DMA_SIZE || bytes_to_read > MAX_DMA_SIZE {
                 return Err((
@@ -1222,12 +1233,12 @@ pub mod dma {
                 return Err((e, self, tx_buffer, rx_buffer));
             }
 
-            Ok(SpiDmaTransfer {
-                spi_dma: self,
-                dma_buf: (tx_buffer, rx_buffer),
-                is_tx: true,
-                is_rx: true,
-            })
+            Ok(SpiDmaTransfer::new(
+                self,
+                (tx_buffer, rx_buffer),
+                true,
+                true,
+            ))
         }
     }
 
@@ -1250,7 +1261,7 @@ pub mod dma {
             buffer: DmaRxBuf,
         ) -> Result<SpiDmaTransfer<'d, T, C, M, DmaMode, DmaRxBuf>, (Error, Self, DmaRxBuf)>
         {
-            let bytes_to_read = buffer.capacity();
+            let bytes_to_read = buffer.len();
             if bytes_to_read > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
@@ -1313,12 +1324,7 @@ pub mod dma {
                 return Err((e, self, buffer));
             }
 
-            Ok(SpiDmaTransfer {
-                spi_dma: self,
-                dma_buf: buffer,
-                is_tx: false,
-                is_rx: true,
-            })
+            Ok(SpiDmaTransfer::new(self, buffer, false, true))
         }
 
         #[allow(clippy::type_complexity)]
@@ -1395,12 +1401,7 @@ pub mod dma {
                 return Err((e, self, buffer));
             }
 
-            Ok(SpiDmaTransfer {
-                spi_dma: self,
-                dma_buf: buffer,
-                is_tx: true,
-                is_rx: false,
-            })
+            Ok(SpiDmaTransfer::new(self, buffer, true, false))
         }
     }
 
