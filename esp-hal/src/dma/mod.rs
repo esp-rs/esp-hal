@@ -497,8 +497,7 @@ pub enum DmaError {
     OutOfDescriptors,
     /// DescriptorError the DMA rejected the descriptor configuration. This
     /// could be because the source address of the data is not in RAM. Ensure
-    /// your source data is in a valid address space, or try using
-    /// [`crate::FlashSafeDma`] wrapper.
+    /// your source data is in a valid address space.
     DescriptorError,
     /// The available free buffer is less than the amount of data to push
     Overflow,

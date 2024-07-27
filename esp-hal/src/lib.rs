@@ -567,57 +567,6 @@ mod critical_section_impl {
     }
 }
 
-/// FlashSafeDma
-///
-/// The embedded-hal traits make no guarantees about
-/// where the buffers are placed. The DMA implementation in Espressif chips has
-/// a limitation in that it can only access the RAM address space, meaning data
-/// to be transmitted from the flash address space must be copied into RAM
-/// first.
-///
-/// This wrapper struct should be used when a peripheral using the DMA engine
-/// needs to transmit data from flash (ROM) via the embedded-hal traits. This is
-/// often a `const` variable.
-///
-/// Example usage using [`spi::master::dma::SpiDma`]
-/// ```rust, ignore
-/// const ARRAY_IN_FLASH = [0xAA; 128];
-///
-/// let spi = SpiDma::new(/* */);
-///
-/// spi.write(&ARRAY_IN_FLASH[..]).unwrap(); // error when transmission starts
-///
-/// let spi = FlashSafeDma::new(spi);
-///
-/// spi.write(&ARRAY_IN_FLASH[..]).unwrap(); // success
-/// ```
-pub struct FlashSafeDma<T, const SIZE: usize> {
-    inner: T,
-    #[allow(unused)]
-    buffer: [u8; SIZE],
-}
-
-impl<T, const SIZE: usize> FlashSafeDma<T, SIZE> {
-    pub fn new(inner: T) -> Self {
-        Self {
-            inner,
-            buffer: [0u8; SIZE],
-        }
-    }
-
-    pub fn inner_mut(&mut self) -> &mut T {
-        &mut self.inner
-    }
-
-    pub fn inner(&self) -> &T {
-        &self.inner
-    }
-
-    pub fn free(self) -> T {
-        self.inner
-    }
-}
-
 /// Default (unhandled) interrupt handler
 pub const DEFAULT_INTERRUPT_HANDLER: interrupt::InterruptHandler = interrupt::InterruptHandler::new(
     unsafe { core::mem::transmute::<*const (), extern "C" fn()>(EspDefaultHandler as *const ()) },
