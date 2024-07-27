@@ -70,6 +70,8 @@
 //! # }
 //! ```
 
+#![deny(missing_docs)]
+
 use fugit::HertzU32;
 
 #[cfg(any(esp32, esp32c2))]
@@ -88,13 +90,17 @@ use crate::{
 #[cfg_attr(esp32s3, path = "clocks_ll/esp32s3.rs")]
 pub(crate) mod clocks_ll;
 
+/// Clock properties
 pub trait Clock {
+    /// Frequency of the clock in [Hertz](fugit::HertzU32), using [fugit] types.
     fn frequency(&self) -> HertzU32;
 
+    /// Frequency of the clock in Megahertz
     fn mhz(&self) -> u32 {
         self.frequency().to_MHz()
     }
 
+    /// Frequency of the clock in Hertz
     fn hz(&self) -> u32 {
         self.frequency().to_Hz()
     }
@@ -103,14 +109,19 @@ pub trait Clock {
 /// CPU clock speed
 #[derive(Debug, Clone, Copy)]
 pub enum CpuClock {
+    /// 80MHz CPU clock
     #[cfg(not(esp32h2))]
     Clock80MHz,
+    /// 96MHz CPU clock
     #[cfg(esp32h2)]
     Clock96MHz,
+    /// 120MHz CPU clock
     #[cfg(esp32c2)]
     Clock120MHz,
+    /// 160MHz CPU clock
     #[cfg(not(any(esp32c2, esp32h2)))]
     Clock160MHz,
+    /// 240MHz CPU clock
     #[cfg(xtensa)]
     Clock240MHz,
 }
@@ -133,15 +144,20 @@ impl Clock for CpuClock {
     }
 }
 
+/// XTAL clock speed
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
 pub enum XtalClock {
+    /// 26MHz XTAL clock
     #[cfg(any(esp32, esp32c2))]
     RtcXtalFreq26M,
+    /// 32MHz XTAL clock
     #[cfg(any(esp32c3, esp32h2, esp32s3))]
     RtcXtalFreq32M,
+    /// 40MHz XTAL clock
     #[cfg(not(esp32h2))]
     RtcXtalFreq40M,
+    /// Other XTAL clock
     RtcXtalFreqOther(u32),
 }
 
@@ -239,23 +255,32 @@ impl Clock for ApbClock {
 
 /// Frozen clock frequencies
 ///
-/// The existence of this value indicates that the clock configuration can no
+/// The instantiation of this type indicates that the clock configuration can no
 /// longer be changed
 pub struct Clocks<'d> {
     _private: PeripheralRef<'d, SystemClockControl>,
+    /// CPU clock frequency
     pub cpu_clock: HertzU32,
+    /// APB clock frequency
     pub apb_clock: HertzU32,
+    /// XTAL clock frequency
     pub xtal_clock: HertzU32,
+    /// I2C clock frequency
     #[cfg(esp32)]
     pub i2c_clock: HertzU32,
+    /// PWM clock frequency
     #[cfg(esp32)]
     pub pwm_clock: HertzU32,
+    /// Crypto PWM  clock frequency
     #[cfg(esp32s3)]
     pub crypto_pwm_clock: HertzU32,
+    /// Crypto clock frequency
     #[cfg(any(esp32c6, esp32h2))]
     pub crypto_clock: HertzU32,
+    /// PLL 48M clock frequency (fixed)
     #[cfg(esp32h2)]
     pub pll_48m_clock: HertzU32,
+    /// PLL 96M clock frequency (fixed)
     #[cfg(esp32h2)]
     pub pll_96m_clock: HertzU32,
 }

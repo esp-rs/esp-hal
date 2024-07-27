@@ -55,7 +55,8 @@ async fn main(_spawner: Spawner) {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
-    let timers = [OneShotTimer::new(systimer.alarm0.into())];
+    let alarm0: ErasedTimer = systimer.alarm0.into();
+    let timers = [OneShotTimer::new(alarm0)];
     let timers = mk_static!([OneShotTimer<ErasedTimer>; 1], timers);
     esp_hal_embassy::init(&clocks, timers);
 

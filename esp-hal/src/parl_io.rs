@@ -27,7 +27,6 @@
 
 use core::marker::PhantomData;
 
-use embedded_dma::{ReadBuffer, WriteBuffer};
 use enumset::{EnumSet, EnumSetType};
 use fugit::HertzU32;
 use peripheral::PeripheralRef;
@@ -48,8 +47,10 @@ use crate::{
         DmaTransferRx,
         DmaTransferTx,
         ParlIoPeripheral,
+        ReadBuffer,
         RxPrivate,
         TxPrivate,
+        WriteBuffer,
     },
     gpio::{InputPin, OutputPin},
     interrupt::InterruptHandler,
@@ -1431,7 +1432,7 @@ where
         words: &'t TXBUF,
     ) -> Result<DmaTransferTx<Self>, Error>
     where
-        TXBUF: ReadBuffer<Word = u8>,
+        TXBUF: ReadBuffer,
     {
         let (ptr, len) = unsafe { words.read_buffer() };
 
@@ -1527,7 +1528,7 @@ where
         words: &'t mut RXBUF,
     ) -> Result<DmaTransferRx<Self>, Error>
     where
-        RXBUF: WriteBuffer<Word = u8>,
+        RXBUF: WriteBuffer,
     {
         let (ptr, len) = unsafe { words.write_buffer() };
 

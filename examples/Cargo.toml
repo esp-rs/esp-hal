@@ -7,6 +7,7 @@ publish = false
 
 [dependencies]
 aes                 = "0.8.4"
+aligned             = { version = "0.4.2", optional = true }
 bleps               = { git = "https://github.com/bjoernQ/bleps", package = "bleps", rev = "a5148d8ae679e021b78f53fd33afb8bb35d0b62e", features = [ "macros", "async"] }
 cfg-if              = "1.0.0"
 critical-section    = "1.1.2"

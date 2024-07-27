@@ -78,3 +78,20 @@ pub(crate) fn is_slice_in_dram<T>(slice: &[T]) -> bool {
     let end = start + slice.len() as u32;
     self::constants::SOC_DRAM_LOW <= start && end <= self::constants::SOC_DRAM_HIGH
 }
+
+#[allow(unused)]
+pub(crate) fn is_valid_psram_address(address: u32) -> bool {
+    #[cfg(psram)]
+    {
+        let start = crate::psram::psram_vaddr_start() as u32;
+        let end = start + crate::psram::PSRAM_BYTES as u32;
+        (start..=end).contains(&address)
+    }
+    #[cfg(not(psram))]
+    false
+}
+
+#[allow(unused)]
+pub(crate) fn is_valid_memory_address(address: u32) -> bool {
+    is_valid_ram_address(address) || is_valid_psram_address(address)
+}

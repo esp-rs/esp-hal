@@ -103,6 +103,7 @@ cfg_if::cfg_if! {
 /// The sampling/readout resolution of the ADC.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Resolution {
+    /// 12-bit resolution
     #[default]
     Resolution12Bit,
 }

@@ -59,7 +59,6 @@
 
 use core::{fmt::Formatter, mem::size_of};
 
-use embedded_dma::ReadBuffer;
 use fugit::HertzU32;
 
 use crate::{
@@ -74,6 +73,7 @@ use crate::{
         DmaPeripheral,
         DmaTransferTx,
         LcdCamPeripheral,
+        ReadBuffer,
         TxPrivate,
     },
     gpio::{OutputPin, OutputSignal},
@@ -352,12 +352,12 @@ where
         data: &'t TXBUF,
     ) -> Result<DmaTransferTx<Self>, DmaError>
     where
-        TXBUF: ReadBuffer<Word = P::Word>,
+        TXBUF: ReadBuffer,
     {
         let (ptr, len) = unsafe { data.read_buffer() };
 
         self.setup_send(cmd.into(), dummy);
-        self.start_write_bytes_dma(ptr as _, len * size_of::<P::Word>())?;
+        self.start_write_bytes_dma(ptr as _, len)?;
         self.start_send();
 
         Ok(DmaTransferTx::new(self))

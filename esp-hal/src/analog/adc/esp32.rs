@@ -9,9 +9,13 @@ pub(super) const NUM_ATTENS: usize = 10;
 /// The sampling/readout resolution of the ADC.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Resolution {
+    /// 9-bit resolution
     Resolution9Bit  = 0b00,
+    /// 10-bit resolution
     Resolution10Bit = 0b01,
+    /// 11-bit resolution
     Resolution11Bit = 0b10,
+    /// 12-bit resolution
     #[default]
     Resolution12Bit = 0b11,
 }
@@ -324,15 +328,15 @@ where
 }
 
 impl<'d, ADC1> Adc<'d, ADC1> {
+    /// Enable the Hall sensor
     pub fn enable_hall_sensor() {
-        // Connect hall sensor
         unsafe { &*RTC_IO::ptr() }
             .hall_sens()
             .modify(|_, w| w.xpd_hall().set_bit());
     }
 
+    /// Disable the Hall sensor
     pub fn disable_hall_sensor() {
-        // Disconnect hall sensor
         unsafe { &*RTC_IO::ptr() }
             .hall_sens()
             .modify(|_, w| w.xpd_hall().clear_bit());

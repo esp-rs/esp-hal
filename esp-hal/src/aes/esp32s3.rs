@@ -59,12 +59,8 @@ impl<'d> Aes<'d> {
 
 impl AesFlavour for Aes128 {
     type KeyType<'b> = &'b [u8; 16];
-    const ENCRYPT_MODE: u32 = 0;
-    const DECRYPT_MODE: u32 = 4;
 }
 
 impl AesFlavour for Aes256 {
     type KeyType<'b> = &'b [u8; 32];
-    const ENCRYPT_MODE: u32 = 2;
-    const DECRYPT_MODE: u32 = 6;
 }

@@ -10,19 +10,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Introduce DMA buffer objects (#1856)
 
+- Added new `Io::new_no_bind_interrupt` constructor (#1861)
+
 ### Changed
+
 - Peripheral driver constructors don't take `InterruptHandler`s anymore. Use `set_interrupt_handler` to explicitly set the interrupt handler now. (#1819)
 - Migrate SPI driver to use DMA buffer objects (#1856)
+- Use the peripheral ref pattern for `OneShotTimer` and `PeriodicTimer` (#1855)
+
+- Allow DMA to/from psram for esp32s3 (#1827)
+- DMA buffers now don't require a static lifetime. Make sure to never `mem::forget` an in-progress DMA transfer (consider using `#[deny(clippy::mem_forget)]`) (#1837)
 
 ### Fixed
-- Improve error detection in the I2C driver (#1847)
 
+- Improve error detection in the I2C driver (#1847)
 - Fix I2S async-tx (#1833)
 - Fix PARL_IO async-rx (#1851)
+- SPI: Clear DMA interrupts before (not after) DMA starts (#1859)
 
 ### Removed
 
 - This package no longer re-exports the `esp_hal_procmacros::main` macro (#1828)
+- The `AesFlavour` trait no longer has the `ENCRYPT_MODE`/`DECRYPT_MODE` associated constants (#1849)
 
 ## [0.19.0] - 2024-07-15
 

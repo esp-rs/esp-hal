@@ -522,6 +522,19 @@ where
     }
 }
 
+impl<T, DM> Peripheral for Timer<T, DM>
+where
+    T: Instance,
+    DM: Mode,
+{
+    type P = Self;
+
+    #[inline]
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        core::ptr::read(self as *const _)
+    }
+}
+
 #[doc(hidden)]
 pub trait Instance: Sealed + Enable {
     fn register_block(&self) -> &RegisterBlock;
