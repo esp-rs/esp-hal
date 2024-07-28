@@ -1,27 +1,6 @@
-use core::ops::{Deref, DerefMut};
+use core::mem::MaybeUninit;
 
-use crate::chip_specific;
-
-#[repr(C, align(4))]
-pub struct FlashSectorBuffer {
-    // NOTE: Ensure that no unaligned fields are added above `data` to maintain its required
-    // alignment
-    data: [u8; FlashStorage::SECTOR_SIZE as usize],
-}
-
-impl Deref for FlashSectorBuffer {
-    type Target = [u8; FlashStorage::SECTOR_SIZE as usize];
-
-    fn deref(&self) -> &Self::Target {
-        &self.data
-    }
-}
-
-impl DerefMut for FlashSectorBuffer {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.data
-    }
-}
+use crate::{buffer::*, chip_specific};
 
 #[derive(Debug)]
 #[non_exhaustive]
@@ -71,8 +50,9 @@ impl FlashStorage {
         #[cfg(any(feature = "esp32", feature = "esp32s2"))]
         const ADDR: u32 = 0x1000;
 
-        let mut buffer = [0u8; 8];
-        storage.internal_read(ADDR, &mut buffer).ok();
+        let mut buffer = FlashWordBuffer::uninit();
+        storage.internal_read(ADDR, buffer.as_bytes_mut()).unwrap();
+        let buffer = unsafe { buffer.assume_init_bytes() };
         let mb = match buffer[3] & 0xf0 {
             0x00 => 1,
             0x10 => 2,
@@ -115,11 +95,11 @@ impl FlashStorage {
     pub(crate) fn internal_read(
         &mut self,
         offset: u32,
-        bytes: &mut [u8],
+        bytes: &mut [MaybeUninit<u8>],
     ) -> Result<(), FlashStorageError> {
         check_rc(chip_specific::esp_rom_spiflash_read(
             offset,
-            bytes.as_ptr() as *mut u32,
+            bytes.as_mut_ptr() as *mut u32,
             bytes.len() as u32,
         ))
     }

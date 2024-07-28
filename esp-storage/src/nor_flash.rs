@@ -1,5 +1,3 @@
-use core::mem::MaybeUninit;
-
 use embedded_storage::nor_flash::{
     ErrorType,
     NorFlash,
@@ -8,31 +6,13 @@ use embedded_storage::nor_flash::{
     ReadNorFlash,
 };
 
-use crate::{FlashSectorBuffer, FlashStorage, FlashStorageError};
-
 #[cfg(feature = "bytewise-read")]
-#[repr(C, align(4))]
-struct FlashWordBuffer {
-    // NOTE: Ensure that no unaligned fields are added above `data` to maintain its required
-    // alignment
-    data: [u8; FlashStorage::WORD_SIZE as usize],
-}
-
-#[cfg(feature = "bytewise-read")]
-impl core::ops::Deref for FlashWordBuffer {
-    type Target = [u8; FlashStorage::WORD_SIZE as usize];
-
-    fn deref(&self) -> &Self::Target {
-        &self.data
-    }
-}
-
-#[cfg(feature = "bytewise-read")]
-impl core::ops::DerefMut for FlashWordBuffer {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.data
-    }
-}
+use crate::buffer::FlashWordBuffer;
+use crate::{
+    buffer::{uninit_slice, uninit_slice_mut, FlashSectorBuffer},
+    FlashStorage,
+    FlashStorageError,
+};
 
 impl FlashStorage {
     #[inline(always)]
@@ -71,13 +51,13 @@ impl ReadNorFlash for FlashStorage {
         let (offset, bytes) = {
             let byte_offset = (offset % Self::WORD_SIZE) as usize;
             if byte_offset > 0 {
-                let mut word_buffer = MaybeUninit::<FlashWordBuffer>::uninit();
-                let word_buffer = unsafe { word_buffer.assume_init_mut() };
+                let mut word_buffer = FlashWordBuffer::uninit();
 
                 let offset = offset - byte_offset as u32;
-                let length = bytes.len().min(word_buffer.len() - byte_offset);
+                let length = bytes.len().min(Self::WORD_SIZE as usize - byte_offset);
 
-                self.internal_read(offset, &mut word_buffer[..])?;
+                self.internal_read(offset, word_buffer.as_bytes_mut())?;
+                let word_buffer = unsafe { word_buffer.assume_init_bytes_mut() };
                 bytes[..length].copy_from_slice(&word_buffer[byte_offset..][..length]);
 
                 (offset + Self::WORD_SIZE, &mut bytes[length..])
@@ -94,7 +74,7 @@ impl ReadNorFlash for FlashStorage {
             {
                 // Chunk already is word aligned so we can read directly to it
                 #[cfg(not(feature = "bytewise-read"))]
-                self.internal_read(offset, chunk)?;
+                self.internal_read(offset, uninit_slice_mut(chunk))?;
 
                 #[cfg(feature = "bytewise-read")]
                 {
@@ -102,22 +82,21 @@ impl ReadNorFlash for FlashStorage {
                     let byte_length = length % Self::WORD_SIZE as usize;
                     let length = length - byte_length;
 
-                    self.internal_read(offset, &mut chunk[..length])?;
+                    self.internal_read(offset, &mut uninit_slice_mut(chunk)[..length])?;
 
                     // Read not aligned rest of data
                     if byte_length > 0 {
-                        let mut word_buffer = MaybeUninit::<FlashWordBuffer>::uninit();
-                        let word_buffer = unsafe { word_buffer.assume_init_mut() };
+                        let mut word_buffer = FlashWordBuffer::uninit();
 
-                        self.internal_read(offset + length as u32, &mut word_buffer[..])?;
+                        self.internal_read(offset + length as u32, word_buffer.as_bytes_mut())?;
+                        let word_buffer = unsafe { word_buffer.assume_init_bytes_mut() };
                         chunk[length..].copy_from_slice(&word_buffer[..byte_length]);
                     }
                 }
             }
         } else {
             // Bytes buffer isn't word-aligned so we might read only via aligned buffer
-            let mut buffer = MaybeUninit::<FlashSectorBuffer>::uninit();
-            let buffer = unsafe { buffer.assume_init_mut() };
+            let mut buffer = FlashSectorBuffer::uninit();
 
             for (offset, chunk) in (offset..)
                 .step_by(Self::SECTOR_SIZE as _)
@@ -125,7 +104,7 @@ impl ReadNorFlash for FlashStorage {
             {
                 // Read to temporary buffer first (chunk length is aligned)
                 #[cfg(not(feature = "bytewise-read"))]
-                self.internal_read(offset, &mut buffer[..chunk.len()])?;
+                self.internal_read(offset, &mut buffer.as_bytes_mut()[..chunk.len()])?;
 
                 // Read to temporary buffer first (chunk length is not aligned)
                 #[cfg(feature = "bytewise-read")]
@@ -138,8 +117,10 @@ impl ReadNorFlash for FlashStorage {
                         length
                     };
 
-                    self.internal_read(offset, &mut buffer[..length])?;
+                    self.internal_read(offset, &mut buffer.as_bytes_mut()[..length])?;
                 }
+
+                let buffer = unsafe { buffer.assume_init_bytes() };
 
                 // Copy to bytes buffer
                 chunk.copy_from_slice(&buffer[..chunk.len()]);
@@ -173,17 +154,16 @@ impl NorFlash for FlashStorage {
             }
         } else {
             // Bytes buffer isn't word-aligned so we might write only via aligned buffer
-            let mut buffer = MaybeUninit::<FlashSectorBuffer>::uninit();
-            let buffer = unsafe { buffer.assume_init_mut() };
+            let mut buffer = FlashSectorBuffer::uninit();
 
             for (offset, chunk) in (offset..)
                 .step_by(Self::SECTOR_SIZE as _)
                 .zip(bytes.chunks(Self::SECTOR_SIZE as _))
             {
                 // Copy to temporary buffer first
-                buffer[..chunk.len()].copy_from_slice(chunk);
+                buffer.as_bytes_mut()[..chunk.len()].copy_from_slice(uninit_slice(chunk));
                 // Write from temporary buffer
-                self.internal_write(offset, &buffer[..chunk.len()])?;
+                self.internal_write(offset, chunk)?;
             }
         }
 
