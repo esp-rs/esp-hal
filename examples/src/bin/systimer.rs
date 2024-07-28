@@ -7,7 +7,7 @@
 #![no_std]
 #![no_main]
 
-use core::cell::RefCell;
+use core::cell::{Cell, RefCell};
 
 use critical_section::Mutex;
 use esp_backtrace as _;
@@ -18,16 +18,19 @@ use esp_hal::{
     peripherals::{Interrupt, Peripherals},
     prelude::*,
     system::SystemControl,
-    timer::systimer::{Alarm, Periodic, SystemTimer, Target},
+    timer::systimer::{Alarm, Config, FrozenUnit, Periodic, SystemTimer, Target, Unit},
     Blocking,
 };
 use esp_println::println;
 use fugit::ExtU32;
+use static_cell::StaticCell;
 
-static ALARM0: Mutex<RefCell<Option<Alarm<Periodic, Blocking, 0>>>> =
+static ALARM0: Mutex<RefCell<Option<Alarm<Periodic, Blocking, 0, 0>>>> =
     Mutex::new(RefCell::new(None));
-static ALARM1: Mutex<RefCell<Option<Alarm<Target, Blocking, 1>>>> = Mutex::new(RefCell::new(None));
-static ALARM2: Mutex<RefCell<Option<Alarm<Target, Blocking, 2>>>> = Mutex::new(RefCell::new(None));
+static ALARM1: Mutex<RefCell<Option<Alarm<Target, Blocking, 1, 0>>>> =
+    Mutex::new(RefCell::new(None));
+static ALARM2: Mutex<RefCell<Option<Alarm<Target, Blocking, 2, 0>>>> =
+    Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -38,18 +41,28 @@ fn main() -> ! {
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
     println!("SYSTIMER Current value = {}", SystemTimer::now());
 
+    static CONFIG: Mutex<Cell<Option<Config>>> = Mutex::new(Cell::new(None));
+    static UNIT0: StaticCell<Unit<'static, 0>> = StaticCell::new();
+
+    let unit0 = UNIT0.init(systimer.unit0);
+    critical_section::with(|cs| CONFIG.borrow(cs).set(Some(systimer.config)));
+
+    let frozen_unit = FrozenUnit::new(unit0);
+
+    let alarm0 = Alarm::new(systimer.comparator0, &frozen_unit, &CONFIG);
+    let alarm1 = Alarm::new(systimer.comparator1, &frozen_unit, &CONFIG);
+    let alarm2 = Alarm::new(systimer.comparator2, &frozen_unit, &CONFIG);
+
     critical_section::with(|cs| {
-        let alarm0 = systimer.alarm0.into_periodic();
+        let alarm0 = alarm0.into_periodic();
         alarm0.set_interrupt_handler(systimer_target0);
         alarm0.set_period(1u32.secs());
         alarm0.enable_interrupt(true);
 
-        let alarm1 = systimer.alarm1;
         alarm1.set_interrupt_handler(systimer_target1);
         alarm1.set_target(SystemTimer::now() + (SystemTimer::TICKS_PER_SECOND * 2));
         alarm1.enable_interrupt(true);
 
-        let alarm2 = systimer.alarm2;
         alarm2.set_interrupt_handler(systimer_target2);
         alarm2.set_target(SystemTimer::now() + (SystemTimer::TICKS_PER_SECOND * 3));
         alarm2.enable_interrupt(true);

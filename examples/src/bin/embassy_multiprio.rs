@@ -99,7 +99,8 @@ async fn main(low_prio_spawner: Spawner) {
     };
     #[cfg(feature = "esp32c2")]
     let timer1 = {
-        let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER);
+        let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER)
+            .split::<esp_hal::timer::systimer::Target>();
         let alarm0: ErasedTimer = systimer.alarm0.into();
         OneShotTimer::new(alarm0)
     };
