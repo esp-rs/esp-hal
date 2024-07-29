@@ -41,8 +41,8 @@ use smoltcp::{
     wire::{IpAddress, Ipv4Address},
 };
 
-const SSID: &str = env!("SSID");
-const PASSWORD: &str = env!("PASSWORD");
+const SSID: &str = "EspressifSystems";
+const PASSWORD: &str = "Espressif32";
 
 #[entry]
 fn main() -> ! {
