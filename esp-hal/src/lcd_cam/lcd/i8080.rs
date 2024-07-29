@@ -386,7 +386,7 @@ where
         let (ptr, len) = unsafe { data.read_buffer() };
 
         self.setup_send(cmd.into(), dummy);
-        self.start_write_bytes_dma(ptr as _, len * size_of::<P::Word>())?;
+        self.start_write_bytes_dma(ptr as _, len)?;
         self.start_send();
 
         LcdDoneFuture::new().await;
