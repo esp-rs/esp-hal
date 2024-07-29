@@ -146,10 +146,12 @@ pub(crate) fn esp_rom_spiflash_erase_sector(sector_number: u32) -> i32 {
 #[link_section = ".rwtext"]
 fn spi_write_enable() {
     spiflash_wait_for_ready();
-
-    write_register(SPI_RD_STATUS_REG, 0);
-    write_register(SPI_CMD_REG, SPI_FLASH_WREN);
-    while read_register(SPI_CMD_REG) != 0 {}
+    unsafe {
+        let spi = &*crate::peripherals::SPI1::PTR;
+        spi.rd_status().modify(|_, w| w.bits(0));
+        spi.cmd().modify(|_, w| w.flash_wren().set_bit());
+        while spi.cmd().read().bits() != 0 {}
+    }
 }
 
 #[inline(never)]
@@ -167,34 +169,33 @@ pub(crate) fn esp_rom_spiflash_write(dest_addr: u32, data: *const u32, len: u32)
         }
 
         spiflash_wait_for_ready();
+        unsafe {
+            let spi = &*crate::peripherals::SPI1::PTR;
 
-        write_register(SPI_USER_REG, read_register(SPI_USER_REG) & !SPI_USR_DUMMY);
-        let addrbits = ESP_ROM_SPIFLASH_W_SIO_ADDR_BITSLEN;
-        let mut regval = read_register(SPI_USER1_REG);
-        regval &= !SPI_USR_ADDR_BITLEN_M;
-        regval |= addrbits << SPI_USR_ADDR_BITLEN_S;
-        write_register(SPI_USER1_REG, regval);
+            spi.user().modify(|_, w| w.usr_dummy().clear_bit());
 
-        for block in (0..len).step_by(32) {
-            spiflash_wait_for_ready();
-            spi_write_enable();
+            spi.user1().modify(|_, w| {
+                w.usr_addr_bitlen()
+                    .bits(ESP_ROM_SPIFLASH_W_SIO_ADDR_BITSLEN)
+            });
 
-            let block_len = if len - block < 32 { len - block } else { 32 };
-            write_register(
-                SPI_ADDR_REG,
-                ((dest_addr + block) & 0xffffff) | block_len << 24,
-            );
+            for block in (0..len).step_by(32) {
+                spiflash_wait_for_ready();
+                spi_write_enable();
+                let block_len = if len - block < 32 { len - block } else { 32 };
+                spi.addr()
+                    .modify(|_, w| w.bits(((dest_addr + block) & 0xffffff) | block_len << 24));
 
-            let data_ptr = unsafe { data.offset((block / 4) as isize) };
-            for i in 0..block_len / 4 {
-                write_register(SPI_W0_REG + (4 * i), unsafe {
-                    data_ptr.offset(i as isize).read_volatile()
-                });
+                let data_ptr = data.offset((block / 4) as isize);
+                for i in 0..block_len / 4 {
+                    spi.w(i)
+                        .modify(|_, w| w.bits(data_ptr.offset(i as isize).read_volatile()));
+                }
+
+                spi.rd_status().modify(|_, w| w.bits(0));
+                spi.cmd().modify(|_, w| w.flash_pp().set_bit());
+                while spi.cmd().read().bits() != 0 {}
             }
-
-            write_register(SPI_RD_STATUS_REG, 0);
-            write_register(SPI_CMD_REG, 1 << 25); // FLASH PP
-            while read_register(SPI_CMD_REG) != 0 { /* wait */ }
 
             wait_for_ready();
         }
@@ -213,24 +214,12 @@ pub(crate) fn esp_rom_spiflash_write(dest_addr: u32, data: *const u32, len: u32)
 
 #[inline(always)]
 #[link_section = ".rwtext"]
-pub fn read_register(address: u32) -> u32 {
-    unsafe { (address as *const u32).read_volatile() }
-}
-
-#[inline(always)]
-#[link_section = ".rwtext"]
-pub fn write_register(address: u32, value: u32) {
-    unsafe {
-        (address as *mut u32).write_volatile(value);
-    }
-}
-
-#[inline(always)]
-#[link_section = ".rwtext"]
 fn wait_for_ready() {
-    while (read_register(SPI_EXT2_REG) & SPI_ST) != 0 {}
-    // ESP32_OR_LATER ... we don't support anything earlier
-    while (read_register(SPI0_EXT2_REG) & SPI_ST) != 0 {}
+    unsafe {
+        while (&*crate::peripherals::SPI1::PTR).ext2().read().st().bits() != 0 {}
+        // ESP32_OR_LATER ... we don't support anything earlier
+        while (&*crate::peripherals::SPI0::PTR).ext2().read().st().bits() != 0 {}
+    }
 }
 
 #[inline(always)]
@@ -272,8 +261,11 @@ pub(crate) fn esp_rom_spiflash_unlock() -> i32 {
 
         // Clear all bits except QE, if it is set
         status &= STATUS_QIE_BIT;
-
-        write_register(SPI_CTRL_REG, read_register(SPI_CTRL_REG) | SPI_WRSR_2B);
+        unsafe {
+            (&*crate::peripherals::SPI1::PTR)
+                .ctrl()
+                .modify(|_, w| w.wrsr_2b().set_bit());
+        }
 
         spiflash_wait_for_ready();
         if spi_write_status(flashchip, status) != 0 {

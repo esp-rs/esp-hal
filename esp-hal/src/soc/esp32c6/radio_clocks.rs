@@ -342,11 +342,9 @@ fn init_clocks() {
         pmu.hp_active_icg_modem()
             .modify(|_, w| w.hp_active_dig_icg_modem_code().bits(2));
         pmu.imm_modem_icg()
-            .as_ptr()
-            .write_volatile(pmu.imm_modem_icg().as_ptr().read_volatile() | 1 << 31);
+            .modify(|_, w| w.update_dig_icg_modem_en().set_bit());
         pmu.imm_sleep_sysclk()
-            .as_ptr()
-            .write_volatile(pmu.imm_sleep_sysclk().as_ptr().read_volatile() | 1 << 28);
+            .modify(|_, w| w.update_dig_icg_switch().set_bit());
 
         let modem_syscon = &*esp32c6::MODEM_SYSCON::PTR;
         modem_syscon.clk_conf_power_st().modify(|_, w| {
