@@ -23,6 +23,7 @@ env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MSRV: "1.76.0"
+  RUSTDOCFLAGS: -Dwarnings
 
 # Cancel any currently running workflows from the same PR, branch, or
 # tag when a new workflow is triggered.
@@ -62,6 +63,13 @@ jobs:
           ]
 
     steps:
+      - name: Set up cargo environment
+        run: |
+          # Convert the target triple from kebab-case to SCREAMING_SNAKE_CASE:
+          big_target=$(echo "${{ matrix.device.target }}" | tr [:lower:] [:upper:] | tr '-' '_')
+          # Set the *target specific* RUSTFLAGS for the current device:
+          echo "CARGO_TARGET_${big_target}_RUSTFLAGS=-Dwarnings" >> $GITHUB_ENV
+
       - uses: actions/checkout@v4
 
       # Install the Rust toolchain for Xtensa devices:
@@ -89,7 +97,7 @@ jobs:
         run: cargo xtask build-examples esp-lp-hal ${{ matrix.device.soc }}
       - if: contains(fromJson('["esp32c6", "esp32s2", "esp32s3"]'), matrix.device.soc)
         name: Check esp-lp-hal documentation
-        run: RUSTDOCFLAGS="-D warnings" cargo xtask build-documentation --packages esp-lp-hal --chips ${{ matrix.device.soc }}
+        run: cargo xtask build-documentation --packages esp-lp-hal --chips ${{ matrix.device.soc }}
 
       # Make sure we're able to build the HAL without the default features
       # enabled:
@@ -107,7 +115,7 @@ jobs:
       - name: Check doc-tests
         run: cargo +esp xtask run-doc-test esp-hal ${{ matrix.device.soc }}
       - name: Check documentation
-        run: RUSTDOCFLAGS="-D warnings" cargo xtask build-documentation --packages esp-hal --chips ${{ matrix.device.soc }}
+        run: cargo xtask build-documentation --packages esp-hal --chips ${{ matrix.device.soc }}
       # Run clippy
       - name: Clippy
         # We use the 'esp' toolchain for *all* targets, in order to get a
@@ -224,8 +232,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        # Install the Rust toolchain for RISC-V devices:
-
+      
+      # Install the Rust toolchain for RISC-V devices:
       - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.target.soc) }}
         uses: dtolnay/rust-toolchain@v1
         with:
