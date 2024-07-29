@@ -81,12 +81,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
-          toolchain: stable
+          toolchain: nightly
           components: rust-src
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
-          toolchain: nightly
+          toolchain: stable
           components: rust-src
 
       - uses: Swatinem/rust-cache@v2
