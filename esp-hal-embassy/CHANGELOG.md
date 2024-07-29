@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed a bug where the timeout was huge whenever the timestamp at the time of scheduling was already in the past (#1875)
+
 ### Removed
 
 ## 0.2.0 - 2024-07-15
