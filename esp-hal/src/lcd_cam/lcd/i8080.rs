@@ -381,7 +381,7 @@ where
         data: &'t TXBUF,
     ) -> Result<(), DmaError>
     where
-        TXBUF: ReadBuffer<Word = P::Word>,
+        TXBUF: ReadBuffer,
     {
         let (ptr, len) = unsafe { data.read_buffer() };
 
