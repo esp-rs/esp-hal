@@ -1324,7 +1324,7 @@ pub mod dma {
                 return Err((e, self, buffer));
             }
 
-            Ok(SpiDmaTransfer::new(self, buffer, false, true))
+            Ok(SpiDmaTransfer::new(self, buffer, bytes_to_read > 0, false))
         }
 
         #[allow(clippy::type_complexity)]
@@ -1401,7 +1401,7 @@ pub mod dma {
                 return Err((e, self, buffer));
             }
 
-            Ok(SpiDmaTransfer::new(self, buffer, true, false))
+            Ok(SpiDmaTransfer::new(self, buffer, false, bytes_to_write > 0))
         }
     }
 
