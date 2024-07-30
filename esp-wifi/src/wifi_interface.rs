@@ -30,7 +30,7 @@ const LOCAL_PORT_MAX: u16 = 65535;
 ///
 /// Mostly a convenience wrapper for `smoltcp`
 pub struct WifiStack<'a, MODE: WifiDeviceMode> {
-    device: RefCell<WifiDevice<'static, MODE>>, // TODO allow non static lifetime
+    device: RefCell<WifiDevice<'a, MODE>>,
     network_interface: RefCell<Interface>,
     sockets: RefCell<SocketSet<'a>>,
     current_millis_fn: fn() -> u64,
@@ -49,7 +49,7 @@ pub struct WifiStack<'a, MODE: WifiDeviceMode> {
 impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
     pub fn new(
         network_interface: Interface,
-        device: WifiDevice<'static, MODE>, // TODO relax this lifetime requirement
+        device: WifiDevice<'a, MODE>,
         #[allow(unused_mut)] mut sockets: SocketSet<'a>,
         current_millis_fn: fn() -> u64,
     ) -> WifiStack<'a, MODE> {
