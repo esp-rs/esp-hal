@@ -1955,15 +1955,10 @@ impl DmaTxBuf {
     /// The number of bytes in data must be less than or equal to the buffer
     /// size.
     pub fn set_length(&mut self, len: usize) {
-        if len == 0 {
-            self.descriptors.fill(DmaDescriptor::EMPTY);
-            return;
-        }
-
         assert!(len <= self.buffer.len());
 
         // Get the minimum number of descriptors needed for this length of data.
-        let descriptor_count = len.div_ceil(CHUNK_SIZE);
+        let descriptor_count = len.div_ceil(CHUNK_SIZE).max(1);
         let required_descriptors = &mut self.descriptors[0..descriptor_count];
 
         // Link up the relevant descriptors.
@@ -1989,10 +1984,6 @@ impl DmaTxBuf {
         }
         debug_assert_eq!(remaining_length, 0);
 
-        // ESP32-S3: The last descriptor in the linked list must have the EOF bit set,
-        // otherwise transfers of less than 24 bytes (size of the L1FIFO) don't
-        // make it to the peripheral and the channel hangs forever.
-        // As of writing, the TRM or Errata don't mention this.
         required_descriptors.last_mut().unwrap().set_suc_eof(true);
     }
 
@@ -2100,15 +2091,10 @@ impl DmaRxBuf {
     /// The number of bytes in data must be less than or equal to the buffer
     /// size.
     pub fn set_length(&mut self, len: usize) {
-        if len == 0 {
-            self.descriptors.fill(DmaDescriptor::EMPTY);
-            return;
-        }
-
         assert!(len <= self.buffer.len());
 
         // Get the minimum number of descriptors needed for this length of data.
-        let descriptor_count = len.div_ceil(CHUNK_SIZE);
+        let descriptor_count = len.div_ceil(CHUNK_SIZE).max(1);
         let required_descriptors = &mut self.descriptors[..descriptor_count];
 
         // Link up the relevant descriptors.
@@ -2119,12 +2105,8 @@ impl DmaRxBuf {
         }
 
         // Get required part of the buffer.
-        let required_buf = &self.buffer[..len];
-
-        let chunk_iter = required_descriptors
-            .iter_mut()
-            .zip(required_buf.chunks(CHUNK_SIZE));
-        for (desc, chunk) in chunk_iter {
+        let mut remaining_length = len;
+        for desc in required_descriptors.iter_mut() {
             // Clear this to allow hardware to set it when the peripheral returns an EOF
             // bit.
             desc.set_suc_eof(false);
@@ -2137,8 +2119,11 @@ impl DmaRxBuf {
             // done receiving data for this descriptor.
             desc.set_length(0);
 
-            desc.set_size(chunk.len());
+            let chunk_size = min(CHUNK_SIZE, remaining_length);
+            desc.set_size(chunk_size);
+            remaining_length -= chunk_size;
         }
+        debug_assert_eq!(remaining_length, 0);
     }
 
     /// Returns the entire underlying buffer as a slice than can be read.
@@ -2334,16 +2319,10 @@ impl DmaTxRxBuf {
     ///
     /// `len` must be less than or equal to the buffer size.
     pub fn set_length(&mut self, len: usize) {
-        if len == 0 {
-            self.tx_descriptors.fill(DmaDescriptor::EMPTY);
-            self.rx_descriptors.fill(DmaDescriptor::EMPTY);
-            return;
-        }
-
         assert!(len <= self.buffer.len());
 
         // Get the minimum number of descriptors needed for this length of data.
-        let descriptor_count = len.div_ceil(CHUNK_SIZE);
+        let descriptor_count = len.div_ceil(CHUNK_SIZE).max(1);
 
         let relevant_tx_descriptors = &mut self.tx_descriptors[..descriptor_count];
         let relevant_rx_descriptors = &mut self.rx_descriptors[..descriptor_count];
@@ -2360,13 +2339,8 @@ impl DmaTxRxBuf {
             }
         }
 
-        // Get required part of the buffer.
-        let required_buf = &self.buffer[..len];
-
-        for (desc, chunk) in relevant_tx_descriptors
-            .iter_mut()
-            .zip(required_buf.chunks(CHUNK_SIZE))
-        {
+        let mut remaining_length = len;
+        for desc in relevant_tx_descriptors.iter_mut() {
             // As this is a simple dma buffer implementation we won't
             // be making use of this feature.
             desc.set_suc_eof(false);
@@ -2375,17 +2349,18 @@ impl DmaTxRxBuf {
             // but it is useful for debugging.
             desc.set_owner(Owner::Dma);
 
-            desc.set_length(chunk.len());
+            let chunk_size = min(desc.size(), remaining_length);
+            desc.set_length(chunk_size);
+            remaining_length -= chunk_size;
         }
+        debug_assert_eq!(remaining_length, 0);
         relevant_tx_descriptors
             .last_mut()
             .unwrap()
             .set_suc_eof(true);
 
-        for (desc, chunk) in relevant_rx_descriptors
-            .iter_mut()
-            .zip(required_buf.chunks(CHUNK_SIZE))
-        {
+        let mut remaining_length = len;
+        for desc in relevant_rx_descriptors.iter_mut() {
             // Clear this to allow hardware to set it when the peripheral returns an EOF
             // bit.
             desc.set_suc_eof(false);
@@ -2398,8 +2373,11 @@ impl DmaTxRxBuf {
             // done receiving data for this descriptor.
             desc.set_length(0);
 
-            desc.set_size(chunk.len());
+            let chunk_size = min(CHUNK_SIZE, remaining_length);
+            desc.set_size(chunk_size);
+            remaining_length -= chunk_size;
         }
+        debug_assert_eq!(remaining_length, 0);
     }
 }
 
