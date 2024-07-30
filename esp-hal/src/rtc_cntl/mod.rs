@@ -216,7 +216,7 @@ impl<'d> Rtc<'d> {
     }
 
     /// Read the current value of the rtc time registers.
-    pub fn get_time_raw(&self) -> u64 {
+    fn get_time_since_boot_raw(&self) -> u64 {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let rtc_cntl = unsafe { &*LPWR::ptr() };
         #[cfg(any(esp32c6, esp32h2))]
@@ -255,13 +255,56 @@ impl<'d> Rtc<'d> {
     }
 
     /// Read the current value of the rtc time registers in microseconds.
-    pub fn get_time_us(&self) -> u64 {
+    fn get_time_since_boot_us(&self) -> u64 {
         self.get_time_raw() * 1_000_000 / RtcClock::get_slow_freq().frequency().to_Hz() as u64
     }
 
     /// Read the current value of the rtc time registers in milliseconds.
-    pub fn get_time_ms(&self) -> u64 {
+    fn get_time_since_boot_ms(&self) -> u64 {
         self.get_time_raw() * 1_000 / RtcClock::get_slow_freq().frequency().to_Hz() as u64
+    }
+
+    fn get_boot_time_us(&self) -> u64 {
+        let rtc_cntl = unsafe { &*LPWR::ptr() };
+
+        // Register documentation: https://github.com/espressif/esp-idf/blob/master/components/esp_rom/esp32s3/include/esp32s3/rom/rtc.h
+        let boot_time_low = rtc_cntl.store2();
+        let boot_time_high = rtc_cntl.store3();
+
+        let boot_time_low = boot_time_low.read().bits() as u64;
+        let boot_time_high = boot_time_high.read().bits() as u64;
+
+        // https://github.com/espressif/esp-idf/blob/23e4823f17a8349b5e03536ff7653e3e584c9351/components/newlib/port/esp_time_impl.c#L115
+        boot_time_low + (boot_time_high << 32)
+    }
+
+    fn set_boot_time(&self, boot_time_us: u64) {
+        let rtc_cntl = unsafe { &*LPWR::ptr() };
+
+        // Register documentation: https://github.com/espressif/esp-idf/blob/master/components/esp_rom/esp32s3/include/esp32s3/rom/rtc.h
+        let boot_time_low = rtc_cntl.store2();
+        let boot_time_high = rtc_cntl.store3();
+
+        // https://github.com/espressif/esp-idf/blob/23e4823f17a8349b5e03536ff7653e3e584c9351/components/newlib/port/esp_time_impl.c#L102-L103
+        boot_time_low.write(|w| unsafe { w.bits((boot_time_us & 0xffffffff) as u32) });
+        boot_time_high.write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
+    }
+
+    pub fn get_time_us(&self) -> u64 {
+        // current time is boot time + time since boot
+        self.get_boot_time_us() + self.get_time_since_boot_us()
+    }
+
+    pub fn set_time(&self, time_us: u64) {
+        // current time is boot time + time since boot
+        // so boot time = current time - time since boot
+        let time_since_boot = self.get_time_since_boot_us();
+        if time_us < time_since_boot {
+            // TODO: handle this better - return a Result?
+            self.set_boot_time(0)
+        } else {
+            self.set_boot_time(time_us - time_since_boot)
+        }
     }
 
     /// Enter deep sleep and wake with the provided `wake_sources`.
