@@ -38,8 +38,9 @@ jobs:
   # Build Packages
 
   esp-hal:
-    name: esp-hal (${{ matrix.device.soc }})
+    name: esp-hal (${{ matrix.device.soc }} | ${{ matrix.device.toolchain }})
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.device.toolchain == 'nightly' }}
     env:
       SSID: SSID
       PASSWORD: PASSWORD
@@ -52,16 +53,21 @@ jobs:
       matrix:
         device: [
             # RISC-V devices:
-            { soc: "esp32c2", target: "riscv32imc-unknown-none-elf" },
-            { soc: "esp32c3", target: "riscv32imc-unknown-none-elf" },
-            { soc: "esp32c6", target: "riscv32imac-unknown-none-elf" },
-            { soc: "esp32h2", target: "riscv32imac-unknown-none-elf" },
+            # Stable toolchain
+            { soc: "esp32c2", target: "riscv32imc-unknown-none-elf", toolchain: "stable" },
+            { soc: "esp32c3", target: "riscv32imc-unknown-none-elf", toolchain: "stable" },
+            { soc: "esp32c6", target: "riscv32imac-unknown-none-elf", toolchain: "stable" },
+            { soc: "esp32h2", target: "riscv32imac-unknown-none-elf", toolchain: "stable" },
+            # Nightly toolchain
+            { soc: "esp32c2", target: "riscv32imc-unknown-none-elf", toolchain: "nightly" },
+            { soc: "esp32c3", target: "riscv32imc-unknown-none-elf", toolchain: "nightly" },
+            { soc: "esp32c6", target: "riscv32imac-unknown-none-elf", toolchain: "nightly" },
+            { soc: "esp32h2", target: "riscv32imac-unknown-none-elf", toolchain: "nightly" },
             # Xtensa devices:
-            { soc: "esp32", target: "xtensa-esp32-none-elf" },
-            { soc: "esp32s2", target: "xtensa-esp32s2-none-elf" },
-            { soc: "esp32s3", target: "xtensa-esp32s3-none-elf" },
+            { soc: "esp32", target: "xtensa-esp32-none-elf", toolchain: "esp" },
+            { soc: "esp32s2", target: "xtensa-esp32s2-none-elf", toolchain: "esp" },
+            { soc: "esp32s3", target: "xtensa-esp32s3-none-elf", toolchain: "esp" },
           ]
-
     steps:
       - name: Set up cargo environment
         run: |
@@ -69,18 +75,30 @@ jobs:
           big_target=$(echo "${{ matrix.device.target }}" | tr [:lower:] [:upper:] | tr '-' '_')
           # Set the *target specific* RUSTFLAGS for the current device:
           echo "CARGO_TARGET_${big_target}_RUSTFLAGS=-Dwarnings" >> $GITHUB_ENV
-
+          if [ "${{ matrix.device.toolchain }}" == "nightly" ]; then
+            echo "LINTING_TOOLCHAIN=+nightly" >> $GITHUB_ENV
+          else
+            echo "LINTING_TOOLCHAIN=+esp" >> $GITHUB_ENV
+          fi
       - uses: actions/checkout@v4
 
       # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.5
+        if: contains(fromJson('["stable", "esp"]'), matrix.device.toolchain)
         with:
           ldproxy: false
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
+        if: contains(fromJson('["stable", "esp"]'), matrix.device.toolchain)
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: stable
+          components: rust-src
+      - uses: dtolnay/rust-toolchain@v1
+        if: contains(fromJson('["nightly"]'), matrix.device.toolchain)
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          toolchain: nightly
           components: rust-src
       - uses: Swatinem/rust-cache@v2
 
@@ -91,13 +109,13 @@ jobs:
       - if: contains(fromJson('["esp32c6", "esp32s2", "esp32s3"]'), matrix.device.soc)
         name: Check esp-lp-hal documentation
         run: cargo xtask build-documentation --packages esp-lp-hal --chips ${{ matrix.device.soc }}
-
       # Make sure we're able to build the HAL without the default features
       # enabled:
       - name: Build (no features)
         run: |
           cargo xtask build-package \
             --no-default-features \
+            --toolchain=${{ matrix.device.toolchain }} \
             --features=${{ matrix.device.soc }} \
             --target=${{ matrix.device.target }} \
             esp-hal
@@ -106,81 +124,14 @@ jobs:
         run: cargo xtask build-examples esp-hal ${{ matrix.device.soc }}
       # Check doc-tests
       - name: Check doc-tests
-        run: cargo +esp xtask run-doc-test esp-hal ${{ matrix.device.soc }}
+        run: cargo $LINTING_TOOLCHAIN xtask run-doc-test esp-hal ${{ matrix.device.soc }}
       - name: Check documentation
-        run: cargo +esp xtask build-documentation --packages esp-hal --chips ${{ matrix.device.soc }}
+        run: cargo $LINTING_TOOLCHAIN xtask build-documentation --packages esp-hal --chips ${{ matrix.device.soc }}
       # Run Clippy
       - name: Clippy
         # We use the 'esp' toolchain for *all* targets, in order to get a
         # semi-stable and consistent set of lints for all targets:
-        run: cargo +esp xtask lint-packages --chips ${{ matrix.device.soc }}
-
-  nightly:
-    name: nightly | esp-hal (${{ matrix.device.soc }})
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    env:
-      SSID: SSID
-      PASSWORD: PASSWORD
-      STATIC_IP: 1.1.1.1
-      GATEWAY_IP: 1.1.1.1
-      HOST_IP: 1.1.1.1
-
-    strategy:
-      fail-fast: false
-      matrix:
-        device: [
-            { soc: "esp32c2", target: "riscv32imc-unknown-none-elf" },
-            { soc: "esp32c3", target: "riscv32imc-unknown-none-elf" },
-            { soc: "esp32c6", target: "riscv32imac-unknown-none-elf" },
-            { soc: "esp32h2", target: "riscv32imac-unknown-none-elf" },
-          ]
-
-    steps:
-      - name: Set up cargo environment
-        run: |
-          # Convert the target triple from kebab-case to SCREAMING_SNAKE_CASE:
-          big_target=$(echo "${{ matrix.device.target }}" | tr [:lower:] [:upper:] | tr '-' '_')
-          # Set the *target specific* RUSTFLAGS for the current device:
-          echo "CARGO_TARGET_${big_target}_RUSTFLAGS=-Dwarnings" >> $GITHUB_ENV
-
-      - uses: actions/checkout@v4
-
-      # Install the Rust nightly toolchain for RISC-V devices:
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
-          toolchain: nightly
-          components: rust-src, clippy
-
-      - uses: Swatinem/rust-cache@v2
-
-      # Build all supported examples for the low-power core first (if present):
-      - if: contains(fromJson('["esp32c6"]'), matrix.device.soc)
-        name: Build prerequisite examples (esp-lp-hal)
-        run: cargo xtask build-examples esp-lp-hal ${{ matrix.device.soc }}
-
-      # Make sure we're able to build the HAL without the default features
-      # enabled:
-      - name: Build (no features)
-        run: |
-          cargo xtask build-package \
-            --no-default-features \
-            --toolchain=nightly \
-            --features=${{ matrix.device.soc }} \
-            --target=${{ matrix.device.target }} \
-            esp-hal
-      # Build all supported examples for the specified device:
-      - name: Build (examples)
-        run: cargo xtask build-examples esp-hal ${{ matrix.device.soc }}
-      # Check doc-tests
-      - name: Check doc-tests
-        run: cargo +nightly xtask run-doc-test esp-hal ${{ matrix.device.soc }}
-      - name: Check documentation
-        run: cargo +nightly xtask build-documentation --packages esp-hal --chips ${{ matrix.device.soc }}
-      # Run Clippy
-      - name: Clippy
-        run: cargo +nightly xtask lint-packages --chips ${{ matrix.device.soc }}
+        run: cargo $LINTING_TOOLCHAIN xtask lint-packages --chips ${{ matrix.device.soc }}
 
   extras:
     runs-on: ubuntu-latest
