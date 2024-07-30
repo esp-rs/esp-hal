@@ -740,7 +740,7 @@ impl<'s, 'n: 's, MODE: WifiDeviceMode> embedded_io::ReadReady for Socket<'s, 'n,
             let socket = sockets.get_mut::<TcpSocket>(self.socket_handle);
 
             match socket.peek(1) {
-                Ok(s) => Ok(s.len() > 0),
+                Ok(s) => Ok(!s.is_empty()),
                 Err(RecvError::Finished) => Err(IoError::SocketClosed),
                 Err(RecvError::InvalidState) => Err(IoError::TcpRecvError),
             }
