@@ -37,6 +37,8 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{RTC_CNTL, SENS, TOUCH},
     private::{Internal, Sealed},
+    Blocking,
+    Mode,
 };
 
 /// A marker trait describing the mode the touch pad is set to.
@@ -85,11 +87,12 @@ pub struct TouchConfig {
 }
 
 /// This struct marks a successfully initialized touch peripheral
-pub struct Touch<'d, MODE: TouchMode> {
+pub struct Touch<'d, TOUCHMODE: TouchMode, MODE: Mode> {
     _inner: PeripheralRef<'d, TOUCH>,
-    phantom: PhantomData<MODE>,
+    _touch_mode: PhantomData<TOUCHMODE>,
+    _mode: PhantomData<MODE>,
 }
-impl<'d, MODE: TouchMode> Touch<'d, MODE> {
+impl<'d, TOUCHMODE: TouchMode, MODE: Mode> Touch<'d, TOUCHMODE, MODE> {
     /// Common initialization of the touch peripheral.
     fn initialize_common(config: Option<TouchConfig>) {
         let rtccntl = unsafe { &*RTC_CNTL::ptr() };
@@ -143,8 +146,42 @@ impl<'d, MODE: TouchMode> Touch<'d, MODE> {
                 .bits(0xff)
         });
     }
+
+    /// Common parts of the continous mode initialization.
+    fn initialize_common_continoous(config: Option<TouchConfig>) {
+        let rtccntl = unsafe { &*RTC_CNTL::ptr() };
+        let sens = unsafe { &*SENS::ptr() };
+
+        // Default nr of sleep cycles from IDF
+        let mut sleep_cyc = 0x1000;
+        if let Some(config) = config {
+            if let Some(slp) = config.sleep_cycles {
+                sleep_cyc = slp;
+            }
+        }
+
+        Self::initialize_common(config);
+
+        sens.sar_touch_ctrl2().write(|w| unsafe {
+            w
+                // Reset existing touch measurements
+                .touch_meas_en_clr()
+                .set_bit()
+                .touch_sleep_cycles()
+                .bits(sleep_cyc)
+                // Configure FSM for timer mode
+                .touch_start_fsm_en()
+                .set_bit()
+                .touch_start_force()
+                .clear_bit()
+        });
+
+        // start touch fsm
+        rtccntl.state0().write(|w| w.touch_slp_timer_en().set_bit());
+    }
 }
-impl<'d> Touch<'d, OneShot> {
+// Async mode and OneShot does not seem to be a sensible combination....
+impl<'d> Touch<'d, OneShot, Blocking> {
     /// Initializes the touch peripheral and returns this marker struct.
     /// Optionally accepts configuration options.
     ///
@@ -199,11 +236,12 @@ impl<'d> Touch<'d, OneShot> {
 
         Self {
             _inner: touch_peripheral,
-            phantom: PhantomData,
+            _mode: PhantomData,
+            _touch_mode: PhantomData,
         }
     }
 }
-impl<'d> Touch<'d, Continous> {
+impl<'d> Touch<'d, Continous, Blocking> {
     /// Initializes the touch peripheral in continous mode and returns this
     /// marker struct. Optionally accepts configuration options.
     ///
@@ -224,52 +262,24 @@ impl<'d> Touch<'d, Continous> {
         config: Option<TouchConfig>,
     ) -> Self {
         crate::into_ref!(touch_peripheral);
-        let rtccntl = unsafe { &*RTC_CNTL::ptr() };
-        let sens = unsafe { &*SENS::ptr() };
 
-        // Default nr of sleep cycles from IDF
-        let mut sleep_cyc = 0x1000;
-        if let Some(config) = config {
-            if let Some(slp) = config.sleep_cycles {
-                sleep_cyc = slp;
-            }
-        }
-
-        Self::initialize_common(config);
-
-        sens.sar_touch_ctrl2().write(|w| unsafe {
-            w
-                // Reset existing touch measurements
-                .touch_meas_en_clr()
-                .set_bit()
-                .touch_sleep_cycles()
-                .bits(sleep_cyc)
-                // Configure FSM for timer mode
-                .touch_start_fsm_en()
-                .set_bit()
-                .touch_start_force()
-                .clear_bit()
-        });
-
-        // start touch fsm
-        rtccntl.state0().write(|w| w.touch_slp_timer_en().set_bit());
+        Self::initialize_common_continoous(config);
 
         Self {
             _inner: touch_peripheral,
-            phantom: PhantomData,
+            _mode: PhantomData,
+            _touch_mode: PhantomData,
         }
     }
 }
 
 /// A pin that is configured as a TouchPad.
-pub struct TouchPad<P, MODE: TouchMode>
-where
-    P: TouchPin,
-{
+pub struct TouchPad<P: TouchPin, TOUCHMODE: TouchMode, MODE: Mode> {
     pin: P,
-    phantom: PhantomData<MODE>,
+    _touch_mode: PhantomData<TOUCHMODE>,
+    _mode: PhantomData<MODE>,
 }
-impl<P: TouchPin> TouchPad<P, OneShot> {
+impl<P: TouchPin> TouchPad<P, OneShot, Blocking> {
     /// (Re-)Start a touch measurement on the pin. You can get the result by
     /// calling [`read`](Self::read) once it is finished.
     pub fn start_measurement(&mut self) {
@@ -308,19 +318,20 @@ impl<P: TouchPin> TouchPad<P, OneShot> {
             .modify(|_, w| w.touch_start_en().set_bit());
     }
 }
-impl<P: TouchPin, MODE: TouchMode> TouchPad<P, MODE> {
+impl<P: TouchPin, TOUCHMODE: TouchMode, MODE: Mode> TouchPad<P, TOUCHMODE, MODE> {
     /// Construct a new instance of [`TouchPad`].
     ///
     /// ## Parameters:
     /// - `pin`: The pin that gets configured as touch pad
     /// - `touch`: The [`Touch`] struct indicating that touch is configured.
-    pub fn new(pin: P, _touch: &Touch<MODE>) -> Self {
+    pub fn new(pin: P, _touch: &Touch<TOUCHMODE, MODE>) -> Self {
         // TODO revert this on drop
         pin.set_touch(Internal);
 
         Self {
             pin,
-            phantom: PhantomData,
+            _mode: PhantomData,
+            _touch_mode: PhantomData,
         }
     }
 
@@ -332,7 +343,7 @@ impl<P: TouchPin, MODE: TouchMode> TouchPad<P, MODE> {
     /// Returns `None` if the value is not yet ready. (Note: Measurement must be
     /// started manually with [`start_measurement`](Self::start_measurement) if
     /// the touch peripheral is in [`OneShot`] mode).
-    pub fn read(&mut self) -> Option<u16> {
+    pub fn try_read(&mut self) -> Option<u16> {
         if unsafe { &*crate::peripherals::SENS::ptr() }
             .sar_touch_ctrl2()
             .read()
@@ -343,6 +354,72 @@ impl<P: TouchPin, MODE: TouchMode> TouchPad<P, MODE> {
         } else {
             None
         }
+    }
+
+    fn internal_enable_interrupt(&mut self, threshold: u16) {
+        self.pin.set_threshold(threshold, Internal);
+
+        let rtccntl = unsafe { &*RTC_CNTL::ptr() };
+        // enable touch interrupts
+        rtccntl.int_ena().write(|w| w.touch().set_bit());
+
+        let sens = unsafe { &*SENS::ptr() };
+        sens.sar_touch_enable().modify(|r, w| unsafe {
+            w.touch_pad_outen1()
+                .bits(r.touch_pad_outen1().bits() | 1 << self.pin.get_touch_nr(Internal))
+        });
+    }
+
+    fn internal_disable_interrupt(&mut self) {
+        let sens = unsafe { &*SENS::ptr() };
+        sens.sar_touch_enable().modify(|r, w| unsafe {
+            w.touch_pad_outen1()
+                .bits(r.touch_pad_outen1().bits() & !(1 << self.pin.get_touch_nr(Internal)))
+        });
+        if sens.sar_touch_enable().read().touch_pad_outen1().bits() == 0 {
+            let rtccntl = unsafe { &*RTC_CNTL::ptr() };
+            rtccntl.int_ena().write(|w| w.touch().clear_bit());
+        }
+    }
+
+    fn internal_clear_interrupt(&mut self) {
+        let rtccntl = unsafe { &*RTC_CNTL::ptr() };
+        rtccntl.int_clr().write(|w| w.touch().clear_bit_by_one());
+        let sens = unsafe { &*SENS::ptr() };
+        sens.sar_touch_ctrl2()
+            .write(|w| w.touch_meas_en_clr().set_bit());
+    }
+
+    fn internal_is_interrupt_set(&mut self) -> bool {
+        let sens = unsafe { &*SENS::ptr() };
+        let ctrl2 = sens.sar_touch_ctrl2().read();
+        // Only god knows, why the "interrupt flag" register is called "meas_en" on this
+        // chip...
+        ctrl2.touch_meas_en().bits() & (1 << self.pin.get_touch_nr(Internal)) != 0
+    }
+
+}
+impl<P: TouchPin, TOUCHMODE: TouchMode> TouchPad<P, TOUCHMODE, Blocking> {
+    /// Blocking read of the current touch pad capacitance counter.
+    ///
+    /// Usually a lower value means higher capacitance, thus indicating touch
+    /// event.
+    ///
+    /// ## Note for [`OneShot`] mode:
+    ///
+    /// This function might block forever, if
+    /// [`start_measurement`](Self::start_measurement) was not called before. As
+    /// measurements are not cleared, the touch values might also be
+    /// outdated, if it has been some time since the last call to that
+    /// function.
+    pub fn read(&mut self) -> u16 {
+        while unsafe { &*crate::peripherals::SENS::ptr() }
+            .sar_touch_ctrl2()
+            .read()
+            .touch_meas_done()
+            .bit_is_clear()
+        {}
+        self.pin.get_touch_measurement(Internal)
     }
 
     /// Enables the touch_pad interrupt.
@@ -360,17 +437,7 @@ impl<P: TouchPin, MODE: TouchMode> TouchPad<P, MODE> {
     ///
     /// ## Example
     pub fn enable_interrupt(&mut self, threshold: u16) {
-        self.pin.set_threshold(threshold, Internal);
-
-        let rtccntl = unsafe { &*RTC_CNTL::ptr() };
-        // enable touch interrupts
-        rtccntl.int_ena().write(|w| w.touch().set_bit());
-
-        let sens = unsafe { &*SENS::ptr() };
-        sens.sar_touch_enable().modify(|r, w| unsafe {
-            w.touch_pad_outen1()
-                .bits(r.touch_pad_outen1().bits() | 1 << self.pin.get_touch_nr(Internal))
-        });
+        self.internal_enable_interrupt(threshold)
     }
 
     /// Disables the touch pad's interrupt.
@@ -378,15 +445,7 @@ impl<P: TouchPin, MODE: TouchMode> TouchPad<P, MODE> {
     /// If no other touch pad interrupts are active, the touch interrupt is
     /// disabled completely.
     pub fn disable_interrupt(&mut self) {
-        let sens = unsafe { &*SENS::ptr() };
-        sens.sar_touch_enable().modify(|r, w| unsafe {
-            w.touch_pad_outen1()
-                .bits(r.touch_pad_outen1().bits() & !(1 << self.pin.get_touch_nr(Internal)))
-        });
-        if sens.sar_touch_enable().read().touch_pad_outen1().bits() == 0 {
-            let rtccntl = unsafe { &*RTC_CNTL::ptr() };
-            rtccntl.int_ena().write(|w| w.touch().clear_bit());
-        }
+        self.internal_disable_interrupt()
     }
 
     /// Clears a pending touch interrupt.
@@ -398,19 +457,12 @@ impl<P: TouchPin, MODE: TouchMode> TouchPad<P, MODE> {
     /// which pins are touchted. However, this function clears the interrupt
     /// status for all pins. So only call it when all pins are handled.
     pub fn clear_interrupt(&mut self) {
-        let rtccntl = unsafe { &*RTC_CNTL::ptr() };
-        rtccntl.int_clr().write(|w| w.touch().clear_bit_by_one());
-        let sens = unsafe { &*SENS::ptr() };
-        sens.sar_touch_ctrl2()
-            .write(|w| w.touch_meas_en_clr().set_bit());
+        self.internal_clear_interrupt()
     }
 
     /// Checks if the pad is touched, based on the configured threshold value.
     pub fn is_interrupt_set(&mut self) -> bool {
-        let sens = unsafe { &*SENS::ptr() };
-        let ctrl2 = sens.sar_touch_ctrl2().read();
-        // Only god knows, why the "interrupt flag" register is called "meas_en" on this
-        // chip...
-        ctrl2.touch_meas_en().bits() & (1 << self.pin.get_touch_nr(Internal)) != 0
+        self.internal_is_interrupt_set()
     }
 }
+

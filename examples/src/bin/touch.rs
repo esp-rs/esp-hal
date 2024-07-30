@@ -26,10 +26,11 @@ use esp_hal::{
     rtc_cntl::Rtc,
     system::SystemControl,
     touch::{Continous, Touch, TouchConfig, TouchPad},
+    Blocking,
 };
 use esp_println::println;
 
-static TOUCH1: Mutex<RefCell<Option<TouchPad<gpio::Gpio4, Continous>>>> =
+static TOUCH1: Mutex<RefCell<Option<TouchPad<gpio::Gpio4, Continous, Blocking>>>> =
     Mutex::new(RefCell::new(None));
 
 #[handler]
@@ -73,24 +74,16 @@ fn main() -> ! {
 
     let delay = Delay::new(&clocks);
 
-    let mut touch1_baseline = touch1.read();
-    while touch1_baseline.is_none() {
-        delay.delay_millis(1);
-        touch1_baseline = touch1.read();
-    }
+    let touch1_baseline = touch1.read();
 
     critical_section::with(|cs| {
         // A good threshold is 2/3 of the reading when the pad is not touched.
-        touch1.enable_interrupt(touch1_baseline.unwrap() * 2 / 3);
+        touch1.enable_interrupt(touch1_baseline * 2 / 3);
         TOUCH1.borrow_ref_mut(cs).replace(touch1)
     });
 
     loop {
-        let mut touch_reading = touch0.read();
-        while touch_reading.is_none() {
-            delay.delay_millis(1);
-            touch_reading = touch0.read();
-        }
+        let touch_reading = touch0.read();
         println!("touch pad measurement: {touch_reading:?}");
         delay.delay_millis(500);
 
@@ -99,7 +92,7 @@ fn main() -> ! {
                 .borrow_ref_mut(cs)
                 .as_mut()
                 .unwrap()
-                .enable_interrupt(touch1_baseline.unwrap() * 2 / 3);
+                .enable_interrupt(touch1_baseline * 2 / 3);
         });
     }
 }
