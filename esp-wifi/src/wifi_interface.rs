@@ -2,10 +2,6 @@
 
 use core::{borrow::BorrowMut, cell::RefCell, fmt::Display};
 
-#[cfg(feature = "tcp")]
-use embedded_io::ErrorType;
-#[cfg(feature = "tcp")]
-use embedded_io::{Read, Write};
 #[cfg(feature = "dhcpv4")]
 use smoltcp::socket::dhcpv4::Socket as Dhcpv4Socket;
 #[cfg(feature = "tcp")]
@@ -709,12 +705,12 @@ impl embedded_io::Error for IoError {
 }
 
 #[cfg(feature = "tcp")]
-impl<'s, 'n: 's, MODE: WifiDeviceMode> ErrorType for Socket<'s, 'n, MODE> {
+impl<'s, 'n: 's, MODE: WifiDeviceMode> embedded_io::ErrorType for Socket<'s, 'n, MODE> {
     type Error = IoError;
 }
 
 #[cfg(feature = "tcp")]
-impl<'s, 'n: 's, MODE: WifiDeviceMode> Read for Socket<'s, 'n, MODE> {
+impl<'s, 'n: 's, MODE: WifiDeviceMode> embedded_io::Read for Socket<'s, 'n, MODE> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         self.network.with_mut(|interface, device, sockets| {
             use smoltcp::socket::tcp::RecvError;
@@ -735,7 +731,25 @@ impl<'s, 'n: 's, MODE: WifiDeviceMode> Read for Socket<'s, 'n, MODE> {
 }
 
 #[cfg(feature = "tcp")]
-impl<'s, 'n: 's, MODE: WifiDeviceMode> Write for Socket<'s, 'n, MODE> {
+impl<'s, 'n: 's, MODE: WifiDeviceMode> embedded_io::ReadReady for Socket<'s, 'n, MODE> {
+    fn read_ready(&mut self) -> Result<bool, Self::Error> {
+        self.network.with_mut(|interface, device, sockets| {
+            use smoltcp::socket::tcp::RecvError;
+
+            interface.poll(timestamp(), device, sockets);
+            let socket = sockets.get_mut::<TcpSocket>(self.socket_handle);
+
+            match socket.peek(1) {
+                Ok(s) => Ok(s.len() > 0),
+                Err(RecvError::Finished) => Err(IoError::SocketClosed),
+                Err(RecvError::InvalidState) => Err(IoError::TcpRecvError),
+            }
+        })
+    }
+}
+
+#[cfg(feature = "tcp")]
+impl<'s, 'n: 's, MODE: WifiDeviceMode> embedded_io::Write for Socket<'s, 'n, MODE> {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         loop {
             let (may_send, is_open, can_send) =
@@ -796,6 +810,29 @@ impl<'s, 'n: 's, MODE: WifiDeviceMode> Write for Socket<'s, 'n, MODE> {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(feature = "tcp")]
+impl<'s, 'n: 's, MODE: WifiDeviceMode> embedded_io::WriteReady for Socket<'s, 'n, MODE> {
+    fn write_ready(&mut self) -> Result<bool, Self::Error> {
+        let (may_send, is_open, can_send) = self.network.with_mut(|interface, device, sockets| {
+            interface.poll(
+                Instant::from_millis((self.network.current_millis_fn)() as i64),
+                device,
+                sockets,
+            );
+
+            let socket = sockets.get_mut::<TcpSocket>(self.socket_handle);
+
+            (socket.may_send(), socket.is_open(), socket.can_send())
+        });
+
+        if !is_open || !can_send {
+            return Err(IoError::SocketClosed);
+        }
+
+        Ok(may_send)
     }
 }
 
