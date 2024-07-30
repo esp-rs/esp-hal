@@ -1432,7 +1432,7 @@ pub mod dma {
             }
         }
 
-        fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
             let mut spi_dma = self.spi_dma.take().unwrap();
             let (tx_buf, mut rx_buf) = self.buffers.take().unwrap();
 
@@ -1459,7 +1459,7 @@ pub mod dma {
             Ok(())
         }
 
-        fn write(&mut self, words: &[u8]) -> Result<(), Error> {
+        pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
             let mut spi_dma = self.spi_dma.take().unwrap();
             let (mut tx_buf, rx_buf) = self.buffers.take().unwrap();
 
@@ -1483,7 +1483,7 @@ pub mod dma {
             Ok(())
         }
 
-        fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
+        pub fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
             let mut spi_dma = self.spi_dma.take().unwrap();
             let (mut tx_buf, mut rx_buf) = self.buffers.take().unwrap();
 
@@ -1526,7 +1526,7 @@ pub mod dma {
             }
         }
 
-        fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        pub fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Error> {
             let mut spi_dma = self.spi_dma.take().unwrap();
             let (mut tx_buf, mut rx_buf) = self.buffers.take().unwrap();
 
