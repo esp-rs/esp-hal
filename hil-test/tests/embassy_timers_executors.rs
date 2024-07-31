@@ -30,13 +30,16 @@ use embassy_time::{Duration, Ticker, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    interrupt::Priority,
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
-    timer::{systimer::SystemTimer, timg::TimerGroup, ErasedTimer, OneShotTimer, PeriodicTimer},
+    timer::{timg::TimerGroup, ErasedTimer, OneShotTimer, PeriodicTimer},
 };
+#[cfg(not(feature = "esp32"))]
+use esp_hal::{interrupt::Priority, timer::systimer::SystemTimer};
+#[cfg(not(feature = "esp32"))]
 use esp_hal_embassy::InterruptExecutor;
+#[cfg(not(feature = "esp32"))]
 use static_cell::StaticCell;
 
 macro_rules! mk_static {
@@ -68,6 +71,7 @@ mod task_invokers {
     }
 
     #[embassy_executor::task]
+    #[cfg(not(feature = "esp32"))]
     pub async fn test_one_shot_systimer_invoker() {
         let outcome;
         {
@@ -86,6 +90,7 @@ mod task_invokers {
     }
 
     #[embassy_executor::task]
+    #[cfg(not(feature = "esp32"))]
     pub async fn test_join_systimer_invoker() {
         let outcome;
         {
@@ -95,6 +100,7 @@ mod task_invokers {
     }
 
     #[embassy_executor::task]
+    #[cfg(not(feature = "esp32"))]
     pub async fn test_interrupt_executor_invoker() {
         let outcome;
         {
@@ -136,6 +142,7 @@ mod test_helpers {
         assert!((t2 - t1).to_millis() >= 500u64);
     }
 
+    #[cfg(not(feature = "esp32"))]
     pub async fn test_one_shot_systimer() {
         let peripherals = unsafe { Peripherals::steal() };
         let system = SystemControl::new(peripherals.SYSTEM);
@@ -176,6 +183,7 @@ mod test_helpers {
         assert!((t2 - t1).to_millis() >= 1_000u64);
     }
 
+    #[cfg(not(feature = "esp32"))]
     pub async fn test_join_systimer() {
         let peripherals = unsafe { Peripherals::steal() };
         let system = SystemControl::new(peripherals.SYSTEM);
@@ -196,6 +204,7 @@ mod test_helpers {
         assert!((t2 - t1).to_millis() >= 1_000u64);
     }
 
+    #[cfg(not(feature = "esp32"))]
     pub async fn test_interrupt_executor() {
         let mut ticker = Ticker::every(Duration::from_millis(300));
 
@@ -298,6 +307,7 @@ mod test {
 
     #[test]
     #[timeout(3)]
+    #[cfg(not(feature = "esp32"))]
     fn run_test_one_shot_systimer() {
         let mut executor = esp_hal_embassy::Executor::new();
         let executor = unsafe { __make_static(&mut executor) };
@@ -308,6 +318,7 @@ mod test {
 
     #[test]
     #[timeout(3)]
+    #[cfg(not(feature = "esp32"))]
     fn run_test_periodic_systimer() {
         let peripherals = Peripherals::take();
 
@@ -367,6 +378,7 @@ mod test {
 
     #[test]
     #[timeout(3)]
+    #[cfg(not(feature = "esp32"))]
     fn run_test_periodic_oneshot_systimer() {
         let mut peripherals = Peripherals::take();
 
@@ -412,6 +424,7 @@ mod test {
 
     #[test]
     #[timeout(3)]
+    #[cfg(not(feature = "esp32"))]
     fn run_test_join_systimer() {
         let mut executor = esp_hal_embassy::Executor::new();
         let executor = unsafe { __make_static(&mut executor) };
@@ -422,6 +435,7 @@ mod test {
 
     #[test]
     #[timeout(3)]
+    #[cfg(not(feature = "esp32"))]
     async fn run_test_interrupt_executor() {
         let spawner = embassy_executor::Spawner::for_current_executor().await;
 
