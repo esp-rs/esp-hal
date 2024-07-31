@@ -26,6 +26,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         "esp32", "esp32c2", "esp32c3", "esp32c6", "esp32h2", "esp32s2", "esp32s3"
     );
 
+    // Ensure at most one dma chunk size feature is specified.
+    assert_unique_used_features!("dma4032", "dma4064");
+
     #[cfg(all(
         feature = "flip-link",
         not(any(feature = "esp32c6", feature = "esp32h2"))
