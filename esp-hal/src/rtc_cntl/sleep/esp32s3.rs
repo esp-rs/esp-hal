@@ -378,7 +378,7 @@ fn rtc_sleep_pu(val: bool) {
                 .clear_bit()
         });
     }
-    
+
     if val {
         fe.gen_ctrl().modify(|_, w| w.iq_est_force_pu().set_bit());
     } else {
@@ -386,9 +386,11 @@ fn rtc_sleep_pu(val: bool) {
     }
 
     if val {
-        fe2.tx_interp_ctrl().modify(|_, w| w.tx_inf_force_pu().set_bit());
+        fe2.tx_interp_ctrl()
+            .modify(|_, w| w.tx_inf_force_pu().set_bit());
     } else {
-        fe2.tx_interp_ctrl().modify(|_, w| w.tx_inf_force_pu().clear_bit());
+        fe2.tx_interp_ctrl()
+            .modify(|_, w| w.tx_inf_force_pu().clear_bit());
     }
 
     syscon.mem_power_up().modify(|_r, w| unsafe {

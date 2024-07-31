@@ -394,9 +394,9 @@ fn rtc_sleep_pu(val: bool) {
     let rtc_cntl = unsafe { &*esp32c3::RTC_CNTL::ptr() };
     let syscon = unsafe { &*esp32c3::APB_CTRL::ptr() };
     let bb = unsafe { &*esp32c3::BB::ptr() };
-    let nrx = unsafe { &*esp32s3::NRX::ptr() };
-    let fe = unsafe { &*esp32s3::FE::ptr() };
-    let fe2 = unsafe { &*esp32s3::FE2::ptr() };
+    let nrx = unsafe { &*esp32c3::NRX::ptr() };
+    let fe = unsafe { &*esp32c3::FE::ptr() };
+    let fe2 = unsafe { &*esp32c3::FE2::ptr() };
 
     rtc_cntl
         .dig_pwc()
@@ -413,7 +413,6 @@ fn rtc_sleep_pu(val: bool) {
 
     bb.bbpd_ctrl()
         .modify(|_r, w| w.fft_force_pu().bit(val).dc_est_force_pu().bit(val));
-
 
     if val {
         nrx.nrxpd_ctrl().modify(|_, w| {
@@ -442,9 +441,11 @@ fn rtc_sleep_pu(val: bool) {
     }
 
     if val {
-        fe2.tx_interp_ctrl().modify(|_, w| w.tx_inf_force_pu().set_bit());
+        fe2.tx_interp_ctrl()
+            .modify(|_, w| w.tx_inf_force_pu().set_bit());
     } else {
-        fe2.tx_interp_ctrl().modify(|_, w| w.tx_inf_force_pu().clear_bit());
+        fe2.tx_interp_ctrl()
+            .modify(|_, w| w.tx_inf_force_pu().clear_bit());
     }
 
     syscon.mem_power_up().modify(|_r, w| unsafe {

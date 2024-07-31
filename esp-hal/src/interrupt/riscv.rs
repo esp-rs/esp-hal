@@ -572,12 +572,7 @@ mod classic {
     /// priority of interrupts 1 - 15.
     pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
-        let cpu_interrupt_number = which as isize;
-        let intr_prio_base = intr.cpu_int_pri(0).as_ptr();
-
-        intr_prio_base
-            .offset(cpu_interrupt_number)
-            .write_volatile(priority as u32);
+        intr.cpu_int_pri(which as usize).read().map().bits(priority as u32);
     }
 
     /// Clear a CPU interrupt
@@ -601,12 +596,7 @@ mod classic {
     #[inline]
     pub(super) unsafe extern "C" fn get_priority(cpu_interrupt: CpuInterrupt) -> Priority {
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
-        let intr_prio_base = intr.cpu_int_pri(0).as_ptr();
-
-        let prio = intr_prio_base
-            .offset(cpu_interrupt as isize)
-            .read_volatile();
-        core::mem::transmute::<u8, Priority>(prio as u8)
+        core::mem::transmute::<u8, Priority>(intr.cpu_int_pri(cpu_interrupt as usize).read().map().bits())
     }
     #[no_mangle]
     #[link_section = ".trap"]
@@ -659,22 +649,19 @@ mod plic {
         1, 2, 0, 0, 3, 4, 0, 0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
     ];
 
-    const DR_REG_PLIC_MX_BASE: u32 = 0x20001000;
-    const PLIC_MXINT_ENABLE_REG: u32 = DR_REG_PLIC_MX_BASE;
-    const PLIC_MXINT_TYPE_REG: u32 = DR_REG_PLIC_MX_BASE + 0x4;
-    const PLIC_MXINT_CLEAR_REG: u32 = DR_REG_PLIC_MX_BASE + 0x8;
-    const PLIC_MXINT0_PRI_REG: u32 = DR_REG_PLIC_MX_BASE + 0x10;
-    const PLIC_MXINT_THRESH_REG: u32 = DR_REG_PLIC_MX_BASE + 0x90;
     /// Enable a CPU interrupt
     ///
     /// # Safety
     ///
     /// Make sure there is an interrupt handler registered.
     pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
-        let cpu_interrupt_number = which as isize;
-        let mxint_enable = PLIC_MXINT_ENABLE_REG as *mut u32;
         unsafe {
-            mxint_enable.write_volatile(mxint_enable.read_volatile() | 1 << cpu_interrupt_number);
+            let plic = &*crate::peripherals::PLIC_MX::PTR;
+            plic.mxint_enable().modify(|r, w| {
+                let old = r.cpu_mxint_enable().bits();
+                let new = old | 1 << (which as isize);
+                w.cpu_mxint_enable().bits(new)
+            });
         }
     }
 
@@ -684,17 +671,17 @@ mod plic {
     /// bits.
     pub fn set_kind(_core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
         unsafe {
-            let intr = PLIC_MXINT_TYPE_REG as *mut u32;
-            let cpu_interrupt_number = which as isize;
-
+            let plic = &*crate::peripherals::PLIC_MX::PTR;
             let interrupt_type = match kind {
                 InterruptKind::Level => 0,
                 InterruptKind::Edge => 1,
             };
-            intr.write_volatile(
-                intr.read_volatile() & !(1 << cpu_interrupt_number)
-                    | (interrupt_type << cpu_interrupt_number),
-            );
+
+            plic.mxint_type().modify(|r, w| {
+                let old = r.cpu_mxint_type().bits();
+                let new = old & !(1 << (which as isize)) | (interrupt_type << (which as isize));
+                w.cpu_mxint_type().bits(new)
+            });
         }
     }
 
@@ -705,21 +692,23 @@ mod plic {
     /// Great care must be taken when using this function; avoid changing the
     /// priority of interrupts 1 - 15.
     pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {
-        let plic_mxint_pri_ptr = PLIC_MXINT0_PRI_REG as *mut u32;
-
-        let cpu_interrupt_number = which as isize;
-        plic_mxint_pri_ptr
-            .offset(cpu_interrupt_number)
-            .write_volatile(priority as u32);
+        unsafe {
+            let plic = &*crate::peripherals::PLIC_MX::PTR;
+            plic.mxint_pri(which as usize)
+                .modify(|_, w| w.cpu_mxint_pri().bits(priority as u8));
+        }
     }
 
     /// Clear a CPU interrupt
     #[inline]
     pub fn clear(_core: Cpu, which: CpuInterrupt) {
         unsafe {
-            let cpu_interrupt_number = which as isize;
-            let intr = PLIC_MXINT_CLEAR_REG as *mut u32;
-            intr.write_volatile(1 << cpu_interrupt_number);
+            let plic = &*crate::peripherals::PLIC_MX::PTR;
+            plic.mxint_clear().modify(|r, w| {
+                let old = r.cpu_mxint_clear().bits();
+                let new = old | (1 << (which as isize));
+                w.cpu_mxint_clear().bits(new)
+            });
         }
     }
 
@@ -735,40 +724,35 @@ mod plic {
     /// Get interrupt priority - called by assembly code
     #[inline]
     pub(super) unsafe extern "C" fn get_priority(cpu_interrupt: CpuInterrupt) -> Priority {
-        let plic_mxint_pri_ptr = PLIC_MXINT0_PRI_REG as *mut u32;
-
-        let cpu_interrupt_number = cpu_interrupt as isize;
-        let prio = plic_mxint_pri_ptr
-            .offset(cpu_interrupt_number)
-            .read_volatile();
+        let plic = &*crate::peripherals::PLIC_MX::PTR;
+        let prio = plic.mxint_pri(cpu_interrupt as usize).read().cpu_mxint_pri().bits();
         core::mem::transmute::<u8, Priority>(prio as u8)
     }
     #[no_mangle]
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
         use super::mcause;
-        let plic_mxint_pri_ptr = PLIC_MXINT0_PRI_REG as *mut u32;
-        let interrupt_id: isize = unwrap!(mcause::read().code().try_into()); // MSB is whether its exception or interrupt.
-        let interrupt_priority = plic_mxint_pri_ptr.offset(interrupt_id).read_volatile();
+        let plic = &*crate::peripherals::PLIC_MX::PTR;
 
-        let thresh_reg = PLIC_MXINT_THRESH_REG as *mut u32;
-        let prev_interrupt_priority = thresh_reg.read_volatile() & 0x000000FF;
-        // this is a u8 according to esp-idf, so mask everything else.
+        let interrupt_id: usize = unwrap!(mcause::read().code().try_into()); // MSB is whether its exception or interrupt.
+        let interrupt_priority = plic.mxint_pri(interrupt_id).read().cpu_mxint_pri().bits();
+
+        let prev_interrupt_priority = plic.mxint_thresh().read().cpu_mxint_thresh().bits();
         if interrupt_priority < 15 {
             // leave interrupts disabled if interrupt is of max priority.
-            thresh_reg.write_volatile(interrupt_priority + 1);
+            plic.mxint_thresh().write(|w| w.cpu_mxint_thresh().bits(interrupt_priority + 1));
             unsafe {
                 riscv::interrupt::enable();
             }
         }
-        prev_interrupt_priority
+        prev_interrupt_priority as u32
     }
     #[no_mangle]
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {
         riscv::interrupt::disable();
-        let thresh_reg = PLIC_MXINT_THRESH_REG as *mut u32;
-        thresh_reg.write_volatile(stored_prio);
+        let plic = &*crate::peripherals::PLIC_MX::PTR;
+        plic.mxint_thresh().write(|w| w.cpu_mxint_thresh().bits(stored_prio as u8));
     }
 }
 
