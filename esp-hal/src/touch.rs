@@ -355,49 +355,6 @@ impl<P: TouchPin, TOUCHMODE: TouchMode, MODE: Mode> TouchPad<P, TOUCHMODE, MODE>
             None
         }
     }
-
-    fn internal_enable_interrupt(&mut self, threshold: u16) {
-        self.pin.set_threshold(threshold, Internal);
-
-        let rtccntl = unsafe { &*RTC_CNTL::ptr() };
-        // enable touch interrupts
-        rtccntl.int_ena().write(|w| w.touch().set_bit());
-
-        let sens = unsafe { &*SENS::ptr() };
-        sens.sar_touch_enable().modify(|r, w| unsafe {
-            w.touch_pad_outen1()
-                .bits(r.touch_pad_outen1().bits() | 1 << self.pin.get_touch_nr(Internal))
-        });
-    }
-
-    fn internal_disable_interrupt(&mut self) {
-        let sens = unsafe { &*SENS::ptr() };
-        sens.sar_touch_enable().modify(|r, w| unsafe {
-            w.touch_pad_outen1()
-                .bits(r.touch_pad_outen1().bits() & !(1 << self.pin.get_touch_nr(Internal)))
-        });
-        if sens.sar_touch_enable().read().touch_pad_outen1().bits() == 0 {
-            let rtccntl = unsafe { &*RTC_CNTL::ptr() };
-            rtccntl.int_ena().write(|w| w.touch().clear_bit());
-        }
-    }
-
-    fn internal_clear_interrupt(&mut self) {
-        let rtccntl = unsafe { &*RTC_CNTL::ptr() };
-        rtccntl.int_clr().write(|w| w.touch().clear_bit_by_one());
-        let sens = unsafe { &*SENS::ptr() };
-        sens.sar_touch_ctrl2()
-            .write(|w| w.touch_meas_en_clr().set_bit());
-    }
-
-    fn internal_is_interrupt_set(&mut self) -> bool {
-        let sens = unsafe { &*SENS::ptr() };
-        let ctrl2 = sens.sar_touch_ctrl2().read();
-        // Only god knows, why the "interrupt flag" register is called "meas_en" on this
-        // chip...
-        ctrl2.touch_meas_en().bits() & (1 << self.pin.get_touch_nr(Internal)) != 0
-    }
-
 }
 impl<P: TouchPin, TOUCHMODE: TouchMode> TouchPad<P, TOUCHMODE, Blocking> {
     /// Blocking read of the current touch pad capacitance counter.
@@ -437,7 +394,8 @@ impl<P: TouchPin, TOUCHMODE: TouchMode> TouchPad<P, TOUCHMODE, Blocking> {
     ///
     /// ## Example
     pub fn enable_interrupt(&mut self, threshold: u16) {
-        self.internal_enable_interrupt(threshold)
+        self.pin.set_threshold(threshold, Internal);
+        internal_enable_interrupt(self.pin.get_touch_nr(Internal))
     }
 
     /// Disables the touch pad's interrupt.
@@ -445,7 +403,7 @@ impl<P: TouchPin, TOUCHMODE: TouchMode> TouchPad<P, TOUCHMODE, Blocking> {
     /// If no other touch pad interrupts are active, the touch interrupt is
     /// disabled completely.
     pub fn disable_interrupt(&mut self) {
-        self.internal_disable_interrupt()
+        internal_disable_interrupt(self.pin.get_touch_nr(Internal))
     }
 
     /// Clears a pending touch interrupt.
@@ -457,12 +415,65 @@ impl<P: TouchPin, TOUCHMODE: TouchMode> TouchPad<P, TOUCHMODE, Blocking> {
     /// which pins are touchted. However, this function clears the interrupt
     /// status for all pins. So only call it when all pins are handled.
     pub fn clear_interrupt(&mut self) {
-        self.internal_clear_interrupt()
+        internal_clear_interrupt()
     }
 
     /// Checks if the pad is touched, based on the configured threshold value.
     pub fn is_interrupt_set(&mut self) -> bool {
-        self.internal_is_interrupt_set()
+        internal_is_interrupt_set(self.pin.get_touch_nr(Internal))
     }
+}
+
+fn internal_enable_interrupt(touch_nr: u8) {
+    let rtccntl = unsafe { &*RTC_CNTL::ptr() };
+    // enable touch interrupts
+    rtccntl.int_ena().write(|w| w.touch().set_bit());
+
+    let sens = unsafe { &*SENS::ptr() };
+    sens.sar_touch_enable().modify(|r, w| unsafe {
+        w.touch_pad_outen1()
+            .bits(r.touch_pad_outen1().bits() | 1 << touch_nr)
+    });
+}
+
+fn internal_disable_interrupt(touch_nr: u8) {
+    let sens = unsafe { &*SENS::ptr() };
+    sens.sar_touch_enable().modify(|r, w| unsafe {
+        w.touch_pad_outen1()
+            .bits(r.touch_pad_outen1().bits() & !(1 << touch_nr))
+    });
+    if sens.sar_touch_enable().read().touch_pad_outen1().bits() == 0 {
+        let rtccntl = unsafe { &*RTC_CNTL::ptr() };
+        rtccntl.int_ena().write(|w| w.touch().clear_bit());
+    }
+}
+
+fn internal_disable_interrupts() {
+    let sens = unsafe { &*SENS::ptr() };
+    sens.sar_touch_enable()
+        .write(|w| unsafe { w.touch_pad_outen1().bits(0) });
+    if sens.sar_touch_enable().read().touch_pad_outen1().bits() == 0 {
+        let rtccntl = unsafe { &*RTC_CNTL::ptr() };
+        rtccntl.int_ena().write(|w| w.touch().clear_bit());
+    }
+}
+
+fn internal_clear_interrupt() {
+    let rtccntl = unsafe { &*RTC_CNTL::ptr() };
+    rtccntl.int_clr().write(|w| w.touch().clear_bit_by_one());
+    let sens = unsafe { &*SENS::ptr() };
+    sens.sar_touch_ctrl2()
+        .write(|w| w.touch_meas_en_clr().set_bit());
+}
+
+fn internal_pins_touched() -> u16 {
+    let sens = unsafe { &*SENS::ptr() };
+    // Only god knows, why the "interrupt flag" register is called "meas_en" on this
+    // chip...
+    sens.sar_touch_ctrl2().read().touch_meas_en().bits()
+}
+
+fn internal_is_interrupt_set(touch_nr: u8) -> bool {
+    internal_pins_touched() & (1 << touch_nr) != 0
 }
 
