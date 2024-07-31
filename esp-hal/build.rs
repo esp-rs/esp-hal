@@ -7,7 +7,7 @@ use std::{
     str::FromStr,
 };
 
-use esp_build::assert_unique_used_features;
+use esp_build::{assert_unique_features, assert_unique_used_features};
 use esp_metadata::{Chip, Config};
 
 #[cfg(debug_assertions)]
@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     // Ensure at most one dma chunk size feature is specified.
-    assert_unique_used_features!("dma4032", "dma4064");
+    assert_unique_features!("dma4032", "dma4064");
 
     #[cfg(all(
         feature = "flip-link",
