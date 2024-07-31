@@ -281,8 +281,18 @@ pub enum DmaInterrupt {
     RxDone,
 }
 
-/// The default CHUNK_SIZE used for DMA transfers
-pub const CHUNK_SIZE: usize = 4092;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "dma4064")] {
+        /// The default CHUNK_SIZE used for DMA transfers
+        pub const CHUNK_SIZE: usize = 4064;
+    } else if #[cfg(feature = "dma4032")] {
+        /// The default CHUNK_SIZE used for DMA transfers
+        pub const CHUNK_SIZE: usize = 4032;
+    } else {
+        /// The default CHUNK_SIZE used for DMA transfers
+        pub const CHUNK_SIZE: usize = 4092;
+    }
+}
 
 /// Convenience macro to create DMA buffers and descriptors
 ///
