@@ -791,6 +791,21 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     }
                 }
 
+                Package::EspRustlsProvider => {
+                    if matches!(device.arch(), Arch::RiscV) {
+                        lint_package(
+                            chip,
+                            &path,
+                            &[
+                                "-Zbuild-std=core,alloc",
+                                "--features=esp-hal/esp32c6",
+                                &format!("--target={}", chip.target()),
+                            ],
+                            args.fix,
+                        )?;
+                    }
+                }
+
                 Package::EspStorage => {
                     lint_package(
                         chip,

@@ -45,6 +45,7 @@ pub enum Package {
     EspMetadata,
     EspPrintln,
     EspRiscvRt,
+    EspRustlsProvider,
     EspStorage,
     EspWifi,
     Examples,
