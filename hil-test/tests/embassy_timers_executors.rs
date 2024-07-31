@@ -263,6 +263,7 @@ mod test {
     use crate::{task_invokers::*, test_helpers::*};
 
     #[test]
+    #[timeout(3)]
     fn run_test_one_shot_timg() {
         let mut executor = esp_hal_embassy::Executor::new();
         let executor = unsafe { __make_static(&mut executor) };
@@ -272,6 +273,7 @@ mod test {
     }
 
     #[test]
+    #[timeout(3)]
     fn run_test_periodic_timg() {
         let peripherals = Peripherals::take();
         let system = SystemControl::new(peripherals.SYSTEM);
@@ -295,6 +297,7 @@ mod test {
     }
 
     #[test]
+    #[timeout(3)]
     fn run_test_one_shot_systimer() {
         let mut executor = esp_hal_embassy::Executor::new();
         let executor = unsafe { __make_static(&mut executor) };
@@ -304,6 +307,7 @@ mod test {
     }
 
     #[test]
+    #[timeout(3)]
     fn run_test_periodic_systimer() {
         let peripherals = Peripherals::take();
 
@@ -325,6 +329,7 @@ mod test {
     }
 
     #[test]
+    #[timeout(3)]
     fn run_test_periodic_oneshot_timg() {
         let mut peripherals = Peripherals::take();
         let system = SystemControl::new(peripherals.SYSTEM);
@@ -361,6 +366,7 @@ mod test {
     }
 
     #[test]
+    #[timeout(3)]
     fn run_test_periodic_oneshot_systimer() {
         let mut peripherals = Peripherals::take();
 
@@ -395,6 +401,7 @@ mod test {
     }
 
     #[test]
+    #[timeout(3)]
     fn run_test_join_timg() {
         let mut executor = esp_hal_embassy::Executor::new();
         let executor = unsafe { __make_static(&mut executor) };
@@ -404,6 +411,7 @@ mod test {
     }
 
     #[test]
+    #[timeout(3)]
     fn run_test_join_systimer() {
         let mut executor = esp_hal_embassy::Executor::new();
         let executor = unsafe { __make_static(&mut executor) };
@@ -413,6 +421,7 @@ mod test {
     }
 
     #[test]
+    #[timeout(3)]
     async fn run_test_interrupt_executor() {
         let spawner = embassy_executor::Spawner::for_current_executor().await;
 
@@ -451,6 +460,7 @@ mod test {
     }
 
     #[test]
+    #[timeout(3)]
     async fn run_tick_test_timg() {
         let spawner = embassy_executor::Spawner::for_current_executor().await;
 
