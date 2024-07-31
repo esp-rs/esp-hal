@@ -24,7 +24,6 @@
 //!
 //! Mostly feature complete, missing:
 //!
-//! - Async support
 //! - Touch sensor slope control
 //! - Deep Sleep support (wakeup from Deep Sleep)
 
@@ -40,6 +39,8 @@ use crate::{
     Blocking,
     Mode,
 };
+#[cfg(feature = "async")]
+use crate::{rtc_cntl::Rtc, Async, InterruptConfigurable};
 
 /// A marker trait describing the mode the touch pad is set to.
 pub trait TouchMode: Sealed {}
@@ -272,6 +273,52 @@ impl<'d> Touch<'d, Continous, Blocking> {
         }
     }
 }
+#[cfg(feature = "async")]
+impl<'d> Touch<'d, Continous, Async> {
+    /// Initializes the touch peripheral in continous async mode and returns
+    /// this marker struct.
+    ///
+    /// ## Warning:
+    ///
+    /// This uses [`RTC_CORE`](crate::peripherals::Interrupt::RTC_CORE)
+    /// interrupts under the hood. So the whole async part breaks if you install
+    /// an interrupt handler with [`Rtc::set_interrupt_handler()`][1].
+    ///
+    /// [1]: ../rtc_cntl/struct.Rtc.html#method.set_interrupt_handler
+    ///
+    /// ## Parameters:
+    ///
+    /// - `rtc`: The RTC peripheral is needed to configure the required
+    ///   interrupts.
+    /// - `config`: Optional configuration options.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::touch::{Touch, TouchConfig};
+    /// let mut rtc = Rtc::new(peripherals.LPWR);
+    /// let touch = Touch::async_mode(peripherals.TOUCH, &mut rtc, None);
+    /// # }
+    /// ```
+    pub fn async_mode(
+        touch_peripheral: impl Peripheral<P = TOUCH> + 'd,
+        rtc: &mut Rtc,
+        config: Option<TouchConfig>,
+    ) -> Self {
+        crate::into_ref!(touch_peripheral);
+
+        Self::initialize_common_continoous(config);
+
+        rtc.set_interrupt_handler(asynch::handle_touch_interrupt);
+
+        Self {
+            _inner: touch_peripheral,
+            _mode: PhantomData,
+            _touch_mode: PhantomData,
+        }
+    }
+}
 
 /// A pin that is configured as a TouchPad.
 pub struct TouchPad<P: TouchPin, TOUCHMODE: TouchMode, MODE: Mode> {
@@ -448,6 +495,7 @@ fn internal_disable_interrupt(touch_nr: u8) {
     }
 }
 
+#[cfg(feature = "async")]
 fn internal_disable_interrupts() {
     let sens = unsafe { &*SENS::ptr() };
     sens.sar_touch_enable()
@@ -477,3 +525,76 @@ fn internal_is_interrupt_set(touch_nr: u8) -> bool {
     internal_pins_touched() & (1 << touch_nr) != 0
 }
 
+#[cfg(feature = "async")]
+mod asynch {
+    use core::{
+        sync::atomic::{AtomicU16, Ordering},
+        task::{Context, Poll},
+    };
+
+    use embassy_sync::waitqueue::AtomicWaker;
+
+    use super::*;
+    use crate::{macros::ram, prelude::handler, Async};
+
+    const NUM_TOUCH_PINS: usize = 10;
+
+    #[allow(clippy::declare_interior_mutable_const)]
+    const NEW_AW: AtomicWaker = AtomicWaker::new();
+    static TOUCH_WAKERS: [AtomicWaker; NUM_TOUCH_PINS] = [NEW_AW; NUM_TOUCH_PINS];
+
+    // Helper variable to store which pins need handling.
+    static TOUCHED_PINS: AtomicU16 = AtomicU16::new(0);
+
+    pub struct TouchFuture {
+        touch_nr: u8,
+    }
+
+    impl TouchFuture {
+        pub fn new(touch_nr: u8) -> Self {
+            Self { touch_nr }
+        }
+    }
+
+    impl core::future::Future for TouchFuture {
+        type Output = ();
+
+        fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            TOUCH_WAKERS[self.touch_nr as usize].register(cx.waker());
+
+            let pins = TOUCHED_PINS.load(Ordering::Acquire);
+
+            if pins & (1 << self.touch_nr) != 0 {
+                // clear the pin to signal that this pin was handled.
+                TOUCHED_PINS.fetch_and(!(1 << self.touch_nr), Ordering::Release);
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        }
+    }
+
+    #[handler]
+    #[ram]
+    pub(super) fn handle_touch_interrupt() {
+        let touch_pads = internal_pins_touched();
+        for (i, waker) in TOUCH_WAKERS.iter().enumerate() {
+            if touch_pads & (1 << i) != 0 {
+                waker.wake();
+            }
+        }
+        TOUCHED_PINS.store(touch_pads, Ordering::Relaxed);
+        internal_clear_interrupt();
+        internal_disable_interrupts();
+    }
+
+    impl<P: TouchPin, TOUCHMODE: TouchMode> TouchPad<P, TOUCHMODE, Async> {
+        /// Wait for the pad to be touched.
+        pub async fn wait_for_touch(&mut self, threshold: u16) {
+            self.pin.set_threshold(threshold, Internal);
+            let touch_nr = self.pin.get_touch_nr(Internal);
+            internal_enable_interrupt(touch_nr);
+            TouchFuture::new(touch_nr).await;
+        }
+    }
+}
