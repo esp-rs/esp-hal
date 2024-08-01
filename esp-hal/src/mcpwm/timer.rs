@@ -32,12 +32,18 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
     /// Apply the given timer configuration.
     ///
     /// ### Note:
-    /// The prescaler and period configuration will be applied immediately and
-    /// before setting the [`PwmWorkingMode`].
+    /// The prescaler and period configuration will be applied immediately by
+    /// default and before setting the [`PwmWorkingMode`].
     /// If the timer is already running you might want to call [`Timer::stop`]
     /// and/or [`Timer::set_counter`] first
     /// (if the new period is larger than the current counter value this will
     /// cause weird behavior).
+    ///
+    /// If configured via [`TimerClockConfig::with_period_updating_method`],
+    /// another behavior can be applied. Currently, only
+    /// [`PeriodUpdatingMethod::Immediately`]
+    /// and [`PeriodUpdatingMethod::TimerEqualsZero`] are useful as the sync
+    /// method is not yet implemented.
     ///
     /// The hardware supports writing these settings in sync with certain timer
     /// events but this HAL does not expose these for now.
@@ -46,7 +52,8 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
         self.cfg0().write(|w| unsafe {
             w.prescale().bits(timer_config.prescaler);
             w.period().bits(timer_config.period);
-            w.period_upmethod().bits(0)
+            w.period_upmethod()
+                .bits(timer_config.period_updating_method as u8)
         });
 
         // set timer to continuously run and set the timer working mode
@@ -111,6 +118,7 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
 pub struct TimerClockConfig<'a> {
     frequency: HertzU32,
     period: u16,
+    period_updating_method: PeriodUpdatingMethod,
     prescaler: u8,
     mode: PwmWorkingMode,
     phantom: PhantomData<&'a Clocks<'a>>,
@@ -134,6 +142,7 @@ impl<'a> TimerClockConfig<'a> {
             frequency,
             prescaler,
             period,
+            period_updating_method: PeriodUpdatingMethod::Immediately,
             mode,
             phantom: PhantomData,
         }
@@ -167,9 +176,18 @@ impl<'a> TimerClockConfig<'a> {
             frequency,
             prescaler: prescaler as u8,
             period,
+            period_updating_method: PeriodUpdatingMethod::Immediately,
             mode,
             phantom: PhantomData,
         })
+    }
+
+    /// Set the method for updating the PWM period
+    pub fn with_period_updating_method(self, method: PeriodUpdatingMethod) -> Self {
+        Self {
+            period_updating_method: method,
+            ..self
+        }
     }
 
     /// Get the timer clock frequency.
@@ -179,6 +197,21 @@ impl<'a> TimerClockConfig<'a> {
     pub fn frequency(&self) -> HertzU32 {
         self.frequency
     }
+}
+
+/// Method for updating the PWM period
+#[derive(Clone, Copy)]
+#[repr(u8)]
+pub enum PeriodUpdatingMethod {
+    /// The period is updated immediately.
+    Immediately           = 0,
+    /// The period is updated when the timer equals zero.
+    TimerEqualsZero       = 1,
+    /// The period is updated on a synchronization event.
+    Sync                  = 2,
+    /// The period is updated either when the timer equals zero or on a
+    /// synchronization event.
+    TimerEqualsZeroOrSync = 3,
 }
 
 /// PWM working mode
