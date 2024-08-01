@@ -306,8 +306,10 @@ pub(crate) mod utils {
             spi.sram_dwr_cmd()
                 .modify(|_, w| w.cache_sram_usr_wr_cmd_bitlen().bits(7));
 
-            spi.sram_dwr_cmd()
-                .modify(|_, w| w.cache_sram_usr_wr_cmd_value().bits(PSRAM_QUAD_WRITE as u8));
+            spi.sram_dwr_cmd().modify(|_, w| {
+                w.cache_sram_usr_wr_cmd_value()
+                    .bits(PSRAM_QUAD_WRITE as u16)
+            });
 
             spi.sram_drd_cmd()
                 .modify(|_, w| w.cache_sram_usr_rd_cmd_bitlen().bits(7));
@@ -399,9 +401,7 @@ pub(crate) mod utils {
     fn spi0_timing_config_set_flash_clock(freqdiv: u32) {
         let spi = unsafe { &*crate::peripherals::SPI0::PTR };
         if freqdiv == 1 {
-            unsafe {
-                spi.clock().modify(|_, w| w.clk_equ_sysclk().set_bit());
-            }
+            spi.clock().modify(|_, w| w.clk_equ_sysclk().set_bit());
         } else {
             let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_CLKCNT_N_S)
                 | ((freqdiv / 2 - 1) << SPI_MEM_CLKCNT_H_S)
@@ -416,9 +416,7 @@ pub(crate) mod utils {
     fn spi1_timing_config_set_flash_clock(freqdiv: u32) {
         let spi = unsafe { &*crate::peripherals::SPI1::PTR };
         if freqdiv == 1 {
-            unsafe {
-                spi.clock().modify(|_, w| w.clk_equ_sysclk().set_bit());
-            }
+            spi.clock().modify(|_, w| w.clk_equ_sysclk().set_bit());
         } else {
             let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_CLKCNT_N_S)
                 | ((freqdiv / 2 - 1) << SPI_MEM_CLKCNT_H_S)
@@ -433,9 +431,7 @@ pub(crate) mod utils {
     fn spi0_timing_config_set_psram_clock(freqdiv: u32) {
         let spi = unsafe { &*crate::peripherals::SPI0::PTR };
         if freqdiv == 1 {
-            unsafe {
-                spi.sram_clk().modify(|_, w| w.sclk_equ_sysclk().set_bit());
-            }
+            spi.sram_clk().modify(|_, w| w.sclk_equ_sysclk().set_bit());
         } else {
             let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_SCLKCNT_N_S)
                 | ((freqdiv / 2 - 1) << SPI_MEM_SCLKCNT_H_S)
@@ -1595,9 +1591,7 @@ pub(crate) mod utils {
     fn spi0_timing_config_set_flash_clock(freqdiv: u32) {
         let spi = unsafe { &*crate::peripherals::SPI0::PTR };
         if freqdiv == 1 {
-            unsafe {
-                spi.clock().modify(|_, w| w.clk_equ_sysclk().set_bit());
-            }
+            spi.clock().modify(|_, w| w.clk_equ_sysclk().set_bit());
         } else {
             let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_CLKCNT_N_S)
                 | ((freqdiv / 2 - 1) << SPI_MEM_CLKCNT_H_S)
@@ -1612,9 +1606,7 @@ pub(crate) mod utils {
     fn spi1_timing_config_set_flash_clock(freqdiv: u32) {
         let spi = unsafe { &*crate::peripherals::SPI1::PTR };
         if freqdiv == 1 {
-            unsafe {
-                spi.clock().modify(|_, w| w.clk_equ_sysclk().set_bit());
-            }
+            spi.clock().modify(|_, w| w.clk_equ_sysclk().set_bit());
         } else {
             let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_CLKCNT_N_S)
                 | ((freqdiv / 2 - 1) << SPI_MEM_CLKCNT_H_S)
@@ -1629,9 +1621,7 @@ pub(crate) mod utils {
     fn spi0_timing_config_set_psram_clock(freqdiv: u32) {
         let spi = unsafe { &*crate::peripherals::SPI0::PTR };
         if freqdiv == 1 {
-            unsafe {
-                spi.sram_clk().modify(|_, w| w.sclk_equ_sysclk().set_bit());
-            }
+            spi.sram_clk().modify(|_, w| w.sclk_equ_sysclk().set_bit());
         } else {
             let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_SCLKCNT_N_S)
                 | ((freqdiv / 2 - 1) << SPI_MEM_SCLKCNT_H_S)
