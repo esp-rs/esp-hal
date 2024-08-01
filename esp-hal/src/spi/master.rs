@@ -1099,8 +1099,8 @@ pub mod dma {
             true
         }
 
-        pub fn wait(self) -> (SpiDma<'d, T, C, M, DmaMode>, Buf) {
-            while !self.is_done() {}
+        pub fn wait(mut self) -> (SpiDma<'d, T, C, M, DmaMode>, Buf) {
+            self.spi_dma.spi.flush().ok();
             fence(Ordering::Acquire);
             (self.spi_dma, self.dma_buf)
         }
@@ -1156,13 +1156,13 @@ pub mod dma {
 
             let result = unsafe {
                 self.spi
-                    .start_write_bytes_dma(buffer.first(), buffer.len(), &mut self.channel.tx)
+                    .start_write_bytes_dma(buffer.first(), bytes_to_write, &mut self.channel.tx)
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
             }
 
-            Ok(SpiDmaTransfer::new(self, buffer, true, false))
+            Ok(SpiDmaTransfer::new(self, buffer, false, true))
         }
 
         /// Perform a DMA read.
@@ -1190,7 +1190,7 @@ pub mod dma {
                 return Err((e, self, buffer));
             }
 
-            Ok(SpiDmaTransfer::new(self, buffer, false, true))
+            Ok(SpiDmaTransfer::new(self, buffer, true, false))
         }
 
         /// Perform a DMA transfer
