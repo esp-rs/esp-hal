@@ -572,7 +572,8 @@ mod classic {
     /// priority of interrupts 1 - 15.
     pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
-        intr.cpu_int_pri(which as usize).read().map().bits(priority as u32);
+        intr.cpu_int_pri(which as usize)
+            .write(|w| w.map().bits(priority as u8));
     }
 
     /// Clear a CPU interrupt
@@ -596,7 +597,9 @@ mod classic {
     #[inline]
     pub(super) unsafe extern "C" fn get_priority(cpu_interrupt: CpuInterrupt) -> Priority {
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
-        core::mem::transmute::<u8, Priority>(intr.cpu_int_pri(cpu_interrupt as usize).read().map().bits())
+        core::mem::transmute::<u8, Priority>(
+            intr.cpu_int_pri(cpu_interrupt as usize).read().map().bits(),
+        )
     }
     #[no_mangle]
     #[link_section = ".trap"]
@@ -725,7 +728,11 @@ mod plic {
     #[inline]
     pub(super) unsafe extern "C" fn get_priority(cpu_interrupt: CpuInterrupt) -> Priority {
         let plic = &*crate::peripherals::PLIC_MX::PTR;
-        let prio = plic.mxint_pri(cpu_interrupt as usize).read().cpu_mxint_pri().bits();
+        let prio = plic
+            .mxint_pri(cpu_interrupt as usize)
+            .read()
+            .cpu_mxint_pri()
+            .bits();
         core::mem::transmute::<u8, Priority>(prio as u8)
     }
     #[no_mangle]
@@ -740,7 +747,8 @@ mod plic {
         let prev_interrupt_priority = plic.mxint_thresh().read().cpu_mxint_thresh().bits();
         if interrupt_priority < 15 {
             // leave interrupts disabled if interrupt is of max priority.
-            plic.mxint_thresh().write(|w| w.cpu_mxint_thresh().bits(interrupt_priority + 1));
+            plic.mxint_thresh()
+                .write(|w| w.cpu_mxint_thresh().bits(interrupt_priority + 1));
             unsafe {
                 riscv::interrupt::enable();
             }
@@ -752,7 +760,8 @@ mod plic {
     pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {
         riscv::interrupt::disable();
         let plic = &*crate::peripherals::PLIC_MX::PTR;
-        plic.mxint_thresh().write(|w| w.cpu_mxint_thresh().bits(stored_prio as u8));
+        plic.mxint_thresh()
+            .write(|w| w.cpu_mxint_thresh().bits(stored_prio as u8));
     }
 }
 
