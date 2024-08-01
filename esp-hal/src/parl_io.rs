@@ -1381,6 +1381,7 @@ where
         return Err(Error::UnreachableClockRate);
     }
 
+    PeripheralClockControl::reset(crate::system::Peripheral::ParlIo);
     PeripheralClockControl::enable(crate::system::Peripheral::ParlIo);
 
     let pcr = unsafe { &*crate::peripherals::PCR::PTR };

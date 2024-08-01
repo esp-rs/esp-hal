@@ -330,6 +330,7 @@ where
         // the targets the same and force same configuration for both, TX and RX
 
         channel.tx.init_channel();
+        PeripheralClockControl::reset(I::get_peripheral());
         PeripheralClockControl::enable(I::get_peripheral());
         I::set_clock(calculate_clock(
             sample_rate,
