@@ -57,12 +57,13 @@ impl EmbassyTimer {
             handler0, handler1, handler2, handler3, handler4, handler5, handler6,
         ];
 
-        timers
-            .iter_mut()
-            .enumerate()
-            .for_each(|(n, timer)| timer.set_interrupt_handler(HANDLERS[n]));
-
         critical_section::with(|cs| {
+            timers.iter_mut().enumerate().for_each(|(n, timer)| {
+                timer.enable_interrupt(false);
+                timer.stop();
+                timer.set_interrupt_handler(HANDLERS[n]);
+            });
+
             TIMERS.replace(cs, Some(timers));
         });
 
@@ -99,7 +100,7 @@ impl EmbassyTimer {
     fn on_interrupt(&self, id: usize) {
         let cb = critical_section::with(|cs| {
             let mut timers = TIMERS.borrow_ref_mut(cs);
-            let timers = timers.as_mut().unwrap();
+            let timers = timers.as_mut().expect("Time driver not initialized");
             let timer = &mut timers[id];
 
             timer.clear_interrupt();
@@ -121,7 +122,8 @@ impl EmbassyTimer {
     fn arm(timer: &mut Timer, timestamp: u64) {
         let now = current_time().duration_since_epoch();
         let ts = timestamp.micros();
-        let timeout = if ts > now { ts - now } else { now };
+        // if the TS is already in the past make the timer fire immediately
+        let timeout = if ts > now { ts - now } else { 0.micros() };
         timer.schedule(timeout).unwrap();
         timer.enable_interrupt(true);
     }
@@ -169,7 +171,7 @@ impl Driver for EmbassyTimer {
         // soon as possible, but not synchronously.)
         critical_section::with(|cs| {
             let mut timers = TIMERS.borrow_ref_mut(cs);
-            let timers = timers.as_mut().unwrap();
+            let timers = timers.as_mut().expect("Time driver not initialized");
             let timer = &mut timers[alarm.id() as usize];
 
             Self::arm(timer, timestamp);

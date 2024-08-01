@@ -14,8 +14,9 @@ use crate::{peripheral::PeripheralRef, peripherals::LCD_CAM};
 
 pub mod i8080;
 
-pub struct Lcd<'d> {
+pub struct Lcd<'d, DM: crate::Mode> {
     pub(crate) lcd_cam: PeripheralRef<'d, LCD_CAM>,
+    pub(crate) _mode: core::marker::PhantomData<DM>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]

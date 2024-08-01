@@ -391,7 +391,12 @@ fn ZB_MAC() {
                     log::warn!("Receive queue full");
                 }
 
-                let frm = &RX_BUFFER[1..][..RX_BUFFER[0] as usize];
+                let frm = if RX_BUFFER[0] > FRAME_SIZE as u8 {
+                    log::warn!("RX_BUFFER[0] {:} is larger than frame size", RX_BUFFER[0]);
+                    &RX_BUFFER[1..][..FRAME_SIZE]
+                } else {
+                    &RX_BUFFER[1..][..RX_BUFFER[0] as usize]
+                };
                 if will_auto_send_ack(frm) {
                     *STATE.borrow_ref_mut(cs) = Ieee802154State::TxAck;
                 } else if should_send_enhanced_ack(frm) {

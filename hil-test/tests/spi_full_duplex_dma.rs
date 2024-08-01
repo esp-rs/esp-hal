@@ -83,6 +83,8 @@ mod tests {
 
     #[test]
     #[timeout(3)]
+    // S3 is disabled due to https://github.com/esp-rs/esp-hal/issues/1524#issuecomment-2255306292
+    #[cfg(not(feature = "esp32s3"))]
     fn test_asymmetric_dma_transfer() {
         let peripherals = Peripherals::take();
         let system = SystemControl::new(peripherals.SYSTEM);

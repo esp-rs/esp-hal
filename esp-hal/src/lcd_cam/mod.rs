@@ -8,20 +8,23 @@
 pub mod cam;
 pub mod lcd;
 
+use core::marker::PhantomData;
+
 use crate::{
+    interrupt::InterruptHandler,
     lcd_cam::{cam::Cam, lcd::Lcd},
     peripheral::Peripheral,
     peripherals::LCD_CAM,
-    system,
-    system::PeripheralClockControl,
+    system::{self, PeripheralClockControl},
+    InterruptConfigurable,
 };
 
-pub struct LcdCam<'d> {
-    pub lcd: Lcd<'d>,
+pub struct LcdCam<'d, DM: crate::Mode> {
+    pub lcd: Lcd<'d, DM>,
     pub cam: Cam<'d>,
 }
 
-impl<'d> LcdCam<'d> {
+impl<'d> LcdCam<'d, crate::Blocking> {
     pub fn new(lcd_cam: impl Peripheral<P = LCD_CAM> + 'd) -> Self {
         crate::into_ref!(lcd_cam);
 
@@ -30,6 +33,54 @@ impl<'d> LcdCam<'d> {
         Self {
             lcd: Lcd {
                 lcd_cam: unsafe { lcd_cam.clone_unchecked() },
+                _mode: PhantomData,
+            },
+            cam: Cam {
+                lcd_cam: unsafe { lcd_cam.clone_unchecked() },
+            },
+        }
+    }
+}
+
+impl<'d> crate::private::Sealed for LcdCam<'d, crate::Blocking> {}
+// TODO: This interrupt is shared with the Camera module, we should handle this
+// in a similar way to the gpio::IO
+impl<'d> InterruptConfigurable for LcdCam<'d, crate::Blocking> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        unsafe {
+            crate::interrupt::bind_interrupt(
+                crate::peripherals::Interrupt::LCD_CAM,
+                handler.handler(),
+            );
+            crate::interrupt::enable(crate::peripherals::Interrupt::LCD_CAM, handler.priority())
+                .unwrap();
+        }
+    }
+}
+
+#[cfg(feature = "async")]
+impl<'d> LcdCam<'d, crate::Async> {
+    pub fn new_async(lcd_cam: impl Peripheral<P = LCD_CAM> + 'd) -> Self {
+        crate::into_ref!(lcd_cam);
+
+        PeripheralClockControl::enable(system::Peripheral::LcdCam);
+
+        unsafe {
+            crate::interrupt::bind_interrupt(
+                crate::peripherals::Interrupt::LCD_CAM,
+                asynch::interrupt_handler.handler(),
+            );
+        }
+        crate::interrupt::enable(
+            crate::peripherals::Interrupt::LCD_CAM,
+            asynch::interrupt_handler.priority(),
+        )
+        .unwrap();
+
+        Self {
+            lcd: Lcd {
+                lcd_cam: unsafe { lcd_cam.clone_unchecked() },
+                _mode: PhantomData,
             },
             cam: Cam {
                 lcd_cam: unsafe { lcd_cam.clone_unchecked() },
@@ -60,7 +111,99 @@ pub enum ByteOrder {
     Inverted = 1,
 }
 
+#[doc(hidden)]
+#[cfg(feature = "async")]
+pub mod asynch {
+    use core::task::Poll;
+
+    use embassy_sync::waitqueue::AtomicWaker;
+    use procmacros::handler;
+
+    use super::private::Instance;
+
+    static TX_WAKER: AtomicWaker = AtomicWaker::new();
+
+    pub(crate) struct LcdDoneFuture {}
+
+    impl LcdDoneFuture {
+        pub(crate) fn new() -> Self {
+            Self {}
+        }
+    }
+
+    impl core::future::Future for LcdDoneFuture {
+        type Output = ();
+
+        fn poll(
+            self: core::pin::Pin<&mut Self>,
+            cx: &mut core::task::Context<'_>,
+        ) -> core::task::Poll<Self::Output> {
+            TX_WAKER.register(cx.waker());
+            if Instance::is_lcd_done_set() {
+                Instance::clear_lcd_done();
+                Poll::Ready(())
+            } else {
+                Instance::listen_lcd_done();
+                Poll::Pending
+            }
+        }
+    }
+
+    impl Drop for LcdDoneFuture {
+        fn drop(&mut self) {
+            Instance::unlisten_lcd_done();
+        }
+    }
+
+    #[handler]
+    pub(crate) fn interrupt_handler() {
+        // TODO: this is a shared interrupt with Camera and here we ignore that!
+        if Instance::is_lcd_done_set() {
+            Instance::unlisten_lcd_done();
+            TX_WAKER.wake()
+        }
+    }
+}
+
 mod private {
+    #[cfg(feature = "async")]
+    pub(crate) struct Instance;
+
+    // NOTE: the LCD_CAM interrupt registers are shared between LCD and Camera and
+    // this is only implemented for the LCD side, when the Camera is implemented a
+    // CriticalSection will be needed to protect these shared registers.
+    #[cfg(feature = "async")]
+    impl Instance {
+        pub(crate) fn listen_lcd_done() {
+            let lcd_cam = unsafe { crate::peripherals::LCD_CAM::steal() };
+            lcd_cam
+                .lc_dma_int_ena()
+                .modify(|_, w| w.lcd_trans_done_int_ena().set_bit());
+        }
+
+        pub(crate) fn unlisten_lcd_done() {
+            let lcd_cam = unsafe { crate::peripherals::LCD_CAM::steal() };
+            lcd_cam
+                .lc_dma_int_ena()
+                .modify(|_, w| w.lcd_trans_done_int_ena().clear_bit());
+        }
+
+        pub(crate) fn is_lcd_done_set() -> bool {
+            let lcd_cam = unsafe { crate::peripherals::LCD_CAM::steal() };
+            lcd_cam
+                .lc_dma_int_raw()
+                .read()
+                .lcd_trans_done_int_raw()
+                .bit()
+        }
+
+        pub(crate) fn clear_lcd_done() {
+            let lcd_cam = unsafe { crate::peripherals::LCD_CAM::steal() };
+            lcd_cam
+                .lc_dma_int_clr()
+                .write(|w| w.lcd_trans_done_int_clr().set_bit());
+        }
+    }
     pub struct ClockDivider {
         // Integral LCD clock divider value. (8 bits)
         // Value 0 is treated as 256
