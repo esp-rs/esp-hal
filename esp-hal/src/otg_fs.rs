@@ -66,6 +66,7 @@ impl<'d> Usb<'d> {
         P: UsbDp + Send + Sync,
         M: UsbDm + Send + Sync,
     {
+        PeripheralClockControl::reset(PeripheralEnable::Usb);
         PeripheralClockControl::enable(PeripheralEnable::Usb);
 
         Self {

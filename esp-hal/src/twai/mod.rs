@@ -644,11 +644,13 @@ where
         baud_rate: BaudRate,
         no_transceiver: bool,
     ) -> Self {
-        // Enable the peripheral clock for the TWAI peripheral.
-        T::enable_peripheral();
-
         // Set up the GPIO pins.
         crate::into_ref!(tx_pin, rx_pin);
+
+        // Enable the peripheral clock for the TWAI peripheral.
+        T::reset_peripheral();
+        T::enable_peripheral();
+
         if no_transceiver {
             tx_pin.set_to_open_drain_output(crate::private::Internal);
         }
@@ -1147,6 +1149,8 @@ pub trait Instance: crate::private::Sealed {
 
     fn enable_peripheral();
 
+    fn reset_peripheral();
+
     fn enable_interrupts();
 }
 
@@ -1331,6 +1335,10 @@ impl Instance for crate::peripherals::TWAI0 {
         PeripheralClockControl::enable(crate::system::Peripheral::Twai0);
     }
 
+    fn reset_peripheral() {
+        PeripheralClockControl::reset(crate::system::Peripheral::Twai0);
+    }
+
     fn enable_interrupts() {
         let register_block = Self::register_block();
         register_block.int_ena().modify(|_, w| {
@@ -1375,6 +1383,10 @@ impl Instance for crate::peripherals::TWAI0 {
         PeripheralClockControl::enable(crate::system::Peripheral::Twai0);
     }
 
+    fn reset_peripheral() {
+        PeripheralClockControl::enable(crate::system::Peripheral::Twai0);
+    }
+
     fn enable_interrupts() {
         let register_block = Self::register_block();
         register_block.interrupt_enable().modify(|_, w| {
@@ -1416,6 +1428,10 @@ impl Instance for crate::peripherals::TWAI1 {
     }
 
     fn enable_peripheral() {
+        PeripheralClockControl::enable(crate::system::Peripheral::Twai1);
+    }
+
+    fn reset_peripheral() {
         PeripheralClockControl::enable(crate::system::Peripheral::Twai1);
     }
 

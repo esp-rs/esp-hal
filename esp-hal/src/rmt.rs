@@ -227,6 +227,7 @@ where
             return Err(Error::UnreachableTargetFrequency);
         }
 
+        PeripheralClockControl::reset(crate::system::Peripheral::Rmt);
         PeripheralClockControl::enable(crate::system::Peripheral::Rmt);
 
         #[cfg(not(any(esp32, esp32s2)))]

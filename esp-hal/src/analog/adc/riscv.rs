@@ -408,6 +408,7 @@ where
         adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
         config: AdcConfig<ADCI>,
     ) -> Self {
+        PeripheralClockControl::reset(Peripheral::ApbSarAdc);
         PeripheralClockControl::enable(Peripheral::ApbSarAdc);
 
         unsafe { &*APB_SARADC::PTR }.ctrl().modify(|_, w| unsafe {

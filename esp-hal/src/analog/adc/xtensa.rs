@@ -6,6 +6,7 @@ use crate::efuse::Efuse;
 use crate::{
     peripheral::PeripheralRef,
     peripherals::{APB_SARADC, SENS},
+    system::{Peripheral, PeripheralClockControl},
 };
 
 mod calibration;
@@ -400,6 +401,9 @@ where
         adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
         config: AdcConfig<ADCI>,
     ) -> Self {
+        PeripheralClockControl::reset(Peripheral::ApbSarAdc);
+        PeripheralClockControl::enable(Peripheral::ApbSarAdc);
+
         let sensors = unsafe { &*SENS::ptr() };
 
         // Set attenuation for pins
