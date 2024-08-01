@@ -2113,6 +2113,11 @@ where
 
         rx.is_done();
 
+        // disable the write side when reading is being done
+        reg_block
+            .user()
+            .modify(|_, w| w.usr_miso().bit(true).usr_mosi().bit(false));
+
         self.enable_dma();
         self.update();
 
