@@ -96,9 +96,7 @@ impl<'d> Hmac<'d> {
     pub fn new(hmac: impl Peripheral<P = HMAC> + 'd) -> Self {
         crate::into_ref!(hmac);
 
-        PeripheralClockControl::reset(PeripheralEnable::Sha);
         PeripheralClockControl::reset(PeripheralEnable::Hmac);
-        PeripheralClockControl::enable(PeripheralEnable::Sha);
         PeripheralClockControl::enable(PeripheralEnable::Hmac);
 
         Self {
