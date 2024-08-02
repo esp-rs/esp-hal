@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix I2S async-tx (#1833)
 - Fix PARL_IO async-rx (#1851)
 - SPI: Clear DMA interrupts before (not after) DMA starts (#1859)
+- SPI: disable and re-enable MISO and MOSI in `start_transfer_dma`, `start_read_bytes_dma` and `start_write_bytes_dma` accordingly (#1894)
 
 ### Removed
 
