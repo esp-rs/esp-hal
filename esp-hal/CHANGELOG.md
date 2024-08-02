@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added new `Io::new_no_bind_interrupt` constructor (#1861)
+- Added a `PeripheralClockControl::reset` to the driver constructors where missing (#1893)
 
 ### Changed
 
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Allow DMA to/from psram for esp32s3 (#1827)
 - DMA buffers now don't require a static lifetime. Make sure to never `mem::forget` an in-progress DMA transfer (consider using `#[deny(clippy::mem_forget)]`) (#1837)
+- Peripherals (where possible) are now explicitly reset and enabled in their constructors (#1893)
 
 ### Fixed
 
