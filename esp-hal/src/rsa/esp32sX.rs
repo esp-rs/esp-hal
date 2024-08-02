@@ -296,7 +296,7 @@ where
         0
     }
 
-    pub(super) fn set_mode(rsa: &mut Rsa<DM>) {
+    pub(super) fn set_mode(rsa: &mut Rsa<'d, DM>) {
         rsa.write_mode((N - 1) as u32)
     }
 
@@ -333,7 +333,7 @@ where
         }
     }
 
-    fn write_mode(rsa: &mut Rsa<DM>) {
+    fn write_mode(rsa: &mut Rsa<'d, DM>) {
         rsa.write_mode((N - 1) as u32)
     }
 
@@ -376,7 +376,7 @@ where
         self.set_start();
     }
 
-    pub(super) fn set_mode(rsa: &mut Rsa<DM>) {
+    pub(super) fn set_mode(rsa: &mut Rsa<'d, DM>) {
         rsa.write_mode((N * 2 - 1) as u32)
     }
 

@@ -453,7 +453,7 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
         timeout: Option<u32>,
     ) -> Self {
         crate::into_ref!(i2c, sda, scl);
@@ -529,7 +529,7 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
     ) -> Self {
         Self::new_with_timeout(i2c, sda, scl, frequency, clocks, None)
     }
@@ -542,7 +542,7 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
         timeout: Option<u32>,
     ) -> Self {
         Self::new_internal(i2c, sda, scl, frequency, clocks, timeout)
@@ -573,7 +573,7 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
     ) -> Self {
         Self::new_with_timeout_async(i2c, sda, scl, frequency, clocks, None)
     }
@@ -586,7 +586,7 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
         timeout: Option<u32>,
     ) -> Self {
         let mut this = Self::new_internal(i2c, sda, scl, frequency, clocks, timeout);
@@ -1153,7 +1153,7 @@ pub trait Instance: crate::private::Sealed {
 
     fn i2c_number(&self) -> usize;
 
-    fn setup(&mut self, frequency: HertzU32, clocks: &Clocks, timeout: Option<u32>) {
+    fn setup(&mut self, frequency: HertzU32, clocks: &Clocks<'_>, timeout: Option<u32>) {
         self.register_block().ctr().modify(|_, w| unsafe {
             // Clear register
             w.bits(0)
@@ -2426,8 +2426,8 @@ pub mod lp_i2c {
     impl LpI2c {
         pub fn new(
             i2c: LP_I2C0,
-            _sda: LowPowerOutputOpenDrain<6>,
-            _scl: LowPowerOutputOpenDrain<7>,
+            _sda: LowPowerOutputOpenDrain<'_, 6>,
+            _scl: LowPowerOutputOpenDrain<'_, 7>,
             frequency: HertzU32,
         ) -> Self {
             let me = Self { i2c };

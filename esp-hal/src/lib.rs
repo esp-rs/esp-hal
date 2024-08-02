@@ -142,6 +142,7 @@
 #![allow(asm_sub_register)]
 #![cfg_attr(feature = "async", allow(stable_features, async_fn_in_trait))]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
+#![deny(rust_2018_idioms)]
 #![no_std]
 
 // MUST be the first module

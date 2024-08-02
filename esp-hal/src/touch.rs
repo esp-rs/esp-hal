@@ -303,7 +303,7 @@ impl<'d> Touch<'d, Continous, Async> {
     /// ```
     pub fn async_mode(
         touch_peripheral: impl Peripheral<P = TOUCH> + 'd,
-        rtc: &mut Rtc,
+        rtc: &mut Rtc<'_>,
         config: Option<TouchConfig>,
     ) -> Self {
         crate::into_ref!(touch_peripheral);
@@ -371,7 +371,7 @@ impl<P: TouchPin, TOUCHMODE: TouchMode, MODE: Mode> TouchPad<P, TOUCHMODE, MODE>
     /// ## Parameters:
     /// - `pin`: The pin that gets configured as touch pad
     /// - `touch`: The [`Touch`] struct indicating that touch is configured.
-    pub fn new(pin: P, _touch: &Touch<TOUCHMODE, MODE>) -> Self {
+    pub fn new(pin: P, _touch: &Touch<'_, TOUCHMODE, MODE>) -> Self {
         // TODO revert this on drop
         pin.set_touch(Internal);
 
