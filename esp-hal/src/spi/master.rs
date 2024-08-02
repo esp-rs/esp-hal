@@ -2032,6 +2032,11 @@ where
         tx.is_done();
         rx.is_done();
 
+        // re-enable the MISO and MOSI
+        reg_block
+            .user()
+            .modify(|_, w| w.usr_miso().bit(true).usr_mosi().bit(true));
+
         self.enable_dma();
         self.update();
 
@@ -2082,6 +2087,11 @@ where
 
         tx.is_done();
 
+        // disable MISO and re-enable MOSI
+        reg_block
+            .user()
+            .modify(|_, w| w.usr_miso().bit(false).usr_mosi().bit(true));
+
         self.enable_dma();
         self.update();
 
@@ -2113,7 +2123,7 @@ where
 
         rx.is_done();
 
-        // disable the write side when reading is being done
+        // re-enable MISO and disable MOSI
         reg_block
             .user()
             .modify(|_, w| w.usr_miso().bit(true).usr_mosi().bit(false));
