@@ -2074,6 +2074,13 @@ pub trait InstanceDma: Instance {
         tx.start_transfer()?;
         reset_dma_before_usr_cmd(reg_block);
 
+        // Wait for at least one clock cycle for the DMA to fill the SPI async FIFO,
+        // before starting the SPI
+        #[cfg(riscv)]
+        riscv::asm::delay(1);
+        #[cfg(xtensa)]
+        xtensa_lx::timer::delay(1);
+
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
 
         Ok(())
