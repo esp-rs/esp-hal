@@ -10,18 +10,17 @@
 #![no_std]
 #![no_main]
 
+use core::primitive::u32;
+
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::Io,
+    gpio::{any_pin::AnyPin, Flex, Io},
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
-    gpio::any_pin::AnyPin,
-    gpio::Flex,
 };
-use core::primitive::u32;
 
 pub struct FlexIo<'a> {
     pub gpio0: Flex<'a, AnyPin<'a>>,
@@ -55,9 +54,9 @@ fn main() -> ! {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let delay = Delay::new(&clocks);
-    
+
     let mut flexIo = FlexIo::new(io);
-    // You can also use set_as_input() to use those GPIOs easily as input too 
+    // You can also use set_as_input() to use those GPIOs easily as input too
     flexIo.gpio0.set_as_output();
     flexIo.gpio1.set_as_output();
     flexIo.gpio2.set_as_output();
