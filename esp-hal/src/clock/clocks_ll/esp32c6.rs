@@ -253,13 +253,6 @@ const REGI2C_DIG_REG: u8 = 0x6d;
 const REGI2C_ULP_CAL: u8 = 0x61;
 const REGI2C_SAR_I2C: u8 = 0x69;
 
-const I2C_MST_ANA_CONF1_M: u32 = 0x00FFFFFF;
-const REGI2C_BBPLL_RD_MASK: u32 = !(1 << 7) & I2C_MST_ANA_CONF1_M;
-const REGI2C_BIAS_RD_MASK: u32 = !(1 << 6) & I2C_MST_ANA_CONF1_M;
-const REGI2C_DIG_REG_RD_MASK: u32 = !(1 << 10) & I2C_MST_ANA_CONF1_M;
-const REGI2C_ULP_CAL_RD_MASK: u32 = !(1 << 8) & I2C_MST_ANA_CONF1_M;
-const REGI2C_SAR_I2C_RD_MASK: u32 = !(1 << 9) & I2C_MST_ANA_CONF1_M;
-
 const REGI2C_RTC_SLAVE_ID_V: u8 = 0xFF;
 const REGI2C_RTC_SLAVE_ID_S: u8 = 0;
 const REGI2C_RTC_ADDR_V: u8 = 0xFF;
@@ -271,97 +264,81 @@ const REGI2C_RTC_DATA_S: u8 = 16;
 
 const REGI2C_BBPLL: u8 = 0x66;
 
+const DR_REG_LP_I2C_ANA_MST_BASE: u32 = 0x600B2400;
+const LP_I2C_ANA_MST_DEVICE_EN_REG: u32 = DR_REG_LP_I2C_ANA_MST_BASE + 0x14;
+const REGI2C_BBPLL_DEVICE_EN: u32 = 1 << 5;
+const REGI2C_BIAS_DEVICE_EN: u32 = 1 << 4;
+const REGI2C_DIG_REG_DEVICE_EN: u32 = 1 << 8;
+const REGI2C_ULP_CAL_DEVICE_EN: u32 = 1 << 6;
+const REGI2C_SAR_I2C_DEVICE_EN: u32 = 1 << 7;
+
+fn reg_set_bit(reg: u32, bit: u32) {
+    unsafe {
+        (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() | bit);
+    }
+}
+
+fn reg_clr_bit(reg: u32, bit: u32) {
+    unsafe {
+        (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() & !bit);
+    }
+}
+
 fn regi2c_enable_block(block: u8) {
     let modem_lpcon = unsafe { &*crate::peripherals::MODEM_LPCON::ptr() };
     let lp_i2c_ana = unsafe { &*crate::peripherals::LP_I2C_ANA_MST::ptr() };
 
-    unsafe {
-        modem_lpcon
-            .clk_conf()
-            .modify(|_, w| w.clk_i2c_mst_en().set_bit());
+    modem_lpcon
+        .clk_conf()
+        .modify(|_, w| w.clk_i2c_mst_en().set_bit());
 
-        modem_lpcon
-            .i2c_mst_clk_conf()
-            .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
+    modem_lpcon
+        .i2c_mst_clk_conf()
+        .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
 
-        lp_i2c_ana
-            .date()
-            .modify(|_, w| w.lp_i2c_ana_mast_i2c_mat_clk_en().set_bit());
+    lp_i2c_ana
+        .date()
+        .modify(|_, w| w.lp_i2c_ana_mast_i2c_mat_clk_en().set_bit());
 
-        // Before config I2C register, enable corresponding slave.
-        match block {
-            REGI2C_BBPLL => {
-                lp_i2c_ana.ana_conf1().modify(|r, w| {
-                    w.lp_i2c_ana_mast_ana_conf1()
-                        .bits(r.lp_i2c_ana_mast_ana_conf1().bits() | REGI2C_BBPLL_RD_MASK)
-                });
-            }
-            REGI2C_BIAS => {
-                lp_i2c_ana.ana_conf1().modify(|r, w| {
-                    w.lp_i2c_ana_mast_ana_conf1()
-                        .bits(r.lp_i2c_ana_mast_ana_conf1().bits() | REGI2C_BIAS_RD_MASK)
-                });
-            }
-            REGI2C_DIG_REG => {
-                lp_i2c_ana.ana_conf1().modify(|r, w| {
-                    w.lp_i2c_ana_mast_ana_conf1()
-                        .bits(r.lp_i2c_ana_mast_ana_conf1().bits() | REGI2C_DIG_REG_RD_MASK)
-                });
-            }
-            REGI2C_ULP_CAL => {
-                lp_i2c_ana.ana_conf1().modify(|r, w| {
-                    w.lp_i2c_ana_mast_ana_conf1()
-                        .bits(r.lp_i2c_ana_mast_ana_conf1().bits() | REGI2C_ULP_CAL_RD_MASK)
-                });
-            }
-            REGI2C_SAR_I2C => {
-                lp_i2c_ana.ana_conf1().modify(|r, w| {
-                    w.lp_i2c_ana_mast_ana_conf1()
-                        .bits(r.lp_i2c_ana_mast_ana_conf1().bits() | REGI2C_SAR_I2C_RD_MASK)
-                });
-            }
-            _ => (),
+    // Before config I2C register, enable corresponding slave.
+    match block {
+        v if v == REGI2C_BBPLL => {
+            reg_set_bit(LP_I2C_ANA_MST_DEVICE_EN_REG, REGI2C_BBPLL_DEVICE_EN);
         }
+        v if v == REGI2C_BIAS => {
+            reg_set_bit(LP_I2C_ANA_MST_DEVICE_EN_REG, REGI2C_BIAS_DEVICE_EN);
+        }
+        v if v == REGI2C_DIG_REG => {
+            reg_set_bit(LP_I2C_ANA_MST_DEVICE_EN_REG, REGI2C_DIG_REG_DEVICE_EN);
+        }
+        v if v == REGI2C_ULP_CAL => {
+            reg_set_bit(LP_I2C_ANA_MST_DEVICE_EN_REG, REGI2C_ULP_CAL_DEVICE_EN);
+        }
+        v if v == REGI2C_SAR_I2C => {
+            reg_set_bit(LP_I2C_ANA_MST_DEVICE_EN_REG, REGI2C_SAR_I2C_DEVICE_EN);
+        }
+        _ => (),
     }
 }
 
 fn regi2c_disable_block(block: u8) {
-    let lp_i2c_ana = unsafe { &*crate::peripherals::LP_I2C_ANA_MST::ptr() };
-
-    unsafe {
-        match block {
-            REGI2C_BBPLL => {
-                lp_i2c_ana.ana_conf1().modify(|r, w| {
-                    w.lp_i2c_ana_mast_ana_conf1()
-                        .bits(r.lp_i2c_ana_mast_ana_conf1().bits() & !REGI2C_BBPLL_RD_MASK)
-                });
-            }
-            REGI2C_BIAS => {
-                lp_i2c_ana.ana_conf1().modify(|r, w| {
-                    w.lp_i2c_ana_mast_ana_conf1()
-                        .bits(r.lp_i2c_ana_mast_ana_conf1().bits() & !REGI2C_BIAS_RD_MASK)
-                });
-            }
-            REGI2C_DIG_REG => {
-                lp_i2c_ana.ana_conf1().modify(|r, w| {
-                    w.lp_i2c_ana_mast_ana_conf1()
-                        .bits(r.lp_i2c_ana_mast_ana_conf1().bits() & !REGI2C_DIG_REG_RD_MASK)
-                });
-            }
-            REGI2C_ULP_CAL => {
-                lp_i2c_ana.ana_conf1().modify(|r, w| {
-                    w.lp_i2c_ana_mast_ana_conf1()
-                        .bits(r.lp_i2c_ana_mast_ana_conf1().bits() & !REGI2C_ULP_CAL_RD_MASK)
-                });
-            }
-            REGI2C_SAR_I2C => {
-                lp_i2c_ana.ana_conf1().modify(|r, w| {
-                    w.lp_i2c_ana_mast_ana_conf1()
-                        .bits(r.lp_i2c_ana_mast_ana_conf1().bits() & !REGI2C_SAR_I2C_RD_MASK)
-                });
-            }
-            _ => (),
+    match block {
+        v if v == REGI2C_BBPLL => {
+            reg_clr_bit(LP_I2C_ANA_MST_DEVICE_EN_REG, REGI2C_BBPLL_DEVICE_EN);
         }
+        v if v == REGI2C_BIAS => {
+            reg_clr_bit(LP_I2C_ANA_MST_DEVICE_EN_REG, REGI2C_BIAS_DEVICE_EN);
+        }
+        v if v == REGI2C_DIG_REG => {
+            reg_clr_bit(LP_I2C_ANA_MST_DEVICE_EN_REG, REGI2C_DIG_REG_DEVICE_EN);
+        }
+        v if v == REGI2C_ULP_CAL => {
+            reg_clr_bit(LP_I2C_ANA_MST_DEVICE_EN_REG, REGI2C_ULP_CAL_DEVICE_EN);
+        }
+        v if v == REGI2C_SAR_I2C => {
+            reg_clr_bit(LP_I2C_ANA_MST_DEVICE_EN_REG, REGI2C_SAR_I2C_DEVICE_EN);
+        }
+        _ => (),
     }
 }
 
