@@ -2022,13 +2022,13 @@ where
     unsafe {
         match command {
             Command::Start => {
-                cmd.write(|w| w.opcode().bits(OPCODE_RSTART as u8));
+                cmd.write(|w| w.opcode().rstart());
             }
             Command::Stop => {
-                cmd.write(|w| w.opcode().bits(OPCODE_STOP as u8));
+                cmd.write(|w| w.opcode().stop());
             }
             Command::End => {
-                cmd.write(|w| w.opcode().bits(OPCODE_END as u8));
+                cmd.write(|w| w.opcode().end());
             }
             Command::Write {
                 ack_exp,
@@ -2036,7 +2036,7 @@ where
                 length,
             } => {
                 cmd.write(|w| {
-                    w.opcode().bits(OPCODE_WRITE as u8);
+                    w.opcode().write();
                     w.ack_exp().bit(ack_exp == Ack::Nack);
                     w.ack_check_en().bit(ack_check_en);
                     w.byte_num().bits(length);
@@ -2045,7 +2045,7 @@ where
             }
             Command::Read { ack_value, length } => {
                 cmd.write(|w| {
-                    w.opcode().bits(OPCODE_READ as u8);
+                    w.opcode().read();
                     w.ack_value().bit(ack_value == Ack::Nack);
                     w.byte_num().bits(length);
                     w
