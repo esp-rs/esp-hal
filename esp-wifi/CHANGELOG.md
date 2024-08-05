@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Increased NPL event queue size to prevent overflow (#1891)
+
 ### Removed
 
 ## 0.7.1 - 2024-07-17
