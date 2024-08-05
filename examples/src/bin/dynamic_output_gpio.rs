@@ -1,4 +1,4 @@
-//! Iterates over an array of LEDs, demonstrating how to use AnyPin and FlexPins to drive GPIOs.
+//! Iterates over an array of LEDs, demonstrating how to use AnyPin and Flex to drive GPIOs.
 //!
 //! The following wiring is assumed:
 //! - LED => GPIO0
