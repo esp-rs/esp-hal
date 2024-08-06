@@ -227,7 +227,7 @@ where
     T: TimerGroupInstance,
 {
     /// Construct a new instance of [`TimerGroup`] in blocking mode
-    pub fn new(_timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Self {
+    pub fn new(_timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks<'d>) -> Self {
         crate::into_ref!(_timer_group);
 
         T::configure_src_clk();
@@ -266,7 +266,7 @@ where
     T: TimerGroupInstance,
 {
     /// Construct a new instance of [`TimerGroup`] in asynchronous mode
-    pub fn new_async(_timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Self {
+    pub fn new_async(_timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks<'d>) -> Self {
         crate::into_ref!(_timer_group);
 
         T::configure_src_clk();

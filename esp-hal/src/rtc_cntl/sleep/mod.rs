@@ -170,7 +170,12 @@ impl Default for GpioWakeupSource {
 }
 
 impl WakeSource for GpioWakeupSource {
-    fn apply(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
+    fn apply(
+        &self,
+        _rtc: &Rtc<'_>,
+        triggers: &mut WakeTriggers,
+        _sleep_config: &mut RtcSleepConfig,
+    ) {
         triggers.set_gpio(true);
     }
 }
@@ -216,7 +221,7 @@ macro_rules! uart_wakeup_impl {
             }
 
             impl WakeSource for [< Uart $num WakeupSource >] {
-                fn apply(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
+                fn apply(&self, _rtc: &Rtc<'_>, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
                     triggers.[< set_uart $num >](true);
                     let uart = unsafe { crate::peripherals::[< UART $num >]::steal() };
 
@@ -302,5 +307,5 @@ bitfield::bitfield! {
 }
 
 pub trait WakeSource {
-    fn apply(&self, rtc: &Rtc, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig);
+    fn apply(&self, rtc: &Rtc<'_>, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig);
 }

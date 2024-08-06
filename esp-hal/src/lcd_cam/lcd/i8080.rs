@@ -111,7 +111,7 @@ where
         mut pins: P,
         frequency: HertzU32,
         config: Config,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
     ) -> Self {
         let is_2byte_mode = size_of::<P::Word>() == 2;
 
@@ -355,7 +355,7 @@ where
         cmd: impl Into<Command<P::Word>>,
         dummy: u8,
         data: &'t TXBUF,
-    ) -> Result<DmaTransferTx<Self>, DmaError>
+    ) -> Result<DmaTransferTx<'_, Self>, DmaError>
     where
         TXBUF: ReadBuffer,
     {

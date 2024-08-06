@@ -101,7 +101,7 @@ where
         }
     }
 
-    fn set_mode(rsa: &mut Rsa<DM>) {
+    fn set_mode(rsa: &mut Rsa<'d, DM>) {
         rsa.write_multi_mode((N / 16 - 1) as u32)
     }
 
@@ -165,7 +165,7 @@ where
         }
     }
 
-    pub(super) fn set_mode(rsa: &mut Rsa<DM>) {
+    pub(super) fn set_mode(rsa: &mut Rsa<'d, DM>) {
         rsa.write_modexp_mode((N / 16 - 1) as u32)
     }
 
@@ -196,7 +196,7 @@ where
         self.set_start();
     }
 
-    pub(super) fn set_mode(rsa: &mut Rsa<DM>) {
+    pub(super) fn set_mode(rsa: &mut Rsa<'d, DM>) {
         rsa.write_multi_mode(((N * 2) / 16 + 7) as u32)
     }
 

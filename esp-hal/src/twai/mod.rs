@@ -640,7 +640,7 @@ where
         _peripheral: impl Peripheral<P = T> + 'd,
         tx_pin: impl Peripheral<P = TX> + 'd,
         rx_pin: impl Peripheral<P = RX> + 'd,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
         baud_rate: BaudRate,
         no_transceiver: bool,
     ) -> Self {
@@ -674,7 +674,7 @@ where
     /// Set the bitrate of the bus.
     ///
     /// Note: The timings currently assume a APB_CLK of 80MHz.
-    fn set_baud_rate(&mut self, baud_rate: BaudRate, _clocks: &Clocks) {
+    fn set_baud_rate(&mut self, baud_rate: BaudRate, _clocks: &Clocks<'d>) {
         // TWAI is clocked from the APB_CLK according to Table 6-4 [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf)
         // Included timings are all for 80MHz so assert that we are running at 80MHz.
         #[cfg(not(esp32c6))]
@@ -781,7 +781,7 @@ where
         peripheral: impl Peripheral<P = T> + 'd,
         tx_pin: impl Peripheral<P = TX> + 'd,
         rx_pin: impl Peripheral<P = RX> + 'd,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
         baud_rate: BaudRate,
     ) -> Self {
         Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, false)
@@ -796,7 +796,7 @@ where
         peripheral: impl Peripheral<P = T> + 'd,
         tx_pin: impl Peripheral<P = TX> + 'd,
         rx_pin: impl Peripheral<P = RX> + 'd,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
         baud_rate: BaudRate,
     ) -> Self {
         Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, true)
@@ -826,7 +826,7 @@ where
         peripheral: impl Peripheral<P = T> + 'd,
         tx_pin: impl Peripheral<P = TX> + 'd,
         rx_pin: impl Peripheral<P = RX> + 'd,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
         baud_rate: BaudRate,
     ) -> Self {
         let mut this = Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, false);
@@ -843,7 +843,7 @@ where
         peripheral: impl Peripheral<P = T> + 'd,
         tx_pin: impl Peripheral<P = TX> + 'd,
         rx_pin: impl Peripheral<P = RX> + 'd,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
         baud_rate: BaudRate,
     ) -> Self {
         let mut this = Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, true);

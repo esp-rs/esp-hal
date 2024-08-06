@@ -85,7 +85,12 @@ pub const SIG_GPIO_OUT_IDX: u32 = 128;
 pub const GPIO_NUM_MAX: usize = 22;
 
 impl WakeSource for TimerWakeupSource {
-    fn apply(&self, rtc: &Rtc, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
+    fn apply(
+        &self,
+        rtc: &Rtc<'_>,
+        triggers: &mut WakeTriggers,
+        _sleep_config: &mut RtcSleepConfig,
+    ) {
         triggers.set_timer(true);
         let rtc_cntl = unsafe { &*esp32c3::RTC_CNTL::ptr() };
         let clock_freq = RtcClock::get_slow_freq();
@@ -178,7 +183,12 @@ fn isolate_digital_gpio() {
 }
 
 impl WakeSource for RtcioWakeupSource<'_, '_> {
-    fn apply(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig) {
+    fn apply(
+        &self,
+        _rtc: &Rtc<'_>,
+        triggers: &mut WakeTriggers,
+        sleep_config: &mut RtcSleepConfig,
+    ) {
         let mut pins = self.pins.borrow_mut();
 
         if pins.is_empty() {
@@ -486,7 +496,7 @@ impl RtcSleepConfig {
         cfg
     }
 
-    pub(crate) fn base_settings(_rtc: &Rtc) {
+    pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
         let cfg = RtcConfig::default();
 
         // settings derived from esp_clk_init -> rtc_init

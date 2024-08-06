@@ -227,7 +227,7 @@ impl<'a, S: TimerSpeed> Timer<'a, S> {
     /// Create a new intance of a timer
     pub fn new(
         ledc: &'a ledc::RegisterBlock,
-        clock_control_config: &'a Clocks,
+        clock_control_config: &'a Clocks<'a>,
         number: Number,
     ) -> Self {
         Timer {
