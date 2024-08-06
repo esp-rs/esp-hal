@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added new `Io::new_no_bind_interrupt` constructor (#1861)
 - Added touch pad support for esp32 (#1873)
+- Added `digest::Digest` implementation to SHA (#1908)
 
 ### Changed
 
@@ -19,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Allow DMA to/from psram for esp32s3 (#1827)
 - DMA buffers now don't require a static lifetime. Make sure to never `mem::forget` an in-progress DMA transfer (consider using `#[deny(clippy::mem_forget)]`) (#1837)
+- SHA driver now use specific structs for the hashing algorithm instead of a parameter. (#1908)
 
 ### Fixed
 
