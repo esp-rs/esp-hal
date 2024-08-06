@@ -544,6 +544,7 @@ where
         mode: SpiMode,
         clocks: &Clocks,
     ) -> Spi<'d, T, FullDuplexMode> {
+        spi.reset_peripheral();
         spi.enable_peripheral();
 
         let mut spi = Spi {
@@ -721,6 +722,7 @@ where
         mode: SpiMode,
         clocks: &Clocks,
     ) -> Spi<'d, T, HalfDuplexMode> {
+        spi.reset_peripheral();
         spi.enable_peripheral();
 
         let mut spi = Spi {
@@ -2280,6 +2282,8 @@ pub trait Instance: private::Sealed {
 
     fn enable_peripheral(&self);
 
+    fn reset_peripheral(&self);
+
     fn spi_num(&self) -> u8;
 
     /// Initialize for full-duplex 1 bit mode
@@ -3241,6 +3245,11 @@ impl Instance for crate::peripherals::SPI2 {
     }
 
     #[inline(always)]
+    fn reset_peripheral(&self) {
+        PeripheralClockControl::reset(crate::system::Peripheral::Spi2);
+    }
+
+    #[inline(always)]
     fn spi_num(&self) -> u8 {
         2
     }
@@ -3318,6 +3327,11 @@ impl Instance for crate::peripherals::SPI2 {
     }
 
     #[inline(always)]
+    fn reset_peripheral(&self) {
+        PeripheralClockControl::reset(crate::system::Peripheral::Spi2);
+    }
+
+    #[inline(always)]
     fn spi_num(&self) -> u8 {
         2
     }
@@ -3389,6 +3403,11 @@ impl Instance for crate::peripherals::SPI3 {
     }
 
     #[inline(always)]
+    fn reset_peripheral(&self) {
+        PeripheralClockControl::reset(crate::system::Peripheral::Spi3)
+    }
+
+    #[inline(always)]
     fn spi_num(&self) -> u8 {
         3
     }
@@ -3430,6 +3449,11 @@ impl Instance for crate::peripherals::SPI2 {
     #[inline(always)]
     fn enable_peripheral(&self) {
         PeripheralClockControl::enable(crate::system::Peripheral::Spi2)
+    }
+
+    #[inline(always)]
+    fn reset_peripheral(&self) {
+        PeripheralClockControl::reset(crate::system::Peripheral::Spi2)
     }
 
     #[inline(always)]
@@ -3507,6 +3531,11 @@ impl Instance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn enable_peripheral(&self) {
         PeripheralClockControl::enable(crate::system::Peripheral::Spi3)
+    }
+
+    #[inline(always)]
+    fn reset_peripheral(&self) {
+        PeripheralClockControl::reset(crate::system::Peripheral::Spi3)
     }
 
     #[inline(always)]

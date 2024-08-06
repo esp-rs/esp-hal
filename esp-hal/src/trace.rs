@@ -66,6 +66,7 @@ where
     pub fn new(peripheral: impl Peripheral<P = T> + 'd) -> Self {
         crate::into_ref!(peripheral);
 
+        PeripheralClockControl::reset(crate::system::Peripheral::Trace0);
         PeripheralClockControl::enable(crate::system::Peripheral::Trace0);
 
         Self {

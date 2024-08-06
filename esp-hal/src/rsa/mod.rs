@@ -101,6 +101,7 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
     fn new_internal(rsa: impl Peripheral<P = RSA> + 'd) -> Self {
         crate::into_ref!(rsa);
 
+        PeripheralClockControl::reset(PeripheralEnable::Rsa);
         PeripheralClockControl::enable(PeripheralEnable::Rsa);
 
         Self {

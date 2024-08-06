@@ -85,6 +85,7 @@ impl<'d> Ecc<'d, crate::Blocking> {
     pub fn new(ecc: impl Peripheral<P = ECC> + 'd) -> Self {
         crate::into_ref!(ecc);
 
+        PeripheralClockControl::reset(PeripheralEnable::Ecc);
         PeripheralClockControl::enable(PeripheralEnable::Ecc);
 
         Self {
