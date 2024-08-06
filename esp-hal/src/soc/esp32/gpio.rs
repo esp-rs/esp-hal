@@ -871,11 +871,11 @@ pub(crate) fn errata36(pin_num: u8, pull_up: Option<bool>, pull_down: Option<boo
 }
 
 crate::gpio::gpio! {
-    (0, 0, InputOutputAnalog (5 => EMAC_TX_CLK) (1 => CLK_OUT1))
+    (0, 0, InputOutputAnalogTouch (5 => EMAC_TX_CLK) (1 => CLK_OUT1))
     (1, 0, InputOutput (5 => EMAC_RXD2) (0 => U0TXD 1 => CLK_OUT3))
-    (2, 0, InputOutputAnalog (1 => HSPIWP 3 => HS2_DATA0 4 => SD_DATA0) (3 => HS2_DATA0 4 => SD_DATA0))
+    (2, 0, InputOutputAnalogTouch (1 => HSPIWP 3 => HS2_DATA0 4 => SD_DATA0) (3 => HS2_DATA0 4 => SD_DATA0))
     (3, 0, InputOutput (0 => U0RXD) (1 => CLK_OUT2))
-    (4, 0, InputOutputAnalog (1 => HSPIHD 3 => HS2_DATA1 4 => SD_DATA1 5 => EMAC_TX_ER) (3 => HS2_DATA1 4 => SD_DATA1))
+    (4, 0, InputOutputAnalogTouch (1 => HSPIHD 3 => HS2_DATA1 4 => SD_DATA1 5 => EMAC_TX_ER) (3 => HS2_DATA1 4 => SD_DATA1))
     (5, 0, InputOutput (1 => VSPICS0 3 => HS1_DATA6 5 => EMAC_RX_CLK) (3 => HS1_DATA6))
     (6, 0, InputOutput (4 => U1CTS) (0 => SD_CLK 1 => SPICLK 3 => HS1_CLK))
     (7, 0, InputOutput (0 => SD_DATA0 1 => SPIQ 3 => HS1_DATA0) (0 => SD_DATA0 1 => SPIQ 3 => HS1_DATA0 4 => U2RTS))
@@ -883,10 +883,10 @@ crate::gpio::gpio! {
     (9, 0, InputOutput (0 => SD_DATA2 1 => SPIHD 3 => HS1_DATA2 4 => U1RXD) (0 => SD_DATA2 1 => SPIHD 3 => HS1_DATA2))
     (10, 0, InputOutput ( 0 => SD_DATA3 1 => SPIWP 3 => HS1_DATA3) (0 => SD_DATA3 1 => SPIWP 3 => HS1_DATA3 4 => U1TXD))
     (11, 0, InputOutput ( 1 => SPICS0) (0 => SD_CMD 1 => SPICS0 3 => HS1_CMD 4 => U1RTS))
-    (12, 0, InputOutputAnalog (0 => MTDI 1 => HSPIQ 3 => HS2_DATA2 4 => SD_DATA2) (1 => HSPIQ 3 => HS2_DATA2 4 => SD_DATA2 5 => EMAC_TXD3))
-    (13, 0, InputOutputAnalog (0 => MTCK 1 => HSPID 3 => HS2_DATA3 4 => SD_DATA3) (1 => HSPID 3 => HS2_DATA3 4 => SD_DATA3 5 => EMAC_RX_ER))
-    (14, 0, InputOutputAnalog (0 => MTMS 1 => HSPICLK) (1 => HSPICLK 3 => HS2_CLK 4 => SD_CLK 5 => EMAC_TXD2))
-    (15, 0, InputOutputAnalog (1 => HSPICS0 5 => EMAC_RXD3) (0 => MTDO 1 => HSPICS0 3 => HS2_CMD 4 => SD_CMD))
+    (12, 0, InputOutputAnalogTouch (0 => MTDI 1 => HSPIQ 3 => HS2_DATA2 4 => SD_DATA2) (1 => HSPIQ 3 => HS2_DATA2 4 => SD_DATA2 5 => EMAC_TXD3))
+    (13, 0, InputOutputAnalogTouch (0 => MTCK 1 => HSPID 3 => HS2_DATA3 4 => SD_DATA3) (1 => HSPID 3 => HS2_DATA3 4 => SD_DATA3 5 => EMAC_RX_ER))
+    (14, 0, InputOutputAnalogTouch (0 => MTMS 1 => HSPICLK) (1 => HSPICLK 3 => HS2_CLK 4 => SD_CLK 5 => EMAC_TXD2))
+    (15, 0, InputOutputAnalogTouch (1 => HSPICS0 5 => EMAC_RXD3) (0 => MTDO 1 => HSPICS0 3 => HS2_CMD 4 => SD_CMD))
     (16, 0, InputOutput (3 => HS1_DATA4 4 => U2RXD) (3 => HS1_DATA4 5 => EMAC_CLK_OUT))
     (17, 0, InputOutput (3 => HS1_DATA5) (3 => HS1_DATA5 4 => U2TXD 5 => EMAC_CLK_180))
     (18, 0, InputOutput (1 => VSPICLK 3 => HS1_DATA7) (1 => VSPICLK 3 => HS1_DATA7))
@@ -898,7 +898,7 @@ crate::gpio::gpio! {
     (24, 0, InputOutput)
     (25, 0, InputOutputAnalog (5 => EMAC_RXD0) ())
     (26, 0, InputOutputAnalog (5 => EMAC_RXD1) ())
-    (27, 0, InputOutputAnalog (5 => EMAC_RX_DV) ())
+    (27, 0, InputOutputAnalogTouch (5 => EMAC_RX_DV) ())
     (32, 1, InputOutputAnalog)
     (33, 1, InputOutputAnalog)
     (34, 1, InputOnlyAnalog)
@@ -949,6 +949,35 @@ crate::gpio::rtc_pins! {
         (12, 15, touch_pad5(),     "",      touch_pad5_hold_force, rue,       rde       )
         (14, 16, touch_pad6(),     "",      touch_pad6_hold_force, rue,       rde       )
         (27, 17, touch_pad7(),     "",      touch_pad7_hold_force, rue,       rde       )
+}
+
+crate::gpio::touch_into! {
+    // (touch_nr, pin_nr, rtc_pin, touch_comb_reg_nr, normal_pin)
+     (0, 4,  10, sar_touch_thres1, touch_out_th0, true )
+     (1, 0,  11, sar_touch_thres1, touch_out_th1, true )
+     (2, 2,  12, sar_touch_thres2, touch_out_th2, true )
+     (3, 15, 13, sar_touch_thres2, touch_out_th3, true )
+     (4, 13, 14, sar_touch_thres3, touch_out_th4, true )
+     (5, 12, 15, sar_touch_thres3, touch_out_th5, true )
+     (6, 14, 16, sar_touch_thres4, touch_out_th6, true )
+     (7, 27, 17, sar_touch_thres4, touch_out_th7, true )
+     ---
+     (8, 33, 8, sar_touch_thres5, touch_out_th8, false )
+     (9, 32, 9, sar_touch_thres5, touch_out_th9, false )
+}
+
+crate::gpio::touch_common! {
+    // (touch_nr, pin_nr, touch_out_reg, touch_thres_reg )
+     (0, 4,  sar_touch_out1, touch_meas_out0, sar_touch_thres1, touch_out_th0)
+     (1, 0,  sar_touch_out1, touch_meas_out1, sar_touch_thres1, touch_out_th1)
+     (2, 2,  sar_touch_out2, touch_meas_out2, sar_touch_thres2, touch_out_th2)
+     (3, 15, sar_touch_out2, touch_meas_out3, sar_touch_thres2, touch_out_th3)
+     (4, 13, sar_touch_out3, touch_meas_out4, sar_touch_thres3, touch_out_th4)
+     (5, 12, sar_touch_out3, touch_meas_out5, sar_touch_thres3, touch_out_th5)
+     (6, 14, sar_touch_out4, touch_meas_out6, sar_touch_thres4, touch_out_th6)
+     (7, 27, sar_touch_out4, touch_meas_out7, sar_touch_thres4, touch_out_th7)
+     (8, 33, sar_touch_out5, touch_meas_out8, sar_touch_thres5, touch_out_th8)
+     (9, 32, sar_touch_out5, touch_meas_out9, sar_touch_thres5, touch_out_th9)
 }
 
 impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank0 {
