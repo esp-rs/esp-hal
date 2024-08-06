@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix I2S async-tx (#1833)
 - Fix PARL_IO async-rx (#1851)
 - SPI: Clear DMA interrupts before (not after) DMA starts (#1859)
+- TWAI: GPIO pins are not configured as input and output (#1906)
 
 ### Removed
 
