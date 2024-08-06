@@ -38,7 +38,7 @@ jobs:
   # Build Packages
 
   esp-hal:
-    name: esp-hal (${{ matrix.device.soc }} | ${{ matrix.device.toolchain }})
+    name: esp-hal (${{ matrix.device.soc }})
     runs-on: ubuntu-latest
     continue-on-error: ${{ matrix.device.toolchain == 'nightly' }}
     env:
