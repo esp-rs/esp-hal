@@ -28,6 +28,7 @@ impl EndianessConverter for NativeEndianess {
 }
 
 /// Use BE for ESP32, NE otherwise
+#[derive(Debug, Clone)]
 pub(crate) struct SocDependentEndianess;
 
 #[cfg(not(esp32))]
@@ -61,7 +62,7 @@ impl EndianessConverter for SocDependentEndianess {
 // It assumes incoming `dst` are aligned to desired layout (in future
 // ptr.is_aligned can be used). It also assumes that writes are done in FIFO
 // order.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct AlignmentHelper<E: EndianessConverter> {
     buf: [u8; U32_ALIGN_SIZE],
     buf_fill: usize,
