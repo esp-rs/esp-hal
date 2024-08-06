@@ -32,12 +32,12 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::sha::Sha;
-//! # use esp_hal::sha::ShaMode;
+//! # use esp_hal::sha::Sha256;
 //! # use core::option::Option::None;
 //! # use nb::block;
 //! let source_data = "HELLO, ESPRESSIF!".as_bytes();
 //! let mut remaining = source_data;
-//! let mut hasher = Sha::new(peripherals.SHA, ShaMode::SHA256);
+//! let mut hasher = Sha256::new(peripherals.SHA);
 //! // Short hashes can be created by decreasing the output buffer to the
 //! // desired length
 //! let mut output = [0u8; 32];
@@ -126,7 +126,8 @@ pub trait Sha<'d, DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
 
     fn digest_length(&self) -> usize;
 
-    /// ESP32 requires that a control register to be written to calculate the final SHA hash.
+    /// ESP32 requires that a control register to be written to calculate the
+    /// final SHA hash.
     #[cfg(esp32)]
     fn load_reg(&self);
 
@@ -349,8 +350,8 @@ pub trait Sha<'d, DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
     }
 }
 
-/// This macro implements the Sha<'a, DM> trait for a specified Sha algorithm and a set of
-/// parameters
+/// This macro implements the Sha<'a, DM> trait for a specified Sha algorithm
+/// and a set of parameters
 macro_rules! impl_sha {
     ($name: ident, $mode_bits: tt, $digest_length: tt, $chunk_length: tt) => {
         pub struct $name<'d, DM: crate::Mode>(PeripheralRef<'d, SHA>, Context<DM>);
@@ -406,7 +407,9 @@ macro_rules! impl_sha {
             // ESP32 uses different registers for its operation
             #[cfg(esp32)]
             fn load_reg(&self) {
-                unsafe { self.0.sha1_load().write(|w| w.bits(1)) };
+                paste::paste! {
+                    unsafe { self.0.[< $name:lower _load >]().write(|w| w.bits(1)) };
+                }
             }
 
             #[cfg(esp32)]
@@ -418,24 +421,27 @@ macro_rules! impl_sha {
 
             #[cfg(esp32)]
             fn process_buffer(&mut self) {
-                if self.first_run {
-                    self.0.sha1_start().write(|w| unsafe { w.bits(1) });
-                    self.first_run = false;
-                } else {
-                    self.0.sha1_continue().write(|w| unsafe { w.bits(1) });
+                paste::paste! {
+                    if self.first_run {
+                        self.0.[< $name:lower _start >]().write(|w| unsafe { w.bits(1) });
+                        self.first_run = false;
+                    } else {
+                        self.0.[< $name:lower _continue >]().write(|w| unsafe { w.bits(1) });
+                    }
                 }
             }
         }
 
         /// implement digest traits if digest feature is present.
-        /// Note: digest has a blanket trait implementation for [digest::Digest] for any element
-        /// that implements FixedOutput + Default + Update + HashMarker
+        /// Note: digest has a blanket trait implementation for [digest::Digest] for any
+        /// element that implements FixedOutput + Default + Update + HashMarker
         #[cfg(feature = "digest")]
         impl<'d, DM: crate::Mode> digest::HashMarker for $name<'d, DM> {}
 
         #[cfg(feature = "digest")]
         impl<'a, DM: crate::Mode> digest::OutputSizeUser for $name<'a, DM> {
-            // We use paste to append `U` to the digest size to match a const defined in digest
+            // We use paste to append `U` to the digest size to match a const defined in
+            // digest
             paste::paste! {
             type OutputSize = digest::consts::[< U $digest_length >];
             }
