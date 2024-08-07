@@ -45,7 +45,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Build and Check
-        uses: ./.github/actions/check-packages
+        uses: ./.github/actions/check-esp-hal
         with:
           device: ${{ matrix.device.soc }}
           target: ${{ matrix.device.target }}
