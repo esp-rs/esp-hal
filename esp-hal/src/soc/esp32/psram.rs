@@ -18,7 +18,7 @@
 //!
 //! NOTE: If you want to use `PSRAM` on `ESP32` or `ESP32-S3`, it'll work only
 //! in `release` mode.
-pub const PSRAM_VADDR_START: usize = 0x3F800000 as usize;
+pub const PSRAM_VADDR_START: usize = 0x3F800000;
 
 pub fn psram_vaddr_start() -> usize {
     PSRAM_VADDR_START
@@ -786,7 +786,7 @@ pub(crate) mod utils {
                 spi.user().modify(|_, w| w.usr_command().set_bit());
                 // Load command,bit15-0 is cmd value.
                 spi.user2()
-                    .modify(|_, w| w.usr_command_value().bits(p_in_data.cmd as u16));
+                    .modify(|_, w| w.usr_command_value().bits(p_in_data.cmd));
             } else {
                 spi.user().modify(|_, w| w.usr_command().clear_bit());
                 spi.user2().modify(|_, w| w.usr_command_bitlen().bits(0));
@@ -1027,8 +1027,6 @@ pub(crate) mod utils {
                 spi_cache_dummy = SPI0_R_DIO_DUMMY_CYCLELEN;
                 spi.user1()
                     .modify(|_, w| w.usr_addr_bitlen().bits(SPI0_R_DIO_ADDR_BITSLEN as u8));
-            } else if (rd_mode_reg & (SPI_FREAD_QUAD_M | SPI_FREAD_DUAL_M)) != 0 {
-                spi_cache_dummy = SPI0_R_FAST_DUMMY_CYCLELEN;
             } else {
                 spi_cache_dummy = SPI0_R_FAST_DUMMY_CYCLELEN;
             }
