@@ -647,13 +647,40 @@ where
         // Enable the peripheral clock for the TWAI peripheral.
         T::enable_peripheral();
 
+        // Set RESET bit to 1
+        T::register_block()
+            .mode()
+            .write(|w| w.reset_mode().set_bit());
+
         // Set up the GPIO pins.
         crate::into_ref!(tx_pin, rx_pin);
         if no_transceiver {
             tx_pin.set_to_open_drain_output(crate::private::Internal);
         }
+        tx_pin.set_to_push_pull_output(crate::private::Internal);
         tx_pin.connect_peripheral_to_output(T::OUTPUT_SIGNAL, crate::private::Internal);
+        rx_pin.set_to_input(crate::private::Internal);
         rx_pin.connect_input_to_peripheral(T::INPUT_SIGNAL, crate::private::Internal);
+
+        // Set mod to listen only first
+        T::register_block()
+            .mode()
+            .modify(|_, w| w.listen_only_mode().set_bit());
+
+        // Set TEC to 0
+        T::register_block()
+            .tx_err_cnt()
+            .write(|w| unsafe { w.tx_err_cnt().bits(0) });
+
+        // Set REC to 0
+        T::register_block()
+            .rx_err_cnt()
+            .write(|w| unsafe { w.rx_err_cnt().bits(0) });
+
+        // Set EWL to 96
+        T::register_block()
+            .err_warning_limit()
+            .write(|w| unsafe { w.err_warning_limit().bits(96) });
 
         let mut cfg = TwaiConfiguration {
             peripheral: PhantomData,
