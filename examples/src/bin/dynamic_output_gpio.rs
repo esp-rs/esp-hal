@@ -10,8 +10,6 @@
 #![no_std]
 #![no_main]
 
-use core::primitive::u32;
-
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
