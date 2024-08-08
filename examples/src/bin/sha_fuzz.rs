@@ -13,7 +13,12 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl, entry, peripherals::Peripherals, prelude::*, sha::Sha,
+    clock::ClockControl,
+    entry,
+    peripherals::Peripherals,
+    prelude::*,
+    rng::Rng,
+    sha::Sha,
     system::SystemControl,
 };
 use esp_println::println;
@@ -23,12 +28,35 @@ use sha2::Digest;
 /// Dummy data used to feed the hasher.
 static CHAR_ARRAY: [u8; 4096] = [b'a'; 4096];
 
+/// Dummy random data used to feed the Sha1 hasher
+static mut SHA1_RANDOM_ARRAY: [u8; 4096] = [0u8; 4096];
+
+/// Dummy random data used to feed the Sha224 hasher
+static mut SHA224_RANDOM_ARRAY: [u8; 4096] = [0u8; 4096];
+
+/// Dummy random data used to feed the Sha256 hasher
+static mut SHA256_RANDOM_ARRAY: [u8; 4096] = [0u8; 4096];
+
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger(log::LevelFilter::Warn);
     let peripherals = Peripherals::take();
     let system = SystemControl::new(peripherals.SYSTEM);
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+    let mut rng = Rng::new(peripherals.RNG);
+
+    // Fill source data with random data
+    use core::ptr::addr_of_mut;
+    for slice in unsafe {
+        [
+            addr_of_mut!(SHA1_RANDOM_ARRAY),
+            addr_of_mut!(SHA224_RANDOM_ARRAY),
+            addr_of_mut!(SHA256_RANDOM_ARRAY),
+        ]
+    } {
+        rng.read(unsafe { &mut *slice });
+    }
 
     for i in 1..512 {
         println!("Testing with {} chars", i);
@@ -53,10 +81,12 @@ fn main() -> ! {
         }
 
         // Notes: SHA512 and SHA384 are broken for now for certain lengths.
+        #[cfg(any(esp32, esp32s2, esp32s3))]
         if !test_for_size::<esp_hal::sha::Sha384<esp_hal::Blocking>, 48>(i) {
             println!("SHA384 {} Failed", i);
             // panic!("failed");
         }
+        #[cfg(any(esp32, esp32s2, esp32s3))]
         if !test_for_size::<esp_hal::sha::Sha512<esp_hal::Blocking>, 64>(i) {
             log::error!("SHA512 {} Failed", i);
             // panic!("failed");
@@ -72,7 +102,12 @@ fn main() -> ! {
 ///
 /// Returns true if the test succeed, else false.
 fn rolling_with_digest_trait(size: usize) -> bool {
-    let source_data = unsafe { core::slice::from_raw_parts(CHAR_ARRAY.as_ptr(), size) };
+    // Use different random data for each hasher.
+    let sha1_source_data = unsafe { core::slice::from_raw_parts(SHA1_RANDOM_ARRAY.as_ptr(), size) };
+    #[cfg(not(feature = "esp32"))]
+    let sha224_source_data = unsafe { core::slice::from_raw_parts(SHA224_RANDOM_ARRAY.as_ptr(), size) };
+    let sha256_source_data =
+        unsafe { core::slice::from_raw_parts(SHA256_RANDOM_ARRAY.as_ptr(), size) };
 
     let mut sha1 = esp_hal::sha::Sha1::default();
     #[cfg(not(feature = "esp32"))]
@@ -81,10 +116,10 @@ fn rolling_with_digest_trait(size: usize) -> bool {
 
     // The Digest::update will consume the entirety of remaining. We don't need to loop until
     // remaining is fully consumed.
-    Digest::update(&mut sha1, source_data);
+    Digest::update(&mut sha1, sha1_source_data);
     #[cfg(not(feature = "esp32"))]
-    Digest::update(&mut sha224, source_data);
-    Digest::update(&mut sha256, source_data);
+    Digest::update(&mut sha224, sha224_source_data);
+    Digest::update(&mut sha256, sha256_source_data);
 
     let sha1_output: [u8; 20] = Digest::finalize(sha1).into();
     #[cfg(not(feature = "esp32"))]
@@ -94,12 +129,12 @@ fn rolling_with_digest_trait(size: usize) -> bool {
     // Calculate software result to compare against
     // Sha1
     let mut sha1_sw = sha1::Sha1::new();
-    sha1_sw.update(source_data);
+    sha1_sw.update(sha1_source_data);
     let soft_result = sha1_sw.finalize();
     for (a, b) in sha1_output.iter().zip(soft_result) {
         if *a != b {
-            log::error!("HW: {:02x?}", sha1_output);
-            log::error!("SW: {:02x?}", soft_result);
+            log::error!("SHA1 HW: {:02x?}", sha1_output);
+            log::error!("SHA1 SW: {:02x?}", soft_result);
             return false;
         }
     }
@@ -108,12 +143,12 @@ fn rolling_with_digest_trait(size: usize) -> bool {
     #[cfg(not(feature = "esp32"))]
     {
         let mut sha224_sw = sha2::Sha224::new();
-        sha224_sw.update(source_data);
+        sha224_sw.update(sha224_source_data);
         let soft_result = sha224_sw.finalize();
         for (a, b) in sha224_output.iter().zip(soft_result) {
             if *a != b {
-                log::error!("HW: {:02x?}", sha224_output);
-                log::error!("SW: {:02x?}", soft_result);
+                log::error!("SHA224 HW: {:02x?}", sha224_output);
+                log::error!("SHA224 SW: {:02x?}", soft_result);
                 return false;
             }
         }
@@ -121,12 +156,12 @@ fn rolling_with_digest_trait(size: usize) -> bool {
 
     // Sha256
     let mut sha256_sw = sha2::Sha256::new();
-    sha256_sw.update(source_data);
+    sha256_sw.update(sha256_source_data);
     let soft_result = sha256_sw.finalize();
     for (a, b) in sha256_output.iter().zip(soft_result) {
         if *a != b {
-            log::error!("HW: {:02x?}", sha256_output);
-            log::error!("SW: {:02x?}", soft_result);
+            log::error!("SHA256 HW: {:02x?}", sha256_output);
+            log::error!("SHA256 SW: {:02x?}", soft_result);
             return false;
         }
     }

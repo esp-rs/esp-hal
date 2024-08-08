@@ -120,6 +120,9 @@ impl<DM: crate::Mode> Context<DM> {
 // This implementation might fail after u32::MAX/8 bytes, to increase please see
 // ::finish() length/self.cursor usage
 pub trait Sha<'d, DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
+    /// Constant containing the name of the algorithm as a string.
+    const ALGORITHM: &'static str;
+
     /// Setup SHA Mode
     #[cfg(not(esp32))]
     fn mode_as_bits() -> u8;
@@ -421,6 +424,8 @@ macro_rules! impl_sha {
         }
 
         impl<'d> $crate::sha::Sha<'d, crate::Blocking> for $name<'d, crate::Blocking> {
+            const ALGORITHM: &'static str = stringify!($name);
+
             #[cfg(not(esp32))]
             fn mode_as_bits() -> u8 {
                 $mode_bits
