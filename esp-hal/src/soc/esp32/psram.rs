@@ -909,12 +909,7 @@ pub(crate) mod utils {
                 .modify(|r, w| w.bits(r.bits() & !(1 << 14)));
 
             // recover spi mode
-            // if !p_rx_data.is_null() {
-            //     spi.user().modify(|_, w| w.fwrite_dual().bits(mode_backup));
-            // } else {
-            //     0xf
-            // }
-            // TODO: get back to this
+            // TODO: get back to this, why writing on `0xf` address?
             set_peri_reg_bits(
                 SPI1_USER_REG,
                 if !p_rx_data.is_null() {
