@@ -36,7 +36,10 @@ use esp_hal::{
     timer::{timg::TimerGroup, ErasedTimer, OneShotTimer, PeriodicTimer},
 };
 #[cfg(not(feature = "esp32"))]
-use esp_hal::{interrupt::Priority, timer::systimer::SystemTimer};
+use esp_hal::{
+    interrupt::Priority,
+    timer::systimer::{Alarm, FrozenUnit, Periodic, SystemTimer, Target},
+};
 #[cfg(not(feature = "esp32"))]
 use esp_hal_embassy::InterruptExecutor;
 #[cfg(not(feature = "esp32"))]
@@ -121,6 +124,9 @@ mod task_invokers {
 
 // List of the functions that are ACTUALLY TESTS but are called in the invokers
 mod test_helpers {
+    #[cfg(not(feature = "esp32"))]
+    use esp_hal::timer::systimer::Target;
+
     use crate::*;
     pub async fn test_one_shot_timg() {
         let peripherals = unsafe { Peripherals::steal() };
@@ -148,7 +154,7 @@ mod test_helpers {
         let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-        let systimer = SystemTimer::new(peripherals.SYSTIMER);
+        let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
         let alarm0: ErasedTimer = systimer.alarm0.into();
         let timers = [OneShotTimer::new(alarm0)];
         let timers = mk_static!([OneShotTimer<ErasedTimer>; 1], timers);
@@ -189,7 +195,7 @@ mod test_helpers {
         let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-        let systimer = SystemTimer::new(peripherals.SYSTIMER);
+        let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
         let alarm0: ErasedTimer = systimer.alarm0.into();
         let timers = [OneShotTimer::new(alarm0)];
         let timers = mk_static!([OneShotTimer<ErasedTimer>; 1], timers);
@@ -322,7 +328,7 @@ mod test {
     fn run_test_periodic_systimer() {
         let peripherals = Peripherals::take();
 
-        let systimer = SystemTimer::new(peripherals.SYSTIMER);
+        let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Periodic>();
 
         let mut periodic = PeriodicTimer::new(systimer.alarm0);
 
@@ -384,7 +390,9 @@ mod test {
 
         let mut systimer = SystemTimer::new(&mut peripherals.SYSTIMER);
 
-        let mut periodic = PeriodicTimer::new(&mut systimer.alarm0);
+        let unit = FrozenUnit::new(&mut systimer.unit0);
+        let mut alarm: Alarm<'_, Periodic, _, 0, 0> = Alarm::new(systimer.comparator0, &unit);
+        let mut periodic = PeriodicTimer::new(&mut alarm);
 
         let t1 = esp_hal::time::current_time();
         periodic.start(1.secs()).unwrap();
@@ -400,9 +408,11 @@ mod test {
 
         core::mem::drop(periodic);
 
-        let systimer = SystemTimer::new(&mut peripherals.SYSTIMER);
+        let mut systimer = SystemTimer::new(&mut peripherals.SYSTIMER);
 
-        let timer0 = OneShotTimer::new(systimer.alarm0);
+        let unit = FrozenUnit::new(&mut systimer.unit0);
+        let alarm: Alarm<'_, Target, _, 0, 0> = Alarm::new(systimer.comparator0, &unit);
+        let timer0 = OneShotTimer::new(alarm);
 
         let t1 = esp_hal::time::current_time();
         timer0.delay_millis(500);
@@ -448,7 +458,8 @@ mod test {
         let timer0 = OneShotTimer::new(timer0);
 
         let timer1 = {
-            let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER);
+            let systimer =
+                esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
             let alarm0: ErasedTimer = systimer.alarm0.into();
             OneShotTimer::new(alarm0)
         };

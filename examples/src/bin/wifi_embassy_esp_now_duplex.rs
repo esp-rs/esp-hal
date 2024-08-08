@@ -75,7 +75,8 @@ async fn main(spawner: Spawner) -> ! {
 
     #[cfg(not(feature = "esp32"))]
     {
-        let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER);
+        let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER)
+            .split::<esp_hal::timer::systimer::Target>();
         let alarm0: ErasedTimer = systimer.alarm0.into();
         let timers = [OneShotTimer::new(alarm0)];
         let timers = mk_static!([OneShotTimer<ErasedTimer>; 1], timers);

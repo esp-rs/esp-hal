@@ -19,7 +19,7 @@ use esp_hal::{
     },
     peripherals::Peripherals,
     prelude::*,
-    timer::systimer::{etm::SysTimerEtmEvent, SystemTimer},
+    timer::systimer::{etm::SysTimerEtmEvent, Periodic, SystemTimer},
 };
 use fugit::ExtU32;
 
@@ -28,7 +28,8 @@ fn main() -> ! {
     let peripherals = Peripherals::take();
 
     let syst = SystemTimer::new(peripherals.SYSTIMER);
-    let mut alarm0 = syst.alarm0.into_periodic();
+    let syst_alarms = syst.split::<Periodic>();
+    let mut alarm0 = syst_alarms.alarm0;
     alarm0.set_period(1u32.secs());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);

@@ -33,7 +33,11 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
-    timer::{systimer::SystemTimer, ErasedTimer, OneShotTimer},
+    timer::{
+        systimer::{SystemTimer, Target},
+        ErasedTimer,
+        OneShotTimer,
+    },
 };
 use esp_println::println;
 
@@ -54,7 +58,7 @@ async fn main(_spawner: Spawner) {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let systimer = SystemTimer::new(peripherals.SYSTIMER);
+    let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
     let alarm0: ErasedTimer = systimer.alarm0.into();
     let timers = [OneShotTimer::new(alarm0)];
     let timers = mk_static!([OneShotTimer<ErasedTimer>; 1], timers);
