@@ -1,0 +1,61 @@
+name: Build and Check
+description: Build and check the esp-hal and esp-lp-hal pacakges for a specified device
+inputs:
+  device:
+    description: "Device SOC"
+    required: true
+  target:
+    description: "Target"
+    required: true
+  toolchain:
+    description: "Toolchain channel"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Set up cargo environment
+      shell: bash
+      run: |
+        # Convert the target triple from kebab-case to SCREAMING_SNAKE_CASE:
+        big_target=$(echo "${{ matrix.device.target }}" | tr [:lower:] [:upper:] | tr '-' '_')
+        # Set the *target specific* RUSTFLAGS for the current device:
+        echo "CARGO_TARGET_${big_target}_RUSTFLAGS=-Dwarnings" >> $GITHUB_ENV
+        # Linting toolchain (stable cant build documentation)
+        if [ "${{ inputs.toolchain }}" == "nightly" ]; then
+          echo "LINTING_TOOLCHAIN=+nightly" >> $GITHUB_ENV
+        else
+          echo "LINTING_TOOLCHAIN=+esp" >> $GITHUB_ENV
+        fi
+    # Clippy and docs checks
+    - name: Clippy
+      shell: bash
+      run: cargo $LINTING_TOOLCHAIN xtask lint-packages --chips ${{ inputs.device }}
+    - name: Check doc-tests
+      shell: bash
+      run: cargo $LINTING_TOOLCHAIN xtask run-doc-test esp-hal ${{ inputs.device }}
+    - name: Check documentation
+      shell: bash
+      run: cargo $LINTING_TOOLCHAIN xtask build-documentation --packages esp-hal --chips ${{ inputs.device }}
+    # Build all supported examples for the low-power core first (if present):
+    - name: Build prerequisite examples (esp-lp-hal)
+      shell: bash
+      if: contains(fromJson('["esp32c6", "esp32s2", "esp32s3"]'), inputs.device)
+      run: cargo +${{ inputs.toolchain }} xtask build-examples esp-lp-hal ${{ inputs.device }}
+    - name: Check esp-lp-hal documentation
+      shell: bash
+      if: contains(fromJson('["esp32c6", "esp32s2", "esp32s3"]'), inputs.device)
+      run: cargo $LINTING_TOOLCHAIN xtask build-documentation --packages esp-lp-hal --chips ${{ inputs.device }}
+    # Make sure we're able to build the HAL without the default features
+    # enabled:
+    - name: Build (no features)
+      shell: bash
+      run: |
+        cargo xtask build-package \
+        	--no-default-features \
+          --toolchain=${{ inputs.toolchain }} \
+        	--features=${{ inputs.device }} \
+        	--target=${{ inputs.target }} \
+        	esp-hal
+    - name: Build (examples)
+      shell: bash
+      run: cargo +${{ inputs.toolchain }} xtask build-examples esp-hal ${{ inputs.device }}

@@ -57,10 +57,12 @@
 //! # }
 //! ```
 
-use core::{fmt::Formatter, mem::size_of};
+use core::{fmt::Formatter, marker::PhantomData, mem::size_of};
 
 use fugit::HertzU32;
 
+#[cfg(feature = "async")]
+use crate::lcd_cam::asynch::LcdDoneFuture;
 use crate::{
     clock::Clocks,
     dma::{
@@ -86,28 +88,30 @@ use crate::{
     },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
+    Mode,
 };
 
-pub struct I8080<'d, CH: DmaChannel, P> {
+pub struct I8080<'d, CH: DmaChannel, P, DM: Mode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     tx_channel: ChannelTx<'d, CH>,
     tx_chain: DescriptorChain,
     _pins: P,
+    _phantom: PhantomData<DM>,
 }
 
-impl<'d, CH: DmaChannel, P: TxPins> I8080<'d, CH, P>
+impl<'d, CH: DmaChannel, P: TxPins, DM: Mode> I8080<'d, CH, P, DM>
 where
     CH::P: LcdCamPeripheral,
     P::Word: Into<u16>,
 {
     pub fn new(
-        lcd: Lcd<'d>,
+        lcd: Lcd<'d, DM>,
         mut channel: ChannelTx<'d, CH>,
         descriptors: &'static mut [DmaDescriptor],
         mut pins: P,
         frequency: HertzU32,
         config: Config,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
     ) -> Self {
         let is_2byte_mode = size_of::<P::Word>() == 2;
 
@@ -249,11 +253,12 @@ where
             tx_channel: channel,
             tx_chain: DescriptorChain::new(descriptors),
             _pins: pins,
+            _phantom: PhantomData,
         }
     }
 }
 
-impl<'d, CH: DmaChannel, P: TxPins> DmaSupport for I8080<'d, CH, P> {
+impl<'d, CH: DmaChannel, P: TxPins, DM: Mode> DmaSupport for I8080<'d, CH, P, DM> {
     fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
         let lcd_user = self.lcd_cam.lcd_user();
         // Wait until LCD_START is cleared by hardware.
@@ -266,7 +271,7 @@ impl<'d, CH: DmaChannel, P: TxPins> DmaSupport for I8080<'d, CH, P> {
     }
 }
 
-impl<'d, CH: DmaChannel, P: TxPins> DmaSupportTx for I8080<'d, CH, P> {
+impl<'d, CH: DmaChannel, P: TxPins, DM: Mode> DmaSupportTx for I8080<'d, CH, P, DM> {
     type TX = ChannelTx<'d, CH>;
 
     fn tx(&mut self) -> &mut Self::TX {
@@ -278,7 +283,7 @@ impl<'d, CH: DmaChannel, P: TxPins> DmaSupportTx for I8080<'d, CH, P> {
     }
 }
 
-impl<'d, CH: DmaChannel, P: TxPins> I8080<'d, CH, P>
+impl<'d, CH: DmaChannel, P: TxPins, DM: Mode> I8080<'d, CH, P, DM>
 where
     P::Word: Into<u16>,
 {
@@ -350,7 +355,7 @@ where
         cmd: impl Into<Command<P::Word>>,
         dummy: u8,
         data: &'t TXBUF,
-    ) -> Result<DmaTransferTx<Self>, DmaError>
+    ) -> Result<DmaTransferTx<'_, Self>, DmaError>
     where
         TXBUF: ReadBuffer,
     {
@@ -364,7 +369,35 @@ where
     }
 }
 
-impl<'d, CH: DmaChannel, P> I8080<'d, CH, P> {
+#[cfg(feature = "async")]
+impl<'d, CH: DmaChannel, P: TxPins> I8080<'d, CH, P, crate::Async>
+where
+    P::Word: Into<u16>,
+{
+    pub async fn send_dma_async<'t, TXBUF>(
+        &'t mut self,
+        cmd: impl Into<Command<P::Word>>,
+        dummy: u8,
+        data: &'t TXBUF,
+    ) -> Result<(), DmaError>
+    where
+        TXBUF: ReadBuffer,
+    {
+        let (ptr, len) = unsafe { data.read_buffer() };
+
+        self.setup_send(cmd.into(), dummy);
+        self.start_write_bytes_dma(ptr as _, len)?;
+        self.start_send();
+
+        LcdDoneFuture::new().await;
+        if self.tx_channel.has_error() {
+            return Err(DmaError::DescriptorError);
+        }
+        Ok(())
+    }
+}
+
+impl<'d, CH: DmaChannel, P, DM: Mode> I8080<'d, CH, P, DM> {
     fn setup_send<T: Copy + Into<u16>>(&mut self, cmd: Command<T>, dummy: u8) {
         // Reset LCD control unit and Async Tx FIFO
         self.lcd_cam
@@ -476,7 +509,7 @@ impl<'d, CH: DmaChannel, P> I8080<'d, CH, P> {
     }
 }
 
-impl<'d, CH: DmaChannel, P> core::fmt::Debug for I8080<'d, CH, P> {
+impl<'d, CH: DmaChannel, P, DM: Mode> core::fmt::Debug for I8080<'d, CH, P, DM> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("I8080").finish()
     }

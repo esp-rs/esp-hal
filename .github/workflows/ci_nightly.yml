@@ -1,0 +1,52 @@
+name: CI - nightly
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"
+
+env:
+  CARGO_TERM_COLOR: always
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  RUSTDOCFLAGS: -Dwarnings
+
+jobs:
+
+  esp-hal-nightly:
+    name: esp-hal | nightly (${{ matrix.device.soc }})
+    runs-on: ubuntu-latest
+    env:
+      SSID: SSID
+      PASSWORD: PASSWORD
+      STATIC_IP: 1.1.1.1
+      GATEWAY_IP: 1.1.1.1
+      HOST_IP: 1.1.1.1
+
+    strategy:
+      fail-fast: false
+      matrix:
+        device: [
+            # RISC-V devices:
+            { soc: "esp32c2", target: "riscv32imc-unknown-none-elf" },
+            { soc: "esp32c3", target: "riscv32imc-unknown-none-elf" },
+            { soc: "esp32c6", target: "riscv32imac-unknown-none-elf" },
+            { soc: "esp32h2", target: "riscv32imac-unknown-none-elf" },
+          ]
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install the Rust nightly toolchain for RISC-V devices:
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          toolchain: nightly
+          components: rust-src, clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build and Check
+        uses: ./.github/actions/check-esp-hal
+        with:
+          device: ${{ matrix.device.soc }}
+          target: ${{ matrix.device.target }}
+          toolchain: nightly

@@ -128,7 +128,6 @@ pub fn build_documentation(
 
     // Build up an array of command-line arguments to pass to `cargo`:
     let builder = CargoArgsBuilder::default()
-        .toolchain(if chip.is_xtensa() { "esp" } else { "nightly" })
         .subcommand("doc")
         .target(target)
         .features(&features)

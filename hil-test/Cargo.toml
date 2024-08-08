@@ -57,6 +57,14 @@ name    = "i2s_async"
 harness = false
 
 [[test]]
+name    = "lcd_cam_i8080"
+harness = false
+
+[[test]]
+name    = "lcd_cam_i8080_async"
+harness = false
+
+[[test]]
 name    = "spi_full_duplex"
 harness = false
 
@@ -106,6 +114,10 @@ harness = false
 name    = "uart_tx_rx_async"
 harness = false
 
+[[test]]
+name              = "embassy_timers_executors"
+harness           = false
+required-features = ["async", "embassy"]
 
 [dependencies]
 cfg-if             = "1.0.0"

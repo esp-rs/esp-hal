@@ -41,7 +41,7 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
     ///
     /// The hardware supports writing these settings in sync with certain timer
     /// events but this HAL does not expose these for now.
-    pub fn start(&mut self, timer_config: TimerClockConfig) {
+    pub fn start(&mut self, timer_config: TimerClockConfig<'_>) {
         // write prescaler and period with immediate update method
         self.cfg0().write(|w| unsafe {
             w.prescale().bits(timer_config.prescaler);

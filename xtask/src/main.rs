@@ -644,9 +644,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 fn lint_package(path: &Path, args: &[&str]) -> Result<()> {
     log::info!("Linting package: {}", path.display());
 
-    let mut builder = CargoArgsBuilder::default()
-        .toolchain("esp")
-        .subcommand("clippy"); // TODO: Is this still actually required?
+    let mut builder = CargoArgsBuilder::default().subcommand("clippy");
 
     for arg in args {
         builder = builder.arg(arg.to_string());
