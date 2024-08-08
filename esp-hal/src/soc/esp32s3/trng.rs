@@ -1,5 +1,3 @@
-const DR_REG_SYSCON_BASE: u32 = 0x60026000;
-const SYSTEM_WIFI_CLK_EN_REG: u32 = DR_REG_SYSCON_BASE + 0x14;
 const SYSTEM_WIFI_CLK_RNG_EN: u32 = 1 << 15;
 
 const I2C_SAR_ADC: u8 = 0x69;
@@ -20,14 +18,20 @@ const ADC_SARADC_DTEST_RTC_ADDR_LSB: u32 = 0;
 use crate::regi2c_write_mask;
 
 pub(crate) fn ensure_randomness() {
-    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
-    let system = unsafe { &*crate::peripherals::SYSTEM::ptr() };
-    let apb_saradc = unsafe { &*crate::peripherals::APB_SARADC::ptr() };
-    let sens = unsafe { &*crate::peripherals::SENS::ptr() };
-
     unsafe {
-        // Temporarily `WIFI_CLK_RNG_EN` is not in PACs
-        set_peri_reg_mask(SYSTEM_WIFI_CLK_EN_REG, SYSTEM_WIFI_CLK_RNG_EN);
+        let rtc_cntl = &*crate::peripherals::RTC_CNTL::ptr();
+        let system = &*crate::peripherals::SYSTEM::ptr();
+        let apb_saradc = &*crate::peripherals::APB_SARADC::ptr();
+        let sens = &*crate::peripherals::SENS::ptr();
+        let syscon = &*crate::peripherals::APB_CTRL::ptr();
+
+        // `wifi_clk_en` register is defined in a really weird way, for now just simple
+        // bit edit
+        syscon.wifi_clk_en().modify(|r, w| {
+            let current_bits = r.bits();
+            let new_bits = current_bits | SYSTEM_WIFI_CLK_RNG_EN;
+            w.bits(new_bits)
+        });
 
         // Enable 8M clock source for RNG (this is actually enough to produce strong
         // random results, but enabling the SAR ADC as well adds some insurance.)
@@ -139,11 +143,5 @@ pub fn revert_trng() {
         system
             .perip_rst_en0()
             .modify(|_, w| w.apb_saradc_rst().set_bit());
-    }
-}
-
-fn set_peri_reg_mask(reg: u32, mask: u32) {
-    unsafe {
-        (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() | mask);
     }
 }
