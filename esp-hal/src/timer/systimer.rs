@@ -887,7 +887,7 @@ mod asynch {
     }
 
     impl<'a, const COMP: u8, const UNIT: u8> AlarmFuture<'a, COMP, UNIT> {
-        pub(crate) fn new(alarm: &'a Alarm<Periodic, crate::Async, COMP, UNIT>) -> Self {
+        pub(crate) fn new(alarm: &'a Alarm<'a, Periodic, crate::Async, COMP, UNIT>) -> Self {
             alarm.clear_interrupt();
 
             let (interrupt, handler) = match COMP {
