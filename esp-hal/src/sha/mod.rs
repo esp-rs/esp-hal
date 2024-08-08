@@ -75,6 +75,8 @@ pub struct Context<DM: crate::Mode> {
     cursor: usize,
     first_run: bool,
     finished: bool,
+    /// Saved digest (SHA_H_n_REG) for interleaving operation
+    saved_digest: Option<[u8; 64]>,
     phantom: PhantomData<DM>,
 }
 
@@ -221,7 +223,34 @@ pub trait Sha<'d, DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
 
         self.finished = false;
 
+        let sha = unsafe { crate::peripherals::SHA::steal() };
+        // Restore previously saved hash for interleaving operation.
+        if let Some(ref saved_digest) = self.saved_digest.take() {
+            self.alignment_helper.volatile_write_regset(
+                #[cfg(esp32)]
+                sha.text(0).as_ptr(),
+                #[cfg(not(esp32))]
+                sha.h_mem(0).as_ptr(),
+                saved_digest,
+                64,
+            );
+        }
+
         let remaining = self.write_data(buffer)?;
+
+        // Wait until previous operation finished processing
+        while self.is_busy() {}
+        // Save the content of the current hash for interleaving operation.
+        let mut saved_digest = [0u8; 64];
+        self.alignment_helper.volatile_read_regset(
+            #[cfg(esp32)]
+            sha.text(0).as_ptr(),
+            #[cfg(not(esp32))]
+            sha.h_mem(0).as_ptr(),
+            &mut saved_digest,
+            64 / self.alignment_helper.align_size(),
+        );
+        self.saved_digest.replace(saved_digest);
 
         Ok(remaining)
     }
@@ -344,6 +373,7 @@ pub trait Sha<'d, DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
                 first_run: true,
                 finished: false,
                 alignment_helper: AlignmentHelper::default(),
+                saved_digest: None,
                 phantom: PhantomData,
             },
         )
