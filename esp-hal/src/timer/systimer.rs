@@ -69,13 +69,11 @@
 //! ```
 
 use core::{
-    cell::Cell,
     fmt::{Debug, Formatter},
     marker::PhantomData,
     ptr::addr_of_mut,
 };
 
-use critical_section::Mutex;
 use fugit::{Instant, MicrosDurationU32, MicrosDurationU64};
 
 use super::{Error, Timer as _};
@@ -92,9 +90,6 @@ use crate::{
 
 /// System Timer driver.
 pub struct SystemTimer<'d> {
-    /// Shared configuration
-    pub config: Config<'d>,
-
     /// Unit 0
     pub unit0: Unit<'d, 0>,
 
@@ -137,7 +132,6 @@ impl<'d> SystemTimer<'d> {
         etm::enable_etm();
 
         Self {
-            config: Config::new(),
             unit0: Unit::new(),
             #[cfg(not(esp32s2))]
             unit1: Unit::new(),
@@ -171,19 +165,16 @@ impl SystemTimer<'static> {
     /// type. You are encouraged to use [Alarm::new] over this very specific
     /// helper.
     pub fn split<MODE>(self) -> SysTimerAlarms<MODE, Blocking> {
-        static CONFIG: Mutex<Cell<Option<Config>>> = Mutex::new(Cell::new(None));
         static mut UNIT0: Option<Unit<'static, 0>> = None;
         let unit0 = unsafe { &mut *addr_of_mut!(UNIT0) };
-
-        critical_section::with(|cs| CONFIG.borrow(cs).set(Some(self.config)));
 
         let unit0 = unit0.insert(self.unit0);
         let unit = FrozenUnit::new(unit0);
 
         SysTimerAlarms {
-            alarm0: Alarm::new(self.comparator0, &unit, &CONFIG),
-            alarm1: Alarm::new(self.comparator1, &unit, &CONFIG),
-            alarm2: Alarm::new(self.comparator2, &unit, &CONFIG),
+            alarm0: Alarm::new(self.comparator0, &unit),
+            alarm1: Alarm::new(self.comparator1, &unit),
+            alarm2: Alarm::new(self.comparator2, &unit),
             #[cfg(not(esp32s2))]
             unit1: self.unit1,
         }
@@ -195,32 +186,19 @@ impl SystemTimer<'static> {
     /// type. You are encouraged to use [Alarm::new_async] over this very
     /// specific helper.
     pub fn split_async<MODE>(self) -> SysTimerAlarms<MODE, Async> {
-        static CONFIG: Mutex<Cell<Option<Config>>> = Mutex::new(Cell::new(None));
         static mut UNIT0: Option<Unit<'static, 0>> = None;
         let unit0 = unsafe { &mut *addr_of_mut!(UNIT0) };
-
-        critical_section::with(|cs| CONFIG.borrow(cs).set(Some(self.config)));
 
         let unit0 = unit0.insert(self.unit0);
         let unit = FrozenUnit::new(unit0);
 
         SysTimerAlarms {
-            alarm0: Alarm::new_async(self.comparator0, &unit, &CONFIG),
-            alarm1: Alarm::new_async(self.comparator1, &unit, &CONFIG),
-            alarm2: Alarm::new_async(self.comparator2, &unit, &CONFIG),
+            alarm0: Alarm::new_async(self.comparator0, &unit),
+            alarm1: Alarm::new_async(self.comparator1, &unit),
+            alarm2: Alarm::new_async(self.comparator2, &unit),
             #[cfg(not(esp32s2))]
             unit1: self.unit1,
         }
-    }
-}
-
-/// Represents the shared configuration between the units and comparators.
-#[derive(Debug)]
-pub struct Config<'d>(PhantomData<&'d ()>);
-
-impl<'d> Config<'d> {
-    fn new() -> Self {
-        Self(PhantomData)
     }
 }
 
@@ -240,50 +218,52 @@ impl<'d, const CHANNEL: u8> Unit<'d, CHANNEL> {
     /// Configures when this counter can run.
     /// It can be configured to stall or continue running when CPU stalls
     /// or enters on-chip-debugging mode
-    pub fn configure(&self, _config: &mut Config, config: UnitConfig) {
+    pub fn configure(&self, config: UnitConfig) {
         let systimer = unsafe { &*SYSTIMER::ptr() };
         let conf = systimer.conf();
 
-        conf.modify(|_, w| match config {
-            UnitConfig::Disabled => match CHANNEL {
-                0 => w.timer_unit0_work_en().clear_bit(),
-                1 => w.timer_unit1_work_en().clear_bit(),
-                _ => unreachable!(),
-            },
-            UnitConfig::DisabledIfCpuIsStalled(cpu) => match CHANNEL {
-                0 => w
-                    .timer_unit0_work_en()
-                    .set_bit()
-                    .timer_unit0_core0_stall_en()
-                    .bit(cpu == Cpu::ProCpu)
-                    .timer_unit0_core1_stall_en()
-                    .bit(cpu != Cpu::ProCpu),
-                1 => w
-                    .timer_unit1_work_en()
-                    .set_bit()
-                    .timer_unit1_core0_stall_en()
-                    .bit(cpu == Cpu::ProCpu)
-                    .timer_unit1_core1_stall_en()
-                    .bit(cpu != Cpu::ProCpu),
-                _ => unreachable!(),
-            },
-            UnitConfig::Enabled => match CHANNEL {
-                0 => w
-                    .timer_unit0_work_en()
-                    .set_bit()
-                    .timer_unit0_core0_stall_en()
-                    .clear_bit()
-                    .timer_unit0_core1_stall_en()
-                    .clear_bit(),
-                1 => w
-                    .timer_unit1_work_en()
-                    .set_bit()
-                    .timer_unit1_core0_stall_en()
-                    .clear_bit()
-                    .timer_unit1_core1_stall_en()
-                    .clear_bit(),
-                _ => unreachable!(),
-            },
+        critical_section::with(|_| {
+            conf.modify(|_, w| match config {
+                UnitConfig::Disabled => match CHANNEL {
+                    0 => w.timer_unit0_work_en().clear_bit(),
+                    1 => w.timer_unit1_work_en().clear_bit(),
+                    _ => unreachable!(),
+                },
+                UnitConfig::DisabledIfCpuIsStalled(cpu) => match CHANNEL {
+                    0 => w
+                        .timer_unit0_work_en()
+                        .set_bit()
+                        .timer_unit0_core0_stall_en()
+                        .bit(cpu == Cpu::ProCpu)
+                        .timer_unit0_core1_stall_en()
+                        .bit(cpu != Cpu::ProCpu),
+                    1 => w
+                        .timer_unit1_work_en()
+                        .set_bit()
+                        .timer_unit1_core0_stall_en()
+                        .bit(cpu == Cpu::ProCpu)
+                        .timer_unit1_core1_stall_en()
+                        .bit(cpu != Cpu::ProCpu),
+                    _ => unreachable!(),
+                },
+                UnitConfig::Enabled => match CHANNEL {
+                    0 => w
+                        .timer_unit0_work_en()
+                        .set_bit()
+                        .timer_unit0_core0_stall_en()
+                        .clear_bit()
+                        .timer_unit0_core1_stall_en()
+                        .clear_bit(),
+                    1 => w
+                        .timer_unit1_work_en()
+                        .set_bit()
+                        .timer_unit1_core0_stall_en()
+                        .clear_bit()
+                        .timer_unit1_core1_stall_en()
+                        .clear_bit(),
+                    _ => unreachable!(),
+                },
+            });
         });
     }
 
@@ -377,29 +357,23 @@ impl<'d, const CHANNEL: u8> Comparator<'d, CHANNEL> {
 
     /// Enables/disables the comparator. If enabled, this means
     /// it will generate interrupt based on its configuration.
-    ///
-    /// Note: This requires an exclusive reference to config as the register
-    /// is shared between all units and comparators.
-    #[cfg(not(esp32s2))]
-    pub fn set_enable(&self, _config: &mut Config<'d>, enable: bool) {
-        let systimer = unsafe { &*SYSTIMER::ptr() };
-        systimer.conf().modify(|_, w| match CHANNEL {
-            0 => w.target0_work_en().bit(enable),
-            1 => w.target1_work_en().bit(enable),
-            2 => w.target2_work_en().bit(enable),
-            _ => unreachable!(),
-        });
-    }
-
-    /// Enables/disables the comparator. If enabled, this means
-    /// it will generate interrupt based on its configuration.
-    #[cfg(esp32s2)]
     pub fn set_enable(&self, enable: bool) {
-        let tconf = unsafe {
-            let systimer = &*SYSTIMER::ptr();
-            systimer.target_conf(CHANNEL as usize)
-        };
-        tconf.modify(|_r, w| w.work_en().bit(enable));
+        let systimer = unsafe { &*SYSTIMER::ptr() };
+
+        #[cfg(not(esp32s2))]
+        critical_section::with(|_| {
+            systimer.conf().modify(|_, w| match CHANNEL {
+                0 => w.target0_work_en().bit(enable),
+                1 => w.target1_work_en().bit(enable),
+                2 => w.target2_work_en().bit(enable),
+                _ => unreachable!(),
+            });
+        });
+
+        #[cfg(esp32s2)]
+        systimer
+            .target_conf(CHANNEL as usize)
+            .modify(|_r, w| w.work_en().bit(enable));
     }
 
     /// Returns true if the comparator has been enabled. This means
@@ -617,7 +591,6 @@ where
 {
     comparator: Comparator<'d, COMP>,
     unit: &'d Unit<'d, UNIT>,
-    config: &'d Mutex<Cell<Option<Config<'d>>>>,
     _pd: PhantomData<(MODE, DM)>,
 }
 
@@ -635,15 +608,10 @@ where
 
 impl<'d, T, const COMP: u8, const UNIT: u8> Alarm<'d, T, Blocking, COMP, UNIT> {
     /// Creates a new alarm from a comparator and unit, in blocking mode.
-    pub fn new(
-        comparator: Comparator<'d, COMP>,
-        unit: &FrozenUnit<'d, UNIT>,
-        config: &'d Mutex<Cell<Option<Config<'d>>>>,
-    ) -> Self {
+    pub fn new(comparator: Comparator<'d, COMP>, unit: &FrozenUnit<'d, UNIT>) -> Self {
         Self {
             comparator,
             unit: unit.borrow(),
-            config,
             _pd: PhantomData,
         }
     }
@@ -651,15 +619,10 @@ impl<'d, T, const COMP: u8, const UNIT: u8> Alarm<'d, T, Blocking, COMP, UNIT> {
 
 impl<'d, T, const COMP: u8, const UNIT: u8> Alarm<'d, T, Async, COMP, UNIT> {
     /// Creates a new alarm from a comparator and unit, in async mode.
-    pub fn new_async(
-        comparator: Comparator<'d, COMP>,
-        unit: &FrozenUnit<'d, UNIT>,
-        config: &'d Mutex<Cell<Option<Config<'d>>>>,
-    ) -> Self {
+    pub fn new_async(comparator: Comparator<'d, COMP>, unit: &FrozenUnit<'d, UNIT>) -> Self {
         Self {
             comparator,
             unit: unit.0,
-            config,
             _pd: PhantomData,
         }
     }
@@ -688,14 +651,6 @@ where
 
         self.comparator.set_mode(ComparatorMode::Target);
         self.comparator.set_target(timestamp);
-        #[cfg(not(esp32s2))]
-        critical_section::with(|cs| {
-            let config_cell = self.config.borrow(cs);
-            let mut config = config_cell.take().unwrap();
-            self.comparator.set_enable(&mut config, true);
-            config_cell.set(Some(config));
-        });
-        #[cfg(esp32s2)]
         self.comparator.set_enable(true);
     }
 
@@ -717,7 +672,6 @@ where
         Alarm {
             comparator: self.comparator,
             unit: self.unit,
-            config: self.config,
             _pd: PhantomData,
         }
     }
@@ -741,15 +695,6 @@ where
 
         self.comparator.set_mode(ComparatorMode::Period);
         self.comparator.set_period(ticks);
-
-        #[cfg(not(esp32s2))]
-        critical_section::with(|cs| {
-            let config_cell = self.config.borrow(cs);
-            let mut config = config_cell.take().unwrap();
-            self.comparator.set_enable(&mut config, true);
-            config_cell.set(Some(config));
-        });
-        #[cfg(esp32s2)]
         self.comparator.set_enable(true);
     }
 
@@ -758,7 +703,6 @@ where
         Alarm {
             comparator: self.comparator,
             unit: self.unit,
-            config: self.config,
             _pd: PhantomData,
         }
     }
@@ -776,26 +720,10 @@ where
     DM: Mode,
 {
     fn start(&self) {
-        #[cfg(not(esp32s2))]
-        critical_section::with(|cs| {
-            let config_cell = self.config.borrow(cs);
-            let mut config = config_cell.take().unwrap();
-            self.comparator.set_enable(&mut config, true);
-            config_cell.set(Some(config));
-        });
-        #[cfg(esp32s2)]
         self.comparator.set_enable(true);
     }
 
     fn stop(&self) {
-        #[cfg(not(esp32s2))]
-        critical_section::with(|cs| {
-            let config_cell = self.config.borrow(cs);
-            let mut config = config_cell.take().unwrap();
-            self.comparator.set_enable(&mut config, false);
-            config_cell.set(Some(config));
-        });
-        #[cfg(esp32s2)]
         self.comparator.set_enable(false);
     }
 

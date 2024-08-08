@@ -7,7 +7,7 @@
 #![no_std]
 #![no_main]
 
-use core::cell::{Cell, RefCell};
+use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_backtrace as _;
@@ -18,7 +18,7 @@ use esp_hal::{
     peripherals::{Interrupt, Peripherals},
     prelude::*,
     system::SystemControl,
-    timer::systimer::{Alarm, Config, FrozenUnit, Periodic, SystemTimer, Target, Unit},
+    timer::systimer::{Alarm, FrozenUnit, Periodic, SystemTimer, Target, Unit},
     Blocking,
 };
 use esp_println::println;
@@ -41,17 +41,15 @@ fn main() -> ! {
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
     println!("SYSTIMER Current value = {}", SystemTimer::now());
 
-    static CONFIG: Mutex<Cell<Option<Config>>> = Mutex::new(Cell::new(None));
     static UNIT0: StaticCell<Unit<'static, 0>> = StaticCell::new();
 
     let unit0 = UNIT0.init(systimer.unit0);
-    critical_section::with(|cs| CONFIG.borrow(cs).set(Some(systimer.config)));
 
     let frozen_unit = FrozenUnit::new(unit0);
 
-    let alarm0 = Alarm::new(systimer.comparator0, &frozen_unit, &CONFIG);
-    let alarm1 = Alarm::new(systimer.comparator1, &frozen_unit, &CONFIG);
-    let alarm2 = Alarm::new(systimer.comparator2, &frozen_unit, &CONFIG);
+    let alarm0 = Alarm::new(systimer.comparator0, &frozen_unit);
+    let alarm1 = Alarm::new(systimer.comparator1, &frozen_unit);
+    let alarm2 = Alarm::new(systimer.comparator2, &frozen_unit);
 
     critical_section::with(|cs| {
         let alarm0 = alarm0.into_periodic();
