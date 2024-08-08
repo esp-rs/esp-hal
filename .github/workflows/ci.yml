@@ -40,7 +40,6 @@ jobs:
   esp-hal:
     name: esp-hal (${{ matrix.device.soc }})
     runs-on: ubuntu-latest
-    continue-on-error: ${{ matrix.device.toolchain == 'nightly' }}
     env:
       SSID: SSID
       PASSWORD: PASSWORD
@@ -199,7 +198,7 @@ jobs:
         uses: dtolnay/rust-toolchain@v1
         with:
           target: ${{ matrix.target.rust-target }}
-          toolchain: nightly
+          toolchain: stable
           components: rust-src
       # Install the Rust toolchain for Xtensa devices:
       - if: contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.target.soc)
