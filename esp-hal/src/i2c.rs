@@ -131,73 +131,6 @@ impl embedded_hal::i2c::Error for Error {
     }
 }
 
-// This should really be defined in the PAC, but the PAC only
-// defines the "command" field as a 16-bit field :-(
-bitfield::bitfield! {
-    struct CommandReg(u32);
-    cmd_done, _: 31;
-    from into Opcode, opcode, set_opcode: 13, 11;
-    from into Ack, ack_value, set_ack_value: 10, 10;
-    from into Ack, ack_exp, set_ack_exp: 9, 9;
-    ack_check_en, set_ack_check_en: 8;
-    length, set_length: 7, 0;
-}
-
-impl CommandReg {
-    fn bits(&self) -> u32 {
-        self.0
-    }
-
-    fn new_start() -> Self {
-        let mut cmd = Self(0);
-        cmd.set_opcode(Opcode::RStart);
-        cmd
-    }
-
-    fn new_end() -> Self {
-        let mut cmd = Self(0);
-        cmd.set_opcode(Opcode::End);
-        cmd
-    }
-
-    fn new_stop() -> Self {
-        let mut cmd = Self(0);
-        cmd.set_opcode(Opcode::Stop);
-        cmd
-    }
-
-    fn new_write(ack_exp: Ack, ack_check_en: bool, length: u8) -> Self {
-        let mut cmd = Self(0);
-        cmd.set_opcode(Opcode::Write);
-        cmd.set_ack_exp(ack_exp);
-        cmd.set_ack_check_en(ack_check_en);
-        cmd.set_length(length as u32);
-        cmd
-    }
-
-    fn new_read(ack_value: Ack, length: u8) -> Self {
-        let mut cmd = Self(0);
-        cmd.set_opcode(Opcode::Read);
-        cmd.set_ack_value(ack_value);
-        cmd.set_length(length as u32);
-        cmd
-    }
-}
-
-#[cfg(feature = "debug")]
-impl core::fmt::Debug for CommandReg {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("CommandReg")
-            .field("cmd_done", &self.cmd_done())
-            .field("opcode", &self.opcode())
-            .field("ack_value", &self.ack_value())
-            .field("ack_exp", &self.ack_exp())
-            .field("ack_check_en", &self.ack_check_en())
-            .field("length", &self.length())
-            .finish()
-    }
-}
-
 /// A generic I2C Command
 #[cfg_attr(feature = "debug", derive(Debug))]
 enum Command {
@@ -221,22 +154,6 @@ enum Command {
         /// while the minimum is 1.
         length: u8,
     },
-}
-
-impl From<Command> for CommandReg {
-    fn from(c: Command) -> Self {
-        match c {
-            Command::Start => CommandReg::new_start(),
-            Command::End => CommandReg::new_end(),
-            Command::Stop => CommandReg::new_stop(),
-            Command::Write {
-                ack_exp,
-                ack_check_en,
-                length,
-            } => CommandReg::new_write(ack_exp, ack_check_en, length),
-            Command::Read { ack_value, length } => CommandReg::new_read(ack_value, length),
-        }
-    }
 }
 
 enum OperationType {
@@ -1739,8 +1656,12 @@ pub trait Instance: crate::private::Sealed {
         //       but does not seem to clear the done bit! So we don't check the done
         //       status of an end command
         for cmd_reg in self.register_block().comd_iter() {
-            let cmd = CommandReg(cmd_reg.read().bits());
-            if cmd.bits() != 0x0 && cmd.opcode() != Opcode::End && !cmd.cmd_done() {
+            let cmd = cmd_reg.read();
+
+            if cmd.bits() != 0x0
+                && cmd.opcode().bits() != (OPCODE_END as u8)
+                && !cmd.command_done().bit_is_set()
+            {
                 return Err(Error::ExecIncomplete);
             }
         }
@@ -2098,8 +2019,40 @@ where
     I: Iterator<Item = &'a COMD>,
 {
     let cmd = cmd_iterator.next().ok_or(Error::CommandNrExceeded)?;
-    let cmd_reg: CommandReg = command.into();
-    cmd.write(|w| unsafe { w.bits(cmd_reg.bits()) });
+    unsafe {
+        match command {
+            Command::Start => {
+                cmd.write(|w| w.opcode().rstart());
+            }
+            Command::Stop => {
+                cmd.write(|w| w.opcode().stop());
+            }
+            Command::End => {
+                cmd.write(|w| w.opcode().end());
+            }
+            Command::Write {
+                ack_exp,
+                ack_check_en,
+                length,
+            } => {
+                cmd.write(|w| {
+                    w.opcode().write();
+                    w.ack_exp().bit(ack_exp == Ack::Nack);
+                    w.ack_check_en().bit(ack_check_en);
+                    w.byte_num().bits(length);
+                    w
+                });
+            }
+            Command::Read { ack_value, length } => {
+                cmd.write(|w| {
+                    w.opcode().read();
+                    w.ack_value().bit(ack_value == Ack::Nack);
+                    w.byte_num().bits(length);
+                    w
+                });
+            }
+        }
+    }
     Ok(())
 }
 
