@@ -676,29 +676,15 @@ fn run_elfs(args: RunElfArgs) -> Result<()> {
 
         log::info!("Running test '{}' for '{}'", elf_name, args.chip);
 
-        let command = if args.chip == Chip::Esp32 {
+        let command = if args.chip == Chip::Esp32c2 {
             Command::new("probe-rs")
                 .arg("run")
-                .arg("--chip")
-                .arg("esp32-3.3v")
-                .arg(elf_path)
-                .output()?
-        } else if args.chip == Chip::Esp32c2 {
-            Command::new("probe-rs")
-                .arg("run")
-                .arg("--chip")
-                .arg(args.chip.to_string())
                 .arg("--speed")
                 .arg("15000")
                 .arg(elf_path)
                 .output()?
         } else {
-            Command::new("probe-rs")
-                .arg("run")
-                .arg("--chip")
-                .arg(args.chip.to_string())
-                .arg(elf_path)
-                .output()?
+            Command::new("probe-rs").arg("run").arg(elf_path).output()?
         };
 
         println!(
