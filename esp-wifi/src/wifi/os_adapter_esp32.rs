@@ -4,12 +4,7 @@
 
 use crate::hal::{interrupt, peripherals};
 
-const DR_REG_DPORT_BASE: u32 = 0x3ff00000;
-const DPORT_WIFI_CLK_EN_REG: u32 = DR_REG_DPORT_BASE + 0x0CC;
-const DPORT_WIFI_CLK_WIFI_EN: u32 = 0x00000406;
-const DPORT_WIFI_CLK_WIFI_EN_V: u32 = 0x406;
-const DPORT_WIFI_CLK_WIFI_EN_S: u32 = 0;
-const DPORT_WIFI_CLK_WIFI_EN_M: u32 = (DPORT_WIFI_CLK_WIFI_EN_V) << (DPORT_WIFI_CLK_WIFI_EN_S);
+const DPORT_WIFI_CLK_WIFI_EN_M: u32 = 0x406;
 
 pub(crate) fn chip_ints_on(mask: u32) {
     unsafe { crate::hal::xtensa_lx::interrupt::enable_mask(mask) };
@@ -56,15 +51,21 @@ pub(crate) unsafe extern "C" fn set_intr(
 }
 
 pub(crate) unsafe extern "C" fn wifi_clock_enable() {
-    let ptr = DPORT_WIFI_CLK_EN_REG as *mut u32;
-    let old = ptr.read_volatile();
-    ptr.write_volatile(old | DPORT_WIFI_CLK_WIFI_EN_M);
+    let dport = &*crate::hal::peripherals::SYSTEM::ptr();
+    dport.wifi_clk_en().modify(|r, w| {
+        let old = r.bits();
+        let new_bits = old | DPORT_WIFI_CLK_WIFI_EN_M;
+        w.bits(new_bits)
+    });
 }
 
 pub(crate) unsafe extern "C" fn wifi_clock_disable() {
-    let ptr = DPORT_WIFI_CLK_EN_REG as *mut u32;
-    let old = ptr.read_volatile();
-    ptr.write_volatile(old & !DPORT_WIFI_CLK_WIFI_EN_M);
+    let dport = &*crate::hal::peripherals::SYSTEM::ptr();
+    dport.wifi_clk_en().modify(|r, w| {
+        let old = r.bits();
+        let new_bits = old & !DPORT_WIFI_CLK_WIFI_EN_M;
+        w.bits(new_bits)
+    });
 }
 
 /// **************************************************************************
