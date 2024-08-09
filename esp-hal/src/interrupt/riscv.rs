@@ -733,7 +733,7 @@ mod plic {
             .read()
             .cpu_mxint_pri()
             .bits();
-        core::mem::transmute::<u8, Priority>(prio as u8)
+        core::mem::transmute::<u8, Priority>(prio)
     }
     #[no_mangle]
     #[link_section = ".trap"]
