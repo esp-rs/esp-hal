@@ -31,7 +31,7 @@ embedded-io-async   = "0.6.1"
 embedded-storage    = "0.3.1"
 esp-alloc           = { path = "../esp-alloc" }
 esp-backtrace       = { path = "../esp-backtrace", features = ["exception-handler", "panic-handler", "println"] }
-esp-hal             = { path = "../esp-hal", features = ["log"] }
+esp-hal             = { path = "../esp-hal", features = ["log", "digest"] }
 esp-hal-embassy     = { path = "../esp-hal-embassy", optional = true }
 esp-hal-smartled    = { path = "../esp-hal-smartled", optional = true }
 esp-ieee802154      = { path = "../esp-ieee802154", optional = true }
@@ -49,6 +49,7 @@ nb                  = "1.1.0"
 p192                = { version = "0.13.0", default-features = false, features = ["arithmetic"] }
 p256                = { version = "0.13.2", default-features = false, features = ["arithmetic"] }
 portable-atomic     = { version = "1.6.0",  default-features = false }
+sha1                = { version = "0.10.6", default-features = false }
 sha2                = { version = "0.10.8", default-features = false }
 smart-leds          = "0.4.0"
 smoltcp             = { version = "0.11.0", default-features = false, features = [ "medium-ethernet", "socket-raw"] }
