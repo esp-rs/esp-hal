@@ -6,13 +6,10 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]
-aes                 = "0.8.4"
 aligned             = { version = "0.4.2", optional = true }
 bleps               = { git = "https://github.com/bjoernQ/bleps", package = "bleps", rev = "a5148d8ae679e021b78f53fd33afb8bb35d0b62e", features = [ "macros", "async"] }
 cfg-if              = "1.0.0"
 critical-section    = "1.1.2"
-crypto-bigint       = { version = "0.5.5", default-features = false }
-elliptic-curve      = { version = "0.13.8", default-features = false, features = ["sec1"] }
 embassy-executor    = { version = "0.5.0", features = ["task-arena-size-40960"] }
 embassy-futures     = "0.1.1"
 embassy-net = { version = "0.4.0", features = [ "tcp", "udp", "dhcpv4", "medium-ethernet"] }
@@ -33,6 +30,7 @@ esp-alloc           = { path = "../esp-alloc" }
 esp-backtrace       = { path = "../esp-backtrace", features = ["exception-handler", "panic-handler", "println"] }
 esp-hal             = { path = "../esp-hal", features = ["log"] }
 esp-hal-embassy     = { path = "../esp-hal-embassy", optional = true }
+esp-rustls-provider = { path = "../esp-rustls-provider", optional = true }
 esp-hal-smartled    = { path = "../esp-hal-smartled", optional = true }
 esp-ieee802154      = { path = "../esp-ieee802154", optional = true }
 esp-println         = { path = "../esp-println", features = ["log"] }
@@ -40,14 +38,12 @@ esp-storage         = { path = "../esp-storage", optional = true }
 esp-wifi            = { path = "../esp-wifi", optional = true }
 fugit               = "0.3.7"
 heapless            = "0.8.0"
-hex-literal         = "0.4.1"
 hmac                = { version = "0.12.1", default-features = false }
 ieee802154          = "0.6.1"
 lis3dh-async        = "0.9.3"
 log                 = "0.4.22"
 nb                  = "1.1.0"
-p192                = { version = "0.13.0", default-features = false, features = ["arithmetic"] }
-p256                = { version = "0.13.2", default-features = false, features = ["arithmetic"] }
+ntp-nostd           = { version = "0.0.1", optional = true }
 portable-atomic     = { version = "1.6.0",  default-features = false }
 sha2                = { version = "0.10.8", default-features = false }
 smart-leds          = "0.4.0"
