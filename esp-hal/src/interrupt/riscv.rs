@@ -741,7 +741,7 @@ mod plic {
         use super::mcause;
         let plic = &*crate::peripherals::PLIC_MX::PTR;
 
-        let interrupt_id: usize = unwrap!(mcause::read().code().try_into()); // MSB is whether its exception or interrupt.
+        let interrupt_id: usize = mcause::read().code(); // MSB is whether its exception or interrupt.
         let interrupt_priority = plic.mxint_pri(interrupt_id).read().cpu_mxint_pri().bits();
 
         let prev_interrupt_priority = plic.mxint_thresh().read().cpu_mxint_thresh().bits();
