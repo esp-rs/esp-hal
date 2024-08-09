@@ -131,9 +131,9 @@ fn init_clocks() {
         pmu.hp_active_icg_modem()
             .modify(|_, w| w.hp_active_dig_icg_modem_code().bits(2));
         pmu.imm_modem_icg()
-            .modify(|_, w| w.update_dig_icg_modem_en().set_bit());
+            .write(|w| w.update_dig_icg_modem_en().set_bit());
         pmu.imm_sleep_sysclk()
-            .modify(|_, w| w.update_dig_icg_switch().set_bit());
+            .write(|w| w.update_dig_icg_switch().set_bit());
 
         (*esp32h2::MODEM_LPCON::PTR).clk_conf().modify(|_, w| {
             w.clk_i2c_mst_en()
