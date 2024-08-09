@@ -180,6 +180,12 @@ opsram-8m = []
 ## Use externally connected Octal RAM (16MB).
 opsram-16m = []
 
+#! ### DMA Feature Flags
+## Use a DMA chunk size that is a multiple of 32 bytes.
+dma4064 = []
+## Use a DMA chunk size that is a multiple of 64 bytes.
+dma4032 = []
+
 # This feature is intended for testing; you probably don't want to enable it:
 ci = ["async", "embedded-hal-02", "embedded-io", "ufmt", "defmt", "bluetooth", "place-spi-driver-in-ram"]
 
