@@ -75,7 +75,10 @@ pub struct Context<DM: crate::Mode> {
     cursor: usize,
     first_run: bool,
     finished: bool,
+    /// Buffered bytes (SHA_M_n_REG) to be processed.
+    buffer: [u32; 32],
     /// Saved digest (SHA_H_n_REG) for interleaving operation
+    #[cfg(not(esp32))]
     saved_digest: Option<[u8; 64]>,
     phantom: PhantomData<DM>,
 }
@@ -160,6 +163,14 @@ pub trait Sha<'d, DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
             sha.start().write(|w| unsafe { w.bits(1) });
             self.first_run = false;
         } else {
+            // Restore previously saved hash if interleaving operation
+            if let Some(ref saved_digest) = self.saved_digest.take() {
+                self.alignment_helper.volatile_write_regset(
+                    sha.h_mem(0).as_ptr(),
+                    saved_digest,
+                    64,
+                );
+            }
             // SET SHA_CONTINUE_REG
             sha.continue_().write(|w| unsafe { w.bits(1) });
         }
@@ -172,6 +183,18 @@ pub trait Sha<'d, DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
         }
 
         let chunk_len = self.chunk_length();
+
+        // Flush aligned buffer in memory before flushing alignment_helper
+        unsafe {
+            core::ptr::copy_nonoverlapping(
+                self.buffer.as_ptr(),
+                #[cfg(esp32)]
+                sha.text(0).as_ptr(),
+                #[cfg(not(esp32))]
+                sha.m_mem(0).as_ptr(),
+                32,
+            );
+        }
 
         let ctx = self.deref_mut();
         let flushed = ctx.alignment_helper.flush_to(
@@ -200,11 +223,9 @@ pub trait Sha<'d, DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
         let chunk_len = self.chunk_length();
 
         let ctx = self.deref_mut();
+        // Buffer the incoming bytes into u32 aligned words.
         let (remaining, bound_reached) = ctx.alignment_helper.aligned_volatile_copy(
-            #[cfg(esp32)]
-            sha.text(0).as_ptr(),
-            #[cfg(not(esp32))]
-            sha.m_mem(0).as_ptr(),
+            ctx.buffer.as_mut_ptr(),
             incoming,
             chunk_len / ctx.alignment_helper.align_size(),
             mod_cursor / ctx.alignment_helper.align_size(),
@@ -212,8 +233,33 @@ pub trait Sha<'d, DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
 
         self.cursor = self.cursor.wrapping_add(incoming.len() - remaining.len());
 
+        // If bound reached we write the buffer to memory and process it.
         if bound_reached {
+            unsafe {
+                core::ptr::copy_nonoverlapping(
+                    self.buffer.as_ptr(),
+                    #[cfg(esp32)]
+                    sha.text(0).as_ptr(),
+                    #[cfg(not(esp32))]
+                    sha.m_mem(0).as_ptr(),
+                    32,
+                );
+            }
             self.process_buffer();
+
+            // Wait until buffer has completely processed
+            while self.is_busy() {}
+            // Save the content of the current hash for interleaving operation.
+            #[cfg(not(esp32))]
+            {
+                let mut saved_digest = [0u8; 64];
+                self.alignment_helper.volatile_read_regset(
+                    sha.h_mem(0).as_ptr(),
+                    &mut saved_digest,
+                    64 / self.alignment_helper.align_size(),
+                );
+                self.saved_digest.replace(saved_digest);
+            }
         }
 
         Ok(remaining)
@@ -226,34 +272,7 @@ pub trait Sha<'d, DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
 
         self.finished = false;
 
-        let sha = unsafe { crate::peripherals::SHA::steal() };
-        // Restore previously saved hash for interleaving operation.
-        if let Some(ref saved_digest) = self.saved_digest.take() {
-            self.alignment_helper.volatile_write_regset(
-                #[cfg(esp32)]
-                sha.text(0).as_ptr(),
-                #[cfg(not(esp32))]
-                sha.h_mem(0).as_ptr(),
-                saved_digest,
-                64,
-            );
-        }
-
         let remaining = self.write_data(buffer)?;
-
-        // Wait until previous operation finished processing
-        while self.is_busy() {}
-        // Save the content of the current hash for interleaving operation.
-        let mut saved_digest = [0u8; 64];
-        self.alignment_helper.volatile_read_regset(
-            #[cfg(esp32)]
-            sha.text(0).as_ptr(),
-            #[cfg(not(esp32))]
-            sha.h_mem(0).as_ptr(),
-            &mut saved_digest,
-            64 / self.alignment_helper.align_size(),
-        );
-        self.saved_digest.replace(saved_digest);
 
         Ok(remaining)
     }
@@ -376,6 +395,8 @@ pub trait Sha<'d, DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
                 first_run: true,
                 finished: false,
                 alignment_helper: AlignmentHelper::default(),
+                buffer: [0u32; 32],
+                #[cfg(not(esp32))]
                 saved_digest: None,
                 phantom: PhantomData,
             },

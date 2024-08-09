@@ -39,7 +39,7 @@ static mut SHA256_RANDOM_ARRAY: [u8; 4096] = [0u8; 4096];
 
 #[entry]
 fn main() -> ! {
-    esp_println::logger::init_logger(log::LevelFilter::Warn);
+    esp_println::logger::init_logger(log::LevelFilter::Error);
     let peripherals = Peripherals::take();
     let system = SystemControl::new(peripherals.SYSTEM);
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
@@ -58,38 +58,36 @@ fn main() -> ! {
         rng.read(unsafe { &mut *slice });
     }
 
-    for i in 1..512 {
+    for i in 1..=1024 {
         println!("Testing with {} chars", i);
 
+        if !rolling_with_sha_trait(i) {
+            panic!("Rolling sha {} Failed", i);
+        }
+
         if !rolling_with_digest_trait(i) {
-            println!("Rolling digest {} Failed", i);
-            // panic!("failed");
+            panic!("Rolling digest {} Failed", i);
         }
 
         if !test_for_size::<esp_hal::sha::Sha1<esp_hal::Blocking>, 20>(i) {
-            println!("SHA1 {} Failed", i);
-            // panic!("failed");
+            panic!("SHA1 {} Failed", i);
         }
         #[cfg(not(feature = "esp32"))]
         if !test_for_size::<esp_hal::sha::Sha224<esp_hal::Blocking>, 28>(i) {
-            println!("SHA224 {} Failed", i);
-            // panic!("failed");
+            panic!("SHA224 {} Failed", i);
         }
         if !test_for_size::<esp_hal::sha::Sha256<esp_hal::Blocking>, 32>(i) {
-            println!("SHA256 {} Failed", i);
-            // panic!("failed");
+            panic!("SHA256 {} Failed", i);
         }
 
         // Notes: SHA512 and SHA384 are broken for now for certain lengths.
-        #[cfg(any(esp32, esp32s2, esp32s3))]
+        #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
         if !test_for_size::<esp_hal::sha::Sha384<esp_hal::Blocking>, 48>(i) {
-            println!("SHA384 {} Failed", i);
-            // panic!("failed");
+            log::error!("SHA384 {} Failed", i);
         }
-        #[cfg(any(esp32, esp32s2, esp32s3))]
+        #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
         if !test_for_size::<esp_hal::sha::Sha512<esp_hal::Blocking>, 64>(i) {
             log::error!("SHA512 {} Failed", i);
-            // panic!("failed");
         }
     }
 
@@ -101,11 +99,96 @@ fn main() -> ! {
 /// A rolling test that loops between hasher for every step to test interleaving.
 ///
 /// Returns true if the test succeed, else false.
+fn rolling_with_sha_trait(size: usize) -> bool {
+    // Use different random data for each hasher.
+    let sha1_source_data = unsafe { core::slice::from_raw_parts(SHA1_RANDOM_ARRAY.as_ptr(), size) };
+    #[cfg(not(feature = "esp32"))]
+    let sha224_source_data =
+        unsafe { core::slice::from_raw_parts(SHA224_RANDOM_ARRAY.as_ptr(), size) };
+    let sha256_source_data =
+        unsafe { core::slice::from_raw_parts(SHA256_RANDOM_ARRAY.as_ptr(), size) };
+
+    let mut sha1_remaining = sha1_source_data;
+    #[cfg(not(feature = "esp32"))]
+    let mut sha224_remaining = sha224_source_data;
+    let mut sha256_remaining = sha256_source_data;
+
+    let mut sha1 = esp_hal::sha::Sha1::default();
+    #[cfg(not(feature = "esp32"))]
+    let mut sha224 = esp_hal::sha::Sha224::default();
+    let mut sha256 = esp_hal::sha::Sha256::default();
+
+    // All sources are the same length
+    while sha1_remaining.len() > 0 {
+        sha1_remaining = block!(Sha::update(&mut sha1, sha1_remaining)).unwrap();
+        #[cfg(not(feature = "esp32"))]
+        {
+            sha224_remaining = block!(Sha::update(&mut sha224, sha224_remaining)).unwrap();
+        }
+        sha256_remaining = block!(Sha::update(&mut sha256, sha256_remaining)).unwrap();
+    }
+
+    let mut sha1_output = [0u8; 20];
+    block!(sha1.finish(sha1_output.as_mut_slice())).unwrap();
+    #[cfg(not(feature = "esp32"))]
+    let mut sha224_output = [0u8; 28];
+    #[cfg(not(feature = "esp32"))]
+    block!(sha224.finish(sha224_output.as_mut_slice())).unwrap();
+    let mut sha256_output = [0u8; 32];
+    block!(sha256.finish(sha256_output.as_mut_slice())).unwrap();
+
+    // Calculate software result to compare against
+    // Sha1
+    let mut sha1_sw = sha1::Sha1::new();
+    sha1_sw.update(sha1_source_data);
+    let soft_result = sha1_sw.finalize();
+    for (a, b) in sha1_output.iter().zip(soft_result) {
+        if *a != b {
+            log::error!("SHA1 HW: {:02x?}", sha1_output);
+            log::error!("SHA1 SW: {:02x?}", soft_result);
+            return false;
+        }
+    }
+
+    // Sha224
+    #[cfg(not(feature = "esp32"))]
+    {
+        let mut sha224_sw = sha2::Sha224::new();
+        sha224_sw.update(sha224_source_data);
+        let soft_result = sha224_sw.finalize();
+        for (a, b) in sha224_output.iter().zip(soft_result) {
+            if *a != b {
+                log::error!("SHA224 HW: {:02x?}", sha224_output);
+                log::error!("SHA224 SW: {:02x?}", soft_result);
+                return false;
+            }
+        }
+    }
+
+    // Sha256
+    let mut sha256_sw = sha2::Sha256::new();
+    sha256_sw.update(sha256_source_data);
+    let soft_result = sha256_sw.finalize();
+    for (a, b) in sha256_output.iter().zip(soft_result) {
+        if *a != b {
+            log::error!("SHA256 HW: {:02x?}", sha256_output);
+            log::error!("SHA256 SW: {:02x?}", soft_result);
+            return false;
+        }
+    }
+
+    true
+}
+
+/// A rolling test that loops between hasher for every step to test interleaving.
+///
+/// Returns true if the test succeed, else false.
 fn rolling_with_digest_trait(size: usize) -> bool {
     // Use different random data for each hasher.
     let sha1_source_data = unsafe { core::slice::from_raw_parts(SHA1_RANDOM_ARRAY.as_ptr(), size) };
     #[cfg(not(feature = "esp32"))]
-    let sha224_source_data = unsafe { core::slice::from_raw_parts(SHA224_RANDOM_ARRAY.as_ptr(), size) };
+    let sha224_source_data =
+        unsafe { core::slice::from_raw_parts(SHA224_RANDOM_ARRAY.as_ptr(), size) };
     let sha256_source_data =
         unsafe { core::slice::from_raw_parts(SHA256_RANDOM_ARRAY.as_ptr(), size) };
 
