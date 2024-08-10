@@ -247,11 +247,12 @@ pub trait Sha<'d, DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
             }
             self.process_buffer();
 
-            // Wait until buffer has completely processed
-            while self.is_busy() {}
             // Save the content of the current hash for interleaving operation.
             #[cfg(not(esp32))]
             {
+                // Wait until buffer has completely processed
+                while self.is_busy() {}
+
                 let mut saved_digest = [0u8; 64];
                 self.alignment_helper.volatile_read_regset(
                     sha.h_mem(0).as_ptr(),
@@ -305,7 +306,7 @@ pub trait Sha<'d, DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
         debug_assert!(self.cursor % 4 == 0);
 
         let mod_cursor = self.cursor % chunk_len;
-        if (chunk_len - mod_cursor) < core::mem::size_of::<u64>() {
+        if (chunk_len - mod_cursor) < chunk_len / 8 {
             // Zero out remaining data if buffer is almost full (>=448/896), and process
             // buffer
             let pad_len = chunk_len - mod_cursor;

@@ -6,13 +6,39 @@
 #![no_main]
 
 use defmt_rtt as _;
+use digest::Digest;
 use esp_backtrace as _;
 use esp_hal::{
+    clock::ClockControl,
     peripherals::Peripherals,
     prelude::*,
+    rng::Rng,
     sha::{Sha, Sha1, Sha256},
+    system::SystemControl,
 };
 use nb::block;
+use sha1;
+use sha2;
+
+/// Dummy data used to feed the hasher.
+static CHAR_ARRAY: [u8; 200] = [b'a'; 200];
+
+/// Dummy random data used to feed the Sha1 hasher
+static mut SHA1_RANDOM_ARRAY: [u8; 256] = [0u8; 256];
+
+/// Dummy random data used to feed the Sha224 hasher
+static mut SHA224_RANDOM_ARRAY: [u8; 256] = [0u8; 256];
+
+/// Dummy random data used to feed the Sha256 hasher
+static mut SHA256_RANDOM_ARRAY: [u8; 256] = [0u8; 256];
+
+/// Dummy random data used to feed the Sha384 hasher
+#[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+static mut SHA384_RANDOM_ARRAY: [u8; 256] = [0u8; 256];
+
+/// Dummy random data used to feed the Sha512 hasher
+#[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+static mut SHA512_RANDOM_ARRAY: [u8; 256] = [0u8; 256];
 
 #[cfg(test)]
 #[embedded_test::tests]
@@ -39,7 +65,7 @@ mod tests {
         let mut output = [0u8; 32];
 
         while remaining.len() > 0 {
-            remaining = block!(sha.update(remaining)).unwrap();
+            remaining = block!(Sha::update(&mut sha, remaining)).unwrap();
         }
         block!(sha.finish(output.as_mut_slice())).unwrap();
 
@@ -76,7 +102,7 @@ mod tests {
         let mut output = [0u8; 28];
 
         while remaining.len() > 0 {
-            remaining = block!(sha.update(remaining)).unwrap();
+            remaining = block!(Sha::update(&mut sha, remaining)).unwrap();
         }
         block!(sha.finish(output.as_mut_slice())).unwrap();
 
@@ -115,7 +141,7 @@ mod tests {
         let mut output = [0u8; 32];
 
         while remaining.len() > 0 {
-            remaining = block!(sha.update(remaining)).unwrap();
+            remaining = block!(Sha::update(&mut sha, remaining)).unwrap();
         }
         block!(sha.finish(output.as_mut_slice())).unwrap();
 
@@ -155,7 +181,7 @@ mod tests {
         let mut output = [0u8; 32];
 
         while remaining.len() > 0 {
-            remaining = block!(sha.update(remaining)).unwrap();
+            remaining = block!(Sha::update(&mut sha, remaining)).unwrap();
         }
         block!(sha.finish(output.as_mut_slice())).unwrap();
 
@@ -197,7 +223,7 @@ mod tests {
         let mut output = [0u8; 32];
 
         while remaining.len() > 0 {
-            remaining = block!(sha.update(remaining)).unwrap();
+            remaining = block!(Sha::update(&mut sha, remaining)).unwrap();
         }
         block!(sha.finish(output.as_mut_slice())).unwrap();
 
@@ -240,7 +266,7 @@ mod tests {
         let mut output = [0u8; 32];
 
         while remaining.len() > 0 {
-            remaining = block!(sha.update(remaining)).unwrap();
+            remaining = block!(Sha::update(&mut sha, remaining)).unwrap();
         }
         block!(sha.finish(output.as_mut_slice())).unwrap();
 
@@ -280,7 +306,7 @@ mod tests {
         let mut output = [0u8; 32];
 
         while remaining.len() > 0 {
-            remaining = block!(sha.update(remaining)).unwrap();
+            remaining = block!(Sha::update(&mut sha, remaining)).unwrap();
         }
         block!(sha.finish(output.as_mut_slice())).unwrap();
 
@@ -304,4 +330,351 @@ mod tests {
 
         assert_eq!(expected_output, output);
     }
+
+    /// A test that runs a hashing on a digest of every size between 1 and 256
+    /// inclusively.
+    #[test]
+    fn test_digest_of_size_1_to_200() {
+        for i in 1..=200 {
+            test_for_size::<esp_hal::sha::Sha1<esp_hal::Blocking>, 20>(i);
+            #[cfg(not(feature = "esp32"))]
+            test_for_size::<esp_hal::sha::Sha224<esp_hal::Blocking>, 28>(i);
+            test_for_size::<esp_hal::sha::Sha256<esp_hal::Blocking>, 32>(i);
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            test_for_size::<esp_hal::sha::Sha384<esp_hal::Blocking>, 48>(i);
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            test_for_size::<esp_hal::sha::Sha512<esp_hal::Blocking>, 64>(i);
+        }
+    }
+
+    /// A rolling test that loops between hasher for every step to test
+    /// interleaving. This specifically test the Sha trait implementation
+    #[test]
+    fn test_sha_rolling() {
+        let peripherals = Peripherals::take();
+        let system = SystemControl::new(peripherals.SYSTEM);
+        let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+        let mut rng = Rng::new(peripherals.RNG);
+
+        // Fill source data with random data
+        use core::ptr::addr_of_mut;
+        for slice in unsafe {
+            [
+                addr_of_mut!(SHA1_RANDOM_ARRAY),
+                addr_of_mut!(SHA224_RANDOM_ARRAY),
+                addr_of_mut!(SHA256_RANDOM_ARRAY),
+                #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+                addr_of_mut!(SHA384_RANDOM_ARRAY),
+                #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+                addr_of_mut!(SHA512_RANDOM_ARRAY),
+            ]
+        } {
+            rng.read(unsafe { &mut *slice });
+        }
+
+        for size in [1, 64, 128, 256] {
+            // Use different random data for each hasher.
+            let sha1_source_data =
+                unsafe { core::slice::from_raw_parts(SHA1_RANDOM_ARRAY.as_ptr(), size) };
+            #[cfg(not(feature = "esp32"))]
+            let sha224_source_data =
+                unsafe { core::slice::from_raw_parts(SHA224_RANDOM_ARRAY.as_ptr(), size) };
+            let sha256_source_data =
+                unsafe { core::slice::from_raw_parts(SHA256_RANDOM_ARRAY.as_ptr(), size) };
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            let sha384_source_data =
+                unsafe { core::slice::from_raw_parts(SHA384_RANDOM_ARRAY.as_ptr(), size) };
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            let sha512_source_data =
+                unsafe { core::slice::from_raw_parts(SHA512_RANDOM_ARRAY.as_ptr(), size) };
+
+            let mut sha1_remaining = sha1_source_data;
+            #[cfg(not(feature = "esp32"))]
+            let mut sha224_remaining = sha224_source_data;
+            let mut sha256_remaining = sha256_source_data;
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            let mut sha384_remaining = sha384_source_data;
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            let mut sha512_remaining = sha512_source_data;
+
+            let mut sha1 = esp_hal::sha::Sha1::default();
+            #[cfg(not(feature = "esp32"))]
+            let mut sha224 = esp_hal::sha::Sha224::default();
+            let mut sha256 = esp_hal::sha::Sha256::default();
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            let mut sha384 = esp_hal::sha::Sha384::default();
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            let mut sha512 = esp_hal::sha::Sha512::default();
+
+            // All sources are the same length
+            while sha1_remaining.len() > 0 {
+                sha1_remaining = block!(Sha::update(&mut sha1, sha1_remaining)).unwrap();
+                #[cfg(not(feature = "esp32"))]
+                {
+                    sha224_remaining = block!(Sha::update(&mut sha224, sha224_remaining)).unwrap();
+                }
+                sha256_remaining = block!(Sha::update(&mut sha256, sha256_remaining)).unwrap();
+                #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+                {
+                    sha384_remaining = block!(Sha::update(&mut sha384, sha384_remaining)).unwrap();
+                    sha512_remaining = block!(Sha::update(&mut sha512, sha512_remaining)).unwrap();
+                }
+            }
+
+            let mut sha1_output = [0u8; 20];
+            block!(sha1.finish(sha1_output.as_mut_slice())).unwrap();
+            #[cfg(not(feature = "esp32"))]
+            let mut sha224_output = [0u8; 28];
+            #[cfg(not(feature = "esp32"))]
+            block!(sha224.finish(sha224_output.as_mut_slice())).unwrap();
+            let mut sha256_output = [0u8; 32];
+            block!(sha256.finish(sha256_output.as_mut_slice())).unwrap();
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            let mut sha384_output = [0u8; 48];
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            block!(sha384.finish(sha384_output.as_mut_slice())).unwrap();
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            let mut sha512_output = [0u8; 64];
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            block!(sha512.finish(sha512_output.as_mut_slice())).unwrap();
+
+            // Calculate software result to compare against
+            // Sha1
+            let mut sha1_sw = sha1::Sha1::new();
+            sha1_sw.update(sha1_source_data);
+            let soft_result = sha1_sw.finalize();
+            for (a, b) in sha1_output.iter().zip(soft_result) {
+                assert_eq!(*a, b);
+            }
+
+            // Sha224
+            #[cfg(not(feature = "esp32"))]
+            {
+                let mut sha224_sw = sha2::Sha224::new();
+                sha224_sw.update(sha224_source_data);
+                let soft_result = sha224_sw.finalize();
+                for (a, b) in sha224_output.iter().zip(soft_result) {
+                    assert_eq!(*a, b);
+                }
+            }
+
+            // Sha256
+            let mut sha256_sw = sha2::Sha256::new();
+            sha256_sw.update(sha256_source_data);
+            let soft_result = sha256_sw.finalize();
+            for (a, b) in sha256_output.iter().zip(soft_result) {
+                assert_eq!(*a, b);
+            }
+
+            // Sha384
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            {
+                let mut sha384_sw = sha2::Sha384::new();
+                sha384_sw.update(sha384_source_data);
+                let soft_result = sha384_sw.finalize();
+                for (a, b) in sha384_output.iter().zip(soft_result) {
+                    assert_eq!(*a, b);
+                }
+            }
+
+            // Sha512
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            {
+                let mut sha512_sw = sha2::Sha512::new();
+                sha512_sw.update(sha512_source_data);
+                let soft_result = sha512_sw.finalize();
+                for (a, b) in sha512_output.iter().zip(soft_result) {
+                    assert_eq!(*a, b);
+                }
+            }
+        }
+    }
+
+    /// A rolling test that loops between hasher for every step to test
+    /// interleaving. This specifically test the Digest trait implementation
+    #[test]
+    fn test_for_digest_rolling() {
+        let peripherals = Peripherals::take();
+        let system = SystemControl::new(peripherals.SYSTEM);
+        let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+        let mut rng = Rng::new(peripherals.RNG);
+
+        // Fill source data with random data
+        use core::ptr::addr_of_mut;
+        for slice in unsafe {
+            [
+                addr_of_mut!(SHA1_RANDOM_ARRAY),
+                addr_of_mut!(SHA224_RANDOM_ARRAY),
+                addr_of_mut!(SHA256_RANDOM_ARRAY),
+                #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+                addr_of_mut!(SHA384_RANDOM_ARRAY),
+                #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+                addr_of_mut!(SHA512_RANDOM_ARRAY),
+            ]
+        } {
+            rng.read(unsafe { &mut *slice });
+        }
+
+        for size in [1, 64, 128, 256] {
+            // Use different random data for each hasher.
+            let sha1_source_data =
+                unsafe { core::slice::from_raw_parts(SHA1_RANDOM_ARRAY.as_ptr(), size) };
+            #[cfg(not(feature = "esp32"))]
+            let sha224_source_data =
+                unsafe { core::slice::from_raw_parts(SHA224_RANDOM_ARRAY.as_ptr(), size) };
+            let sha256_source_data =
+                unsafe { core::slice::from_raw_parts(SHA256_RANDOM_ARRAY.as_ptr(), size) };
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            let sha384_source_data =
+                unsafe { core::slice::from_raw_parts(SHA384_RANDOM_ARRAY.as_ptr(), size) };
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            let sha512_source_data =
+                unsafe { core::slice::from_raw_parts(SHA512_RANDOM_ARRAY.as_ptr(), size) };
+
+            let mut sha1 = esp_hal::sha::Sha1::default();
+            #[cfg(not(feature = "esp32"))]
+            let mut sha224 = esp_hal::sha::Sha224::default();
+            let mut sha256 = esp_hal::sha::Sha256::default();
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            let mut sha384 = esp_hal::sha::Sha384::default();
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            let mut sha512 = esp_hal::sha::Sha512::default();
+
+            // The Digest::update will consume the entirety of remaining. We don't need to
+            // loop until remaining is fully consumed.
+            Digest::update(&mut sha1, sha1_source_data);
+            #[cfg(not(feature = "esp32"))]
+            Digest::update(&mut sha224, sha224_source_data);
+            Digest::update(&mut sha256, sha256_source_data);
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            Digest::update(&mut sha384, sha384_source_data);
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            Digest::update(&mut sha512, sha512_source_data);
+
+            let sha1_output: [u8; 20] = Digest::finalize(sha1).into();
+            #[cfg(not(feature = "esp32"))]
+            let sha224_output: [u8; 28] = Digest::finalize(sha224).into();
+            let sha256_output: [u8; 32] = Digest::finalize(sha256).into();
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            let sha384_output: [u8; 48] = Digest::finalize(sha384).into();
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            let sha512_output: [u8; 64] = Digest::finalize(sha512).into();
+
+            // Calculate software result to compare against
+            // Sha1
+            let mut sha1_sw = sha1::Sha1::new();
+            sha1_sw.update(sha1_source_data);
+            let soft_result = sha1_sw.finalize();
+            for (a, b) in sha1_output.iter().zip(soft_result) {
+                assert_eq!(*a, b);
+            }
+
+            // Sha224
+            #[cfg(not(feature = "esp32"))]
+            {
+                let mut sha224_sw = sha2::Sha224::new();
+                sha224_sw.update(sha224_source_data);
+                let soft_result = sha224_sw.finalize();
+                for (a, b) in sha224_output.iter().zip(soft_result) {
+                    assert_eq!(*a, b);
+                }
+            }
+
+            // Sha256
+            let mut sha256_sw = sha2::Sha256::new();
+            sha256_sw.update(sha256_source_data);
+            let soft_result = sha256_sw.finalize();
+            for (a, b) in sha256_output.iter().zip(soft_result) {
+                assert_eq!(*a, b);
+            }
+
+            // Sha384
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            {
+                let mut sha384_sw = sha2::Sha384::new();
+                sha384_sw.update(sha384_source_data);
+                let soft_result = sha384_sw.finalize();
+                for (a, b) in sha384_output.iter().zip(soft_result) {
+                    assert_eq!(*a, b);
+                }
+            }
+
+            // Sha512
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+            {
+                let mut sha512_sw = sha2::Sha512::new();
+                sha512_sw.update(sha512_source_data);
+                let soft_result = sha512_sw.finalize();
+                for (a, b) in sha512_output.iter().zip(soft_result) {
+                    assert_eq!(*a, b);
+                }
+            }
+        }
+    }
+}
+
+/// A simple test using [esp_hal::sha::Sha] trait to test hashing for an
+/// algorithm against a specific size. This will compare the result with a
+/// software implementation and return false if there's a mismatch
+fn test_for_size<'a, D: Digest + Default + Sha<'a, esp_hal::Blocking>, const N: usize>(
+    size: usize,
+) {
+    let source_data = unsafe { core::slice::from_raw_parts(CHAR_ARRAY.as_ptr(), size) };
+    let mut remaining = source_data;
+    let mut hasher = D::default();
+
+    let mut output = [0u8; N];
+
+    while remaining.len() > 0 {
+        remaining = block!(Sha::update(&mut hasher, &remaining)).unwrap();
+    }
+
+    block!(hasher.finish(output.as_mut_slice())).unwrap();
+
+    // Compare against Software result.
+    match N {
+        20 => {
+            let mut hasher = sha1::Sha1::new();
+            hasher.update(source_data);
+            let soft_result = hasher.finalize();
+            for (a, b) in output.iter().zip(soft_result) {
+                assert_eq!(*a, b);
+            }
+        }
+        28 => {
+            let mut hasher = sha2::Sha224::new();
+            hasher.update(source_data);
+            let soft_result = hasher.finalize();
+            for (a, b) in output.iter().zip(soft_result) {
+                assert_eq!(*a, b);
+            }
+        }
+        32 => {
+            let mut hasher = sha2::Sha256::new();
+            hasher.update(source_data);
+            let soft_result = hasher.finalize();
+            for (a, b) in output.iter().zip(soft_result) {
+                assert_eq!(*a, b);
+            }
+        }
+        48 => {
+            let mut hasher = sha2::Sha384::new();
+            hasher.update(source_data);
+            let soft_result = hasher.finalize();
+            for (a, b) in output.iter().zip(soft_result) {
+                assert_eq!(*a, b);
+            }
+        }
+        64 => {
+            let mut hasher = sha2::Sha512::new();
+            hasher.update(source_data);
+            let soft_result = hasher.finalize();
+            for (a, b) in output.iter().zip(soft_result) {
+                assert_eq!(*a, b);
+            }
+        }
+        _ => unreachable!(),
+    };
 }
