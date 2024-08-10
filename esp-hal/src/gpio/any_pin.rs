@@ -1,9 +1,3 @@
-//! Type-erased wrappers for GPIO pins.
-//! These are useful to pass them into peripheral drivers.
-//!
-//! If you want a generic pin for GPIO input/output look into
-//! [Output],[OutputOpenDrain], [Input] and [Flex].
-
 use super::*;
 
 #[derive(Clone, Copy)]

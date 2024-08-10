@@ -90,7 +90,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, Uart};
-//! use esp_hal::gpio::{Io, any_pin::AnyPin};
+//! use esp_hal::gpio::{AnyPin, Io};
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
 //! let tx = AnyPin::new_inverted(io.pins.gpio1);
@@ -103,7 +103,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, UartTx, UartRx};
-//! use esp_hal::gpio::{Io, any_pin::AnyPin};
+//! use esp_hal::gpio::{AnyPin, Io};
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
 //! let tx = UartTx::new(peripherals.UART0, &clocks,

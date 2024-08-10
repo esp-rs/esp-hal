@@ -16,7 +16,7 @@ use critical_section::Mutex;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::{any_pin::AnyPin, Gpio2, Gpio3, GpioPin, Input, Io, Level, Output, Pull},
+    gpio::{AnyPin, Gpio2, Gpio3, GpioPin, Input, Io, Level, Output, Pull},
     macros::handler,
     peripherals::Peripherals,
     system::SystemControl,

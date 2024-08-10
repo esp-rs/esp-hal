@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SHA driver now use specific structs for the hashing algorithm instead of a parameter. (#1908)
 - Remove `fn free(self)` in HMAC which goes against esp-hal API guidelines (#1972)
 - PARL_IO use ReadBuffer and WriteBuffer for Async DMA (#1996)
+- `AnyPin`, `AnyInputOnyPin` and `DummyPin` are now accessible from `gpio` module (#1918)
 
 ### Fixed
 
