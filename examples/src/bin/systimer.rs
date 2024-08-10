@@ -18,19 +18,36 @@ use esp_hal::{
     peripherals::{Interrupt, Peripherals},
     prelude::*,
     system::SystemControl,
-    timer::systimer::{Alarm, FrozenUnit, Periodic, SystemTimer, Target, Unit},
+    timer::systimer::{
+        Alarm,
+        FrozenUnit,
+        Periodic,
+        SpecificComparator,
+        SpecificUnit,
+        SystemTimer,
+        Target,
+    },
     Blocking,
 };
 use esp_println::println;
 use fugit::ExtU32;
 use static_cell::StaticCell;
 
-static ALARM0: Mutex<RefCell<Option<Alarm<Periodic, Blocking, 0, 0>>>> =
-    Mutex::new(RefCell::new(None));
-static ALARM1: Mutex<RefCell<Option<Alarm<Target, Blocking, 1, 0>>>> =
-    Mutex::new(RefCell::new(None));
-static ALARM2: Mutex<RefCell<Option<Alarm<Target, Blocking, 2, 0>>>> =
-    Mutex::new(RefCell::new(None));
+static ALARM0: Mutex<
+    RefCell<
+        Option<Alarm<Periodic, Blocking, SpecificComparator<'static, 0>, SpecificUnit<'static, 0>>>,
+    >,
+> = Mutex::new(RefCell::new(None));
+static ALARM1: Mutex<
+    RefCell<
+        Option<Alarm<Target, Blocking, SpecificComparator<'static, 1>, SpecificUnit<'static, 0>>>,
+    >,
+> = Mutex::new(RefCell::new(None));
+static ALARM2: Mutex<
+    RefCell<
+        Option<Alarm<Target, Blocking, SpecificComparator<'static, 2>, SpecificUnit<'static, 0>>>,
+    >,
+> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -41,7 +58,7 @@ fn main() -> ! {
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
     println!("SYSTIMER Current value = {}", SystemTimer::now());
 
-    static UNIT0: StaticCell<Unit<'static, 0>> = StaticCell::new();
+    static UNIT0: StaticCell<SpecificUnit<'static, 0>> = StaticCell::new();
 
     let unit0 = UNIT0.init(systimer.unit0);
 

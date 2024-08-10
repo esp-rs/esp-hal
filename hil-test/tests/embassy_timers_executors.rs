@@ -391,7 +391,7 @@ mod test {
         let mut systimer = SystemTimer::new(&mut peripherals.SYSTIMER);
 
         let unit = FrozenUnit::new(&mut systimer.unit0);
-        let mut alarm: Alarm<'_, Periodic, _, 0, 0> = Alarm::new(systimer.comparator0, &unit);
+        let mut alarm: Alarm<'_, Periodic, _, _, _> = Alarm::new(systimer.comparator0, &unit);
         let mut periodic = PeriodicTimer::new(&mut alarm);
 
         let t1 = esp_hal::time::current_time();
@@ -411,7 +411,7 @@ mod test {
         let mut systimer = SystemTimer::new(&mut peripherals.SYSTIMER);
 
         let unit = FrozenUnit::new(&mut systimer.unit0);
-        let alarm: Alarm<'_, Target, _, 0, 0> = Alarm::new(systimer.comparator0, &unit);
+        let alarm: Alarm<'_, Target, _, _, _> = Alarm::new(systimer.comparator0, &unit);
         let timer0 = OneShotTimer::new(alarm);
 
         let t1 = esp_hal::time::current_time();
