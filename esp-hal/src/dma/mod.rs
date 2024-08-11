@@ -79,7 +79,7 @@ impl<W> crate::private::Sealed for &[W] where W: Word {}
 impl<W> crate::private::Sealed for &mut [W] where W: Word {}
 
 /// Trait for buffers that can be given to DMA for reading.
-pub trait ReadBuffer: crate::private::Sealed {
+pub trait ReadBuffer {
     /// Provide a buffer usable for DMA reads.
     ///
     /// The return value is:
@@ -140,7 +140,7 @@ where
 }
 
 /// Trait for buffers that can be given to DMA for writing.
-pub trait WriteBuffer: crate::private::Sealed {
+pub trait WriteBuffer {
     /// Provide a buffer usable for DMA writes.
     ///
     /// The return value is:
