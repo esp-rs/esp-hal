@@ -17,7 +17,15 @@ use crate::{
     common_adapter::RADIO_CLOCKS,
     compat::{
         common::{
-            create_recursive_mutex, create_wifi_queue, lock_mutex, number_of_messages_in_queue, receive_queued, send_queued, str_from_c, thread_sem_get, unlock_mutex
+            create_recursive_mutex,
+            create_wifi_queue,
+            lock_mutex,
+            number_of_messages_in_queue,
+            receive_queued,
+            send_queued,
+            str_from_c,
+            thread_sem_get,
+            unlock_mutex,
         },
         malloc::calloc,
         task_runner::spawn_task,
