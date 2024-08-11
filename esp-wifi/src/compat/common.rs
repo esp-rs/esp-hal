@@ -309,7 +309,7 @@ pub fn receive_queued(queue: *mut c_void, item: *mut c_void, block_time_tick: u3
     }
 }
 pub fn number_of_messages_in_queue(queue: *mut c_void) -> u32 {
-    trace!("queue_msg_waiting {queue:?}");
+    trace!("queue_msg_waiting {:?}", queue);
     if queue != unsafe { addr_of_mut!(REAL_WIFI_QUEUE).cast() } {
         warn!("queue_msg_waiting: Unknown queue.");
         return 0;
