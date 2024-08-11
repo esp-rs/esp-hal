@@ -38,6 +38,7 @@ esp-ieee802154      = { path = "../esp-ieee802154", optional = true }
 esp-println         = { path = "../esp-println", features = ["log"] }
 esp-storage         = { path = "../esp-storage", optional = true }
 esp-wifi            = { path = "../esp-wifi", optional = true }
+esp-wifi-sys        = { version = "0.4.0", optional = true }
 fugit               = "0.3.7"
 heapless            = "0.8.0"
 hex-literal         = "0.4.1"

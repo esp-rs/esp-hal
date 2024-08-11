@@ -40,12 +40,21 @@ lazy_static! {
             display: "Ethernet".into(),
         },
     };
+    static ref WIFI_RAW_CAPTURE_INTERFACE: Interface = Interface {
+        value: "wifi_rfmon".into(),
+        display: "esp-wifi IEEE802.11 capture".into(),
+        dlt: Dlt {
+            data_link_type: DataLink::USER1,
+            name: "USER1".into(),
+            display: "IEEE802.11".into(),
+        },
+    };
     static ref BT_CAPTURE_INTERFACE: Interface = Interface {
         value: "bt".into(),
         display: "esp-wifi HCI capture".into(),
         dlt: Dlt {
-            data_link_type: DataLink::USER1,
-            name: "USER1".into(),
+            data_link_type: DataLink::USER2,
+            name: "USER2".into(),
             display: "HCI".into(),
         },
     };
@@ -72,13 +81,13 @@ fn main() {
         ExtcapStep::Interfaces(interfaces_step) => {
             interfaces_step.list_interfaces(
                 &METADATA,
-                &[&*WIFI_CAPTURE_INTERFACE, &*BT_CAPTURE_INTERFACE],
+                &[&*WIFI_CAPTURE_INTERFACE, &*WIFI_RAW_CAPTURE_INTERFACE, &*BT_CAPTURE_INTERFACE],
                 &[],
             );
         }
         ExtcapStep::Dlts(dlts_step) => {
             dlts_step
-                .print_from_interfaces(&[&*WIFI_CAPTURE_INTERFACE, &*BT_CAPTURE_INTERFACE])
+                .print_from_interfaces(&[&*WIFI_CAPTURE_INTERFACE, &*WIFI_RAW_CAPTURE_INTERFACE, &*BT_CAPTURE_INTERFACE])
                 .unwrap();
         }
         ExtcapStep::Config(config_step) => config_step.list_configs(&[&*CONFIG_SERIALPORT]),
@@ -88,6 +97,8 @@ fn main() {
         ExtcapStep::Capture(capture_step) => {
             let (data_link, prefix) = if capture_step.interface == WIFI_CAPTURE_INTERFACE.value {
                 (DataLink::ETHERNET, "@WIFIFRAME [")
+            } else if capture_step.interface == WIFI_RAW_CAPTURE_INTERFACE.value {
+                (DataLink::IEEE802_11, "@WIFIFRAME [")
             } else {
                 (DataLink::BLUETOOTH_HCI_H4, "@HCIFRAME [")
             };
