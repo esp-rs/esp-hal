@@ -28,6 +28,7 @@
 //! # use esp_hal::twai::filter;
 //! # use esp_hal::twai::TwaiConfiguration;
 //! # use esp_hal::twai::BaudRate;
+//! # use esp_hal::twai::TwaiMode;
 //! # use esp_hal::gpio::Io;
 //! # use embedded_can::Frame;
 //! # use core::option::Option::None;
@@ -49,6 +50,7 @@
 //!     can_rx_pin,
 //!     &clocks,
 //!     CAN_BAUDRATE,
+//!     TwaiMode::Normal
 //! );
 //!
 //! // Partially filter the incoming messages to reduce overhead of receiving
@@ -69,6 +71,61 @@
 //!     // Transmit the frame back.
 //!     let _result = block!(can.transmit(&frame)).unwrap();
 //! }
+//! # }
+//! ```
+//! ### Self-testing (self reception of transmitted messages)
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::twai;
+//! # use embedded_can::Id;
+//! # use esp_hal::twai::filter::SingleStandardFilter;
+//! # use esp_hal::twai::filter;
+//! # use esp_hal::twai::TwaiConfiguration;
+//! # use esp_hal::twai::BaudRate;
+//! # use esp_hal::twai::TwaiMode;
+//! # use esp_hal::gpio::Io;
+//! # use embedded_can::Frame;
+//! # use core::option::Option::None;
+//! # use nb::block;
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! // Use GPIO pins 2 and 3 to connect to the respective pins on the CAN
+//! // transceiver.
+//! let can_tx_pin = io.pins.gpio2;
+//! let can_rx_pin = io.pins.gpio3;
+//!
+//! // The speed of the CAN bus.
+//! const CAN_BAUDRATE: twai::BaudRate = BaudRate::B1000K;
+//!
+//! // Begin configuring the TWAI peripheral.
+//! let mut can_config = twai::TwaiConfiguration::new(
+//!     peripherals.TWAI0,
+//!     can_tx_pin,
+//!     can_rx_pin,
+//!     &clocks,
+//!     CAN_BAUDRATE,
+//!     TwaiMode::NoAck
+//! );
+//!
+//! // Partially filter the incoming messages to reduce overhead of receiving
+//! // undesired messages
+//! const FILTER: twai::filter::SingleStandardFilter =
+//!     SingleStandardFilter::new_self_reception(b"xxxxxxxxxx0", b"x",
+//!         [b"xxxxxxxx", b"xxxxxxxx"]);
+//! can_config.set_filter(FILTER);
+//!
+//! // Start the peripheral. This locks the configuration settings of the
+//! // peripheral and puts it into operation mode, allowing packets to be sent
+//! // and received.
+//! let mut can = can_config.start();
+//!
+//! let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO.into(),
+//!     &[1, 2, 3]).unwrap();
+//! println!("Sent a frame");
+//! // Wait for a frame to be received.
+//! let frame = block!(can.receive()).unwrap();
+//! println!("Received a frame: {frame:?}");
+//!
+//! loop {}
 //! # }
 //! ```
 
@@ -184,6 +241,17 @@ impl embedded_can::Error for ErrorKind {
     fn kind(&self) -> embedded_can::ErrorKind {
         (*self).into()
     }
+}
+
+/// Specifies in which mode the TWAI controller will operate.
+pub enum TwaiMode {
+    /// Normal operating mode
+    Normal,
+    /// Self-test mode (no acknowledgement required for a successful message
+    /// transmission)
+    NoAck,
+    /// Listen only operating mode
+    ListenOnly,
 }
 
 /// Standard 11-bit CAN Identifier (`0..=0x7FF`).
@@ -400,6 +468,7 @@ pub struct EspTwaiFrame {
     dlc: usize,
     data: [u8; 8],
     is_remote: bool,
+    self_reception: bool,
 }
 
 impl EspTwaiFrame {
@@ -418,6 +487,7 @@ impl EspTwaiFrame {
             data: d,
             dlc: data.len(),
             is_remote: false,
+            self_reception: false,
         })
     }
 
@@ -432,6 +502,25 @@ impl EspTwaiFrame {
             data: [0; 8],
             dlc,
             is_remote: true,
+            self_reception: false,
+        })
+    }
+
+    pub fn new_self_reception(id: Id, data: &[u8]) -> Option<Self> {
+        if data.len() > 8 {
+            return None;
+        }
+
+        let mut d: [u8; 8] = [0; 8];
+        let (left, _unused) = d.split_at_mut(data.len());
+        left.clone_from_slice(data);
+
+        Some(EspTwaiFrame {
+            id,
+            data: d,
+            dlc: data.len(),
+            is_remote: false,
+            self_reception: true,
         })
     }
 
@@ -455,6 +544,7 @@ impl EspTwaiFrame {
             data,
             dlc,
             is_remote: false,
+            self_reception: true,
         }
     }
 }
@@ -643,6 +733,7 @@ where
         clocks: &Clocks<'d>,
         baud_rate: BaudRate,
         no_transceiver: bool,
+        mode: TwaiMode,
     ) -> Self {
         // Enable the peripheral clock for the TWAI peripheral.
         T::enable_peripheral();
@@ -662,10 +753,24 @@ where
         rx_pin.set_to_input(crate::private::Internal);
         rx_pin.connect_input_to_peripheral(T::INPUT_SIGNAL, crate::private::Internal);
 
-        // Set mod to listen only first
-        T::register_block()
-            .mode()
-            .modify(|_, w| w.listen_only_mode().set_bit());
+        // Set the operating mode based on provided option
+        match mode {
+            TwaiMode::Normal => {
+                // Do nothing special, the default state is Normal mode.
+            }
+            TwaiMode::NoAck => {
+                // Set the self-test mode (no acknowledgement required)
+                T::register_block()
+                    .mode()
+                    .modify(|_, w| w.self_test_mode().set_bit());
+            }
+            TwaiMode::ListenOnly => {
+                // Set listen-only mode
+                T::register_block()
+                    .mode()
+                    .modify(|_, w| w.listen_only_mode().set_bit());
+            }
+        }
 
         // Set TEC to 0
         T::register_block()
@@ -810,8 +915,9 @@ where
         rx_pin: impl Peripheral<P = RX> + 'd,
         clocks: &Clocks<'d>,
         baud_rate: BaudRate,
+        mode: TwaiMode,
     ) -> Self {
-        Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, false)
+        Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, false, mode)
     }
 
     /// Create a new instance of [TwaiConfiguration] meant to connect two ESP32s
@@ -825,8 +931,9 @@ where
         rx_pin: impl Peripheral<P = RX> + 'd,
         clocks: &Clocks<'d>,
         baud_rate: BaudRate,
+        mode: TwaiMode,
     ) -> Self {
-        Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, true)
+        Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, true, mode)
     }
 }
 
@@ -855,8 +962,10 @@ where
         rx_pin: impl Peripheral<P = RX> + 'd,
         clocks: &Clocks<'d>,
         baud_rate: BaudRate,
+        mode: TwaiMode,
     ) -> Self {
-        let mut this = Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, false);
+        let mut this =
+            Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, false, mode);
         this.internal_set_interrupt_handler(T::async_handler());
         this
     }
@@ -872,8 +981,10 @@ where
         rx_pin: impl Peripheral<P = RX> + 'd,
         clocks: &Clocks<'d>,
         baud_rate: BaudRate,
+        mode: TwaiMode,
     ) -> Self {
-        let mut this = Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, true);
+        let mut this =
+            Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, true, mode);
         this.internal_set_interrupt_handler(T::async_handler());
         this
     }
@@ -1264,9 +1375,19 @@ pub trait OperationInstance: Instance {
             // Is RTR frame, so no data is included.
         }
 
-        // Set the transmit request command, this will lock the transmit buffer until
-        // the transmission is complete or aborted.
-        register_block.cmd().write(|w| w.tx_req().set_bit());
+        // Trigger the appropriate transmission request based on self_reception flag
+        if frame.self_reception {
+            #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))]
+            register_block.cmd().write(|w| w.self_rx_req().set_bit());
+            #[cfg(not(any(esp32, esp32c3, esp32s2, esp32s3)))]
+            register_block
+                .cmd()
+                .write(|w| w.self_rx_request().set_bit());
+        } else {
+            // Set the transmit request command, this will lock the transmit buffer until
+            // the transmission is complete or aborted.
+            register_block.cmd().write(|w| w.tx_req().set_bit());
+        }
     }
 
     /// Read a frame from the peripheral.

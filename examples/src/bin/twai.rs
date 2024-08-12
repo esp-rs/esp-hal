@@ -13,6 +13,9 @@
 //! ESP1/GPIO0 --- ESP1/GPIO2 --- ESP2/GPIO0 --- ESP2/GPIO2 --- 4.8kOhm --- ESP1/5V
 //!
 //! `IS_FIRST_SENDER` below must be set to false on one of the ESP's
+//!
+//! In case you want to use `self-testing``, get rid of everything related to the aforementioned `IS_FIRST_SENDER`
+//! and follow the advice in the comments related to this mode.
 
 //% CHIPS: esp32c3 esp32c6 esp32s2 esp32s3
 
@@ -28,7 +31,7 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
-    twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId},
+    twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId, TwaiMode},
 };
 use esp_println::println;
 use nb::block;
@@ -48,15 +51,18 @@ fn main() -> ! {
     const CAN_BAUDRATE: twai::BaudRate = twai::BaudRate::B1000K;
 
     // !!! Use `new` when using a transceiver. `new_no_transceiver` sets TX to open-drain
+    // Self-testing also works using the regular `new` function.
 
     // Begin configuring the TWAI peripheral. The peripheral is in a reset like
     // state that prevents transmission but allows configuration.
+    // For self-testing use `NoAck` mode of the TWAI peripheral.
     let mut can_config = twai::TwaiConfiguration::new_no_transceiver(
         peripherals.TWAI0,
         can_tx_pin,
         can_rx_pin,
         &clocks,
         CAN_BAUDRATE,
+        TwaiMode::NoAck,
     );
 
     // Partially filter the incoming messages to reduce overhead of receiving
@@ -76,7 +82,8 @@ fn main() -> ! {
 
     if IS_FIRST_SENDER {
         // Send a frame to the other ESP
-        let frame = EspTwaiFrame::new(StandardId::ZERO.into(), &[1, 2, 3]).unwrap();
+        // Use `new_self_reception` if you want to use self-testing.
+        let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO.into(), &[1, 2, 3]).unwrap();
         block!(can.transmit(&frame)).unwrap();
         println!("Sent a frame");
     }
