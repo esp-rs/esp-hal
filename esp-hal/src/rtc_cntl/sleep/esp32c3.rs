@@ -414,39 +414,19 @@ fn rtc_sleep_pu(val: bool) {
     bb.bbpd_ctrl()
         .modify(|_r, w| w.fft_force_pu().bit(val).dc_est_force_pu().bit(val));
 
-    if val {
-        nrx.nrxpd_ctrl().modify(|_, w| {
-            w.rx_rot_force_pu()
-                .set_bit()
-                .vit_force_pu()
-                .set_bit()
-                .demap_force_pu()
-                .set_bit()
-        });
-    } else {
-        nrx.nrxpd_ctrl().modify(|_, w| {
-            w.rx_rot_force_pu()
-                .clear_bit()
-                .vit_force_pu()
-                .clear_bit()
-                .demap_force_pu()
-                .clear_bit()
-        });
-    }
+    nrx.nrxpd_ctrl().modify(|_, w| {
+        w.rx_rot_force_pu()
+            .bit(val)
+            .vit_force_pu()
+            .bit(val)
+            .demap_force_pu()
+            .bit(val)
+    });
 
-    if val {
-        fe.gen_ctrl().modify(|_, w| w.iq_est_force_pu().set_bit());
-    } else {
-        fe.gen_ctrl().modify(|_, w| w.iq_est_force_pu().clear_bit());
-    }
+    fe.gen_ctrl().modify(|_, w| w.iq_est_force_pu().bit(val));
 
-    if val {
-        fe2.tx_interp_ctrl()
-            .modify(|_, w| w.tx_inf_force_pu().set_bit());
-    } else {
-        fe2.tx_interp_ctrl()
-            .modify(|_, w| w.tx_inf_force_pu().clear_bit());
-    }
+    fe2.tx_interp_ctrl()
+        .modify(|_, w| w.tx_inf_force_pu().bit(val));
 
     syscon.mem_power_up().modify(|_r, w| unsafe {
         w.sram_power_up()
