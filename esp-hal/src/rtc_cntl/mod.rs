@@ -224,8 +224,9 @@ impl<'d> Rtc<'d> {
     #[deprecated = "This function does not take into account the boot time registers, and therefore will not react to using `set_time_us` and `set_time_ms`."]
     /// Read the current raw value of the rtc time registers.
     ///
-    /// **This function does not take into account the boot time registers, and therefore
-    /// will not react to using [`set_time_us`][Self::set_time_us] and [`set_time_ms`][Self::set_time_ms].**
+    /// **This function does not take into account the boot time registers, and
+    /// therefore will not react to using [`set_time_us`][Self::set_time_us]
+    /// and [`set_time_ms`][Self::set_time_ms].**
     pub fn get_time_raw(&self) -> u64 {
         self.get_rtc_time_raw()
     }
@@ -287,7 +288,8 @@ impl<'d> Rtc<'d> {
         let rtc_cntl = unsafe { &*LP_TIMER::ptr() };
 
         // Register documentation: https://github.com/espressif/esp-idf/blob/master/components/esp_rom/esp32s3/include/esp32s3/rom/rtc.h
-        // STORE2 and STORE3 are used on all current chips: esp32, esp32p4, esp32h2, esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32s2, esp32s3
+        // STORE2 and STORE3 are used on all current chips: esp32, esp32p4, esp32h2,
+        // esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32s2, esp32s3
         // See https://github.com/search?q=repo%3Aespressif%2Fesp-idf+RTC_BOOT_TIME_LOW_REG+RTC_BOOT_TIME_HIGH_REG+path%3A**%2Frtc.h&type=code
         let (l, h) = (rtc_cntl.store2(), rtc_cntl.store3());
 
@@ -311,7 +313,8 @@ impl<'d> Rtc<'d> {
         let rtc_cntl = unsafe { &*LP_TIMER::ptr() };
 
         // Register documentation: https://github.com/espressif/esp-idf/blob/master/components/esp_rom/esp32s3/include/esp32s3/rom/rtc.h
-        // STORE2 and STORE3 are used on all current chips: esp32, esp32p4, esp32h2, esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32s2, esp32s3
+        // STORE2 and STORE3 are used on all current chips: esp32, esp32p4, esp32h2,
+        // esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32s2, esp32s3
         // See https://github.com/search?q=repo%3Aespressif%2Fesp-idf+RTC_BOOT_TIME_LOW_REG+RTC_BOOT_TIME_HIGH_REG+path%3A**%2Frtc.h&type=code
         let (l, h) = (rtc_cntl.store2(), rtc_cntl.store3());
 
@@ -346,7 +349,8 @@ impl<'d> Rtc<'d> {
         // so boot time = current time - time since boot (rtc time)
         let rtc_time_us = self.get_rtc_time_us();
         if time_us < rtc_time_us {
-            // if we subtract rtc_time_us from time_us, it will be negative and an overflow will happen
+            // if we subtract rtc_time_us from time_us, it will be negative and an overflow
+            // will happen
             Err(RtcSetOverflow)
         } else {
             Ok(self.set_boot_time_us(time_us - rtc_time_us))
