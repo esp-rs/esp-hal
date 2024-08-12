@@ -61,6 +61,10 @@
 
 use core::{convert::Infallible, marker::PhantomData};
 
+/// Re-export digest for convenience
+#[cfg(feature = "digest")]
+pub use digest::Digest;
+
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::SHA,
