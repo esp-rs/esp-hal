@@ -10,14 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added new `Io::new_no_bind_interrupt` constructor (#1861)
+- Added `Rtc::set_time_us` and `Rtc::set_time_ms` to allow setting RTC time (#1883)
 
 ### Changed
 
 - Peripheral driver constructors don't take `InterruptHandler`s anymore. Use `set_interrupt_handler` to explicitly set the interrupt handler now. (#1819)
 - Use the peripheral ref pattern for `OneShotTimer` and `PeriodicTimer` (#1855)
-
 - Allow DMA to/from psram for esp32s3 (#1827)
 - DMA buffers now don't require a static lifetime. Make sure to never `mem::forget` an in-progress DMA transfer (consider using `#[deny(clippy::mem_forget)]`) (#1837)
+- Deprecated `Rtc::get_time_raw` since it doesn't respect boot time and therefore won't react to setting RTC time (#1883)
 
 ### Fixed
 
