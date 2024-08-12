@@ -31,7 +31,7 @@ use esp_hal::{
     peripherals::{self, Peripherals, TWAI0},
     system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
-    twai::{self, EspTwaiFrame, TwaiRx, TwaiTx},
+    twai::{self, EspTwaiFrame, TwaiMode, TwaiRx, TwaiTx},
 };
 use esp_println::println;
 use static_cell::StaticCell;
@@ -122,6 +122,7 @@ async fn main(spawner: Spawner) {
         can_rx_pin,
         &clocks,
         CAN_BAUDRATE,
+        TwaiMode::Normal,
     );
 
     // Partially filter the incoming messages to reduce overhead of receiving
