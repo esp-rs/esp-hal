@@ -82,6 +82,8 @@
 //! # use esp_hal::twai::filter;
 //! # use esp_hal::twai::TwaiConfiguration;
 //! # use esp_hal::twai::BaudRate;
+//! # use esp_hal::twai::EspTwaiFrame;
+//! # use esp_hal::twai::StandardId;
 //! # use esp_hal::twai::TwaiMode;
 //! # use esp_hal::gpio::Io;
 //! # use embedded_can::Frame;
@@ -109,7 +111,7 @@
 //! // Partially filter the incoming messages to reduce overhead of receiving
 //! // undesired messages
 //! const FILTER: twai::filter::SingleStandardFilter =
-//!     SingleStandardFilter::new_self_reception(b"xxxxxxxxxx0", b"x",
+//!     SingleStandardFilter::new(b"xxxxxxxxxx0", b"x",
 //!         [b"xxxxxxxx", b"xxxxxxxx"]);
 //! can_config.set_filter(FILTER);
 //!
@@ -120,10 +122,8 @@
 //!
 //! let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO.into(),
 //!     &[1, 2, 3]).unwrap();
-//! println!("Sent a frame");
 //! // Wait for a frame to be received.
 //! let frame = block!(can.receive()).unwrap();
-//! println!("Received a frame: {frame:?}");
 //!
 //! loop {}
 //! # }
