@@ -3,7 +3,7 @@
 //! ## Overview
 //! The DMA driver provides an interface to efficiently transfer data between
 //! different memory regions and peripherals within the ESP microcontroller
-//! without involving the CPU. The DMA controller is reponsible for managing
+//! without involving the CPU. The DMA controller is responsible for managing
 //! these data transfers.
 //!
 //! Notice, that this module is a common version of the DMA driver, `ESP32` and
