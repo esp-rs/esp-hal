@@ -29,6 +29,8 @@
 //! # }
 //! ```
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use crate::{
     interrupt::InterruptHandler,
     peripheral::PeripheralRef,

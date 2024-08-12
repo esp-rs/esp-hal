@@ -50,8 +50,6 @@
 //!
 //! For convenience you can use the [crate::dma_buffers] macro.
 
-#![deny(missing_docs)]
-
 use core::{fmt::Debug, marker::PhantomData, ptr::addr_of_mut, sync::atomic::compiler_fence};
 
 trait Word: crate::private::Sealed {}

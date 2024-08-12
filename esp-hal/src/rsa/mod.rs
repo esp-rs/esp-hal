@@ -34,6 +34,8 @@
 //! [nb]: https://docs.rs/nb/1.1.0/nb/
 //! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/rsa.rs
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use core::{marker::PhantomData, ptr::copy_nonoverlapping};
 
 use crate::{

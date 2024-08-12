@@ -118,6 +118,8 @@
 //! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/
 //! [embedded-io-async]: https://docs.rs/embedded-io-async/latest/embedded_io_async/
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use core::marker::PhantomData;
 
 use self::config::Config;

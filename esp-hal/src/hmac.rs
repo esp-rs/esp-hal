@@ -34,6 +34,8 @@
 //!
 //! [HMAC]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/hmac.rs
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use core::convert::Infallible;
 
 use crate::{

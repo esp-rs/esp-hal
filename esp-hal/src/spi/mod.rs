@@ -9,6 +9,8 @@
 //! more information on these modes, please refer to the documentation in their
 //! respective modules.
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use crate::dma::DmaError;
 
 pub mod master;

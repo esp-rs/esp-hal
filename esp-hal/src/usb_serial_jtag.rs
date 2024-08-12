@@ -337,6 +337,7 @@ where
         self.tx.flush_tx_nb()
     }
 
+    /// Read a single byte but don't block if it isn't ready immediately
     pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
         self.rx.read_byte()
     }
