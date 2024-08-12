@@ -14,7 +14,7 @@
 //!
 //! `IS_FIRST_SENDER` below must be set to false on one of the ESP's
 //!
-//! In case you want to use `self-testing``, get rid of everything related to the aforementioned `IS_FIRST_SENDER`
+//! In case you want to use `self-testing`, get rid of everything related to the aforementioned `IS_FIRST_SENDER`
 //! and follow the advice in the comments related to this mode.
 
 //% CHIPS: esp32c3 esp32c6 esp32s2 esp32s3
@@ -62,7 +62,7 @@ fn main() -> ! {
         can_rx_pin,
         &clocks,
         CAN_BAUDRATE,
-        TwaiMode::NoAck,
+        TwaiMode::Normal,
     );
 
     // Partially filter the incoming messages to reduce overhead of receiving
@@ -83,7 +83,7 @@ fn main() -> ! {
     if IS_FIRST_SENDER {
         // Send a frame to the other ESP
         // Use `new_self_reception` if you want to use self-testing.
-        let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO.into(), &[1, 2, 3]).unwrap();
+        let frame = EspTwaiFrame::new(StandardId::ZERO.into(), &[1, 2, 3]).unwrap();
         block!(can.transmit(&frame)).unwrap();
         println!("Sent a frame");
     }
