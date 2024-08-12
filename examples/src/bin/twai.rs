@@ -55,7 +55,7 @@ fn main() -> ! {
 
     // Begin configuring the TWAI peripheral. The peripheral is in a reset like
     // state that prevents transmission but allows configuration.
-    // For self-testing use `NoAck` mode of the TWAI peripheral.
+    // For self-testing use `SelfTest` mode of the TWAI peripheral.
     let mut can_config = twai::TwaiConfiguration::new_no_transceiver(
         peripherals.TWAI0,
         can_tx_pin,

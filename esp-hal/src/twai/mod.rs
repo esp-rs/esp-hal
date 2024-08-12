@@ -105,7 +105,7 @@
 //!     can_rx_pin,
 //!     &clocks,
 //!     CAN_BAUDRATE,
-//!     TwaiMode::NoAck
+//!     TwaiMode::SelfTest
 //! );
 //!
 //! // Partially filter the incoming messages to reduce overhead of receiving
@@ -249,7 +249,7 @@ pub enum TwaiMode {
     Normal,
     /// Self-test mode (no acknowledgement required for a successful message
     /// transmission)
-    NoAck,
+    SelfTest,
     /// Listen only operating mode
     ListenOnly,
 }
@@ -758,7 +758,7 @@ where
             TwaiMode::Normal => {
                 // Do nothing special, the default state is Normal mode.
             }
-            TwaiMode::NoAck => {
+            TwaiMode::SelfTest => {
                 // Set the self-test mode (no acknowledgement required)
                 T::register_block()
                     .mode()
