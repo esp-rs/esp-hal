@@ -282,6 +282,7 @@ impl<'d> Rtc<'d> {
 
     /// Read the current value of the boot time registers in microseconds.
     fn get_boot_time_us(&self) -> u64 {
+        // For more info on about how RTC setting works, see https://github.com/esp-rs/esp-hal/pull/1883
         #[cfg(not(any(esp32c6, esp32h2)))]
         let rtc_cntl = unsafe { &*LPWR::ptr() };
         #[cfg(any(esp32c6, esp32h2))]
@@ -307,6 +308,7 @@ impl<'d> Rtc<'d> {
 
     /// Set the current value of the boot time registers in microseconds.
     fn set_boot_time_us(&self, boot_time_us: u64) {
+        // For more info on about how RTC setting works, see https://github.com/esp-rs/esp-hal/pull/1883
         #[cfg(not(any(esp32c6, esp32h2)))]
         let rtc_cntl = unsafe { &*LPWR::ptr() };
         #[cfg(any(esp32c6, esp32h2))]
