@@ -440,7 +440,6 @@ macro_rules! impl_sha {
         }
 
         /// Implement Default to create hasher out of thin air
-        /// TODO: Ensure safety is when using multiple Sha at once.
         impl<'d> core::default::Default for $name<'d, crate::Blocking> {
             fn default() -> Self {
                 let sha = unsafe { crate::peripherals::SHA::steal() };
