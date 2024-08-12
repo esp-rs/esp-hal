@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added new `Io::new_no_bind_interrupt` constructor (#1861)
+- Added touch pad support for esp32 (#1873)
+- Allow configuration of period updating method for MCPWM timers (#1898)
+- Add self-testing mode for TWAI peripheral. (#1929)
 - Added `Rtc::set_time_us` and `Rtc::set_time_ms` to allow setting RTC time (#1883)
 
 ### Changed
@@ -26,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix I2S async-tx (#1833)
 - Fix PARL_IO async-rx (#1851)
 - SPI: Clear DMA interrupts before (not after) DMA starts (#1859)
+- SPI: disable and re-enable MISO and MOSI in `start_transfer_dma`, `start_read_bytes_dma` and `start_write_bytes_dma` accordingly (#1894)
+- TWAI: GPIO pins are not configured as input and output (#1906)
 
 ### Removed
 

@@ -55,7 +55,7 @@ jobs:
         uses: dtolnay/rust-toolchain@v1
         with:
           target: ${{ matrix.target.rust-target }}
-          toolchain: nightly
+          toolchain: stable
           components: rust-src
       # Install the Rust toolchain for Xtensa devices:
       - if: contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.target.soc)
@@ -103,7 +103,7 @@ jobs:
           # RISC-V devices:
           - soc: esp32c2
             runner: esp32c2-jtag
-            usb: ACM0
+            usb: USB2
           - soc: esp32c3
             runner: esp32c3-usb
             usb: ACM0
@@ -112,16 +112,23 @@ jobs:
             usb: ACM0
           - soc: esp32h2
             runner: esp32h2-usb
-            usb: ACM0
+            usb: USB0
           # Xtensa devices:
           - soc: esp32s2
             runner: esp32s2-jtag
-            usb: USB0
+            usb: USB1
           - soc: esp32s3
             runner: esp32s3-usb
             usb: USB0
     steps:
       - uses: actions/checkout@v4
+        if: github.event_name != 'workflow_dispatch'
+      - uses: actions/checkout@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          repository: ${{ github.event.inputs.repository }}
+          ref: ${{ github.event.inputs.branch }}
+
       - uses: actions/download-artifact@v4
         with:
           name: tests-${{ matrix.target.soc }}

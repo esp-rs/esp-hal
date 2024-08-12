@@ -31,7 +31,12 @@ use crate::{
 };
 
 impl WakeSource for TimerWakeupSource {
-    fn apply(&self, rtc: &Rtc, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
+    fn apply(
+        &self,
+        rtc: &Rtc<'_>,
+        triggers: &mut WakeTriggers,
+        _sleep_config: &mut RtcSleepConfig,
+    ) {
         triggers.set_timer(true);
 
         let lp_timer = unsafe { &*esp32c6::LP_TIMER::ptr() };
@@ -91,7 +96,12 @@ impl Ext1WakeupSource<'_, '_> {
 }
 
 impl WakeSource for Ext1WakeupSource<'_, '_> {
-    fn apply(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
+    fn apply(
+        &self,
+        _rtc: &Rtc<'_>,
+        triggers: &mut WakeTriggers,
+        _sleep_config: &mut RtcSleepConfig,
+    ) {
         // We don't have to keep the LP domain powered if we hold the wakeup pin states.
         triggers.set_ext1(true);
 
@@ -140,7 +150,12 @@ impl Drop for Ext1WakeupSource<'_, '_> {
 }
 
 impl WakeSource for WakeFromLpCoreWakeupSource {
-    fn apply(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
+    fn apply(
+        &self,
+        _rtc: &Rtc<'_>,
+        triggers: &mut WakeTriggers,
+        _sleep_config: &mut RtcSleepConfig,
+    ) {
         triggers.set_lp_core(true);
     }
 }
@@ -823,7 +838,7 @@ impl RtcSleepConfig {
         }
     }
 
-    pub(crate) fn base_settings(_rtc: &Rtc) {
+    pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
         Self::wake_io_reset();
     }
 

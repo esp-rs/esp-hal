@@ -9,15 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Implement `embedded_io::{ReadReady, WriteReady}` traits for `WifiStack` (#1882)
+
 ### Changed
 
 ### Fixed
 
+- Increased NPL event queue size to prevent overflow (#1891)
+
 ### Removed
 
 ## 0.7.1 - 2024-07-17
-
-### Added
 
 ### Changed
 
@@ -26,8 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Downgrade `embedded-svc` to 0.27.1 (#1820)
-
-### Removed
 
 ## 0.7.0 - 2024-07-15
 

@@ -244,47 +244,9 @@ pub(crate) mod utils {
     const ESP_ROM_EFUSE_FLASH_DEFAULT_SPI: u32 = 0;
     const SPICS1_OUT_IDX: u8 = 6;
 
-    const DR_REG_SPI0_BASE: u32 = 0x60003000;
-    const SPI0_MEM_SPI_SMEM_AC_REG: u32 = DR_REG_SPI0_BASE + 0xDC;
-    const SPI_MEM_SPI_SMEM_CS_HOLD_TIME_V: u32 = 0x1F;
-    const SPI_MEM_SPI_SMEM_CS_HOLD_TIME_S: u32 = 7;
-    const SPI_MEM_SPI_SMEM_CS_SETUP_TIME_V: u32 = 0x1F;
-    const SPI_MEM_SPI_SMEM_CS_SETUP_TIME_S: u32 = 2;
-    const SPI_MEM_SPI_SMEM_CS_HOLD_M: u32 = 1 << 1;
-    const SPI_MEM_SPI_SMEM_CS_SETUP_M: u32 = 1 << 0;
-    const SPI0_MEM_CACHE_SCTRL_REG: u32 = DR_REG_SPI0_BASE + 0x40;
-    const SPI0_MEM_SRAM_DWR_CMD_REG: u32 = DR_REG_SPI0_BASE + 0x4C;
-    const SPI0_MEM_SRAM_DRD_CMD_REG: u32 = DR_REG_SPI0_BASE + 0x48;
-    const SPI_MEM_USR_SRAM_DIO_M: u32 = 1 << 1;
-    const SPI_MEM_USR_SRAM_QIO_M: u32 = 1 << 2;
-    const SPI_MEM_CACHE_SRAM_USR_RCMD_M: u32 = 1 << 5;
-    const SPI_MEM_CACHE_SRAM_USR_WCMD_M: u32 = 1 << 20;
-    const SPI_MEM_CACHE_SRAM_USR_WR_CMD_BITLEN: u32 = 0x0000000F;
-    const SPI_MEM_CACHE_SRAM_USR_WR_CMD_BITLEN_S: u32 = 28;
-    const SPI_MEM_CACHE_SRAM_USR_WR_CMD_VALUE: u32 = 0x0000FFFF;
-    const SPI_MEM_CACHE_SRAM_USR_WR_CMD_VALUE_S: u32 = 0;
     const PSRAM_QUAD_WRITE: u32 = 0x38;
-    const SPI_MEM_CACHE_SRAM_USR_RD_CMD_BITLEN_V: u32 = 0xF;
-    const SPI_MEM_CACHE_SRAM_USR_RD_CMD_BITLEN_S: u32 = 28;
-    const SPI_MEM_CACHE_SRAM_USR_RD_CMD_VALUE_V: u32 = 0xFFFF;
     const PSRAM_FAST_READ_QUAD: u32 = 0xEB;
-    const SPI_MEM_CACHE_SRAM_USR_RD_CMD_VALUE_S: u32 = 0;
-    const SPI_MEM_SRAM_ADDR_BITLEN_V: u32 = 0x3F;
-    const SPI_MEM_SRAM_ADDR_BITLEN_S: u32 = 14;
-    const SPI_MEM_USR_RD_SRAM_DUMMY_M: u32 = 1 << 4;
-    const SPI_MEM_SRAM_RDUMMY_CYCLELEN_V: u32 = 0x3F;
     const PSRAM_FAST_READ_QUAD_DUMMY: u32 = 6;
-    const SPI_MEM_SRAM_RDUMMY_CYCLELEN_S: u32 = 6;
-    const SPI0_MEM_MISC_REG: u32 = DR_REG_SPI0_BASE + 0x34;
-    const SPI_MEM_CS1_DIS_M: u32 = 1 << 1;
-    const SPI0_MEM_CORE_CLK_SEL_REG: u32 = DR_REG_SPI0_BASE + 0xEC;
-    const SPI_MEM_CORE_CLK_SEL: u32 = 0x00000003;
-    const DR_REG_SPI1_BASE: u32 = 0x60002000;
-    const SPI0_MEM_CLOCK_REG: u32 = DR_REG_SPI0_BASE + 0x14;
-    const SPI1_MEM_CLOCK_REG: u32 = DR_REG_SPI1_BASE + 0x14;
-    const SPI0_MEM_SRAM_CLK_REG: u32 = DR_REG_SPI0_BASE + 0x50;
-    const SPI_MEM_CLK_EQU_SYSCLK: u32 = 1 << 31;
-    const SPI_MEM_SCLK_EQU_SYSCLK: u32 = 1 << 31;
     const SPI_MEM_CLKCNT_N_S: u32 = 16;
     const SPI_MEM_SCLKCNT_N_S: u32 = 16;
     const SPI_MEM_CLKCNT_H_S: u32 = 8;
@@ -327,57 +289,55 @@ pub(crate) mod utils {
     // requirement
     #[ram]
     fn config_psram_spi_phases() {
-        // Config CMD phase
-        clear_peri_reg_mask(SPI0_MEM_CACHE_SCTRL_REG, SPI_MEM_USR_SRAM_DIO_M); // disable dio mode for cache command
-        set_peri_reg_mask(SPI0_MEM_CACHE_SCTRL_REG, SPI_MEM_USR_SRAM_QIO_M); // enable qio mode for cache command
-        set_peri_reg_mask(SPI0_MEM_CACHE_SCTRL_REG, SPI_MEM_CACHE_SRAM_USR_RCMD_M); // enable cache read command
-        set_peri_reg_mask(SPI0_MEM_CACHE_SCTRL_REG, SPI_MEM_CACHE_SRAM_USR_WCMD_M); // enable cache write command
-        set_peri_reg_bits(
-            SPI0_MEM_SRAM_DWR_CMD_REG,
-            SPI_MEM_CACHE_SRAM_USR_WR_CMD_BITLEN,
-            7,
-            SPI_MEM_CACHE_SRAM_USR_WR_CMD_BITLEN_S,
-        );
-        set_peri_reg_bits(
-            SPI0_MEM_SRAM_DWR_CMD_REG,
-            SPI_MEM_CACHE_SRAM_USR_WR_CMD_VALUE,
-            PSRAM_QUAD_WRITE,
-            SPI_MEM_CACHE_SRAM_USR_WR_CMD_VALUE_S,
-        ); // 0x38
-        set_peri_reg_bits(
-            SPI0_MEM_SRAM_DRD_CMD_REG,
-            SPI_MEM_CACHE_SRAM_USR_RD_CMD_BITLEN_V,
-            7,
-            SPI_MEM_CACHE_SRAM_USR_RD_CMD_BITLEN_S,
-        );
-        set_peri_reg_bits(
-            SPI0_MEM_SRAM_DRD_CMD_REG,
-            SPI_MEM_CACHE_SRAM_USR_RD_CMD_VALUE_V,
-            PSRAM_FAST_READ_QUAD,
-            SPI_MEM_CACHE_SRAM_USR_RD_CMD_VALUE_S,
-        ); // 0xEB
+        unsafe {
+            let spi = &*crate::peripherals::SPI0::PTR;
+            // Config CMD phase
+            spi.cache_sctrl()
+                .modify(|_, w| w.usr_sram_dio().clear_bit()); // disable dio mode for cache command
 
-        // Config ADDR phase
-        set_peri_reg_bits(
-            SPI0_MEM_CACHE_SCTRL_REG,
-            SPI_MEM_SRAM_ADDR_BITLEN_V,
-            23,
-            SPI_MEM_SRAM_ADDR_BITLEN_S,
-        );
+            spi.cache_sctrl().modify(|_, w| w.usr_sram_qio().set_bit()); // enable qio mode for cache command
 
-        // Dummy
-        // We set the PSRAM chip required dummy here. If timing tuning is
-        // needed, the dummy length will be updated in
-        // `mspi_timing_enter_high_speed_mode()`
-        set_peri_reg_mask(SPI0_MEM_CACHE_SCTRL_REG, SPI_MEM_USR_RD_SRAM_DUMMY_M); // enable cache read dummy
-        set_peri_reg_bits(
-            SPI0_MEM_CACHE_SCTRL_REG,
-            SPI_MEM_SRAM_RDUMMY_CYCLELEN_V,
-            PSRAM_FAST_READ_QUAD_DUMMY - 1,
-            SPI_MEM_SRAM_RDUMMY_CYCLELEN_S,
-        ); // dummy
+            spi.cache_sctrl()
+                .modify(|_, w| w.cache_sram_usr_rcmd().set_bit()); // enable cache read command
 
-        clear_peri_reg_mask(SPI0_MEM_MISC_REG, SPI_MEM_CS1_DIS_M); // ENABLE SPI0 CS1 TO PSRAM(CS0--FLASH; CS1--SRAM)
+            spi.cache_sctrl()
+                .modify(|_, w| w.cache_sram_usr_wcmd().set_bit()); // enable cache write command
+
+            spi.sram_dwr_cmd()
+                .modify(|_, w| w.cache_sram_usr_wr_cmd_bitlen().bits(7));
+
+            spi.sram_dwr_cmd().modify(|_, w| {
+                w.cache_sram_usr_wr_cmd_value()
+                    .bits(PSRAM_QUAD_WRITE as u16)
+            });
+
+            spi.sram_drd_cmd()
+                .modify(|_, w| w.cache_sram_usr_rd_cmd_bitlen().bits(7));
+
+            spi.sram_drd_cmd().modify(|_, w| {
+                w.cache_sram_usr_rd_cmd_value()
+                    .bits(PSRAM_FAST_READ_QUAD as u16)
+            });
+
+            // Config ADDR phase
+            spi.cache_sctrl()
+                .modify(|_, w| w.sram_addr_bitlen().bits(23));
+
+            // Dummy
+            // We set the PSRAM chip required dummy here. If timing tuning is
+            // needed, the dummy length will be updated in
+            // `mspi_timing_enter_high_speed_mode()`
+            spi.cache_sctrl()
+                .modify(|_, w| w.usr_rd_sram_dummy().set_bit()); // enable cache read dummy
+
+            spi.cache_sctrl().modify(|_, w| {
+                w.sram_rdummy_cyclelen()
+                    .bits((PSRAM_FAST_READ_QUAD_DUMMY - 1) as u8)
+            });
+
+            // ENABLE SPI0 CS1 TO PSRAM(CS0--FLASH; CS1--SRAM)
+            spi.misc().modify(|_, w| w.cs1_dis().clear_bit());
+        }
     }
 
     #[ram]
@@ -424,49 +384,61 @@ pub(crate) mod utils {
 
     #[ram]
     fn spi0_timing_config_set_core_clock(core_clock: SpiTimingConfigCoreClock) {
-        let reg_val = match core_clock {
-            SpiTimingConfigCoreClock::SpiTimingConfigCoreClock80m => 0,
-            SpiTimingConfigCoreClock::SpiTimingConfigCoreClock120m => 1,
-            SpiTimingConfigCoreClock::SpiTimingConfigCoreClock160m => 2,
-            SpiTimingConfigCoreClock::SpiTimingConfigCoreClock240m => 3,
-        };
-
-        set_peri_reg_bits(SPI0_MEM_CORE_CLK_SEL_REG, SPI_MEM_CORE_CLK_SEL, reg_val, 0);
+        unsafe {
+            let spi = &*crate::peripherals::SPI0::PTR;
+            spi.core_clk_sel().modify(|_, w| {
+                w.core_clk_sel().bits(match core_clock {
+                    SpiTimingConfigCoreClock::SpiTimingConfigCoreClock80m => 0,
+                    SpiTimingConfigCoreClock::SpiTimingConfigCoreClock120m => 1,
+                    SpiTimingConfigCoreClock::SpiTimingConfigCoreClock160m => 2,
+                    SpiTimingConfigCoreClock::SpiTimingConfigCoreClock240m => 3,
+                })
+            });
+        }
     }
 
     #[ram]
     fn spi0_timing_config_set_flash_clock(freqdiv: u32) {
+        let spi = unsafe { &*crate::peripherals::SPI0::PTR };
         if freqdiv == 1 {
-            write_peri_reg(SPI0_MEM_CLOCK_REG, SPI_MEM_CLK_EQU_SYSCLK);
+            spi.clock().modify(|_, w| w.clk_equ_sysclk().set_bit());
         } else {
             let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_CLKCNT_N_S)
                 | ((freqdiv / 2 - 1) << SPI_MEM_CLKCNT_H_S)
                 | ((freqdiv - 1) << SPI_MEM_CLKCNT_L_S);
-            write_peri_reg(SPI0_MEM_CLOCK_REG, freqbits);
+            unsafe {
+                spi.clock().modify(|_, w| w.bits(freqbits));
+            }
         }
     }
 
     #[ram]
     fn spi1_timing_config_set_flash_clock(freqdiv: u32) {
+        let spi = unsafe { &*crate::peripherals::SPI1::PTR };
         if freqdiv == 1 {
-            write_peri_reg(SPI1_MEM_CLOCK_REG, SPI_MEM_CLK_EQU_SYSCLK);
+            spi.clock().modify(|_, w| w.clk_equ_sysclk().set_bit());
         } else {
             let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_CLKCNT_N_S)
                 | ((freqdiv / 2 - 1) << SPI_MEM_CLKCNT_H_S)
                 | ((freqdiv - 1) << SPI_MEM_CLKCNT_L_S);
-            write_peri_reg(SPI1_MEM_CLOCK_REG, freqbits);
+            unsafe {
+                spi.clock().modify(|_, w| w.bits(freqbits));
+            }
         }
     }
 
     #[ram]
     fn spi0_timing_config_set_psram_clock(freqdiv: u32) {
+        let spi = unsafe { &*crate::peripherals::SPI0::PTR };
         if freqdiv == 1 {
-            write_peri_reg(SPI0_MEM_SRAM_CLK_REG, SPI_MEM_SCLK_EQU_SYSCLK);
+            spi.sram_clk().modify(|_, w| w.sclk_equ_sysclk().set_bit());
         } else {
             let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_SCLKCNT_N_S)
                 | ((freqdiv / 2 - 1) << SPI_MEM_SCLKCNT_H_S)
                 | ((freqdiv - 1) << SPI_MEM_SCLKCNT_L_S);
-            write_peri_reg(SPI0_MEM_SRAM_CLK_REG, freqbits);
+            unsafe {
+                spi.sram_clk().modify(|_, w| w.bits(freqbits));
+            }
         }
     }
 
@@ -702,24 +674,19 @@ pub(crate) mod utils {
 
     #[ram]
     fn psram_set_cs_timing() {
-        // SPI0/1 share the cs_hold / cs_setup, cd_hold_time / cd_setup_time registers
-        // for PSRAM, so we only need to set SPI0 related registers here
-        set_peri_reg_bits(
-            SPI0_MEM_SPI_SMEM_AC_REG,
-            SPI_MEM_SPI_SMEM_CS_HOLD_TIME_V,
-            0,
-            SPI_MEM_SPI_SMEM_CS_HOLD_TIME_S,
-        );
-        set_peri_reg_bits(
-            SPI0_MEM_SPI_SMEM_AC_REG,
-            SPI_MEM_SPI_SMEM_CS_SETUP_TIME_V,
-            0,
-            SPI_MEM_SPI_SMEM_CS_SETUP_TIME_S,
-        );
-        set_peri_reg_mask(
-            SPI0_MEM_SPI_SMEM_AC_REG,
-            SPI_MEM_SPI_SMEM_CS_HOLD_M | SPI_MEM_SPI_SMEM_CS_SETUP_M,
-        );
+        unsafe {
+            let spi = &*crate::peripherals::SPI0::PTR;
+            // SPI0/1 share the cs_hold / cs_setup, cd_hold_time / cd_setup_time registers
+            // for PSRAM, so we only need to set SPI0 related registers here
+            spi.spi_smem_ac()
+                .modify(|_, w| w.spi_smem_cs_hold_time().bits(0));
+            spi.spi_smem_ac()
+                .modify(|_, w| w.spi_smem_cs_setup_time().bits(0));
+            spi.spi_smem_ac()
+                .modify(|_, w| w.spi_smem_cs_hold().set_bit());
+            spi.spi_smem_ac()
+                .modify(|_, w| w.spi_smem_cs_setup().set_bit());
+        }
     }
 
     #[ram]
@@ -758,37 +725,6 @@ pub(crate) mod utils {
         // This ROM function will init both WP and HD pins.
         unsafe {
             esp_rom_spiflash_select_qio_pins(wp_io, spiconfig);
-        }
-    }
-
-    #[inline(always)]
-    fn clear_peri_reg_mask(reg: u32, mask: u32) {
-        unsafe {
-            (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() & !mask);
-        }
-    }
-
-    #[inline(always)]
-    fn set_peri_reg_mask(reg: u32, mask: u32) {
-        unsafe {
-            (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() | mask);
-        }
-    }
-
-    #[inline(always)]
-    fn set_peri_reg_bits(reg: u32, bitmap: u32, value: u32, shift: u32) {
-        unsafe {
-            (reg as *mut u32).write_volatile(
-                ((reg as *mut u32).read_volatile() & !(bitmap << shift))
-                    | ((value & bitmap) << shift),
-            );
-        }
-    }
-
-    #[inline(always)]
-    fn write_peri_reg(reg: u32, val: u32) {
-        unsafe {
-            (reg as *mut u32).write_volatile(val);
         }
     }
 }
@@ -877,71 +813,12 @@ pub(crate) mod utils {
     const SPI_CS1_GPIO_NUM: u8 = 26;
     const FUNC_SPICS1_SPICS1: u8 = 0;
 
-    const SPI1_MEM_DDR_REG: u32 = DR_REG_SPI1_BASE + 0xe0;
-    const SPI_MEM_SPI_FMEM_VAR_DUMMY: u32 = 1 << 1;
-
-    const DR_REG_SPI0_BASE: u32 = 0x60003000;
-    const SPI0_MEM_SPI_SMEM_AC_REG: u32 = DR_REG_SPI0_BASE + 0xDC;
-    const SPI_MEM_SPI_SMEM_CS_HOLD_TIME_V: u32 = 0x1F;
-    const SPI_MEM_SPI_SMEM_CS_HOLD_TIME_S: u32 = 7;
-    const SPI_MEM_SPI_SMEM_CS_SETUP_TIME_V: u32 = 0x1F;
-    const SPI_MEM_SPI_SMEM_CS_SETUP_TIME_S: u32 = 2;
-    const SPI_MEM_SPI_SMEM_CS_HOLD_M: u32 = 1 << 1;
-    const SPI_MEM_SPI_SMEM_CS_SETUP_M: u32 = 1 << 0;
-    const SPI0_MEM_CACHE_SCTRL_REG: u32 = DR_REG_SPI0_BASE + 0x40;
-    const SPI0_MEM_SRAM_DWR_CMD_REG: u32 = DR_REG_SPI0_BASE + 0x4C;
-    const SPI0_MEM_SRAM_DRD_CMD_REG: u32 = DR_REG_SPI0_BASE + 0x48;
-    const SPI_MEM_CACHE_SRAM_USR_RCMD_M: u32 = 1 << 5;
-    const SPI_MEM_CACHE_SRAM_USR_WCMD_M: u32 = 1 << 20;
-    const SPI_MEM_CACHE_SRAM_USR_WR_CMD_BITLEN: u32 = 0x0000000F;
-    const SPI_MEM_CACHE_SRAM_USR_WR_CMD_BITLEN_S: u32 = 28;
-    const SPI_MEM_CACHE_SRAM_USR_WR_CMD_VALUE: u32 = 0x0000FFFF;
-    const SPI_MEM_CACHE_SRAM_USR_WR_CMD_VALUE_S: u32 = 0;
-    const SPI_MEM_CACHE_SRAM_USR_RD_CMD_BITLEN_V: u32 = 0xF;
-    const SPI_MEM_CACHE_SRAM_USR_RD_CMD_BITLEN_S: u32 = 28;
-    const SPI_MEM_CACHE_SRAM_USR_RD_CMD_VALUE_V: u32 = 0xFFFF;
-    const SPI_MEM_CACHE_SRAM_USR_RD_CMD_VALUE_S: u32 = 0;
-    const SPI_MEM_SRAM_ADDR_BITLEN_V: u32 = 0x3F;
-    const SPI_MEM_SRAM_ADDR_BITLEN_S: u32 = 14;
-    const SPI_MEM_USR_RD_SRAM_DUMMY_M: u32 = 1 << 4;
-    const SPI_MEM_SRAM_RDUMMY_CYCLELEN_V: u32 = 0x3F;
-    const SPI_MEM_SRAM_RDUMMY_CYCLELEN_S: u32 = 6;
-    const SPI0_MEM_CORE_CLK_SEL_REG: u32 = DR_REG_SPI0_BASE + 0xEC;
-    const SPI_MEM_CORE_CLK_SEL: u32 = 0x00000003;
-    const DR_REG_SPI1_BASE: u32 = 0x60002000;
-    const SPI0_MEM_DATE_REG: u32 = DR_REG_SPI0_BASE + 0x3FC;
-    const SPI0_MEM_CLOCK_REG: u32 = DR_REG_SPI0_BASE + 0x14;
-    const SPI1_MEM_CLOCK_REG: u32 = DR_REG_SPI1_BASE + 0x14;
-    const SPI0_MEM_SRAM_CLK_REG: u32 = DR_REG_SPI0_BASE + 0x50;
-    const SPI_MEM_CLK_EQU_SYSCLK: u32 = 1 << 31;
-    const SPI_MEM_SCLK_EQU_SYSCLK: u32 = 1 << 31;
     const SPI_MEM_CLKCNT_N_S: u32 = 16;
     const SPI_MEM_SCLKCNT_N_S: u32 = 16;
     const SPI_MEM_CLKCNT_H_S: u32 = 8;
     const SPI_MEM_SCLKCNT_H_S: u32 = 8;
     const SPI_MEM_CLKCNT_L_S: u32 = 0;
     const SPI_MEM_SCLKCNT_L_S: u32 = 0;
-    const SPI_MEM_CACHE_USR_SCMD_4BYTE_M: u32 = 1 << 0;
-    const SPI_MEM_USR_WR_SRAM_DUMMY_M: u32 = 1 << 3;
-    const SPI0_MEM_SPI_SMEM_DDR_REG: u32 = DR_REG_SPI0_BASE + 0xE4;
-    const SPI0_MEM_SRAM_CMD_REG: u32 = DR_REG_SPI0_BASE + 0x44;
-    const SPI_MEM_SPI_SMEM_VAR_DUMMY_M: u32 = 1 << 1;
-    const SPI_MEM_SRAM_WDUMMY_CYCLELEN_V: u32 = 0x3F;
-    const SPI_MEM_SRAM_WDUMMY_CYCLELEN_S: u32 = 22;
-    const SPI_MEM_SPI_SMEM_DDR_WDAT_SWP_M: u32 = 1 << 3;
-    const SPI_MEM_SPI_SMEM_DDR_RDAT_SWP_M: u32 = 1 << 2;
-    const SPI_MEM_SPI_SMEM_DDR_EN_M: u32 = 1 << 0;
-    const SPI_MEM_SDUMMY_OUT_M: u32 = 1 << 22;
-    const SPI_MEM_SCMD_OCT_M: u32 = 1 << 21;
-    const SPI_MEM_SADDR_OCT_M: u32 = 1 << 20;
-    const SPI_MEM_SDOUT_OCT_M: u32 = 1 << 19;
-    const SPI_MEM_SDIN_OCT_M: u32 = 1 << 18;
-    const SPI_MEM_SRAM_OCT_M: u32 = 1 << 21;
-    const SPI_MEM_SPI_SMEM_CS_HOLD_DELAY_V: u32 = 0x3F;
-    const SPI_MEM_SPI_SMEM_CS_HOLD_DELAY_S: u32 = 25;
-    const SPI_MEM_SPI_SMEM_SPICLK_FUN_DRV: u32 = 0x00000003;
-    const SPI_MEM_SPI_SMEM_SPICLK_FUN_DRV_V: u32 = 0x3;
-    const SPI_MEM_SPI_SMEM_SPICLK_FUN_DRV_S: u32 = 0;
     const ESP_ROM_SPIFLASH_OPI_DTR_MODE: u8 = 7;
 
     extern "C" {
@@ -1200,9 +1077,10 @@ pub(crate) mod utils {
         // enter MSPI slow mode to init PSRAM device registers
         spi_timing_enter_mspi_low_speed_mode(true);
 
-        // set to variable dummy mode
-        set_peri_reg_mask(SPI1_MEM_DDR_REG, SPI_MEM_SPI_FMEM_VAR_DUMMY);
         unsafe {
+            // set to variable dummy mode
+            let spi = &*crate::peripherals::SPI1::PTR;
+            spi.ddr().modify(|_, w| w.spi_fmem_var_dummy().set_bit());
             esp_rom_spi_set_dtr_swap_mode(1, false, false);
         }
 
@@ -1258,85 +1136,67 @@ pub(crate) mod utils {
     // Configure PSRAM SPI0 phase related registers here according to the PSRAM chip
     // requirement
     fn config_psram_spi_phases() {
-        // Config Write CMD phase for SPI0 to access PSRAM
-        set_peri_reg_mask(SPI0_MEM_CACHE_SCTRL_REG, SPI_MEM_CACHE_SRAM_USR_WCMD_M);
-        set_peri_reg_bits(
-            SPI0_MEM_SRAM_DWR_CMD_REG,
-            SPI_MEM_CACHE_SRAM_USR_WR_CMD_BITLEN,
-            (OCT_PSRAM_WR_CMD_BITLEN - 1) as u32,
-            SPI_MEM_CACHE_SRAM_USR_WR_CMD_BITLEN_S,
-        );
-        set_peri_reg_bits(
-            SPI0_MEM_SRAM_DWR_CMD_REG,
-            SPI_MEM_CACHE_SRAM_USR_WR_CMD_VALUE,
-            OPI_PSRAM_SYNC_WRITE as u32,
-            SPI_MEM_CACHE_SRAM_USR_WR_CMD_VALUE_S,
-        );
+        unsafe {
+            let spi = &*crate::peripherals::SPI0::PTR;
+            // Config Write CMD phase for SPI0 to access PSRAM
+            spi.cache_sctrl()
+                .modify(|_, w| w.cache_sram_usr_wcmd().set_bit());
 
-        // Config Read CMD phase for SPI0 to access PSRAM
-        set_peri_reg_mask(SPI0_MEM_CACHE_SCTRL_REG, SPI_MEM_CACHE_SRAM_USR_RCMD_M);
-        set_peri_reg_bits(
-            SPI0_MEM_SRAM_DRD_CMD_REG,
-            SPI_MEM_CACHE_SRAM_USR_RD_CMD_BITLEN_V,
-            (OCT_PSRAM_RD_CMD_BITLEN - 1) as u32,
-            SPI_MEM_CACHE_SRAM_USR_RD_CMD_BITLEN_S,
-        );
-        set_peri_reg_bits(
-            SPI0_MEM_SRAM_DRD_CMD_REG,
-            SPI_MEM_CACHE_SRAM_USR_RD_CMD_VALUE_V,
-            OPI_PSRAM_SYNC_READ as u32,
-            SPI_MEM_CACHE_SRAM_USR_RD_CMD_VALUE_S,
-        );
+            spi.sram_dwr_cmd().modify(|_, w| {
+                w.cache_sram_usr_wr_cmd_bitlen()
+                    .bits(OCT_PSRAM_WR_CMD_BITLEN - 1)
+            });
+            spi.sram_dwr_cmd()
+                .modify(|_, w| w.cache_sram_usr_wr_cmd_value().bits(OPI_PSRAM_SYNC_WRITE));
 
-        // Config ADDR phase
-        set_peri_reg_bits(
-            SPI0_MEM_CACHE_SCTRL_REG,
-            SPI_MEM_SRAM_ADDR_BITLEN_V,
-            (OCT_PSRAM_ADDR_BITLEN - 1) as u32,
-            SPI_MEM_SRAM_ADDR_BITLEN_S,
-        );
-        set_peri_reg_mask(SPI0_MEM_CACHE_SCTRL_REG, SPI_MEM_CACHE_USR_SCMD_4BYTE_M);
+            // Config Read CMD phase for SPI0 to access PSRAM
+            spi.cache_sctrl()
+                .modify(|_, w| w.cache_sram_usr_rcmd().set_bit());
 
-        // Config RD/WR Dummy phase
-        set_peri_reg_mask(
-            SPI0_MEM_CACHE_SCTRL_REG,
-            SPI_MEM_USR_RD_SRAM_DUMMY_M | SPI_MEM_USR_WR_SRAM_DUMMY_M,
-        );
-        set_peri_reg_bits(
-            SPI0_MEM_CACHE_SCTRL_REG,
-            SPI_MEM_SRAM_RDUMMY_CYCLELEN_V,
-            (OCT_PSRAM_RD_DUMMY_BITLEN - 1) as u32,
-            SPI_MEM_SRAM_RDUMMY_CYCLELEN_S,
-        );
-        set_peri_reg_mask(SPI0_MEM_SPI_SMEM_DDR_REG, SPI_MEM_SPI_SMEM_VAR_DUMMY_M);
-        set_peri_reg_bits(
-            SPI0_MEM_CACHE_SCTRL_REG,
-            SPI_MEM_SRAM_WDUMMY_CYCLELEN_V,
-            (OCT_PSRAM_WR_DUMMY_BITLEN - 1) as u32,
-            SPI_MEM_SRAM_WDUMMY_CYCLELEN_S,
-        );
+            spi.sram_drd_cmd().modify(|_, w| {
+                w.cache_sram_usr_rd_cmd_bitlen()
+                    .bits(OCT_PSRAM_RD_CMD_BITLEN - 1)
+            });
+            spi.sram_drd_cmd()
+                .modify(|_, w| w.cache_sram_usr_rd_cmd_value().bits(OPI_PSRAM_SYNC_READ));
 
-        clear_peri_reg_mask(
-            SPI0_MEM_SPI_SMEM_DDR_REG,
-            SPI_MEM_SPI_SMEM_DDR_WDAT_SWP_M | SPI_MEM_SPI_SMEM_DDR_RDAT_SWP_M,
-        );
-        set_peri_reg_mask(SPI0_MEM_SPI_SMEM_DDR_REG, SPI_MEM_SPI_SMEM_DDR_EN_M);
+            // Config ADDR phase
+            spi.cache_sctrl()
+                .modify(|_, w| w.sram_addr_bitlen().bits(OCT_PSRAM_ADDR_BITLEN - 1));
+            spi.cache_sctrl()
+                .modify(|_, w| w.cache_usr_scmd_4byte().set_bit());
 
-        set_peri_reg_mask(
-            SPI0_MEM_SRAM_CMD_REG,
-            SPI_MEM_SDUMMY_OUT_M
-                | SPI_MEM_SCMD_OCT_M
-                | SPI_MEM_SADDR_OCT_M
-                | SPI_MEM_SDOUT_OCT_M
-                | SPI_MEM_SDIN_OCT_M,
-        );
-        set_peri_reg_mask(SPI0_MEM_CACHE_SCTRL_REG, SPI_MEM_SRAM_OCT_M);
+            // Config RD/WR Dummy phase
+            spi.cache_sctrl()
+                .modify(|_, w| w.usr_rd_sram_dummy().set_bit());
+            spi.cache_sctrl()
+                .modify(|_, w| w.usr_wr_sram_dummy().set_bit());
+            spi.cache_sctrl()
+                .modify(|_, w| w.sram_rdummy_cyclelen().bits(OCT_PSRAM_RD_DUMMY_BITLEN - 1));
+            spi.spi_smem_ddr()
+                .modify(|_, w| w.spi_smem_var_dummy().set_bit());
+            spi.cache_sctrl()
+                .modify(|_, w| w.sram_wdummy_cyclelen().bits(OCT_PSRAM_WR_DUMMY_BITLEN - 1));
+
+            spi.spi_smem_ddr().modify(|_, w| w.wdat_swp().clear_bit());
+            spi.spi_smem_ddr().modify(|_, w| w.rdat_swp().clear_bit());
+            spi.spi_smem_ddr().modify(|_, w| w.en().set_bit());
+
+            spi.sram_cmd().modify(|_, w| w.sdummy_out().set_bit());
+            spi.sram_cmd().modify(|_, w| w.scmd_oct().set_bit());
+            spi.sram_cmd().modify(|_, w| w.saddr_oct().set_bit());
+            spi.sram_cmd().modify(|_, w| w.sdout_oct().set_bit());
+            spi.sram_cmd().modify(|_, w| w.sdin_oct().set_bit());
+
+            spi.cache_sctrl().modify(|_, w| w.sram_oct().set_bit())
+        }
     }
 
     #[ram]
     fn spi_flash_set_rom_required_regs() {
         // Disable the variable dummy mode when doing timing tuning
-        clear_peri_reg_mask(SPI1_MEM_DDR_REG, SPI_MEM_SPI_FMEM_VAR_DUMMY);
+        let spi = unsafe { &*crate::peripherals::SPI1::PTR };
+        spi.ddr().modify(|_, w| w.spi_fmem_var_dummy().clear_bit())
         // STR /DTR mode setting is done every time when
         // `esp_rom_opiflash_exec_cmd` is called
         //
@@ -1357,32 +1217,24 @@ pub(crate) mod utils {
     fn spi_timing_set_pin_drive_strength() {
         // For now, set them all to 3. Need to check after QVL test results are out.
         // TODO: IDF-3663 Set default clk
-        set_peri_reg_mask(SPI0_MEM_DATE_REG, SPI_MEM_SPICLK_PAD_DRV_CTL_EN);
-        set_peri_reg_bits(
-            SPI0_MEM_DATE_REG,
-            SPI_MEM_SPI_SMEM_SPICLK_FUN_DRV,
-            3,
-            SPI_MEM_SPI_SMEM_SPICLK_FUN_DRV_S,
-        );
-        set_peri_reg_bits(
-            SPI0_MEM_DATE_REG,
-            SPI_MEM_SPI_FMEM_SPICLK_FUN_DRV,
-            3,
-            SPI_MEM_SPI_FMEM_SPICLK_FUN_DRV_S,
-        );
-        // Set default mspi d0 ~ d7, dqs pin drive strength
-        let pins = &[27usize, 28, 31, 32, 33, 34, 35, 36, 37];
-        for pin in pins {
-            unsafe {
+        unsafe {
+            let spi = &*crate::peripherals::SPI0::PTR;
+
+            spi.date()
+                .modify(|_, w| w.spi_spiclk_pad_drv_ctl_en().set_bit());
+            spi.date()
+                .modify(|_, w| w.spi_smem_spiclk_fun_drv().bits(3));
+            spi.date()
+                .modify(|_, w| w.spi_fmem_spiclk_fun_drv().bits(3));
+
+            // Set default mspi d0 ~ d7, dqs pin drive strength
+            let pins = &[27usize, 28, 31, 32, 33, 34, 35, 36, 37];
+            for pin in pins {
                 let iomux = &*esp32s3::IO_MUX::PTR;
                 iomux.gpio(*pin).modify(|_, w| w.fun_drv().bits(3))
             }
         }
     }
-
-    const SPI_MEM_SPICLK_PAD_DRV_CTL_EN: u32 = 1 << 4;
-    const SPI_MEM_SPI_FMEM_SPICLK_FUN_DRV: u32 = 0x00000003;
-    const SPI_MEM_SPI_FMEM_SPICLK_FUN_DRV_S: u32 = 2;
 
     fn spi_timing_enter_mspi_low_speed_mode(control_spi1: bool) {
         // Here we are going to slow the SPI1 frequency to 20Mhz, so we need to
@@ -1439,33 +1291,26 @@ pub(crate) mod utils {
     }
 
     fn set_psram_cs_timing() {
-        // SPI0/1 share the cs_hold / cs_setup, cd_hold_time / cd_setup_time,
-        // cs_hold_delay registers for PSRAM, so we only need to set SPI0 related
-        // registers here
-        set_peri_reg_mask(
-            SPI0_MEM_SPI_SMEM_AC_REG,
-            SPI_MEM_SPI_SMEM_CS_HOLD_M | SPI_MEM_SPI_SMEM_CS_SETUP_M,
-        );
-        set_peri_reg_bits(
-            SPI0_MEM_SPI_SMEM_AC_REG,
-            SPI_MEM_SPI_SMEM_CS_HOLD_TIME_V,
-            OCT_PSRAM_CS_HOLD_TIME as u32,
-            SPI_MEM_SPI_SMEM_CS_HOLD_TIME_S,
-        );
-        set_peri_reg_bits(
-            SPI0_MEM_SPI_SMEM_AC_REG,
-            SPI_MEM_SPI_SMEM_CS_SETUP_TIME_V,
-            OCT_PSRAM_CS_SETUP_TIME as u32,
-            SPI_MEM_SPI_SMEM_CS_SETUP_TIME_S,
-        );
-        // CONFIG_SPIRAM_ECC_ENABLE unsupported for now
-        // CS1 high time
-        set_peri_reg_bits(
-            SPI0_MEM_SPI_SMEM_AC_REG,
-            SPI_MEM_SPI_SMEM_CS_HOLD_DELAY_V,
-            OCT_PSRAM_CS_HOLD_DELAY as u32,
-            SPI_MEM_SPI_SMEM_CS_HOLD_DELAY_S,
-        );
+        unsafe {
+            let spi = &*crate::peripherals::SPI0::PTR;
+            // SPI0/1 share the cs_hold / cs_setup, cd_hold_time / cd_setup_time,
+            // cs_hold_delay registers for PSRAM, so we only need to set SPI0 related
+            // registers here
+            spi.spi_smem_ac()
+                .modify(|_, w| w.spi_smem_cs_hold().set_bit());
+            spi.spi_smem_ac()
+                .modify(|_, w| w.spi_smem_cs_setup().set_bit());
+
+            spi.spi_smem_ac()
+                .modify(|_, w| w.spi_smem_cs_hold_time().bits(OCT_PSRAM_CS_HOLD_TIME));
+            spi.spi_smem_ac()
+                .modify(|_, w| w.spi_smem_cs_setup_time().bits(OCT_PSRAM_CS_SETUP_TIME));
+
+            // CONFIG_SPIRAM_ECC_ENABLE unsupported for now
+            // CS1 high time
+            spi.spi_smem_ac()
+                .modify(|_, w| w.spi_smem_cs_hold_delay().bits(OCT_PSRAM_CS_HOLD_DELAY));
+        }
     }
 
     fn init_psram_pins() {
@@ -1486,12 +1331,11 @@ pub(crate) mod utils {
         }
 
         // Set psram clock pin drive strength
-        set_peri_reg_bits(
-            SPI0_MEM_DATE_REG,
-            SPI_MEM_SPI_SMEM_SPICLK_FUN_DRV_V,
-            3,
-            SPI_MEM_SPI_SMEM_SPICLK_FUN_DRV_S,
-        );
+        unsafe {
+            let spi = &*crate::peripherals::SPI0::PTR;
+            spi.date()
+                .modify(|_, w| w.spi_smem_spiclk_fun_drv().bits(3));
+        }
     }
 
     fn get_psram_mode_reg(spi_num: u32, out_reg: &mut OpiPsramModeReg) {
@@ -1729,49 +1573,62 @@ pub(crate) mod utils {
 
     #[ram]
     fn spi0_timing_config_set_core_clock(core_clock: SpiTimingConfigCoreClock) {
-        let reg_val = match core_clock {
-            SpiTimingConfigCoreClock::SpiTimingConfigCoreClock80m => 0,
-            SpiTimingConfigCoreClock::SpiTimingConfigCoreClock120m => 1,
-            SpiTimingConfigCoreClock::SpiTimingConfigCoreClock160m => 2,
-            SpiTimingConfigCoreClock::SpiTimingConfigCoreClock240m => 3,
-        };
+        let spi = unsafe { &*crate::peripherals::SPI0::PTR };
 
-        set_peri_reg_bits(SPI0_MEM_CORE_CLK_SEL_REG, SPI_MEM_CORE_CLK_SEL, reg_val, 0);
+        unsafe {
+            spi.core_clk_sel().modify(|_, w| {
+                w.core_clk_sel().bits(match core_clock {
+                    SpiTimingConfigCoreClock::SpiTimingConfigCoreClock80m => 0,
+                    SpiTimingConfigCoreClock::SpiTimingConfigCoreClock120m => 1,
+                    SpiTimingConfigCoreClock::SpiTimingConfigCoreClock160m => 2,
+                    SpiTimingConfigCoreClock::SpiTimingConfigCoreClock240m => 3,
+                })
+            });
+        }
     }
 
     #[ram]
     fn spi0_timing_config_set_flash_clock(freqdiv: u32) {
+        let spi = unsafe { &*crate::peripherals::SPI0::PTR };
         if freqdiv == 1 {
-            write_peri_reg(SPI0_MEM_CLOCK_REG, SPI_MEM_CLK_EQU_SYSCLK);
+            spi.clock().modify(|_, w| w.clk_equ_sysclk().set_bit());
         } else {
             let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_CLKCNT_N_S)
                 | ((freqdiv / 2 - 1) << SPI_MEM_CLKCNT_H_S)
                 | ((freqdiv - 1) << SPI_MEM_CLKCNT_L_S);
-            write_peri_reg(SPI0_MEM_CLOCK_REG, freqbits);
+            unsafe {
+                spi.clock().modify(|_, w| w.bits(freqbits));
+            }
         }
     }
 
     #[ram]
     fn spi1_timing_config_set_flash_clock(freqdiv: u32) {
+        let spi = unsafe { &*crate::peripherals::SPI1::PTR };
         if freqdiv == 1 {
-            write_peri_reg(SPI1_MEM_CLOCK_REG, SPI_MEM_CLK_EQU_SYSCLK);
+            spi.clock().modify(|_, w| w.clk_equ_sysclk().set_bit());
         } else {
             let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_CLKCNT_N_S)
                 | ((freqdiv / 2 - 1) << SPI_MEM_CLKCNT_H_S)
                 | ((freqdiv - 1) << SPI_MEM_CLKCNT_L_S);
-            write_peri_reg(SPI1_MEM_CLOCK_REG, freqbits);
+            unsafe {
+                spi.clock().modify(|_, w| w.bits(freqbits));
+            }
         }
     }
 
     #[ram]
     fn spi0_timing_config_set_psram_clock(freqdiv: u32) {
+        let spi = unsafe { &*crate::peripherals::SPI0::PTR };
         if freqdiv == 1 {
-            write_peri_reg(SPI0_MEM_SRAM_CLK_REG, SPI_MEM_SCLK_EQU_SYSCLK);
+            spi.sram_clk().modify(|_, w| w.sclk_equ_sysclk().set_bit());
         } else {
             let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_SCLKCNT_N_S)
                 | ((freqdiv / 2 - 1) << SPI_MEM_SCLKCNT_H_S)
                 | ((freqdiv - 1) << SPI_MEM_SCLKCNT_L_S);
-            write_peri_reg(SPI0_MEM_SRAM_CLK_REG, freqbits);
+            unsafe {
+                spi.sram_clk().modify(|_, w| w.bits(freqbits));
+            }
         }
     }
 
@@ -1791,37 +1648,6 @@ pub(crate) mod utils {
             SpiRamFreq::Freq40m => SPI_TIMING_CORE_CLOCK.mhz() / 40,
             SpiRamFreq::Freq80m => SPI_TIMING_CORE_CLOCK.mhz() / 80,
             SpiRamFreq::Freq120m => SPI_TIMING_CORE_CLOCK.mhz() / 120,
-        }
-    }
-
-    #[inline(always)]
-    fn clear_peri_reg_mask(reg: u32, mask: u32) {
-        unsafe {
-            (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() & !mask);
-        }
-    }
-
-    #[inline(always)]
-    fn set_peri_reg_mask(reg: u32, mask: u32) {
-        unsafe {
-            (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() | mask);
-        }
-    }
-
-    #[inline(always)]
-    fn set_peri_reg_bits(reg: u32, bitmap: u32, value: u32, shift: u32) {
-        unsafe {
-            (reg as *mut u32).write_volatile(
-                ((reg as *mut u32).read_volatile() & !(bitmap << shift))
-                    | ((value & bitmap) << shift),
-            );
-        }
-    }
-
-    #[inline(always)]
-    fn write_peri_reg(reg: u32, val: u32) {
-        unsafe {
-            (reg as *mut u32).write_volatile(val);
         }
     }
 }

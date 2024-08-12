@@ -253,13 +253,6 @@ const REGI2C_DIG_REG: u8 = 0x6d;
 const REGI2C_ULP_CAL: u8 = 0x61;
 const REGI2C_SAR_I2C: u8 = 0x69;
 
-const I2C_MST_ANA_CONF1_M: u32 = 0x00FFFFFF;
-const REGI2C_BBPLL_RD_MASK: u32 = !(1 << 7) & I2C_MST_ANA_CONF1_M;
-const REGI2C_BIAS_RD_MASK: u32 = !(1 << 6) & I2C_MST_ANA_CONF1_M;
-const REGI2C_DIG_REG_RD_MASK: u32 = !(1 << 10) & I2C_MST_ANA_CONF1_M;
-const REGI2C_ULP_CAL_RD_MASK: u32 = !(1 << 8) & I2C_MST_ANA_CONF1_M;
-const REGI2C_SAR_I2C_RD_MASK: u32 = !(1 << 9) & I2C_MST_ANA_CONF1_M;
-
 const REGI2C_RTC_SLAVE_ID_V: u8 = 0xFF;
 const REGI2C_RTC_SLAVE_ID_S: u8 = 0;
 const REGI2C_RTC_ADDR_V: u8 = 0xFF;
@@ -271,53 +264,59 @@ const REGI2C_RTC_DATA_S: u8 = 16;
 
 const REGI2C_BBPLL: u8 = 0x66;
 
+const REGI2C_BBPLL_DEVICE_EN: u16 = 1 << 5;
+const REGI2C_BIAS_DEVICE_EN: u16 = 1 << 4;
+const REGI2C_DIG_REG_DEVICE_EN: u16 = 1 << 8;
+const REGI2C_ULP_CAL_DEVICE_EN: u16 = 1 << 6;
+const REGI2C_SAR_I2C_DEVICE_EN: u16 = 1 << 7;
+
 fn regi2c_enable_block(block: u8) {
     let modem_lpcon = unsafe { &*crate::peripherals::MODEM_LPCON::ptr() };
     let lp_i2c_ana = unsafe { &*crate::peripherals::LP_I2C_ANA_MST::ptr() };
 
+    modem_lpcon
+        .clk_conf()
+        .modify(|_, w| w.clk_i2c_mst_en().set_bit());
+
+    modem_lpcon
+        .i2c_mst_clk_conf()
+        .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
+
+    lp_i2c_ana
+        .date()
+        .modify(|_, w| w.lp_i2c_ana_mast_i2c_mat_clk_en().set_bit());
+
+    // Before config I2C register, enable corresponding slave.
     unsafe {
-        modem_lpcon
-            .clk_conf()
-            .modify(|_, w| w.clk_i2c_mst_en().set_bit());
-
-        modem_lpcon
-            .i2c_mst_clk_conf()
-            .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
-
-        lp_i2c_ana
-            .date()
-            .modify(|_, w| w.lp_i2c_ana_mast_i2c_mat_clk_en().set_bit());
-
-        // Before config I2C register, enable corresponding slave.
         match block {
             REGI2C_BBPLL => {
-                lp_i2c_ana.ana_conf1().modify(|r, w| {
-                    w.lp_i2c_ana_mast_ana_conf1()
-                        .bits(r.lp_i2c_ana_mast_ana_conf1().bits() | REGI2C_BBPLL_RD_MASK)
+                lp_i2c_ana.device_en().modify(|r, w| {
+                    w.lp_i2c_ana_mast_i2c_device_en()
+                        .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() | REGI2C_BBPLL_DEVICE_EN)
                 });
             }
             REGI2C_BIAS => {
-                lp_i2c_ana.ana_conf1().modify(|r, w| {
-                    w.lp_i2c_ana_mast_ana_conf1()
-                        .bits(r.lp_i2c_ana_mast_ana_conf1().bits() | REGI2C_BIAS_RD_MASK)
+                lp_i2c_ana.device_en().modify(|r, w| {
+                    w.lp_i2c_ana_mast_i2c_device_en()
+                        .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() | REGI2C_BIAS_DEVICE_EN)
                 });
             }
             REGI2C_DIG_REG => {
-                lp_i2c_ana.ana_conf1().modify(|r, w| {
-                    w.lp_i2c_ana_mast_ana_conf1()
-                        .bits(r.lp_i2c_ana_mast_ana_conf1().bits() | REGI2C_DIG_REG_RD_MASK)
+                lp_i2c_ana.device_en().modify(|r, w| {
+                    w.lp_i2c_ana_mast_i2c_device_en()
+                        .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() | REGI2C_DIG_REG_DEVICE_EN)
                 });
             }
             REGI2C_ULP_CAL => {
-                lp_i2c_ana.ana_conf1().modify(|r, w| {
-                    w.lp_i2c_ana_mast_ana_conf1()
-                        .bits(r.lp_i2c_ana_mast_ana_conf1().bits() | REGI2C_ULP_CAL_RD_MASK)
+                lp_i2c_ana.device_en().modify(|r, w| {
+                    w.lp_i2c_ana_mast_i2c_device_en()
+                        .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() | REGI2C_ULP_CAL_DEVICE_EN)
                 });
             }
             REGI2C_SAR_I2C => {
-                lp_i2c_ana.ana_conf1().modify(|r, w| {
-                    w.lp_i2c_ana_mast_ana_conf1()
-                        .bits(r.lp_i2c_ana_mast_ana_conf1().bits() | REGI2C_SAR_I2C_RD_MASK)
+                lp_i2c_ana.device_en().modify(|r, w| {
+                    w.lp_i2c_ana_mast_i2c_device_en()
+                        .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() | REGI2C_SAR_I2C_DEVICE_EN)
                 });
             }
             _ => (),
@@ -326,38 +325,37 @@ fn regi2c_enable_block(block: u8) {
 }
 
 fn regi2c_disable_block(block: u8) {
-    let lp_i2c_ana = unsafe { &*crate::peripherals::LP_I2C_ANA_MST::ptr() };
-
     unsafe {
+        let lp_i2c_ana = &*crate::peripherals::LP_I2C_ANA_MST::ptr();
         match block {
             REGI2C_BBPLL => {
-                lp_i2c_ana.ana_conf1().modify(|r, w| {
-                    w.lp_i2c_ana_mast_ana_conf1()
-                        .bits(r.lp_i2c_ana_mast_ana_conf1().bits() & !REGI2C_BBPLL_RD_MASK)
+                lp_i2c_ana.device_en().modify(|r, w| {
+                    w.lp_i2c_ana_mast_i2c_device_en()
+                        .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() & !REGI2C_BBPLL_DEVICE_EN)
                 });
             }
             REGI2C_BIAS => {
-                lp_i2c_ana.ana_conf1().modify(|r, w| {
-                    w.lp_i2c_ana_mast_ana_conf1()
-                        .bits(r.lp_i2c_ana_mast_ana_conf1().bits() & !REGI2C_BIAS_RD_MASK)
+                lp_i2c_ana.device_en().modify(|r, w| {
+                    w.lp_i2c_ana_mast_i2c_device_en()
+                        .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() & !REGI2C_BIAS_DEVICE_EN)
                 });
             }
             REGI2C_DIG_REG => {
-                lp_i2c_ana.ana_conf1().modify(|r, w| {
-                    w.lp_i2c_ana_mast_ana_conf1()
-                        .bits(r.lp_i2c_ana_mast_ana_conf1().bits() & !REGI2C_DIG_REG_RD_MASK)
+                lp_i2c_ana.device_en().modify(|r, w| {
+                    w.lp_i2c_ana_mast_i2c_device_en()
+                        .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() & !REGI2C_DIG_REG_DEVICE_EN)
                 });
             }
             REGI2C_ULP_CAL => {
-                lp_i2c_ana.ana_conf1().modify(|r, w| {
-                    w.lp_i2c_ana_mast_ana_conf1()
-                        .bits(r.lp_i2c_ana_mast_ana_conf1().bits() & !REGI2C_ULP_CAL_RD_MASK)
+                lp_i2c_ana.device_en().modify(|r, w| {
+                    w.lp_i2c_ana_mast_i2c_device_en()
+                        .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() & !REGI2C_ULP_CAL_DEVICE_EN)
                 });
             }
             REGI2C_SAR_I2C => {
-                lp_i2c_ana.ana_conf1().modify(|r, w| {
-                    w.lp_i2c_ana_mast_ana_conf1()
-                        .bits(r.lp_i2c_ana_mast_ana_conf1().bits() & !REGI2C_SAR_I2C_RD_MASK)
+                lp_i2c_ana.device_en().modify(|r, w| {
+                    w.lp_i2c_ana_mast_i2c_device_en()
+                        .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() & !REGI2C_SAR_I2C_DEVICE_EN)
                 });
             }
             _ => (),
