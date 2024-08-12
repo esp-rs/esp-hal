@@ -79,7 +79,13 @@ impl<W> crate::private::Sealed for &[W] where W: Word {}
 impl<W> crate::private::Sealed for &mut [W] where W: Word {}
 
 /// Trait for buffers that can be given to DMA for reading.
-pub trait ReadBuffer {
+///
+/// # Safety
+///
+/// Once the `read_buffer` method has been called, it is unsafe to call any
+/// `&mut self` methods on this object as long as the returned value is in use
+/// (by DMA).
+pub unsafe trait ReadBuffer {
     /// Provide a buffer usable for DMA reads.
     ///
     /// The return value is:
@@ -94,7 +100,7 @@ pub trait ReadBuffer {
     unsafe fn read_buffer(&self) -> (*const u8, usize);
 }
 
-impl<W, const S: usize> ReadBuffer for [W; S]
+unsafe impl<W, const S: usize> ReadBuffer for [W; S]
 where
     W: Word,
 {
@@ -103,7 +109,7 @@ where
     }
 }
 
-impl<W, const S: usize> ReadBuffer for &[W; S]
+unsafe impl<W, const S: usize> ReadBuffer for &[W; S]
 where
     W: Word,
 {
@@ -112,7 +118,7 @@ where
     }
 }
 
-impl<W, const S: usize> ReadBuffer for &mut [W; S]
+unsafe impl<W, const S: usize> ReadBuffer for &mut [W; S]
 where
     W: Word,
 {
@@ -121,7 +127,7 @@ where
     }
 }
 
-impl<W> ReadBuffer for &[W]
+unsafe impl<W> ReadBuffer for &[W]
 where
     W: Word,
 {
@@ -130,7 +136,7 @@ where
     }
 }
 
-impl<W> ReadBuffer for &mut [W]
+unsafe impl<W> ReadBuffer for &mut [W]
 where
     W: Word,
 {
@@ -140,7 +146,13 @@ where
 }
 
 /// Trait for buffers that can be given to DMA for writing.
-pub trait WriteBuffer {
+///
+/// # Safety
+///
+/// Once the `write_buffer` method has been called, it is unsafe to call any
+/// `&mut self` methods, except for `write_buffer`, on this object as long as
+/// the returned value is in use (by DMA).
+pub unsafe trait WriteBuffer {
     /// Provide a buffer usable for DMA writes.
     ///
     /// The return value is:
@@ -156,7 +168,7 @@ pub trait WriteBuffer {
     unsafe fn write_buffer(&mut self) -> (*mut u8, usize);
 }
 
-impl<W, const S: usize> WriteBuffer for [W; S]
+unsafe impl<W, const S: usize> WriteBuffer for [W; S]
 where
     W: Word,
 {
@@ -165,7 +177,7 @@ where
     }
 }
 
-impl<W, const S: usize> WriteBuffer for &mut [W; S]
+unsafe impl<W, const S: usize> WriteBuffer for &mut [W; S]
 where
     W: Word,
 {
@@ -174,7 +186,7 @@ where
     }
 }
 
-impl<W> WriteBuffer for &mut [W]
+unsafe impl<W> WriteBuffer for &mut [W]
 where
     W: Word,
 {
