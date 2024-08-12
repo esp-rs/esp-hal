@@ -22,7 +22,7 @@
 //!   reversed
 //!
 //! ## Examples
-//! ### Toogle an LED When a Button is Pressed
+//! ### Toggle an LED When a Button is Pressed
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::Io;
