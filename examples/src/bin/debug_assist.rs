@@ -42,7 +42,9 @@ fn main() -> ! {
                 static mut _stack_end: u32;
             }
 
+            #[allow(unused_unsafe)]
             let stack_top = unsafe { addr_of_mut!(_stack_start) } as *mut _ as u32;
+            #[allow(unused_unsafe)]
             let stack_bottom = unsafe { addr_of_mut!(_stack_end) } as *mut _ as u32;
 
             let size = 4096;

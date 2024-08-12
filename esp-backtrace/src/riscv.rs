@@ -15,6 +15,7 @@ pub(super) const RA_OFFSET: usize = 4;
 #[derive(Default, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(C)]
+#[cfg(feature = "exception-handler")]
 pub(crate) struct TrapFrame {
     /// Return address, stores the address to return to after a function call or
     /// interrupt.
@@ -102,6 +103,7 @@ pub(crate) struct TrapFrame {
     pub mtval: usize,
 }
 
+#[cfg(feature = "exception-handler")]
 impl core::fmt::Debug for TrapFrame {
     fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
         write!(
