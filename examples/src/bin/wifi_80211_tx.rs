@@ -13,12 +13,12 @@ use core::marker::PhantomData;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     peripherals::Peripherals,
     prelude::*,
     rng::Rng,
     system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer, PeriodicTimer},
-    delay::Delay
 };
 use esp_wifi::{initialize, wifi, EspWifiInitFor};
 use ieee80211::{

@@ -1832,7 +1832,7 @@ pub struct RxControlInfo {
 }
 impl RxControlInfo {
     /// Create an instance from a raw pointer to [wifi_pkt_rx_ctrl_t].
-    /// 
+    ///
     /// # Safety
     /// When calling this, you must ensure, that `rx_cntl` points to a valid
     /// instance of [wifi_pkt_rx_ctrl_t].
