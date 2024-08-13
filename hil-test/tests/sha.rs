@@ -52,8 +52,7 @@ mod tests {
 
     #[test]
     fn test_sha_1() {
-        let peripherals = Peripherals::take();
-        let mut sha = Sha1::new(peripherals.SHA);
+        let mut sha = Sha1::new();
 
         let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
         let mut remaining = source_data;
@@ -90,8 +89,7 @@ mod tests {
     #[test]
     #[cfg(not(feature = "esp32"))]
     fn test_sha_224() {
-        let peripherals = Peripherals::take();
-        let mut sha = esp_hal::sha::Sha224::new(peripherals.SHA);
+        let mut sha = esp_hal::sha::Sha224::new();
 
         let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
         let mut remaining = source_data;
@@ -128,8 +126,7 @@ mod tests {
 
     #[test]
     fn test_sha_256() {
-        let peripherals = Peripherals::take();
-        let mut sha = Sha256::new(peripherals.SHA);
+        let mut sha = Sha256::new();
 
         let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
         let mut remaining = source_data;
@@ -168,8 +165,7 @@ mod tests {
     #[test]
     #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
     fn test_sha_384() {
-        let peripherals = Peripherals::take();
-        let mut sha = esp_hal::sha::Sha384::new(peripherals.SHA);
+        let mut sha = esp_hal::sha::Sha384::new();
 
         let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
         let mut remaining = source_data;
@@ -210,8 +206,7 @@ mod tests {
     #[test]
     #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
     fn test_sha_512() {
-        let peripherals = Peripherals::take();
-        let mut sha = esp_hal::sha::Sha512::new(peripherals.SHA);
+        let mut sha = esp_hal::sha::Sha512::new();
 
         let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
         let mut remaining = source_data;
@@ -253,8 +248,7 @@ mod tests {
     #[test]
     #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
     fn test_sha_512_224() {
-        let peripherals = Peripherals::take();
-        let mut sha = esp_hal::sha::Sha512_224::new(peripherals.SHA);
+        let mut sha = esp_hal::sha::Sha512_224::new();
 
         let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
         let mut remaining = source_data;
@@ -293,8 +287,7 @@ mod tests {
     #[test]
     #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
     fn test_sha_512_256() {
-        let peripherals = Peripherals::take();
-        let mut sha = esp_hal::sha::Sha512_256::new(peripherals.SHA);
+        let mut sha = esp_hal::sha::Sha512_256::new();
 
         let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
         let mut remaining = source_data;
@@ -618,9 +611,7 @@ mod tests {
 /// A simple test using [esp_hal::sha::Sha] trait to test hashing for an
 /// algorithm against a specific size. This will compare the result with a
 /// software implementation and return false if there's a mismatch
-fn test_for_size<'a, D: Digest + Default + Sha<'a, esp_hal::Blocking>, const N: usize>(
-    size: usize,
-) {
+fn test_for_size<D: Digest + Default + Sha<esp_hal::Blocking>, const N: usize>(size: usize) {
     let source_data = unsafe { core::slice::from_raw_parts(CHAR_ARRAY.as_ptr(), size) };
     let mut remaining = source_data;
     let mut hasher = D::default();
