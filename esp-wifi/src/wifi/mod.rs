@@ -1879,12 +1879,14 @@ impl RxControlInfo {
         rx_control_info
     }
 }
+#[cfg(feature = "sniffer")]
 pub struct PromiscuousPkt<'a> {
     pub rx_cntl: RxControlInfo,
     pub frame_type: wifi_promiscuous_pkt_type_t,
     pub len: usize,
     pub data: &'a [u8],
 }
+#[cfg(feature = "sniffer")]
 impl PromiscuousPkt<'_> {
     /// # Safety
     /// When calling this, you have to ensure, that `buf` points to a valid [wifi_promiscuous_pkt_t].
