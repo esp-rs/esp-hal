@@ -6,15 +6,21 @@ pub(crate) mod state;
 use core::{
     cell::{RefCell, RefMut},
     fmt::Debug,
-    mem,
-    mem::MaybeUninit,
+    mem::{self, MaybeUninit},
     ptr::addr_of,
+    slice,
     time::Duration,
 };
 
 use critical_section::{CriticalSection, Mutex};
 use enumset::{EnumSet, EnumSetType};
 use esp_wifi_sys::include::{
+    esp_wifi_80211_tx,
+    esp_wifi_set_promiscuous,
+    esp_wifi_set_promiscuous_rx_cb,
+    wifi_pkt_rx_ctrl_t,
+    wifi_promiscuous_pkt_t,
+    wifi_promiscuous_pkt_type_t,
     WIFI_PROTOCOL_11AX,
     WIFI_PROTOCOL_11B,
     WIFI_PROTOCOL_11G,
@@ -25,6 +31,8 @@ use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 #[doc(hidden)]
 pub(crate) use os_adapter::*;
+#[cfg(feature = "sniffer")]
+use portable_atomic::AtomicBool;
 use portable_atomic::{AtomicUsize, Ordering};
 #[cfg(feature = "smoltcp")]
 use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
@@ -1770,10 +1778,198 @@ fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
     }
 }
 
+#[cfg(not(any(esp32c6)))]
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct RxControlInfo {
+    pub rssi: i32,
+    pub rate: u32,
+    pub sig_mode: u32,
+    pub mcs: u32,
+    pub cwb: u32,
+    pub smoothing: u32,
+    pub not_sounding: u32,
+    pub aggregation: u32,
+    pub stbc: u32,
+    pub fec_coding: u32,
+    pub sgi: u32,
+    pub ampdu_cnt: u32,
+    pub channel: u32,
+    pub secondary_channel: u32,
+    pub timestamp: u32,
+    pub noise_floor: i32,
+    pub ant: u32,
+    pub sig_len: u32,
+    pub rx_state: u32,
+}
+
+#[cfg(esp32c6)]
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct RxControlInfo {
+    pub rssi: i32,
+    pub rate: u32,
+    pub sig_len: u32,
+    pub rx_state: u32,
+    pub dump_len: u32,
+    pub he_sigb_len: u32,
+    pub cur_single_mpdu: u32,
+    pub cur_bb_format: u32,
+    pub rx_channel_estimate_info_vld: u32,
+    pub rx_channel_estimate_len: u32,
+    pub second: u32,
+    pub channel: u32,
+    pub data_rssi: i32,
+    pub noise_floor: u32,
+    pub is_group: u32,
+    pub rxend_state: u32,
+    pub rxmatch3: u32,
+    pub rxmatch2: u32,
+    pub rxmatch1: u32,
+    pub rxmatch0: u32,
+}
+impl RxControlInfo {
+    pub unsafe fn from_raw(rx_cntl: *const wifi_pkt_rx_ctrl_t) -> Self {
+        #[cfg(not(esp32c6))]
+        let rx_control_info = RxControlInfo {
+            rssi: (*rx_cntl).rssi(),
+            rate: (*rx_cntl).rate(),
+            sig_mode: (*rx_cntl).sig_mode(),
+            mcs: (*rx_cntl).mcs(),
+            cwb: (*rx_cntl).cwb(),
+            smoothing: (*rx_cntl).smoothing(),
+            not_sounding: (*rx_cntl).not_sounding(),
+            aggregation: (*rx_cntl).aggregation(),
+            stbc: (*rx_cntl).stbc(),
+            fec_coding: (*rx_cntl).fec_coding(),
+            sgi: (*rx_cntl).sgi(),
+            ampdu_cnt: (*rx_cntl).ampdu_cnt(),
+            channel: (*rx_cntl).channel(),
+            secondary_channel: (*rx_cntl).secondary_channel(),
+            timestamp: (*rx_cntl).timestamp(),
+            noise_floor: (*rx_cntl).noise_floor(),
+            ant: (*rx_cntl).ant(),
+            sig_len: (*rx_cntl).sig_len(),
+            rx_state: (*rx_cntl).rx_state(),
+        };
+        #[cfg(esp32c6)]
+        let rx_control_info = RxControlInfo {
+            rssi: (*rx_cntl).rssi(),
+            rate: (*rx_cntl).rate(),
+            sig_len: (*rx_cntl).sig_len(),
+            rx_state: (*rx_cntl).rx_state(),
+            dump_len: (*rx_cntl).dump_len(),
+            he_sigb_len: (*rx_cntl).he_sigb_len(),
+            cur_single_mpdu: (*rx_cntl).cur_single_mpdu(),
+            cur_bb_format: (*rx_cntl).cur_bb_format(),
+            rx_channel_estimate_info_vld: (*rx_cntl).rx_channel_estimate_info_vld(),
+            rx_channel_estimate_len: (*rx_cntl).rx_channel_estimate_len(),
+            second: (*rx_cntl).second(),
+            channel: (*rx_cntl).channel(),
+            data_rssi: (*rx_cntl).data_rssi(),
+            noise_floor: (*rx_cntl).noise_floor(),
+            is_group: (*rx_cntl).is_group(),
+            rxend_state: (*rx_cntl).rxend_state(),
+            rxmatch3: (*rx_cntl).rxmatch3(),
+            rxmatch2: (*rx_cntl).rxmatch2(),
+            rxmatch1: (*rx_cntl).rxmatch1(),
+            rxmatch0: (*rx_cntl).rxmatch0(),
+        };
+        rx_control_info
+    }
+}
+pub struct PromiscuousPkt<'a> {
+    pub rx_cntl: RxControlInfo,
+    pub frame_type: wifi_promiscuous_pkt_type_t,
+    pub len: usize,
+    pub data: &'a [u8],
+}
+impl PromiscuousPkt<'_> {
+    pub unsafe fn from_raw(
+        buf: *const wifi_promiscuous_pkt_t,
+        frame_type: wifi_promiscuous_pkt_type_t,
+    ) -> Self {
+        let rx_cntl = RxControlInfo::from_raw(&(*buf).rx_ctrl);
+        let len = rx_cntl.sig_len as usize;
+        PromiscuousPkt {
+            rx_cntl,
+            frame_type,
+            len,
+            data: slice::from_raw_parts(
+                (buf as *const u8).add(size_of::<wifi_pkt_rx_ctrl_t>()),
+                len,
+            ),
+        }
+    }
+}
+
+#[cfg(feature = "sniffer")]
+static SNIFFER_CB: Mutex<RefCell<Option<fn(PromiscuousPkt)>>> = Mutex::new(RefCell::new(None));
+
+#[cfg(feature = "sniffer")]
+unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: u32) {
+    critical_section::with(|cs| {
+        let Some(sniffer_callback) = *SNIFFER_CB.borrow_ref(cs) else {
+            return;
+        };
+        let promiscuous_pkt = PromiscuousPkt::from_raw(buf as *const _, frame_type);
+        sniffer_callback(promiscuous_pkt);
+    });
+}
+
+#[cfg(feature = "sniffer")]
+/// A wifi sniffer.
+pub struct Sniffer {
+    promiscuous_mode_enabled: AtomicBool,
+}
+#[cfg(feature = "sniffer")]
+impl Sniffer {
+    pub(crate) fn new() -> Self {
+        // This shouldn't fail, since the way this is created, means that wifi will
+        // always be initialized.
+        esp_wifi_result!(unsafe { esp_wifi_set_promiscuous_rx_cb(Some(promiscuous_rx_cb)) })
+            .unwrap();
+        Self {
+            promiscuous_mode_enabled: AtomicBool::new(false),
+        }
+    }
+    /// Set promiscuous mode enabled or disabled.
+    pub fn set_promiscuous_mode(&self, enabled: bool) -> Result<(), WifiError> {
+        esp_wifi_result!(unsafe { esp_wifi_set_promiscuous(enabled) })?;
+        self.promiscuous_mode_enabled
+            .store(enabled, Ordering::Relaxed);
+        Ok(())
+    }
+    /// Transmit a raw frame.
+    pub fn send_raw_frame(
+        &mut self,
+        use_sta_interface: bool,
+        buffer: &[u8],
+        use_internal_seq_num: bool,
+    ) -> Result<(), WifiError> {
+        esp_wifi_result!(unsafe {
+            esp_wifi_80211_tx(
+                if use_sta_interface { 0 } else { 1 } as wifi_interface_t,
+                buffer.as_ptr() as *const _,
+                buffer.len() as i32,
+                use_internal_seq_num,
+            )
+        })
+    }
+    /// Set the callback for receiving a packet.
+    pub fn set_receive_cb(&mut self, cb: fn(PromiscuousPkt)) {
+        critical_section::with(|cs| {
+            *SNIFFER_CB.borrow_ref_mut(cs) = Some(cb);
+        });
+    }
+}
+
 /// A wifi controller
 pub struct WifiController<'d> {
     _device: PeripheralRef<'d, crate::hal::peripherals::WIFI>,
     config: Configuration,
+    #[cfg(feature = "sniffer")]
+    sniffer_taken: AtomicBool,
 }
 
 impl<'d> WifiController<'d> {
@@ -1792,6 +1988,8 @@ impl<'d> WifiController<'d> {
         let mut this = Self {
             _device,
             config: Default::default(),
+            #[cfg(feature = "sniffer")]
+            sniffer_taken: AtomicBool::new(false),
         };
 
         let mode = WifiMode::try_from(&config)?;
@@ -1800,6 +1998,18 @@ impl<'d> WifiController<'d> {
 
         this.set_configuration(&config)?;
         Ok(this)
+    }
+    #[cfg(feature = "sniffer")]
+    pub fn take_sniffer(&self) -> Option<Sniffer> {
+        if self
+            .sniffer_taken
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            == Ok(false)
+        {
+            Some(Sniffer::new())
+        } else {
+            None
+        }
     }
 
     /// Set the wifi protocol.
