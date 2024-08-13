@@ -69,6 +69,8 @@
 //! # }
 //! ```
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use core::marker::PhantomData;
 
 use fugit::HertzU32;

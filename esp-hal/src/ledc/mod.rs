@@ -60,6 +60,8 @@
 //! - Source clock selection is not supported
 //! - Interrupts are not supported
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use self::{
     channel::Channel,
     timer::{Timer, TimerSpeed},
@@ -114,6 +116,8 @@ impl<'d> Ledc<'d> {
         clock_control_config: &'d Clocks<'d>,
     ) -> Self {
         crate::into_ref!(_instance);
+
+        PeripheralClockControl::reset(PeripheralEnable::Ledc);
         PeripheralClockControl::enable(PeripheralEnable::Ledc);
 
         let ledc = unsafe { &*crate::peripherals::LEDC::ptr() };

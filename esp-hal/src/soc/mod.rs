@@ -1,3 +1,5 @@
+#![allow(missing_docs)] // TODO: Remove when able
+
 use portable_atomic::{AtomicU8, Ordering};
 
 pub use self::implementation::*;

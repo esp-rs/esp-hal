@@ -142,7 +142,7 @@
 #![allow(asm_sub_register)]
 #![cfg_attr(feature = "async", allow(stable_features, async_fn_in_trait))]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
-#![deny(rust_2018_idioms)]
+#![deny(missing_docs, rust_2018_idioms)]
 #![no_std]
 
 // MUST be the first module
@@ -601,6 +601,7 @@ pub struct FlashSafeDma<T, const SIZE: usize> {
 }
 
 impl<T, const SIZE: usize> FlashSafeDma<T, SIZE> {
+    /// Create a new instance wrapping a given buffer
     pub fn new(inner: T) -> Self {
         Self {
             inner,
@@ -608,14 +609,17 @@ impl<T, const SIZE: usize> FlashSafeDma<T, SIZE> {
         }
     }
 
+    /// Return a mutable reference to the inner buffer
     pub fn inner_mut(&mut self) -> &mut T {
         &mut self.inner
     }
 
+    /// Return an immutable reference to the inner buffer
     pub fn inner(&self) -> &T {
         &self.inner
     }
 
+    /// Free the inner buffer
     pub fn free(self) -> T {
         self.inner
     }

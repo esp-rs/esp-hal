@@ -79,8 +79,6 @@
 //! (on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80
 //! MHz)
 
-#![warn(missing_docs)]
-
 use core::marker::PhantomData;
 
 use fugit::HertzU32;
@@ -227,6 +225,7 @@ where
             return Err(Error::UnreachableTargetFrequency);
         }
 
+        PeripheralClockControl::reset(crate::system::Peripheral::Rmt);
         PeripheralClockControl::enable(crate::system::Peripheral::Rmt);
 
         #[cfg(not(any(esp32, esp32s2)))]
