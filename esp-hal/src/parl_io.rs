@@ -23,8 +23,6 @@
 //!
 //! [Parallel IO TX]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/parl_io_tx.rs
 
-#![warn(missing_docs)]
-
 use core::marker::PhantomData;
 
 use enumset::{EnumSet, EnumSetType};
@@ -1122,7 +1120,7 @@ where
         tx_descriptors: &'static mut [DmaDescriptor],
         rx_descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
-        _clocks: &Clocks,
+        _clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
         internal_init(&mut dma_channel, frequency)?;
 
@@ -1215,7 +1213,7 @@ where
         mut dma_channel: Channel<'d, CH, DM>,
         descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
-        _clocks: &Clocks,
+        _clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
         internal_init(&mut dma_channel, frequency)?;
 
@@ -1303,7 +1301,7 @@ where
         mut dma_channel: Channel<'d, CH, DM>,
         descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
-        _clocks: &Clocks,
+        _clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
         internal_init(&mut dma_channel, frequency)?;
 
@@ -1381,6 +1379,7 @@ where
         return Err(Error::UnreachableClockRate);
     }
 
+    PeripheralClockControl::reset(crate::system::Peripheral::ParlIo);
     PeripheralClockControl::enable(crate::system::Peripheral::ParlIo);
 
     let pcr = unsafe { &*crate::peripherals::PCR::PTR };
@@ -1430,7 +1429,7 @@ where
     pub fn write_dma<'t, TXBUF>(
         &'t mut self,
         words: &'t TXBUF,
-    ) -> Result<DmaTransferTx<Self>, Error>
+    ) -> Result<DmaTransferTx<'_, Self>, Error>
     where
         TXBUF: ReadBuffer,
     {
@@ -1526,7 +1525,7 @@ where
     pub fn read_dma<'t, RXBUF>(
         &'t mut self,
         words: &'t mut RXBUF,
-    ) -> Result<DmaTransferRx<Self>, Error>
+    ) -> Result<DmaTransferRx<'_, Self>, Error>
     where
         RXBUF: WriteBuffer,
     {

@@ -60,6 +60,8 @@
 //! - Source clock selection is not supported
 //! - Interrupts are not supported
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use self::{
     channel::Channel,
     timer::{Timer, TimerSpeed},
@@ -111,9 +113,11 @@ impl<'d> Ledc<'d> {
     /// Return a new LEDC
     pub fn new(
         _instance: impl Peripheral<P = crate::peripherals::LEDC> + 'd,
-        clock_control_config: &'d Clocks,
+        clock_control_config: &'d Clocks<'d>,
     ) -> Self {
         crate::into_ref!(_instance);
+
+        PeripheralClockControl::reset(PeripheralEnable::Ledc);
         PeripheralClockControl::enable(PeripheralEnable::Ledc);
 
         let ledc = unsafe { &*crate::peripherals::LEDC::ptr() };
@@ -164,7 +168,7 @@ impl<'d> Ledc<'d> {
     }
 
     /// Return a new timer
-    pub fn get_timer<S: TimerSpeed>(&self, number: timer::Number) -> Timer<S> {
+    pub fn get_timer<S: TimerSpeed>(&self, number: timer::Number) -> Timer<'d, S> {
         Timer::new(self.ledc, self.clock_control_config, number)
     }
 
@@ -173,7 +177,7 @@ impl<'d> Ledc<'d> {
         &self,
         number: channel::Number,
         output_pin: impl Peripheral<P = O> + 'd,
-    ) -> Channel<S, O> {
+    ) -> Channel<'d, S, O> {
         Channel::new(number, output_pin)
     }
 }

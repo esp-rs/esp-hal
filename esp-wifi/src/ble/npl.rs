@@ -61,7 +61,7 @@ struct Event {
 
 static mut EVENTS: [Option<Event>; 95] = [None; 95];
 
-static mut EVENT_QUEUE: SimpleQueue<usize, 10> = SimpleQueue::new();
+static mut EVENT_QUEUE: SimpleQueue<usize, 16> = SimpleQueue::new();
 
 static BT_RECEIVE_QUEUE: Mutex<RefCell<SimpleQueue<ReceivedPacket, 10>>> =
     Mutex::new(RefCell::new(SimpleQueue::new()));

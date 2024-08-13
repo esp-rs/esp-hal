@@ -118,6 +118,8 @@
 //! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/
 //! [embedded-io-async]: https://docs.rs/embedded-io-async/latest/embedded_io_async/
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use core::marker::PhantomData;
 
 use self::config::Config;
@@ -464,7 +466,7 @@ where
     /// Create a new UART TX instance in [`Blocking`] mode.
     pub fn new<TX: OutputPin>(
         uart: impl Peripheral<P = T> + 'd,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
         tx: impl Peripheral<P = TX> + 'd,
     ) -> Result<Self, Error> {
         Self::new_with_config(uart, Default::default(), clocks, tx)
@@ -475,7 +477,7 @@ where
     pub fn new_with_config<TX: OutputPin>(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
         tx: impl Peripheral<P = TX> + 'd,
     ) -> Result<Self, Error> {
         crate::into_ref!(tx);
@@ -672,7 +674,7 @@ where
     /// Create a new UART RX instance in [`Blocking`] mode.
     pub fn new<RX: InputPin>(
         uart: impl Peripheral<P = T> + 'd,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Result<Self, Error> {
         Self::new_with_config(uart, Default::default(), clocks, rx)
@@ -683,7 +685,7 @@ where
     pub fn new_with_config<RX: InputPin>(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Result<Self, Error> {
         crate::into_ref!(rx);
@@ -706,7 +708,7 @@ where
     pub fn new_with_config<TX: OutputPin, RX: InputPin>(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
         tx: impl Peripheral<P = TX> + 'd,
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Result<Self, Error> {
@@ -723,7 +725,7 @@ where
     /// Create a new UART instance with defaults in [`Blocking`] mode.
     pub fn new<TX: OutputPin, RX: InputPin>(
         uart: impl Peripheral<P = T> + 'd,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
         tx: impl Peripheral<P = TX> + 'd,
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Result<Self, Error> {
@@ -741,7 +743,7 @@ where
     /// Verify that the default pins (DefaultTxPin and DefaultRxPin) are used.
     pub fn new_with_default_pins(
         uart: impl Peripheral<P = T> + 'd,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
         tx: &mut DefaultTxPin,
         rx: &mut DefaultRxPin,
     ) -> Result<Self, Error> {
@@ -762,7 +764,7 @@ where
     pub(crate) fn new_with_config_inner(
         _uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
         Self::init();
 
@@ -810,7 +812,7 @@ where
         }
     }
 
-    fn new_inner(uart: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Result<Self, Error> {
+    fn new_inner(uart: impl Peripheral<P = T> + 'd, clocks: &Clocks<'d>) -> Result<Self, Error> {
         Self::new_with_config_inner(uart, Default::default(), clocks)
     }
 
@@ -1042,7 +1044,7 @@ where
     }
 
     #[cfg(any(esp32c2, esp32c3, esp32s3))]
-    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks) {
+    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks<'d>) {
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
@@ -1079,7 +1081,7 @@ where
     }
 
     #[cfg(any(esp32c6, esp32h2))]
-    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks) {
+    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks<'d>) {
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
@@ -1150,7 +1152,7 @@ where
     }
 
     #[cfg(any(esp32, esp32s2))]
-    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks) {
+    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks<'d>) {
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::RefTick => REF_TICK.to_Hz(), /* ESP32(/-S2) TRM, section 3.2.4.2
@@ -1189,7 +1191,7 @@ where
     }
 
     /// Modify UART baud rate and reset TX/RX fifo.
-    pub fn change_baud(&mut self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks) {
+    pub fn change_baud(&mut self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks<'d>) {
         self.change_baud_internal(baudrate, clock_source, clocks);
         self.txfifo_reset();
         self.rxfifo_reset();
@@ -2003,7 +2005,7 @@ mod asynch {
         pub fn new_async_with_config<TX: OutputPin, RX: InputPin>(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
-            clocks: &Clocks,
+            clocks: &Clocks<'d>,
             tx: impl Peripheral<P = TX> + 'd,
             rx: impl Peripheral<P = RX> + 'd,
         ) -> Result<Self, Error> {
@@ -2032,7 +2034,7 @@ mod asynch {
         /// Create a new UART instance with defaults in [`Async`] mode.
         pub fn new_async<TX: OutputPin, RX: InputPin>(
             uart: impl Peripheral<P = T> + 'd,
-            clocks: &Clocks,
+            clocks: &Clocks<'d>,
             tx: impl Peripheral<P = TX> + 'd,
             rx: impl Peripheral<P = RX> + 'd,
         ) -> Result<Self, Error> {
@@ -2042,7 +2044,7 @@ mod asynch {
         /// Create a new UART instance with defaults in [`Async`] mode.
         pub fn new_async_with_default_pins(
             uart: impl Peripheral<P = T> + 'd,
-            clocks: &Clocks,
+            clocks: &Clocks<'d>,
             tx: DefaultTxPin,
             rx: DefaultRxPin,
         ) -> Result<Self, Error> {
@@ -2075,7 +2077,7 @@ mod asynch {
         /// Create a new UART TX instance in [`Async`] mode.
         pub fn new_async<TX: OutputPin>(
             uart: impl Peripheral<P = T> + 'd,
-            clocks: &Clocks,
+            clocks: &Clocks<'d>,
             tx: impl Peripheral<P = TX> + 'd,
         ) -> Result<Self, Error> {
             Self::new_async_with_config(uart, Default::default(), clocks, tx)
@@ -2086,7 +2088,7 @@ mod asynch {
         pub fn new_async_with_config<TX: OutputPin>(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
-            clocks: &Clocks,
+            clocks: &Clocks<'d>,
             tx: impl Peripheral<P = TX> + 'd,
         ) -> Result<Self, Error> {
             crate::into_ref!(tx);
@@ -2151,7 +2153,7 @@ mod asynch {
         /// Create a new UART RX instance in [`Async`] mode.
         pub fn new_async<RX: InputPin>(
             uart: impl Peripheral<P = T> + 'd,
-            clocks: &Clocks,
+            clocks: &Clocks<'d>,
             rx: impl Peripheral<P = RX> + 'd,
         ) -> Result<Self, Error> {
             Self::new_async_with_config(uart, Default::default(), clocks, rx)
@@ -2162,7 +2164,7 @@ mod asynch {
         pub fn new_async_with_config<RX: InputPin>(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
-            clocks: &Clocks,
+            clocks: &Clocks<'d>,
             rx: impl Peripheral<P = RX> + 'd,
         ) -> Result<Self, Error> {
             crate::into_ref!(rx);
@@ -2387,7 +2389,7 @@ pub mod lp_uart {
     impl LpUart {
         /// Initialize the UART driver using the default configuration
         // TODO: CTS and RTS pins
-        pub fn new(uart: LP_UART, _tx: LowPowerOutput<5>, _rx: LowPowerInput<4>) -> Self {
+        pub fn new(uart: LP_UART, _tx: LowPowerOutput<'_, 5>, _rx: LowPowerInput<'_, 4>) -> Self {
             let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
             let lp_aon = unsafe { &*crate::peripherals::LP_AON::PTR };
 

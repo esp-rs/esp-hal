@@ -83,8 +83,6 @@
 //! # }
 //! ```
 
-#![deny(missing_docs)]
-
 use core::{marker::PhantomData, ops::Deref};
 
 use fugit::HertzU32;
@@ -128,10 +126,11 @@ impl<'d, PWM: PwmPeripheral> McPwm<'d, PWM> {
     // clocks.crypto_pwm_clock normally is 160 MHz
     pub fn new(
         peripheral: impl Peripheral<P = PWM> + 'd,
-        peripheral_clock: PeripheralClockConfig,
+        peripheral_clock: PeripheralClockConfig<'d>,
     ) -> Self {
         crate::into_ref!(peripheral);
 
+        PWM::reset();
         PWM::enable();
 
         #[cfg(not(esp32c6))]
@@ -201,7 +200,7 @@ impl<'a> PeripheralClockConfig<'a> {
     ///
     /// The peripheral clock frequency is calculated as:
     /// `peripheral_clock = input_clock / (prescaler + 1)`
-    pub fn with_prescaler(clocks: &'a Clocks, prescaler: u8) -> Self {
+    pub fn with_prescaler(clocks: &'a Clocks<'a>, prescaler: u8) -> Self {
         #[cfg(esp32)]
         let source_clock = clocks.pwm_clock;
         #[cfg(esp32c6)]
@@ -233,7 +232,7 @@ impl<'a> PeripheralClockConfig<'a> {
     /// `160 Mhz / 256`) are representable exactly. Other target frequencies
     /// will be rounded up to the next divisor.
     pub fn with_frequency(
-        clocks: &'a Clocks,
+        clocks: &'a Clocks<'a>,
         target_freq: HertzU32,
     ) -> Result<Self, FrequencyError> {
         #[cfg(esp32)]
@@ -312,6 +311,8 @@ pub struct FrequencyError;
 pub trait PwmPeripheral: Deref<Target = RegisterBlock> + crate::private::Sealed {
     /// Enable peripheral
     fn enable();
+    /// Reset peripheral
+    fn reset();
     /// Get a pointer to the peripheral RegisterBlock
     fn block() -> *const RegisterBlock;
     /// Get operator GPIO mux output signal
@@ -322,6 +323,10 @@ pub trait PwmPeripheral: Deref<Target = RegisterBlock> + crate::private::Sealed 
 impl PwmPeripheral for crate::peripherals::MCPWM0 {
     fn enable() {
         PeripheralClockControl::enable(PeripheralEnable::Mcpwm0)
+    }
+
+    fn reset() {
+        PeripheralClockControl::reset(PeripheralEnable::Mcpwm0)
     }
 
     fn block() -> *const RegisterBlock {
@@ -345,6 +350,10 @@ impl PwmPeripheral for crate::peripherals::MCPWM0 {
 impl PwmPeripheral for crate::peripherals::MCPWM1 {
     fn enable() {
         PeripheralClockControl::enable(PeripheralEnable::Mcpwm1)
+    }
+
+    fn reset() {
+        PeripheralClockControl::reset(PeripheralEnable::Mcpwm1)
     }
 
     fn block() -> *const RegisterBlock {

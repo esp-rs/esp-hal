@@ -79,8 +79,6 @@
 //! (on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80
 //! MHz)
 
-#![warn(missing_docs)]
-
 use core::marker::PhantomData;
 
 use fugit::HertzU32;
@@ -218,7 +216,7 @@ where
     pub(crate) fn new_internal(
         peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
         frequency: HertzU32,
-        _clocks: &Clocks,
+        _clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
         let me = Rmt::create(peripheral);
 
@@ -227,6 +225,7 @@ where
             return Err(Error::UnreachableTargetFrequency);
         }
 
+        PeripheralClockControl::reset(crate::system::Peripheral::Rmt);
         PeripheralClockControl::enable(crate::system::Peripheral::Rmt);
 
         #[cfg(not(any(esp32, esp32s2)))]
@@ -247,7 +246,7 @@ where
     }
 
     #[cfg(not(any(esp32, esp32s2)))]
-    fn configure_clock(&self, frequency: HertzU32, _clocks: &Clocks) -> Result<(), Error> {
+    fn configure_clock(&self, frequency: HertzU32, _clocks: &Clocks<'d>) -> Result<(), Error> {
         let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
 
         if frequency > src_clock {
@@ -271,7 +270,7 @@ impl<'d> Rmt<'d, crate::Blocking> {
     pub fn new(
         peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
         frequency: HertzU32,
-        _clocks: &Clocks,
+        _clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
         Self::new_internal(peripheral, frequency, _clocks)
     }
@@ -291,7 +290,7 @@ impl<'d> Rmt<'d, crate::Async> {
     pub fn new_async(
         peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
         frequency: HertzU32,
-        _clocks: &Clocks,
+        _clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
         let mut this = Self::new_internal(peripheral, frequency, _clocks)?;
         this.internal_set_interrupt_handler(asynch::async_interrupt_handler);
@@ -995,7 +994,7 @@ pub trait TxChannel: private::TxChannelInternal<crate::Blocking> {
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
     /// use.
-    fn transmit<T: Into<u32> + Copy>(self, data: &[T]) -> SingleShotTxTransaction<Self, T>
+    fn transmit<T: Into<u32> + Copy>(self, data: &[T]) -> SingleShotTxTransaction<'_, Self, T>
     where
         Self: Sized,
     {
@@ -1088,7 +1087,10 @@ pub trait RxChannel: private::RxChannelInternal<crate::Blocking> {
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
     /// The length of the received data cannot exceed the allocated RMT RAM.
-    fn receive<T: From<u32> + Copy>(self, data: &mut [T]) -> Result<RxTransaction<Self, T>, Error>
+    fn receive<T: From<u32> + Copy>(
+        self,
+        data: &mut [T],
+    ) -> Result<RxTransaction<'_, Self, T>, Error>
     where
         Self: Sized,
     {

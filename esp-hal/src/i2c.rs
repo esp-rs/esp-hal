@@ -69,6 +69,8 @@
 //! # }
 //! ```
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use core::marker::PhantomData;
 
 use fugit::HertzU32;
@@ -131,73 +133,6 @@ impl embedded_hal::i2c::Error for Error {
     }
 }
 
-// This should really be defined in the PAC, but the PAC only
-// defines the "command" field as a 16-bit field :-(
-bitfield::bitfield! {
-    struct CommandReg(u32);
-    cmd_done, _: 31;
-    from into Opcode, opcode, set_opcode: 13, 11;
-    from into Ack, ack_value, set_ack_value: 10, 10;
-    from into Ack, ack_exp, set_ack_exp: 9, 9;
-    ack_check_en, set_ack_check_en: 8;
-    length, set_length: 7, 0;
-}
-
-impl CommandReg {
-    fn bits(&self) -> u32 {
-        self.0
-    }
-
-    fn new_start() -> Self {
-        let mut cmd = Self(0);
-        cmd.set_opcode(Opcode::RStart);
-        cmd
-    }
-
-    fn new_end() -> Self {
-        let mut cmd = Self(0);
-        cmd.set_opcode(Opcode::End);
-        cmd
-    }
-
-    fn new_stop() -> Self {
-        let mut cmd = Self(0);
-        cmd.set_opcode(Opcode::Stop);
-        cmd
-    }
-
-    fn new_write(ack_exp: Ack, ack_check_en: bool, length: u8) -> Self {
-        let mut cmd = Self(0);
-        cmd.set_opcode(Opcode::Write);
-        cmd.set_ack_exp(ack_exp);
-        cmd.set_ack_check_en(ack_check_en);
-        cmd.set_length(length as u32);
-        cmd
-    }
-
-    fn new_read(ack_value: Ack, length: u8) -> Self {
-        let mut cmd = Self(0);
-        cmd.set_opcode(Opcode::Read);
-        cmd.set_ack_value(ack_value);
-        cmd.set_length(length as u32);
-        cmd
-    }
-}
-
-#[cfg(feature = "debug")]
-impl core::fmt::Debug for CommandReg {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("CommandReg")
-            .field("cmd_done", &self.cmd_done())
-            .field("opcode", &self.opcode())
-            .field("ack_value", &self.ack_value())
-            .field("ack_exp", &self.ack_exp())
-            .field("ack_check_en", &self.ack_check_en())
-            .field("length", &self.length())
-            .finish()
-    }
-}
-
 /// A generic I2C Command
 #[cfg_attr(feature = "debug", derive(Debug))]
 enum Command {
@@ -223,22 +158,6 @@ enum Command {
     },
 }
 
-impl From<Command> for CommandReg {
-    fn from(c: Command) -> Self {
-        match c {
-            Command::Start => CommandReg::new_start(),
-            Command::End => CommandReg::new_end(),
-            Command::Stop => CommandReg::new_stop(),
-            Command::Write {
-                ack_exp,
-                ack_check_en,
-                length,
-            } => CommandReg::new_write(ack_exp, ack_check_en, length),
-            Command::Read { ack_value, length } => CommandReg::new_read(ack_value, length),
-        }
-    }
-}
-
 enum OperationType {
     Write = 0,
     Read  = 1,
@@ -262,55 +181,6 @@ impl From<u32> for Ack {
 impl From<Ack> for u32 {
     fn from(ack: Ack) -> u32 {
         ack as u32
-    }
-}
-
-cfg_if::cfg_if! {
-    if #[cfg(any(esp32, esp32s2))] {
-        const OPCODE_RSTART: u32 = 0;
-        const OPCODE_WRITE: u32  = 1;
-        const OPCODE_READ: u32   = 2;
-        const OPCODE_STOP: u32   = 3;
-        const OPCODE_END: u32    = 4;
-    } else if #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))] {
-        const OPCODE_RSTART: u32 = 6;
-        const OPCODE_WRITE: u32  = 1;
-        const OPCODE_READ: u32   = 3;
-        const OPCODE_STOP: u32   = 2;
-        const OPCODE_END: u32    = 4;
-    }
-}
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[derive(PartialEq)]
-enum Opcode {
-    RStart,
-    Write,
-    Read,
-    Stop,
-    End,
-}
-
-impl From<Opcode> for u32 {
-    fn from(opcode: Opcode) -> u32 {
-        match opcode {
-            Opcode::RStart => OPCODE_RSTART,
-            Opcode::Write => OPCODE_WRITE,
-            Opcode::Read => OPCODE_READ,
-            Opcode::Stop => OPCODE_STOP,
-            Opcode::End => OPCODE_END,
-        }
-    }
-}
-impl From<u32> for Opcode {
-    fn from(opcode: u32) -> Self {
-        match opcode {
-            OPCODE_RSTART => Opcode::RStart,
-            OPCODE_WRITE => Opcode::Write,
-            OPCODE_READ => Opcode::Read,
-            OPCODE_STOP => Opcode::Stop,
-            OPCODE_END => Opcode::End,
-            _ => unreachable!(),
-        }
     }
 }
 
@@ -453,7 +323,7 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
         timeout: Option<u32>,
     ) -> Self {
         crate::into_ref!(i2c, sda, scl);
@@ -529,7 +399,7 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
     ) -> Self {
         Self::new_with_timeout(i2c, sda, scl, frequency, clocks, None)
     }
@@ -542,7 +412,7 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
         timeout: Option<u32>,
     ) -> Self {
         Self::new_internal(i2c, sda, scl, frequency, clocks, timeout)
@@ -573,7 +443,7 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
     ) -> Self {
         Self::new_with_timeout_async(i2c, sda, scl, frequency, clocks, None)
     }
@@ -586,7 +456,7 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
         timeout: Option<u32>,
     ) -> Self {
         let mut this = Self::new_internal(i2c, sda, scl, frequency, clocks, timeout);
@@ -1153,7 +1023,7 @@ pub trait Instance: crate::private::Sealed {
 
     fn i2c_number(&self) -> usize;
 
-    fn setup(&mut self, frequency: HertzU32, clocks: &Clocks, timeout: Option<u32>) {
+    fn setup(&mut self, frequency: HertzU32, clocks: &Clocks<'_>, timeout: Option<u32>) {
         self.register_block().ctr().modify(|_, w| unsafe {
             // Clear register
             w.bits(0)
@@ -1739,8 +1609,9 @@ pub trait Instance: crate::private::Sealed {
         //       but does not seem to clear the done bit! So we don't check the done
         //       status of an end command
         for cmd_reg in self.register_block().comd_iter() {
-            let cmd = CommandReg(cmd_reg.read().bits());
-            if cmd.bits() != 0x0 && cmd.opcode() != Opcode::End && !cmd.cmd_done() {
+            let cmd = cmd_reg.read();
+
+            if cmd.bits() != 0x0 && !cmd.opcode().is_end() && !cmd.command_done().bit_is_set() {
                 return Err(Error::ExecIncomplete);
             }
         }
@@ -2098,8 +1969,40 @@ where
     I: Iterator<Item = &'a COMD>,
 {
     let cmd = cmd_iterator.next().ok_or(Error::CommandNrExceeded)?;
-    let cmd_reg: CommandReg = command.into();
-    cmd.write(|w| unsafe { w.bits(cmd_reg.bits()) });
+    unsafe {
+        match command {
+            Command::Start => {
+                cmd.write(|w| w.opcode().rstart());
+            }
+            Command::Stop => {
+                cmd.write(|w| w.opcode().stop());
+            }
+            Command::End => {
+                cmd.write(|w| w.opcode().end());
+            }
+            Command::Write {
+                ack_exp,
+                ack_check_en,
+                length,
+            } => {
+                cmd.write(|w| {
+                    w.opcode().write();
+                    w.ack_exp().bit(ack_exp == Ack::Nack);
+                    w.ack_check_en().bit(ack_check_en);
+                    w.byte_num().bits(length);
+                    w
+                });
+            }
+            Command::Read { ack_value, length } => {
+                cmd.write(|w| {
+                    w.opcode().read();
+                    w.ack_value().bit(ack_value == Ack::Nack);
+                    w.byte_num().bits(length);
+                    w
+                });
+            }
+        }
+    }
     Ok(())
 }
 
@@ -2258,15 +2161,6 @@ pub mod lp_i2c {
         Nack,
     }
 
-    #[allow(unused)]
-    enum Opcode {
-        RStart = 6,
-        Write  = 1,
-        Read   = 3,
-        Stop   = 2,
-        End    = 4,
-    }
-
     #[derive(PartialEq)]
     #[allow(unused)]
     enum Command {
@@ -2293,122 +2187,6 @@ pub mod lp_i2c {
         },
     }
 
-    impl From<Command> for u16 {
-        fn from(c: Command) -> u16 {
-            let opcode = match c {
-                Command::Start => Opcode::RStart,
-                Command::Stop => Opcode::Stop,
-                Command::End => Opcode::End,
-                Command::Write { .. } => Opcode::Write,
-                Command::Read { .. } => Opcode::Read,
-            };
-
-            let length = match c {
-                Command::Start | Command::Stop | Command::End => 0,
-                Command::Write { length: l, .. } | Command::Read { length: l, .. } => l,
-            };
-
-            let ack_exp = match c {
-                Command::Start | Command::Stop | Command::End | Command::Read { .. } => Ack::Nack,
-                Command::Write { ack_exp: exp, .. } => exp,
-            };
-
-            let ack_check_en = match c {
-                Command::Start | Command::Stop | Command::End | Command::Read { .. } => false,
-                Command::Write {
-                    ack_check_en: en, ..
-                } => en,
-            };
-
-            let ack_value = match c {
-                Command::Start | Command::Stop | Command::End | Command::Write { .. } => Ack::Nack,
-                Command::Read { ack_value: ack, .. } => ack,
-            };
-
-            let mut cmd: u16 = length.into();
-
-            if ack_check_en {
-                cmd |= 1 << 8;
-            } else {
-                cmd &= !(1 << 8);
-            }
-
-            if ack_exp == Ack::Nack {
-                cmd |= 1 << 9;
-            } else {
-                cmd &= !(1 << 9);
-            }
-
-            if ack_value == Ack::Nack {
-                cmd |= 1 << 10;
-            } else {
-                cmd &= !(1 << 10);
-            }
-
-            cmd |= (opcode as u16) << 11;
-
-            cmd
-        }
-    }
-
-    impl From<Command> for u32 {
-        fn from(c: Command) -> u32 {
-            let opcode = match c {
-                Command::Start => Opcode::RStart,
-                Command::Stop => Opcode::Stop,
-                Command::End => Opcode::End,
-                Command::Write { .. } => Opcode::Write,
-                Command::Read { .. } => Opcode::Read,
-            };
-
-            let length = match c {
-                Command::Start | Command::Stop | Command::End => 0,
-                Command::Write { length: l, .. } | Command::Read { length: l, .. } => l,
-            };
-
-            let ack_exp = match c {
-                Command::Start | Command::Stop | Command::End | Command::Read { .. } => Ack::Nack,
-                Command::Write { ack_exp: exp, .. } => exp,
-            };
-
-            let ack_check_en = match c {
-                Command::Start | Command::Stop | Command::End | Command::Read { .. } => false,
-                Command::Write {
-                    ack_check_en: en, ..
-                } => en,
-            };
-
-            let ack_value = match c {
-                Command::Start | Command::Stop | Command::End | Command::Write { .. } => Ack::Nack,
-                Command::Read { ack_value: ack, .. } => ack,
-            };
-
-            let mut cmd: u32 = length.into();
-
-            if ack_check_en {
-                cmd |= 1 << 8;
-            } else {
-                cmd &= !(1 << 8);
-            }
-
-            if ack_exp == Ack::Nack {
-                cmd |= 1 << 9;
-            } else {
-                cmd &= !(1 << 9);
-            }
-
-            if ack_value == Ack::Nack {
-                cmd |= 1 << 10;
-            } else {
-                cmd &= !(1 << 10);
-            }
-
-            cmd |= (opcode as u32) << 11;
-
-            cmd
-        }
-    }
-
     // https://github.com/espressif/esp-idf/blob/master/components/ulp/lp_core/lp_core_i2c.c#L122
     // TX/RX RAM size is 16*8 bit
     // TX RX FIFO has 16 bit depth
@@ -2426,8 +2204,8 @@ pub mod lp_i2c {
     impl LpI2c {
         pub fn new(
             i2c: LP_I2C0,
-            _sda: LowPowerOutputOpenDrain<6>,
-            _scl: LowPowerOutputOpenDrain<7>,
+            _sda: LowPowerOutputOpenDrain<'_, 6>,
+            _scl: LowPowerOutputOpenDrain<'_, 7>,
             frequency: HertzU32,
         ) -> Self {
             let me = Self { i2c };

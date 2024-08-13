@@ -749,7 +749,7 @@ mod m2m {
             &mut self,
             tx_buffer: &'t TXBUF,
             rx_buffer: &'t mut RXBUF,
-        ) -> Result<DmaTransferRx<Self>, DmaError>
+        ) -> Result<DmaTransferRx<'_, Self>, DmaError>
         where
             TXBUF: ReadBuffer,
             RXBUF: WriteBuffer,

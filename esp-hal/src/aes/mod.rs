@@ -46,8 +46,6 @@
 //! * AES-DMA mode is currently not supported on ESP32 and ESP32S2
 //! * AES-DMA Initialization Vector (IV) is currently not supported
 
-#![deny(missing_docs)]
-
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::AES,
@@ -135,6 +133,10 @@ impl<'d> Aes<'d> {
     /// Constructs a new `Aes` instance.
     pub fn new(aes: impl Peripheral<P = AES> + 'd) -> Self {
         crate::into_ref!(aes);
+
+        crate::system::PeripheralClockControl::reset(crate::system::Peripheral::Aes);
+        crate::system::PeripheralClockControl::enable(crate::system::Peripheral::Aes);
+
         let mut ret = Self {
             aes,
             alignment_helper: AlignmentHelper::native_endianess(),
@@ -406,7 +408,7 @@ pub mod dma {
             mode: Mode,
             cipher_mode: CipherMode,
             key: K,
-        ) -> Result<DmaTransferTxRx<Self>, crate::dma::DmaError>
+        ) -> Result<DmaTransferTxRx<'_, Self>, crate::dma::DmaError>
         where
             K: Into<Key>,
             TXBUF: ReadBuffer,

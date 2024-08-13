@@ -142,6 +142,7 @@
 #![allow(asm_sub_register)]
 #![cfg_attr(feature = "async", allow(stable_features, async_fn_in_trait))]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
+#![deny(missing_docs, rust_2018_idioms)]
 #![no_std]
 
 // MUST be the first module
@@ -229,6 +230,8 @@ pub mod system;
 pub mod time;
 #[cfg(any(systimer, timg0, timg1))]
 pub mod timer;
+#[cfg(touch)]
+pub mod touch;
 #[cfg(trace0)]
 pub mod trace;
 #[cfg(any(twai0, twai1))]

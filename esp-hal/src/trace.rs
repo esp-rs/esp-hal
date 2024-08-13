@@ -42,13 +42,16 @@ use crate::{
 /// Errors returned from [Trace::stop_trace]
 #[derive(Debug, Clone, Copy)]
 pub enum Error {
+    /// Attempted to stop a trace which had not been started yet
     NotStarted,
 }
 
 /// Returned by [Trace::stop_trace]
 #[derive(Debug, Clone, Copy)]
 pub struct TraceResult {
+    /// Start index of the valid data
     pub valid_start_index: usize,
+    /// Length of the valid data
     pub valid_length: usize,
 }
 
@@ -66,6 +69,7 @@ where
     pub fn new(peripheral: impl Peripheral<P = T> + 'd) -> Self {
         crate::into_ref!(peripheral);
 
+        PeripheralClockControl::reset(crate::system::Peripheral::Trace0);
         PeripheralClockControl::enable(crate::system::Peripheral::Trace0);
 
         Self {
@@ -199,7 +203,9 @@ where
     }
 }
 
+/// Trace peripheral instance
 pub trait Instance: crate::private::Sealed {
+    /// Get a reference to the peripheral's underlying register block
     fn register_block(&self) -> &RegisterBlock;
 }
 

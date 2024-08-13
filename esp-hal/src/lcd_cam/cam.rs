@@ -134,7 +134,7 @@ where
         descriptors: &'static mut [DmaDescriptor],
         _pins: P,
         frequency: HertzU32,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
     ) -> Self {
         let lcd_cam = cam.lcd_cam;
 
@@ -391,7 +391,7 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
     pub fn read_dma<'t, RXBUF: WriteBuffer>(
         &'t mut self,
         buf: &'t mut RXBUF,
-    ) -> Result<DmaTransferRx<Self>, DmaError> {
+    ) -> Result<DmaTransferRx<'_, Self>, DmaError> {
         self.reset_unit_and_fifo();
         // Start DMA to receive incoming transfer.
         self.start_dma(false, buf)?;
@@ -403,7 +403,7 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
     pub fn read_dma_circular<'t, RXBUF: WriteBuffer>(
         &'t mut self,
         buf: &'t mut RXBUF,
-    ) -> Result<DmaTransferRxCircular<Self>, DmaError> {
+    ) -> Result<DmaTransferRxCircular<'_, Self>, DmaError> {
         self.reset_unit_and_fifo();
         // Start DMA to receive incoming transfer.
         self.start_dma(true, buf)?;

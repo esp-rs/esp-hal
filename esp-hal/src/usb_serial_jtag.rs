@@ -273,6 +273,7 @@ where
     M: Mode,
 {
     fn new_inner(_usb_device: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
+        PeripheralClockControl::reset(crate::system::Peripheral::UsbDevice);
         PeripheralClockControl::enable(crate::system::Peripheral::UsbDevice);
 
         USB_DEVICE::disable_tx_interrupts();
@@ -337,6 +338,7 @@ where
         self.tx.flush_tx_nb()
     }
 
+    /// Read a single byte but don't block if it isn't ready immediately
     pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
         self.rx.read_byte()
     }

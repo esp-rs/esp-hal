@@ -80,6 +80,8 @@
 //! - Only master mode is supported.
 //! - Only TDM Philips standard is supported.
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use core::marker::PhantomData;
 
 use enumset::{EnumSet, EnumSetType};
@@ -251,7 +253,7 @@ where
     /// Write I2S.
     /// Returns [DmaTransferTx] which represents the in-progress DMA
     /// transfer
-    fn write_dma<'t>(&'t mut self, words: &'t TXBUF) -> Result<DmaTransferTx<Self>, Error>
+    fn write_dma<'t>(&'t mut self, words: &'t TXBUF) -> Result<DmaTransferTx<'_, Self>, Error>
     where
         TXBUF: ReadBuffer;
 
@@ -260,7 +262,7 @@ where
     fn write_dma_circular<'t>(
         &'t mut self,
         words: &'t TXBUF,
-    ) -> Result<DmaTransferTxCircular<Self>, Error>
+    ) -> Result<DmaTransferTxCircular<'_, Self>, Error>
     where
         TXBUF: ReadBuffer;
 }
@@ -281,7 +283,7 @@ where
     /// Read I2S.
     /// Returns [DmaTransferRx] which represents the in-progress DMA
     /// transfer
-    fn read_dma<'t>(&'t mut self, words: &'t mut RXBUF) -> Result<DmaTransferRx<Self>, Error>
+    fn read_dma<'t>(&'t mut self, words: &'t mut RXBUF) -> Result<DmaTransferRx<'_, Self>, Error>
     where
         RXBUF: WriteBuffer;
 
@@ -291,7 +293,7 @@ where
     fn read_dma_circular<'t>(
         &'t mut self,
         words: &'t mut RXBUF,
-    ) -> Result<DmaTransferRxCircular<Self>, Error>
+    ) -> Result<DmaTransferRxCircular<'_, Self>, Error>
     where
         RXBUF: WriteBuffer;
 }
@@ -323,13 +325,14 @@ where
         mut channel: Channel<'d, CH, DmaMode>,
         tx_descriptors: &'static mut [DmaDescriptor],
         rx_descriptors: &'static mut [DmaDescriptor],
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
     ) -> Self {
         // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
         // could be configured totally independently but for now handle all
         // the targets the same and force same configuration for both, TX and RX
 
         channel.tx.init_channel();
+        PeripheralClockControl::reset(I::get_peripheral());
         PeripheralClockControl::enable(I::get_peripheral());
         I::set_clock(calculate_clock(
             sample_rate,
@@ -429,7 +432,7 @@ where
         channel: Channel<'d, CH, DmaMode>,
         tx_descriptors: &'static mut [DmaDescriptor],
         rx_descriptors: &'static mut [DmaDescriptor],
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
     ) -> Self
     where
         I: I2s0Instance,
@@ -460,7 +463,7 @@ where
         channel: Channel<'d, CH, DmaMode>,
         tx_descriptors: &'static mut [DmaDescriptor],
         rx_descriptors: &'static mut [DmaDescriptor],
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
     ) -> Self
     where
         I: I2s1Instance,
@@ -646,7 +649,7 @@ where
     CH: DmaChannel,
     DmaMode: Mode,
 {
-    fn write_dma<'t>(&'t mut self, words: &'t TXBUF) -> Result<DmaTransferTx<Self>, Error>
+    fn write_dma<'t>(&'t mut self, words: &'t TXBUF) -> Result<DmaTransferTx<'_, Self>, Error>
     where
         TXBUF: ReadBuffer,
     {
@@ -657,7 +660,7 @@ where
     fn write_dma_circular<'t>(
         &'t mut self,
         words: &'t TXBUF,
-    ) -> Result<DmaTransferTxCircular<Self>, Error>
+    ) -> Result<DmaTransferTxCircular<'_, Self>, Error>
     where
         TXBUF: ReadBuffer,
     {
@@ -827,7 +830,7 @@ where
     DmaMode: Mode,
     Self: DmaSupportRx + Sized,
 {
-    fn read_dma<'t>(&'t mut self, words: &'t mut RXBUF) -> Result<DmaTransferRx<Self>, Error>
+    fn read_dma<'t>(&'t mut self, words: &'t mut RXBUF) -> Result<DmaTransferRx<'_, Self>, Error>
     where
         RXBUF: WriteBuffer,
     {
@@ -838,7 +841,7 @@ where
     fn read_dma_circular<'t>(
         &'t mut self,
         words: &'t mut RXBUF,
-    ) -> Result<DmaTransferRxCircular<Self>, Error>
+    ) -> Result<DmaTransferRxCircular<'_, Self>, Error>
     where
         RXBUF: WriteBuffer,
     {
@@ -2084,7 +2087,7 @@ mod private {
         sample_rate: impl Into<fugit::HertzU32>,
         channels: u8,
         data_bits: u8,
-        _clocks: &Clocks,
+        _clocks: &Clocks<'_>,
     ) -> I2sClockDividers {
         // this loosely corresponds to `i2s_std_calculate_clock` and
         // `i2s_ll_tx_set_mclk` in esp-idf

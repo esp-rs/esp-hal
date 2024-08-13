@@ -34,6 +34,8 @@
 //!
 //! [HMAC]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/hmac.rs
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use core::convert::Infallible;
 
 use crate::{
@@ -96,7 +98,7 @@ impl<'d> Hmac<'d> {
     pub fn new(hmac: impl Peripheral<P = HMAC> + 'd) -> Self {
         crate::into_ref!(hmac);
 
-        PeripheralClockControl::enable(PeripheralEnable::Sha);
+        PeripheralClockControl::reset(PeripheralEnable::Hmac);
         PeripheralClockControl::enable(PeripheralEnable::Hmac);
 
         Self {

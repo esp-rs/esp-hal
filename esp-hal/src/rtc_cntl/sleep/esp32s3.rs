@@ -80,7 +80,12 @@ pub const RTC_MEM_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
 pub const RTC_MEM_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
 
 impl WakeSource for TimerWakeupSource {
-    fn apply(&self, rtc: &Rtc, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
+    fn apply(
+        &self,
+        rtc: &Rtc<'_>,
+        triggers: &mut WakeTriggers,
+        _sleep_config: &mut RtcSleepConfig,
+    ) {
         triggers.set_timer(true);
         let rtc_cntl = unsafe { &*esp32s3::RTC_CNTL::ptr() };
         let clock_freq = RtcClock::get_slow_freq();
@@ -111,7 +116,12 @@ impl WakeSource for TimerWakeupSource {
 }
 
 impl<P: RtcPin> WakeSource for Ext0WakeupSource<'_, P> {
-    fn apply(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig) {
+    fn apply(
+        &self,
+        _rtc: &Rtc<'_>,
+        triggers: &mut WakeTriggers,
+        sleep_config: &mut RtcSleepConfig,
+    ) {
         // don't power down RTC peripherals
         sleep_config.set_rtc_peri_pd_en(false);
         triggers.set_ext0(true);
@@ -148,7 +158,12 @@ impl<P: RtcPin> Drop for Ext0WakeupSource<'_, P> {
 }
 
 impl WakeSource for Ext1WakeupSource<'_, '_> {
-    fn apply(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig) {
+    fn apply(
+        &self,
+        _rtc: &Rtc<'_>,
+        triggers: &mut WakeTriggers,
+        sleep_config: &mut RtcSleepConfig,
+    ) {
         // don't power down RTC peripherals
         sleep_config.set_rtc_peri_pd_en(false);
         triggers.set_ext1(true);
@@ -209,7 +224,12 @@ impl<'a, 'b> RtcioWakeupSource<'a, 'b> {
 }
 
 impl WakeSource for RtcioWakeupSource<'_, '_> {
-    fn apply(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig) {
+    fn apply(
+        &self,
+        _rtc: &Rtc<'_>,
+        triggers: &mut WakeTriggers,
+        sleep_config: &mut RtcSleepConfig,
+    ) {
         let mut pins = self.pins.borrow_mut();
 
         if pins.is_empty() {
@@ -421,7 +441,7 @@ impl RtcSleepConfig {
         cfg
     }
 
-    pub(crate) fn base_settings(_rtc: &Rtc) {
+    pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
         // settings derived from esp_clk_init -> rtc_init
         unsafe {
             let rtc_cntl = &*esp32s3::RTC_CNTL::ptr();

@@ -263,7 +263,7 @@ impl<'d, const NUM: usize> Unit<'d, NUM> {
     }
 
     /// Disable interrupts for this unit.
-    pub fn unlisten(&self, _cs: CriticalSection) {
+    pub fn unlisten(&self, _cs: CriticalSection<'_>) {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
         critical_section::with(|_cs| {
             pcnt.int_ena()

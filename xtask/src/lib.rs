@@ -128,7 +128,6 @@ pub fn build_documentation(
 
     // Build up an array of command-line arguments to pass to `cargo`:
     let builder = CargoArgsBuilder::default()
-        .toolchain(if chip.is_xtensa() { "esp" } else { "nightly" })
         .subcommand("doc")
         .target(target)
         .features(&features)
@@ -243,19 +242,8 @@ pub fn execute_app(
 
     // probe-rs cannot currently do auto detection, so we need to tell probe-rs run
     // which chip we are testing
-    if subcommand == "test" {
-        if chip == Chip::Esp32 {
-            builder = builder.arg("--").arg("--chip").arg("esp32-3.3v");
-        } else if chip == Chip::Esp32c2 {
-            builder = builder
-                .arg("--")
-                .arg("--chip")
-                .arg("esp32c2")
-                .arg("--speed")
-                .arg("15000");
-        } else {
-            builder = builder.arg("--").arg("--chip").arg(format!("{}", chip));
-        }
+    if subcommand == "test" && chip == Chip::Esp32c2 {
+        builder = builder.arg("--").arg("--speed").arg("15000");
     }
 
     // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:

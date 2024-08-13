@@ -454,7 +454,7 @@ where
         spi: impl Peripheral<P = T> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
     ) -> Spi<'d, T, FullDuplexMode> {
         crate::into_ref!(spi);
         Self::new_internal(spi, frequency, mode, clocks)
@@ -542,8 +542,9 @@ where
         spi: PeripheralRef<'d, T>,
         frequency: HertzU32,
         mode: SpiMode,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
     ) -> Spi<'d, T, FullDuplexMode> {
+        spi.reset_peripheral();
         spi.enable_peripheral();
 
         let mut spi = Spi {
@@ -557,7 +558,7 @@ where
         spi
     }
 
-    pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks) {
+    pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks<'d>) {
         self.spi.ch_bus_freq(frequency, clocks);
     }
 }
@@ -574,7 +575,7 @@ where
         spi: impl Peripheral<P = T> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
     ) -> Spi<'d, T, HalfDuplexMode> {
         crate::into_ref!(spi);
         Self::new_internal(spi, frequency, mode, clocks)
@@ -719,8 +720,9 @@ where
         spi: PeripheralRef<'d, T>,
         frequency: HertzU32,
         mode: SpiMode,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
     ) -> Spi<'d, T, HalfDuplexMode> {
+        spi.reset_peripheral();
         spi.enable_peripheral();
 
         let mut spi = Spi {
@@ -734,7 +736,7 @@ where
         spi
     }
 
-    pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks) {
+    pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks<'d>) {
         self.spi.ch_bus_freq(frequency, clocks);
     }
 
@@ -1030,7 +1032,7 @@ pub mod dma {
         M: DuplexMode,
         DmaMode: Mode,
     {
-        pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks) {
+        pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks<'d>) {
             self.spi.ch_bus_freq(frequency, clocks);
         }
     }
@@ -2035,6 +2037,11 @@ pub trait InstanceDma: Instance {
         tx.is_done();
         rx.is_done();
 
+        // re-enable the MISO and MOSI
+        reg_block
+            .user()
+            .modify(|_, w| w.usr_miso().bit(true).usr_mosi().bit(true));
+
         self.enable_dma();
         self.update();
 
@@ -2063,6 +2070,11 @@ pub trait InstanceDma: Instance {
         self.configure_datalen(len as u32 * 8);
 
         tx.is_done();
+
+        // disable MISO and re-enable MOSI
+        reg_block
+            .user()
+            .modify(|_, w| w.usr_miso().bit(false).usr_mosi().bit(true));
 
         self.enable_dma();
         self.update();
@@ -2097,6 +2109,11 @@ pub trait InstanceDma: Instance {
         self.configure_datalen(data_length as u32 * 8);
 
         rx.is_done();
+
+        // re-enable MISO and disable MOSI
+        reg_block
+            .user()
+            .modify(|_, w| w.usr_miso().bit(true).usr_mosi().bit(false));
 
         self.enable_dma();
         self.update();
@@ -2254,6 +2271,8 @@ pub trait Instance: private::Sealed {
     fn cs_signal(&self) -> OutputSignal;
 
     fn enable_peripheral(&self);
+
+    fn reset_peripheral(&self);
 
     fn spi_num(&self) -> u8;
 
@@ -2529,7 +2548,7 @@ pub trait Instance: private::Sealed {
     }
 
     // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
-    fn setup(&mut self, frequency: HertzU32, clocks: &Clocks) {
+    fn setup(&mut self, frequency: HertzU32, clocks: &Clocks<'_>) {
         #[cfg(not(esp32h2))]
         let apb_clk_freq: HertzU32 = HertzU32::Hz(clocks.apb_clock.to_Hz());
         // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
@@ -2728,7 +2747,7 @@ pub trait Instance: private::Sealed {
         self
     }
 
-    fn ch_bus_freq(&mut self, frequency: HertzU32, clocks: &Clocks) {
+    fn ch_bus_freq(&mut self, frequency: HertzU32, clocks: &Clocks<'_>) {
         // Disable clock source
         #[cfg(not(any(esp32, esp32s2)))]
         self.register_block().clk_gate().modify(|_, w| {
@@ -3216,6 +3235,11 @@ impl Instance for crate::peripherals::SPI2 {
     }
 
     #[inline(always)]
+    fn reset_peripheral(&self) {
+        PeripheralClockControl::reset(crate::system::Peripheral::Spi2);
+    }
+
+    #[inline(always)]
     fn spi_num(&self) -> u8 {
         2
     }
@@ -3293,6 +3317,11 @@ impl Instance for crate::peripherals::SPI2 {
     }
 
     #[inline(always)]
+    fn reset_peripheral(&self) {
+        PeripheralClockControl::reset(crate::system::Peripheral::Spi2);
+    }
+
+    #[inline(always)]
     fn spi_num(&self) -> u8 {
         2
     }
@@ -3364,6 +3393,11 @@ impl Instance for crate::peripherals::SPI3 {
     }
 
     #[inline(always)]
+    fn reset_peripheral(&self) {
+        PeripheralClockControl::reset(crate::system::Peripheral::Spi3)
+    }
+
+    #[inline(always)]
     fn spi_num(&self) -> u8 {
         3
     }
@@ -3405,6 +3439,11 @@ impl Instance for crate::peripherals::SPI2 {
     #[inline(always)]
     fn enable_peripheral(&self) {
         PeripheralClockControl::enable(crate::system::Peripheral::Spi2)
+    }
+
+    #[inline(always)]
+    fn reset_peripheral(&self) {
+        PeripheralClockControl::reset(crate::system::Peripheral::Spi2)
     }
 
     #[inline(always)]
@@ -3482,6 +3521,11 @@ impl Instance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn enable_peripheral(&self) {
         PeripheralClockControl::enable(crate::system::Peripheral::Spi3)
+    }
+
+    #[inline(always)]
+    fn reset_peripheral(&self) {
+        PeripheralClockControl::reset(crate::system::Peripheral::Spi3)
     }
 
     #[inline(always)]

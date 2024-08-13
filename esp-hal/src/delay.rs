@@ -87,7 +87,7 @@ mod implementation {
 
     impl Delay {
         /// Create a new `Delay` instance
-        pub fn new(clocks: &Clocks) -> Self {
+        pub fn new(clocks: &Clocks<'_>) -> Self {
             // The counters and comparators are driven using `XTAL_CLK`.
             // The average clock frequency is fXTAL_CLK/2.5, which is 16 MHz.
             // The timer counting is incremented by 1/16 μs on each `CNT_CLK` cycle.
@@ -134,7 +134,7 @@ mod implementation {
 
     impl Delay {
         /// Create a new `Delay` instance
-        pub fn new(clocks: &Clocks) -> Self {
+        pub fn new(clocks: &Clocks<'_>) -> Self {
             Self {
                 freq: clocks.cpu_clock.into(),
             }
