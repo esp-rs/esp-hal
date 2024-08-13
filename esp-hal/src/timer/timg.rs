@@ -151,7 +151,7 @@ impl TimerGroupInstance for TIMG0 {
     }
 
     fn reset_peripheral() {
-        crate::system::PeripheralClockControl::reset(crate::system::Peripheral::Timg0)
+        // for TIMG0 do nothing for now because the reset breaks `current_time`
     }
 
     #[inline(always)]
