@@ -132,6 +132,7 @@ impl<'d, PWM: PwmPeripheral> McPwm<'d, PWM> {
     ) -> Self {
         crate::into_ref!(peripheral);
 
+        PWM::reset();
         PWM::enable();
 
         #[cfg(not(esp32c6))]
@@ -312,6 +313,8 @@ pub struct FrequencyError;
 pub trait PwmPeripheral: Deref<Target = RegisterBlock> + crate::private::Sealed {
     /// Enable peripheral
     fn enable();
+    /// Reset peripheral
+    fn reset();
     /// Get a pointer to the peripheral RegisterBlock
     fn block() -> *const RegisterBlock;
     /// Get operator GPIO mux output signal
@@ -322,6 +325,10 @@ pub trait PwmPeripheral: Deref<Target = RegisterBlock> + crate::private::Sealed 
 impl PwmPeripheral for crate::peripherals::MCPWM0 {
     fn enable() {
         PeripheralClockControl::enable(PeripheralEnable::Mcpwm0)
+    }
+
+    fn reset() {
+        PeripheralClockControl::reset(PeripheralEnable::Mcpwm0)
     }
 
     fn block() -> *const RegisterBlock {
@@ -345,6 +352,10 @@ impl PwmPeripheral for crate::peripherals::MCPWM0 {
 impl PwmPeripheral for crate::peripherals::MCPWM1 {
     fn enable() {
         PeripheralClockControl::enable(PeripheralEnable::Mcpwm1)
+    }
+
+    fn reset() {
+        PeripheralClockControl::reset(PeripheralEnable::Mcpwm1)
     }
 
     fn block() -> *const RegisterBlock {

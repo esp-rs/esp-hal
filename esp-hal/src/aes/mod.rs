@@ -135,6 +135,10 @@ impl<'d> Aes<'d> {
     /// Constructs a new `Aes` instance.
     pub fn new(aes: impl Peripheral<P = AES> + 'd) -> Self {
         crate::into_ref!(aes);
+
+        crate::system::PeripheralClockControl::reset(crate::system::Peripheral::Aes);
+        crate::system::PeripheralClockControl::enable(crate::system::Peripheral::Aes);
+
         let mut ret = Self {
             aes,
             alignment_helper: AlignmentHelper::native_endianess(),
