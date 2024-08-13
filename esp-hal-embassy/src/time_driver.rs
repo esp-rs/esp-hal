@@ -12,7 +12,7 @@ use esp_hal::{
 
 pub const MAX_SUPPORTED_ALARM_COUNT: usize = 7;
 
-pub type Timer = OneShotTimer<ErasedTimer>;
+pub type Timer = OneShotTimer<'static, ErasedTimer>;
 
 static TIMERS: Mutex<RefCell<Option<&'static mut [Timer]>>> = Mutex::new(RefCell::new(None));
 

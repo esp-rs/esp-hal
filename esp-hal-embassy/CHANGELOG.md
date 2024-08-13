@@ -19,7 +19,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed a bug where the timeout was huge whenever the timestamp at the time of scheduling was already in the past (#1875)
 - Fixed interrupt executors looping endlessly when `integrated-timers` is used. (#1936)
-- Fixed reference to `OneShotTimer` which had a now unneeded lifetime annotation (#1942)
 
 ### Removed
 
