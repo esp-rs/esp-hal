@@ -19,7 +19,7 @@ env:
 
 jobs:
   build-tests:
-    name: HIL Test | ${{ matrix.target.soc }}
+    name: Build HIL Tests | ${{ matrix.target.soc }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -92,7 +92,7 @@ jobs:
           overwrite: true
 
   hil:
-    name: HIL Test | ${{ matrix.target.soc }}
+    name: Run HIL Tests | ${{ matrix.target.soc }}
     needs: build-tests
     runs-on:
       labels: [self-hosted, "${{ matrix.target.runner }}"]
