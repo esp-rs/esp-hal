@@ -16,7 +16,7 @@
 //! - run_test_interrupt_executor(): Tests InterruptExecutor and Thread
 //!   (default) executor in parallel
 //! - run_tick_test_timg(): Tests Timg configured as OneShotTimer if it fires
-//!   immediatelly in the case of the time scheduling was already in the past
+//!   immediately in the case of the time scheduling was already in the past
 //!   (timestamp being too big)
 
 // esp32c2 is disabled currently as it fails

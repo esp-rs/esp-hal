@@ -57,6 +57,8 @@
 //! ## Implementation State
 //! - DMA-SHA Mode is not supported.
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use core::{convert::Infallible, marker::PhantomData};
 
 use crate::{
@@ -136,6 +138,7 @@ impl<'d> Sha<'d, crate::Blocking> {
     pub fn new(sha: impl Peripheral<P = SHA> + 'd, mode: ShaMode) -> Self {
         crate::into_ref!(sha);
 
+        PeripheralClockControl::reset(crate::system::Peripheral::Sha);
         PeripheralClockControl::enable(crate::system::Peripheral::Sha);
 
         // Setup SHA Mode
