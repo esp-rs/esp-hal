@@ -15,7 +15,11 @@ use core::{
 use critical_section::{CriticalSection, Mutex};
 use enumset::{EnumSet, EnumSetType};
 #[cfg(feature = "sniffer")]
-use esp_wifi_sys::include::{esp_wifi_80211_tx, esp_wifi_set_promiscuous, esp_wifi_set_promiscuous_rx_cb};
+use esp_wifi_sys::include::{
+    esp_wifi_80211_tx,
+    esp_wifi_set_promiscuous,
+    esp_wifi_set_promiscuous_rx_cb,
+};
 use esp_wifi_sys::include::{
     wifi_pkt_rx_ctrl_t,
     wifi_promiscuous_pkt_t,
@@ -1829,7 +1833,8 @@ pub struct RxControlInfo {
 }
 impl RxControlInfo {
     /// # Safety
-    /// When calling this, you must ensure, that `rx_cntl` points to a valid instance of [wifi_pkt_rx_ctrl_t].
+    /// When calling this, you must ensure, that `rx_cntl` points to a valid
+    /// instance of [wifi_pkt_rx_ctrl_t].
     pub(crate) unsafe fn from_raw(rx_cntl: *const wifi_pkt_rx_ctrl_t) -> Self {
         #[cfg(not(esp32c6))]
         let rx_control_info = RxControlInfo {
@@ -1889,7 +1894,8 @@ pub struct PromiscuousPkt<'a> {
 #[cfg(feature = "sniffer")]
 impl PromiscuousPkt<'_> {
     /// # Safety
-    /// When calling this, you have to ensure, that `buf` points to a valid [wifi_promiscuous_pkt_t].
+    /// When calling this, you have to ensure, that `buf` points to a valid
+    /// [wifi_promiscuous_pkt_t].
     pub(crate) unsafe fn from_raw(
         buf: *const wifi_promiscuous_pkt_t,
         frame_type: wifi_promiscuous_pkt_type_t,
