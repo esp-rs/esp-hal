@@ -7,8 +7,7 @@
 #![no_std]
 #![no_main]
 
-use embassy_sync::signal::Signal;
-use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
@@ -38,9 +37,9 @@ mod test {
     use esp_backtrace as _;
     use esp_hal::{
         clock::ClockControl,
+        interrupt::Priority,
         peripherals::Peripherals,
         system::{SoftwareInterrupt, SystemControl},
-        interrupt::Priority,
     };
     use esp_hal_embassy::InterruptExecutor;
 
