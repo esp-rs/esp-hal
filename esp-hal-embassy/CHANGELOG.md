@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Updated to latest release (`0.6.0`) for `embassy-executor` (#XXX)
+- Updated to latest release (`0.6.0`) for `embassy-executor` (#1942)
 
 ### Fixed
 
