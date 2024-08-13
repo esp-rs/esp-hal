@@ -184,55 +184,6 @@ impl From<Ack> for u32 {
     }
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(any(esp32, esp32s2))] {
-        const OPCODE_RSTART: u32 = 0;
-        const OPCODE_WRITE: u32  = 1;
-        const OPCODE_READ: u32   = 2;
-        const OPCODE_STOP: u32   = 3;
-        const OPCODE_END: u32    = 4;
-    } else if #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))] {
-        const OPCODE_RSTART: u32 = 6;
-        const OPCODE_WRITE: u32  = 1;
-        const OPCODE_READ: u32   = 3;
-        const OPCODE_STOP: u32   = 2;
-        const OPCODE_END: u32    = 4;
-    }
-}
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[derive(PartialEq)]
-enum Opcode {
-    RStart,
-    Write,
-    Read,
-    Stop,
-    End,
-}
-
-impl From<Opcode> for u32 {
-    fn from(opcode: Opcode) -> u32 {
-        match opcode {
-            Opcode::RStart => OPCODE_RSTART,
-            Opcode::Write => OPCODE_WRITE,
-            Opcode::Read => OPCODE_READ,
-            Opcode::Stop => OPCODE_STOP,
-            Opcode::End => OPCODE_END,
-        }
-    }
-}
-impl From<u32> for Opcode {
-    fn from(opcode: u32) -> Self {
-        match opcode {
-            OPCODE_RSTART => Opcode::RStart,
-            OPCODE_WRITE => Opcode::Write,
-            OPCODE_READ => Opcode::Read,
-            OPCODE_STOP => Opcode::Stop,
-            OPCODE_END => Opcode::End,
-            _ => unreachable!(),
-        }
-    }
-}
-
 /// I2C peripheral container (I2C)
 pub struct I2C<'d, T, DM: crate::Mode> {
     peripheral: PeripheralRef<'d, T>,
@@ -1660,10 +1611,7 @@ pub trait Instance: crate::private::Sealed {
         for cmd_reg in self.register_block().comd_iter() {
             let cmd = cmd_reg.read();
 
-            if cmd.bits() != 0x0
-                && cmd.opcode().bits() != (OPCODE_END as u8)
-                && !cmd.command_done().bit_is_set()
-            {
+            if cmd.bits() != 0x0 && !cmd.opcode().is_end() && !cmd.command_done().bit_is_set() {
                 return Err(Error::ExecIncomplete);
             }
         }
@@ -2213,15 +2161,6 @@ pub mod lp_i2c {
         Nack,
     }
 
-    #[allow(unused)]
-    enum Opcode {
-        RStart = 6,
-        Write  = 1,
-        Read   = 3,
-        Stop   = 2,
-        End    = 4,
-    }
-
     #[derive(PartialEq)]
     #[allow(unused)]
     enum Command {
@@ -2246,122 +2185,6 @@ pub mod lp_i2c {
             /// while the minimum is 1.
             length: u8,
         },
-    }
-
-    impl From<Command> for u16 {
-        fn from(c: Command) -> u16 {
-            let opcode = match c {
-                Command::Start => Opcode::RStart,
-                Command::Stop => Opcode::Stop,
-                Command::End => Opcode::End,
-                Command::Write { .. } => Opcode::Write,
-                Command::Read { .. } => Opcode::Read,
-            };
-
-            let length = match c {
-                Command::Start | Command::Stop | Command::End => 0,
-                Command::Write { length: l, .. } | Command::Read { length: l, .. } => l,
-            };
-
-            let ack_exp = match c {
-                Command::Start | Command::Stop | Command::End | Command::Read { .. } => Ack::Nack,
-                Command::Write { ack_exp: exp, .. } => exp,
-            };
-
-            let ack_check_en = match c {
-                Command::Start | Command::Stop | Command::End | Command::Read { .. } => false,
-                Command::Write {
-                    ack_check_en: en, ..
-                } => en,
-            };
-
-            let ack_value = match c {
-                Command::Start | Command::Stop | Command::End | Command::Write { .. } => Ack::Nack,
-                Command::Read { ack_value: ack, .. } => ack,
-            };
-
-            let mut cmd: u16 = length.into();
-
-            if ack_check_en {
-                cmd |= 1 << 8;
-            } else {
-                cmd &= !(1 << 8);
-            }
-
-            if ack_exp == Ack::Nack {
-                cmd |= 1 << 9;
-            } else {
-                cmd &= !(1 << 9);
-            }
-
-            if ack_value == Ack::Nack {
-                cmd |= 1 << 10;
-            } else {
-                cmd &= !(1 << 10);
-            }
-
-            cmd |= (opcode as u16) << 11;
-
-            cmd
-        }
-    }
-
-    impl From<Command> for u32 {
-        fn from(c: Command) -> u32 {
-            let opcode = match c {
-                Command::Start => Opcode::RStart,
-                Command::Stop => Opcode::Stop,
-                Command::End => Opcode::End,
-                Command::Write { .. } => Opcode::Write,
-                Command::Read { .. } => Opcode::Read,
-            };
-
-            let length = match c {
-                Command::Start | Command::Stop | Command::End => 0,
-                Command::Write { length: l, .. } | Command::Read { length: l, .. } => l,
-            };
-
-            let ack_exp = match c {
-                Command::Start | Command::Stop | Command::End | Command::Read { .. } => Ack::Nack,
-                Command::Write { ack_exp: exp, .. } => exp,
-            };
-
-            let ack_check_en = match c {
-                Command::Start | Command::Stop | Command::End | Command::Read { .. } => false,
-                Command::Write {
-                    ack_check_en: en, ..
-                } => en,
-            };
-
-            let ack_value = match c {
-                Command::Start | Command::Stop | Command::End | Command::Write { .. } => Ack::Nack,
-                Command::Read { ack_value: ack, .. } => ack,
-            };
-
-            let mut cmd: u32 = length.into();
-
-            if ack_check_en {
-                cmd |= 1 << 8;
-            } else {
-                cmd &= !(1 << 8);
-            }
-
-            if ack_exp == Ack::Nack {
-                cmd |= 1 << 9;
-            } else {
-                cmd &= !(1 << 9);
-            }
-
-            if ack_value == Ack::Nack {
-                cmd |= 1 << 10;
-            } else {
-                cmd &= !(1 << 10);
-            }
-
-            cmd |= (opcode as u32) << 11;
-
-            cmd
-        }
     }
 
     // https://github.com/espressif/esp-idf/blob/master/components/ulp/lp_core/lp_core_i2c.c#L122
