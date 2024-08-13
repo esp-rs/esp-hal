@@ -8,7 +8,6 @@ use core::{
     fmt::Debug,
     mem::{self, MaybeUninit},
     ptr::addr_of,
-    slice,
     time::Duration,
 };
 
@@ -19,11 +18,11 @@ use esp_wifi_sys::include::{
     esp_wifi_80211_tx,
     esp_wifi_set_promiscuous,
     esp_wifi_set_promiscuous_rx_cb,
+    wifi_promiscuous_pkt_t,
+    wifi_promiscuous_pkt_type_t,
 };
 use esp_wifi_sys::include::{
     wifi_pkt_rx_ctrl_t,
-    wifi_promiscuous_pkt_t,
-    wifi_promiscuous_pkt_type_t,
     WIFI_PROTOCOL_11AX,
     WIFI_PROTOCOL_11B,
     WIFI_PROTOCOL_11G,
@@ -1906,7 +1905,7 @@ impl PromiscuousPkt<'_> {
             rx_cntl,
             frame_type,
             len,
-            data: slice::from_raw_parts(
+            data: core::slice::from_raw_parts(
                 (buf as *const u8).add(size_of::<wifi_pkt_rx_ctrl_t>()),
                 len,
             ),
