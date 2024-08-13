@@ -355,7 +355,8 @@ impl<'d> Rtc<'d> {
             // will happen
             Err(RtcSetOverflow)
         } else {
-            Ok(self.set_boot_time_us(time_us - rtc_time_us))
+            self.set_boot_time_us(time_us - rtc_time_us);
+            Ok(())
         }
     }
 

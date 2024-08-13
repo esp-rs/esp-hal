@@ -99,7 +99,7 @@ impl WakeSource for TimerWakeupSource {
         let clock_hz = clock_freq.frequency().to_Hz() as u64;
         let ticks = self.duration.as_micros() as u64 * clock_hz / 1_000_000u64;
         // "alarm" time in slow rtc ticks
-        let now = rtc.get_time_raw();
+        let now = rtc.get_rtc_time_raw();
         let time_in_ticks = now + ticks;
         unsafe {
             rtc_cntl
