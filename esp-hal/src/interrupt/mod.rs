@@ -73,8 +73,6 @@
 //! }
 //! ```
 
-#![warn(missing_docs)]
-
 use core::ops::BitAnd;
 
 #[cfg(riscv)]

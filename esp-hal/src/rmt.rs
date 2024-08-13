@@ -79,8 +79,6 @@
 //! (on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80
 //! MHz)
 
-#![warn(missing_docs)]
-
 use core::marker::PhantomData;
 
 use fugit::HertzU32;

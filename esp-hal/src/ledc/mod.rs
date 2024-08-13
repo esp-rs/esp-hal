@@ -60,6 +60,8 @@
 //! - Source clock selection is not supported
 //! - Interrupts are not supported
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use self::{
     channel::Channel,
     timer::{Timer, TimerSpeed},

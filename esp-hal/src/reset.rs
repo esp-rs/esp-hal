@@ -17,6 +17,7 @@
 
 use crate::rtc_cntl::SocResetReason;
 
+/// Source of the wakeup event
 #[derive(Debug, Copy, Clone)]
 pub enum SleepSource {
     /// In case of deep sleep, reset was not caused by exit from deep sleep

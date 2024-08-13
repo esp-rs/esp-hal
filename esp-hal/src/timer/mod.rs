@@ -38,8 +38,6 @@
 //! # }
 //! ```
 
-#![deny(missing_docs)]
-
 use fugit::{ExtU64, Instant, MicrosDurationU64};
 
 use crate::{

@@ -61,6 +61,8 @@
 //! # }
 //! ```
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     system::PeripheralClockControl,

@@ -83,8 +83,6 @@
 //! # }
 //! ```
 
-#![deny(missing_docs)]
-
 use core::{marker::PhantomData, ops::Deref};
 
 use fugit::HertzU32;

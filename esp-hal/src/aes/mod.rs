@@ -46,8 +46,6 @@
 //! * AES-DMA mode is currently not supported on ESP32 and ESP32S2
 //! * AES-DMA Initialization Vector (IV) is currently not supported
 
-#![deny(missing_docs)]
-
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::AES,

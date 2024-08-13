@@ -5,6 +5,8 @@
 //! used simultaneously. For more information on these modules, please refer to
 //! the documentation in their respective modules.
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 pub mod cam;
 pub mod lcd;
 

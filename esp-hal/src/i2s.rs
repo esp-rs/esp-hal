@@ -80,6 +80,8 @@
 //! - Only master mode is supported.
 //! - Only TDM Philips standard is supported.
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use core::marker::PhantomData;
 
 use enumset::{EnumSet, EnumSetType};

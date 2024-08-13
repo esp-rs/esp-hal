@@ -70,8 +70,6 @@
 //! # }
 //! ```
 
-#![deny(missing_docs)]
-
 use fugit::HertzU32;
 
 #[cfg(any(esp32, esp32c2))]

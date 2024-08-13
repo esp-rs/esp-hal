@@ -25,6 +25,8 @@
 //!
 //! [ECC]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/ecc.rs
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use core::marker::PhantomData;
 
 use crate::{

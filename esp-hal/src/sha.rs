@@ -57,6 +57,8 @@
 //! ## Implementation State
 //! - DMA-SHA Mode is not supported.
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use core::{convert::Infallible, marker::PhantomData};
 
 use crate::{
