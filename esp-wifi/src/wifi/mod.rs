@@ -1886,7 +1886,9 @@ pub struct PromiscuousPkt<'a> {
     pub data: &'a [u8],
 }
 impl PromiscuousPkt<'_> {
-    pub unsafe fn from_raw(
+    /// # Safety
+    /// When calling this, you have to ensure, that `buf` points to a valid [wifi_promiscuous_pkt_t].
+    pub(crate) unsafe fn from_raw(
         buf: *const wifi_promiscuous_pkt_t,
         frame_type: wifi_promiscuous_pkt_type_t,
     ) -> Self {
