@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Peripheral driver constructors don't take `InterruptHandler`s anymore. Use `set_interrupt_handler` to explicitly set the interrupt handler now. (#1819)
 - Use the peripheral ref pattern for `OneShotTimer` and `PeriodicTimer` (#1855)
-
+- DMA: don't require `Sealed` to implement `ReadBuffer` and `WriteBuffer` (#1921)
 - Allow DMA to/from psram for esp32s3 (#1827)
 - DMA buffers now don't require a static lifetime. Make sure to never `mem::forget` an in-progress DMA transfer (consider using `#[deny(clippy::mem_forget)]`) (#1837)
 
