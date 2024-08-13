@@ -240,8 +240,6 @@ pub fn execute_app(
         .features(&features)
         .arg(bin);
 
-    // probe-rs cannot currently do auto detection, so we need to tell probe-rs run
-    // which chip we are testing
     if subcommand == "test" && chip == Chip::Esp32c2 {
         builder = builder.arg("--").arg("--speed").arg("15000");
     }
