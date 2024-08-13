@@ -18,10 +18,6 @@ macro_rules! mk_static {
     }};
 }
 
-unsafe fn __make_static<T>(t: &mut T) -> &'static mut T {
-    ::core::mem::transmute(t)
-}
-
 #[embassy_executor::task]
 async fn interrupt_driven_task(signal: &'static Signal<CriticalSectionRawMutex, ()>) {
     loop {
