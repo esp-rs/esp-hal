@@ -42,6 +42,7 @@ fugit               = "0.3.7"
 heapless            = "0.8.0"
 hex-literal         = "0.4.1"
 hmac                = { version = "0.12.1", default-features = false }
+ieee80211           = { version = "0.4.0", default-features = false }
 ieee802154          = "0.6.1"
 lis3dh-async        = "0.9.3"
 log                 = "0.4.22"
