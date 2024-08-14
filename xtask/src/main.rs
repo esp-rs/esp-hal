@@ -153,8 +153,7 @@ fn main() -> Result<()> {
         .filter_module("xtask", log::LevelFilter::Info)
         .init();
 
-    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let workspace = workspace.parent().unwrap().canonicalize()?;
+    let workspace = std::env::current_dir()?;
 
     match Cli::parse() {
         Cli::BuildDocumentation(args) => build_documentation(&workspace, args),
