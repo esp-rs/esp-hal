@@ -34,6 +34,8 @@
 //! [nb]: https://docs.rs/nb/1.1.0/nb/
 //! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/rsa.rs
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use core::{marker::PhantomData, ptr::copy_nonoverlapping};
 
 use crate::{
@@ -101,6 +103,7 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
     fn new_internal(rsa: impl Peripheral<P = RSA> + 'd) -> Self {
         crate::into_ref!(rsa);
 
+        PeripheralClockControl::reset(PeripheralEnable::Rsa);
         PeripheralClockControl::enable(PeripheralEnable::Rsa);
 
         Self {

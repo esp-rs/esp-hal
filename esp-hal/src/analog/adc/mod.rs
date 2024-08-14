@@ -66,7 +66,7 @@ mod implementation;
 
 /// The attenuation of the ADC pin.
 ///
-/// The effective measurement range for a given attuenation is dependent on the
+/// The effective measurement range for a given attenuation is dependent on the
 /// device being targeted. Please refer to "ADC Characteristics" section of your
 /// device's datasheet for more information.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

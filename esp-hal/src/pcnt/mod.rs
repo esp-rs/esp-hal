@@ -20,6 +20,8 @@
 //! [unit]: unit/index.html
 //! [PCNT Encoder]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/pcnt_encoder.rs
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use self::unit::Unit;
 use crate::{
     interrupt::{self, InterruptHandler},
@@ -61,6 +63,7 @@ impl<'d> Pcnt<'d> {
     /// Return a new PCNT
     pub fn new(_instance: impl Peripheral<P = peripherals::PCNT> + 'd) -> Self {
         crate::into_ref!(_instance);
+
         // Enable the PCNT peripherals clock in the system peripheral
         PeripheralClockControl::reset(crate::system::Peripheral::Pcnt);
         PeripheralClockControl::enable(crate::system::Peripheral::Pcnt);

@@ -106,6 +106,8 @@ pub trait TimerGroupInstance {
     fn id() -> u8;
     fn register_block() -> *const RegisterBlock;
     fn configure_src_clk();
+    fn enable_peripheral();
+    fn reset_peripheral();
     fn configure_wdt_src_clk();
 }
 
@@ -142,6 +144,14 @@ impl TimerGroupInstance for TIMG0 {
     #[cfg(esp32)]
     fn configure_src_clk() {
         // ESP32 has only APB clock source, do nothing
+    }
+
+    fn enable_peripheral() {
+        crate::system::PeripheralClockControl::enable(crate::system::Peripheral::Timg0)
+    }
+
+    fn reset_peripheral() {
+        // for TIMG0 do nothing for now because the reset breaks `current_time`
     }
 
     #[inline(always)]
@@ -207,6 +217,16 @@ impl TimerGroupInstance for TIMG1 {
     }
 
     #[inline(always)]
+    fn enable_peripheral() {
+        crate::system::PeripheralClockControl::enable(crate::system::Peripheral::Timg1)
+    }
+
+    #[inline(always)]
+    fn reset_peripheral() {
+        crate::system::PeripheralClockControl::reset(crate::system::Peripheral::Timg1)
+    }
+
+    #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))]
     fn configure_wdt_src_clk() {
         unsafe { &*crate::peripherals::PCR::PTR }
@@ -229,6 +249,9 @@ where
     /// Construct a new instance of [`TimerGroup`] in blocking mode
     pub fn new(_timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks<'d>) -> Self {
         crate::into_ref!(_timer_group);
+
+        T::reset_peripheral();
+        T::enable_peripheral();
 
         T::configure_src_clk();
 
@@ -268,6 +291,9 @@ where
     /// Construct a new instance of [`TimerGroup`] in asynchronous mode
     pub fn new_async(_timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks<'d>) -> Self {
         crate::into_ref!(_timer_group);
+
+        T::reset_peripheral();
+        T::enable_peripheral();
 
         T::configure_src_clk();
 

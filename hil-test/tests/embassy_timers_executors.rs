@@ -16,7 +16,7 @@
 //! - run_test_interrupt_executor(): Tests InterruptExecutor and Thread
 //!   (default) executor in parallel
 //! - run_tick_test_timg(): Tests Timg configured as OneShotTimer if it fires
-//!   immediatelly in the case of the time scheduling was already in the past
+//!   immediately in the case of the time scheduling was already in the past
 //!   (timestamp being too big)
 
 // esp32c2 is disabled currently as it fails
@@ -39,8 +39,6 @@ use esp_hal::{
 use esp_hal::{interrupt::Priority, timer::systimer::SystemTimer};
 #[cfg(not(feature = "esp32"))]
 use esp_hal_embassy::InterruptExecutor;
-#[cfg(not(feature = "esp32"))]
-use static_cell::StaticCell;
 
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
@@ -60,68 +58,58 @@ unsafe fn __make_static<T>(t: &mut T) -> &'static mut T {
 mod task_invokers {
     use test_helpers::*;
 
-    use crate::*;
+    use super::*;
+
     #[embassy_executor::task]
     pub async fn test_one_shot_timg_invoker() {
-        let outcome;
-        {
-            outcome = test_helpers::test_one_shot_timg().await;
-        }
+        let outcome = test_helpers::test_one_shot_timg().await;
+
         embedded_test::export::check_outcome(outcome);
     }
 
     #[embassy_executor::task]
     #[cfg(not(feature = "esp32"))]
     pub async fn test_one_shot_systimer_invoker() {
-        let outcome;
-        {
-            outcome = task_invokers::test_one_shot_systimer().await;
-        }
+        let outcome = task_invokers::test_one_shot_systimer().await;
+
         embedded_test::export::check_outcome(outcome);
     }
 
     #[embassy_executor::task]
     pub async fn test_join_timg_invoker() {
-        let outcome;
-        {
-            outcome = test_join_timg().await;
-        }
+        let outcome = test_join_timg().await;
+
         embedded_test::export::check_outcome(outcome);
     }
 
     #[embassy_executor::task]
     #[cfg(not(feature = "esp32"))]
     pub async fn test_join_systimer_invoker() {
-        let outcome;
-        {
-            outcome = test_join_systimer().await;
-        }
+        let outcome = test_join_systimer().await;
+
         embedded_test::export::check_outcome(outcome);
     }
 
     #[embassy_executor::task]
     #[cfg(not(feature = "esp32"))]
     pub async fn test_interrupt_executor_invoker() {
-        let outcome;
-        {
-            outcome = test_interrupt_executor().await;
-        }
+        let outcome = test_interrupt_executor().await;
+
         embedded_test::export::check_outcome(outcome);
     }
 
     #[embassy_executor::task]
     pub async fn test_tick_and_increment_invoker() {
-        let outcome;
-        {
-            outcome = tick_and_increment().await;
-        }
+        let outcome = tick_and_increment().await;
+
         embedded_test::export::check_outcome(outcome);
     }
 }
 
 // List of the functions that are ACTUALLY TESTS but are called in the invokers
 mod test_helpers {
-    use crate::*;
+    use super::*;
+
     pub async fn test_one_shot_timg() {
         let peripherals = unsafe { Peripherals::steal() };
         let system = SystemControl::new(peripherals.SYSTEM);
@@ -457,10 +445,10 @@ mod test {
         let timers = mk_static!([OneShotTimer<ErasedTimer>; 2], timers);
         esp_hal_embassy::init(&clocks, timers);
 
-        static EXECUTOR: StaticCell<InterruptExecutor<2>> = StaticCell::new();
-        let executor =
-            InterruptExecutor::new(system.software_interrupt_control.software_interrupt2);
-        let executor = EXECUTOR.init(executor);
+        let executor = mk_static!(
+            InterruptExecutor<2>,
+            InterruptExecutor::new(system.software_interrupt_control.software_interrupt2)
+        );
 
         let spawner_int = executor.start(Priority::Priority3);
         spawner_int.must_spawn(test_interrupt_executor_invoker());

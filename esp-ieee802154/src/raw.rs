@@ -19,12 +19,16 @@ use esp_wifi_sys::include::{
 use heapless::spsc::Queue;
 
 use crate::{
-    frame::{frame_get_version, frame_is_ack_required, FRAME_VERSION_1, FRAME_VERSION_2},
+    frame::{
+        frame_get_version,
+        frame_is_ack_required,
+        FRAME_SIZE,
+        FRAME_VERSION_1,
+        FRAME_VERSION_2,
+    },
     hal::*,
     pib::*,
 };
-
-pub(crate) const FRAME_SIZE: usize = 129;
 
 const PHY_ENABLE_VERSION_PRINT: u32 = 1;
 
@@ -391,9 +395,9 @@ fn ZB_MAC() {
                     log::warn!("Receive queue full");
                 }
 
-                let frm = if RX_BUFFER[0] > FRAME_SIZE as u8 {
+                let frm = if RX_BUFFER[0] >= FRAME_SIZE as u8 {
                     log::warn!("RX_BUFFER[0] {:} is larger than frame size", RX_BUFFER[0]);
-                    &RX_BUFFER[1..][..FRAME_SIZE]
+                    &RX_BUFFER[1..][..FRAME_SIZE - 1]
                 } else {
                     &RX_BUFFER[1..][..RX_BUFFER[0] as usize]
                 };
