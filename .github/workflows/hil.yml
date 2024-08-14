@@ -18,6 +18,46 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
+  build-xtasks:
+    name: Build xtasks | ${{ matrix.host.arch }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        host:
+          - arch: armv7
+            rust-target: armv7-unknown-linux-gnueabihf
+          - arch: aarch64
+            rust-target: aarch64-unknown-linux-gnu
+
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name != 'workflow_dispatch'
+      - uses: actions/checkout@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          repository: ${{ github.event.inputs.repository }}
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rust-src
+
+      - name: Install cross
+        run: cargo install cross
+
+      - name: Build xtasks
+        run: cross build --release --target ${{ matrix.host.rust-target }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xtask-${{ matrix.host.arch }}
+          path: target/${{ matrix.host.rust-target }}/release/xtask
+
   build-tests:
     name: Build HIL Tests | ${{ matrix.target.soc }}
     runs-on: ubuntu-latest
@@ -93,7 +133,7 @@ jobs:
 
   hil:
     name: Run HIL Tests | ${{ matrix.target.soc }}
-    needs: build-tests
+    needs: [build-tests, build-xtasks]
     runs-on:
       labels: [self-hosted, "${{ matrix.target.runner }}"]
     strategy:
@@ -104,40 +144,41 @@ jobs:
           - soc: esp32c2
             runner: esp32c2-jtag
             usb: USB2
+            host: aarch64
           - soc: esp32c3
             runner: esp32c3-usb
             usb: ACM0
+            host: armv7
           - soc: esp32c6
             runner: esp32c6-usb
             usb: ACM0
+            host: armv7
           - soc: esp32h2
             runner: esp32h2-usb
             usb: USB0
+            host: armv7
           # Xtensa devices:
           - soc: esp32s2
             runner: esp32s2-jtag
             usb: USB1
+            host: armv7
           - soc: esp32s3
             runner: esp32s3-usb
             usb: USB0
+            host: armv7
     steps:
-      - uses: actions/checkout@v4
-        if: github.event_name != 'workflow_dispatch'
-      - uses: actions/checkout@v4
-        if: github.event_name == 'workflow_dispatch'
-        with:
-          repository: ${{ github.event.inputs.repository }}
-          ref: ${{ github.event.inputs.branch }}
-
       - uses: actions/download-artifact@v4
         with:
           name: tests-${{ matrix.target.soc }}
           path: tests-${{ matrix.target.soc }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: xtask-${{ matrix.target.host }}
+
       - name: Run Tests
         id: run-tests
-        run: |
-          export PATH=$PATH:/home/espressif/.cargo/bin
-          cargo xtask run-elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
+        run: ./xtask run-elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
 
       - name: Erase Flash on Failure
         if: ${{ failure() && steps.run-tests.conclusion == 'failure' }}
