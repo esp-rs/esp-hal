@@ -791,6 +791,11 @@ where
             .err_warning_limit()
             .write(|w| unsafe { w.err_warning_limit().bits(96) });
 
+        // Disable CLKOUT
+        T::register_block()
+            .clock_divider()
+            .write(|w| unsafe { w.cd().bits(0).clock_off().set_bit() });
+
         let mut cfg = TwaiConfiguration {
             peripheral: PhantomData,
             phantom: PhantomData,
