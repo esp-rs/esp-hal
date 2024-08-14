@@ -183,12 +183,6 @@ pub(crate) enum RtcCalSel {
     RtcCalInternalOsc = 3,
 }
 
-#[derive(Debug)]
-/// This error indicates that an overflow would've happened if
-/// the rtc time was set to the requested value. See [`Rtc::set_time_us`]
-/// and [`Rtc::set_time_ms`] for more info.
-pub struct RtcSetOverflow;
-
 /// Low-power Management
 pub struct Rtc<'d> {
     _inner: PeripheralRef<'d, crate::peripherals::LPWR>,
@@ -338,48 +332,44 @@ impl<'d> Rtc<'d> {
     /// Read the current value of the time registers in microseconds.
     pub fn get_time_us(&self) -> u64 {
         // current time is boot time + time since boot
-        self.get_boot_time_us() + self.get_rtc_time_us()
+        let rtc_time_us = self.get_rtc_time_us();
+        let boot_time_us = self.get_boot_time_us();
+        let wrapped_boot_time_us = u64::MAX - boot_time_us;
+        // We can detect if we wrapped the boot time by checking if rtc time is greater
+        // than the amount of time we would've wrapped.
+        if rtc_time_us > wrapped_boot_time_us {
+            // We also just checked that this won't overflow
+            rtc_time_us - wrapped_boot_time_us
+        } else {
+            boot_time_us + rtc_time_us
+        }
     }
 
     /// Read the current value of the time registers in milliseconds.
     pub fn get_time_ms(&self) -> u64 {
-        // current time is boot time + time since boot
-        self.get_boot_time_ms() + self.get_rtc_time_ms()
+        self.get_time_us() / 1_000
     }
 
     /// Set the current value of the time registers in microseconds.
-    ///
-    /// This function will fail if `time_us` is less than the time
-    /// since boot. This happens because when setting the time, we
-    /// have to set the boot time which is calculated by subtracting
-    /// `time_us` from the time since boot. However, since time is
-    /// stored with unsigned integers, if `time_us` is less than
-    /// the time since boot, the subtraction result will be negative
-    /// and thus an overflow will occur.
-    pub fn set_time_us(&self, time_us: u64) -> Result<(), RtcSetOverflow> {
-        // current time is boot time + time since boot (rtc time)
-        // so boot time = current time - time since boot (rtc time)
+    pub fn set_time_us(&self, time_us: u64) {
+        // Current time is boot time + time since boot (rtc time)
+        // So boot time = current time - time since boot (rtc time)
         let rtc_time_us = self.get_rtc_time_us();
         if time_us < rtc_time_us {
-            // if we subtract rtc_time_us from time_us, it will be negative and an overflow
-            // will happen
-            Err(RtcSetOverflow)
+            // An overflow would happen if we subtracted rtc_time_us from time_us.
+            // To work around this, we can wrap around u64::MAX by subtracting the
+            // difference between the current time and the time since boot.
+            // Subtracting time since boot and adding current new time is equivalent and
+            // avoids overflow. We just checked that rtc_time_us is less than time_us
+            // so this won't overflow.
+            self.set_boot_time_us(u64::MAX - rtc_time_us + time_us)
         } else {
-            self.set_boot_time_us(time_us - rtc_time_us);
-            Ok(())
+            self.set_boot_time_us(time_us - rtc_time_us)
         }
     }
 
     /// Set the current value of the time registers in milliseconds.
-    ///
-    /// This function will fail if `time_ms` is less than the time
-    /// since boot. This happens because when setting the time, we
-    /// have to set the boot time which is calculated by subtracting
-    /// `time_ms` from the time since boot. However, since time is
-    /// stored with unsigned integers, if `time_ms` is less than
-    /// the time since boot, the subtraction result will be negative
-    /// and thus an overflow will occur.
-    pub fn set_time_ms(&self, time_ms: u64) -> Result<(), RtcSetOverflow> {
+    pub fn set_time_ms(&self, time_ms: u64) {
         self.set_time_us(time_ms * 1_000)
     }
 

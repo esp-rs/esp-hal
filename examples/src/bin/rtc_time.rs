@@ -27,13 +27,10 @@ fn main() -> ! {
     loop {
         esp_println::println!("rtc time in milliseconds is {}", rtc.get_time_ms());
         delay.delay_millis(1000);
-        // Set the time to 1 second past the current time after 5 seconds have passed
-        if rtc.get_time_ms() > 5_000 {
-            let new_time = rtc.get_time_ms() + 1_000;
-            esp_println::println!("setting rtc time to {new_time} (milliseconds)");
-            if rtc.set_time_ms(new_time).is_err() {
-                esp_println::println!("failed to set rtc time due to overflow");
-            }
-        }
+
+        // Set the time to half a second in the past
+        let new_time = rtc.get_time_ms() - 500;
+        esp_println::println!("setting rtc time to {new_time} milliseconds");
+        rtc.set_time_ms(new_time);
     }
 }
