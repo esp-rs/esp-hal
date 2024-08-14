@@ -55,7 +55,7 @@ impl Context {
             SingleStandardFilter::new(b"00000000000", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
         config.set_filter(FILTER);
 
-        let mut twai = config.start();
+        let twai = config.start();
 
         Context { twai }
     }
