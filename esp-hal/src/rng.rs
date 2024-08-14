@@ -152,7 +152,7 @@ impl rand_core::RngCore for Rng {
 /// let mut trng = Trng::new(peripherals.RNG, &mut peripherals.ADC1);
 /// trng.read(&mut buf);
 /// let mut true_rand = trng.random();
-#[cfg_attr(not(esp32c6), doc = "let mut rng = trng.downgrade();")]
+/// let mut rng = trng.downgrade();
 /// // ADC is available now
 #[cfg_attr(esp32, doc = "let analog_pin = io.pins.gpio32;")]
 #[cfg_attr(not(esp32), doc = "let analog_pin = io.pins.gpio3;")]
@@ -161,8 +161,8 @@ impl rand_core::RngCore for Rng {
 /// Attenuation::Attenuation11dB); let mut adc1 =
 /// Adc::<ADC1>::new(peripherals.ADC1, adc1_config); let pin_value: u16 =
 /// nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
-#[cfg_attr(not(esp32c6), doc = "rng.read(&mut buf);")]
-#[cfg_attr(not(esp32c6), doc = "true_rand = rng.random();")]
+/// rng.read(&mut buf);
+/// true_rand = rng.random();
 /// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
 /// # }
 /// ```
@@ -208,15 +208,11 @@ impl<'d> Trng<'d> {
 
     /// Downgrades the `Trng` instance to a `Rng` instance and releases the
     /// ADC1.
-    /// For esp32c6 - blocked on <https://github.com/espressif/esp-idf/issues/14124>
-    #[cfg(not(esp32c6))]
     pub fn downgrade(self) -> Rng {
         self.rng
     }
 }
 
-/// For esp32c6 - blocked on <https://github.com/espressif/esp-idf/issues/14124>
-#[cfg(not(esp32c6))]
 impl<'d> Drop for Trng<'d> {
     fn drop(&mut self) {
         crate::soc::trng::revert_trng();
