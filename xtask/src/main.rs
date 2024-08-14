@@ -683,17 +683,14 @@ fn run_elfs(args: RunElfArgs) -> Result<()> {
             command.arg("--speed").arg("15000");
         };
 
-        let command = command.output().context("Failed to execute probe-rs")?;
-
-        println!(
-            "{}\n{}",
-            String::from_utf8_lossy(&command.stderr),
-            String::from_utf8_lossy(&command.stdout)
-        );
+        let mut command = command.spawn().context("Failed to execute probe-rs")?;
+        let status = command
+            .wait()
+            .context("Error while waiting for probe-rs to exit")?;
 
         log::info!("'{elf_name}' done");
 
-        if !command.status.success() {
+        if !status.success() {
             failed.push(elf_name);
         }
     }
