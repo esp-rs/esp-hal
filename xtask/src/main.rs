@@ -5,7 +5,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context as _, Result};
 use clap::{Args, Parser};
 use esp_metadata::{Arch, Chip, Config};
 use minijinja::Value;
@@ -153,8 +153,7 @@ fn main() -> Result<()> {
         .filter_module("xtask", log::LevelFilter::Info)
         .init();
 
-    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let workspace = workspace.parent().unwrap().canonicalize()?;
+    let workspace = std::env::current_dir()?;
 
     match Cli::parse() {
         Cli::BuildDocumentation(args) => build_documentation(&workspace, args),
@@ -676,24 +675,21 @@ fn run_elfs(args: RunElfArgs) -> Result<()> {
 
         log::info!("Running test '{}' for '{}'", elf_name, args.chip);
 
-        let command = if args.chip == Chip::Esp32c2 {
-            Command::new("probe-rs")
-                .arg("run")
-                .arg("--speed")
-                .arg("15000")
-                .arg(elf_path)
-                .output()?
-        } else {
-            Command::new("probe-rs").arg("run").arg(elf_path).output()?
+        let mut command = Command::new("probe-rs");
+        command.arg("run").arg(elf_path);
+
+        if args.chip == Chip::Esp32c2 {
+            command.arg("--speed").arg("15000");
         };
 
-        println!(
-            "{}\n{}",
-            String::from_utf8_lossy(&command.stderr),
-            String::from_utf8_lossy(&command.stdout)
-        );
+        let mut command = command.spawn().context("Failed to execute probe-rs")?;
+        let status = command
+            .wait()
+            .context("Error while waiting for probe-rs to exit")?;
 
-        if !command.status.success() {
+        log::info!("'{elf_name}' done");
+
+        if !status.success() {
             failed.push(elf_name);
         }
     }
