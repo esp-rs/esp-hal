@@ -267,8 +267,21 @@ impl<'d> Rtc<'d> {
     }
 
     /// Read the current value of the rtc time registers in microseconds.
-    fn get_rtc_time_us(&self) -> u64 {
+    ///
+    /// **This function does not take into account the boot time registers, and
+    /// therefore will not react to using [`set_time_us`][Self::set_time_us]
+    /// and [`set_time_ms`][Self::set_time_ms].**
+    pub fn get_rtc_time_us(&self) -> u64 {
         self.get_rtc_time_raw() * 1_000_000 / RtcClock::get_slow_freq().frequency().to_Hz() as u64
+    }
+
+    /// Read the current value of the rtc time registers in milliseconds.
+    ///
+    /// **This function does not take into account the boot time registers, and
+    /// therefore will not react to using [`set_time_us`][Self::set_time_us]
+    /// and [`set_time_ms`][Self::set_time_ms].**
+    pub fn get_rtc_time_ms(&self) -> u64 {
+        self.get_rtc_time_raw() * 1_000 / RtcClock::get_slow_freq().frequency().to_Hz() as u64
     }
 
     /// Read the current value of the boot time registers in microseconds.
