@@ -12,6 +12,7 @@
 #![no_main]
 
 use defmt_rtt as _;
+use embedded_hal_02::can::Frame;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
@@ -22,7 +23,6 @@ use esp_hal::{
     twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId, TwaiMode},
     Blocking,
 };
-use embedded_hal_02::can::Frame;
 use nb::block;
 
 struct Context {
@@ -81,6 +81,6 @@ mod tests {
 
         let frame = block!(ctx.twai.receive()).unwrap();
 
-        assert_eq!(frame.data(),  &[1, 2, 3])
+        assert_eq!(frame.data(), &[1, 2, 3])
     }
 }
