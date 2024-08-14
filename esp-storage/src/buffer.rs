@@ -15,15 +15,15 @@ pub type FlashSectorBuffer = FlashBuffer<4096, 1024>;
 
 #[repr(C)]
 pub union FlashBuffer<const N: usize, const M: usize> {
-    bytes: [MaybeUninit<u8>; M],
-    words: [MaybeUninit<u32>; N],
+    bytes: [MaybeUninit<u8>; N],
+    words: [MaybeUninit<u32>; M],
 }
 
 impl<const N: usize, const M: usize> FlashBuffer<N, M> {
     pub const fn uninit() -> Self {
-        debug_assert!(N * 4 == M);
+        assert!(N == M * 4);
         Self {
-            words: [MaybeUninit::uninit(); N],
+            words: [MaybeUninit::uninit(); M],
         }
     }
 
