@@ -217,18 +217,12 @@ impl<'d> Rtc<'d> {
         RtcClock::estimate_xtal_frequency()
     }
 
-    #[deprecated = "This function does not take into account the boot time registers, and therefore will not react to using `set_time_us` and `set_time_ms`."]
     /// Read the current raw value of the rtc time registers.
     ///
     /// **This function does not take into account the boot time registers, and
     /// therefore will not react to using [`set_time_us`][Self::set_time_us]
     /// and [`set_time_ms`][Self::set_time_ms].**
-    pub fn get_time_raw(&self) -> u64 {
-        self.get_rtc_time_raw()
-    }
-
-    /// Read the current raw value of the rtc time registers.
-    fn get_rtc_time_raw(&self) -> u64 {
+    pub fn get_rtc_time_raw(&self) -> u64 {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let rtc_cntl = unsafe { &*LPWR::ptr() };
         #[cfg(any(esp32c6, esp32h2))]
