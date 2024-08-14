@@ -180,4 +180,5 @@ jobs:
         id: run-tests
         run: |
           export PATH=$PATH:/home/espressif/.cargo/bin
+          chmod +x xtask
           ./xtask run-elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
