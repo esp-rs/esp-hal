@@ -10,7 +10,6 @@
 //! let time = time::current_time();
 //! # }
 //! ```
-#![warn(missing_docs)]
 
 /// Provides time since system start in microseconds precision
 ///

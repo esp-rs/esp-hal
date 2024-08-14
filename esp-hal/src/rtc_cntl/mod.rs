@@ -69,6 +69,8 @@
 //! }
 //! ```
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 #[cfg(not(any(esp32c6, esp32h2)))]
 use fugit::HertzU32;
 use fugit::MicrosDurationU64;

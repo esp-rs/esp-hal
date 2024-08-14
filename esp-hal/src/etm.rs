@@ -61,6 +61,8 @@
 //! # }
 //! ```
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     system::PeripheralClockControl,
@@ -149,6 +151,7 @@ macro_rules! create_etm {
                 pub fn new(peripheral: impl Peripheral<P = crate::peripherals::SOC_ETM> + 'd) -> Self {
                     crate::into_ref!(peripheral);
 
+                    PeripheralClockControl::reset(crate::system::Peripheral::Etm);
                     PeripheralClockControl::enable(crate::system::Peripheral::Etm);
 
                     Self {

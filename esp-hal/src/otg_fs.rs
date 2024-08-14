@@ -36,6 +36,8 @@
 //! ## Implementation State
 //! - Low-speed (LS) is not supported.
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 pub use esp_synopsys_usb_otg::UsbBus;
 use esp_synopsys_usb_otg::UsbPeripheral;
 
@@ -66,6 +68,7 @@ impl<'d> Usb<'d> {
         P: UsbDp + Send + Sync,
         M: UsbDm + Send + Sync,
     {
+        PeripheralClockControl::reset(PeripheralEnable::Usb);
         PeripheralClockControl::enable(PeripheralEnable::Usb);
 
         Self {

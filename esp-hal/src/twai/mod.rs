@@ -129,6 +129,8 @@
 //! # }
 //! ```
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use core::marker::PhantomData;
 
 use self::filter::{Filter, FilterType};
@@ -735,7 +737,11 @@ where
         no_transceiver: bool,
         mode: TwaiMode,
     ) -> Self {
+        // Set up the GPIO pins.
+        crate::into_ref!(tx_pin, rx_pin);
+
         // Enable the peripheral clock for the TWAI peripheral.
+        T::reset_peripheral();
         T::enable_peripheral();
 
         // Set RESET bit to 1
@@ -743,8 +749,6 @@ where
             .mode()
             .write(|w| w.reset_mode().set_bit());
 
-        // Set up the GPIO pins.
-        crate::into_ref!(tx_pin, rx_pin);
         if no_transceiver {
             tx_pin.set_to_open_drain_output(crate::private::Internal);
         }
@@ -1285,6 +1289,8 @@ pub trait Instance: crate::private::Sealed {
 
     fn enable_peripheral();
 
+    fn reset_peripheral();
+
     fn enable_interrupts();
 }
 
@@ -1475,6 +1481,10 @@ impl Instance for crate::peripherals::TWAI0 {
         unsafe { &*crate::peripherals::TWAI0::PTR }
     }
 
+    fn reset_peripheral() {
+        PeripheralClockControl::reset(crate::system::Peripheral::Twai0);
+    }
+
     fn enable_peripheral() {
         PeripheralClockControl::enable(crate::system::Peripheral::Twai0);
     }
@@ -1519,6 +1529,10 @@ impl Instance for crate::peripherals::TWAI0 {
         unsafe { &*crate::peripherals::TWAI0::PTR }
     }
 
+    fn reset_peripheral() {
+        PeripheralClockControl::enable(crate::system::Peripheral::Twai0);
+    }
+
     fn enable_peripheral() {
         PeripheralClockControl::enable(crate::system::Peripheral::Twai0);
     }
@@ -1561,6 +1575,10 @@ impl Instance for crate::peripherals::TWAI1 {
     #[inline(always)]
     fn register_block() -> &'static RegisterBlock {
         unsafe { &*crate::peripherals::TWAI1::PTR }
+    }
+
+    fn reset_peripheral() {
+        PeripheralClockControl::enable(crate::system::Peripheral::Twai1);
     }
 
     fn enable_peripheral() {

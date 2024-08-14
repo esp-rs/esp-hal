@@ -80,6 +80,8 @@
 //! - Only master mode is supported.
 //! - Only TDM Philips standard is supported.
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use core::marker::PhantomData;
 
 use enumset::{EnumSet, EnumSetType};
@@ -330,6 +332,7 @@ where
         // the targets the same and force same configuration for both, TX and RX
 
         channel.tx.init_channel();
+        PeripheralClockControl::reset(I::get_peripheral());
         PeripheralClockControl::enable(I::get_peripheral());
         I::set_clock(calculate_clock(
             sample_rate,
