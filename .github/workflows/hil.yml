@@ -178,7 +178,9 @@ jobs:
 
       - name: Run Tests
         id: run-tests
-        run: ./xtask run-elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
+        run: |
+          export PATH=$PATH:/home/espressif/.cargo/bin
+          ./xtask run-elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
 
       - name: Erase Flash on Failure
         if: ${{ failure() && steps.run-tests.conclusion == 'failure' }}

@@ -6,7 +6,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use cargo::CargoAction;
 use clap::ValueEnum;
 use esp_metadata::Chip;
@@ -151,7 +151,8 @@ pub fn load_examples(path: &Path) -> Result<Vec<Metadata>> {
 
     for entry in fs::read_dir(path)? {
         let path = windows_safe_path(&entry?.path());
-        let text = fs::read_to_string(&path)?;
+        let text = fs::read_to_string(&path)
+            .with_context(|| format!("Could not read {}", path.display()))?;
 
         let mut chips = Vec::new();
         let mut features = Vec::new();
@@ -184,7 +185,7 @@ pub fn load_examples(path: &Path) -> Result<Vec<Metadata>> {
             } else if key == "FEATURES" {
                 features = split.into();
             } else {
-                log::warn!("Unregognized metadata key '{key}', ignoring");
+                log::warn!("Unrecognized metadata key '{key}', ignoring");
             }
         }
 
@@ -309,7 +310,8 @@ pub fn build_package(
 /// Bump the version of the specified package by the specified amount.
 pub fn bump_version(workspace: &Path, package: Package, amount: Version) -> Result<()> {
     let manifest_path = workspace.join(package.to_string()).join("Cargo.toml");
-    let manifest = fs::read_to_string(&manifest_path)?;
+    let manifest = fs::read_to_string(&manifest_path)
+        .with_context(|| format!("Could not read {}", manifest_path.display()))?;
 
     let mut manifest = manifest.parse::<toml_edit::DocumentMut>()?;
 
@@ -528,7 +530,10 @@ pub fn package_version(workspace: &Path, package: Package) -> Result<semver::Ver
         version: semver::Version,
     }
 
-    let manifest = fs::read_to_string(workspace.join(package.to_string()).join("Cargo.toml"))?;
+    let path = workspace.join(package.to_string()).join("Cargo.toml");
+    let path = windows_safe_path(&path);
+    let manifest =
+        fs::read_to_string(&path).with_context(|| format!("Could not read {}", path.display()))?;
     let manifest: Manifest = basic_toml::from_str(&manifest)?;
 
     Ok(manifest.package.version)
