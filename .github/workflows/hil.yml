@@ -181,11 +181,3 @@ jobs:
         run: |
           export PATH=$PATH:/home/espressif/.cargo/bin
           ./xtask run-elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
-
-      - name: Erase Flash on Failure
-        if: ${{ failure() && steps.run-tests.conclusion == 'failure' }}
-        env:
-          ESPFLASH_PORT: /dev/tty${{ matrix.target.usb }}
-        run: |
-          export PATH=$PATH:/home/espressif/.cargo/bin
-          espflash erase-flash
