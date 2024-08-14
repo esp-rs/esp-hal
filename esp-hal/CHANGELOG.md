@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Allow configuration of period updating method for MCPWM timers (#1898)
 - Add self-testing mode for TWAI peripheral. (#1929)
 - Added a `PeripheralClockControl::reset` to the driver constructors where missing (#1893)
-- Added `Rtc::set_time_us` and `Rtc::set_time_ms` to allow setting RTC time (#1883)
+- Added `Rtc::set_time_us` and `Rtc::set_time_ms` to allow setting RTC time, and `Rtc::get_rtc_time_us` and `Rtc::get_rtc_time_ms` to allow getting the RTC time without taking into account boot time (#1883)
 
 ### Changed
 
