@@ -328,42 +328,16 @@ impl Default for RtcSleepConfig {
     }
 }
 
-const DR_REG_NRX_BASE: u32 = 0x6001CC00;
-const DR_REG_FE_BASE: u32 = 0x60006000;
-const DR_REG_FE2_BASE: u32 = 0x60005000;
-
-const NRXPD_CTRL: u32 = DR_REG_NRX_BASE + 0x00d4;
-const FE_GEN_CTRL: u32 = DR_REG_FE_BASE + 0x0090;
-const FE2_TX_INTERP_CTRL: u32 = DR_REG_FE2_BASE + 0x00f0;
-
 const SYSCON_SRAM_POWER_UP: u16 = 0x7FF;
 const SYSCON_ROM_POWER_UP: u8 = 0x7;
-
-const NRX_RX_ROT_FORCE_PU: u32 = 1 << 5;
-const NRX_VIT_FORCE_PU: u32 = 1 << 3;
-const NRX_DEMAP_FORCE_PU: u32 = 1 << 1;
-
-const FE_IQ_EST_FORCE_PU: u32 = 1 << 5;
-const FE2_TX_INF_FORCE_PU: u32 = 1 << 10;
-
-fn modify_register(reg: u32, mask: u32, value: u32) {
-    let reg = reg as *mut u32;
-
-    unsafe { reg.write_volatile((reg.read_volatile() & !mask) | value) };
-}
-
-fn register_modify_bits(reg: u32, bits: u32, set: bool) {
-    if set {
-        modify_register(reg, bits, bits);
-    } else {
-        modify_register(reg, bits, 0);
-    }
-}
 
 fn rtc_sleep_pu(val: bool) {
     let rtc_cntl = unsafe { &*esp32s3::RTC_CNTL::ptr() };
     let syscon = unsafe { &*esp32s3::APB_CTRL::ptr() };
     let bb = unsafe { &*esp32s3::BB::ptr() };
+    let nrx = unsafe { &*esp32s3::NRX::ptr() };
+    let fe = unsafe { &*esp32s3::FE::ptr() };
+    let fe2 = unsafe { &*esp32s3::FE2::ptr() };
 
     rtc_cntl
         .dig_pwc()
@@ -385,15 +359,19 @@ fn rtc_sleep_pu(val: bool) {
     bb.bbpd_ctrl()
         .modify(|_r, w| w.fft_force_pu().bit(val).dc_est_force_pu().bit(val));
 
-    register_modify_bits(
-        NRXPD_CTRL,
-        NRX_RX_ROT_FORCE_PU | NRX_VIT_FORCE_PU | NRX_DEMAP_FORCE_PU,
-        val,
-    );
+    nrx.nrxpd_ctrl().modify(|_, w| {
+        w.rx_rot_force_pu()
+            .bit(val)
+            .vit_force_pu()
+            .bit(val)
+            .demap_force_pu()
+            .bit(val)
+    });
 
-    register_modify_bits(FE_GEN_CTRL, FE_IQ_EST_FORCE_PU, val);
+    fe.gen_ctrl().modify(|_, w| w.iq_est_force_pu().bit(val));
 
-    register_modify_bits(FE2_TX_INTERP_CTRL, FE2_TX_INF_FORCE_PU, val);
+    fe2.tx_interp_ctrl()
+        .modify(|_, w| w.tx_inf_force_pu().bit(val));
 
     syscon.mem_power_up().modify(|_r, w| unsafe {
         w.sram_power_up()
