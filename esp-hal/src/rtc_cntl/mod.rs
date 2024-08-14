@@ -271,11 +271,6 @@ impl<'d> Rtc<'d> {
         self.get_rtc_time_raw() * 1_000_000 / RtcClock::get_slow_freq().frequency().to_Hz() as u64
     }
 
-    /// Read the current value of the rtc time registers in milliseconds.
-    fn get_rtc_time_ms(&self) -> u64 {
-        self.get_rtc_time_raw() * 1_000 / RtcClock::get_slow_freq().frequency().to_Hz() as u64
-    }
-
     /// Read the current value of the boot time registers in microseconds.
     fn get_boot_time_us(&self) -> u64 {
         // For more info on about how RTC setting works and what it has to do with boot time, see https://github.com/esp-rs/esp-hal/pull/1883
@@ -305,11 +300,6 @@ impl<'d> Rtc<'d> {
 
         // https://github.com/espressif/esp-idf/blob/23e4823f17a8349b5e03536ff7653e3e584c9351/components/newlib/port/esp_time_impl.c#L115
         l + (h << 32)
-    }
-
-    /// Read the current value of the rtc time registers in milliseconds.
-    fn get_boot_time_ms(&self) -> u64 {
-        self.get_boot_time_us() / 1_000
     }
 
     /// Set the current value of the boot time registers in microseconds.
