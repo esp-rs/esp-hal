@@ -72,9 +72,9 @@ mod test_helpers {
             }
         }
 
-        assert!(t2 > t1);
-        assert!((t2 - t1).to_millis() >= 10u64);
-        assert!((t2 - t1).to_millis() <= 13u64);
+        assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
+        assert!((t2 - t1).to_millis() >= 10u64, "diff: {:?}", (t2 - t1).to_millis());
+        assert!((t2 - t1).to_millis() <= 13u64, "diff: {:?}", (t2 - t1).to_millis());
     }
 
     #[embassy_executor::task]
@@ -104,8 +104,8 @@ mod test_cases {
         Timer::after_millis(30).await;
         let t2 = esp_hal::time::current_time();
 
-        assert!(t2 > t1);
-        assert!((t2 - t1).to_millis() >= 80u64);
+        assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
+        assert!((t2 - t1).to_millis() >= 80u64, "diff: {:?}", (t2 - t1).to_millis());
     }
 
     pub fn run_test_periodic_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
@@ -117,8 +117,8 @@ mod test_cases {
         nb::block!(periodic.wait()).unwrap();
         let t2 = esp_hal::time::current_time();
 
-        assert!(t2 > t1);
-        assert!((t2 - t1).to_millis() >= 100u64);
+        assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
+        assert!((t2 - t1).to_millis() >= 100u64, "diff: {:?}", (t2 - t1).to_millis());
     }
 
     pub fn run_test_oneshot_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
@@ -128,8 +128,8 @@ mod test_cases {
         timer.delay_millis(50);
         let t2 = esp_hal::time::current_time();
 
-        assert!(t2 > t1);
-        assert!((t2 - t1).to_millis() >= 50u64);
+        assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
+        assert!((t2 - t1).to_millis() >= 50u64, "diff: {:?}", (t2 - t1).to_millis());
     }
 
     pub async fn run_join_test() {
@@ -138,8 +138,8 @@ mod test_cases {
         Timer::after_millis(50).await;
         let t2 = esp_hal::time::current_time();
 
-        assert!(t2 > t1);
-        assert!((t2 - t1).to_millis() >= 100u64);
+        assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
+        assert!((t2 - t1).to_millis() >= 100u64, "diff: {:?}", (t2 - t1).to_millis());
     }
 }
 
@@ -293,8 +293,8 @@ mod test {
                 ticker.next().await;
                 let t2 = esp_hal::time::current_time();
 
-                assert!(t2 > t1);
-                assert!((t2 - t1).to_millis() >= 90u64);
+                assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
+                assert!((t2 - t1).to_millis() >= 90u64, "diff: {:?}", (t2 - t1).to_millis());
             };
 
             embedded_test::export::check_outcome(outcome.await);
