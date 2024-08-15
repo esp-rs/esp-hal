@@ -33,7 +33,7 @@ use esp_hal::{
         SpiMode,
     },
     system::SystemControl,
-    timer::{timg::TimerGroup, },
+    timer::timg::TimerGroup,
 };
 
 #[esp_hal_embassy::main]

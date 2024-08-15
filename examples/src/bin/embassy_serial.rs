@@ -17,7 +17,7 @@ use esp_hal::{
     gpio::Io,
     peripherals::{Peripherals, UART0},
     system::SystemControl,
-    timer::{timg::TimerGroup, },
+    timer::timg::TimerGroup,
     uart::{
         config::{AtCmdConfig, Config},
         Uart,

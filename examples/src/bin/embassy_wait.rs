@@ -16,7 +16,7 @@ use esp_hal::{
     gpio::{Input, Io, Pull},
     peripherals::Peripherals,
     system::SystemControl,
-    timer::{timg::TimerGroup, },
+    timer::timg::TimerGroup,
 };
 
 #[esp_hal_embassy::main]

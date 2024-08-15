@@ -16,7 +16,7 @@ use esp_hal::{
     clock::ClockControl,
     peripherals::Peripherals,
     system::SystemControl,
-    timer::{timg::TimerGroup, },
+    timer::timg::TimerGroup,
 };
 
 #[embassy_executor::task]

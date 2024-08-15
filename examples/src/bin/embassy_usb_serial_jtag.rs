@@ -15,7 +15,7 @@ use esp_hal::{
     clock::ClockControl,
     peripherals::Peripherals,
     system::SystemControl,
-    timer::{timg::TimerGroup, },
+    timer::timg::TimerGroup,
     usb_serial_jtag::{UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
     Async,
 };

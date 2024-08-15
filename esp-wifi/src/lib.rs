@@ -17,8 +17,20 @@ use core::{cell::RefCell, mem::MaybeUninit, ptr::addr_of_mut};
 use common_adapter::{chip_specific::phy_mem_init, init_radio_clock_control, RADIO_CLOCKS};
 use critical_section::Mutex;
 use esp_hal as hal;
+#[cfg(not(feature = "esp32"))]
+use esp_hal::timer::systimer::Alarm;
+#[cfg(timg_timer1)]
+use esp_hal::timer::timg::Timer1;
 use fugit::MegahertzU32;
-use hal::{clock::Clocks, system::RadioClockController};
+use hal::{
+    clock::Clocks,
+    system::RadioClockController,
+    timer::{
+        timg::{Timer as Timg, Timer0, TimerGroupInstance},
+        ErasedTimer,
+        PeriodicTimer,
+    },
+};
 use linked_list_allocator::Heap;
 #[cfg(feature = "wifi")]
 use wifi::WifiError;
@@ -142,7 +154,7 @@ fn init_heap() {
     });
 }
 
-pub(crate) type EspWifiTimer = crate::timer::TimeBase;
+type TimeBase = PeriodicTimer<'static, ErasedTimer>;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -215,10 +227,62 @@ impl EspWifiInitFor {
     }
 }
 
+/// A trait to allow better UX for initializing esp-wifi.
+pub trait EspWifiTimerSource {
+    /// Returns the timer source.
+    fn timer(self) -> TimeBase;
+}
+
+impl<T, DM> EspWifiTimerSource for Timg<Timer0<T>, DM>
+where
+    DM: esp_hal::Mode,
+    T: TimerGroupInstance,
+    ErasedTimer: From<Timg<Timer0<T>, DM>>,
+{
+    fn timer(self) -> TimeBase {
+        ErasedTimer::from(self).timer()
+    }
+}
+
+#[cfg(timg_timer1)]
+impl<T, DM> EspWifiTimerSource for Timg<Timer1<T>, DM>
+where
+    DM: esp_hal::Mode,
+    T: TimerGroupInstance,
+    ErasedTimer: From<Timg<Timer1<T>, DM>>,
+{
+    fn timer(self) -> TimeBase {
+        ErasedTimer::from(self).timer()
+    }
+}
+
+#[cfg(not(feature = "esp32"))]
+impl<T, DM, const N: u8> EspWifiTimerSource for Alarm<T, DM, N>
+where
+    DM: esp_hal::Mode,
+    ErasedTimer: From<Alarm<T, DM, N>>,
+{
+    fn timer(self) -> TimeBase {
+        ErasedTimer::from(self).timer()
+    }
+}
+
+impl EspWifiTimerSource for ErasedTimer {
+    fn timer(self) -> TimeBase {
+        TimeBase::new(self)
+    }
+}
+
+impl EspWifiTimerSource for TimeBase {
+    fn timer(self) -> TimeBase {
+        self
+    }
+}
+
 /// Initialize for using WiFi and or BLE
 pub fn initialize(
     init_for: EspWifiInitFor,
-    timer: EspWifiTimer,
+    timer: impl EspWifiTimerSource,
     rng: hal::rng::Rng,
     radio_clocks: hal::peripherals::RADIO_CLK,
     clocks: &Clocks,
@@ -238,7 +302,7 @@ pub fn initialize(
     init_radio_clock_control(radio_clocks);
     init_rng(rng);
     init_tasks();
-    setup_timer_isr(timer)?;
+    setup_timer_isr(timer.timer())?;
     wifi_set_log_verbose();
     init_clocks();
 

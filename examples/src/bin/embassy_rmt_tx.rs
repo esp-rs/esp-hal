@@ -21,7 +21,7 @@ use esp_hal::{
     prelude::*,
     rmt::{asynch::TxChannelAsync, PulseCode, Rmt, TxChannelConfig, TxChannelCreatorAsync},
     system::SystemControl,
-    timer::{timg::TimerGroup, },
+    timer::timg::TimerGroup,
 };
 use esp_println::println;
 

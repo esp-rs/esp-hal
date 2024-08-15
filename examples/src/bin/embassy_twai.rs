@@ -30,7 +30,7 @@ use esp_hal::{
     interrupt,
     peripherals::{self, Peripherals, TWAI0},
     system::SystemControl,
-    timer::{timg::TimerGroup,},
+    timer::timg::TimerGroup,
     twai::{self, EspTwaiFrame, TwaiMode, TwaiRx, TwaiTx},
 };
 use esp_println::println;

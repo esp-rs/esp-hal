@@ -19,7 +19,7 @@ use esp_hal::{
     prelude::*,
     rmt::{asynch::RxChannelAsync, PulseCode, Rmt, RxChannelConfig, RxChannelCreatorAsync},
     system::SystemControl,
-    timer::{timg::TimerGroup},
+    timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
 

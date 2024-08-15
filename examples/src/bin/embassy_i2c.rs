@@ -26,7 +26,7 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
-    timer::{timg::TimerGroup,},
+    timer::timg::TimerGroup,
 };
 use lis3dh_async::{Lis3dh, Range, SlaveAddr};
 

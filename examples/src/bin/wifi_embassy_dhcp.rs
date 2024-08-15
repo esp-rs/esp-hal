@@ -22,7 +22,7 @@ use esp_hal::{
     peripherals::Peripherals,
     rng::Rng,
     system::SystemControl,
-    timer::{timg::TimerGroup, ErasedTimer, PeriodicTimer},
+    timer::timg::TimerGroup,
 };
 use esp_println::println;
 use esp_wifi::{
@@ -62,12 +62,10 @@ async fn main(spawner: Spawner) -> ! {
     let clocks = ClockControl::max(system.clock_control).freeze();
 
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let timer0: ErasedTimer = timg0.timer0.into();
-    let timer = PeriodicTimer::new(timer0);
 
     let init = initialize(
         EspWifiInitFor::Wifi,
-        timer,
+        timg0.timer0,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
         &clocks,
