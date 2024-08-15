@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added new `Io::new_no_bind_interrupt` constructor (#1861)
-- Added touch pad support for esp32 (#1873)
+- Added touch pad support for esp32 (#1873, #1956)
 - Allow configuration of period updating method for MCPWM timers (#1898)
 - Add self-testing mode for TWAI peripheral. (#1929)
 - Added a `PeripheralClockControl::reset` to the driver constructors where missing (#1893)
