@@ -18,7 +18,7 @@ use esp_hal::{
     gpio::Io,
     i2s::{asynch::*, DataFormat, I2s, I2sTx, Standard},
     peripheral::Peripheral,
-    peripherals::{I2S0, Peripherals},
+    peripherals::{Peripherals, I2S0},
     prelude::*,
     system::SystemControl,
     Async,
@@ -52,15 +52,7 @@ impl Iterator for SampleSource {
 }
 
 #[embassy_executor::task]
-async fn writer(
-    tx_buffer: &'static mut [u8],
-    i2s_tx: I2sTx<
-        'static,
-        I2S0,
-        DmaChannel0,
-        Async
-    >,
-) {
+async fn writer(tx_buffer: &'static mut [u8], i2s_tx: I2sTx<'static, I2S0, DmaChannel0, Async>) {
     let mut samples = SampleSource::new();
     for b in tx_buffer.iter_mut() {
         *b = samples.next().unwrap();
@@ -144,8 +136,8 @@ mod tests {
             i2s.rx_conf().modify(|_, w| w.rx_update().set_bit());
         }
 
-        spawner.must_spawn(writer(tx_buffer, i2s_tx));
         let mut rx_transfer = i2s_rx.read_dma_circular_async(rx_buffer).unwrap();
+        spawner.must_spawn(writer(tx_buffer, i2s_tx));
 
         let mut rcv = [0u8; BUFFER_SIZE];
         let mut sample_idx = 0;
@@ -154,7 +146,11 @@ mod tests {
             let len = rx_transfer.pop(&mut rcv).await.unwrap();
             for &b in &rcv[..len] {
                 let expected = samples.next().unwrap();
-                assert_eq!(b, expected, "Sample #{} does not match ({} != {})", sample_idx, b, expected);
+                assert_eq!(
+                    b, expected,
+                    "Sample #{} does not match ({} != {})",
+                    sample_idx, b, expected
+                );
                 sample_idx += 1;
             }
         }
