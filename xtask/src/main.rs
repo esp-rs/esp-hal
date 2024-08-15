@@ -68,6 +68,9 @@ struct TestArgs {
     /// Optional test to act on (all tests used if omitted)
     #[arg(short = 't', long)]
     test: Option<String>,
+    /// Repeat the tests for a specific number of times.
+    #[arg(long)]
+    repeat: Option<usize>,
 }
 
 #[derive(Debug, Args)]
@@ -231,7 +234,8 @@ fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Pat
             args.chip,
             target,
             example,
-            &CargoAction::Build,
+            CargoAction::Build,
+            1,
         )
     } else if args.example.is_some() {
         // An invalid argument was provided:
@@ -244,7 +248,8 @@ fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Pat
                 args.chip,
                 target,
                 example,
-                &CargoAction::Build,
+                CargoAction::Build,
+                1,
             )
         })
     }
@@ -262,7 +267,8 @@ fn run_example(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) 
             args.chip,
             target,
             &example,
-            &CargoAction::Run,
+            CargoAction::Run,
+            1,
         )
     } else {
         bail!("Example not found or unsupported for the given chip")
@@ -287,13 +293,29 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
 
     // Execute the specified action:
     if let Some(test) = tests.iter().find(|test| Some(test.name()) == args.test) {
-        xtask::execute_app(&package_path, args.chip, target, &test, &action)
+        xtask::execute_app(
+            &package_path,
+            args.chip,
+            target,
+            &test,
+            action,
+            args.repeat.unwrap_or(1),
+        )
     } else if args.test.is_some() {
         bail!("Test not found or unsupported for the given chip")
     } else {
         let mut failed = Vec::new();
         for test in tests {
-            if xtask::execute_app(&package_path, args.chip, target, &test, &action).is_err() {
+            if xtask::execute_app(
+                &package_path,
+                args.chip,
+                target,
+                &test,
+                action,
+                args.repeat.unwrap_or(1),
+            )
+            .is_err()
+            {
                 failed.push(test.name());
             }
         }

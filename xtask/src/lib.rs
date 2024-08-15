@@ -201,7 +201,8 @@ pub fn execute_app(
     chip: Chip,
     target: &str,
     app: &Metadata,
-    action: &CargoAction,
+    action: CargoAction,
+    mut repeat: usize,
 ) -> Result<()> {
     log::info!(
         "Building example '{}' for '{}'",
@@ -214,7 +215,8 @@ pub fn execute_app(
 
     let package = app.example_path().strip_prefix(package_path)?;
     log::info!("Package: {:?}", package);
-    let (bin, subcommand) = if action == &CargoAction::Build {
+    let (bin, subcommand) = if action == CargoAction::Build {
+        repeat = 1; // Do not repeat builds in a loop
         let bin = if package.starts_with("src/bin") {
             format!("--bin={}", app.name())
         } else if package.starts_with("tests") {
@@ -254,7 +256,11 @@ pub fn execute_app(
     let args = builder.build();
     log::debug!("{args:#?}");
 
-    cargo::run(&args, package_path)
+    for _ in 0..repeat {
+        cargo::run(&args, package_path)?;
+    }
+
+    Ok(())
 }
 
 /// Build the specified package, using the given toolchain/target/features if
