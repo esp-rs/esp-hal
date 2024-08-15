@@ -150,19 +150,13 @@ mod tests {
         let mut rcv = [0u8; BUFFER_SIZE];
         let mut sample_idx = 0;
         let mut samples = SampleSource::new();
-        let mut success = true;
         for _ in 0..30 {
             let len = rx_transfer.pop(&mut rcv).await.unwrap();
             for &b in &rcv[..len] {
                 let expected = samples.next().unwrap();
-                if b != expected {
-                    success = false;
-                    defmt::error!("Sample #{} does not match ({} != {})", sample_idx, b, expected);
-                }
+                assert_eq!(b, expected, "Sample #{} does not match ({} != {})", sample_idx, b, expected);
                 sample_idx += 1;
             }
         }
-
-        assert!(success);
     }
 }
