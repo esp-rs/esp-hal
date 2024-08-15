@@ -10,7 +10,7 @@ use defmt_rtt as _;
 use embassy_time::{Duration, Ticker, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::{Clocks, ClockControl},
+    clock::{ClockControl, Clocks},
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
@@ -41,9 +41,9 @@ mod test_helpers {
 }
 
 mod test_cases {
-    use super::*;
-
     use esp_hal::peripheral::Peripheral;
+
+    use super::*;
 
     pub async fn run_test_one_shot_async() {
         let t1 = esp_hal::time::current_time();
@@ -52,7 +52,11 @@ mod test_cases {
         let t2 = esp_hal::time::current_time();
 
         assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
-        assert!((t2 - t1).to_millis() >= 80u64, "diff: {:?}", (t2 - t1).to_millis());
+        assert!(
+            (t2 - t1).to_millis() >= 80u64,
+            "diff: {:?}",
+            (t2 - t1).to_millis()
+        );
     }
 
     pub fn run_test_periodic_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
@@ -65,7 +69,11 @@ mod test_cases {
         let t2 = esp_hal::time::current_time();
 
         assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
-        assert!((t2 - t1).to_millis() >= 100u64, "diff: {:?}", (t2 - t1).to_millis());
+        assert!(
+            (t2 - t1).to_millis() >= 100u64,
+            "diff: {:?}",
+            (t2 - t1).to_millis()
+        );
     }
 
     pub fn run_test_oneshot_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
@@ -76,7 +84,11 @@ mod test_cases {
         let t2 = esp_hal::time::current_time();
 
         assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
-        assert!((t2 - t1).to_millis() >= 50u64, "diff: {:?}", (t2 - t1).to_millis());
+        assert!(
+            (t2 - t1).to_millis() >= 50u64,
+            "diff: {:?}",
+            (t2 - t1).to_millis()
+        );
     }
 
     pub async fn run_join_test() {
@@ -86,7 +98,11 @@ mod test_cases {
         let t2 = esp_hal::time::current_time();
 
         assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
-        assert!((t2 - t1).to_millis() >= 100u64, "diff: {:?}", (t2 - t1).to_millis());
+        assert!(
+            (t2 - t1).to_millis() >= 100u64,
+            "diff: {:?}",
+            (t2 - t1).to_millis()
+        );
     }
 }
 
@@ -119,8 +135,7 @@ impl Resources {
 #[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
 mod test {
     use super::*;
-    use crate::test_helpers::*;
-    use crate::test_cases::*;
+    use crate::{test_cases::*, test_helpers::*};
 
     #[init]
     fn init() -> Resources {
@@ -242,7 +257,11 @@ mod test {
                 let t2 = esp_hal::time::current_time();
 
                 assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
-                assert!((t2 - t1).to_micros() >= 85000u64, "diff: {:?}", (t2 - t1).to_micros());
+                assert!(
+                    (t2 - t1).to_micros() >= 85000u64,
+                    "diff: {:?}",
+                    (t2 - t1).to_micros()
+                );
             };
 
             embedded_test::export::check_outcome(outcome.await);
@@ -264,7 +283,8 @@ mod test {
     async fn tick_test_timer_tick_rates(resources: Resources) {
         resources.set_up_embassy_with_timg0();
 
-        // We are retrying 5 times because probe-rs polling RTT may introduce some jitter.
+        // We are retrying 5 times because probe-rs polling RTT may introduce some
+        // jitter.
         for _ in 0..5 {
             let t1 = esp_hal::time::current_time();
 
