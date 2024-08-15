@@ -66,15 +66,15 @@ mod test_helpers {
             ticker.next().await;
             counter += 1;
 
-            if counter > 100_000 {
+            if counter > 1000 {
                 t2 = esp_hal::time::current_time();
                 break;
             }
         }
 
         assert!(t2 > t1);
-        assert!((t2 - t1).to_millis() >= 1000u64);
-        assert!((t2 - t1).to_millis() <= 1300u64);
+        assert!((t2 - t1).to_millis() >= 10u64);
+        assert!((t2 - t1).to_millis() <= 13u64);
     }
 
     #[embassy_executor::task]
@@ -88,8 +88,8 @@ mod test_helpers {
     }
 
     #[embassy_executor::task]
-    pub async fn e_task300ms() {
-        Timer::after_millis(300).await;
+    pub async fn e_task30ms() {
+        Timer::after_millis(30).await;
     }
 }
 
@@ -100,49 +100,46 @@ mod test_cases {
 
     pub async fn run_test_one_shot_async() {
         let t1 = esp_hal::time::current_time();
-        Timer::after_millis(500).await;
-        Timer::after_millis(300).await;
+        Timer::after_millis(50).await;
+        Timer::after_millis(30).await;
         let t2 = esp_hal::time::current_time();
 
         assert!(t2 > t1);
-        assert!((t2 - t1).to_millis() >= 800u64);
+        assert!((t2 - t1).to_millis() >= 80u64);
     }
 
     pub fn run_test_periodic_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
         let mut periodic = PeriodicTimer::new(timer);
 
         let t1 = esp_hal::time::current_time();
-        periodic.start(1.secs()).unwrap();
+        periodic.start(100.millis()).unwrap();
 
-        let t2;
-        loop {
-            nb::block!(periodic.wait()).unwrap();
-            t2 = esp_hal::time::current_time();
-            break;
-        }
+        nb::block!(periodic.wait()).unwrap();
+        let t2 = esp_hal::time::current_time();
+
         assert!(t2 > t1);
-        assert!((t2 - t1).to_millis() >= 1_000u64);
+        assert!((t2 - t1).to_millis() >= 100u64);
     }
 
     pub fn run_test_oneshot_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
         let timer = OneShotTimer::new(timer);
 
         let t1 = esp_hal::time::current_time();
-        timer.delay_millis(500);
+        timer.delay_millis(50);
         let t2 = esp_hal::time::current_time();
 
         assert!(t2 > t1);
-        assert!((t2 - t1).to_millis() >= 500u64);
+        assert!((t2 - t1).to_millis() >= 50u64);
     }
 
     pub async fn run_join_test() {
         let t1 = esp_hal::time::current_time();
-        embassy_futures::join::join(Timer::after_millis(500), Timer::after_millis(300)).await;
-        Timer::after_millis(500).await;
+        embassy_futures::join::join(Timer::after_millis(50), Timer::after_millis(30)).await;
+        Timer::after_millis(50).await;
         let t2 = esp_hal::time::current_time();
 
         assert!(t2 > t1);
-        assert!((t2 - t1).to_millis() >= 1_000u64);
+        assert!((t2 - t1).to_millis() >= 100u64);
     }
 }
 
@@ -288,7 +285,7 @@ mod test {
         #[cfg(not(feature = "esp32"))]
         async fn test_interrupt_executor_invoker() {
             let outcome = async {
-                let mut ticker = Ticker::every(Duration::from_millis(300));
+                let mut ticker = Ticker::every(Duration::from_millis(30));
 
                 let t1 = esp_hal::time::current_time();
                 ticker.next().await;
@@ -297,7 +294,7 @@ mod test {
                 let t2 = esp_hal::time::current_time();
 
                 assert!(t2 > t1);
-                assert!((t2 - t1).to_millis() >= 900u64);
+                assert!((t2 - t1).to_millis() >= 90u64);
             };
 
             embedded_test::export::check_outcome(outcome.await);
@@ -307,7 +304,7 @@ mod test {
         spawner_int.must_spawn(test_interrupt_executor_invoker());
 
         let spawner = embassy_executor::Spawner::for_current_executor().await;
-        spawner.must_spawn(e_task300ms());
+        spawner.must_spawn(e_task30ms());
 
         // we need to delay so the e_task300ms() could be spawned
         yield_now().await;
