@@ -1,23 +1,4 @@
 //! Embassy timer and executor Test
-//!
-//! Description of implemented tests:
-//! - run_test_one_shot_timg(): Tests Timg configured as OneShotTimer
-//! - run_test_periodic_timg(): Tests Timg configured as PeriodicTimer
-//! - run_test_one_shot_systimer(): Tests systimer configured as OneShotTimer
-//! - run_test_periodic_systimer(): Tests systimer configured as PeriodicTimer
-//! - run_test_periodic_oneshot_timg(): Tests Timg configured as PeriodicTimer
-//!   and then reconfigured as OneShotTimer
-//! - run_test_periodic_oneshot_systimer(): Tests systimer configured as
-//!   PeriodicTimer and then reconfigured as OneShotTimer
-//! - run_test_join_timg(): Tests Timg configured as OneShotTimer and wait on
-//!   two different timeouts via join
-//! - run_test_join_systimer(): Tests systimer configured as OneShotTimer and
-//!   wait on two different timeouts via join
-//! - run_test_interrupt_executor(): Tests InterruptExecutor and Thread
-//!   (default) executor in parallel
-//! - run_tick_test_timg(): Tests Timg configured as OneShotTimer if it fires
-//!   immediately in the case of the time scheduling was already in the past
-//!   (timestamp being too big)
 
 // esp32c2 is disabled currently as it fails
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s3
@@ -53,39 +34,6 @@ macro_rules! mk_static {
 // List of the functions that are ACTUALLY TESTS but are called in the invokers
 mod test_helpers {
     use super::*;
-
-    pub async fn tick_and_increment() {
-        const HZ: u64 = 100_000u64;
-        let mut counter = 0;
-        let mut ticker = Ticker::every(Duration::from_hz(HZ));
-
-        let t1 = esp_hal::time::current_time();
-        let t2;
-
-        loop {
-            ticker.next().await;
-            counter += 1;
-
-            if counter > 1000 {
-                t2 = esp_hal::time::current_time();
-                break;
-            }
-        }
-
-        assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
-        assert!((t2 - t1).to_millis() >= 10u64, "diff: {:?}", (t2 - t1).to_millis());
-        assert!((t2 - t1).to_millis() <= 13u64, "diff: {:?}", (t2 - t1).to_millis());
-    }
-
-    #[embassy_executor::task]
-    pub async fn tick() {
-        const HZ: u64 = 1000u64;
-        let mut ticker = Ticker::every(Duration::from_hz(HZ));
-
-        loop {
-            ticker.next().await;
-        }
-    }
 
     #[embassy_executor::task]
     pub async fn e_task30ms() {
@@ -261,6 +209,7 @@ mod test {
         run_join_test().await;
     }
 
+    /// Test that the ticker works in tasks ran by the interrupt executors.
     #[test]
     #[timeout(3)]
     #[cfg(not(feature = "esp32"))]
@@ -294,7 +243,8 @@ mod test {
                 let t2 = esp_hal::time::current_time();
 
                 assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
-                assert!((t2 - t1).to_millis() >= 90u64, "diff: {:?}", (t2 - t1).to_millis());
+                assert!((t2 - t1).to_micros() >= 85000u64, "diff: {:?}", (t2 - t1).to_micros());
+                assert!((t2 - t1).to_micros() < 100000u64, "diff: {:?}", (t2 - t1).to_micros());
             };
 
             embedded_test::export::check_outcome(outcome.await);
@@ -313,14 +263,23 @@ mod test {
         loop {}
     }
 
+    /// Test that timg0 and systimer don't have vastly different tick rates.
     #[test]
     #[timeout(3)]
     async fn tick_test_timg(resources: Resources) {
-        let spawner = embassy_executor::Spawner::for_current_executor().await;
-
         resources.set_up_embassy_with_timg0();
 
-        spawner.must_spawn(tick());
-        tick_and_increment().await;
+        let mut ticker = Ticker::every(Duration::from_hz(100_000));
+
+        let t1 = esp_hal::time::current_time();
+        for _ in 0..1000 {
+            ticker.next().await;
+        }
+        let t2 = esp_hal::time::current_time();
+
+        assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
+        // We are a bit more lenient in the upper range as the repeated ticker may accumulate some errors.
+        assert!((t2 - t1).to_micros() >= 9900u64, "diff: {:?}", (t2 - t1).to_micros());
+        assert!((t2 - t1).to_micros() <= 13000u64, "diff: {:?}", (t2 - t1).to_micros());
     }
 }
