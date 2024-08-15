@@ -20,8 +20,12 @@ pub union FlashBuffer<const N: usize, const M: usize> {
 }
 
 impl<const N: usize, const M: usize> FlashBuffer<N, M> {
-    pub const fn uninit() -> Self {
+    const _CHECK: () = {
         assert!(N == M * 4);
+    };
+
+    pub const fn uninit() -> Self {
+        let _ = Self::_CHECK;
         Self {
             words: [MaybeUninit::uninit(); M],
         }
