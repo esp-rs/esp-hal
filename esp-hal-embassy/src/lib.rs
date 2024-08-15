@@ -38,14 +38,9 @@ mod fmt;
 
 #[cfg(not(feature = "esp32"))]
 use esp_hal::timer::systimer::Alarm;
-#[cfg(timg_timer1)]
-use esp_hal::timer::timg::Timer1;
 use esp_hal::{
     clock::Clocks,
-    timer::{
-        timg::{Timer as Timg, Timer0, TimerGroupInstance},
-        ErasedTimer,
-    },
+    timer::{timg::Timer as TimgTimer, ErasedTimer},
 };
 pub use macros::main;
 
@@ -67,49 +62,50 @@ macro_rules! mk_static {
 }
 
 /// A trait to allow better UX for initializing the timers.
+///
+/// This trait is meant to be used only for the `init` function.
+/// Calling `timers()` multiple times may panic.
 pub trait TimerCollection {
     /// Returns the timers as a slice.
     fn timers(self) -> &'static mut [Timer];
+}
+
+/// Helper trait to reduce boilerplate.
+///
+/// We can't blanket-implement for `Into<ErasedTimer>` because of possible
+/// conflicting implementations.
+trait IntoErasedTimer: Into<ErasedTimer> {}
+
+impl IntoErasedTimer for ErasedTimer {}
+
+impl<T, DM> IntoErasedTimer for TimgTimer<T, DM>
+where
+    DM: esp_hal::Mode,
+    Self: Into<ErasedTimer>,
+{
+}
+
+#[cfg(not(feature = "esp32"))]
+impl<T, DM, const N: u8> IntoErasedTimer for Alarm<T, DM, N>
+where
+    DM: esp_hal::Mode,
+    Self: Into<ErasedTimer>,
+{
+}
+
+impl<T> TimerCollection for T
+where
+    T: IntoErasedTimer,
+{
+    fn timers(self) -> &'static mut [Timer] {
+        Timer::new(self.into()).timers()
+    }
 }
 
 impl TimerCollection for Timer {
     fn timers(self) -> &'static mut [Timer] {
         let timers = mk_static!([Timer; 1], [self]);
         timers.timers()
-    }
-}
-
-impl<T, DM> TimerCollection for Timg<Timer0<T>, DM>
-where
-    DM: esp_hal::Mode,
-    T: TimerGroupInstance,
-    ErasedTimer: From<Timg<Timer0<T>, DM>>,
-{
-    fn timers(self) -> &'static mut [Timer] {
-        Timer::new(ErasedTimer::from(self)).timers()
-    }
-}
-
-#[cfg(timg_timer1)]
-impl<T, DM> TimerCollection for Timg<Timer1<T>, DM>
-where
-    DM: esp_hal::Mode,
-    T: TimerGroupInstance,
-    ErasedTimer: From<Timg<Timer1<T>, DM>>,
-{
-    fn timers(self) -> &'static mut [Timer] {
-        Timer::new(ErasedTimer::from(self)).timers()
-    }
-}
-
-#[cfg(not(feature = "esp32"))]
-impl<T, DM, const N: u8> TimerCollection for Alarm<T, DM, N>
-where
-    DM: esp_hal::Mode,
-    ErasedTimer: From<Alarm<T, DM, N>>,
-{
-    fn timers(self) -> &'static mut [Timer] {
-        Timer::new(ErasedTimer::from(self)).timers()
     }
 }
 
@@ -131,9 +127,12 @@ impl<const N: usize> TimerCollection for &'static mut [Timer; N] {
 ///
 /// The time driver can be one of a number of different options:
 ///
-/// - A single timer unit, such as a TIMG timer or a SYSTIMER alarm.
-/// - A slice (or array reference) of multiple `[OneShotTimer<ErasedTimer>]`
-///   objects.
+/// - A [Timg] timer instance
+/// - An [Alarm] instance
+/// - An [ErasedTimer] instance
+/// - A [OneShotTimer] instance
+/// - A mutable static slice of [OneShotTimer] instances
+/// - A mutable static array of [OneShotTimer] instances
 pub fn init(clocks: &Clocks, time_driver: impl TimerCollection) {
     EmbassyTimer::init(clocks, time_driver.timers())
 }

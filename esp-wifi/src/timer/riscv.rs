@@ -1,10 +1,7 @@
 use core::cell::RefCell;
 
 use critical_section::Mutex;
-use esp_hal::{
-    interrupt::InterruptHandler,
-    timer::{ErasedTimer, PeriodicTimer},
-};
+use esp_hal::interrupt::InterruptHandler;
 #[cfg(any(feature = "esp32c6", feature = "esp32h2"))]
 use peripherals::INTPRI as SystemPeripheral;
 #[cfg(not(any(feature = "esp32c6", feature = "esp32h2")))]

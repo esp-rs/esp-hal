@@ -22,9 +22,7 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
-    timer::{
-        systimer::{SystemTimer, Target},
-    },
+    timer::systimer::{SystemTimer, Target},
 };
 use esp_println::println;
 

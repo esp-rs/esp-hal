@@ -19,17 +19,11 @@ use critical_section::Mutex;
 use esp_hal as hal;
 #[cfg(not(feature = "esp32"))]
 use esp_hal::timer::systimer::Alarm;
-#[cfg(timg_timer1)]
-use esp_hal::timer::timg::Timer1;
 use fugit::MegahertzU32;
 use hal::{
     clock::Clocks,
     system::RadioClockController,
-    timer::{
-        timg::{Timer as Timg, Timer0, TimerGroupInstance},
-        ErasedTimer,
-        PeriodicTimer,
-    },
+    timer::{timg::Timer as TimgTimer, ErasedTimer, PeriodicTimer},
 };
 use linked_list_allocator::Heap;
 #[cfg(feature = "wifi")]
@@ -228,48 +222,43 @@ impl EspWifiInitFor {
 }
 
 /// A trait to allow better UX for initializing esp-wifi.
+///
+/// This trait is meant to be used only for the `init` function.
+/// Calling `timers()` multiple times may panic.
 pub trait EspWifiTimerSource {
     /// Returns the timer source.
     fn timer(self) -> TimeBase;
 }
 
-impl<T, DM> EspWifiTimerSource for Timg<Timer0<T>, DM>
-where
-    DM: esp_hal::Mode,
-    T: TimerGroupInstance,
-    ErasedTimer: From<Timg<Timer0<T>, DM>>,
-{
-    fn timer(self) -> TimeBase {
-        ErasedTimer::from(self).timer()
-    }
-}
+/// Helper trait to reduce boilerplate.
+///
+/// We can't blanket-implement for `Into<ErasedTimer>` because of possible
+/// conflicting implementations.
+trait IntoErasedTimer: Into<ErasedTimer> {}
 
-#[cfg(timg_timer1)]
-impl<T, DM> EspWifiTimerSource for Timg<Timer1<T>, DM>
+impl<T, DM> IntoErasedTimer for TimgTimer<T, DM>
 where
     DM: esp_hal::Mode,
-    T: TimerGroupInstance,
-    ErasedTimer: From<Timg<Timer1<T>, DM>>,
+    Self: Into<ErasedTimer>,
 {
-    fn timer(self) -> TimeBase {
-        ErasedTimer::from(self).timer()
-    }
 }
 
 #[cfg(not(feature = "esp32"))]
-impl<T, DM, const N: u8> EspWifiTimerSource for Alarm<T, DM, N>
+impl<T, DM, const N: u8> IntoErasedTimer for Alarm<T, DM, N>
 where
     DM: esp_hal::Mode,
-    ErasedTimer: From<Alarm<T, DM, N>>,
+    Self: Into<ErasedTimer>,
 {
-    fn timer(self) -> TimeBase {
-        ErasedTimer::from(self).timer()
-    }
 }
 
-impl EspWifiTimerSource for ErasedTimer {
+impl IntoErasedTimer for ErasedTimer {}
+
+impl<T> EspWifiTimerSource for T
+where
+    T: IntoErasedTimer,
+{
     fn timer(self) -> TimeBase {
-        TimeBase::new(self)
+        TimeBase::new(self.into()).timer()
     }
 }
 
@@ -279,7 +268,17 @@ impl EspWifiTimerSource for TimeBase {
     }
 }
 
-/// Initialize for using WiFi and or BLE
+/// Initialize for using WiFi and or BLE.
+///
+/// # The `timer` argument
+///
+/// The `timer` argument is a timer source that is used by the WiFi driver to
+/// schedule internal tasks. The timer source can be any of the following:
+///
+/// - A [Timg] timer instance
+/// - An [Alarm] instance
+/// - An [ErasedTimer] instance
+/// - A [PeriodicTimer] instance
 pub fn initialize(
     init_for: EspWifiInitFor,
     timer: impl EspWifiTimerSource,
