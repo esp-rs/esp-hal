@@ -8,8 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Introduce DMA buffer objects (#1856)
 
+- Introduce DMA buffer objects (#1856)
 - Added new `Io::new_no_bind_interrupt` constructor (#1861)
 - Added touch pad support for esp32 (#1873)
 - Allow configuration of period updating method for MCPWM timers (#1898)
@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - This package no longer re-exports the `esp_hal_procmacros::main` macro (#1828)
 - The `AesFlavour` trait no longer has the `ENCRYPT_MODE`/`DECRYPT_MODE` associated constants (#1849)
+- Removed `FlashSafeDma` (#1856)
 
 ## [0.19.0] - 2024-07-15
 
