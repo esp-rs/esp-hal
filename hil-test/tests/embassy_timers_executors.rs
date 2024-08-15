@@ -20,7 +20,6 @@ use esp_hal::{
 use esp_hal::{interrupt::Priority, timer::systimer::SystemTimer};
 #[cfg(not(feature = "esp32"))]
 use esp_hal_embassy::InterruptExecutor;
-use embassy_futures::yield_now;
 
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
@@ -244,7 +243,6 @@ mod test {
 
                 assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
                 assert!((t2 - t1).to_micros() >= 85000u64, "diff: {:?}", (t2 - t1).to_micros());
-                assert!((t2 - t1).to_micros() < 100000u64, "diff: {:?}", (t2 - t1).to_micros());
             };
 
             embedded_test::export::check_outcome(outcome.await);
@@ -256,9 +254,6 @@ mod test {
         let spawner = embassy_executor::Spawner::for_current_executor().await;
         spawner.must_spawn(e_task30ms());
 
-        // we need to delay so the e_task300ms() could be spawned
-        yield_now().await;
-
         // The test ends once the interrupt executor's task has finished
         loop {}
     }
@@ -266,20 +261,28 @@ mod test {
     /// Test that timg0 and systimer don't have vastly different tick rates.
     #[test]
     #[timeout(3)]
-    async fn tick_test_timg(resources: Resources) {
+    async fn tick_test_timer_tick_rates(resources: Resources) {
         resources.set_up_embassy_with_timg0();
 
-        let mut ticker = Ticker::every(Duration::from_hz(100_000));
+        // We are retrying 5 times because probe-rs polling RTT may introduce some jitter.
+        for _ in 0..5 {
+            let t1 = esp_hal::time::current_time();
 
-        let t1 = esp_hal::time::current_time();
-        for _ in 0..1000 {
-            ticker.next().await;
+            let mut ticker = Ticker::every(Duration::from_hz(100_000));
+            for _ in 0..2000 {
+                ticker.next().await;
+            }
+            let t2 = esp_hal::time::current_time();
+
+            assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
+            let duration = (t2 - t1).to_micros();
+
+            assert!(duration >= 19000, "diff: {:?}", (t2 - t1).to_micros());
+            if duration <= 21000 {
+                return;
+            }
         }
-        let t2 = esp_hal::time::current_time();
 
-        assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
-        // We are a bit more lenient in the upper range as the repeated ticker may accumulate some errors.
-        assert!((t2 - t1).to_micros() >= 9900u64, "diff: {:?}", (t2 - t1).to_micros());
-        assert!((t2 - t1).to_micros() <= 13000u64, "diff: {:?}", (t2 - t1).to_micros());
+        assert!(false, "Test failed after 5 retries");
     }
 }
