@@ -2251,8 +2251,6 @@ pub mod asynch {
     }
 
     /// An in-progress async circular DMA write transfer.
-    #[non_exhaustive]
-
     pub struct I2sWriteDmaTransferAsync<'d, T, CH, BUFFER>
     where
         T: RegisterAccess,
@@ -2313,7 +2311,7 @@ pub mod asynch {
         /// One-shot read I2S.
         async fn read_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error>;
 
-        /// Continuously read frm I2S. Returns [I2sReadDmaTransferAsync]
+        /// Continuously read from I2S. Returns [I2sReadDmaTransferAsync]
         fn read_dma_circular_async<RXBUF>(
             self,
             words: RXBUF,
@@ -2407,8 +2405,6 @@ pub mod asynch {
     }
 
     /// An in-progress async circular DMA read transfer.
-    #[non_exhaustive]
-
     pub struct I2sReadDmaTransferAsync<'d, T, CH, BUFFER>
     where
         T: RegisterAccess,

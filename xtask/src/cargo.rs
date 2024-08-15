@@ -9,7 +9,7 @@ use anyhow::{bail, Result};
 
 use crate::windows_safe_path;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum CargoAction {
     Build,
     Run,
