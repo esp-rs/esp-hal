@@ -127,12 +127,25 @@ impl<const N: usize> TimerCollection for &'static mut [Timer; N] {
 ///
 /// The time driver can be one of a number of different options:
 ///
-/// - A [Timg] timer instance
-/// - An [Alarm] instance
-/// - An [ErasedTimer] instance
-/// - A [OneShotTimer] instance
-/// - A mutable static slice of [OneShotTimer] instances
-/// - A mutable static array of [OneShotTimer] instances
+/// - A timg `Timer` instance
+/// - A systimer `Alarm` instance
+/// - An `ErasedTimer` instance
+/// - A `OneShotTimer` instance
+/// - A mutable static slice of `OneShotTimer` instances
+/// - A mutable static array of `OneShotTimer` instances
+///
+/// # Examples
+///
+/// ```rust, no_run
+#[doc = esp_hal::before_snippet!()]
+/// use esp_hal::timg::TimerGroup;
+///
+/// let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+/// esp_hal_embassy::init(&clocks, timg0.timer0);
+///
+/// // ... now you can spawn embassy tasks or use `Timer::after` etc.
+/// # }
+/// ```
 pub fn init(clocks: &Clocks, time_driver: impl TimerCollection) {
     EmbassyTimer::init(clocks, time_driver.timers())
 }

@@ -275,10 +275,29 @@ impl EspWifiTimerSource for TimeBase {
 /// The `timer` argument is a timer source that is used by the WiFi driver to
 /// schedule internal tasks. The timer source can be any of the following:
 ///
-/// - A [Timg] timer instance
-/// - An [Alarm] instance
-/// - An [ErasedTimer] instance
-/// - A [PeriodicTimer] instance
+/// - A timg `Timer` instance
+/// - A systimer `Alarm` instance
+/// - An `ErasedTimer` instance
+/// - A `OneShotTimer` instance
+///
+/// # Examples
+///
+/// ```rust, no_run
+#[doc = esp_hal::before_snippet!()]
+/// use esp_hal::{rng::Rng, timg::TimerGroup};
+/// use esp_wifi::EspWifiInitFor;
+///
+/// let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+/// let init = esp_wifi::initialize(
+///     EspWifiInitFor::Wifi,
+///     timg0.timer0,
+///     Rng::new(peripherals.RNG),
+///     peripherals.RADIO_CLK,
+///     &clocks,
+/// )
+/// .unwrap();
+/// # }
+/// ```
 pub fn initialize(
     init_for: EspWifiInitFor,
     timer: impl EspWifiTimerSource,

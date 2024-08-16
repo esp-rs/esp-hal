@@ -680,7 +680,10 @@ unsafe extern "C" fn stack_chk_fail() {
 #[macro_export]
 macro_rules! before_snippet {
     () => {
-        core::include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))
+        core::include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../esp-hal/doc-helper/before"
+        ))
     };
 }
 
@@ -690,6 +693,9 @@ macro_rules! before_snippet {
 #[macro_export]
 macro_rules! before_snippet {
     () => {
-        core::include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "\\doc-helper\\before"))
+        core::include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "\\..\\esp-hal\\doc-helper\\before"
+        ))
     };
 }
