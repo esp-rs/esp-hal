@@ -244,7 +244,7 @@ where
 }
 
 #[cfg(not(feature = "esp32"))]
-impl<T, DM, const N: u8> IntoErasedTimer for Alarm<T, DM, N>
+impl<T, DM, COMP, UNIT> IntoErasedTimer for Alarm<'_, T, DM, COMP, UNIT>
 where
     DM: esp_hal::Mode,
     Self: Into<ErasedTimer>,
