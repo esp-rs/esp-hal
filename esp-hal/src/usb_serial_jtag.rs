@@ -273,7 +273,8 @@ where
     M: Mode,
 {
     fn new_inner(_usb_device: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
-        PeripheralClockControl::reset(crate::system::Peripheral::UsbDevice);
+        // Do NOT reset the peripheral. Doing so will result in a broken USB JTAG
+        // connection.
         PeripheralClockControl::enable(crate::system::Peripheral::UsbDevice);
 
         USB_DEVICE::disable_tx_interrupts();
