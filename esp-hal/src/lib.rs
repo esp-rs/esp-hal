@@ -241,6 +241,8 @@ pub mod uart;
 #[cfg(usb_device)]
 pub mod usb_serial_jtag;
 
+pub mod debugger;
+
 /// State of the CPU saved when entering exception or interrupt
 pub mod trapframe {
     #[cfg(riscv)]
