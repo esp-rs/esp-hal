@@ -6,7 +6,6 @@
 #![no_std]
 #![no_main]
 
-use hil_test as _;
 use embassy_time::{Duration, Ticker, Timer};
 use esp_hal::{
     clock::{ClockControl, Clocks},
@@ -22,6 +21,7 @@ use esp_hal::{
 };
 #[cfg(not(feature = "esp32"))]
 use esp_hal_embassy::InterruptExecutor;
+use hil_test as _;
 
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{

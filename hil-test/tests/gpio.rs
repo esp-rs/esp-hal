@@ -12,7 +12,6 @@
 use core::cell::RefCell;
 
 use critical_section::Mutex;
-use hil_test as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
@@ -23,6 +22,7 @@ use esp_hal::{
     timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
     InterruptConfigurable,
 };
+use hil_test as _;
 
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{

@@ -10,7 +10,6 @@
 #![no_std]
 #![no_main]
 
-use hil_test as _;
 use esp_hal::{
     clock::ClockControl,
     dma::{Dma, DmaChannel0, DmaPriority},
@@ -22,6 +21,7 @@ use esp_hal::{
     system::SystemControl,
     Async,
 };
+use hil_test as _;
 
 const BUFFER_SIZE: usize = 2000;
 

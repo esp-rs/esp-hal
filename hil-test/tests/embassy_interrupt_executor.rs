@@ -28,7 +28,6 @@ async fn interrupt_driven_task(signal: &'static Signal<CriticalSectionRawMutex, 
 #[cfg(test)]
 #[embedded_test::tests]
 mod test {
-    use hil_test as _;
     use esp_hal::{
         clock::ClockControl,
         interrupt::Priority,
@@ -36,6 +35,7 @@ mod test {
         system::{SoftwareInterrupt, SystemControl},
     };
     use esp_hal_embassy::InterruptExecutor;
+    use hil_test as _;
 
     use super::*;
 

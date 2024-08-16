@@ -11,7 +11,6 @@
 #![no_std]
 #![no_main]
 
-use hil_test as _;
 use esp_hal::{
     clock::ClockControl,
     gpio::Io,
@@ -20,6 +19,7 @@ use esp_hal::{
     uart::Uart,
     Async,
 };
+use hil_test as _;
 
 struct Context {
     uart: Uart<'static, UART0, Async>,
