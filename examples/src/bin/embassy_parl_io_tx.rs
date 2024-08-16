@@ -33,23 +33,9 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
-    timer::{
-        systimer::{SystemTimer, Target},
-        ErasedTimer,
-        OneShotTimer,
-    },
+    timer::systimer::{SystemTimer, Target},
 };
 use esp_println::println;
-
-// When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
-macro_rules! mk_static {
-    ($t:ty,$val:expr) => {{
-        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
-        #[deny(unused_attributes)]
-        let x = STATIC_CELL.uninit().write(($val));
-        x
-    }};
-}
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
@@ -59,10 +45,7 @@ async fn main(_spawner: Spawner) {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
-    let alarm0: ErasedTimer = systimer.alarm0.into();
-    let timers = [OneShotTimer::new(alarm0)];
-    let timers = mk_static!([OneShotTimer<ErasedTimer>; 1], timers);
-    esp_hal_embassy::init(&clocks, timers);
+    esp_hal_embassy::init(&clocks, systimer.alarm0);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

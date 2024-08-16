@@ -120,17 +120,13 @@ struct Resources {
 impl Resources {
     fn set_up_embassy_with_timg0(self) {
         let timg0 = TimerGroup::new(self.timg0, &self.clocks);
-        let timer0: ErasedTimer = timg0.timer0.into();
-        let timers = mk_static!(OneShotTimer<ErasedTimer>, OneShotTimer::new(timer0));
-        esp_hal_embassy::init(&self.clocks, core::slice::from_mut(timers));
+        esp_hal_embassy::init(&self.clocks, timg0.timer0);
     }
 
     #[cfg(not(feature = "esp32"))]
     fn set_up_embassy_with_systimer(self) {
         let systimer = SystemTimer::new(self.systimer).split::<Target>();
-        let alarm0: ErasedTimer = systimer.alarm0.into();
-        let timers = mk_static!(OneShotTimer<ErasedTimer>, OneShotTimer::new(alarm0));
-        esp_hal_embassy::init(&self.clocks, core::slice::from_mut(timers));
+        esp_hal_embassy::init(&self.clocks, systimer.alarm0);
     }
 }
 

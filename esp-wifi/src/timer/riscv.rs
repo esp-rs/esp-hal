@@ -1,10 +1,7 @@
 use core::cell::RefCell;
 
 use critical_section::Mutex;
-use esp_hal::{
-    interrupt::InterruptHandler,
-    timer::{ErasedTimer, PeriodicTimer},
-};
+use esp_hal::interrupt::InterruptHandler;
 #[cfg(any(feature = "esp32c6", feature = "esp32h2"))]
 use peripherals::INTPRI as SystemPeripheral;
 #[cfg(not(any(feature = "esp32c6", feature = "esp32h2")))]
@@ -17,10 +14,10 @@ use crate::{
         riscv,
     },
     preempt::preempt::task_switch,
+    TimeBase,
 };
 
 /// The timer responsible for time slicing.
-pub type TimeBase = PeriodicTimer<'static, ErasedTimer>;
 static ALARM0: Mutex<RefCell<Option<TimeBase>>> = Mutex::new(RefCell::new(None));
 const TIMESLICE_FREQUENCY: fugit::HertzU64 =
     fugit::HertzU64::from_raw(crate::CONFIG.tick_rate_hz as u64);

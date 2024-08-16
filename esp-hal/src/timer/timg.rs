@@ -369,7 +369,7 @@ where
         }
     }
 
-    /// Block until the timer has elasped.
+    /// Block until the timer has elapsed.
     pub fn wait(&mut self) {
         while !self.has_elapsed() {}
     }

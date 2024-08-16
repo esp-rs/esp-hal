@@ -19,7 +19,7 @@ use esp_hal::{
     peripherals::Peripherals,
     rng::Rng,
     system::SystemControl,
-    timer::{timg::TimerGroup, ErasedTimer, OneShotTimer, PeriodicTimer},
+    timer::timg::TimerGroup,
 };
 use esp_println::println;
 use esp_wifi::{
@@ -48,12 +48,10 @@ async fn main(spawner: Spawner) -> ! {
     let clocks = ClockControl::max(system.clock_control).freeze();
 
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let timer0: ErasedTimer = timg0.timer0.into();
-    let timer = PeriodicTimer::new(timer0);
 
     let init = initialize(
         EspWifiInitFor::Wifi,
-        timer,
+        timg0.timer0,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
         &clocks,
@@ -67,20 +65,14 @@ async fn main(spawner: Spawner) -> ! {
     #[cfg(feature = "esp32")]
     {
         let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-        let timer0: ErasedTimer = timg1.timer0.into();
-        let timers = [OneShotTimer::new(timer0)];
-        let timers = mk_static!([OneShotTimer<ErasedTimer>; 1], timers);
-        esp_hal_embassy::init(&clocks, timers);
+        esp_hal_embassy::init(&clocks, timg1.timer0);
     }
 
     #[cfg(not(feature = "esp32"))]
     {
         let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER)
             .split::<esp_hal::timer::systimer::Target>();
-        let alarm0: ErasedTimer = systimer.alarm0.into();
-        let timers = [OneShotTimer::new(alarm0)];
-        let timers = mk_static!([OneShotTimer<ErasedTimer>; 1], timers);
-        esp_hal_embassy::init(&clocks, timers);
+        esp_hal_embassy::init(&clocks, systimer.alarm0);
     }
 
     let (manager, sender, receiver) = esp_now.split();

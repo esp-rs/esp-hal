@@ -105,8 +105,7 @@ async fn main(low_prio_spawner: Spawner) {
         OneShotTimer::new(alarm0)
     };
 
-    let timers = [timer0, timer1];
-    let timers = mk_static!([OneShotTimer<ErasedTimer>; 2], timers);
+    let timers = mk_static!([OneShotTimer<ErasedTimer>; 2], [timer0, timer1]);
     esp_hal_embassy::init(&clocks, timers);
 
     static EXECUTOR: StaticCell<InterruptExecutor<2>> = StaticCell::new();
