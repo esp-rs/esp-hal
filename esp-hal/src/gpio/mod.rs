@@ -1423,7 +1423,7 @@ macro_rules! gpio {
 
             procmacros::make_gpio_enum_dispatch_macro!(
                 handle_gpio_output
-                { InputOutputAnalog, InputOutput, }
+                { InputOutputAnalogTouch, InputOutputAnalog, InputOutput, }
                 {
                     $(
                         $type,$gpionum
@@ -1433,7 +1433,7 @@ macro_rules! gpio {
 
             procmacros::make_gpio_enum_dispatch_macro!(
                 handle_gpio_input
-                { InputOutputAnalog, InputOutput, InputOnlyAnalog }
+                { InputOutputAnalogTouch, InputOutputAnalog, InputOutput, InputOnlyAnalog }
                 {
                     $(
                         $type,$gpionum
