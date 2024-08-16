@@ -4,10 +4,7 @@
 pub fn debugger_connected() -> bool {
     #[cfg(xtensa)]
     {
-        let dsr: u32 = 0x10200C;
-        let reg: u32;
-        unsafe { core::arch::asm!("rer {0}, {1}", out(reg) reg, in(reg) dsr) };
-        reg & 1 == 1
+        xtensa_lx::is_debugger_attached()
     }
 
     #[cfg(riscv)]
