@@ -311,7 +311,7 @@ where
     }
 
     /// Split the USB Serial JTAG peripheral into a transmitter and receiver,
-    /// which is particuarly useful when having two tasks correlating to
+    /// which is particularly useful when having two tasks correlating to
     /// transmitting and receiving.
     pub fn split(self) -> (UsbSerialJtagTx<'d, M>, UsbSerialJtagRx<'d, M>) {
         (self.tx, self.rx)
