@@ -1,4 +1,4 @@
-//! SPI Full Duplex DMA Test
+//! SPI Full Duplex DMA ASYNC Test
 //!
 //! Folowing pins are used:
 //! SCLK    GPIO0
@@ -6,9 +6,13 @@
 //! MOSI    GPIO3
 //! CS      GPIO8
 //!
-//! Only for test_dma_read_dma_write and test_dma_read_dma_transfer tests:
+//! Only for test_dma_read_dma_write_pcnt and test_dma_read_dma_transfer_pcnt
+//! tests:
 //! PCNT    GPIO2
-//! OUTPUT  GPIO5 (helper to keep MISO HIGH)
+//! OUTPUT  GPIO5 (helper to keep MISO LOW)
+//!
+//! The idea of using PCNT (input) here is to connect MOSI to it and count the
+//! edges of whatever SPI writes (in this test case 3 pos edges).
 //!
 //! Connect MISO (GPIO2) and MOSI (GPIO3) pins.
 
@@ -72,7 +76,6 @@ mod tests {
                 rx_descriptors,
             );
 
-        // DMA buffer require a static life-time
         let mut send = tx_buffer;
         let mut receive = rx_buffer;
 
@@ -115,7 +118,6 @@ mod tests {
                 rx_descriptors,
             );
 
-        // DMA buffer require a static life-time
         let mut send = tx_buffer;
         let mut receive = rx_buffer;
 
@@ -158,7 +160,6 @@ mod tests {
                 rx_descriptors,
             );
 
-        // DMA buffer require a static life-time
         let mut send = tx_buffer;
         let mut receive = rx_buffer;
 
@@ -309,7 +310,6 @@ mod tests {
                 rx_descriptors,
             );
 
-        // DMA buffer require a static life-time
         let send = tx_buffer;
         let receive = rx_buffer;
 
@@ -331,7 +331,7 @@ mod tests {
         feature = "esp32h2",
         feature = "esp32s3"
     ))]
-    fn test_dma_read_dma_write() {
+    fn test_dma_read_dma_write_pcnt() {
         use esp_hal::{
             gpio::{Level, Output, Pull},
             pcnt::{
@@ -383,32 +383,23 @@ mod tests {
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        // DMA buffer require a static life-time
         let mut receive = rx_buffer;
 
+        // Fill the buffer where each byte has 3 pos edges.
         tx_buffer.fill(0b0110_1010);
 
         assert_eq!(out_pin.is_set_low(), true);
 
-        // 1
-        receive.copy_from_slice(&[5, 5, 5, 5, 5]);
-        let transfer = spi.dma_read(&mut receive).unwrap();
-        transfer.wait().unwrap();
-        assert_eq!(receive, &[0, 0, 0, 0, 0]);
+        for i in 1..4 {
+            receive.copy_from_slice(&[5, 5, 5, 5, 5]);
+            let transfer = spi.dma_read(&mut receive).unwrap();
+            transfer.wait().unwrap();
+            assert_eq!(receive, &[0, 0, 0, 0, 0]);
 
-        let transfer = spi.dma_write(&tx_buffer).unwrap();
-        transfer.wait().unwrap();
-        assert_eq!(unit.get_value(), (3 * DMA_BUFFER_SIZE) as _);
-
-        // 2
-        receive.copy_from_slice(&[5, 5, 5, 5, 5]);
-        let transfer = spi.dma_read(&mut receive).unwrap();
-        transfer.wait().unwrap();
-        assert_eq!(receive, &[0, 0, 0, 0, 0]);
-
-        let transfer = spi.dma_write(&tx_buffer).unwrap();
-        transfer.wait().unwrap();
-        assert_eq!(unit.get_value(), (6 * DMA_BUFFER_SIZE) as _);
+            let transfer = spi.dma_write(&tx_buffer).unwrap();
+            transfer.wait().unwrap();
+            assert_eq!(unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
+        }
     }
 
     #[test]
@@ -419,7 +410,7 @@ mod tests {
         feature = "esp32h2",
         feature = "esp32s3"
     ))]
-    fn test_dma_read_dma_transfer() {
+    fn test_dma_read_dma_transfer_pcnt() {
         use esp_hal::{
             gpio::{Level, Output, Pull},
             pcnt::{
@@ -471,42 +462,22 @@ mod tests {
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        // DMA buffer require a static life-time
         let mut receive = rx_buffer;
 
-        // Fill the buffer where each byte 3 pos edges.
+        // Fill the buffer where each byte has 3 pos edges.
         tx_buffer.fill(0b0110_1010);
 
         assert_eq!(out_pin.is_set_low(), true);
 
-        // 1
-        receive.copy_from_slice(&[5, 5, 5, 5, 5]);
-        let transfer = spi.dma_read(&mut receive).unwrap();
-        transfer.wait().unwrap();
-        assert_eq!(receive, &[0, 0, 0, 0, 0]);
+        for i in 1..4 {
+            receive.copy_from_slice(&[5, 5, 5, 5, 5]);
+            let transfer = spi.dma_read(&mut receive).unwrap();
+            transfer.wait().unwrap();
+            assert_eq!(receive, &[0, 0, 0, 0, 0]);
 
-        let transfer = spi.dma_transfer(&tx_buffer, &mut receive).unwrap();
-        transfer.wait().unwrap();
-        assert_eq!(unit.get_value(), (3 * DMA_BUFFER_SIZE) as _);
-
-        // 2
-        receive.copy_from_slice(&[5, 5, 5, 5, 5]);
-        let transfer = spi.dma_read(&mut receive).unwrap();
-        transfer.wait().unwrap();
-        assert_eq!(receive, &[0, 0, 0, 0, 0]);
-
-        let transfer = spi.dma_transfer(&tx_buffer, &mut receive).unwrap();
-        transfer.wait().unwrap();
-        assert_eq!(unit.get_value(), (6 * DMA_BUFFER_SIZE) as _);
-
-        // 3
-        receive.copy_from_slice(&[5, 5, 5, 5, 5]);
-        let transfer = spi.dma_read(&mut receive).unwrap();
-        transfer.wait().unwrap();
-        assert_eq!(receive, &[0, 0, 0, 0, 0]);
-
-        let transfer = spi.dma_transfer(&tx_buffer, &mut receive).unwrap();
-        transfer.wait().unwrap();
-        assert_eq!(unit.get_value(), (9 * DMA_BUFFER_SIZE) as _);
+            let transfer = spi.dma_transfer(&tx_buffer, &mut receive).unwrap();
+            transfer.wait().unwrap();
+            assert_eq!(unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
+        }
     }
 }

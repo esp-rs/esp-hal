@@ -7,7 +7,10 @@
 //! CS      GPIO8
 //!
 //! PCNT    GPIO2
-//! OUTPUT  GPIO5 (helper to keep MISO HIGH)
+//! OUTPUT  GPIO5 (helper to keep MISO LOW)
+//!
+//! The idea of using PCNT (input) here is to connect MOSI to it and count the
+//! edges of whatever SPI writes (in this test case 3 pos edges).
 //!
 //! Connect PCNT (GPIO2) and MOSI (GPIO3) and MISO (GPIO6) and GPIO5 pins.
 
@@ -17,6 +20,7 @@
 #![no_main]
 
 use defmt_rtt as _;
+use embedded_hal_async::spi::SpiBus;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
@@ -55,7 +59,7 @@ mod tests {
 
     #[test]
     #[timeout(3)]
-    async fn test_async_dma_read_dma_write() {
+    async fn test_async_dma_read_dma_write_pcnt() {
         const DMA_BUFFER_SIZE: usize = 5;
 
         let peripherals = Peripherals::take();
@@ -99,54 +103,26 @@ mod tests {
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        // DMA buffer require a static life-time
         let receive = rx_buffer;
 
-        // Fill the buffer where each byte 3 pos edges.
+        // Fill the buffer where each byte has 3 pos edges.
         tx_buffer.fill(0b0110_1010);
 
         assert_eq!(out_pin.is_set_low(), true);
 
-        // 1
-        receive.copy_from_slice(&[5, 5, 5, 5, 5]);
-        embedded_hal_async::spi::SpiBus::read(&mut spi, receive)
-            .await
-            .unwrap();
-        assert_eq!(receive, &[0, 0, 0, 0, 0]);
+        for i in 1..4 {
+            receive.copy_from_slice(&[5, 5, 5, 5, 5]);
+            SpiBus::read(&mut spi, receive).await.unwrap();
+            assert_eq!(receive, &[0, 0, 0, 0, 0]);
 
-        embedded_hal_async::spi::SpiBus::write(&mut spi, tx_buffer)
-            .await
-            .unwrap();
-        assert_eq!(unit.get_value(), (3 * DMA_BUFFER_SIZE) as _);
-
-        // 2
-        receive.copy_from_slice(&[5, 5, 5, 5, 5]);
-        embedded_hal_async::spi::SpiBus::read(&mut spi, receive)
-            .await
-            .unwrap();
-        assert_eq!(receive, &[0, 0, 0, 0, 0]);
-
-        embedded_hal_async::spi::SpiBus::write(&mut spi, tx_buffer)
-            .await
-            .unwrap();
-        assert_eq!(unit.get_value(), (6 * DMA_BUFFER_SIZE) as _);
-
-        // 3
-        receive.copy_from_slice(&[5, 5, 5, 5, 5]);
-        embedded_hal_async::spi::SpiBus::read(&mut spi, receive)
-            .await
-            .unwrap();
-        assert_eq!(receive, &[0, 0, 0, 0, 0]);
-
-        embedded_hal_async::spi::SpiBus::write(&mut spi, tx_buffer)
-            .await
-            .unwrap();
-        assert_eq!(unit.get_value(), (9 * DMA_BUFFER_SIZE) as _);
+            SpiBus::write(&mut spi, tx_buffer).await.unwrap();
+            assert_eq!(unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
+        }
     }
 
     #[test]
     #[timeout(3)]
-    async fn test_async_dma_read_dma_transfer() {
+    async fn test_async_dma_read_dma_transfer_pcnt() {
         const DMA_BUFFER_SIZE: usize = 5;
 
         let peripherals = Peripherals::take();
@@ -196,49 +172,22 @@ mod tests {
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        // DMA buffer require a static life-time
         let receive = rx_buffer;
 
-        // Fill the buffer where each byte 3 pos edges.
+        // Fill the buffer where each byte has 3 pos edges.
         tx_buffer.fill(0b0110_1010);
 
         assert_eq!(out_pin.is_set_low(), true);
 
-        // 1
-        receive.copy_from_slice(&[5, 5, 5, 5, 5]);
-        embedded_hal_async::spi::SpiBus::read(&mut spi, receive)
-            .await
-            .unwrap();
-        assert_eq!(receive, &[0, 0, 0, 0, 0]);
+        for i in 1..4 {
+            receive.copy_from_slice(&[5, 5, 5, 5, 5]);
+            SpiBus::read(&mut spi, receive).await.unwrap();
+            assert_eq!(receive, &[0, 0, 0, 0, 0]);
 
-        embedded_hal_async::spi::SpiBus::transfer(&mut spi, receive, tx_buffer)
-            .await
-            .unwrap();
-        // Timer::after(Duration::from_millis(1000)).await;
-        assert_eq!(unit.get_value(), (3 * DMA_BUFFER_SIZE) as _);
-
-        // 2
-        receive.copy_from_slice(&[5, 5, 5, 5, 5]);
-        embedded_hal_async::spi::SpiBus::read(&mut spi, receive)
-            .await
-            .unwrap();
-        assert_eq!(receive, &[0, 0, 0, 0, 0]);
-
-        embedded_hal_async::spi::SpiBus::transfer(&mut spi, receive, tx_buffer)
-            .await
-            .unwrap();
-        assert_eq!(unit.get_value(), (6 * DMA_BUFFER_SIZE) as _);
-
-        // 3
-        receive.copy_from_slice(&[5, 5, 5, 5, 5]);
-        embedded_hal_async::spi::SpiBus::read(&mut spi, receive)
-            .await
-            .unwrap();
-        assert_eq!(receive, &[0, 0, 0, 0, 0]);
-
-        embedded_hal_async::spi::SpiBus::transfer(&mut spi, receive, tx_buffer)
-            .await
-            .unwrap();
-        assert_eq!(unit.get_value(), (9 * DMA_BUFFER_SIZE) as _);
+            SpiBus::transfer(&mut spi, receive, tx_buffer)
+                .await
+                .unwrap();
+            assert_eq!(unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
+        }
     }
 }

@@ -82,7 +82,7 @@ mod tests {
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        // Fill the buffer where each byte 3 pos edges.
+        // Fill the buffer where each byte has 3 pos edges.
         tx_buffer.fill(0b0110_1010);
 
         let transfer = spi
