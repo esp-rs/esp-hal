@@ -20,7 +20,7 @@ If you have any questions, comments, or concerns, please [open an issue], [start
 
 > [!NOTE]
 >
-> This project is still in the relatively early stages of development, and as such there should be no expectation of API stability. A significant number of peripherals currently have drivers implemented but have varying levels of functionality. For most basic tasks, this should be usable already, however some more advanced or uncommon features may not yet be implemented.
+> This project is still in the relatively early stages of development, and as such there should be no expectation of API stability. A significant number of peripherals currently have drivers implemented but have varying levels of functionality. For most tasks, this should be usable already, however some more advanced or uncommon features may not yet be implemented.
 
 [esp-lp-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp-lp-hal
 [esp-idf-svc]: https://github.com/esp-rs/esp-idf-svc
@@ -49,6 +49,13 @@ For information about the HAL and how to use it in your own projects, please ref
 
 This repository is home to a number of different packages; for more information regarding a particular package, please refer to its `README.md` and/or documentation.
 
+## Contributing
+
+We have a number of living documents to aid contributing to the project, please give these a read before modifying code:
+
+- [API-GUIDELINES](https://github.com/esp-rs/esp-hal/blob/main/documentation/API-GUIDELINES.md)
+- [CONTRIBUTING-GUIDE](https://github.com/esp-rs/esp-hal/blob/main/documentation/CONTRIBUTING.md)
+
 ## License
 
 Licensed under either of:
@@ -58,10 +65,8 @@ Licensed under either of:
 
 at your option.
 
-### Contribution
+### Contribution notice
 
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in
 the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without
 any additional terms or conditions.
-
-If you consider contributing, please make sure you have read and understood our [contributing guide](./CONTRIBUTING.md) and [API guidelines](https://github.com/esp-rs/esp-hal/blob/main/API-GUIDELINES.md).

@@ -1,5 +1,5 @@
 [target.'cfg(target_arch = "riscv32")']
-runner    = "probe-rs run"
+runner    = "probe-rs run --preverify"
 rustflags = [
     "-C", "link-arg=-Tlinkall.x",
     "-C", "link-arg=-Tembedded-test.x",
@@ -8,7 +8,7 @@ rustflags = [
 ]
 
 [target.'cfg(target_arch = "xtensa")']
-runner    = "probe-rs run"
+runner    = "probe-rs run --preverify"
 rustflags = [
     "-C", "link-arg=-nostartfiles",
     "-C", "link-arg=-Wl,-Tlinkall.x",

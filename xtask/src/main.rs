@@ -5,7 +5,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context as _, Result};
 use clap::{Args, Parser};
 use esp_metadata::{Arch, Chip, Config};
 use minijinja::Value;
@@ -68,6 +68,9 @@ struct TestArgs {
     /// Optional test to act on (all tests used if omitted)
     #[arg(short = 't', long)]
     test: Option<String>,
+    /// Repeat the tests for a specific number of times.
+    #[arg(long)]
+    repeat: Option<usize>,
 }
 
 #[derive(Debug, Args)]
@@ -153,8 +156,7 @@ fn main() -> Result<()> {
         .filter_module("xtask", log::LevelFilter::Info)
         .init();
 
-    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let workspace = workspace.parent().unwrap().canonicalize()?;
+    let workspace = std::env::current_dir()?;
 
     match Cli::parse() {
         Cli::BuildDocumentation(args) => build_documentation(&workspace, args),
@@ -232,7 +234,8 @@ fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Pat
             args.chip,
             target,
             example,
-            &CargoAction::Build,
+            CargoAction::Build,
+            1,
         )
     } else if args.example.is_some() {
         // An invalid argument was provided:
@@ -245,7 +248,8 @@ fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Pat
                 args.chip,
                 target,
                 example,
-                &CargoAction::Build,
+                CargoAction::Build,
+                1,
             )
         })
     }
@@ -263,7 +267,8 @@ fn run_example(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) 
             args.chip,
             target,
             &example,
-            &CargoAction::Run,
+            CargoAction::Run,
+            1,
         )
     } else {
         bail!("Example not found or unsupported for the given chip")
@@ -288,13 +293,29 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
 
     // Execute the specified action:
     if let Some(test) = tests.iter().find(|test| Some(test.name()) == args.test) {
-        xtask::execute_app(&package_path, args.chip, target, &test, &action)
+        xtask::execute_app(
+            &package_path,
+            args.chip,
+            target,
+            &test,
+            action,
+            args.repeat.unwrap_or(1),
+        )
     } else if args.test.is_some() {
         bail!("Test not found or unsupported for the given chip")
     } else {
         let mut failed = Vec::new();
         for test in tests {
-            if xtask::execute_app(&package_path, args.chip, target, &test, &action).is_err() {
+            if xtask::execute_app(
+                &package_path,
+                args.chip,
+                target,
+                &test,
+                action,
+                args.repeat.unwrap_or(1),
+            )
+            .is_err()
+            {
                 failed.push(test.name());
             }
         }
@@ -676,24 +697,21 @@ fn run_elfs(args: RunElfArgs) -> Result<()> {
 
         log::info!("Running test '{}' for '{}'", elf_name, args.chip);
 
-        let command = if args.chip == Chip::Esp32c2 {
-            Command::new("probe-rs")
-                .arg("run")
-                .arg("--speed")
-                .arg("15000")
-                .arg(elf_path)
-                .output()?
-        } else {
-            Command::new("probe-rs").arg("run").arg(elf_path).output()?
+        let mut command = Command::new("probe-rs");
+        command.arg("run").arg(elf_path);
+
+        if args.chip == Chip::Esp32c2 {
+            command.arg("--speed").arg("15000");
         };
 
-        println!(
-            "{}\n{}",
-            String::from_utf8_lossy(&command.stderr),
-            String::from_utf8_lossy(&command.stdout)
-        );
+        let mut command = command.spawn().context("Failed to execute probe-rs")?;
+        let status = command
+            .wait()
+            .context("Error while waiting for probe-rs to exit")?;
 
-        if !command.status.success() {
+        log::info!("'{elf_name}' done");
+
+        if !status.success() {
             failed.push(elf_name);
         }
     }
