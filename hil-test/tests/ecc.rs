@@ -13,9 +13,7 @@ use crypto_bigint::{
     U192,
     U256,
 };
-use defmt_rtt as _;
 use elliptic_curve::sec1::ToEncodedPoint;
-use esp_backtrace as _;
 #[cfg(feature = "esp32h2")]
 use esp_hal::ecc::WorkMode;
 use esp_hal::{
@@ -25,6 +23,7 @@ use esp_hal::{
     Blocking,
 };
 use hex_literal::hex;
+use hil_test as _;
 
 struct TestParams<'a> {
     prime_fields: &'a [&'a [u8]],

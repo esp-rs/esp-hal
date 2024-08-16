@@ -12,8 +12,7 @@
 use core::cell::RefCell;
 
 use critical_section::Mutex;
-use defmt_rtt as _;
-use esp_backtrace as _;
+use hil_test as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,

@@ -10,8 +10,6 @@
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
-use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
@@ -24,6 +22,7 @@ use esp_hal::{
     prelude::*,
     system::SystemControl,
 };
+use hil_test as _;
 
 // choose values which DON'T restart on every descriptor buffer's start
 const ADD: u8 = 5;

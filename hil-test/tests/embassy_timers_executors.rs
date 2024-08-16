@@ -6,9 +6,8 @@
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
+use hil_test as _;
 use embassy_time::{Duration, Ticker, Timer};
-use esp_backtrace as _;
 use esp_hal::{
     clock::{ClockControl, Clocks},
     peripherals::Peripherals,
