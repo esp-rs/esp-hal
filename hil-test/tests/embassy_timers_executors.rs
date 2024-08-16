@@ -183,7 +183,7 @@ mod test {
     #[timeout(3)]
     #[cfg(not(feature = "esp32"))]
     fn test_periodic_systimer(resources: Resources) {
-        let systimer = SystemTimer::new(resources.systimer);
+        let systimer = SystemTimer::new(resources.systimer).split::<Periodic>();
 
         run_test_periodic_timer(systimer.alarm0);
     }
@@ -203,10 +203,14 @@ mod test {
     #[cfg(not(feature = "esp32"))]
     fn test_periodic_oneshot_systimer(mut resources: Resources) {
         let mut systimer = SystemTimer::new(&mut resources.systimer);
-        run_test_periodic_timer(&mut systimer.alarm0);
+        let unit = FrozenUnit::new(&mut systimer.unit0);
+        let mut alarm: Alarm<'_, Periodic, _, _, _> = Alarm::new(systimer.comparator0, &unit);
+        run_test_periodic_timer(&mut alarm);
 
         let mut systimer = SystemTimer::new(&mut resources.systimer);
-        run_test_oneshot_timer(&mut systimer.alarm0);
+        let unit = FrozenUnit::new(&mut systimer.unit0);
+        let mut alarm: Alarm<'_, Target, _, _, _> = Alarm::new(systimer.comparator0, &unit);
+        run_test_oneshot_timer(&mut alarm);
     }
 
     #[test]
