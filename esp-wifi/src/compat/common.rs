@@ -308,6 +308,14 @@ pub fn receive_queued(queue: *mut c_void, item: *mut c_void, block_time_tick: u3
         yield_task();
     }
 }
+pub fn number_of_messages_in_queue(queue: *const c_void) -> u32 {
+    trace!("queue_msg_waiting {:?}", queue);
+    if queue != unsafe { addr_of!(REAL_WIFI_QUEUE).cast() } {
+        warn!("queue_msg_waiting: Unknown queue.");
+        return 0;
+    }
+    critical_section::with(|_| unsafe { REAL_WIFI_QUEUE.len() as u32 })
+}
 
 /// Implementation of sleep() from newlib in esp-idf.
 /// components/newlib/time.c

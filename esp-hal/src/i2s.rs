@@ -80,6 +80,8 @@
 //! - Only master mode is supported.
 //! - Only TDM Philips standard is supported.
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use core::marker::PhantomData;
 
 use enumset::{EnumSet, EnumSetType};
@@ -330,6 +332,7 @@ where
         // the targets the same and force same configuration for both, TX and RX
 
         channel.tx.init_channel();
+        PeripheralClockControl::reset(I::get_peripheral());
         PeripheralClockControl::enable(I::get_peripheral());
         I::set_clock(calculate_clock(
             sample_rate,
@@ -2248,8 +2251,6 @@ pub mod asynch {
     }
 
     /// An in-progress async circular DMA write transfer.
-    #[non_exhaustive]
-
     pub struct I2sWriteDmaTransferAsync<'d, T, CH, BUFFER>
     where
         T: RegisterAccess,
@@ -2310,7 +2311,7 @@ pub mod asynch {
         /// One-shot read I2S.
         async fn read_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error>;
 
-        /// Continuously read frm I2S. Returns [I2sReadDmaTransferAsync]
+        /// Continuously read from I2S. Returns [I2sReadDmaTransferAsync]
         fn read_dma_circular_async<RXBUF>(
             self,
             words: RXBUF,
@@ -2404,8 +2405,6 @@ pub mod asynch {
     }
 
     /// An in-progress async circular DMA read transfer.
-    #[non_exhaustive]
-
     pub struct I2sReadDmaTransferAsync<'d, T, CH, BUFFER>
     where
         T: RegisterAccess,

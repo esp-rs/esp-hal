@@ -5,6 +5,8 @@
 //! used simultaneously. For more information on these modules, please refer to
 //! the documentation in their respective modules.
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 pub mod cam;
 pub mod lcd;
 
@@ -28,6 +30,7 @@ impl<'d> LcdCam<'d, crate::Blocking> {
     pub fn new(lcd_cam: impl Peripheral<P = LCD_CAM> + 'd) -> Self {
         crate::into_ref!(lcd_cam);
 
+        PeripheralClockControl::reset(system::Peripheral::LcdCam);
         PeripheralClockControl::enable(system::Peripheral::LcdCam);
 
         Self {

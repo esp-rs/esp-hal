@@ -27,8 +27,6 @@
 //! - Touch sensor slope control
 //! - Deep Sleep support (wakeup from Deep Sleep)
 
-#![deny(missing_docs)]
-
 use core::marker::PhantomData;
 
 use crate::{

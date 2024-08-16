@@ -25,6 +25,8 @@
 //!
 //! [ECC]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/ecc.rs
 
+#![allow(missing_docs)] // TODO: Remove when able
+
 use core::marker::PhantomData;
 
 use crate::{
@@ -85,6 +87,7 @@ impl<'d> Ecc<'d, crate::Blocking> {
     pub fn new(ecc: impl Peripheral<P = ECC> + 'd) -> Self {
         crate::into_ref!(ecc);
 
+        PeripheralClockControl::reset(PeripheralEnable::Ecc);
         PeripheralClockControl::enable(PeripheralEnable::Ecc);
 
         Self {

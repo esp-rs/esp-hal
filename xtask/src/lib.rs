@@ -6,7 +6,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use cargo::CargoAction;
 use clap::ValueEnum;
 use esp_metadata::Chip;
@@ -151,7 +151,8 @@ pub fn load_examples(path: &Path) -> Result<Vec<Metadata>> {
 
     for entry in fs::read_dir(path)? {
         let path = windows_safe_path(&entry?.path());
-        let text = fs::read_to_string(&path)?;
+        let text = fs::read_to_string(&path)
+            .with_context(|| format!("Could not read {}", path.display()))?;
 
         let mut chips = Vec::new();
         let mut features = Vec::new();
@@ -184,7 +185,7 @@ pub fn load_examples(path: &Path) -> Result<Vec<Metadata>> {
             } else if key == "FEATURES" {
                 features = split.into();
             } else {
-                log::warn!("Unregognized metadata key '{key}', ignoring");
+                log::warn!("Unrecognized metadata key '{key}', ignoring");
             }
         }
 
@@ -200,7 +201,8 @@ pub fn execute_app(
     chip: Chip,
     target: &str,
     app: &Metadata,
-    action: &CargoAction,
+    action: CargoAction,
+    mut repeat: usize,
 ) -> Result<()> {
     log::info!(
         "Building example '{}' for '{}'",
@@ -213,7 +215,8 @@ pub fn execute_app(
 
     let package = app.example_path().strip_prefix(package_path)?;
     log::info!("Package: {:?}", package);
-    let (bin, subcommand) = if action == &CargoAction::Build {
+    let (bin, subcommand) = if action == CargoAction::Build {
+        repeat = 1; // Do not repeat builds in a loop
         let bin = if package.starts_with("src/bin") {
             format!("--bin={}", app.name())
         } else if package.starts_with("tests") {
@@ -240,21 +243,8 @@ pub fn execute_app(
         .features(&features)
         .arg(bin);
 
-    // probe-rs cannot currently do auto detection, so we need to tell probe-rs run
-    // which chip we are testing
-    if subcommand == "test" {
-        if chip == Chip::Esp32 {
-            builder = builder.arg("--").arg("--chip").arg("esp32-3.3v");
-        } else if chip == Chip::Esp32c2 {
-            builder = builder
-                .arg("--")
-                .arg("--chip")
-                .arg("esp32c2")
-                .arg("--speed")
-                .arg("15000");
-        } else {
-            builder = builder.arg("--").arg("--chip").arg(format!("{}", chip));
-        }
+    if subcommand == "test" && chip == Chip::Esp32c2 {
+        builder = builder.arg("--").arg("--speed").arg("15000");
     }
 
     // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
@@ -266,7 +256,11 @@ pub fn execute_app(
     let args = builder.build();
     log::debug!("{args:#?}");
 
-    cargo::run(&args, package_path)
+    for _ in 0..repeat {
+        cargo::run(&args, package_path)?;
+    }
+
+    Ok(())
 }
 
 /// Build the specified package, using the given toolchain/target/features if
@@ -322,7 +316,8 @@ pub fn build_package(
 /// Bump the version of the specified package by the specified amount.
 pub fn bump_version(workspace: &Path, package: Package, amount: Version) -> Result<()> {
     let manifest_path = workspace.join(package.to_string()).join("Cargo.toml");
-    let manifest = fs::read_to_string(&manifest_path)?;
+    let manifest = fs::read_to_string(&manifest_path)
+        .with_context(|| format!("Could not read {}", manifest_path.display()))?;
 
     let mut manifest = manifest.parse::<toml_edit::DocumentMut>()?;
 
@@ -541,7 +536,10 @@ pub fn package_version(workspace: &Path, package: Package) -> Result<semver::Ver
         version: semver::Version,
     }
 
-    let manifest = fs::read_to_string(workspace.join(package.to_string()).join("Cargo.toml"))?;
+    let path = workspace.join(package.to_string()).join("Cargo.toml");
+    let path = windows_safe_path(&path);
+    let manifest =
+        fs::read_to_string(&path).with_context(|| format!("Could not read {}", path.display()))?;
     let manifest: Manifest = basic_toml::from_str(&manifest)?;
 
     Ok(manifest.package.version)

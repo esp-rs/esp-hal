@@ -23,8 +23,6 @@
 //!
 //! [Parallel IO TX]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/parl_io_tx.rs
 
-#![warn(missing_docs)]
-
 use core::marker::PhantomData;
 
 use enumset::{EnumSet, EnumSetType};
@@ -1381,6 +1379,7 @@ where
         return Err(Error::UnreachableClockRate);
     }
 
+    PeripheralClockControl::reset(crate::system::Peripheral::ParlIo);
     PeripheralClockControl::enable(crate::system::Peripheral::ParlIo);
 
     let pcr = unsafe { &*crate::peripherals::PCR::PTR };

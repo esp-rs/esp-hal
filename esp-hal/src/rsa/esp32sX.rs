@@ -21,7 +21,7 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
         Ok(())
     }
 
-    /// Enables/disables rsa interrupt, when enabled rsa perpheral would
+    /// Enables/disables rsa interrupt, when enabled rsa peripheral would
     /// generate an interrupt when a operation is finished.
     pub fn enable_disable_interrupt(&mut self, enable: bool) {
         match enable {
