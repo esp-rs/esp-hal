@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SPI: disable and re-enable MISO and MOSI in `start_transfer_dma`, `start_read_bytes_dma` and `start_write_bytes_dma` accordingly (#1894)
 - TWAI: GPIO pins are not configured as input and output (#1906)
 - ESP32C6: Make ADC usable after TRNG deinicialization (#1945)
+- We should no longer generate 1GB .elf files for ESP32C2 and ESP32C3 (#1962)
 
 ### Removed
 
