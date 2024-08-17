@@ -10,19 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added new `Io::new_no_bind_interrupt` constructor (#1861)
-- Added touch pad support for esp32 (#1873)
+- Added touch pad support for esp32 (#1873, #1956)
 - Allow configuration of period updating method for MCPWM timers (#1898)
 - Add self-testing mode for TWAI peripheral. (#1929)
-- Added a `PeripheralClockControl::reset` to the driver constructors where missing (#1893)
+- Added `debugger::debugger_connected`. (#1961)
 
 ### Changed
 
 - Peripheral driver constructors don't take `InterruptHandler`s anymore. Use `set_interrupt_handler` to explicitly set the interrupt handler now. (#1819)
 - Use the peripheral ref pattern for `OneShotTimer` and `PeriodicTimer` (#1855)
+- Improve SYSTIMER API (#1870)
 - DMA: don't require `Sealed` to implement `ReadBuffer` and `WriteBuffer` (#1921)
 - Allow DMA to/from psram for esp32s3 (#1827)
 - DMA buffers now don't require a static lifetime. Make sure to never `mem::forget` an in-progress DMA transfer (consider using `#[deny(clippy::mem_forget)]`) (#1837)
 - Peripherals (where possible) are now explicitly reset and enabled in their constructors (#1893)
+- Reset peripherals in driver constructors where missing (#1893, #1961)
 
 ### Fixed
 

@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Changed `init` to accept timers of multiple types (#1957)
+
 ### Fixed
 
 - Increased NPL event queue size to prevent overflow (#1891)
