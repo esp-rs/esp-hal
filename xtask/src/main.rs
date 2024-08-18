@@ -214,7 +214,7 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
         .collect::<Vec<_>>();
 
     // Sort all examples by name:
-    examples.sort_by(|a, b| a.name().cmp(&b.name()));
+    examples.sort_by_key(|a| a.name());
 
     // Execute the specified action:
     match action {
@@ -230,7 +230,7 @@ fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Pat
     if let Some(example) = examples.iter().find(|ex| Some(ex.name()) == args.example) {
         // Attempt to build only the specified example:
         xtask::execute_app(
-            &package_path,
+            package_path,
             args.chip,
             target,
             example,
@@ -244,7 +244,7 @@ fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Pat
         // Attempt to build each supported example, with all required features enabled:
         examples.iter().try_for_each(|example| {
             xtask::execute_app(
-                &package_path,
+                package_path,
                 args.chip,
                 target,
                 example,
@@ -263,10 +263,10 @@ fn run_example(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) 
     // actually supports the specified chip:
     if let Some(example) = examples.iter().find(|ex| Some(ex.name()) == args.example) {
         xtask::execute_app(
-            &package_path,
+            package_path,
             args.chip,
             target,
-            &example,
+            example,
             CargoAction::Run,
             1,
         )
@@ -289,7 +289,7 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
         .collect::<Vec<_>>();
 
     // Sort all tests by name:
-    tests.sort_by(|a, b| a.name().cmp(&b.name()));
+    tests.sort_by_key(|a| a.name());
 
     // Execute the specified action:
     if let Some(test) = tests.iter().find(|test| Some(test.name()) == args.test) {
@@ -297,7 +297,7 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
             &package_path,
             args.chip,
             target,
-            &test,
+            test,
             action,
             args.repeat.unwrap_or(1),
         )
@@ -373,7 +373,7 @@ fn build_documentation_for_package(
         validate_package_chip(&package, chip)?;
 
         // Determine the appropriate build target for the given package and chip:
-        let target = target_triple(&package, &chip)?;
+        let target = target_triple(&package, chip)?;
 
         // Build the documentation for the specified package, targeting the
         // specified chip:
@@ -679,7 +679,7 @@ fn lint_package(path: &Path, args: &[&str]) -> Result<()> {
         .arg("warnings")
         .build();
 
-    xtask::cargo::run(&cargo_args, &path)
+    xtask::cargo::run(&cargo_args, path)
 }
 
 fn run_elfs(args: RunElfArgs) -> Result<()> {
