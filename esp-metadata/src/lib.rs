@@ -210,36 +210,26 @@ impl Config {
     }
 
     /// All configuration values for the device.
-    pub fn all(&self) -> Vec<String> {
+    pub fn all(&self) -> impl Iterator<Item = String> {
         [
-            vec![
-                self.device.name.clone(),
-                self.device.arch.to_string(),
-                self.device.cores.to_string(),
-            ],
-            self.device.peripherals.clone(),
-            self.device.symbols.clone(),
+            self.device.name.clone(),
+            self.device.arch.to_string(),
+            self.device.cores.to_string(),
         ]
-        .concat()
+        .into_iter()
+        .chain(self.device.peripherals.clone())
+        .chain(self.device.symbols.clone())
     }
 
     /// Does the configuration contain `item`?
     pub fn contains(&self, item: &String) -> bool {
-        self.all().contains(item)
+        self.all().any(|i| &i == item)
     }
 
     /// Define all symbols for a given configuration.
     pub fn define_symbols(&self) {
         // Define all necessary configuration symbols for the configured device:
-        println!("cargo:rustc-cfg={}", self.name());
-        println!("cargo:rustc-cfg={}", self.arch());
-        println!("cargo:rustc-cfg={}", self.cores());
-
-        for peripheral in self.peripherals() {
-            println!("cargo:rustc-cfg={peripheral}");
-        }
-
-        for symbol in self.symbols() {
+        for symbol in self.all() {
             println!("cargo:rustc-cfg={symbol}");
         }
     }

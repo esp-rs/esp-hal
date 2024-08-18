@@ -67,7 +67,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     config.define_symbols();
 
     #[allow(unused_mut)]
-    let mut config_symbols = config.all();
+    let mut config_symbols = config.all().collect::<Vec<_>>();
     #[cfg(feature = "flip-link")]
     config_symbols.push("flip-link".to_owned());
 
@@ -135,7 +135,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 // Helper Functions
 
 fn copy_dir_all(
-    config_symbols: &Vec<String>,
+    config_symbols: &[String],
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
 ) -> std::io::Result<()> {
