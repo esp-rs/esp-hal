@@ -68,7 +68,7 @@ impl<'d> InterruptConfigurable for DebugAssist<'d> {
 #[cfg(assist_debug_sp_monitor)]
 impl<'d> DebugAssist<'d> {
     /// Enable SP monitoring on main core. When the SP exceeds the
-    /// `lower_bound` or `upper_bound` treshold, the module will record the PC
+    /// `lower_bound` or `upper_bound` threshold, the module will record the PC
     /// pointer and generate an interrupt.
     pub fn enable_sp_monitor(&mut self, lower_bound: u32, upper_bound: u32) {
         self.debug_assist
@@ -150,8 +150,8 @@ impl<'d> DebugAssist<'d> {
 
 #[cfg(all(assist_debug_sp_monitor, multi_core))]
 impl<'d> DebugAssist<'d> {
-    /// Enable SP monitoring on secondondary core. When the SP exceeds the
-    /// `lower_bound` or `upper_bound` treshold, the module will record the PC
+    /// Enable SP monitoring on secondary core. When the SP exceeds the
+    /// `lower_bound` or `upper_bound` threshold, the module will record the PC
     /// pointer and generate an interrupt.
     pub fn enable_core1_sp_monitor(&mut self, lower_bound: u32, upper_bound: u32) {
         self.debug_assist
@@ -384,7 +384,7 @@ impl<'d> DebugAssist<'d> {
                 .bit_is_set()
     }
 
-    /// Get region monotoring PC value on main core.
+    /// Get region monitoring PC value on main core.
     pub fn get_region_monitor_pc(&self) -> u32 {
         self.debug_assist
             .core_0_area_pc()
@@ -550,7 +550,7 @@ impl<'d> DebugAssist<'d> {
                 .bit_is_set()
     }
 
-    /// Get region monotoring PC value on secondary core.
+    /// Get region monitoring PC value on secondary core.
     pub fn get_core1_region_monitor_pc(&self) -> u32 {
         self.debug_assist
             .core_1_area_pc()

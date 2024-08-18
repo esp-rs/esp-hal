@@ -17,7 +17,10 @@ use esp_hal::{
     timer::{timg::TimerGroup, ErasedTimer, OneShotTimer, PeriodicTimer},
 };
 #[cfg(not(feature = "esp32"))]
-use esp_hal::{interrupt::Priority, timer::systimer::SystemTimer};
+use esp_hal::{
+    interrupt::Priority,
+    timer::systimer::{Alarm, FrozenUnit, Periodic, SystemTimer, Target},
+};
 #[cfg(not(feature = "esp32"))]
 use esp_hal_embassy::InterruptExecutor;
 
@@ -117,17 +120,13 @@ struct Resources {
 impl Resources {
     fn set_up_embassy_with_timg0(self) {
         let timg0 = TimerGroup::new(self.timg0, &self.clocks);
-        let timer0: ErasedTimer = timg0.timer0.into();
-        let timers = mk_static!(OneShotTimer<ErasedTimer>, OneShotTimer::new(timer0));
-        esp_hal_embassy::init(&self.clocks, core::slice::from_mut(timers));
+        esp_hal_embassy::init(&self.clocks, timg0.timer0);
     }
 
     #[cfg(not(feature = "esp32"))]
     fn set_up_embassy_with_systimer(self) {
-        let systimer = SystemTimer::new(self.systimer);
-        let alarm0: ErasedTimer = systimer.alarm0.into();
-        let timers = mk_static!(OneShotTimer<ErasedTimer>, OneShotTimer::new(alarm0));
-        esp_hal_embassy::init(&self.clocks, core::slice::from_mut(timers));
+        let systimer = SystemTimer::new(self.systimer).split::<Target>();
+        esp_hal_embassy::init(&self.clocks, systimer.alarm0);
     }
 }
 
@@ -180,7 +179,7 @@ mod test {
     #[timeout(3)]
     #[cfg(not(feature = "esp32"))]
     fn test_periodic_systimer(resources: Resources) {
-        let systimer = SystemTimer::new(resources.systimer);
+        let systimer = SystemTimer::new(resources.systimer).split::<Periodic>();
 
         run_test_periodic_timer(systimer.alarm0);
     }
@@ -200,10 +199,14 @@ mod test {
     #[cfg(not(feature = "esp32"))]
     fn test_periodic_oneshot_systimer(mut resources: Resources) {
         let mut systimer = SystemTimer::new(&mut resources.systimer);
-        run_test_periodic_timer(&mut systimer.alarm0);
+        let unit = FrozenUnit::new(&mut systimer.unit0);
+        let mut alarm: Alarm<'_, Periodic, _, _, _> = Alarm::new(systimer.comparator0, &unit);
+        run_test_periodic_timer(&mut alarm);
 
         let mut systimer = SystemTimer::new(&mut resources.systimer);
-        run_test_oneshot_timer(&mut systimer.alarm0);
+        let unit = FrozenUnit::new(&mut systimer.unit0);
+        let mut alarm: Alarm<'_, Target, _, _, _> = Alarm::new(systimer.comparator0, &unit);
+        run_test_oneshot_timer(&mut alarm);
     }
 
     #[test]
@@ -232,7 +235,7 @@ mod test {
         let timer0: ErasedTimer = timg0.timer0.into();
         let timer0 = OneShotTimer::new(timer0);
 
-        let systimer = SystemTimer::new(resources.systimer);
+        let systimer = SystemTimer::new(resources.systimer).split::<Target>();
         let alarm0: ErasedTimer = systimer.alarm0.into();
         let timer1 = OneShotTimer::new(alarm0);
 

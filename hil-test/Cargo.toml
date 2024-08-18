@@ -101,6 +101,10 @@ name    = "uart"
 harness = false
 
 [[test]]
+name    = "usb_serial_jtag"
+harness = false
+
+[[test]]
 name              = "uart_async"
 harness           = false
 required-features = ["async", "embassy"]

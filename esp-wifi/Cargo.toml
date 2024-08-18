@@ -53,8 +53,9 @@ atomic-waker = { version = "1.1.2", default-features = false, features = [
 ] }
 
 [build-dependencies]
-toml-cfg = "0.2.0"
-esp-build = { version = "0.1.0", path = "../esp-build" }
+toml-cfg     = "0.2.0"
+esp-build    = { version = "0.1.0", path = "../esp-build" }
+esp-metadata = { version = "0.2.0", path = "../esp-metadata" }
 
 [features]
 default = ["log"]
