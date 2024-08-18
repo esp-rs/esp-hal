@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add self-testing mode for TWAI peripheral. (#1929)
 - Added a `PeripheralClockControl::reset` to the driver constructors where missing (#1893)
 - Added `debugger::debugger_connected`. (#1961)
-- Added `Rtc::set_time_us` and `Rtc::set_time_ms` to allow setting RTC time, and `Rtc::get_rtc_time_us` and `Rtc::get_rtc_time_ms` to allow getting the RTC time without taking into account boot time (#1883)
+- Added `Rtc::set_current_time` to allow setting RTC time, and `Rtc::current_time` to getting RTC time while taking into account boot time (#1883)
 
 ### Changed
 
@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DMA buffers now don't require a static lifetime. Make sure to never `mem::forget` an in-progress DMA transfer (consider using `#[deny(clippy::mem_forget)]`) (#1837)
 - Peripherals (where possible) are now explicitly reset and enabled in their constructors (#1893)
 - Reset peripherals in driver constructors where missing (#1893, #1961)
-- Renamed `Rtc::get_time_raw` to `Rtc::get_rtc_time_raw` (#1883)
+- Renamed and merged `Rtc::get_time_us` and `Rtc::get_time_ms` into `Rtc::time_since_boot` (#1883)
 
 ### Fixed
 
@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - This package no longer re-exports the `esp_hal_procmacros::main` macro (#1828)
 - The `AesFlavour` trait no longer has the `ENCRYPT_MODE`/`DECRYPT_MODE` associated constants (#1849)
+- Removed `Rtc::get_time_raw` (#1883)
 
 ## [0.19.0] - 2024-07-15
 

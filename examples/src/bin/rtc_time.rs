@@ -25,12 +25,15 @@ fn main() -> ! {
     let delay = Delay::new(&clocks);
 
     loop {
-        esp_println::println!("rtc time in milliseconds is {}", rtc.get_time_ms());
+        esp_println::println!(
+            "rtc time in milliseconds is {}",
+            rtc.current_time().to_millis()
+        );
         delay.delay_millis(1000);
 
         // Set the time to half a second in the past
-        let new_time = rtc.get_time_ms() - 500;
-        esp_println::println!("setting rtc time to {new_time} milliseconds");
-        rtc.set_time_ms(new_time);
+        let new_time = rtc.current_time() - 500.millis();
+        esp_println::println!("setting rtc time to {} milliseconds", new_time.to_millis());
+        rtc.set_current_time(new_time);
     }
 }

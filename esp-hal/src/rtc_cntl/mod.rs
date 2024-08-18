@@ -218,7 +218,7 @@ impl<'d> Rtc<'d> {
     }
 
     /// Get the time since boot in the raw register units.
-    pub fn time_since_boot_raw(&self) -> u64 {
+    fn time_since_boot_raw(&self) -> u64 {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let rtc_cntl = unsafe { &*LPWR::ptr() };
         #[cfg(any(esp32c6, esp32h2))]
@@ -256,15 +256,12 @@ impl<'d> Rtc<'d> {
         ((h as u64) << 32) | (l as u64)
     }
 
-    /// Get the time since boot in microseconds.
-    pub fn time_since_boot_us(&self) -> u64 {
-        self.time_since_boot_raw() * 1_000_000
-            / RtcClock::get_slow_freq().frequency().to_Hz() as u64
-    }
-
-    /// Get the time since boot in milliseconds.
-    pub fn time_since_boot_ms(&self) -> u64 {
-        self.time_since_boot_raw() * 1_000 / RtcClock::get_slow_freq().frequency().to_Hz() as u64
+    /// Get the time since boot.
+    pub fn time_since_boot(&self) -> MicrosDurationU64 {
+        MicrosDurationU64::micros(
+            self.time_since_boot_raw() * 1_000_000
+                / RtcClock::get_slow_freq().frequency().to_Hz() as u64,
+        )
     }
 
     /// Read the current value of the boot time registers in microseconds.
@@ -316,47 +313,44 @@ impl<'d> Rtc<'d> {
     }
 
     /// Get the current time in microseconds.
-    pub fn current_time_us(&self) -> u64 {
+    pub fn current_time(&self) -> MicrosDurationU64 {
         // current time is boot time + time since boot
-        let rtc_time_us = self.time_since_boot_us();
+
+        let rtc_time_us = self.time_since_boot().to_micros();
         let boot_time_us = self.boot_time_us();
         let wrapped_boot_time_us = u64::MAX - boot_time_us;
+
         // We can detect if we wrapped the boot time by checking if rtc time is greater
         // than the amount of time we would've wrapped.
-        if rtc_time_us > wrapped_boot_time_us {
+        let current_time_us = if rtc_time_us > wrapped_boot_time_us {
             // We also just checked that this won't overflow
             rtc_time_us - wrapped_boot_time_us
         } else {
             boot_time_us + rtc_time_us
-        }
-    }
+        };
 
-    /// Get the current time in milliseconds.
-    pub fn current_time_ms(&self) -> u64 {
-        self.current_time_us() / 1_000
+        MicrosDurationU64::micros(current_time_us)
     }
 
     /// Set the current time in microseconds.
-    pub fn set_current_time_us(&self, time_us: u64) {
+    pub fn set_current_time(&self, current_time: MicrosDurationU64) {
+        let current_time_us = current_time.to_micros();
+
         // Current time is boot time + time since boot (rtc time)
         // So boot time = current time - time since boot (rtc time)
-        let rtc_time_us = self.time_since_boot_us();
-        if time_us < rtc_time_us {
+
+        let rtc_time_us = self.time_since_boot().to_micros();
+        if current_time_us < rtc_time_us {
             // An overflow would happen if we subtracted rtc_time_us from time_us.
             // To work around this, we can wrap around u64::MAX by subtracting the
             // difference between the current time and the time since boot.
             // Subtracting time since boot and adding current new time is equivalent and
             // avoids overflow. We just checked that rtc_time_us is less than time_us
             // so this won't overflow.
-            self.set_boot_time_us(u64::MAX - rtc_time_us + time_us)
+            self.set_boot_time_us(u64::MAX - rtc_time_us + current_time_us)
         } else {
-            self.set_boot_time_us(time_us - rtc_time_us)
+            self.set_boot_time_us(current_time_us - rtc_time_us)
         }
-    }
-
-    /// Set the current time in milliseconds.
-    pub fn set_current_time_ms(&self, time_ms: u64) {
-        self.set_current_time_us(time_ms * 1_000)
     }
 
     /// Enter deep sleep and wake with the provided `wake_sources`.
