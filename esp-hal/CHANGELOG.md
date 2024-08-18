@@ -13,7 +13,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added touch pad support for esp32 (#1873, #1956)
 - Allow configuration of period updating method for MCPWM timers (#1898)
 - Add self-testing mode for TWAI peripheral. (#1929)
-- Added a `PeripheralClockControl::reset` to the driver constructors where missing (#1893)
 - Added `debugger::debugger_connected`. (#1961)
 - Added `Rtc::set_current_time` to allow setting RTC time, and `Rtc::current_time` to getting RTC time while taking into account boot time (#1883)
 
