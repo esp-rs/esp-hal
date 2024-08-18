@@ -297,7 +297,7 @@ impl<'d> Rtc<'d> {
 
     /// Set the current value of the boot time registers in microseconds.
     fn set_boot_time_us(&self, boot_time_us: u64) {
-        // Please see `boot_time_ms` for documentation on registers and peripherals
+        // Please see `boot_time_us` for documentation on registers and peripherals
         // used for certain SOCs.
 
         #[cfg(not(any(esp32c6, esp32h2)))]
@@ -314,7 +314,7 @@ impl<'d> Rtc<'d> {
 
     /// Get the current time in microseconds.
     pub fn current_time(&self) -> MicrosDurationU64 {
-        // current time is boot time + time since boot
+        // Current time is boot time + time since boot
 
         let rtc_time_us = self.time_since_boot().to_micros();
         let boot_time_us = self.boot_time_us();
