@@ -405,7 +405,6 @@ fn build_documentation_for_package(
             chip => chip.to_string(),
             chip_pretty => chip.pretty_name(),
             package => package.to_string().replace('-', "_"),
-            description => format!("{} (targeting {})", package, chip.pretty_name()),
         });
     }
 
