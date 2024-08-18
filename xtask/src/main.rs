@@ -9,6 +9,7 @@ use anyhow::{bail, Context as _, Result};
 use clap::{Args, Parser};
 use esp_metadata::{Arch, Chip, Config};
 use minijinja::Value;
+use rayon::prelude::*;
 use strum::IntoEnumIterator;
 use xtask::{
     cargo::{CargoAction, CargoArgsBuilder},
@@ -81,6 +82,9 @@ struct BuildDocumentationArgs {
     /// Which chip to build the documentation for.
     #[arg(long, value_enum, value_delimiter(','), default_values_t = Chip::iter())]
     chips: Vec<Chip>,
+    /// Whether to build documentation in parallel.
+    #[arg(long)]
+    parallel: bool,
 }
 
 #[derive(Debug, Args)]
@@ -137,6 +141,10 @@ struct LintPackagesArgs {
     /// Lint for a specific chip
     #[arg(long, value_enum, default_values_t = Chip::iter())]
     chips: Vec<Chip>,
+
+    /// Whether to run linting in parallel.
+    #[arg(long)]
+    parallel: bool,
 }
 
 #[derive(Debug, Args)]
@@ -329,6 +337,8 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
 }
 
 fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result<()> {
+    init_rayon(args.parallel);
+
     let output_path = workspace.join("docs");
     let resources = workspace.join("resources");
 
@@ -336,17 +346,17 @@ fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result
         .packages
         .iter()
         .flat_map(|package| args.chips.iter().map(move |chip| (package, chip)))
+        .par_bridge()
         .map(|(package, chip)| {
             build_documentation_for_package_and_chip(workspace, *package, *chip)
                 .map(|value| (*package, value))
-        });
+        })
+        .collect::<Result<Vec<_>>>()?;
 
     // Collect all results for building the index:
     let mut packages = HashMap::new();
-    for result in results {
-        let (package, build_packages) = result?;
-
-        packages.insert(package, build_packages);
+    for (package, built_packages) in results {
+        packages.insert(package, built_packages);
     }
 
     // Copy any additional assets to the documentation's output path:
@@ -482,12 +492,15 @@ fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
 }
 
 fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
+    init_rayon(args.parallel);
+
     let mut packages = args.packages;
     packages.sort();
 
     packages
         .iter()
         .flat_map(|package| args.chips.iter().map(move |chip| (*package, *chip)))
+        .par_bridge()
         .try_for_each(|(package, chip)| lint_esp_package(workspace, package, chip))
 }
 
@@ -790,4 +803,13 @@ fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn init_rayon(parallel: bool) {
+    if !parallel {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(1)
+            .build_global()
+            .expect("Failed to initialize Rayon thread pool");
+    }
 }
