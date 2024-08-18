@@ -34,6 +34,7 @@ lazy_static::lazy_static! {
     strum::Display,
     strum::EnumIter,
     strum::EnumString,
+    strum::AsRefStr,
 )]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
@@ -58,6 +59,7 @@ pub enum Arch {
     strum::Display,
     strum::EnumIter,
     strum::EnumString,
+    strum::AsRefStr,
 )]
 pub enum Cores {
     /// Single CPU core
@@ -84,6 +86,7 @@ pub enum Cores {
     strum::Display,
     strum::EnumIter,
     strum::EnumString,
+    strum::AsRefStr,
     clap::ValueEnum,
 )]
 #[serde(rename_all = "kebab-case")]
@@ -210,20 +213,20 @@ impl Config {
     }
 
     /// All configuration values for the device.
-    pub fn all(&self) -> impl Iterator<Item = String> {
+    pub fn all(&self) -> impl Iterator<Item = &str> + '_ {
         [
-            self.device.name.clone(),
-            self.device.arch.to_string(),
-            self.device.cores.to_string(),
+            self.device.name.as_str(),
+            self.device.arch.as_ref(),
+            self.device.cores.as_ref(),
         ]
         .into_iter()
-        .chain(self.device.peripherals.clone())
-        .chain(self.device.symbols.clone())
+        .chain(self.device.peripherals.iter().map(|s| s.as_str()))
+        .chain(self.device.symbols.iter().map(|s| s.as_str()))
     }
 
     /// Does the configuration contain `item`?
-    pub fn contains(&self, item: &String) -> bool {
-        self.all().any(|i| &i == item)
+    pub fn contains(&self, item: &str) -> bool {
+        self.all().any(|i| i == item)
     }
 
     /// Define all symbols for a given configuration.

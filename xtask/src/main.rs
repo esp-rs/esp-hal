@@ -508,13 +508,13 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     let mut features = format!("--features={chip},ci");
 
                     // Cover all esp-hal features where a device is supported
-                    if device.contains(&"usb0".to_owned()) {
+                    if device.contains("usb0") {
                         features.push_str(",usb-otg")
                     }
-                    if device.contains(&"bt".to_owned()) {
+                    if device.contains("bt") {
                         features.push_str(",bluetooth")
                     }
-                    if device.contains(&"psram".to_owned()) {
+                    if device.contains("psram") {
                         // TODO this doesn't test octal psram as it would require a separate build
                         features.push_str(",psram-4m,psram-80mhz")
                     }
@@ -544,7 +544,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 }
 
                 Package::EspIeee802154 => {
-                    if device.contains(&"ieee802154".to_owned()) {
+                    if device.contains("ieee802154") {
                         lint_package(
                             &path,
                             &[
@@ -556,7 +556,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     }
                 }
                 Package::EspLpHal => {
-                    if device.contains(&"lp_core".to_owned()) {
+                    if device.contains("lp_core") {
                         lint_package(
                             &path,
                             &[
@@ -568,7 +568,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     }
                 }
                 Package::EspHalSmartled => {
-                    if device.contains(&"rmt".to_owned()) {
+                    if device.contains("rmt") {
                         lint_package(
                             &path,
                             &[
@@ -614,14 +614,14 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 Package::EspWifi => {
                     let mut features = format!("--features={chip},async,ps-min-modem,defmt");
 
-                    if device.contains(&"wifi".to_owned()) {
+                    if device.contains("wifi") {
                         features
                             .push_str(",wifi-default,esp-now,embedded-svc,embassy-net,dump-packets")
                     }
-                    if device.contains(&"bt".to_owned()) {
+                    if device.contains("bt") {
                         features.push_str(",ble")
                     }
-                    if device.contains(&"coex".to_owned()) {
+                    if device.contains("coex") {
                         features.push_str(",coex")
                     }
                     lint_package(
