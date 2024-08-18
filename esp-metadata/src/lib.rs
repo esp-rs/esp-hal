@@ -172,15 +172,15 @@ pub struct Config {
 
 impl Config {
     /// The configuration for the specified chip.
-    pub fn for_chip(chip: &Chip) -> Self {
+    pub fn for_chip(chip: &Chip) -> &Self {
         match chip {
-            Chip::Esp32 => ESP32_CFG.clone(),
-            Chip::Esp32c2 => ESP32C2_CFG.clone(),
-            Chip::Esp32c3 => ESP32C3_CFG.clone(),
-            Chip::Esp32c6 => ESP32C6_CFG.clone(),
-            Chip::Esp32h2 => ESP32H2_CFG.clone(),
-            Chip::Esp32s2 => ESP32S2_CFG.clone(),
-            Chip::Esp32s3 => ESP32S3_CFG.clone(),
+            Chip::Esp32 => &ESP32_CFG,
+            Chip::Esp32c2 => &ESP32C2_CFG,
+            Chip::Esp32c3 => &ESP32C3_CFG,
+            Chip::Esp32c6 => &ESP32C6_CFG,
+            Chip::Esp32h2 => &ESP32H2_CFG,
+            Chip::Esp32s2 => &ESP32S2_CFG,
+            Chip::Esp32s3 => &ESP32S3_CFG,
         }
     }
 

@@ -5,7 +5,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::{bail, Context as _, Result};
+use anyhow::{bail, ensure, Context as _, Result};
 use clap::{Args, Parser};
 use esp_metadata::{Arch, Chip, Config};
 use minijinja::Value;
@@ -225,7 +225,7 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
 
 fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) -> Result<()> {
     // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(&args.package, &args.chip)?;
+    let target = target_triple(args.package, &args.chip)?;
 
     if let Some(example) = examples.iter().find(|ex| Some(ex.name()) == args.example) {
         // Attempt to build only the specified example:
@@ -257,7 +257,7 @@ fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Pat
 
 fn run_example(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) -> Result<()> {
     // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(&args.package, &args.chip)?;
+    let target = target_triple(args.package, &args.chip)?;
 
     // Filter the examples down to only the binary we're interested in, assuming it
     // actually supports the specified chip:
@@ -280,7 +280,7 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
     let package_path = xtask::windows_safe_path(&workspace.join("hil-test"));
 
     // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(&Package::HilTest, &args.chip)?;
+    let target = target_triple(Package::HilTest, &args.chip)?;
 
     // Load all tests which support the specified chip and parse their metadata:
     let mut tests = xtask::load_examples(&package_path.join("tests"))?
@@ -373,7 +373,7 @@ fn build_documentation_for_package(
         validate_package_chip(&package, chip)?;
 
         // Determine the appropriate build target for the given package and chip:
-        let target = target_triple(&package, chip)?;
+        let target = target_triple(package, chip)?;
 
         // Build the documentation for the specified package, targeting the
         // specified chip:
@@ -489,7 +489,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
         // is *some* overlap)
 
         for chip in &args.chips {
-            let device = Config::for_chip(&chip);
+            let device = Config::for_chip(chip);
 
             match package {
                 Package::EspBacktrace => {
@@ -727,7 +727,7 @@ fn run_doctests(workspace: &Path, args: ExampleArgs) -> Result<()> {
     let package_path = xtask::windows_safe_path(&workspace.join(&package_name));
 
     // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(&args.package, &args.chip)?;
+    let target = target_triple(args.package, &args.chip)?;
     let features = vec![args.chip.to_string()];
 
     // Build up an array of command-line arguments to pass to `cargo`:
@@ -752,8 +752,8 @@ fn run_doctests(workspace: &Path, args: ExampleArgs) -> Result<()> {
 // ----------------------------------------------------------------------------
 // Helper Functions
 
-fn target_triple<'a>(package: &'a Package, chip: &'a Chip) -> Result<&'a str> {
-    if *package == Package::EspLpHal {
+fn target_triple(package: Package, chip: &Chip) -> Result<&str> {
+    if package == Package::EspLpHal {
         chip.lp_target()
     } else {
         Ok(chip.target())
@@ -761,13 +761,12 @@ fn target_triple<'a>(package: &'a Package, chip: &'a Chip) -> Result<&'a str> {
 }
 
 fn validate_package_chip(package: &Package, chip: &Chip) -> Result<()> {
-    if *package == Package::EspLpHal && !chip.has_lp_core() {
-        bail!(
-            "Invalid chip provided for package '{}': '{}'",
-            package,
-            chip
-        );
-    }
+    ensure!(
+        *package != Package::EspLpHal || chip.has_lp_core(),
+        "Invalid chip provided for package '{}': '{}'",
+        package,
+        chip
+    );
 
     Ok(())
 }
