@@ -179,7 +179,7 @@ fn main() -> Result<()> {
 
 fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Result<()> {
     // Ensure that the package/chip combination provided are valid:
-    validate_package_chip(&args.package, &args.chip)?;
+    validate_package_chip(&args.package, args.chip)?;
 
     // If the 'esp-hal' package is specified, what we *really* want is the
     // 'examples' package instead:
@@ -332,12 +332,21 @@ fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result
     let output_path = workspace.join("docs");
     let resources = workspace.join("resources");
 
+    let results = args
+        .packages
+        .iter()
+        .flat_map(|package| args.chips.iter().map(move |chip| (package, chip)))
+        .map(|(package, chip)| {
+            build_documentation_for_package_and_chip(workspace, *package, *chip)
+                .map(|value| (*package, value))
+        });
+
+    // Collect all results for building the index:
     let mut packages = HashMap::new();
-    for package in args.packages {
-        packages.insert(
-            package,
-            build_documentation_for_package(workspace, package, &args.chips)?,
-        );
+    for result in results {
+        let (package, build_packages) = result?;
+
+        packages.insert(package, build_packages);
     }
 
     // Copy any additional assets to the documentation's output path:
@@ -357,59 +366,53 @@ fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result
     Ok(())
 }
 
-fn build_documentation_for_package(
+fn build_documentation_for_package_and_chip(
     workspace: &Path,
     package: Package,
-    chips: &[Chip],
-) -> Result<Vec<Value>> {
+    chip: Chip,
+) -> Result<Value> {
     let output_path = workspace.join("docs");
 
     let version = xtask::package_version(workspace, package)?;
 
-    let mut metadata = Vec::new();
+    // Ensure that the package/chip combination provided are valid:
+    validate_package_chip(&package, chip)?;
 
-    for chip in chips {
-        // Ensure that the package/chip combination provided are valid:
-        validate_package_chip(&package, chip)?;
+    // Determine the appropriate build target for the given package and chip:
+    let target = target_triple(&package, &chip)?;
 
-        // Determine the appropriate build target for the given package and chip:
-        let target = target_triple(&package, chip)?;
+    // Build the documentation for the specified package, targeting the
+    // specified chip:
+    xtask::build_documentation(workspace, package, chip, target)?;
 
-        // Build the documentation for the specified package, targeting the
-        // specified chip:
-        xtask::build_documentation(workspace, package, *chip, target)?;
-
-        let docs_path = xtask::windows_safe_path(
-            &workspace
-                .join(package.to_string())
-                .join("target")
-                .join(target)
-                .join("doc"),
-        );
-
-        let output_path = output_path
+    let docs_path = xtask::windows_safe_path(
+        &workspace
             .join(package.to_string())
-            .join(version.to_string())
-            .join(chip.to_string());
-        let output_path = xtask::windows_safe_path(&output_path);
+            .join("target")
+            .join(target)
+            .join("doc"),
+    );
 
-        // Create the output directory, and copy the built documentation into it:
-        fs::create_dir_all(&output_path)?;
-        copy_dir_all(&docs_path, &output_path)?;
+    let output_path = output_path
+        .join(package.to_string())
+        .join(version.to_string())
+        .join(chip.to_string());
+    let output_path = xtask::windows_safe_path(&output_path);
 
-        // Build the context object required for rendering this particular build's
-        // information on the documentation index:
-        metadata.push(minijinja::context! {
-            name => package,
-            version => version,
-            chip => chip.to_string(),
-            chip_pretty => chip.pretty_name(),
-            package => package.to_string().replace('-', "_"),
-            description => format!("{} (targeting {})", package, chip.pretty_name()),
-        });
-    }
+    // Create the output directory, and copy the built documentation into it:
+    fs::create_dir_all(&output_path)?;
+    copy_dir_all(&docs_path, &output_path)?;
 
-    Ok(metadata)
+    // Build the context object required for rendering this particular build's
+    // information on the documentation index:
+    Ok(minijinja::context! {
+        name => package,
+        version => version,
+        chip => chip.to_string(),
+        chip_pretty => chip.pretty_name(),
+        package => package.to_string().replace('-', "_"),
+        description => format!("{} (targeting {})", package, chip.pretty_name()),
+    })
 }
 
 fn build_package(workspace: &Path, args: BuildPackageArgs) -> Result<()> {
@@ -482,181 +485,179 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
     let mut packages = args.packages;
     packages.sort();
 
-    for package in packages {
-        let path = workspace.join(package.to_string());
+    packages
+        .iter()
+        .flat_map(|package| args.chips.iter().map(move |chip| (*package, *chip)))
+        .try_for_each(|(package, chip)| lint_esp_package(workspace, package, chip))
+}
 
-        // Unfortunately each package has its own unique requirements for
-        // building, so we need to handle each individually (though there
-        // is *some* overlap)
+fn lint_esp_package(workspace: &Path, package: Package, chip: Chip) -> Result<()> {
+    let path = workspace.join(package.to_string());
 
-        for chip in &args.chips {
-            let device = Config::for_chip(&chip);
+    let device = Config::for_chip(&chip);
 
-            match package {
-                Package::EspBacktrace => {
-                    lint_package(
-                        &path,
-                        &[
-                            "-Zbuild-std=core",
-                            "--no-default-features",
-                            &format!("--target={}", chip.target()),
-                            &format!("--features={chip},defmt"),
-                        ],
-                    )?;
-                }
+    match package {
+        Package::EspBacktrace => {
+            lint_package(
+                &path,
+                &[
+                    "-Zbuild-std=core",
+                    "--no-default-features",
+                    &format!("--target={}", chip.target()),
+                    &format!("--features={chip},defmt"),
+                ],
+            )?;
+        }
 
-                Package::EspHal => {
-                    let mut features = format!("--features={chip},ci");
+        Package::EspHal => {
+            let mut features = format!("--features={chip},ci");
 
-                    // Cover all esp-hal features where a device is supported
-                    if device.contains(&"usb0".to_owned()) {
-                        features.push_str(",usb-otg")
-                    }
-                    if device.contains(&"bt".to_owned()) {
-                        features.push_str(",bluetooth")
-                    }
-                    if device.contains(&"psram".to_owned()) {
-                        // TODO this doesn't test octal psram as it would require a separate build
-                        features.push_str(",psram-4m,psram-80mhz")
-                    }
-                    if matches!(chip, Chip::Esp32c6 | Chip::Esp32h2) {
-                        features.push_str(",flip-link")
-                    }
+            // Cover all esp-hal features where a device is supported
+            if device.contains(&"usb0".to_owned()) {
+                features.push_str(",usb-otg")
+            }
+            if device.contains(&"bt".to_owned()) {
+                features.push_str(",bluetooth")
+            }
+            if device.contains(&"psram".to_owned()) {
+                // TODO this doesn't test octal psram as it would require a separate build
+                features.push_str(",psram-4m,psram-80mhz")
+            }
+            if matches!(chip, Chip::Esp32c6 | Chip::Esp32h2) {
+                features.push_str(",flip-link")
+            }
 
-                    lint_package(
-                        &path,
-                        &[
-                            "-Zbuild-std=core",
-                            &format!("--target={}", chip.target()),
-                            &features,
-                        ],
-                    )?;
-                }
+            lint_package(
+                &path,
+                &[
+                    "-Zbuild-std=core",
+                    &format!("--target={}", chip.target()),
+                    &features,
+                ],
+            )?;
+        }
 
-                Package::EspHalEmbassy => {
-                    lint_package(
-                        &path,
-                        &[
-                            "-Zbuild-std=core",
-                            &format!("--target={}", chip.target()),
-                            &format!("--features={chip},executors,defmt,integrated-timers"),
-                        ],
-                    )?;
-                }
+        Package::EspHalEmbassy => {
+            lint_package(
+                &path,
+                &[
+                    "-Zbuild-std=core",
+                    &format!("--target={}", chip.target()),
+                    &format!("--features={chip},executors,defmt,integrated-timers"),
+                ],
+            )?;
+        }
 
-                Package::EspIeee802154 => {
-                    if device.contains(&"ieee802154".to_owned()) {
-                        lint_package(
-                            &path,
-                            &[
-                                "-Zbuild-std=core",
-                                &format!("--target={}", chip.target()),
-                                &format!("--features={chip}"),
-                            ],
-                        )?;
-                    }
-                }
-                Package::EspLpHal => {
-                    if device.contains(&"lp_core".to_owned()) {
-                        lint_package(
-                            &path,
-                            &[
-                                "-Zbuild-std=core",
-                                &format!("--target={}", chip.lp_target().unwrap()),
-                                &format!("--features={chip},embedded-io,embedded-hal-02"),
-                            ],
-                        )?;
-                    }
-                }
-                Package::EspHalSmartled => {
-                    if device.contains(&"rmt".to_owned()) {
-                        lint_package(
-                            &path,
-                            &[
-                                "-Zbuild-std=core",
-                                &format!("--target={}", chip.target()),
-                                &format!("--features={chip}"),
-                            ],
-                        )?;
-                    }
-                }
-
-                Package::EspPrintln => {
-                    lint_package(
-                        &path,
-                        &[
-                            "-Zbuild-std=core",
-                            &format!("--target={}", chip.target()),
-                            &format!("--features={chip},defmt-espflash"),
-                        ],
-                    )?;
-                }
-
-                Package::EspRiscvRt => {
-                    if matches!(device.arch(), Arch::RiscV) {
-                        lint_package(
-                            &path,
-                            &["-Zbuild-std=core", &format!("--target={}", chip.target())],
-                        )?;
-                    }
-                }
-
-                Package::EspStorage => {
-                    lint_package(
-                        &path,
-                        &[
-                            "-Zbuild-std=core",
-                            &format!("--target={}", chip.target()),
-                            &format!("--features={chip},storage,nor-flash,low-level"),
-                        ],
-                    )?;
-                }
-
-                Package::EspWifi => {
-                    let mut features = format!("--features={chip},async,ps-min-modem,defmt");
-
-                    if device.contains(&"wifi".to_owned()) {
-                        features
-                            .push_str(",wifi-default,esp-now,embedded-svc,embassy-net,dump-packets")
-                    }
-                    if device.contains(&"bt".to_owned()) {
-                        features.push_str(",ble")
-                    }
-                    if device.contains(&"coex".to_owned()) {
-                        features.push_str(",coex")
-                    }
-                    lint_package(
-                        &path,
-                        &[
-                            "-Zbuild-std=core",
-                            &format!("--target={}", chip.target()),
-                            "--no-default-features",
-                            &features,
-                        ],
-                    )?;
-                }
-
-                Package::XtensaLxRt => {
-                    if matches!(device.arch(), Arch::Xtensa) {
-                        lint_package(
-                            &path,
-                            &[
-                                "-Zbuild-std=core",
-                                &format!("--target={}", chip.target()),
-                                &format!("--features={chip}"),
-                            ],
-                        )?
-                    }
-                }
-
-                // We will *not* check the following packages with `clippy`; this
-                // may or may not change in the future:
-                Package::Examples | Package::HilTest => {}
-
-                // By default, no `clippy` arguments are required:
-                _ => lint_package(&path, &[])?,
+        Package::EspIeee802154 => {
+            if device.contains(&"ieee802154".to_owned()) {
+                lint_package(
+                    &path,
+                    &[
+                        "-Zbuild-std=core",
+                        &format!("--target={}", chip.target()),
+                        &format!("--features={chip}"),
+                    ],
+                )?;
             }
         }
+        Package::EspLpHal => {
+            if device.contains(&"lp_core".to_owned()) {
+                lint_package(
+                    &path,
+                    &[
+                        "-Zbuild-std=core",
+                        &format!("--target={}", chip.lp_target().unwrap()),
+                        &format!("--features={chip},embedded-io,embedded-hal-02"),
+                    ],
+                )?;
+            }
+        }
+        Package::EspHalSmartled => {
+            if device.contains(&"rmt".to_owned()) {
+                lint_package(
+                    &path,
+                    &[
+                        "-Zbuild-std=core",
+                        &format!("--target={}", chip.target()),
+                        &format!("--features={chip}"),
+                    ],
+                )?;
+            }
+        }
+
+        Package::EspPrintln => {
+            lint_package(
+                &path,
+                &[
+                    "-Zbuild-std=core",
+                    &format!("--target={}", chip.target()),
+                    &format!("--features={chip},defmt-espflash"),
+                ],
+            )?;
+        }
+
+        Package::EspRiscvRt => {
+            if matches!(device.arch(), Arch::RiscV) {
+                lint_package(
+                    &path,
+                    &["-Zbuild-std=core", &format!("--target={}", chip.target())],
+                )?;
+            }
+        }
+
+        Package::EspStorage => {
+            lint_package(
+                &path,
+                &[
+                    "-Zbuild-std=core",
+                    &format!("--target={}", chip.target()),
+                    &format!("--features={chip},storage,nor-flash,low-level"),
+                ],
+            )?;
+        }
+
+        Package::EspWifi => {
+            let mut features = format!("--features={chip},async,ps-min-modem,defmt");
+
+            if device.contains(&"wifi".to_owned()) {
+                features.push_str(",wifi-default,esp-now,embedded-svc,embassy-net,dump-packets")
+            }
+            if device.contains(&"bt".to_owned()) {
+                features.push_str(",ble")
+            }
+            if device.contains(&"coex".to_owned()) {
+                features.push_str(",coex")
+            }
+            lint_package(
+                &path,
+                &[
+                    "-Zbuild-std=core",
+                    &format!("--target={}", chip.target()),
+                    "--no-default-features",
+                    &features,
+                ],
+            )?;
+        }
+
+        Package::XtensaLxRt => {
+            if matches!(device.arch(), Arch::Xtensa) {
+                lint_package(
+                    &path,
+                    &[
+                        "-Zbuild-std=core",
+                        &format!("--target={}", chip.target()),
+                        &format!("--features={chip}"),
+                    ],
+                )?
+            }
+        }
+
+        // We will *not* check the following packages with `clippy`; this
+        // may or may not change in the future:
+        Package::Examples | Package::HilTest => {}
+
+        // By default, no `clippy` arguments are required:
+        _ => lint_package(&path, &[])?,
     }
 
     Ok(())
@@ -761,7 +762,7 @@ fn target_triple<'a>(package: &'a Package, chip: &'a Chip) -> Result<&'a str> {
     }
 }
 
-fn validate_package_chip(package: &Package, chip: &Chip) -> Result<()> {
+fn validate_package_chip(package: &Package, chip: Chip) -> Result<()> {
     if *package == Package::EspLpHal && !chip.has_lp_core() {
         bail!(
             "Invalid chip provided for package '{}': '{}'",
