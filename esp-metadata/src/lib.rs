@@ -34,6 +34,7 @@ lazy_static::lazy_static! {
     strum::Display,
     strum::EnumIter,
     strum::EnumString,
+    strum::AsRefStr,
 )]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
@@ -58,6 +59,7 @@ pub enum Arch {
     strum::Display,
     strum::EnumIter,
     strum::EnumString,
+    strum::AsRefStr,
 )]
 pub enum Cores {
     /// Single CPU core
@@ -84,6 +86,7 @@ pub enum Cores {
     strum::Display,
     strum::EnumIter,
     strum::EnumString,
+    strum::AsRefStr,
     clap::ValueEnum,
 )]
 #[serde(rename_all = "kebab-case")]
@@ -172,15 +175,15 @@ pub struct Config {
 
 impl Config {
     /// The configuration for the specified chip.
-    pub fn for_chip(chip: &Chip) -> Self {
+    pub fn for_chip(chip: &Chip) -> &Self {
         match chip {
-            Chip::Esp32 => ESP32_CFG.clone(),
-            Chip::Esp32c2 => ESP32C2_CFG.clone(),
-            Chip::Esp32c3 => ESP32C3_CFG.clone(),
-            Chip::Esp32c6 => ESP32C6_CFG.clone(),
-            Chip::Esp32h2 => ESP32H2_CFG.clone(),
-            Chip::Esp32s2 => ESP32S2_CFG.clone(),
-            Chip::Esp32s3 => ESP32S3_CFG.clone(),
+            Chip::Esp32 => &ESP32_CFG,
+            Chip::Esp32c2 => &ESP32C2_CFG,
+            Chip::Esp32c3 => &ESP32C3_CFG,
+            Chip::Esp32c6 => &ESP32C6_CFG,
+            Chip::Esp32h2 => &ESP32H2_CFG,
+            Chip::Esp32s2 => &ESP32S2_CFG,
+            Chip::Esp32s3 => &ESP32S3_CFG,
         }
     }
 
@@ -210,36 +213,26 @@ impl Config {
     }
 
     /// All configuration values for the device.
-    pub fn all(&self) -> Vec<String> {
+    pub fn all(&self) -> impl Iterator<Item = &str> + '_ {
         [
-            vec![
-                self.device.name.clone(),
-                self.device.arch.to_string(),
-                self.device.cores.to_string(),
-            ],
-            self.device.peripherals.clone(),
-            self.device.symbols.clone(),
+            self.device.name.as_str(),
+            self.device.arch.as_ref(),
+            self.device.cores.as_ref(),
         ]
-        .concat()
+        .into_iter()
+        .chain(self.device.peripherals.iter().map(|s| s.as_str()))
+        .chain(self.device.symbols.iter().map(|s| s.as_str()))
     }
 
     /// Does the configuration contain `item`?
-    pub fn contains(&self, item: &String) -> bool {
-        self.all().contains(item)
+    pub fn contains(&self, item: &str) -> bool {
+        self.all().any(|i| i == item)
     }
 
     /// Define all symbols for a given configuration.
     pub fn define_symbols(&self) {
         // Define all necessary configuration symbols for the configured device:
-        println!("cargo:rustc-cfg={}", self.name());
-        println!("cargo:rustc-cfg={}", self.arch());
-        println!("cargo:rustc-cfg={}", self.cores());
-
-        for peripheral in self.peripherals() {
-            println!("cargo:rustc-cfg={peripheral}");
-        }
-
-        for symbol in self.symbols() {
+        for symbol in self.all() {
             println!("cargo:rustc-cfg={symbol}");
         }
     }
