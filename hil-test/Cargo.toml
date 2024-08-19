@@ -4,6 +4,9 @@ version = "0.0.0"
 edition = "2021"
 publish = false
 
+[lib]
+name = "hil_test"
+
 [[test]]
 name    = "aes"
 harness = false
@@ -117,7 +120,6 @@ required-features = ["async", "embassy"]
 name    = "uart_tx_rx"
 harness = false
 
-
 [[test]]
 name    = "uart_tx_rx_async"
 harness = false
@@ -140,7 +142,7 @@ harness = false
 cfg-if             = "1.0.0"
 critical-section   = "1.1.2"
 defmt              = "0.3.8"
-defmt-rtt          = "0.4.1"
+defmt-rtt          = { version = "0.4.1", optional = true }
 embassy-futures    = "0.1.1"
 embassy-sync       = "0.6.0"
 embassy-time       = { version = "0.3.1", features = ["generic-queue-64"] }
@@ -170,6 +172,8 @@ sha2                = { version = "0.10.8", default-features = false }
 
 [features]
 default = ["async", "embassy"]
+
+defmt = ["dep:defmt-rtt"]
 
 # Device support (required!):
 esp32 = [

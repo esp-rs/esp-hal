@@ -5,9 +5,7 @@
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
 use digest::Digest;
-use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     peripherals::Peripherals,
@@ -16,6 +14,7 @@ use esp_hal::{
     sha::{Sha, Sha1, Sha256},
     system::SystemControl,
 };
+use hil_test as _;
 use nb::block;
 use sha1;
 use sha2;

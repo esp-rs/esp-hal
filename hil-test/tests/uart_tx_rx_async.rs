@@ -11,8 +11,6 @@
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
-use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     gpio::Io,
@@ -21,6 +19,7 @@ use esp_hal::{
     uart::{UartRx, UartTx},
     Async,
 };
+use hil_test as _;
 
 struct Context {
     tx: UartTx<'static, UART0, Async>,

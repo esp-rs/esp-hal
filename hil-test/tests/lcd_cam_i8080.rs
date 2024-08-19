@@ -5,8 +5,6 @@
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
-use esp_backtrace as _;
 use esp_hal::{
     clock::{ClockControl, Clocks},
     dma::{Dma, DmaDescriptor, DmaPriority},
@@ -23,6 +21,7 @@ use esp_hal::{
     prelude::*,
     system::SystemControl,
 };
+use hil_test as _;
 
 const DATA_SIZE: usize = 1024 * 10;
 

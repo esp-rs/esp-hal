@@ -19,9 +19,7 @@
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
 use embedded_hal_async::spi::SpiBus;
-use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     dma::{Dma, DmaPriority},
@@ -39,6 +37,7 @@ use esp_hal::{
     },
     system::SystemControl,
 };
+use hil_test as _;
 
 #[cfg(test)]
 #[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
