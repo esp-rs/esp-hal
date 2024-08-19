@@ -37,6 +37,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_current_time(ctx: Context) {
         let t1 = esp_hal::time::current_time();
         ctx.delay.delay_millis(500);

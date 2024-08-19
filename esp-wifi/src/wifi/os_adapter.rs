@@ -20,6 +20,7 @@ use crate::{
             create_recursive_mutex,
             create_wifi_queue,
             lock_mutex,
+            number_of_messages_in_queue,
             receive_queued,
             send_queued,
             str_from_c,
@@ -530,8 +531,8 @@ pub unsafe extern "C" fn queue_recv(
 ///   Message number
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn queue_msg_waiting(_queue: *mut crate::binary::c_types::c_void) -> u32 {
-    todo!("queue_msg_waiting")
+pub unsafe extern "C" fn queue_msg_waiting(queue: *mut crate::binary::c_types::c_void) -> u32 {
+    number_of_messages_in_queue(queue)
 }
 
 /// **************************************************************************

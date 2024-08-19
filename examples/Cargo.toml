@@ -13,7 +13,7 @@ cfg-if              = "1.0.0"
 critical-section    = "1.1.2"
 crypto-bigint       = { version = "0.5.5", default-features = false }
 elliptic-curve      = { version = "0.13.8", default-features = false, features = ["sec1"] }
-embassy-executor    = { version = "0.5.0", features = ["task-arena-size-40960"] }
+embassy-executor    = { version = "0.6.0", features = ["task-arena-size-40960"] }
 embassy-futures     = "0.1.1"
 embassy-net = { version = "0.4.0", features = [ "tcp", "udp", "dhcpv4", "medium-ethernet"] }
 embassy-sync        = "0.6.0"
@@ -42,6 +42,7 @@ fugit               = "0.3.7"
 heapless            = "0.8.0"
 hex-literal         = "0.4.1"
 hmac                = { version = "0.12.1", default-features = false }
+ieee80211           = { version = "0.4.0", default-features = false }
 ieee802154          = "0.6.1"
 lis3dh-async        = "0.9.3"
 log                 = "0.4.22"

@@ -17,8 +17,14 @@ use core::{cell::RefCell, mem::MaybeUninit, ptr::addr_of_mut};
 use common_adapter::{chip_specific::phy_mem_init, init_radio_clock_control, RADIO_CLOCKS};
 use critical_section::Mutex;
 use esp_hal as hal;
+#[cfg(not(feature = "esp32"))]
+use esp_hal::timer::systimer::Alarm;
 use fugit::MegahertzU32;
-use hal::{clock::Clocks, system::RadioClockController};
+use hal::{
+    clock::Clocks,
+    system::RadioClockController,
+    timer::{timg::Timer as TimgTimer, ErasedTimer, PeriodicTimer},
+};
 use linked_list_allocator::Heap;
 #[cfg(feature = "wifi")]
 use wifi::WifiError;
@@ -142,7 +148,7 @@ fn init_heap() {
     });
 }
 
-pub(crate) type EspWifiTimer = crate::timer::TimeBase;
+type TimeBase = PeriodicTimer<'static, ErasedTimer>;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -215,10 +221,86 @@ impl EspWifiInitFor {
     }
 }
 
-/// Initialize for using WiFi and or BLE
+/// A trait to allow better UX for initializing esp-wifi.
+///
+/// This trait is meant to be used only for the `init` function.
+/// Calling `timers()` multiple times may panic.
+pub trait EspWifiTimerSource {
+    /// Returns the timer source.
+    fn timer(self) -> TimeBase;
+}
+
+/// Helper trait to reduce boilerplate.
+///
+/// We can't blanket-implement for `Into<ErasedTimer>` because of possible
+/// conflicting implementations.
+trait IntoErasedTimer: Into<ErasedTimer> {}
+
+impl<T, DM> IntoErasedTimer for TimgTimer<T, DM>
+where
+    DM: esp_hal::Mode,
+    Self: Into<ErasedTimer>,
+{
+}
+
+#[cfg(not(feature = "esp32"))]
+impl<T, DM, COMP, UNIT> IntoErasedTimer for Alarm<'_, T, DM, COMP, UNIT>
+where
+    DM: esp_hal::Mode,
+    Self: Into<ErasedTimer>,
+{
+}
+
+impl IntoErasedTimer for ErasedTimer {}
+
+impl<T> EspWifiTimerSource for T
+where
+    T: IntoErasedTimer,
+{
+    fn timer(self) -> TimeBase {
+        TimeBase::new(self.into()).timer()
+    }
+}
+
+impl EspWifiTimerSource for TimeBase {
+    fn timer(self) -> TimeBase {
+        self
+    }
+}
+
+/// Initialize for using WiFi and or BLE.
+///
+/// # The `timer` argument
+///
+/// The `timer` argument is a timer source that is used by the WiFi driver to
+/// schedule internal tasks. The timer source can be any of the following:
+///
+/// - A timg `Timer` instance
+/// - A systimer `Alarm` instance
+/// - An `ErasedTimer` instance
+/// - A `OneShotTimer` instance
+///
+/// # Examples
+///
+/// ```rust, no_run
+#[doc = esp_hal::before_snippet!()]
+/// use esp_hal::{rng::Rng, timg::TimerGroup};
+/// use esp_wifi::EspWifiInitFor;
+///
+/// let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+/// let init = esp_wifi::initialize(
+///     EspWifiInitFor::Wifi,
+///     timg0.timer0,
+///     Rng::new(peripherals.RNG),
+///     peripherals.RADIO_CLK,
+///     &clocks,
+/// )
+/// .unwrap();
+/// # }
+/// ```
 pub fn initialize(
     init_for: EspWifiInitFor,
-    timer: EspWifiTimer,
+    timer: impl EspWifiTimerSource,
     rng: hal::rng::Rng,
     radio_clocks: hal::peripherals::RADIO_CLK,
     clocks: &Clocks,
@@ -238,7 +320,7 @@ pub fn initialize(
     init_radio_clock_control(radio_clocks);
     init_rng(rng);
     init_tasks();
-    setup_timer_isr(timer)?;
+    setup_timer_isr(timer.timer())?;
     wifi_set_log_verbose();
     init_clocks();
 

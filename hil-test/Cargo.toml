@@ -73,6 +73,10 @@ name    = "spi_full_duplex_dma"
 harness = false
 
 [[test]]
+name    = "spi_full_duplex_dma_async"
+harness = false
+
+[[test]]
 name    = "spi_half_duplex_read"
 harness = false
 
@@ -101,6 +105,10 @@ name    = "uart"
 harness = false
 
 [[test]]
+name    = "usb_serial_jtag"
+harness = false
+
+[[test]]
 name              = "uart_async"
 harness           = false
 required-features = ["async", "embassy"]
@@ -124,6 +132,10 @@ name              = "embassy_interrupt_executor"
 harness           = false
 required-features = ["async", "embassy", "integrated-timers"]
 
+[[test]]
+name    = "twai"
+harness = false
+
 [dependencies]
 cfg-if             = "1.0.0"
 critical-section   = "1.1.2"
@@ -146,7 +158,7 @@ static_cell        = { version = "2.1.0", features = ["nightly"] }
 crypto-bigint       = { version = "0.5.5", default-features = false }
 digest              = { version = "0.10.7", default-features = false }
 elliptic-curve      = { version = "0.13.8", default-features = false, features = ["sec1"] }
-embassy-executor    = { version = "0.5.0", default-features = false }
+embassy-executor    = { version = "0.6.0", default-features = false }
 # Add the `embedded-test/defmt` feature for more verbose testing
 embedded-test       = { version = "0.4.0", default-features = false }
 hex-literal         = "0.4.1"

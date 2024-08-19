@@ -17,7 +17,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::{Gpio2, Gpio3, GpioPin, Input, Io, Level, Output, Pull},
+    gpio::{any_pin::AnyPin, Gpio2, Gpio3, GpioPin, Input, Io, Level, Output, Pull},
     macros::handler,
     peripherals::Peripherals,
     system::SystemControl,
@@ -55,10 +55,7 @@ impl<'d> Context<'d> {
         let delay = Delay::new(&clocks);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-        let timer0: ErasedTimer = timg0.timer0.into();
-        let timers = [OneShotTimer::new(timer0)];
-        let timers = mk_static!([OneShotTimer<ErasedTimer>; 1], timers);
-        esp_hal_embassy::init(&clocks, timers);
+        esp_hal_embassy::init(&clocks, timg0.timer0);
 
         Context {
             io2: Input::new(io.pins.gpio2, Pull::Down),
@@ -278,5 +275,33 @@ mod tests {
 
         assert_eq!(io2.is_low(), true);
         assert_eq!(io3.is_set_low(), true);
+    }
+
+    // Tests touch pin (GPIO2) as AnyPin and Output
+    // https://github.com/esp-rs/esp-hal/issues/1943
+    #[test]
+    fn test_gpio_touch_anypin_output() {
+        let any_pin2 = AnyPin::new(unsafe { GpioPin::<2>::steal() });
+        let any_pin3 = AnyPin::new(unsafe { GpioPin::<3>::steal() });
+
+        let out_pin = Output::new(any_pin2, Level::High);
+        let in_pin = Input::new(any_pin3, Pull::Down);
+
+        assert_eq!(out_pin.is_set_high(), true);
+        assert_eq!(in_pin.is_high(), true);
+    }
+
+    // Tests touch pin (GPIO2) as AnyPin and Input
+    // https://github.com/esp-rs/esp-hal/issues/1943
+    #[test]
+    fn test_gpio_touch_anypin_input() {
+        let any_pin2 = AnyPin::new(unsafe { GpioPin::<2>::steal() });
+        let any_pin3 = AnyPin::new(unsafe { GpioPin::<3>::steal() });
+
+        let out_pin = Output::new(any_pin3, Level::Low);
+        let in_pin = Input::new(any_pin2, Pull::Down);
+
+        assert_eq!(out_pin.is_set_high(), false);
+        assert_eq!(in_pin.is_high(), false);
     }
 }
