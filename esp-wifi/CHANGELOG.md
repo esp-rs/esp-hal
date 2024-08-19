@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Implement `embedded_io::{ReadReady, WriteReady}` traits for `WifiStack` (#1882)
 - Implement `queue_msg_waiting` on the os_adapter (#1925)
+- Added API for promiscuous mode (#1935)
 
 ### Changed
 
