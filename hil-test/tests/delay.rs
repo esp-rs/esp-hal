@@ -6,10 +6,9 @@
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
 use embedded_hal::delay::DelayNs;
-use esp_backtrace as _;
 use esp_hal::{clock::ClockControl, delay::Delay, peripherals::Peripherals, system::SystemControl};
+use hil_test as _;
 
 struct Context {
     delay: Delay,

@@ -5,8 +5,7 @@
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
-use esp_backtrace as _;
+use hil_test as _;
 
 const DATA_SIZE: usize = 1024 * 10;
 

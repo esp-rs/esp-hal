@@ -8,8 +8,6 @@
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    use defmt_rtt as _;
-    use esp_backtrace as _;
     use esp_hal::{
         clock::ClockControl,
         peripherals::Peripherals,
@@ -17,6 +15,7 @@ mod tests {
         timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
         usb_serial_jtag::UsbSerialJtag,
     };
+    use hil_test as _;
 
     // When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
     macro_rules! mk_static {

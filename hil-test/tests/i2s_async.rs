@@ -10,8 +10,6 @@
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
-use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     dma::{Dma, DmaChannel0, DmaPriority},
@@ -23,6 +21,7 @@ use esp_hal::{
     system::SystemControl,
     Async,
 };
+use hil_test as _;
 
 const BUFFER_SIZE: usize = 2000;
 

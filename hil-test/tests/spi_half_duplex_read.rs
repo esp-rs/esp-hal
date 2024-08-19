@@ -13,8 +13,7 @@
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
-use esp_backtrace as _;
+use hil_test as _;
 
 #[cfg(test)]
 #[embedded_test::tests]

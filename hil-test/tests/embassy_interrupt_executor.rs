@@ -22,15 +22,12 @@ macro_rules! mk_static {
 async fn interrupt_driven_task(signal: &'static Signal<CriticalSectionRawMutex, ()>) {
     loop {
         signal.wait().await;
-        defmt::info!("Received");
     }
 }
 
 #[cfg(test)]
 #[embedded_test::tests]
 mod test {
-    use defmt_rtt as _;
-    use esp_backtrace as _;
     use esp_hal::{
         clock::ClockControl,
         interrupt::Priority,
@@ -38,6 +35,7 @@ mod test {
         system::{SoftwareInterrupt, SystemControl},
     };
     use esp_hal_embassy::InterruptExecutor;
+    use hil_test as _;
 
     use super::*;
 
@@ -61,6 +59,5 @@ mod test {
         spawner.spawn(interrupt_driven_task(signal)).unwrap();
 
         signal.signal(());
-        defmt::info!("Returned");
     }
 }

@@ -11,8 +11,6 @@
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
-use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     gpio::Io,
@@ -22,6 +20,7 @@ use esp_hal::{
     uart::{UartRx, UartTx},
     Blocking,
 };
+use hil_test as _;
 use nb::block;
 
 struct Context {

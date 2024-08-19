@@ -11,9 +11,7 @@
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
 use embedded_hal_02::can::Frame;
-use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     gpio::Io,
@@ -23,6 +21,7 @@ use esp_hal::{
     twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId, TwaiMode},
     Blocking,
 };
+use hil_test as _;
 use nb::block;
 
 struct Context {

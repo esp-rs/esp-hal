@@ -5,14 +5,13 @@
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
-use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     peripherals::Peripherals,
     rtc_cntl::Rtc,
     system::SystemControl,
 };
+use hil_test as _;
 
 struct Context<'a> {
     rtc: Rtc<'a>,
