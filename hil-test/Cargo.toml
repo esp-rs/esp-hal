@@ -72,10 +72,6 @@ name    = "spi_full_duplex"
 harness = false
 
 [[test]]
-name    = "spi_full_duplex_async"
-harness = false
-
-[[test]]
 name    = "spi_full_duplex_dma"
 harness = false
 

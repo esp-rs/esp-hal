@@ -43,6 +43,10 @@ use hil_test as _;
 #[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
 mod tests {
     use defmt::assert_eq;
+    use esp_hal::{
+        dma::{DmaRxBuf, DmaTxBuf},
+        spi::master::dma::asynch::SpiDmaAsyncBus,
+    };
 
     use super::*;
 
@@ -75,14 +79,14 @@ mod tests {
         let dma_channel = dma.channel0;
 
         let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
+        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
-        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(
-                dma_channel.configure_for_async(false, DmaPriority::Priority0),
-                tx_descriptors,
-                rx_descriptors,
-            );
+            .with_dma(dma_channel.configure_for_async(false, DmaPriority::Priority0));
+
+        let mut spi = SpiDmaAsyncBus::new(spi, dma_tx_buf, dma_rx_buf);
 
         let unit = pcnt.unit0;
         unit.channel0.set_edge_signal(PcntSource::from_pin(
@@ -92,19 +96,19 @@ mod tests {
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let receive = rx_buffer;
+        let mut receive = [0; DMA_BUFFER_SIZE];
 
         // Fill the buffer where each byte has 3 pos edges.
-        tx_buffer.fill(0b0110_1010);
+        let transmit = [0b0110_1010; DMA_BUFFER_SIZE];
 
         assert_eq!(out_pin.is_set_low(), true);
 
         for i in 1..4 {
             receive.copy_from_slice(&[5, 5, 5, 5, 5]);
-            SpiBus::read(&mut spi, receive).await.unwrap();
-            assert_eq!(receive, &[0, 0, 0, 0, 0]);
+            SpiBus::read(&mut spi, &mut receive).await.unwrap();
+            assert_eq!(receive, [0, 0, 0, 0, 0]);
 
-            SpiBus::write(&mut spi, tx_buffer).await.unwrap();
+            SpiBus::write(&mut spi, &transmit).await.unwrap();
             assert_eq!(unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
         }
     }
@@ -138,14 +142,13 @@ mod tests {
         let dma_channel = dma.channel0;
 
         let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
+        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
-        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(
-                dma_channel.configure_for_async(false, DmaPriority::Priority0),
-                tx_descriptors,
-                rx_descriptors,
-            );
+            .with_dma(dma_channel.configure_for_async(false, DmaPriority::Priority0));
+        let mut spi = SpiDmaAsyncBus::new(spi, dma_tx_buf, dma_rx_buf);
 
         let unit = pcnt.unit0;
         unit.channel0.set_edge_signal(PcntSource::from_pin(
@@ -155,19 +158,19 @@ mod tests {
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let receive = rx_buffer;
+        let mut receive = [0; DMA_BUFFER_SIZE];
 
         // Fill the buffer where each byte has 3 pos edges.
-        tx_buffer.fill(0b0110_1010);
+        let transmit = [0b0110_1010; DMA_BUFFER_SIZE];
 
         assert_eq!(out_pin.is_set_low(), true);
 
         for i in 1..4 {
             receive.copy_from_slice(&[5, 5, 5, 5, 5]);
-            SpiBus::read(&mut spi, receive).await.unwrap();
-            assert_eq!(receive, &[0, 0, 0, 0, 0]);
+            SpiBus::read(&mut spi, &mut receive).await.unwrap();
+            assert_eq!(receive, [0, 0, 0, 0, 0]);
 
-            SpiBus::transfer(&mut spi, receive, tx_buffer)
+            SpiBus::transfer(&mut spi, &mut receive, &transmit)
                 .await
                 .unwrap();
             assert_eq!(unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
