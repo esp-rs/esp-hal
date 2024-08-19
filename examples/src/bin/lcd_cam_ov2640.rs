@@ -25,7 +25,6 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
@@ -36,18 +35,18 @@ use esp_hal::{
         cam::{Camera, RxEightBits},
         LcdCam,
     },
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
     Blocking,
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let System {
+        peripherals,
+        clocks,
+        ..
+    } = esp_hal::init(CpuClock::boot_default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

@@ -13,20 +13,22 @@
 //! # use esp_hal::cpu_control::{CpuControl, Stack};
 //! # use core::{cell::RefCell, ptr::addr_of_mut};
 //! # use critical_section::Mutex;
-//! # use esp_hal::prelude::*;
 //! static mut APP_CORE_STACK: Stack<8192> = Stack::new();
+//! let system = esp_hal::init(CpuClock::boot_default());
 //!
-//! # let delay = Delay::new(&clocks);
+//! # let delay = Delay::new(&system.clocks);
 //!
 //! let counter = Mutex::new(RefCell::new(0));
 //!
-//! let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
+//! let mut cpu_control = CpuControl::new(system.peripherals.CPU_CTRL);
 //! let cpu1_fnctn = || {
 //!     cpu1_task(&delay, &counter);
 //! };
 //! let _guard = cpu_control
-//!    .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) },
-//! cpu1_fnctn)     .unwrap();
+//!    .start_app_core(
+//!         unsafe { &mut *addr_of_mut!(APP_CORE_STACK) },
+//!         cpu1_fnctn,
+//!     ).unwrap();
 //!
 //! loop {
 //!     delay.delay(1.secs());
@@ -37,7 +39,7 @@
 //! // Where `cpu1_task()` may be defined as:
 //! # use esp_hal::delay::Delay;
 //! # use core::cell::RefCell;
-//! # use esp_hal::prelude::*;
+//!
 //! fn cpu1_task(
 //!     delay: &Delay,
 //!     counter: &critical_section::Mutex<RefCell<i32>>,

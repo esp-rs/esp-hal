@@ -37,7 +37,8 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::{Io, Level, Output};
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let system = esp_hal::init(CpuClock::boot_default());
+//! let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
 //! let mut led = Output::new(io.pins.gpio5, Level::High);
 //! # }
 //! ```

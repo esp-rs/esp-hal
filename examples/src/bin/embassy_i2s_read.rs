@@ -20,14 +20,11 @@
 use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::Io,
     i2s::{asynch::*, DataFormat, I2s, Standard},
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
     timer::timg::TimerGroup,
 };
 use esp_println::println;
@@ -35,9 +32,11 @@ use esp_println::println;
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
     println!("Init!");
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let System {
+        peripherals,
+        clocks,
+        ..
+    } = esp_hal::init(CpuClock::boot_default());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     esp_hal_embassy::init(&clocks, timg0.timer0);

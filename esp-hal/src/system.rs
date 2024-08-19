@@ -1,46 +1,60 @@
 //! # System Control
 //!
 //! ## Overview
+//!
 //! This `system` driver provides an interface to control and configure various
 //! system-related features and peripherals on ESP chips. It includes
 //! functionality to control peripheral clocks, manage software interrupts,
 //! configure chip clocks, and control radio peripherals.
 //!
-//! ### Software Interrupts
+//! ## Software Interrupts
+//!
 //! The `SoftwareInterruptControl` struct gives access to the available software
 //! interrupts.
 //!
 //! The `SoftwareInterrupt` struct allows raising or resetting software
 //! interrupts using the `raise()` and `reset()` methods.
 //!
-//! ### Peripheral Clock Control
-//! The `PeripheralClockControl` struct controls the enablement of peripheral
-//! clocks.
+//! ### Examples
 //!
-//! It provides an `enable()` method to enable and reset specific peripherals.
-//! The available peripherals are represented by the `Peripheral` enum
-//!
-//! ## Examples
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! let peripherals = Peripherals::take();
-//! let system = SystemControl::new(peripherals.SYSTEM);
-//! let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+//! let system = esp_hal::init(CpuClock::boot_default());
+//!
+//! let mut int0 = system.software_interrupt_control.software_interrupt0;
+//!
+//! critical_section::with(|cs| {
+//!     int0.set_interrupt_handler(interrupt_handler);
+//!     SWINT0.borrow_ref_mut(cs).replace(int0);
+//! });
 //! # }
+//!
+//! use core::cell::RefCell;
+//! use critical_section::Mutex;
+//! use esp_hal::system::SoftwareInterrupt;
+//!
+//! static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> =
+//!     Mutex::new(RefCell::new(None));
+//!
+//! #[handler]
+//! fn interrupt_handler() {
+//!     // esp_println::println!("SW interrupt0");
+//!     critical_section::with(|cs| {
+//!         SWINT0.borrow_ref(cs).as_ref().unwrap().reset();
+//!     });
+//! }
 //! ```
 
-use crate::{
-    interrupt::InterruptHandler,
-    peripheral::PeripheralRef,
-    peripherals::SYSTEM,
-    InterruptConfigurable,
-};
+use crate::{interrupt::InterruptHandler, peripherals::SYSTEM, InterruptConfigurable};
 
 /// Peripherals which can be enabled via `PeripheralClockControl`.
 ///
 /// This enum represents various hardware peripherals that can be enabled
 /// by the system's clock control. Depending on the target device, different
 /// peripherals will be available for enabling.
+// FIXME: This enum needs to be public because it's exposed via a bunch of traits, but it's not
+// useful to users.
+#[doc(hidden)]
 pub enum Peripheral {
     /// SPI2 peripheral.
     #[cfg(spi2)]
@@ -144,30 +158,6 @@ pub enum Peripheral {
     /// Systimer peripheral.
     #[cfg(systimer)]
     Systimer,
-}
-
-/// The `DPORT`/`PCR`/`SYSTEM` peripheral split into its different logical
-/// components.
-pub struct SystemControl<'d> {
-    /// Inner reference to the SYSTEM peripheral.
-    _inner: PeripheralRef<'d, SYSTEM>,
-    /// Controls the system's clock settings and configurations.
-    pub clock_control: SystemClockControl,
-    /// Controls the system's software interrupt settings.
-    pub software_interrupt_control: SoftwareInterruptControl,
-}
-
-impl<'d> SystemControl<'d> {
-    /// Construct a new instance of [`SystemControl`].
-    pub fn new(system: impl crate::peripheral::Peripheral<P = SYSTEM> + 'd) -> Self {
-        crate::into_ref!(system);
-
-        Self {
-            _inner: system,
-            clock_control: SystemClockControl::new(),
-            software_interrupt_control: SoftwareInterruptControl::new(),
-        }
-    }
 }
 
 /// A software interrupt can be triggered by software.
@@ -312,7 +302,7 @@ pub struct SoftwareInterruptControl {
 }
 
 impl SoftwareInterruptControl {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         SoftwareInterruptControl {
             software_interrupt0: SoftwareInterrupt {},
             software_interrupt1: SoftwareInterrupt {},

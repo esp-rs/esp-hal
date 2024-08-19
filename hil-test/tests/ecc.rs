@@ -18,7 +18,7 @@ use elliptic_curve::sec1::ToEncodedPoint;
 use esp_hal::ecc::WorkMode;
 use esp_hal::{
     ecc::{Ecc, EllipticCurve, Error},
-    peripherals::Peripherals,
+    prelude::*,
     rng::Rng,
     Blocking,
 };
@@ -47,16 +47,6 @@ struct Context<'a> {
     rng: Rng,
 }
 
-impl Context<'_> {
-    pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let ecc = Ecc::new(peripherals.ECC);
-        let rng = Rng::new(peripherals.RNG);
-
-        Context { ecc, rng }
-    }
-}
-
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
@@ -66,7 +56,12 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        Context::init()
+        let System { peripherals, .. } = esp_hal::init(CpuClock::max());
+
+        let ecc = Ecc::new(peripherals.ECC);
+        let rng = Rng::new(peripherals.RNG);
+
+        Context { ecc, rng }
     }
 
     #[test]

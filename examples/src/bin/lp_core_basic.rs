@@ -17,14 +17,13 @@ use esp_backtrace as _;
 use esp_hal::{
     gpio::{lp_io::LowPowerOutput, Io},
     lp_core::{LpCore, LpCoreWakeupSource},
-    peripherals::Peripherals,
     prelude::*,
 };
 use esp_println::{print, println};
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
+    let System { peripherals, .. } = esp_hal::init(CpuClock::boot_default());
 
     // configure GPIO 1 as LP output pin
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);

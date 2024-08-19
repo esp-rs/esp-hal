@@ -16,15 +16,12 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     gpio,
     gpio::Io,
     macros::ram,
-    peripherals::Peripherals,
     prelude::*,
     rtc_cntl::Rtc,
-    system::SystemControl,
     touch::{Continous, Touch, TouchConfig, TouchPad},
     Blocking,
 };
@@ -51,9 +48,11 @@ fn interrupt_handler() {
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let System {
+        peripherals,
+        clocks,
+        ..
+    } = esp_hal::init(CpuClock::boot_default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

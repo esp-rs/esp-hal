@@ -6,12 +6,12 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{peripherals::Peripherals, prelude::*, rng::Rng};
+use esp_hal::{prelude::*, rng::Rng};
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
+    let System { peripherals, .. } = esp_hal::init(CpuClock::boot_default());
     let mut rng = Rng::new(peripherals.RNG);
 
     // Generate a random word (u32):

@@ -13,12 +13,10 @@ use esp_hal::sha::{Sha384, Sha512};
 #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
 use esp_hal::sha::{Sha512_224, Sha512_256};
 use esp_hal::{
-    clock::ClockControl,
     peripherals::Peripherals,
     prelude::*,
     rng::Rng,
     sha::{Sha, Sha1, Sha256},
-    system::SystemControl,
     Blocking,
 };
 use hil_test as _;
@@ -165,14 +163,12 @@ mod tests {
 
     #[init]
     fn init() -> Rng {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
         cfg_if::cfg_if! {
             if #[cfg(feature = "esp32")] {
                 // FIXME: max speed fails...?
-                let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+                let System { peripherals, .. } = esp_hal::init(CpuClock::boot_default());
             } else {
-                let _clocks = ClockControl::max(system.clock_control).freeze();
+                let System { peripherals, .. } = esp_hal::init(CpuClock::max());
             }
         }
 

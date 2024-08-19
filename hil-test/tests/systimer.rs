@@ -11,11 +11,9 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use embedded_hal::delay::DelayNs;
 use esp_hal::{
-    clock::{ClockControl, Clocks},
+    clock::Clocks,
     delay::Delay,
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
     timer::systimer::{
         Alarm,
         FrozenUnit,
@@ -44,27 +42,6 @@ struct Context {
     comparator0: SpecificComparator<'static, 0>,
     comparator1: SpecificComparator<'static, 1>,
     clocks: Clocks<'static>,
-}
-
-impl Context {
-    pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-        let systimer = SystemTimer::new(peripherals.SYSTIMER);
-        static UNIT0: StaticCell<SpecificUnit<'static, 0>> = StaticCell::new();
-
-        let unit0 = UNIT0.init(systimer.unit0);
-        let frozen_unit = FrozenUnit::new(unit0);
-
-        Context {
-            clocks,
-            unit: frozen_unit,
-            comparator0: systimer.comparator0,
-            comparator1: systimer.comparator1,
-        }
-    }
 }
 
 #[handler(priority = esp_hal::interrupt::Priority::min())]
@@ -127,7 +104,24 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        Context::init()
+        let System {
+            peripherals,
+            clocks,
+            ..
+        } = esp_hal::init(CpuClock::boot_default());
+
+        let systimer = SystemTimer::new(peripherals.SYSTIMER);
+        static UNIT0: StaticCell<SpecificUnit<'static, 0>> = StaticCell::new();
+
+        let unit0 = UNIT0.init(systimer.unit0);
+        let frozen_unit = FrozenUnit::new(unit0);
+
+        Context {
+            clocks,
+            unit: frozen_unit,
+            comparator0: systimer.comparator0,
+            comparator1: systimer.comparator1,
+        }
     }
 
     #[test]

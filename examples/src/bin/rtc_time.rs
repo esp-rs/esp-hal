@@ -6,20 +6,15 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    delay::Delay,
-    peripherals::Peripherals,
-    prelude::*,
-    rtc_cntl::Rtc,
-    system::SystemControl,
-};
+use esp_hal::{delay::Delay, prelude::*, rtc_cntl::Rtc};
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let System {
+        peripherals,
+        clocks,
+        ..
+    } = esp_hal::init(CpuClock::boot_default());
 
     let rtc = Rtc::new(peripherals.LPWR);
     let delay = Delay::new(&clocks);

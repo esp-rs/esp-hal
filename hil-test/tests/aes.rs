@@ -7,7 +7,7 @@
 
 use esp_hal::{
     aes::{Aes, Mode},
-    peripherals::Peripherals,
+    prelude::*,
 };
 use hil_test as _;
 
@@ -17,7 +17,7 @@ struct Context<'a> {
 
 impl Context<'_> {
     pub fn init() -> Self {
-        let peripherals = Peripherals::take();
+        let System { peripherals, .. } = esp_hal::init(CpuClock::max());
         let aes = Aes::new(peripherals.AES);
 
         Context { aes }

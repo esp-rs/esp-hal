@@ -1,14 +1,15 @@
 //! # Inter-IC Sound (I2S)
 //!
 //! ## Overview
+//!
 //! I2S (Inter-IC Sound) is a synchronous serial communication protocol usually
 //! used for transmitting audio data between two digital audio devices.
 //! Espressif devices may contain more than one I2S peripheral(s). These
 //! peripherals can be configured to input and output sample data via the I2S
 //! driver.
 //!
-//!
 //! ## Configuration
+//!
 //! I2S supports different data formats, including varying data and channel
 //! widths, different standards, such as the Philips standard and configurable
 //! pin mappings for I2S clock (BCLK), word select (WS), and data input/output
@@ -18,33 +19,33 @@
 //! supports various configurations, such as different data formats, standards
 //! (e.g., Philips) and pin configurations. It relies on other peripheral
 //! modules, such as
-//!     - `GPIO`
-//!     - `DMA`
-//!     - `system` (to configure and enable the I2S peripheral)
+//!   - `GPIO`
+//!   - `DMA`
+//!   - `system` (to configure and enable the I2S peripheral)
 //!
-//! ## Examples
+//! ## Example
+//!
 //! ### Initialization
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::i2s::I2s;
 //! # use esp_hal::i2s::Standard;
 //! # use esp_hal::i2s::DataFormat;
+//! # use esp_hal::i2s::I2sReadDma;
 //! # use esp_hal::gpio::Io;
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::{Dma, DmaPriority};
-//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
-//! # use crate::esp_hal::peripherals::Peripherals;
-//! # use crate::esp_hal::i2s::I2sReadDma;
-//! # use core::ptr::addr_of_mut;
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let dma = Dma::new(peripherals.DMA);
+//! let system = esp_hal::init(CpuClock::boot_default());
+//! # let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
+//! let dma = Dma::new(system.peripherals.DMA);
 #![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.i2s0channel;")]
 #![cfg_attr(not(any(esp32, esp32s2)), doc = "let dma_channel = dma.channel0;")]
 //! let (_, tx_descriptors, mut rx_buffer, rx_descriptors) =
 //! dma_buffers!(0, 4 * 4092);
 //!
 //! let i2s = I2s::new(
-//!     peripherals.I2S0,
+//!     system.peripherals.I2S0,
 //!     Standard::Philips,
 //!     DataFormat::Data16Channel16,
 //!     44100.Hz(),
@@ -54,7 +55,7 @@
 //!     ),
 //!     tx_descriptors,
 //!     rx_descriptors,
-//!     &clocks,
+//!     &system.clocks,
 //! );
 #![cfg_attr(not(esp32), doc = "let i2s = i2s.with_mclk(io.pins.gpio0);")]
 //! let mut i2s_rx = i2s.i2s_rx

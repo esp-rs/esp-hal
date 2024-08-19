@@ -15,12 +15,9 @@
 
 use embedded_hal::spi::SpiBus;
 use esp_hal::{
-    clock::ClockControl,
     gpio::Io,
-    peripherals::Peripherals,
     prelude::*,
     spi::{master::Spi, FullDuplexMode, SpiMode},
-    system::SystemControl,
 };
 use hil_test as _;
 
@@ -37,9 +34,11 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let System {
+            peripherals,
+            clocks,
+            ..
+        } = esp_hal::init(CpuClock::boot_default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;

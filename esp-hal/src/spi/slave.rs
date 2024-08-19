@@ -21,10 +21,11 @@
 //! # use esp_hal::spi::slave::{prelude::*, Spi};
 //! # use esp_hal::dma::Dma;
 //! # use esp_hal::gpio::Io;
-//! let dma = Dma::new(peripherals.DMA);
+//! let system = esp_hal::init(CpuClock::boot_default());
+//! let dma = Dma::new(system.peripherals.DMA);
 #![cfg_attr(esp32s2, doc = "let dma_channel = dma.spi2channel;")]
 #![cfg_attr(not(esp32s2), doc = "let dma_channel = dma.channel0;")]
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
 //! let sclk = io.pins.gpio0;
 //! let miso = io.pins.gpio1;
 //! let mosi = io.pins.gpio2;
@@ -32,7 +33,7 @@
 //!
 //! let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) =
 //! dma_buffers!(32000); let mut spi = Spi::new(
-//!     peripherals.SPI2,
+//!     system.peripherals.SPI2,
 //!     sclk,
 //!     mosi,
 //!     miso,
@@ -48,8 +49,8 @@
 //! let mut receive = rx_buffer;
 //!
 //! let transfer = spi
-//! .dma_transfer(&mut send, &mut receive)
-//! .unwrap();
+//!     .dma_transfer(&mut send, &mut receive)
+//!     .unwrap();
 //!
 //! transfer.wait().unwrap();
 //! # }

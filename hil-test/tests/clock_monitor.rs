@@ -5,12 +5,7 @@
 #![no_std]
 #![no_main]
 
-use esp_hal::{
-    clock::ClockControl,
-    peripherals::Peripherals,
-    rtc_cntl::Rtc,
-    system::SystemControl,
-};
+use esp_hal::{prelude::*, rtc_cntl::Rtc};
 use hil_test as _;
 
 struct Context<'a> {
@@ -19,11 +14,8 @@ struct Context<'a> {
 
 impl Context<'_> {
     pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        ClockControl::boot_defaults(system.clock_control).freeze();
-
-        let rtc = Rtc::new(peripherals.LPWR);
+        let system = esp_hal::init(CpuClock::boot_default());
+        let rtc = Rtc::new(system.peripherals.LPWR);
 
         Context { rtc }
     }

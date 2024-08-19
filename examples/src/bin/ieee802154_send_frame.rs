@@ -4,13 +4,7 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    delay::Delay,
-    peripherals::Peripherals,
-    prelude::*,
-    system::SystemControl,
-};
+use esp_hal::{delay::Delay, prelude::*};
 use esp_ieee802154::*;
 use esp_println::println;
 use ieee802154::mac::{
@@ -25,9 +19,11 @@ use ieee802154::mac::{
 
 #[entry]
 fn main() -> ! {
-    let mut peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::max(system.clock_control).freeze();
+    let System {
+        mut peripherals,
+        clocks,
+        ..
+    } = esp_hal::init(CpuClock::boot_default());
 
     let delay = Delay::new(&clocks);
 

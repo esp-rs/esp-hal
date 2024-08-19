@@ -21,9 +21,10 @@
 //! # use fugit::RateExtU32;
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::{Dma, DmaPriority};
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let system = esp_hal::init(CpuClock::boot_default());
+//! # let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
 //!
-//! # let dma = Dma::new(peripherals.DMA);
+//! # let dma = Dma::new(system.peripherals.DMA);
 //! # let channel = dma.channel0;
 //!
 //! # let (tx_buffer, tx_descriptors, _, rx_descriptors) = dma_buffers!(32678, 0);
@@ -48,14 +49,14 @@
 //!     io.pins.gpio16,
 //! );
 //!
-//! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
+//! let lcd_cam = LcdCam::new(system.peripherals.LCD_CAM);
 //! let mut camera = Camera::new(
 //!     lcd_cam.cam,
 //!     channel.rx,
 //!     rx_descriptors,
 //!     data_pins,
 //!     20u32.MHz(),
-//!     &clocks
+//!     &system.clocks
 //! )
 //! // Remove this for slave mode.
 //! .with_master_clock(mclk_pin)

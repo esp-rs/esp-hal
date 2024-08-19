@@ -17,13 +17,12 @@ use esp_hal::{
         Level,
         Pull,
     },
-    peripherals::Peripherals,
     prelude::*,
 };
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
+    let System { peripherals, .. } = esp_hal::init(CpuClock::boot_default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut led = io.pins.gpio1;

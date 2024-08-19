@@ -13,10 +13,9 @@
 #![no_main]
 
 use esp_hal::{
-    clock::ClockControl,
     gpio::Io,
-    peripherals::{Peripherals, UART0, UART1},
-    system::SystemControl,
+    peripherals::{UART0, UART1},
+    prelude::*,
     uart::{UartRx, UartTx},
     Async,
 };
@@ -25,21 +24,6 @@ use hil_test as _;
 struct Context {
     tx: UartTx<'static, UART0, Async>,
     rx: UartRx<'static, UART1, Async>,
-}
-
-impl Context {
-    pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
-        let tx = UartTx::new_async(peripherals.UART0, &clocks, io.pins.gpio2).unwrap();
-        let rx = UartRx::new_async(peripherals.UART1, &clocks, io.pins.gpio3).unwrap();
-
-        Context { tx, rx }
-    }
 }
 
 #[cfg(test)]
@@ -51,7 +35,18 @@ mod tests {
 
     #[init]
     async fn init() -> Context {
-        Context::init()
+        let System {
+            peripherals,
+            clocks,
+            ..
+        } = esp_hal::init(CpuClock::boot_default());
+
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+
+        let tx = UartTx::new_async(peripherals.UART0, &clocks, io.pins.gpio2).unwrap();
+        let rx = UartRx::new_async(peripherals.UART1, &clocks, io.pins.gpio3).unwrap();
+
+        Context { tx, rx }
     }
 
     #[test]

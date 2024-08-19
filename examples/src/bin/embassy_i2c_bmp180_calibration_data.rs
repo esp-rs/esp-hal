@@ -20,21 +20,15 @@
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    gpio::Io,
-    i2c::I2C,
-    peripherals::Peripherals,
-    prelude::*,
-    system::SystemControl,
-    timer::timg::TimerGroup,
-};
+use esp_hal::{gpio::Io, i2c::I2C, prelude::*, timer::timg::TimerGroup};
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let System {
+        peripherals,
+        clocks,
+        ..
+    } = esp_hal::init(CpuClock::boot_default());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     esp_hal_embassy::init(&clocks, timg0.timer0);

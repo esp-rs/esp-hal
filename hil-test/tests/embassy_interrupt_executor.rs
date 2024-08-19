@@ -10,10 +10,9 @@
 
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use esp_hal::{
-    clock::ClockControl,
+    clock::CpuClock,
     interrupt::Priority,
-    peripherals::Peripherals,
-    system::{SoftwareInterrupt, SystemControl},
+    system::SoftwareInterrupt,
     timer::timg::TimerGroup,
 };
 use esp_hal_embassy::InterruptExecutor;
@@ -38,13 +37,13 @@ async fn interrupt_driven_task(signal: &'static Signal<CriticalSectionRawMutex, 
 #[cfg(test)]
 #[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
 mod test {
+    use hil_test as _;
+
     use super::*;
 
     #[init]
     fn init() -> SoftwareInterrupt<1> {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let system = esp_hal::init(CpuClock::boot_default());
 
         let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
         esp_hal_embassy::init(&clocks, timg0.timer0);

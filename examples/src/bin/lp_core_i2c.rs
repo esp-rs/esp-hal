@@ -19,14 +19,13 @@ use esp_hal::{
     gpio::{lp_io::LowPowerOutputOpenDrain, Io},
     i2c::lp_i2c::LpI2c,
     lp_core::{LpCore, LpCoreWakeupSource},
-    peripherals::Peripherals,
     prelude::*,
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
+    let System { peripherals, .. } = esp_hal::init(CpuClock::boot_default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

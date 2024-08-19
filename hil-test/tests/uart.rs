@@ -13,11 +13,10 @@
 
 use embedded_hal_02::serial::{Read, Write};
 use esp_hal::{
-    clock::{ClockControl, Clocks},
+    clock::Clocks,
     gpio::Io,
-    peripherals::{Peripherals, UART1},
+    peripherals::UART1,
     prelude::*,
-    system::SystemControl,
     uart::{ClockSource, Uart},
     Blocking,
 };
@@ -29,20 +28,6 @@ struct Context {
     uart: Uart<'static, UART1, Blocking>,
 }
 
-impl Context {
-    pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
-        let uart = Uart::new(peripherals.UART1, &clocks, io.pins.gpio2, io.pins.gpio3).unwrap();
-
-        Context { clocks, uart }
-    }
-}
-
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
@@ -52,7 +37,17 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        Context::init()
+        let System {
+            peripherals,
+            clocks,
+            ..
+        } = esp_hal::init(CpuClock::boot_default());
+
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+
+        let uart = Uart::new(peripherals.UART1, &clocks, io.pins.gpio2, io.pins.gpio3).unwrap();
+
+        Context { clocks, uart }
     }
 
     #[test]

@@ -13,12 +13,9 @@ use core::{cell::RefCell, ptr::addr_of_mut};
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     cpu_control::{CpuControl, Stack},
     delay::Delay,
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
 };
 use esp_println::println;
 
@@ -26,9 +23,11 @@ static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let System {
+        peripherals,
+        clocks,
+        ..
+    } = esp_hal::init(CpuClock::boot_default());
 
     let delay = Delay::new(&clocks);
 

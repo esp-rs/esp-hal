@@ -28,8 +28,9 @@
 //! # use esp_hal::uart::Uart;
 //! # use core::writeln;
 //! # use core::fmt::Write;
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! # let mut serial_tx = Uart::new(peripherals.UART0, &clocks, io.pins.gpio4, io.pins.gpio5).unwrap();
+//! # let system = esp_hal::init(CpuClock::boot_default());
+//! # let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
+//! # let mut serial_tx = Uart::new(system.peripherals.UART0, &system.clocks, io.pins.gpio4, io.pins.gpio5).unwrap();
 //! let mac_address = Efuse::read_base_mac_address();
 //! writeln!(
 //!     serial_tx,

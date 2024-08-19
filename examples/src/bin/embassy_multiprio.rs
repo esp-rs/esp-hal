@@ -24,10 +24,7 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Instant, Ticker, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     interrupt::Priority,
-    peripherals::Peripherals,
-    system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer},
 };
 use esp_hal_embassy::InterruptExecutor;
@@ -73,9 +70,12 @@ async fn low_prio_async() {
 async fn main(low_prio_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     println!("Init!");
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+    let System {
+        peripherals,
+        clocks,
+        ..
+    } = esp_hal::init(CpuClock::boot_default());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let timer0: ErasedTimer = timg0.timer0.into();

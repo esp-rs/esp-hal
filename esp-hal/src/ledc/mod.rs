@@ -18,8 +18,10 @@
 //! ## Examples
 //!
 //! ### Low Speed Channel
-//! The following will configure the Low Speed Channel0 to 24kHz output with
-//! 10% duty using the ABPClock
+//!
+//! The following example will configure the Low Speed Channel0 to 24kHz output
+//! with 10% duty using the ABPClock.
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::ledc::Ledc;
@@ -28,14 +30,12 @@
 //! # use esp_hal::ledc::LowSpeed;
 //! # use esp_hal::ledc::channel;
 //! # use esp_hal::gpio::Io;
-//! # use crate::esp_hal::prelude::_esp_hal_ledc_timer_TimerIFace;
-//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
-//! # use crate::esp_hal::prelude::_esp_hal_ledc_channel_ChannelIFace;
 //!
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let system = esp_hal::init(CpuClock::boot_default());
+//! # let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
 //! # let led = io.pins.gpio0;
 //!
-//! let mut ledc = Ledc::new(peripherals.LEDC, &clocks);
+//! let mut ledc = Ledc::new(system.peripherals.LEDC, &system.clocks);
 //! ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
 //!
 //! let mut lstimer0 = ledc.get_timer::<LowSpeed>(timer::Number::Timer0);

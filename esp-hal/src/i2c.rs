@@ -5,61 +5,46 @@
 //! same bus. I2C uses two bidirectional open-drain lines: serial data line
 //! (SDA) and serial clock line (SCL), pulled up by resistors.
 //!
-//! Espressif devices sometimes have more than one I2C controller (also called
-//! port), responsible for handling communication on the I2C bus. A single I2C
-//! controller can be a master or a slave.
+//! Espressif devices sometimes have more than one I2C controller, responsible
+//! for handling communication on the I2C bus. A single I2C controller can be
+//! a master or a slave.
 //!
 //! Typically, an I2C slave device has a 7-bit address or 10-bit address.
-//! Espressif devices supports both I2C Standard-mode (Sm) and Fast-mode
-//! (Fm) which can go up to 100KHz and 400KHz respectively.
+//! Devices supports both I2C Standard-mode (Sm) and Fast-mode (Fm) which can
+//! go up to 100KHz and 400KHz respectively.
 //!
 //! ## Configuration
 //!
 //! Each I2C controller is individually configurable, and the usual setting
 //! such as frequency, timeout, and SDA/SCL pins can easily be configured.
 //!
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! # use esp_hal::i2c::I2C;
-//! # use esp_hal::gpio::Io;
-//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! // Create a new peripheral object with the described wiring
-//! // and standard I2C clock speed
-//! let mut i2c = I2C::new(
-//!     peripherals.I2C0,
-//!     io.pins.gpio1,
-//!     io.pins.gpio2,
-//!     100.kHz(),
-//!     &clocks,
-//! );
-//! # }
-//! ```
-//! 
 //! ## Usage
 //!
 //! The I2C driver implements a number of third-party traits, with the
 //! intention of making the HAL inter-compatible with various device drivers
 //! from the community. This includes the [embedded-hal] for both 0.2.x and
-//! 1.x.x versions.
+//! 1.0.x versions.
 //!
 //! ## Examples
+//!
 //! ### Read Data from a BMP180 Sensor
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::i2c::I2C;
 //! # use esp_hal::gpio::Io;
-//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
+//!
 //! // Create a new peripheral object with the described wiring
-//! // and standard I2C clock speed
+//! // and standard I2C clock speed.
 //! let mut i2c = I2C::new(
-//!     peripherals.I2C0,
+//!     system.peripherals.I2C0,
 //!     io.pins.gpio1,
 //!     io.pins.gpio2,
 //!     100.kHz(),
-//!     &clocks,
+//!     &system.clocks,
 //! );
+//!
 //! loop {
 //!     let mut data = [0u8; 22];
 //!     i2c.write_read(0x77, &[0xaa], &mut data).ok();

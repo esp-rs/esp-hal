@@ -1,6 +1,6 @@
 //! SPI Full Duplex DMA Test
 //!
-//! Folowing pins are used:
+//! Following pins are used:
 //! SCLK    GPIO0
 //! MOSI    GPIO3
 //! MISO    GPIO6
@@ -72,9 +72,11 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let System {
+            peripherals,
+            clocks,
+            ..
+        } = esp_hal::init(CpuClock::boot_default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let pcnt = Pcnt::new(peripherals.PCNT);

@@ -11,16 +11,13 @@
 #![no_main]
 
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::Io,
     i2s::{DataFormat, I2s, I2sReadDma, I2sWriteDma, Standard},
     peripheral::Peripheral,
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
 };
 use hil_test as _;
 
@@ -52,17 +49,14 @@ impl Iterator for SampleSource {
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-
     use super::*;
-
-    #[init]
-    fn init() {}
 
     #[test]
     fn test_i2s_loopback() {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let system = esp_hal::init(CpuClock::boot_default());
+
+        let peripherals = system.peripherals;
+        let clocks = system.clocks;
 
         let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

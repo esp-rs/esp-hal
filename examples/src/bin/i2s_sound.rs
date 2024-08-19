@@ -1,7 +1,7 @@
-//! This shows how to transmit data continously via I2S.
+//! This shows how to transmit data continuously via I2S.
 //!
 //! Without an additional I2S sink device you can inspect the MCLK, BCLK, WS
-//!  andDOUT with a logic analyzer.
+//!  and DOUT with a logic analyzer.
 //!
 //! You can also connect e.g. a PCM510x to hear an annoying loud sine tone (full
 //! scale), so turn down the volume before running this example.
@@ -32,14 +32,11 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::Io,
     i2s::{DataFormat, I2s, I2sWriteDma, Standard},
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
 };
 
 const SINE: [i16; 64] = [
@@ -52,9 +49,11 @@ const SINE: [i16; 64] = [
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let System {
+        peripherals,
+        clocks,
+        ..
+    } = esp_hal::init(CpuClock::boot_default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

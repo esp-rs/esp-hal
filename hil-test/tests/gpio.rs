@@ -1,8 +1,8 @@
 //! GPIO Test
 //!
 //! Folowing pins are used:
-//! GPIO2
-//! GPIO3
+//! - GPIO2
+//! - GPIO3
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: generic-queue
@@ -14,12 +14,10 @@ use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     gpio::{AnyPin, Gpio2, Gpio3, GpioPin, Input, Io, Level, Output, Pull},
     macros::handler,
-    peripherals::Peripherals,
-    system::SystemControl,
+    prelude::*,
     timer::timg::TimerGroup,
     InterruptConfigurable,
 };
@@ -36,17 +34,15 @@ struct Context<'d> {
 
 impl<'d> Context<'d> {
     pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let system = esp_hal::init(CpuClock::boot_default());
 
-        let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let mut io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
         io.set_interrupt_handler(interrupt_handler);
 
-        let delay = Delay::new(&clocks);
+        let delay = Delay::new(&system.clocks);
 
-        let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-        esp_hal_embassy::init(&clocks, timg0.timer0);
+        let timg0 = TimerGroup::new(system.peripherals.TIMG0, &system.clocks);
+        esp_hal_embassy::init(&system.clocks, timg0.timer0);
 
         Context {
             io2: Input::new(io.pins.gpio2, Pull::Down),

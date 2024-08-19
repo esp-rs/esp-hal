@@ -21,17 +21,22 @@
 //! # use esp_hal::gpio::Io;
 //! # use esp_hal::spi::{master::Spi, SpiMode};
 //! # use esp_hal::dma::{Dma, DmaPriority};
-//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
-//! let dma = Dma::new(peripherals.DMA);
+//! let system = esp_hal::init(CpuClock::boot_default());
+//! let dma = Dma::new(system.peripherals.DMA);
 #![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.spi2channel;")]
 #![cfg_attr(not(any(esp32, esp32s2)), doc = "let dma_channel = dma.channel0;")]
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
 //! let sclk = io.pins.gpio0;
 //! let miso = io.pins.gpio2;
 //! let mosi = io.pins.gpio4;
 //! let cs = io.pins.gpio5;
 //!
-//! let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+//! let mut spi = Spi::new(
+//!     system.peripherals.SPI2,
+//!     100.kHz(),
+//!     SpiMode::Mode0,
+//!     &system.clocks
+//! )
 //! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
 //! .with_dma(dma_channel.configure(
 //!     false,
@@ -43,10 +48,10 @@
 //! ⚠️ Note: Descriptors should be sized as `(max_transfer_size + CHUNK_SIZE - 1) / CHUNK_SIZE`.
 //! I.e., to transfer buffers of size `1..=CHUNK_SIZE`, you need 1 descriptor.
 //!
-//! ⚠️ Note: For chips that support DMA to/from PSRAM (esp32s3) DMA transfers to/from PSRAM
+//! ⚠️ Note: For chips that support DMA to/from PSRAM (ESP32-S3) DMA transfers to/from PSRAM
 //! have extra alignment requirements. The address and size of the buffer pointed to by
 //! each descriptor must be a multiple of the cache line (block) size. This is 32 bytes
-//! on esp32s3.
+//! on ESP32-S3.
 //!
 //! For convenience you can use the [crate::dma_buffers] macro.
 
@@ -288,7 +293,7 @@ mod gdma;
 #[cfg(pdma)]
 mod pdma;
 
-/// Kinds of interrupt to listen to
+/// Kinds of interrupt to listen to.
 #[derive(EnumSetType)]
 pub enum DmaInterrupt {
     /// TX is done
@@ -297,15 +302,21 @@ pub enum DmaInterrupt {
     RxDone,
 }
 
-/// The default CHUNK_SIZE used for DMA transfers
+/// The default chunk size used for DMA transfers.
 pub const CHUNK_SIZE: usize = 4092;
 
-/// Convenience macro to create DMA buffers and descriptors
+/// Convenience macro to create DMA buffers and descriptors.
 ///
 /// ## Usage
-/// ```rust,ignore
-/// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX and RX the same size
-/// let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(32000, 32000);
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::dma_buffers;
+///
+/// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX
+/// // and RX the same size.
+/// let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) =
+///     dma_buffers!(32000, 32000);
+/// # }
 /// ```
 #[macro_export]
 macro_rules! dma_buffers {
@@ -317,13 +328,18 @@ macro_rules! dma_buffers {
     };
 }
 
-/// Convenience macro to create circular DMA buffers and descriptors
+/// Convenience macro to create circular DMA buffers and descriptors.
 ///
 /// ## Usage
-/// ```rust,ignore
-/// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX and RX the same size
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::dma_circular_buffers;
+///
+/// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX
+/// // and RX the same size.
 /// let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) =
 ///     dma_circular_buffers!(32000, 32000);
+/// # }
 /// ```
 #[macro_export]
 macro_rules! dma_circular_buffers {
@@ -336,12 +352,17 @@ macro_rules! dma_circular_buffers {
     };
 }
 
-/// Convenience macro to create DMA descriptors
+/// Convenience macro to create DMA descriptors.
 ///
 /// ## Usage
-/// ```rust,ignore
-/// // Create TX and RX descriptors for transactions up to 32000 bytes - passing only one parameter assumes TX and RX are the same size
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::dma_descriptors;
+///
+/// // Create TX and RX descriptors for transactions up to 32000 bytes - passing
+/// // only one parameter assumes TX and RX are the same size.
 /// let (tx_descriptors, rx_descriptors) = dma_descriptors!(32000, 32000);
+/// # }
 /// ```
 #[macro_export]
 macro_rules! dma_descriptors {
@@ -354,12 +375,18 @@ macro_rules! dma_descriptors {
     };
 }
 
-/// Convenience macro to create circular DMA descriptors
+/// Convenience macro to create circular DMA descriptors.
 ///
 /// ## Usage
-/// ```rust,ignore
-/// // Create TX and RX descriptors for transactions up to 32000 bytes - passing only one parameter assumes TX and RX are the same size
-/// let (tx_descriptors, rx_descriptors) = dma_circular_descriptors!(32000, 32000);
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::dma_circular_descriptors;
+///
+/// // Create TX and RX descriptors for transactions up to 32000
+/// // bytes - passing only one parameter assumes TX and RX are the same size.
+/// let (tx_descriptors, rx_descriptors) =
+///     dma_circular_descriptors!(32000, 32000);
+/// # }
 /// ```
 #[macro_export]
 macro_rules! dma_circular_descriptors {
@@ -373,12 +400,18 @@ macro_rules! dma_circular_descriptors {
 }
 
 /// Convenience macro to create DMA buffers and descriptors with specific chunk
-/// size
+/// size.
 ///
 /// ## Usage
-/// ```rust,ignore
-/// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX and RX the same size
-/// let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(32000, 32000, 4032);
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::dma_buffers_chunk_size;
+///
+/// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX
+/// // and RX the same size.
+/// let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) =
+///     dma_buffers_chunk_size!(32000, 32000, 4032);
+/// # }
 /// ```
 #[macro_export]
 macro_rules! dma_buffers_chunk_size {
@@ -403,13 +436,18 @@ macro_rules! dma_buffers_chunk_size {
 }
 
 /// Convenience macro to create circular DMA buffers and descriptors with
-/// specific chunk size
+/// specific chunk size.
 ///
 /// ## Usage
-/// ```rust,ignore
-/// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX and RX the same size
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::dma_circular_buffers_chunk_size;
+///
+/// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX
+/// // and RX the same size.
 /// let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) =
-///     dma_circular_buffers!(32000, 32000, 4032);
+///     dma_circular_buffers_chunk_size!(32000, 32000, 4032);
+/// # }
 /// ```
 #[macro_export]
 macro_rules! dma_circular_buffers_chunk_size {
@@ -436,9 +474,15 @@ macro_rules! dma_circular_buffers_chunk_size {
 /// Convenience macro to create DMA descriptors with specific chunk size
 ///
 /// ## Usage
-/// ```rust,ignore
-/// // Create TX and RX descriptors for transactions up to 32000 bytes - passing only one parameter assumes TX and RX are the same size
-/// let (tx_descriptors, rx_descriptors) = dma_descriptors_chunk_size!(32000, 32000, 4032);
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::dma_descriptors_chunk_size;
+///
+/// // Create TX and RX descriptors for transactions up to 32000 bytes - passing
+/// // only one parameter assumes TX and RX are the same size.
+/// let (tx_descriptors, rx_descriptors) =
+///     dma_descriptors_chunk_size!(32000, 32000, 4032);
+/// # }
 /// ```
 #[macro_export]
 macro_rules! dma_descriptors_chunk_size {
@@ -465,9 +509,15 @@ macro_rules! dma_descriptors_chunk_size {
 /// size
 ///
 /// ## Usage
-/// ```rust,ignore
-/// // Create TX and RX descriptors for transactions up to 32000 bytes - passing only one parameter assumes TX and RX are the same size
-/// let (tx_descriptors, rx_descriptors) = dma_circular_descriptors!(32000, 32000, 4032);
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::dma_circular_descriptors_chunk_size;
+///
+/// // Create TX and RX descriptors for transactions up to 32000 bytes - passing
+/// // only one parameter assumes TX and RX are the same size.
+/// let (tx_descriptors, rx_descriptors) =
+///     dma_circular_descriptors_chunk_size!(32000, 32000, 4032);
+/// # }
 /// ```
 #[macro_export]
 macro_rules! dma_circular_descriptors_chunk_size {

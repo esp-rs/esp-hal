@@ -42,29 +42,32 @@
 #![cfg_attr(esp32h2, doc = "Clock source is XTAL")]
 #![doc = ""]
 //! ## Examples
+//!
 //! ### Output a 20 kHz signal
-//! Uses timer0 and operator0 of the MCPWM0 peripheral to output a 50% duty
-//! signal at 20 kHz. The signal will be output to the pin assigned to `pin`.
+//!
+//! This example uses timer0 and operator0 of the MCPWM0 peripheral to output a
+//! 50% duty signal at 20 kHz. The signal will be output to the pin assigned to
+//! `pin`.
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::{mcpwm, prelude::*};
-//! # use esp_hal::mcpwm::operator::{DeadTimeCfg, PWMStream};
-//! # use mcpwm::{operator::PwmPinConfig, timer::PwmWorkingMode, McPwm, PeripheralClockConfig};
+//! # use esp_hal::mcpwm::{operator::{DeadTimeCfg, PWMStream, PwmPinConfig}, timer::PwmWorkingMode, McPwm, PeripheralClockConfig};
 //! # use esp_hal::gpio::Io;
 //!
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! # let system = esp_hal::init(CpuClock::boot_default());
+//! # let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
 //! # let pin = io.pins.gpio0;
 //!
 //! // initialize peripheral
 #![cfg_attr(
     esp32h2,
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40.MHz()).unwrap();"
+    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(&system.clocks, 40.MHz()).unwrap();"
 )]
 #![cfg_attr(
     not(esp32h2),
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 32.MHz()).unwrap();"
+    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(&system.clocks, 32.MHz()).unwrap();"
 )]
-//! let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
+//! let mut mcpwm = McPwm::new(system.peripherals.MCPWM0, clock_cfg);
 //!
 //! // connect operator0 to timer0
 //! mcpwm.operator0.set_timer(&mcpwm.timer0);

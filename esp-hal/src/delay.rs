@@ -1,16 +1,18 @@
 //! # Delay
 //!
 //! ## Overview
+//!
 //! The Delay driver provides blocking delay functionalities using the
-//! `SYSTIMER` peripheral for RISC-V devices and the built-in Xtensa timer for
-//! Xtensa devices.
+//! [current_time] function.
 //!
 //! ## Configuration
+//!
 //! The delays are implemented in a "best-effort" way, meaning that the CPU will
 //! block for at least the amount of time specified, but accuracy can be
 //! affected by many factors, including interrupt usage.
 //!
 //! ## Usage
+//!
 //! This module implements the blocking [DelayMs] and [DelayUs] traits from
 //! [embedded-hal], both 0.2.x and 1.x.x.
 //!
@@ -20,7 +22,9 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
 //! # use embedded_hal::delay::DelayNs;
-//! let mut delay = Delay::new(&clocks);
+//! let system = esp_hal::init(CpuClock::boot_default());
+//!
+//! let mut delay = Delay::new(&system.clocks);
 //!
 //! delay.delay_ms(1000 as u32);
 //! # }

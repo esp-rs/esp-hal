@@ -1,4 +1,4 @@
-//! This demos the RTC Watchdog Timer (RWDT).
+//! This example demonstrates the RTC Watchdog Timer (RWDT).
 //!
 //! The RWDT is initially configured to trigger an interrupt after a given
 //! timeout. Then, upon expiration, the RWDT is restarted and then reconfigured
@@ -14,16 +14,17 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
-    peripherals::Peripherals,
+    interrupt::Priority,
     prelude::*,
     rtc_cntl::{Rtc, Rwdt},
 };
+use esp_println::println;
 
 static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
+    let System { peripherals, .. } = esp_hal::init(CpuClock::boot_default());
 
     let mut rtc = Rtc::new(peripherals.LPWR);
     rtc.set_interrupt_handler(interrupt_handler);
@@ -35,16 +36,16 @@ fn main() -> ! {
     loop {}
 }
 
-#[handler(priority = esp_hal::interrupt::Priority::min())]
+#[handler(priority = Priority::min())]
 fn interrupt_handler() {
     critical_section::with(|cs| {
-        esp_println::println!("RWDT Interrupt");
+        println!("RWDT Interrupt");
 
         let mut rwdt = RWDT.borrow_ref_mut(cs);
         let rwdt = rwdt.as_mut().unwrap();
         rwdt.clear_interrupt();
 
-        esp_println::println!("Restarting in 5 seconds...");
+        println!("Restarting in 5 seconds...");
 
         rwdt.set_timeout(5000.millis());
         rwdt.unlisten();

@@ -20,11 +20,8 @@ use critical_section::Mutex;
 use esp_alloc::heap_allocator;
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
-    peripherals::Peripherals,
     prelude::*,
     rng::Rng,
-    system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer, PeriodicTimer},
 };
 use esp_println::println;
@@ -37,12 +34,14 @@ static KNOWN_SSIDS: Mutex<RefCell<BTreeSet<String>>> = Mutex::new(RefCell::new(B
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
 
-    let peripherals = Peripherals::take();
+    let System {
+        peripherals,
+        clocks,
+        ..
+    } = esp_hal::init(CpuClock::max());
+
     // Create a heap allocator, with 32kB of space.
     heap_allocator!(32_168);
-
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::max(system.clock_control).freeze();
 
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let timer0: ErasedTimer = timg0.timer0.into();

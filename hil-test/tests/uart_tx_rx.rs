@@ -12,11 +12,9 @@
 #![no_main]
 
 use esp_hal::{
-    clock::ClockControl,
     gpio::Io,
-    peripherals::{Peripherals, UART0, UART1},
+    peripherals::{UART0, UART1},
     prelude::*,
-    system::SystemControl,
     uart::{UartRx, UartTx},
     Blocking,
 };
@@ -28,21 +26,6 @@ struct Context {
     rx: UartRx<'static, UART1, Blocking>,
 }
 
-impl Context {
-    pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
-        let tx = UartTx::new(peripherals.UART0, &clocks, io.pins.gpio2).unwrap();
-        let rx = UartRx::new(peripherals.UART1, &clocks, io.pins.gpio3).unwrap();
-
-        Context { tx, rx }
-    }
-}
-
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
@@ -52,7 +35,18 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        Context::init()
+        let System {
+            peripherals,
+            clocks,
+            ..
+        } = esp_hal::init(CpuClock::boot_default());
+
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+
+        let tx = UartTx::new(peripherals.UART0, &clocks, io.pins.gpio2).unwrap();
+        let rx = UartRx::new(peripherals.UART1, &clocks, io.pins.gpio3).unwrap();
+
+        Context { tx, rx }
     }
 
     #[test]

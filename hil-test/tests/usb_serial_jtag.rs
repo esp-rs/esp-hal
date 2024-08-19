@@ -8,20 +8,16 @@
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    use esp_hal::{
-        clock::ClockControl,
-        peripherals::Peripherals,
-        system::SystemControl,
-        timer::timg::TimerGroup,
-        usb_serial_jtag::UsbSerialJtag,
-    };
+    use esp_hal::{prelude::*, timer::timg::TimerGroup, usb_serial_jtag::UsbSerialJtag};
     use hil_test as _;
 
     #[test]
     fn creating_peripheral_does_not_break_debug_connection() {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let System {
+            peripherals,
+            clocks,
+            ..
+        } = esp_hal::init(CpuClock::boot_default());
 
         let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
         esp_hal_embassy::init(&clocks, timg0.timer0);

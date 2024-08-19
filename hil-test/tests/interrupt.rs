@@ -11,10 +11,10 @@ use core::{arch::asm, cell::RefCell};
 
 use critical_section::Mutex;
 use esp_hal::{
-    clock::ClockControl,
     interrupt::{self, *},
-    peripherals::{Interrupt, Peripherals},
-    system::{SoftwareInterrupt, SystemControl},
+    peripherals::Interrupt,
+    prelude::*,
+    system::SoftwareInterrupt,
 };
 use hil_test as _;
 
@@ -27,7 +27,11 @@ struct Context {
 
 impl Context {
     pub fn init() -> Self {
-        let peripherals = Peripherals::take();
+        let System {
+            peripherals,
+            software_interrupt_control: sw_int,
+            ..
+        } = esp_hal::init(CpuClock::max());
 
         cfg_if::cfg_if! {
             if #[cfg(any(feature = "esp32c6", feature = "esp32h2"))] {
@@ -38,11 +42,6 @@ impl Context {
         }
 
         let sw0_trigger_addr = cpu_intr.cpu_intr_from_cpu_0() as *const _ as u32;
-
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let _clocks = ClockControl::max(system.clock_control).freeze();
-
-        let sw_int = system.software_interrupt_control;
 
         critical_section::with(|cs| {
             SWINT0

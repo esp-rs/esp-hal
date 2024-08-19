@@ -17,7 +17,6 @@ use esp_backtrace as _;
 use esp_hal::{
     gpio::Io,
     otg_fs::{Usb, UsbBus},
-    peripherals::Peripherals,
     prelude::*,
 };
 use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
@@ -27,7 +26,7 @@ static mut EP_MEMORY: [u32; 1024] = [0; 1024];
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
+    let System { peripherals, .. } = esp_hal::init(CpuClock::boot_default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

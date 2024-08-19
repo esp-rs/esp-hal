@@ -1,14 +1,17 @@
 //! # LCD - I8080/MOTO6800 Mode.
 //!
 //! ## Overview
+//!
 //! The LCD_CAM peripheral I8080 driver provides support for the I8080
-//! format/timing. The driver mandates DMA for DMA (Direct Memory Access) for
+//! format/timing. The driver mandates DMA (Direct Memory Access) for
 //! efficient data transfer.
 //!
-//! ## Examples
+//! ## Example
+//!
 //! ### MIPI-DSI Display
-//! Following code show how to send a command to a MIPI-DSI display over I8080
-//! protocol.
+//!
+//! The following example shows how to send a command to a MIPI-DSI display over
+//! the I8080 protocol.
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -16,11 +19,11 @@
 //! # use esp_hal::lcd_cam::{LcdCam, lcd::i8080::{Config, I8080, TxEightBits}};
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::{Dma, DmaPriority};
-//! # use fugit::RateExtU32;
+//! #
+//! let system = esp_hal::init(CpuClock::boot_default());
+//! # let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
 //!
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//!
-//! # let dma = Dma::new(peripherals.DMA);
+//! # let dma = Dma::new(system.peripherals.DMA);
 //! # let channel = dma.channel0;
 //!
 //! # let (tx_buffer, tx_descriptors, _, rx_descriptors) = dma_buffers!(32678, 0);
@@ -40,7 +43,7 @@
 //!     io.pins.gpio16,
 //!     io.pins.gpio15,
 //! );
-//! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
+//! let lcd_cam = LcdCam::new(system.peripherals.LCD_CAM);
 //!
 //! let mut i8080 = I8080::new(
 //!     lcd_cam.lcd,
@@ -49,7 +52,7 @@
 //!     tx_pins,
 //!     20.MHz(),
 //!     Config::default(),
-//!     &clocks,
+//!     &system.clocks,
 //! )
 //! .with_ctrl_pins(io.pins.gpio0, io.pins.gpio47);
 //!

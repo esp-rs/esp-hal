@@ -59,12 +59,9 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     hmac::{Hmac, HmacPurpose, KeyId},
-    peripherals::Peripherals,
     prelude::*,
     rng::Rng,
-    system::SystemControl,
     timer::systimer::SystemTimer,
 };
 use esp_println::println;
@@ -76,9 +73,7 @@ type HmacSha256 = HmacSw<Sha256>;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let System { peripherals, .. } = esp_hal::init(CpuClock::boot_default());
 
     let mut rng = Rng::new(peripherals.RNG);
 

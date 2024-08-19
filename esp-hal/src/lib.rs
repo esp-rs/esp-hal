@@ -17,7 +17,7 @@
 #![cfg_attr(esp32c3, doc = "**ESP32-C3**")]
 #![cfg_attr(esp32c6, doc = "**ESP32-C6**")]
 #![cfg_attr(esp32h2, doc = "**ESP32-H2**")]
-//! please ensure you are reading the correct [documentation] for your target
+//! . Please ensure you are reading the correct [documentation] for your target
 //! device.
 //!
 //! ## Choosing a Device
@@ -63,12 +63,9 @@
 //! // A panic - handler e.g. `use esp_backtrace as _;`
 //!
 //! use esp_hal::{
-//!     clock::ClockControl,
 //!     delay::Delay,
 //!     gpio::{Io, Level, Output},
-//!     peripherals::Peripherals,
 //!     prelude::*,
-//!     system::SystemControl,
 //! };
 //! # #[panic_handler]
 //! # fn panic(_ : &core::panic::PanicInfo) -> ! {
@@ -77,15 +74,13 @@
 //!
 //! #[entry]
 //! fn main() -> ! {
-//!     let peripherals = Peripherals::take();
-//!     let system = SystemControl::new(peripherals.SYSTEM);
-//!     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+//!     let system = esp_hal::init(CpuClock::boot_default());
 //!
 //!     // Set GPIO0 as an output, and set its state high initially.
-//!     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//!     let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
 //!     let mut led = Output::new(io.pins.gpio0, Level::High);
 //!
-//!     let delay = Delay::new(&clocks);
+//!     let delay = Delay::new(&system.clocks);
 //!
 //!     loop {
 //!         led.toggle();
@@ -626,17 +621,40 @@ macro_rules! before_snippet {
     () => {
         r#"
 # #![no_std]
-# use esp_hal::peripherals::Peripherals;
-# use esp_hal::clock::ClockControl;
-# use esp_hal::system::SystemControl;
+# use esp_hal::prelude::*;
 # #[panic_handler]
 # fn panic(_ : &core::panic::PanicInfo) -> ! {
 #     loop {}
 # }
 # fn main() {
-#   let peripherals = Peripherals::take();
-#   let system = SystemControl::new(peripherals.SYSTEM);
-#   let mut clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 "#
     };
+}
+
+use crate::{
+    clock::{ClockControl, Clocks, CpuClock},
+    peripherals::Peripherals,
+};
+
+/// System components.
+pub struct System {
+    /// The available peripheral instances.
+    pub peripherals: Peripherals,
+
+    /// The configured clocks.
+    pub clocks: Clocks<'static>,
+
+    /// The available software interrupts.
+    pub software_interrupt_control: crate::system::SoftwareInterruptControl,
+}
+
+/// Initialize the system.
+pub fn init(clock_config: CpuClock) -> System {
+    let peripherals = Peripherals::take();
+
+    System {
+        peripherals,
+        clocks: ClockControl::new(clock_config).freeze(),
+        software_interrupt_control: crate::system::SoftwareInterruptControl::new(),
+    }
 }
