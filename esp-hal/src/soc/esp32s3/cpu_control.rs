@@ -100,14 +100,17 @@ impl<const SIZE: usize> Stack<SIZE> {
         }
     }
 
+    /// Returns the length of the stack in bytes.
     pub const fn len(&self) -> usize {
         SIZE
     }
 
+    /// Returns a mutable pointer to the bottom of the stack.
     pub fn bottom(&mut self) -> *mut u32 {
         self.mem.as_mut_ptr() as *mut u32
     }
 
+    /// Returns a mutable pointer to the top of the stack.
     pub fn top(&mut self) -> *mut u32 {
         unsafe { self.bottom().add(SIZE / 4) }
     }
@@ -132,9 +135,11 @@ impl<'a> Drop for AppCoreGuard<'a> {
     }
 }
 
+/// Represents error that can occur in the system.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
+    /// Core is already running.
     CoreAlreadyRunning,
 }
 
@@ -168,6 +173,7 @@ unsafe fn internal_park_core(core: Cpu) {
 }
 
 impl<'d> CpuControl<'d> {
+    /// Creates a new instance of `CpuControl`.
     pub fn new(cpu_control: impl Peripheral<P = CPU_CTRL> + 'd) -> CpuControl<'d> {
         crate::into_ref!(cpu_control);
 

@@ -5,7 +5,7 @@
 //! used simultaneously. For more information on these modules, please refer to
 //! the documentation in their respective modules.
 
-#![allow(missing_docs)] // TODO: Remove when able
+// #![allow(missing_docs)] // TODO: Remove when able
 
 pub mod cam;
 pub mod lcd;
@@ -21,12 +21,16 @@ use crate::{
     InterruptConfigurable,
 };
 
+/// Represents a combined LCD and Camera interface peripheral.
 pub struct LcdCam<'d, DM: crate::Mode> {
+    /// The LCD interface.
     pub lcd: Lcd<'d, DM>,
+    /// The Camera interface.
     pub cam: Cam<'d>,
 }
 
 impl<'d> LcdCam<'d, crate::Blocking> {
+    /// Creates a new `LcdCam` instance.
     pub fn new(lcd_cam: impl Peripheral<P = LCD_CAM> + 'd) -> Self {
         crate::into_ref!(lcd_cam);
 
@@ -63,6 +67,7 @@ impl<'d> InterruptConfigurable for LcdCam<'d, crate::Blocking> {
 
 #[cfg(feature = "async")]
 impl<'d> LcdCam<'d, crate::Async> {
+    /// Creates a new `LcdCam` instance for asynchronous operation.
     pub fn new_async(lcd_cam: impl Peripheral<P = LCD_CAM> + 'd) -> Self {
         crate::into_ref!(lcd_cam);
 

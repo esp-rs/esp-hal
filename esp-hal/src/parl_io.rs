@@ -1096,14 +1096,17 @@ fn internal_clear_interrupts(interrupts: EnumSet<ParlIoInterrupt>) {
 /// Parallel IO in full duplex mode
 ///
 /// Full duplex mode might limit the maximum possible bit width.
-#[allow(missing_docs)]
 pub struct ParlIoFullDuplex<'d, CH, DM>
 where
     CH: DmaChannel,
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
+    /// The transmitter (TX) channel responsible for handling DMA transfers in
+    /// the parallel I/O full-duplex operation.
     pub tx: TxCreatorFullDuplex<'d, CH, DM>,
+    /// The receiver (RX) channel responsible for handling DMA transfers in the
+    /// parallel I/O full-duplex operation.
     pub rx: RxCreatorFullDuplex<'d, CH, DM>,
 }
 
@@ -1191,13 +1194,14 @@ where
 }
 
 /// Parallel IO in half duplex / TX only mode
-#[allow(missing_docs)]
 pub struct ParlIoTxOnly<'d, CH, DM>
 where
     CH: DmaChannel,
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
+    /// The transmitter (TX) channel responsible for handling DMA transfers in
+    /// the parallel I/O operation.
     pub tx: TxCreator<'d, CH, DM>,
 }
 
@@ -1279,13 +1283,14 @@ where
 }
 
 /// Parallel IO in half duplex / RX only mode
-#[allow(missing_docs)]
 pub struct ParlIoRxOnly<'d, CH, DM>
 where
     CH: DmaChannel,
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
+    /// The receiver (RX) channel responsible for handling DMA transfers in the
+    /// parallel I/O operation.
     pub rx: RxCreator<'d, CH, DM>,
 }
 

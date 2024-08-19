@@ -1305,6 +1305,7 @@ fn modem_clk_domain_active_state_icg_map_preinit() {
 // System Reset: Reset the whole digital system, including RTC sub-system
 // Chip Reset:   Reset the whole chip, including the analog part
 
+/// SOC Reset Reason
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr)]
 pub enum SocResetReason {
     /// Power on reset

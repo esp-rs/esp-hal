@@ -91,6 +91,7 @@ use crate::{
     Mode,
 };
 
+/// Represents the I8080 LCD interface.
 pub struct I8080<'d, CH: DmaChannel, P, DM: Mode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     tx_channel: ChannelTx<'d, CH>,
@@ -104,6 +105,7 @@ where
     CH::P: LcdCamPeripheral,
     P::Word: Into<u16>,
 {
+    /// Creates a new instance of the I8080 LCD interface.
     pub fn new(
         lcd: Lcd<'d, DM>,
         mut channel: ChannelTx<'d, CH>,
@@ -287,6 +289,7 @@ impl<'d, CH: DmaChannel, P: TxPins, DM: Mode> I8080<'d, CH, P, DM>
 where
     P::Word: Into<u16>,
 {
+    /// Configures the byte order for data transmission.
     pub fn set_byte_order(&mut self, byte_order: ByteOrder) -> &mut Self {
         let is_inverted = byte_order != ByteOrder::default();
         self.lcd_cam.lcd_user().modify(|_, w| {
@@ -299,6 +302,7 @@ where
         self
     }
 
+    /// Configures the bit order for data transmission.
     pub fn set_bit_order(&mut self, bit_order: BitOrder) -> &mut Self {
         self.lcd_cam
             .lcd_user()
@@ -306,6 +310,7 @@ where
         self
     }
 
+    /// Associates a CS pin with the I8080 interface.
     pub fn with_cs<CS: OutputPin>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_ref!(cs);
         cs.set_to_push_pull_output(crate::private::Internal);
@@ -314,6 +319,7 @@ where
         self
     }
 
+    /// Configures the control pins for the I8080 interface.
     pub fn with_ctrl_pins<DC: OutputPin, WRX: OutputPin>(
         self,
         dc: impl Peripheral<P = DC> + 'd,
@@ -331,6 +337,7 @@ where
         self
     }
 
+    /// Sends a command and data to the LCD using the I8080 interface.
     pub fn send(
         &mut self,
         cmd: impl Into<Command<P::Word>>,
@@ -350,6 +357,7 @@ where
         Ok(())
     }
 
+    /// Sends a command and data to the LCD using DMA.
     pub fn send_dma<'t, TXBUF>(
         &'t mut self,
         cmd: impl Into<Command<P::Word>>,
@@ -374,6 +382,7 @@ impl<'d, CH: DmaChannel, P: TxPins> I8080<'d, CH, P, crate::Async>
 where
     P::Word: Into<u16>,
 {
+    /// Asynchronously sends a command and data to the LCD using DMA.
     pub async fn send_dma_async<'t, TXBUF>(
         &'t mut self,
         cmd: impl Into<Command<P::Word>>,
@@ -517,7 +526,9 @@ impl<'d, CH: DmaChannel, P, DM: Mode> core::fmt::Debug for I8080<'d, CH, P, DM> 
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+/// Configuration settings for the I8080 interface.
 pub struct Config {
+    /// Specifies the clock mode, including polarity and phase settings.
     pub clock_mode: ClockMode,
 
     /// Setup cycles expected, must be at least 1. (6 bits)
@@ -563,8 +574,11 @@ impl Default for Config {
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Command<T> {
+    /// Suppresses the command phase. No command is sent.
     None,
+    /// Sends a single-word command.
     One(T),
+    /// Sends a two-word command.
     Two(T, T),
 }
 
@@ -574,6 +588,8 @@ impl<T> From<T> for Command<T> {
     }
 }
 
+/// Represents a group of 8 output pins configured for 8-bit parallel data
+/// transmission.
 pub struct TxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7> {
     pin_0: PeripheralRef<'d, P0>,
     pin_1: PeripheralRef<'d, P1>,
@@ -597,6 +613,7 @@ where
     P7: OutputPin,
 {
     #[allow(clippy::too_many_arguments)]
+    /// Creates a new `TxEightBits` instance with the provided output pins.
     pub fn new(
         pin_0: impl Peripheral<P = P0> + 'd,
         pin_1: impl Peripheral<P = P1> + 'd,
@@ -670,6 +687,8 @@ where
     }
 }
 
+/// Represents a group of 16 output pins configured for 16-bit parallel data
+/// transmission.
 pub struct TxSixteenBits<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15> {
     pin_0: PeripheralRef<'d, P0>,
     pin_1: PeripheralRef<'d, P1>,
@@ -710,6 +729,7 @@ where
     P15: OutputPin,
 {
     #[allow(clippy::too_many_arguments)]
+    /// Creates a new `TxSixteenBits` instance with the provided output pins.
     pub fn new(
         pin_0: impl Peripheral<P = P0> + 'd,
         pin_1: impl Peripheral<P = P1> + 'd,

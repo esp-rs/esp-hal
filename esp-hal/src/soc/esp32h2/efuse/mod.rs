@@ -45,6 +45,7 @@ use crate::peripherals::EFUSE;
 
 mod fields;
 
+/// A struct representing the eFuse functionality of the chip.
 pub struct Efuse;
 
 impl Efuse {

@@ -14,7 +14,7 @@
 //! up the timing parameters, configuring acceptance filters, handling
 //! interrupts, and transmitting/receiving messages on the TWAI bus.
 //!
-//! This driver manages the ISO 11898-1 (CAN Specification 2.0) compatible TWAI
+//! This driver manages the ISO 11898-1 compatible TWAI
 //! controllers. It supports Standard Frame Format (11-bit) and Extended Frame
 //! Format (29-bit) frame identifiers.
 //!
@@ -34,13 +34,13 @@
 //! # use core::option::Option::None;
 //! # use nb::block;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! // Use GPIO pins 2 and 3 to connect to the respective pins on the CAN
+//! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.
 //! let can_tx_pin = io.pins.gpio2;
 //! let can_rx_pin = io.pins.gpio3;
 //!
-//! // The speed of the CAN bus.
-//! const CAN_BAUDRATE: twai::BaudRate = BaudRate::B1000K;
+//! // The speed of the TWAI bus.
+//! const TWAI_BAUDRATE: twai::BaudRate = BaudRate::B1000K;
 //!
 //! // Begin configuring the TWAI peripheral. The peripheral is in a reset like
 //! // state that prevents transmission but allows configuration.
@@ -49,7 +49,7 @@
 //!     can_tx_pin,
 //!     can_rx_pin,
 //!     &clocks,
-//!     CAN_BAUDRATE,
+//!     TWAI_BAUDRATE,
 //!     TwaiMode::Normal
 //! );
 //!
@@ -90,13 +90,13 @@
 //! # use core::option::Option::None;
 //! # use nb::block;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! // Use GPIO pins 2 and 3 to connect to the respective pins on the CAN
+//! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.
 //! let can_tx_pin = io.pins.gpio2;
 //! let can_rx_pin = io.pins.gpio3;
 //!
-//! // The speed of the CAN bus.
-//! const CAN_BAUDRATE: twai::BaudRate = BaudRate::B1000K;
+//! // The speed of the TWAI bus.
+//! const TWAI_BAUDRATE: twai::BaudRate = BaudRate::B1000K;
 //!
 //! // Begin configuring the TWAI peripheral.
 //! let mut can_config = twai::TwaiConfiguration::new(
@@ -104,7 +104,7 @@
 //!     can_tx_pin,
 //!     can_rx_pin,
 //!     &clocks,
-//!     CAN_BAUDRATE,
+//!     TWAI_BAUDRATE,
 //!     TwaiMode::SelfTest
 //! );
 //!
@@ -129,8 +129,6 @@
 //! # }
 //! ```
 
-#![allow(missing_docs)] // TODO: Remove when able
-
 use core::marker::PhantomData;
 
 use self::filter::{Filter, FilterType};
@@ -146,12 +144,12 @@ use crate::{
 
 pub mod filter;
 
-/// CAN error kind
+/// TWAI error kind
 ///
-/// This represents a common set of CAN operation errors. HAL implementations
+/// This represents a common set of TWAI operation errors. HAL implementations
 /// are free to define more specific or additional error types. However, by
-/// providing a mapping to these common CAN errors, generic code can still react
-/// to them.
+/// providing a mapping to these common TWAI errors, generic code can still
+/// react to them.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[non_exhaustive]
 pub enum ErrorKind {
@@ -256,15 +254,15 @@ pub enum TwaiMode {
     ListenOnly,
 }
 
-/// Standard 11-bit CAN Identifier (`0..=0x7FF`).
+/// Standard 11-bit TWAI Identifier (`0..=0x7FF`).
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct StandardId(u16);
 
 impl StandardId {
-    /// CAN ID `0`, the highest priority.
+    /// TWAI ID `0`, the highest priority.
     pub const ZERO: Self = StandardId(0);
 
-    /// CAN ID `0x7FF`, the lowest priority.
+    /// TWAI ID `0x7FF`, the lowest priority.
     pub const MAX: Self = StandardId(0x7FF);
 
     /// Tries to create a `StandardId` from a raw 16-bit integer.
@@ -290,7 +288,7 @@ impl StandardId {
         StandardId(raw)
     }
 
-    /// Returns this CAN Identifier as a raw 16-bit integer.
+    /// Returns TWAI Identifier as a raw 16-bit integer.
     #[inline]
     pub fn as_raw(&self) -> u16 {
         self.0
@@ -325,15 +323,15 @@ impl From<embedded_can::StandardId> for StandardId {
     }
 }
 
-/// Extended 29-bit CAN Identifier (`0..=1FFF_FFFF`).
+/// Extended 29-bit TWAI Identifier (`0..=1FFF_FFFF`).
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct ExtendedId(u32);
 
 impl ExtendedId {
-    /// CAN ID `0`, the highest priority.
+    /// TWAI ID `0`, the highest priority.
     pub const ZERO: Self = ExtendedId(0);
 
-    /// CAN ID `0x1FFFFFFF`, the lowest priority.
+    /// TWAI ID `0x1FFFFFFF`, the lowest priority.
     pub const MAX: Self = ExtendedId(0x1FFF_FFFF);
 
     /// Tries to create a `ExtendedId` from a raw 32-bit integer.
@@ -359,7 +357,7 @@ impl ExtendedId {
         ExtendedId(raw)
     }
 
-    /// Returns this CAN Identifier as a raw 32-bit integer.
+    /// Returns TWAI Identifier as a raw 32-bit integer.
     #[inline]
     pub fn as_raw(&self) -> u32 {
         self.0
@@ -400,7 +398,7 @@ impl From<embedded_can::ExtendedId> for ExtendedId {
     }
 }
 
-/// A CAN Identifier (standard or extended).
+/// A TWAI Identifier (standard or extended).
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Id {
     /// Standard 11-bit Identifier (`0..=0x7FF`).
@@ -474,8 +472,9 @@ pub struct EspTwaiFrame {
 }
 
 impl EspTwaiFrame {
+    /// Creates a new `EspTwaiFrame` with the specified ID and data payload.
     pub fn new(id: Id, data: &[u8]) -> Option<Self> {
-        // CAN2.0 frames cannot contain more than 8 bytes of data.
+        // TWAI frames cannot contain more than 8 bytes of data.
         if data.len() > 8 {
             return None;
         }
@@ -493,8 +492,10 @@ impl EspTwaiFrame {
         })
     }
 
+    /// Creates a new `EspTwaiFrame` for a transmission request with the
+    /// specified ID and data length (DLC).
     pub fn new_remote(id: Id, dlc: usize) -> Option<Self> {
-        // CAN2.0 frames cannot have more than 8 bytes.
+        // TWAI frames cannot have more than 8 bytes.
         if dlc > 8 {
             return None;
         }
@@ -508,6 +509,8 @@ impl EspTwaiFrame {
         })
     }
 
+    /// Creates a new `EspTwaiFrame` ready for self-reception with the specified
+    /// ID and data payload.
     pub fn new_self_reception(id: Id, data: &[u8]) -> Option<Self> {
         if data.len() > 8 {
             return None;
@@ -635,10 +638,23 @@ impl embedded_can::Frame for EspTwaiFrame {
 
 /// The underlying timings for the TWAI peripheral.
 pub struct TimingConfig {
+    /// The baudrate prescaler is used to determine the period of each time
+    /// quantum by dividing the TWAI controller's source clock.
     pub baud_rate_prescaler: u16,
+
+    /// The synchronization jump width is used to determine the maximum number
+    /// of time quanta a single bit time can be lengthened/shortened for
+    /// synchronization purposes.
     pub sync_jump_width: u8,
+
+    /// Timing segment 1 consists of 1 to 16 time quanta before sample point.
     pub tseg_1: u8,
+
+    /// Timing Segment 2 consists of 1 to 8 time quanta after sample point.
     pub tseg_2: u8,
+
+    /// Enabling triple sampling causes 3 time quanta to be sampled per bit
+    /// instead of 1.
     pub triple_sample: bool,
 }
 
@@ -646,33 +662,24 @@ pub struct TimingConfig {
 /// Currently these timings are sourced from the ESP IDF C driver which assumes
 /// an APB clock of 80MHz.
 pub enum BaudRate {
+    /// A baud rate of 125 Kbps.
     B125K,
+    /// A baud rate of 250 Kbps.
     B250K,
+    /// A baud rate of 500 Kbps.
     B500K,
+    /// A baud rate of 1 Mbps.
     B1000K,
+    /// A custom baud rate defined by the user.
+    ///
+    /// This variant allows users to specify their own timing configuration
+    /// using a `TimingConfig` struct.
     Custom(TimingConfig),
 }
 
 impl BaudRate {
     /// Convert the BaudRate into the timings that the peripheral needs.
-    // These timings are copied from the ESP IDF C driver.
-    // #define TWAI_TIMING_CONFIG_25KBITS()    {.brp = 128, .tseg_1 = 16, .tseg_2 =
-    // 8, .sjw = 3, .triple_sampling = false}
-    // #define TWAI_TIMING_CONFIG_50KBITS()    {.brp = 80, .tseg_1 = 15, .tseg_2 =
-    // 4, .sjw = 3, .triple_sampling = false}
-    // #define TWAI_TIMING_CONFIG_100KBITS()   {.brp = 40, .tseg_1 = 15, .tseg_2 =
-    // 4, .sjw = 3, .triple_sampling = false}
-    // #define TWAI_TIMING_CONFIG_125KBITS()   {.brp = 32, .tseg_1 = 15, .tseg_2 =
-    // 4, .sjw = 3, .triple_sampling = false}
-    // #define TWAI_TIMING_CONFIG_250KBITS()   {.brp = 16, .tseg_1 = 15, .tseg_2 =
-    // 4, .sjw = 3, .triple_sampling = false}
-    // #define TWAI_TIMING_CONFIG_500KBITS()   {.brp = 8, .tseg_1 = 15, .tseg_2 = 4,
-    // .sjw = 3, .triple_sampling = false} #define TWAI_TIMING_CONFIG_800KBITS()
-    // {.brp = 4, .tseg_1 = 16, .tseg_2 = 8, .sjw = 3, .triple_sampling = false}
-    // #define TWAI_TIMING_CONFIG_1MBITS()     {.brp = 4, .tseg_1 = 15, .tseg_2 = 4,
-    // .sjw = 3, .triple_sampling = false}
-    //
-    // see https://github.com/espressif/esp-idf/tree/master/components/hal/include/hal/twai_types.h
+    // See: https://github.com/espressif/esp-idf/tree/master/components/hal/include/hal/twai_types.h
     const fn timing(self) -> TimingConfig {
         #[allow(unused_mut)]
         let mut timing = match self {
@@ -1024,10 +1031,12 @@ where
         }
     }
 
+    /// Returns the value of the receive error counter.
     pub fn receive_error_count(&self) -> u8 {
         T::register_block().rx_err_cnt().read().rx_err_cnt().bits()
     }
 
+    /// Returns the value of the transmit error counter.
     pub fn transmit_error_count(&self) -> u8 {
         T::register_block().tx_err_cnt().read().tx_err_cnt().bits()
     }
@@ -1067,10 +1076,12 @@ where
         }
     }
 
+    /// Sends the specified `EspTwaiFrame` over the TWAI bus.
     pub fn transmit(&mut self, frame: &EspTwaiFrame) -> nb::Result<(), EspTwaiError> {
         self.tx.transmit(frame)
     }
 
+    /// Receives a TWAI frame from the TWAI bus.
     pub fn receive(&mut self) -> nb::Result<EspTwaiFrame, EspTwaiError> {
         self.rx.receive()
     }
@@ -1082,7 +1093,7 @@ where
     }
 }
 
-/// Interface to the CAN transmitter part.
+/// Interface to the TWAI transmitter part.
 pub struct TwaiTx<'d, T, DM: crate::Mode> {
     _peripheral: PhantomData<&'d T>,
     phantom: PhantomData<DM>,
@@ -1124,7 +1135,7 @@ where
     }
 }
 
-/// Interface to the CAN receiver part.
+/// Interface to the TWAI receiver part.
 pub struct TwaiRx<'d, T, DM: crate::Mode> {
     _peripheral: PhantomData<&'d T>,
     phantom: PhantomData<DM>,
@@ -1135,7 +1146,7 @@ where
     T: OperationInstance,
     DM: crate::Mode,
 {
-    // Receive a frame
+    /// Receive a frame
     pub fn receive(&mut self) -> nb::Result<EspTwaiFrame, EspTwaiError> {
         let register_block = T::register_block();
         let status = register_block.status().read();
@@ -1166,9 +1177,14 @@ where
     }
 }
 
+/// Represents errors that can occur in the TWAI driver.
+/// This enum defines the possible errors that can be encountered when
+/// interacting with the TWAI peripheral.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum EspTwaiError {
+    /// TWAI peripheral has entered a bus-off state.
     BusOff,
+    /// Encapsulates errors defined by the embedded-hal crate.
     EmbeddedHAL(ErrorKind),
 }
 
@@ -1274,28 +1290,41 @@ where
     }
 }
 
+/// TWAI peripheral instance.
 pub trait Instance: crate::private::Sealed {
+    /// The system peripheral associated with this TWAI instance.
     const SYSTEM_PERIPHERAL: system::Peripheral;
+    /// The identifier number for this TWAI instance.
     const NUMBER: usize;
 
+    /// Input signal.
     const INPUT_SIGNAL: InputSignal;
+    /// Output signal.
     const OUTPUT_SIGNAL: OutputSignal;
-
+    /// The interrupt associated with this TWAI instance.
     const INTERRUPT: crate::peripherals::Interrupt;
     #[cfg(feature = "async")]
+    /// Provides an asynchronous interrupt handler for TWAI instance.
     fn async_handler() -> InterruptHandler;
 
+    /// Returns a reference to the register block for TWAI instance.
     fn register_block() -> &'static RegisterBlock;
 
+    /// Enables the TWAI peripheral.
     fn enable_peripheral();
 
+    /// Resets the TWAI peripheral.
     fn reset_peripheral();
 
+    /// Enables interrupts for the TWAI peripheral.
     fn enable_interrupts();
 }
 
+/// An extension of the `Instance` trait that provides additional operations
+/// for managing and interacting with the TWAI peripheral.
 pub trait OperationInstance: Instance {
     #[cfg(feature = "async")]
+    /// Returns a reference to the asynchronous state for this TWAI instance.
     fn async_state() -> &'static asynch::TwaiAsyncState {
         &asynch::TWAI_STATE[Self::NUMBER]
     }
@@ -1652,10 +1681,11 @@ mod asynch {
     where
         T: OperationInstance,
     {
+        /// Transmits an `EspTwaiFrame` asynchronously over the TWAI bus.
         pub async fn transmit_async(&mut self, frame: &EspTwaiFrame) -> Result<(), EspTwaiError> {
             self.tx.transmit_async(frame).await
         }
-
+        /// Receives an `EspTwaiFrame` asynchronously over the TWAI bus.
         pub async fn receive_async(&mut self) -> Result<EspTwaiFrame, EspTwaiError> {
             self.rx.receive_async().await
         }
@@ -1665,6 +1695,7 @@ mod asynch {
     where
         T: OperationInstance,
     {
+        /// Transmits an `EspTwaiFrame` asynchronously over the TWAI bus.
         pub async fn transmit_async(&mut self, frame: &EspTwaiFrame) -> Result<(), EspTwaiError> {
             T::enable_interrupts();
             poll_fn(|cx| {
@@ -1694,6 +1725,7 @@ mod asynch {
     where
         T: OperationInstance,
     {
+        /// Receives an `EspTwaiFrame` asynchronously over the TWAI bus.
         pub async fn receive_async(&mut self) -> Result<EspTwaiFrame, EspTwaiError> {
             T::enable_interrupts();
             poll_fn(|cx| {

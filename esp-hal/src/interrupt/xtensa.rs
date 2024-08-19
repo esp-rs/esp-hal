@@ -27,39 +27,70 @@ pub enum Error {
 #[derive(Debug, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u32)]
-#[allow(missing_docs)]
 pub enum CpuInterrupt {
+    /// Level-triggered interrupt with priority 1.
     Interrupt0LevelPriority1 = 0,
+    /// Level-triggered interrupt with priority 1.
     Interrupt1LevelPriority1,
+    /// Level-triggered interrupt with priority 1.
     Interrupt2LevelPriority1,
+    /// Level-triggered interrupt with priority 1.
     Interrupt3LevelPriority1,
+    /// Level-triggered interrupt with priority 1.
     Interrupt4LevelPriority1,
+    /// Level-triggered interrupt with priority 1.
     Interrupt5LevelPriority1,
+    /// Timer 0 interrupt with priority 1.
     Interrupt6Timer0Priority1,
+    /// Software-triggered interrupt with priority 1.
     Interrupt7SoftwarePriority1,
+    /// Level-triggered interrupt with priority 1.
     Interrupt8LevelPriority1,
+    /// Level-triggered interrupt with priority 1.
     Interrupt9LevelPriority1,
+    /// Edge-triggered interrupt with priority 1.
     Interrupt10EdgePriority1,
+    /// Profiling-related interrupt with priority 3.
     Interrupt11ProfilingPriority3,
+    /// Level-triggered interrupt with priority 1.
     Interrupt12LevelPriority1,
+    /// Level-triggered interrupt with priority 1.
     Interrupt13LevelPriority1,
+    /// Non-maskable interrupt (NMI) with priority 7.
     Interrupt14NmiPriority7,
+    /// Timer 1 interrupt with priority 3.
     Interrupt15Timer1Priority3,
+    /// Timer 2 interrupt with priority 5.
     Interrupt16Timer2Priority5,
+    /// Level-triggered interrupt with priority 1.
     Interrupt17LevelPriority1,
+    /// Level-triggered interrupt with priority 1.
     Interrupt18LevelPriority1,
+    /// Level-triggered interrupt with priority 2.
     Interrupt19LevelPriority2,
+    /// Level-triggered interrupt with priority 2.
     Interrupt20LevelPriority2,
+    /// Level-triggered interrupt with priority 2.
     Interrupt21LevelPriority2,
+    /// Edge-triggered interrupt with priority 3.
     Interrupt22EdgePriority3,
+    /// Level-triggered interrupt with priority 3.
     Interrupt23LevelPriority3,
+    /// Level-triggered interrupt with priority 4.
     Interrupt24LevelPriority4,
+    /// Level-triggered interrupt with priority 4.
     Interrupt25LevelPriority4,
+    /// Level-triggered interrupt with priority 5.
     Interrupt26LevelPriority5,
+    /// Level-triggered interrupt with priority 3.
     Interrupt27LevelPriority3,
+    /// Edge-triggered interrupt with priority 4.
     Interrupt28EdgePriority4,
+    /// Software-triggered interrupt with priority 3.
     Interrupt29SoftwarePriority3,
+    /// Edge-triggered interrupt with priority 4.
     Interrupt30EdgePriority4,
+    /// Edge-triggered interrupt with priority 5.
     Interrupt31EdgePriority5,
 }
 
@@ -267,11 +298,14 @@ mod vectored {
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     #[repr(u8)]
-    #[allow(missing_docs)]
     pub enum Priority {
+        /// No priority.
         None = 0,
+        /// Priority level 1.
         Priority1,
+        /// Priority level 2.
         Priority2,
+        /// Priority level 3.
         Priority3,
     }
 

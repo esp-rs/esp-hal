@@ -272,10 +272,12 @@ mod peripheral_macros {
                 $crate::impl_dma_eligible!(MEM2MEM15,Mem2Mem15);
             }
 
+            /// The `Peripherals` struct provides access to all of the hardware peripherals on the chip.
             #[allow(non_snake_case)]
             pub struct Peripherals {
                 $(
                     $(#[$cfg])?
+                    /// Each field represents a hardware peripheral.
                     pub $name: peripherals::$name,
                 )*
             }
@@ -325,6 +327,7 @@ mod peripheral_macros {
                     impl peripherals::$name {
                         $(
                             paste::paste!{
+                                /// Binds an interrupt handler to the corresponding interrupt for this peripheral.
                                 pub fn [<bind_ $interrupt:lower _interrupt >](&mut self, handler: unsafe extern "C" fn() -> ()) {
                                     unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$interrupt, handler); }
                                 }
@@ -355,6 +358,7 @@ mod peripheral_macros {
             $(#[$cfg])?
             #[derive(Debug)]
             #[allow(non_camel_case_types)]
+            /// Macro to create a peripheral structure with a virtual interface.
             pub struct $name { _inner: () }
 
             $(#[$cfg])?
@@ -385,6 +389,7 @@ mod peripheral_macros {
             $(#[$cfg])?
             #[derive(Debug)]
             #[allow(non_camel_case_types)]
+            /// Macro to create a peripheral structure with a virtual interface.
             pub struct $name { _inner: () }
 
             $(#[$cfg])?

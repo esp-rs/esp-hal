@@ -80,8 +80,6 @@
 //! - Only master mode is supported.
 //! - Only TDM Philips standard is supported.
 
-#![allow(missing_docs)] // TODO: Remove when able
-
 use core::marker::PhantomData;
 
 use enumset::{EnumSet, EnumSetType};
@@ -121,12 +119,17 @@ use crate::{
 };
 
 #[derive(EnumSetType)]
+/// Represents the various interrupt types for the I2S peripheral.
 pub enum I2sInterrupt {
+    /// Transmit buffer hung, indicating a stall in data transmission.
     TxHung,
+    /// Receive buffer hung, indicating a stall in data reception.
     RxHung,
     #[cfg(not(any(esp32, esp32s2)))]
+    /// Transmission of data is complete.
     TxDone,
     #[cfg(not(any(esp32, esp32s2)))]
+    /// Reception of data is complete.
     RxDone,
 }
 
@@ -150,8 +153,11 @@ impl AcceptedWord for i32 {}
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
+    /// An unspecified or unknown error occurred during an I2S operation.
     Unknown,
+    /// A DMA-related error occurred during I2S operations.
     DmaError(DmaError),
+    /// An illegal or invalid argument was passed to an I2S function or method.
     IllegalArgument,
 }
 
@@ -165,6 +171,7 @@ impl From<DmaError> for Error {
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Standard {
+    /// The Philips I2S standard.
     Philips,
     // Tdm,
     // Pdm,
@@ -175,12 +182,19 @@ pub enum Standard {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(not(any(esp32, esp32s2)))]
 pub enum DataFormat {
+    /// 32-bit data width and 32-bit channel width.
     Data32Channel32,
+    /// 32-bit data width and 24-bit channel width.
     Data32Channel24,
+    /// 32-bit data width and 16-bit channel width.
     Data32Channel16,
+    /// 32-bit data width and 8-bit channel width.
     Data32Channel8,
+    /// 16-bit data width and 16-bit channel width.
     Data16Channel16,
+    /// 16-bit data width and 8-bit channel width.
     Data16Channel8,
+    /// 8-bit data width and 8-bit channel width.
     Data8Channel8,
 }
 
@@ -189,12 +203,15 @@ pub enum DataFormat {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(any(esp32, esp32s2))]
 pub enum DataFormat {
+    /// 32-bit data width and 32-bit channel width.
     Data32Channel32,
+    /// 16-bit data width and 16-bit channel width.
     Data16Channel16,
 }
 
 #[cfg(not(any(esp32, esp32s2)))]
 impl DataFormat {
+    /// Returns the number of data bits for the selected data format.
     pub fn data_bits(&self) -> u8 {
         match self {
             DataFormat::Data32Channel32 => 32,
@@ -207,6 +224,7 @@ impl DataFormat {
         }
     }
 
+    /// Returns the number of channel bits for the selected data format.
     pub fn channel_bits(&self) -> u8 {
         match self {
             DataFormat::Data32Channel32 => 32,
@@ -222,6 +240,7 @@ impl DataFormat {
 
 #[cfg(any(esp32, esp32s2))]
 impl DataFormat {
+    /// Returns the number of data bits for the selected data format.
     pub fn data_bits(&self) -> u8 {
         match self {
             DataFormat::Data32Channel32 => 32,
@@ -229,6 +248,7 @@ impl DataFormat {
         }
     }
 
+    /// Returns the number of channel bits for the selected data format.
     pub fn channel_bits(&self) -> u8 {
         match self {
             DataFormat::Data32Channel32 => 32,
@@ -239,6 +259,7 @@ impl DataFormat {
 
 /// Blocking I2s Write
 pub trait I2sWrite<W> {
+    /// Writes a slice of data to the I2S peripheral.
     fn write(&mut self, words: &[W]) -> Result<(), Error>;
 }
 
@@ -269,6 +290,8 @@ where
 
 /// Blocking I2S Read
 pub trait I2sRead<W> {
+    /// Reads a slice of data from the I2S peripheral and stores it in the
+    /// provided buffer.
     fn read(&mut self, words: &mut [W]) -> Result<(), Error>;
 }
 
@@ -305,7 +328,9 @@ where
     CH: DmaChannel,
     DmaMode: Mode,
 {
+    /// Handles the transmission (TX) side of the I2S peripheral.
     pub i2s_tx: TxCreator<'d, I, CH, DmaMode>,
+    /// Handles the reception (RX) side of the I2S peripheral.
     pub i2s_rx: RxCreator<'d, I, CH, DmaMode>,
     phantom: PhantomData<DmaMode>,
 }
@@ -481,6 +506,7 @@ where
         )
     }
 
+    /// Configures the I2S peripheral to use a master clock (MCLK) output pin.
     pub fn with_mclk<P: OutputPin>(self, pin: impl Peripheral<P = P> + 'd) -> Self {
         into_ref!(pin);
         pin.set_to_push_pull_output(crate::private::Internal);
@@ -850,6 +876,7 @@ where
     }
 }
 
+/// Provides an abstraction for accessing the I2S peripheral registers.
 pub trait RegisterAccess: RegisterAccessPrivate {}
 
 mod private {
@@ -2153,6 +2180,7 @@ mod private {
     }
 }
 
+/// Async functionality
 #[cfg(feature = "async")]
 pub mod asynch {
     use super::{Error, I2sRx, I2sTx, RegisterAccess};

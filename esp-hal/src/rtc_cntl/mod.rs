@@ -69,8 +69,6 @@
 //! }
 //! ```
 
-#![allow(missing_docs)] // TODO: Remove when able
-
 #[cfg(not(any(esp32c6, esp32h2)))]
 use fugit::HertzU32;
 use fugit::MicrosDurationU64;
@@ -186,8 +184,10 @@ pub(crate) enum RtcCalSel {
 /// Low-power Management
 pub struct Rtc<'d> {
     _inner: PeripheralRef<'d, crate::peripherals::LPWR>,
+    /// Reset Watchdog Timer.
     pub rwdt: Rwdt,
     #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
+    /// Super Watchdog
     pub swd: Swd,
 }
 

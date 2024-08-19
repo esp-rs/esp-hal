@@ -170,31 +170,40 @@ pub struct RtcOutput;
 pub struct Analog;
 
 /// Drive strength (values are approximates)
-#[allow(missing_docs)]
 pub enum DriveStrength {
+    /// Drive strength of approximately 5mA.
     I5mA  = 0,
+    /// Drive strength of approximately 10mA.
     I10mA = 1,
+    /// Drive strength of approximately 20mA.
     I20mA = 2,
+    /// Drive strength of approximately 40mA.
     I40mA = 3,
 }
 
 /// Alternate functions
 #[derive(PartialEq)]
-#[allow(missing_docs)]
 pub enum AlternateFunction {
+    /// Alternate function 0.
     Function0 = 0,
+    /// Alternate function 1.
     Function1 = 1,
+    /// Alternate function 2.
     Function2 = 2,
+    /// Alternate function 3.
     Function3 = 3,
+    /// Alternate function 4.
     Function4 = 4,
+    /// Alternate function 5.
     Function5 = 5,
 }
 
 /// RTC function
 #[derive(PartialEq)]
-#[allow(missing_docs)]
 pub enum RtcFunction {
+    /// RTC mode.
     Rtc     = 0,
+    /// Digital mode.
     Digital = 1,
 }
 
@@ -1390,9 +1399,9 @@ macro_rules! gpio {
             )+
 
             /// Pins available on this chip
-            #[allow(missing_docs)]
             pub struct Pins {
                 $(
+                    /// GPIO pin number `$gpionum`.
                     pub [< gpio $gpionum >] : GpioPin<$gpionum>,
                 )+
             }

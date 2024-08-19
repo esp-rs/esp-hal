@@ -60,6 +60,8 @@ const ADC_SARADC2_ENCAL_REF_ADDR: u8 = 0x7;
 const ADC_SARADC2_ENCAL_REF_ADDR_MSB: u8 = 6;
 const ADC_SARADC2_ENCAL_REF_ADDR_LSB: u8 = 6;
 
+/// Enable true randomness by enabling the entropy source.
+/// Blocks `ADC` usage.
 pub(crate) fn ensure_randomness() {
     let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
     let pmu = unsafe { &*crate::peripherals::PMU::ptr() };
@@ -190,10 +192,9 @@ pub(crate) fn ensure_randomness() {
     }
 }
 
-#[allow(unused)]
+/// Disable true randomness. Unlocks `ADC` peripheral.
 pub(crate) fn revert_trng() {
     let apb_saradc = unsafe { &*crate::peripherals::APB_SARADC::ptr() };
-    let pmu = unsafe { &*crate::peripherals::PMU::ptr() };
     let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
 
     unsafe {

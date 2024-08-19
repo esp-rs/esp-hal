@@ -51,10 +51,12 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
         }
     }
 
+    /// Checks if the search functionality is enabled in the RSA hardware.
     pub(super) fn is_search_enabled(&mut self) -> bool {
         self.rsa.search_enable().read().search_enable().bit_is_set()
     }
 
+    /// Sets the search position in the RSA hardware.
     pub(super) fn write_search_position(&mut self, search_position: u32) {
         self.rsa
             .search_pos()
@@ -79,28 +81,33 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
         }
     }
 
+    /// Starts the modular exponentiation operation.
     pub(super) fn write_modexp_start(&mut self) {
         self.rsa
             .set_start_modexp()
             .write(|w| w.set_start_modexp().set_bit());
     }
 
+    /// Starts the multiplication operation.
     pub(super) fn write_multi_start(&mut self) {
         self.rsa
             .set_start_mult()
             .write(|w| w.set_start_mult().set_bit());
     }
 
+    /// Starts the modular multiplication operation.
     fn write_modmulti_start(&mut self) {
         self.rsa
             .set_start_modmult()
             .write(|w| w.set_start_modmult().set_bit());
     }
 
+    /// Clears the RSA interrupt flag.
     pub(super) fn clear_interrupt(&mut self) {
         self.rsa.int_clr().write(|w| w.clear_interrupt().set_bit());
     }
 
+    /// Checks if the RSA peripheral is idle.
     pub(super) fn is_idle(&mut self) -> bool {
         self.rsa.query_idle().read().query_idle().bit_is_set()
     }
@@ -110,6 +117,7 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
     }
 }
 
+/// Module defining marker types for various RSA operand sizes.
 pub mod operand_sizes {
     //! Marker types for the operand sizes
     use paste::paste;
@@ -255,10 +263,12 @@ where
         0
     }
 
+    /// Sets the modular exponentiation mode for the RSA hardware.
     pub(super) fn set_mode(rsa: &mut Rsa<'d, DM>) {
         rsa.write_mode((N - 1) as u32)
     }
 
+    /// Starts the modular exponentiation operation on the RSA hardware.
     pub(super) fn set_start(&mut self) {
         self.rsa.write_modexp_start();
     }
@@ -335,10 +345,12 @@ where
         self.set_start();
     }
 
+    /// Sets the multiplication mode for the RSA hardware.    
     pub(super) fn set_mode(rsa: &mut Rsa<'d, DM>) {
         rsa.write_mode((N * 2 - 1) as u32)
     }
 
+    /// Starts the multiplication operation on the RSA hardware.
     pub(super) fn set_start(&mut self) {
         self.rsa.write_multi_start();
     }

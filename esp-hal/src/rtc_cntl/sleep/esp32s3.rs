@@ -42,41 +42,69 @@ const I2C_DIG_REG_XPD_DIG_REG_LSB: u32 = 3;
 // Approximate mapping of voltages to RTC_CNTL_DBIAS_WAK, RTC_CNTL_DBIAS_SLP,
 // RTC_CNTL_DIG_DBIAS_WAK, RTC_CNTL_DIG_DBIAS_SLP values.
 // Valid if RTC_CNTL_DBG_ATTEN is 0.
+/// Digital bias setting for 0.90V.
 pub const RTC_CNTL_DBIAS_0V90: u32 = 13;
+/// Digital bias setting for 0.95V.
 pub const RTC_CNTL_DBIAS_0V95: u32 = 16;
+/// Digital bias setting for 1.00V.
 pub const RTC_CNTL_DBIAS_1V00: u32 = 18;
+/// Digital bias setting for 1.05V.
 pub const RTC_CNTL_DBIAS_1V05: u32 = 20;
+/// Digital bias setting for 1.10V.
 pub const RTC_CNTL_DBIAS_1V10: u32 = 23;
+/// Digital bias setting for 1.15V.
 pub const RTC_CNTL_DBIAS_1V15: u32 = 25;
+/// Digital bias setting for 1.20V.
 pub const RTC_CNTL_DBIAS_1V20: u32 = 28;
+/// Digital bias setting for 1.25V.
 pub const RTC_CNTL_DBIAS_1V25: u32 = 30;
-pub const RTC_CNTL_DBIAS_1V30: u32 = 31; //< voltage is about 1.34v in fact
-
+/// Digital bias setting for 1.30V. Voltage is approximately 1.34V in practice.
+pub const RTC_CNTL_DBIAS_1V30: u32 = 31;
+/// Default monitor debug attenuation value.
 pub const RTC_CNTL_DBG_ATTEN_MONITOR_DEFAULT: u8 = 0;
+/// ULP co-processor touch start wait time during sleep, set to maximum.
 pub const RTC_CNTL_ULPCP_TOUCH_START_WAIT_IN_SLEEP: u16 = 0xFF;
+/// ULP co-processor touch start wait time default value.
 pub const RTC_CNTL_ULPCP_TOUCH_START_WAIT_DEFAULT: u16 = 0x10;
-
+/// Default wait time for PLL buffer during startup.
 pub const RTC_CNTL_PLL_BUF_WAIT_DEFAULT: u8 = 20;
+/// Default wait time for CK8M during startup.
 pub const RTC_CNTL_CK8M_WAIT_DEFAULT: u8 = 20;
+/// Minimum sleep value.
 pub const RTC_CNTL_MIN_SLP_VAL_MIN: u8 = 2;
+/// Deep sleep debug attenuation setting for ultra-low power mode.
 pub const RTC_CNTL_DBG_ATTEN_DEEPSLEEP_ULTRA_LOW: u8 = 15;
-
+/// Power-up setting for other blocks.
 pub const OTHER_BLOCKS_POWERUP: u8 = 1;
+/// Wait cycles for other blocks.
 pub const OTHER_BLOCKS_WAIT: u16 = 1;
-
+/// WiFi power-up cycles.
 pub const WIFI_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
+/// WiFi wait cycles.
 pub const WIFI_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
+/// Bluetooth power-up cycles.
 pub const BT_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
+/// Bluetooth wait cycles.
 pub const BT_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
+/// RTC power-up cycles.
 pub const RTC_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
+/// RTC wait cycles.
 pub const RTC_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
+/// CPU top power-up cycles.
 pub const CPU_TOP_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
+/// CPU top wait cycles.
 pub const CPU_TOP_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
+/// DG wrap power-up cycles.
 pub const DG_WRAP_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
+/// DG wrap wait cycles.
 pub const DG_WRAP_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
+/// DG peripheral power-up cycles.
 pub const DG_PERI_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
+/// DG peripheral wait cycles.
 pub const DG_PERI_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
+/// RTC memory power-up cycles.
 pub const RTC_MEM_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
+/// RTC memory wait cycles.
 pub const RTC_MEM_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
 
 impl WakeSource for TimerWakeupSource {
@@ -266,6 +294,7 @@ impl Drop for RtcioWakeupSource<'_, '_> {
 }
 
 bitfield::bitfield! {
+    /// Configuration for the RTC sleep behavior.
     #[derive(Clone, Copy)]
     pub struct RtcSleepConfig(u64);
     impl Debug;
@@ -382,6 +411,7 @@ fn rtc_sleep_pu(val: bool) {
 }
 
 impl RtcSleepConfig {
+    /// Configures the RTC for deep sleep mode.
     pub fn deep() -> Self {
         // Set up for ultra-low power sleep. Wakeup sources may modify these settings.
         let mut cfg = Self::default();

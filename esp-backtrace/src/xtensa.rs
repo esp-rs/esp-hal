@@ -9,8 +9,8 @@ use crate::MAX_BACKTRACE_ADDRESSES;
 #[cfg(feature = "panic-handler")]
 pub(super) const RA_OFFSET: usize = 3;
 
+/// Exception Cause
 #[doc(hidden)]
-#[allow(missing_docs)]
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(C)]
@@ -95,89 +95,165 @@ pub enum ExceptionCause {
     Cp6Disabled                    = 38,
     /// Access To Coprocessor 7 When Disabled
     Cp7Disabled                    = 39,
-
+    /// None
     None                           = 255,
 }
 
 #[doc(hidden)]
-#[allow(missing_docs, non_snake_case)]
+#[allow(non_snake_case)]
 #[derive(Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(C)]
 pub struct Context {
+    /// Program counter, stores the address of the next instruction to be
+    /// executed.
     pub PC: u32,
+    /// Processor status, holds various status flags for the CPU.
     pub PS: u32,
+    /// General-purpose register A0 used for data storage and manipulation.
     pub A0: u32,
+    /// General-purpose register A1 used for data storage and manipulation.
     pub A1: u32,
+    /// General-purpose register A2 used for data storage and manipulation.
     pub A2: u32,
+    /// General-purpose register A3 used for data storage and manipulation.
     pub A3: u32,
+    /// General-purpose register A4 used for data storage and manipulation.
     pub A4: u32,
+    /// General-purpose register A5 used for data storage and manipulation.
     pub A5: u32,
+    /// General-purpose register A6 used for data storage and manipulation.
     pub A6: u32,
+    /// General-purpose register A7 used for data storage and manipulation.
     pub A7: u32,
+    /// General-purpose register A8 used for data storage and manipulation.
     pub A8: u32,
+    /// General-purpose register A9 used for data storage and manipulation.
     pub A9: u32,
+    /// General-purpose register A10 used for data storage and manipulation.
     pub A10: u32,
+    /// General-purpose register A11 used for data storage and manipulation.
     pub A11: u32,
+    /// General-purpose register A12 used for data storage and manipulation.
     pub A12: u32,
+    /// General-purpose register A13 used for data storage and manipulation.
     pub A13: u32,
+    /// General-purpose register A14 used for data storage and manipulation.
     pub A14: u32,
+    /// General-purpose register A15 used for data storage and manipulation.
     pub A15: u32,
+    /// Shift amount register, used for shift and rotate instructions.
     pub SAR: u32,
+    /// Exception cause, indicates the reason for the last exception.
     pub EXCCAUSE: u32,
+    /// Exception address, holds the address related to the exception.
     pub EXCVADDR: u32,
+    /// Loop start address, used in loop instructions.
     pub LBEG: u32,
+    /// Loop end address, used in loop instructions.
     pub LEND: u32,
+    /// Loop counter, used to count iterations in loop instructions.
     pub LCOUNT: u32,
+    /// Thread pointer, used for thread-local storage.
     pub THREADPTR: u32,
+    /// Compare register, used for certain compare instructions.
     pub SCOMPARE1: u32,
+    /// Break register, used for breakpoint-related operations.
     pub BR: u32,
+    /// Accumulator low register, used for extended arithmetic operations.
     pub ACCLO: u32,
+    /// Accumulator high register, used for extended arithmetic operations.
     pub ACCHI: u32,
+    /// Additional register M0 used for special operations.
     pub M0: u32,
+    /// Additional register M1 used for special operations.
     pub M1: u32,
+    /// Additional register M2 used for special operations.
     pub M2: u32,
+    /// Additional register M3 used for special operations.
     pub M3: u32,
+    /// 64-bit floating-point register (low part), available if the
+    /// `print-float-registers` feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub F64R_LO: u32,
+    /// 64-bit floating-point register (high part), available if the
+    /// `print-float-registers` feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub F64R_HI: u32,
+    /// Floating-point status register, available if the `print-float-registers`
+    /// feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub F64S: u32,
+    /// Floating-point control register, available if the
+    /// `print-float-registers` feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub FCR: u32,
+    /// Floating-point status register, available if the `print-float-registers`
+    /// feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub FSR: u32,
+    /// Floating-point register F0, available if the `print-float-registers`
+    /// feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub F0: u32,
+    /// Floating-point register F1, available if the `print-float-registers`
+    /// feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub F1: u32,
+    /// Floating-point register F2, available if the `print-float-registers`
+    /// feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub F2: u32,
+    /// Floating-point register F3, available if the `print-float-registers`
+    /// feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub F3: u32,
+    /// Floating-point register F4, available if the `print-float-registers`
+    /// feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub F4: u32,
+    /// Floating-point register F5, available if the `print-float-registers`
+    /// feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub F5: u32,
+    /// Floating-point register F6, available if the `print-float-registers`
+    /// feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub F6: u32,
+    /// Floating-point register F7, available if the `print-float-registers`
+    /// feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub F7: u32,
+    /// Floating-point register F8, available if the `print-float-registers`
+    /// feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub F8: u32,
+    /// Floating-point register F9, available if the `print-float-registers`
+    /// feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub F9: u32,
+    /// Floating-point register F10, available if the `print-float-registers`
+    /// feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub F10: u32,
+    /// Floating-point register F11, available if the `print-float-registers`
+    /// feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub F11: u32,
+    /// Floating-point register F12, available if the `print-float-registers`
+    /// feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub F12: u32,
+    /// Floating-point register F13, available if the `print-float-registers`
+    /// feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub F13: u32,
+    /// Floating-point register F14, available if the `print-float-registers`
+    /// feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub F14: u32,
+    /// Floating-point register F15, available if the `print-float-registers`
+    /// feature is enabled.
     #[cfg(feature = "print-float-registers")]
     pub F15: u32,
 }
