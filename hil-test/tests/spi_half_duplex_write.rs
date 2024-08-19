@@ -13,8 +13,7 @@
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
-use esp_backtrace as _;
+use hil_test as _;
 
 #[cfg(test)]
 #[embedded_test::tests]
@@ -79,7 +78,7 @@ mod tests {
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        // Fill the buffer where each byte 3 pos edges.
+        // Fill the buffer where each byte has 3 pos edges.
         dma_tx_buf.fill(&[0b0110_1010; DMA_BUFFER_SIZE]);
 
         let transfer = spi

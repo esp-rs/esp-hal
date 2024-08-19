@@ -273,8 +273,6 @@ pub(crate) fn revert_trng() {
             0,
         );
 
-        pmu.rf_pwc().modify(|_, w| w.perif_i2c_rstb().clear_bit());
-
         pcr.saradc_clkm_conf().modify(|_, w| w.bits(0x00404000));
 
         pcr.saradc_conf().modify(|_, w| w.bits(0x5));

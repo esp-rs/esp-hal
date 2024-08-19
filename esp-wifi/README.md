@@ -28,7 +28,7 @@ Minimum supported Rust compiler version: 1.72.0.0
 
 ### Importing
 
-Ensure that the right features are enabled for your chip. See [Examples] for more examples.
+Ensure that the right features are enabled for your chip. See [Examples](https://github.com/esp-rs/esp-hal/tree/main/examples#examples) for more examples.
 
 ```toml
 [dependencies.esp-wifi]

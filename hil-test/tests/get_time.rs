@@ -6,9 +6,8 @@
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
-use esp_backtrace as _;
 use esp_hal::{clock::ClockControl, delay::Delay, peripherals::Peripherals, system::SystemControl};
+use hil_test as _;
 
 struct Context {
     delay: Delay,
@@ -37,6 +36,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_current_time(ctx: Context) {
         let t1 = esp_hal::time::current_time();
         ctx.delay.delay_millis(500);

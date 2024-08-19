@@ -53,8 +53,9 @@ atomic-waker = { version = "1.1.2", default-features = false, features = [
 ] }
 
 [build-dependencies]
-toml-cfg = "0.2.0"
-esp-build = { version = "0.1.0", path = "../esp-build" }
+toml-cfg     = "0.2.0"
+esp-build    = { version = "0.1.0", path = "../esp-build" }
+esp-metadata = { version = "0.2.0", path = "../esp-metadata" }
 
 [features]
 default = ["log"]
@@ -132,6 +133,7 @@ dhcpv4 = ["wifi", "utils", "smoltcp?/proto-dhcpv4", "smoltcp?/socket-dhcpv4"]
 wifi-default = ["ipv4", "tcp", "udp", "icmp", "igmp", "dns", "dhcpv4"]
 defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt"]
 log = ["dep:log", "esp-hal/log"]
+sniffer = ["wifi"]
 
 [package.metadata.docs.rs]
 features = [

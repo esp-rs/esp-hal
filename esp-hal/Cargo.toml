@@ -22,6 +22,7 @@ cfg-if                   = "1.0.0"
 critical-section         = "1.1.2"
 defmt                    = { version = "0.3.8", optional = true }
 delegate                 = "0.12.0"
+digest                   = { version = "0.10.7", default-features = false, optional = true }
 document-features        = "0.2.10"
 embassy-futures          = { version = "0.1.1", optional = true }
 embassy-sync             = { version = "0.6.0", optional = true }
@@ -53,13 +54,13 @@ xtensa-lx                = { version = "0.9.0", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { git = "https://github.com/esp-rs/esp-pacs", rev = "5270c86", features = ["critical-section", "rt"], optional = true }
-esp32c2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "5270c86", features = ["critical-section", "rt"], optional = true }
-esp32c3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "5270c86", features = ["critical-section", "rt"], optional = true }
-esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", rev = "5270c86", features = ["critical-section", "rt"], optional = true }
-esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "5270c86", features = ["critical-section", "rt"], optional = true }
-esp32s2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "5270c86", features = ["critical-section", "rt"], optional = true }
-esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "5270c86", features = ["critical-section", "rt"], optional = true }
+esp32   = { git = "https://github.com/esp-rs/esp-pacs", rev = "bf5890e", features = ["critical-section", "rt"], optional = true }
+esp32c2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "bf5890e", features = ["critical-section", "rt"], optional = true }
+esp32c3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "bf5890e", features = ["critical-section", "rt"], optional = true }
+esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", rev = "bf5890e", features = ["critical-section", "rt"], optional = true }
+esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "bf5890e", features = ["critical-section", "rt"], optional = true }
+esp32s2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "bf5890e", features = ["critical-section", "rt"], optional = true }
+esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "bf5890e", features = ["critical-section", "rt"], optional = true }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 esp-riscv-rt = { version = "0.9.0", path = "../esp-riscv-rt" }

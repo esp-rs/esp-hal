@@ -11,9 +11,7 @@
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
 use embedded_hal_02::serial::{Read, Write};
-use esp_backtrace as _;
 use esp_hal::{
     clock::{ClockControl, Clocks},
     gpio::Io,
@@ -23,6 +21,7 @@ use esp_hal::{
     uart::{ClockSource, Uart},
     Blocking,
 };
+use hil_test as _;
 use nb::block;
 
 struct Context {

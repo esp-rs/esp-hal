@@ -9,19 +9,18 @@ For assistance with this package please [open an issue] or [start a discussion].
 
 ## Quickstart
 
-We use [embedded-test] as our testing framework, which relies on [defmt] internally. This allows us to write unit and integration tests much in the same way you would for a normal Rust project, when the standard library is available, and to execute them using Cargo's built-in test runner.
+We use [embedded-test] as our testing framework. This allows us to write unit and integration tests much in the same way you would for a normal Rust project, when the standard library is available, and to execute them using Cargo's built-in test runner.
 
 [embedded-test]: https://github.com/probe-rs/embedded-test
-[defmt]: https://github.com/knurling-rs/defmt
 
 ### Running Tests Locally
 
-We use [probe-rs] for flashing and running the tests on a target device, however, this **MUST** be installed from the correct revision, and with the correct features enabled:
+We use [probe-rs] for flashing and running the tests on a target device, however, this **MUST** be installed from the correct revision:
 
 ```text
 cargo install probe-rs-tools \
   --git https://github.com/probe-rs/probe-rs \
-  --rev bba1bb5 --force --locked
+  --rev 9bde591 --force --locked
 ```
 
 Target device **MUST** connected via its USB-Serial-JTAG port, or if unavailable (eg. ESP32, ESP32-C2, ESP32-S2) then you must connect a compatible debug probe such as an [ESP-Prog].
@@ -37,6 +36,13 @@ For running a single test on a target, from the `xtask` folder run:
 ```shell
 # Run GPIO tests for ESP32-C6
 cargo xtask run-tests esp32c6 --test gpio
+```
+
+If you want to run a test multiple times:
+
+```shell
+# Run GPIO tests for ESP32-C6
+cargo xtask run-tests esp32c6 --test gpio --repeat 10
 ```
 
 Another alternative way of running a single test is, from the `hil-tests` folder:
@@ -108,7 +114,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-t
 # Install dependencies
 sudo apt install -y pkg-config libudev-dev
 # Install probe-rs
-cargo install probe-rs-tools --git https://github.com/probe-rs/probe-rs --rev bba1bb5 --force
+cargo install probe-rs-tools --git https://github.com/probe-rs/probe-rs --rev 9bde591 --force
 # Add the udev rules
 wget -O - https://probe.rs/files/69-probe-rs.rules | sudo tee /etc/udev/rules.d/69-probe-rs.rules > /dev/null
 # Add the user to plugdev group
@@ -138,3 +144,23 @@ sudo reboot
 If the test is supported by all the targets, you can omit the header.
 
 6. Write some documentation at the top of the `tests/$PERIPHERAL.rs` file with the pins being used and the required connections, if applicable.
+
+## Logging in tests
+
+The tests can use [defmt] to print logs. To enable log output, add the `defmt` feature to the test
+you want to run. Eg:
+
+```rust
+//! AES Test
+
+//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: defmt
+```
+
+Make sure to remove this addition before you commit any modifications.
+
+> NOTE: log output is disabled by default. Enabling it can introduce some timing issues, which
+makes some tests fail randomly. This issue affects all Xtensa devices, as well as ESP32-C2 and
+ESP32-C3 currently.
+
+[defmt]: https://github.com/knurling-rs/defmt

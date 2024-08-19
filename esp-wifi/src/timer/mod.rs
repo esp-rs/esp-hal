@@ -14,6 +14,8 @@ mod arch_specific;
 pub use arch_specific::*;
 pub use chip_specific::*;
 
+use crate::TimeBase;
+
 pub fn setup_timer_isr(timebase: TimeBase) -> Result<(), esp_hal::timer::Error> {
     setup_radio_isr();
 

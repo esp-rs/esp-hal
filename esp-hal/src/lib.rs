@@ -241,6 +241,8 @@ pub mod uart;
 #[cfg(usb_device)]
 pub mod usb_serial_jtag;
 
+pub mod debugger;
+
 /// State of the CPU saved when entering exception or interrupt
 pub mod trapframe {
     #[cfg(riscv)]
@@ -623,7 +625,10 @@ unsafe extern "C" fn stack_chk_fail() {
 #[macro_export]
 macro_rules! before_snippet {
     () => {
-        core::include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/doc-helper/before"))
+        core::include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../esp-hal/doc-helper/before"
+        ))
     };
 }
 
@@ -633,6 +638,9 @@ macro_rules! before_snippet {
 #[macro_export]
 macro_rules! before_snippet {
     () => {
-        core::include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "\\doc-helper\\before"))
+        core::include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "\\..\\esp-hal\\doc-helper\\before"
+        ))
     };
 }

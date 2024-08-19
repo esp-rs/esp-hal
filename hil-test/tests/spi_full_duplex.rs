@@ -13,9 +13,7 @@
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
 use embedded_hal::spi::SpiBus;
-use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     gpio::Io,
@@ -24,6 +22,7 @@ use esp_hal::{
     spi::{master::Spi, FullDuplexMode, SpiMode},
     system::SystemControl,
 };
+use hil_test as _;
 
 struct Context {
     spi: Spi<'static, esp_hal::peripherals::SPI2, FullDuplexMode>,
