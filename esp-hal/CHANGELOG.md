@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added touch pad support for esp32 (#1873, #1956)
 - Allow configuration of period updating method for MCPWM timers (#1898)
 - Add self-testing mode for TWAI peripheral. (#1929)
+- Added a `PeripheralClockControl::reset` to the driver constructors where missing (#1893)
+- Added `digest::Digest` implementation to SHA (#1908)
 - Added `debugger::debugger_connected`. (#1961)
 
 ### Changed
@@ -24,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Allow DMA to/from psram for esp32s3 (#1827)
 - DMA buffers now don't require a static lifetime. Make sure to never `mem::forget` an in-progress DMA transfer (consider using `#[deny(clippy::mem_forget)]`) (#1837)
 - Peripherals (where possible) are now explicitly reset and enabled in their constructors (#1893)
+- SHA driver now use specific structs for the hashing algorithm instead of a parameter. (#1908)
 - Reset peripherals in driver constructors where missing (#1893, #1961)
 
 ### Fixed

@@ -32,12 +32,12 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::sha::Sha;
-//! # use esp_hal::sha::ShaMode;
+//! # use esp_hal::sha::Sha256;
 //! # use core::option::Option::None;
 //! # use nb::block;
 //! let source_data = "HELLO, ESPRESSIF!".as_bytes();
 //! let mut remaining = source_data;
-//! let mut hasher = Sha::new(peripherals.SHA, ShaMode::SHA256);
+//! let mut hasher = Sha256::new();
 //! // Short hashes can be created by decreasing the output buffer to the
 //! // desired length
 //! let mut output = [0u8; 32];
@@ -61,107 +61,34 @@
 
 use core::{convert::Infallible, marker::PhantomData};
 
+/// Re-export digest for convenience
+#[cfg(feature = "digest")]
+pub use digest::Digest;
+
 use crate::{
-    peripheral::{Peripheral, PeripheralRef},
-    peripherals::SHA,
     reg_access::{AlignmentHelper, SocDependentEndianess},
     system::PeripheralClockControl,
 };
 
-// All the hash algorithms introduced in FIPS PUB 180-4 Spec.
-// – SHA-1
-// – SHA-224
-// – SHA-256
-// – SHA-384
-// – SHA-512
-// – SHA-512/224
-// – SHA-512/256
-// – SHA-512/t (not implemented yet)
-// Two working modes
-// – Typical SHA
-// – DMA-SHA (not implemented yet)
-
-/// The SHA Accelerator driver instance
-pub struct Sha<'d, DM: crate::Mode> {
-    sha: PeripheralRef<'d, SHA>,
-    mode: ShaMode,
+/// Context for a SHA Accelerator driver instance
+#[derive(Debug, Clone)]
+pub struct Context<DM: crate::Mode> {
     alignment_helper: AlignmentHelper<SocDependentEndianess>,
     cursor: usize,
     first_run: bool,
     finished: bool,
+    /// Buffered bytes (SHA_M_n_REG) to be processed.
+    buffer: [u32; 32],
+    /// Saved digest (SHA_H_n_REG) for interleaving operation
+    #[cfg(not(esp32))]
+    saved_digest: Option<[u8; 64]>,
     phantom: PhantomData<DM>,
 }
 
-/// Hash Algorithm Mode
-#[derive(Debug, Clone, Copy)]
-pub enum ShaMode {
-    SHA1,
-    #[cfg(not(esp32))]
-    SHA224,
-    SHA256,
-    #[cfg(any(esp32, esp32s2, esp32s3))]
-    SHA384,
-    #[cfg(any(esp32, esp32s2, esp32s3))]
-    SHA512,
-    #[cfg(any(esp32s2, esp32s3))]
-    SHA512_224,
-    #[cfg(any(esp32s2, esp32s3))]
-    SHA512_256,
-    // SHA512_(u16) // Max 511
-}
-
-// TODO: Maybe make Sha Generic (Sha<Mode>) in order to allow for better
-// compiler optimizations? (Requires complex const generics which isn't stable
-// yet)
+impl crate::private::Sealed for Context<crate::Blocking> {}
 
 #[cfg(not(esp32))]
-fn mode_as_bits(mode: ShaMode) -> u8 {
-    match mode {
-        ShaMode::SHA1 => 0,
-        ShaMode::SHA224 => 1,
-        ShaMode::SHA256 => 2,
-        #[cfg(any(esp32s2, esp32s3))]
-        ShaMode::SHA384 => 3,
-        #[cfg(any(esp32s2, esp32s3))]
-        ShaMode::SHA512 => 4,
-        #[cfg(any(esp32s2, esp32s3))]
-        ShaMode::SHA512_224 => 5,
-        #[cfg(any(esp32s2, esp32s3))]
-        ShaMode::SHA512_256 => 6,
-        // _ => 0 // TODO: SHA512/t
-    }
-}
-
-impl<'d> Sha<'d, crate::Blocking> {
-    /// Create a new instance in [crate::Blocking] mode.
-    #[cfg_attr(not(esp32), doc = "Optionally an interrupt handler can be bound.")]
-    pub fn new(sha: impl Peripheral<P = SHA> + 'd, mode: ShaMode) -> Self {
-        crate::into_ref!(sha);
-
-        PeripheralClockControl::reset(crate::system::Peripheral::Sha);
-        PeripheralClockControl::enable(crate::system::Peripheral::Sha);
-
-        // Setup SHA Mode
-        #[cfg(not(esp32))]
-        sha.mode()
-            .write(|w| unsafe { w.mode().bits(mode_as_bits(mode)) });
-
-        Self {
-            sha,
-            mode,
-            cursor: 0,
-            first_run: true,
-            finished: false,
-            alignment_helper: AlignmentHelper::default(),
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<'d> crate::private::Sealed for Sha<'d, crate::Blocking> {}
-
-#[cfg(not(esp32))]
-impl<'d> crate::InterruptConfigurable for Sha<'d, crate::Blocking> {
+impl crate::InterruptConfigurable for Context<crate::Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         unsafe {
             crate::interrupt::bind_interrupt(crate::peripherals::Interrupt::SHA, handler.handler());
@@ -171,7 +98,15 @@ impl<'d> crate::InterruptConfigurable for Sha<'d, crate::Blocking> {
     }
 }
 
-// TODO: Allow/Implement SHA512_(u16)
+impl<DM: crate::Mode> Context<DM> {
+    pub fn first_run(&self) -> bool {
+        self.first_run
+    }
+
+    pub fn finished(&self) -> bool {
+        self.finished
+    }
+}
 
 // A few notes on this implementation with regards to 'memcpy',
 // - It seems that ptr::write_bytes already acts as volatile, while ptr::copy_*
@@ -189,87 +124,73 @@ impl<'d> crate::InterruptConfigurable for Sha<'d, crate::Blocking> {
 
 // This implementation might fail after u32::MAX/8 bytes, to increase please see
 // ::finish() length/self.cursor usage
-impl<'d, DM: crate::Mode> Sha<'d, DM> {
-    pub fn first_run(&self) -> bool {
-        self.first_run
+pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
+    /// Constant containing the name of the algorithm as a string.
+    const ALGORITHM: &'static str;
+
+    /// Setup SHA Mode
+    #[cfg(not(esp32))]
+    fn mode_as_bits() -> u8;
+
+    fn chunk_length(&self) -> usize;
+
+    fn digest_length(&self) -> usize;
+
+    /// ESP32 requires that a control register to be written to calculate the
+    /// final SHA hash.
+    #[cfg(esp32)]
+    fn load_reg(&self);
+
+    /// ESP32 uses a different register per hash mode.
+    #[cfg(esp32)]
+    fn is_busy(&self) -> bool;
+
+    #[cfg(not(esp32))]
+    fn is_busy(&self) -> bool {
+        // Safety: This is safe because we only read `SHA_BUSY_REG`
+        let sha = unsafe { crate::peripherals::SHA::steal() };
+        sha.busy().read().bits() != 0
     }
 
-    pub fn finished(&self) -> bool {
-        self.finished
-    }
+    #[cfg(esp32)]
+    fn process_buffer(&mut self);
 
     #[cfg(not(esp32))]
     fn process_buffer(&mut self) {
+        // Safety: This is safe because digest state is restored and saved between
+        // operations.
+        let sha = unsafe { crate::peripherals::SHA::steal() };
+        // Setup SHA Mode before processing current buffer.
+        sha.mode()
+            .write(|w| unsafe { w.mode().bits(Self::mode_as_bits()) });
         if self.first_run {
             // Set SHA_START_REG
-            self.sha.start().write(|w| unsafe { w.bits(1) });
+            sha.start().write(|w| unsafe { w.bits(1) });
             self.first_run = false;
         } else {
+            // Restore previously saved hash if interleaving operation
+            if let Some(ref saved_digest) = self.saved_digest.take() {
+                self.alignment_helper.volatile_write_regset(
+                    sha.h_mem(0).as_ptr(),
+                    saved_digest,
+                    64,
+                );
+            }
             // SET SHA_CONTINUE_REG
-            self.sha.continue_().write(|w| unsafe { w.bits(1) });
+            sha.continue_().write(|w| unsafe { w.bits(1) });
         }
-    }
 
-    #[cfg(esp32)]
-    fn process_buffer(&mut self) {
-        if self.first_run {
-            match self.mode {
-                ShaMode::SHA1 => self.sha.sha1_start().write(|w| unsafe { w.bits(1) }),
-                ShaMode::SHA256 => self.sha.sha256_start().write(|w| unsafe { w.bits(1) }),
-                ShaMode::SHA384 => self.sha.sha384_start().write(|w| unsafe { w.bits(1) }),
-                ShaMode::SHA512 => self.sha.sha512_start().write(|w| unsafe { w.bits(1) }),
-            }
-            self.first_run = false;
-        } else {
-            match self.mode {
-                ShaMode::SHA1 => self.sha.sha1_continue().write(|w| unsafe { w.bits(1) }),
-                ShaMode::SHA256 => self.sha.sha256_continue().write(|w| unsafe { w.bits(1) }),
-                ShaMode::SHA384 => self.sha.sha384_continue().write(|w| unsafe { w.bits(1) }),
-                ShaMode::SHA512 => self.sha.sha512_continue().write(|w| unsafe { w.bits(1) }),
-            }
-        }
-    }
+        // Wait until buffer has completely processed
+        while self.is_busy() {}
 
-    fn chunk_length(&self) -> usize {
-        match self.mode {
-            ShaMode::SHA1 | ShaMode::SHA256 => 64,
-            #[cfg(not(esp32))]
-            ShaMode::SHA224 => 64,
-            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-            _ => 128,
-        }
-    }
-
-    #[cfg(esp32)]
-    fn is_busy(&self) -> bool {
-        match self.mode {
-            ShaMode::SHA1 => self.sha.sha1_busy().read().sha1_busy().bit_is_set(),
-            ShaMode::SHA256 => self.sha.sha256_busy().read().sha256_busy().bit_is_set(),
-            ShaMode::SHA384 => self.sha.sha384_busy().read().sha384_busy().bit_is_set(),
-            ShaMode::SHA512 => self.sha.sha512_busy().read().sha512_busy().bit_is_set(),
-        }
-    }
-
-    #[cfg(not(esp32))]
-    fn is_busy(&self) -> bool {
-        self.sha.busy().read().bits() != 0
-    }
-
-    pub fn digest_length(&self) -> usize {
-        match self.mode {
-            ShaMode::SHA1 => 20,
-            #[cfg(not(esp32))]
-            ShaMode::SHA224 => 28,
-            ShaMode::SHA256 => 32,
-            #[cfg(any(esp32, esp32s2, esp32s3))]
-            ShaMode::SHA384 => 48,
-            #[cfg(any(esp32, esp32s2, esp32s3))]
-            ShaMode::SHA512 => 64,
-            #[cfg(any(esp32s2, esp32s3))]
-            ShaMode::SHA512_224 => 28,
-            #[cfg(any(esp32s2, esp32s3))]
-            ShaMode::SHA512_256 => 32,
-        }
+        // Save the content of the current hash for interleaving operation.
+        let mut saved_digest = [0u8; 64];
+        self.alignment_helper.volatile_read_regset(
+            sha.h_mem(0).as_ptr(),
+            &mut saved_digest,
+            64 / self.alignment_helper.align_size(),
+        );
+        self.saved_digest.replace(saved_digest);
     }
 
     fn flush_data(&mut self) -> nb::Result<(), Infallible> {
@@ -277,14 +198,31 @@ impl<'d, DM: crate::Mode> Sha<'d, DM> {
             return Err(nb::Error::WouldBlock);
         }
 
-        let chunk_len = self.chunk_length();
+        // Safety: This is safe because the buffer is processed after being flushed to
+        // memory.
+        let sha = unsafe { crate::peripherals::SHA::steal() };
 
-        let flushed = self.alignment_helper.flush_to(
+        let chunk_len = self.chunk_length();
+        let ctx = self.deref_mut();
+
+        // Flush aligned buffer in memory before flushing alignment_helper
+        unsafe {
+            core::ptr::copy_nonoverlapping(
+                ctx.buffer.as_ptr(),
+                #[cfg(esp32)]
+                sha.text(0).as_ptr(),
+                #[cfg(not(esp32))]
+                sha.m_mem(0).as_ptr(),
+                (ctx.cursor % chunk_len) / ctx.alignment_helper.align_size(),
+            );
+        }
+
+        let flushed = ctx.alignment_helper.flush_to(
             #[cfg(esp32)]
-            self.sha.text(0).as_ptr(),
+            sha.text(0).as_ptr(),
             #[cfg(not(esp32))]
-            self.sha.m_mem(0).as_ptr(),
-            (self.cursor % chunk_len) / self.alignment_helper.align_size(),
+            sha.m_mem(0).as_ptr(),
+            (ctx.cursor % chunk_len) / ctx.alignment_helper.align_size(),
         );
 
         self.cursor = self.cursor.wrapping_add(flushed);
@@ -303,26 +241,39 @@ impl<'d, DM: crate::Mode> Sha<'d, DM> {
 
         let chunk_len = self.chunk_length();
 
-        let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(
-            #[cfg(esp32)]
-            self.sha.text(0).as_ptr(),
-            #[cfg(not(esp32))]
-            self.sha.m_mem(0).as_ptr(),
+        let ctx = self.deref_mut();
+        // Buffer the incoming bytes into u32 aligned words.
+        let (remaining, bound_reached) = ctx.alignment_helper.aligned_volatile_copy(
+            ctx.buffer.as_mut_ptr(),
             incoming,
-            chunk_len / self.alignment_helper.align_size(),
-            mod_cursor / self.alignment_helper.align_size(),
+            chunk_len / ctx.alignment_helper.align_size(),
+            mod_cursor / ctx.alignment_helper.align_size(),
         );
 
         self.cursor = self.cursor.wrapping_add(incoming.len() - remaining.len());
 
+        // If bound reached we write the buffer to memory and process it.
         if bound_reached {
+            // Safety: This is safe because the bound has been reached and the buffer will
+            // be fully processed then saved.
+            unsafe {
+                let sha = crate::peripherals::SHA::steal();
+                core::ptr::copy_nonoverlapping(
+                    self.buffer.as_ptr(),
+                    #[cfg(esp32)]
+                    sha.text(0).as_ptr(),
+                    #[cfg(not(esp32))]
+                    sha.m_mem(0).as_ptr(),
+                    32,
+                );
+            }
             self.process_buffer();
         }
 
         Ok(remaining)
     }
 
-    pub fn update<'a>(&mut self, buffer: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
+    fn update<'a>(&mut self, buffer: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
         if self.is_busy() {
             return Err(nb::Error::WouldBlock);
         }
@@ -340,12 +291,14 @@ impl<'d, DM: crate::Mode> Sha<'d, DM> {
     //
     // Typically output is expected to be the size of digest_length(), but smaller
     // inputs can be given to get a "short hash"
-    pub fn finish(&mut self, output: &mut [u8]) -> nb::Result<(), Infallible> {
+    fn finish(&mut self, output: &mut [u8]) -> nb::Result<(), Infallible> {
         // The main purpose of this function is to dynamically generate padding for the
         // input. Padding: Append "1" bit, Pad zeros until 512/1024 filled
         // then set the message length in the LSB (overwriting the padding)
         // If not enough free space for length+1, add length at end of a new zero'd
         // block
+
+        let sha = unsafe { crate::peripherals::SHA::steal() };
 
         if self.is_busy() {
             return Err(nb::Error::WouldBlock);
@@ -355,23 +308,24 @@ impl<'d, DM: crate::Mode> Sha<'d, DM> {
 
         // Store message length for padding
         let length = (self.cursor as u64 * 8).to_be_bytes();
-        nb::block!(self.update(&[0x80]))?; // Append "1" bit
+        nb::block!(Sha::update(self, &[0x80]))?; // Append "1" bit
         nb::block!(self.flush_data())?; // Flush partial data, ensures aligned cursor
         debug_assert!(self.cursor % 4 == 0);
 
         let mod_cursor = self.cursor % chunk_len;
-        if (chunk_len - mod_cursor) < core::mem::size_of::<u64>() {
+        if (chunk_len - mod_cursor) < chunk_len / 8 {
             // Zero out remaining data if buffer is almost full (>=448/896), and process
             // buffer
             let pad_len = chunk_len - mod_cursor;
-            self.alignment_helper.volatile_write_bytes(
+            let ctx = self.deref_mut();
+            ctx.alignment_helper.volatile_write_bytes(
                 #[cfg(esp32)]
-                self.sha.text(0).as_ptr(),
+                sha.text(0).as_ptr(),
                 #[cfg(not(esp32))]
-                self.sha.m_mem(0).as_ptr(),
+                sha.m_mem(0).as_ptr(),
                 0_u8,
-                pad_len / self.alignment_helper.align_size(),
-                mod_cursor / self.alignment_helper.align_size(),
+                pad_len / ctx.alignment_helper.align_size(),
+                mod_cursor / ctx.alignment_helper.align_size(),
             );
             self.process_buffer();
             self.cursor = self.cursor.wrapping_add(pad_len);
@@ -385,24 +339,25 @@ impl<'d, DM: crate::Mode> Sha<'d, DM> {
         let mod_cursor = self.cursor % chunk_len; // Should be zero if branched above
         let pad_len = chunk_len - mod_cursor - core::mem::size_of::<u64>();
 
-        self.alignment_helper.volatile_write_bytes(
+        let ctx = self.deref_mut();
+        ctx.alignment_helper.volatile_write_bytes(
             #[cfg(esp32)]
-            self.sha.text(0).as_ptr(),
+            sha.text(0).as_ptr(),
             #[cfg(not(esp32))]
-            self.sha.m_mem(0).as_ptr(),
+            sha.m_mem(0).as_ptr(),
             0_u8,
-            pad_len / self.alignment_helper.align_size(),
-            mod_cursor / self.alignment_helper.align_size(),
+            pad_len / ctx.alignment_helper.align_size(),
+            mod_cursor / ctx.alignment_helper.align_size(),
         );
 
-        self.alignment_helper.aligned_volatile_copy(
+        ctx.alignment_helper.aligned_volatile_copy(
             #[cfg(esp32)]
-            self.sha.text(0).as_ptr(),
+            sha.text(0).as_ptr(),
             #[cfg(not(esp32))]
-            self.sha.m_mem(0).as_ptr(),
+            sha.m_mem(0).as_ptr(),
             &length,
-            chunk_len / self.alignment_helper.align_size(),
-            (chunk_len - core::mem::size_of::<u64>()) / self.alignment_helper.align_size(),
+            chunk_len / ctx.alignment_helper.align_size(),
+            (chunk_len - core::mem::size_of::<u64>()) / ctx.alignment_helper.align_size(),
         );
 
         self.process_buffer();
@@ -412,22 +367,16 @@ impl<'d, DM: crate::Mode> Sha<'d, DM> {
         // ESP32 requires additional load to retrieve output
         #[cfg(esp32)]
         {
-            match self.mode {
-                ShaMode::SHA1 => unsafe { self.sha.sha1_load().write(|w| w.bits(1)) },
-                ShaMode::SHA256 => unsafe { self.sha.sha256_load().write(|w| w.bits(1)) },
-                ShaMode::SHA384 => unsafe { self.sha.sha384_load().write(|w| w.bits(1)) },
-                ShaMode::SHA512 => unsafe { self.sha.sha512_load().write(|w| w.bits(1)) },
-            }
-
+            self.load_reg();
             // Spin wait for result, 8-20 clock cycles according to manual
             while self.is_busy() {}
         }
 
         self.alignment_helper.volatile_read_regset(
             #[cfg(esp32)]
-            self.sha.text(0).as_ptr(),
+            sha.text(0).as_ptr(),
             #[cfg(not(esp32))]
-            self.sha.h_mem(0).as_ptr(),
+            sha.h_mem(0).as_ptr(),
             output,
             core::cmp::min(output.len(), 32) / self.alignment_helper.align_size(),
         );
@@ -439,3 +388,161 @@ impl<'d, DM: crate::Mode> Sha<'d, DM> {
         Ok(())
     }
 }
+
+/// This macro implements the Sha<'a, DM> trait for a specified Sha algorithm
+/// and a set of parameters
+macro_rules! impl_sha {
+    ($name: ident, $mode_bits: tt, $digest_length: tt, $chunk_length: tt) => {
+        pub struct $name<DM: crate::Mode>(Context<DM>);
+
+        impl $name<crate::Blocking> {
+            /// Create a new instance in [crate::Blocking] mode.
+            #[cfg_attr(not(esp32), doc = "Optionally an interrupt handler can be bound.")]
+            pub fn new() -> $name<crate::Blocking> {
+                Self::default()
+            }
+        }
+
+        /// Automatically implement Deref + DerefMut to get access to inner context
+        impl<DM: crate::Mode> core::ops::Deref for $name<DM> {
+            type Target = Context<DM>;
+
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
+        }
+
+        impl<DM: crate::Mode> core::ops::DerefMut for $name<DM> {
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                &mut self.0
+            }
+        }
+
+        /// Implement Default to create hasher out of thin air
+        impl core::default::Default for $name<crate::Blocking> {
+            fn default() -> Self {
+                PeripheralClockControl::reset(crate::system::Peripheral::Sha);
+                PeripheralClockControl::enable(crate::system::Peripheral::Sha);
+
+                Self(Context {
+                    cursor: 0,
+                    first_run: true,
+                    finished: false,
+                    alignment_helper: AlignmentHelper::default(),
+                    buffer: [0u32; 32],
+                    #[cfg(not(esp32))]
+                    saved_digest: None,
+                    phantom: PhantomData,
+                })
+            }
+        }
+
+        impl $crate::sha::Sha<crate::Blocking> for $name<crate::Blocking> {
+            const ALGORITHM: &'static str = stringify!($name);
+
+            #[cfg(not(esp32))]
+            fn mode_as_bits() -> u8 {
+                $mode_bits
+            }
+
+            fn chunk_length(&self) -> usize {
+                $chunk_length
+            }
+
+            fn digest_length(&self) -> usize {
+                $digest_length
+            }
+
+            // ESP32 uses different registers for its operation
+            #[cfg(esp32)]
+            fn load_reg(&self) {
+                // Safety: This is safe because digest state is restored and saved between
+                // operations.
+                let sha = unsafe { crate::peripherals::SHA::steal() };
+                paste::paste! {
+                    unsafe { sha.[< $name:lower _load >]().write(|w| w.bits(1)) };
+                }
+            }
+
+            #[cfg(esp32)]
+            fn is_busy(&self) -> bool {
+                let sha = unsafe { crate::peripherals::SHA::steal() };
+                paste::paste! {
+                    sha.[< $name:lower _busy >]().read().[< $name:lower _busy >]().bit_is_set()
+                }
+            }
+
+            #[cfg(esp32)]
+            fn process_buffer(&mut self) {
+                let sha = unsafe { crate::peripherals::SHA::steal() };
+                paste::paste! {
+                    if self.first_run {
+                        sha.[< $name:lower _start >]().write(|w| unsafe { w.bits(1) });
+                        self.first_run = false;
+                    } else {
+                        sha.[< $name:lower _continue >]().write(|w| unsafe { w.bits(1) });
+                    }
+                }
+            }
+        }
+
+        /// implement digest traits if digest feature is present.
+        /// Note: digest has a blanket trait implementation for [digest::Digest] for any
+        /// element that implements FixedOutput + Default + Update + HashMarker
+        #[cfg(feature = "digest")]
+        impl<DM: crate::Mode> digest::HashMarker for $name<DM> {}
+
+        #[cfg(feature = "digest")]
+        impl<DM: crate::Mode> digest::OutputSizeUser for $name<DM> {
+            // We use paste to append `U` to the digest size to match a const defined in
+            // digest
+            paste::paste! {
+            type OutputSize = digest::consts::[< U $digest_length >];
+            }
+        }
+
+        #[cfg(feature = "digest")]
+        impl digest::Update for $name<crate::Blocking> {
+            fn update(&mut self, data: &[u8]) {
+                let mut remaining = data.as_ref();
+                while remaining.len() > 0 {
+                    remaining = nb::block!(Sha::update(self, remaining)).unwrap();
+                }
+            }
+        }
+
+        #[cfg(feature = "digest")]
+        impl digest::FixedOutput for $name<crate::Blocking> {
+            fn finalize_into(mut self, out: &mut digest::Output<Self>) {
+                nb::block!(self.finish(out)).unwrap()
+            }
+        }
+    };
+}
+
+// All the hash algorithms introduced in FIPS PUB 180-4 Spec.
+// – SHA-1
+// – SHA-224
+// – SHA-256
+// – SHA-384
+// – SHA-512
+// – SHA-512/224
+// – SHA-512/256
+// – SHA-512/t (not implemented yet)
+// Two working modes
+// – Typical SHA
+// – DMA-SHA (not implemented yet)
+//
+// TODO: Allow/Implement SHA512_(u16)
+impl_sha!(Sha1, 0, 20, 64);
+#[cfg(not(esp32))]
+impl_sha!(Sha224, 1, 28, 64);
+impl_sha!(Sha256, 2, 32, 64);
+#[cfg(any(esp32, esp32s2, esp32s3))]
+impl_sha!(Sha384, 3, 48, 128);
+#[cfg(any(esp32, esp32s2, esp32s3))]
+impl_sha!(Sha512, 4, 64, 128);
+#[cfg(any(esp32s2, esp32s3))]
+impl_sha!(Sha512_224, 5, 28, 128);
+#[cfg(any(esp32s2, esp32s3))]
+impl_sha!(Sha512_256, 6, 32, 128);
