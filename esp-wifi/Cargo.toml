@@ -51,6 +51,7 @@ futures-util = { version = "0.3.30", default-features = false, features = [
 atomic-waker = { version = "1.1.2", default-features = false, features = [
   "portable-atomic",
 ] }
+bt-hci = { version = "0.1.0", optional = true }
 
 [build-dependencies]
 toml-cfg     = "0.2.0"
@@ -103,6 +104,8 @@ async = [
   "dep:embassy-futures",
   "dep:embedded-io-async",
   "dep:esp-hal-embassy",
+  "dep:bt-hci",
+  "esp-hal/async",
 ]
 
 embassy-net = ["dep:embassy-net-driver", "async"]

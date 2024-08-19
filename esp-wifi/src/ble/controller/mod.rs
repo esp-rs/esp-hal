@@ -83,6 +83,13 @@ impl Write for BleConnector<'_> {
 pub mod asynch {
     use core::task::Poll;
 
+    use bt_hci::{
+        transport::{Transport, WithIndicator},
+        ControllerToHostPacket,
+        FromHciBytes,
+        HostToControllerPacket,
+        WriteHci,
+    };
     use embassy_sync::waitqueue::AtomicWaker;
     use embedded_io::ErrorType;
 
@@ -175,6 +182,45 @@ pub mod asynch {
             } else {
                 Poll::Pending
             }
+        }
+    }
+
+    impl<'d> Transport for BleConnector<'d> {
+        /// Read a complete HCI packet into the rx buffer
+        async fn read<'a>(
+            &self,
+            rx: &'a mut [u8],
+        ) -> Result<ControllerToHostPacket<'a>, Self::Error> {
+            if !have_hci_read_data() {
+                HciReadyEventFuture.await;
+            }
+
+            let mut total = 0;
+            for b in rx.iter_mut() {
+                let mut buffer = [0u8];
+                let len = read_hci(&mut buffer);
+
+                if len == 1 {
+                    *b = buffer[0];
+                    total += 1;
+                } else {
+                    let (p, _) = ControllerToHostPacket::from_hci_bytes(&rx[..total])
+                        .map_err(|_| BleConnectorError::Unknown)?;
+                    return Ok(p);
+                }
+            }
+            Err(BleConnectorError::Unknown)
+        }
+
+        /// Write a complete HCI packet from the tx buffer
+        async fn write<T: HostToControllerPacket>(&self, val: &T) -> Result<(), Self::Error> {
+            let mut buf: [u8; 259] = [0; 259];
+            let w = WithIndicator::new(val);
+            let len = w.size();
+            w.write_hci(&mut buf[..])
+                .map_err(|_| BleConnectorError::Unknown)?;
+            send_hci(&buf[..len]);
+            Ok(())
         }
     }
 }
