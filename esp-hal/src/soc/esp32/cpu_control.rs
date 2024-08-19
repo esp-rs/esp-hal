@@ -135,11 +135,11 @@ impl<'a> Drop for AppCoreGuard<'a> {
     }
 }
 
-/// Represents error that can occur in the system.
+/// Represents errors that can occur while working with the core.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
-    /// Core is already running.
+    /// The core is already running.
     CoreAlreadyRunning,
 }
 

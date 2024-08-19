@@ -1545,7 +1545,7 @@ pub trait Instance: crate::private::Sealed {
     }
 
     #[cfg(not(any(esp32, esp32s2)))]
-    /// Reads all bytes from the RX FIFO
+    /// Reads all bytes from the RX FIFO.
     fn read_all_from_fifo(&self, buffer: &mut [u8]) -> Result<(), Error> {
         // Read bytes from FIFO
         // FIXME: Handle case where less data has been provided by the slave than
@@ -1567,7 +1567,7 @@ pub trait Instance: crate::private::Sealed {
     }
 
     #[cfg(any(esp32, esp32s2))]
-    /// Reads all bytes from the RX FIFO
+    /// Reads all bytes from the RX FIFO.
     fn read_all_from_fifo(&self, buffer: &mut [u8]) -> Result<(), Error> {
         // on ESP32/ESP32-S2 we currently don't support I2C transactions larger than the
         // FIFO apparently it would be possible by using non-fifo mode

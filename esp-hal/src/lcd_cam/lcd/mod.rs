@@ -14,7 +14,7 @@ use crate::{peripheral::PeripheralRef, peripherals::LCD_CAM};
 
 pub mod i8080;
 
-/// Represents an LCD interface peripheral.
+/// Represents an LCD interface.
 pub struct Lcd<'d, DM: crate::Mode> {
     /// The `LCD_CAM` peripheral reference for managing the LCD functionality.
     pub(crate) lcd_cam: PeripheralRef<'d, LCD_CAM>,

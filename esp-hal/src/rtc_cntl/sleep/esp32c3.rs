@@ -306,7 +306,7 @@ bitfield::bitfield! {
     pub clkctl_init, set_clkctl_init: 24;
     /// Perform power control related initialization.
     pub pwrctl_init, set_pwrctl_init: 25;
-    /// Force power down RTC_DBOOST
+    /// Force power down `RTC_DBOOST`.
     pub rtc_dboost_fpd, set_rtc_dboost_fpd: 26;
     /// Keep the XTAL oscillator powered up in sleep.
     pub xtal_fpu, set_xtal_fpu: 27;

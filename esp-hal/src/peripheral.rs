@@ -358,7 +358,7 @@ mod peripheral_macros {
             $(#[$cfg])?
             #[derive(Debug)]
             #[allow(non_camel_case_types)]
-            /// Macro to create a peripheral structure with a virtual interface.
+            /// Macro to create a peripheral structure.
             pub struct $name { _inner: () }
 
             $(#[$cfg])?
@@ -389,7 +389,7 @@ mod peripheral_macros {
             $(#[$cfg])?
             #[derive(Debug)]
             #[allow(non_camel_case_types)]
-            /// Macro to create a peripheral structure with a virtual interface.
+            /// Macro to create a peripheral structure.
             pub struct $name { _inner: () }
 
             $(#[$cfg])?

@@ -131,7 +131,7 @@ unsafe impl<'d> UsbPeripheral for Usb<'d> {
         80_000_000
     }
 }
-/// Asynch functionality
+/// Async functionality
 #[cfg(feature = "async")]
 pub mod asynch {
     use embassy_usb_driver::{

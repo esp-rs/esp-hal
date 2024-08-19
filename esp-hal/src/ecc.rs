@@ -93,7 +93,7 @@ pub enum WorkMode {
     /// Modular multiplication mode.
     ModMulti                = 10,
     #[cfg(esp32h2)]
-    /// Modular multiplication mode.
+    /// Modular division mode.
     ModDiv                  = 11,
 }
 

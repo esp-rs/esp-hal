@@ -5,8 +5,6 @@
 //! used simultaneously. For more information on these modules, please refer to
 //! the documentation in their respective modules.
 
-// #![allow(missing_docs)] // TODO: Remove when able
-
 pub mod cam;
 pub mod lcd;
 
@@ -21,7 +19,7 @@ use crate::{
     InterruptConfigurable,
 };
 
-/// Represents a combined LCD and Camera interface peripheral.
+/// Represents a combined LCD and Camera interface.
 pub struct LcdCam<'d, DM: crate::Mode> {
     /// The LCD interface.
     pub lcd: Lcd<'d, DM>,
