@@ -862,6 +862,7 @@ pub mod dma {
             SpiPeripheral,
             TxPrivate,
         },
+        Blocking,
         InterruptConfigurable,
         Mode,
     };
@@ -1034,6 +1035,37 @@ pub mod dma {
     {
         pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks<'d>) {
             self.spi.ch_bus_freq(frequency, clocks);
+        }
+    }
+
+    impl<'d, T, C> SpiDma<'d, T, C, FullDuplexMode, Blocking>
+    where
+        T: InstanceDma,
+        C: DmaChannel,
+        C::P: SpiPeripheral,
+    {
+        pub fn with_buffers(
+            self,
+            dma_tx_buf: DmaTxBuf,
+            dma_rx_buf: DmaRxBuf,
+        ) -> SpiDmaBus<'d, T, C> {
+            SpiDmaBus::new(self, dma_tx_buf, dma_rx_buf)
+        }
+    }
+
+    #[cfg(feature = "async")]
+    impl<'d, T, C> SpiDma<'d, T, C, FullDuplexMode, crate::Async>
+    where
+        T: InstanceDma,
+        C: DmaChannel,
+        C::P: SpiPeripheral,
+    {
+        pub fn with_buffers(
+            self,
+            dma_tx_buf: DmaTxBuf,
+            dma_rx_buf: DmaRxBuf,
+        ) -> asynch::SpiDmaAsyncBus<'d, T, C> {
+            asynch::SpiDmaAsyncBus::new(self, dma_tx_buf, dma_rx_buf)
         }
     }
 

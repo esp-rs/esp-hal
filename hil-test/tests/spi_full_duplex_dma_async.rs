@@ -43,10 +43,7 @@ use hil_test as _;
 #[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
 mod tests {
     use defmt::assert_eq;
-    use esp_hal::{
-        dma::{DmaRxBuf, DmaTxBuf},
-        spi::master::dma::asynch::SpiDmaAsyncBus,
-    };
+    use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
 
     use super::*;
 
@@ -82,11 +79,10 @@ mod tests {
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
-        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(dma_channel.configure_for_async(false, DmaPriority::Priority0));
-
-        let mut spi = SpiDmaAsyncBus::new(spi, dma_tx_buf, dma_rx_buf);
+            .with_dma(dma_channel.configure_for_async(false, DmaPriority::Priority0))
+            .with_buffers(dma_tx_buf, dma_rx_buf);
 
         let unit = pcnt.unit0;
         unit.channel0.set_edge_signal(PcntSource::from_pin(
@@ -145,10 +141,10 @@ mod tests {
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
-        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(dma_channel.configure_for_async(false, DmaPriority::Priority0));
-        let mut spi = SpiDmaAsyncBus::new(spi, dma_tx_buf, dma_rx_buf);
+            .with_dma(dma_channel.configure_for_async(false, DmaPriority::Priority0))
+            .with_buffers(dma_tx_buf, dma_rx_buf);
 
         let unit = pcnt.unit0;
         unit.channel0.set_edge_signal(PcntSource::from_pin(

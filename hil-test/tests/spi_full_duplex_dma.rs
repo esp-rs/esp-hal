@@ -348,16 +348,15 @@ mod tests {
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
-        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
-
-        let mut spi_bus = SpiDmaBus::new(spi, dma_tx_buf, dma_rx_buf);
+            .with_dma(dma_channel.configure(false, DmaPriority::Priority0))
+            .with_buffers(dma_tx_buf, dma_rx_buf);
 
         let tx_buf = [0xde, 0xad, 0xbe, 0xef];
         let mut rx_buf = [0; 4];
 
-        spi_bus.transfer(&mut rx_buf, &tx_buf).unwrap();
+        spi.transfer(&mut rx_buf, &tx_buf).unwrap();
 
         assert_eq!(tx_buf, rx_buf);
     }
@@ -386,16 +385,15 @@ mod tests {
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
-        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
-
-        let mut spi_bus = SpiDmaBus::new(spi, dma_tx_buf, dma_rx_buf);
+            .with_dma(dma_channel.configure(false, DmaPriority::Priority0))
+            .with_buffers(dma_tx_buf, dma_rx_buf);
 
         let tx_buf = [0xde, 0xad, 0xbe, 0xef];
         let mut rx_buf = [0; 4];
 
-        spi_bus.transfer(&mut rx_buf, &tx_buf).unwrap();
+        spi.transfer(&mut rx_buf, &tx_buf).unwrap();
 
         assert_eq!(&tx_buf[0..1], &rx_buf[0..1]);
     }
@@ -426,16 +424,15 @@ mod tests {
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
-        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
-
-        let mut spi_bus = SpiDmaBus::new(spi, dma_tx_buf, dma_rx_buf);
+            .with_dma(dma_channel.configure(false, DmaPriority::Priority0))
+            .with_buffers(dma_tx_buf, dma_rx_buf);
 
         let tx_buf = core::array::from_fn(|i| i as _);
         let mut rx_buf = [0; DMA_BUFFER_SIZE];
 
-        spi_bus.transfer(&mut rx_buf, &tx_buf).unwrap();
+        spi.transfer(&mut rx_buf, &tx_buf).unwrap();
 
         assert_eq!(tx_buf, rx_buf);
     }
