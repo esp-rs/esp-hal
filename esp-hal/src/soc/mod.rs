@@ -75,6 +75,13 @@ pub(crate) fn is_valid_ram_address(address: u32) -> bool {
 }
 
 #[allow(unused)]
+pub(crate) fn is_slice_in_dram<T>(slice: &[T]) -> bool {
+    let start = slice.as_ptr() as u32;
+    let end = start + slice.len() as u32;
+    self::constants::SOC_DRAM_LOW <= start && end <= self::constants::SOC_DRAM_HIGH
+}
+
+#[allow(unused)]
 pub(crate) fn is_valid_psram_address(address: u32) -> bool {
     #[cfg(psram)]
     {

@@ -40,6 +40,10 @@ use hil_test as _;
 #[embedded_test::tests]
 mod tests {
     use defmt::assert_eq;
+    use esp_hal::{
+        dma::{DmaRxBuf, DmaTxBuf},
+        spi::master::dma::SpiDmaBus,
+    };
 
     use super::*;
 
@@ -66,23 +70,21 @@ mod tests {
         let dma_channel = dma.channel0;
 
         let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
+        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
-        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(
-                dma_channel.configure(false, DmaPriority::Priority0),
-                tx_descriptors,
-                rx_descriptors,
-            );
+            .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
-        let mut send = tx_buffer;
-        let mut receive = rx_buffer;
+        dma_tx_buf.fill(&[0xde, 0xad, 0xbe, 0xef]);
 
-        send.copy_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
-
-        let transfer = spi.dma_transfer(&mut send, &mut receive).unwrap();
-        transfer.wait().unwrap();
-        assert_eq!(send, receive);
+        let transfer = spi
+            .dma_transfer(dma_tx_buf, dma_rx_buf)
+            .map_err(|e| e.0)
+            .unwrap();
+        (_, (dma_tx_buf, dma_rx_buf)) = transfer.wait();
+        assert_eq!(dma_tx_buf.as_slice(), dma_rx_buf.as_slice());
     }
 
     #[test]
@@ -108,23 +110,21 @@ mod tests {
         let dma_channel = dma.channel0;
 
         let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(4, 2);
+        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
-        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(
-                dma_channel.configure(false, DmaPriority::Priority0),
-                tx_descriptors,
-                rx_descriptors,
-            );
+            .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
-        let mut send = tx_buffer;
-        let mut receive = rx_buffer;
+        dma_tx_buf.fill(&[0xde, 0xad, 0xbe, 0xef]);
 
-        send.copy_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
-
-        let transfer = spi.dma_transfer(&mut send, &mut receive).unwrap();
-        transfer.wait().unwrap();
-        assert_eq!(send[0..1], receive[0..1]);
+        let transfer = spi
+            .dma_transfer(dma_tx_buf, dma_rx_buf)
+            .map_err(|e| e.0)
+            .unwrap();
+        (_, (dma_tx_buf, dma_rx_buf)) = transfer.wait();
+        assert_eq!(dma_tx_buf.as_slice()[0..1], dma_rx_buf.as_slice()[0..1]);
     }
 
     #[test]
@@ -150,176 +150,23 @@ mod tests {
         let dma_channel = dma.channel0;
 
         let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
-
-        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
-            .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(
-                dma_channel.configure(false, DmaPriority::Priority0),
-                tx_descriptors,
-                rx_descriptors,
-            );
-
-        let mut send = tx_buffer;
-        let mut receive = rx_buffer;
-
-        send.copy_from_slice(&[0x55u8; 4096]);
-        for byte in 0..send.len() {
-            send[byte] = byte as u8;
-        }
-
-        let transfer = spi.dma_transfer(&mut send, &mut receive).unwrap();
-        transfer.wait().unwrap();
-        assert_eq!(send, receive);
-    }
-
-    #[test]
-    #[timeout(3)]
-    fn test_try_using_non_dma_memory_tx_buffer() {
-        const DMA_BUFFER_SIZE: usize = 4096;
-
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let sclk = io.pins.gpio0;
-        let miso = io.pins.gpio2;
-        let mosi = io.pins.gpio3;
-        let cs = io.pins.gpio8;
-
-        let dma = Dma::new(peripherals.DMA);
-
-        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-        let dma_channel = dma.spi2channel;
-        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
-        let dma_channel = dma.channel0;
-
-        let (_, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
-
-        let tx_buffer = {
-            // using `static`, not `static mut`, places the array in .rodata
-            static TX_BUFFER: [u8; DMA_BUFFER_SIZE] = [42u8; DMA_BUFFER_SIZE];
-            unsafe {
-                core::slice::from_raw_parts(
-                    &mut *(core::ptr::addr_of!(TX_BUFFER) as *mut u8),
-                    DMA_BUFFER_SIZE,
-                )
-            }
-        };
-
-        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
-            .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(
-                dma_channel.configure(false, DmaPriority::Priority0),
-                tx_descriptors,
-                rx_descriptors,
-            );
-
-        let mut receive = rx_buffer;
-
-        assert!(matches!(
-            spi.dma_transfer(&tx_buffer, &mut receive),
-            Err(esp_hal::spi::Error::DmaError(
-                esp_hal::dma::DmaError::UnsupportedMemoryRegion
-            ))
-        ));
-    }
-
-    #[test]
-    #[timeout(3)]
-    fn test_try_using_non_dma_memory_rx_buffer() {
-        const DMA_BUFFER_SIZE: usize = 4096;
-
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let sclk = io.pins.gpio0;
-        let miso = io.pins.gpio2;
-        let mosi = io.pins.gpio3;
-        let cs = io.pins.gpio8;
-
-        let dma = Dma::new(peripherals.DMA);
-
-        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-        let dma_channel = dma.spi2channel;
-        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
-        let dma_channel = dma.channel0;
-
-        let (tx_buffer, tx_descriptors, _, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
-
-        let rx_buffer = {
-            // using `static`, not `static mut`, places the array in .rodata
-            static RX_BUFFER: [u8; DMA_BUFFER_SIZE] = [42u8; DMA_BUFFER_SIZE];
-            unsafe {
-                core::slice::from_raw_parts_mut(
-                    &mut *(core::ptr::addr_of!(RX_BUFFER) as *mut u8),
-                    DMA_BUFFER_SIZE,
-                )
-            }
-        };
-
-        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
-            .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(
-                dma_channel.configure(false, DmaPriority::Priority0),
-                tx_descriptors,
-                rx_descriptors,
-            );
-
-        let mut receive = rx_buffer;
-        assert!(matches!(
-            spi.dma_transfer(&tx_buffer, &mut receive),
-            Err(esp_hal::spi::Error::DmaError(
-                esp_hal::dma::DmaError::UnsupportedMemoryRegion
-            ))
-        ));
-    }
-
-    #[test]
-    #[timeout(3)]
-    fn test_symmetric_dma_transfer_owned() {
-        const DMA_BUFFER_SIZE: usize = 4096;
-
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let sclk = io.pins.gpio0;
-        let miso = io.pins.gpio2;
-        let mosi = io.pins.gpio3;
-        let cs = io.pins.gpio8;
-
-        let dma = Dma::new(peripherals.DMA);
-
-        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-        let dma_channel = dma.spi2channel;
-        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
-        let dma_channel = dma.channel0;
-
-        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
+        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
         let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(
-                dma_channel.configure(false, DmaPriority::Priority0),
-                tx_descriptors,
-                rx_descriptors,
-            );
+            .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
-        let send = tx_buffer;
-        let receive = rx_buffer;
-
-        send.copy_from_slice(&[0x55u8; 4096]);
-        for byte in 0..send.len() {
-            send[byte] = byte as u8;
+        for (i, d) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
+            *d = i as _;
         }
 
-        let transfer = spi.dma_transfer_owned(send, receive).unwrap();
-        let (_, send, receive) = transfer.wait().unwrap();
-        assert_eq!(send, receive);
+        let transfer = spi
+            .dma_transfer(dma_tx_buf, dma_rx_buf)
+            .map_err(|e| e.0)
+            .unwrap();
+        (_, (dma_tx_buf, dma_rx_buf)) = transfer.wait();
+        assert_eq!(dma_tx_buf.as_slice(), dma_rx_buf.as_slice());
     }
 
     #[test]
@@ -365,14 +212,12 @@ mod tests {
         let dma_channel = dma.channel0;
 
         let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
+        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
         let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(
-                dma_channel.configure(false, DmaPriority::Priority0),
-                tx_descriptors,
-                rx_descriptors,
-            );
+            .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
         let unit = pcnt.unit0;
         unit.channel0.set_edge_signal(PcntSource::from_pin(
@@ -382,21 +227,19 @@ mod tests {
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let mut receive = rx_buffer;
-
         // Fill the buffer where each byte has 3 pos edges.
-        tx_buffer.fill(0b0110_1010);
+        dma_tx_buf.as_mut_slice().fill(0b0110_1010);
 
         assert_eq!(out_pin.is_set_low(), true);
 
         for i in 1..4 {
-            receive.copy_from_slice(&[5, 5, 5, 5, 5]);
-            let transfer = spi.dma_read(&mut receive).unwrap();
-            transfer.wait().unwrap();
-            assert_eq!(receive, &[0, 0, 0, 0, 0]);
+            dma_rx_buf.as_mut_slice().copy_from_slice(&[5, 5, 5, 5, 5]);
+            let transfer = spi.dma_read(dma_rx_buf).map_err(|e| e.0).unwrap();
+            (spi, dma_rx_buf) = transfer.wait();
+            assert_eq!(dma_rx_buf.as_slice(), &[0, 0, 0, 0, 0]);
 
-            let transfer = spi.dma_write(&tx_buffer).unwrap();
-            transfer.wait().unwrap();
+            let transfer = spi.dma_write(dma_tx_buf).map_err(|e| e.0).unwrap();
+            (spi, dma_tx_buf) = transfer.wait();
             assert_eq!(unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
         }
     }
@@ -444,14 +287,12 @@ mod tests {
         let dma_channel = dma.channel0;
 
         let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
+        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
         let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(
-                dma_channel.configure(false, DmaPriority::Priority0),
-                tx_descriptors,
-                rx_descriptors,
-            );
+            .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
         let unit = pcnt.unit0;
         unit.channel0.set_edge_signal(PcntSource::from_pin(
@@ -461,22 +302,138 @@ mod tests {
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let mut receive = rx_buffer;
-
         // Fill the buffer where each byte has 3 pos edges.
-        tx_buffer.fill(0b0110_1010);
+        dma_tx_buf.as_mut_slice().fill(0b0110_1010);
 
         assert_eq!(out_pin.is_set_low(), true);
 
         for i in 1..4 {
-            receive.copy_from_slice(&[5, 5, 5, 5, 5]);
-            let transfer = spi.dma_read(&mut receive).unwrap();
-            transfer.wait().unwrap();
-            assert_eq!(receive, &[0, 0, 0, 0, 0]);
+            dma_rx_buf.as_mut_slice().copy_from_slice(&[5, 5, 5, 5, 5]);
+            let transfer = spi.dma_read(dma_rx_buf).map_err(|e| e.0).unwrap();
+            (spi, dma_rx_buf) = transfer.wait();
+            assert_eq!(dma_rx_buf.as_slice(), &[0, 0, 0, 0, 0]);
 
-            let transfer = spi.dma_transfer(&tx_buffer, &mut receive).unwrap();
-            transfer.wait().unwrap();
+            let transfer = spi
+                .dma_transfer(dma_tx_buf, dma_rx_buf)
+                .map_err(|e| e.0)
+                .unwrap();
+            (spi, (dma_tx_buf, dma_rx_buf)) = transfer.wait();
             assert_eq!(unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
         }
+    }
+
+    #[test]
+    #[timeout(3)]
+    fn test_dma_bus_symmetric_transfer() {
+        const DMA_BUFFER_SIZE: usize = 4;
+
+        let peripherals = Peripherals::take();
+        let system = SystemControl::new(peripherals.SYSTEM);
+        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let sclk = io.pins.gpio0;
+        let miso = io.pins.gpio2;
+        let mosi = io.pins.gpio3;
+        let cs = io.pins.gpio8;
+
+        let dma = Dma::new(peripherals.DMA);
+
+        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+        let dma_channel = dma.spi2channel;
+        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
+        let dma_channel = dma.channel0;
+
+        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
+        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+
+        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+            .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
+            .with_dma(dma_channel.configure(false, DmaPriority::Priority0))
+            .with_buffers(dma_tx_buf, dma_rx_buf);
+
+        let tx_buf = [0xde, 0xad, 0xbe, 0xef];
+        let mut rx_buf = [0; 4];
+
+        spi.transfer(&mut rx_buf, &tx_buf).unwrap();
+
+        assert_eq!(tx_buf, rx_buf);
+    }
+
+    #[test]
+    #[timeout(3)]
+    fn test_dma_bus_asymmetric_transfer() {
+        let peripherals = Peripherals::take();
+        let system = SystemControl::new(peripherals.SYSTEM);
+        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let sclk = io.pins.gpio0;
+        let miso = io.pins.gpio2;
+        let mosi = io.pins.gpio3;
+        let cs = io.pins.gpio8;
+
+        let dma = Dma::new(peripherals.DMA);
+
+        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+        let dma_channel = dma.spi2channel;
+        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
+        let dma_channel = dma.channel0;
+
+        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(4);
+        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+
+        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+            .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
+            .with_dma(dma_channel.configure(false, DmaPriority::Priority0))
+            .with_buffers(dma_tx_buf, dma_rx_buf);
+
+        let tx_buf = [0xde, 0xad, 0xbe, 0xef];
+        let mut rx_buf = [0; 4];
+
+        spi.transfer(&mut rx_buf, &tx_buf).unwrap();
+
+        assert_eq!(&tx_buf[0..1], &rx_buf[0..1]);
+    }
+
+    #[test]
+    #[timeout(3)]
+    fn test_dma_bus_symmetric_transfer_huge_buffer() {
+        const DMA_BUFFER_SIZE: usize = 4096;
+
+        let peripherals = Peripherals::take();
+        let system = SystemControl::new(peripherals.SYSTEM);
+        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let sclk = io.pins.gpio0;
+        let miso = io.pins.gpio2;
+        let mosi = io.pins.gpio3;
+        let cs = io.pins.gpio8;
+
+        let dma = Dma::new(peripherals.DMA);
+
+        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+        let dma_channel = dma.spi2channel;
+        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
+        let dma_channel = dma.channel0;
+
+        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(40);
+        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+
+        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+            .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
+            .with_dma(dma_channel.configure(false, DmaPriority::Priority0))
+            .with_buffers(dma_tx_buf, dma_rx_buf);
+
+        let tx_buf = core::array::from_fn(|i| i as _);
+        let mut rx_buf = [0; DMA_BUFFER_SIZE];
+
+        spi.transfer(&mut rx_buf, &tx_buf).unwrap();
+
+        assert_eq!(tx_buf, rx_buf);
     }
 }

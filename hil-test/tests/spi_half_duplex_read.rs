@@ -20,7 +20,7 @@ use hil_test as _;
 mod tests {
     use esp_hal::{
         clock::ClockControl,
-        dma::{Dma, DmaPriority},
+        dma::{Dma, DmaPriority, DmaRxBuf},
         dma_buffers,
         gpio::{Io, Level, Output},
         peripherals::Peripherals,
@@ -58,19 +58,13 @@ mod tests {
         #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
         let dma_channel = dma.channel0;
 
-        let (_, tx_descriptors, mut rx_buffer, rx_descriptors) = dma_buffers!(0, DMA_BUFFER_SIZE);
+        let (buffer, descriptors, _, _) = dma_buffers!(DMA_BUFFER_SIZE, 0);
+        let mut dma_rx_buf = DmaRxBuf::new(descriptors, buffer).unwrap();
 
         let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_sck(sclk)
             .with_miso(miso)
-            .with_dma(
-                dma_channel.configure(false, DmaPriority::Priority0),
-                tx_descriptors,
-                rx_descriptors,
-            );
-
-        // Fill with neither 0x00 nor 0xFF.
-        rx_buffer.fill(5);
+            .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
         // SPI should read '0's from the MISO pin
         miso_mirror.set_low();
@@ -81,12 +75,13 @@ mod tests {
                 Command::None,
                 Address::None,
                 0,
-                &mut rx_buffer,
+                dma_rx_buf,
             )
+            .map_err(|e| e.0)
             .unwrap();
-        transfer.wait().unwrap();
+        (spi, dma_rx_buf) = transfer.wait();
 
-        assert_eq!(rx_buffer, &[0x00; DMA_BUFFER_SIZE]);
+        assert_eq!(dma_rx_buf.as_slice(), &[0x00; DMA_BUFFER_SIZE]);
 
         // SPI should read '1's from the MISO pin
         miso_mirror.set_high();
@@ -97,11 +92,13 @@ mod tests {
                 Command::None,
                 Address::None,
                 0,
-                &mut rx_buffer,
+                dma_rx_buf,
             )
+            .map_err(|e| e.0)
             .unwrap();
-        transfer.wait().unwrap();
 
-        assert_eq!(rx_buffer, &[0xFF; DMA_BUFFER_SIZE]);
+        (_, dma_rx_buf) = transfer.wait();
+
+        assert_eq!(dma_rx_buf.as_slice(), &[0xFF; DMA_BUFFER_SIZE]);
     }
 }
