@@ -29,20 +29,12 @@ use esp_println::{print, println};
 
 use opentherm_boiler_controller_lib::{BoilerControl, TimeBaseRef, Instant};
 use opentherm_boiler_controller_lib::opentherm_interface::OpenThermEdgeTriggerBus;
-use opentherm_boiler_controller_lib::opentherm_interface::{DataOt, Error as OtError, OpenThermMessage, MessageType};
+use opentherm_boiler_controller_lib::opentherm_interface::{DataOt, Error as OtError, OpenThermMessage};
 use opentherm_boiler_controller_lib::opentherm_interface::edge_trigger_capture_interface::{
     CaptureError, EdgeCaptureInterface, EdgeTriggerInterface, InitLevel, TriggerError,
 };
-use opentherm_boiler_controller_lib::opentherm_interface::manchester;
-use opentherm_boiler_controller_lib::opentherm_interface::manchester::{
-    manchester_decode, ManchesterDecodingVariant, ManchesterIteratorAdapter,
-};
-use opentherm_boiler_controller_lib::opentherm_interface::{
-    CAPTURE_OT_FRAME_PAYLOAD_SIZE, MANCHESTER_OPENTHERM_RESOLUTION, MESSAGE_DATA_ID_BIT_LEN,
-    MESSAGE_DATA_VALUE_BIT_LEN, MESSAGE_TYPE_BIT_LEN, OT_FRAME_SKIP_SPARE,
-};
 use opentherm_boiler_controller_lib::opentherm_interface::api;
-use opentherm_boiler_controller_lib::opentherm_interface::api::OpenThermBus;
+//  use opentherm_boiler_controller_lib::opentherm_interface::api::OpenThermBus;
 use opentherm_boiler_controller_lib::opentherm_interface::OpenThermInterface;
 
 pub struct EspOpenthermRmt<E: EdgeCaptureInterface, T: EdgeTriggerInterface>{
@@ -143,7 +135,6 @@ impl<'d, const N: usize, const Inverted: bool> RmtEdgeCapture<N, Inverted> {
         //  vector.push(period)
     }
 }
-
 
 //  _____|''|_____|''|__|''|__    ___|''|__|'''''|__|''|___   //  0x200000003
 //  -----|  1  |  0  |  0  |      |  0  |  0  |  1  |  1  |
@@ -428,6 +419,7 @@ async fn main(spawner: Spawner) {
         //  rmt_tx.trigger(data.clone().into_iter(), core::time::Duration::from_millis(500)).await;
         //  input.wait_for_falling_edge().await;
         println!("loop");
+        boiler.process().await.unwrap();
         Timer::after(Duration::from_millis(1000)).await;
     }
 }

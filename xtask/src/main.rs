@@ -12,9 +12,7 @@ use minijinja::Value;
 use strum::IntoEnumIterator;
 use xtask::{
     cargo::{CargoAction, CargoArgsBuilder},
-    Metadata,
-    Package,
-    Version,
+    Metadata, Package, Version,
 };
 
 // ----------------------------------------------------------------------------
