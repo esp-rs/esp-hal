@@ -27,10 +27,7 @@ use esp_hal::{
     gpio::Io,
     peripherals::Peripherals,
     prelude::*,
-    spi::{
-        master::{prelude::*, Spi},
-        SpiMode,
-    },
+    spi::{master::Spi, SpiMode},
     system::SystemControl,
 };
 use esp_println::println;

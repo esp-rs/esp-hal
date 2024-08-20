@@ -30,7 +30,7 @@ mod tests {
         peripherals::Peripherals,
         prelude::_fugit_RateExtU32,
         spi::{
-            master::{prelude::*, Address, Command, Spi},
+            master::{Address, Command, Spi},
             SpiDataMode,
             SpiMode,
         },

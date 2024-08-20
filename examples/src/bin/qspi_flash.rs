@@ -37,7 +37,7 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     spi::{
-        master::{prelude::*, Address, Command, Spi},
+        master::{Address, Command, Spi},
         SpiDataMode,
         SpiMode,
     },
