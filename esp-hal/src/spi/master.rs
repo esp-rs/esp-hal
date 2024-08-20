@@ -856,7 +856,9 @@ pub mod dma {
             Channel,
             DmaChannel,
             DmaRxBuf,
+            DmaRxBuffer,
             DmaTxBuf,
+            DmaTxBuffer,
             RxPrivate,
             Spi2Peripheral,
             SpiPeripheral,
@@ -1178,19 +1180,21 @@ pub mod dma {
         /// bytes.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-        pub fn dma_write(
+        pub fn dma_write<TX: DmaTxBuffer>(
             mut self,
-            buffer: DmaTxBuf,
-        ) -> Result<SpiDmaTransfer<'d, T, C, M, DmaMode, DmaTxBuf>, (Error, Self, DmaTxBuf)>
-        {
-            let bytes_to_write = buffer.len();
-            if bytes_to_write > MAX_DMA_SIZE {
+            mut buffer: TX,
+        ) -> Result<SpiDmaTransfer<'d, T, C, M, DmaMode, TX>, (Error, Self, TX)> {
+            let preparation = buffer.prepare();
+            if preparation.length > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
 
             let result = unsafe {
-                self.spi
-                    .start_write_bytes_dma(buffer.first(), bytes_to_write, &mut self.channel.tx)
+                self.spi.start_write_bytes_dma(
+                    preparation.start,
+                    preparation.length,
+                    &mut self.channel.tx,
+                )
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
@@ -1206,19 +1210,21 @@ pub mod dma {
         /// received is 32736 bytes.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-        pub fn dma_read(
+        pub fn dma_read<RX: DmaRxBuffer>(
             mut self,
-            buffer: DmaRxBuf,
-        ) -> Result<SpiDmaTransfer<'d, T, C, M, DmaMode, DmaRxBuf>, (Error, Self, DmaRxBuf)>
-        {
-            let bytes_to_read = buffer.len();
-            if bytes_to_read > MAX_DMA_SIZE {
+            mut buffer: RX,
+        ) -> Result<SpiDmaTransfer<'d, T, C, M, DmaMode, RX>, (Error, Self, RX)> {
+            let preparation = buffer.prepare();
+            if preparation.length > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
 
             let result = unsafe {
-                self.spi
-                    .start_read_bytes_dma(buffer.first(), bytes_to_read, &mut self.channel.rx)
+                self.spi.start_read_bytes_dma(
+                    preparation.start,
+                    preparation.length,
+                    &mut self.channel.rx,
+                )
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
@@ -1233,18 +1239,15 @@ pub mod dma {
         /// the SPI instance. The maximum amount of data to be
         /// sent/received is 32736 bytes.
         #[allow(clippy::type_complexity)]
-        pub fn dma_transfer(
+        pub fn dma_transfer<TX: DmaTxBuffer, RX: DmaRxBuffer>(
             mut self,
-            tx_buffer: DmaTxBuf,
-            rx_buffer: DmaRxBuf,
-        ) -> Result<
-            SpiDmaTransfer<'d, T, C, M, DmaMode, (DmaTxBuf, DmaRxBuf)>,
-            (Error, Self, DmaTxBuf, DmaRxBuf),
-        > {
-            let bytes_to_write = tx_buffer.len();
-            let bytes_to_read = rx_buffer.len();
+            mut tx_buffer: TX,
+            mut rx_buffer: RX,
+        ) -> Result<SpiDmaTransfer<'d, T, C, M, DmaMode, (TX, RX)>, (Error, Self, TX, RX)> {
+            let tx_preparation = tx_buffer.prepare();
+            let rx_preparation = rx_buffer.prepare();
 
-            if bytes_to_write > MAX_DMA_SIZE || bytes_to_read > MAX_DMA_SIZE {
+            if tx_preparation.length > MAX_DMA_SIZE || rx_preparation.length > MAX_DMA_SIZE {
                 return Err((
                     Error::MaxDmaTransferSizeExceeded,
                     self,
@@ -1255,10 +1258,10 @@ pub mod dma {
 
             let result = unsafe {
                 self.spi.start_transfer_dma(
-                    tx_buffer.first(),
-                    rx_buffer.first(),
-                    bytes_to_write,
-                    bytes_to_read,
+                    tx_preparation.start,
+                    rx_preparation.start,
+                    tx_preparation.length,
+                    rx_preparation.length,
                     &mut self.channel.tx,
                     &mut self.channel.rx,
                 )
@@ -1286,17 +1289,16 @@ pub mod dma {
     {
         #[allow(clippy::type_complexity)]
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-        pub fn read(
+        pub fn read<RX: DmaRxBuffer>(
             mut self,
             data_mode: SpiDataMode,
             cmd: Command,
             address: Address,
             dummy: u8,
-            buffer: DmaRxBuf,
-        ) -> Result<SpiDmaTransfer<'d, T, C, M, DmaMode, DmaRxBuf>, (Error, Self, DmaRxBuf)>
-        {
-            let bytes_to_read = buffer.len();
-            if bytes_to_read > MAX_DMA_SIZE {
+            mut buffer: RX,
+        ) -> Result<SpiDmaTransfer<'d, T, C, M, DmaMode, RX>, (Error, Self, RX)> {
+            let preparation = buffer.prepare();
+            if preparation.length > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
 
@@ -1306,7 +1308,7 @@ pub mod dma {
                 !address.is_none(),
                 false,
                 dummy != 0,
-                bytes_to_read == 0,
+                preparation.length == 0,
             );
             self.spi
                 .init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
@@ -1351,29 +1353,36 @@ pub mod dma {
             }
 
             let result = unsafe {
-                self.spi
-                    .start_read_bytes_dma(buffer.first(), bytes_to_read, &mut self.channel.rx)
+                self.spi.start_read_bytes_dma(
+                    preparation.start,
+                    preparation.length,
+                    &mut self.channel.rx,
+                )
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
             }
 
-            Ok(SpiDmaTransfer::new(self, buffer, bytes_to_read > 0, false))
+            Ok(SpiDmaTransfer::new(
+                self,
+                buffer,
+                preparation.length > 0,
+                false,
+            ))
         }
 
         #[allow(clippy::type_complexity)]
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-        pub fn write(
+        pub fn write<TX: DmaTxBuffer>(
             mut self,
             data_mode: SpiDataMode,
             cmd: Command,
             address: Address,
             dummy: u8,
-            buffer: DmaTxBuf,
-        ) -> Result<SpiDmaTransfer<'d, T, C, M, DmaMode, DmaTxBuf>, (Error, Self, DmaTxBuf)>
-        {
-            let bytes_to_write = buffer.len();
-            if bytes_to_write > MAX_DMA_SIZE {
+            mut buffer: TX,
+        ) -> Result<SpiDmaTransfer<'d, T, C, M, DmaMode, TX>, (Error, Self, TX)> {
+            let preparation = buffer.prepare();
+            if preparation.length > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
 
@@ -1383,7 +1392,7 @@ pub mod dma {
                 !address.is_none(),
                 false,
                 dummy != 0,
-                bytes_to_write == 0,
+                preparation.length == 0,
             );
             self.spi
                 .init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
@@ -1428,14 +1437,22 @@ pub mod dma {
             }
 
             let result = unsafe {
-                self.spi
-                    .start_write_bytes_dma(buffer.first(), bytes_to_write, &mut self.channel.tx)
+                self.spi.start_write_bytes_dma(
+                    preparation.start,
+                    preparation.length,
+                    &mut self.channel.tx,
+                )
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
             }
 
-            Ok(SpiDmaTransfer::new(self, buffer, false, bytes_to_write > 0))
+            Ok(SpiDmaTransfer::new(
+                self,
+                buffer,
+                false,
+                preparation.length > 0,
+            ))
         }
     }
 

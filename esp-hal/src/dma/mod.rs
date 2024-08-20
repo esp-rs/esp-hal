@@ -1878,6 +1878,37 @@ where
     }
 }
 
+/// Holds all the information needed to configure a DMA channel for a transfer.
+pub struct Preparation {
+    pub(crate) start: *mut DmaDescriptor,
+    pub(crate) length: usize,
+    // burst_mode, alignment, check_owner, etc.
+}
+
+/// [DmaTxBuffer] is a DMA descriptor + memory combo that can be used for
+/// transmitting data from a DMA channel to a peripheral's FIFO.
+pub trait DmaTxBuffer {
+    /// Prepares the buffer for an imminent transfer and returns
+    /// information required to use this buffer.
+    ///
+    /// Note: This operation is idempotent.
+    fn prepare(&mut self) -> Preparation;
+}
+
+/// [DmaRxBuffer] is a DMA descriptor + memory combo that can be used for
+/// receiving data from a peripheral's FIFO to a DMA channel.
+///
+/// Note: Implementations of this trait may only support having a single EOF bit
+/// which resides in the last descriptor. There will be a separate trait in
+/// future to support multiple EOFs.
+pub trait DmaRxBuffer {
+    /// Prepares the buffer for an imminent transfer and returns
+    /// information required to use this buffer.
+    ///
+    /// Note: This operation is idempotent.
+    fn prepare(&mut self) -> Preparation;
+}
+
 /// Error returned from Dma[Tx|Rx|TxRx]Buf operations.
 #[derive(Debug)]
 pub enum DmaBufError {
@@ -2016,9 +2047,26 @@ impl DmaTxBuf {
     pub fn as_slice(&self) -> &[u8] {
         self.buffer
     }
+}
 
-    pub(crate) fn first(&self) -> *mut DmaDescriptor {
-        self.descriptors.as_ptr() as _
+impl DmaTxBuffer for DmaTxBuf {
+    fn prepare(&mut self) -> Preparation {
+        // Calculate length and setup descriptor flags.
+        let mut length = 0;
+        for desc in self.descriptors.iter_mut() {
+            // Give ownership to the DMA
+            desc.set_owner(Owner::Dma);
+
+            length += desc.len();
+            if desc.next.is_null() {
+                break;
+            }
+        }
+
+        Preparation {
+            start: self.descriptors.as_mut_ptr(),
+            length,
+        }
     }
 }
 
@@ -2227,9 +2275,34 @@ impl DmaRxBuf {
             Some(chunk)
         })
     }
+}
 
-    pub(crate) fn first(&self) -> *mut DmaDescriptor {
-        self.descriptors.as_ptr() as _
+impl DmaRxBuffer for DmaRxBuf {
+    fn prepare(&mut self) -> Preparation {
+        // Calculate length and setup descriptor flags.
+        let mut length = 0;
+        for desc in self.descriptors.iter_mut() {
+            // Give ownership to the DMA
+            desc.set_owner(Owner::Dma);
+
+            // Clear this to allow hardware to set it when the peripheral returns an EOF
+            // bit.
+            desc.set_suc_eof(false);
+
+            // Clear this to allow hardware to set it when it's
+            // done receiving data for this descriptor.
+            desc.set_length(0);
+
+            length += desc.size();
+            if desc.next.is_null() {
+                break;
+            }
+        }
+
+        Preparation {
+            start: self.descriptors.as_mut_ptr(),
+            length,
+        }
     }
 }
 
@@ -2320,7 +2393,7 @@ impl DmaTxRxBuf {
     }
 
     /// Returns the entire buf as a slice than can be written.
-    pub fn as_slice_mut(&mut self) -> &mut [u8] {
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
         &mut self.buffer[..]
     }
 
@@ -2388,6 +2461,56 @@ impl DmaTxRxBuf {
             remaining_length -= chunk_size;
         }
         debug_assert_eq!(remaining_length, 0);
+    }
+}
+
+impl DmaTxBuffer for DmaTxRxBuf {
+    fn prepare(&mut self) -> Preparation {
+        // Calculate length and setup descriptor flags.
+        let mut length = 0;
+        for desc in self.tx_descriptors.iter_mut() {
+            // Give ownership to the DMA
+            desc.set_owner(Owner::Dma);
+
+            length += desc.len();
+            if desc.next.is_null() {
+                break;
+            }
+        }
+
+        Preparation {
+            start: self.tx_descriptors.as_mut_ptr(),
+            length,
+        }
+    }
+}
+
+impl DmaRxBuffer for DmaTxRxBuf {
+    fn prepare(&mut self) -> Preparation {
+        // Calculate length and setup descriptor flags.
+        let mut length = 0;
+        for desc in self.rx_descriptors.iter_mut() {
+            // Give ownership to the DMA
+            desc.set_owner(Owner::Dma);
+
+            // Clear this to allow hardware to set it when the peripheral returns an EOF
+            // bit.
+            desc.set_suc_eof(false);
+
+            // Clear this to allow hardware to set it when it's
+            // done receiving data for this descriptor.
+            desc.set_length(0);
+
+            length += desc.size();
+            if desc.next.is_null() {
+                break;
+            }
+        }
+
+        Preparation {
+            start: self.rx_descriptors.as_mut_ptr(),
+            length,
+        }
     }
 }
 
