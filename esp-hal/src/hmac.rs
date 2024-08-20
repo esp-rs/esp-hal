@@ -109,10 +109,6 @@ impl<'d> Hmac<'d> {
         }
     }
 
-    pub fn free(self) -> PeripheralRef<'d, HMAC> {
-        self.hmac
-    }
-
     /// Step 1. Enable HMAC module.
     ///
     /// Before these steps, the user shall set the peripheral clocks bits for
