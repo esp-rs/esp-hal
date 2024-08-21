@@ -524,8 +524,46 @@ pub trait Comparator {
             2 => Interrupt::SYSTIMER_TARGET2,
             _ => unreachable!(),
         };
+
+        #[cfg(not(esp32s2))]
         unsafe {
             interrupt::bind_interrupt(interrupt, handler.handler());
+        }
+
+        #[cfg(esp32s2)]
+        {
+            // ESP32-S2 Systimer interrupts are edge triggered. Our interrupt
+            // handler calls each of the handlers, regardless of which one triggered the interrupt.
+            // This mess registers an intermediate handler that checks if an interrupt is active
+            // before calling the associated handler functions.
+
+            static mut HANDLERS: [Option<extern "C" fn()>; 3] = [None, None, None];
+
+            #[crate::prelude::ram]
+            unsafe extern "C" fn _handle_interrupt<const CH: u8>() {
+                if unsafe { &*SYSTIMER::PTR }
+                    .int_raw()
+                    .read()
+                    .target(CH)
+                    .bit_is_set()
+                {
+                    let handler = unsafe { HANDLERS[CH as usize] };
+                    if let Some(handler) = handler {
+                        handler();
+                    }
+                }
+            }
+
+            unsafe {
+                HANDLERS[self.channel() as usize] = Some(handler.handler());
+                let handler = match self.channel() {
+                    0 => _handle_interrupt::<0>,
+                    1 => _handle_interrupt::<1>,
+                    2 => _handle_interrupt::<2>,
+                    _ => unreachable!(),
+                };
+                interrupt::bind_interrupt(interrupt, handler);
+            }
         }
         unwrap!(interrupt::enable(interrupt, handler.priority()));
     }
