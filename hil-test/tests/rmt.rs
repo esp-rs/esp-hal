@@ -59,11 +59,16 @@ mod tests {
         };
 
         cfg_if::cfg_if! {
-            if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
+            if #[cfg(feature = "esp32")] {
                 let  rx_channel = {
                     use esp_hal::rmt::RxChannelCreator;
                     rmt.channel1.configure(rx, rx_config).unwrap()
                 };
+            } else if #[cfg(feature = "esp32s2")] {
+                    let  rx_channel = {
+                        use esp_hal::rmt::RxChannelCreator;
+                        rmt.channel1.configure(io.pins.gpio3, rx_config).unwrap()
+                    };
             } else if #[cfg(feature = "esp32s3")] {
                 let  rx_channel = {
                     use esp_hal::rmt::RxChannelCreator;
@@ -102,7 +107,8 @@ mod tests {
         let rx_transaction = rx_channel.receive(&mut rcv_data).unwrap();
         let tx_transaction = tx_channel.transmit(&tx_data);
         tx_transaction.wait().unwrap();
-        rx_transaction.wait().unwrap();
+
+        rx_transaction.wait().unwrap(); // HERE ESP32 hangs
 
         // the last two pulse-codes are the ones which wait for the timeout so they
         // can't be equal

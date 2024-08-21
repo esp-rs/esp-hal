@@ -13,6 +13,10 @@
 use core::cell::RefCell;
 
 use critical_section::Mutex;
+#[cfg(feature = "esp32")]
+use esp_hal::gpio::Gpio0;
+#[cfg(not(feature = "esp32"))]
+use esp_hal::gpio::Gpio3;
 use esp_hal::{
     delay::Delay,
     gpio::{AnyPin, ErasedPin, Input, Io, Level, Output, Pin, Pull},

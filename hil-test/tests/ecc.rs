@@ -1,6 +1,6 @@
 //! ECC Test
 
-//% CHIPS: esp32c2 esp32c6 esp32h2
+//% CHIPS: esp32 esp32c2 esp32c6 esp32h2
 
 #![no_std]
 #![no_main]
