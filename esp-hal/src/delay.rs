@@ -39,16 +39,8 @@ use crate::clock::Clocks;
 /// Uses the `SYSTIMER` peripheral internally for RISC-V devices, and the
 /// built-in Xtensa timer for Xtensa devices.
 #[derive(Clone, Copy)]
-pub struct Delay;
-
-impl Delay {
-    /// Delay for the specified number of milliseconds
-    pub fn delay_millis(&self, ms: u32) {
-        for _ in 0..ms {
-            self.delay_micros(1000);
-        }
-    }
-}
+#[non_exhaustive]
+pub struct Delay {}
 
 #[cfg(feature = "embedded-hal-02")]
 impl<T> embedded_hal_02::blocking::delay::DelayMs<T> for Delay
@@ -56,9 +48,7 @@ where
     T: Into<u32>,
 {
     fn delay_ms(&mut self, ms: T) {
-        for _ in 0..ms.into() {
-            self.delay_micros(1000);
-        }
+        self.delay_millis(ms.into());
     }
 }
 
@@ -81,10 +71,8 @@ impl embedded_hal::delay::DelayNs for Delay {
 
 impl Delay {
     /// Creates a new `Delay` instance.
+    // Do not remove the argument, it makes sure that the clocks are initialized.
     pub fn new(_clocks: &Clocks<'_>) -> Self {
-        // The counters and comparators are driven using `XTAL_CLK`.
-        // The average clock frequency is fXTAL_CLK/2.5, which is 16 MHz.
-        // The timer counting is incremented by 1/16 μs on each `CNT_CLK` cycle.
         Self {}
     }
 
@@ -93,6 +81,13 @@ impl Delay {
         let start = crate::time::current_time();
 
         while elapsed_since(start) < delay {}
+    }
+
+    /// Delay for the specified number of milliseconds
+    pub fn delay_millis(&self, ms: u32) {
+        for _ in 0..ms {
+            self.delay_micros(1000);
+        }
     }
 
     /// Delay for the specified number of microseconds

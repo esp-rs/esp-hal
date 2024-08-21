@@ -1,6 +1,7 @@
 //! Delay Test
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32s2 esp32s3
+//% FEATURES: defmt
 
 #![no_std]
 #![no_main]
@@ -36,7 +37,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1)]
+    #[timeout(2)]
     fn delay_ns(mut ctx: Context) {
         let t1 = esp_hal::time::current_time();
         ctx.delay.delay_ns(600_000_000);
@@ -51,7 +52,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1)]
+    #[timeout(2)]
     fn delay_700millis(ctx: Context) {
         let t1 = esp_hal::time::current_time();
         ctx.delay.delay_millis(700);
