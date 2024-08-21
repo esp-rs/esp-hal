@@ -533,9 +533,10 @@ pub trait Comparator {
         #[cfg(esp32s2)]
         {
             // ESP32-S2 Systimer interrupts are edge triggered. Our interrupt
-            // handler calls each of the handlers, regardless of which one triggered the interrupt.
-            // This mess registers an intermediate handler that checks if an interrupt is active
-            // before calling the associated handler functions.
+            // handler calls each of the handlers, regardless of which one triggered the
+            // interrupt. This mess registers an intermediate handler that
+            // checks if an interrupt is active before calling the associated
+            // handler functions.
 
             static mut HANDLERS: [Option<extern "C" fn()>; 3] = [None, None, None];
 
