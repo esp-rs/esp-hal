@@ -40,7 +40,7 @@ use crate::clock::Clocks;
 /// built-in Xtensa timer for Xtensa devices.
 #[derive(Clone, Copy)]
 #[non_exhaustive]
-pub struct Delay {}
+pub struct Delay;
 
 #[cfg(feature = "embedded-hal-02")]
 impl<T> embedded_hal_02::blocking::delay::DelayMs<T> for Delay
