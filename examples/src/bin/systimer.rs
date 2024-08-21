@@ -74,11 +74,11 @@ fn main() -> ! {
         alarm0.enable_interrupt(true);
 
         alarm1.set_interrupt_handler(systimer_target1);
-        alarm1.set_target(SystemTimer::now() + (SystemTimer::TICKS_PER_SECOND * 2));
+        alarm1.set_target(SystemTimer::now() + (SystemTimer::ticks_per_second() * 2));
         alarm1.enable_interrupt(true);
 
         alarm2.set_interrupt_handler(systimer_target2);
-        alarm2.set_target(SystemTimer::now() + (SystemTimer::TICKS_PER_SECOND * 3));
+        alarm2.set_target(SystemTimer::now() + (SystemTimer::ticks_per_second() * 3));
         alarm2.enable_interrupt(true);
 
         ALARM0.borrow_ref_mut(cs).replace(alarm0);
