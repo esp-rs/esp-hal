@@ -141,6 +141,9 @@ pub enum Peripheral {
     /// LCD Camera peripheral.
     #[cfg(lcd_cam)]
     LcdCam,
+    /// Systimer peripheral.
+    #[cfg(systimer)]
+    Systimer,
 }
 
 /// The `DPORT`/`PCR`/`SYSTEM` peripheral split into its different logical
@@ -540,6 +543,11 @@ impl PeripheralClockControl {
                 perip_clk_en1.modify(|_, w| w.lcd_cam_clk_en().set_bit());
                 perip_rst_en1.modify(|_, w| w.lcd_cam_rst().clear_bit());
             }
+            #[cfg(systimer)]
+            Peripheral::Systimer => {
+                perip_clk_en0.modify(|_, w| w.systimer_clk_en().set_bit());
+                perip_rst_en0.modify(|_, w| w.systimer_rst().clear_bit());
+            }
         });
     }
 
@@ -743,6 +751,11 @@ impl PeripheralClockControl {
             Peripheral::LcdCam => {
                 perip_rst_en1.modify(|_, w| w.lcd_cam_rst().set_bit());
                 perip_rst_en1.modify(|_, w| w.lcd_cam_rst().clear_bit());
+            }
+            #[cfg(systimer)]
+            Peripheral::Systimer => {
+                perip_rst_en0.modify(|_, w| w.systimer_rst().set_bit());
+                perip_rst_en0.modify(|_, w| w.systimer_rst().clear_bit());
             }
         });
     }
@@ -962,6 +975,15 @@ impl PeripheralClockControl {
                     .trace_conf()
                     .modify(|_, w| w.trace_rst_en().clear_bit());
             }
+            #[cfg(systimer)]
+            Peripheral::Systimer => {
+                system
+                    .systimer_conf()
+                    .modify(|_, w| w.systimer_clk_en().set_bit());
+                system
+                    .systimer_conf()
+                    .modify(|_, w| w.systimer_rst_en().clear_bit());
+            }
         }
     }
 
@@ -1153,6 +1175,15 @@ impl PeripheralClockControl {
                 system
                     .trace_conf()
                     .modify(|_, w| w.trace_rst_en().clear_bit());
+            }
+            #[cfg(systimer)]
+            Peripheral::Systimer => {
+                system
+                    .systimer_conf()
+                    .modify(|_, w| w.systimer_rst_en().set_bit());
+                system
+                    .systimer_conf()
+                    .modify(|_, w| w.systimer_rst_en().clear_bit());
             }
         }
     }
