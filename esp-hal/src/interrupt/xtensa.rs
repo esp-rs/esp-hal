@@ -520,9 +520,9 @@ mod vectored {
     mod chip_specific {
         use super::*;
         pub const INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
-            0b0000_0000_0000_0000_0000_0000_0000_0011,
-            0b1111_1100_0000_0000_0000_0000_0000_0000,
             0b0000_0000_0000_0000_0000_0000_0000_0000,
+            0b1111_1100_0000_0000_0000_0000_0000_0000,
+            0b0000_0000_0000_0000_0000_0000_0000_0011,
         );
         #[inline]
         pub fn interrupt_is_edge(interrupt: Interrupt) -> bool {
@@ -541,14 +541,13 @@ mod vectored {
         }
     }
 
-    #[allow(clippy::unusual_byte_groupings)]
     #[cfg(esp32s2)]
     mod chip_specific {
         use super::*;
         pub const INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
-            0b0000_0000_0000_0000_0000_0011_1011_1111,
-            0b1100_0000_0000_0000_0000_0000_0000_0000,
             0b0000_0000_0000_0000_0000_0000_0000_0000,
+            0b1100_0000_0000_0000_0000_0000_0000_0000,
+            0b0000_0000_0000_0000_0000_0011_1011_1111,
         );
         #[inline]
         pub fn interrupt_is_edge(interrupt: Interrupt) -> bool {
