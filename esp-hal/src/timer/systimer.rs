@@ -396,20 +396,20 @@ pub trait Comparator {
     fn set_enable(&self, enable: bool) {
         let systimer = unsafe { &*SYSTIMER::ptr() };
 
-        #[cfg(not(esp32s2))]
         critical_section::with(|_| {
+            #[cfg(not(esp32s2))]
             systimer.conf().modify(|_, w| match self.channel() {
                 0 => w.target0_work_en().bit(enable),
                 1 => w.target1_work_en().bit(enable),
                 2 => w.target2_work_en().bit(enable),
                 _ => unreachable!(),
             });
-        });
 
-        #[cfg(esp32s2)]
-        systimer
-            .target_conf(self.channel() as usize)
-            .modify(|_r, w| w.work_en().bit(enable));
+            #[cfg(esp32s2)]
+            systimer
+                .target_conf(self.channel() as usize)
+                .modify(|_r, w| w.work_en().bit(enable));
+        });
     }
 
     /// Returns true if the comparator has been enabled. This means
