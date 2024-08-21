@@ -1,6 +1,6 @@
 //! Interrupt handling
 
-use xtensa_lx::interrupt::{self, InterruptNumber};
+use xtensa_lx::interrupt;
 use xtensa_lx_rt::exception::Context;
 
 pub use self::vectored::*;
@@ -502,7 +502,7 @@ mod vectored {
             fn EspDefaultHandler(level: u32, interrupt: Interrupt);
         }
 
-        let handler = peripherals::__INTERRUPTS[interrupt.number() as usize]._handler;
+        let handler = peripherals::__INTERRUPTS[interrupt as usize]._handler;
         if core::ptr::eq(
             handler as *const _,
             EspDefaultHandler as *const unsafe extern "C" fn(),
@@ -520,9 +520,9 @@ mod vectored {
     mod chip_specific {
         use super::*;
         pub const INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
-            0b0000_0000_0000_0000_0000_0000_0000_0011,
-            0b1111_1100_0000_0000_0000_0000_0000_0000,
             0b0000_0000_0000_0000_0000_0000_0000_0000,
+            0b1111_1100_0000_0000_0000_0000_0000_0000,
+            0b0000_0000_0000_0000_0000_0000_0000_0011,
         );
         #[inline]
         pub fn interrupt_is_edge(interrupt: Interrupt) -> bool {
@@ -541,14 +541,13 @@ mod vectored {
         }
     }
 
-    #[allow(clippy::unusual_byte_groupings)]
     #[cfg(esp32s2)]
     mod chip_specific {
         use super::*;
         pub const INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
-            0b0000_0000_0000_0000_0000_0011_1011_1111,
-            0b1100_0000_0000_0000_0000_0000_0000_0000,
             0b0000_0000_0000_0000_0000_0000_0000_0000,
+            0b1100_0000_0000_0000_0000_0000_0000_0000,
+            0b0000_0000_0000_0000_0000_0011_1011_1111,
         );
         #[inline]
         pub fn interrupt_is_edge(interrupt: Interrupt) -> bool {

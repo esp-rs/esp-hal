@@ -14,8 +14,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    interrupt::{self, Priority},
-    peripherals::{Interrupt, Peripherals},
+    peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
     timer::systimer::{
@@ -86,10 +85,6 @@ fn main() -> ! {
         ALARM1.borrow_ref_mut(cs).replace(alarm1);
         ALARM2.borrow_ref_mut(cs).replace(alarm2);
     });
-
-    interrupt::enable(Interrupt::SYSTIMER_TARGET0, Priority::Priority1).unwrap();
-    interrupt::enable(Interrupt::SYSTIMER_TARGET1, Priority::Priority3).unwrap();
-    interrupt::enable(Interrupt::SYSTIMER_TARGET2, Priority::Priority3).unwrap();
 
     let delay = Delay::new(&clocks);
 

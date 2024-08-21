@@ -225,10 +225,6 @@ impl Iterator for InterruptStatusIterator {
     type Item = u8;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.idx == usize::MAX {
-            return None;
-        }
-
         for i in self.idx..STATUS_WORDS {
             if self.status.status[i] != 0 {
                 let bit = self.status.status[i].trailing_zeros();
