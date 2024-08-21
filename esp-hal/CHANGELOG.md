@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32C6: Make ADC usable after TRNG deinicialization (#1945)
 - We should no longer generate 1GB .elf files for ESP32C2 and ESP32C3 (#1962)
 - Reset peripherals in driver constructors where missing (#1893, #1961)
+- Fixed ESP32-S2 systimer interrupts (#1979)
 
 ### Removed
 
