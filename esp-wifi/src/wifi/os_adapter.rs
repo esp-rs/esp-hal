@@ -17,8 +17,9 @@ use crate::{
     common_adapter::RADIO_CLOCKS,
     compat::{
         common::{
+            create_queue,
             create_recursive_mutex,
-            create_wifi_queue,
+            delete_queue,
             lock_mutex,
             number_of_messages_in_queue,
             receive_queued,
@@ -28,7 +29,6 @@ use crate::{
             unlock_mutex,
         },
         malloc::calloc,
-        task_runner::spawn_task,
     },
     hal::system::{RadioClockController, RadioPeripherals},
     memory_fence::memory_fence,
@@ -377,10 +377,19 @@ pub unsafe extern "C" fn mutex_unlock(mutex: *mut crate::binary::c_types::c_void
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn queue_create(
-    _queue_len: u32,
-    _item_size: u32,
+    queue_len: u32,
+    item_size: u32,
 ) -> *mut crate::binary::c_types::c_void {
-    todo!("queue_create")
+    // TODO remove this once fixed in esp_supplicant AND we updated to the fixed
+    // version
+    let (queue_len, item_size) = if queue_len != 3 && item_size != 4 {
+        (queue_len, item_size)
+    } else {
+        warn!("Fixing queue item_size");
+        (3, 8)
+    };
+
+    create_queue(queue_len as i32, item_size as i32)
 }
 
 /// **************************************************************************
@@ -396,8 +405,8 @@ pub unsafe extern "C" fn queue_create(
 ///   None
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn queue_delete(_queue: *mut crate::binary::c_types::c_void) {
-    todo!("queue_delete")
+pub unsafe extern "C" fn queue_delete(queue: *mut crate::binary::c_types::c_void) {
+    delete_queue(queue);
 }
 
 /// **************************************************************************
@@ -642,21 +651,15 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
         core_id
     );
 
-    *(task_handle as *mut usize) = 0; // we will run it in task 0
+    let task_func = core::mem::transmute::<
+        *mut crate::binary::c_types::c_void,
+        extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
+    >(task_func);
 
-    if spawn_task(
-        task_func,
-        name,
-        stack_depth,
-        param,
-        prio,
-        task_handle,
-        core_id,
-    ) {
-        1
-    } else {
-        0
-    }
+    let task = crate::preempt::arch_specific::task_create(task_func, param, stack_depth as usize);
+    *(task_handle as *mut usize) = task as usize;
+
+    1
 }
 
 /// **************************************************************************
@@ -679,14 +682,14 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn task_create(
-    _task_func: *mut crate::binary::c_types::c_void,
-    _name: *const crate::binary::c_types::c_char,
-    _stack_depth: u32,
-    _param: *mut crate::binary::c_types::c_void,
-    _prio: u32,
-    _task_handle: *mut crate::binary::c_types::c_void,
+    task_func: *mut crate::binary::c_types::c_void,
+    name: *const crate::binary::c_types::c_char,
+    stack_depth: u32,
+    param: *mut crate::binary::c_types::c_void,
+    prio: u32,
+    task_handle: *mut crate::binary::c_types::c_void,
 ) -> i32 {
-    todo!("task_create");
+    task_create_pinned_to_core(task_func, name, stack_depth, param, prio, task_handle, 0)
 }
 
 /// **************************************************************************
@@ -703,8 +706,15 @@ pub unsafe extern "C" fn task_create(
 ///   None
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn task_delete(_task_handle: *mut crate::binary::c_types::c_void) {
-    todo!("task_delete")
+pub unsafe extern "C" fn task_delete(task_handle: *mut crate::binary::c_types::c_void) {
+    trace!("task delete called for {:p}", task_handle);
+
+    let task = if task_handle.is_null() {
+        crate::preempt::current_task()
+    } else {
+        task_handle as *mut _
+    };
+    crate::preempt::schedule_task_deletion(task);
 }
 
 /// **************************************************************************
@@ -797,7 +807,6 @@ pub unsafe extern "C" fn task_get_max_priority() -> i32 {
 ///   Memory pointer
 ///
 /// *************************************************************************
-#[no_mangle]
 pub unsafe extern "C" fn malloc(size: usize) -> *mut crate::binary::c_types::c_void {
     crate::compat::malloc::malloc(size).cast()
 }
@@ -815,7 +824,6 @@ pub unsafe extern "C" fn malloc(size: usize) -> *mut crate::binary::c_types::c_v
 ///   No
 ///
 /// *************************************************************************
-#[no_mangle]
 pub unsafe extern "C" fn free(p: *mut crate::binary::c_types::c_void) {
     crate::compat::malloc::free(p.cast());
 }
@@ -1652,7 +1660,12 @@ pub unsafe extern "C" fn wifi_create_queue(
     queue_len: crate::binary::c_types::c_int,
     item_size: crate::binary::c_types::c_int,
 ) -> *mut crate::binary::c_types::c_void {
-    create_wifi_queue(queue_len, item_size)
+    static mut QUEUE_HANDLE: *mut crate::binary::c_types::c_void = core::ptr::null_mut();
+
+    let queue = create_queue(queue_len, item_size);
+    QUEUE_HANDLE = queue;
+
+    addr_of_mut!(QUEUE_HANDLE).cast()
 }
 
 /// **************************************************************************
@@ -1669,10 +1682,8 @@ pub unsafe extern "C" fn wifi_create_queue(
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_delete_queue(queue: *mut crate::binary::c_types::c_void) {
-    trace!(
-        "wifi_delete_queue {:?} - not implemented - doing nothing",
-        queue
-    );
+    trace!("wifi_delete_queue {:?}", queue);
+    delete_queue(queue);
 }
 
 /// **************************************************************************

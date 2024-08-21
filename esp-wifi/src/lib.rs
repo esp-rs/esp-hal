@@ -73,6 +73,12 @@ const DEFAULT_TICK_RATE_HZ: u32 = 50;
 #[cfg(not(debug_assertions))]
 const DEFAULT_TICK_RATE_HZ: u32 = 100;
 
+#[cfg(not(coex))]
+const DEFAULT_HEAP_SIZE: usize = 81920;
+
+#[cfg(coex)]
+const DEFAULT_HEAP_SIZE: usize = 90112;
+
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[toml_cfg::toml_config]
@@ -106,7 +112,7 @@ struct Config {
     country_code_operating_class: u8,
     #[default(1492)]
     mtu: usize,
-    #[default(65536)]
+    #[default(DEFAULT_HEAP_SIZE)]
     heap_size: usize,
     #[default(DEFAULT_TICK_RATE_HZ)]
     tick_rate_hz: u32,
