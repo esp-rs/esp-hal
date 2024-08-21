@@ -1,6 +1,6 @@
 //! Interrupt handling
 
-use xtensa_lx::interrupt::{self, InterruptNumber};
+use xtensa_lx::interrupt;
 use xtensa_lx_rt::exception::Context;
 
 pub use self::vectored::*;
@@ -502,7 +502,7 @@ mod vectored {
             fn EspDefaultHandler(level: u32, interrupt: Interrupt);
         }
 
-        let handler = peripherals::__INTERRUPTS[interrupt.number() as usize]._handler;
+        let handler = peripherals::__INTERRUPTS[interrupt as usize]._handler;
         if core::ptr::eq(
             handler as *const _,
             EspDefaultHandler as *const unsafe extern "C" fn(),
