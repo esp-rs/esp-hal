@@ -287,7 +287,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Auto detect crystal frequency based on `RtcClock::estimate_xtal_frequency()` (#1165)
 - ESP32-S3: Configure 32k ICACHE (#1169)
 - Lift the minimal buffer size requirement for I2S (#1189)
-- Replaced `SystemTimer::TICKS_PER_SEC` with `SystemTimer::ticks_per_sec()` (#?)
+- Replaced `SystemTimer::TICKS_PER_SEC` with `SystemTimer::ticks_per_sec()` (#1981)
 
 ### Removed
 
