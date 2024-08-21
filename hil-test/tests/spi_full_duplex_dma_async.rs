@@ -31,10 +31,7 @@ use esp_hal::{
     },
     peripherals::Peripherals,
     prelude::*,
-    spi::{
-        master::{prelude::*, Spi},
-        SpiMode,
-    },
+    spi::{master::Spi, SpiMode},
     system::SystemControl,
 };
 use hil_test as _;

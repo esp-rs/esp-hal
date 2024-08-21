@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - This package no longer re-exports the `esp_hal_procmacros::main` macro (#1828)
 - The `AesFlavour` trait no longer has the `ENCRYPT_MODE`/`DECRYPT_MODE` associated constants (#1849)
 - Removed `FlashSafeDma` (#1856)
+- Remove redundant WithDmaSpi traits (#1975)
 
 ## [0.19.0] - 2024-07-15
 

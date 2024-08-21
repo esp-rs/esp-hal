@@ -90,10 +90,7 @@ use crate::{
 
 /// Prelude for the SPI (Master) driver
 pub mod prelude {
-    #[cfg(spi3)]
-    pub use super::dma::WithDmaSpi3 as _esp_hal_spi_master_dma_WithDmaSpi3;
     pub use super::{
-        dma::WithDmaSpi2 as _esp_hal_spi_master_dma_WithDmaSpi2,
         Instance as _esp_hal_spi_master_Instance,
         InstanceDma as _esp_hal_spi_master_InstanceDma,
     };
@@ -867,44 +864,19 @@ pub mod dma {
         Mode,
     };
 
-    pub trait WithDmaSpi2<'d, C, M, DmaMode>
+    impl<'d, M> Spi<'d, crate::peripherals::SPI2, M>
     where
-        C: DmaChannel,
-        C::P: SpiPeripheral,
         M: DuplexMode,
-        DmaMode: Mode,
     {
-        fn with_dma(
-            self,
-            channel: Channel<'d, C, DmaMode>,
-        ) -> SpiDma<'d, crate::peripherals::SPI2, C, M, DmaMode>;
-    }
-
-    #[cfg(spi3)]
-    pub trait WithDmaSpi3<'d, C, M, DmaMode>
-    where
-        C: DmaChannel,
-        C::P: SpiPeripheral,
-        M: DuplexMode,
-        DmaMode: Mode,
-    {
-        fn with_dma(
-            self,
-            channel: Channel<'d, C, DmaMode>,
-        ) -> SpiDma<'d, crate::peripherals::SPI3, C, M, DmaMode>;
-    }
-
-    impl<'d, C, M, DmaMode> WithDmaSpi2<'d, C, M, DmaMode> for Spi<'d, crate::peripherals::SPI2, M>
-    where
-        C: DmaChannel,
-        C::P: SpiPeripheral + Spi2Peripheral,
-        M: DuplexMode,
-        DmaMode: Mode,
-    {
-        fn with_dma(
+        pub fn with_dma<C, DmaMode>(
             self,
             mut channel: Channel<'d, C, DmaMode>,
-        ) -> SpiDma<'d, crate::peripherals::SPI2, C, M, DmaMode> {
+        ) -> SpiDma<'d, crate::peripherals::SPI2, C, M, DmaMode>
+        where
+            C: DmaChannel,
+            C::P: SpiPeripheral + Spi2Peripheral,
+            DmaMode: Mode,
+        {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             SpiDma {
@@ -916,17 +888,19 @@ pub mod dma {
     }
 
     #[cfg(spi3)]
-    impl<'d, C, M, DmaMode> WithDmaSpi3<'d, C, M, DmaMode> for Spi<'d, crate::peripherals::SPI3, M>
+    impl<'d, M> Spi<'d, crate::peripherals::SPI3, M>
     where
-        C: DmaChannel,
-        C::P: SpiPeripheral + Spi3Peripheral,
         M: DuplexMode,
-        DmaMode: Mode,
     {
-        fn with_dma(
+        pub fn with_dma<C, DmaMode>(
             self,
             mut channel: Channel<'d, C, DmaMode>,
-        ) -> SpiDma<'d, crate::peripherals::SPI3, C, M, DmaMode> {
+        ) -> SpiDma<'d, crate::peripherals::SPI3, C, M, DmaMode>
+        where
+            C: DmaChannel,
+            C::P: SpiPeripheral + Spi3Peripheral,
+            DmaMode: Mode,
+        {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             SpiDma {
