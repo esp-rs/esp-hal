@@ -30,26 +30,17 @@
 //! [DelayUs]: embedded_hal_02::blocking::delay::DelayUs
 //! [embedded-hal]: https://docs.rs/embedded-hal/1.0.0/embedded_hal/delay/index.html
 
-use fugit::HertzU64;
 pub use fugit::MicrosDurationU64;
+
+use crate::clock::Clocks;
 
 /// Delay driver
 ///
 /// Uses the `SYSTIMER` peripheral internally for RISC-V devices, and the
 /// built-in Xtensa timer for Xtensa devices.
 #[derive(Clone, Copy)]
-pub struct Delay {
-    freq: HertzU64,
-}
-
-impl Delay {
-    /// Delay for the specified number of milliseconds
-    pub fn delay_millis(&self, ms: u32) {
-        for _ in 0..ms {
-            self.delay_micros(1000);
-        }
-    }
-}
+#[non_exhaustive]
+pub struct Delay;
 
 #[cfg(feature = "embedded-hal-02")]
 impl<T> embedded_hal_02::blocking::delay::DelayMs<T> for Delay
@@ -57,9 +48,7 @@ where
     T: Into<u32>,
 {
     fn delay_ms(&mut self, ms: T) {
-        for _ in 0..ms.into() {
-            self.delay_micros(1000);
-        }
+        self.delay_millis(ms.into());
     }
 }
 
@@ -80,83 +69,48 @@ impl embedded_hal::delay::DelayNs for Delay {
     }
 }
 
-#[cfg(riscv)]
-mod implementation {
-    use super::*;
-    use crate::{clock::Clocks, timer::systimer::SystemTimer};
+impl Delay {
+    /// Creates a new `Delay` instance.
+    // Do not remove the argument, it makes sure that the clocks are initialized.
+    pub fn new(_clocks: &Clocks<'_>) -> Self {
+        Self {}
+    }
 
-    impl Delay {
-        /// Create a new `Delay` instance
-        pub fn new(clocks: &Clocks<'_>) -> Self {
-            // The counters and comparators are driven using `XTAL_CLK`.
-            // The average clock frequency is fXTAL_CLK/2.5, which is 16 MHz.
-            // The timer counting is incremented by 1/16 μs on each `CNT_CLK` cycle.
-            Self {
-                #[cfg(not(esp32h2))]
-                freq: HertzU64::MHz(clocks.xtal_clock.to_MHz() as u64 * 10 / 25),
-                #[cfg(esp32h2)]
-                // esp32h2 TRM, section 11.2 Clock Source Selection
-                freq: HertzU64::MHz(clocks.xtal_clock.to_MHz() as u64 * 10 / 20),
-            }
+    /// Delay for the specified time
+    pub fn delay(&self, delay: MicrosDurationU64) {
+        let start = crate::time::current_time();
+
+        while elapsed_since(start) < delay {}
+    }
+
+    /// Delay for the specified number of milliseconds
+    pub fn delay_millis(&self, ms: u32) {
+        for _ in 0..ms {
+            self.delay_micros(1000);
         }
+    }
 
-        /// Delay for the specified time
-        pub fn delay(&self, time: MicrosDurationU64) {
-            let t0 = SystemTimer::now();
-            let rate: HertzU64 = MicrosDurationU64::from_ticks(1).into_rate();
-            let clocks = time.ticks() * (self.freq / rate);
+    /// Delay for the specified number of microseconds
+    pub fn delay_micros(&self, us: u32) {
+        let delay = MicrosDurationU64::micros(us as u64);
+        self.delay(delay);
+    }
 
-            while SystemTimer::now().wrapping_sub(t0) & SystemTimer::BIT_MASK <= clocks {}
-        }
-
-        /// Delay for the specified number of microseconds
-        pub fn delay_micros(&self, us: u32) {
-            let t0 = SystemTimer::now();
-            let clocks = us as u64 * (self.freq / HertzU64::MHz(1));
-
-            while SystemTimer::now().wrapping_sub(t0) & SystemTimer::BIT_MASK <= clocks {}
-        }
-
-        /// Delay for the specified number of nanoseconds
-        pub fn delay_nanos(&self, ns: u32) {
-            let t0 = SystemTimer::now();
-            let clocks = ns as u64 * (self.freq / HertzU64::MHz(1)) / 1000;
-
-            while SystemTimer::now().wrapping_sub(t0) & SystemTimer::BIT_MASK <= clocks {}
-        }
+    /// Delay for the specified number of nanoseconds
+    pub fn delay_nanos(&self, ns: u32) {
+        let delay = MicrosDurationU64::nanos(ns as u64);
+        self.delay(delay);
     }
 }
 
-#[cfg(xtensa)]
-mod implementation {
-    use super::*;
-    use crate::clock::Clocks;
+fn elapsed_since(start: fugit::Instant<u64, 1, 1_000_000>) -> MicrosDurationU64 {
+    let now = crate::time::current_time();
 
-    impl Delay {
-        /// Create a new `Delay` instance
-        pub fn new(clocks: &Clocks<'_>) -> Self {
-            Self {
-                freq: clocks.cpu_clock.into(),
-            }
-        }
-
-        /// Delay for the specified time
-        pub fn delay(&self, time: MicrosDurationU64) {
-            let rate: HertzU64 = MicrosDurationU64::from_ticks(1).into_rate();
-            let clocks = time.ticks() * (self.freq / rate);
-            xtensa_lx::timer::delay(clocks as u32);
-        }
-
-        /// Delay for the specified number of microseconds
-        pub fn delay_micros(&self, us: u32) {
-            let clocks = us as u64 * (self.freq / HertzU64::MHz(1));
-            xtensa_lx::timer::delay(clocks as u32);
-        }
-
-        /// Delay for the specified number of nanoseconds
-        pub fn delay_nanos(&self, ns: u32) {
-            let clocks = ns as u64 * (self.freq / HertzU64::MHz(1)) / 1000;
-            xtensa_lx::timer::delay(clocks as u32);
-        }
+    if start.ticks() <= now.ticks() {
+        now - start
+    } else {
+        // current_time specifies at least 7 happy years, let's ignore this issue for
+        // now.
+        panic!("Time has wrapped around, which we currently don't handle");
     }
 }

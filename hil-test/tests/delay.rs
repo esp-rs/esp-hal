@@ -1,7 +1,6 @@
 //! Delay Test
 
-// esp32c2 is disabled currently as it fails
-//% CHIPS: esp32  esp32c3 esp32c6 esp32s3
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
@@ -37,25 +36,33 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1)]
+    #[timeout(2)]
     fn delay_ns(mut ctx: Context) {
         let t1 = esp_hal::time::current_time();
         ctx.delay.delay_ns(600_000_000);
         let t2 = esp_hal::time::current_time();
 
         assert!(t2 > t1);
-        assert!((t2 - t1).to_nanos() >= 600_000_000u64);
+        assert!(
+            (t2 - t1).to_nanos() >= 600_000_000u64,
+            "diff: {:?}",
+            (t2 - t1).to_nanos()
+        );
     }
 
     #[test]
-    #[timeout(1)]
+    #[timeout(2)]
     fn delay_700millis(ctx: Context) {
         let t1 = esp_hal::time::current_time();
         ctx.delay.delay_millis(700);
         let t2 = esp_hal::time::current_time();
 
         assert!(t2 > t1);
-        assert!((t2 - t1).to_millis() >= 700u64);
+        assert!(
+            (t2 - t1).to_millis() >= 700u64,
+            "diff: {:?}",
+            (t2 - t1).to_millis()
+        );
     }
 
     #[test]
@@ -66,7 +73,11 @@ mod tests {
         let t2 = esp_hal::time::current_time();
 
         assert!(t2 > t1);
-        assert!((t2 - t1).to_micros() >= 1_500_000u64);
+        assert!(
+            (t2 - t1).to_micros() >= 1_500_000u64,
+            "diff: {:?}",
+            (t2 - t1).to_micros()
+        );
     }
 
     #[test]
@@ -77,6 +88,10 @@ mod tests {
         let t2 = esp_hal::time::current_time();
 
         assert!(t2 > t1);
-        assert!((t2 - t1).to_millis() >= 3000u64);
+        assert!(
+            (t2 - t1).to_millis() >= 3000u64,
+            "diff: {:?}",
+            (t2 - t1).to_millis()
+        );
     }
 }
