@@ -17,19 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a `PeripheralClockControl::reset` to the driver constructors where missing (#1893)
 - Added `digest::Digest` implementation to SHA (#1908)
 - Added `debugger::debugger_connected`. (#1961)
+- DMA: don't require `Sealed` to implement `ReadBuffer` and `WriteBuffer` (#1921)
+- Allow DMA to/from psram for esp32s3 (#1827)
 
 ### Changed
 
 - Peripheral driver constructors don't take `InterruptHandler`s anymore. Use `set_interrupt_handler` to explicitly set the interrupt handler now. (#1819)
 - Migrate SPI driver to use DMA buffer objects (#1856)
 - Use the peripheral ref pattern for `OneShotTimer` and `PeriodicTimer` (#1855)
-- Improve SYSTIMER API (#1870)
-- DMA: don't require `Sealed` to implement `ReadBuffer` and `WriteBuffer` (#1921)
-- Allow DMA to/from psram for esp32s3 (#1827)
+- Improve SYSTIMER API (#1871)
 - DMA buffers now don't require a static lifetime. Make sure to never `mem::forget` an in-progress DMA transfer (consider using `#[deny(clippy::mem_forget)]`) (#1837)
-- Peripherals (where possible) are now explicitly reset and enabled in their constructors (#1893)
 - SHA driver now use specific structs for the hashing algorithm instead of a parameter. (#1908)
-- Reset peripherals in driver constructors where missing (#1893, #1961)
 - Remove `fn free(self)` in HMAC which goes against esp-hal API guidelines (#1972)
 
 ### Fixed
@@ -42,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - TWAI: GPIO pins are not configured as input and output (#1906)
 - ESP32C6: Make ADC usable after TRNG deinicialization (#1945)
 - We should no longer generate 1GB .elf files for ESP32C2 and ESP32C3 (#1962)
+- Reset peripherals in driver constructors where missing (#1893, #1961)
 
 ### Removed
 
