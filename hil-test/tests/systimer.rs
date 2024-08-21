@@ -14,7 +14,15 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
-    timer::systimer::{Alarm, FrozenUnit, Periodic, SpecificComparator, SpecificUnit, SystemTimer},
+    timer::systimer::{
+        Alarm,
+        FrozenUnit,
+        Periodic,
+        SpecificComparator,
+        SpecificUnit,
+        SystemTimer,
+        Target,
+    },
     Blocking,
 };
 use fugit::ExtU32;
@@ -22,10 +30,11 @@ use hil_test as _;
 use portable_atomic::{AtomicUsize, Ordering};
 use static_cell::StaticCell;
 
-type TestAlarm =
-    Alarm<'static, Periodic, Blocking, SpecificComparator<'static, 0>, SpecificUnit<'static, 0>>;
+type TestAlarm<M> =
+    Alarm<'static, M, Blocking, SpecificComparator<'static, 0>, SpecificUnit<'static, 0>>;
 
-static ALARM0: Mutex<RefCell<Option<TestAlarm>>> = Mutex::new(RefCell::new(None));
+static ALARM_PERIODIC: Mutex<RefCell<Option<TestAlarm<Periodic>>>> = Mutex::new(RefCell::new(None));
+static ALARM_TARGET: Mutex<RefCell<Option<TestAlarm<Target>>>> = Mutex::new(RefCell::new(None));
 
 struct Context {
     unit: FrozenUnit<'static, SpecificUnit<'static, 0>>,
@@ -54,7 +63,7 @@ impl Context {
 #[handler(priority = esp_hal::interrupt::Priority::min())]
 fn pass_test_if_called() {
     critical_section::with(|cs| {
-        ALARM0
+        ALARM_TARGET
             .borrow_ref_mut(cs)
             .as_mut()
             .unwrap()
@@ -68,7 +77,7 @@ static COUNTER: AtomicUsize = AtomicUsize::new(0);
 #[handler(priority = esp_hal::interrupt::Priority::min())]
 fn pass_test_if_called_twice() {
     critical_section::with(|cs| {
-        ALARM0
+        ALARM_PERIODIC
             .borrow_ref_mut(cs)
             .as_mut()
             .unwrap()
@@ -97,10 +106,10 @@ mod tests {
 
         critical_section::with(|cs| {
             alarm0.set_interrupt_handler(pass_test_if_called);
-            alarm0.set_period(100u32.millis());
+            alarm0.set_target(SystemTimer::now() + SystemTimer::TICKS_PER_SECOND / 10);
             alarm0.enable_interrupt(true);
 
-            ALARM0.borrow_ref_mut(cs).replace(alarm0);
+            ALARM_TARGET.borrow_ref_mut(cs).replace(alarm0);
         });
 
         // We'll end the test in the interrupt handler.
@@ -120,7 +129,7 @@ mod tests {
             alarm0.set_period(100u32.millis());
             alarm0.enable_interrupt(true);
 
-            ALARM0.borrow_ref_mut(cs).replace(alarm0);
+            ALARM_PERIODIC.borrow_ref_mut(cs).replace(alarm0);
         });
 
         // We'll end the test in the interrupt handler.
