@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Introduce DMA buffer objects (#1856)
+- Introduce DMA buffer objects (#1856, #1985)
 - Added new `Io::new_no_bind_interrupt` constructor (#1861)
 - Added touch pad support for esp32 (#1873, #1956)
 - Allow configuration of period updating method for MCPWM timers (#1898)
@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Peripheral driver constructors don't take `InterruptHandler`s anymore. Use `set_interrupt_handler` to explicitly set the interrupt handler now. (#1819)
-- Migrate SPI driver to use DMA buffer objects (#1856)
+- Migrate SPI driver to use DMA buffer objects (#1856, #1985)
 - Use the peripheral ref pattern for `OneShotTimer` and `PeriodicTimer` (#1855)
 - Improve SYSTIMER API (#1871)
 - DMA buffers now don't require a static lifetime. Make sure to never `mem::forget` an in-progress DMA transfer (consider using `#[deny(clippy::mem_forget)]`) (#1837)
