@@ -49,6 +49,7 @@ struct Context {
 #[embedded_test::tests]
 mod tests {
     use defmt::assert_eq;
+    use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
 
     use super::*;
 
