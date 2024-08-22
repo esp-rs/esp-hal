@@ -152,14 +152,15 @@ mod tests {
         #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
         let dma_channel = dma.channel0;
 
-        let (buffer, descriptors, _, _) = dma_buffers!(DMA_BUFFER_SIZE, 0);
+        let (buffer, descriptors, tx, txd) = dma_buffers!(DMA_BUFFER_SIZE, 1);
         let dma_rx_buf = DmaRxBuf::new(descriptors, buffer).unwrap();
+        let dma_tx_buf = DmaTxBuf::new(txd, tx).unwrap();
 
         let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_sck(sclk)
             .with_miso(miso)
             .with_dma(dma_channel.configure(false, DmaPriority::Priority0))
-            .with_buffers(DmaTxBuf::empty(), dma_rx_buf);
+            .with_buffers(dma_tx_buf, dma_rx_buf);
 
         // SPI should read '0's from the MISO pin
         miso_mirror.set_low();
