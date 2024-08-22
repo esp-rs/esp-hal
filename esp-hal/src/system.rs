@@ -29,8 +29,6 @@
 //! # }
 //! ```
 
-#![allow(missing_docs)] // TODO: Remove when able
-
 use crate::{
     interrupt::InterruptHandler,
     peripheral::PeripheralRef,
@@ -38,72 +36,109 @@ use crate::{
     InterruptConfigurable,
 };
 
-/// Peripherals which can be enabled via `PeripheralClockControl`
+/// Peripherals which can be enabled via `PeripheralClockControl`.
+///
+/// This enum represents various hardware peripherals that can be enabled
+/// by the system's clock control. Depending on the target device, different
+/// peripherals will be available for enabling.
 pub enum Peripheral {
+    /// SPI2 peripheral.
     #[cfg(spi2)]
     Spi2,
+    /// SPI3 peripheral.
     #[cfg(spi3)]
     Spi3,
+    /// External I2C0 peripheral.
     #[cfg(i2c0)]
     I2cExt0,
+    /// External I2C1 peripheral.
     #[cfg(i2c1)]
     I2cExt1,
+    /// RMT peripheral (Remote Control).
     #[cfg(rmt)]
     Rmt,
+    /// LEDC peripheral (LED PWM Controller).
     #[cfg(ledc)]
     Ledc,
+    /// MCPWM0 peripheral (Motor Control PWM 0).
     #[cfg(mcpwm0)]
     Mcpwm0,
+    /// MCPWM1 peripheral (Motor Control PWM 1).
     #[cfg(mcpwm1)]
     Mcpwm1,
+    /// PCNT peripheral (Pulse Counter).
     #[cfg(pcnt)]
     Pcnt,
+    /// APB SAR ADC peripheral.
     #[cfg(apb_saradc)]
     ApbSarAdc,
+    /// General DMA (GDMA) peripheral.
     #[cfg(gdma)]
     Gdma,
+    /// Peripheral DMA (PDMA) peripheral.
     #[cfg(pdma)]
     Dma,
+    /// I2S0 peripheral (Inter-IC Sound).
     #[cfg(i2s0)]
     I2s0,
+    /// I2S1 peripheral (Inter-IC Sound).
     #[cfg(i2s1)]
     I2s1,
+    /// USB0 peripheral.
     #[cfg(usb0)]
     Usb,
+    /// AES peripheral (Advanced Encryption Standard).
     #[cfg(aes)]
     Aes,
+    /// TWAI0 peripheral.
     #[cfg(twai0)]
     Twai0,
+    /// TWAI1 peripheral.
     #[cfg(twai1)]
     Twai1,
+    /// Timer Group 0 peripheral.
     #[cfg(timg0)]
     Timg0,
+    /// Timer Group 1 peripheral.
     #[cfg(timg1)]
     Timg1,
+    /// Low-power watchdog timer (WDT) peripheral.
     #[cfg(lp_wdt)]
     Wdt,
+    /// SHA peripheral (Secure Hash Algorithm).
     #[cfg(sha)]
     Sha,
+    /// USB Device peripheral.
     #[cfg(usb_device)]
     UsbDevice,
+    /// UART0 peripheral.
     #[cfg(uart0)]
     Uart0,
+    /// UART1 peripheral.
     #[cfg(uart1)]
     Uart1,
+    /// UART2 peripheral.
     #[cfg(uart2)]
     Uart2,
+    /// RSA peripheral (Rivest-Shamir-Adleman encryption).
     #[cfg(rsa)]
     Rsa,
+    /// Parallel IO peripheral.
     #[cfg(parl_io)]
     ParlIo,
+    /// HMAC peripheral (Hash-based Message Authentication Code).
     #[cfg(hmac)]
     Hmac,
+    /// ECC peripheral (Elliptic Curve Cryptography).
     #[cfg(ecc)]
     Ecc,
+    /// SOC ETM peripheral (Event Task Manager).
     #[cfg(soc_etm)]
     Etm,
+    /// TRACE0 peripheral (Debug trace).
     #[cfg(trace0)]
     Trace0,
+    /// LCD Camera peripheral.
     #[cfg(lcd_cam)]
     LcdCam,
 }
@@ -111,8 +146,11 @@ pub enum Peripheral {
 /// The `DPORT`/`PCR`/`SYSTEM` peripheral split into its different logical
 /// components.
 pub struct SystemControl<'d> {
+    /// Inner reference to the SYSTEM peripheral.
     _inner: PeripheralRef<'d, SYSTEM>,
+    /// Controls the system's clock settings and configurations.
     pub clock_control: SystemClockControl,
+    /// Controls the system's software interrupt settings.
     pub software_interrupt_control: SoftwareInterruptControl,
 }
 
@@ -244,6 +282,10 @@ impl<const NUM: u8> InterruptConfigurable for SoftwareInterrupt<NUM> {
 }
 
 /// This gives access to the available software interrupts.
+///
+/// This struct contains several instances of software interrupts that can be
+/// used for signaling between different parts of a program or system. Each
+/// interrupt is identified by an index (0 to 3).
 #[cfg_attr(
     multi_core,
     doc = r#"
@@ -253,9 +295,14 @@ feature is enabled."#
 )]
 #[non_exhaustive]
 pub struct SoftwareInterruptControl {
+    /// Software interrupt 0.
     pub software_interrupt0: SoftwareInterrupt<0>,
+    /// Software interrupt 1.
     pub software_interrupt1: SoftwareInterrupt<1>,
+    /// Software interrupt 2.
     pub software_interrupt2: SoftwareInterrupt<2>,
+    /// Software interrupt 3 (only available when not running on a multi-core
+    /// system with the `embassy` feature enabled).
     #[cfg(not(all(feature = "embassy", multi_core)))]
     pub software_interrupt3: SoftwareInterrupt<3>,
 }
@@ -1117,6 +1164,7 @@ pub struct SystemClockControl {
 }
 
 impl SystemClockControl {
+    /// Creates new instance of `SystemClockControl`.
     pub fn new() -> Self {
         Self { _private: () }
     }
@@ -1142,12 +1190,16 @@ impl crate::private::Sealed for SystemClockControl {}
 /// Enumeration of the available radio peripherals for this chip.
 #[cfg(any(bt, ieee802154, wifi))]
 pub enum RadioPeripherals {
+    /// Represents the PHY (Physical Layer) peripheral.
     #[cfg(phy)]
     Phy,
+    /// Represents the Bluetooth peripheral.
     #[cfg(bt)]
     Bt,
+    /// Represents the WiFi peripheral.
     #[cfg(wifi)]
     Wifi,
+    /// Represents the IEEE 802.15.4 peripheral.
     #[cfg(ieee802154)]
     Ieee802154,
 }
@@ -1170,5 +1222,6 @@ pub trait RadioClockController {
     /// Initialize BLE RTC clocks
     fn ble_rtc_clk_init(&mut self);
 
+    /// Reset the Resolvable Private Address (RPA).
     fn reset_rpa(&mut self);
 }

@@ -96,9 +96,14 @@ pub mod prelude {
     };
 }
 
+/// Enumeration of possible SPI interrupt events.
 #[cfg(not(any(esp32, esp32s2)))]
 #[derive(EnumSetType)]
 pub enum SpiInterrupt {
+    /// Indicates that the SPI transaction has completed successfully.
+    ///
+    /// This interrupt is triggered when an SPI transaction has finished
+    /// transmitting and receiving data.
     TransDone,
 }
 
@@ -114,26 +119,44 @@ const EMPTY_WRITE_PAD: u8 = 0x00u8;
 #[allow(unused)]
 const MAX_DMA_SIZE: usize = 32736;
 
-/// SPI command, 1 to 16 bits.
+/// SPI commands, each consisting of a 16-bit command value and a data mode.
 ///
+/// Used to define specific commands sent over the SPI bus.
 /// Can be [Command::None] if command phase should be suppressed.
 pub enum Command {
+    /// No command is sent.
     None,
+    /// Command1.
     Command1(u16, SpiDataMode),
+    /// Command2.
     Command2(u16, SpiDataMode),
+    /// Command3.
     Command3(u16, SpiDataMode),
+    /// Command4.
     Command4(u16, SpiDataMode),
+    /// Command5.
     Command5(u16, SpiDataMode),
+    /// Command6.
     Command6(u16, SpiDataMode),
+    /// Command7.
     Command7(u16, SpiDataMode),
+    /// Command8.
     Command8(u16, SpiDataMode),
+    /// Command9.
     Command9(u16, SpiDataMode),
+    /// Command10.
     Command10(u16, SpiDataMode),
+    /// Command11.
     Command11(u16, SpiDataMode),
+    /// Command12.
     Command12(u16, SpiDataMode),
+    /// Command13.
     Command13(u16, SpiDataMode),
+    /// Command14.
     Command14(u16, SpiDataMode),
+    /// Command15.
     Command15(u16, SpiDataMode),
+    /// Command16.
     Command16(u16, SpiDataMode),
 }
 
@@ -209,42 +232,76 @@ impl Command {
     }
 }
 
-/// SPI address, 1 to 32 bits.
+/// SPI address, ranging from 1 to 32 bits, paired with a data mode.
 ///
+/// This can be used to specify the address phase of SPI transactions.
 /// Can be [Address::None] if address phase should be suppressed.
 pub enum Address {
+    /// No address phase.
     None,
+    /// Address with 1-bit.
     Address1(u32, SpiDataMode),
+    /// Address with 2-bit.
     Address2(u32, SpiDataMode),
+    /// Address with 3-bit.
     Address3(u32, SpiDataMode),
+    /// Address with 4-bit.
     Address4(u32, SpiDataMode),
+    /// Address with 5-bit.
     Address5(u32, SpiDataMode),
+    /// Address with 6-bit.
     Address6(u32, SpiDataMode),
+    /// Address with 7-bit.
     Address7(u32, SpiDataMode),
+    /// Address with 8-bit.
     Address8(u32, SpiDataMode),
+    /// Address with 9-bit.
     Address9(u32, SpiDataMode),
+    /// Address with 10-bit.
     Address10(u32, SpiDataMode),
+    /// Address with 11-bit.
     Address11(u32, SpiDataMode),
+    /// Address with 12-bit.
     Address12(u32, SpiDataMode),
+    /// Address with 13-bit.
     Address13(u32, SpiDataMode),
+    /// Address with 14-bit.
     Address14(u32, SpiDataMode),
+    /// Address with 15-bit.
     Address15(u32, SpiDataMode),
+    /// Address with 16-bit.
     Address16(u32, SpiDataMode),
+    /// Address with 17-bit.
     Address17(u32, SpiDataMode),
+    /// Address with 18-bit.
     Address18(u32, SpiDataMode),
+    /// Address with 19-bit.
     Address19(u32, SpiDataMode),
+    /// Address with 20-bit.
     Address20(u32, SpiDataMode),
+    /// Address with 21-bit.
     Address21(u32, SpiDataMode),
+    /// Address with 22-bit.
     Address22(u32, SpiDataMode),
+    /// Address with 23-bit.
     Address23(u32, SpiDataMode),
+    /// Address with 24-bit.
     Address24(u32, SpiDataMode),
+    /// Address with 25-bit.
     Address25(u32, SpiDataMode),
+    /// Address with 26-bit.
     Address26(u32, SpiDataMode),
+    /// Address with 27-bit.
     Address27(u32, SpiDataMode),
+    /// Address with 28-bit.
     Address28(u32, SpiDataMode),
+    /// Address with 29-bit.
     Address29(u32, SpiDataMode),
+    /// Address with 30-bit.
     Address30(u32, SpiDataMode),
+    /// Address with 31-bit.
     Address31(u32, SpiDataMode),
+    /// Address with 32-bit.
     Address32(u32, SpiDataMode),
 }
 
@@ -370,6 +427,8 @@ impl Address {
 
 /// Read and Write in half duplex mode.
 pub trait HalfDuplexReadWrite {
+    /// The associated error type that will be returned in the event of a
+    /// failure.
     type Error;
 
     /// Half-duplex read.
@@ -457,6 +516,10 @@ where
         Self::new_internal(spi, frequency, mode, clocks)
     }
 
+    /// Assign the SCK (Serial Clock) pin for the SPI instance.
+    ///
+    /// Sets the specified pin to push-pull output and connects it to the SPI
+    /// clock signal.
     pub fn with_sck<SCK: OutputPin>(self, sck: impl Peripheral<P = SCK> + 'd) -> Self {
         crate::into_ref!(sck);
         sck.set_to_push_pull_output(private::Internal);
@@ -465,6 +528,10 @@ where
         self
     }
 
+    /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
+    ///
+    /// Sets the specified pin to push-pull output and connects it to the SPI
+    /// MOSI signal.
     pub fn with_mosi<MOSI: OutputPin>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
         crate::into_ref!(mosi);
         mosi.set_to_push_pull_output(private::Internal);
@@ -473,6 +540,9 @@ where
         self
     }
 
+    /// Assign the MISO (Master In Slave Out) pin for the SPI instance.
+    ///
+    /// Sets the specified pin to input and connects it to the SPI MISO signal.
     pub fn with_miso<MISO: InputPin>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
         crate::into_ref!(miso);
         miso.set_to_input(private::Internal);
@@ -481,6 +551,10 @@ where
         self
     }
 
+    /// Assign the CS (Chip Select) pin for the SPI instance.
+    ///
+    /// Sets the specified pin to push-pull output and connects it to the SPI CS
+    /// signal.
     pub fn with_cs<CS: OutputPin>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_ref!(cs);
         cs.set_to_push_pull_output(private::Internal);
@@ -555,6 +629,10 @@ where
         spi
     }
 
+    /// Change the bus frequency of the SPI instance.
+    ///
+    /// This method allows user to update the bus frequency for the SPI
+    /// communication after the instance has been created.
     pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks<'d>) {
         self.spi.ch_bus_freq(frequency, clocks);
     }
@@ -578,6 +656,10 @@ where
         Self::new_internal(spi, frequency, mode, clocks)
     }
 
+    /// Assign the SCK (Serial Clock) pin for the SPI instance.
+    ///
+    /// Sets the specified pin to push-pull output and connects it to the SPI
+    /// clock signal.
     pub fn with_sck<SCK: OutputPin>(self, sck: impl Peripheral<P = SCK> + 'd) -> Self {
         crate::into_ref!(sck);
         sck.set_to_push_pull_output(private::Internal);
@@ -586,6 +668,11 @@ where
         self
     }
 
+    /// Assign the MOSI (Master Out Slave In) pin for the SPI instance in
+    /// half-duplex mode.
+    ///
+    /// Enables both input and output functionality for the pin, and connects it
+    /// to the MOSI signal and SIO0 input signal.
     pub fn with_mosi<MOSI: OutputPin + InputPin>(
         self,
         mosi: impl Peripheral<P = MOSI> + 'd,
@@ -599,6 +686,11 @@ where
         self
     }
 
+    /// Assign the MISO (Master In Slave Out) pin for the SPI instance in
+    /// half-duplex mode.
+    ///
+    /// Enables both input and output functionality for the pin, and connects it
+    /// to the MISO signal and SIO1 input signal.
     pub fn with_miso<MISO: OutputPin + InputPin>(
         self,
         miso: impl Peripheral<P = MISO> + 'd,
@@ -612,6 +704,10 @@ where
         self
     }
 
+    /// Assign the SIO2 pin for the SPI instance.
+    ///
+    /// Enables both input and output functionality for the pin, and connects it
+    /// to the SIO2 output and input signals.
     pub fn with_sio2<SIO2: OutputPin + InputPin>(
         self,
         sio2: impl Peripheral<P = SIO2> + 'd,
@@ -625,6 +721,10 @@ where
         self
     }
 
+    /// Assign the SIO3 pin for the SPI instance.
+    ///
+    /// Enables both input and output functionality for the pin, and connects it
+    /// to the SIO3 output and input signals.
     pub fn with_sio3<SIO3: OutputPin + InputPin>(
         self,
         sio3: impl Peripheral<P = SIO3> + 'd,
@@ -638,6 +738,10 @@ where
         self
     }
 
+    /// Assign the CS (Chip Select) pin for the SPI instance.
+    ///
+    /// Sets the specified pin to push-pull output and connects it to the SPI CS
+    /// signal.
     pub fn with_cs<CS: OutputPin>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_ref!(cs);
         cs.set_to_push_pull_output(private::Internal);
@@ -733,6 +837,10 @@ where
         spi
     }
 
+    /// Change the bus frequency of the SPI instance in half-duplex mode.
+    ///
+    /// This method allows you to update the bus frequency for the SPI
+    /// communication after the instance has been created.
     pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks<'d>) {
         self.spi.ch_bus_freq(frequency, clocks);
     }
@@ -837,6 +945,7 @@ where
     }
 }
 
+/// DMA (Direct Memory Access) funtionality (Master).
 pub mod dma {
     use core::{
         cmp::min,
@@ -868,6 +977,11 @@ pub mod dma {
     where
         M: DuplexMode,
     {
+        /// Configures the SPI instance to use DMA with the specified channel.
+        ///
+        /// This method prepares the SPI instance for DMA transfers. It
+        /// initializes the DMA channel for transmission and returns an
+        /// instance of `SpiDma` that supports DMA operations.
         pub fn with_dma<C, DmaMode>(
             self,
             mut channel: Channel<'d, C, DmaMode>,
@@ -892,6 +1006,11 @@ pub mod dma {
     where
         M: DuplexMode,
     {
+        /// Configures the SPI3 instance to use DMA with the specified channel.
+        ///
+        /// This method prepares the SPI instance for DMA transfers using SPI3
+        /// and returns an instance of `SpiDma` that supports DMA
+        /// operations.
         pub fn with_dma<C, DmaMode>(
             self,
             mut channel: Channel<'d, C, DmaMode>,
@@ -931,6 +1050,10 @@ pub mod dma {
         M: DuplexMode,
         DmaMode: Mode,
     {
+        /// Formats the `SpiDma` instance for debugging purposes.
+        ///
+        /// This method returns a debug struct with the name "SpiDma" without
+        /// exposing internal details.
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             f.debug_struct("SpiDma").finish()
         }
@@ -994,6 +1117,7 @@ pub mod dma {
         M: DuplexMode,
         DmaMode: Mode,
     {
+        /// Configures the interrupt handler for the DMA-enabled SPI instance.
         fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
             SpiDma::set_interrupt_handler(self, handler);
         }
@@ -1007,6 +1131,7 @@ pub mod dma {
         M: DuplexMode,
         DmaMode: Mode,
     {
+        /// Changes the SPI bus frequency for the DMA-enabled SPI instance.
         pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks<'d>) {
             self.spi.ch_bus_freq(frequency, clocks);
         }
@@ -1018,6 +1143,11 @@ pub mod dma {
         C: DmaChannel,
         C::P: SpiPeripheral,
     {
+        /// Configures the DMA buffers for the SPI instance.
+        ///
+        /// This method sets up both TX and RX buffers for DMA transfers.
+        /// It returns an instance of `SpiDmaBus` that can be used for SPI
+        /// communication.
         pub fn with_buffers(
             self,
             dma_tx_buf: DmaTxBuf,
@@ -1034,6 +1164,11 @@ pub mod dma {
         C: DmaChannel,
         C::P: SpiPeripheral,
     {
+        /// Configures the DMA buffers for asynchronous SPI communication.
+        ///
+        /// This method sets up both TX and RX buffers for DMA transfers.
+        /// It eturns an instance of `SpiDmaAsyncBus` to be used for
+        /// asynchronous SPI operations.
         pub fn with_buffers(
             self,
             dma_tx_buf: DmaTxBuf,
@@ -1043,6 +1178,10 @@ pub mod dma {
         }
     }
 
+    /// A structure representing a DMA transfer for SPI.
+    ///
+    /// This structure holds references to the SPI instance, DMA buffers, and
+    /// transfer status.
     pub struct SpiDmaTransfer<'d, T, C, M, DmaMode, Buf>
     where
         C: DmaChannel,
@@ -1083,6 +1222,10 @@ pub mod dma {
             }
         }
 
+        /// Checks if the DMA transfer is complete.
+        ///
+        /// This method returns `true` if both TX and RX operations are done,
+        /// and the SPI instance is no longer busy.
         pub fn is_done(&self) -> bool {
             if self.is_tx && !self.tx_future_awaited && !self.spi_dma.channel.tx.is_done() {
                 return false;
@@ -1107,6 +1250,10 @@ pub mod dma {
             true
         }
 
+        /// Waits for the DMA transfer to complete.
+        ///
+        /// This method blocks until the transfer is finished and returns the
+        /// `SpiDma` instance and the associated buffer.
         pub fn wait(mut self) -> (SpiDma<'d, T, C, M, DmaMode>, Buf) {
             self.spi_dma.spi.flush().ok();
             fence(Ordering::Acquire);
@@ -1122,6 +1269,9 @@ pub mod dma {
         C::P: SpiPeripheral,
         M: DuplexMode,
     {
+        /// Waits for the DMA transfer to complete asynchronously.
+        ///
+        /// This method awaits the completion of both TX and RX operations.
         pub async fn wait_for_done(&mut self) {
             if self.is_tx && !self.tx_future_awaited {
                 let _ = DmaTxFuture::new(&mut self.spi_dma.channel.tx).await;
@@ -1258,6 +1408,7 @@ pub mod dma {
         M: IsHalfDuplex,
         DmaMode: Mode,
     {
+        /// Perform a half-duplex read operation using DMA.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
         pub fn read(
@@ -1335,6 +1486,7 @@ pub mod dma {
             Ok(SpiDmaTransfer::new(self, buffer, bytes_to_read > 0, false))
         }
 
+        /// Perform a half-duplex write operation using DMA.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
         pub fn write(
@@ -1413,6 +1565,10 @@ pub mod dma {
         }
     }
 
+    /// A DMA-capable SPI bus that handles full-duplex transfers.
+    ///
+    /// This structure is responsible for managing SPI transfers using DMA
+    /// buffers.
     pub struct SpiDmaBus<'d, T, C>
     where
         T: InstanceDma,
@@ -1429,6 +1585,8 @@ pub mod dma {
         C: DmaChannel,
         C::P: SpiPeripheral,
     {
+        /// Creates a new `SpiDmaBus` with the specified SPI instance and DMA
+        /// buffers.
         pub fn new(
             spi_dma: SpiDma<'d, T, C, FullDuplexMode, crate::Blocking>,
             tx_buffer: DmaTxBuf,
@@ -1440,6 +1598,7 @@ pub mod dma {
             }
         }
 
+        /// Reads data from the SPI bus using DMA.
         pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
             let mut spi_dma = self.spi_dma.take().unwrap();
             let (tx_buf, mut rx_buf) = self.buffers.take().unwrap();
@@ -1467,6 +1626,7 @@ pub mod dma {
             Ok(())
         }
 
+        /// Writes data to the SPI bus using DMA.
         pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
             let mut spi_dma = self.spi_dma.take().unwrap();
             let (mut tx_buf, rx_buf) = self.buffers.take().unwrap();
@@ -1491,6 +1651,7 @@ pub mod dma {
             Ok(())
         }
 
+        /// Transfers data to and from the SPI bus simultaneously using DMA.
         pub fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
             let mut spi_dma = self.spi_dma.take().unwrap();
             let (mut tx_buf, mut rx_buf) = self.buffers.take().unwrap();
@@ -1534,6 +1695,7 @@ pub mod dma {
             }
         }
 
+        /// Transfers data in place on the SPI bus using DMA.
         pub fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Error> {
             let mut spi_dma = self.spi_dma.take().unwrap();
             let (mut tx_buf, mut rx_buf) = self.buffers.take().unwrap();
@@ -1595,6 +1757,7 @@ pub mod dma {
         }
     }
 
+    /// Async functionality
     #[cfg(feature = "async")]
     pub mod asynch {
         use core::{cmp::min, mem::take};
@@ -1630,6 +1793,10 @@ pub mod dma {
             InUse,
         }
 
+        /// An asynchronous DMA-capable SPI bus for full-duplex operations.
+        ///
+        /// This struct provides an interface for SPI operations using DMA in an
+        /// asynchronous way.
         pub struct SpiDmaAsyncBus<'d, T, C>
         where
             T: InstanceDma,
@@ -1645,6 +1812,10 @@ pub mod dma {
             C: DmaChannel,
             C::P: SpiPeripheral,
         {
+            /// Creates a new asynchronous DMA SPI bus instance.
+            ///
+            /// Initializes the bus with the provided SPI instance and DMA
+            /// buffers for transmit and receive operations.
             pub fn new(
                 spi: SpiDma<'d, T, C, FullDuplexMode, crate::Async>,
                 dma_tx_buf: DmaTxBuf,
@@ -1655,6 +1826,8 @@ pub mod dma {
                 }
             }
 
+            /// Waits for the current SPI DMA transfer to complete, ensuring the
+            /// bus is idle.
             async fn wait_for_idle(
                 &mut self,
             ) -> (
@@ -1703,6 +1876,8 @@ pub mod dma {
             C: DmaChannel,
             C::P: SpiPeripheral,
         {
+            /// Asynchronously reads data from the SPI bus into the provided
+            /// buffer.
             async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
                 // Get previous transfer.
                 let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle().await;
@@ -1741,6 +1916,8 @@ pub mod dma {
                 Ok(())
             }
 
+            /// Asynchronously writes data to the SPI bus from the provided
+            /// buffer.
             async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
                 // Get previous transfer.
                 let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle().await;
@@ -1777,6 +1954,12 @@ pub mod dma {
                 Ok(())
             }
 
+            /// Asynchronously performs a full-duplex transfer over the SPI bus.
+            ///
+            /// This method splits the transfer operation into chunks and
+            /// processes it asynchronously. It simultaneously
+            /// writes data from the `write` buffer and reads data into the
+            /// `read` buffer.
             async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
                 // Get previous transfer.
                 let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle().await;
@@ -1832,6 +2015,8 @@ pub mod dma {
                 }
             }
 
+            /// Asynchronously performs an in-place full-duplex transfer over
+            /// the SPI bus.
             async fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
                 // Get previous transfer.
                 let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle().await;
