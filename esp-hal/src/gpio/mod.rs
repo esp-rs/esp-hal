@@ -182,6 +182,12 @@ pub enum DriveStrength {
 }
 
 /// Alternate functions
+///
+/// GPIO pins can be configured for various functions, such as GPIO
+/// or being directly connected to a peripheral's signal like UART, SPI, etc.
+/// The `AlternateFunction` enum allows to select one of several functions that
+/// a pin can perform, rather than using it as a general-purpose input or
+/// output.
 #[derive(PartialEq)]
 pub enum AlternateFunction {
     /// Alternate function 0.

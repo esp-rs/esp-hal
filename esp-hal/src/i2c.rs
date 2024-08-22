@@ -1642,6 +1642,12 @@ pub trait Instance: crate::private::Sealed {
     }
 
     /// Checks for I2C transmission errors and handles them.
+    ///
+    /// This function inspects specific I2C-related interrupts to detect errors
+    /// during communication, such as timeouts, failed acknowledgments, or
+    /// arbitration loss. If an error is detected, the function handles it
+    /// by resetting the I2C peripheral to clear the error condition and then
+    /// returns an appropriate error.
     fn check_errors(&self) -> Result<(), Error> {
         let interrupts = self.register_block().int_raw().read();
 
@@ -1683,6 +1689,14 @@ pub trait Instance: crate::private::Sealed {
     }
 
     /// Updates the configuration of the I2C peripheral.
+    ///
+    /// This function ensures that the configuration values, such as clock
+    /// settings, SDA/SCL filtering, timeouts, and other operational
+    /// parameters, which are configured in other functions, are properly
+    /// propagated to the I2C hardware. This step is necessary to synchronize
+    /// the software-configured settings with the peripheral's internal
+    /// registers, ensuring that the hardware behaves according to the
+    /// current configuration.
     fn update_config(&self) {
         // Ensure that the configuration of the peripheral is correctly propagated
         // (only necessary for C2, C3, C6, H2 and S3 variant)
