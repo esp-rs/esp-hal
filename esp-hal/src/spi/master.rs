@@ -123,6 +123,7 @@ const MAX_DMA_SIZE: usize = 32736;
 ///
 /// Used to define specific commands sent over the SPI bus.
 /// Can be [Command::None] if command phase should be suppressed.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Command {
     /// No command is sent.
     None,
@@ -236,6 +237,7 @@ impl Command {
 ///
 /// This can be used to specify the address phase of SPI transactions.
 /// Can be [Address::None] if address phase should be suppressed.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Address {
     /// No address phase.
     None,
@@ -1136,11 +1138,12 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, C, M> SpiDma<'d, T, C, FullDuplexMode, M>
+    impl<'d, T, C, D, M> SpiDma<'d, T, C, D, M>
     where
         T: InstanceDma,
         C: DmaChannel,
         C::P: SpiPeripheral,
+        D: DuplexMode,
         M: Mode,
     {
         /// Configures the DMA buffers for the SPI instance.
@@ -1152,7 +1155,7 @@ pub mod dma {
             self,
             dma_tx_buf: DmaTxBuf,
             dma_rx_buf: DmaRxBuf,
-        ) -> SpiDmaBus<'d, T, C, FullDuplexMode, M> {
+        ) -> SpiDmaBus<'d, T, C, D, M> {
             SpiDmaBus::new(self, dma_tx_buf, dma_rx_buf)
         }
     }
@@ -1727,6 +1730,78 @@ pub mod dma {
             }
 
             self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+            Ok(())
+        }
+    }
+
+    impl<'d, T, C, D, M> HalfDuplexReadWrite for SpiDmaBus<'d, T, C, D, M>
+    where
+        T: InstanceDma,
+        C: DmaChannel,
+        C::P: SpiPeripheral,
+        D: IsHalfDuplex,
+        M: Mode,
+    {
+        type Error = super::Error;
+
+        /// Half-duplex read.
+        fn read(
+            &mut self,
+            data_mode: SpiDataMode,
+            cmd: Command,
+            address: Address,
+            dummy: u8,
+            buffer: &mut [u8],
+        ) -> Result<(), Self::Error> {
+            let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle();
+
+            for chunk in buffer.chunks_mut(rx_buf.capacity()) {
+                rx_buf.set_length(chunk.len());
+
+                match spi_dma.read(data_mode, cmd, address, dummy, rx_buf) {
+                    Ok(transfer) => self.state = State::Reading(transfer, tx_buf),
+                    Err((e, spi, rx)) => {
+                        self.state = State::Idle(spi, tx_buf, rx);
+                        return Err(e);
+                    }
+                }
+                (spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+
+                let bytes_read = rx_buf.read_received_data(chunk);
+                debug_assert_eq!(bytes_read, chunk.len());
+            }
+
+            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+
+            Ok(())
+        }
+
+        /// Half-duplex write.
+        fn write(
+            &mut self,
+            data_mode: SpiDataMode,
+            cmd: Command,
+            address: Address,
+            dummy: u8,
+            buffer: &[u8],
+        ) -> Result<(), Self::Error> {
+            let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle();
+
+            for chunk in buffer.chunks(tx_buf.capacity()) {
+                tx_buf.fill(chunk);
+
+                match spi_dma.write(data_mode, cmd, address, dummy, tx_buf) {
+                    Ok(transfer) => self.state = State::Writing(transfer, rx_buf),
+                    Err((e, spi, tx)) => {
+                        self.state = State::Idle(spi, tx, rx_buf);
+                        return Err(e);
+                    }
+                }
+                (spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+            }
+
+            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+
             Ok(())
         }
     }

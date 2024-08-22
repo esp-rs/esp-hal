@@ -1947,6 +1947,16 @@ impl DmaTxBuf {
         Ok(buf)
     }
 
+    /// Create an empty DmaTxBuf.
+    ///
+    /// This has no ability to transmit data.
+    pub fn empty() -> Self {
+        Self {
+            descriptors: &mut [],
+            buffer: &mut [],
+        }
+    }
+
     /// Consume the buf, returning the descriptors and buffer.
     pub fn split(self) -> (&'static mut [DmaDescriptor], &'static mut [u8]) {
         (self.descriptors, self.buffer)
@@ -2080,6 +2090,16 @@ impl DmaRxBuf {
         buf.set_length(buf.capacity());
 
         Ok(buf)
+    }
+
+    /// Create an empty DmaRxBuf.
+    ///
+    /// This has no ability to recieve data.
+    pub fn empty() -> Self {
+        Self {
+            descriptors: &mut [],
+            buffer: &mut [],
+        }
     }
 
     /// Consume the buf, returning the descriptors and buffer.

@@ -86,7 +86,7 @@ pub trait IsFullDuplex: DuplexMode {}
 pub trait IsHalfDuplex: DuplexMode {}
 
 /// SPI data mode
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SpiDataMode {
     /// `Single` Data Mode - 1 bit, 2 wires.
