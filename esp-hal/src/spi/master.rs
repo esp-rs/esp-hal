@@ -1152,7 +1152,7 @@ pub mod dma {
             self,
             dma_tx_buf: DmaTxBuf,
             dma_rx_buf: DmaRxBuf,
-        ) -> SpiDmaBus<'d, T, C, M> {
+        ) -> SpiDmaBus<'d, T, C, FullDuplexMode, M> {
             SpiDmaBus::new(self, dma_tx_buf, dma_rx_buf)
         }
     }
@@ -1185,12 +1185,7 @@ pub mod dma {
         D: DuplexMode,
         M: Mode,
     {
-        fn new(
-            spi_dma: SpiDma<'d, T, C, D, M>,
-            dma_buf: Buf,
-            is_rx: bool,
-            is_tx: bool,
-        ) -> Self {
+        fn new(spi_dma: SpiDma<'d, T, C, D, M>, dma_buf: Buf, is_rx: bool, is_tx: bool) -> Self {
             Self {
                 spi_dma,
                 dma_buf,
@@ -1284,8 +1279,7 @@ pub mod dma {
         pub fn dma_write(
             mut self,
             buffer: DmaTxBuf,
-        ) -> Result<SpiDmaTransfer<'d, T, C, D, M, DmaTxBuf>, (Error, Self, DmaTxBuf)>
-        {
+        ) -> Result<SpiDmaTransfer<'d, T, C, D, M, DmaTxBuf>, (Error, Self, DmaTxBuf)> {
             let bytes_to_write = buffer.len();
             if bytes_to_write > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
@@ -1312,8 +1306,7 @@ pub mod dma {
         pub fn dma_read(
             mut self,
             buffer: DmaRxBuf,
-        ) -> Result<SpiDmaTransfer<'d, T, C, D, M, DmaRxBuf>, (Error, Self, DmaRxBuf)>
-        {
+        ) -> Result<SpiDmaTransfer<'d, T, C, D, M, DmaRxBuf>, (Error, Self, DmaRxBuf)> {
             let bytes_to_read = buffer.len();
             if bytes_to_read > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
@@ -1397,8 +1390,7 @@ pub mod dma {
             address: Address,
             dummy: u8,
             buffer: DmaRxBuf,
-        ) -> Result<SpiDmaTransfer<'d, T, C, D, M, DmaRxBuf>, (Error, Self, DmaRxBuf)>
-        {
+        ) -> Result<SpiDmaTransfer<'d, T, C, D, M, DmaRxBuf>, (Error, Self, DmaRxBuf)> {
             let bytes_to_read = buffer.len();
             if bytes_to_read > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
@@ -1475,8 +1467,7 @@ pub mod dma {
             address: Address,
             dummy: u8,
             buffer: DmaTxBuf,
-        ) -> Result<SpiDmaTransfer<'d, T, C, D, M, DmaTxBuf>, (Error, Self, DmaTxBuf)>
-        {
+        ) -> Result<SpiDmaTransfer<'d, T, C, D, M, DmaTxBuf>, (Error, Self, DmaTxBuf)> {
             let bytes_to_write = buffer.len();
             if bytes_to_write > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
@@ -1545,23 +1536,18 @@ pub mod dma {
     }
 
     #[derive(Default)]
-    enum State<'d, T, C, M>
+    enum State<'d, T, C, D, M>
     where
         T: InstanceDma,
         C: DmaChannel,
         C::P: SpiPeripheral,
+        D: DuplexMode,
         M: Mode,
     {
-        Idle(SpiDma<'d, T, C, FullDuplexMode, M>, DmaTxBuf, DmaRxBuf),
-        Reading(
-            SpiDmaTransfer<'d, T, C, FullDuplexMode, M, DmaRxBuf>,
-            DmaTxBuf,
-        ),
-        Writing(
-            SpiDmaTransfer<'d, T, C, FullDuplexMode, M, DmaTxBuf>,
-            DmaRxBuf,
-        ),
-        Transferring(SpiDmaTransfer<'d, T, C, FullDuplexMode, M, (DmaTxBuf, DmaRxBuf)>),
+        Idle(SpiDma<'d, T, C, D, M>, DmaTxBuf, DmaRxBuf),
+        Reading(SpiDmaTransfer<'d, T, C, D, M, DmaRxBuf>, DmaTxBuf),
+        Writing(SpiDmaTransfer<'d, T, C, D, M, DmaTxBuf>, DmaRxBuf),
+        Transferring(SpiDmaTransfer<'d, T, C, D, M, (DmaTxBuf, DmaRxBuf)>),
         #[default]
         InUse,
     }
@@ -1570,27 +1556,29 @@ pub mod dma {
     ///
     /// This structure is responsible for managing SPI transfers using DMA
     /// buffers.
-    pub struct SpiDmaBus<'d, T, C, M>
+    pub struct SpiDmaBus<'d, T, C, D, M>
     where
         T: InstanceDma,
         C: DmaChannel,
         C::P: SpiPeripheral,
+        D: DuplexMode,
         M: Mode,
     {
-        state: State<'d, T, C, M>,
+        state: State<'d, T, C, D, M>,
     }
 
-    impl<'d, T, C, M> SpiDmaBus<'d, T, C, M>
+    impl<'d, T, C, D, M> SpiDmaBus<'d, T, C, D, M>
     where
         T: InstanceDma,
         C: DmaChannel,
         C::P: SpiPeripheral,
+        D: DuplexMode,
         M: Mode,
     {
         /// Creates a new `SpiDmaBus` with the specified SPI instance and DMA
         /// buffers.
         pub fn new(
-            spi: SpiDma<'d, T, C, FullDuplexMode, M>,
+            spi: SpiDma<'d, T, C, D, M>,
             dma_tx_buf: DmaTxBuf,
             dma_rx_buf: DmaRxBuf,
         ) -> Self {
@@ -1599,7 +1587,7 @@ pub mod dma {
             }
         }
 
-        fn wait_for_idle(&mut self) -> (SpiDma<'d, T, C, FullDuplexMode, M>, DmaTxBuf, DmaRxBuf) {
+        fn wait_for_idle(&mut self) -> (SpiDma<'d, T, C, D, M>, DmaTxBuf, DmaRxBuf) {
             match core::mem::take(&mut self.state) {
                 State::Idle(spi, tx_buf, rx_buf) => (spi, tx_buf, rx_buf),
                 State::Reading(transfer, tx_buf) => {
@@ -1617,7 +1605,16 @@ pub mod dma {
                 State::InUse => unreachable!(),
             }
         }
+    }
 
+    impl<'d, T, C, D, M> SpiDmaBus<'d, T, C, D, M>
+    where
+        T: InstanceDma,
+        C: DmaChannel,
+        C::P: SpiPeripheral,
+        D: IsFullDuplex,
+        M: Mode,
+    {
         /// Reads data from the SPI bus using DMA.
         pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
             let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle();
@@ -1735,7 +1732,8 @@ pub mod dma {
     }
 
     #[cfg(feature = "embedded-hal-02")]
-    impl<'d, T, C> embedded_hal_02::blocking::spi::Transfer<u8> for SpiDmaBus<'d, T, C, crate::Blocking>
+    impl<'d, T, C> embedded_hal_02::blocking::spi::Transfer<u8>
+        for SpiDmaBus<'d, T, C, FullDuplexMode, crate::Blocking>
     where
         T: InstanceDma,
         C: DmaChannel,
@@ -1750,7 +1748,8 @@ pub mod dma {
     }
 
     #[cfg(feature = "embedded-hal-02")]
-    impl<'d, T, C> embedded_hal_02::blocking::spi::Write<u8> for SpiDmaBus<'d, T, C, crate::Blocking>
+    impl<'d, T, C> embedded_hal_02::blocking::spi::Write<u8>
+        for SpiDmaBus<'d, T, C, FullDuplexMode, crate::Blocking>
     where
         T: InstanceDma,
         C: DmaChannel,
@@ -1771,7 +1770,7 @@ pub mod dma {
 
         use super::*;
 
-        impl<'d, T, C> SpiDmaBus<'d, T, C, crate::Async>
+        impl<'d, T, C> SpiDmaBus<'d, T, C, FullDuplexMode, crate::Async>
         where
             T: InstanceDma,
             C: DmaChannel,
@@ -1961,7 +1960,7 @@ pub mod dma {
             }
         }
 
-        impl<'d, T, C> embedded_hal_async::spi::SpiBus for SpiDmaBus<'d, T, C, crate::Async>
+        impl<'d, T, C> embedded_hal_async::spi::SpiBus for SpiDmaBus<'d, T, C, FullDuplexMode, crate::Async>
         where
             T: InstanceDma,
             C: DmaChannel,
@@ -1995,7 +1994,7 @@ pub mod dma {
 
         use super::*;
 
-        impl<'d, T, C, M> ErrorType for SpiDmaBus<'d, T, C, M>
+        impl<'d, T, C, M> ErrorType for SpiDmaBus<'d, T, C, FullDuplexMode, M>
         where
             T: InstanceDma,
             C: DmaChannel,
@@ -2005,7 +2004,7 @@ pub mod dma {
             type Error = Error;
         }
 
-        impl<'d, T, C, M> SpiBus for SpiDmaBus<'d, T, C, M>
+        impl<'d, T, C, M> SpiBus for SpiDmaBus<'d, T, C, FullDuplexMode, M>
         where
             T: InstanceDma,
             C: DmaChannel,
