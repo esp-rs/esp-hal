@@ -1883,7 +1883,8 @@ pub mod dma {
                 }
             }
 
-            async fn read_async(&mut self, words: &mut [u8]) -> Result<(), super::Error> {
+            /// Fill the given buffer with data from the bus.
+            pub async fn read_async(&mut self, words: &mut [u8]) -> Result<(), super::Error> {
                 // Get previous transfer.
                 let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle_async().await;
 
@@ -1911,7 +1912,8 @@ pub mod dma {
                 Ok(())
             }
 
-            async fn write_async(&mut self, words: &[u8]) -> Result<(), super::Error> {
+            /// Transmit the given buffer to the bus.
+            pub async fn write_async(&mut self, words: &[u8]) -> Result<(), super::Error> {
                 // Get previous transfer.
                 let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle_async().await;
 
@@ -1936,7 +1938,9 @@ pub mod dma {
                 Ok(())
             }
 
-            async fn transfer_async(
+            /// Transfer by writing out a buffer and reading the response from
+            /// the bus into another buffer.
+            pub async fn transfer_async(
                 &mut self,
                 read: &mut [u8],
                 write: &[u8],
@@ -1984,7 +1988,9 @@ pub mod dma {
                 }
             }
 
-            async fn transfer_in_place_async(
+            /// Transfer by writing out a buffer and reading the response from
+            /// the bus into the same buffer.
+            pub async fn transfer_in_place_async(
                 &mut self,
                 words: &mut [u8],
             ) -> Result<(), super::Error> {
@@ -2027,7 +2033,8 @@ pub mod dma {
                 Ok(())
             }
 
-            async fn flush_async(&mut self) -> Result<(), super::Error> {
+            /// Flush any pending data in the SPI peripheral.
+            pub async fn flush_async(&mut self) -> Result<(), super::Error> {
                 // Get previous transfer.
                 let (spi_dma, tx_buf, rx_buf) = self.wait_for_idle_async().await;
                 self.state = State::Idle(spi_dma, tx_buf, rx_buf);
