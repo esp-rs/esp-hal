@@ -1620,19 +1620,19 @@ pub mod dma {
 
         /// Reads data from the SPI bus using DMA.
         pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
-            let (mut spi_dma, tx_buf, mut rx_buf) = self.wait_for_idle();
+            let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle();
 
             for chunk in words.chunks_mut(rx_buf.capacity()) {
                 rx_buf.set_length(chunk.len());
 
-                let transfer = match spi_dma.dma_read(rx_buf) {
-                    Ok(transfer) => transfer,
+                match spi_dma.dma_read(rx_buf) {
+                    Ok(transfer) => self.state = State::Reading(transfer, tx_buf),
                     Err((e, spi, rx)) => {
                         self.state = State::Idle(spi, tx_buf, rx);
                         return Err(e);
                     }
-                };
-                (spi_dma, rx_buf) = transfer.wait();
+                }
+                (spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
 
                 let bytes_read = rx_buf.read_received_data(chunk);
                 debug_assert_eq!(bytes_read, chunk.len());
@@ -1645,19 +1645,19 @@ pub mod dma {
 
         /// Writes data to the SPI bus using DMA.
         pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
-            let (mut spi_dma, mut tx_buf, rx_buf) = self.wait_for_idle();
+            let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle();
 
             for chunk in words.chunks(tx_buf.capacity()) {
                 tx_buf.fill(chunk);
 
-                let transfer = match spi_dma.dma_write(tx_buf) {
-                    Ok(transfer) => transfer,
+                match spi_dma.dma_write(tx_buf) {
+                    Ok(transfer) => self.state = State::Writing(transfer, rx_buf),
                     Err((e, spi, tx)) => {
                         self.state = State::Idle(spi, tx, rx_buf);
                         return Err(e);
                     }
-                };
-                (spi_dma, tx_buf) = transfer.wait();
+                }
+                (spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
             }
 
             self.state = State::Idle(spi_dma, tx_buf, rx_buf);
@@ -1682,14 +1682,14 @@ pub mod dma {
                 tx_buf.fill(write_chunk);
                 rx_buf.set_length(read_chunk.len());
 
-                let transfer = match spi_dma.dma_transfer(tx_buf, rx_buf) {
-                    Ok(transfer) => transfer,
+                match spi_dma.dma_transfer(tx_buf, rx_buf) {
+                    Ok(transfer) => self.state = State::Transferring(transfer),
                     Err((e, spi, tx, rx)) => {
                         self.state = State::Idle(spi, tx, rx);
                         return Err(e);
                     }
-                };
-                (spi_dma, (tx_buf, rx_buf)) = transfer.wait();
+                }
+                (spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
 
                 let bytes_read = rx_buf.read_received_data(read_chunk);
                 debug_assert_eq!(bytes_read, read_chunk.len());
@@ -1716,14 +1716,14 @@ pub mod dma {
                 tx_buf.fill(chunk);
                 rx_buf.set_length(chunk.len());
 
-                let transfer = match spi_dma.dma_transfer(tx_buf, rx_buf) {
-                    Ok(transfer) => transfer,
+                match spi_dma.dma_transfer(tx_buf, rx_buf) {
+                    Ok(transfer) => self.state = State::Transferring(transfer),
                     Err((e, spi, tx, rx)) => {
                         self.state = State::Idle(spi, tx, rx);
                         return Err(e);
                     }
-                };
-                (spi_dma, (tx_buf, rx_buf)) = transfer.wait();
+                }
+                (spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
 
                 let bytes_read = rx_buf.read_received_data(chunk);
                 debug_assert_eq!(bytes_read, chunk.len());
@@ -1826,17 +1826,7 @@ pub mod dma {
                         }
                     };
 
-                    match &mut self.state {
-                        State::Reading(transfer, _) => transfer.wait_for_done().await,
-                        _ => unreachable!(),
-                    };
-                    (spi_dma, tx_buf, rx_buf) = match take(&mut self.state) {
-                        State::Reading(transfer, tx_buf) => {
-                            let (spi, rx_buf) = transfer.wait();
-                            (spi, tx_buf, rx_buf)
-                        }
-                        _ => unreachable!(),
-                    };
+                    (spi_dma, tx_buf, rx_buf) = self.wait_for_idle_async().await;
 
                     let bytes_read = rx_buf.read_received_data(chunk);
                     debug_assert_eq!(bytes_read, chunk.len());
@@ -1864,18 +1854,7 @@ pub mod dma {
                         }
                     };
 
-                    match &mut self.state {
-                        State::Writing(transfer, _) => transfer.wait_for_done().await,
-                        _ => unreachable!(),
-                    };
-
-                    (spi_dma, tx_buf, rx_buf) = match take(&mut self.state) {
-                        State::Writing(transfer, rx_buf) => {
-                            let (spi, tx_buf) = transfer.wait();
-                            (spi, tx_buf, rx_buf)
-                        }
-                        _ => unreachable!(),
-                    };
+                    (spi_dma, tx_buf, rx_buf) = self.wait_for_idle_async().await;
                 }
 
                 self.state = State::Idle(spi_dma, tx_buf, rx_buf);
@@ -1914,18 +1893,7 @@ pub mod dma {
                         }
                     };
 
-                    match &mut self.state {
-                        State::Transferring(transfer) => transfer.wait_for_done().await,
-                        _ => unreachable!(),
-                    };
-
-                    (spi_dma, tx_buf, rx_buf) = match take(&mut self.state) {
-                        State::Transferring(transfer) => {
-                            let (spi, (tx_buf, rx_buf)) = transfer.wait();
-                            (spi, tx_buf, rx_buf)
-                        }
-                        _ => unreachable!(),
-                    };
+                    (spi_dma, tx_buf, rx_buf) = self.wait_for_idle_async().await;
 
                     let bytes_read = rx_buf.read_received_data(read_chunk);
                     assert_eq!(bytes_read, read_chunk.len());
