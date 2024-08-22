@@ -272,7 +272,7 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
 
     /// Writes data into the SHA buffer.
     /// This function ensures that incoming data is aligned to u32 (due to
-    /// issues with cpy_mem<u8>)
+    /// issues with `cpy_mem<u8>`)
     fn write_data<'a>(&mut self, incoming: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
         let mod_cursor = self.cursor % self.chunk_length();
 
