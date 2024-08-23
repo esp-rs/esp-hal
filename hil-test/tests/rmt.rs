@@ -106,12 +106,12 @@ mod tests {
 
         let rx_transaction = rx_channel.receive(&mut rcv_data).unwrap();
         let tx_transaction = tx_channel.transmit(&tx_data);
+
+        rx_transaction.wait().unwrap();
         tx_transaction.wait().unwrap();
 
-        rx_transaction.wait().unwrap(); // HERE ESP32 hangs
-
-        // the last two pulse-codes are the ones which wait for the timeout so they
-        // can't be equal
+        // the last two pulse-codes are the ones which wait for the timeout so
+        // they can't be equal
         assert_eq!(&tx_data[..18], &rcv_data[..18]);
     }
 }
