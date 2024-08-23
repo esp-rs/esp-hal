@@ -22,33 +22,37 @@
 use embedded_hal_async::spi::SpiBus;
 use esp_hal::{
     clock::ClockControl,
-    dma::{Dma, DmaPriority},
+    dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf, DmaChannel0},
     dma_buffers,
-    gpio::{Io, Level, Output, Pull},
+    gpio::{Io, GpioPin, Level, Output, Pull},
     pcnt::{
         channel::{EdgeMode, PcntInputConfig, PcntSource},
-        Pcnt,
+        Pcnt, unit::Unit
     },
-    peripherals::Peripherals,
+    peripherals::{Peripherals, SPI2},
     prelude::*,
-    spi::{master::Spi, SpiMode},
+    spi::{master::{Spi, dma::asynch::SpiDmaAsyncBus}, SpiMode},
     system::SystemControl,
 };
 use hil_test as _;
 
+const DMA_BUFFER_SIZE: usize = 5;
+
+struct Context {
+    spi: SpiDmaAsyncBus<'static, SPI2, DmaChannel0>,
+    pcnt_unit: Unit<'static, 0>,
+    out_pin: Output<'static, GpioPin<5>>,
+    mosi_mirror: GpioPin<2>,
+}
+
 #[cfg(test)]
 #[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
 mod tests {
-    use defmt::assert_eq;
-    use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
-
     use super::*;
+    use defmt::assert_eq;
 
-    #[test]
-    #[timeout(3)]
-    async fn test_async_dma_read_dma_write_pcnt() {
-        const DMA_BUFFER_SIZE: usize = 5;
-
+    #[init]
+    fn init() -> Context {
         let peripherals = Peripherals::take();
         let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
@@ -67,88 +71,39 @@ mod tests {
 
         let dma = Dma::new(peripherals.DMA);
 
-        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-        let dma_channel = dma.spi2channel;
-        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
-        let dma_channel = dma.channel0;
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "esp32")] {
+                let dma_channel = dma.spi2channel;
+            } else {
+                let dma_channel = dma.channel0;
+            }
+        }
 
         let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
-        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
             .with_dma(dma_channel.configure_for_async(false, DmaPriority::Priority0))
             .with_buffers(dma_tx_buf, dma_rx_buf);
 
-        let unit = pcnt.unit0;
-        unit.channel0.set_edge_signal(PcntSource::from_pin(
+        Context {
+            spi,
+            pcnt_unit: pcnt.unit0,
+            out_pin,
             mosi_mirror,
-            PcntInputConfig { pull: Pull::Down },
-        ));
-        unit.channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-
-        let mut receive = [0; DMA_BUFFER_SIZE];
-
-        // Fill the buffer where each byte has 3 pos edges.
-        let transmit = [0b0110_1010; DMA_BUFFER_SIZE];
-
-        assert_eq!(out_pin.is_set_low(), true);
-
-        for i in 1..4 {
-            receive.copy_from_slice(&[5, 5, 5, 5, 5]);
-            SpiBus::read(&mut spi, &mut receive).await.unwrap();
-            assert_eq!(receive, [0, 0, 0, 0, 0]);
-
-            SpiBus::write(&mut spi, &transmit).await.unwrap();
-            assert_eq!(unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
         }
     }
 
     #[test]
     #[timeout(3)]
-    async fn test_async_dma_read_dma_transfer_pcnt() {
-        const DMA_BUFFER_SIZE: usize = 5;
-
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let pcnt = Pcnt::new(peripherals.PCNT);
-        let sclk = io.pins.gpio0;
-        let mosi_mirror = io.pins.gpio2;
-        let mosi = io.pins.gpio3;
-        let miso = io.pins.gpio6;
-        let cs = io.pins.gpio8;
-
-        let mut out_pin = Output::new(io.pins.gpio5, Level::High);
-        out_pin.set_low();
-        assert_eq!(out_pin.is_set_low(), true);
-
-        let dma = Dma::new(peripherals.DMA);
-
-        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-        let dma_channel = dma.spi2channel;
-        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
-        let dma_channel = dma.channel0;
-
-        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
-        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
-        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-
-        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
-            .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-            .with_dma(dma_channel.configure_for_async(false, DmaPriority::Priority0))
-            .with_buffers(dma_tx_buf, dma_rx_buf);
-
-        let unit = pcnt.unit0;
-        unit.channel0.set_edge_signal(PcntSource::from_pin(
-            mosi_mirror,
+    async fn test_async_dma_read_dma_write_pcnt(mut ctx: Context) {
+        ctx.pcnt_unit.channel0.set_edge_signal(PcntSource::from_pin(
+            ctx.mosi_mirror,
             PcntInputConfig { pull: Pull::Down },
         ));
-        unit.channel0
+        ctx.pcnt_unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
         let mut receive = [0; DMA_BUFFER_SIZE];
@@ -156,17 +111,44 @@ mod tests {
         // Fill the buffer where each byte has 3 pos edges.
         let transmit = [0b0110_1010; DMA_BUFFER_SIZE];
 
-        assert_eq!(out_pin.is_set_low(), true);
+        assert_eq!(ctx.out_pin.is_set_low(), true);
 
         for i in 1..4 {
             receive.copy_from_slice(&[5, 5, 5, 5, 5]);
-            SpiBus::read(&mut spi, &mut receive).await.unwrap();
+            SpiBus::read(&mut ctx.spi, &mut receive).await.unwrap();
             assert_eq!(receive, [0, 0, 0, 0, 0]);
 
-            SpiBus::transfer(&mut spi, &mut receive, &transmit)
+            SpiBus::write(&mut ctx.spi, &transmit).await.unwrap();
+            assert_eq!(ctx.pcnt_unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
+        }
+    }
+
+    #[test]
+    #[timeout(3)]
+    async fn test_async_dma_read_dma_transfer_pcnt(mut ctx: Context) {
+        ctx.pcnt_unit.channel0.set_edge_signal(PcntSource::from_pin(
+            ctx.mosi_mirror,
+            PcntInputConfig { pull: Pull::Down },
+        ));
+        ctx.pcnt_unit.channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+
+        let mut receive = [0; DMA_BUFFER_SIZE];
+
+        // Fill the buffer where each byte has 3 pos edges.
+        let transmit = [0b0110_1010; DMA_BUFFER_SIZE];
+
+        assert_eq!(ctx.out_pin.is_set_low(), true);
+
+        for i in 1..4 {
+            receive.copy_from_slice(&[5, 5, 5, 5, 5]);
+            SpiBus::read(&mut ctx.spi, &mut receive).await.unwrap();
+            assert_eq!(receive, [0, 0, 0, 0, 0]);
+
+            SpiBus::transfer(&mut ctx.spi, &mut receive, &transmit)
                 .await
                 .unwrap();
-            assert_eq!(unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
+            assert_eq!(ctx.pcnt_unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
         }
     }
 }
