@@ -28,8 +28,15 @@ struct Context {
     spi: Spi<'static, esp_hal::peripherals::SPI2, FullDuplexMode>,
 }
 
-impl Context {
-    pub fn init() -> Self {
+#[cfg(test)]
+#[embedded_test::tests]
+mod tests {
+    use defmt::assert_eq;
+
+    use super::*;
+
+    #[init]
+    fn init() -> Context {
         let peripherals = Peripherals::take();
         let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
@@ -48,19 +55,6 @@ impl Context {
         );
 
         Context { spi }
-    }
-}
-
-#[cfg(test)]
-#[embedded_test::tests]
-mod tests {
-    use defmt::assert_eq;
-
-    use super::*;
-
-    #[init]
-    fn init() -> Context {
-        Context::init()
     }
 
     #[test]

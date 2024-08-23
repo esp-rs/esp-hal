@@ -22,19 +22,33 @@
 use embedded_hal_async::spi::SpiBus;
 use esp_hal::{
     clock::ClockControl,
-    dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf, DmaChannel0},
+    dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{Io, GpioPin, Level, Output, Pull},
+    gpio::{GpioPin, Io, Level, Output, Pull},
     pcnt::{
         channel::{EdgeMode, PcntInputConfig, PcntSource},
-        Pcnt, unit::Unit
+        unit::Unit,
+        Pcnt,
     },
     peripherals::{Peripherals, SPI2},
     prelude::*,
-    spi::{master::{Spi, dma::asynch::SpiDmaAsyncBus}, SpiMode},
+    spi::{
+        master::{dma::asynch::SpiDmaAsyncBus, Spi},
+        SpiMode,
+    },
     system::SystemControl,
 };
 use hil_test as _;
+
+cfg_if::cfg_if! {
+    if #[cfg(any(
+        feature = "esp32",
+    ))] {
+        use esp_hal::dma::Spi2DmaChannel as DmaChannel0;
+    } else {
+        use esp_hal::dma::DmaChannel0;
+    }
+}
 
 const DMA_BUFFER_SIZE: usize = 5;
 
@@ -48,8 +62,9 @@ struct Context {
 #[cfg(test)]
 #[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
 mod tests {
-    use super::*;
     use defmt::assert_eq;
+
+    use super::*;
 
     #[init]
     fn init() -> Context {
@@ -103,7 +118,8 @@ mod tests {
             ctx.mosi_mirror,
             PcntInputConfig { pull: Pull::Down },
         ));
-        ctx.pcnt_unit.channel0
+        ctx.pcnt_unit
+            .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
         let mut receive = [0; DMA_BUFFER_SIZE];
@@ -130,7 +146,8 @@ mod tests {
             ctx.mosi_mirror,
             PcntInputConfig { pull: Pull::Down },
         ));
-        ctx.pcnt_unit.channel0
+        ctx.pcnt_unit
+            .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
         let mut receive = [0; DMA_BUFFER_SIZE];
