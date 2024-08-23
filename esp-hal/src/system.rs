@@ -304,9 +304,7 @@ pub struct SoftwareInterruptControl {
     pub software_interrupt1: SoftwareInterrupt<1>,
     /// Software interrupt 2.
     pub software_interrupt2: SoftwareInterrupt<2>,
-    /// Software interrupt 3 (only available when not running on a multi-core
-    /// system with the `embassy` feature enabled).
-    #[cfg(not(all(feature = "embassy", multi_core)))]
+    /// Software interrupt 3.
     pub software_interrupt3: SoftwareInterrupt<3>,
 }
 
@@ -316,10 +314,6 @@ impl SoftwareInterruptControl {
             software_interrupt0: SoftwareInterrupt {},
             software_interrupt1: SoftwareInterrupt {},
             software_interrupt2: SoftwareInterrupt {},
-            // the thread-executor uses SW-INT3 when used on a multi-core system
-            // we cannot easily require `software_interrupt3` there since it's created
-            // before `main` via proc-macro so we  cfg it away from users
-            #[cfg(not(all(feature = "embassy", multi_core)))]
             software_interrupt3: SoftwareInterrupt {},
         }
     }
