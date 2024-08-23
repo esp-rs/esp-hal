@@ -1,6 +1,7 @@
 //! lcd_cam i8080 tests
 
 //% CHIPS: esp32s3
+//% FEATURES: generic-queue
 
 #![no_std]
 #![no_main]
