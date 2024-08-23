@@ -2,10 +2,8 @@
 //!
 //! ## Overview
 //!
-//! This `system` driver provides an interface to control and configure various
-//! system-related features and peripherals on ESP chips. It includes
-//! functionality to control peripheral clocks, manage software interrupts,
-//! configure chip clocks, and control radio peripherals.
+//! This `system` module defines the available radio peripherals and provides an
+//! interface to control and configure radio clocks.
 
 use crate::peripherals::SYSTEM;
 
