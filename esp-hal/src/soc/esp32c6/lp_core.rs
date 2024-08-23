@@ -23,8 +23,10 @@ use esp32c6 as pac;
 
 use crate::peripheral::{Peripheral, PeripheralRef};
 
+/// Represents the possible wakeup sources for the LP (Low Power) core.
 #[derive(Debug, Clone, Copy)]
 pub enum LpCoreWakeupSource {
+    /// Wakeup source from the HP (High Performance) CPU.
     HpCpu,
 }
 
@@ -39,6 +41,7 @@ pub enum LpCoreClockSource {
     XtalD2Clk,
 }
 
+/// Represents the Low Power (LP) core peripheral.
 pub struct LpCore<'d> {
     _lp_core: PeripheralRef<'d, crate::soc::peripherals::LP_CORE>,
 }

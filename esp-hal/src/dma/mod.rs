@@ -523,17 +523,26 @@ pub enum DmaError {
 #[cfg(gdma)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(missing_docs)]
 pub enum DmaPriority {
+    /// The lowest priority level (Priority 0).
     Priority0 = 0,
+    /// Priority level 1.
     Priority1 = 1,
+    /// Priority level 2.
     Priority2 = 2,
+    /// Priority level 3.
     Priority3 = 3,
+    /// Priority level 4.
     Priority4 = 4,
+    /// Priority level 5.
     Priority5 = 5,
+    /// Priority level 6.
     Priority6 = 6,
+    /// Priority level 7.
     Priority7 = 7,
+    /// Priority level 8.
     Priority8 = 8,
+    /// The highest priority level (Priority 9).
     Priority9 = 9,
 }
 
@@ -542,8 +551,8 @@ pub enum DmaPriority {
 #[cfg(pdma)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(missing_docs)]
 pub enum DmaPriority {
+    /// The lowest priority level (Priority 0).
     Priority0 = 0,
 }
 
@@ -860,10 +869,12 @@ impl DescriptorChain {
 
 /// Block size for transfers to/from psram
 #[derive(Copy, Clone, Debug, PartialEq)]
-#[allow(missing_docs)]
 pub enum DmaExtMemBKSize {
+    /// External memory block size of 16 bytes.
     Size16 = 0,
+    /// External memory block size of 32 bytes.
     Size32 = 1,
+    /// External memory block size of 64 bytes.
     Size64 = 2,
 }
 

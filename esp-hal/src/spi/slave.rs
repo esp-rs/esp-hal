@@ -143,6 +143,7 @@ where
     }
 }
 
+/// DMA (Direct Memory Access) funtionality (Slave).
 pub mod dma {
     use super::*;
     #[cfg(spi3)]
@@ -169,12 +170,15 @@ pub mod dma {
         Mode,
     };
 
+    /// Trait for configuring DMA with SPI2 peripherals in slave mode.
     pub trait WithDmaSpi2<'d, C, DmaMode>
     where
         C: DmaChannel,
         C::P: SpiPeripheral,
         DmaMode: Mode,
     {
+        /// Configures the SPI2 peripheral with the provided DMA channel and
+        /// descriptors.
         fn with_dma(
             self,
             channel: Channel<'d, C, DmaMode>,
@@ -183,6 +187,7 @@ pub mod dma {
         ) -> SpiDma<'d, crate::peripherals::SPI2, C, DmaMode>;
     }
 
+    /// Trait for configuring DMA with SPI3 peripherals in slave mode.
     #[cfg(spi3)]
     pub trait WithDmaSpi3<'d, C, DmaMode>
     where
@@ -190,6 +195,8 @@ pub mod dma {
         C::P: SpiPeripheral,
         DmaMode: Mode,
     {
+        /// Configures the SPI3 peripheral with the provided DMA channel and
+        /// descriptors.
         fn with_dma(
             self,
             channel: Channel<'d, C, DmaMode>,

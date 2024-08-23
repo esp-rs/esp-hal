@@ -39,6 +39,8 @@ pub struct PcntSource {
 }
 
 impl PcntSource {
+    /// Creates a `PcntSource` from an input pin with the specified
+    /// configuration.
     pub fn from_pin<'a, P: InputPin>(
         pin: impl Peripheral<P = P> + 'a,
         pin_config: PcntInputConfig,
@@ -56,12 +58,16 @@ impl PcntSource {
             inverted: false,
         }
     }
+
+    /// Creates a `PcntSource` that is always high.
     pub fn always_high() -> Self {
         Self {
             source: ONE_INPUT,
             inverted: false,
         }
     }
+
+    /// Creates a `PcntSource` that is always low.
     pub fn always_low() -> Self {
         Self {
             source: ZERO_INPUT,
@@ -69,6 +75,7 @@ impl PcntSource {
         }
     }
 
+    /// Inverts the `PcntSource` signal.
     pub fn invert(self) -> Self {
         Self {
             source: self.source,
@@ -77,6 +84,7 @@ impl PcntSource {
     }
 }
 
+/// Represents a channel within a pulse counter unit.
 pub struct Channel<'d, const UNIT: usize, const NUM: usize> {
     _phantom: PhantomData<&'d ()>,
     // Individual channels are not Send, since they share registers.

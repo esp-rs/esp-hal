@@ -1,5 +1,3 @@
-#![allow(missing_docs)] // TODO: Remove when able
-
 use portable_atomic::{AtomicU8, Ordering};
 
 pub use self::implementation::*;
@@ -26,8 +24,10 @@ mod efuse_field;
 static MAC_OVERRIDE_STATE: AtomicU8 = AtomicU8::new(0);
 static mut MAC_OVERRIDE: [u8; 6] = [0; 6];
 
+/// Error indicating issues with setting the MAC address.
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub enum SetMacError {
+    /// The MAC address has already been set and cannot be changed.
     AlreadySet,
 }
 

@@ -53,38 +53,68 @@ pub enum InterruptKind {
 #[repr(u32)]
 #[derive(Debug, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(missing_docs)]
 pub enum CpuInterrupt {
+    /// Interrupt number 1.
     Interrupt1 = 1,
+    /// Interrupt number 2.
     Interrupt2,
+    /// Interrupt number 3.
     Interrupt3,
+    /// Interrupt number 4.
     Interrupt4,
+    /// Interrupt number 5.
     Interrupt5,
+    /// Interrupt number 6.
     Interrupt6,
+    /// Interrupt number 7.
     Interrupt7,
+    /// Interrupt number 8.
     Interrupt8,
+    /// Interrupt number 9.
     Interrupt9,
+    /// Interrupt number 10.
     Interrupt10,
+    /// Interrupt number 11.
     Interrupt11,
+    /// Interrupt number 12.
     Interrupt12,
+    /// Interrupt number 13.
     Interrupt13,
+    /// Interrupt number 14.
     Interrupt14,
+    /// Interrupt number 15.
     Interrupt15,
+    /// Interrupt number 16.
     Interrupt16,
+    /// Interrupt number 17.
     Interrupt17,
+    /// Interrupt number 18.
     Interrupt18,
+    /// Interrupt number 19.
     Interrupt19,
+    /// Interrupt number 20.
     Interrupt20,
+    /// Interrupt number 21.
     Interrupt21,
+    /// Interrupt number 22.
     Interrupt22,
+    /// Interrupt number 23.
     Interrupt23,
+    /// Interrupt number 24.
     Interrupt24,
+    /// Interrupt number 25.
     Interrupt25,
+    /// Interrupt number 26.
     Interrupt26,
+    /// Interrupt number 27.
     Interrupt27,
+    /// Interrupt number 28.
     Interrupt28,
+    /// Interrupt number 29.
     Interrupt29,
+    /// Interrupt number 30.
     Interrupt30,
+    /// Interrupt number 31.
     Interrupt31,
 }
 
@@ -92,30 +122,45 @@ pub enum CpuInterrupt {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u8)]
-#[allow(missing_docs)]
 pub enum Priority {
+    /// No priority.
     None = 0,
+    /// Priority level 1.
     Priority1,
+    /// Priority level 2.
     Priority2,
+    /// Priority level 3.
     Priority3,
+    /// Priority level 4.
     Priority4,
+    /// Priority level 5.
     Priority5,
+    /// Priority level 6.
     Priority6,
+    /// Priority level 7.
     Priority7,
+    /// Priority level 8.
     #[cfg(not(clic))]
     Priority8,
+    /// Priority level 9.
     #[cfg(not(clic))]
     Priority9,
+    /// Priority level 10.
     #[cfg(not(clic))]
     Priority10,
+    /// Priority level 11.
     #[cfg(not(clic))]
     Priority11,
+    /// Priority level 12.
     #[cfg(not(clic))]
     Priority12,
+    /// Priority level 13.
     #[cfg(not(clic))]
     Priority13,
+    /// Priority level 14.
     #[cfg(not(clic))]
     Priority14,
+    /// Priority level 15.
     #[cfg(not(clic))]
     Priority15,
 }

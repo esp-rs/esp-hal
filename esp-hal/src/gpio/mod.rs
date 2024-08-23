@@ -170,31 +170,46 @@ pub struct RtcOutput;
 pub struct Analog;
 
 /// Drive strength (values are approximates)
-#[allow(missing_docs)]
 pub enum DriveStrength {
+    /// Drive strength of approximately 5mA.
     I5mA  = 0,
+    /// Drive strength of approximately 10mA.
     I10mA = 1,
+    /// Drive strength of approximately 20mA.
     I20mA = 2,
+    /// Drive strength of approximately 40mA.
     I40mA = 3,
 }
 
 /// Alternate functions
+///
+/// GPIO pins can be configured for various functions, such as GPIO
+/// or being directly connected to a peripheral's signal like UART, SPI, etc.
+/// The `AlternateFunction` enum allows to select one of several functions that
+/// a pin can perform, rather than using it as a general-purpose input or
+/// output.
 #[derive(PartialEq)]
-#[allow(missing_docs)]
 pub enum AlternateFunction {
+    /// Alternate function 0.
     Function0 = 0,
+    /// Alternate function 1.
     Function1 = 1,
+    /// Alternate function 2.
     Function2 = 2,
+    /// Alternate function 3.
     Function3 = 3,
+    /// Alternate function 4.
     Function4 = 4,
+    /// Alternate function 5.
     Function5 = 5,
 }
 
 /// RTC function
 #[derive(PartialEq)]
-#[allow(missing_docs)]
 pub enum RtcFunction {
+    /// RTC mode.
     Rtc     = 0,
+    /// Digital mode.
     Digital = 1,
 }
 
@@ -1390,9 +1405,9 @@ macro_rules! gpio {
             )+
 
             /// Pins available on this chip
-            #[allow(missing_docs)]
             pub struct Pins {
                 $(
+                    /// GPIO pin number `$gpionum`.
                     pub [< gpio $gpionum >] : GpioPin<$gpionum>,
                 )+
             }

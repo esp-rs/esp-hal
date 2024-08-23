@@ -42,46 +42,83 @@ const I2C_ULP_HOSTID: u8 = 0;
 // Approximate mapping of voltages to RTC_CNTL_DBIAS_WAK, RTC_CNTL_DBIAS_SLP,
 // RTC_CNTL_DIG_DBIAS_WAK, RTC_CNTL_DIG_DBIAS_SLP values.
 // Valid if RTC_CNTL_DBG_ATTEN is 0.
+/// Digital bias voltage level of 0.90V.
 pub const RTC_CNTL_DBIAS_0V90: u32 = 13;
+/// Digital bias voltage level of 0.95V.
 pub const RTC_CNTL_DBIAS_0V95: u32 = 16;
+/// Digital bias voltage level of 1.00V.
 pub const RTC_CNTL_DBIAS_1V00: u32 = 18;
+/// Digital bias voltage level of 1.05V.
 pub const RTC_CNTL_DBIAS_1V05: u32 = 20;
+/// Digital bias voltage level of 1.10V.
 pub const RTC_CNTL_DBIAS_1V10: u32 = 23;
+/// Digital bias voltage level of 1.15V.
 pub const RTC_CNTL_DBIAS_1V15: u32 = 25;
+/// Digital bias voltage level of 1.20V.
 pub const RTC_CNTL_DBIAS_1V20: u32 = 28;
+/// Digital bias voltage level of 1.25V.
 pub const RTC_CNTL_DBIAS_1V25: u32 = 30;
-pub const RTC_CNTL_DBIAS_1V30: u32 = 31; //< voltage is about 1.34v in fact
+/// Digital bias voltage level of approximately 1.34V.
+pub const RTC_CNTL_DBIAS_1V30: u32 = 31;
 
+/// Default attenuation setting during light sleep, with a voltage drop.
 pub const RTC_CNTL_DBG_ATTEN_LIGHTSLEEP_DEFAULT: u8 = 5;
+/// No attenuation (no voltage drop) during light sleep.
 pub const RTC_CNTL_DBG_ATTEN_LIGHTSLEEP_NODROP: u8 = 0;
+/// Default attenuation setting during deep sleep, with maximum voltage drop.
 pub const RTC_CNTL_DBG_ATTEN_DEEPSLEEP_DEFAULT: u8 = 15;
+/// No attenuation (no voltage drop) during deep sleep.
 pub const RTC_CNTL_DBG_ATTEN_DEEPSLEEP_NODROP: u8 = 0;
+
+/// Default bias setting during sleep mode.
 pub const RTC_CNTL_BIASSLP_SLEEP_DEFAULT: u8 = 1;
+/// Keeps the bias for ultra-low power sleep mode always on.
 pub const RTC_CNTL_BIASSLP_SLEEP_ON: u8 = 0;
+
+/// Default power-down current setting during sleep mode.
 pub const RTC_CNTL_PD_CUR_SLEEP_DEFAULT: u8 = 1;
+/// Keeps the power-down current setting for sleep mode always on.
 pub const RTC_CNTL_PD_CUR_SLEEP_ON: u8 = 0;
+
+/// Default driver bias setting for the digital domain during sleep mode.
 pub const RTC_CNTL_DG_VDD_DRV_B_SLP_DEFAULT: u8 = 254;
 
+/// Default debug attenuation setting for the monitor mode.
 pub const RTC_CNTL_DBG_ATTEN_MONITOR_DEFAULT: u8 = 0;
+/// Default bias setting for sleep mode in the monitor mode.
 pub const RTC_CNTL_BIASSLP_MONITOR_DEFAULT: bool = false;
+/// Default power-down current setting for the monitor mode.
 pub const RTC_CNTL_PD_CUR_MONITOR_DEFAULT: bool = false;
 
+/// Default number of cycles to wait for the PLL buffer to stabilize.
 pub const RTC_CNTL_PLL_BUF_WAIT_DEFAULT: u8 = 20;
+/// Default number of cycles to wait for the XTL buffer to stabilize.
 pub const RTC_CNTL_XTL_BUF_WAIT_DEFAULT: u8 = 100;
+/// Default number of cycles to wait for the internal 8MHz clock to stabilize.
 pub const RTC_CNTL_CK8M_WAIT_DEFAULT: u8 = 20;
+/// Default number of cycles required to enable the internal 8MHz clock.
 pub const RTC_CK8M_ENABLE_WAIT_DEFAULT: u8 = 5;
 
+/// Minimum number of cycles for sleep duration.
 pub const RTC_CNTL_MIN_SLP_VAL_MIN: u8 = 2;
 
+/// Power-up cycles for other hardware blocks.
 pub const OTHER_BLOCKS_POWERUP: u8 = 1;
+/// Wait cycles for other hardware blocks to stabilize.
 pub const OTHER_BLOCKS_WAIT: u16 = 1;
 
+/// Disables GPIO interrupt.
 pub const GPIO_INTR_DISABLE: u8 = 0;
+/// Sets GPIO interrupt to trigger on a low level signal.
 pub const GPIO_INTR_LOW_LEVEL: u8 = 4;
+/// Sets GPIO interrupt to trigger on a high level signal.
 pub const GPIO_INTR_HIGH_LEVEL: u8 = 5;
 
+/// Specifies the function configuration for GPIO pins.
 pub const PIN_FUNC_GPIO: u8 = 1;
+/// Index for signaling GPIO output.
 pub const SIG_GPIO_OUT_IDX: u32 = 128;
+/// Maximum number of GPIO pins supported.
 pub const GPIO_NUM_MAX: usize = 22;
 
 impl WakeSource for TimerWakeupSource {
@@ -256,6 +293,7 @@ impl WakeSource for RtcioWakeupSource<'_, '_> {
 
 bitfield::bitfield! {
     #[derive(Clone, Copy)]
+    /// RTC Configuration.
     pub struct RtcConfig(u32);
     impl Debug;
     /// Number of rtc_fast_clk cycles to wait for 8M clock to be ready
@@ -264,16 +302,19 @@ bitfield::bitfield! {
     pub u8, xtal_wait, set_xtal_wait: 15, 8;
     /// Number of rtc_fast_clk cycles to wait for PLL clock to be ready
     pub u8, pll_wait, set_pll_wait: 23, 16;
-    // Perform clock control related initialization.
+    /// Perform clock control related initialization.
     pub clkctl_init, set_clkctl_init: 24;
-    // Perform power control related initialization.
+    /// Perform power control related initialization.
     pub pwrctl_init, set_pwrctl_init: 25;
-    // Force power down RTC_DBOOST
+    /// Force power down `RTC_DBOOST`.
     pub rtc_dboost_fpd, set_rtc_dboost_fpd: 26;
+    /// Keep the XTAL oscillator powered up in sleep.
     pub xtal_fpu, set_xtal_fpu: 27;
+    /// Keep the BBPLL oscillator powered up in sleep.
     pub bbpll_fpu, set_bbpll_fpu: 28;
+    /// Enable clock gating when the CPU is in wait-for-interrupt state.
     pub cpu_waiti_clk_gate, set_cpu_waiti_clk_gate: 29;
-    // Calibrate Ocode to make bandgap voltage more precise.
+    /// Calibrate Ocode to make bandgap voltage more precise.
     pub cali_ocode, set_cali_ocode: 30;
 }
 
@@ -293,17 +334,28 @@ impl Default for RtcConfig {
 
 bitfield::bitfield! {
     #[derive(Clone, Copy)]
+    /// Configuration for RTC initialization.
     pub struct RtcInitConfig(u128);
     impl Debug;
+    /// Number of cycles required to power up WiFi
     pub u8, wifi_powerup_cycles, set_wifi_powerup_cycles: 6, 0;
+    /// Number of wait cycles for WiFi to stabilize
     pub u16, wifi_wait_cycles, set_wifi_wait_cycles: 15, 7;
+    /// Number of cycles required to power up Bluetooth
     pub u8, bt_powerup_cycles, set_bt_powerup_cycles: 22, 16;
+    /// Number of wait cycles for Bluetooth to stabilize
     pub u16, bt_wait_cycles, set_bt_wait_cycles: 31, 23;
+    /// Number of cycles required to power up the top CPU
     pub u8, cpu_top_powerup_cycles, set_cpu_top_powerup_cycles: 38, 32;
+    /// Number of wait cycles for the top CPU to stabilize
     pub u16, cpu_top_wait_cycles, set_cpu_top_wait_cycles: 47, 39;
+    /// Number of cycles required to power up the digital wrapper
     pub u8, dg_wrap_powerup_cycles, set_dg_wrap_powerup_cycles: 54, 48;
+    /// Number of wait cycles for the digital wrapper to stabilize
     pub u16, dg_wrap_wait_cycles, set_dg_wrap_wait_cycles: 63, 55;
+    /// Number of cycles required to power up the digital peripherals
     pub u8, dg_peri_powerup_cycles, set_dg_peri_powerup_cycles: 70, 64;
+    /// Number of wait cycles for the digital peripherals to stabilize
     pub u16, dg_peri_wait_cycles, set_dg_peri_wait_cycles: 79, 71;
 }
 
@@ -326,6 +378,7 @@ impl Default for RtcInitConfig {
 
 bitfield::bitfield! {
     #[derive(Clone, Copy)]
+    /// Configuration for RTC sleep mode.
     pub struct RtcSleepConfig(u64);
     impl Debug;
     /// force normal voltage in sleep mode (digital domain memory)
@@ -437,6 +490,7 @@ fn rtc_sleep_pu(val: bool) {
 }
 
 impl RtcSleepConfig {
+    /// Configures the RTC for deep sleep mode.
     pub fn deep() -> Self {
         // Set up for ultra-low power sleep. Wakeup sources may modify these settings.
         let mut cfg = Self::default();

@@ -47,20 +47,30 @@ use crate::peripherals::EFUSE;
 
 mod fields;
 
+/// A struct representing the eFuse functionality of the chip.
 pub struct Efuse;
 
+/// Representing different types of ESP32 chips.
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub enum ChipType {
+    /// Represents the ESP32 D0WDQ6 chip variant.
     Esp32D0wdq6,
+    /// Represents the ESP32 D0WDQ5 chip variant.
     Esp32D0wdq5,
+    /// Represents the ESP32 D2WDQ5 chip variant.
     Esp32D2wdq5,
+    /// Represents the ESP32 Pico D2 chip variant.
     Esp32Picod2,
+    /// Represents the ESP32 Pico D4 chip variant.
     Esp32Picod4,
+    /// Represents the ESP32 Pico v3.02 chip variant.
     Esp32Picov302,
+    /// Represents an unknown or unsupported chip variant.
     Unknown,
 }
 
 impl Efuse {
+    /// Reads the base MAC address from the eFuse memory.
     pub fn read_base_mac_address() -> [u8; 6] {
         Self::read_field_be(MAC)
     }

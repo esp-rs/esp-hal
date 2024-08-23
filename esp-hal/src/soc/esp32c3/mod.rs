@@ -34,17 +34,26 @@ pub(crate) mod registers {
 }
 
 pub(crate) mod constants {
+    /// The base clock frequency for the I2S peripheral (Hertz).
     pub const I2S_SCLK: u32 = 160_000_000;
+    /// The default clock source for I2S operations.
     pub const I2S_DEFAULT_CLK_SRC: u8 = 2;
 
+    /// The starting address of the Remote Control (RMT) module's RAM.
     pub const RMT_RAM_START: usize = 0x60016400;
+    /// The size, in bytes, of each RMT channel's dedicated RAM.
     pub const RMT_CHANNEL_RAM_SIZE: usize = 48;
+    /// RMT Clock source value.
     pub const RMT_CLOCK_SRC: u8 = 1;
+    /// RMT Clock source frequence.
     pub const RMT_CLOCK_SRC_FREQ: fugit::HertzU32 = fugit::HertzU32::MHz(80);
 
+    /// The lower bound of the system's DRAM (Data RAM) address space.
     pub const SOC_DRAM_LOW: u32 = 0x3FC8_0000;
+    /// The upper bound of the system's DRAM (Data RAM) address space.
     pub const SOC_DRAM_HIGH: u32 = 0x3FCE_0000;
 
+    /// RC FAST Clock value (Hertz).
     pub const RC_FAST_CLK: fugit::HertzU32 = fugit::HertzU32::kHz(17500);
 }
 

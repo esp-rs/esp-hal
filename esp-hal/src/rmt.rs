@@ -642,15 +642,18 @@ mod impl_for_chip {
     use crate::peripheral::{Peripheral, PeripheralRef};
 
     /// RMT Instance
-    #[allow(missing_docs)]
     pub struct Rmt<'d, M>
     where
         M: crate::Mode,
     {
         _peripheral: PeripheralRef<'d, crate::peripherals::RMT>,
+        /// RMT Channel 0.
         pub channel0: ChannelCreator<M, 0>,
+        /// RMT Channel 1.
         pub channel1: ChannelCreator<M, 1>,
+        /// RMT Channel 2.
         pub channel2: ChannelCreator<M, 2>,
+        /// RMT Channel 3.
         pub channel3: ChannelCreator<M, 3>,
         phantom: PhantomData<M>,
     }
@@ -710,19 +713,26 @@ mod impl_for_chip {
     use crate::peripheral::{Peripheral, PeripheralRef};
 
     /// RMT Instance
-    #[allow(missing_docs)]
     pub struct Rmt<'d, M>
     where
         M: crate::Mode,
     {
         _peripheral: PeripheralRef<'d, crate::peripherals::RMT>,
+        /// RMT Channel 0.
         pub channel0: ChannelCreator<M, 0>,
+        /// RMT Channel 1.
         pub channel1: ChannelCreator<M, 1>,
+        /// RMT Channel 2.
         pub channel2: ChannelCreator<M, 2>,
+        /// RMT Channel 3.
         pub channel3: ChannelCreator<M, 3>,
+        /// RMT Channel 4.
         pub channel4: ChannelCreator<M, 4>,
+        /// RMT Channel 5.
         pub channel5: ChannelCreator<M, 5>,
+        /// RMT Channel 6.
         pub channel6: ChannelCreator<M, 6>,
+        /// RMT Channel 7.
         pub channel7: ChannelCreator<M, 7>,
         phantom: PhantomData<M>,
     }
@@ -818,15 +828,18 @@ mod impl_for_chip {
     use crate::peripheral::{Peripheral, PeripheralRef};
 
     /// RMT Instance
-    #[allow(missing_docs)]
     pub struct Rmt<'d, M>
     where
         M: crate::Mode,
     {
         _peripheral: PeripheralRef<'d, crate::peripherals::RMT>,
+        /// RMT Channel 0.
         pub channel0: ChannelCreator<M, 0>,
+        /// RMT Channel 1.
         pub channel1: ChannelCreator<M, 1>,
+        /// RMT Channel 2.
         pub channel2: ChannelCreator<M, 2>,
+        /// RMT Channel 3.
         pub channel3: ChannelCreator<M, 3>,
         phantom: PhantomData<M>,
     }
@@ -894,19 +907,26 @@ mod impl_for_chip {
     use crate::peripheral::{Peripheral, PeripheralRef};
 
     /// RMT Instance
-    #[allow(missing_docs)]
     pub struct Rmt<'d, M>
     where
         M: crate::Mode,
     {
         _peripheral: PeripheralRef<'d, crate::peripherals::RMT>,
+        /// RMT Channel 0.
         pub channel0: ChannelCreator<M, 0>,
+        /// RMT Channel 1.
         pub channel1: ChannelCreator<M, 1>,
+        /// RMT Channel 2.
         pub channel2: ChannelCreator<M, 2>,
+        /// RMT Channel 3.
         pub channel3: ChannelCreator<M, 3>,
+        /// RMT Channel 4.
         pub channel4: ChannelCreator<M, 4>,
+        /// RMT Channel 5.
         pub channel5: ChannelCreator<M, 5>,
+        /// RMT Channel 6.
         pub channel6: ChannelCreator<M, 6>,
+        /// RMT Channel 7.
         pub channel7: ChannelCreator<M, 7>,
         phantom: PhantomData<M>,
     }

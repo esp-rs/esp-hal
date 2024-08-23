@@ -35,21 +35,33 @@ pub(crate) mod registers {
 }
 
 pub(crate) mod constants {
+    /// Default clock source for the timer group (TIMG) peripheral.
     pub const TIMG_DEFAULT_CLK_SRC: u8 = 2;
 
+    /// Default clock source for the I2S peripheral.
     pub const I2S_DEFAULT_CLK_SRC: u8 = 1;
+    /// Clock frequency for the I2S peripheral, in Hertz.
     pub const I2S_SCLK: u32 = 96_000_000;
 
+    /// Start address of the RMT (Remote Control) peripheral's RAM.
     pub const RMT_RAM_START: usize = 0x60007400;
+    /// Size of the RAM allocated per RMT channel, in bytes.
     pub const RMT_CHANNEL_RAM_SIZE: usize = 48;
+    /// Clock source for the RMT peripheral (false = default source).
     pub const RMT_CLOCK_SRC: bool = false;
+    /// Frequency of the RMT clock source, in Hertz.
     pub const RMT_CLOCK_SRC_FREQ: fugit::HertzU32 = fugit::HertzU32::MHz(32);
 
+    /// System clock frequency for the parallel I/O (PARL IO) peripheral, in
+    /// Hertz.
     pub const PARL_IO_SCLK: u32 = 96_000_000;
 
+    /// Start address of the system's DRAM (low range).
     pub const SOC_DRAM_LOW: u32 = 0x4080_0000;
+    /// End address of the system's DRAM (high range).
     pub const SOC_DRAM_HIGH: u32 = 0x4085_0000;
 
+    /// RC FAST Clock value (Hertz).
     pub const RC_FAST_CLK: fugit::HertzU32 = fugit::HertzU32::kHz(17500);
 }
 

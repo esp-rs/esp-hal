@@ -18,8 +18,12 @@
 //!
 //! NOTE: If you want to use `PSRAM` on `ESP32` or `ESP32-S3`, it'll work only
 //! in `release` mode.
+
+/// The starting virtual address of the PSRAM (Pseudo-SRAM) region in memory.
 pub const PSRAM_VADDR_START: usize = 0x3F800000;
 
+/// Retrieves the starting virtual address of the PSRAM (Pseudo-SRAM) region in
+/// memory.
 pub fn psram_vaddr_start() -> usize {
     PSRAM_VADDR_START
 }
@@ -36,8 +40,10 @@ cfg_if::cfg_if! {
     }
 }
 
+/// The total size of the PSRAM (Pseudo-SRAM) in bytes.
 pub const PSRAM_BYTES: usize = PSRAM_SIZE as usize * 1024 * 1024;
 
+/// Initializes the PSRAM memory on supported devices.
 #[cfg(any(feature = "psram-2m", feature = "psram-4m", feature = "psram-8m"))]
 pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::peripherals::PSRAM>) {
     utils::psram_init();

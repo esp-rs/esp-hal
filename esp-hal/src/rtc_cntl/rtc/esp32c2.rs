@@ -201,6 +201,7 @@ fn rtc_sleep_pu() {
 // Chip Reset:   Reset the whole chip, including the analog part
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr)]
+/// SOC Reset Reason.
 pub enum SocResetReason {
     /// Power on reset
     ChipPowerOn   = 0x01,

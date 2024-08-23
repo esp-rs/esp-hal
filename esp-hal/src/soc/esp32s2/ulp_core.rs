@@ -42,16 +42,20 @@ use esp32s2 as pac;
 
 use crate::peripheral::{Peripheral, PeripheralRef};
 
+/// Enum representing the possible wakeup sources for the ULP core.
 #[derive(Debug, Clone, Copy)]
 pub enum UlpCoreWakeupSource {
+    /// Wakeup source from the HP (High Performance) CPU.
     HpCpu,
 }
 
+/// Structure representing the ULP (Ultra-Low Power) core.
 pub struct UlpCore<'d> {
     _lp_core: PeripheralRef<'d, crate::soc::peripherals::ULP_RISCV_CORE>,
 }
 
 impl<'d> UlpCore<'d> {
+    /// Creates a new instance of the `UlpCore` struct.
     pub fn new(lp_core: impl Peripheral<P = crate::soc::peripherals::ULP_RISCV_CORE> + 'd) -> Self {
         crate::into_ref!(lp_core);
 
@@ -70,6 +74,7 @@ impl<'d> UlpCore<'d> {
     //     ulp_stop();
     // }
 
+    /// Runs the ULP core with the specified wakeup source.
     pub fn run(&mut self, wakeup_src: UlpCoreWakeupSource) {
         ulp_run(wakeup_src);
     }

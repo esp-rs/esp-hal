@@ -58,6 +58,7 @@ use crate::{
     Cpu,
 };
 
+/// The total number of GPIO pins available.
 pub const NUM_PINS: usize = 40;
 
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;

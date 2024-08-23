@@ -1,6 +1,8 @@
 //! Helper functions for TRNG functionality
 
-pub fn ensure_randomness() {
+/// Enable true randomness by enabling the entropy source.
+/// Blocks `ADC` usage.
+pub(crate) fn ensure_randomness() {
     let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
     let sens = unsafe { &*crate::peripherals::SENS::ptr() };
     let dport = unsafe { &*crate::peripherals::DPORT::ptr() };
@@ -104,7 +106,8 @@ pub fn ensure_randomness() {
     }
 }
 
-pub fn revert_trng() {
+/// Disable true randomness. Unlocks `ADC` peripheral.
+pub(crate) fn revert_trng() {
     let sens = unsafe { &*crate::peripherals::SENS::ptr() };
     let i2s0 = unsafe { &*crate::peripherals::I2S0::ptr() };
     let apb_ctrl = unsafe { &*crate::peripherals::APB_CTRL::ptr() };

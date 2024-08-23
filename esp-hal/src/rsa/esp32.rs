@@ -25,28 +25,35 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
         Ok(())
     }
 
+    /// Writes the multi-mode configuration to the RSA hardware.
     pub(super) fn write_multi_mode(&mut self, mode: u32) {
         self.rsa.mult_mode().write(|w| unsafe { w.bits(mode) });
     }
 
+    /// Writes the modular exponentiation mode configuration to the RSA
+    /// hardware.
     pub(super) fn write_modexp_mode(&mut self, mode: u32) {
         self.rsa.modexp_mode().write(|w| unsafe { w.bits(mode) });
     }
 
+    /// Starts the modular exponentiation operation.
     pub(super) fn write_modexp_start(&mut self) {
         self.rsa
             .modexp_start()
             .write(|w| w.modexp_start().set_bit());
     }
 
+    /// Starts the multiplication operation.
     pub(super) fn write_multi_start(&mut self) {
         self.rsa.mult_start().write(|w| w.mult_start().set_bit());
     }
 
+    /// Clears the RSA interrupt flag.
     pub(super) fn clear_interrupt(&mut self) {
         self.rsa.interrupt().write(|w| w.interrupt().set_bit());
     }
 
+    /// Checks if the RSA peripheral is idle.
     pub(super) fn is_idle(&mut self) -> bool {
         self.rsa.interrupt().read().bits() == 1
     }
@@ -62,6 +69,7 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
     }
 }
 
+/// Module defining marker types for various RSA operand sizes.
 pub mod operand_sizes {
     //! Marker types for the operand sizes
     use paste::paste;
@@ -165,10 +173,12 @@ where
         }
     }
 
+    /// Sets the modular exponentiation mode for the RSA hardware.
     pub(super) fn set_mode(rsa: &mut Rsa<'d, DM>) {
         rsa.write_modexp_mode((N / 16 - 1) as u32)
     }
 
+    /// Starts the modular exponentiation operation on the RSA hardware.
     pub(super) fn set_start(&mut self) {
         self.rsa.write_modexp_start();
     }
@@ -196,10 +206,12 @@ where
         self.set_start();
     }
 
+    /// Sets the multiplication mode for the RSA hardware.    
     pub(super) fn set_mode(rsa: &mut Rsa<'d, DM>) {
         rsa.write_multi_mode(((N * 2) / 16 + 7) as u32)
     }
 
+    /// Starts the multiplication operation on the RSA hardware.
     pub(super) fn set_start(&mut self) {
         self.rsa.write_multi_start();
     }
