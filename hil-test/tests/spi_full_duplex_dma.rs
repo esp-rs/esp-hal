@@ -100,8 +100,6 @@ mod tests {
 
     #[test]
     #[timeout(3)]
-    // S3 is disabled due to https://github.com/esp-rs/esp-hal/issues/1524#issuecomment-2255306292
-    #[cfg(not(feature = "esp32s3"))]
     fn test_asymmetric_dma_transfer(ctx: Context) {
         let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(4, 2);
         let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
