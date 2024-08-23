@@ -1,6 +1,7 @@
 //! Metadata for Espressif devices, primarily intended for use in build scripts.
 
 use anyhow::{bail, Result};
+use strum::IntoEnumIterator;
 
 const ESP32_TOML: &str = include_str!("../devices/esp32.toml");
 const ESP32C2_TOML: &str = include_str!("../devices/esp32c2.toml");
@@ -231,9 +232,24 @@ impl Config {
 
     /// Define all symbols for a given configuration.
     pub fn define_symbols(&self) {
+        define_all_possible_symbols();
         // Define all necessary configuration symbols for the configured device:
         for symbol in self.all() {
             println!("cargo:rustc-cfg={symbol}");
+        }
+    }
+}
+
+/// Defines all possible symbols that _could_ be output from this crate
+/// regardless of the chosen configuration.
+///
+/// This is required to avoid triggering the unexpected-cfgs lint.
+fn define_all_possible_symbols() {
+    for chip in Chip::iter() {
+        let config = Config::for_chip(&chip);
+        for symbol in config.all() {
+            // https://doc.rust-lang.org/cargo/reference/build-scripts.html#rustc-check-cfg
+            println!("cargo:rustc-check-cfg=cfg({})", symbol);
         }
     }
 }
