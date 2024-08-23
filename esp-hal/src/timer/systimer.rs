@@ -81,6 +81,7 @@ use crate::{
     interrupt::{self, InterruptHandler},
     peripheral::Peripheral,
     peripherals::{Interrupt, SYSTIMER},
+    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
     Async,
     Blocking,
     Cpu,
@@ -145,6 +146,9 @@ impl<'d> SystemTimer<'d> {
 
     /// Create a new instance.
     pub fn new(_systimer: impl Peripheral<P = SYSTIMER> + 'd) -> Self {
+        // Don't reset Systimer as it will break `current_time`, only enable it
+        PeripheralClockControl::enable(PeripheralEnable::Systimer);
+
         #[cfg(soc_etm)]
         etm::enable_etm();
 
