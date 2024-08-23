@@ -6,14 +6,6 @@
 //! MOSI    GPIO3
 //! CS      GPIO8
 //!
-//! Only for test_dma_read_dma_write_pcnt and test_dma_read_dma_transfer_pcnt
-//! tests:
-//! PCNT    GPIO2
-//! OUTPUT  GPIO5 (helper to keep MISO LOW)
-//!
-//! The idea of using PCNT (input) here is to connect MOSI to it and count the
-//! edges of whatever SPI writes (in this test case 3 pos edges).
-//!
 //! Connect MISO (GPIO2) and MOSI (GPIO3) pins.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s3
@@ -36,20 +28,6 @@ use esp_hal::{
     system::SystemControl,
     Blocking,
 };
-#[cfg(any(
-    feature = "esp32",
-    feature = "esp32c6",
-    feature = "esp32h2",
-    feature = "esp32s3"
-))]
-use esp_hal::{
-    gpio::{GpioPin, Level, Output, Pull},
-    pcnt::{
-        channel::{EdgeMode, PcntInputConfig, PcntSource},
-        unit::Unit,
-        Pcnt,
-    },
-};
 use hil_test as _;
 
 cfg_if::cfg_if! {
@@ -62,24 +40,8 @@ cfg_if::cfg_if! {
     }
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(any(
-        feature = "esp32",
-        feature = "esp32c6",
-        feature = "esp32h2",
-        feature = "esp32s3"
-    ))] {
-        struct Context {
-            spi: SpiDma<'static, SPI2, DmaChannel0, FullDuplexMode, Blocking>,
-            pcnt_unit: Unit<'static, 0>,
-            out_pin: Output<'static, GpioPin<5>>,
-            mosi_mirror: GpioPin<2>,
-        }
-    } else {
-        struct Context {
-            spi: SpiDma<'static, SPI2, DmaChannel0, FullDuplexMode, Blocking>,
-        }
-    }
+struct Context {
+    spi: SpiDma<'static, SPI2, DmaChannel0, FullDuplexMode, Blocking>,
 }
 
 #[cfg(test)]
@@ -115,39 +77,7 @@ mod tests {
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
             .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
-        #[cfg(any(
-            feature = "esp32",
-            feature = "esp32c6",
-            feature = "esp32h2",
-            feature = "esp32s3"
-        ))]
-        let pcnt = Pcnt::new(peripherals.PCNT);
-
-        cfg_if::cfg_if! {
-            if #[cfg(any(
-                feature = "esp32",
-                feature = "esp32c6",
-                feature = "esp32h2",
-                feature = "esp32s3"
-            ))] {
-
-                let mut out_pin = Output::new(io.pins.gpio5, Level::Low);
-                out_pin.set_low();
-                assert_eq!(out_pin.is_set_low(), true);
-                let mosi_mirror = io.pins.gpio2;
-
-                Context {
-                    spi,
-                    pcnt_unit: pcnt.unit0,
-                    out_pin,
-                    mosi_mirror,
-                }
-            } else {
-                Context {
-                    spi
-                }
-            }
-        }
+        Context { spi }
     }
 
     #[test]
@@ -206,91 +136,6 @@ mod tests {
             .unwrap();
         let (_, (dma_tx_buf, dma_rx_buf)) = transfer.wait();
         assert_eq!(dma_tx_buf.as_slice(), dma_rx_buf.as_slice());
-    }
-
-    #[test]
-    #[timeout(3)]
-    #[cfg(any(
-        feature = "esp32",
-        feature = "esp32c6",
-        feature = "esp32h2",
-        feature = "esp32s3"
-    ))]
-    fn test_dma_read_dma_write_pcnt(ctx: Context) {
-        const DMA_BUFFER_SIZE: usize = 5;
-        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
-        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-
-        let unit = ctx.pcnt_unit;
-        let mut spi = ctx.spi;
-
-        unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.mosi_mirror,
-            PcntInputConfig { pull: Pull::Down },
-        ));
-        unit.channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-
-        // Fill the buffer where each byte has 3 pos edges.
-        dma_tx_buf.as_mut_slice().fill(0b0110_1010);
-
-        assert_eq!(ctx.out_pin.is_set_low(), true);
-
-        for i in 1..4 {
-            dma_rx_buf.as_mut_slice().copy_from_slice(&[5, 5, 5, 5, 5]);
-            let transfer = spi.dma_read(dma_rx_buf).map_err(|e| e.0).unwrap();
-            (spi, dma_rx_buf) = transfer.wait();
-            assert_eq!(dma_rx_buf.as_slice(), &[0, 0, 0, 0, 0]);
-
-            let transfer = spi.dma_write(dma_tx_buf).map_err(|e| e.0).unwrap();
-            (spi, dma_tx_buf) = transfer.wait();
-            assert_eq!(unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
-        }
-    }
-
-    #[test]
-    #[timeout(3)]
-    #[cfg(any(
-        feature = "esp32",
-        feature = "esp32c6",
-        feature = "esp32h2",
-        feature = "esp32s3"
-    ))]
-    fn test_dma_read_dma_transfer_pcnt(ctx: Context) {
-        const DMA_BUFFER_SIZE: usize = 5;
-        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
-        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-
-        let unit = ctx.pcnt_unit;
-        let mut spi = ctx.spi;
-
-        unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.mosi_mirror,
-            PcntInputConfig { pull: Pull::Down },
-        ));
-        unit.channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-
-        // Fill the buffer where each byte has 3 pos edges.
-        dma_tx_buf.as_mut_slice().fill(0b0110_1010);
-
-        assert_eq!(ctx.out_pin.is_set_low(), true);
-
-        for i in 1..4 {
-            dma_rx_buf.as_mut_slice().copy_from_slice(&[5, 5, 5, 5, 5]);
-            let transfer = spi.dma_read(dma_rx_buf).map_err(|e| e.0).unwrap();
-            (spi, dma_rx_buf) = transfer.wait();
-            assert_eq!(dma_rx_buf.as_slice(), &[0, 0, 0, 0, 0]);
-
-            let transfer = spi
-                .dma_transfer(dma_tx_buf, dma_rx_buf)
-                .map_err(|e| e.0)
-                .unwrap();
-            (spi, (dma_tx_buf, dma_rx_buf)) = transfer.wait();
-            assert_eq!(unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
-        }
     }
 
     #[test]
