@@ -1033,6 +1033,12 @@ pub mod dma {
     }
 
     /// A DMA capable SPI instance.
+    ///
+    /// Using `SpiDma` is not recommended unless you wish
+    /// to manage buffers yourself. It's recommended to use
+    /// [`SpiDmaBus`] via `with_buffers` to get access
+    /// to a DMA capable SPI bus that implements the
+    /// embedded-hal traits.
     pub struct SpiDma<'d, T, C, D, M>
     where
         C: DmaChannel,
@@ -1559,7 +1565,7 @@ pub mod dma {
     /// A DMA-capable SPI bus.
     ///
     /// This structure is responsible for managing SPI transfers using DMA
-    /// buffers.
+    /// buffers. Implements the embedded-hal traits.
     pub struct SpiDmaBus<'d, T, C, D, M>
     where
         T: InstanceDma,
