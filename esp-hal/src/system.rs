@@ -21,24 +21,32 @@
 #![doc = crate::before_snippet!()]
 //! let sw_ints =
 //!     SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+//!
+//! // Take the interrupt you want to use.
 //! let mut int0 = sw_ints.software_interrupt0;
 //!
+//! // Set up the interrupt handler. Do this in a critical section so the global
+//! // contains the interrupt object before the interrupt is triggered.
 //! critical_section::with(|cs| {
 //!     int0.set_interrupt_handler(interrupt_handler);
 //!     SWINT0.borrow_ref_mut(cs).replace(int0);
 //! });
 //! # }
 //!
-//! use core::cell::RefCell;
-//! use critical_section::Mutex;
-//! use esp_hal::system::{SoftwareInterrupt, SoftwareInterruptControl};
+//! # use core::cell::RefCell;
+//! # use critical_section::Mutex;
+//! # use esp_hal::system::{SoftwareInterrupt, SoftwareInterruptControl};
+//! // ... somewhere outside of your main function
 //!
+//! // Define a shared handle to the software interrupt.
 //! static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> =
 //!     Mutex::new(RefCell::new(None));
 //!
 //! #[handler]
 //! fn interrupt_handler() {
-//!     // esp_println::println!("SW interrupt0");
+//!     // esp_println::println!("SW interrupt0 handled");
+//!
+//!     // Clear the interrupt request.
 //!     critical_section::with(|cs| {
 //!         SWINT0.borrow_ref(cs).as_ref().unwrap().reset();
 //!     });
@@ -1176,35 +1184,6 @@ impl PeripheralClockControl {
         }
     }
 }
-
-/// Controls the configuration of the chip's clocks.
-pub struct SystemClockControl {
-    _private: (),
-}
-
-impl SystemClockControl {
-    /// Creates new instance of `SystemClockControl`.
-    pub fn new() -> Self {
-        Self { _private: () }
-    }
-}
-
-impl Default for SystemClockControl {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl crate::peripheral::Peripheral for SystemClockControl {
-    type P = SystemClockControl;
-
-    #[inline]
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
-        SystemClockControl { _private: () }
-    }
-}
-
-impl crate::private::Sealed for SystemClockControl {}
 
 /// Enumeration of the available radio peripherals for this chip.
 #[cfg(any(bt, ieee802154, wifi))]

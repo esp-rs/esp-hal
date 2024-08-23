@@ -90,10 +90,10 @@
 //!
 //! The steps here are:
 //! - Call [`init`] with the desired [`CpuClock`] configuration
-//! - Create [gpio::Io] which provides access to the GPIO pins
-//! - Create an [gpio::Output] pin driver which lets us control the logical
+//! - Create [`gpio::Io`] which provides access to the GPIO pins
+//! - Create an [`gpio::Output`] pin driver which lets us control the logical
 //!   level of an output pin
-//! - Create a [delay::Delay] driver
+//! - Create a [`delay::Delay`] driver
 //! - In a loop, toggle the output pin's logical level with a delay of 1000 ms
 //!
 //! ## `PeripheralRef` Pattern
