@@ -186,6 +186,3 @@ ci = ["async", "embedded-hal-02", "embedded-io", "ufmt", "defmt", "bluetooth", "
 
 [lints.clippy]
 mixed_attributes_style = "allow"
-
-[lints.rust]
-unexpected_cfgs = "allow"
