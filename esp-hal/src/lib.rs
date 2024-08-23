@@ -60,17 +60,16 @@
 //! #![no_std]
 //! #![no_main]
 //!
-//! // A panic - handler e.g. `use esp_backtrace as _;`
-//!
+//! // You'll need a panic handler e.g. `use esp_backtrace as _;`
+//! # #[panic_handler]
+//! # fn panic(_ : &core::panic::PanicInfo) -> ! {
+//! #     loop {}
+//! # }
 //! use esp_hal::{
 //!     delay::Delay,
 //!     gpio::{Io, Level, Output},
 //!     prelude::*,
 //! };
-//! # #[panic_handler]
-//! # fn panic(_ : &core::panic::PanicInfo) -> ! {
-//! #     loop {}
-//! # }
 //!
 //! #[entry]
 //! fn main() -> ! {
@@ -90,10 +89,7 @@
 //! ```
 //!
 //! The steps here are:
-//! - Take all the peripherals from the PAC to pass them to the HAL drivers
-//!   later
-//! - Create [system::SystemControl]
-//! - Configure the system clocks - in this case use the boot defaults
+//! - Call [`init`] with the desired [`CpuClock`] configuration
 //! - Create [gpio::Io] which provides access to the GPIO pins
 //! - Create an [gpio::Output] pin driver which lets us control the logical
 //!   level of an output pin

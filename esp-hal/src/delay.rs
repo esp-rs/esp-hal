@@ -31,6 +31,7 @@
 //! [DelayMs]: embedded_hal_02::blocking::delay::DelayMs
 //! [DelayUs]: embedded_hal_02::blocking::delay::DelayUs
 //! [embedded-hal]: https://docs.rs/embedded-hal/1.0.0/embedded_hal/delay/index.html
+//! [current_time]: crate::time::current_time
 
 pub use fugit::MicrosDurationU64;
 

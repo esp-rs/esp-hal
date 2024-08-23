@@ -18,7 +18,7 @@
 //!
 //! ### Splitting up the System Timer into three alarms
 //!
-//! Use the [split] method to create three alarms from the System Timer,
+//! Use the [split][SystemTimer::split] method to create three alarms from the System Timer,
 //! contained in a [SysTimerAlarms] struct.
 //!
 //! ```rust, no_run
