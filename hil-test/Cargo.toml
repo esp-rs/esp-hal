@@ -136,7 +136,7 @@ required-features = ["async", "embassy"]
 [[test]]
 name              = "embassy_interrupt_executor"
 harness           = false
-required-features = ["async", "embassy", "integrated-timers"]
+required-features = ["async", "embassy"]
 
 [[test]]
 name    = "twai"
@@ -166,7 +166,7 @@ digest              = { version = "0.10.7", default-features = false }
 elliptic-curve      = { version = "0.13.8", default-features = false, features = ["sec1"] }
 embassy-executor    = { version = "0.6.0", default-features = false }
 # Add the `embedded-test/defmt` feature for more verbose testing
-embedded-test       = { version = "0.4.0", default-features = false, git = "https://github.com/probe-rs/embedded-test.git", branch = "embassy" }
+embedded-test       = { version = "0.4.0", default-features = false }
 fugit               = "0.3.7"
 hex-literal         = "0.4.1"
 nb                  = "1.1.0"
