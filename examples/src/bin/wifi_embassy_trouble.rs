@@ -133,26 +133,31 @@ async fn main(_s: Spawner) {
         },
         // Advertise our presence to the world.
         async {
-            let mut advertiser = ble
-                .advertise(
-                    &Default::default(),
-                    Advertisement::ConnectableScannableUndirected {
-                        adv_data: &adv_data[..],
-                        scan_data: &[],
-                    },
-                )
-                .await
-                .unwrap();
-            let conn = advertiser.accept().await.unwrap();
-            // Keep connection alive and notify with value change
-            let mut tick: u8 = 0;
             loop {
-                Timer::after(Duration::from_secs(10)).await;
-                tick += 1;
-                server
-                    .notify(bat_level_handle, &conn, &[tick])
+                let mut advertiser = ble
+                    .advertise(
+                        &Default::default(),
+                        Advertisement::ConnectableScannableUndirected {
+                            adv_data: &adv_data[..],
+                            scan_data: &[],
+                        },
+                    )
                     .await
                     .unwrap();
+                let conn = advertiser.accept().await.unwrap();
+                // Keep connection alive and notify with value change
+                let mut tick: u8 = 0;
+                loop {
+                    if !conn.is_connected() {
+                        break;
+                    }
+                    Timer::after(Duration::from_secs(1)).await;
+                    tick = tick.wrapping_add(1);
+                    server
+                        .notify(bat_level_handle, &conn, &[tick])
+                        .await
+                        .unwrap();
+                }
             }
         },
     )
