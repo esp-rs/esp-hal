@@ -195,21 +195,10 @@ pub mod asynch {
                 HciReadyEventFuture.await;
             }
 
-            let mut total = 0;
-            for b in rx.iter_mut() {
-                let mut buffer = [0u8];
-                let len = read_hci(&mut buffer);
-
-                if len == 1 {
-                    *b = buffer[0];
-                    total += 1;
-                } else {
-                    let (p, _) = ControllerToHostPacket::from_hci_bytes(&rx[..total])
-                        .map_err(|_| BleConnectorError::Unknown)?;
-                    return Ok(p);
-                }
-            }
-            Err(BleConnectorError::Unknown)
+            let len = crate::ble::read_next(rx);
+            let p = ControllerToHostPacket::from_hci_bytes_complete(&rx[..len])
+                .map_err(|_| BleConnectorError::Unknown)?;
+            Ok(p)
         }
 
         /// Write a complete HCI packet from the tx buffer
