@@ -1,7 +1,6 @@
 //! SHA Test
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: defmt
 
 #![no_std]
 #![no_main]
@@ -88,6 +87,7 @@ fn assert_digest<D: Digest, const N: usize>(input: &[u8]) {
 }
 
 fn with_random_data(
+    mut rng: Rng,
     f: impl Fn(
         (&[u8], &mut [u8]),
         (&[u8], &mut [u8]),
@@ -96,12 +96,6 @@ fn with_random_data(
         (&[u8], &mut [u8]),
     ),
 ) {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-    let mut rng = Rng::new(peripherals.RNG);
-
     const BUFFER_LEN: usize = 256;
 
     let mut sha1_random = [0u8; BUFFER_LEN];
@@ -165,8 +159,25 @@ fn with_random_data(
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
+    use defmt::assert_eq;
 
     use super::*;
+
+    #[init]
+    fn init() -> Rng {
+        let peripherals = Peripherals::take();
+        let system = SystemControl::new(peripherals.SYSTEM);
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "esp32")] {
+                // FIXME: max speed fails...?
+                let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+            } else {
+                let _clocks = ClockControl::max(system.clock_control).freeze();
+            }
+        }
+
+        Rng::new(peripherals.RNG)
+    }
 
     #[test]
     #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
@@ -232,9 +243,9 @@ mod tests {
     /// A rolling test that loops between hasher for every step to test
     /// interleaving. This specifically test the Sha trait implementation
     #[test]
-    fn test_sha_rolling() {
+    fn test_sha_rolling(rng: Rng) {
         #[allow(unused)]
-        with_random_data(|sha1_p, sha224_p, sha256_p, sha384_p, sha512_p| {
+        with_random_data(rng, |sha1_p, sha224_p, sha256_p, sha384_p, sha512_p| {
             let mut sha1_remaining = sha1_p.0;
             #[cfg(not(feature = "esp32"))]
             let mut sha224_remaining = sha224_p.0;
@@ -307,9 +318,9 @@ mod tests {
     /// A rolling test that loops between hasher for every step to test
     /// interleaving. This specifically test the Digest trait implementation
     #[test]
-    fn test_for_digest_rolling() {
+    fn test_for_digest_rolling(rng: Rng) {
         #[allow(unused)]
-        with_random_data(|sha1_p, sha224_p, sha256_p, sha384_p, sha512_p| {
+        with_random_data(rng, |sha1_p, sha224_p, sha256_p, sha384_p, sha512_p| {
             // The Digest::update will consume the entirety of remaining. We don't need to
             // loop until remaining is fully consumed.
 
