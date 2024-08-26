@@ -153,29 +153,29 @@ jobs:
           # RISC-V devices:
           - soc: esp32c2
             runner: esp32c2-jtag
-            usb: USB2
             host: aarch64
+            hubs: "1 3"
           - soc: esp32c3
             runner: esp32c3-usb
-            usb: ACM0
             host: armv7
+            hubs: "1-1"
           - soc: esp32c6
             runner: esp32c6-usb
-            usb: ACM0
             host: armv7
+            hubs: "1-1"
           - soc: esp32h2
             runner: esp32h2-usb
-            usb: USB0
             host: armv7
+            hubs: "1-1"
           # Xtensa devices:
           - soc: esp32s2
             runner: esp32s2-jtag
-            usb: USB1
             host: armv7
+            hubs: "1-1"
           - soc: esp32s3
             runner: esp32s3-usb
-            usb: USB0
             host: armv7
+            hubs: "1-1"
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -185,6 +185,27 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: xtask-${{ matrix.target.host }}
+
+      - name: Cycle USB ports
+        run: |
+          export PATH=$PATH:/home/espressif/.cargo/bin
+          for i in {1..10}; do
+            # Disable all used hubs
+            for hub in ${{ matrix.target.hubs }}; do
+              sudo uhubctl -a off -l $hub
+            done
+
+            # Enable all used hubs
+            for hub in ${{ matrix.target.hubs }}; do
+              sudo uhubctl -a on -l $hub
+            done
+
+            sleep 0.5
+
+            if probe-rs list | grep -q "\[0\]:"; then
+              break
+            fi
+          done
 
       - name: Run Tests
         id: run-tests
