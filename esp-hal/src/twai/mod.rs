@@ -35,7 +35,6 @@
 //! # use esp_hal::gpio::Io;
 //! # use embedded_can::Frame;
 //! # use nb::block;
-//! # let (peripherals, clocks) = esp_hal::init(Config::default());
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.
@@ -92,7 +91,6 @@
 //! # use esp_hal::gpio::Io;
 //! # use embedded_can::Frame;
 //! # use nb::block;
-//! # let (peripherals, clocks) = esp_hal::init(Config::default());
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.

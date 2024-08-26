@@ -35,7 +35,6 @@
 //! # use esp_hal::gpio::Io;
 //! # use core::writeln;
 //! # use core::fmt::Write;
-//! # let (peripherals, clocks) = esp_hal::init(Config::default());
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let mut uart0 = Uart::new(peripherals.UART0, &clocks, io.pins.gpio1, io.pins.gpio2).unwrap();
 //! # let data = "Dummy";
@@ -52,7 +51,6 @@
 //! # use esp_hal::gpio::Io;
 //! # use core::writeln;
 //! # use core::fmt::Write;
-//! # let (peripherals, clocks) = esp_hal::init(Config::default());
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let mut uart0 = Uart::new(peripherals.UART0, &clocks, io.pins.gpio1, io.pins.gpio2).unwrap();
 //! # let data0 = "Dummy";
