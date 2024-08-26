@@ -8,71 +8,105 @@
 //!
 //! Connect MOSI (GPIO2) and PCNT (GPIO3) pins.
 
-//% CHIPS: esp32 esp32c6 esp32h2 esp32s3
+//% CHIPS: esp32 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
 
+use esp_hal::{
+    clock::ClockControl,
+    dma::{Dma, DmaPriority, DmaTxBuf},
+    dma_buffers,
+    gpio::{GpioPin, Io, Pull},
+    pcnt::{
+        channel::{EdgeMode, PcntInputConfig, PcntSource},
+        unit::Unit,
+        Pcnt,
+    },
+    peripherals::{Peripherals, SPI2},
+    prelude::*,
+    spi::{
+        master::{dma::SpiDma, Address, Command, Spi},
+        HalfDuplexMode,
+        SpiDataMode,
+        SpiMode,
+    },
+    system::SystemControl,
+    Blocking,
+};
 use hil_test as _;
+
+cfg_if::cfg_if! {
+    if #[cfg(any(
+        feature = "esp32",
+        feature = "esp32s2",
+    ))] {
+        use esp_hal::dma::Spi2DmaChannel as DmaChannel0;
+    } else {
+        use esp_hal::dma::DmaChannel0;
+    }
+}
+
+struct Context {
+    spi: SpiDma<'static, SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
+    pcnt_unit: Unit<'static, 0>,
+    mosi_mirror: GpioPin<3>,
+}
 
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    use esp_hal::{
-        clock::ClockControl,
-        dma::{Dma, DmaPriority, DmaTxBuf},
-        dma_buffers,
-        gpio::{Io, Pull},
-        pcnt::{
-            channel::{EdgeMode, PcntInputConfig, PcntSource},
-            Pcnt,
-        },
-        peripherals::Peripherals,
-        prelude::_fugit_RateExtU32,
-        spi::{
-            master::{Address, Command, Spi},
-            SpiDataMode,
-            SpiMode,
-        },
-        system::SystemControl,
-    };
+    use defmt::assert_eq;
+
+    use super::*;
 
     #[init]
-    fn init() {}
-
-    #[test]
-    #[timeout(3)]
-    fn test_spi_writes_are_correctly_by_pcnt() {
-        const DMA_BUFFER_SIZE: usize = 4;
-
+    fn init() -> Context {
         let peripherals = Peripherals::take();
         let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let pcnt = Pcnt::new(peripherals.PCNT);
-        let dma = Dma::new(peripherals.DMA);
-
         let sclk = io.pins.gpio0;
         let mosi = io.pins.gpio2;
         let mosi_mirror = io.pins.gpio3;
 
-        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-        let dma_channel = dma.spi2channel;
-        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
-        let dma_channel = dma.channel0;
+        let pcnt = Pcnt::new(peripherals.PCNT);
+        let dma = Dma::new(peripherals.DMA);
 
-        let (buffer, descriptors, _, _) = dma_buffers!(DMA_BUFFER_SIZE, 0);
-        let mut dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
+        cfg_if::cfg_if! {
+            if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
+                let dma_channel = dma.spi2channel;
+            } else {
+                let dma_channel = dma.channel0;
+            }
+        }
 
-        let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+        let spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
             .with_sck(sclk)
             .with_mosi(mosi)
             .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
-        let unit = pcnt.unit0;
-        unit.channel0.set_edge_signal(PcntSource::from_pin(
+        Context {
+            spi,
             mosi_mirror,
+            pcnt_unit: pcnt.unit0,
+        }
+    }
+
+    #[test]
+    #[timeout(3)]
+    fn test_spi_writes_are_correctly_by_pcnt(ctx: Context) {
+        const DMA_BUFFER_SIZE: usize = 4;
+
+        let (buffer, descriptors, _, _) = dma_buffers!(DMA_BUFFER_SIZE, 0);
+        let mut dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
+
+        let unit = ctx.pcnt_unit;
+        let mut spi = ctx.spi;
+
+        unit.channel0.set_edge_signal(PcntSource::from_pin(
+            ctx.mosi_mirror,
             PcntInputConfig { pull: Pull::Down },
         ));
         unit.channel0
