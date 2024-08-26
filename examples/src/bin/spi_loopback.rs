@@ -22,7 +22,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::{any_pin::AnyPin, Io},
+    gpio::{AnyPin, Io},
     peripherals::Peripherals,
     prelude::*,
     spi::{master::Spi, SpiMode},
