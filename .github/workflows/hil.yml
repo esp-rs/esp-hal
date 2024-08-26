@@ -213,3 +213,8 @@ jobs:
           export PATH=$PATH:/home/espressif/.cargo/bin
           chmod +x xtask
           ./xtask run-elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
+
+      - name: Clean up
+        run: |
+          rm -rf tests-${{ matrix.target.soc }}
+          rm -f xtask
