@@ -8,15 +8,17 @@
 #![no_main]
 
 use embassy_time::{Duration, Ticker, Timer};
+use esp_hal::{
+    clock::Clocks,
+    peripherals::Peripherals,
+    prelude::*,
+    system::SoftwareInterruptControl,
+    timer::{timg::TimerGroup, ErasedTimer, OneShotTimer, PeriodicTimer},
+};
 #[cfg(not(feature = "esp32"))]
 use esp_hal::{
     interrupt::Priority,
     timer::systimer::{Alarm, FrozenUnit, Periodic, SystemTimer, Target},
-};
-use esp_hal::{
-    prelude::*,
-    system::SoftwareInterruptControl,
-    timer::{timg::TimerGroup, ErasedTimer, OneShotTimer, PeriodicTimer},
 };
 #[cfg(not(feature = "esp32"))]
 use esp_hal_embassy::InterruptExecutor;
@@ -107,15 +109,15 @@ mod test_cases {
     }
 }
 
-fn set_up_embassy_with_timg0(system: System) {
-    let timg0 = TimerGroup::new(system.peripherals.TIMG0, &system.clocks);
-    esp_hal_embassy::init(&system.clocks, timg0.timer0);
+fn set_up_embassy_with_timg0(peripherals: Peripherals, clocks: Clocks<'static>) {
+    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    esp_hal_embassy::init(&clocks, timg0.timer0);
 }
 
 #[cfg(not(feature = "esp32"))]
-fn set_up_embassy_with_systimer(system: System) {
-    let systimer = SystemTimer::new(system.peripherals.SYSTIMER).split::<Target>();
-    esp_hal_embassy::init(&system.clocks, systimer.alarm0);
+fn set_up_embassy_with_systimer(peripherals: Peripherals, clocks: Clocks<'static>) {
+    let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+    esp_hal_embassy::init(&clocks, systimer.alarm0);
 }
 
 #[cfg(test)]
@@ -125,14 +127,14 @@ mod test {
     use crate::{test_cases::*, test_helpers::*};
 
     #[init]
-    fn init() -> System {
+    fn init() -> (Peripherals, Clocks<'static>) {
         esp_hal::init(CpuClock::boot_default())
     }
 
     #[test]
     #[timeout(3)]
-    async fn test_one_shot_timg(system: System) {
-        set_up_embassy_with_timg0(system);
+    async fn test_one_shot_timg((peripherals, clocks): (Peripherals, Clocks<'static>)) {
+        set_up_embassy_with_timg0(peripherals, clocks);
 
         run_test_one_shot_async().await;
     }
@@ -140,16 +142,16 @@ mod test {
     #[test]
     #[timeout(3)]
     #[cfg(not(feature = "esp32"))]
-    async fn test_one_shot_systimer(system: System) {
-        set_up_embassy_with_systimer(system);
+    async fn test_one_shot_systimer((peripherals, clocks): (Peripherals, Clocks<'static>)) {
+        set_up_embassy_with_systimer(peripherals, clocks);
 
         run_test_one_shot_async().await;
     }
 
     #[test]
     #[timeout(3)]
-    fn test_periodic_timg(system: System) {
-        let timg0 = TimerGroup::new(system.peripherals.TIMG0, &system.clocks);
+    fn test_periodic_timg((peripherals, clocks): (Peripherals, Clocks<'static>)) {
+        let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
 
         run_test_periodic_timer(timg0.timer0);
     }
@@ -157,32 +159,32 @@ mod test {
     #[test]
     #[timeout(3)]
     #[cfg(not(feature = "esp32"))]
-    fn test_periodic_systimer(system: System) {
-        let systimer = SystemTimer::new(system.peripherals.SYSTIMER).split::<Periodic>();
+    fn test_periodic_systimer((peripherals, clocks): (Peripherals, Clocks<'static>)) {
+        let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Periodic>();
 
         run_test_periodic_timer(systimer.alarm0);
     }
 
     #[test]
     #[timeout(3)]
-    fn test_periodic_oneshot_timg(mut system: System) {
-        let mut timg0 = TimerGroup::new(&mut system.peripherals.TIMG0, &system.clocks);
+    fn test_periodic_oneshot_timg((mut peripherals, clocks): (Peripherals, Clocks<'static>)) {
+        let mut timg0 = TimerGroup::new(&mut peripherals.TIMG0, &clocks);
         run_test_periodic_timer(&mut timg0.timer0);
 
-        let mut timg0 = TimerGroup::new(&mut system.peripherals.TIMG0, &system.clocks);
+        let mut timg0 = TimerGroup::new(&mut peripherals.TIMG0, &clocks);
         run_test_oneshot_timer(&mut timg0.timer0);
     }
 
     #[test]
     #[timeout(3)]
     #[cfg(not(feature = "esp32"))]
-    fn test_periodic_oneshot_systimer(mut system: System) {
-        let mut systimer = SystemTimer::new(&mut system.peripherals.SYSTIMER);
+    fn test_periodic_oneshot_systimer((mut peripherals, clocks): (Peripherals, Clocks<'static>)) {
+        let mut systimer = SystemTimer::new(&mut peripherals.SYSTIMER);
         let unit = FrozenUnit::new(&mut systimer.unit0);
         let mut alarm: Alarm<'_, Periodic, _, _, _> = Alarm::new(systimer.comparator0, &unit);
         run_test_periodic_timer(&mut alarm);
 
-        let mut systimer = SystemTimer::new(&mut system.peripherals.SYSTIMER);
+        let mut systimer = SystemTimer::new(&mut peripherals.SYSTIMER);
         let unit = FrozenUnit::new(&mut systimer.unit0);
         let mut alarm: Alarm<'_, Target, _, _, _> = Alarm::new(systimer.comparator0, &unit);
         run_test_oneshot_timer(&mut alarm);
@@ -190,8 +192,8 @@ mod test {
 
     #[test]
     #[timeout(3)]
-    async fn test_join_timg(system: System) {
-        set_up_embassy_with_timg0(system);
+    async fn test_join_timg((peripherals, clocks): (Peripherals, Clocks<'static>)) {
+        set_up_embassy_with_timg0(peripherals, clocks);
 
         run_join_test().await;
     }
@@ -199,8 +201,8 @@ mod test {
     #[test]
     #[timeout(3)]
     #[cfg(not(feature = "esp32"))]
-    async fn test_join_systimer(system: System) {
-        set_up_embassy_with_systimer(system);
+    async fn test_join_systimer((peripherals, clocks): (Peripherals, Clocks<'static>)) {
+        set_up_embassy_with_systimer(peripherals, clocks);
 
         run_join_test().await;
     }
@@ -209,19 +211,19 @@ mod test {
     #[test]
     #[timeout(3)]
     #[cfg(not(feature = "esp32"))]
-    async fn test_interrupt_executor(system: System) {
-        let timg0 = TimerGroup::new(system.peripherals.TIMG0, &system.clocks);
+    async fn test_interrupt_executor((peripherals, clocks): (Peripherals, Clocks<'static>)) {
+        let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
         let timer0: ErasedTimer = timg0.timer0.into();
         let timer0 = OneShotTimer::new(timer0);
 
-        let systimer = SystemTimer::new(system.peripherals.SYSTIMER).split::<Target>();
+        let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
         let alarm0: ErasedTimer = systimer.alarm0.into();
         let timer1 = OneShotTimer::new(alarm0);
 
         let timers = mk_static!([OneShotTimer<ErasedTimer>; 2], [timer0, timer1]);
-        esp_hal_embassy::init(&system.clocks, timers);
+        esp_hal_embassy::init(&clocks, timers);
 
-        let sw_ints = SoftwareInterruptControl::new(system.peripherals.SW_INTERRUPT);
+        let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
         let executor = mk_static!(
             InterruptExecutor<2>,
@@ -264,8 +266,8 @@ mod test {
     /// Test that timg0 and systimer don't have vastly different tick rates.
     #[test]
     #[timeout(3)]
-    async fn tick_test_timer_tick_rates(system: System) {
-        set_up_embassy_with_timg0(system);
+    async fn tick_test_timer_tick_rates((peripherals, clocks): (Peripherals, Clocks<'static>)) {
+        set_up_embassy_with_timg0(peripherals, clocks);
 
         // We are retrying 5 times because probe-rs polling RTT may introduce some
         // jitter.

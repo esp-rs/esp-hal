@@ -14,8 +14,8 @@ struct Context<'a> {
 
 impl Context<'_> {
     pub fn init() -> Self {
-        let system = esp_hal::init(CpuClock::boot_default());
-        let rtc = Rtc::new(system.peripherals.LPWR);
+        let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+        let rtc = Rtc::new(peripherals.LPWR);
 
         Context { rtc }
     }

@@ -38,4 +38,4 @@ pub use crate::timer::timg::{
 pub use crate::timer::Timer as _esp_hal_timer_Timer;
 #[cfg(any(uart0, uart1, uart2))]
 pub use crate::uart::Instance as _esp_hal_uart_Instance;
-pub use crate::{clock::CpuClock, entry, macros::*, InterruptConfigurable, System};
+pub use crate::{clock::CpuClock, entry, macros::*, InterruptConfigurable};

@@ -35,8 +35,8 @@
 //! # use esp_hal::gpio::Io;
 //! # use embedded_can::Frame;
 //! # use nb::block;
-//! # let system = esp_hal::init(CpuClock::boot_default());
-//! # let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
+//! # let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.
 //! let can_tx_pin = io.pins.gpio2;
@@ -48,10 +48,10 @@
 //! // Begin configuring the TWAI peripheral. The peripheral is in a reset like
 //! // state that prevents transmission but allows configuration.
 //! let mut can_config = twai::TwaiConfiguration::new(
-//!     system.peripherals.TWAI0,
+//!     peripherals.TWAI0,
 //!     can_tx_pin,
 //!     can_rx_pin,
-//!     &system.clocks,
+//!     &clocks,
 //!     TWAI_BAUDRATE,
 //!     TwaiMode::Normal
 //! );
@@ -92,8 +92,8 @@
 //! # use esp_hal::gpio::Io;
 //! # use embedded_can::Frame;
 //! # use nb::block;
-//! # let system = esp_hal::init(CpuClock::boot_default());
-//! # let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
+//! # let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.
 //! let can_tx_pin = io.pins.gpio2;
@@ -104,10 +104,10 @@
 //!
 //! // Begin configuring the TWAI peripheral.
 //! let mut can_config = twai::TwaiConfiguration::new(
-//!     system.peripherals.TWAI0,
+//!     peripherals.TWAI0,
 //!     can_tx_pin,
 //!     can_rx_pin,
-//!     &system.clocks,
+//!     &clocks,
 //!     TWAI_BAUDRATE,
 //!     TwaiMode::SelfTest
 //! );

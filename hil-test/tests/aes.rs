@@ -17,7 +17,7 @@ struct Context<'a> {
 
 impl Context<'_> {
     pub fn init() -> Self {
-        let System { peripherals, .. } = esp_hal::init(CpuClock::max());
+        let (peripherals, _clocks) = esp_hal::init(CpuClock::max());
         let aes = Aes::new(peripherals.AES);
 
         Context { aes }

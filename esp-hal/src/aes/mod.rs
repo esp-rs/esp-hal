@@ -29,12 +29,10 @@
 //! # let mut keybuf = [0_u8; 16];
 //! # keybuf[..keytext.len()].copy_from_slice(keytext);
 //! #
-//! let system = esp_hal::init(CpuClock::boot_default());
-//!
 //! let mut block = [0_u8; 16];
 //! block[..plaintext.len()].copy_from_slice(plaintext);
 //!
-//! let mut aes = Aes::new(system.peripherals.AES);
+//! let mut aes = Aes::new(peripherals.AES);
 //! aes.process(&mut block, Mode::Encryption128, keybuf);
 //!
 //! // The encryption happens in-place, so the ciphertext is in `block`

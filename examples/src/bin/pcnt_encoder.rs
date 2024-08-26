@@ -37,7 +37,7 @@ static VALUE: AtomicI32 = AtomicI32::new(0);
 
 #[entry]
 fn main() -> ! {
-    let System { peripherals, .. } = esp_hal::init(CpuClock::boot_default());
+    let (peripherals, _clocks) = esp_hal::init(CpuClock::boot_default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

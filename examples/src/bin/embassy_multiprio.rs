@@ -72,10 +72,7 @@ async fn main(low_prio_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     println!("Init!");
 
-    let System {
-        peripherals,
-        clocks,
-    } = esp_hal::init(CpuClock::boot_default());
+    let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
 
     let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 

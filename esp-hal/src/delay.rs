@@ -22,9 +22,7 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
 //! # use embedded_hal::delay::DelayNs;
-//! let system = esp_hal::init(CpuClock::boot_default());
-//!
-//! let mut delay = Delay::new(&system.clocks);
+//! let mut delay = Delay::new(&clocks);
 //!
 //! delay.delay_ms(1000 as u32);
 //! # }

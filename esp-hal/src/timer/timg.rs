@@ -28,8 +28,7 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::timg::TimerGroup;
 //!
-//! let system = esp_hal::init(CpuClock::boot_default());
-//! let timg0 = TimerGroup::new(system.peripherals.TIMG0, &system.clocks);
+//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
 //! let timer0 = timg0.timer0;
 //!
 //! // Get the current timestamp, in microseconds:
@@ -52,8 +51,7 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::timg::TimerGroup;
 //!
-//! let system = esp_hal::init(CpuClock::boot_default());
-//! let timg0 = TimerGroup::new(system.peripherals.TIMG0, &system.clocks);
+//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
 //! let mut wdt = timg0.wdt;
 //!
 //! wdt.set_timeout(5_000.millis());

@@ -24,8 +24,7 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::rtc_io::LowPowerOutput;
 //! # use esp_hal::gpio::Io;
-//! let system = esp_hal::init(CpuClock::boot_default());
-//! let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // configure GPIO 1 as ULP output pin
 //! let lp_pin = LowPowerOutput::<'static, 1>::new(io.pins.gpio1);
 //! # }

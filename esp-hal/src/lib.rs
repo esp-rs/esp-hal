@@ -74,13 +74,13 @@
 //!
 //! #[entry]
 //! fn main() -> ! {
-//!     let system = esp_hal::init(CpuClock::boot_default());
+//!     let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
 //!
 //!     // Set GPIO0 as an output, and set its state high initially.
-//!     let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
+//!     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!     let mut led = Output::new(io.pins.gpio0, Level::High);
 //!
-//!     let delay = Delay::new(&system.clocks);
+//!     let delay = Delay::new(&clocks);
 //!
 //!     loop {
 //!         led.toggle();
@@ -627,6 +627,7 @@ macro_rules! before_snippet {
 #     loop {}
 # }
 # fn main() {
+#     let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
 "#
     };
 }
@@ -636,21 +637,10 @@ use crate::{
     peripherals::Peripherals,
 };
 
-/// System components.
-pub struct System {
-    /// The available peripheral instances.
-    pub peripherals: Peripherals,
-
-    /// The configured clocks.
-    pub clocks: Clocks<'static>,
-}
-
 /// Initialize the system.
-pub fn init(clock_config: CpuClock) -> System {
+pub fn init(clock_config: CpuClock) -> (Peripherals, Clocks<'static>) {
     let peripherals = Peripherals::take();
+    let clocks = ClockControl::new(clock_config).freeze();
 
-    System {
-        peripherals,
-        clocks: ClockControl::new(clock_config).freeze(),
-    }
+    (peripherals, clocks)
 }

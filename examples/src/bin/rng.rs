@@ -11,7 +11,7 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let System { peripherals, .. } = esp_hal::init(CpuClock::boot_default());
+    let (peripherals, _clocks) = esp_hal::init(CpuClock::boot_default());
     let mut rng = Rng::new(peripherals.RNG);
 
     // Generate a random word (u32):

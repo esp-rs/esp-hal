@@ -57,12 +57,10 @@
 //! # use esp_hal::gpio::Io;
 //! # use esp_hal::clock::ClockControl;
 //! # use crate::esp_hal::rmt::TxChannelCreator;
-//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
-//! let system = esp_hal::init(CpuClock::boot_default());
-//! # let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 #![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
 #![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
-//! let rmt = Rmt::new(system.peripherals.RMT, freq, &system.clocks).unwrap();
+//! let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
 //! let mut channel = rmt
 //!     .channel0
 //!     .configure(

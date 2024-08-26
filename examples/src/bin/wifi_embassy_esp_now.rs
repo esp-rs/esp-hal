@@ -25,12 +25,7 @@ use esp_wifi::{
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
-
-    let System {
-        peripherals,
-        clocks,
-        ..
-    } = esp_hal::init(CpuClock::max());
+    let (peripherals, clocks) = esp_hal::init(CpuClock::max());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
 

@@ -19,11 +19,9 @@
 //! # use esp_hal::lcd_cam::{LcdCam, lcd::i8080::{Config, I8080, TxEightBits}};
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::{Dma, DmaPriority};
-//! #
-//! let system = esp_hal::init(CpuClock::boot_default());
-//! # let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
-//! # let dma = Dma::new(system.peripherals.DMA);
+//! # let dma = Dma::new(peripherals.DMA);
 //! # let channel = dma.channel0;
 //!
 //! # let (tx_buffer, tx_descriptors, _, rx_descriptors) = dma_buffers!(32678, 0);
@@ -43,7 +41,7 @@
 //!     io.pins.gpio16,
 //!     io.pins.gpio15,
 //! );
-//! let lcd_cam = LcdCam::new(system.peripherals.LCD_CAM);
+//! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 //!
 //! let mut i8080 = I8080::new(
 //!     lcd_cam.lcd,
@@ -52,7 +50,7 @@
 //!     tx_pins,
 //!     20.MHz(),
 //!     Config::default(),
-//!     &system.clocks,
+//!     &clocks,
 //! )
 //! .with_ctrl_pins(io.pins.gpio0, io.pins.gpio47);
 //!

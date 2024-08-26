@@ -25,11 +25,7 @@ async fn run() {
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
-    let System {
-        peripherals,
-        clocks,
-        ..
-    } = esp_hal::init(CpuClock::boot_default());
+    let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
 
     esp_println::println!("Init!");
 

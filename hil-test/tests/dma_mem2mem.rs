@@ -39,16 +39,16 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let system = esp_hal::init(CpuClock::boot_default());
+        let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
 
-        let dma = Dma::new(system.peripherals.DMA);
+        let dma = Dma::new(peripherals.DMA);
         let channel = dma.channel0.configure(false, DmaPriority::Priority0);
 
         cfg_if::cfg_if! {
             if #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))] {
-                let dma_peripheral = system.peripherals.SPI2;
+                let dma_peripheral = peripherals.SPI2;
             } else {
-                let dma_peripheral = system.peripherals.MEM2MEM1;
+                let dma_peripheral = peripherals.MEM2MEM1;
             }
         }
 

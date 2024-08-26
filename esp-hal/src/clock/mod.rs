@@ -59,7 +59,7 @@
 #![cfg_attr(esp32h2, doc = "// let system = esp_hal::init(CpuClock::Clock96MHz);")]
 //! //
 //! // Initialize with default clock frequency for this chip
-//! // let system = esp_hal::init(CpuClock::boot_default());
+//! // let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
 //! # }
 //! ```
 

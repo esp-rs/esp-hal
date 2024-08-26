@@ -53,10 +53,10 @@ mod tests {
 
     #[test]
     fn test_i2s_loopback() {
-        let system = esp_hal::init(CpuClock::boot_default());
+        let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
 
-        let peripherals = system.peripherals;
-        let clocks = system.clocks;
+        let peripherals = peripherals;
+        let clocks = clocks;
 
         let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

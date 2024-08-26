@@ -66,12 +66,7 @@ static mut TX_BUFFER: [u8; TX_BUFFER_SIZE] = [0; TX_BUFFER_SIZE];
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
-
-    let System {
-        peripherals,
-        clocks,
-        ..
-    } = esp_hal::init(CpuClock::max());
+    let (peripherals, clocks) = esp_hal::init(CpuClock::max());
 
     let server_address: Ipv4Address = HOST_IP.parse().expect("Invalid HOST_IP address");
 

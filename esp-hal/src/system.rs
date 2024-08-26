@@ -19,10 +19,8 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! let system = esp_hal::init(CpuClock::boot_default());
-//!
 //! let sw_ints =
-//!     SoftwareInterruptControl::new(system.peripherals.SW_INTERRUPT);
+//!     SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 //! let mut int0 = sw_ints.software_interrupt0;
 //!
 //! critical_section::with(|cs| {

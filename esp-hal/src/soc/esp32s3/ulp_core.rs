@@ -16,15 +16,13 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! let system = esp_hal::init(CpuClock::boot_default());
-//!
 //! const CODE: &[u8] = &[
 //!     0x17, 0x05, 0x00, 0x00, 0x13, 0x05, 0x05, 0x01, 0x81, 0x45, 0x85, 0x05,
 //!     0x0c, 0xc1, 0xf5, 0xbf, 0x00, 0x00, 0x00, 0x00,
 //! ];
 //!
 //! let mut ulp_core =
-//!     esp_hal::ulp_core::UlpCore::new(system.peripherals.ULP_RISCV_CORE);
+//!     esp_hal::ulp_core::UlpCore::new(peripherals.ULP_RISCV_CORE);
 //! ulp_core.stop();
 //!
 //! // copy code to RTC ram

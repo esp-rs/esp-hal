@@ -26,7 +26,7 @@ static mut EP_MEMORY: [u32; 1024] = [0; 1024];
 
 #[entry]
 fn main() -> ! {
-    let System { peripherals, .. } = esp_hal::init(CpuClock::boot_default());
+    let (peripherals, _clocks) = esp_hal::init(CpuClock::boot_default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

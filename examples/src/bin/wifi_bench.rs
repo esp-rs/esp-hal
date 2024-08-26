@@ -51,12 +51,7 @@ const UPLOAD_DOWNLOAD_PORT: u16 = 4323;
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
-
-    let System {
-        peripherals,
-        clocks,
-        ..
-    } = esp_hal::init(CpuClock::max());
+    let (peripherals, clocks) = esp_hal::init(CpuClock::max());
 
     let server_address: Ipv4Address = HOST_IP.parse().expect("Invalid HOST_IP address");
 

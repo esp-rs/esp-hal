@@ -32,7 +32,7 @@
 //! # use esp_hal::analog::adc::Adc;
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::gpio::Io;
-//! # let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 #![cfg_attr(esp32, doc = "let analog_pin = io.pins.gpio32;")]
 #![cfg_attr(any(esp32s2, esp32s3), doc = "let analog_pin = io.pins.gpio3;")]
 #![cfg_attr(
@@ -44,9 +44,9 @@
 //!     analog_pin,
 //!     Attenuation::Attenuation11dB,
 //! );
-//! let mut adc1 = Adc::new(system.peripherals.ADC1, adc1_config);
+//! let mut adc1 = Adc::new(peripherals.ADC1, adc1_config);
 //!
-//! let mut delay = Delay::new(&system.clocks);
+//! let mut delay = Delay::new(&clocks);
 //!
 //! loop {
 //!     let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut pin)).unwrap();

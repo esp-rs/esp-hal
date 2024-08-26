@@ -35,9 +35,9 @@
 //! # use esp_hal::gpio::Io;
 //! # use core::writeln;
 //! # use core::fmt::Write;
-//! # let system = esp_hal::init(CpuClock::boot_default());
-//! # let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
-//! # let mut uart0 = Uart::new(system.peripherals.UART0, &system.clocks, io.pins.gpio1, io.pins.gpio2).unwrap();
+//! # let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! # let mut uart0 = Uart::new(peripherals.UART0, &clocks, io.pins.gpio1, io.pins.gpio2).unwrap();
 //! # let data = "Dummy";
 //! let d: md5::Digest = md5::compute(&data);
 //! writeln!(uart0, "{}", d);
@@ -52,9 +52,9 @@
 //! # use esp_hal::gpio::Io;
 //! # use core::writeln;
 //! # use core::fmt::Write;
-//! # let system = esp_hal::init(CpuClock::boot_default());
-//! # let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
-//! # let mut uart0 = Uart::new(system.peripherals.UART0, &system.clocks, io.pins.gpio1, io.pins.gpio2).unwrap();
+//! # let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! # let mut uart0 = Uart::new(peripherals.UART0, &clocks, io.pins.gpio1, io.pins.gpio2).unwrap();
 //! # let data0 = "Dummy";
 //! # let data1 = "Dummy";
 //! #

@@ -10,11 +10,7 @@ use esp_hal::{delay::Delay, prelude::*, rtc_cntl::Rtc};
 
 #[entry]
 fn main() -> ! {
-    let System {
-        peripherals,
-        clocks,
-        ..
-    } = esp_hal::init(CpuClock::boot_default());
+    let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
 
     let rtc = Rtc::new(peripherals.LPWR);
     let delay = Delay::new(&clocks);

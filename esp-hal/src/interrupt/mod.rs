@@ -30,10 +30,8 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! let system = esp_hal::init(CpuClock::boot_default());
-//!
 //! let mut sw_int =
-//!     SoftwareInterruptControl::new(system.peripherals.SW_INTERRUPT);
+//!     SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 //! critical_section::with(|cs| {
 //!     sw_int
 //!         .software_interrupt0

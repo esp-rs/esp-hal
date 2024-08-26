@@ -40,12 +40,7 @@ const GATEWAY_IP: &str = env!("GATEWAY_IP");
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
-
-    let System {
-        peripherals,
-        clocks,
-        ..
-    } = esp_hal::init(CpuClock::max());
+    let (peripherals, clocks) = esp_hal::init(CpuClock::max());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
 

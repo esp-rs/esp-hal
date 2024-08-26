@@ -22,7 +22,7 @@
 
 use embedded_hal_async::spi::SpiBus;
 use esp_hal::{
-    clock::ClockControl,
+    clock::{ClockControl, Clocks},
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{GpioPin, Io, Level, Output, Pull},
@@ -72,11 +72,7 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let System {
-            peripherals,
-            clocks,
-            ..
-        } = esp_hal::init(CpuClock::boot_default());
+        let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let pcnt = Pcnt::new(peripherals.PCNT);

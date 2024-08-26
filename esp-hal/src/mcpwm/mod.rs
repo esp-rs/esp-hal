@@ -54,20 +54,20 @@
 //! # use esp_hal::mcpwm::{operator::{DeadTimeCfg, PWMStream, PwmPinConfig}, timer::PwmWorkingMode, McPwm, PeripheralClockConfig};
 //! # use esp_hal::gpio::Io;
 //!
-//! # let system = esp_hal::init(CpuClock::boot_default());
-//! # let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
+//! # let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let pin = io.pins.gpio0;
 //!
 //! // initialize peripheral
 #![cfg_attr(
     esp32h2,
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(&system.clocks, 40.MHz()).unwrap();"
+    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40.MHz()).unwrap();"
 )]
 #![cfg_attr(
     not(esp32h2),
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(&system.clocks, 32.MHz()).unwrap();"
+    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 32.MHz()).unwrap();"
 )]
-//! let mut mcpwm = McPwm::new(system.peripherals.MCPWM0, clock_cfg);
+//! let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
 //!
 //! // connect operator0 to timer0
 //! mcpwm.operator0.set_timer(&mcpwm.timer0);

@@ -39,11 +39,7 @@ mod tests {
 
     #[init]
     async fn init() -> Context<'static> {
-        let System {
-            peripherals,
-            clocks,
-            ..
-        } = esp_hal::init(CpuClock::boot_default());
+        let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
 
         let dma = Dma::new(peripherals.DMA);
         let lcd_cam = LcdCam::new_async(peripherals.LCD_CAM);

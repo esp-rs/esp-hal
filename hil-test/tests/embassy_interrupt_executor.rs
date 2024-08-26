@@ -43,7 +43,7 @@ mod test {
 
     #[init]
     fn init() -> SoftwareInterrupt<1> {
-        let System{peripherals,..} = esp_hal::init(CpuClock::boot_default());
+        let (peripherals, _clocks) = esp_hal::init(CpuClock::boot_default());
 
         let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
         esp_hal_embassy::init(&clocks, timg0.timer0);

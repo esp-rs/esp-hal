@@ -21,7 +21,7 @@ use esp_println::{print, println};
 
 #[entry]
 fn main() -> ! {
-    let System { peripherals, .. } = esp_hal::init(CpuClock::boot_default());
+    let (peripherals, _clocks) = esp_hal::init(CpuClock::boot_default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let pin = LowPowerOutput::new(io.pins.gpio1);

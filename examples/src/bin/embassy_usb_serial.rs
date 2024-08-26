@@ -32,11 +32,7 @@ use esp_hal::{
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) -> () {
     esp_println::println!("Init!");
-    let System {
-        peripherals,
-        clocks,
-        ..
-    } = esp_hal::init(CpuClock::boot_default());
+    let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     esp_hal_embassy::init(&clocks, timg0.timer0);

@@ -38,22 +38,20 @@
 //! ### SPI Initialization
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
 //! # use esp_hal::spi::SpiMode;
 //! # use esp_hal::spi::master::Spi;
 //! # use esp_hal::gpio::Io;
-//! let system = esp_hal::init(CpuClock::boot_default());
-//! # let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let sclk = io.pins.gpio0;
 //! let miso = io.pins.gpio2;
 //! let mosi = io.pins.gpio1;
 //! let cs = io.pins.gpio5;
 //!
 //! let mut spi = Spi::new(
-//!     system.peripherals.SPI2,
+//!     peripherals.SPI2,
 //!     100.kHz(),
 //!     SpiMode::Mode0,
-//!     &system.clocks,
+//!     &clocks,
 //! )
 //! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs));
 //! # }

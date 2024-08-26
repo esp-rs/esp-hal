@@ -35,11 +35,7 @@ use nb::block;
 
 #[entry]
 fn main() -> ! {
-    let System {
-        peripherals,
-        clocks,
-        ..
-    } = esp_hal::init(CpuClock::boot_default());
+    let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

@@ -22,7 +22,7 @@ use esp_hal::{
 
 #[entry]
 fn main() -> ! {
-    let System { peripherals, .. } = esp_hal::init(CpuClock::boot_default());
+    let (peripherals, _clocks) = esp_hal::init(CpuClock::boot_default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut led = io.pins.gpio1;

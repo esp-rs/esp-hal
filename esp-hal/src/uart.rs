@@ -25,12 +25,11 @@
 //! # use esp_hal::uart::{config::Config, Uart};
 //! use esp_hal::gpio::Io;
 //!
-//! let system = esp_hal::init(CpuClock::boot_default());
-//! let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
 //! let mut uart1 = Uart::new(
-//!     system.peripherals.UART1,
-//!     &system.clocks,
+//!     peripherals.UART1,
+//!     &clocks,
 //!     io.pins.gpio1,
 //!     io.pins.gpio2,
 //! ).unwrap();
@@ -59,12 +58,12 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, Uart};
 //! # use esp_hal::gpio::Io;
-//! # let system = esp_hal::init(CpuClock::boot_default());
-//! # let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
+//! # let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let mut uart1 = Uart::new_with_config(
-//! #     system.peripherals.UART1,
+//! #     peripherals.UART1,
 //! #     Config::default(),
-//! #     &system.clocks,
+//! #     &clocks,
 //! #     io.pins.gpio1,
 //! #     io.pins.gpio2,
 //! # ).unwrap();
@@ -78,12 +77,12 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, Uart};
 //! # use esp_hal::gpio::Io;
-//! # let system = esp_hal::init(CpuClock::boot_default());
-//! # let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
+//! # let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let mut uart1 = Uart::new_with_config(
-//! #     system.peripherals.UART1,
+//! #     peripherals.UART1,
 //! #     Config::default(),
-//! #     &system.clocks,
+//! #     &clocks,
 //! #     io.pins.gpio1,
 //! #     io.pins.gpio2,
 //! # ).unwrap();
@@ -102,13 +101,13 @@
 //! # use esp_hal::uart::{config::Config, Uart};
 //! use esp_hal::gpio::{AnyPin, Io};
 //!
-//! let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
 //! let tx = AnyPin::new_inverted(io.pins.gpio1);
 //! let rx = AnyPin::new_inverted(io.pins.gpio2);
 //! let mut uart1 = Uart::new(
-//!     system.peripherals.UART1,
-//!     &system.clocks,
+//!     peripherals.UART1,
+//!     &clocks,
 //!     tx,
 //!     rx,
 //! ).unwrap();
@@ -121,11 +120,11 @@
 //! # use esp_hal::uart::{config::Config, UartTx, UartRx};
 //! use esp_hal::gpio::{AnyPin, Io};
 //!
-//! let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
-//! let tx = UartTx::new(system.peripherals.UART0, &system.clocks,
+//! let tx = UartTx::new(peripherals.UART0, &clocks,
 //!     io.pins.gpio1).unwrap();
-//! let rx = UartRx::new(system.peripherals.UART1, &system.clocks,
+//! let rx = UartRx::new(peripherals.UART1, &clocks,
 //!     io.pins.gpio2).unwrap();
 //! # }
 //! ```

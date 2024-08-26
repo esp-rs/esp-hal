@@ -36,16 +36,15 @@
 //! # use esp_hal::gpio::Io;
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::{Dma, DmaPriority};
-//! let system = esp_hal::init(CpuClock::boot_default());
-//! # let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
-//! let dma = Dma::new(system.peripherals.DMA);
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let dma = Dma::new(peripherals.DMA);
 #![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.i2s0channel;")]
 #![cfg_attr(not(any(esp32, esp32s2)), doc = "let dma_channel = dma.channel0;")]
 //! let (_, tx_descriptors, mut rx_buffer, rx_descriptors) =
 //! dma_buffers!(0, 4 * 4092);
 //!
 //! let i2s = I2s::new(
-//!     system.peripherals.I2S0,
+//!     peripherals.I2S0,
 //!     Standard::Philips,
 //!     DataFormat::Data16Channel16,
 //!     44100.Hz(),
@@ -55,7 +54,7 @@
 //!     ),
 //!     tx_descriptors,
 //!     rx_descriptors,
-//!     &system.clocks,
+//!     &clocks,
 //! );
 #![cfg_attr(not(esp32), doc = "let i2s = i2s.with_mclk(io.pins.gpio0);")]
 //! let mut i2s_rx = i2s.i2s_rx

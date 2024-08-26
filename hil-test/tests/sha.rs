@@ -166,9 +166,9 @@ mod tests {
         cfg_if::cfg_if! {
             if #[cfg(feature = "esp32")] {
                 // FIXME: max speed fails...?
-                let System { peripherals, .. } = esp_hal::init(CpuClock::boot_default());
+                let (peripherals, _clocks) = esp_hal::init(CpuClock::boot_default());
             } else {
-                let System { peripherals, .. } = esp_hal::init(CpuClock::max());
+                let (peripherals, _clocks) = esp_hal::init(CpuClock::max());
             }
         }
 

@@ -21,21 +21,20 @@
 //! # use esp_hal::gpio::Io;
 //! # use esp_hal::spi::{master::Spi, SpiMode};
 //! # use esp_hal::dma::{Dma, DmaPriority};
-//! let system = esp_hal::init(CpuClock::boot_default());
-//! let dma = Dma::new(system.peripherals.DMA);
+//! let dma = Dma::new(peripherals.DMA);
 #![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.spi2channel;")]
 #![cfg_attr(not(any(esp32, esp32s2)), doc = "let dma_channel = dma.channel0;")]
-//! let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
+//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let sclk = io.pins.gpio0;
 //! let miso = io.pins.gpio2;
 //! let mosi = io.pins.gpio4;
 //! let cs = io.pins.gpio5;
 //!
 //! let mut spi = Spi::new(
-//!     system.peripherals.SPI2,
+//!     peripherals.SPI2,
 //!     100.kHz(),
 //!     SpiMode::Mode0,
-//!     &system.clocks
+//!     &clocks
 //! )
 //! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
 //! .with_dma(dma_channel.configure(

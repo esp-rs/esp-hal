@@ -56,7 +56,7 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        let System { peripherals, .. } = esp_hal::init(CpuClock::max());
+        let (peripherals, _clocks) = esp_hal::init(CpuClock::max());
 
         let ecc = Ecc::new(peripherals.ECC);
         let rng = Rng::new(peripherals.RNG);

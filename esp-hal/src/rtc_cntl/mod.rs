@@ -29,11 +29,9 @@
 //! # use crate::esp_hal::prelude::_fugit_ExtU64;
 //! # use crate::esp_hal::InterruptConfigurable;
 //! static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
+//! let mut delay = Delay::new(&clocks);
 //!
-//! let system = esp_hal::init(CpuClock::boot_default());
-//! let mut delay = Delay::new(&system.clocks);
-//!
-//! let mut rtc = Rtc::new(system.peripherals.LPWR);
+//! let mut rtc = Rtc::new(peripherals.LPWR);
 //!
 //! rtc.set_interrupt_handler(interrupt_handler);
 //! rtc.rwdt.set_timeout(2000.millis());

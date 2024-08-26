@@ -28,9 +28,8 @@
 //!     Periodic,
 //! };
 //!
-//! let system = esp_hal::init(CpuClock::boot_default());
 //! let systimer = SystemTimer::new(
-//!     system.peripherals.SYSTIMER,
+//!     peripherals.SYSTIMER,
 //! ).split::<Periodic>();
 //!
 //! // Reconfigure a periodic alarm to be a target alarm
@@ -48,8 +47,7 @@
 //!     SystemTimer,
 //! };
 //!
-//! let system = esp_hal::init(CpuClock::boot_default());
-//! let mut systimer = SystemTimer::new(system.peripherals.SYSTIMER);
+//! let mut systimer = SystemTimer::new(peripherals.SYSTIMER);
 //!
 //! // Get the current timestamp, in microseconds:
 //! let now = SystemTimer::now();

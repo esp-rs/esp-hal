@@ -13,14 +13,12 @@
 //! # use esp_hal::cpu_control::{CpuControl, Stack};
 //! # use core::{cell::RefCell, ptr::addr_of_mut};
 //! # use critical_section::Mutex;
+//! # let delay = Delay::new(&clocks);
 //! static mut APP_CORE_STACK: Stack<8192> = Stack::new();
-//! let system = esp_hal::init(CpuClock::boot_default());
-//!
-//! # let delay = Delay::new(&system.clocks);
 //!
 //! let counter = Mutex::new(RefCell::new(0));
 //!
-//! let mut cpu_control = CpuControl::new(system.peripherals.CPU_CTRL);
+//! let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 //! let cpu1_fnctn = || {
 //!     cpu1_task(&delay, &counter);
 //! };

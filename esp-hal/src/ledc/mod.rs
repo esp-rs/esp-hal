@@ -30,12 +30,10 @@
 //! # use esp_hal::ledc::LowSpeed;
 //! # use esp_hal::ledc::channel;
 //! # use esp_hal::gpio::Io;
-//!
-//! let system = esp_hal::init(CpuClock::boot_default());
-//! # let io = Io::new(system.peripherals.GPIO, system.peripherals.IO_MUX);
+//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let led = io.pins.gpio0;
 //!
-//! let mut ledc = Ledc::new(system.peripherals.LEDC, &system.clocks);
+//! let mut ledc = Ledc::new(peripherals.LEDC, &clocks);
 //! ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
 //!
 //! let mut lstimer0 = ledc.get_timer::<LowSpeed>(timer::Number::Timer0);
