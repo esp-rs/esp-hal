@@ -1,12 +1,14 @@
-//! RSA Test
+//! Async RSA Test
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: defmt
 
 #![no_std]
 #![no_main]
 
 use crypto_bigint::{Uint, U1024, U512};
 use esp_hal::{
+    Async,
     peripherals::Peripherals,
     prelude::*,
     rsa::{
@@ -16,7 +18,6 @@ use esp_hal::{
         RsaModularMultiplication,
         RsaMultiplication,
     },
-    Blocking,
 };
 use hil_test as _;
 
@@ -34,7 +35,7 @@ const BIGNUM_3: U512 = Uint::from_be_hex(
 );
 
 struct Context<'a> {
-    rsa: Rsa<'a, Blocking>,
+    rsa: Rsa<'a, Async>,
 }
 
 const fn compute_r(modulus: &U512) -> U512 {
@@ -50,7 +51,7 @@ const fn compute_mprime(modulus: &U512) -> u32 {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
 mod tests {
     use defmt::assert_eq;
 
@@ -59,14 +60,14 @@ mod tests {
     #[init]
     fn init() -> Context<'static> {
         let peripherals = Peripherals::take();
-        let mut rsa = Rsa::new(peripherals.RSA);
+        let mut rsa = Rsa::new_async(peripherals.RSA);
         nb::block!(rsa.ready()).unwrap();
 
         Context { rsa }
     }
 
     #[test]
-    fn test_modular_exponentiation(mut ctx: Context<'static>) {
+    async fn modular_exponentiation(mut ctx: Context<'static>) {
         const EXPECTED_OUTPUT: [u32; U512::LIMBS] = [
             1601059419, 3994655875, 2600857657, 1530060852, 64828275, 4221878473, 2751381085,
             1938128086, 625895085, 2087010412, 2133352910, 101578249, 3798099415, 3357588690,
@@ -86,13 +87,12 @@ mod tests {
             compute_mprime(&BIGNUM_3),
         );
         let r = compute_r(&BIGNUM_3);
-        mod_exp.start_exponentiation(BIGNUM_1.as_words(), r.as_words());
-        mod_exp.read_results(&mut outbuf);
+        mod_exp.exponentiation(BIGNUM_1.as_words(), r.as_words(), &mut outbuf).await;
         assert_eq!(EXPECTED_OUTPUT, outbuf);
     }
 
     #[test]
-    fn test_modular_multiplication(mut ctx: Context<'static>) {
+    async fn test_modular_multiplication(mut ctx: Context<'static>) {
         const EXPECTED_OUTPUT: [u32; U512::LIMBS] = [
             1868256644, 833470784, 4187374062, 2684021027, 191862388, 1279046003, 1929899870,
             4209598061, 3830489207, 1317083344, 2666864448, 3701382766, 3232598924, 2904609522,
@@ -101,20 +101,20 @@ mod tests {
 
         let mut outbuf = [0_u32; U512::LIMBS];
         let r = compute_r(&BIGNUM_3);
-        let mut mod_multi = RsaModularMultiplication::<Op512, _>::new(
-            &mut ctx.rsa,
-            BIGNUM_1.as_words(),
-            BIGNUM_3.as_words(),
-            r.as_words(),
-            compute_mprime(&BIGNUM_3),
-        );
-        mod_multi.start_modular_multiplication(BIGNUM_2.as_words());
-        mod_multi.read_results(&mut outbuf);
+        let mut mod_multi =
+            RsaModularMultiplication::<Op512, _>::new(
+                &mut ctx.rsa,
+                BIGNUM_1.as_words(),
+                BIGNUM_3.as_words(),
+                r.as_words(),
+                compute_mprime(&BIGNUM_3),
+            );
+        mod_multi.modular_multiplication(BIGNUM_2.as_words(), &mut outbuf).await;
         assert_eq!(EXPECTED_OUTPUT, outbuf);
     }
 
     #[test]
-    fn test_multiplication(mut ctx: Context<'static>) {
+    async fn test_multiplication(mut ctx: Context<'static>) {
         const EXPECTED_OUTPUT: [u32; U1024::LIMBS] = [
             1264702968, 3552243420, 2602501218, 498422249, 2431753435, 2307424767, 349202767,
             2269697177, 1525551459, 3623276361, 3146383138, 191420847, 4252021895, 9176459,
@@ -127,9 +127,11 @@ mod tests {
         let operand_a = BIGNUM_1.as_words();
         let operand_b = BIGNUM_2.as_words();
 
-        let mut rsamulti = RsaMultiplication::<Op512, _>::new(&mut ctx.rsa, operand_a);
-        rsamulti.start_multiplication(operand_b);
-        rsamulti.read_results(&mut outbuf);
+        let mut rsamulti = RsaMultiplication::<Op512, _>::new(
+            &mut ctx.rsa,
+            operand_a,
+        );
+        rsamulti.multiplication(operand_b, &mut outbuf).await;
 
         assert_eq!(EXPECTED_OUTPUT, outbuf)
     }

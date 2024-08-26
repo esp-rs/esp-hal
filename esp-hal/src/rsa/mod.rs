@@ -18,12 +18,6 @@
 //! ### Modular Exponentiation, Modular Multiplication, and Multiplication
 //! Visit the [RSA test suite] for an example of using the peripheral.
 //!
-//! ## Implementation State
-//!
-//! - The [nb] crate is used to handle non-blocking operations.
-//! - This peripheral supports `async` on every available chip except of `esp32`
-//!   (to be solved).
-//!
 //! [nb]: https://docs.rs/nb/1.1.0/nb/
 //! [RSA test suite]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/rsa.rs
 
@@ -250,10 +244,11 @@ where
         }
     }
 
-    /// Starts the modular exponentiation operation on the RSA hardware.
-    fn start(&mut self) {
-        self.rsa.write_modexp_start();
+    fn set_up_exponentiation(&mut self, base: &T::InputType, r: &T::InputType) {
+        self.rsa.write_operand_a(base);
+        self.rsa.write_r(r);
     }
+
 
     /// Starts the modular exponentiation operation.
     ///
@@ -261,9 +256,8 @@ where
     ///
     /// For more information refer to 24.3.2 of <https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf>.
     pub fn start_exponentiation(&mut self, base: &T::InputType, r: &T::InputType) {
-        self.rsa.write_operand_a(base);
-        self.rsa.write_r(r);
-        self.start();
+        self.set_up_exponentiation(base, r);
+        self.rsa.write_modexp_start();
     }
 
     /// Reads the result to the given buffer.
@@ -315,6 +309,14 @@ where
         }
     }
 
+    /// Starts the modular multiplication operation.
+    ///
+    /// For more information refer to 19.3.1 of <https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf>.
+    pub fn start_modular_multiplication(&mut self, operand_b: &T::InputType) {
+        self.set_up_modular_multiplication(operand_b);
+        self.rsa.write_modmulti_start();
+    }
+
     /// Reads the result to the given buffer.
     /// This is a non blocking function that returns without an error if
     /// operation is completed successfully.
@@ -347,6 +349,12 @@ where
         }
     }
 
+    /// Starts the multiplication operation.
+    pub fn start_multiplication(&mut self, operand_b: &T::InputType) {
+        self.set_up_multiplication(operand_b);
+        self.rsa.write_multi_start();
+    }
+
     /// Reads the result to the given buffer.
     /// This is a non blocking function that returns without an error if
     /// operation is completed successfully. `start_multiplication` must be
@@ -367,13 +375,13 @@ pub(crate) mod asynch {
     use embassy_sync::waitqueue::AtomicWaker;
     use procmacros::handler;
 
-    use crate::rsa::{
-        Multi,
+    use crate::{Async, rsa::{
+        Multi,Rsa,
         RsaMode,
         RsaModularExponentiation,
         RsaModularMultiplication,
         RsaMultiplication,
-    };
+    }};
 
     static WAKER: AtomicWaker = AtomicWaker::new();
 
@@ -385,14 +393,14 @@ pub(crate) mod asynch {
 
     impl<'d> RsaFuture<'d> {
         /// Asynchronously initializes the RSA peripheral.
-        pub fn new(instance: &'d crate::peripherals::RSA) -> Self {
+        fn new(instance: &'d crate::peripherals::RSA) -> Self {
             cfg_if::cfg_if! {
                 if #[cfg(esp32)] {
-                    instance.interrupt().modify(|_, w| w.interrupt().set_bit());
+                    instance.rsa.interrupt().modify(|_, w| w.interrupt().set_bit());
                 } else if #[cfg(any(esp32s2, esp32s3))] {
-                    instance.interrupt_ena().modify(|_, w| w.interrupt_ena().set_bit());
+                    instance.rsa.interrupt_ena().modify(|_, w| w.interrupt_ena().set_bit());
                 } else {
-                    instance.int_ena().modify(|_, w| w.int_ena().set_bit());
+                    instance.rsa.int_ena().modify(|_, w| w.int_ena().set_bit());
                 }
             }
 
@@ -400,24 +408,20 @@ pub(crate) mod asynch {
         }
 
         fn event_bit_is_clear(&self) -> bool {
+            // Looks weird, but we signal completion by disabling the interrupt.
             cfg_if::cfg_if! {
                 if #[cfg(esp32)] {
-                    self.instance.interrupt().read().interrupt().bit_is_clear()
+                    self.instance.rsa.interrupt().read().interrupt().bit_is_clear()
                 } else if #[cfg(any(esp32s2, esp32s3))] {
-                    self
-                        .instance
-                        .interrupt_ena()
-                        .read()
-                        .interrupt_ena()
-                        .bit_is_clear()
+                    self.instance.rsa.interrupt_ena().read().interrupt_ena().bit_is_clear()
                 } else {
-                    self.instance.int_ena().read().int_ena().bit_is_clear()
+                    self.instance.rsa.int_ena().read().int_ena().bit_is_clear()
                 }
             }
         }
     }
 
-    impl<'d> core::future::Future for RsaFuture<'d> {
+    impl core::future::Future for RsaFuture<'_, '_> {
         type Output = ();
 
         fn poll(
@@ -433,7 +437,7 @@ pub(crate) mod asynch {
         }
     }
 
-    impl<'a, 'd, T: RsaMode, const N: usize> RsaModularExponentiation<'a, 'd, T, crate::Async>
+    impl<'a, 'd, T: RsaMode, const N: usize> RsaModularExponentiation<'a, 'd, T, Async>
     where
         T: RsaMode<InputType = [u32; N]>,
     {
@@ -444,13 +448,15 @@ pub(crate) mod asynch {
             r: &T::InputType,
             outbuf: &mut T::InputType,
         ) {
-            self.start_exponentiation(base, r);
-            RsaFuture::new(&self.rsa.rsa).await;
+            self.set_up_exponentiation(base, r);
+            let fut = RsaFuture::new(self.rsa);
+            self.rsa.write_modexp_start();
+            fut.await;
             self.rsa.read_out(outbuf);
         }
     }
 
-    impl<'a, 'd, T: RsaMode, const N: usize> RsaModularMultiplication<'a, 'd, T, crate::Async>
+    impl<'a, 'd, T: RsaMode, const N: usize> RsaModularMultiplication<'a, 'd, T, Async>
     where
         T: RsaMode<InputType = [u32; N]>,
     {
@@ -460,13 +466,15 @@ pub(crate) mod asynch {
             operand_b: &T::InputType,
             outbuf: &mut T::InputType,
         ) {
-            self.start_modular_multiplication(operand_b);
-            RsaFuture::new(&self.rsa.rsa).await;
+            self.set_up_modular_multiplication(operand_b);
+            let fut = RsaFuture::new(self.rsa);
+            self.rsa.write_modmulti_start();
+            fut.await;
             self.rsa.read_out(outbuf);
         }
     }
 
-    impl<'a, 'd, T: RsaMode + Multi, const N: usize> RsaMultiplication<'a, 'd, T, crate::Async>
+    impl<'a, 'd, T: RsaMode + Multi, const N: usize> RsaMultiplication<'a, 'd, T, Async>
     where
         T: RsaMode<InputType = [u32; N]>,
     {
@@ -478,8 +486,10 @@ pub(crate) mod asynch {
         ) where
             T: Multi<OutputType = [u32; O]>,
         {
-            self.start_multiplication(operand_b);
-            RsaFuture::new(&self.rsa.rsa).await;
+            self.set_up_multiplication(operand_b);
+            let fut = RsaFuture::new(self.rsa);
+            self.rsa.write_multi_start();
+            fut.await;
             self.rsa.read_out(outbuf);
         }
     }

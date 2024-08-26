@@ -108,6 +108,10 @@ name    = "rsa"
 harness = false
 
 [[test]]
+name    = "rsa_async"
+harness = false
+
+[[test]]
 name    = "sha"
 harness = false
 
