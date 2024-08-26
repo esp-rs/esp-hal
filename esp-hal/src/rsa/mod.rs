@@ -16,7 +16,7 @@
 //! ## Examples
 //!
 //! ### Modular Exponentiation, Modular Multiplication, and Multiplication
-//! Visit the [RSA test] for an example of using the peripheral.
+//! Visit the [RSA test suite] for an example of using the peripheral.
 //!
 //! ## Implementation State
 //!
@@ -25,7 +25,7 @@
 //!   (to be solved).
 //!
 //! [nb]: https://docs.rs/nb/1.1.0/nb/
-//! [RSA test]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/rsa.rs
+//! [RSA test suite]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/rsa.rs
 
 use core::{marker::PhantomData, ptr::copy_nonoverlapping};
 
@@ -64,9 +64,8 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
 
     fn read_results<const N: usize>(&mut self, outbuf: &mut [u32; N]) {
         while !self.is_idle() {}
-        unsafe {
-            self.read_out(outbuf);
-        }
+        self.read_out(outbuf);
+
         self.clear_interrupt();
     }
 }
@@ -111,32 +110,48 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
         }
     }
 
-    unsafe fn write_operand_b<const N: usize>(&mut self, operand_b: &[u32; N]) {
-        copy_nonoverlapping(operand_b.as_ptr(), self.rsa.y_mem(0).as_ptr(), N);
+    fn write_operand_b<const N: usize>(&mut self, operand_b: &[u32; N]) {
+        unsafe {
+            copy_nonoverlapping(operand_b.as_ptr(), self.rsa.y_mem(0).as_ptr(), N);
+        }
     }
 
-    unsafe fn write_modulus<const N: usize>(&mut self, modulus: &[u32; N]) {
-        copy_nonoverlapping(modulus.as_ptr(), self.rsa.m_mem(0).as_ptr(), N);
+    fn write_modulus<const N: usize>(&mut self, modulus: &[u32; N]) {
+        unsafe {
+            copy_nonoverlapping(modulus.as_ptr(), self.rsa.m_mem(0).as_ptr(), N);
+        }
     }
 
     fn write_mprime(&mut self, m_prime: u32) {
         self.rsa.m_prime().write(|w| unsafe { w.bits(m_prime) });
     }
 
-    unsafe fn write_operand_a<const N: usize>(&mut self, operand_a: &[u32; N]) {
-        copy_nonoverlapping(operand_a.as_ptr(), self.rsa.x_mem(0).as_ptr(), N);
+    fn write_operand_a<const N: usize>(&mut self, operand_a: &[u32; N]) {
+        unsafe {
+            copy_nonoverlapping(operand_a.as_ptr(), self.rsa.x_mem(0).as_ptr(), N);
+        }
     }
 
-    unsafe fn write_r<const N: usize>(&mut self, r: &[u32; N]) {
-        copy_nonoverlapping(r.as_ptr(), self.rsa.z_mem(0).as_ptr(), N);
+    fn write_multi_operand_b<const N: usize>(&mut self, operand_b: &[u32; N]) {
+        unsafe {
+            copy_nonoverlapping(operand_b.as_ptr(), self.rsa.z_mem(0).as_ptr().add(N), N);
+        }
     }
 
-    unsafe fn read_out<const N: usize>(&mut self, outbuf: &mut [u32; N]) {
-        copy_nonoverlapping(
-            self.rsa.z_mem(0).as_ptr() as *const u32,
-            outbuf.as_ptr() as *mut u32,
-            N,
-        );
+    fn write_r<const N: usize>(&mut self, r: &[u32; N]) {
+        unsafe {
+            copy_nonoverlapping(r.as_ptr(), self.rsa.z_mem(0).as_ptr(), N);
+        }
+    }
+
+    fn read_out<const N: usize>(&mut self, outbuf: &mut [u32; N]) {
+        unsafe {
+            copy_nonoverlapping(
+                self.rsa.z_mem(0).as_ptr() as *const u32,
+                outbuf.as_ptr() as *mut u32,
+                N,
+            );
+        }
     }
 }
 
@@ -204,16 +219,47 @@ impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularExponentiati
 where
     T: RsaMode<InputType = [u32; N]>,
 {
+    /// Creates an instance of `RsaModularExponentiation`.
+    ///
+    /// `m_prime` could be calculated using `-(modular multiplicative inverse of
+    /// modulus) mod 2^32`.
+    ///
+    /// For more information refer to 24.3.2 of <https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf>.
+    pub fn new(
+        rsa: &'a mut Rsa<'d, DM>,
+        exponent: &T::InputType,
+        modulus: &T::InputType,
+        m_prime: u32,
+    ) -> Self {
+        Self::write_mode(rsa);
+        rsa.write_operand_b(exponent);
+        rsa.write_modulus(modulus);
+        rsa.write_mprime(m_prime);
+
+        #[cfg(not(esp32))]
+        if rsa.is_search_enabled() {
+            rsa.write_search_position(Self::find_search_pos(exponent));
+        }
+
+        Self {
+            rsa,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Starts the modular exponentiation operation on the RSA hardware.
+    fn start(&mut self) {
+        self.rsa.write_modexp_start();
+    }
+
     /// Starts the modular exponentiation operation.
     ///
     /// `r` can be calculated using `2 ^ ( bitlength * 2 ) mod modulus`.
     ///
     /// For more information refer to 24.3.2 of <https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf>.
     pub fn start_exponentiation(&mut self, base: &T::InputType, r: &T::InputType) {
-        unsafe {
-            self.rsa.write_operand_a(base);
-            self.rsa.write_r(r);
-        }
+        self.rsa.write_operand_a(base);
+        self.rsa.write_r(r);
         self.start();
     }
 
@@ -261,6 +307,17 @@ impl<'a, 'd, T: RsaMode + Multi, DM: crate::Mode, const N: usize> RsaMultiplicat
 where
     T: RsaMode<InputType = [u32; N]>,
 {
+    /// Creates an instance of `RsaMultiplication`.
+    pub fn new(rsa: &'a mut Rsa<'d, DM>, operand_a: &T::InputType) -> Self {
+        Self::write_mode(rsa);
+        rsa.write_operand_a(operand_a);
+
+        Self {
+            rsa,
+            phantom: PhantomData,
+        }
+    }
+
     /// Reads the result to the given buffer.
     /// This is a non blocking function that returns without an error if
     /// operation is completed successfully. `start_multiplication` must be
@@ -368,29 +425,13 @@ pub(crate) mod asynch {
     where
         T: RsaMode<InputType = [u32; N]>,
     {
-        #[cfg(not(esp32))]
         /// Asynchronously performs an RSA modular multiplication operation.
         pub async fn modular_multiplication(
             &mut self,
-            r: &T::InputType,
-            outbuf: &mut T::InputType,
-        ) {
-            self.start_modular_multiplication(r);
-            RsaFuture::new(&self.rsa.rsa).await;
-            self.read_results(outbuf);
-        }
-
-        #[cfg(esp32)]
-        /// Asynchronously performs an RSA modular multiplication operation.
-        pub async fn modular_multiplication(
-            &mut self,
-            operand_a: &T::InputType,
             operand_b: &T::InputType,
-            r: &T::InputType,
             outbuf: &mut T::InputType,
         ) {
-            self.start_step1(operand_a, r);
-            self.start_step2(operand_b);
+            self.start_modular_multiplication(operand_b);
             RsaFuture::new(&self.rsa.rsa).await;
             self.read_results(outbuf);
         }
@@ -400,7 +441,6 @@ pub(crate) mod asynch {
     where
         T: RsaMode<InputType = [u32; N]>,
     {
-        #[cfg(not(esp32))]
         /// Asynchronously performs an RSA multiplication operation.
         pub async fn multiplication<'b, const O: usize>(
             &mut self,
@@ -413,40 +453,22 @@ pub(crate) mod asynch {
             RsaFuture::new(&self.rsa.rsa).await;
             self.read_results(outbuf);
         }
-
-        #[cfg(esp32)]
-        /// Asynchronously performs an RSA multiplication operation.
-        pub async fn multiplication<'b, const O: usize>(
-            &mut self,
-            operand_a: &T::InputType,
-            operand_b: &T::InputType,
-            outbuf: &mut T::OutputType,
-        ) where
-            T: Multi<OutputType = [u32; O]>,
-        {
-            self.start_multiplication(operand_a, operand_b);
-            RsaFuture::new(&self.rsa.rsa).await;
-            self.read_results(outbuf);
-        }
     }
 
     #[handler]
     /// Interrupt handler for RSA.
     pub(super) fn rsa_interrupt_handler() {
-        #[cfg(not(any(esp32, esp32s2, esp32s3)))]
-        unsafe { &*crate::peripherals::RSA::ptr() }
-            .int_ena()
-            .modify(|_, w| w.int_ena().clear_bit());
+        let rsa = unsafe { &*crate::peripherals::RSA::ptr() };
 
-        #[cfg(esp32)]
-        unsafe { &*crate::peripherals::RSA::ptr() }
-            .interrupt()
-            .modify(|_, w| w.interrupt().clear_bit());
-
-        #[cfg(any(esp32s2, esp32s3))]
-        unsafe { &*crate::peripherals::RSA::ptr() }
-            .interrupt_ena()
-            .modify(|_, w| w.interrupt_ena().clear_bit());
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                rsa.interrupt().modify(|_, w| w.interrupt().clear_bit());
+            } else if #[cfg(any(esp32s2, esp32s3))] {
+                rsa.interrupt_ena().modify(|_, w| w.interrupt_ena().clear_bit());
+            } else {
+                rsa.int_ena().modify(|_, w| w.int_ena().clear_bit());
+            }
+        }
 
         WAKER.wake();
     }

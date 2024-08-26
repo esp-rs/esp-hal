@@ -1,6 +1,7 @@
 //! RSA Test
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: defmt
 
 #![no_std]
 #![no_main]
@@ -107,26 +108,16 @@ mod tests {
         ];
 
         let mut outbuf = [0_u32; U512::LIMBS];
+        let r = compute_r(&BIGNUM_3);
         let mut mod_multi =
             RsaModularMultiplication::<operand_sizes::Op512, esp_hal::Blocking>::new(
                 &mut ctx.rsa,
-                #[cfg(not(feature = "esp32"))]
                 BIGNUM_1.as_words(),
-                #[cfg(not(feature = "esp32"))]
-                BIGNUM_2.as_words(),
                 BIGNUM_3.as_words(),
+                r.as_words(),
                 compute_mprime(&BIGNUM_3),
             );
-        let r = compute_r(&BIGNUM_3);
-        #[cfg(feature = "esp32")]
-        {
-            mod_multi.start_step1(BIGNUM_1.as_words(), r.as_words());
-            mod_multi.start_step2(BIGNUM_2.as_words());
-        }
-        #[cfg(not(feature = "esp32"))]
-        {
-            mod_multi.start_modular_multiplication(r.as_words());
-        }
+        mod_multi.start_modular_multiplication(BIGNUM_2.as_words());
         mod_multi.read_results(&mut outbuf);
         assert_eq!(EXPECTED_OUTPUT, outbuf);
     }
@@ -145,21 +136,13 @@ mod tests {
         let operand_a = BIGNUM_1.as_words();
         let operand_b = BIGNUM_2.as_words();
 
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "esp32")] {
-                let mut rsamulti =
-                    RsaMultiplication::<operand_sizes::Op512, esp_hal::Blocking>::new(&mut ctx.rsa);
-                rsamulti.start_multiplication(operand_a, operand_b);
-                rsamulti.read_results(&mut outbuf);
-            } else {
-                let mut rsamulti = RsaMultiplication::<operand_sizes::Op512, esp_hal::Blocking>::new(
-                    &mut ctx.rsa,
-                    operand_a,
-                );
-                rsamulti.start_multiplication(operand_b);
-                rsamulti.read_results(&mut outbuf);
-            }
-        }
+        let mut rsamulti = RsaMultiplication::<operand_sizes::Op512, esp_hal::Blocking>::new(
+            &mut ctx.rsa,
+            operand_a,
+        );
+        rsamulti.start_multiplication(operand_b);
+        rsamulti.read_results(&mut outbuf);
+
         assert_eq!(EXPECTED_OUTPUT, outbuf)
     }
 }
