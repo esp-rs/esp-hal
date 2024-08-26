@@ -1,38 +1,31 @@
-//! # Rivest–Shamir–Adleman (RSA) Accelerator.
+//! # RSA (Rivest–Shamir–Adleman) accelerator.
 //!
 //! ## Overview
-//! The RSA Accelerator provides hardware support for high precision computation
+//!
+//! The RSA accelerator provides hardware support for high precision computation
 //! used in various RSA asymmetric cipher algorithms by significantly reducing
 //! their software complexity. Compared with RSA algorithms implemented solely
 //! in software, this hardware accelerator can speed up RSA algorithms
 //! significantly.
 //!
 //! ## Configuration
-//! The RSA Accelerator also supports operands of different lengths, which
+//!
+//! The RSA accelerator also supports operands of different lengths, which
 //! provides more flexibility during the computation.
 //!
-//! ## Usage
-//! Implementation details;
-//!    * The driver uses low-level peripheral access to read and write data
-//!      from/to the `RSA` peripheral.
-//!    * The driver contains `unsafe` code blocks as it directly manipulates
-//!      memory addresses for data transfer.
-//!    * The driver supports different sizes of operands based on the generic
-//!      types provided during instantiation.
-//!    * The [nb] crate is used to handle non-blocking operations.
-//!    * The driver provides a set of high-level abstractions to simplify `RSA`
-//!      cryptographic operations on `ESP` chips, allowing developers to
-//!      leverage the `RSA accelerator` for improved performance.
-//!
-//! This peripheral supports `async` on every available chip except of `esp32`
-//! (to be solved).
-//!
 //! ## Examples
+//!
 //! ### Modular Exponentiation, Modular Multiplication, and Multiplication
-//! Visit the [RSA] test for an example of using the peripheral.
+//! Visit the [RSA test] for an example of using the peripheral.
+//!
+//! ## Implementation State
+//!
+//! - The [nb] crate is used to handle non-blocking operations.
+//! - This peripheral supports `async` on every available chip except of `esp32`
+//!   (to be solved).
 //!
 //! [nb]: https://docs.rs/nb/1.1.0/nb/
-//! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/rsa.rs
+//! [RSA test]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/rsa.rs
 
 use core::{marker::PhantomData, ptr::copy_nonoverlapping};
 
@@ -67,6 +60,14 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
             crate::interrupt::enable(crate::peripherals::Interrupt::RSA, handler.priority())
                 .unwrap();
         }
+    }
+
+    fn read_results<const N: usize>(&mut self, outbuf: &mut [u32; N]) {
+        while !self.is_idle() {}
+        unsafe {
+            self.read_out(outbuf);
+        }
+        self.clear_interrupt();
     }
 }
 
@@ -156,16 +157,13 @@ macro_rules! implement_op {
         paste! {
             /// Represents an RSA operation for the given bit size with multi-output.
             pub struct [<Op $x>];
-        }
-        paste! {
+
             impl Multi for [<Op $x>] {
                 type OutputType = [u32; $x * 2 / 32];
             }
-        }
-        paste! {
+
             impl crate::private::Sealed for [<Op $x>] {}
-        }
-        paste! {
+
             impl RsaMode for [<Op $x>] {
                 type InputType = [u32; $x / 32];
             }
@@ -176,11 +174,9 @@ macro_rules! implement_op {
         paste! {
             /// Represents an RSA operation for the given bit size.
             pub struct [<Op $x>];
-        }
-        paste! {
+
             impl crate::private::Sealed for [<Op $x>] {}
-        }
-        paste! {
+
             impl RsaMode for [<Op $x>] {
                 type InputType = [u32; $x / 32];
             }
@@ -208,31 +204,26 @@ impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularExponentiati
 where
     T: RsaMode<InputType = [u32; N]>,
 {
-    /// starts the modular exponentiation operation. `r` could be calculated
-    /// using `2 ^ ( bitlength * 2 ) mod modulus`, for more information
-    /// check 24.3.2 in the <https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf>
+    /// Starts the modular exponentiation operation.
+    ///
+    /// `r` can be calculated using `2 ^ ( bitlength * 2 ) mod modulus`.
+    ///
+    /// For more information refer to 24.3.2 of <https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf>.
     pub fn start_exponentiation(&mut self, base: &T::InputType, r: &T::InputType) {
         unsafe {
             self.rsa.write_operand_a(base);
             self.rsa.write_r(r);
         }
-        self.set_start();
+        self.start();
     }
 
-    /// reads the result to the given buffer.
+    /// Reads the result to the given buffer.
+    ///
     /// This is a non blocking function that returns without an error if
     /// operation is completed successfully. `start_exponentiation` must be
     /// called before calling this function.
     pub fn read_results(&mut self, outbuf: &mut T::InputType) {
-        loop {
-            if self.rsa.is_idle() {
-                unsafe {
-                    self.rsa.read_out(outbuf);
-                }
-                self.rsa.clear_interrupt();
-                break;
-            }
-        }
+        self.rsa.read_results(outbuf);
     }
 }
 
@@ -253,15 +244,7 @@ where
     /// This is a non blocking function that returns without an error if
     /// operation is completed successfully.
     pub fn read_results(&mut self, outbuf: &mut T::InputType) {
-        loop {
-            if self.rsa.is_idle() {
-                unsafe {
-                    self.rsa.read_out(outbuf);
-                }
-                self.rsa.clear_interrupt();
-                break;
-            }
-        }
+        self.rsa.read_results(outbuf);
     }
 }
 
@@ -286,15 +269,7 @@ where
     where
         T: Multi<OutputType = [u32; O]>,
     {
-        loop {
-            if self.rsa.is_idle() {
-                unsafe {
-                    self.rsa.read_out(outbuf);
-                }
-                self.rsa.clear_interrupt();
-                break;
-            }
-        }
+        self.rsa.read_results(outbuf);
     }
 }
 
@@ -324,34 +299,34 @@ pub(crate) mod asynch {
     impl<'d> RsaFuture<'d> {
         /// Asynchronously initializes the RSA peripheral.
         pub async fn new(instance: &'d crate::peripherals::RSA) -> Self {
-            #[cfg(not(any(esp32, esp32s2, esp32s3)))]
-            instance.int_ena().modify(|_, w| w.int_ena().set_bit());
-
-            #[cfg(any(esp32s2, esp32s3))]
-            instance
-                .interrupt_ena()
-                .modify(|_, w| w.interrupt_ena().set_bit());
-
-            #[cfg(esp32)]
-            instance.interrupt().modify(|_, w| w.interrupt().set_bit());
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    instance.interrupt().modify(|_, w| w.interrupt().set_bit());
+                } else if #[cfg(any(esp32s2, esp32s3))] {
+                    instance.interrupt_ena().modify(|_, w| w.interrupt_ena().set_bit());
+                } else {
+                    instance.int_ena().modify(|_, w| w.int_ena().set_bit());
+                }
+            }
 
             Self { instance }
         }
 
         fn event_bit_is_clear(&self) -> bool {
-            #[cfg(not(any(esp32, esp32s2, esp32s3)))]
-            return self.instance.int_ena().read().int_ena().bit_is_clear();
-
-            #[cfg(any(esp32s2, esp32s3))]
-            return self
-                .instance
-                .interrupt_ena()
-                .read()
-                .interrupt_ena()
-                .bit_is_clear();
-
-            #[cfg(esp32)]
-            return self.instance.interrupt().read().interrupt().bit_is_clear();
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    self.instance.interrupt().read().interrupt().bit_is_clear()
+                } else if #[cfg(any(esp32s2, esp32s3))] {
+                    self
+                        .instance
+                        .interrupt_ena()
+                        .read()
+                        .interrupt_ena()
+                        .bit_is_clear()
+                } else {
+                    self.instance.int_ena().read().int_ena().bit_is_clear()
+                }
+            }
         }
     }
 
