@@ -1669,7 +1669,7 @@ pub mod asynch {
 
     use super::{private::Instance, Error, ParlIoRx, ParlIoTx, MAX_DMA_SIZE};
     use crate::{
-        dma::{asynch::DmaRxFuture, DmaChannel, ParlIoPeripheral},
+        dma::{asynch::DmaRxFuture, DmaChannel, ParlIoPeripheral, ReadBuffer, WriteBuffer},
         peripherals::Interrupt,
     };
 
@@ -1731,8 +1731,11 @@ pub mod asynch {
         /// Perform a DMA write.
         ///
         /// The maximum amount of data to be sent is 32736 bytes.
-        pub async fn write_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-            let (ptr, len) = (words.as_ptr(), words.len());
+        pub async fn write_dma_async<'t, TXBUF>(&mut self, words: &'t TXBUF) -> Result<(), Error>
+        where
+            TXBUF: ReadBuffer,
+        {
+            let (ptr, len) = unsafe { words.read_buffer() };
 
             if len > MAX_DMA_SIZE {
                 return Err(Error::MaxDmaTransferSizeExceeded);
@@ -1754,8 +1757,14 @@ pub mod asynch {
         /// Perform a DMA write.
         ///
         /// The maximum amount of data to be sent is 32736 bytes.
-        pub async fn read_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-            let (ptr, len) = (words.as_mut_ptr(), words.len());
+        pub async fn read_dma_async<'t, RXBUF>(
+            &'t mut self,
+            words: &'t mut RXBUF,
+        ) -> Result<(), Error>
+        where
+            RXBUF: WriteBuffer,
+        {
+            let (ptr, len) = unsafe { words.write_buffer() };
 
             if !Instance::is_suc_eof_generated_externally() && len > MAX_DMA_SIZE {
                 return Err(Error::MaxDmaTransferSizeExceeded);

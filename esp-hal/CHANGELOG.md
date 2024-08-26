@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DMA buffers now don't require a static lifetime. Make sure to never `mem::forget` an in-progress DMA transfer (consider using `#[deny(clippy::mem_forget)]`) (#1837)
 - SHA driver now use specific structs for the hashing algorithm instead of a parameter. (#1908)
 - Remove `fn free(self)` in HMAC which goes against esp-hal API guidelines (#1972)
+- PARL_IO use ReadBuffer and WriteBuffer for Async DMA (#1996)
 
 ### Fixed
 
