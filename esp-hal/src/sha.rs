@@ -159,19 +159,7 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
     /// Checks if the SHA peripheral is busy processing data.
     ///
     /// Returns `true` if the SHA peripheral is busy, `false` otherwise.
-    /// ESP32 uses a different register per hash mode.
-    #[cfg(esp32)]
     fn is_busy(&self) -> bool;
-
-    /// Checks if the SHA peripheral is busy processing data.
-    ///
-    /// Returns `true` if the SHA peripheral is busy, `false` otherwise.
-    #[cfg(not(esp32))]
-    fn is_busy(&self) -> bool {
-        // Safety: This is safe because we only read `SHA_BUSY_REG`
-        let sha = unsafe { crate::peripherals::SHA::steal() };
-        sha.busy().read().bits() != 0
-    }
 
     /// Processes the data buffer and updates the hash state.
     ///
@@ -199,11 +187,8 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
         } else {
             // Restore previously saved hash if interleaving operation
             if let Some(ref saved_digest) = self.saved_digest.take() {
-                self.alignment_helper.volatile_write_regset(
-                    sha.h_mem(0).as_ptr(),
-                    saved_digest,
-                    64,
-                );
+                self.alignment_helper
+                    .volatile_write_regset(h_mem(&sha, 0), saved_digest, 64);
             }
             // SET SHA_CONTINUE_REG
             sha.continue_().write(|w| unsafe { w.bits(1) });
@@ -215,7 +200,7 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
         // Save the content of the current hash for interleaving operation.
         let mut saved_digest = [0u8; 64];
         self.alignment_helper.volatile_read_regset(
-            sha.h_mem(0).as_ptr(),
+            h_mem(&sha, 0),
             &mut saved_digest,
             64 / self.alignment_helper.align_size(),
         );
@@ -243,19 +228,13 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
         unsafe {
             core::ptr::copy_nonoverlapping(
                 ctx.buffer.as_ptr(),
-                #[cfg(esp32)]
-                sha.text(0).as_ptr(),
-                #[cfg(not(esp32))]
-                sha.m_mem(0).as_ptr(),
+                m_mem(&sha, 0),
                 (ctx.cursor % chunk_len) / ctx.alignment_helper.align_size(),
             );
         }
 
         let flushed = ctx.alignment_helper.flush_to(
-            #[cfg(esp32)]
-            sha.text(0).as_ptr(),
-            #[cfg(not(esp32))]
-            sha.m_mem(0).as_ptr(),
+            m_mem(&sha, 0),
             (ctx.cursor % chunk_len) / ctx.alignment_helper.align_size(),
         );
 
@@ -293,14 +272,7 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
             // be fully processed then saved.
             unsafe {
                 let sha = crate::peripherals::SHA::steal();
-                core::ptr::copy_nonoverlapping(
-                    self.buffer.as_ptr(),
-                    #[cfg(esp32)]
-                    sha.text(0).as_ptr(),
-                    #[cfg(not(esp32))]
-                    sha.m_mem(0).as_ptr(),
-                    32,
-                );
+                core::ptr::copy_nonoverlapping(self.buffer.as_ptr(), m_mem(&sha, 0), 32);
             }
             self.process_buffer();
         }
@@ -334,11 +306,10 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
         // If not enough free space for length+1, add length at end of a new zero'd
         // block
 
-        let sha = unsafe { crate::peripherals::SHA::steal() };
-
         if self.is_busy() {
             return Err(nb::Error::WouldBlock);
         }
+        let sha = unsafe { crate::peripherals::SHA::steal() };
 
         let chunk_len = self.chunk_length();
 
@@ -354,11 +325,9 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
             // buffer
             let pad_len = chunk_len - mod_cursor;
             let ctx = self.deref_mut();
+
             ctx.alignment_helper.volatile_write_bytes(
-                #[cfg(esp32)]
-                sha.text(0).as_ptr(),
-                #[cfg(not(esp32))]
-                sha.m_mem(0).as_ptr(),
+                m_mem(&sha, 0),
                 0_u8,
                 pad_len / ctx.alignment_helper.align_size(),
                 mod_cursor / ctx.alignment_helper.align_size(),
@@ -376,21 +345,16 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
         let pad_len = chunk_len - mod_cursor - core::mem::size_of::<u64>();
 
         let ctx = self.deref_mut();
+
         ctx.alignment_helper.volatile_write_bytes(
-            #[cfg(esp32)]
-            sha.text(0).as_ptr(),
-            #[cfg(not(esp32))]
-            sha.m_mem(0).as_ptr(),
+            m_mem(&sha, 0),
             0_u8,
             pad_len / ctx.alignment_helper.align_size(),
             mod_cursor / ctx.alignment_helper.align_size(),
         );
 
         ctx.alignment_helper.aligned_volatile_copy(
-            #[cfg(esp32)]
-            sha.text(0).as_ptr(),
-            #[cfg(not(esp32))]
-            sha.m_mem(0).as_ptr(),
+            m_mem(&sha, 0),
             &length,
             chunk_len / ctx.alignment_helper.align_size(),
             (chunk_len - core::mem::size_of::<u64>()) / ctx.alignment_helper.align_size(),
@@ -409,10 +373,7 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
         }
 
         self.alignment_helper.volatile_read_regset(
-            #[cfg(esp32)]
-            sha.text(0).as_ptr(),
-            #[cfg(not(esp32))]
-            sha.h_mem(0).as_ptr(),
+            h_mem(&sha, 0),
             output,
             core::cmp::min(output.len(), 32) / self.alignment_helper.align_size(),
         );
@@ -509,11 +470,16 @@ macro_rules! impl_sha {
                 }
             }
 
-            #[cfg(esp32)]
             fn is_busy(&self) -> bool {
                 let sha = unsafe { crate::peripherals::SHA::steal() };
-                paste::paste! {
-                    sha.[< $name:lower _busy >]().read().[< $name:lower _busy >]().bit_is_set()
+                cfg_if::cfg_if! {
+                    if #[cfg(esp32)] {
+                        paste::paste! {
+                            sha.[< $name:lower _busy >]().read().[< $name:lower _busy >]().bit_is_set()
+                        }
+                    } else {
+                        sha.busy().read().bits() != 0
+                    }
                 }
             }
 
@@ -591,3 +557,23 @@ impl_sha!(Sha512, 4, 64, 128);
 impl_sha!(Sha512_224, 5, 28, 128);
 #[cfg(any(esp32s2, esp32s3))]
 impl_sha!(Sha512_256, 6, 32, 128);
+
+fn h_mem(sha: &crate::peripherals::SHA, index: usize) -> *mut u32 {
+    cfg_if::cfg_if! {
+        if #[cfg(esp32)] {
+            sha.text(index).as_ptr()
+        } else {
+            sha.h_mem(index).as_ptr()
+        }
+    }
+}
+
+fn m_mem(sha: &crate::peripherals::SHA, index: usize) -> *mut u32 {
+    cfg_if::cfg_if! {
+        if #[cfg(esp32)] {
+            sha.text(index).as_ptr()
+        } else {
+            sha.m_mem(index).as_ptr()
+        }
+    }
+}
