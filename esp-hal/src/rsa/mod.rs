@@ -140,15 +140,15 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
     }
 }
 
-/// Defines an RSA operation mode.
+/// Defines the input size of an RSA operation.
 pub trait RsaMode: crate::private::Sealed {
-    /// The input data type used for the RSA operation.
+    /// The input data type used for the operation.
     type InputType;
 }
 
-/// A trait for RSA operations that involve multiple inputs and outputs.
+/// Defines the output type of RSA multiplications.
 pub trait Multi: RsaMode {
-    /// The type of the output produced by the RSA operation.
+    /// The type of the output produced by the operation.
     type OutputType;
 }
 
