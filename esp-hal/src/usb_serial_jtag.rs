@@ -45,7 +45,7 @@
 //! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 //!
 //! // Write bytes out over the USB Serial/JTAG:
-//! usb_serial.write_bytes("Hello, world!".as_bytes()).expect("write error!");
+//! usb_serial.write_bytes(b"Hello, world!").expect("write error!");
 //! }
 //! ```
 //! 

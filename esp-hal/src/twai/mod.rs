@@ -31,7 +31,6 @@
 //! # use esp_hal::twai::TwaiMode;
 //! # use esp_hal::gpio::Io;
 //! # use embedded_can::Frame;
-//! # use core::option::Option::None;
 //! # use nb::block;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
@@ -87,7 +86,6 @@
 //! # use esp_hal::twai::TwaiMode;
 //! # use esp_hal::gpio::Io;
 //! # use embedded_can::Frame;
-//! # use core::option::Option::None;
 //! # use nb::block;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI

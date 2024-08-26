@@ -33,19 +33,17 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::sha::Sha;
 //! # use esp_hal::sha::Sha256;
-//! # use core::option::Option::None;
 //! # use nb::block;
-//! let source_data = "HELLO, ESPRESSIF!".as_bytes();
-//! let mut remaining = source_data;
+//! let mut source_data = "HELLO, ESPRESSIF!".as_bytes();
 //! let mut hasher = Sha256::new();
 //! // Short hashes can be created by decreasing the output buffer to the
 //! // desired length
 //! let mut output = [0u8; 32];
 //!
-//! while remaining.len() > 0 {
+//! while !source_data.is_empty() {
 //!     // All the HW Sha functions are infallible so unwrap is fine to use if
 //!     // you use block!
-//!     remaining = block!(hasher.update(remaining)).unwrap();
+//!     source_data = block!(hasher.update(source_data)).unwrap();
 //! }
 //!
 //! // Finish can be called as many times as desired to get multiple copies of

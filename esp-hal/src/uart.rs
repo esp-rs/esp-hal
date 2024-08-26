@@ -20,7 +20,6 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use core::option::Option::Some;
 //! # use esp_hal::uart::{config::Config, Uart};
 //! use esp_hal::gpio::Io;
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -31,7 +30,7 @@
 //! ```
 //! 
 //! The UART controller can be configured to invert the polarity of the pins.
-//! This is achived by inverting the desired pins, and then constucting the
+//! This is achived by inverting the desired pins, and then constructing the
 //! UART instance using the inverted pins.
 //!
 //! ## Usage
@@ -60,7 +59,7 @@
 //! #     io.pins.gpio2,
 //! # ).unwrap();
 //! // Write bytes out over the UART:
-//! uart1.write_bytes("Hello, world!".as_bytes()).expect("write error!");
+//! uart1.write_bytes(b"Hello, world!").expect("write error!");
 //! # }
 //! ```
 //! 

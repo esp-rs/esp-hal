@@ -27,7 +27,6 @@
 //! # use esp_hal::analog::adc::Adc;
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::gpio::Io;
-//! # use core::result::Result::Err;
 //!
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 #![cfg_attr(esp32, doc = "let analog_pin = io.pins.gpio32;")]
