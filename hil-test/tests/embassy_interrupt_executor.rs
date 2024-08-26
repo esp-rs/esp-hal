@@ -3,11 +3,21 @@
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: integrated-timers
+//% FEATURES: generic-queue
 
 #![no_std]
 #![no_main]
 
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
+use esp_hal::{
+    clock::ClockControl,
+    interrupt::Priority,
+    peripherals::Peripherals,
+    system::{SoftwareInterrupt, SystemControl},
+    timer::timg::TimerGroup,
+};
+use esp_hal_embassy::InterruptExecutor;
+use hil_test as _;
 
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
@@ -26,24 +36,19 @@ async fn interrupt_driven_task(signal: &'static Signal<CriticalSectionRawMutex, 
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
 mod test {
-    use esp_hal::{
-        clock::ClockControl,
-        interrupt::Priority,
-        peripherals::Peripherals,
-        system::{SoftwareInterrupt, SystemControl},
-    };
-    use esp_hal_embassy::InterruptExecutor;
-    use hil_test as _;
-
     use super::*;
 
     #[init]
     fn init() -> SoftwareInterrupt<1> {
         let peripherals = Peripherals::take();
         let system = SystemControl::new(peripherals.SYSTEM);
-        let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+        let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+        esp_hal_embassy::init(&clocks, timg0.timer0);
+
         system.software_interrupt_control.software_interrupt1
     }
 

@@ -6,6 +6,7 @@
 //! with loopback mode enabled). It's using circular DMA mode
 
 //% CHIPS: esp32c3 esp32c6 esp32s3 esp32h2
+//% FEATURES: generic-queue
 
 #![no_std]
 #![no_main]

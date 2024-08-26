@@ -136,7 +136,7 @@ required-features = ["async", "embassy"]
 [[test]]
 name              = "embassy_interrupt_executor"
 harness           = false
-required-features = ["async", "embassy", "integrated-timers"]
+required-features = ["async", "embassy"]
 
 [[test]]
 name    = "twai"
@@ -149,7 +149,7 @@ defmt              = "0.3.8"
 defmt-rtt          = { version = "0.4.1", optional = true }
 embassy-futures    = "0.1.1"
 embassy-sync       = "0.6.0"
-embassy-time       = { version = "0.3.1", features = ["generic-queue-64"] }
+embassy-time       = { version = "0.3.1" }
 embedded-hal       = "1.0.0"
 embedded-hal-02    = { version = "0.2.7", package = "embedded-hal", features = ["unproven"] }
 embedded-hal-async = { version = "1.0.0", optional = true }
@@ -214,8 +214,11 @@ embassy = [
     "embedded-test/external-executor",
     "dep:esp-hal-embassy",
 ]
+generic-queue = [
+    "embassy-time/generic-queue-64"
+]
 integrated-timers = [
-    "embassy-executor/integrated-timers",
+    "esp-hal-embassy/integrated-timers",
 ]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html#test
