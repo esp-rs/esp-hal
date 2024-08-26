@@ -1,4 +1,4 @@
-use core::{convert::Infallible, marker::PhantomData};
+use core::convert::Infallible;
 
 use crate::rsa::{
     implement_op,
@@ -32,7 +32,7 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
         }
     }
 
-    pub(super) fn write_mode(&mut self, mode: u32) {
+    fn write_mode(&mut self, mode: u32) {
         self.rsa.mode().write(|w| unsafe { w.bits(mode) });
     }
 
@@ -236,7 +236,7 @@ impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularExponentiati
 where
     T: RsaMode<InputType = [u32; N]>,
 {
-    fn find_search_pos(exponent: &T::InputType) -> u32 {
+    pub(super) fn find_search_pos(exponent: &T::InputType) -> u32 {
         for (i, byte) in exponent.iter().rev().enumerate() {
             if *byte == 0 {
                 continue;
@@ -247,7 +247,7 @@ where
     }
 
     /// Sets the modular exponentiation mode for the RSA hardware.
-    fn write_mode(rsa: &mut Rsa<'d, DM>) {
+    pub(super) fn write_mode(rsa: &mut Rsa<'d, DM>) {
         rsa.write_mode((N - 1) as u32)
     }
 }
@@ -256,37 +256,7 @@ impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularMultiplicati
 where
     T: RsaMode<InputType = [u32; N]>,
 {
-    fn write_mode(rsa: &mut Rsa<'d, DM>) {
-        rsa.write_mode((N - 1) as u32)
-    }
-
-    /// Creates an instance of `RsaModularMultiplication`.
-    ///
-    /// - `r` can be calculated using `2 ^ ( bitlength * 2 ) mod modulus`.
-    /// - `m_prime` can be calculated using `-(modular multiplicative inverse of
-    ///   modulus) mod 2^32`.
-    ///
-    /// For more information refer to 19.3.1 of <https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf>.
-    pub fn new(
-        rsa: &'a mut Rsa<'d, DM>,
-        operand_a: &T::InputType,
-        modulus: &T::InputType,
-        r: &T::InputType,
-        m_prime: u32,
-    ) -> Self {
-        Self::write_mode(rsa);
-        rsa.write_mprime(m_prime);
-        rsa.write_modulus(modulus);
-        rsa.write_operand_a(operand_a);
-        rsa.write_r(r);
-
-        Self {
-            rsa,
-            phantom: PhantomData,
-        }
-    }
-
-    fn write_mode(rsa: &mut Rsa<'d, DM>) {
+    pub(super) fn write_mode(rsa: &mut Rsa<'d, DM>) {
         rsa.write_mode((N - 1) as u32)
     }
 
@@ -295,10 +265,6 @@ where
     /// For more information refer to 19.3.1 of <https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf>.
     pub fn start_modular_multiplication(&mut self, operand_b: &T::InputType) {
         self.rsa.write_operand_b(operand_b);
-        self.start();
-    }
-
-    fn start(&mut self) {
         self.rsa.write_modmulti_start();
     }
 }
@@ -314,7 +280,7 @@ where
     }
 
     /// Sets the multiplication mode for the RSA hardware.
-    fn write_mode(rsa: &mut Rsa<'d, DM>) {
+    pub(super) fn write_mode(rsa: &mut Rsa<'d, DM>) {
         rsa.write_mode((N * 2 - 1) as u32)
     }
 

@@ -62,11 +62,14 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
         }
     }
 
-    fn read_results<const N: usize>(&mut self, outbuf: &mut [u32; N]) {
+    fn wait_for_idle(&mut self) {
         while !self.is_idle() {}
-        self.read_out(outbuf);
-
         self.clear_interrupt();
+    }
+
+    fn read_results<const N: usize>(&mut self, outbuf: &mut [u32; N]) {
+        self.wait_for_idle();
+        self.read_out(outbuf);
     }
 }
 
@@ -170,7 +173,7 @@ pub trait Multi: RsaMode {
 macro_rules! implement_op {
     (($x:literal, multi)) => {
         paste! {
-            /// Represents an RSA operation for the given bit size with multi-output.
+            #[doc = concat!($x, "-bit RSA operation.")]
             pub struct [<Op $x>];
 
             impl Multi for [<Op $x>] {
@@ -286,6 +289,32 @@ impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularMultiplicati
 where
     T: RsaMode<InputType = [u32; N]>,
 {
+    /// Creates an instance of `RsaModularMultiplication`.
+    ///
+    /// - `r` can be calculated using `2 ^ ( bitlength * 2 ) mod modulus`.
+    /// - `m_prime` can be calculated using `-(modular multiplicative inverse of
+    ///   modulus) mod 2^32`.
+    ///
+    /// For more information refer to 20.3.1 of <https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf>.
+    pub fn new(
+        rsa: &'a mut Rsa<'d, DM>,
+        operand_a: &T::InputType,
+        modulus: &T::InputType,
+        r: &T::InputType,
+        m_prime: u32,
+    ) -> Self {
+        Self::write_mode(rsa);
+        rsa.write_mprime(m_prime);
+        rsa.write_modulus(modulus);
+        rsa.write_operand_a(operand_a);
+        rsa.write_r(r);
+
+        Self {
+            rsa,
+            phantom: PhantomData,
+        }
+    }
+
     /// Reads the result to the given buffer.
     /// This is a non blocking function that returns without an error if
     /// operation is completed successfully.
@@ -417,7 +446,7 @@ pub(crate) mod asynch {
         ) {
             self.start_exponentiation(base, r);
             RsaFuture::new(&self.rsa.rsa).await;
-            self.read_results(outbuf);
+            self.rsa.read_out(outbuf);
         }
     }
 
@@ -433,7 +462,7 @@ pub(crate) mod asynch {
         ) {
             self.start_modular_multiplication(operand_b);
             RsaFuture::new(&self.rsa.rsa).await;
-            self.read_results(outbuf);
+            self.rsa.read_out(outbuf);
         }
     }
 
@@ -451,7 +480,7 @@ pub(crate) mod asynch {
         {
             self.start_multiplication(operand_b);
             RsaFuture::new(&self.rsa.rsa).await;
-            self.read_results(outbuf);
+            self.rsa.read_out(outbuf);
         }
     }
 
