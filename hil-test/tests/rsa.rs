@@ -57,7 +57,7 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        let (peripherals, _clocks) = esp_hal::init(CpuClock::boot_default());
+        let (peripherals, _clocks) = esp_hal::init(Config::default());
         let mut rsa = Rsa::new(peripherals.RSA);
         nb::block!(rsa.ready()).unwrap();
 

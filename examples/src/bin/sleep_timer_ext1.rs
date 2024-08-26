@@ -28,7 +28,7 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+    let (peripherals, clocks) = esp_hal::init(Config::default());
 
     let mut rtc = Rtc::new(peripherals.LPWR);
 

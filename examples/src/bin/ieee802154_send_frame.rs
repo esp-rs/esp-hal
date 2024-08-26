@@ -19,7 +19,7 @@ use ieee802154::mac::{
 
 #[entry]
 fn main() -> ! {
-    let (mut peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+    let (mut peripherals, clocks) = esp_hal::init(Config::default());
 
     let delay = Delay::new(&clocks);
 

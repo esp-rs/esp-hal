@@ -18,7 +18,7 @@ use esp_hal::{
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+    let (peripherals, clocks) = esp_hal::init(Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let pin = io.pins.gpio0;

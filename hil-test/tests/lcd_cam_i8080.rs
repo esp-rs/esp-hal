@@ -35,7 +35,7 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+        let (peripherals, clocks) = esp_hal::init(Config::default());
         let dma = Dma::new(peripherals.DMA);
         let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
         let (tx_buffer, tx_descriptors, _, _) = dma_buffers!(DATA_SIZE, 0);

@@ -31,7 +31,7 @@ static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+    let (peripherals, clocks) = esp_hal::init(Config::default());
 
     let delay = Delay::new(&clocks);
 

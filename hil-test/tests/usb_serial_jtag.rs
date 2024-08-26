@@ -13,7 +13,7 @@ mod tests {
 
     #[test]
     fn creating_peripheral_does_not_break_debug_connection() {
-        let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+        let (peripherals, clocks) = esp_hal::init(Config::default());
 
         let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
         esp_hal_embassy::init(&clocks, timg0.timer0);

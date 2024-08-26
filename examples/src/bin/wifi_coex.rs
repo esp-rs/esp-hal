@@ -47,7 +47,11 @@ const PASSWORD: &str = env!("PASSWORD");
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
-    let (peripherals, clocks) = esp_hal::init(CpuClock::max());
+    let (peripherals, clocks) = esp_hal::init({
+        let mut config = Config::default();
+        config.cpu_clock = CpuClock::max();
+        config
+    });
 
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
 

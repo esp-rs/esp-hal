@@ -85,7 +85,7 @@ mod tests {
     async fn test_i2s_loopback() {
         let spawner = embassy_executor::Spawner::for_current_executor().await;
 
-        let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+        let (peripherals, clocks) = esp_hal::init(Config::default());
 
         let peripherals = peripherals;
         let clocks = clocks;

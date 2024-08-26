@@ -58,7 +58,7 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, Uart};
 //! # use esp_hal::gpio::Io;
-//! # let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+//! # let (peripherals, clocks) = esp_hal::init(Config::default());
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let mut uart1 = Uart::new_with_config(
 //! #     peripherals.UART1,
@@ -77,7 +77,7 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, Uart};
 //! # use esp_hal::gpio::Io;
-//! # let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+//! # let (peripherals, clocks) = esp_hal::init(Config::default());
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let mut uart1 = Uart::new_with_config(
 //! #     peripherals.UART1,

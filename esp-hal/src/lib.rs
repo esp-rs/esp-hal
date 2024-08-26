@@ -73,7 +73,7 @@
 //!
 //! #[entry]
 //! fn main() -> ! {
-//!     let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+//!     let (peripherals, clocks) = esp_hal::init(Config::default());
 //!
 //!     // Set GPIO0 as an output, and set its state high initially.
 //!     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -623,7 +623,7 @@ macro_rules! before_snippet {
 #     loop {}
 # }
 # fn main() {
-#     let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+#     let (peripherals, clocks) = esp_hal::init(Config::default());
 "#
     };
 }
@@ -633,12 +633,20 @@ use crate::{
     peripherals::Peripherals,
 };
 
+/// System configuration.
+#[non_exhaustive]
+#[derive(Default)]
+pub struct Config {
+    /// The CPU clock configuration.
+    pub cpu_clock: CpuClock,
+}
+
 /// Initialize the system.
 ///
 /// This function sets up the CPU clock and returns the peripherals and clocks.
-pub fn init(clock_config: CpuClock) -> (Peripherals, Clocks<'static>) {
+pub fn init(config: Config) -> (Peripherals, Clocks<'static>) {
     let peripherals = Peripherals::take();
-    let clocks = ClockControl::new(clock_config).freeze();
+    let clocks = ClockControl::new(config.cpu_clock).freeze();
 
     (peripherals, clocks)
 }

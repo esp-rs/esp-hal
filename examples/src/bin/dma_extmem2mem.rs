@@ -62,7 +62,7 @@ fn init_heap(psram: impl esp_hal::peripheral::Peripheral<P = esp_hal::peripheral
 fn main() -> ! {
     esp_println::logger::init_logger(log::LevelFilter::Info);
 
-    let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+    let (peripherals, clocks) = esp_hal::init(Config::default());
 
     init_heap(peripherals.PSRAM);
     let delay = Delay::new(&clocks);

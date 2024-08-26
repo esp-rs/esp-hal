@@ -26,7 +26,7 @@
 //! # use esp_hal::uart::Uart;
 //! # use core::writeln;
 //! # use core::fmt::Write;
-//! # let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+//! # let (peripherals, clocks) = esp_hal::init(Config::default());
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let mut serial_tx = Uart::new(peripherals.UART0, &clocks, io.pins.gpio4, io.pins.gpio5).unwrap();
 //! let mac_address = Efuse::read_base_mac_address();

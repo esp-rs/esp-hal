@@ -24,7 +24,7 @@ use fugit::ExtU32;
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, _clocks) = esp_hal::init(CpuClock::boot_default());
+    let (peripherals, _clocks) = esp_hal::init(Config::default());
 
     let syst = SystemTimer::new(peripherals.SYSTIMER);
     let syst_alarms = syst.split::<Periodic>();

@@ -128,7 +128,7 @@ mod test {
 
     #[init]
     fn init() -> (Peripherals, Clocks<'static>) {
-        esp_hal::init(CpuClock::boot_default())
+        esp_hal::init(Config::default())
     }
 
     #[test]

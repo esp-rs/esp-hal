@@ -39,7 +39,7 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+        let (peripherals, clocks) = esp_hal::init(Config::default());
 
         let dma = Dma::new(peripherals.DMA);
         let channel = dma.channel0.configure(false, DmaPriority::Priority0);

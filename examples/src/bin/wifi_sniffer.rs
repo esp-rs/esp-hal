@@ -33,7 +33,11 @@ static KNOWN_SSIDS: Mutex<RefCell<BTreeSet<String>>> = Mutex::new(RefCell::new(B
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
-    let (peripherals, clocks) = esp_hal::init(CpuClock::max());
+    let (peripherals, clocks) = esp_hal::init({
+        let mut config = Config::default();
+        config.cpu_clock = CpuClock::max();
+        config
+    });
 
     // Create a heap allocator, with 32kB of space.
     heap_allocator!(32_168);

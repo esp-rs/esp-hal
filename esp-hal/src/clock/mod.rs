@@ -48,7 +48,11 @@
 //! # }
 //! # fn main() {
 //! // Initialize with the highest possible frequency for this chip
-//! let system = esp_hal::init(CpuClock::max());
+//! let (peripherals, clocks) = esp_hal::init({
+//!     let mut config = Config::default();
+//!     config.cpu_clock = CpuClock::max();
+//!     config
+//! });
 //!
 //! // Initialize with custom clock frequency
 #![cfg_attr(
@@ -59,7 +63,7 @@
 #![cfg_attr(esp32h2, doc = "// let system = esp_hal::init(CpuClock::Clock96MHz);")]
 //! //
 //! // Initialize with default clock frequency for this chip
-//! // let (peripherals, clocks) = esp_hal::init(CpuClock::boot_default());
+//! // let (peripherals, clocks) = esp_hal::init(Config::default());
 //! # }
 //! ```
 
@@ -124,13 +128,6 @@ pub enum CpuClock {
 
 impl Default for CpuClock {
     fn default() -> Self {
-        Self::boot_default()
-    }
-}
-
-impl CpuClock {
-    /// Use the default frequency.
-    pub fn boot_default() -> Self {
         cfg_if::cfg_if! {
             if #[cfg(esp32h2)] {
                 Self::Clock96MHz
@@ -140,9 +137,11 @@ impl CpuClock {
             }
         }
     }
+}
 
+impl CpuClock {
     /// Use the highest possible frequency for a particular chip.
-    pub fn max() -> Self {
+    pub const fn max() -> Self {
         cfg_if::cfg_if! {
             if #[cfg(esp32c2)] {
                 Self::Clock120MHz
@@ -389,7 +388,7 @@ impl ClockControl {
             XtalClock::RtcXtalFreq26M
         };
 
-        if cpu_clock_speed != CpuClock::boot_default() {
+        if cpu_clock_speed != CpuClock::default() {
             let pll_freq = match cpu_clock_speed {
                 CpuClock::Clock80MHz => PllClock::Pll320MHz,
                 CpuClock::Clock160MHz => PllClock::Pll320MHz,
@@ -429,7 +428,7 @@ impl ClockControl {
         XTAL_FREQ_MHZ.store(xtal_freq.mhz(), Ordering::Relaxed);
 
         let apb_freq;
-        if cpu_clock_speed != CpuClock::boot_default() {
+        if cpu_clock_speed != CpuClock::default() {
             let pll_freq = PllClock::Pll480MHz;
 
             if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
@@ -464,7 +463,7 @@ impl ClockControl {
         let xtal_freq = XtalClock::RtcXtalFreq40M;
 
         let apb_freq;
-        if cpu_clock_speed != CpuClock::boot_default() {
+        if cpu_clock_speed != CpuClock::default() {
             if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
                 apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
                 clocks_ll::esp32c3_rtc_update_to_xtal(xtal_freq, 1);
@@ -498,7 +497,7 @@ impl ClockControl {
         let xtal_freq = XtalClock::RtcXtalFreq40M;
 
         let apb_freq;
-        if cpu_clock_speed != CpuClock::boot_default() {
+        if cpu_clock_speed != CpuClock::default() {
             if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
                 apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
                 clocks_ll::esp32c6_rtc_update_to_xtal(xtal_freq, 1);
@@ -533,7 +532,7 @@ impl ClockControl {
         let xtal_freq = XtalClock::RtcXtalFreq32M;
 
         let apb_freq;
-        if cpu_clock_speed != CpuClock::boot_default() {
+        if cpu_clock_speed != CpuClock::default() {
             if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
                 apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
                 clocks_ll::esp32h2_rtc_update_to_xtal(xtal_freq, 1);
@@ -567,7 +566,7 @@ impl ClockControl {
 impl ClockControl {
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> ClockControl {
-        if cpu_clock_speed != CpuClock::boot_default() {
+        if cpu_clock_speed != CpuClock::default() {
             clocks_ll::set_cpu_clock(cpu_clock_speed);
         }
 
@@ -585,7 +584,7 @@ impl ClockControl {
 impl ClockControl {
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> ClockControl {
-        if cpu_clock_speed != CpuClock::boot_default() {
+        if cpu_clock_speed != CpuClock::default() {
             clocks_ll::set_cpu_clock(cpu_clock_speed);
         }
 

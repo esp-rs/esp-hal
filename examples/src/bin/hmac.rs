@@ -73,7 +73,7 @@ type HmacSha256 = HmacSw<Sha256>;
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, _clocks) = esp_hal::init(CpuClock::boot_default());
+    let (peripherals, _clocks) = esp_hal::init(Config::default());
 
     let mut rng = Rng::new(peripherals.RNG);
 

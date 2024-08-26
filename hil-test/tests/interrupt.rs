@@ -63,7 +63,11 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let (peripherals, _clocks) = esp_hal::init(CpuClock::max());
+        let (peripherals, _clocks) = esp_hal::init({
+            let mut config = Config::default();
+            config.cpu_clock = CpuClock::max();
+            config
+        });
         let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
         cfg_if::cfg_if! {
