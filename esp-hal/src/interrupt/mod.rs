@@ -51,7 +51,7 @@
 //! # use core::cell::RefCell;
 //! #
 //! # use critical_section::Mutex;
-//! # use esp_hal::system::{SoftwareInterrupt, SoftwareInterruptControl};
+//! # use esp_hal::interrupt::software::{SoftwareInterrupt, SoftwareInterruptControl};
 //! # use esp_hal::interrupt::Priority;
 //! # use esp_hal::interrupt::InterruptHandler;
 //! #
@@ -78,6 +78,8 @@ pub use self::xtensa::*;
 mod riscv;
 #[cfg(xtensa)]
 mod xtensa;
+
+pub mod software;
 
 /// An interrupt handler
 #[cfg_attr(

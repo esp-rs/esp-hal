@@ -11,10 +11,12 @@ use core::{arch::asm, cell::RefCell};
 
 use critical_section::Mutex;
 use esp_hal::{
-    interrupt::{self, *},
+    interrupt::{
+        self,
+        software::{SoftwareInterrupt, SoftwareInterruptControl},
+    },
     peripherals::Interrupt,
     prelude::*,
-    system::{SoftwareInterrupt, SoftwareInterruptControl},
 };
 use hil_test as _;
 
