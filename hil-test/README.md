@@ -112,7 +112,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-t
 # Source the current shell:
 . "$HOME/.cargo/env"
 # Install dependencies
-sudo apt install -y pkg-config libudev-dev
+sudo apt install -y pkg-config libudev-dev uhubctl
 # Install probe-rs
 cargo install probe-rs-tools --git https://github.com/probe-rs/probe-rs --rev 9bde591 --force
 # Add the udev rules
