@@ -15,6 +15,7 @@ use esp_hal::{
 };
 use esp_hal::{
     prelude::*,
+    system::SoftwareInterruptControl,
     timer::{timg::TimerGroup, ErasedTimer, OneShotTimer, PeriodicTimer},
 };
 #[cfg(not(feature = "esp32"))]
@@ -220,9 +221,11 @@ mod test {
         let timers = mk_static!([OneShotTimer<ErasedTimer>; 2], [timer0, timer1]);
         esp_hal_embassy::init(&system.clocks, timers);
 
+        let sw_ints = SoftwareInterruptControl::new(system.peripherals.SW_INTERRUPT);
+
         let executor = mk_static!(
             InterruptExecutor<2>,
-            InterruptExecutor::new(system.software_interrupt_control.software_interrupt2)
+            InterruptExecutor::new(sw_ints.software_interrupt2)
         );
 
         #[embassy_executor::task]

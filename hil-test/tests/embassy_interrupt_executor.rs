@@ -12,7 +12,7 @@ use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal}
 use esp_hal::{
     clock::CpuClock,
     interrupt::Priority,
-    system::SoftwareInterrupt,
+    system::{SoftwareInterrupt, SoftwareInterruptControl},
     timer::timg::TimerGroup,
 };
 use esp_hal_embassy::InterruptExecutor;
@@ -43,12 +43,13 @@ mod test {
 
     #[init]
     fn init() -> SoftwareInterrupt<1> {
-        let system = esp_hal::init(CpuClock::boot_default());
+        let System{peripherals,..} = esp_hal::init(CpuClock::boot_default());
 
         let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
         esp_hal_embassy::init(&clocks, timg0.timer0);
 
-        system.software_interrupt_control.software_interrupt1
+        let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+        sw_ints.software_interrupt1
     }
 
     #[test]

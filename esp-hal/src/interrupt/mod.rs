@@ -31,27 +31,29 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! let system = esp_hal::init(CpuClock::boot_default());
-//! let mut sw_int = system.software_interrupt_control;
-//!     critical_section::with(|cs| {
-//!         sw_int
-//!             .software_interrupt0
-//!             .set_interrupt_handler(swint0_handler);
-//!         SWINT0
-//!             .borrow_ref_mut(cs)
-//!             .replace(sw_int.software_interrupt0);
-//!     });
 //!
-//!     critical_section::with(|cs| {
-//!         SWINT0.borrow_ref(cs).as_ref().unwrap().raise();
-//!     });
+//! let mut sw_int =
+//!     SoftwareInterruptControl::new(system.peripherals.SW_INTERRUPT);
+//! critical_section::with(|cs| {
+//!     sw_int
+//!         .software_interrupt0
+//!         .set_interrupt_handler(swint0_handler);
+//!     SWINT0
+//!         .borrow_ref_mut(cs)
+//!         .replace(sw_int.software_interrupt0);
+//! });
 //!
-//!     loop {}
+//! critical_section::with(|cs| {
+//!     SWINT0.borrow_ref(cs).as_ref().unwrap().raise();
+//! });
+//! #
+//! # loop {}
 //! # }
 //!
 //! # use core::cell::RefCell;
 //! #
 //! # use critical_section::Mutex;
-//! # use esp_hal::system::SoftwareInterrupt;
+//! # use esp_hal::system::{SoftwareInterrupt, SoftwareInterruptControl};
 //! # use esp_hal::interrupt::Priority;
 //! # use esp_hal::interrupt::InterruptHandler;
 //! #

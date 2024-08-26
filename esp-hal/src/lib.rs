@@ -643,9 +643,6 @@ pub struct System {
 
     /// The configured clocks.
     pub clocks: Clocks<'static>,
-
-    /// The available software interrupts.
-    pub software_interrupt_control: crate::system::SoftwareInterruptControl,
 }
 
 /// Initialize the system.
@@ -655,6 +652,5 @@ pub fn init(clock_config: CpuClock) -> System {
     System {
         peripherals,
         clocks: ClockControl::new(clock_config).freeze(),
-        software_interrupt_control: crate::system::SoftwareInterruptControl::new(),
     }
 }

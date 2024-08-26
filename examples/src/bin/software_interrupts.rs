@@ -13,7 +13,11 @@ use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_backtrace as _;
-use esp_hal::{delay::Delay, prelude::*, system::SoftwareInterrupt};
+use esp_hal::{
+    delay::Delay,
+    prelude::*,
+    system::{SoftwareInterrupt, SoftwareInterruptControl},
+};
 
 static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> = Mutex::new(RefCell::new(None));
 static SWINT1: Mutex<RefCell<Option<SoftwareInterrupt<1>>>> = Mutex::new(RefCell::new(None));
@@ -24,9 +28,11 @@ static SWINT3: Mutex<RefCell<Option<SoftwareInterrupt<3>>>> = Mutex::new(RefCell
 fn main() -> ! {
     let System {
         clocks,
-        software_interrupt_control: mut sw_int,
+        peripherals,
         ..
     } = esp_hal::init(CpuClock::boot_default());
+
+    let mut sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
     critical_section::with(|cs| {
         sw_int

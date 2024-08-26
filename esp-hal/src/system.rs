@@ -21,7 +21,9 @@
 #![doc = crate::before_snippet!()]
 //! let system = esp_hal::init(CpuClock::boot_default());
 //!
-//! let mut int0 = system.software_interrupt_control.software_interrupt0;
+//! let sw_ints =
+//!     SoftwareInterruptControl::new(system.peripherals.SW_INTERRUPT);
+//! let mut int0 = sw_ints.software_interrupt0;
 //!
 //! critical_section::with(|cs| {
 //!     int0.set_interrupt_handler(interrupt_handler);
@@ -31,7 +33,7 @@
 //!
 //! use core::cell::RefCell;
 //! use critical_section::Mutex;
-//! use esp_hal::system::SoftwareInterrupt;
+//! use esp_hal::system::{SoftwareInterrupt, SoftwareInterruptControl};
 //!
 //! static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> =
 //!     Mutex::new(RefCell::new(None));
@@ -302,7 +304,7 @@ pub struct SoftwareInterruptControl {
 }
 
 impl SoftwareInterruptControl {
-    pub(crate) fn new() -> Self {
+    pub fn new(_peripheral: crate::peripherals::SW_INTERRUPT) -> Self {
         SoftwareInterruptControl {
             software_interrupt0: SoftwareInterrupt {},
             software_interrupt1: SoftwareInterrupt {},

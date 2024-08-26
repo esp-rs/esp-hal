@@ -14,7 +14,7 @@ use esp_hal::{
     interrupt::{self, *},
     peripherals::Interrupt,
     prelude::*,
-    system::SoftwareInterrupt,
+    system::{SoftwareInterrupt, SoftwareInterruptControl},
 };
 use hil_test as _;
 
@@ -27,11 +27,8 @@ struct Context {
 
 impl Context {
     pub fn init() -> Self {
-        let System {
-            peripherals,
-            software_interrupt_control: sw_int,
-            ..
-        } = esp_hal::init(CpuClock::max());
+        let System { peripherals, .. } = esp_hal::init(CpuClock::max());
+        let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
         cfg_if::cfg_if! {
             if #[cfg(any(feature = "esp32c6", feature = "esp32h2"))] {
@@ -46,7 +43,7 @@ impl Context {
         critical_section::with(|cs| {
             SWINT0
                 .borrow_ref_mut(cs)
-                .replace(sw_int.software_interrupt0)
+                .replace(sw_ints.software_interrupt0)
         });
         interrupt::enable_direct(
             Interrupt::FROM_CPU_INTR0,
