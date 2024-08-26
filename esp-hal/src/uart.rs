@@ -22,7 +22,7 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{config::Config, Uart};
+//! # use esp_hal::uart::Uart;
 //! use esp_hal::gpio::Io;
 //!
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -56,13 +56,13 @@
 //! ### Sending and Receiving Data
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{config::Config, Uart};
+//! # use esp_hal::uart::{self, Uart};
 //! # use esp_hal::gpio::Io;
 //! # let (peripherals, clocks) = esp_hal::init(Config::default());
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let mut uart1 = Uart::new_with_config(
 //! #     peripherals.UART1,
-//! #     Config::default(),
+//! #     uart::config::Config::default(),
 //! #     &clocks,
 //! #     io.pins.gpio1,
 //! #     io.pins.gpio2,
@@ -75,13 +75,13 @@
 //! ### Splitting the UART into TX and RX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{config::Config, Uart};
+//! # use esp_hal::uart::{self, Uart};
 //! # use esp_hal::gpio::Io;
 //! # let (peripherals, clocks) = esp_hal::init(Config::default());
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let mut uart1 = Uart::new_with_config(
 //! #     peripherals.UART1,
-//! #     Config::default(),
+//! #     uart::config::Config::default(),
 //! #     &clocks,
 //! #     io.pins.gpio1,
 //! #     io.pins.gpio2,
@@ -98,7 +98,7 @@
 //! ### Inverting TX and RX Pins
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{config::Config, Uart};
+//! # use esp_hal::uart::Uart;
 //! use esp_hal::gpio::{AnyPin, Io};
 //!
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -117,7 +117,7 @@
 //! ### Constructing TX and RX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{config::Config, UartTx, UartRx};
+//! # use esp_hal::uart::{UartTx, UartRx};
 //! use esp_hal::gpio::{AnyPin, Io};
 //!
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);

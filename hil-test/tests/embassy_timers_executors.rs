@@ -10,9 +10,9 @@
 use embassy_time::{Duration, Ticker, Timer};
 use esp_hal::{
     clock::Clocks,
+    interrupt::software::SoftwareInterruptControl,
     peripherals::Peripherals,
     prelude::*,
-    system::SoftwareInterruptControl,
     timer::{timg::TimerGroup, ErasedTimer, OneShotTimer, PeriodicTimer},
 };
 #[cfg(not(feature = "esp32"))]
@@ -159,7 +159,7 @@ mod test {
     #[test]
     #[timeout(3)]
     #[cfg(not(feature = "esp32"))]
-    fn test_periodic_systimer((peripherals, clocks): (Peripherals, Clocks<'static>)) {
+    fn test_periodic_systimer((peripherals, _clocks): (Peripherals, Clocks<'static>)) {
         let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Periodic>();
 
         run_test_periodic_timer(systimer.alarm0);
@@ -178,7 +178,7 @@ mod test {
     #[test]
     #[timeout(3)]
     #[cfg(not(feature = "esp32"))]
-    fn test_periodic_oneshot_systimer((mut peripherals, clocks): (Peripherals, Clocks<'static>)) {
+    fn test_periodic_oneshot_systimer((mut peripherals, _clocks): (Peripherals, Clocks<'static>)) {
         let mut systimer = SystemTimer::new(&mut peripherals.SYSTIMER);
         let unit = FrozenUnit::new(&mut systimer.unit0);
         let mut alarm: Alarm<'_, Periodic, _, _, _> = Alarm::new(systimer.comparator0, &unit);

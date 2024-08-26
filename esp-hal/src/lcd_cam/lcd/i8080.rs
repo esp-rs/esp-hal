@@ -16,7 +16,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::Io;
-//! # use esp_hal::lcd_cam::{LcdCam, lcd::i8080::{Config, I8080, TxEightBits}};
+//! # use esp_hal::lcd_cam::{LcdCam, lcd::i8080::{self, I8080, TxEightBits}};
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::{Dma, DmaPriority};
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -49,7 +49,7 @@
 //!     tx_descriptors,
 //!     tx_pins,
 //!     20.MHz(),
-//!     Config::default(),
+//!     i8080::Config::default(),
 //!     &clocks,
 //! )
 //! .with_ctrl_pins(io.pins.gpio0, io.pins.gpio47);

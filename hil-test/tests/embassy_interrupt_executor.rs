@@ -15,6 +15,7 @@ use esp_hal::{
         software::{SoftwareInterrupt, SoftwareInterruptControl},
         Priority,
     },
+    prelude::*,
     timer::timg::TimerGroup,
 };
 use esp_hal_embassy::InterruptExecutor;

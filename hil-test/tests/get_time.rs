@@ -7,17 +7,13 @@
 
 #[cfg(esp32)]
 use esp_hal::clock::Clocks;
-use esp_hal::{delay::Delay, prelude::*, system::SystemControl};
+use esp_hal::{delay::Delay, prelude::*};
 use hil_test as _;
 
 struct Context {
     delay: Delay,
     #[cfg(esp32)]
     clocks: Clocks<'static>,
-}
-
-impl Context {
-    pub fn init() -> Self {}
 }
 
 fn time_moves_forward_during<F: FnOnce(Context)>(ctx: Context, f: F) {
@@ -35,14 +31,14 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let (peripherals, clocks) = esp_hal::init(Config::default());
+        let (_peripherals, clocks) = esp_hal::init(Config::default());
 
-        let delay = Delay::new(&system.clocks);
+        let delay = Delay::new(&clocks);
 
         Context {
             delay,
             #[cfg(esp32)]
-            clocks: system.clocks,
+            clocks,
         }
     }
 
