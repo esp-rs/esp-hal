@@ -56,7 +56,7 @@ smart-leds          = "0.4.0"
 smoltcp             = { version = "0.11.0", default-features = false, features = [ "medium-ethernet", "socket-raw"] }
 ssd1306             = "0.8.4"
 static_cell         = { version = "2.1.0", features = ["nightly"] }
-trouble-host        = { git = "https://github.com/embassy-rs/trouble", package = "trouble-host", rev = "75dc087edde312eb1c2fa49dd57b5c16e00ff26b", features = [ "log", "gatt" ] }
+trouble-host        = { git = "https://github.com/embassy-rs/trouble", package = "trouble-host", rev = "4f1114ce58e96fe54f5ed7e726f66e1ad8d9ce54", features = [ "log", "gatt" ] }
 usb-device          = "0.3.2"
 usbd-serial         = "0.2.2"
 

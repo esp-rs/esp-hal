@@ -91,14 +91,11 @@ async fn main(_s: Spawner) {
     table.add_service(Service::new(0x1801));
 
     // Battery service
-    let bat_level_handle = table
-        .add_service(Service::new(0x180f))
-        .add_characteristic(
-            0x2a19,
-            &[CharacteristicProp::Read, CharacteristicProp::Notify],
-            &mut bat_level,
-        )
-        .build();
+    let bat_level_handle = table.add_service(Service::new(0x180f)).add_characteristic(
+        0x2a19,
+        &[CharacteristicProp::Read, CharacteristicProp::Notify],
+        &mut bat_level,
+    );
 
     let mut adv_data = [0; 31];
     AdStructure::encode_slice(
@@ -111,7 +108,7 @@ async fn main(_s: Spawner) {
     )
     .unwrap();
 
-    let server = ble.gatt_server(&table);
+    let server = ble.gatt_server::<NoopRawMutex, 10, 256>(&table);
 
     info!("Starting advertising and GATT service");
     // Run all 3 tasks in a join. They can also be separate embassy tasks.
@@ -154,7 +151,7 @@ async fn main(_s: Spawner) {
                     Timer::after(Duration::from_secs(1)).await;
                     tick = tick.wrapping_add(1);
                     server
-                        .notify(bat_level_handle, &conn, &[tick])
+                        .notify(&ble, bat_level_handle, &conn, &[tick])
                         .await
                         .unwrap();
                 }
