@@ -102,7 +102,7 @@
 //! This means you can pass the pin/peripheral or a mutable reference to the
 //! pin/peripheral.
 //!
-//! The later can be used to regain access to the pin when the driver gets
+//! The latter can be used to regain access to the pin when the driver gets
 //! dropped. Then it's possible to reuse the pin/peripheral for a different
 //! purpose.
 //!
@@ -634,6 +634,8 @@ use crate::{
 };
 
 /// Initialize the system.
+///
+/// This function sets up the CPU clock and returns the peripherals and clocks.
 pub fn init(clock_config: CpuClock) -> (Peripherals, Clocks<'static>) {
     let peripherals = Peripherals::take();
     let clocks = ClockControl::new(clock_config).freeze();

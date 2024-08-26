@@ -1,10 +1,11 @@
 //! # Software Interrupts
 //!
-//! The `SoftwareInterruptControl` struct gives access to the available software
-//! interrupts.
+//! The [`SoftwareInterruptControl`] struct gives access to the available
+//! software interrupts.
 //!
-//! The `SoftwareInterrupt` struct allows raising or resetting software
-//! interrupts using the `raise()` and `reset()` methods.
+//! The [`SoftwareInterrupt`] struct allows raising or resetting software
+//! interrupts using the [`raise()`][SoftwareInterrupt::raise] and
+//! [`reset()`][SoftwareInterrupt::reset] methods.
 //!
 //! ## Examples
 //!
@@ -44,7 +45,7 @@
 //! }
 //! ```
 
-use crate::{interrupt::InterruptHandler, peripherals::SYSTEM, InterruptConfigurable};
+use crate::{interrupt::InterruptHandler, InterruptConfigurable};
 
 /// A software interrupt can be triggered by software.
 #[non_exhaustive]
@@ -73,31 +74,23 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
             if #[cfg(any(esp32c6, esp32h2))] {
                 let system = unsafe { &*crate::peripherals::INTPRI::PTR };
             } else {
-                let system = unsafe { &*SYSTEM::PTR };
+                let system = unsafe { &*crate::peripherals::SYSTEM::PTR };
             }
         }
 
         match NUM {
-            0 => {
-                system
-                    .cpu_intr_from_cpu_0()
-                    .write(|w| w.cpu_intr_from_cpu_0().set_bit());
-            }
-            1 => {
-                system
-                    .cpu_intr_from_cpu_1()
-                    .write(|w| w.cpu_intr_from_cpu_1().set_bit());
-            }
-            2 => {
-                system
-                    .cpu_intr_from_cpu_2()
-                    .write(|w| w.cpu_intr_from_cpu_2().set_bit());
-            }
-            3 => {
-                system
-                    .cpu_intr_from_cpu_3()
-                    .write(|w| w.cpu_intr_from_cpu_3().set_bit());
-            }
+            0 => system
+                .cpu_intr_from_cpu_0()
+                .write(|w| w.cpu_intr_from_cpu_0().set_bit()),
+            1 => system
+                .cpu_intr_from_cpu_1()
+                .write(|w| w.cpu_intr_from_cpu_1().set_bit()),
+            2 => system
+                .cpu_intr_from_cpu_2()
+                .write(|w| w.cpu_intr_from_cpu_2().set_bit()),
+            3 => system
+                .cpu_intr_from_cpu_3()
+                .write(|w| w.cpu_intr_from_cpu_3().set_bit()),
             _ => unreachable!(),
         }
     }
@@ -108,31 +101,23 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
             if #[cfg(any(esp32c6, esp32h2))] {
                 let system = unsafe { &*crate::peripherals::INTPRI::PTR };
             } else {
-                let system = unsafe { &*SYSTEM::PTR };
+                let system = unsafe { &*crate::peripherals::SYSTEM::PTR };
             }
         }
 
         match NUM {
-            0 => {
-                system
-                    .cpu_intr_from_cpu_0()
-                    .write(|w| w.cpu_intr_from_cpu_0().clear_bit());
-            }
-            1 => {
-                system
-                    .cpu_intr_from_cpu_1()
-                    .write(|w| w.cpu_intr_from_cpu_1().clear_bit());
-            }
-            2 => {
-                system
-                    .cpu_intr_from_cpu_2()
-                    .write(|w| w.cpu_intr_from_cpu_2().clear_bit());
-            }
-            3 => {
-                system
-                    .cpu_intr_from_cpu_3()
-                    .write(|w| w.cpu_intr_from_cpu_3().clear_bit());
-            }
+            0 => system
+                .cpu_intr_from_cpu_0()
+                .write(|w| w.cpu_intr_from_cpu_0().clear_bit()),
+            1 => system
+                .cpu_intr_from_cpu_1()
+                .write(|w| w.cpu_intr_from_cpu_1().clear_bit()),
+            2 => system
+                .cpu_intr_from_cpu_2()
+                .write(|w| w.cpu_intr_from_cpu_2().clear_bit()),
+            3 => system
+                .cpu_intr_from_cpu_3()
+                .write(|w| w.cpu_intr_from_cpu_3().clear_bit()),
             _ => unreachable!(),
         }
     }

@@ -14,6 +14,7 @@ use esp_hal::{
     interrupt::{
         self,
         software::{SoftwareInterrupt, SoftwareInterruptControl},
+        CpuInterrupt,
     },
     peripherals::Interrupt,
     prelude::*,

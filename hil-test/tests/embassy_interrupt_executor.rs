@@ -11,8 +11,10 @@
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use esp_hal::{
     clock::CpuClock,
-    interrupt::Priority,
-    system::software::{SoftwareInterrupt, SoftwareInterruptControl},
+    interrupt::{
+        software::{SoftwareInterrupt, SoftwareInterruptControl},
+        Priority,
+    },
     timer::timg::TimerGroup,
 };
 use esp_hal_embassy::InterruptExecutor;
