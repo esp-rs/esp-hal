@@ -1,6 +1,7 @@
 //! # Timer Group (TIMG)
 //!
 //! ## Overview
+//!
 //! The Timer Group (TIMG) peripherals contain one or more general-purpose
 //! timers, plus one or more watchdog timers.
 //!
@@ -8,6 +9,7 @@
 //! auto-reload-capable up-down counter.
 //!
 //! ## Configuration
+//!
 //! The timers have configurable alarms, which are triggered when the internal
 //! counter of the timers reaches a specific target value. The timers are
 //! clocked using the APB clock source.
@@ -18,9 +20,10 @@
 //! - Generate one-shot alarms; trigger events once
 //! - Free-running; fetching a high-resolution timestamp on demand
 //!
-//!
 //! ## Examples
+//!
 //! ### General-purpose Timer
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::timg::TimerGroup;
@@ -42,7 +45,7 @@
 //! # }
 //! ```
 //! 
-//! #### Watchdog Timer
+//! ### Watchdog Timer
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::timg::TimerGroup;
@@ -242,12 +245,13 @@ impl TimerGroupInstance for TIMG1 {
     }
 }
 
-impl<'d, T> TimerGroup<'d, T, Blocking>
+impl<'d, T, DM> TimerGroup<'d, T, DM>
 where
     T: TimerGroupInstance,
+    DM: crate::Mode,
 {
     /// Construct a new instance of [`TimerGroup`] in blocking mode
-    pub fn new(_timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks<'d>) -> Self {
+    pub fn new_inner(_timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks<'d>) -> Self {
         crate::into_ref!(_timer_group);
 
         T::reset_peripheral();
@@ -255,15 +259,20 @@ where
 
         T::configure_src_clk();
 
-        // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
+        cfg_if::cfg_if! {
+            if #[cfg(esp32h2)] {
+                // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
+                let apb_clk_freq = clocks.pll_48m_clock;
+            } else {
+                let apb_clk_freq = clocks.apb_clock;
+            }
+        };
+
         let timer0 = Timer::new(
             Timer0 {
                 phantom: PhantomData,
             },
-            #[cfg(not(esp32h2))]
-            clocks.apb_clock,
-            #[cfg(esp32h2)]
-            clocks.pll_48m_clock,
+            apb_clk_freq,
         );
 
         #[cfg(timg_timer1)]
@@ -271,7 +280,7 @@ where
             Timer1 {
                 phantom: PhantomData,
             },
-            clocks.apb_clock,
+            apb_clk_freq,
         );
 
         Self {
@@ -284,45 +293,23 @@ where
     }
 }
 
+impl<'d, T> TimerGroup<'d, T, Blocking>
+where
+    T: TimerGroupInstance,
+{
+    /// Construct a new instance of [`TimerGroup`] in blocking mode
+    pub fn new(timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks<'d>) -> Self {
+        Self::new_inner(timer_group, clocks)
+    }
+}
+
 impl<'d, T> TimerGroup<'d, T, Async>
 where
     T: TimerGroupInstance,
 {
     /// Construct a new instance of [`TimerGroup`] in asynchronous mode
-    pub fn new_async(_timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks<'d>) -> Self {
-        crate::into_ref!(_timer_group);
-
-        T::reset_peripheral();
-        T::enable_peripheral();
-
-        T::configure_src_clk();
-
-        // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
-        let timer0 = Timer::new(
-            Timer0 {
-                phantom: PhantomData,
-            },
-            #[cfg(not(esp32h2))]
-            clocks.apb_clock,
-            #[cfg(esp32h2)]
-            clocks.pll_48m_clock,
-        );
-
-        #[cfg(timg_timer1)]
-        let timer1 = Timer::new(
-            Timer1 {
-                phantom: PhantomData,
-            },
-            clocks.apb_clock,
-        );
-
-        Self {
-            _timer_group,
-            timer0,
-            #[cfg(timg_timer1)]
-            timer1,
-            wdt: Wdt::new(),
-        }
+    pub fn new_async(timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks<'d>) -> Self {
+        Self::new_inner(timer_group, clocks)
     }
 }
 

@@ -1,13 +1,16 @@
 //! # Serial Peripheral Interface - Master Mode
 //!
 //! ## Overview
+//!
 //! In this mode, the SPI acts as master and initiates the SPI transactions.
 //!
 //! ## Configuration
+//!
 //! The peripheral can be used in full-duplex and half-duplex mode and can
 //! leverage DMA for data transfers. It can also be used in blocking or async.
 //!
 //! ### Exclusive access to the SPI bus
+//!
 //! If all you want to do is to communicate to a single device, and you initiate
 //! transactions yourself, there are a number of ways to achieve this:
 //!
@@ -19,17 +22,19 @@
 //! - Use the `ExclusiveDevice` struct from [`embedded-hal-bus`] or `SpiDevice`
 //!   from [`embassy-embedded-hal`].
 //!
-//!
 //! ### Shared SPI access
+//!
 //! If you have multiple devices on the same SPI bus that each have their own CS
 //! line, you may want to have a look at the implementations provided by
 //! [`embedded-hal-bus`] and [`embassy-embedded-hal`].
 //!
 //! ## Usage
+//!
 //! The module implements several third-party traits from embedded-hal@0.2.x,
 //! embedded-hal@1.x.x and embassy-embedded-hal
 //!
 //! ## Example
+//!
 //! ### SPI Initialization
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -2740,11 +2745,14 @@ pub trait Instance: private::Sealed {
 
     // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
     fn setup(&mut self, frequency: HertzU32, clocks: &Clocks<'_>) {
-        #[cfg(not(esp32h2))]
-        let apb_clk_freq: HertzU32 = HertzU32::Hz(clocks.apb_clock.to_Hz());
-        // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
-        #[cfg(esp32h2)]
-        let apb_clk_freq: HertzU32 = HertzU32::Hz(clocks.pll_48m_clock.to_Hz());
+        cfg_if::cfg_if! {
+            if #[cfg(esp32h2)] {
+                // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
+                let apb_clk_freq = HertzU32::Hz(clocks.pll_48m_clock.to_Hz());
+            } else {
+                let apb_clk_freq = HertzU32::Hz(clocks.apb_clock.to_Hz());
+            }
+        }
 
         let reg_val: u32;
         let duty_cycle = 128;

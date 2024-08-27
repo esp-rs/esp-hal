@@ -1,6 +1,7 @@
 //! # LED Controller (LEDC)
 //!
 //! ## Overview
+//!
 //! The LEDC peripheral is primarily designed to control the intensity of LEDs,
 //! although it can also be used to generate PWM signals for other purposes. It
 //! has multiple channels which can generate independent waveforms that can be
@@ -15,6 +16,7 @@
 //! supported chips.
 //!
 //! ## Examples
+//!
 //! ### Low Speed Channel
 //! The following will configure the Low Speed Channel0 to 24kHz output with
 //! 10% duty using the ABPClock

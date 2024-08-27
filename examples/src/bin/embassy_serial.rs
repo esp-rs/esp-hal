@@ -90,20 +90,21 @@ async fn main(spawner: Spawner) {
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // Default pins for Uart/Serial communication
-    #[cfg(feature = "esp32")]
-    let (tx_pin, rx_pin) = (io.pins.gpio1, io.pins.gpio3);
-    #[cfg(feature = "esp32c2")]
-    let (tx_pin, rx_pin) = (io.pins.gpio20, io.pins.gpio19);
-    #[cfg(feature = "esp32c3")]
-    let (tx_pin, rx_pin) = (io.pins.gpio21, io.pins.gpio20);
-    #[cfg(feature = "esp32c6")]
-    let (tx_pin, rx_pin) = (io.pins.gpio16, io.pins.gpio17);
-    #[cfg(feature = "esp32h2")]
-    let (tx_pin, rx_pin) = (io.pins.gpio24, io.pins.gpio23);
-    #[cfg(feature = "esp32s2")]
-    let (tx_pin, rx_pin) = (io.pins.gpio43, io.pins.gpio44);
-    #[cfg(feature = "esp32s3")]
-    let (tx_pin, rx_pin) = (io.pins.gpio43, io.pins.gpio44);
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32")] {
+            let (tx_pin, rx_pin) = (io.pins.gpio1, io.pins.gpio3);
+        } else if #[cfg(feature = "esp32c2")] {
+            let (tx_pin, rx_pin) = (io.pins.gpio20, io.pins.gpio19);
+        } else if #[cfg(feature = "esp32c3")] {
+            let (tx_pin, rx_pin) = (io.pins.gpio21, io.pins.gpio20);
+        } else if #[cfg(feature = "esp32c6")] {
+            let (tx_pin, rx_pin) = (io.pins.gpio16, io.pins.gpio17);
+        } else if #[cfg(feature = "esp32h2")] {
+            let (tx_pin, rx_pin) = (io.pins.gpio24, io.pins.gpio23);
+        } else if #[cfg(any(feature = "esp32s2", feature = "esp32s3"))] {
+            let (tx_pin, rx_pin) = (io.pins.gpio43, io.pins.gpio44);
+        }
+    }
 
     let config = Config::default().rx_fifo_full_threshold(READ_BUF_SIZE as u16);
 

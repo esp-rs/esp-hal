@@ -91,19 +91,18 @@ async fn main(low_prio_spawner: Spawner) {
     let timer0: ErasedTimer = timg0.timer0.into();
     let timer0 = OneShotTimer::new(timer0);
 
-    #[cfg(not(feature = "esp32c2"))]
-    let timer1 = {
-        let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-        let timer0: ErasedTimer = timg1.timer0.into();
-        OneShotTimer::new(timer0)
-    };
-    #[cfg(feature = "esp32c2")]
-    let timer1 = {
-        let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER)
-            .split::<esp_hal::timer::systimer::Target>();
-        let alarm0: ErasedTimer = systimer.alarm0.into();
-        OneShotTimer::new(alarm0)
-    };
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32c2")] {
+            use esp_hal::timer::systimer::{SystemTimer, Target};
+            let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+            let alarm0: ErasedTimer = systimer.alarm0.into();
+            let timer1 = OneShotTimer::new(alarm0);
+        } else {
+            let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
+            let timer1: ErasedTimer = timg1.timer0.into();
+            let timer1 = OneShotTimer::new(timer1);
+        }
+    }
 
     let timers = mk_static!([OneShotTimer<ErasedTimer>; 2], [timer0, timer1]);
     esp_hal_embassy::init(&clocks, timers);

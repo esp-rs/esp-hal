@@ -1,12 +1,14 @@
 //! # Exclusive peripheral access
 //!
 //! ## Overview
+//!
 //! The Peripheral module provides an exclusive access mechanism to peripherals
 //! on ESP chips. It includes the `PeripheralRef` struct, which represents an
 //! exclusive reference to a peripheral. It offers memory efficiency benefits
 //! for zero-sized types.
 //!
 //! ## Configuration
+//!
 //! The `PeripheralRef` struct is used to access and interact with peripherals.
 //! It implements the `Deref` and `DerefMut` traits, allowing you to dereference
 //! it to access the underlying peripheral. It also provides methods for cloning

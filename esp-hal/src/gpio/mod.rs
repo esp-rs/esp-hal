@@ -1,16 +1,19 @@
 //! # General Purpose I/Os (GPIO)
 //!
 //! ## Overview
+//!
 //! Each pin can be used as a general-purpose I/O, or be connected to an
 //! internal peripheral signal.
 //!
 //! ## Configuration
+//!
 //! This driver supports various operations on GPIO pins, including setting the
 //! pin mode, direction, and manipulating the pin state (setting high/low,
 //! toggling). It provides an interface to interact with GPIO pins on ESP chips,
 //! allowing developers to control and read the state of the pins.
 //!
 //! ## Usage
+//!
 //! This module also implements a number of traits from [embedded-hal] to
 //! provide a common interface for GPIO pins.
 //!
@@ -18,6 +21,7 @@
 //! designed struct from the pac struct `GPIO` and `IO_MUX` using `Io::new`.
 //!
 //! ### Pin Types
+//!
 //! - [Input] pins can be used as digital inputs.
 //! - [Output] and [OutputOpenDrain] pins can be used as digital outputs.
 //! - [Flex] pin is a pin that can be used as an input and output pin.
@@ -27,7 +31,9 @@
 //!   but real pin cannot be used.
 //!
 //! ## Examples
+//!
 //! ### Set up a GPIO as an Output
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::{Io, Level, Output};
@@ -37,6 +43,7 @@
 //! ```
 //! 
 //! ### Blink an LED
+//!
 //! See the [Commonly Used Setup] section of the crate documentation.
 //!
 //! ### Inverting a signal using `AnyPin`

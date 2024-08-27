@@ -1,6 +1,7 @@
 //! USB Serial/JTAG Controller (USB_SERIAL_JTAG)
 //!
 //! ## Overview
+//!
 //! The USB Serial/JTAG controller can be used to program the SoC's flash, read
 //! program output, or attach a debugger to the running program. This is
 //! possible for any computer with a USB host (hereafter referred to as 'host'),
@@ -27,6 +28,7 @@
 //!   connect to a host computer
 //!
 //! ## Usage
+//!
 //! The USB Serial/JTAG driver implements a number of third-party traits, with
 //! the intention of making the HAL inter-compatible with various device drivers
 //! from the community. This includes, but is not limited to, the [embedded-hal]
@@ -38,6 +40,7 @@
 //! with this driver.
 //!
 //! ## Examples
+//!
 //! ### Sending and Receiving Data
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]

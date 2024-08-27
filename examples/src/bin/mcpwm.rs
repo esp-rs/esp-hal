@@ -29,10 +29,15 @@ fn main() -> ! {
     let pin = io.pins.gpio0;
 
     // initialize peripheral
-    #[cfg(feature = "esp32h2")]
-    let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40.MHz()).unwrap();
-    #[cfg(not(feature = "esp32h2"))]
-    let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 32.MHz()).unwrap();
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32h2")] {
+            let freq = 40.MHz();
+        } else {
+            let freq = 32.MHz();
+        }
+    }
+
+    let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, freq).unwrap();
 
     let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
 

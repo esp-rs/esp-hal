@@ -1,14 +1,18 @@
 //! # Serial Peripheral Interface - Slave Mode
 //!
 //! ## Overview
+//!
 //! In this mode, the SPI acts as slave and transfers data with its master when
 //! its CS is asserted.
 //!
 //! ## Configuration
+//!
 //! The SPI slave driver allows using full-duplex and can only be used with DMA.
 //!
 //! ## Example
+//!
 //! ### SPI Slave with DMA
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::dma::DmaPriority;
@@ -52,6 +56,7 @@
 //! ```
 //! 
 //! ## Implementation State
+//!
 //! There are several options for working with the SPI peripheral in slave mode,
 //! but the code currently only supports single transfers (not segmented
 //! transfers), full duplex, single bit (not dual or quad SPI), and DMA mode

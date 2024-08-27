@@ -1,13 +1,16 @@
-//! # Real-Time Clock Control and Low-power Management (RTC_CNTL)
+//! # Real-Time Control and Low-power Management (RTC_CNTL)
 //!
 //! ## Overview
-//! The RTC_CNTL peripheral is responsible for managing the real-time clock and
-//! low-power modes on the chip.
+//!
+//! The RTC_CNTL peripheral is responsible for managing the low-power modes on
+//! the chip.
 //!
 //! ## Configuration
-//!  It also includes the necessary configurations and constants for clock
+//!
+//! It also includes the necessary configurations and constants for clock
 //! sources and low-power management. The driver provides the following features
 //! and functionalities:
+//!
 //!    * Clock Configuration
 //!    * Calibration
 //!    * Low-Power Management

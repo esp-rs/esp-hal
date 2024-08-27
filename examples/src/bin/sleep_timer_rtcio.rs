@@ -52,15 +52,18 @@ fn main() -> ! {
     let delay = Delay::new(&clocks);
     let timer = TimerWakeupSource::new(Duration::from_secs(10));
 
-    #[cfg(feature = "esp32c3")]
-    let wakeup_pins: &mut [(&mut dyn gpio::RtcPinWithResistors, WakeupLevel)] = &mut [
-        (&mut io.pins.gpio2, WakeupLevel::Low),
-        (&mut io.pins.gpio3, WakeupLevel::High),
-    ];
-
-    #[cfg(feature = "esp32s3")]
-    let wakeup_pins: &mut [(&mut dyn gpio::RtcPin, WakeupLevel)] =
-        &mut [(&mut io.pins.gpio18, WakeupLevel::Low)];
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32c3")] {
+            let wakeup_pins: &mut [(&mut dyn gpio::RtcPinWithResistors, WakeupLevel)] = &mut [
+                (&mut io.pins.gpio2, WakeupLevel::Low),
+                (&mut io.pins.gpio3, WakeupLevel::High),
+            ];
+        } else if #[cfg(feature = "esp32s3")] {
+            let wakeup_pins: &mut [(&mut dyn gpio::RtcPin, WakeupLevel)] = &mut [
+                (&mut io.pins.gpio18, WakeupLevel::Low)
+            ];
+        }
+    }
 
     let rtcio = RtcioWakeupSource::new(wakeup_pins);
     println!("sleeping!");

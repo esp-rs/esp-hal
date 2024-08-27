@@ -1,6 +1,7 @@
 //! # Direct Memory Access (DMA)
 //!
 //! ## Overview
+//!
 //! The DMA driver provides an interface to efficiently transfer data between
 //! different memory regions and peripherals within the ESP microcontroller
 //! without involving the CPU. The DMA controller is responsible for managing
@@ -10,8 +11,10 @@
 //! `ESP32-S2` are using older `PDMA` controller, whenever other chips are using
 //! newer `GDMA` controller.
 //!
-//! ## Examples
-//! ### Initialize and Utilize DMA Controller in `SPI`
+//! ## Example
+//!
+//! ### Initialize and utilize DMA controller in `SPI`
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::dma_buffers;

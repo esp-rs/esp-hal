@@ -228,11 +228,13 @@ where
         PeripheralClockControl::reset(crate::system::Peripheral::Rmt);
         PeripheralClockControl::enable(crate::system::Peripheral::Rmt);
 
-        #[cfg(not(any(esp32, esp32s2)))]
-        me.configure_clock(frequency, _clocks)?;
-
-        #[cfg(any(esp32, esp32s2))]
-        self::chip_specific::configure_clock();
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32s2))] {
+                self::chip_specific::configure_clock();
+            } else {
+                me.configure_clock(frequency, _clocks)?;
+            }
+        }
 
         Ok(me)
     }
