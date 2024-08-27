@@ -20,7 +20,7 @@ use esp_hal::{
     macros::handler,
     peripherals::Peripherals,
     system::SystemControl,
-    timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
+    timer::timg::TimerGroup,
     InterruptConfigurable,
 };
 use hil_test as _;

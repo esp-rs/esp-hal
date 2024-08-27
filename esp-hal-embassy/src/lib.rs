@@ -121,6 +121,23 @@ impl<const N: usize> TimerCollection for &'static mut [Timer; N] {
     }
 }
 
+macro_rules! impl_array {
+    ($n:literal) => {
+        impl<T> TimerCollection for [T; $n]
+        where
+            T: IntoErasedTimer,
+        {
+            fn timers(self) -> &'static mut [Timer] {
+                mk_static!([Timer; $n], self.map(|t| Timer::new(t.into())))
+            }
+        }
+    };
+}
+
+impl_array!(2);
+impl_array!(3);
+impl_array!(4);
+
 /// Initialize embassy.
 ///
 /// Call this as soon as possible, before the first timer-related operation.
@@ -133,6 +150,7 @@ impl<const N: usize> TimerCollection for &'static mut [Timer; N] {
 /// - A `OneShotTimer` instance
 /// - A mutable static slice of `OneShotTimer` instances
 /// - A mutable static array of `OneShotTimer` instances
+/// - A 2, 3, 4 element array of `ErasedTimer` instances
 ///
 /// # Examples
 ///
