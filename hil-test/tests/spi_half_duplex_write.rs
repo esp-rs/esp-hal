@@ -15,7 +15,7 @@
 
 use esp_hal::{
     clock::ClockControl,
-    dma::{Dma, DmaPriority, DmaTxBuf},
+    dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{GpioPin, Io, Pull},
     pcnt::{
@@ -26,7 +26,7 @@ use esp_hal::{
     peripherals::{Peripherals, SPI2},
     prelude::*,
     spi::{
-        master::{dma::SpiDma, Address, Command, Spi},
+        master::{dma::SpiDma, Address, Command, HalfDuplexReadWrite, Spi},
         HalfDuplexMode,
         SpiDataMode,
         SpiMode,
@@ -146,39 +146,18 @@ mod tests {
 
     #[test]
     #[timeout(3)]
-    fn test_spidmabus_writes_are_correctly_by_pcnt() {
+    fn test_spidmabus_writes_are_correctly_by_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
-
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let pcnt = Pcnt::new(peripherals.PCNT);
-        let dma = Dma::new(peripherals.DMA);
-
-        let sclk = io.pins.gpio0;
-        let mosi = io.pins.gpio2;
-        let mosi_mirror = io.pins.gpio3;
-
-        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-        let dma_channel = dma.spi2channel;
-        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
-        let dma_channel = dma.channel0;
 
         let (buffer, descriptors, rx, rxd) = dma_buffers!(DMA_BUFFER_SIZE, 1);
         let dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
         let dma_rx_buf = DmaRxBuf::new(rxd, rx).unwrap();
 
-        let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
-            .with_sck(sclk)
-            .with_mosi(mosi)
-            .with_dma(dma_channel.configure(false, DmaPriority::Priority0))
-            .with_buffers(dma_tx_buf, dma_rx_buf);
+        let unit = ctx.pcnt_unit;
+        let mut spi = ctx.spi.with_buffers(dma_tx_buf, dma_rx_buf);
 
-        let unit = pcnt.unit0;
         unit.channel0.set_edge_signal(PcntSource::from_pin(
-            mosi_mirror,
+            ctx.mosi_mirror,
             PcntInputConfig { pull: Pull::Down },
         ));
         unit.channel0
