@@ -1549,7 +1549,7 @@ mod dma {
         Writing(SpiDmaTransfer<'d, T, C, D, M, DmaTxBuf>, DmaRxBuf),
         Transferring(SpiDmaTransfer<'d, T, C, D, M, (DmaTxBuf, DmaRxBuf)>),
         #[default]
-        InUse,
+        TemporarilyRemoved,
     }
 
     /// A DMA-capable SPI bus.
@@ -1602,7 +1602,7 @@ mod dma {
                     let (spi, (tx_buf, rx_buf)) = transfer.wait();
                     (spi, tx_buf, rx_buf)
                 }
-                State::InUse => unreachable!(),
+                State::TemporarilyRemoved => unreachable!(),
             }
         }
     }
@@ -1860,7 +1860,7 @@ mod dma {
                     State::Reading(transfer, _) => transfer.wait_for_done().await,
                     State::Writing(transfer, _) => transfer.wait_for_done().await,
                     State::Transferring(transfer) => transfer.wait_for_done().await,
-                    State::InUse => unreachable!(),
+                    State::TemporarilyRemoved => unreachable!(),
                 }
                 match take(&mut self.state) {
                     State::Idle(spi, tx_buf, rx_buf) => (spi, tx_buf, rx_buf),
@@ -1876,7 +1876,7 @@ mod dma {
                         let (spi, (tx_buf, rx_buf)) = transfer.wait();
                         (spi, tx_buf, rx_buf)
                     }
-                    State::InUse => unreachable!(),
+                    State::TemporarilyRemoved => unreachable!(),
                 }
             }
 
