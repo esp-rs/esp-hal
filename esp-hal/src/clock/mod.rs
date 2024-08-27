@@ -1,6 +1,7 @@
-//! # Clock Control
+//! # CPU Clock Control
 //!
 //! ## Overview
+//!
 //! Clocks are mainly sourced from oscillator (OSC), RC, and PLL circuits, and
 //! then processed by the dividers or selectors, which allows most functional
 //! modules to select their working clock according to their power consumption

@@ -1,13 +1,13 @@
 //! # Reading of eFuses (ESP32-H2)
 //!
 //! ## Overview
+//!
 //! The `efuse` module provides functionality for reading eFuse data
 //! from the `ESP32-H2` chip, allowing access to various chip-specific
-//! information such as :
+//! information such as:
+//!
 //!   * MAC address
-//!   * core count
-//!   * CPU frequency
-//!   * chip type
+//!   * ADC calibration data
 //!
 //! and more. It is useful for retrieving chip-specific configuration and
 //! identification data during runtime.
@@ -15,8 +15,10 @@
 //! The `Efuse` struct represents the eFuse peripheral and is responsible for
 //! reading various eFuse fields and values.
 //!
-//! ## Examples
+//! ## Example
+//!
 //! ### Read chip's MAC address from the eFuse storage.
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::efuse::Efuse;

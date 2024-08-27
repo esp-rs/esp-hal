@@ -1,6 +1,7 @@
 //! Two-wire Automotive Interface (TWAI) Filters
 //!
 //! ## Overview
+//!
 //! The TWAI controller contains a hardware acceptance filter which can be used
 //! to filter messages of a particular ID. A node that filters out a message
 //! does not receive the message, but will still acknowledge it. Acceptance
@@ -8,6 +9,7 @@
 //! the bus that are irrelevant to the node.
 //!
 //! ## Configuration
+//!
 //! The acceptance filters are configured using two 32-bit values known as the
 //! acceptance code and the acceptance mask.
 
@@ -106,9 +108,16 @@ impl SingleStandardFilter {
     ///
     /// Example matching only even IDs, allowing any rtr value and any payload
     /// data:
-    /// ```rust, ignore
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::twai::filter::SingleStandardFilter;
     /// const FILTER: SingleStandardFilter =
-    ///     SingleStandardFilter::new(b"xxxxxxxxxx0", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
+    ///     SingleStandardFilter::new(
+    ///         b"xxxxxxxxxx0",
+    ///         b"x",
+    ///         [b"xxxxxxxx", b"xxxxxxxx"]
+    ///     );
+    /// # }
     /// ```
     pub const fn new(id: &BitFilter<11>, rtr: &BitFilter<1>, payload: [&BitFilter<8>; 2]) -> Self {
         // The bit values we desire to match against. This determines whether we want a

@@ -71,6 +71,7 @@ impl Executor {
     #[cfg_attr(
         multi_core,
         doc = r#"
+
     This will use software-interrupt 3 which isn't
     available for anything else to wake the other core(s).
     "#

@@ -145,21 +145,20 @@ mod tests {
         let operand_a = BIGNUM_1.as_words();
         let operand_b = BIGNUM_2.as_words();
 
-        #[cfg(feature = "esp32")]
-        {
-            let mut rsamulti =
-                RsaMultiplication::<operand_sizes::Op512, esp_hal::Blocking>::new(&mut ctx.rsa);
-            rsamulti.start_multiplication(operand_a, operand_b);
-            rsamulti.read_results(&mut outbuf);
-        }
-        #[cfg(not(feature = "esp32"))]
-        {
-            let mut rsamulti = RsaMultiplication::<operand_sizes::Op512, esp_hal::Blocking>::new(
-                &mut ctx.rsa,
-                operand_a,
-            );
-            rsamulti.start_multiplication(operand_b);
-            rsamulti.read_results(&mut outbuf);
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "esp32")] {
+                let mut rsamulti =
+                    RsaMultiplication::<operand_sizes::Op512, esp_hal::Blocking>::new(&mut ctx.rsa);
+                rsamulti.start_multiplication(operand_a, operand_b);
+                rsamulti.read_results(&mut outbuf);
+            } else {
+                let mut rsamulti = RsaMultiplication::<operand_sizes::Op512, esp_hal::Blocking>::new(
+                    &mut ctx.rsa,
+                    operand_a,
+                );
+                rsamulti.start_multiplication(operand_b);
+                rsamulti.read_results(&mut outbuf);
+            }
         }
         assert_eq!(EXPECTED_OUTPUT, outbuf)
     }

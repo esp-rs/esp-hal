@@ -95,17 +95,15 @@ async fn main(spawner: Spawner) -> ! {
     let (wifi_interface, controller) =
         esp_wifi::wifi::new_with_mode(&init, wifi, WifiStaDevice).unwrap();
 
-    #[cfg(feature = "esp32")]
-    {
-        let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-        esp_hal_embassy::init(&clocks, timg1.timer0);
-    }
-
-    #[cfg(not(feature = "esp32"))]
-    {
-        let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER)
-            .split::<esp_hal::timer::systimer::Target>();
-        esp_hal_embassy::init(&clocks, systimer.alarm0);
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32")] {
+            let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
+            esp_hal_embassy::init(&clocks, timg1.timer0);
+        } else {
+            use esp_hal::timer::systimer::{SystemTimer, Target};
+            let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+            esp_hal_embassy::init(&clocks, systimer.alarm0);
+        }
     }
 
     let config = Config::dhcpv4(Default::default());

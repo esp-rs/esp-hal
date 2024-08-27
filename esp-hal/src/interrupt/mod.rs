@@ -24,8 +24,10 @@
 //! We reserve a number of CPU interrupts, which cannot be used; see
 //! [`RESERVED_INTERRUPTS`].
 //!
-//! ## Examples
-//! ### Using the Peripheral Driver to Register an Interrupt Handler
+//! ## Example
+//!
+//! ### Using the peripheral driver to register an interrupt handler
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use core::cell::RefCell;

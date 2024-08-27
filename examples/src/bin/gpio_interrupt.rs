@@ -25,10 +25,13 @@ use esp_hal::{
     system::SystemControl,
 };
 
-#[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
-static BUTTON: Mutex<RefCell<Option<Input<gpio::Gpio0>>>> = Mutex::new(RefCell::new(None));
-#[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")))]
-static BUTTON: Mutex<RefCell<Option<Input<gpio::Gpio9>>>> = Mutex::new(RefCell::new(None));
+cfg_if::cfg_if! {
+    if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
+        static BUTTON: Mutex<RefCell<Option<Input<gpio::Gpio0>>>> = Mutex::new(RefCell::new(None));
+    } else {
+        static BUTTON: Mutex<RefCell<Option<Input<gpio::Gpio9>>>> = Mutex::new(RefCell::new(None));
+    }
+}
 
 #[entry]
 fn main() -> ! {
@@ -41,10 +44,13 @@ fn main() -> ! {
     io.set_interrupt_handler(handler);
     let mut led = Output::new(io.pins.gpio2, Level::Low);
 
-    #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
-    let button = io.pins.gpio0;
-    #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")))]
-    let button = io.pins.gpio9;
+    cfg_if::cfg_if! {
+        if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
+            let button = io.pins.gpio0;
+        } else {
+            let button = io.pins.gpio9;
+        }
+    }
 
     let mut button = Input::new(button, Pull::Up);
 
@@ -65,13 +71,16 @@ fn main() -> ! {
 #[handler]
 #[ram]
 fn handler() {
-    #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
-    esp_println::println!(
-        "GPIO Interrupt with priority {}",
-        esp_hal::xtensa_lx::interrupt::get_level()
-    );
-    #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")))]
-    esp_println::println!("GPIO Interrupt");
+    cfg_if::cfg_if! {
+        if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
+            esp_println::println!(
+                "GPIO Interrupt with priority {}",
+                esp_hal::xtensa_lx::interrupt::get_level()
+            );
+        } else {
+            esp_println::println!("GPIO Interrupt");
+        }
+    }
 
     if critical_section::with(|cs| {
         BUTTON

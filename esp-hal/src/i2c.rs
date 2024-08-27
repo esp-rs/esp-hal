@@ -1068,12 +1068,15 @@ pub trait Instance: crate::private::Sealed {
         self.set_filter(Some(7), Some(7));
 
         // Configure frequency
-        #[cfg(esp32)]
-        self.set_frequency(clocks.i2c_clock.convert(), frequency, timeout);
-        #[cfg(esp32s2)]
-        self.set_frequency(clocks.apb_clock.convert(), frequency, timeout);
-        #[cfg(not(any(esp32, esp32s2)))]
-        self.set_frequency(clocks.xtal_clock.convert(), frequency, timeout);
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                self.set_frequency(clocks.i2c_clock.convert(), frequency, timeout);
+            } else if #[cfg(esp32s2)] {
+                self.set_frequency(clocks.apb_clock.convert(), frequency, timeout);
+            } else {
+                self.set_frequency(clocks.xtal_clock.convert(), frequency, timeout);
+            }
+        }
 
         self.update_config();
 

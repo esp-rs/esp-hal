@@ -1,12 +1,14 @@
 //! # Advanced Encryption Standard (AES).
 //!
 //! ## Overview
+//!
 //! The AES accelerator is a hardware device that speeds up computation
 //! using AES algorithm significantly, compared to AES algorithms implemented
 //! solely in software.  The AES accelerator has two working modes, which are
 //! Typical AES and AES-DMA.
 //!
 //! ## Configuration
+//!
 //! The AES peripheral can be configured to encrypt or decrypt data using
 //! different encryption/decryption modes.
 //!
@@ -14,8 +16,11 @@
 //! cipher modes such as ECB, CBC, OFB, CTR, CFB8, and CFB128.
 //!
 //! ## Examples
-//! ### Encrypting and Decrypting a Message
+//!
+//! ### Encrypting and decrypting a message
+//!
 //! Simple example of encrypting and decrypting a message using AES-128:
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::aes::{Aes, Mode};

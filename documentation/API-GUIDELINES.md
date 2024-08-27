@@ -53,6 +53,7 @@ The following paragraphs contain additional recommendations.
 - If necessary provide further context as comments (consider linking to code, PRs, TRM - make sure to use permanent links, e.g. include the hash when linking to a Git repository, include the revision, page number etc. when linking to TRMs)
 - Generally, follow common "good practices" and idiomatic Rust style
 - All `Future` objects (public or private) must be marked with ``#[must_use = "futures do nothing unless you `.await` or poll them"]``.
+- Prefer `cfg_if!` over multiple exclusive `#[cfg]` attributes. `cfg_if!` visually divides the options, often results in simpler conditions and simplifies adding new branches in the future.
 
 ## Modules Documentation
 

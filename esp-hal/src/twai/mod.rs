@@ -1,6 +1,7 @@
 //! # Two-wire Automotive Interface (TWAI)
 //!
 //! ## Overview
+//!
 //! The TWAI is a multi-master, multi-cast communication protocol with error
 //! detection and signaling and inbuilt message priorities and arbitration. The
 //! TWAI protocol is suited for automotive and industrial applications.
@@ -18,14 +19,16 @@
 //! controllers. It supports Standard Frame Format (11-bit) and Extended Frame
 //! Format (29-bit) frame identifiers.
 //!
-//! ## Example
+//! ## Examples
+//!
 //! ### Transmitting and Receiving Messages
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::twai;
 //! # use embedded_can::Id;
-//! # use esp_hal::twai::filter::SingleStandardFilter;
+//! # use esp_hal::twai;
 //! # use esp_hal::twai::filter;
+//! # use esp_hal::twai::filter::SingleStandardFilter;
 //! # use esp_hal::twai::TwaiConfiguration;
 //! # use esp_hal::twai::BaudRate;
 //! # use esp_hal::twai::TwaiMode;
@@ -72,13 +75,14 @@
 //! }
 //! # }
 //! ```
+//! 
 //! ### Self-testing (self reception of transmitted messages)
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::twai;
 //! # use embedded_can::Id;
-//! # use esp_hal::twai::filter::SingleStandardFilter;
+//! # use esp_hal::twai;
 //! # use esp_hal::twai::filter;
+//! # use esp_hal::twai::filter::SingleStandardFilter;
 //! # use esp_hal::twai::TwaiConfiguration;
 //! # use esp_hal::twai::BaudRate;
 //! # use esp_hal::twai::EspTwaiFrame;
@@ -123,7 +127,7 @@
 //! // Wait for a frame to be received.
 //! let frame = block!(can.receive()).unwrap();
 //!
-//! loop {}
+//! # loop {}
 //! # }
 //! ```
 

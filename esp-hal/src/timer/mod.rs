@@ -11,7 +11,9 @@
 )]
 #![cfg_attr(feature = "esp32", doc = "See the [timg] module for more information.")]
 //! ## Examples
+//!
 //! ### One-shot Timer
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::{OneShotTimer, PeriodicTimer, timg::TimerGroup};
