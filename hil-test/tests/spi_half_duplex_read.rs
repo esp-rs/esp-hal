@@ -15,13 +15,13 @@
 
 use esp_hal::{
     clock::ClockControl,
-    dma::{Dma, DmaPriority, DmaRxBuf},
+    dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{GpioPin, Io, Level, Output},
     peripherals::{Peripherals, SPI2},
     prelude::*,
     spi::{
-        master::{dma::SpiDma, Address, Command, Spi},
+        master::{Address, Command, HalfDuplexReadWrite, Spi, SpiDma},
         HalfDuplexMode,
         SpiDataMode,
         SpiMode,
@@ -128,5 +128,46 @@ mod tests {
         (_, dma_rx_buf) = transfer.wait();
 
         assert_eq!(dma_rx_buf.as_slice(), &[0xFF; DMA_BUFFER_SIZE]);
+    }
+
+    #[test]
+    #[timeout(3)]
+    fn test_spidmabus_reads_correctly_from_gpio_pin(mut ctx: Context) {
+        const DMA_BUFFER_SIZE: usize = 4;
+
+        let (buffer, descriptors, tx, txd) = dma_buffers!(DMA_BUFFER_SIZE, 1);
+        let dma_rx_buf = DmaRxBuf::new(descriptors, buffer).unwrap();
+        let dma_tx_buf = DmaTxBuf::new(txd, tx).unwrap();
+
+        let mut spi = ctx.spi.with_buffers(dma_tx_buf, dma_rx_buf);
+
+        // SPI should read '0's from the MISO pin
+        ctx.miso_mirror.set_low();
+
+        let mut buffer = [0xAA; DMA_BUFFER_SIZE];
+        spi.read(
+            SpiDataMode::Single,
+            Command::None,
+            Address::None,
+            0,
+            &mut buffer,
+        )
+        .unwrap();
+
+        assert_eq!(buffer.as_slice(), &[0x00; DMA_BUFFER_SIZE]);
+
+        // SPI should read '1's from the MISO pin
+        ctx.miso_mirror.set_high();
+
+        spi.read(
+            SpiDataMode::Single,
+            Command::None,
+            Address::None,
+            0,
+            &mut buffer,
+        )
+        .unwrap();
+
+        assert_eq!(buffer.as_slice(), &[0xFF; DMA_BUFFER_SIZE]);
     }
 }

@@ -15,7 +15,7 @@
 
 use esp_hal::{
     clock::ClockControl,
-    dma::{Dma, DmaPriority, DmaTxBuf},
+    dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{GpioPin, Io, Pull},
     pcnt::{
@@ -26,7 +26,7 @@ use esp_hal::{
     peripherals::{Peripherals, SPI2},
     prelude::*,
     spi::{
-        master::{dma::SpiDma, Address, Command, Spi},
+        master::{Address, Command, HalfDuplexReadWrite, Spi, SpiDma},
         HalfDuplexMode,
         SpiDataMode,
         SpiMode,
@@ -140,6 +140,50 @@ mod tests {
             .map_err(|e| e.0)
             .unwrap();
         transfer.wait();
+
+        assert_eq!(unit.get_value(), (6 * DMA_BUFFER_SIZE) as _);
+    }
+
+    #[test]
+    #[timeout(3)]
+    fn test_spidmabus_writes_are_correctly_by_pcnt(ctx: Context) {
+        const DMA_BUFFER_SIZE: usize = 4;
+
+        let (buffer, descriptors, rx, rxd) = dma_buffers!(DMA_BUFFER_SIZE, 1);
+        let dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
+        let dma_rx_buf = DmaRxBuf::new(rxd, rx).unwrap();
+
+        let unit = ctx.pcnt_unit;
+        let mut spi = ctx.spi.with_buffers(dma_tx_buf, dma_rx_buf);
+
+        unit.channel0.set_edge_signal(PcntSource::from_pin(
+            ctx.mosi_mirror,
+            PcntInputConfig { pull: Pull::Down },
+        ));
+        unit.channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+
+        let buffer = [0b0110_1010; DMA_BUFFER_SIZE];
+        // Write the buffer where each byte has 3 pos edges.
+        spi.write(
+            SpiDataMode::Single,
+            Command::None,
+            Address::None,
+            0,
+            &buffer,
+        )
+        .unwrap();
+
+        assert_eq!(unit.get_value(), (3 * DMA_BUFFER_SIZE) as _);
+
+        spi.write(
+            SpiDataMode::Single,
+            Command::None,
+            Address::None,
+            0,
+            &buffer,
+        )
+        .unwrap();
 
         assert_eq!(unit.get_value(), (6 * DMA_BUFFER_SIZE) as _);
     }

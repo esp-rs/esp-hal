@@ -21,7 +21,7 @@ use esp_hal::{
     peripherals::{Peripherals, SPI2},
     prelude::*,
     spi::{
-        master::{dma::SpiDma, Spi},
+        master::{Spi, SpiDma},
         FullDuplexMode,
         SpiMode,
     },
@@ -49,6 +49,7 @@ struct Context {
 #[embedded_test::tests]
 mod tests {
     use defmt::assert_eq;
+    use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
 
     use super::*;
 

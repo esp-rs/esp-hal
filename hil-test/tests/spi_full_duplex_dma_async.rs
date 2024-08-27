@@ -34,10 +34,12 @@ use esp_hal::{
     peripherals::{Peripherals, SPI2},
     prelude::*,
     spi::{
-        master::{dma::asynch::SpiDmaAsyncBus, Spi},
+        master::{Spi, SpiDmaBus},
+        FullDuplexMode,
         SpiMode,
     },
     system::SystemControl,
+    Async,
 };
 use hil_test as _;
 
@@ -55,7 +57,7 @@ cfg_if::cfg_if! {
 const DMA_BUFFER_SIZE: usize = 5;
 
 struct Context {
-    spi: SpiDmaAsyncBus<'static, SPI2, DmaChannel0>,
+    spi: SpiDmaBus<'static, SPI2, DmaChannel0, FullDuplexMode, Async>,
     pcnt_unit: Unit<'static, 0>,
     out_pin: Output<'static, GpioPin<5>>,
     mosi_mirror: GpioPin<2>,
