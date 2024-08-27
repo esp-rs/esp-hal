@@ -79,11 +79,7 @@ pub enum SpiBitOrder {
 }
 
 /// Trait marker for defining SPI duplex modes.
-pub trait DuplexMode {}
-/// Trait marker for SPI full-duplex mode.
-pub trait IsFullDuplex: DuplexMode {}
-/// Trait marker for SPI half-duplex mode.
-pub trait IsHalfDuplex: DuplexMode {}
+pub trait DuplexMode: crate::private::Sealed {}
 
 /// SPI data mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -100,9 +96,9 @@ pub enum SpiDataMode {
 /// Full-duplex operation
 pub struct FullDuplexMode {}
 impl DuplexMode for FullDuplexMode {}
-impl IsFullDuplex for FullDuplexMode {}
+impl crate::private::Sealed for FullDuplexMode {}
 
 /// Half-duplex operation
 pub struct HalfDuplexMode {}
 impl DuplexMode for HalfDuplexMode {}
-impl IsHalfDuplex for HalfDuplexMode {}
+impl crate::private::Sealed for HalfDuplexMode {}
