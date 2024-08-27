@@ -55,12 +55,16 @@
 //! });
 //!
 //! // Initialize with custom clock frequency
+//! // let (peripherals, clocks) = esp_hal::init({
+//! //    let mut config = Config::default();
 #![cfg_attr(
     not(any(esp32c2, esp32h2)),
-    doc = "// let system = esp_hal::init(CpuClock::Clock160MHz);"
+    doc = "//    config.cpu_clock = CpuClock::Clock160MHz;"
 )]
-#![cfg_attr(esp32c2, doc = "// let system = esp_hal::init(CpuClock::Clock120MHz);")]
-#![cfg_attr(esp32h2, doc = "// let system = esp_hal::init(CpuClock::Clock96MHz);")]
+#![cfg_attr(esp32c2, doc = "//    config.cpu_clock = CpuClock::Clock120MHz;")]
+#![cfg_attr(esp32h2, doc = "//    config.cpu_clock = CpuClock::Clock96MHz;")]
+//! //    config
+//! // });
 //! //
 //! // Initialize with default clock frequency for this chip
 //! // let (peripherals, clocks) = esp_hal::init(Config::default());

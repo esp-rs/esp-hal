@@ -179,6 +179,7 @@ pub struct SoftwareInterruptControl {
 }
 
 impl SoftwareInterruptControl {
+    /// Create a new instance of the software interrupt control.
     pub fn new(_peripheral: crate::peripherals::SW_INTERRUPT) -> Self {
         SoftwareInterruptControl {
             software_interrupt0: SoftwareInterrupt {},
