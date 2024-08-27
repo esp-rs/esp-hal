@@ -100,6 +100,7 @@ pub mod prelude {
 /// Enumeration of possible SPI interrupt events.
 #[cfg(not(any(esp32, esp32s2)))]
 #[derive(EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SpiInterrupt {
     /// Indicates that the SPI transaction has completed successfully.
     ///
@@ -125,6 +126,7 @@ const MAX_DMA_SIZE: usize = 32736;
 /// Used to define specific commands sent over the SPI bus.
 /// Can be [Command::None] if command phase should be suppressed.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Command {
     /// No command is sent.
     None,
@@ -239,6 +241,7 @@ impl Command {
 /// This can be used to specify the address phase of SPI transactions.
 /// Can be [Address::None] if address phase should be suppressed.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Address {
     /// No address phase.
     None,
@@ -1565,7 +1568,7 @@ pub mod dma {
     /// A DMA-capable SPI bus.
     ///
     /// This structure is responsible for managing SPI transfers using DMA
-    /// buffers. Implements the embedded-hal traits.
+    /// buffers.
     pub struct SpiDmaBus<'d, T, C, D, M>
     where
         T: InstanceDma,
