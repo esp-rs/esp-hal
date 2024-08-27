@@ -21,7 +21,7 @@ use esp_hal::{
     peripherals::{Peripherals, SPI2},
     prelude::*,
     spi::{
-        master::{dma::SpiDma, Spi},
+        master::{Spi, SpiDma},
         FullDuplexMode,
         SpiMode,
     },

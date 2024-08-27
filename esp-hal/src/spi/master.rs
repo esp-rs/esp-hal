@@ -58,6 +58,7 @@
 
 use core::marker::PhantomData;
 
+pub use dma::*;
 #[cfg(not(any(esp32, esp32s2)))]
 use enumset::EnumSet;
 #[cfg(not(any(esp32, esp32s2)))]
@@ -86,14 +87,6 @@ use crate::{
     private,
     system::PeripheralClockControl,
 };
-
-/// Prelude for the SPI (Master) driver
-pub mod prelude {
-    pub use super::{
-        Instance as _esp_hal_spi_master_Instance,
-        InstanceDma as _esp_hal_spi_master_InstanceDma,
-    };
-}
 
 /// Enumeration of possible SPI interrupt events.
 #[cfg(not(any(esp32, esp32s2)))]
@@ -944,8 +937,7 @@ where
     }
 }
 
-/// DMA (Direct Memory Access) funtionality (Master).
-pub mod dma {
+mod dma {
     use core::{
         cmp::min,
         sync::atomic::{fence, Ordering},
@@ -1845,7 +1837,7 @@ pub mod dma {
 
     /// Async functionality
     #[cfg(feature = "async")]
-    pub mod asynch {
+    mod asynch {
         use core::{cmp::min, mem::take};
 
         use super::*;

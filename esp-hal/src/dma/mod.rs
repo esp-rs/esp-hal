@@ -16,7 +16,7 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::gpio::Io;
-//! # use esp_hal::spi::{master::{Spi, prelude::*}, SpiMode};
+//! # use esp_hal::spi::{master::Spi, SpiMode};
 //! # use esp_hal::dma::{Dma, DmaPriority};
 //! # use crate::esp_hal::prelude::_fugit_RateExtU32;
 //! let dma = Dma::new(peripherals.DMA);
