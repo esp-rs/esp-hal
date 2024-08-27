@@ -19,8 +19,8 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::aes::{Aes, Mode};
-//! # let keytext = "SUp4SeCp@sSw0rd".as_bytes();
-//! # let plaintext = "message".as_bytes();
+//! # let keytext = b"SUp4SeCp@sSw0rd";
+//! # let plaintext = b"message";
 //! # let mut keybuf = [0_u8; 16];
 //! # keybuf[..keytext.len()].copy_from_slice(keytext);
 //! let mut block_buf = [0_u8; 16];

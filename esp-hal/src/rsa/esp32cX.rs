@@ -21,8 +21,10 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
         Ok(())
     }
 
-    /// Enables/disables rsa interrupt, when enabled rsa perpheral would
-    /// generate an interrupt when a operation is finished.
+    /// Enables/disables rsa interrupt.
+    ///
+    /// When enabled rsa peripheral would generate an interrupt when a operation
+    /// is finished.
     pub fn enable_disable_interrupt(&mut self, enable: bool) {
         match enable {
             true => self.rsa.int_ena().write(|w| w.int_ena().set_bit()),
@@ -34,10 +36,15 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
         self.rsa.mode().write(|w| unsafe { w.bits(mode) });
     }
 
-    /// Enables/disables search acceleration, when enabled it would increases
-    /// the performance of modular exponentiation by discarding the
-    /// exponent's bits before the most significant set bit. Note: this might
-    /// affect the security, for more info refer 18.3.4 of <https://www.espressif.com/sites/default/files/documentation/esp32-c6_technical_reference_manual_en.pdf>
+    /// Enables/disables search acceleration.
+    ///
+    /// When enabled it would increases the performance of modular
+    /// exponentiation by discarding the exponent's bits before the most
+    /// significant set bit.
+    ///
+    /// Note: this might decrease security.
+    ///
+    /// For more information refer to 18.3.4 of <https://www.espressif.com/sites/default/files/documentation/esp32-c6_technical_reference_manual_en.pdf>
     pub fn enable_disable_search_acceleration(&mut self, enable: bool) {
         match enable {
             true => self
@@ -63,11 +70,16 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
             .write(|w| unsafe { w.bits(search_position) });
     }
 
-    /// Enables/disables constant time acceleration, when enabled it would
-    /// increases the performance of modular exponentiation by simplifying
-    /// the calculation concerning the 0 bits of the exponent i.e. lesser the
-    /// hamming weight, greater the performance. Note : this might affect
-    /// the security, for more info refer 18.3.4 of <https://www.espressif.com/sites/default/files/documentation/esp32-c6_technical_reference_manual_en.pdf>
+    /// Enables/disables constant time acceleration.
+    ///
+    /// When enabled it would increases the performance of modular
+    /// exponentiation by simplifying the calculation concerning the 0 bits
+    /// of the exponent. I.e. lesser the hamming weight, greater the
+    /// performance.
+    ///
+    /// Note: this might decrease security.
+    ///
+    /// For more information refer to 18.3.4 of <https://www.espressif.com/sites/default/files/documentation/esp32-c6_technical_reference_manual_en.pdf>.
     pub fn enable_disable_constant_time_acceleration(&mut self, enable: bool) {
         match enable {
             true => self
@@ -228,10 +240,12 @@ impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularExponentiati
 where
     T: RsaMode<InputType = [u32; N]>,
 {
-    /// Creates an Instance of `RsaModularExponentiation`.  
+    /// Creates an instance of `RsaModularExponentiation`.
+    ///
     /// `m_prime` could be calculated using `-(modular multiplicative inverse of
-    /// modulus) mod 2^32`, for more information check 19.3.1 in the
-    /// <https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf>
+    /// modulus) mod 2^32`.
+    ///
+    /// For more information refer to 19.3.1 of <https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf>.
     pub fn new(
         rsa: &'a mut Rsa<'d, DM>,
         exponent: &T::InputType,
@@ -269,7 +283,7 @@ where
     }
 
     /// Starts the modular exponentiation operation on the RSA hardware.
-    pub(super) fn set_start(&mut self) {
+    pub(super) fn start(&mut self) {
         self.rsa.write_modexp_start();
     }
 }
@@ -282,10 +296,12 @@ where
         rsa.write_mode((N - 1) as u32)
     }
 
-    /// Creates an Instance of `RsaModularMultiplication`.  
-    /// `m_prime` could be calculated using `-(modular multiplicative inverse of
-    /// modulus) mod 2^32`, for more information check 19.3.1 in the
-    /// <https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf>
+    /// Creates an instance of `RsaModularMultiplication`.
+    ///
+    /// `m_prime` can be calculated using `-(modular multiplicative inverse of
+    /// modulus) mod 2^32`.
+    ///
+    /// For more information refer to 19.3.1 of <https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf>.
     pub fn new(
         rsa: &'a mut Rsa<'d, DM>,
         operand_a: &T::InputType,
@@ -306,17 +322,19 @@ where
         }
     }
 
-    /// Starts the modular multiplication operation. `r` could be calculated
-    /// using `2 ^ ( bitlength * 2 ) mod modulus`, for more information
-    /// check 19.3.1 in the <https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf>
+    /// Starts the modular multiplication operation.
+    ///
+    /// `r` could be calculated using `2 ^ ( bitlength * 2 ) mod modulus`.
+    ///
+    /// For more information refer to 19.3.1 of <https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf>.
     pub fn start_modular_multiplication(&mut self, r: &T::InputType) {
         unsafe {
             self.rsa.write_r(r);
         }
-        self.set_start();
+        self.start();
     }
 
-    fn set_start(&mut self) {
+    fn start(&mut self) {
         self.rsa.write_modmulti_start();
     }
 }
@@ -325,7 +343,7 @@ impl<'a, 'd, T: RsaMode + Multi, DM: crate::Mode, const N: usize> RsaMultiplicat
 where
     T: RsaMode<InputType = [u32; N]>,
 {
-    /// Creates an Instance of `RsaMultiplication`.
+    /// Creates an instance of `RsaMultiplication`.
     pub fn new(rsa: &'a mut Rsa<'d, DM>, operand_a: &T::InputType) -> Self {
         Self::set_mode(rsa);
         unsafe {
@@ -342,16 +360,16 @@ where
         unsafe {
             self.rsa.write_multi_operand_b(operand_b);
         }
-        self.set_start();
+        self.start();
     }
 
-    /// Sets the multiplication mode for the RSA hardware.    
+    /// Sets the multiplication mode for the RSA hardware.
     pub(super) fn set_mode(rsa: &mut Rsa<'d, DM>) {
         rsa.write_mode((N * 2 - 1) as u32)
     }
 
     /// Starts the multiplication operation on the RSA hardware.
-    pub(super) fn set_start(&mut self) {
+    pub(super) fn start(&mut self) {
         self.rsa.write_multi_start();
     }
 }

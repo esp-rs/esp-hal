@@ -44,11 +44,11 @@ mod tests {
             rx_descriptors,
         );
 
-        let keytext = "SUp4SeCp@sSw0rd".as_bytes();
+        let keytext = b"SUp4SeCp@sSw0rd";
         let mut keybuf = [0_u8; 16];
         keybuf[..keytext.len()].copy_from_slice(keytext);
 
-        let plaintext = "message".as_bytes();
+        let plaintext = b"message";
         input[..plaintext.len()].copy_from_slice(plaintext);
 
         let encrypted_message = [
@@ -88,11 +88,11 @@ mod tests {
             rx_descriptors,
         );
 
-        let keytext = "SUp4SeCp@sSw0rd".as_bytes();
+        let keytext = b"SUp4SeCp@sSw0rd";
         let mut keybuf = [0_u8; 16];
         keybuf[..keytext.len()].copy_from_slice(keytext);
 
-        let plaintext = "message".as_bytes();
+        let plaintext = b"message";
         let encrypted_message = [
             0xb3, 0xc8, 0xd2, 0x3b, 0xa7, 0x36, 0x5f, 0x18, 0x61, 0x70, 0x0, 0x3e, 0xd9, 0x3a,
             0x31, 0x96,
@@ -131,11 +131,11 @@ mod tests {
             rx_descriptors,
         );
 
-        let keytext = "SUp4SeCp@sSw0rd".as_bytes();
+        let keytext = b"SUp4SeCp@sSw0rd";
         let mut keybuf = [0_u8; 16];
         keybuf[..keytext.len()].copy_from_slice(keytext);
 
-        let plaintext = "message".as_bytes();
+        let plaintext = b"message";
         input[..plaintext.len()].copy_from_slice(plaintext);
 
         let encrypted_message = [
@@ -175,11 +175,11 @@ mod tests {
             rx_descriptors,
         );
 
-        let keytext = "SUp4SeCp@sSw0rd".as_bytes();
+        let keytext = b"SUp4SeCp@sSw0rd";
         let mut keybuf = [0_u8; 16];
         keybuf[..keytext.len()].copy_from_slice(keytext);
 
-        let plaintext = "message".as_bytes();
+        let plaintext = b"message";
         let encrypted_message = [
             0x0, 0x63, 0x3f, 0x2, 0xa4, 0x53, 0x9, 0x72, 0x20, 0x6d, 0xc9, 0x8, 0x7c, 0xe5, 0xfd,
             0xc,

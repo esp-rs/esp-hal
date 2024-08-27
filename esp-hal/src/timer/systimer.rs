@@ -1022,6 +1022,7 @@ mod asynch {
     const INIT: AtomicWaker = AtomicWaker::new();
     static WAKERS: [AtomicWaker; NUM_ALARMS] = [INIT; NUM_ALARMS];
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct AlarmFuture<'a, COMP: Comparator, UNIT: Unit> {
         alarm: &'a Alarm<'a, Periodic, crate::Async, COMP, UNIT>,
     }

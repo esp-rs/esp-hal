@@ -2716,12 +2716,12 @@ pub(crate) mod asynch {
 
     use super::*;
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct DmaTxFuture<'a, TX>
     where
         TX: Tx,
     {
         pub(crate) tx: &'a mut TX,
-        _a: (),
     }
 
     impl<'a, TX> DmaTxFuture<'a, TX>
@@ -2729,7 +2729,7 @@ pub(crate) mod asynch {
         TX: Tx,
     {
         pub fn new(tx: &'a mut TX) -> Self {
-            Self { tx, _a: () }
+            Self { tx }
         }
     }
 
@@ -2768,12 +2768,12 @@ pub(crate) mod asynch {
         }
     }
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct DmaRxFuture<'a, RX>
     where
         RX: Rx,
     {
         pub(crate) rx: &'a mut RX,
-        _a: (),
     }
 
     impl<'a, RX> DmaRxFuture<'a, RX>
@@ -2781,7 +2781,7 @@ pub(crate) mod asynch {
         RX: Rx,
     {
         pub fn new(rx: &'a mut RX) -> Self {
-            Self { rx, _a: () }
+            Self { rx }
         }
 
         #[allow(dead_code)] // Dead on the C2

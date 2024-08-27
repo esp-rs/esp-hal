@@ -22,7 +22,6 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::i2c::I2C;
 //! # use esp_hal::gpio::Io;
-//! # use core::option::Option::None;
 //! # use crate::esp_hal::prelude::_fugit_RateExtU32;
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // Create a new peripheral object with the described wiring
@@ -50,7 +49,6 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::i2c::I2C;
 //! # use esp_hal::gpio::Io;
-//! # use core::option::Option::None;
 //! # use crate::esp_hal::prelude::_fugit_RateExtU32;
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // Create a new peripheral object with the described wiring
@@ -516,6 +514,7 @@ mod asynch {
     }
 
     #[cfg(not(esp32))]
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct I2cFuture<'a, T>
     where
         T: Instance,
