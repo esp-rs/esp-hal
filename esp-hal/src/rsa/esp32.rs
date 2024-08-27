@@ -46,7 +46,7 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
 
     /// Starts the modular multiplication operation.
     pub(super) fn write_modmulti_start(&self) {
-        self.rsa.mult_start().write(|w| w.mult_start().set_bit());
+        self.write_multi_start();
     }
 
     /// Clears the RSA interrupt flag.
