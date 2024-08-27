@@ -292,9 +292,10 @@ impl<const NUM: u8> InterruptConfigurable for SoftwareInterrupt<NUM> {
 #[cfg_attr(
     multi_core,
     doc = r#"
+
 Please note: Software interrupt 3 is reserved
-for inter-processor communication when the `embassy`
-feature is enabled."#
+for inter-processor communication when using
+`esp-hal-embassy`."#
 )]
 #[non_exhaustive]
 pub struct SoftwareInterruptControl {
@@ -304,7 +305,9 @@ pub struct SoftwareInterruptControl {
     pub software_interrupt1: SoftwareInterrupt<1>,
     /// Software interrupt 2.
     pub software_interrupt2: SoftwareInterrupt<2>,
-    /// Software interrupt 3.
+    #[cfg(not(all(feature = "__esp_hal_embassy", multi_core)))]
+    /// Software interrupt 3. Only available when not using `esp-hal-embassy`,
+    /// or on single-core systems.
     pub software_interrupt3: SoftwareInterrupt<3>,
 }
 
@@ -314,6 +317,7 @@ impl SoftwareInterruptControl {
             software_interrupt0: SoftwareInterrupt {},
             software_interrupt1: SoftwareInterrupt {},
             software_interrupt2: SoftwareInterrupt {},
+            #[cfg(not(all(feature = "__esp_hal_embassy", multi_core)))]
             software_interrupt3: SoftwareInterrupt {},
         }
     }

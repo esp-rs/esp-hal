@@ -85,6 +85,8 @@ bluetooth = []
 
 usb-otg = ["esp-synopsys-usb-otg", "usb-device"]
 
+__esp_hal_embassy = []
+
 ## Enable debug features in the HAL (used for development).
 debug = [
     "esp32?/impl-register-debug",
