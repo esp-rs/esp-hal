@@ -14,18 +14,17 @@
 #![no_main]
 
 use esp_hal::{
-    clock::{ClockControl, Clocks},
+    clock::Clocks,
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::Io,
-    peripherals::{Peripherals, SPI2},
+    peripherals::SPI2,
     prelude::*,
     spi::{
         master::{Spi, SpiDma},
         FullDuplexMode,
         SpiMode,
     },
-    system::SystemControl,
     Blocking,
 };
 use hil_test as _;

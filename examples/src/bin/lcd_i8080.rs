@@ -28,7 +28,7 @@ use esp_hal::{
     dma_buffers,
     gpio::{Io, Level, Output},
     lcd_cam::{
-        lcd::i8080::{Config, TxEightBits, I8080},
+        lcd::i8080::{self, TxEightBits, I8080},
         LcdCam,
     },
     prelude::*,
@@ -77,7 +77,7 @@ fn main() -> ! {
         tx_descriptors,
         tx_pins,
         20.MHz(),
-        Config::default(),
+        i8080::Config::default(),
         &clocks,
     )
     .with_ctrl_pins(lcd_rs, lcd_wr);

@@ -14,7 +14,6 @@
 #![no_main]
 
 use esp_hal::{
-    clock::ClockControl,
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{GpioPin, Io, Pull},
@@ -23,7 +22,7 @@ use esp_hal::{
         unit::Unit,
         Pcnt,
     },
-    peripherals::{Peripherals, SPI2},
+    peripherals::SPI2,
     prelude::*,
     spi::{
         master::{Address, Command, HalfDuplexReadWrite, Spi, SpiDma},
@@ -31,7 +30,6 @@ use esp_hal::{
         SpiDataMode,
         SpiMode,
     },
-    system::SystemControl,
     Blocking,
 };
 use hil_test as _;

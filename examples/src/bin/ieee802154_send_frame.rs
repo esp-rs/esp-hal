@@ -5,7 +5,7 @@
 
 use esp_backtrace as _;
 use esp_hal::{delay::Delay, prelude::*};
-use esp_ieee802154::*;
+use esp_ieee802154::{Config as Ieee802154Config, Frame, Ieee802154};
 use esp_println::println;
 use ieee802154::mac::{
     Address,
@@ -25,12 +25,12 @@ fn main() -> ! {
 
     let mut ieee802154 = Ieee802154::new(peripherals.IEEE802154, &mut peripherals.RADIO_CLK);
 
-    ieee802154.set_config(Config {
+    ieee802154.set_config(Ieee802154Config {
         channel: 15,
         promiscuous: false,
         pan_id: Some(0x4242),
         short_addr: Some(0x2222),
-        ..Config::default()
+        ..Default::default()
     });
 
     let mut seq_number = 0u8;

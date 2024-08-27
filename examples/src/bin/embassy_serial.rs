@@ -15,9 +15,10 @@ use esp_backtrace as _;
 use esp_hal::{
     gpio::Io,
     peripherals::UART0,
+    prelude::*,
     timer::timg::TimerGroup,
     uart::{
-        config::{AtCmdConfig, Config},
+        config::{AtCmdConfig, Config as UartConfig},
         Uart,
         UartRx,
         UartTx,
@@ -102,7 +103,7 @@ async fn main(spawner: Spawner) {
         }
     }
 
-    let config = Config::default().rx_fifo_full_threshold(READ_BUF_SIZE as u16);
+    let config = UartConfig::default().rx_fifo_full_threshold(READ_BUF_SIZE as u16);
 
     let mut uart0 =
         Uart::new_async_with_config(peripherals.UART0, config, &clocks, tx_pin, rx_pin).unwrap();

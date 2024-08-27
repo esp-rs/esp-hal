@@ -17,7 +17,7 @@ use esp_hal::{
     peripherals::UART0,
     prelude::*,
     uart::{
-        config::{AtCmdConfig, Config},
+        config::{AtCmdConfig, Config as UartConfig},
         Uart,
     },
     Blocking,
@@ -49,7 +49,7 @@ fn main() -> ! {
             let (tx_pin, rx_pin) = (io.pins.gpio43, io.pins.gpio44);
         }
     }
-    let config = Config::default().rx_fifo_full_threshold(30);
+    let config = UartConfig::default().rx_fifo_full_threshold(30);
 
     let mut uart0 =
         Uart::new_with_config(peripherals.UART0, config, &clocks, tx_pin, rx_pin).unwrap();

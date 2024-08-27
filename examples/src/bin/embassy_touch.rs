@@ -18,6 +18,7 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::Io,
+    prelude::*,
     rtc_cntl::Rtc,
     timer::timg::TimerGroup,
     touch::{Touch, TouchConfig, TouchPad},

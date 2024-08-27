@@ -10,7 +10,6 @@
 
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use esp_hal::{
-    clock::CpuClock,
     interrupt::{
         software::{SoftwareInterrupt, SoftwareInterruptControl},
         Priority,

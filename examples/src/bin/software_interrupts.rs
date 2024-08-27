@@ -15,7 +15,7 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    interrupt::interrupt::software::{SoftwareInterrupt, SoftwareInterruptControl},
+    interrupt::software::{SoftwareInterrupt, SoftwareInterruptControl},
     prelude::*,
 };
 
@@ -31,33 +31,33 @@ fn main() -> ! {
     let mut sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
     critical_section::with(|cs| {
-        sw_int
+        sw_ints
             .software_interrupt0
             .set_interrupt_handler(swint0_handler);
         SWINT0
             .borrow_ref_mut(cs)
-            .replace(sw_int.software_interrupt0);
+            .replace(sw_ints.software_interrupt0);
 
-        sw_int
+        sw_ints
             .software_interrupt1
             .set_interrupt_handler(swint1_handler);
         SWINT1
             .borrow_ref_mut(cs)
-            .replace(sw_int.software_interrupt1);
+            .replace(sw_ints.software_interrupt1);
 
-        sw_int
+        sw_ints
             .software_interrupt2
             .set_interrupt_handler(swint2_handler);
         SWINT2
             .borrow_ref_mut(cs)
-            .replace(sw_int.software_interrupt2);
+            .replace(sw_ints.software_interrupt2);
 
-        sw_int
+        sw_ints
             .software_interrupt3
             .set_interrupt_handler(swint3_handler);
         SWINT3
             .borrow_ref_mut(cs)
-            .replace(sw_int.software_interrupt3);
+            .replace(sw_ints.software_interrupt3);
     });
 
     let delay = Delay::new(&clocks);

@@ -16,6 +16,7 @@ use esp_hal::{
     delay::Delay,
     entry,
     gpio::{Io, RtcPinWithResistors},
+    prelude::*,
     rtc_cntl::{
         get_reset_reason,
         get_wakeup_cause,

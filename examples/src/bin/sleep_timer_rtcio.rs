@@ -20,6 +20,7 @@ use esp_hal::{
     entry,
     gpio,
     gpio::Io,
+    prelude::*,
     rtc_cntl::{
         get_reset_reason,
         get_wakeup_cause,

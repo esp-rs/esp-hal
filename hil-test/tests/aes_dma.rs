@@ -29,7 +29,7 @@ mod tests {
 
     #[init]
     fn init() -> Peripherals {
-        let (peripherals, clocks) = esp_hal::init(Config::default());
+        let (peripherals, _clocks) = esp_hal::init(Config::default());
         peripherals
     }
 

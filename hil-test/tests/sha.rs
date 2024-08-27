@@ -13,7 +13,6 @@ use esp_hal::sha::{Sha384, Sha512};
 #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
 use esp_hal::sha::{Sha512_224, Sha512_256};
 use esp_hal::{
-    peripherals::Peripherals,
     prelude::*,
     rng::Rng,
     sha::{Sha, Sha1, Sha256},
@@ -84,6 +83,7 @@ fn assert_digest<D: Digest, const N: usize>(input: &[u8]) {
     }
 }
 
+#[allow(unused_mut)]
 fn with_random_data(
     mut rng: Rng,
     f: impl Fn(
@@ -97,7 +97,6 @@ fn with_random_data(
     const BUFFER_LEN: usize = 256;
 
     let mut sha1_random = [0u8; BUFFER_LEN];
-    #[cfg_attr(feature = "esp32", allow(unused_mut))]
     let mut sha224_random = [0u8; BUFFER_LEN];
     let mut sha256_random = [0u8; BUFFER_LEN];
     let mut sha384_random = [0u8; BUFFER_LEN];
@@ -157,6 +156,7 @@ fn with_random_data(
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
+    #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
     use defmt::assert_eq;
 
     use super::*;

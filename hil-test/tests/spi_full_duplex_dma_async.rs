@@ -22,7 +22,6 @@
 
 use embedded_hal_async::spi::SpiBus;
 use esp_hal::{
-    clock::{ClockControl, Clocks},
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{GpioPin, Io, Level, Output, Pull},
@@ -31,14 +30,13 @@ use esp_hal::{
         unit::Unit,
         Pcnt,
     },
-    peripherals::{Peripherals, SPI2},
+    peripherals::SPI2,
     prelude::*,
     spi::{
         master::{Spi, SpiDmaBus},
         FullDuplexMode,
         SpiMode,
     },
-    system::SystemControl,
     Async,
 };
 use hil_test as _;

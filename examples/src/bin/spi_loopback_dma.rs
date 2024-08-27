@@ -20,15 +20,12 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::Io,
-    peripherals::Peripherals,
     prelude::*,
     spi::{master::Spi, SpiMode},
-    system::SystemControl,
 };
 use esp_println::println;
 

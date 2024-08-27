@@ -12,15 +12,6 @@ struct Context<'a> {
     rtc: Rtc<'a>,
 }
 
-impl Context<'_> {
-    pub fn init() -> Self {
-        let (peripherals, clocks) = esp_hal::init(Config::default());
-        let rtc = Rtc::new(peripherals.LPWR);
-
-        Context { rtc }
-    }
-}
-
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
@@ -28,7 +19,10 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        Context::init()
+        let (peripherals, _clocks) = esp_hal::init(Config::default());
+        let rtc = Rtc::new(peripherals.LPWR);
+
+        Context { rtc }
     }
 
     #[test]

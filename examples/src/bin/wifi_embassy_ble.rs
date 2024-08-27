@@ -28,7 +28,7 @@ use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
     gpio::{Input, Io, Pull},
-    peripherals::*,
+    prelude::*,
     rng::Rng,
     timer::timg::TimerGroup,
 };

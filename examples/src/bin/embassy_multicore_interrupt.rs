@@ -21,9 +21,8 @@ use esp_hal::{
     cpu_control::{CpuControl, Stack},
     get_core,
     gpio::{AnyOutput, Io, Level},
-    interrupt::Priority,
+    interrupt::{software::SoftwareInterruptControl, Priority},
     prelude::*,
-    system::SoftwareInterruptControl,
     timer::{timg::TimerGroup, ErasedTimer},
 };
 use esp_hal_embassy::InterruptExecutor;

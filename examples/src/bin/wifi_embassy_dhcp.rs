@@ -14,10 +14,10 @@
 #![no_main]
 
 use embassy_executor::Spawner;
-use embassy_net::{tcp::TcpSocket, Config, Ipv4Address, Stack, StackResources};
+use embassy_net::{tcp::TcpSocket, Ipv4Address, Stack, StackResources};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
-use esp_hal::{rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{
     initialize,
@@ -81,7 +81,7 @@ async fn main(spawner: Spawner) -> ! {
         }
     }
 
-    let config = Config::dhcpv4(Default::default());
+    let config = embassy_net::Config::dhcpv4(Default::default());
 
     let seed = 1234; // very random, very secure seed
 
