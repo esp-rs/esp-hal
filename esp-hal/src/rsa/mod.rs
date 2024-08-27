@@ -47,26 +47,6 @@ pub struct Rsa<'d, DM: crate::Mode> {
     phantom: PhantomData<DM>,
 }
 
-impl<'d, DM: crate::Mode> Rsa<'d, DM> {
-    fn internal_set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        unsafe {
-            crate::interrupt::bind_interrupt(crate::peripherals::Interrupt::RSA, handler.handler());
-            crate::interrupt::enable(crate::peripherals::Interrupt::RSA, handler.priority())
-                .unwrap();
-        }
-    }
-
-    fn wait_for_idle(&self) {
-        while !self.is_idle() {}
-        self.clear_interrupt();
-    }
-
-    fn read_results<const N: usize>(&self, outbuf: &mut [u32; N]) {
-        self.wait_for_idle();
-        self.read_out(outbuf);
-    }
-}
-
 impl<'d> Rsa<'d, crate::Blocking> {
     /// Create a new instance in [crate::Blocking] mode.
     ///
@@ -149,6 +129,24 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
                 N,
             );
         }
+    }
+
+    fn internal_set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        unsafe {
+            crate::interrupt::bind_interrupt(crate::peripherals::Interrupt::RSA, handler.handler());
+            crate::interrupt::enable(crate::peripherals::Interrupt::RSA, handler.priority())
+                .unwrap();
+        }
+    }
+
+    fn wait_for_idle(&self) {
+        while !self.is_idle() {}
+        self.clear_interrupt();
+    }
+
+    fn read_results<const N: usize>(&self, outbuf: &mut [u32; N]) {
+        self.wait_for_idle();
+        self.read_out(outbuf);
     }
 }
 
