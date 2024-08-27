@@ -514,6 +514,7 @@ mod asynch {
     }
 
     #[cfg(not(esp32))]
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct I2cFuture<'a, T>
     where
         T: Instance,

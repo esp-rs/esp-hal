@@ -292,13 +292,14 @@ pub(crate) mod asynch {
     static WAKER: AtomicWaker = AtomicWaker::new();
 
     /// `Future` that waits for the RSA operation to complete.
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct RsaFuture<'d> {
         instance: &'d crate::peripherals::RSA,
     }
 
     impl<'d> RsaFuture<'d> {
         /// Asynchronously initializes the RSA peripheral.
-        pub async fn new(instance: &'d crate::peripherals::RSA) -> Self {
+        pub fn new(instance: &'d crate::peripherals::RSA) -> Self {
             cfg_if::cfg_if! {
                 if #[cfg(esp32)] {
                     instance.interrupt().modify(|_, w| w.interrupt().set_bit());

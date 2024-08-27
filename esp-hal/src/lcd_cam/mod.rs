@@ -129,6 +129,7 @@ pub mod asynch {
 
     static TX_WAKER: AtomicWaker = AtomicWaker::new();
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct LcdDoneFuture {}
 
     impl LcdDoneFuture {

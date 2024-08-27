@@ -681,6 +681,7 @@ mod asynch {
     static WAKER_TX: AtomicWaker = AtomicWaker::new();
     static WAKER_RX: AtomicWaker = AtomicWaker::new();
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct UsbSerialJtagWriteFuture<'d> {
         phantom: PhantomData<&'d mut USB_DEVICE>,
     }
@@ -723,6 +724,7 @@ mod asynch {
         }
     }
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct UsbSerialJtagReadFuture<'d> {
         phantom: PhantomData<&'d mut USB_DEVICE>,
     }

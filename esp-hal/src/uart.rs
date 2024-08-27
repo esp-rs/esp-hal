@@ -1988,11 +1988,13 @@ mod asynch {
     /// Upon construction the future enables the passed interrupt and when it
     /// is dropped it disables the interrupt again. The future returns the event
     /// that was initially passed, when it resolves.
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct UartRxFuture<'d, T: Instance> {
         events: EnumSet<RxEvent>,
         phantom: PhantomData<&'d mut T>,
         registered: bool,
     }
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct UartTxFuture<'d, T: Instance> {
         events: EnumSet<TxEvent>,
         phantom: PhantomData<&'d mut T>,

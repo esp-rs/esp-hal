@@ -1149,6 +1149,7 @@ pub mod asynch {
     const INIT: AtomicWaker = AtomicWaker::new();
     static WAKER: [AtomicWaker; NUM_CHANNELS] = [INIT; NUM_CHANNELS];
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct RmtTxFuture<T>
     where
         T: TxChannelAsync,
@@ -1212,6 +1213,7 @@ pub mod asynch {
         }
     }
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct RmtRxFuture<T>
     where
         T: RxChannelAsync,
