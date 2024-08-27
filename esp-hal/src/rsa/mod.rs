@@ -139,12 +139,12 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
         }
     }
 
-    fn wait_for_idle(&self) {
+    fn wait_for_idle(&mut self) {
         while !self.is_idle() {}
         self.clear_interrupt();
     }
 
-    fn read_results<const N: usize>(&self, outbuf: &mut [u32; N]) {
+    fn read_results<const N: usize>(&mut self, outbuf: &mut [u32; N]) {
         self.wait_for_idle();
         self.read_out(outbuf);
     }
