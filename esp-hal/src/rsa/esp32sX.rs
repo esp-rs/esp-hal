@@ -120,7 +120,7 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
     }
 
     /// Clears the RSA interrupt flag.
-    pub(super) fn clear_interrupt(&mut self) {
+    pub(super) fn clear_interrupt(&self) {
         self.rsa
             .clear_interrupt()
             .write(|w| w.clear_interrupt().set_bit());

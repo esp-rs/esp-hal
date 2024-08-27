@@ -1,14 +1,12 @@
 //! Async RSA Test
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: defmt
 
 #![no_std]
 #![no_main]
 
 use crypto_bigint::{Uint, U1024, U512};
 use esp_hal::{
-    Async,
     peripherals::Peripherals,
     prelude::*,
     rsa::{
@@ -18,6 +16,7 @@ use esp_hal::{
         RsaModularMultiplication,
         RsaMultiplication,
     },
+    Async,
 };
 use hil_test as _;
 
@@ -67,6 +66,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(5)]
     async fn modular_exponentiation(mut ctx: Context<'static>) {
         const EXPECTED_OUTPUT: [u32; U512::LIMBS] = [
             1601059419, 3994655875, 2600857657, 1530060852, 64828275, 4221878473, 2751381085,
@@ -87,11 +87,14 @@ mod tests {
             compute_mprime(&BIGNUM_3),
         );
         let r = compute_r(&BIGNUM_3);
-        mod_exp.exponentiation(BIGNUM_1.as_words(), r.as_words(), &mut outbuf).await;
+        mod_exp
+            .exponentiation(BIGNUM_1.as_words(), r.as_words(), &mut outbuf)
+            .await;
         assert_eq!(EXPECTED_OUTPUT, outbuf);
     }
 
     #[test]
+    #[timeout(5)]
     async fn test_modular_multiplication(mut ctx: Context<'static>) {
         const EXPECTED_OUTPUT: [u32; U512::LIMBS] = [
             1868256644, 833470784, 4187374062, 2684021027, 191862388, 1279046003, 1929899870,
@@ -101,19 +104,21 @@ mod tests {
 
         let mut outbuf = [0_u32; U512::LIMBS];
         let r = compute_r(&BIGNUM_3);
-        let mut mod_multi =
-            RsaModularMultiplication::<Op512, _>::new(
-                &mut ctx.rsa,
-                BIGNUM_1.as_words(),
-                BIGNUM_3.as_words(),
-                r.as_words(),
-                compute_mprime(&BIGNUM_3),
-            );
-        mod_multi.modular_multiplication(BIGNUM_2.as_words(), &mut outbuf).await;
+        let mut mod_multi = RsaModularMultiplication::<Op512, _>::new(
+            &mut ctx.rsa,
+            BIGNUM_1.as_words(),
+            BIGNUM_3.as_words(),
+            r.as_words(),
+            compute_mprime(&BIGNUM_3),
+        );
+        mod_multi
+            .modular_multiplication(BIGNUM_2.as_words(), &mut outbuf)
+            .await;
         assert_eq!(EXPECTED_OUTPUT, outbuf);
     }
 
     #[test]
+    #[timeout(5)]
     async fn test_multiplication(mut ctx: Context<'static>) {
         const EXPECTED_OUTPUT: [u32; U1024::LIMBS] = [
             1264702968, 3552243420, 2602501218, 498422249, 2431753435, 2307424767, 349202767,
@@ -127,10 +132,7 @@ mod tests {
         let operand_a = BIGNUM_1.as_words();
         let operand_b = BIGNUM_2.as_words();
 
-        let mut rsamulti = RsaMultiplication::<Op512, _>::new(
-            &mut ctx.rsa,
-            operand_a,
-        );
+        let mut rsamulti = RsaMultiplication::<Op512, _>::new(&mut ctx.rsa, operand_a);
         rsamulti.multiplication(operand_b, &mut outbuf).await;
 
         assert_eq!(EXPECTED_OUTPUT, outbuf)

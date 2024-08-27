@@ -56,12 +56,12 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
         }
     }
 
-    fn wait_for_idle(&mut self) {
+    fn wait_for_idle(&self) {
         while !self.is_idle() {}
         self.clear_interrupt();
     }
 
-    fn read_results<const N: usize>(&mut self, outbuf: &mut [u32; N]) {
+    fn read_results<const N: usize>(&self, outbuf: &mut [u32; N]) {
         self.wait_for_idle();
         self.read_out(outbuf);
     }
@@ -141,7 +141,7 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
         }
     }
 
-    fn read_out<const N: usize>(&mut self, outbuf: &mut [u32; N]) {
+    fn read_out<const N: usize>(&self, outbuf: &mut [u32; N]) {
         unsafe {
             copy_nonoverlapping(
                 self.rsa.z_mem(0).as_ptr() as *const u32,
@@ -248,7 +248,6 @@ where
         self.rsa.write_operand_a(base);
         self.rsa.write_r(r);
     }
-
 
     /// Starts the modular exponentiation operation.
     ///
@@ -373,49 +372,61 @@ pub(crate) mod asynch {
     use core::task::Poll;
 
     use embassy_sync::waitqueue::AtomicWaker;
+    use portable_atomic::{AtomicBool, Ordering};
     use procmacros::handler;
 
-    use crate::{Async, rsa::{
-        Multi,Rsa,
-        RsaMode,
-        RsaModularExponentiation,
-        RsaModularMultiplication,
-        RsaMultiplication,
-    }};
+    use crate::{
+        rsa::{
+            Multi,
+            Rsa,
+            RsaMode,
+            RsaModularExponentiation,
+            RsaModularMultiplication,
+            RsaMultiplication,
+        },
+        Async,
+    };
 
     static WAKER: AtomicWaker = AtomicWaker::new();
 
+    static SIGNALED: AtomicBool = AtomicBool::new(false);
+
     /// `Future` that waits for the RSA operation to complete.
     #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub(crate) struct RsaFuture<'d> {
-        instance: &'d crate::peripherals::RSA,
+    struct RsaFuture<'a, 'd> {
+        #[cfg_attr(esp32, allow(dead_code))]
+        instance: &'a Rsa<'d, Async>,
     }
 
-    impl<'d> RsaFuture<'d> {
-        /// Asynchronously initializes the RSA peripheral.
-        fn new(instance: &'d crate::peripherals::RSA) -> Self {
+    impl<'a, 'd> RsaFuture<'a, 'd> {
+        fn new(instance: &'a Rsa<'d, Async>) -> Self {
+            SIGNALED.store(false, Ordering::Relaxed);
+
             cfg_if::cfg_if! {
                 if #[cfg(esp32)] {
-                    instance.rsa.interrupt().modify(|_, w| w.interrupt().set_bit());
                 } else if #[cfg(any(esp32s2, esp32s3))] {
-                    instance.rsa.interrupt_ena().modify(|_, w| w.interrupt_ena().set_bit());
+                    instance.rsa.interrupt_ena().write(|w| w.interrupt_ena().set_bit());
                 } else {
-                    instance.rsa.int_ena().modify(|_, w| w.int_ena().set_bit());
+                    instance.rsa.int_ena().write(|w| w.int_ena().set_bit());
                 }
             }
 
             Self { instance }
         }
 
-        fn event_bit_is_clear(&self) -> bool {
-            // Looks weird, but we signal completion by disabling the interrupt.
+        fn is_done(&self) -> bool {
+            SIGNALED.load(Ordering::Relaxed)
+        }
+    }
+
+    impl Drop for RsaFuture<'_, '_> {
+        fn drop(&mut self) {
             cfg_if::cfg_if! {
                 if #[cfg(esp32)] {
-                    self.instance.rsa.interrupt().read().interrupt().bit_is_clear()
                 } else if #[cfg(any(esp32s2, esp32s3))] {
-                    self.instance.rsa.interrupt_ena().read().interrupt_ena().bit_is_clear()
+                    self.instance.rsa.interrupt_ena().write(|w| w.interrupt_ena().clear_bit());
                 } else {
-                    self.instance.rsa.int_ena().read().int_ena().bit_is_clear()
+                    self.instance.rsa.int_ena().write(|w| w.int_ena().clear_bit());
                 }
             }
         }
@@ -429,7 +440,7 @@ pub(crate) mod asynch {
             cx: &mut core::task::Context<'_>,
         ) -> core::task::Poll<Self::Output> {
             WAKER.register(cx.waker());
-            if self.event_bit_is_clear() {
+            if self.is_done() {
                 Poll::Ready(())
             } else {
                 Poll::Pending
@@ -466,7 +477,18 @@ pub(crate) mod asynch {
             operand_b: &T::InputType,
             outbuf: &mut T::InputType,
         ) {
-            self.set_up_modular_multiplication(operand_b);
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    let fut = RsaFuture::new(self.rsa);
+                    self.rsa.write_multi_start();
+                    fut.await;
+
+                    self.rsa.write_operand_a(operand_b);
+                } else {
+                    self.set_up_modular_multiplication(operand_b);
+                }
+            }
+
             let fut = RsaFuture::new(self.rsa);
             self.rsa.write_modmulti_start();
             fut.await;
@@ -498,14 +520,14 @@ pub(crate) mod asynch {
     /// Interrupt handler for RSA.
     pub(super) fn rsa_interrupt_handler() {
         let rsa = unsafe { &*crate::peripherals::RSA::ptr() };
-
+        SIGNALED.store(true, Ordering::Relaxed);
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
-                rsa.interrupt().modify(|_, w| w.interrupt().clear_bit());
+                rsa.interrupt().write(|w| w.interrupt().set_bit());
             } else if #[cfg(any(esp32s2, esp32s3))] {
-                rsa.interrupt_ena().modify(|_, w| w.interrupt_ena().clear_bit());
-            } else {
-                rsa.int_ena().modify(|_, w| w.int_ena().clear_bit());
+                rsa.clear_interrupt().write(|w| w.clear_interrupt().set_bit());
+            } else  {
+                rsa.int_clr().write(|w| w.clear_interrupt().set_bit());
             }
         }
 
