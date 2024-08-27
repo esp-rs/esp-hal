@@ -413,7 +413,7 @@ pub(crate) mod asynch {
         }
 
         fn is_done(&self) -> bool {
-            SIGNALED.load(Ordering::Relaxed)
+            SIGNALED.load(Ordering::Acquire)
         }
     }
 
@@ -518,7 +518,7 @@ pub(crate) mod asynch {
     /// Interrupt handler for RSA.
     pub(super) fn rsa_interrupt_handler() {
         let rsa = unsafe { &*crate::peripherals::RSA::ptr() };
-        SIGNALED.store(true, Ordering::Relaxed);
+        SIGNALED.store(true, Ordering::Release);
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
                 rsa.interrupt().write(|w| w.interrupt().set_bit());
