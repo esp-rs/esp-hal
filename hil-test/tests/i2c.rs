@@ -1,8 +1,8 @@
 //! TWAI test
 //!
 //! Folowing pins are used:
-//! SCL    GPIO2
-//! SDA    GPIO3
+//! SCL    GPIO4
+//! SDA    GPIO7
 
 //% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -38,7 +38,7 @@ impl Context {
         let mut i2c = I2C::new(
             peripherals.I2C0,
             io.pins.gpio4,
-            io.pins.gpio5,
+            io.pins.gpio7,
             100.kHz(),
             &clocks,
         );    
