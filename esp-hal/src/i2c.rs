@@ -1477,7 +1477,7 @@ pub trait Instance: crate::private::Sealed {
             return Err(Error::ExceedingFifo);
         }
 
-        let extra_len = if start {1} else {0};
+        let extra_len = if start { 1 } else { 0 };
         // WRITE command
         add_cmd(
             cmd_iterator,
