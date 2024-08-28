@@ -225,7 +225,8 @@ pub mod asynch {
 
                 // Workaround for borrow checker.
                 // Safety: we only return a reference to x once, if parsing is successful.
-                let rx = unsafe { &mut *core::ptr::slice_from_raw_parts_mut(rx.as_mut_ptr(), rx.len()) };
+                let rx =
+                    unsafe { &mut *core::ptr::slice_from_raw_parts_mut(rx.as_mut_ptr(), rx.len()) };
 
                 let len = crate::ble::read_next(rx);
                 if let Some(packet) = parse_hci(&rx[..len])? {
