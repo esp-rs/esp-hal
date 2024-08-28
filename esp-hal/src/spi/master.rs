@@ -1608,6 +1608,56 @@ mod dma {
             }
         }
 
+        /// Sets the interrupt handler
+        ///
+        /// Interrupts are not enabled at the peripheral level here.
+        pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+            let (mut spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+            spi_dma.set_interrupt_handler(handler);
+            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+        }
+
+        /// Listen for the given interrupts
+        #[cfg(not(any(esp32, esp32s2)))]
+        pub fn listen(&mut self, interrupts: EnumSet<SpiInterrupt>) {
+            let (mut spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+            spi_dma.listen(interrupts);
+            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+        }
+
+        /// Unlisten the given interrupts
+        #[cfg(not(any(esp32, esp32s2)))]
+        pub fn unlisten(&mut self, interrupts: EnumSet<SpiInterrupt>) {
+            let (mut spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+            spi_dma.unlisten(interrupts);
+            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+        }
+
+        /// Gets asserted interrupts
+        #[cfg(not(any(esp32, esp32s2)))]
+        pub fn interrupts(&mut self) -> EnumSet<SpiInterrupt> {
+            let (mut spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+            let interrupts = spi_dma.interrupts();
+            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+
+            interrupts
+        }
+
+        /// Resets asserted interrupts
+        #[cfg(not(any(esp32, esp32s2)))]
+        pub fn clear_interrupts(&mut self, interrupts: EnumSet<SpiInterrupt>) {
+            let (mut spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+            spi_dma.clear_interrupts(interrupts);
+            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+        }
+
+        /// Changes the SPI bus frequency for the DMA-enabled SPI instance.
+        pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks<'d>) {
+            let (mut spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+            spi_dma.change_bus_frequency(frequency, clocks);
+            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+        }
+
         fn wait_for_idle(&mut self) -> (SpiDma<'d, T, C, D, M>, DmaTxBuf, DmaRxBuf) {
             match core::mem::take(&mut self.state) {
                 State::Idle(spi, tx_buf, rx_buf) => (spi, tx_buf, rx_buf),
@@ -1626,6 +1676,32 @@ mod dma {
                 State::TemporarilyRemoved => unreachable!(),
             }
         }
+    }
+
+    impl<'d, T, C, D, M> InterruptConfigurable for SpiDmaBus<'d, T, C, D, M>
+    where
+        T: InstanceDma,
+        C: DmaChannel,
+        C::P: SpiPeripheral,
+        D: DuplexMode,
+        M: Mode,
+    {
+        /// Configures the interrupt handler for the DMA-enabled SPI instance.
+        fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+            let (mut spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+            SpiDma::set_interrupt_handler(&mut spi_dma, handler);
+            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+        }
+    }
+
+    impl<'d, T, C, D, M> crate::private::Sealed for SpiDmaBus<'d, T, C, D, M>
+    where
+        T: InstanceDma,
+        C: DmaChannel,
+        C::P: SpiPeripheral,
+        D: DuplexMode,
+        M: Mode,
+    {
     }
 
     impl<'d, T, C, M> SpiDmaBus<'d, T, C, FullDuplexMode, M>
