@@ -1289,8 +1289,12 @@ mod dma {
             }
 
             let result = unsafe {
-                self.spi
-                    .start_write_bytes_dma(buffer.first(), bytes_to_write, &mut self.channel.tx)
+                self.spi.start_write_bytes_dma(
+                    buffer.first(),
+                    bytes_to_write,
+                    &mut self.channel.tx,
+                    true,
+                )
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
@@ -1317,8 +1321,12 @@ mod dma {
             }
 
             let result = unsafe {
-                self.spi
-                    .start_read_bytes_dma(buffer.first(), bytes_to_read, &mut self.channel.rx)
+                self.spi.start_read_bytes_dma(
+                    buffer.first(),
+                    bytes_to_read,
+                    &mut self.channel.rx,
+                    true,
+                )
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
@@ -1451,8 +1459,12 @@ mod dma {
             }
 
             let result = unsafe {
-                self.spi
-                    .start_read_bytes_dma(buffer.first(), bytes_to_read, &mut self.channel.rx)
+                self.spi.start_read_bytes_dma(
+                    buffer.first(),
+                    bytes_to_read,
+                    &mut self.channel.rx,
+                    false,
+                )
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
@@ -1529,8 +1541,12 @@ mod dma {
             }
 
             let result = unsafe {
-                self.spi
-                    .start_write_bytes_dma(buffer.first(), bytes_to_write, &mut self.channel.tx)
+                self.spi.start_write_bytes_dma(
+                    buffer.first(),
+                    bytes_to_write,
+                    &mut self.channel.tx,
+                    false,
+                )
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
@@ -2262,16 +2278,19 @@ pub trait InstanceDma: Instance {
         first_desc: *mut DmaDescriptor,
         len: usize,
         tx: &mut TX,
+        full_duplex: bool,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
         self.configure_datalen(len as u32 * 8);
 
         tx.is_done();
 
-        // disable MISO and re-enable MOSI
-        reg_block
-            .user()
-            .modify(|_, w| w.usr_miso().bit(false).usr_mosi().bit(true));
+        // disable MISO and re-enable MOSI (DON'T do it for half-duplex)
+        if full_duplex {
+            reg_block
+                .user()
+                .modify(|_, w| w.usr_miso().bit(false).usr_mosi().bit(true));
+        }
 
         self.enable_dma();
         self.update();
@@ -2301,16 +2320,19 @@ pub trait InstanceDma: Instance {
         desc: *mut DmaDescriptor,
         data_length: usize,
         rx: &mut RX,
+        full_duplex: bool,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
         self.configure_datalen(data_length as u32 * 8);
 
         rx.is_done();
 
-        // re-enable MISO and disable MOSI
-        reg_block
-            .user()
-            .modify(|_, w| w.usr_miso().bit(true).usr_mosi().bit(false));
+        // re-enable MISO and disable MOSI (DON'T do it for half-duplex)
+        if full_duplex {
+            reg_block
+                .user()
+                .modify(|_, w| w.usr_miso().bit(true).usr_mosi().bit(false));
+        }
 
         self.enable_dma();
         self.update();
