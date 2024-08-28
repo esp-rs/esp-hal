@@ -56,7 +56,10 @@ struct Context {
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    use defmt::assert_eq;
+    // defmt::* is load-bearing, it ensures that the assert in dma_buffers! is not
+    // using defmt's non-const assert. Doing so would result in a compile error.
+    #[allow(unused_imports)]
+    use defmt::{assert_eq, *};
 
     use super::*;
 
