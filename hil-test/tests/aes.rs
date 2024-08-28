@@ -15,19 +15,6 @@ struct Context<'a> {
     aes: Aes<'a>,
 }
 
-impl Context<'_> {
-    pub fn init() -> Self {
-        let (peripherals, _clocks) = esp_hal::init({
-            let mut config = Config::default();
-            config.cpu_clock = CpuClock::max();
-            config
-        });
-        let aes = Aes::new(peripherals.AES);
-
-        Context { aes }
-    }
-}
-
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
@@ -37,7 +24,14 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        Context::init()
+        let (peripherals, _clocks) = esp_hal::init({
+            let mut config = Config::default();
+            config.cpu_clock = CpuClock::max();
+            config
+        });
+        let aes = Aes::new(peripherals.AES);
+
+        Context { aes }
     }
 
     #[test]

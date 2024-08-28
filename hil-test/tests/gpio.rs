@@ -32,26 +32,6 @@ struct Context<'d> {
     delay: Delay,
 }
 
-impl<'d> Context<'d> {
-    pub fn init() -> Self {
-        let (peripherals, clocks) = esp_hal::init(Config::default());
-
-        let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        io.set_interrupt_handler(interrupt_handler);
-
-        let delay = Delay::new(&clocks);
-
-        let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-        esp_hal_embassy::init(&clocks, timg0.timer0);
-
-        Context {
-            io2: Input::new(io.pins.gpio2, Pull::Down),
-            io3: Output::new(io.pins.gpio3, Level::Low),
-            delay,
-        }
-    }
-}
-
 #[handler]
 pub fn interrupt_handler() {
     critical_section::with(|cs| {
@@ -75,10 +55,21 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        let mut ctx = Context::init();
-        // make sure tests don't interfere with each other
-        ctx.io3.set_low();
-        ctx
+        let (peripherals, clocks) = esp_hal::init(Config::default());
+
+        let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        io.set_interrupt_handler(interrupt_handler);
+
+        let delay = Delay::new(&clocks);
+
+        let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+        esp_hal_embassy::init(&clocks, timg0.timer0);
+
+        Context {
+            io2: Input::new(io.pins.gpio2, Pull::Down),
+            io3: Output::new(io.pins.gpio3, Level::Low),
+            delay,
+        }
     }
 
     #[test]

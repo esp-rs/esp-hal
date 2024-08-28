@@ -13,15 +13,6 @@ struct Context {
     delay: Delay,
 }
 
-impl Context {
-    pub fn init() -> Self {
-        let (peripherals, clocks) = esp_hal::init(Config::default());
-        let delay = Delay::new(&clocks);
-
-        Context { delay }
-    }
-}
-
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
@@ -29,7 +20,10 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        Context::init()
+        let (peripherals, clocks) = esp_hal::init(Config::default());
+        let delay = Delay::new(&clocks);
+
+        Context { delay }
     }
 
     #[test]
