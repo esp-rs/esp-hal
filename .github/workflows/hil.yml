@@ -195,6 +195,8 @@ jobs:
               sudo uhubctl -a off -l $hub
             done
 
+            sleep 0.5
+
             # Enable all used hubs
             for hub in ${{ matrix.target.hubs }}; do
               sudo uhubctl -a on -l $hub
@@ -215,6 +217,7 @@ jobs:
           ./xtask run-elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
 
       - name: Clean up
+        if: always()
         run: |
           rm -rf tests-${{ matrix.target.soc }}
           rm -f xtask
