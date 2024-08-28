@@ -25,23 +25,13 @@ use esp_hal::{
     gpio::{AnyOutput, Io, Level},
     peripherals::Peripherals,
     system::SystemControl,
-    timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
+    timer::{timg::TimerGroup, ErasedTimer},
 };
 use esp_hal_embassy::Executor;
 use esp_println::println;
 use static_cell::StaticCell;
 
 static mut APP_CORE_STACK: Stack<8192> = Stack::new();
-
-// When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
-macro_rules! mk_static {
-    ($t:ty,$val:expr) => {{
-        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
-        #[deny(unused_attributes)]
-        let x = STATIC_CELL.uninit().write(($val));
-        x
-    }};
-}
 
 /// Waits for a message that contains a duration, then flashes a led for that
 /// duration of time.
@@ -73,9 +63,7 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let timer0: ErasedTimer = timg0.timer0.into();
     let timer1: ErasedTimer = timg0.timer1.into();
-    let timers = [OneShotTimer::new(timer0), OneShotTimer::new(timer1)];
-    let timers = mk_static!([OneShotTimer<ErasedTimer>; 2], timers);
-    esp_hal_embassy::init(&clocks, timers);
+    esp_hal_embassy::init(&clocks, [timer0, timer1]);
 
     let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 
