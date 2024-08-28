@@ -98,7 +98,7 @@ pub enum Error {
 // This enum is used to keep track of the last operation that was performed
 // in an embedded-hal(-async) I2C::transaction. It used to determine whether
 // a START condition should be issued at the start of the current operation.
-enum LastOpWas {
+enum OpWasIs {
     Write,
     Read,
     None,
@@ -252,9 +252,19 @@ where
         operations: &mut [embedded_hal::i2c::Operation<'_>],
     ) -> Result<(), Self::Error> {
         use embedded_hal::i2c::Operation;
-        let mut last_op = LastOpWas::None;
+        let mut last_op = OpWasIs::None;
         let mut op_iter = operations.iter_mut().peekable();
         while let Some(op) = op_iter.next() {
+            let next_op = {
+                if let Some(next_op) = op_iter.peek() {
+                    match next_op {
+                        Operation::Write(_) => OpWasIs::Write,
+                        Operation::Read(_) => OpWasIs::Read,
+                    }
+                } else {
+                    OpWasIs::None
+                }
+            };
             // Clear all I2C interrupts
             self.peripheral.clear_all_interrupts();
 
@@ -268,24 +278,26 @@ where
                     self.peripheral.write_operation(
                         address,
                         bytes,
-                        last_op != LastOpWas::Write,
+                        last_op != OpWasIs::Write,
                         op_iter.peek().is_none(),
                         cmd_iterator,
                     )?;
-                    last_op = LastOpWas::Write;
+                    last_op = OpWasIs::Write;
                 }
                 Operation::Read(buffer) => {
                     // execute a read operation:
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
+                    // - will_continue is true if there is another read operation next
                     self.peripheral.read_operation(
                         address,
                         buffer,
-                        last_op != LastOpWas::Read,
+                        last_op != OpWasIs::Read,
                         op_iter.peek().is_none(),
+                        next_op == OpWasIs::Read,
                         cmd_iterator,
                     )?;
-                    last_op = LastOpWas::Read;
+                    last_op = OpWasIs::Read;
                 }
             }
         }
@@ -743,7 +755,8 @@ mod asynch {
             if start {
                 add_cmd(cmd_iterator, Command::Start)?;
             }
-            self.peripheral.setup_write(address, bytes, cmd_iterator)?;
+            self.peripheral
+                .setup_write(address, bytes, start, cmd_iterator)?;
             add_cmd(
                 cmd_iterator,
                 if stop { Command::Stop } else { Command::End },
@@ -763,6 +776,7 @@ mod asynch {
             buffer: &mut [u8],
             start: bool,
             stop: bool,
+            will_continue: bool,
             cmd_iterator: &mut I,
         ) -> Result<(), Error>
         where
@@ -774,7 +788,8 @@ mod asynch {
             if start {
                 add_cmd(cmd_iterator, Command::Start)?;
             }
-            self.peripheral.setup_read(address, buffer, cmd_iterator)?;
+            self.peripheral
+                .setup_read(address, buffer, start, will_continue, cmd_iterator)?;
             add_cmd(
                 cmd_iterator,
                 if stop { Command::Stop } else { Command::End },
@@ -812,6 +827,7 @@ mod asynch {
                 buffer,
                 true,
                 true,
+                false,
                 &mut self.peripheral.register_block().comd_iter(),
             )
             .await?;
@@ -847,6 +863,7 @@ mod asynch {
                 buffer,
                 true,
                 true,
+                false,
                 &mut self.peripheral.register_block().comd_iter(),
             )
             .await?;
@@ -887,9 +904,19 @@ mod asynch {
             address: u8,
             operations: &mut [Operation<'_>],
         ) -> Result<(), Self::Error> {
-            let mut last_op = LastOpWas::None;
+            let mut last_op = OpWasIs::None;
             let mut op_iter = operations.iter_mut().peekable();
             while let Some(op) = op_iter.next() {
+                let next_op = {
+                    if let Some(next_op) = op_iter.peek() {
+                        match next_op {
+                            Operation::Write(_) => OpWasIs::Write,
+                            Operation::Read(_) => OpWasIs::Read,
+                        }
+                    } else {
+                        OpWasIs::None
+                    }
+                };
                 // Clear all I2C interrupts
                 self.peripheral.clear_all_interrupts();
 
@@ -899,12 +926,12 @@ mod asynch {
                         self.write_operation(
                             address,
                             bytes,
-                            last_op != LastOpWas::Write,
+                            last_op != OpWasIs::Write,
                             op_iter.peek().is_none(),
                             cmd_iterator,
                         )
                         .await?;
-                        last_op = LastOpWas::Write;
+                        last_op = OpWasIs::Write;
                     }
                     Operation::Read(buffer) => {
                         // execute a read operation:
@@ -913,12 +940,13 @@ mod asynch {
                         self.read_operation(
                             address,
                             buffer,
-                            last_op != LastOpWas::Read,
+                            last_op != OpWasIs::Read,
                             op_iter.peek().is_none(),
+                            next_op == OpWasIs::Read,
                             cmd_iterator,
                         )
                         .await?;
-                        last_op = LastOpWas::Read;
+                        last_op = OpWasIs::Read;
                     }
                 }
             }
@@ -1433,86 +1461,111 @@ pub trait Instance: crate::private::Sealed {
     }
 
     /// Configures the I2C peripheral for a write operation.
-    fn setup_write<'a, I>(&self, addr: u8, bytes: &[u8], cmd_iterator: &mut I) -> Result<(), Error>
-    where
-        I: Iterator<Item = &'a COMD>,
-    {
-        if bytes.len() > 254 {
-            // we could support more by adding multiple write operations
-            return Err(Error::ExceedingFifo);
-        }
-
-        // WRITE command
-        add_cmd(
-            cmd_iterator,
-            Command::Write {
-                ack_exp: Ack::Ack,
-                ack_check_en: true,
-                length: 1 + bytes.len() as u8,
-            },
-        )?;
-
-        self.update_config();
-
-        // Load address and R/W bit into FIFO
-        write_fifo(
-            self.register_block(),
-            addr << 1 | OperationType::Write as u8,
-        );
-
-        Ok(())
-    }
-
-    /// Configures the I2C peripheral for a read operation.
-    fn setup_read<'a, I>(
+    fn setup_write<'a, I>(
         &self,
         addr: u8,
-        buffer: &mut [u8],
+        bytes: &[u8],
+        start: bool,
         cmd_iterator: &mut I,
     ) -> Result<(), Error>
     where
         I: Iterator<Item = &'a COMD>,
     {
-        if buffer.len() > 254 {
-            // we could support more by adding multiple read operations
+        let max_len = if start { 254usize } else { 255usize };
+        if bytes.len() > max_len {
+            // we could support more by adding multiple write operations
             return Err(Error::ExceedingFifo);
         }
 
+        let extra_len = if start {1} else {0};
         // WRITE command
         add_cmd(
             cmd_iterator,
             Command::Write {
                 ack_exp: Ack::Ack,
                 ack_check_en: true,
-                length: 1,
-            },
-        )?;
-
-        if buffer.len() > 1 {
-            // READ command (N - 1)
-            add_cmd(
-                cmd_iterator,
-                Command::Read {
-                    ack_value: Ack::Ack,
-                    length: buffer.len() as u8 - 1,
-                },
-            )?;
-        }
-
-        // READ w/o ACK
-        add_cmd(
-            cmd_iterator,
-            Command::Read {
-                ack_value: Ack::Nack,
-                length: 1,
+                length: extra_len + bytes.len() as u8,
             },
         )?;
 
         self.update_config();
 
-        // Load address and R/W bit into FIFO
-        write_fifo(self.register_block(), addr << 1 | OperationType::Read as u8);
+        if start {
+            // Load address and R/W bit into FIFO
+            write_fifo(
+                self.register_block(),
+                addr << 1 | OperationType::Write as u8,
+            );
+        }
+        Ok(())
+    }
 
+    /// Configures the I2C peripheral for a read operation.
+    /// `addr` is the address of the slave device.
+    /// `buffer` is the buffer to store the read data.
+    /// `start` indicates whether the operation should start by writing the
+    /// address `will_continue` indicates whether there is another read
+    /// operation following this one and we should not nack the last byte.
+    /// The `cmd_iterator` parameter is an iterator over the command registers.
+    fn setup_read<'a, I>(
+        &self,
+        addr: u8,
+        buffer: &mut [u8],
+        start: bool,
+        will_continue: bool,
+        cmd_iterator: &mut I,
+    ) -> Result<(), Error>
+    where
+        I: Iterator<Item = &'a COMD>,
+    {
+        let (max_len, initial_len) = if will_continue {
+            (255usize, buffer.len())
+        } else {
+            (254usize, buffer.len() - 1)
+        };
+        if buffer.len() > max_len {
+            // we could support more by adding multiple read operations
+            return Err(Error::ExceedingFifo);
+        }
+
+        if start {
+            // WRITE command
+            add_cmd(
+                cmd_iterator,
+                Command::Write {
+                    ack_exp: Ack::Ack,
+                    ack_check_en: true,
+                    length: 1,
+                },
+            )?;
+        }
+        // there is another read so we need to ack all
+        add_cmd(
+            cmd_iterator,
+            Command::Read {
+                ack_value: Ack::Ack,
+                length: initial_len as u8,
+            },
+        )?;
+
+        if !will_continue {
+            // this is the last read so we need to nack the last byte
+            // READ w/o ACK
+            add_cmd(
+                cmd_iterator,
+                Command::Read {
+                    ack_value: Ack::Nack,
+                    length: 1,
+                },
+            )?;
+        }
+
+        self.update_config();
+
+        if start {
+            // Load address and R/W bit into FIFO
+            write_fifo(self.register_block(), addr << 1 | OperationType::Read as u8);
+        }
         Ok(())
     }
 
@@ -1875,7 +1928,7 @@ pub trait Instance: crate::private::Sealed {
         if start {
             add_cmd(cmd_iterator, Command::Start)?;
         }
-        self.setup_write(address, bytes, cmd_iterator)?;
+        self.setup_write(address, bytes, start, cmd_iterator)?;
         add_cmd(
             cmd_iterator,
             if stop { Command::Stop } else { Command::End },
@@ -1896,6 +1949,7 @@ pub trait Instance: crate::private::Sealed {
         buffer: &mut [u8],
         start: bool,
         stop: bool,
+        will_continue: bool,
         cmd_iterator: &mut I,
     ) -> Result<(), Error>
     where
@@ -1908,7 +1962,9 @@ pub trait Instance: crate::private::Sealed {
         if start {
             add_cmd(cmd_iterator, Command::Start)?;
         }
-        self.setup_read(address, buffer, cmd_iterator)?;
+
+        self.setup_read(address, buffer, start, will_continue, cmd_iterator)?;
+
         add_cmd(
             cmd_iterator,
             if stop { Command::Stop } else { Command::End },
@@ -1945,6 +2001,7 @@ pub trait Instance: crate::private::Sealed {
             buffer,
             true,
             true,
+            false,
             &mut self.register_block().comd_iter(),
         )?;
         Ok(())
@@ -1978,6 +2035,7 @@ pub trait Instance: crate::private::Sealed {
             buffer,
             true,
             true,
+            false,
             &mut self.register_block().comd_iter(),
         )?;
         Ok(())
