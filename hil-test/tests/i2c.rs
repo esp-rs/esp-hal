@@ -16,7 +16,7 @@ use esp_hal::{
     peripherals::{Peripherals, I2C0},
     prelude::*,
     system::SystemControl,
-    Blocking
+    Blocking,
 };
 use hil_test as _;
 use nb::block;
@@ -30,9 +30,9 @@ impl Context {
         let peripherals = Peripherals::take();
         let system = SystemControl::new(peripherals.SYSTEM);
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-    
+
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    
+
         // Create a new peripheral object with the described wiring and standard
         // I2C clock speed:
         let mut i2c = I2C::new(
@@ -41,7 +41,7 @@ impl Context {
             io.pins.gpio7,
             100.kHz(),
             &clocks,
-        );    
+        );
 
         Context { i2c }
     }
