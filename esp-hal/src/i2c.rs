@@ -95,10 +95,11 @@ pub enum Error {
 }
 
 #[derive(PartialEq)]
-// This enum is used to keep track of the last operation that was performed
-// in an embedded-hal(-async) I2C::transaction. It used to determine whether
-// a START condition should be issued at the start of the current operation.
-enum OpWasIs {
+// This enum is used to keep track of the last/next operation that was/will be
+// performed in an embedded-hal(-async) I2C::transaction. It used to determine
+// whether a START condition should be issued at the start of the current
+// operation and whether a read needs an ack or a nack for the final byte.
+enum Op {
     Write,
     Read,
     None,
@@ -252,17 +253,17 @@ where
         operations: &mut [embedded_hal::i2c::Operation<'_>],
     ) -> Result<(), Self::Error> {
         use embedded_hal::i2c::Operation;
-        let mut last_op = OpWasIs::None;
+        let mut last_op = Op::None;
         let mut op_iter = operations.iter_mut().peekable();
         while let Some(op) = op_iter.next() {
             let next_op = {
                 if let Some(next_op) = op_iter.peek() {
                     match next_op {
-                        Operation::Write(_) => OpWasIs::Write,
-                        Operation::Read(_) => OpWasIs::Read,
+                        Operation::Write(_) => Op::Write,
+                        Operation::Read(_) => Op::Read,
                     }
                 } else {
-                    OpWasIs::None
+                    Op::None
                 }
             };
             // Clear all I2C interrupts
@@ -278,11 +279,11 @@ where
                     self.peripheral.write_operation(
                         address,
                         bytes,
-                        last_op != OpWasIs::Write,
+                        last_op != Op::Write,
                         op_iter.peek().is_none(),
                         cmd_iterator,
                     )?;
-                    last_op = OpWasIs::Write;
+                    last_op = Op::Write;
                 }
                 Operation::Read(buffer) => {
                     // execute a read operation:
@@ -292,12 +293,12 @@ where
                     self.peripheral.read_operation(
                         address,
                         buffer,
-                        last_op != OpWasIs::Read,
+                        last_op != Op::Read,
                         op_iter.peek().is_none(),
-                        next_op == OpWasIs::Read,
+                        next_op == Op::Read,
                         cmd_iterator,
                     )?;
-                    last_op = OpWasIs::Read;
+                    last_op = Op::Read;
                 }
             }
         }
@@ -904,17 +905,17 @@ mod asynch {
             address: u8,
             operations: &mut [Operation<'_>],
         ) -> Result<(), Self::Error> {
-            let mut last_op = OpWasIs::None;
+            let mut last_op = Op::None;
             let mut op_iter = operations.iter_mut().peekable();
             while let Some(op) = op_iter.next() {
                 let next_op = {
                     if let Some(next_op) = op_iter.peek() {
                         match next_op {
-                            Operation::Write(_) => OpWasIs::Write,
-                            Operation::Read(_) => OpWasIs::Read,
+                            Operation::Write(_) => Op::Write,
+                            Operation::Read(_) => Op::Read,
                         }
                     } else {
-                        OpWasIs::None
+                        Op::None
                     }
                 };
                 // Clear all I2C interrupts
@@ -926,12 +927,12 @@ mod asynch {
                         self.write_operation(
                             address,
                             bytes,
-                            last_op != OpWasIs::Write,
+                            last_op != Op::Write,
                             op_iter.peek().is_none(),
                             cmd_iterator,
                         )
                         .await?;
-                        last_op = OpWasIs::Write;
+                        last_op = Op::Write;
                     }
                     Operation::Read(buffer) => {
                         // execute a read operation:
@@ -940,13 +941,13 @@ mod asynch {
                         self.read_operation(
                             address,
                             buffer,
-                            last_op != OpWasIs::Read,
+                            last_op != Op::Read,
                             op_iter.peek().is_none(),
-                            next_op == OpWasIs::Read,
+                            next_op == Op::Read,
                             cmd_iterator,
                         )
                         .await?;
-                        last_op = OpWasIs::Read;
+                        last_op = Op::Read;
                     }
                 }
             }
