@@ -215,6 +215,7 @@ jobs:
           ./xtask run-elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
 
       - name: Clean up
+        if: always()
         run: |
           rm -rf tests-${{ matrix.target.soc }}
           rm -f xtask
