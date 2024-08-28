@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `debugger::debugger_connected`. (#1961)
 - DMA: don't require `Sealed` to implement `ReadBuffer` and `WriteBuffer` (#1921)
 - Allow DMA to/from psram for esp32s3 (#1827)
+- Added missing methods to `SpiDmaBus` (#2016).
 
 ### Changed
 
