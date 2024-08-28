@@ -185,9 +185,7 @@ pub mod asynch {
         }
     }
 
-    fn parse_hci<'m>(
-        data: &'m [u8],
-    ) -> Result<Option<ControllerToHostPacket<'m>>, BleConnectorError> {
+    fn parse_hci(data: &[u8]) -> Result<Option<ControllerToHostPacket<'_>>, BleConnectorError> {
         match ControllerToHostPacket::from_hci_bytes_complete(data) {
             Ok(p) => Ok(Some(p)),
             Err(e) => {
