@@ -20,7 +20,7 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     spi::{
-        master::{dma::SpiDma, Address, Command, Spi},
+        master::{Address, Command, Spi, SpiDma},
         HalfDuplexMode,
         SpiDataMode,
         SpiMode,
@@ -41,21 +41,12 @@ cfg_if::cfg_if! {
     }
 }
 
-macro_rules! mk_static {
-    ($t:ty,$val:expr) => {{
-        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
-        #[deny(unused_attributes)]
-        let x = STATIC_CELL.uninit().write(($val));
-        x
-    }};
-}
-
 struct Context {
     spi: esp_hal::peripherals::SPI2,
     dma_channel: Channel<'static, DmaChannel0, Blocking>,
     miso: esp_hal::gpio::GpioPin<2>,
     miso_mirror: Output<'static, GpioPin<3>>,
-    clocks: &'static Clocks<'static>,
+    clocks: Clocks<'static>,
 }
 
 fn execute(
@@ -131,7 +122,6 @@ mod tests {
 
         let dma_channel = dma_channel.configure(false, DmaPriority::Priority0);
 
-        let clocks = mk_static!(Clocks, clocks);
         Context {
             spi: peripherals.SPI2,
             dma_channel,
@@ -144,7 +134,7 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin_0(ctx: Context) {
-        let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0, ctx.clocks)
+        let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0, &ctx.clocks)
             .with_pins(
                 esp_hal::gpio::NO_PIN,
                 Some(ctx.miso),
@@ -162,7 +152,7 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin_1(ctx: Context) {
-        let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0, ctx.clocks)
+        let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0, &ctx.clocks)
             .with_pins(
                 esp_hal::gpio::NO_PIN,
                 esp_hal::gpio::NO_PIN,
@@ -180,7 +170,7 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin_2(ctx: Context) {
-        let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0, ctx.clocks)
+        let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0, &ctx.clocks)
             .with_pins(
                 esp_hal::gpio::NO_PIN,
                 esp_hal::gpio::NO_PIN,
@@ -198,7 +188,7 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin_3(ctx: Context) {
-        let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0, ctx.clocks)
+        let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0, &ctx.clocks)
             .with_pins(
                 esp_hal::gpio::NO_PIN,
                 esp_hal::gpio::NO_PIN,
