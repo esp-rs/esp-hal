@@ -153,7 +153,7 @@ async fn main(_s: Spawner) {
                     server
                         .notify(&ble, bat_level_handle, &conn, &[tick])
                         .await
-                        .unwrap();
+                        .ok();
                 }
             }
         },
