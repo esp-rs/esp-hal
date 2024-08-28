@@ -1,8 +1,4 @@
-use core::{
-    convert::Infallible,
-    marker::PhantomData,
-    ptr::{copy_nonoverlapping, write_bytes},
-};
+use core::convert::Infallible;
 
 use crate::rsa::{
     implement_op,
@@ -37,15 +33,20 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
     }
 
     /// Starts the modular exponentiation operation.
-    pub(super) fn write_modexp_start(&mut self) {
+    pub(super) fn write_modexp_start(&self) {
         self.rsa
             .modexp_start()
             .write(|w| w.modexp_start().set_bit());
     }
 
     /// Starts the multiplication operation.
-    pub(super) fn write_multi_start(&mut self) {
+    pub(super) fn write_multi_start(&self) {
         self.rsa.mult_start().write(|w| w.mult_start().set_bit());
+    }
+
+    /// Starts the modular multiplication operation.
+    pub(super) fn write_modmulti_start(&self) {
+        self.write_multi_start();
     }
 
     /// Clears the RSA interrupt flag.
@@ -54,18 +55,8 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
     }
 
     /// Checks if the RSA peripheral is idle.
-    pub(super) fn is_idle(&mut self) -> bool {
-        self.rsa.interrupt().read().bits() == 1
-    }
-
-    unsafe fn write_multi_operand_a<const N: usize>(&mut self, operand_a: &[u32; N]) {
-        copy_nonoverlapping(operand_a.as_ptr(), self.rsa.x_mem(0).as_ptr(), N);
-        write_bytes(self.rsa.x_mem(0).as_ptr().add(N), 0, N);
-    }
-
-    unsafe fn write_multi_operand_b<const N: usize>(&mut self, operand_b: &[u32; N]) {
-        write_bytes(self.rsa.z_mem(0).as_ptr(), 0, N);
-        copy_nonoverlapping(operand_b.as_ptr(), self.rsa.z_mem(0).as_ptr().add(N), N);
+    pub(super) fn is_idle(&self) -> bool {
+        self.rsa.interrupt().read().interrupt().bit_is_set()
     }
 }
 
@@ -92,59 +83,18 @@ impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularMultiplicati
 where
     T: RsaMode<InputType = [u32; N]>,
 {
-    /// Creates an instance of `RsaMultiplication`.
-    ///
-    /// `m_prime` can be calculated using `-(modular multiplicative inverse of
-    /// modulus) mod 2^32`.
-    ///
-    /// For more information refer to 24.3.2 of <https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf>.
-    pub fn new(rsa: &'a mut Rsa<'d, DM>, modulus: &T::InputType, m_prime: u32) -> Self {
-        Self::set_mode(rsa);
-        unsafe {
-            rsa.write_modulus(modulus);
-        }
-        rsa.write_mprime(m_prime);
-
-        Self {
-            rsa,
-            phantom: PhantomData,
-        }
-    }
-
-    fn set_mode(rsa: &mut Rsa<'d, DM>) {
+    pub(super) fn write_mode(rsa: &mut Rsa<'d, DM>) {
         rsa.write_multi_mode((N / 16 - 1) as u32)
     }
 
-    /// Starts the first step of modular multiplication operation.
-    ///
-    /// `r` can be calculated using `2 ^ ( bitlength * 2 ) mod modulus`.
+    /// Starts the modular multiplication operation.
     ///
     /// For more information refer to 24.3.2 of <https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf>.
-    pub fn start_step1(&mut self, operand_a: &T::InputType, r: &T::InputType) {
-        unsafe {
-            self.rsa.write_operand_a(operand_a);
-            self.rsa.write_r(r);
-        }
-        self.start();
-    }
-
-    /// Starts the second step of modular multiplication operation.
-    ///
-    /// This is a non blocking function that returns without an error if
-    /// operation is completed successfully. `start_step1` must be called
-    /// before calling this function.
-    pub fn start_step2(&mut self, operand_b: &T::InputType) {
-        while !self.rsa.is_idle() {}
-
-        self.rsa.clear_interrupt();
-        unsafe {
-            self.rsa.write_operand_a(operand_b);
-        }
-        self.start();
-    }
-
-    fn start(&mut self) {
+    pub(super) fn set_up_modular_multiplication(&mut self, operand_b: &T::InputType) {
         self.rsa.write_multi_start();
+        self.rsa.wait_for_idle();
+
+        self.rsa.write_operand_a(operand_b);
     }
 }
 
@@ -152,38 +102,9 @@ impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularExponentiati
 where
     T: RsaMode<InputType = [u32; N]>,
 {
-    /// Creates an instance of `RsaModularExponentiation`.
-    ///
-    /// `m_prime` can be calculated using `-(modular multiplicative inverse of
-    /// modulus) mod 2^32`.
-    ///
-    /// For more information refer to 24.3.2 of <https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf>.
-    pub fn new(
-        rsa: &'a mut Rsa<'d, DM>,
-        exponent: &T::InputType,
-        modulus: &T::InputType,
-        m_prime: u32,
-    ) -> Self {
-        Self::set_mode(rsa);
-        unsafe {
-            rsa.write_operand_b(exponent);
-            rsa.write_modulus(modulus);
-        }
-        rsa.write_mprime(m_prime);
-        Self {
-            rsa,
-            phantom: PhantomData,
-        }
-    }
-
     /// Sets the modular exponentiation mode for the RSA hardware.
-    pub(super) fn set_mode(rsa: &mut Rsa<'d, DM>) {
+    pub(super) fn write_mode(rsa: &mut Rsa<'d, DM>) {
         rsa.write_modexp_mode((N / 16 - 1) as u32)
-    }
-
-    /// Starts the modular exponentiation operation on the RSA hardware.
-    pub(super) fn start(&mut self) {
-        self.rsa.write_modexp_start();
     }
 }
 
@@ -191,31 +112,12 @@ impl<'a, 'd, T: RsaMode + Multi, DM: crate::Mode, const N: usize> RsaMultiplicat
 where
     T: RsaMode<InputType = [u32; N]>,
 {
-    /// Creates an instance of `RsaMultiplication`.
-    pub fn new(rsa: &'a mut Rsa<'d, DM>) -> Self {
-        Self::set_mode(rsa);
-        Self {
-            rsa,
-            phantom: PhantomData,
-        }
-    }
-
-    /// Starts the multiplication operation.
-    pub fn start_multiplication(&mut self, operand_a: &T::InputType, operand_b: &T::InputType) {
-        unsafe {
-            self.rsa.write_multi_operand_a(operand_a);
-            self.rsa.write_multi_operand_b(operand_b);
-        }
-        self.start();
-    }
-
     /// Sets the multiplication mode for the RSA hardware.
-    pub(super) fn set_mode(rsa: &mut Rsa<'d, DM>) {
+    pub(super) fn write_mode(rsa: &mut Rsa<'d, DM>) {
         rsa.write_multi_mode(((N * 2) / 16 + 7) as u32)
     }
 
-    /// Starts the multiplication operation on the RSA hardware.
-    pub(super) fn start(&mut self) {
-        self.rsa.write_multi_start();
+    pub(super) fn set_up_multiplication(&mut self, operand_b: &T::InputType) {
+        self.rsa.write_multi_operand_b(operand_b);
     }
 }

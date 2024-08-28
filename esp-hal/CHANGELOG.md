@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove `fn free(self)` in HMAC which goes against esp-hal API guidelines (#1972)
 - PARL_IO use ReadBuffer and WriteBuffer for Async DMA (#1996)
 - `AnyPin`, `AnyInputOnyPin` and `DummyPin` are now accessible from `gpio` module (#1918)
+- Changed the RSA modular multiplication API to be consistent across devices (#2002)
 
 ### Fixed
 
@@ -45,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reset peripherals in driver constructors where missing (#1893, #1961)
 - Fixed ESP32-S2 systimer interrupts (#1979)
 - Software interrupt 3 is no longer available when it is required by `esp-hal-embassy`. (#2011)
+- ESP32: Fixed async RSA (#2002)
 
 ### Removed
 
