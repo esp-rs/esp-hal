@@ -1540,14 +1540,17 @@ pub trait Instance: crate::private::Sealed {
                 },
             )?;
         }
-        // there is another read so we need to ack all
-        add_cmd(
-            cmd_iterator,
-            Command::Read {
-                ack_value: Ack::Ack,
-                length: initial_len as u8,
-            },
-        )?;
+
+        if initial_len > 0 {
+            // READ command
+            add_cmd(
+                cmd_iterator,
+                Command::Read {
+                    ack_value: Ack::Ack,
+                    length: initial_len as u8,
+                },
+            )?;
+        }
 
         if !will_continue {
             // this is the last read so we need to nack the last byte
