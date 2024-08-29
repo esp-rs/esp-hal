@@ -117,12 +117,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         )?;
     }
 
-    // needed for before_snippet! macro
-    let host = env::var_os("HOST").expect("HOST not set");
-    if let Some("windows") = host.to_str().unwrap().split('-').nth(2) {
-        println!("cargo:rustc-cfg=host_os=\"windows\"");
-    }
-
     // With the architecture-specific linker scripts taken care of, we can copy all
     // remaining linker scripts which are common to all devices:
     copy_dir_all(&config_symbols, "ld/sections", &out)?;
