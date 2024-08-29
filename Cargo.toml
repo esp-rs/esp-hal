@@ -1,11 +1,11 @@
 [workspace]
 resolver = "2"
-members  = [
-    "xtask",
-    "esp-hal",
+members  = ["xtask"]
+exclude  = [
     "esp-alloc",
     "esp-backtrace",
     "esp-build",
+    "esp-hal",
     "esp-hal-embassy",
     "esp-hal-procmacros",
     "esp-hal-smartled",
@@ -20,19 +20,8 @@ members  = [
     "extras/bench-server",
     "extras/esp-wifishark",
     "extras/ieee802154-sniffer",
-]
-exclude = [
     "hil-test",
     "xtensa-lx",
     "xtensa-lx-rt",
     "xtensa-lx-rt/procmacros",
 ]
-
-[profile.release]
-codegen-units    = 1
-debug            = 2
-debug-assertions = false
-incremental      = false
-opt-level        = 3
-lto = 'fat'
-overflow-checks  = false

@@ -144,10 +144,10 @@ pub fn build_documentation(
 
     let docs_path = windows_safe_path(
         &workspace
+            .join(package.to_string())
             .join("target")
             .join(target)
-            .join("doc")
-            .join(package.to_string().replace('-', "_")),
+            .join("doc"),
     );
 
     Ok(docs_path)

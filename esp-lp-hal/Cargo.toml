@@ -73,15 +73,15 @@ embedded-hal = ["dep:embedded-hal", "dep:embedded-hal-nb"]
 embedded-io = ["dep:embedded-io"]
 
 [[example]]
-name              = "lp_blinky"
+name              = "blinky"
 required-features = ["embedded-hal-02"]
 
 [[example]]
-name              = "lp_i2c"
+name              = "i2c"
 required-features = ["embedded-hal-02", "esp32c6"]
 
 [[example]]
-name              = "lp_uart"
+name              = "uart"
 required-features = ["embedded-hal-02", "esp32c6"]
 
 [lints.rust]

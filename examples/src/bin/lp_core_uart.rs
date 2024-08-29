@@ -59,7 +59,7 @@ fn main() -> ! {
 
     // Load code to LP core:
     let lp_core_code =
-        load_lp_code!("../target/riscv32imac-unknown-none-elf/release/examples/lp_uart");
+        load_lp_code!("../esp-lp-hal/target/riscv32imac-unknown-none-elf/release/examples/uart");
 
     // Start LP core:
     lp_core_code.run(&mut lp_core, LpCoreWakeupSource::HpCpu, lp_uart);
