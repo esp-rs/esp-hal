@@ -332,6 +332,9 @@ fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result
     let output_path = workspace.join("docs");
     let resources = workspace.join("resources");
 
+    fs::create_dir_all(&output_path)
+        .with_context(|| format!("Failed to create {}", output_path.display()))?;
+
     let mut packages = HashMap::new();
     for package in args.packages {
         packages.insert(
