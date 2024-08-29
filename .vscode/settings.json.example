@@ -1,0 +1,12 @@
+{
+    "rust-analyzer.cargo.allTargets": false,
+    "rust-analyzer.cargo.target": "riscv32imac-unknown-none-elf",
+    "rust-analyzer.cargo.features": [
+        "esp32c6",
+        "esp-hal/async",
+        "esp-hal/defmt",
+        "esp-backtrace/defmt",
+        "esp-println/uart",
+        "esp-println/defmt-espflash"
+    ]
+}
