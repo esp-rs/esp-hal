@@ -114,7 +114,7 @@ pub fn assert_unique_used_features(input: TokenStream) -> TokenStream {
 // Helper Functions
 
 fn impl_unique_features(features: &[LitStr], expectation: &str) -> impl ToTokens {
-    let pairs = unique_pairs(&features);
+    let pairs = unique_pairs(features);
     let unique_cfgs = pairs
         .iter()
         .map(|(a, b)| quote::quote! { all(feature = #a, feature = #b) });

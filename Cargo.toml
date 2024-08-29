@@ -27,3 +27,12 @@ exclude = [
     "xtensa-lx-rt",
     "xtensa-lx-rt/procmacros",
 ]
+
+[profile.release]
+codegen-units    = 1
+debug            = 2
+debug-assertions = false
+incremental      = false
+opt-level        = 3
+lto = 'fat'
+overflow-checks  = false

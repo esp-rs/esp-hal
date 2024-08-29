@@ -80,12 +80,3 @@ embassy-generic-timers = ["embassy-time/generic-queue-8"]
 
 opsram-2m = ["esp-hal/opsram-2m"]
 psram-2m  = ["esp-hal/psram-2m"]
-
-[profile.release]
-codegen-units    = 1
-debug            = 2
-debug-assertions = false
-incremental      = false
-opt-level        = 3
-lto = 'fat'
-overflow-checks  = false
