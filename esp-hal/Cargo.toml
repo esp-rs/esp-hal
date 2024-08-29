@@ -66,7 +66,7 @@ esp32s3 = { version = "0.28.0", features = ["critical-section", "rt"], optional 
 esp-riscv-rt = { version = "0.9.0", path = "../esp-riscv-rt" }
 
 [target.'cfg(target_arch = "xtensa")'.dependencies]
-xtensa-lx-rt = "0.16.0"
+xtensa-lx-rt = { version = "0.16.1", path = "../xtensa-lx-rt" }
 
 [build-dependencies]
 basic-toml   = "0.1.9"
