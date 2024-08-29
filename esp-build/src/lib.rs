@@ -5,6 +5,7 @@
 use std::{io::Write as _, process};
 
 use proc_macro::TokenStream;
+use quote::ToTokens;
 use syn::{parse_macro_input, punctuated::Punctuated, LitStr, Token};
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
@@ -58,22 +59,10 @@ pub fn assert_unique_features(input: TokenStream) -> TokenStream {
         .into_iter()
         .collect::<Vec<_>>();
 
-    let pairs = unique_pairs(&features);
-    let unique_cfgs = pairs
-        .iter()
-        .map(|(a, b)| quote::quote! { all(feature = #a, feature = #b) });
-
-    let message = format!(
-        r#"
-ERROR: expected exactly zero or one enabled feature from feature group:
-  {:?}
-"#,
-        features.iter().map(|lit| lit.value()).collect::<Vec<_>>(),
-    );
+    let unique = impl_unique_features(&features, "exactly zero or one");
 
     quote::quote! {
-        #[cfg(any(#(#unique_cfgs),*))]
-        ::esp_build::error! { #message }
+        #unique
     }
     .into()
 }
@@ -91,17 +80,10 @@ pub fn assert_used_features(input: TokenStream) -> TokenStream {
         .into_iter()
         .collect::<Vec<_>>();
 
-    let message = format!(
-        r#"
-ERROR: expected at least one enabled feature from feature group:
-  {:?}
-    "#,
-        features.iter().map(|lit| lit.value()).collect::<Vec<_>>()
-    );
+    let used = impl_used_features(&features, "at least one");
 
     quote::quote! {
-        #[cfg(not(any(#(feature = #features),*)))]
-        ::esp_build::error! { #message }
+        #used
     }
     .into()
 }
@@ -118,6 +100,20 @@ pub fn assert_unique_used_features(input: TokenStream) -> TokenStream {
         .into_iter()
         .collect::<Vec<_>>();
 
+    let unique = impl_unique_features(&features, "exactly one");
+    let used = impl_used_features(&features, "exactly one");
+
+    quote::quote! {
+        #unique
+        #used
+    }
+    .into()
+}
+
+// ----------------------------------------------------------------------------
+// Helper Functions
+
+fn impl_unique_features(features: &[LitStr], expectation: &str) -> impl ToTokens {
     let pairs = unique_pairs(&features);
     let unique_cfgs = pairs
         .iter()
@@ -125,21 +121,32 @@ pub fn assert_unique_used_features(input: TokenStream) -> TokenStream {
 
     let message = format!(
         r#"
-ERROR: expected exactly one enabled feature from feature group:
+ERROR: expected {expectation} enabled feature from feature group:
+  {:?}
+"#,
+        features.iter().map(|lit| lit.value()).collect::<Vec<_>>(),
+    );
+
+    quote::quote! {
+        #[cfg(any(#(#unique_cfgs),*))]
+        ::esp_build::error! { #message }
+    }
+}
+
+fn impl_used_features(features: &[LitStr], expectation: &str) -> impl ToTokens {
+    let message = format!(
+        r#"
+ERROR: expected {expectation} enabled feature from feature group:
   {:?}
     "#,
         features.iter().map(|lit| lit.value()).collect::<Vec<_>>()
     );
 
     quote::quote! {
-        #[cfg(any(any(#(#unique_cfgs),*), not(any(#(feature = #features),*))))]
+        #[cfg(not(any(#(feature = #features),*)))]
         ::esp_build::error! { #message }
     }
-    .into()
 }
-
-// ----------------------------------------------------------------------------
-// Helper Functions
 
 // Adapted from:
 // https://github.com/dtolnay/build-alert/blob/49d060e/src/lib.rs#L54-L93
