@@ -281,7 +281,7 @@ where
                         address,
                         bytes,
                         last_op != Op::Write,
-                        op_iter.peek().is_none(),
+                        next_op == Op::None,
                         cmd_iterator,
                     )?;
                     last_op = Op::Write;
@@ -295,7 +295,7 @@ where
                         address,
                         buffer,
                         last_op != Op::Read,
-                        op_iter.peek().is_none(),
+                        next_op == Op::None,
                         next_op == Op::Read,
                         cmd_iterator,
                     )?;
@@ -740,6 +740,14 @@ mod asynch {
             Ok(())
         }
 
+        /// Executes an async I2C write operation.
+        /// - `addr` is the address of the slave device.
+        /// - `bytes` is the data two be sent.
+        /// - `start` indicates whether the operation should start by a START
+        ///   condition and sending the address.
+        /// - `stop` indicates whether the operation should end with a STOP
+        ///   condition.
+        /// - `cmd_iterator` is an iterator over the command registers.
         async fn write_operation<'a, I>(
             &self,
             address: u8,
@@ -772,6 +780,16 @@ mod asynch {
             Ok(())
         }
 
+        /// Executes an async I2C read operation.
+        /// - `addr` is the address of the slave device.
+        /// - `buffer` is the buffer to store the read data.
+        /// - `start` indicates whether the operation should start by a START
+        ///   condition and sending the address.
+        /// - `stop` indicates whether the operation should end with a STOP
+        ///   condition.
+        /// - `will_continue` indicates whether there is another read operation
+        ///   following this one and we should not nack the last byte.
+        /// - `cmd_iterator` is an iterator over the command registers.
         async fn read_operation<'a, I>(
             &self,
             address: u8,
@@ -929,7 +947,7 @@ mod asynch {
                             address,
                             bytes,
                             last_op != Op::Write,
-                            op_iter.peek().is_none(),
+                            next_op == Op::None,
                             cmd_iterator,
                         )
                         .await?;
@@ -943,7 +961,7 @@ mod asynch {
                             address,
                             buffer,
                             last_op != Op::Read,
-                            op_iter.peek().is_none(),
+                            next_op == Op::None,
                             next_op == Op::Read,
                             cmd_iterator,
                         )
@@ -1463,6 +1481,11 @@ pub trait Instance: crate::private::Sealed {
     }
 
     /// Configures the I2C peripheral for a write operation.
+    /// - `addr` is the address of the slave device.
+    /// - `bytes` is the data two be sent.
+    /// - `start` indicates whether the operation should start by a START
+    ///   condition and sending the address.
+    /// - `cmd_iterator` is an iterator over the command registers.
     fn setup_write<'a, I>(
         &self,
         addr: u8,
@@ -1503,12 +1526,13 @@ pub trait Instance: crate::private::Sealed {
     }
 
     /// Configures the I2C peripheral for a read operation.
-    /// `addr` is the address of the slave device.
-    /// `buffer` is the buffer to store the read data.
-    /// `start` indicates whether the operation should start by writing the
-    /// address `will_continue` indicates whether there is another read
-    /// operation following this one and we should not nack the last byte.
-    /// The `cmd_iterator` parameter is an iterator over the command registers.
+    /// - `addr` is the address of the slave device.
+    /// - `buffer` is the buffer to store the read data.
+    /// - `start` indicates whether the operation should start by a START
+    ///   condition and sending the address.
+    /// - `will_continue` indicates whether there is another read operation
+    ///   following this one and we should not nack the last byte.
+    /// - `cmd_iterator` is an iterator over the command registers.
     fn setup_read<'a, I>(
         &self,
         addr: u8,
@@ -1915,6 +1939,13 @@ pub trait Instance: crate::private::Sealed {
     }
 
     /// Executes an I2C write operation.
+    /// - `addr` is the address of the slave device.
+    /// - `bytes` is the data two be sent.
+    /// - `start` indicates whether the operation should start by a START
+    ///   condition and sending the address.
+    /// - `stop` indicates whether the operation should end with a STOP
+    ///   condition.
+    /// - `cmd_iterator` is an iterator over the command registers.
     fn write_operation<'a, I>(
         &self,
         address: u8,
@@ -1948,6 +1979,15 @@ pub trait Instance: crate::private::Sealed {
     }
 
     /// Executes an I2C read operation.
+    /// - `addr` is the address of the slave device.
+    /// - `buffer` is the buffer to store the read data.
+    /// - `start` indicates whether the operation should start by a START
+    ///   condition and sending the address.
+    /// - `stop` indicates whether the operation should end with a STOP
+    ///   condition.
+    /// - `will_continue` indicates whether there is another read operation
+    ///   following this one and we should not nack the last byte.
+    /// - `cmd_iterator` is an iterator over the command registers.
     fn read_operation<'a, I>(
         &self,
         address: u8,
