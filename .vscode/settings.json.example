@@ -8,6 +8,8 @@
         "esp-hal/log",
         "esp-hal-procmacros/has-lp-core",
         "esp-backtrace/println",
+        "esp-backtrace/panic-handler",
+        "esp-backtrace/exception-handler",
         "esp-println/uart",
         "esp-println/log",
     ],

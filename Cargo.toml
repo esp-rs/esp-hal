@@ -10,6 +10,7 @@ members  = [
     "esp-hal-procmacros",
     "esp-hal-smartled",
     "esp-ieee802154",
+    "esp-lp-hal",
     "esp-metadata",
     "esp-println",
     "esp-riscv-rt",
@@ -21,7 +22,6 @@ members  = [
     "extras/ieee802154-sniffer",
 ]
 exclude = [
-    "esp-lp-hal",
     "hil-test",
     "xtensa-lx",
     "xtensa-lx-rt",

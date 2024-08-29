@@ -23,19 +23,19 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
         let mut res = String::from("__ULP_MAGIC_");
         for &a in args {
             let t = &a.ty;
-            let quoted = to_string(&t);
+            let quoted = to_string(t);
             res.push_str(&quoted);
-            res.push_str("$");
+            res.push('$');
         }
 
         res
     }
 
     pub(crate) fn get_simplename(t: &Type) -> String {
-        String::from(match t {
+        match t {
             Type::Path(p) => String::from(&p.path.segments.last().unwrap().ident.to_string()),
             _ => String::new(),
-        })
+        }
     }
 
     pub(crate) fn extract_pin(ty: &Type) -> u8 {
@@ -49,7 +49,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                             res = extract_pin(t);
                         }
                         GenericArgument::Const(c) => {
-                            res = (&quote! { #c }.to_string()).parse().unwrap();
+                            res = quote! { #c }.to_string().parse().unwrap();
                         }
                         _ => (),
                     }
@@ -68,11 +68,11 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
             res.push_str(&segment.ident.to_string());
 
             if let PathArguments::AngleBracketed(g) = &segment.arguments {
-                res.push_str("<");
+                res.push('<');
                 let mut pushed = false;
                 for arg in &g.args {
                     if pushed {
-                        res.push_str(",");
+                        res.push(',');
                     }
 
                     match arg {
@@ -87,7 +87,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                         _ => (),
                     }
                 }
-                res.push_str(">");
+                res.push('>');
             }
         }
 
