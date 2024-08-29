@@ -1,0 +1,25 @@
+{
+    // These are recommended settings.
+    // Should you wish to disable rust-analyzer, you can replace all of this with
+    // `"rust-analyzer.files.excludeDirs": ["."]`.
+    // You can also omit all this, but that will cause r-a to try
+    // (and after a long while, fail) initializing.
+    // Note that we are not telling rust-analyzer to use an embedded target.
+    // This results in a few pointer width related errors, but it also means r-a is able
+    // to cope with xtask and its dependencies.
+    "rust-analyzer.cargo.allTargets": false,
+    "rust-analyzer.cargo.targetDir": "target/rust-analyzer",
+    "rust-analyzer.procMacro.attributes.enable": false,
+    "rust-analyzer.cargo.features": [
+        "esp32c6",
+        "esp-hal/async",
+        "esp-hal/log",
+        "esp-hal-procmacros/has-lp-core",
+        "esp-backtrace/println",
+        "esp-backtrace/panic-handler",
+        "esp-backtrace/exception-handler",
+        "esp-println/uart",
+        "esp-println/log",
+    ],
+    "editor.formatOnSave": true,
+}
