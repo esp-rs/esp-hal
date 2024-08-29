@@ -1,14 +1,13 @@
 {
     "rust-analyzer.cargo.allTargets": false,
     "rust-analyzer.cargo.targetDir": "target/rust-analyzer",
-    "rust-analyzer.cargo.target": "riscv32imac-unknown-none-elf",
     "rust-analyzer.procMacro.attributes.enable": false,
     "rust-analyzer.cargo.features": [
         "esp32c6",
         "esp-hal/async",
-        "esp-hal/defmt",
-        "esp-backtrace/defmt",
+        "esp-hal/log",
+        "esp-backtrace/println",
         "esp-println/uart",
-        "esp-println/defmt-espflash"
+        "esp-println/log"
     ]
 }
