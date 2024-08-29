@@ -125,10 +125,7 @@ use crate::{
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
     interrupt::InterruptHandler,
     peripheral::Peripheral,
-    peripherals::{
-        uart0::{fifo::FIFO_SPEC, RegisterBlock},
-        Interrupt,
-    },
+    peripherals::{uart0::RegisterBlock, Interrupt},
     private::Internal,
     system::PeripheralClockControl,
     Blocking,
@@ -654,7 +651,7 @@ where
         if T::get_rx_fifo_count() > 0 {
             let value = unsafe {
                 let fifo = (T::register_block().fifo().as_ptr() as *mut u8).offset(offset)
-                    as *mut crate::peripherals::generic::Reg<FIFO_SPEC>;
+                    as *mut crate::peripherals::uart0::FIFO;
                 (*fifo).read().rxfifo_rd_byte().bits()
             };
 
@@ -674,7 +671,7 @@ where
         while T::get_rx_fifo_count() > 0 && count < buf.len() {
             let value = unsafe {
                 let fifo = (T::register_block().fifo().as_ptr() as *mut u8).offset(offset)
-                    as *mut crate::peripherals::generic::Reg<FIFO_SPEC>;
+                    as *mut crate::peripherals::uart0::FIFO;
                 (*fifo).read().rxfifo_rd_byte().bits()
             };
             buf[count] = value;

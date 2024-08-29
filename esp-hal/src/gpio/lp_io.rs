@@ -181,7 +181,7 @@ fn get_pin_reg(pin: u8) -> &'static crate::peripherals::lp_io::GPIO0 {
         let lp_io = &*crate::peripherals::LP_IO::PTR;
         let pin_ptr = (lp_io.gpio0().as_ptr()).add(pin as usize);
 
-        &*(pin_ptr as *const esp32c6::generic::Reg<esp32c6::lp_io::gpio0::GPIO0_SPEC>)
+        &*(pin_ptr as *const crate::peripherals::lp_io::GPIO0)
     }
 }
 
