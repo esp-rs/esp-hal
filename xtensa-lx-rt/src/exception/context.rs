@@ -87,6 +87,19 @@ pub struct Context {
     pub F15: u32,
 }
 
+impl Default for Context {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Context {
+    /// Creates a new, zeroed out context.
+    pub const fn new() -> Self {
+        unsafe { core::mem::zeroed() }
+    }
+}
+
 extern "Rust" {
     /// The exception assembly jumps here once registers have been spilled
     fn __exception(cause: ExceptionCause, save_frame: &mut Context);
