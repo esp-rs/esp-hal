@@ -169,24 +169,13 @@ impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     }
 }
 
-#[cfg(esp32s3)]
-#[inline(always)]
-fn get_pin_reg(pin: u8) -> &'static crate::peripherals::rtc_io::TOUCH_PAD0 {
-    unsafe {
-        let rtc_io = &*crate::peripherals::RTC_IO::PTR;
-        let pin_ptr = (rtc_io.touch_pad0().as_ptr()).add(pin as usize);
-
-        &*(pin_ptr as *const esp32s3::generic::Reg<esp32s3::rtc_io::touch_pad0::TOUCH_PAD0_SPEC>)
-    }
-}
-
-#[cfg(esp32s2)]
+#[cfg(any(esp32s2, esp32s3))]
 #[inline(always)]
 fn get_pin_reg(pin: u8) -> &'static crate::peripherals::rtc_io::TOUCH_PAD {
     unsafe {
         let rtc_io = &*crate::peripherals::RTC_IO::PTR;
         let pin_ptr = (rtc_io.touch_pad(0).as_ptr()).add(pin as usize);
 
-        &*(pin_ptr as *const esp32s2::generic::Reg<esp32s2::rtc_io::touch_pad::TOUCH_PAD_SPEC>)
+        &*(pin_ptr as *const crate::peripherals::rtc_io::TOUCH_PAD)
     }
 }
