@@ -96,9 +96,10 @@ pub enum Error {
 
 #[derive(PartialEq)]
 // This enum is used to keep track of the last/next operation that was/will be
-// performed in an embedded-hal(-async) I2C::transaction. It used to determine
-// whether a START condition should be issued at the start of the current
-// operation and whether a read needs an ack or a nack for the final byte.
+// performed in an embedded-hal(-async) I2C::transaction. It is used to
+// determine whether a START condition should be issued at the start of the
+// current operation and whether a read needs an ack or a nack for the final
+// byte.
 enum Op {
     Write,
     Read,
