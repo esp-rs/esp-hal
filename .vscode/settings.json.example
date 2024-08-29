@@ -6,8 +6,10 @@
         "esp32c6",
         "esp-hal/async",
         "esp-hal/log",
+        "esp-hal-procmacros/has-lp-core",
         "esp-backtrace/println",
         "esp-println/uart",
-        "esp-println/log"
-    ]
+        "esp-println/log",
+    ],
+    "editor.formatOnSave": true,
 }
