@@ -112,6 +112,8 @@ pub(crate) mod rtc;
 #[cfg(any(esp32c6, esp32h2))]
 pub use rtc::RtcClock;
 
+pub use rtc::RtcSlowClock;
+
 #[cfg(not(any(esp32c6, esp32h2)))]
 #[allow(unused)]
 #[derive(Debug, Clone, Copy)]
@@ -137,13 +139,15 @@ impl Clock for RtcFastClock {
 }
 
 #[cfg(not(any(esp32c6, esp32h2)))]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 #[non_exhaustive]
 /// RTC SLOW_CLK frequency values
 pub enum RtcSlowClock {
     /// Internal slow RC oscillator
+    //#[default]
     RtcSlowClockRtc     = 0,
     /// External 32 KHz XTAL
+    #[default] // Only for testing
     RtcSlowClock32kXtal = 1,
     /// Internal fast RC oscillator, divided by 256
     RtcSlowClock8mD256  = 2,
@@ -198,9 +202,12 @@ impl<'d> Rtc<'d> {
     /// Create a new instance in [crate::Blocking] mode.
     ///
     /// Optionally an interrupt handler can be bound.
-    pub fn new(rtc_cntl: impl Peripheral<P = crate::peripherals::LPWR> + 'd) -> Self {
+    pub fn new(
+        rtc_cntl: impl Peripheral<P = crate::peripherals::LPWR> + 'd,
+        slowClock: RtcSlowClock,
+    ) -> Self {
         rtc::init();
-        rtc::configure_clock();
+        rtc::configure_clock(slowClock);
 
         let this = Self {
             _inner: rtc_cntl.into_ref(),

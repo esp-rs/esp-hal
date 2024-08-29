@@ -23,6 +23,8 @@ use esp_hal::{
     prelude::*,
     system::SystemControl,
     uart::Uart,
+    rtc_cntl::Rtc,
+    rtc_cntl::RtcSlowClock,
 };
 
 #[entry]
@@ -30,6 +32,8 @@ fn main() -> ! {
     let peripherals = Peripherals::take();
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+    let mut rtc = Rtc::new(peripherals.LPWR, RtcSlowClock::default());
 
     let delay = Delay::new(&clocks);
 
