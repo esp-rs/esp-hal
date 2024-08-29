@@ -36,7 +36,7 @@ fn main() -> ! {
 
     // load code to LP core
     let lp_core_code =
-        load_lp_code!("../esp-lp-hal/target/riscv32imac-unknown-none-elf/release/examples/blinky");
+        load_lp_code!("../target/riscv32imac-unknown-none-elf/release/examples/blinky");
 
     // start LP core
     lp_core_code.run(&mut lp_core, LpCoreWakeupSource::HpCpu, lp_pin);
