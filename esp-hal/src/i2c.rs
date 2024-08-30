@@ -106,6 +106,17 @@ enum Op {
     None,
 }
 
+impl From<Option<&&mut embedded_hal::i2c::Operation<'_>>> for Op {
+    fn from(op: Option<&&mut embedded_hal::i2c::Operation<'_>>) -> Self {
+        use embedded_hal::i2c::Operation;
+        match op {
+            Some(Operation::Write(_)) => Op::Write,
+            Some(Operation::Read(_)) => Op::Read,
+            None => Op::None,
+        }
+    }
+}
+
 impl embedded_hal::i2c::Error for Error {
     fn kind(&self) -> embedded_hal::i2c::ErrorKind {
         use embedded_hal::i2c::{ErrorKind, NoAcknowledgeSource};
@@ -257,16 +268,7 @@ where
         let mut last_op = Op::None;
         let mut op_iter = operations.iter_mut().peekable();
         while let Some(op) = op_iter.next() {
-            let next_op = {
-                if let Some(next_op) = op_iter.peek() {
-                    match next_op {
-                        Operation::Write(_) => Op::Write,
-                        Operation::Read(_) => Op::Read,
-                    }
-                } else {
-                    Op::None
-                }
-            };
+            let next_op: Op = op_iter.peek().into();
             // Clear all I2C interrupts
             self.peripheral.clear_all_interrupts();
 
@@ -927,16 +929,7 @@ mod asynch {
             let mut last_op = Op::None;
             let mut op_iter = operations.iter_mut().peekable();
             while let Some(op) = op_iter.next() {
-                let next_op = {
-                    if let Some(next_op) = op_iter.peek() {
-                        match next_op {
-                            Operation::Write(_) => Op::Write,
-                            Operation::Read(_) => Op::Read,
-                        }
-                    } else {
-                        Op::None
-                    }
-                };
+                let next_op: Op = op_iter.peek().into();
                 // Clear all I2C interrupts
                 self.peripheral.clear_all_interrupts();
 
