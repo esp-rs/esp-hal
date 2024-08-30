@@ -769,6 +769,12 @@ mod asynch {
         where
             I: Iterator<Item = &'a COMD>,
         {
+            // Short circuit for zero length writes without start as that would be an
+            // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
+            if bytes.is_empty() && !start {
+                return Ok(());
+            }
+
             // Reset FIFO and command list
             self.peripheral.reset_fifo();
             self.peripheral.reset_command_list();
@@ -812,6 +818,12 @@ mod asynch {
         where
             I: Iterator<Item = &'a COMD>,
         {
+            // Short circuit for zero length reads as that would be an invalid operation
+            // read lengths in the TRM (at least for ESP32-S3) are 1-255
+            if buffer.is_empty() {
+                return Ok(());
+            }
+
             // Reset FIFO and command list
             self.peripheral.reset_fifo();
             self.peripheral.reset_command_list();
@@ -1507,7 +1519,9 @@ pub trait Instance: crate::private::Sealed {
         if bytes.is_empty() && !start {
             return Err(Error::InvalidZeroLength);
         }
-        // if start we can only send 254 additional bytes, the address would be the first
+
+        // if start is true we can only send 254 additional bytes with the address as
+        // the first
         let max_len = if start { 254usize } else { 255usize };
         if bytes.len() > max_len {
             // we could support more by adding multiple write operations
@@ -1972,6 +1986,12 @@ pub trait Instance: crate::private::Sealed {
     where
         I: Iterator<Item = &'a COMD>,
     {
+        // Short circuit for zero length writes without start as that would be an
+        // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
+        if bytes.is_empty() && !start {
+            return Ok(());
+        }
+
         // Reset FIFO and command list
         self.reset_fifo();
         self.reset_command_list();
@@ -2015,6 +2035,12 @@ pub trait Instance: crate::private::Sealed {
     where
         I: Iterator<Item = &'a COMD>,
     {
+        // Short circuit for zero length reads as that would be an invalid operation
+        // read lengths in the TRM (at least for ESP32-S3) are 1-255
+        if buffer.is_empty() {
+            return Ok(());
+        }
+
         // Reset FIFO and command list
         self.reset_fifo();
         self.reset_command_list();
