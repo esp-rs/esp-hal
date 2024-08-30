@@ -33,7 +33,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 
     pub(crate) fn get_simplename(t: &Type) -> String {
         match t {
-            Type::Path(p) => String::from(&p.path.segments.last().unwrap().ident.to_string()),
+            Type::Path(p) => p.path.segments.last().unwrap().ident.to_string(),
             _ => String::new(),
         }
     }
