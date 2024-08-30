@@ -11,7 +11,7 @@ links         = "esp-hal"
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
-features       = ["embedded-hal", "esp32c6"]
+features       = ["esp32c6"]
 rustdoc-args   = ["--cfg", "docsrs"]
 
 [dependencies]
@@ -28,11 +28,11 @@ embassy-futures          = { version = "0.1.1", optional = true }
 embassy-sync             = { version = "0.6.0", optional = true }
 embassy-usb-driver       = { version = "0.1.0", optional = true }
 embassy-usb-synopsys-otg = { version = "0.1.0", optional = true }
-embedded-can             = { version = "0.4.1", optional = true }
+embedded-can             = "0.4.1"
 embedded-hal-02          = { version = "0.2.7", features = ["unproven"], package = "embedded-hal" }
-embedded-hal             = { version = "1.0.0", optional = true }
+embedded-hal             = "1.0.0"
 embedded-hal-async       = { version = "1.0.0", optional = true }
-embedded-hal-nb          = { version = "1.0.0", optional = true }
+embedded-hal-nb          = "1.0.0"
 embedded-io              = { version = "0.6.1", optional = true }
 embedded-io-async        = { version = "0.6.1", optional = true }
 enumset                  = "1.1.5"
@@ -76,7 +76,7 @@ esp-metadata = { version = "0.3.0", path = "../esp-metadata" }
 serde        = { version = "1.0.209", features = ["derive"] }
 
 [features]
-default = ["embedded-hal"]
+default = []
 
 riscv  = ["dep:riscv",     "critical-section/restore-state-u8"]
 xtensa = ["dep:xtensa-lx", "critical-section/restore-state-u32"]
@@ -128,7 +128,6 @@ flip-link = ["esp-riscv-rt/fix-sp"]
 ## `embedded-hal-async` and `embedded-io-async`.
 ## Also enables `embassy-usb` support for ESP32-S2 and ESP32-S3.
 async = [
-    "embedded-hal",
     "embedded-hal-async",
     "embedded-io",
     "embedded-io-async",
@@ -142,7 +141,7 @@ defmt = [
     "dep:defmt",
     "embassy-futures?/defmt",
     "embassy-sync?/defmt",
-    "embedded-hal?/defmt-03",
+    "embedded-hal/defmt-03",
     "embedded-io/defmt-03",
     "embedded-io-async?/defmt-03",
     "esp32?/defmt",
@@ -153,9 +152,6 @@ defmt = [
     "esp32s2?/defmt",
     "esp32s3?/defmt",
 ]
-## Implement the traits defined in the `1.0.0` releases of `embedded-hal` and
-## `embedded-hal-nb` for the relevant peripherals.
-embedded-hal = ["dep:embedded-hal", "dep:embedded-hal-nb", "dep:embedded-can"]
 ## Implement the traits defined in `embedded-io` for certain peripherals.
 embedded-io = ["dep:embedded-io"]
 

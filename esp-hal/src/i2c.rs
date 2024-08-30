@@ -95,7 +95,6 @@ pub enum Error {
     CommandNrExceeded,
 }
 
-#[cfg(any(feature = "embedded-hal", feature = "async"))]
 #[derive(PartialEq)]
 // This enum is used to keep track of the last operation that was performed
 // in an embedded-hal(-async) I2C::transaction. It used to determine whether
@@ -106,7 +105,6 @@ enum LastOpWas {
     None,
 }
 
-#[cfg(feature = "embedded-hal")]
 impl embedded_hal::i2c::Error for Error {
     fn kind(&self) -> embedded_hal::i2c::ErrorKind {
         use embedded_hal::i2c::{ErrorKind, NoAcknowledgeSource};
@@ -241,12 +239,10 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, DM: crate::Mode> embedded_hal::i2c::ErrorType for I2C<'_, T, DM> {
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, DM: crate::Mode> embedded_hal::i2c::I2c for I2C<'_, T, DM>
 where
     T: Instance,
@@ -890,7 +886,6 @@ mod asynch {
         }
     }
 
-    #[cfg(feature = "embedded-hal")]
     impl<'d, T> embedded_hal_async::i2c::I2c for I2C<'d, T, crate::Async>
     where
         T: Instance,

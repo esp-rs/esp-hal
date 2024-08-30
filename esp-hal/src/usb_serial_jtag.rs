@@ -515,7 +515,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::ErrorType for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -523,7 +522,6 @@ where
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::ErrorType for UsbSerialJtagTx<'_, M>
 where
     M: Mode,
@@ -531,7 +529,6 @@ where
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::ErrorType for UsbSerialJtagRx<'_, M>
 where
     M: Mode,
@@ -539,7 +536,6 @@ where
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::Read for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -549,7 +545,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::Read for UsbSerialJtagRx<'_, M>
 where
     M: Mode,
@@ -559,7 +554,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::Write for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -573,7 +567,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::Write for UsbSerialJtagTx<'_, M>
 where
     M: Mode,

@@ -221,7 +221,6 @@ impl embedded_hal_02::can::Error for ErrorKind {
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl From<ErrorKind> for embedded_can::ErrorKind {
     fn from(value: ErrorKind) -> Self {
         match value {
@@ -236,7 +235,6 @@ impl From<ErrorKind> for embedded_can::ErrorKind {
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl embedded_can::Error for ErrorKind {
     fn kind(&self) -> embedded_can::ErrorKind {
         (*self).into()
@@ -307,14 +305,12 @@ impl From<embedded_hal_02::can::StandardId> for StandardId {
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl From<StandardId> for embedded_can::StandardId {
     fn from(value: StandardId) -> Self {
         embedded_can::StandardId::new(value.as_raw()).unwrap()
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl From<embedded_can::StandardId> for StandardId {
     fn from(value: embedded_can::StandardId) -> Self {
         StandardId::new(value.as_raw()).unwrap()
@@ -380,14 +376,12 @@ impl From<embedded_hal_02::can::ExtendedId> for ExtendedId {
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl From<ExtendedId> for embedded_can::ExtendedId {
     fn from(value: ExtendedId) -> Self {
         embedded_can::ExtendedId::new(value.0).unwrap()
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl From<embedded_can::ExtendedId> for ExtendedId {
     fn from(value: embedded_can::ExtendedId) -> Self {
         ExtendedId::new(value.as_raw()).unwrap()
@@ -435,7 +429,6 @@ impl From<embedded_hal_02::can::Id> for Id {
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl From<Id> for embedded_can::Id {
     fn from(value: Id) -> Self {
         match value {
@@ -445,7 +438,6 @@ impl From<Id> for embedded_can::Id {
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl From<embedded_can::Id> for Id {
     fn from(value: embedded_can::Id) -> Self {
         match value {
@@ -588,7 +580,6 @@ impl embedded_hal_02::can::Frame for EspTwaiFrame {
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl embedded_can::Frame for EspTwaiFrame {
     fn new(id: impl Into<embedded_can::Id>, data: &[u8]) -> Option<Self> {
         let id: embedded_can::Id = id.into();
@@ -1190,7 +1181,6 @@ impl embedded_hal_02::can::Error for EspTwaiError {
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl embedded_can::Error for EspTwaiError {
     fn kind(&self) -> embedded_can::ErrorKind {
         match self {
@@ -1256,7 +1246,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<'d, T, DM> embedded_can::nb::Can for Twai<'d, T, DM>
 where
     T: OperationInstance,

@@ -232,7 +232,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<'d, T> embedded_hal::delay::DelayNs for OneShotTimer<'d, T>
 where
     T: Timer,

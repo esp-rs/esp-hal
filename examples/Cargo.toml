@@ -71,10 +71,7 @@ esp-wifi = ["dep:esp-wifi"]
 
 async = ["esp-hal/async", "embassy-usb"]
 
-embedded-hal = ["esp-hal/embedded-hal"]
-
-embassy = ["dep:esp-hal-embassy"]
-
+embassy                = ["dep:esp-hal-embassy"]
 embassy-generic-timers = ["embassy-time/generic-queue-8"]
 
 opsram-2m = ["esp-hal/opsram-2m"]

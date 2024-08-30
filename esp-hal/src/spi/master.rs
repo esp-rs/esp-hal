@@ -16,9 +16,8 @@
 //!
 //! - Use the [`FullDuplex`](embedded_hal_02::spi::FullDuplex) trait to
 //!   read/write single bytes at a time,
-//! - Use the [`SpiBus`](embedded_hal::spi::SpiBus) trait (requires the
-//!   "embedded-hal" feature) and its associated functions to initiate
-//!   transactions with simultaneous reads and writes, or
+//! - Use the [`SpiBus`](embedded_hal::spi::SpiBus) trait and its associated
+//!   functions to initiate transactions with simultaneous reads and writes, or
 //! - Use the `ExclusiveDevice` struct from [`embedded-hal-bus`] or `SpiDevice`
 //!   from [`embassy-embedded-hal`].
 //!
@@ -2158,7 +2157,6 @@ mod dma {
         }
     }
 
-    #[cfg(feature = "embedded-hal")]
     mod ehal1 {
         use embedded_hal::spi::{ErrorType, SpiBus};
 
@@ -2205,7 +2203,6 @@ mod dma {
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 mod ehal1 {
     use embedded_hal::spi::SpiBus;
     use embedded_hal_nb::spi::FullDuplex;

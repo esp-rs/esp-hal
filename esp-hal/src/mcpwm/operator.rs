@@ -448,7 +448,6 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> emb
 }
 
 /// Implement no error type for the PwmPin because the method are infallible
-#[cfg(feature = "embedded-hal")]
 impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     embedded_hal::pwm::ErrorType for PwmPin<'d, Pin, PWM, OP, IS_A>
 {
@@ -456,7 +455,6 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
 }
 
 /// Implement the trait SetDutyCycle for PwmPin
-#[cfg(feature = "embedded-hal")]
 impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     embedded_hal::pwm::SetDutyCycle for PwmPin<'d, Pin, PWM, OP, IS_A>
 {

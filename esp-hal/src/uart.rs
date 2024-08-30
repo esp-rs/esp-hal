@@ -255,7 +255,6 @@ pub enum Error {
     RxParityError,
 }
 
-#[cfg(feature = "embedded-hal")]
 impl embedded_hal_nb::serial::Error for Error {
     fn kind(&self) -> embedded_hal_nb::serial::ErrorKind {
         embedded_hal_nb::serial::ErrorKind::Other
@@ -1774,22 +1773,18 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::ErrorType for Uart<'_, T, M> {
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::ErrorType for UartTx<'_, T, M> {
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::ErrorType for UartRx<'_, T, M> {
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::Read for Uart<'_, T, M>
 where
     T: Instance,
@@ -1800,7 +1795,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::Read for UartRx<'_, T, M>
 where
     T: Instance,
@@ -1811,7 +1805,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::Write for Uart<'_, T, M>
 where
     T: Instance,
@@ -1826,7 +1819,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::Write for UartTx<'_, T, M>
 where
     T: Instance,
