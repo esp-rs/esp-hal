@@ -1540,7 +1540,12 @@ pub trait Instance: crate::private::Sealed {
         let (max_len, initial_len) = if will_continue {
             (255usize, buffer.len())
         } else {
-            (254usize, buffer.len() - 1)
+            let len = if buffer.is_empty() {
+                0
+            } else {
+                buffer.len() - 1
+            };
+            (254usize, len)
         };
         if buffer.len() > max_len {
             // we could support more by adding multiple read operations
@@ -1570,7 +1575,9 @@ pub trait Instance: crate::private::Sealed {
             )?;
         }
 
-        if !will_continue {
+        // If we are not continuing the read in the next operation we need to nack the
+        // last byte. But don't issue the read command if the buffer is empty!
+        if !will_continue && !buffer.is_empty() {
             // this is the last read so we need to nack the last byte
             // READ w/o ACK
             add_cmd(
