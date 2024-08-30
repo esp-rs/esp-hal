@@ -1662,7 +1662,6 @@ impl_instance!(UART1, 1, U1TXD, U1RXD, U1CTS, U1RTS, Uart1);
 #[cfg(uart2)]
 impl_instance!(UART2, 2, U2TXD, U2RXD, U2CTS, U2RTS, Uart2);
 
-#[cfg(feature = "ufmt")]
 impl<T, M> ufmt_write::uWrite for Uart<'_, T, M>
 where
     T: Instance,
@@ -1681,7 +1680,6 @@ where
     }
 }
 
-#[cfg(feature = "ufmt")]
 impl<T, M> ufmt_write::uWrite for UartTx<'_, T, M>
 where
     T: Instance,
