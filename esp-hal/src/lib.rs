@@ -618,6 +618,8 @@ macro_rules! before_snippet {
         r#"
 # #![no_std]
 # use esp_hal::prelude::*;
+# use procmacros::handler;
+# use esp_hal::interrupt;
 # #[panic_handler]
 # fn panic(_ : &core::panic::PanicInfo) -> ! {
 #     loop {}
