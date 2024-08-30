@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A build issue when including doc comment prelude (#2040)
+- Fix i2c embedded-hal transaction (#2028)
 
 ## [0.20.0] - 2024-08-29
 
@@ -81,7 +82,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed ESP32-S2 systimer interrupts (#1979)
 - Software interrupt 3 is no longer available when it is required by `esp-hal-embassy`. (#2011)
 - ESP32: Fixed async RSA (#2002)
-- Fix i2c embedded-hal transaction (#2028)
 
 ### Removed
 
