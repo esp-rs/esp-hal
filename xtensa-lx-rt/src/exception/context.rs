@@ -134,6 +134,14 @@ unsafe extern "C" fn __default_exception(cause: ExceptionCause, save_frame: &mut
 #[no_mangle]
 #[link_section = ".rwtext"]
 extern "C" fn __default_user_exception(cause: ExceptionCause, save_frame: &Context) {
+    #[cfg(any(feature = "esp32", feature = "esp32s3"))]
+    if cause == ExceptionCause::Cp0Disabled {
+        panic!(
+            "Access to the floating point coprocessor is not allowed. You may want to enable the `float-save-restore` feature of the `xtensa-lx-rt` crate. {:08x?}",
+            save_frame
+        )
+    }
+
     panic!("Exception: {:?}, {:08x?}", cause, save_frame)
 }
 
