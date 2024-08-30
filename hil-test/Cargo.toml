@@ -159,6 +159,11 @@ harness           = false
 required-features = ["async", "embassy"]
 
 [[test]]
+name    = "embassy_interrupt_spi_dma"
+harness = false
+required-features = ["async", "embassy"]
+
+[[test]]
 name    = "twai"
 harness = false
 
