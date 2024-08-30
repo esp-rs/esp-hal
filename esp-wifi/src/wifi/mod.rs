@@ -314,6 +314,7 @@ pub struct EapClientConfiguration {
     pub pac_file: Option<&'static [u8]>,
     pub time_check: bool,
     pub ca_cert: Option<&'static [u8]>,
+    #[allow(clippy::type_complexity)]
     pub certificate_and_key: Option<(&'static [u8], &'static [u8], Option<&'static [u8]>)>,
     pub ttls_phase2_method: Option<TtlsPhase2Method>,
 
@@ -374,6 +375,7 @@ pub enum Capability {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[derive(Default)]
+#[allow(clippy::large_enum_variant)]
 pub enum Configuration {
     #[default]
     None,
@@ -2565,7 +2567,7 @@ fn apply_sta_eap_config(config: &EapClientConfiguration) -> Result<(), WifiError
             ))?;
         }
 
-        if let Some(ca_cert) = *&config.ca_cert {
+        if let Some(ca_cert) = config.ca_cert {
             esp_wifi_result!(esp_eap_client_set_ca_cert(
                 ca_cert.as_ptr(),
                 ca_cert.len() as i32
@@ -2574,7 +2576,7 @@ fn apply_sta_eap_config(config: &EapClientConfiguration) -> Result<(), WifiError
             esp_eap_client_clear_ca_cert();
         }
 
-        if let Some((cert, key, password)) = *&config.certificate_and_key {
+        if let Some((cert, key, password)) = config.certificate_and_key {
             let (pwd, pwd_len) = if let Some(pwd) = password {
                 (pwd.as_ptr(), pwd.len() as i32)
             } else {

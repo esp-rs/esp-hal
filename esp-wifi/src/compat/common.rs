@@ -116,7 +116,7 @@ pub fn sem_create(max: u32, init: u32) -> *mut c_void {
         let ptr = malloc(4) as *mut u32;
         ptr.write_volatile(init);
 
-        trace!("sem created res = {:p}", ptr);
+        trace!("sem created res = {:?}", ptr);
         ptr.cast()
     })
 }
@@ -258,13 +258,13 @@ pub fn create_queue(queue_len: c_int, item_size: c_int) -> *mut c_void {
         ptr.write(queue);
     }
 
-    trace!("created queue @{:p}", ptr);
+    trace!("created queue @{:?}", ptr);
 
     ptr.cast()
 }
 
 pub fn delete_queue(queue: *mut c_void) {
-    trace!("delete_queue {:p}", queue);
+    trace!("delete_queue {:?}", queue);
 
     let queue: *mut RawQueue = queue.cast();
     unsafe {

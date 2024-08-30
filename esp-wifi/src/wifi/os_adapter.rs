@@ -707,7 +707,7 @@ pub unsafe extern "C" fn task_create(
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn task_delete(task_handle: *mut crate::binary::c_types::c_void) {
-    trace!("task delete called for {:p}", task_handle);
+    trace!("task delete called for {:?}", task_handle);
 
     let task = if task_handle.is_null() {
         crate::preempt::current_task()

@@ -61,7 +61,7 @@ pub unsafe extern "C" fn calloc(number: u32, size: usize) -> *mut u8 {
 
 #[no_mangle]
 unsafe extern "C" fn realloc(ptr: *mut u8, new_size: usize) -> *mut u8 {
-    trace!("realloc {:p} {}", ptr, new_size);
+    trace!("realloc {:?} {}", ptr, new_size);
 
     extern "C" {
         fn memcpy(d: *mut u8, s: *const u8, l: usize);

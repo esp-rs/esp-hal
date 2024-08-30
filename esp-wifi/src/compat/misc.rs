@@ -2,27 +2,27 @@ use crate::compat::malloc::*;
 
 #[no_mangle]
 unsafe extern "C" fn fwrite(ptr: *const (), size: usize, count: usize, stream: *const ()) -> usize {
-    todo!("fwrite {:p} {} {} {:p}", ptr, size, count, stream)
+    todo!("fwrite {:?} {} {} {:?}", ptr, size, count, stream)
 }
 
 #[no_mangle]
 unsafe extern "C" fn fopen(filename: *const u8, mode: *const u8) -> *const () {
-    todo!("fopen {:p} {:p}", filename, mode)
+    todo!("fopen {:?} {:?}", filename, mode)
 }
 
 #[no_mangle]
 unsafe extern "C" fn fgets(str: *const u8, count: u32, file: *const ()) -> *const u8 {
-    todo!("fgets {:p} {} {:p}", str, count, file)
+    todo!("fgets {:?} {} {:?}", str, count, file)
 }
 
 #[no_mangle]
 unsafe extern "C" fn fclose(stream: *const ()) -> i32 {
-    todo!("fclose {:p}", stream);
+    todo!("fclose {:?}", stream);
 }
 
 #[no_mangle]
 unsafe extern "C" fn strcat(destination: *mut u8, source: *const u8) -> *const u8 {
-    trace!("strcat {:p} {:p}", destination, source);
+    trace!("strcat {:?} {:?}", destination, source);
 
     let dst: *mut u8 = strchr(destination.cast(), 0) as *mut u8;
     let len = strchr(source.cast(), 0) as usize - source as usize;
@@ -32,7 +32,7 @@ unsafe extern "C" fn strcat(destination: *mut u8, source: *const u8) -> *const u
 
 #[no_mangle]
 unsafe extern "C" fn strcmp(str1: *const i8, str2: *const i8) -> i32 {
-    trace!("strcmp {:p} {:p}", str1, str2);
+    trace!("strcmp {:?} {:?}", str1, str2);
 
     let s1 = core::ffi::CStr::from_ptr(str1).to_str().unwrap();
     let s2 = core::ffi::CStr::from_ptr(str2).to_str().unwrap();
@@ -48,7 +48,7 @@ unsafe extern "C" fn strcmp(str1: *const i8, str2: *const i8) -> i32 {
 
 #[no_mangle]
 unsafe extern "C" fn strchr(str: *const i8, c: i32) -> *const i8 {
-    trace!("strchr {:p} {}", str, c);
+    trace!("strchr {:?} {}", str, c);
 
     unsafe {
         let mut p = str;
@@ -68,7 +68,7 @@ unsafe extern "C" fn strchr(str: *const i8, c: i32) -> *const i8 {
 
 #[no_mangle]
 unsafe extern "C" fn strlcpy(dst: *mut u8, src: *const u8, size: usize) -> usize {
-    trace!("strlcpy {:p} {:p} {}", dst, src, size);
+    trace!("strlcpy {:?} {:?} {}", dst, src, size);
 
     let mut dst = dst;
     let mut src = src;
@@ -93,7 +93,7 @@ unsafe extern "C" fn strlcpy(dst: *mut u8, src: *const u8, size: usize) -> usize
 
 #[no_mangle]
 unsafe extern "C" fn strstr(str1: *const i8, str2: *const i8) -> *const i8 {
-    trace!("strstr {:p} {:p}", str1, str2);
+    trace!("strstr {:?} {:?}", str1, str2);
 
     let s1 = core::ffi::CStr::from_ptr(str1).to_str().unwrap();
     let s2 = core::ffi::CStr::from_ptr(str2).to_str().unwrap();
@@ -108,7 +108,7 @@ unsafe extern "C" fn strstr(str1: *const i8, str2: *const i8) -> *const i8 {
 
 #[no_mangle]
 unsafe extern "C" fn strcasecmp(str1: *const u8, str2: *const u8) -> i32 {
-    trace!("strcasecmp {:p} {:p}", str1, str2);
+    trace!("strcasecmp {:?} {:?}", str1, str2);
 
     let mut str1 = str1;
     let mut str2 = str2;
@@ -131,12 +131,12 @@ unsafe extern "C" fn strcasecmp(str1: *const u8, str2: *const u8) -> i32 {
         c2 = *str2 as char;
     }
 
-    return c1 as i32 - c2 as i32;
+    c1 as i32 - c2 as i32
 }
 
 #[no_mangle]
 unsafe extern "C" fn strdup(str: *const i8) -> *const u8 {
-    trace!("strdup {:p}", str);
+    trace!("strdup {:?}", str);
 
     unsafe {
         let s = core::ffi::CStr::from_ptr(str);
@@ -150,7 +150,7 @@ unsafe extern "C" fn strdup(str: *const i8) -> *const u8 {
 
 #[no_mangle]
 unsafe extern "C" fn atoi(str: *const i8) -> i32 {
-    trace!("atoi {:p}", str);
+    trace!("atoi {:?}", str);
 
     unsafe {
         let s = core::ffi::CStr::from_ptr(str);
@@ -175,7 +175,7 @@ struct Tm {
 
 #[no_mangle]
 unsafe extern "C" fn mktime(time: *const Tm) -> i64 {
-    trace!("mktime {:p}", time);
+    trace!("mktime {:?}", time);
     let time = *time;
 
     // Simplified implementation, ignoring time zones, leap seconds, and other
