@@ -769,9 +769,9 @@ mod asynch {
         where
             I: Iterator<Item = &'a COMD>,
         {
-            // Short circuit for zero length writes without start as that would be an
+            // Short circuit for zero length writes without start or end as that would be an
             // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
-            if bytes.is_empty() && !start {
+            if bytes.is_empty() && !start && !stop {
                 return Ok(());
             }
 
@@ -1516,10 +1516,6 @@ pub trait Instance: crate::private::Sealed {
     where
         I: Iterator<Item = &'a COMD>,
     {
-        if bytes.is_empty() && !start {
-            return Err(Error::InvalidZeroLength);
-        }
-
         // if start is true we can only send 254 additional bytes with the address as
         // the first
         let max_len = if start { 254usize } else { 255usize };
@@ -1528,16 +1524,19 @@ pub trait Instance: crate::private::Sealed {
             return Err(Error::ExceedingFifo);
         }
 
-        let extra_len = if start { 1 } else { 0 };
-        // WRITE command
-        add_cmd(
-            cmd_iterator,
-            Command::Write {
-                ack_exp: Ack::Ack,
-                ack_check_en: true,
-                length: extra_len + bytes.len() as u8,
-            },
-        )?;
+        let write_len = if start { bytes.len() + 1 } else { bytes.len() };
+        // don't issue write if there is no data to write
+        if write_len > 0 {
+            // WRITE command
+            add_cmd(
+                cmd_iterator,
+                Command::Write {
+                    ack_exp: Ack::Ack,
+                    ack_check_en: true,
+                    length: write_len as u8,
+                },
+            )?;
+        }
 
         self.update_config();
 
@@ -1986,9 +1985,9 @@ pub trait Instance: crate::private::Sealed {
     where
         I: Iterator<Item = &'a COMD>,
     {
-        // Short circuit for zero length writes without start as that would be an
+        // Short circuit for zero length writes without start or end as that would be an
         // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
-        if bytes.is_empty() && !start {
+        if bytes.is_empty() && !start && !stop {
             return Ok(());
         }
 
