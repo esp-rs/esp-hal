@@ -895,11 +895,13 @@ mod asynch {
                 addr,
                 bytes,
                 true,
-                false,
+                buffer.is_empty(), // if the read buffer is empty, then issue a stop
                 &mut self.peripheral.register_block().comd_iter(),
             )
             .await?;
             self.peripheral.clear_all_interrupts();
+            // this will be a no-op if the buffer is empty, in that case we issued the stop
+            // with the write
             self.read_operation(
                 addr,
                 buffer,
@@ -2111,10 +2113,12 @@ pub trait Instance: crate::private::Sealed {
             addr,
             bytes,
             true,
-            false,
+            buffer.is_empty(), // if the read buffer is empty, then issue a stop
             &mut self.register_block().comd_iter(),
         )?;
         self.clear_all_interrupts();
+        // this will be a no-op if the buffer is empty, in that case we issued the stop
+        // with the write
         self.read_operation(
             addr,
             buffer,
