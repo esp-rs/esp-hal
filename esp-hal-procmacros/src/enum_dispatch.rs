@@ -30,21 +30,18 @@ impl Parse for MakeGpioEnumDispatchMacro {
 
         let mut elements = vec![];
 
-        let mut stream = input.parse::<Group>()?.stream().into_iter();
+        let stream = input.parse::<Group>()?.stream().into_iter();
         let mut element_name = String::new();
-        loop {
-            match stream.next() {
-                Some(v) => match v {
-                    TokenTree::Ident(ident) => {
-                        element_name = ident.to_string();
-                    }
-                    TokenTree::Literal(lit) => {
-                        let index = lit.to_string().parse().unwrap();
-                        elements.push((element_name.clone(), index));
-                    }
-                    _ => (),
-                },
-                None => break,
+        for v in stream {
+            match v {
+                TokenTree::Ident(ident) => {
+                    element_name = ident.to_string();
+                }
+                TokenTree::Literal(lit) => {
+                    let index = lit.to_string().parse().unwrap();
+                    elements.push((element_name.clone(), index));
+                }
+                _ => (),
             }
         }
 

@@ -60,7 +60,7 @@ jobs:
         run: cargo install cross
 
       - name: Build xtasks
-        run: cross build --release --target ${{ matrix.host.rust-target }}
+        run: cross build --release --target ${{ matrix.host.rust-target }} -p xtask
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

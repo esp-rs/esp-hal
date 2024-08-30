@@ -332,6 +332,9 @@ fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result
     let output_path = workspace.join("docs");
     let resources = workspace.join("resources");
 
+    fs::create_dir_all(&output_path)
+        .with_context(|| format!("Failed to create {}", output_path.display()))?;
+
     let mut packages = HashMap::new();
     for package in args.packages {
         packages.insert(
@@ -341,10 +344,12 @@ fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result
     }
 
     // Copy any additional assets to the documentation's output path:
-    fs::copy(resources.join("esp-rs.svg"), output_path.join("esp-rs.svg"))?;
+    fs::copy(resources.join("esp-rs.svg"), output_path.join("esp-rs.svg"))
+        .context("Failed to copy esp-rs.svg")?;
 
     // Render the index and write it out to the documentaiton's output path:
-    let source = fs::read_to_string(resources.join("index.html.jinja"))?;
+    let source = fs::read_to_string(resources.join("index.html.jinja"))
+        .context("Failed to read index.html.jinja")?;
 
     let mut env = minijinja::Environment::new();
     env.add_template("index", &source)?;
@@ -352,7 +357,7 @@ fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result
     let tmpl = env.get_template("index")?;
     let html = tmpl.render(minijinja::context! { packages => packages })?;
 
-    fs::write(output_path.join("index.html"), html)?;
+    fs::write(output_path.join("index.html"), html).context("Failed to write index.html")?;
 
     Ok(())
 }
@@ -377,14 +382,12 @@ fn build_documentation_for_package(
 
         // Build the documentation for the specified package, targeting the
         // specified chip:
-        xtask::build_documentation(workspace, package, *chip, target)?;
+        let docs_path = xtask::build_documentation(workspace, package, *chip, target)?;
 
-        let docs_path = xtask::windows_safe_path(
-            &workspace
-                .join(package.to_string())
-                .join("target")
-                .join(target)
-                .join("doc"),
+        ensure!(
+            docs_path.exists(),
+            "Documentation not found at {}",
+            docs_path.display()
         );
 
         let output_path = output_path
@@ -394,8 +397,15 @@ fn build_documentation_for_package(
         let output_path = xtask::windows_safe_path(&output_path);
 
         // Create the output directory, and copy the built documentation into it:
-        fs::create_dir_all(&output_path)?;
-        copy_dir_all(&docs_path, &output_path)?;
+        fs::create_dir_all(&output_path)
+            .with_context(|| format!("Failed to create {}", output_path.display()))?;
+        copy_dir_all(&docs_path, &output_path).with_context(|| {
+            format!(
+                "Failed to copy {} to {}",
+                docs_path.display(),
+                output_path.display()
+            )
+        })?;
 
         // Build the context object required for rendering this particular build's
         // information on the documentation index:

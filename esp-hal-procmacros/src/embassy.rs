@@ -46,13 +46,13 @@ pub(crate) mod main {
         if !f.sig.generics.params.is_empty() {
             ctxt.error_spanned_by(&f.sig, "main function must not be generic");
         }
-        if !f.sig.generics.where_clause.is_none() {
+        if f.sig.generics.where_clause.is_some() {
             ctxt.error_spanned_by(&f.sig, "main function must not have `where` clauses");
         }
-        if !f.sig.abi.is_none() {
+        if f.sig.abi.is_some() {
             ctxt.error_spanned_by(&f.sig, "main function must not have an ABI qualifier");
         }
-        if !f.sig.variadic.is_none() {
+        if f.sig.variadic.is_some() {
             ctxt.error_spanned_by(&f.sig, "main function must not be variadic");
         }
         match &f.sig.output {
