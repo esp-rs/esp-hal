@@ -425,7 +425,6 @@ where
     }
 }
 
-#[cfg(feature = "ufmt")]
 impl<M> ufmt_write::uWrite for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -443,7 +442,6 @@ where
     }
 }
 
-#[cfg(feature = "ufmt")]
 impl<M> ufmt_write::uWrite for UsbSerialJtagTx<'_, M>
 where
     M: Mode,
