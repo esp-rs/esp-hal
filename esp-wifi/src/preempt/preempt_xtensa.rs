@@ -16,7 +16,7 @@ pub fn task_create(
     param: *mut c_types::c_void,
     task_stack_size: usize,
 ) -> *mut Context {
-    trace!("task_create {:p} {:p} {}", task, param, task_stack_size);
+    trace!("task_create {:?} {:?} {}", task, param, task_stack_size);
     unsafe {
         let ctx = allocate_task();
 
