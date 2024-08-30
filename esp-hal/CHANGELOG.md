@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed an issue with DMA transfers potentially not waking up the correct async task (#2065)
 - Fixed an issue with LCD_CAM i8080 where it would send double the clocks in 16bit mode (#2085)
+- Fix i2c embedded-hal transaction (#2028)
 
 ### Removed
 - Removed `digest::Digest` implementation from SHA (#2049)
@@ -38,7 +39,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A build issue when including doc comment prelude (#2040)
-- Fix i2c embedded-hal transaction (#2028)
 
 ## [0.20.0] - 2024-08-29
 
