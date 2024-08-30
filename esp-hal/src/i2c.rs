@@ -92,6 +92,8 @@ pub enum Error {
     ExecIncomplete,
     /// The number of commands issued exceeded the limit.
     CommandNrExceeded,
+    /// Zero length read or write operation.
+    InvalidZeroLength,
 }
 
 #[derive(PartialEq)]
@@ -1489,6 +1491,9 @@ pub trait Instance: crate::private::Sealed {
     where
         I: Iterator<Item = &'a COMD>,
     {
+        if bytes.is_empty() && !start {
+            return Err(Error::InvalidZeroLength);
+        }
         let max_len = if start { 254usize } else { 255usize };
         if bytes.len() > max_len {
             // we could support more by adding multiple write operations
@@ -1537,15 +1542,13 @@ pub trait Instance: crate::private::Sealed {
     where
         I: Iterator<Item = &'a COMD>,
     {
+        if buffer.is_empty() {
+            return Err(Error::InvalidZeroLength);
+        }
         let (max_len, initial_len) = if will_continue {
             (255usize, buffer.len())
         } else {
-            let len = if buffer.is_empty() {
-                0
-            } else {
-                buffer.len() - 1
-            };
-            (254usize, len)
+            (254usize, buffer.len() - 1)
         };
         if buffer.len() > max_len {
             // we could support more by adding multiple read operations
@@ -1575,9 +1578,7 @@ pub trait Instance: crate::private::Sealed {
             )?;
         }
 
-        // If we are not continuing the read in the next operation we need to nack the
-        // last byte. But don't issue the read command if the buffer is empty!
-        if !will_continue && !buffer.is_empty() {
+        if !will_continue {
             // this is the last read so we need to nack the last byte
             // READ w/o ACK
             add_cmd(
