@@ -572,7 +572,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             &[
                                 "-Zbuild-std=core",
                                 &format!("--target={}", chip.lp_target().unwrap()),
-                                &format!("--features={chip},embedded-io,embedded-hal-02"),
+                                &format!("--features={chip},embedded-io"),
                             ],
                         )?;
                     }

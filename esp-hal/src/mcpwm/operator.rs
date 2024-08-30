@@ -414,7 +414,6 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal_02::PwmPin
     for PwmPin<'d, Pin, PWM, OP, IS_A>
 {

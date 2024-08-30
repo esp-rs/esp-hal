@@ -2954,7 +2954,6 @@ mod asynch {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 mod embedded_hal_02_impls {
     use embedded_hal_02::digital::v2 as digital;
 

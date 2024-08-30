@@ -900,7 +900,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T> embedded_hal_02::spi::FullDuplex<u8> for Spi<'_, T, FullDuplexMode>
 where
     T: Instance,
@@ -916,7 +915,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T> embedded_hal_02::blocking::spi::Transfer<u8> for Spi<'_, T, FullDuplexMode>
 where
     T: Instance,
@@ -928,7 +926,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T> embedded_hal_02::blocking::spi::Write<u8> for Spi<'_, T, FullDuplexMode>
 where
     T: Instance,
@@ -1899,7 +1896,6 @@ mod dma {
         }
     }
 
-    #[cfg(feature = "embedded-hal-02")]
     impl<'d, T, C> embedded_hal_02::blocking::spi::Transfer<u8>
         for SpiDmaBus<'d, T, C, FullDuplexMode, crate::Blocking>
     where
@@ -1915,7 +1911,6 @@ mod dma {
         }
     }
 
-    #[cfg(feature = "embedded-hal-02")]
     impl<'d, T, C> embedded_hal_02::blocking::spi::Write<u8>
         for SpiDmaBus<'d, T, C, FullDuplexMode, crate::Blocking>
     where

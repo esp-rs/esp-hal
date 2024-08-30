@@ -463,7 +463,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<M> embedded_hal_02::serial::Read<u8> for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -475,7 +474,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<M> embedded_hal_02::serial::Read<u8> for UsbSerialJtagRx<'_, M>
 where
     M: Mode,
@@ -487,7 +485,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<M> embedded_hal_02::serial::Write<u8> for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -503,7 +500,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<M> embedded_hal_02::serial::Write<u8> for UsbSerialJtagTx<'_, M>
 where
     M: Mode,

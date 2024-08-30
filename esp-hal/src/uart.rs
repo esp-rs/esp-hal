@@ -1718,7 +1718,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T, M> embedded_hal_02::serial::Write<u8> for Uart<'_, T, M>
 where
     T: Instance,
@@ -1735,7 +1734,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T, M> embedded_hal_02::serial::Write<u8> for UartTx<'_, T, M>
 where
     T: Instance,
@@ -1752,7 +1750,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T, M> embedded_hal_02::serial::Read<u8> for Uart<'_, T, M>
 where
     T: Instance,
@@ -1765,7 +1762,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T, M> embedded_hal_02::serial::Read<u8> for UartRx<'_, T, M>
 where
     T: Instance,

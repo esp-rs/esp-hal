@@ -133,7 +133,6 @@ impl InputPin for DummyPin {
     fn disconnect_input_from_peripheral(&mut self, _signal: InputSignal, _: private::Internal) {}
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl embedded_hal_02::digital::v2::OutputPin for DummyPin {
     type Error = core::convert::Infallible;
 
@@ -146,7 +145,6 @@ impl embedded_hal_02::digital::v2::OutputPin for DummyPin {
         Ok(())
     }
 }
-#[cfg(feature = "embedded-hal-02")]
 impl embedded_hal_02::digital::v2::StatefulOutputPin for DummyPin {
     fn is_set_high(&self) -> Result<bool, Self::Error> {
         Ok(OutputPin::is_set_high(self, private::Internal))

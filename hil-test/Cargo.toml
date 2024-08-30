@@ -180,7 +180,7 @@ embedded-hal-02    = { version = "0.2.7", package = "embedded-hal", features = [
 embedded-hal-async = { version = "1.0.0", optional = true }
 embedded-hal-nb    = { version = "1.0.0", optional = true }
 esp-backtrace      = { path = "../esp-backtrace", default-features = false, features = ["exception-handler", "panic-handler", "defmt", "semihosting"] }
-esp-hal            = { path = "../esp-hal", features = ["defmt", "digest", "embedded-hal", "embedded-hal-02"], optional = true }
+esp-hal            = { path = "../esp-hal", features = ["defmt", "digest", "embedded-hal"], optional = true }
 esp-hal-embassy    = { path = "../esp-hal-embassy", optional = true }
 portable-atomic    = "1.6.0"
 static_cell        = { version = "2.1.0", features = ["nightly"] }

@@ -820,7 +820,6 @@ where
     (1_000_000 * micros / period as u64) as u64
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T, DM> embedded_hal_02::timer::CountDown for Timer<T, DM>
 where
     T: Instance + super::Timer,
@@ -845,7 +844,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T, DM> embedded_hal_02::timer::Cancel for Timer<T, DM>
 where
     T: Instance + super::Timer,
@@ -866,7 +864,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T, DM> embedded_hal_02::timer::Periodic for Timer<T, DM>
 where
     T: Instance + super::Timer,
@@ -1033,7 +1030,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<TG, DM> embedded_hal_02::watchdog::WatchdogDisable for Wdt<TG, DM>
 where
     TG: TimerGroupInstance,
@@ -1044,7 +1040,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<TG, DM> embedded_hal_02::watchdog::WatchdogEnable for Wdt<TG, DM>
 where
     TG: TimerGroupInstance,
@@ -1061,7 +1056,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<TG, DM> embedded_hal_02::watchdog::Watchdog for Wdt<TG, DM>
 where
     TG: TimerGroupInstance,
