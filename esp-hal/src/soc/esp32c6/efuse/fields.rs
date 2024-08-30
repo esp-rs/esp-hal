@@ -235,6 +235,8 @@ pub const SPI_DOWNLOAD_MSPI_DIS: EfuseField = EfuseField::new(EfuseBlock::Block0
 /// `[DIS_CAN]` Represents whether TWAI function is disabled or enabled. 1:
 /// disabled. 0: enabled
 pub const DIS_TWAI: EfuseField = EfuseField::new(EfuseBlock::Block0, 46, 1);
+#[allow(unknown_lints)]
+#[allow(clippy::too_long_first_doc_paragraph)]
 /// `[]` Represents whether the selection between usb_to_jtag and pad_to_jtag
 /// through strapping gpio15 when both EFUSE_DIS_PAD_JTAG and EFUSE_DIS_USB_JTAG
 /// are equal to 0 is enabled or disabled. 1: enabled. 0: disabled
