@@ -20,8 +20,8 @@ pub fn task_create(
     unsafe {
         let ctx = allocate_task();
 
-        (*ctx).trap_frame.PC = task as u32;
-        (*ctx).trap_frame.A6 = param as u32;
+        (*ctx).trap_frame.PC = task as usize as u32;
+        (*ctx).trap_frame.A6 = param as usize as u32;
 
         let stack = malloc(task_stack_size as u32);
         (*ctx).allocated_stack = stack.cast();
