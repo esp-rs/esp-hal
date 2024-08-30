@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `esp_hal::init` to simplify HAL initialisation (#1970)
+
 ### Changed
 
 ### Fixed
