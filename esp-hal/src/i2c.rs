@@ -1494,6 +1494,7 @@ pub trait Instance: crate::private::Sealed {
         if bytes.is_empty() && !start {
             return Err(Error::InvalidZeroLength);
         }
+        // if start we can only send 254 additional bytes, the address would be the first
         let max_len = if start { 254usize } else { 255usize };
         if bytes.len() > max_len {
             // we could support more by adding multiple write operations
