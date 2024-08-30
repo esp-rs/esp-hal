@@ -268,13 +268,19 @@ where
     ) -> Result<(), Self::Error> {
         use embedded_hal::i2c::Operation;
         let mut last_op = Op::None;
-        let mut op_iter = operations.iter_mut().peekable();
+        // filter out 0 length read operations
+        let mut op_iter = operations
+            .iter_mut()
+            .filter(|op| match op {
+                Operation::Write(_) => true,
+                Operation::Read(buffer) => !buffer.is_empty(),
+            })
+            .peekable();
         while let Some(op) = op_iter.next() {
             let next_op: Op = op_iter.peek().into();
             // Clear all I2C interrupts
             self.peripheral.clear_all_interrupts();
 
-            // TODO somehow know that we can combine a write and a read into one transaction
             let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
             match op {
                 Operation::Write(bytes) => {
@@ -929,7 +935,14 @@ mod asynch {
             operations: &mut [Operation<'_>],
         ) -> Result<(), Self::Error> {
             let mut last_op = Op::None;
-            let mut op_iter = operations.iter_mut().peekable();
+            // filter out 0 length read operations
+            let mut op_iter = operations
+                .iter_mut()
+                .filter(|op| match op {
+                    Operation::Write(_) => true,
+                    Operation::Read(buffer) => !buffer.is_empty(),
+                })
+                .peekable();
             while let Some(op) = op_iter.next() {
                 let next_op: Op = op_iter.peek().into();
                 // Clear all I2C interrupts
