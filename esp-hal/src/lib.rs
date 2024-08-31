@@ -602,7 +602,7 @@ impl LockState {
 #[allow(unused_variables)]
 pub(crate) fn lock<T>(state: &LockState, f: impl FnOnce() -> T) -> T {
     // In regards to disabling interrupts, we only need to disable
-    // the interrupts that may only eb calling this function.
+    // the interrupts that may be calling this function.
 
     #[cfg(not(multi_core))]
     {
@@ -632,7 +632,7 @@ pub(crate) fn lock<T>(state: &LockState, f: impl FnOnce() -> T) -> T {
             }
         }
 
-        let mut f = Some(f);
+        let mut f = f;
 
         loop {
             // Relaxed ordering is fine here since it's just a hint for the CEX below.
@@ -648,7 +648,7 @@ pub(crate) fn lock<T>(state: &LockState, f: impl FnOnce() -> T) -> T {
 
             // The lock is released.
 
-            let mut f = || {
+            let func = || {
                 // Use Acquire ordering in success to ensure `f()` "happens after" the lock is
                 // taken. Use Relaxed ordering in failure as there's no
                 // synchronisation happening.
@@ -657,25 +657,26 @@ pub(crate) fn lock<T>(state: &LockState, f: impl FnOnce() -> T) -> T {
                     .compare_exchange(0, current_core, Ordering::Acquire, Ordering::Relaxed)
                     .is_ok()
                 {
-                    let result = f.take().unwrap()();
+                    let result = f();
 
                     // Use Release ordering here to ensure `f()` "happens before" this lock is
                     // released.
                     state.core.store(0, Ordering::Release);
 
-                    Some(result)
+                    Ok(result)
                 } else {
-                    None
+                    Err(f)
                 }
             };
 
             #[cfg(riscv)]
-            let result = riscv::interrupt::free(f);
+            let result = riscv::interrupt::free(func);
             #[cfg(xtensa)]
-            let result = xtensa_lx::interrupt::free(|_| f());
+            let result = xtensa_lx::interrupt::free(|_| func());
 
-            if let Some(result) = result {
-                break result;
+            match result {
+                Ok(result) => break result,
+                Err(the_function) => f = the_function,
             }
         }
     }
