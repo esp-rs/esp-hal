@@ -77,6 +77,7 @@ use crate::soc::constants::TIMG_DEFAULT_CLK_SRC;
 use crate::{
     clock::Clocks,
     interrupt::{self, InterruptHandler},
+    lock,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{timg0::RegisterBlock, Interrupt, TIMG0},
     private::Sealed,
@@ -84,8 +85,11 @@ use crate::{
     Async,
     Blocking,
     InterruptConfigurable,
+    LockState,
     Mode,
 };
+
+static INT_ENA_LOCK: LockState = LockState::new();
 
 /// A timer group consisting of up to 2 timers (chip dependent) and a watchdog
 /// timer.
@@ -481,9 +485,11 @@ where
             .config()
             .modify(|_, w| w.level_int_en().set_bit());
 
-        self.register_block()
-            .int_ena()
-            .modify(|_, w| w.t(self.timer_number()).bit(state));
+        lock(&INT_ENA_LOCK, || {
+            self.register_block()
+                .int_ena()
+                .modify(|_, w| w.t(self.timer_number()).bit(state));
+        });
     }
 
     fn clear_interrupt(&self) {
@@ -706,15 +712,19 @@ where
             .config()
             .modify(|_, w| w.level_int_en().set_bit());
 
-        self.register_block()
-            .int_ena()
-            .modify(|_, w| w.t(T).set_bit());
+        lock(&INT_ENA_LOCK, || {
+            self.register_block()
+                .int_ena()
+                .modify(|_, w| w.t(T).set_bit());
+        });
     }
 
     fn unlisten(&self) {
-        self.register_block()
-            .int_ena()
-            .modify(|_, w| w.t(T).clear_bit());
+        lock(&INT_ENA_LOCK, || {
+            self.register_block()
+                .int_ena()
+                .modify(|_, w| w.t(T).clear_bit());
+        });
     }
 
     fn clear_interrupt(&self) {
