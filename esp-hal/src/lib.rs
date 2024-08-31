@@ -575,14 +575,16 @@ mod critical_section_impl {
 // The state of a re-entrant lock
 pub(crate) struct LockState {
     #[cfg(multi_core)]
-    core: portable_atomic::AtomicU8,
+    core: core::sync::atomic::AtomicUsize,
 }
 
 impl LockState {
+    const UNLOCKED: usize = usize::MAX;
+
     pub const fn new() -> Self {
         Self {
             #[cfg(multi_core)]
-            core: portable_atomic::AtomicU8::new(0xFF),
+            core: core::sync::atomic::AtomicUsize::new(Self::UNLOCKED),
         }
     }
 }
@@ -608,9 +610,9 @@ pub(crate) fn lock<T>(state: &LockState, f: impl FnOnce() -> T) -> T {
 
     #[cfg(multi_core)]
     {
-        use portable_atomic::Ordering;
+        use core::sync::atomic::Ordering;
 
-        let current_core = get_core() as u8;
+        let current_core = get_core() as usize;
 
         let mut f = f;
 
@@ -620,7 +622,7 @@ pub(crate) fn lock<T>(state: &LockState, f: impl FnOnce() -> T) -> T {
                 // taken. Use Relaxed ordering in failure as there's no
                 // synchronisation happening.
                 if let Err(locked_core) = state.core.compare_exchange(
-                    0xFF,
+                    LockState::UNLOCKED,
                     current_core,
                     Ordering::Acquire,
                     Ordering::Relaxed,
@@ -636,7 +638,7 @@ pub(crate) fn lock<T>(state: &LockState, f: impl FnOnce() -> T) -> T {
 
                     // Use Release ordering here to ensure `f()` "happens before" this lock is
                     // released.
-                    state.core.store(0xFF, Ordering::Release);
+                    state.core.store(LockState::UNLOCKED, Ordering::Release);
 
                     Ok(result)
                 }
