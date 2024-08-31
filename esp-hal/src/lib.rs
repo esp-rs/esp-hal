@@ -575,16 +575,17 @@ mod critical_section_impl {
 // The state of a re-entrant lock
 pub(crate) struct LockState {
     #[cfg(multi_core)]
-    core: core::sync::atomic::AtomicUsize,
+    core: portable_atomic::AtomicUsize,
 }
 
 impl LockState {
+    #[cfg(multi_core)]
     const UNLOCKED: usize = usize::MAX;
 
     pub const fn new() -> Self {
         Self {
             #[cfg(multi_core)]
-            core: core::sync::atomic::AtomicUsize::new(Self::UNLOCKED),
+            core: portable_atomic::AtomicUsize::new(Self::UNLOCKED),
         }
     }
 }
@@ -610,7 +611,7 @@ pub(crate) fn lock<T>(state: &LockState, f: impl FnOnce() -> T) -> T {
 
     #[cfg(multi_core)]
     {
-        use core::sync::atomic::Ordering;
+        use portable_atomic::Ordering;
 
         let current_core = get_core() as usize;
 
