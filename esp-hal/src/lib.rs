@@ -582,16 +582,7 @@ impl LockState {
     pub const fn new() -> Self {
         Self {
             #[cfg(multi_core)]
-            core: portable_atomic::AtomicU8::new(0),
-        }
-    }
-
-    #[cfg(multi_core)]
-    fn current_core() -> u8 {
-        // Note: 0 means unlocked.
-        match get_core() {
-            Cpu::ProCpu => 1,
-            Cpu::AppCpu => 2,
+            core: portable_atomic::AtomicU8::new(0xFF),
         }
     }
 }
@@ -619,53 +610,35 @@ pub(crate) fn lock<T>(state: &LockState, f: impl FnOnce() -> T) -> T {
     {
         use portable_atomic::Ordering;
 
-        let current_core = LockState::current_core();
-
-        // Check for re-entry
-        {
-            // Used Relaxed ordering since an Acquire has already been performed for the
-            // re-entrant case that is being checked here.
-            let locked_core = state.core.load(Ordering::Relaxed);
-            if locked_core == current_core {
-                // Note: Since this is re-entrant, interrupts have already been disabled.
-                return f();
-            }
-        }
+        let current_core = get_core() as u8;
 
         let mut f = f;
 
         loop {
-            // Relaxed ordering is fine here since it's just a hint for the CEX below.
-            let locked_core = state.core.load(Ordering::Relaxed);
-
-            if locked_core != 0 {
-                // Re-entry should've been caught before the loop.
-                debug_assert_ne!(locked_core, current_core);
-
-                // Consider using core::hint::spin_loop(); Might need SW_INT.
-                continue;
-            }
-
-            // The lock is released.
-
             let func = || {
                 // Use Acquire ordering in success to ensure `f()` "happens after" the lock is
                 // taken. Use Relaxed ordering in failure as there's no
                 // synchronisation happening.
-                if state
-                    .core
-                    .compare_exchange(0, current_core, Ordering::Acquire, Ordering::Relaxed)
-                    .is_ok()
-                {
+                if let Err(locked_core) = state.core.compare_exchange(
+                    0xFF,
+                    current_core,
+                    Ordering::Acquire,
+                    Ordering::Relaxed,
+                ) {
+                    assert_ne!(
+                        locked_core, current_core,
+                        "esp_hal::lock is not re-entrant!"
+                    );
+
+                    Err(f)
+                } else {
                     let result = f();
 
                     // Use Release ordering here to ensure `f()` "happens before" this lock is
                     // released.
-                    state.core.store(0, Ordering::Release);
+                    state.core.store(0xFF, Ordering::Release);
 
                     Ok(result)
-                } else {
-                    Err(f)
                 }
             };
 
@@ -678,6 +651,8 @@ pub(crate) fn lock<T>(state: &LockState, f: impl FnOnce() -> T) -> T {
                 Ok(result) => break result,
                 Err(the_function) => f = the_function,
             }
+
+            // Consider using core::hint::spin_loop(); Might need SW_INT.
         }
     }
 }
