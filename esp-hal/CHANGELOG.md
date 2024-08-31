@@ -10,10 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- Make saving and restoring SHA digest state an explicit operation (#2049)
 
 ### Fixed
+- SHA driver can now be safely used in multiple contexts concurrently (#2049)
 
 ### Removed
+- Removed `digest::Digest` implementation from SHA (#2049)
 
 ## [0.20.1] - 2024-08-30
 
