@@ -71,6 +71,7 @@
 
 #![allow(missing_docs)] // TODO: Remove when able
 
+use chrono::{DateTime, NaiveDateTime};
 #[cfg(not(any(esp32c6, esp32h2)))]
 use fugit::HertzU32;
 use fugit::MicrosDurationU64;
@@ -312,8 +313,8 @@ impl<'d> Rtc<'d> {
         h.write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
     }
 
-    /// Get the current time in microseconds.
-    pub fn current_time(&self) -> MicrosDurationU64 {
+    /// Get the current time.
+    pub fn current_time(&self) -> NaiveDateTime {
         // Current time is boot time + time since boot
 
         let rtc_time_us = self.time_since_boot().to_micros();
@@ -329,19 +330,30 @@ impl<'d> Rtc<'d> {
             boot_time_us + rtc_time_us
         };
 
-        MicrosDurationU64::micros(current_time_us)
+        DateTime::from_timestamp_micros(current_time_us as i64)
+            .unwrap()
+            .naive_utc()
     }
 
-    /// Set the current time in microseconds.
-    pub fn set_current_time(&self, current_time: MicrosDurationU64) {
-        let current_time_us = current_time.to_micros();
+    /// Set the current time.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `current_time` is before the Unix epoch (meaning the
+    /// underlying timestamp is negative).
+    pub fn set_current_time(&self, current_time: NaiveDateTime) {
+        let current_time_us: u64 = current_time
+            .and_utc()
+            .timestamp_micros()
+            .try_into()
+            .expect("current_time is negative");
 
         // Current time is boot time + time since boot (rtc time)
         // So boot time = current time - time since boot (rtc time)
 
         let rtc_time_us = self.time_since_boot().to_micros();
         if current_time_us < rtc_time_us {
-            // An overflow would happen if we subtracted rtc_time_us from time_us.
+            // An overflow would happen if we subtracted rtc_time_us from current_time_us.
             // To work around this, we can wrap around u64::MAX by subtracting the
             // difference between the current time and the time since boot.
             // Subtracting time since boot and adding current new time is equivalent and
