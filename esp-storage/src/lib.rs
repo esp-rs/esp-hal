@@ -30,7 +30,7 @@ mod chip_specific;
 mod common;
 
 #[cfg(any(feature = "storage", feature = "nor-flash"))]
-use common::FlashSectorBuffer;
+mod buffer;
 #[cfg(any(feature = "storage", feature = "nor-flash"))]
 pub use common::{FlashStorage, FlashStorageError};
 

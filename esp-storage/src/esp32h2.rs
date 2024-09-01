@@ -5,9 +5,9 @@ const ESP_ROM_SPIFLASH_UNLOCK: u32 = 0x40000130;
 const ESP_ROM_SPIFLASH_ERASE_SECTOR: u32 = 0x40000120;
 const ESP_ROM_SPIFLASH_WRITE: u32 = 0x40000128;
 
-pub(crate) fn esp_rom_spiflash_read(src_addr: u32, data: *const u32, len: u32) -> i32 {
+pub(crate) fn esp_rom_spiflash_read(src_addr: u32, data: *mut u32, len: u32) -> i32 {
     maybe_with_critical_section(|| unsafe {
-        let esp_rom_spiflash_read: unsafe extern "C" fn(u32, *const u32, u32) -> i32 =
+        let esp_rom_spiflash_read: unsafe extern "C" fn(u32, *mut u32, u32) -> i32 =
             core::mem::transmute(ESP_ROM_SPIFLASH_READ);
         esp_rom_spiflash_read(src_addr, data, len)
     })
