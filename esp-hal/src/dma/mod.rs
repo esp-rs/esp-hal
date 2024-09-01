@@ -1139,10 +1139,10 @@ pub trait RxPrivate: crate::private::Sealed {
         chain: &DescriptorChain,
     ) -> Result<(), DmaError>;
 
-    unsafe fn prepare_transfer(
+    unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
         &mut self,
         peri: DmaPeripheral,
-        first_desc: *mut DmaDescriptor,
+        buffer: &mut BUF,
     ) -> Result<(), DmaError>;
 
     fn start_transfer(&mut self) -> Result<(), DmaError>;
@@ -1325,18 +1325,20 @@ where
             .prepare_transfer_without_start(chain.first() as _, peri)
     }
 
-    unsafe fn prepare_transfer(
+    unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
         &mut self,
         peri: DmaPeripheral,
-        first_desc: *mut DmaDescriptor,
+        buffer: &mut BUF,
     ) -> Result<(), DmaError> {
-        // TODO: Figure out burst mode for DmaBuf.
+        let preparation = buffer.prepare();
+
+        // TODO: Get burst mode from DmaBuf.
         if self.burst_mode {
             return Err(DmaError::InvalidAlignment);
         }
 
         self.rx_impl
-            .prepare_transfer_without_start(first_desc, peri)
+            .prepare_transfer_without_start(preparation.start, peri)
     }
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
@@ -1464,10 +1466,10 @@ pub trait TxPrivate: crate::private::Sealed {
         chain: &DescriptorChain,
     ) -> Result<(), DmaError>;
 
-    unsafe fn prepare_transfer(
+    unsafe fn prepare_transfer<BUF: DmaTxBuffer>(
         &mut self,
         peri: DmaPeripheral,
-        desc: *mut DmaDescriptor,
+        buffer: &mut BUF,
     ) -> Result<(), DmaError>;
 
     fn start_transfer(&mut self) -> Result<(), DmaError>;
@@ -1653,12 +1655,15 @@ where
             .prepare_transfer_without_start(chain.first() as _, peri)
     }
 
-    unsafe fn prepare_transfer(
+    unsafe fn prepare_transfer<BUF: DmaTxBuffer>(
         &mut self,
         peri: DmaPeripheral,
-        desc: *mut DmaDescriptor,
+        buffer: &mut BUF,
     ) -> Result<(), DmaError> {
-        self.tx_impl.prepare_transfer_without_start(desc, peri)
+        let preparation = buffer.prepare();
+
+        self.tx_impl
+            .prepare_transfer_without_start(preparation.start, peri)
     }
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
@@ -1894,8 +1899,7 @@ where
 
 /// Holds all the information needed to configure a DMA channel for a transfer.
 pub struct Preparation {
-    pub(crate) start: *mut DmaDescriptor,
-    pub(crate) length: usize,
+    start: *mut DmaDescriptor,
     // burst_mode, alignment, check_owner, etc.
 }
 
@@ -1907,6 +1911,13 @@ pub trait DmaTxBuffer {
     ///
     /// Note: This operation is idempotent.
     fn prepare(&mut self) -> Preparation;
+
+    /// Returns the maximum number of bytes that would be transmitted by this
+    /// buffer.
+    ///
+    /// This is a convenience hint for SPI. Most peripherals don't care how long
+    /// the transfer is.
+    fn length(&self) -> usize;
 }
 
 /// [DmaRxBuffer] is a DMA descriptor + memory combo that can be used for
@@ -1921,6 +1932,12 @@ pub trait DmaRxBuffer {
     ///
     /// Note: This operation is idempotent.
     fn prepare(&mut self) -> Preparation;
+
+    /// Returns the maximum number of bytes that can be received by this buffer.
+    ///
+    /// This is a convenience hint for SPI. Most peripherals don't care how long
+    /// the transfer is.
+    fn length(&self) -> usize;
 }
 
 /// Error returned from Dma[Tx|Rx|TxRx]Buf operations.
@@ -2065,13 +2082,10 @@ impl DmaTxBuf {
 
 impl DmaTxBuffer for DmaTxBuf {
     fn prepare(&mut self) -> Preparation {
-        // Calculate length and setup descriptor flags.
-        let mut length = 0;
         for desc in self.descriptors.iter_mut() {
             // Give ownership to the DMA
             desc.set_owner(Owner::Dma);
 
-            length += desc.len();
             if desc.next.is_null() {
                 break;
             }
@@ -2079,8 +2093,11 @@ impl DmaTxBuffer for DmaTxBuf {
 
         Preparation {
             start: self.descriptors.as_mut_ptr(),
-            length,
         }
+    }
+
+    fn length(&self) -> usize {
+        self.len()
     }
 }
 
@@ -2293,8 +2310,6 @@ impl DmaRxBuf {
 
 impl DmaRxBuffer for DmaRxBuf {
     fn prepare(&mut self) -> Preparation {
-        // Calculate length and setup descriptor flags.
-        let mut length = 0;
         for desc in self.descriptors.iter_mut() {
             // Give ownership to the DMA
             desc.set_owner(Owner::Dma);
@@ -2307,7 +2322,6 @@ impl DmaRxBuffer for DmaRxBuf {
             // done receiving data for this descriptor.
             desc.set_length(0);
 
-            length += desc.size();
             if desc.next.is_null() {
                 break;
             }
@@ -2315,8 +2329,11 @@ impl DmaRxBuffer for DmaRxBuf {
 
         Preparation {
             start: self.descriptors.as_mut_ptr(),
-            length,
         }
+    }
+
+    fn length(&self) -> usize {
+        self.len()
     }
 }
 
@@ -2401,6 +2418,19 @@ impl DmaTxRxBuf {
         self.buffer.len()
     }
 
+    /// Return the number of bytes that would be transmitted by this buf.
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        let mut result = 0;
+        for desc in self.tx_descriptors.iter() {
+            result += desc.len();
+            if desc.next.is_null() {
+                break;
+            }
+        }
+        result
+    }
+
     /// Returns the entire buf as a slice than can be read.
     pub fn as_slice(&self) -> &[u8] {
         self.buffer
@@ -2480,13 +2510,10 @@ impl DmaTxRxBuf {
 
 impl DmaTxBuffer for DmaTxRxBuf {
     fn prepare(&mut self) -> Preparation {
-        // Calculate length and setup descriptor flags.
-        let mut length = 0;
         for desc in self.tx_descriptors.iter_mut() {
             // Give ownership to the DMA
             desc.set_owner(Owner::Dma);
 
-            length += desc.len();
             if desc.next.is_null() {
                 break;
             }
@@ -2494,15 +2521,16 @@ impl DmaTxBuffer for DmaTxRxBuf {
 
         Preparation {
             start: self.tx_descriptors.as_mut_ptr(),
-            length,
         }
+    }
+
+    fn length(&self) -> usize {
+        self.len()
     }
 }
 
 impl DmaRxBuffer for DmaTxRxBuf {
     fn prepare(&mut self) -> Preparation {
-        // Calculate length and setup descriptor flags.
-        let mut length = 0;
         for desc in self.rx_descriptors.iter_mut() {
             // Give ownership to the DMA
             desc.set_owner(Owner::Dma);
@@ -2515,7 +2543,6 @@ impl DmaRxBuffer for DmaTxRxBuf {
             // done receiving data for this descriptor.
             desc.set_length(0);
 
-            length += desc.size();
             if desc.next.is_null() {
                 break;
             }
@@ -2523,8 +2550,11 @@ impl DmaRxBuffer for DmaTxRxBuf {
 
         Preparation {
             start: self.rx_descriptors.as_mut_ptr(),
-            length,
         }
+    }
+
+    fn length(&self) -> usize {
+        self.len()
     }
 }
 

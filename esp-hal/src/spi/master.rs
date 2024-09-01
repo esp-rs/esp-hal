@@ -84,7 +84,7 @@ use super::{
 };
 use crate::{
     clock::Clocks,
-    dma::{DmaDescriptor, DmaPeripheral, Rx, Tx},
+    dma::{DmaPeripheral, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
@@ -1284,18 +1284,14 @@ mod dma {
             mut self,
             mut buffer: TX,
         ) -> Result<SpiDmaTransfer<'d, T, C, FullDuplexMode, M, TX>, (Error, Self, TX)> {
-            let preparation = buffer.prepare();
-            if preparation.length > MAX_DMA_SIZE {
+            let bytes_to_write = buffer.length();
+            if bytes_to_write > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
 
             let result = unsafe {
-                self.spi.start_write_bytes_dma(
-                    preparation.start,
-                    preparation.length,
-                    &mut self.channel.tx,
-                    true,
-                )
+                self.spi
+                    .start_write_bytes_dma(&mut buffer, &mut self.channel.tx, true)
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
@@ -1315,18 +1311,14 @@ mod dma {
             mut self,
             mut buffer: RX,
         ) -> Result<SpiDmaTransfer<'d, T, C, FullDuplexMode, M, RX>, (Error, Self, RX)> {
-            let preparation = buffer.prepare();
-            if preparation.length > MAX_DMA_SIZE {
+            let bytes_to_read = buffer.length();
+            if bytes_to_read > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
 
             let result = unsafe {
-                self.spi.start_read_bytes_dma(
-                    preparation.start,
-                    preparation.length,
-                    &mut self.channel.rx,
-                    true
-                )
+                self.spi
+                    .start_read_bytes_dma(&mut buffer, &mut self.channel.rx, true)
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
@@ -1345,11 +1337,12 @@ mod dma {
             mut self,
             mut tx_buffer: TX,
             mut rx_buffer: RX,
-        ) -> Result<SpiDmaTransfer<'d, T, C, FullDuplexMode, M, (TX, RX)>, (Error, Self, TX, RX)> {
-            let tx_preparation = tx_buffer.prepare();
-            let rx_preparation = rx_buffer.prepare();
+        ) -> Result<SpiDmaTransfer<'d, T, C, FullDuplexMode, M, (TX, RX)>, (Error, Self, TX, RX)>
+        {
+            let bytes_to_write = tx_buffer.length();
+            let bytes_to_read = rx_buffer.length();
 
-            if tx_preparation.length > MAX_DMA_SIZE || rx_preparation.length > MAX_DMA_SIZE {
+            if bytes_to_write > MAX_DMA_SIZE || bytes_to_read > MAX_DMA_SIZE {
                 return Err((
                     Error::MaxDmaTransferSizeExceeded,
                     self,
@@ -1360,10 +1353,8 @@ mod dma {
 
             let result = unsafe {
                 self.spi.start_transfer_dma(
-                    tx_preparation.start,
-                    rx_preparation.start,
-                    tx_preparation.length,
-                    rx_preparation.length,
+                    &mut tx_buffer,
+                    &mut rx_buffer,
                     &mut self.channel.tx,
                     &mut self.channel.rx,
                 )
@@ -1399,8 +1390,8 @@ mod dma {
             dummy: u8,
             mut buffer: RX,
         ) -> Result<SpiDmaTransfer<'d, T, C, HalfDuplexMode, M, RX>, (Error, Self, RX)> {
-            let preparation = buffer.prepare();
-            if preparation.length > MAX_DMA_SIZE {
+            let bytes_to_read = buffer.length();
+            if bytes_to_read > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
 
@@ -1410,7 +1401,7 @@ mod dma {
                 !address.is_none(),
                 false,
                 dummy != 0,
-                preparation.length == 0,
+                bytes_to_read == 0,
             );
             self.spi
                 .init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
@@ -1455,23 +1446,14 @@ mod dma {
             }
 
             let result = unsafe {
-                self.spi.start_read_bytes_dma(
-                    preparation.start,
-                    preparation.length,
-                    &mut self.channel.rx,
-                    false,
-                )
+                self.spi
+                    .start_read_bytes_dma(&mut buffer, &mut self.channel.rx, false)
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
             }
 
-            Ok(SpiDmaTransfer::new(
-                self,
-                buffer,
-                preparation.length > 0,
-                false,
-            ))
+            Ok(SpiDmaTransfer::new(self, buffer, bytes_to_read > 0, false))
         }
 
         /// Perform a half-duplex write operation using DMA.
@@ -1485,8 +1467,8 @@ mod dma {
             dummy: u8,
             mut buffer: TX,
         ) -> Result<SpiDmaTransfer<'d, T, C, HalfDuplexMode, M, TX>, (Error, Self, TX)> {
-            let preparation = buffer.prepare();
-            if preparation.length > MAX_DMA_SIZE {
+            let bytes_to_write = buffer.length();
+            if bytes_to_write > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
 
@@ -1496,7 +1478,7 @@ mod dma {
                 !address.is_none(),
                 false,
                 dummy != 0,
-                preparation.length == 0,
+                bytes_to_write == 0,
             );
             self.spi
                 .init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
@@ -1541,23 +1523,14 @@ mod dma {
             }
 
             let result = unsafe {
-                self.spi.start_write_bytes_dma(
-                    preparation.start,
-                    preparation.length,
-                    &mut self.channel.tx,
-                    false,
-                )
+                self.spi
+                    .start_write_bytes_dma(&mut buffer, &mut self.channel.tx, false)
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
             }
 
-            Ok(SpiDmaTransfer::new(
-                self,
-                buffer,
-                false,
-                preparation.length > 0,
-            ))
+            Ok(SpiDmaTransfer::new(self, buffer, false, bytes_to_write > 0))
         }
     }
 
@@ -2318,15 +2291,13 @@ pub trait InstanceDma: Instance {
     #[allow(clippy::too_many_arguments)]
     unsafe fn start_transfer_dma<TX: Tx, RX: Rx>(
         &mut self,
-        tx_desc: *mut DmaDescriptor,
-        rx_desc: *mut DmaDescriptor,
-        write_buffer_len: usize,
-        read_buffer_len: usize,
+        tx_buffer: &mut impl DmaTxBuffer,
+        rx_buffer: &mut impl DmaRxBuffer,
         tx: &mut TX,
         rx: &mut RX,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
-        self.configure_datalen(usize::max(read_buffer_len, write_buffer_len) as u32 * 8);
+        self.configure_datalen(usize::max(rx_buffer.length(), tx_buffer.length()) as u32 * 8);
 
         tx.is_done();
         rx.is_done();
@@ -2341,9 +2312,9 @@ pub trait InstanceDma: Instance {
 
         self.clear_dma_interrupts();
         reset_dma_before_load_dma_dscr(reg_block);
-        tx.prepare_transfer(self.dma_peripheral(), tx_desc)
+        tx.prepare_transfer(self.dma_peripheral(), tx_buffer)
             .and_then(|_| tx.start_transfer())?;
-        rx.prepare_transfer(self.dma_peripheral(), rx_desc)
+        rx.prepare_transfer(self.dma_peripheral(), rx_buffer)
             .and_then(|_| rx.start_transfer())?;
 
         reset_dma_before_usr_cmd(reg_block);
@@ -2356,13 +2327,12 @@ pub trait InstanceDma: Instance {
     #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
     unsafe fn start_write_bytes_dma<TX: Tx>(
         &mut self,
-        first_desc: *mut DmaDescriptor,
-        len: usize,
+        buffer: &mut impl DmaTxBuffer,
         tx: &mut TX,
         full_duplex: bool,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
-        self.configure_datalen(len as u32 * 8);
+        self.configure_datalen(buffer.length() as u32 * 8);
 
         tx.is_done();
 
@@ -2379,7 +2349,7 @@ pub trait InstanceDma: Instance {
         reset_dma_before_load_dma_dscr(reg_block);
         self.clear_dma_interrupts();
 
-        tx.prepare_transfer(self.dma_peripheral(), first_desc)?;
+        tx.prepare_transfer(self.dma_peripheral(), buffer)?;
         tx.start_transfer()?;
         reset_dma_before_usr_cmd(reg_block);
 
@@ -2396,15 +2366,14 @@ pub trait InstanceDma: Instance {
     }
 
     #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-    unsafe fn start_read_bytes_dma<RX: Rx>(
+    unsafe fn start_read_bytes_dma<RX: Rx, BUF: DmaRxBuffer>(
         &mut self,
-        desc: *mut DmaDescriptor,
-        data_length: usize,
+        buffer: &mut BUF,
         rx: &mut RX,
         full_duplex: bool,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
-        self.configure_datalen(data_length as u32 * 8);
+        self.configure_datalen(buffer.length() as u32 * 8);
 
         rx.is_done();
 
@@ -2423,7 +2392,7 @@ pub trait InstanceDma: Instance {
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
 
-        rx.prepare_transfer(self.dma_peripheral(), desc)?;
+        rx.prepare_transfer(self.dma_peripheral(), buffer)?;
         rx.start_transfer()?;
 
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
