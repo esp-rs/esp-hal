@@ -11,6 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Introduce DMA buffer objects (#1856)
 - Introduce traits for the DMA buffer objects (#1976)
+### Changed
+
+### Fixed
+
+### Removed
+
+## [0.20.1] - 2024-08-30
+
+### Fixed
+
+- A build issue when including doc comment prelude (#2040)
+
+## [0.20.0] - 2024-08-29
+
+### Added
+
+- Introduce DMA buffer objects (#1856, #1985)
 - Added new `Io::new_no_bind_interrupt` constructor (#1861)
 - Added touch pad support for esp32 (#1873, #1956)
 - Allow configuration of period updating method for MCPWM timers (#1898)
@@ -18,20 +35,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a `PeripheralClockControl::reset` to the driver constructors where missing (#1893)
 - Added `digest::Digest` implementation to SHA (#1908)
 - Added `debugger::debugger_connected`. (#1961)
+- DMA: don't require `Sealed` to implement `ReadBuffer` and `WriteBuffer` (#1921)
+- Allow DMA to/from psram for esp32s3 (#1827)
+- Added missing methods to `SpiDmaBus` (#2016).
+- PARL_IO use ReadBuffer and WriteBuffer for Async DMA (#1996)
 
 ### Changed
 
 - Peripheral driver constructors don't take `InterruptHandler`s anymore. Use `set_interrupt_handler` to explicitly set the interrupt handler now. (#1819)
-- Migrate SPI driver to use DMA buffer objects (#1856)
+- Migrate SPI driver to use DMA buffer objects (#1856, #1985)
 - Use the peripheral ref pattern for `OneShotTimer` and `PeriodicTimer` (#1855)
-- Improve SYSTIMER API (#1870)
-- DMA: don't require `Sealed` to implement `ReadBuffer` and `WriteBuffer` (#1921)
-- Allow DMA to/from psram for esp32s3 (#1827)
-- DMA buffers now don't require a static lifetime. Make sure to never `mem::forget` an in-progress DMA transfer (consider using `#[deny(clippy::mem_forget)]`) (#1837)
-- Peripherals (where possible) are now explicitly reset and enabled in their constructors (#1893)
+- Improve SYSTIMER API (#1871)
 - SHA driver now use specific structs for the hashing algorithm instead of a parameter. (#1908)
-- Reset peripherals in driver constructors where missing (#1893, #1961)
 - Remove `fn free(self)` in HMAC which goes against esp-hal API guidelines (#1972)
+- `AnyPin`, `AnyInputOnyPin` and `DummyPin` are now accessible from `gpio` module (#1918)
+- Changed the RSA modular multiplication API to be consistent across devices (#2002)
 
 ### Fixed
 
@@ -43,12 +61,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - TWAI: GPIO pins are not configured as input and output (#1906)
 - ESP32C6: Make ADC usable after TRNG deinicialization (#1945)
 - We should no longer generate 1GB .elf files for ESP32C2 and ESP32C3 (#1962)
+- Reset peripherals in driver constructors where missing (#1893, #1961)
+- Fixed ESP32-S2 systimer interrupts (#1979)
+- Software interrupt 3 is no longer available when it is required by `esp-hal-embassy`. (#2011)
+- ESP32: Fixed async RSA (#2002)
 
 ### Removed
 
 - This package no longer re-exports the `esp_hal_procmacros::main` macro (#1828)
 - The `AesFlavour` trait no longer has the `ENCRYPT_MODE`/`DECRYPT_MODE` associated constants (#1849)
 - Removed `FlashSafeDma` (#1856)
+- Remove redundant WithDmaSpi traits (#1975)
+- `IsFullDuplex` and `IsHalfDuplex` traits (#1985)
 
 ## [0.19.0] - 2024-07-15
 
@@ -287,6 +311,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Auto detect crystal frequency based on `RtcClock::estimate_xtal_frequency()` (#1165)
 - ESP32-S3: Configure 32k ICACHE (#1169)
 - Lift the minimal buffer size requirement for I2S (#1189)
+- Replaced `SystemTimer::TICKS_PER_SEC` with `SystemTimer::ticks_per_sec()` (#1981)
 
 ### Removed
 
@@ -681,7 +706,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.20.0...HEAD
+[0.20.1]: https://github.com/esp-rs/esp-hal/compare/v0.20.0...v0.20.1
+[0.20.0]: https://github.com/esp-rs/esp-hal/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/esp-rs/esp-hal/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/esp-rs/esp-hal/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/esp-rs/esp-hal/compare/v0.16.1...v0.17.0

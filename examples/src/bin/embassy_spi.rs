@@ -28,10 +28,7 @@ use esp_hal::{
     gpio::Io,
     peripherals::Peripherals,
     prelude::*,
-    spi::{
-        master::{prelude::*, Spi},
-        SpiMode,
-    },
+    spi::{master::Spi, SpiMode},
     system::SystemControl,
     timer::timg::TimerGroup,
 };
@@ -54,10 +51,13 @@ async fn main(_spawner: Spawner) {
 
     let dma = Dma::new(peripherals.DMA);
 
-    #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-    let dma_channel = dma.spi2channel;
-    #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
-    let dma_channel = dma.channel0;
+    cfg_if::cfg_if! {
+        if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
+            let dma_channel = dma.spi2channel;
+        } else {
+            let dma_channel = dma.channel0;
+        }
+    }
 
     let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(32000);
     let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();

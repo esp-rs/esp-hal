@@ -160,11 +160,14 @@ impl WakeSource for WakeFromLpCoreWakeupSource {
     }
 }
 
+/// Configuration for controlling the behavior during sleep modes.
 #[derive(Clone, Copy)]
 // pmu_sleep_analog_config_t
 pub struct AnalogSleepConfig {
+    /// High-power system configuration.
     pub hp_sys: HpAnalog,
     // pub lp_sys_active: LpAnalog, // unused
+    /// Low-power system analog configuration.
     pub lp_sys_sleep: LpAnalog,
 }
 
@@ -298,9 +301,12 @@ impl AnalogSleepConfig {
     }
 }
 
+/// Configuration for controlling the behavior of digital peripherals during
+/// sleep modes.
 #[derive(Clone, Copy)]
 // pmu_sleep_digital_config_t
 pub struct DigitalSleepConfig {
+    /// High-power system control register configuration.
     pub syscntl: HpSysCntlReg,
 }
 
@@ -329,11 +335,16 @@ impl DigitalSleepConfig {
     }
 }
 
+/// Configuration for controlling the power settings of high-power and low-power
+/// systems during sleep modes.
 #[derive(Clone, Copy)]
 // pmu_sleep_power_config_t
 pub struct PowerSleepConfig {
+    /// Power configuration for the high-power system during sleep.
     pub hp_sys: HpSysPower,
+    /// Power configuration for the low-power system when it is active.
     pub lp_sys_active: LpSysPower,
+    /// Power configuration for the low-power system when it is in sleep mode.
     pub lp_sys_sleep: LpSysPower,
 }
 
@@ -424,42 +435,64 @@ impl PowerSleepConfig {
     }
 }
 
+/// Parameters for high-power system configurations during sleep modes.
 #[derive(Clone, Copy)]
 // pmu_hp_param_t
 pub struct HpParam {
+    /// Number of cycles to wait for the modem to wake up.
     pub modem_wakeup_wait_cycle: u32,
+    /// Number of cycles to wait for the analog component stabilization.
     pub analog_wait_target_cycle: u16,
+    /// Number of cycles to wait for the digital power-down sequence.
     pub digital_power_down_wait_cycle: u16,
+    /// Number of cycles to wait for the digital power supply to stabilize.
     pub digital_power_supply_wait_cycle: u16,
+    /// Number of cycles to wait for the digital power-up sequence.
     pub digital_power_up_wait_cycle: u16,
+    /// Number of cycles to wait for the PLL to stabilize.
     pub pll_stable_wait_cycle: u16,
+    /// Number of cycles to wait for modifying the ICG control.
     pub modify_icg_cntl_wait_cycle: u8,
+    /// Number of cycles to wait for switching the ICG coйntrol.
     pub switch_icg_cntl_wait_cycle: u8,
+    /// Minimum sleep time measured in slow clock cycles.
     pub min_slp_slow_clk_cycle: u8,
 }
 
+/// Parameters for low-power system configurations during sleep modes.
 #[derive(Clone, Copy)]
 // pmu_lp_param_t
 pub struct LpParam {
+    /// Number of cycles to wait for the digital power supply to stabilize.
     pub digital_power_supply_wait_cycle: u16,
+    /// Minimum sleep time measured in slow clock cycles.
     pub min_slp_slow_clk_cycle: u8,
+    /// Number of cycles to wait for the analog component stabilization.
     pub analog_wait_target_cycle: u8,
+    /// Number of cycles to wait for the digital power-down sequence.
     pub digital_power_down_wait_cycle: u8,
+    /// Number of cycles to wait for the digital power-up sequence.
     pub digital_power_up_wait_cycle: u8,
 }
 
+/// Parameters for high-power and low-power system configurations during sleep
+/// modes.
 #[derive(Clone, Copy)]
 // pmu_hp_lp_param_t
 pub struct HpLpParam {
-    // union of two u16 variants, I've elected to not complicate things...
+    /// Union of two u16 variants
     pub xtal_stable_wait_cycle: u16,
 }
 
+/// Configuration of parameters for sleep modes
 #[derive(Clone, Copy)]
 // pmu_sleep_param_config_t
 pub struct ParamSleepConfig {
+    /// Configuration of high-power system parameters.
     pub hp_sys: HpParam,
+    /// Configuration of low-power system parameters.
     pub lp_sys: LpParam,
+    /// Shared configuration parameters for high-power and low-power systems.
     pub hp_lp: HpLpParam,
 }
 impl ParamSleepConfig {
@@ -729,10 +762,13 @@ impl SleepTimeConfig {
     }
 }
 
+/// Configuration for the RTC sleep behavior.
 #[derive(Clone, Copy)]
 // pmu_sleep_config_t + deep sleep flag + pd flags
 pub struct RtcSleepConfig {
+    /// Deep Sleep flag
     pub deep: bool,
+    /// Power Down flags
     pub pd_flags: PowerDownFlags,
 }
 
@@ -761,28 +797,46 @@ bitfield::bitfield! {
     /// Power domains to be powered down during sleep
     pub struct PowerDownFlags(u32);
 
+    /// Controls the power-down status of the top power domain.
     pub u32, pd_top      , set_pd_top      : 0;
+    /// Controls the power-down status of the VDD_SDIO power domain.
     pub u32, pd_vddsdio  , set_pd_vddsdio  : 1;
+    /// Controls the power-down status of the modem power domain.
     pub u32, pd_modem    , set_pd_modem    : 2;
+    /// Controls the power-down status of the high-performance peripheral power domain.
     pub u32, pd_hp_periph, set_pd_hp_periph: 3;
+    /// Controls the power-down status of the CPU power domain.
     pub u32, pd_cpu      , set_pd_cpu      : 4;
+    /// Controls the power-down status of the high-performance always-on domain.
     pub u32, pd_hp_aon   , set_pd_hp_aon   : 5;
+    /// Controls the power-down status of memory group 0.
     pub u32, pd_mem_g0   , set_pd_mem_g0   : 6;
+    /// Controls the power-down status of memory group 1.
     pub u32, pd_mem_g1   , set_pd_mem_g1   : 7;
+    /// Controls the power-down status of memory group 2.
     pub u32, pd_mem_g2   , set_pd_mem_g2   : 8;
+    /// Controls the power-down status of memory group 3.
     pub u32, pd_mem_g3   , set_pd_mem_g3   : 9;
+    /// Controls the power-down status of the crystal oscillator.
     pub u32, pd_xtal     , set_pd_xtal     : 10;
+    /// Controls the power-down status of the fast RC oscillator.
     pub u32, pd_rc_fast  , set_pd_rc_fast  : 11;
+    /// Controls the power-down status of the 32kHz crystal oscillator.
     pub u32, pd_xtal32k  , set_pd_xtal32k  : 12;
+    /// Controls the power-down status of the 32kHz RC oscillator.
     pub u32, pd_rc32k    , set_pd_rc32k    : 13;
+    /// Controls the power-down status of the low-power peripheral domain.
     pub u32, pd_lp_periph, set_pd_lp_periph: 14;
 }
 
 impl PowerDownFlags {
+    /// Checks whether all memory groups (G0, G1, G2, G3) are powered down.
     pub fn pd_mem(self) -> bool {
         self.pd_mem_g0() && self.pd_mem_g1() && self.pd_mem_g2() && self.pd_mem_g3()
     }
 
+    /// Sets the power-down status for all memory groups (G0, G1, G2, G3) at
+    /// once.
     pub fn set_pd_mem(&mut self, value: bool) {
         self.set_pd_mem_g0(value);
         self.set_pd_mem_g1(value);
@@ -826,10 +880,12 @@ impl MachineConstants {
 }
 
 impl RtcSleepConfig {
+    /// Returns whether the device is in deep sleep mode.
     pub fn deep_slp(&self) -> bool {
         self.deep
     }
 
+    /// Configures the device for deep sleep mode with ultra-low power settings.
     pub fn deep() -> Self {
         // Set up for ultra-low power sleep. Wakeup sources may modify these settings.
         Self {

@@ -544,6 +544,7 @@ mod asynch {
     // Helper variable to store which pins need handling.
     static TOUCHED_PINS: AtomicU16 = AtomicU16::new(0);
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct TouchFuture {
         touch_nr: u8,
     }

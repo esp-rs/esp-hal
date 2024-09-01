@@ -9,14 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added additional checks to prevent various array access panics while processing frames
-- Added range check to avoid panic when indexing into RX_BUFFER slice
-
 ### Changed
 
 ### Fixed
 
 ### Removed
+
+## 0.2.0 - 2024-08-29
+
+### Added
+
+- Added additional checks to prevent various array access panics while processing frames (#1923)
+- Added range check to avoid panic when indexing into RX_BUFFER slice (#1682)
 
 ## 0.1.0 - 2024-07-15
 

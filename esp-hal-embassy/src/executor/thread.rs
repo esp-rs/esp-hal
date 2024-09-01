@@ -71,9 +71,8 @@ impl Executor {
     #[cfg_attr(
         multi_core,
         doc = r#"
-    This will use software-interrupt 3 which isn't
-    available for anything else to wake the other core(s).
-    "#
+
+This will use software-interrupt 3 which isn't available for anything else to wake the other core(s)."#
     )]
     pub fn new() -> Self {
         #[cfg(multi_core)]

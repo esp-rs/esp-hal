@@ -1,11 +1,13 @@
 //! # Analog to Digital Converter (ADC)
 //!
 //! ## Overview
+//!
 //! The ADC is integrated on the chip, and is capable of measuring analog
 //! signals from specific analog I/O pins. One or more ADC units are available,
 //! depending on the device being used.
 //!
 //! ## Configuration
+//!
 //! The ADC can be configured to measure analog signals from specific pins. The
 //! configuration includes the resolution of the ADC, the attenuation of the
 //! input signal, and the pins to be measured.
@@ -15,10 +17,13 @@
 //! schemes can be used to improve the accuracy of the ADC readings.
 //!
 //! ## Usage
+//!
 //! The ADC driver implements the `embedded-hal@0.2.x` ADC traits.
 //!
-//! ## Examples
-//! #### Read an analog signal from a pin
+//! ## Example
+//!
+//! ### Read an analog signal from a pin
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::analog::adc::AdcConfig;
@@ -27,7 +32,6 @@
 //! # use esp_hal::analog::adc::Adc;
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::gpio::Io;
-//! # use core::result::Result::Err;
 //!
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 #![cfg_attr(esp32, doc = "let analog_pin = io.pins.gpio32;")]

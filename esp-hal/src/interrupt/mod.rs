@@ -24,8 +24,10 @@
 //! We reserve a number of CPU interrupts, which cannot be used; see
 //! [`RESERVED_INTERRUPTS`].
 //!
-//! ## Examples
-//! ### Using the Peripheral Driver to Register an Interrupt Handler
+//! ## Example
+//!
+//! ### Using the peripheral driver to register an interrupt handler
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use core::cell::RefCell;
@@ -225,10 +227,6 @@ impl Iterator for InterruptStatusIterator {
     type Item = u8;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.idx == usize::MAX {
-            return None;
-        }
-
         for i in self.idx..STATUS_WORDS {
             if self.status.status[i] != 0 {
                 let bit = self.status.status[i].trailing_zeros();

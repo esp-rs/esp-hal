@@ -62,17 +62,15 @@ async fn main(spawner: Spawner) -> ! {
     let esp_now = esp_wifi::esp_now::EspNow::new(&init, wifi).unwrap();
     println!("esp-now version {}", esp_now.get_version().unwrap());
 
-    #[cfg(feature = "esp32")]
-    {
-        let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-        esp_hal_embassy::init(&clocks, timg1.timer0);
-    }
-
-    #[cfg(not(feature = "esp32"))]
-    {
-        let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER)
-            .split::<esp_hal::timer::systimer::Target>();
-        esp_hal_embassy::init(&clocks, systimer.alarm0);
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32")] {
+            let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
+            esp_hal_embassy::init(&clocks, timg1.timer0);
+        } else {
+            use esp_hal::timer::systimer::{SystemTimer, Target};
+            let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+            esp_hal_embassy::init(&clocks, systimer.alarm0);
+        }
     }
 
     let (manager, sender, receiver) = esp_now.split();

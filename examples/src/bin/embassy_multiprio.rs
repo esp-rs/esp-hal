@@ -28,21 +28,11 @@ use esp_hal::{
     interrupt::Priority,
     peripherals::Peripherals,
     system::SystemControl,
-    timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
+    timer::{timg::TimerGroup, ErasedTimer},
 };
 use esp_hal_embassy::InterruptExecutor;
 use esp_println::println;
 use static_cell::StaticCell;
-
-// When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
-macro_rules! mk_static {
-    ($t:ty,$val:expr) => {{
-        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
-        #[deny(unused_attributes)]
-        let x = STATIC_CELL.uninit().write(($val));
-        x
-    }};
-}
 
 /// Periodically print something.
 #[embassy_executor::task]
@@ -89,24 +79,19 @@ async fn main(low_prio_spawner: Spawner) {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let timer0: ErasedTimer = timg0.timer0.into();
-    let timer0 = OneShotTimer::new(timer0);
 
-    #[cfg(not(feature = "esp32c2"))]
-    let timer1 = {
-        let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-        let timer0: ErasedTimer = timg1.timer0.into();
-        OneShotTimer::new(timer0)
-    };
-    #[cfg(feature = "esp32c2")]
-    let timer1 = {
-        let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER)
-            .split::<esp_hal::timer::systimer::Target>();
-        let alarm0: ErasedTimer = systimer.alarm0.into();
-        OneShotTimer::new(alarm0)
-    };
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32c2")] {
+            use esp_hal::timer::systimer::{SystemTimer, Target};
+            let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+            let timer1: ErasedTimer = systimer.alarm0.into();
+        } else {
+            let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
+            let timer1: ErasedTimer = timg1.timer0.into();
+        }
+    }
 
-    let timers = mk_static!([OneShotTimer<ErasedTimer>; 2], [timer0, timer1]);
-    esp_hal_embassy::init(&clocks, timers);
+    esp_hal_embassy::init(&clocks, [timer0, timer1]);
 
     static EXECUTOR: StaticCell<InterruptExecutor<2>> = StaticCell::new();
     let executor = InterruptExecutor::new(system.software_interrupt_control.software_interrupt2);

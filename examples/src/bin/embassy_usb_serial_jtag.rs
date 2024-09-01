@@ -57,6 +57,7 @@ async fn reader(
                 string_buffer.extend_from_slice(&rbuf[..len]).unwrap();
                 signal.signal(heapless::String::from_utf8(string_buffer).unwrap());
             }
+            #[allow(unreachable_patterns)]
             Err(e) => esp_println::println!("RX Error: {:?}", e),
         }
     }

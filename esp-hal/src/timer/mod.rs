@@ -11,7 +11,9 @@
 )]
 #![cfg_attr(feature = "esp32", doc = "See the [timg] module for more information.")]
 //! ## Examples
+//!
 //! ### One-shot Timer
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::{OneShotTimer, PeriodicTimer, timg::TimerGroup};
@@ -364,17 +366,22 @@ impl<'d, T> embedded_hal_02::timer::Periodic for PeriodicTimer<'d, T> where T: T
 /// A type-erased timer
 ///
 /// You can create an instance of this by just calling `.into()` on a timer.
-#[allow(missing_docs)]
 pub enum ErasedTimer {
+    /// Timer 0 of the TIMG0 peripheral in blocking mode.
     Timg0Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>),
+    /// Timer 1 of the TIMG0 peripheral in blocking mode.
     #[cfg(timg_timer1)]
     Timg0Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking>),
+    /// Timer 0 of the TIMG1 peripheral in blocking mode.
     #[cfg(timg1)]
     Timg1Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking>),
+    /// Timer 1 of the TIMG1 peripheral in blocking mode.
     #[cfg(all(timg1, timg_timer1))]
     Timg1Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>),
+    /// Systimer Alarm in periodic mode with blocking behavior.
     #[cfg(systimer)]
     SystimerAlarmPeriodic(systimer::Alarm<'static, systimer::Periodic, Blocking>),
+    /// Systimer Target in periodic mode with blocking behavior.
     #[cfg(systimer)]
     SystimerAlarmTarget(systimer::Alarm<'static, systimer::Target, Blocking>),
 }

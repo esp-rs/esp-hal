@@ -33,6 +33,7 @@ pub enum Error {
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum HSClockSource {
+    /// APB clock.
     APBClk,
     // TODO RefTick,
 }
@@ -41,6 +42,7 @@ pub enum HSClockSource {
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum LSClockSource {
+    /// APB clock.
     APBClk,
     // TODO SLOWClk
 }
@@ -49,9 +51,13 @@ pub enum LSClockSource {
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Number {
+    /// Timer 0.
     Timer0 = 0,
+    /// Timer 1.
     Timer1 = 1,
+    /// Timer 2.
     Timer2 = 2,
+    /// Timer 3.
     Timer3 = 3,
 }
 
@@ -63,56 +69,82 @@ pub mod config {
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub enum Duty {
+        /// 1-bit resolution for duty cycle adjustment.
         Duty1Bit = 1,
+        /// 2-bit resolution for duty cycle adjustment.
         Duty2Bit,
+        /// 3-bit resolution for duty cycle adjustment.
         Duty3Bit,
+        /// 4-bit resolution for duty cycle adjustment.
         Duty4Bit,
+        /// 5-bit resolution for duty cycle adjustment.
         Duty5Bit,
+        /// 6-bit resolution for duty cycle adjustment.
         Duty6Bit,
+        /// 7-bit resolution for duty cycle adjustment.
         Duty7Bit,
+        /// 8-bit resolution for duty cycle adjustment.
         Duty8Bit,
+        /// 9-bit resolution for duty cycle adjustment.
         Duty9Bit,
+        /// 10-bit resolution for duty cycle adjustment.
         Duty10Bit,
+        /// 11-bit resolution for duty cycle adjustment.
         Duty11Bit,
+        /// 12-bit resolution for duty cycle adjustment.
         Duty12Bit,
+        /// 13-bit resolution for duty cycle adjustment.
         Duty13Bit,
+        /// 14-bit resolution for duty cycle adjustment.
         Duty14Bit,
         #[cfg(esp32)]
+        /// 15-bit resolution for duty cycle adjustment.
         Duty15Bit,
         #[cfg(esp32)]
+        /// 16-bit resolution for duty cycle adjustment.
         Duty16Bit,
         #[cfg(esp32)]
+        /// 17-bit resolution for duty cycle adjustment.
         Duty17Bit,
         #[cfg(esp32)]
+        /// 18-bit resolution for duty cycle adjustment.
         Duty18Bit,
         #[cfg(esp32)]
+        /// 19-bit resolution for duty cycle adjustment.
         Duty19Bit,
         #[cfg(esp32)]
+        /// 20-bit resolution for duty cycle adjustment.
         Duty20Bit,
     }
 
     /// Timer configuration
     #[derive(Copy, Clone)]
     pub struct Config<CS> {
+        /// The duty cycle resolution.
         pub duty: Duty,
+        /// The clock source for the timer.
         pub clock_source: CS,
+        /// The frequency of the PWM signal in Hertz.
         pub frequency: HertzU32,
     }
 }
 
 /// Trait defining the type of timer source
 pub trait TimerSpeed: Speed {
+    /// The type of clock source used by the timer in this speed mode.
     type ClockSourceType;
 }
 
 /// Timer source type for LowSpeed timers
 impl TimerSpeed for LowSpeed {
+    /// The clock source type for low-speed timers.
     type ClockSourceType = LSClockSource;
 }
 
 #[cfg(esp32)]
 /// Timer source type for HighSpeed timers
 impl TimerSpeed for HighSpeed {
+    /// The clock source type for high-speed timers.
     type ClockSourceType = HSClockSource;
 }
 

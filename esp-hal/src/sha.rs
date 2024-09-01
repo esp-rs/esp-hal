@@ -33,19 +33,17 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::sha::Sha;
 //! # use esp_hal::sha::Sha256;
-//! # use core::option::Option::None;
 //! # use nb::block;
-//! let source_data = "HELLO, ESPRESSIF!".as_bytes();
-//! let mut remaining = source_data;
+//! let mut source_data = "HELLO, ESPRESSIF!".as_bytes();
 //! let mut hasher = Sha256::new();
 //! // Short hashes can be created by decreasing the output buffer to the
 //! // desired length
 //! let mut output = [0u8; 32];
 //!
-//! while remaining.len() > 0 {
+//! while !source_data.is_empty() {
 //!     // All the HW Sha functions are infallible so unwrap is fine to use if
 //!     // you use block!
-//!     remaining = block!(hasher.update(remaining)).unwrap();
+//!     source_data = block!(hasher.update(source_data)).unwrap();
 //! }
 //!
 //! // Finish can be called as many times as desired to get multiple copies of
@@ -56,8 +54,6 @@
 //! ```
 //! ## Implementation State
 //! - DMA-SHA Mode is not supported.
-
-#![allow(missing_docs)] // TODO: Remove when able
 
 use core::{convert::Infallible, marker::PhantomData};
 
@@ -99,10 +95,17 @@ impl crate::InterruptConfigurable for Context<crate::Blocking> {
 }
 
 impl<DM: crate::Mode> Context<DM> {
+    /// Indicates if the SHA context is in the first run.
+    ///
+    /// Returns `true` if this is the first time processing data with the SHA
+    /// instance, otherwise returns `false`.
     pub fn first_run(&self) -> bool {
         self.first_run
     }
 
+    /// Indicates if the SHA context has finished processing the data.
+    ///
+    /// Returns `true` if the SHA calculation is complete, otherwise returns.
     pub fn finished(&self) -> bool {
         self.finished
     }
@@ -122,8 +125,14 @@ impl<DM: crate::Mode> Context<DM> {
 //   - This means that we need to buffer bytes coming in up to 4 u8's in order
 //     to create a full u32
 
-// This implementation might fail after u32::MAX/8 bytes, to increase please see
-// ::finish() length/self.cursor usage
+/// Trait for defining the behavior of a SHA algorithm instance.
+///
+/// This trait encapsulates the operations and configuration for a specific SHA
+/// algorithm and provides methods for processing data buffers and calculating
+/// the final hash.
+///
+/// This implementation might fail after u32::MAX/8 bytes, to increase please
+/// see ::finish() length/self.cursor usage
 pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
     /// Constant containing the name of the algorithm as a string.
     const ALGORITHM: &'static str;
@@ -132,8 +141,14 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
     #[cfg(not(esp32))]
     fn mode_as_bits() -> u8;
 
+    /// Returns the length of the chunk that the algorithm processes at a time.
+    ///
+    /// For example, in SHA-256, this would typically return 64 bytes.
     fn chunk_length(&self) -> usize;
 
+    /// Returns the length of the resulting digest produced by the algorithm.
+    ///
+    /// For example, in SHA-256, this would return 32 bytes.
     fn digest_length(&self) -> usize;
 
     /// ESP32 requires that a control register to be written to calculate the
@@ -141,20 +156,22 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
     #[cfg(esp32)]
     fn load_reg(&self);
 
-    /// ESP32 uses a different register per hash mode.
-    #[cfg(esp32)]
+    /// Checks if the SHA peripheral is busy processing data.
+    ///
+    /// Returns `true` if the SHA peripheral is busy, `false` otherwise.
     fn is_busy(&self) -> bool;
 
-    #[cfg(not(esp32))]
-    fn is_busy(&self) -> bool {
-        // Safety: This is safe because we only read `SHA_BUSY_REG`
-        let sha = unsafe { crate::peripherals::SHA::steal() };
-        sha.busy().read().bits() != 0
-    }
-
+    /// Processes the data buffer and updates the hash state.
+    ///
+    /// This method is platform-specific and differs for ESP32 and non-ESP32
+    /// platforms.
     #[cfg(esp32)]
     fn process_buffer(&mut self);
 
+    /// Processes the data buffer and updates the hash state.
+    ///
+    /// This method is platform-specific and differs for ESP32 and non-ESP32
+    /// platforms.
     #[cfg(not(esp32))]
     fn process_buffer(&mut self) {
         // Safety: This is safe because digest state is restored and saved between
@@ -170,11 +187,8 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
         } else {
             // Restore previously saved hash if interleaving operation
             if let Some(ref saved_digest) = self.saved_digest.take() {
-                self.alignment_helper.volatile_write_regset(
-                    sha.h_mem(0).as_ptr(),
-                    saved_digest,
-                    64,
-                );
+                self.alignment_helper
+                    .volatile_write_regset(h_mem(&sha, 0), saved_digest, 64);
             }
             // SET SHA_CONTINUE_REG
             sha.continue_().write(|w| unsafe { w.bits(1) });
@@ -186,13 +200,18 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
         // Save the content of the current hash for interleaving operation.
         let mut saved_digest = [0u8; 64];
         self.alignment_helper.volatile_read_regset(
-            sha.h_mem(0).as_ptr(),
+            h_mem(&sha, 0),
             &mut saved_digest,
             64 / self.alignment_helper.align_size(),
         );
         self.saved_digest.replace(saved_digest);
     }
 
+    /// Flushes any remaining data from the internal buffer to the SHA
+    /// peripheral.
+    ///
+    /// Returns a `Result` indicating whether the flush was successful or if the
+    /// operation would block.
     fn flush_data(&mut self) -> nb::Result<(), Infallible> {
         if self.is_busy() {
             return Err(nb::Error::WouldBlock);
@@ -209,19 +228,13 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
         unsafe {
             core::ptr::copy_nonoverlapping(
                 ctx.buffer.as_ptr(),
-                #[cfg(esp32)]
-                sha.text(0).as_ptr(),
-                #[cfg(not(esp32))]
-                sha.m_mem(0).as_ptr(),
+                m_mem(&sha, 0),
                 (ctx.cursor % chunk_len) / ctx.alignment_helper.align_size(),
             );
         }
 
         let flushed = ctx.alignment_helper.flush_to(
-            #[cfg(esp32)]
-            sha.text(0).as_ptr(),
-            #[cfg(not(esp32))]
-            sha.m_mem(0).as_ptr(),
+            m_mem(&sha, 0),
             (ctx.cursor % chunk_len) / ctx.alignment_helper.align_size(),
         );
 
@@ -234,8 +247,9 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
         Ok(())
     }
 
-    // This function ensures that incoming data is aligned to u32 (due to issues
-    // with cpy_mem<u8>)
+    /// Writes data into the SHA buffer.
+    /// This function ensures that incoming data is aligned to u32 (due to
+    /// issues with `cpy_mem<u8>`)
     fn write_data<'a>(&mut self, incoming: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
         let mod_cursor = self.cursor % self.chunk_length();
 
@@ -258,14 +272,7 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
             // be fully processed then saved.
             unsafe {
                 let sha = crate::peripherals::SHA::steal();
-                core::ptr::copy_nonoverlapping(
-                    self.buffer.as_ptr(),
-                    #[cfg(esp32)]
-                    sha.text(0).as_ptr(),
-                    #[cfg(not(esp32))]
-                    sha.m_mem(0).as_ptr(),
-                    32,
-                );
+                core::ptr::copy_nonoverlapping(self.buffer.as_ptr(), m_mem(&sha, 0), 32);
             }
             self.process_buffer();
         }
@@ -273,6 +280,7 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
         Ok(remaining)
     }
 
+    /// Updates the SHA context with the provided data buffer.
     fn update<'a>(&mut self, buffer: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
         if self.is_busy() {
             return Err(nb::Error::WouldBlock);
@@ -285,12 +293,12 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
         Ok(remaining)
     }
 
-    // Finish of the calculation (if not alreaedy) and copy result to output
-    // After `finish()` is called `update()`s will contribute to a new hash which
-    // can be calculated again with `finish()`.
-    //
-    // Typically output is expected to be the size of digest_length(), but smaller
-    // inputs can be given to get a "short hash"
+    /// Finish of the calculation (if not already) and copy result to output
+    /// After `finish()` is called `update()`s will contribute to a new hash
+    /// which can be calculated again with `finish()`.
+    ///
+    /// Typically output is expected to be the size of digest_length(), but
+    /// smaller inputs can be given to get a "short hash"
     fn finish(&mut self, output: &mut [u8]) -> nb::Result<(), Infallible> {
         // The main purpose of this function is to dynamically generate padding for the
         // input. Padding: Append "1" bit, Pad zeros until 512/1024 filled
@@ -298,11 +306,10 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
         // If not enough free space for length+1, add length at end of a new zero'd
         // block
 
-        let sha = unsafe { crate::peripherals::SHA::steal() };
-
         if self.is_busy() {
             return Err(nb::Error::WouldBlock);
         }
+        let sha = unsafe { crate::peripherals::SHA::steal() };
 
         let chunk_len = self.chunk_length();
 
@@ -318,11 +325,9 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
             // buffer
             let pad_len = chunk_len - mod_cursor;
             let ctx = self.deref_mut();
+
             ctx.alignment_helper.volatile_write_bytes(
-                #[cfg(esp32)]
-                sha.text(0).as_ptr(),
-                #[cfg(not(esp32))]
-                sha.m_mem(0).as_ptr(),
+                m_mem(&sha, 0),
                 0_u8,
                 pad_len / ctx.alignment_helper.align_size(),
                 mod_cursor / ctx.alignment_helper.align_size(),
@@ -340,21 +345,16 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
         let pad_len = chunk_len - mod_cursor - core::mem::size_of::<u64>();
 
         let ctx = self.deref_mut();
+
         ctx.alignment_helper.volatile_write_bytes(
-            #[cfg(esp32)]
-            sha.text(0).as_ptr(),
-            #[cfg(not(esp32))]
-            sha.m_mem(0).as_ptr(),
+            m_mem(&sha, 0),
             0_u8,
             pad_len / ctx.alignment_helper.align_size(),
             mod_cursor / ctx.alignment_helper.align_size(),
         );
 
         ctx.alignment_helper.aligned_volatile_copy(
-            #[cfg(esp32)]
-            sha.text(0).as_ptr(),
-            #[cfg(not(esp32))]
-            sha.m_mem(0).as_ptr(),
+            m_mem(&sha, 0),
             &length,
             chunk_len / ctx.alignment_helper.align_size(),
             (chunk_len - core::mem::size_of::<u64>()) / ctx.alignment_helper.align_size(),
@@ -373,10 +373,7 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
         }
 
         self.alignment_helper.volatile_read_regset(
-            #[cfg(esp32)]
-            sha.text(0).as_ptr(),
-            #[cfg(not(esp32))]
-            sha.h_mem(0).as_ptr(),
+            h_mem(&sha, 0),
             output,
             core::cmp::min(output.len(), 32) / self.alignment_helper.align_size(),
         );
@@ -393,6 +390,15 @@ pub trait Sha<DM: crate::Mode>: core::ops::DerefMut<Target = Context<DM>> {
 /// and a set of parameters
 macro_rules! impl_sha {
     ($name: ident, $mode_bits: tt, $digest_length: tt, $chunk_length: tt) => {
+        /// A SHA implementation struct.
+        ///
+        /// This struct is generated by the macro and represents a specific SHA hashing
+        /// algorithm (e.g., SHA-256, SHA-1). It manages the context and state required
+        /// for processing data using the selected hashing algorithm.
+        ///
+        /// The struct provides various functionalities such as initializing the hashing
+        /// process, updating the internal state with new data, and finalizing the
+        /// hashing operation to generate the final digest.
         pub struct $name<DM: crate::Mode>(Context<DM>);
 
         impl $name<crate::Blocking> {
@@ -464,11 +470,16 @@ macro_rules! impl_sha {
                 }
             }
 
-            #[cfg(esp32)]
             fn is_busy(&self) -> bool {
                 let sha = unsafe { crate::peripherals::SHA::steal() };
-                paste::paste! {
-                    sha.[< $name:lower _busy >]().read().[< $name:lower _busy >]().bit_is_set()
+                cfg_if::cfg_if! {
+                    if #[cfg(esp32)] {
+                        paste::paste! {
+                            sha.[< $name:lower _busy >]().read().[< $name:lower _busy >]().bit_is_set()
+                        }
+                    } else {
+                        sha.busy().read().bits() != 0
+                    }
                 }
             }
 
@@ -546,3 +557,23 @@ impl_sha!(Sha512, 4, 64, 128);
 impl_sha!(Sha512_224, 5, 28, 128);
 #[cfg(any(esp32s2, esp32s3))]
 impl_sha!(Sha512_256, 6, 32, 128);
+
+fn h_mem(sha: &crate::peripherals::SHA, index: usize) -> *mut u32 {
+    cfg_if::cfg_if! {
+        if #[cfg(esp32)] {
+            sha.text(index).as_ptr()
+        } else {
+            sha.h_mem(index).as_ptr()
+        }
+    }
+}
+
+fn m_mem(sha: &crate::peripherals::SHA, index: usize) -> *mut u32 {
+    cfg_if::cfg_if! {
+        if #[cfg(esp32)] {
+            sha.text(index).as_ptr()
+        } else {
+            sha.m_mem(index).as_ptr()
+        }
+    }
+}

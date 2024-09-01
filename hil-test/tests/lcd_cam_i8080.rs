@@ -9,7 +9,7 @@ use esp_hal::{
     clock::{ClockControl, Clocks},
     dma::{Dma, DmaDescriptor, DmaPriority},
     dma_buffers,
-    gpio::dummy_pin::DummyPin,
+    gpio::DummyPin,
     lcd_cam::{
         lcd::{
             i8080,

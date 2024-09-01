@@ -15,10 +15,8 @@
 pub use esp_riscv_rt::TrapFrame;
 use riscv::register::{mcause, mtvec};
 
-#[cfg(not(any(plic, clic)))]
+#[cfg(not(plic))]
 pub use self::classic::*;
-#[cfg(clic)]
-pub use self::clic::*;
 #[cfg(plic)]
 pub use self::plic::*;
 pub use self::vectored::*;
@@ -53,38 +51,68 @@ pub enum InterruptKind {
 #[repr(u32)]
 #[derive(Debug, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(missing_docs)]
 pub enum CpuInterrupt {
+    /// Interrupt number 1.
     Interrupt1 = 1,
+    /// Interrupt number 2.
     Interrupt2,
+    /// Interrupt number 3.
     Interrupt3,
+    /// Interrupt number 4.
     Interrupt4,
+    /// Interrupt number 5.
     Interrupt5,
+    /// Interrupt number 6.
     Interrupt6,
+    /// Interrupt number 7.
     Interrupt7,
+    /// Interrupt number 8.
     Interrupt8,
+    /// Interrupt number 9.
     Interrupt9,
+    /// Interrupt number 10.
     Interrupt10,
+    /// Interrupt number 11.
     Interrupt11,
+    /// Interrupt number 12.
     Interrupt12,
+    /// Interrupt number 13.
     Interrupt13,
+    /// Interrupt number 14.
     Interrupt14,
+    /// Interrupt number 15.
     Interrupt15,
+    /// Interrupt number 16.
     Interrupt16,
+    /// Interrupt number 17.
     Interrupt17,
+    /// Interrupt number 18.
     Interrupt18,
+    /// Interrupt number 19.
     Interrupt19,
+    /// Interrupt number 20.
     Interrupt20,
+    /// Interrupt number 21.
     Interrupt21,
+    /// Interrupt number 22.
     Interrupt22,
+    /// Interrupt number 23.
     Interrupt23,
+    /// Interrupt number 24.
     Interrupt24,
+    /// Interrupt number 25.
     Interrupt25,
+    /// Interrupt number 26.
     Interrupt26,
+    /// Interrupt number 27.
     Interrupt27,
+    /// Interrupt number 28.
     Interrupt28,
+    /// Interrupt number 29.
     Interrupt29,
+    /// Interrupt number 30.
     Interrupt30,
+    /// Interrupt number 31.
     Interrupt31,
 }
 
@@ -92,44 +120,45 @@ pub enum CpuInterrupt {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u8)]
-#[allow(missing_docs)]
 pub enum Priority {
+    /// No priority.
     None = 0,
+    /// Priority level 1.
     Priority1,
+    /// Priority level 2.
     Priority2,
+    /// Priority level 3.
     Priority3,
+    /// Priority level 4.
     Priority4,
+    /// Priority level 5.
     Priority5,
+    /// Priority level 6.
     Priority6,
+    /// Priority level 7.
     Priority7,
-    #[cfg(not(clic))]
+    /// Priority level 8.
     Priority8,
-    #[cfg(not(clic))]
+    /// Priority level 9.
     Priority9,
-    #[cfg(not(clic))]
+    /// Priority level 10.
     Priority10,
-    #[cfg(not(clic))]
+    /// Priority level 11.
     Priority11,
-    #[cfg(not(clic))]
+    /// Priority level 12.
     Priority12,
-    #[cfg(not(clic))]
+    /// Priority level 13.
     Priority13,
-    #[cfg(not(clic))]
+    /// Priority level 14.
     Priority14,
-    #[cfg(not(clic))]
+    /// Priority level 15.
     Priority15,
 }
 
 impl Priority {
     /// Maximum interrupt priority
     pub const fn max() -> Priority {
-        cfg_if::cfg_if! {
-            if #[cfg(not(clic))] {
-                Priority::Priority15
-            } else {
-                Priority::Priority7
-            }
-        }
+        Priority::Priority15
     }
 
     /// Minimum interrupt priority
@@ -515,7 +544,7 @@ mod vectored {
     interrupt_handler!(19);
 }
 
-#[cfg(not(any(plic, clic)))]
+#[cfg(not(plic))]
 mod classic {
     use super::{CpuInterrupt, InterruptKind, Priority};
     use crate::Cpu;
@@ -762,128 +791,5 @@ mod plic {
         let plic = &*crate::peripherals::PLIC_MX::PTR;
         plic.mxint_thresh()
             .write(|w| w.cpu_mxint_thresh().bits(stored_prio as u8));
-    }
-}
-
-#[cfg(clic)]
-mod clic {
-    use super::{CpuInterrupt, InterruptKind, Priority};
-    use crate::Cpu;
-
-    pub(super) const DISABLED_CPU_INTERRUPT: u32 = 0;
-
-    pub(super) const EXTERNAL_INTERRUPT_OFFSET: u32 = 16;
-
-    pub(super) const PRIORITY_TO_INTERRUPT: &[usize] =
-        &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-
-    pub(super) const INTERRUPT_TO_PRIORITY: &[usize] =
-        &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-
-    // The memory map for interrupt registers is on a per-core basis,
-    // base points to the current core interrupt register,
-    // whereas base + DUALCORE_CLIC_CTRL_OFF points to the other
-    // core registers, regardless of the core we are currently running on.
-
-    const DR_REG_CLIC_CTRL_BASE: u32 = 0x20801000;
-    const DUALCORE_CLIC_CTRL_OFF: u32 = 0x10000;
-
-    const CLIC_EXT_INTR_NUM_OFFSET: usize = 16;
-
-    bitfield::bitfield! {
-        #[derive(Clone, Copy, Default)]
-        pub struct InterruptControl(u32);
-
-        bool,pending, set_pending: 0;
-        bool,enabled, set_enabled: 8;
-        bool,vectored, set_vectored: 16;
-        u8,trigger, set_trigger: 18, 17;
-        u8,mode, _: 23, 22;
-        u8,priority, set_priority: 31, 29;
-    }
-
-    /// Get pointer to interrupt control register for the given core and CPU
-    /// interrupt number
-    fn intr_cntrl(core: Cpu, cpu_interrupt_number: usize) -> *mut u32 {
-        let offset = if core == crate::get_core() {
-            0
-        } else {
-            DUALCORE_CLIC_CTRL_OFF
-        };
-        unsafe {
-            ((DR_REG_CLIC_CTRL_BASE + offset) as *mut u32)
-                .add(CLIC_EXT_INTR_NUM_OFFSET + cpu_interrupt_number)
-        }
-    }
-
-    /// Enable a CPU interrupt on current core
-    ///
-    /// # Safety
-    ///
-    /// Make sure there is an interrupt handler registered.
-    pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
-        let cpu_interrupt_number = which as usize;
-        let intr_cntrl = intr_cntrl(crate::get_core(), cpu_interrupt_number);
-        unsafe {
-            let mut val = InterruptControl(intr_cntrl.read_volatile());
-            val.set_enabled(true);
-            intr_cntrl.write_volatile(val.0);
-        }
-    }
-
-    /// Set the interrupt kind (i.e. level or edge) of an CPU interrupt
-    ///
-    /// The vectored interrupt handler will take care of clearing edge interrupt
-    /// bits.
-    pub fn set_kind(core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
-        let cpu_interrupt_number = which as usize;
-        unsafe {
-            let intr_cntrl = intr_cntrl(core, cpu_interrupt_number);
-            let mut val = InterruptControl(intr_cntrl.read_volatile());
-            val.set_trigger(match kind {
-                InterruptKind::Level => 0b00,
-                InterruptKind::Edge => 0b10,
-            });
-            intr_cntrl.write_volatile(val.0);
-        }
-    }
-
-    /// Set the priority level of an CPU interrupt
-    ///
-    /// # Safety
-    ///
-    /// Great care must be taken when using this function; avoid changing the
-    /// priority of interrupts 1 - 15.
-    pub unsafe fn set_priority(core: Cpu, which: CpuInterrupt, priority: Priority) {
-        let cpu_interrupt_number = which as usize;
-        let intr_cntrl = intr_cntrl(core, cpu_interrupt_number);
-        unsafe {
-            let mut val = InterruptControl(intr_cntrl.read_volatile());
-            val.set_priority(priority as u8);
-            intr_cntrl.write_volatile(val.0);
-        }
-    }
-
-    /// Clear a CPU interrupt
-    #[inline]
-    pub fn clear(core: Cpu, which: CpuInterrupt) {
-        let cpu_interrupt_number = which as usize;
-        unsafe {
-            let intr_cntrl = intr_cntrl(core, cpu_interrupt_number);
-            let mut val = InterruptControl(intr_cntrl.read_volatile());
-            val.set_pending(false);
-            intr_cntrl.write_volatile(val.0);
-        }
-    }
-
-    /// Get interrupt priority
-    #[inline]
-    pub(super) fn get_priority_by_core(core: Cpu, cpu_interrupt: CpuInterrupt) -> Priority {
-        let cpu_interrupt_number = cpu_interrupt as usize;
-        unsafe {
-            let intr_cntrl = intr_cntrl(core, cpu_interrupt_number);
-            let val = InterruptControl(intr_cntrl.read_volatile());
-            core::mem::transmute::<u8, Priority>(val.priority())
-        }
     }
 }

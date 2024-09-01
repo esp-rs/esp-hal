@@ -5,6 +5,7 @@
 //! GPIO3
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: generic-queue
 
 #![no_std]
 #![no_main]
@@ -15,23 +16,14 @@ use critical_section::Mutex;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::{any_pin::AnyPin, Gpio2, Gpio3, GpioPin, Input, Io, Level, Output, Pull},
+    gpio::{AnyPin, Gpio2, Gpio3, GpioPin, Input, Io, Level, Output, Pull},
     macros::handler,
     peripherals::Peripherals,
     system::SystemControl,
-    timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
+    timer::timg::TimerGroup,
     InterruptConfigurable,
 };
 use hil_test as _;
-
-macro_rules! mk_static {
-    ($t:ty,$val:expr) => {{
-        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
-        #[deny(unused_attributes)]
-        let x = STATIC_CELL.uninit().write(($val));
-        x
-    }};
-}
 
 static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
 static INPUT_PIN: Mutex<RefCell<Option<Input<'static, Gpio2>>>> = Mutex::new(RefCell::new(None));

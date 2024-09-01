@@ -1,6 +1,7 @@
-//! # Clock Control
+//! # CPU Clock Control
 //!
 //! ## Overview
+//!
 //! Clocks are mainly sourced from oscillator (OSC), RC, and PLL circuits, and
 //! then processed by the dividers or selectors, which allows most functional
 //! modules to select their working clock according to their power consumption
@@ -71,6 +72,8 @@
 //! ```
 
 use fugit::HertzU32;
+#[cfg(esp32c2)]
+use portable_atomic::{AtomicU32, Ordering};
 
 #[cfg(any(esp32, esp32c2))]
 use crate::rtc_cntl::RtcClock;
@@ -333,6 +336,26 @@ pub struct RawClocks {
     pub pll_96m_clock: HertzU32,
 }
 
+cfg_if::cfg_if! {
+    if #[cfg(esp32c2)] {
+        static XTAL_FREQ_MHZ: AtomicU32 = AtomicU32::new(40);
+
+        pub(crate) fn xtal_freq_mhz() -> u32 {
+            XTAL_FREQ_MHZ.load(Ordering::Relaxed)
+        }
+    } else if #[cfg(esp32h2)] {
+        pub(crate) fn xtal_freq_mhz() -> u32 {
+            32
+        }
+    } else if #[cfg(any(esp32, esp32s2))] {
+        // Function would be unused
+    } else {
+        pub(crate) fn xtal_freq_mhz() -> u32 {
+            40
+        }
+    }
+}
+
 /// Used to configure the frequencies of the clocks present in the chip.
 ///
 /// After setting all frequencies, call the freeze function to apply the
@@ -429,6 +452,7 @@ impl<'d> ClockControl<'d> {
         } else {
             26
         };
+        XTAL_FREQ_MHZ.store(xtal_freq, Ordering::Relaxed);
 
         ClockControl {
             _private: clock_control.into_ref(),
@@ -452,6 +476,7 @@ impl<'d> ClockControl<'d> {
         } else {
             XtalClock::RtcXtalFreq26M
         };
+        XTAL_FREQ_MHZ.store(xtal_freq.mhz(), Ordering::Relaxed);
 
         let pll_freq = PllClock::Pll480MHz;
 

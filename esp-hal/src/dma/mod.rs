@@ -1,6 +1,7 @@
 //! # Direct Memory Access (DMA)
 //!
 //! ## Overview
+//!
 //! The DMA driver provides an interface to efficiently transfer data between
 //! different memory regions and peripherals within the ESP microcontroller
 //! without involving the CPU. The DMA controller is responsible for managing
@@ -10,13 +11,15 @@
 //! `ESP32-S2` are using older `PDMA` controller, whenever other chips are using
 //! newer `GDMA` controller.
 //!
-//! ## Examples
-//! ### Initialize and Utilize DMA Controller in `SPI`
+//! ## Example
+//!
+//! ### Initialize and utilize DMA controller in `SPI`
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::gpio::Io;
-//! # use esp_hal::spi::{master::{Spi, prelude::*}, SpiMode};
+//! # use esp_hal::spi::{master::Spi, SpiMode};
 //! # use esp_hal::dma::{Dma, DmaPriority};
 //! # use crate::esp_hal::prelude::_fugit_RateExtU32;
 //! let dma = Dma::new(peripherals.DMA);
@@ -441,8 +444,8 @@ macro_rules! dma_circular_buffers_chunk_size {
 macro_rules! dma_descriptors_chunk_size {
     ($tx_size:expr, $rx_size:expr, $chunk_size:expr) => {{
         // these will check for size at compile time
-        const _: () = assert!($chunk_size <= 4092, "chunk size must be <= 4092");
-        const _: () = assert!($chunk_size > 0, "chunk size must be > 0");
+        const _: () = ::core::assert!($chunk_size <= 4092, "chunk size must be <= 4092");
+        const _: () = ::core::assert!($chunk_size > 0, "chunk size must be > 0");
 
         static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor;
             ($tx_size + $chunk_size - 1) / $chunk_size] =
@@ -470,8 +473,8 @@ macro_rules! dma_descriptors_chunk_size {
 macro_rules! dma_circular_descriptors_chunk_size {
     ($tx_size:expr, $rx_size:expr, $chunk_size:expr) => {{
         // these will check for size at compile time
-        const _: () = assert!($chunk_size <= 4092, "chunk size must be <= 4092");
-        const _: () = assert!($chunk_size > 0, "chunk size must be > 0");
+        const _: () = ::core::assert!($chunk_size <= 4092, "chunk size must be <= 4092");
+        const _: () = ::core::assert!($chunk_size > 0, "chunk size must be > 0");
 
         const tx_descriptor_len: usize = if $tx_size > $chunk_size * 2 {
             ($tx_size + $chunk_size - 1) / $chunk_size
@@ -523,17 +526,26 @@ pub enum DmaError {
 #[cfg(gdma)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(missing_docs)]
 pub enum DmaPriority {
+    /// The lowest priority level (Priority 0).
     Priority0 = 0,
+    /// Priority level 1.
     Priority1 = 1,
+    /// Priority level 2.
     Priority2 = 2,
+    /// Priority level 3.
     Priority3 = 3,
+    /// Priority level 4.
     Priority4 = 4,
+    /// Priority level 5.
     Priority5 = 5,
+    /// Priority level 6.
     Priority6 = 6,
+    /// Priority level 7.
     Priority7 = 7,
+    /// Priority level 8.
     Priority8 = 8,
+    /// The highest priority level (Priority 9).
     Priority9 = 9,
 }
 
@@ -542,8 +554,8 @@ pub enum DmaPriority {
 #[cfg(pdma)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(missing_docs)]
 pub enum DmaPriority {
+    /// The lowest priority level (Priority 0).
     Priority0 = 0,
 }
 
@@ -860,10 +872,12 @@ impl DescriptorChain {
 
 /// Block size for transfers to/from psram
 #[derive(Copy, Clone, Debug, PartialEq)]
-#[allow(missing_docs)]
 pub enum DmaExtMemBKSize {
+    /// External memory block size of 16 bytes.
     Size16 = 0,
+    /// External memory block size of 32 bytes.
     Size32 = 1,
+    /// External memory block size of 64 bytes.
     Size64 = 2,
 }
 
@@ -2828,12 +2842,12 @@ pub(crate) mod asynch {
 
     use super::*;
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct DmaTxFuture<'a, TX>
     where
         TX: Tx,
     {
         pub(crate) tx: &'a mut TX,
-        _a: (),
     }
 
     impl<'a, TX> DmaTxFuture<'a, TX>
@@ -2841,7 +2855,7 @@ pub(crate) mod asynch {
         TX: Tx,
     {
         pub fn new(tx: &'a mut TX) -> Self {
-            Self { tx, _a: () }
+            Self { tx }
         }
     }
 
@@ -2880,12 +2894,12 @@ pub(crate) mod asynch {
         }
     }
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct DmaRxFuture<'a, RX>
     where
         RX: Rx,
     {
         pub(crate) rx: &'a mut RX,
-        _a: (),
     }
 
     impl<'a, RX> DmaRxFuture<'a, RX>
@@ -2893,7 +2907,7 @@ pub(crate) mod asynch {
         RX: Rx,
     {
         pub fn new(rx: &'a mut RX) -> Self {
-            Self { rx, _a: () }
+            Self { rx }
         }
 
         #[allow(dead_code)] // Dead on the C2

@@ -621,26 +621,22 @@ unsafe extern "C" fn stack_chk_fail() {
 
 #[doc(hidden)]
 /// Helper macro for checking doctest code snippets
-#[cfg(not(host_os = "windows"))]
 #[macro_export]
 macro_rules! before_snippet {
     () => {
-        core::include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../esp-hal/doc-helper/before"
-        ))
-    };
-}
-
-#[doc(hidden)]
-/// Helper macro for checking doctest code snippets
-#[cfg(host_os = "windows")]
-#[macro_export]
-macro_rules! before_snippet {
-    () => {
-        core::include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "\\..\\esp-hal\\doc-helper\\before"
-        ))
+        r#"
+# #![no_std]
+# use esp_hal::peripherals::Peripherals;
+# use esp_hal::clock::ClockControl;
+# use esp_hal::system::SystemControl;
+# #[panic_handler]
+# fn panic(_ : &core::panic::PanicInfo) -> ! {
+#     loop {}
+# }
+# fn main() {
+#   let peripherals = Peripherals::take();
+#   let system = SystemControl::new(peripherals.SYSTEM);
+#   let mut clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+"#
     };
 }

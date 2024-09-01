@@ -60,7 +60,7 @@ jobs:
         run: cargo install cross
 
       - name: Build xtasks
-        run: cross build --release --target ${{ matrix.host.rust-target }}
+        run: cross build --release --target ${{ matrix.host.rust-target }} -p xtask
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -153,29 +153,29 @@ jobs:
           # RISC-V devices:
           - soc: esp32c2
             runner: esp32c2-jtag
-            usb: USB2
             host: aarch64
+            hubs: "1 3"
           - soc: esp32c3
             runner: esp32c3-usb
-            usb: ACM0
             host: armv7
+            hubs: "1-1"
           - soc: esp32c6
             runner: esp32c6-usb
-            usb: ACM0
             host: armv7
+            hubs: "1-1"
           - soc: esp32h2
             runner: esp32h2-usb
-            usb: USB0
             host: armv7
+            hubs: "1-1"
           # Xtensa devices:
           - soc: esp32s2
             runner: esp32s2-jtag
-            usb: USB1
             host: armv7
+            hubs: "1-1"
           - soc: esp32s3
             runner: esp32s3-usb
-            usb: USB0
             host: armv7
+            hubs: "1-1"
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -186,9 +186,38 @@ jobs:
         with:
           name: xtask-${{ matrix.target.host }}
 
+      - name: Cycle USB ports
+        run: |
+          export PATH=$PATH:/home/espressif/.cargo/bin
+          for i in {1..10}; do
+            # Disable all used hubs
+            for hub in ${{ matrix.target.hubs }}; do
+              sudo uhubctl -a off -l $hub
+            done
+
+            sleep 0.5
+
+            # Enable all used hubs
+            for hub in ${{ matrix.target.hubs }}; do
+              sudo uhubctl -a on -l $hub
+            done
+
+            sleep 0.5
+
+            if probe-rs list | grep -q "\[0\]:"; then
+              break
+            fi
+          done
+
       - name: Run Tests
         id: run-tests
         run: |
           export PATH=$PATH:/home/espressif/.cargo/bin
           chmod +x xtask
           ./xtask run-elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
+
+      - name: Clean up
+        if: always()
+        run: |
+          rm -rf tests-${{ matrix.target.soc }}
+          rm -f xtask

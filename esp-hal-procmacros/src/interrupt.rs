@@ -24,7 +24,7 @@ pub(crate) fn check_attr_whitelist(
 
     'o: for attr in attrs {
         for val in whitelist {
-            if eq(&attr, &val) {
+            if eq(attr, val) {
                 continue 'o;
             }
         }
@@ -35,7 +35,7 @@ pub(crate) fn check_attr_whitelist(
             }
         };
 
-        return Err(Error::new(attr.span(), &err_str).to_compile_error().into());
+        return Err(Error::new(attr.span(), err_str).to_compile_error().into());
     }
 
     Ok(())

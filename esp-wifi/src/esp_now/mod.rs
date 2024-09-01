@@ -438,6 +438,8 @@ impl<'d> EspNowSender<'d> {
     }
 }
 
+#[allow(unknown_lints)]
+#[allow(clippy::too_long_first_doc_paragraph)]
 /// This struct is returned by a sync esp now send. Invoking `wait` method of
 /// this struct will block current task until the callback function of esp now
 /// send is called and return the status of previous sending.
@@ -535,6 +537,8 @@ impl<'d> Drop for EspNowRc<'d> {
     }
 }
 
+#[allow(unknown_lints)]
+#[allow(clippy::too_long_first_doc_paragraph)]
 /// ESP-NOW is a kind of connectionless Wi-Fi communication protocol that is
 /// defined by Espressif. In ESP-NOW, application data is encapsulated in a
 /// vendor-specific action frame and then transmitted from one Wi-Fi device to
@@ -832,14 +836,12 @@ mod asynch {
         /// This function takes mutable reference to self because the
         /// implementation of `ReceiveFuture` is not logically thread
         /// safe.
-        #[must_use]
         pub fn receive_async(&mut self) -> ReceiveFuture<'_> {
             self.receiver.receive_async()
         }
 
         /// The returned future must not be dropped before it's ready to avoid
         /// getting wrong status for sendings.
-        #[must_use]
         pub fn send_async<'s, 'r>(
             &'s mut self,
             dst_addr: &'r [u8; 6],
@@ -849,6 +851,7 @@ mod asynch {
         }
     }
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct SendFuture<'s, 'r> {
         _sender: PhantomData<&'s mut EspNowSender<'s>>,
         addr: &'r [u8; 6],
@@ -886,6 +889,7 @@ mod asynch {
     /// It's not logically safe to poll multiple instances of `ReceiveFuture`
     /// simultaneously since the callback can only wake one future, leaving
     /// the rest of them unwakable.
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct ReceiveFuture<'r>(PhantomData<&'r mut EspNowReceiver<'r>>);
 
     impl<'r> core::future::Future for ReceiveFuture<'r> {

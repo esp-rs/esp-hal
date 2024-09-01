@@ -158,6 +158,7 @@ pub mod asynch {
         }
     }
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct HciReadyEventFuture;
 
     impl core::future::Future for HciReadyEventFuture {

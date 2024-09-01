@@ -38,15 +38,19 @@ macro_rules! chip {
 pub use chip;
 
 pub(crate) mod constants {
+    /// System clock frequency for the I2S peripheral, in Hertz.
     pub const I2S_SCLK: u32 = 160_000_000;
+    /// Default clock source for the I2S peripheral.
     pub const I2S_DEFAULT_CLK_SRC: u32 = 2;
-
+    /// Start address of the RMT (Remote Control) peripheral's RAM.
     pub const RMT_RAM_START: usize = 0x3f416400;
+    /// Size of the RAM allocated per RMT channel, in bytes.
     pub const RMT_CHANNEL_RAM_SIZE: usize = 64;
-
+    /// Start address of the system's DRAM (low range).
     pub const SOC_DRAM_LOW: u32 = 0x3FFB_0000;
+    /// End address of the system's DRAM (high range).
     pub const SOC_DRAM_HIGH: u32 = 0x4000_0000;
-
+    /// Reference clock tick frequency, set to 1 MHz.
     pub const REF_TICK: fugit::HertzU32 = fugit::HertzU32::MHz(1);
 }
 

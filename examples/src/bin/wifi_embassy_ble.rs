@@ -58,27 +58,23 @@ async fn main(_spawner: Spawner) -> ! {
     .unwrap();
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
-    let button = Input::new(io.pins.gpio0, Pull::Down);
-    #[cfg(any(
-        feature = "esp32c2",
-        feature = "esp32c3",
-        feature = "esp32c6",
-        feature = "esp32h2"
-    ))]
-    let button = Input::new(io.pins.gpio9, Pull::Down);
-
-    #[cfg(feature = "esp32")]
-    {
-        let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-        esp_hal_embassy::init(&clocks, timg1.timer0);
+    cfg_if::cfg_if! {
+        if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
+        let button = Input::new(io.pins.gpio0, Pull::Down);
+        } else {
+        let button = Input::new(io.pins.gpio9, Pull::Down);
+        }
     }
 
-    #[cfg(not(feature = "esp32"))]
-    {
-        let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER)
-            .split::<esp_hal::timer::systimer::Target>();
-        esp_hal_embassy::init(&clocks, systimer.alarm0);
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32")] {
+            let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
+            esp_hal_embassy::init(&clocks, timg1.timer0);
+        } else {
+            use esp_hal::timer::systimer::{SystemTimer, Target};
+            let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+            esp_hal_embassy::init(&clocks, systimer.alarm0);
+        }
     }
 
     let mut bluetooth = peripherals.BT;

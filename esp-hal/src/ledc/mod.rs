@@ -1,6 +1,7 @@
 //! # LED Controller (LEDC)
 //!
 //! ## Overview
+//!
 //! The LEDC peripheral is primarily designed to control the intensity of LEDs,
 //! although it can also be used to generate PWM signals for other purposes. It
 //! has multiple channels which can generate independent waveforms that can be
@@ -15,6 +16,7 @@
 //! supported chips.
 //!
 //! ## Examples
+//!
 //! ### Low Speed Channel
 //! The following will configure the Low Speed Channel0 to 24kHz output with
 //! 10% duty using the ABPClock
@@ -60,8 +62,6 @@
 //! - Source clock selection is not supported
 //! - Interrupts are not supported
 
-#![allow(missing_docs)] // TODO: Remove when able
-
 use self::{
     channel::Channel,
     timer::{Timer, TimerSpeed},
@@ -79,6 +79,7 @@ pub mod timer;
 /// Global slow clock source
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub enum LSGlobalClkSource {
+    /// APB clock.
     APBClk,
 }
 
@@ -96,7 +97,9 @@ pub struct HighSpeed {}
 /// Used to specify LowSpeed Timer/Channel
 pub struct LowSpeed {}
 
+/// Trait representing the speed mode of a clock or peripheral.
 pub trait Speed {
+    /// Boolean constant indicating whether the speed is high-speed.
     const IS_HS: bool;
 }
 

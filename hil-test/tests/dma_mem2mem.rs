@@ -38,10 +38,14 @@ mod tests {
 
         let dma = Dma::new(peripherals.DMA);
         let channel = dma.channel0.configure(false, DmaPriority::Priority0);
-        #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))]
-        let dma_peripheral = peripherals.SPI2;
-        #[cfg(not(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3")))]
-        let dma_peripheral = peripherals.MEM2MEM1;
+
+        cfg_if::cfg_if! {
+            if #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))] {
+                let dma_peripheral = peripherals.SPI2;
+            } else {
+                let dma_peripheral = peripherals.MEM2MEM1;
+            }
+        }
 
         let mut mem2mem =
             Mem2Mem::new(channel, dma_peripheral, tx_descriptors, rx_descriptors).unwrap();
@@ -68,10 +72,14 @@ mod tests {
 
         let dma = Dma::new(peripherals.DMA);
         let channel = dma.channel0.configure(false, DmaPriority::Priority0);
-        #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))]
-        let dma_peripheral = peripherals.SPI2;
-        #[cfg(not(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3")))]
-        let dma_peripheral = peripherals.MEM2MEM1;
+
+        cfg_if::cfg_if! {
+            if #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))] {
+                let dma_peripheral = peripherals.SPI2;
+            } else {
+                let dma_peripheral = peripherals.MEM2MEM1;
+            }
+        }
 
         let mut mem2mem = Mem2Mem::new_with_chunk_size(
             channel,
@@ -102,10 +110,14 @@ mod tests {
 
         let dma = Dma::new(peripherals.DMA);
         let channel = dma.channel0.configure(false, DmaPriority::Priority0);
-        #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))]
-        let dma_peripheral = peripherals.SPI2;
-        #[cfg(not(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3")))]
-        let dma_peripheral = peripherals.MEM2MEM1;
+
+        cfg_if::cfg_if! {
+            if #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))] {
+                let dma_peripheral = peripherals.SPI2;
+            } else {
+                let dma_peripheral = peripherals.MEM2MEM1;
+            }
+        }
 
         let (tx_descriptors, rx_descriptors) = dma_descriptors!(0, 1024);
         match Mem2Mem::new_with_chunk_size(
@@ -130,10 +142,14 @@ mod tests {
 
         let dma = Dma::new(peripherals.DMA);
         let channel = dma.channel0.configure(false, DmaPriority::Priority0);
-        #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))]
-        let dma_peripheral = peripherals.SPI2;
-        #[cfg(not(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3")))]
-        let dma_peripheral = peripherals.MEM2MEM1;
+
+        cfg_if::cfg_if! {
+            if #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))] {
+                let dma_peripheral = peripherals.SPI2;
+            } else {
+                let dma_peripheral = peripherals.MEM2MEM1;
+            }
+        }
 
         let (tx_descriptors, rx_descriptors) = dma_descriptors!(1024, 0);
         match Mem2Mem::new_with_chunk_size(
@@ -156,10 +172,14 @@ mod tests {
 
         let dma = Dma::new(peripherals.DMA);
         let channel = dma.channel0.configure(false, DmaPriority::Priority0);
-        #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))]
-        let dma_peripheral = peripherals.SPI2;
-        #[cfg(not(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3")))]
-        let dma_peripheral = peripherals.MEM2MEM1;
+
+        cfg_if::cfg_if! {
+            if #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))] {
+                let dma_peripheral = peripherals.SPI2;
+            } else {
+                let dma_peripheral = peripherals.MEM2MEM1;
+            }
+        }
 
         let (tx_descriptors, rx_descriptors) = dma_descriptors!(1024, 1024);
         match Mem2Mem::new_with_chunk_size(
@@ -182,10 +202,14 @@ mod tests {
 
         let dma = Dma::new(peripherals.DMA);
         let channel = dma.channel0.configure(false, DmaPriority::Priority0);
-        #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))]
-        let dma_peripheral = peripherals.SPI2;
-        #[cfg(not(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3")))]
-        let dma_peripheral = peripherals.MEM2MEM1;
+
+        cfg_if::cfg_if! {
+            if #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))] {
+                let dma_peripheral = peripherals.SPI2;
+            } else {
+                let dma_peripheral = peripherals.MEM2MEM1;
+            }
+        }
 
         let (tx_descriptors, rx_descriptors) = dma_descriptors!(1024, 1024);
         match Mem2Mem::new_with_chunk_size(

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## 0.8.0 - 2024-08-29
+
+### Added
+
 - Implement `embedded_io::{ReadReady, WriteReady}` traits for `WifiStack` (#1882)
 - Implement `queue_msg_waiting` on the os_adapter (#1925)
 - Added API for promiscuous mode (#1935)
@@ -20,8 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Increased NPL event queue size to prevent overflow (#1891)
-
-### Removed
 
 ## 0.7.1 - 2024-07-17
 

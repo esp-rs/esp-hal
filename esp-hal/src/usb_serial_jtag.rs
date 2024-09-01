@@ -1,6 +1,7 @@
 //! USB Serial/JTAG Controller (USB_SERIAL_JTAG)
 //!
 //! ## Overview
+//!
 //! The USB Serial/JTAG controller can be used to program the SoC's flash, read
 //! program output, or attach a debugger to the running program. This is
 //! possible for any computer with a USB host (hereafter referred to as 'host'),
@@ -27,6 +28,7 @@
 //!   connect to a host computer
 //!
 //! ## Usage
+//!
 //! The USB Serial/JTAG driver implements a number of third-party traits, with
 //! the intention of making the HAL inter-compatible with various device drivers
 //! from the community. This includes, but is not limited to, the [embedded-hal]
@@ -38,6 +40,7 @@
 //! with this driver.
 //!
 //! ## Examples
+//!
 //! ### Sending and Receiving Data
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -45,7 +48,7 @@
 //! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 //!
 //! // Write bytes out over the USB Serial/JTAG:
-//! usb_serial.write_bytes("Hello, world!".as_bytes()).expect("write error!");
+//! usb_serial.write_bytes(b"Hello, world!").expect("write error!");
 //! }
 //! ```
 //! 
@@ -681,6 +684,7 @@ mod asynch {
     static WAKER_TX: AtomicWaker = AtomicWaker::new();
     static WAKER_RX: AtomicWaker = AtomicWaker::new();
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct UsbSerialJtagWriteFuture<'d> {
         phantom: PhantomData<&'d mut USB_DEVICE>,
     }
@@ -723,6 +727,7 @@ mod asynch {
         }
     }
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct UsbSerialJtagReadFuture<'d> {
         phantom: PhantomData<&'d mut USB_DEVICE>,
     }

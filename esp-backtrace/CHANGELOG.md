@@ -8,15 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
-- add custom-pre-backtrace feature (#1822)
 
 ### Changed
-
-- Improve panic message printing (#1823)
 
 ### Fixed
 
 ### Removed
+
+## 0.14.0 - 2024-08-29
+
+### Added
+
+- Add custom-pre-backtrace feature (#1822)
+
+### Changed
+
+- Improve panic message printing (#1823)
 
 ## 0.13.0 - 2024-07-16
 

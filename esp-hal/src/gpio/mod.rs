@@ -1,16 +1,19 @@
 //! # General Purpose I/Os (GPIO)
 //!
 //! ## Overview
+//!
 //! Each pin can be used as a general-purpose I/O, or be connected to an
 //! internal peripheral signal.
 //!
 //! ## Configuration
+//!
 //! This driver supports various operations on GPIO pins, including setting the
 //! pin mode, direction, and manipulating the pin state (setting high/low,
 //! toggling). It provides an interface to interact with GPIO pins on ESP chips,
 //! allowing developers to control and read the state of the pins.
 //!
 //! ## Usage
+//!
 //! This module also implements a number of traits from [embedded-hal] to
 //! provide a common interface for GPIO pins.
 //!
@@ -18,16 +21,19 @@
 //! designed struct from the pac struct `GPIO` and `IO_MUX` using `Io::new`.
 //!
 //! ### Pin Types
+//!
 //! - [Input] pins can be used as digital inputs.
 //! - [Output] and [OutputOpenDrain] pins can be used as digital outputs.
 //! - [Flex] pin is a pin that can be used as an input and output pin.
-//! - [any_pin::AnyPin] pin is type-erased that can be used for peripherals
-//!   signals.
-//!    - It supports inverting the pin, so the peripheral signal can be
-//!      inverted.
+//! - [AnyPin] and [AnyInputOnlyPin] are type-erased GPIO pins with support for
+//!   inverted signalling.
+//! - [DummyPin] is a useful for cases where peripheral driver requires a pin,
+//!   but real pin cannot be used.
 //!
 //! ## Examples
+//!
 //! ### Set up a GPIO as an Output
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::{Io, Level, Output};
@@ -37,6 +43,7 @@
 //! ```
 //! 
 //! ### Blink an LED
+//!
 //! See the [Commonly Used Setup] section of the crate documentation.
 //!
 //! ### Inverting a signal using `AnyPin`
@@ -67,8 +74,11 @@ use crate::{
 #[cfg(touch)]
 pub(crate) use crate::{touch_common, touch_into};
 
-pub mod any_pin;
-pub mod dummy_pin;
+mod any_pin;
+mod dummy_pin;
+
+pub use any_pin::{AnyInputOnlyPin, AnyPin};
+pub use dummy_pin::DummyPin;
 
 #[cfg(soc_etm)]
 pub mod etm;
@@ -170,31 +180,46 @@ pub struct RtcOutput;
 pub struct Analog;
 
 /// Drive strength (values are approximates)
-#[allow(missing_docs)]
 pub enum DriveStrength {
+    /// Drive strength of approximately 5mA.
     I5mA  = 0,
+    /// Drive strength of approximately 10mA.
     I10mA = 1,
+    /// Drive strength of approximately 20mA.
     I20mA = 2,
+    /// Drive strength of approximately 40mA.
     I40mA = 3,
 }
 
 /// Alternate functions
+///
+/// GPIO pins can be configured for various functions, such as GPIO
+/// or being directly connected to a peripheral's signal like UART, SPI, etc.
+/// The `AlternateFunction` enum allows to select one of several functions that
+/// a pin can perform, rather than using it as a general-purpose input or
+/// output.
 #[derive(PartialEq)]
-#[allow(missing_docs)]
 pub enum AlternateFunction {
+    /// Alternate function 0.
     Function0 = 0,
+    /// Alternate function 1.
     Function1 = 1,
+    /// Alternate function 2.
     Function2 = 2,
+    /// Alternate function 3.
     Function3 = 3,
+    /// Alternate function 4.
     Function4 = 4,
+    /// Alternate function 5.
     Function5 = 5,
 }
 
 /// RTC function
 #[derive(PartialEq)]
-#[allow(missing_docs)]
 pub enum RtcFunction {
+    /// RTC mode.
     Rtc     = 0,
+    /// Digital mode.
     Digital = 1,
 }
 
@@ -1390,9 +1415,9 @@ macro_rules! gpio {
             )+
 
             /// Pins available on this chip
-            #[allow(missing_docs)]
             pub struct Pins {
                 $(
+                    /// GPIO pin number `$gpionum`.
                     pub [< gpio $gpionum >] : GpioPin<$gpionum>,
                 )+
             }
@@ -2847,6 +2872,7 @@ mod asynch {
         }
     }
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct PinFuture {
         pin_num: u8,
     }

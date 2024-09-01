@@ -2829,6 +2829,7 @@ mod asynch {
         }
     }
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct WifiEventFuture {
         event: WifiEvent,
     }
@@ -2855,6 +2856,7 @@ mod asynch {
         }
     }
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct MultiWifiEventFuture {
         event: EnumSet<WifiEvent>,
     }

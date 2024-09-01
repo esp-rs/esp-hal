@@ -8,6 +8,7 @@
 //! operating system, or simply as a general-purpose timer.
 //!
 //! ## Configuration
+//!
 //! The timer consists of two counters, `UNIT0` and `UNIT1`. The counter values
 //! can be monitored by 3 comparators, `COMP0`, `COMP1`, and `COMP2`.
 //!
@@ -81,6 +82,7 @@ use crate::{
     interrupt::{self, InterruptHandler},
     peripheral::Peripheral,
     peripherals::{Interrupt, SYSTIMER},
+    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
     Async,
     Blocking,
     Cpu,
@@ -112,22 +114,42 @@ impl<'d> SystemTimer<'d> {
         if #[cfg(esp32s2)] {
             /// Bitmask to be applied to the raw register value.
             pub const BIT_MASK: u64 = u64::MAX;
-            /// The ticks per second the underlying peripheral uses.
-            pub const TICKS_PER_SECOND: u64 = 80_000_000;
             // Bitmask to be applied to the raw period register value.
             const PERIOD_MASK: u64 = 0x1FFF_FFFF;
         } else {
             /// Bitmask to be applied to the raw register value.
             pub const BIT_MASK: u64 = 0xF_FFFF_FFFF_FFFF;
-            /// The ticks per second the underlying peripheral uses.
-            pub const TICKS_PER_SECOND: u64 = 16_000_000;
             // Bitmask to be applied to the raw period register value.
             const PERIOD_MASK: u64 = 0x3FF_FFFF;
         }
     }
 
+    /// Returns the tick frequency of the underlying timer unit.
+    pub fn ticks_per_second() -> u64 {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s2)] {
+                80_000_000
+            } else if #[cfg(esp32h2)] {
+                // The counters and comparators are driven using `XTAL_CLK`.
+                // The average clock frequency is fXTAL_CLK/2, which is 16 MHz.
+                // The timer counting is incremented by 1/16 μs on each `CNT_CLK` cycle.
+                const MULTIPLIER: u64 = 10_000_000 / 20;
+                crate::clock::xtal_freq_mhz() as u64 * MULTIPLIER
+            } else {
+                // The counters and comparators are driven using `XTAL_CLK`.
+                // The average clock frequency is fXTAL_CLK/2.5, which is 16 MHz.
+                // The timer counting is incremented by 1/16 μs on each `CNT_CLK` cycle.
+                const MULTIPLIER: u64 = 10_000_000 / 25;
+                crate::clock::xtal_freq_mhz() as u64 * MULTIPLIER
+            }
+        }
+    }
+
     /// Create a new instance.
     pub fn new(_systimer: impl Peripheral<P = SYSTIMER> + 'd) -> Self {
+        // Don't reset Systimer as it will break `current_time`, only enable it
+        PeripheralClockControl::enable(PeripheralEnable::Systimer);
+
         #[cfg(soc_etm)]
         etm::enable_etm();
 
@@ -396,20 +418,20 @@ pub trait Comparator {
     fn set_enable(&self, enable: bool) {
         let systimer = unsafe { &*SYSTIMER::ptr() };
 
-        #[cfg(not(esp32s2))]
         critical_section::with(|_| {
+            #[cfg(not(esp32s2))]
             systimer.conf().modify(|_, w| match self.channel() {
                 0 => w.target0_work_en().bit(enable),
                 1 => w.target1_work_en().bit(enable),
                 2 => w.target2_work_en().bit(enable),
                 _ => unreachable!(),
             });
-        });
 
-        #[cfg(esp32s2)]
-        systimer
-            .target_conf(self.channel() as usize)
-            .modify(|_r, w| w.work_en().bit(enable));
+            #[cfg(esp32s2)]
+            systimer
+                .target_conf(self.channel() as usize)
+                .modify(|_r, w| w.work_en().bit(enable));
+        });
     }
 
     /// Returns true if the comparator has been enabled. This means
@@ -524,8 +546,47 @@ pub trait Comparator {
             2 => Interrupt::SYSTIMER_TARGET2,
             _ => unreachable!(),
         };
+
+        #[cfg(not(esp32s2))]
         unsafe {
             interrupt::bind_interrupt(interrupt, handler.handler());
+        }
+
+        #[cfg(esp32s2)]
+        {
+            // ESP32-S2 Systimer interrupts are edge triggered. Our interrupt
+            // handler calls each of the handlers, regardless of which one triggered the
+            // interrupt. This mess registers an intermediate handler that
+            // checks if an interrupt is active before calling the associated
+            // handler functions.
+
+            static mut HANDLERS: [Option<extern "C" fn()>; 3] = [None, None, None];
+
+            #[crate::prelude::ram]
+            unsafe extern "C" fn _handle_interrupt<const CH: u8>() {
+                if unsafe { &*SYSTIMER::PTR }
+                    .int_raw()
+                    .read()
+                    .target(CH)
+                    .bit_is_set()
+                {
+                    let handler = unsafe { HANDLERS[CH as usize] };
+                    if let Some(handler) = handler {
+                        handler();
+                    }
+                }
+            }
+
+            unsafe {
+                HANDLERS[self.channel() as usize] = Some(handler.handler());
+                let handler = match self.channel() {
+                    0 => _handle_interrupt::<0>,
+                    1 => _handle_interrupt::<1>,
+                    2 => _handle_interrupt::<2>,
+                    _ => unreachable!(),
+                };
+                interrupt::bind_interrupt(interrupt, handler);
+            }
         }
         unwrap!(interrupt::enable(interrupt, handler.priority()));
     }
@@ -771,7 +832,7 @@ where
         }
 
         let us = period.ticks();
-        let ticks = us * (SystemTimer::TICKS_PER_SECOND / 1_000_000) as u32;
+        let ticks = us * (SystemTimer::ticks_per_second() / 1_000_000) as u32;
 
         self.comparator.set_mode(ComparatorMode::Period);
         self.comparator.set_period(ticks);
@@ -840,7 +901,7 @@ where
             }
         };
 
-        let us = ticks / (SystemTimer::TICKS_PER_SECOND / 1_000_000);
+        let us = ticks / (SystemTimer::ticks_per_second() / 1_000_000);
 
         Instant::<u64, 1, 1_000_000>::from_ticks(us)
     }
@@ -849,7 +910,7 @@ where
         let mode = self.comparator.get_mode();
 
         let us = value.ticks();
-        let ticks = us * (SystemTimer::TICKS_PER_SECOND / 1_000_000);
+        let ticks = us * (SystemTimer::ticks_per_second() / 1_000_000);
 
         if matches!(mode, ComparatorMode::Period) {
             // Period mode
@@ -962,6 +1023,7 @@ mod asynch {
     const INIT: AtomicWaker = AtomicWaker::new();
     static WAKERS: [AtomicWaker; NUM_ALARMS] = [INIT; NUM_ALARMS];
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct AlarmFuture<'a, COMP: Comparator, UNIT: Unit> {
         alarm: &'a Alarm<'a, Periodic, crate::Async, COMP, UNIT>,
     }
@@ -1060,9 +1122,9 @@ pub mod etm {
     //!
     //! ## Overview
     //!
-    //!    The system timer supports the Event Task Matrix (ETM) function, which
-    //! allows the system timer’s    ETM events to trigger any
-    //!    peripherals’ ETM tasks.
+    //! The system timer supports the Event Task Matrix (ETM) function, which
+    //! allows the system timer’s ETM events to trigger any peripherals’ ETM
+    //! tasks.
     //!
     //!    The system timer can generate the following ETM events:
     //!    - SYSTIMER_EVT_CNT_CMPx: Indicates the alarm pulses generated by
@@ -1076,7 +1138,7 @@ pub mod etm {
     //! let syst = SystemTimer::new(peripherals.SYSTIMER);
     //! let syst_alarms = syst.split();
     //! let mut alarm0 = syst_alarms.alarm0.into_periodic();
-    //! alarm0.set_period(1.secs());
+    //! alarm0.set_period(1u32.secs());
     //!
     //! let timer_event = SysTimerEtmEvent::new(&mut alarm0);
     //! # }

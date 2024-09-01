@@ -1,13 +1,16 @@
-//! # Real-Time Clock Control and Low-power Management (RTC_CNTL)
+//! # Real-Time Control and Low-power Management (RTC_CNTL)
 //!
 //! ## Overview
-//! The RTC_CNTL peripheral is responsible for managing the real-time clock and
-//! low-power modes on the chip.
+//!
+//! The RTC_CNTL peripheral is responsible for managing the low-power modes on
+//! the chip.
 //!
 //! ## Configuration
-//!  It also includes the necessary configurations and constants for clock
+//!
+//! It also includes the necessary configurations and constants for clock
 //! sources and low-power management. The driver provides the following features
 //! and functionalities:
+//!
 //!    * Clock Configuration
 //!    * Calibration
 //!    * Low-Power Management
@@ -68,8 +71,6 @@
 //!     });
 //! }
 //! ```
-
-#![allow(missing_docs)] // TODO: Remove when able
 
 #[cfg(not(any(esp32c6, esp32h2)))]
 use fugit::HertzU32;
@@ -186,8 +187,10 @@ pub(crate) enum RtcCalSel {
 /// Low-power Management
 pub struct Rtc<'d> {
     _inner: PeripheralRef<'d, crate::peripherals::LPWR>,
+    /// Reset Watchdog Timer.
     pub rwdt: Rwdt,
     #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
+    /// Super Watchdog
     pub swd: Swd,
 }
 

@@ -80,11 +80,19 @@ name    = "spi_full_duplex_dma_async"
 harness = false
 
 [[test]]
+name    = "spi_full_duplex_dma_pcnt"
+harness = false
+
+[[test]]
 name    = "spi_half_duplex_read"
 harness = false
 
 [[test]]
 name    = "spi_half_duplex_write"
+harness = false
+
+[[test]]
+name    = "systimer"
 harness = false
 
 [[test]]
@@ -97,6 +105,10 @@ harness = false
 
 [[test]]
 name    = "rsa"
+harness = false
+
+[[test]]
+name    = "rsa_async"
 harness = false
 
 [[test]]
@@ -132,7 +144,7 @@ required-features = ["async", "embassy"]
 [[test]]
 name              = "embassy_interrupt_executor"
 harness           = false
-required-features = ["async", "embassy", "integrated-timers"]
+required-features = ["async", "embassy"]
 
 [[test]]
 name    = "twai"
@@ -145,7 +157,7 @@ defmt              = "0.3.8"
 defmt-rtt          = { version = "0.4.1", optional = true }
 embassy-futures    = "0.1.1"
 embassy-sync       = "0.6.0"
-embassy-time       = { version = "0.3.1", features = ["generic-queue-64"] }
+embassy-time       = { version = "0.3.1" }
 embedded-hal       = "1.0.0"
 embedded-hal-02    = { version = "0.2.7", package = "embedded-hal", features = ["unproven"] }
 embedded-hal-async = { version = "1.0.0", optional = true }
@@ -163,12 +175,17 @@ elliptic-curve      = { version = "0.13.8", default-features = false, features =
 embassy-executor    = { version = "0.6.0", default-features = false }
 # Add the `embedded-test/defmt` feature for more verbose testing
 embedded-test       = { version = "0.4.0", default-features = false }
+fugit               = "0.3.7"
 hex-literal         = "0.4.1"
 nb                  = "1.1.0"
 p192                = { version = "0.13.0", default-features = false, features = ["arithmetic"] }
 p256                = { version = "0.13.2", default-features = false, features = ["arithmetic"] }
 sha1                = { version = "0.10.6", default-features = false }
 sha2                = { version = "0.10.8", default-features = false }
+
+[build-dependencies]
+esp-build    = { version = "0.1.0", path = "../esp-build" }
+esp-metadata = { version = "0.3.0", path = "../esp-metadata" }
 
 [features]
 default = ["async", "embassy"]
@@ -205,8 +222,11 @@ embassy = [
     "embedded-test/external-executor",
     "dep:esp-hal-embassy",
 ]
+generic-queue = [
+    "embassy-time/generic-queue-64"
+]
 integrated-timers = [
-    "embassy-executor/integrated-timers",
+    "esp-hal-embassy/integrated-timers",
 ]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html#test

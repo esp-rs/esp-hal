@@ -1,6 +1,7 @@
 //! lcd_cam i8080 tests
 
 //% CHIPS: esp32s3
+//% FEATURES: generic-queue
 
 #![no_std]
 #![no_main]
@@ -9,7 +10,7 @@ use esp_hal::{
     clock::{ClockControl, Clocks},
     dma::{Dma, DmaDescriptor, DmaPriority},
     dma_buffers,
-    gpio::dummy_pin::DummyPin,
+    gpio::DummyPin,
     lcd_cam::{
         lcd::{
             i8080,

@@ -14,8 +14,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    interrupt::{self, Priority},
-    peripherals::{Interrupt, Peripherals},
+    peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
     timer::systimer::{
@@ -75,21 +74,17 @@ fn main() -> ! {
         alarm0.enable_interrupt(true);
 
         alarm1.set_interrupt_handler(systimer_target1);
-        alarm1.set_target(SystemTimer::now() + (SystemTimer::TICKS_PER_SECOND * 2));
+        alarm1.set_target(SystemTimer::now() + (SystemTimer::ticks_per_second() * 2));
         alarm1.enable_interrupt(true);
 
         alarm2.set_interrupt_handler(systimer_target2);
-        alarm2.set_target(SystemTimer::now() + (SystemTimer::TICKS_PER_SECOND * 3));
+        alarm2.set_target(SystemTimer::now() + (SystemTimer::ticks_per_second() * 3));
         alarm2.enable_interrupt(true);
 
         ALARM0.borrow_ref_mut(cs).replace(alarm0);
         ALARM1.borrow_ref_mut(cs).replace(alarm1);
         ALARM2.borrow_ref_mut(cs).replace(alarm2);
     });
-
-    interrupt::enable(Interrupt::SYSTIMER_TARGET0, Priority::Priority1).unwrap();
-    interrupt::enable(Interrupt::SYSTIMER_TARGET1, Priority::Priority3).unwrap();
-    interrupt::enable(Interrupt::SYSTIMER_TARGET2, Priority::Priority3).unwrap();
 
     let delay = Delay::new(&clocks);
 
