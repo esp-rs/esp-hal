@@ -37,18 +37,12 @@ mod tests {
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        
+
         let (sda, scl) = hil_test::i2c_pins!(io);
 
         // Create a new peripheral object with the described wiring and standard
         // I2C clock speed:
-        let i2c = I2C::new(
-            peripherals.I2C0,
-            sda,
-            scl,
-            100.kHz(),
-            &clocks,
-        );
+        let i2c = I2C::new(peripherals.I2C0, sda, scl, 100.kHz(), &clocks);
 
         Context { i2c }
     }

@@ -15,7 +15,7 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp_hal::{
     delay::Delay,
-    gpio::{AnyPin, Gpio2, Gpio3, GpioPin, Input, Io, Level, Output, Pull},
+    gpio::{AnyPin, GpioPin, Input, Io, Level, Output, Pull},
     macros::handler,
     timer::timg::TimerGroup,
     InterruptConfigurable,
@@ -23,11 +23,22 @@ use esp_hal::{
 use hil_test as _;
 
 static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
-static INPUT_PIN: Mutex<RefCell<Option<Input<'static, Gpio2>>>> = Mutex::new(RefCell::new(None));
+static INPUT_PIN: Mutex<RefCell<Option<Input<'static, TestGpio1>>>> =
+    Mutex::new(RefCell::new(None));
+
+cfg_if::cfg_if! {
+    if #[cfg(not(any(esp32s2, esp32s3)))] {
+        pub type TestGpio1 = GpioPin<2>;
+        pub type TestGpio2 = GpioPin<3>;
+    } else if #[cfg(any(esp32s2, esp32s3))] {
+        pub type TestGpio1 = GpioPin<9>;
+        pub type TestGpio2 = GpioPin<10>;
+    }
+}
 
 struct Context<'d> {
-    io2: Input<'d, Gpio2>,
-    io3: Output<'d, Gpio3>,
+    test_gpio1: Input<'d, TestGpio1>,
+    test_gpio2: Output<'d, TestGpio2>,
     delay: Delay,
 }
 
@@ -61,12 +72,14 @@ mod tests {
 
         let delay = Delay::new(&clocks);
 
+        let (gpio1, gpio2) = hil_test::common_test_pins!(io);
+
         let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
         esp_hal_embassy::init(&clocks, timg0.timer0);
 
         Context {
-            io2: Input::new(io.pins.gpio2, Pull::Down),
-            io3: Output::new(io.pins.gpio3, Level::Low),
+            test_gpio1: Input::new(gpio1, Pull::Down),
+            test_gpio2: Output::new(gpio2, Level::Low),
             delay,
         }
     }
@@ -75,20 +88,22 @@ mod tests {
     async fn test_async_edge(ctx: Context<'static>) {
         let counter = AtomicUsize::new(0);
         let Context {
-            mut io2, mut io3, ..
+            mut test_gpio1,
+            mut test_gpio2,
+            ..
         } = ctx;
         embassy_futures::select::select(
             async {
                 loop {
-                    io2.wait_for_rising_edge().await;
+                    test_gpio1.wait_for_rising_edge().await;
                     counter.fetch_add(1, Ordering::SeqCst);
                 }
             },
             async {
                 for _ in 0..5 {
-                    io3.set_high();
+                    test_gpio2.set_high();
                     Timer::after(Duration::from_millis(25)).await;
-                    io3.set_low();
+                    test_gpio2.set_low();
                     Timer::after(Duration::from_millis(25)).await;
                 }
             },
@@ -113,153 +128,155 @@ mod tests {
     #[test]
     fn test_gpio_input(ctx: Context<'static>) {
         // `InputPin`:
-        assert_eq!(ctx.io2.is_low(), true);
-        assert_eq!(ctx.io2.is_high(), false);
+        assert_eq!(ctx.test_gpio1.is_low(), true);
+        assert_eq!(ctx.test_gpio1.is_high(), false);
     }
 
     #[test]
     fn test_gpio_output(mut ctx: Context<'static>) {
         // `StatefulOutputPin`:
-        assert_eq!(ctx.io3.is_set_low(), true);
-        assert_eq!(ctx.io3.is_set_high(), false);
-        ctx.io3.set_high();
-        assert_eq!(ctx.io3.is_set_low(), false);
-        assert_eq!(ctx.io3.is_set_high(), true);
+        assert_eq!(ctx.test_gpio2.is_set_low(), true);
+        assert_eq!(ctx.test_gpio2.is_set_high(), false);
+        ctx.test_gpio2.set_high();
+        assert_eq!(ctx.test_gpio2.is_set_low(), false);
+        assert_eq!(ctx.test_gpio2.is_set_high(), true);
 
         // `ToggleableOutputPin`:
-        ctx.io3.toggle();
-        assert_eq!(ctx.io3.is_set_low(), true);
-        assert_eq!(ctx.io3.is_set_high(), false);
-        ctx.io3.toggle();
-        assert_eq!(ctx.io3.is_set_low(), false);
-        assert_eq!(ctx.io3.is_set_high(), true);
+        ctx.test_gpio2.toggle();
+        assert_eq!(ctx.test_gpio2.is_set_low(), true);
+        assert_eq!(ctx.test_gpio2.is_set_high(), false);
+        ctx.test_gpio2.toggle();
+        assert_eq!(ctx.test_gpio2.is_set_low(), false);
+        assert_eq!(ctx.test_gpio2.is_set_high(), true);
     }
 
     #[test]
     fn test_gpio_interrupt(mut ctx: Context<'static>) {
         critical_section::with(|cs| {
             *COUNTER.borrow_ref_mut(cs) = 0;
-            ctx.io2.listen(Event::AnyEdge);
-            INPUT_PIN.borrow_ref_mut(cs).replace(ctx.io2);
+            ctx.test_gpio1.listen(Event::AnyEdge);
+            INPUT_PIN.borrow_ref_mut(cs).replace(ctx.test_gpio1);
         });
-        ctx.io3.set_high();
+        ctx.test_gpio2.set_high();
         ctx.delay.delay_millis(1);
-        ctx.io3.set_low();
+        ctx.test_gpio2.set_low();
         ctx.delay.delay_millis(1);
-        ctx.io3.set_high();
+        ctx.test_gpio2.set_high();
         ctx.delay.delay_millis(1);
-        ctx.io3.set_low();
+        ctx.test_gpio2.set_low();
         ctx.delay.delay_millis(1);
-        ctx.io3.set_high();
+        ctx.test_gpio2.set_high();
         ctx.delay.delay_millis(1);
-        ctx.io3.set_low();
+        ctx.test_gpio2.set_low();
         ctx.delay.delay_millis(1);
-        ctx.io3.set_high();
+        ctx.test_gpio2.set_high();
         ctx.delay.delay_millis(1);
-        ctx.io3.set_low();
+        ctx.test_gpio2.set_low();
         ctx.delay.delay_millis(1);
-        ctx.io3.set_high();
+        ctx.test_gpio2.set_high();
         ctx.delay.delay_millis(1);
 
         let count = critical_section::with(|cs| *COUNTER.borrow_ref(cs));
         assert_eq!(count, 9);
 
-        ctx.io2 = critical_section::with(|cs| INPUT_PIN.borrow_ref_mut(cs).take().unwrap());
-        ctx.io2.unlisten();
+        ctx.test_gpio1 = critical_section::with(|cs| INPUT_PIN.borrow_ref_mut(cs).take().unwrap());
+        ctx.test_gpio1.unlisten();
     }
 
     #[test]
     fn test_gpio_od(ctx: Context<'static>) {
-        let mut io2 = OutputOpenDrain::new(unsafe { GpioPin::<2>::steal() }, Level::High, Pull::Up);
-        let mut io3 = OutputOpenDrain::new(unsafe { GpioPin::<3>::steal() }, Level::High, Pull::Up);
+        let mut test_gpio1 =
+            OutputOpenDrain::new(unsafe { TestGpio1::steal() }, Level::High, Pull::Up);
+        let mut test_gpio2 =
+            OutputOpenDrain::new(unsafe { TestGpio2::steal() }, Level::High, Pull::Up);
 
         ctx.delay.delay_millis(1);
 
-        assert_eq!(io2.is_high(), true);
-        assert_eq!(io3.is_high(), true);
+        assert_eq!(test_gpio1.is_high(), true);
+        assert_eq!(test_gpio2.is_high(), true);
 
-        io2.set_low();
-        io3.set_high();
+        test_gpio1.set_low();
+        test_gpio2.set_high();
         ctx.delay.delay_millis(1);
 
-        assert_eq!(io2.is_low(), true);
-        assert_eq!(io3.is_low(), true);
+        assert_eq!(test_gpio1.is_low(), true);
+        assert_eq!(test_gpio2.is_low(), true);
 
-        io2.set_high();
-        io3.set_high();
+        test_gpio1.set_high();
+        test_gpio2.set_high();
         ctx.delay.delay_millis(1);
 
-        assert_eq!(io2.is_high(), true);
-        assert_eq!(io3.is_high(), true);
+        assert_eq!(test_gpio1.is_high(), true);
+        assert_eq!(test_gpio2.is_high(), true);
 
-        io2.set_high();
-        io3.set_low();
+        test_gpio1.set_high();
+        test_gpio2.set_low();
         ctx.delay.delay_millis(1);
 
-        assert_eq!(io2.is_low(), true);
-        assert_eq!(io3.is_low(), true);
+        assert_eq!(test_gpio1.is_low(), true);
+        assert_eq!(test_gpio2.is_low(), true);
 
-        io2.set_high();
-        io3.set_high();
+        test_gpio1.set_high();
+        test_gpio2.set_high();
         ctx.delay.delay_millis(1);
 
-        assert_eq!(io2.is_high(), true);
-        assert_eq!(io3.is_high(), true);
+        assert_eq!(test_gpio1.is_high(), true);
+        assert_eq!(test_gpio2.is_high(), true);
 
-        io2.set_low();
-        io3.set_low();
+        test_gpio1.set_low();
+        test_gpio2.set_low();
         ctx.delay.delay_millis(1);
 
-        assert_eq!(io2.is_low(), true);
-        assert_eq!(io3.is_low(), true);
+        assert_eq!(test_gpio1.is_low(), true);
+        assert_eq!(test_gpio2.is_low(), true);
     }
 
     #[test]
     fn test_gpio_flex(ctx: Context<'static>) {
-        let mut io2 = Flex::new(unsafe { GpioPin::<2>::steal() });
-        let mut io3 = Flex::new(unsafe { GpioPin::<3>::steal() });
+        let mut test_gpio1 = Flex::new(unsafe { TestGpio1::steal() });
+        let mut test_gpio2 = Flex::new(unsafe { TestGpio2::steal() });
 
-        io2.set_high();
-        io2.set_as_output();
-        io3.set_as_input(Pull::None);
+        test_gpio1.set_high();
+        test_gpio1.set_as_output();
+        test_gpio2.set_as_input(Pull::None);
 
         ctx.delay.delay_millis(1);
 
-        assert_eq!(io2.is_set_high(), true);
-        assert_eq!(io3.is_high(), true);
+        assert_eq!(test_gpio1.is_set_high(), true);
+        assert_eq!(test_gpio2.is_high(), true);
 
-        io2.set_low();
+        test_gpio1.set_low();
         ctx.delay.delay_millis(1);
 
-        assert_eq!(io2.is_set_high(), false);
-        assert_eq!(io3.is_high(), false);
+        assert_eq!(test_gpio1.is_set_high(), false);
+        assert_eq!(test_gpio2.is_high(), false);
 
-        io2.set_as_input(Pull::None);
-        io3.set_as_output();
+        test_gpio1.set_as_input(Pull::None);
+        test_gpio2.set_as_output();
         ctx.delay.delay_millis(1);
 
-        assert_eq!(io2.is_high(), false);
-        assert_eq!(io3.is_set_high(), false);
+        assert_eq!(test_gpio1.is_high(), false);
+        assert_eq!(test_gpio2.is_set_high(), false);
 
-        io3.set_high();
+        test_gpio2.set_high();
         ctx.delay.delay_millis(1);
 
-        assert_eq!(io2.is_high(), true);
-        assert_eq!(io3.is_set_high(), true);
+        assert_eq!(test_gpio1.is_high(), true);
+        assert_eq!(test_gpio2.is_set_high(), true);
 
-        io3.set_low();
+        test_gpio2.set_low();
         ctx.delay.delay_millis(1);
 
-        assert_eq!(io2.is_low(), true);
-        assert_eq!(io3.is_set_low(), true);
+        assert_eq!(test_gpio1.is_low(), true);
+        assert_eq!(test_gpio2.is_set_low(), true);
     }
 
     // Tests touch pin (GPIO2) as AnyPin and Output
     // https://github.com/esp-rs/esp-hal/issues/1943
     #[test]
     fn test_gpio_touch_anypin_output() {
-        let any_pin2 = AnyPin::new(unsafe { GpioPin::<2>::steal() });
-        let any_pin3 = AnyPin::new(unsafe { GpioPin::<3>::steal() });
+        let any_pin2 = AnyPin::new(unsafe { TestGpio1::steal() });
+        let any_pin3 = AnyPin::new(unsafe { TestGpio2::steal() });
 
         let out_pin = Output::new(any_pin2, Level::High);
         let in_pin = Input::new(any_pin3, Pull::Down);
@@ -272,8 +289,8 @@ mod tests {
     // https://github.com/esp-rs/esp-hal/issues/1943
     #[test]
     fn test_gpio_touch_anypin_input() {
-        let any_pin2 = AnyPin::new(unsafe { GpioPin::<2>::steal() });
-        let any_pin3 = AnyPin::new(unsafe { GpioPin::<3>::steal() });
+        let any_pin2 = AnyPin::new(unsafe { TestGpio1::steal() });
+        let any_pin3 = AnyPin::new(unsafe { TestGpio2::steal() });
 
         let out_pin = Output::new(any_pin3, Level::Low);
         let in_pin = Input::new(any_pin2, Pull::Down);

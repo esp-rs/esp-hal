@@ -29,19 +29,19 @@ macro_rules! i2c_pins {
     ($io:expr) => {{
         cfg_if::cfg_if! {
             if #[cfg(any(esp32s2, esp32s3))] {
-                // For ESP32-S2 and ESP32-S3, use GPIO 2 and 3 for I2C
+                // For ESP32-S2 and ESP32-S3, use GPIO 2(SDA) and 3(SCL) for I2C
                 ($io.pins.gpio2, $io.pins.gpio3)
             } else if #[cfg(esp32c6)] {
-                // For ESP32-C6, use GPIO 6 and 7 for I2C
+                // For ESP32-C6, use GPIO 6(SDA) and 7(SCL) for I2C
                 ($io.pins.gpio6, $io.pins.gpio7)
             } else if #[cfg(esp32h2)] {
-                // For ESP32-H2, use GPIO 6 and 7 for I2C
-                ($io.pins.gpio4, $io.pins.gpio7)
-            } else if #[cfg(any(esp32c2, esp32c3))] {
-                // For ESP32-C2 and ESP32-C3, use GPIO 4 and 7 for I2C
-                ($io.pins.gpio4, $io.pins.gpio7)
+                // For ESP32-H2, use GPIO 4(SDA) and 22(SCL) for I2C
+                ($io.pins.gpio4, $io.pins.gpio22)
+            } else if #[cfg(esp32c2)] {
+                // For ESP32-C2, use GPIO 18(SDA) and 19(SCL) for I2C
+                ($io.pins.gpio18, $io.pins.gpio19)
             } else {
-                // Default case: fallback if needed
+                // ESP32 and ESP32C3, use GPIO 4(SDA) and 7(SCL)
                 ($io.pins.gpio4, $io.pins.gpio7)
             }
         }
@@ -53,13 +53,12 @@ macro_rules! common_test_pins {
     ($io:expr) => {{
         cfg_if::cfg_if! {
             if #[cfg(not(any(esp32s2, esp32s3)))] {
-                // For ESP32-S2 and ESP32-S3, use GPIO 2 and 3 for I2C
+                // For other targets, use GPIO 2 and 3 for common tests
                 ($io.pins.gpio2, $io.pins.gpio3)
             } else if #[cfg(any(esp32s2, esp32s3))] {
-                // For ESP32-C6, use GPIO 6 and 7 for I2C
+                // For ESP32-S2 and ESP32-S3, use GPIO 9 and 10 for common tests
                 ($io.pins.gpio9, $io.pins.gpio10)
             }
         }
     }};
 }
-
