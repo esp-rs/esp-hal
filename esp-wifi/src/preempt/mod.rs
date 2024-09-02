@@ -45,7 +45,10 @@ fn next_task() {
     }
 }
 
-fn remove_task(task: *mut Context) {
+/// Delete the given task
+///
+/// This will also free the memory allocated for it.
+fn delete_task(task: *mut Context) {
     critical_section::with(|_| unsafe {
         let mut ptr = CTX_NOW;
         loop {
@@ -92,7 +95,7 @@ pub fn task_switch(trap_frame: &mut TrapFrame) {
 
     unsafe {
         if !SCHEDULED_TASK_TO_DELETE.is_null() {
-            remove_task(SCHEDULED_TASK_TO_DELETE);
+            delete_task(SCHEDULED_TASK_TO_DELETE);
             SCHEDULED_TASK_TO_DELETE = core::ptr::null_mut();
         }
     }
