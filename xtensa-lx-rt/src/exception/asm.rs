@@ -66,6 +66,7 @@ global_asm!(
     .set XT_STK_F14,           208
     .set XT_STK_F15,           212
     .set XT_STK_TMP,           216
+    .set XT_STK_CPENABLE,      220
 
     .set XT_STK_FRMSZ,         256      // needs to be multiple of 16 and enough additional free space
                                         // for the registers spilled to the stack (max 8 registers / 0x20 bytes)
@@ -126,6 +127,8 @@ unsafe extern "C" fn save_context() {
         #[cfg(all(XCHAL_HAVE_CP, not(feature = "float-save-restore")))]
         "
         /* Disable coprocessor, any use of floats in ISRs will cause an exception unless float-save-restore feature is enabled */
+        rsr     a3, CPENABLE
+        s32i    a3, sp, +XT_STK_CPENABLE
         movi    a3,  0
         wsr     a3,  CPENABLE
         rsync
@@ -429,8 +432,8 @@ unsafe extern "C" fn restore_context() {
         ",
         #[cfg(all(XCHAL_HAVE_CP, not(feature = "float-save-restore")))]
         "
-        /* Re-enable coprocessor(s) after ISR */
-        movi    a3,  8 /* XCHAL_CP_MAXCFG */
+        /* Restore coprocessor state after ISR */
+        l32i    a3, sp, +XT_STK_CPENABLE
         wsr     a3,  CPENABLE
         rsync
         ",
