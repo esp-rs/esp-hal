@@ -5,7 +5,7 @@
 #![no_std]
 #![no_main]
 
-use esp_hal::{delay::Delay, prelude::*};
+use esp_hal::delay::Delay;
 use hil_test as _;
 
 struct Context {

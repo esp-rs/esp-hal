@@ -712,7 +712,7 @@ macro_rules! before_snippet {
 #     loop {}
 # }
 # fn main() {
-#     let peripherals = esp_hal::init(esp_hal::Config::default());
+#     let mut peripherals = esp_hal::init(esp_hal::Config::default());
 "#
     };
 }

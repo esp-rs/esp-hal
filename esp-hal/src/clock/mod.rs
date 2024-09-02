@@ -314,17 +314,13 @@ static mut ACTIVE_CLOCKS: Option<Clocks> = None;
 
 impl Clocks {
     pub(crate) fn init(cpu_clock_speed: CpuClock) {
-        unsafe { ACTIVE_CLOCKS = Some(Self::configure(cpu_clock_speed)) };
+        critical_section::with(|_| {
+            unsafe { ACTIVE_CLOCKS = Some(Self::configure(cpu_clock_speed)) };
+        })
     }
 
     /// Get the active clock configuration.
     // This should be fine since we only allow reading after initialization.
-    //
-    // FIXME: technically, this needs to be unsafe to avoid requiring a critical
-    // section - we need the user to promise not to poll `Clocks::get` at the
-    // same time as `esp_hal::init` is running (e.g. initializing in an interrupt
-    // handler). Alternatively, we can require a peripheral reference (any) to be
-    // passed as those can only be returned by `esp_hal::init`.
     pub fn get() -> &'static Clocks {
         unwrap!(unsafe { ACTIVE_CLOCKS.as_ref() })
     }
