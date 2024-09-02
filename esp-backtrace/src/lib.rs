@@ -100,10 +100,10 @@ unsafe fn __user_exception(cause: arch::ExceptionCause, context: arch::Context) 
 
     // Unfortunately, a different formatter string is used
     #[cfg(not(feature = "defmt"))]
-    esp_println::println!("\n\nException occured '{:?}'", cause);
+    esp_println::println!("\n\nException occurred '{:?}'", cause);
 
     #[cfg(feature = "defmt")]
-    defmt::error!("\n\nException occured '{}'", cause);
+    defmt::error!("\n\nException occurred '{}'", cause);
 
     println!("{:?}", context);
 
