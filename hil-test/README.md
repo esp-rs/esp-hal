@@ -31,7 +31,7 @@ You can run all tests for a given device by running the following command from t
 cargo xtask run-tests $CHIP
 ```
 
-For running a single test on a target, from the `xtask` folder run:
+To run a single test on a target, run the following command from the workspace root:
 
 ```shell
 # Run GPIO tests for ESP32-C6
