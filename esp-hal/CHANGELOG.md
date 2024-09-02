@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Implement `embedded-hal` output pin traits for `DummyPin` (#2019)
 - Added `esp_hal::init` to simplify HAL initialisation (#1970)
 
 ### Changed
