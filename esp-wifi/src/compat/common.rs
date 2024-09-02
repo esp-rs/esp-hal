@@ -124,7 +124,7 @@ pub fn sem_create(max: u32, init: u32) -> *mut c_void {
 pub fn sem_delete(semphr: *mut c_void) {
     trace!(">>> sem delete");
 
-    // TODO remove this once fixed in esp_supplicant AND we updated to the fixed
+    // TODO remove this once fixed in esp_supplicant AND we updated to the fixed - JIRA: WIFI-6676
     unsafe {
         if semphr as usize > addr_of!(MUTEXES) as usize
             && semphr as usize

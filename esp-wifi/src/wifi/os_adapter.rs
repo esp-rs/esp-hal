@@ -381,7 +381,7 @@ pub unsafe extern "C" fn queue_create(
     item_size: u32,
 ) -> *mut crate::binary::c_types::c_void {
     // TODO remove this once fixed in esp_supplicant AND we updated to the fixed
-    // version
+    // version - JIRA: WIFI-6676
     let (queue_len, item_size) = if queue_len != 3 && item_size != 4 {
         (queue_len, item_size)
     } else {
