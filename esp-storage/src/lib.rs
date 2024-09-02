@@ -76,7 +76,7 @@ macro_rules! rom_fn {
         }
     };
 
-    ($($(#[$attrs:meta])* fn $name:ident($($arg:tt: $ty:ty),*) $(-> $retval:ty)? = $addr:expr),+ $(,)?) => {
+    ($($(#[$attrs:meta])* fn $name:ident($($arg:tt: $ty:ty),*) $(-> $retval:ty)? = $addr:expr;)+) => {
         $(
             $crate::rom_fn!(fn $name($($arg: $ty),*) $(-> $retval)? = $addr);
         )+

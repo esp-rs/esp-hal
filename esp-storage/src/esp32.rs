@@ -26,16 +26,16 @@ const FLASH_CHIP_ADDR: u32 = 0x3ffae270;
 const FLASH_DUMMY_LEN_PLUS_ADDR: u32 = 0x3ffae290;
 
 crate::rom_fn! {
-    fn esp_rom_cache_flush(cpu_num: u32) = 0x40009a14,
-    fn esp_rom_cache_read_enable(cpu_num: u32) = 0x40009a84,
-    fn esp_rom_spiflash_read(src_addr: u32, data: *const u32, len: u32) -> i32 = 0x40062ed8,
-    fn esp_rom_spiflash_erase_sector(sector_number: u32) -> i32 = 0x40062ccc,
+    fn esp_rom_cache_flush(cpu_num: u32) = 0x40009a14;
+    fn esp_rom_cache_read_enable(cpu_num: u32) = 0x40009a84;
+    fn esp_rom_spiflash_read(src_addr: u32, data: *const u32, len: u32) -> i32 = 0x40062ed8;
+    fn esp_rom_spiflash_erase_sector(sector_number: u32) -> i32 = 0x40062ccc;
     fn esp_rom_spi_read_status_high(
         flash_chip: *const EspRomSpiflashChipT,
         status: *mut u32
-    ) -> i32 = 0x40062448,
-    fn esp_rom_spi_read_status(flash_chip: *const EspRomSpiflashChipT, status: *mut u32) -> i32 = 0x4006226c,
-    fn esp_rom_spi_write_status(flash_chip: *const EspRomSpiflashChipT, status_value: u32) -> i32 = 0x400622f0,
+    ) -> i32 = 0x40062448;
+    fn esp_rom_spi_read_status(flash_chip: *const EspRomSpiflashChipT, status: *mut u32) -> i32 = 0x4006226c;
+    fn esp_rom_spi_write_status(flash_chip: *const EspRomSpiflashChipT, status_value: u32) -> i32 = 0x400622f0;
 }
 
 #[inline(always)]
