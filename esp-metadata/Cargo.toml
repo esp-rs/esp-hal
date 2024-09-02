@@ -9,7 +9,7 @@ license      = "MIT OR Apache-2.0"
 
 [dependencies]
 anyhow     = "1.0.86"
-clap       = { version = "4.5.16", features = ["derive"] }
+clap       = { version = "4.5.16", features = ["derive"], optional = true }
 basic-toml  = "0.1.9"
 lazy_static = "1.5.0"
 serde       = { version = "1.0.209", features = ["derive"] }
