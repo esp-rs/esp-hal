@@ -25,7 +25,7 @@ cargo install probe-rs-tools \
 
 Target device **MUST** connected via its USB-Serial-JTAG port, or if unavailable (eg. ESP32, ESP32-C2, ESP32-S2) then you must connect a compatible debug probe such as an [ESP-Prog].
 
-You can run all tests for a given device by running the following command from the `xtask` folder:
+You can run all tests for a given device by running the following command from the workspace root:
 
 ```shell
 cargo xtask run-tests $CHIP
