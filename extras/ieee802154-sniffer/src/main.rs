@@ -28,6 +28,13 @@ pub struct AppArgs {
     channel: String,
 }
 
+fn config_option_value(value: &'static str) -> ConfigOptionValue {
+    ConfigOptionValue::builder()
+        .value(value)
+        .display(value)
+        .build()
+}
+
 lazy_static! {
     static ref METADATA: Metadata = Metadata {
         help_url: "http://github.com/esp-rs".into(),
@@ -62,66 +69,21 @@ lazy_static! {
                 .display("11")
                 .default(true)
                 .build(),
-            ConfigOptionValue::builder()
-                .value("12")
-                .display("12")
-                .build(),
-            ConfigOptionValue::builder()
-                .value("13")
-                .display("13")
-                .build(),
-            ConfigOptionValue::builder()
-                .value("14")
-                .display("14")
-                .build(),
-            ConfigOptionValue::builder()
-                .value("15")
-                .display("15")
-                .build(),
-            ConfigOptionValue::builder()
-                .value("16")
-                .display("16")
-                .build(),
-            ConfigOptionValue::builder()
-                .value("17")
-                .display("17")
-                .build(),
-            ConfigOptionValue::builder()
-                .value("18")
-                .display("18")
-                .build(),
-            ConfigOptionValue::builder()
-                .value("19")
-                .display("19")
-                .build(),
-            ConfigOptionValue::builder()
-                .value("20")
-                .display("20")
-                .build(),
-            ConfigOptionValue::builder()
-                .value("21")
-                .display("21")
-                .build(),
-            ConfigOptionValue::builder()
-                .value("22")
-                .display("22")
-                .build(),
-            ConfigOptionValue::builder()
-                .value("23")
-                .display("23")
-                .build(),
-            ConfigOptionValue::builder()
-                .value("24")
-                .display("24")
-                .build(),
-            ConfigOptionValue::builder()
-                .value("25")
-                .display("25")
-                .build(),
-            ConfigOptionValue::builder()
-                .value("26")
-                .display("26")
-                .build(),
+            config_option_value("12"),
+            config_option_value("13"),
+            config_option_value("14"),
+            config_option_value("15"),
+            config_option_value("16"),
+            config_option_value("17"),
+            config_option_value("18"),
+            config_option_value("19"),
+            config_option_value("20"),
+            config_option_value("21"),
+            config_option_value("22"),
+            config_option_value("23"),
+            config_option_value("24"),
+            config_option_value("25"),
+            config_option_value("26"),
         ])
         .build();
 }
