@@ -572,6 +572,94 @@ mod critical_section_impl {
     }
 }
 
+// The state of a re-entrant lock
+pub(crate) struct LockState {
+    #[cfg(multi_core)]
+    core: portable_atomic::AtomicUsize,
+}
+
+impl LockState {
+    #[cfg(multi_core)]
+    const UNLOCKED: usize = usize::MAX;
+
+    pub const fn new() -> Self {
+        Self {
+            #[cfg(multi_core)]
+            core: portable_atomic::AtomicUsize::new(Self::UNLOCKED),
+        }
+    }
+}
+
+// This is preferred over critical-section as this allows you to have multiple
+// locks active at the same time rather than using the global mutex that is
+// critical-section.
+#[allow(unused_variables)]
+pub(crate) fn lock<T>(state: &LockState, f: impl FnOnce() -> T) -> T {
+    // In regards to disabling interrupts, we only need to disable
+    // the interrupts that may be calling this function.
+
+    #[cfg(not(multi_core))]
+    {
+        // Disabling interrupts is enough on single core chips to ensure mutual
+        // exclusion.
+
+        #[cfg(riscv)]
+        return riscv::interrupt::free(f);
+        #[cfg(xtensa)]
+        return xtensa_lx::interrupt::free(|_| f());
+    }
+
+    #[cfg(multi_core)]
+    {
+        use portable_atomic::Ordering;
+
+        let current_core = get_core() as usize;
+
+        let mut f = f;
+
+        loop {
+            let func = || {
+                // Use Acquire ordering in success to ensure `f()` "happens after" the lock is
+                // taken. Use Relaxed ordering in failure as there's no
+                // synchronisation happening.
+                if let Err(locked_core) = state.core.compare_exchange(
+                    LockState::UNLOCKED,
+                    current_core,
+                    Ordering::Acquire,
+                    Ordering::Relaxed,
+                ) {
+                    assert_ne!(
+                        locked_core, current_core,
+                        "esp_hal::lock is not re-entrant!"
+                    );
+
+                    Err(f)
+                } else {
+                    let result = f();
+
+                    // Use Release ordering here to ensure `f()` "happens before" this lock is
+                    // released.
+                    state.core.store(LockState::UNLOCKED, Ordering::Release);
+
+                    Ok(result)
+                }
+            };
+
+            #[cfg(riscv)]
+            let result = riscv::interrupt::free(func);
+            #[cfg(xtensa)]
+            let result = xtensa_lx::interrupt::free(|_| func());
+
+            match result {
+                Ok(result) => break result,
+                Err(the_function) => f = the_function,
+            }
+
+            // Consider using core::hint::spin_loop(); Might need SW_INT.
+        }
+    }
+}
+
 /// Default (unhandled) interrupt handler
 pub const DEFAULT_INTERRUPT_HANDLER: interrupt::InterruptHandler = interrupt::InterruptHandler::new(
     unsafe { core::mem::transmute::<*const (), extern "C" fn()>(EspDefaultHandler as *const ()) },

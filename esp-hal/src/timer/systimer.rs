@@ -80,6 +80,7 @@ use fugit::{Instant, MicrosDurationU32, MicrosDurationU64};
 use super::{Error, Timer as _};
 use crate::{
     interrupt::{self, InterruptHandler},
+    lock,
     peripheral::Peripheral,
     peripherals::{Interrupt, SYSTIMER},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
@@ -87,6 +88,7 @@ use crate::{
     Blocking,
     Cpu,
     InterruptConfigurable,
+    LockState,
     Mode,
 };
 
@@ -240,7 +242,7 @@ pub trait Unit {
         let systimer = unsafe { &*SYSTIMER::ptr() };
         let conf = systimer.conf();
 
-        critical_section::with(|_| {
+        lock(&CONF_LOCK, || {
             conf.modify(|_, w| match config {
                 UnitConfig::Disabled => match self.channel() {
                     0 => w.timer_unit0_work_en().clear_bit(),
@@ -418,7 +420,7 @@ pub trait Comparator {
     fn set_enable(&self, enable: bool) {
         let systimer = unsafe { &*SYSTIMER::ptr() };
 
-        critical_section::with(|_| {
+        lock(&CONF_LOCK, || {
             #[cfg(not(esp32s2))]
             systimer.conf().modify(|_, w| match self.channel() {
                 0 => w.target0_work_en().bit(enable),
@@ -426,12 +428,14 @@ pub trait Comparator {
                 2 => w.target2_work_en().bit(enable),
                 _ => unreachable!(),
             });
-
-            #[cfg(esp32s2)]
-            systimer
-                .target_conf(self.channel() as usize)
-                .modify(|_r, w| w.work_en().bit(enable));
         });
+
+        // Note: The ESP32-S2 doesn't require a lock because each
+        // comparator's enable bit in a different register.
+        #[cfg(esp32s2)]
+        systimer
+            .target_conf(self.channel() as usize)
+            .modify(|_r, w| w.work_en().bit(enable));
     }
 
     /// Returns true if the comparator has been enabled. This means
@@ -964,9 +968,11 @@ where
     }
 
     fn enable_interrupt(&self, state: bool) {
-        unsafe { &*SYSTIMER::PTR }
-            .int_ena()
-            .modify(|_, w| w.target(self.comparator.channel()).bit(state));
+        lock(&INT_ENA_LOCK, || {
+            unsafe { &*SYSTIMER::PTR }
+                .int_ena()
+                .modify(|_, w| w.target(self.comparator.channel()).bit(state));
+        });
     }
 
     fn clear_interrupt(&self) {
@@ -1003,6 +1009,9 @@ where
         core::ptr::read(self as *const _)
     }
 }
+
+static CONF_LOCK: LockState = LockState::new();
+static INT_ENA_LOCK: LockState = LockState::new();
 
 // Async functionality of the system timer.
 #[cfg(feature = "async")]
@@ -1090,27 +1099,33 @@ mod asynch {
 
     #[handler]
     fn target0_handler() {
-        unsafe { &*crate::peripherals::SYSTIMER::PTR }
-            .int_ena()
-            .modify(|_, w| w.target0().clear_bit());
+        lock(&INT_ENA_LOCK, || {
+            unsafe { &*crate::peripherals::SYSTIMER::PTR }
+                .int_ena()
+                .modify(|_, w| w.target0().clear_bit());
+        });
 
         WAKERS[0].wake();
     }
 
     #[handler]
     fn target1_handler() {
-        unsafe { &*crate::peripherals::SYSTIMER::PTR }
-            .int_ena()
-            .modify(|_, w| w.target1().clear_bit());
+        lock(&INT_ENA_LOCK, || {
+            unsafe { &*crate::peripherals::SYSTIMER::PTR }
+                .int_ena()
+                .modify(|_, w| w.target1().clear_bit());
+        });
 
         WAKERS[1].wake();
     }
 
     #[handler]
     fn target2_handler() {
-        unsafe { &*crate::peripherals::SYSTIMER::PTR }
-            .int_ena()
-            .modify(|_, w| w.target2().clear_bit());
+        lock(&INT_ENA_LOCK, || {
+            unsafe { &*crate::peripherals::SYSTIMER::PTR }
+                .int_ena()
+                .modify(|_, w| w.target2().clear_bit());
+        });
 
         WAKERS[2].wake();
     }
