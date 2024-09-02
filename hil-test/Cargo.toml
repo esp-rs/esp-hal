@@ -228,22 +228,3 @@ generic-queue = [
 integrated-timers = [
     "esp-hal-embassy/integrated-timers",
 ]
-
-# https://doc.rust-lang.org/cargo/reference/profiles.html#test
-# Test and bench profiles inherit from dev and release respectively.
-[profile.dev]
-codegen-units    = 1
-debug            = 2
-debug-assertions = true
-incremental      = false
-opt-level        = "z"
-overflow-checks  = true
-
-[profile.release]
-codegen-units    = 1
-debug            = 2
-debug-assertions = false
-incremental      = false
-opt-level        = 3
-lto              = "fat"
-overflow-checks  = false

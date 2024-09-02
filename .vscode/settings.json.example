@@ -9,7 +9,7 @@
     // to cope with xtask and its dependencies.
     "rust-analyzer.cargo.allTargets": false,
     "rust-analyzer.cargo.targetDir": "target/rust-analyzer",
-    "rust-analyzer.procMacro.attributes.enable": false,
+    "rust-analyzer.procMacro.enable": false,
     "rust-analyzer.cargo.features": [
         "esp32c6",
         "esp-hal/async",

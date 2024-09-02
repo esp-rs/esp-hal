@@ -20,13 +20,23 @@ members  = [
     "extras/bench-server",
     "extras/esp-wifishark",
     "extras/ieee802154-sniffer",
+    "hil-test",
 ]
 exclude = [
-    "hil-test",
     "xtensa-lx",
     "xtensa-lx-rt",
     "xtensa-lx-rt/procmacros",
 ]
+
+# https://doc.rust-lang.org/cargo/reference/profiles.html#test
+# Test and bench profiles inherit from dev and release respectively.
+[profile.dev]
+codegen-units    = 1
+debug            = 2
+debug-assertions = true
+incremental      = false
+opt-level        = "z"
+overflow-checks  = true
 
 [profile.release]
 codegen-units    = 1
@@ -34,5 +44,5 @@ debug            = 2
 debug-assertions = false
 incremental      = false
 opt-level        = 3
-lto = 'fat'
+lto              = "fat"
 overflow-checks  = false
