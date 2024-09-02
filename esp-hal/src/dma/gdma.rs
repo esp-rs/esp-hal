@@ -424,20 +424,21 @@ pub struct ChannelTxImpl<const N: u8> {}
 use embassy_sync::waitqueue::AtomicWaker;
 
 #[cfg(feature = "async")]
-const NEW_WAKER: AtomicWaker = AtomicWaker::new();
+#[allow(clippy::declare_interior_mutable_const)]
+const INIT: AtomicWaker = AtomicWaker::new();
 
 #[cfg(feature = "async")]
-static TX_WAKER: [AtomicWaker; CHANNEL_COUNT] = [NEW_WAKER; CHANNEL_COUNT];
+static TX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [INIT; CHANNEL_COUNT];
 
 #[cfg(feature = "async")]
-static RX_WAKER: [AtomicWaker; CHANNEL_COUNT] = [NEW_WAKER; CHANNEL_COUNT];
+static RX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [INIT; CHANNEL_COUNT];
 
 impl<const N: u8> crate::private::Sealed for ChannelTxImpl<N> {}
 
 impl<const N: u8> TxChannel<Channel<N>> for ChannelTxImpl<N> {
     #[cfg(feature = "async")]
     fn waker() -> &'static AtomicWaker {
-        &TX_WAKER[N as usize]
+        &TX_WAKERS[N as usize]
     }
 }
 
@@ -450,7 +451,7 @@ impl<const N: u8> crate::private::Sealed for ChannelRxImpl<N> {}
 impl<const N: u8> RxChannel<Channel<N>> for ChannelRxImpl<N> {
     #[cfg(feature = "async")]
     fn waker() -> &'static AtomicWaker {
-        &RX_WAKER[N as usize]
+        &RX_WAKERS[N as usize]
     }
 }
 
