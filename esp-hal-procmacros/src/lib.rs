@@ -210,7 +210,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 
         let hal = proc_macro2::Ident::new(
             if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-hal") {
-                &name
+                name
             } else {
                 "crate"
             },
@@ -278,7 +278,7 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
 
     let root = Ident::new(
         if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-hal") {
-            &name
+            name
         } else {
             "crate"
         },

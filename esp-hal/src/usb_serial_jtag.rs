@@ -45,17 +45,19 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! use esp_hal::usb_serial_jtag::UsbSerialJtag;
+//!
 //! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 //!
 //! // Write bytes out over the USB Serial/JTAG:
 //! usb_serial.write_bytes(b"Hello, world!").expect("write error!");
-//! }
+//! # }
 //! ```
 //! 
 //! ### Splitting the USB Serial/JTAG into TX and RX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::usb_serial_jtag::UsbSerialJtag;
+//! use esp_hal::usb_serial_jtag::UsbSerialJtag;
+//!
 //! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 //! // The USB Serial/JTAG can be split into separate Transmit and Receive
 //! // components:

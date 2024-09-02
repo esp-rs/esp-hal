@@ -479,6 +479,7 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
 /// configured deadtime.
 ///
 /// # H-Bridge example
+///
 /// ```rust, no_run
 #[doc = crate::before_snippet!()]
 /// # use esp_hal::{mcpwm, prelude::*};

@@ -16,13 +16,10 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     gpio::{self, Event, Input, Io, Level, Output, Pull},
     macros::ram,
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
 };
 
 cfg_if::cfg_if! {
@@ -35,9 +32,7 @@ cfg_if::cfg_if! {
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
     // Set GPIO2 as an output, and set its state high initially.
     let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);

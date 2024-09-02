@@ -438,6 +438,8 @@ impl<'d> EspNowSender<'d> {
     }
 }
 
+#[allow(unknown_lints)]
+#[allow(clippy::too_long_first_doc_paragraph)]
 /// This struct is returned by a sync esp now send. Invoking `wait` method of
 /// this struct will block current task until the callback function of esp now
 /// send is called and return the status of previous sending.
@@ -535,6 +537,8 @@ impl<'d> Drop for EspNowRc<'d> {
     }
 }
 
+#[allow(unknown_lints)]
+#[allow(clippy::too_long_first_doc_paragraph)]
 /// ESP-NOW is a kind of connectionless Wi-Fi communication protocol that is
 /// defined by Espressif. In ESP-NOW, application data is encapsulated in a
 /// vendor-specific action frame and then transmitted from one Wi-Fi device to

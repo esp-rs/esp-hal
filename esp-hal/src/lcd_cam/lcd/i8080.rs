@@ -1,14 +1,17 @@
 //! # LCD - I8080/MOTO6800 Mode.
 //!
 //! ## Overview
+//!
 //! The LCD_CAM peripheral I8080 driver provides support for the I8080
-//! format/timing. The driver mandates DMA for DMA (Direct Memory Access) for
+//! format/timing. The driver mandates DMA (Direct Memory Access) for
 //! efficient data transfer.
 //!
-//! ## Examples
+//! ## Example
+//!
 //! ### MIPI-DSI Display
-//! Following code show how to send a command to a MIPI-DSI display over I8080
-//! protocol.
+//!
+//! The following example shows how to send a command to a MIPI-DSI display over
+//! the I8080 protocol.
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -16,8 +19,6 @@
 //! # use esp_hal::lcd_cam::{LcdCam, lcd::i8080::{Config, I8080, TxEightBits}};
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::{Dma, DmaPriority};
-//! # use fugit::RateExtU32;
-//!
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
 //! # let dma = Dma::new(peripherals.DMA);

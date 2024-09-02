@@ -4,13 +4,13 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{peripherals::Peripherals, prelude::*};
-use esp_ieee802154::*;
+use esp_hal::prelude::*;
+use esp_ieee802154::{Config, Ieee802154};
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let mut peripherals = Peripherals::take();
+    let (mut peripherals, _clocks) = esp_hal::init(esp_hal::Config::default());
     let mut ieee802154 = Ieee802154::new(peripherals.IEEE802154, &mut peripherals.RADIO_CLK);
 
     ieee802154.set_config(Config {
@@ -21,7 +21,7 @@ fn main() -> ! {
         auto_ack_tx: true,
         pan_id: Some(0x4242),
         short_addr: Some(0x2323),
-        ..Config::default()
+        ..Default::default()
     });
 
     println!("Start receiving:");

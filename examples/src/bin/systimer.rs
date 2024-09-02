@@ -12,11 +12,8 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
     timer::systimer::{
         Alarm,
         FrozenUnit,
@@ -50,9 +47,7 @@ static ALARM2: Mutex<
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
     println!("SYSTIMER Current value = {}", SystemTimer::now());

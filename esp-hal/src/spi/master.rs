@@ -38,7 +38,6 @@
 //! ### SPI Initialization
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
 //! # use esp_hal::spi::SpiMode;
 //! # use esp_hal::spi::master::Spi;
 //! # use esp_hal::gpio::Io;
@@ -52,7 +51,7 @@
 //!     peripherals.SPI2,
 //!     100.kHz(),
 //!     SpiMode::Mode0,
-//!     &mut clocks,
+//!     &clocks,
 //! )
 //! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs));
 //! # }

@@ -18,14 +18,11 @@ use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal}
 use embassy_time::{Duration, Ticker};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     cpu_control::{CpuControl, Stack},
     get_core,
     gpio::{AnyOutput, Io, Level},
-    interrupt::Priority,
-    peripherals::Peripherals,
+    interrupt::{software::SoftwareInterruptControl, Priority},
     prelude::*,
-    system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer},
 };
 use esp_hal_embassy::InterruptExecutor;
@@ -74,9 +71,9 @@ async fn enable_disable_led(control: &'static Signal<CriticalSectionRawMutex, bo
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+
+    let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -93,8 +90,7 @@ fn main() -> ! {
     let led = AnyOutput::new(io.pins.gpio0, Level::Low);
 
     static EXECUTOR_CORE_1: StaticCell<InterruptExecutor<1>> = StaticCell::new();
-    let executor_core1 =
-        InterruptExecutor::new(system.software_interrupt_control.software_interrupt1);
+    let executor_core1 = InterruptExecutor::new(sw_ints.software_interrupt1);
     let executor_core1 = EXECUTOR_CORE_1.init(executor_core1);
 
     let _guard = cpu_control
@@ -109,8 +105,7 @@ fn main() -> ! {
         .unwrap();
 
     static EXECUTOR_CORE_0: StaticCell<InterruptExecutor<0>> = StaticCell::new();
-    let executor_core0 =
-        InterruptExecutor::new(system.software_interrupt_control.software_interrupt0);
+    let executor_core0 = InterruptExecutor::new(sw_ints.software_interrupt0);
     let executor_core0 = EXECUTOR_CORE_0.init(executor_core0);
 
     let spawner = executor_core0.start(Priority::Priority1);

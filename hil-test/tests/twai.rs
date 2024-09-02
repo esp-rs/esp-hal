@@ -13,11 +13,9 @@
 
 use embedded_hal_02::can::Frame;
 use esp_hal::{
-    clock::ClockControl,
     gpio::Io,
-    peripherals::{Peripherals, TWAI0},
+    peripherals::TWAI0,
     prelude::*,
-    system::SystemControl,
     twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId, TwaiMode},
     Blocking,
 };
@@ -26,38 +24,6 @@ use nb::block;
 
 struct Context {
     twai: twai::Twai<'static, TWAI0, Blocking>,
-}
-
-impl Context {
-    pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
-        let can_tx_pin = io.pins.gpio2;
-        let can_rx_pin = io.pins.gpio3;
-
-        const CAN_BAUDRATE: twai::BaudRate = twai::BaudRate::B1000K;
-
-        let mut config = twai::TwaiConfiguration::new(
-            peripherals.TWAI0,
-            can_tx_pin,
-            can_rx_pin,
-            &clocks,
-            CAN_BAUDRATE,
-            TwaiMode::SelfTest,
-        );
-
-        const FILTER: SingleStandardFilter =
-            SingleStandardFilter::new(b"00000000000", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
-        config.set_filter(FILTER);
-
-        let twai = config.start();
-
-        Context { twai }
-    }
 }
 
 #[cfg(test)]
@@ -69,7 +35,29 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        Context::init()
+        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+
+        let can_tx_pin = io.pins.gpio2;
+        let can_rx_pin = io.pins.gpio3;
+
+        let mut config = twai::TwaiConfiguration::new(
+            peripherals.TWAI0,
+            can_tx_pin,
+            can_rx_pin,
+            &clocks,
+            twai::BaudRate::B1000K,
+            TwaiMode::SelfTest,
+        );
+
+        const FILTER: SingleStandardFilter =
+            SingleStandardFilter::new(b"00000000000", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
+        config.set_filter(FILTER);
+
+        let twai = config.start();
+
+        Context { twai }
     }
 
     #[test]

@@ -14,12 +14,9 @@ use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     gpio::{AnyPin, Gpio2, Gpio3, GpioPin, Input, Io, Level, Output, Pull},
     macros::handler,
-    peripherals::Peripherals,
-    system::SystemControl,
     timer::timg::TimerGroup,
     InterruptConfigurable,
 };
@@ -32,28 +29,6 @@ struct Context<'d> {
     io2: Input<'d, Gpio2>,
     io3: Output<'d, Gpio3>,
     delay: Delay,
-}
-
-impl<'d> Context<'d> {
-    pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-        let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        io.set_interrupt_handler(interrupt_handler);
-
-        let delay = Delay::new(&clocks);
-
-        let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-        esp_hal_embassy::init(&clocks, timg0.timer0);
-
-        Context {
-            io2: Input::new(io.pins.gpio2, Pull::Down),
-            io3: Output::new(io.pins.gpio3, Level::Low),
-            delay,
-        }
-    }
 }
 
 #[handler]
@@ -79,10 +54,21 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        let mut ctx = Context::init();
-        // make sure tests don't interfere with each other
-        ctx.io3.set_low();
-        ctx
+        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+
+        let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        io.set_interrupt_handler(interrupt_handler);
+
+        let delay = Delay::new(&clocks);
+
+        let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+        esp_hal_embassy::init(&clocks, timg0.timer0);
+
+        Context {
+            io2: Input::new(io.pins.gpio2, Pull::Down),
+            io3: Output::new(io.pins.gpio3, Level::Low),
+            delay,
+        }
     }
 
     #[test]

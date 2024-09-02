@@ -320,6 +320,7 @@ impl embedded_io::Write for LpUart {
             match self.flush_tx() {
                 Ok(_) => break,
                 Err(nb::Error::WouldBlock) => { /* Wait */ }
+                #[allow(unreachable_patterns)]
                 Err(nb::Error::Other(e)) => return Err(e),
             }
         }

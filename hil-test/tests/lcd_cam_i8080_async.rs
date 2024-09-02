@@ -7,20 +7,15 @@
 #![no_main]
 
 use esp_hal::{
-    clock::{ClockControl, Clocks},
+    clock::Clocks,
     dma::{Dma, DmaDescriptor, DmaPriority},
     dma_buffers,
     gpio::DummyPin,
     lcd_cam::{
-        lcd::{
-            i8080,
-            i8080::{Command, TxEightBits, I8080},
-        },
+        lcd::i8080::{Command, Config, TxEightBits, I8080},
         LcdCam,
     },
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
 };
 use hil_test as _;
 
@@ -34,25 +29,6 @@ struct Context<'d> {
     tx_descriptors: &'static mut [DmaDescriptor],
 }
 
-impl<'d> Context<'d> {
-    pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-        let dma = Dma::new(peripherals.DMA);
-        let lcd_cam = LcdCam::new_async(peripherals.LCD_CAM);
-        let (tx_buffer, tx_descriptors, _, _) = dma_buffers!(DATA_SIZE, 0);
-
-        Self {
-            lcd_cam,
-            clocks,
-            dma,
-            tx_buffer,
-            tx_descriptors,
-        }
-    }
-}
-
 #[cfg(test)]
 #[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
 mod tests {
@@ -60,7 +36,19 @@ mod tests {
 
     #[init]
     async fn init() -> Context<'static> {
-        Context::init()
+        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+
+        let dma = Dma::new(peripherals.DMA);
+        let lcd_cam = LcdCam::new_async(peripherals.LCD_CAM);
+        let (tx_buffer, tx_descriptors, _, _) = dma_buffers!(DATA_SIZE, 0);
+
+        Context {
+            lcd_cam,
+            clocks,
+            dma,
+            tx_buffer,
+            tx_descriptors,
+        }
     }
 
     #[test]
@@ -83,7 +71,7 @@ mod tests {
             ctx.tx_descriptors,
             pins,
             20.MHz(),
-            i8080::Config::default(),
+            Config::default(),
             &ctx.clocks,
         );
 
@@ -116,7 +104,7 @@ mod tests {
             ctx.tx_descriptors,
             pins,
             20.MHz(),
-            i8080::Config::default(),
+            Config::default(),
             &ctx.clocks,
         );
 

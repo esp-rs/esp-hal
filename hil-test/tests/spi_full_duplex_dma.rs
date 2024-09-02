@@ -14,18 +14,16 @@
 #![no_main]
 
 use esp_hal::{
-    clock::ClockControl,
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::Io,
-    peripherals::{Peripherals, SPI2},
+    peripherals::SPI2,
     prelude::*,
     spi::{
         master::{Spi, SpiDma},
         FullDuplexMode,
         SpiMode,
     },
-    system::SystemControl,
     Blocking,
 };
 use hil_test as _;
@@ -49,15 +47,12 @@ struct Context {
 #[embedded_test::tests]
 mod tests {
     use defmt::assert_eq;
-    use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
 
     use super::*;
 
     #[init]
     fn init() -> Context {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;

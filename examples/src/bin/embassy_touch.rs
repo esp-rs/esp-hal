@@ -17,11 +17,8 @@ use embassy_futures::select::{select, Either};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     gpio::Io,
-    peripherals::Peripherals,
     rtc_cntl::Rtc,
-    system::SystemControl,
     timer::timg::TimerGroup,
     touch::{Touch, TouchConfig, TouchPad},
 };
@@ -30,10 +27,7 @@ use esp_println::println;
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
-
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     esp_hal_embassy::init(&clocks, timg0.timer0);

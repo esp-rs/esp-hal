@@ -14,11 +14,10 @@
 //!    * Clock Configuration
 //!    * Calibration
 //!    * Low-Power Management
-//!    * Real-Time Clock
 //!    * Handling Watchdog Timers
 //!
-//! ## Examples
-//! ### Print Time in Milliseconds From the RTC Timer
+//! ## Example
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use core::cell::RefCell;
@@ -33,28 +32,23 @@
 //! let mut delay = Delay::new(&clocks);
 //!
 //! let mut rtc = Rtc::new(peripherals.LPWR);
+//!
 //! rtc.set_interrupt_handler(interrupt_handler);
 //! rtc.rwdt.set_timeout(2000.millis());
 //! rtc.rwdt.listen();
 //!
 //! critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
-//!
-//!
-//! loop {}
 //! # }
 //!
 //! // Where the `LP_WDT` interrupt handler is defined as:
-//! // Handle the corresponding interrupt
 //! # use core::cell::RefCell;
 //!
 //! # use critical_section::Mutex;
-//! # use esp_hal::prelude::handler;
-//! # use esp_hal::interrupt::InterruptHandler;
-//! # use esp_hal::interrupt;
-//! # use esp_hal::interrupt::Priority;
-//! # use crate::esp_hal::prelude::_fugit_ExtU64;
 //! # use esp_hal::rtc_cntl::Rwdt;
+//!
 //! static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
+//!
+//! // Handle the corresponding interrupt
 //! #[handler]
 //! fn interrupt_handler() {
 //!     critical_section::with(|cs| {

@@ -7,10 +7,6 @@ description  = "HAL for low-power RISC-V coprocessors found in ESP32 devices"
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
 
-[lib]
-bench = false
-test  = false
-
 keywords = [
     "embedded",
     "embedded-hal",
@@ -23,6 +19,10 @@ categories = [
     "hardware-support",
     "no-std",
 ]
+
+[lib]
+bench = false
+test  = false
 
 [dependencies]
 cfg-if            = "1.0.0"

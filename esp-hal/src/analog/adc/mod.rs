@@ -32,7 +32,6 @@
 //! # use esp_hal::analog::adc::Adc;
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::gpio::Io;
-//!
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 #![cfg_attr(esp32, doc = "let analog_pin = io.pins.gpio32;")]
 #![cfg_attr(any(esp32s2, esp32s3), doc = "let analog_pin = io.pins.gpio3;")]
@@ -41,8 +40,10 @@
     doc = "let analog_pin = io.pins.gpio2;"
 )]
 //! let mut adc1_config = AdcConfig::new();
-//! let mut pin = adc1_config.enable_pin(analog_pin,
-//!               Attenuation::Attenuation11dB);
+//! let mut pin = adc1_config.enable_pin(
+//!     analog_pin,
+//!     Attenuation::Attenuation11dB,
+//! );
 //! let mut adc1 = Adc::new(peripherals.ADC1, adc1_config);
 //!
 //! let mut delay = Delay::new(&clocks);
@@ -54,8 +55,10 @@
 //! }
 //! # }
 //! ```
+//! 
 //! ## Implementation State
-//! - [ADC calibration is not implemented for all targets].
+//!
+//!  - [ADC calibration is not implemented for all targets].
 //!
 //! [ADC calibration is not implemented for all targets]: https://github.com/esp-rs/esp-hal/issues/326
 use core::marker::PhantomData;

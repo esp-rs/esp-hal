@@ -12,9 +12,6 @@ use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
-    peripherals::Peripherals,
-    system::SystemControl,
     timer::timg::TimerGroup,
     usb_serial_jtag::{UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
     Async,
@@ -57,17 +54,16 @@ async fn reader(
                 string_buffer.extend_from_slice(&rbuf[..len]).unwrap();
                 signal.signal(heapless::String::from_utf8(string_buffer).unwrap());
             }
+            #[allow(unreachable_patterns)]
             Err(e) => esp_println::println!("RX Error: {:?}", e),
         }
     }
 }
 
 #[esp_hal_embassy::main]
-async fn main(spawner: Spawner) -> () {
+async fn main(spawner: Spawner) {
     esp_println::println!("Init!");
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     esp_hal_embassy::init(&clocks, timg0.timer0);

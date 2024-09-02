@@ -14,3 +14,4 @@ jobs:
         with:
           project-url: https://github.com/orgs/esp-rs/projects/2
           github-token: ${{ secrets.PAT }}
+          labeled: status:needs-attention

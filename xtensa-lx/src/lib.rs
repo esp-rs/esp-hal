@@ -80,9 +80,9 @@ pub fn get_program_counter() -> *const u32 {
     unsafe {
         asm!("
             mov {1}, {2}
-            call0 1f
+            call0 2f
             .align 4
-            1: 
+            2:
             mov {0}, {2}
             mov {2}, {1}
             ", out(reg) x, out(reg) _, out(reg) _, options(nostack))

@@ -7,7 +7,14 @@
 #![no_std]
 #![no_main]
 
-use esp_hal::{delay::Delay, gpio::GpioPin, pcnt::Pcnt};
+use esp_hal::{
+    delay::Delay,
+    gpio::{GpioPin, Io, Level, Output, Pull},
+    pcnt::{
+        channel::{EdgeMode, PcntInputConfig, PcntSource},
+        Pcnt,
+    },
+};
 use hil_test as _;
 
 struct Context<'d> {
@@ -20,22 +27,11 @@ struct Context<'d> {
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    use esp_hal::{
-        clock::ClockControl,
-        delay::Delay,
-        gpio::{Io, Level, Output, Pull},
-        pcnt::channel::{EdgeMode, PcntInputConfig, PcntSource},
-        peripherals::Peripherals,
-        system::SystemControl,
-    };
-
     use super::*;
 
     #[init]
     fn init() -> Context<'static> {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

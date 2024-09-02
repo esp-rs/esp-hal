@@ -4,14 +4,8 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    delay::Delay,
-    peripherals::Peripherals,
-    prelude::*,
-    system::SystemControl,
-};
-use esp_ieee802154::*;
+use esp_hal::{delay::Delay, prelude::*};
+use esp_ieee802154::{Config, Frame, Ieee802154};
 use esp_println::println;
 use ieee802154::mac::{
     Address,
@@ -25,9 +19,7 @@ use ieee802154::mac::{
 
 #[entry]
 fn main() -> ! {
-    let mut peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::max(system.clock_control).freeze();
+    let (mut peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
     let delay = Delay::new(&clocks);
 
@@ -38,7 +30,7 @@ fn main() -> ! {
         promiscuous: false,
         pan_id: Some(0x4242),
         short_addr: Some(0x2222),
-        ..Config::default()
+        ..Default::default()
     });
 
     let mut seq_number = 0u8;
