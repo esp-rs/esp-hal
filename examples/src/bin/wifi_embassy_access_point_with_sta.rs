@@ -20,7 +20,6 @@
 use embassy_executor::Spawner;
 use embassy_net::{
     tcp::TcpSocket,
-    Config,
     IpListenEndpoint,
     Ipv4Address,
     Ipv4Cidr,
@@ -30,13 +29,7 @@ use embassy_net::{
 };
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    peripherals::Peripherals,
-    rng::Rng,
-    system::SystemControl,
-    timer::timg::TimerGroup,
-};
+use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_wifi::{
     initialize,
@@ -70,11 +63,11 @@ macro_rules! mk_static {
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
-
-    let peripherals = Peripherals::take();
-
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::max(system.clock_control).freeze();
+    let (peripherals, clocks) = esp_hal::init({
+        let mut config = esp_hal::Config::default();
+        config.cpu_clock = CpuClock::max();
+        config
+    });
 
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
 
@@ -102,12 +95,12 @@ async fn main(spawner: Spawner) -> ! {
         }
     }
 
-    let ap_config = Config::ipv4_static(StaticConfigV4 {
+    let ap_config = embassy_net::Config::ipv4_static(StaticConfigV4 {
         address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 2, 1), 24),
         gateway: Some(Ipv4Address::from_bytes(&[192, 168, 2, 1])),
         dns_servers: Default::default(),
     });
-    let sta_config = Config::dhcpv4(Default::default());
+    let sta_config = embassy_net::Config::dhcpv4(Default::default());
 
     let seed = 1234; // very random, very secure seed
 

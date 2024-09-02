@@ -17,17 +17,21 @@
 #![doc = crate::before_snippet!()]
 //! const CODE: &[u8] = &[
 //!     0x17, 0x05, 0x00, 0x00, 0x13, 0x05, 0x05, 0x01, 0x81, 0x45, 0x85, 0x05,
-//! 0x0c, 0xc1, 0xf5, 0xbf, 0x00, 0x00, 0x00, 0x00,
-//!     ];
+//!     0x0c, 0xc1, 0xf5, 0xbf, 0x00, 0x00, 0x00, 0x00,
+//! ];
 //! let mut ulp_core =
-//! esp_hal::ulp_core::UlpCore::new(peripherals.ULP_RISCV_CORE);
+//!     esp_hal::ulp_core::UlpCore::new(peripherals.ULP_RISCV_CORE);
 //! // ulp_core.stop(); currently not implemented
 //!
 //! // copy code to RTC ram
 //! let lp_ram = 0x5000_0000 as *mut u8;
 //! unsafe {
-//!     core::ptr::copy_nonoverlapping(CODE as *const _ as *const u8, lp_ram,
-//! CODE.len()); }
+//!     core::ptr::copy_nonoverlapping(
+//!         CODE as *const _ as *const u8,
+//!         lp_ram,
+//!         CODE.len(),
+//!     );
+//! }
 //!
 //! // start ULP core
 //! ulp_core.run(esp_hal::ulp_core::UlpCoreWakeupSource::HpCpu);

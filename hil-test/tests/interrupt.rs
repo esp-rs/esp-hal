@@ -11,10 +11,14 @@ use core::{arch::asm, cell::RefCell};
 
 use critical_section::Mutex;
 use esp_hal::{
-    clock::ClockControl,
-    interrupt::{self, *},
-    peripherals::{Interrupt, Peripherals},
-    system::{SoftwareInterrupt, SystemControl},
+    interrupt::{
+        self,
+        software::{SoftwareInterrupt, SoftwareInterruptControl},
+        CpuInterrupt,
+        Priority,
+    },
+    peripherals::Interrupt,
+    prelude::*,
 };
 use hil_test as _;
 
@@ -23,41 +27,6 @@ static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> = Mutex::new(RefCell
 #[allow(unused)] // TODO: Remove attribute when interrupt latency test re-enabled
 struct Context {
     sw0_trigger_addr: u32,
-}
-
-impl Context {
-    pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-
-        cfg_if::cfg_if! {
-            if #[cfg(any(feature = "esp32c6", feature = "esp32h2"))] {
-                let cpu_intr = &peripherals.INTPRI;
-            } else {
-                let cpu_intr = &peripherals.SYSTEM;
-            }
-        }
-
-        let sw0_trigger_addr = cpu_intr.cpu_intr_from_cpu_0() as *const _ as u32;
-
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let _clocks = ClockControl::max(system.clock_control).freeze();
-
-        let sw_int = system.software_interrupt_control;
-
-        critical_section::with(|cs| {
-            SWINT0
-                .borrow_ref_mut(cs)
-                .replace(sw_int.software_interrupt0)
-        });
-        interrupt::enable_direct(
-            Interrupt::FROM_CPU_INTR0,
-            Priority::Priority3,
-            CpuInterrupt::Interrupt20,
-        )
-        .unwrap();
-
-        Context { sw0_trigger_addr }
-    }
 }
 
 #[no_mangle]
@@ -95,7 +64,36 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        Context::init()
+        let (peripherals, _clocks) = esp_hal::init({
+            let mut config = esp_hal::Config::default();
+            config.cpu_clock = CpuClock::max();
+            config
+        });
+        let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+
+        cfg_if::cfg_if! {
+            if #[cfg(any(feature = "esp32c6", feature = "esp32h2"))] {
+                let cpu_intr = &peripherals.INTPRI;
+            } else {
+                let cpu_intr = &peripherals.SYSTEM;
+            }
+        }
+
+        let sw0_trigger_addr = cpu_intr.cpu_intr_from_cpu_0() as *const _ as u32;
+
+        critical_section::with(|cs| {
+            SWINT0
+                .borrow_ref_mut(cs)
+                .replace(sw_ints.software_interrupt0)
+        });
+        interrupt::enable_direct(
+            Interrupt::FROM_CPU_INTR0,
+            Priority::Priority3,
+            CpuInterrupt::Interrupt20,
+        )
+        .unwrap();
+
+        Context { sw0_trigger_addr }
     }
 
     #[test]

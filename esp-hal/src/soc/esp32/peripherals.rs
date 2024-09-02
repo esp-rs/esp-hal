@@ -63,6 +63,7 @@ crate::peripherals! {
     SPI2 <= SPI2 (SPI2_DMA, SPI2),
     SPI3 <= SPI3 (SPI3_DMA, SPI3),
     SYSTEM <= DPORT,
+    SW_INTERRUPT <= virtual,
     TIMG0 <= TIMG0,
     TIMG1 <= TIMG1,
     TOUCH <= virtual,

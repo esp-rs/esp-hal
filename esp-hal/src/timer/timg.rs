@@ -27,8 +27,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::timg::TimerGroup;
-//! # use crate::esp_hal::prelude::_esp_hal_timer_Timer;
-//! # use esp_hal::prelude::*;
+//!
 //! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
 //! let timer0 = timg0.timer0;
 //!
@@ -42,6 +41,8 @@
 //! while !timer0.is_interrupt_set() {
 //!     // Wait
 //! }
+//!
+//! timer0.clear_interrupt();
 //! # }
 //! ```
 //! 
@@ -49,7 +50,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::timg::TimerGroup;
-//! # use esp_hal::prelude::*;
+//!
 //! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
 //! let mut wdt = timg0.wdt;
 //!

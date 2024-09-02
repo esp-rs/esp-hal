@@ -1,6 +1,6 @@
 //! SPI Full Duplex DMA Test
 //!
-//! Folowing pins are used:
+//! Following pins are used:
 //! SCLK    GPIO0
 //! MOSI    GPIO3
 //! MISO    GPIO6
@@ -22,7 +22,6 @@
 
 use embedded_hal_async::spi::SpiBus;
 use esp_hal::{
-    clock::ClockControl,
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{GpioPin, Io, Level, Output, Pull},
@@ -31,14 +30,13 @@ use esp_hal::{
         unit::Unit,
         Pcnt,
     },
-    peripherals::{Peripherals, SPI2},
+    peripherals::SPI2,
     prelude::*,
     spi::{
         master::{Spi, SpiDmaBus},
         FullDuplexMode,
         SpiMode,
     },
-    system::SystemControl,
     Async,
 };
 use hil_test as _;
@@ -72,9 +70,7 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let pcnt = Pcnt::new(peripherals.PCNT);

@@ -15,58 +15,57 @@
 //! [Alarm]s can be configured in two modes: [Target] (one-shot) and [Periodic].
 //!
 //! ## Examples
+//!
+//! ### Splitting up the System Timer into three alarms
+//!
+//! Use the [split][SystemTimer::split] method to create three alarms from the
+//!  System Timer, contained in a [SysTimerAlarms] struct.
+//!
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! use esp_hal::timer::systimer::{
+//!     SystemTimer,
+//!     Periodic,
+//! };
+//!
+//! let systimer = SystemTimer::new(
+//!     peripherals.SYSTIMER,
+//! ).split::<Periodic>();
+//!
+//! // Reconfigure a periodic alarm to be a target alarm
+//! let target_alarm = systimer.alarm0.into_target();
+//! # }
+//! ```
+//! 
 //! ### General-purpose Timer
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::timer::systimer::SystemTimer;
-//! # use esp_hal::timer::timg::TimerGroup;
-//! # use crate::esp_hal::prelude::_esp_hal_timer_Timer;
-//! # use esp_hal::prelude::*;
-//! let systimer = SystemTimer::new(peripherals.SYSTIMER);
+//! use esp_hal::timer::systimer::{
+//!     Alarm,
+//!     FrozenUnit,
+//!     SpecificUnit,
+//!     SystemTimer,
+//! };
+//!
+//! let mut systimer = SystemTimer::new(peripherals.SYSTIMER);
 //!
 //! // Get the current timestamp, in microseconds:
 //! let now = SystemTimer::now();
 //!
-//! let timg0 = TimerGroup::new(
-//!     peripherals.TIMG0,
-//!     &clocks,
+//! let frozen_unit = FrozenUnit::new(&mut systimer.unit0);
+//! let alarm0 = Alarm::new(systimer.comparator0, &frozen_unit);
+//!
+//! alarm0.set_target(
+//!     SystemTimer::now() + SystemTimer::ticks_per_second() * 2
 //! );
+//! alarm0.enable_interrupt(true);
 //!
-//! let mut timer0 = timg0.timer0;
-//! timer0.set_interrupt_handler(tg0_t0_level);
-//!
-//! // Wait for timeout:
-//! timer0.load_value(1.secs());
-//! timer0.start();
-//!
-//! while !timer0.is_interrupt_set() {
-//!     // Wait
+//! while !alarm0.is_interrupt_set() {
+//!     // Wait for the interrupt to be set
 //! }
+//!
+//! alarm0.clear_interrupt();
 //! # }
-//!
-//!
-//! # use core::cell::RefCell;
-//! # use critical_section::Mutex;
-//! # use procmacros::handler;
-//! # use esp_hal::interrupt::InterruptHandler;
-//! # use esp_hal::interrupt;
-//! # use esp_hal::peripherals::TIMG0;
-//! # use esp_hal::timer::timg::{Timer, Timer0};
-//! # use crate::esp_hal::prelude::_esp_hal_timer_Timer;
-//! # static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0>, esp_hal::Blocking>>>> = Mutex::new(RefCell::new(None));
-//! #[handler]
-//! fn tg0_t0_level() {
-//!     critical_section::with(|cs| {
-//!     let mut timer0 = TIMER0.borrow_ref_mut(cs);
-//!     let timer0 = timer0.as_mut().unwrap();
-//!
-//!     timer0.clear_interrupt();
-//!
-//!     // Counter value should be a very small number as the alarm triggered a
-//!     // counter reload to 0 and ETM stopped the counter quickly after
-//!     // esp_println::println!("counter in interrupt: {}", timer0.now());
-//!     });
-//! }
 //! ```
 
 use core::{

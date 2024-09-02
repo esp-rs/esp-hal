@@ -13,20 +13,14 @@
 //! module clocks.
 //!
 //! ## Configuration
-//! Proper clock configuration is essential for the correct functioning of the
-//! microcontroller and its peripherals.
 //!
-//! The `Clock` driver supports configuring multiple clocks, including:
-//!   * CPU clock
-//!   * APB (Advanced Peripheral Bus) clock
-//!   * XTAL (External Crystal) clock
-//!   * PLL (Phase Lock Loop) clock
-//!
-//! and other specific clocks based on the ESP microcontroller's architecture.
+//! During HAL initialization, specify a CPU clock speed to configure the
+//! desired clock frequencies.
 //!
 //! The `CPU clock` is responsible for defining the speed at which the central
 //! processing unit (CPU) operates. This driver provides predefined options for
-//! different CPU clock speeds, such
+//! different CPU clock speeds, such as
+//!
 //!   * 80 MHz
 //!   * 96 MHz
 //!   * 120 MHz
@@ -35,41 +29,49 @@
 //!
 //! and others, depending on the microcontroller model.
 //!
-//! ### Clock Control
-//! The `ClockControl` struct allows users to configure the desired clock
-//! frequencies before applying them. It offers flexibility in selecting
-//! appropriate clock frequencies based on specific application requirements.
-//!
 //! ### Frozen Clock Frequencies
-//! Once the clock configuration is applied using the `freeze` function of the
-//! ClockControl struct, the clock frequencies become `frozen` and cannot be
-//! changed. The `Clocks` struct is returned after freezing, providing read-only
-//! access to the configured clock frequencies.
+//!
+//! Once the clock configuration is applied, the clock frequencies become
+//! `frozen` and cannot be changed. The `Clocks` struct is returned as part of
+//! the `System` struct, providing read-only access to the configured clock
+//! frequencies.
 //!
 //! ## Examples
+//!
 //! ### Initialize With Different Clock Frequencies
 //! ```rust, no_run
 //! # #![no_std]
-//! # use esp_hal::peripherals::Peripherals;
-//! # use esp_hal::clock::ClockControl;
-//! # use esp_hal::system::SystemControl;
+//! # use esp_hal::prelude::*;
 //! # #[panic_handler]
 //! # fn panic(_ : &core::panic::PanicInfo) -> ! {
 //! #     loop {}
 //! # }
 //! # fn main() {
-//! #   let peripherals = Peripherals::take();
-//! #   let system = SystemControl::new(peripherals.SYSTEM);
 //! // Initialize with the highest possible frequency for this chip
-//! let clocks = ClockControl::max(system.clock_control).freeze();
+//! let (peripherals, clocks) = esp_hal::init({
+//!     let mut config = esp_hal::Config::default();
+//!     config.cpu_clock = CpuClock::max();
+//!     config
+//! });
 //!
 //! // Initialize with custom clock frequency
-//! // let clocks = ClockControl::configure(system.clock_control, CpuClock::Clock160MHz).freeze();
+//! // let (peripherals, clocks) = esp_hal::init({
+//! //    let mut config = esp_hal::Config::default();
+#![cfg_attr(
+    not(any(esp32c2, esp32h2)),
+    doc = "//    config.cpu_clock = CpuClock::Clock160MHz;"
+)]
+#![cfg_attr(esp32c2, doc = "//    config.cpu_clock = CpuClock::Clock120MHz;")]
+#![cfg_attr(esp32h2, doc = "//    config.cpu_clock = CpuClock::Clock96MHz;")]
+//! //    config
+//! // });
 //! //
 //! // Initialize with default clock frequency for this chip
-//! // let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+//! // let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 //! # }
 //! ```
+
+use core::marker::PhantomData;
 
 use fugit::HertzU32;
 #[cfg(esp32c2)]
@@ -77,10 +79,6 @@ use portable_atomic::{AtomicU32, Ordering};
 
 #[cfg(any(esp32, esp32c2))]
 use crate::rtc_cntl::RtcClock;
-use crate::{
-    peripheral::{Peripheral, PeripheralRef},
-    system::SystemClockControl,
-};
 
 #[cfg_attr(esp32, path = "clocks_ll/esp32.rs")]
 #[cfg_attr(esp32c2, path = "clocks_ll/esp32c2.rs")]
@@ -108,40 +106,63 @@ pub trait Clock {
 }
 
 /// CPU clock speed
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum CpuClock {
     /// 80MHz CPU clock
     #[cfg(not(esp32h2))]
-    Clock80MHz,
+    Clock80MHz  = 80,
+
     /// 96MHz CPU clock
     #[cfg(esp32h2)]
-    Clock96MHz,
+    Clock96MHz  = 96,
+
     /// 120MHz CPU clock
     #[cfg(esp32c2)]
-    Clock120MHz,
+    Clock120MHz = 120,
+
     /// 160MHz CPU clock
     #[cfg(not(any(esp32c2, esp32h2)))]
-    Clock160MHz,
+    Clock160MHz = 160,
+
     /// 240MHz CPU clock
     #[cfg(xtensa)]
-    Clock240MHz,
+    Clock240MHz = 240,
 }
 
-#[allow(dead_code)]
+impl Default for CpuClock {
+    fn default() -> Self {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32h2)] {
+                Self::Clock96MHz
+            } else {
+                // FIXME: I don't think this is correct in general?
+                Self::Clock80MHz
+            }
+        }
+    }
+}
+
+impl CpuClock {
+    /// Use the highest possible frequency for a particular chip.
+    pub const fn max() -> Self {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32c2)] {
+                Self::Clock120MHz
+            } else if #[cfg(any(esp32c3, esp32c6))] {
+                Self::Clock160MHz
+            } else if #[cfg(esp32h2)] {
+                Self::Clock96MHz
+            } else {
+                Self::Clock240MHz
+            }
+        }
+    }
+}
+
 impl Clock for CpuClock {
     fn frequency(&self) -> HertzU32 {
-        match self {
-            #[cfg(not(esp32h2))]
-            CpuClock::Clock80MHz => HertzU32::MHz(80),
-            #[cfg(esp32h2)]
-            CpuClock::Clock96MHz => HertzU32::MHz(96),
-            #[cfg(esp32c2)]
-            CpuClock::Clock120MHz => HertzU32::MHz(120),
-            #[cfg(not(any(esp32c2, esp32h2)))]
-            CpuClock::Clock160MHz => HertzU32::MHz(160),
-            #[cfg(xtensa)]
-            CpuClock::Clock240MHz => HertzU32::MHz(240),
-        }
+        HertzU32::MHz(*self as u32)
     }
 }
 
@@ -257,81 +278,65 @@ impl Clock for ApbClock {
 /// Frozen clock frequencies
 ///
 /// The instantiation of this type indicates that the clock configuration can no
-/// longer be changed
-pub struct Clocks<'d> {
-    _private: PeripheralRef<'d, SystemClockControl>,
-    /// CPU clock frequency
-    pub cpu_clock: HertzU32,
-    /// APB clock frequency
-    pub apb_clock: HertzU32,
-    /// XTAL clock frequency
-    pub xtal_clock: HertzU32,
-    /// I2C clock frequency
-    #[cfg(esp32)]
-    pub i2c_clock: HertzU32,
-    /// PWM clock frequency
-    #[cfg(esp32)]
-    pub pwm_clock: HertzU32,
-    /// Crypto PWM  clock frequency
-    #[cfg(esp32s3)]
-    pub crypto_pwm_clock: HertzU32,
-    /// Crypto clock frequency
-    #[cfg(any(esp32c6, esp32h2))]
-    pub crypto_clock: HertzU32,
-    /// PLL 48M clock frequency (fixed)
-    #[cfg(esp32h2)]
-    pub pll_48m_clock: HertzU32,
-    /// PLL 96M clock frequency (fixed)
-    #[cfg(esp32h2)]
-    pub pll_96m_clock: HertzU32,
+/// longer be changed.
+pub struct Clocks<'a> {
+    _private: PhantomData<&'a ()>,
+    rates: RawClocks,
 }
 
-#[doc(hidden)]
-impl<'d> Clocks<'d> {
+impl<'a> Clocks<'a> {
     /// This should not be used in user code.
     /// The whole point this exists is make it possible to have other crates
     /// (i.e. esp-wifi) create `Clocks`
     #[doc(hidden)]
-    pub fn from_raw_clocks(
-        system_clock_control: PeripheralRef<'d, SystemClockControl>,
-        raw_clocks: RawClocks,
-    ) -> Clocks<'d> {
+    pub(crate) fn from_raw_clocks(raw_clocks: RawClocks) -> Clocks<'a> {
         Self {
-            _private: system_clock_control,
-            cpu_clock: raw_clocks.cpu_clock,
-            apb_clock: raw_clocks.apb_clock,
-            xtal_clock: raw_clocks.xtal_clock,
-            #[cfg(esp32)]
-            i2c_clock: raw_clocks.i2c_clock,
-            #[cfg(esp32)]
-            pwm_clock: raw_clocks.pwm_clock,
-            #[cfg(esp32s3)]
-            crypto_pwm_clock: raw_clocks.crypto_pwm_clock,
-            #[cfg(any(esp32c6, esp32h2))]
-            crypto_clock: raw_clocks.crypto_clock,
-            #[cfg(esp32h2)]
-            pll_48m_clock: raw_clocks.pll_48m_clock,
-            #[cfg(esp32h2)]
-            pll_96m_clock: raw_clocks.pll_96m_clock,
+            _private: PhantomData,
+            rates: raw_clocks,
         }
     }
 }
 
-#[doc(hidden)]
+impl core::ops::Deref for Clocks<'_> {
+    type Target = RawClocks;
+
+    fn deref(&self) -> &RawClocks {
+        &self.rates
+    }
+}
+
+/// The list of the clock frequencies that are used in the system.
 pub struct RawClocks {
+    /// CPU clock frequency
     pub cpu_clock: HertzU32,
+
+    /// APB clock frequency
     pub apb_clock: HertzU32,
+
+    /// XTAL clock frequency
     pub xtal_clock: HertzU32,
+
+    /// I2C clock frequency
     #[cfg(esp32)]
     pub i2c_clock: HertzU32,
+
+    /// PWM clock frequency
     #[cfg(esp32)]
     pub pwm_clock: HertzU32,
+
+    /// Crypto PWM  clock frequency
     #[cfg(esp32s3)]
     pub crypto_pwm_clock: HertzU32,
+
+    /// Crypto clock frequency
     #[cfg(any(esp32c6, esp32h2))]
     pub crypto_clock: HertzU32,
+
+    /// PLL 48M clock frequency (fixed)
     #[cfg(esp32h2)]
     pub pll_48m_clock: HertzU32,
+
+    /// PLL 96M clock frequency (fixed)
     #[cfg(esp32h2)]
     pub pll_96m_clock: HertzU32,
 }
@@ -360,72 +365,51 @@ cfg_if::cfg_if! {
 ///
 /// After setting all frequencies, call the freeze function to apply the
 /// configuration.
-pub struct ClockControl<'d> {
-    _private: PeripheralRef<'d, SystemClockControl>,
+pub struct ClockControl {
     desired_rates: RawClocks,
 }
 
-impl<'d> ClockControl<'d> {
+impl ClockControl {
+    pub(crate) fn new(clock: CpuClock) -> Self {
+        Self::configure(clock)
+    }
+
     /// Applies the clock configuration and returns a Clocks struct that
     /// signifies that the clocks are frozen, and contains the frequencies
     /// used. After this function is called, the clocks can not change
-    pub fn freeze(self) -> Clocks<'d> {
-        Clocks::from_raw_clocks(self._private, self.desired_rates)
+    pub fn freeze(self) -> Clocks<'static> {
+        Clocks::from_raw_clocks(self.desired_rates)
     }
 }
 
 #[cfg(esp32)]
-impl<'d> ClockControl<'d> {
-    /// Use what is considered the default settings after boot.
-    pub fn boot_defaults(
-        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
-    ) -> ClockControl<'d> {
-        let xtal_freq = if RtcClock::estimate_xtal_frequency() > 33 {
-            40
-        } else {
-            26
-        };
-
-        ClockControl {
-            _private: clock_control.into_ref(),
-            desired_rates: RawClocks {
-                cpu_clock: HertzU32::MHz(80),
-                apb_clock: HertzU32::MHz(80),
-                xtal_clock: HertzU32::MHz(xtal_freq),
-                i2c_clock: HertzU32::MHz(80),
-                pwm_clock: HertzU32::MHz(160),
-            },
-        }
-    }
-
+impl ClockControl {
     /// Configure the CPU clock speed.
-    pub fn configure(
-        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
-        cpu_clock_speed: CpuClock,
-    ) -> ClockControl<'d> {
+    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> ClockControl {
         let xtal_freq = if RtcClock::estimate_xtal_frequency() > 33 {
             XtalClock::RtcXtalFreq40M
         } else {
             XtalClock::RtcXtalFreq26M
         };
 
-        let pll_freq = match cpu_clock_speed {
-            CpuClock::Clock80MHz => PllClock::Pll320MHz,
-            CpuClock::Clock160MHz => PllClock::Pll320MHz,
-            CpuClock::Clock240MHz => PllClock::Pll480MHz,
-        };
+        if cpu_clock_speed != CpuClock::default() {
+            let pll_freq = match cpu_clock_speed {
+                CpuClock::Clock80MHz => PllClock::Pll320MHz,
+                CpuClock::Clock160MHz => PllClock::Pll320MHz,
+                CpuClock::Clock240MHz => PllClock::Pll480MHz,
+            };
 
-        clocks_ll::esp32_rtc_update_to_xtal(xtal_freq, 1);
-        clocks_ll::esp32_rtc_bbpll_enable();
-        clocks_ll::esp32_rtc_bbpll_configure(xtal_freq, pll_freq);
-        clocks_ll::set_cpu_freq(cpu_clock_speed);
+            clocks_ll::esp32_rtc_update_to_xtal(xtal_freq, 1);
+            clocks_ll::esp32_rtc_bbpll_enable();
+            clocks_ll::esp32_rtc_bbpll_configure(xtal_freq, pll_freq);
+            clocks_ll::set_cpu_freq(cpu_clock_speed);
+        }
 
         ClockControl {
-            _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: cpu_clock_speed.frequency(),
                 apb_clock: HertzU32::MHz(80),
-                xtal_clock: HertzU32::MHz(40),
+                xtal_clock: HertzU32::MHz(xtal_freq.mhz()),
                 i2c_clock: HertzU32::MHz(80),
                 // The docs are unclear here. pwm_clock seems to be tied to clocks.apb_clock
                 // while simultaneously being fixed at 160 MHz.
@@ -434,43 +418,12 @@ impl<'d> ClockControl<'d> {
             },
         }
     }
-
-    /// Use the highest possible frequency for a particular chip
-    pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
-        Self::configure(clock_control, CpuClock::Clock240MHz)
-    }
 }
 
 #[cfg(esp32c2)]
-impl<'d> ClockControl<'d> {
-    /// Use what is considered the default settings after boot.
-    pub fn boot_defaults(
-        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
-    ) -> ClockControl<'d> {
-        let xtal_freq = if RtcClock::estimate_xtal_frequency() > 33 {
-            40
-        } else {
-            26
-        };
-        XTAL_FREQ_MHZ.store(xtal_freq, Ordering::Relaxed);
-
-        ClockControl {
-            _private: clock_control.into_ref(),
-            desired_rates: RawClocks {
-                cpu_clock: HertzU32::MHz(80),
-                apb_clock: HertzU32::MHz(40),
-                xtal_clock: HertzU32::MHz(xtal_freq),
-            },
-        }
-    }
-
+impl ClockControl {
     /// Configure the CPU clock speed.
-    pub fn configure(
-        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
-        cpu_clock_speed: CpuClock,
-    ) -> ClockControl<'d> {
-        let apb_freq;
-
+    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> ClockControl {
         let xtal_freq = if RtcClock::estimate_xtal_frequency() > 33 {
             XtalClock::RtcXtalFreq40M
         } else {
@@ -478,129 +431,94 @@ impl<'d> ClockControl<'d> {
         };
         XTAL_FREQ_MHZ.store(xtal_freq.mhz(), Ordering::Relaxed);
 
-        let pll_freq = PllClock::Pll480MHz;
+        let apb_freq;
+        if cpu_clock_speed != CpuClock::default() {
+            let pll_freq = PllClock::Pll480MHz;
 
-        if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
-            apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
-            clocks_ll::esp32c2_rtc_update_to_xtal(xtal_freq, 1);
-            clocks_ll::esp32c2_rtc_apb_freq_update(apb_freq);
+            if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
+                apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
+                clocks_ll::esp32c2_rtc_update_to_xtal(xtal_freq, 1);
+                clocks_ll::esp32c2_rtc_apb_freq_update(apb_freq);
+            } else {
+                apb_freq = ApbClock::ApbFreq40MHz;
+                clocks_ll::esp32c2_rtc_bbpll_enable();
+                clocks_ll::esp32c2_rtc_bbpll_configure(xtal_freq, pll_freq);
+                clocks_ll::esp32c2_rtc_freq_to_pll_mhz(cpu_clock_speed);
+                clocks_ll::esp32c2_rtc_apb_freq_update(apb_freq);
+            }
         } else {
             apb_freq = ApbClock::ApbFreq40MHz;
-            clocks_ll::esp32c2_rtc_bbpll_enable();
-            clocks_ll::esp32c2_rtc_bbpll_configure(xtal_freq, pll_freq);
-            clocks_ll::esp32c2_rtc_freq_to_pll_mhz(cpu_clock_speed);
-            clocks_ll::esp32c2_rtc_apb_freq_update(apb_freq);
         }
 
         ClockControl {
-            _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: cpu_clock_speed.frequency(),
                 apb_clock: apb_freq.frequency(),
                 xtal_clock: xtal_freq.frequency(),
             },
         }
-    }
-
-    /// Use the highest possible frequency for a particular chip
-    pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
-        Self::configure(clock_control, CpuClock::Clock120MHz)
     }
 }
 
 #[cfg(esp32c3)]
-impl<'d> ClockControl<'d> {
-    /// Use what is considered the default settings after boot.
-    pub fn boot_defaults(
-        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
-    ) -> ClockControl<'d> {
-        ClockControl {
-            _private: clock_control.into_ref(),
-            desired_rates: RawClocks {
-                cpu_clock: HertzU32::MHz(80),
-                apb_clock: HertzU32::MHz(80),
-                xtal_clock: HertzU32::MHz(40),
-            },
-        }
-    }
-
+impl ClockControl {
     /// Configure the CPU clock speed.
-    pub fn configure(
-        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
-        cpu_clock_speed: CpuClock,
-    ) -> ClockControl<'d> {
-        let apb_freq;
+    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> ClockControl {
         let xtal_freq = XtalClock::RtcXtalFreq40M;
-        let pll_freq = PllClock::Pll480MHz;
 
-        if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
-            apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
-            clocks_ll::esp32c3_rtc_update_to_xtal(xtal_freq, 1);
-            clocks_ll::esp32c3_rtc_apb_freq_update(apb_freq);
+        let apb_freq;
+        if cpu_clock_speed != CpuClock::default() {
+            if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
+                apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
+                clocks_ll::esp32c3_rtc_update_to_xtal(xtal_freq, 1);
+                clocks_ll::esp32c3_rtc_apb_freq_update(apb_freq);
+            } else {
+                let pll_freq = PllClock::Pll480MHz;
+                apb_freq = ApbClock::ApbFreq80MHz;
+                clocks_ll::esp32c3_rtc_bbpll_enable();
+                clocks_ll::esp32c3_rtc_bbpll_configure(xtal_freq, pll_freq);
+                clocks_ll::esp32c3_rtc_freq_to_pll_mhz(cpu_clock_speed);
+                clocks_ll::esp32c3_rtc_apb_freq_update(apb_freq);
+            }
         } else {
             apb_freq = ApbClock::ApbFreq80MHz;
-            clocks_ll::esp32c3_rtc_bbpll_enable();
-            clocks_ll::esp32c3_rtc_bbpll_configure(xtal_freq, pll_freq);
-            clocks_ll::esp32c3_rtc_freq_to_pll_mhz(cpu_clock_speed);
-            clocks_ll::esp32c3_rtc_apb_freq_update(apb_freq);
         }
 
         ClockControl {
-            _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: cpu_clock_speed.frequency(),
                 apb_clock: apb_freq.frequency(),
                 xtal_clock: xtal_freq.frequency(),
             },
         }
-    }
-
-    /// Use the highest possible frequency for a particular chip
-    pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
-        Self::configure(clock_control, CpuClock::Clock160MHz)
     }
 }
 
 #[cfg(esp32c6)]
-impl<'d> ClockControl<'d> {
-    /// Use what is considered the default settings after boot.
-    pub fn boot_defaults(
-        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
-    ) -> ClockControl<'d> {
-        ClockControl {
-            _private: clock_control.into_ref(),
-            desired_rates: RawClocks {
-                cpu_clock: HertzU32::MHz(80),
-                apb_clock: HertzU32::MHz(80),
-                xtal_clock: HertzU32::MHz(40),
-                crypto_clock: HertzU32::MHz(160),
-            },
-        }
-    }
-
+impl ClockControl {
     /// Configure the CPU clock speed.
-    pub fn configure(
-        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
-        cpu_clock_speed: CpuClock,
-    ) -> ClockControl<'d> {
-        let apb_freq;
+    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> ClockControl {
         let xtal_freq = XtalClock::RtcXtalFreq40M;
-        let pll_freq = PllClock::Pll480MHz;
 
-        if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
-            apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
-            clocks_ll::esp32c6_rtc_update_to_xtal(xtal_freq, 1);
-            clocks_ll::esp32c6_rtc_apb_freq_update(apb_freq);
+        let apb_freq;
+        if cpu_clock_speed != CpuClock::default() {
+            if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
+                apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
+                clocks_ll::esp32c6_rtc_update_to_xtal(xtal_freq, 1);
+                clocks_ll::esp32c6_rtc_apb_freq_update(apb_freq);
+            } else {
+                let pll_freq = PllClock::Pll480MHz;
+                apb_freq = ApbClock::ApbFreq80MHz;
+                clocks_ll::esp32c6_rtc_bbpll_enable();
+                clocks_ll::esp32c6_rtc_bbpll_configure(xtal_freq, pll_freq);
+                clocks_ll::esp32c6_rtc_freq_to_pll_mhz(cpu_clock_speed);
+                clocks_ll::esp32c6_rtc_apb_freq_update(apb_freq);
+            }
         } else {
             apb_freq = ApbClock::ApbFreq80MHz;
-            clocks_ll::esp32c6_rtc_bbpll_enable();
-            clocks_ll::esp32c6_rtc_bbpll_configure(xtal_freq, pll_freq);
-            clocks_ll::esp32c6_rtc_freq_to_pll_mhz(cpu_clock_speed);
-            clocks_ll::esp32c6_rtc_apb_freq_update(apb_freq);
         }
 
         ClockControl {
-            _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: cpu_clock_speed.frequency(),
                 apb_clock: apb_freq.frequency(),
@@ -608,56 +526,34 @@ impl<'d> ClockControl<'d> {
                 crypto_clock: HertzU32::MHz(160),
             },
         }
-    }
-
-    /// Use the highest possible frequency for a particular chip
-    pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
-        Self::configure(clock_control, CpuClock::Clock160MHz)
     }
 }
 
 #[cfg(esp32h2)]
-impl<'d> ClockControl<'d> {
-    /// Use what is considered the default settings after boot.
-    pub fn boot_defaults(
-        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
-    ) -> ClockControl<'d> {
-        ClockControl {
-            _private: clock_control.into_ref(),
-            desired_rates: RawClocks {
-                cpu_clock: HertzU32::MHz(96),
-                apb_clock: HertzU32::MHz(32),
-                xtal_clock: HertzU32::MHz(32),
-                pll_48m_clock: HertzU32::MHz(48),
-                crypto_clock: HertzU32::MHz(96),
-                pll_96m_clock: HertzU32::MHz(96),
-            },
-        }
-    }
-
+impl ClockControl {
     /// Configure the CPU clock speed.
-    pub fn configure(
-        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
-        cpu_clock_speed: CpuClock,
-    ) -> ClockControl<'d> {
-        let apb_freq;
+    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> ClockControl {
         let xtal_freq = XtalClock::RtcXtalFreq32M;
-        let pll_freq = PllClock::Pll96MHz;
 
-        if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
-            apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
-            clocks_ll::esp32h2_rtc_update_to_xtal(xtal_freq, 1);
-            clocks_ll::esp32h2_rtc_apb_freq_update(apb_freq);
+        let apb_freq;
+        if cpu_clock_speed != CpuClock::default() {
+            if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
+                apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
+                clocks_ll::esp32h2_rtc_update_to_xtal(xtal_freq, 1);
+                clocks_ll::esp32h2_rtc_apb_freq_update(apb_freq);
+            } else {
+                let pll_freq = PllClock::Pll96MHz;
+                apb_freq = ApbClock::ApbFreq32MHz;
+                clocks_ll::esp32h2_rtc_bbpll_enable();
+                clocks_ll::esp32h2_rtc_bbpll_configure(xtal_freq, pll_freq);
+                clocks_ll::esp32h2_rtc_freq_to_pll_mhz(cpu_clock_speed);
+                clocks_ll::esp32h2_rtc_apb_freq_update(apb_freq);
+            }
         } else {
             apb_freq = ApbClock::ApbFreq32MHz;
-            clocks_ll::esp32h2_rtc_bbpll_enable();
-            clocks_ll::esp32h2_rtc_bbpll_configure(xtal_freq, pll_freq);
-            clocks_ll::esp32h2_rtc_freq_to_pll_mhz(cpu_clock_speed);
-            clocks_ll::esp32h2_rtc_apb_freq_update(apb_freq);
         }
 
         ClockControl {
-            _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: cpu_clock_speed.frequency(),
                 apb_clock: apb_freq.frequency(),
@@ -668,78 +564,35 @@ impl<'d> ClockControl<'d> {
             },
         }
     }
-
-    /// Use the highest possible frequency for a particular chip
-    pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
-        Self::configure(clock_control, CpuClock::Clock96MHz)
-    }
 }
 
 #[cfg(esp32s2)]
-impl<'d> ClockControl<'d> {
-    /// Use what is considered the default settings after boot.
-    pub fn boot_defaults(
-        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
-    ) -> ClockControl<'d> {
-        ClockControl {
-            _private: clock_control.into_ref(),
-            desired_rates: RawClocks {
-                cpu_clock: HertzU32::MHz(80),
-                apb_clock: HertzU32::MHz(80),
-                xtal_clock: HertzU32::MHz(40),
-            },
-        }
-    }
-
+impl ClockControl {
     /// Configure the CPU clock speed.
-    pub fn configure(
-        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
-        cpu_clock_speed: CpuClock,
-    ) -> ClockControl<'d> {
-        clocks_ll::set_cpu_clock(cpu_clock_speed);
+    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> ClockControl {
+        if cpu_clock_speed != CpuClock::default() {
+            clocks_ll::set_cpu_clock(cpu_clock_speed);
+        }
 
         ClockControl {
-            _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: cpu_clock_speed.frequency(),
                 apb_clock: HertzU32::MHz(80),
                 xtal_clock: HertzU32::MHz(40),
             },
         }
-    }
-
-    /// Use the highest possible frequency for a particular chip
-    pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
-        Self::configure(clock_control, CpuClock::Clock240MHz)
     }
 }
 
 #[cfg(esp32s3)]
-impl<'d> ClockControl<'d> {
-    /// Use what is considered the default settings after boot.
-    pub fn boot_defaults(
-        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
-    ) -> ClockControl<'d> {
-        ClockControl {
-            _private: clock_control.into_ref(),
-            desired_rates: RawClocks {
-                cpu_clock: HertzU32::MHz(80),
-                apb_clock: HertzU32::MHz(80),
-                xtal_clock: HertzU32::MHz(40),
-                crypto_pwm_clock: HertzU32::MHz(160),
-            },
-        }
-    }
-
+impl ClockControl {
     /// Configure the CPU clock speed.
-    pub fn configure(
-        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
-        cpu_clock_speed: CpuClock,
-    ) -> ClockControl<'d> {
-        clocks_ll::set_cpu_clock(cpu_clock_speed);
+    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> ClockControl {
+        if cpu_clock_speed != CpuClock::default() {
+            clocks_ll::set_cpu_clock(cpu_clock_speed);
+        }
 
         ClockControl {
-            _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: cpu_clock_speed.frequency(),
                 apb_clock: HertzU32::MHz(80),
@@ -747,10 +600,5 @@ impl<'d> ClockControl<'d> {
                 crypto_pwm_clock: HertzU32::MHz(160),
             },
         }
-    }
-
-    /// Use the highest possible frequency for a particular chip
-    pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
-        Self::configure(clock_control, CpuClock::Clock240MHz)
     }
 }

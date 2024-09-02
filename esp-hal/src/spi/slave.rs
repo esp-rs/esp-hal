@@ -48,8 +48,8 @@
 //! let mut receive = rx_buffer;
 //!
 //! let transfer = spi
-//! .dma_transfer(&mut send, &mut receive)
-//! .unwrap();
+//!     .dma_transfer(&mut send, &mut receive)
+//!     .unwrap();
 //!
 //! transfer.wait().unwrap();
 //! # }

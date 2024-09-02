@@ -13,7 +13,7 @@ extern crate alloc;
 use alloc::{string::String, vec::Vec};
 
 use esp_backtrace as _;
-use esp_hal::{peripherals::Peripherals, prelude::*, psram};
+use esp_hal::{prelude::*, psram};
 use esp_println::println;
 
 #[global_allocator]
@@ -30,7 +30,7 @@ fn main() -> ! {
     #[cfg(debug_assertions)]
     compile_error!("This example MUST be built in release mode!");
 
-    let peripherals = Peripherals::take();
+    let (peripherals, _clocks) = esp_hal::init(esp_hal::Config::default());
 
     psram::init_psram(peripherals.PSRAM);
     init_psram_heap();

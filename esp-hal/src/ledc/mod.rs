@@ -18,8 +18,10 @@
 //! ## Examples
 //!
 //! ### Low Speed Channel
-//! The following will configure the Low Speed Channel0 to 24kHz output with
-//! 10% duty using the ABPClock
+//!
+//! The following example will configure the Low Speed Channel0 to 24kHz output
+//! with 10% duty using the ABPClock.
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::ledc::Ledc;
@@ -28,10 +30,6 @@
 //! # use esp_hal::ledc::LowSpeed;
 //! # use esp_hal::ledc::channel;
 //! # use esp_hal::gpio::Io;
-//! # use crate::esp_hal::prelude::_esp_hal_ledc_timer_TimerIFace;
-//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
-//! # use crate::esp_hal::prelude::_esp_hal_ledc_channel_ChannelIFace;
-//!
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let led = io.pins.gpio0;
 //!

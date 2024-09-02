@@ -8,23 +8,13 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    gpio::Io,
-    peripherals::Peripherals,
-    prelude::*,
-    reset::software_reset,
-    system::SystemControl,
-    uart::Uart,
-};
-use esp_ieee802154::*;
+use esp_hal::{gpio::Io, prelude::*, reset::software_reset, uart::Uart};
+use esp_ieee802154::{Config, Ieee802154};
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let mut peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::max(system.clock_control).freeze();
+    let (mut peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -69,7 +59,7 @@ fn main() -> ! {
         rx_when_idle: true,
         auto_ack_rx: false,
         auto_ack_tx: false,
-        ..Config::default()
+        ..Default::default()
     });
 
     ieee802154.start_receive();

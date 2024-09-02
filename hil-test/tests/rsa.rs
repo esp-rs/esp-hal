@@ -7,7 +7,6 @@
 
 use crypto_bigint::{Uint, U1024, U512};
 use esp_hal::{
-    peripherals::Peripherals,
     prelude::*,
     rsa::{
         operand_sizes::*,
@@ -58,7 +57,7 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        let peripherals = Peripherals::take();
+        let (peripherals, _clocks) = esp_hal::init(esp_hal::Config::default());
         let mut rsa = Rsa::new(peripherals.RSA);
         nb::block!(rsa.ready()).unwrap();
 

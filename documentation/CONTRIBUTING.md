@@ -84,11 +84,11 @@ By taking these extra steps to test your contributions, you help maintain the hi
 
 Ensuring the quality and reliability of `esp-hal` is a shared responsibility, and testing plays a critical role in this process. Our GitHub CI automatically checks the buildability of all examples and drivers within the project. However, automated tests can't catch everything, especially when it comes to the nuanced behavior of hardware interactions. So make sure that the example affected by your change works as expected. 
 
-Further steps that can (or should) be taken in testing: 
+Further steps that can (or should) be taken in testing:
 
-* Using [xtask], build examples for the specified chip. 
+* Using [xtask], build examples for the specified chip.
 * Build the documentation and run the doctests if they have been modified using the `build-documentation` and  `run-doc-test` commands in [xtask].
-* Run the [HIL] tests locally if changes have been made to them. 
+* Run the [HIL] tests locally if changes have been made to them.
 
 [xtask]: https://github.com/esp-rs/esp-hal/tree/main/xtask
 
@@ -122,6 +122,7 @@ This will use `rustfmt` to ensure that all source code is formatted correctly pr
 *   [Link your PR] to any relevant issues it addresses.
 *   [Allow edits from maintainers] so the branch can be updated for a merge. Once you submit your PR, a Docs team member will review your proposal. We may ask questions or request additional information.
 *   Make sure you add an entry with your changes to the [Changelog]. Also make sure that it is in the appropriate section of the document.
+*   Make sure you add your changes to the current [migration guide].
 *   We may ask for changes to be made before a PR can be merged, either using [suggested changes] or pull request comments. You can apply suggested changes directly through the UI. You can make any other changes in your fork, then commit them to your branch.
 *   As you update your PR and apply changes, mark each conversation as [resolved].
 *   Resolve merge conflicts if they arise, using resources like [this git tutorial] for help.
@@ -129,6 +130,7 @@ This will use `rustfmt` to ensure that all source code is formatted correctly pr
 [Link your PR]: https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue
 [Allow edits from maintainers]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/allowing-changes-to-a-pull-request-branch-created-from-a-forkmember
 [Changelog]: esp-hal/CHANGELOG.md
+[migration guide]: esp-hal/MIGRATING-0.20.md
 [suggested changes]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/incorporating-feedback-in-your-pull-request
 [resolved]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/commenting-on-a-pull-request#resolving-conversations
 [this git tutorial]: https://github.com/skills/resolve-merge-conflicts

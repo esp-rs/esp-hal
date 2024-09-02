@@ -27,11 +27,9 @@ use bleps::{
 use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     gpio::{Input, Io, Pull},
-    peripherals::*,
+    prelude::*,
     rng::Rng,
-    system::SystemControl,
     timer::timg::TimerGroup,
 };
 use esp_println::println;
@@ -40,11 +38,11 @@ use esp_wifi::{ble::controller::asynch::BleConnector, initialize, EspWifiInitFor
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
-
-    let peripherals = Peripherals::take();
-
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::max(system.clock_control).freeze();
+    let (peripherals, clocks) = esp_hal::init({
+        let mut config = esp_hal::Config::default();
+        config.cpu_clock = CpuClock::max();
+        config
+    });
 
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
 
@@ -60,9 +58,9 @@ async fn main(_spawner: Spawner) -> ! {
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
-        let button = Input::new(io.pins.gpio0, Pull::Down);
+            let button = Input::new(io.pins.gpio0, Pull::Down);
         } else {
-        let button = Input::new(io.pins.gpio9, Pull::Down);
+            let button = Input::new(io.pins.gpio9, Pull::Down);
         }
     }
 

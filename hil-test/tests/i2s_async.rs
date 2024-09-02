@@ -12,14 +12,12 @@
 #![no_main]
 
 use esp_hal::{
-    clock::ClockControl,
     dma::{Dma, DmaChannel0, DmaPriority},
     gpio::Io,
     i2s::{asynch::*, DataFormat, I2s, I2sTx, Standard},
     peripheral::Peripheral,
-    peripherals::{Peripherals, I2S0},
+    peripherals::I2S0,
     prelude::*,
-    system::SystemControl,
     Async,
 };
 use hil_test as _;
@@ -83,16 +81,14 @@ mod tests {
 
     use super::*;
 
-    #[init]
-    async fn init() {}
-
     #[test]
     async fn test_i2s_loopback() {
         let spawner = embassy_executor::Spawner::for_current_executor().await;
 
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+
+        let peripherals = peripherals;
+        let clocks = clocks;
 
         let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
