@@ -16,7 +16,7 @@
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{GpioPin, Io, Pull},
+    gpio::{AnyPin, Io, Pull},
     pcnt::{
         channel::{EdgeMode, PcntInputConfig, PcntSource},
         unit::Unit,
@@ -48,7 +48,7 @@ cfg_if::cfg_if! {
 struct Context {
     spi: SpiDma<'static, SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
     pcnt_unit: Unit<'static, 0>,
-    mosi_mirror: GpioPin<3>,
+    mosi_mirror: AnyPin<'static>,
 }
 
 #[cfg(test)]
@@ -67,8 +67,9 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
-        let mosi = io.pins.gpio2;
-        let mosi_mirror = io.pins.gpio3;
+        let (mosi, mosi_mirror) = hil_test::common_test_pins!(io);
+
+        let mosi_mirror = AnyPin::new(mosi_mirror);
 
         let pcnt = Pcnt::new(peripherals.PCNT);
         let dma = Dma::new(peripherals.DMA);

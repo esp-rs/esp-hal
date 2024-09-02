@@ -78,18 +78,20 @@ mod tests {
             &clocks,
         );
 
+        let (dout, din) = hil_test::common_test_pins!(io);
+
         let mut i2s_tx = i2s
             .i2s_tx
             .with_bclk(unsafe { io.pins.gpio0.clone_unchecked() })
             .with_ws(unsafe { io.pins.gpio1.clone_unchecked() })
-            .with_dout(unsafe { io.pins.gpio2.clone_unchecked() })
+            .with_dout(dout)
             .build();
 
         let mut i2s_rx = i2s
             .i2s_rx
             .with_bclk(io.pins.gpio0)
             .with_ws(io.pins.gpio1)
-            .with_din(io.pins.gpio3)
+            .with_din(din)
             .build();
 
         // enable loopback testing

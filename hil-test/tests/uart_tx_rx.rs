@@ -39,8 +39,10 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let tx = UartTx::new(peripherals.UART0, &clocks, io.pins.gpio2).unwrap();
-        let rx = UartRx::new(peripherals.UART1, &clocks, io.pins.gpio3).unwrap();
+        let (tx, rx) = hil_test::common_test_pins!(io);
+
+        let tx = UartTx::new(peripherals.UART0, &clocks, tx).unwrap();
+        let rx = UartRx::new(peripherals.UART1, &clocks, rx).unwrap();
 
         Context { tx, rx }
     }

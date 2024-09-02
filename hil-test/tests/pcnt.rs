@@ -9,7 +9,7 @@
 
 use esp_hal::{
     delay::Delay,
-    gpio::{GpioPin, Io, Level, Output, Pull},
+    gpio::{GpioPin, AnyPin, Io, Level, Output, Pull},
     pcnt::{
         channel::{EdgeMode, PcntInputConfig, PcntSource},
         Pcnt,
@@ -19,8 +19,8 @@ use hil_test as _;
 
 struct Context<'d> {
     pcnt: Pcnt<'d>,
-    gpio2: GpioPin<2>,
-    gpio3: GpioPin<3>,
+    input: AnyPin<'d>,
+    output: AnyPin<'d>,
     delay: Delay,
 }
 
@@ -35,10 +35,15 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
+        let (din, dout) = hil_test::common_test_pins!(io);
+
+        let din = AnyPin::new(din);
+        let dout = AnyPin::new(dout);
+
         Context {
             pcnt: Pcnt::new(peripherals.PCNT),
-            gpio2: io.pins.gpio2,
-            gpio3: io.pins.gpio3,
+            input: din,
+            output: dout,
             delay: Delay::new(&clocks),
         }
     }
@@ -49,13 +54,13 @@ mod tests {
 
         // Setup channel 0 to increment the count when gpio2 does LOW -> HIGH
         unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.gpio2,
+            ctx.input,
             PcntInputConfig { pull: Pull::Down },
         ));
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let mut output = Output::new(ctx.gpio3, Level::Low);
+        let mut output = Output::new(ctx.output, Level::Low);
 
         unit.resume();
 
@@ -88,13 +93,13 @@ mod tests {
 
         // Setup channel 0 to increment the count when gpio2 does LOW -> HIGH
         unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.gpio2,
+            ctx.input,
             PcntInputConfig { pull: Pull::Up },
         ));
         unit.channel0
             .set_input_mode(EdgeMode::Increment, EdgeMode::Hold);
 
-        let mut output = Output::new(ctx.gpio3, Level::High);
+        let mut output = Output::new(ctx.output, Level::High);
 
         unit.resume();
 
@@ -129,13 +134,13 @@ mod tests {
 
         // Setup channel 0 to increment the count when gpio2 does LOW -> HIGH
         unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.gpio2,
+            ctx.input,
             PcntInputConfig { pull: Pull::Up },
         ));
         unit.channel0
             .set_input_mode(EdgeMode::Increment, EdgeMode::Hold);
 
-        let mut output = Output::new(ctx.gpio3, Level::High);
+        let mut output = Output::new(ctx.output, Level::High);
 
         unit.resume();
 
@@ -192,13 +197,13 @@ mod tests {
 
         // Setup channel 0 to increment the count when gpio2 does LOW -> HIGH
         unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.gpio2,
+            ctx.input,
             PcntInputConfig { pull: Pull::Up },
         ));
         unit.channel0
             .set_input_mode(EdgeMode::Increment, EdgeMode::Hold);
 
-        let mut output = Output::new(ctx.gpio3, Level::High);
+        let mut output = Output::new(ctx.output, Level::High);
 
         unit.resume();
 
@@ -259,13 +264,13 @@ mod tests {
 
         // Setup channel 0 to decrement the count when gpio2 does LOW -> HIGH
         unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.gpio2,
+            ctx.input,
             PcntInputConfig { pull: Pull::Up },
         ));
         unit.channel0
             .set_input_mode(EdgeMode::Decrement, EdgeMode::Hold);
 
-        let mut output = Output::new(ctx.gpio3, Level::High);
+        let mut output = Output::new(ctx.output, Level::High);
 
         unit.resume();
 
@@ -317,13 +322,13 @@ mod tests {
 
         // Setup channel 1 to increment the count when gpio2 does LOW -> HIGH
         unit.channel1.set_edge_signal(PcntSource::from_pin(
-            ctx.gpio2,
+            ctx.input,
             PcntInputConfig { pull: Pull::Up },
         ));
         unit.channel1
             .set_input_mode(EdgeMode::Increment, EdgeMode::Hold);
 
-        let mut output = Output::new(ctx.gpio3, Level::High);
+        let mut output = Output::new(ctx.output, Level::High);
 
         unit.resume();
 

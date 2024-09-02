@@ -16,7 +16,7 @@
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{GpioPin, Io, Level, Output},
+    gpio::{AnyOutput, Io, Level, Output},
     peripherals::SPI2,
     prelude::*,
     spi::{
@@ -42,7 +42,7 @@ cfg_if::cfg_if! {
 
 struct Context {
     spi: SpiDma<'static, SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
-    miso_mirror: Output<'static, GpioPin<3>>,
+    miso_mirror: AnyOutput<'static>,
 }
 
 #[cfg(test)]
@@ -58,9 +58,9 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
-        let miso = io.pins.gpio2;
+        let (miso, miso_mirror) = hil_test::common_test_pins!(io);
 
-        let miso_mirror = Output::new(io.pins.gpio3, Level::High);
+        let miso_mirror = AnyOutput::new(miso_mirror, Level::High);
 
         let dma = Dma::new(peripherals.DMA);
 

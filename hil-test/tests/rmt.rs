@@ -39,6 +39,8 @@ mod tests {
 
         let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
 
+        let (tx, rx) = hil_test::common_test_pins!(io);
+
         let tx_config = TxChannelConfig {
             clk_divider: 255,
             ..TxChannelConfig::default()
@@ -46,7 +48,7 @@ mod tests {
 
         let tx_channel = {
             use esp_hal::rmt::TxChannelCreator;
-            rmt.channel0.configure(io.pins.gpio2, tx_config).unwrap()
+            rmt.channel0.configure(tx, tx_config).unwrap()
         };
 
         let rx_config = RxChannelConfig {
@@ -59,17 +61,17 @@ mod tests {
             if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
                 let  rx_channel = {
                     use esp_hal::rmt::RxChannelCreator;
-                    rmt.channel1.configure(io.pins.gpio3, rx_config).unwrap()
+                    rmt.channel1.configure(rx, rx_config).unwrap()
                 };
             } else if #[cfg(feature = "esp32s3")] {
                 let  rx_channel = {
                     use esp_hal::rmt::RxChannelCreator;
-                    rmt.channel7.configure(io.pins.gpio3, rx_config).unwrap()
+                    rmt.channel7.configure(rx, rx_config).unwrap()
                 };
             } else {
                 let  rx_channel = {
                     use esp_hal::rmt::RxChannelCreator;
-                    rmt.channel2.configure(io.pins.gpio3, rx_config).unwrap()
+                    rmt.channel2.configure(rx, rx_config).unwrap()
                 };
             }
         }

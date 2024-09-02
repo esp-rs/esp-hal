@@ -77,7 +77,7 @@ mod tests {
         let sclk = io.pins.gpio0;
         let mosi_mirror = io.pins.gpio2;
         let mosi = io.pins.gpio3;
-        let miso = unsafe { hil_test::SPI_MISO_Pin::steal() };
+        let miso = io.pins.gpio6;
         let cs = io.pins.gpio8;
 
         let mut out_pin = Output::new(io.pins.gpio5, Level::Low);

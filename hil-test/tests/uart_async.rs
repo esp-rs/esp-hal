@@ -1,7 +1,7 @@
 //! UART Test
 //!
 //! Folowing pins are used:
-//! TX    GPIP2
+//! TX    GPIO2
 //! RX    GPIO3
 //!
 //! Connect TX (GPIO2) and RX (GPIO3) pins.
@@ -32,8 +32,10 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
+        let (tx, rx) = hil_test::common_test_pins!(io);
+    
         let uart =
-            Uart::new_async(peripherals.UART0, &clocks, io.pins.gpio2, io.pins.gpio3).unwrap();
+            Uart::new_async(peripherals.UART0, &clocks, tx, rx).unwrap();
 
         Context { uart }
     }

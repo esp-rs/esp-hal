@@ -38,8 +38,7 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
-        let miso = io.pins.gpio2;
-        let mosi = io.pins.gpio3;
+        let (miso, mosi) = hil_test::common_test_pins!(io);
         let cs = io.pins.gpio8;
 
         let spi = Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0, &clocks).with_pins(

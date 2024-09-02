@@ -39,8 +39,7 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let can_tx_pin = io.pins.gpio2;
-        let can_rx_pin = io.pins.gpio3;
+        let (can_tx_pin, can_rx_pin) = hil_test::common_test_pins!(io);
 
         let mut config = twai::TwaiConfiguration::new(
             peripherals.TWAI0,
