@@ -124,7 +124,7 @@ jobs:
           mkdir -p tests
 
           # Find ELF files in the specified path and move them to 'tests'
-          find "hil-test/target/${{ matrix.target.rust-target }}/release/deps/" -type f -exec file {} + | \
+          find "target/${{ matrix.target.rust-target }}/release/deps/" -type f -exec file {} + | \
           grep ELF | \
           awk -F: '{print $1}' | \
           xargs -I {} mv {} tests
