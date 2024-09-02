@@ -2318,11 +2318,6 @@ impl<'d> AnyInput<'d> {
         self.pin.listen(event, private::Internal);
     }
 
-    /// Stop listening for interrupts
-    pub fn unlisten(&mut self) {
-        self.pin.unlisten(private::Internal);
-    }
-
     /// Clear the interrupt status bit for this Pin
     #[inline]
     pub fn clear_interrupt(&mut self) {
