@@ -104,7 +104,7 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let (peripherals, clocks) = esp_hal::init(Config::default());
+        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
         let systimer = SystemTimer::new(peripherals.SYSTIMER);
         static UNIT0: StaticCell<SpecificUnit<'static, 0>> = StaticCell::new();

@@ -20,7 +20,6 @@ use esp_hal::{
     entry,
     gpio,
     gpio::Io,
-    prelude::*,
     rtc_cntl::{
         get_reset_reason,
         get_wakeup_cause,
@@ -34,7 +33,7 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(Config::default());
+    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
     let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut rtc = Rtc::new(peripherals.LPWR);

@@ -12,7 +12,7 @@
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
-use esp_hal::{prelude::*, timer::timg::TimerGroup};
+use esp_hal::timer::timg::TimerGroup;
 
 #[embassy_executor::task]
 async fn run() {
@@ -25,7 +25,7 @@ async fn run() {
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
-    let (peripherals, clocks) = esp_hal::init(Config::default());
+    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
     esp_println::println!("Init!");
 

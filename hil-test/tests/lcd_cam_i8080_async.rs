@@ -12,10 +12,7 @@ use esp_hal::{
     dma_buffers,
     gpio::DummyPin,
     lcd_cam::{
-        lcd::{
-            i8080,
-            i8080::{Command, TxEightBits, I8080},
-        },
+        lcd::i8080::{Command, Config, TxEightBits, I8080},
         LcdCam,
     },
     prelude::*,
@@ -39,7 +36,7 @@ mod tests {
 
     #[init]
     async fn init() -> Context<'static> {
-        let (peripherals, clocks) = esp_hal::init(Config::default());
+        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
         let dma = Dma::new(peripherals.DMA);
         let lcd_cam = LcdCam::new_async(peripherals.LCD_CAM);
@@ -74,7 +71,7 @@ mod tests {
             ctx.tx_descriptors,
             pins,
             20.MHz(),
-            i8080::Config::default(),
+            Config::default(),
             &ctx.clocks,
         );
 
@@ -107,7 +104,7 @@ mod tests {
             ctx.tx_descriptors,
             pins,
             20.MHz(),
-            i8080::Config::default(),
+            Config::default(),
             &ctx.clocks,
         );
 

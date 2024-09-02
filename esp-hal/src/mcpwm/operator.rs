@@ -486,7 +486,6 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
 /// # use esp_hal::mcpwm::{McPwm, PeripheralClockConfig};
 /// # use esp_hal::mcpwm::operator::{DeadTimeCfg, PwmPinConfig, PWMStream};
 /// # use esp_hal::gpio::Io;
-/// let (peripherals, clocks) = esp_hal::init(Config::default());
 /// # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 /// // active high complementary using PWMA input
 /// let bridge_active = DeadTimeCfg::new_ahc();

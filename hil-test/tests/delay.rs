@@ -6,7 +6,7 @@
 #![no_main]
 
 use embedded_hal::delay::DelayNs;
-use esp_hal::{delay::Delay, prelude::*};
+use esp_hal::delay::Delay;
 use hil_test as _;
 
 struct Context {
@@ -20,7 +20,7 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let (peripherals, clocks) = esp_hal::init(Config::default());
+        let (_peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
         let delay = Delay::new(&clocks);
 
         Context { delay }

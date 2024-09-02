@@ -9,12 +9,12 @@
 
 use esp_backtrace as _;
 use esp_hal::{gpio::Io, prelude::*, reset::software_reset, uart::Uart};
-use esp_ieee802154::{Config as Ieee802154Config, Ieee802154};
+use esp_ieee802154::{Config, Ieee802154};
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let (mut peripherals, clocks) = esp_hal::init(Config::default());
+    let (mut peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -53,7 +53,7 @@ fn main() -> ! {
     let radio = peripherals.IEEE802154;
     let mut ieee802154 = Ieee802154::new(radio, &mut peripherals.RADIO_CLK);
 
-    ieee802154.set_config(Ieee802154Config {
+    ieee802154.set_config(Config {
         channel,
         promiscuous: true,
         rx_when_idle: true,

@@ -26,7 +26,7 @@ use esp_wifi::{
 async fn main(_spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
     let (peripherals, clocks) = esp_hal::init({
-        let mut config = Config::default();
+        let mut config = esp_hal::Config::default();
         config.cpu_clock = CpuClock::max();
         config
     });

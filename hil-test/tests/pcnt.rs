@@ -14,7 +14,6 @@ use esp_hal::{
         channel::{EdgeMode, PcntInputConfig, PcntSource},
         Pcnt,
     },
-    prelude::*,
 };
 use hil_test as _;
 
@@ -32,7 +31,7 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        let (peripherals, clocks) = esp_hal::init(Config::default());
+        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

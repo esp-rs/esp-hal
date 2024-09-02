@@ -5,15 +5,15 @@
 
 use esp_backtrace as _;
 use esp_hal::prelude::*;
-use esp_ieee802154::{Config as Ieee802154Config, Ieee802154};
+use esp_ieee802154::{Config, Ieee802154};
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let (mut peripherals, _clocks) = esp_hal::init(Config::default());
+    let (mut peripherals, _clocks) = esp_hal::init(esp_hal::Config::default());
     let mut ieee802154 = Ieee802154::new(peripherals.IEEE802154, &mut peripherals.RADIO_CLK);
 
-    ieee802154.set_config(Ieee802154Config {
+    ieee802154.set_config(Config {
         channel: 15,
         promiscuous: true,
         rx_when_idle: true,

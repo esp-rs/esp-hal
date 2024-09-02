@@ -15,7 +15,6 @@
 use esp_hal::{
     gpio::Io,
     peripherals::{UART0, UART1},
-    prelude::*,
     uart::{UartRx, UartTx},
     Async,
 };
@@ -35,7 +34,7 @@ mod tests {
 
     #[init]
     async fn init() -> Context {
-        let (peripherals, clocks) = esp_hal::init(Config::default());
+        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

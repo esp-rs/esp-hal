@@ -14,7 +14,6 @@ use esp_hal::{
         software::{SoftwareInterrupt, SoftwareInterruptControl},
         Priority,
     },
-    prelude::*,
     timer::timg::TimerGroup,
 };
 use esp_hal_embassy::InterruptExecutor;
@@ -45,7 +44,7 @@ mod test {
 
     #[init]
     fn init() -> SoftwareInterrupt<1> {
-        let (peripherals, clocks) = esp_hal::init(Config::default());
+        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
         let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
         esp_hal_embassy::init(&clocks, timg0.timer0);

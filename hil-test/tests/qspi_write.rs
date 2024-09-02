@@ -15,7 +15,7 @@
 #![no_main]
 
 use esp_hal::{
-    clock::{ClockControl, Clocks},
+    clock::Clocks,
     dma::{Channel, Dma, DmaPriority, DmaTxBuf},
     dma_buffers,
     gpio::{Io, Pull},
@@ -24,7 +24,6 @@ use esp_hal::{
         unit::Unit,
         Pcnt,
     },
-    peripherals::Peripherals,
     prelude::*,
     spi::{
         master::{Address, Command, Spi, SpiDma},
@@ -32,7 +31,6 @@ use esp_hal::{
         SpiDataMode,
         SpiMode,
     },
-    system::SystemControl,
     Blocking,
 };
 use hil_test as _;
@@ -112,9 +110,7 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let mosi = io.pins.gpio2;

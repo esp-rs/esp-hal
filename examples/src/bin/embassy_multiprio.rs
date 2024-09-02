@@ -25,7 +25,6 @@ use embassy_time::{Duration, Instant, Ticker, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     interrupt::{software::SoftwareInterruptControl, Priority},
-    prelude::*,
     timer::{timg::TimerGroup, ErasedTimer},
 };
 use esp_hal_embassy::InterruptExecutor;
@@ -72,7 +71,7 @@ async fn main(low_prio_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     println!("Init!");
 
-    let (peripherals, clocks) = esp_hal::init(Config::default());
+    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
     let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 

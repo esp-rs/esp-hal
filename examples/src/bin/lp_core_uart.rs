@@ -22,13 +22,13 @@ use esp_hal::{
     },
     lp_core::{LpCore, LpCoreWakeupSource},
     prelude::*,
-    uart::{config::Config as UartConfig, lp_uart::LpUart, Uart},
+    uart::{config::Config, lp_uart::LpUart, Uart},
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(Config::default());
+    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -36,7 +36,7 @@ fn main() -> ! {
 
     let mut uart1 = Uart::new_with_config(
         peripherals.UART1,
-        UartConfig::default(),
+        Config::default(),
         &clocks,
         io.pins.gpio6,
         io.pins.gpio7,

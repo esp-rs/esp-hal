@@ -65,7 +65,7 @@ mod tests {
     #[init]
     fn init() -> Context {
         let (peripherals, _clocks) = esp_hal::init({
-            let mut config = Config::default();
+            let mut config = esp_hal::Config::default();
             config.cpu_clock = CpuClock::max();
             config
         });

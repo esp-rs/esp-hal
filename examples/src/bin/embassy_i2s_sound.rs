@@ -54,7 +54,7 @@ const SINE: [i16; 64] = [
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
     println!("Init!");
-    let (peripherals, clocks) = esp_hal::init(Config::default());
+    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     esp_hal_embassy::init(&clocks, timg0.timer0);

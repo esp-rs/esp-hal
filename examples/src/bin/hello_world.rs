@@ -19,7 +19,7 @@ use esp_hal::{delay::Delay, gpio::Io, prelude::*, uart::Uart};
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(Config::default());
+    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
     let delay = Delay::new(&clocks);
 

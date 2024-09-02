@@ -25,7 +25,7 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, _clocks) = esp_hal::init(Config::default());
+    let (peripherals, _clocks) = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

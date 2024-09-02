@@ -10,7 +10,6 @@ use esp_hal::{
     dma_buffers,
     dma_buffers_chunk_size,
     dma_descriptors,
-    prelude::*,
     Blocking,
 };
 use hil_test as _;
@@ -39,7 +38,7 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let (peripherals, _clocks) = esp_hal::init(Config::default());
+        let (peripherals, _clocks) = esp_hal::init(esp_hal::Config::default());
 
         let dma = Dma::new(peripherals.DMA);
         let channel = dma.channel0.configure(false, DmaPriority::Priority0);

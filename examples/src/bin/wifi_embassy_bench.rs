@@ -67,7 +67,7 @@ static mut TX_BUFFER: [u8; TX_BUFFER_SIZE] = [0; TX_BUFFER_SIZE];
 async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
     let (peripherals, clocks) = esp_hal::init({
-        let mut config = Config::default();
+        let mut config = esp_hal::Config::default();
         config.cpu_clock = CpuClock::max();
         config
     });

@@ -7,7 +7,7 @@
 
 #[cfg(esp32)]
 use esp_hal::clock::Clocks;
-use esp_hal::{delay::Delay, prelude::*};
+use esp_hal::delay::Delay;
 use hil_test as _;
 
 struct Context {
@@ -31,7 +31,7 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let (_peripherals, clocks) = esp_hal::init(Config::default());
+        let (_peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
         let delay = Delay::new(&clocks);
 

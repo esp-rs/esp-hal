@@ -28,7 +28,6 @@ use esp_hal::{
     gpio::Io,
     interrupt,
     peripherals::{self, TWAI0},
-    prelude::*,
     timer::timg::TimerGroup,
     twai::{self, EspTwaiFrame, TwaiMode, TwaiRx, TwaiTx},
 };
@@ -83,7 +82,7 @@ async fn transmitter(
 
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
-    let (peripherals, clocks) = esp_hal::init(Config::default());
+    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     esp_hal_embassy::init(&clocks, timg0.timer0);

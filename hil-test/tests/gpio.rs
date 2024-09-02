@@ -1,8 +1,8 @@
 //! GPIO Test
 //!
 //! Folowing pins are used:
-//! - GPIO2
-//! - GPIO3
+//! GPIO2
+//! GPIO3
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: generic-queue
@@ -17,7 +17,6 @@ use esp_hal::{
     delay::Delay,
     gpio::{AnyPin, Gpio2, Gpio3, GpioPin, Input, Io, Level, Output, Pull},
     macros::handler,
-    prelude::*,
     timer::timg::TimerGroup,
     InterruptConfigurable,
 };
@@ -55,7 +54,7 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        let (peripherals, clocks) = esp_hal::init(Config::default());
+        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
         let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         io.set_interrupt_handler(interrupt_handler);

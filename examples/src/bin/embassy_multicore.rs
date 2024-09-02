@@ -22,7 +22,6 @@ use esp_hal::{
     cpu_control::{CpuControl, Stack},
     get_core,
     gpio::{AnyOutput, Io, Level},
-    prelude::*,
     timer::{timg::TimerGroup, ErasedTimer},
 };
 use esp_hal_embassy::Executor;
@@ -52,7 +51,7 @@ async fn control_led(
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
-    let (peripherals, clocks) = esp_hal::init(Config::default());
+    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

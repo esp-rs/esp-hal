@@ -71,7 +71,7 @@ async fn enable_disable_led(control: &'static Signal<CriticalSectionRawMutex, bo
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(Config::default());
+    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
     let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 

@@ -5,7 +5,7 @@
 #![no_std]
 #![no_main]
 
-use esp_hal::{prelude::*, rtc_cntl::Rtc};
+use esp_hal::rtc_cntl::Rtc;
 use hil_test as _;
 
 struct Context<'a> {
@@ -19,7 +19,7 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        let (peripherals, _clocks) = esp_hal::init(Config::default());
+        let (peripherals, _clocks) = esp_hal::init(esp_hal::Config::default());
         let rtc = Rtc::new(peripherals.LPWR);
 
         Context { rtc }

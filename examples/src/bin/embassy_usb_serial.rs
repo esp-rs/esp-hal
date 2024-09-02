@@ -23,17 +23,16 @@ use esp_backtrace as _;
 use esp_hal::{
     gpio::Io,
     otg_fs::{
-        asynch::{Config as OtgConfig, Driver},
+        asynch::{Config, Driver},
         Usb,
     },
-    prelude::*,
     timer::timg::TimerGroup,
 };
 
 #[esp_hal_embassy::main]
-async fn main(_spawner: Spawner) -> () {
+async fn main(_spawner: Spawner) {
     esp_println::println!("Init!");
-    let (peripherals, clocks) = esp_hal::init(Config::default());
+    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     esp_hal_embassy::init(&clocks, timg0.timer0);
@@ -44,7 +43,7 @@ async fn main(_spawner: Spawner) -> () {
 
     // Create the driver, from the HAL.
     let mut ep_out_buffer = [0u8; 1024];
-    let config = OtgConfig::default();
+    let config = Config::default();
 
     let driver = Driver::new(usb, &mut ep_out_buffer, config);
 

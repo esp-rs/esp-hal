@@ -32,7 +32,7 @@ cfg_if::cfg_if! {
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(Config::default());
+    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
     // Set GPIO2 as an output, and set its state high initially.
     let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);

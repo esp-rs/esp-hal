@@ -14,7 +14,6 @@
 #![no_main]
 
 use esp_hal::{
-    clock::Clocks,
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::Io,
@@ -48,13 +47,12 @@ struct Context {
 #[embedded_test::tests]
 mod tests {
     use defmt::assert_eq;
-    use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
 
     use super::*;
 
     #[init]
     fn init() -> Context {
-        let (peripherals, clocks) = esp_hal::init(Config::default());
+        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;

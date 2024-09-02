@@ -56,12 +56,12 @@
 //! ### Sending and Receiving Data
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{self, Uart};
+//! # use esp_hal::uart::{config::Config, Uart};
 //! # use esp_hal::gpio::Io;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let mut uart1 = Uart::new_with_config(
 //! #     peripherals.UART1,
-//! #     uart::config::Config::default(),
+//! #     Config::default(),
 //! #     &clocks,
 //! #     io.pins.gpio1,
 //! #     io.pins.gpio2,
@@ -74,12 +74,12 @@
 //! ### Splitting the UART into TX and RX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{self, Uart};
+//! # use esp_hal::uart::{config::Config, Uart};
 //! # use esp_hal::gpio::Io;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let mut uart1 = Uart::new_with_config(
 //! #     peripherals.UART1,
-//! #     uart::config::Config::default(),
+//! #     Config::default(),
 //! #     &clocks,
 //! #     io.pins.gpio1,
 //! #     io.pins.gpio2,

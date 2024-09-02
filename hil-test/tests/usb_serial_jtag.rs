@@ -8,12 +8,12 @@
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    use esp_hal::{prelude::*, timer::timg::TimerGroup, usb_serial_jtag::UsbSerialJtag};
+    use esp_hal::{timer::timg::TimerGroup, usb_serial_jtag::UsbSerialJtag};
     use hil_test as _;
 
     #[test]
     fn creating_peripheral_does_not_break_debug_connection() {
-        let (peripherals, clocks) = esp_hal::init(Config::default());
+        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
         let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
         esp_hal_embassy::init(&clocks, timg0.timer0);

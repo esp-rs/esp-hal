@@ -49,14 +49,14 @@
 //! # fn main() {
 //! // Initialize with the highest possible frequency for this chip
 //! let (peripherals, clocks) = esp_hal::init({
-//!     let mut config = Config::default();
+//!     let mut config = esp_hal::Config::default();
 //!     config.cpu_clock = CpuClock::max();
 //!     config
 //! });
 //!
 //! // Initialize with custom clock frequency
 //! // let (peripherals, clocks) = esp_hal::init({
-//! //    let mut config = Config::default();
+//! //    let mut config = esp_hal::Config::default();
 #![cfg_attr(
     not(any(esp32c2, esp32h2)),
     doc = "//    config.cpu_clock = CpuClock::Clock160MHz;"
@@ -67,7 +67,7 @@
 //! // });
 //! //
 //! // Initialize with default clock frequency for this chip
-//! // let (peripherals, clocks) = esp_hal::init(Config::default());
+//! // let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 //! # }
 //! ```
 

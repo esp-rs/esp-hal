@@ -18,7 +18,7 @@ static DA: Mutex<RefCell<Option<DebugAssist>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, _clocks) = esp_hal::init(Config::default());
+    let (peripherals, _clocks) = esp_hal::init(esp_hal::Config::default());
 
     let mut da = DebugAssist::new(peripherals.ASSIST_DEBUG);
     da.set_interrupt_handler(interrupt_handler);
