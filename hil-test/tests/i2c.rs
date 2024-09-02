@@ -1,4 +1,4 @@
-//! TWAI test
+//! I2C test
 //!
 //! Folowing pins are used:
 //! SCL    GPIO4
@@ -24,29 +24,6 @@ use nb::block;
 struct Context {
     i2c: I2C<'static, I2C0, Blocking>,
 }
-
-impl Context {
-    pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
-        // Create a new peripheral object with the described wiring and standard
-        // I2C clock speed:
-        let mut i2c = I2C::new(
-            peripherals.I2C0,
-            io.pins.gpio4,
-            io.pins.gpio7,
-            100.kHz(),
-            &clocks,
-        );
-
-        Context { i2c }
-    }
-}
-
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
@@ -56,12 +33,31 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        Context::init()
+        let peripherals = Peripherals::take();
+        let system = SystemControl::new(peripherals.SYSTEM);
+        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+
+        let scl = unsafe { hil_test::I2C_SCL_Pin::steal() };
+        let sda = unsafe { hil_test::I2C_SDA_Pin::steal() };
+
+        // Create a new peripheral object with the described wiring and standard
+        // I2C clock speed:
+        let mut i2c = I2C::new(
+            peripherals.I2C0,
+            sda,
+            scl,
+            100.kHz(),
+            &clocks,
+        );
+
+        Context { i2c }
     }
 
     #[test]
     #[timeout(3)]
-    fn test_measures(mut ctx: Context) {
+    fn test_read_cali(mut ctx: Context) {
         let mut read_data = [0u8; 22];
 
         ctx.i2c.write_read(0x77, &[0xaa], &mut read_data).ok();

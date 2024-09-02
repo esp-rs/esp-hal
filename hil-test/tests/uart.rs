@@ -1,7 +1,7 @@
 //! UART Test
 //!
 //! Folowing pins are used:
-//! TX    GPIP2
+//! TX    GPIO2
 //! RX    GPIO3
 //!
 //! Connect TX (GPIO2) and RX (GPIO3) pins.

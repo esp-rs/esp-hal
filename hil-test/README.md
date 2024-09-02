@@ -79,7 +79,7 @@ Our self-hosted runners have the following setup:
 - ESP32-C6 (`esp32c6-usb`):
   - Devkit: `ESP32-C6-DevKitC-1 V1.2` connected via USB-Serial-JTAG (`USB` port).
     - `GPIO2` and `GPIO3` are connected.
-    - `GPIO5` and `GPIO6` are connected.
+    - `GPIO4` and `GPIO5` are connected.
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-H2 (`esp32h2-usb`):
   - Devkit: `ESP32-H2-DevKitM-1` connected via USB-Serial-JTAG (`USB` port).
