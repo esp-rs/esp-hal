@@ -1,4 +1,4 @@
-Migration Guide from 0.3.x to vNext
+Migration Guide from 0.9.x to vNext
 ====================================
 
 Initialsation
