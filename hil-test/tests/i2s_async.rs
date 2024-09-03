@@ -120,8 +120,8 @@ mod tests {
             DataFormat::Data16Channel16,
             16000.Hz(),
             dma_channel.configure_for_async(false, DmaPriority::Priority0),
-            tx_descriptors,
             rx_descriptors,
+            tx_descriptors,
         );
 
         let (dout, din) = hil_test::common_test_pins!(io);

@@ -50,8 +50,8 @@ fn main() -> ! {
         DataFormat::Data16Channel16,
         44100.Hz(),
         dma_channel.configure(false, DmaPriority::Priority0),
-        tx_descriptors,
         rx_descriptors,
+        tx_descriptors,
     );
 
     #[cfg(not(feature = "esp32"))]
