@@ -1,6 +1,6 @@
 //! Reproduction and regression test for a sneaky issue.
 
-//% CHIPS: esp32s3
+//% CHIPS: esp32 esp32s2 esp32s3
 //% FEATURES: integrated-timers
 //% FEATURES: generic-queue
 
@@ -104,7 +104,7 @@ mod test {
             .with_buffers(dma_tx_buf, dma_rx_buf);
 
         let spi2 = Spi::new(peripherals.SPI3, 100.kHz(), SpiMode::Mode0, &clocks)
-            .with_dma(dma_channel2.configure_for_async(false, DmaPriority::Priority1));
+            .with_dma(dma_channel2.configure_for_async(false, DmaPriority::Priority0));
 
         let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
