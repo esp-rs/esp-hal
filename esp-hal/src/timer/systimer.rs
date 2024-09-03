@@ -142,7 +142,7 @@ impl<'d> SystemTimer<'d> {
                 const MULTIPLIER: u64 = 10_000_000 / 25;
             }
         }
-        let xtal_freq_mhz = crate::clock::Clocks::get().xtal_clock.to_MHz();
+        let xtal_freq_mhz = crate::clock::Clocks::xtal_freq().to_MHz();
         xtal_freq_mhz as u64 * MULTIPLIER
     }
 

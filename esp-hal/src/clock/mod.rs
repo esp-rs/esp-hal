@@ -319,22 +319,41 @@ impl Clocks {
         })
     }
 
+    fn try_get() -> Option<&'static Clocks> {
+        unsafe { ACTIVE_CLOCKS.as_ref() }
+    }
+
     /// Get the active clock configuration.
-    // This should be fine since we only allow reading after initialization.
     pub fn get() -> &'static Clocks {
-        unwrap!(unsafe { ACTIVE_CLOCKS.as_ref() })
+        unwrap!(Self::try_get())
+    }
+
+    /// Returns the xtal frequency.
+    ///
+    /// This function will run the frequency estimation if called before
+    /// [`esp_hal::init()`].
+    pub fn xtal_freq() -> HertzU32 {
+        if let Some(clocks) = Self::try_get() {
+            clocks.xtal_clock
+        } else {
+            Self::measure_xtal_frequency().frequency()
+        }
     }
 }
 
 #[cfg(esp32)]
 impl Clocks {
-    /// Configure the CPU clock speed.
-    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        let xtal_freq = if RtcClock::estimate_xtal_frequency() > 33 {
+    fn measure_xtal_frequency() -> XtalClock {
+        if RtcClock::estimate_xtal_frequency() > 33 {
             XtalClock::RtcXtalFreq40M
         } else {
             XtalClock::RtcXtalFreq26M
-        };
+        }
+    }
+
+    /// Configure the CPU clock speed.
+    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
+        let xtal_freq = Self::measure_xtal_frequency();
 
         if cpu_clock_speed != CpuClock::default() {
             let pll_freq = match cpu_clock_speed {
@@ -364,13 +383,17 @@ impl Clocks {
 
 #[cfg(esp32c2)]
 impl Clocks {
-    /// Configure the CPU clock speed.
-    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        let xtal_freq = if RtcClock::estimate_xtal_frequency() > 33 {
+    fn measure_xtal_frequency() -> XtalClock {
+        if RtcClock::estimate_xtal_frequency() > 33 {
             XtalClock::RtcXtalFreq40M
         } else {
             XtalClock::RtcXtalFreq26M
-        };
+        }
+    }
+
+    /// Configure the CPU clock speed.
+    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
+        let xtal_freq = Self::measure_xtal_frequency();
 
         let apb_freq;
         if cpu_clock_speed != CpuClock::default() {
@@ -401,9 +424,13 @@ impl Clocks {
 
 #[cfg(esp32c3)]
 impl Clocks {
+    fn measure_xtal_frequency() -> XtalClock {
+        XtalClock::RtcXtalFreq40M
+    }
+
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        let xtal_freq = XtalClock::RtcXtalFreq40M;
+        let xtal_freq = Self::measure_xtal_frequency();
 
         let apb_freq;
         if cpu_clock_speed != CpuClock::default() {
@@ -433,9 +460,13 @@ impl Clocks {
 
 #[cfg(esp32c6)]
 impl Clocks {
+    fn measure_xtal_frequency() -> XtalClock {
+        XtalClock::RtcXtalFreq40M
+    }
+
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        let xtal_freq = XtalClock::RtcXtalFreq40M;
+        let xtal_freq = Self::measure_xtal_frequency();
 
         let apb_freq;
         if cpu_clock_speed != CpuClock::default() {
@@ -466,9 +497,13 @@ impl Clocks {
 
 #[cfg(esp32h2)]
 impl Clocks {
+    fn measure_xtal_frequency() -> XtalClock {
+        XtalClock::RtcXtalFreq32M
+    }
+
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        let xtal_freq = XtalClock::RtcXtalFreq32M;
+        let xtal_freq = Self::measure_xtal_frequency();
 
         let apb_freq;
         if cpu_clock_speed != CpuClock::default() {
@@ -501,8 +536,14 @@ impl Clocks {
 
 #[cfg(esp32s2)]
 impl Clocks {
+    fn measure_xtal_frequency() -> XtalClock {
+        XtalClock::RtcXtalFreq40M
+    }
+
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
+        let xtal_freq = Self::measure_xtal_frequency();
+
         if cpu_clock_speed != CpuClock::default() {
             clocks_ll::set_cpu_clock(cpu_clock_speed);
         }
@@ -510,15 +551,21 @@ impl Clocks {
         Self {
             cpu_clock: cpu_clock_speed.frequency(),
             apb_clock: HertzU32::MHz(80),
-            xtal_clock: HertzU32::MHz(40),
+            xtal_clock: xtal_freq.frequency(),
         }
     }
 }
 
 #[cfg(esp32s3)]
 impl Clocks {
+    fn measure_xtal_frequency() -> XtalClock {
+        XtalClock::RtcXtalFreq40M
+    }
+
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
+        let xtal_freq = Self::measure_xtal_frequency();
+
         if cpu_clock_speed != CpuClock::default() {
             clocks_ll::set_cpu_clock(cpu_clock_speed);
         }
@@ -526,7 +573,7 @@ impl Clocks {
         Self {
             cpu_clock: cpu_clock_speed.frequency(),
             apb_clock: HertzU32::MHz(80),
-            xtal_clock: HertzU32::MHz(40),
+            xtal_clock: xtal_freq.frequency(),
             crypto_pwm_clock: HertzU32::MHz(160),
         }
     }
