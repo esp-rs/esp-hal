@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed an issue with DMA transfers potentially not waking up the correct async task (#2065)
+
 ### Removed
 
 ## [0.20.1] - 2024-08-30

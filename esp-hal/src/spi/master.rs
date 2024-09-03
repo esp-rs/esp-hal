@@ -3661,7 +3661,7 @@ impl Instance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.bind_spi3_interrupt(handler.handler());
-        crate::interrupt::enable(crate::peripherals::Interrupt::SPI2, handler.priority()).unwrap();
+        crate::interrupt::enable(crate::peripherals::Interrupt::SPI3, handler.priority()).unwrap();
     }
 
     #[inline(always)]
@@ -3792,7 +3792,7 @@ impl Instance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.bind_spi3_interrupt(handler.handler());
-        crate::interrupt::enable(crate::peripherals::Interrupt::SPI2, handler.priority()).unwrap();
+        crate::interrupt::enable(crate::peripherals::Interrupt::SPI3, handler.priority()).unwrap();
     }
 
     #[inline(always)]
