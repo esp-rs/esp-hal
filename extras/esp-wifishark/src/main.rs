@@ -4,7 +4,6 @@ use std::{
 };
 
 use clap::Parser;
-use lazy_static::lazy_static;
 use pcap_file::{
     pcap::{PcapHeader, PcapPacket, PcapWriter},
     DataLink,
@@ -25,40 +24,6 @@ pub struct AppArgs {
     serialport: String,
 }
 
-lazy_static! {
-    static ref METADATA: Metadata = Metadata {
-        help_url: "http://github.com/esp-rs/esp-wifi".into(),
-        display_description: "esp-wifi".into(),
-        ..r_extcap::cargo_metadata!()
-    };
-    static ref WIFI_CAPTURE_INTERFACE: Interface = Interface {
-        value: "wifi".into(),
-        display: "esp-wifi Ethernet capture".into(),
-        dlt: Dlt {
-            data_link_type: DataLink::USER0,
-            name: "USER0".into(),
-            display: "Ethernet".into(),
-        },
-    };
-    static ref BT_CAPTURE_INTERFACE: Interface = Interface {
-        value: "bt".into(),
-        display: "esp-wifi HCI capture".into(),
-        dlt: Dlt {
-            data_link_type: DataLink::USER1,
-            name: "USER1".into(),
-            display: "HCI".into(),
-        },
-    };
-    static ref CONFIG_SERIALPORT: StringConfig = StringConfig::builder()
-        .config_number(1)
-        .call("serialport")
-        .display("Serialport")
-        .tooltip("Serialport to connect to")
-        .required(false)
-        .placeholder("")
-        .build();
-}
-
 fn main() {
     let args = AppArgs::parse();
 
@@ -68,25 +33,62 @@ fn main() {
         }
     }
 
+    let wifi_capture_interface = Interface {
+        value: "wifi".into(),
+        display: "esp-wifi Ethernet capture".into(),
+        dlt: Dlt {
+            data_link_type: DataLink::USER0,
+            name: "USER0".into(),
+            display: "Ethernet".into(),
+        },
+    };
+
+    let bt_capture_interface = Interface {
+        value: "bt".into(),
+        display: "esp-wifi HCI capture".into(),
+        dlt: Dlt {
+            data_link_type: DataLink::USER1,
+            name: "USER1".into(),
+            display: "HCI".into(),
+        },
+    };
+
     match args.extcap.run().unwrap() {
         ExtcapStep::Interfaces(interfaces_step) => {
+            let metadata = Metadata {
+                help_url: "http://github.com/esp-rs/esp-wifi".into(),
+                display_description: "esp-wifi".into(),
+                ..r_extcap::cargo_metadata!()
+            };
+
             interfaces_step.list_interfaces(
-                &METADATA,
-                &[&*WIFI_CAPTURE_INTERFACE, &*BT_CAPTURE_INTERFACE],
+                &metadata,
+                &[&wifi_capture_interface, &bt_capture_interface],
                 &[],
             );
         }
         ExtcapStep::Dlts(dlts_step) => {
             dlts_step
-                .print_from_interfaces(&[&*WIFI_CAPTURE_INTERFACE, &*BT_CAPTURE_INTERFACE])
+                .print_from_interfaces(&[&wifi_capture_interface, &bt_capture_interface])
                 .unwrap();
         }
-        ExtcapStep::Config(config_step) => config_step.list_configs(&[&*CONFIG_SERIALPORT]),
+        ExtcapStep::Config(config_step) => {
+            let config_serialport = StringConfig::builder()
+                .config_number(1)
+                .call("serialport")
+                .display("Serialport")
+                .tooltip("Serialport to connect to")
+                .required(false)
+                .placeholder("")
+                .build();
+
+            config_step.list_configs(&[&config_serialport])
+        }
         ExtcapStep::ReloadConfig(_reload_config_step) => {
             panic!("Unsupported operation");
         }
         ExtcapStep::Capture(capture_step) => {
-            let (data_link, prefix) = if capture_step.interface == WIFI_CAPTURE_INTERFACE.value {
+            let (data_link, prefix) = if capture_step.interface == wifi_capture_interface.value {
                 (DataLink::ETHERNET, "@WIFIFRAME [")
             } else {
                 (DataLink::BLUETOOTH_HCI_H4, "@HCIFRAME [")

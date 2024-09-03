@@ -1,24 +1,15 @@
 //! Metadata for Espressif devices, primarily intended for use in build scripts.
 
+use std::sync::OnceLock;
+
 use anyhow::{bail, Result};
 use strum::IntoEnumIterator;
 
-const ESP32_TOML: &str = include_str!("../devices/esp32.toml");
-const ESP32C2_TOML: &str = include_str!("../devices/esp32c2.toml");
-const ESP32C3_TOML: &str = include_str!("../devices/esp32c3.toml");
-const ESP32C6_TOML: &str = include_str!("../devices/esp32c6.toml");
-const ESP32H2_TOML: &str = include_str!("../devices/esp32h2.toml");
-const ESP32S2_TOML: &str = include_str!("../devices/esp32s2.toml");
-const ESP32S3_TOML: &str = include_str!("../devices/esp32s3.toml");
-
-lazy_static::lazy_static! {
-    static ref ESP32_CFG: Config = basic_toml::from_str(ESP32_TOML).unwrap();
-    static ref ESP32C2_CFG: Config = basic_toml::from_str(ESP32C2_TOML).unwrap();
-    static ref ESP32C3_CFG: Config = basic_toml::from_str(ESP32C3_TOML).unwrap();
-    static ref ESP32C6_CFG: Config = basic_toml::from_str(ESP32C6_TOML).unwrap();
-    static ref ESP32H2_CFG: Config = basic_toml::from_str(ESP32H2_TOML).unwrap();
-    static ref ESP32S2_CFG: Config = basic_toml::from_str(ESP32S2_TOML).unwrap();
-    static ref ESP32S3_CFG: Config = basic_toml::from_str(ESP32S3_TOML).unwrap();
+macro_rules! include_toml {
+    ($type:ty, $file:expr) => {{
+        static LOADED_TOML: OnceLock<$type> = OnceLock::new();
+        LOADED_TOML.get_or_init(|| basic_toml::from_str(include_str!($file)).unwrap())
+    }};
 }
 
 /// Supported device architectures.
@@ -178,13 +169,13 @@ impl Config {
     /// The configuration for the specified chip.
     pub fn for_chip(chip: &Chip) -> &Self {
         match chip {
-            Chip::Esp32 => &ESP32_CFG,
-            Chip::Esp32c2 => &ESP32C2_CFG,
-            Chip::Esp32c3 => &ESP32C3_CFG,
-            Chip::Esp32c6 => &ESP32C6_CFG,
-            Chip::Esp32h2 => &ESP32H2_CFG,
-            Chip::Esp32s2 => &ESP32S2_CFG,
-            Chip::Esp32s3 => &ESP32S3_CFG,
+            Chip::Esp32 => include_toml!(Config, "../devices/esp32.toml"),
+            Chip::Esp32c2 => include_toml!(Config, "../devices/esp32c2.toml"),
+            Chip::Esp32c3 => include_toml!(Config, "../devices/esp32c3.toml"),
+            Chip::Esp32c6 => include_toml!(Config, "../devices/esp32c6.toml"),
+            Chip::Esp32h2 => include_toml!(Config, "../devices/esp32h2.toml"),
+            Chip::Esp32s2 => include_toml!(Config, "../devices/esp32s2.toml"),
+            Chip::Esp32s3 => include_toml!(Config, "../devices/esp32s3.toml"),
         }
     }
 
