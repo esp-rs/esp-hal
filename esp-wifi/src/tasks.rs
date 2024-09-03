@@ -1,20 +1,19 @@
 use crate::{
-    compat::{self, queue::SimpleQueue, timer_compat::TIMERS},
+    compat::{queue::SimpleQueue, timer_compat::TIMERS},
     memory_fence::memory_fence,
-    preempt::preempt::task_create,
+    preempt::arch_specific::task_create,
     timer::{get_systimer_count, yield_task},
 };
 
 pub fn init_tasks() {
-    task_create(compat::task_runner::run_c_task);
-    task_create(timer_task);
+    // allocate the main task
+    crate::preempt::allocate_main_task();
 
-    // if coex then we know we have ble + wifi
-    #[cfg(coex)]
-    task_create(compat::task_runner::run_c_task);
+    // schedule the timer task
+    task_create(timer_task, core::ptr::null_mut(), 8192);
 }
 
-pub extern "C" fn timer_task() {
+pub extern "C" fn timer_task(_param: *mut esp_wifi_sys::c_types::c_void) {
     loop {
         let mut to_run = SimpleQueue::<_, 20>::new();
 

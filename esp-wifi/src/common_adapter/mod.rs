@@ -1,6 +1,6 @@
 use core::ptr::addr_of;
 
-use esp_wifi_sys::include::timespec;
+use esp_wifi_sys::include::timeval;
 use hal::{macros::ram, rng::Rng};
 
 use crate::{
@@ -219,48 +219,8 @@ pub unsafe extern "C" fn puts(s: *const u8) {
     info!("{}", cstr);
 }
 
-#[cfg(any(feature = "wifi-logs", nightly))]
-#[no_mangle]
-pub unsafe extern "C" fn sprintf(dst: *mut u8, format: *const u8, args: ...) -> i32 {
-    let str = str_from_c(format);
-    trace!("sprintf format: {}", str);
-
-    let len = crate::compat::syslog::vsnprintf(dst, 512, format, args);
-
-    let s = str_from_c(dst);
-    trace!("sprintf result: {}", s);
-
-    len
-}
-
-#[cfg(all(not(feature = "wifi-logs"), not(nightly)))]
-#[no_mangle]
-pub unsafe extern "C" fn sprintf(dst: *mut u8, format: *const u8, _args: *const ()) -> i32 {
-    let str = str_from_c(format);
-
-    let res = match str {
-        "ESP_%02X%02X%02X" => "ESP_0000",
-        "%d,%s,%s,%s" => "????",
-        "unknown id:%d" => "unknown id:??",
-        _ => {
-            warn!("Unexpected call to `sprintf`: {}", str);
-            "???"
-        }
-    };
-
-    dst.copy_from_nonoverlapping(res.as_ptr(), res.len());
-    dst.add(res.len()).write_volatile(0);
-
-    res.len() as i32
-}
-
 #[cfg(feature = "wifi-logs")]
 mod log {
-    #[no_mangle]
-    pub unsafe extern "C" fn printf(s: *const u8, args: ...) {
-        crate::compat::syslog::syslog(0, s, args);
-    }
-
     #[no_mangle]
     pub unsafe extern "C" fn rtc_printf(s: *const u8, args: ...) {
         crate::compat::syslog::syslog(0, s, args);
@@ -289,9 +249,6 @@ mod log {
 
 #[cfg(not(feature = "wifi-logs"))]
 mod log {
-    #[no_mangle]
-    pub unsafe extern "C" fn printf(_s: *const u8, _args: *const ()) {}
-
     #[no_mangle]
     pub unsafe extern "C" fn rtc_printf(_s: *const u8, _args: *const ()) {}
 
@@ -381,12 +338,12 @@ pub unsafe extern "C" fn ets_timer_arm_us(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn gettimeofday(tv: *mut timespec, _tz: *mut ()) -> i32 {
+pub unsafe extern "C" fn gettimeofday(tv: *mut timeval, _tz: *mut ()) -> i32 {
     if !tv.is_null() {
         unsafe {
             let microseconds = esp_timer_get_time();
-            (*tv).tv_sec = (microseconds / 1_000_000) as i32;
-            (*tv).tv_nsec = (microseconds % 1_000_000) as i32 * 1000;
+            (*tv).tv_sec = (microseconds / 1_000_000) as u64;
+            (*tv).tv_usec = (microseconds % 1_000_000) as u32;
         }
     }
 

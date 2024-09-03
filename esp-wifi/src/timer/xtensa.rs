@@ -5,7 +5,7 @@ use esp_hal::interrupt::InterruptHandler;
 
 use crate::{
     hal::{interrupt, trapframe::TrapFrame, xtensa_lx, xtensa_lx_rt},
-    preempt::preempt::task_switch,
+    preempt::task_switch,
     TimeBase,
 };
 

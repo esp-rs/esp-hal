@@ -10,7 +10,7 @@ use crate::{
         HciOutCollector,
         HCI_OUT_COLLECTOR,
     },
-    compat::{common::str_from_c, queue::SimpleQueue, task_runner::spawn_task},
+    compat::{common::str_from_c, queue::SimpleQueue},
     hal::macros::ram,
     memory_fence::memory_fence,
     timer::yield_task,
@@ -305,21 +305,15 @@ unsafe extern "C" fn task_create(
         core_id
     );
 
-    *(handle as *mut usize) = 0; // we will run it in task 0
+    let task_func = core::mem::transmute::<
+        *mut crate::binary::c_types::c_void,
+        extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
+    >(func);
 
-    if spawn_task(
-        func,
-        name as *const i8,
-        stack_depth,
-        param,
-        prio,
-        handle,
-        core_id,
-    ) {
-        1
-    } else {
-        0
-    }
+    let task = crate::preempt::arch_specific::task_create(task_func, param, stack_depth as usize);
+    *(handle as *mut usize) = task as usize;
+
+    1
 }
 
 unsafe extern "C" fn task_delete(_task: *const ()) {
