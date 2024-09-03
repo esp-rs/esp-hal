@@ -1,27 +1,12 @@
 use super::*;
 
-#[derive(Clone, Copy)]
-enum Inverted {
-    NonInverted,
-    Inverted,
-}
-
-impl Inverted {
-    fn is_inverted(&self) -> bool {
-        match self {
-            Inverted::NonInverted => false,
-            Inverted::Inverted => true,
-        }
-    }
-}
-
 /// A type-erased GPIO pin, with additional configuration options.
 ///
 /// Note that accessing unsupported pin functions (e.g. trying to use an
 /// input-only pin as output) will panic.
 pub struct AnyPin<'d> {
     pin: ErasedPin,
-    inverted: Inverted,
+    is_inverted: bool,
     _phantom: PhantomData<&'d ()>,
 }
 
@@ -34,7 +19,7 @@ impl<'d> AnyPin<'d> {
 
         Self {
             pin,
-            inverted: Inverted::NonInverted,
+            is_inverted: false,
             _phantom: PhantomData,
         }
     }
@@ -50,7 +35,7 @@ impl<'d> AnyPin<'d> {
 
         Self {
             pin,
-            inverted: Inverted::Inverted,
+            is_inverted: true,
             _phantom: PhantomData,
         }
     }
@@ -62,7 +47,7 @@ impl<'d> crate::peripheral::Peripheral for AnyPin<'d> {
     unsafe fn clone_unchecked(&mut self) -> Self::P {
         Self {
             pin: unsafe { self.pin.clone_unchecked() },
-            inverted: self.inverted,
+            is_inverted: self.is_inverted,
             _phantom: PhantomData,
         }
     }
@@ -115,10 +100,10 @@ impl<'d> OutputPin for AnyPin<'d> {
     fn connect_peripheral_to_output(&mut self, signal: OutputSignal, _internal: private::Internal) {
         self.pin.connect_peripheral_to_output_with_options(
             signal,
-            self.inverted.is_inverted(),
+            self.is_inverted,
             false,
             false,
-            self.inverted.is_inverted(),
+            self.is_inverted,
             private::Internal,
         );
     }
@@ -132,7 +117,7 @@ impl<'d> OutputPin for AnyPin<'d> {
         force_via_gpio_mux: bool,
         _internal: private::Internal,
     ) {
-        if self.inverted.is_inverted() {
+        if self.is_inverted {
             self.pin.connect_peripheral_to_output_with_options(
                 signal,
                 true,
@@ -169,8 +154,8 @@ impl<'d> InputPin for AnyPin<'d> {
     fn connect_input_to_peripheral(&mut self, signal: InputSignal, _internal: private::Internal) {
         self.pin.connect_input_to_peripheral_with_options(
             signal,
-            self.inverted.is_inverted(),
-            self.inverted.is_inverted(),
+            self.is_inverted,
+            self.is_inverted,
             private::Internal,
         );
     }
@@ -182,7 +167,7 @@ impl<'d> InputPin for AnyPin<'d> {
         force_via_gpio_mux: bool,
         _internal: private::Internal,
     ) {
-        if self.inverted.is_inverted() {
+        if self.is_inverted {
             self.pin.connect_input_to_peripheral_with_options(
                 signal,
                 true,
