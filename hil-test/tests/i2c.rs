@@ -4,8 +4,8 @@
 //! SDA     GPIO2   (esp32s2 and esp32s3)
 //!         GPIO6   (esp32c6)
 //!         GPIO18  (esp32c2)
-//!         GPIO4   (esp32, esp32h2 and esp32c3) 
-//! 
+//!         GPIO4   (esp32, esp32h2 and esp32c3)
+//!
 //! SCL     GPIO3   (esp32s2 and esp32s3)
 //!         GPIO7   (esp32c6, esp32 and esp32c3)
 //!         GPIO22  (esp32h2)
@@ -22,7 +22,6 @@ use esp_hal::{
     i2c::I2C,
     peripherals::{Peripherals, I2C0},
     prelude::*,
-    system::SystemControl,
     Blocking,
 };
 use hil_test as _;
@@ -39,10 +38,7 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
+        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
         let (sda, scl) = hil_test::i2c_pins!(io);

@@ -3,7 +3,7 @@
 //! Following pins are used:
 //! SCLK    GPIO0
 //! MOSI    GPIO2 / GPIO9 (esp32s2 and esp32s3)
-//! 
+//!
 //! PCNT    GPIO3 / GPIO10 (esp32s2 and esp32s3)
 //!
 //! Connect MOSI and PCNT pins.

@@ -1,7 +1,7 @@
 //! PCNT tests
 //!
 //! It's assumed GPIO2 is connected to GPIO3
-//! (GPIO9 and GPIO10 for esp32s3)
+//! (GPIO9 and GPIO10 for esp32s2 and esp32s3)
 
 //% CHIPS: esp32 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -10,7 +10,7 @@
 
 use esp_hal::{
     delay::Delay,
-    gpio::{GpioPin, AnyPin, Io, Level, Output, Pull},
+    gpio::{AnyPin, Io, Level, Output, Pull},
     pcnt::{
         channel::{EdgeMode, PcntInputConfig, PcntSource},
         Pcnt,

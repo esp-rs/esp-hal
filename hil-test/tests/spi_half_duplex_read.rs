@@ -3,7 +3,7 @@
 //! Folowing pins are used:
 //! SCLK    GPIO0
 //! MISO    GPIO2 / GPIO9 (esp32s2 and esp32s3)
-//! 
+//!
 //! GPIO    GPIO3 / GPIO10 (esp32s2 and esp32s3)
 //!
 //! Connect MISO and GPIO pins.
@@ -16,7 +16,7 @@
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{AnyOutput, Io, Level, Output},
+    gpio::{AnyOutput, Io, Level},
     peripherals::SPI2,
     prelude::*,
     spi::{

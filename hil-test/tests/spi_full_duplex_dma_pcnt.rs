@@ -20,7 +20,7 @@
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{GpioPin, Io, Level, Output, Pull},
+    gpio::{AnyPin, GpioPin, Io, Level, Output, Pull},
     pcnt::{
         channel::{EdgeMode, PcntInputConfig, PcntSource},
         unit::Unit,
@@ -52,7 +52,7 @@ struct Context {
     spi: SpiDma<'static, SPI2, DmaChannel0, FullDuplexMode, Blocking>,
     pcnt_unit: Unit<'static, 0>,
     out_pin: Output<'static, GpioPin<5>>,
-    mosi_mirror: GpioPin<2>,
+    mosi_mirror: AnyPin<'static>,
 }
 
 #[cfg(test)]
@@ -68,7 +68,7 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
-        let (_, mosi) = hil_test::common_test_pins!(io);
+        let (mosi_mirror, mosi) = hil_test::common_test_pins!(io);
         let miso = io.pins.gpio4;
         let cs = io.pins.gpio8;
 
@@ -91,7 +91,7 @@ mod tests {
         let mut out_pin = Output::new(io.pins.gpio5, Level::Low);
         out_pin.set_low();
         assert_eq!(out_pin.is_set_low(), true);
-        let mosi_mirror = io.pins.gpio2;
+        let mosi_mirror = AnyPin::new(mosi_mirror);
 
         Context {
             spi,
