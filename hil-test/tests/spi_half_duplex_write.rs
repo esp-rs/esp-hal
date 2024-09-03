@@ -2,11 +2,11 @@
 //!
 //! Following pins are used:
 //! SCLK    GPIO0
-//! MOSI    GPIO2
+//! MOSI    GPIO2 / GPIO9 (esp32s2 and esp32s3)
+//! 
+//! PCNT    GPIO3 / GPIO10 (esp32s2 and esp32s3)
 //!
-//! PCNT    GPIO3
-//!
-//! Connect MOSI (GPIO2) and PCNT (GPIO3) pins.
+//! Connect MOSI and PCNT pins.
 
 //% CHIPS: esp32 esp32c6 esp32h2 esp32s2 esp32s3
 

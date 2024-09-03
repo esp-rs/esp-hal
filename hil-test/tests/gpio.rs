@@ -1,8 +1,8 @@
 //! GPIO Test
 //!
 //! Folowing pins are used:
-//! GPIO2
-//! GPIO3
+//! GPIO2 / GPIO9 (esp32s2 and esp32s3)
+//! GPIO3 / GPIO10 (esp32s2 and esp32s3)
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: generic-queue

@@ -1,10 +1,10 @@
 //! TWAI test
 //!
 //! Folowing pins are used:
-//! TX    GPIO2
-//! RX    GPIO3
+//! TX    GPIO2 / GPIO9 (esp32s2 and esp32s3)
+//! RX    GPIO3 / GPIO10 (esp32s2 and esp32s3)
 //!
-//! Connect TX (GPIO2) and RX (GPIO3) pins.
+//! Connect TX and RX pins.
 
 //% CHIPS: esp32c3 esp32c6 esp32s2 esp32s3
 

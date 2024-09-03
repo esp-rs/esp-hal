@@ -26,6 +26,7 @@ use esp_backtrace as _;
 #[macro_export]
 macro_rules! i2c_pins {
     ($io:expr) => {{
+        // Order: (SDA, SCL)
         cfg_if::cfg_if! {
             if #[cfg(any(esp32s2, esp32s3))] {
                 ($io.pins.gpio2, $io.pins.gpio3)

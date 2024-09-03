@@ -2,17 +2,17 @@
 //!
 //! Following pins are used:
 //! SCLK    GPIO0
-//! MOSI    GPIO3
+//! MOSI    GPIO3 / GPIO10 (esp32s3)
 //! MISO    GPIO4
 //! CS      GPIO8
 //!
-//! PCNT    GPIO2
+//! PCNT    GPIO2 / GPIO9 (esp32s3)
 //! OUTPUT  GPIO5 (helper to keep MISO LOW)
 //!
 //! The idea of using PCNT (input) here is to connect MOSI to it and count the
 //! edges of whatever SPI writes (in this test case 3 pos edges).
 //!
-//! Connect PCNT (GPIO2) and MOSI (GPIO3) and MISO (GPIO4) and GPIO5 pins.
+//! Connect PCNT and MOSI, MISO and GPIO5 pins.
 
 //% CHIPS: esp32 esp32c6 esp32h2 esp32s3
 //% FEATURES: generic-queue

@@ -1,8 +1,15 @@
 //! I2C test
 //!
 //! Folowing pins are used:
-//! SCL    GPIO4
-//! SDA    GPIO7
+//! SDA     GPIO2   (esp32s2 and esp32s3)
+//!         GPIO6   (esp32c6)
+//!         GPIO18  (esp32c2)
+//!         GPIO4   (esp32, esp32h2 and esp32c3) 
+//! 
+//! SCL     GPIO3   (esp32s2 and esp32s3)
+//!         GPIO7   (esp32c6, esp32 and esp32c3)
+//!         GPIO22  (esp32h2)
+//!         GPIO19  (esp32c2)
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
