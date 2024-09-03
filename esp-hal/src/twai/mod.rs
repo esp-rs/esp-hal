@@ -943,7 +943,6 @@ where
     }
 }
 
-#[cfg(feature = "async")]
 impl<'d, T> TwaiConfiguration<'d, T, crate::Async>
 where
     T: Instance,
@@ -1283,7 +1282,7 @@ pub trait Instance: crate::private::Sealed {
     const OUTPUT_SIGNAL: OutputSignal;
     /// The interrupt associated with this TWAI instance.
     const INTERRUPT: crate::peripherals::Interrupt;
-    #[cfg(feature = "async")]
+
     /// Provides an asynchronous interrupt handler for TWAI instance.
     fn async_handler() -> InterruptHandler;
 
@@ -1303,7 +1302,6 @@ pub trait Instance: crate::private::Sealed {
 /// An extension of the `Instance` trait that provides additional operations
 /// for managing and interacting with the TWAI peripheral.
 pub trait OperationInstance: Instance {
-    #[cfg(feature = "async")]
     /// Returns a reference to the asynchronous state for this TWAI instance.
     fn async_state() -> &'static asynch::TwaiAsyncState {
         &asynch::TWAI_STATE[Self::NUMBER]
@@ -1480,7 +1478,6 @@ impl Instance for crate::peripherals::TWAI0 {
 
     const INTERRUPT: crate::peripherals::Interrupt = crate::peripherals::Interrupt::TWAI0;
 
-    #[cfg(feature = "async")]
     fn async_handler() -> InterruptHandler {
         asynch::twai0
     }
@@ -1528,7 +1525,6 @@ impl Instance for crate::peripherals::TWAI0 {
 
     const INTERRUPT: crate::peripherals::Interrupt = crate::peripherals::Interrupt::TWAI0;
 
-    #[cfg(feature = "async")]
     fn async_handler() -> InterruptHandler {
         asynch::twai0
     }
@@ -1576,7 +1572,6 @@ impl Instance for crate::peripherals::TWAI1 {
 
     const INTERRUPT: crate::peripherals::Interrupt = crate::peripherals::Interrupt::TWAI1;
 
-    #[cfg(feature = "async")]
     fn async_handler() -> InterruptHandler {
         asynch::twai1
     }
@@ -1614,7 +1609,6 @@ impl Instance for crate::peripherals::TWAI1 {
 #[cfg(esp32c6)]
 impl OperationInstance for crate::peripherals::TWAI1 {}
 
-#[cfg(feature = "async")]
 mod asynch {
     use core::{future::poll_fn, task::Poll};
 

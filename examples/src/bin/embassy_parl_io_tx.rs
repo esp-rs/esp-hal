@@ -9,7 +9,7 @@
 //! You can use a logic analyzer to see how the pins are used.
 
 //% CHIPS: esp32c6 esp32h2
-//% FEATURES: async embassy embassy-generic-timers
+//% FEATURES: embassy embassy-generic-timers
 
 #![no_std]
 #![no_main]

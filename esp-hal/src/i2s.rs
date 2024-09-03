@@ -2181,7 +2181,6 @@ mod private {
 }
 
 /// Async functionality
-#[cfg(feature = "async")]
 pub mod asynch {
     use super::{Error, I2sRx, I2sTx, RegisterAccess};
     use crate::{

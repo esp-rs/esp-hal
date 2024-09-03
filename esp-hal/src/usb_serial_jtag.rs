@@ -652,7 +652,6 @@ where
     }
 }
 
-#[cfg(feature = "async")]
 mod asynch {
     use core::{marker::PhantomData, task::Poll};
 

@@ -410,7 +410,6 @@ where
     }
 }
 
-#[cfg(feature = "async")]
 impl<'d, T> I2C<'d, T, crate::Async>
 where
     T: Instance,
@@ -457,7 +456,6 @@ where
     }
 }
 
-#[cfg(feature = "async")]
 mod asynch {
     #[cfg(not(esp32))]
     use core::{

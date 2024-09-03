@@ -24,17 +24,17 @@ defmt                    = { version = "0.3.8", optional = true }
 delegate                 = "0.12.0"
 digest                   = { version = "0.10.7", default-features = false, optional = true }
 document-features        = "0.2.10"
-embassy-futures          = { version = "0.1.1", optional = true }
-embassy-sync             = { version = "0.6.0", optional = true }
+embassy-futures          = "0.1.1"
+embassy-sync             = "0.6.0"
 embassy-usb-driver       = { version = "0.1.0", optional = true }
 embassy-usb-synopsys-otg = { version = "0.1.0", optional = true }
 embedded-can             = "0.4.1"
 embedded-hal-02          = { version = "0.2.7", features = ["unproven"], package = "embedded-hal" }
 embedded-hal             = "1.0.0"
-embedded-hal-async       = { version = "1.0.0", optional = true }
+embedded-hal-async       = "1.0.0"
 embedded-hal-nb          = "1.0.0"
 embedded-io              = "0.6.1"
-embedded-io-async        = { version = "0.6.1", optional = true }
+embedded-io-async        = "0.6.1"
 enumset                  = "1.1.5"
 esp-synopsys-usb-otg     = { version = "0.4.2", optional = true, features = ["fs", "esp32sx"] }
 fugit                    = "0.3.7"
@@ -83,7 +83,7 @@ xtensa = ["dep:xtensa-lx", "critical-section/restore-state-u32"]
 
 bluetooth = []
 
-usb-otg = ["esp-synopsys-usb-otg", "usb-device"]
+usb-otg = ["dep:embassy-usb-driver", "dep:embassy-usb-synopsys-otg", "dep:esp-synopsys-usb-otg", "dep:usb-device"]
 
 __esp_hal_embassy = []
 
@@ -124,25 +124,14 @@ esp32s3 = ["dep:esp32s3", "xtensa", "procmacros/has-ulp-core", "xtensa-lx/spin",
 flip-link = ["esp-riscv-rt/fix-sp"]
 
 #! ### Trait Implementation Feature Flags
-## Enable support for asynchronous operation, with interfaces provided by
-## `embedded-hal-async` and `embedded-io-async`.
-## Also enables `embassy-usb` support for ESP32-S2 and ESP32-S3.
-async = [
-    "embedded-hal-async",
-    "embedded-io-async",
-    "embassy-sync",
-    "embassy-futures",
-    "embassy-usb-driver",
-    "embassy-usb-synopsys-otg"
-]
 ## Implement `defmt::Format` on certain types.
 defmt = [
     "dep:defmt",
-    "embassy-futures?/defmt",
-    "embassy-sync?/defmt",
+    "embassy-futures/defmt",
+    "embassy-sync/defmt",
     "embedded-hal/defmt-03",
     "embedded-io/defmt-03",
-    "embedded-io-async?/defmt-03",
+    "embedded-io-async/defmt-03",
     "esp32?/defmt",
     "esp32c2?/defmt",
     "esp32c3?/defmt",
@@ -173,7 +162,7 @@ opsram-8m = []
 opsram-16m = []
 
 # This feature is intended for testing; you probably don't want to enable it:
-ci = ["async", "defmt", "bluetooth", "place-spi-driver-in-ram"]
+ci = ["defmt", "bluetooth", "place-spi-driver-in-ram"]
 
 [lints.clippy]
 mixed_attributes_style = "allow"

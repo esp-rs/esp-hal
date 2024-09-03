@@ -228,7 +228,6 @@ pub enum Error {
     InvalidArgument,
 
     /// The RX FIFO overflowed.
-    #[cfg(feature = "async")]
     RxFifoOvf,
 
     /// A glitch was detected on the RX line.
@@ -236,14 +235,12 @@ pub enum Error {
     /// This error occurs when an unexpected or erroneous signal (glitch) is
     /// detected on the UART RX line, which could lead to incorrect data
     /// reception.
-    #[cfg(feature = "async")]
     RxGlitchDetected,
 
     /// A framing error was detected on the RX line.
     ///
     /// This error occurs when the received data does not conform to the
     /// expected UART frame format.
-    #[cfg(feature = "async")]
     RxFrameError,
 
     /// A parity error was detected on the RX line.
@@ -251,7 +248,6 @@ pub enum Error {
     /// This error occurs when the parity bit in the received data does not
     /// match the expected parity configuration.
     /// with the `async` feature.
-    #[cfg(feature = "async")]
     RxParityError,
 }
 
@@ -1928,7 +1924,6 @@ where
     }
 }
 
-#[cfg(feature = "async")]
 mod asynch {
     use core::task::Poll;
 

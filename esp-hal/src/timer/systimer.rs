@@ -1013,7 +1013,6 @@ static CONF_LOCK: LockState = LockState::new();
 static INT_ENA_LOCK: LockState = LockState::new();
 
 // Async functionality of the system timer.
-#[cfg(feature = "async")]
 mod asynch {
     use core::{
         pin::Pin,

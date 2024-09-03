@@ -177,7 +177,7 @@ embassy-sync       = "0.6.0"
 embassy-time       = { version = "0.3.1" }
 embedded-hal       = "1.0.0"
 embedded-hal-02    = { version = "0.2.7", package = "embedded-hal", features = ["unproven"] }
-embedded-hal-async = { version = "1.0.0", optional = true }
+embedded-hal-async = "1.0.0"
 embedded-hal-nb    = { version = "1.0.0", optional = true }
 esp-backtrace      = { path = "../esp-backtrace", default-features = false, features = ["exception-handler", "panic-handler", "defmt", "semihosting"] }
 esp-hal            = { path = "../esp-hal", features = ["defmt", "digest"], optional = true }
@@ -205,7 +205,7 @@ esp-build    = { version = "0.1.0", path = "../esp-build" }
 esp-metadata = { version = "0.3.0", path = "../esp-metadata" }
 
 [features]
-default = ["async", "embassy"]
+default = ["embassy"]
 
 defmt = ["dep:defmt-rtt"]
 
@@ -233,7 +233,6 @@ esp32s3 = [
     "esp-hal-embassy/esp32s3",
 ]
 # Async & Embassy:
-async = ["dep:embedded-hal-async", "esp-hal?/async"]
 embassy = [
     "embedded-test/embassy",
     "embedded-test/external-executor",

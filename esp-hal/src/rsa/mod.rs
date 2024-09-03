@@ -64,7 +64,6 @@ impl<'d> InterruptConfigurable for Rsa<'d, crate::Blocking> {
     }
 }
 
-#[cfg(feature = "async")]
 impl<'d> Rsa<'d, crate::Async> {
     /// Create a new instance in [crate::Blocking] mode.
     pub fn new_async(rsa: impl Peripheral<P = RSA> + 'd) -> Self {
@@ -365,7 +364,6 @@ where
 }
 
 /// Async functionality
-#[cfg(feature = "async")]
 pub(crate) mod asynch {
     use core::task::Poll;
 

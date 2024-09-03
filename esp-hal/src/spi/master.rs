@@ -944,12 +944,11 @@ mod dma {
     };
 
     use super::*;
-    #[cfg(feature = "async")]
-    use crate::dma::asynch::{DmaRxFuture, DmaTxFuture};
     #[cfg(spi3)]
     use crate::dma::Spi3Peripheral;
     use crate::{
         dma::{
+            asynch::{DmaRxFuture, DmaTxFuture},
             Channel,
             DmaChannel,
             DmaRxBuf,
@@ -1233,7 +1232,6 @@ mod dma {
         }
     }
 
-    #[cfg(feature = "async")]
     impl<'d, T, C, D, Buf> SpiDmaTransfer<'d, T, C, D, crate::Async, Buf>
     where
         T: Instance,
@@ -1926,7 +1924,6 @@ mod dma {
     }
 
     /// Async functionality
-    #[cfg(feature = "async")]
     mod asynch {
         use core::{cmp::min, mem::take};
 

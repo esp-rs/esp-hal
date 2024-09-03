@@ -19,7 +19,7 @@ embassy-net = { version = "0.4.0", features = [ "tcp", "udp", "dhcpv4", "medium-
 embassy-sync        = "0.6.0"
 embassy-time        = "0.3.1"
 embassy-time-driver = { version = "0.1.0", optional = true }
-embassy-usb         = { version = "0.2.0", default-features = false, optional = true }
+embassy-usb         = { version = "0.2.0", default-features = false }
 embedded-can        = "0.4.1"
 embedded-graphics   = "0.8.1"
 embedded-hal        = "1.0.0"
@@ -68,8 +68,6 @@ esp32s2 = ["esp-hal/esp32s2", "esp-backtrace/esp32s2", "esp-hal-embassy?/esp32s2
 esp32s3 = ["esp-hal/esp32s3", "esp-backtrace/esp32s3", "esp-hal-embassy?/esp32s3", "esp-println/esp32s3", "esp-storage?/esp32s3", "esp-wifi?/esp32s3", "esp-hal-smartled/esp32s3"]
 
 esp-wifi = ["dep:esp-wifi"]
-
-async = ["esp-hal/async", "embassy-usb"]
 
 embassy                = ["dep:esp-hal-embassy"]
 embassy-generic-timers = ["embassy-time/generic-queue-8"]

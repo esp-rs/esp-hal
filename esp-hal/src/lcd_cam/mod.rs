@@ -63,7 +63,6 @@ impl<'d> InterruptConfigurable for LcdCam<'d, crate::Blocking> {
     }
 }
 
-#[cfg(feature = "async")]
 impl<'d> LcdCam<'d, crate::Async> {
     /// Creates a new `LcdCam` instance for asynchronous operation.
     pub fn new_async(lcd_cam: impl Peripheral<P = LCD_CAM> + 'd) -> Self {
@@ -118,7 +117,6 @@ pub enum ByteOrder {
 }
 
 #[doc(hidden)]
-#[cfg(feature = "async")]
 pub mod asynch {
     use core::task::Poll;
 
@@ -173,13 +171,11 @@ pub mod asynch {
 }
 
 mod private {
-    #[cfg(feature = "async")]
     pub(crate) struct Instance;
 
     // NOTE: the LCD_CAM interrupt registers are shared between LCD and Camera and
     // this is only implemented for the LCD side, when the Camera is implemented a
     // CriticalSection will be needed to protect these shared registers.
-    #[cfg(feature = "async")]
     impl Instance {
         pub(crate) fn listen_lcd_done() {
             let lcd_cam = unsafe { crate::peripherals::LCD_CAM::steal() };

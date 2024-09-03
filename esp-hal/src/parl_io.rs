@@ -1660,7 +1660,6 @@ where
 }
 
 #[doc(hidden)]
-#[cfg(feature = "async")]
 pub mod asynch {
     use core::task::Poll;
 
@@ -2045,7 +2044,6 @@ mod private {
             reg_block.rx_cfg0().read().rx_eof_gen_sel().bit_is_set()
         }
 
-        #[cfg(feature = "async")]
         pub fn listen_tx_done() {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
@@ -2053,7 +2051,6 @@ mod private {
             reg_block.int_ena().modify(|_, w| w.tx_eof().set_bit());
         }
 
-        #[cfg(feature = "async")]
         pub fn unlisten_tx_done() {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
@@ -2061,7 +2058,6 @@ mod private {
             reg_block.int_ena().modify(|_, w| w.tx_eof().clear_bit());
         }
 
-        #[cfg(feature = "async")]
         pub fn is_listening_tx_done() -> bool {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
@@ -2069,7 +2065,6 @@ mod private {
             reg_block.int_ena().read().tx_eof().bit()
         }
 
-        #[cfg(feature = "async")]
         pub fn is_tx_done_set() -> bool {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
@@ -2077,7 +2072,6 @@ mod private {
             reg_block.int_raw().read().tx_eof().bit()
         }
 
-        #[cfg(feature = "async")]
         pub fn clear_is_tx_done() {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
@@ -2312,7 +2306,6 @@ mod private {
                 .bit_is_set()
         }
 
-        #[cfg(feature = "async")]
         pub fn listen_tx_done() {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
@@ -2320,7 +2313,6 @@ mod private {
             reg_block.int_ena().modify(|_, w| w.tx_eof().set_bit());
         }
 
-        #[cfg(feature = "async")]
         pub fn unlisten_tx_done() {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
@@ -2328,7 +2320,6 @@ mod private {
             reg_block.int_ena().modify(|_, w| w.tx_eof().clear_bit());
         }
 
-        #[cfg(feature = "async")]
         pub fn is_listening_tx_done() -> bool {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
@@ -2336,7 +2327,6 @@ mod private {
             reg_block.int_ena().read().tx_eof().bit()
         }
 
-        #[cfg(feature = "async")]
         pub fn is_tx_done_set() -> bool {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
@@ -2344,7 +2334,6 @@ mod private {
             reg_block.int_raw().read().tx_eof().bit()
         }
 
-        #[cfg(feature = "async")]
         pub fn clear_is_tx_done() {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
