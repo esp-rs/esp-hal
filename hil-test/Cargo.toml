@@ -138,7 +138,7 @@ harness = false
 [[test]]
 name              = "uart_async"
 harness           = false
-required-features = ["async", "embassy"]
+required-features = ["embassy"]
 
 [[test]]
 name    = "uart_tx_rx"
@@ -151,17 +151,17 @@ harness = false
 [[test]]
 name              = "embassy_timers_executors"
 harness           = false
-required-features = ["async", "embassy"]
+required-features = ["embassy"]
 
 [[test]]
 name              = "embassy_interrupt_executor"
 harness           = false
-required-features = ["async", "embassy"]
+required-features = ["embassy"]
 
 [[test]]
 name    = "embassy_interrupt_spi_dma"
 harness = false
-required-features = ["async", "embassy"]
+required-features = ["embassy"]
 
 [[test]]
 name    = "twai"
