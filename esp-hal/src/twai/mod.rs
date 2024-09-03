@@ -984,8 +984,8 @@ where
 /// In this mode, the TWAI controller can transmit and receive messages
 /// including error signals (such as error and overload frames).
 pub struct Twai<'d, T, DM: crate::Mode> {
-    rx: TwaiRx<'d, T, DM>,
     tx: TwaiTx<'d, T, DM>,
+    rx: TwaiRx<'d, T, DM>,
     phantom: PhantomData<DM>,
 }
 
@@ -1066,8 +1066,8 @@ where
 
     /// Consumes this `Twai` instance and splits it into transmitting and
     /// receiving halves.
-    pub fn split(self) -> (TwaiTx<'d, T, DM>, TwaiRx<'d, T, DM>) {
-        (self.tx, self.rx)
+    pub fn split(self) -> (TwaiRx<'d, T, DM>, TwaiTx<'d, T, DM>) {
+        (self.rx, self.tx)
     }
 }
 
