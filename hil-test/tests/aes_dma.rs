@@ -36,7 +36,7 @@ mod tests {
         let dma = Dma::new(peripherals.DMA);
         let dma_channel = dma.channel0;
 
-        let (input, tx_descriptors, mut output, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
+        let (mut output, rx_descriptors, input, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 
         let mut aes = Aes::new(peripherals.AES).with_dma(
             dma_channel.configure(false, DmaPriority::Priority0),
@@ -78,7 +78,7 @@ mod tests {
         let dma = Dma::new(peripherals.DMA);
         let dma_channel = dma.channel0;
 
-        let (input, tx_descriptors, mut output, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
+        let (mut output, rx_descriptors, input, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 
         let mut aes = Aes::new(peripherals.AES).with_dma(
             dma_channel.configure(false, DmaPriority::Priority0),
@@ -119,7 +119,7 @@ mod tests {
         let dma = Dma::new(peripherals.DMA);
         let dma_channel = dma.channel0;
 
-        let (input, tx_descriptors, mut output, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
+        let (mut output, rx_descriptors, input, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 
         let mut aes = Aes::new(peripherals.AES).with_dma(
             dma_channel.configure(false, DmaPriority::Priority0),
@@ -161,7 +161,7 @@ mod tests {
         let dma = Dma::new(peripherals.DMA);
         let dma_channel = dma.channel0;
 
-        let (input, tx_descriptors, mut output, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
+        let (mut output, rx_descriptors, input, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 
         let mut aes = Aes::new(peripherals.AES).with_dma(
             dma_channel.configure(false, DmaPriority::Priority0),

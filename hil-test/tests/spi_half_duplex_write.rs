@@ -99,7 +99,7 @@ mod tests {
     fn test_spi_writes_are_correctly_by_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
 
-        let (buffer, descriptors, _, _) = dma_buffers!(DMA_BUFFER_SIZE, 0);
+        let (_, _, buffer, descriptors) = dma_buffers!(0, DMA_BUFFER_SIZE);
         let mut dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
 
         let unit = ctx.pcnt_unit;
@@ -149,9 +149,9 @@ mod tests {
     fn test_spidmabus_writes_are_correctly_by_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
 
-        let (buffer, descriptors, rx, rxd) = dma_buffers!(DMA_BUFFER_SIZE, 1);
-        let dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
+        let (rx, rxd, buffer, descriptors) = dma_buffers!(1, DMA_BUFFER_SIZE);
         let dma_rx_buf = DmaRxBuf::new(rxd, rx).unwrap();
+        let dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
 
         let unit = ctx.pcnt_unit;
         let mut spi = ctx.spi.with_buffers(dma_tx_buf, dma_rx_buf);

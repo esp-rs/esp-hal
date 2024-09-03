@@ -38,7 +38,7 @@ fn main() -> ! {
     #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
     let dma_channel = dma.channel0;
 
-    let (_, tx_descriptors, mut rx_buffer, rx_descriptors) = dma_buffers!(0, 4 * 4092);
+    let (mut rx_buffer, rx_descriptors, _, tx_descriptors) = dma_buffers!(0, 4 * 4092);
 
     // Here we test that the type is
     // 1) reasonably simple (or at least this will flag changes that may make it

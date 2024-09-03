@@ -40,7 +40,7 @@
 //! let dma = Dma::new(peripherals.DMA);
 #![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.i2s0channel;")]
 #![cfg_attr(not(any(esp32, esp32s2)), doc = "let dma_channel = dma.channel0;")]
-//! let (_, tx_descriptors, mut rx_buffer, rx_descriptors) =
+//! let (mut rx_buffer, rx_descriptors, _, tx_descriptors) =
 //! dma_buffers!(0, 4 * 4092);
 //!
 //! let i2s = I2s::new(
@@ -74,7 +74,7 @@
 //! }
 //! # }
 //! ```
-//!
+//! 
 //! ## Implementation State
 //! - Only master mode is supported.
 //! - Only TDM Philips standard is supported.

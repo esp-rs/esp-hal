@@ -111,7 +111,7 @@ mod tests {
             }
         }
 
-        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) =
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
             esp_hal::dma_circular_buffers!(BUFFER_SIZE, BUFFER_SIZE);
 
         let i2s = I2s::new(

@@ -30,7 +30,7 @@
 //! let mosi = io.pins.gpio2;
 //! let cs = io.pins.gpio3;
 //!
-//! let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) =
+//! let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
 //! dma_buffers!(32000); let mut spi = Spi::new(
 //!     peripherals.SPI2,
 //!     sclk,
@@ -163,8 +163,8 @@ pub mod dma {
             DmaChannel,
             DmaDescriptor,
             DmaTransferRx,
+            DmaTransferRxTx,
             DmaTransferTx,
-            DmaTransferTxRx,
             ReadBuffer,
             RxPrivate,
             Spi2Peripheral,
@@ -401,7 +401,7 @@ pub mod dma {
 
         /// Register buffers for a DMA transfer.
         ///
-        /// This will return a [DmaTransferTxRx]. The maximum amount of data to
+        /// This will return a [DmaTransferRxTx]. The maximum amount of data to
         /// be sent/received is 32736 bytes.
         ///
         /// The data transfer is driven by the SPI master's sclk signal and cs
@@ -410,7 +410,7 @@ pub mod dma {
             &'t mut self,
             words: &'t TXBUF,
             read_buffer: &'t mut RXBUF,
-        ) -> Result<DmaTransferTxRx<'t, Self>, Error>
+        ) -> Result<DmaTransferRxTx<'t, Self>, Error>
         where
             TXBUF: ReadBuffer,
             RXBUF: WriteBuffer,
@@ -434,7 +434,7 @@ pub mod dma {
                         &mut self.channel.tx,
                         &mut self.channel.rx,
                     )
-                    .map(move |_| DmaTransferTxRx::new(self))
+                    .map(move |_| DmaTransferRxTx::new(self))
             }
         }
     }

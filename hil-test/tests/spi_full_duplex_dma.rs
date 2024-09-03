@@ -79,9 +79,9 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn test_symmetric_dma_transfer(ctx: Context) {
-        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(4);
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
         dma_tx_buf.fill(&[0xde, 0xad, 0xbe, 0xef]);
 
@@ -97,9 +97,9 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn test_asymmetric_dma_transfer(ctx: Context) {
-        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(4, 2);
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(2, 4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
         dma_tx_buf.fill(&[0xde, 0xad, 0xbe, 0xef]);
 
@@ -115,9 +115,9 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn test_symmetric_dma_transfer_huge_buffer(ctx: Context) {
-        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(4096);
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4096);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
         for (i, d) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
             *d = i as _;
@@ -135,9 +135,9 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn test_dma_bus_symmetric_transfer(ctx: Context) {
-        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(4);
-        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
         let mut spi = ctx.spi.with_buffers(dma_tx_buf, dma_rx_buf);
 
@@ -152,9 +152,9 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn test_dma_bus_asymmetric_transfer(ctx: Context) {
-        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(4);
-        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
         let mut spi = ctx.spi.with_buffers(dma_tx_buf, dma_rx_buf);
 
@@ -171,9 +171,9 @@ mod tests {
     fn test_dma_bus_symmetric_transfer_huge_buffer(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4096;
 
-        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(40);
-        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(40);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
         let mut spi = ctx.spi.with_buffers(dma_tx_buf, dma_rx_buf);
 

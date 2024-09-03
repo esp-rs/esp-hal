@@ -131,6 +131,7 @@ mod tests {
     fn test_spidmabus_reads_correctly_from_gpio_pin(mut ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
 
+        // WAS THIS AN ERROR?
         let (buffer, descriptors, tx, txd) = dma_buffers!(DMA_BUFFER_SIZE, 1);
         let dma_rx_buf = DmaRxBuf::new(descriptors, buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(txd, tx).unwrap();

@@ -54,10 +54,10 @@ fn execute(
 ) {
     const DMA_BUFFER_SIZE: usize = 4;
 
-    let (buffer, descriptors, rx_buffer, rx_descriptors) =
+    let (rx_buffer, rx_descriptors, buffer, descriptors) =
         dma_buffers!(DMA_BUFFER_SIZE, DMA_BUFFER_SIZE);
-    let mut dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
     let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+    let mut dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
 
     dma_tx_buf.fill(&[0xff; DMA_BUFFER_SIZE]);
 

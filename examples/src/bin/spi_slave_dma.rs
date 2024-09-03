@@ -68,7 +68,7 @@ fn main() -> ! {
         }
     }
 
-    let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(32000);
+    let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
 
     let mut spi = Spi::new(
         peripherals.SPI2,

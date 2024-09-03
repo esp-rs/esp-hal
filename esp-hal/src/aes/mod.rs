@@ -243,7 +243,7 @@ pub mod dma {
             DmaChannel,
             DmaDescriptor,
             DmaPeripheral,
-            DmaTransferTxRx,
+            DmaTransferRxTx,
             ReadBuffer,
             RxPrivate,
             TxPrivate,
@@ -408,7 +408,7 @@ pub mod dma {
 
         /// Perform a DMA transfer.
         ///
-        /// This will return a [DmaTransferTxRx]. The maximum amount of data to
+        /// This will return a [DmaTransferRxTx]. The maximum amount of data to
         /// be sent/received is 32736 bytes.
         pub fn process<'t, K, TXBUF, RXBUF>(
             &'t mut self,
@@ -417,7 +417,7 @@ pub mod dma {
             mode: Mode,
             cipher_mode: CipherMode,
             key: K,
-        ) -> Result<DmaTransferTxRx<'t, Self>, crate::dma::DmaError>
+        ) -> Result<DmaTransferRxTx<'t, Self>, crate::dma::DmaError>
         where
             K: Into<Key>,
             TXBUF: ReadBuffer,
@@ -436,7 +436,7 @@ pub mod dma {
                 key.into(),
             )?;
 
-            Ok(DmaTransferTxRx::new(self))
+            Ok(DmaTransferRxTx::new(self))
         }
 
         #[allow(clippy::too_many_arguments)]

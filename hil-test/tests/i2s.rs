@@ -63,7 +63,7 @@ mod tests {
         let dma = Dma::new(peripherals.DMA);
         let dma_channel = dma.channel0;
 
-        let (tx_buffer, tx_descriptors, mut rx_buffer, rx_descriptors) = dma_buffers!(16000, 16000);
+        let (mut rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(16000, 16000);
 
         let i2s = I2s::new(
             peripherals.I2S0,

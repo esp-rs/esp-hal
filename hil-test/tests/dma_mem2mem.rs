@@ -59,7 +59,7 @@ mod tests {
 
     #[test]
     fn test_internal_mem2mem(ctx: Context) {
-        let (tx_buffer, tx_descriptors, mut rx_buffer, rx_descriptors) = dma_buffers!(DATA_SIZE);
+        let (mut rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DATA_SIZE);
 
         let mut mem2mem = Mem2Mem::new(
             ctx.channel,
