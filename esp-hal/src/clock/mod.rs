@@ -331,7 +331,7 @@ impl Clocks {
     /// Returns the xtal frequency.
     ///
     /// This function will run the frequency estimation if called before
-    /// [`esp_hal::init()`].
+    /// [`crate::init()`].
     pub fn xtal_freq() -> HertzU32 {
         if let Some(clocks) = Self::try_get() {
             clocks.xtal_clock
