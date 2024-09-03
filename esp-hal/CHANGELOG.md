@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- You can now create an `AnyPin` out of an `ErasedPin`. (#2072)
+
 ### Fixed
 
 - Fixed an issue with DMA transfers potentially not waking up the correct async task (#2065)
