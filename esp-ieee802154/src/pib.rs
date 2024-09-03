@@ -19,7 +19,7 @@ use crate::hal::{
     set_tx_enhance_ack,
 };
 
-pub(crate) const CONFIG_IEEE802154_CCA_THRESHOLD: i8 = 1;
+pub(crate) const CONFIG_IEEE802154_CCA_THRESHOLD: i8 = -60;
 pub(crate) const IEEE802154_FRAME_EXT_ADDR_SIZE: usize = 8;
 
 const IEEE802154_MULTIPAN_0: u8 = 0;
