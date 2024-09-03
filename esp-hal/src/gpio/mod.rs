@@ -748,6 +748,14 @@ where
     pub fn is_low(&self) -> bool {
         !self.is_high()
     }
+
+    fn write_out_en(&self, enable: bool) {
+        if enable {
+            <Self as GpioProperties>::Bank::write_out_en_set(1 << (GPIONUM % 32));
+        } else {
+            <Self as GpioProperties>::Bank::write_out_en_clear(1 << (GPIONUM % 32));
+        }
+    }
 }
 
 /// Workaround to make D+ and D- work on the ESP32-C3 and ESP32-S3, which by
@@ -787,7 +795,8 @@ where
     fn init_input(&self, pull_down: bool, pull_up: bool, _: private::Internal) {
         let gpio = unsafe { &*GPIO::PTR };
 
-        <Self as GpioProperties>::Bank::write_out_en_clear(1 << (GPIONUM % 32));
+        self.write_out_en(false);
+
         gpio.func_out_sel_cfg(GPIONUM as usize)
             .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
 
@@ -824,7 +833,7 @@ where
     }
 
     fn is_input_high(&self, _: private::Internal) -> bool {
-        <Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0
+        self.is_high()
     }
 
     fn connect_input_to_peripheral(&mut self, signal: InputSignal, _: private::Internal) {
@@ -989,7 +998,8 @@ where
         #[cfg(esp32)]
         crate::soc::gpio::errata36(GPIONUM, Some(false), Some(false));
 
-        <Self as GpioProperties>::Bank::write_out_en_set(1 << (GPIONUM % 32));
+        self.write_out_en(true);
+
         gpio.pin(GPIONUM as usize)
             .modify(|_, w| w.pad_driver().bit(open_drain));
 
@@ -1073,18 +1083,14 @@ where
     }
 
     fn enable_output(&mut self, on: bool, _: private::Internal) {
-        if on {
-            <Self as GpioProperties>::Bank::write_out_en_set(1 << (GPIONUM % 32));
-        } else {
-            <Self as GpioProperties>::Bank::write_out_en_clear(1 << (GPIONUM % 32));
-        }
+        self.write_out_en(on);
     }
 
     fn set_output_high(&mut self, high: bool, _: private::Internal) {
         if high {
-            <Self as GpioProperties>::Bank::write_output_set(1 << (GPIONUM % 32));
+            self.set_high()
         } else {
-            <Self as GpioProperties>::Bank::write_output_clear(1 << (GPIONUM % 32));
+            self.set_low()
         }
     }
 
