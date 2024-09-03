@@ -33,11 +33,11 @@ macro_rules! i2c_pins {
             } else if #[cfg(esp32c6)] {
                 ($io.pins.gpio6, $io.pins.gpio7)
             } else if #[cfg(esp32h2)] {
-                ($io.pins.gpio4, $io.pins.gpio22)
+                ($io.pins.gpio12, $io.pins.gpio22)
             } else if #[cfg(esp32c2)] {
                 ($io.pins.gpio18, $io.pins.gpio19)
             } else {
-                ($io.pins.gpio4, $io.pins.gpio7)
+                ($io.pins.gpio18, $io.pins.gpio7)
             }
         }
     }};

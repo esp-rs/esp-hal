@@ -17,10 +17,9 @@
 #![no_main]
 
 use esp_hal::{
-    clock::ClockControl,
     gpio::Io,
     i2c::I2C,
-    peripherals::{Peripherals, I2C0},
+    peripherals::I2C0,
     prelude::*,
     Blocking,
 };
