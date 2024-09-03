@@ -69,17 +69,8 @@ use crate::{
     clock::Clocks,
     dma::{
         dma_private::{DmaSupport, DmaSupportRx},
-        ChannelRx,
-        DescriptorChain,
-        DmaChannel,
-        DmaDescriptor,
-        DmaError,
-        DmaPeripheral,
-        DmaTransferRx,
-        DmaTransferRxCircular,
-        LcdCamPeripheral,
-        RxPrivate,
-        WriteBuffer,
+        ChannelRx, DescriptorChain, DmaChannel, DmaDescriptor, DmaError, DmaPeripheral,
+        DmaTransferRx, DmaTransferRxCircular, LcdCamPeripheral, RxPrivate, WriteBuffer,
     },
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
     lcd_cam::{cam::private::RxPins, private::calculate_clkm, BitOrder, ByteOrder},
@@ -218,7 +209,7 @@ where
 }
 
 impl<'d, CH: DmaChannel> DmaSupport for Camera<'d, CH> {
-    fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+    fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         loop {
             // Wait for IN_SUC_EOF (i.e. VSYNC)
             if self.rx_channel.is_done() {

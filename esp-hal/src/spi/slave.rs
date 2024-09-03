@@ -290,7 +290,7 @@ pub mod dma {
         C::P: SpiPeripheral,
         DmaMode: Mode,
     {
-        fn peripheral_wait_dma(&mut self, is_tx: bool, is_rx: bool) {
+        fn peripheral_wait_dma(&mut self, is_rx: bool, is_tx: bool) {
             while !((!is_tx || self.channel.tx.is_done())
                 && (!is_rx || self.channel.rx.is_done())
                 && !self.spi.is_bus_busy())

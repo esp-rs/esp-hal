@@ -648,19 +648,8 @@ mod m2m {
     use crate::dma::DmaExtMemBKSize;
     use crate::dma::{
         dma_private::{DmaSupport, DmaSupportRx},
-        Channel,
-        ChannelRx,
-        DescriptorChain,
-        DmaChannel,
-        DmaDescriptor,
-        DmaEligible,
-        DmaError,
-        DmaPeripheral,
-        DmaTransferRx,
-        ReadBuffer,
-        RxPrivate,
-        TxPrivate,
-        WriteBuffer,
+        Channel, ChannelRx, DescriptorChain, DmaChannel, DmaDescriptor, DmaEligible, DmaError,
+        DmaPeripheral, DmaTransferRx, ReadBuffer, RxPrivate, TxPrivate, WriteBuffer,
     };
 
     /// DMA Memory to Memory pseudo-Peripheral
@@ -799,7 +788,7 @@ mod m2m {
         C: DmaChannel,
         MODE: crate::Mode,
     {
-        fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+        fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
             while !self.channel.rx.is_done() {}
         }
 

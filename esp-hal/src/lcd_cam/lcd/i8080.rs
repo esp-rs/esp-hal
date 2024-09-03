@@ -259,7 +259,7 @@ where
 }
 
 impl<'d, CH: DmaChannel, P: TxPins, DM: Mode> DmaSupport for I8080<'d, CH, P, DM> {
-    fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+    fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         let lcd_user = self.lcd_cam.lcd_user();
         // Wait until LCD_START is cleared by hardware.
         while lcd_user.read().lcd_start().bit_is_set() {}

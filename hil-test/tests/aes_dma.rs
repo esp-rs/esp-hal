@@ -8,8 +8,7 @@
 use esp_hal::{
     aes::{
         dma::{CipherMode, WithDmaAes},
-        Aes,
-        Mode,
+        Aes, Mode,
     },
     dma::{Dma, DmaPriority},
     dma_buffers,
@@ -40,8 +39,8 @@ mod tests {
 
         let mut aes = Aes::new(peripherals.AES).with_dma(
             dma_channel.configure(false, DmaPriority::Priority0),
-            tx_descriptors,
             rx_descriptors,
+            tx_descriptors,
         );
 
         let keytext = b"SUp4SeCp@sSw0rd";
@@ -82,8 +81,8 @@ mod tests {
 
         let mut aes = Aes::new(peripherals.AES).with_dma(
             dma_channel.configure(false, DmaPriority::Priority0),
-            tx_descriptors,
             rx_descriptors,
+            tx_descriptors,
         );
 
         let keytext = b"SUp4SeCp@sSw0rd";
@@ -123,8 +122,8 @@ mod tests {
 
         let mut aes = Aes::new(peripherals.AES).with_dma(
             dma_channel.configure(false, DmaPriority::Priority0),
-            tx_descriptors,
             rx_descriptors,
+            tx_descriptors,
         );
 
         let keytext = b"SUp4SeCp@sSw0rd";
@@ -165,8 +164,8 @@ mod tests {
 
         let mut aes = Aes::new(peripherals.AES).with_dma(
             dma_channel.configure(false, DmaPriority::Priority0),
-            tx_descriptors,
             rx_descriptors,
+            tx_descriptors,
         );
 
         let keytext = b"SUp4SeCp@sSw0rd";

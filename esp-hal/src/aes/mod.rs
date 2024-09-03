@@ -269,8 +269,8 @@ pub mod dma {
         pub aes: super::Aes<'d>,
 
         pub(crate) channel: Channel<'d, C, crate::Blocking>,
-        tx_chain: DescriptorChain,
         rx_chain: DescriptorChain,
+        tx_chain: DescriptorChain,
     }
 
     /// Functionality for using AES with DMA.
@@ -283,8 +283,8 @@ pub mod dma {
         fn with_dma(
             self,
             channel: Channel<'d, C, crate::Blocking>,
-            tx_descriptors: &'static mut [DmaDescriptor],
             rx_descriptors: &'static mut [DmaDescriptor],
+            tx_descriptors: &'static mut [DmaDescriptor],
         ) -> AesDma<'d, C>;
     }
 
@@ -296,16 +296,16 @@ pub mod dma {
         fn with_dma(
             self,
             mut channel: Channel<'d, C, crate::Blocking>,
-            tx_descriptors: &'static mut [DmaDescriptor],
             rx_descriptors: &'static mut [DmaDescriptor],
+            tx_descriptors: &'static mut [DmaDescriptor],
         ) -> AesDma<'d, C> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             AesDma {
                 aes: self,
                 channel,
-                tx_chain: DescriptorChain::new(tx_descriptors),
                 rx_chain: DescriptorChain::new(rx_descriptors),
+                tx_chain: DescriptorChain::new(tx_descriptors),
             }
         }
     }
@@ -325,7 +325,7 @@ pub mod dma {
         C: DmaChannel,
         C::P: AesPeripheral,
     {
-        fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+        fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
             while self.aes.aes.state().read().state().bits() != 2 // DMA status DONE == 2
             && !self.channel.tx.is_done()
             {

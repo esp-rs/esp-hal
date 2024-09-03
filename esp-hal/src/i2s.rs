@@ -74,7 +74,7 @@
 //! }
 //! # }
 //! ```
-//! 
+//!
 //! ## Implementation State
 //! - Only master mode is supported.
 //! - Only TDM Philips standard is supported.
@@ -532,7 +532,7 @@ where
     CH: DmaChannel,
     DmaMode: Mode,
 {
-    fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+    fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         self.wait_tx_dma_done().ok();
     }
 
@@ -713,7 +713,7 @@ where
     CH: DmaChannel,
     DmaMode: Mode,
 {
-    fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+    fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         T::wait_for_rx_done();
     }
 
