@@ -25,8 +25,7 @@
 //! - [Input] pins can be used as digital inputs.
 //! - [Output] and [OutputOpenDrain] pins can be used as digital outputs.
 //! - [Flex] pin is a pin that can be used as an input and output pin.
-//! - [AnyPin] and [AnyInputOnlyPin] are type-erased GPIO pins with support for
-//!   inverted signalling.
+//! - [AnyPin] is a type-erased GPIO pin with support for inverted signalling.
 //! - [DummyPin] is a useful for cases where peripheral driver requires a pin,
 //!   but real pin cannot be used.
 //!
@@ -77,7 +76,7 @@ pub(crate) use crate::{touch_common, touch_into};
 mod any_pin;
 mod dummy_pin;
 
-pub use any_pin::{AnyInputOnlyPin, AnyPin};
+pub use any_pin::AnyPin;
 pub use dummy_pin::DummyPin;
 
 #[cfg(soc_etm)]

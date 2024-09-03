@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `NoPinType` in favour of `DummyPin`. (#2068)
 - Removed the `async`, `embedded-hal-02`, `embedded-hal`, `embedded-io`, `embedded-io-async`, and `ufmt` features (#2070)
 - Removed the `GpioN` type aliasses. Use `GpioPin<N>` instead. (#2073)
+- Removed `AnyInputOnlyPin` in favour of `AnyPin`. (#2071)
 
 ## [0.20.1] - 2024-08-30
 
