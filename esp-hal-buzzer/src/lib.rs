@@ -47,7 +47,7 @@ use esp_hal::{
 };
 use fugit::RateExtU32;
 
-pub mod songs;
+pub mod notes;
 
 /// Errors from Buzzer
 #[derive(Debug)]
