@@ -663,8 +663,8 @@ mod m2m {
         MODE: crate::Mode,
     {
         channel: Channel<'d, C, MODE>,
-        tx_chain: DescriptorChain,
         rx_chain: DescriptorChain,
+        tx_chain: DescriptorChain,
         peripheral: DmaPeripheral,
     }
 
@@ -677,15 +677,15 @@ mod m2m {
         pub fn new(
             channel: Channel<'d, C, MODE>,
             peripheral: impl DmaEligible,
-            tx_descriptors: &'static mut [DmaDescriptor],
             rx_descriptors: &'static mut [DmaDescriptor],
+            tx_descriptors: &'static mut [DmaDescriptor],
         ) -> Result<Self, DmaError> {
             unsafe {
                 Self::new_unsafe(
                     channel,
                     peripheral.dma_peripheral(),
-                    tx_descriptors,
                     rx_descriptors,
+                    tx_descriptors,
                     crate::dma::CHUNK_SIZE,
                 )
             }
@@ -695,16 +695,16 @@ mod m2m {
         pub fn new_with_chunk_size(
             channel: Channel<'d, C, MODE>,
             peripheral: impl DmaEligible,
-            tx_descriptors: &'static mut [DmaDescriptor],
             rx_descriptors: &'static mut [DmaDescriptor],
+            tx_descriptors: &'static mut [DmaDescriptor],
             chunk_size: usize,
         ) -> Result<Self, DmaError> {
             unsafe {
                 Self::new_unsafe(
                     channel,
                     peripheral.dma_peripheral(),
-                    tx_descriptors,
                     rx_descriptors,
+                    tx_descriptors,
                     chunk_size,
                 )
             }
@@ -719,8 +719,8 @@ mod m2m {
         pub unsafe fn new_unsafe(
             mut channel: Channel<'d, C, MODE>,
             peripheral: DmaPeripheral,
-            tx_descriptors: &'static mut [DmaDescriptor],
             rx_descriptors: &'static mut [DmaDescriptor],
+            tx_descriptors: &'static mut [DmaDescriptor],
             chunk_size: usize,
         ) -> Result<Self, DmaError> {
             if !(1..=4092).contains(&chunk_size) {
@@ -734,16 +734,16 @@ mod m2m {
             Ok(Mem2Mem {
                 channel,
                 peripheral,
-                tx_chain: DescriptorChain::new_with_chunk_size(tx_descriptors, chunk_size),
                 rx_chain: DescriptorChain::new_with_chunk_size(rx_descriptors, chunk_size),
+                tx_chain: DescriptorChain::new_with_chunk_size(tx_descriptors, chunk_size),
             })
         }
 
         /// Start a memory to memory transfer.
         pub fn start_transfer<'t, TXBUF, RXBUF>(
             &mut self,
-            tx_buffer: &'t TXBUF,
             rx_buffer: &'t mut RXBUF,
+            tx_buffer: &'t TXBUF,
         ) -> Result<DmaTransferRx<'_, Self>, DmaError>
         where
             TXBUF: ReadBuffer,

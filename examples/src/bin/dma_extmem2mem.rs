@@ -78,8 +78,8 @@ fn main() -> ! {
     let mut mem2mem = Mem2Mem::new_with_chunk_size(
         channel,
         dma_peripheral,
-        tx_descriptors,
         rx_descriptors,
+        tx_descriptors,
         CHUNK_SIZE,
     )
     .unwrap();
