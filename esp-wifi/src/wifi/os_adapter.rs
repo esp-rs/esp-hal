@@ -1682,7 +1682,7 @@ pub unsafe extern "C" fn wifi_create_queue(
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_delete_queue(queue: *mut crate::binary::c_types::c_void) {
-    info!("wifi_delete_queue {:?}", queue);
+    trace!("wifi_delete_queue {:?}", queue);
     if queue == addr_of_mut!(QUEUE_HANDLE).cast() {
         delete_queue(QUEUE_HANDLE);
     } else {
