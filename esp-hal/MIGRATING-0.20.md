@@ -1,8 +1,19 @@
-Migration Guide from 0.20.x to vNext
-====================================
+# Migration Guide from 0.20.x to vNext
 
-HAL initialsation
------------------
+## Cargo Features
+
+A number of trait implementations which were previously feature-gated are now implemented by default. The following Cargo features have been removed:
+
+- `async`
+- `embedded-hal-02`
+- `embedded-hal`
+- `embedded-io`
+- `embedded-io-async`
+- `ufmt`
+
+If your project enables any of these features, simply remove them from your Cargo manifest and things should continue to work as expected.
+
+## HAL Initialisation
 
 Instead of manually grabbing peripherals and setting up clocks, you should now call `esp_hal::init`.
 
@@ -13,7 +24,7 @@ Instead of manually grabbing peripherals and setting up clocks, you should now c
      prelude::*,
 -    system::SystemControl,
  };
- 
+
  #[entry]
  fn main() -> ! {
 -    let peripherals = Peripherals::take();
