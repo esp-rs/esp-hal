@@ -644,8 +644,6 @@ pub fn connect_high_to_peripheral(signal: InputSignal) {
         });
 }
 
-
-
 #[doc(hidden)]
 pub trait BooleanType {
     const VALUE: bool;
@@ -670,6 +668,10 @@ pub trait PinType {
     type IsOutput: BooleanType;
     type IsAnalog: BooleanType;
     type IsTouch: BooleanType;
+
+    fn is_output() -> bool {
+        <Self::IsOutput as BooleanType>::VALUE
+    }
 }
 
 #[doc(hidden)]
@@ -1329,6 +1331,16 @@ pub trait GpioProperties {
 
 #[doc(hidden)]
 #[macro_export]
+macro_rules! if_output_pin {
+    (InputOnlyAnalog, { $($then:tt)* } else { $($else:tt)* } ) => { $($else)* };
+    (InputOutputAnalog, { $($then:tt)* } else { $($else:tt)* } ) => { $($then)* };
+    (InputOutputAnalogTouch, { $($then:tt)* } else { $($else:tt)* } ) => { $($then)* };
+    (InputOutput, { $($then:tt)* } else { $($else:tt)* } ) => { $($then)* };
+}
+pub use if_output_pin;
+
+#[doc(hidden)]
+#[macro_export]
 macro_rules! gpio {
     (
         $(
@@ -1430,25 +1442,39 @@ macro_rules! gpio {
                 }
             }
 
-            procmacros::make_gpio_enum_dispatch_macro!(
-                handle_gpio_output
-                { InputOutputAnalogTouch, InputOutputAnalog, InputOutput, }
-                {
-                    $(
-                        $type,$gpionum
-                    )+
-                }
-            );
+            // These macros call the code block on the actually contained GPIO pin.
 
-            procmacros::make_gpio_enum_dispatch_macro!(
-                handle_gpio_input
-                { InputOutputAnalogTouch, InputOutputAnalog, InputOutput, InputOnlyAnalog }
-                {
-                    $(
-                        $type,$gpionum
-                    )+
+            #[doc(hidden)]
+            #[macro_export]
+            macro_rules! handle_gpio_output {
+                ($this:ident, $inner:ident, $code:tt) => {
+                    match $this {
+                        $(
+                            ErasedPin::[<Gpio $gpionum >]($inner) => if_output_pin!($type, {
+                                $code
+                            } else {{
+                                let _ = $inner;
+                                panic!("Unsupported")
+                            }}),
+                        )+
+                    }
                 }
-            );
+            }
+
+            #[doc(hidden)]
+            #[macro_export]
+            macro_rules! handle_gpio_input {
+                ($this:ident, $inner:ident, $code:tt) => {
+                    match $this {
+                        $(
+                            ErasedPin::[<Gpio $gpionum >]($inner) => $code
+                        )+
+                    }
+                }
+            }
+
+            pub(crate) use handle_gpio_output;
+            pub(crate) use handle_gpio_input;
         }
     };
 }
