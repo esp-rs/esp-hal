@@ -645,79 +645,15 @@ pub fn connect_high_to_peripheral(signal: InputSignal) {
 }
 
 #[doc(hidden)]
-pub trait BooleanType {
-    const VALUE: bool;
-}
+pub trait BooleanType {}
 
 #[doc(hidden)]
 pub struct True {}
-
-impl BooleanType for True {
-    const VALUE: bool = true;
-}
+impl BooleanType for True {}
 
 #[doc(hidden)]
 pub struct False {}
-
-impl BooleanType for False {
-    const VALUE: bool = false;
-}
-
-#[doc(hidden)]
-pub trait PinType {
-    type IsOutput: BooleanType;
-    type IsAnalog: BooleanType;
-    type IsTouch: BooleanType;
-
-    fn is_output() -> bool {
-        <Self::IsOutput as BooleanType>::VALUE
-    }
-}
-
-#[doc(hidden)]
-pub struct InputOutputPinType;
-
-#[doc(hidden)]
-pub struct InputOnlyPinType;
-
-#[doc(hidden)]
-pub struct InputOutputAnalogPinType;
-
-#[doc(hidden)]
-pub struct InputOnlyAnalogPinType;
-
-#[doc(hidden)]
-pub struct InputOutputAnalogTouchPinType;
-
-impl PinType for InputOutputPinType {
-    type IsOutput = True;
-    type IsAnalog = False;
-    type IsTouch = False;
-}
-
-impl PinType for InputOnlyPinType {
-    type IsOutput = False;
-    type IsAnalog = False;
-    type IsTouch = False;
-}
-
-impl PinType for InputOutputAnalogPinType {
-    type IsOutput = True;
-    type IsAnalog = True;
-    type IsTouch = False;
-}
-
-impl PinType for InputOnlyAnalogPinType {
-    type IsOutput = False;
-    type IsAnalog = True;
-    type IsTouch = False;
-}
-
-impl PinType for InputOutputAnalogTouchPinType {
-    type IsOutput = True;
-    type IsAnalog = True;
-    type IsTouch = True;
-}
+impl BooleanType for False {}
 
 /// GPIO pin
 pub struct GpioPin<const GPIONUM: u8>;
@@ -991,8 +927,7 @@ impl<const GPIONUM: u8> private::Sealed for GpioPin<GPIONUM> where Self: GpioPro
 
 impl<const GPIONUM: u8> GpioPin<GPIONUM>
 where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: PinType<IsOutput = True>,
+    Self: GpioProperties<IsOutput = True>,
 {
     fn init_output(&self, alternate: AlternateFunction, open_drain: bool) {
         let gpio = unsafe { &*GPIO::PTR };
@@ -1073,8 +1008,7 @@ where
 
 impl<const GPIONUM: u8> OutputPin for GpioPin<GPIONUM>
 where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: PinType<IsOutput = True>,
+    Self: GpioProperties<IsOutput = True>,
 {
     fn set_to_open_drain_output(&mut self, _: private::Internal) {
         self.init_output(GPIO_FUNCTION, true);
@@ -1212,8 +1146,7 @@ where
 #[cfg(any(adc, dac))]
 impl<const GPIONUM: u8> AnalogPin for GpioPin<GPIONUM>
 where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: PinType<IsAnalog = True>,
+    Self: GpioProperties<IsAnalog = True>,
 {
     /// Configures the pin for analog mode.
     fn set_analog(&self, _: private::Internal) {
@@ -1224,8 +1157,7 @@ where
 #[cfg(touch)]
 impl<const GPIONUM: u8> TouchPin for GpioPin<GPIONUM>
 where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: PinType<IsTouch = True>,
+    Self: GpioProperties<IsTouch = True>,
 {
     fn set_touch(&self, _: private::Internal) {
         crate::soc::gpio::internal_into_touch(GPIONUM);
@@ -1326,7 +1258,10 @@ pub trait GpioProperties {
     type Bank: BankGpioRegisterAccess;
     type InterruptStatus: InterruptStatusRegisterAccess;
     type Signals: GpioSignal;
-    type PinType: PinType;
+
+    type IsOutput: BooleanType;
+    type IsAnalog: BooleanType;
+    type IsTouch: BooleanType;
 }
 
 #[doc(hidden)]
@@ -1337,7 +1272,37 @@ macro_rules! if_output_pin {
     (InputOutputAnalogTouch, { $($then:tt)* } else { $($else:tt)* } ) => { $($then)* };
     (InputOutput, { $($then:tt)* } else { $($else:tt)* } ) => { $($then)* };
 }
-pub use if_output_pin;
+pub(crate) use if_output_pin;
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! pin_types {
+    (InputOnly) => {
+        type IsOutput = $crate::gpio::False;
+        type IsAnalog = $crate::gpio::False;
+        type IsTouch = $crate::gpio::False;
+    };
+    (InputOnlyAnalog) => {
+        type IsOutput = $crate::gpio::False;
+        type IsAnalog = $crate::gpio::True;
+        type IsTouch = $crate::gpio::False;
+    };
+    (InputOutput) => {
+        type IsOutput = $crate::gpio::True;
+        type IsAnalog = $crate::gpio::False;
+        type IsTouch = $crate::gpio::False;
+    };
+    (InputOutputAnalog) => {
+        type IsOutput = $crate::gpio::True;
+        type IsAnalog = $crate::gpio::True;
+        type IsTouch = $crate::gpio::False;
+    };
+    (InputOutputAnalogTouch) => {
+        type IsOutput = $crate::gpio::True;
+        type IsAnalog = $crate::gpio::True;
+        type IsTouch = $crate::gpio::True;
+    };
+}
 
 #[doc(hidden)]
 #[macro_export]
@@ -1370,7 +1335,7 @@ macro_rules! gpio {
                     type Bank = $crate::gpio::[< Bank $bank GpioRegisterAccess >];
                     type InterruptStatus = $crate::gpio::[< InterruptStatusRegisterAccessBank $bank >];
                     type Signals = [< Gpio $gpionum Signals >];
-                    type PinType = $crate::gpio::[<$type PinType>];
+                    $crate::pin_types!($type);
                 }
 
                 #[doc(hidden)]
