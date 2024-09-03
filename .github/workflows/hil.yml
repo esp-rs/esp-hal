@@ -86,6 +86,8 @@ jobs:
           - soc: esp32h2
             rust-target: riscv32imac-unknown-none-elf
           # # Xtensa devices:
+          - soc: esp32
+            rust-target: xtensa-esp32-none-elf
           - soc: esp32s2
             rust-target: xtensa-esp32s2-none-elf
           - soc: esp32s3
@@ -168,6 +170,10 @@ jobs:
             host: armv7
             hubs: "1-1"
           # Xtensa devices:
+          - soc: esp32
+            runner: esp32-jtag
+            usb: USB1 # ESP32 HIL TODO
+            host: aarch64
           - soc: esp32s2
             runner: esp32s2-jtag
             host: armv7

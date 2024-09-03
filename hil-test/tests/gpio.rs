@@ -14,7 +14,7 @@ use core::cell::RefCell;
 
 use critical_section::Mutex;
 #[cfg(feature = "esp32")]
-use esp_hal::gpio::Gpio0;
+use esp_hal::gpio::Gpio4;
 #[cfg(not(feature = "esp32"))]
 use esp_hal::gpio::Gpio3;
 use esp_hal::{

@@ -14,7 +14,7 @@
 //!
 //! Connect PCNT and MOSI, MISO and GPIO5 pins.
 
-//% CHIPS: esp32 esp32c6 esp32h2 esp32s3
+//% CHIPS: esp32c6 esp32h2 esp32s3
 //% FEATURES: generic-queue
 
 #![no_std]

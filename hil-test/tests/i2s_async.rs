@@ -91,6 +91,9 @@ mod tests {
         let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
         let dma = Dma::new(peripherals.DMA);
+        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+        let dma_channel = dma.i2s0channel;
+        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
         let dma_channel = dma.channel0;
 
         let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) =

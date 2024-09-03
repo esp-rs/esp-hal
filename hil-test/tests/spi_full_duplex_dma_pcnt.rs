@@ -12,7 +12,7 @@
 //!
 //! Connect MISO and MOSI pins.
 
-//% CHIPS: esp32 esp32c6 esp32h2 esp32s3
+//% CHIPS: esp32c6 esp32h2 esp32s3
 
 #![no_std]
 #![no_main]
