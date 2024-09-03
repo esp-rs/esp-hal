@@ -113,7 +113,7 @@ fn main() -> ! {
         println!("Do `dma_transfer`");
 
         let transfer = spi
-            .dma_transfer(&mut slave_send, &mut slave_receive)
+            .dma_transfer(&mut slave_receive, &mut slave_send)
             .unwrap();
 
         bitbang_master(

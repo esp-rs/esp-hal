@@ -42,7 +42,7 @@
 //! // The decryption happens in-place, so the plaintext is in `block`
 //! # }
 //! ```
-//! 
+//!
 //! ### AES-DMA
 //!
 //! Visit the [AES-DMA] test for a more advanced example of using AES-DMA
@@ -218,7 +218,7 @@ impl crate::private::Sealed for Aes256 {}
 #[cfg(any(esp32, esp32s2))]
 pub enum Endianness {
     /// Big endian (most-significant byte at the smallest address)
-    BigEndian    = 1,
+    BigEndian = 1,
     /// Little endian (least-significant byte at the smallest address)
     LittleEndian = 0,
 }
@@ -235,18 +235,8 @@ pub mod dma {
         aes::{Key, Mode},
         dma::{
             dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
-            AesPeripheral,
-            Channel,
-            ChannelRx,
-            ChannelTx,
-            DescriptorChain,
-            DmaChannel,
-            DmaDescriptor,
-            DmaPeripheral,
-            DmaTransferRxTx,
-            ReadBuffer,
-            RxPrivate,
-            TxPrivate,
+            AesPeripheral, Channel, ChannelRx, ChannelTx, DescriptorChain, DmaChannel,
+            DmaDescriptor, DmaPeripheral, DmaTransferRxTx, ReadBuffer, RxPrivate, TxPrivate,
             WriteBuffer,
         },
     };
@@ -427,10 +417,10 @@ pub mod dma {
             let (read_ptr, read_len) = unsafe { read_buffer.write_buffer() };
 
             self.start_transfer_dma(
-                write_ptr,
-                write_len,
                 read_ptr,
                 read_len,
+                write_ptr,
+                write_len,
                 mode,
                 cipher_mode,
                 key.into(),
@@ -442,10 +432,10 @@ pub mod dma {
         #[allow(clippy::too_many_arguments)]
         fn start_transfer_dma<K>(
             &mut self,
-            write_buffer_ptr: *const u8,
-            write_buffer_len: usize,
             read_buffer_ptr: *mut u8,
             read_buffer_len: usize,
+            write_buffer_ptr: *const u8,
+            write_buffer_len: usize,
             mode: Mode,
             cipher_mode: CipherMode,
             key: K,

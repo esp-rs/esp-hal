@@ -19,9 +19,7 @@ use esp_hal::{
     prelude::*,
     spi::{
         master::{Address, Command, Spi, SpiDma},
-        HalfDuplexMode,
-        SpiDataMode,
-        SpiMode,
+        HalfDuplexMode, SpiDataMode, SpiMode,
     },
     Blocking,
 };

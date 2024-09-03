@@ -26,9 +26,7 @@ use esp_hal::{
     prelude::*,
     spi::{
         master::{Address, Command, HalfDuplexReadWrite, Spi, SpiDma},
-        HalfDuplexMode,
-        SpiDataMode,
-        SpiMode,
+        HalfDuplexMode, SpiDataMode, SpiMode,
     },
     Blocking,
 };
@@ -154,7 +152,7 @@ mod tests {
         let dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
 
         let unit = ctx.pcnt_unit;
-        let mut spi = ctx.spi.with_buffers(dma_tx_buf, dma_rx_buf);
+        let mut spi = ctx.spi.with_buffers(dma_rx_buf, dma_tx_buf);
 
         unit.channel0.set_edge_signal(PcntSource::from_pin(
             ctx.mosi_mirror,

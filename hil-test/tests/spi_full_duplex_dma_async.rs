@@ -102,7 +102,7 @@ mod tests {
             .with_mosi(mosi)
             .with_miso(miso)
             .with_dma(dma_channel.configure_for_async(false, DmaPriority::Priority0))
-            .with_buffers(dma_tx_buf, dma_rx_buf);
+            .with_buffers(dma_rx_buf, dma_tx_buf);
 
         Context {
             spi,

@@ -20,8 +20,7 @@ use esp_hal::{
     prelude::*,
     spi::{
         master::{Spi, SpiDma},
-        FullDuplexMode,
-        SpiMode,
+        FullDuplexMode, SpiMode,
     },
     Blocking,
 };
@@ -87,10 +86,10 @@ mod tests {
 
         let transfer = ctx
             .spi
-            .dma_transfer(dma_tx_buf, dma_rx_buf)
+            .dma_transfer(dma_rx_buf, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
-        let (_, (dma_tx_buf, dma_rx_buf)) = transfer.wait();
+        let (_, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
         assert_eq!(dma_tx_buf.as_slice(), dma_rx_buf.as_slice());
     }
 
@@ -105,10 +104,10 @@ mod tests {
 
         let transfer = ctx
             .spi
-            .dma_transfer(dma_tx_buf, dma_rx_buf)
+            .dma_transfer(dma_rx_buf, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
-        let (_, (dma_tx_buf, dma_rx_buf)) = transfer.wait();
+        let (_, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
         assert_eq!(dma_tx_buf.as_slice()[0..1], dma_rx_buf.as_slice()[0..1]);
     }
 
@@ -125,10 +124,10 @@ mod tests {
 
         let transfer = ctx
             .spi
-            .dma_transfer(dma_tx_buf, dma_rx_buf)
+            .dma_transfer(dma_rx_buf, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
-        let (_, (dma_tx_buf, dma_rx_buf)) = transfer.wait();
+        let (_, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
         assert_eq!(dma_tx_buf.as_slice(), dma_rx_buf.as_slice());
     }
 
@@ -139,7 +138,7 @@ mod tests {
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        let mut spi = ctx.spi.with_buffers(dma_tx_buf, dma_rx_buf);
+        let mut spi = ctx.spi.with_buffers(dma_rx_buf, dma_tx_buf);
 
         let tx_buf = [0xde, 0xad, 0xbe, 0xef];
         let mut rx_buf = [0; 4];
@@ -156,7 +155,7 @@ mod tests {
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        let mut spi = ctx.spi.with_buffers(dma_tx_buf, dma_rx_buf);
+        let mut spi = ctx.spi.with_buffers(dma_rx_buf, dma_tx_buf);
 
         let tx_buf = [0xde, 0xad, 0xbe, 0xef];
         let mut rx_buf = [0; 4];
@@ -175,7 +174,7 @@ mod tests {
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        let mut spi = ctx.spi.with_buffers(dma_tx_buf, dma_rx_buf);
+        let mut spi = ctx.spi.with_buffers(dma_rx_buf, dma_tx_buf);
 
         let tx_buf = core::array::from_fn(|i| i as _);
         let mut rx_buf = [0; DMA_BUFFER_SIZE];

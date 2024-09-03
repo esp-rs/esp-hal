@@ -21,9 +21,7 @@ use esp_hal::{
     prelude::*,
     spi::{
         master::{Address, Command, HalfDuplexReadWrite, Spi, SpiDma},
-        HalfDuplexMode,
-        SpiDataMode,
-        SpiMode,
+        HalfDuplexMode, SpiDataMode, SpiMode,
     },
     Blocking,
 };
@@ -136,7 +134,7 @@ mod tests {
         let dma_rx_buf = DmaRxBuf::new(descriptors, buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(txd, tx).unwrap();
 
-        let mut spi = ctx.spi.with_buffers(dma_tx_buf, dma_rx_buf);
+        let mut spi = ctx.spi.with_buffers(dma_rx_buf, dma_tx_buf);
 
         // SPI should read '0's from the MISO pin
         ctx.miso_mirror.set_low();

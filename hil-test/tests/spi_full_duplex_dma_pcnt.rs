@@ -29,8 +29,7 @@ use esp_hal::{
     prelude::*,
     spi::{
         master::{Spi, SpiDma},
-        FullDuplexMode,
-        SpiMode,
+        FullDuplexMode, SpiMode,
     },
     Blocking,
 };
@@ -166,10 +165,10 @@ mod tests {
             assert_eq!(dma_rx_buf.as_slice(), &[0, 0, 0, 0, 0]);
 
             let transfer = spi
-                .dma_transfer(dma_tx_buf, dma_rx_buf)
+                .dma_transfer(dma_rx_buf, dma_tx_buf)
                 .map_err(|e| e.0)
                 .unwrap();
-            (spi, (dma_tx_buf, dma_rx_buf)) = transfer.wait();
+            (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
             assert_eq!(unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
         }
     }

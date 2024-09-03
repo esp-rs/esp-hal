@@ -61,7 +61,7 @@ async fn main(_spawner: Spawner) {
     let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
         .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
         .with_dma(dma_channel.configure_for_async(false, DmaPriority::Priority0))
-        .with_buffers(dma_tx_buf, dma_rx_buf);
+        .with_buffers(dma_rx_buf, dma_tx_buf);
 
     let send_buffer = [0, 1, 2, 3, 4, 5, 6, 7];
     loop {
