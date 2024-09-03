@@ -87,11 +87,8 @@ pub mod lp_io;
 #[cfg(all(rtc_io, not(esp32)))]
 pub mod rtc_io;
 
-/// Convenience type-alias for a no-pin / don't care - pin
-pub type NoPinType = Gpio0;
-
 /// Convenience constant for `Option::None` pin
-pub const NO_PIN: Option<NoPinType> = None;
+pub const NO_PIN: Option<DummyPin> = None;
 
 static USER_INTERRUPT_HANDLER: Mutex<Cell<Option<InterruptHandler>>> = Mutex::new(Cell::new(None));
 

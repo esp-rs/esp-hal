@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Removed `NoPinType` in favour of `DummyPin`. (#2068)
+
 ## [0.20.1] - 2024-08-30
 
 ### Fixed
