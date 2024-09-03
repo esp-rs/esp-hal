@@ -68,7 +68,7 @@ async fn main(spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    let (tx, rx) = UsbSerialJtag::new_async(peripherals.USB_DEVICE).split();
+    let (rx, tx) = UsbSerialJtag::new_async(peripherals.USB_DEVICE).split();
 
     static SIGNAL: StaticCell<Signal<NoopRawMutex, heapless::String<MAX_BUFFER_SIZE>>> =
         StaticCell::new();

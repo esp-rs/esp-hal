@@ -69,7 +69,7 @@ fn main() -> ! {
 
     let mut extram_buffer: &mut [u8] = dma_alloc_buffer!(DATA_SIZE, 64);
     let mut intram_buffer = dma_buffer_aligned!(DATA_SIZE, A64);
-    let (tx_descriptors, rx_descriptors) = dma_descriptors_chunk_size!(DATA_SIZE, CHUNK_SIZE);
+    let (rx_descriptors, tx_descriptors) = dma_descriptors_chunk_size!(DATA_SIZE, CHUNK_SIZE);
 
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0.configure(false, DmaPriority::Priority0);

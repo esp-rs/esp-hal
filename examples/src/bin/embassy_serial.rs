@@ -104,10 +104,10 @@ async fn main(spawner: Spawner) {
 
     let config = Config::default().rx_fifo_full_threshold(READ_BUF_SIZE as u16);
 
-    let mut uart0 = Uart::new_async_with_config(peripherals.UART0, config, tx_pin, rx_pin).unwrap();
+    let mut uart0 = Uart::new_async_with_config(peripherals.UART0, config, rx_pin, tx_pin).unwrap();
     uart0.set_at_cmd(AtCmdConfig::new(None, None, None, AT_CMD, None));
 
-    let (tx, rx) = uart0.split();
+    let (rx, tx) = uart0.split();
 
     static SIGNAL: StaticCell<Signal<NoopRawMutex, usize>> = StaticCell::new();
     let signal = &*SIGNAL.init(Signal::new());
