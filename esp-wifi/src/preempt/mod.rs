@@ -2,7 +2,7 @@
 #[cfg_attr(target_arch = "xtensa", path = "preempt_xtensa.rs")]
 pub mod arch_specific;
 
-use core::cell::RefCell;
+use core::{cell::RefCell, mem::size_of};
 
 use arch_specific::*;
 use critical_section::Mutex;

@@ -2,6 +2,7 @@
 
 use core::{
     fmt::Write,
+    mem::size_of_val,
     ptr::{addr_of, addr_of_mut},
 };
 
