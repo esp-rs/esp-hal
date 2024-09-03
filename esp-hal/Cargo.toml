@@ -33,7 +33,7 @@ embedded-hal-02          = { version = "0.2.7", features = ["unproven"], package
 embedded-hal             = "1.0.0"
 embedded-hal-async       = { version = "1.0.0", optional = true }
 embedded-hal-nb          = "1.0.0"
-embedded-io              = { version = "0.6.1", optional = true }
+embedded-io              = "0.6.1"
 embedded-io-async        = { version = "0.6.1", optional = true }
 enumset                  = "1.1.5"
 esp-synopsys-usb-otg     = { version = "0.4.2", optional = true, features = ["fs", "esp32sx"] }
@@ -129,7 +129,6 @@ flip-link = ["esp-riscv-rt/fix-sp"]
 ## Also enables `embassy-usb` support for ESP32-S2 and ESP32-S3.
 async = [
     "embedded-hal-async",
-    "embedded-io",
     "embedded-io-async",
     "embassy-sync",
     "embassy-futures",
@@ -152,8 +151,6 @@ defmt = [
     "esp32s2?/defmt",
     "esp32s3?/defmt",
 ]
-## Implement the traits defined in `embedded-io` for certain peripherals.
-embedded-io = ["dep:embedded-io"]
 
 #! ### PSRAM Feature Flags
 ## Use externally connected PSRAM (2MB).
@@ -176,7 +173,7 @@ opsram-8m = []
 opsram-16m = []
 
 # This feature is intended for testing; you probably don't want to enable it:
-ci = ["async", "embedded-io", "defmt", "bluetooth", "place-spi-driver-in-ram"]
+ci = ["async", "defmt", "bluetooth", "place-spi-driver-in-ram"]
 
 [lints.clippy]
 mixed_attributes_style = "allow"

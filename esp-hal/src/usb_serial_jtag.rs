@@ -580,7 +580,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::ErrorType for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -588,7 +587,6 @@ where
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::ErrorType for UsbSerialJtagTx<'_, M>
 where
     M: Mode,
@@ -596,7 +594,6 @@ where
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::ErrorType for UsbSerialJtagRx<'_, M>
 where
     M: Mode,
@@ -604,7 +601,6 @@ where
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::Read for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -614,7 +610,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::Read for UsbSerialJtagRx<'_, M>
 where
     M: Mode,
@@ -629,7 +624,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::Write for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -643,7 +637,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::Write for UsbSerialJtagTx<'_, M>
 where
     M: Mode,

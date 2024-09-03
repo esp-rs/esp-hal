@@ -261,7 +261,6 @@ impl embedded_hal_nb::serial::Error for Error {
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl embedded_io::Error for Error {
     fn kind(&self) -> embedded_io::ErrorKind {
         embedded_io::ErrorKind::Other
@@ -1833,22 +1832,18 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::ErrorType for Uart<'_, T, M> {
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::ErrorType for UartTx<'_, T, M> {
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::ErrorType for UartRx<'_, T, M> {
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::Read for Uart<'_, T, M>
 where
     T: Instance,
@@ -1859,7 +1854,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::Read for UartRx<'_, T, M>
 where
     T: Instance,
@@ -1878,7 +1872,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::ReadReady for Uart<'_, T, M>
 where
     T: Instance,
@@ -1889,7 +1882,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::ReadReady for UartRx<'_, T, M>
 where
     T: Instance,
@@ -1900,7 +1892,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::Write for Uart<'_, T, M>
 where
     T: Instance,
@@ -1915,7 +1906,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::Write for UartTx<'_, T, M>
 where
     T: Instance,
