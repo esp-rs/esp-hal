@@ -16,13 +16,7 @@
 #![no_std]
 #![no_main]
 
-use esp_hal::{
-    gpio::Io,
-    i2c::I2C,
-    peripherals::I2C0,
-    prelude::*,
-    Blocking,
-};
+use esp_hal::{gpio::Io, i2c::I2C, peripherals::I2C0, prelude::*, Blocking};
 use hil_test as _;
 
 struct Context {
