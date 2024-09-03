@@ -150,7 +150,7 @@ jobs:
       - name: msrv Xtensa (esp-wifi)
         run: |
           cargo xtask build-package --toolchain=esp --features=esp32,wifi,ble,async   --target=xtensa-esp32-none-elf   esp-wifi
-          cargo xtask build-package --toolchain=esp --features=esp32s2,wifi,ble,async --target=xtensa-esp32s2-none-elf esp-wifi
+          cargo xtask build-package --toolchain=esp --features=esp32s2,wifi,async --target=xtensa-esp32s2-none-elf esp-wifi
           cargo xtask build-package --toolchain=esp --features=esp32s3,wifi,ble,async --target=xtensa-esp32s3-none-elf esp-wifi
 
       - name: msrv (esp-lp-hal)
