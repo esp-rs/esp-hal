@@ -35,6 +35,8 @@ use crate::{
     timer::yield_task,
 };
 
+static mut QUEUE_HANDLE: *mut crate::binary::c_types::c_void = core::ptr::null_mut();
+
 // useful for waiting for events - clear and wait for the event bit to be set
 // again
 pub(crate) static WIFI_EVENTS: Mutex<RefCell<EnumSet<WifiEvent>>> =
@@ -1660,8 +1662,6 @@ pub unsafe extern "C" fn wifi_create_queue(
     queue_len: crate::binary::c_types::c_int,
     item_size: crate::binary::c_types::c_int,
 ) -> *mut crate::binary::c_types::c_void {
-    static mut QUEUE_HANDLE: *mut crate::binary::c_types::c_void = core::ptr::null_mut();
-
     let queue = create_queue(queue_len, item_size);
     QUEUE_HANDLE = queue;
 
@@ -1682,8 +1682,12 @@ pub unsafe extern "C" fn wifi_create_queue(
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_delete_queue(queue: *mut crate::binary::c_types::c_void) {
-    trace!("wifi_delete_queue {:?}", queue);
-    delete_queue(queue);
+    info!("wifi_delete_queue {:?}", queue);
+    if queue == addr_of_mut!(QUEUE_HANDLE).cast() {
+        delete_queue(QUEUE_HANDLE);
+    } else {
+        warn!("unknown queue when trying to delete WIFI queue");
+    }
 }
 
 /// **************************************************************************
