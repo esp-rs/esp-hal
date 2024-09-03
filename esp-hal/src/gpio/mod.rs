@@ -644,20 +644,33 @@ pub fn connect_high_to_peripheral(signal: InputSignal) {
         });
 }
 
-#[doc(hidden)]
-pub trait PinType {}
+
 
 #[doc(hidden)]
-pub trait IsOutputPin: PinType {}
+pub trait BooleanType {
+    const VALUE: bool;
+}
 
 #[doc(hidden)]
-pub trait IsInputPin: PinType {}
+pub struct True {}
+
+impl BooleanType for True {
+    const VALUE: bool = true;
+}
 
 #[doc(hidden)]
-pub trait IsAnalogPin: PinType {}
+pub struct False {}
+
+impl BooleanType for False {
+    const VALUE: bool = false;
+}
 
 #[doc(hidden)]
-pub trait IsTouchPin: PinType {}
+pub trait PinType {
+    type IsOutput: BooleanType;
+    type IsAnalog: BooleanType;
+    type IsTouch: BooleanType;
+}
 
 #[doc(hidden)]
 pub struct InputOutputPinType;
@@ -674,27 +687,35 @@ pub struct InputOnlyAnalogPinType;
 #[doc(hidden)]
 pub struct InputOutputAnalogTouchPinType;
 
-impl PinType for InputOutputPinType {}
-impl IsOutputPin for InputOutputPinType {}
-impl IsInputPin for InputOutputPinType {}
+impl PinType for InputOutputPinType {
+    type IsOutput = True;
+    type IsAnalog = False;
+    type IsTouch = False;
+}
 
-impl PinType for InputOnlyPinType {}
-impl IsInputPin for InputOnlyPinType {}
+impl PinType for InputOnlyPinType {
+    type IsOutput = False;
+    type IsAnalog = False;
+    type IsTouch = False;
+}
 
-impl PinType for InputOutputAnalogPinType {}
-impl IsOutputPin for InputOutputAnalogPinType {}
-impl IsInputPin for InputOutputAnalogPinType {}
-impl IsAnalogPin for InputOutputAnalogPinType {}
+impl PinType for InputOutputAnalogPinType {
+    type IsOutput = True;
+    type IsAnalog = True;
+    type IsTouch = False;
+}
 
-impl PinType for InputOnlyAnalogPinType {}
-impl IsInputPin for InputOnlyAnalogPinType {}
-impl IsAnalogPin for InputOnlyAnalogPinType {}
+impl PinType for InputOnlyAnalogPinType {
+    type IsOutput = False;
+    type IsAnalog = True;
+    type IsTouch = False;
+}
 
-impl PinType for InputOutputAnalogTouchPinType {}
-impl IsOutputPin for InputOutputAnalogTouchPinType {}
-impl IsInputPin for InputOutputAnalogTouchPinType {}
-impl IsAnalogPin for InputOutputAnalogTouchPinType {}
-impl IsTouchPin for InputOutputAnalogTouchPinType {}
+impl PinType for InputOutputAnalogTouchPinType {
+    type IsOutput = True;
+    type IsAnalog = True;
+    type IsTouch = True;
+}
 
 /// GPIO pin
 pub struct GpioPin<const GPIONUM: u8>;
@@ -702,7 +723,7 @@ pub struct GpioPin<const GPIONUM: u8>;
 impl<const GPIONUM: u8> GpioPin<GPIONUM>
 where
     Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
+    <Self as GpioProperties>::PinType: PinType<IsOutput = True>,
 {
     /// Is the input pin high?
     #[inline]
@@ -720,17 +741,24 @@ where
 impl<const GPIONUM: u8> GpioPin<GPIONUM>
 where
     Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsInputPin,
 {
     pub(crate) fn new() -> Self {
         Self
+    }
+
+    /// Create a pin out of thin air.
+    ///
+    /// # Safety
+    ///
+    /// Ensure that only one instance of a pin exists at one time.
+    pub unsafe fn steal() -> Self {
+        Self::new()
     }
 }
 
 impl<const GPIONUM: u8> InputPin for GpioPin<GPIONUM>
 where
     Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsInputPin,
 {
     fn init_input(&self, pull_down: bool, pull_up: bool, _: private::Internal) {
         let gpio = unsafe { &*GPIO::PTR };
@@ -874,20 +902,6 @@ where
     }
 }
 
-impl<const GPIONUM: u8> GpioPin<GPIONUM>
-where
-    Self: GpioProperties,
-{
-    /// Create a pin out of thin air.
-    ///
-    /// # Safety
-    ///
-    /// Ensure that only one instance of a pin exists at one time.
-    pub unsafe fn steal() -> Self {
-        Self
-    }
-}
-
 impl<const GPIONUM: u8> Pin for GpioPin<GPIONUM>
 where
     Self: GpioProperties,
@@ -966,7 +980,7 @@ where
 impl<const GPIONUM: u8> GpioPin<GPIONUM>
 where
     Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
+    <Self as GpioProperties>::PinType: PinType<IsOutput = True>,
 {
     /// Drives the pin high.
     #[inline]
@@ -1028,9 +1042,9 @@ impl<const GPIONUM: u8> private::Sealed for GpioPin<GPIONUM> where Self: GpioPro
 impl<const GPIONUM: u8> GpioPin<GPIONUM>
 where
     Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
+    <Self as GpioProperties>::PinType: PinType<IsOutput = True>,
 {
-    fn init_output(&self, alternate: AlternateFunction, open_drain: bool, _: private::Internal) {
+    fn init_output(&self, alternate: AlternateFunction, open_drain: bool) {
         let gpio = unsafe { &*GPIO::PTR };
 
         #[cfg(esp32)]
@@ -1080,14 +1094,14 @@ where
 impl<const GPIONUM: u8> OutputPin for GpioPin<GPIONUM>
 where
     Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
+    <Self as GpioProperties>::PinType: PinType<IsOutput = True>,
 {
     fn set_to_open_drain_output(&mut self, _: private::Internal) {
-        self.init_output(GPIO_FUNCTION, true, private::Internal);
+        self.init_output(GPIO_FUNCTION, true);
     }
 
     fn set_to_push_pull_output(&mut self, _: private::Internal) {
-        self.init_output(GPIO_FUNCTION, false, private::Internal);
+        self.init_output(GPIO_FUNCTION, false);
     }
 
     fn enable_output(&mut self, on: bool, _: private::Internal) {
@@ -1223,7 +1237,7 @@ where
 impl<const GPIONUM: u8> AnalogPin for GpioPin<GPIONUM>
 where
     Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsAnalogPin,
+    <Self as GpioProperties>::PinType: PinType<IsAnalog = True>,
 {
     /// Configures the pin for analog mode.
     fn set_analog(&self, _: private::Internal) {
@@ -1235,7 +1249,7 @@ where
 impl<const GPIONUM: u8> TouchPin for GpioPin<GPIONUM>
 where
     Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsTouchPin,
+    <Self as GpioProperties>::PinType: PinType<IsTouch = True>,
 {
     fn set_touch(&self, _: private::Internal) {
         crate::soc::gpio::internal_into_touch(GPIONUM);
