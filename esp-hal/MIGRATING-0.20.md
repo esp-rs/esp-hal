@@ -63,7 +63,7 @@ To avoid confusion with the `Rtc::current_time` wall clock time APIs, we've rena
 
 ## RX/TX Order
 
-Previously, or API was pretty inconsitent with the RX/TX ordering, and different peripherals had different order. Now, all
+Previously, our API was pretty inconsitent with the RX/TX ordering, and different peripherals had different order. Now, all
 the peripherals use rx-tx. Make sure your methods are expecting the rigth RX/TX order, for example an SPI DMA app should be updated to:
 
 ```diff
