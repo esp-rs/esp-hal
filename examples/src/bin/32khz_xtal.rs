@@ -15,7 +15,7 @@ use esp_hal::{delay::Delay, gpio::Io, prelude::*, uart::Uart, RtcSlowClock};
 
 #[entry]
 fn main() -> ! {
-    let mut conf: esp_hal::Config = esp_hal::Config::default();
+    let mut conf = esp_hal::Config::default();
     conf.rtc_slow_clock = RtcSlowClock::RtcSlowClock32kXtal;
     let (peripherals, clocks) = esp_hal::init(conf);
 
