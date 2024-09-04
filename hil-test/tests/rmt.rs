@@ -41,7 +41,7 @@ mod tests {
 
         let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
 
-        let (tx, rx) = hil_test::common_test_pins!(io);
+        let (rx, tx) = hil_test::common_test_pins!(io);
 
         let tx_config = TxChannelConfig {
             clk_divider: 255,
