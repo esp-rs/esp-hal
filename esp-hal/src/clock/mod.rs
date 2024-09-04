@@ -320,7 +320,10 @@ impl Clocks {
     }
 
     fn try_get() -> Option<&'static Clocks> {
-        unsafe { ACTIVE_CLOCKS.as_ref() }
+        unsafe {
+            // Safety: ACTIVE_CLOCKS is only set in `init` and never modified after that.
+            ACTIVE_CLOCKS.as_ref()
+        }
     }
 
     /// Get the active clock configuration.
