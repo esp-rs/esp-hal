@@ -110,7 +110,6 @@ pub struct AdcPin<PIN, ADCI, CS = ()> {
     _phantom: PhantomData<ADCI>,
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<PIN, ADCI, CS> embedded_hal_02::adc::Channel<ADCI> for AdcPin<PIN, ADCI, CS>
 where
     PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8>,
@@ -260,7 +259,6 @@ macro_rules! impl_adc_interface {
                 const CHANNEL: u8 = $channel;
             }
 
-            #[cfg(feature = "embedded-hal-02")]
             impl embedded_hal_02::adc::Channel<crate::peripherals::$adc> for crate::gpio::$pin {
                 type ID = u8;
 

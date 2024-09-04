@@ -93,7 +93,6 @@ impl Rng {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl embedded_hal_02::blocking::rng::Read for Rng {
     type Error = core::convert::Infallible;
 
@@ -219,7 +218,6 @@ impl<'d> Drop for Trng<'d> {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl embedded_hal_02::blocking::rng::Read for Trng<'_> {
     type Error = core::convert::Infallible;
     /// Fills the provided buffer with random bytes.

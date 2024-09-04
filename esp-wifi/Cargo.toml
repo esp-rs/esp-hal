@@ -103,7 +103,6 @@ async = [
   "dep:embassy-futures",
   "dep:embedded-io-async",
   "dep:esp-hal-embassy",
-  "esp-hal/async",
 ]
 
 embassy-net = ["dep:embassy-net-driver", "async"]

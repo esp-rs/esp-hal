@@ -228,7 +228,6 @@ pub enum Error {
     InvalidArgument,
 
     /// The RX FIFO overflowed.
-    #[cfg(feature = "async")]
     RxFifoOvf,
 
     /// A glitch was detected on the RX line.
@@ -236,14 +235,12 @@ pub enum Error {
     /// This error occurs when an unexpected or erroneous signal (glitch) is
     /// detected on the UART RX line, which could lead to incorrect data
     /// reception.
-    #[cfg(feature = "async")]
     RxGlitchDetected,
 
     /// A framing error was detected on the RX line.
     ///
     /// This error occurs when the received data does not conform to the
     /// expected UART frame format.
-    #[cfg(feature = "async")]
     RxFrameError,
 
     /// A parity error was detected on the RX line.
@@ -251,18 +248,15 @@ pub enum Error {
     /// This error occurs when the parity bit in the received data does not
     /// match the expected parity configuration.
     /// with the `async` feature.
-    #[cfg(feature = "async")]
     RxParityError,
 }
 
-#[cfg(feature = "embedded-hal")]
 impl embedded_hal_nb::serial::Error for Error {
     fn kind(&self) -> embedded_hal_nb::serial::ErrorKind {
         embedded_hal_nb::serial::ErrorKind::Other
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl embedded_io::Error for Error {
     fn kind(&self) -> embedded_io::ErrorKind {
         embedded_io::ErrorKind::Other
@@ -1662,7 +1656,6 @@ impl_instance!(UART1, 1, U1TXD, U1RXD, U1CTS, U1RTS, Uart1);
 #[cfg(uart2)]
 impl_instance!(UART2, 2, U2TXD, U2RXD, U2CTS, U2RTS, Uart2);
 
-#[cfg(feature = "ufmt")]
 impl<T, M> ufmt_write::uWrite for Uart<'_, T, M>
 where
     T: Instance,
@@ -1681,7 +1674,6 @@ where
     }
 }
 
-#[cfg(feature = "ufmt")]
 impl<T, M> ufmt_write::uWrite for UartTx<'_, T, M>
 where
     T: Instance,
@@ -1720,7 +1712,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T, M> embedded_hal_02::serial::Write<u8> for Uart<'_, T, M>
 where
     T: Instance,
@@ -1737,7 +1728,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T, M> embedded_hal_02::serial::Write<u8> for UartTx<'_, T, M>
 where
     T: Instance,
@@ -1754,7 +1744,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T, M> embedded_hal_02::serial::Read<u8> for Uart<'_, T, M>
 where
     T: Instance,
@@ -1767,7 +1756,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T, M> embedded_hal_02::serial::Read<u8> for UartRx<'_, T, M>
 where
     T: Instance,
@@ -1780,22 +1768,18 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::ErrorType for Uart<'_, T, M> {
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::ErrorType for UartTx<'_, T, M> {
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::ErrorType for UartRx<'_, T, M> {
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::Read for Uart<'_, T, M>
 where
     T: Instance,
@@ -1806,7 +1790,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::Read for UartRx<'_, T, M>
 where
     T: Instance,
@@ -1817,7 +1800,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::Write for Uart<'_, T, M>
 where
     T: Instance,
@@ -1832,7 +1814,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::Write for UartTx<'_, T, M>
 where
     T: Instance,
@@ -1847,22 +1828,18 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::ErrorType for Uart<'_, T, M> {
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::ErrorType for UartTx<'_, T, M> {
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::ErrorType for UartRx<'_, T, M> {
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::Read for Uart<'_, T, M>
 where
     T: Instance,
@@ -1873,7 +1850,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::Read for UartRx<'_, T, M>
 where
     T: Instance,
@@ -1892,7 +1868,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::ReadReady for Uart<'_, T, M>
 where
     T: Instance,
@@ -1903,7 +1878,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::ReadReady for UartRx<'_, T, M>
 where
     T: Instance,
@@ -1914,7 +1888,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::Write for Uart<'_, T, M>
 where
     T: Instance,
@@ -1929,7 +1902,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::Write for UartTx<'_, T, M>
 where
     T: Instance,
@@ -1952,7 +1924,6 @@ where
     }
 }
 
-#[cfg(feature = "async")]
 mod asynch {
     use core::task::Poll;
 

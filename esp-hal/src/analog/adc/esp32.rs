@@ -343,7 +343,6 @@ impl<'d, ADC1> Adc<'d, ADC1> {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<'d, ADCI, PIN> embedded_hal_02::adc::OneShot<ADCI, u16, super::AdcPin<PIN, ADCI>>
     for Adc<'d, ADCI>
 where

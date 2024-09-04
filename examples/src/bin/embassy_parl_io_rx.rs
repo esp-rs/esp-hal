@@ -5,7 +5,7 @@
 //! - Data pins => GPIO1, GPIO2, GPIO3, and GPIO4.
 
 //% CHIPS: esp32c6 esp32h2
-//% FEATURES: async embassy embassy-generic-timers
+//% FEATURES: embassy embassy-generic-timers
 
 #![no_std]
 #![no_main]

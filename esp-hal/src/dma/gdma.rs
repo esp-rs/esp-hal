@@ -420,23 +420,18 @@ impl<const N: u8> RegisterAccess for Channel<N> {
 #[doc(hidden)]
 pub struct ChannelTxImpl<const N: u8> {}
 
-#[cfg(feature = "async")]
 use embassy_sync::waitqueue::AtomicWaker;
 
-#[cfg(feature = "async")]
 #[allow(clippy::declare_interior_mutable_const)]
 const INIT: AtomicWaker = AtomicWaker::new();
 
-#[cfg(feature = "async")]
 static TX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [INIT; CHANNEL_COUNT];
 
-#[cfg(feature = "async")]
 static RX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [INIT; CHANNEL_COUNT];
 
 impl<const N: u8> crate::private::Sealed for ChannelTxImpl<N> {}
 
 impl<const N: u8> TxChannel<Channel<N>> for ChannelTxImpl<N> {
-    #[cfg(feature = "async")]
     fn waker() -> &'static AtomicWaker {
         &TX_WAKERS[N as usize]
     }
@@ -449,7 +444,6 @@ pub struct ChannelRxImpl<const N: u8> {}
 impl<const N: u8> crate::private::Sealed for ChannelRxImpl<N> {}
 
 impl<const N: u8> RxChannel<Channel<N>> for ChannelRxImpl<N> {
-    #[cfg(feature = "async")]
     fn waker() -> &'static AtomicWaker {
         &RX_WAKERS[N as usize]
     }
@@ -551,7 +545,6 @@ macro_rules! impl_channel {
                 ///
                 /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
                 /// transfer buffers of size `1..=4092`, you need 1 descriptor.
-                #[cfg(feature = "async")]
                 pub fn configure_for_async<'a>(
                     self,
                     burst_mode: bool,
@@ -578,23 +571,19 @@ macro_rules! impl_channel {
 
 cfg_if::cfg_if! {
     if #[cfg(esp32c2)] {
-        #[cfg(feature = "async")]
         const CHANNEL_COUNT: usize = 1;
         impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_CH0);
     } else if #[cfg(esp32c3)] {
-        #[cfg(feature = "async")]
         const CHANNEL_COUNT: usize = 3;
         impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_CH0);
         impl_channel!(1, super::asynch::interrupt::interrupt_handler_ch1, DMA_CH1);
         impl_channel!(2, super::asynch::interrupt::interrupt_handler_ch2, DMA_CH2);
     } else if #[cfg(any(esp32c6, esp32h2))] {
-        #[cfg(feature = "async")]
         const CHANNEL_COUNT: usize = 3;
         impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_IN_CH0, DMA_OUT_CH0);
         impl_channel!(1, super::asynch::interrupt::interrupt_handler_ch1, DMA_IN_CH1, DMA_OUT_CH1);
         impl_channel!(2, super::asynch::interrupt::interrupt_handler_ch2, DMA_IN_CH2, DMA_OUT_CH2);
     } else if #[cfg(esp32s3)] {
-        #[cfg(feature = "async")]
         const CHANNEL_COUNT: usize = 5;
         impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_IN_CH0, DMA_OUT_CH0);
         impl_channel!(1, super::asynch::interrupt::interrupt_handler_ch1, DMA_IN_CH1, DMA_OUT_CH1);

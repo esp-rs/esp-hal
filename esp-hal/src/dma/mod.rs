@@ -1249,7 +1249,6 @@ pub trait RxPrivate: crate::private::Sealed {
 
     fn clear_interrupts(&self);
 
-    #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
 }
 
@@ -1296,7 +1295,6 @@ where
         R::is_in_done()
     }
 
-    #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
 }
 
@@ -1494,7 +1492,6 @@ where
         CH::Channel::clear_in_interrupts();
     }
 
-    #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
         CH::Rx::waker()
     }
@@ -1552,7 +1549,6 @@ pub trait TxPrivate: crate::private::Sealed {
 
     fn clear_interrupts(&self);
 
-    #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
 
     fn descriptors_handled(&self) -> bool;
@@ -1633,7 +1629,6 @@ where
         R::last_out_dscr_address()
     }
 
-    #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
 }
 
@@ -1759,7 +1754,6 @@ where
         CH::Channel::has_out_descriptor_error()
     }
 
-    #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
         CH::Tx::waker()
     }
@@ -2762,7 +2756,6 @@ where
     }
 }
 
-#[cfg(feature = "async")]
 pub(crate) mod asynch {
     use core::task::Poll;
 

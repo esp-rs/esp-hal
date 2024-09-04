@@ -7,7 +7,7 @@
 //! pad on a PCB).
 
 //% CHIPS: esp32
-//% FEATURES: async embassy esp-hal-embassy/integrated-timers
+//% FEATURES: embassy esp-hal-embassy/integrated-timers
 
 #![no_std]
 #![no_main]

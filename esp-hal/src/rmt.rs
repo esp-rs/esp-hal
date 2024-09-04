@@ -208,7 +208,6 @@ pub struct RxChannelConfig {
 
 pub use impl_for_chip::{ChannelCreator, Rmt};
 
-#[cfg(feature = "async")]
 use self::asynch::{RxChannelAsync, TxChannelAsync};
 
 impl<'d, M> Rmt<'d, M>
@@ -288,7 +287,6 @@ impl<'d> InterruptConfigurable for Rmt<'d, crate::Blocking> {
     }
 }
 
-#[cfg(feature = "async")]
 impl<'d> Rmt<'d, crate::Async> {
     /// Create a new RMT instance
     pub fn new_async(
@@ -334,7 +332,6 @@ where
 }
 
 /// Creates a TX channel in async mode
-#[cfg(feature = "async")]
 pub trait TxChannelCreatorAsync<'d, T, P>
 where
     P: OutputPin,
@@ -412,7 +409,6 @@ where
 }
 
 /// Creates a RX channel in async mode
-#[cfg(feature = "async")]
 pub trait RxChannelCreatorAsync<'d, T, P>
 where
     P: InputPin,
@@ -601,7 +597,6 @@ macro_rules! impl_tx_channel_creator {
 
         impl $crate::rmt::TxChannel for $crate::rmt::Channel<$crate::Blocking, $channel> {}
 
-        #[cfg(feature = "async")]
         impl<'d, P> $crate::rmt::TxChannelCreatorAsync<'d, $crate::rmt::Channel<$crate::Async, $channel>, P>
             for ChannelCreator<$crate::Async, $channel>
         where
@@ -609,7 +604,6 @@ macro_rules! impl_tx_channel_creator {
         {
         }
 
-        #[cfg(feature = "async")]
         impl $crate::rmt::asynch::TxChannelAsync for $crate::rmt::Channel<$crate::Async, $channel> {}
     };
 }
@@ -625,7 +619,6 @@ macro_rules! impl_rx_channel_creator {
 
         impl $crate::rmt::RxChannel for $crate::rmt::Channel<$crate::Blocking, $channel> {}
 
-        #[cfg(feature = "async")]
         impl<'d, P> $crate::rmt::RxChannelCreatorAsync<'d, $crate::rmt::Channel<$crate::Async, $channel>, P>
         for ChannelCreator<$crate::Async, $channel>
         where
@@ -633,7 +626,6 @@ macro_rules! impl_rx_channel_creator {
         {
         }
 
-        #[cfg(feature = "async")]
         impl $crate::rmt::asynch::RxChannelAsync for $crate::rmt::Channel<$crate::Async, $channel> {}
     };
 }
@@ -1132,7 +1124,6 @@ pub trait RxChannel: private::RxChannelInternal<crate::Blocking> {
 }
 
 /// Async functionality
-#[cfg(feature = "async")]
 pub mod asynch {
     use core::{
         pin::Pin,

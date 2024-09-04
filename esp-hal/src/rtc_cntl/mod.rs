@@ -854,14 +854,12 @@ impl Rwdt {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl embedded_hal_02::watchdog::WatchdogDisable for Rwdt {
     fn disable(&mut self) {
         self.disable();
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl embedded_hal_02::watchdog::WatchdogEnable for Rwdt {
     type Time = MicrosDurationU64;
 
@@ -873,7 +871,6 @@ impl embedded_hal_02::watchdog::WatchdogEnable for Rwdt {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl embedded_hal_02::watchdog::Watchdog for Rwdt {
     fn feed(&mut self) {
         self.feed();
@@ -935,10 +932,7 @@ impl Default for Swd {
     }
 }
 
-#[cfg(all(
-    any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3),
-    feature = "embedded-hal-02"
-))]
+#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
 impl embedded_hal_02::watchdog::WatchdogDisable for Swd {
     fn disable(&mut self) {
         self.disable();

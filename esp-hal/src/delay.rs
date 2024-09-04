@@ -45,7 +45,6 @@ use crate::clock::Clocks;
 #[non_exhaustive]
 pub struct Delay;
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T> embedded_hal_02::blocking::delay::DelayMs<T> for Delay
 where
     T: Into<u32>,
@@ -55,7 +54,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T> embedded_hal_02::blocking::delay::DelayUs<T> for Delay
 where
     T: Into<u32>,
@@ -65,7 +63,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl embedded_hal::delay::DelayNs for Delay {
     fn delay_ns(&mut self, ns: u32) {
         self.delay_nanos(ns);

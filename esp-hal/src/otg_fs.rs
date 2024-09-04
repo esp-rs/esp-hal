@@ -132,7 +132,6 @@ unsafe impl<'d> UsbPeripheral for Usb<'d> {
     }
 }
 /// Async functionality
-#[cfg(feature = "async")]
 pub mod asynch {
     use embassy_usb_driver::{
         EndpointAddress,

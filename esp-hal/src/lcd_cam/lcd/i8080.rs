@@ -62,8 +62,6 @@ use core::{fmt::Formatter, marker::PhantomData, mem::size_of};
 
 use fugit::HertzU32;
 
-#[cfg(feature = "async")]
-use crate::lcd_cam::asynch::LcdDoneFuture;
 use crate::{
     clock::Clocks,
     dma::{
@@ -81,6 +79,7 @@ use crate::{
     },
     gpio::{OutputPin, OutputSignal},
     lcd_cam::{
+        asynch::LcdDoneFuture,
         lcd::{i8080::private::TxPins, ClockMode, DelayMode, Phase, Polarity},
         private::calculate_clkm,
         BitOrder,
@@ -378,7 +377,6 @@ where
     }
 }
 
-#[cfg(feature = "async")]
 impl<'d, CH: DmaChannel, P: TxPins> I8080<'d, CH, P, crate::Async>
 where
     P::Word: Into<u16>,

@@ -1328,7 +1328,6 @@ extern "C" fn gpio_interrupt_handler() {
         user_handler.call();
     }
 
-    #[cfg(feature = "async")]
     asynch::handle_gpio_interrupt();
 }
 
@@ -2786,7 +2785,6 @@ pub(crate) mod internal {
     }
 }
 
-#[cfg(feature = "async")]
 mod asynch {
     use core::task::{Context, Poll};
 
@@ -2954,7 +2952,6 @@ mod asynch {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 mod embedded_hal_02_impls {
     use embedded_hal_02::digital::v2 as digital;
 
@@ -3249,7 +3246,6 @@ mod embedded_hal_02_impls {
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 mod embedded_hal_impls {
     use embedded_hal::digital;
 
@@ -3499,8 +3495,6 @@ mod embedded_hal_impls {
     }
 }
 
-#[cfg(feature = "embedded-hal")]
-#[cfg(feature = "async")]
 mod embedded_hal_async_impls {
     use embedded_hal_async::digital::Wait;
 

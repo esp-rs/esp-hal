@@ -7,7 +7,7 @@
 //! - DM => GPIO19
 
 //% CHIPS: esp32s2 esp32s3
-//% FEATURES: async embassy embassy-generic-timers
+//% FEATURES: embassy embassy-generic-timers
 
 #![no_std]
 #![no_main]

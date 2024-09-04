@@ -590,7 +590,6 @@ impl super::AdcCalEfuse for crate::peripherals::ADC2 {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<'d, ADCI, PIN, CS> embedded_hal_02::adc::OneShot<ADCI, u16, AdcPin<PIN, ADCI, CS>>
     for Adc<'d, ADCI>
 where

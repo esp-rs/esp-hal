@@ -16,9 +16,8 @@
 //!
 //! - Use the [`FullDuplex`](embedded_hal_02::spi::FullDuplex) trait to
 //!   read/write single bytes at a time,
-//! - Use the [`SpiBus`](embedded_hal::spi::SpiBus) trait (requires the
-//!   "embedded-hal" feature) and its associated functions to initiate
-//!   transactions with simultaneous reads and writes, or
+//! - Use the [`SpiBus`](embedded_hal::spi::SpiBus) trait and its associated
+//!   functions to initiate transactions with simultaneous reads and writes, or
 //! - Use the `ExclusiveDevice` struct from [`embedded-hal-bus`] or `SpiDevice`
 //!   from [`embassy-embedded-hal`].
 //!
@@ -900,7 +899,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T> embedded_hal_02::spi::FullDuplex<u8> for Spi<'_, T, FullDuplexMode>
 where
     T: Instance,
@@ -916,7 +914,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T> embedded_hal_02::blocking::spi::Transfer<u8> for Spi<'_, T, FullDuplexMode>
 where
     T: Instance,
@@ -928,7 +925,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T> embedded_hal_02::blocking::spi::Write<u8> for Spi<'_, T, FullDuplexMode>
 where
     T: Instance,
@@ -948,12 +944,11 @@ mod dma {
     };
 
     use super::*;
-    #[cfg(feature = "async")]
-    use crate::dma::asynch::{DmaRxFuture, DmaTxFuture};
     #[cfg(spi3)]
     use crate::dma::Spi3Peripheral;
     use crate::{
         dma::{
+            asynch::{DmaRxFuture, DmaTxFuture},
             Channel,
             DmaChannel,
             DmaRxBuf,
@@ -1237,7 +1232,6 @@ mod dma {
         }
     }
 
-    #[cfg(feature = "async")]
     impl<'d, T, C, D, Buf> SpiDmaTransfer<'d, T, C, D, crate::Async, Buf>
     where
         T: Instance,
@@ -1899,7 +1893,6 @@ mod dma {
         }
     }
 
-    #[cfg(feature = "embedded-hal-02")]
     impl<'d, T, C> embedded_hal_02::blocking::spi::Transfer<u8>
         for SpiDmaBus<'d, T, C, FullDuplexMode, crate::Blocking>
     where
@@ -1915,7 +1908,6 @@ mod dma {
         }
     }
 
-    #[cfg(feature = "embedded-hal-02")]
     impl<'d, T, C> embedded_hal_02::blocking::spi::Write<u8>
         for SpiDmaBus<'d, T, C, FullDuplexMode, crate::Blocking>
     where
@@ -1932,7 +1924,6 @@ mod dma {
     }
 
     /// Async functionality
-    #[cfg(feature = "async")]
     mod asynch {
         use core::{cmp::min, mem::take};
 
@@ -2163,7 +2154,6 @@ mod dma {
         }
     }
 
-    #[cfg(feature = "embedded-hal")]
     mod ehal1 {
         use embedded_hal::spi::{ErrorType, SpiBus};
 
@@ -2210,7 +2200,6 @@ mod dma {
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 mod ehal1 {
     use embedded_hal::spi::SpiBus;
     use embedded_hal_nb::spi::FullDuplex;
