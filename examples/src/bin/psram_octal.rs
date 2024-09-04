@@ -25,11 +25,11 @@ fn init_psram_heap() {
     }
 }
 
+#[cfg(is_not_release)]
+compile_error!("PSRAM example must be built in release mode!");
+
 #[entry]
 fn main() -> ! {
-    #[cfg(debug_assertions)]
-    compile_error!("This example MUST be built in release mode!");
-
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     psram::init_psram(peripherals.PSRAM);

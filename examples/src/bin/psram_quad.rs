@@ -1,6 +1,6 @@
 //! This shows how to use PSRAM as heap-memory via esp-alloc
 //!
-//! You need an ESP32, ESP32-S2, or ESP32-S3 with at least 2 MB of PSRAM memory.
+//! You need an ESP32, ESP32-S2 or ESP32-S3 with at least 2 MB of PSRAM memory.
 
 //% CHIPS: esp32 esp32s2 esp32s3
 //% FEATURES: psram-2m
@@ -25,11 +25,11 @@ fn init_psram_heap() {
     }
 }
 
+#[cfg(is_not_release)]
+compile_error!("PSRAM example must be built in release mode!");
+
 #[entry]
 fn main() -> ! {
-    #[cfg(debug_assertions)]
-    compile_error!("PSRAM example must be built in release mode!");
-
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     psram::init_psram(peripherals.PSRAM);

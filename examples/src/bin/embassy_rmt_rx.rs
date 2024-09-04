@@ -22,7 +22,7 @@ use esp_println::{print, println};
 
 const WIDTH: usize = 80;
 
-#[cfg(debug_assertions)]
+#[cfg(is_not_release)]
 compile_error!("Run this example in release mode");
 
 #[embassy_executor::task]

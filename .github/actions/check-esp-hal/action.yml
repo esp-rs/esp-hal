@@ -57,5 +57,7 @@ runs:
         	--target=${{ inputs.target }} \
         	esp-hal
     - name: Build (examples)
+      env:
+        CI: 1
       shell: bash
       run: cargo +${{ inputs.toolchain }} xtask build-examples esp-hal ${{ inputs.device }} --debug
