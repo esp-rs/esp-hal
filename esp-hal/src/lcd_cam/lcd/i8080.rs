@@ -488,21 +488,14 @@ impl<'d, CH: DmaChannel, P, DM: Mode> I8080<'d, CH, P, DM> {
                 .lcd_user()
                 .modify(|_, w| w.lcd_dout().clear_bit());
         } else {
-            // Set transfer length.
-            self.lcd_cam.lcd_user().modify(|_, w| unsafe {
-                if len <= 8192 {
-                    // Data length in fixed mode. (13 bits)
-                    w.lcd_always_out_en()
-                        .clear_bit()
-                        .lcd_dout_cyclelen()
-                        .bits((len - 1) as _)
-                } else {
-                    // Enable continuous output.
-                    w.lcd_always_out_en().set_bit()
-                }
-                .lcd_dout()
-                .set_bit()
-            });
+            // Use continous mode for DMA. FROM the S3 TRM:
+            // > In a continuous output, LCD module keeps sending data till:
+            // > i. LCD_CAM_LCD_START is cleared;
+            // > ii. or LCD_CAM_LCD_RESET is set;
+            // > iii. or all the data in GDMA is sent out.
+            self.lcd_cam
+                .lcd_user()
+                .modify(|_, w| w.lcd_always_out_en().set_bit().lcd_dout().set_bit());
 
             unsafe {
                 self.tx_chain.fill_for_tx(false, ptr, len)?;
