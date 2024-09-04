@@ -1198,7 +1198,7 @@ pub(crate) fn init() {
     modem_clock_select_lp_clock_source(RadioPeripherals::Wifi, modem_lpclk_src, 0);
 }
 
-pub(crate) fn configure_clock() {
+pub(crate) fn configure_clock(slow_clock: RtcSlowClock) {
     assert!(matches!(
         RtcClock::get_xtal_freq(),
         XtalClock::RtcXtalFreq40M
@@ -1207,9 +1207,9 @@ pub(crate) fn configure_clock() {
     RtcClock::set_fast_freq(RtcFastClock::RtcFastClockRcFast);
 
     let cal_val = loop {
-        RtcClock::set_slow_freq(RtcSlowClock::RtcSlowClockRcSlow);
+        RtcClock::set_slow_freq(slow_clock);
 
-        let res = RtcClock::calibrate(RtcCalSel::RtcCalRtcMux, 1024);
+        let res = RtcClock::calibrate(slow_clock.into_cal(), slow_clock.into_cal_cycles());
         if res != 0 {
             break res;
         }
@@ -1370,10 +1370,11 @@ impl Clock for RtcFastClock {
 }
 
 #[allow(clippy::enum_variant_names)]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 /// RTC SLOW_CLK frequency values
-pub(crate) enum RtcSlowClock {
+pub enum RtcSlowClock {
     /// Select RC_SLOW_CLK as RTC_SLOW_CLK source
+    #[default]
     RtcSlowClockRcSlow  = 0,
     /// Select XTAL32K_CLK as RTC_SLOW_CLK source
     RtcSlowClock32kXtal = 1,
@@ -1381,6 +1382,25 @@ pub(crate) enum RtcSlowClock {
     RtcSlowClock32kRc   = 2,
     /// Select OSC_SLOW_CLK (external slow clock) as RTC_SLOW_CLK source
     RtcSlowOscSlow      = 3,
+}
+
+impl RtcSlowClock {
+    fn into_cal(&self) -> RtcCalSel {
+        match self {
+            RtcSlowClock::RtcSlowClockRcSlow => RtcCalSel::RtcCalRtcMux,
+            RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
+            RtcSlowClock::RtcSlowClock32kRc => RtcCalSel::RtcCal32kRc,
+            RtcSlowClock::RtcSlowOscSlow => RtcCalSel::RtcCal32kOscSlow,
+        }
+    }
+    fn into_cal_cycles(&self) -> u32 {
+        match self {
+            RtcSlowClock::RtcSlowClockRcSlow => 1024,
+            RtcSlowClock::RtcSlowClock32kXtal => 3000,
+            RtcSlowClock::RtcSlowClock32kRc => 3000,
+            RtcSlowClock::RtcSlowOscSlow => 3000, // Not sure https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/kconfig.html#config-rtc-clk-cal-cycles
+        }
+    }
 }
 
 impl Clock for RtcSlowClock {

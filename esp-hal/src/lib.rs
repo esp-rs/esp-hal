@@ -721,7 +721,10 @@ macro_rules! before_snippet {
 use crate::{
     clock::{ClockControl, Clocks, CpuClock},
     peripherals::Peripherals,
+    rtc_cntl::rtc::configure_clock,
 };
+
+pub use crate::rtc_cntl::rtc::RtcSlowClock;
 
 /// System configuration.
 #[non_exhaustive]
@@ -729,6 +732,8 @@ use crate::{
 pub struct Config {
     /// The CPU clock configuration.
     pub cpu_clock: CpuClock,
+    /// The slow RTC clock configuration. Some options choosed here may require a special bootloader!
+    pub slow_clock: RtcSlowClock,
 }
 
 /// Initialize the system.
@@ -737,6 +742,7 @@ pub struct Config {
 pub fn init(config: Config) -> (Peripherals, Clocks<'static>) {
     let peripherals = Peripherals::take();
     let clocks = ClockControl::new(config.cpu_clock).freeze();
+    configure_clock(config.slow_clock);
 
     (peripherals, clocks)
 }
