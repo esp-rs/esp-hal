@@ -17,7 +17,7 @@
 //!
 //! Each UART controller is individually configurable, and the usual setting
 //! such as baud rate, data bits, parity, and stop bits can easily be
-//! configured. Additionally, the transmit (TX) and receive (RX) pins need to
+//! configured. Additionally, the receive (RX) and transmit (TX) pins need to
 //! be specified.
 //!
 //! ```rust, no_run

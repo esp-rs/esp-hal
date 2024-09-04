@@ -22,8 +22,8 @@ use hil_test as _;
 use nb::block;
 
 struct Context {
-    tx: UartTx<'static, UART0, Blocking>,
     rx: UartRx<'static, UART1, Blocking>,
+    tx: UartTx<'static, UART0, Blocking>,
 }
 
 #[cfg(test)]
@@ -44,7 +44,7 @@ mod tests {
         let tx = UartTx::new(peripherals.UART0, tx).unwrap();
         let rx = UartRx::new(peripherals.UART1, rx).unwrap();
 
-        Context { tx, rx }
+        Context { rx, tx }
     }
 
     #[test]

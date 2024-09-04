@@ -43,8 +43,8 @@ mod tests {
 
         let mut config = twai::TwaiConfiguration::new(
             peripherals.TWAI0,
-            can_tx_pin,
             can_rx_pin,
+            can_tx_pin,
             twai::BaudRate::B1000K,
             TwaiMode::SelfTest,
         );
