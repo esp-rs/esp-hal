@@ -90,7 +90,7 @@ fn main() -> ! {
     }
 
     info!(" ext2int: Starting transfer of {} bytes", DATA_SIZE);
-    match mem2mem.start_transfer(&extram_buffer, &mut intram_buffer) {
+    match mem2mem.start_transfer(&mut intram_buffer, &extram_buffer) {
         Ok(dma_wait) => {
             info!("Transfer started");
             dma_wait.wait().unwrap();
@@ -122,7 +122,7 @@ fn main() -> ! {
     }
 
     info!(" int2ext: Starting transfer of {} bytes", DATA_SIZE);
-    match mem2mem.start_transfer(&intram_buffer, &mut extram_buffer) {
+    match mem2mem.start_transfer(&mut extram_buffer, &intram_buffer) {
         Ok(dma_wait) => {
             info!("Transfer started");
             dma_wait.wait().unwrap();
