@@ -1256,7 +1256,7 @@ where
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::RefTick => REF_TICK.to_Hz(), /* ESP32(/-S2) TRM, section 3.2.4.2
-                                                        * (6.2.4.2 for S2) */
+                                                       * (6.2.4.2 for S2) */
         };
 
         T::register_block().conf0().modify(|_, w| {

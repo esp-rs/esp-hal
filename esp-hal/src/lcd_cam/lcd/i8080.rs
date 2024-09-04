@@ -122,7 +122,7 @@ where
         // the LCD_PCLK divider must be at least 2. To make up for this the user
         // provided frequency is doubled to match.
         let (i, divider) = calculate_clkm(
-            (frequency.to_Hz() * 2 ) as _,
+            (frequency.to_Hz() * 2) as _,
             &[
                 clocks.xtal_clock.to_Hz() as _,
                 clocks.cpu_clock.to_Hz() as _,

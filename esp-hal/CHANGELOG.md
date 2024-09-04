@@ -10,9 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Implement `embedded-hal` output pin traits for `DummyPin` (#2019)
-- Added `esp_hal::init` to simplify HAL initialisation (#1970)
+- Added `esp_hal::init` to simplify HAL initialisation (#1970, #1999)
 
 ### Changed
+
+- `Delay::new()` is now a `const` function (#1999)
 
 ### Fixed
 
@@ -23,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `NoPinType` in favour of `DummyPin`. (#2068)
 - Removed the `async`, `embedded-hal-02`, `embedded-hal`, `embedded-io`, `embedded-io-async`, and `ufmt` features (#2070)
 - Removed the `GpioN` type aliasses. Use `GpioPin<N>` instead. (#2073)
+- Removed `Peripherals::take`. Use `esp_hal::init` to obtain `Peripherals` (#1999)
 
 ## [0.20.1] - 2024-08-30
 
@@ -80,7 +83,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `FlashSafeDma` (#1856)
 - Remove redundant WithDmaSpi traits (#1975)
 - `IsFullDuplex` and `IsHalfDuplex` traits (#1985)
-- `Peripherals::take` (#1999)
 
 ## [0.19.0] - 2024-07-15
 
