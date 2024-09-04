@@ -55,12 +55,11 @@
 //! # use esp_hal::rmt::TxChannelConfig;
 //! # use esp_hal::rmt::Rmt;
 //! # use esp_hal::gpio::Io;
-//! # use esp_hal::clock::ClockControl;
 //! # use crate::esp_hal::rmt::TxChannelCreator;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 #![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
 #![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
-//! let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
+//! let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
 //! let mut channel = rmt
 //!     .channel0
 //!     .configure(
@@ -86,7 +85,6 @@ use core::marker::PhantomData;
 use fugit::HertzU32;
 
 use crate::{
-    clock::Clocks,
     gpio::{InputPin, OutputPin},
     interrupt::InterruptHandler,
     peripheral::Peripheral,
@@ -217,7 +215,6 @@ where
     pub(crate) fn new_internal(
         peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
         frequency: HertzU32,
-        _clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
         let me = Rmt::create(peripheral);
 
@@ -233,7 +230,7 @@ where
             if #[cfg(any(esp32, esp32s2))] {
                 self::chip_specific::configure_clock();
             } else {
-                me.configure_clock(frequency, _clocks)?;
+                me.configure_clock(frequency)?;
             }
         }
 
@@ -249,7 +246,7 @@ where
     }
 
     #[cfg(not(any(esp32, esp32s2)))]
-    fn configure_clock(&self, frequency: HertzU32, _clocks: &Clocks<'d>) -> Result<(), Error> {
+    fn configure_clock(&self, frequency: HertzU32) -> Result<(), Error> {
         let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
 
         if frequency > src_clock {
@@ -273,9 +270,8 @@ impl<'d> Rmt<'d, crate::Blocking> {
     pub fn new(
         peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
         frequency: HertzU32,
-        _clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
-        Self::new_internal(peripheral, frequency, _clocks)
+        Self::new_internal(peripheral, frequency)
     }
 }
 
@@ -292,9 +288,8 @@ impl<'d> Rmt<'d, crate::Async> {
     pub fn new_async(
         peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
         frequency: HertzU32,
-        _clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
-        let mut this = Self::new_internal(peripheral, frequency, _clocks)?;
+        let mut this = Self::new_internal(peripheral, frequency)?;
         this.internal_set_interrupt_handler(asynch::async_interrupt_handler);
         Ok(this)
     }

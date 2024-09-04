@@ -24,20 +24,14 @@ use lis3dh_async::{Lis3dh, Range, SlaveAddr};
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0.timer0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_hal_embassy::init(timg0.timer0);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let i2c0 = I2C::new_async(
-        peripherals.I2C0,
-        io.pins.gpio4,
-        io.pins.gpio5,
-        400.kHz(),
-        &clocks,
-    );
+    let i2c0 = I2C::new_async(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, 400.kHz());
 
     let mut lis3dh = Lis3dh::new_i2c(i2c0, SlaveAddr::Alternate).await.unwrap();
     lis3dh.set_range(Range::G8).await.unwrap();

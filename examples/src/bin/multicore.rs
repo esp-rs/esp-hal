@@ -23,9 +23,9 @@ static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let counter = Mutex::new(RefCell::new(0u32));
 

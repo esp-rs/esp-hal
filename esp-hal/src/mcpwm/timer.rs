@@ -8,10 +8,7 @@ use core::marker::PhantomData;
 
 use fugit::HertzU32;
 
-use crate::{
-    clock::Clocks,
-    mcpwm::{FrequencyError, PeripheralClockConfig, PwmPeripheral},
-};
+use crate::mcpwm::{FrequencyError, PeripheralClockConfig, PwmPeripheral};
 
 /// A MCPWM timer
 ///
@@ -47,7 +44,7 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
     ///
     /// The hardware supports writing these settings in sync with certain timer
     /// events but this HAL does not expose these for now.
-    pub fn start(&mut self, timer_config: TimerClockConfig<'_>) {
+    pub fn start(&mut self, timer_config: TimerClockConfig) {
         // write prescaler and period with immediate update method
         self.cfg0().write(|w| unsafe {
             w.prescale().bits(timer_config.prescaler);
@@ -115,18 +112,17 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
 /// Use [`PeripheralClockConfig::timer_clock_with_prescaler`](super::PeripheralClockConfig::timer_clock_with_prescaler) or
 /// [`PeripheralClockConfig::timer_clock_with_frequency`](super::PeripheralClockConfig::timer_clock_with_frequency) to it.
 #[derive(Copy, Clone)]
-pub struct TimerClockConfig<'a> {
+pub struct TimerClockConfig {
     frequency: HertzU32,
     period: u16,
     period_updating_method: PeriodUpdatingMethod,
     prescaler: u8,
     mode: PwmWorkingMode,
-    phantom: PhantomData<&'a Clocks<'a>>,
 }
 
-impl<'a> TimerClockConfig<'a> {
+impl TimerClockConfig {
     pub(super) fn with_prescaler(
-        clock: &PeripheralClockConfig<'a>,
+        clock: &PeripheralClockConfig,
         period: u16,
         mode: PwmWorkingMode,
         prescaler: u8,
@@ -144,12 +140,11 @@ impl<'a> TimerClockConfig<'a> {
             period,
             period_updating_method: PeriodUpdatingMethod::Immediately,
             mode,
-            phantom: PhantomData,
         }
     }
 
     pub(super) fn with_frequency(
-        clock: &PeripheralClockConfig<'a>,
+        clock: &PeripheralClockConfig,
         period: u16,
         mode: PwmWorkingMode,
         target_freq: HertzU32,
@@ -178,7 +173,6 @@ impl<'a> TimerClockConfig<'a> {
             period,
             period_updating_method: PeriodUpdatingMethod::Immediately,
             mode,
-            phantom: PhantomData,
         })
     }
 

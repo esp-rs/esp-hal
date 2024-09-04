@@ -14,11 +14,11 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
-    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new_async(peripherals.TIMG0);
     let mut wdt0 = timg0.wdt;
     wdt0.enable();
     wdt0.set_timeout(2u64.secs());

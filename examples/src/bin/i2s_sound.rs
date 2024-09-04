@@ -49,7 +49,7 @@ const SINE: [i16; 64] = [
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -69,7 +69,6 @@ fn main() -> ! {
         dma_channel.configure(false, DmaPriority::Priority0),
         tx_descriptors,
         rx_descriptors,
-        &clocks,
     );
 
     let mut i2s_tx = i2s

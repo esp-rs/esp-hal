@@ -47,7 +47,7 @@ static ALARM2: Mutex<
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
     println!("SYSTIMER Current value = {}", SystemTimer::now());
@@ -81,7 +81,7 @@ fn main() -> ! {
         ALARM2.borrow_ref_mut(cs).replace(alarm2);
     });
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     loop {
         delay.delay_millis(500);

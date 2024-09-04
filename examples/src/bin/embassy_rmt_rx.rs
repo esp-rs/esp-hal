@@ -39,10 +39,10 @@ async fn signal_task(mut pin: Output<'static, GpioPin<5>>) {
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
     println!("Init!");
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0.timer0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_hal_embassy::init(timg0.timer0);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -54,7 +54,7 @@ async fn main(spawner: Spawner) {
         }
     };
 
-    let rmt = Rmt::new_async(peripherals.RMT, freq, &clocks).unwrap();
+    let rmt = Rmt::new_async(peripherals.RMT, freq).unwrap();
     let rx_config = RxChannelConfig {
         clk_divider: 255,
         idle_threshold: 10000,

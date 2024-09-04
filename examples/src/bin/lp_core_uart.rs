@@ -28,7 +28,7 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -37,7 +37,6 @@ fn main() -> ! {
     let mut uart1 = Uart::new_with_config(
         peripherals.UART1,
         Config::default(),
-        &clocks,
         io.pins.gpio6,
         io.pins.gpio7,
     )

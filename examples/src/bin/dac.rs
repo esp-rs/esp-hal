@@ -23,7 +23,7 @@ use esp_hal::{analog::dac::Dac, delay::Delay, gpio::Io, prelude::*};
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -41,7 +41,7 @@ fn main() -> ! {
     let mut dac1 = Dac::new(peripherals.DAC1, dac1_pin);
     let mut dac2 = Dac::new(peripherals.DAC2, dac2_pin);
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let mut voltage_dac1: u8 = 200;
     let mut voltage_dac2: u8 = 255;

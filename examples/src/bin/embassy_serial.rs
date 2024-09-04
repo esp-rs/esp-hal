@@ -78,10 +78,10 @@ async fn reader(
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
     esp_println::println!("Init!");
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0.timer0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_hal_embassy::init(timg0.timer0);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -104,8 +104,7 @@ async fn main(spawner: Spawner) {
 
     let config = Config::default().rx_fifo_full_threshold(READ_BUF_SIZE as u16);
 
-    let mut uart0 =
-        Uart::new_async_with_config(peripherals.UART0, config, &clocks, tx_pin, rx_pin).unwrap();
+    let mut uart0 = Uart::new_async_with_config(peripherals.UART0, config, tx_pin, rx_pin).unwrap();
     uart0.set_at_cmd(AtCmdConfig::new(None, None, None, AT_CMD, None));
 
     let (tx, rx) = uart0.split();

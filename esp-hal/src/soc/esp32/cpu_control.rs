@@ -15,7 +15,7 @@
 //! # use esp_hal::prelude::*;
 //! static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 //!
-//! # let delay = Delay::new(&clocks);
+//! # let delay = Delay::new();
 //!
 //! let counter = Mutex::new(RefCell::new(0));
 //!

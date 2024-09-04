@@ -287,8 +287,7 @@ mod peripheral_macros {
             impl Peripherals {
                 /// Returns all the peripherals *once*
                 #[inline]
-                pub fn take() -> Self {
-
+                pub(crate) fn take() -> Self {
                     #[no_mangle]
                     static mut _ESP_HAL_DEVICE_PERIPHERALS: bool = false;
 

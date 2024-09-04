@@ -52,7 +52,7 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
@@ -69,7 +69,7 @@ mod tests {
             }
         }
 
-        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
             .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 

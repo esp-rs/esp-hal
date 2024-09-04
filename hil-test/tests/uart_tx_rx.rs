@@ -35,14 +35,14 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
         let (tx, rx) = hil_test::common_test_pins!(io);
 
-        let tx = UartTx::new(peripherals.UART0, &clocks, tx).unwrap();
-        let rx = UartRx::new(peripherals.UART1, &clocks, rx).unwrap();
+        let tx = UartTx::new(peripherals.UART0, tx).unwrap();
+        let rx = UartRx::new(peripherals.UART1, rx).unwrap();
 
         Context { tx, rx }
     }

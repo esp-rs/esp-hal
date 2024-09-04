@@ -47,7 +47,7 @@ fn interrupt_handler() {
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -66,7 +66,7 @@ fn main() -> ! {
     let mut touch0 = TouchPad::new(touch_pin0, &touch);
     let mut touch1 = TouchPad::new(touch_pin1, &touch);
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let touch1_baseline = touch1.read();
 

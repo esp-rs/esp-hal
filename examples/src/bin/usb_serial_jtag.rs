@@ -23,9 +23,9 @@ static USB_SERIAL: Mutex<RefCell<Option<UsbSerialJtag<'static, Blocking>>>> =
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
     usb_serial.set_interrupt_handler(usb_device);

@@ -34,7 +34,7 @@ static BUTTON: Mutex<RefCell<Option<Input<GpioPin<BUTTON_PIN>>>>> = Mutex::new(R
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     // Set GPIO2 as an output, and set its state high initially.
     let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -57,7 +57,7 @@ fn main() -> ! {
     });
     led.set_high();
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     loop {
         led.toggle();

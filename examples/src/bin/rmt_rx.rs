@@ -24,7 +24,7 @@ const WIDTH: usize = 80;
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut out = io.pins.gpio5;
@@ -37,7 +37,7 @@ fn main() -> ! {
         }
     };
 
-    let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
+    let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
 
     let rx_config = RxChannelConfig {
         clk_divider: 1,
@@ -55,7 +55,7 @@ fn main() -> ! {
         }
     }
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let mut data = [PulseCode {
         level1: true,
