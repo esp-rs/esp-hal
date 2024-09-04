@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `Delay::new()` is now a `const` function (#1999)
+- You can now create an `AnyPin` out of an `ErasedPin`. (#2072)
 
 ### Fixed
 

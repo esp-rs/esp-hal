@@ -1377,7 +1377,7 @@ macro_rules! gpio {
             /// Pins available on this chip
             pub struct Pins {
                 $(
-                    /// GPIO pin number `$gpionum`.
+                    #[doc = concat!("GPIO pin number ", $gpionum, ".")]
                     pub [< gpio $gpionum >] : GpioPin<$gpionum>,
                 )+
             }
@@ -1394,7 +1394,19 @@ macro_rules! gpio {
                     match self {
                         $(
                         ErasedPin::[<Gpio $gpionum >](_) => {
-                            $crate::gpio::ErasedPin::[< Gpio $gpionum >](unsafe { GpioPin::steal() })
+                            ErasedPin::[< Gpio $gpionum >](unsafe { GpioPin::steal() })
+                        }
+                        )+
+                    }
+                }
+            }
+
+            impl $crate::gpio::CreateErasedPin for ErasedPin {
+                fn erased_pin(&self, _: $crate::private::Internal) -> ErasedPin {
+                    match self {
+                        $(
+                        ErasedPin::[<Gpio $gpionum >](_) => {
+                            ErasedPin::[< Gpio $gpionum >](unsafe { GpioPin::steal() })
                         }
                         )+
                     }
