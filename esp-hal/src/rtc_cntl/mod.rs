@@ -194,6 +194,7 @@ impl<'d> Rtc<'d> {
     /// Optionally an interrupt handler can be bound.
     pub fn new(rtc_cntl: impl Peripheral<P = crate::peripherals::LPWR> + 'd) -> Self {
         rtc::init();
+        rtc::configure_clock();
 
         let this = Self {
             _inner: rtc_cntl.into_ref(),

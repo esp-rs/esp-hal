@@ -1198,7 +1198,7 @@ pub(crate) fn init() {
     modem_clock_select_lp_clock_source(RadioPeripherals::Wifi, modem_lpclk_src, 0);
 }
 
-pub fn configure_clock() {
+pub(crate) fn configure_clock() {
     assert!(matches!(
         RtcClock::get_xtal_freq(),
         XtalClock::RtcXtalFreq40M
@@ -1372,7 +1372,7 @@ impl Clock for RtcFastClock {
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 /// RTC SLOW_CLK frequency values
-pub enum RtcSlowClock {
+pub(crate) enum RtcSlowClock {
     /// Select RC_SLOW_CLK as RTC_SLOW_CLK source
     RtcSlowClockRcSlow  = 0,
     /// Select XTAL32K_CLK as RTC_SLOW_CLK source
