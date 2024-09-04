@@ -13,9 +13,12 @@ pub struct AnyPin<'d> {
 impl<'d> AnyPin<'d> {
     /// Create wrapper for the given pin.
     #[inline]
-    pub fn new<P: CreateErasedPin>(pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self {
+    pub fn new<P>(pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
+    where
+        P: OutputPin + InputPin + GpioProperties,
+    {
         crate::into_ref!(pin);
-        let pin = pin.erased_pin(private::Internal);
+        let pin = pin.degrade_pin(private::Internal);
 
         Self {
             pin,
@@ -27,11 +30,12 @@ impl<'d> AnyPin<'d> {
     /// Create wrapper for the given pin. The peripheral signal will be
     /// inverted.
     #[inline]
-    pub fn new_inverted<P: OutputPin + InputPin + CreateErasedPin>(
-        pin: impl crate::peripheral::Peripheral<P = P> + 'd,
-    ) -> Self {
+    pub fn new_inverted<P>(pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
+    where
+        P: OutputPin + InputPin + GpioProperties,
+    {
         crate::into_ref!(pin);
-        let pin = pin.erased_pin(private::Internal);
+        let pin = pin.degrade_pin(private::Internal);
 
         Self {
             pin,
@@ -59,6 +63,7 @@ impl<'d> Pin for AnyPin<'d> {
     delegate::delegate! {
         to self.pin {
             fn number(&self, _internal: private::Internal) -> u8;
+            fn degrade(self) -> ErasedPin;
             fn sleep_mode(&mut self, on: bool, _internal: private::Internal);
             fn set_alternate_function(&mut self, alternate: AlternateFunction, _internal: private::Internal);
             fn is_listening(&self, _internal: private::Internal) -> bool;

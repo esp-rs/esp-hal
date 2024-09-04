@@ -32,6 +32,10 @@ impl Pin for DummyPin {
         panic!("DummyPin not supported here!");
     }
 
+    fn degrade(self) -> ErasedPin {
+        panic!("Can not type erase the DummyPin!");
+    }
+
     fn sleep_mode(&mut self, _on: bool, _: private::Internal) {}
 
     fn set_alternate_function(&mut self, _alternate: AlternateFunction, _: private::Internal) {}

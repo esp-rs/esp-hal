@@ -259,6 +259,12 @@ pub trait Pin: private::Sealed {
     /// GPIO number
     fn number(&self, _: private::Internal) -> u8;
 
+    /// Type-erase (degrade) this pin into an ErasedPin.
+    ///
+    /// This converts pin singletons (PA5, PB6, …), which are all different types, into the same
+    /// type. It is useful for creating arrays of pins, or avoiding generics.
+    fn degrade(self) -> ErasedPin;
+
     /// Enable/disable sleep-mode
     fn sleep_mode(&mut self, on: bool, _: private::Internal);
 
@@ -429,11 +435,6 @@ pub trait TouchPin: Pin {
 
     /// Set a pins touch threshold for interrupts.
     fn set_threshold(&self, threshold: u16, _: private::Internal);
-}
-
-#[doc(hidden)]
-pub trait CreateErasedPin: Pin {
-    fn erased_pin(&self, _: private::Internal) -> ErasedPin;
 }
 
 #[doc(hidden)]
@@ -842,6 +843,10 @@ where
 {
     fn number(&self, _: private::Internal) -> u8 {
         GPIONUM
+    }
+
+    fn degrade(self) -> ErasedPin {
+        self.degrade_pin(private::Internal)
     }
 
     fn sleep_mode(&mut self, on: bool, _: private::Internal) {
@@ -1261,6 +1266,8 @@ pub trait GpioProperties {
     type IsOutput: BooleanType;
     type IsAnalog: BooleanType;
     type IsTouch: BooleanType;
+
+    fn degrade_pin(&self, _: private::Internal) -> ErasedPin;
 }
 
 #[doc(hidden)]
@@ -1335,6 +1342,10 @@ macro_rules! gpio {
                     type InterruptStatus = $crate::gpio::[< InterruptStatusRegisterAccessBank $bank >];
                     type Signals = [< Gpio $gpionum Signals >];
                     $crate::pin_types!($type);
+
+                    fn degrade_pin(&self, _: $crate::private::Internal) -> ErasedPin {
+                        $crate::gpio::ErasedPin::[< Gpio $gpionum >](unsafe { Self::steal() })
+                    }
                 }
 
                 #[doc(hidden)]
@@ -1366,12 +1377,6 @@ macro_rules! gpio {
                         input_signals
                     }
                 }
-
-                impl $crate::gpio::CreateErasedPin for GpioPin<$gpionum> {
-                    fn erased_pin(&self, _: $crate::private::Internal) -> ErasedPin {
-                        $crate::gpio::ErasedPin::[< Gpio $gpionum >](unsafe { Self::steal() })
-                    }
-                }
             )+
 
             /// Pins available on this chip
@@ -1389,20 +1394,9 @@ macro_rules! gpio {
                 )+
             }
 
-            impl crate::peripheral::Peripheral for ErasedPin {
-                pub(crate) unsafe fn clone_unchecked(&mut self) ->  Self {
-                    match self {
-                        $(
-                        ErasedPin::[<Gpio $gpionum >](_) => {
-                            ErasedPin::[< Gpio $gpionum >](unsafe { GpioPin::steal() })
-                        }
-                        )+
-                    }
-                }
-            }
-
-            impl $crate::gpio::CreateErasedPin for ErasedPin {
-                fn erased_pin(&self, _: $crate::private::Internal) -> ErasedPin {
+            impl $crate::peripheral::Peripheral for ErasedPin {
+                type P = ErasedPin;
+                unsafe fn clone_unchecked(&mut self) ->  Self {
                     match self {
                         $(
                         ErasedPin::[<Gpio $gpionum >](_) => {
@@ -2192,6 +2186,10 @@ pub(crate) mod internal {
     impl Pin for ErasedPin {
         fn number(&self, _: private::Internal) -> u8 {
             handle_gpio_input!(self, target, { Pin::number(target, private::Internal) })
+        }
+
+        fn degrade(self) -> ErasedPin {
+            self
         }
 
         fn sleep_mode(&mut self, on: bool, _: private::Internal) {
