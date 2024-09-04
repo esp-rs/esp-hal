@@ -26,7 +26,7 @@ static SWINT3: Mutex<RefCell<Option<SoftwareInterrupt<3>>>> = Mutex::new(RefCell
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let mut sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
@@ -60,7 +60,7 @@ fn main() -> ! {
             .replace(sw_ints.software_interrupt3);
     });
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
     let mut counter = 0;
 
     loop {

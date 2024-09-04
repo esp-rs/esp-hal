@@ -32,7 +32,7 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -45,7 +45,7 @@ mod tests {
             pcnt: Pcnt::new(peripherals.PCNT),
             input: din,
             output: dout,
-            delay: Delay::new(&clocks),
+            delay: Delay::new(),
         }
     }
 

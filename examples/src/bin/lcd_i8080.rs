@@ -37,7 +37,7 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -54,7 +54,7 @@ fn main() -> ! {
 
     let channel = channel.configure(false, DmaPriority::Priority0);
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let mut backlight = Output::new(lcd_backlight, Level::Low);
     let mut reset = Output::new(lcd_reset, Level::Low);
@@ -78,7 +78,6 @@ fn main() -> ! {
         tx_pins,
         20.MHz(),
         Config::default(),
-        &clocks,
     )
     .with_ctrl_pins(lcd_rs, lcd_wr);
 

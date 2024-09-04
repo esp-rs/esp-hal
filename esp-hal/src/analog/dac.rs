@@ -27,7 +27,7 @@
 #![cfg_attr(esp32s2, doc = "let dac1_pin = io.pins.gpio17;")]
 //! let mut dac1 = Dac::new(peripherals.DAC1, dac1_pin);
 //!
-//! let mut delay = Delay::new(&clocks);
+//! let mut delay = Delay::new();
 //!
 //! let mut voltage_dac1 = 200u8;
 //!

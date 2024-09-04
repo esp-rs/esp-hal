@@ -184,7 +184,6 @@ pub trait TimerHW<S: TimerSpeed> {
 /// Timer struct
 pub struct Timer<'a, S: TimerSpeed> {
     ledc: &'a crate::peripherals::ledc::RegisterBlock,
-    clock_control_config: &'a Clocks<'a>,
     number: Number,
     duty: Option<config::Duty>,
     frequency: u32,
@@ -256,15 +255,10 @@ where
 }
 
 impl<'a, S: TimerSpeed> Timer<'a, S> {
-    /// Create a new intance of a timer
-    pub fn new(
-        ledc: &'a ledc::RegisterBlock,
-        clock_control_config: &'a Clocks<'a>,
-        number: Number,
-    ) -> Self {
+    /// Create a new instance of a timer
+    pub fn new(ledc: &'a ledc::RegisterBlock, number: Number) -> Self {
         Timer {
             ledc,
-            clock_control_config,
             number,
             duty: None,
             frequency: 0u32,
@@ -278,9 +272,12 @@ impl<'a, S: TimerSpeed> Timer<'a, S> {
 /// Timer HW implementation for LowSpeed timers
 impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
     /// Get the current source timer frequency from the HW
-    fn get_freq_hw(&self) -> Option<fugit::HertzU32> {
-        self.clock_source.map(|cs| match cs {
-            LSClockSource::APBClk => self.clock_control_config.apb_clock,
+    fn get_freq_hw(&self) -> Option<HertzU32> {
+        self.clock_source.map(|source| match source {
+            LSClockSource::APBClk => {
+                let clocks = Clocks::get();
+                clocks.apb_clock
+            }
         })
     }
 
@@ -322,10 +319,13 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
 
     /// Update the timer in HW
     fn update_hw(&self) {
-        #[cfg(esp32)]
-        let tmr = self.ledc.lstimer(self.number as usize);
-        #[cfg(not(esp32))]
-        let tmr = self.ledc.timer(self.number as usize);
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                let tmr = self.ledc.lstimer(self.number as usize);
+            } else {
+                let tmr = self.ledc.timer(self.number as usize);
+            }
+        }
 
         tmr.conf().modify(|_, w| w.para_up().set_bit());
     }
@@ -336,8 +336,11 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
 impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
     /// Get the current source timer frequency from the HW
     fn get_freq_hw(&self) -> Option<HertzU32> {
-        self.clock_source.map(|cs| match cs {
-            HSClockSource::APBClk => self.clock_control_config.apb_clock,
+        self.clock_source.map(|source| match source {
+            HSClockSource::APBClk => {
+                let clocks = Clocks::get();
+                clocks.apb_clock
+            }
         })
     }
 

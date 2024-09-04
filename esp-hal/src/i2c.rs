@@ -42,7 +42,6 @@
 //!     io.pins.gpio1,
 //!     io.pins.gpio2,
 //!     100.kHz(),
-//!     &clocks,
 //! );
 //!
 //! loop {
@@ -303,7 +302,6 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        clocks: &Clocks<'d>,
         timeout: Option<u32>,
     ) -> Self {
         crate::into_ref!(i2c, sda, scl);
@@ -355,7 +353,7 @@ where
             crate::private::Internal,
         );
 
-        i2c.peripheral.setup(frequency, clocks, timeout);
+        i2c.peripheral.setup(frequency, timeout);
         i2c
     }
 
@@ -379,9 +377,8 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        clocks: &Clocks<'d>,
     ) -> Self {
-        Self::new_with_timeout(i2c, sda, scl, frequency, clocks, None)
+        Self::new_with_timeout(i2c, sda, scl, frequency, None)
     }
 
     /// Create a new I2C instance with a custom timeout value.
@@ -392,10 +389,9 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        clocks: &Clocks<'d>,
         timeout: Option<u32>,
     ) -> Self {
-        Self::new_internal(i2c, sda, scl, frequency, clocks, timeout)
+        Self::new_internal(i2c, sda, scl, frequency, timeout)
     }
 }
 
@@ -422,9 +418,8 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        clocks: &Clocks<'d>,
     ) -> Self {
-        Self::new_with_timeout_async(i2c, sda, scl, frequency, clocks, None)
+        Self::new_with_timeout_async(i2c, sda, scl, frequency, None)
     }
 
     /// Create a new I2C instance with a custom timeout value.
@@ -435,10 +430,9 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        clocks: &Clocks<'d>,
         timeout: Option<u32>,
     ) -> Self {
-        let mut this = Self::new_internal(i2c, sda, scl, frequency, clocks, timeout);
+        let mut this = Self::new_internal(i2c, sda, scl, frequency, timeout);
 
         let handler = match T::I2C_NUMBER {
             0 => asynch::i2c0_handler,
@@ -1011,7 +1005,7 @@ pub trait Instance: crate::private::Sealed {
 
     /// Configures the I2C peripheral with the specified frequency, clocks, and
     /// optional timeout.
-    fn setup(&mut self, frequency: HertzU32, clocks: &Clocks<'_>, timeout: Option<u32>) {
+    fn setup(&mut self, frequency: HertzU32, timeout: Option<u32>) {
         self.register_block().ctr().modify(|_, w| unsafe {
             // Clear register
             w.bits(0)
@@ -1043,6 +1037,7 @@ pub trait Instance: crate::private::Sealed {
         self.set_filter(Some(7), Some(7));
 
         // Configure frequency
+        let clocks = Clocks::get();
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
                 self.set_frequency(clocks.i2c_clock.convert(), frequency, timeout);

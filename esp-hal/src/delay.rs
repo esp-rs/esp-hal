@@ -22,7 +22,7 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
 //! # use embedded_hal::delay::DelayNs;
-//! let mut delay = Delay::new(&clocks);
+//! let mut delay = Delay::new();
 //!
 //! delay.delay_ms(1000 as u32);
 //! # }
@@ -35,13 +35,11 @@
 
 pub use fugit::MicrosDurationU64;
 
-use crate::clock::Clocks;
-
 /// Delay driver
 ///
 /// Uses the `SYSTIMER` peripheral internally for RISC-V devices, and the
 /// built-in Xtensa timer for Xtensa devices.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 #[non_exhaustive]
 pub struct Delay;
 
@@ -71,8 +69,7 @@ impl embedded_hal::delay::DelayNs for Delay {
 
 impl Delay {
     /// Creates a new `Delay` instance.
-    // Do not remove the argument, it makes sure that the clocks are initialized.
-    pub fn new(_clocks: &Clocks<'_>) -> Self {
+    pub const fn new() -> Self {
         Self {}
     }
 

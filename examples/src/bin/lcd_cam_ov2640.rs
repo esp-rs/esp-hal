@@ -42,7 +42,7 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -77,20 +77,19 @@ fn main() -> ! {
         rx_descriptors,
         cam_data_pins,
         20u32.MHz(),
-        &clocks,
     )
     .with_master_clock(cam_xclk)
     .with_pixel_clock(cam_pclk)
     .with_ctrl_pins(cam_vsync, cam_href);
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let mut buffer = rx_buffer;
     buffer.fill(0u8);
 
     delay.delay_millis(500u32);
 
-    let i2c = I2C::new(peripherals.I2C0, cam_siod, cam_sioc, 100u32.kHz(), &clocks);
+    let i2c = I2C::new(peripherals.I2C0, cam_siod, cam_sioc, 100u32.kHz());
 
     let mut sccb = Sccb::new(i2c);
 

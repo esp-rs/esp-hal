@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Removed the `clocks` parameter from `esp_wifi::initialize` (#1999)
+
 ## 0.8.0 - 2024-08-29
 
 ### Added

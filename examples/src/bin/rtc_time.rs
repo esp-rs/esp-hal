@@ -10,10 +10,10 @@ use esp_hal::{delay::Delay, prelude::*, rtc_cntl::Rtc};
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let rtc = Rtc::new(peripherals.LPWR);
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     loop {
         esp_println::println!("rtc time in milliseconds is {}", rtc.get_time_ms());

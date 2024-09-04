@@ -27,9 +27,9 @@ static SERIAL: Mutex<RefCell<Option<Uart<UART0, Blocking>>>> = Mutex::new(RefCel
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -51,8 +51,7 @@ fn main() -> ! {
     }
     let config = Config::default().rx_fifo_full_threshold(30);
 
-    let mut uart0 =
-        Uart::new_with_config(peripherals.UART0, config, &clocks, tx_pin, rx_pin).unwrap();
+    let mut uart0 = Uart::new_with_config(peripherals.UART0, config, tx_pin, rx_pin).unwrap();
     uart0.set_interrupt_handler(interrupt_handler);
 
     critical_section::with(|cs| {

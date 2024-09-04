@@ -54,14 +54,11 @@ mod tests {
 
     #[test]
     fn test_i2s_loopback() {
-        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
-
-        let peripherals = peripherals;
-        let clocks = clocks;
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let delay = Delay::new(&clocks);
+        let delay = Delay::new();
 
         let dma = Dma::new(peripherals.DMA);
         let dma_channel = dma.channel0;
@@ -76,7 +73,6 @@ mod tests {
             dma_channel.configure(false, DmaPriority::Priority0),
             tx_descriptors,
             rx_descriptors,
-            &clocks,
         );
 
         let (dout, din) = hil_test::common_test_pins!(io);

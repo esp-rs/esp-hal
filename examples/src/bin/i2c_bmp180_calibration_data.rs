@@ -17,19 +17,13 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // Create a new peripheral object with the described wiring and standard
     // I2C clock speed:
-    let mut i2c = I2C::new(
-        peripherals.I2C0,
-        io.pins.gpio4,
-        io.pins.gpio5,
-        100.kHz(),
-        &clocks,
-    );
+    let mut i2c = I2C::new(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, 100.kHz());
 
     loop {
         let mut data = [0u8; 22];

@@ -54,7 +54,6 @@
 //!     ),
 //!     tx_descriptors,
 //!     rx_descriptors,
-//!     &clocks,
 //! );
 #![cfg_attr(not(esp32), doc = "let i2s = i2s.with_mclk(io.pins.gpio0);")]
 //! let mut i2s_rx = i2s.i2s_rx
@@ -88,7 +87,6 @@ use private::*;
 #[cfg(any(esp32, esp32s3))]
 use crate::dma::I2s1Peripheral;
 use crate::{
-    clock::Clocks,
     dma::{
         dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
         Channel,
@@ -350,7 +348,6 @@ where
         mut channel: Channel<'d, CH, DmaMode>,
         tx_descriptors: &'static mut [DmaDescriptor],
         rx_descriptors: &'static mut [DmaDescriptor],
-        clocks: &Clocks<'d>,
     ) -> Self {
         // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
         // could be configured totally independently but for now handle all
@@ -359,12 +356,7 @@ where
         channel.tx.init_channel();
         PeripheralClockControl::reset(I::get_peripheral());
         PeripheralClockControl::enable(I::get_peripheral());
-        I::set_clock(calculate_clock(
-            sample_rate,
-            2,
-            data_format.channel_bits(),
-            clocks,
-        ));
+        I::set_clock(calculate_clock(sample_rate, 2, data_format.channel_bits()));
         I::configure(&standard, &data_format);
         I::set_master();
         I::update();
@@ -457,7 +449,6 @@ where
         channel: Channel<'d, CH, DmaMode>,
         tx_descriptors: &'static mut [DmaDescriptor],
         rx_descriptors: &'static mut [DmaDescriptor],
-        clocks: &Clocks<'d>,
     ) -> Self
     where
         I: I2s0Instance,
@@ -472,7 +463,6 @@ where
             channel,
             tx_descriptors,
             rx_descriptors,
-            clocks,
         )
     }
 
@@ -488,7 +478,6 @@ where
         channel: Channel<'d, CH, DmaMode>,
         tx_descriptors: &'static mut [DmaDescriptor],
         rx_descriptors: &'static mut [DmaDescriptor],
-        clocks: &Clocks<'d>,
     ) -> Self
     where
         I: I2s1Instance,
@@ -502,7 +491,6 @@ where
             channel,
             tx_descriptors,
             rx_descriptors,
-            clocks,
         )
     }
 
@@ -901,7 +889,6 @@ mod private {
     #[cfg(any(esp32, esp32s3))]
     use crate::peripherals::{i2s1::RegisterBlock, I2S1};
     use crate::{
-        clock::Clocks,
         dma::{ChannelRx, ChannelTx, DmaChannel, DmaDescriptor, DmaPeripheral},
         gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
         interrupt::InterruptHandler,
@@ -2114,7 +2101,6 @@ mod private {
         sample_rate: impl Into<fugit::HertzU32>,
         channels: u8,
         data_bits: u8,
-        _clocks: &Clocks<'_>,
     ) -> I2sClockDividers {
         // this loosely corresponds to `i2s_std_calculate_clock` and
         // `i2s_ll_tx_set_mclk` in esp-idf

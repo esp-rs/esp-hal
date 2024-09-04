@@ -50,7 +50,6 @@
 //!     tx_pins,
 //!     20.MHz(),
 //!     Config::default(),
-//!     &clocks,
 //! )
 //! .with_ctrl_pins(io.pins.gpio0, io.pins.gpio47);
 //!
@@ -113,16 +112,15 @@ where
         mut pins: P,
         frequency: HertzU32,
         config: Config,
-        clocks: &Clocks<'d>,
     ) -> Self {
         let is_2byte_mode = size_of::<P::Word>() == 2;
 
         let lcd_cam = lcd.lcd_cam;
 
+        let clocks = Clocks::get();
         // Due to https://www.espressif.com/sites/default/files/documentation/esp32-s3_errata_en.pdf
         // the LCD_PCLK divider must be at least 2. To make up for this the user
         // provided frequency is doubled to match.
-
         let (i, divider) = calculate_clkm(
             (frequency.to_Hz() * 2) as _,
             &[

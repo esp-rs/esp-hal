@@ -14,7 +14,7 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let (mut peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let mut peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -28,7 +28,7 @@ fn main() -> ! {
     }
 
     let mut uart0 =
-        Uart::new_with_default_pins(peripherals.UART0, &clocks, &mut tx_pin, &mut rx_pin).unwrap();
+        Uart::new_with_default_pins(peripherals.UART0, &mut tx_pin, &mut rx_pin).unwrap();
 
     // read two characters which get parsed as the channel
     let mut cnt = 0;

@@ -13,7 +13,7 @@
 //! # use esp_hal::cpu_control::{CpuControl, Stack};
 //! # use core::{cell::RefCell, ptr::addr_of_mut};
 //! # use critical_section::Mutex;
-//! # let delay = Delay::new(&clocks);
+//! # let delay = Delay::new();
 //! static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 //!
 //! let counter = Mutex::new(RefCell::new(0));
