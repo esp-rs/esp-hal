@@ -16,6 +16,7 @@ on:
   push:
     branches-ignore:
       - "gh-readonly-queue/**"
+      - "main"
   merge_group:
   workflow_dispatch:
 
