@@ -1040,6 +1040,153 @@ where
     }
 }
 
+// Async functionality of the timer groups.
+mod asynch {
+    use core::{
+        pin::Pin,
+        task::{Context, Poll},
+    };
+
+    use embassy_sync::waitqueue::AtomicWaker;
+    use procmacros::handler;
+
+    use super::*;
+
+    cfg_if::cfg_if! {
+        if #[cfg(all(timg1, timg_timer1))] {
+            const NUM_WAKERS: usize = 4;
+        } else if #[cfg(timg1)] {
+            const NUM_WAKERS: usize = 2;
+        } else {
+            const NUM_WAKERS: usize = 1;
+        }
+    }
+
+    #[allow(clippy::declare_interior_mutable_const)]
+    const INIT: AtomicWaker = AtomicWaker::new();
+    static WAKERS: [AtomicWaker; NUM_WAKERS] = [INIT; NUM_WAKERS];
+
+    pub(crate) struct TimerFuture<'a, T>
+    where
+        T: Instance,
+    {
+        timer: &'a Timer<T, crate::Async>,
+    }
+
+    impl<'a, T> TimerFuture<'a, T>
+    where
+        T: Instance,
+    {
+        pub(crate) fn new(timer: &'a Timer<T, crate::Async>) -> Self {
+            use crate::timer::Timer as _;
+
+            timer.clear_interrupt();
+
+            let (interrupt, handler) = match (timer.timer_group(), timer.timer_number()) {
+                (0, 0) => (Interrupt::TG0_T0_LEVEL, timg0_timer0_handler),
+                #[cfg(timg1)]
+                (1, 0) => (Interrupt::TG1_T0_LEVEL, timg1_timer0_handler),
+                #[cfg(timg_timer1)]
+                (0, 1) => (Interrupt::TG0_T1_LEVEL, timg0_timer1_handler),
+                #[cfg(all(timg1, timg_timer1))]
+                (1, 1) => (Interrupt::TG1_T1_LEVEL, timg1_timer1_handler),
+                _ => unreachable!(),
+            };
+
+            unsafe {
+                interrupt::bind_interrupt(interrupt, handler.handler());
+                interrupt::enable(interrupt, handler.priority()).unwrap();
+            }
+
+            timer.enable_interrupt(true);
+
+            Self { timer }
+        }
+
+        fn event_bit_is_clear(&self) -> bool {
+            self.timer
+                .register_block()
+                .int_ena()
+                .read()
+                .t(self.timer.timer_number())
+                .bit_is_clear()
+        }
+    }
+
+    impl<'a, T> core::future::Future for TimerFuture<'a, T>
+    where
+        T: Instance,
+    {
+        type Output = ();
+
+        fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+            let index = (self.timer.timer_number() << 1) | self.timer.timer_group();
+            WAKERS[index as usize].register(ctx.waker());
+
+            if self.event_bit_is_clear() {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        }
+    }
+
+    impl<T> embedded_hal_async::delay::DelayNs for Timer<T, crate::Async>
+    where
+        T: Instance,
+    {
+        async fn delay_ns(&mut self, ns: u32) {
+            use crate::timer::Timer as _;
+
+            let period = MicrosDurationU64::from_ticks(ns.div_ceil(1000) as u64);
+            self.load_value(period).unwrap();
+            self.start();
+            self.listen();
+
+            TimerFuture::new(self).await;
+        }
+    }
+
+    #[handler]
+    fn timg0_timer0_handler() {
+        unsafe { &*crate::peripherals::TIMG0::PTR }
+            .int_ena()
+            .modify(|_, w| w.t(0).clear_bit());
+
+        WAKERS[0].wake();
+    }
+
+    #[cfg(timg1)]
+    #[handler]
+    fn timg1_timer0_handler() {
+        unsafe { &*crate::peripherals::TIMG1::PTR }
+            .int_ena()
+            .modify(|_, w| w.t(0).clear_bit());
+
+        WAKERS[1].wake();
+    }
+
+    #[cfg(timg_timer1)]
+    #[handler]
+    fn timg0_timer1_handler() {
+        unsafe { &*crate::peripherals::TIMG0::PTR }
+            .int_ena()
+            .modify(|_, w| w.t(1).clear_bit());
+
+        WAKERS[2].wake();
+    }
+
+    #[cfg(all(timg1, timg_timer1))]
+    #[handler]
+    fn timg1_timer1_handler() {
+        unsafe { &*crate::peripherals::TIMG1::PTR }
+            .int_ena()
+            .modify(|_, w| w.t(1).clear_bit());
+
+        WAKERS[3].wake();
+    }
+}
+
 /// Event Task Matrix
 #[cfg(soc_etm)]
 pub mod etm {
