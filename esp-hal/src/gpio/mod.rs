@@ -645,56 +645,15 @@ pub fn connect_high_to_peripheral(signal: InputSignal) {
 }
 
 #[doc(hidden)]
-pub trait PinType {}
+pub trait BooleanType {}
 
 #[doc(hidden)]
-pub trait IsOutputPin: PinType {}
+pub struct True {}
+impl BooleanType for True {}
 
 #[doc(hidden)]
-pub trait IsInputPin: PinType {}
-
-#[doc(hidden)]
-pub trait IsAnalogPin: PinType {}
-
-#[doc(hidden)]
-pub trait IsTouchPin: PinType {}
-
-#[doc(hidden)]
-pub struct InputOutputPinType;
-
-#[doc(hidden)]
-pub struct InputOnlyPinType;
-
-#[doc(hidden)]
-pub struct InputOutputAnalogPinType;
-
-#[doc(hidden)]
-pub struct InputOnlyAnalogPinType;
-
-#[doc(hidden)]
-pub struct InputOutputAnalogTouchPinType;
-
-impl PinType for InputOutputPinType {}
-impl IsOutputPin for InputOutputPinType {}
-impl IsInputPin for InputOutputPinType {}
-
-impl PinType for InputOnlyPinType {}
-impl IsInputPin for InputOnlyPinType {}
-
-impl PinType for InputOutputAnalogPinType {}
-impl IsOutputPin for InputOutputAnalogPinType {}
-impl IsInputPin for InputOutputAnalogPinType {}
-impl IsAnalogPin for InputOutputAnalogPinType {}
-
-impl PinType for InputOnlyAnalogPinType {}
-impl IsInputPin for InputOnlyAnalogPinType {}
-impl IsAnalogPin for InputOnlyAnalogPinType {}
-
-impl PinType for InputOutputAnalogTouchPinType {}
-impl IsOutputPin for InputOutputAnalogTouchPinType {}
-impl IsInputPin for InputOutputAnalogTouchPinType {}
-impl IsAnalogPin for InputOutputAnalogTouchPinType {}
-impl IsTouchPin for InputOutputAnalogTouchPinType {}
+pub struct False {}
+impl BooleanType for False {}
 
 /// GPIO pin
 pub struct GpioPin<const GPIONUM: u8>;
@@ -702,8 +661,20 @@ pub struct GpioPin<const GPIONUM: u8>;
 impl<const GPIONUM: u8> GpioPin<GPIONUM>
 where
     Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
 {
+    pub(crate) fn new() -> Self {
+        Self
+    }
+
+    /// Create a pin out of thin air.
+    ///
+    /// # Safety
+    ///
+    /// Ensure that only one instance of a pin exists at one time.
+    pub unsafe fn steal() -> Self {
+        Self::new()
+    }
+
     /// Is the input pin high?
     #[inline]
     pub fn is_high(&self) -> bool {
@@ -715,71 +686,63 @@ where
     pub fn is_low(&self) -> bool {
         !self.is_high()
     }
+
+    fn write_out_en(&self, enable: bool) {
+        if enable {
+            <Self as GpioProperties>::Bank::write_out_en_set(1 << (GPIONUM % 32));
+        } else {
+            <Self as GpioProperties>::Bank::write_out_en_clear(1 << (GPIONUM % 32));
+        }
+    }
 }
 
-impl<const GPIONUM: u8> GpioPin<GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsInputPin,
-{
-    pub(crate) fn new() -> Self {
-        Self
+/// Workaround to make D+ and D- work on the ESP32-C3 and ESP32-S3, which by
+/// default are assigned to the `USB_SERIAL_JTAG` peripheral.
+#[cfg(any(esp32c3, esp32s3))]
+fn disable_usb_pads(gpionum: u8) {
+    cfg_if::cfg_if! {
+        if #[cfg(esp32c3)] {
+            let pins = [18, 19];
+        } else if #[cfg(esp32s3)] {
+            let pins = [19, 20];
+        }
+    }
+
+    if pins.contains(&gpionum) {
+        unsafe { &*crate::peripherals::USB_DEVICE::PTR }
+            .conf0()
+            .modify(|_, w| {
+                w.usb_pad_enable()
+                    .clear_bit()
+                    .dm_pullup()
+                    .clear_bit()
+                    .dm_pulldown()
+                    .clear_bit()
+                    .dp_pullup()
+                    .clear_bit()
+                    .dp_pulldown()
+                    .clear_bit()
+            });
     }
 }
 
 impl<const GPIONUM: u8> InputPin for GpioPin<GPIONUM>
 where
     Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsInputPin,
 {
     fn init_input(&self, pull_down: bool, pull_up: bool, _: private::Internal) {
         let gpio = unsafe { &*GPIO::PTR };
 
-        <Self as GpioProperties>::Bank::write_out_en_clear(1 << (GPIONUM % 32));
+        self.write_out_en(false);
+
         gpio.func_out_sel_cfg(GPIONUM as usize)
             .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
 
         #[cfg(esp32)]
         crate::soc::gpio::errata36(GPIONUM, Some(pull_up), Some(pull_down));
 
-        // NOTE: Workaround to make GPIO18 and GPIO19 work on the ESP32-C3, which by
-        //       default are assigned to the `USB_SERIAL_JTAG` peripheral.
-        #[cfg(esp32c3)]
-        if GPIONUM == 18 || GPIONUM == 19 {
-            unsafe { &*crate::peripherals::USB_DEVICE::PTR }
-                .conf0()
-                .modify(|_, w| {
-                    w.usb_pad_enable()
-                        .clear_bit()
-                        .dm_pullup()
-                        .clear_bit()
-                        .dm_pulldown()
-                        .clear_bit()
-                        .dp_pullup()
-                        .clear_bit()
-                        .dp_pulldown()
-                        .clear_bit()
-                });
-        }
-
-        // Same workaround as above for ESP32-S3
-        #[cfg(esp32s3)]
-        if GPIONUM == 19 || GPIONUM == 20 {
-            unsafe { &*crate::peripherals::USB_DEVICE::PTR }
-                .conf0()
-                .modify(|_, w| {
-                    w.usb_pad_enable()
-                        .clear_bit()
-                        .dm_pullup()
-                        .clear_bit()
-                        .dm_pulldown()
-                        .clear_bit()
-                        .dp_pullup()
-                        .clear_bit()
-                        .dp_pulldown()
-                        .clear_bit()
-                });
-        }
+        #[cfg(any(esp32c3, esp32s3))]
+        disable_usb_pads(GPIONUM);
 
         get_io_mux_reg(GPIONUM).modify(|_, w| unsafe {
             w.mcu_sel()
@@ -808,7 +771,7 @@ where
     }
 
     fn is_input_high(&self, _: private::Internal) -> bool {
-        <Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0
+        self.is_high()
     }
 
     fn connect_input_to_peripheral(&mut self, signal: InputSignal, _: private::Internal) {
@@ -871,20 +834,6 @@ where
         unsafe { &*GPIO::PTR }
             .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
             .modify(|_, w| w.sel().clear_bit());
-    }
-}
-
-impl<const GPIONUM: u8> GpioPin<GPIONUM>
-where
-    Self: GpioProperties,
-{
-    /// Create a pin out of thin air.
-    ///
-    /// # Safety
-    ///
-    /// Ensure that only one instance of a pin exists at one time.
-    pub unsafe fn steal() -> Self {
-        Self
     }
 }
 
@@ -963,11 +912,56 @@ where
     }
 }
 
-impl<const GPIONUM: u8> GpioPin<GPIONUM>
+impl<const GPIONUM: u8> crate::peripheral::Peripheral for GpioPin<GPIONUM>
 where
     Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
 {
+    type P = GpioPin<GPIONUM>;
+
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        core::ptr::read(self as *const _)
+    }
+}
+
+impl<const GPIONUM: u8> private::Sealed for GpioPin<GPIONUM> where Self: GpioProperties {}
+
+impl<const GPIONUM: u8> GpioPin<GPIONUM>
+where
+    Self: GpioProperties<IsOutput = True>,
+{
+    fn init_output(&self, alternate: AlternateFunction, open_drain: bool) {
+        let gpio = unsafe { &*GPIO::PTR };
+
+        #[cfg(esp32)]
+        crate::soc::gpio::errata36(GPIONUM, Some(false), Some(false));
+
+        self.write_out_en(true);
+
+        gpio.pin(GPIONUM as usize)
+            .modify(|_, w| w.pad_driver().bit(open_drain));
+
+        gpio.func_out_sel_cfg(GPIONUM as usize)
+            .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
+
+        #[cfg(any(esp32c3, esp32s3))]
+        disable_usb_pads(GPIONUM);
+
+        get_io_mux_reg(GPIONUM).modify(|_, w| unsafe {
+            w.mcu_sel()
+                .bits(alternate as u8)
+                .fun_ie()
+                .bit(open_drain)
+                .fun_wpd()
+                .clear_bit()
+                .fun_wpu()
+                .clear_bit()
+                .fun_drv()
+                .bits(DriveStrength::I20mA as u8)
+                .slp_sel()
+                .clear_bit()
+        });
+    }
+
     /// Drives the pin high.
     #[inline]
     pub fn set_high(&mut self) {
@@ -1012,97 +1006,27 @@ where
     }
 }
 
-impl<const GPIONUM: u8> crate::peripheral::Peripheral for GpioPin<GPIONUM>
-where
-    Self: GpioProperties,
-{
-    type P = GpioPin<GPIONUM>;
-
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
-        core::ptr::read(self as *const _)
-    }
-}
-
-impl<const GPIONUM: u8> private::Sealed for GpioPin<GPIONUM> where Self: GpioProperties {}
-
-impl<const GPIONUM: u8> GpioPin<GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
-{
-    fn init_output(&self, alternate: AlternateFunction, open_drain: bool, _: private::Internal) {
-        let gpio = unsafe { &*GPIO::PTR };
-
-        #[cfg(esp32)]
-        crate::soc::gpio::errata36(GPIONUM, Some(false), Some(false));
-
-        <Self as GpioProperties>::Bank::write_out_en_set(1 << (GPIONUM % 32));
-        gpio.pin(GPIONUM as usize)
-            .modify(|_, w| w.pad_driver().bit(open_drain));
-
-        gpio.func_out_sel_cfg(GPIONUM as usize)
-            .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
-
-        // NOTE: Workaround to make GPIO18 and GPIO19 work on the ESP32-C3, which by
-        //       default are assigned to the `USB_SERIAL_JTAG` peripheral.
-        #[cfg(esp32c3)]
-        if GPIONUM == 18 || GPIONUM == 19 {
-            unsafe { &*crate::peripherals::USB_DEVICE::PTR }
-                .conf0()
-                .modify(|_, w| w.usb_pad_enable().clear_bit());
-        }
-
-        // Same workaround as above for ESP32-S3
-        #[cfg(esp32s3)]
-        if GPIONUM == 19 || GPIONUM == 20 {
-            unsafe { &*crate::peripherals::USB_DEVICE::PTR }
-                .conf0()
-                .modify(|_, w| w.usb_pad_enable().clear_bit());
-        }
-
-        get_io_mux_reg(GPIONUM).modify(|_, w| unsafe {
-            w.mcu_sel()
-                .bits(alternate as u8)
-                .fun_ie()
-                .bit(open_drain)
-                .fun_wpd()
-                .clear_bit()
-                .fun_wpu()
-                .clear_bit()
-                .fun_drv()
-                .bits(DriveStrength::I20mA as u8)
-                .slp_sel()
-                .clear_bit()
-        });
-    }
-}
-
 impl<const GPIONUM: u8> OutputPin for GpioPin<GPIONUM>
 where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
+    Self: GpioProperties<IsOutput = True>,
 {
     fn set_to_open_drain_output(&mut self, _: private::Internal) {
-        self.init_output(GPIO_FUNCTION, true, private::Internal);
+        self.init_output(GPIO_FUNCTION, true);
     }
 
     fn set_to_push_pull_output(&mut self, _: private::Internal) {
-        self.init_output(GPIO_FUNCTION, false, private::Internal);
+        self.init_output(GPIO_FUNCTION, false);
     }
 
     fn enable_output(&mut self, on: bool, _: private::Internal) {
-        if on {
-            <Self as GpioProperties>::Bank::write_out_en_set(1 << (GPIONUM % 32));
-        } else {
-            <Self as GpioProperties>::Bank::write_out_en_clear(1 << (GPIONUM % 32));
-        }
+        self.write_out_en(on);
     }
 
     fn set_output_high(&mut self, high: bool, _: private::Internal) {
         if high {
-            <Self as GpioProperties>::Bank::write_output_set(1 << (GPIONUM % 32));
+            self.set_high()
         } else {
-            <Self as GpioProperties>::Bank::write_output_clear(1 << (GPIONUM % 32));
+            self.set_low()
         }
     }
 
@@ -1222,8 +1146,7 @@ where
 #[cfg(any(adc, dac))]
 impl<const GPIONUM: u8> AnalogPin for GpioPin<GPIONUM>
 where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsAnalogPin,
+    Self: GpioProperties<IsAnalog = True>,
 {
     /// Configures the pin for analog mode.
     fn set_analog(&self, _: private::Internal) {
@@ -1234,8 +1157,7 @@ where
 #[cfg(touch)]
 impl<const GPIONUM: u8> TouchPin for GpioPin<GPIONUM>
 where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsTouchPin,
+    Self: GpioProperties<IsTouch = True>,
 {
     fn set_touch(&self, _: private::Internal) {
         crate::soc::gpio::internal_into_touch(GPIONUM);
@@ -1336,7 +1258,50 @@ pub trait GpioProperties {
     type Bank: BankGpioRegisterAccess;
     type InterruptStatus: InterruptStatusRegisterAccess;
     type Signals: GpioSignal;
-    type PinType: PinType;
+
+    type IsOutput: BooleanType;
+    type IsAnalog: BooleanType;
+    type IsTouch: BooleanType;
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! if_output_pin {
+    (InputOnlyAnalog, { $($then:tt)* } else { $($else:tt)* } ) => { $($else)* };
+    (InputOutputAnalog, { $($then:tt)* } else { $($else:tt)* } ) => { $($then)* };
+    (InputOutputAnalogTouch, { $($then:tt)* } else { $($else:tt)* } ) => { $($then)* };
+    (InputOutput, { $($then:tt)* } else { $($else:tt)* } ) => { $($then)* };
+}
+pub(crate) use if_output_pin;
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! pin_types {
+    (InputOnly) => {
+        type IsOutput = $crate::gpio::False;
+        type IsAnalog = $crate::gpio::False;
+        type IsTouch = $crate::gpio::False;
+    };
+    (InputOnlyAnalog) => {
+        type IsOutput = $crate::gpio::False;
+        type IsAnalog = $crate::gpio::True;
+        type IsTouch = $crate::gpio::False;
+    };
+    (InputOutput) => {
+        type IsOutput = $crate::gpio::True;
+        type IsAnalog = $crate::gpio::False;
+        type IsTouch = $crate::gpio::False;
+    };
+    (InputOutputAnalog) => {
+        type IsOutput = $crate::gpio::True;
+        type IsAnalog = $crate::gpio::True;
+        type IsTouch = $crate::gpio::False;
+    };
+    (InputOutputAnalogTouch) => {
+        type IsOutput = $crate::gpio::True;
+        type IsAnalog = $crate::gpio::True;
+        type IsTouch = $crate::gpio::True;
+    };
 }
 
 #[doc(hidden)]
@@ -1370,7 +1335,7 @@ macro_rules! gpio {
                     type Bank = $crate::gpio::[< Bank $bank GpioRegisterAccess >];
                     type InterruptStatus = $crate::gpio::[< InterruptStatusRegisterAccessBank $bank >];
                     type Signals = [< Gpio $gpionum Signals >];
-                    type PinType = $crate::gpio::[<$type PinType>];
+                    $crate::pin_types!($type);
                 }
 
                 #[doc(hidden)]
@@ -1437,25 +1402,39 @@ macro_rules! gpio {
                 }
             }
 
-            procmacros::make_gpio_enum_dispatch_macro!(
-                handle_gpio_output
-                { InputOutputAnalogTouch, InputOutputAnalog, InputOutput, }
-                {
-                    $(
-                        $type,$gpionum
-                    )+
-                }
-            );
+            // These macros call the code block on the actually contained GPIO pin.
 
-            procmacros::make_gpio_enum_dispatch_macro!(
-                handle_gpio_input
-                { InputOutputAnalogTouch, InputOutputAnalog, InputOutput, InputOnlyAnalog }
-                {
-                    $(
-                        $type,$gpionum
-                    )+
+            #[doc(hidden)]
+            #[macro_export]
+            macro_rules! handle_gpio_output {
+                ($this:ident, $inner:ident, $code:tt) => {
+                    match $this {
+                        $(
+                            ErasedPin::[<Gpio $gpionum >]($inner) => if_output_pin!($type, {
+                                $code
+                            } else {{
+                                let _ = $inner;
+                                panic!("Unsupported")
+                            }}),
+                        )+
+                    }
                 }
-            );
+            }
+
+            #[doc(hidden)]
+            #[macro_export]
+            macro_rules! handle_gpio_input {
+                ($this:ident, $inner:ident, $code:tt) => {
+                    match $this {
+                        $(
+                            ErasedPin::[<Gpio $gpionum >]($inner) => $code
+                        )+
+                    }
+                }
+            }
+
+            pub(crate) use handle_gpio_output;
+            pub(crate) use handle_gpio_input;
         }
     };
 }
