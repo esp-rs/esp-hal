@@ -21,8 +21,8 @@ use esp_hal::{
 use hil_test as _;
 
 struct Context {
-    rx: UartRx<'static, UART1, Async>,
-    tx: UartTx<'static, UART0, Async>,
+    rx: UartRx<'static, UART0, Async>,
+    tx: UartTx<'static, UART1, Async>,
 }
 
 #[cfg(test)]
