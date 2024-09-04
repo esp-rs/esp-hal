@@ -136,6 +136,17 @@ pub enum Level {
     High,
 }
 
+impl core::ops::Not for Level {
+    type Output = Self;
+
+    fn not(self) -> Self {
+        match self {
+            Self::Low => Self::High,
+            Self::High => Self::Low,
+        }
+    }
+}
+
 impl From<bool> for Level {
     fn from(val: bool) -> Self {
         match val {
@@ -261,9 +272,15 @@ pub trait Pin: private::Sealed {
 
     /// Type-erase (degrade) this pin into an ErasedPin.
     ///
-    /// This converts pin singletons (PA5, PB6, …), which are all different types, into the same
-    /// type. It is useful for creating arrays of pins, or avoiding generics.
-    fn degrade(self) -> ErasedPin;
+    /// This converts pin singletons (`GpioPin<0>`, …), which are all different
+    /// types, into the same type. It is useful for creating arrays of pins,
+    /// or avoiding generics.
+    fn degrade(self) -> ErasedPin where Self: Sized {
+        self.degrade_internal(private::Internal)
+    }
+
+    #[doc(hidden)]
+    fn degrade_internal(&self, _: private::Internal) -> ErasedPin;
 
     /// Enable/disable sleep-mode
     fn sleep_mode(&mut self, on: bool, _: private::Internal);
@@ -845,7 +862,7 @@ where
         GPIONUM
     }
 
-    fn degrade(self) -> ErasedPin {
+    fn degrade_internal(&self, _: private::Internal) -> ErasedPin {
         self.degrade_pin(private::Internal)
     }
 
@@ -1394,9 +1411,8 @@ macro_rules! gpio {
                 )+
             }
 
-            impl $crate::peripheral::Peripheral for ErasedPin {
-                type P = ErasedPin;
-                unsafe fn clone_unchecked(&mut self) ->  Self {
+            impl ErasedPin {
+                pub(crate) fn clone(&self) -> ErasedPin {
                     match self {
                         $(
                         ErasedPin::[<Gpio $gpionum >](_) => {
@@ -1404,6 +1420,13 @@ macro_rules! gpio {
                         }
                         )+
                     }
+                }
+            }
+
+            impl $crate::peripheral::Peripheral for ErasedPin {
+                type P = ErasedPin;
+                unsafe fn clone_unchecked(&mut self) ->  Self {
+                    self.clone()
                 }
             }
 
@@ -1822,7 +1845,7 @@ macro_rules! touch_common {
 
 /// GPIO output driver.
 pub struct Output<'d, P> {
-    pin: PeripheralRef<'d, P>,
+    pin: Flex<'d, P>,
 }
 
 impl<'d, P> Output<'d, P>
@@ -1832,10 +1855,16 @@ where
     /// Create GPIO output driver for a [GpioPin] with the provided level
     #[inline]
     pub fn new(pin: impl crate::peripheral::Peripheral<P = P> + 'd, initial_output: Level) -> Self {
-        crate::into_ref!(pin);
+        let pin = Flex::new(pin);
 
-        pin.set_output_high(initial_output.into(), private::Internal);
-        pin.set_to_push_pull_output(private::Internal);
+        Self::new_inner(pin, initial_output)
+    }
+
+    fn new_inner(mut pin: Flex<'d, P>, initial_output: Level) -> Self {
+        pin.pin
+            .set_output_high(initial_output.into(), private::Internal);
+
+        pin.set_as_output();
 
         Self { pin }
     }
@@ -1843,55 +1872,54 @@ where
     /// Set the output as high.
     #[inline]
     pub fn set_high(&mut self) {
-        self.pin.set_output_high(true, private::Internal);
+        self.set_level(Level::High)
     }
 
     /// Set the output as low.
     #[inline]
     pub fn set_low(&mut self) {
-        self.pin.set_output_high(false, private::Internal);
+        self.set_level(Level::Low)
     }
 
     /// Set the output level.
     #[inline]
     pub fn set_level(&mut self, level: Level) {
-        self.pin.set_output_high(level.into(), private::Internal);
+        self.pin.set_level(level)
     }
 
     /// Is the output pin set as high?
     #[inline]
     pub fn is_set_high(&self) -> bool {
-        self.pin.is_set_high(private::Internal)
+        self.get_output_level() == Level::High
     }
 
     /// Is the output pin set as low?
     #[inline]
     pub fn is_set_low(&self) -> bool {
-        !self.pin.is_set_high(private::Internal)
+        self.get_output_level() == Level::Low
     }
 
     /// What level output is set to
     #[inline]
     pub fn get_output_level(&self) -> Level {
-        self.pin.is_set_high(private::Internal).into()
+        self.pin.get_output_level()
     }
 
     /// Toggle pin output
     #[inline]
     pub fn toggle(&mut self) {
-        let level = !self.pin.is_set_high(private::Internal);
-        self.pin.set_output_high(level, private::Internal);
+        self.pin.toggle();
     }
 
     /// Configure the [DriveStrength] of the pin
     pub fn set_drive_strength(&mut self, strength: DriveStrength) {
-        self.pin.set_drive_strength(strength, private::Internal);
+        self.pin.set_drive_strength(strength);
     }
 }
 
 /// GPIO input driver.
 pub struct Input<'d, P> {
-    pin: PeripheralRef<'d, P>,
+    pin: Flex<'d, P>,
 }
 
 impl<'d, P> Input<'d, P>
@@ -1902,27 +1930,221 @@ where
     /// configuration.
     #[inline]
     pub fn new(pin: impl crate::peripheral::Peripheral<P = P> + 'd, pull: Pull) -> Self {
-        crate::into_ref!(pin);
-        pin.init_input(pull == Pull::Down, pull == Pull::Up, private::Internal);
+        let pin = Flex::new(pin);
+
+        Self::new_inner(pin, pull)
+    }
+
+    fn new_inner(mut pin: Flex<'d, P>, pull: Pull) -> Self {
+        pin.set_as_input(pull);
+
         Self { pin }
     }
 
     /// Get whether the pin input level is high.
     #[inline]
     pub fn is_high(&self) -> bool {
-        self.pin.is_input_high(private::Internal)
+        self.get_level() == Level::High
     }
 
     /// Get whether the pin input level is low.
     #[inline]
     pub fn is_low(&self) -> bool {
-        !self.is_high()
+        self.get_level() == Level::Low
     }
 
     /// Get the current pin input level.
     #[inline]
     pub fn get_level(&self) -> Level {
-        self.is_high().into()
+        self.pin.get_level()
+    }
+
+    /// Listen for interrupts
+    #[inline]
+    pub fn listen(&mut self, event: Event) {
+        self.pin.listen(event);
+    }
+
+    /// Stop listening for interrupts
+    pub fn unlisten(&mut self) {
+        self.pin.unlisten();
+    }
+
+    /// Clear the interrupt status bit for this Pin
+    #[inline]
+    pub fn clear_interrupt(&mut self) {
+        self.pin.clear_interrupt();
+    }
+
+    /// Checks if the interrupt status bit for this Pin is set
+    #[inline]
+    pub fn is_interrupt_set(&self) -> bool {
+        self.pin.is_interrupt_set()
+    }
+
+    /// Enable as a wake-up source.
+    ///
+    /// This will unlisten for interrupts
+    #[inline]
+    pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
+        self.pin.wakeup_enable(enable, event);
+    }
+}
+
+/// GPIO open-drain output driver.
+pub struct OutputOpenDrain<'d, P> {
+    pin: Flex<'d, P>,
+}
+
+impl<'d, P> OutputOpenDrain<'d, P>
+where
+    P: InputPin + OutputPin,
+{
+    /// Create GPIO open-drain output driver for a [Pin] with the provided
+    /// initial output-level and [Pull] configuration.
+    #[inline]
+    pub fn new(
+        pin: impl crate::peripheral::Peripheral<P = P> + 'd,
+        initial_output: Level,
+        pull: Pull,
+    ) -> Self
+    {
+        let pin = Flex::new(pin);
+
+        Self::new_inner(pin, initial_output, pull)
+    }
+
+    fn new_inner(mut pin: Flex<'d, P>, initial_output: Level, pull: Pull) -> Self {
+        pin.pin
+            .set_output_high(initial_output.into(), private::Internal);
+
+        pin.set_as_open_drain(pull);
+
+        Self { pin }
+    }
+
+    /// Get whether the pin input level is high.
+    #[inline]
+    pub fn is_high(&self) -> bool {
+        self.get_level() == Level::High
+    }
+
+    /// Get whether the pin input level is low.
+    #[inline]
+    pub fn is_low(&self) -> bool {
+        self.get_level() == Level::Low
+    }
+
+    /// Get the current pin input level.
+    #[inline]
+    pub fn get_level(&self) -> Level {
+        self.pin.get_level()
+    }
+
+    /// Listen for interrupts
+    #[inline]
+    pub fn listen(&mut self, event: Event) {
+        self.pin.listen(event);
+    }
+
+    /// Clear the interrupt status bit for this Pin
+    #[inline]
+    pub fn clear_interrupt(&mut self) {
+        self.pin.clear_interrupt();
+    }
+
+    /// Set the output as high.
+    #[inline]
+    pub fn set_high(&mut self) {
+        self.set_level(Level::High);
+    }
+
+    /// Set the output as low.
+    #[inline]
+    pub fn set_low(&mut self) {
+        self.set_level(Level::Low);
+    }
+
+    /// Set the output level.
+    #[inline]
+    pub fn set_level(&mut self, level: Level) {
+        self.pin.set_level(level);
+    }
+
+    /// Is the output pin set as high?
+    #[inline]
+    pub fn is_set_high(&self) -> bool {
+        self.get_output_level() == Level::High
+    }
+
+    /// Is the output pin set as low?
+    #[inline]
+    pub fn is_set_low(&self) -> bool {
+        self.get_output_level() == Level::Low
+    }
+
+    /// What level output is set to
+    #[inline]
+    pub fn get_output_level(&self) -> Level {
+        self.pin.get_output_level()
+    }
+
+    /// Toggle pin output
+    #[inline]
+    pub fn toggle(&mut self) {
+        self.pin.toggle()
+    }
+
+    /// Configure the [DriveStrength] of the pin
+    pub fn set_drive_strength(&mut self, strength: DriveStrength) {
+        self.pin.set_drive_strength(strength);
+    }
+}
+
+/// Flexible pin driver.
+pub struct Flex<'d, P> {
+    pin: PeripheralRef<'d, P>,
+}
+
+impl<'d, P> Flex<'d, P>
+where
+    P: Pin,
+{
+    /// Create flexible pin driver for a [Pin].
+    /// No mode change happens.
+    #[inline]
+    pub fn new(pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self {
+        crate::into_ref!(pin);
+        Self { pin }
+    }
+}
+
+impl<'d, P> Flex<'d, P>
+where
+    P: InputPin,
+{
+    /// Set the GPIO to input mode.
+    pub fn set_as_input(&mut self, pull: Pull) {
+        self.pin
+            .init_input(pull == Pull::Down, pull == Pull::Up, private::Internal);
+    }
+
+    /// Get whether the pin input level is high.
+    #[inline]
+    pub fn is_high(&self) -> bool {
+        self.get_level() == Level::High
+    }
+
+    /// Get whether the pin input level is low.
+    #[inline]
+    pub fn is_low(&self) -> bool {
+        self.get_level() == Level::Low
+    }
+
+    /// Get the current pin input level.
+    #[inline]
+    pub fn get_level(&self) -> Level {
+        self.pin.is_input_high(private::Internal).into()
     }
 
     /// Listen for interrupts
@@ -1957,72 +2179,25 @@ where
     }
 }
 
-/// GPIO open-drain output driver.
-pub struct OutputOpenDrain<'d, P> {
-    pin: PeripheralRef<'d, P>,
-}
-
-impl<'d, P> OutputOpenDrain<'d, P>
+impl<'d, P> Flex<'d, P>
 where
-    P: InputPin + OutputPin,
+    P: OutputPin,
 {
-    /// Create GPIO open-drain output driver for a [Pin] with the provided
-    /// initial output-level and [Pull] configuration.
-    #[inline]
-    pub fn new(
-        pin: impl crate::peripheral::Peripheral<P = P> + 'd,
-        initial_output: Level,
-        pull: Pull,
-    ) -> Self {
-        crate::into_ref!(pin);
-        pin.set_output_high(initial_output.into(), private::Internal);
-        pin.set_to_open_drain_output(private::Internal);
-        pin.internal_pull_down(pull == Pull::Down, private::Internal);
-        pin.internal_pull_up(pull == Pull::Up, private::Internal);
-
-        Self { pin }
-    }
-
-    /// Get whether the pin input level is high.
-    #[inline]
-    pub fn is_high(&self) -> bool {
-        self.pin.is_input_high(private::Internal)
-    }
-
-    /// Get whether the pin input level is low.
-    #[inline]
-    pub fn is_low(&self) -> bool {
-        !self.is_high()
-    }
-
-    /// Get the current pin input level.
-    #[inline]
-    pub fn get_level(&self) -> Level {
-        self.is_high().into()
-    }
-
-    /// Listen for interrupts
-    #[inline]
-    pub fn listen(&mut self, event: Event) {
-        self.pin.listen(event, private::Internal);
-    }
-
-    /// Clear the interrupt status bit for this Pin
-    #[inline]
-    pub fn clear_interrupt(&mut self) {
-        self.pin.clear_interrupt(private::Internal);
+    /// Set the GPIO to output mode.
+    pub fn set_as_output(&mut self) {
+        self.pin.set_to_push_pull_output(private::Internal);
     }
 
     /// Set the output as high.
     #[inline]
     pub fn set_high(&mut self) {
-        self.pin.set_output_high(true, private::Internal);
+        self.set_level(Level::High)
     }
 
     /// Set the output as low.
     #[inline]
     pub fn set_low(&mut self) {
-        self.pin.set_output_high(false, private::Internal);
+        self.set_level(Level::Low)
     }
 
     /// Set the output level.
@@ -2034,13 +2209,13 @@ where
     /// Is the output pin set as high?
     #[inline]
     pub fn is_set_high(&self) -> bool {
-        self.pin.is_set_high(private::Internal)
+        self.get_output_level() == Level::High
     }
 
     /// Is the output pin set as low?
     #[inline]
     pub fn is_set_low(&self) -> bool {
-        !self.pin.is_set_high(private::Internal)
+        self.get_output_level() == Level::Low
     }
 
     /// What level output is set to
@@ -2052,8 +2227,8 @@ where
     /// Toggle pin output
     #[inline]
     pub fn toggle(&mut self) {
-        let level = !self.pin.is_set_high(private::Internal);
-        self.pin.set_output_high(level, private::Internal);
+        let level = !self.get_output_level();
+        self.set_level(level);
     }
 
     /// Configure the [DriveStrength] of the pin
@@ -2062,23 +2237,10 @@ where
     }
 }
 
-/// GPIO flexible pin driver.
-pub struct Flex<'d, P> {
-    pin: PeripheralRef<'d, P>,
-}
-
 impl<'d, P> Flex<'d, P>
 where
     P: InputPin + OutputPin,
 {
-    /// Create GPIO flexible pin driver for a [Pin].
-    /// No mode change happens.
-    #[inline]
-    pub fn new(pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self {
-        crate::into_ref!(pin);
-        Self { pin }
-    }
-
     /// Set the GPIO to open-drain mode.
     pub fn set_as_open_drain(&mut self, pull: Pull) {
         self.pin.set_to_open_drain_output(private::Internal);
@@ -2086,95 +2248,6 @@ where
             .internal_pull_down(pull == Pull::Down, private::Internal);
         self.pin
             .internal_pull_up(pull == Pull::Up, private::Internal);
-    }
-
-    /// Set the GPIO to input mode.
-    pub fn set_as_input(&mut self, pull: Pull) {
-        self.pin
-            .init_input(pull == Pull::Down, pull == Pull::Up, private::Internal);
-    }
-
-    /// Set the GPIO to output mode.
-    pub fn set_as_output(&mut self) {
-        self.pin.set_to_push_pull_output(private::Internal);
-    }
-
-    /// Get whether the pin input level is high.
-    #[inline]
-    pub fn is_high(&self) -> bool {
-        self.pin.is_input_high(private::Internal)
-    }
-
-    /// Get whether the pin input level is low.
-    #[inline]
-    pub fn is_low(&self) -> bool {
-        !self.is_high()
-    }
-
-    /// Get the current pin input level.
-    #[inline]
-    pub fn get_level(&self) -> Level {
-        self.is_high().into()
-    }
-
-    /// Listen for interrupts
-    #[inline]
-    pub fn listen(&mut self, event: Event) {
-        self.pin.listen(event, private::Internal);
-    }
-
-    /// Clear the interrupt status bit for this Pin
-    #[inline]
-    pub fn clear_interrupt(&mut self) {
-        self.pin.clear_interrupt(private::Internal);
-    }
-
-    /// Set the output as high.
-    #[inline]
-    pub fn set_high(&mut self) {
-        self.pin.set_output_high(true, private::Internal);
-    }
-
-    /// Set the output as low.
-    #[inline]
-    pub fn set_low(&mut self) {
-        self.pin.set_output_high(false, private::Internal);
-    }
-
-    /// Set the output level.
-    #[inline]
-    pub fn set_level(&mut self, level: Level) {
-        self.pin.set_output_high(level.into(), private::Internal);
-    }
-
-    /// Is the output pin set as high?
-    #[inline]
-    pub fn is_set_high(&self) -> bool {
-        self.pin.is_set_high(private::Internal)
-    }
-
-    /// Is the output pin set as low?
-    #[inline]
-    pub fn is_set_low(&self) -> bool {
-        !self.pin.is_set_high(private::Internal)
-    }
-
-    /// What level output is set to
-    #[inline]
-    pub fn get_output_level(&self) -> Level {
-        self.pin.is_set_high(private::Internal).into()
-    }
-
-    /// Toggle pin output
-    #[inline]
-    pub fn toggle(&mut self) {
-        let level = !self.pin.is_set_high(private::Internal);
-        self.pin.set_output_high(level, private::Internal);
-    }
-
-    /// Configure the [DriveStrength] of the pin
-    pub fn set_drive_strength(&mut self, strength: DriveStrength) {
-        self.pin.set_drive_strength(strength, private::Internal);
     }
 }
 
@@ -2188,8 +2261,8 @@ pub(crate) mod internal {
             handle_gpio_input!(self, target, { Pin::number(target, private::Internal) })
         }
 
-        fn degrade(self) -> ErasedPin {
-            self
+        fn degrade_internal(&self, _: private::Internal) -> ErasedPin {
+            self.clone()
         }
 
         fn sleep_mode(&mut self, on: bool, _: private::Internal) {
@@ -2435,7 +2508,7 @@ mod asynch {
     const NEW_AW: AtomicWaker = AtomicWaker::new();
     static PIN_WAKERS: [AtomicWaker; NUM_PINS] = [NEW_AW; NUM_PINS];
 
-    impl<'d, P> Input<'d, P>
+    impl<'d, P> Flex<'d, P>
     where
         P: InputPin,
     {
@@ -2469,6 +2542,38 @@ mod asynch {
         pub async fn wait_for_any_edge(&mut self) {
             self.listen(Event::AnyEdge);
             PinFuture::new(self.pin.number(private::Internal)).await
+        }
+    }
+
+    impl<'d, P> Input<'d, P>
+    where
+        P: InputPin,
+    {
+        /// Wait until the pin is high. If it is already high, return
+        /// immediately.
+        pub async fn wait_for_high(&mut self) {
+            self.pin.wait_for_high().await
+        }
+
+        /// Wait until the pin is low. If it is already low, return immediately.
+        pub async fn wait_for_low(&mut self) {
+            self.pin.wait_for_low().await
+        }
+
+        /// Wait for the pin to undergo a transition from low to high.
+        pub async fn wait_for_rising_edge(&mut self) {
+            self.pin.wait_for_rising_edge().await
+        }
+
+        /// Wait for the pin to undergo a transition from high to low.
+        pub async fn wait_for_falling_edge(&mut self) {
+            self.pin.wait_for_falling_edge().await
+        }
+
+        /// Wait for the pin to undergo any transition, i.e low to high OR high
+        /// to low.
+        pub async fn wait_for_any_edge(&mut self) {
+            self.pin.wait_for_any_edge().await
         }
     }
 
@@ -2569,10 +2674,10 @@ mod embedded_hal_02_impls {
         type Error = core::convert::Infallible;
 
         fn is_high(&self) -> Result<bool, Self::Error> {
-            Ok(self.pin.is_input_high(private::Internal))
+            Ok(self.pin.is_high())
         }
         fn is_low(&self) -> Result<bool, Self::Error> {
-            Ok(!self.pin.is_input_high(private::Internal))
+            Ok(self.pin.is_low())
         }
     }
 
@@ -2583,11 +2688,11 @@ mod embedded_hal_02_impls {
         type Error = core::convert::Infallible;
 
         fn set_high(&mut self) -> Result<(), Self::Error> {
-            self.pin.set_output_high(true, private::Internal);
+            self.pin.is_set_high();
             Ok(())
         }
         fn set_low(&mut self) -> Result<(), Self::Error> {
-            self.pin.set_output_high(false, private::Internal);
+            self.pin.is_set_low();
             Ok(())
         }
     }
@@ -2623,10 +2728,10 @@ mod embedded_hal_02_impls {
         type Error = core::convert::Infallible;
 
         fn is_high(&self) -> Result<bool, Self::Error> {
-            Ok(self.pin.is_input_high(private::Internal))
+            Ok(self.pin.is_high())
         }
         fn is_low(&self) -> Result<bool, Self::Error> {
-            Ok(!self.pin.is_input_high(private::Internal))
+            Ok(self.pin.is_low())
         }
     }
 
@@ -2637,11 +2742,12 @@ mod embedded_hal_02_impls {
         type Error = core::convert::Infallible;
 
         fn set_high(&mut self) -> Result<(), Self::Error> {
-            self.pin.set_output_high(true, private::Internal);
+            self.set_high();
             Ok(())
         }
+
         fn set_low(&mut self) -> Result<(), Self::Error> {
-            self.pin.set_output_high(false, private::Internal);
+            self.set_low();
             Ok(())
         }
     }
@@ -2677,10 +2783,10 @@ mod embedded_hal_02_impls {
         type Error = core::convert::Infallible;
 
         fn is_high(&self) -> Result<bool, Self::Error> {
-            Ok(self.pin.is_input_high(private::Internal))
+            Ok(self.is_high())
         }
         fn is_low(&self) -> Result<bool, Self::Error> {
-            Ok(!self.pin.is_input_high(private::Internal))
+            Ok(self.is_low())
         }
     }
 
@@ -2742,11 +2848,11 @@ mod embedded_hal_impls {
         P: InputPin,
     {
         fn is_high(&mut self) -> Result<bool, Self::Error> {
-            Ok(Input::is_high(self))
+            Ok(Self::is_high(self))
         }
 
         fn is_low(&mut self) -> Result<bool, Self::Error> {
-            Ok(Input::is_low(self))
+            Ok(Self::is_low(self))
         }
     }
 
@@ -2762,12 +2868,12 @@ mod embedded_hal_impls {
         P: OutputPin,
     {
         fn set_low(&mut self) -> Result<(), Self::Error> {
-            self.set_low();
+            Self::set_low(self);
             Ok(())
         }
 
         fn set_high(&mut self) -> Result<(), Self::Error> {
-            self.set_high();
+            Self::set_high(self);
             Ok(())
         }
     }
@@ -2790,11 +2896,11 @@ mod embedded_hal_impls {
         P: InputPin + OutputPin,
     {
         fn is_high(&mut self) -> Result<bool, Self::Error> {
-            Ok(OutputOpenDrain::is_high(self))
+            Ok(Self::is_high(self))
         }
 
         fn is_low(&mut self) -> Result<bool, Self::Error> {
-            Ok(OutputOpenDrain::is_low(self))
+            Ok(Self::is_low(self))
         }
     }
 
@@ -2810,12 +2916,12 @@ mod embedded_hal_impls {
         P: InputPin + OutputPin,
     {
         fn set_low(&mut self) -> Result<(), Self::Error> {
-            self.set_low();
+            Self::set_low(self);
             Ok(())
         }
 
         fn set_high(&mut self) -> Result<(), Self::Error> {
-            self.set_high();
+            Self::set_high(self);
             Ok(())
         }
     }
@@ -2835,42 +2941,39 @@ mod embedded_hal_impls {
 
     impl<'d, P> digital::InputPin for Flex<'d, P>
     where
-        P: InputPin + OutputPin,
+        P: InputPin,
     {
         fn is_high(&mut self) -> Result<bool, Self::Error> {
-            Ok(Flex::is_high(self))
+            Ok(Self::is_high(self))
         }
 
         fn is_low(&mut self) -> Result<bool, Self::Error> {
-            Ok(Flex::is_low(self))
+            Ok(Self::is_low(self))
         }
     }
 
-    impl<'d, P> digital::ErrorType for Flex<'d, P>
-    where
-        P: InputPin + OutputPin,
-    {
+    impl<'d, P> digital::ErrorType for Flex<'d, P> {
         type Error = core::convert::Infallible;
     }
 
     impl<'d, P> digital::OutputPin for Flex<'d, P>
     where
-        P: InputPin + OutputPin,
+        P: OutputPin,
     {
         fn set_low(&mut self) -> Result<(), Self::Error> {
-            self.set_low();
+            Self::set_low(self);
             Ok(())
         }
 
         fn set_high(&mut self) -> Result<(), Self::Error> {
-            self.set_high();
+            Self::set_high(self);
             Ok(())
         }
     }
 
     impl<'d, P> digital::StatefulOutputPin for Flex<'d, P>
     where
-        P: InputPin + OutputPin,
+        P: OutputPin,
     {
         fn is_set_high(&mut self) -> Result<bool, Self::Error> {
             Ok(Self::is_set_high(self))
@@ -2887,32 +2990,62 @@ mod embedded_hal_async_impls {
 
     use super::*;
 
+    impl<'d, P> Wait for Flex<'d, P>
+    where
+        P: InputPin,
+    {
+        async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
+            Self::wait_for_high(self).await;
+            Ok(())
+        }
+
+        async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
+            Self::wait_for_low(self).await;
+            Ok(())
+        }
+
+        async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
+            Self::wait_for_rising_edge(self).await;
+            Ok(())
+        }
+
+        async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
+            Self::wait_for_falling_edge(self).await;
+            Ok(())
+        }
+
+        async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
+            Self::wait_for_any_edge(self).await;
+            Ok(())
+        }
+    }
+
     impl<'d, P> Wait for Input<'d, P>
     where
         P: InputPin,
     {
         async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
-            self.wait_for_high().await;
+            Self::wait_for_high(self).await;
             Ok(())
         }
 
         async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
-            self.wait_for_low().await;
+            Self::wait_for_low(self).await;
             Ok(())
         }
 
         async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
-            self.wait_for_rising_edge().await;
+            Self::wait_for_rising_edge(self).await;
             Ok(())
         }
 
         async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
-            self.wait_for_falling_edge().await;
+            Self::wait_for_falling_edge(self).await;
             Ok(())
         }
 
         async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
-            self.wait_for_any_edge().await;
+            Self::wait_for_any_edge(self).await;
             Ok(())
         }
     }

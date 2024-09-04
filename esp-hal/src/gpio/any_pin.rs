@@ -15,10 +15,10 @@ impl<'d> AnyPin<'d> {
     #[inline]
     pub fn new<P>(pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
     where
-        P: OutputPin + InputPin + GpioProperties,
+        P: OutputPin + InputPin,
     {
         crate::into_ref!(pin);
-        let pin = pin.degrade_pin(private::Internal);
+        let pin = pin.degrade_internal(private::Internal);
 
         Self {
             pin,
@@ -32,10 +32,10 @@ impl<'d> AnyPin<'d> {
     #[inline]
     pub fn new_inverted<P>(pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
     where
-        P: OutputPin + InputPin + GpioProperties,
+        P: OutputPin + InputPin,
     {
         crate::into_ref!(pin);
-        let pin = pin.degrade_pin(private::Internal);
+        let pin = pin.degrade_internal(private::Internal);
 
         Self {
             pin,
@@ -63,7 +63,7 @@ impl<'d> Pin for AnyPin<'d> {
     delegate::delegate! {
         to self.pin {
             fn number(&self, _internal: private::Internal) -> u8;
-            fn degrade(self) -> ErasedPin;
+            fn degrade_internal(&self, _internal: private::Internal) -> ErasedPin;
             fn sleep_mode(&mut self, on: bool, _internal: private::Internal);
             fn set_alternate_function(&mut self, alternate: AlternateFunction, _internal: private::Internal);
             fn is_listening(&self, _internal: private::Internal) -> bool;

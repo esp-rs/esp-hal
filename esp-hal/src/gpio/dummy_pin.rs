@@ -32,7 +32,7 @@ impl Pin for DummyPin {
         panic!("DummyPin not supported here!");
     }
 
-    fn degrade(self) -> ErasedPin {
+    fn degrade_internal(&self, _: private::Internal) -> ErasedPin {
         panic!("Can not type erase the DummyPin!");
     }
 

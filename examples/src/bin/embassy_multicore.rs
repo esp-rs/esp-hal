@@ -21,7 +21,7 @@ use esp_backtrace as _;
 use esp_hal::{
     cpu_control::{CpuControl, Stack},
     get_core,
-    gpio::{Output, Io, Level, ErasedPin, Pin},
+    gpio::{ErasedPin, Io, Level, Output, Pin},
     timer::{timg::TimerGroup, ErasedTimer},
 };
 use esp_hal_embassy::Executor;
