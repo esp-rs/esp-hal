@@ -1389,7 +1389,7 @@ macro_rules! gpio {
                 )+
             }
 
-            impl ErasedPin {
+            impl crate::peripheral::Peripheral for ErasedPin {
                 pub(crate) unsafe fn clone_unchecked(&mut self) ->  Self {
                     match self {
                         $(
