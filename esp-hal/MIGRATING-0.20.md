@@ -79,5 +79,4 @@ let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 +    .dma_transfer(dma_rx_buf, dma_tx_buf)
     .map_err(|e| e.0)
     .unwrap();
-
 ```
