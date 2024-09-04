@@ -74,7 +74,7 @@ mod tests {
 
         let (gpio1, gpio2) = hil_test::common_test_pins!(io);
 
-        let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_hal_embassy::init(timg0.timer0);
 
         Context {
