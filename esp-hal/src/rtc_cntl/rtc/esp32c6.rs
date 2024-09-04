@@ -1198,7 +1198,7 @@ pub(crate) fn init() {
     modem_clock_select_lp_clock_source(RadioPeripherals::Wifi, modem_lpclk_src, 0);
 }
 
-pub(crate) fn configure_clock() {
+pub fn configure_clock() {
     assert!(matches!(
         RtcClock::get_xtal_freq(),
         XtalClock::RtcXtalFreq40M

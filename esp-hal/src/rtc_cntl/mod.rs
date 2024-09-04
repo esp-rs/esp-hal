@@ -192,9 +192,7 @@ impl<'d> Rtc<'d> {
     /// Create a new instance in [crate::Blocking] mode.
     ///
     /// Optionally an interrupt handler can be bound.
-    pub fn new(
-        rtc_cntl: impl Peripheral<P = crate::peripherals::LPWR> + 'd
-    ) -> Self {
+    pub fn new(rtc_cntl: impl Peripheral<P = crate::peripherals::LPWR> + 'd) -> Self {
         rtc::init();
 
         let this = Self {
