@@ -18,16 +18,10 @@
 
 use embassy_executor::Spawner;
 use embassy_futures::join::join;
-use embassy_net::{tcp::TcpSocket, Config, Ipv4Address, Stack, StackResources};
+use embassy_net::{tcp::TcpSocket, Ipv4Address, Stack, StackResources};
 use embassy_time::{with_timeout, Duration, Timer};
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    peripherals::Peripherals,
-    rng::Rng,
-    system::SystemControl,
-    timer::timg::TimerGroup,
-};
+use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{
     initialize,
@@ -72,11 +66,11 @@ static mut TX_BUFFER: [u8; TX_BUFFER_SIZE] = [0; TX_BUFFER_SIZE];
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
-
-    let peripherals = Peripherals::take();
-
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::max(system.clock_control).freeze();
+    let (peripherals, clocks) = esp_hal::init({
+        let mut config = esp_hal::Config::default();
+        config.cpu_clock = CpuClock::max();
+        config
+    });
 
     let server_address: Ipv4Address = HOST_IP.parse().expect("Invalid HOST_IP address");
 
@@ -106,7 +100,7 @@ async fn main(spawner: Spawner) -> ! {
         }
     }
 
-    let config = Config::dhcpv4(Default::default());
+    let config = embassy_net::Config::dhcpv4(Default::default());
 
     let seed = 1234; // very random, very secure seed
 

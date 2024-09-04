@@ -55,6 +55,7 @@
 //! # let mut uart0 = Uart::new(peripherals.UART0, &clocks, io.pins.gpio1, io.pins.gpio2).unwrap();
 //! # let data0 = "Dummy";
 //! # let data1 = "Dummy";
+//! #
 //! let mut ctx = md5::Context::new();
 //! ctx.consume(&data0);
 //! ctx.consume(&data1);

@@ -19,12 +19,9 @@ use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal}
 use embassy_time::{Duration, Ticker};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     cpu_control::{CpuControl, Stack},
     get_core,
     gpio::{AnyOutput, Io, Level},
-    peripherals::Peripherals,
-    system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer},
 };
 use esp_hal_embassy::Executor;
@@ -54,9 +51,7 @@ async fn control_led(
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

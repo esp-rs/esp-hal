@@ -114,7 +114,7 @@ pub fn build_documentation(
     package: Package,
     chip: Chip,
     target: &str,
-) -> Result<()> {
+) -> Result<PathBuf> {
     let package_name = package.to_string();
     let package_path = windows_safe_path(&workspace.join(&package_name));
 
@@ -142,7 +142,15 @@ pub fn build_documentation(
     // Execute `cargo doc` from the package root:
     cargo::run(&args, &package_path)?;
 
-    Ok(())
+    let docs_path = windows_safe_path(
+        &workspace
+            .join(package.to_string())
+            .join("target")
+            .join(target)
+            .join("doc"),
+    );
+
+    Ok(docs_path)
 }
 
 /// Load all examples at the given path, and parse their metadata.

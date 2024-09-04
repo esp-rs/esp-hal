@@ -1198,9 +1198,7 @@ pub(crate) fn init() {
     modem_clock_select_lp_clock_source(RadioPeripherals::Wifi, modem_lpclk_src, 0);
 }
 
-use esp_println::println;
-
-pub(crate) fn configure_clock(slowClock: RtcSlowClock) {
+pub(crate) fn configure_clock() {
     assert!(matches!(
         RtcClock::get_xtal_freq(),
         XtalClock::RtcXtalFreq40M
@@ -1209,10 +1207,9 @@ pub(crate) fn configure_clock(slowClock: RtcSlowClock) {
     RtcClock::set_fast_freq(RtcFastClock::RtcFastClockRcFast);
 
     let cal_val = loop {
-        RtcClock::set_slow_freq(slowClock);
+        RtcClock::set_slow_freq(RtcSlowClock::RtcSlowClockRcSlow);
 
-        let res = RtcClock::calibrate(RtcCalSel::RtcCalRtcMux, 3000);
-        println!("Res: {}", res);
+        let res = RtcClock::calibrate(RtcCalSel::RtcCalRtcMux, 1024);
         if res != 0 {
             break res;
         }
@@ -1373,14 +1370,12 @@ impl Clock for RtcFastClock {
 }
 
 #[allow(clippy::enum_variant_names)]
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 /// RTC SLOW_CLK frequency values
 pub enum RtcSlowClock {
     /// Select RC_SLOW_CLK as RTC_SLOW_CLK source
-    //#[default]
     RtcSlowClockRcSlow  = 0,
     /// Select XTAL32K_CLK as RTC_SLOW_CLK source
-    #[default] // Only for testing in here
     RtcSlowClock32kXtal = 1,
     /// Select RC32K_CLK as RTC_SLOW_CLK source
     RtcSlowClock32kRc   = 2,

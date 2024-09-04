@@ -88,8 +88,8 @@ pub enum Cores {
     strum::EnumIter,
     strum::EnumString,
     strum::AsRefStr,
-    clap::ValueEnum,
 )]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[serde(rename_all = "kebab-case")]
 #[strum(serialize_all = "kebab-case")]
 pub enum Chip {

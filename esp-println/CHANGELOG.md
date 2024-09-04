@@ -8,13 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
-- made `esp_println::Printer::write_bytes` public (#1812)
 
 ### Changed
 
 ### Fixed
 
 ### Removed
+
+## 0.11.0 - 2024-08-29
+
+### Added
+
+- Made `esp_println::Printer::write_bytes` public (#1812)
 
 ## 0.10.0 - 2024-07-15
 

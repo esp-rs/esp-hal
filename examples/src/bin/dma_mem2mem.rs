@@ -8,13 +8,10 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     dma::{Dma, DmaPriority, Mem2Mem},
     dma_buffers,
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
 };
 use log::{error, info};
 
@@ -24,9 +21,8 @@ const DATA_SIZE: usize = 1024 * 10;
 fn main() -> ! {
     esp_println::logger::init_logger(log::LevelFilter::Info);
 
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+
     let delay = Delay::new(&clocks);
 
     let (tx_buffer, tx_descriptors, mut rx_buffer, rx_descriptors) = dma_buffers!(DATA_SIZE);

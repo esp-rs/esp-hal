@@ -1,6 +1,7 @@
 //! # Universal Asynchronous Receiver/Transmitter (UART)
 //!
 //! ## Overview
+//!
 //! The UART is a hardware peripheral which handles communication using serial
 //! communication interfaces, such as RS232 and RS485. This peripheral provides
 //! a cheap and ubiquitous method for full- and half-duplex communication
@@ -13,6 +14,7 @@
 //! protocols.
 //!
 //! ## Configuration
+//!
 //! Each UART controller is individually configurable, and the usual setting
 //! such as baud rate, data bits, parity, and stop bits can easily be
 //! configured. Additionally, the transmit (TX) and receive (RX) pins need to
@@ -20,20 +22,26 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{config::Config, Uart};
+//! # use esp_hal::uart::Uart;
 //! use esp_hal::gpio::Io;
+//!
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
-//! let mut uart1 = Uart::new(peripherals.UART1, &clocks, io.pins.gpio1,
-//!     io.pins.gpio2).unwrap();
+//! let mut uart1 = Uart::new(
+//!     peripherals.UART1,
+//!     &clocks,
+//!     io.pins.gpio1,
+//!     io.pins.gpio2,
+//! ).unwrap();
 //! # }
 //! ```
 //! 
 //! The UART controller can be configured to invert the polarity of the pins.
-//! This is achived by inverting the desired pins, and then constructing the
+//! This is achieved by inverting the desired pins, and then constructing the
 //! UART instance using the inverted pins.
 //!
 //! ## Usage
+//!
 //! The UART driver implements a number of third-party traits, with the
 //! intention of making the HAL inter-compatible with various device drivers
 //! from the community. This includes, but is not limited to, the [embedded-hal]
@@ -49,7 +57,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, Uart};
-//! use esp_hal::gpio::Io;
+//! # use esp_hal::gpio::Io;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let mut uart1 = Uart::new_with_config(
 //! #     peripherals.UART1,
@@ -67,7 +75,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, Uart};
-//! use esp_hal::gpio::Io;
+//! # use esp_hal::gpio::Io;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let mut uart1 = Uart::new_with_config(
 //! #     peripherals.UART1,
@@ -88,21 +96,28 @@
 //! ### Inverting TX and RX Pins
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{config::Config, Uart};
+//! # use esp_hal::uart::Uart;
 //! use esp_hal::gpio::{AnyPin, Io};
+//!
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
 //! let tx = AnyPin::new_inverted(io.pins.gpio1);
 //! let rx = AnyPin::new_inverted(io.pins.gpio2);
-//! let mut uart1 = Uart::new(peripherals.UART1, &clocks, tx, rx).unwrap();
+//! let mut uart1 = Uart::new(
+//!     peripherals.UART1,
+//!     &clocks,
+//!     tx,
+//!     rx,
+//! ).unwrap();
 //! # }
 //! ```
 //! 
 //! ### Constructing TX and RX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{config::Config, UartTx, UartRx};
+//! # use esp_hal::uart::{UartTx, UartRx};
 //! use esp_hal::gpio::{AnyPin, Io};
+//!
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
 //! let tx = UartTx::new(peripherals.UART0, &clocks,
@@ -125,10 +140,7 @@ use crate::{
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
     interrupt::InterruptHandler,
     peripheral::Peripheral,
-    peripherals::{
-        uart0::{fifo::FIFO_SPEC, RegisterBlock},
-        Interrupt,
-    },
+    peripherals::{uart0::RegisterBlock, Interrupt},
     private::Internal,
     system::PeripheralClockControl,
     Blocking,
@@ -170,7 +182,7 @@ cfg_if::cfg_if! {
         /// Default RX pin for UART0 on ESP32-C3.
         /// Corresponds to GPIO20.
         pub type DefaultRxPin = crate::gpio::Gpio20;
-    }else if #[cfg(esp32c6)] {
+    } else if #[cfg(esp32c6)] {
         /// Default TX pin for UART0 on ESP32-C6.
         /// Corresponds to GPIO16.
         pub type DefaultTxPin = crate::gpio::Gpio16;
@@ -178,7 +190,7 @@ cfg_if::cfg_if! {
         /// Default RX pin for UART0 on ESP32-C6.
         /// Corresponds to GPIO17.
         pub type DefaultRxPin = crate::gpio::Gpio17;
-    }else if #[cfg(esp32h2)] {
+    } else if #[cfg(esp32h2)] {
         /// Default TX pin for UART0 on ESP32-H2.
         /// Corresponds to GPIO24.
         pub type DefaultTxPin = crate::gpio::Gpio24;
@@ -654,7 +666,7 @@ where
         if T::get_rx_fifo_count() > 0 {
             let value = unsafe {
                 let fifo = (T::register_block().fifo().as_ptr() as *mut u8).offset(offset)
-                    as *mut crate::peripherals::generic::Reg<FIFO_SPEC>;
+                    as *mut crate::peripherals::uart0::FIFO;
                 (*fifo).read().rxfifo_rd_byte().bits()
             };
 
@@ -674,7 +686,7 @@ where
         while T::get_rx_fifo_count() > 0 && count < buf.len() {
             let value = unsafe {
                 let fifo = (T::register_block().fifo().as_ptr() as *mut u8).offset(offset)
-                    as *mut crate::peripherals::generic::Reg<FIFO_SPEC>;
+                    as *mut crate::peripherals::uart0::FIFO;
                 (*fifo).read().rxfifo_rd_byte().bits()
             };
             buf[count] = value;

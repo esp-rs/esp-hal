@@ -68,6 +68,7 @@ crate::peripherals! {
     SPI2 <= SPI2 (SPI2),
     SYSTEM <= PCR,
     SYSTIMER <= SYSTIMER,
+    SW_INTERRUPT <= virtual,
     TEE <= TEE,
     TIMG0 <= TIMG0,
     TIMG1 <= TIMG1,

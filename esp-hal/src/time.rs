@@ -1,17 +1,8 @@
 //! # Time
 //!
-//! ## Overview
 //! The `time` module offers a way to get the system uptime.
-//!
-//! ## Examples
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! # use esp_hal::time;
-//! let time = time::current_time();
-//! # }
-//! ```
 
-/// Provides time since system start in microseconds precision
+/// Provides time since system start in microseconds precision.
 ///
 /// The counter won’t measure time in sleep-mode.
 ///

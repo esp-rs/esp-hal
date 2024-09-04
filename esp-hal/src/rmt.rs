@@ -18,24 +18,25 @@
 //!   the input signal
 //!
 //! ### Channels
+//!
 //! There are
 #![cfg_attr(
     esp32,
-    doc = "8 channels, each of them can be either receiver or transmitter"
+    doc = "8 channels, each of them can be either receiver or transmitter."
 )]
 #![cfg_attr(
     esp32s2,
-    doc = "4 channels, each of them can be either receiver or transmitter"
+    doc = "4 channels, each of them can be either receiver or transmitter."
 )]
 #![cfg_attr(
     esp32s3,
-    doc = "8 channels, `Channel<0>`-`Channel<3>` hardcoded for transmitting signals and `Channel<4>`-`Channel<7>` hardcoded for receiving signals"
+    doc = "8 channels, `Channel<0>`-`Channel<3>` hardcoded for transmitting signals and `Channel<4>`-`Channel<7>` hardcoded for receiving signals."
 )]
 #![cfg_attr(
     any(esp32c3, esp32c6, esp32h2),
     doc = "4 channels, `Channel<0>` and `Channel<1>` hardcoded for transmitting signals and `Channel<2>` and `Channel<3>` hardcoded for receiving signals."
 )]
-#![doc = "  "]
+#![doc = ""]
 //! For more information, please refer to the
 #![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/peripherals/rmt.html)")]
 //! ## Configuration
@@ -44,8 +45,10 @@
 //! channels are indicated by n which is used as a placeholder for the channel
 //! number, and by m for RX channels.
 //!
-//! ## Examples
+//! ## Example
+//!
 //! ### Initialization
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::peripherals::Peripherals;
@@ -54,7 +57,6 @@
 //! # use esp_hal::gpio::Io;
 //! # use esp_hal::clock::ClockControl;
 //! # use crate::esp_hal::rmt::TxChannelCreator;
-//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 #![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
 #![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
@@ -76,8 +78,8 @@
 //!     .unwrap();
 //! # }
 //! ```
-//! (on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80
-//! MHz)
+//! 
+//! > Note: on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80 MHz
 
 use core::marker::PhantomData;
 

@@ -12,7 +12,6 @@
 
 use self::peripherals::{LPWR, TIMG0, TIMG1};
 use crate::{rtc_cntl::Rtc, timer::timg::Wdt};
-use crate::rtc_cntl::rtc::RtcSlowClock;
 
 pub mod efuse;
 pub mod gpio;
@@ -66,13 +65,10 @@ pub(crate) mod constants {
     pub const RC_FAST_CLK: fugit::HertzU32 = fugit::HertzU32::kHz(17_500);
 }
 
-use esp_println::println;
-
 #[export_name = "__post_init"]
 unsafe fn post_init() {
     // RTC domain must be enabled before we try to disable
-    println!("Post init making a mess");
-    let mut rtc = Rtc::new(LPWR::steal(), RtcSlowClock::default());
+    let mut rtc = Rtc::new(LPWR::steal());
     rtc.swd.disable();
     rtc.rwdt.disable();
 

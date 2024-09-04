@@ -12,21 +12,12 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    gpio::Io,
-    i2c::I2C,
-    peripherals::Peripherals,
-    prelude::*,
-    system::SystemControl,
-};
+use esp_hal::{gpio::Io, i2c::I2C, prelude::*};
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

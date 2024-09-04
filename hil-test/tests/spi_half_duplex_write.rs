@@ -14,7 +14,6 @@
 #![no_main]
 
 use esp_hal::{
-    clock::ClockControl,
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{GpioPin, Io, Pull},
@@ -23,7 +22,7 @@ use esp_hal::{
         unit::Unit,
         Pcnt,
     },
-    peripherals::{Peripherals, SPI2},
+    peripherals::SPI2,
     prelude::*,
     spi::{
         master::{Address, Command, HalfDuplexReadWrite, Spi, SpiDma},
@@ -31,7 +30,6 @@ use esp_hal::{
         SpiDataMode,
         SpiMode,
     },
-    system::SystemControl,
     Blocking,
 };
 use hil_test as _;
@@ -56,15 +54,16 @@ struct Context {
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    use defmt::assert_eq;
+    // defmt::* is load-bearing, it ensures that the assert in dma_buffers! is not
+    // using defmt's non-const assert. Doing so would result in a compile error.
+    #[allow(unused_imports)]
+    use defmt::{assert_eq, *};
 
     use super::*;
 
     #[init]
     fn init() -> Context {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;

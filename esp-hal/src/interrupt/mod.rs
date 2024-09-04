@@ -30,43 +30,35 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use core::cell::RefCell;
+//! let mut sw_int =
+//!     SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+//! critical_section::with(|cs| {
+//!     sw_int
+//!         .software_interrupt0
+//!         .set_interrupt_handler(swint0_handler);
+//!     SWINT0
+//!         .borrow_ref_mut(cs)
+//!         .replace(sw_int.software_interrupt0);
+//! });
 //!
+//! critical_section::with(|cs| {
+//!     SWINT0.borrow_ref(cs).as_ref().unwrap().raise();
+//! });
+//! #
+//! # loop {}
+//! # }
+//!
+//! # use core::cell::RefCell;
+//! #
 //! # use critical_section::Mutex;
-//! # use esp_hal::{
-//! #    prelude::*,
-//! #    system::{SoftwareInterrupt, SystemControl},
-//! # };
+//! # use esp_hal::interrupt::software::{SoftwareInterrupt, SoftwareInterruptControl};
 //! # use esp_hal::interrupt::Priority;
 //! # use esp_hal::interrupt::InterruptHandler;
-//!
+//! #
 //! static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> =
-//! Mutex::new(RefCell::new(None));
+//!     Mutex::new(RefCell::new(None));
 //!
-//! let mut sw_int = system.software_interrupt_control;
-//!     critical_section::with(|cs| {
-//!         sw_int
-//!             .software_interrupt0
-//!             .set_interrupt_handler(swint0_handler);
-//!         SWINT0
-//!             .borrow_ref_mut(cs)
-//!             .replace(sw_int.software_interrupt0);
-//!     });
-//!
-//!     critical_section::with(|cs| {
-//!         SWINT0.borrow_ref(cs).as_ref().unwrap().raise();
-//!     });
-//!
-//!     loop {}
-//! }
-//!
-//! # use procmacros::handler;
-//! # use esp_hal::interrupt;
-//! # use critical_section::Mutex;
-//! # use core::cell::RefCell;
-//! # use esp_hal::system::SoftwareInterrupt;
-//! # static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> = Mutex::new(RefCell::new(None));
-//! #[handler(priority = esp_hal::interrupt::Priority::Priority1)]
+//! #[handler(priority = Priority::Priority1)]
 //! fn swint0_handler() {
 //!     // esp_println::println!("SW interrupt0");
 //!     critical_section::with(|cs| {
@@ -86,6 +78,8 @@ pub use self::xtensa::*;
 mod riscv;
 #[cfg(xtensa)]
 mod xtensa;
+
+pub mod software;
 
 /// An interrupt handler
 #[cfg_attr(

@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Implement `embedded-hal` output pin traits for `DummyPin` (#2019)
+- Added `esp_hal::init` to simplify HAL initialisation (#1970)
+
+### Changed
+
+### Fixed
+
+### Removed
+
+## [0.20.1] - 2024-08-30
+
+### Fixed
+
+- A build issue when including doc comment prelude (#2040)
+
+## [0.20.0] - 2024-08-29
+
+### Added
+
 - Introduce DMA buffer objects (#1856, #1985)
 - Added new `Io::new_no_bind_interrupt` constructor (#1861)
 - Added touch pad support for esp32 (#1873, #1956)
@@ -19,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `debugger::debugger_connected`. (#1961)
 - DMA: don't require `Sealed` to implement `ReadBuffer` and `WriteBuffer` (#1921)
 - Allow DMA to/from psram for esp32s3 (#1827)
+- Added missing methods to `SpiDmaBus` (#2016).
+- PARL_IO use ReadBuffer and WriteBuffer for Async DMA (#1996)
 
 ### Changed
 
@@ -26,10 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Migrate SPI driver to use DMA buffer objects (#1856, #1985)
 - Use the peripheral ref pattern for `OneShotTimer` and `PeriodicTimer` (#1855)
 - Improve SYSTIMER API (#1871)
-- DMA buffers now don't require a static lifetime. Make sure to never `mem::forget` an in-progress DMA transfer (consider using `#[deny(clippy::mem_forget)]`) (#1837)
 - SHA driver now use specific structs for the hashing algorithm instead of a parameter. (#1908)
 - Remove `fn free(self)` in HMAC which goes against esp-hal API guidelines (#1972)
-- PARL_IO use ReadBuffer and WriteBuffer for Async DMA (#1996)
 - `AnyPin`, `AnyInputOnyPin` and `DummyPin` are now accessible from `gpio` module (#1918)
 - Changed the RSA modular multiplication API to be consistent across devices (#2002)
 
@@ -688,7 +707,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.20.1...HEAD
+[0.20.1]: https://github.com/esp-rs/esp-hal/compare/v0.20.0...v0.20.1
+[0.20.0]: https://github.com/esp-rs/esp-hal/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/esp-rs/esp-hal/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/esp-rs/esp-hal/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/esp-rs/esp-hal/compare/v0.16.1...v0.17.0

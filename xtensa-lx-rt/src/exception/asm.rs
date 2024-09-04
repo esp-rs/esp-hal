@@ -11,25 +11,25 @@ use crate::cfg_asm;
 // Additionally there is a chunk of memory reserved for spilled registers.
 global_asm!(
     "
-    .set XT_STK_PC,              0 
-    .set XT_STK_PS,              4 
-    .set XT_STK_A0,              8 
-    .equ XT_STK_A1,             12 
-    .set XT_STK_A2,             16 
-    .set XT_STK_A3,             20 
-    .set XT_STK_A4,             24 
-    .set XT_STK_A5,             28 
-    .set XT_STK_A6,             32 
-    .set XT_STK_A7,             36 
-    .set XT_STK_A8,             40 
-    .set XT_STK_A9,             44 
-    .set XT_STK_A10,            48 
-    .set XT_STK_A11,            52 
-    .set XT_STK_A12,            56 
-    .set XT_STK_A13,            60 
-    .set XT_STK_A14,            64 
-    .set XT_STK_A15,            68 
-    .set XT_STK_SAR,            72 
+    .set XT_STK_PC,              0
+    .set XT_STK_PS,              4
+    .set XT_STK_A0,              8
+    .equ XT_STK_A1,             12
+    .set XT_STK_A2,             16
+    .set XT_STK_A3,             20
+    .set XT_STK_A4,             24
+    .set XT_STK_A5,             28
+    .set XT_STK_A6,             32
+    .set XT_STK_A7,             36
+    .set XT_STK_A8,             40
+    .set XT_STK_A9,             44
+    .set XT_STK_A10,            48
+    .set XT_STK_A11,            52
+    .set XT_STK_A12,            56
+    .set XT_STK_A13,            60
+    .set XT_STK_A14,            64
+    .set XT_STK_A15,            68
+    .set XT_STK_SAR,            72
     .set XT_STK_EXCCAUSE,       76
     .set XT_STK_EXCVADDR,       80
     .set XT_STK_LBEG,           84 // Registers for Loop Option
@@ -66,6 +66,7 @@ global_asm!(
     .set XT_STK_F14,           208
     .set XT_STK_F15,           212
     .set XT_STK_TMP,           216
+    .set XT_STK_CPENABLE,      220
 
     .set XT_STK_FRMSZ,         256      // needs to be multiple of 16 and enough additional free space
                                         // for the registers spilled to the stack (max 8 registers / 0x20 bytes)
@@ -126,6 +127,8 @@ unsafe extern "C" fn save_context() {
         #[cfg(all(XCHAL_HAVE_CP, not(feature = "float-save-restore")))]
         "
         /* Disable coprocessor, any use of floats in ISRs will cause an exception unless float-save-restore feature is enabled */
+        rsr     a3, CPENABLE
+        s32i    a3, sp, +XT_STK_CPENABLE
         movi    a3,  0
         wsr     a3,  CPENABLE
         rsync
@@ -177,11 +180,11 @@ unsafe extern "C" fn save_context() {
         #[cfg(all(feature = "float-save-restore", XCHAL_HAVE_DFP_ACCEL))]
         "
         // Double Precision Accelerator Option
-        rur     a3, f64r_lo 
+        rur     a3, f64r_lo
         s32i    a3, sp, +XT_STK_F64R_LO
         rur     a3, f64r_hi
         s32i    a3, sp, +XT_STK_F64R_HI
-        rur     a3, f64s   
+        rur     a3, f64s
         s32i    a3, sp, +XT_STK_F64S
         ",
         #[cfg(all(feature = "float-save-restore", XCHAL_HAVE_FP))]
@@ -226,7 +229,7 @@ unsafe extern "C" fn save_context() {
         // used as a temporary by this code, the temporary value would get stored
         // onto the stack, instead of the real value.
         //
-        
+
         rsr     a2, PS                     // to be restored after SPILL_REGISTERS
         movi    a0, PS_INTLEVEL_MASK
         and     a3, a2, a0                 // get the current INTLEVEL
@@ -237,11 +240,11 @@ unsafe extern "C" fn save_context() {
         or      a3, a3, a0
         wsr     a3, ps
         rsr     a0, EPC1
-        
+
         addmi   sp,  sp, +XT_STK_FRMSZ   // go back to spill register region
         SPILL_REGISTERS
         addmi   sp,  sp, -XT_STK_FRMSZ   // return the current stack pointer
-        
+
         wsr     a2, PS                   //  restore to the value at entry
         rsync
         wsr     a0, EPC1
@@ -288,9 +291,9 @@ global_asm!(
     //   file on an LX6 core (ESP-32) I'm measuring 145 cycles to spill
     //   registers with this vs. 279 (!) to do it with
     //   xthal_spill_windows().
-       
+
     .macro SPILL_REGISTERS
-    and a12, a12, a12                
+    and a12, a12, a12
     rotw 3
     and a12, a12, a12
     rotw 3
@@ -311,10 +314,10 @@ global_asm!(
     addmi   sp, sp, -XT_STK_FRMSZ      // only allow multiple of 256
 
     s32i    a0, sp, +XT_STK_A1         // save interruptee's A1/SP
-    s32e    a0, sp, -12                // for debug backtrace 
+    s32e    a0, sp, -12                // for debug backtrace
 
     .ifc \level,1
-    rsr     a0, PS                     
+    rsr     a0, PS
     s32i    a0, sp, +XT_STK_PS         // save interruptee's PS
 
     rsr     a0, EXCCAUSE
@@ -323,15 +326,15 @@ global_asm!(
     s32i    a0, sp, +XT_STK_EXCVADDR
     .else
     rsr     a0, EPS\level
-    s32i    a0, sp, +XT_STK_PS         // save interruptee's PS    
+    s32i    a0, sp, +XT_STK_PS         // save interruptee's PS
     .endif
 
-    rsr     a0, EPC\level                   
-    s32i    a0, sp, +XT_STK_PC         // save interruptee's PC 
-    s32e    a0, sp, -16                // for debug backtrace 
+    rsr     a0, EPC\level
+    s32i    a0, sp, +XT_STK_PC         // save interruptee's PC
+    s32e    a0, sp, -16                // for debug backtrace
 
-    rsr     a0, EXCSAVE\level               
-    s32i    a0, sp, +XT_STK_A0         // save interruptee's A0 
+    rsr     a0, EXCSAVE\level
+    s32i    a0, sp, +XT_STK_A0         // save interruptee's A0
 
     call0   save_context
 
@@ -429,8 +432,8 @@ unsafe extern "C" fn restore_context() {
         ",
         #[cfg(all(XCHAL_HAVE_CP, not(feature = "float-save-restore")))]
         "
-        /* Re-enable coprocessor(s) after ISR */
-        movi    a3,  8 /* XCHAL_CP_MAXCFG */
+        /* Restore coprocessor state after ISR */
+        l32i    a3, sp, +XT_STK_CPENABLE
         wsr     a3,  CPENABLE
         rsync
         ",
@@ -458,26 +461,26 @@ unsafe extern "C" fn restore_context() {
 global_asm!(
     r#"
     .macro RESTORE_CONTEXT level:req
-    
-    // Restore context and return 
+
+    // Restore context and return
     call0   restore_context
 
     .ifc \level,1
-    l32i    a0, sp, +XT_STK_PS        // retrieve interruptee's PS 
+    l32i    a0, sp, +XT_STK_PS        // retrieve interruptee's PS
     wsr     a0, PS
-    l32i    a0, sp, +XT_STK_PC        // retrieve interruptee's PC 
+    l32i    a0, sp, +XT_STK_PC        // retrieve interruptee's PC
     wsr     a0, EPC\level
     .else
-    l32i    a0, sp, +XT_STK_PS        // retrieve interruptee's PS 
+    l32i    a0, sp, +XT_STK_PS        // retrieve interruptee's PS
     wsr     a0, EPS\level
-    l32i    a0, sp, +XT_STK_PC        // retrieve interruptee's PC 
-    wsr     a0, EPC\level    
-    .endif 
+    l32i    a0, sp, +XT_STK_PC        // retrieve interruptee's PC
+    wsr     a0, EPC\level
+    .endif
 
-    l32i    a0, sp, +XT_STK_A0        // retrieve interruptee's A0 
-    l32i    sp, sp, +XT_STK_A1        // remove exception frame 
-    rsync                             // ensure PS and EPC written 
-    
+    l32i    a0, sp, +XT_STK_A0        // retrieve interruptee's A0
+    l32i    sp, sp, +XT_STK_A1        // remove exception frame
+    rsync                             // ensure PS and EPC written
+
     .endm
     "#
 );
@@ -518,8 +521,8 @@ unsafe extern "C" fn __default_naked_exception() {
 
         .RestoreContext:
         RESTORE_CONTEXT 1
-        
-        rfe                               // PS.EXCM is cleared 
+
+        rfe                               // PS.EXCM is cleared
         ",
         options(noreturn)
     )
@@ -539,44 +542,44 @@ unsafe extern "C" fn __default_naked_double_exception() {
         "
         mov     a0, a1                     // save a1/sp
         addmi   sp, sp, -XT_STK_FRMSZ      // only allow multiple of 256
-    
+
         s32i    a0, sp, +XT_STK_A1         // save interruptee's A1/SP
-        s32e    a0, sp, -12                // for debug backtrace 
-    
-        rsr     a0, PS                     
+        s32e    a0, sp, -12                // for debug backtrace
+
+        rsr     a0, PS
         s32i    a0, sp, +XT_STK_PS         // save interruptee's PS
-    
+
         rsr     a0, EXCCAUSE
         s32i    a0, sp, +XT_STK_EXCCAUSE
         rsr     a0, EXCVADDR
         s32i    a0, sp, +XT_STK_EXCVADDR
-    
-        rsr     a0, DEPC                   
-        s32i    a0, sp, +XT_STK_PC         // save interruptee's PC 
-        s32e    a0, sp, -16                // for debug backtrace 
-    
+
+        rsr     a0, DEPC
+        s32i    a0, sp, +XT_STK_PC         // save interruptee's PC
+        s32e    a0, sp, -16                // for debug backtrace
+
         rsr     a0, EXCSAVE7               // ok to reuse EXCSAVE7 for double exception as long as
                                            // double exception is not in first couple of instructions
                                            // of level 7 handler
-        s32i    a0, sp, +XT_STK_A0         // save interruptee's A0 
-    
+        s32i    a0, sp, +XT_STK_A0         // save interruptee's A0
+
         call0   save_context
 
         l32i    a6, sp, +XT_STK_EXCCAUSE  // put cause in a6 = a2 in callee
         mov     a7, sp                    // put address of save frame in a7=a3 in callee
         call4   __exception               // call handler <= actual call!
 
-        // Restore context and return 
+        // Restore context and return
         call0   restore_context
 
-        l32i    a0, sp, +XT_STK_PS        // retrieve interruptee's PS 
+        l32i    a0, sp, +XT_STK_PS        // retrieve interruptee's PS
         wsr     a0, PS
-        l32i    a0, sp, +XT_STK_PC        // retrieve interruptee's PC 
+        l32i    a0, sp, +XT_STK_PC        // retrieve interruptee's PC
         wsr     a0, EPC1
 
-        l32i    a0, sp, +XT_STK_A0        // retrieve interruptee's A0 
-        l32i    sp, sp, +XT_STK_A1        // remove exception frame 
-        rsync                             // ensure PS and EPC written 
+        l32i    a0, sp, +XT_STK_A0        // retrieve interruptee's A0
+        l32i    sp, sp, +XT_STK_A1        // remove exception frame
+        rsync                             // ensure PS and EPC written
 
         rfde
         ",

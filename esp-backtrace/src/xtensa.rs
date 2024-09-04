@@ -1,4 +1,4 @@
-use core::arch::asm;
+use core::{arch::asm, fmt::Display};
 
 use crate::MAX_BACKTRACE_ADDRESSES;
 
@@ -11,7 +11,7 @@ pub(super) const RA_OFFSET: usize = 3;
 
 /// Exception Cause
 #[doc(hidden)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(C)]
 pub enum ExceptionCause {
@@ -97,6 +97,16 @@ pub enum ExceptionCause {
     Cp7Disabled                    = 39,
     /// None
     None                           = 255,
+}
+
+impl Display for ExceptionCause {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        if *self == Self::Cp0Disabled {
+            write!(f, "Cp0Disabled (Access to the floating point coprocessor is not allowed. You may want to enable the `float-save-restore` feature of the `xtensa-lx-rt` crate.)")
+        } else {
+            write!(f, "{:?}", self)
+        }
+    }
 }
 
 #[doc(hidden)]

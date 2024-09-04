@@ -23,19 +23,19 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
         let mut res = String::from("__ULP_MAGIC_");
         for &a in args {
             let t = &a.ty;
-            let quoted = to_string(&t);
+            let quoted = to_string(t);
             res.push_str(&quoted);
-            res.push_str("$");
+            res.push('$');
         }
 
         res
     }
 
     pub(crate) fn get_simplename(t: &Type) -> String {
-        String::from(match t {
-            Type::Path(p) => String::from(&p.path.segments.last().unwrap().ident.to_string()),
+        match t {
+            Type::Path(p) => p.path.segments.last().unwrap().ident.to_string(),
             _ => String::new(),
-        })
+        }
     }
 
     pub(crate) fn extract_pin(ty: &Type) -> u8 {
@@ -49,7 +49,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                             res = extract_pin(t);
                         }
                         GenericArgument::Const(c) => {
-                            res = (&quote! { #c }.to_string()).parse().unwrap();
+                            res = quote! { #c }.to_string().parse().unwrap();
                         }
                         _ => (),
                     }
@@ -68,11 +68,11 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
             res.push_str(&segment.ident.to_string());
 
             if let PathArguments::AngleBracketed(g) = &segment.arguments {
-                res.push_str("<");
+                res.push('<');
                 let mut pushed = false;
                 for arg in &g.args {
                     if pushed {
-                        res.push_str(",");
+                        res.push(',');
                     }
 
                     match arg {
@@ -87,7 +87,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                         _ => (),
                     }
                 }
-                res.push_str(">");
+                res.push('>');
             }
         }
 
@@ -219,7 +219,7 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
     };
 
     let hal_crate = if let Ok(FoundCrate::Name(ref name)) = hal_crate {
-        let ident = Ident::new(&name, Span::call_site().into());
+        let ident = Ident::new(name, Span::call_site().into());
         quote!( #ident )
     } else {
         quote!(crate)
@@ -261,12 +261,14 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
 
     let mut sections: Vec<Section> = sections
         .into_iter()
-        .filter(|section| match section.kind() {
-            SectionKind::Text
-            | SectionKind::ReadOnlyData
-            | SectionKind::Data
-            | SectionKind::UninitializedData => true,
-            _ => false,
+        .filter(|section| {
+            matches!(
+                section.kind(),
+                SectionKind::Text
+                    | SectionKind::ReadOnlyData
+                    | SectionKind::Data
+                    | SectionKind::UninitializedData
+            )
         })
         .collect();
     sections.sort_by(|a, b| a.address().partial_cmp(&b.address()).unwrap());
@@ -280,9 +282,8 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
 
     for section in sections {
         if section.address() > last_address {
-            for _ in 0..(section.address() - last_address) {
-                binary.push(0);
-            }
+            let fill = section.address() - last_address;
+            binary.extend(std::iter::repeat(0).take(fill as usize));
         }
 
         binary.extend_from_slice(section.data().unwrap());
@@ -293,21 +294,20 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
         .symbols()
         .find(|s| s.name().unwrap().starts_with("__ULP_MAGIC_"));
 
-    if let None = magic_symbol {
+    let magic_symbol = if let Some(magic_symbol) = magic_symbol {
+        magic_symbol.name().unwrap()
+    } else {
         return Error::new(
             Span::call_site().into(),
             "Given file doesn't seem to be an LP/ULP core application.",
         )
         .to_compile_error()
         .into();
-    }
-
-    let magic_symbol = magic_symbol.unwrap().name().unwrap();
+    };
 
     let magic_symbol = magic_symbol.trim_start_matches("__ULP_MAGIC_");
     let args: Vec<proc_macro2::TokenStream> = magic_symbol
         .split("$")
-        .into_iter()
         .map(|t| {
             let t = if t.contains("OutputOpenDrain") {
                 t.replace("OutputOpenDrain", "LowPowerOutputOpenDrain")

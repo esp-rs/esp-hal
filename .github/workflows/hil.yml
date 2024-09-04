@@ -60,7 +60,7 @@ jobs:
         run: cargo install cross
 
       - name: Build xtasks
-        run: cross build --release --target ${{ matrix.host.rust-target }}
+        run: cross build --release --target ${{ matrix.host.rust-target }} -p xtask
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -195,6 +195,8 @@ jobs:
               sudo uhubctl -a off -l $hub
             done
 
+            sleep 0.5
+
             # Enable all used hubs
             for hub in ${{ matrix.target.hubs }}; do
               sudo uhubctl -a on -l $hub
@@ -215,6 +217,7 @@ jobs:
           ./xtask run-elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
 
       - name: Clean up
+        if: always()
         run: |
           rm -rf tests-${{ matrix.target.soc }}
           rm -f xtask

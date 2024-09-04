@@ -42,14 +42,16 @@
 #![cfg_attr(esp32h2, doc = "Clock source is XTAL")]
 #![doc = ""]
 //! ## Examples
+//!
 //! ### Output a 20 kHz signal
-//! Uses timer0 and operator0 of the MCPWM0 peripheral to output a 50% duty
-//! signal at 20 kHz. The signal will be output to the pin assigned to `pin`.
+//!
+//! This example uses timer0 and operator0 of the MCPWM0 peripheral to output a
+//! 50% duty signal at 20 kHz. The signal will be output to the pin assigned to
+//! `pin`.
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::{mcpwm, prelude::*};
-//! # use esp_hal::mcpwm::operator::{DeadTimeCfg, PWMStream};
-//! # use mcpwm::{operator::PwmPinConfig, timer::PwmWorkingMode, McPwm, PeripheralClockConfig};
+//! # use esp_hal::mcpwm::{operator::{DeadTimeCfg, PWMStream, PwmPinConfig}, timer::PwmWorkingMode, McPwm, PeripheralClockConfig};
 //! # use esp_hal::gpio::Io;
 //!
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);

@@ -14,7 +14,6 @@
 use esp_backtrace as _;
 use esp_hal::{
     gpio::{rtc_io::*, Io},
-    peripherals::Peripherals,
     prelude::*,
     ulp_core,
 };
@@ -22,7 +21,7 @@ use esp_println::{print, println};
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
+    let (peripherals, _clocks) = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let pin = LowPowerOutput::new(io.pins.gpio1);

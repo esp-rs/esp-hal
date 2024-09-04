@@ -57,7 +57,7 @@ fn check<const ALIGN: u32, const SIZE: u32, const MAX_LEN: u32>(
     true
 }
 
-pub(crate) fn esp_rom_spiflash_read(src_addr: u32, data: *mut u32, len: u32) -> i32 {
+pub(crate) fn spiflash_read(src_addr: u32, data: *mut u32, len: u32) -> i32 {
     if check::<WORD_SIZE, FLASH_SIZE, SECTOR_SIZE>(src_addr, len, data) {
         maybe_with_critical_section(|| {
             let src = unsafe { slice::from_raw_parts_mut(data as *mut u8, len as _) };
@@ -69,14 +69,14 @@ pub(crate) fn esp_rom_spiflash_read(src_addr: u32, data: *mut u32, len: u32) -> 
     }
 }
 
-pub(crate) fn esp_rom_spiflash_unlock() -> i32 {
+pub(crate) fn spiflash_unlock() -> i32 {
     maybe_with_critical_section(|| {
         unsafe { FLASH_LOCK = false };
     });
     SUCCESS_CODE
 }
 
-pub(crate) fn esp_rom_spiflash_erase_sector(sector_number: u32) -> i32 {
+pub(crate) fn spiflash_erase_sector(sector_number: u32) -> i32 {
     if check::<1, NUM_SECTORS, 1>(sector_number, 1, ptr::null()) {
         maybe_with_critical_section(|| {
             let dst_addr = sector_number * SECTOR_SIZE;
@@ -89,7 +89,7 @@ pub(crate) fn esp_rom_spiflash_erase_sector(sector_number: u32) -> i32 {
     }
 }
 
-pub(crate) fn esp_rom_spiflash_write(dest_addr: u32, data: *const u32, len: u32) -> i32 {
+pub(crate) fn spiflash_write(dest_addr: u32, data: *const u32, len: u32) -> i32 {
     if check::<WORD_SIZE, FLASH_SIZE, SECTOR_SIZE>(dest_addr, len, data) {
         maybe_with_critical_section(|| {
             let dst = unsafe { slice::from_raw_parts(data as *const u8, len as _) };
