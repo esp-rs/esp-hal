@@ -34,14 +34,14 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
         let (miso, mosi) = hil_test::common_test_pins!(io);
         let cs = io.pins.gpio8;
 
-        let spi = Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0, &clocks).with_pins(
+        let spi = Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0).with_pins(
             Some(sclk),
             Some(mosi),
             Some(miso),

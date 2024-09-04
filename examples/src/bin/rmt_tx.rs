@@ -20,7 +20,7 @@ use esp_hal::{
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -32,7 +32,7 @@ fn main() -> ! {
         }
     };
 
-    let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
+    let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
 
     let tx_config = TxChannelConfig {
         clk_divider: 255,
@@ -41,7 +41,7 @@ fn main() -> ! {
 
     let mut channel = rmt.channel0.configure(io.pins.gpio4, tx_config).unwrap();
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let mut data = [PulseCode {
         level1: true,

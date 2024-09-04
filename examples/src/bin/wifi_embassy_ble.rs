@@ -38,20 +38,19 @@ use esp_wifi::{ble::controller::asynch::BleConnector, initialize, EspWifiInitFor
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
-    let (peripherals, clocks) = esp_hal::init({
+    let peripherals = esp_hal::init({
         let mut config = esp_hal::Config::default();
         config.cpu_clock = CpuClock::max();
         config
     });
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
 
     let init = initialize(
         EspWifiInitFor::Ble,
         timg0.timer0,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
-        &clocks,
     )
     .unwrap();
 
@@ -66,12 +65,12 @@ async fn main(_spawner: Spawner) -> ! {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
-            let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-            esp_hal_embassy::init(&clocks, timg1.timer0);
+            let timg1 = TimerGroup::new(peripherals.TIMG1);
+            esp_hal_embassy::init(timg1.timer0);
         } else {
             use esp_hal::timer::systimer::{SystemTimer, Target};
             let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
-            esp_hal_embassy::init(&clocks, systimer.alarm0);
+            esp_hal_embassy::init(systimer.alarm0);
         }
     }
 

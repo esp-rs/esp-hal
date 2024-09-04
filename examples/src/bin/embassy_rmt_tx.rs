@@ -25,10 +25,10 @@ use esp_println::println;
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
     println!("Init!");
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0.timer0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_hal_embassy::init(timg0.timer0);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -40,7 +40,7 @@ async fn main(_spawner: Spawner) {
         }
     };
 
-    let rmt = Rmt::new_async(peripherals.RMT, freq, &clocks).unwrap();
+    let rmt = Rmt::new_async(peripherals.RMT, freq).unwrap();
 
     let mut channel = rmt
         .channel0

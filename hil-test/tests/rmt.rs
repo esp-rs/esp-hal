@@ -26,7 +26,7 @@ mod tests {
     #[test]
     #[timeout(1)]
     fn rmt_loopback() {
-        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -38,7 +38,7 @@ mod tests {
             }
         };
 
-        let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
+        let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
 
         let (tx, rx) = hil_test::common_test_pins!(io);
 

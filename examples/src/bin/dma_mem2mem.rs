@@ -21,9 +21,9 @@ const DATA_SIZE: usize = 1024 * 10;
 fn main() -> ! {
     esp_println::logger::init_logger(log::LevelFilter::Info);
 
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let (tx_buffer, tx_descriptors, mut rx_buffer, rx_descriptors) = dma_buffers!(DATA_SIZE);
 

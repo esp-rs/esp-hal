@@ -29,7 +29,6 @@
 //!
 //! let mut uart1 = Uart::new(
 //!     peripherals.UART1,
-//!     &clocks,
 //!     io.pins.gpio1,
 //!     io.pins.gpio2,
 //! ).unwrap();
@@ -62,7 +61,6 @@
 //! # let mut uart1 = Uart::new_with_config(
 //! #     peripherals.UART1,
 //! #     Config::default(),
-//! #     &clocks,
 //! #     io.pins.gpio1,
 //! #     io.pins.gpio2,
 //! # ).unwrap();
@@ -80,7 +78,6 @@
 //! # let mut uart1 = Uart::new_with_config(
 //! #     peripherals.UART1,
 //! #     Config::default(),
-//! #     &clocks,
 //! #     io.pins.gpio1,
 //! #     io.pins.gpio2,
 //! # ).unwrap();
@@ -105,7 +102,6 @@
 //! let rx = AnyPin::new_inverted(io.pins.gpio2);
 //! let mut uart1 = Uart::new(
 //!     peripherals.UART1,
-//!     &clocks,
 //!     tx,
 //!     rx,
 //! ).unwrap();
@@ -120,10 +116,8 @@
 //!
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
-//! let tx = UartTx::new(peripherals.UART0, &clocks,
-//!     io.pins.gpio1).unwrap();
-//! let rx = UartRx::new(peripherals.UART1, &clocks,
-//!     io.pins.gpio2).unwrap();
+//! let tx = UartTx::new(peripherals.UART0, io.pins.gpio1).unwrap();
+//! let rx = UartRx::new(peripherals.UART1, io.pins.gpio2).unwrap();
 //! # }
 //! ```
 //! 
@@ -579,10 +573,9 @@ where
     /// Create a new UART TX instance in [`Blocking`] mode.
     pub fn new<TX: OutputPin>(
         uart: impl Peripheral<P = T> + 'd,
-        clocks: &Clocks<'d>,
         tx: impl Peripheral<P = TX> + 'd,
     ) -> Result<Self, Error> {
-        Self::new_with_config(uart, Default::default(), clocks, tx)
+        Self::new_with_config(uart, Default::default(), tx)
     }
 
     /// Create a new UART TX instance with configuration options in
@@ -590,15 +583,13 @@ where
     pub fn new_with_config<TX: OutputPin>(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        clocks: &Clocks<'d>,
         tx: impl Peripheral<P = TX> + 'd,
     ) -> Result<Self, Error> {
         crate::into_ref!(tx);
         tx.set_to_push_pull_output(Internal);
         tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
-        let (uart_tx, _) =
-            Uart::<'d, T, Blocking>::new_with_config_inner(uart, config, clocks)?.split();
+        let (uart_tx, _) = Uart::<'d, T, Blocking>::new_with_config_inner(uart, config)?.split();
 
         Ok(uart_tx)
     }
@@ -787,10 +778,9 @@ where
     /// Create a new UART RX instance in [`Blocking`] mode.
     pub fn new<RX: InputPin>(
         uart: impl Peripheral<P = T> + 'd,
-        clocks: &Clocks<'d>,
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Result<Self, Error> {
-        Self::new_with_config(uart, Default::default(), clocks, rx)
+        Self::new_with_config(uart, Default::default(), rx)
     }
 
     /// Create a new UART RX instance with configuration options in
@@ -798,15 +788,13 @@ where
     pub fn new_with_config<RX: InputPin>(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        clocks: &Clocks<'d>,
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Result<Self, Error> {
         crate::into_ref!(rx);
         rx.set_to_input(Internal);
         rx.connect_input_to_peripheral(T::rx_signal(), Internal);
 
-        let (_, uart_rx) =
-            Uart::<'d, T, Blocking>::new_with_config_inner(uart, config, clocks)?.split();
+        let (_, uart_rx) = Uart::<'d, T, Blocking>::new_with_config_inner(uart, config)?.split();
 
         Ok(uart_rx)
     }
@@ -821,7 +809,6 @@ where
     pub fn new_with_config<TX: OutputPin, RX: InputPin>(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        clocks: &Clocks<'d>,
         tx: impl Peripheral<P = TX> + 'd,
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Result<Self, Error> {
@@ -832,13 +819,12 @@ where
 
         rx.set_to_input(Internal);
         rx.connect_input_to_peripheral(T::rx_signal(), Internal);
-        Self::new_with_config_inner(uart, config, clocks)
+        Self::new_with_config_inner(uart, config)
     }
 
     /// Create a new UART instance with defaults in [`Blocking`] mode.
     pub fn new<TX: OutputPin, RX: InputPin>(
         uart: impl Peripheral<P = T> + 'd,
-        clocks: &Clocks<'d>,
         tx: impl Peripheral<P = TX> + 'd,
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Result<Self, Error> {
@@ -849,14 +835,13 @@ where
 
         rx.set_to_input(Internal);
         rx.connect_input_to_peripheral(T::rx_signal(), Internal);
-        Self::new_inner(uart, clocks)
+        Self::new_inner(uart)
     }
 
     /// Create a new UART instance with defaults in [`Blocking`] mode.
     /// Verify that the default pins (DefaultTxPin and DefaultRxPin) are used.
     pub fn new_with_default_pins(
         uart: impl Peripheral<P = T> + 'd,
-        clocks: &Clocks<'d>,
         tx: &mut DefaultTxPin,
         rx: &mut DefaultRxPin,
     ) -> Result<Self, Error> {
@@ -865,7 +850,7 @@ where
 
         rx.set_to_input(Internal);
         rx.connect_input_to_peripheral(T::rx_signal(), Internal);
-        Self::new_inner(uart, clocks)
+        Self::new_inner(uart)
     }
 }
 
@@ -877,7 +862,6 @@ where
     pub(crate) fn new_with_config_inner(
         _uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
         Self::init();
 
@@ -893,7 +877,7 @@ where
             .rx
             .set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)?;
         serial.rx.set_rx_timeout(config.rx_timeout)?;
-        serial.change_baud_internal(config.baudrate, config.clock_source, clocks);
+        serial.change_baud_internal(config.baudrate, config.clock_source);
         serial.change_data_bits(config.data_bits);
         serial.change_parity(config.parity);
         serial.change_stop_bits(config.stop_bits);
@@ -925,8 +909,8 @@ where
         }
     }
 
-    fn new_inner(uart: impl Peripheral<P = T> + 'd, clocks: &Clocks<'d>) -> Result<Self, Error> {
-        Self::new_with_config_inner(uart, Default::default(), clocks)
+    fn new_inner(uart: impl Peripheral<P = T> + 'd) -> Result<Self, Error> {
+        Self::new_with_config_inner(uart, Default::default())
     }
 
     /// Configure CTS pin
@@ -1157,7 +1141,8 @@ where
     }
 
     #[cfg(any(esp32c2, esp32c3, esp32s3))]
-    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks<'d>) {
+    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource) {
+        let clocks = Clocks::get();
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
@@ -1194,7 +1179,8 @@ where
     }
 
     #[cfg(any(esp32c6, esp32h2))]
-    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks<'d>) {
+    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource) {
+        let clocks = Clocks::get();
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
@@ -1265,11 +1251,12 @@ where
     }
 
     #[cfg(any(esp32, esp32s2))]
-    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks<'d>) {
+    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource) {
+        let clocks = Clocks::get();
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::RefTick => REF_TICK.to_Hz(), /* ESP32(/-S2) TRM, section 3.2.4.2
-                                                       * (6.2.4.2 for S2) */
+                                                        * (6.2.4.2 for S2) */
         };
 
         T::register_block().conf0().modify(|_, w| {
@@ -1304,8 +1291,8 @@ where
     }
 
     /// Modify UART baud rate and reset TX/RX fifo.
-    pub fn change_baud(&mut self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks<'d>) {
-        self.change_baud_internal(baudrate, clock_source, clocks);
+    pub fn change_baud(&mut self, baudrate: u32, clock_source: ClockSource) {
+        self.change_baud_internal(baudrate, clock_source);
         self.txfifo_reset();
         self.rxfifo_reset();
     }
@@ -2146,7 +2133,6 @@ mod asynch {
         pub fn new_async_with_config<TX: OutputPin, RX: InputPin>(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
-            clocks: &Clocks<'d>,
             tx: impl Peripheral<P = TX> + 'd,
             rx: impl Peripheral<P = RX> + 'd,
         ) -> Result<Self, Error> {
@@ -2157,7 +2143,7 @@ mod asynch {
 
             rx.set_to_input(Internal);
             rx.connect_input_to_peripheral(T::rx_signal(), Internal);
-            let mut this = Self::new_with_config_inner(uart, config, clocks)?;
+            let mut this = Self::new_with_config_inner(uart, config)?;
 
             this.inner_set_interrupt_handler(match T::uart_number() {
                 #[cfg(uart0)]
@@ -2175,21 +2161,19 @@ mod asynch {
         /// Create a new UART instance with defaults in [`Async`] mode.
         pub fn new_async<TX: OutputPin, RX: InputPin>(
             uart: impl Peripheral<P = T> + 'd,
-            clocks: &Clocks<'d>,
             tx: impl Peripheral<P = TX> + 'd,
             rx: impl Peripheral<P = RX> + 'd,
         ) -> Result<Self, Error> {
-            Self::new_async_with_config(uart, Default::default(), clocks, tx, rx)
+            Self::new_async_with_config(uart, Default::default(), tx, rx)
         }
 
         /// Create a new UART instance with defaults in [`Async`] mode.
         pub fn new_async_with_default_pins(
             uart: impl Peripheral<P = T> + 'd,
-            clocks: &Clocks<'d>,
             tx: DefaultTxPin,
             rx: DefaultRxPin,
         ) -> Result<Self, Error> {
-            Self::new_async_with_config(uart, Default::default(), clocks, tx, rx)
+            Self::new_async_with_config(uart, Default::default(), tx, rx)
         }
     }
 
@@ -2221,10 +2205,9 @@ mod asynch {
         /// Create a new UART TX instance in [`Async`] mode.
         pub fn new_async<TX: OutputPin>(
             uart: impl Peripheral<P = T> + 'd,
-            clocks: &Clocks<'d>,
             tx: impl Peripheral<P = TX> + 'd,
         ) -> Result<Self, Error> {
-            Self::new_async_with_config(uart, Default::default(), clocks, tx)
+            Self::new_async_with_config(uart, Default::default(), tx)
         }
 
         /// Create a new UART TX instance with configuration options in
@@ -2232,14 +2215,13 @@ mod asynch {
         pub fn new_async_with_config<TX: OutputPin>(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
-            clocks: &Clocks<'d>,
             tx: impl Peripheral<P = TX> + 'd,
         ) -> Result<Self, Error> {
             crate::into_ref!(tx);
             tx.set_to_push_pull_output(Internal);
             tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
-            let mut uart = Uart::<'d, T, Async>::new_with_config_inner(uart, config, clocks)?;
+            let mut uart = Uart::<'d, T, Async>::new_with_config_inner(uart, config)?;
 
             uart.inner_set_interrupt_handler(match T::uart_number() {
                 #[cfg(uart0)]
@@ -2308,10 +2290,9 @@ mod asynch {
         /// Create a new UART RX instance in [`Async`] mode.
         pub fn new_async<RX: InputPin>(
             uart: impl Peripheral<P = T> + 'd,
-            clocks: &Clocks<'d>,
             rx: impl Peripheral<P = RX> + 'd,
         ) -> Result<Self, Error> {
-            Self::new_async_with_config(uart, Default::default(), clocks, rx)
+            Self::new_async_with_config(uart, Default::default(), rx)
         }
 
         /// Create a new UART RX instance with configuration options in
@@ -2319,14 +2300,13 @@ mod asynch {
         pub fn new_async_with_config<RX: InputPin>(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
-            clocks: &Clocks<'d>,
             rx: impl Peripheral<P = RX> + 'd,
         ) -> Result<Self, Error> {
             crate::into_ref!(rx);
             rx.set_to_input(Internal);
             rx.connect_input_to_peripheral(T::rx_signal(), Internal);
 
-            let mut uart = Uart::<'d, T, Async>::new_with_config_inner(uart, config, clocks)?;
+            let mut uart = Uart::<'d, T, Async>::new_with_config_inner(uart, config)?;
 
             uart.inner_set_interrupt_handler(match T::uart_number() {
                 #[cfg(uart0)]

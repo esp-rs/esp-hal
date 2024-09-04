@@ -63,10 +63,10 @@ async fn reader(
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
     esp_println::println!("Init!");
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0.timer0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_hal_embassy::init(timg0.timer0);
 
     let (tx, rx) = UsbSerialJtag::new_async(peripherals.USB_DEVICE).split();
 

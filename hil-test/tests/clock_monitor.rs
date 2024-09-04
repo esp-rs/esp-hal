@@ -19,7 +19,7 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        let (peripherals, _clocks) = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(esp_hal::Config::default());
         let rtc = Rtc::new(peripherals.LPWR);
 
         Context { rtc }

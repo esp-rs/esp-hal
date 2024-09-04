@@ -36,7 +36,7 @@ use smart_leds::{
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -65,14 +65,14 @@ fn main() -> ! {
         }
     }
 
-    let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
+    let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
 
     // We use one of the RMT channels to instantiate a `SmartLedsAdapter` which can
     // be used directly with all `smart_led` implementations
     let rmt_buffer = smartLedBuffer!(1);
-    let mut led = SmartLedsAdapter::new(rmt.channel0, led_pin, rmt_buffer, &clocks);
+    let mut led = SmartLedsAdapter::new(rmt.channel0, led_pin, rmt_buffer);
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let mut color = Hsv {
         hue: 0,

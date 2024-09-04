@@ -491,11 +491,11 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
 /// true);
 #[cfg_attr(
     esp32h2,
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40.MHz()).unwrap();"
+    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(40.MHz()).unwrap();"
 )]
 #[cfg_attr(
     not(esp32h2),
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 32.MHz()).unwrap();"
+    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(32.MHz()).unwrap();"
 )]
 /// let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
 ///

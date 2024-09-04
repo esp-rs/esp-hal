@@ -38,10 +38,7 @@ mod fmt;
 
 #[cfg(not(feature = "esp32"))]
 use esp_hal::timer::systimer::Alarm;
-use esp_hal::{
-    clock::Clocks,
-    timer::{timg::Timer as TimgTimer, ErasedTimer},
-};
+use esp_hal::timer::{timg::Timer as TimgTimer, ErasedTimer};
 pub use macros::main;
 
 #[cfg(feature = "executors")]
@@ -158,12 +155,12 @@ impl_array!(4);
 #[doc = esp_hal::before_snippet!()]
 /// use esp_hal::timg::TimerGroup;
 ///
-/// let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-/// esp_hal_embassy::init(&clocks, timg0.timer0);
+/// let timg0 = TimerGroup::new(peripherals.TIMG0);
+/// esp_hal_embassy::init(timg0.timer0);
 ///
 /// // ... now you can spawn embassy tasks or use `Timer::after` etc.
 /// # }
 /// ```
-pub fn init(clocks: &Clocks, time_driver: impl TimerCollection) {
-    EmbassyTimer::init(clocks, time_driver.timers())
+pub fn init(time_driver: impl TimerCollection) {
+    EmbassyTimer::init(time_driver.timers())
 }

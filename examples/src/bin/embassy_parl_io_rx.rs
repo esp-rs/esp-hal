@@ -26,10 +26,10 @@ use esp_println::println;
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
     esp_println::println!("Init!");
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
-    esp_hal_embassy::init(&clocks, systimer.alarm0);
+    esp_hal_embassy::init(systimer.alarm0);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -45,7 +45,6 @@ async fn main(_spawner: Spawner) {
         dma_channel.configure_for_async(false, DmaPriority::Priority0),
         rx_descriptors,
         1.MHz(),
-        &clocks,
     )
     .unwrap();
 

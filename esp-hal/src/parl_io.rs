@@ -31,7 +31,6 @@ use peripheral::PeripheralRef;
 use private::*;
 
 use crate::{
-    clock::Clocks,
     dma::{
         dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
         Channel,
@@ -1123,7 +1122,6 @@ where
         tx_descriptors: &'static mut [DmaDescriptor],
         rx_descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
-        _clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
         internal_init(&mut dma_channel, frequency)?;
 
@@ -1217,7 +1215,6 @@ where
         mut dma_channel: Channel<'d, CH, DM>,
         descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
-        _clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
         internal_init(&mut dma_channel, frequency)?;
 
@@ -1306,7 +1303,6 @@ where
         mut dma_channel: Channel<'d, CH, DM>,
         descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
-        _clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
         internal_init(&mut dma_channel, frequency)?;
 

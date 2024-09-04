@@ -10,7 +10,7 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let (mut peripherals, _clocks) = esp_hal::init(esp_hal::Config::default());
+    let mut peripherals = esp_hal::init(esp_hal::Config::default());
     let mut ieee802154 = Ieee802154::new(peripherals.IEEE802154, &mut peripherals.RADIO_CLK);
 
     ieee802154.set_config(Config {

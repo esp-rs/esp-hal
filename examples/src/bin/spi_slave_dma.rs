@@ -45,7 +45,7 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let slave_sclk = io.pins.gpio0;
@@ -85,7 +85,7 @@ fn main() -> ! {
         rx_descriptors,
     );
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     // DMA buffer require a static life-time
     let master_send = &mut [0u8; 32000];

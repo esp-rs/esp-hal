@@ -22,7 +22,7 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
 //! # use embedded_hal::delay::DelayNs;
-//! let mut delay = Delay::new(&clocks);
+//! let mut delay = Delay::new();
 //!
 //! delay.delay_ms(1000 as u32);
 //! # }
@@ -34,8 +34,6 @@
 //! [current_time]: crate::time::current_time
 
 pub use fugit::MicrosDurationU64;
-
-use crate::clock::Clocks;
 
 /// Delay driver
 ///
@@ -72,7 +70,7 @@ impl embedded_hal::delay::DelayNs for Delay {
 impl Delay {
     /// Creates a new `Delay` instance.
     // Do not remove the argument, it makes sure that the clocks are initialized.
-    pub fn new(_clocks: &Clocks<'_>) -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 

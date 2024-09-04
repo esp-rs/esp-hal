@@ -1,4 +1,4 @@
-//! Embassy "async" vesrion of ead calibration data from BMP180 sensor
+//! Embassy "async" version of ead calibration data from BMP180 sensor
 //!
 //! This example dumps the calibration data from a BMP180 sensor by reading by reading
 //! with the direct I2C API and the embedded-hal-async I2C API.
@@ -24,20 +24,14 @@ use esp_hal::{gpio::Io, i2c::I2C, prelude::*, timer::timg::TimerGroup};
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0.timer0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_hal_embassy::init(timg0.timer0);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let mut i2c = I2C::new_async(
-        peripherals.I2C0,
-        io.pins.gpio4,
-        io.pins.gpio5,
-        400.kHz(),
-        &clocks,
-    );
+    let mut i2c = I2C::new_async(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, 400.kHz());
 
     loop {
         let mut data = [0u8; 22];

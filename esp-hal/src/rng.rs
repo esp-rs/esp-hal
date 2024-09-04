@@ -143,7 +143,6 @@ impl rand_core::RngCore for Rng {
 /// # use esp_hal::analog::adc::{AdcConfig, Attenuation, Adc};
 /// # use esp_hal::gpio::Io;
 ///
-/// let mut peripherals = Peripherals::take();
 /// let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 /// let mut buf = [0u8; 16];
 ///

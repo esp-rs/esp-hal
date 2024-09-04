@@ -35,7 +35,7 @@ use nb::block;
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -55,7 +55,6 @@ fn main() -> ! {
         peripherals.TWAI0,
         can_tx_pin,
         can_rx_pin,
-        &clocks,
         CAN_BAUDRATE,
         TwaiMode::Normal,
     );

@@ -173,7 +173,7 @@ mod tests {
             }
         }
 
-        let (peripherals, _clocks) = esp_hal::init(config);
+        let peripherals = esp_hal::init(config);
 
         Rng::new(peripherals.RNG)
     }

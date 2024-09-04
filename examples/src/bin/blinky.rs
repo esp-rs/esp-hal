@@ -17,13 +17,13 @@ use esp_hal::{
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     // Set GPIO0 as an output, and set its state high initially.
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut led = Output::new(io.pins.gpio0, Level::High);
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     loop {
         led.toggle();

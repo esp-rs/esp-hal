@@ -29,7 +29,7 @@
 //! # use crate::esp_hal::prelude::_fugit_ExtU64;
 //! # use crate::esp_hal::InterruptConfigurable;
 //! static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
-//! let mut delay = Delay::new(&clocks);
+//! let mut delay = Delay::new();
 //!
 //! let mut rtc = Rtc::new(peripherals.LPWR);
 //!

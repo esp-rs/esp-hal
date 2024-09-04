@@ -33,7 +33,7 @@ static KNOWN_SSIDS: Mutex<RefCell<BTreeSet<String>>> = Mutex::new(RefCell::new(B
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
-    let (peripherals, clocks) = esp_hal::init({
+    let peripherals = esp_hal::init({
         let mut config = esp_hal::Config::default();
         config.cpu_clock = CpuClock::max();
         config
@@ -42,7 +42,7 @@ fn main() -> ! {
     // Create a heap allocator, with 32kB of space.
     heap_allocator!(32_168);
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
     let timer0: ErasedTimer = timg0.timer0.into();
     let timer = PeriodicTimer::new(timer0);
 
@@ -51,7 +51,6 @@ fn main() -> ! {
         timer,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
-        &clocks,
     )
     .unwrap();
 

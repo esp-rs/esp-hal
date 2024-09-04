@@ -20,7 +20,7 @@ use esp_hal::{
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -39,7 +39,7 @@ fn main() -> ! {
 
     let mut pins = [led1, led2, led3];
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     loop {
         toggle_pins(&mut pins, &button);

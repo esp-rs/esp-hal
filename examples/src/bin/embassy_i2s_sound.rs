@@ -1,4 +1,4 @@
-//! This shows how to transmit data continously via I2S.
+//! This shows how to transmit data continuously via I2S.
 //!
 //! Without an additional I2S sink device you can inspect the BCLK, WS
 //! and DOUT with a logic analyzer.
@@ -54,10 +54,10 @@ const SINE: [i16; 64] = [
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
     println!("Init!");
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0.timer0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_hal_embassy::init(timg0.timer0);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -77,7 +77,6 @@ async fn main(_spawner: Spawner) {
         dma_channel.configure_for_async(false, DmaPriority::Priority0),
         tx_descriptors,
         rx_descriptors,
-        &clocks,
     );
 
     let i2s_tx = i2s

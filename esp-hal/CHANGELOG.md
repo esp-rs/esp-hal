@@ -80,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `FlashSafeDma` (#1856)
 - Remove redundant WithDmaSpi traits (#1975)
 - `IsFullDuplex` and `IsHalfDuplex` traits (#1985)
+- `Peripherals::take` (#1999)
 
 ## [0.19.0] - 2024-07-15
 

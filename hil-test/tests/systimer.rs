@@ -11,7 +11,6 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use embedded_hal::delay::DelayNs;
 use esp_hal::{
-    clock::Clocks,
     delay::Delay,
     prelude::*,
     timer::systimer::{
@@ -41,7 +40,6 @@ struct Context {
     unit: FrozenUnit<'static, SpecificUnit<'static, 0>>,
     comparator0: SpecificComparator<'static, 0>,
     comparator1: SpecificComparator<'static, 1>,
-    clocks: Clocks<'static>,
 }
 
 #[handler(priority = esp_hal::interrupt::Priority::min())]
@@ -104,7 +102,7 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let systimer = SystemTimer::new(peripherals.SYSTIMER);
         static UNIT0: StaticCell<SpecificUnit<'static, 0>> = StaticCell::new();
@@ -113,7 +111,6 @@ mod tests {
         let frozen_unit = FrozenUnit::new(unit0);
 
         Context {
-            clocks,
             unit: frozen_unit,
             comparator0: systimer.comparator0,
             comparator1: systimer.comparator1,
@@ -159,7 +156,7 @@ mod tests {
             ALARM_PERIODIC.borrow_ref_mut(cs).replace(alarm1);
         });
 
-        let mut delay = Delay::new(&ctx.clocks);
+        let mut delay = Delay::new();
         delay.delay_ms(300);
     }
 

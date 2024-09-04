@@ -5,15 +5,11 @@
 #![no_std]
 #![no_main]
 
-#[cfg(esp32)]
-use esp_hal::clock::Clocks;
-use esp_hal::delay::Delay;
+use esp_hal::{delay::Delay, prelude::*};
 use hil_test as _;
 
 struct Context {
     delay: Delay,
-    #[cfg(esp32)]
-    clocks: Clocks<'static>,
 }
 
 fn time_moves_forward_during<F: FnOnce(Context)>(ctx: Context, f: F) {
@@ -31,15 +27,11 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let (_peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+        let _ = esp_hal::init(esp_hal::Config::default());
 
-        let delay = Delay::new(&clocks);
+        let delay = Delay::new();
 
-        Context {
-            delay,
-            #[cfg(esp32)]
-            clocks,
-        }
+        Context { delay }
     }
 
     #[test]
@@ -71,10 +63,9 @@ mod tests {
     fn test_current_time_construct_timg0(ctx: Context) {
         time_moves_forward_during(ctx, |ctx| {
             // construct the timer in between calls to current_time
-            let _ = esp_hal::timer::timg::TimerGroup::new(
-                unsafe { esp_hal::peripherals::TIMG0::steal() },
-                &ctx.clocks,
-            );
+            let _ = esp_hal::timer::timg::TimerGroup::new(unsafe {
+                esp_hal::peripherals::TIMG0::steal()
+            });
         })
     }
 }

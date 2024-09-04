@@ -7,7 +7,6 @@
 #![no_main]
 
 use esp_hal::{
-    clock::Clocks,
     dma::{Dma, DmaDescriptor, DmaPriority},
     dma_buffers,
     gpio::DummyPin,
@@ -23,7 +22,6 @@ const DATA_SIZE: usize = 1024 * 10;
 
 struct Context<'d> {
     lcd_cam: LcdCam<'d, esp_hal::Async>,
-    clocks: Clocks<'d>,
     dma: Dma<'d>,
     tx_buffer: &'static [u8],
     tx_descriptors: &'static mut [DmaDescriptor],
@@ -36,7 +34,7 @@ mod tests {
 
     #[init]
     async fn init() -> Context<'static> {
-        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let dma = Dma::new(peripherals.DMA);
         let lcd_cam = LcdCam::new_async(peripherals.LCD_CAM);
@@ -44,7 +42,6 @@ mod tests {
 
         Context {
             lcd_cam,
-            clocks,
             dma,
             tx_buffer,
             tx_descriptors,
@@ -72,7 +69,6 @@ mod tests {
             pins,
             20.MHz(),
             Config::default(),
-            &ctx.clocks,
         );
 
         i8080
@@ -105,7 +101,6 @@ mod tests {
             pins,
             20.MHz(),
             Config::default(),
-            &ctx.clocks,
         );
 
         i8080

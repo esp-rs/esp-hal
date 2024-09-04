@@ -24,7 +24,7 @@ static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, _clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let mut rtc = Rtc::new(peripherals.LPWR);
     rtc.set_interrupt_handler(interrupt_handler);

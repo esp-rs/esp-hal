@@ -33,7 +33,7 @@
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let led = io.pins.gpio0;
 //!
-//! let mut ledc = Ledc::new(peripherals.LEDC, &clocks);
+//! let mut ledc = Ledc::new(peripherals.LEDC);
 //! ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
 //!
 //! let mut lstimer0 = ledc.get_timer::<LowSpeed>(timer::Number::Timer0);
@@ -65,7 +65,6 @@ use self::{
     timer::{Timer, TimerSpeed},
 };
 use crate::{
-    clock::Clocks,
     gpio::OutputPin,
     peripheral::{Peripheral, PeripheralRef},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
@@ -85,7 +84,6 @@ pub enum LSGlobalClkSource {
 pub struct Ledc<'d> {
     _instance: PeripheralRef<'d, crate::peripherals::LEDC>,
     ledc: &'d crate::peripherals::ledc::RegisterBlock,
-    clock_control_config: &'d Clocks<'d>,
 }
 
 #[cfg(esp32)]
@@ -112,21 +110,14 @@ impl Speed for LowSpeed {
 
 impl<'d> Ledc<'d> {
     /// Return a new LEDC
-    pub fn new(
-        _instance: impl Peripheral<P = crate::peripherals::LEDC> + 'd,
-        clock_control_config: &'d Clocks<'d>,
-    ) -> Self {
+    pub fn new(_instance: impl Peripheral<P = crate::peripherals::LEDC> + 'd) -> Self {
         crate::into_ref!(_instance);
 
         PeripheralClockControl::reset(PeripheralEnable::Ledc);
         PeripheralClockControl::enable(PeripheralEnable::Ledc);
 
         let ledc = unsafe { &*crate::peripherals::LEDC::ptr() };
-        Ledc {
-            _instance,
-            ledc,
-            clock_control_config,
-        }
+        Ledc { _instance, ledc }
     }
 
     /// Set global slow clock source
@@ -170,7 +161,7 @@ impl<'d> Ledc<'d> {
 
     /// Return a new timer
     pub fn get_timer<S: TimerSpeed>(&self, number: timer::Number) -> Timer<'d, S> {
-        Timer::new(self.ledc, self.clock_control_config, number)
+        Timer::new(self.ledc, number)
     }
 
     /// Return a new channel
