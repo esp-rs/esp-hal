@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed an issue with DMA transfers potentially not waking up the correct async task (#2065)
+- Fixed an issue with LCD_CAM i8080 where it would send double the clocks in 16bit mode (#2085)
 
 ### Removed
 
