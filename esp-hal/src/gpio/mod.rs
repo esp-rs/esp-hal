@@ -275,7 +275,10 @@ pub trait Pin: private::Sealed {
     /// This converts pin singletons (`GpioPin<0>`, …), which are all different
     /// types, into the same type. It is useful for creating arrays of pins,
     /// or avoiding generics.
-    fn degrade(self) -> ErasedPin where Self: Sized {
+    fn degrade(self) -> ErasedPin
+    where
+        Self: Sized,
+    {
         self.degrade_internal(private::Internal)
     }
 
@@ -1844,8 +1847,21 @@ macro_rules! touch_common {
 }
 
 /// GPIO output driver.
-pub struct Output<'d, P> {
+pub struct Output<'d, P = ErasedPin> {
     pin: Flex<'d, P>,
+}
+
+impl<'d> Output<'d> {
+    /// Create GPIO output driver for a [GpioPin] with the provided level
+    #[inline]
+    pub fn new<P: OutputPin>(
+        pin: impl crate::peripheral::Peripheral<P = P> + 'd,
+        initial_output: Level,
+    ) -> Self {
+        let pin = Flex::new(pin);
+
+        Self::new_inner(pin, initial_output)
+    }
 }
 
 impl<'d, P> Output<'d, P>
@@ -1854,8 +1870,11 @@ where
 {
     /// Create GPIO output driver for a [GpioPin] with the provided level
     #[inline]
-    pub fn new(pin: impl crate::peripheral::Peripheral<P = P> + 'd, initial_output: Level) -> Self {
-        let pin = Flex::new(pin);
+    pub fn new_typed(
+        pin: impl crate::peripheral::Peripheral<P = P> + 'd,
+        initial_output: Level,
+    ) -> Self {
+        let pin = Flex::new_typed(pin);
 
         Self::new_inner(pin, initial_output)
     }
@@ -1918,8 +1937,22 @@ where
 }
 
 /// GPIO input driver.
-pub struct Input<'d, P> {
+pub struct Input<'d, P = ErasedPin> {
     pin: Flex<'d, P>,
+}
+
+impl<'d> Input<'d> {
+    /// Create GPIO input driver for a [Pin] with the provided [Pull]
+    /// configuration.
+    #[inline]
+    pub fn new<P: InputPin>(
+        pin: impl crate::peripheral::Peripheral<P = P> + 'd,
+        pull: Pull,
+    ) -> Self {
+        let pin = Flex::new(pin);
+
+        Self::new_inner(pin, pull)
+    }
 }
 
 impl<'d, P> Input<'d, P>
@@ -1929,8 +1962,8 @@ where
     /// Create GPIO input driver for a [Pin] with the provided [Pull]
     /// configuration.
     #[inline]
-    pub fn new(pin: impl crate::peripheral::Peripheral<P = P> + 'd, pull: Pull) -> Self {
-        let pin = Flex::new(pin);
+    pub fn new_typed(pin: impl crate::peripheral::Peripheral<P = P> + 'd, pull: Pull) -> Self {
+        let pin = Flex::new_typed(pin);
 
         Self::new_inner(pin, pull)
     }
@@ -1992,8 +2025,23 @@ where
 }
 
 /// GPIO open-drain output driver.
-pub struct OutputOpenDrain<'d, P> {
+pub struct OutputOpenDrain<'d, P = ErasedPin> {
     pin: Flex<'d, P>,
+}
+
+impl<'d> OutputOpenDrain<'d> {
+    /// Create GPIO open-drain output driver for a [Pin] with the provided
+    /// initial output-level and [Pull] configuration.
+    #[inline]
+    pub fn new<P: InputPin + OutputPin>(
+        pin: impl crate::peripheral::Peripheral<P = P> + 'd,
+        initial_output: Level,
+        pull: Pull,
+    ) -> Self {
+        let pin = Flex::new(pin);
+
+        Self::new_inner(pin, initial_output, pull)
+    }
 }
 
 impl<'d, P> OutputOpenDrain<'d, P>
@@ -2003,13 +2051,12 @@ where
     /// Create GPIO open-drain output driver for a [Pin] with the provided
     /// initial output-level and [Pull] configuration.
     #[inline]
-    pub fn new(
+    pub fn new_typed(
         pin: impl crate::peripheral::Peripheral<P = P> + 'd,
         initial_output: Level,
         pull: Pull,
-    ) -> Self
-    {
-        let pin = Flex::new(pin);
+    ) -> Self {
+        let pin = Flex::new_typed(pin);
 
         Self::new_inner(pin, initial_output, pull)
     }
@@ -2102,8 +2149,19 @@ where
 }
 
 /// Flexible pin driver.
-pub struct Flex<'d, P> {
+pub struct Flex<'d, P = ErasedPin> {
     pin: PeripheralRef<'d, P>,
+}
+
+impl<'d> Flex<'d> {
+    /// Create flexible pin driver for a [Pin].
+    /// No mode change happens.
+    #[inline]
+    pub fn new<P: Pin>(pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self {
+        crate::into_ref!(pin);
+        let pin = pin.degrade_internal(private::Internal);
+        Self::new_typed(pin)
+    }
 }
 
 impl<'d, P> Flex<'d, P>
@@ -2113,7 +2171,7 @@ where
     /// Create flexible pin driver for a [Pin].
     /// No mode change happens.
     #[inline]
-    pub fn new(pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self {
+    pub fn new_typed(pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self {
         crate::into_ref!(pin);
         Self { pin }
     }

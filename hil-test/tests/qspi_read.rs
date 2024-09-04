@@ -15,7 +15,7 @@
 use esp_hal::{
     dma::{Channel, Dma, DmaPriority, DmaRxBuf},
     dma_buffers,
-    gpio::{AnyOutput, AnyPin, Io, Level},
+    gpio::{ErasedPin, Io, Level, Output},
     prelude::*,
     spi::{
         master::{Address, Command, Spi, SpiDma},
@@ -41,13 +41,13 @@ cfg_if::cfg_if! {
 struct Context {
     spi: esp_hal::peripherals::SPI2,
     dma_channel: Channel<'static, DmaChannel0, Blocking>,
-    miso: AnyPin<'static>,
-    miso_mirror: AnyOutput<'static>,
+    miso: ErasedPin,
+    miso_mirror: Output<'static>,
 }
 
 fn execute(
     mut spi: SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
-    mut miso_mirror: AnyOutput<'static>,
+    mut miso_mirror: Output<'static>,
     wanted: u8,
 ) {
     const DMA_BUFFER_SIZE: usize = 4;
@@ -103,8 +103,8 @@ mod tests {
 
         let (miso, miso_mirror) = hil_test::common_test_pins!(io);
 
-        let miso = AnyPin::new(miso);
-        let miso_mirror = AnyOutput::new(miso_mirror, Level::High);
+        let miso = miso.degrade();
+        let miso_mirror = Output::new(miso_mirror, Level::High);
 
         let dma = Dma::new(peripherals.DMA);
 

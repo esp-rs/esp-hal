@@ -23,22 +23,11 @@ use esp_hal::{
 use hil_test as _;
 
 static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
-static INPUT_PIN: Mutex<RefCell<Option<Input<'static, TestGpio1>>>> =
-    Mutex::new(RefCell::new(None));
-
-cfg_if::cfg_if! {
-    if #[cfg(not(any(esp32s2, esp32s3)))] {
-        pub type TestGpio1 = GpioPin<2>;
-        pub type TestGpio2 = GpioPin<3>;
-    } else if #[cfg(any(esp32s2, esp32s3))] {
-        pub type TestGpio1 = GpioPin<9>;
-        pub type TestGpio2 = GpioPin<10>;
-    }
-}
+static INPUT_PIN: Mutex<RefCell<Option<Input<'static>>>> = Mutex::new(RefCell::new(None));
 
 struct Context<'d> {
-    test_gpio1: Input<'d, TestGpio1>,
-    test_gpio2: Output<'d, TestGpio2>,
+    test_gpio1: Input<'d>,
+    test_gpio2: Output<'d>,
     delay: Delay,
 }
 

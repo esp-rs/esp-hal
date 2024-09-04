@@ -16,7 +16,7 @@
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{AnyOutput, Io, Level},
+    gpio::{Io, Level, Output},
     peripherals::SPI2,
     prelude::*,
     spi::{
@@ -42,7 +42,7 @@ cfg_if::cfg_if! {
 
 struct Context {
     spi: SpiDma<'static, SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
-    miso_mirror: AnyOutput<'static>,
+    miso_mirror: Output<'static>,
 }
 
 #[cfg(test)]
