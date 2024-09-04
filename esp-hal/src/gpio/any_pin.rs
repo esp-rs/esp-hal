@@ -15,7 +15,7 @@ impl<'d> AnyPin<'d> {
     #[inline]
     pub fn new<P>(pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
     where
-        P: OutputPin + InputPin,
+        P: Pin,
     {
         crate::into_ref!(pin);
         let pin = pin.degrade_internal(private::Internal);
@@ -32,7 +32,7 @@ impl<'d> AnyPin<'d> {
     #[inline]
     pub fn new_inverted<P>(pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
     where
-        P: OutputPin + InputPin,
+        P: Pin,
     {
         crate::into_ref!(pin);
         let pin = pin.degrade_internal(private::Internal);
