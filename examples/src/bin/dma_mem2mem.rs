@@ -42,7 +42,7 @@ fn main() -> ! {
     }
 
     info!("Starting transfer of {} bytes", DATA_SIZE);
-    let result = mem2mem.start_transfer(&rx_buffer, &mut tx_buffer);
+    let result = mem2mem.start_transfer(&mut rx_buffer, tx_buffer);
     match result {
         Ok(dma_wait) => {
             info!("Transfer started");

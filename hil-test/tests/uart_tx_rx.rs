@@ -22,8 +22,8 @@ use hil_test as _;
 use nb::block;
 
 struct Context {
-    rx: UartRx<'static, UART0, Blocking>,
-    tx: UartTx<'static, UART1, Blocking>,
+    rx: UartRx<'static, UART1, Blocking>,
+    tx: UartTx<'static, UART0, Blocking>,
 }
 
 #[cfg(test)]
