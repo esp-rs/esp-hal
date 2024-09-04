@@ -68,35 +68,39 @@ The [`hil.yml`] workflow builds the test suite for all our available targets and
 Our self-hosted runners have the following setup:
 - ESP32-C2 (`esp32c2-jtag`):
   - Devkit: `ESP8684-DevKitM-1` connected via UART.
+    - `GPIO18` and `GPIO9` are I2C pins.
     - `GPIO2` and `GPIO3` are connected.
   - Probe: `ESP-Prog` connected with the [following connections][connection_c2]
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-C3 (`rustboard`):
   - Devkit: `ESP32-C3-DevKit-RUST-1` connected via USB-Serial-JTAG.
+    - `GPIO4` and `GPIO5` are I2C pins.
     - `GPIO2` and `GPIO3` are connected.
-    - `GPIO5` and `GPIO6` are connected.
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-C6 (`esp32c6-usb`):
   - Devkit: `ESP32-C6-DevKitC-1 V1.2` connected via USB-Serial-JTAG (`USB` port).
+    - `GPIO6` and `GPIO7` are I2C pins.
     - `GPIO2` and `GPIO3` are connected.
-    - `GPIO5` and `GPIO6` are connected.
+    - `GPIO4` and `GPIO5` are connected.
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-H2 (`esp32h2-usb`):
   - Devkit: `ESP32-H2-DevKitM-1` connected via USB-Serial-JTAG (`USB` port).
+    - `GPIO12` and `GPIO22` are I2C pins.
     - `GPIO2` and `GPIO3` are connected.
-    - `GPIO5` and `GPIO8` are connected.
+    - `GPIO4` and `GPIO5` are connected.
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-S2 (`esp32s2-jtag`):
   - Devkit: `ESP32-S2-Saola-1` connected via UART.
-    - `GPIO2` and `GPIO3` are connected.
-    - `GPIO5` and `GPIO6` are connected.
+    - `GPIO2` and `GPIO3` are I2C pins.
+    - `GPIO9` and `GPIO10` are connected.
   - Probe: `ESP-Prog` connected with the [following connections][connection_s2]
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-S3 (`esp32s3-usb`):
   - Devkit: `ESP32-S3-DevKitC-1` connected via USB-Serial-JTAG.
-    - `GPIO2` and `GPIO3` are connected.
-    - `GPIO5` and `GPIO6` are connected.
+    - `GPIO2` and `GPIO3` are I2C pins.
+    - `GPIO4` and `GPIO5` are connected.
     - `GPIO1` and `GPIO21` are connected.
+    - `GPIO9` and `GPIO10` are connected.
     - `GPIO43 (TX)` and `GPIO45` are connected.
   - RPi: Raspbian 12 configured with the following [setup]
 

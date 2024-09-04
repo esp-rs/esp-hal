@@ -1,11 +1,11 @@
 //! QSPI Read Test
 //!
 //! Following pins are used:
-//! MISO    GPIO2
+//! MISO    GPIO2 / GPIO9 (esp32s2 and esp32s3)
 //!
-//! GPIO    GPIO3
+//! GPIO    GPIO3 / GPIO10 (esp32s2 and esp32s3)
 //!
-//! Connect MISO (GPIO2) and GPIO (GPIO3) pins.
+//! Connect MISO and GPIO pins.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -16,7 +16,7 @@ use esp_hal::{
     clock::Clocks,
     dma::{Channel, Dma, DmaPriority, DmaRxBuf},
     dma_buffers,
-    gpio::{GpioPin, Io, Level, Output},
+    gpio::{AnyOutput, AnyPin, Io, Level},
     prelude::*,
     spi::{
         master::{Address, Command, Spi, SpiDma},
@@ -42,14 +42,14 @@ cfg_if::cfg_if! {
 struct Context {
     spi: esp_hal::peripherals::SPI2,
     dma_channel: Channel<'static, DmaChannel0, Blocking>,
-    miso: esp_hal::gpio::GpioPin<2>,
-    miso_mirror: Output<'static, GpioPin<3>>,
+    miso: AnyPin<'static>,
+    miso_mirror: AnyOutput<'static>,
     clocks: Clocks<'static>,
 }
 
 fn execute(
     mut spi: SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
-    mut miso_mirror: Output<'static, GpioPin<3>>,
+    mut miso_mirror: AnyOutput<'static>,
     wanted: u8,
 ) {
     const DMA_BUFFER_SIZE: usize = 4;
@@ -102,9 +102,11 @@ mod tests {
         let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let miso = io.pins.gpio2;
 
-        let miso_mirror = Output::new(io.pins.gpio3, Level::High);
+        let (miso, miso_mirror) = hil_test::common_test_pins!(io);
+
+        let miso = AnyPin::new(miso);
+        let miso_mirror = AnyOutput::new(miso_mirror, Level::High);
 
         let dma = Dma::new(peripherals.DMA);
 

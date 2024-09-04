@@ -2,17 +2,17 @@
 //!
 //! Following pins are used:
 //! SCLK    GPIO0
-//! MOSI    GPIO3
-//! MISO    GPIO6
+//! MOSI    GPIO3 / GPIO10 (esp32s3)
+//! MISO    GPIO4
 //! CS      GPIO8
 //!
-//! PCNT    GPIO2
+//! PCNT    GPIO2 / GPIO9 (esp32s3)
 //! OUTPUT  GPIO5 (helper to keep MISO LOW)
 //!
 //! The idea of using PCNT (input) here is to connect MOSI to it and count the
 //! edges of whatever SPI writes (in this test case 3 pos edges).
 //!
-//! Connect PCNT (GPIO2) and MOSI (GPIO3) and MISO (GPIO6) and GPIO5 pins.
+//! Connect PCNT and MOSI, MISO and GPIO5 pins.
 
 //% CHIPS: esp32 esp32c6 esp32h2 esp32s3
 //% FEATURES: generic-queue
@@ -24,7 +24,7 @@ use embedded_hal_async::spi::SpiBus;
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{GpioPin, Io, Level, Output, Pull},
+    gpio::{AnyPin, GpioPin, Io, Level, Output, Pull},
     pcnt::{
         channel::{EdgeMode, PcntInputConfig, PcntSource},
         unit::Unit,
@@ -58,7 +58,7 @@ struct Context {
     spi: SpiDmaBus<'static, SPI2, DmaChannel0, FullDuplexMode, Async>,
     pcnt_unit: Unit<'static, 0>,
     out_pin: Output<'static, GpioPin<5>>,
-    mosi_mirror: GpioPin<2>,
+    mosi_mirror: AnyPin<'static>,
 }
 
 #[cfg(test)]
@@ -75,10 +75,11 @@ mod tests {
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let pcnt = Pcnt::new(peripherals.PCNT);
         let sclk = io.pins.gpio0;
-        let mosi_mirror = io.pins.gpio2;
-        let mosi = io.pins.gpio3;
-        let miso = io.pins.gpio6;
+
+        let (mosi_mirror, mosi) = hil_test::common_test_pins!(io);
+        let miso = io.pins.gpio4;
         let cs = io.pins.gpio8;
+        let mosi_mirror = AnyPin::new(mosi_mirror);
 
         let mut out_pin = Output::new(io.pins.gpio5, Level::Low);
         out_pin.set_low();

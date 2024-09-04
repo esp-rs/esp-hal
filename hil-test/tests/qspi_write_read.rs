@@ -3,11 +3,11 @@
 //! Make sure issue #1860 doesn't affect us
 //!
 //! Following pins are used:
-//! MOSI/MISO    GPIO2
+//! MOSI/MISO    GPIO2 / GPIO9 (esp32s2 and esp32s3)
 //!
-//! GPIO         GPIO3
+//! GPIO         GPIO3 / GPIO10 (esp32s2 and esp32s3)
 //!
-//! Connect MOSI/MISO (GPIO2) and GPIO (GPIO3) pins.
+//! Connect MOSI/MISO and GPIO pins.
 
 //% CHIPS: esp32 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -18,7 +18,7 @@ use esp_hal::{
     clock::Clocks,
     dma::{Channel, Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{GpioPin, Io, Level, Output},
+    gpio::{AnyOutput, AnyPin, Io, Level},
     prelude::*,
     spi::{
         master::{Address, Command, Spi, SpiDma},
@@ -44,14 +44,14 @@ cfg_if::cfg_if! {
 struct Context {
     spi: esp_hal::peripherals::SPI2,
     dma_channel: Channel<'static, DmaChannel0, Blocking>,
-    mosi: esp_hal::gpio::GpioPin<2>,
-    mosi_mirror: Output<'static, GpioPin<3>>,
+    mosi: AnyPin<'static>,
+    mosi_mirror: AnyOutput<'static>,
     clocks: Clocks<'static>,
 }
 
 fn execute(
     mut spi: SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
-    mut mosi_mirror: Output<'static, GpioPin<3>>,
+    mut mosi_mirror: AnyOutput<'static>,
     wanted: u8,
 ) {
     const DMA_BUFFER_SIZE: usize = 4;
@@ -104,8 +104,11 @@ mod tests {
         let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let mosi = io.pins.gpio2;
-        let mosi_mirror = Output::new(io.pins.gpio3, Level::High);
+
+        let (mosi, mosi_mirror) = hil_test::common_test_pins!(io);
+
+        let mosi = AnyPin::new(mosi);
+        let mosi_mirror = AnyOutput::new(mosi_mirror, Level::High);
 
         let dma = Dma::new(peripherals.DMA);
 

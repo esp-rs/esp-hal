@@ -1,10 +1,10 @@
 //! TWAI test
 //!
 //! Folowing pins are used:
-//! TX    GPIO2
-//! RX    GPIO3
+//! TX    GPIO2 / GPIO9 (esp32s2 and esp32s3)
+//! RX    GPIO3 / GPIO10 (esp32s2 and esp32s3)
 //!
-//! Connect TX (GPIO2) and RX (GPIO3) pins.
+//! Connect TX and RX pins.
 
 //% CHIPS: esp32c3 esp32c6 esp32s2 esp32s3
 
@@ -39,8 +39,7 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let can_tx_pin = io.pins.gpio2;
-        let can_rx_pin = io.pins.gpio3;
+        let (can_tx_pin, can_rx_pin) = hil_test::common_test_pins!(io);
 
         let mut config = twai::TwaiConfiguration::new(
             peripherals.TWAI0,

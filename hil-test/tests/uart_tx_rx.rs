@@ -1,10 +1,10 @@
 //! UART TX/RX Test
 //!
 //! Folowing pins are used:
-//! TX    GPIP2
-//! RX    GPIO3
+//! TX    GPIO2 / GPIO9 (esp32s2 and esp32s3)
+//! RX    GPIO3 / GPIO10 (esp32s2 and esp32s3)
 //!
-//! Connect TX (GPIO2) and RX (GPIO3) pins.
+//! Connect TX and RX pins.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -39,8 +39,10 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let tx = UartTx::new(peripherals.UART0, &clocks, io.pins.gpio2).unwrap();
-        let rx = UartRx::new(peripherals.UART1, &clocks, io.pins.gpio3).unwrap();
+        let (tx, rx) = hil_test::common_test_pins!(io);
+
+        let tx = UartTx::new(peripherals.UART0, &clocks, tx).unwrap();
+        let rx = UartRx::new(peripherals.UART1, &clocks, rx).unwrap();
 
         Context { tx, rx }
     }

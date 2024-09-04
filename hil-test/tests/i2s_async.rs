@@ -1,6 +1,7 @@
 //! I2S Loopback Test (Async)
 //!
 //! It's assumed GPIO2 is connected to GPIO3
+//! (GPIO9 and GPIO10 for esp32s3)
 //!
 //! This test uses I2S TX to transmit known data to I2S RX (forced to slave mode
 //! with loopback mode enabled). It's using circular DMA mode
@@ -109,18 +110,20 @@ mod tests {
             &clocks,
         );
 
+        let (dout, din) = hil_test::common_test_pins!(io);
+
         let i2s_tx = i2s
             .i2s_tx
             .with_bclk(unsafe { io.pins.gpio0.clone_unchecked() })
             .with_ws(unsafe { io.pins.gpio1.clone_unchecked() })
-            .with_dout(io.pins.gpio2)
+            .with_dout(dout)
             .build();
 
         let i2s_rx = i2s
             .i2s_rx
             .with_bclk(io.pins.gpio0)
             .with_ws(io.pins.gpio1)
-            .with_din(io.pins.gpio3)
+            .with_din(din)
             .build();
 
         // enable loopback testing

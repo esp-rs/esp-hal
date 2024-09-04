@@ -3,11 +3,11 @@
 //! This uses PCNT to count the edges of the MOSI signal
 //!
 //! Following pins are used:
-//! MOSI    GPIO2
+//! MOSI    GPIO2 / GPIO9 (esp32s2 and esp32s3)
 //!
-//! PCNT    GPIO3
+//! PCNT    GPIO3 / GPIO10 (esp32s2 and esp32s3)
 //!
-//! Connect MOSI (GPIO2) and PCNT (GPIO3) pins.
+//! Connect MOSI and PCNT pins.
 
 //% CHIPS: esp32 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -18,7 +18,7 @@ use esp_hal::{
     clock::Clocks,
     dma::{Channel, Dma, DmaPriority, DmaTxBuf},
     dma_buffers,
-    gpio::{Io, Pull},
+    gpio::{AnyPin, Io, Pull},
     pcnt::{
         channel::{EdgeMode, PcntInputConfig, PcntSource},
         unit::Unit,
@@ -50,8 +50,8 @@ struct Context {
     spi: esp_hal::peripherals::SPI2,
     pcnt: esp_hal::peripherals::PCNT,
     dma_channel: Channel<'static, DmaChannel0, Blocking>,
-    mosi: esp_hal::gpio::GpioPin<2>,
-    mosi_mirror: esp_hal::gpio::GpioPin<3>,
+    mosi: AnyPin<'static>,
+    mosi_mirror: AnyPin<'static>,
     clocks: Clocks<'static>,
 }
 
@@ -113,8 +113,11 @@ mod tests {
         let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let mosi = io.pins.gpio2;
-        let mosi_mirror = io.pins.gpio3;
+
+        let (mosi, mosi_mirror) = hil_test::common_test_pins!(io);
+
+        let mosi = AnyPin::new(mosi);
+        let mosi_mirror = AnyPin::new(mosi_mirror);
 
         let dma = Dma::new(peripherals.DMA);
 
