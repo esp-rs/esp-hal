@@ -85,6 +85,7 @@ INCLUDE "rodata.x"
 INCLUDE "rwtext.x"
 INCLUDE "rwdata.x"
 INCLUDE "stack.x"
+INCLUDE "dram2.x"
 /* End of Shared sections */
 
 INCLUDE "debug.x"

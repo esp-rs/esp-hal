@@ -24,6 +24,9 @@ MEMORY
   iram_seg ( RX )        : ORIGIN = 0x40370000 + RESERVE_ICACHE + VECTORS_SIZE, len = 328k - VECTORS_SIZE - RESERVE_ICACHE
   dram_seg ( RW )        : ORIGIN = 0x3FC88000 , len = 345856 
 
+  /* memory available after the 2nd stage bootloader is finished */
+  dram2_seg ( RW )       : ORIGIN = ORIGIN(dram_seg) + LENGTH(dram_seg), len = 0x3fced710 - (ORIGIN(dram_seg) + LENGTH(dram_seg))
+
   /* external flash 
      The 0x20 offset is a convenience for the app binary image generation.
      Flash cache has 64KB pages. The .bin file which is flashed to the chip

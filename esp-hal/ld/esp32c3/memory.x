@@ -13,14 +13,15 @@ MEMORY
                   [0x50000000, 0x50002000, "RTC_IRAM"],
                   [0x50000000, 0x50002000, "RTC_DRAM"],
                   [0x600FE000, 0x60100000, "MEM_INTERNAL2"]]
-    */
-    /* 400K of on soc RAM, 16K reserved for cache */
+
     ICACHE : ORIGIN = 0x4037C000,  LENGTH = 0x4000
     /* Instruction RAM */
-    IRAM : ORIGIN = 0x4037C000 + 0x4000, LENGTH = 400K - 0x4000
+    IRAM : ORIGIN = 0x4037C000 + 0x4000, LENGTH = 313K - 0x4000
     /* Data RAM */
-    DRAM : ORIGIN = 0x3FC80000, LENGTH = 0x50000
+    DRAM : ORIGIN = 0x3FC80000, LENGTH = 313K
     
+    /* memory available after the 2nd stage bootloader is finished */
+    dram2_seg ( RW )       : ORIGIN = ORIGIN(DRAM) + LENGTH(DRAM), len = 0x3fcde710 - (ORIGIN(DRAM) + LENGTH(DRAM))
 
     /* External flash */
     /* Instruction ROM */
