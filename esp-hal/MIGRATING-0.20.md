@@ -50,6 +50,7 @@ However, if you want to, you can keep using their typed form!
 ```rust
 let pin = Input::new(io.gpio0); // pin will have the type `Input<'some>` (or `Input<'some, ErasedPin>` if you want to be explicit about it)
 let pin = Input::new_typed(io.gpio0); // pin will have the type `Input<'some, GpioPin<0>>`
+```
 
 ## `esp_hal::time::current_time` rename
 
@@ -58,4 +59,25 @@ To avoid confusion with the `Rtc::current_time` wall clock time APIs, we've rena
 ```diff
 - use esp_hal::time::current_time;
 + use esp_hal::time::now;
+```
+
+## RX/TX Order
+
+Previously, or API was pretty inconsitent with the RX/TX ordering, and different peripherals had different order. Now, all
+the peripherals use rx-tx. Make sure your methods are expecting the rigth RX/TX order, for example an SPI DMA app should be updated to:
+
+```diff
+- let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(4);
++ let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
+let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+
+...
+
+ let transfer = spi
+-    .dma_transfer(dma_tx_buf, dma_rx_buf)
++    .dma_transfer(dma_rx_buf, dma_tx_buf)
+    .map_err(|e| e.0)
+    .unwrap();
+
 ```
