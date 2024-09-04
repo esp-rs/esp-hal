@@ -733,7 +733,7 @@ pub struct Config {
     /// The CPU clock configuration.
     pub cpu_clock: CpuClock,
     /// The slow RTC clock configuration. Some options choosed here may require a special bootloader!
-    pub slow_clock: RtcSlowClock,
+    pub rtc_slow_clock: RtcSlowClock,
 }
 
 /// Initialize the system.
@@ -742,7 +742,7 @@ pub struct Config {
 pub fn init(config: Config) -> (Peripherals, Clocks<'static>) {
     let peripherals = Peripherals::take();
     let clocks = ClockControl::new(config.cpu_clock).freeze();
-    configure_clock(config.slow_clock);
+    configure_clock(config.rtc_slow_clock);
 
     (peripherals, clocks)
 }
