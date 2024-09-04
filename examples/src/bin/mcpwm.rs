@@ -18,7 +18,7 @@ use esp_hal::{
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let pin = io.pins.gpio0;
@@ -32,7 +32,7 @@ fn main() -> ! {
         }
     }
 
-    let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, freq).unwrap();
+    let clock_cfg = PeripheralClockConfig::with_frequency(freq).unwrap();
 
     let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
 

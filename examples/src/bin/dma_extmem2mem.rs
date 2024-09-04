@@ -62,10 +62,10 @@ fn init_heap(psram: impl esp_hal::peripheral::Peripheral<P = esp_hal::peripheral
 fn main() -> ! {
     esp_println::logger::init_logger(log::LevelFilter::Info);
 
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     init_heap(peripherals.PSRAM);
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let mut extram_buffer: &mut [u8] = dma_alloc_buffer!(DATA_SIZE, 64);
     let mut intram_buffer = dma_buffer_aligned!(DATA_SIZE, A64);

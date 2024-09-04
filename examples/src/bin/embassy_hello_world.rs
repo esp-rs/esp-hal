@@ -25,12 +25,12 @@ async fn run() {
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     esp_println::println!("Init!");
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0.timer0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_hal_embassy::init(timg0.timer0);
 
     spawner.spawn(run()).ok();
 

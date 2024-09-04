@@ -82,10 +82,10 @@ async fn transmitter(
 
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0.timer0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_hal_embassy::init(timg0.timer0);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -103,7 +103,6 @@ async fn main(spawner: Spawner) {
         peripherals.TWAI0,
         can_tx_pin,
         can_rx_pin,
-        &clocks,
         CAN_BAUDRATE,
         TwaiMode::Normal,
     );

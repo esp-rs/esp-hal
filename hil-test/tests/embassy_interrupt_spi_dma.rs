@@ -72,16 +72,13 @@ mod test {
     #[test]
     #[timeout(3)]
     async fn run_interrupt_executor_test() {
-        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-        esp_hal_embassy::init(
-            &clocks,
-            [
-                ErasedTimer::from(timg0.timer0),
-                ErasedTimer::from(timg0.timer1),
-            ],
-        );
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        esp_hal_embassy::init([
+            ErasedTimer::from(timg0.timer0),
+            ErasedTimer::from(timg0.timer1),
+        ]);
 
         let dma = Dma::new(peripherals.DMA);
 
@@ -99,11 +96,11 @@ mod test {
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
-        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
             .with_dma(dma_channel1.configure_for_async(false, DmaPriority::Priority0))
             .with_buffers(dma_tx_buf, dma_rx_buf);
 
-        let spi2 = Spi::new(peripherals.SPI3, 100.kHz(), SpiMode::Mode0, &clocks)
+        let spi2 = Spi::new(peripherals.SPI3, 100.kHz(), SpiMode::Mode0)
             .with_dma(dma_channel2.configure_for_async(false, DmaPriority::Priority0));
 
         let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);

@@ -42,7 +42,7 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     cfg_if::cfg_if! {
@@ -63,17 +63,16 @@ fn main() -> ! {
         }
     }
 
-    let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
-        .with_pins(
-            Some(sclk),
-            Some(mosi),
-            Some(miso),
-            Some(sio2),
-            Some(sio3),
-            Some(cs),
-        );
+    let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0).with_pins(
+        Some(sclk),
+        Some(mosi),
+        Some(miso),
+        Some(sio2),
+        Some(sio3),
+        Some(cs),
+    );
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     loop {
         // READ MANUFACTURER ID FROM FLASH CHIP

@@ -293,13 +293,12 @@ impl EspWifiTimerSource for TimeBase {
 /// use esp_hal::{rng::Rng, timg::TimerGroup};
 /// use esp_wifi::EspWifiInitFor;
 ///
-/// let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+/// let timg0 = TimerGroup::new(peripherals.TIMG0);
 /// let init = esp_wifi::initialize(
 ///     EspWifiInitFor::Wifi,
 ///     timg0.timer0,
 ///     Rng::new(peripherals.RNG),
 ///     peripherals.RADIO_CLK,
-///     &clocks,
 /// )
 /// .unwrap();
 /// # }
@@ -309,10 +308,10 @@ pub fn initialize(
     timer: impl EspWifiTimerSource,
     rng: hal::rng::Rng,
     radio_clocks: hal::peripherals::RADIO_CLK,
-    clocks: &Clocks,
 ) -> Result<EspWifiInitialization, InitializationError> {
     // A minimum clock of 80MHz is required to operate WiFi module.
     const MIN_CLOCK: u32 = 80;
+    let clocks = Clocks::get();
     if clocks.cpu_clock < MegahertzU32::MHz(MIN_CLOCK) {
         return Err(InitializationError::WrongClockConfig);
     }

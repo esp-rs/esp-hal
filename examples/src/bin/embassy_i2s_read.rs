@@ -1,4 +1,4 @@
-//! This shows how to continously receive data via I2S.
+//! This shows how to continuously receive data via I2S.
 //!
 //! Without an additional I2S source device you can connect 3V3 or GND to DIN
 //! to read 0 or 0xFF or connect DIN to WS to read two different values.
@@ -32,10 +32,10 @@ use esp_println::println;
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
     println!("Init!");
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0.timer0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_hal_embassy::init(timg0.timer0);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -55,7 +55,6 @@ async fn main(_spawner: Spawner) {
         dma_channel.configure_for_async(false, DmaPriority::Priority0),
         tx_descriptors,
         rx_descriptors,
-        &clocks,
     );
 
     #[cfg(not(feature = "esp32"))]

@@ -3,7 +3,6 @@ use core::cell::{Cell, RefCell};
 use critical_section::Mutex;
 use embassy_time_driver::{AlarmHandle, Driver};
 use esp_hal::{
-    clock::Clocks,
     interrupt::{InterruptHandler, Priority},
     prelude::*,
     time::current_time,
@@ -45,7 +44,7 @@ embassy_time_driver::time_driver_impl!(static DRIVER: EmbassyTimer = EmbassyTime
 });
 
 impl EmbassyTimer {
-    pub(super) fn init(_clocks: &Clocks, timers: &'static mut [Timer]) {
+    pub(super) fn init(timers: &'static mut [Timer]) {
         if timers.len() > MAX_SUPPORTED_ALARM_COUNT {
             panic!(
                 "Maximum of {} timers can be used.",

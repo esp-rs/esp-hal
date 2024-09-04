@@ -29,7 +29,7 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let sclk = io.pins.gpio0;
@@ -40,14 +40,14 @@ fn main() -> ! {
     let miso = AnyPin::new(miso);
     let mosi = AnyPin::new(mosi);
 
-    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks).with_pins(
+    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0).with_pins(
         Some(sclk),
         Some(mosi),
         Some(miso),
         Some(cs),
     );
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     loop {
         let mut data = [0xde, 0xca, 0xfb, 0xad];

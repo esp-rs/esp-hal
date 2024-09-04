@@ -18,7 +18,7 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::{OneShotTimer, PeriodicTimer, timg::TimerGroup};
 //! #
-//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+//! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! let one_shot = OneShotTimer::new(timg0.timer0);
 //!
 //! one_shot.delay_millis(500);
@@ -30,7 +30,7 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::{PeriodicTimer, timg::TimerGroup};
 //! #
-//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+//! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! let mut periodic = PeriodicTimer::new(timg0.timer0);
 //!
 //! periodic.start(1.secs());

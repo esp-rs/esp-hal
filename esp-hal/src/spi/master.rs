@@ -50,7 +50,6 @@
 //!     peripherals.SPI2,
 //!     100.kHz(),
 //!     SpiMode::Mode0,
-//!     &clocks,
 //! )
 //! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs));
 //! # }
@@ -509,10 +508,9 @@ where
         spi: impl Peripheral<P = T> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
-        clocks: &Clocks<'d>,
     ) -> Spi<'d, T, FullDuplexMode> {
         crate::into_ref!(spi);
-        Self::new_internal(spi, frequency, mode, clocks)
+        Self::new_internal(spi, frequency, mode)
     }
 
     /// Assign the SCK (Serial Clock) pin for the SPI instance.
@@ -612,7 +610,6 @@ where
         spi: PeripheralRef<'d, T>,
         frequency: HertzU32,
         mode: SpiMode,
-        clocks: &Clocks<'d>,
     ) -> Spi<'d, T, FullDuplexMode> {
         spi.reset_peripheral();
         spi.enable_peripheral();
@@ -621,7 +618,7 @@ where
             spi,
             _mode: PhantomData,
         };
-        spi.spi.setup(frequency, clocks);
+        spi.spi.setup(frequency);
         spi.spi.init();
         spi.spi.set_data_mode(mode);
 
@@ -632,8 +629,8 @@ where
     ///
     /// This method allows user to update the bus frequency for the SPI
     /// communication after the instance has been created.
-    pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks<'d>) {
-        self.spi.ch_bus_freq(frequency, clocks);
+    pub fn change_bus_frequency(&mut self, frequency: HertzU32) {
+        self.spi.ch_bus_freq(frequency);
     }
 }
 
@@ -649,10 +646,9 @@ where
         spi: impl Peripheral<P = T> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
-        clocks: &Clocks<'d>,
     ) -> Spi<'d, T, HalfDuplexMode> {
         crate::into_ref!(spi);
-        Self::new_internal(spi, frequency, mode, clocks)
+        Self::new_internal(spi, frequency, mode)
     }
 
     /// Assign the SCK (Serial Clock) pin for the SPI instance.
@@ -820,7 +816,6 @@ where
         spi: PeripheralRef<'d, T>,
         frequency: HertzU32,
         mode: SpiMode,
-        clocks: &Clocks<'d>,
     ) -> Spi<'d, T, HalfDuplexMode> {
         spi.reset_peripheral();
         spi.enable_peripheral();
@@ -829,7 +824,7 @@ where
             spi,
             _mode: PhantomData,
         };
-        spi.spi.setup(frequency, clocks);
+        spi.spi.setup(frequency);
         spi.spi.init();
         spi.spi.set_data_mode(mode);
 
@@ -840,8 +835,8 @@ where
     ///
     /// This method allows you to update the bus frequency for the SPI
     /// communication after the instance has been created.
-    pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks<'d>) {
-        self.spi.ch_bus_freq(frequency, clocks);
+    pub fn change_bus_frequency(&mut self, frequency: HertzU32) {
+        self.spi.ch_bus_freq(frequency);
     }
 
     /// Set the bit order for the SPI instance.
@@ -1127,8 +1122,8 @@ mod dma {
         M: Mode,
     {
         /// Changes the SPI bus frequency for the DMA-enabled SPI instance.
-        pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks<'d>) {
-            self.spi.ch_bus_freq(frequency, clocks);
+        pub fn change_bus_frequency(&mut self, frequency: HertzU32) {
+            self.spi.ch_bus_freq(frequency);
         }
     }
 
@@ -1645,9 +1640,9 @@ mod dma {
         }
 
         /// Changes the SPI bus frequency for the DMA-enabled SPI instance.
-        pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks<'d>) {
+        pub fn change_bus_frequency(&mut self, frequency: HertzU32) {
             let (mut spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
-            spi_dma.change_bus_frequency(frequency, clocks);
+            spi_dma.change_bus_frequency(frequency);
             self.state = State::Idle(spi_dma, tx_buf, rx_buf);
         }
 
@@ -2831,7 +2826,8 @@ pub trait Instance: private::Sealed {
     }
 
     // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
-    fn setup(&mut self, frequency: HertzU32, clocks: &Clocks<'_>) {
+    fn setup(&mut self, frequency: HertzU32) {
+        let clocks = Clocks::get();
         cfg_if::cfg_if! {
             if #[cfg(esp32h2)] {
                 // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
@@ -3033,7 +3029,7 @@ pub trait Instance: private::Sealed {
         self
     }
 
-    fn ch_bus_freq(&mut self, frequency: HertzU32, clocks: &Clocks<'_>) {
+    fn ch_bus_freq(&mut self, frequency: HertzU32) {
         // Disable clock source
         #[cfg(not(any(esp32, esp32s2)))]
         self.register_block().clk_gate().modify(|_, w| {
@@ -3046,7 +3042,7 @@ pub trait Instance: private::Sealed {
         });
 
         // Change clock frequency
-        self.setup(frequency, clocks);
+        self.setup(frequency);
 
         // Enable clock source
         #[cfg(not(any(esp32, esp32s2)))]

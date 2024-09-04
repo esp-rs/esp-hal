@@ -86,10 +86,7 @@ mod tests {
     async fn test_i2s_loopback() {
         let spawner = embassy_executor::Spawner::for_current_executor().await;
 
-        let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
-
-        let peripherals = peripherals;
-        let clocks = clocks;
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -107,7 +104,6 @@ mod tests {
             dma_channel.configure_for_async(false, DmaPriority::Priority0),
             tx_descriptors,
             rx_descriptors,
-            &clocks,
         );
 
         let (dout, din) = hil_test::common_test_pins!(io);

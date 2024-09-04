@@ -19,9 +19,9 @@ use ieee802154::mac::{
 
 #[entry]
 fn main() -> ! {
-    let (mut peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let mut peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let mut ieee802154 = Ieee802154::new(peripherals.IEEE802154, &mut peripherals.RADIO_CLK);
 

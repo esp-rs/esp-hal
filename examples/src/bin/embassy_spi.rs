@@ -33,10 +33,10 @@ use esp_hal::{
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
     esp_println::println!("Init!");
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0.timer0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_hal_embassy::init(timg0.timer0);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let sclk = io.pins.gpio0;
@@ -58,7 +58,7 @@ async fn main(_spawner: Spawner) {
     let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
     let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
-    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
         .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
         .with_dma(dma_channel.configure_for_async(false, DmaPriority::Priority0))
         .with_buffers(dma_tx_buf, dma_rx_buf);

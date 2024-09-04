@@ -28,7 +28,7 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let (peripherals, clocks) = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let mut rtc = Rtc::new(peripherals.LPWR);
 
@@ -42,7 +42,7 @@ fn main() -> ! {
     let wake_reason = get_wakeup_cause();
     println!("wake reason: {:?}", wake_reason);
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let timer = TimerWakeupSource::new(Duration::from_secs(30));
     let mut wakeup_pins: [&mut dyn RtcPin; 2] = [&mut pin_0, &mut pin_2];
