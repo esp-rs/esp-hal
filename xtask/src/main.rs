@@ -58,6 +58,9 @@ struct ExampleArgs {
     chip: Chip,
     /// Optional example to act on (all examples used if omitted)
     example: Option<String>,
+    /// Build examples in debug mode only
+    #[arg(long)]
+    debug: bool,
 }
 
 #[derive(Debug, Args)]
@@ -236,6 +239,7 @@ fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Pat
             example,
             CargoAction::Build,
             1,
+            args.debug,
         )
     } else if args.example.is_some() {
         // An invalid argument was provided:
@@ -250,6 +254,7 @@ fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Pat
                 example,
                 CargoAction::Build,
                 1,
+                args.debug,
             )
         })
     }
@@ -269,6 +274,7 @@ fn run_example(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) 
             example,
             CargoAction::Run,
             1,
+            args.debug,
         )
     } else {
         bail!("Example not found or unsupported for the given chip")
@@ -300,6 +306,7 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
             test,
             action,
             args.repeat.unwrap_or(1),
+            false,
         )
     } else if args.test.is_some() {
         bail!("Test not found or unsupported for the given chip")
@@ -313,6 +320,7 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
                 &test,
                 action,
                 args.repeat.unwrap_or(1),
+                false,
             )
             .is_err()
             {

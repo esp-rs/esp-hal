@@ -211,6 +211,7 @@ pub fn execute_app(
     app: &Metadata,
     action: CargoAction,
     repeat: usize,
+    debug: bool,
 ) -> Result<()> {
     log::info!(
         "Building example '{}' for '{}'",
@@ -225,7 +226,16 @@ pub fn execute_app(
     };
 
     for features in feature_sets {
-        execute_app_with_features(package_path, chip, target, app, action, repeat, features)?;
+        execute_app_with_features(
+            package_path,
+            chip,
+            target,
+            app,
+            action,
+            repeat,
+            features,
+            debug,
+        )?;
     }
 
     Ok(())
@@ -241,6 +251,7 @@ pub fn execute_app_with_features(
     action: CargoAction,
     mut repeat: usize,
     mut features: Vec<String>,
+    debug: bool,
 ) -> Result<()> {
     if !features.is_empty() {
         log::info!("Features: {}", features.join(","));
@@ -269,19 +280,22 @@ pub fn execute_app_with_features(
 
     let mut builder = CargoArgsBuilder::default()
         .subcommand(subcommand)
-        .arg("--release")
         .target(target)
         .features(&features)
         .arg(bin);
 
+    if !debug {
+        builder.add_arg("--release");
+    }
+
     if subcommand == "test" && chip == Chip::Esp32c2 {
-        builder = builder.arg("--").arg("--speed").arg("15000");
+        builder.add_arg("--").add_arg("--speed").add_arg("15000");
     }
 
     // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
     if target.starts_with("xtensa") {
         builder = builder.toolchain("esp");
-        builder = builder.arg("-Zbuild-std=core,alloc")
+        builder.add_arg("-Zbuild-std=core,alloc");
     }
 
     let args = builder.build();

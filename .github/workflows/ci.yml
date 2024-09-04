@@ -139,7 +139,7 @@ jobs:
           cargo xtask build-package --features=esp32c3,wifi,ble,async --target=riscv32imc-unknown-none-elf   esp-wifi
           cargo xtask build-package --features=esp32c6,wifi,ble,async --target=riscv32imac-unknown-none-elf  esp-wifi
           cargo xtask build-package --features=esp32h2,ble,async --target=riscv32imac-unknown-none-elf  esp-wifi
-      
+
         # Verify the MSRV for all Xtensa chips:
       - name: msrv Xtensa (esp-hal)
         run: |

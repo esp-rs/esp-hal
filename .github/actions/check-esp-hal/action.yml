@@ -58,4 +58,4 @@ runs:
         	esp-hal
     - name: Build (examples)
       shell: bash
-      run: cargo +${{ inputs.toolchain }} xtask build-examples esp-hal ${{ inputs.device }}
+      run: cargo +${{ inputs.toolchain }} xtask build-examples esp-hal ${{ inputs.device }} --debug
