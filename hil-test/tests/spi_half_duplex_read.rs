@@ -21,7 +21,9 @@ use esp_hal::{
     prelude::*,
     spi::{
         master::{Address, Command, HalfDuplexReadWrite, Spi, SpiDma},
-        HalfDuplexMode, SpiDataMode, SpiMode,
+        HalfDuplexMode,
+        SpiDataMode,
+        SpiMode,
     },
     Blocking,
 };

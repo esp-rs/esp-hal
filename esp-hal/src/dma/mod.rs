@@ -42,7 +42,7 @@
 //! ));
 //! # }
 //! ```
-//!
+//! 
 //! ⚠️ Note: Descriptors should be sized as `(max_transfer_size + CHUNK_SIZE - 1) / CHUNK_SIZE`.
 //! I.e., to transfer buffers of size `1..=CHUNK_SIZE`, you need 1 descriptor.
 //!
@@ -54,7 +54,11 @@
 //! For convenience you can use the [crate::dma_buffers] macro.
 
 use core::{
-    cmp::min, fmt::Debug, marker::PhantomData, ptr::addr_of_mut, sync::atomic::compiler_fence,
+    cmp::min,
+    fmt::Debug,
+    marker::PhantomData,
+    ptr::addr_of_mut,
+    sync::atomic::compiler_fence,
 };
 
 trait Word: crate::private::Sealed {}
@@ -609,33 +613,33 @@ pub enum DmaPriority {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum DmaPeripheral {
-    Spi2 = 0,
+    Spi2      = 0,
     #[cfg(any(pdma, esp32s3))]
-    Spi3 = 1,
+    Spi3      = 1,
     #[cfg(any(esp32c6, esp32h2))]
-    Mem2Mem1 = 1,
+    Mem2Mem1  = 1,
     #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
-    Uhci0 = 2,
+    Uhci0     = 2,
     #[cfg(any(esp32, esp32s2, esp32c3, esp32c6, esp32h2, esp32s3))]
-    I2s0 = 3,
+    I2s0      = 3,
     #[cfg(any(esp32, esp32s3))]
-    I2s1 = 4,
+    I2s1      = 4,
     #[cfg(any(esp32c6, esp32h2))]
-    Mem2Mem4 = 4,
+    Mem2Mem4  = 4,
     #[cfg(esp32s3)]
-    LcdCam = 5,
+    LcdCam    = 5,
     #[cfg(any(esp32c6, esp32h2))]
-    Mem2Mem5 = 5,
+    Mem2Mem5  = 5,
     #[cfg(not(esp32c2))]
-    Aes = 6,
+    Aes       = 6,
     #[cfg(gdma)]
-    Sha = 7,
+    Sha       = 7,
     #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
-    Adc = 8,
+    Adc       = 8,
     #[cfg(esp32s3)]
-    Rmt = 9,
+    Rmt       = 9,
     #[cfg(parl_io)]
-    ParlIo = 9,
+    ParlIo    = 9,
     #[cfg(any(esp32c6, esp32h2))]
     Mem2Mem10 = 10,
     #[cfg(any(esp32c6, esp32h2))]
@@ -3041,7 +3045,8 @@ pub(crate) mod asynch {
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_ch0() {
             use crate::dma::gdma::{
-                Channel0 as Channel, Channel0RxImpl as ChannelRxImpl,
+                Channel0 as Channel,
+                Channel0RxImpl as ChannelRxImpl,
                 Channel0TxImpl as ChannelTxImpl,
             };
 
@@ -3052,7 +3057,8 @@ pub(crate) mod asynch {
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_ch1() {
             use crate::dma::gdma::{
-                Channel1 as Channel, Channel1RxImpl as ChannelRxImpl,
+                Channel1 as Channel,
+                Channel1RxImpl as ChannelRxImpl,
                 Channel1TxImpl as ChannelTxImpl,
             };
 
@@ -3063,7 +3069,8 @@ pub(crate) mod asynch {
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_ch2() {
             use crate::dma::gdma::{
-                Channel2 as Channel, Channel2RxImpl as ChannelRxImpl,
+                Channel2 as Channel,
+                Channel2RxImpl as ChannelRxImpl,
                 Channel2TxImpl as ChannelTxImpl,
             };
 
@@ -3074,7 +3081,8 @@ pub(crate) mod asynch {
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_ch3() {
             use crate::dma::gdma::{
-                Channel3 as Channel, Channel3RxImpl as ChannelRxImpl,
+                Channel3 as Channel,
+                Channel3RxImpl as ChannelRxImpl,
                 Channel3TxImpl as ChannelTxImpl,
             };
 
@@ -3085,7 +3093,8 @@ pub(crate) mod asynch {
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_ch4() {
             use crate::dma::gdma::{
-                Channel4 as Channel, Channel4RxImpl as ChannelRxImpl,
+                Channel4 as Channel,
+                Channel4RxImpl as ChannelRxImpl,
                 Channel4TxImpl as ChannelTxImpl,
             };
 
@@ -3102,7 +3111,8 @@ pub(crate) mod asynch {
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_spi2_dma() {
             use crate::dma::pdma::{
-                Spi2DmaChannel as Channel, Spi2DmaChannelRxImpl as ChannelRxImpl,
+                Spi2DmaChannel as Channel,
+                Spi2DmaChannelRxImpl as ChannelRxImpl,
                 Spi2DmaChannelTxImpl as ChannelTxImpl,
             };
 
@@ -3112,7 +3122,8 @@ pub(crate) mod asynch {
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_spi3_dma() {
             use crate::dma::pdma::{
-                Spi3DmaChannel as Channel, Spi3DmaChannelRxImpl as ChannelRxImpl,
+                Spi3DmaChannel as Channel,
+                Spi3DmaChannelRxImpl as ChannelRxImpl,
                 Spi3DmaChannelTxImpl as ChannelTxImpl,
             };
 
@@ -3122,7 +3133,8 @@ pub(crate) mod asynch {
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_i2s0() {
             use crate::dma::pdma::{
-                I2s0DmaChannel as Channel, I2s0DmaChannelRxImpl as ChannelRxImpl,
+                I2s0DmaChannel as Channel,
+                I2s0DmaChannelRxImpl as ChannelRxImpl,
                 I2s0DmaChannelTxImpl as ChannelTxImpl,
             };
 
@@ -3133,7 +3145,8 @@ pub(crate) mod asynch {
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_i2s1() {
             use crate::dma::pdma::{
-                I2s1DmaChannel as Channel, I2s1DmaChannelRxImpl as ChannelRxImpl,
+                I2s1DmaChannel as Channel,
+                I2s1DmaChannelRxImpl as ChannelRxImpl,
                 I2s1DmaChannelTxImpl as ChannelTxImpl,
             };
 

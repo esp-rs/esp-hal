@@ -52,7 +52,7 @@
 //! usb_serial.write_bytes(b"Hello, world!").expect("write error!");
 //! # }
 //! ```
-//!
+//! 
 //! ### Splitting the USB Serial/JTAG into TX and RX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -69,7 +69,7 @@
 //! let byte = rx.read_byte().expect("read error!");
 //! # }
 //! ```
-//!
+//! 
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 //! [embedded-io]: https://docs.rs/embedded-io/latest/embedded_io/
 //! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/

@@ -8,7 +8,8 @@
 use esp_hal::{
     aes::{
         dma::{CipherMode, WithDmaAes},
-        Aes, Mode,
+        Aes,
+        Mode,
     },
     dma::{Dma, DmaPriority},
     dma_buffers,

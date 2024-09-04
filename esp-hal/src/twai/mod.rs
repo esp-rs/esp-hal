@@ -74,7 +74,7 @@
 //! }
 //! # }
 //! ```
-//!
+//! 
 //! ### Self-testing (self reception of transmitted messages)
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]

@@ -648,8 +648,19 @@ mod m2m {
     use crate::dma::DmaExtMemBKSize;
     use crate::dma::{
         dma_private::{DmaSupport, DmaSupportRx},
-        Channel, ChannelRx, DescriptorChain, DmaChannel, DmaDescriptor, DmaEligible, DmaError,
-        DmaPeripheral, DmaTransferRx, ReadBuffer, RxPrivate, TxPrivate, WriteBuffer,
+        Channel,
+        ChannelRx,
+        DescriptorChain,
+        DmaChannel,
+        DmaDescriptor,
+        DmaEligible,
+        DmaError,
+        DmaPeripheral,
+        DmaTransferRx,
+        ReadBuffer,
+        RxPrivate,
+        TxPrivate,
+        WriteBuffer,
     };
 
     /// DMA Memory to Memory pseudo-Peripheral

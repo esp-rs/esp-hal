@@ -42,7 +42,7 @@
 //! // The decryption happens in-place, so the plaintext is in `block`
 //! # }
 //! ```
-//!
+//! 
 //! ### AES-DMA
 //!
 //! Visit the [AES-DMA] test for a more advanced example of using AES-DMA
@@ -218,7 +218,7 @@ impl crate::private::Sealed for Aes256 {}
 #[cfg(any(esp32, esp32s2))]
 pub enum Endianness {
     /// Big endian (most-significant byte at the smallest address)
-    BigEndian = 1,
+    BigEndian    = 1,
     /// Little endian (least-significant byte at the smallest address)
     LittleEndian = 0,
 }
@@ -235,8 +235,18 @@ pub mod dma {
         aes::{Key, Mode},
         dma::{
             dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
-            AesPeripheral, Channel, ChannelRx, ChannelTx, DescriptorChain, DmaChannel,
-            DmaDescriptor, DmaPeripheral, DmaTransferRxTx, ReadBuffer, RxPrivate, TxPrivate,
+            AesPeripheral,
+            Channel,
+            ChannelRx,
+            ChannelTx,
+            DescriptorChain,
+            DmaChannel,
+            DmaDescriptor,
+            DmaPeripheral,
+            DmaTransferRxTx,
+            ReadBuffer,
+            RxPrivate,
+            TxPrivate,
             WriteBuffer,
         },
     };

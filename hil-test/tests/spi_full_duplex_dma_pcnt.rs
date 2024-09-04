@@ -29,7 +29,8 @@ use esp_hal::{
     prelude::*,
     spi::{
         master::{Spi, SpiDma},
-        FullDuplexMode, SpiMode,
+        FullDuplexMode,
+        SpiMode,
     },
     Blocking,
 };

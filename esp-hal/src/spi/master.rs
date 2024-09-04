@@ -54,7 +54,7 @@
 //! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs));
 //! # }
 //! ```
-//!
+//! 
 //! [`embedded-hal-bus`]: https://docs.rs/embedded-hal-bus/latest/embedded_hal_bus/spi/index.html
 //! [`embassy-embedded-hal`]: https://docs.embassy.dev/embassy-embedded-hal/git/default/shared_bus/index.html
 
@@ -2001,7 +2001,7 @@ mod dma {
 
                     match spi_dma.dma_write(tx_buf) {
                         Ok(transfer) => {
-                            self.state = State::Writing(transfer, rx_buf,);
+                            self.state = State::Writing(transfer, rx_buf);
                         }
                         Err((e, spi, tx)) => {
                             self.state = State::Idle(spi, rx_buf, tx);
