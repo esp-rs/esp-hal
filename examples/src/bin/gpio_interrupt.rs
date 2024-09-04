@@ -24,9 +24,9 @@ use esp_hal::{
 
 cfg_if::cfg_if! {
     if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
-        static BUTTON: Mutex<RefCell<Option<Input<gpio::Gpio0>>>> = Mutex::new(RefCell::new(None));
+        static BUTTON: Mutex<RefCell<Option<Input<gpio::GpioPin<0>>>>> = Mutex::new(RefCell::new(None));
     } else {
-        static BUTTON: Mutex<RefCell<Option<Input<gpio::Gpio9>>>> = Mutex::new(RefCell::new(None));
+        static BUTTON: Mutex<RefCell<Option<Input<gpio::GpioPin<9>>>>> = Mutex::new(RefCell::new(None));
     }
 }
 

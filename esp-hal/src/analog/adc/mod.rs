@@ -252,14 +252,14 @@ trait AdcCalEfuse {
 
 macro_rules! impl_adc_interface {
     ($adc:ident [
-        $( ($pin:ident, $channel:expr) ,)+
+        $( (GpioPin<$pin:literal>, $channel:expr) ,)+
     ]) => {
         $(
-            impl $crate::analog::adc::AdcChannel for crate::gpio::$pin {
+            impl $crate::analog::adc::AdcChannel for crate::gpio::GpioPin<$pin> {
                 const CHANNEL: u8 = $channel;
             }
 
-            impl embedded_hal_02::adc::Channel<crate::peripherals::$adc> for crate::gpio::$pin {
+            impl embedded_hal_02::adc::Channel<crate::peripherals::$adc> for crate::gpio::GpioPin<$pin> {
                 type ID = u8;
 
                 fn channel() -> u8 { $channel }

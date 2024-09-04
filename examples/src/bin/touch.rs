@@ -27,7 +27,7 @@ use esp_hal::{
 };
 use esp_println::println;
 
-static TOUCH1: Mutex<RefCell<Option<TouchPad<gpio::Gpio4, Continous, Blocking>>>> =
+static TOUCH1: Mutex<RefCell<Option<TouchPad<gpio::GpioPin<4>, Continous, Blocking>>>> =
     Mutex::new(RefCell::new(None));
 
 #[handler]

@@ -51,11 +51,11 @@ use crate::{
 // reason, we will type alias the pins for ease of use later in this module:
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
-        type Dac1Gpio = gpio::Gpio25;
-        type Dac2Gpio = gpio::Gpio26;
+        type Dac1Gpio = gpio::GpioPin<25>;
+        type Dac2Gpio = gpio::GpioPin<26>;
     } else if #[cfg(esp32s2)] {
-        type Dac1Gpio = gpio::Gpio17;
-        type Dac2Gpio = gpio::Gpio18;
+        type Dac1Gpio = gpio::GpioPin<17>;
+        type Dac2Gpio = gpio::GpioPin<18>;
     }
 }
 

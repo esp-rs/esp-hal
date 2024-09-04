@@ -35,3 +35,7 @@ Instead of manually grabbing peripherals and setting up clocks, you should now c
      // ...
  }
 ```
+
+## GPIO changes
+
+The `GpioN` type aliasses are no longer available. You can use `GpioPin<N>` instead.
