@@ -1418,15 +1418,10 @@ macro_rules! gpio {
                 )+
             }
 
-            $(
-                #[doc = concat!("Alias for GpioPin<MODE, ", $gpionum, ">")]
-                pub type [<Gpio $gpionum >] = GpioPin<$gpionum>;
-            )+
-
             #[doc(hidden)]
             pub enum ErasedPin {
                 $(
-                    [<Gpio $gpionum >]([<Gpio $gpionum >]),
+                    [<Gpio $gpionum >](GpioPin<$gpionum>),
                 )+
             }
 

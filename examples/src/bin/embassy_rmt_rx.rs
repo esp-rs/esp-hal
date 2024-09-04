@@ -13,7 +13,7 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::{Gpio5, Io, Level, Output},
+    gpio::{GpioPin, Io, Level, Output},
     prelude::*,
     rmt::{asynch::RxChannelAsync, PulseCode, Rmt, RxChannelConfig, RxChannelCreatorAsync},
     timer::timg::TimerGroup,
@@ -26,7 +26,7 @@ const WIDTH: usize = 80;
 compile_error!("Run this example in release mode");
 
 #[embassy_executor::task]
-async fn signal_task(mut pin: Output<'static, Gpio5>) {
+async fn signal_task(mut pin: Output<'static, GpioPin<5>>) {
     loop {
         for _ in 0..10 {
             pin.toggle();

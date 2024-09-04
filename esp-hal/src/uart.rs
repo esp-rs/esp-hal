@@ -161,59 +161,59 @@ cfg_if::cfg_if! {
     if #[cfg(esp32)] {
         /// Default TX pin for UART0 on ESP32.
         /// Corresponds to GPIO1.
-        pub type DefaultTxPin = crate::gpio::Gpio1;
+        pub type DefaultTxPin = crate::gpio::GpioPin<1>;
 
         /// Default RX pin for UART0 on ESP32.
         /// Corresponds to GPIO3.
-        pub type DefaultRxPin = crate::gpio::Gpio3;
+        pub type DefaultRxPin = crate::gpio::GpioPin<3>;
     } else if #[cfg(esp32c2)] {
         /// Default TX pin for UART0 on ESP32-C2.
         /// Corresponds to GPIO20.
-        pub type DefaultTxPin = crate::gpio::Gpio20;
+        pub type DefaultTxPin = crate::gpio::GpioPin<20>;
 
         /// Default RX pin for UART0 on ESP32-C2.
         /// Corresponds to GPIO19.
-        pub type DefaultRxPin = crate::gpio::Gpio19;
+        pub type DefaultRxPin = crate::gpio::GpioPin<19>;
     } else if #[cfg(esp32c3)] {
         /// Default TX pin for UART0 on ESP32-C3.
         /// Corresponds to GPIO21.
-        pub type DefaultTxPin = crate::gpio::Gpio21;
+        pub type DefaultTxPin = crate::gpio::GpioPin<21>;
 
         /// Default RX pin for UART0 on ESP32-C3.
         /// Corresponds to GPIO20.
-        pub type DefaultRxPin = crate::gpio::Gpio20;
+        pub type DefaultRxPin = crate::gpio::GpioPin<20>;
     } else if #[cfg(esp32c6)] {
         /// Default TX pin for UART0 on ESP32-C6.
         /// Corresponds to GPIO16.
-        pub type DefaultTxPin = crate::gpio::Gpio16;
+        pub type DefaultTxPin = crate::gpio::GpioPin<16>;
 
         /// Default RX pin for UART0 on ESP32-C6.
         /// Corresponds to GPIO17.
-        pub type DefaultRxPin = crate::gpio::Gpio17;
+        pub type DefaultRxPin = crate::gpio::GpioPin<17>;
     } else if #[cfg(esp32h2)] {
         /// Default TX pin for UART0 on ESP32-H2.
         /// Corresponds to GPIO24.
-        pub type DefaultTxPin = crate::gpio::Gpio24;
+        pub type DefaultTxPin = crate::gpio::GpioPin<24>;
 
         /// Default RX pin for UART0 on ESP32-H2.
         /// Corresponds to GPIO23.
-        pub type DefaultRxPin = crate::gpio::Gpio23;
+        pub type DefaultRxPin = crate::gpio::GpioPin<23>;
     } else if #[cfg(esp32s2)] {
         /// Default TX pin for UART0 on ESP32-S2.
         /// Corresponds to GPIO43.
-        pub type DefaultTxPin = crate::gpio::Gpio43;
+        pub type DefaultTxPin = crate::gpio::GpioPin<43>;
 
         /// Default RX pin for UART0 on ESP32-S2.
         /// Corresponds to GPIO44.
-        pub type DefaultRxPin = crate::gpio::Gpio44;
+        pub type DefaultRxPin = crate::gpio::GpioPin<44>;
     } else if #[cfg(esp32s3)] {
         /// Default TX pin for UART0 on ESP32-S3.
         /// Corresponds to GPIO43.
-        pub type DefaultTxPin = crate::gpio::Gpio43;
+        pub type DefaultTxPin = crate::gpio::GpioPin<43>;
 
         /// Default RX pin for UART0 on ESP32-S3.
         /// Corresponds to GPIO44.
-        pub type DefaultRxPin = crate::gpio::Gpio44;
+        pub type DefaultRxPin = crate::gpio::GpioPin<44>;
     }
 }
 

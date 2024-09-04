@@ -34,7 +34,7 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::{Gpio4, Gpio5, Gpio8, Gpio9, Input, Io, Level, Output, Pull},
+    gpio::{GpioPin, Input, Io, Level, Output, Pull},
     prelude::*,
     spi::{
         slave::{prelude::*, Spi},
@@ -189,10 +189,10 @@ fn main() -> ! {
 fn bitbang_master(
     master_send: &[u8],
     master_receive: &mut [u8],
-    master_cs: &mut Output<Gpio9>,
-    master_mosi: &mut Output<Gpio8>,
-    master_sclk: &mut Output<Gpio4>,
-    master_miso: &Input<Gpio5>,
+    master_cs: &mut Output<GpioPin<9>>,
+    master_mosi: &mut Output<GpioPin<8>>,
+    master_sclk: &mut Output<GpioPin<4>>,
+    master_miso: &Input<GpioPin<5>>,
 ) {
     // Bit-bang out the contents of master_send and read into master_receive
     // as quickly as manageable. MSB first. Mode 0, so sampled on the rising
