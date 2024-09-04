@@ -1430,7 +1430,7 @@ where
     pub fn write_dma<'t, TXBUF>(
         &'t mut self,
         words: &'t TXBUF,
-    ) -> Result<DmaTransferTx<'_, Self>, Error>
+    ) -> Result<DmaTransferTx<'t, Self>, Error>
     where
         TXBUF: ReadBuffer,
     {
@@ -1526,7 +1526,7 @@ where
     pub fn read_dma<'t, RXBUF>(
         &'t mut self,
         words: &'t mut RXBUF,
-    ) -> Result<DmaTransferRx<'_, Self>, Error>
+    ) -> Result<DmaTransferRx<'t, Self>, Error>
     where
         RXBUF: WriteBuffer,
     {

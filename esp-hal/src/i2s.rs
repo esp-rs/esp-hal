@@ -272,7 +272,7 @@ where
     /// Write I2S.
     /// Returns [DmaTransferTx] which represents the in-progress DMA
     /// transfer
-    fn write_dma<'t>(&'t mut self, words: &'t TXBUF) -> Result<DmaTransferTx<'_, Self>, Error>
+    fn write_dma<'t>(&'t mut self, words: &'t TXBUF) -> Result<DmaTransferTx<'t, Self>, Error>
     where
         TXBUF: ReadBuffer;
 
@@ -281,7 +281,7 @@ where
     fn write_dma_circular<'t>(
         &'t mut self,
         words: &'t TXBUF,
-    ) -> Result<DmaTransferTxCircular<'_, Self>, Error>
+    ) -> Result<DmaTransferTxCircular<'t, Self>, Error>
     where
         TXBUF: ReadBuffer;
 }
@@ -304,7 +304,7 @@ where
     /// Read I2S.
     /// Returns [DmaTransferRx] which represents the in-progress DMA
     /// transfer
-    fn read_dma<'t>(&'t mut self, words: &'t mut RXBUF) -> Result<DmaTransferRx<'_, Self>, Error>
+    fn read_dma<'t>(&'t mut self, words: &'t mut RXBUF) -> Result<DmaTransferRx<'t, Self>, Error>
     where
         RXBUF: WriteBuffer;
 
@@ -314,7 +314,7 @@ where
     fn read_dma_circular<'t>(
         &'t mut self,
         words: &'t mut RXBUF,
-    ) -> Result<DmaTransferRxCircular<'_, Self>, Error>
+    ) -> Result<DmaTransferRxCircular<'t, Self>, Error>
     where
         RXBUF: WriteBuffer;
 }
@@ -663,7 +663,7 @@ where
     CH: DmaChannel,
     DmaMode: Mode,
 {
-    fn write_dma<'t>(&'t mut self, words: &'t TXBUF) -> Result<DmaTransferTx<'_, Self>, Error>
+    fn write_dma<'t>(&'t mut self, words: &'t TXBUF) -> Result<DmaTransferTx<'t, Self>, Error>
     where
         TXBUF: ReadBuffer,
     {
@@ -674,7 +674,7 @@ where
     fn write_dma_circular<'t>(
         &'t mut self,
         words: &'t TXBUF,
-    ) -> Result<DmaTransferTxCircular<'_, Self>, Error>
+    ) -> Result<DmaTransferTxCircular<'t, Self>, Error>
     where
         TXBUF: ReadBuffer,
     {
@@ -844,7 +844,7 @@ where
     DmaMode: Mode,
     Self: DmaSupportRx + Sized,
 {
-    fn read_dma<'t>(&'t mut self, words: &'t mut RXBUF) -> Result<DmaTransferRx<'_, Self>, Error>
+    fn read_dma<'t>(&'t mut self, words: &'t mut RXBUF) -> Result<DmaTransferRx<'t, Self>, Error>
     where
         RXBUF: WriteBuffer,
     {
@@ -855,7 +855,7 @@ where
     fn read_dma_circular<'t>(
         &'t mut self,
         words: &'t mut RXBUF,
-    ) -> Result<DmaTransferRxCircular<'_, Self>, Error>
+    ) -> Result<DmaTransferRxCircular<'t, Self>, Error>
     where
         RXBUF: WriteBuffer,
     {

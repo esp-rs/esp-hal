@@ -417,7 +417,7 @@ pub mod dma {
             mode: Mode,
             cipher_mode: CipherMode,
             key: K,
-        ) -> Result<DmaTransferTxRx<'_, Self>, crate::dma::DmaError>
+        ) -> Result<DmaTransferTxRx<'t, Self>, crate::dma::DmaError>
         where
             K: Into<Key>,
             TXBUF: ReadBuffer,
