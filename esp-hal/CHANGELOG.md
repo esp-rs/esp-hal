@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the `async`, `embedded-hal-02`, `embedded-hal`, `embedded-io`, `embedded-io-async`, and `ufmt` features (#2070)
 - Removed the `GpioN` type aliasses. Use `GpioPin<N>` instead. (#2073)
 - Removed `Peripherals::take`. Use `esp_hal::init` to obtain `Peripherals` (#1999)
+- Removed `AnyInputOnlyPin` in favour of `AnyPin`. (#2071)
 
 ## [0.20.1] - 2024-08-30
 

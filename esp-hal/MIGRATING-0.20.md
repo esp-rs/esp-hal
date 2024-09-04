@@ -38,4 +38,6 @@ Instead of manually grabbing peripherals and setting up clocks, you should now c
 
 ## GPIO changes
 
-The `GpioN` type aliasses are no longer available. You can use `GpioPin<N>` instead.
+ - The `GpioN` type aliasses are no longer available. You can use `GpioPin<N>` instead.
+ - The `AnyInputOnlyPin` has been removed. Replace any use with `AnyPin`.
+ - The `NoPinType` has been removed. You can use `DummyPin` in its place.
