@@ -61,7 +61,7 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn test_current_time_construct_timg0(ctx: Context) {
-        time_moves_forward_during(ctx, |ctx| {
+        time_moves_forward_during(ctx, |_| {
             // construct the timer in between calls to current_time
             let _ = esp_hal::timer::timg::TimerGroup::new(unsafe {
                 esp_hal::peripherals::TIMG0::steal()

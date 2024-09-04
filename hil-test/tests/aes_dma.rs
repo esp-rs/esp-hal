@@ -14,7 +14,6 @@ use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
     peripherals::Peripherals,
-    prelude::*,
 };
 use hil_test as _;
 

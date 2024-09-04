@@ -60,7 +60,7 @@ mod tests {
         let sclk = io.pins.gpio0;
         let (miso, miso_mirror) = hil_test::common_test_pins!(io);
 
-        let miso_mirror = AnyOutput::new(miso_mirror, Level::High);
+        let miso_mirror = Output::new(miso_mirror, Level::High);
 
         let dma = Dma::new(peripherals.DMA);
 

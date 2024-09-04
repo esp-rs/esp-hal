@@ -17,7 +17,7 @@
 use esp_hal::{
     dma::{Channel, Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{AnyPin, Io, Level, Output},
+    gpio::{ErasedPin, Io, Level, Output},
     prelude::*,
     spi::{
         master::{Address, Command, Spi, SpiDma},
@@ -106,7 +106,7 @@ mod tests {
         let (mosi, mosi_mirror) = hil_test::common_test_pins!(io);
 
         let mosi = mosi.degrade();
-        let mosi_mirror = AnyOutput::new(mosi_mirror, Level::High);
+        let mosi_mirror = Output::new(mosi_mirror, Level::High);
 
         let dma = Dma::new(peripherals.DMA);
 

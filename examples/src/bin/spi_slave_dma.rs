@@ -34,7 +34,7 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::{GpioPin, Input, Io, Level, Output, Pull},
+    gpio::{Input, Io, Level, Output, Pull},
     prelude::*,
     spi::{
         slave::{prelude::*, Spi},
@@ -48,17 +48,16 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let slave_sclk = io.pins.gpio0;
+
     let mut master_sclk = Output::new(io.pins.gpio4, Level::Low);
-    let slave_miso = io.pins.gpio1;
     let master_miso = Input::new(io.pins.gpio5, Pull::None);
-    let slave_mosi = io.pins.gpio2;
     let mut master_mosi = Output::new(io.pins.gpio8, Level::Low);
+    let mut master_cs = Output::new(io.pins.gpio9, Level::High);
+
+    let slave_sclk = io.pins.gpio0;
+    let slave_miso = io.pins.gpio1;
+    let slave_mosi = io.pins.gpio2;
     let slave_cs = io.pins.gpio3;
-    let mut master_cs = Output::new(io.pins.gpio9, Level::Low);
-    master_cs.set_high();
-    master_sclk.set_low();
-    master_mosi.set_low();
 
     let dma = Dma::new(peripherals.DMA);
     cfg_if::cfg_if! {
@@ -189,10 +188,10 @@ fn main() -> ! {
 fn bitbang_master(
     master_send: &[u8],
     master_receive: &mut [u8],
-    master_cs: &mut Output<GpioPin<9>>,
-    master_mosi: &mut Output<GpioPin<8>>,
-    master_sclk: &mut Output<GpioPin<4>>,
-    master_miso: &Input<GpioPin<5>>,
+    master_cs: &mut Output,
+    master_mosi: &mut Output,
+    master_sclk: &mut Output,
+    master_miso: &Input,
 ) {
     // Bit-bang out the contents of master_send and read into master_receive
     // as quickly as manageable. MSB first. Mode 0, so sampled on the rising

@@ -15,7 +15,7 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp_hal::{
     delay::Delay,
-    gpio::{AnyPin, GpioPin, Input, Io, Level, Output, Pull},
+    gpio::{AnyPin, ErasedPin, Input, Io, Level, Output, Pin, Pull},
     macros::handler,
     timer::timg::TimerGroup,
     InterruptConfigurable,
@@ -23,11 +23,11 @@ use esp_hal::{
 use hil_test as _;
 
 static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
-static INPUT_PIN: Mutex<RefCell<Option<Input<'static>>>> = Mutex::new(RefCell::new(None));
+static INPUT_PIN: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
 
-struct Context<'d> {
-    test_gpio1: Input<'d>,
-    test_gpio2: Output<'d>,
+struct Context {
+    test_gpio1: ErasedPin,
+    test_gpio2: ErasedPin,
     delay: Delay,
 }
 
@@ -53,7 +53,7 @@ mod tests {
     use super::*;
 
     #[init]
-    fn init() -> Context<'static> {
+    fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -67,20 +67,22 @@ mod tests {
         esp_hal_embassy::init(timg0.timer0);
 
         Context {
-            test_gpio1: Input::new(gpio1, Pull::Down),
-            test_gpio2: Output::new(gpio2, Level::Low),
+            test_gpio1: gpio1.degrade(),
+            test_gpio2: gpio2.degrade(),
             delay,
         }
     }
 
     #[test]
-    async fn test_async_edge(ctx: Context<'static>) {
+    async fn test_async_edge(ctx: Context) {
         let counter = AtomicUsize::new(0);
         let Context {
-            mut test_gpio1,
-            mut test_gpio2,
+            test_gpio1,
+            test_gpio2,
             ..
         } = ctx;
+        let mut test_gpio1 = Input::new(test_gpio1, Pull::Down);
+        let mut test_gpio2 = Output::new(test_gpio2, Level::Low);
         embassy_futures::select::select(
             async {
                 loop {
@@ -102,8 +104,8 @@ mod tests {
     }
 
     #[test]
-    async fn test_a_pin_can_wait(_ctx: Context<'static>) {
-        let mut first = Input::new(unsafe { GpioPin::<0>::steal() }, Pull::Down);
+    async fn test_a_pin_can_wait(ctx: Context) {
+        let mut first = Input::new(ctx.test_gpio1, Pull::Down);
 
         embassy_futures::select::select(
             first.wait_for_rising_edge(),
@@ -115,69 +117,74 @@ mod tests {
     }
 
     #[test]
-    fn test_gpio_input(ctx: Context<'static>) {
+    fn test_gpio_input(ctx: Context) {
+        let test_gpio1 = Input::new(ctx.test_gpio1, Pull::Down);
         // `InputPin`:
-        assert_eq!(ctx.test_gpio1.is_low(), true);
-        assert_eq!(ctx.test_gpio1.is_high(), false);
+        assert_eq!(test_gpio1.is_low(), true);
+        assert_eq!(test_gpio1.is_high(), false);
     }
 
     #[test]
-    fn test_gpio_output(mut ctx: Context<'static>) {
+    fn test_gpio_output(ctx: Context) {
+        let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low);
+
         // `StatefulOutputPin`:
-        assert_eq!(ctx.test_gpio2.is_set_low(), true);
-        assert_eq!(ctx.test_gpio2.is_set_high(), false);
-        ctx.test_gpio2.set_high();
-        assert_eq!(ctx.test_gpio2.is_set_low(), false);
-        assert_eq!(ctx.test_gpio2.is_set_high(), true);
+        assert_eq!(test_gpio2.is_set_low(), true);
+        assert_eq!(test_gpio2.is_set_high(), false);
+        test_gpio2.set_high();
+        assert_eq!(test_gpio2.is_set_low(), false);
+        assert_eq!(test_gpio2.is_set_high(), true);
 
         // `ToggleableOutputPin`:
-        ctx.test_gpio2.toggle();
-        assert_eq!(ctx.test_gpio2.is_set_low(), true);
-        assert_eq!(ctx.test_gpio2.is_set_high(), false);
-        ctx.test_gpio2.toggle();
-        assert_eq!(ctx.test_gpio2.is_set_low(), false);
-        assert_eq!(ctx.test_gpio2.is_set_high(), true);
+        test_gpio2.toggle();
+        assert_eq!(test_gpio2.is_set_low(), true);
+        assert_eq!(test_gpio2.is_set_high(), false);
+        test_gpio2.toggle();
+        assert_eq!(test_gpio2.is_set_low(), false);
+        assert_eq!(test_gpio2.is_set_high(), true);
     }
 
     #[test]
-    fn test_gpio_interrupt(mut ctx: Context<'static>) {
+    fn test_gpio_interrupt(ctx: Context) {
+        let mut test_gpio1 = Input::new(ctx.test_gpio1, Pull::Down);
+        let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low);
+
         critical_section::with(|cs| {
             *COUNTER.borrow_ref_mut(cs) = 0;
-            ctx.test_gpio1.listen(Event::AnyEdge);
-            INPUT_PIN.borrow_ref_mut(cs).replace(ctx.test_gpio1);
+            test_gpio1.listen(Event::AnyEdge);
+            INPUT_PIN.borrow_ref_mut(cs).replace(test_gpio1);
         });
-        ctx.test_gpio2.set_high();
+        test_gpio2.set_high();
         ctx.delay.delay_millis(1);
-        ctx.test_gpio2.set_low();
+        test_gpio2.set_low();
         ctx.delay.delay_millis(1);
-        ctx.test_gpio2.set_high();
+        test_gpio2.set_high();
         ctx.delay.delay_millis(1);
-        ctx.test_gpio2.set_low();
+        test_gpio2.set_low();
         ctx.delay.delay_millis(1);
-        ctx.test_gpio2.set_high();
+        test_gpio2.set_high();
         ctx.delay.delay_millis(1);
-        ctx.test_gpio2.set_low();
+        test_gpio2.set_low();
         ctx.delay.delay_millis(1);
-        ctx.test_gpio2.set_high();
+        test_gpio2.set_high();
         ctx.delay.delay_millis(1);
-        ctx.test_gpio2.set_low();
+        test_gpio2.set_low();
         ctx.delay.delay_millis(1);
-        ctx.test_gpio2.set_high();
+        test_gpio2.set_high();
         ctx.delay.delay_millis(1);
 
         let count = critical_section::with(|cs| *COUNTER.borrow_ref(cs));
         assert_eq!(count, 9);
 
-        ctx.test_gpio1 = critical_section::with(|cs| INPUT_PIN.borrow_ref_mut(cs).take().unwrap());
-        ctx.test_gpio1.unlisten();
-    }
-
-    #[test]
-    fn test_gpio_od(ctx: Context<'static>) {
         let mut test_gpio1 =
-            OutputOpenDrain::new(unsafe { TestGpio1::steal() }, Level::High, Pull::Up);
-        let mut test_gpio2 =
-            OutputOpenDrain::new(unsafe { TestGpio2::steal() }, Level::High, Pull::Up);
+            critical_section::with(|cs| INPUT_PIN.borrow_ref_mut(cs).take().unwrap());
+        test_gpio1.unlisten();
+    }
+
+    #[test]
+    fn test_gpio_od(ctx: Context) {
+        let mut test_gpio1 = OutputOpenDrain::new(ctx.test_gpio1, Level::High, Pull::Up);
+        let mut test_gpio2 = OutputOpenDrain::new(ctx.test_gpio2, Level::High, Pull::Up);
 
         ctx.delay.delay_millis(1);
 
@@ -221,9 +228,9 @@ mod tests {
     }
 
     #[test]
-    fn test_gpio_flex(ctx: Context<'static>) {
-        let mut test_gpio1 = Flex::new(unsafe { TestGpio1::steal() });
-        let mut test_gpio2 = Flex::new(unsafe { TestGpio2::steal() });
+    fn test_gpio_flex(ctx: Context) {
+        let mut test_gpio1 = Flex::new(ctx.test_gpio1);
+        let mut test_gpio2 = Flex::new(ctx.test_gpio2);
 
         test_gpio1.set_high();
         test_gpio1.set_as_output();
@@ -263,9 +270,9 @@ mod tests {
     // Tests touch pin (GPIO2) as AnyPin and Output
     // https://github.com/esp-rs/esp-hal/issues/1943
     #[test]
-    fn test_gpio_touch_anypin_output() {
-        let any_pin2 = AnyPin::new(unsafe { TestGpio1::steal() });
-        let any_pin3 = AnyPin::new(unsafe { TestGpio2::steal() });
+    fn test_gpio_touch_anypin_output(ctx: Context) {
+        let any_pin2 = AnyPin::new(ctx.test_gpio1);
+        let any_pin3 = AnyPin::new(ctx.test_gpio2);
 
         let out_pin = Output::new(any_pin2, Level::High);
         let in_pin = Input::new(any_pin3, Pull::Down);
@@ -277,9 +284,9 @@ mod tests {
     // Tests touch pin (GPIO2) as AnyPin and Input
     // https://github.com/esp-rs/esp-hal/issues/1943
     #[test]
-    fn test_gpio_touch_anypin_input() {
-        let any_pin2 = AnyPin::new(unsafe { TestGpio1::steal() });
-        let any_pin3 = AnyPin::new(unsafe { TestGpio2::steal() });
+    fn test_gpio_touch_anypin_input(ctx: Context) {
+        let any_pin2 = AnyPin::new(ctx.test_gpio1);
+        let any_pin3 = AnyPin::new(ctx.test_gpio2);
 
         let out_pin = Output::new(any_pin3, Level::Low);
         let in_pin = Input::new(any_pin2, Pull::Down);

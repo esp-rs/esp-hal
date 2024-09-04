@@ -17,20 +17,12 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::{Event, GpioPin, Input, Io, Level, Output, Pull},
+    gpio::{Event, Input, Io, Level, Output, Pull},
     macros::ram,
     prelude::*,
 };
 
-cfg_if::cfg_if! {
-    if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
-        const BUTTON_PIN: u8 = 0;
-    } else {
-        const BUTTON_PIN: u8 = 9;
-    }
-}
-
-static BUTTON: Mutex<RefCell<Option<Input<GpioPin<BUTTON_PIN>>>>> = Mutex::new(RefCell::new(None));
+static BUTTON: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {

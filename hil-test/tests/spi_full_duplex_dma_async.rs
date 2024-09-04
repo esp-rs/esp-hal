@@ -24,7 +24,7 @@ use embedded_hal_async::spi::SpiBus;
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{ErasedPin, GpioPin, Io, Level, Output, Pull},
+    gpio::{ErasedPin, Io, Level, Output, Pull},
     pcnt::{
         channel::{EdgeMode, PcntInputConfig, PcntSource},
         unit::Unit,
