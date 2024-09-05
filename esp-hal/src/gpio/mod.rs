@@ -1089,17 +1089,6 @@ where
     }
 }
 
-#[cfg(any(adc, dac))]
-impl<const GPIONUM: u8> AnalogPin for GpioPin<GPIONUM>
-where
-    Self: GpioProperties<IsAnalog = True>,
-{
-    /// Configures the pin for analog mode.
-    fn set_analog(&self, _: private::Internal) {
-        crate::soc::gpio::internal_into_analog(GPIONUM);
-    }
-}
-
 #[cfg(touch)]
 impl<const GPIONUM: u8> TouchPin for GpioPin<GPIONUM>
 where
@@ -1541,8 +1530,6 @@ macro_rules! rtc_pins {
     ( $( $pin_num:expr )+ ) => { $( $crate::gpio::rtc_pins!($pin_num); )+ };
 }
 
-// Following code enables `into_analog`
-
 #[doc(hidden)]
 pub fn enable_iomux_clk_gate() {
     cfg_if::cfg_if! {
@@ -1572,52 +1559,52 @@ macro_rules! analog {
             )
         )+
     ) => {
-        pub(crate) fn internal_into_analog(pin: u8) {
-            use $crate::peripherals::RTC_IO;
+        $(
+            #[cfg(any(adc, dac))]
+            impl $crate::gpio::AnalogPin for GpioPin<$pin_num>
+            where
+                Self: $crate::gpio::GpioProperties<IsAnalog = $crate::gpio::True>,
+            {
+                /// Configures the pin for analog mode.
+                fn set_analog(&self, _: $crate::private::Internal) {
+                    let rtcio = unsafe{ &*$crate::peripherals::RTC_IO::ptr() };
 
-            let rtcio = unsafe{ &*RTC_IO::ptr() };
-            #[cfg(esp32s2)]
-            $crate::gpio::enable_iomux_clk_gate();
+                    #[cfg(esp32s2)]
+                    $crate::gpio::enable_iomux_clk_gate();
 
-            match pin {
-                $(
-                    $pin_num => {
-                        // We need `paste` (and a [< >] in it) to rewrite the token stream to
-                        // handle indexed pins.
-                        paste::paste! {
-                            // disable input
-                            rtcio.$pin_reg.modify(|_,w| w.$fun_ie().bit([< false >]));
+                    // We need `paste` (and a [< >] in it) to rewrite the token stream to
+                    // handle indexed pins.
+                    paste::paste! {
+                        // disable input
+                        rtcio.$pin_reg.modify(|_,w| w.$fun_ie().bit([< false >]));
 
-                            // disable output
-                            rtcio.enable_w1tc().write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
+                        // disable output
+                        rtcio.enable_w1tc().write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
 
-                            // disable open drain
-                            rtcio.pin($rtc_pin).modify(|_,w| w.pad_driver().bit(false));
+                        // disable open drain
+                        rtcio.pin($rtc_pin).modify(|_,w| w.pad_driver().bit(false));
 
-                            rtcio.$pin_reg.modify(|_,w| {
-                                w.$fun_ie().clear_bit();
+                        rtcio.$pin_reg.modify(|_,w| {
+                            w.$fun_ie().clear_bit();
 
-                                // Connect pin to analog / RTC module instead of standard GPIO
-                                w.$mux_sel().set_bit();
+                            // Connect pin to analog / RTC module instead of standard GPIO
+                            w.$mux_sel().set_bit();
 
-                                // Select function "RTC function 1" (GPIO) for analog use
-                                unsafe { w.$fun_sel().bits(0b00) }
-                            });
+                            // Select function "RTC function 1" (GPIO) for analog use
+                            unsafe { w.$fun_sel().bits(0b00) };
 
                             // Disable pull-up and pull-down resistors on the pin, if it has them
                             $(
-                                rtcio.$pin_reg.modify(|_,w| {
-                                    w
-                                    .$rue().bit(false)
-                                    .$rde().bit(false)
-                                });
+                                w.$rue().bit(false);
+                                w.$rde().bit(false);
                             )?
-                        }
+
+                            w
+                        });
                     }
-                )+
-                _ => unreachable!(),
+                }
             }
-        }
+        )+
     }
 }
 
@@ -1628,30 +1615,27 @@ macro_rules! analog {
     (
         $($pin_num:literal)+
     ) => {
-        pub(crate) fn internal_into_analog(pin: u8) {
-            use $crate::peripherals::IO_MUX;
-            use $crate::peripherals::GPIO;
+        $(
+            #[cfg(any(adc, dac))]
+            impl $crate::gpio::AnalogPin for GpioPin<$pin_num>
+            where
+                Self: $crate::gpio::GpioProperties<IsAnalog = $crate::gpio::True>,
+            {
+                /// Configures the pin for analog mode.
+                fn set_analog(&self, _: $crate::private::Internal) {
+                    use $crate::peripherals::{GPIO};
 
-            let io_mux = unsafe{ &*IO_MUX::PTR };
-            let gpio = unsafe{ &*GPIO::PTR };
+                    get_io_mux_reg($pin_num).modify(|_,w| unsafe {
+                        w.mcu_sel().bits(1)
+                            .fun_ie().clear_bit()
+                            .fun_wpu().clear_bit()
+                            .fun_wpd().clear_bit()
+                    });
 
-            match pin {
-                $(
-                    $pin_num => {
-                        io_mux.gpio($pin_num).modify(|_,w| unsafe {
-                            w.mcu_sel().bits(1)
-                                .fun_ie().clear_bit()
-                                .fun_wpu().clear_bit()
-                                .fun_wpd().clear_bit()
-                        });
-
-                        gpio.enable_w1tc().write(|w| unsafe { w.bits(1 << $pin_num) });
-                    }
-                )+
-                _ => unreachable!()
+                    unsafe{ &*GPIO::PTR }.enable_w1tc().write(|w| unsafe { w.bits(1 << $pin_num) });
+                }
             }
-
-        }
+        )+
     }
 }
 
