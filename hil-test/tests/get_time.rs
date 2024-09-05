@@ -1,4 +1,4 @@
-//! current_time Test
+//! time::now Test
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -13,9 +13,9 @@ struct Context {
 }
 
 fn time_moves_forward_during<F: FnOnce(Context)>(ctx: Context, f: F) {
-    let t1 = esp_hal::time::uptime();
+    let t1 = esp_hal::time::now();
     f(ctx);
-    let t2 = esp_hal::time::uptime();
+    let t2 = esp_hal::time::now();
 
     assert!(t2 > t1);
 }
@@ -37,9 +37,9 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn test_current_time(ctx: Context) {
-        let t1 = esp_hal::time::uptime();
+        let t1 = esp_hal::time::now();
         ctx.delay.delay_millis(500);
-        let t2 = esp_hal::time::uptime();
+        let t2 = esp_hal::time::now();
 
         assert!(t2 > t1);
         assert!((t2 - t1).to_millis() >= 500u64);

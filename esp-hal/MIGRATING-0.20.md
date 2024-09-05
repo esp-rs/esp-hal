@@ -53,9 +53,9 @@ let pin = Input::new_typed(io.gpio0); // pin will have the type `Input<'some, Gp
 
 ## `esp_hal::time::current_time` rename
 
-To avoid confusion with the `Rtc::current_time` wall clock time APIs, we've renamed `esp_hal::time::current_time` to `esp_hal::time::uptime()`.
+To avoid confusion with the `Rtc::current_time` wall clock time APIs, we've renamed `esp_hal::time::current_time` to `esp_hal::time::now()`.
 
 ```diff
 - use esp_hal::time::current_time;
-+ use esp_hal::time::uptime;
++ use esp_hal::time::now;
 ```

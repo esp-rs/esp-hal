@@ -29,9 +29,9 @@ mod tests {
     #[test]
     #[timeout(2)]
     fn delay_ns(mut ctx: Context) {
-        let t1 = esp_hal::time::uptime();
+        let t1 = esp_hal::time::now();
         ctx.delay.delay_ns(600_000_000);
-        let t2 = esp_hal::time::uptime();
+        let t2 = esp_hal::time::now();
 
         assert!(t2 > t1);
         assert!(
@@ -44,9 +44,9 @@ mod tests {
     #[test]
     #[timeout(2)]
     fn delay_700millis(ctx: Context) {
-        let t1 = esp_hal::time::uptime();
+        let t1 = esp_hal::time::now();
         ctx.delay.delay_millis(700);
-        let t2 = esp_hal::time::uptime();
+        let t2 = esp_hal::time::now();
 
         assert!(t2 > t1);
         assert!(
@@ -59,9 +59,9 @@ mod tests {
     #[test]
     #[timeout(2)]
     fn delay_1_500_000us(mut ctx: Context) {
-        let t1 = esp_hal::time::uptime();
+        let t1 = esp_hal::time::now();
         ctx.delay.delay_us(1_500_000);
-        let t2 = esp_hal::time::uptime();
+        let t2 = esp_hal::time::now();
 
         assert!(t2 > t1);
         assert!(
@@ -74,9 +74,9 @@ mod tests {
     #[test]
     #[timeout(5)]
     fn delay_3_000ms(mut ctx: Context) {
-        let t1 = esp_hal::time::uptime();
+        let t1 = esp_hal::time::now();
         ctx.delay.delay_ms(3000);
-        let t2 = esp_hal::time::uptime();
+        let t2 = esp_hal::time::now();
 
         assert!(t2 > t1);
         assert!(

@@ -1,6 +1,6 @@
 //! # Time
 //!
-//! The `time` module offers a way to get the system uptime.
+//! The `time` module offers a way to get the system now.
 
 /// Provides time since system start in microseconds precision.
 ///
@@ -10,7 +10,7 @@
 #[cfg_attr(esp32, doc = "36_558 years")]
 #[cfg_attr(esp32s2, doc = "7_311 years")]
 #[cfg_attr(not(any(esp32, esp32s2)), doc = "more than 7 years")]
-pub fn uptime() -> fugit::Instant<u64, 1, 1_000_000> {
+pub fn now() -> fugit::Instant<u64, 1, 1_000_000> {
     #[cfg(esp32)]
     let (ticks, div) = {
         // on ESP32 use LACT
