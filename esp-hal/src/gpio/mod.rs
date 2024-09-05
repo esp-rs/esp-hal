@@ -877,25 +877,7 @@ where
             }
         }
 
-        unsafe {
-            (*GPIO::PTR).pin(GPIONUM as usize).modify(|_, w| {
-                w.int_ena()
-                    .bits(gpio_intr_enable(int_enable, nmi_enable))
-                    .int_type()
-                    .bits(event as u8)
-                    .wakeup_enable()
-                    .bit(wake_up_from_light_sleep)
-            });
-        }
-    }
-
-    fn is_listening(&self, _: private::Internal) -> bool {
-        let bits = unsafe { &*GPIO::PTR }
-            .pin(GPIONUM as usize)
-            .read()
-            .int_ena()
-            .bits();
-        bits != 0
+        set_int_enable(GPIONUM, gpio_intr_enable(int_enable, nmi_enable), event as u8, wake_up_from_light_sleep)
     }
 
     fn unlisten(&mut self, _: private::Internal) {
@@ -2529,6 +2511,23 @@ fn is_listening(pin_num: u8) -> bool {
     bits != 0
 }
 
+fn set_int_enable(
+    gpio_num: u8,
+    int_ena: u8,
+    int_type: u8,
+    wake_up_from_light_sleep: bool,
+) {
+    let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
+    gpio.pin(gpio_num as usize).modify(|_, w| unsafe {
+        w.int_ena()
+            .bits(int_ena)
+            .int_type()
+            .bits(int_type)
+            .wakeup_enable()
+            .bit(wake_up_from_light_sleep)
+    });
+}
+
 mod asynch {
     use core::task::{Context, Poll};
 
@@ -2634,23 +2633,6 @@ mod asynch {
                 Poll::Pending
             }
         }
-    }
-
-    fn set_int_enable(
-        gpio_num: u8,
-        int_ena: u8,
-        int_type: u8,
-        wake_up_from_light_sleep: bool,
-    ) {
-        let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
-        gpio.pin(gpio_num as usize).modify(|_, w| unsafe {
-            w.int_ena()
-                .bits(int_ena)
-                .int_type()
-                .bits(int_type)
-                .wakeup_enable()
-                .bit(wake_up_from_light_sleep)
-        });
     }
 
     #[ram]
