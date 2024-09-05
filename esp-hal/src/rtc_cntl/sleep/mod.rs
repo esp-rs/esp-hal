@@ -23,6 +23,11 @@ use crate::gpio::RtcPin as RtcIoWakeupPinType;
 #[cfg(any(esp32c3, esp32c6, esp32c2))]
 use crate::gpio::RtcPinWithResistors as RtcIoWakeupPinType;
 use crate::rtc_cntl::Rtc;
+#[cfg(any(esp32, esp32s3))]
+use crate::{
+    into_ref,
+    peripheral::{Peripheral, PeripheralRef},
+};
 
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3.rs")]
@@ -71,11 +76,10 @@ pub enum Error {
 }
 
 /// External wake-up source (Ext0).
-#[derive(Debug)]
 #[cfg(any(esp32, esp32s3))]
 pub struct Ext0WakeupSource<'a, P: RtcIoWakeupPinType> {
     /// The pin used as the wake-up source.
-    pin: RefCell<&'a mut P>,
+    pin: RefCell<PeripheralRef<'a, P>>,
     /// The level at which the wake-up event is triggered.
     level: WakeupLevel,
 }
@@ -84,7 +88,8 @@ pub struct Ext0WakeupSource<'a, P: RtcIoWakeupPinType> {
 impl<'a, P: RtcIoWakeupPinType> Ext0WakeupSource<'a, P> {
     /// Creates a new external wake-up source (Ext0``) with the specified pin
     /// and wake-up level.
-    pub fn new(pin: &'a mut P, level: WakeupLevel) -> Self {
+    pub fn new(pin: impl Peripheral<P = P> + 'a, level: WakeupLevel) -> Self {
+        into_ref!(pin);
         Self {
             pin: RefCell::new(pin),
             level,
