@@ -66,10 +66,10 @@ mod tests {
                     rmt.channel1.configure(rx, rx_config).unwrap()
                 };
             } else if #[cfg(feature = "esp32s2")] {
-                    let  rx_channel = {
-                        use esp_hal::rmt::RxChannelCreator;
-                        rmt.channel1.configure(rx, rx_config).unwrap()
-                    };
+                let rx_channel = {
+                    use esp_hal::rmt::RxChannelCreator;
+                    rmt.channel1.configure(rx, rx_config).unwrap()
+                };
             } else if #[cfg(feature = "esp32s3")] {
                 let  rx_channel = {
                     use esp_hal::rmt::RxChannelCreator;
