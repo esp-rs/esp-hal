@@ -695,18 +695,6 @@ where
         Self::new()
     }
 
-    /// Is the input pin high?
-    #[inline]
-    pub fn is_high(&self) -> bool {
-        <Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0
-    }
-
-    /// Is the input pin low?
-    #[inline]
-    pub fn is_low(&self) -> bool {
-        !self.is_high()
-    }
-
     fn write_out_en(&self, enable: bool) {
         if enable {
             <Self as GpioProperties>::Bank::write_out_en_set(1 << (GPIONUM % 32));
@@ -791,7 +779,7 @@ where
     }
 
     fn is_input_high(&self, _: private::Internal) -> bool {
-        self.is_high()
+        <Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0
     }
 
     fn connect_input_to_peripheral(&mut self, signal: InputSignal, _: private::Internal) {
@@ -985,49 +973,6 @@ where
                 .clear_bit()
         });
     }
-
-    /// Drives the pin high.
-    #[inline]
-    pub fn set_high(&mut self) {
-        <Self as GpioProperties>::Bank::write_output_set(1 << (GPIONUM % 32));
-    }
-
-    /// Drives the pin low.
-    #[inline]
-    pub fn set_low(&mut self) {
-        <Self as GpioProperties>::Bank::write_output_clear(1 << (GPIONUM % 32));
-    }
-
-    /// Drives the pin high or low depending on the provided value.
-    #[inline]
-    pub fn set_state(&mut self, state: bool) {
-        match state {
-            true => self.set_high(),
-            false => self.set_low(),
-        }
-    }
-
-    /// Is the pin in drive high mode?
-    #[inline]
-    pub fn is_set_high(&self) -> bool {
-        <Self as GpioProperties>::Bank::read_output() & (1 << (GPIONUM % 32)) != 0
-    }
-
-    /// Is the pin in drive low mode?
-    #[inline]
-    pub fn is_set_low(&self) -> bool {
-        !self.is_set_high()
-    }
-
-    /// Toggle pin output.
-    #[inline]
-    pub fn toggle(&mut self) {
-        if self.is_set_high() {
-            self.set_low();
-        } else {
-            self.set_high();
-        }
-    }
 }
 
 impl<const GPIONUM: u8> OutputPin for GpioPin<GPIONUM>
@@ -1048,9 +993,9 @@ where
 
     fn set_output_high(&mut self, high: bool, _: private::Internal) {
         if high {
-            self.set_high()
+            <Self as GpioProperties>::Bank::write_output_set(1 << (GPIONUM % 32));
         } else {
-            self.set_low()
+            <Self as GpioProperties>::Bank::write_output_clear(1 << (GPIONUM % 32));
         }
     }
 

@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the `GpioN` type aliasses. Use `GpioPin<N>` instead. (#2073)
 - Removed `Peripherals::take`. Use `esp_hal::init` to obtain `Peripherals` (#1999)
 - Removed `AnyInputOnlyPin` in favour of `AnyPin`. (#2071)
+- Removed the following functions from `GpioPin`: `is_high`, `is_low`, `set_high`, `set_low`, `set_state`, `is_set_high`, `is_set_low`, `toggle`.
 
 ## [0.20.1] - 2024-08-30
 
