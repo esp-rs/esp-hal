@@ -954,8 +954,7 @@ where
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
-        let mut this =
-            Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, false, mode);
+        let mut this = Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, false, mode);
         this.internal_set_interrupt_handler(T::async_handler());
         this
     }
@@ -972,8 +971,7 @@ where
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
-        let mut this =
-            Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, true, mode);
+        let mut this = Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, true, mode);
         this.internal_set_interrupt_handler(T::async_handler());
         this
     }
