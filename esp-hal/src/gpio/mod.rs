@@ -2610,12 +2610,12 @@ mod asynch {
     }
 
     #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub struct PinFuture {
+    struct PinFuture {
         pin_num: u8,
     }
 
     impl PinFuture {
-        pub fn new(pin_num: u8) -> Self {
+        fn new(pin_num: u8) -> Self {
             Self { pin_num }
         }
     }
