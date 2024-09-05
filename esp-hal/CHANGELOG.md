@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added missing functions to `Flex`: `unlisten`, `is_interrupt_set`, `wakeup_enable`, `wait_for_high`, `wait_for_low`, `wait_for_rising_edge`, `wait_for_falling_edge`, `wait_for_any_edge`. (#2075)
 - `Flex` now implements `Wait`. (#2075)
 - Added sleep and wakeup support for esp32c2 (#1922)
+- `Input`, `Output`, `OutputOpenDrain` and `Flex` now implement `Peripheral`. (#2094)
 
 ### Changed
 

@@ -65,7 +65,7 @@ pub(crate) use crate::rtc_pins;
 pub use crate::soc::gpio::*;
 use crate::{
     interrupt::InterruptHandler,
-    peripheral::PeripheralRef,
+    peripheral::{Peripheral, PeripheralRef},
     peripherals::{GPIO, IO_MUX},
     private,
     InterruptConfigurable,
@@ -911,7 +911,7 @@ where
     }
 }
 
-impl<const GPIONUM: u8> crate::peripheral::Peripheral for GpioPin<GPIONUM>
+impl<const GPIONUM: u8> Peripheral for GpioPin<GPIONUM>
 where
     Self: GpioProperties,
 {
@@ -1744,13 +1744,19 @@ pub struct Output<'d, P = ErasedPin> {
     pin: Flex<'d, P>,
 }
 
+impl<P> private::Sealed for Output<'_, P> {}
+
+impl<'d, P> Peripheral for Output<'d, P> {
+    type P = P;
+    unsafe fn clone_unchecked(&mut self) -> P {
+        self.pin.clone_unchecked()
+    }
+}
+
 impl<'d> Output<'d> {
     /// Create GPIO output driver for a [GpioPin] with the provided level
     #[inline]
-    pub fn new<P: OutputPin>(
-        pin: impl crate::peripheral::Peripheral<P = P> + 'd,
-        initial_output: Level,
-    ) -> Self {
+    pub fn new<P: OutputPin>(pin: impl Peripheral<P = P> + 'd, initial_output: Level) -> Self {
         let pin = Flex::new(pin);
 
         Self::new_inner(pin, initial_output)
@@ -1763,10 +1769,7 @@ where
 {
     /// Create GPIO output driver for a [GpioPin] with the provided level
     #[inline]
-    pub fn new_typed(
-        pin: impl crate::peripheral::Peripheral<P = P> + 'd,
-        initial_output: Level,
-    ) -> Self {
+    pub fn new_typed(pin: impl Peripheral<P = P> + 'd, initial_output: Level) -> Self {
         let pin = Flex::new_typed(pin);
 
         Self::new_inner(pin, initial_output)
@@ -1834,14 +1837,20 @@ pub struct Input<'d, P = ErasedPin> {
     pin: Flex<'d, P>,
 }
 
+impl<P> private::Sealed for Input<'_, P> {}
+
+impl<'d, P> Peripheral for Input<'d, P> {
+    type P = P;
+    unsafe fn clone_unchecked(&mut self) -> P {
+        self.pin.clone_unchecked()
+    }
+}
+
 impl<'d> Input<'d> {
     /// Create GPIO input driver for a [Pin] with the provided [Pull]
     /// configuration.
     #[inline]
-    pub fn new<P: InputPin>(
-        pin: impl crate::peripheral::Peripheral<P = P> + 'd,
-        pull: Pull,
-    ) -> Self {
+    pub fn new<P: InputPin>(pin: impl Peripheral<P = P> + 'd, pull: Pull) -> Self {
         let pin = Flex::new(pin);
 
         Self::new_inner(pin, pull)
@@ -1855,7 +1864,7 @@ where
     /// Create GPIO input driver for a [Pin] with the provided [Pull]
     /// configuration.
     #[inline]
-    pub fn new_typed(pin: impl crate::peripheral::Peripheral<P = P> + 'd, pull: Pull) -> Self {
+    pub fn new_typed(pin: impl Peripheral<P = P> + 'd, pull: Pull) -> Self {
         let pin = Flex::new_typed(pin);
 
         Self::new_inner(pin, pull)
@@ -1922,12 +1931,21 @@ pub struct OutputOpenDrain<'d, P = ErasedPin> {
     pin: Flex<'d, P>,
 }
 
+impl<P> private::Sealed for OutputOpenDrain<'_, P> {}
+
+impl<'d, P> Peripheral for OutputOpenDrain<'d, P> {
+    type P = P;
+    unsafe fn clone_unchecked(&mut self) -> P {
+        self.pin.clone_unchecked()
+    }
+}
+
 impl<'d> OutputOpenDrain<'d> {
     /// Create GPIO open-drain output driver for a [Pin] with the provided
     /// initial output-level and [Pull] configuration.
     #[inline]
     pub fn new<P: InputPin + OutputPin>(
-        pin: impl crate::peripheral::Peripheral<P = P> + 'd,
+        pin: impl Peripheral<P = P> + 'd,
         initial_output: Level,
         pull: Pull,
     ) -> Self {
@@ -1944,11 +1962,7 @@ where
     /// Create GPIO open-drain output driver for a [Pin] with the provided
     /// initial output-level and [Pull] configuration.
     #[inline]
-    pub fn new_typed(
-        pin: impl crate::peripheral::Peripheral<P = P> + 'd,
-        initial_output: Level,
-        pull: Pull,
-    ) -> Self {
+    pub fn new_typed(pin: impl Peripheral<P = P> + 'd, initial_output: Level, pull: Pull) -> Self {
         let pin = Flex::new_typed(pin);
 
         Self::new_inner(pin, initial_output, pull)
@@ -2046,11 +2060,20 @@ pub struct Flex<'d, P = ErasedPin> {
     pin: PeripheralRef<'d, P>,
 }
 
+impl<P> private::Sealed for Flex<'_, P> {}
+
+impl<'d, P> Peripheral for Flex<'d, P> {
+    type P = P;
+    unsafe fn clone_unchecked(&mut self) -> P {
+        core::ptr::read(&*self.pin as *const _)
+    }
+}
+
 impl<'d> Flex<'d> {
     /// Create flexible pin driver for a [Pin].
     /// No mode change happens.
     #[inline]
-    pub fn new<P: Pin>(pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self {
+    pub fn new<P: Pin>(pin: impl Peripheral<P = P> + 'd) -> Self {
         crate::into_ref!(pin);
         let pin = pin.degrade_internal(private::Internal);
         Self::new_typed(pin)
@@ -2064,7 +2087,7 @@ where
     /// Create flexible pin driver for a [Pin].
     /// No mode change happens.
     #[inline]
-    pub fn new_typed(pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self {
+    pub fn new_typed(pin: impl Peripheral<P = P> + 'd) -> Self {
         crate::into_ref!(pin);
         Self { pin }
     }
