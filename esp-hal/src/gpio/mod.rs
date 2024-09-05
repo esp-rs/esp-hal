@@ -297,7 +297,9 @@ pub trait Pin: private::Sealed {
     }
 
     /// Checks if listening for interrupts is enabled for this Pin
-    fn is_listening(&self, _: private::Internal) -> bool;
+    fn is_listening(&self, _: private::Internal) -> bool {
+        is_listening(self.number(private::Internal))
+    }
 
     /// Listen for interrupts
     fn listen_with_options(
@@ -2310,12 +2312,6 @@ pub(crate) mod internal {
             })
         }
 
-        fn is_listening(&self, _: private::Internal) -> bool {
-            handle_gpio_input!(self, target, {
-                Pin::is_listening(target, private::Internal)
-            })
-        }
-
         fn listen_with_options(
             &mut self,
             event: Event,
@@ -2524,6 +2520,15 @@ pub(crate) mod internal {
     }
 }
 
+fn is_listening(pin_num: u8) -> bool {
+    let bits = unsafe { &*GPIO::PTR }
+        .pin(pin_num as usize)
+        .read()
+        .int_ena()
+        .bits();
+    bits != 0
+}
+
 mod asynch {
     use core::task::{Context, Poll};
 
@@ -2631,16 +2636,7 @@ mod asynch {
         }
     }
 
-    pub(crate) fn is_listening(gpio_num: u8) -> bool {
-        let bits = unsafe { &*GPIO::PTR }
-            .pin(gpio_num as usize)
-            .read()
-            .int_ena()
-            .bits();
-        bits != 0
-    }
-
-    pub(crate) fn set_int_enable(
+    fn set_int_enable(
         gpio_num: u8,
         int_ena: u8,
         int_type: u8,
