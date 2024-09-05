@@ -105,7 +105,6 @@ async = [
   "dep:embedded-io-async",
   "dep:esp-hal-embassy",
   "dep:bt-hci",
-  "esp-hal/async",
 ]
 
 embassy-net = ["dep:embassy-net-driver", "async"]
