@@ -20,7 +20,7 @@ use esp_backtrace as _;
 use esp_hal::{
     cpu_control::{CpuControl, Stack},
     get_core,
-    gpio::{AnyOutput, Io, Level},
+    gpio::{ErasedPin, Io, Level, Output, Pin},
     interrupt::{software::SoftwareInterruptControl, Priority},
     prelude::*,
     timer::{timg::TimerGroup, ErasedTimer},
@@ -35,7 +35,7 @@ static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 /// duration of time.
 #[embassy_executor::task]
 async fn control_led(
-    mut led: AnyOutput<'static>,
+    mut led: Output<'static, ErasedPin>,
     control: &'static Signal<CriticalSectionRawMutex, bool>,
 ) {
     println!("Starting control_led() on core {}", get_core() as usize);
@@ -87,7 +87,7 @@ fn main() -> ! {
     static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
     let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
 
-    let led = AnyOutput::new(io.pins.gpio0, Level::Low);
+    let led = Output::new(io.pins.gpio0.degrade(), Level::Low);
 
     static EXECUTOR_CORE_1: StaticCell<InterruptExecutor<1>> = StaticCell::new();
     let executor_core1 = InterruptExecutor::new(sw_ints.software_interrupt1);

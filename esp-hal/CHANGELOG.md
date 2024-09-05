@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Implement `embedded-hal` output pin traits for `DummyPin` (#2019)
 - Added `esp_hal::init` to simplify HAL initialisation (#1970, #1999)
+- Added GpioPin::degrade to create ErasePins easily. Same for AnyPin by accident. (#2075)
+- Added missing functions to `Flex`: `unlisten`, `is_interrupt_set`, `wakeup_enable`, `wait_for_high`, `wait_for_low`, `wait_for_rising_edge`, `wait_for_falling_edge`, `wait_for_any_edge`. (#2075)
+- `Flex` now implements `Wait`. (#2075)
 - Added sleep and wakeup support for esp32c2 (#1922)
 
 ### Changed
@@ -18,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Delay::new()` is now a `const` function (#1999)
 - You can now create an `AnyPin` out of an `ErasedPin`. (#2072)
+- `Input`, `Output`, `OutputOpenDrain` and `Flex` are now type-erased by default. Use the new `new_typed` constructor to keep using the ZST pin types. (#2075)
 
 ### Fixed
 - SHA driver can now be safely used in multiple contexts concurrently (#2049)

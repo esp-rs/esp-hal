@@ -24,7 +24,7 @@ use embedded_hal_async::spi::SpiBus;
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{AnyPin, GpioPin, Io, Level, Output, Pull},
+    gpio::{ErasedPin, Io, Level, Output, Pull},
     pcnt::{
         channel::{EdgeMode, PcntInputConfig, PcntSource},
         unit::Unit,
@@ -57,8 +57,8 @@ const DMA_BUFFER_SIZE: usize = 5;
 struct Context {
     spi: SpiDmaBus<'static, SPI2, DmaChannel0, FullDuplexMode, Async>,
     pcnt_unit: Unit<'static, 0>,
-    out_pin: Output<'static, GpioPin<5>>,
-    mosi_mirror: AnyPin<'static>,
+    out_pin: Output<'static>,
+    mosi_mirror: ErasedPin,
 }
 
 #[cfg(test)]
@@ -79,7 +79,7 @@ mod tests {
         let (mosi_mirror, mosi) = hil_test::common_test_pins!(io);
         let miso = io.pins.gpio4;
         let cs = io.pins.gpio8;
-        let mosi_mirror = AnyPin::new(mosi_mirror);
+        let mosi_mirror = mosi_mirror.degrade();
 
         let mut out_pin = Output::new(io.pins.gpio5, Level::Low);
         out_pin.set_low();

@@ -41,3 +41,13 @@ Instead of manually grabbing peripherals and setting up clocks, you should now c
  - The `GpioN` type aliasses are no longer available. You can use `GpioPin<N>` instead.
  - The `AnyInputOnlyPin` has been removed. Replace any use with `AnyPin`.
  - The `NoPinType` has been removed. You can use `DummyPin` in its place.
+
+### Type-erased GPIO drivers
+
+You no longer have to spell out the GPIO pin type for `Input`, `Output`, `OutputOpenDrain` or `Flex`.
+However, if you want to, you can keep using their typed form!
+
+```rust
+let pin = Input::new(io.gpio0); // pin will have the type `Input<'some>` (or `Input<'some, ErasedPin>` if you want to be explicit about it)
+let pin = Input::new_typed(io.gpio0); // pin will have the type `Input<'some, GpioPin<0>>`
+```
