@@ -1660,93 +1660,73 @@ macro_rules! analog {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! touch_into {
+    (@pin_specific $touch_num:expr, true) => {
+        paste::paste! {
+            unsafe { &*RTC_IO::ptr() }.[< touch_pad $touch_num >]().write(|w| unsafe {
+                w
+                .xpd().set_bit()
+                // clear input_enable
+                .fun_ie().clear_bit()
+                // Connect pin to analog / RTC module instead of standard GPIO
+                .mux_sel().set_bit()
+                // Disable pull-up and pull-down resistors on the pin
+                .rue().clear_bit()
+                .rde().clear_bit()
+                .tie_opt().clear_bit()
+                // Select function "RTC function 1" (GPIO) for analog use
+                .fun_sel().bits(0b00)
+            });
+        }
+    };
+
+    (@pin_specific $touch_num:expr, false) => {
+        paste::paste! {
+            unsafe { &*RTC_IO::ptr() }.[< touch_pad $touch_num >]().write(|w|
+                w
+                .xpd().set_bit()
+                .tie_opt().clear_bit()
+            );
+        }
+    };
+
     (
-        $( ( $touch_num:expr, $pin_num:expr, $rtc_pin:expr, $touch_thres_reg:expr, $touch_thres_field:expr , true ) )+
-        ---
-        $( ( $touch_numx:expr, $pin_numx:expr, $rtc_pinx:expr, $touch_thres_regx:expr , $touch_thres_fieldx:expr , false ) )*
+        $( ( $touch_num:expr, $pin_num:expr, $rtc_pin:expr, $touch_thres_reg:expr, $touch_thres_field:expr , $needs_extra_setup:tt ))+
     ) => {
         pub(crate) fn internal_into_touch(pin: u8) {
-            use $crate::peripherals::{GPIO, RTC_IO, SENS};
-
-            let rtcio = unsafe { &*RTC_IO::ptr() };
-            let sens = unsafe { &*SENS::ptr() };
-            let gpio = unsafe { &*GPIO::ptr() };
-
             match pin {
                 $(
                     $pin_num => {
-                        paste::paste! {
-                            // Pad to normal mode (not open-drain)
-                            gpio.pin($rtc_pin).write(|w| w.pad_driver().clear_bit());
+                        use $crate::peripherals::{GPIO, RTC_IO, SENS};
 
-                            // clear output
-                            rtcio.enable_w1tc().write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
-                            sens
-                                . $touch_thres_reg ()
+                        let gpio = unsafe { &*GPIO::ptr() };
+                        let rtcio = unsafe { &*RTC_IO::ptr() };
+                        let sens = unsafe { &*SENS::ptr() };
+
+                        // Pad to normal mode (not open-drain)
+                        gpio.pin($rtc_pin).write(|w| w.pad_driver().clear_bit());
+
+                        // clear output
+                        rtcio.enable_w1tc().write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
+                        paste::paste! {
+                            sens . $touch_thres_reg ()
                                 .write(|w| unsafe {
                                     w. $touch_thres_field ().bits(
                                         0b0 // Default: 0 for esp32 gets overridden later anyway.
                                     )
                                 });
 
-                            rtcio.[< touch_pad $touch_num >]().write(|w| unsafe {
-                                w
-                                .xpd().set_bit()
-                                // clear input_enable
-                                .fun_ie().clear_bit()
-                                // Connect pin to analog / RTC module instead of standard GPIO
-                                .mux_sel().set_bit()
-                                // Disable pull-up and pull-down resistors on the pin
-                                .rue().clear_bit()
-                                .rde().clear_bit()
-                                .tie_opt().clear_bit()
-                                // Select function "RTC function 1" (GPIO) for analog use
-                                .fun_sel().bits(0b00)
-                            });
+                            $crate::touch_into!( @pin_specific $touch_num, $needs_extra_setup );
 
+                            // enable the pin
                             sens.sar_touch_enable().modify(|r, w| unsafe {
-                                w
-                                // enable the pin
-                                .touch_pad_worken().bits(
-                                   r.touch_pad_worken().bits() | ( 1 << [< $touch_num >] )
+                                w.touch_pad_worken().bits(
+                                    r.touch_pad_worken().bits() | ( 1 << [< $touch_num >] )
                                 )
                             });
                         }
                     }
                 )+
 
-                $(
-                    $pin_numx => {
-                        paste::paste! {
-                            // Pad to normal mode (not open-drain)
-                            gpio.pin($rtc_pinx).write(|w| w.pad_driver().clear_bit());
-
-                            // clear output
-                            rtcio.enable_w1tc().write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pinx) });
-                            sens
-                                . $touch_thres_regx ()
-                                .write(|w| unsafe {
-                                    w. $touch_thres_fieldx ().bits(
-                                        0b0 // Default: 0 for esp32 gets overridden later anyway.
-                                    )
-                                });
-
-                            rtcio.[< touch_pad $touch_numx >]().write(|w|
-                                w
-                                .xpd().set_bit()
-                                .tie_opt().clear_bit()
-                            );
-
-                            sens.sar_touch_enable().modify(|r, w| unsafe {
-                                w
-                                // enable the pin
-                                .touch_pad_worken().bits(
-                                   r.touch_pad_worken().bits() | ( 1 << [< $touch_numx >] )
-                                )
-                            });
-                        }
-                    }
-                )*
                 _ => unreachable!(),
             }
         }

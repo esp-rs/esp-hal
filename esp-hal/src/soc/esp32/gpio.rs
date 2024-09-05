@@ -855,7 +855,7 @@ crate::gpio::touch_into! {
     (5, 12, 15, sar_touch_thres3, touch_out_th5, true )
     (6, 14, 16, sar_touch_thres4, touch_out_th6, true )
     (7, 27, 17, sar_touch_thres4, touch_out_th7, true )
-    ---
+    // ---
     (8, 33, 8, sar_touch_thres5, touch_out_th8, false )
     (9, 32, 9, sar_touch_thres5, touch_out_th9, false )
 }
