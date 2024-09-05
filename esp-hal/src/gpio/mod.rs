@@ -327,9 +327,6 @@ pub trait InputPin: Pin {
     /// Init as input with the given pull-up/pull-down
     fn init_input(&self, pull_down: bool, pull_up: bool, _: private::Internal);
 
-    /// Set the pin to input mode without internal pull-up / pull-down resistors
-    fn set_to_input(&mut self, _: private::Internal);
-
     /// Enable input for the pin
     fn enable_input(&mut self, on: bool, _: private::Internal);
 
@@ -764,10 +761,6 @@ where
                 .slp_sel()
                 .clear_bit()
         });
-    }
-
-    fn set_to_input(&mut self, _: private::Internal) {
-        self.init_input(false, false, private::Internal);
     }
 
     fn enable_input(&mut self, on: bool, _: private::Internal) {
@@ -2378,12 +2371,6 @@ pub(crate) mod internal {
             handle_gpio_input!(self, target, {
                 InputPin::init_input(target, pull_down, pull_up, private::Internal)
             })
-        }
-
-        fn set_to_input(&mut self, _: private::Internal) {
-            handle_gpio_input!(self, target, {
-                InputPin::set_to_input(target, private::Internal);
-            });
         }
 
         fn enable_input(&mut self, on: bool, _: private::Internal) {

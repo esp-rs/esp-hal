@@ -613,7 +613,7 @@ where
     /// Configure CTS pin
     pub fn with_cts<CTS: InputPin>(self, cts: impl Peripheral<P = CTS> + 'd) -> Self {
         crate::into_ref!(cts);
-        cts.set_to_input(Internal);
+        cts.init_input(false, false, Internal);
         cts.connect_input_to_peripheral(T::cts_signal(), Internal);
 
         self
@@ -791,7 +791,7 @@ where
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Result<Self, Error> {
         crate::into_ref!(rx);
-        rx.set_to_input(Internal);
+        rx.init_input(false, false, Internal);
         rx.connect_input_to_peripheral(T::rx_signal(), Internal);
 
         let (_, uart_rx) = Uart::<'d, T, Blocking>::new_with_config_inner(uart, config)?.split();
@@ -817,7 +817,7 @@ where
         tx.set_to_push_pull_output(Internal);
         tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
-        rx.set_to_input(Internal);
+        rx.init_input(false, false, Internal);
         rx.connect_input_to_peripheral(T::rx_signal(), Internal);
         Self::new_with_config_inner(uart, config)
     }
@@ -833,7 +833,7 @@ where
         tx.set_to_push_pull_output(Internal);
         tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
-        rx.set_to_input(Internal);
+        rx.init_input(false, false, Internal);
         rx.connect_input_to_peripheral(T::rx_signal(), Internal);
         Self::new_inner(uart)
     }
@@ -848,7 +848,7 @@ where
         tx.set_to_push_pull_output(Internal);
         tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
-        rx.set_to_input(Internal);
+        rx.init_input(false, false, Internal);
         rx.connect_input_to_peripheral(T::rx_signal(), Internal);
         Self::new_inner(uart)
     }
@@ -916,7 +916,7 @@ where
     /// Configure CTS pin
     pub fn with_cts<CTS: InputPin>(self, cts: impl Peripheral<P = CTS> + 'd) -> Self {
         crate::into_ref!(cts);
-        cts.set_to_input(Internal);
+        cts.init_input(false, false, Internal);
         cts.connect_input_to_peripheral(T::cts_signal(), Internal);
 
         self
@@ -2141,7 +2141,7 @@ mod asynch {
             tx.set_to_push_pull_output(Internal);
             tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
-            rx.set_to_input(Internal);
+            rx.init_input(false, false, Internal);
             rx.connect_input_to_peripheral(T::rx_signal(), Internal);
             let mut this = Self::new_with_config_inner(uart, config)?;
 
@@ -2303,7 +2303,7 @@ mod asynch {
             rx: impl Peripheral<P = RX> + 'd,
         ) -> Result<Self, Error> {
             crate::into_ref!(rx);
-            rx.set_to_input(Internal);
+            rx.init_input(false, false, Internal);
             rx.connect_input_to_peripheral(T::rx_signal(), Internal);
 
             let mut uart = Uart::<'d, T, Async>::new_with_config_inner(uart, config)?;

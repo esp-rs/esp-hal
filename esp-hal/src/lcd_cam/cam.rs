@@ -311,7 +311,7 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
     pub fn with_pixel_clock<PCLK: InputPin>(self, pclk: impl Peripheral<P = PCLK> + 'd) -> Self {
         crate::into_ref!(pclk);
 
-        pclk.set_to_input(crate::private::Internal);
+        pclk.init_input(false, false, crate::private::Internal);
         pclk.connect_input_to_peripheral(InputSignal::CAM_PCLK, crate::private::Internal);
 
         self
@@ -327,9 +327,9 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
         crate::into_ref!(vsync);
         crate::into_ref!(h_enable);
 
-        vsync.set_to_input(crate::private::Internal);
+        vsync.init_input(false, false, crate::private::Internal);
         vsync.connect_input_to_peripheral(InputSignal::CAM_V_SYNC, crate::private::Internal);
-        h_enable.set_to_input(crate::private::Internal);
+        h_enable.init_input(false, false, crate::private::Internal);
         h_enable.connect_input_to_peripheral(InputSignal::CAM_H_ENABLE, crate::private::Internal);
 
         self.lcd_cam
@@ -351,11 +351,11 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
         crate::into_ref!(hsync);
         crate::into_ref!(h_enable);
 
-        vsync.set_to_input(crate::private::Internal);
+        vsync.init_input(false, false, crate::private::Internal);
         vsync.connect_input_to_peripheral(InputSignal::CAM_V_SYNC, crate::private::Internal);
-        hsync.set_to_input(crate::private::Internal);
+        hsync.init_input(false, false, crate::private::Internal);
         hsync.connect_input_to_peripheral(InputSignal::CAM_H_SYNC, crate::private::Internal);
-        h_enable.set_to_input(crate::private::Internal);
+        h_enable.init_input(false, false, crate::private::Internal);
         h_enable.connect_input_to_peripheral(InputSignal::CAM_H_ENABLE, crate::private::Internal);
 
         self.lcd_cam
@@ -475,21 +475,21 @@ impl RxEightBits {
         crate::into_ref!(pin_6);
         crate::into_ref!(pin_7);
 
-        pin_0.set_to_input(crate::private::Internal);
+        pin_0.init_input(false, false, crate::private::Internal);
         pin_0.connect_input_to_peripheral(InputSignal::CAM_DATA_0, crate::private::Internal);
-        pin_1.set_to_input(crate::private::Internal);
+        pin_1.init_input(false, false, crate::private::Internal);
         pin_1.connect_input_to_peripheral(InputSignal::CAM_DATA_1, crate::private::Internal);
-        pin_2.set_to_input(crate::private::Internal);
+        pin_2.init_input(false, false, crate::private::Internal);
         pin_2.connect_input_to_peripheral(InputSignal::CAM_DATA_2, crate::private::Internal);
-        pin_3.set_to_input(crate::private::Internal);
+        pin_3.init_input(false, false, crate::private::Internal);
         pin_3.connect_input_to_peripheral(InputSignal::CAM_DATA_3, crate::private::Internal);
-        pin_4.set_to_input(crate::private::Internal);
+        pin_4.init_input(false, false, crate::private::Internal);
         pin_4.connect_input_to_peripheral(InputSignal::CAM_DATA_4, crate::private::Internal);
-        pin_5.set_to_input(crate::private::Internal);
+        pin_5.init_input(false, false, crate::private::Internal);
         pin_5.connect_input_to_peripheral(InputSignal::CAM_DATA_5, crate::private::Internal);
-        pin_6.set_to_input(crate::private::Internal);
+        pin_6.init_input(false, false, crate::private::Internal);
         pin_6.connect_input_to_peripheral(InputSignal::CAM_DATA_6, crate::private::Internal);
-        pin_7.set_to_input(crate::private::Internal);
+        pin_7.init_input(false, false, crate::private::Internal);
         pin_7.connect_input_to_peripheral(InputSignal::CAM_DATA_7, crate::private::Internal);
 
         Self { _pins: () }
@@ -563,37 +563,37 @@ impl RxSixteenBits {
         crate::into_ref!(pin_14);
         crate::into_ref!(pin_15);
 
-        pin_0.set_to_input(crate::private::Internal);
+        pin_0.init_input(false, false, crate::private::Internal);
         pin_0.connect_input_to_peripheral(InputSignal::CAM_DATA_0, crate::private::Internal);
-        pin_1.set_to_input(crate::private::Internal);
+        pin_1.init_input(false, false, crate::private::Internal);
         pin_1.connect_input_to_peripheral(InputSignal::CAM_DATA_1, crate::private::Internal);
-        pin_2.set_to_input(crate::private::Internal);
+        pin_2.init_input(false, false, crate::private::Internal);
         pin_2.connect_input_to_peripheral(InputSignal::CAM_DATA_2, crate::private::Internal);
-        pin_3.set_to_input(crate::private::Internal);
+        pin_3.init_input(false, false, crate::private::Internal);
         pin_3.connect_input_to_peripheral(InputSignal::CAM_DATA_3, crate::private::Internal);
-        pin_4.set_to_input(crate::private::Internal);
+        pin_4.init_input(false, false, crate::private::Internal);
         pin_4.connect_input_to_peripheral(InputSignal::CAM_DATA_4, crate::private::Internal);
-        pin_5.set_to_input(crate::private::Internal);
+        pin_5.init_input(false, false, crate::private::Internal);
         pin_5.connect_input_to_peripheral(InputSignal::CAM_DATA_5, crate::private::Internal);
-        pin_6.set_to_input(crate::private::Internal);
+        pin_6.init_input(false, false, crate::private::Internal);
         pin_6.connect_input_to_peripheral(InputSignal::CAM_DATA_6, crate::private::Internal);
-        pin_7.set_to_input(crate::private::Internal);
+        pin_7.init_input(false, false, crate::private::Internal);
         pin_7.connect_input_to_peripheral(InputSignal::CAM_DATA_7, crate::private::Internal);
-        pin_8.set_to_input(crate::private::Internal);
+        pin_8.init_input(false, false, crate::private::Internal);
         pin_8.connect_input_to_peripheral(InputSignal::CAM_DATA_8, crate::private::Internal);
-        pin_9.set_to_input(crate::private::Internal);
+        pin_9.init_input(false, false, crate::private::Internal);
         pin_9.connect_input_to_peripheral(InputSignal::CAM_DATA_9, crate::private::Internal);
-        pin_10.set_to_input(crate::private::Internal);
+        pin_10.init_input(false, false, crate::private::Internal);
         pin_10.connect_input_to_peripheral(InputSignal::CAM_DATA_10, crate::private::Internal);
-        pin_11.set_to_input(crate::private::Internal);
+        pin_11.init_input(false, false, crate::private::Internal);
         pin_11.connect_input_to_peripheral(InputSignal::CAM_DATA_11, crate::private::Internal);
-        pin_12.set_to_input(crate::private::Internal);
+        pin_12.init_input(false, false, crate::private::Internal);
         pin_12.connect_input_to_peripheral(InputSignal::CAM_DATA_12, crate::private::Internal);
-        pin_13.set_to_input(crate::private::Internal);
+        pin_13.init_input(false, false, crate::private::Internal);
         pin_13.connect_input_to_peripheral(InputSignal::CAM_DATA_13, crate::private::Internal);
-        pin_14.set_to_input(crate::private::Internal);
+        pin_14.init_input(false, false, crate::private::Internal);
         pin_14.connect_input_to_peripheral(InputSignal::CAM_DATA_14, crate::private::Internal);
-        pin_15.set_to_input(crate::private::Internal);
+        pin_15.init_input(false, false, crate::private::Internal);
         pin_15.connect_input_to_peripheral(InputSignal::CAM_DATA_15, crate::private::Internal);
 
         Self { _pins: () }

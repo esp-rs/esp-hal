@@ -113,8 +113,6 @@ impl OutputPin for DummyPin {
 impl InputPin for DummyPin {
     fn init_input(&self, _pull_down: bool, _pull_up: bool, _: private::Internal) {}
 
-    fn set_to_input(&mut self, _: private::Internal) {}
-
     fn enable_input(&mut self, _on: bool, _: private::Internal) {}
 
     fn enable_input_in_sleep_mode(&mut self, _on: bool, _: private::Internal) {}

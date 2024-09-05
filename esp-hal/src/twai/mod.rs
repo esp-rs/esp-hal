@@ -741,7 +741,7 @@ where
         }
         tx_pin.set_to_push_pull_output(crate::private::Internal);
         tx_pin.connect_peripheral_to_output(T::OUTPUT_SIGNAL, crate::private::Internal);
-        rx_pin.set_to_input(crate::private::Internal);
+        rx_pin.init_input(false, false, crate::private::Internal);
         rx_pin.connect_input_to_peripheral(T::INPUT_SIGNAL, crate::private::Internal);
 
         // Set the operating mode based on provided option

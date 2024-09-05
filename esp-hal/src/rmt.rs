@@ -387,7 +387,7 @@ where
         }
 
         crate::into_ref!(pin);
-        pin.set_to_input(crate::private::Internal);
+        pin.init_input(false, false, crate::private::Internal);
         pin.connect_input_to_peripheral(T::input_signal(), crate::private::Internal);
         T::set_divider(config.clk_divider);
         T::set_carrier(
@@ -433,7 +433,7 @@ where
         }
 
         crate::into_ref!(pin);
-        pin.set_to_input(crate::private::Internal);
+        pin.init_input(false, false, crate::private::Internal);
         pin.connect_input_to_peripheral(T::input_signal(), crate::private::Internal);
         T::set_divider(config.clk_divider);
         T::set_carrier(

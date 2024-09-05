@@ -148,7 +148,6 @@ impl<'d> InputPin for AnyPin<'d> {
     delegate::delegate! {
         to self.pin {
             fn init_input(&self, pull_down: bool, pull_up: bool, _internal: private::Internal);
-            fn set_to_input(&mut self, _internal: private::Internal);
             fn enable_input(&mut self, on: bool, _internal: private::Internal);
             fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             fn is_input_high(&self, _internal: private::Internal) -> bool;

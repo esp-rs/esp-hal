@@ -999,7 +999,7 @@ mod private {
             P: InputPin,
         {
             into_ref!(pin);
-            pin.set_to_input(crate::private::Internal);
+            pin.init_input(false, false, crate::private::Internal);
             pin.connect_input_to_peripheral(T::din_signal(), crate::private::Internal);
             self
         }
