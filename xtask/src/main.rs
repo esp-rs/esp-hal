@@ -58,6 +58,9 @@ struct ExampleArgs {
     chip: Chip,
     /// Optional example to act on (all examples used if omitted)
     example: Option<String>,
+    /// Build examples in debug mode only
+    #[arg(long)]
+    debug: bool,
 }
 
 #[derive(Debug, Args)]
@@ -202,7 +205,7 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
     };
 
     // Load all examples which support the specified chip and parse their metadata:
-    let mut examples = xtask::load_examples(&example_path)?
+    let mut examples = xtask::load_examples(&example_path, action)?
         .iter()
         .filter_map(|example| {
             if example.supports_chip(args.chip) {
@@ -227,16 +230,24 @@ fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Pat
     // Determine the appropriate build target for the given package and chip:
     let target = target_triple(args.package, &args.chip)?;
 
-    if let Some(example) = examples.iter().find(|ex| Some(ex.name()) == args.example) {
+    if examples
+        .iter()
+        .find(|ex| Some(ex.name()) == args.example)
+        .is_some()
+    {
         // Attempt to build only the specified example:
-        xtask::execute_app(
-            package_path,
-            args.chip,
-            target,
-            example,
-            CargoAction::Build,
-            1,
-        )
+        for example in examples.iter().filter(|ex| Some(ex.name()) == args.example) {
+            xtask::execute_app(
+                package_path,
+                args.chip,
+                target,
+                example,
+                CargoAction::Build,
+                1,
+                args.debug,
+            )?;
+        }
+        Ok(())
     } else if args.example.is_some() {
         // An invalid argument was provided:
         bail!("Example not found or unsupported for the given chip")
@@ -250,6 +261,7 @@ fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Pat
                 example,
                 CargoAction::Build,
                 1,
+                args.debug,
             )
         })
     }
@@ -261,7 +273,9 @@ fn run_example(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) 
 
     // Filter the examples down to only the binary we're interested in, assuming it
     // actually supports the specified chip:
-    if let Some(example) = examples.iter().find(|ex| Some(ex.name()) == args.example) {
+    let mut found_one = false;
+    for example in examples.iter().filter(|ex| Some(ex.name()) == args.example) {
+        found_one = true;
         xtask::execute_app(
             package_path,
             args.chip,
@@ -269,10 +283,17 @@ fn run_example(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) 
             example,
             CargoAction::Run,
             1,
-        )
-    } else {
-        bail!("Example not found or unsupported for the given chip")
+            args.debug,
+        )?;
     }
+
+    ensure!(
+        found_one,
+        "Example not found or unsupported for {}",
+        args.chip
+    );
+
+    Ok(())
 }
 
 fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
@@ -283,7 +304,7 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
     let target = target_triple(Package::HilTest, &args.chip)?;
 
     // Load all tests which support the specified chip and parse their metadata:
-    let mut tests = xtask::load_examples(&package_path.join("tests"))?
+    let mut tests = xtask::load_examples(&package_path.join("tests"), action)?
         .into_iter()
         .filter(|example| example.supports_chip(args.chip))
         .collect::<Vec<_>>();
@@ -292,15 +313,23 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
     tests.sort_by_key(|a| a.name());
 
     // Execute the specified action:
-    if let Some(test) = tests.iter().find(|test| Some(test.name()) == args.test) {
-        xtask::execute_app(
-            &package_path,
-            args.chip,
-            target,
-            test,
-            action,
-            args.repeat.unwrap_or(1),
-        )
+    if tests
+        .iter()
+        .find(|test| Some(test.name()) == args.test)
+        .is_some()
+    {
+        for test in tests.iter().filter(|test| Some(test.name()) == args.test) {
+            xtask::execute_app(
+                &package_path,
+                args.chip,
+                target,
+                test,
+                action,
+                args.repeat.unwrap_or(1),
+                false,
+            )?;
+        }
+        Ok(())
     } else if args.test.is_some() {
         bail!("Test not found or unsupported for the given chip")
     } else {
@@ -313,6 +342,7 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
                 &test,
                 action,
                 args.repeat.unwrap_or(1),
+                false,
             )
             .is_err()
             {
