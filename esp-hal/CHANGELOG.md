@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added sleep and wakeup support for esp32c2 (#1922)
 - `Input`, `Output`, `OutputOpenDrain` and `Flex` now implement `Peripheral`. (#2094)
 - Previously unavailable memory is available via `.dram2_uninit` section (#2079)
+- Added `Rtc::set_current_time` to allow setting RTC time, and `Rtc::current_time` to getting RTC time while taking into account boot time (#1883)
 
 ### Changed
 
@@ -31,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - To avoid confusion with the `Rtc::current_time` wall clock time APIs, we've renamed `esp_hal::time::current_time` to `esp_hal::time::now`. (#2091)
 - Renamed `touch::Continous` to `touch::Continuous`. (#2094)
 - The (previously undocumented) `ErasedPin` enum has been replaced with the `ErasedPin` struct. (#2094)
+- Renamed and merged `Rtc::get_time_us` and `Rtc::get_time_ms` into `Rtc::time_since_boot` (#1883)
 
 ### Fixed
 
@@ -48,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `Peripherals::take`. Use `esp_hal::init` to obtain `Peripherals` (#1999)
 - Removed `AnyInputOnlyPin` in favour of `AnyPin`. (#2071)
 - Removed the following functions from `GpioPin`: `is_high`, `is_low`, `set_high`, `set_low`, `set_state`, `is_set_high`, `is_set_low`, `toggle`. (#2094)
+- Removed `Rtc::get_time_raw` (#1883)
 
 ## [0.20.1] - 2024-08-30
 
@@ -67,7 +70,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a `PeripheralClockControl::reset` to the driver constructors where missing (#1893)
 - Added `digest::Digest` implementation to SHA (#1908)
 - Added `debugger::debugger_connected`. (#1961)
-- Added `Rtc::set_current_time` to allow setting RTC time, and `Rtc::current_time` to getting RTC time while taking into account boot time (#1883)
 - DMA: don't require `Sealed` to implement `ReadBuffer` and `WriteBuffer` (#1921)
 - Allow DMA to/from psram for esp32s3 (#1827)
 - Added missing methods to `SpiDmaBus` (#2016).
@@ -84,7 +86,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DMA buffers now don't require a static lifetime. Make sure to never `mem::forget` an in-progress DMA transfer (consider using `#[deny(clippy::mem_forget)]`) (#1837)
 - Peripherals (where possible) are now explicitly reset and enabled in their constructors (#1893)
 - Reset peripherals in driver constructors where missing (#1893, #1961)
-- Renamed and merged `Rtc::get_time_us` and `Rtc::get_time_ms` into `Rtc::time_since_boot` (#1883)
 - Improve SYSTIMER API (#1871)
 - SHA driver now use specific structs for the hashing algorithm instead of a parameter. (#1908)
 - Remove `fn free(self)` in HMAC which goes against esp-hal API guidelines (#1972)
@@ -110,7 +111,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - This package no longer re-exports the `esp_hal_procmacros::main` macro (#1828)
 - The `AesFlavour` trait no longer has the `ENCRYPT_MODE`/`DECRYPT_MODE` associated constants (#1849)
-- Removed `Rtc::get_time_raw` (#1883)
 - Removed `FlashSafeDma` (#1856)
 - Remove redundant WithDmaSpi traits (#1975)
 - `IsFullDuplex` and `IsHalfDuplex` traits (#1985)
