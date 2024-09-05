@@ -50,7 +50,7 @@ async fn main(_s: Spawner) {
 
     #[cfg(feature = "esp32")]
     {
-        let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
+        let timg1 = TimerGroup::new(peripherals.TIMG1);
         esp_hal_embassy::init(timg1.timer0);
     }
 
