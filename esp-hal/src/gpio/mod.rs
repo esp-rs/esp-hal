@@ -321,7 +321,9 @@ pub trait Pin: private::Sealed {
     fn clear_interrupt(&mut self, _: private::Internal);
 
     /// Enable this pin as a wake up source
-    fn wakeup_enable(&mut self, enable: bool, event: WakeEvent, _: private::Internal);
+    fn wakeup_enable(&mut self, enable: bool, event: WakeEvent, _: private::Internal) {
+        self.listen_with_options(event.into(), false, false, enable, private::Internal);
+    }
 }
 
 /// Trait implemented by pins which can be used as inputs
@@ -339,7 +341,9 @@ pub trait InputPin: Pin {
     fn is_input_high(&self, _: private::Internal) -> bool;
 
     /// Connect the pin to a peripheral input signal
-    fn connect_input_to_peripheral(&mut self, signal: InputSignal, _: private::Internal);
+    fn connect_input_to_peripheral(&mut self, signal: InputSignal, _: private::Internal) {
+        self.connect_input_to_peripheral_with_options(signal, false, false, private::Internal);
+    }
 
     /// Connect the pin to a peripheral input signal.
     ///
@@ -397,7 +401,16 @@ pub trait OutputPin: Pin {
     fn internal_pull_down(&mut self, on: bool, _: private::Internal);
 
     /// Connect the pin to a peripheral output signal
-    fn connect_peripheral_to_output(&mut self, signal: OutputSignal, _: private::Internal);
+    fn connect_peripheral_to_output(&mut self, signal: OutputSignal, _: private::Internal) {
+        self.connect_peripheral_to_output_with_options(
+            signal,
+            false,
+            false,
+            false,
+            false,
+            private::Internal,
+        )
+    }
 
     /// Connect the pin to a peripheral output signal.
     ///
@@ -777,10 +790,6 @@ where
         <Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0
     }
 
-    fn connect_input_to_peripheral(&mut self, signal: InputSignal, _: private::Internal) {
-        self.connect_input_to_peripheral_with_options(signal, false, false, private::Internal);
-    }
-
     fn connect_input_to_peripheral_with_options(
         &mut self,
         signal: InputSignal,
@@ -895,10 +904,6 @@ where
     fn clear_interrupt(&mut self, _: private::Internal) {
         <Self as GpioProperties>::Bank::write_interrupt_status_clear(1 << (GPIONUM % 32));
     }
-
-    fn wakeup_enable(&mut self, enable: bool, event: WakeEvent, _: private::Internal) {
-        self.listen_with_options(event.into(), false, false, enable, private::Internal);
-    }
 }
 
 impl<const GPIONUM: u8> crate::peripheral::Peripheral for GpioPin<GPIONUM>
@@ -989,9 +994,11 @@ where
     fn internal_pull_up_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
         get_io_mux_reg(GPIONUM).modify(|_, w| w.mcu_wpu().bit(on));
     }
+
     fn internal_pull_down_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
         get_io_mux_reg(GPIONUM).modify(|_, w| w.mcu_wpd().bit(on));
     }
+
     fn enable_output_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
         get_io_mux_reg(GPIONUM).modify(|_, w| w.mcu_oe().bit(on));
     }
@@ -1002,22 +1009,12 @@ where
 
         get_io_mux_reg(GPIONUM).modify(|_, w| w.fun_wpu().bit(on));
     }
+
     fn internal_pull_down(&mut self, on: bool, _: private::Internal) {
         #[cfg(esp32)]
         crate::soc::gpio::errata36(GPIONUM, None, Some(on));
 
         get_io_mux_reg(GPIONUM).modify(|_, w| w.fun_wpd().bit(on));
-    }
-
-    fn connect_peripheral_to_output(&mut self, signal: OutputSignal, _: private::Internal) {
-        self.connect_peripheral_to_output_with_options(
-            signal,
-            false,
-            false,
-            false,
-            false,
-            private::Internal,
-        )
     }
 
     fn connect_peripheral_to_output_with_options(
@@ -2293,12 +2290,6 @@ pub(crate) mod internal {
                 Pin::clear_interrupt(target, private::Internal)
             })
         }
-
-        fn wakeup_enable(&mut self, enable: bool, event: WakeEvent, _: private::Internal) {
-            handle_gpio_input!(self, target, {
-                Pin::wakeup_enable(target, enable, event, private::Internal)
-            })
-        }
     }
 
     impl InputPin for ErasedPin {
@@ -2324,12 +2315,6 @@ pub(crate) mod internal {
             handle_gpio_input!(self, target, {
                 InputPin::is_input_high(target, private::Internal)
             })
-        }
-
-        fn connect_input_to_peripheral(&mut self, signal: InputSignal, _: private::Internal) {
-            handle_gpio_input!(self, target, {
-                InputPin::connect_input_to_peripheral(target, signal, private::Internal)
-            });
         }
 
         fn connect_input_to_peripheral_with_options(
@@ -2421,12 +2406,6 @@ pub(crate) mod internal {
         fn internal_pull_down(&mut self, on: bool, _: private::Internal) {
             handle_gpio_output!(self, target, {
                 OutputPin::internal_pull_down(target, on, private::Internal)
-            });
-        }
-
-        fn connect_peripheral_to_output(&mut self, signal: OutputSignal, _: private::Internal) {
-            handle_gpio_output!(self, target, {
-                OutputPin::connect_peripheral_to_output(target, signal, private::Internal)
             });
         }
 
