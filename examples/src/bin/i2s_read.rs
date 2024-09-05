@@ -1,4 +1,4 @@
-//! This shows how to continously receive data via I2S.
+//! This shows how to continuously receive data via I2S.
 //!
 //! Without an additional I2S source device you can connect 3V3 or GND to DIN
 //! to read 0 or 0xFF or connect DIN to WS to read two different values.
