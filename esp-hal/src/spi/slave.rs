@@ -356,7 +356,7 @@ pub mod dma {
         pub fn dma_write<'t, TXBUF>(
             &'t mut self,
             words: &'t TXBUF,
-        ) -> Result<DmaTransferTx<'_, Self>, Error>
+        ) -> Result<DmaTransferTx<'t, Self>, Error>
         where
             TXBUF: ReadBuffer,
         {
@@ -382,7 +382,7 @@ pub mod dma {
         pub fn dma_read<'t, RXBUF>(
             &'t mut self,
             words: &'t mut RXBUF,
-        ) -> Result<DmaTransferRx<'_, Self>, Error>
+        ) -> Result<DmaTransferRx<'t, Self>, Error>
         where
             RXBUF: WriteBuffer,
         {
@@ -410,7 +410,7 @@ pub mod dma {
             &'t mut self,
             words: &'t TXBUF,
             read_buffer: &'t mut RXBUF,
-        ) -> Result<DmaTransferTxRx<'_, Self>, Error>
+        ) -> Result<DmaTransferTxRx<'t, Self>, Error>
         where
             TXBUF: ReadBuffer,
             RXBUF: WriteBuffer,
