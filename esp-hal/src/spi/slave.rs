@@ -408,6 +408,7 @@ pub mod dma {
         /// line.
         pub fn dma_transfer<'t, RXBUF, TXBUF>(
             &'t mut self,
+            words: &'t TXBUF,
             read_buffer: &'t mut RXBUF,
         ) -> Result<DmaTransferRxTx<'t, Self>, Error>
         where
