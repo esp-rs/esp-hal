@@ -19,7 +19,7 @@ document-features = "0.2.10"
 litrs             = "0.4.1"
 object            = { version = "0.36.4", optional = true, default-features = false, features = ["read_core", "elf"] }
 proc-macro-crate  = "3.2.0"
-proc-macro-error  = "1.0.4"
+proc-macro-error2 = "2.0.0"
 proc-macro2       = "1.0.86"
 quote             = "1.0.37"
 syn               = { version = "2.0.76", features = ["extra-traits", "full"] }

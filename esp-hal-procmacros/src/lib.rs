@@ -128,11 +128,11 @@ struct RamArgs {
 /// [`bytemuck::Zeroable`]: https://docs.rs/bytemuck/1.9.0/bytemuck/trait.Zeroable.html
 #[cfg(feature = "ram")]
 #[proc_macro_attribute]
-#[proc_macro_error::proc_macro_error]
+#[proc_macro_error2::proc_macro_error]
 pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     use darling::{ast::NestedMeta, Error, FromMeta};
     use proc_macro::Span;
-    use proc_macro_error::abort;
+    use proc_macro_error2::abort;
     use syn::{parse, Item};
 
     let attr_args = match NestedMeta::parse_meta_list(args.into()) {
@@ -241,7 +241,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// If no priority is given, `Priority::min()` is assumed
 #[cfg(feature = "interrupt")]
-#[proc_macro_error::proc_macro_error]
+#[proc_macro_error2::proc_macro_error]
 #[proc_macro_attribute]
 pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
     use darling::{ast::NestedMeta, FromMeta};
@@ -352,7 +352,7 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
 
 /// Marks the entry function of a LP core / ULP program.
 #[cfg(any(feature = "is-lp-core", feature = "is-ulp-core"))]
-#[proc_macro_error::proc_macro_error]
+#[proc_macro_error2::proc_macro_error]
 #[proc_macro_attribute]
 pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
     lp_core::entry(args, input)
