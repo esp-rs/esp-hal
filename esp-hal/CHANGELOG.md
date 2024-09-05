@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Delay::new()` is now a `const` function (#1999)
 - You can now create an `AnyPin` out of an `ErasedPin`. (#2072)
 - `Input`, `Output`, `OutputOpenDrain` and `Flex` are now type-erased by default. Use the new `new_typed` constructor to keep using the ZST pin types. (#2075)
+- To avoid confusion with the `Rtc::current_time` wall clock time APIs, we've renamed `esp_hal::time::current_time` to `esp_hal::time::now`. (#2091)
 
 ### Fixed
 - SHA driver can now be safely used in multiple contexts concurrently (#2049)

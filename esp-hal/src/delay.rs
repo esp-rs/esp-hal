@@ -3,7 +3,7 @@
 //! ## Overview
 //!
 //! The Delay driver provides blocking delay functionalities using the
-//! [current_time] function.
+//! [now] function.
 //!
 //! ## Configuration
 //!
@@ -31,7 +31,7 @@
 //! [DelayMs]: embedded_hal_02::blocking::delay::DelayMs
 //! [DelayUs]: embedded_hal_02::blocking::delay::DelayUs
 //! [embedded-hal]: https://docs.rs/embedded-hal/1.0.0/embedded_hal/delay/index.html
-//! [current_time]: crate::time::current_time
+//! [now]: crate::time::now
 
 pub use fugit::MicrosDurationU64;
 
@@ -75,7 +75,7 @@ impl Delay {
 
     /// Delay for the specified time
     pub fn delay(&self, delay: MicrosDurationU64) {
-        let start = crate::time::current_time();
+        let start = crate::time::now();
 
         while elapsed_since(start) < delay {}
     }
@@ -101,12 +101,12 @@ impl Delay {
 }
 
 fn elapsed_since(start: fugit::Instant<u64, 1, 1_000_000>) -> MicrosDurationU64 {
-    let now = crate::time::current_time();
+    let now = crate::time::now();
 
     if start.ticks() <= now.ticks() {
         now - start
     } else {
-        // current_time specifies at least 7 happy years, let's ignore this issue for
+        // now specifies at least 7 happy years, let's ignore this issue for
         // now.
         panic!("Time has wrapped around, which we currently don't handle");
     }

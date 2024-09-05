@@ -159,7 +159,7 @@ impl TimerGroupInstance for TIMG0 {
     }
 
     fn reset_peripheral() {
-        // for TIMG0 do nothing for now because the reset breaks `current_time`
+        // for TIMG0 do nothing for now because the reset breaks `time::now`
     }
 
     #[inline(always)]
