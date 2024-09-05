@@ -13,9 +13,9 @@ struct Context {
 }
 
 fn time_moves_forward_during<F: FnOnce(Context)>(ctx: Context, f: F) {
-    let t1 = esp_hal::time::current_time();
+    let t1 = esp_hal::time::uptime();
     f(ctx);
-    let t2 = esp_hal::time::current_time();
+    let t2 = esp_hal::time::uptime();
 
     assert!(t2 > t1);
 }
@@ -37,9 +37,9 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn test_current_time(ctx: Context) {
-        let t1 = esp_hal::time::current_time();
+        let t1 = esp_hal::time::uptime();
         ctx.delay.delay_millis(500);
-        let t2 = esp_hal::time::current_time();
+        let t2 = esp_hal::time::uptime();
 
         assert!(t2 > t1);
         assert!((t2 - t1).to_millis() >= 500u64);

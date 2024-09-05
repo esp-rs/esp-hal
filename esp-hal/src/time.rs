@@ -10,7 +10,7 @@
 #[cfg_attr(esp32, doc = "36_558 years")]
 #[cfg_attr(esp32s2, doc = "7_311 years")]
 #[cfg_attr(not(any(esp32, esp32s2)), doc = "more than 7 years")]
-pub fn current_time() -> fugit::Instant<u64, 1, 1_000_000> {
+pub fn uptime() -> fugit::Instant<u64, 1, 1_000_000> {
     #[cfg(esp32)]
     let (ticks, div) = {
         // on ESP32 use LACT
@@ -50,9 +50,10 @@ pub fn current_time() -> fugit::Instant<u64, 1, 1_000_000> {
 
 #[cfg(esp32)]
 pub(crate) fn time_init() {
+    let apb = Clocks::get().apb_clock.to_Hz();
     // we assume 80MHz APB clock source - there is no way to configure it in a
     // different way currently
-    const APB_FREQUENCY: u32 = 80_000_000u32;
+    assert!(apb, 80_000_000u32);
 
     let tg0 = unsafe { crate::peripherals::TIMG0::steal() };
 
@@ -63,7 +64,7 @@ pub(crate) fn time_init() {
 
     // 16 MHz counter
     tg0.lactconfig()
-        .modify(|_, w| unsafe { w.divider().bits((APB_FREQUENCY / 16_000_000u32) as u16) });
+        .modify(|_, w| unsafe { w.divider().bits((apb / 16_000_000u32) as u16) });
     tg0.lactconfig().modify(|_, w| {
         w.increase().bit(true);
         w.autoreload().bit(true);
