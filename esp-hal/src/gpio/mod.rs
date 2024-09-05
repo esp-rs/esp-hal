@@ -886,7 +886,12 @@ where
             }
         }
 
-        set_int_enable(GPIONUM, gpio_intr_enable(int_enable, nmi_enable), event as u8, wake_up_from_light_sleep)
+        set_int_enable(
+            GPIONUM,
+            gpio_intr_enable(int_enable, nmi_enable),
+            event as u8,
+            wake_up_from_light_sleep,
+        )
     }
 
     fn unlisten(&mut self, _: private::Internal) {
@@ -1265,7 +1270,7 @@ macro_rules! gpio {
                     $crate::pin_types!($type);
 
                     fn degrade_pin(&self, _: $crate::private::Internal) -> ErasedPin {
-                        $crate::gpio::ErasedPin::[< Gpio $gpionum >](unsafe { Self::steal() })
+                        ErasedPin($crate::gpio::ErasedPinInner::[< Gpio $gpionum >](unsafe { Self::steal() }))
                     }
                 }
 
@@ -1308,21 +1313,21 @@ macro_rules! gpio {
                 )+
             }
 
-            #[doc(hidden)]
-            pub enum ErasedPin {
+            pub(crate) enum ErasedPinInner {
                 $(
                     [<Gpio $gpionum >](GpioPin<$gpionum>),
                 )+
             }
 
+            /// Type-erased GPIO pin
+            pub struct ErasedPin(pub(crate) ErasedPinInner);
+
             impl ErasedPin {
                 pub(crate) unsafe fn clone_unchecked(&self) -> Self {
-                    match self {
-                        $(
-                        ErasedPin::[<Gpio $gpionum >](_) => {
-                            ErasedPin::[< Gpio $gpionum >](unsafe { GpioPin::steal() })
-                        }
-                        )+
+                    match self.0 {
+                        $(ErasedPinInner::[<Gpio $gpionum >](_) => {
+                            Self(ErasedPinInner::[< Gpio $gpionum >](unsafe { GpioPin::steal() }))
+                        })+
                     }
                 }
             }
@@ -1339,10 +1344,10 @@ macro_rules! gpio {
             #[doc(hidden)]
             #[macro_export]
             macro_rules! handle_gpio_output {
-                ($this:ident, $inner:ident, $code:tt) => {
+                ($this:expr, $inner:ident, $code:tt) => {
                     match $this {
                         $(
-                            ErasedPin::[<Gpio $gpionum >]($inner) => if_output_pin!($type, {
+                            ErasedPinInner::[<Gpio $gpionum >]($inner) => if_output_pin!($type, {
                                 $code
                             } else {{
                                 let _ = $inner;
@@ -1356,10 +1361,10 @@ macro_rules! gpio {
             #[doc(hidden)]
             #[macro_export]
             macro_rules! handle_gpio_input {
-                ($this:ident, $inner:ident, $code:tt) => {
+                ($this:expr, $inner:ident, $code:tt) => {
                     match $this {
                         $(
-                            ErasedPin::[<Gpio $gpionum >]($inner) => $code
+                            ErasedPinInner::[<Gpio $gpionum >]($inner) => $code
                         )+
                     }
                 }
@@ -2236,7 +2241,7 @@ pub(crate) mod internal {
 
     impl Pin for ErasedPin {
         fn number(&self, _: private::Internal) -> u8 {
-            handle_gpio_input!(self, target, { Pin::number(target, private::Internal) })
+            handle_gpio_input!(&self.0, target, { Pin::number(target, private::Internal) })
         }
 
         fn degrade_internal(&self, _: private::Internal) -> ErasedPin {
@@ -2244,13 +2249,13 @@ pub(crate) mod internal {
         }
 
         fn sleep_mode(&mut self, on: bool, _: private::Internal) {
-            handle_gpio_input!(self, target, {
+            handle_gpio_input!(&mut self.0, target, {
                 Pin::sleep_mode(target, on, private::Internal)
             })
         }
 
         fn set_alternate_function(&mut self, alternate: AlternateFunction, _: private::Internal) {
-            handle_gpio_input!(self, target, {
+            handle_gpio_input!(&mut self.0, target, {
                 Pin::set_alternate_function(target, alternate, private::Internal)
             })
         }
@@ -2263,7 +2268,7 @@ pub(crate) mod internal {
             wake_up_from_light_sleep: bool,
             _: private::Internal,
         ) {
-            handle_gpio_input!(self, target, {
+            handle_gpio_input!(&mut self.0, target, {
                 Pin::listen_with_options(
                     target,
                     event,
@@ -2276,17 +2281,19 @@ pub(crate) mod internal {
         }
 
         fn unlisten(&mut self, _: private::Internal) {
-            handle_gpio_input!(self, target, { Pin::unlisten(target, private::Internal) })
+            handle_gpio_input!(&mut self.0, target, {
+                Pin::unlisten(target, private::Internal)
+            })
         }
 
         fn is_interrupt_set(&self, _: private::Internal) -> bool {
-            handle_gpio_input!(self, target, {
+            handle_gpio_input!(&self.0, target, {
                 Pin::is_interrupt_set(target, private::Internal)
             })
         }
 
         fn clear_interrupt(&mut self, _: private::Internal) {
-            handle_gpio_input!(self, target, {
+            handle_gpio_input!(&mut self.0, target, {
                 Pin::clear_interrupt(target, private::Internal)
             })
         }
@@ -2294,25 +2301,25 @@ pub(crate) mod internal {
 
     impl InputPin for ErasedPin {
         fn init_input(&self, pull_down: bool, pull_up: bool, _: private::Internal) {
-            handle_gpio_input!(self, target, {
+            handle_gpio_input!(&self.0, target, {
                 InputPin::init_input(target, pull_down, pull_up, private::Internal)
             })
         }
 
         fn enable_input(&mut self, on: bool, _: private::Internal) {
-            handle_gpio_input!(self, target, {
+            handle_gpio_input!(&mut self.0, target, {
                 InputPin::enable_input(target, on, private::Internal)
             });
         }
 
         fn enable_input_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
-            handle_gpio_input!(self, target, {
+            handle_gpio_input!(&mut self.0, target, {
                 InputPin::enable_input_in_sleep_mode(target, on, private::Internal)
             });
         }
 
         fn is_input_high(&self, _: private::Internal) -> bool {
-            handle_gpio_input!(self, target, {
+            handle_gpio_input!(&self.0, target, {
                 InputPin::is_input_high(target, private::Internal)
             })
         }
@@ -2324,7 +2331,7 @@ pub(crate) mod internal {
             force_via_gpio_mux: bool,
             _: private::Internal,
         ) {
-            handle_gpio_input!(self, target, {
+            handle_gpio_input!(&mut self.0, target, {
                 InputPin::connect_input_to_peripheral_with_options(
                     target,
                     signal,
@@ -2336,7 +2343,7 @@ pub(crate) mod internal {
         }
 
         fn disconnect_input_from_peripheral(&mut self, signal: InputSignal, _: private::Internal) {
-            handle_gpio_input!(self, target, {
+            handle_gpio_input!(&mut self.0, target, {
                 InputPin::disconnect_input_from_peripheral(target, signal, private::Internal)
             });
         }
@@ -2344,67 +2351,67 @@ pub(crate) mod internal {
 
     impl OutputPin for ErasedPin {
         fn set_to_open_drain_output(&mut self, _: private::Internal) {
-            handle_gpio_output!(self, target, {
+            handle_gpio_output!(&mut self.0, target, {
                 OutputPin::set_to_open_drain_output(target, private::Internal)
             });
         }
 
         fn set_to_push_pull_output(&mut self, _: private::Internal) {
-            handle_gpio_output!(self, target, {
+            handle_gpio_output!(&mut self.0, target, {
                 OutputPin::set_to_push_pull_output(target, private::Internal)
             });
         }
 
         fn enable_output(&mut self, on: bool, _: private::Internal) {
-            handle_gpio_output!(self, target, {
+            handle_gpio_output!(&mut self.0, target, {
                 OutputPin::enable_output(target, on, private::Internal)
             });
         }
 
         fn set_output_high(&mut self, on: bool, _: private::Internal) {
-            handle_gpio_output!(self, target, {
+            handle_gpio_output!(&mut self.0, target, {
                 OutputPin::set_output_high(target, on, private::Internal)
             });
         }
 
         fn set_drive_strength(&mut self, strength: DriveStrength, _: private::Internal) {
-            handle_gpio_output!(self, target, {
+            handle_gpio_output!(&mut self.0, target, {
                 OutputPin::set_drive_strength(target, strength, private::Internal)
             });
         }
 
         fn enable_open_drain(&mut self, on: bool, _: private::Internal) {
-            handle_gpio_output!(self, target, {
+            handle_gpio_output!(&mut self.0, target, {
                 OutputPin::enable_open_drain(target, on, private::Internal)
             });
         }
 
         fn enable_output_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
-            handle_gpio_output!(self, target, {
+            handle_gpio_output!(&mut self.0, target, {
                 OutputPin::enable_output_in_sleep_mode(target, on, private::Internal)
             });
         }
 
         fn internal_pull_up_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
-            handle_gpio_output!(self, target, {
+            handle_gpio_output!(&mut self.0, target, {
                 OutputPin::internal_pull_up_in_sleep_mode(target, on, private::Internal)
             });
         }
 
         fn internal_pull_down_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
-            handle_gpio_output!(self, target, {
+            handle_gpio_output!(&mut self.0, target, {
                 OutputPin::internal_pull_down_in_sleep_mode(target, on, private::Internal)
             });
         }
 
         fn internal_pull_up(&mut self, on: bool, _: private::Internal) {
-            handle_gpio_output!(self, target, {
+            handle_gpio_output!(&mut self.0, target, {
                 OutputPin::internal_pull_up(target, on, private::Internal)
             });
         }
 
         fn internal_pull_down(&mut self, on: bool, _: private::Internal) {
-            handle_gpio_output!(self, target, {
+            handle_gpio_output!(&mut self.0, target, {
                 OutputPin::internal_pull_down(target, on, private::Internal)
             });
         }
@@ -2418,7 +2425,7 @@ pub(crate) mod internal {
             force_via_gpio_mux: bool,
             _: private::Internal,
         ) {
-            handle_gpio_output!(self, target, {
+            handle_gpio_output!(&mut self.0, target, {
                 OutputPin::connect_peripheral_to_output_with_options(
                     target,
                     signal,
@@ -2432,13 +2439,13 @@ pub(crate) mod internal {
         }
 
         fn disconnect_peripheral_from_output(&mut self, _: private::Internal) {
-            handle_gpio_output!(self, target, {
+            handle_gpio_output!(&mut self.0, target, {
                 OutputPin::disconnect_peripheral_from_output(target, private::Internal)
             });
         }
 
         fn is_set_high(&self, _: private::Internal) -> bool {
-            handle_gpio_output!(self, target, {
+            handle_gpio_output!(&self.0, target, {
                 OutputPin::is_set_high(target, private::Internal)
             })
         }
@@ -2454,12 +2461,7 @@ fn is_listening(pin_num: u8) -> bool {
     bits != 0
 }
 
-fn set_int_enable(
-    gpio_num: u8,
-    int_ena: u8,
-    int_type: u8,
-    wake_up_from_light_sleep: bool,
-) {
+fn set_int_enable(gpio_num: u8, int_ena: u8, int_type: u8, wake_up_from_light_sleep: bool) {
     let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
     gpio.pin(gpio_num as usize).modify(|_, w| unsafe {
         w.int_ena()
