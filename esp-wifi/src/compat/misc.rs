@@ -46,6 +46,13 @@ unsafe extern "C" fn strcmp(str1: *const i8, str2: *const i8) -> i32 {
     }
 }
 
+
+#[cfg(feature = "have-strchr")]
+extern "C" {
+    fn strchr(str: *const i8, c: i32) -> *const i8;
+}
+
+#[cfg(not(feature = "have-strchr"))]
 #[no_mangle]
 unsafe extern "C" fn strchr(str: *const i8, c: i32) -> *const i8 {
     trace!("strchr {:?} {}", str, c);
