@@ -634,7 +634,8 @@ where
 {
     fn configure(&mut self) -> Result<(), Error> {
         self.rx_pins.configure()?;
-        self.valid_pin.init_input(false, false, crate::private::Internal);
+        self.valid_pin
+            .init_input(false, false, crate::private::Internal);
         self.valid_pin
             .connect_input_to_peripheral(Instance::rx_valid_pin_signal(), crate::private::Internal);
         Instance::set_rx_sw_en(false);
