@@ -1490,10 +1490,7 @@ macro_rules! rtc_pins {
 
                 let rtcio = unsafe{ &*RTC_IO::ptr() };
 
-                #[cfg(esp32s3)]
-                unsafe { $crate::peripherals::SENS::steal() }.sar_peri_clk_gate_conf().modify(|_,w| w.iomux_clk_en().set_bit());
-                #[cfg(esp32s2)]
-                unsafe { $crate::peripherals::SENS::steal() }.sar_io_mux_conf().modify(|_,w| w.iomux_clk_gate_en().set_bit());
+                $crate::gpio::enable_iomux_clk_gate();
 
                 // disable input
                 paste::paste!{
@@ -1633,13 +1630,18 @@ macro_rules! rtc_pins {
 
 #[doc(hidden)]
 pub fn enable_iomux_clk_gate() {
-    #[cfg(esp32s2)]
-    {
-        use crate::peripherals::SENS;
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
-            .sar_io_mux_conf()
-            .modify(|_, w| w.iomux_clk_gate_en().set_bit());
+    cfg_if::cfg_if! {
+        if #[cfg(esp32s2)] {
+            let sensors = unsafe { &*crate::peripherals::SENS::ptr() };
+            sensors
+                .sar_io_mux_conf()
+                .modify(|_, w| w.iomux_clk_gate_en().set_bit());
+        } else if #[cfg(esp32s3)] {
+            let sensors = unsafe { &*crate::peripherals::SENS::ptr() };
+            sensors
+                .sar_peri_clk_gate_conf()
+                .modify(|_,w| w.iomux_clk_en().set_bit());
+        }
     }
 }
 
@@ -1659,6 +1661,7 @@ macro_rules! analog {
             use $crate::peripherals::RTC_IO;
 
             let rtcio = unsafe{ &*RTC_IO::ptr() };
+            #[cfg(esp32s2)]
             $crate::gpio::enable_iomux_clk_gate();
 
             match pin {
@@ -1697,7 +1700,7 @@ macro_rules! analog {
                         }
                     }
                 )+
-                    _ => unreachable!(),
+                _ => unreachable!(),
             }
         }
     }
