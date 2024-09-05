@@ -17,12 +17,7 @@ use embassy_futures::join::join3;
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    peripherals::Peripherals,
-    system::SystemControl,
-    timer::timg::TimerGroup,
-};
+use esp_hal::{prelude::*, timer::timg::TimerGroup};
 use esp_wifi::ble::controller::asynch::BleConnector;
 use log::*;
 use static_cell::StaticCell;
@@ -38,32 +33,32 @@ use trouble_host::{
 #[esp_hal_embassy::main]
 async fn main(_s: Spawner) {
     esp_println::logger::init_logger_from_env();
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::max(system.clock_control).freeze();
-
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let peripherals = esp_hal::init({
+        let mut config = esp_hal::Config::default();
+        config.cpu_clock = CpuClock::max();
+        config
+    });
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
 
     let init = esp_wifi::initialize(
         esp_wifi::EspWifiInitFor::Ble,
         timg0.timer0,
         esp_hal::rng::Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
-        &clocks,
     )
     .unwrap();
 
     #[cfg(feature = "esp32")]
     {
         let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-        esp_hal_embassy::init(&clocks, timg1.timer0);
+        esp_hal_embassy::init(timg1.timer0);
     }
 
     #[cfg(not(feature = "esp32"))]
     {
         let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER)
             .split::<esp_hal::timer::systimer::Target>();
-        esp_hal_embassy::init(&clocks, systimer.alarm0);
+        esp_hal_embassy::init(systimer.alarm0);
     }
 
     let mut bluetooth = peripherals.BT;
