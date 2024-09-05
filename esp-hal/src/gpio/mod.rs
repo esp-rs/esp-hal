@@ -1162,12 +1162,7 @@ impl Io {
         gpio.bind_gpio_interrupt(gpio_interrupt_handler);
         crate::interrupt::enable(crate::peripherals::Interrupt::GPIO, prio).unwrap();
 
-        let pins = gpio.pins();
-
-        Io {
-            _io_mux: io_mux,
-            pins,
-        }
+        Self::new_no_bind_interrupt(gpio, io_mux)
     }
 
     /// Initialize the I/O driver without enabling the GPIO interrupt or
@@ -1176,12 +1171,10 @@ impl Io {
     /// *Note:* You probably don't want to use this, it is intended to be used
     /// in very specific use cases. Async GPIO functionality will not work
     /// when instantiating `Io` using this constructor.
-    pub fn new_no_bind_interrupt(gpio: GPIO, io_mux: IO_MUX) -> Self {
-        let pins = gpio.pins();
-
+    pub fn new_no_bind_interrupt(gpio: GPIO, _io_mux: IO_MUX) -> Self {
         Io {
-            _io_mux: io_mux,
-            pins,
+            _io_mux,
+            pins: gpio.pins(),
         }
     }
 }
