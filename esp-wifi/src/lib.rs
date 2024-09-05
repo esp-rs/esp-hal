@@ -9,13 +9,12 @@
 #![allow(unknown_lints)]
 #![allow(non_local_definitions)]
 
+extern crate alloc;
+
 // MUST be the first module
 mod fmt;
 
-use core::{cell::RefCell, mem::MaybeUninit, ptr::addr_of_mut};
-
 use common_adapter::{chip_specific::phy_mem_init, init_radio_clock_control, RADIO_CLOCKS};
-use critical_section::Mutex;
 use esp_hal as hal;
 #[cfg(not(feature = "esp32"))]
 use esp_hal::timer::systimer::Alarm;
@@ -25,7 +24,6 @@ use hal::{
     system::RadioClockController,
     timer::{timg::Timer as TimgTimer, ErasedTimer, PeriodicTimer},
 };
-use linked_list_allocator::Heap;
 #[cfg(feature = "wifi")]
 use wifi::WifiError;
 
@@ -73,12 +71,6 @@ const DEFAULT_TICK_RATE_HZ: u32 = 50;
 #[cfg(not(debug_assertions))]
 const DEFAULT_TICK_RATE_HZ: u32 = 100;
 
-#[cfg(not(coex))]
-const DEFAULT_HEAP_SIZE: usize = 81920;
-
-#[cfg(coex)]
-const DEFAULT_HEAP_SIZE: usize = 90112;
-
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[toml_cfg::toml_config]
@@ -112,8 +104,6 @@ struct Config {
     country_code_operating_class: u8,
     #[default(1492)]
     mtu: usize,
-    #[default(DEFAULT_HEAP_SIZE)]
-    heap_size: usize,
     #[default(DEFAULT_TICK_RATE_HZ)]
     tick_rate_hz: u32,
     #[default(3)]
@@ -139,20 +129,6 @@ const _: () = {
     );
     core::assert!(CONFIG.rx_ba_win < (CONFIG.static_rx_buf_num * 2), "WiFi configuration check: rx_ba_win should not be larger than double of the static_rx_buf_num!");
 };
-
-const HEAP_SIZE: usize = crate::CONFIG.heap_size;
-
-#[cfg_attr(esp32, link_section = ".dram2_uninit")]
-static mut HEAP_DATA: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
-
-pub(crate) static HEAP: Mutex<RefCell<Heap>> = Mutex::new(RefCell::new(Heap::empty()));
-
-fn init_heap() {
-    critical_section::with(|cs| {
-        HEAP.borrow_ref_mut(cs)
-            .init_from_slice(unsafe { &mut *addr_of_mut!(HEAP_DATA) as &mut [MaybeUninit<u8>] })
-    });
-}
 
 type TimeBase = PeriodicTimer<'static, ErasedTimer>;
 
@@ -320,7 +296,6 @@ pub fn initialize(
 
     crate::common_adapter::chip_specific::enable_wifi_power_domain();
 
-    init_heap();
     phy_mem_init();
     init_radio_clock_control(radio_clocks);
     init_rng(rng);
