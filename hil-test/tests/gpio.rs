@@ -1,8 +1,8 @@
 //! GPIO Test
 //!
 //! Folowing pins are used:
-//! GPIO2 / GPIO9 (esp32s2 and esp32s3)
-//! GPIO3 / GPIO10 (esp32s2 and esp32s3)
+//! GPIO2 / GPIO9 / GPIO26  (esp32s2 / esp32s3 / esp32)
+//! GPIO3 / GPIO10 / GPIO26 (esp32s2 / esp32s3 / esp32)
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: generic-queue
@@ -13,10 +13,6 @@
 use core::cell::RefCell;
 
 use critical_section::Mutex;
-#[cfg(feature = "esp32")]
-use esp_hal::gpio::Gpio4;
-#[cfg(not(feature = "esp32"))]
-use esp_hal::gpio::Gpio3;
 use esp_hal::{
     delay::Delay,
     gpio::{AnyPin, ErasedPin, Input, Io, Level, Output, Pin, Pull},

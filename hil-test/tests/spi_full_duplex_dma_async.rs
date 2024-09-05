@@ -4,7 +4,6 @@
 //! SCLK    GPIO0
 //! MOSI    GPIO3 / GPIO10 (esp32s3)
 //! MISO    GPIO4
-//! CS      GPIO8
 //!
 //! PCNT    GPIO2 / GPIO9 (esp32s3)
 //! OUTPUT  GPIO5 (helper to keep MISO LOW)
@@ -99,8 +98,10 @@ mod tests {
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
-        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-            .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
+        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+            .with_sck(sclk)
+            .with_mosi(mosi)
+            .with_miso(miso)
             .with_dma(dma_channel.configure_for_async(false, DmaPriority::Priority0))
             .with_buffers(dma_tx_buf, dma_rx_buf);
 

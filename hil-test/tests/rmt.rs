@@ -2,6 +2,7 @@
 //!
 //! It's assumed GPIO2 is connected to GPIO3
 //! (GPIO9 and GPIO10 for esp32s2 and esp32s3)
+//! (GPIO26 and GPIO27 for esp32)
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 

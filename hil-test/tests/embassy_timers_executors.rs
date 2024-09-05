@@ -12,17 +12,20 @@ use esp_hal::{
     interrupt::software::SoftwareInterruptControl,
     peripherals::Peripherals,
     prelude::*,
-    timer::{timg::TimerGroup, ErasedTimer, OneShotTimer, PeriodicTimer},
+    timer::{timg::TimerGroup, OneShotTimer, PeriodicTimer},
 };
 #[cfg(not(feature = "esp32"))]
 use esp_hal::{
+    interrupt::software::SoftwareInterruptControl,
     interrupt::Priority,
     timer::systimer::{Alarm, FrozenUnit, Periodic, SystemTimer, Target},
+    timer::ErasedTimer,
 };
 #[cfg(not(feature = "esp32"))]
 use esp_hal_embassy::InterruptExecutor;
 use hil_test as _;
 
+#[cfg(not(feature = "esp32"))]
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
         static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
@@ -123,7 +126,9 @@ fn set_up_embassy_with_systimer(peripherals: Peripherals) {
 #[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
 mod test {
     use super::*;
-    use crate::{test_cases::*, test_helpers::*};
+    use crate::test_cases::*;
+    #[cfg(not(feature = "esp32"))]
+    use crate::test_helpers::*;
 
     #[init]
     fn init() -> Peripherals {

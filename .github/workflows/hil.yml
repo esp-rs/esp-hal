@@ -172,8 +172,8 @@ jobs:
           # Xtensa devices:
           - soc: esp32
             runner: esp32-jtag
-            usb: USB1 # ESP32 HIL TODO
             host: aarch64
+            hubs: "1 3"
           - soc: esp32s2
             runner: esp32s2-jtag
             host: armv7

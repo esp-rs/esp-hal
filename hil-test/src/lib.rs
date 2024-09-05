@@ -30,6 +30,8 @@ macro_rules! i2c_pins {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32s2, esp32s3))] {
                 ($io.pins.gpio2, $io.pins.gpio3)
+            } else if #[cfg(esp32)] {
+                ($io.pins.gpio32, $io.pins.gpio33)
             } else if #[cfg(esp32c6)] {
                 ($io.pins.gpio6, $io.pins.gpio7)
             } else if #[cfg(esp32h2)] {
@@ -49,7 +51,11 @@ macro_rules! common_test_pins {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32s2, esp32s3))] {
                 ($io.pins.gpio9, $io.pins.gpio10)
-            } else {
+            }
+            else if #[cfg(esp32)] {
+                ($io.pins.gpio26, $io.pins.gpio27)
+            }
+            else {
                 ($io.pins.gpio2, $io.pins.gpio3)
             }
         }
