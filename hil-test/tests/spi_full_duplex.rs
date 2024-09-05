@@ -40,7 +40,7 @@ mod tests {
         let sclk = io.pins.gpio0;
         let (miso, mosi) = hil_test::common_test_pins!(io);
 
-        let spi = Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0, &clocks)
+        let spi = Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0)
             .with_sck(sclk)
             .with_mosi(mosi)
             .with_miso(miso);

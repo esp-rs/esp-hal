@@ -8,18 +8,17 @@
 #![no_main]
 
 use embassy_time::{Duration, Ticker, Timer};
-use esp_hal::{
-    interrupt::software::SoftwareInterruptControl,
-    peripherals::Peripherals,
-    prelude::*,
-    timer::{timg::TimerGroup, OneShotTimer, PeriodicTimer},
-};
 #[cfg(not(feature = "esp32"))]
 use esp_hal::{
     interrupt::software::SoftwareInterruptControl,
     interrupt::Priority,
     timer::systimer::{Alarm, FrozenUnit, Periodic, SystemTimer, Target},
     timer::ErasedTimer,
+};
+use esp_hal::{
+    peripherals::Peripherals,
+    prelude::*,
+    timer::{timg::TimerGroup, OneShotTimer, PeriodicTimer},
 };
 #[cfg(not(feature = "esp32"))]
 use esp_hal_embassy::InterruptExecutor;
