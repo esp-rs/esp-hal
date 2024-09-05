@@ -3,11 +3,21 @@
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: integrated-timers
+//% FEATURES: generic-queue
 
 #![no_std]
 #![no_main]
 
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
+use esp_hal::{
+    interrupt::{
+        software::{SoftwareInterrupt, SoftwareInterruptControl},
+        Priority,
+    },
+    timer::timg::TimerGroup,
+};
+use esp_hal_embassy::InterruptExecutor;
+use hil_test as _;
 
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
@@ -22,31 +32,25 @@ macro_rules! mk_static {
 async fn interrupt_driven_task(signal: &'static Signal<CriticalSectionRawMutex, ()>) {
     loop {
         signal.wait().await;
-        defmt::info!("Received");
     }
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
 mod test {
-    use defmt_rtt as _;
-    use esp_backtrace as _;
-    use esp_hal::{
-        clock::ClockControl,
-        interrupt::Priority,
-        peripherals::Peripherals,
-        system::{SoftwareInterrupt, SystemControl},
-    };
-    use esp_hal_embassy::InterruptExecutor;
+    use hil_test as _;
 
     use super::*;
 
     #[init]
     fn init() -> SoftwareInterrupt<1> {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-        system.software_interrupt_control.software_interrupt1
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        esp_hal_embassy::init(timg0.timer0);
+
+        let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+        sw_ints.software_interrupt1
     }
 
     #[test]
@@ -61,6 +65,5 @@ mod test {
         spawner.spawn(interrupt_driven_task(signal)).unwrap();
 
         signal.signal(());
-        defmt::info!("Returned");
     }
 }

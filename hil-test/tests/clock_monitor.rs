@@ -5,29 +5,11 @@
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
-use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    peripherals::Peripherals,
-    rtc_cntl::Rtc,
-    system::SystemControl,
-};
+use esp_hal::rtc_cntl::Rtc;
+use hil_test as _;
 
 struct Context<'a> {
     rtc: Rtc<'a>,
-}
-
-impl Context<'_> {
-    pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        ClockControl::boot_defaults(system.clock_control).freeze();
-
-        let rtc = Rtc::new(peripherals.LPWR);
-
-        Context { rtc }
-    }
 }
 
 #[cfg(test)]
@@ -37,16 +19,32 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        Context::init()
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let rtc = Rtc::new(peripherals.LPWR);
+
+        Context { rtc }
     }
 
     #[test]
     fn test_estimated_clock(mut ctx: Context<'static>) {
-        #[cfg(feature = "esp32c2")] // 26 MHz
-        defmt::assert!((23..=29).contains(&ctx.rtc.estimate_xtal_frequency()));
-        #[cfg(feature = "esp32h2")] // 32 MHz
-        defmt::assert!((29..=35).contains(&ctx.rtc.estimate_xtal_frequency()));
-        #[cfg(not(any(feature = "esp32h2", feature = "esp32c2")))] // 40 MHz
-        defmt::assert!((35..=45).contains(&ctx.rtc.estimate_xtal_frequency()));
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "esp32c2")] {
+                // 26 MHz
+                let expected_range = 23..=29;
+            } else if #[cfg(feature = "esp32h2")] {
+                // 32 MHz
+                let expected_range = 29..=35;
+            } else {
+                // 40 MHz
+                let expected_range = 35..=45;
+            }
+        }
+
+        let measured_frequency = ctx.rtc.estimate_xtal_frequency();
+        defmt::assert!(
+            expected_range.contains(&measured_frequency),
+            "Measured frequency: {}",
+            measured_frequency
+        );
     }
 }

@@ -420,14 +420,20 @@ impl<const N: u8> RegisterAccess for Channel<N> {
 #[doc(hidden)]
 pub struct ChannelTxImpl<const N: u8> {}
 
+use embassy_sync::waitqueue::AtomicWaker;
+
+#[allow(clippy::declare_interior_mutable_const)]
+const INIT: AtomicWaker = AtomicWaker::new();
+
+static TX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [INIT; CHANNEL_COUNT];
+
+static RX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [INIT; CHANNEL_COUNT];
+
 impl<const N: u8> crate::private::Sealed for ChannelTxImpl<N> {}
 
 impl<const N: u8> TxChannel<Channel<N>> for ChannelTxImpl<N> {
-    #[cfg(feature = "async")]
-    fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
-        static WAKER: embassy_sync::waitqueue::AtomicWaker =
-            embassy_sync::waitqueue::AtomicWaker::new();
-        &WAKER
+    fn waker() -> &'static AtomicWaker {
+        &TX_WAKERS[N as usize]
     }
 }
 
@@ -438,11 +444,8 @@ pub struct ChannelRxImpl<const N: u8> {}
 impl<const N: u8> crate::private::Sealed for ChannelRxImpl<N> {}
 
 impl<const N: u8> RxChannel<Channel<N>> for ChannelRxImpl<N> {
-    #[cfg(feature = "async")]
-    fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
-        static WAKER: embassy_sync::waitqueue::AtomicWaker =
-            embassy_sync::waitqueue::AtomicWaker::new();
-        &WAKER
+    fn waker() -> &'static AtomicWaker {
+        &RX_WAKERS[N as usize]
     }
 }
 
@@ -542,7 +545,6 @@ macro_rules! impl_channel {
                 ///
                 /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
                 /// transfer buffers of size `1..=4092`, you need 1 descriptor.
-                #[cfg(feature = "async")]
                 pub fn configure_for_async<'a>(
                     self,
                     burst_mode: bool,
@@ -569,16 +571,20 @@ macro_rules! impl_channel {
 
 cfg_if::cfg_if! {
     if #[cfg(esp32c2)] {
+        const CHANNEL_COUNT: usize = 1;
         impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_CH0);
     } else if #[cfg(esp32c3)] {
+        const CHANNEL_COUNT: usize = 3;
         impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_CH0);
         impl_channel!(1, super::asynch::interrupt::interrupt_handler_ch1, DMA_CH1);
         impl_channel!(2, super::asynch::interrupt::interrupt_handler_ch2, DMA_CH2);
     } else if #[cfg(any(esp32c6, esp32h2))] {
+        const CHANNEL_COUNT: usize = 3;
         impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_IN_CH0, DMA_OUT_CH0);
         impl_channel!(1, super::asynch::interrupt::interrupt_handler_ch1, DMA_IN_CH1, DMA_OUT_CH1);
         impl_channel!(2, super::asynch::interrupt::interrupt_handler_ch2, DMA_IN_CH2, DMA_OUT_CH2);
-   } else if #[cfg(esp32s3)] {
+    } else if #[cfg(esp32s3)] {
+        const CHANNEL_COUNT: usize = 5;
         impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_IN_CH0, DMA_OUT_CH0);
         impl_channel!(1, super::asynch::interrupt::interrupt_handler_ch1, DMA_IN_CH1, DMA_OUT_CH1);
         impl_channel!(2, super::asynch::interrupt::interrupt_handler_ch2, DMA_IN_CH2, DMA_OUT_CH2);
@@ -668,8 +674,8 @@ mod m2m {
         MODE: crate::Mode,
     {
         channel: Channel<'d, C, MODE>,
-        tx_chain: DescriptorChain,
         rx_chain: DescriptorChain,
+        tx_chain: DescriptorChain,
         peripheral: DmaPeripheral,
     }
 
@@ -682,15 +688,15 @@ mod m2m {
         pub fn new(
             channel: Channel<'d, C, MODE>,
             peripheral: impl DmaEligible,
-            tx_descriptors: &'static mut [DmaDescriptor],
             rx_descriptors: &'static mut [DmaDescriptor],
+            tx_descriptors: &'static mut [DmaDescriptor],
         ) -> Result<Self, DmaError> {
             unsafe {
                 Self::new_unsafe(
                     channel,
                     peripheral.dma_peripheral(),
-                    tx_descriptors,
                     rx_descriptors,
+                    tx_descriptors,
                     crate::dma::CHUNK_SIZE,
                 )
             }
@@ -700,16 +706,16 @@ mod m2m {
         pub fn new_with_chunk_size(
             channel: Channel<'d, C, MODE>,
             peripheral: impl DmaEligible,
-            tx_descriptors: &'static mut [DmaDescriptor],
             rx_descriptors: &'static mut [DmaDescriptor],
+            tx_descriptors: &'static mut [DmaDescriptor],
             chunk_size: usize,
         ) -> Result<Self, DmaError> {
             unsafe {
                 Self::new_unsafe(
                     channel,
                     peripheral.dma_peripheral(),
-                    tx_descriptors,
                     rx_descriptors,
+                    tx_descriptors,
                     chunk_size,
                 )
             }
@@ -724,8 +730,8 @@ mod m2m {
         pub unsafe fn new_unsafe(
             mut channel: Channel<'d, C, MODE>,
             peripheral: DmaPeripheral,
-            tx_descriptors: &'static mut [DmaDescriptor],
             rx_descriptors: &'static mut [DmaDescriptor],
+            tx_descriptors: &'static mut [DmaDescriptor],
             chunk_size: usize,
         ) -> Result<Self, DmaError> {
             if !(1..=4092).contains(&chunk_size) {
@@ -739,16 +745,16 @@ mod m2m {
             Ok(Mem2Mem {
                 channel,
                 peripheral,
-                tx_chain: DescriptorChain::new_with_chunk_size(tx_descriptors, chunk_size),
                 rx_chain: DescriptorChain::new_with_chunk_size(rx_descriptors, chunk_size),
+                tx_chain: DescriptorChain::new_with_chunk_size(tx_descriptors, chunk_size),
             })
         }
 
         /// Start a memory to memory transfer.
         pub fn start_transfer<'t, TXBUF, RXBUF>(
             &mut self,
-            tx_buffer: &'t TXBUF,
             rx_buffer: &'t mut RXBUF,
+            tx_buffer: &'t TXBUF,
         ) -> Result<DmaTransferRx<'_, Self>, DmaError>
         where
             TXBUF: ReadBuffer,
@@ -793,7 +799,7 @@ mod m2m {
         C: DmaChannel,
         MODE: crate::Mode,
     {
-        fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+        fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
             while !self.channel.rx.is_done() {}
         }
 

@@ -6,8 +6,7 @@ pub(crate) mod state;
 use core::{
     cell::{RefCell, RefMut},
     fmt::Debug,
-    mem,
-    mem::MaybeUninit,
+    mem::{self, MaybeUninit},
     ptr::addr_of,
     time::Duration,
 };
@@ -15,16 +14,45 @@ use core::{
 use critical_section::{CriticalSection, Mutex};
 use enumset::{EnumSet, EnumSetType};
 use esp_wifi_sys::include::{
+    esp_eap_client_clear_ca_cert,
+    esp_eap_client_clear_certificate_and_key,
+    esp_eap_client_clear_identity,
+    esp_eap_client_clear_new_password,
+    esp_eap_client_clear_password,
+    esp_eap_client_clear_username,
+    esp_eap_client_set_ca_cert,
+    esp_eap_client_set_certificate_and_key,
+    esp_eap_client_set_disable_time_check,
+    esp_eap_client_set_fast_params,
+    esp_eap_client_set_identity,
+    esp_eap_client_set_new_password,
+    esp_eap_client_set_pac_file,
+    esp_eap_client_set_password,
+    esp_eap_client_set_ttls_phase2_method,
+    esp_eap_client_set_username,
+    esp_eap_fast_config,
+    esp_wifi_sta_enterprise_enable,
+    wifi_pkt_rx_ctrl_t,
     WIFI_PROTOCOL_11AX,
     WIFI_PROTOCOL_11B,
     WIFI_PROTOCOL_11G,
     WIFI_PROTOCOL_11N,
     WIFI_PROTOCOL_LR,
 };
+#[cfg(feature = "sniffer")]
+use esp_wifi_sys::include::{
+    esp_wifi_80211_tx,
+    esp_wifi_set_promiscuous,
+    esp_wifi_set_promiscuous_rx_cb,
+    wifi_promiscuous_pkt_t,
+    wifi_promiscuous_pkt_type_t,
+};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 #[doc(hidden)]
 pub(crate) use os_adapter::*;
+#[cfg(feature = "sniffer")]
+use portable_atomic::AtomicBool;
 use portable_atomic::{AtomicUsize, Ordering};
 #[cfg(feature = "smoltcp")]
 use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
@@ -228,6 +256,114 @@ impl Default for ClientConfiguration {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
+pub struct EapFastConfig {
+    pub fast_provisioning: u8,
+    pub fast_max_pac_list_len: u8,
+    pub fast_pac_format_binary: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
+pub enum TtlsPhase2Method {
+    Eap,
+    Mschapv2,
+    Mschap,
+    Pap,
+    Chap,
+}
+
+impl TtlsPhase2Method {
+    fn to_raw(&self) -> u32 {
+        match self {
+            TtlsPhase2Method::Eap => {
+                esp_wifi_sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_EAP
+            }
+            TtlsPhase2Method::Mschapv2 => {
+                esp_wifi_sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_MSCHAPV2
+            }
+            TtlsPhase2Method::Mschap => {
+                esp_wifi_sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_MSCHAP
+            }
+            TtlsPhase2Method::Pap => {
+                esp_wifi_sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_PAP
+            }
+            TtlsPhase2Method::Chap => {
+                esp_wifi_sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_CHAP
+            }
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
+pub struct EapClientConfiguration {
+    pub ssid: heapless::String<32>,
+    pub bssid: Option<[u8; 6]>,
+    // pub protocol: Protocol,
+    pub auth_method: AuthMethod,
+    pub identity: Option<heapless::String<128>>,
+    pub username: Option<heapless::String<128>>,
+    pub password: Option<heapless::String<64>>,
+    pub new_password: Option<heapless::String<64>>,
+    pub eap_fast_config: Option<EapFastConfig>,
+    pub pac_file: Option<&'static [u8]>,
+    pub time_check: bool,
+    pub ca_cert: Option<&'static [u8]>,
+    #[allow(clippy::type_complexity)]
+    pub certificate_and_key: Option<(&'static [u8], &'static [u8], Option<&'static [u8]>)>,
+    pub ttls_phase2_method: Option<TtlsPhase2Method>,
+
+    pub channel: Option<u8>,
+}
+
+impl Debug for EapClientConfiguration {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("EapClientConfiguration")
+            .field("ssid", &self.ssid)
+            .field("bssid", &self.bssid)
+            .field("auth_method", &self.auth_method)
+            .field("channel", &self.channel)
+            .field("identity", &self.identity)
+            .field("username", &self.username)
+            .field("eap_fast_config", &self.eap_fast_config)
+            .field("time_check", &self.time_check)
+            .field("pac_file set", &self.pac_file.is_some())
+            .field("ca_cert set", &self.ca_cert.is_some())
+            .field(
+                "certificate_and_key set",
+                &self.certificate_and_key.is_some(),
+            )
+            .field("ttls_phase2_method", &self.ttls_phase2_method)
+            .finish()
+    }
+}
+
+impl Default for EapClientConfiguration {
+    fn default() -> Self {
+        EapClientConfiguration {
+            ssid: heapless::String::new(),
+            bssid: None,
+            auth_method: AuthMethod::WPA2Enterprise,
+            identity: None,
+            username: None,
+            password: None,
+            channel: None,
+            eap_fast_config: None,
+            time_check: false,
+            new_password: None,
+            pac_file: None,
+            ca_cert: None,
+            certificate_and_key: None,
+            ttls_phase2_method: None,
+        }
+    }
+}
+
 #[derive(EnumSetType, Debug, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Capability {
@@ -239,12 +375,14 @@ pub enum Capability {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[derive(Default)]
+#[allow(clippy::large_enum_variant)]
 pub enum Configuration {
     #[default]
     None,
     Client(ClientConfiguration),
     AccessPoint(AccessPointConfiguration),
     Mixed(ClientConfiguration, AccessPointConfiguration),
+    EapClient(EapClientConfiguration),
 }
 
 impl Configuration {
@@ -628,6 +766,7 @@ impl TryFrom<&Configuration> for WifiMode {
             Configuration::AccessPoint(_) => Self::Ap,
             Configuration::Client(_) => Self::Sta,
             Configuration::Mixed(_, _) => Self::ApSta,
+            Configuration::EapClient(_) => Self::Sta,
         };
 
         Ok(mode)
@@ -680,6 +819,7 @@ pub enum WifiError {
     InternalError(InternalWifiError),
     Disconnected,
     UnknownWifiMode,
+    Unsupported,
 }
 
 /// Events generated by the WiFi driver
@@ -1770,10 +1910,206 @@ fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
     }
 }
 
+#[cfg(not(any(esp32c6)))]
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct RxControlInfo {
+    pub rssi: i32,
+    pub rate: u32,
+    pub sig_mode: u32,
+    pub mcs: u32,
+    pub cwb: u32,
+    pub smoothing: u32,
+    pub not_sounding: u32,
+    pub aggregation: u32,
+    pub stbc: u32,
+    pub fec_coding: u32,
+    pub sgi: u32,
+    pub ampdu_cnt: u32,
+    pub channel: u32,
+    pub secondary_channel: u32,
+    pub timestamp: u32,
+    pub noise_floor: i32,
+    pub ant: u32,
+    pub sig_len: u32,
+    pub rx_state: u32,
+}
+
+#[cfg(esp32c6)]
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct RxControlInfo {
+    pub rssi: i32,
+    pub rate: u32,
+    pub sig_len: u32,
+    pub rx_state: u32,
+    pub dump_len: u32,
+    pub he_sigb_len: u32,
+    pub cur_single_mpdu: u32,
+    pub cur_bb_format: u32,
+    pub rx_channel_estimate_info_vld: u32,
+    pub rx_channel_estimate_len: u32,
+    pub second: u32,
+    pub channel: u32,
+    pub noise_floor: i32,
+    pub is_group: u32,
+    pub rxend_state: u32,
+    pub rxmatch3: u32,
+    pub rxmatch2: u32,
+    pub rxmatch1: u32,
+    pub rxmatch0: u32,
+}
+impl RxControlInfo {
+    /// Create an instance from a raw pointer to [wifi_pkt_rx_ctrl_t].
+    ///
+    /// # Safety
+    /// When calling this, you must ensure, that `rx_cntl` points to a valid
+    /// instance of [wifi_pkt_rx_ctrl_t].
+    pub unsafe fn from_raw(rx_cntl: *const wifi_pkt_rx_ctrl_t) -> Self {
+        #[cfg(not(esp32c6))]
+        let rx_control_info = RxControlInfo {
+            rssi: (*rx_cntl).rssi(),
+            rate: (*rx_cntl).rate(),
+            sig_mode: (*rx_cntl).sig_mode(),
+            mcs: (*rx_cntl).mcs(),
+            cwb: (*rx_cntl).cwb(),
+            smoothing: (*rx_cntl).smoothing(),
+            not_sounding: (*rx_cntl).not_sounding(),
+            aggregation: (*rx_cntl).aggregation(),
+            stbc: (*rx_cntl).stbc(),
+            fec_coding: (*rx_cntl).fec_coding(),
+            sgi: (*rx_cntl).sgi(),
+            ampdu_cnt: (*rx_cntl).ampdu_cnt(),
+            channel: (*rx_cntl).channel(),
+            secondary_channel: (*rx_cntl).secondary_channel(),
+            timestamp: (*rx_cntl).timestamp(),
+            noise_floor: (*rx_cntl).noise_floor(),
+            ant: (*rx_cntl).ant(),
+            sig_len: (*rx_cntl).sig_len(),
+            rx_state: (*rx_cntl).rx_state(),
+        };
+        #[cfg(esp32c6)]
+        let rx_control_info = RxControlInfo {
+            rssi: (*rx_cntl).rssi(),
+            rate: (*rx_cntl).rate(),
+            sig_len: (*rx_cntl).sig_len(),
+            rx_state: (*rx_cntl).rx_state(),
+            dump_len: (*rx_cntl).dump_len(),
+            he_sigb_len: (*rx_cntl).he_sigb_len(),
+            cur_single_mpdu: (*rx_cntl).cur_single_mpdu(),
+            cur_bb_format: (*rx_cntl).cur_bb_format(),
+            rx_channel_estimate_info_vld: (*rx_cntl).rx_channel_estimate_info_vld(),
+            rx_channel_estimate_len: (*rx_cntl).rx_channel_estimate_len(),
+            second: (*rx_cntl).second(),
+            channel: (*rx_cntl).channel(),
+            noise_floor: (*rx_cntl).noise_floor(),
+            is_group: (*rx_cntl).is_group(),
+            rxend_state: (*rx_cntl).rxend_state(),
+            rxmatch3: (*rx_cntl).rxmatch3(),
+            rxmatch2: (*rx_cntl).rxmatch2(),
+            rxmatch1: (*rx_cntl).rxmatch1(),
+            rxmatch0: (*rx_cntl).rxmatch0(),
+        };
+        rx_control_info
+    }
+}
+#[cfg(feature = "sniffer")]
+pub struct PromiscuousPkt<'a> {
+    pub rx_cntl: RxControlInfo,
+    pub frame_type: wifi_promiscuous_pkt_type_t,
+    pub len: usize,
+    pub data: &'a [u8],
+}
+#[cfg(feature = "sniffer")]
+impl PromiscuousPkt<'_> {
+    /// # Safety
+    /// When calling this, you have to ensure, that `buf` points to a valid
+    /// [wifi_promiscuous_pkt_t].
+    pub(crate) unsafe fn from_raw(
+        buf: *const wifi_promiscuous_pkt_t,
+        frame_type: wifi_promiscuous_pkt_type_t,
+    ) -> Self {
+        let rx_cntl = RxControlInfo::from_raw(&(*buf).rx_ctrl);
+        let len = rx_cntl.sig_len as usize;
+        PromiscuousPkt {
+            rx_cntl,
+            frame_type,
+            len,
+            data: core::slice::from_raw_parts(
+                (buf as *const u8).add(size_of::<wifi_pkt_rx_ctrl_t>()),
+                len,
+            ),
+        }
+    }
+}
+
+#[cfg(feature = "sniffer")]
+static SNIFFER_CB: Mutex<RefCell<Option<fn(PromiscuousPkt)>>> = Mutex::new(RefCell::new(None));
+
+#[cfg(feature = "sniffer")]
+unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: u32) {
+    critical_section::with(|cs| {
+        let Some(sniffer_callback) = *SNIFFER_CB.borrow_ref(cs) else {
+            return;
+        };
+        let promiscuous_pkt = PromiscuousPkt::from_raw(buf as *const _, frame_type);
+        sniffer_callback(promiscuous_pkt);
+    });
+}
+
+#[cfg(feature = "sniffer")]
+/// A wifi sniffer.
+pub struct Sniffer {
+    promiscuous_mode_enabled: AtomicBool,
+}
+#[cfg(feature = "sniffer")]
+impl Sniffer {
+    pub(crate) fn new() -> Self {
+        // This shouldn't fail, since the way this is created, means that wifi will
+        // always be initialized.
+        esp_wifi_result!(unsafe { esp_wifi_set_promiscuous_rx_cb(Some(promiscuous_rx_cb)) })
+            .unwrap();
+        Self {
+            promiscuous_mode_enabled: AtomicBool::new(false),
+        }
+    }
+    /// Set promiscuous mode enabled or disabled.
+    pub fn set_promiscuous_mode(&self, enabled: bool) -> Result<(), WifiError> {
+        esp_wifi_result!(unsafe { esp_wifi_set_promiscuous(enabled) })?;
+        self.promiscuous_mode_enabled
+            .store(enabled, Ordering::Relaxed);
+        Ok(())
+    }
+    /// Transmit a raw frame.
+    pub fn send_raw_frame(
+        &mut self,
+        use_sta_interface: bool,
+        buffer: &[u8],
+        use_internal_seq_num: bool,
+    ) -> Result<(), WifiError> {
+        esp_wifi_result!(unsafe {
+            esp_wifi_80211_tx(
+                if use_sta_interface { 0 } else { 1 } as wifi_interface_t,
+                buffer.as_ptr() as *const _,
+                buffer.len() as i32,
+                use_internal_seq_num,
+            )
+        })
+    }
+    /// Set the callback for receiving a packet.
+    pub fn set_receive_cb(&mut self, cb: fn(PromiscuousPkt)) {
+        critical_section::with(|cs| {
+            *SNIFFER_CB.borrow_ref_mut(cs) = Some(cb);
+        });
+    }
+}
+
 /// A wifi controller
 pub struct WifiController<'d> {
     _device: PeripheralRef<'d, crate::hal::peripherals::WIFI>,
     config: Configuration,
+    #[cfg(feature = "sniffer")]
+    sniffer_taken: AtomicBool,
 }
 
 impl<'d> WifiController<'d> {
@@ -1792,6 +2128,8 @@ impl<'d> WifiController<'d> {
         let mut this = Self {
             _device,
             config: Default::default(),
+            #[cfg(feature = "sniffer")]
+            sniffer_taken: AtomicBool::new(false),
         };
 
         let mode = WifiMode::try_from(&config)?;
@@ -1800,6 +2138,18 @@ impl<'d> WifiController<'d> {
 
         this.set_configuration(&config)?;
         Ok(this)
+    }
+    #[cfg(feature = "sniffer")]
+    pub fn take_sniffer(&self) -> Option<Sniffer> {
+        if self
+            .sniffer_taken
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            == Ok(false)
+        {
+            Some(Sniffer::new())
+        } else {
+            None
+        }
     }
 
     /// Set the wifi protocol.
@@ -2134,6 +2484,140 @@ fn apply_sta_config(config: &ClientConfiguration) -> Result<(), WifiError> {
     }
 }
 
+fn apply_sta_eap_config(config: &EapClientConfiguration) -> Result<(), WifiError> {
+    let mut cfg = wifi_config_t {
+        sta: wifi_sta_config_t {
+            ssid: [0; 32],
+            password: [0; 64],
+            scan_method: crate::CONFIG.scan_method,
+            bssid_set: config.bssid.is_some(),
+            bssid: config.bssid.unwrap_or_default(),
+            channel: config.channel.unwrap_or(0),
+            listen_interval: crate::CONFIG.listen_interval,
+            sort_method: wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
+            threshold: wifi_scan_threshold_t {
+                rssi: -99,
+                authmode: config.auth_method.to_raw(),
+            },
+            pmf_cfg: wifi_pmf_config_t {
+                capable: true,
+                required: false,
+            },
+            sae_pwe_h2e: 3,
+            _bitfield_align_1: [0; 0],
+            _bitfield_1: __BindgenBitfieldUnit::new([0; 4]),
+            failure_retry_cnt: crate::CONFIG.failure_retry_cnt,
+            _bitfield_align_2: [0; 0],
+            _bitfield_2: __BindgenBitfieldUnit::new([0; 4]),
+            sae_pk_mode: 0, // ??
+            sae_h2e_identifier: [0; 32],
+        },
+    };
+
+    unsafe {
+        cfg.sta.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
+        esp_wifi_result!(esp_wifi_set_config(wifi_interface_t_WIFI_IF_STA, &mut cfg))?;
+
+        if let Some(identity) = &config.identity {
+            esp_wifi_result!(esp_eap_client_set_identity(
+                identity.as_str().as_ptr(),
+                identity.len() as i32
+            ))?;
+        } else {
+            esp_eap_client_clear_identity();
+        }
+
+        if let Some(username) = &config.username {
+            esp_wifi_result!(esp_eap_client_set_username(
+                username.as_str().as_ptr(),
+                username.len() as i32
+            ))?;
+        } else {
+            esp_eap_client_clear_username();
+        }
+
+        if let Some(password) = &config.password {
+            esp_wifi_result!(esp_eap_client_set_password(
+                password.as_str().as_ptr(),
+                password.len() as i32
+            ))?;
+        } else {
+            esp_eap_client_clear_password();
+        }
+
+        if let Some(new_password) = &config.new_password {
+            esp_wifi_result!(esp_eap_client_set_new_password(
+                new_password.as_str().as_ptr(),
+                new_password.len() as i32
+            ))?;
+        } else {
+            esp_eap_client_clear_new_password();
+        }
+
+        if let Some(pac_file) = &config.pac_file {
+            esp_wifi_result!(esp_eap_client_set_pac_file(
+                pac_file.as_ptr(),
+                pac_file.len() as i32
+            ))?;
+        }
+
+        if let Some(phase2_method) = &config.ttls_phase2_method {
+            esp_wifi_result!(esp_eap_client_set_ttls_phase2_method(
+                phase2_method.to_raw()
+            ))?;
+        }
+
+        if let Some(ca_cert) = config.ca_cert {
+            esp_wifi_result!(esp_eap_client_set_ca_cert(
+                ca_cert.as_ptr(),
+                ca_cert.len() as i32
+            ))?;
+        } else {
+            esp_eap_client_clear_ca_cert();
+        }
+
+        if let Some((cert, key, password)) = config.certificate_and_key {
+            let (pwd, pwd_len) = if let Some(pwd) = password {
+                (pwd.as_ptr(), pwd.len() as i32)
+            } else {
+                (core::ptr::null(), 0)
+            };
+
+            esp_wifi_result!(esp_eap_client_set_certificate_and_key(
+                cert.as_ptr(),
+                cert.len() as i32,
+                key.as_ptr(),
+                key.len() as i32,
+                pwd,
+                pwd_len,
+            ))?;
+        } else {
+            esp_eap_client_clear_certificate_and_key();
+        }
+
+        if let Some(cfg) = &config.eap_fast_config {
+            let params = esp_eap_fast_config {
+                fast_provisioning: cfg.fast_provisioning as i32,
+                fast_max_pac_list_len: cfg.fast_max_pac_list_len as i32,
+                fast_pac_format_binary: cfg.fast_pac_format_binary,
+            };
+            esp_wifi_result!(esp_eap_client_set_fast_params(params))?;
+        }
+
+        esp_wifi_result!(esp_eap_client_set_disable_time_check(!&config.time_check))?;
+
+        // esp_eap_client_set_suiteb_192bit_certification unsupported because we build
+        // without MBEDTLS
+
+        // esp_eap_client_use_default_cert_bundle unsupported because we build without
+        // MBEDTLS
+
+        esp_wifi_result!(esp_wifi_sta_enterprise_enable())?;
+
+        Ok(())
+    }
+}
+
 impl WifiController<'_> {
     /// Get the supported capabilities of the controller.
     pub fn get_capabilities(&self) -> Result<EnumSet<crate::wifi::Capability>, WifiError> {
@@ -2144,6 +2628,7 @@ impl WifiController<'_> {
             Configuration::Mixed(_, _) => {
                 Capability::Client | Capability::AccessPoint | Capability::Mixed
             }
+            Configuration::EapClient(_) => enumset::enum_set! { Capability::Client },
         };
 
         Ok(caps)
@@ -2155,39 +2640,34 @@ impl WifiController<'_> {
     }
 
     /// Set the configuration, you need to use Wifi::connect() for connecting to
-    /// an AP
+    /// an AP.
+    ///
+    /// This will replace any previously set configuration
     pub fn set_configuration(&mut self, conf: &Configuration) -> Result<(), WifiError> {
-        match self.config {
-            Configuration::None => self.config = conf.clone(), // initial config
-            Configuration::Client(ref mut client) => {
-                if let Configuration::Client(conf) = conf {
-                    *client = conf.clone();
-                } else {
-                    return Err(WifiError::InternalError(
-                        InternalWifiError::EspErrInvalidArg,
-                    ));
-                }
+        let wifi_mode = WifiMode::current().unwrap_or(WifiMode::Sta);
+        let sta_enabled = wifi_mode.is_sta();
+        let ap_enabled = wifi_mode.is_ap();
+
+        match conf {
+            Configuration::Client(_) if !sta_enabled => {
+                return Err(WifiError::InternalError(
+                    InternalWifiError::EspErrInvalidArg,
+                ))
             }
-            Configuration::AccessPoint(ref mut ap) => {
-                if let Configuration::AccessPoint(conf) = conf {
-                    *ap = conf.clone();
-                } else {
-                    return Err(WifiError::InternalError(
-                        InternalWifiError::EspErrInvalidArg,
-                    ));
-                }
+            Configuration::AccessPoint(_) if !ap_enabled => {
+                return Err(WifiError::InternalError(
+                    InternalWifiError::EspErrInvalidArg,
+                ))
             }
-            Configuration::Mixed(ref mut client, ref mut ap) => match conf {
-                Configuration::None => {
-                    return Err(WifiError::InternalError(
-                        InternalWifiError::EspErrInvalidArg,
-                    ));
-                }
-                Configuration::Mixed(_, _) => self.config = conf.clone(),
-                Configuration::Client(conf) => *client = conf.clone(),
-                Configuration::AccessPoint(conf) => *ap = conf.clone(),
-            },
+            Configuration::EapClient(_) if !sta_enabled => {
+                return Err(WifiError::InternalError(
+                    InternalWifiError::EspErrInvalidArg,
+                ))
+            }
+            _ => (),
         }
+
+        self.config = conf.clone();
 
         match conf {
             Configuration::None => {
@@ -2201,6 +2681,7 @@ impl WifiController<'_> {
                 apply_ap_config(ap_config)?;
                 apply_sta_config(sta_config)?;
             }
+            Configuration::EapClient(config) => apply_sta_eap_config(config)?,
         };
 
         Ok(())
@@ -2607,6 +3088,7 @@ mod asynch {
         }
     }
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct WifiEventFuture {
         event: WifiEvent,
     }
@@ -2633,6 +3115,7 @@ mod asynch {
         }
     }
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct MultiWifiEventFuture {
         event: EnumSet<WifiEvent>,
     }
@@ -2813,6 +3296,7 @@ mod embedded_svc_compat {
                         max_connections: ap.max_connections,
                     },
                 ),
+                Configuration::EapClient(_) => panic!("EAP not supported in embedded-svc"),
             }
         }
     }

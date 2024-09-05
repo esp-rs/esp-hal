@@ -1,10 +1,12 @@
 //! RTC IO
 //!
 //! # Overview
+//!
 //! The hardware provides a couple of GPIO pins with low power (LP)
 //! capabilities and analog functions.
 //!
 //! ## Configuration
+//!
 //! These pins can be controlled by either IO MUX or RTC IO.
 //!
 //! If controlled by RTC IO, these pins will bypass IO MUX and GPIO
@@ -14,12 +16,18 @@
 //! the peripherals in RTC system during chip Deep-sleep, and wake up the
 //! chip from Deep-sleep.
 //!
-//! # Example
-//! ## Configure a ULP Pin as Output
-//! ```rust, ignore
+//! ## Example
+//!
+//! ### Configure a ULP Pin as Output
+//!
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::gpio::rtc_io::LowPowerOutput;
+//! # use esp_hal::gpio::Io;
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // configure GPIO 1 as ULP output pin
-//! let lp_pin = LowPowerOutput::new(io.pins.gpio1);
+//! let lp_pin = LowPowerOutput::<'static, 1>::new(io.pins.gpio1);
+//! # }
 //! ```
 
 use core::marker::PhantomData;
@@ -169,24 +177,13 @@ impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     }
 }
 
-#[cfg(esp32s3)]
-#[inline(always)]
-fn get_pin_reg(pin: u8) -> &'static crate::peripherals::rtc_io::TOUCH_PAD0 {
-    unsafe {
-        let rtc_io = &*crate::peripherals::RTC_IO::PTR;
-        let pin_ptr = (rtc_io.touch_pad0().as_ptr()).add(pin as usize);
-
-        &*(pin_ptr as *const esp32s3::generic::Reg<esp32s3::rtc_io::touch_pad0::TOUCH_PAD0_SPEC>)
-    }
-}
-
-#[cfg(esp32s2)]
+#[cfg(any(esp32s2, esp32s3))]
 #[inline(always)]
 fn get_pin_reg(pin: u8) -> &'static crate::peripherals::rtc_io::TOUCH_PAD {
     unsafe {
         let rtc_io = &*crate::peripherals::RTC_IO::PTR;
         let pin_ptr = (rtc_io.touch_pad(0).as_ptr()).add(pin as usize);
 
-        &*(pin_ptr as *const esp32s2::generic::Reg<esp32s2::rtc_io::touch_pad::TOUCH_PAD_SPEC>)
+        &*(pin_ptr as *const crate::peripherals::rtc_io::TOUCH_PAD)
     }
 }

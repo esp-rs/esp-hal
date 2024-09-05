@@ -14,11 +14,9 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
-    peripherals::Peripherals,
+    interrupt::software::{SoftwareInterrupt, SoftwareInterruptControl},
     prelude::*,
-    system::{SoftwareInterrupt, SystemControl},
 };
 
 static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> = Mutex::new(RefCell::new(None));
@@ -28,42 +26,41 @@ static SWINT3: Mutex<RefCell<Option<SoftwareInterrupt<3>>>> = Mutex::new(RefCell
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut sw_int = system.software_interrupt_control;
+    let mut sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+
     critical_section::with(|cs| {
-        sw_int
+        sw_ints
             .software_interrupt0
             .set_interrupt_handler(swint0_handler);
         SWINT0
             .borrow_ref_mut(cs)
-            .replace(sw_int.software_interrupt0);
+            .replace(sw_ints.software_interrupt0);
 
-        sw_int
+        sw_ints
             .software_interrupt1
             .set_interrupt_handler(swint1_handler);
         SWINT1
             .borrow_ref_mut(cs)
-            .replace(sw_int.software_interrupt1);
+            .replace(sw_ints.software_interrupt1);
 
-        sw_int
+        sw_ints
             .software_interrupt2
             .set_interrupt_handler(swint2_handler);
         SWINT2
             .borrow_ref_mut(cs)
-            .replace(sw_int.software_interrupt2);
+            .replace(sw_ints.software_interrupt2);
 
-        sw_int
+        sw_ints
             .software_interrupt3
             .set_interrupt_handler(swint3_handler);
         SWINT3
             .borrow_ref_mut(cs)
-            .replace(sw_int.software_interrupt3);
+            .replace(sw_ints.software_interrupt3);
     });
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
     let mut counter = 0;
 
     loop {

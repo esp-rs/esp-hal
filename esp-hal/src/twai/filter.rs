@@ -1,6 +1,7 @@
 //! Two-wire Automotive Interface (TWAI) Filters
 //!
 //! ## Overview
+//!
 //! The TWAI controller contains a hardware acceptance filter which can be used
 //! to filter messages of a particular ID. A node that filters out a message
 //! does not receive the message, but will still acknowledge it. Acceptance
@@ -8,14 +9,22 @@
 //! the bus that are irrelevant to the node.
 //!
 //! ## Configuration
+//!
 //! The acceptance filters are configured using two 32-bit values known as the
 //! acceptance code and the acceptance mask.
 
 use super::{ExtendedId, StandardId};
 
 #[derive(Debug, PartialEq, Eq)]
+/// Represents the type of filtering to be applied to incoming TWAI frames.
 pub enum FilterType {
+    /// Uses the acceptance code and mask to define a single filter, which
+    /// allows for the first two data bytes of a standard frame to be filtered,
+    /// or the entirety of an extended frame's 29-bit ID.
     Single,
+    /// Uses the acceptance code and mask to define two separate filters
+    /// allowing for increased flexibility of ID's to accept, but does not allow
+    /// for all 29-bits of an extended ID to be filtered.
     Dual,
 }
 
@@ -32,6 +41,7 @@ pub enum FilterType {
 pub trait Filter {
     /// The type of the filter.
     const FILTER_TYPE: FilterType;
+    /// Returns filter type.
     fn filter_type(&self) -> FilterType {
         Self::FILTER_TYPE
     }
@@ -40,6 +50,7 @@ pub trait Filter {
     fn to_registers(&self) -> [u8; 8];
 }
 
+/// A type representing the bitmask used to filter incoming TWAI frames.
 pub type BitFilter<const N: usize> = [u8; N];
 
 // Convert a byte from a bytestring into a bit inside a given code and mask.
@@ -97,9 +108,16 @@ impl SingleStandardFilter {
     ///
     /// Example matching only even IDs, allowing any rtr value and any payload
     /// data:
-    /// ```rust, ignore
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::twai::filter::SingleStandardFilter;
     /// const FILTER: SingleStandardFilter =
-    ///     SingleStandardFilter::new(b"xxxxxxxxxx0", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
+    ///     SingleStandardFilter::new(
+    ///         b"xxxxxxxxxx0",
+    ///         b"x",
+    ///         [b"xxxxxxxx", b"xxxxxxxx"]
+    ///     );
+    /// # }
     /// ```
     pub const fn new(id: &BitFilter<11>, rtr: &BitFilter<1>, payload: [&BitFilter<8>; 2]) -> Self {
         // The bit values we desire to match against. This determines whether we want a

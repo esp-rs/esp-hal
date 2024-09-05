@@ -1,13 +1,15 @@
 //! # Reading of eFuses (ESP32)
 //!
 //! ## Overview
+//!
 //! The `efuse` module provides functionality for reading eFuse data
 //! from the `ESP32` chip, allowing access to various chip-specific information
-//! such as :
+//! such as:
+//!
 //!   * MAC address
-//!   * core count
-//!   * CPU frequency
-//!   * chip type
+//!   * Chip type, revision
+//!   * Core count
+//!   * Max CPU frequency
 //!
 //! and more. It is useful for retrieving chip-specific configuration and
 //! identification data during runtime.
@@ -15,8 +17,10 @@
 //! The `Efuse` struct represents the eFuse peripheral and is responsible for
 //! reading various eFuse fields and values.
 //!
-//! ## Examples
+//! ## Example
+//!
 //! ### Read chip's MAC address from the eFuse storage.
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::efuse::Efuse;
@@ -25,7 +29,7 @@
 //! # use core::writeln;
 //! # use core::fmt::Write;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! # let mut serial_tx = Uart::new(peripherals.UART0, &clocks, io.pins.gpio4, io.pins.gpio5).unwrap();
+//! # let mut serial_tx = Uart::new(peripherals.UART0, io.pins.gpio4, io.pins.gpio5).unwrap();
 //! let mac_address = Efuse::read_base_mac_address();
 //! writeln!(
 //!     serial_tx,
@@ -47,20 +51,30 @@ use crate::peripherals::EFUSE;
 
 mod fields;
 
+/// A struct representing the eFuse functionality of the chip.
 pub struct Efuse;
 
+/// Representing different types of ESP32 chips.
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub enum ChipType {
+    /// Represents the ESP32 D0WDQ6 chip variant.
     Esp32D0wdq6,
+    /// Represents the ESP32 D0WDQ5 chip variant.
     Esp32D0wdq5,
+    /// Represents the ESP32 D2WDQ5 chip variant.
     Esp32D2wdq5,
+    /// Represents the ESP32 Pico D2 chip variant.
     Esp32Picod2,
+    /// Represents the ESP32 Pico D4 chip variant.
     Esp32Picod4,
+    /// Represents the ESP32 Pico v3.02 chip variant.
     Esp32Picov302,
+    /// Represents an unknown or unsupported chip variant.
     Unknown,
 }
 
 impl Efuse {
+    /// Reads the base MAC address from the eFuse memory.
     pub fn read_base_mac_address() -> [u8; 6] {
         Self::read_field_be(MAC)
     }

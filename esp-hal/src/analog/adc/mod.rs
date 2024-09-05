@@ -1,11 +1,13 @@
 //! # Analog to Digital Converter (ADC)
 //!
 //! ## Overview
+//!
 //! The ADC is integrated on the chip, and is capable of measuring analog
 //! signals from specific analog I/O pins. One or more ADC units are available,
 //! depending on the device being used.
 //!
 //! ## Configuration
+//!
 //! The ADC can be configured to measure analog signals from specific pins. The
 //! configuration includes the resolution of the ADC, the attenuation of the
 //! input signal, and the pins to be measured.
@@ -15,10 +17,13 @@
 //! schemes can be used to improve the accuracy of the ADC readings.
 //!
 //! ## Usage
+//!
 //! The ADC driver implements the `embedded-hal@0.2.x` ADC traits.
 //!
-//! ## Examples
-//! #### Read an analog signal from a pin
+//! ## Example
+//!
+//! ### Read an analog signal from a pin
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::analog::adc::AdcConfig;
@@ -27,8 +32,6 @@
 //! # use esp_hal::analog::adc::Adc;
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::gpio::Io;
-//! # use core::result::Result::Err;
-//!
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 #![cfg_attr(esp32, doc = "let analog_pin = io.pins.gpio32;")]
 #![cfg_attr(any(esp32s2, esp32s3), doc = "let analog_pin = io.pins.gpio3;")]
@@ -37,11 +40,13 @@
     doc = "let analog_pin = io.pins.gpio2;"
 )]
 //! let mut adc1_config = AdcConfig::new();
-//! let mut pin = adc1_config.enable_pin(analog_pin,
-//!               Attenuation::Attenuation11dB);
+//! let mut pin = adc1_config.enable_pin(
+//!     analog_pin,
+//!     Attenuation::Attenuation11dB,
+//! );
 //! let mut adc1 = Adc::new(peripherals.ADC1, adc1_config);
 //!
-//! let mut delay = Delay::new(&clocks);
+//! let mut delay = Delay::new();
 //!
 //! loop {
 //!     let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut pin)).unwrap();
@@ -50,8 +55,10 @@
 //! }
 //! # }
 //! ```
+//! 
 //! ## Implementation State
-//! - [ADC calibration is not implemented for all targets].
+//!
+//!  - [ADC calibration is not implemented for all targets].
 //!
 //! [ADC calibration is not implemented for all targets]: https://github.com/esp-rs/esp-hal/issues/326
 use core::marker::PhantomData;
@@ -103,7 +110,6 @@ pub struct AdcPin<PIN, ADCI, CS = ()> {
     _phantom: PhantomData<ADCI>,
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<PIN, ADCI, CS> embedded_hal_02::adc::Channel<ADCI> for AdcPin<PIN, ADCI, CS>
 where
     PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8>,
@@ -246,15 +252,14 @@ trait AdcCalEfuse {
 
 macro_rules! impl_adc_interface {
     ($adc:ident [
-        $( ($pin:ident, $channel:expr) ,)+
+        $( (GpioPin<$pin:literal>, $channel:expr) ,)+
     ]) => {
         $(
-            impl $crate::analog::adc::AdcChannel for crate::gpio::$pin {
+            impl $crate::analog::adc::AdcChannel for crate::gpio::GpioPin<$pin> {
                 const CHANNEL: u8 = $channel;
             }
 
-            #[cfg(feature = "embedded-hal-02")]
-            impl embedded_hal_02::adc::Channel<crate::peripherals::$adc> for crate::gpio::$pin {
+            impl embedded_hal_02::adc::Channel<crate::peripherals::$adc> for crate::gpio::GpioPin<$pin> {
                 type ID = u8;
 
                 fn channel() -> u8 { $channel }

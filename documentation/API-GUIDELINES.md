@@ -15,16 +15,16 @@ The following paragraphs contain additional recommendations.
 
 ## Construction and Destruction of Drivers
 
-- Drivers take peripherals and pins via the `PeripheralRef` pattern - they don't consume peripherals/pins
-- Consider adding a `Drop` implementation resetting the peripheral to idle state
-- Consider using a builder-like pattern for configuration which must be done during initialization
+- Drivers take peripherals and pins via the `PeripheralRef` pattern - they don't consume peripherals/pins.
+- Consider adding a `Drop` implementation resetting the peripheral to idle state.
+- Consider using a builder-like pattern for configuration which must be done during initialization.
 
 ## Interoperability
 
-- `cfg` gated `defmt` derives and impls are added to new structs and enums
+- `cfg` gated `defmt` derives and impls are added to new structs and enums.
     - see [this example](https://github.com/esp-rs/esp-hal/blob/df2b7bd8472cc1d18db0d9441156575570f59bb3/esp-hal/src/spi/mod.rs#L15)
     - e.g. `#[cfg_attr(feature = "defmt", derive(defmt::Format))]`
-- Don't use `log::XXX!` macros directly - use the wrappers in `fmt.rs` (e.g. just `info!` instead of `log::info!` or importing `log::*`)
+- Don't use `log::XXX!` macros directly - use the wrappers in `fmt.rs` (e.g. just `info!` instead of `log::info!` or importing `log::*`)!
 
 ## API Surface
 
@@ -44,6 +44,7 @@ The following paragraphs contain additional recommendations.
     - Common cases of useless type info is storing pin information - this is usually not required after configuring the pins and will bloat the complexity of the type massively. When following the `PeripheralRef` pattern it's not needed in order to keep users from re-using the pin while in use
 - Avoiding `&mut self` when `&self` is safe to use. `&self` is generally easier to use as an API. Typical applications of this are where the methods just do writes to registers which don't have side effects.
     - For example starting a timer is fine for `&self`, worst case a timer will be started twice if two parts of the program call it. You can see a real example of this [here](https://github.com/esp-rs/esp-hal/pull/1500#pullrequestreview-2015911974)
+- Maintain order consistency in the API, such as in the case of pairs like RX/TX.
 
 ## Maintainability
 
@@ -52,6 +53,8 @@ The following paragraphs contain additional recommendations.
 - If you are porting code from ESP-IDF (or anything else), please include a link WITH the commit hash in it, and please highlight the relevant line(s) of code
 - If necessary provide further context as comments (consider linking to code, PRs, TRM - make sure to use permanent links, e.g. include the hash when linking to a Git repository, include the revision, page number etc. when linking to TRMs)
 - Generally, follow common "good practices" and idiomatic Rust style
+- All `Future` objects (public or private) must be marked with ``#[must_use = "futures do nothing unless you `.await` or poll them"]``.
+- Prefer `cfg_if!` over multiple exclusive `#[cfg]` attributes. `cfg_if!` visually divides the options, often results in simpler conditions and simplifies adding new branches in the future.
 
 ## Modules Documentation
 
@@ -77,7 +80,7 @@ Modules should have the following documentation format:
 //! ```
 //!
 //! ## Implementation State
-//! List unsuported features
+//! List unsupported features
 ```
 - If any of the headers is empty, remove it
 - When possible, use ESP-IDF docs and TRM as references and include links if possible.

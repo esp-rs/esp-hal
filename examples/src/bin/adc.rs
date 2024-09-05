@@ -19,20 +19,15 @@
 use esp_backtrace as _;
 use esp_hal::{
     analog::adc::{Adc, AdcConfig, Attenuation},
-    clock::ClockControl,
     delay::Delay,
     gpio::Io,
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     cfg_if::cfg_if! {
@@ -50,7 +45,7 @@ fn main() -> ! {
     let mut adc1_pin = adc1_config.enable_pin(analog_pin, Attenuation::Attenuation11dB);
     let mut adc1 = Adc::new(peripherals.ADC1, adc1_config);
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     loop {
         let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();

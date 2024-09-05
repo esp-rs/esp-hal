@@ -1,6 +1,7 @@
 //! USB Serial/JTAG Controller (USB_SERIAL_JTAG)
 //!
 //! ## Overview
+//!
 //! The USB Serial/JTAG controller can be used to program the SoC's flash, read
 //! program output, or attach a debugger to the running program. This is
 //! possible for any computer with a USB host (hereafter referred to as 'host'),
@@ -27,6 +28,7 @@
 //!   connect to a host computer
 //!
 //! ## Usage
+//!
 //! The USB Serial/JTAG driver implements a number of third-party traits, with
 //! the intention of making the HAL inter-compatible with various device drivers
 //! from the community. This includes, but is not limited to, the [embedded-hal]
@@ -38,25 +40,28 @@
 //! with this driver.
 //!
 //! ## Examples
+//!
 //! ### Sending and Receiving Data
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! use esp_hal::usb_serial_jtag::UsbSerialJtag;
+//!
 //! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 //!
 //! // Write bytes out over the USB Serial/JTAG:
-//! usb_serial.write_bytes("Hello, world!".as_bytes()).expect("write error!");
-//! }
+//! usb_serial.write_bytes(b"Hello, world!").expect("write error!");
+//! # }
 //! ```
 //! 
 //! ### Splitting the USB Serial/JTAG into TX and RX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::usb_serial_jtag::UsbSerialJtag;
+//! use esp_hal::usb_serial_jtag::UsbSerialJtag;
+//!
 //! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 //! // The USB Serial/JTAG can be split into separate Transmit and Receive
 //! // components:
-//! let (mut tx, mut rx) = usb_serial.split();
+//! let (mut rx, mut tx) = usb_serial.split();
 //!
 //! // Each component can be used individually to interact with the USB
 //! // Serial/JTAG:
@@ -87,8 +92,8 @@ type Error = Infallible;
 
 /// USB Serial/JTAG (Full-duplex)
 pub struct UsbSerialJtag<'d, M> {
-    tx: UsbSerialJtagTx<'d, M>,
     rx: UsbSerialJtagRx<'d, M>,
+    tx: UsbSerialJtagTx<'d, M>,
 }
 
 /// USB Serial/JTAG (Transmit)
@@ -299,8 +304,8 @@ where
         }
 
         Self {
-            tx: UsbSerialJtagTx::new_inner(),
             rx: UsbSerialJtagRx::new_inner(),
+            tx: UsbSerialJtagTx::new_inner(),
         }
     }
 
@@ -314,8 +319,8 @@ where
     /// Split the USB Serial JTAG peripheral into a transmitter and receiver,
     /// which is particularly useful when having two tasks correlating to
     /// transmitting and receiving.
-    pub fn split(self) -> (UsbSerialJtagTx<'d, M>, UsbSerialJtagRx<'d, M>) {
-        (self.tx, self.rx)
+    pub fn split(self) -> (UsbSerialJtagRx<'d, M>, UsbSerialJtagTx<'d, M>) {
+        (self.rx, self.tx)
     }
 
     /// Write data to the serial output in chunks of up to 64 bytes
@@ -420,7 +425,6 @@ where
     }
 }
 
-#[cfg(feature = "ufmt")]
 impl<M> ufmt_write::uWrite for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -438,7 +442,6 @@ where
     }
 }
 
-#[cfg(feature = "ufmt")]
 impl<M> ufmt_write::uWrite for UsbSerialJtagTx<'_, M>
 where
     M: Mode,
@@ -460,7 +463,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<M> embedded_hal_02::serial::Read<u8> for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -472,7 +474,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<M> embedded_hal_02::serial::Read<u8> for UsbSerialJtagRx<'_, M>
 where
     M: Mode,
@@ -484,7 +485,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<M> embedded_hal_02::serial::Write<u8> for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -500,7 +500,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<M> embedded_hal_02::serial::Write<u8> for UsbSerialJtagTx<'_, M>
 where
     M: Mode,
@@ -516,7 +515,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::ErrorType for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -524,7 +522,6 @@ where
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::ErrorType for UsbSerialJtagTx<'_, M>
 where
     M: Mode,
@@ -532,7 +529,6 @@ where
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::ErrorType for UsbSerialJtagRx<'_, M>
 where
     M: Mode,
@@ -540,7 +536,6 @@ where
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::Read for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -550,7 +545,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::Read for UsbSerialJtagRx<'_, M>
 where
     M: Mode,
@@ -560,7 +554,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::Write for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -574,7 +567,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::Write for UsbSerialJtagTx<'_, M>
 where
     M: Mode,
@@ -588,7 +580,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::ErrorType for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -596,7 +587,6 @@ where
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::ErrorType for UsbSerialJtagTx<'_, M>
 where
     M: Mode,
@@ -604,7 +594,6 @@ where
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::ErrorType for UsbSerialJtagRx<'_, M>
 where
     M: Mode,
@@ -612,7 +601,6 @@ where
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::Read for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -622,7 +610,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::Read for UsbSerialJtagRx<'_, M>
 where
     M: Mode,
@@ -637,7 +624,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::Write for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -651,7 +637,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::Write for UsbSerialJtagTx<'_, M>
 where
     M: Mode,
@@ -667,7 +652,6 @@ where
     }
 }
 
-#[cfg(feature = "async")]
 mod asynch {
     use core::{marker::PhantomData, task::Poll};
 
@@ -681,6 +665,7 @@ mod asynch {
     static WAKER_TX: AtomicWaker = AtomicWaker::new();
     static WAKER_RX: AtomicWaker = AtomicWaker::new();
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct UsbSerialJtagWriteFuture<'d> {
         phantom: PhantomData<&'d mut USB_DEVICE>,
     }
@@ -723,6 +708,7 @@ mod asynch {
         }
     }
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct UsbSerialJtagReadFuture<'d> {
         phantom: PhantomData<&'d mut USB_DEVICE>,
     }

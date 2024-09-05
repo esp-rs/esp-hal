@@ -50,6 +50,7 @@ use crate::{
     peripherals::GPIO,
 };
 
+/// The total number of GPIO pins available.
 pub const NUM_PINS: usize = 21;
 
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
@@ -195,6 +196,15 @@ crate::gpio::gpio! {
     (18, 0, InputOutput)
     (19, 0, InputOutput)
     (20, 0, InputOutput (0 => U0RXD) ())
+}
+
+crate::gpio::rtc_pins! {
+    0
+    1
+    2
+    3
+    4
+    5
 }
 
 crate::gpio::analog! {

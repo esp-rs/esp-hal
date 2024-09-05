@@ -25,15 +25,7 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    delay::Delay,
-    gpio::Io,
-    peripherals::Peripherals,
-    prelude::*,
-    rmt::Rmt,
-    system::SystemControl,
-};
+use esp_hal::{delay::Delay, gpio::Io, prelude::*, rmt::Rmt};
 use esp_hal_smartled::{smartLedBuffer, SmartLedsAdapter};
 use smart_leds::{
     brightness,
@@ -44,9 +36,7 @@ use smart_leds::{
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -67,17 +57,22 @@ fn main() -> ! {
     }
 
     // Configure RMT peripheral globally
-    #[cfg(not(feature = "esp32h2"))]
-    let rmt = Rmt::new(peripherals.RMT, 80.MHz(), &clocks).unwrap();
-    #[cfg(feature = "esp32h2")]
-    let rmt = Rmt::new(peripherals.RMT, 32.MHz(), &clocks).unwrap();
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32h2")] {
+            let freq = 32.MHz();
+        } else {
+            let freq = 80.MHz();
+        }
+    }
+
+    let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
 
     // We use one of the RMT channels to instantiate a `SmartLedsAdapter` which can
     // be used directly with all `smart_led` implementations
     let rmt_buffer = smartLedBuffer!(1);
-    let mut led = SmartLedsAdapter::new(rmt.channel0, led_pin, rmt_buffer, &clocks);
+    let mut led = SmartLedsAdapter::new(rmt.channel0, led_pin, rmt_buffer);
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let mut color = Hsv {
         hue: 0,

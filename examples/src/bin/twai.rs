@@ -26,11 +26,8 @@ const IS_FIRST_SENDER: bool = true;
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     gpio::Io,
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
     twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId, TwaiMode},
 };
 use esp_println::println;
@@ -38,9 +35,7 @@ use nb::block;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -58,9 +53,8 @@ fn main() -> ! {
     // For self-testing use `SelfTest` mode of the TWAI peripheral.
     let mut can_config = twai::TwaiConfiguration::new_no_transceiver(
         peripherals.TWAI0,
-        can_tx_pin,
         can_rx_pin,
-        &clocks,
+        can_tx_pin,
         CAN_BAUDRATE,
         TwaiMode::Normal,
     );

@@ -5,7 +5,7 @@ use esp_hal::interrupt::InterruptHandler;
 
 use crate::{
     hal::{interrupt, trapframe::TrapFrame, xtensa_lx, xtensa_lx_rt},
-    preempt::preempt::task_switch,
+    preempt::task_switch,
     TimeBase,
 };
 
@@ -20,7 +20,7 @@ pub const TICKS_PER_SECOND: u64 = 1_000_000;
 /// This function must not be called in a critical section. Doing so may return
 /// an incorrect value.
 pub fn get_systimer_count() -> u64 {
-    esp_hal::time::current_time().ticks()
+    esp_hal::time::now().ticks()
 }
 
 pub fn setup_timer(mut timer1: TimeBase) -> Result<(), esp_hal::timer::Error> {

@@ -26,7 +26,7 @@
 //! # let dma = Dma::new(peripherals.DMA);
 //! # let channel = dma.channel0;
 //!
-//! # let (tx_buffer, tx_descriptors, _, rx_descriptors) = dma_buffers!(32678, 0);
+//! # let (_, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32678, 0);
 //!
 //! # let channel = channel.configure(
 //! #     false,
@@ -55,7 +55,6 @@
 //!     rx_descriptors,
 //!     data_pins,
 //!     20u32.MHz(),
-//!     &clocks
 //! )
 //! // Remove this for slave mode.
 //! .with_master_clock(mclk_pin)
@@ -102,20 +101,31 @@ pub enum EofMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum VsyncFilterThreshold {
+    /// Requires 1 valid VSYNC pulse to trigger synchronization.
     One,
+    /// Requires 2 valid VSYNC pulse to trigger synchronization.
     Two,
+    /// Requires 3 valid VSYNC pulse to trigger synchronization.
     Three,
+    /// Requires 4 valid VSYNC pulse to trigger synchronization.
     Four,
+    /// Requires 5 valid VSYNC pulse to trigger synchronization.
     Five,
+    /// Requires 6 valid VSYNC pulse to trigger synchronization.
     Six,
+    /// Requires 7 valid VSYNC pulse to trigger synchronization.
     Seven,
+    /// Requires 8 valid VSYNC pulse to trigger synchronization.
     Eight,
 }
 
+/// Represents the camera interface.
 pub struct Cam<'d> {
+    /// The LCD_CAM peripheral reference for managing the camera functionality.
     pub(crate) lcd_cam: PeripheralRef<'d, LCD_CAM>,
 }
 
+/// Represents the camera interface with DMA support.
 pub struct Camera<'d, CH: DmaChannel> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     rx_channel: ChannelRx<'d, CH>,
@@ -128,16 +138,17 @@ impl<'d, CH: DmaChannel> Camera<'d, CH>
 where
     CH::P: LcdCamPeripheral,
 {
+    /// Creates a new `Camera` instance with DMA support.
     pub fn new<P: RxPins>(
         cam: Cam<'d>,
         mut channel: ChannelRx<'d, CH>,
         descriptors: &'static mut [DmaDescriptor],
         _pins: P,
         frequency: HertzU32,
-        clocks: &Clocks<'d>,
     ) -> Self {
         let lcd_cam = cam.lcd_cam;
 
+        let clocks = Clocks::get();
         let (i, divider) = calculate_clkm(
             frequency.to_Hz() as _,
             &[
@@ -207,7 +218,7 @@ where
 }
 
 impl<'d, CH: DmaChannel> DmaSupport for Camera<'d, CH> {
-    fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+    fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         loop {
             // Wait for IN_SUC_EOF (i.e. VSYNC)
             if self.rx_channel.is_done() {
@@ -244,6 +255,7 @@ impl<'d, CH: DmaChannel> DmaSupportRx for Camera<'d, CH> {
 }
 
 impl<'d, CH: DmaChannel> Camera<'d, CH> {
+    /// Configures the byte order for the camera data.
     pub fn set_byte_order(&mut self, byte_order: ByteOrder) -> &mut Self {
         self.lcd_cam
             .cam_ctrl()
@@ -251,6 +263,7 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
         self
     }
 
+    /// Configures the bit order for the camera data.
     pub fn set_bit_order(&mut self, bit_order: BitOrder) -> &mut Self {
         self.lcd_cam
             .cam_ctrl()
@@ -258,6 +271,7 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
         self
     }
 
+    /// Configures the VSYNC filter threshold.
     pub fn set_vsync_filter(&mut self, threshold: Option<VsyncFilterThreshold>) -> &mut Self {
         if let Some(threshold) = threshold {
             let value = match threshold {
@@ -285,6 +299,7 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
         self
     }
 
+    /// Configures the master clock (MCLK) pin for the camera interface.
     pub fn with_master_clock<MCLK: OutputPin>(self, mclk: impl Peripheral<P = MCLK> + 'd) -> Self {
         crate::into_ref!(mclk);
         mclk.set_to_push_pull_output(crate::private::Internal);
@@ -292,15 +307,18 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
         self
     }
 
+    /// Configures the pixel clock (PCLK) pin for the camera interface.
     pub fn with_pixel_clock<PCLK: InputPin>(self, pclk: impl Peripheral<P = PCLK> + 'd) -> Self {
         crate::into_ref!(pclk);
 
-        pclk.set_to_input(crate::private::Internal);
+        pclk.init_input(false, false, crate::private::Internal);
         pclk.connect_input_to_peripheral(InputSignal::CAM_PCLK, crate::private::Internal);
 
         self
     }
 
+    /// Configures the control pins for the camera interface (VSYNC and
+    /// HENABLE).
     pub fn with_ctrl_pins<VSYNC: InputPin, HENABLE: InputPin>(
         self,
         vsync: impl Peripheral<P = VSYNC> + 'd,
@@ -309,9 +327,9 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
         crate::into_ref!(vsync);
         crate::into_ref!(h_enable);
 
-        vsync.set_to_input(crate::private::Internal);
+        vsync.init_input(false, false, crate::private::Internal);
         vsync.connect_input_to_peripheral(InputSignal::CAM_V_SYNC, crate::private::Internal);
-        h_enable.set_to_input(crate::private::Internal);
+        h_enable.init_input(false, false, crate::private::Internal);
         h_enable.connect_input_to_peripheral(InputSignal::CAM_H_ENABLE, crate::private::Internal);
 
         self.lcd_cam
@@ -321,6 +339,8 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
         self
     }
 
+    /// Configures the control pins for the camera interface (VSYNC, HSYNC, and
+    /// HENABLE) with DE (data enable).
     pub fn with_ctrl_pins_and_de<VSYNC: InputPin, HSYNC: InputPin, HENABLE: InputPin>(
         self,
         vsync: impl Peripheral<P = VSYNC> + 'd,
@@ -331,11 +351,11 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
         crate::into_ref!(hsync);
         crate::into_ref!(h_enable);
 
-        vsync.set_to_input(crate::private::Internal);
+        vsync.init_input(false, false, crate::private::Internal);
         vsync.connect_input_to_peripheral(InputSignal::CAM_V_SYNC, crate::private::Internal);
-        hsync.set_to_input(crate::private::Internal);
+        hsync.init_input(false, false, crate::private::Internal);
         hsync.connect_input_to_peripheral(InputSignal::CAM_H_SYNC, crate::private::Internal);
-        h_enable.set_to_input(crate::private::Internal);
+        h_enable.init_input(false, false, crate::private::Internal);
         h_enable.connect_input_to_peripheral(InputSignal::CAM_H_ENABLE, crate::private::Internal);
 
         self.lcd_cam
@@ -388,6 +408,7 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
         self.rx_channel.start_transfer()
     }
 
+    /// Starts a DMA transfer to receive data from the camera peripheral.
     pub fn read_dma<'t, RXBUF: WriteBuffer>(
         &'t mut self,
         buf: &'t mut RXBUF,
@@ -400,6 +421,8 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
         Ok(DmaTransferRx::new(self))
     }
 
+    /// Starts a circular DMA transfer to receive data from the camera
+    /// peripheral.
     pub fn read_dma_circular<'t, RXBUF: WriteBuffer>(
         &'t mut self,
         buf: &'t mut RXBUF,
@@ -413,12 +436,16 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
     }
 }
 
+/// Represents an 8-bit wide camera data bus.
+/// Is used to configure the camera interface to receive 8-bit data.
 pub struct RxEightBits {
     _pins: (),
 }
 
 impl RxEightBits {
     #[allow(clippy::too_many_arguments)]
+    /// Creates a new instance of `RxEightBits`, configuring the specified pins
+    /// as the 8-bit data bus.
     pub fn new<'d, P0, P1, P2, P3, P4, P5, P6, P7>(
         pin_0: impl Peripheral<P = P0> + 'd,
         pin_1: impl Peripheral<P = P1> + 'd,
@@ -448,21 +475,21 @@ impl RxEightBits {
         crate::into_ref!(pin_6);
         crate::into_ref!(pin_7);
 
-        pin_0.set_to_input(crate::private::Internal);
+        pin_0.init_input(false, false, crate::private::Internal);
         pin_0.connect_input_to_peripheral(InputSignal::CAM_DATA_0, crate::private::Internal);
-        pin_1.set_to_input(crate::private::Internal);
+        pin_1.init_input(false, false, crate::private::Internal);
         pin_1.connect_input_to_peripheral(InputSignal::CAM_DATA_1, crate::private::Internal);
-        pin_2.set_to_input(crate::private::Internal);
+        pin_2.init_input(false, false, crate::private::Internal);
         pin_2.connect_input_to_peripheral(InputSignal::CAM_DATA_2, crate::private::Internal);
-        pin_3.set_to_input(crate::private::Internal);
+        pin_3.init_input(false, false, crate::private::Internal);
         pin_3.connect_input_to_peripheral(InputSignal::CAM_DATA_3, crate::private::Internal);
-        pin_4.set_to_input(crate::private::Internal);
+        pin_4.init_input(false, false, crate::private::Internal);
         pin_4.connect_input_to_peripheral(InputSignal::CAM_DATA_4, crate::private::Internal);
-        pin_5.set_to_input(crate::private::Internal);
+        pin_5.init_input(false, false, crate::private::Internal);
         pin_5.connect_input_to_peripheral(InputSignal::CAM_DATA_5, crate::private::Internal);
-        pin_6.set_to_input(crate::private::Internal);
+        pin_6.init_input(false, false, crate::private::Internal);
         pin_6.connect_input_to_peripheral(InputSignal::CAM_DATA_6, crate::private::Internal);
-        pin_7.set_to_input(crate::private::Internal);
+        pin_7.init_input(false, false, crate::private::Internal);
         pin_7.connect_input_to_peripheral(InputSignal::CAM_DATA_7, crate::private::Internal);
 
         Self { _pins: () }
@@ -473,12 +500,16 @@ impl RxPins for RxEightBits {
     const BUS_WIDTH: usize = 1;
 }
 
+/// Represents a 16-bit wide camera data bus.
+/// Is used to configure the camera interface to receive 16-bit data.
 pub struct RxSixteenBits {
     _pins: (),
 }
 
 impl RxSixteenBits {
     #[allow(clippy::too_many_arguments)]
+    /// Creates a new instance of `RxSixteenBits`, configuring the specified
+    /// pins as the 16-bit data bus.
     pub fn new<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>(
         pin_0: impl Peripheral<P = P0> + 'd,
         pin_1: impl Peripheral<P = P1> + 'd,
@@ -532,37 +563,37 @@ impl RxSixteenBits {
         crate::into_ref!(pin_14);
         crate::into_ref!(pin_15);
 
-        pin_0.set_to_input(crate::private::Internal);
+        pin_0.init_input(false, false, crate::private::Internal);
         pin_0.connect_input_to_peripheral(InputSignal::CAM_DATA_0, crate::private::Internal);
-        pin_1.set_to_input(crate::private::Internal);
+        pin_1.init_input(false, false, crate::private::Internal);
         pin_1.connect_input_to_peripheral(InputSignal::CAM_DATA_1, crate::private::Internal);
-        pin_2.set_to_input(crate::private::Internal);
+        pin_2.init_input(false, false, crate::private::Internal);
         pin_2.connect_input_to_peripheral(InputSignal::CAM_DATA_2, crate::private::Internal);
-        pin_3.set_to_input(crate::private::Internal);
+        pin_3.init_input(false, false, crate::private::Internal);
         pin_3.connect_input_to_peripheral(InputSignal::CAM_DATA_3, crate::private::Internal);
-        pin_4.set_to_input(crate::private::Internal);
+        pin_4.init_input(false, false, crate::private::Internal);
         pin_4.connect_input_to_peripheral(InputSignal::CAM_DATA_4, crate::private::Internal);
-        pin_5.set_to_input(crate::private::Internal);
+        pin_5.init_input(false, false, crate::private::Internal);
         pin_5.connect_input_to_peripheral(InputSignal::CAM_DATA_5, crate::private::Internal);
-        pin_6.set_to_input(crate::private::Internal);
+        pin_6.init_input(false, false, crate::private::Internal);
         pin_6.connect_input_to_peripheral(InputSignal::CAM_DATA_6, crate::private::Internal);
-        pin_7.set_to_input(crate::private::Internal);
+        pin_7.init_input(false, false, crate::private::Internal);
         pin_7.connect_input_to_peripheral(InputSignal::CAM_DATA_7, crate::private::Internal);
-        pin_8.set_to_input(crate::private::Internal);
+        pin_8.init_input(false, false, crate::private::Internal);
         pin_8.connect_input_to_peripheral(InputSignal::CAM_DATA_8, crate::private::Internal);
-        pin_9.set_to_input(crate::private::Internal);
+        pin_9.init_input(false, false, crate::private::Internal);
         pin_9.connect_input_to_peripheral(InputSignal::CAM_DATA_9, crate::private::Internal);
-        pin_10.set_to_input(crate::private::Internal);
+        pin_10.init_input(false, false, crate::private::Internal);
         pin_10.connect_input_to_peripheral(InputSignal::CAM_DATA_10, crate::private::Internal);
-        pin_11.set_to_input(crate::private::Internal);
+        pin_11.init_input(false, false, crate::private::Internal);
         pin_11.connect_input_to_peripheral(InputSignal::CAM_DATA_11, crate::private::Internal);
-        pin_12.set_to_input(crate::private::Internal);
+        pin_12.init_input(false, false, crate::private::Internal);
         pin_12.connect_input_to_peripheral(InputSignal::CAM_DATA_12, crate::private::Internal);
-        pin_13.set_to_input(crate::private::Internal);
+        pin_13.init_input(false, false, crate::private::Internal);
         pin_13.connect_input_to_peripheral(InputSignal::CAM_DATA_13, crate::private::Internal);
-        pin_14.set_to_input(crate::private::Internal);
+        pin_14.init_input(false, false, crate::private::Internal);
         pin_14.connect_input_to_peripheral(InputSignal::CAM_DATA_14, crate::private::Internal);
-        pin_15.set_to_input(crate::private::Internal);
+        pin_15.init_input(false, false, crate::private::Internal);
         pin_15.connect_input_to_peripheral(InputSignal::CAM_DATA_15, crate::private::Internal);
 
         Self { _pins: () }

@@ -7,11 +7,7 @@
 
 use core::ptr::addr_of_mut;
 
-use self::peripherals::{LPWR, TIMG0, TIMG1};
-use crate::{
-    rtc_cntl::{Rtc, SocResetReason},
-    timer::timg::Wdt,
-};
+use crate::rtc_cntl::SocResetReason;
 
 pub mod cpu_control;
 pub mod efuse;
@@ -33,15 +29,19 @@ macro_rules! chip {
 pub use chip;
 
 pub(crate) mod constants {
+    /// The base clock frequency for the I2S peripheral (Hertz).
     pub const I2S_SCLK: u32 = 160_000_000;
+    /// The default clock source for I2S operations.
     pub const I2S_DEFAULT_CLK_SRC: u32 = 2;
-
+    /// The starting address of the Remote Control (RMT) module's RAM.
     pub const RMT_RAM_START: usize = 0x3ff56800;
+    /// The size, in bytes, of each RMT channel's dedicated RAM.
     pub const RMT_CHANNEL_RAM_SIZE: usize = 64;
-
+    /// The lower bound of the system's DRAM (Data RAM) address space.
     pub const SOC_DRAM_LOW: u32 = 0x3FFA_E000;
+    /// The upper bound of the system's DRAM (Data RAM) address space.
     pub const SOC_DRAM_HIGH: u32 = 0x4000_0000;
-
+    /// A reference clock tick of 1 MHz.
     pub const REF_TICK: fugit::HertzU32 = fugit::HertzU32::MHz(1);
 }
 
@@ -107,9 +107,6 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
         stack_chk_guard.write_volatile(0xdeadbabe);
     }
 
-    crate::interrupt::setup_interrupts();
-    crate::time::time_init();
-
     // continue with default reset handler
     xtensa_lx_rt::Reset();
 }
@@ -121,14 +118,4 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
 #[rustfmt::skip]
 pub extern "Rust" fn __init_data() -> bool {
     false
-}
-
-#[export_name = "__post_init"]
-unsafe fn post_init() {
-    // RTC domain must be enabled before we try to disable
-    let mut rtc = Rtc::new(LPWR::steal());
-    rtc.rwdt.disable();
-
-    Wdt::<TIMG0, crate::Blocking>::set_wdt_enabled(false);
-    Wdt::<TIMG1, crate::Blocking>::set_wdt_enabled(false);
 }

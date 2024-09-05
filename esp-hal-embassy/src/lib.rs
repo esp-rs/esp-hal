@@ -38,10 +38,7 @@ mod fmt;
 
 #[cfg(not(feature = "esp32"))]
 use esp_hal::timer::systimer::Alarm;
-use esp_hal::{
-    clock::Clocks,
-    timer::{timg::Timer as TimgTimer, ErasedTimer},
-};
+use esp_hal::timer::{timg::Timer as TimgTimer, ErasedTimer};
 pub use macros::main;
 
 #[cfg(feature = "executors")]
@@ -121,6 +118,23 @@ impl<const N: usize> TimerCollection for &'static mut [Timer; N] {
     }
 }
 
+macro_rules! impl_array {
+    ($n:literal) => {
+        impl<T> TimerCollection for [T; $n]
+        where
+            T: IntoErasedTimer,
+        {
+            fn timers(self) -> &'static mut [Timer] {
+                mk_static!([Timer; $n], self.map(|t| Timer::new(t.into())))
+            }
+        }
+    };
+}
+
+impl_array!(2);
+impl_array!(3);
+impl_array!(4);
+
 /// Initialize embassy.
 ///
 /// Call this as soon as possible, before the first timer-related operation.
@@ -133,6 +147,7 @@ impl<const N: usize> TimerCollection for &'static mut [Timer; N] {
 /// - A `OneShotTimer` instance
 /// - A mutable static slice of `OneShotTimer` instances
 /// - A mutable static array of `OneShotTimer` instances
+/// - A 2, 3, 4 element array of `ErasedTimer` instances
 ///
 /// # Examples
 ///
@@ -140,12 +155,12 @@ impl<const N: usize> TimerCollection for &'static mut [Timer; N] {
 #[doc = esp_hal::before_snippet!()]
 /// use esp_hal::timg::TimerGroup;
 ///
-/// let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-/// esp_hal_embassy::init(&clocks, timg0.timer0);
+/// let timg0 = TimerGroup::new(peripherals.TIMG0);
+/// esp_hal_embassy::init(timg0.timer0);
 ///
 /// // ... now you can spawn embassy tasks or use `Timer::after` etc.
 /// # }
 /// ```
-pub fn init(clocks: &Clocks, time_driver: impl TimerCollection) {
-    EmbassyTimer::init(clocks, time_driver.timers())
+pub fn init(time_driver: impl TimerCollection) {
+    EmbassyTimer::init(time_driver.timers())
 }

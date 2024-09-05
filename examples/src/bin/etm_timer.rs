@@ -11,12 +11,10 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     etm::Etm,
-    peripherals::{Peripherals, TIMG0},
+    peripherals::TIMG0,
     prelude::*,
-    system::SystemControl,
     timer::timg::{
         etm::{TimerEtmEvents, TimerEtmTasks},
         Timer,
@@ -30,11 +28,9 @@ static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0>, esp_hal::Blocking>>>> =
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
     let timer0 = timg0.timer0;
     timer0.set_interrupt_handler(tg0_t0_level);
 
@@ -59,7 +55,7 @@ fn main() -> ! {
         TIMER0.borrow_ref_mut(cs).replace(timer0);
     });
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     loop {
         delay.delay_millis(500u32);

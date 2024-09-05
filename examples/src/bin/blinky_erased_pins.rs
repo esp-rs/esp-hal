@@ -13,38 +13,33 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
-    gpio::{AnyInput, AnyOutput, Io, Level, Pull},
-    peripherals::Peripherals,
+    gpio::{ErasedPin, Input, Io, Level, Output, Pin, Pull},
     prelude::*,
-    system::SystemControl,
 };
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // Set LED GPIOs as an output:
-    let led1 = AnyOutput::new(io.pins.gpio2, Level::Low);
-    let led2 = AnyOutput::new(io.pins.gpio4, Level::Low);
-    let led3 = AnyOutput::new(io.pins.gpio5, Level::Low);
+    let led1 = Output::new(io.pins.gpio2.degrade(), Level::Low);
+    let led2 = Output::new(io.pins.gpio4.degrade(), Level::Low);
+    let led3 = Output::new(io.pins.gpio5.degrade(), Level::Low);
 
     // Use boot button as an input:
     #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
-    let button = io.pins.gpio0;
+    let button = io.pins.gpio0.degrade();
     #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")))]
-    let button = io.pins.gpio9;
+    let button = io.pins.gpio9.degrade();
 
-    let button = AnyInput::new(button, Pull::Up);
+    let button = Input::new(button, Pull::Up);
 
     let mut pins = [led1, led2, led3];
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     loop {
         toggle_pins(&mut pins, &button);
@@ -52,7 +47,7 @@ fn main() -> ! {
     }
 }
 
-fn toggle_pins(leds: &mut [AnyOutput], button: &AnyInput) {
+fn toggle_pins(leds: &mut [Output<ErasedPin>], button: &Input<ErasedPin>) {
     for pin in leds.iter_mut() {
         pin.toggle();
     }

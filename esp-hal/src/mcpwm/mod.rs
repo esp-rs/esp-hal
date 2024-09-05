@@ -1,6 +1,7 @@
 //! # Motor Control Pulse Width Modulator (MCPWM)
 //!
 //! ## Overview
+//!
 //! The MCPWM peripheral is a versatile PWM generator, which contains various
 //! submodules to make it a key element in power electronic applications like
 //! motor control, digital power, and so on. Typically, the MCPWM peripheral can
@@ -13,6 +14,7 @@
 //! - Generate Space Vector PWM (SVPWM) signals for Field Oriented Control (FOC)
 //!
 //! ## Configuration
+//!
 //! * PWM Timers 0, 1 and 2
 //!     * Every PWM timer has a dedicated 8-bit clock prescaler.
 //!     * The 16-bit counter in the PWM timer can work in count-up mode,
@@ -40,14 +42,16 @@
 #![cfg_attr(esp32h2, doc = "Clock source is XTAL")]
 #![doc = ""]
 //! ## Examples
+//!
 //! ### Output a 20 kHz signal
-//! Uses timer0 and operator0 of the MCPWM0 peripheral to output a 50% duty
-//! signal at 20 kHz. The signal will be output to the pin assigned to `pin`.
+//!
+//! This example uses timer0 and operator0 of the MCPWM0 peripheral to output a
+//! 50% duty signal at 20 kHz. The signal will be output to the pin assigned to
+//! `pin`.
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::{mcpwm, prelude::*};
-//! # use esp_hal::mcpwm::operator::{DeadTimeCfg, PWMStream};
-//! # use mcpwm::{operator::PwmPinConfig, timer::PwmWorkingMode, McPwm, PeripheralClockConfig};
+//! # use esp_hal::mcpwm::{operator::{DeadTimeCfg, PWMStream, PwmPinConfig}, timer::PwmWorkingMode, McPwm, PeripheralClockConfig};
 //! # use esp_hal::gpio::Io;
 //!
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -56,11 +60,11 @@
 //! // initialize peripheral
 #![cfg_attr(
     esp32h2,
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40.MHz()).unwrap();"
+    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(40.MHz()).unwrap();"
 )]
 #![cfg_attr(
     not(esp32h2),
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 32.MHz()).unwrap();"
+    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(32.MHz()).unwrap();"
 )]
 //! let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
 //!
@@ -83,7 +87,7 @@
 //! # }
 //! ```
 
-use core::{marker::PhantomData, ops::Deref};
+use core::ops::Deref;
 
 use fugit::HertzU32;
 use operator::Operator;
@@ -126,7 +130,7 @@ impl<'d, PWM: PwmPeripheral> McPwm<'d, PWM> {
     // clocks.crypto_pwm_clock normally is 160 MHz
     pub fn new(
         peripheral: impl Peripheral<P = PWM> + 'd,
-        peripheral_clock: PeripheralClockConfig<'d>,
+        peripheral_clock: PeripheralClockConfig,
     ) -> Self {
         crate::into_ref!(peripheral);
 
@@ -186,13 +190,12 @@ impl<'d, PWM: PwmPeripheral> McPwm<'d, PWM> {
 
 /// Clock configuration of the MCPWM peripheral
 #[derive(Copy, Clone)]
-pub struct PeripheralClockConfig<'a> {
+pub struct PeripheralClockConfig {
     frequency: HertzU32,
     prescaler: u8,
-    phantom: PhantomData<&'a Clocks<'a>>,
 }
 
-impl<'a> PeripheralClockConfig<'a> {
+impl PeripheralClockConfig {
     /// Get a clock configuration with the given prescaler.
     ///
     /// With standard system clock configurations the input clock to the MCPWM
@@ -200,20 +203,23 @@ impl<'a> PeripheralClockConfig<'a> {
     ///
     /// The peripheral clock frequency is calculated as:
     /// `peripheral_clock = input_clock / (prescaler + 1)`
-    pub fn with_prescaler(clocks: &'a Clocks<'a>, prescaler: u8) -> Self {
-        #[cfg(esp32)]
-        let source_clock = clocks.pwm_clock;
-        #[cfg(esp32c6)]
-        let source_clock = clocks.crypto_clock;
-        #[cfg(esp32s3)]
-        let source_clock = clocks.crypto_pwm_clock;
-        #[cfg(esp32h2)]
-        let source_clock = clocks.xtal_clock;
+    pub fn with_prescaler(prescaler: u8) -> Self {
+        let clocks = Clocks::get();
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                let source_clock = clocks.pwm_clock;
+            } else if #[cfg(esp32c6)] {
+                let source_clock = clocks.crypto_clock;
+            } else if #[cfg(esp32s3)] {
+                let source_clock = clocks.crypto_pwm_clock;
+            } else if #[cfg(esp32h2)] {
+                let source_clock = clocks.xtal_clock;
+            }
+        }
 
         Self {
             frequency: source_clock / (prescaler as u32 + 1),
             prescaler,
-            phantom: PhantomData,
         }
     }
 
@@ -231,18 +237,19 @@ impl<'a> PeripheralClockConfig<'a> {
     /// Only divisors of the input clock (`160 Mhz / 1`, `160 Mhz / 2`, ...,
     /// `160 Mhz / 256`) are representable exactly. Other target frequencies
     /// will be rounded up to the next divisor.
-    pub fn with_frequency(
-        clocks: &'a Clocks<'a>,
-        target_freq: HertzU32,
-    ) -> Result<Self, FrequencyError> {
-        #[cfg(esp32)]
-        let source_clock = clocks.pwm_clock;
-        #[cfg(esp32c6)]
-        let source_clock = clocks.crypto_clock;
-        #[cfg(esp32s3)]
-        let source_clock = clocks.crypto_pwm_clock;
-        #[cfg(esp32h2)]
-        let source_clock = clocks.xtal_clock;
+    pub fn with_frequency(target_freq: HertzU32) -> Result<Self, FrequencyError> {
+        let clocks = Clocks::get();
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                let source_clock = clocks.pwm_clock;
+            } else if #[cfg(esp32c6)] {
+                let source_clock = clocks.crypto_clock;
+            } else if #[cfg(esp32s3)] {
+                let source_clock = clocks.crypto_pwm_clock;
+            } else if #[cfg(esp32h2)] {
+                let source_clock = clocks.xtal_clock;
+            }
+        }
 
         if target_freq.raw() == 0 || target_freq > source_clock {
             return Err(FrequencyError);
@@ -253,7 +260,7 @@ impl<'a> PeripheralClockConfig<'a> {
             return Err(FrequencyError);
         }
 
-        Ok(Self::with_prescaler(clocks, prescaler as u8))
+        Ok(Self::with_prescaler(prescaler as u8))
     }
 
     /// Get the peripheral clock frequency.
@@ -278,7 +285,7 @@ impl<'a> PeripheralClockConfig<'a> {
         period: u16,
         mode: timer::PwmWorkingMode,
         prescaler: u8,
-    ) -> timer::TimerClockConfig<'a> {
+    ) -> timer::TimerClockConfig {
         timer::TimerClockConfig::with_prescaler(self, period, mode, prescaler)
     }
 
@@ -296,7 +303,7 @@ impl<'a> PeripheralClockConfig<'a> {
         period: u16,
         mode: timer::PwmWorkingMode,
         target_freq: HertzU32,
-    ) -> Result<timer::TimerClockConfig<'a>, FrequencyError> {
+    ) -> Result<timer::TimerClockConfig, FrequencyError> {
         timer::TimerClockConfig::with_frequency(self, period, mode, target_freq)
     }
 }

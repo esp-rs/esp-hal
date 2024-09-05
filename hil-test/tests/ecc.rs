@@ -13,18 +13,17 @@ use crypto_bigint::{
     U192,
     U256,
 };
-use defmt_rtt as _;
 use elliptic_curve::sec1::ToEncodedPoint;
-use esp_backtrace as _;
 #[cfg(feature = "esp32h2")]
 use esp_hal::ecc::WorkMode;
 use esp_hal::{
     ecc::{Ecc, EllipticCurve, Error},
-    peripherals::Peripherals,
+    prelude::*,
     rng::Rng,
     Blocking,
 };
 use hex_literal::hex;
+use hil_test as _;
 
 struct TestParams<'a> {
     prime_fields: &'a [&'a [u8]],
@@ -48,16 +47,6 @@ struct Context<'a> {
     rng: Rng,
 }
 
-impl Context<'_> {
-    pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let ecc = Ecc::new(peripherals.ECC);
-        let rng = Rng::new(peripherals.RNG);
-
-        Context { ecc, rng }
-    }
-}
-
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
@@ -67,7 +56,16 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        Context::init()
+        let peripherals = esp_hal::init({
+            let mut config = esp_hal::Config::default();
+            config.cpu_clock = CpuClock::max();
+            config
+        });
+
+        let ecc = Ecc::new(peripherals.ECC);
+        let rng = Rng::new(peripherals.RNG);
+
+        Context { ecc, rng }
     }
 
     #[test]

@@ -18,6 +18,7 @@
 
 static mut PSRAM_VADDR: u32 = 0x3C000000;
 
+/// Returns the start address of the PSRAM virtual address space.
 pub fn psram_vaddr_start() -> usize {
     unsafe { PSRAM_VADDR as usize }
 }
@@ -42,6 +43,8 @@ cfg_if::cfg_if! {
     }
 }
 
+/// The total size of the PSRAM in bytes, calculated from the PSRAM size
+/// constant.
 pub const PSRAM_BYTES: usize = PSRAM_SIZE as usize * 1024 * 1024;
 
 /// Initialize PSRAM to be used for data.
@@ -54,6 +57,7 @@ pub const PSRAM_BYTES: usize = PSRAM_SIZE as usize * 1024 * 1024;
     feature = "opsram-8m",
     feature = "opsram-16m"
 ))]
+#[procmacros::ram]
 pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::peripherals::PSRAM>) {
     const CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE: u32 = 0x4000;
     const CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS: u8 = 8;
@@ -862,14 +866,21 @@ pub(crate) mod utils {
         fn esp_rom_opiflash_pin_config();
     }
 
+    /// Represents the operational mode registers of an OPI PSRAM.
     #[derive(Default)]
     #[repr(C)]
     struct OpiPsramModeReg {
+        // Mode register 0 (MR0).
         pub mr0: u8,
+        // Mode register 1 (MR1).
         pub mr1: u8,
+        // Mode register 2 (MR2).
         pub mr2: u8,
+        // Mode register 3 (MR3).
         pub mr3: u8,
+        // Mode register 4 (MR4).
         pub mr4: u8,
+        // Mode register 8 (MR8).
         pub mr8: u8,
     }
 

@@ -17,6 +17,8 @@ const ADC_SARADC_DTEST_RTC_ADDR_LSB: u32 = 0;
 
 use crate::regi2c_write_mask;
 
+/// Enable true randomness by enabling the entropy source.
+/// Blocks `ADC` usage.
 pub(crate) fn ensure_randomness() {
     unsafe {
         let rtc_cntl = &*crate::peripherals::RTC_CNTL::ptr();
@@ -117,7 +119,8 @@ pub(crate) fn ensure_randomness() {
     }
 }
 
-pub fn revert_trng() {
+/// Disable true randomness. Unlocks `ADC` peripheral.
+pub(crate) fn revert_trng() {
     let system = unsafe { &*crate::peripherals::SYSTEM::ptr() };
     let apb_saradc = unsafe { &*crate::peripherals::APB_SARADC::ptr() };
     let sens = unsafe { &*crate::peripherals::SENS::ptr() };

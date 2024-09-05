@@ -2,79 +2,96 @@
 //!
 //! Folowing pins are used:
 //! SCLK    GPIO0
-//! MISO    GPIO2
+//! MISO    GPIO2 / GPIO9  (esp32s2 / esp32s3) / GPIO26 (esp32)
 //!
-//! GPIO    GPIO3
+//! GPIO    GPIO3 / GPIO10 (esp32s2 / esp32s3) / GPIO27 (esp32)
 //!
-//! Connect MISO (GPIO2) and GPIO (GPIO3) pins.
+//! Connect MISO and GPIO pins.
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s3
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
-use esp_backtrace as _;
+use esp_hal::{
+    dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma_buffers,
+    gpio::{Io, Level, Output},
+    peripherals::SPI2,
+    prelude::*,
+    spi::{
+        master::{Address, Command, HalfDuplexReadWrite, Spi, SpiDma},
+        HalfDuplexMode,
+        SpiDataMode,
+        SpiMode,
+    },
+    Blocking,
+};
+use hil_test as _;
+
+cfg_if::cfg_if! {
+    if #[cfg(any(
+        feature = "esp32",
+        feature = "esp32s2",
+    ))] {
+        use esp_hal::dma::Spi2DmaChannel as DmaChannel0;
+    } else {
+        use esp_hal::dma::DmaChannel0;
+    }
+}
+
+struct Context {
+    spi: SpiDma<'static, SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
+    miso_mirror: Output<'static>,
+}
 
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    use esp_hal::{
-        clock::ClockControl,
-        dma::{Dma, DmaPriority},
-        dma_buffers,
-        gpio::{Io, Level, Output},
-        peripherals::Peripherals,
-        prelude::_fugit_RateExtU32,
-        spi::{
-            master::{prelude::*, Address, Command, Spi},
-            SpiDataMode,
-            SpiMode,
-        },
-        system::SystemControl,
-    };
+    use defmt::assert_eq;
+
+    use super::*;
 
     #[init]
-    fn init() {}
-
-    #[test]
-    #[timeout(3)]
-    fn test_spi_reads_correctly_from_gpio_pin() {
-        const DMA_BUFFER_SIZE: usize = 4;
-
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    fn init() -> Context {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
-        let miso = io.pins.gpio2;
+        let (miso, miso_mirror) = hil_test::common_test_pins!(io);
 
-        let mut miso_mirror = Output::new(io.pins.gpio3, Level::High);
+        let miso_mirror = Output::new(miso_mirror, Level::High);
 
         let dma = Dma::new(peripherals.DMA);
 
-        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-        let dma_channel = dma.spi2channel;
-        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
-        let dma_channel = dma.channel0;
+        cfg_if::cfg_if! {
+            if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
+                let dma_channel = dma.spi2channel;
+            } else {
+                let dma_channel = dma.channel0;
+            }
+        }
 
-        let (_, tx_descriptors, mut rx_buffer, rx_descriptors) = dma_buffers!(0, DMA_BUFFER_SIZE);
-
-        let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+        let spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
             .with_sck(sclk)
             .with_miso(miso)
-            .with_dma(
-                dma_channel.configure(false, DmaPriority::Priority0),
-                tx_descriptors,
-                rx_descriptors,
-            );
+            .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
-        // Fill with neither 0x00 nor 0xFF.
-        rx_buffer.fill(5);
+        Context { spi, miso_mirror }
+    }
+
+    #[test]
+    #[timeout(3)]
+    fn test_spi_reads_correctly_from_gpio_pin(mut ctx: Context) {
+        const DMA_BUFFER_SIZE: usize = 4;
+
+        let (buffer, descriptors, _, _) = dma_buffers!(DMA_BUFFER_SIZE, 0);
+        let mut dma_rx_buf = DmaRxBuf::new(descriptors, buffer).unwrap();
 
         // SPI should read '0's from the MISO pin
-        miso_mirror.set_low();
+        ctx.miso_mirror.set_low();
+
+        let mut spi = ctx.spi;
 
         let transfer = spi
             .read(
@@ -82,15 +99,16 @@ mod tests {
                 Command::None,
                 Address::None,
                 0,
-                &mut rx_buffer,
+                dma_rx_buf,
             )
+            .map_err(|e| e.0)
             .unwrap();
-        transfer.wait().unwrap();
+        (spi, dma_rx_buf) = transfer.wait();
 
-        assert_eq!(rx_buffer, &[0x00; DMA_BUFFER_SIZE]);
+        assert_eq!(dma_rx_buf.as_slice(), &[0x00; DMA_BUFFER_SIZE]);
 
         // SPI should read '1's from the MISO pin
-        miso_mirror.set_high();
+        ctx.miso_mirror.set_high();
 
         let transfer = spi
             .read(
@@ -98,11 +116,55 @@ mod tests {
                 Command::None,
                 Address::None,
                 0,
-                &mut rx_buffer,
+                dma_rx_buf,
             )
+            .map_err(|e| e.0)
             .unwrap();
-        transfer.wait().unwrap();
 
-        assert_eq!(rx_buffer, &[0xFF; DMA_BUFFER_SIZE]);
+        (_, dma_rx_buf) = transfer.wait();
+
+        assert_eq!(dma_rx_buf.as_slice(), &[0xFF; DMA_BUFFER_SIZE]);
+    }
+
+    #[test]
+    #[timeout(3)]
+    fn test_spidmabus_reads_correctly_from_gpio_pin(mut ctx: Context) {
+        const DMA_BUFFER_SIZE: usize = 4;
+
+        // WAS THIS AN ERROR?
+        let (buffer, descriptors, tx, txd) = dma_buffers!(DMA_BUFFER_SIZE, 1);
+        let dma_rx_buf = DmaRxBuf::new(descriptors, buffer).unwrap();
+        let dma_tx_buf = DmaTxBuf::new(txd, tx).unwrap();
+
+        let mut spi = ctx.spi.with_buffers(dma_rx_buf, dma_tx_buf);
+
+        // SPI should read '0's from the MISO pin
+        ctx.miso_mirror.set_low();
+
+        let mut buffer = [0xAA; DMA_BUFFER_SIZE];
+        spi.read(
+            SpiDataMode::Single,
+            Command::None,
+            Address::None,
+            0,
+            &mut buffer,
+        )
+        .unwrap();
+
+        assert_eq!(buffer.as_slice(), &[0x00; DMA_BUFFER_SIZE]);
+
+        // SPI should read '1's from the MISO pin
+        ctx.miso_mirror.set_high();
+
+        spi.read(
+            SpiDataMode::Single,
+            Command::None,
+            Address::None,
+            0,
+            &mut buffer,
+        )
+        .unwrap();
+
+        assert_eq!(buffer.as_slice(), &[0xFF; DMA_BUFFER_SIZE]);
     }
 }

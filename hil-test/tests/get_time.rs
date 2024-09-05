@@ -1,29 +1,23 @@
-//! current_time Test
+//! time::now Test
 
-// esp32c2 is disabled currently as it fails
-//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
-use esp_backtrace as _;
-use esp_hal::{clock::ClockControl, delay::Delay, peripherals::Peripherals, system::SystemControl};
+use esp_hal::delay::Delay;
+use hil_test as _;
 
 struct Context {
     delay: Delay,
 }
 
-impl Context {
-    pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+fn time_moves_forward_during<F: FnOnce(Context)>(ctx: Context, f: F) {
+    let t1 = esp_hal::time::now();
+    f(ctx);
+    let t2 = esp_hal::time::now();
 
-        let delay = Delay::new(&clocks);
-
-        Context { delay }
-    }
+    assert!(t2 > t1);
 }
 
 #[cfg(test)]
@@ -33,17 +27,45 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        Context::init()
+        let _ = esp_hal::init(esp_hal::Config::default());
+
+        let delay = Delay::new();
+
+        Context { delay }
     }
 
     #[test]
     #[timeout(3)]
     fn test_current_time(ctx: Context) {
-        let t1 = esp_hal::time::current_time();
+        let t1 = esp_hal::time::now();
         ctx.delay.delay_millis(500);
-        let t2 = esp_hal::time::current_time();
+        let t2 = esp_hal::time::now();
 
         assert!(t2 > t1);
         assert!((t2 - t1).to_millis() >= 500u64);
+    }
+
+    #[cfg(systimer)]
+    #[test]
+    #[timeout(3)]
+    fn test_current_time_construct_systimer(ctx: Context) {
+        time_moves_forward_during(ctx, |_| {
+            // construct the timer in between calls to current_time
+            let _ = esp_hal::timer::systimer::SystemTimer::new(unsafe {
+                esp_hal::peripherals::SYSTIMER::steal()
+            });
+        })
+    }
+
+    #[cfg(esp32)]
+    #[test]
+    #[timeout(3)]
+    fn test_current_time_construct_timg0(ctx: Context) {
+        time_moves_forward_during(ctx, |_| {
+            // construct the timer in between calls to current_time
+            let _ = esp_hal::timer::timg::TimerGroup::new(unsafe {
+                esp_hal::peripherals::TIMG0::steal()
+            });
+        })
     }
 }

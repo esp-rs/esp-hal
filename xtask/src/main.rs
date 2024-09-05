@@ -5,7 +5,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::{bail, Context as _, Result};
+use anyhow::{bail, ensure, Context as _, Result};
 use clap::{Args, Parser};
 use esp_metadata::{Arch, Chip, Config};
 use minijinja::Value;
@@ -58,6 +58,9 @@ struct ExampleArgs {
     chip: Chip,
     /// Optional example to act on (all examples used if omitted)
     example: Option<String>,
+    /// Build examples in debug mode only
+    #[arg(long)]
+    debug: bool,
 }
 
 #[derive(Debug, Args)]
@@ -202,7 +205,7 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
     };
 
     // Load all examples which support the specified chip and parse their metadata:
-    let mut examples = xtask::load_examples(&example_path)?
+    let mut examples = xtask::load_examples(&example_path, action)?
         .iter()
         .filter_map(|example| {
             if example.supports_chip(args.chip) {
@@ -214,7 +217,7 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
         .collect::<Vec<_>>();
 
     // Sort all examples by name:
-    examples.sort_by(|a, b| a.name().cmp(&b.name()));
+    examples.sort_by_key(|a| a.name());
 
     // Execute the specified action:
     match action {
@@ -225,18 +228,26 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
 
 fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) -> Result<()> {
     // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(&args.package, &args.chip)?;
+    let target = target_triple(args.package, &args.chip)?;
 
-    if let Some(example) = examples.iter().find(|ex| Some(ex.name()) == args.example) {
+    if examples
+        .iter()
+        .find(|ex| Some(ex.name()) == args.example)
+        .is_some()
+    {
         // Attempt to build only the specified example:
-        xtask::execute_app(
-            &package_path,
-            args.chip,
-            target,
-            example,
-            CargoAction::Build,
-            1,
-        )
+        for example in examples.iter().filter(|ex| Some(ex.name()) == args.example) {
+            xtask::execute_app(
+                package_path,
+                args.chip,
+                target,
+                example,
+                CargoAction::Build,
+                1,
+                args.debug,
+            )?;
+        }
+        Ok(())
     } else if args.example.is_some() {
         // An invalid argument was provided:
         bail!("Example not found or unsupported for the given chip")
@@ -244,12 +255,13 @@ fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Pat
         // Attempt to build each supported example, with all required features enabled:
         examples.iter().try_for_each(|example| {
             xtask::execute_app(
-                &package_path,
+                package_path,
                 args.chip,
                 target,
                 example,
                 CargoAction::Build,
                 1,
+                args.debug,
             )
         })
     }
@@ -257,22 +269,31 @@ fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Pat
 
 fn run_example(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) -> Result<()> {
     // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(&args.package, &args.chip)?;
+    let target = target_triple(args.package, &args.chip)?;
 
     // Filter the examples down to only the binary we're interested in, assuming it
     // actually supports the specified chip:
-    if let Some(example) = examples.iter().find(|ex| Some(ex.name()) == args.example) {
+    let mut found_one = false;
+    for example in examples.iter().filter(|ex| Some(ex.name()) == args.example) {
+        found_one = true;
         xtask::execute_app(
-            &package_path,
+            package_path,
             args.chip,
             target,
-            &example,
+            example,
             CargoAction::Run,
             1,
-        )
-    } else {
-        bail!("Example not found or unsupported for the given chip")
+            args.debug,
+        )?;
     }
+
+    ensure!(
+        found_one,
+        "Example not found or unsupported for {}",
+        args.chip
+    );
+
+    Ok(())
 }
 
 fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
@@ -280,27 +301,35 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
     let package_path = xtask::windows_safe_path(&workspace.join("hil-test"));
 
     // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(&Package::HilTest, &args.chip)?;
+    let target = target_triple(Package::HilTest, &args.chip)?;
 
     // Load all tests which support the specified chip and parse their metadata:
-    let mut tests = xtask::load_examples(&package_path.join("tests"))?
+    let mut tests = xtask::load_examples(&package_path.join("tests"), action)?
         .into_iter()
         .filter(|example| example.supports_chip(args.chip))
         .collect::<Vec<_>>();
 
     // Sort all tests by name:
-    tests.sort_by(|a, b| a.name().cmp(&b.name()));
+    tests.sort_by_key(|a| a.name());
 
     // Execute the specified action:
-    if let Some(test) = tests.iter().find(|test| Some(test.name()) == args.test) {
-        xtask::execute_app(
-            &package_path,
-            args.chip,
-            target,
-            &test,
-            action,
-            args.repeat.unwrap_or(1),
-        )
+    if tests
+        .iter()
+        .find(|test| Some(test.name()) == args.test)
+        .is_some()
+    {
+        for test in tests.iter().filter(|test| Some(test.name()) == args.test) {
+            xtask::execute_app(
+                &package_path,
+                args.chip,
+                target,
+                test,
+                action,
+                args.repeat.unwrap_or(1),
+                false,
+            )?;
+        }
+        Ok(())
     } else if args.test.is_some() {
         bail!("Test not found or unsupported for the given chip")
     } else {
@@ -313,6 +342,7 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
                 &test,
                 action,
                 args.repeat.unwrap_or(1),
+                false,
             )
             .is_err()
             {
@@ -332,6 +362,9 @@ fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result
     let output_path = workspace.join("docs");
     let resources = workspace.join("resources");
 
+    fs::create_dir_all(&output_path)
+        .with_context(|| format!("Failed to create {}", output_path.display()))?;
+
     let mut packages = HashMap::new();
     for package in args.packages {
         packages.insert(
@@ -341,10 +374,12 @@ fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result
     }
 
     // Copy any additional assets to the documentation's output path:
-    fs::copy(resources.join("esp-rs.svg"), output_path.join("esp-rs.svg"))?;
+    fs::copy(resources.join("esp-rs.svg"), output_path.join("esp-rs.svg"))
+        .context("Failed to copy esp-rs.svg")?;
 
     // Render the index and write it out to the documentaiton's output path:
-    let source = fs::read_to_string(resources.join("index.html.jinja"))?;
+    let source = fs::read_to_string(resources.join("index.html.jinja"))
+        .context("Failed to read index.html.jinja")?;
 
     let mut env = minijinja::Environment::new();
     env.add_template("index", &source)?;
@@ -352,7 +387,7 @@ fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result
     let tmpl = env.get_template("index")?;
     let html = tmpl.render(minijinja::context! { packages => packages })?;
 
-    fs::write(output_path.join("index.html"), html)?;
+    fs::write(output_path.join("index.html"), html).context("Failed to write index.html")?;
 
     Ok(())
 }
@@ -373,18 +408,16 @@ fn build_documentation_for_package(
         validate_package_chip(&package, chip)?;
 
         // Determine the appropriate build target for the given package and chip:
-        let target = target_triple(&package, &chip)?;
+        let target = target_triple(package, chip)?;
 
         // Build the documentation for the specified package, targeting the
         // specified chip:
-        xtask::build_documentation(workspace, package, *chip, target)?;
+        let docs_path = xtask::build_documentation(workspace, package, *chip, target)?;
 
-        let docs_path = xtask::windows_safe_path(
-            &workspace
-                .join(package.to_string())
-                .join("target")
-                .join(target)
-                .join("doc"),
+        ensure!(
+            docs_path.exists(),
+            "Documentation not found at {}",
+            docs_path.display()
         );
 
         let output_path = output_path
@@ -394,8 +427,15 @@ fn build_documentation_for_package(
         let output_path = xtask::windows_safe_path(&output_path);
 
         // Create the output directory, and copy the built documentation into it:
-        fs::create_dir_all(&output_path)?;
-        copy_dir_all(&docs_path, &output_path)?;
+        fs::create_dir_all(&output_path)
+            .with_context(|| format!("Failed to create {}", output_path.display()))?;
+        copy_dir_all(&docs_path, &output_path).with_context(|| {
+            format!(
+                "Failed to copy {} to {}",
+                docs_path.display(),
+                output_path.display()
+            )
+        })?;
 
         // Build the context object required for rendering this particular build's
         // information on the documentation index:
@@ -405,7 +445,6 @@ fn build_documentation_for_package(
             chip => chip.to_string(),
             chip_pretty => chip.pretty_name(),
             package => package.to_string().replace('-', "_"),
-            description => format!("{} (targeting {})", package, chip.pretty_name()),
         });
     }
 
@@ -490,7 +529,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
         // is *some* overlap)
 
         for chip in &args.chips {
-            let device = Config::for_chip(&chip);
+            let device = Config::for_chip(chip);
 
             match package {
                 Package::EspBacktrace => {
@@ -509,13 +548,13 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     let mut features = format!("--features={chip},ci");
 
                     // Cover all esp-hal features where a device is supported
-                    if device.contains(&"usb0".to_owned()) {
+                    if device.contains("usb0") {
                         features.push_str(",usb-otg")
                     }
-                    if device.contains(&"bt".to_owned()) {
+                    if device.contains("bt") {
                         features.push_str(",bluetooth")
                     }
-                    if device.contains(&"psram".to_owned()) {
+                    if device.contains("psram") {
                         // TODO this doesn't test octal psram as it would require a separate build
                         features.push_str(",psram-4m,psram-80mhz")
                     }
@@ -545,7 +584,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 }
 
                 Package::EspIeee802154 => {
-                    if device.contains(&"ieee802154".to_owned()) {
+                    if device.contains("ieee802154") {
                         lint_package(
                             &path,
                             &[
@@ -557,19 +596,19 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     }
                 }
                 Package::EspLpHal => {
-                    if device.contains(&"lp_core".to_owned()) {
+                    if device.contains("lp_core") {
                         lint_package(
                             &path,
                             &[
                                 "-Zbuild-std=core",
                                 &format!("--target={}", chip.lp_target().unwrap()),
-                                &format!("--features={chip},embedded-io,embedded-hal-02"),
+                                &format!("--features={chip},embedded-io"),
                             ],
                         )?;
                     }
                 }
                 Package::EspHalSmartled => {
-                    if device.contains(&"rmt".to_owned()) {
+                    if device.contains("rmt") {
                         lint_package(
                             &path,
                             &[
@@ -615,20 +654,20 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 Package::EspWifi => {
                     let mut features = format!("--features={chip},async,ps-min-modem,defmt");
 
-                    if device.contains(&"wifi".to_owned()) {
+                    if device.contains("wifi") {
                         features
                             .push_str(",wifi-default,esp-now,embedded-svc,embassy-net,dump-packets")
                     }
-                    if device.contains(&"bt".to_owned()) {
+                    if device.contains("bt") {
                         features.push_str(",ble")
                     }
-                    if device.contains(&"coex".to_owned()) {
+                    if device.contains("coex") {
                         features.push_str(",coex")
                     }
                     lint_package(
                         &path,
                         &[
-                            "-Zbuild-std=core",
+                            "-Zbuild-std=core,alloc",
                             &format!("--target={}", chip.target()),
                             "--no-default-features",
                             &features,
@@ -679,7 +718,7 @@ fn lint_package(path: &Path, args: &[&str]) -> Result<()> {
         .arg("warnings")
         .build();
 
-    xtask::cargo::run(&cargo_args, &path)
+    xtask::cargo::run(&cargo_args, path)
 }
 
 fn run_elfs(args: RunElfArgs) -> Result<()> {
@@ -728,7 +767,7 @@ fn run_doctests(workspace: &Path, args: ExampleArgs) -> Result<()> {
     let package_path = xtask::windows_safe_path(&workspace.join(&package_name));
 
     // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(&args.package, &args.chip)?;
+    let target = target_triple(args.package, &args.chip)?;
     let features = vec![args.chip.to_string()];
 
     // Build up an array of command-line arguments to pass to `cargo`:
@@ -753,8 +792,8 @@ fn run_doctests(workspace: &Path, args: ExampleArgs) -> Result<()> {
 // ----------------------------------------------------------------------------
 // Helper Functions
 
-fn target_triple<'a>(package: &'a Package, chip: &'a Chip) -> Result<&'a str> {
-    if *package == Package::EspLpHal {
+fn target_triple(package: Package, chip: &Chip) -> Result<&str> {
+    if package == Package::EspLpHal {
         chip.lp_target()
     } else {
         Ok(chip.target())
@@ -762,13 +801,12 @@ fn target_triple<'a>(package: &'a Package, chip: &'a Chip) -> Result<&'a str> {
 }
 
 fn validate_package_chip(package: &Package, chip: &Chip) -> Result<()> {
-    if *package == Package::EspLpHal && !chip.has_lp_core() {
-        bail!(
-            "Invalid chip provided for package '{}': '{}'",
-            package,
-            chip
-        );
-    }
+    ensure!(
+        *package != Package::EspLpHal || chip.has_lp_core(),
+        "Invalid chip provided for package '{}': '{}'",
+        package,
+        chip
+    );
 
     Ok(())
 }

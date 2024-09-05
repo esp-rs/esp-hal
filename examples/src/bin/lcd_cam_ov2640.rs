@@ -25,7 +25,6 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
@@ -36,25 +35,21 @@ use esp_hal::{
         cam::{Camera, RxEightBits},
         LcdCam,
     },
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
     Blocking,
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0;
 
-    let (_, _, rx_buffer, rx_descriptors) = dma_buffers!(0, 32678);
+    let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(0, 32678);
 
     let channel = channel.configure(false, DmaPriority::Priority0);
 
@@ -82,20 +77,19 @@ fn main() -> ! {
         rx_descriptors,
         cam_data_pins,
         20u32.MHz(),
-        &clocks,
     )
     .with_master_clock(cam_xclk)
     .with_pixel_clock(cam_pclk)
     .with_ctrl_pins(cam_vsync, cam_href);
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let mut buffer = rx_buffer;
     buffer.fill(0u8);
 
     delay.delay_millis(500u32);
 
-    let i2c = I2C::new(peripherals.I2C0, cam_siod, cam_sioc, 100u32.kHz(), &clocks);
+    let i2c = I2C::new(peripherals.I2C0, cam_siod, cam_sioc, 100u32.kHz());
 
     let mut sccb = Sccb::new(i2c);
 

@@ -33,7 +33,7 @@ pub use context::Context;
 /// general exceptions, which vector to the user, kernel, or double-exception
 /// vectors).
 #[allow(unused)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 #[repr(C)]
 pub enum ExceptionCause {
     /// Illegal Instruction

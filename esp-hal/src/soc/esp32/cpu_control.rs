@@ -15,7 +15,7 @@
 //! # use esp_hal::prelude::*;
 //! static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 //!
-//! # let delay = Delay::new(&clocks);
+//! # let delay = Delay::new();
 //!
 //! let counter = Mutex::new(RefCell::new(0));
 //!
@@ -99,14 +99,17 @@ impl<const SIZE: usize> Stack<SIZE> {
         }
     }
 
+    /// Returns the size of the stack.
     pub const fn len(&self) -> usize {
         SIZE
     }
 
+    /// Provides a mutable pointer to the bottom of the stack.
     pub fn bottom(&mut self) -> *mut u32 {
         self.mem.as_mut_ptr() as *mut u32
     }
 
+    /// Provides a mutable pointer to the top of the stack.
     pub fn top(&mut self) -> *mut u32 {
         unsafe { self.bottom().add(SIZE / 4) }
     }
@@ -132,9 +135,11 @@ impl<'a> Drop for AppCoreGuard<'a> {
     }
 }
 
+/// Represents errors that can occur while working with the core.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
+    /// The core is already running.
     CoreAlreadyRunning,
 }
 
@@ -168,6 +173,7 @@ unsafe fn internal_park_core(core: Cpu) {
 }
 
 impl<'d> CpuControl<'d> {
+    /// Creates a new instance of `CpuControl`.
     pub fn new(cpu_control: impl Peripheral<P = CPU_CTRL> + 'd) -> CpuControl<'d> {
         crate::into_ref!(cpu_control);
 

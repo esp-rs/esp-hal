@@ -356,7 +356,6 @@ macro_rules! ImplSpiChannel {
             impl $crate::private::Sealed for [<Spi $num DmaChannelTxImpl>] {}
 
             impl<'a> TxChannel<[<Spi $num DmaChannel>]> for [<Spi $num DmaChannelTxImpl>] {
-                #[cfg(feature = "async")]
                 fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
                     static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
                     &WAKER
@@ -370,7 +369,6 @@ macro_rules! ImplSpiChannel {
             impl $crate::private::Sealed for [<Spi $num DmaChannelRxImpl>] {}
 
             impl<'a> RxChannel<[<Spi $num DmaChannel>]> for [<Spi $num DmaChannelRxImpl>] {
-                #[cfg(feature = "async")]
                 fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
                     static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
                     &WAKER
@@ -408,7 +406,6 @@ macro_rules! ImplSpiChannel {
                 ///
                 /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
                 /// transfer buffers of size `1..=4092`, you need 1 descriptor.
-                #[cfg(feature = "async")]
                 pub fn configure_for_async<'a>(
                     self,
                     burst_mode: bool,
@@ -752,7 +749,6 @@ macro_rules! ImplI2sChannel {
             impl $crate::private::Sealed for [<I2s $num DmaChannelTxImpl>] {}
 
             impl<'a> TxChannel<[<I2s $num DmaChannel>]> for [<I2s $num DmaChannelTxImpl>] {
-                #[cfg(feature = "async")]
                 fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
                     static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
                     &WAKER
@@ -765,7 +761,6 @@ macro_rules! ImplI2sChannel {
             impl $crate::private::Sealed for [<I2s $num DmaChannelRxImpl>] {}
 
             impl<'a> RxChannel<[<I2s $num DmaChannel>]> for [<I2s $num DmaChannelRxImpl>] {
-                #[cfg(feature = "async")]
                 fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
                     static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
                     &WAKER
@@ -802,7 +797,6 @@ macro_rules! ImplI2sChannel {
                 ///
                 /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
                 /// transfer buffers of size `1..=4092`, you need 1 descriptor.
-                #[cfg(feature = "async")]
                 pub fn configure_for_async<'a>(
                     self,
                     burst_mode: bool,

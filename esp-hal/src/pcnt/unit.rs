@@ -57,21 +57,30 @@ impl From<u8> for ZeroMode {
     }
 }
 
-// Events
+/// Events that can occur in a pulse counter unit.
 #[derive(Copy, Clone, Debug, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Events {
+    /// Set when the pulse counter reaches the low limit.
     pub low_limit: bool,
+    /// Set when the pulse counter reaches the high limit.
     pub high_limit: bool,
+    /// Set when the pulse counter crosses threshold 0.
     pub threshold0: bool,
+    /// Set when the pulse counter crosses threshold 1.
     pub threshold1: bool,
+    /// Set when the pulse counter reaches zero.
     pub zero: bool,
 }
 
+/// Represents a pulse counter unit.
 #[non_exhaustive]
 pub struct Unit<'d, const NUM: usize> {
+    /// The counter for PCNT unit.
     pub counter: Counter<'d, NUM>,
+    /// The first channel in PCNT unit.
     pub channel0: Channel<'d, NUM, 0>,
+    /// The second channel in PCNT unit.
     pub channel1: Channel<'d, NUM, 1>,
 }
 
@@ -301,6 +310,7 @@ impl<'d, const NUM: usize> Drop for Unit<'d, NUM> {
 // The entire Unit is Send but the individual channels are not.
 unsafe impl<'d, const NUM: usize> Send for Unit<'d, NUM> {}
 
+/// Represents the counter within a pulse counter unit.
 #[derive(Clone)]
 pub struct Counter<'d, const NUM: usize> {
     _phantom: PhantomData<&'d ()>,

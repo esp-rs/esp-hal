@@ -9,19 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+- Removed the `clocks` parameter from `esp_hal_embassy::init`. (#1999)
+
+## 0.3.0 - 2024-08-29
+
+### Added
+
 - This package now re-exports the `esp_hal_procmacros::main` macro (#1828)
 
 ### Changed
 
 - Updated to latest release (`0.6.0`) for `embassy-executor` (#1942)
-- Changed `init` to accept timers of multiple types (#1957)
+- Changed `init` to accept timers of multiple types (#1957, #2012)
 
 ### Fixed
 
 - Fixed a bug where the timeout was huge whenever the timestamp at the time of scheduling was already in the past (#1875)
 - Fixed interrupt executors looping endlessly when `integrated-timers` is used. (#1936)
-
-### Removed
 
 ## 0.2.0 - 2024-07-15
 

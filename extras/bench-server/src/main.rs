@@ -1,7 +1,9 @@
-use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
-use std::thread::spawn;
-use std::time::Duration;
+use std::{
+    io::{Read, Write},
+    net::{TcpListener, TcpStream},
+    thread::spawn,
+    time::Duration,
+};
 
 use log::info;
 
@@ -22,8 +24,12 @@ fn tx_listen() {
 }
 
 fn tx_conn(mut socket: TcpStream) {
-    socket.set_read_timeout(Some(Duration::from_secs(30))).unwrap();
-    socket.set_write_timeout(Some(Duration::from_secs(30))).unwrap();
+    socket
+        .set_read_timeout(Some(Duration::from_secs(30)))
+        .unwrap();
+    socket
+        .set_write_timeout(Some(Duration::from_secs(30)))
+        .unwrap();
 
     let buf = [0; 1024];
     loop {
@@ -44,8 +50,12 @@ fn rx_listen() {
 }
 
 fn rx_conn(mut socket: TcpStream) {
-    socket.set_read_timeout(Some(Duration::from_secs(30))).unwrap();
-    socket.set_write_timeout(Some(Duration::from_secs(30))).unwrap();
+    socket
+        .set_read_timeout(Some(Duration::from_secs(30)))
+        .unwrap();
+    socket
+        .set_write_timeout(Some(Duration::from_secs(30)))
+        .unwrap();
 
     let mut buf = [0; 1024];
     loop {
@@ -66,8 +76,12 @@ fn rxtx_listen() {
 }
 
 fn rxtx_conn(mut socket: TcpStream) {
-    socket.set_read_timeout(Some(Duration::from_secs(30))).unwrap();
-    socket.set_write_timeout(Some(Duration::from_secs(30))).unwrap();
+    socket
+        .set_read_timeout(Some(Duration::from_secs(30)))
+        .unwrap();
+    socket
+        .set_write_timeout(Some(Duration::from_secs(30)))
+        .unwrap();
 
     let mut buf = [0; 1024];
     loop {

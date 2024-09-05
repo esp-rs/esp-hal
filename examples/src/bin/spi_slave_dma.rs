@@ -31,39 +31,33 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::{Gpio4, Gpio5, Gpio8, Gpio9, Input, Io, Level, Output, Pull},
-    peripherals::Peripherals,
+    gpio::{Input, Io, Level, Output, Pull},
     prelude::*,
     spi::{
         slave::{prelude::*, Spi},
         SpiMode,
     },
-    system::SystemControl,
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let slave_sclk = io.pins.gpio0;
+
     let mut master_sclk = Output::new(io.pins.gpio4, Level::Low);
-    let slave_miso = io.pins.gpio1;
     let master_miso = Input::new(io.pins.gpio5, Pull::None);
-    let slave_mosi = io.pins.gpio2;
     let mut master_mosi = Output::new(io.pins.gpio8, Level::Low);
+    let mut master_cs = Output::new(io.pins.gpio9, Level::High);
+
+    let slave_sclk = io.pins.gpio0;
+    let slave_miso = io.pins.gpio1;
+    let slave_mosi = io.pins.gpio2;
     let slave_cs = io.pins.gpio3;
-    let mut master_cs = Output::new(io.pins.gpio9, Level::Low);
-    master_cs.set_high();
-    master_sclk.set_low();
-    master_mosi.set_low();
 
     let dma = Dma::new(peripherals.DMA);
     cfg_if::cfg_if! {
@@ -74,7 +68,7 @@ fn main() -> ! {
         }
     }
 
-    let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(32000);
+    let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
 
     let mut spi = Spi::new(
         peripherals.SPI2,
@@ -90,7 +84,7 @@ fn main() -> ! {
         rx_descriptors,
     );
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     // DMA buffer require a static life-time
     let master_send = &mut [0u8; 32000];
@@ -119,7 +113,7 @@ fn main() -> ! {
         println!("Do `dma_transfer`");
 
         let transfer = spi
-            .dma_transfer(&mut slave_send, &mut slave_receive)
+            .dma_transfer(&mut slave_receive, &mut slave_send)
             .unwrap();
 
         bitbang_master(
@@ -194,10 +188,10 @@ fn main() -> ! {
 fn bitbang_master(
     master_send: &[u8],
     master_receive: &mut [u8],
-    master_cs: &mut Output<Gpio9>,
-    master_mosi: &mut Output<Gpio8>,
-    master_sclk: &mut Output<Gpio4>,
-    master_miso: &Input<Gpio5>,
+    master_cs: &mut Output,
+    master_mosi: &mut Output,
+    master_sclk: &mut Output,
+    master_miso: &Input,
 ) {
     // Bit-bang out the contents of master_send and read into master_receive
     // as quickly as manageable. MSB first. Mode 0, so sampled on the rising

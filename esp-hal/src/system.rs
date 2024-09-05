@@ -1,278 +1,123 @@
 //! # System Control
 //!
 //! ## Overview
-//! This `system` driver provides an interface to control and configure various
-//! system-related features and peripherals on ESP chips. It includes
-//! functionality to control peripheral clocks, manage software interrupts,
-//! configure chip clocks, and control radio peripherals.
 //!
-//! ### Software Interrupts
-//! The `SoftwareInterruptControl` struct gives access to the available software
-//! interrupts.
-//!
-//! The `SoftwareInterrupt` struct allows raising or resetting software
-//! interrupts using the `raise()` and `reset()` methods.
-//!
-//! ### Peripheral Clock Control
-//! The `PeripheralClockControl` struct controls the enablement of peripheral
-//! clocks.
-//!
-//! It provides an `enable()` method to enable and reset specific peripherals.
-//! The available peripherals are represented by the `Peripheral` enum
-//!
-//! ## Examples
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! let peripherals = Peripherals::take();
-//! let system = SystemControl::new(peripherals.SYSTEM);
-//! let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-//! # }
-//! ```
+//! This `system` module defines the available radio peripherals and provides an
+//! interface to control and configure radio clocks.
 
-#![allow(missing_docs)] // TODO: Remove when able
+use crate::peripherals::SYSTEM;
 
-use crate::{
-    interrupt::InterruptHandler,
-    peripheral::PeripheralRef,
-    peripherals::SYSTEM,
-    InterruptConfigurable,
-};
-
-/// Peripherals which can be enabled via `PeripheralClockControl`
+/// Peripherals which can be enabled via `PeripheralClockControl`.
+///
+/// This enum represents various hardware peripherals that can be enabled
+/// by the system's clock control. Depending on the target device, different
+/// peripherals will be available for enabling.
+// FIXME: This enum needs to be public because it's exposed via a bunch of traits, but it's not
+// useful to users.
+#[doc(hidden)]
 pub enum Peripheral {
+    /// SPI2 peripheral.
     #[cfg(spi2)]
     Spi2,
+    /// SPI3 peripheral.
     #[cfg(spi3)]
     Spi3,
+    /// External I2C0 peripheral.
     #[cfg(i2c0)]
     I2cExt0,
+    /// External I2C1 peripheral.
     #[cfg(i2c1)]
     I2cExt1,
+    /// RMT peripheral (Remote Control).
     #[cfg(rmt)]
     Rmt,
+    /// LEDC peripheral (LED PWM Controller).
     #[cfg(ledc)]
     Ledc,
+    /// MCPWM0 peripheral (Motor Control PWM 0).
     #[cfg(mcpwm0)]
     Mcpwm0,
+    /// MCPWM1 peripheral (Motor Control PWM 1).
     #[cfg(mcpwm1)]
     Mcpwm1,
+    /// PCNT peripheral (Pulse Counter).
     #[cfg(pcnt)]
     Pcnt,
+    /// APB SAR ADC peripheral.
     #[cfg(apb_saradc)]
     ApbSarAdc,
+    /// General DMA (GDMA) peripheral.
     #[cfg(gdma)]
     Gdma,
+    /// Peripheral DMA (PDMA) peripheral.
     #[cfg(pdma)]
     Dma,
+    /// I2S0 peripheral (Inter-IC Sound).
     #[cfg(i2s0)]
     I2s0,
+    /// I2S1 peripheral (Inter-IC Sound).
     #[cfg(i2s1)]
     I2s1,
+    /// USB0 peripheral.
     #[cfg(usb0)]
     Usb,
+    /// AES peripheral (Advanced Encryption Standard).
     #[cfg(aes)]
     Aes,
+    /// TWAI0 peripheral.
     #[cfg(twai0)]
     Twai0,
+    /// TWAI1 peripheral.
     #[cfg(twai1)]
     Twai1,
+    /// Timer Group 0 peripheral.
     #[cfg(timg0)]
     Timg0,
+    /// Timer Group 1 peripheral.
     #[cfg(timg1)]
     Timg1,
+    /// Low-power watchdog timer (WDT) peripheral.
     #[cfg(lp_wdt)]
     Wdt,
+    /// SHA peripheral (Secure Hash Algorithm).
     #[cfg(sha)]
     Sha,
+    /// USB Device peripheral.
     #[cfg(usb_device)]
     UsbDevice,
+    /// UART0 peripheral.
     #[cfg(uart0)]
     Uart0,
+    /// UART1 peripheral.
     #[cfg(uart1)]
     Uart1,
+    /// UART2 peripheral.
     #[cfg(uart2)]
     Uart2,
+    /// RSA peripheral (Rivest-Shamir-Adleman encryption).
     #[cfg(rsa)]
     Rsa,
+    /// Parallel IO peripheral.
     #[cfg(parl_io)]
     ParlIo,
+    /// HMAC peripheral (Hash-based Message Authentication Code).
     #[cfg(hmac)]
     Hmac,
+    /// ECC peripheral (Elliptic Curve Cryptography).
     #[cfg(ecc)]
     Ecc,
+    /// SOC ETM peripheral (Event Task Manager).
     #[cfg(soc_etm)]
     Etm,
+    /// TRACE0 peripheral (Debug trace).
     #[cfg(trace0)]
     Trace0,
+    /// LCD Camera peripheral.
     #[cfg(lcd_cam)]
     LcdCam,
-}
-
-/// The `DPORT`/`PCR`/`SYSTEM` peripheral split into its different logical
-/// components.
-pub struct SystemControl<'d> {
-    _inner: PeripheralRef<'d, SYSTEM>,
-    pub clock_control: SystemClockControl,
-    pub software_interrupt_control: SoftwareInterruptControl,
-}
-
-impl<'d> SystemControl<'d> {
-    /// Construct a new instance of [`SystemControl`].
-    pub fn new(system: impl crate::peripheral::Peripheral<P = SYSTEM> + 'd) -> Self {
-        crate::into_ref!(system);
-
-        Self {
-            _inner: system,
-            clock_control: SystemClockControl::new(),
-            software_interrupt_control: SoftwareInterruptControl::new(),
-        }
-    }
-}
-
-/// A software interrupt can be triggered by software.
-#[non_exhaustive]
-pub struct SoftwareInterrupt<const NUM: u8>;
-
-impl<const NUM: u8> SoftwareInterrupt<NUM> {
-    /// Sets the interrupt handler for this software-interrupt
-    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        let interrupt = match NUM {
-            0 => crate::peripherals::Interrupt::FROM_CPU_INTR0,
-            1 => crate::peripherals::Interrupt::FROM_CPU_INTR1,
-            2 => crate::peripherals::Interrupt::FROM_CPU_INTR2,
-            3 => crate::peripherals::Interrupt::FROM_CPU_INTR3,
-            _ => unreachable!(),
-        };
-
-        unsafe {
-            crate::interrupt::bind_interrupt(interrupt, handler.handler());
-            crate::interrupt::enable(interrupt, handler.priority()).unwrap();
-        }
-    }
-
-    /// Trigger this software-interrupt
-    pub fn raise(&self) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let system = unsafe { &*SYSTEM::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let system = unsafe { &*crate::peripherals::INTPRI::PTR };
-
-        match NUM {
-            0 => {
-                system
-                    .cpu_intr_from_cpu_0()
-                    .write(|w| w.cpu_intr_from_cpu_0().set_bit());
-            }
-            1 => {
-                system
-                    .cpu_intr_from_cpu_1()
-                    .write(|w| w.cpu_intr_from_cpu_1().set_bit());
-            }
-            2 => {
-                system
-                    .cpu_intr_from_cpu_2()
-                    .write(|w| w.cpu_intr_from_cpu_2().set_bit());
-            }
-            3 => {
-                system
-                    .cpu_intr_from_cpu_3()
-                    .write(|w| w.cpu_intr_from_cpu_3().set_bit());
-            }
-            _ => unreachable!(),
-        }
-    }
-
-    /// Resets this software-interrupt
-    pub fn reset(&self) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let system = unsafe { &*SYSTEM::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let system = unsafe { &*crate::peripherals::INTPRI::PTR };
-
-        match NUM {
-            0 => {
-                system
-                    .cpu_intr_from_cpu_0()
-                    .write(|w| w.cpu_intr_from_cpu_0().clear_bit());
-            }
-            1 => {
-                system
-                    .cpu_intr_from_cpu_1()
-                    .write(|w| w.cpu_intr_from_cpu_1().clear_bit());
-            }
-            2 => {
-                system
-                    .cpu_intr_from_cpu_2()
-                    .write(|w| w.cpu_intr_from_cpu_2().clear_bit());
-            }
-            3 => {
-                system
-                    .cpu_intr_from_cpu_3()
-                    .write(|w| w.cpu_intr_from_cpu_3().clear_bit());
-            }
-            _ => unreachable!(),
-        }
-    }
-
-    /// Unsafely create an instance of this peripheral out of thin air.
-    ///
-    /// # Safety
-    ///
-    /// You must ensure that you're only using one instance of this type at a
-    /// time.
-    #[inline]
-    pub unsafe fn steal() -> Self {
-        Self
-    }
-}
-
-impl<const NUM: u8> crate::peripheral::Peripheral for SoftwareInterrupt<NUM> {
-    type P = SoftwareInterrupt<NUM>;
-
-    #[inline]
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
-        Self::steal()
-    }
-}
-
-impl<const NUM: u8> crate::private::Sealed for SoftwareInterrupt<NUM> {}
-
-impl<const NUM: u8> InterruptConfigurable for SoftwareInterrupt<NUM> {
-    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-        SoftwareInterrupt::set_interrupt_handler(self, handler);
-    }
-}
-
-/// This gives access to the available software interrupts.
-#[cfg_attr(
-    multi_core,
-    doc = r#"
-Please note: Software interrupt 3 is reserved
-for inter-processor communication when the `embassy`
-feature is enabled."#
-)]
-#[non_exhaustive]
-pub struct SoftwareInterruptControl {
-    pub software_interrupt0: SoftwareInterrupt<0>,
-    pub software_interrupt1: SoftwareInterrupt<1>,
-    pub software_interrupt2: SoftwareInterrupt<2>,
-    #[cfg(not(all(feature = "embassy", multi_core)))]
-    pub software_interrupt3: SoftwareInterrupt<3>,
-}
-
-impl SoftwareInterruptControl {
-    fn new() -> Self {
-        SoftwareInterruptControl {
-            software_interrupt0: SoftwareInterrupt {},
-            software_interrupt1: SoftwareInterrupt {},
-            software_interrupt2: SoftwareInterrupt {},
-            // the thread-executor uses SW-INT3 when used on a multi-core system
-            // we cannot easily require `software_interrupt3` there since it's created
-            // before `main` via proc-macro so we  cfg it away from users
-            #[cfg(not(all(feature = "embassy", multi_core)))]
-            software_interrupt3: SoftwareInterrupt {},
-        }
-    }
+    /// Systimer peripheral.
+    #[cfg(systimer)]
+    Systimer,
 }
 
 /// Controls the enablement of peripheral clocks.
@@ -493,6 +338,11 @@ impl PeripheralClockControl {
                 perip_clk_en1.modify(|_, w| w.lcd_cam_clk_en().set_bit());
                 perip_rst_en1.modify(|_, w| w.lcd_cam_rst().clear_bit());
             }
+            #[cfg(systimer)]
+            Peripheral::Systimer => {
+                perip_clk_en0.modify(|_, w| w.systimer_clk_en().set_bit());
+                perip_rst_en0.modify(|_, w| w.systimer_rst().clear_bit());
+            }
         });
     }
 
@@ -696,6 +546,11 @@ impl PeripheralClockControl {
             Peripheral::LcdCam => {
                 perip_rst_en1.modify(|_, w| w.lcd_cam_rst().set_bit());
                 perip_rst_en1.modify(|_, w| w.lcd_cam_rst().clear_bit());
+            }
+            #[cfg(systimer)]
+            Peripheral::Systimer => {
+                perip_rst_en0.modify(|_, w| w.systimer_rst().set_bit());
+                perip_rst_en0.modify(|_, w| w.systimer_rst().clear_bit());
             }
         });
     }
@@ -915,6 +770,15 @@ impl PeripheralClockControl {
                     .trace_conf()
                     .modify(|_, w| w.trace_rst_en().clear_bit());
             }
+            #[cfg(systimer)]
+            Peripheral::Systimer => {
+                system
+                    .systimer_conf()
+                    .modify(|_, w| w.systimer_clk_en().set_bit());
+                system
+                    .systimer_conf()
+                    .modify(|_, w| w.systimer_rst_en().clear_bit());
+            }
         }
     }
 
@@ -1107,47 +971,32 @@ impl PeripheralClockControl {
                     .trace_conf()
                     .modify(|_, w| w.trace_rst_en().clear_bit());
             }
+            #[cfg(systimer)]
+            Peripheral::Systimer => {
+                system
+                    .systimer_conf()
+                    .modify(|_, w| w.systimer_rst_en().set_bit());
+                system
+                    .systimer_conf()
+                    .modify(|_, w| w.systimer_rst_en().clear_bit());
+            }
         }
     }
 }
 
-/// Controls the configuration of the chip's clocks.
-pub struct SystemClockControl {
-    _private: (),
-}
-
-impl SystemClockControl {
-    pub fn new() -> Self {
-        Self { _private: () }
-    }
-}
-
-impl Default for SystemClockControl {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl crate::peripheral::Peripheral for SystemClockControl {
-    type P = SystemClockControl;
-
-    #[inline]
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
-        SystemClockControl { _private: () }
-    }
-}
-
-impl crate::private::Sealed for SystemClockControl {}
-
 /// Enumeration of the available radio peripherals for this chip.
 #[cfg(any(bt, ieee802154, wifi))]
 pub enum RadioPeripherals {
+    /// Represents the PHY (Physical Layer) peripheral.
     #[cfg(phy)]
     Phy,
+    /// Represents the Bluetooth peripheral.
     #[cfg(bt)]
     Bt,
+    /// Represents the WiFi peripheral.
     #[cfg(wifi)]
     Wifi,
+    /// Represents the IEEE 802.15.4 peripheral.
     #[cfg(ieee802154)]
     Ieee802154,
 }
@@ -1170,5 +1019,6 @@ pub trait RadioClockController {
     /// Initialize BLE RTC clocks
     fn ble_rtc_clk_init(&mut self);
 
+    /// Reset the Resolvable Private Address (RPA).
     fn reset_rpa(&mut self);
 }

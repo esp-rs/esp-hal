@@ -22,14 +22,12 @@ use bleps::{
     Ble,
     HciConnector,
 };
+use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     gpio::{Input, Io, Pull},
-    peripherals::*,
     prelude::*,
     rng::Rng,
-    system::SystemControl,
     timer::timg::TimerGroup,
 };
 use esp_println::println;
@@ -38,33 +36,33 @@ use esp_wifi::{ble::controller::BleConnector, initialize, EspWifiInitFor};
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
+    let peripherals = esp_hal::init({
+        let mut config = esp_hal::Config::default();
+        config.cpu_clock = CpuClock::max();
+        config
+    });
 
-    let peripherals = Peripherals::take();
+    esp_alloc::heap_allocator!(72 * 1024);
 
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::max(system.clock_control).freeze();
-
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
 
     let init = initialize(
         EspWifiInitFor::Ble,
         timg0.timer0,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
-        &clocks,
     )
     .unwrap();
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
-    let button = Input::new(io.pins.gpio0, Pull::Down);
-    #[cfg(any(
-        feature = "esp32c2",
-        feature = "esp32c3",
-        feature = "esp32c6",
-        feature = "esp32h2"
-    ))]
-    let button = Input::new(io.pins.gpio9, Pull::Down);
+
+    cfg_if::cfg_if! {
+        if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
+            let button = Input::new(io.pins.gpio0, Pull::Down);
+        } else {
+            let button = Input::new(io.pins.gpio9, Pull::Down);
+        }
+    }
 
     let mut debounce_cnt = 500;
 

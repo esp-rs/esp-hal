@@ -20,8 +20,6 @@
 //! [unit]: unit/index.html
 //! [PCNT Encoder]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/pcnt_encoder.rs
 
-#![allow(missing_docs)] // TODO: Remove when able
-
 use self::unit::Unit;
 use crate::{
     interrupt::{self, InterruptHandler},
@@ -34,6 +32,7 @@ use crate::{
 pub mod channel;
 pub mod unit;
 
+/// Pulse Counter (PCNT) peripheral driver.
 pub struct Pcnt<'d> {
     _instance: PeripheralRef<'d, peripherals::PCNT>,
 

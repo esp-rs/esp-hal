@@ -15,7 +15,6 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
@@ -28,21 +27,17 @@ use esp_hal::{
         TxFourBits,
         TxPinConfigWithValidPin,
     },
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let (tx_buffer, tx_descriptors, _, _) = dma_buffers!(32000, 0);
+    let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(32000, 0);
 
     let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
@@ -56,7 +51,6 @@ fn main() -> ! {
         dma_channel.configure(false, DmaPriority::Priority0),
         tx_descriptors,
         1.MHz(),
-        &clocks,
     )
     .unwrap();
 
@@ -78,7 +72,7 @@ fn main() -> ! {
         buffer[i] = (i % 255) as u8;
     }
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     loop {
         let transfer = parl_io_tx.write_dma(&buffer).unwrap();

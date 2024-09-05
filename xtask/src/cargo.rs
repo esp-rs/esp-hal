@@ -113,6 +113,14 @@ impl CargoArgsBuilder {
         self
     }
 
+    pub fn add_arg<S>(&mut self, arg: S) -> &mut Self
+    where
+        S: Into<String>,
+    {
+        self.args.push(arg.into());
+        self
+    }
+
     #[must_use]
     pub fn build(self) -> Vec<String> {
         let mut args = vec![];

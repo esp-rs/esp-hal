@@ -1,6 +1,7 @@
 //! # Direct Memory Access (DMA)
 //!
 //! ## Overview
+//!
 //! The DMA driver provides an interface to efficiently transfer data between
 //! different memory regions and peripherals within the ESP microcontroller
 //! without involving the CPU. The DMA controller is responsible for managing
@@ -10,15 +11,16 @@
 //! `ESP32-S2` are using older `PDMA` controller, whenever other chips are using
 //! newer `GDMA` controller.
 //!
-//! ## Examples
-//! ### Initialize and Utilize DMA Controller in `SPI`
+//! ## Example
+//!
+//! ### Initialize and utilize DMA controller in `SPI`
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::gpio::Io;
-//! # use esp_hal::spi::{master::{Spi, prelude::*}, SpiMode};
+//! # use esp_hal::spi::{master::Spi, SpiMode};
 //! # use esp_hal::dma::{Dma, DmaPriority};
-//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
 //! let dma = Dma::new(peripherals.DMA);
 #![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.spi2channel;")]
 #![cfg_attr(not(any(esp32, esp32s2)), doc = "let dma_channel = dma.channel0;")]
@@ -28,29 +30,36 @@
 //! let mosi = io.pins.gpio4;
 //! let cs = io.pins.gpio5;
 //!
-//! let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) =
-//! dma_buffers!(32000);
-//!
-//! let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+//! let mut spi = Spi::new(
+//!     peripherals.SPI2,
+//!     100.kHz(),
+//!     SpiMode::Mode0,
+//! )
 //! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
 //! .with_dma(dma_channel.configure(
 //!     false,
 //!     DmaPriority::Priority0,
-//! ), tx_descriptors, rx_descriptors);
+//! ));
 //! # }
 //! ```
 //! 
 //! ⚠️ Note: Descriptors should be sized as `(max_transfer_size + CHUNK_SIZE - 1) / CHUNK_SIZE`.
 //! I.e., to transfer buffers of size `1..=CHUNK_SIZE`, you need 1 descriptor.
 //!
-//! ⚠️ Note: For chips that support DMA to/from PSRAM (esp32s3) DMA transfers to/from PSRAM
+//! ⚠️ Note: For chips that support DMA to/from PSRAM (ESP32-S3) DMA transfers to/from PSRAM
 //! have extra alignment requirements. The address and size of the buffer pointed to by
 //! each descriptor must be a multiple of the cache line (block) size. This is 32 bytes
-//! on esp32s3.
+//! on ESP32-S3.
 //!
 //! For convenience you can use the [crate::dma_buffers] macro.
 
-use core::{fmt::Debug, marker::PhantomData, ptr::addr_of_mut, sync::atomic::compiler_fence};
+use core::{
+    cmp::min,
+    fmt::Debug,
+    marker::PhantomData,
+    ptr::addr_of_mut,
+    sync::atomic::compiler_fence,
+};
 
 trait Word: crate::private::Sealed {}
 
@@ -162,7 +171,7 @@ pub unsafe trait WriteBuffer {
     ///
     /// Once this method has been called, it is unsafe to call any `&mut self`
     /// methods, except for `write_buffer`, on this object as long as the
-    /// returned value is in use (by DMA).    
+    /// returned value is in use (by DMA).
     unsafe fn write_buffer(&mut self) -> (*mut u8, usize);
 }
 
@@ -275,54 +284,65 @@ use enumset::{EnumSet, EnumSetType};
 pub use self::gdma::*;
 #[cfg(pdma)]
 pub use self::pdma::*;
-use crate::{interrupt::InterruptHandler, Mode};
+use crate::{interrupt::InterruptHandler, soc::is_slice_in_dram, Mode};
 
 #[cfg(gdma)]
 mod gdma;
 #[cfg(pdma)]
 mod pdma;
 
-/// Kinds of interrupt to listen to
+/// Kinds of interrupt to listen to.
 #[derive(EnumSetType)]
 pub enum DmaInterrupt {
-    /// TX is done
-    TxDone,
     /// RX is done
     RxDone,
+    /// TX is done
+    TxDone,
 }
 
-/// The default CHUNK_SIZE used for DMA transfers
+/// The default chunk size used for DMA transfers.
 pub const CHUNK_SIZE: usize = 4092;
 
-/// Convenience macro to create DMA buffers and descriptors
+/// Convenience macro to create DMA buffers and descriptors.
 ///
 /// ## Usage
-/// ```rust,ignore
-/// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX and RX the same size
-/// let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(32000, 32000);
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::dma_buffers;
+///
+/// // RX and TX buffers are 32000 bytes - passing only one parameter makes RX
+/// // and TX the same size.
+/// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
+///     dma_buffers!(32000, 32000);
+/// # }
 /// ```
 #[macro_export]
 macro_rules! dma_buffers {
-    ($tx_size:expr, $rx_size:expr) => {
-        $crate::dma_buffers_chunk_size!($tx_size, $rx_size, $crate::dma::CHUNK_SIZE)
+    ($rx_size:expr, $tx_size:expr) => {
+        $crate::dma_buffers_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE)
     };
     ($size:expr) => {
         $crate::dma_buffers_chunk_size!($size, $crate::dma::CHUNK_SIZE)
     };
 }
 
-/// Convenience macro to create circular DMA buffers and descriptors
+/// Convenience macro to create circular DMA buffers and descriptors.
 ///
 /// ## Usage
-/// ```rust,ignore
-/// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX and RX the same size
-/// let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) =
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::dma_circular_buffers;
+///
+/// // RX and TX buffers are 32000 bytes - passing only one parameter makes RX
+/// // and TX the same size.
+/// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
 ///     dma_circular_buffers!(32000, 32000);
+/// # }
 /// ```
 #[macro_export]
 macro_rules! dma_circular_buffers {
-    ($tx_size:expr, $rx_size:expr) => {
-        $crate::dma_circular_buffers_chunk_size!($tx_size, $rx_size, $crate::dma::CHUNK_SIZE)
+    ($rx_size:expr, $tx_size:expr) => {
+        $crate::dma_circular_buffers_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE)
     };
 
     ($size:expr) => {
@@ -330,17 +350,22 @@ macro_rules! dma_circular_buffers {
     };
 }
 
-/// Convenience macro to create DMA descriptors
+/// Convenience macro to create DMA descriptors.
 ///
 /// ## Usage
-/// ```rust,ignore
-/// // Create TX and RX descriptors for transactions up to 32000 bytes - passing only one parameter assumes TX and RX are the same size
-/// let (tx_descriptors, rx_descriptors) = dma_descriptors!(32000, 32000);
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::dma_descriptors;
+///
+/// // Create RX and TX descriptors for transactions up to 32000 bytes - passing
+/// // only one parameter assumes RX and TX are the same size.
+/// let (rx_descriptors, tx_descriptors) = dma_descriptors!(32000, 32000);
+/// # }
 /// ```
 #[macro_export]
 macro_rules! dma_descriptors {
-    ($tx_size:expr, $rx_size:expr) => {
-        $crate::dma_descriptors_chunk_size!($tx_size, $rx_size, $crate::dma::CHUNK_SIZE)
+    ($rx_size:expr, $tx_size:expr) => {
+        $crate::dma_descriptors_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE)
     };
 
     ($size:expr) => {
@@ -348,17 +373,23 @@ macro_rules! dma_descriptors {
     };
 }
 
-/// Convenience macro to create circular DMA descriptors
+/// Convenience macro to create circular DMA descriptors.
 ///
 /// ## Usage
-/// ```rust,ignore
-/// // Create TX and RX descriptors for transactions up to 32000 bytes - passing only one parameter assumes TX and RX are the same size
-/// let (tx_descriptors, rx_descriptors) = dma_circular_descriptors!(32000, 32000);
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::dma_circular_descriptors;
+///
+/// // Create RX and TX descriptors for transactions up to 32000
+/// // bytes - passing only one parameter assumes RX and TX are the same size.
+/// let (rx_descriptors, tx_descriptors) =
+///     dma_circular_descriptors!(32000, 32000);
+/// # }
 /// ```
 #[macro_export]
 macro_rules! dma_circular_descriptors {
-    ($tx_size:expr, $rx_size:expr) => {
-        $crate::dma_circular_descriptors_chunk_size!($tx_size, $rx_size, $crate::dma::CHUNK_SIZE)
+    ($rx_size:expr, $tx_size:expr) => {
+        $crate::dma_circular_descriptors_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE)
     };
 
     ($size:expr) => {
@@ -367,26 +398,32 @@ macro_rules! dma_circular_descriptors {
 }
 
 /// Convenience macro to create DMA buffers and descriptors with specific chunk
-/// size
+/// size.
 ///
 /// ## Usage
-/// ```rust,ignore
-/// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX and RX the same size
-/// let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(32000, 32000, 4032);
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::dma_buffers_chunk_size;
+///
+/// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX
+/// // and RX the same size.
+/// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
+///     dma_buffers_chunk_size!(32000, 32000, 4032);
+/// # }
 /// ```
 #[macro_export]
 macro_rules! dma_buffers_chunk_size {
-    ($tx_size:expr, $rx_size:expr, $chunk_size:expr) => {{
-        static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
         static mut RX_BUFFER: [u8; $rx_size] = [0u8; $rx_size];
-        let (mut tx_descriptors, mut rx_descriptors) =
-            $crate::dma_descriptors_chunk_size!($tx_size, $rx_size, $chunk_size);
+        static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
+        let (mut rx_descriptors, mut tx_descriptors) =
+            $crate::dma_descriptors_chunk_size!($rx_size, $tx_size, $chunk_size);
         unsafe {
             (
-                &mut TX_BUFFER,
-                tx_descriptors,
                 &mut RX_BUFFER,
                 rx_descriptors,
+                &mut TX_BUFFER,
+                tx_descriptors,
             )
         }
     }};
@@ -397,27 +434,32 @@ macro_rules! dma_buffers_chunk_size {
 }
 
 /// Convenience macro to create circular DMA buffers and descriptors with
-/// specific chunk size
+/// specific chunk size.
 ///
 /// ## Usage
-/// ```rust,ignore
-/// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX and RX the same size
-/// let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) =
-///     dma_circular_buffers!(32000, 32000, 4032);
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::dma_circular_buffers_chunk_size;
+///
+/// // RX and TX buffers are 32000 bytes - passing only one parameter makes RX
+/// // and TX the same size.
+/// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
+///     dma_circular_buffers_chunk_size!(32000, 32000, 4032);
+/// # }
 /// ```
 #[macro_export]
 macro_rules! dma_circular_buffers_chunk_size {
-    ($tx_size:expr, $rx_size:expr, $chunk_size:expr) => {{
-        static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
         static mut RX_BUFFER: [u8; $rx_size] = [0u8; $rx_size];
-        let (mut tx_descriptors, mut rx_descriptors) =
-            $crate::dma_circular_descriptors_chunk_size!($tx_size, $rx_size, $chunk_size);
+        static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
+        let (mut rx_descriptors, mut tx_descriptors) =
+            $crate::dma_circular_descriptors_chunk_size!($rx_size, $tx_size, $chunk_size);
         unsafe {
             (
-                &mut TX_BUFFER,
-                tx_descriptors,
                 &mut RX_BUFFER,
                 rx_descriptors,
+                &mut TX_BUFFER,
+                tx_descriptors,
             )
         }
     }};
@@ -430,24 +472,30 @@ macro_rules! dma_circular_buffers_chunk_size {
 /// Convenience macro to create DMA descriptors with specific chunk size
 ///
 /// ## Usage
-/// ```rust,ignore
-/// // Create TX and RX descriptors for transactions up to 32000 bytes - passing only one parameter assumes TX and RX are the same size
-/// let (tx_descriptors, rx_descriptors) = dma_descriptors_chunk_size!(32000, 32000, 4032);
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::dma_descriptors_chunk_size;
+///
+/// // Create RX and TX descriptors for transactions up to 32000 bytes - passing
+/// // only one parameter assumes RX and TX are the same size.
+/// let (rx_descriptors, tx_descriptors) =
+///     dma_descriptors_chunk_size!(32000, 32000, 4032);
+/// # }
 /// ```
 #[macro_export]
 macro_rules! dma_descriptors_chunk_size {
-    ($tx_size:expr, $rx_size:expr, $chunk_size:expr) => {{
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
         // these will check for size at compile time
-        const _: () = assert!($chunk_size <= 4092, "chunk size must be <= 4092");
-        const _: () = assert!($chunk_size > 0, "chunk size must be > 0");
+        const _: () = ::core::assert!($chunk_size <= 4092, "chunk size must be <= 4092");
+        const _: () = ::core::assert!($chunk_size > 0, "chunk size must be > 0");
 
-        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor;
-            ($tx_size + $chunk_size - 1) / $chunk_size] =
-            [$crate::dma::DmaDescriptor::EMPTY; ($tx_size + $chunk_size - 1) / $chunk_size];
         static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor;
             ($rx_size + $chunk_size - 1) / $chunk_size] =
             [$crate::dma::DmaDescriptor::EMPTY; ($rx_size + $chunk_size - 1) / $chunk_size];
-        unsafe { (&mut TX_DESCRIPTORS, &mut RX_DESCRIPTORS) }
+        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor;
+            ($tx_size + $chunk_size - 1) / $chunk_size] =
+            [$crate::dma::DmaDescriptor::EMPTY; ($tx_size + $chunk_size - 1) / $chunk_size];
+        unsafe { (&mut RX_DESCRIPTORS, &mut TX_DESCRIPTORS) }
     }};
 
     ($size:expr, $chunk_size:expr) => {
@@ -459,22 +507,22 @@ macro_rules! dma_descriptors_chunk_size {
 /// size
 ///
 /// ## Usage
-/// ```rust,ignore
-/// // Create TX and RX descriptors for transactions up to 32000 bytes - passing only one parameter assumes TX and RX are the same size
-/// let (tx_descriptors, rx_descriptors) = dma_circular_descriptors!(32000, 32000, 4032);
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::dma_circular_descriptors_chunk_size;
+///
+/// // Create RX and TX descriptors for transactions up to 32000 bytes - passing
+/// // only one parameter assumes RX and TX are the same size.
+/// let (rx_descriptors, tx_descriptors) =
+///     dma_circular_descriptors_chunk_size!(32000, 32000, 4032);
+/// # }
 /// ```
 #[macro_export]
 macro_rules! dma_circular_descriptors_chunk_size {
-    ($tx_size:expr, $rx_size:expr, $chunk_size:expr) => {{
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
         // these will check for size at compile time
-        const _: () = assert!($chunk_size <= 4092, "chunk size must be <= 4092");
-        const _: () = assert!($chunk_size > 0, "chunk size must be > 0");
-
-        const tx_descriptor_len: usize = if $tx_size > $chunk_size * 2 {
-            ($tx_size + $chunk_size - 1) / $chunk_size
-        } else {
-            3
-        };
+        const _: () = ::core::assert!($chunk_size <= 4092, "chunk size must be <= 4092");
+        const _: () = ::core::assert!($chunk_size > 0, "chunk size must be > 0");
 
         const rx_descriptor_len: usize = if $rx_size > $chunk_size * 2 {
             ($rx_size + $chunk_size - 1) / $chunk_size
@@ -482,11 +530,17 @@ macro_rules! dma_circular_descriptors_chunk_size {
             3
         };
 
-        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; tx_descriptor_len] =
-            [$crate::dma::DmaDescriptor::EMPTY; tx_descriptor_len];
+        const tx_descriptor_len: usize = if $tx_size > $chunk_size * 2 {
+            ($tx_size + $chunk_size - 1) / $chunk_size
+        } else {
+            3
+        };
+
         static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor; rx_descriptor_len] =
             [$crate::dma::DmaDescriptor::EMPTY; rx_descriptor_len];
-        unsafe { (&mut TX_DESCRIPTORS, &mut RX_DESCRIPTORS) }
+        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; tx_descriptor_len] =
+            [$crate::dma::DmaDescriptor::EMPTY; tx_descriptor_len];
+        unsafe { (&mut RX_DESCRIPTORS, &mut TX_DESCRIPTORS) }
     }};
 
     ($size:expr, $chunk_size:expr) => {
@@ -504,8 +558,7 @@ pub enum DmaError {
     OutOfDescriptors,
     /// DescriptorError the DMA rejected the descriptor configuration. This
     /// could be because the source address of the data is not in RAM. Ensure
-    /// your source data is in a valid address space, or try using
-    /// [`crate::FlashSafeDma`] wrapper.
+    /// your source data is in a valid address space.
     DescriptorError,
     /// The available free buffer is less than the amount of data to push
     Overflow,
@@ -521,17 +574,26 @@ pub enum DmaError {
 #[cfg(gdma)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(missing_docs)]
 pub enum DmaPriority {
+    /// The lowest priority level (Priority 0).
     Priority0 = 0,
+    /// Priority level 1.
     Priority1 = 1,
+    /// Priority level 2.
     Priority2 = 2,
+    /// Priority level 3.
     Priority3 = 3,
+    /// Priority level 4.
     Priority4 = 4,
+    /// Priority level 5.
     Priority5 = 5,
+    /// Priority level 6.
     Priority6 = 6,
+    /// Priority level 7.
     Priority7 = 7,
+    /// Priority level 8.
     Priority8 = 8,
+    /// The highest priority level (Priority 9).
     Priority9 = 9,
 }
 
@@ -540,8 +602,8 @@ pub enum DmaPriority {
 #[cfg(pdma)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(missing_docs)]
 pub enum DmaPriority {
+    /// The lowest priority level (Priority 0).
     Priority0 = 0,
 }
 
@@ -858,10 +920,12 @@ impl DescriptorChain {
 
 /// Block size for transfers to/from psram
 #[derive(Copy, Clone, Debug, PartialEq)]
-#[allow(missing_docs)]
 pub enum DmaExtMemBKSize {
+    /// External memory block size of 16 bytes.
     Size16 = 0,
+    /// External memory block size of 32 bytes.
     Size32 = 1,
+    /// External memory block size of 64 bytes.
     Size64 = 2,
 }
 
@@ -1123,6 +1187,12 @@ pub trait RxPrivate: crate::private::Sealed {
         chain: &DescriptorChain,
     ) -> Result<(), DmaError>;
 
+    unsafe fn prepare_transfer(
+        &mut self,
+        peri: DmaPeripheral,
+        first_desc: *mut DmaDescriptor,
+    ) -> Result<(), DmaError>;
+
     fn start_transfer(&mut self) -> Result<(), DmaError>;
 
     #[cfg(esp32s3)]
@@ -1178,7 +1248,6 @@ pub trait RxPrivate: crate::private::Sealed {
 
     fn clear_interrupts(&self);
 
-    #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
 }
 
@@ -1198,14 +1267,14 @@ where
 
     unsafe fn prepare_transfer_without_start(
         &mut self,
-        descriptors: &DescriptorChain,
+        first_desc: *mut DmaDescriptor,
         peri: DmaPeripheral,
     ) -> Result<(), DmaError> {
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
         R::clear_in_interrupts();
         R::reset_in();
-        R::set_in_descriptors(descriptors.first() as u32);
+        R::set_in_descriptors(first_desc as u32);
         R::set_in_peripheral(peri as u8);
 
         Ok(())
@@ -1225,7 +1294,6 @@ where
         R::is_in_done()
     }
 
-    #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
 }
 
@@ -1299,7 +1367,22 @@ where
             }
         }
 
-        self.rx_impl.prepare_transfer_without_start(chain, peri)
+        self.rx_impl
+            .prepare_transfer_without_start(chain.first() as _, peri)
+    }
+
+    unsafe fn prepare_transfer(
+        &mut self,
+        peri: DmaPeripheral,
+        first_desc: *mut DmaDescriptor,
+    ) -> Result<(), DmaError> {
+        // TODO: Figure out burst mode for DmaBuf.
+        if self.burst_mode {
+            return Err(DmaError::InvalidAlignment);
+        }
+
+        self.rx_impl
+            .prepare_transfer_without_start(first_desc, peri)
     }
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
@@ -1408,7 +1491,6 @@ where
         CH::Channel::clear_in_interrupts();
     }
 
-    #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
         CH::Rx::waker()
     }
@@ -1425,6 +1507,12 @@ pub trait TxPrivate: crate::private::Sealed {
         &mut self,
         peri: DmaPeripheral,
         chain: &DescriptorChain,
+    ) -> Result<(), DmaError>;
+
+    unsafe fn prepare_transfer(
+        &mut self,
+        peri: DmaPeripheral,
+        desc: *mut DmaDescriptor,
     ) -> Result<(), DmaError>;
 
     fn start_transfer(&mut self) -> Result<(), DmaError>;
@@ -1460,7 +1548,6 @@ pub trait TxPrivate: crate::private::Sealed {
 
     fn clear_interrupts(&self);
 
-    #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
 
     fn descriptors_handled(&self) -> bool;
@@ -1482,14 +1569,14 @@ where
 
     unsafe fn prepare_transfer_without_start(
         &mut self,
-        descriptors: &DescriptorChain,
+        first_desc: *mut DmaDescriptor,
         peri: DmaPeripheral,
     ) -> Result<(), DmaError> {
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
         R::clear_out_interrupts();
         R::reset_out();
-        R::set_out_descriptors(descriptors.first() as u32);
+        R::set_out_descriptors(first_desc as u32);
         R::set_out_peripheral(peri as u8);
 
         Ok(())
@@ -1541,7 +1628,6 @@ where
         R::last_out_dscr_address()
     }
 
-    #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
 }
 
@@ -1606,7 +1692,16 @@ where
                 crate::soc::cache_writeback_addr(des.buffer as u32, des.size() as u32);
             }
         }
-        self.tx_impl.prepare_transfer_without_start(chain, peri)
+        self.tx_impl
+            .prepare_transfer_without_start(chain.first() as _, peri)
+    }
+
+    unsafe fn prepare_transfer(
+        &mut self,
+        peri: DmaPeripheral,
+        desc: *mut DmaDescriptor,
+    ) -> Result<(), DmaError> {
+        self.tx_impl.prepare_transfer_without_start(desc, peri)
     }
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
@@ -1658,7 +1753,6 @@ where
         CH::Channel::has_out_descriptor_error()
     }
 
-    #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
         CH::Tx::waker()
     }
@@ -1778,10 +1872,10 @@ where
     CH: DmaChannel,
     MODE: Mode,
 {
-    /// TX half of the channel
-    pub tx: ChannelTx<'d, CH>,
     /// RX half of the channel
     pub rx: ChannelRx<'d, CH>,
+    /// TX half of the channel
+    pub tx: ChannelTx<'d, CH>,
     phantom: PhantomData<MODE>,
 }
 
@@ -1789,7 +1883,7 @@ impl<'d, C> Channel<'d, C, crate::Blocking>
 where
     C: DmaChannel,
 {
-    /// Sets the interrupt handler for TX and RX interrupts, enables them
+    /// Sets the interrupt handler for RX and TX interrupts, enables them
     /// with [crate::interrupt::Priority::max()]
     ///
     /// Interrupts are not enabled at the peripheral level here.
@@ -1801,8 +1895,8 @@ where
     pub fn listen(&mut self, interrupts: EnumSet<DmaInterrupt>) {
         for interrupt in interrupts {
             match interrupt {
-                DmaInterrupt::TxDone => self.tx.listen_ch_out_done(),
                 DmaInterrupt::RxDone => self.rx.listen_ch_in_done(),
+                DmaInterrupt::TxDone => self.tx.listen_ch_out_done(),
             }
         }
     }
@@ -1811,8 +1905,8 @@ where
     pub fn unlisten(&mut self, interrupts: EnumSet<DmaInterrupt>) {
         for interrupt in interrupts {
             match interrupt {
-                DmaInterrupt::TxDone => self.tx.unlisten_ch_out_done(),
                 DmaInterrupt::RxDone => self.rx.unlisten_ch_in_done(),
+                DmaInterrupt::TxDone => self.tx.unlisten_ch_out_done(),
             }
         }
     }
@@ -1820,11 +1914,11 @@ where
     /// Gets asserted interrupts
     pub fn interrupts(&mut self) -> EnumSet<DmaInterrupt> {
         let mut res = EnumSet::new();
-        if self.tx.is_done() {
-            res.insert(DmaInterrupt::TxDone);
-        }
         if self.rx.is_done() {
             res.insert(DmaInterrupt::RxDone);
+        }
+        if self.tx.is_done() {
+            res.insert(DmaInterrupt::TxDone);
         }
         res
     }
@@ -1833,10 +1927,523 @@ where
     pub fn clear_interrupts(&mut self, interrupts: EnumSet<DmaInterrupt>) {
         for interrupt in interrupts {
             match interrupt {
-                DmaInterrupt::TxDone => self.tx.clear_ch_out_done(),
                 DmaInterrupt::RxDone => self.rx.clear_ch_in_done(),
+                DmaInterrupt::TxDone => self.tx.clear_ch_out_done(),
             }
         }
+    }
+}
+
+/// Error returned from Dma[Rx|Tx|RxTx]Buf operations.
+#[derive(Debug)]
+pub enum DmaBufError {
+    /// More descriptors are needed for the buffer size
+    InsufficientDescriptors,
+    /// Descriptors or buffers are not located in a supported memory region
+    UnsupportedMemoryRegion,
+}
+
+/// DMA transmit buffer
+///
+/// This is a contiguous buffer linked together by DMA descriptors of length
+/// 4092. It can only be used for transmitting data to a peripheral's FIFO.
+/// See [DmaRxBuf] for receiving data.
+#[derive(Debug)]
+pub struct DmaTxBuf {
+    descriptors: &'static mut [DmaDescriptor],
+    buffer: &'static mut [u8],
+}
+
+impl DmaTxBuf {
+    /// Creates a new [DmaTxBuf] from some descriptors and a buffer.
+    ///
+    /// There must be enough descriptors for the provided buffer.
+    /// Each descriptor can handle 4092 bytes worth of buffer.
+    ///
+    /// Both the descriptors and buffer must be in DMA-capable memory.
+    /// Only DRAM is supported.
+    pub fn new(
+        descriptors: &'static mut [DmaDescriptor],
+        buffer: &'static mut [u8],
+    ) -> Result<Self, DmaBufError> {
+        let min_descriptors = buffer.len().div_ceil(CHUNK_SIZE);
+        if descriptors.len() < min_descriptors {
+            return Err(DmaBufError::InsufficientDescriptors);
+        }
+
+        if !is_slice_in_dram(descriptors) || !is_slice_in_dram(buffer) {
+            return Err(DmaBufError::UnsupportedMemoryRegion);
+        }
+
+        // Setup size and buffer pointer as these will not change for the remainder of
+        // this object's lifetime
+        let chunk_iter = descriptors.iter_mut().zip(buffer.chunks_mut(CHUNK_SIZE));
+        for (desc, chunk) in chunk_iter {
+            desc.set_size(chunk.len());
+            desc.buffer = chunk.as_mut_ptr();
+        }
+
+        let mut buf = Self {
+            descriptors,
+            buffer,
+        };
+        buf.set_length(buf.capacity());
+
+        Ok(buf)
+    }
+
+    /// Consume the buf, returning the descriptors and buffer.
+    pub fn split(self) -> (&'static mut [DmaDescriptor], &'static mut [u8]) {
+        (self.descriptors, self.buffer)
+    }
+
+    /// Returns the size of the underlying buffer
+    pub fn capacity(&self) -> usize {
+        self.buffer.len()
+    }
+
+    /// Return the number of bytes that would be transmitted by this buf.
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        let mut result = 0;
+        for desc in self.descriptors.iter() {
+            result += desc.len();
+            if desc.next.is_null() {
+                break;
+            }
+        }
+        result
+    }
+
+    /// Reset the descriptors to only transmit `len` amount of bytes from this
+    /// buf.
+    ///
+    /// The number of bytes in data must be less than or equal to the buffer
+    /// size.
+    pub fn set_length(&mut self, len: usize) {
+        assert!(len <= self.buffer.len());
+
+        // Get the minimum number of descriptors needed for this length of data.
+        let descriptor_count = len.div_ceil(CHUNK_SIZE).max(1);
+        let required_descriptors = &mut self.descriptors[0..descriptor_count];
+
+        // Link up the relevant descriptors.
+        let mut next = core::ptr::null_mut();
+        for desc in required_descriptors.iter_mut().rev() {
+            desc.next = next;
+            next = desc;
+        }
+
+        let mut remaining_length = len;
+        for desc in required_descriptors.iter_mut() {
+            // As this is a simple dma buffer implementation we won't
+            // be making use of this feature.
+            desc.set_suc_eof(false);
+
+            // This isn't strictly needed for this simple implementation,
+            // but it is useful for debugging.
+            desc.set_owner(Owner::Dma);
+
+            let chunk_size = min(remaining_length, desc.flags.size() as usize);
+            desc.set_length(chunk_size);
+            remaining_length -= chunk_size;
+        }
+        debug_assert_eq!(remaining_length, 0);
+
+        required_descriptors.last_mut().unwrap().set_suc_eof(true);
+    }
+
+    /// Fills the TX buffer with the bytes provided in `data` and reset the
+    /// descriptors to only cover the filled section.
+    ///
+    /// The number of bytes in data must be less than or equal to the buffer
+    /// size.
+    pub fn fill(&mut self, data: &[u8]) {
+        self.set_length(data.len());
+        self.as_mut_slice()[..data.len()].copy_from_slice(data);
+    }
+
+    /// Returns the buf as a mutable slice than can be written.
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
+        &mut self.buffer[..]
+    }
+
+    /// Returns the buf as a slice than can be read.
+    pub fn as_slice(&self) -> &[u8] {
+        self.buffer
+    }
+
+    pub(crate) fn first(&self) -> *mut DmaDescriptor {
+        self.descriptors.as_ptr() as _
+    }
+}
+
+/// DMA receive buffer
+///
+/// This is a contiguous buffer linked together by DMA descriptors of length
+/// 4092. It can only be used for receiving data from a peripheral's FIFO.
+/// See [DmaTxBuf] for transmitting data.
+pub struct DmaRxBuf {
+    descriptors: &'static mut [DmaDescriptor],
+    buffer: &'static mut [u8],
+}
+
+impl DmaRxBuf {
+    /// Creates a new [DmaRxBuf] from some descriptors and a buffer.
+    ///
+    /// There must be enough descriptors for the provided buffer.
+    /// Each descriptor can handle 4092 bytes worth of buffer.
+    ///
+    /// Both the descriptors and buffer must be in DMA-capable memory.
+    /// Only DRAM is supported.
+    pub fn new(
+        descriptors: &'static mut [DmaDescriptor],
+        buffer: &'static mut [u8],
+    ) -> Result<Self, DmaBufError> {
+        let min_descriptors = buffer.len().div_ceil(CHUNK_SIZE);
+        if descriptors.len() < min_descriptors {
+            return Err(DmaBufError::InsufficientDescriptors);
+        }
+
+        if !is_slice_in_dram(descriptors) || !is_slice_in_dram(buffer) {
+            return Err(DmaBufError::UnsupportedMemoryRegion);
+        }
+
+        // Setup size and buffer pointer as these will not change for the remainder of
+        // this object's lifetime
+        let chunk_iter = descriptors.iter_mut().zip(buffer.chunks_mut(CHUNK_SIZE));
+        for (desc, chunk) in chunk_iter {
+            desc.set_size(chunk.len());
+            desc.buffer = chunk.as_mut_ptr();
+        }
+
+        let mut buf = Self {
+            descriptors,
+            buffer,
+        };
+
+        buf.set_length(buf.capacity());
+
+        Ok(buf)
+    }
+
+    /// Consume the buf, returning the descriptors and buffer.
+    pub fn split(self) -> (&'static mut [DmaDescriptor], &'static mut [u8]) {
+        (self.descriptors, self.buffer)
+    }
+
+    /// Returns the size of the underlying buffer
+    pub fn capacity(&self) -> usize {
+        self.buffer.len()
+    }
+
+    /// Returns the maximum number of bytes that this buf has been configured to
+    /// receive.
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        let mut result = 0;
+        for desc in self.descriptors.iter() {
+            result += desc.flags.size() as usize;
+            if desc.next.is_null() {
+                break;
+            }
+        }
+        result
+    }
+
+    /// Reset the descriptors to only receive `len` amount of bytes into this
+    /// buf.
+    ///
+    /// The number of bytes in data must be less than or equal to the buffer
+    /// size.
+    pub fn set_length(&mut self, len: usize) {
+        assert!(len <= self.buffer.len());
+
+        // Get the minimum number of descriptors needed for this length of data.
+        let descriptor_count = len.div_ceil(CHUNK_SIZE).max(1);
+        let required_descriptors = &mut self.descriptors[..descriptor_count];
+
+        // Link up the relevant descriptors.
+        let mut next = core::ptr::null_mut();
+        for desc in required_descriptors.iter_mut().rev() {
+            desc.next = next;
+            next = desc;
+        }
+
+        // Get required part of the buffer.
+        let mut remaining_length = len;
+        for desc in required_descriptors.iter_mut() {
+            // Clear this to allow hardware to set it when the peripheral returns an EOF
+            // bit.
+            desc.set_suc_eof(false);
+
+            // This isn't strictly needed for this simple implementation,
+            // but it is useful for debugging.
+            desc.set_owner(Owner::Dma);
+
+            // Clear this to allow hardware to set it when it's
+            // done receiving data for this descriptor.
+            desc.set_length(0);
+
+            let chunk_size = min(CHUNK_SIZE, remaining_length);
+            desc.set_size(chunk_size);
+            remaining_length -= chunk_size;
+        }
+        debug_assert_eq!(remaining_length, 0);
+    }
+
+    /// Returns the entire underlying buffer as a slice than can be read.
+    pub fn as_slice(&self) -> &[u8] {
+        self.buffer
+    }
+
+    /// Returns the entire underlying buffer as a slice than can be written.
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
+        &mut self.buffer[..]
+    }
+
+    /// Return the number of bytes that was received by this buf.
+    pub fn number_of_received_bytes(&self) -> usize {
+        let mut result = 0;
+        for desc in self.descriptors.iter() {
+            result += desc.len();
+            if desc.next.is_null() {
+                break;
+            }
+        }
+        result
+    }
+
+    /// Reads the received data into the provided `buf`.
+    ///
+    /// If `buf.len()` is less than the amount of received data then only the
+    /// first `buf.len()` bytes of received data is written into `buf`.
+    ///
+    /// Returns the number of bytes in written to `buf`.
+    pub fn read_received_data(&self, buf: &mut [u8]) -> usize {
+        let mut remaining = &mut buf[..];
+
+        let mut buffer_offset = 0;
+        for desc in self.descriptors.iter() {
+            if remaining.is_empty() {
+                break;
+            }
+
+            let amount_to_copy = min(desc.len(), remaining.len());
+
+            let (to_fill, to_remain) = remaining.split_at_mut(amount_to_copy);
+            to_fill.copy_from_slice(&self.buffer[buffer_offset..][..amount_to_copy]);
+            remaining = to_remain;
+
+            if desc.next.is_null() {
+                break;
+            }
+            buffer_offset += desc.flags.size() as usize;
+        }
+
+        let remaining_bytes = remaining.len();
+        buf.len() - remaining_bytes
+    }
+
+    /// Returns the received data as an iterator of slices.
+    pub fn received_data(&self) -> impl Iterator<Item = &[u8]> {
+        let mut descriptors = self.descriptors.iter();
+        #[allow(clippy::redundant_slicing)] // Clippy can't see why this is needed.
+        let mut buf = &self.buffer[..];
+
+        core::iter::from_fn(move || {
+            let mut chunk_size = 0;
+            let mut skip_size = 0;
+            while let Some(desc) = descriptors.next() {
+                chunk_size += desc.len();
+                skip_size += desc.flags.size() as usize;
+
+                // If this is the end of the linked list, we can skip the remaining descriptors.
+                if desc.next.is_null() {
+                    while descriptors.next().is_some() {
+                        // Drain the iterator so the next call to from_fn return
+                        // None.
+                    }
+                    break;
+                }
+
+                // This typically happens when the DMA gets an EOF bit from the peripheral.
+                // It can also happen if the DMA is restarted.
+                if desc.len() < desc.flags.size() as usize {
+                    break;
+                }
+            }
+
+            if chunk_size == 0 {
+                return None;
+            }
+
+            let chunk = &buf[..chunk_size];
+            buf = &buf[skip_size..];
+            Some(chunk)
+        })
+    }
+
+    pub(crate) fn first(&self) -> *mut DmaDescriptor {
+        self.descriptors.as_ptr() as _
+    }
+}
+
+/// DMA transmit and receive buffer.
+///
+/// This is a (single) contiguous buffer linked together by two sets of DMA
+/// descriptors of length 4092 each.
+/// It can be used for simultaneously transmitting to and receiving from a
+/// peripheral's FIFO. These are typically full-duplex transfers.
+pub struct DmaRxTxBuf {
+    rx_descriptors: &'static mut [DmaDescriptor],
+    tx_descriptors: &'static mut [DmaDescriptor],
+    buffer: &'static mut [u8],
+}
+
+impl DmaRxTxBuf {
+    /// Creates a new [DmaRxTxBuf] from some descriptors and a buffer.
+    ///
+    /// There must be enough descriptors for the provided buffer.
+    /// Each descriptor can handle 4092 bytes worth of buffer.
+    ///
+    /// Both the descriptors and buffer must be in DMA-capable memory.
+    /// Only DRAM is supported.
+    pub fn new(
+        rx_descriptors: &'static mut [DmaDescriptor],
+        tx_descriptors: &'static mut [DmaDescriptor],
+        buffer: &'static mut [u8],
+    ) -> Result<Self, DmaBufError> {
+        let min_descriptors = buffer.len().div_ceil(CHUNK_SIZE);
+        if rx_descriptors.len() < min_descriptors {
+            return Err(DmaBufError::InsufficientDescriptors);
+        }
+        if tx_descriptors.len() < min_descriptors {
+            return Err(DmaBufError::InsufficientDescriptors);
+        }
+
+        if !is_slice_in_dram(rx_descriptors)
+            || !is_slice_in_dram(tx_descriptors)
+            || !is_slice_in_dram(buffer)
+        {
+            return Err(DmaBufError::UnsupportedMemoryRegion);
+        }
+
+        // Reset the provided descriptors
+        rx_descriptors.fill(DmaDescriptor::EMPTY);
+        tx_descriptors.fill(DmaDescriptor::EMPTY);
+
+        let descriptors = tx_descriptors.iter_mut().zip(rx_descriptors.iter_mut());
+        let chunks = buffer.chunks_mut(CHUNK_SIZE);
+
+        for ((rx_desc, tx_desc), chunk) in descriptors.zip(chunks) {
+            rx_desc.set_size(chunk.len());
+            rx_desc.buffer = chunk.as_mut_ptr();
+            tx_desc.set_size(chunk.len());
+            tx_desc.buffer = chunk.as_mut_ptr();
+        }
+
+        let mut buf = Self {
+            rx_descriptors,
+            tx_descriptors,
+            buffer,
+        };
+        buf.set_length(buf.capacity());
+
+        Ok(buf)
+    }
+
+    /// Consume the buf, returning the rx descriptors, tx descriptors and
+    /// buffer.
+    pub fn split(
+        self,
+    ) -> (
+        &'static mut [DmaDescriptor],
+        &'static mut [DmaDescriptor],
+        &'static mut [u8],
+    ) {
+        (self.rx_descriptors, self.tx_descriptors, self.buffer)
+    }
+
+    /// Return the size of the underlying buffer.
+    pub fn capacity(&self) -> usize {
+        self.buffer.len()
+    }
+
+    /// Returns the entire buf as a slice than can be read.
+    pub fn as_slice(&self) -> &[u8] {
+        self.buffer
+    }
+
+    /// Returns the entire buf as a slice than can be written.
+    pub fn as_slice_mut(&mut self) -> &mut [u8] {
+        &mut self.buffer[..]
+    }
+
+    /// Reset the descriptors to only transmit/receive `len` amount of bytes
+    /// with this buf.
+    ///
+    /// `len` must be less than or equal to the buffer size.
+    pub fn set_length(&mut self, len: usize) {
+        assert!(len <= self.buffer.len());
+
+        // Get the minimum number of descriptors needed for this length of data.
+        let descriptor_count = len.div_ceil(CHUNK_SIZE).max(1);
+
+        let relevant_rx_descriptors = &mut self.rx_descriptors[..descriptor_count];
+        let relevant_tx_descriptors = &mut self.tx_descriptors[..descriptor_count];
+
+        // Link up the relevant descriptors.
+        for descriptors in [
+            &mut relevant_rx_descriptors[..],
+            &mut relevant_tx_descriptors[..],
+        ] {
+            let mut next = core::ptr::null_mut();
+            for desc in descriptors.iter_mut().rev() {
+                desc.next = next;
+                next = desc;
+            }
+        }
+
+        let mut remaining_length = len;
+        for desc in relevant_tx_descriptors.iter_mut() {
+            // As this is a simple dma buffer implementation we won't
+            // be making use of this feature.
+            desc.set_suc_eof(false);
+
+            // This isn't strictly needed for this simple implementation,
+            // but it is useful for debugging.
+            desc.set_owner(Owner::Dma);
+
+            let chunk_size = min(desc.size(), remaining_length);
+            desc.set_length(chunk_size);
+            remaining_length -= chunk_size;
+        }
+        debug_assert_eq!(remaining_length, 0);
+        relevant_tx_descriptors
+            .last_mut()
+            .unwrap()
+            .set_suc_eof(true);
+
+        let mut remaining_length = len;
+        for desc in relevant_rx_descriptors.iter_mut() {
+            // Clear this to allow hardware to set it when the peripheral returns an EOF
+            // bit.
+            desc.set_suc_eof(false);
+
+            // This isn't strictly needed for this simple implementation,
+            // but it is useful for debugging.
+            desc.set_owner(Owner::Dma);
+
+            // Clear this to allow hardware to set it when it is
+            // done receiving data for this descriptor.
+            desc.set_length(0);
+
+            let chunk_size = min(CHUNK_SIZE, remaining_length);
+            desc.set_size(chunk_size);
+            remaining_length -= chunk_size;
+        }
+        debug_assert_eq!(remaining_length, 0);
     }
 }
 
@@ -1854,7 +2461,7 @@ pub(crate) mod dma_private {
         ///
         /// Please note: This is called in the transfer's `wait` function _and_
         /// by it's [Drop] implementation.
-        fn peripheral_wait_dma(&mut self, is_tx: bool, is_rx: bool);
+        fn peripheral_wait_dma(&mut self, is_rx: bool, is_tx: bool);
 
         /// Only used by circular DMA transfers in both, the `stop` function
         /// _and_ it's [Drop] implementation
@@ -1902,7 +2509,7 @@ where
 
     /// Wait for the transfer to finish.
     pub fn wait(self) -> Result<(), DmaError> {
-        self.instance.peripheral_wait_dma(true, false);
+        self.instance.peripheral_wait_dma(false, true);
 
         if self.instance.tx().has_error() {
             Err(DmaError::DescriptorError)
@@ -1950,7 +2557,7 @@ where
 
     /// Wait for the transfer to finish.
     pub fn wait(self) -> Result<(), DmaError> {
-        self.instance.peripheral_wait_dma(false, true);
+        self.instance.peripheral_wait_dma(true, false);
 
         if self.instance.rx().has_error() {
             Err(DmaError::DescriptorError)
@@ -1970,7 +2577,7 @@ where
     I: dma_private::DmaSupportRx,
 {
     fn drop(&mut self) {
-        self.instance.peripheral_wait_dma(false, true);
+        self.instance.peripheral_wait_dma(true, false);
     }
 }
 
@@ -1981,17 +2588,18 @@ where
 /// Never use [core::mem::forget] on an in-progress transfer
 #[non_exhaustive]
 #[must_use]
-pub struct DmaTransferTxRx<'a, I>
+pub struct DmaTransferRxTx<'a, I>
 where
     I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
 {
     instance: &'a mut I,
 }
 
-impl<'a, I> DmaTransferTxRx<'a, I>
+impl<'a, I> DmaTransferRxTx<'a, I>
 where
     I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
 {
+    #[allow(dead_code)]
     pub(crate) fn new(instance: &'a mut I) -> Self {
         Self { instance }
     }
@@ -2013,241 +2621,9 @@ where
     }
 }
 
-impl<'a, I> Drop for DmaTransferTxRx<'a, I>
+impl<'a, I> Drop for DmaTransferRxTx<'a, I>
 where
     I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
-{
-    fn drop(&mut self) {
-        self.instance.peripheral_wait_dma(true, true);
-    }
-}
-
-/// DMA transaction for TX transfers with moved-in/moved-out peripheral and
-/// buffer
-///
-/// # Safety
-///
-/// Never use [core::mem::forget] on an in-progress transfer
-#[non_exhaustive]
-#[must_use]
-pub struct DmaTransferTxOwned<I, T>
-where
-    I: dma_private::DmaSupportTx,
-    T: ReadBuffer,
-{
-    instance: I,
-    tx_buffer: T,
-}
-
-impl<I, T> DmaTransferTxOwned<I, T>
-where
-    I: dma_private::DmaSupportTx,
-    T: ReadBuffer,
-{
-    pub(crate) fn new(instance: I, tx_buffer: T) -> Self {
-        Self {
-            instance,
-            tx_buffer,
-        }
-    }
-
-    /// Wait for the transfer to finish and return the peripheral and the
-    /// buffer.
-    pub fn wait(mut self) -> Result<(I, T), (DmaError, I, T)> {
-        self.instance.peripheral_wait_dma(true, false);
-
-        let err = self.instance.tx().has_error();
-
-        // We need to have a `Drop` implementation, because we accept
-        // managed buffers that can free their memory on drop. Because of that
-        // we can't move out of the `Transfer`'s fields, so we use `ptr::read`
-        // and `mem::forget`.
-        //
-        // NOTE(unsafe) There is no panic branch between getting the resources
-        // and forgetting `self`.
-
-        let (instance, tx_buffer) = unsafe {
-            let instance = core::ptr::read(&self.instance);
-            let tx_buffer = core::ptr::read(&self.tx_buffer);
-            core::mem::forget(self);
-
-            (instance, tx_buffer)
-        };
-
-        if err {
-            Err((DmaError::DescriptorError, instance, tx_buffer))
-        } else {
-            Ok((instance, tx_buffer))
-        }
-    }
-
-    /// Check if the transfer is finished.
-    pub fn is_done(&mut self) -> bool {
-        self.instance.tx().is_done()
-    }
-}
-
-impl<I, T> Drop for DmaTransferTxOwned<I, T>
-where
-    I: dma_private::DmaSupportTx,
-    T: ReadBuffer,
-{
-    fn drop(&mut self) {
-        self.instance.peripheral_wait_dma(true, false);
-    }
-}
-
-/// DMA transaction for RX transfers with moved-in/moved-out peripheral and
-/// buffer
-///
-/// # Safety
-///
-/// Never use [core::mem::forget] on an in-progress transfer
-#[non_exhaustive]
-#[must_use]
-pub struct DmaTransferRxOwned<I, R>
-where
-    I: dma_private::DmaSupportRx,
-    R: WriteBuffer,
-{
-    instance: I,
-    rx_buffer: R,
-}
-
-impl<I, R> DmaTransferRxOwned<I, R>
-where
-    I: dma_private::DmaSupportRx,
-    R: WriteBuffer,
-{
-    pub(crate) fn new(instance: I, rx_buffer: R) -> Self {
-        Self {
-            instance,
-            rx_buffer,
-        }
-    }
-
-    /// Wait for the transfer to finish and return the peripheral and the
-    /// buffers.
-    pub fn wait(mut self) -> Result<(I, R), (DmaError, I, R)> {
-        self.instance.peripheral_wait_dma(false, true);
-
-        let err = self.instance.rx().has_error();
-
-        // We need to have a `Drop` implementation, because we accept
-        // managed buffers that can free their memory on drop. Because of that
-        // we can't move out of the `Transfer`'s fields, so we use `ptr::read`
-        // and `mem::forget`.
-        //
-        // NOTE(unsafe) There is no panic branch between getting the resources
-        // and forgetting `self`.
-
-        let (instance, rx_buffer) = unsafe {
-            let instance = core::ptr::read(&self.instance);
-            let rx_buffer = core::ptr::read(&self.rx_buffer);
-            core::mem::forget(self);
-
-            (instance, rx_buffer)
-        };
-
-        if err {
-            Err((DmaError::DescriptorError, instance, rx_buffer))
-        } else {
-            Ok((instance, rx_buffer))
-        }
-    }
-
-    /// Check if the transfer is finished.
-    pub fn is_done(&mut self) -> bool {
-        self.instance.rx().is_done()
-    }
-}
-
-impl<I, R> Drop for DmaTransferRxOwned<I, R>
-where
-    I: dma_private::DmaSupportRx,
-    R: WriteBuffer,
-{
-    fn drop(&mut self) {
-        self.instance.peripheral_wait_dma(false, true);
-    }
-}
-
-/// DMA transaction for TX+RX transfers with moved-in/moved-out peripheral and
-/// buffers
-///
-/// # Safety
-///
-/// Never use [core::mem::forget] on an in-progress transfer
-#[non_exhaustive]
-#[must_use]
-pub struct DmaTransferTxRxOwned<I, T, R>
-where
-    I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
-    T: ReadBuffer,
-    R: WriteBuffer,
-{
-    instance: I,
-    tx_buffer: T,
-    rx_buffer: R,
-}
-
-impl<I, T, R> DmaTransferTxRxOwned<I, T, R>
-where
-    I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
-    T: ReadBuffer,
-    R: WriteBuffer,
-{
-    pub(crate) fn new(instance: I, tx_buffer: T, rx_buffer: R) -> Self {
-        Self {
-            instance,
-            tx_buffer,
-            rx_buffer,
-        }
-    }
-
-    /// Wait for the transfer to finish and return the peripheral and the
-    /// buffers.
-    #[allow(clippy::type_complexity)]
-    pub fn wait(mut self) -> Result<(I, T, R), (DmaError, I, T, R)> {
-        self.instance.peripheral_wait_dma(true, true);
-
-        let err = self.instance.tx().has_error() || self.instance.rx().has_error();
-
-        // We need to have a `Drop` implementation, because we accept
-        // managed buffers that can free their memory on drop. Because of that
-        // we can't move out of the `Transfer`'s fields, so we use `ptr::read`
-        // and `mem::forget`.
-        //
-        // NOTE(unsafe) There is no panic branch between getting the resources
-        // and forgetting `self`.
-
-        let (instance, tx_buffer, rx_buffer) = unsafe {
-            let instance = core::ptr::read(&self.instance);
-            let tx_buffer = core::ptr::read(&self.tx_buffer);
-            let rx_buffer = core::ptr::read(&self.rx_buffer);
-            core::mem::forget(self);
-
-            (instance, tx_buffer, rx_buffer)
-        };
-
-        if err {
-            Err((DmaError::DescriptorError, instance, tx_buffer, rx_buffer))
-        } else {
-            Ok((instance, tx_buffer, rx_buffer))
-        }
-    }
-
-    /// Check if the transfer is finished.
-    pub fn is_done(&mut self) -> bool {
-        self.instance.tx().is_done() && self.instance.rx().is_done()
-    }
-}
-
-impl<I, T, R> Drop for DmaTransferTxRxOwned<I, T, R>
-where
-    I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
-    T: ReadBuffer,
-    R: WriteBuffer,
 {
     fn drop(&mut self) {
         self.instance.peripheral_wait_dma(true, true);
@@ -2379,18 +2755,17 @@ where
     }
 }
 
-#[cfg(feature = "async")]
 pub(crate) mod asynch {
     use core::task::Poll;
 
     use super::*;
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct DmaTxFuture<'a, TX>
     where
         TX: Tx,
     {
         pub(crate) tx: &'a mut TX,
-        _a: (),
     }
 
     impl<'a, TX> DmaTxFuture<'a, TX>
@@ -2398,11 +2773,7 @@ pub(crate) mod asynch {
         TX: Tx,
     {
         pub fn new(tx: &'a mut TX) -> Self {
-            Self { tx, _a: () }
-        }
-
-        pub fn tx(&mut self) -> &mut TX {
-            self.tx
+            Self { tx }
         }
     }
 
@@ -2441,12 +2812,12 @@ pub(crate) mod asynch {
         }
     }
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct DmaRxFuture<'a, RX>
     where
         RX: Rx,
     {
         pub(crate) rx: &'a mut RX,
-        _a: (),
     }
 
     impl<'a, RX> DmaRxFuture<'a, RX>
@@ -2454,9 +2825,10 @@ pub(crate) mod asynch {
         RX: Rx,
     {
         pub fn new(rx: &'a mut RX) -> Self {
-            Self { rx, _a: () }
+            Self { rx }
         }
 
+        #[allow(dead_code)] // Dead on the C2
         pub fn rx(&mut self) -> &mut RX {
             self.rx
         }

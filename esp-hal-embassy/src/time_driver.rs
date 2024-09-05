@@ -3,10 +3,9 @@ use core::cell::{Cell, RefCell};
 use critical_section::Mutex;
 use embassy_time_driver::{AlarmHandle, Driver};
 use esp_hal::{
-    clock::Clocks,
     interrupt::{InterruptHandler, Priority},
     prelude::*,
-    time::current_time,
+    time::now,
     timer::{ErasedTimer, OneShotTimer},
 };
 
@@ -45,7 +44,7 @@ embassy_time_driver::time_driver_impl!(static DRIVER: EmbassyTimer = EmbassyTime
 });
 
 impl EmbassyTimer {
-    pub(super) fn init(_clocks: &Clocks, timers: &'static mut [Timer]) {
+    pub(super) fn init(timers: &'static mut [Timer]) {
         if timers.len() > MAX_SUPPORTED_ALARM_COUNT {
             panic!(
                 "Maximum of {} timers can be used.",
@@ -120,7 +119,7 @@ impl EmbassyTimer {
     }
 
     fn arm(timer: &mut Timer, timestamp: u64) {
-        let now = current_time().duration_since_epoch();
+        let now = now().duration_since_epoch();
         let ts = timestamp.micros();
         // if the TS is already in the past make the timer fire immediately
         let timeout = if ts > now { ts - now } else { 0.micros() };
@@ -131,7 +130,7 @@ impl EmbassyTimer {
 
 impl Driver for EmbassyTimer {
     fn now(&self) -> u64 {
-        current_time().ticks()
+        now().ticks()
     }
 
     unsafe fn allocate_alarm(&self) -> Option<AlarmHandle> {

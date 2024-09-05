@@ -67,9 +67,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     config.define_symbols();
 
     #[allow(unused_mut)]
-    let mut config_symbols = config.all();
+    let mut config_symbols = config.all().collect::<Vec<_>>();
     #[cfg(feature = "flip-link")]
-    config_symbols.push("flip-link".to_owned());
+    config_symbols.push("flip-link");
 
     // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
     // files:
@@ -117,12 +117,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         )?;
     }
 
-    // needed for before_snippet! macro
-    let host = env::var_os("HOST").expect("HOST not set");
-    if let Some("windows") = host.to_str().unwrap().split('-').nth(2) {
-        println!("cargo:rustc-cfg=host_os=\"windows\"");
-    }
-
     // With the architecture-specific linker scripts taken care of, we can copy all
     // remaining linker scripts which are common to all devices:
     copy_dir_all(&config_symbols, "ld/sections", &out)?;
@@ -135,7 +129,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 // Helper Functions
 
 fn copy_dir_all(
-    config_symbols: &Vec<String>,
+    config_symbols: &[&str],
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
 ) -> std::io::Result<()> {
@@ -162,7 +156,7 @@ fn copy_dir_all(
 
 /// A naive pre-processor for linker scripts
 fn preprocess_file(
-    config: &[String],
+    config: &[&str],
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
 ) -> std::io::Result<()> {
@@ -176,8 +170,7 @@ fn preprocess_file(
         let line = line?;
         let trimmed = line.trim();
 
-        if let Some(stripped) = trimmed.strip_prefix("#IF ") {
-            let condition = stripped.to_string();
+        if let Some(condition) = trimmed.strip_prefix("#IF ") {
             let should_take = take.iter().all(|v| *v);
             let should_take = should_take && config.contains(&condition);
             take.push(should_take);

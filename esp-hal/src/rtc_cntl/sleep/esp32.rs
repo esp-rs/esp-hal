@@ -7,38 +7,66 @@ use crate::{
 // Approximate mapping of voltages to RTC_CNTL_DBIAS_WAK, RTC_CNTL_DBIAS_SLP,
 // RTC_CNTL_DIG_DBIAS_WAK, RTC_CNTL_DIG_DBIAS_SLP values.
 // Valid if RTC_CNTL_DBG_ATTEN is 0.
+/// RTC digital bias setting corresponding to 0.90V.
 pub const RTC_CNTL_DBIAS_0V90: u8 = 0;
+/// RTC digital bias setting corresponding to 0.95V.
 pub const RTC_CNTL_DBIAS_0V95: u8 = 1;
+/// RTC digital bias setting corresponding to 1.00V.
 pub const RTC_CNTL_DBIAS_1V00: u8 = 2;
+/// RTC digital bias setting corresponding to 1.05V.
 pub const RTC_CNTL_DBIAS_1V05: u8 = 3;
+/// RTC digital bias setting corresponding to 1.10V.
 pub const RTC_CNTL_DBIAS_1V10: u8 = 4;
+/// RTC digital bias setting corresponding to 1.15V.
 pub const RTC_CNTL_DBIAS_1V15: u8 = 5;
+/// RTC digital bias setting corresponding to 1.20V.
 pub const RTC_CNTL_DBIAS_1V20: u8 = 6;
+/// RTC digital bias setting corresponding to 1.25V.
 pub const RTC_CNTL_DBIAS_1V25: u8 = 7;
+
 // Various delays to be programmed into power control state machines
+/// Time (in microseconds) for waiting the XTL buffer to stabilize during sleep.
 pub const RTC_CNTL_XTL_BUF_WAIT_SLP_US: u32 = 1000;
+/// Cycles to wait for PLL buffer stabilization.
 pub const RTC_CNTL_PLL_BUF_WAIT_SLP_CYCLES: u8 = 1;
+/// Cycles to wait for the 8MHz clock to stabilize.
 pub const RTC_CNTL_CK8M_WAIT_SLP_CYCLES: u8 = 4;
+/// Delay in cycles for wakeup signal to be applied.
 pub const RTC_CNTL_WAKEUP_DELAY_CYCLES: u8 = 7;
+/// Power-up cycles for other blocks.
 pub const RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES: u8 = 1;
+/// Wait cycles for other blocks.
 pub const RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES: u16 = 1;
+/// Minimum sleep value (in cycles).
 pub const RTC_CNTL_MIN_SLP_VAL_MIN: u8 = 128;
+/// Default debug attenuation value.
 pub const RTC_CNTL_DBG_ATTEN_DEFAULT: u8 = 3;
 
+/// Power-up cycles for RTC memory.
 pub const RTC_MEM_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
+/// Wait cycles for RTC memory.
 pub const RTC_MEM_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
+/// Power-up cycles for ROM and RAM.
 pub const ROM_RAM_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
+/// Wait cycles for ROM and RAM.
 pub const ROM_RAM_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
+/// Power-up cycles for Wi-Fi.
 pub const WIFI_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
+/// Wait cycles for Wi-Fi.
 pub const WIFI_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
+/// Power-up cycles for RTC components.
 pub const RTC_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
+/// Wait cycles for RTC components.
 pub const RTC_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
+/// Power-up cycles for the digital wrap components.
 pub const DG_WRAP_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
+/// Wait cycles for the digital wrap components.
 pub const DG_WRAP_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 
+/// Default wait cycles for the 8MHz clock.
 pub const RTC_CNTL_CK8M_WAIT_DEFAULT: u8 = 20;
+/// Default wait cycles to enable the 8MHz clock.
 pub const RTC_CK8M_ENABLE_WAIT_DEFAULT: u8 = 5;
-
 impl WakeSource for TimerWakeupSource {
     fn apply(
         &self,
@@ -162,6 +190,7 @@ impl Drop for Ext1WakeupSource<'_, '_> {
 
 bitfield::bitfield! {
     #[derive(Clone, Copy)]
+    /// Configuration for the RTC sleep behavior.
     pub struct RtcSleepConfig(u32);
     impl Debug;
     /// force normal voltage in sleep mode (digital domain memory)
@@ -221,6 +250,7 @@ impl Default for RtcSleepConfig {
 }
 
 impl RtcSleepConfig {
+    /// Configures the RTC for deep sleep mode.
     pub fn deep() -> Self {
         let mut cfg = Self::default();
         cfg.set_deep_slp(true);

@@ -6,13 +6,10 @@
 #![no_main]
 
 use crypto_bigint::{Uint, U1024, U512};
-use defmt_rtt as _;
-use esp_backtrace as _;
 use esp_hal::{
-    peripherals::Peripherals,
     prelude::*,
     rsa::{
-        operand_sizes,
+        operand_sizes::*,
         Rsa,
         RsaModularExponentiation,
         RsaModularMultiplication,
@@ -20,6 +17,8 @@ use esp_hal::{
     },
     Blocking,
 };
+use hil_test as _;
+
 const BIGNUM_1: U512 = Uint::from_be_hex(
     "c7f61058f96db3bd87dbab08ab03b4f7f2f864eac249144adea6a65f97803b719d8ca980b7b3c0389c1c7c6\
     7dc353c5e0ec11f5fc8ce7f6073796cc8f73fa878",
@@ -35,16 +34,6 @@ const BIGNUM_3: U512 = Uint::from_be_hex(
 
 struct Context<'a> {
     rsa: Rsa<'a, Blocking>,
-}
-
-impl Context<'_> {
-    pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let mut rsa = Rsa::new(peripherals.RSA);
-        nb::block!(rsa.ready()).unwrap();
-
-        Context { rsa }
-    }
 }
 
 const fn compute_r(modulus: &U512) -> U512 {
@@ -68,10 +57,15 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        Context::init()
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let mut rsa = Rsa::new(peripherals.RSA);
+        nb::block!(rsa.ready()).unwrap();
+
+        Context { rsa }
     }
 
     #[test]
+    #[timeout(5)]
     fn test_modular_exponentiation(mut ctx: Context<'static>) {
         const EXPECTED_OUTPUT: [u32; U512::LIMBS] = [
             1601059419, 3994655875, 2600857657, 1530060852, 64828275, 4221878473, 2751381085,
@@ -85,20 +79,20 @@ mod tests {
             ctx.rsa.enable_disable_search_acceleration(true);
         }
         let mut outbuf = [0_u32; U512::LIMBS];
-        let mut mod_exp = RsaModularExponentiation::<operand_sizes::Op512, esp_hal::Blocking>::new(
+        let mut mod_exp = RsaModularExponentiation::<Op512, _>::new(
             &mut ctx.rsa,
             BIGNUM_2.as_words(),
             BIGNUM_3.as_words(),
             compute_mprime(&BIGNUM_3),
         );
         let r = compute_r(&BIGNUM_3);
-        let base = &BIGNUM_1.as_words();
-        mod_exp.start_exponentiation(&base, r.as_words());
+        mod_exp.start_exponentiation(BIGNUM_1.as_words(), r.as_words());
         mod_exp.read_results(&mut outbuf);
         assert_eq!(EXPECTED_OUTPUT, outbuf);
     }
 
     #[test]
+    #[timeout(5)]
     fn test_modular_multiplication(mut ctx: Context<'static>) {
         const EXPECTED_OUTPUT: [u32; U512::LIMBS] = [
             1868256644, 833470784, 4187374062, 2684021027, 191862388, 1279046003, 1929899870,
@@ -107,31 +101,21 @@ mod tests {
         ];
 
         let mut outbuf = [0_u32; U512::LIMBS];
-        let mut mod_multi =
-            RsaModularMultiplication::<operand_sizes::Op512, esp_hal::Blocking>::new(
-                &mut ctx.rsa,
-                #[cfg(not(feature = "esp32"))]
-                BIGNUM_1.as_words(),
-                #[cfg(not(feature = "esp32"))]
-                BIGNUM_2.as_words(),
-                BIGNUM_3.as_words(),
-                compute_mprime(&BIGNUM_3),
-            );
         let r = compute_r(&BIGNUM_3);
-        #[cfg(feature = "esp32")]
-        {
-            mod_multi.start_step1(BIGNUM_1.as_words(), r.as_words());
-            mod_multi.start_step2(BIGNUM_2.as_words());
-        }
-        #[cfg(not(feature = "esp32"))]
-        {
-            mod_multi.start_modular_multiplication(r.as_words());
-        }
+        let mut mod_multi = RsaModularMultiplication::<Op512, _>::new(
+            &mut ctx.rsa,
+            BIGNUM_1.as_words(),
+            BIGNUM_3.as_words(),
+            r.as_words(),
+            compute_mprime(&BIGNUM_3),
+        );
+        mod_multi.start_modular_multiplication(BIGNUM_2.as_words());
         mod_multi.read_results(&mut outbuf);
         assert_eq!(EXPECTED_OUTPUT, outbuf);
     }
 
     #[test]
+    #[timeout(5)]
     fn test_multiplication(mut ctx: Context<'static>) {
         const EXPECTED_OUTPUT: [u32; U1024::LIMBS] = [
             1264702968, 3552243420, 2602501218, 498422249, 2431753435, 2307424767, 349202767,
@@ -145,22 +129,10 @@ mod tests {
         let operand_a = BIGNUM_1.as_words();
         let operand_b = BIGNUM_2.as_words();
 
-        #[cfg(feature = "esp32")]
-        {
-            let mut rsamulti =
-                RsaMultiplication::<operand_sizes::Op512, esp_hal::Blocking>::new(&mut ctx.rsa);
-            rsamulti.start_multiplication(operand_a, operand_b);
-            rsamulti.read_results(&mut outbuf);
-        }
-        #[cfg(not(feature = "esp32"))]
-        {
-            let mut rsamulti = RsaMultiplication::<operand_sizes::Op512, esp_hal::Blocking>::new(
-                &mut ctx.rsa,
-                operand_a,
-            );
-            rsamulti.start_multiplication(operand_b);
-            rsamulti.read_results(&mut outbuf);
-        }
+        let mut rsamulti = RsaMultiplication::<Op512, _>::new(&mut ctx.rsa, operand_a);
+        rsamulti.start_multiplication(operand_b);
+        rsamulti.read_results(&mut outbuf);
+
         assert_eq!(EXPECTED_OUTPUT, outbuf)
     }
 }

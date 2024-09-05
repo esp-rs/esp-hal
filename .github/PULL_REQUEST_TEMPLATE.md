@@ -7,6 +7,7 @@ To help us review it efficiently, please ensure you've gone through the followin
 - [ ] I have updated existing examples or added new ones (if applicable).
 - [ ] I have used `cargo xtask fmt-packages` command to ensure that all changed code is formatted correctly.
 - [ ] My changes were added to the [`CHANGELOG.md`](https://github.com/esp-rs/esp-hal/blob/main/esp-hal/CHANGELOG.md) in the **_proper_** section.
+- [ ] I have added necessary changes to user code to the [Migration Guide](https://github.com/esp-rs/esp-hal/blob/main/esp-hal/MIGRATING-0.21.md).
 - [ ] My changes are in accordance to the [esp-rs API guidelines](https://github.com/esp-rs/esp-hal/blob/main/documentation/API-GUIDELINES.md)
 
 #### Extra:

@@ -1,50 +1,52 @@
 //! PCNT tests
 //!
 //! It's assumed GPIO2 is connected to GPIO3
+//! (GPIO9 and GPIO10 for esp32s2 and esp32s3)
+//! (GPIO26 and GPIO27 for esp32)
 
 //% CHIPS: esp32 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
-use esp_backtrace as _;
-use esp_hal::{delay::Delay, gpio::GpioPin, pcnt::Pcnt};
+use esp_hal::{
+    delay::Delay,
+    gpio::{AnyPin, Io, Level, Output, Pull},
+    pcnt::{
+        channel::{EdgeMode, PcntInputConfig, PcntSource},
+        Pcnt,
+    },
+};
+use hil_test as _;
 
 struct Context<'d> {
     pcnt: Pcnt<'d>,
-    gpio2: GpioPin<2>,
-    gpio3: GpioPin<3>,
+    input: AnyPin<'d>,
+    output: AnyPin<'d>,
     delay: Delay,
 }
 
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    use esp_hal::{
-        clock::ClockControl,
-        delay::Delay,
-        gpio::{Io, Level, Output, Pull},
-        pcnt::channel::{EdgeMode, PcntInputConfig, PcntSource},
-        peripherals::Peripherals,
-        system::SystemControl,
-    };
-
     use super::*;
 
     #[init]
     fn init() -> Context<'static> {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
+        let (din, dout) = hil_test::common_test_pins!(io);
+
+        let din = AnyPin::new(din);
+        let dout = AnyPin::new(dout);
+
         Context {
             pcnt: Pcnt::new(peripherals.PCNT),
-            gpio2: io.pins.gpio2,
-            gpio3: io.pins.gpio3,
-            delay: Delay::new(&clocks),
+            input: din,
+            output: dout,
+            delay: Delay::new(),
         }
     }
 
@@ -54,13 +56,13 @@ mod tests {
 
         // Setup channel 0 to increment the count when gpio2 does LOW -> HIGH
         unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.gpio2,
+            ctx.input,
             PcntInputConfig { pull: Pull::Down },
         ));
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let mut output = Output::new(ctx.gpio3, Level::Low);
+        let mut output = Output::new(ctx.output, Level::Low);
 
         unit.resume();
 
@@ -93,13 +95,13 @@ mod tests {
 
         // Setup channel 0 to increment the count when gpio2 does LOW -> HIGH
         unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.gpio2,
+            ctx.input,
             PcntInputConfig { pull: Pull::Up },
         ));
         unit.channel0
             .set_input_mode(EdgeMode::Increment, EdgeMode::Hold);
 
-        let mut output = Output::new(ctx.gpio3, Level::High);
+        let mut output = Output::new(ctx.output, Level::High);
 
         unit.resume();
 
@@ -134,13 +136,13 @@ mod tests {
 
         // Setup channel 0 to increment the count when gpio2 does LOW -> HIGH
         unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.gpio2,
+            ctx.input,
             PcntInputConfig { pull: Pull::Up },
         ));
         unit.channel0
             .set_input_mode(EdgeMode::Increment, EdgeMode::Hold);
 
-        let mut output = Output::new(ctx.gpio3, Level::High);
+        let mut output = Output::new(ctx.output, Level::High);
 
         unit.resume();
 
@@ -197,13 +199,13 @@ mod tests {
 
         // Setup channel 0 to increment the count when gpio2 does LOW -> HIGH
         unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.gpio2,
+            ctx.input,
             PcntInputConfig { pull: Pull::Up },
         ));
         unit.channel0
             .set_input_mode(EdgeMode::Increment, EdgeMode::Hold);
 
-        let mut output = Output::new(ctx.gpio3, Level::High);
+        let mut output = Output::new(ctx.output, Level::High);
 
         unit.resume();
 
@@ -264,13 +266,13 @@ mod tests {
 
         // Setup channel 0 to decrement the count when gpio2 does LOW -> HIGH
         unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.gpio2,
+            ctx.input,
             PcntInputConfig { pull: Pull::Up },
         ));
         unit.channel0
             .set_input_mode(EdgeMode::Decrement, EdgeMode::Hold);
 
-        let mut output = Output::new(ctx.gpio3, Level::High);
+        let mut output = Output::new(ctx.output, Level::High);
 
         unit.resume();
 
@@ -322,13 +324,13 @@ mod tests {
 
         // Setup channel 1 to increment the count when gpio2 does LOW -> HIGH
         unit.channel1.set_edge_signal(PcntSource::from_pin(
-            ctx.gpio2,
+            ctx.input,
             PcntInputConfig { pull: Pull::Up },
         ));
         unit.channel1
             .set_input_mode(EdgeMode::Increment, EdgeMode::Hold);
 
-        let mut output = Output::new(ctx.gpio3, Level::High);
+        let mut output = Output::new(ctx.output, Level::High);
 
         unit.resume();
 

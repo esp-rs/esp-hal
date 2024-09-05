@@ -57,11 +57,11 @@ pub enum Package {
 pub struct Metadata {
     example_path: PathBuf,
     chips: Vec<Chip>,
-    features: Vec<String>,
+    feature_set: Vec<String>,
 }
 
 impl Metadata {
-    pub fn new(example_path: &Path, chips: Vec<Chip>, features: Vec<String>) -> Self {
+    pub fn new(example_path: &Path, chips: Vec<Chip>, feature_set: Vec<String>) -> Self {
         let chips = if chips.is_empty() {
             Chip::iter().collect()
         } else {
@@ -71,7 +71,7 @@ impl Metadata {
         Self {
             example_path: example_path.to_path_buf(),
             chips,
-            features,
+            feature_set,
         }
     }
 
@@ -89,9 +89,9 @@ impl Metadata {
             .replace(".rs", "")
     }
 
-    /// A list of all features required for building a given examples.
-    pub fn features(&self) -> &[String] {
-        &self.features
+    /// A list of all features required for building a given example.
+    pub fn feature_set(&self) -> &[String] {
+        &self.feature_set
     }
 
     /// If the specified chip is in the list of chips, then it is supported.
@@ -114,7 +114,7 @@ pub fn build_documentation(
     package: Package,
     chip: Chip,
     target: &str,
-) -> Result<()> {
+) -> Result<PathBuf> {
     let package_name = package.to_string();
     let package_path = windows_safe_path(&workspace.join(&package_name));
 
@@ -142,11 +142,19 @@ pub fn build_documentation(
     // Execute `cargo doc` from the package root:
     cargo::run(&args, &package_path)?;
 
-    Ok(())
+    let docs_path = windows_safe_path(
+        &workspace
+            .join(package.to_string())
+            .join("target")
+            .join(target)
+            .join("doc"),
+    );
+
+    Ok(docs_path)
 }
 
 /// Load all examples at the given path, and parse their metadata.
-pub fn load_examples(path: &Path) -> Result<Vec<Metadata>> {
+pub fn load_examples(path: &Path, action: CargoAction) -> Result<Vec<Metadata>> {
     let mut examples = Vec::new();
 
     for entry in fs::read_dir(path)? {
@@ -155,7 +163,7 @@ pub fn load_examples(path: &Path) -> Result<Vec<Metadata>> {
             .with_context(|| format!("Could not read {}", path.display()))?;
 
         let mut chips = Vec::new();
-        let mut features = Vec::new();
+        let mut feature_sets = Vec::new();
 
         // We will indicate metadata lines using the `//%` prefix:
         for line in text.lines().filter(|line| line.starts_with("//%")) {
@@ -164,7 +172,7 @@ pub fn load_examples(path: &Path) -> Result<Vec<Metadata>> {
                 .trim()
                 .split_ascii_whitespace()
                 .map(|s| s.to_string())
-                .collect::<VecDeque<_>>();
+                .collect::<Vec<_>>();
 
             if split.len() < 2 {
                 bail!(
@@ -174,7 +182,7 @@ pub fn load_examples(path: &Path) -> Result<Vec<Metadata>> {
             }
 
             // The trailing ':' on metadata keys is optional :)
-            let key = split.pop_front().unwrap();
+            let key = split.swap_remove(0);
             let key = key.trim_end_matches(':');
 
             if key == "CHIPS" {
@@ -183,14 +191,30 @@ pub fn load_examples(path: &Path) -> Result<Vec<Metadata>> {
                     .map(|s| Chip::from_str(s, false).unwrap())
                     .collect::<Vec<_>>();
             } else if key == "FEATURES" {
-                features = split.into();
+                // Sort the features so they are in a deterministic order:
+                split.sort();
+                feature_sets.push(split);
             } else {
                 log::warn!("Unrecognized metadata key '{key}', ignoring");
             }
         }
 
-        examples.push(Metadata::new(&path, chips, features));
+        if feature_sets.is_empty() {
+            feature_sets.push(Vec::new());
+        }
+        if action == CargoAction::Build {
+            // Only build the first feature set for each example.
+            // Rebuilding with a different feature set just wastes time because the latter
+            // one will overwrite the former one(s).
+            feature_sets.truncate(1);
+        }
+        for feature_set in feature_sets {
+            examples.push(Metadata::new(&path, chips.clone(), feature_set));
+        }
     }
+
+    // Sort by feature set, to prevent rebuilding packages if not necessary.
+    examples.sort_by_key(|e| e.feature_set().join(","));
 
     Ok(examples)
 }
@@ -203,18 +227,22 @@ pub fn execute_app(
     app: &Metadata,
     action: CargoAction,
     mut repeat: usize,
+    debug: bool,
 ) -> Result<()> {
     log::info!(
         "Building example '{}' for '{}'",
         app.example_path().display(),
         chip
     );
-    if !app.features().is_empty() {
-        log::info!("  Features: {}", app.features().join(","));
+
+    let mut features = app.feature_set().to_vec();
+    if !features.is_empty() {
+        log::info!("Features: {}", features.join(","));
     }
+    features.push(chip.to_string());
 
     let package = app.example_path().strip_prefix(package_path)?;
-    log::info!("Package: {:?}", package);
+    log::info!("Package: {}", package.display());
     let (bin, subcommand) = if action == CargoAction::Build {
         repeat = 1; // Do not repeat builds in a loop
         let bin = if package.starts_with("src/bin") {
@@ -233,30 +261,33 @@ pub fn execute_app(
         (format!("--example={}", app.name()), "run")
     };
 
-    let mut features = app.features().to_vec();
-    features.push(chip.to_string());
-
     let mut builder = CargoArgsBuilder::default()
         .subcommand(subcommand)
-        .arg("--release")
         .target(target)
         .features(&features)
         .arg(bin);
 
+    if !debug {
+        builder.add_arg("--release");
+    }
+
     if subcommand == "test" && chip == Chip::Esp32c2 {
-        builder = builder.arg("--").arg("--speed").arg("15000");
+        builder.add_arg("--").add_arg("--speed").add_arg("15000");
     }
 
     // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
     if target.starts_with("xtensa") {
         builder = builder.toolchain("esp");
-        builder = builder.arg("-Zbuild-std=core,alloc")
+        builder.add_arg("-Zbuild-std=core,alloc");
     }
 
     let args = builder.build();
     log::debug!("{args:#?}");
 
-    for _ in 0..repeat {
+    for i in 0..repeat {
+        if repeat != 1 {
+            log::info!("Run {}/{}", i + 1, repeat);
+        }
         cargo::run(&args, package_path)?;
     }
 

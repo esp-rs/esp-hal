@@ -1,22 +1,20 @@
 //! RMT Loopback Test
 //!
 //! It's assumed GPIO2 is connected to GPIO3
+//! (GPIO9 and GPIO10 for esp32s2 and esp32s3)
+//! (GPIO26 and GPIO27 for esp32)
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
-use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     gpio::Io,
-    peripherals::Peripherals,
     prelude::*,
     rmt::{PulseCode, Rmt, RxChannel, RxChannelConfig, TxChannel, TxChannelConfig},
-    system::SystemControl,
 };
+use hil_test as _;
 
 #[cfg(test)]
 #[embedded_test::tests]
@@ -29,9 +27,7 @@ mod tests {
     #[test]
     #[timeout(1)]
     fn rmt_loopback() {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -43,7 +39,9 @@ mod tests {
             }
         };
 
-        let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
+        let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
+
+        let (rx, tx) = hil_test::common_test_pins!(io);
 
         let tx_config = TxChannelConfig {
             clk_divider: 255,
@@ -52,7 +50,7 @@ mod tests {
 
         let tx_channel = {
             use esp_hal::rmt::TxChannelCreator;
-            rmt.channel0.configure(io.pins.gpio2, tx_config).unwrap()
+            rmt.channel0.configure(tx, tx_config).unwrap()
         };
 
         let rx_config = RxChannelConfig {
@@ -62,20 +60,25 @@ mod tests {
         };
 
         cfg_if::cfg_if! {
-            if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
+            if #[cfg(feature = "esp32")] {
                 let  rx_channel = {
                     use esp_hal::rmt::RxChannelCreator;
-                    rmt.channel1.configure(io.pins.gpio3, rx_config).unwrap()
+                    rmt.channel1.configure(rx, rx_config).unwrap()
+                };
+            } else if #[cfg(feature = "esp32s2")] {
+                let rx_channel = {
+                    use esp_hal::rmt::RxChannelCreator;
+                    rmt.channel1.configure(rx, rx_config).unwrap()
                 };
             } else if #[cfg(feature = "esp32s3")] {
                 let  rx_channel = {
                     use esp_hal::rmt::RxChannelCreator;
-                    rmt.channel7.configure(io.pins.gpio3, rx_config).unwrap()
+                    rmt.channel7.configure(rx, rx_config).unwrap()
                 };
             } else {
                 let  rx_channel = {
                     use esp_hal::rmt::RxChannelCreator;
-                    rmt.channel2.configure(io.pins.gpio3, rx_config).unwrap()
+                    rmt.channel2.configure(rx, rx_config).unwrap()
                 };
             }
         }
@@ -104,11 +107,12 @@ mod tests {
 
         let rx_transaction = rx_channel.receive(&mut rcv_data).unwrap();
         let tx_transaction = tx_channel.transmit(&tx_data);
-        tx_transaction.wait().unwrap();
-        rx_transaction.wait().unwrap();
 
-        // the last two pulse-codes are the ones which wait for the timeout so they
-        // can't be equal
+        rx_transaction.wait().unwrap();
+        tx_transaction.wait().unwrap();
+
+        // the last two pulse-codes are the ones which wait for the timeout so
+        // they can't be equal
         assert_eq!(&tx_data[..18], &rcv_data[..18]);
     }
 }

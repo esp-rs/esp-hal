@@ -7,18 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Bump MSRV to 1.77.0 (#1971)
+
 ### Added
 
+- Implement `embedded-hal` output pin traits for `DummyPin` (#2019)
+- Added `esp_hal::init` to simplify HAL initialisation (#1970, #1999)
+- Added GpioPin::degrade to create ErasePins easily. Same for AnyPin by accident. (#2075)
+- Added missing functions to `Flex`: `unlisten`, `is_interrupt_set`, `wakeup_enable`, `wait_for_high`, `wait_for_low`, `wait_for_rising_edge`, `wait_for_falling_edge`, `wait_for_any_edge`. (#2075)
+- `Flex` now implements `Wait`. (#2075)
+- Added sleep and wakeup support for esp32c2 (#1922)
+- `Input`, `Output`, `OutputOpenDrain` and `Flex` now implement `Peripheral`. (#2094)
+- Previously unavailable memory is available via `.dram2_uninit` section (#2079)
+
+### Changed
+
+- Make saving and restoring SHA digest state an explicit operation (#2049)
+- Reordered RX-TX pairs in all APIs to be consistent (#2074)
+- Make saving and restoring SHA digest state an explicit operation (#2049)
+- `Delay::new()` is now a `const` function (#1999)
+- You can now create an `AnyPin` out of an `ErasedPin`. (#2072)
+- `Input`, `Output`, `OutputOpenDrain` and `Flex` are now type-erased by default. Use the new `new_typed` constructor to keep using the ZST pin types. (#2075)
+- To avoid confusion with the `Rtc::current_time` wall clock time APIs, we've renamed `esp_hal::time::current_time` to `esp_hal::time::now`. (#2091)
+- Renamed `touch::Continous` to `touch::Continuous`. (#2094)
+- The (previously undocumented) `ErasedPin` enum has been replaced with the `ErasedPin` struct. (#2094)
+
+### Fixed
+
+- SHA driver can now be safely used in multiple contexts concurrently (#2049)
+- Fixed an issue with DMA transfers potentially not waking up the correct async task (#2065)
+- Fixed an issue with LCD_CAM i8080 where it would send double the clocks in 16bit mode (#2085)
+- Fix i2c embedded-hal transaction (#2028)
+
+### Removed
+
+- Removed `digest::Digest` implementation from SHA (#2049)
+- Removed `NoPinType` in favour of `DummyPin`. (#2068)
+- Removed the `async`, `embedded-hal-02`, `embedded-hal`, `embedded-io`, `embedded-io-async`, and `ufmt` features (#2070)
+- Removed the `GpioN` type aliasses. Use `GpioPin<N>` instead. (#2073)
+- Removed `Peripherals::take`. Use `esp_hal::init` to obtain `Peripherals` (#1999)
+- Removed `AnyInputOnlyPin` in favour of `AnyPin`. (#2071)
+- Removed the following functions from `GpioPin`: `is_high`, `is_low`, `set_high`, `set_low`, `set_state`, `is_set_high`, `is_set_low`, `toggle`. (#2094)
+
+## [0.20.1] - 2024-08-30
+
+### Fixed
+
+- A build issue when including doc comment prelude (#2040)
+
+## [0.20.0] - 2024-08-29
+
+### Added
+
+- Introduce DMA buffer objects (#1856, #1985)
 - Added new `Io::new_no_bind_interrupt` constructor (#1861)
 - Added touch pad support for esp32 (#1873, #1956)
 - Allow configuration of period updating method for MCPWM timers (#1898)
 - Add self-testing mode for TWAI peripheral. (#1929)
+- Added a `PeripheralClockControl::reset` to the driver constructors where missing (#1893)
+- Added `digest::Digest` implementation to SHA (#1908)
 - Added `debugger::debugger_connected`. (#1961)
 - Added `Rtc::set_current_time` to allow setting RTC time, and `Rtc::current_time` to getting RTC time while taking into account boot time (#1883)
+- DMA: don't require `Sealed` to implement `ReadBuffer` and `WriteBuffer` (#1921)
+- Allow DMA to/from psram for esp32s3 (#1827)
+- Added missing methods to `SpiDmaBus` (#2016).
+- PARL_IO use ReadBuffer and WriteBuffer for Async DMA (#1996)
 
 ### Changed
 
 - Peripheral driver constructors don't take `InterruptHandler`s anymore. Use `set_interrupt_handler` to explicitly set the interrupt handler now. (#1819)
+- Migrate SPI driver to use DMA buffer objects (#1856, #1985)
 - Use the peripheral ref pattern for `OneShotTimer` and `PeriodicTimer` (#1855)
 - Improve SYSTIMER API (#1870)
 - DMA: don't require `Sealed` to implement `ReadBuffer` and `WriteBuffer` (#1921)
@@ -27,6 +85,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Peripherals (where possible) are now explicitly reset and enabled in their constructors (#1893)
 - Reset peripherals in driver constructors where missing (#1893, #1961)
 - Renamed and merged `Rtc::get_time_us` and `Rtc::get_time_ms` into `Rtc::time_since_boot` (#1883)
+- Improve SYSTIMER API (#1871)
+- SHA driver now use specific structs for the hashing algorithm instead of a parameter. (#1908)
+- Remove `fn free(self)` in HMAC which goes against esp-hal API guidelines (#1972)
+- `AnyPin`, `AnyInputOnyPin` and `DummyPin` are now accessible from `gpio` module (#1918)
+- Changed the RSA modular multiplication API to be consistent across devices (#2002)
 
 ### Fixed
 
@@ -37,12 +100,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SPI: disable and re-enable MISO and MOSI in `start_transfer_dma`, `start_read_bytes_dma` and `start_write_bytes_dma` accordingly (#1894)
 - TWAI: GPIO pins are not configured as input and output (#1906)
 - ESP32C6: Make ADC usable after TRNG deinicialization (#1945)
+- We should no longer generate 1GB .elf files for ESP32C2 and ESP32C3 (#1962)
+- Reset peripherals in driver constructors where missing (#1893, #1961)
+- Fixed ESP32-S2 systimer interrupts (#1979)
+- Software interrupt 3 is no longer available when it is required by `esp-hal-embassy`. (#2011)
+- ESP32: Fixed async RSA (#2002)
 
 ### Removed
 
 - This package no longer re-exports the `esp_hal_procmacros::main` macro (#1828)
 - The `AesFlavour` trait no longer has the `ENCRYPT_MODE`/`DECRYPT_MODE` associated constants (#1849)
 - Removed `Rtc::get_time_raw` (#1883)
+- Removed `FlashSafeDma` (#1856)
+- Remove redundant WithDmaSpi traits (#1975)
+- `IsFullDuplex` and `IsHalfDuplex` traits (#1985)
 
 ## [0.19.0] - 2024-07-15
 
@@ -281,6 +352,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Auto detect crystal frequency based on `RtcClock::estimate_xtal_frequency()` (#1165)
 - ESP32-S3: Configure 32k ICACHE (#1169)
 - Lift the minimal buffer size requirement for I2S (#1189)
+- Replaced `SystemTimer::TICKS_PER_SEC` with `SystemTimer::ticks_per_sec()` (#1981)
 
 ### Removed
 
@@ -675,7 +747,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.20.1...HEAD
+[0.20.1]: https://github.com/esp-rs/esp-hal/compare/v0.20.0...v0.20.1
+[0.20.0]: https://github.com/esp-rs/esp-hal/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/esp-rs/esp-hal/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/esp-rs/esp-hal/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/esp-rs/esp-hal/compare/v0.16.1...v0.17.0

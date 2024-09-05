@@ -29,27 +29,22 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
-    dma::{Dma, DmaPriority},
+    dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::Io,
-    peripherals::Peripherals,
     prelude::*,
     spi::{
-        master::{prelude::*, Address, Command, Spi},
+        master::{Address, Command, Spi},
         SpiDataMode,
         SpiMode,
     },
-    system::SystemControl,
 };
 use esp_println::{print, println};
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     cfg_if::cfg_if! {
@@ -71,14 +66,20 @@ fn main() -> ! {
     }
 
     let dma = Dma::new(peripherals.DMA);
-    #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-    let dma_channel = dma.spi2channel;
-    #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
-    let dma_channel = dma.channel0;
 
-    let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(256, 320);
+    cfg_if::cfg_if! {
+        if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
+            let dma_channel = dma.spi2channel;
+        } else {
+            let dma_channel = dma.channel0;
+        }
+    }
 
-    let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+    let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(256, 320);
+    let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+    let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+
+    let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
         .with_pins(
             Some(sclk),
             Some(mosi),
@@ -87,30 +88,23 @@ fn main() -> ! {
             Some(sio3),
             Some(cs),
         )
-        .with_dma(
-            dma_channel.configure(false, DmaPriority::Priority0),
-            tx_descriptors,
-            rx_descriptors,
-        );
+        .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
-    let delay = Delay::new(&clocks);
-
-    // DMA buffer require a static life-time
-    let (zero_buf, _, _, _) = dma_buffers!(0);
-    let send = tx_buffer;
-    let mut receive = rx_buffer;
+    let delay = Delay::new();
 
     // write enable
+    dma_tx_buf.set_length(0);
     let transfer = spi
         .write(
             SpiDataMode::Single,
             Command::Command8(0x06, SpiDataMode::Single),
             Address::None,
             0,
-            &zero_buf,
+            dma_tx_buf,
         )
+        .map_err(|e| e.0)
         .unwrap();
-    transfer.wait().unwrap();
+    (spi, dma_tx_buf) = transfer.wait();
     delay.delay_millis(250);
 
     // erase sector
@@ -120,10 +114,11 @@ fn main() -> ! {
             Command::Command8(0x20, SpiDataMode::Single),
             Address::Address24(0x000000, SpiDataMode::Single),
             0,
-            &zero_buf,
+            dma_tx_buf,
         )
+        .map_err(|e| e.0)
         .unwrap();
-    transfer.wait().unwrap();
+    (spi, dma_tx_buf) = transfer.wait();
     delay.delay_millis(250);
 
     // write enable
@@ -133,25 +128,28 @@ fn main() -> ! {
             Command::Command8(0x06, SpiDataMode::Single),
             Address::None,
             0,
-            &zero_buf,
+            dma_tx_buf,
         )
+        .map_err(|e| e.0)
         .unwrap();
-    transfer.wait().unwrap();
+    (spi, dma_tx_buf) = transfer.wait();
     delay.delay_millis(250);
 
     // write data / program page
-    send.fill(b'!');
-    send[0..][..5].copy_from_slice(&b"Hello"[..]);
+    dma_tx_buf.set_length(dma_tx_buf.capacity());
+    dma_tx_buf.as_mut_slice().fill(b'!');
+    dma_tx_buf.as_mut_slice()[0..][..5].copy_from_slice(&b"Hello"[..]);
     let transfer = spi
         .write(
             SpiDataMode::Quad,
             Command::Command8(0x32, SpiDataMode::Single),
             Address::Address24(0x000000, SpiDataMode::Single),
             0,
-            &send,
+            dma_tx_buf,
         )
+        .map_err(|e| e.0)
         .unwrap();
-    transfer.wait().unwrap();
+    (spi, _) = transfer.wait();
     delay.delay_millis(250);
 
     loop {
@@ -162,17 +160,18 @@ fn main() -> ! {
                 Command::Command8(0xeb, SpiDataMode::Single),
                 Address::Address32(0x000000 << 8, SpiDataMode::Quad),
                 4,
-                &mut receive,
+                dma_rx_buf,
             )
+            .map_err(|e| e.0)
             .unwrap();
 
         // here we could do something else while DMA transfer is in progress
         // the buffers and spi is moved into the transfer and we can get it back via
         // `wait`
-        transfer.wait().unwrap();
+        (spi, dma_rx_buf) = transfer.wait();
 
-        println!("{:x?}", &receive);
-        for b in &mut receive.iter() {
+        println!("{:x?}", dma_rx_buf.as_slice());
+        for b in &mut dma_rx_buf.as_slice().iter() {
             if *b >= 32 && *b <= 127 {
                 print!("{}", *b as char);
             } else {

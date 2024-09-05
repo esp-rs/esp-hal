@@ -56,6 +56,8 @@ const REGI2C_RTC_WR_CNTL_S: u8 = 24;
 const REGI2C_RTC_DATA_V: u8 = 0xFF;
 const REGI2C_RTC_DATA_S: u8 = 16;
 
+/// Enable true randomness by enabling the entropy source.
+/// Blocks `ADC` usage.
 pub(crate) fn ensure_randomness() {
     let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
     let pmu = unsafe { &*crate::peripherals::PMU::ptr() };
@@ -177,6 +179,7 @@ pub(crate) fn ensure_randomness() {
     }
 }
 
+/// Disable true randomness. Unlocks `ADC` peripheral.
 pub(crate) fn revert_trng() {
     let apb_saradc = unsafe { &*crate::peripherals::APB_SARADC::ptr() };
     let pcr = unsafe { &*crate::peripherals::PCR::ptr() };

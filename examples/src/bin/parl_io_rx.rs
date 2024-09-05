@@ -11,27 +11,22 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::Io,
     parl_io::{no_clk_pin, BitPackOrder, ParlIoRxOnly, RxFourBits},
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let (_, _, rx_buffer, rx_descriptors) = dma_buffers!(0, 32000);
+    let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(0, 32000);
 
     let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
@@ -43,7 +38,6 @@ fn main() -> ! {
         dma_channel.configure(false, DmaPriority::Priority0),
         rx_descriptors,
         1.MHz(),
-        &clocks,
     )
     .unwrap();
 
@@ -55,7 +49,7 @@ fn main() -> ! {
     let mut buffer = rx_buffer;
     buffer.fill(0u8);
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     loop {
         let transfer = parl_io_rx.read_dma(&mut buffer).unwrap();

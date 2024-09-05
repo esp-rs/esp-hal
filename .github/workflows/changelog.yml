@@ -47,6 +47,8 @@ jobs:
               - 'esp-println/**'
             esp-riscv-rt:
               - 'esp-riscv-rt/**'
+            xtensa-lx-rt:
+              - 'xtensa-lx-rt/**'
             esp-storage:
               - 'esp-storage/**'
             esp-wifi:

@@ -36,14 +36,6 @@ PROVIDE(_mp_hook = default_mp_hook);
 PROVIDE(_start_trap = default_start_trap);
 
 /* esp32c3 fixups */
-SECTIONS {
-  .text.dummy (NOLOAD) :
-  {
-    /* This section is intended to make _stext address work */
-    . = ABSOLUTE(_stext);
-  } > ROTEXT
-}
-INSERT BEFORE .text;
 
 SECTIONS {
   .trap : ALIGN(4)
@@ -94,6 +86,7 @@ INCLUDE "rwtext.x"
 INCLUDE "rwdata.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "stack.x"
+INCLUDE "dram2.x"
 /* End of Shared sections */
 
 INCLUDE "debug.x"

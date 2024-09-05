@@ -1,12 +1,14 @@
 //! # Advanced Encryption Standard (AES).
 //!
 //! ## Overview
+//!
 //! The AES accelerator is a hardware device that speeds up computation
 //! using AES algorithm significantly, compared to AES algorithms implemented
 //! solely in software.  The AES accelerator has two working modes, which are
 //! Typical AES and AES-DMA.
 //!
 //! ## Configuration
+//!
 //! The AES peripheral can be configured to encrypt or decrypt data using
 //! different encryption/decryption modes.
 //!
@@ -14,35 +16,42 @@
 //! cipher modes such as ECB, CBC, OFB, CTR, CFB8, and CFB128.
 //!
 //! ## Examples
-//! ### Encrypting and Decrypting a Message
+//!
+//! ### Encrypting and decrypting a message
+//!
 //! Simple example of encrypting and decrypting a message using AES-128:
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::aes::{Aes, Mode};
-//! # let keytext = "SUp4SeCp@sSw0rd".as_bytes();
-//! # let plaintext = "message".as_bytes();
+//! # let keytext = b"SUp4SeCp@sSw0rd";
+//! # let plaintext = b"message";
 //! # let mut keybuf = [0_u8; 16];
 //! # keybuf[..keytext.len()].copy_from_slice(keytext);
-//! let mut block_buf = [0_u8; 16];
-//! block_buf[..plaintext.len()].copy_from_slice(plaintext);
-//! let mut block = block_buf.clone();
+//! #
+//! let mut block = [0_u8; 16];
+//! block[..plaintext.len()].copy_from_slice(plaintext);
 //!
 //! let mut aes = Aes::new(peripherals.AES);
 //! aes.process(&mut block, Mode::Encryption128, keybuf);
-//! let hw_encrypted = block.clone();
+//!
+//! // The encryption happens in-place, so the ciphertext is in `block`
 //!
 //! aes.process(&mut block, Mode::Decryption128, keybuf);
-//! let hw_decrypted = block;
+//!
+//! // The decryption happens in-place, so the plaintext is in `block`
 //! # }
 //! ```
 //! 
 //! ### AES-DMA
+//!
 //! Visit the [AES-DMA] test for a more advanced example of using AES-DMA
 //! mode.
 //!
 //! [AES-DMA]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/aes_dma.rs
 //!
 //! ## Implementation State
+//!
 //! * AES-DMA mode is currently not supported on ESP32 and ESP32S2
 //! * AES-DMA Initialization Vector (IV) is currently not supported
 
@@ -234,7 +243,7 @@ pub mod dma {
             DmaChannel,
             DmaDescriptor,
             DmaPeripheral,
-            DmaTransferTxRx,
+            DmaTransferRxTx,
             ReadBuffer,
             RxPrivate,
             TxPrivate,
@@ -270,8 +279,8 @@ pub mod dma {
         pub aes: super::Aes<'d>,
 
         pub(crate) channel: Channel<'d, C, crate::Blocking>,
-        tx_chain: DescriptorChain,
         rx_chain: DescriptorChain,
+        tx_chain: DescriptorChain,
     }
 
     /// Functionality for using AES with DMA.
@@ -284,8 +293,8 @@ pub mod dma {
         fn with_dma(
             self,
             channel: Channel<'d, C, crate::Blocking>,
-            tx_descriptors: &'static mut [DmaDescriptor],
             rx_descriptors: &'static mut [DmaDescriptor],
+            tx_descriptors: &'static mut [DmaDescriptor],
         ) -> AesDma<'d, C>;
     }
 
@@ -297,16 +306,16 @@ pub mod dma {
         fn with_dma(
             self,
             mut channel: Channel<'d, C, crate::Blocking>,
-            tx_descriptors: &'static mut [DmaDescriptor],
             rx_descriptors: &'static mut [DmaDescriptor],
+            tx_descriptors: &'static mut [DmaDescriptor],
         ) -> AesDma<'d, C> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             AesDma {
                 aes: self,
                 channel,
-                tx_chain: DescriptorChain::new(tx_descriptors),
                 rx_chain: DescriptorChain::new(rx_descriptors),
+                tx_chain: DescriptorChain::new(tx_descriptors),
             }
         }
     }
@@ -326,7 +335,7 @@ pub mod dma {
         C: DmaChannel,
         C::P: AesPeripheral,
     {
-        fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+        fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
             while self.aes.aes.state().read().state().bits() != 2 // DMA status DONE == 2
             && !self.channel.tx.is_done()
             {
@@ -399,7 +408,7 @@ pub mod dma {
 
         /// Perform a DMA transfer.
         ///
-        /// This will return a [DmaTransferTxRx]. The maximum amount of data to
+        /// This will return a [DmaTransferRxTx]. The maximum amount of data to
         /// be sent/received is 32736 bytes.
         pub fn process<'t, K, TXBUF, RXBUF>(
             &'t mut self,
@@ -408,7 +417,7 @@ pub mod dma {
             mode: Mode,
             cipher_mode: CipherMode,
             key: K,
-        ) -> Result<DmaTransferTxRx<'_, Self>, crate::dma::DmaError>
+        ) -> Result<DmaTransferRxTx<'t, Self>, crate::dma::DmaError>
         where
             K: Into<Key>,
             TXBUF: ReadBuffer,
@@ -418,25 +427,25 @@ pub mod dma {
             let (read_ptr, read_len) = unsafe { read_buffer.write_buffer() };
 
             self.start_transfer_dma(
-                write_ptr,
-                write_len,
                 read_ptr,
                 read_len,
+                write_ptr,
+                write_len,
                 mode,
                 cipher_mode,
                 key.into(),
             )?;
 
-            Ok(DmaTransferTxRx::new(self))
+            Ok(DmaTransferRxTx::new(self))
         }
 
         #[allow(clippy::too_many_arguments)]
         fn start_transfer_dma<K>(
             &mut self,
-            write_buffer_ptr: *const u8,
-            write_buffer_len: usize,
             read_buffer_ptr: *mut u8,
             read_buffer_len: usize,
+            write_buffer_ptr: *const u8,
+            write_buffer_len: usize,
             mode: Mode,
             cipher_mode: CipherMode,
             key: K,

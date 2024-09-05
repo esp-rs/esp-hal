@@ -17,6 +17,7 @@
 //! `4MB`, and `8MB`.
 const PSRAM_VADDR: u32 = 0x3f500000;
 
+/// Returns the start address of the PSRAM virtual address space.
 pub fn psram_vaddr_start() -> usize {
     PSRAM_VADDR_START
 }
@@ -33,11 +34,16 @@ cfg_if::cfg_if! {
     }
 }
 
+/// The total size of the PSRAM in bytes, calculated from the PSRAM size
+/// constant.
 pub const PSRAM_BYTES: usize = PSRAM_SIZE as usize * 1024 * 1024;
 
+/// The start address of the PSRAM virtual address space.
 pub const PSRAM_VADDR_START: usize = PSRAM_VADDR as usize;
 
+/// Initialize PSRAM to be used for data.
 #[cfg(any(feature = "psram-2m", feature = "psram-4m", feature = "psram-8m"))]
+#[procmacros::ram]
 pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::peripherals::PSRAM>) {
     #[allow(unused)]
     enum CacheLayout {

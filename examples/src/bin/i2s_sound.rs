@@ -1,7 +1,7 @@
-//! This shows how to transmit data continously via I2S.
+//! This shows how to transmit data continuously via I2S.
 //!
 //! Without an additional I2S sink device you can inspect the MCLK, BCLK, WS
-//!  andDOUT with a logic analyzer.
+//!  and DOUT with a logic analyzer.
 //!
 //! You can also connect e.g. a PCM510x to hear an annoying loud sine tone (full
 //! scale), so turn down the volume before running this example.
@@ -32,14 +32,11 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::Io,
     i2s::{DataFormat, I2s, I2sWriteDma, Standard},
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
 };
 
 const SINE: [i16; 64] = [
@@ -52,9 +49,7 @@ const SINE: [i16; 64] = [
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -64,7 +59,7 @@ fn main() -> ! {
     #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
     let dma_channel = dma.channel0;
 
-    let (tx_buffer, tx_descriptors, _, rx_descriptors) = dma_buffers!(32000, 0);
+    let (_, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000, 0);
 
     let i2s = I2s::new(
         peripherals.I2S0,
@@ -72,9 +67,8 @@ fn main() -> ! {
         DataFormat::Data16Channel16,
         44100.Hz(),
         dma_channel.configure(false, DmaPriority::Priority0),
-        tx_descriptors,
         rx_descriptors,
-        &clocks,
+        tx_descriptors,
     );
 
     let mut i2s_tx = i2s
