@@ -17,8 +17,8 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::{OneShotTimer, PeriodicTimer, timg::TimerGroup};
-//! # use esp_hal::prelude::*;
-//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+//! #
+//! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! let one_shot = OneShotTimer::new(timg0.timer0);
 //!
 //! one_shot.delay_millis(500);
@@ -29,8 +29,8 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::{PeriodicTimer, timg::TimerGroup};
-//! # use esp_hal::prelude::*;
-//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+//! #
+//! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! let mut periodic = PeriodicTimer::new(timg0.timer0);
 //!
 //! periodic.start(1.secs());
@@ -212,7 +212,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<'d, T, UXX> embedded_hal_02::blocking::delay::DelayMs<UXX> for OneShotTimer<'d, T>
 where
     T: Timer,
@@ -223,7 +222,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<'d, T, UXX> embedded_hal_02::blocking::delay::DelayUs<UXX> for OneShotTimer<'d, T>
 where
     T: Timer,
@@ -234,7 +232,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<'d, T> embedded_hal::delay::DelayNs for OneShotTimer<'d, T>
 where
     T: Timer,
@@ -329,7 +326,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<'d, T> embedded_hal_02::timer::CountDown for PeriodicTimer<'d, T>
 where
     T: Timer,
@@ -348,7 +344,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<'d, T> embedded_hal_02::timer::Cancel for PeriodicTimer<'d, T>
 where
     T: Timer,
@@ -360,7 +355,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<'d, T> embedded_hal_02::timer::Periodic for PeriodicTimer<'d, T> where T: Timer {}
 
 /// A type-erased timer

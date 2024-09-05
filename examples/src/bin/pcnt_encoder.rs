@@ -1,6 +1,6 @@
 //! PCNT Encoder Demo
 //!
-//! This example decodes a quadrature encoder
+//! This example decodes a quadrature encoder.
 //!
 //! Since the PCNT units reset to zero when they reach their limits
 //! we enable an interrupt on the upper and lower limits and
@@ -27,7 +27,6 @@ use esp_hal::{
         unit,
         Pcnt,
     },
-    peripherals::Peripherals,
     prelude::*,
 };
 use esp_println::println;
@@ -38,7 +37,7 @@ static VALUE: AtomicI32 = AtomicI32::new(0);
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

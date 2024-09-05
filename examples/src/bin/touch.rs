@@ -16,21 +16,17 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
-    gpio,
-    gpio::Io,
+    gpio::{GpioPin, Io},
     macros::ram,
-    peripherals::Peripherals,
     prelude::*,
     rtc_cntl::Rtc,
-    system::SystemControl,
     touch::{Continous, Touch, TouchConfig, TouchPad},
     Blocking,
 };
 use esp_println::println;
 
-static TOUCH1: Mutex<RefCell<Option<TouchPad<gpio::Gpio4, Continous, Blocking>>>> =
+static TOUCH1: Mutex<RefCell<Option<TouchPad<GpioPin<4>, Continous, Blocking>>>> =
     Mutex::new(RefCell::new(None));
 
 #[handler]
@@ -51,9 +47,7 @@ fn interrupt_handler() {
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -72,7 +66,7 @@ fn main() -> ! {
     let mut touch0 = TouchPad::new(touch_pin0, &touch);
     let mut touch1 = TouchPad::new(touch_pin1, &touch);
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let touch1_baseline = touch1.read();
 

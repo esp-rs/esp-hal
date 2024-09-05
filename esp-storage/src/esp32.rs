@@ -1,14 +1,5 @@
 use crate::maybe_with_critical_section;
 
-const ESP_ROM_SPIFLASH_READ: u32 = 0x40062ed8;
-const ESP_ROM_SPIFLASH_ERASE_SECTOR: u32 = 0x40062ccc;
-const SPI_READ_STATUS_HIGH: u32 = 0x40062448;
-const SPI_READ_STATUS: u32 = 0x4006226c;
-const SPI_WRITE_STATUS: u32 = 0x400622f0;
-
-const CACHE_FLUSH_ROM: u32 = 0x40009a14;
-const CACHE_READ_ENABLE_ROM: u32 = 0x40009a84;
-
 const SPI_BASE_REG: u32 = 0x3ff42000; // SPI peripheral 1, used for SPI flash
 const SPI0_BASE_REG: u32 = 0x3ff43000; // SPI peripheral 0, inner state machine
 const SPI_EXT2_REG: u32 = SPI_BASE_REG + 0xF8;
@@ -34,23 +25,17 @@ const SPI_WRSR_2B: u32 = 1 << 22;
 const FLASH_CHIP_ADDR: u32 = 0x3ffae270;
 const FLASH_DUMMY_LEN_PLUS_ADDR: u32 = 0x3ffae290;
 
-#[inline(always)]
-#[link_section = ".rwtext"]
-pub(crate) fn cache_flush_rom(cpu_num: u32) {
-    unsafe {
-        let cache_flush_rom: unsafe extern "C" fn(u32) = core::mem::transmute(CACHE_FLUSH_ROM);
-        cache_flush_rom(cpu_num)
-    }
-}
-
-#[inline(always)]
-#[link_section = ".rwtext"]
-pub(crate) fn cache_read_enable_rom(cpu_num: u32) {
-    unsafe {
-        let cache_read_enable_rom: unsafe extern "C" fn(u32) =
-            core::mem::transmute(CACHE_READ_ENABLE_ROM);
-        cache_read_enable_rom(cpu_num)
-    }
+crate::rom_fn! {
+    fn esp_rom_cache_flush(cpu_num: u32) = 0x40009a14;
+    fn esp_rom_cache_read_enable(cpu_num: u32) = 0x40009a84;
+    fn esp_rom_spiflash_read(src_addr: u32, data: *const u32, len: u32) -> i32 = 0x40062ed8;
+    fn esp_rom_spiflash_erase_sector(sector_number: u32) -> i32 = 0x40062ccc;
+    fn esp_rom_spi_read_status_high(
+        flash_chip: *const EspRomSpiflashChipT,
+        status: *mut u32
+    ) -> i32 = 0x40062448;
+    fn esp_rom_spi_read_status(flash_chip: *const EspRomSpiflashChipT, status: *mut u32) -> i32 = 0x4006226c;
+    fn esp_rom_spi_write_status(flash_chip: *const EspRomSpiflashChipT, status_value: u32) -> i32 = 0x400622f0;
 }
 
 #[inline(always)]
@@ -59,33 +44,19 @@ pub(crate) fn spi_read_status_high(
     flash_chip: *const EspRomSpiflashChipT,
     status: &mut u32,
 ) -> i32 {
-    unsafe {
-        let spi_read_status_high: unsafe extern "C" fn(
-            *const EspRomSpiflashChipT,
-            *mut u32,
-        ) -> i32 = core::mem::transmute(SPI_READ_STATUS_HIGH);
-        spi_read_status_high(flash_chip, status as *mut u32)
-    }
+    esp_rom_spi_read_status_high(flash_chip, status as *mut u32)
 }
 
 #[inline(always)]
 #[link_section = ".rwtext"]
 pub(crate) fn spi_read_status(flash_chip: *const EspRomSpiflashChipT, status: &mut u32) -> i32 {
-    unsafe {
-        let spi_read_status: unsafe extern "C" fn(*const EspRomSpiflashChipT, *mut u32) -> i32 =
-            core::mem::transmute(SPI_READ_STATUS);
-        spi_read_status(flash_chip, status as *mut u32)
-    }
+    esp_rom_spi_read_status(flash_chip, status as *mut u32)
 }
 
 #[inline(always)]
 #[link_section = ".rwtext"]
 pub(crate) fn spi_write_status(flash_chip: *const EspRomSpiflashChipT, status_value: u32) -> i32 {
-    unsafe {
-        let spi_write_status: unsafe extern "C" fn(*const EspRomSpiflashChipT, u32) -> i32 =
-            core::mem::transmute(SPI_WRITE_STATUS);
-        spi_write_status(flash_chip, status_value)
-    }
+    esp_rom_spi_write_status(flash_chip, status_value)
 }
 
 #[inline(always)]
@@ -98,10 +69,10 @@ fn begin() {
 #[inline(always)]
 #[link_section = ".rwtext"]
 fn end() {
-    cache_flush_rom(0);
-    cache_flush_rom(1);
-    cache_read_enable_rom(0);
-    cache_read_enable_rom(1);
+    esp_rom_cache_flush(0);
+    esp_rom_cache_flush(1);
+    esp_rom_cache_read_enable(0);
+    esp_rom_cache_read_enable(1);
 }
 
 #[derive(Debug)]
@@ -117,26 +88,18 @@ pub struct EspRomSpiflashChipT {
 
 #[inline(never)]
 #[link_section = ".rwtext"]
-pub(crate) fn esp_rom_spiflash_read(src_addr: u32, data: *const u32, len: u32) -> i32 {
+pub(crate) fn spiflash_read(src_addr: u32, data: *const u32, len: u32) -> i32 {
     maybe_with_critical_section(|| {
         spiflash_wait_for_ready();
-        unsafe {
-            let esp_rom_spiflash_read: unsafe extern "C" fn(u32, *const u32, u32) -> i32 =
-                core::mem::transmute(ESP_ROM_SPIFLASH_READ);
-            esp_rom_spiflash_read(src_addr, data, len)
-        }
+        esp_rom_spiflash_read(src_addr, data, len)
     })
 }
 
 #[inline(never)]
 #[link_section = ".rwtext"]
-pub(crate) fn esp_rom_spiflash_erase_sector(sector_number: u32) -> i32 {
+pub(crate) fn spiflash_erase_sector(sector_number: u32) -> i32 {
     maybe_with_critical_section(|| {
-        let res = unsafe {
-            let esp_rom_spiflash_erase_sector: unsafe extern "C" fn(u32) -> i32 =
-                core::mem::transmute(ESP_ROM_SPIFLASH_ERASE_SECTOR);
-            esp_rom_spiflash_erase_sector(sector_number)
-        };
+        let res = esp_rom_spiflash_erase_sector(sector_number);
         spiflash_wait_for_ready();
         res
     })
@@ -154,7 +117,7 @@ fn spi_write_enable() {
 
 #[inline(never)]
 #[link_section = ".rwtext"]
-pub(crate) fn esp_rom_spiflash_write(dest_addr: u32, data: *const u32, len: u32) -> i32 {
+pub(crate) fn spiflash_write(dest_addr: u32, data: *const u32, len: u32) -> i32 {
     maybe_with_critical_section(|| {
         begin();
 
@@ -250,7 +213,7 @@ fn spiflash_wait_for_ready() {
 
 #[inline(never)]
 #[link_section = ".rwtext"]
-pub(crate) fn esp_rom_spiflash_unlock() -> i32 {
+pub(crate) fn spiflash_unlock() -> i32 {
     let flashchip = FLASH_CHIP_ADDR as *const EspRomSpiflashChipT;
     if unsafe { (*flashchip).device_id } >> 16 & 0xff == 0x9D {
         panic!("ISSI flash is not supported");

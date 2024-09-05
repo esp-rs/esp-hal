@@ -34,11 +34,12 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{RTC_CNTL, SENS, TOUCH},
     private::{Internal, Sealed},
+    rtc_cntl::Rtc,
+    Async,
     Blocking,
+    InterruptConfigurable,
     Mode,
 };
-#[cfg(feature = "async")]
-use crate::{rtc_cntl::Rtc, Async, InterruptConfigurable};
 
 /// A marker trait describing the mode the touch pad is set to.
 pub trait TouchMode: Sealed {}
@@ -271,7 +272,6 @@ impl<'d> Touch<'d, Continous, Blocking> {
         }
     }
 }
-#[cfg(feature = "async")]
 impl<'d> Touch<'d, Continous, Async> {
     /// Initializes the touch peripheral in continous async mode and returns
     /// this marker struct.
@@ -294,6 +294,7 @@ impl<'d> Touch<'d, Continous, Async> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
+    /// # use esp_hal::rtc_cntl::Rtc;
     /// # use esp_hal::touch::{Touch, TouchConfig};
     /// let mut rtc = Rtc::new(peripherals.LPWR);
     /// let touch = Touch::async_mode(peripherals.TOUCH, &mut rtc, None);
@@ -493,7 +494,6 @@ fn internal_disable_interrupt(touch_nr: u8) {
     }
 }
 
-#[cfg(feature = "async")]
 fn internal_disable_interrupts() {
     let sens = unsafe { &*SENS::ptr() };
     sens.sar_touch_enable()
@@ -523,7 +523,6 @@ fn internal_is_interrupt_set(touch_nr: u8) -> bool {
     internal_pins_touched() & (1 << touch_nr) != 0
 }
 
-#[cfg(feature = "async")]
 mod asynch {
     use core::{
         sync::atomic::{AtomicU16, Ordering},

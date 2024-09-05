@@ -1,18 +1,18 @@
 //! SPI Full Duplex DMA Test
 //!
-//! Folowing pins are used:
+//! Following pins are used:
 //! SCLK    GPIO0
-//! MOSI    GPIO3
-//! MISO    GPIO6
+//! MOSI    GPIO3 / GPIO10 (esp32s3)
+//! MISO    GPIO4
 //! CS      GPIO8
 //!
-//! PCNT    GPIO2
+//! PCNT    GPIO2 / GPIO9 (esp32s3)
 //! OUTPUT  GPIO5 (helper to keep MISO LOW)
 //!
 //! The idea of using PCNT (input) here is to connect MOSI to it and count the
 //! edges of whatever SPI writes (in this test case 3 pos edges).
 //!
-//! Connect PCNT (GPIO2) and MOSI (GPIO3) and MISO (GPIO6) and GPIO5 pins.
+//! Connect PCNT and MOSI, MISO and GPIO5 pins.
 
 //% CHIPS: esp32 esp32c6 esp32h2 esp32s3
 //% FEATURES: generic-queue
@@ -22,23 +22,21 @@
 
 use embedded_hal_async::spi::SpiBus;
 use esp_hal::{
-    clock::ClockControl,
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{GpioPin, Io, Level, Output, Pull},
+    gpio::{AnyPin, GpioPin, Io, Level, Output, Pull},
     pcnt::{
         channel::{EdgeMode, PcntInputConfig, PcntSource},
         unit::Unit,
         Pcnt,
     },
-    peripherals::{Peripherals, SPI2},
+    peripherals::SPI2,
     prelude::*,
     spi::{
         master::{Spi, SpiDmaBus},
         FullDuplexMode,
         SpiMode,
     },
-    system::SystemControl,
     Async,
 };
 use hil_test as _;
@@ -60,7 +58,7 @@ struct Context {
     spi: SpiDmaBus<'static, SPI2, DmaChannel0, FullDuplexMode, Async>,
     pcnt_unit: Unit<'static, 0>,
     out_pin: Output<'static, GpioPin<5>>,
-    mosi_mirror: GpioPin<2>,
+    mosi_mirror: AnyPin<'static>,
 }
 
 #[cfg(test)]
@@ -72,17 +70,16 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let pcnt = Pcnt::new(peripherals.PCNT);
         let sclk = io.pins.gpio0;
-        let mosi_mirror = io.pins.gpio2;
-        let mosi = io.pins.gpio3;
-        let miso = io.pins.gpio6;
+
+        let (mosi_mirror, mosi) = hil_test::common_test_pins!(io);
+        let miso = io.pins.gpio4;
         let cs = io.pins.gpio8;
+        let mosi_mirror = AnyPin::new(mosi_mirror);
 
         let mut out_pin = Output::new(io.pins.gpio5, Level::Low);
         out_pin.set_low();
@@ -102,7 +99,7 @@ mod tests {
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
-        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
             .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
             .with_dma(dma_channel.configure_for_async(false, DmaPriority::Priority0))
             .with_buffers(dma_tx_buf, dma_rx_buf);

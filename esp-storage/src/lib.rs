@@ -58,3 +58,27 @@ fn maybe_with_critical_section<R>(f: impl FnOnce() -> R) -> R {
 fn maybe_with_critical_section<R>(f: impl FnOnce() -> R) -> R {
     f()
 }
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! rom_fn {
+    ($(#[$attrs:meta])* fn $name:ident($($arg:tt: $ty:ty),*) $(-> $retval:ty)? = $addr:expr) => {
+        $(#[$attrs])*
+        #[allow(unused)]
+        #[inline(always)]
+        #[link_section = ".rwtext"]
+        fn $name($($arg:$ty),*) $(-> $retval)? {
+            unsafe {
+                let rom_fn: unsafe extern "C" fn($($arg: $ty),*) $(-> $retval)? =
+                    core::mem::transmute($addr as usize);
+                rom_fn($($arg),*)
+            }
+        }
+    };
+
+    ($($(#[$attrs:meta])* fn $name:ident($($arg:tt: $ty:ty),*) $(-> $retval:ty)? = $addr:expr;)+) => {
+        $(
+            $crate::rom_fn!(fn $name($($arg: $ty),*) $(-> $retval)? = $addr);
+        )+
+    };
+}

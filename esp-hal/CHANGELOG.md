@@ -9,14 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Implement `embedded-hal` output pin traits for `DummyPin` (#2019)
+- Added `esp_hal::init` to simplify HAL initialisation (#1970, #1999)
+
 ### Changed
 - Make saving and restoring SHA digest state an explicit operation (#2049)
+
+- `Delay::new()` is now a `const` function (#1999)
+- You can now create an `AnyPin` out of an `ErasedPin`. (#2072)
 
 ### Fixed
 - SHA driver can now be safely used in multiple contexts concurrently (#2049)
 
+- Fixed an issue with DMA transfers potentially not waking up the correct async task (#2065)
+
 ### Removed
 - Removed `digest::Digest` implementation from SHA (#2049)
+
+- Removed `NoPinType` in favour of `DummyPin`. (#2068)
+- Removed the `async`, `embedded-hal-02`, `embedded-hal`, `embedded-io`, `embedded-io-async`, and `ufmt` features (#2070)
+- Removed the `GpioN` type aliasses. Use `GpioPin<N>` instead. (#2073)
+- Removed `Peripherals::take`. Use `esp_hal::init` to obtain `Peripherals` (#1999)
+- Removed `AnyInputOnlyPin` in favour of `AnyPin`. (#2071)
 
 ## [0.20.1] - 2024-08-30
 
@@ -707,7 +721,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.20.1...HEAD
 [0.20.1]: https://github.com/esp-rs/esp-hal/compare/v0.20.0...v0.20.1
 [0.20.0]: https://github.com/esp-rs/esp-hal/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/esp-rs/esp-hal/compare/v0.18.0...v0.19.0

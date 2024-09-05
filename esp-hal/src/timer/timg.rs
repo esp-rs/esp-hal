@@ -27,9 +27,8 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::timg::TimerGroup;
-//! # use crate::esp_hal::prelude::_esp_hal_timer_Timer;
-//! # use esp_hal::prelude::*;
-//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+//!
+//! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! let timer0 = timg0.timer0;
 //!
 //! // Get the current timestamp, in microseconds:
@@ -42,6 +41,8 @@
 //! while !timer0.is_interrupt_set() {
 //!     // Wait
 //! }
+//!
+//! timer0.clear_interrupt();
 //! # }
 //! ```
 //! 
@@ -49,8 +50,8 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::timg::TimerGroup;
-//! # use esp_hal::prelude::*;
-//! let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+//!
+//! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! let mut wdt = timg0.wdt;
 //!
 //! wdt.set_timeout(5_000.millis());
@@ -77,6 +78,7 @@ use crate::soc::constants::TIMG_DEFAULT_CLK_SRC;
 use crate::{
     clock::Clocks,
     interrupt::{self, InterruptHandler},
+    lock,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{timg0::RegisterBlock, Interrupt, TIMG0},
     private::Sealed,
@@ -84,8 +86,11 @@ use crate::{
     Async,
     Blocking,
     InterruptConfigurable,
+    LockState,
     Mode,
 };
+
+static INT_ENA_LOCK: LockState = LockState::new();
 
 /// A timer group consisting of up to 2 timers (chip dependent) and a watchdog
 /// timer.
@@ -251,7 +256,7 @@ where
     DM: crate::Mode,
 {
     /// Construct a new instance of [`TimerGroup`] in blocking mode
-    pub fn new_inner(_timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks<'d>) -> Self {
+    pub fn new_inner(_timer_group: impl Peripheral<P = T> + 'd) -> Self {
         crate::into_ref!(_timer_group);
 
         T::reset_peripheral();
@@ -259,6 +264,7 @@ where
 
         T::configure_src_clk();
 
+        let clocks = Clocks::get();
         cfg_if::cfg_if! {
             if #[cfg(esp32h2)] {
                 // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
@@ -266,7 +272,7 @@ where
             } else {
                 let apb_clk_freq = clocks.apb_clock;
             }
-        };
+        }
 
         let timer0 = Timer::new(
             Timer0 {
@@ -298,8 +304,8 @@ where
     T: TimerGroupInstance,
 {
     /// Construct a new instance of [`TimerGroup`] in blocking mode
-    pub fn new(timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks<'d>) -> Self {
-        Self::new_inner(timer_group, clocks)
+    pub fn new(_timer_group: impl Peripheral<P = T> + 'd) -> Self {
+        Self::new_inner(_timer_group)
     }
 }
 
@@ -308,8 +314,8 @@ where
     T: TimerGroupInstance,
 {
     /// Construct a new instance of [`TimerGroup`] in asynchronous mode
-    pub fn new_async(timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks<'d>) -> Self {
-        Self::new_inner(timer_group, clocks)
+    pub fn new_async(_timer_group: impl Peripheral<P = T> + 'd) -> Self {
+        Self::new_inner(_timer_group)
     }
 }
 
@@ -481,9 +487,11 @@ where
             .config()
             .modify(|_, w| w.level_int_en().set_bit());
 
-        self.register_block()
-            .int_ena()
-            .modify(|_, w| w.t(self.timer_number()).bit(state));
+        lock(&INT_ENA_LOCK, || {
+            self.register_block()
+                .int_ena()
+                .modify(|_, w| w.t(self.timer_number()).bit(state));
+        });
     }
 
     fn clear_interrupt(&self) {
@@ -706,15 +714,19 @@ where
             .config()
             .modify(|_, w| w.level_int_en().set_bit());
 
-        self.register_block()
-            .int_ena()
-            .modify(|_, w| w.t(T).set_bit());
+        lock(&INT_ENA_LOCK, || {
+            self.register_block()
+                .int_ena()
+                .modify(|_, w| w.t(T).set_bit());
+        });
     }
 
     fn unlisten(&self) {
-        self.register_block()
-            .int_ena()
-            .modify(|_, w| w.t(T).clear_bit());
+        lock(&INT_ENA_LOCK, || {
+            self.register_block()
+                .int_ena()
+                .modify(|_, w| w.t(T).clear_bit());
+        });
     }
 
     fn clear_interrupt(&self) {
@@ -809,7 +821,6 @@ where
     (1_000_000 * micros / period as u64) as u64
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T, DM> embedded_hal_02::timer::CountDown for Timer<T, DM>
 where
     T: Instance + super::Timer,
@@ -834,7 +845,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T, DM> embedded_hal_02::timer::Cancel for Timer<T, DM>
 where
     T: Instance + super::Timer,
@@ -855,7 +865,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T, DM> embedded_hal_02::timer::Periodic for Timer<T, DM>
 where
     T: Instance + super::Timer,
@@ -1022,7 +1031,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<TG, DM> embedded_hal_02::watchdog::WatchdogDisable for Wdt<TG, DM>
 where
     TG: TimerGroupInstance,
@@ -1033,7 +1041,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<TG, DM> embedded_hal_02::watchdog::WatchdogEnable for Wdt<TG, DM>
 where
     TG: TimerGroupInstance,
@@ -1050,7 +1057,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<TG, DM> embedded_hal_02::watchdog::Watchdog for Wdt<TG, DM>
 where
     TG: TimerGroupInstance,

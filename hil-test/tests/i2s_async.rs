@@ -1,6 +1,7 @@
 //! I2S Loopback Test (Async)
 //!
 //! It's assumed GPIO2 is connected to GPIO3
+//! (GPIO9 and GPIO10 for esp32s3)
 //!
 //! This test uses I2S TX to transmit known data to I2S RX (forced to slave mode
 //! with loopback mode enabled). It's using circular DMA mode
@@ -12,14 +13,12 @@
 #![no_main]
 
 use esp_hal::{
-    clock::ClockControl,
     dma::{Dma, DmaChannel0, DmaPriority},
     gpio::Io,
     i2s::{asynch::*, DataFormat, I2s, I2sTx, Standard},
     peripheral::Peripheral,
-    peripherals::{Peripherals, I2S0},
+    peripherals::I2S0,
     prelude::*,
-    system::SystemControl,
     Async,
 };
 use hil_test as _;
@@ -83,16 +82,11 @@ mod tests {
 
     use super::*;
 
-    #[init]
-    async fn init() {}
-
     #[test]
     async fn test_i2s_loopback() {
         let spawner = embassy_executor::Spawner::for_current_executor().await;
 
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -110,21 +104,22 @@ mod tests {
             dma_channel.configure_for_async(false, DmaPriority::Priority0),
             tx_descriptors,
             rx_descriptors,
-            &clocks,
         );
+
+        let (dout, din) = hil_test::common_test_pins!(io);
 
         let i2s_tx = i2s
             .i2s_tx
             .with_bclk(unsafe { io.pins.gpio0.clone_unchecked() })
             .with_ws(unsafe { io.pins.gpio1.clone_unchecked() })
-            .with_dout(io.pins.gpio2)
+            .with_dout(dout)
             .build();
 
         let i2s_rx = i2s
             .i2s_rx
             .with_bclk(io.pins.gpio0)
             .with_ws(io.pins.gpio1)
-            .with_din(io.pins.gpio3)
+            .with_din(din)
             .build();
 
         // enable loopback testing

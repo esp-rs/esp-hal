@@ -1,6 +1,7 @@
 //! I2S Loopback Test
 //!
 //! It's assumed GPIO2 is connected to GPIO3
+//! (GPIO9 and GPIO10 for esp32s3)
 //!
 //! This test uses I2S TX to transmit known data to I2S RX (forced to slave mode
 //! with loopback mode enabled). It's using circular DMA mode
@@ -11,16 +12,13 @@
 #![no_main]
 
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::Io,
     i2s::{DataFormat, I2s, I2sReadDma, I2sWriteDma, Standard},
     peripheral::Peripheral,
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
 };
 use hil_test as _;
 
@@ -52,21 +50,15 @@ impl Iterator for SampleSource {
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-
     use super::*;
-
-    #[init]
-    fn init() {}
 
     #[test]
     fn test_i2s_loopback() {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let delay = Delay::new(&clocks);
+        let delay = Delay::new();
 
         let dma = Dma::new(peripherals.DMA);
         let dma_channel = dma.channel0;
@@ -81,21 +73,22 @@ mod tests {
             dma_channel.configure(false, DmaPriority::Priority0),
             tx_descriptors,
             rx_descriptors,
-            &clocks,
         );
+
+        let (dout, din) = hil_test::common_test_pins!(io);
 
         let mut i2s_tx = i2s
             .i2s_tx
             .with_bclk(unsafe { io.pins.gpio0.clone_unchecked() })
             .with_ws(unsafe { io.pins.gpio1.clone_unchecked() })
-            .with_dout(unsafe { io.pins.gpio2.clone_unchecked() })
+            .with_dout(dout)
             .build();
 
         let mut i2s_rx = i2s
             .i2s_rx
             .with_bclk(io.pins.gpio0)
             .with_ws(io.pins.gpio1)
-            .with_din(io.pins.gpio3)
+            .with_din(din)
             .build();
 
         // enable loopback testing

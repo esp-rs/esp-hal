@@ -5,7 +5,7 @@ mod thread;
 
 #[export_name = "__pender"]
 fn __pender(context: *mut ()) {
-    use esp_hal::system::SoftwareInterrupt;
+    use esp_hal::interrupt::software::SoftwareInterrupt;
 
     let context = (context as usize).to_le_bytes();
 

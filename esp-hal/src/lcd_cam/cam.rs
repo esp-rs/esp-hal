@@ -55,7 +55,6 @@
 //!     rx_descriptors,
 //!     data_pins,
 //!     20u32.MHz(),
-//!     &clocks
 //! )
 //! // Remove this for slave mode.
 //! .with_master_clock(mclk_pin)
@@ -146,10 +145,10 @@ where
         descriptors: &'static mut [DmaDescriptor],
         _pins: P,
         frequency: HertzU32,
-        clocks: &Clocks<'d>,
     ) -> Self {
         let lcd_cam = cam.lcd_cam;
 
+        let clocks = Clocks::get();
         let (i, divider) = calculate_clkm(
             frequency.to_Hz() as _,
             &[

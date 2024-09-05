@@ -18,24 +18,25 @@
 //!   the input signal
 //!
 //! ### Channels
+//!
 //! There are
 #![cfg_attr(
     esp32,
-    doc = "8 channels, each of them can be either receiver or transmitter"
+    doc = "8 channels, each of them can be either receiver or transmitter."
 )]
 #![cfg_attr(
     esp32s2,
-    doc = "4 channels, each of them can be either receiver or transmitter"
+    doc = "4 channels, each of them can be either receiver or transmitter."
 )]
 #![cfg_attr(
     esp32s3,
-    doc = "8 channels, `Channel<0>`-`Channel<3>` hardcoded for transmitting signals and `Channel<4>`-`Channel<7>` hardcoded for receiving signals"
+    doc = "8 channels, `Channel<0>`-`Channel<3>` hardcoded for transmitting signals and `Channel<4>`-`Channel<7>` hardcoded for receiving signals."
 )]
 #![cfg_attr(
     any(esp32c3, esp32c6, esp32h2),
     doc = "4 channels, `Channel<0>` and `Channel<1>` hardcoded for transmitting signals and `Channel<2>` and `Channel<3>` hardcoded for receiving signals."
 )]
-#![doc = "  "]
+#![doc = ""]
 //! For more information, please refer to the
 #![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/peripherals/rmt.html)")]
 //! ## Configuration
@@ -44,21 +45,21 @@
 //! channels are indicated by n which is used as a placeholder for the channel
 //! number, and by m for RX channels.
 //!
-//! ## Examples
+//! ## Example
+//!
 //! ### Initialization
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::peripherals::Peripherals;
 //! # use esp_hal::rmt::TxChannelConfig;
 //! # use esp_hal::rmt::Rmt;
 //! # use esp_hal::gpio::Io;
-//! # use esp_hal::clock::ClockControl;
 //! # use crate::esp_hal::rmt::TxChannelCreator;
-//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 #![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
 #![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
-//! let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
+//! let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
 //! let mut channel = rmt
 //!     .channel0
 //!     .configure(
@@ -76,15 +77,14 @@
 //!     .unwrap();
 //! # }
 //! ```
-//! (on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80
-//! MHz)
+//! 
+//! > Note: on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80 MHz
 
 use core::marker::PhantomData;
 
 use fugit::HertzU32;
 
 use crate::{
-    clock::Clocks,
     gpio::{InputPin, OutputPin},
     interrupt::InterruptHandler,
     peripheral::Peripheral,
@@ -206,7 +206,6 @@ pub struct RxChannelConfig {
 
 pub use impl_for_chip::{ChannelCreator, Rmt};
 
-#[cfg(feature = "async")]
 use self::asynch::{RxChannelAsync, TxChannelAsync};
 
 impl<'d, M> Rmt<'d, M>
@@ -216,7 +215,6 @@ where
     pub(crate) fn new_internal(
         peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
         frequency: HertzU32,
-        _clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
         let me = Rmt::create(peripheral);
 
@@ -232,7 +230,7 @@ where
             if #[cfg(any(esp32, esp32s2))] {
                 self::chip_specific::configure_clock();
             } else {
-                me.configure_clock(frequency, _clocks)?;
+                me.configure_clock(frequency)?;
             }
         }
 
@@ -248,7 +246,7 @@ where
     }
 
     #[cfg(not(any(esp32, esp32s2)))]
-    fn configure_clock(&self, frequency: HertzU32, _clocks: &Clocks<'d>) -> Result<(), Error> {
+    fn configure_clock(&self, frequency: HertzU32) -> Result<(), Error> {
         let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
 
         if frequency > src_clock {
@@ -272,9 +270,8 @@ impl<'d> Rmt<'d, crate::Blocking> {
     pub fn new(
         peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
         frequency: HertzU32,
-        _clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
-        Self::new_internal(peripheral, frequency, _clocks)
+        Self::new_internal(peripheral, frequency)
     }
 }
 
@@ -286,15 +283,13 @@ impl<'d> InterruptConfigurable for Rmt<'d, crate::Blocking> {
     }
 }
 
-#[cfg(feature = "async")]
 impl<'d> Rmt<'d, crate::Async> {
     /// Create a new RMT instance
     pub fn new_async(
         peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
         frequency: HertzU32,
-        _clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
-        let mut this = Self::new_internal(peripheral, frequency, _clocks)?;
+        let mut this = Self::new_internal(peripheral, frequency)?;
         this.internal_set_interrupt_handler(asynch::async_interrupt_handler);
         Ok(this)
     }
@@ -332,7 +327,6 @@ where
 }
 
 /// Creates a TX channel in async mode
-#[cfg(feature = "async")]
 pub trait TxChannelCreatorAsync<'d, T, P>
 where
     P: OutputPin,
@@ -410,7 +404,6 @@ where
 }
 
 /// Creates a RX channel in async mode
-#[cfg(feature = "async")]
 pub trait RxChannelCreatorAsync<'d, T, P>
 where
     P: InputPin,
@@ -599,7 +592,6 @@ macro_rules! impl_tx_channel_creator {
 
         impl $crate::rmt::TxChannel for $crate::rmt::Channel<$crate::Blocking, $channel> {}
 
-        #[cfg(feature = "async")]
         impl<'d, P> $crate::rmt::TxChannelCreatorAsync<'d, $crate::rmt::Channel<$crate::Async, $channel>, P>
             for ChannelCreator<$crate::Async, $channel>
         where
@@ -607,7 +599,6 @@ macro_rules! impl_tx_channel_creator {
         {
         }
 
-        #[cfg(feature = "async")]
         impl $crate::rmt::asynch::TxChannelAsync for $crate::rmt::Channel<$crate::Async, $channel> {}
     };
 }
@@ -623,7 +614,6 @@ macro_rules! impl_rx_channel_creator {
 
         impl $crate::rmt::RxChannel for $crate::rmt::Channel<$crate::Blocking, $channel> {}
 
-        #[cfg(feature = "async")]
         impl<'d, P> $crate::rmt::RxChannelCreatorAsync<'d, $crate::rmt::Channel<$crate::Async, $channel>, P>
         for ChannelCreator<$crate::Async, $channel>
         where
@@ -631,7 +621,6 @@ macro_rules! impl_rx_channel_creator {
         {
         }
 
-        #[cfg(feature = "async")]
         impl $crate::rmt::asynch::RxChannelAsync for $crate::rmt::Channel<$crate::Async, $channel> {}
     };
 }
@@ -1130,7 +1119,6 @@ pub trait RxChannel: private::RxChannelInternal<crate::Blocking> {
 }
 
 /// Async functionality
-#[cfg(feature = "async")]
 pub mod asynch {
     use core::{
         pin::Pin,

@@ -1,6 +1,7 @@
 //! # Universal Asynchronous Receiver/Transmitter (UART)
 //!
 //! ## Overview
+//!
 //! The UART is a hardware peripheral which handles communication using serial
 //! communication interfaces, such as RS232 and RS485. This peripheral provides
 //! a cheap and ubiquitous method for full- and half-duplex communication
@@ -13,6 +14,7 @@
 //! protocols.
 //!
 //! ## Configuration
+//!
 //! Each UART controller is individually configurable, and the usual setting
 //! such as baud rate, data bits, parity, and stop bits can easily be
 //! configured. Additionally, the transmit (TX) and receive (RX) pins need to
@@ -20,20 +22,25 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{config::Config, Uart};
+//! # use esp_hal::uart::Uart;
 //! use esp_hal::gpio::Io;
+//!
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
-//! let mut uart1 = Uart::new(peripherals.UART1, &clocks, io.pins.gpio1,
-//!     io.pins.gpio2).unwrap();
+//! let mut uart1 = Uart::new(
+//!     peripherals.UART1,
+//!     io.pins.gpio1,
+//!     io.pins.gpio2,
+//! ).unwrap();
 //! # }
 //! ```
 //! 
 //! The UART controller can be configured to invert the polarity of the pins.
-//! This is achived by inverting the desired pins, and then constructing the
+//! This is achieved by inverting the desired pins, and then constructing the
 //! UART instance using the inverted pins.
 //!
 //! ## Usage
+//!
 //! The UART driver implements a number of third-party traits, with the
 //! intention of making the HAL inter-compatible with various device drivers
 //! from the community. This includes, but is not limited to, the [embedded-hal]
@@ -49,12 +56,11 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, Uart};
-//! use esp_hal::gpio::Io;
+//! # use esp_hal::gpio::Io;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let mut uart1 = Uart::new_with_config(
 //! #     peripherals.UART1,
 //! #     Config::default(),
-//! #     &clocks,
 //! #     io.pins.gpio1,
 //! #     io.pins.gpio2,
 //! # ).unwrap();
@@ -67,12 +73,11 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, Uart};
-//! use esp_hal::gpio::Io;
+//! # use esp_hal::gpio::Io;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let mut uart1 = Uart::new_with_config(
 //! #     peripherals.UART1,
 //! #     Config::default(),
-//! #     &clocks,
 //! #     io.pins.gpio1,
 //! #     io.pins.gpio2,
 //! # ).unwrap();
@@ -88,27 +93,31 @@
 //! ### Inverting TX and RX Pins
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{config::Config, Uart};
+//! # use esp_hal::uart::Uart;
 //! use esp_hal::gpio::{AnyPin, Io};
+//!
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
 //! let tx = AnyPin::new_inverted(io.pins.gpio1);
 //! let rx = AnyPin::new_inverted(io.pins.gpio2);
-//! let mut uart1 = Uart::new(peripherals.UART1, &clocks, tx, rx).unwrap();
+//! let mut uart1 = Uart::new(
+//!     peripherals.UART1,
+//!     tx,
+//!     rx,
+//! ).unwrap();
 //! # }
 //! ```
 //! 
 //! ### Constructing TX and RX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{config::Config, UartTx, UartRx};
+//! # use esp_hal::uart::{UartTx, UartRx};
 //! use esp_hal::gpio::{AnyPin, Io};
+//!
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
-//! let tx = UartTx::new(peripherals.UART0, &clocks,
-//!     io.pins.gpio1).unwrap();
-//! let rx = UartRx::new(peripherals.UART1, &clocks,
-//!     io.pins.gpio2).unwrap();
+//! let tx = UartTx::new(peripherals.UART0, io.pins.gpio1).unwrap();
+//! let rx = UartRx::new(peripherals.UART1, io.pins.gpio2).unwrap();
 //! # }
 //! ```
 //! 
@@ -146,59 +155,59 @@ cfg_if::cfg_if! {
     if #[cfg(esp32)] {
         /// Default TX pin for UART0 on ESP32.
         /// Corresponds to GPIO1.
-        pub type DefaultTxPin = crate::gpio::Gpio1;
+        pub type DefaultTxPin = crate::gpio::GpioPin<1>;
 
         /// Default RX pin for UART0 on ESP32.
         /// Corresponds to GPIO3.
-        pub type DefaultRxPin = crate::gpio::Gpio3;
+        pub type DefaultRxPin = crate::gpio::GpioPin<3>;
     } else if #[cfg(esp32c2)] {
         /// Default TX pin for UART0 on ESP32-C2.
         /// Corresponds to GPIO20.
-        pub type DefaultTxPin = crate::gpio::Gpio20;
+        pub type DefaultTxPin = crate::gpio::GpioPin<20>;
 
         /// Default RX pin for UART0 on ESP32-C2.
         /// Corresponds to GPIO19.
-        pub type DefaultRxPin = crate::gpio::Gpio19;
+        pub type DefaultRxPin = crate::gpio::GpioPin<19>;
     } else if #[cfg(esp32c3)] {
         /// Default TX pin for UART0 on ESP32-C3.
         /// Corresponds to GPIO21.
-        pub type DefaultTxPin = crate::gpio::Gpio21;
+        pub type DefaultTxPin = crate::gpio::GpioPin<21>;
 
         /// Default RX pin for UART0 on ESP32-C3.
         /// Corresponds to GPIO20.
-        pub type DefaultRxPin = crate::gpio::Gpio20;
-    }else if #[cfg(esp32c6)] {
+        pub type DefaultRxPin = crate::gpio::GpioPin<20>;
+    } else if #[cfg(esp32c6)] {
         /// Default TX pin for UART0 on ESP32-C6.
         /// Corresponds to GPIO16.
-        pub type DefaultTxPin = crate::gpio::Gpio16;
+        pub type DefaultTxPin = crate::gpio::GpioPin<16>;
 
         /// Default RX pin for UART0 on ESP32-C6.
         /// Corresponds to GPIO17.
-        pub type DefaultRxPin = crate::gpio::Gpio17;
-    }else if #[cfg(esp32h2)] {
+        pub type DefaultRxPin = crate::gpio::GpioPin<17>;
+    } else if #[cfg(esp32h2)] {
         /// Default TX pin for UART0 on ESP32-H2.
         /// Corresponds to GPIO24.
-        pub type DefaultTxPin = crate::gpio::Gpio24;
+        pub type DefaultTxPin = crate::gpio::GpioPin<24>;
 
         /// Default RX pin for UART0 on ESP32-H2.
         /// Corresponds to GPIO23.
-        pub type DefaultRxPin = crate::gpio::Gpio23;
+        pub type DefaultRxPin = crate::gpio::GpioPin<23>;
     } else if #[cfg(esp32s2)] {
         /// Default TX pin for UART0 on ESP32-S2.
         /// Corresponds to GPIO43.
-        pub type DefaultTxPin = crate::gpio::Gpio43;
+        pub type DefaultTxPin = crate::gpio::GpioPin<43>;
 
         /// Default RX pin for UART0 on ESP32-S2.
         /// Corresponds to GPIO44.
-        pub type DefaultRxPin = crate::gpio::Gpio44;
+        pub type DefaultRxPin = crate::gpio::GpioPin<44>;
     } else if #[cfg(esp32s3)] {
         /// Default TX pin for UART0 on ESP32-S3.
         /// Corresponds to GPIO43.
-        pub type DefaultTxPin = crate::gpio::Gpio43;
+        pub type DefaultTxPin = crate::gpio::GpioPin<43>;
 
         /// Default RX pin for UART0 on ESP32-S3.
         /// Corresponds to GPIO44.
-        pub type DefaultRxPin = crate::gpio::Gpio44;
+        pub type DefaultRxPin = crate::gpio::GpioPin<44>;
     }
 }
 
@@ -213,7 +222,6 @@ pub enum Error {
     InvalidArgument,
 
     /// The RX FIFO overflowed.
-    #[cfg(feature = "async")]
     RxFifoOvf,
 
     /// A glitch was detected on the RX line.
@@ -221,14 +229,12 @@ pub enum Error {
     /// This error occurs when an unexpected or erroneous signal (glitch) is
     /// detected on the UART RX line, which could lead to incorrect data
     /// reception.
-    #[cfg(feature = "async")]
     RxGlitchDetected,
 
     /// A framing error was detected on the RX line.
     ///
     /// This error occurs when the received data does not conform to the
     /// expected UART frame format.
-    #[cfg(feature = "async")]
     RxFrameError,
 
     /// A parity error was detected on the RX line.
@@ -236,18 +242,15 @@ pub enum Error {
     /// This error occurs when the parity bit in the received data does not
     /// match the expected parity configuration.
     /// with the `async` feature.
-    #[cfg(feature = "async")]
     RxParityError,
 }
 
-#[cfg(feature = "embedded-hal")]
 impl embedded_hal_nb::serial::Error for Error {
     fn kind(&self) -> embedded_hal_nb::serial::ErrorKind {
         embedded_hal_nb::serial::ErrorKind::Other
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl embedded_io::Error for Error {
     fn kind(&self) -> embedded_io::ErrorKind {
         embedded_io::ErrorKind::Other
@@ -570,10 +573,9 @@ where
     /// Create a new UART TX instance in [`Blocking`] mode.
     pub fn new<TX: OutputPin>(
         uart: impl Peripheral<P = T> + 'd,
-        clocks: &Clocks<'d>,
         tx: impl Peripheral<P = TX> + 'd,
     ) -> Result<Self, Error> {
-        Self::new_with_config(uart, Default::default(), clocks, tx)
+        Self::new_with_config(uart, Default::default(), tx)
     }
 
     /// Create a new UART TX instance with configuration options in
@@ -581,15 +583,13 @@ where
     pub fn new_with_config<TX: OutputPin>(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        clocks: &Clocks<'d>,
         tx: impl Peripheral<P = TX> + 'd,
     ) -> Result<Self, Error> {
         crate::into_ref!(tx);
         tx.set_to_push_pull_output(Internal);
         tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
-        let (uart_tx, _) =
-            Uart::<'d, T, Blocking>::new_with_config_inner(uart, config, clocks)?.split();
+        let (uart_tx, _) = Uart::<'d, T, Blocking>::new_with_config_inner(uart, config)?.split();
 
         Ok(uart_tx)
     }
@@ -778,10 +778,9 @@ where
     /// Create a new UART RX instance in [`Blocking`] mode.
     pub fn new<RX: InputPin>(
         uart: impl Peripheral<P = T> + 'd,
-        clocks: &Clocks<'d>,
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Result<Self, Error> {
-        Self::new_with_config(uart, Default::default(), clocks, rx)
+        Self::new_with_config(uart, Default::default(), rx)
     }
 
     /// Create a new UART RX instance with configuration options in
@@ -789,15 +788,13 @@ where
     pub fn new_with_config<RX: InputPin>(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        clocks: &Clocks<'d>,
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Result<Self, Error> {
         crate::into_ref!(rx);
         rx.set_to_input(Internal);
         rx.connect_input_to_peripheral(T::rx_signal(), Internal);
 
-        let (_, uart_rx) =
-            Uart::<'d, T, Blocking>::new_with_config_inner(uart, config, clocks)?.split();
+        let (_, uart_rx) = Uart::<'d, T, Blocking>::new_with_config_inner(uart, config)?.split();
 
         Ok(uart_rx)
     }
@@ -812,7 +809,6 @@ where
     pub fn new_with_config<TX: OutputPin, RX: InputPin>(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        clocks: &Clocks<'d>,
         tx: impl Peripheral<P = TX> + 'd,
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Result<Self, Error> {
@@ -823,13 +819,12 @@ where
 
         rx.set_to_input(Internal);
         rx.connect_input_to_peripheral(T::rx_signal(), Internal);
-        Self::new_with_config_inner(uart, config, clocks)
+        Self::new_with_config_inner(uart, config)
     }
 
     /// Create a new UART instance with defaults in [`Blocking`] mode.
     pub fn new<TX: OutputPin, RX: InputPin>(
         uart: impl Peripheral<P = T> + 'd,
-        clocks: &Clocks<'d>,
         tx: impl Peripheral<P = TX> + 'd,
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Result<Self, Error> {
@@ -840,14 +835,13 @@ where
 
         rx.set_to_input(Internal);
         rx.connect_input_to_peripheral(T::rx_signal(), Internal);
-        Self::new_inner(uart, clocks)
+        Self::new_inner(uart)
     }
 
     /// Create a new UART instance with defaults in [`Blocking`] mode.
     /// Verify that the default pins (DefaultTxPin and DefaultRxPin) are used.
     pub fn new_with_default_pins(
         uart: impl Peripheral<P = T> + 'd,
-        clocks: &Clocks<'d>,
         tx: &mut DefaultTxPin,
         rx: &mut DefaultRxPin,
     ) -> Result<Self, Error> {
@@ -856,7 +850,7 @@ where
 
         rx.set_to_input(Internal);
         rx.connect_input_to_peripheral(T::rx_signal(), Internal);
-        Self::new_inner(uart, clocks)
+        Self::new_inner(uart)
     }
 }
 
@@ -868,7 +862,6 @@ where
     pub(crate) fn new_with_config_inner(
         _uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
         Self::init();
 
@@ -884,7 +877,7 @@ where
             .rx
             .set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)?;
         serial.rx.set_rx_timeout(config.rx_timeout)?;
-        serial.change_baud_internal(config.baudrate, config.clock_source, clocks);
+        serial.change_baud_internal(config.baudrate, config.clock_source);
         serial.change_data_bits(config.data_bits);
         serial.change_parity(config.parity);
         serial.change_stop_bits(config.stop_bits);
@@ -916,8 +909,8 @@ where
         }
     }
 
-    fn new_inner(uart: impl Peripheral<P = T> + 'd, clocks: &Clocks<'d>) -> Result<Self, Error> {
-        Self::new_with_config_inner(uart, Default::default(), clocks)
+    fn new_inner(uart: impl Peripheral<P = T> + 'd) -> Result<Self, Error> {
+        Self::new_with_config_inner(uart, Default::default())
     }
 
     /// Configure CTS pin
@@ -1148,7 +1141,8 @@ where
     }
 
     #[cfg(any(esp32c2, esp32c3, esp32s3))]
-    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks<'d>) {
+    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource) {
+        let clocks = Clocks::get();
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
@@ -1185,7 +1179,8 @@ where
     }
 
     #[cfg(any(esp32c6, esp32h2))]
-    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks<'d>) {
+    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource) {
+        let clocks = Clocks::get();
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
@@ -1256,7 +1251,8 @@ where
     }
 
     #[cfg(any(esp32, esp32s2))]
-    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks<'d>) {
+    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource) {
+        let clocks = Clocks::get();
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::RefTick => REF_TICK.to_Hz(), /* ESP32(/-S2) TRM, section 3.2.4.2
@@ -1295,8 +1291,8 @@ where
     }
 
     /// Modify UART baud rate and reset TX/RX fifo.
-    pub fn change_baud(&mut self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks<'d>) {
-        self.change_baud_internal(baudrate, clock_source, clocks);
+    pub fn change_baud(&mut self, baudrate: u32, clock_source: ClockSource) {
+        self.change_baud_internal(baudrate, clock_source);
         self.txfifo_reset();
         self.rxfifo_reset();
     }
@@ -1647,7 +1643,6 @@ impl_instance!(UART1, 1, U1TXD, U1RXD, U1CTS, U1RTS, Uart1);
 #[cfg(uart2)]
 impl_instance!(UART2, 2, U2TXD, U2RXD, U2CTS, U2RTS, Uart2);
 
-#[cfg(feature = "ufmt")]
 impl<T, M> ufmt_write::uWrite for Uart<'_, T, M>
 where
     T: Instance,
@@ -1666,7 +1661,6 @@ where
     }
 }
 
-#[cfg(feature = "ufmt")]
 impl<T, M> ufmt_write::uWrite for UartTx<'_, T, M>
 where
     T: Instance,
@@ -1705,7 +1699,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T, M> embedded_hal_02::serial::Write<u8> for Uart<'_, T, M>
 where
     T: Instance,
@@ -1722,7 +1715,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T, M> embedded_hal_02::serial::Write<u8> for UartTx<'_, T, M>
 where
     T: Instance,
@@ -1739,7 +1731,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T, M> embedded_hal_02::serial::Read<u8> for Uart<'_, T, M>
 where
     T: Instance,
@@ -1752,7 +1743,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T, M> embedded_hal_02::serial::Read<u8> for UartRx<'_, T, M>
 where
     T: Instance,
@@ -1765,22 +1755,18 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::ErrorType for Uart<'_, T, M> {
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::ErrorType for UartTx<'_, T, M> {
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::ErrorType for UartRx<'_, T, M> {
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::Read for Uart<'_, T, M>
 where
     T: Instance,
@@ -1791,7 +1777,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::Read for UartRx<'_, T, M>
 where
     T: Instance,
@@ -1802,7 +1787,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::Write for Uart<'_, T, M>
 where
     T: Instance,
@@ -1817,7 +1801,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, M> embedded_hal_nb::serial::Write for UartTx<'_, T, M>
 where
     T: Instance,
@@ -1832,22 +1815,18 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::ErrorType for Uart<'_, T, M> {
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::ErrorType for UartTx<'_, T, M> {
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::ErrorType for UartRx<'_, T, M> {
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::Read for Uart<'_, T, M>
 where
     T: Instance,
@@ -1858,7 +1837,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::Read for UartRx<'_, T, M>
 where
     T: Instance,
@@ -1877,7 +1855,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::ReadReady for Uart<'_, T, M>
 where
     T: Instance,
@@ -1888,7 +1865,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::ReadReady for UartRx<'_, T, M>
 where
     T: Instance,
@@ -1899,7 +1875,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::Write for Uart<'_, T, M>
 where
     T: Instance,
@@ -1914,7 +1889,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<T, M> embedded_io::Write for UartTx<'_, T, M>
 where
     T: Instance,
@@ -1937,7 +1911,6 @@ where
     }
 }
 
-#[cfg(feature = "async")]
 mod asynch {
     use core::task::Poll;
 
@@ -2160,7 +2133,6 @@ mod asynch {
         pub fn new_async_with_config<TX: OutputPin, RX: InputPin>(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
-            clocks: &Clocks<'d>,
             tx: impl Peripheral<P = TX> + 'd,
             rx: impl Peripheral<P = RX> + 'd,
         ) -> Result<Self, Error> {
@@ -2171,7 +2143,7 @@ mod asynch {
 
             rx.set_to_input(Internal);
             rx.connect_input_to_peripheral(T::rx_signal(), Internal);
-            let mut this = Self::new_with_config_inner(uart, config, clocks)?;
+            let mut this = Self::new_with_config_inner(uart, config)?;
 
             this.inner_set_interrupt_handler(match T::uart_number() {
                 #[cfg(uart0)]
@@ -2189,21 +2161,19 @@ mod asynch {
         /// Create a new UART instance with defaults in [`Async`] mode.
         pub fn new_async<TX: OutputPin, RX: InputPin>(
             uart: impl Peripheral<P = T> + 'd,
-            clocks: &Clocks<'d>,
             tx: impl Peripheral<P = TX> + 'd,
             rx: impl Peripheral<P = RX> + 'd,
         ) -> Result<Self, Error> {
-            Self::new_async_with_config(uart, Default::default(), clocks, tx, rx)
+            Self::new_async_with_config(uart, Default::default(), tx, rx)
         }
 
         /// Create a new UART instance with defaults in [`Async`] mode.
         pub fn new_async_with_default_pins(
             uart: impl Peripheral<P = T> + 'd,
-            clocks: &Clocks<'d>,
             tx: DefaultTxPin,
             rx: DefaultRxPin,
         ) -> Result<Self, Error> {
-            Self::new_async_with_config(uart, Default::default(), clocks, tx, rx)
+            Self::new_async_with_config(uart, Default::default(), tx, rx)
         }
     }
 
@@ -2235,10 +2205,9 @@ mod asynch {
         /// Create a new UART TX instance in [`Async`] mode.
         pub fn new_async<TX: OutputPin>(
             uart: impl Peripheral<P = T> + 'd,
-            clocks: &Clocks<'d>,
             tx: impl Peripheral<P = TX> + 'd,
         ) -> Result<Self, Error> {
-            Self::new_async_with_config(uart, Default::default(), clocks, tx)
+            Self::new_async_with_config(uart, Default::default(), tx)
         }
 
         /// Create a new UART TX instance with configuration options in
@@ -2246,14 +2215,13 @@ mod asynch {
         pub fn new_async_with_config<TX: OutputPin>(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
-            clocks: &Clocks<'d>,
             tx: impl Peripheral<P = TX> + 'd,
         ) -> Result<Self, Error> {
             crate::into_ref!(tx);
             tx.set_to_push_pull_output(Internal);
             tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
-            let mut uart = Uart::<'d, T, Async>::new_with_config_inner(uart, config, clocks)?;
+            let mut uart = Uart::<'d, T, Async>::new_with_config_inner(uart, config)?;
 
             uart.inner_set_interrupt_handler(match T::uart_number() {
                 #[cfg(uart0)]
@@ -2322,10 +2290,9 @@ mod asynch {
         /// Create a new UART RX instance in [`Async`] mode.
         pub fn new_async<RX: InputPin>(
             uart: impl Peripheral<P = T> + 'd,
-            clocks: &Clocks<'d>,
             rx: impl Peripheral<P = RX> + 'd,
         ) -> Result<Self, Error> {
-            Self::new_async_with_config(uart, Default::default(), clocks, rx)
+            Self::new_async_with_config(uart, Default::default(), rx)
         }
 
         /// Create a new UART RX instance with configuration options in
@@ -2333,14 +2300,13 @@ mod asynch {
         pub fn new_async_with_config<RX: InputPin>(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
-            clocks: &Clocks<'d>,
             rx: impl Peripheral<P = RX> + 'd,
         ) -> Result<Self, Error> {
             crate::into_ref!(rx);
             rx.set_to_input(Internal);
             rx.connect_input_to_peripheral(T::rx_signal(), Internal);
 
-            let mut uart = Uart::<'d, T, Async>::new_with_config_inner(uart, config, clocks)?;
+            let mut uart = Uart::<'d, T, Async>::new_with_config_inner(uart, config)?;
 
             uart.inner_set_interrupt_handler(match T::uart_number() {
                 #[cfg(uart0)]

@@ -13,7 +13,7 @@ use crate::{
         peripherals::{self, Interrupt},
         riscv,
     },
-    preempt::preempt::task_switch,
+    preempt::task_switch,
     TimeBase,
 };
 

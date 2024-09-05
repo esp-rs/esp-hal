@@ -2,11 +2,11 @@
 //!
 //! Folowing pins are used:
 //! SCLK    GPIO0
-//! MISO    GPIO2
+//! MISO    GPIO2 / GPIO9 (esp32s2 and esp32s3)
 //!
-//! GPIO    GPIO3
+//! GPIO    GPIO3 / GPIO10 (esp32s2 and esp32s3)
 //!
-//! Connect MISO (GPIO2) and GPIO (GPIO3) pins.
+//! Connect MISO and GPIO pins.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -14,11 +14,10 @@
 #![no_main]
 
 use esp_hal::{
-    clock::ClockControl,
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{GpioPin, Io, Level, Output},
-    peripherals::{Peripherals, SPI2},
+    gpio::{AnyOutput, Io, Level},
+    peripherals::SPI2,
     prelude::*,
     spi::{
         master::{Address, Command, HalfDuplexReadWrite, Spi, SpiDma},
@@ -26,7 +25,6 @@ use esp_hal::{
         SpiDataMode,
         SpiMode,
     },
-    system::SystemControl,
     Blocking,
 };
 use hil_test as _;
@@ -44,7 +42,7 @@ cfg_if::cfg_if! {
 
 struct Context {
     spi: SpiDma<'static, SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
-    miso_mirror: Output<'static, GpioPin<3>>,
+    miso_mirror: AnyOutput<'static>,
 }
 
 #[cfg(test)]
@@ -56,15 +54,13 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
-        let miso = io.pins.gpio2;
+        let (miso, miso_mirror) = hil_test::common_test_pins!(io);
 
-        let miso_mirror = Output::new(io.pins.gpio3, Level::High);
+        let miso_mirror = AnyOutput::new(miso_mirror, Level::High);
 
         let dma = Dma::new(peripherals.DMA);
 
@@ -76,7 +72,7 @@ mod tests {
             }
         }
 
-        let spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+        let spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
             .with_sck(sclk)
             .with_miso(miso)
             .with_dma(dma_channel.configure(false, DmaPriority::Priority0));

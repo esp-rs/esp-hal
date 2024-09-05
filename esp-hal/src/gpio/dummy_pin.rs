@@ -132,3 +132,50 @@ impl InputPin for DummyPin {
 
     fn disconnect_input_from_peripheral(&mut self, _signal: InputSignal, _: private::Internal) {}
 }
+
+impl embedded_hal_02::digital::v2::OutputPin for DummyPin {
+    type Error = core::convert::Infallible;
+
+    fn set_high(&mut self) -> Result<(), Self::Error> {
+        self.set_output_high(true, private::Internal);
+        Ok(())
+    }
+    fn set_low(&mut self) -> Result<(), Self::Error> {
+        self.set_output_high(false, private::Internal);
+        Ok(())
+    }
+}
+impl embedded_hal_02::digital::v2::StatefulOutputPin for DummyPin {
+    fn is_set_high(&self) -> Result<bool, Self::Error> {
+        Ok(OutputPin::is_set_high(self, private::Internal))
+    }
+    fn is_set_low(&self) -> Result<bool, Self::Error> {
+        Ok(!OutputPin::is_set_high(self, private::Internal))
+    }
+}
+
+impl embedded_hal::digital::ErrorType for DummyPin {
+    type Error = core::convert::Infallible;
+}
+
+impl embedded_hal::digital::OutputPin for DummyPin {
+    fn set_low(&mut self) -> Result<(), Self::Error> {
+        self.set_output_high(true, private::Internal);
+        Ok(())
+    }
+
+    fn set_high(&mut self) -> Result<(), Self::Error> {
+        self.set_output_high(false, private::Internal);
+        Ok(())
+    }
+}
+
+impl embedded_hal::digital::StatefulOutputPin for DummyPin {
+    fn is_set_high(&mut self) -> Result<bool, Self::Error> {
+        Ok(OutputPin::is_set_high(self, private::Internal))
+    }
+
+    fn is_set_low(&mut self) -> Result<bool, Self::Error> {
+        Ok(!OutputPin::is_set_high(self, private::Internal))
+    }
+}

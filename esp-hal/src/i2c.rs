@@ -5,61 +5,45 @@
 //! same bus. I2C uses two bidirectional open-drain lines: serial data line
 //! (SDA) and serial clock line (SCL), pulled up by resistors.
 //!
-//! Espressif devices sometimes have more than one I2C controller (also called
-//! port), responsible for handling communication on the I2C bus. A single I2C
-//! controller can be a master or a slave.
+//! Espressif devices sometimes have more than one I2C controller, responsible
+//! for handling communication on the I2C bus. A single I2C controller can be
+//! a master or a slave.
 //!
 //! Typically, an I2C slave device has a 7-bit address or 10-bit address.
-//! Espressif devices supports both I2C Standard-mode (Sm) and Fast-mode
-//! (Fm) which can go up to 100KHz and 400KHz respectively.
+//! Devices supports both I2C Standard-mode (Sm) and Fast-mode (Fm) which can
+//! go up to 100KHz and 400KHz respectively.
 //!
 //! ## Configuration
 //!
 //! Each I2C controller is individually configurable, and the usual setting
 //! such as frequency, timeout, and SDA/SCL pins can easily be configured.
 //!
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! # use esp_hal::i2c::I2C;
-//! # use esp_hal::gpio::Io;
-//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! // Create a new peripheral object with the described wiring
-//! // and standard I2C clock speed
-//! let mut i2c = I2C::new(
-//!     peripherals.I2C0,
-//!     io.pins.gpio1,
-//!     io.pins.gpio2,
-//!     100.kHz(),
-//!     &clocks,
-//! );
-//! # }
-//! ```
-//! 
 //! ## Usage
 //!
 //! The I2C driver implements a number of third-party traits, with the
 //! intention of making the HAL inter-compatible with various device drivers
 //! from the community. This includes the [embedded-hal] for both 0.2.x and
-//! 1.x.x versions.
+//! 1.0.x versions.
 //!
 //! ## Examples
+//!
 //! ### Read Data from a BMP180 Sensor
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::i2c::I2C;
 //! # use esp_hal::gpio::Io;
-//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//!
 //! // Create a new peripheral object with the described wiring
-//! // and standard I2C clock speed
+//! // and standard I2C clock speed.
 //! let mut i2c = I2C::new(
 //!     peripherals.I2C0,
 //!     io.pins.gpio1,
 //!     io.pins.gpio2,
 //!     100.kHz(),
-//!     &clocks,
 //! );
+//!
 //! loop {
 //!     let mut data = [0u8; 22];
 //!     i2c.write_read(0x77, &[0xaa], &mut data).ok();
@@ -110,7 +94,6 @@ pub enum Error {
     CommandNrExceeded,
 }
 
-#[cfg(any(feature = "embedded-hal", feature = "async"))]
 #[derive(PartialEq)]
 // This enum is used to keep track of the last operation that was performed
 // in an embedded-hal(-async) I2C::transaction. It used to determine whether
@@ -121,7 +104,6 @@ enum LastOpWas {
     None,
 }
 
-#[cfg(feature = "embedded-hal")]
 impl embedded_hal::i2c::Error for Error {
     fn kind(&self) -> embedded_hal::i2c::ErrorKind {
         use embedded_hal::i2c::{ErrorKind, NoAcknowledgeSource};
@@ -218,7 +200,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T> embedded_hal_02::blocking::i2c::Read for I2C<'_, T, crate::Blocking>
 where
     T: Instance,
@@ -230,7 +211,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T> embedded_hal_02::blocking::i2c::Write for I2C<'_, T, crate::Blocking>
 where
     T: Instance,
@@ -242,7 +222,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T> embedded_hal_02::blocking::i2c::WriteRead for I2C<'_, T, crate::Blocking>
 where
     T: Instance,
@@ -259,12 +238,10 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, DM: crate::Mode> embedded_hal::i2c::ErrorType for I2C<'_, T, DM> {
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<T, DM: crate::Mode> embedded_hal::i2c::I2c for I2C<'_, T, DM>
 where
     T: Instance,
@@ -325,7 +302,6 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        clocks: &Clocks<'d>,
         timeout: Option<u32>,
     ) -> Self {
         crate::into_ref!(i2c, sda, scl);
@@ -377,7 +353,7 @@ where
             crate::private::Internal,
         );
 
-        i2c.peripheral.setup(frequency, clocks, timeout);
+        i2c.peripheral.setup(frequency, timeout);
         i2c
     }
 
@@ -401,9 +377,8 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        clocks: &Clocks<'d>,
     ) -> Self {
-        Self::new_with_timeout(i2c, sda, scl, frequency, clocks, None)
+        Self::new_with_timeout(i2c, sda, scl, frequency, None)
     }
 
     /// Create a new I2C instance with a custom timeout value.
@@ -414,10 +389,9 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        clocks: &Clocks<'d>,
         timeout: Option<u32>,
     ) -> Self {
-        Self::new_internal(i2c, sda, scl, frequency, clocks, timeout)
+        Self::new_internal(i2c, sda, scl, frequency, timeout)
     }
 }
 
@@ -432,7 +406,6 @@ where
     }
 }
 
-#[cfg(feature = "async")]
 impl<'d, T> I2C<'d, T, crate::Async>
 where
     T: Instance,
@@ -445,9 +418,8 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        clocks: &Clocks<'d>,
     ) -> Self {
-        Self::new_with_timeout_async(i2c, sda, scl, frequency, clocks, None)
+        Self::new_with_timeout_async(i2c, sda, scl, frequency, None)
     }
 
     /// Create a new I2C instance with a custom timeout value.
@@ -458,10 +430,9 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        clocks: &Clocks<'d>,
         timeout: Option<u32>,
     ) -> Self {
-        let mut this = Self::new_internal(i2c, sda, scl, frequency, clocks, timeout);
+        let mut this = Self::new_internal(i2c, sda, scl, frequency, timeout);
 
         let handler = match T::I2C_NUMBER {
             0 => asynch::i2c0_handler,
@@ -479,7 +450,6 @@ where
     }
 }
 
-#[cfg(feature = "async")]
 mod asynch {
     #[cfg(not(esp32))]
     use core::{
@@ -908,7 +878,6 @@ mod asynch {
         }
     }
 
-    #[cfg(feature = "embedded-hal")]
     impl<'d, T> embedded_hal_async::i2c::I2c for I2C<'d, T, crate::Async>
     where
         T: Instance,
@@ -1036,7 +1005,7 @@ pub trait Instance: crate::private::Sealed {
 
     /// Configures the I2C peripheral with the specified frequency, clocks, and
     /// optional timeout.
-    fn setup(&mut self, frequency: HertzU32, clocks: &Clocks<'_>, timeout: Option<u32>) {
+    fn setup(&mut self, frequency: HertzU32, timeout: Option<u32>) {
         self.register_block().ctr().modify(|_, w| unsafe {
             // Clear register
             w.bits(0)
@@ -1068,6 +1037,7 @@ pub trait Instance: crate::private::Sealed {
         self.set_filter(Some(7), Some(7));
 
         // Configure frequency
+        let clocks = Clocks::get();
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
                 self.set_frequency(clocks.i2c_clock.convert(), frequency, timeout);

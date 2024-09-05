@@ -2,11 +2,11 @@
 //!
 //! Folowing pins are used:
 //! SCLK    GPIO0
-//! MISO    GPIO2
-//! MOSI    GPIO3
+//! MISO    GPIO2 / GPIO9 (esp32s2 and esp32s3)
+//! MOSI    GPIO3 / GPIO10 (esp32s2 and esp32s3)
 //! CS      GPIO8
 //!
-//! Connect MISO (GPIO2) and MOSI (GPIO3) pins.
+//! Connect MISO and MOSI pins.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -15,12 +15,9 @@
 
 use embedded_hal::spi::SpiBus;
 use esp_hal::{
-    clock::ClockControl,
     gpio::Io,
-    peripherals::Peripherals,
     prelude::*,
     spi::{master::Spi, FullDuplexMode, SpiMode},
-    system::SystemControl,
 };
 use hil_test as _;
 
@@ -37,17 +34,14 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
-        let miso = io.pins.gpio2;
-        let mosi = io.pins.gpio3;
+        let (miso, mosi) = hil_test::common_test_pins!(io);
         let cs = io.pins.gpio8;
 
-        let spi = Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0, &clocks).with_pins(
+        let spi = Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0).with_pins(
             Some(sclk),
             Some(mosi),
             Some(miso),

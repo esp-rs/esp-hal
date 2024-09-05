@@ -12,10 +12,10 @@
 //!
 //! ```rust,ignore
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let rmt = Rmt::new(peripherals.RMT, 80.MHz(), &clocks, None).unwrap();
+//! let rmt = Rmt::new(peripherals.RMT, 80.MHz(), None).unwrap();
 //!
 //! let rmt_buffer = smartLedBuffer!(1);
-//! let mut led = SmartLedsAdapter::new(rmt.channel0, io.pins.gpio2, rmt_buffer, &clocks);
+//! let mut led = SmartLedsAdapter::new(rmt.channel0, io.pins.gpio2, rmt_buffer);
 //! ```
 //!
 //! ## Feature Flags
@@ -89,7 +89,6 @@ where
         channel: C,
         pin: impl Peripheral<P = O> + 'd,
         rmt_buffer: [u32; BUFFER_SIZE],
-        clocks: &Clocks,
     ) -> SmartLedsAdapter<TX, BUFFER_SIZE>
     where
         O: OutputPin + 'd,
@@ -107,6 +106,7 @@ where
         let channel = channel.configure(pin, config).unwrap();
 
         // Assume the RMT peripheral is set up to use the APB clock
+        let clocks = Clocks::get();
         let src_clock = clocks.apb_clock.to_MHz();
 
         Self {

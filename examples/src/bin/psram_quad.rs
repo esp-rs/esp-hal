@@ -13,13 +13,7 @@ extern crate alloc;
 use alloc::{string::String, vec::Vec};
 
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    peripherals::Peripherals,
-    prelude::*,
-    psram,
-    system::SystemControl,
-};
+use esp_hal::{prelude::*, psram};
 use esp_println::println;
 
 #[global_allocator]
@@ -36,13 +30,10 @@ fn main() -> ! {
     #[cfg(debug_assertions)]
     compile_error!("PSRAM example must be built in release mode!");
 
-    let peripherals = Peripherals::take();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     psram::init_psram(peripherals.PSRAM);
     init_psram_heap();
-
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let _clocks = ClockControl::max(system.clock_control).freeze();
 
     println!("Going to access PSRAM");
     let mut large_vec = Vec::<u32>::with_capacity(500 * 1024 / 4);

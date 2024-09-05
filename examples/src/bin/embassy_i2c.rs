@@ -11,7 +11,7 @@
 //! - SCL => GPIO5
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: async embassy embassy-generic-timers
+//% FEATURES: embassy embassy-generic-timers
 
 #![no_std]
 #![no_main]
@@ -19,35 +19,19 @@
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    gpio::Io,
-    i2c::I2C,
-    peripherals::Peripherals,
-    prelude::*,
-    system::SystemControl,
-    timer::timg::TimerGroup,
-};
+use esp_hal::{gpio::Io, i2c::I2C, prelude::*, timer::timg::TimerGroup};
 use lis3dh_async::{Lis3dh, Range, SlaveAddr};
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0.timer0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_hal_embassy::init(timg0.timer0);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let i2c0 = I2C::new_async(
-        peripherals.I2C0,
-        io.pins.gpio4,
-        io.pins.gpio5,
-        400.kHz(),
-        &clocks,
-    );
+    let i2c0 = I2C::new_async(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, 400.kHz());
 
     let mut lis3dh = Lis3dh::new_i2c(i2c0, SlaveAddr::Alternate).await.unwrap();
     lis3dh.set_range(Range::G8).await.unwrap();

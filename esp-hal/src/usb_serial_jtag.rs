@@ -45,17 +45,19 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! use esp_hal::usb_serial_jtag::UsbSerialJtag;
+//!
 //! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 //!
 //! // Write bytes out over the USB Serial/JTAG:
 //! usb_serial.write_bytes(b"Hello, world!").expect("write error!");
-//! }
+//! # }
 //! ```
 //! 
 //! ### Splitting the USB Serial/JTAG into TX and RX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::usb_serial_jtag::UsbSerialJtag;
+//! use esp_hal::usb_serial_jtag::UsbSerialJtag;
+//!
 //! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 //! // The USB Serial/JTAG can be split into separate Transmit and Receive
 //! // components:
@@ -423,7 +425,6 @@ where
     }
 }
 
-#[cfg(feature = "ufmt")]
 impl<M> ufmt_write::uWrite for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -441,7 +442,6 @@ where
     }
 }
 
-#[cfg(feature = "ufmt")]
 impl<M> ufmt_write::uWrite for UsbSerialJtagTx<'_, M>
 where
     M: Mode,
@@ -463,7 +463,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<M> embedded_hal_02::serial::Read<u8> for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -475,7 +474,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<M> embedded_hal_02::serial::Read<u8> for UsbSerialJtagRx<'_, M>
 where
     M: Mode,
@@ -487,7 +485,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<M> embedded_hal_02::serial::Write<u8> for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -503,7 +500,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<M> embedded_hal_02::serial::Write<u8> for UsbSerialJtagTx<'_, M>
 where
     M: Mode,
@@ -519,7 +515,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::ErrorType for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -527,7 +522,6 @@ where
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::ErrorType for UsbSerialJtagTx<'_, M>
 where
     M: Mode,
@@ -535,7 +529,6 @@ where
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::ErrorType for UsbSerialJtagRx<'_, M>
 where
     M: Mode,
@@ -543,7 +536,6 @@ where
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::Read for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -553,7 +545,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::Read for UsbSerialJtagRx<'_, M>
 where
     M: Mode,
@@ -563,7 +554,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::Write for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -577,7 +567,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<M> embedded_hal_nb::serial::Write for UsbSerialJtagTx<'_, M>
 where
     M: Mode,
@@ -591,7 +580,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::ErrorType for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -599,7 +587,6 @@ where
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::ErrorType for UsbSerialJtagTx<'_, M>
 where
     M: Mode,
@@ -607,7 +594,6 @@ where
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::ErrorType for UsbSerialJtagRx<'_, M>
 where
     M: Mode,
@@ -615,7 +601,6 @@ where
     type Error = Error;
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::Read for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -625,7 +610,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::Read for UsbSerialJtagRx<'_, M>
 where
     M: Mode,
@@ -640,7 +624,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::Write for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -654,7 +637,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-io")]
 impl<M> embedded_io::Write for UsbSerialJtagTx<'_, M>
 where
     M: Mode,
@@ -670,7 +652,6 @@ where
     }
 }
 
-#[cfg(feature = "async")]
 mod asynch {
     use core::{marker::PhantomData, task::Poll};
 

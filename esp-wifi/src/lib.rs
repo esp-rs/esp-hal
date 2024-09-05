@@ -73,6 +73,12 @@ const DEFAULT_TICK_RATE_HZ: u32 = 50;
 #[cfg(not(debug_assertions))]
 const DEFAULT_TICK_RATE_HZ: u32 = 100;
 
+#[cfg(not(coex))]
+const DEFAULT_HEAP_SIZE: usize = 81920;
+
+#[cfg(coex)]
+const DEFAULT_HEAP_SIZE: usize = 90112;
+
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[toml_cfg::toml_config]
@@ -106,7 +112,7 @@ struct Config {
     country_code_operating_class: u8,
     #[default(1492)]
     mtu: usize,
-    #[default(65536)]
+    #[default(DEFAULT_HEAP_SIZE)]
     heap_size: usize,
     #[default(DEFAULT_TICK_RATE_HZ)]
     tick_rate_hz: u32,
@@ -287,13 +293,12 @@ impl EspWifiTimerSource for TimeBase {
 /// use esp_hal::{rng::Rng, timg::TimerGroup};
 /// use esp_wifi::EspWifiInitFor;
 ///
-/// let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+/// let timg0 = TimerGroup::new(peripherals.TIMG0);
 /// let init = esp_wifi::initialize(
 ///     EspWifiInitFor::Wifi,
 ///     timg0.timer0,
 ///     Rng::new(peripherals.RNG),
 ///     peripherals.RADIO_CLK,
-///     &clocks,
 /// )
 /// .unwrap();
 /// # }
@@ -303,10 +308,10 @@ pub fn initialize(
     timer: impl EspWifiTimerSource,
     rng: hal::rng::Rng,
     radio_clocks: hal::peripherals::RADIO_CLK,
-    clocks: &Clocks,
 ) -> Result<EspWifiInitialization, InitializationError> {
     // A minimum clock of 80MHz is required to operate WiFi module.
     const MIN_CLOCK: u32 = 80;
+    let clocks = Clocks::get();
     if clocks.cpu_clock < MegahertzU32::MHz(MIN_CLOCK) {
         return Err(InitializationError::WrongClockConfig);
     }

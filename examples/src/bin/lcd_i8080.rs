@@ -23,7 +23,6 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
@@ -32,17 +31,13 @@ use esp_hal::{
         lcd::i8080::{Config, TxEightBits, I8080},
         LcdCam,
     },
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -59,7 +54,7 @@ fn main() -> ! {
 
     let channel = channel.configure(false, DmaPriority::Priority0);
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let mut backlight = Output::new(lcd_backlight, Level::Low);
     let mut reset = Output::new(lcd_reset, Level::Low);
@@ -83,7 +78,6 @@ fn main() -> ! {
         tx_pins,
         20.MHz(),
         Config::default(),
-        &clocks,
     )
     .with_ctrl_pins(lcd_rs, lcd_wr);
 

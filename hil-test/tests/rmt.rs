@@ -1,6 +1,7 @@
 //! RMT Loopback Test
 //!
 //! It's assumed GPIO2 is connected to GPIO3
+//! (GPIO9 and GPIO10 for esp32s2 and esp32s3)
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -8,12 +9,9 @@
 #![no_main]
 
 use esp_hal::{
-    clock::ClockControl,
     gpio::Io,
-    peripherals::Peripherals,
     prelude::*,
     rmt::{PulseCode, Rmt, RxChannel, RxChannelConfig, TxChannel, TxChannelConfig},
-    system::SystemControl,
 };
 use hil_test as _;
 
@@ -28,9 +26,7 @@ mod tests {
     #[test]
     #[timeout(1)]
     fn rmt_loopback() {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -42,7 +38,9 @@ mod tests {
             }
         };
 
-        let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
+        let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
+
+        let (tx, rx) = hil_test::common_test_pins!(io);
 
         let tx_config = TxChannelConfig {
             clk_divider: 255,
@@ -51,7 +49,7 @@ mod tests {
 
         let tx_channel = {
             use esp_hal::rmt::TxChannelCreator;
-            rmt.channel0.configure(io.pins.gpio2, tx_config).unwrap()
+            rmt.channel0.configure(tx, tx_config).unwrap()
         };
 
         let rx_config = RxChannelConfig {
@@ -64,17 +62,17 @@ mod tests {
             if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
                 let  rx_channel = {
                     use esp_hal::rmt::RxChannelCreator;
-                    rmt.channel1.configure(io.pins.gpio3, rx_config).unwrap()
+                    rmt.channel1.configure(rx, rx_config).unwrap()
                 };
             } else if #[cfg(feature = "esp32s3")] {
                 let  rx_channel = {
                     use esp_hal::rmt::RxChannelCreator;
-                    rmt.channel7.configure(io.pins.gpio3, rx_config).unwrap()
+                    rmt.channel7.configure(rx, rx_config).unwrap()
                 };
             } else {
                 let  rx_channel = {
                     use esp_hal::rmt::RxChannelCreator;
-                    rmt.channel2.configure(io.pins.gpio3, rx_config).unwrap()
+                    rmt.channel2.configure(rx, rx_config).unwrap()
                 };
             }
         }

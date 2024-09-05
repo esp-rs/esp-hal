@@ -13,11 +13,9 @@ use esp_hal::sha::{Sha384, Sha512};
 #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
 use esp_hal::sha::{Sha512_224, Sha512_256};
 use esp_hal::{
-    clock::ClockControl,
-    peripherals::Peripherals,
+    prelude::*,
     rng::Rng,
     sha::{Sha, Sha1, Sha256, ShaAlgorithm, ShaDigest},
-    system::SystemControl,
 };
 use hil_test as _;
 use nb::block;
@@ -84,6 +82,7 @@ fn assert_digest<'a, S: ShaAlgorithm, const N: usize>(sha: &'a mut Sha<'static>,
     }
 }
 
+#[allow(unused_mut)]
 fn with_random_data(
     mut rng: Rng,
     mut f: impl FnMut(
@@ -97,7 +96,6 @@ fn with_random_data(
     const BUFFER_LEN: usize = 256;
 
     let mut sha1_random = [0u8; BUFFER_LEN];
-    #[cfg_attr(feature = "esp32", allow(unused_mut))]
     let mut sha224_random = [0u8; BUFFER_LEN];
     let mut sha256_random = [0u8; BUFFER_LEN];
     let mut sha384_random = [0u8; BUFFER_LEN];
@@ -162,23 +160,24 @@ pub struct Context {
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
+    #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
     use defmt::assert_eq;
 
     use super::*;
 
     #[init]
     fn init() -> Context {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
         cfg_if::cfg_if! {
             if #[cfg(feature = "esp32")] {
                 // FIXME: max speed fails...?
-                let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+                let config = esp_hal::Config::default();
             } else {
-                let _clocks = ClockControl::max(system.clock_control).freeze();
+                let mut config = esp_hal::Config::default();
+                config.cpu_clock = CpuClock::max();
             }
         }
 
+        let peripherals = esp_hal::init(config);
         Context {
             rng: Rng::new(peripherals.RNG),
             sha: Sha::new(peripherals.SHA),

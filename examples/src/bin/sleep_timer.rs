@@ -9,23 +9,18 @@ use core::time::Duration;
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     entry,
-    peripherals::Peripherals,
     rtc_cntl::{get_reset_reason, get_wakeup_cause, sleep::TimerWakeupSource, Rtc, SocResetReason},
-    system::SystemControl,
     Cpu,
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
     let mut rtc = Rtc::new(peripherals.LPWR);
 
     println!("up and runnning!");

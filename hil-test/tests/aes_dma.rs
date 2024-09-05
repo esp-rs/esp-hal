@@ -14,6 +14,7 @@ use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
     peripherals::Peripherals,
+    prelude::*,
 };
 use hil_test as _;
 
@@ -27,12 +28,12 @@ mod tests {
     use super::*;
 
     #[init]
-    fn init() {}
+    fn init() -> Peripherals {
+        esp_hal::init(esp_hal::Config::default())
+    }
 
     #[test]
-    fn test_aes_128_dma_encryption() {
-        let peripherals = Peripherals::take();
-
+    fn test_aes_128_dma_encryption(peripherals: Peripherals) {
         let dma = Dma::new(peripherals.DMA);
         let dma_channel = dma.channel0;
 
@@ -74,9 +75,7 @@ mod tests {
     }
 
     #[test]
-    fn test_aes_128_dma_decryption() {
-        let peripherals = Peripherals::take();
-
+    fn test_aes_128_dma_decryption(peripherals: Peripherals) {
         let dma = Dma::new(peripherals.DMA);
         let dma_channel = dma.channel0;
 
@@ -117,9 +116,7 @@ mod tests {
     }
 
     #[test]
-    fn test_aes_256_dma_encryption() {
-        let peripherals = Peripherals::take();
-
+    fn test_aes_256_dma_encryption(peripherals: Peripherals) {
         let dma = Dma::new(peripherals.DMA);
         let dma_channel = dma.channel0;
 
@@ -161,9 +158,7 @@ mod tests {
     }
 
     #[test]
-    fn test_aes_256_dma_decryption() {
-        let peripherals = Peripherals::take();
-
+    fn test_aes_256_dma_decryption(peripherals: Peripherals) {
         let dma = Dma::new(peripherals.DMA);
         let dma_channel = dma.channel0;
 

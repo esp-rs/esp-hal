@@ -24,10 +24,7 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Instant, Ticker, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
-    interrupt::Priority,
-    peripherals::Peripherals,
-    system::SystemControl,
+    interrupt::{software::SoftwareInterruptControl, Priority},
     timer::{timg::TimerGroup, ErasedTimer},
 };
 use esp_hal_embassy::InterruptExecutor;
@@ -73,11 +70,12 @@ async fn low_prio_async() {
 async fn main(low_prio_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     println!("Init!");
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
     let timer0: ErasedTimer = timg0.timer0.into();
 
     cfg_if::cfg_if! {
@@ -86,15 +84,15 @@ async fn main(low_prio_spawner: Spawner) {
             let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
             let timer1: ErasedTimer = systimer.alarm0.into();
         } else {
-            let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
+            let timg1 = TimerGroup::new(peripherals.TIMG1);
             let timer1: ErasedTimer = timg1.timer0.into();
         }
     }
 
-    esp_hal_embassy::init(&clocks, [timer0, timer1]);
+    esp_hal_embassy::init([timer0, timer1]);
 
     static EXECUTOR: StaticCell<InterruptExecutor<2>> = StaticCell::new();
-    let executor = InterruptExecutor::new(system.software_interrupt_control.software_interrupt2);
+    let executor = InterruptExecutor::new(sw_ints.software_interrupt2);
     let executor = EXECUTOR.init(executor);
 
     let spawner = executor.start(Priority::Priority3);

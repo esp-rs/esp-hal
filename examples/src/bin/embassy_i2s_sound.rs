@@ -1,4 +1,4 @@
-//! This shows how to transmit data continously via I2S.
+//! This shows how to transmit data continuously via I2S.
 //!
 //! Without an additional I2S sink device you can inspect the BCLK, WS
 //! and DOUT with a logic analyzer.
@@ -26,7 +26,7 @@
 //! | XSMT  | +3V3            |
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: async embassy embassy-generic-timers
+//% FEATURES: embassy embassy-generic-timers
 
 #![no_std]
 #![no_main]
@@ -34,14 +34,11 @@
 use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::Io,
     i2s::{asynch::*, DataFormat, I2s, Standard},
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
     timer::timg::TimerGroup,
 };
 use esp_println::println;
@@ -57,12 +54,10 @@ const SINE: [i16; 64] = [
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
     println!("Init!");
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0.timer0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_hal_embassy::init(timg0.timer0);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -82,7 +77,6 @@ async fn main(_spawner: Spawner) {
         dma_channel.configure_for_async(false, DmaPriority::Priority0),
         tx_descriptors,
         rx_descriptors,
-        &clocks,
     );
 
     let i2s_tx = i2s

@@ -6,23 +6,11 @@
 #![no_main]
 
 use embedded_hal::delay::DelayNs;
-use esp_hal::{clock::ClockControl, delay::Delay, peripherals::Peripherals, system::SystemControl};
+use esp_hal::delay::Delay;
 use hil_test as _;
 
 struct Context {
     delay: Delay,
-}
-
-impl Context {
-    pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-        let delay = Delay::new(&clocks);
-
-        Context { delay }
-    }
 }
 
 #[cfg(test)]
@@ -32,7 +20,10 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        Context::init()
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let delay = Delay::new();
+
+        Context { delay }
     }
 
     #[test]

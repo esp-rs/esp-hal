@@ -28,26 +28,30 @@
 //! # let plaintext = b"message";
 //! # let mut keybuf = [0_u8; 16];
 //! # keybuf[..keytext.len()].copy_from_slice(keytext);
-//! let mut block_buf = [0_u8; 16];
-//! block_buf[..plaintext.len()].copy_from_slice(plaintext);
-//! let mut block = block_buf.clone();
+//! #
+//! let mut block = [0_u8; 16];
+//! block[..plaintext.len()].copy_from_slice(plaintext);
 //!
 //! let mut aes = Aes::new(peripherals.AES);
 //! aes.process(&mut block, Mode::Encryption128, keybuf);
-//! let hw_encrypted = block.clone();
+//!
+//! // The encryption happens in-place, so the ciphertext is in `block`
 //!
 //! aes.process(&mut block, Mode::Decryption128, keybuf);
-//! let hw_decrypted = block;
+//!
+//! // The decryption happens in-place, so the plaintext is in `block`
 //! # }
 //! ```
 //! 
 //! ### AES-DMA
+//!
 //! Visit the [AES-DMA] test for a more advanced example of using AES-DMA
 //! mode.
 //!
 //! [AES-DMA]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/aes_dma.rs
 //!
 //! ## Implementation State
+//!
 //! * AES-DMA mode is currently not supported on ESP32 and ESP32S2
 //! * AES-DMA Initialization Vector (IV) is currently not supported
 
@@ -413,7 +417,7 @@ pub mod dma {
             mode: Mode,
             cipher_mode: CipherMode,
             key: K,
-        ) -> Result<DmaTransferTxRx<'_, Self>, crate::dma::DmaError>
+        ) -> Result<DmaTransferTxRx<'t, Self>, crate::dma::DmaError>
         where
             K: Into<Key>,
             TXBUF: ReadBuffer,

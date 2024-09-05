@@ -20,23 +20,18 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::Io,
-    peripherals::Peripherals,
     prelude::*,
     spi::{master::Spi, SpiMode},
-    system::SystemControl,
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let sclk = io.pins.gpio0;
@@ -58,11 +53,11 @@ fn main() -> ! {
     let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
     let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
-    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
         .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
         .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let mut i = 0;
 

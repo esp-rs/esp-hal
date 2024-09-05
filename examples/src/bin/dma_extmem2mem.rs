@@ -9,13 +9,10 @@
 use aligned::{Aligned, A64};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     dma::{Dma, DmaPriority, Mem2Mem},
     dma_descriptors_chunk_size,
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
 };
 use log::{error, info};
 extern crate alloc;
@@ -65,11 +62,10 @@ fn init_heap(psram: impl esp_hal::peripheral::Peripheral<P = esp_hal::peripheral
 fn main() -> ! {
     esp_println::logger::init_logger(log::LevelFilter::Info);
 
-    let peripherals = Peripherals::take();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
+
     init_heap(peripherals.PSRAM);
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let mut extram_buffer: &mut [u8] = dma_alloc_buffer!(DATA_SIZE, 64);
     let mut intram_buffer = dma_buffer_aligned!(DATA_SIZE, A64);

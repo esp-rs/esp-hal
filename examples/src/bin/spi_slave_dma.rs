@@ -31,26 +31,21 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::{Gpio4, Gpio5, Gpio8, Gpio9, Input, Io, Level, Output, Pull},
-    peripherals::Peripherals,
+    gpio::{GpioPin, Input, Io, Level, Output, Pull},
     prelude::*,
     spi::{
         slave::{prelude::*, Spi},
         SpiMode,
     },
-    system::SystemControl,
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let slave_sclk = io.pins.gpio0;
@@ -90,7 +85,7 @@ fn main() -> ! {
         rx_descriptors,
     );
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     // DMA buffer require a static life-time
     let master_send = &mut [0u8; 32000];
@@ -194,10 +189,10 @@ fn main() -> ! {
 fn bitbang_master(
     master_send: &[u8],
     master_receive: &mut [u8],
-    master_cs: &mut Output<Gpio9>,
-    master_mosi: &mut Output<Gpio8>,
-    master_sclk: &mut Output<Gpio4>,
-    master_miso: &Input<Gpio5>,
+    master_cs: &mut Output<GpioPin<9>>,
+    master_mosi: &mut Output<GpioPin<8>>,
+    master_sclk: &mut Output<GpioPin<4>>,
+    master_miso: &Input<GpioPin<5>>,
 ) {
     // Bit-bang out the contents of master_send and read into master_receive
     // as quickly as manageable. MSB first. Mode 0, so sampled on the rising

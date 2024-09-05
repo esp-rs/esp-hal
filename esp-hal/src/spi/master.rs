@@ -16,9 +16,8 @@
 //!
 //! - Use the [`FullDuplex`](embedded_hal_02::spi::FullDuplex) trait to
 //!   read/write single bytes at a time,
-//! - Use the [`SpiBus`](embedded_hal::spi::SpiBus) trait (requires the
-//!   "embedded-hal" feature) and its associated functions to initiate
-//!   transactions with simultaneous reads and writes, or
+//! - Use the [`SpiBus`](embedded_hal::spi::SpiBus) trait and its associated
+//!   functions to initiate transactions with simultaneous reads and writes, or
 //! - Use the `ExclusiveDevice` struct from [`embedded-hal-bus`] or `SpiDevice`
 //!   from [`embassy-embedded-hal`].
 //!
@@ -38,7 +37,6 @@
 //! ### SPI Initialization
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
 //! # use esp_hal::spi::SpiMode;
 //! # use esp_hal::spi::master::Spi;
 //! # use esp_hal::gpio::Io;
@@ -52,7 +50,6 @@
 //!     peripherals.SPI2,
 //!     100.kHz(),
 //!     SpiMode::Mode0,
-//!     &mut clocks,
 //! )
 //! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs));
 //! # }
@@ -511,10 +508,9 @@ where
         spi: impl Peripheral<P = T> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
-        clocks: &Clocks<'d>,
     ) -> Spi<'d, T, FullDuplexMode> {
         crate::into_ref!(spi);
-        Self::new_internal(spi, frequency, mode, clocks)
+        Self::new_internal(spi, frequency, mode)
     }
 
     /// Assign the SCK (Serial Clock) pin for the SPI instance.
@@ -614,7 +610,6 @@ where
         spi: PeripheralRef<'d, T>,
         frequency: HertzU32,
         mode: SpiMode,
-        clocks: &Clocks<'d>,
     ) -> Spi<'d, T, FullDuplexMode> {
         spi.reset_peripheral();
         spi.enable_peripheral();
@@ -623,7 +618,7 @@ where
             spi,
             _mode: PhantomData,
         };
-        spi.spi.setup(frequency, clocks);
+        spi.spi.setup(frequency);
         spi.spi.init();
         spi.spi.set_data_mode(mode);
 
@@ -634,8 +629,8 @@ where
     ///
     /// This method allows user to update the bus frequency for the SPI
     /// communication after the instance has been created.
-    pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks<'d>) {
-        self.spi.ch_bus_freq(frequency, clocks);
+    pub fn change_bus_frequency(&mut self, frequency: HertzU32) {
+        self.spi.ch_bus_freq(frequency);
     }
 }
 
@@ -651,10 +646,9 @@ where
         spi: impl Peripheral<P = T> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
-        clocks: &Clocks<'d>,
     ) -> Spi<'d, T, HalfDuplexMode> {
         crate::into_ref!(spi);
-        Self::new_internal(spi, frequency, mode, clocks)
+        Self::new_internal(spi, frequency, mode)
     }
 
     /// Assign the SCK (Serial Clock) pin for the SPI instance.
@@ -822,7 +816,6 @@ where
         spi: PeripheralRef<'d, T>,
         frequency: HertzU32,
         mode: SpiMode,
-        clocks: &Clocks<'d>,
     ) -> Spi<'d, T, HalfDuplexMode> {
         spi.reset_peripheral();
         spi.enable_peripheral();
@@ -831,7 +824,7 @@ where
             spi,
             _mode: PhantomData,
         };
-        spi.spi.setup(frequency, clocks);
+        spi.spi.setup(frequency);
         spi.spi.init();
         spi.spi.set_data_mode(mode);
 
@@ -842,8 +835,8 @@ where
     ///
     /// This method allows you to update the bus frequency for the SPI
     /// communication after the instance has been created.
-    pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks<'d>) {
-        self.spi.ch_bus_freq(frequency, clocks);
+    pub fn change_bus_frequency(&mut self, frequency: HertzU32) {
+        self.spi.ch_bus_freq(frequency);
     }
 
     /// Set the bit order for the SPI instance.
@@ -901,7 +894,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T> embedded_hal_02::spi::FullDuplex<u8> for Spi<'_, T, FullDuplexMode>
 where
     T: Instance,
@@ -917,7 +909,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T> embedded_hal_02::blocking::spi::Transfer<u8> for Spi<'_, T, FullDuplexMode>
 where
     T: Instance,
@@ -929,7 +920,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T> embedded_hal_02::blocking::spi::Write<u8> for Spi<'_, T, FullDuplexMode>
 where
     T: Instance,
@@ -949,12 +939,11 @@ mod dma {
     };
 
     use super::*;
-    #[cfg(feature = "async")]
-    use crate::dma::asynch::{DmaRxFuture, DmaTxFuture};
     #[cfg(spi3)]
     use crate::dma::Spi3Peripheral;
     use crate::{
         dma::{
+            asynch::{DmaRxFuture, DmaTxFuture},
             Channel,
             DmaChannel,
             DmaRxBuf,
@@ -1133,8 +1122,8 @@ mod dma {
         M: Mode,
     {
         /// Changes the SPI bus frequency for the DMA-enabled SPI instance.
-        pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks<'d>) {
-            self.spi.ch_bus_freq(frequency, clocks);
+        pub fn change_bus_frequency(&mut self, frequency: HertzU32) {
+            self.spi.ch_bus_freq(frequency);
         }
     }
 
@@ -1238,7 +1227,6 @@ mod dma {
         }
     }
 
-    #[cfg(feature = "async")]
     impl<'d, T, C, D, Buf> SpiDmaTransfer<'d, T, C, D, crate::Async, Buf>
     where
         T: Instance,
@@ -1652,9 +1640,9 @@ mod dma {
         }
 
         /// Changes the SPI bus frequency for the DMA-enabled SPI instance.
-        pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks<'d>) {
+        pub fn change_bus_frequency(&mut self, frequency: HertzU32) {
             let (mut spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
-            spi_dma.change_bus_frequency(frequency, clocks);
+            spi_dma.change_bus_frequency(frequency);
             self.state = State::Idle(spi_dma, tx_buf, rx_buf);
         }
 
@@ -1900,7 +1888,6 @@ mod dma {
         }
     }
 
-    #[cfg(feature = "embedded-hal-02")]
     impl<'d, T, C> embedded_hal_02::blocking::spi::Transfer<u8>
         for SpiDmaBus<'d, T, C, FullDuplexMode, crate::Blocking>
     where
@@ -1916,7 +1903,6 @@ mod dma {
         }
     }
 
-    #[cfg(feature = "embedded-hal-02")]
     impl<'d, T, C> embedded_hal_02::blocking::spi::Write<u8>
         for SpiDmaBus<'d, T, C, FullDuplexMode, crate::Blocking>
     where
@@ -1933,7 +1919,6 @@ mod dma {
     }
 
     /// Async functionality
-    #[cfg(feature = "async")]
     mod asynch {
         use core::{cmp::min, mem::take};
 
@@ -2164,7 +2149,6 @@ mod dma {
         }
     }
 
-    #[cfg(feature = "embedded-hal")]
     mod ehal1 {
         use embedded_hal::spi::{ErrorType, SpiBus};
 
@@ -2211,7 +2195,6 @@ mod dma {
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 mod ehal1 {
     use embedded_hal::spi::SpiBus;
     use embedded_hal_nb::spi::FullDuplex;
@@ -2843,7 +2826,8 @@ pub trait Instance: private::Sealed {
     }
 
     // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
-    fn setup(&mut self, frequency: HertzU32, clocks: &Clocks<'_>) {
+    fn setup(&mut self, frequency: HertzU32) {
+        let clocks = Clocks::get();
         cfg_if::cfg_if! {
             if #[cfg(esp32h2)] {
                 // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
@@ -3045,7 +3029,7 @@ pub trait Instance: private::Sealed {
         self
     }
 
-    fn ch_bus_freq(&mut self, frequency: HertzU32, clocks: &Clocks<'_>) {
+    fn ch_bus_freq(&mut self, frequency: HertzU32) {
         // Disable clock source
         #[cfg(not(any(esp32, esp32s2)))]
         self.register_block().clk_gate().modify(|_, w| {
@@ -3058,7 +3042,7 @@ pub trait Instance: private::Sealed {
         });
 
         // Change clock frequency
-        self.setup(frequency, clocks);
+        self.setup(frequency);
 
         // Enable clock source
         #[cfg(not(any(esp32, esp32s2)))]
@@ -3662,7 +3646,7 @@ impl Instance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.bind_spi3_interrupt(handler.handler());
-        crate::interrupt::enable(crate::peripherals::Interrupt::SPI2, handler.priority()).unwrap();
+        crate::interrupt::enable(crate::peripherals::Interrupt::SPI3, handler.priority()).unwrap();
     }
 
     #[inline(always)]
@@ -3793,7 +3777,7 @@ impl Instance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.bind_spi3_interrupt(handler.handler());
-        crate::interrupt::enable(crate::peripherals::Interrupt::SPI2, handler.priority()).unwrap();
+        crate::interrupt::enable(crate::peripherals::Interrupt::SPI3, handler.priority()).unwrap();
     }
 
     #[inline(always)]

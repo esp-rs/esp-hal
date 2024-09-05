@@ -1,14 +1,15 @@
 //! # Inter-IC Sound (I2S)
 //!
 //! ## Overview
+//!
 //! I2S (Inter-IC Sound) is a synchronous serial communication protocol usually
 //! used for transmitting audio data between two digital audio devices.
 //! Espressif devices may contain more than one I2S peripheral(s). These
 //! peripherals can be configured to input and output sample data via the I2S
 //! driver.
 //!
-//!
 //! ## Configuration
+//!
 //! I2S supports different data formats, including varying data and channel
 //! widths, different standards, such as the Philips standard and configurable
 //! pin mappings for I2S clock (BCLK), word select (WS), and data input/output
@@ -18,24 +19,23 @@
 //! supports various configurations, such as different data formats, standards
 //! (e.g., Philips) and pin configurations. It relies on other peripheral
 //! modules, such as
-//!     - `GPIO`
-//!     - `DMA`
-//!     - `system` (to configure and enable the I2S peripheral)
+//!   - `GPIO`
+//!   - `DMA`
+//!   - `system` (to configure and enable the I2S peripheral)
 //!
-//! ## Examples
+//! ## Example
+//!
 //! ### Initialization
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::i2s::I2s;
 //! # use esp_hal::i2s::Standard;
 //! # use esp_hal::i2s::DataFormat;
+//! # use esp_hal::i2s::I2sReadDma;
 //! # use esp_hal::gpio::Io;
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::{Dma, DmaPriority};
-//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
-//! # use crate::esp_hal::peripherals::Peripherals;
-//! # use crate::esp_hal::i2s::I2sReadDma;
-//! # use core::ptr::addr_of_mut;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let dma = Dma::new(peripherals.DMA);
 #![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.i2s0channel;")]
@@ -54,7 +54,6 @@
 //!     ),
 //!     tx_descriptors,
 //!     rx_descriptors,
-//!     &clocks,
 //! );
 #![cfg_attr(not(esp32), doc = "let i2s = i2s.with_mclk(io.pins.gpio0);")]
 //! let mut i2s_rx = i2s.i2s_rx
@@ -88,7 +87,6 @@ use private::*;
 #[cfg(any(esp32, esp32s3))]
 use crate::dma::I2s1Peripheral;
 use crate::{
-    clock::Clocks,
     dma::{
         dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
         Channel,
@@ -274,7 +272,7 @@ where
     /// Write I2S.
     /// Returns [DmaTransferTx] which represents the in-progress DMA
     /// transfer
-    fn write_dma<'t>(&'t mut self, words: &'t TXBUF) -> Result<DmaTransferTx<'_, Self>, Error>
+    fn write_dma<'t>(&'t mut self, words: &'t TXBUF) -> Result<DmaTransferTx<'t, Self>, Error>
     where
         TXBUF: ReadBuffer;
 
@@ -283,7 +281,7 @@ where
     fn write_dma_circular<'t>(
         &'t mut self,
         words: &'t TXBUF,
-    ) -> Result<DmaTransferTxCircular<'_, Self>, Error>
+    ) -> Result<DmaTransferTxCircular<'t, Self>, Error>
     where
         TXBUF: ReadBuffer;
 }
@@ -306,7 +304,7 @@ where
     /// Read I2S.
     /// Returns [DmaTransferRx] which represents the in-progress DMA
     /// transfer
-    fn read_dma<'t>(&'t mut self, words: &'t mut RXBUF) -> Result<DmaTransferRx<'_, Self>, Error>
+    fn read_dma<'t>(&'t mut self, words: &'t mut RXBUF) -> Result<DmaTransferRx<'t, Self>, Error>
     where
         RXBUF: WriteBuffer;
 
@@ -316,7 +314,7 @@ where
     fn read_dma_circular<'t>(
         &'t mut self,
         words: &'t mut RXBUF,
-    ) -> Result<DmaTransferRxCircular<'_, Self>, Error>
+    ) -> Result<DmaTransferRxCircular<'t, Self>, Error>
     where
         RXBUF: WriteBuffer;
 }
@@ -350,7 +348,6 @@ where
         mut channel: Channel<'d, CH, DmaMode>,
         tx_descriptors: &'static mut [DmaDescriptor],
         rx_descriptors: &'static mut [DmaDescriptor],
-        clocks: &Clocks<'d>,
     ) -> Self {
         // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
         // could be configured totally independently but for now handle all
@@ -359,12 +356,7 @@ where
         channel.tx.init_channel();
         PeripheralClockControl::reset(I::get_peripheral());
         PeripheralClockControl::enable(I::get_peripheral());
-        I::set_clock(calculate_clock(
-            sample_rate,
-            2,
-            data_format.channel_bits(),
-            clocks,
-        ));
+        I::set_clock(calculate_clock(sample_rate, 2, data_format.channel_bits()));
         I::configure(&standard, &data_format);
         I::set_master();
         I::update();
@@ -457,7 +449,6 @@ where
         channel: Channel<'d, CH, DmaMode>,
         tx_descriptors: &'static mut [DmaDescriptor],
         rx_descriptors: &'static mut [DmaDescriptor],
-        clocks: &Clocks<'d>,
     ) -> Self
     where
         I: I2s0Instance,
@@ -472,7 +463,6 @@ where
             channel,
             tx_descriptors,
             rx_descriptors,
-            clocks,
         )
     }
 
@@ -488,7 +478,6 @@ where
         channel: Channel<'d, CH, DmaMode>,
         tx_descriptors: &'static mut [DmaDescriptor],
         rx_descriptors: &'static mut [DmaDescriptor],
-        clocks: &Clocks<'d>,
     ) -> Self
     where
         I: I2s1Instance,
@@ -502,7 +491,6 @@ where
             channel,
             tx_descriptors,
             rx_descriptors,
-            clocks,
         )
     }
 
@@ -675,7 +663,7 @@ where
     CH: DmaChannel,
     DmaMode: Mode,
 {
-    fn write_dma<'t>(&'t mut self, words: &'t TXBUF) -> Result<DmaTransferTx<'_, Self>, Error>
+    fn write_dma<'t>(&'t mut self, words: &'t TXBUF) -> Result<DmaTransferTx<'t, Self>, Error>
     where
         TXBUF: ReadBuffer,
     {
@@ -686,7 +674,7 @@ where
     fn write_dma_circular<'t>(
         &'t mut self,
         words: &'t TXBUF,
-    ) -> Result<DmaTransferTxCircular<'_, Self>, Error>
+    ) -> Result<DmaTransferTxCircular<'t, Self>, Error>
     where
         TXBUF: ReadBuffer,
     {
@@ -856,7 +844,7 @@ where
     DmaMode: Mode,
     Self: DmaSupportRx + Sized,
 {
-    fn read_dma<'t>(&'t mut self, words: &'t mut RXBUF) -> Result<DmaTransferRx<'_, Self>, Error>
+    fn read_dma<'t>(&'t mut self, words: &'t mut RXBUF) -> Result<DmaTransferRx<'t, Self>, Error>
     where
         RXBUF: WriteBuffer,
     {
@@ -867,7 +855,7 @@ where
     fn read_dma_circular<'t>(
         &'t mut self,
         words: &'t mut RXBUF,
-    ) -> Result<DmaTransferRxCircular<'_, Self>, Error>
+    ) -> Result<DmaTransferRxCircular<'t, Self>, Error>
     where
         RXBUF: WriteBuffer,
     {
@@ -901,7 +889,6 @@ mod private {
     #[cfg(any(esp32, esp32s3))]
     use crate::peripherals::{i2s1::RegisterBlock, I2S1};
     use crate::{
-        clock::Clocks,
         dma::{ChannelRx, ChannelTx, DmaChannel, DmaDescriptor, DmaPeripheral},
         gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
         interrupt::InterruptHandler,
@@ -2114,7 +2101,6 @@ mod private {
         sample_rate: impl Into<fugit::HertzU32>,
         channels: u8,
         data_bits: u8,
-        _clocks: &Clocks<'_>,
     ) -> I2sClockDividers {
         // this loosely corresponds to `i2s_std_calculate_clock` and
         // `i2s_ll_tx_set_mclk` in esp-idf
@@ -2181,7 +2167,6 @@ mod private {
 }
 
 /// Async functionality
-#[cfg(feature = "async")]
 pub mod asynch {
     use super::{Error, I2sRx, I2sTx, RegisterAccess};
     use crate::{

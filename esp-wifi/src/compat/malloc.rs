@@ -2,6 +2,7 @@ use core::alloc::Layout;
 
 use crate::HEAP;
 
+#[no_mangle]
 pub unsafe extern "C" fn malloc(size: usize) -> *mut u8 {
     trace!("alloc {}", size);
 
@@ -24,6 +25,7 @@ pub unsafe extern "C" fn malloc(size: usize) -> *mut u8 {
     ptr.offset(4)
 }
 
+#[no_mangle]
 pub unsafe extern "C" fn free(ptr: *mut u8) {
     trace!("free {:?}", ptr);
 
@@ -55,4 +57,26 @@ pub unsafe extern "C" fn calloc(number: u32, size: usize) -> *mut u8 {
     }
 
     ptr
+}
+
+#[no_mangle]
+unsafe extern "C" fn realloc(ptr: *mut u8, new_size: usize) -> *mut u8 {
+    trace!("realloc {:?} {}", ptr, new_size);
+
+    extern "C" {
+        fn memcpy(d: *mut u8, s: *const u8, l: usize);
+    }
+
+    unsafe {
+        let p = malloc(new_size);
+        if !p.is_null() && !ptr.is_null() {
+            let len = usize::min(
+                (ptr as *const u32).sub(1).read_volatile() as usize,
+                new_size,
+            );
+            memcpy(p, ptr, len);
+            free(ptr);
+        }
+        p
+    }
 }

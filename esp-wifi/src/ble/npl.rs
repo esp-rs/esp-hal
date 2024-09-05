@@ -12,7 +12,7 @@ use crate::{
         include::*,
     },
     compat,
-    compat::{common::str_from_c, queue::SimpleQueue, task_runner::spawn_task},
+    compat::{common::str_from_c, queue::SimpleQueue},
     timer::yield_task,
 };
 
@@ -294,10 +294,10 @@ pub struct ext_funcs_t {
     hal_uart_init: Option<unsafe extern "C" fn(i32, *const c_void) -> i32>,
     task_create: Option<
         unsafe extern "C" fn(
-            *const c_void,
+            *mut c_void,
             *const c_char,
             u32,
-            *const c_void,
+            *mut c_void,
             u32,
             *const c_void,
             u32,
@@ -352,10 +352,10 @@ unsafe extern "C" fn os_random() -> u32 {
 }
 
 unsafe extern "C" fn task_create(
-    task_func: *const c_void,
+    task_func: *mut c_void,
     name: *const c_char,
     stack_depth: u32,
-    param: *const c_void,
+    param: *mut c_void,
     prio: u32,
     task_handle: *const c_void,
     core_id: u32,
@@ -374,19 +374,15 @@ unsafe extern "C" fn task_create(
 
     *(task_handle as *mut usize) = 0; // we will run it in task 0
 
-    if spawn_task(
-        task_func as *mut c_void,
-        name as *const c_char,
-        stack_depth,
-        param as *mut c_void,
-        prio,
-        task_handle as *mut c_void,
-        core_id,
-    ) {
-        1
-    } else {
-        0
-    }
+    let task_func = core::mem::transmute::<
+        *mut crate::binary::c_types::c_void,
+        extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
+    >(task_func);
+
+    let task = crate::preempt::arch_specific::task_create(task_func, param, stack_depth as usize);
+    *(task_handle as *mut usize) = task as usize;
+
+    1
 }
 
 unsafe extern "C" fn task_delete(_: *const c_void) {

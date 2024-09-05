@@ -5,7 +5,7 @@
 //! - Data pins => GPIO1, GPIO2, GPIO3, and GPIO4.
 
 //% CHIPS: esp32c6 esp32h2
-//% FEATURES: async embassy embassy-generic-timers
+//% FEATURES: embassy embassy-generic-timers
 
 #![no_std]
 #![no_main]
@@ -14,14 +14,11 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::Io,
     parl_io::{no_clk_pin, BitPackOrder, ParlIoRxOnly, RxFourBits},
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
     timer::systimer::{SystemTimer, Target},
 };
 use esp_println::println;
@@ -29,12 +26,10 @@ use esp_println::println;
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
     esp_println::println!("Init!");
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
-    esp_hal_embassy::init(&clocks, systimer.alarm0);
+    esp_hal_embassy::init(systimer.alarm0);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -50,7 +45,6 @@ async fn main(_spawner: Spawner) {
         dma_channel.configure_for_async(false, DmaPriority::Priority0),
         rx_descriptors,
         1.MHz(),
-        &clocks,
     )
     .unwrap();
 

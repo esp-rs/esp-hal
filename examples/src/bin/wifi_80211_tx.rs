@@ -12,12 +12,9 @@ use core::marker::PhantomData;
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
-    peripherals::Peripherals,
     prelude::*,
     rng::Rng,
-    system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer, PeriodicTimer},
 };
 use esp_wifi::{initialize, wifi, EspWifiInitFor};
@@ -37,15 +34,15 @@ const MAC_ADDRESS: [u8; 6] = [0x00, 0x80, 0x41, 0x13, 0x37, 0x42];
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
+    let peripherals = esp_hal::init({
+        let mut config = esp_hal::Config::default();
+        config.cpu_clock = CpuClock::max();
+        config
+    });
 
-    let peripherals = Peripherals::take();
+    let delay = Delay::new();
 
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::max(system.clock_control).freeze();
-
-    let delay = Delay::new(&clocks);
-
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
     let timer0: ErasedTimer = timg0.timer0.into();
     let timer = PeriodicTimer::new(timer0);
 
@@ -54,7 +51,6 @@ fn main() -> ! {
         timer,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
-        &clocks,
     )
     .unwrap();
 

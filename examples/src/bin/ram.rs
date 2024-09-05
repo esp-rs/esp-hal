@@ -17,15 +17,7 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    delay::Delay,
-    macros::ram,
-    peripherals::Peripherals,
-    prelude::*,
-    rtc_cntl::Rtc,
-    system::SystemControl,
-};
+use esp_hal::{delay::Delay, macros::ram, prelude::*, rtc_cntl::Rtc};
 use esp_println::println;
 
 #[ram(rtc_fast)]
@@ -39,11 +31,9 @@ static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     // The RWDT flash boot protection must be enabled, as it is triggered as part of
     // the example.

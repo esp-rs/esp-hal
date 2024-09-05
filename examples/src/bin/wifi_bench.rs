@@ -15,15 +15,7 @@
 
 use embedded_io::*;
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    delay::Delay,
-    peripherals::Peripherals,
-    prelude::*,
-    rng::Rng,
-    system::SystemControl,
-    timer::timg::TimerGroup,
-};
+use esp_hal::{delay::Delay, prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{
     current_millis,
@@ -59,22 +51,21 @@ const UPLOAD_DOWNLOAD_PORT: u16 = 4323;
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
-
-    let peripherals = Peripherals::take();
-
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::max(system.clock_control).freeze();
+    let peripherals = esp_hal::init({
+        let mut config = esp_hal::Config::default();
+        config.cpu_clock = CpuClock::max();
+        config
+    });
 
     let server_address: Ipv4Address = HOST_IP.parse().expect("Invalid HOST_IP address");
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
 
     let init = initialize(
         EspWifiInitFor::Wifi,
         timg0.timer0,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
-        &clocks,
     )
     .unwrap();
 
@@ -139,7 +130,7 @@ fn main() -> ! {
     let mut tx_buffer = [0u8; TX_BUFFER_SIZE];
     let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     loop {
         test_download(server_address, &mut socket);

@@ -294,7 +294,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 mod ehal1 {
     use embedded_hal::pwm::{self, ErrorKind, ErrorType, SetDutyCycle};
 

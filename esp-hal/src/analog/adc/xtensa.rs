@@ -590,7 +590,6 @@ impl super::AdcCalEfuse for crate::peripherals::ADC2 {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<'d, ADCI, PIN, CS> embedded_hal_02::adc::OneShot<ADCI, u16, AdcPin<PIN, ADCI, CS>>
     for Adc<'d, ADCI>
 where
@@ -608,31 +607,31 @@ where
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (Gpio1,  0),
-            (Gpio2,  1),
-            (Gpio3,  2),
-            (Gpio4,  3),
-            (Gpio5,  4),
-            (Gpio6,  5),
-            (Gpio7,  6),
-            (Gpio8,  7),
-            (Gpio9,  8),
-            (Gpio10, 9),
+            (GpioPin<1>,  0),
+            (GpioPin<2>,  1),
+            (GpioPin<3>,  2),
+            (GpioPin<4>,  3),
+            (GpioPin<5>,  4),
+            (GpioPin<6>,  5),
+            (GpioPin<7>,  6),
+            (GpioPin<8>,  7),
+            (GpioPin<9>,  8),
+            (GpioPin<10>, 9),
         ]
     }
 
     crate::analog::adc::impl_adc_interface! {
         ADC2 [
-            (Gpio11, 0),
-            (Gpio12, 1),
-            (Gpio13, 2),
-            (Gpio14, 3),
-            (Gpio15, 4),
-            (Gpio16, 5),
-            (Gpio17, 6),
-            (Gpio18, 7),
-            (Gpio19, 8),
-            (Gpio20, 9),
+            (GpioPin<11>, 0),
+            (GpioPin<12>, 1),
+            (GpioPin<13>, 2),
+            (GpioPin<14>, 3),
+            (GpioPin<15>, 4),
+            (GpioPin<16>, 5),
+            (GpioPin<17>, 6),
+            (GpioPin<18>, 7),
+            (GpioPin<19>, 8),
+            (GpioPin<20>, 9),
         ]
     }
 }

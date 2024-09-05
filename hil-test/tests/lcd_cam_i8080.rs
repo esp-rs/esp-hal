@@ -6,20 +6,14 @@
 #![no_main]
 
 use esp_hal::{
-    clock::{ClockControl, Clocks},
     dma::{Dma, DmaDescriptor, DmaPriority},
     dma_buffers,
     gpio::DummyPin,
     lcd_cam::{
-        lcd::{
-            i8080,
-            i8080::{Command, TxEightBits, I8080},
-        },
+        lcd::i8080::{Command, Config, TxEightBits, I8080},
         LcdCam,
     },
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
 };
 use hil_test as _;
 
@@ -27,29 +21,9 @@ const DATA_SIZE: usize = 1024 * 10;
 
 struct Context<'d> {
     lcd_cam: LcdCam<'d, esp_hal::Blocking>,
-    clocks: Clocks<'d>,
     dma: Dma<'d>,
     tx_buffer: &'static [u8],
     tx_descriptors: &'static mut [DmaDescriptor],
-}
-
-impl<'d> Context<'d> {
-    pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-        let dma = Dma::new(peripherals.DMA);
-        let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-        let (tx_buffer, tx_descriptors, _, _) = dma_buffers!(DATA_SIZE, 0);
-
-        Self {
-            lcd_cam,
-            clocks,
-            dma,
-            tx_buffer,
-            tx_descriptors,
-        }
-    }
 }
 
 #[cfg(test)]
@@ -59,7 +33,17 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        Context::init()
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let dma = Dma::new(peripherals.DMA);
+        let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
+        let (tx_buffer, tx_descriptors, _, _) = dma_buffers!(DATA_SIZE, 0);
+
+        Context {
+            lcd_cam,
+            dma,
+            tx_buffer,
+            tx_descriptors,
+        }
     }
 
     #[test]
@@ -83,8 +67,7 @@ mod tests {
             ctx.tx_descriptors,
             pins,
             20.MHz(),
-            i8080::Config::default(),
-            &ctx.clocks,
+            Config::default(),
         );
 
         let xfer = i8080
@@ -116,8 +99,7 @@ mod tests {
             ctx.tx_descriptors,
             pins,
             20.MHz(),
-            i8080::Config::default(),
-            &ctx.clocks,
+            Config::default(),
         );
 
         let xfer = i8080
