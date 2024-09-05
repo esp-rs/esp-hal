@@ -1415,7 +1415,7 @@ macro_rules! gpio {
             }
 
             impl ErasedPin {
-                pub(crate) fn clone(&self) -> ErasedPin {
+                pub(crate) unsafe fn clone_unchecked(&self) -> Self {
                     match self {
                         $(
                         ErasedPin::[<Gpio $gpionum >](_) => {
@@ -1429,7 +1429,7 @@ macro_rules! gpio {
             impl $crate::peripheral::Peripheral for ErasedPin {
                 type P = ErasedPin;
                 unsafe fn clone_unchecked(&mut self) ->  Self {
-                    self.clone()
+                    ErasedPin::clone_unchecked(self)
                 }
             }
 
@@ -2320,7 +2320,7 @@ pub(crate) mod internal {
         }
 
         fn degrade_internal(&self, _: private::Internal) -> ErasedPin {
-            self.clone()
+            unsafe { self.clone_unchecked() }
         }
 
         fn sleep_mode(&mut self, on: bool, _: private::Internal) {
