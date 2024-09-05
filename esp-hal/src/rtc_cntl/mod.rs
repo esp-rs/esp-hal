@@ -79,7 +79,7 @@ use crate::efuse::Efuse;
 use crate::peripherals::{LPWR, TIMG0};
 #[cfg(any(esp32c6, esp32h2))]
 use crate::peripherals::{LP_TIMER, LP_WDT};
-#[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
+#[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
     clock::Clock,
@@ -91,7 +91,7 @@ use crate::{
     InterruptConfigurable,
 };
 // only include sleep where its been implemented
-#[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
+#[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
 pub mod sleep;
 
 #[cfg_attr(esp32, path = "rtc/esp32.rs")]
@@ -203,7 +203,7 @@ impl<'d> Rtc<'d> {
             swd: Swd::new(),
         };
 
-        #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
+        #[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
         RtcSleepConfig::base_settings(&this);
 
         this
@@ -264,7 +264,7 @@ impl<'d> Rtc<'d> {
     }
 
     /// Enter deep sleep and wake with the provided `wake_sources`.
-    #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
+    #[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
     pub fn sleep_deep(&mut self, wake_sources: &[&dyn WakeSource]) -> ! {
         let config = RtcSleepConfig::deep();
         self.sleep(&config, wake_sources);
@@ -272,7 +272,7 @@ impl<'d> Rtc<'d> {
     }
 
     /// Enter light sleep and wake with the provided `wake_sources`.
-    #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
+    #[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
     pub fn sleep_light(&mut self, wake_sources: &[&dyn WakeSource]) {
         let config = RtcSleepConfig::default();
         self.sleep(&config, wake_sources);
@@ -280,7 +280,7 @@ impl<'d> Rtc<'d> {
 
     /// Enter sleep with the provided `config` and wake with the provided
     /// `wake_sources`.
-    #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
+    #[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
     pub fn sleep(&mut self, config: &RtcSleepConfig, wake_sources: &[&dyn WakeSource]) {
         let mut config = *config;
         let mut wakeup_triggers = WakeTriggers::default();

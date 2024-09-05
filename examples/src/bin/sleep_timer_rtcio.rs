@@ -7,7 +7,7 @@
 //! The following wiring is assumed for ESP32S3:
 //! - RTC wakeup pin => GPIO18 (low level)
 
-//% CHIPS: esp32c3 esp32s3
+//% CHIPS: esp32c3 esp32s3 esp32c2
 
 #![no_std]
 #![no_main]
@@ -48,7 +48,7 @@ fn main() -> ! {
     let timer = TimerWakeupSource::new(Duration::from_secs(10));
 
     cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32c3")] {
+        if #[cfg(any(feature = "esp32c3", feature = "esp32c2"))] {
             let wakeup_pins: &mut [(&mut dyn gpio::RtcPinWithResistors, WakeupLevel)] = &mut [
                 (&mut io.pins.gpio2, WakeupLevel::Low),
                 (&mut io.pins.gpio3, WakeupLevel::High),

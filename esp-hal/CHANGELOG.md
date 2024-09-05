@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Implement `embedded-hal` output pin traits for `DummyPin` (#2019)
 - Added `esp_hal::init` to simplify HAL initialisation (#1970, #1999)
+- Added sleep and wakeup support for esp32c2 (#1922)
 
 ### Changed
 - Make saving and restoring SHA digest state an explicit operation (#2049)

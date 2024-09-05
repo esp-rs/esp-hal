@@ -198,6 +198,15 @@ crate::gpio::gpio! {
     (20, 0, InputOutput (0 => U0RXD) ())
 }
 
+crate::gpio::rtc_pins! {
+    0
+    1
+    2
+    3
+    4
+    5
+}
+
 crate::gpio::analog! {
     0
     1

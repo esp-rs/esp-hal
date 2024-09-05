@@ -15,12 +15,12 @@
 //!    * `BT (Bluetooth) wake` - light sleep only
 
 use core::cell::RefCell;
-#[cfg(any(esp32, esp32c3, esp32s3, esp32c6))]
+#[cfg(any(esp32, esp32c3, esp32s3, esp32c6, esp32c2))]
 use core::time::Duration;
 
 #[cfg(any(esp32, esp32s3))]
 use crate::gpio::RtcPin as RtcIoWakeupPinType;
-#[cfg(any(esp32c3, esp32c6))]
+#[cfg(any(esp32c3, esp32c6, esp32c2))]
 use crate::gpio::RtcPinWithResistors as RtcIoWakeupPinType;
 use crate::rtc_cntl::Rtc;
 
@@ -28,6 +28,7 @@ use crate::rtc_cntl::Rtc;
 #[cfg_attr(esp32s3, path = "esp32s3.rs")]
 #[cfg_attr(esp32c3, path = "esp32c3.rs")]
 #[cfg_attr(esp32c6, path = "esp32c6.rs")]
+#[cfg_attr(esp32c2, path = "esp32c2.rs")]
 mod sleep_impl;
 
 pub use sleep_impl::*;
@@ -45,13 +46,13 @@ pub enum WakeupLevel {
 /// Represents a timer wake-up source, triggering an event after a specified
 /// duration.
 #[derive(Debug, Default, Clone, Copy)]
-#[cfg(any(esp32, esp32c3, esp32s3, esp32c6))]
+#[cfg(any(esp32, esp32c3, esp32s3, esp32c6, esp32c2))]
 pub struct TimerWakeupSource {
     /// The duration after which the wake-up event is triggered.
     duration: Duration,
 }
 
-#[cfg(any(esp32, esp32c3, esp32s3, esp32c6))]
+#[cfg(any(esp32, esp32c3, esp32s3, esp32c6, esp32c2))]
 impl TimerWakeupSource {
     /// Creates a new timer wake-up source with the specified duration.
     pub fn new(duration: Duration) -> Self {
@@ -134,12 +135,12 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// RTC_IO wakeup allows configuring any combination of RTC_IO pins with
 /// arbitrary wakeup levels to wake up the chip from sleep. This wakeup source
 /// can be used to wake up from both light and deep sleep.
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(any(esp32c3, esp32s3, esp32c2))]
 pub struct RtcioWakeupSource<'a, 'b> {
     pins: RefCell<&'a mut [(&'b mut dyn RtcIoWakeupPinType, WakeupLevel)]>,
 }
 
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(any(esp32c3, esp32s3, esp32c2))]
 impl<'a, 'b> RtcioWakeupSource<'a, 'b> {
     /// Creates a new external wake-up source (Ext1).
     pub fn new(pins: &'a mut [(&'b mut dyn RtcIoWakeupPinType, WakeupLevel)]) -> Self {
