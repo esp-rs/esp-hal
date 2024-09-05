@@ -60,7 +60,7 @@ use procmacros::ram;
 #[cfg(any(adc, dac))]
 pub(crate) use crate::analog;
 pub(crate) use crate::gpio;
-#[cfg(any(xtensa, esp32c3))]
+#[cfg(any(xtensa, esp32c3, esp32c2))]
 pub(crate) use crate::rtc_pins;
 pub use crate::soc::gpio::*;
 use crate::{
@@ -247,7 +247,7 @@ pub trait RtcPin: Pin {
     ///
     /// The `level` argument needs to be a valid setting for the
     /// `rtc_cntl.gpio_wakeup.gpio_pinX_int_type`.
-    #[cfg(any(esp32c3, esp32c6))]
+    #[cfg(any(esp32c3, esp32c2, esp32c6))]
     unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8);
 }
 
@@ -1560,6 +1560,47 @@ macro_rules! rtc_pins {
                 paste::paste! {
                     rtc_cntl.gpio_wakeup().modify(|_, w| w.[< gpio_pin $pin_num _wakeup_enable >]().bit(wakeup));
                     rtc_cntl.gpio_wakeup().modify(|_, w| w.[< gpio_pin $pin_num _int_type >]().bits(level));
+                }
+            }
+
+            fn rtcio_pad_hold(&mut self, enable: bool) {
+                let rtc_cntl = unsafe { &*$crate::peripherals::RTC_CNTL::ptr() };
+                paste::paste! {
+                    rtc_cntl.pad_hold().modify(|_, w| w.[< gpio_pin $pin_num _hold >]().bit(enable));
+                }
+            }
+        }
+
+        impl $crate::gpio::RtcPinWithResistors for GpioPin<$pin_num> {
+            fn rtcio_pullup(&mut self, enable: bool) {
+                let io_mux = unsafe { &*$crate::peripherals::IO_MUX::ptr() };
+                io_mux.gpio($pin_num).modify(|_, w| w.fun_wpu().bit(enable));
+            }
+
+            fn rtcio_pulldown(&mut self, enable: bool) {
+                let io_mux = unsafe { &*$crate::peripherals::IO_MUX::ptr() };
+                io_mux.gpio($pin_num).modify(|_, w| w.fun_wpd().bit(enable));
+            }
+        }
+
+    };
+
+    ( $( $pin_num:expr )+ ) => { $( $crate::gpio::rtc_pins!($pin_num); )+ };
+}
+
+#[cfg(esp32c2)]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! rtc_pins {
+    (
+        $pin_num:expr
+    ) => {
+        impl $crate::gpio::RtcPin for GpioPin<$pin_num> {
+            unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
+                let rtc_cntl = unsafe { &*$crate::peripherals::RTC_CNTL::ptr() };
+                paste::paste! {
+                    rtc_cntl.cntl_gpio_wakeup().modify(|_, w| w.[< gpio_pin $pin_num _wakeup_enable >]().bit(wakeup));
+                    rtc_cntl.cntl_gpio_wakeup().modify(|_, w| w.[< gpio_pin $pin_num _int_type >]().bits(level));
                 }
             }
 

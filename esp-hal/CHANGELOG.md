@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added GpioPin::degrade to create ErasePins easily. Same for AnyPin by accident. (#2075)
 - Added missing functions to `Flex`: `unlisten`, `is_interrupt_set`, `wakeup_enable`, `wait_for_high`, `wait_for_low`, `wait_for_rising_edge`, `wait_for_falling_edge`, `wait_for_any_edge`. (#2075)
 - `Flex` now implements `Wait`. (#2075)
+- Added sleep and wakeup support for esp32c2 (#1922)
 
 ### Changed
 - Make saving and restoring SHA digest state an explicit operation (#2049)
@@ -26,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SHA driver can now be safely used in multiple contexts concurrently (#2049)
 
 - Fixed an issue with DMA transfers potentially not waking up the correct async task (#2065)
+- Fixed an issue with LCD_CAM i8080 where it would send double the clocks in 16bit mode (#2085)
 
 ### Removed
 - Removed `digest::Digest` implementation from SHA (#2049)
