@@ -2,7 +2,7 @@
 //!
 //! Folowing pins are used:
 //! SCLK    GPIO0
-//! MISO    GPIO2 / GPIO9 / GPIO26  (esp32s2 / esp32s3 / esp32)
+//! MISO    GPIO2(esp32s2) / GPIO9(esp32s3) / GPIO26(esp32)
 //! MOSI    GPIO3 / GPIO10 / GPIO27 (esp32s2 / esp32s3 / esp32)
 //!
 //! Connect MISO and MOSI pins.

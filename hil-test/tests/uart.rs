@@ -1,8 +1,8 @@
 //! UART Test
 //!
 //! Folowing pins are used:
-//! TX    GPIO2 / GPIO9 / GPIO26  (esp32s2 / esp32s3 / esp32)
-//! RX    GPIO3 / GPIO10 / GPIO27 (esp32s2 / esp32s3 / esp32)
+//! TX    GPIO2 / GPIO9  (esp32s2 / esp32s3) / GPIO26 (esp32)
+//! RX    GPIO3 / GPIO10 (esp32s2 / esp32s3) / GPIO27 (esp32)
 //!
 //! Connect TX and RX pins.
 

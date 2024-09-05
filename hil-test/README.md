@@ -113,7 +113,7 @@ Our self-hosted runners have the following setup:
 
 [connection_c2]: https://docs.espressif.com/projects/esp-idf/en/stable/esp32c2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware
 [connection_s2]: https://docs.espressif.com/projects/esp-idf/en/stable/esp32s2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware
-[connection_esp32]: https://docs.espressif.com/projects/esp-idf/en/v5.3.1/esp32/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware
+[connection_esp32]: https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware.html#configure-hardware
 [`hil.yml`]: https://github.com/esp-rs/esp-hal/blob/main/.github/workflows/hil.yml
 [setup]: #rpi-setup
 
