@@ -50,6 +50,7 @@ However, if you want to, you can keep using their typed form!
 ```rust
 let pin = Input::new(io.gpio0); // pin will have the type `Input<'some>` (or `Input<'some, ErasedPin>` if you want to be explicit about it)
 let pin = Input::new_typed(io.gpio0); // pin will have the type `Input<'some, GpioPin<0>>`
+```
 
 ## `esp_hal::time::current_time` rename
 
