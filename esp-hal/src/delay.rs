@@ -31,7 +31,7 @@
 //! [DelayMs]: embedded_hal_02::blocking::delay::DelayMs
 //! [DelayUs]: embedded_hal_02::blocking::delay::DelayUs
 //! [embedded-hal]: https://docs.rs/embedded-hal/1.0.0/embedded_hal/delay/index.html
-//! [current_time]: crate::time::current_time
+//! [current_time]: crate::time::uptime
 
 pub use fugit::MicrosDurationU64;
 
@@ -75,7 +75,7 @@ impl Delay {
 
     /// Delay for the specified time
     pub fn delay(&self, delay: MicrosDurationU64) {
-        let start = crate::time::current_time();
+        let start = crate::time::uptime();
 
         while elapsed_since(start) < delay {}
     }
@@ -101,7 +101,7 @@ impl Delay {
 }
 
 fn elapsed_since(start: fugit::Instant<u64, 1, 1_000_000>) -> MicrosDurationU64 {
-    let now = crate::time::current_time();
+    let now = crate::time::uptime();
 
     if start.ticks() <= now.ticks() {
         now - start

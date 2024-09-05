@@ -11,11 +11,7 @@
 
 use core::ptr::addr_of_mut;
 
-use self::peripherals::{LPWR, TIMG0, TIMG1};
-use crate::{
-    rtc_cntl::{Rtc, SocResetReason},
-    timer::timg::Wdt,
-};
+use crate::rtc_cntl::SocResetReason;
 
 pub mod efuse;
 pub mod gpio;
@@ -116,8 +112,6 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
         stack_chk_guard.write_volatile(0xdeadbabe);
     }
 
-    crate::interrupt::setup_interrupts();
-
     // continue with default reset handler
     xtensa_lx_rt::Reset();
 }
@@ -129,14 +123,4 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
 #[rustfmt::skip]
 pub extern "Rust" fn __init_data() -> bool {
     false
-}
-
-#[export_name = "__post_init"]
-unsafe fn post_init() {
-    // RTC domain must be enabled before we try to disable
-    let mut rtc = Rtc::new(LPWR::steal());
-    rtc.rwdt.disable();
-
-    Wdt::<TIMG0, crate::Blocking>::set_wdt_enabled(false);
-    Wdt::<TIMG1, crate::Blocking>::set_wdt_enabled(false);
 }

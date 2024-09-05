@@ -734,9 +734,27 @@ pub struct Config {
 ///
 /// This function sets up the CPU clock and returns the peripherals and clocks.
 pub fn init(config: Config) -> Peripherals {
+    use self::peripherals::*;
     let peripherals = Peripherals::take();
 
     Clocks::init(config.cpu_clock);
+
+    #[cfg(xtensa)]
+    crate::interrupt::setup_interrupts();
+    #[cfg(esp32)]
+    crate::time::time_init();
+
+    // RTC domain must be enabled before we try to disable
+    let mut rtc = crate::rtc_cntl::Rtc::new(unsafe { LPWR::steal() });
+    #[cfg(not(any(esp32, esp32s2)))]
+    rtc.swd.disable();
+    rtc.rwdt.disable();
+
+    unsafe {
+        crate::timer::timg::Wdt::<TIMG0, crate::Blocking>::set_wdt_enabled(false);
+        #[cfg(timg1)]
+        crate::timer::timg::Wdt::<TIMG1, crate::Blocking>::set_wdt_enabled(false);
+    }
 
     peripherals
 }

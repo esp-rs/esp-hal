@@ -50,10 +50,10 @@ pub fn uptime() -> fugit::Instant<u64, 1, 1_000_000> {
 
 #[cfg(esp32)]
 pub(crate) fn time_init() {
-    let apb = Clocks::get().apb_clock.to_Hz();
+    let apb = crate::Clocks::get().apb_clock.to_Hz();
     // we assume 80MHz APB clock source - there is no way to configure it in a
     // different way currently
-    assert!(apb, 80_000_000u32);
+    assert_eq!(apb, 80_000_000u32);
 
     let tg0 = unsafe { crate::peripherals::TIMG0::steal() };
 

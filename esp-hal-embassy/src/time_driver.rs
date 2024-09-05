@@ -5,7 +5,7 @@ use embassy_time_driver::{AlarmHandle, Driver};
 use esp_hal::{
     interrupt::{InterruptHandler, Priority},
     prelude::*,
-    time::current_time,
+    time::uptime,
     timer::{ErasedTimer, OneShotTimer},
 };
 
@@ -119,7 +119,7 @@ impl EmbassyTimer {
     }
 
     fn arm(timer: &mut Timer, timestamp: u64) {
-        let now = current_time().duration_since_epoch();
+        let now = uptime().duration_since_epoch();
         let ts = timestamp.micros();
         // if the TS is already in the past make the timer fire immediately
         let timeout = if ts > now { ts - now } else { 0.micros() };
@@ -130,7 +130,7 @@ impl EmbassyTimer {
 
 impl Driver for EmbassyTimer {
     fn now(&self) -> u64 {
-        current_time().ticks()
+        uptime().ticks()
     }
 
     unsafe fn allocate_alarm(&self) -> Option<AlarmHandle> {
