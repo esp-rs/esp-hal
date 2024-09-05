@@ -56,7 +56,6 @@ mod tests {
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
         let (miso, mosi) = hil_test::common_test_pins!(io);
-        // let cs = io.pins.gpio8;
 
         let dma = Dma::new(peripherals.DMA);
 
