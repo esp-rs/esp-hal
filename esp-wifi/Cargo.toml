@@ -2,6 +2,7 @@
 name = "esp-wifi"
 version = "0.9.1"
 edition = "2021"
+rust-version  = "1.77.0"
 authors = ["The ESP-RS team"]
 description = "A WiFi, Bluetooth and ESP-NOW driver for use with Espressif chips and bare-metal Rust"
 repository = "https://github.com/esp-rs/esp-hal"
