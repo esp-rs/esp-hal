@@ -15,10 +15,13 @@ VECTORS_SIZE = 0x400;
 /* Specify main memory areas */
 MEMORY
 {
-  vectors_seg ( RX )     : ORIGIN = 0x40020000 + RESERVE_CACHES, len = VECTORS_SIZE /* SRAM0 */
-  iram_seg ( RX )        : ORIGIN = 0x40020000 + RESERVE_CACHES + VECTORS_SIZE, len = 192k - RESERVE_CACHES - VECTORS_SIZE /* SRAM0 */
+  vectors_seg ( RX )     : ORIGIN = 0x40020000 + RESERVE_CACHES, len = VECTORS_SIZE
+  iram_seg ( RX )        : ORIGIN = 0x40020000 + RESERVE_CACHES + VECTORS_SIZE, len = 188k - RESERVE_CACHES - VECTORS_SIZE
 
   dram_seg ( RW )        : ORIGIN = 0x3FFB0000 + RESERVE_CACHES + VECTORS_SIZE, len = 188k - RESERVE_CACHES - VECTORS_SIZE
+
+  /* memory available after the 2nd stage bootloader is finished */
+  dram2_seg ( RW )       : ORIGIN = ORIGIN(dram_seg) + LENGTH(dram_seg), len = 0x3ffffa10 - (ORIGIN(dram_seg) + LENGTH(dram_seg))
 
   /* external flash 
      The 0x20 offset is a convenience for the app binary image generation.

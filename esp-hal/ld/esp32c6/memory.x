@@ -21,6 +21,9 @@ MEMORY
     */
     RAM : ORIGIN = 0x40800000 , LENGTH = 0x6E610
 
+    /* memory available after the 2nd stage bootloader is finished */
+    dram2_seg ( RW )       : ORIGIN = ORIGIN(RAM) + LENGTH(RAM), len = 0x4087e610 - (ORIGIN(RAM) + LENGTH(RAM))
+
     /* External flash */
     /* Instruction and Data ROM */
     ROM : ORIGIN =   0x42000000 + 0x20, LENGTH = 0x400000 - 0x20

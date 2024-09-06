@@ -12,12 +12,14 @@ MEMORY
                       [0x4037C000, 0x403C0000, "IRAM"]]
     */
 
-    /* 272K of on soc RAM, 16K reserved for cache */
-    ICACHE : ORIGIN = 0x4037C000,  LENGTH = 16K
+    ICACHE : ORIGIN = 0x4037C000, LENGTH = 16K
     /* Instruction RAM */
-    IRAM : ORIGIN = 0x4037C000 + 16K, LENGTH = 272K - 16K
+    IRAM : ORIGIN = 0x4037C000 + LENGTH(ICACHE), LENGTH = 186k
     /* Data RAM */
-    DRAM : ORIGIN = 0x3FCA0000, LENGTH = 0x30000
+    DRAM : ORIGIN = 0x3FCA0000, LENGTH = 186k
+
+    /* memory available after the 2nd stage bootloader is finished */
+    dram2_seg ( RW )       : ORIGIN = ORIGIN(DRAM) + LENGTH(DRAM), len = 0x3fcdeb70 - (ORIGIN(DRAM) + LENGTH(DRAM))
 
     /* External flash */
     /* Instruction ROM */

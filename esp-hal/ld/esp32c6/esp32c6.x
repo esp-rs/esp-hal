@@ -78,6 +78,7 @@ INCLUDE "rodata.x"
 INCLUDE "rwdata.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "stack.x"
+INCLUDE "dram2.x"
 /* End of Shared sections */
 
 INCLUDE "debug.x"
