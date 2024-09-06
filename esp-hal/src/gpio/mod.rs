@@ -177,15 +177,6 @@ pub enum Pull {
     Down,
 }
 
-/// RTC input pin mode
-pub struct RtcInput;
-
-/// RTC output pin mode
-pub struct RtcOutput;
-
-/// Analog mode
-pub struct Analog;
-
 /// Drive strength (values are approximates)
 pub enum DriveStrength {
     /// Drive strength of approximately 5mA.
@@ -259,11 +250,6 @@ pub trait RtcPinWithResistors: RtcPin {
     /// Enable/disable the internal pull-down resistor
     fn rtcio_pulldown(&mut self, enable: bool);
 }
-
-/// Marker for RTC pins which support input mode
-pub trait RtcInputPin: RtcPin {}
-/// Marker for RTC pins which support output mode
-pub trait RtcOutputPin: RtcPin {}
 
 /// Common trait implemented by pins
 pub trait Pin: private::Sealed {
