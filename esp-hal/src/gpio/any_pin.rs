@@ -78,7 +78,6 @@ impl<'d> Pin for AnyPin<'d> {
             fn unlisten(&mut self, _internal: private::Internal);
             fn is_interrupt_set(&self, _internal: private::Internal) -> bool;
             fn clear_interrupt(&mut self, _internal: private::Internal);
-            fn wakeup_enable(&mut self, enable: bool, event: WakeEvent, _internal: private::Internal);
         }
     }
 }
@@ -100,17 +99,6 @@ impl<'d> OutputPin for AnyPin<'d> {
             fn disconnect_peripheral_from_output(&mut self, _internal: private::Internal);
             fn is_set_high(&self, _internal: private::Internal) -> bool;
         }
-    }
-
-    fn connect_peripheral_to_output(&mut self, signal: OutputSignal, _internal: private::Internal) {
-        self.pin.connect_peripheral_to_output_with_options(
-            signal,
-            self.is_inverted,
-            false,
-            false,
-            self.is_inverted,
-            private::Internal,
-        );
     }
 
     fn connect_peripheral_to_output_with_options(
@@ -148,21 +136,11 @@ impl<'d> InputPin for AnyPin<'d> {
     delegate::delegate! {
         to self.pin {
             fn init_input(&self, pull_down: bool, pull_up: bool, _internal: private::Internal);
-            fn set_to_input(&mut self, _internal: private::Internal);
             fn enable_input(&mut self, on: bool, _internal: private::Internal);
             fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             fn is_input_high(&self, _internal: private::Internal) -> bool;
             fn disconnect_input_from_peripheral(&mut self, signal: InputSignal, _internal: private::Internal);
         }
-    }
-
-    fn connect_input_to_peripheral(&mut self, signal: InputSignal, _internal: private::Internal) {
-        self.pin.connect_input_to_peripheral_with_options(
-            signal,
-            self.is_inverted,
-            self.is_inverted,
-            private::Internal,
-        );
     }
 
     fn connect_input_to_peripheral_with_options(

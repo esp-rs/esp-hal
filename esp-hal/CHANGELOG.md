@@ -15,31 +15,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added missing functions to `Flex`: `unlisten`, `is_interrupt_set`, `wakeup_enable`, `wait_for_high`, `wait_for_low`, `wait_for_rising_edge`, `wait_for_falling_edge`, `wait_for_any_edge`. (#2075)
 - `Flex` now implements `Wait`. (#2075)
 - Added sleep and wakeup support for esp32c2 (#1922)
+- `Input`, `Output`, `OutputOpenDrain` and `Flex` now implement `Peripheral`. (#2094)
 
 ### Changed
+
 - Make saving and restoring SHA digest state an explicit operation (#2049)
 - Reordered RX-TX pairs in all APIs to be consistent (#2074)
-
+- Make saving and restoring SHA digest state an explicit operation (#2049)
 - `Delay::new()` is now a `const` function (#1999)
 - You can now create an `AnyPin` out of an `ErasedPin`. (#2072)
 - `Input`, `Output`, `OutputOpenDrain` and `Flex` are now type-erased by default. Use the new `new_typed` constructor to keep using the ZST pin types. (#2075)
 - To avoid confusion with the `Rtc::current_time` wall clock time APIs, we've renamed `esp_hal::time::current_time` to `esp_hal::time::now`. (#2091)
+- Renamed `touch::Continous` to `touch::Continuous`. (#2094)
+- The (previously undocumented) `ErasedPin` enum has been replaced with the `ErasedPin` struct. (#2094)
 
 ### Fixed
-- SHA driver can now be safely used in multiple contexts concurrently (#2049)
 
+- SHA driver can now be safely used in multiple contexts concurrently (#2049)
 - Fixed an issue with DMA transfers potentially not waking up the correct async task (#2065)
 - Fixed an issue with LCD_CAM i8080 where it would send double the clocks in 16bit mode (#2085)
 - Fix i2c embedded-hal transaction (#2028)
 
 ### Removed
-- Removed `digest::Digest` implementation from SHA (#2049)
 
+- Removed `digest::Digest` implementation from SHA (#2049)
 - Removed `NoPinType` in favour of `DummyPin`. (#2068)
 - Removed the `async`, `embedded-hal-02`, `embedded-hal`, `embedded-io`, `embedded-io-async`, and `ufmt` features (#2070)
 - Removed the `GpioN` type aliasses. Use `GpioPin<N>` instead. (#2073)
 - Removed `Peripherals::take`. Use `esp_hal::init` to obtain `Peripherals` (#1999)
 - Removed `AnyInputOnlyPin` in favour of `AnyPin`. (#2071)
+- Removed the following functions from `GpioPin`: `is_high`, `is_low`, `set_high`, `set_low`, `set_state`, `is_set_high`, `is_set_low`, `toggle`. (#2094)
 
 ## [0.20.1] - 2024-08-30
 

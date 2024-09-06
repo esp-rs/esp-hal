@@ -13,7 +13,7 @@
 //! # use esp_hal::gpio::Io;
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let touch_pin0 = io.pins.gpio2;
-//! let touch = Touch::continous_mode(peripherals.TOUCH, None);
+//! let touch = Touch::continuous_mode(peripherals.TOUCH, None);
 //! let mut touchpad = TouchPad::new(touch_pin0, &touch);
 //! // ... give the peripheral some time for the measurement
 //! let touch_val = touchpad.read();
@@ -50,16 +50,16 @@ pub trait TouchMode: Sealed {}
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct OneShot;
 
-/// Marker struct for the touch peripherals continous reading mode. In the
+/// Marker struct for the touch peripherals continuous reading mode. In the
 /// technical reference manual, this is referred to as "start FSM via timer".
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Continous;
+pub struct Continuous;
 
 impl TouchMode for OneShot {}
-impl TouchMode for Continous {}
+impl TouchMode for Continuous {}
 impl Sealed for OneShot {}
-impl Sealed for Continous {}
+impl Sealed for Continuous {}
 
 /// Touchpad threshold type.
 #[derive(Debug, Copy, Clone)]
@@ -81,7 +81,7 @@ pub struct TouchConfig {
     /// Duration of a single measurement (in cycles of the 8 MHz touch clock).
     /// Defaults to `0x7fff`
     pub measurement_duration: Option<u16>,
-    /// Sleep cycles for the touch timer in [`Continous`]-mode. Defaults to
+    /// Sleep cycles for the touch timer in [`Continuous`]-mode. Defaults to
     /// `0x100`
     pub sleep_cycles: Option<u16>,
 }
@@ -147,8 +147,8 @@ impl<'d, TOUCHMODE: TouchMode, MODE: Mode> Touch<'d, TOUCHMODE, MODE> {
         });
     }
 
-    /// Common parts of the continous mode initialization.
-    fn initialize_common_continoous(config: Option<TouchConfig>) {
+    /// Common parts of the continuous mode initialization.
+    fn initialize_common_continuous(config: Option<TouchConfig>) {
         let rtccntl = unsafe { &*RTC_CNTL::ptr() };
         let sens = unsafe { &*SENS::ptr() };
 
@@ -241,8 +241,8 @@ impl<'d> Touch<'d, OneShot, Blocking> {
         }
     }
 }
-impl<'d> Touch<'d, Continous, Blocking> {
-    /// Initializes the touch peripheral in continous mode and returns this
+impl<'d> Touch<'d, Continuous, Blocking> {
+    /// Initializes the touch peripheral in continuous mode and returns this
     /// marker struct. Optionally accepts configuration options.
     ///
     /// ## Example
@@ -254,16 +254,16 @@ impl<'d> Touch<'d, Continous, Blocking> {
     ///     measurement_duration: Some(0x3000),
     ///     ..Default::default()
     /// });
-    /// let touch = Touch::continous_mode(peripherals.TOUCH, touch_cfg);
+    /// let touch = Touch::continuous_mode(peripherals.TOUCH, touch_cfg);
     /// # }
     /// ```
-    pub fn continous_mode(
+    pub fn continuous_mode(
         touch_peripheral: impl Peripheral<P = TOUCH> + 'd,
         config: Option<TouchConfig>,
     ) -> Self {
         crate::into_ref!(touch_peripheral);
 
-        Self::initialize_common_continoous(config);
+        Self::initialize_common_continuous(config);
 
         Self {
             _inner: touch_peripheral,
@@ -272,8 +272,8 @@ impl<'d> Touch<'d, Continous, Blocking> {
         }
     }
 }
-impl<'d> Touch<'d, Continous, Async> {
-    /// Initializes the touch peripheral in continous async mode and returns
+impl<'d> Touch<'d, Continuous, Async> {
+    /// Initializes the touch peripheral in continuous async mode and returns
     /// this marker struct.
     ///
     /// ## Warning:
@@ -307,7 +307,7 @@ impl<'d> Touch<'d, Continous, Async> {
     ) -> Self {
         crate::into_ref!(touch_peripheral);
 
-        Self::initialize_common_continoous(config);
+        Self::initialize_common_continuous(config);
 
         rtc.set_interrupt_handler(asynch::handle_touch_interrupt);
 

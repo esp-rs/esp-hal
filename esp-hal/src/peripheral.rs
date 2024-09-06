@@ -194,11 +194,11 @@ pub trait Peripheral: Sized + crate::private::Sealed {
     }
 }
 
-impl<T> Peripheral for &mut T
+impl<T, P> Peripheral for &mut T
 where
-    T: Peripheral<P = T>,
+    T: Peripheral<P = P>,
 {
-    type P = T;
+    type P = P;
 
     unsafe fn clone_unchecked(&mut self) -> Self::P {
         T::clone_unchecked(self)

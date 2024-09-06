@@ -21,12 +21,12 @@ use esp_hal::{
     macros::ram,
     prelude::*,
     rtc_cntl::Rtc,
-    touch::{Continous, Touch, TouchConfig, TouchPad},
+    touch::{Continuous, Touch, TouchConfig, TouchPad},
     Blocking,
 };
 use esp_println::println;
 
-static TOUCH1: Mutex<RefCell<Option<TouchPad<GpioPin<4>, Continous, Blocking>>>> =
+static TOUCH1: Mutex<RefCell<Option<TouchPad<GpioPin<4>, Continuous, Blocking>>>> =
     Mutex::new(RefCell::new(None));
 
 #[handler]
@@ -62,7 +62,7 @@ fn main() -> ! {
         ..Default::default()
     });
 
-    let touch = Touch::continous_mode(peripherals.TOUCH, touch_cfg);
+    let touch = Touch::continuous_mode(peripherals.TOUCH, touch_cfg);
     let mut touch0 = TouchPad::new(touch_pin0, &touch);
     let mut touch1 = TouchPad::new(touch_pin1, &touch);
 

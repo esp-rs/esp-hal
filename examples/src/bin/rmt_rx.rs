@@ -14,7 +14,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::Io,
+    gpio::{Io, Level, Output},
     prelude::*,
     rmt::{PulseCode, Rmt, RxChannel, RxChannelConfig, RxChannelCreator},
 };
@@ -27,7 +27,7 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let mut out = io.pins.gpio5;
+    let mut out = Output::new(io.pins.gpio5, Level::Low);
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32h2")] {
