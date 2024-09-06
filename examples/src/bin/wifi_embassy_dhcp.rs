@@ -8,7 +8,7 @@
 //! Because of the huge task-arena size configured this won't work on ESP32-S2
 
 //% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/async esp-wifi/embassy-net esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
-//% CHIPS: esp32 esp32s3 esp32c2 esp32c3 esp32c6
+//% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
 #![no_main]
