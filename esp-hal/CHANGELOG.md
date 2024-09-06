@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - To avoid confusion with the `Rtc::current_time` wall clock time APIs, we've renamed `esp_hal::time::current_time` to `esp_hal::time::now`. (#2091)
 - Renamed `touch::Continous` to `touch::Continuous`. (#2094)
 - The (previously undocumented) `ErasedPin` enum has been replaced with the `ErasedPin` struct. (#2094)
+- ESP32: Added support for touch sensing on GPIO32 and 33 (#2109)
 
 ### Fixed
 

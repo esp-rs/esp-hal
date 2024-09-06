@@ -793,8 +793,8 @@ crate::gpio::gpio! {
     (25, 0, InputOutputAnalog (5 => EMAC_RXD0) ())
     (26, 0, InputOutputAnalog (5 => EMAC_RXD1) ())
     (27, 0, InputOutputAnalogTouch (5 => EMAC_RX_DV) ())
-    (32, 1, InputOutputAnalog)
-    (33, 1, InputOutputAnalog)
+    (32, 1, InputOutputAnalogTouch)
+    (33, 1, InputOutputAnalogTouch)
     (34, 1, InputOnlyAnalog)
     (35, 1, InputOnlyAnalog)
     (36, 1, InputOnlyAnalog)
@@ -845,8 +845,8 @@ crate::gpio::rtc_pins! {
     (27, 17, touch_pad7(),     "",      touch_pad7_hold_force, rue,       rde       )
 }
 
-crate::gpio::touch_common! {
-    // (touch_nr, pin_nr, touch_out_reg, touch_thres_reg )
+crate::gpio::touch! {
+    // touch_nr, pin_nr, rtc_pin, touch_out_reg, meas_field, touch_thres_reg, touch_thres_field, normal_pin
     (0, 4,  10, sar_touch_out1, touch_meas_out0, sar_touch_thres1, touch_out_th0, true)
     (1, 0,  11, sar_touch_out1, touch_meas_out1, sar_touch_thres1, touch_out_th1, true)
     (2, 2,  12, sar_touch_out2, touch_meas_out2, sar_touch_thres2, touch_out_th2, true)

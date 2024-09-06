@@ -64,7 +64,7 @@ pub(crate) use crate::gpio;
 pub(crate) use crate::rtc_pins;
 pub use crate::soc::gpio::*;
 #[cfg(touch)]
-pub(crate) use crate::touch_common;
+pub(crate) use crate::touch;
 use crate::{
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
@@ -1091,28 +1091,6 @@ where
     }
 }
 
-#[cfg(touch)]
-impl<const GPIONUM: u8> TouchPin for GpioPin<GPIONUM>
-where
-    Self: GpioProperties<IsTouch = True>,
-{
-    fn set_touch(&self, _: private::Internal) {
-        crate::soc::gpio::internal_into_touch(GPIONUM);
-    }
-
-    fn get_touch_measurement(&self, _: private::Internal) -> u16 {
-        crate::soc::gpio::internal_get_touch_measurement(GPIONUM)
-    }
-
-    fn get_touch_nr(&self, _: private::Internal) -> u8 {
-        crate::soc::gpio::internal_get_touch_nr(GPIONUM)
-    }
-
-    fn set_threshold(&self, threshold: u16, _: private::Internal) {
-        crate::soc::gpio::internal_set_threshold(GPIONUM, threshold)
-    }
-}
-
 /// General Purpose Input/Output driver
 pub struct Io {
     _io_mux: IO_MUX,
@@ -1612,7 +1590,7 @@ macro_rules! analog {
 /// Common functionality for all touch pads
 #[doc(hidden)]
 #[macro_export]
-macro_rules! touch_common {
+macro_rules! touch {
     (@pin_specific $touch_num:expr, true) => {
         paste::paste! {
             unsafe { &*RTC_IO::ptr() }.[< touch_pad $touch_num >]().write(|w| unsafe {
@@ -1649,83 +1627,68 @@ macro_rules! touch_common {
             )
         )+
     ) => {
-        pub(crate) fn internal_get_touch_measurement(pin: u8) -> u16 {
-            match pin {
-                $(
-                    $pin_num => {
-                        paste::paste! {
-                        unsafe { &* $crate::peripherals::SENS::ptr() }
-                            . $touch_out_reg ()
-                            .read()
-                            . $meas_field ()
-                            .bits()
-                        }
-                    },
-                )+
-                _ => unreachable!(),
+        $(
+        impl $crate::gpio::TouchPin for GpioPin<$pin_num>
+        where
+            Self: $crate::gpio::GpioProperties<IsTouch = $crate::gpio::True>,
+        {
+            fn set_touch(&self, _: $crate::private::Internal) {
+                use $crate::peripherals::{GPIO, RTC_IO, SENS};
+
+                let gpio = unsafe { &*GPIO::ptr() };
+                let rtcio = unsafe { &*RTC_IO::ptr() };
+                let sens = unsafe { &*SENS::ptr() };
+
+                // Pad to normal mode (not open-drain)
+                gpio.pin($rtc_pin).write(|w| w.pad_driver().clear_bit());
+
+                // clear output
+                rtcio
+                    .enable_w1tc()
+                    .write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
+                paste::paste! {
+                    sens . $touch_thres_reg ()
+                        .write(|w| unsafe {
+                            w. $touch_thres_field ().bits(
+                                0b0 // Default: 0 for esp32 gets overridden later anyway.
+                            )
+                        });
+
+                    $crate::touch!( @pin_specific $touch_num, $normal_pin );
+
+                    // enable the pin
+                    sens.sar_touch_enable().modify(|r, w| unsafe {
+                        w.touch_pad_worken().bits(
+                            r.touch_pad_worken().bits() | ( 1 << [< $touch_num >] )
+                        )
+                    });
+                }
             }
-        }
-        pub(crate) fn internal_get_touch_nr(pin: u8) -> u8 {
-            match pin {
-                $($pin_num => $touch_num,)+
-                _ => unreachable!(),
+
+            fn get_touch_measurement(&self, _: $crate::private::Internal) -> u16 {
+                paste::paste! {
+                    unsafe { &* $crate::peripherals::SENS::ptr() }
+                        . $touch_out_reg ()
+                        .read()
+                        . $meas_field ()
+                        .bits()
+                }
             }
-        }
-        pub(crate) fn internal_set_threshold(pin: u8, threshold: u16) {
-            match pin {
-                $(
-                    $pin_num => {
-                        paste::paste! {
-                            unsafe { &* $crate::peripherals::SENS::ptr() }
-                                . $touch_thres_reg ()
-                                .write(|w| unsafe {
-                                    w. $touch_thres_field ().bits(threshold)
-                                });
-                        }
-                    },
-                )+
-                _ => unreachable!(),
+
+            fn get_touch_nr(&self, _: $crate::private::Internal) -> u8 {
+                $touch_num
             }
-        }
 
-        pub(crate) fn internal_into_touch(pin: u8) {
-            match pin {
-                $(
-                    $pin_num => {
-                        use $crate::peripherals::{GPIO, RTC_IO, SENS};
-
-                        let gpio = unsafe { &*GPIO::ptr() };
-                        let rtcio = unsafe { &*RTC_IO::ptr() };
-                        let sens = unsafe { &*SENS::ptr() };
-
-                        // Pad to normal mode (not open-drain)
-                        gpio.pin($rtc_pin).write(|w| w.pad_driver().clear_bit());
-
-                        // clear output
-                        rtcio.enable_w1tc().write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
-                        paste::paste! {
-                            sens . $touch_thres_reg ()
-                                .write(|w| unsafe {
-                                    w. $touch_thres_field ().bits(
-                                        0b0 // Default: 0 for esp32 gets overridden later anyway.
-                                    )
-                                });
-
-                            $crate::touch_common!( @pin_specific $touch_num, $normal_pin );
-
-                            // enable the pin
-                            sens.sar_touch_enable().modify(|r, w| unsafe {
-                                w.touch_pad_worken().bits(
-                                    r.touch_pad_worken().bits() | ( 1 << [< $touch_num >] )
-                                )
-                            });
-                        }
-                    }
-                )+
-
-                _ => unreachable!(),
+            fn set_threshold(&self, threshold: u16, _: $crate::private::Internal) {
+                paste::paste! {
+                    unsafe { &* $crate::peripherals::SENS::ptr() }
+                        . $touch_thres_reg ()
+                        .write(|w| unsafe {
+                            w. $touch_thres_field ().bits(threshold)
+                        });
+                }
             }
-        }
+        })+
     };
 }
 
