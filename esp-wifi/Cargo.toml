@@ -2,6 +2,7 @@
 name = "esp-wifi"
 version = "0.9.1"
 edition = "2021"
+rust-version  = "1.77.0"
 authors = ["The ESP-RS team"]
 description = "A WiFi, Bluetooth and ESP-NOW driver for use with Espressif chips and bare-metal Rust"
 repository = "https://github.com/esp-rs/esp-hal"
@@ -51,6 +52,7 @@ futures-util = { version = "0.3.30", default-features = false, features = [
 atomic-waker = { version = "1.1.2", default-features = false, features = [
   "portable-atomic",
 ] }
+bt-hci = { version = "0.1.0", optional = true }
 
 [build-dependencies]
 toml-cfg     = "0.2.0"
@@ -103,6 +105,7 @@ async = [
   "dep:embassy-futures",
   "dep:embedded-io-async",
   "dep:esp-hal-embassy",
+  "dep:bt-hci",
 ]
 
 embassy-net = ["dep:embassy-net-driver", "async"]

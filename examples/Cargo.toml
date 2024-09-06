@@ -9,6 +9,7 @@ publish = false
 aes                 = "0.8.4"
 aligned             = { version = "0.4.2", optional = true }
 bleps               = { git = "https://github.com/bjoernQ/bleps", package = "bleps", rev = "a5148d8ae679e021b78f53fd33afb8bb35d0b62e", features = [ "macros", "async"] }
+bt-hci              = "0.1.0"
 cfg-if              = "1.0.0"
 critical-section    = "1.1.2"
 crypto-bigint       = { version = "0.5.5", default-features = false }
@@ -55,6 +56,7 @@ smart-leds          = "0.4.0"
 smoltcp             = { version = "0.11.0", default-features = false, features = [ "medium-ethernet", "socket-raw"] }
 ssd1306             = "0.8.4"
 static_cell         = { version = "2.1.0", features = ["nightly"] }
+trouble-host        = { git = "https://github.com/embassy-rs/trouble", package = "trouble-host", rev = "4f1114ce58e96fe54f5ed7e726f66e1ad8d9ce54", features = [ "log", "gatt" ] }
 usb-device          = "0.3.2"
 usbd-serial         = "0.2.2"
 
