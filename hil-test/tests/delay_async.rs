@@ -9,13 +9,9 @@
 #![no_main]
 
 use embedded_hal_async::delay::DelayNs;
-use esp_hal::{
-    peripherals::Peripherals,
-    timer::{
-        systimer::{Alarm, FrozenUnit, SystemTimer},
-        timg::TimerGroup,
-    },
-};
+#[cfg(systimer)]
+use esp_hal::timer::systimer::{Alarm, FrozenUnit, SystemTimer};
+use esp_hal::{peripherals::Peripherals, timer::timg::TimerGroup};
 use hil_test as _;
 
 struct Context {
@@ -47,6 +43,7 @@ mod tests {
         }
     }
 
+    #[cfg(systimer)]
     #[test]
     #[timeout(2)]
     async fn test_systimer_async_delay_ns(ctx: Context) {
