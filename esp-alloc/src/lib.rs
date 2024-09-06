@@ -94,6 +94,14 @@ pub struct HeapRegion {
 
 impl HeapRegion {
     /// Create a new [HeapRegion] with the given capabilities
+    ///
+    /// # Safety
+    ///
+    /// - The supplied memory region must be available for the entire program
+    ///   (`'static`).
+    /// - The supplied memory region must be exclusively available to the heap
+    ///   only, no aliasing.
+    /// - `size > 0`.
     pub unsafe fn new(
         heap_bottom: *mut u8,
         size: usize,
@@ -230,6 +238,13 @@ impl EspHeap {
     }
 
     /// Allocate memory in a region satisfying the given requirements.
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe because undefined behavior can result
+    /// if the caller does not ensure that `layout` has non-zero size.
+    ///
+    /// The allocated block of memory may or may not be initialized.
     pub unsafe fn alloc_caps(
         &self,
         capabilities: EnumSet<MemoryCapability>,
@@ -279,13 +294,9 @@ unsafe impl GlobalAlloc for EspHeap {
             let mut regions = self.heap.borrow_ref_mut(cs);
             let mut iter = (*regions).iter_mut();
 
-            loop {
-                if let Some(Some(region)) = iter.next() {
-                    if region.heap.bottom() <= ptr && region.heap.top() >= ptr {
-                        region.heap.deallocate(NonNull::new_unchecked(ptr), layout);
-                    }
-                } else {
-                    break;
+            while let Some(Some(region)) = iter.next() {
+                if region.heap.bottom() <= ptr && region.heap.top() >= ptr {
+                    region.heap.deallocate(NonNull::new_unchecked(ptr), layout);
                 }
             }
         })
