@@ -69,7 +69,7 @@ fn main() -> ! {
 
     let mut extram_buffer: &mut [u8] = dma_alloc_buffer!(DATA_SIZE, 64);
     let mut intram_buffer = dma_buffer_aligned!(DATA_SIZE, A64);
-    let (tx_descriptors, rx_descriptors) = dma_descriptors_chunk_size!(DATA_SIZE, CHUNK_SIZE);
+    let (rx_descriptors, tx_descriptors) = dma_descriptors_chunk_size!(DATA_SIZE, CHUNK_SIZE);
 
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0.configure(false, DmaPriority::Priority0);
@@ -78,8 +78,8 @@ fn main() -> ! {
     let mut mem2mem = Mem2Mem::new_with_chunk_size(
         channel,
         dma_peripheral,
-        tx_descriptors,
         rx_descriptors,
+        tx_descriptors,
         CHUNK_SIZE,
     )
     .unwrap();
@@ -90,7 +90,7 @@ fn main() -> ! {
     }
 
     info!(" ext2int: Starting transfer of {} bytes", DATA_SIZE);
-    match mem2mem.start_transfer(&extram_buffer, &mut intram_buffer) {
+    match mem2mem.start_transfer(&mut intram_buffer, &extram_buffer) {
         Ok(dma_wait) => {
             info!("Transfer started");
             dma_wait.wait().unwrap();
@@ -122,7 +122,7 @@ fn main() -> ! {
     }
 
     info!(" int2ext: Starting transfer of {} bytes", DATA_SIZE);
-    match mem2mem.start_transfer(&intram_buffer, &mut extram_buffer) {
+    match mem2mem.start_transfer(&mut extram_buffer, &intram_buffer) {
         Ok(dma_wait) => {
             info!("Transfer started");
             dma_wait.wait().unwrap();

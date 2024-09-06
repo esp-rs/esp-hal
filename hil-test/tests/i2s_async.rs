@@ -13,7 +13,7 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{Dma, DmaChannel0, DmaPriority},
+    dma::{Dma, DmaPriority},
     gpio::Io,
     i2s::{asynch::*, DataFormat, I2s, I2sTx, Standard},
     peripheral::Peripheral,
@@ -22,6 +22,17 @@ use esp_hal::{
     Async,
 };
 use hil_test as _;
+
+cfg_if::cfg_if! {
+    if #[cfg(any(
+        feature = "esp32",
+        feature = "esp32s2",
+    ))] {
+        use esp_hal::dma::Spi2DmaChannel as DmaChannel0;
+    } else {
+        use esp_hal::dma::DmaChannel0;
+    }
+}
 
 const BUFFER_SIZE: usize = 2000;
 
@@ -91,9 +102,16 @@ mod tests {
         let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
         let dma = Dma::new(peripherals.DMA);
-        let dma_channel = dma.channel0;
 
-        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) =
+        cfg_if::cfg_if! {
+            if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
+                let dma_channel = dma.spi2channel;
+            } else {
+                let dma_channel = dma.channel0;
+            }
+        }
+
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
             esp_hal::dma_circular_buffers!(BUFFER_SIZE, BUFFER_SIZE);
 
         let i2s = I2s::new(
@@ -102,8 +120,8 @@ mod tests {
             DataFormat::Data16Channel16,
             16000.Hz(),
             dma_channel.configure_for_async(false, DmaPriority::Priority0),
-            tx_descriptors,
             rx_descriptors,
+            tx_descriptors,
         );
 
         let (dout, din) = hil_test::common_test_pins!(io);

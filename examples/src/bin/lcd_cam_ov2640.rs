@@ -49,7 +49,7 @@ fn main() -> ! {
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0;
 
-    let (_, _, rx_buffer, rx_descriptors) = dma_buffers!(0, 32678);
+    let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(0, 32678);
 
     let channel = channel.configure(false, DmaPriority::Priority0);
 

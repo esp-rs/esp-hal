@@ -1482,7 +1482,7 @@ where
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
-    fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+    fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         while !Instance::is_tx_eof() {}
 
         Instance::set_tx_start(false);
@@ -1577,7 +1577,7 @@ where
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
-    fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+    fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         loop {
             if self.rx_channel.is_done()
                 || self.rx_channel.has_eof_error()

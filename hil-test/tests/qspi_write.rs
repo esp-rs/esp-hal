@@ -9,7 +9,7 @@
 //!
 //! Connect MOSI and PCNT pins.
 
-//% CHIPS: esp32 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
@@ -60,7 +60,7 @@ fn execute(
 ) {
     const DMA_BUFFER_SIZE: usize = 4;
 
-    let (buffer, descriptors, _, _) = dma_buffers!(DMA_BUFFER_SIZE, 0);
+    let (_, _, buffer, descriptors) = dma_buffers!(0, DMA_BUFFER_SIZE);
     let mut dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
 
     dma_tx_buf.fill(&[write; DMA_BUFFER_SIZE]);

@@ -1,8 +1,8 @@
 //! UART TX/RX Async Test
 //!
 //! Folowing pins are used:
-//! TX    GPIO2 / GPIO9 (esp32s2 and esp32s3)
-//! RX    GPIO3 / GPIO10 (esp32s2 and esp32s3)
+//! TX    GPIO2 / GPIO9  (esp32s2 / esp32s3) / GPIO26 (esp32)
+//! RX    GPIO3 / GPIO10 (esp32s2 / esp32s3) / GPIO27 (esp32)
 //!
 //! Connect TX and RX pins.
 
@@ -21,8 +21,8 @@ use esp_hal::{
 use hil_test as _;
 
 struct Context {
-    tx: UartTx<'static, UART0, Async>,
     rx: UartRx<'static, UART1, Async>,
+    tx: UartTx<'static, UART0, Async>,
 }
 
 #[cfg(test)]
@@ -38,12 +38,12 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let (tx, rx) = hil_test::common_test_pins!(io);
+        let (rx, tx) = hil_test::common_test_pins!(io);
 
         let tx = UartTx::new_async(peripherals.UART0, tx).unwrap();
         let rx = UartRx::new_async(peripherals.UART1, rx).unwrap();
 
-        Context { tx, rx }
+        Context { rx, tx }
     }
 
     #[test]

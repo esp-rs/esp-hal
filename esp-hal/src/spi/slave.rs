@@ -30,7 +30,7 @@
 //! let mosi = io.pins.gpio2;
 //! let cs = io.pins.gpio3;
 //!
-//! let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) =
+//! let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
 //! dma_buffers!(32000); let mut spi = Spi::new(
 //!     peripherals.SPI2,
 //!     sclk,
@@ -42,13 +42,13 @@
 //! .with_dma(dma_channel.configure(
 //!     false,
 //!     DmaPriority::Priority0,
-//! ), tx_descriptors, rx_descriptors);
+//! ), rx_descriptors, tx_descriptors);
 //!
-//! let mut send = tx_buffer;
 //! let mut receive = rx_buffer;
+//! let mut send = tx_buffer;
 //!
 //! let transfer = spi
-//!     .dma_transfer(&mut send, &mut receive)
+//!     .dma_transfer(&mut receive, &mut send)
 //!     .unwrap();
 //!
 //! transfer.wait().unwrap();
@@ -163,8 +163,8 @@ pub mod dma {
             DmaChannel,
             DmaDescriptor,
             DmaTransferRx,
+            DmaTransferRxTx,
             DmaTransferTx,
-            DmaTransferTxRx,
             ReadBuffer,
             RxPrivate,
             Spi2Peripheral,
@@ -187,8 +187,8 @@ pub mod dma {
         fn with_dma(
             self,
             channel: Channel<'d, C, DmaMode>,
-            tx_descriptors: &'static mut [DmaDescriptor],
             rx_descriptors: &'static mut [DmaDescriptor],
+            tx_descriptors: &'static mut [DmaDescriptor],
         ) -> SpiDma<'d, crate::peripherals::SPI2, C, DmaMode>;
     }
 
@@ -205,8 +205,8 @@ pub mod dma {
         fn with_dma(
             self,
             channel: Channel<'d, C, DmaMode>,
-            tx_descriptors: &'static mut [DmaDescriptor],
             rx_descriptors: &'static mut [DmaDescriptor],
+            tx_descriptors: &'static mut [DmaDescriptor],
         ) -> SpiDma<'d, crate::peripherals::SPI3, C, DmaMode>;
     }
 
@@ -220,16 +220,16 @@ pub mod dma {
         fn with_dma(
             self,
             mut channel: Channel<'d, C, DmaMode>,
-            tx_descriptors: &'static mut [DmaDescriptor],
             rx_descriptors: &'static mut [DmaDescriptor],
+            tx_descriptors: &'static mut [DmaDescriptor],
         ) -> SpiDma<'d, crate::peripherals::SPI2, C, DmaMode> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             SpiDma {
                 spi: self.spi,
                 channel,
-                tx_chain: DescriptorChain::new(tx_descriptors),
                 rx_chain: DescriptorChain::new(rx_descriptors),
+                tx_chain: DescriptorChain::new(tx_descriptors),
             }
         }
     }
@@ -245,16 +245,16 @@ pub mod dma {
         fn with_dma(
             self,
             mut channel: Channel<'d, C, DmaMode>,
-            tx_descriptors: &'static mut [DmaDescriptor],
             rx_descriptors: &'static mut [DmaDescriptor],
+            tx_descriptors: &'static mut [DmaDescriptor],
         ) -> SpiDma<'d, crate::peripherals::SPI3, C, DmaMode> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             SpiDma {
                 spi: self.spi,
                 channel,
-                tx_chain: DescriptorChain::new(tx_descriptors),
                 rx_chain: DescriptorChain::new(rx_descriptors),
+                tx_chain: DescriptorChain::new(tx_descriptors),
             }
         }
     }
@@ -268,8 +268,8 @@ pub mod dma {
     {
         pub(crate) spi: PeripheralRef<'d, T>,
         pub(crate) channel: Channel<'d, C, DmaMode>,
-        tx_chain: DescriptorChain,
         rx_chain: DescriptorChain,
+        tx_chain: DescriptorChain,
     }
 
     impl<'d, T, C, DmaMode> core::fmt::Debug for SpiDma<'d, T, C, DmaMode>
@@ -285,12 +285,12 @@ pub mod dma {
 
     impl<'d, T, C, DmaMode> DmaSupport for SpiDma<'d, T, C, DmaMode>
     where
-        T: InstanceDma<ChannelTx<'d, C>, ChannelRx<'d, C>>,
+        T: InstanceDma<ChannelRx<'d, C>, ChannelTx<'d, C>>,
         C: DmaChannel,
         C::P: SpiPeripheral,
         DmaMode: Mode,
     {
-        fn peripheral_wait_dma(&mut self, is_tx: bool, is_rx: bool) {
+        fn peripheral_wait_dma(&mut self, is_rx: bool, is_tx: bool) {
             while !((!is_tx || self.channel.tx.is_done())
                 && (!is_rx || self.channel.rx.is_done())
                 && !self.spi.is_bus_busy())
@@ -306,7 +306,7 @@ pub mod dma {
 
     impl<'d, T, C, DmaMode> DmaSupportTx for SpiDma<'d, T, C, DmaMode>
     where
-        T: InstanceDma<ChannelTx<'d, C>, ChannelRx<'d, C>>,
+        T: InstanceDma<ChannelRx<'d, C>, ChannelTx<'d, C>>,
         C: DmaChannel,
         C::P: SpiPeripheral,
         DmaMode: Mode,
@@ -324,7 +324,7 @@ pub mod dma {
 
     impl<'d, T, C, DmaMode> DmaSupportRx for SpiDma<'d, T, C, DmaMode>
     where
-        T: InstanceDma<ChannelTx<'d, C>, ChannelRx<'d, C>>,
+        T: InstanceDma<ChannelRx<'d, C>, ChannelTx<'d, C>>,
         C: DmaChannel,
         C::P: SpiPeripheral,
         DmaMode: Mode,
@@ -342,7 +342,7 @@ pub mod dma {
 
     impl<'d, T, C, DmaMode> SpiDma<'d, T, C, DmaMode>
     where
-        T: InstanceDma<ChannelTx<'d, C>, ChannelRx<'d, C>>,
+        T: InstanceDma<ChannelRx<'d, C>, ChannelTx<'d, C>>,
         C: DmaChannel,
         C::P: SpiPeripheral,
         DmaMode: Mode,
@@ -401,19 +401,19 @@ pub mod dma {
 
         /// Register buffers for a DMA transfer.
         ///
-        /// This will return a [DmaTransferTxRx]. The maximum amount of data to
+        /// This will return a [DmaTransferRxTx]. The maximum amount of data to
         /// be sent/received is 32736 bytes.
         ///
         /// The data transfer is driven by the SPI master's sclk signal and cs
         /// line.
-        pub fn dma_transfer<'t, TXBUF, RXBUF>(
+        pub fn dma_transfer<'t, RXBUF, TXBUF>(
             &'t mut self,
             words: &'t TXBUF,
             read_buffer: &'t mut RXBUF,
-        ) -> Result<DmaTransferTxRx<'t, Self>, Error>
+        ) -> Result<DmaTransferRxTx<'t, Self>, Error>
         where
-            TXBUF: ReadBuffer,
             RXBUF: WriteBuffer,
+            TXBUF: ReadBuffer,
         {
             let (write_ptr, write_len) = unsafe { words.read_buffer() };
             let (read_ptr, read_len) = unsafe { read_buffer.write_buffer() };
@@ -425,53 +425,53 @@ pub mod dma {
             unsafe {
                 self.spi
                     .start_transfer_dma(
-                        &mut self.tx_chain,
                         &mut self.rx_chain,
-                        write_ptr,
-                        write_len,
+                        &mut self.tx_chain,
                         read_ptr,
                         read_len,
-                        &mut self.channel.tx,
+                        write_ptr,
+                        write_len,
                         &mut self.channel.rx,
+                        &mut self.channel.tx,
                     )
-                    .map(move |_| DmaTransferTxRx::new(self))
+                    .map(move |_| DmaTransferRxTx::new(self))
             }
         }
     }
 }
 
 #[doc(hidden)]
-pub trait InstanceDma<TX, RX>: Instance
+pub trait InstanceDma<RX, TX>: Instance
 where
-    TX: Tx,
     RX: Rx,
+    TX: Tx,
 {
     #[allow(clippy::too_many_arguments)]
     unsafe fn start_transfer_dma(
         &mut self,
-        tx_chain: &mut DescriptorChain,
         rx_chain: &mut DescriptorChain,
-        write_buffer_ptr: *const u8,
-        write_buffer_len: usize,
+        tx_chain: &mut DescriptorChain,
         read_buffer_ptr: *mut u8,
         read_buffer_len: usize,
-        tx: &mut TX,
+        write_buffer_ptr: *const u8,
+        write_buffer_len: usize,
         rx: &mut RX,
+        tx: &mut TX,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
 
-        tx.is_done();
         rx.is_done();
+        tx.is_done();
 
         self.enable_dma();
 
         reset_dma_before_load_dma_dscr(reg_block);
 
-        tx_chain.fill_for_tx(false, write_buffer_ptr, write_buffer_len)?;
-        tx.prepare_transfer_without_start(self.dma_peripheral(), tx_chain)?;
-
         rx_chain.fill_for_rx(false, read_buffer_ptr, read_buffer_len)?;
         rx.prepare_transfer_without_start(self.dma_peripheral(), rx_chain)?;
+
+        tx_chain.fill_for_tx(false, write_buffer_ptr, write_buffer_len)?;
+        tx.prepare_transfer_without_start(self.dma_peripheral(), tx_chain)?;
 
         reset_dma_before_usr_cmd(reg_block);
 
@@ -680,18 +680,18 @@ fn reset_dma_before_load_dma_dscr(reg_block: &RegisterBlock) {
         .modify(|_, w| w.dma_infifo_full_clr().clear_bit());
 }
 
-impl<TX, RX> InstanceDma<TX, RX> for crate::peripherals::SPI2
+impl<TX, RX> InstanceDma<RX, TX> for crate::peripherals::SPI2
 where
-    TX: Tx,
     RX: Rx,
+    TX: Tx,
 {
 }
 
 #[cfg(spi3)]
-impl<TX, RX> InstanceDma<TX, RX> for crate::peripherals::SPI3
+impl<TX, RX> InstanceDma<RX, TX> for crate::peripherals::SPI3
 where
-    TX: Tx,
     RX: Rx,
+    TX: Tx,
 {
 }
 

@@ -38,8 +38,8 @@
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.
-//! let can_tx_pin = io.pins.gpio2;
 //! let can_rx_pin = io.pins.gpio3;
+//! let can_tx_pin = io.pins.gpio2;
 //!
 //! // The speed of the TWAI bus.
 //! const TWAI_BAUDRATE: twai::BaudRate = BaudRate::B1000K;
@@ -48,8 +48,8 @@
 //! // state that prevents transmission but allows configuration.
 //! let mut can_config = twai::TwaiConfiguration::new(
 //!     peripherals.TWAI0,
-//!     can_tx_pin,
 //!     can_rx_pin,
+//!     can_tx_pin,
 //!     TWAI_BAUDRATE,
 //!     TwaiMode::Normal
 //! );
@@ -93,8 +93,8 @@
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.
-//! let can_tx_pin = io.pins.gpio2;
 //! let can_rx_pin = io.pins.gpio3;
+//! let can_tx_pin = io.pins.gpio2;
 //!
 //! // The speed of the TWAI bus.
 //! const TWAI_BAUDRATE: twai::BaudRate = BaudRate::B1000K;
@@ -102,8 +102,8 @@
 //! // Begin configuring the TWAI peripheral.
 //! let mut can_config = twai::TwaiConfiguration::new(
 //!     peripherals.TWAI0,
-//!     can_tx_pin,
 //!     can_rx_pin,
+//!     can_tx_pin,
 //!     TWAI_BAUDRATE,
 //!     TwaiMode::SelfTest
 //! );
@@ -718,8 +718,8 @@ where
 {
     fn new_internal<TX: OutputPin, RX: InputPin>(
         _peripheral: impl Peripheral<P = T> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
         rx_pin: impl Peripheral<P = RX> + 'd,
+        tx_pin: impl Peripheral<P = TX> + 'd,
         baud_rate: BaudRate,
         no_transceiver: bool,
         mode: TwaiMode,
@@ -883,11 +883,11 @@ where
             .modify(|_, w| w.reset_mode().clear_bit());
 
         Twai {
-            tx: TwaiTx {
+            rx: TwaiRx {
                 _peripheral: PhantomData,
                 phantom: PhantomData,
             },
-            rx: TwaiRx {
+            tx: TwaiTx {
                 _peripheral: PhantomData,
                 phantom: PhantomData,
             },
@@ -903,14 +903,14 @@ where
     /// Create a new instance of [TwaiConfiguration]
     ///
     /// You will need to use a transceiver to connect to the TWAI bus
-    pub fn new<TX: OutputPin, RX: InputPin>(
+    pub fn new<RX: InputPin, TX: OutputPin>(
         peripheral: impl Peripheral<P = T> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
         rx_pin: impl Peripheral<P = RX> + 'd,
+        tx_pin: impl Peripheral<P = TX> + 'd,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
-        Self::new_internal(peripheral, tx_pin, rx_pin, baud_rate, false, mode)
+        Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, false, mode)
     }
 
     /// Create a new instance of [TwaiConfiguration] meant to connect two ESP32s
@@ -918,14 +918,14 @@ where
     ///
     /// You don't need a transceiver by following the description in the
     /// `twai.rs` example
-    pub fn new_no_transceiver<TX: OutputPin, RX: InputPin>(
+    pub fn new_no_transceiver<RX: InputPin, TX: OutputPin>(
         peripheral: impl Peripheral<P = T> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
         rx_pin: impl Peripheral<P = RX> + 'd,
+        tx_pin: impl Peripheral<P = TX> + 'd,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
-        Self::new_internal(peripheral, tx_pin, rx_pin, baud_rate, true, mode)
+        Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, true, mode)
     }
 }
 
@@ -947,14 +947,14 @@ where
     /// Create a new instance of [TwaiConfiguration] in async mode
     ///
     /// You will need to use a transceiver to connect to the TWAI bus
-    pub fn new_async<TX: OutputPin, RX: InputPin>(
+    pub fn new_async<RX: InputPin, TX: OutputPin>(
         peripheral: impl Peripheral<P = T> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
         rx_pin: impl Peripheral<P = RX> + 'd,
+        tx_pin: impl Peripheral<P = TX> + 'd,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
-        let mut this = Self::new_internal(peripheral, tx_pin, rx_pin, baud_rate, false, mode);
+        let mut this = Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, false, mode);
         this.internal_set_interrupt_handler(T::async_handler());
         this
     }
@@ -964,14 +964,14 @@ where
     ///
     /// You don't need a transceiver by following the description in the
     /// `twai.rs` example
-    pub fn new_async_no_transceiver<TX: OutputPin, RX: InputPin>(
+    pub fn new_async_no_transceiver<RX: InputPin, TX: OutputPin>(
         peripheral: impl Peripheral<P = T> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
         rx_pin: impl Peripheral<P = RX> + 'd,
+        tx_pin: impl Peripheral<P = TX> + 'd,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
-        let mut this = Self::new_internal(peripheral, tx_pin, rx_pin, baud_rate, true, mode);
+        let mut this = Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, true, mode);
         this.internal_set_interrupt_handler(T::async_handler());
         this
     }
@@ -1064,8 +1064,8 @@ where
 
     /// Consumes this `Twai` instance and splits it into transmitting and
     /// receiving halves.
-    pub fn split(self) -> (TwaiTx<'d, T, DM>, TwaiRx<'d, T, DM>) {
-        (self.tx, self.rx)
+    pub fn split(self) -> (TwaiRx<'d, T, DM>, TwaiTx<'d, T, DM>) {
+        (self.rx, self.tx)
     }
 }
 

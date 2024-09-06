@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Make saving and restoring SHA digest state an explicit operation (#2049)
+- Reordered RX-TX pairs in all APIs to be consistent (#2074)
+- Make saving and restoring SHA digest state an explicit operation (#2049)
 - `Delay::new()` is now a `const` function (#1999)
 - You can now create an `AnyPin` out of an `ErasedPin`. (#2072)
 - `Input`, `Output`, `OutputOpenDrain` and `Flex` are now type-erased by default. Use the new `new_typed` constructor to keep using the ZST pin types. (#2075)

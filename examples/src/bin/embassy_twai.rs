@@ -101,8 +101,8 @@ async fn main(spawner: Spawner) {
     // state that prevents transmission but allows configuration.
     let mut can_config = twai::TwaiConfiguration::new_async_no_transceiver(
         peripherals.TWAI0,
-        can_tx_pin,
         can_rx_pin,
+        can_tx_pin,
         CAN_BAUDRATE,
         TwaiMode::Normal,
     );
@@ -123,7 +123,7 @@ async fn main(spawner: Spawner) {
     let can = can_config.start();
 
     // Get separate transmit and receive halves of the peripheral.
-    let (tx, rx) = can.split();
+    let (rx, tx) = can.split();
 
     interrupt::enable(
         peripherals::Interrupt::TWAI0,

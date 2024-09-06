@@ -49,9 +49,9 @@ fn main() -> ! {
         }
     }
 
-    let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(32000);
-    let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+    let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
     let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+    let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
     let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
         .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
@@ -71,7 +71,7 @@ fn main() -> ! {
         i = i.wrapping_add(1);
 
         let transfer = spi
-            .dma_transfer(dma_tx_buf, dma_rx_buf)
+            .dma_transfer(dma_rx_buf, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
         // here we could do something else while DMA transfer is in progress
@@ -83,7 +83,7 @@ fn main() -> ! {
             n += 1;
         }
 
-        (spi, (dma_tx_buf, dma_rx_buf)) = transfer.wait();
+        (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
         println!(
             "{:x?} .. {:x?}",
             &dma_rx_buf.as_slice()[..10],

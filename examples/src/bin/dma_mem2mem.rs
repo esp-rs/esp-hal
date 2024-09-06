@@ -25,7 +25,7 @@ fn main() -> ! {
 
     let delay = Delay::new();
 
-    let (tx_buffer, tx_descriptors, mut rx_buffer, rx_descriptors) = dma_buffers!(DATA_SIZE);
+    let (mut rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DATA_SIZE);
 
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0.configure(false, DmaPriority::Priority0);
@@ -35,14 +35,14 @@ fn main() -> ! {
     let dma_peripheral = peripherals.MEM2MEM1;
 
     let mut mem2mem =
-        Mem2Mem::new(channel, dma_peripheral, tx_descriptors, rx_descriptors).unwrap();
+        Mem2Mem::new(channel, dma_peripheral, rx_descriptors, tx_descriptors).unwrap();
 
     for i in 0..core::mem::size_of_val(tx_buffer) {
         tx_buffer[i] = (i % 256) as u8;
     }
 
     info!("Starting transfer of {} bytes", DATA_SIZE);
-    let result = mem2mem.start_transfer(&tx_buffer, &mut rx_buffer);
+    let result = mem2mem.start_transfer(&mut rx_buffer, tx_buffer);
     match result {
         Ok(dma_wait) => {
             info!("Transfer started");

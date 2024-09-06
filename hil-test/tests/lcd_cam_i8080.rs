@@ -36,7 +36,7 @@ mod tests {
         let peripherals = esp_hal::init(esp_hal::Config::default());
         let dma = Dma::new(peripherals.DMA);
         let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-        let (tx_buffer, tx_descriptors, _, _) = dma_buffers!(DATA_SIZE, 0);
+        let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(DATA_SIZE, 0);
 
         Context {
             lcd_cam,
