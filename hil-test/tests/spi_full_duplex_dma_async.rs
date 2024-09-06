@@ -77,7 +77,6 @@ mod tests {
 
         let (mosi_mirror, mosi) = hil_test::common_test_pins!(io);
         let miso = io.pins.gpio4;
-        let cs = io.pins.gpio8;
         let mosi_mirror = mosi_mirror.degrade();
 
         let mut out_pin = Output::new(io.pins.gpio5, Level::Low);
