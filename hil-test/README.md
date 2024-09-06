@@ -103,9 +103,17 @@ Our self-hosted runners have the following setup:
     - `GPIO9` and `GPIO10` are connected.
     - `GPIO43 (TX)` and `GPIO45` are connected.
   - RPi: Raspbian 12 configured with the following [setup]
+- ESP32 (`esp32-jtag`):
+  - Devkit: `ESP32-DevKitC-V4` connected via UART.
+    - `GPIO32` and `GPIO33` are I2C pins.
+    - `GPIO4` and `GPIO5` are connected.
+    - `GPIO26` and `GPIO27` are connected.
+  - Probe: `ESP-Prog` connected with the [following connections][connection_esp32]
+  - RPi: Raspbian 12 configured with the following [setup]
 
 [connection_c2]: https://docs.espressif.com/projects/esp-idf/en/stable/esp32c2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware
 [connection_s2]: https://docs.espressif.com/projects/esp-idf/en/stable/esp32s2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware
+[connection_esp32]: https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware.html#configure-hardware
 [`hil.yml`]: https://github.com/esp-rs/esp-hal/blob/main/.github/workflows/hil.yml
 [setup]: #rpi-setup
 

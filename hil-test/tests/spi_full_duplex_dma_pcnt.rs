@@ -3,7 +3,6 @@
 //! Folowing pins are used:
 //! SCLK    GPIO0
 //! MOSI    GPIO3 / GPIO10 (esp32s3)
-//! CS      GPIO8
 //! PCNT    GPIO2 / GPIO9 (esp32s3)
 //! OUTPUT  GPIO5 (helper to keep MISO LOW)
 //!
@@ -12,7 +11,7 @@
 //!
 //! Connect MISO and MOSI pins.
 
-//% CHIPS: esp32 esp32c6 esp32h2 esp32s3
+//% CHIPS: esp32c6 esp32h2 esp32s3
 
 #![no_std]
 #![no_main]
@@ -70,7 +69,6 @@ mod tests {
         let sclk = io.pins.gpio0;
         let (mosi_mirror, mosi) = hil_test::common_test_pins!(io);
         let miso = io.pins.gpio4;
-        let cs = io.pins.gpio8;
 
         let dma = Dma::new(peripherals.DMA);
 
@@ -83,7 +81,9 @@ mod tests {
         }
 
         let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-            .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
+            .with_sck(sclk)
+            .with_mosi(mosi)
+            .with_miso(miso)
             .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
         let pcnt = Pcnt::new(peripherals.PCNT);

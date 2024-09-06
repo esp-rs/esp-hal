@@ -2,9 +2,8 @@
 //!
 //! Folowing pins are used:
 //! SCLK    GPIO0
-//! MISO    GPIO2 / GPIO9 (esp32s2 and esp32s3)
-//! MOSI    GPIO3 / GPIO10 (esp32s2 and esp32s3)
-//! CS      GPIO8
+//! MISO    GPIO2 / GPIO9  (esp32s2 / esp32s3) / GPIO26 (esp32)
+//! MOSI    GPIO3 / GPIO10 (esp32s2 / esp32s3) / GPIO27 (esp32)
 //!
 //! Connect MISO and MOSI pins.
 
@@ -37,16 +36,14 @@ mod tests {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+
         let sclk = io.pins.gpio0;
         let (miso, mosi) = hil_test::common_test_pins!(io);
-        let cs = io.pins.gpio8;
 
-        let spi = Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0).with_pins(
-            Some(sclk),
-            Some(mosi),
-            Some(miso),
-            Some(cs),
-        );
+        let spi = Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0)
+            .with_sck(sclk)
+            .with_mosi(mosi)
+            .with_miso(miso);
 
         Context { spi }
     }
