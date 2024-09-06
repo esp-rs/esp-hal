@@ -63,6 +63,8 @@ pub(crate) use crate::gpio;
 #[cfg(any(xtensa, esp32c3, esp32c2))]
 pub(crate) use crate::rtc_pins;
 pub use crate::soc::gpio::*;
+#[cfg(touch)]
+pub(crate) use crate::touch_common;
 use crate::{
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
@@ -70,8 +72,6 @@ use crate::{
     private,
     InterruptConfigurable,
 };
-#[cfg(touch)]
-pub(crate) use crate::{touch_common, touch_into};
 
 mod any_pin;
 mod dummy_pin;
@@ -1609,11 +1609,10 @@ macro_rules! analog {
     }
 }
 
-/// normal touch pin initialization. This is separate from touch_common, as we
-/// need to handle some touch_pads differently
+/// Common functionality for all touch pads
 #[doc(hidden)]
 #[macro_export]
-macro_rules! touch_into {
+macro_rules! touch_common {
     (@pin_specific $touch_num:expr, true) => {
         paste::paste! {
             unsafe { &*RTC_IO::ptr() }.[< touch_pad $touch_num >]().write(|w| unsafe {
@@ -1644,57 +1643,9 @@ macro_rules! touch_into {
     };
 
     (
-        $( ( $touch_num:expr, $pin_num:expr, $rtc_pin:expr, $touch_thres_reg:expr, $touch_thres_field:expr , $needs_extra_setup:tt ))+
-    ) => {
-        pub(crate) fn internal_into_touch(pin: u8) {
-            match pin {
-                $(
-                    $pin_num => {
-                        use $crate::peripherals::{GPIO, RTC_IO, SENS};
-
-                        let gpio = unsafe { &*GPIO::ptr() };
-                        let rtcio = unsafe { &*RTC_IO::ptr() };
-                        let sens = unsafe { &*SENS::ptr() };
-
-                        // Pad to normal mode (not open-drain)
-                        gpio.pin($rtc_pin).write(|w| w.pad_driver().clear_bit());
-
-                        // clear output
-                        rtcio.enable_w1tc().write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
-                        paste::paste! {
-                            sens . $touch_thres_reg ()
-                                .write(|w| unsafe {
-                                    w. $touch_thres_field ().bits(
-                                        0b0 // Default: 0 for esp32 gets overridden later anyway.
-                                    )
-                                });
-
-                            $crate::touch_into!( @pin_specific $touch_num, $needs_extra_setup );
-
-                            // enable the pin
-                            sens.sar_touch_enable().modify(|r, w| unsafe {
-                                w.touch_pad_worken().bits(
-                                    r.touch_pad_worken().bits() | ( 1 << [< $touch_num >] )
-                                )
-                            });
-                        }
-                    }
-                )+
-
-                _ => unreachable!(),
-            }
-        }
-    };
-}
-
-/// Common functionality for all touch pads
-#[doc(hidden)]
-#[macro_export]
-macro_rules! touch_common {
-    (
         $(
             (
-                $touch_num:expr, $pin_num:expr, $touch_out_reg:expr, $meas_field: expr, $touch_thres_reg:expr, $touch_thres_field:expr
+                $touch_num:literal, $pin_num:literal, $rtc_pin:literal, $touch_out_reg:expr, $meas_field: expr, $touch_thres_reg:expr, $touch_thres_field:expr, $normal_pin:literal
             )
         )+
     ) => {
@@ -1733,6 +1684,45 @@ macro_rules! touch_common {
                         }
                     },
                 )+
+                _ => unreachable!(),
+            }
+        }
+
+        pub(crate) fn internal_into_touch(pin: u8) {
+            match pin {
+                $(
+                    $pin_num => {
+                        use $crate::peripherals::{GPIO, RTC_IO, SENS};
+
+                        let gpio = unsafe { &*GPIO::ptr() };
+                        let rtcio = unsafe { &*RTC_IO::ptr() };
+                        let sens = unsafe { &*SENS::ptr() };
+
+                        // Pad to normal mode (not open-drain)
+                        gpio.pin($rtc_pin).write(|w| w.pad_driver().clear_bit());
+
+                        // clear output
+                        rtcio.enable_w1tc().write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
+                        paste::paste! {
+                            sens . $touch_thres_reg ()
+                                .write(|w| unsafe {
+                                    w. $touch_thres_field ().bits(
+                                        0b0 // Default: 0 for esp32 gets overridden later anyway.
+                                    )
+                                });
+
+                            $crate::touch_common!( @pin_specific $touch_num, $normal_pin );
+
+                            // enable the pin
+                            sens.sar_touch_enable().modify(|r, w| unsafe {
+                                w.touch_pad_worken().bits(
+                                    r.touch_pad_worken().bits() | ( 1 << [< $touch_num >] )
+                                )
+                            });
+                        }
+                    }
+                )+
+
                 _ => unreachable!(),
             }
         }
