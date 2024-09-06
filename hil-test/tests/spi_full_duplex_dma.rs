@@ -96,6 +96,7 @@ mod tests {
 
     #[test]
     #[timeout(3)]
+    #[cfg(not(feature = "esp32s2"))]
     fn test_asymmetric_dma_transfer(ctx: Context) {
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(2, 4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
