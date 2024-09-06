@@ -19,7 +19,7 @@ use esp_println::println;
 
 fn init_psram_heap() {
     unsafe {
-        esp_alloc::INSTANCE.add_region(esp_alloc::HeapRegion::new(
+        esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
             psram::psram_vaddr_start() as *mut u8,
             psram::PSRAM_BYTES,
             esp_alloc::MemoryCapability::External.into(),

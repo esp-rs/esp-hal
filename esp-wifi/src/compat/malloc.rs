@@ -78,7 +78,7 @@ unsafe extern "C" fn realloc(ptr: *mut u8, new_size: usize) -> *mut u8 {
 #[doc(hidden)]
 #[no_mangle]
 pub extern "C" fn esp_wifi_free_internal_heap() -> usize {
-    esp_alloc::INSTANCE.free_caps(esp_alloc::MemoryCapability::Internal.into())
+    esp_alloc::HEAP.free_caps(esp_alloc::MemoryCapability::Internal.into())
 }
 
 #[cfg(feature = "esp-alloc")]
@@ -86,7 +86,7 @@ pub extern "C" fn esp_wifi_free_internal_heap() -> usize {
 #[no_mangle]
 pub extern "C" fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8 {
     unsafe {
-        esp_alloc::INSTANCE.alloc_caps(
+        esp_alloc::HEAP.alloc_caps(
             esp_alloc::MemoryCapability::Internal.into(),
             core::alloc::Layout::from_size_align_unchecked(size, 4),
         )

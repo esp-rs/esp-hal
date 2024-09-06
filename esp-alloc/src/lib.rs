@@ -72,7 +72,7 @@ use linked_list_allocator::Heap;
 
 /// The global allocator instance
 #[global_allocator]
-pub static INSTANCE: EspHeap = EspHeap::empty();
+pub static HEAP: EspHeap = EspHeap::empty();
 
 const NON_REGION: Option<HeapRegion> = None;
 
@@ -157,7 +157,7 @@ impl EspHeap {
     /// - `size > 0`.
     pub unsafe fn add_region(&self, region: HeapRegion) {
         critical_section::with(|cs| {
-            let mut regions = INSTANCE.heap.borrow_ref_mut(cs);
+            let mut regions = self.heap.borrow_ref_mut(cs);
             let free = regions
                 .iter()
                 .enumerate()

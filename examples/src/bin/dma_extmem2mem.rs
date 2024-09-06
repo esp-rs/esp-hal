@@ -49,7 +49,7 @@ fn init_heap(psram: impl esp_hal::peripheral::Peripheral<P = esp_hal::peripheral
         esp_hal::psram::psram_vaddr_start()
     );
     unsafe {
-        esp_alloc::INSTANCE.add_region(esp_alloc::HeapRegion::new(
+        esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
             esp_hal::psram::psram_vaddr_start() as *mut u8,
             esp_hal::psram::PSRAM_BYTES,
             esp_alloc::MemoryCapability::External.into(),

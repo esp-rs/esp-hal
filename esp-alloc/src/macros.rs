@@ -8,7 +8,7 @@ macro_rules! heap_allocator {
         static mut HEAP: core::mem::MaybeUninit<[u8; $size]> = core::mem::MaybeUninit::uninit();
 
         unsafe {
-            $crate::INSTANCE.add_region($crate::HeapRegion::new(
+            $crate::HEAP.add_region($crate::HeapRegion::new(
                 HEAP.as_mut_ptr() as *mut u8,
                 $size,
                 $crate::MemoryCapability::Internal.into(),
@@ -33,7 +33,7 @@ macro_rules! psram_allocator {
         use $psram_module as _psram;
         _psram::init_psram($peripheral);
         unsafe {
-            $crate::INSTANCE.add_region($crate::HeapRegion::new(
+            $crate::HEAP.add_region($crate::HeapRegion::new(
                 _psram::psram_vaddr_start() as *mut u8,
                 _psram::PSRAM_BYTES,
                 $crate::MemoryCapability::External.into(),
