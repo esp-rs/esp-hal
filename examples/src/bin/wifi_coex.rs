@@ -54,7 +54,25 @@ fn main() -> ! {
         config
     });
 
-    esp_alloc::heap_allocator!(92 * 1024);
+    static mut HEAP: core::mem::MaybeUninit<[u8; 72 * 1024]> = core::mem::MaybeUninit::uninit();
+
+    #[link_section = ".dram2_uninit"]
+    static mut HEAP2: core::mem::MaybeUninit<[u8; 64 * 1024]> = core::mem::MaybeUninit::uninit();
+
+    unsafe {
+        esp_alloc::INSTANCE.add_region(esp_alloc::HeapRegion::new(
+            HEAP.as_mut_ptr() as *mut u8,
+            core::mem::size_of_val(&*core::ptr::addr_of!(HEAP)),
+            esp_alloc::MemoryCapability::Internal.into(),
+        ));
+
+        // COEX needs more RAM - add some more
+        esp_alloc::INSTANCE.add_region(esp_alloc::HeapRegion::new(
+            HEAP2.as_mut_ptr() as *mut u8,
+            core::mem::size_of_val(&*core::ptr::addr_of!(HEAP2)),
+            esp_alloc::MemoryCapability::Internal.into(),
+        ));
+    }
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
