@@ -133,6 +133,7 @@ wifi-default = ["ipv4", "tcp", "udp", "icmp", "igmp", "dns", "dhcpv4"]
 defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt"]
 log = ["dep:log", "esp-hal/log"]
 sniffer = ["wifi"]
+have-strchr = []
 
 [package.metadata.docs.rs]
 features = [
