@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- a global allocator is created in esp-alloc, now you need to add individual memory regions (up to 3) to the allocator
+- a global allocator is created in esp-alloc, now you need to add individual memory regions (up to 3) to the allocator (#2099)
 
 ### Fixed
 
