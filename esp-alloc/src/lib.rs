@@ -114,25 +114,6 @@ impl HeapRegion {
     }
 }
 
-/// For esp-wifi
-#[doc(hidden)]
-#[no_mangle]
-pub extern "C" fn free_internal_heap() -> usize {
-    INSTANCE.free_caps(MemoryCapability::Internal.into())
-}
-
-/// For esp-wifi
-#[doc(hidden)]
-#[no_mangle]
-pub extern "C" fn allocate_from_internal_ram(size: usize) -> *mut u8 {
-    unsafe {
-        INSTANCE.alloc_caps(
-            MemoryCapability::Internal.into(),
-            Layout::from_size_align_unchecked(size, 4),
-        )
-    }
-}
-
 /// A memory allocator
 ///
 /// In addition to what Rust's memory allocator can do it allows to allocate

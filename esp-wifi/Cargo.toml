@@ -13,6 +13,8 @@ categories = ["embedded", "hardware-support", "no-std"]
 
 [dependencies]
 defmt = { version = "0.3.8", optional = true }
+document-features  = "0.2.10"
+esp-alloc = { version = "0.4.0", path = "../esp-alloc", optional = true }
 esp-hal = { version = "0.20.0", path = "../esp-hal", default-features = false }
 esp-hal-embassy = { version = "0.3.0", path = "../esp-hal-embassy", default-features = false, optional = true }
 smoltcp = { version = "0.11.0", default-features = false, features = [
@@ -57,46 +59,59 @@ esp-build    = { version = "0.1.0", path = "../esp-build" }
 esp-metadata = { version = "0.3.0", path = "../esp-metadata" }
 
 [features]
-default = ["log"]
+default = ["log", "esp-alloc"]
 
-# chip features
+## Use `esp-alloc` for dynamic allocations.
+##
+## If you opt-out you need to provide implementations for `pub extern "C" fn esp_wifi_free_internal_heap() -> usize` 
+## and `pub extern "C" fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8`
+esp-alloc = ["dep:esp-alloc"]
+
+# Chip Support Feature Flags
+# Target the ESP32-C2.
 esp32c2 = [
   "esp-hal/esp32c2",
   "esp-hal-embassy?/esp32c2",
   "esp-wifi-sys/esp32c2",
 ]
+# Target the ESP32-C3.
 esp32c3 = [
   "esp-hal/esp32c3",
   "esp-hal-embassy?/esp32c3",
   "esp-wifi-sys/esp32c3",
 ]
+# Target the ESP32-C6.
 esp32c6 = [
   "esp-hal/esp32c6",
   "esp-hal-embassy?/esp32c6",
   "esp-wifi-sys/esp32c6",
 ]
+# Target the ESP32-H2.
 esp32h2 = [
   "esp-hal/esp32h2",
   "esp-hal-embassy?/esp32h2",
   "esp-wifi-sys/esp32h2",
 ]
+# Target the ESP32.
 esp32 = [
   "esp-hal/esp32",
   "esp-hal-embassy?/esp32",
   "esp-wifi-sys/esp32",
 ]
+# Target the ESP32-S2.
 esp32s2 = [
   "esp-hal/esp32s2",
   "esp-hal-embassy?/esp32s2",
   "esp-wifi-sys/esp32s2",
 ]
+# Target the ESP32-S3.
 esp32s3 = [
   "esp-hal/esp32s3",
   "esp-hal-embassy?/esp32s3",
   "esp-wifi-sys/esp32s3",
 ]
 
-# async features
+## Enable Async support
 async = [
   "dep:embassy-sync",
   "dep:embassy-futures",
@@ -105,34 +120,84 @@ async = [
   "dep:bt-hci",
 ]
 
+## Enable `embassy-net` support
 embassy-net = ["dep:embassy-net-driver", "async"]
 
-# misc features
+## Enable WiFi-BLE coexistence support
 coex = []
+
+## Logs the WiFi logs from the driver at log level info (needs a nightly-compiler)
 wifi-logs = []
+
+## Dumps packet info at log level info
 dump-packets = []
+
+## Provide implementations of smoltcp traits
 smoltcp = ["dep:smoltcp"]
+
+## Provide utilities for smoltcp initialization. Adds smoltcp dependency
 utils = ["smoltcp"]
+
 enumset = []
+
+## Enable WiFi support
 wifi = ["dep:enumset", "dep:no-std-net"]
+
+## Implement the embedded-svc Wifi trait
 embedded-svc = ["dep:embedded-svc"]
+
+## Enable BLE support
 ble = ["esp-hal/bluetooth"]
+
+## See USB-SERIAL-JTAG below
 phy-enable-usb = []
+
+## Enable minimum modem sleep. Only affects STA mode
 ps-min-modem = []
+
+## Enable maximum modem sleep. Only affects STA mode
 ps-max-modem = []
+
+## Enable esp-now support
 esp-now = ["wifi"]
+
+## IPv6 support. Includes utils feature
 ipv6 = ["wifi", "utils", "smoltcp?/proto-ipv6"]
+
+## IPv4 support. Includes utils feature
 ipv4 = ["wifi", "utils", "smoltcp?/proto-ipv4"]
+
+## TCP socket support. Includes ipv4 feature
 tcp = ["ipv4", "smoltcp?/socket-tcp"]
+
+## UDP socket support. Includes ipv4 feature
 udp = ["ipv4", "smoltcp?/socket-udp"]
+
+## ICMP socket support. Includes ipv4 feature
 icmp = ["ipv4", "smoltcp?/socket-icmp"]
+
+## IGMP (multicast) support. Includes ipv4 featu
 igmp = ["ipv4", "smoltcp?/proto-igmp"]
+
+## DNS support. Includes udp feature
 dns = ["udp", "smoltcp?/proto-dns", "smoltcp?/socket-dns"]
+
+## DHCPv4 support, both creating sockets and autoconfiguring network settings. Includes utils feature
 dhcpv4 = ["wifi", "utils", "smoltcp?/proto-dhcpv4", "smoltcp?/socket-dhcpv4"]
+
+## Convenience to enable "ipv4", "tcp", "udp", "icmp", "igmp", "dns", "dhcpv4"
 wifi-default = ["ipv4", "tcp", "udp", "icmp", "igmp", "dns", "dhcpv4"]
+
+## Enable support for `defmt`
 defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt"]
+
+## Enable support for the `log` crate
 log = ["dep:log", "esp-hal/log"]
+
+## Enable sniffer mode support
 sniffer = ["wifi"]
+
+# Don't include `strchr` - not shown in docs
 have-strchr = []
 
 [package.metadata.docs.rs]

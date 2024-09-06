@@ -1,8 +1,18 @@
+//! # Features flags
+//!
+//! Note that not all features are available on every MCU. For example, `ble`
+//! (and thus, `coex`) is not available on ESP32-S2.
+//!
+//! When using the `dump-packets` feature you can use the extcap in
+//! `extras/esp-wifishark` to analyze the frames in Wireshark.
+//! For more information see
+//! [extras/esp-wifishark/README.md](../extras/esp-wifishark/README.md)
+#![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
+#![doc = include_str!("../README.md")]
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
 #![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
 #![cfg_attr(any(feature = "wifi-logs", nightly), feature(c_variadic))]
-#![doc = include_str!("../README.md")]
-#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![allow(rustdoc::bare_urls)]
 // allow until num-derive doesn't generate this warning anymore (unknown_lints because Xtensa
 // toolchain doesn't know about that lint, yet)
