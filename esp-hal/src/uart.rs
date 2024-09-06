@@ -17,7 +17,7 @@
 //!
 //! Each UART controller is individually configurable, and the usual setting
 //! such as baud rate, data bits, parity, and stop bits can easily be
-//! configured. Additionally, the transmit (TX) and receive (RX) pins need to
+//! configured. Additionally, the receive (RX) and transmit (TX) pins need to
 //! be specified.
 //!
 //! ```rust, no_run
@@ -69,7 +69,7 @@
 //! # }
 //! ```
 //! 
-//! ### Splitting the UART into TX and RX Components
+//! ### Splitting the UART into RX and TX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{config::Config, Uart};
@@ -82,7 +82,7 @@
 //! #     io.pins.gpio2,
 //! # ).unwrap();
 //! // The UART can be split into separate Transmit and Receive components:
-//! let (mut tx, mut rx) = uart1.split();
+//! let (mut rx, mut tx) = uart1.split();
 //!
 //! // Each component can be used individually to interact with the UART:
 //! tx.write_bytes(&[42u8]).expect("write error!");
@@ -90,7 +90,7 @@
 //! # }
 //! ```
 //! 
-//! ### Inverting TX and RX Pins
+//! ### Inverting RX and TX Pins
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::Uart;
@@ -98,17 +98,17 @@
 //!
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
-//! let tx = AnyPin::new_inverted(io.pins.gpio1);
 //! let rx = AnyPin::new_inverted(io.pins.gpio2);
+//! let tx = AnyPin::new_inverted(io.pins.gpio1);
 //! let mut uart1 = Uart::new(
 //!     peripherals.UART1,
-//!     tx,
 //!     rx,
+//!     tx,
 //! ).unwrap();
 //! # }
 //! ```
 //! 
-//! ### Constructing TX and RX Components
+//! ### Constructing RX and TX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{UartTx, UartRx};
@@ -496,8 +496,8 @@ pub mod config {
 
 /// UART (Full-duplex)
 pub struct Uart<'d, T, M> {
-    tx: UartTx<'d, T, M>,
     rx: UartRx<'d, T, M>,
+    tx: UartTx<'d, T, M>,
 }
 
 /// UART (Transmit)
@@ -589,7 +589,7 @@ where
         tx.set_to_push_pull_output(Internal);
         tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
-        let (uart_tx, _) = Uart::<'d, T, Blocking>::new_with_config_inner(uart, config)?.split();
+        let (_, uart_tx) = Uart::<'d, T, Blocking>::new_with_config_inner(uart, config)?.split();
 
         Ok(uart_tx)
     }
@@ -794,7 +794,7 @@ where
         rx.set_to_input(Internal);
         rx.connect_input_to_peripheral(T::rx_signal(), Internal);
 
-        let (_, uart_rx) = Uart::<'d, T, Blocking>::new_with_config_inner(uart, config)?.split();
+        let (uart_rx, _) = Uart::<'d, T, Blocking>::new_with_config_inner(uart, config)?.split();
 
         Ok(uart_rx)
     }
@@ -809,8 +809,8 @@ where
     pub fn new_with_config<TX: OutputPin, RX: InputPin>(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        tx: impl Peripheral<P = TX> + 'd,
         rx: impl Peripheral<P = RX> + 'd,
+        tx: impl Peripheral<P = TX> + 'd,
     ) -> Result<Self, Error> {
         crate::into_ref!(tx);
         crate::into_ref!(rx);
@@ -825,8 +825,8 @@ where
     /// Create a new UART instance with defaults in [`Blocking`] mode.
     pub fn new<TX: OutputPin, RX: InputPin>(
         uart: impl Peripheral<P = T> + 'd,
-        tx: impl Peripheral<P = TX> + 'd,
         rx: impl Peripheral<P = RX> + 'd,
+        tx: impl Peripheral<P = TX> + 'd,
     ) -> Result<Self, Error> {
         crate::into_ref!(tx);
         crate::into_ref!(rx);
@@ -842,8 +842,8 @@ where
     /// Verify that the default pins (DefaultTxPin and DefaultRxPin) are used.
     pub fn new_with_default_pins(
         uart: impl Peripheral<P = T> + 'd,
-        tx: &mut DefaultTxPin,
         rx: &mut DefaultRxPin,
+        tx: &mut DefaultTxPin,
     ) -> Result<Self, Error> {
         tx.set_to_push_pull_output(Internal);
         tx.connect_peripheral_to_output(T::tx_signal(), Internal);
@@ -866,11 +866,11 @@ where
         Self::init();
 
         let mut serial = Uart {
-            tx: UartTx::new_inner(),
             rx: UartRx::new_inner(
                 #[cfg(not(esp32))]
                 config.symbol_length(),
             ),
+            tx: UartTx::new_inner(),
         };
 
         serial
@@ -935,8 +935,8 @@ where
     ///
     /// This is particularly useful when having two tasks correlating to
     /// transmitting and receiving.
-    pub fn split(self) -> (UartTx<'d, T, M>, UartRx<'d, T, M>) {
-        (self.tx, self.rx)
+    pub fn split(self) -> (UartRx<'d, T, M>, UartTx<'d, T, M>) {
+        (self.rx, self.tx)
     }
 
     /// Write bytes out over the UART
@@ -2130,14 +2130,14 @@ mod asynch {
     {
         /// Create a new UART instance with configuration options in [`Async`]
         /// mode.
-        pub fn new_async_with_config<TX: OutputPin, RX: InputPin>(
+        pub fn new_async_with_config<RX: InputPin, TX: OutputPin>(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
-            tx: impl Peripheral<P = TX> + 'd,
             rx: impl Peripheral<P = RX> + 'd,
+            tx: impl Peripheral<P = TX> + 'd,
         ) -> Result<Self, Error> {
-            crate::into_ref!(tx);
             crate::into_ref!(rx);
+            crate::into_ref!(tx);
             tx.set_to_push_pull_output(Internal);
             tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
@@ -2159,21 +2159,21 @@ mod asynch {
         }
 
         /// Create a new UART instance with defaults in [`Async`] mode.
-        pub fn new_async<TX: OutputPin, RX: InputPin>(
+        pub fn new_async<RX: InputPin, TX: OutputPin>(
             uart: impl Peripheral<P = T> + 'd,
-            tx: impl Peripheral<P = TX> + 'd,
             rx: impl Peripheral<P = RX> + 'd,
+            tx: impl Peripheral<P = TX> + 'd,
         ) -> Result<Self, Error> {
-            Self::new_async_with_config(uart, Default::default(), tx, rx)
+            Self::new_async_with_config(uart, Default::default(), rx, tx)
         }
 
         /// Create a new UART instance with defaults in [`Async`] mode.
         pub fn new_async_with_default_pins(
             uart: impl Peripheral<P = T> + 'd,
-            tx: DefaultTxPin,
             rx: DefaultRxPin,
+            tx: DefaultTxPin,
         ) -> Result<Self, Error> {
-            Self::new_async_with_config(uart, Default::default(), tx, rx)
+            Self::new_async_with_config(uart, Default::default(), rx, tx)
         }
     }
 
@@ -2233,7 +2233,7 @@ mod asynch {
                 _ => unreachable!(),
             });
 
-            let (uart_tx, _) = uart.split();
+            let (_, uart_tx) = uart.split();
             Ok(uart_tx)
         }
 
@@ -2318,7 +2318,7 @@ mod asynch {
                 _ => unreachable!(),
             });
 
-            let (_, uart_rx) = uart.split();
+            let (uart_rx, _) = uart.split();
             Ok(uart_rx)
         }
 

@@ -38,7 +38,7 @@ mod tests {
 
         let dma = Dma::new(peripherals.DMA);
         let lcd_cam = LcdCam::new_async(peripherals.LCD_CAM);
-        let (tx_buffer, tx_descriptors, _, _) = dma_buffers!(DATA_SIZE, 0);
+        let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(DATA_SIZE, 0);
 
         Context {
             lcd_cam,

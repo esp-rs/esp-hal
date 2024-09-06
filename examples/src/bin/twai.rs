@@ -53,8 +53,8 @@ fn main() -> ! {
     // For self-testing use `SelfTest` mode of the TWAI peripheral.
     let mut can_config = twai::TwaiConfiguration::new_no_transceiver(
         peripherals.TWAI0,
-        can_tx_pin,
         can_rx_pin,
+        can_tx_pin,
         CAN_BAUDRATE,
         TwaiMode::Normal,
     );

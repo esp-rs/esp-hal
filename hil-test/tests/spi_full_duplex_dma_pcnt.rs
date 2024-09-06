@@ -105,9 +105,9 @@ mod tests {
     #[timeout(3)]
     fn test_dma_read_dma_write_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 5;
-        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
         let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
         let unit = ctx.pcnt_unit;
         let mut spi = ctx.spi;
@@ -140,9 +140,9 @@ mod tests {
     #[timeout(3)]
     fn test_dma_read_dma_transfer_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 5;
-        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
         let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
         let unit = ctx.pcnt_unit;
         let mut spi = ctx.spi;
@@ -166,10 +166,10 @@ mod tests {
             assert_eq!(dma_rx_buf.as_slice(), &[0, 0, 0, 0, 0]);
 
             let transfer = spi
-                .dma_transfer(dma_tx_buf, dma_rx_buf)
+                .dma_transfer(dma_rx_buf, dma_tx_buf)
                 .map_err(|e| e.0)
                 .unwrap();
-            (spi, (dma_tx_buf, dma_rx_buf)) = transfer.wait();
+            (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
             assert_eq!(unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
         }
     }

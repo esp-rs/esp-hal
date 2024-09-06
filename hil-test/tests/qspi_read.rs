@@ -52,7 +52,7 @@ fn execute(
 ) {
     const DMA_BUFFER_SIZE: usize = 4;
 
-    let (buffer, descriptors, _, _) = dma_buffers!(DMA_BUFFER_SIZE, 0);
+    let (_, _, buffer, descriptors) = dma_buffers!(0, DMA_BUFFER_SIZE);
     let mut dma_rx_buf = DmaRxBuf::new(descriptors, buffer).unwrap();
 
     miso_mirror.set_low();

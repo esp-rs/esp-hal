@@ -111,7 +111,7 @@ mod tests {
             }
         }
 
-        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) =
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
             esp_hal::dma_circular_buffers!(BUFFER_SIZE, BUFFER_SIZE);
 
         let i2s = I2s::new(
@@ -120,8 +120,8 @@ mod tests {
             DataFormat::Data16Channel16,
             16000.Hz(),
             dma_channel.configure_for_async(false, DmaPriority::Priority0),
-            tx_descriptors,
             rx_descriptors,
+            tx_descriptors,
         );
 
         let (dout, din) = hil_test::common_test_pins!(io);

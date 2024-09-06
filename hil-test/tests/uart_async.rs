@@ -32,9 +32,9 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let (tx, rx) = hil_test::common_test_pins!(io);
+        let (rx, tx) = hil_test::common_test_pins!(io);
 
-        let uart = Uart::new_async(peripherals.UART0, tx, rx).unwrap();
+        let uart = Uart::new_async(peripherals.UART0, rx, tx).unwrap();
 
         Context { uart }
     }
