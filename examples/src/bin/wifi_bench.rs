@@ -14,6 +14,7 @@
 #![no_main]
 
 use embedded_io::*;
+use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{delay::Delay, prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
@@ -56,6 +57,8 @@ fn main() -> ! {
         config.cpu_clock = CpuClock::max();
         config
     });
+
+    esp_alloc::heap_allocator!(72 * 1024);
 
     let server_address: Ipv4Address = HOST_IP.parse().expect("Invalid HOST_IP address");
 

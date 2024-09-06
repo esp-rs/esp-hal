@@ -11,7 +11,7 @@
 //!
 
 //% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/async esp-wifi/embassy-net esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
-//% CHIPS: esp32 esp32s3 esp32c3 esp32c6
+//% CHIPS: esp32 esp32s2 esp32s3 esp32c3 esp32c6
 
 #![no_std]
 #![no_main]
@@ -20,6 +20,7 @@ use embassy_executor::Spawner;
 use embassy_futures::join::join;
 use embassy_net::{tcp::TcpSocket, Ipv4Address, Stack, StackResources};
 use embassy_time::{with_timeout, Duration, Timer};
+use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
@@ -71,6 +72,26 @@ async fn main(spawner: Spawner) -> ! {
         config.cpu_clock = CpuClock::max();
         config
     });
+
+    static mut HEAP: core::mem::MaybeUninit<[u8; 32 * 1024]> = core::mem::MaybeUninit::uninit();
+
+    #[link_section = ".dram2_uninit"]
+    static mut HEAP2: core::mem::MaybeUninit<[u8; 64 * 1024]> = core::mem::MaybeUninit::uninit();
+
+    unsafe {
+        esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
+            HEAP.as_mut_ptr() as *mut u8,
+            core::mem::size_of_val(&*core::ptr::addr_of!(HEAP)),
+            esp_alloc::MemoryCapability::Internal.into(),
+        ));
+
+        // add some more RAM
+        esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
+            HEAP2.as_mut_ptr() as *mut u8,
+            core::mem::size_of_val(&*core::ptr::addr_of!(HEAP2)),
+            esp_alloc::MemoryCapability::Internal.into(),
+        ));
+    }
 
     let server_address: Ipv4Address = HOST_IP.parse().expect("Invalid HOST_IP address");
 

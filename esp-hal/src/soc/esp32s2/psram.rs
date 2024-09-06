@@ -43,6 +43,7 @@ pub const PSRAM_VADDR_START: usize = PSRAM_VADDR as usize;
 
 /// Initialize PSRAM to be used for data.
 #[cfg(any(feature = "psram-2m", feature = "psram-4m", feature = "psram-8m"))]
+#[procmacros::ram]
 pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::peripherals::PSRAM>) {
     #[allow(unused)]
     enum CacheLayout {

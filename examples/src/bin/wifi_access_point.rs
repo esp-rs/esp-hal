@@ -14,6 +14,7 @@
 #![no_main]
 
 use embedded_io::*;
+use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
@@ -39,6 +40,8 @@ fn main() -> ! {
         config.cpu_clock = CpuClock::max();
         config
     });
+
+    esp_alloc::heap_allocator!(72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 

@@ -9,7 +9,7 @@
 //! Because of the huge task-arena size configured this won't work on ESP32-S2
 
 //% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/async esp-wifi/embassy-net esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
-//% CHIPS: esp32 esp32s3 esp32c2 esp32c3 esp32c6
+//% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
 #![no_main]
@@ -25,6 +25,7 @@ use embassy_net::{
     StaticConfigV4,
 };
 use embassy_time::{Duration, Timer};
+use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
@@ -60,6 +61,8 @@ async fn main(spawner: Spawner) -> ! {
         config.cpu_clock = CpuClock::max();
         config
     });
+
+    esp_alloc::heap_allocator!(72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
