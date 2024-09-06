@@ -2,7 +2,7 @@
 name          = "esp-hal"
 version       = "0.20.1"
 edition       = "2021"
-rust-version  = "1.76.0"
+rust-version  = "1.77.0"
 description   = "Bare-metal HAL for Espressif devices"
 documentation = "https://docs.esp-rs.org/esp-hal/"
 repository    = "https://github.com/esp-rs/esp-hal"
