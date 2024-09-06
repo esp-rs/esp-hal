@@ -23,9 +23,9 @@ struct Context {
 }
 
 async fn test_async_delay_ns(mut timer: impl DelayNs, duration: u32) {
-    let t1 = esp_hal::time::current_time();
+    let t1 = esp_hal::time::now();
     timer.delay_ns(duration).await;
-    let t2 = esp_hal::time::current_time();
+    let t2 = esp_hal::time::now();
 
     assert!(t2 > t1);
     assert!(
