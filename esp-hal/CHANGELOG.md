@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Input`, `Output`, `OutputOpenDrain` and `Flex` are now type-erased by default. Use the new `new_typed` constructor to keep using the ZST pin types. (#2075)
 - To avoid confusion with the `Rtc::current_time` wall clock time APIs, we've renamed `esp_hal::time::current_time` to `esp_hal::time::now`. (#2091)
 - Renamed `touch::Continous` to `touch::Continuous`. (#2094)
+- Faster SHA (#2112)
 - The (previously undocumented) `ErasedPin` enum has been replaced with the `ErasedPin` struct. (#2094)
 
 ### Fixed
