@@ -9,9 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added board-specific consts for c6 and h2 when caluclating transmit power conversion
+
 ### Changed
 
+- Modified CCA threshold value to default of -60 
+
 ### Fixed
+
+- Fixed possible integer underflow in array access
+- Fixed compile error when building binary-logs feature
 
 ### Removed
 
