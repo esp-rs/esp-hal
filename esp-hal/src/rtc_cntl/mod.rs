@@ -88,7 +88,8 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
     reset::{SleepSource, WakeupReason},
-    Cpu, InterruptConfigurable,
+    Cpu,
+    InterruptConfigurable,
 };
 // only include sleep where its been implemented
 #[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
@@ -114,7 +115,7 @@ pub(crate) enum RtcFastClock {
     /// Main XTAL, divided by 4
     RtcFastClockXtalD4 = 0,
     /// Internal fast RC oscillator
-    RtcFastClock8m = 1,
+    RtcFastClock8m     = 1,
 }
 
 #[cfg(not(any(esp32c6, esp32h2)))]
@@ -136,11 +137,11 @@ impl Clock for RtcFastClock {
 /// RTC SLOW_CLK frequency values
 pub enum RtcSlowClock {
     /// Internal slow RC oscillator
-    RtcSlowClockRtc = 0,
+    RtcSlowClockRtc     = 0,
     /// External 32 KHz XTAL
     RtcSlowClock32kXtal = 1,
     /// Internal fast RC oscillator, divided by 256
-    RtcSlowClock8mD256 = 2,
+    RtcSlowClock8mD256  = 2,
 }
 
 #[cfg(not(any(esp32c6, esp32h2)))]
@@ -168,11 +169,11 @@ impl Clock for RtcSlowClock {
 /// Clock source to be calibrated using rtc_clk_cal function
 pub(crate) enum RtcCalSel {
     /// Currently selected RTC SLOW_CLK
-    RtcCalRtcMux = 0,
+    RtcCalRtcMux      = 0,
     /// Internal 8 MHz RC oscillator, divided by 256
-    RtcCal8mD256 = 1,
+    RtcCal8mD256      = 1,
     /// External 32 KHz XTAL
-    RtcCal32kXtal = 2,
+    RtcCal32kXtal     = 2,
     #[cfg(not(esp32))]
     /// Internal 150 KHz RC oscillator
     RtcCalInternalOsc = 3,
@@ -760,11 +761,11 @@ impl RtcClock {
 #[allow(unused)]
 #[derive(Debug, Clone, Copy)]
 enum RwdtStageAction {
-    Off = 0,
-    Interrupt = 1,
-    ResetCpu = 2,
+    Off         = 0,
+    Interrupt   = 1,
+    ResetCpu    = 2,
     ResetSystem = 3,
-    ResetRtc = 4,
+    ResetRtc    = 4,
 }
 
 /// RTC Watchdog Timer.
