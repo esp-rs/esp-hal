@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SHA driver can now be safely used in multiple contexts concurrently (#2049)
 - Fixed an issue with DMA transfers potentially not waking up the correct async task (#2065)
 - Fixed an issue with LCD_CAM i8080 where it would send double the clocks in 16bit mode (#2085)
+- Fix asymmetric SPI transfers on the chips that support it (#2113)
 - Fix i2c embedded-hal transaction (#2028)
 
 ### Removed

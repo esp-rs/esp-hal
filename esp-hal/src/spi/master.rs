@@ -2304,7 +2304,7 @@ pub trait InstanceDma: Instance {
         tx: &mut TX,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
-        self.configure_datalen(usize::max(read_buffer_len, write_buffer_len) as u32 * 8);
+        self.configure_datalen(read_buffer_len as u32 * 8, write_buffer_len as u32 * 8);
 
         rx.is_done();
         tx.is_done();
@@ -2340,7 +2340,7 @@ pub trait InstanceDma: Instance {
         full_duplex: bool,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
-        self.configure_datalen(len as u32 * 8);
+        self.configure_datalen(0, len as u32 * 8);
 
         tx.is_done();
 
@@ -2382,7 +2382,7 @@ pub trait InstanceDma: Instance {
         full_duplex: bool,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
-        self.configure_datalen(data_length as u32 * 8);
+        self.configure_datalen(data_length as u32 * 8, 0);
 
         rx.is_done();
 
@@ -3107,7 +3107,7 @@ pub trait Instance: private::Sealed {
             return Err(nb::Error::WouldBlock);
         }
 
-        self.configure_datalen(8);
+        self.configure_datalen(0, 8);
 
         let reg_block = self.register_block();
         reg_block.w(0).write(|w| w.buf().set(word.into()));
@@ -3138,7 +3138,7 @@ pub trait Instance: private::Sealed {
         // The fifo has a limited fixed size, so the data must be chunked and then
         // transmitted
         for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
-            self.configure_datalen(chunk.len() as u32 * 8);
+            self.configure_datalen(0, chunk.len() as u32 * 8);
 
             {
                 // TODO: replace with `array_chunks` and `from_le_bytes`
@@ -3209,7 +3209,7 @@ pub trait Instance: private::Sealed {
         let reg_block = self.register_block();
 
         for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.configure_datalen(chunk.len() as u32 * 8);
+            self.configure_datalen(chunk.len() as u32 * 8, 0);
 
             for (index, w_reg) in (0..chunk.len()).step_by(4).zip(reg_block.w_iter()) {
                 let reg_val = w_reg.read().bits();
@@ -3433,7 +3433,7 @@ pub trait Instance: private::Sealed {
                 .modify(|_, w| unsafe { w.usr_dummy_cyclelen().bits(dummy - 1) });
         }
 
-        self.configure_datalen(buffer.len() as u32 * 8);
+        self.configure_datalen(buffer.len() as u32 * 8, 0);
         self.update();
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
         self.flush()?;
@@ -3456,24 +3456,34 @@ pub trait Instance: private::Sealed {
         // not need/available on ESP32/ESP32S2
     }
 
-    fn configure_datalen(&self, len: u32) {
+    fn configure_datalen(&self, rx_len: u32, tx_len: u32) {
         let reg_block = self.register_block();
-        let len = if len > 0 { len - 1 } else { 0 };
 
         #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
-        reg_block
-            .ms_dlen()
-            .write(|w| unsafe { w.ms_data_bitlen().bits(len) });
+        {
+            // Note: This will still lead to an error interrupt being fired but it is
+            // something the users can be notified of at the end of the
+            // transfer.
+            let len = core::cmp::max(rx_len, tx_len);
+            let len = len.saturating_sub(1);
+
+            reg_block
+                .ms_dlen()
+                .write(|w| unsafe { w.ms_data_bitlen().bits(len) });
+        }
 
         #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3)))]
         {
+            let rx_len = rx_len.saturating_sub(1);
+            let tx_len = tx_len.saturating_sub(1);
+
             reg_block
                 .mosi_dlen()
-                .write(|w| unsafe { w.usr_mosi_dbitlen().bits(len) });
+                .write(|w| unsafe { w.usr_mosi_dbitlen().bits(tx_len) });
 
             reg_block
                 .miso_dlen()
-                .write(|w| unsafe { w.usr_miso_dbitlen().bits(len) });
+                .write(|w| unsafe { w.usr_miso_dbitlen().bits(rx_len) });
         }
     }
 }
