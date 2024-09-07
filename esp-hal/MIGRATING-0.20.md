@@ -83,7 +83,7 @@ let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
 ## RTC Wall Clock APIs
 
-Instead of the `get_time_ms`, `get_time_us`, and `get_time_raw` functions, the `Rtc` struct now provides the `current_time` function, using `chrono`'s `NaiveDateTime` struct. The current time can also be set using the `set_current_time` function.
+Instead of the `get_time_ms`, `get_time_us`, and `get_time_raw` functions, the `Rtc` struct now provides the `current_time` function, using `chrono`'s `NaiveDateTime` struct.
 
 ```diff
 let rtc = Rtc::new(peripherals.LPWR);
