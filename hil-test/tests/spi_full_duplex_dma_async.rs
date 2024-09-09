@@ -93,10 +93,7 @@ mod tests {
 
         Context {
             spi,
-            pcnt_source: PcntSource::from(
-                mosi_loopback,
-                PcntInputConfig { pull: Pull::Down },
-            ),
+            pcnt_source: PcntSource::from(mosi_loopback, PcntInputConfig { pull: Pull::Down }),
             pcnt_unit: pcnt.unit0,
             out_pin,
         }
