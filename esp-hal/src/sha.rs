@@ -135,6 +135,7 @@ pub struct ShaDigest<'d, A, S: BorrowMut<Sha<'d>>> {
     cursor: usize,
     first_run: bool,
     finished: bool,
+    message_buffer_is_full: bool,
     phantom: PhantomData<(&'d (), A)>,
 }
 
@@ -155,6 +156,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
             cursor: 0,
             first_run: true,
             finished: false,
+            message_buffer_is_full: false,
             phantom: PhantomData,
         }
     }
@@ -188,6 +190,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
             cursor: ctx.cursor,
             first_run: ctx.first_run,
             finished: ctx.finished,
+            message_buffer_is_full: ctx.message_buffer_is_full,
             phantom: PhantomData,
         }
     }
@@ -205,9 +208,6 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
 
     /// Updates the SHA digest with the provided data buffer.
     pub fn update<'a>(&mut self, incoming: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
-        if self.is_busy() {
-            return Err(nb::Error::WouldBlock);
-        }
         self.finished = false;
 
         self.write_data(incoming)
@@ -221,10 +221,6 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
     /// [ShaAlgorithm::DIGEST_LENGTH], but smaller inputs can be given to
     /// get a "short hash"
     pub fn finish(&mut self, output: &mut [u8]) -> nb::Result<(), Infallible> {
-        if self.is_busy() {
-            return Err(nb::Error::WouldBlock);
-        }
-
         // Store message length for padding
         let length = (self.cursor as u64 * 8).to_be_bytes();
         nb::block!(self.update(&[0x80]))?; // Append "1" bit
@@ -232,6 +228,11 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
         // Flush partial data, ensures aligned cursor
         {
             while self.is_busy() {}
+            if self.message_buffer_is_full {
+                self.process_buffer();
+                self.message_buffer_is_full = false;
+                while self.is_busy() {}
+            }
 
             let flushed = self.alignment_helper.flush_to(
                 m_mem(&self.sha.borrow_mut().sha, 0),
@@ -320,6 +321,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
         context.cursor = self.cursor;
         context.first_run = self.first_run;
         context.finished = self.finished;
+        context.message_buffer_is_full = self.message_buffer_is_full;
 
         // Save the content of the current hash.
         self.alignment_helper.volatile_read_regset(
@@ -378,10 +380,18 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
     }
 
     fn write_data<'a>(&mut self, incoming: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
-        if self.is_busy() {
-            return Err(nb::Error::WouldBlock);
+        if self.message_buffer_is_full {
+            if self.is_busy() {
+                // The message buffer is full and the hardware is still processing the previous
+                // message. There's nothing to be done besides wait for the hardware.
+                return Err(nb::Error::WouldBlock);
+            } else {
+                // Submit the full buffer.
+                self.process_buffer();
+                // The buffer is now free for filling.
+                self.message_buffer_is_full = false;
+            }
         }
-        self.finished = false;
 
         let mod_cursor = self.cursor % A::CHUNK_LENGTH;
         let chunk_len = A::CHUNK_LENGTH;
@@ -396,7 +406,16 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
         self.cursor = self.cursor.wrapping_add(incoming.len() - remaining.len());
 
         if bound_reached {
-            self.process_buffer();
+            // Message is full now.
+
+            if self.is_busy() {
+                // The message buffer is full and the hardware is still processing the previous
+                // message. There's nothing to be done besides wait for the hardware.
+                self.message_buffer_is_full = true;
+            } else {
+                // Send the full buffer.
+                self.process_buffer();
+            }
         }
 
         Ok(remaining)
@@ -411,6 +430,7 @@ pub struct Context<A: ShaAlgorithm> {
     cursor: usize,
     first_run: bool,
     finished: bool,
+    message_buffer_is_full: bool,
     /// Buffered bytes (SHA_M_n_REG) to be processed.
     buffer: [u32; 32],
     /// Saved digest (SHA_H_n_REG) for interleaving operation
@@ -426,6 +446,7 @@ impl<A: ShaAlgorithm> Context<A> {
             cursor: 0,
             first_run: true,
             finished: false,
+            message_buffer_is_full: false,
             alignment_helper: AlignmentHelper::default(),
             buffer: [0; 32],
             saved_digest: [0; 64],
