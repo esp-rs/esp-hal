@@ -403,23 +403,10 @@ pub trait InputPin: Pin + PeripheralInputPin {
     fn wakeup_enable(&mut self, enable: bool, event: WakeEvent, _: private::Internal) {
         self.listen_with_options(event.into(), false, false, enable, private::Internal);
     }
-
-    /// Turns the pin object into a peripheral input.
-    fn peripheral_input(&self) -> interconnect::InputSignal {
-        interconnect::InputSignal::new(self.degrade_internal(private::Internal))
-    }
 }
 
 /// Trait implemented by pins which can be used as outputs.
-pub trait OutputPin: Pin + PeripheralOutputPin {
-    /// Turns the pin object into a peripheral output.
-    fn into_peripheral_output(self) -> interconnect::OutputSignal
-    where
-        Self: Sized,
-    {
-        interconnect::OutputSignal::new(self.degrade_internal(private::Internal))
-    }
-}
+pub trait OutputPin: Pin + PeripheralOutputPin {}
 
 /// Trait implemented by pins which can be used as analog pins
 pub trait AnalogPin: Pin {
@@ -680,6 +667,12 @@ where
         } else {
             <Self as GpioProperties>::Bank::write_out_en_clear(1 << (GPIONUM % 32));
         }
+    }
+
+    /// Turns the pin object into a peripheral input.
+    #[inline]
+    pub fn peripheral_input(&self) -> interconnect::InputSignal {
+        interconnect::InputSignal::new(self.degrade_internal(private::Internal))
     }
 }
 
@@ -968,6 +961,12 @@ where
                 .slp_sel()
                 .clear_bit()
         });
+    }
+
+    /// Turns the pin object into a peripheral output.
+    #[inline]
+    pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
+        interconnect::OutputSignal::new(self.degrade_internal(private::Internal))
     }
 }
 
@@ -1720,8 +1719,15 @@ where
     }
 
     /// Configure the [DriveStrength] of the pin
+    #[inline]
     pub fn set_drive_strength(&mut self, strength: DriveStrength) {
         self.pin.set_drive_strength(strength);
+    }
+
+    /// Turns the pin object into a peripheral output.
+    #[inline]
+    pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
+        self.pin.into_peripheral_output()
     }
 }
 
@@ -1794,6 +1800,7 @@ where
     }
 
     /// Stop listening for interrupts
+    #[inline]
     pub fn unlisten(&mut self) {
         self.pin.unlisten();
     }
@@ -1816,6 +1823,12 @@ where
     #[inline]
     pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
         self.pin.wakeup_enable(enable, event);
+    }
+
+    /// Turns the pin object into a peripheral input.
+    #[inline]
+    pub fn peripheral_input(&self) -> interconnect::InputSignal {
+        self.pin.peripheral_input()
     }
 }
 
@@ -1946,6 +1959,12 @@ where
     pub fn set_drive_strength(&mut self, strength: DriveStrength) {
         self.pin.set_drive_strength(strength);
     }
+
+    /// Turns the pin object into a peripheral output.
+    #[inline]
+    pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
+        self.pin.into_peripheral_output()
+    }
 }
 
 /// Flexible pin driver.
@@ -2044,6 +2063,12 @@ where
     pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
         self.pin.wakeup_enable(enable, event, private::Internal);
     }
+
+    /// Turns the pin object into a peripheral input.
+    #[inline]
+    pub fn peripheral_input(&self) -> interconnect::InputSignal {
+        interconnect::InputSignal::new(self.pin.degrade_internal(private::Internal))
+    }
 }
 
 impl<'d, P> Flex<'d, P>
@@ -2099,8 +2124,15 @@ where
     }
 
     /// Configure the [DriveStrength] of the pin
+    #[inline]
     pub fn set_drive_strength(&mut self, strength: DriveStrength) {
         self.pin.set_drive_strength(strength, private::Internal);
+    }
+
+    /// Turns the pin object into a peripheral output.
+    #[inline]
+    pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
+        interconnect::OutputSignal::new(self.pin.degrade_internal(private::Internal))
     }
 }
 
@@ -2122,6 +2154,20 @@ pub(crate) mod internal {
     use super::*;
 
     impl private::Sealed for ErasedPin {}
+
+    impl ErasedPin {
+        /// Turns the pin object into a peripheral output.
+        #[inline]
+        pub fn peripheral_input(self) -> interconnect::InputSignal {
+            handle_gpio_input!(&self.0, target, { target.peripheral_input() })
+        }
+
+        /// Turns the pin object into a peripheral output.
+        #[inline]
+        pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
+            handle_gpio_output!(self.0, target, { target.into_peripheral_output() })
+        }
+    }
 
     impl Pin for ErasedPin {
         fn number(&self, _: private::Internal) -> u8 {
