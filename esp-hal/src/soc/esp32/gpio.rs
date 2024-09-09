@@ -793,8 +793,8 @@ crate::gpio::gpio! {
     (25, 0, InputOutputAnalog (5 => EMAC_RXD0) ())
     (26, 0, InputOutputAnalog (5 => EMAC_RXD1) ())
     (27, 0, InputOutputAnalogTouch (5 => EMAC_RX_DV) ())
-    (32, 1, InputOutputAnalog)
-    (33, 1, InputOutputAnalog)
+    (32, 1, InputOutputAnalogTouch)
+    (33, 1, InputOutputAnalogTouch)
     (34, 1, InputOnlyAnalog)
     (35, 1, InputOnlyAnalog)
     (36, 1, InputOnlyAnalog)
@@ -845,33 +845,19 @@ crate::gpio::rtc_pins! {
     (27, 17, touch_pad7(),     "",      touch_pad7_hold_force, rue,       rde       )
 }
 
-crate::gpio::touch_into! {
-    // (touch_nr, pin_nr, rtc_pin, touch_comb_reg_nr, normal_pin)
-    (0, 4,  10, sar_touch_thres1, touch_out_th0, true )
-    (1, 0,  11, sar_touch_thres1, touch_out_th1, true )
-    (2, 2,  12, sar_touch_thres2, touch_out_th2, true )
-    (3, 15, 13, sar_touch_thres2, touch_out_th3, true )
-    (4, 13, 14, sar_touch_thres3, touch_out_th4, true )
-    (5, 12, 15, sar_touch_thres3, touch_out_th5, true )
-    (6, 14, 16, sar_touch_thres4, touch_out_th6, true )
-    (7, 27, 17, sar_touch_thres4, touch_out_th7, true )
+crate::gpio::touch! {
+    // touch_nr, pin_nr, rtc_pin, touch_out_reg, meas_field, touch_thres_reg, touch_thres_field, normal_pin
+    (0, 4,  10, sar_touch_out1, touch_meas_out0, sar_touch_thres1, touch_out_th0, true)
+    (1, 0,  11, sar_touch_out1, touch_meas_out1, sar_touch_thres1, touch_out_th1, true)
+    (2, 2,  12, sar_touch_out2, touch_meas_out2, sar_touch_thres2, touch_out_th2, true)
+    (3, 15, 13, sar_touch_out2, touch_meas_out3, sar_touch_thres2, touch_out_th3, true)
+    (4, 13, 14, sar_touch_out3, touch_meas_out4, sar_touch_thres3, touch_out_th4, true)
+    (5, 12, 15, sar_touch_out3, touch_meas_out5, sar_touch_thres3, touch_out_th5, true)
+    (6, 14, 16, sar_touch_out4, touch_meas_out6, sar_touch_thres4, touch_out_th6, true)
+    (7, 27, 17, sar_touch_out4, touch_meas_out7, sar_touch_thres4, touch_out_th7, true)
     // ---
-    (8, 33, 8, sar_touch_thres5, touch_out_th8, false )
-    (9, 32, 9, sar_touch_thres5, touch_out_th9, false )
-}
-
-crate::gpio::touch_common! {
-    // (touch_nr, pin_nr, touch_out_reg, touch_thres_reg )
-    (0, 4,  sar_touch_out1, touch_meas_out0, sar_touch_thres1, touch_out_th0)
-    (1, 0,  sar_touch_out1, touch_meas_out1, sar_touch_thres1, touch_out_th1)
-    (2, 2,  sar_touch_out2, touch_meas_out2, sar_touch_thres2, touch_out_th2)
-    (3, 15, sar_touch_out2, touch_meas_out3, sar_touch_thres2, touch_out_th3)
-    (4, 13, sar_touch_out3, touch_meas_out4, sar_touch_thres3, touch_out_th4)
-    (5, 12, sar_touch_out3, touch_meas_out5, sar_touch_thres3, touch_out_th5)
-    (6, 14, sar_touch_out4, touch_meas_out6, sar_touch_thres4, touch_out_th6)
-    (7, 27, sar_touch_out4, touch_meas_out7, sar_touch_thres4, touch_out_th7)
-    (8, 33, sar_touch_out5, touch_meas_out8, sar_touch_thres5, touch_out_th8)
-    (9, 32, sar_touch_out5, touch_meas_out9, sar_touch_thres5, touch_out_th9)
+    (8, 33, 8, sar_touch_out5, touch_meas_out8, sar_touch_thres5, touch_out_th8, false)
+    (9, 32, 9, sar_touch_out5, touch_meas_out9, sar_touch_thres5, touch_out_th9, false)
 }
 
 impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank0 {
