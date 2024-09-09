@@ -1198,7 +1198,7 @@ pub(crate) fn init() {
     modem_clock_select_lp_clock_source(RadioPeripherals::Wifi, modem_lpclk_src, 0);
 }
 
-pub(crate) fn configure_clock(slow_clock: RtcSlowClock) {
+pub(crate) fn configure_clock(mut slow_clock: RtcSlowClock) {
     assert!(matches!(
         RtcClock::get_xtal_freq(),
         XtalClock::RtcXtalFreq40M
@@ -1206,12 +1206,25 @@ pub(crate) fn configure_clock(slow_clock: RtcSlowClock) {
 
     RtcClock::set_fast_freq(RtcFastClock::RtcFastClockRcFast);
 
+    let mut c: u8 = 0;
+    let mut switch = false;
     let cal_val = loop {
+        c = c + 1;
         RtcClock::set_slow_freq(slow_clock);
 
         let res = RtcClock::calibrate(slow_clock.into_cal(), slow_clock.into_cal_cycles());
         if res != 0 {
             break res;
+        }
+        if c > 5 {
+            if !switch {
+                switch = true;
+                slow_clock = RtcSlowClock::default();
+                c = 0;
+                warn!("Failed to init 32Khz clock, you need a special bootloader!");
+            } else {
+                panic!("Failed to switch back to default rtc clock");
+            }
         }
     };
 
@@ -1518,7 +1531,7 @@ impl RtcClock {
 
         crate::rom::ets_delay_us(3);
     }
-
+    
     /// Calibration of RTC_SLOW_CLK is performed using a special feature of
     /// TIMG0. This feature counts the number of XTAL clock cycles within a
     /// given number of RTC_SLOW_CLK cycles.
@@ -1526,7 +1539,7 @@ impl RtcClock {
         const SOC_CLK_RC_FAST_FREQ_APPROX: u32 = 17_500_000;
         const SOC_CLK_RC_SLOW_FREQ_APPROX: u32 = 136_000;
         const SOC_CLK_XTAL32K_FREQ_APPROX: u32 = 32768;
-
+        
         if cal_clk == RtcCalSel::RtcCalRtcMux {
             cal_clk = match cal_clk {
                 RtcCalSel::RtcCalRtcMux => match RtcClock::get_slow_freq() {
