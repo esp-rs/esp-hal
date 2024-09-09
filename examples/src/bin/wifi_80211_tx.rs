@@ -10,6 +10,7 @@
 
 use core::marker::PhantomData;
 
+use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
@@ -39,6 +40,8 @@ fn main() -> ! {
         config.cpu_clock = CpuClock::max();
         config
     });
+
+    esp_alloc::heap_allocator!(72 * 1024);
 
     let delay = Delay::new();
 

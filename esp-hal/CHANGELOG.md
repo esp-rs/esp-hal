@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added sleep and wakeup support for esp32c2 (#1922)
 - `Input`, `Output`, `OutputOpenDrain` and `Flex` now implement `Peripheral`. (#2094)
 - Previously unavailable memory is available via `.dram2_uninit` section (#2079)
+- Added `Rtc::set_current_time` to allow setting RTC time, and `Rtc::current_time` to getting RTC time while taking into account boot time (#1883)
 
 ### Changed
 
@@ -31,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - To avoid confusion with the `Rtc::current_time` wall clock time APIs, we've renamed `esp_hal::time::current_time` to `esp_hal::time::now`. (#2091)
 - Renamed `touch::Continous` to `touch::Continuous`. (#2094)
 - The (previously undocumented) `ErasedPin` enum has been replaced with the `ErasedPin` struct. (#2094)
+- Renamed and merged `Rtc::get_time_us` and `Rtc::get_time_ms` into `Rtc::time_since_boot` (#1883)
 - ESP32: Added support for touch sensing on GPIO32 and 33 (#2109)
 
 ### Fixed
@@ -49,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `Peripherals::take`. Use `esp_hal::init` to obtain `Peripherals` (#1999)
 - Removed `AnyInputOnlyPin` in favour of `AnyPin`. (#2071)
 - Removed the following functions from `GpioPin`: `is_high`, `is_low`, `set_high`, `set_low`, `set_state`, `is_set_high`, `is_set_low`, `toggle`. (#2094)
+- Removed `Rtc::get_time_raw` (#1883)
 
 ## [0.20.1] - 2024-08-30
 

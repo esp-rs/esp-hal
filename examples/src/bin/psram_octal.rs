@@ -12,16 +12,18 @@ extern crate alloc;
 
 use alloc::{string::String, vec::Vec};
 
+use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{prelude::*, psram};
 use esp_println::println;
 
-#[global_allocator]
-static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
-
 fn init_psram_heap() {
     unsafe {
-        ALLOCATOR.init(psram::psram_vaddr_start() as *mut u8, psram::PSRAM_BYTES);
+        esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
+            psram::psram_vaddr_start() as *mut u8,
+            psram::PSRAM_BYTES,
+            esp_alloc::MemoryCapability::External.into(),
+        ));
     }
 }
 

@@ -17,7 +17,6 @@ use alloc::{
 use core::cell::RefCell;
 
 use critical_section::Mutex;
-use esp_alloc::heap_allocator;
 use esp_backtrace as _;
 use esp_hal::{
     prelude::*,
@@ -39,8 +38,7 @@ fn main() -> ! {
         config
     });
 
-    // Create a heap allocator, with 32kB of space.
-    heap_allocator!(32_168);
+    esp_alloc::heap_allocator!(72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let timer0: ErasedTimer = timg0.timer0.into();
