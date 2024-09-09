@@ -15,7 +15,7 @@
 //! - RX => GPIO2
 
 //% CHIPS: esp32c3 esp32c6 esp32s2 esp32s3
-//% FEATURES: async embassy embassy-generic-timers
+//% FEATURES: embassy embassy-generic-timers
 
 #![no_std]
 #![no_main]
@@ -25,11 +25,9 @@ use embassy_sync::{blocking_mutex::raw::NoopRawMutex, channel::Channel};
 use embedded_can::{Frame, Id};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     gpio::Io,
     interrupt,
-    peripherals::{self, Peripherals, TWAI0},
-    system::SystemControl,
+    peripherals::{self, TWAI0},
     timer::timg::TimerGroup,
     twai::{self, EspTwaiFrame, TwaiMode, TwaiRx, TwaiTx},
 };
@@ -84,12 +82,10 @@ async fn transmitter(
 
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0.timer0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_hal_embassy::init(timg0.timer0);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -105,9 +101,8 @@ async fn main(spawner: Spawner) {
     // state that prevents transmission but allows configuration.
     let mut can_config = twai::TwaiConfiguration::new_async_no_transceiver(
         peripherals.TWAI0,
-        can_tx_pin,
         can_rx_pin,
-        &clocks,
+        can_tx_pin,
         CAN_BAUDRATE,
         TwaiMode::Normal,
     );
@@ -128,7 +123,7 @@ async fn main(spawner: Spawner) {
     let can = can_config.start();
 
     // Get separate transmit and receive halves of the peripheral.
-    let (tx, rx) = can.split();
+    let (rx, tx) = can.split();
 
     interrupt::enable(
         peripherals::Interrupt::TWAI0,

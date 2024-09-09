@@ -15,19 +15,25 @@
 //!    * `BT (Bluetooth) wake` - light sleep only
 
 use core::cell::RefCell;
-#[cfg(any(esp32, esp32c3, esp32s3, esp32c6))]
+#[cfg(any(esp32, esp32c3, esp32s3, esp32c6, esp32c2))]
 use core::time::Duration;
 
 #[cfg(any(esp32, esp32s3))]
 use crate::gpio::RtcPin as RtcIoWakeupPinType;
-#[cfg(any(esp32c3, esp32c6))]
+#[cfg(any(esp32c3, esp32c6, esp32c2))]
 use crate::gpio::RtcPinWithResistors as RtcIoWakeupPinType;
 use crate::rtc_cntl::Rtc;
+#[cfg(any(esp32, esp32s3))]
+use crate::{
+    into_ref,
+    peripheral::{Peripheral, PeripheralRef},
+};
 
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3.rs")]
 #[cfg_attr(esp32c3, path = "esp32c3.rs")]
 #[cfg_attr(esp32c6, path = "esp32c6.rs")]
+#[cfg_attr(esp32c2, path = "esp32c2.rs")]
 mod sleep_impl;
 
 pub use sleep_impl::*;
@@ -45,13 +51,13 @@ pub enum WakeupLevel {
 /// Represents a timer wake-up source, triggering an event after a specified
 /// duration.
 #[derive(Debug, Default, Clone, Copy)]
-#[cfg(any(esp32, esp32c3, esp32s3, esp32c6))]
+#[cfg(any(esp32, esp32c3, esp32s3, esp32c6, esp32c2))]
 pub struct TimerWakeupSource {
     /// The duration after which the wake-up event is triggered.
     duration: Duration,
 }
 
-#[cfg(any(esp32, esp32c3, esp32s3, esp32c6))]
+#[cfg(any(esp32, esp32c3, esp32s3, esp32c6, esp32c2))]
 impl TimerWakeupSource {
     /// Creates a new timer wake-up source with the specified duration.
     pub fn new(duration: Duration) -> Self {
@@ -70,11 +76,10 @@ pub enum Error {
 }
 
 /// External wake-up source (Ext0).
-#[derive(Debug)]
 #[cfg(any(esp32, esp32s3))]
 pub struct Ext0WakeupSource<'a, P: RtcIoWakeupPinType> {
     /// The pin used as the wake-up source.
-    pin: RefCell<&'a mut P>,
+    pin: RefCell<PeripheralRef<'a, P>>,
     /// The level at which the wake-up event is triggered.
     level: WakeupLevel,
 }
@@ -83,7 +88,8 @@ pub struct Ext0WakeupSource<'a, P: RtcIoWakeupPinType> {
 impl<'a, P: RtcIoWakeupPinType> Ext0WakeupSource<'a, P> {
     /// Creates a new external wake-up source (Ext0``) with the specified pin
     /// and wake-up level.
-    pub fn new(pin: &'a mut P, level: WakeupLevel) -> Self {
+    pub fn new(pin: impl Peripheral<P = P> + 'a, level: WakeupLevel) -> Self {
+        into_ref!(pin);
         Self {
             pin: RefCell::new(pin),
             level,
@@ -134,12 +140,12 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// RTC_IO wakeup allows configuring any combination of RTC_IO pins with
 /// arbitrary wakeup levels to wake up the chip from sleep. This wakeup source
 /// can be used to wake up from both light and deep sleep.
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(any(esp32c3, esp32s3, esp32c2))]
 pub struct RtcioWakeupSource<'a, 'b> {
     pins: RefCell<&'a mut [(&'b mut dyn RtcIoWakeupPinType, WakeupLevel)]>,
 }
 
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(any(esp32c3, esp32s3, esp32c2))]
 impl<'a, 'b> RtcioWakeupSource<'a, 'b> {
     /// Creates a new external wake-up source (Ext1).
     pub fn new(pins: &'a mut [(&'b mut dyn RtcIoWakeupPinType, WakeupLevel)]) -> Self {

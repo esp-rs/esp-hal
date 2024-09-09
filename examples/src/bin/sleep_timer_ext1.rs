@@ -12,11 +12,10 @@ use core::time::Duration;
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     entry,
-    gpio::{Io, RtcPin},
-    peripherals::Peripherals,
+    gpio::{Input, Io, Pull, RtcPin},
+    peripheral::Peripheral,
     rtc_cntl::{
         get_reset_reason,
         get_wakeup_cause,
@@ -24,21 +23,18 @@ use esp_hal::{
         Rtc,
         SocResetReason,
     },
-    system::SystemControl,
     Cpu,
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let mut rtc = Rtc::new(peripherals.LPWR);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let mut pin_0 = io.pins.gpio4;
+    let pin_0 = Input::new(io.pins.gpio4, Pull::None);
     let mut pin_2 = io.pins.gpio2;
 
     println!("up and runnning!");
@@ -47,10 +43,10 @@ fn main() -> ! {
     let wake_reason = get_wakeup_cause();
     println!("wake reason: {:?}", wake_reason);
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let timer = TimerWakeupSource::new(Duration::from_secs(30));
-    let mut wakeup_pins: [&mut dyn RtcPin; 2] = [&mut pin_0, &mut pin_2];
+    let mut wakeup_pins: [&mut dyn RtcPin; 2] = [&mut *pin_0.into_ref(), &mut pin_2];
     let ext1 = Ext1WakeupSource::new(&mut wakeup_pins, WakeupLevel::High);
     println!("sleeping!");
     delay.delay_millis(100);

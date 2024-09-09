@@ -7,15 +7,13 @@
 #![no_main]
 
 use aligned::{Aligned, A64};
+use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     dma::{Dma, DmaPriority, Mem2Mem},
     dma_descriptors_chunk_size,
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
 };
 use log::{error, info};
 extern crate alloc;
@@ -44,9 +42,6 @@ macro_rules! dma_alloc_buffer {
     }};
 }
 
-#[global_allocator]
-static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
-
 fn init_heap(psram: impl esp_hal::peripheral::Peripheral<P = esp_hal::peripherals::PSRAM>) {
     esp_hal::psram::init_psram(psram);
     info!(
@@ -54,10 +49,11 @@ fn init_heap(psram: impl esp_hal::peripheral::Peripheral<P = esp_hal::peripheral
         esp_hal::psram::psram_vaddr_start()
     );
     unsafe {
-        ALLOCATOR.init(
+        esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
             esp_hal::psram::psram_vaddr_start() as *mut u8,
             esp_hal::psram::PSRAM_BYTES,
-        );
+            esp_alloc::MemoryCapability::External.into(),
+        ));
     }
 }
 
@@ -65,15 +61,14 @@ fn init_heap(psram: impl esp_hal::peripheral::Peripheral<P = esp_hal::peripheral
 fn main() -> ! {
     esp_println::logger::init_logger(log::LevelFilter::Info);
 
-    let peripherals = Peripherals::take();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
+
     init_heap(peripherals.PSRAM);
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let mut extram_buffer: &mut [u8] = dma_alloc_buffer!(DATA_SIZE, 64);
     let mut intram_buffer = dma_buffer_aligned!(DATA_SIZE, A64);
-    let (tx_descriptors, rx_descriptors) = dma_descriptors_chunk_size!(DATA_SIZE, CHUNK_SIZE);
+    let (rx_descriptors, tx_descriptors) = dma_descriptors_chunk_size!(DATA_SIZE, CHUNK_SIZE);
 
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0.configure(false, DmaPriority::Priority0);
@@ -82,8 +77,8 @@ fn main() -> ! {
     let mut mem2mem = Mem2Mem::new_with_chunk_size(
         channel,
         dma_peripheral,
-        tx_descriptors,
         rx_descriptors,
+        tx_descriptors,
         CHUNK_SIZE,
     )
     .unwrap();
@@ -94,7 +89,7 @@ fn main() -> ! {
     }
 
     info!(" ext2int: Starting transfer of {} bytes", DATA_SIZE);
-    match mem2mem.start_transfer(&extram_buffer, &mut intram_buffer) {
+    match mem2mem.start_transfer(&mut intram_buffer, &extram_buffer) {
         Ok(dma_wait) => {
             info!("Transfer started");
             dma_wait.wait().unwrap();
@@ -126,7 +121,7 @@ fn main() -> ! {
     }
 
     info!(" int2ext: Starting transfer of {} bytes", DATA_SIZE);
-    match mem2mem.start_transfer(&intram_buffer, &mut extram_buffer) {
+    match mem2mem.start_transfer(&mut extram_buffer, &intram_buffer) {
         Ok(dma_wait) => {
             info!("Transfer started");
             dma_wait.wait().unwrap();

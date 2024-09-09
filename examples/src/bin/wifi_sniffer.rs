@@ -17,14 +17,10 @@ use alloc::{
 use core::cell::RefCell;
 
 use critical_section::Mutex;
-use esp_alloc::heap_allocator;
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
-    peripherals::Peripherals,
     prelude::*,
     rng::Rng,
-    system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer, PeriodicTimer},
 };
 use esp_println::println;
@@ -36,15 +32,15 @@ static KNOWN_SSIDS: Mutex<RefCell<BTreeSet<String>>> = Mutex::new(RefCell::new(B
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
+    let peripherals = esp_hal::init({
+        let mut config = esp_hal::Config::default();
+        config.cpu_clock = CpuClock::max();
+        config
+    });
 
-    let peripherals = Peripherals::take();
-    // Create a heap allocator, with 32kB of space.
-    heap_allocator!(32_168);
+    esp_alloc::heap_allocator!(72 * 1024);
 
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::max(system.clock_control).freeze();
-
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
     let timer0: ErasedTimer = timg0.timer0.into();
     let timer = PeriodicTimer::new(timer0);
 
@@ -53,7 +49,6 @@ fn main() -> ! {
         timer,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
-        &clocks,
     )
     .unwrap();
 

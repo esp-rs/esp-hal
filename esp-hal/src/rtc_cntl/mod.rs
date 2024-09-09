@@ -14,11 +14,10 @@
 //!    * Clock Configuration
 //!    * Calibration
 //!    * Low-Power Management
-//!    * Real-Time Clock
 //!    * Handling Watchdog Timers
 //!
-//! ## Examples
-//! ### Print Time in Milliseconds From the RTC Timer
+//! ## Example
+//!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use core::cell::RefCell;
@@ -30,31 +29,26 @@
 //! # use crate::esp_hal::prelude::_fugit_ExtU64;
 //! # use crate::esp_hal::InterruptConfigurable;
 //! static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
-//! let mut delay = Delay::new(&clocks);
+//! let mut delay = Delay::new();
 //!
 //! let mut rtc = Rtc::new(peripherals.LPWR);
+//!
 //! rtc.set_interrupt_handler(interrupt_handler);
 //! rtc.rwdt.set_timeout(2000.millis());
 //! rtc.rwdt.listen();
 //!
 //! critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
-//!
-//!
-//! loop {}
 //! # }
 //!
 //! // Where the `LP_WDT` interrupt handler is defined as:
-//! // Handle the corresponding interrupt
 //! # use core::cell::RefCell;
 //!
 //! # use critical_section::Mutex;
-//! # use esp_hal::prelude::handler;
-//! # use esp_hal::interrupt::InterruptHandler;
-//! # use esp_hal::interrupt;
-//! # use esp_hal::interrupt::Priority;
-//! # use crate::esp_hal::prelude::_fugit_ExtU64;
 //! # use esp_hal::rtc_cntl::Rwdt;
+//!
 //! static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
+//!
+//! // Handle the corresponding interrupt
 //! #[handler]
 //! fn interrupt_handler() {
 //!     critical_section::with(|cs| {
@@ -72,6 +66,7 @@
 //! }
 //! ```
 
+use chrono::{DateTime, NaiveDateTime};
 #[cfg(not(any(esp32c6, esp32h2)))]
 use fugit::HertzU32;
 use fugit::MicrosDurationU64;
@@ -84,8 +79,8 @@ use crate::efuse::Efuse;
 #[cfg(not(any(esp32c6, esp32h2)))]
 use crate::peripherals::{LPWR, TIMG0};
 #[cfg(any(esp32c6, esp32h2))]
-use crate::peripherals::{LP_TIMER, LP_WDT};
-#[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
+use crate::peripherals::{LP_AON, LP_TIMER, LP_WDT};
+#[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
     clock::Clock,
@@ -97,7 +92,7 @@ use crate::{
     InterruptConfigurable,
 };
 // only include sleep where its been implemented
-#[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
+#[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
 pub mod sleep;
 
 #[cfg_attr(esp32, path = "rtc/esp32.rs")]
@@ -209,7 +204,7 @@ impl<'d> Rtc<'d> {
             swd: Swd::new(),
         };
 
-        #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
+        #[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
         RtcSleepConfig::base_settings(&this);
 
         this
@@ -220,8 +215,8 @@ impl<'d> Rtc<'d> {
         RtcClock::estimate_xtal_frequency()
     }
 
-    /// Read the current value of the rtc time registers.
-    pub fn get_time_raw(&self) -> u64 {
+    /// Get the time since boot in the raw register units.
+    fn time_since_boot_raw(&self) -> u64 {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let rtc_cntl = unsafe { &*LPWR::ptr() };
         #[cfg(any(esp32c6, esp32h2))]
@@ -259,18 +254,116 @@ impl<'d> Rtc<'d> {
         ((h as u64) << 32) | (l as u64)
     }
 
-    /// Read the current value of the rtc time registers in microseconds.
-    pub fn get_time_us(&self) -> u64 {
-        self.get_time_raw() * 1_000_000 / RtcClock::get_slow_freq().frequency().to_Hz() as u64
+    /// Get the time since boot.
+    pub fn time_since_boot(&self) -> MicrosDurationU64 {
+        MicrosDurationU64::micros(
+            self.time_since_boot_raw() * 1_000_000
+                / RtcClock::get_slow_freq().frequency().to_Hz() as u64,
+        )
     }
 
-    /// Read the current value of the rtc time registers in milliseconds.
-    pub fn get_time_ms(&self) -> u64 {
-        self.get_time_raw() * 1_000 / RtcClock::get_slow_freq().frequency().to_Hz() as u64
+    /// Read the current value of the boot time registers in microseconds.
+    fn boot_time_us(&self) -> u64 {
+        // For more info on about how RTC setting works and what it has to do with boot time, see https://github.com/esp-rs/esp-hal/pull/1883
+
+        // In terms of registers, STORE2 and STORE3 are used on all current chips
+        // (esp32, esp32p4, esp32h2, esp32c2, esp32c3, esp32c5, esp32c6, esp32c61,
+        // esp32s2, esp32s3)
+
+        // In terms of peripherals:
+
+        // - LPWR is used on the following chips: esp32, esp32p4, esp32c2, esp32c3,
+        //   esp32s2, esp32s3
+
+        // - LP_AON is used on the following chips: esp32c5, esp32c6, esp32c61, esp32h2
+
+        // For registers and peripherals used in esp-idf, see https://github.com/search?q=repo%3Aespressif%2Fesp-idf+RTC_BOOT_TIME_LOW_REG+RTC_BOOT_TIME_HIGH_REG+path%3A**%2Frtc.h&type=code
+
+        #[cfg(not(any(esp32c6, esp32h2)))]
+        let rtc_cntl = unsafe { &*LPWR::ptr() };
+        #[cfg(any(esp32c6, esp32h2))]
+        let rtc_cntl = unsafe { &*LP_AON::ptr() };
+
+        let (l, h) = (rtc_cntl.store2(), rtc_cntl.store3());
+
+        let l = l.read().bits() as u64;
+        let h = h.read().bits() as u64;
+
+        // https://github.com/espressif/esp-idf/blob/23e4823f17a8349b5e03536ff7653e3e584c9351/components/newlib/port/esp_time_impl.c#L115
+        l + (h << 32)
+    }
+
+    /// Set the current value of the boot time registers in microseconds.
+    fn set_boot_time_us(&self, boot_time_us: u64) {
+        // Please see `boot_time_us` for documentation on registers and peripherals
+        // used for certain SOCs.
+
+        #[cfg(not(any(esp32c6, esp32h2)))]
+        let rtc_cntl = unsafe { &*LPWR::ptr() };
+        #[cfg(any(esp32c6, esp32h2))]
+        let rtc_cntl = unsafe { &*LP_AON::ptr() };
+
+        let (l, h) = (rtc_cntl.store2(), rtc_cntl.store3());
+
+        // https://github.com/espressif/esp-idf/blob/23e4823f17a8349b5e03536ff7653e3e584c9351/components/newlib/port/esp_time_impl.c#L102-L103
+        l.write(|w| unsafe { w.bits((boot_time_us & 0xffffffff) as u32) });
+        h.write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
+    }
+
+    /// Get the current time.
+    pub fn current_time(&self) -> NaiveDateTime {
+        // Current time is boot time + time since boot
+
+        let rtc_time_us = self.time_since_boot().to_micros();
+        let boot_time_us = self.boot_time_us();
+        let wrapped_boot_time_us = u64::MAX - boot_time_us;
+
+        // We can detect if we wrapped the boot time by checking if rtc time is greater
+        // than the amount of time we would've wrapped.
+        let current_time_us = if rtc_time_us > wrapped_boot_time_us {
+            // We also just checked that this won't overflow
+            rtc_time_us - wrapped_boot_time_us
+        } else {
+            boot_time_us + rtc_time_us
+        };
+
+        DateTime::from_timestamp_micros(current_time_us as i64)
+            .unwrap()
+            .naive_utc()
+    }
+
+    /// Set the current time.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `current_time` is before the Unix epoch (meaning the
+    /// underlying timestamp is negative).
+    pub fn set_current_time(&self, current_time: NaiveDateTime) {
+        let current_time_us: u64 = current_time
+            .and_utc()
+            .timestamp_micros()
+            .try_into()
+            .expect("current_time is negative");
+
+        // Current time is boot time + time since boot (rtc time)
+        // So boot time = current time - time since boot (rtc time)
+
+        let rtc_time_us = self.time_since_boot().to_micros();
+        if current_time_us < rtc_time_us {
+            // An overflow would happen if we subtracted rtc_time_us from current_time_us.
+            // To work around this, we can wrap around u64::MAX by subtracting the
+            // difference between the current time and the time since boot.
+            // Subtracting time since boot and adding current new time is equivalent and
+            // avoids overflow. We just checked that rtc_time_us is less than time_us
+            // so this won't overflow.
+            self.set_boot_time_us(u64::MAX - rtc_time_us + current_time_us)
+        } else {
+            self.set_boot_time_us(current_time_us - rtc_time_us)
+        }
     }
 
     /// Enter deep sleep and wake with the provided `wake_sources`.
-    #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
+    #[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
     pub fn sleep_deep(&mut self, wake_sources: &[&dyn WakeSource]) -> ! {
         let config = RtcSleepConfig::deep();
         self.sleep(&config, wake_sources);
@@ -278,7 +371,7 @@ impl<'d> Rtc<'d> {
     }
 
     /// Enter light sleep and wake with the provided `wake_sources`.
-    #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
+    #[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
     pub fn sleep_light(&mut self, wake_sources: &[&dyn WakeSource]) {
         let config = RtcSleepConfig::default();
         self.sleep(&config, wake_sources);
@@ -286,7 +379,7 @@ impl<'d> Rtc<'d> {
 
     /// Enter sleep with the provided `config` and wake with the provided
     /// `wake_sources`.
-    #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
+    #[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
     pub fn sleep(&mut self, config: &RtcSleepConfig, wake_sources: &[&dyn WakeSource]) {
         let mut config = *config;
         let mut wakeup_triggers = WakeTriggers::default();
@@ -860,14 +953,12 @@ impl Rwdt {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl embedded_hal_02::watchdog::WatchdogDisable for Rwdt {
     fn disable(&mut self) {
         self.disable();
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl embedded_hal_02::watchdog::WatchdogEnable for Rwdt {
     type Time = MicrosDurationU64;
 
@@ -879,7 +970,6 @@ impl embedded_hal_02::watchdog::WatchdogEnable for Rwdt {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl embedded_hal_02::watchdog::Watchdog for Rwdt {
     fn feed(&mut self) {
         self.feed();
@@ -941,10 +1031,7 @@ impl Default for Swd {
     }
 }
 
-#[cfg(all(
-    any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3),
-    feature = "embedded-hal-02"
-))]
+#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
 impl embedded_hal_02::watchdog::WatchdogDisable for Swd {
     fn disable(&mut self) {
         self.disable();

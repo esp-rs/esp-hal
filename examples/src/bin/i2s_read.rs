@@ -1,4 +1,4 @@
-//! This shows how to continously receive data via I2S.
+//! This shows how to continuously receive data via I2S.
 //!
 //! Without an additional I2S source device you can connect 3V3 or GND to DIN
 //! to read 0 or 0xFF or connect DIN to WS to read two different values.
@@ -18,22 +18,17 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::Io,
     i2s::{DataFormat, I2s, I2sReadDma, Standard},
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -43,7 +38,7 @@ fn main() -> ! {
     #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
     let dma_channel = dma.channel0;
 
-    let (_, tx_descriptors, mut rx_buffer, rx_descriptors) = dma_buffers!(0, 4 * 4092);
+    let (mut rx_buffer, rx_descriptors, _, tx_descriptors) = dma_buffers!(0, 4 * 4092);
 
     // Here we test that the type is
     // 1) reasonably simple (or at least this will flag changes that may make it
@@ -55,9 +50,8 @@ fn main() -> ! {
         DataFormat::Data16Channel16,
         44100.Hz(),
         dma_channel.configure(false, DmaPriority::Priority0),
-        tx_descriptors,
         rx_descriptors,
-        &clocks,
+        tx_descriptors,
     );
 
     #[cfg(not(feature = "esp32"))]

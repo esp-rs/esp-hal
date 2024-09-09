@@ -1,6 +1,6 @@
 //! This shows how to use PSRAM as heap-memory via esp-alloc
 //!
-//! You need an ESP32, ESP32-S2, or ESP32-S3 with at least 2 MB of PSRAM memory.
+//! You need an ESP32, ESP32-S2 or ESP32-S3 with at least 2 MB of PSRAM memory.
 
 //% CHIPS: esp32 esp32s2 esp32s3
 //% FEATURES: psram-2m
@@ -12,37 +12,30 @@ extern crate alloc;
 
 use alloc::{string::String, vec::Vec};
 
+use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    peripherals::Peripherals,
-    prelude::*,
-    psram,
-    system::SystemControl,
-};
+use esp_hal::{prelude::*, psram};
 use esp_println::println;
-
-#[global_allocator]
-static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
 
 fn init_psram_heap() {
     unsafe {
-        ALLOCATOR.init(psram::psram_vaddr_start() as *mut u8, psram::PSRAM_BYTES);
+        esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
+            psram::psram_vaddr_start() as *mut u8,
+            psram::PSRAM_BYTES,
+            esp_alloc::MemoryCapability::External.into(),
+        ));
     }
 }
 
+#[cfg(is_not_release)]
+compile_error!("PSRAM example must be built in release mode!");
+
 #[entry]
 fn main() -> ! {
-    #[cfg(debug_assertions)]
-    compile_error!("PSRAM example must be built in release mode!");
-
-    let peripherals = Peripherals::take();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     psram::init_psram(peripherals.PSRAM);
     init_psram_heap();
-
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let _clocks = ClockControl::max(system.clock_control).freeze();
 
     println!("Going to access PSRAM");
     let mut large_vec = Vec::<u32>::with_capacity(500 * 1024 / 4);

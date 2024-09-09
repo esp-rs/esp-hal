@@ -31,7 +31,6 @@ use peripheral::PeripheralRef;
 use private::*;
 
 use crate::{
-    clock::Clocks,
     dma::{
         dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
         Channel,
@@ -333,7 +332,7 @@ where
         pcr.parl_clk_tx_conf()
             .modify(|_, w| unsafe { w.parl_clk_tx_sel().bits(3).parl_clk_tx_div_num().bits(0) }); // PAD_CLK_TX, no divider
 
-        self.pin.set_to_input(crate::private::Internal);
+        self.pin.init_input(false, false, crate::private::Internal);
         self.pin.connect_input_to_peripheral(
             crate::gpio::InputSignal::PARL_TX_CLK,
             crate::private::Internal,
@@ -368,7 +367,7 @@ where
         pcr.parl_clk_rx_conf()
             .modify(|_, w| unsafe { w.parl_clk_rx_sel().bits(3).parl_clk_rx_div_num().bits(0) }); // PAD_CLK_TX, no divider
 
-        self.pin.set_to_input(crate::private::Internal);
+        self.pin.init_input(false, false, crate::private::Internal);
         self.pin.connect_input_to_peripheral(
             crate::gpio::InputSignal::PARL_RX_CLK,
             crate::private::Internal,
@@ -635,7 +634,8 @@ where
 {
     fn configure(&mut self) -> Result<(), Error> {
         self.rx_pins.configure()?;
-        self.valid_pin.set_to_input(crate::private::Internal);
+        self.valid_pin
+            .init_input(false, false, crate::private::Internal);
         self.valid_pin
             .connect_input_to_peripheral(Instance::rx_valid_pin_signal(), crate::private::Internal);
         Instance::set_rx_sw_en(false);
@@ -739,7 +739,7 @@ macro_rules! rx_pins {
             {
                 fn configure(&mut self)  -> Result<(), Error> {
                     $(
-                        self.[< pin_ $pin:lower >].set_to_input($crate::private::Internal);
+                        self.[< pin_ $pin:lower >].init_input(false, false, $crate::private::Internal);
                         self.[< pin_ $pin:lower >].connect_input_to_peripheral(crate::gpio::InputSignal::$signal, $crate::private::Internal);
                     )+
 
@@ -1123,7 +1123,6 @@ where
         tx_descriptors: &'static mut [DmaDescriptor],
         rx_descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
-        _clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
         internal_init(&mut dma_channel, frequency)?;
 
@@ -1217,7 +1216,6 @@ where
         mut dma_channel: Channel<'d, CH, DM>,
         descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
-        _clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
         internal_init(&mut dma_channel, frequency)?;
 
@@ -1306,7 +1304,6 @@ where
         mut dma_channel: Channel<'d, CH, DM>,
         descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
-        _clocks: &Clocks<'d>,
     ) -> Result<Self, Error> {
         internal_init(&mut dma_channel, frequency)?;
 
@@ -1434,7 +1431,7 @@ where
     pub fn write_dma<'t, TXBUF>(
         &'t mut self,
         words: &'t TXBUF,
-    ) -> Result<DmaTransferTx<'_, Self>, Error>
+    ) -> Result<DmaTransferTx<'t, Self>, Error>
     where
         TXBUF: ReadBuffer,
     {
@@ -1485,7 +1482,7 @@ where
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
-    fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+    fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         while !Instance::is_tx_eof() {}
 
         Instance::set_tx_start(false);
@@ -1530,7 +1527,7 @@ where
     pub fn read_dma<'t, RXBUF>(
         &'t mut self,
         words: &'t mut RXBUF,
-    ) -> Result<DmaTransferRx<'_, Self>, Error>
+    ) -> Result<DmaTransferRx<'t, Self>, Error>
     where
         RXBUF: WriteBuffer,
     {
@@ -1580,7 +1577,7 @@ where
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
-    fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+    fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         loop {
             if self.rx_channel.is_done()
                 || self.rx_channel.has_eof_error()
@@ -1660,7 +1657,6 @@ where
 }
 
 #[doc(hidden)]
-#[cfg(feature = "async")]
 pub mod asynch {
     use core::task::Poll;
 
@@ -2045,7 +2041,6 @@ mod private {
             reg_block.rx_cfg0().read().rx_eof_gen_sel().bit_is_set()
         }
 
-        #[cfg(feature = "async")]
         pub fn listen_tx_done() {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
@@ -2053,7 +2048,6 @@ mod private {
             reg_block.int_ena().modify(|_, w| w.tx_eof().set_bit());
         }
 
-        #[cfg(feature = "async")]
         pub fn unlisten_tx_done() {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
@@ -2061,7 +2055,6 @@ mod private {
             reg_block.int_ena().modify(|_, w| w.tx_eof().clear_bit());
         }
 
-        #[cfg(feature = "async")]
         pub fn is_listening_tx_done() -> bool {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
@@ -2069,7 +2062,6 @@ mod private {
             reg_block.int_ena().read().tx_eof().bit()
         }
 
-        #[cfg(feature = "async")]
         pub fn is_tx_done_set() -> bool {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
@@ -2077,7 +2069,6 @@ mod private {
             reg_block.int_raw().read().tx_eof().bit()
         }
 
-        #[cfg(feature = "async")]
         pub fn clear_is_tx_done() {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
@@ -2312,7 +2303,6 @@ mod private {
                 .bit_is_set()
         }
 
-        #[cfg(feature = "async")]
         pub fn listen_tx_done() {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
@@ -2320,7 +2310,6 @@ mod private {
             reg_block.int_ena().modify(|_, w| w.tx_eof().set_bit());
         }
 
-        #[cfg(feature = "async")]
         pub fn unlisten_tx_done() {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
@@ -2328,7 +2317,6 @@ mod private {
             reg_block.int_ena().modify(|_, w| w.tx_eof().clear_bit());
         }
 
-        #[cfg(feature = "async")]
         pub fn is_listening_tx_done() -> bool {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
@@ -2336,7 +2324,6 @@ mod private {
             reg_block.int_ena().read().tx_eof().bit()
         }
 
-        #[cfg(feature = "async")]
         pub fn is_tx_done_set() -> bool {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
@@ -2344,7 +2331,6 @@ mod private {
             reg_block.int_raw().read().tx_eof().bit()
         }
 
-        #[cfg(feature = "async")]
         pub fn clear_is_tx_done() {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };

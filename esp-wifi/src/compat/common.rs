@@ -2,10 +2,13 @@
 
 use core::{
     fmt::Write,
+    mem::size_of_val,
     ptr::{addr_of, addr_of_mut},
 };
 
-use super::queue::SimpleQueue;
+use esp_wifi_sys::include::malloc;
+
+use super::malloc::free;
 use crate::{
     binary::{
         c_types::{c_int, c_void},
@@ -15,13 +18,6 @@ use crate::{
     preempt::current_task,
     timer::yield_task,
 };
-
-static mut CURR_SEM: [Option<u32>; 20] = [
-    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
-    None, None, None, None,
-];
-
-static mut PER_THREAD_SEM: [Option<*mut c_void>; 4] = [None; 4];
 
 #[derive(Clone, Copy, Debug)]
 struct Mutex {
@@ -37,8 +33,66 @@ static mut MUTEXES: [Mutex; 10] = [Mutex {
 }; 10];
 static mut MUTEX_IDX_CURRENT: usize = 0;
 
-static mut FAKE_WIFI_QUEUE: *const SimpleQueue<[u8; 8], 200> = unsafe { addr_of!(REAL_WIFI_QUEUE) };
-static mut REAL_WIFI_QUEUE: SimpleQueue<[u8; 8], 200> = SimpleQueue::new(); // first there is a ptr to the real queue - driver checks it's not null
+/// A naive and pretty much unsafe queue to back the queues used in drivers and
+/// supplicant code
+struct RawQueue {
+    count: usize,
+    item_size: usize,
+    current_read: usize,
+    current_write: usize,
+    storage: *mut u8,
+}
+
+impl RawQueue {
+    fn new(count: usize, item_size: usize) -> Self {
+        let storage = unsafe { malloc((count * item_size) as u32) as *mut u8 };
+        Self {
+            count,
+            item_size,
+            current_read: 0,
+            current_write: 0,
+            storage,
+        }
+    }
+
+    fn free_storage(&mut self) {
+        unsafe {
+            free(self.storage);
+        }
+        self.storage = core::ptr::null_mut();
+    }
+
+    fn enqueue(&mut self, item: *mut c_void) -> i32 {
+        if (self.current_write - self.current_read) % self.count < self.count {
+            unsafe {
+                let p = self.storage.byte_add(self.item_size * self.current_write);
+                p.copy_from(item as *mut u8, self.item_size);
+                self.current_write = (self.current_write + 1) % self.count;
+            }
+
+            1
+        } else {
+            0
+        }
+    }
+
+    fn try_dequeue(&mut self, item: *mut c_void) -> bool {
+        if (self.current_write - self.current_read) % self.count > 0 {
+            unsafe {
+                let p = self.storage.byte_add(self.item_size * self.current_read) as *const c_void;
+                item.copy_from(p, self.item_size);
+                self.current_read = (self.current_read + 1) % self.count;
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    fn count(&self) -> usize {
+        (self.current_write - self.current_read) % self.count
+    }
+}
 
 pub unsafe fn str_from_c<'a>(s: *const u8) -> &'a str {
     let c_str = core::ffi::CStr::from_ptr(s.cast());
@@ -60,33 +114,31 @@ unsafe extern "C" fn strnlen(chars: *const u8, maxlen: usize) -> usize {
 
 pub fn sem_create(max: u32, init: u32) -> *mut c_void {
     critical_section::with(|_| unsafe {
-        let mut res = 0xffff;
-        memory_fence();
-        for (i, sem) in CURR_SEM.iter().enumerate() {
-            memory_fence();
-            if sem.is_none() {
-                res = i;
-                break;
-            }
-        }
+        let ptr = malloc(4) as *mut u32;
+        ptr.write_volatile(init);
 
-        trace!("sem created res = {} (+1)", res);
-
-        if res != 0xffff {
-            memory_fence();
-            CURR_SEM[res] = Some(init);
-            (res + 1) as *mut c_void
-        } else {
-            core::ptr::null_mut()
-        }
+        trace!("sem created res = {:?}", ptr);
+        ptr.cast()
     })
 }
 
 pub fn sem_delete(semphr: *mut c_void) {
     trace!(">>> sem delete");
+
+    // TODO remove this once fixed in esp_supplicant AND we updated to the fixed -
+    // JIRA: WIFI-6676
+    unsafe {
+        if semphr as usize > addr_of!(MUTEXES) as usize
+            && semphr as usize
+                <= unsafe { addr_of!(MUTEXES).byte_add(size_of_val(&*addr_of!(MUTEXES))) } as usize
+        {
+            warn!("trying to remove a mutex via sem_delete");
+            return;
+        }
+    }
+
     critical_section::with(|_| unsafe {
-        CURR_SEM[semphr as usize - 1] = None;
-        memory_fence();
+        free(semphr.cast());
     })
 }
 
@@ -97,18 +149,15 @@ pub fn sem_take(semphr: *mut c_void, tick: u32) -> i32 {
     let timeout = tick as u64;
     let start = crate::timer::get_systimer_count();
 
-    let sem_idx = semphr as usize - 1;
+    let sem = semphr as *mut u32;
 
     'outer: loop {
         let res = critical_section::with(|_| unsafe {
             memory_fence();
-            if let Some(cnt) = CURR_SEM[sem_idx] {
-                if cnt > 0 {
-                    CURR_SEM[sem_idx] = Some(cnt - 1);
-                    1
-                } else {
-                    0
-                }
+            let cnt = *sem;
+            if cnt > 0 {
+                *sem = cnt - 1;
+                1
             } else {
                 0
             }
@@ -132,33 +181,18 @@ pub fn sem_take(semphr: *mut c_void, tick: u32) -> i32 {
 
 pub fn sem_give(semphr: *mut c_void) -> i32 {
     trace!("semphr_give {:?}", semphr);
-    let sem_idx = semphr as usize - 1;
+    let sem = semphr as *mut u32;
 
     critical_section::with(|_| unsafe {
-        if let Some(cnt) = CURR_SEM[sem_idx] {
-            CURR_SEM[sem_idx] = Some(cnt + 1);
-            memory_fence();
-            1
-        } else {
-            0
-        }
+        let cnt = *sem;
+        *sem = cnt + 1;
+        1
     })
 }
 
 pub fn thread_sem_get() -> *mut c_void {
     trace!("wifi_thread_semphr_get");
-    critical_section::with(|_| unsafe {
-        let tid = current_task();
-        if let Some(sem) = PER_THREAD_SEM[tid] {
-            trace!("wifi_thread_semphr_get - return for {} {:?}", tid, sem);
-            sem
-        } else {
-            let sem = sem_create(1, 0);
-            trace!("wifi_thread_semphr_get - create for {} {:?}", tid, sem);
-            PER_THREAD_SEM[tid] = Some(sem);
-            sem
-        }
-    })
+    unsafe { &mut ((*current_task()).thread_semaphore) as *mut _ as *mut c_void }
 }
 
 pub fn create_recursive_mutex() -> *mut c_void {
@@ -177,7 +211,7 @@ pub fn lock_mutex(mutex: *mut c_void) -> i32 {
     trace!("mutex_lock ptr = {:?}", mutex);
 
     let ptr = mutex as *mut Mutex;
-    let current_task = current_task();
+    let current_task = current_task() as usize;
 
     loop {
         let mutex_locked = critical_section::with(|_| unsafe {
@@ -217,21 +251,28 @@ pub fn unlock_mutex(mutex: *mut c_void) -> i32 {
     })
 }
 
-pub fn create_wifi_queue(queue_len: c_int, item_size: c_int) -> *mut c_void {
-    trace!(
-        "wifi_create_queue len={} size={} ptr={:?} real-queue {:?}  - not checked",
-        queue_len,
-        item_size,
-        unsafe { addr_of_mut!(FAKE_WIFI_QUEUE) },
-        unsafe { addr_of_mut!(REAL_WIFI_QUEUE) },
-    );
+pub fn create_queue(queue_len: c_int, item_size: c_int) -> *mut c_void {
+    trace!("wifi_create_queue len={} size={}", queue_len, item_size,);
 
-    if item_size > 8 {
-        // TODO: don't assume
-        panic!("don't expecting the wifi queue to hold items larger than 8");
+    let queue = RawQueue::new(queue_len as usize, item_size as usize);
+    let ptr = unsafe { malloc(size_of_val(&queue) as u32) as *mut RawQueue };
+    unsafe {
+        ptr.write(queue);
     }
 
-    unsafe { addr_of_mut!(FAKE_WIFI_QUEUE).cast() }
+    trace!("created queue @{:?}", ptr);
+
+    ptr.cast()
+}
+
+pub fn delete_queue(queue: *mut c_void) {
+    trace!("delete_queue {:?}", queue);
+
+    let queue: *mut RawQueue = queue.cast();
+    unsafe {
+        (*queue).free_storage();
+        free(queue.cast());
+    }
 }
 
 pub fn send_queued(queue: *mut c_void, item: *mut c_void, block_time_tick: u32) -> i32 {
@@ -242,30 +283,8 @@ pub fn send_queued(queue: *mut c_void, item: *mut c_void, block_time_tick: u32) 
         block_time_tick
     );
 
-    // handle the WIFI_QUEUE
-    unsafe {
-        if queue != addr_of_mut!(REAL_WIFI_QUEUE).cast() {
-            warn!("Posting message to an unknown queue");
-            return 0;
-        }
-    }
-
-    let message = unsafe {
-        // SAFETY: we checked that our queue is used and it stores with 8 byte items
-        core::slice::from_raw_parts(item.cast::<u8>(), 8)
-    };
-    let mut data: [u8; 8] = unwrap!(message.try_into());
-    trace!("queue posting {:?}", data);
-
-    critical_section::with(|_| {
-        if unsafe { REAL_WIFI_QUEUE.enqueue(data).is_ok() } {
-            memory_fence();
-            1
-        } else {
-            warn!("queue_send failed");
-            0
-        }
-    })
+    let queue: *mut RawQueue = queue.cast();
+    critical_section::with(|_| unsafe { (*queue).enqueue(item) })
 }
 
 pub fn receive_queued(queue: *mut c_void, item: *mut c_void, block_time_tick: u32) -> i32 {
@@ -280,23 +299,11 @@ pub fn receive_queued(queue: *mut c_void, item: *mut c_void, block_time_tick: u3
     let timeout = block_time_tick as u64;
     let start = crate::timer::get_systimer_count();
 
-    // handle the WIFI_QUEUE
-    if queue != unsafe { addr_of_mut!(REAL_WIFI_QUEUE).cast() } {
-        warn!("Posting message to an unknown queue");
-        return 0;
-    }
+    let queue: *mut RawQueue = queue.cast();
 
     loop {
-        let message = critical_section::with(|_| unsafe { REAL_WIFI_QUEUE.dequeue() });
-
-        if let Some(message) = message {
-            let out_message = unsafe {
-                // SAFETY: we checked that our queue is used and it stores with 8 byte items
-                core::slice::from_raw_parts_mut(item.cast::<u8>(), 8)
-            };
-            out_message.copy_from_slice(&message);
-            trace!("received {:?}", message);
-
+        if critical_section::with(|_| unsafe { (*queue).try_dequeue(item) }) {
+            trace!("received");
             return 1;
         }
 
@@ -308,13 +315,12 @@ pub fn receive_queued(queue: *mut c_void, item: *mut c_void, block_time_tick: u3
         yield_task();
     }
 }
+
 pub fn number_of_messages_in_queue(queue: *const c_void) -> u32 {
     trace!("queue_msg_waiting {:?}", queue);
-    if queue != unsafe { addr_of!(REAL_WIFI_QUEUE).cast() } {
-        warn!("queue_msg_waiting: Unknown queue.");
-        return 0;
-    }
-    critical_section::with(|_| unsafe { REAL_WIFI_QUEUE.len() as u32 })
+
+    let queue: *const RawQueue = queue.cast();
+    critical_section::with(|_| unsafe { (*queue).count() as u32 })
 }
 
 /// Implementation of sleep() from newlib in esp-idf.
@@ -343,6 +349,6 @@ unsafe extern "C" fn usleep(us: u32) -> crate::binary::c_types::c_int {
 
 #[no_mangle]
 unsafe extern "C" fn putchar(c: i32) -> crate::binary::c_types::c_int {
-    info!("putchar {}", c as u8 as char);
+    trace!("putchar {}", c as u8 as char);
     c
 }

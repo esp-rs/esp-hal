@@ -530,7 +530,6 @@ impl super::AdcCalEfuse for crate::peripherals::ADC2 {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<'d, ADCI, PIN, CS> embedded_hal_02::adc::OneShot<ADCI, u16, super::AdcPin<PIN, ADCI, CS>>
     for Adc<'d, ADCI>
 where
@@ -549,11 +548,11 @@ where
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (Gpio0, 0),
-            (Gpio1, 1),
-            (Gpio2, 2),
-            (Gpio3, 3),
-            (Gpio4, 4),
+            (GpioPin<0>, 0),
+            (GpioPin<1>, 1),
+            (GpioPin<2>, 2),
+            (GpioPin<3>, 3),
+            (GpioPin<4>, 4),
         ]
     }
 }
@@ -562,17 +561,17 @@ mod adc_implementation {
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (Gpio0, 0),
-            (Gpio1, 1),
-            (Gpio2, 2),
-            (Gpio3, 3),
-            (Gpio4, 4),
+            (GpioPin<0>, 0),
+            (GpioPin<1>, 1),
+            (GpioPin<2>, 2),
+            (GpioPin<3>, 3),
+            (GpioPin<4>, 4),
         ]
     }
 
     crate::analog::adc::impl_adc_interface! {
         ADC2 [
-            (Gpio5, 0),
+            (GpioPin<5>, 0),
         ]
     }
 }
@@ -581,13 +580,13 @@ mod adc_implementation {
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (Gpio0, 0),
-            (Gpio1, 1),
-            (Gpio2, 2),
-            (Gpio3, 3),
-            (Gpio4, 4),
-            (Gpio5, 5),
-            (Gpio6, 6),
+            (GpioPin<0>, 0),
+            (GpioPin<1>, 1),
+            (GpioPin<2>, 2),
+            (GpioPin<3>, 3),
+            (GpioPin<4>, 4),
+            (GpioPin<5>, 5),
+            (GpioPin<6>, 6),
         ]
     }
 }
@@ -596,11 +595,11 @@ mod adc_implementation {
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (Gpio1, 0),
-            (Gpio2, 1),
-            (Gpio3, 2),
-            (Gpio4, 3),
-            (Gpio5, 4),
+            (GpioPin<1>, 0),
+            (GpioPin<2>, 1),
+            (GpioPin<3>, 2),
+            (GpioPin<4>, 3),
+            (GpioPin<5>, 4),
         ]
     }
 }

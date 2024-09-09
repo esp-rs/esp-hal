@@ -12,25 +12,27 @@ extern crate alloc;
 
 use alloc::{string::String, vec::Vec};
 
+use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{peripherals::Peripherals, prelude::*, psram};
+use esp_hal::{prelude::*, psram};
 use esp_println::println;
-
-#[global_allocator]
-static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
 
 fn init_psram_heap() {
     unsafe {
-        ALLOCATOR.init(psram::psram_vaddr_start() as *mut u8, psram::PSRAM_BYTES);
+        esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
+            psram::psram_vaddr_start() as *mut u8,
+            psram::PSRAM_BYTES,
+            esp_alloc::MemoryCapability::External.into(),
+        ));
     }
 }
 
+#[cfg(is_not_release)]
+compile_error!("PSRAM example must be built in release mode!");
+
 #[entry]
 fn main() -> ! {
-    #[cfg(debug_assertions)]
-    compile_error!("This example MUST be built in release mode!");
-
-    let peripherals = Peripherals::take();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     psram::init_psram(peripherals.PSRAM);
     init_psram_heap();

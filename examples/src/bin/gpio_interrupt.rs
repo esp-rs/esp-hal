@@ -16,28 +16,17 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
-    gpio::{self, Event, Input, Io, Level, Output, Pull},
+    gpio::{Event, Input, Io, Level, Output, Pull},
     macros::ram,
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
 };
 
-cfg_if::cfg_if! {
-    if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
-        static BUTTON: Mutex<RefCell<Option<Input<gpio::Gpio0>>>> = Mutex::new(RefCell::new(None));
-    } else {
-        static BUTTON: Mutex<RefCell<Option<Input<gpio::Gpio9>>>> = Mutex::new(RefCell::new(None));
-    }
-}
+static BUTTON: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     // Set GPIO2 as an output, and set its state high initially.
     let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -60,7 +49,7 @@ fn main() -> ! {
     });
     led.set_high();
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     loop {
         led.toggle();

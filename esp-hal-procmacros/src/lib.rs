@@ -52,8 +52,6 @@ use proc_macro::TokenStream;
 
 #[cfg(feature = "embassy")]
 mod embassy;
-#[cfg(feature = "enum-dispatch")]
-mod enum_dispatch;
 #[cfg(feature = "interrupt")]
 mod interrupt;
 #[cfg(any(
@@ -130,11 +128,11 @@ struct RamArgs {
 /// [`bytemuck::Zeroable`]: https://docs.rs/bytemuck/1.9.0/bytemuck/trait.Zeroable.html
 #[cfg(feature = "ram")]
 #[proc_macro_attribute]
-#[proc_macro_error::proc_macro_error]
+#[proc_macro_error2::proc_macro_error]
 pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     use darling::{ast::NestedMeta, Error, FromMeta};
     use proc_macro::Span;
-    use proc_macro_error::abort;
+    use proc_macro_error2::abort;
     use syn::{parse, Item};
 
     let attr_args = match NestedMeta::parse_meta_list(args.into()) {
@@ -243,7 +241,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// If no priority is given, `Priority::min()` is assumed
 #[cfg(feature = "interrupt")]
-#[proc_macro_error::proc_macro_error]
+#[proc_macro_error2::proc_macro_error]
 #[proc_macro_attribute]
 pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
     use darling::{ast::NestedMeta, FromMeta};
@@ -339,37 +337,6 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
     .into()
 }
 
-/// Create an enum for erased GPIO pins, using the enum-dispatch pattern
-///
-/// Only used internally
-#[cfg(feature = "enum-dispatch")]
-#[proc_macro]
-pub fn make_gpio_enum_dispatch_macro(input: TokenStream) -> TokenStream {
-    use quote::{format_ident, quote};
-
-    use self::enum_dispatch::{build_match_arms, MakeGpioEnumDispatchMacro};
-
-    let input = syn::parse_macro_input!(input as MakeGpioEnumDispatchMacro);
-
-    let macro_name = format_ident!("{}", input.name);
-    let arms = build_match_arms(input);
-
-    quote! {
-        #[doc(hidden)]
-        #[macro_export]
-        macro_rules! #macro_name {
-            ($m:ident, $target:ident, $body:block) => {
-                match $m {
-                    #(#arms)*
-                }
-            }
-        }
-
-        pub(crate) use #macro_name;
-    }
-    .into()
-}
-
 /// Load code to be run on the LP/ULP core.
 ///
 /// ## Example
@@ -385,7 +352,7 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
 
 /// Marks the entry function of a LP core / ULP program.
 #[cfg(any(feature = "is-lp-core", feature = "is-ulp-core"))]
-#[proc_macro_error::proc_macro_error]
+#[proc_macro_error2::proc_macro_error]
 #[proc_macro_attribute]
 pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
     lp_core::entry(args, input)

@@ -6,23 +6,11 @@
 #![no_main]
 
 use embedded_hal::delay::DelayNs;
-use esp_hal::{clock::ClockControl, delay::Delay, peripherals::Peripherals, system::SystemControl};
+use esp_hal::delay::Delay;
 use hil_test as _;
 
 struct Context {
     delay: Delay,
-}
-
-impl Context {
-    pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-        let delay = Delay::new(&clocks);
-
-        Context { delay }
-    }
 }
 
 #[cfg(test)]
@@ -32,15 +20,18 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        Context::init()
+        let _peripherals = esp_hal::init(esp_hal::Config::default());
+        let delay = Delay::new();
+
+        Context { delay }
     }
 
     #[test]
     #[timeout(2)]
     fn delay_ns(mut ctx: Context) {
-        let t1 = esp_hal::time::current_time();
+        let t1 = esp_hal::time::now();
         ctx.delay.delay_ns(600_000_000);
-        let t2 = esp_hal::time::current_time();
+        let t2 = esp_hal::time::now();
 
         assert!(t2 > t1);
         assert!(
@@ -53,9 +44,9 @@ mod tests {
     #[test]
     #[timeout(2)]
     fn delay_700millis(ctx: Context) {
-        let t1 = esp_hal::time::current_time();
+        let t1 = esp_hal::time::now();
         ctx.delay.delay_millis(700);
-        let t2 = esp_hal::time::current_time();
+        let t2 = esp_hal::time::now();
 
         assert!(t2 > t1);
         assert!(
@@ -68,9 +59,9 @@ mod tests {
     #[test]
     #[timeout(2)]
     fn delay_1_500_000us(mut ctx: Context) {
-        let t1 = esp_hal::time::current_time();
+        let t1 = esp_hal::time::now();
         ctx.delay.delay_us(1_500_000);
-        let t2 = esp_hal::time::current_time();
+        let t2 = esp_hal::time::now();
 
         assert!(t2 > t1);
         assert!(
@@ -83,9 +74,9 @@ mod tests {
     #[test]
     #[timeout(5)]
     fn delay_3_000ms(mut ctx: Context) {
-        let t1 = esp_hal::time::current_time();
+        let t1 = esp_hal::time::now();
         ctx.delay.delay_ms(3000);
-        let t2 = esp_hal::time::current_time();
+        let t2 = esp_hal::time::now();
 
         assert!(t2 > t1);
         assert!(

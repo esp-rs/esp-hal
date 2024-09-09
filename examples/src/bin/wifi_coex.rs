@@ -25,15 +25,9 @@ use bleps::{
     HciConnector,
 };
 use embedded_io::*;
+use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    peripherals::Peripherals,
-    prelude::*,
-    rng::Rng,
-    system::SystemControl,
-    timer::timg::TimerGroup,
-};
+use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_wifi::{
     ble::controller::BleConnector,
@@ -54,20 +48,39 @@ const PASSWORD: &str = env!("PASSWORD");
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
+    let peripherals = esp_hal::init({
+        let mut config = esp_hal::Config::default();
+        config.cpu_clock = CpuClock::max();
+        config
+    });
 
-    let peripherals = Peripherals::take();
+    static mut HEAP: core::mem::MaybeUninit<[u8; 72 * 1024]> = core::mem::MaybeUninit::uninit();
 
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::max(system.clock_control).freeze();
+    #[link_section = ".dram2_uninit"]
+    static mut HEAP2: core::mem::MaybeUninit<[u8; 64 * 1024]> = core::mem::MaybeUninit::uninit();
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    unsafe {
+        esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
+            HEAP.as_mut_ptr() as *mut u8,
+            core::mem::size_of_val(&*core::ptr::addr_of!(HEAP)),
+            esp_alloc::MemoryCapability::Internal.into(),
+        ));
+
+        // COEX needs more RAM - add some more
+        esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
+            HEAP2.as_mut_ptr() as *mut u8,
+            core::mem::size_of_val(&*core::ptr::addr_of!(HEAP2)),
+            esp_alloc::MemoryCapability::Internal.into(),
+        ));
+    }
+
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
 
     let init = initialize(
         EspWifiInitFor::WifiBle,
         timg0.timer0,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
-        &clocks,
     )
     .unwrap();
 

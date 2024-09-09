@@ -9,17 +9,18 @@ publish = false
 aes                 = "0.8.4"
 aligned             = { version = "0.4.2", optional = true }
 bleps               = { git = "https://github.com/bjoernQ/bleps", package = "bleps", rev = "a5148d8ae679e021b78f53fd33afb8bb35d0b62e", features = [ "macros", "async"] }
+bt-hci              = "0.1.0"
 cfg-if              = "1.0.0"
 critical-section    = "1.1.2"
 crypto-bigint       = { version = "0.5.5", default-features = false }
 elliptic-curve      = { version = "0.13.8", default-features = false, features = ["sec1"] }
-embassy-executor    = { version = "0.6.0", features = ["task-arena-size-40960"] }
+embassy-executor    = { version = "0.6.0", features = ["task-arena-size-12288"] }
 embassy-futures     = "0.1.1"
 embassy-net = { version = "0.4.0", features = [ "tcp", "udp", "dhcpv4", "medium-ethernet"] }
 embassy-sync        = "0.6.0"
 embassy-time        = "0.3.1"
 embassy-time-driver = { version = "0.1.0", optional = true }
-embassy-usb         = { version = "0.2.0", default-features = false, optional = true }
+embassy-usb         = { version = "0.2.0", default-features = false }
 embedded-can        = "0.4.1"
 embedded-graphics   = "0.8.1"
 embedded-hal        = "1.0.0"
@@ -55,6 +56,7 @@ smart-leds          = "0.4.0"
 smoltcp             = { version = "0.11.0", default-features = false, features = [ "medium-ethernet", "socket-raw"] }
 ssd1306             = "0.8.4"
 static_cell         = { version = "2.1.0", features = ["nightly"] }
+trouble-host        = { git = "https://github.com/embassy-rs/trouble", package = "trouble-host", rev = "4f1114ce58e96fe54f5ed7e726f66e1ad8d9ce54", features = [ "log", "gatt" ] }
 usb-device          = "0.3.2"
 usbd-serial         = "0.2.2"
 
@@ -69,13 +71,7 @@ esp32s3 = ["esp-hal/esp32s3", "esp-backtrace/esp32s3", "esp-hal-embassy?/esp32s3
 
 esp-wifi = ["dep:esp-wifi"]
 
-async = ["esp-hal/async", "embassy-usb"]
-
-embedded-hal-02 = ["esp-hal/embedded-hal-02"]
-embedded-hal = ["esp-hal/embedded-hal"]
-
-embassy = ["dep:esp-hal-embassy"]
-
+embassy                = ["dep:esp-hal-embassy"]
 embassy-generic-timers = ["embassy-time/generic-queue-8"]
 
 opsram-2m = ["esp-hal/opsram-2m"]

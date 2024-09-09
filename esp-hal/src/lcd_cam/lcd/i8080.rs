@@ -1,14 +1,17 @@
 //! # LCD - I8080/MOTO6800 Mode.
 //!
 //! ## Overview
+//!
 //! The LCD_CAM peripheral I8080 driver provides support for the I8080
-//! format/timing. The driver mandates DMA for DMA (Direct Memory Access) for
+//! format/timing. The driver mandates DMA (Direct Memory Access) for
 //! efficient data transfer.
 //!
-//! ## Examples
+//! ## Example
+//!
 //! ### MIPI-DSI Display
-//! Following code show how to send a command to a MIPI-DSI display over I8080
-//! protocol.
+//!
+//! The following example shows how to send a command to a MIPI-DSI display over
+//! the I8080 protocol.
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -16,14 +19,12 @@
 //! # use esp_hal::lcd_cam::{LcdCam, lcd::i8080::{Config, I8080, TxEightBits}};
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::{Dma, DmaPriority};
-//! # use fugit::RateExtU32;
-//!
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
 //! # let dma = Dma::new(peripherals.DMA);
 //! # let channel = dma.channel0;
 //!
-//! # let (tx_buffer, tx_descriptors, _, rx_descriptors) = dma_buffers!(32678, 0);
+//! # let ( _, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32678, 0);
 //!
 //! # let channel = channel.configure(
 //! #     false,
@@ -49,7 +50,6 @@
 //!     tx_pins,
 //!     20.MHz(),
 //!     Config::default(),
-//!     &clocks,
 //! )
 //! .with_ctrl_pins(io.pins.gpio0, io.pins.gpio47);
 //!
@@ -61,8 +61,6 @@ use core::{fmt::Formatter, marker::PhantomData, mem::size_of};
 
 use fugit::HertzU32;
 
-#[cfg(feature = "async")]
-use crate::lcd_cam::asynch::LcdDoneFuture;
 use crate::{
     clock::Clocks,
     dma::{
@@ -80,6 +78,7 @@ use crate::{
     },
     gpio::{OutputPin, OutputSignal},
     lcd_cam::{
+        asynch::LcdDoneFuture,
         lcd::{i8080::private::TxPins, ClockMode, DelayMode, Phase, Polarity},
         private::calculate_clkm,
         BitOrder,
@@ -113,16 +112,15 @@ where
         mut pins: P,
         frequency: HertzU32,
         config: Config,
-        clocks: &Clocks<'d>,
     ) -> Self {
         let is_2byte_mode = size_of::<P::Word>() == 2;
 
         let lcd_cam = lcd.lcd_cam;
 
+        let clocks = Clocks::get();
         // Due to https://www.espressif.com/sites/default/files/documentation/esp32-s3_errata_en.pdf
         // the LCD_PCLK divider must be at least 2. To make up for this the user
         // provided frequency is doubled to match.
-
         let (i, divider) = calculate_clkm(
             (frequency.to_Hz() * 2) as _,
             &[
@@ -261,7 +259,7 @@ where
 }
 
 impl<'d, CH: DmaChannel, P: TxPins, DM: Mode> DmaSupport for I8080<'d, CH, P, DM> {
-    fn peripheral_wait_dma(&mut self, _is_tx: bool, _is_rx: bool) {
+    fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         let lcd_user = self.lcd_cam.lcd_user();
         // Wait until LCD_START is cleared by hardware.
         while lcd_user.read().lcd_start().bit_is_set() {}
@@ -377,7 +375,6 @@ where
     }
 }
 
-#[cfg(feature = "async")]
 impl<'d, CH: DmaChannel, P: TxPins> I8080<'d, CH, P, crate::Async>
 where
     P::Word: Into<u16>,
@@ -491,21 +488,14 @@ impl<'d, CH: DmaChannel, P, DM: Mode> I8080<'d, CH, P, DM> {
                 .lcd_user()
                 .modify(|_, w| w.lcd_dout().clear_bit());
         } else {
-            // Set transfer length.
-            self.lcd_cam.lcd_user().modify(|_, w| unsafe {
-                if len <= 8192 {
-                    // Data length in fixed mode. (13 bits)
-                    w.lcd_always_out_en()
-                        .clear_bit()
-                        .lcd_dout_cyclelen()
-                        .bits((len - 1) as _)
-                } else {
-                    // Enable continuous output.
-                    w.lcd_always_out_en().set_bit()
-                }
-                .lcd_dout()
-                .set_bit()
-            });
+            // Use continous mode for DMA. FROM the S3 TRM:
+            // > In a continuous output, LCD module keeps sending data till:
+            // > i. LCD_CAM_LCD_START is cleared;
+            // > ii. or LCD_CAM_LCD_RESET is set;
+            // > iii. or all the data in GDMA is sent out.
+            self.lcd_cam
+                .lcd_user()
+                .modify(|_, w| w.lcd_always_out_en().set_bit().lcd_dout().set_bit());
 
             unsafe {
                 self.tx_chain.fill_for_tx(false, ptr, len)?;

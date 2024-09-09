@@ -10,25 +10,20 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     gpio::{Io, Level, Output},
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
 };
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     // Set GPIO0 as an output, and set its state high initially.
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut led = Output::new(io.pins.gpio0, Level::High);
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     loop {
         led.toggle();

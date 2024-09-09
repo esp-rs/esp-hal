@@ -17,7 +17,6 @@ use esp_hal::{
         Level,
         Pull,
     },
-    peripherals::Peripherals,
     prelude::*,
     timer::systimer::{etm::SysTimerEtmEvent, Periodic, SystemTimer},
 };
@@ -25,7 +24,7 @@ use fugit::ExtU32;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let syst = SystemTimer::new(peripherals.SYSTIMER);
     let syst_alarms = syst.split::<Periodic>();

@@ -11,11 +11,8 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use embedded_hal::delay::DelayNs;
 use esp_hal::{
-    clock::{ClockControl, Clocks},
     delay::Delay,
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
     timer::systimer::{
         Alarm,
         FrozenUnit,
@@ -43,28 +40,6 @@ struct Context {
     unit: FrozenUnit<'static, SpecificUnit<'static, 0>>,
     comparator0: SpecificComparator<'static, 0>,
     comparator1: SpecificComparator<'static, 1>,
-    clocks: Clocks<'static>,
-}
-
-impl Context {
-    pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-        let systimer = SystemTimer::new(peripherals.SYSTIMER);
-        static UNIT0: StaticCell<SpecificUnit<'static, 0>> = StaticCell::new();
-
-        let unit0 = UNIT0.init(systimer.unit0);
-        let frozen_unit = FrozenUnit::new(unit0);
-
-        Context {
-            clocks,
-            unit: frozen_unit,
-            comparator0: systimer.comparator0,
-            comparator1: systimer.comparator1,
-        }
-    }
 }
 
 #[handler(priority = esp_hal::interrupt::Priority::min())]
@@ -127,7 +102,19 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        Context::init()
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let systimer = SystemTimer::new(peripherals.SYSTIMER);
+        static UNIT0: StaticCell<SpecificUnit<'static, 0>> = StaticCell::new();
+
+        let unit0 = UNIT0.init(systimer.unit0);
+        let frozen_unit = FrozenUnit::new(unit0);
+
+        Context {
+            unit: frozen_unit,
+            comparator0: systimer.comparator0,
+            comparator1: systimer.comparator1,
+        }
     }
 
     #[test]
@@ -169,7 +156,7 @@ mod tests {
             ALARM_PERIODIC.borrow_ref_mut(cs).replace(alarm1);
         });
 
-        let mut delay = Delay::new(&ctx.clocks);
+        let mut delay = Delay::new();
         delay.delay_ms(300);
     }
 

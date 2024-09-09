@@ -57,11 +57,11 @@ pub enum Package {
 pub struct Metadata {
     example_path: PathBuf,
     chips: Vec<Chip>,
-    feature_sets: Vec<Vec<String>>,
+    feature_set: Vec<String>,
 }
 
 impl Metadata {
-    pub fn new(example_path: &Path, chips: Vec<Chip>, feature_sets: Vec<Vec<String>>) -> Self {
+    pub fn new(example_path: &Path, chips: Vec<Chip>, feature_set: Vec<String>) -> Self {
         let chips = if chips.is_empty() {
             Chip::iter().collect()
         } else {
@@ -71,7 +71,7 @@ impl Metadata {
         Self {
             example_path: example_path.to_path_buf(),
             chips,
-            feature_sets,
+            feature_set,
         }
     }
 
@@ -89,9 +89,9 @@ impl Metadata {
             .replace(".rs", "")
     }
 
-    /// A list of all features required for building a given examples.
-    pub fn feature_sets(&self) -> &[Vec<String>] {
-        &self.feature_sets
+    /// A list of all features required for building a given example.
+    pub fn feature_set(&self) -> &[String] {
+        &self.feature_set
     }
 
     /// If the specified chip is in the list of chips, then it is supported.
@@ -154,7 +154,7 @@ pub fn build_documentation(
 }
 
 /// Load all examples at the given path, and parse their metadata.
-pub fn load_examples(path: &Path) -> Result<Vec<Metadata>> {
+pub fn load_examples(path: &Path, action: CargoAction) -> Result<Vec<Metadata>> {
     let mut examples = Vec::new();
 
     for entry in fs::read_dir(path)? {
@@ -172,7 +172,7 @@ pub fn load_examples(path: &Path) -> Result<Vec<Metadata>> {
                 .trim()
                 .split_ascii_whitespace()
                 .map(|s| s.to_string())
-                .collect::<VecDeque<_>>();
+                .collect::<Vec<_>>();
 
             if split.len() < 2 {
                 bail!(
@@ -182,7 +182,7 @@ pub fn load_examples(path: &Path) -> Result<Vec<Metadata>> {
             }
 
             // The trailing ':' on metadata keys is optional :)
-            let key = split.pop_front().unwrap();
+            let key = split.swap_remove(0);
             let key = key.trim_end_matches(':');
 
             if key == "CHIPS" {
@@ -191,14 +191,30 @@ pub fn load_examples(path: &Path) -> Result<Vec<Metadata>> {
                     .map(|s| Chip::from_str(s, false).unwrap())
                     .collect::<Vec<_>>();
             } else if key == "FEATURES" {
-                feature_sets.push(split.into());
+                // Sort the features so they are in a deterministic order:
+                split.sort();
+                feature_sets.push(split);
             } else {
                 log::warn!("Unrecognized metadata key '{key}', ignoring");
             }
         }
 
-        examples.push(Metadata::new(&path, chips, feature_sets));
+        if feature_sets.is_empty() {
+            feature_sets.push(Vec::new());
+        }
+        if action == CargoAction::Build {
+            // Only build the first feature set for each example.
+            // Rebuilding with a different feature set just wastes time because the latter
+            // one will overwrite the former one(s).
+            feature_sets.truncate(1);
+        }
+        for feature_set in feature_sets {
+            examples.push(Metadata::new(&path, chips.clone(), feature_set));
+        }
     }
+
+    // Sort by feature set, to prevent rebuilding packages if not necessary.
+    examples.sort_by_key(|e| e.feature_set().join(","));
 
     Ok(examples)
 }
@@ -210,7 +226,8 @@ pub fn execute_app(
     target: &str,
     app: &Metadata,
     action: CargoAction,
-    repeat: usize,
+    mut repeat: usize,
+    debug: bool,
 ) -> Result<()> {
     log::info!(
         "Building example '{}' for '{}'",
@@ -218,30 +235,7 @@ pub fn execute_app(
         chip
     );
 
-    let feature_sets = if app.feature_sets().is_empty() {
-        vec![vec![]]
-    } else {
-        app.feature_sets().to_vec()
-    };
-
-    for features in feature_sets {
-        execute_app_with_features(package_path, chip, target, app, action, repeat, features)?;
-    }
-
-    Ok(())
-}
-
-/// Run or build the specified test or example for the specified chip, with the
-/// specified features enabled.
-pub fn execute_app_with_features(
-    package_path: &Path,
-    chip: Chip,
-    target: &str,
-    app: &Metadata,
-    action: CargoAction,
-    mut repeat: usize,
-    mut features: Vec<String>,
-) -> Result<()> {
+    let mut features = app.feature_set().to_vec();
     if !features.is_empty() {
         log::info!("Features: {}", features.join(","));
     }
@@ -269,19 +263,22 @@ pub fn execute_app_with_features(
 
     let mut builder = CargoArgsBuilder::default()
         .subcommand(subcommand)
-        .arg("--release")
         .target(target)
         .features(&features)
         .arg(bin);
 
+    if !debug {
+        builder.add_arg("--release");
+    }
+
     if subcommand == "test" && chip == Chip::Esp32c2 {
-        builder = builder.arg("--").arg("--speed").arg("15000");
+        builder.add_arg("--").add_arg("--speed").add_arg("15000");
     }
 
     // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
     if target.starts_with("xtensa") {
         builder = builder.toolchain("esp");
-        builder = builder.arg("-Zbuild-std=core,alloc")
+        builder.add_arg("-Zbuild-std=core,alloc");
     }
 
     let args = builder.build();

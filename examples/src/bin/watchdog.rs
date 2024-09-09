@@ -9,25 +9,16 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    delay::Delay,
-    peripherals::Peripherals,
-    prelude::*,
-    system::SystemControl,
-    timer::timg::TimerGroup,
-};
+use esp_hal::{delay::Delay, prelude::*, timer::timg::TimerGroup};
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
-    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new_async(peripherals.TIMG0);
     let mut wdt0 = timg0.wdt;
     wdt0.enable();
     wdt0.set_timeout(2u64.secs());

@@ -36,7 +36,7 @@
 //! # use core::writeln;
 //! # use core::fmt::Write;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! # let mut uart0 = Uart::new(peripherals.UART0, &clocks, io.pins.gpio1, io.pins.gpio2).unwrap();
+//! # let mut uart0 = Uart::new(peripherals.UART0, io.pins.gpio1, io.pins.gpio2).unwrap();
 //! # let data = "Dummy";
 //! let d: md5::Digest = md5::compute(&data);
 //! writeln!(uart0, "{}", d);
@@ -52,9 +52,10 @@
 //! # use core::writeln;
 //! # use core::fmt::Write;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! # let mut uart0 = Uart::new(peripherals.UART0, &clocks, io.pins.gpio1, io.pins.gpio2).unwrap();
+//! # let mut uart0 = Uart::new(peripherals.UART0, io.pins.gpio1, io.pins.gpio2).unwrap();
 //! # let data0 = "Dummy";
 //! # let data1 = "Dummy";
+//! #
 //! let mut ctx = md5::Context::new();
 //! ctx.consume(&data0);
 //! ctx.consume(&data1);

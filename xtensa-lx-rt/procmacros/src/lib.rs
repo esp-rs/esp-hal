@@ -128,6 +128,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
             )
         }
 
+        #[doc(hidden)]
         #[allow(clippy::inline_always)]
         #[inline(always)]
         #f
@@ -398,6 +399,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
                 )
             }
 
+            #[doc(hidden)]
             #[allow(clippy::inline_always)]
             #[inline(always)]
             #f

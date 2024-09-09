@@ -38,8 +38,8 @@
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.
-//! let can_tx_pin = io.pins.gpio2;
 //! let can_rx_pin = io.pins.gpio3;
+//! let can_tx_pin = io.pins.gpio2;
 //!
 //! // The speed of the TWAI bus.
 //! const TWAI_BAUDRATE: twai::BaudRate = BaudRate::B1000K;
@@ -48,9 +48,8 @@
 //! // state that prevents transmission but allows configuration.
 //! let mut can_config = twai::TwaiConfiguration::new(
 //!     peripherals.TWAI0,
-//!     can_tx_pin,
 //!     can_rx_pin,
-//!     &clocks,
+//!     can_tx_pin,
 //!     TWAI_BAUDRATE,
 //!     TwaiMode::Normal
 //! );
@@ -94,8 +93,8 @@
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.
-//! let can_tx_pin = io.pins.gpio2;
 //! let can_rx_pin = io.pins.gpio3;
+//! let can_tx_pin = io.pins.gpio2;
 //!
 //! // The speed of the TWAI bus.
 //! const TWAI_BAUDRATE: twai::BaudRate = BaudRate::B1000K;
@@ -103,9 +102,8 @@
 //! // Begin configuring the TWAI peripheral.
 //! let mut can_config = twai::TwaiConfiguration::new(
 //!     peripherals.TWAI0,
-//!     can_tx_pin,
 //!     can_rx_pin,
-//!     &clocks,
+//!     can_tx_pin,
 //!     TWAI_BAUDRATE,
 //!     TwaiMode::SelfTest
 //! );
@@ -135,7 +133,6 @@ use core::marker::PhantomData;
 
 use self::filter::{Filter, FilterType};
 use crate::{
-    clock::Clocks,
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
@@ -201,7 +198,6 @@ impl core::fmt::Display for ErrorKind {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl From<ErrorKind> for embedded_hal_02::can::ErrorKind {
     fn from(value: ErrorKind) -> Self {
         match value {
@@ -216,14 +212,12 @@ impl From<ErrorKind> for embedded_hal_02::can::ErrorKind {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl embedded_hal_02::can::Error for ErrorKind {
     fn kind(&self) -> embedded_hal_02::can::ErrorKind {
         (*self).into()
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl From<ErrorKind> for embedded_can::ErrorKind {
     fn from(value: ErrorKind) -> Self {
         match value {
@@ -238,7 +232,6 @@ impl From<ErrorKind> for embedded_can::ErrorKind {
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl embedded_can::Error for ErrorKind {
     fn kind(&self) -> embedded_can::ErrorKind {
         (*self).into()
@@ -297,28 +290,24 @@ impl StandardId {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl From<StandardId> for embedded_hal_02::can::StandardId {
     fn from(value: StandardId) -> Self {
         embedded_hal_02::can::StandardId::new(value.as_raw()).unwrap()
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl From<embedded_hal_02::can::StandardId> for StandardId {
     fn from(value: embedded_hal_02::can::StandardId) -> Self {
         StandardId::new(value.as_raw()).unwrap()
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl From<StandardId> for embedded_can::StandardId {
     fn from(value: StandardId) -> Self {
         embedded_can::StandardId::new(value.as_raw()).unwrap()
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl From<embedded_can::StandardId> for StandardId {
     fn from(value: embedded_can::StandardId) -> Self {
         StandardId::new(value.as_raw()).unwrap()
@@ -372,28 +361,24 @@ impl ExtendedId {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl From<ExtendedId> for embedded_hal_02::can::ExtendedId {
     fn from(value: ExtendedId) -> Self {
         embedded_hal_02::can::ExtendedId::new(value.0).unwrap()
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl From<embedded_hal_02::can::ExtendedId> for ExtendedId {
     fn from(value: embedded_hal_02::can::ExtendedId) -> Self {
         ExtendedId::new(value.as_raw()).unwrap()
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl From<ExtendedId> for embedded_can::ExtendedId {
     fn from(value: ExtendedId) -> Self {
         embedded_can::ExtendedId::new(value.0).unwrap()
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl From<embedded_can::ExtendedId> for ExtendedId {
     fn from(value: embedded_can::ExtendedId) -> Self {
         ExtendedId::new(value.as_raw()).unwrap()
@@ -423,7 +408,6 @@ impl From<ExtendedId> for Id {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl From<Id> for embedded_hal_02::can::Id {
     fn from(value: Id) -> Self {
         match value {
@@ -433,7 +417,6 @@ impl From<Id> for embedded_hal_02::can::Id {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl From<embedded_hal_02::can::Id> for Id {
     fn from(value: embedded_hal_02::can::Id) -> Self {
         match value {
@@ -443,7 +426,6 @@ impl From<embedded_hal_02::can::Id> for Id {
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl From<Id> for embedded_can::Id {
     fn from(value: Id) -> Self {
         match value {
@@ -453,7 +435,6 @@ impl From<Id> for embedded_can::Id {
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl From<embedded_can::Id> for Id {
     fn from(value: embedded_can::Id) -> Self {
         match value {
@@ -556,7 +537,6 @@ impl EspTwaiFrame {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl embedded_hal_02::can::Frame for EspTwaiFrame {
     fn new(id: impl Into<embedded_hal_02::can::Id>, data: &[u8]) -> Option<Self> {
         let id: embedded_hal_02::can::Id = id.into();
@@ -597,7 +577,6 @@ impl embedded_hal_02::can::Frame for EspTwaiFrame {
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl embedded_can::Frame for EspTwaiFrame {
     fn new(id: impl Into<embedded_can::Id>, data: &[u8]) -> Option<Self> {
         let id: embedded_can::Id = id.into();
@@ -739,9 +718,8 @@ where
 {
     fn new_internal<TX: OutputPin, RX: InputPin>(
         _peripheral: impl Peripheral<P = T> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
         rx_pin: impl Peripheral<P = RX> + 'd,
-        clocks: &Clocks<'d>,
+        tx_pin: impl Peripheral<P = TX> + 'd,
         baud_rate: BaudRate,
         no_transceiver: bool,
         mode: TwaiMode,
@@ -763,7 +741,7 @@ where
         }
         tx_pin.set_to_push_pull_output(crate::private::Internal);
         tx_pin.connect_peripheral_to_output(T::OUTPUT_SIGNAL, crate::private::Internal);
-        rx_pin.set_to_input(crate::private::Internal);
+        rx_pin.init_input(false, false, crate::private::Internal);
         rx_pin.connect_input_to_peripheral(T::INPUT_SIGNAL, crate::private::Internal);
 
         // Set the operating mode based on provided option
@@ -805,7 +783,7 @@ where
             phantom: PhantomData,
         };
 
-        cfg.set_baud_rate(baud_rate, clocks);
+        cfg.set_baud_rate(baud_rate);
         cfg
     }
 
@@ -819,11 +797,14 @@ where
     /// Set the bitrate of the bus.
     ///
     /// Note: The timings currently assume a APB_CLK of 80MHz.
-    fn set_baud_rate(&mut self, baud_rate: BaudRate, _clocks: &Clocks<'d>) {
+    fn set_baud_rate(&mut self, baud_rate: BaudRate) {
         // TWAI is clocked from the APB_CLK according to Table 6-4 [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf)
         // Included timings are all for 80MHz so assert that we are running at 80MHz.
         #[cfg(not(esp32c6))]
-        assert!(_clocks.apb_clock == fugit::HertzU32::MHz(80));
+        {
+            let apb_clock = crate::clock::Clocks::get().apb_clock;
+            assert!(apb_clock == fugit::HertzU32::MHz(80));
+        }
 
         // Unpack the baud rate timings and convert them to the values needed for the
         // register. Many of the registers have a minimum value of 1 which is
@@ -902,11 +883,11 @@ where
             .modify(|_, w| w.reset_mode().clear_bit());
 
         Twai {
-            tx: TwaiTx {
+            rx: TwaiRx {
                 _peripheral: PhantomData,
                 phantom: PhantomData,
             },
-            rx: TwaiRx {
+            tx: TwaiTx {
                 _peripheral: PhantomData,
                 phantom: PhantomData,
             },
@@ -922,15 +903,14 @@ where
     /// Create a new instance of [TwaiConfiguration]
     ///
     /// You will need to use a transceiver to connect to the TWAI bus
-    pub fn new<TX: OutputPin, RX: InputPin>(
+    pub fn new<RX: InputPin, TX: OutputPin>(
         peripheral: impl Peripheral<P = T> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
         rx_pin: impl Peripheral<P = RX> + 'd,
-        clocks: &Clocks<'d>,
+        tx_pin: impl Peripheral<P = TX> + 'd,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
-        Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, false, mode)
+        Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, false, mode)
     }
 
     /// Create a new instance of [TwaiConfiguration] meant to connect two ESP32s
@@ -938,15 +918,14 @@ where
     ///
     /// You don't need a transceiver by following the description in the
     /// `twai.rs` example
-    pub fn new_no_transceiver<TX: OutputPin, RX: InputPin>(
+    pub fn new_no_transceiver<RX: InputPin, TX: OutputPin>(
         peripheral: impl Peripheral<P = T> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
         rx_pin: impl Peripheral<P = RX> + 'd,
-        clocks: &Clocks<'d>,
+        tx_pin: impl Peripheral<P = TX> + 'd,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
-        Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, true, mode)
+        Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, true, mode)
     }
 }
 
@@ -961,7 +940,6 @@ where
     }
 }
 
-#[cfg(feature = "async")]
 impl<'d, T> TwaiConfiguration<'d, T, crate::Async>
 where
     T: Instance,
@@ -969,16 +947,14 @@ where
     /// Create a new instance of [TwaiConfiguration] in async mode
     ///
     /// You will need to use a transceiver to connect to the TWAI bus
-    pub fn new_async<TX: OutputPin, RX: InputPin>(
+    pub fn new_async<RX: InputPin, TX: OutputPin>(
         peripheral: impl Peripheral<P = T> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
         rx_pin: impl Peripheral<P = RX> + 'd,
-        clocks: &Clocks<'d>,
+        tx_pin: impl Peripheral<P = TX> + 'd,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
-        let mut this =
-            Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, false, mode);
+        let mut this = Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, false, mode);
         this.internal_set_interrupt_handler(T::async_handler());
         this
     }
@@ -988,16 +964,14 @@ where
     ///
     /// You don't need a transceiver by following the description in the
     /// `twai.rs` example
-    pub fn new_async_no_transceiver<TX: OutputPin, RX: InputPin>(
+    pub fn new_async_no_transceiver<RX: InputPin, TX: OutputPin>(
         peripheral: impl Peripheral<P = T> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
         rx_pin: impl Peripheral<P = RX> + 'd,
-        clocks: &Clocks<'d>,
+        tx_pin: impl Peripheral<P = TX> + 'd,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
-        let mut this =
-            Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, true, mode);
+        let mut this = Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, true, mode);
         this.internal_set_interrupt_handler(T::async_handler());
         this
     }
@@ -1090,8 +1064,8 @@ where
 
     /// Consumes this `Twai` instance and splits it into transmitting and
     /// receiving halves.
-    pub fn split(self) -> (TwaiTx<'d, T, DM>, TwaiRx<'d, T, DM>) {
-        (self.tx, self.rx)
+    pub fn split(self) -> (TwaiRx<'d, T, DM>, TwaiTx<'d, T, DM>) {
+        (self.rx, self.tx)
     }
 }
 
@@ -1190,7 +1164,6 @@ pub enum EspTwaiError {
     EmbeddedHAL(ErrorKind),
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl embedded_hal_02::can::Error for EspTwaiError {
     fn kind(&self) -> embedded_hal_02::can::ErrorKind {
         match self {
@@ -1200,7 +1173,6 @@ impl embedded_hal_02::can::Error for EspTwaiError {
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl embedded_can::Error for EspTwaiError {
     fn kind(&self) -> embedded_can::ErrorKind {
         match self {
@@ -1242,7 +1214,6 @@ unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<'d, T, DM> embedded_hal_02::can::Can for Twai<'d, T, DM>
 where
     T: OperationInstance,
@@ -1267,7 +1238,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl<'d, T, DM> embedded_can::nb::Can for Twai<'d, T, DM>
 where
     T: OperationInstance,
@@ -1305,7 +1275,7 @@ pub trait Instance: crate::private::Sealed {
     const OUTPUT_SIGNAL: OutputSignal;
     /// The interrupt associated with this TWAI instance.
     const INTERRUPT: crate::peripherals::Interrupt;
-    #[cfg(feature = "async")]
+
     /// Provides an asynchronous interrupt handler for TWAI instance.
     fn async_handler() -> InterruptHandler;
 
@@ -1325,7 +1295,6 @@ pub trait Instance: crate::private::Sealed {
 /// An extension of the `Instance` trait that provides additional operations
 /// for managing and interacting with the TWAI peripheral.
 pub trait OperationInstance: Instance {
-    #[cfg(feature = "async")]
     /// Returns a reference to the asynchronous state for this TWAI instance.
     fn async_state() -> &'static asynch::TwaiAsyncState {
         &asynch::TWAI_STATE[Self::NUMBER]
@@ -1502,7 +1471,6 @@ impl Instance for crate::peripherals::TWAI0 {
 
     const INTERRUPT: crate::peripherals::Interrupt = crate::peripherals::Interrupt::TWAI0;
 
-    #[cfg(feature = "async")]
     fn async_handler() -> InterruptHandler {
         asynch::twai0
     }
@@ -1550,7 +1518,6 @@ impl Instance for crate::peripherals::TWAI0 {
 
     const INTERRUPT: crate::peripherals::Interrupt = crate::peripherals::Interrupt::TWAI0;
 
-    #[cfg(feature = "async")]
     fn async_handler() -> InterruptHandler {
         asynch::twai0
     }
@@ -1598,7 +1565,6 @@ impl Instance for crate::peripherals::TWAI1 {
 
     const INTERRUPT: crate::peripherals::Interrupt = crate::peripherals::Interrupt::TWAI1;
 
-    #[cfg(feature = "async")]
     fn async_handler() -> InterruptHandler {
         asynch::twai1
     }
@@ -1636,7 +1602,6 @@ impl Instance for crate::peripherals::TWAI1 {
 #[cfg(esp32c6)]
 impl OperationInstance for crate::peripherals::TWAI1 {}
 
-#[cfg(feature = "async")]
 mod asynch {
     use core::{future::poll_fn, task::Poll};
 

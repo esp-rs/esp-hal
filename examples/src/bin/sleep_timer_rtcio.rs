@@ -7,7 +7,7 @@
 //! The following wiring is assumed for ESP32S3:
 //! - RTC wakeup pin => GPIO18 (low level)
 
-//% CHIPS: esp32c3 esp32s3
+//% CHIPS: esp32c3 esp32s3 esp32c2
 
 #![no_std]
 #![no_main]
@@ -16,12 +16,11 @@ use core::time::Duration;
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     entry,
     gpio,
-    gpio::Io,
-    peripherals::Peripherals,
+    gpio::{Input, Io, Pull},
+    peripheral::Peripheral,
     rtc_cntl::{
         get_reset_reason,
         get_wakeup_cause,
@@ -29,18 +28,15 @@ use esp_hal::{
         Rtc,
         SocResetReason,
     },
-    system::SystemControl,
     Cpu,
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut rtc = Rtc::new(peripherals.LPWR);
 
     println!("up and runnning!");
@@ -49,18 +45,25 @@ fn main() -> ! {
     let wake_reason = get_wakeup_cause();
     println!("wake reason: {:?}", wake_reason);
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
     let timer = TimerWakeupSource::new(Duration::from_secs(10));
 
     cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32c3")] {
+        if #[cfg(any(feature = "esp32c3", feature = "esp32c2"))] {
+            let pin2 = Input::new(io.pins.gpio2, Pull::None);
+            let mut pin3 = io.pins.gpio3;
+
             let wakeup_pins: &mut [(&mut dyn gpio::RtcPinWithResistors, WakeupLevel)] = &mut [
-                (&mut io.pins.gpio2, WakeupLevel::Low),
-                (&mut io.pins.gpio3, WakeupLevel::High),
+                (&mut *pin2.into_ref(), WakeupLevel::Low),
+                (&mut pin3, WakeupLevel::High),
             ];
         } else if #[cfg(feature = "esp32s3")] {
+            let pin17 = Input::new(io.pins.gpio17, Pull::None);
+            let mut pin18 = io.pins.gpio18;
+
             let wakeup_pins: &mut [(&mut dyn gpio::RtcPin, WakeupLevel)] = &mut [
-                (&mut io.pins.gpio18, WakeupLevel::Low)
+                (&mut *pin17.into_ref(), WakeupLevel::Low),
+                (&mut pin18, WakeupLevel::High),
             ];
         }
     }

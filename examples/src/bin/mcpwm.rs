@@ -11,19 +11,14 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     gpio::Io,
     mcpwm::{operator::PwmPinConfig, timer::PwmWorkingMode, McPwm, PeripheralClockConfig},
-    peripherals::Peripherals,
     prelude::*,
-    system::SystemControl,
 };
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let pin = io.pins.gpio0;
@@ -37,7 +32,7 @@ fn main() -> ! {
         }
     }
 
-    let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, freq).unwrap();
+    let clock_cfg = PeripheralClockConfig::with_frequency(freq).unwrap();
 
     let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
 

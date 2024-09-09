@@ -12,11 +12,9 @@ use core::time::Duration;
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     entry,
-    gpio::Io,
-    peripherals::Peripherals,
+    gpio::{Input, Io, Pull},
     rtc_cntl::{
         get_reset_reason,
         get_wakeup_cause,
@@ -24,21 +22,18 @@ use esp_hal::{
         Rtc,
         SocResetReason,
     },
-    system::SystemControl,
     Cpu,
 };
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let mut rtc = Rtc::new(peripherals.LPWR);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let mut ext0_pin = io.pins.gpio4;
+    let ext0_pin = Input::new(io.pins.gpio4, Pull::None);
 
     println!("up and runnning!");
     let reason = get_reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
@@ -46,10 +41,10 @@ fn main() -> ! {
     let wake_reason = get_wakeup_cause();
     println!("wake reason: {:?}", wake_reason);
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let timer = TimerWakeupSource::new(Duration::from_secs(30));
-    let ext0 = Ext0WakeupSource::new(&mut ext0_pin, WakeupLevel::High);
+    let ext0 = Ext0WakeupSource::new(ext0_pin, WakeupLevel::High);
     println!("sleeping!");
     delay.delay_millis(100);
     rtc.sleep_deep(&[&timer, &ext0]);

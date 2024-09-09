@@ -16,14 +16,16 @@ on:
   push:
     branches-ignore:
       - "gh-readonly-queue/**"
+      - "main"
   merge_group:
   workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  MSRV: "1.76.0"
+  MSRV: "1.77.0"
   RUSTDOCFLAGS: -Dwarnings
+  DEFMT_LOG: trace
 
 # Cancel any currently running workflows from the same PR, branch, or
 # tag when a new workflow is triggered.
@@ -133,12 +135,25 @@ jobs:
           cargo xtask build-package --features=esp32c6,ci --target=riscv32imac-unknown-none-elf  esp-hal
           cargo xtask build-package --features=esp32h2,ci --target=riscv32imac-unknown-none-elf  esp-hal
 
-      # Verify the MSRV for all Xtensa chips:
+      - name: msrv RISCV (esp-wifi)
+        run: |
+          cargo xtask build-package --features=esp32c2,wifi,ble,async --target=riscv32imc-unknown-none-elf   esp-wifi
+          cargo xtask build-package --features=esp32c3,wifi,ble,async --target=riscv32imc-unknown-none-elf   esp-wifi
+          cargo xtask build-package --features=esp32c6,wifi,ble,async --target=riscv32imac-unknown-none-elf  esp-wifi
+          cargo xtask build-package --features=esp32h2,ble,async --target=riscv32imac-unknown-none-elf  esp-wifi
+
+        # Verify the MSRV for all Xtensa chips:
       - name: msrv Xtensa (esp-hal)
         run: |
           cargo xtask build-package --toolchain=esp --features=esp32,ci   --target=xtensa-esp32-none-elf   esp-hal
           cargo xtask build-package --toolchain=esp --features=esp32s2,ci --target=xtensa-esp32s2-none-elf esp-hal
           cargo xtask build-package --toolchain=esp --features=esp32s3,ci --target=xtensa-esp32s3-none-elf esp-hal
+
+      - name: msrv Xtensa (esp-wifi)
+        run: |
+          cargo xtask build-package --toolchain=esp --features=esp32,wifi,ble,async   --target=xtensa-esp32-none-elf   esp-wifi
+          cargo xtask build-package --toolchain=esp --features=esp32s2,wifi,async --target=xtensa-esp32s2-none-elf esp-wifi
+          cargo xtask build-package --toolchain=esp --features=esp32s3,wifi,ble,async --target=xtensa-esp32s3-none-elf esp-wifi
 
       - name: msrv (esp-lp-hal)
         run: |

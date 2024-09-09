@@ -17,7 +17,7 @@
 #![cfg_attr(esp32c3, doc = "**ESP32-C3**")]
 #![cfg_attr(esp32c6, doc = "**ESP32-C6**")]
 #![cfg_attr(esp32h2, doc = "**ESP32-H2**")]
-//! please ensure you are reading the correct [documentation] for your target
+//! . Please ensure you are reading the correct [documentation] for your target
 //! device.
 //!
 //! ## Choosing a Device
@@ -60,32 +60,26 @@
 //! #![no_std]
 //! #![no_main]
 //!
-//! // A panic - handler e.g. `use esp_backtrace as _;`
-//!
-//! use esp_hal::{
-//!     clock::ClockControl,
-//!     delay::Delay,
-//!     gpio::{Io, Level, Output},
-//!     peripherals::Peripherals,
-//!     prelude::*,
-//!     system::SystemControl,
-//! };
+//! // You'll need a panic handler e.g. `use esp_backtrace as _;`
 //! # #[panic_handler]
 //! # fn panic(_ : &core::panic::PanicInfo) -> ! {
 //! #     loop {}
 //! # }
+//! use esp_hal::{
+//!     delay::Delay,
+//!     gpio::{Io, Level, Output},
+//!     prelude::*,
+//! };
 //!
 //! #[entry]
 //! fn main() -> ! {
-//!     let peripherals = Peripherals::take();
-//!     let system = SystemControl::new(peripherals.SYSTEM);
-//!     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+//!     let peripherals = esp_hal::init(esp_hal::Config::default());
 //!
 //!     // Set GPIO0 as an output, and set its state high initially.
 //!     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!     let mut led = Output::new(io.pins.gpio0, Level::High);
 //!
-//!     let delay = Delay::new(&clocks);
+//!     let delay = Delay::new();
 //!
 //!     loop {
 //!         led.toggle();
@@ -95,14 +89,11 @@
 //! ```
 //!
 //! The steps here are:
-//! - Take all the peripherals from the PAC to pass them to the HAL drivers
-//!   later
-//! - Create [system::SystemControl]
-//! - Configure the system clocks - in this case use the boot defaults
-//! - Create [gpio::Io] which provides access to the GPIO pins
-//! - Create an [gpio::Output] pin driver which lets us control the logical
+//! - Call [`init`] with the desired [`CpuClock`] configuration
+//! - Create [`gpio::Io`] which provides access to the GPIO pins
+//! - Create an [`gpio::Output`] pin driver which lets us control the logical
 //!   level of an output pin
-//! - Create a [delay::Delay] driver
+//! - Create a [`delay::Delay`] driver
 //! - In a loop, toggle the output pin's logical level with a delay of 1000 ms
 //!
 //! ## `PeripheralRef` Pattern
@@ -111,7 +102,7 @@
 //! This means you can pass the pin/peripheral or a mutable reference to the
 //! pin/peripheral.
 //!
-//! The later can be used to regain access to the pin when the driver gets
+//! The latter can be used to regain access to the pin when the driver gets
 //! dropped. Then it's possible to reuse the pin/peripheral for a different
 //! purpose.
 //!
@@ -139,8 +130,7 @@
 //! ## Feature Flags
 #![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
-#![allow(asm_sub_register)]
-#![cfg_attr(feature = "async", allow(stable_features, async_fn_in_trait))]
+#![allow(asm_sub_register, async_fn_in_trait, stable_features)]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![deny(missing_docs, rust_2018_idioms)]
 #![no_std]
@@ -572,6 +562,94 @@ mod critical_section_impl {
     }
 }
 
+// The state of a re-entrant lock
+pub(crate) struct LockState {
+    #[cfg(multi_core)]
+    core: portable_atomic::AtomicUsize,
+}
+
+impl LockState {
+    #[cfg(multi_core)]
+    const UNLOCKED: usize = usize::MAX;
+
+    pub const fn new() -> Self {
+        Self {
+            #[cfg(multi_core)]
+            core: portable_atomic::AtomicUsize::new(Self::UNLOCKED),
+        }
+    }
+}
+
+// This is preferred over critical-section as this allows you to have multiple
+// locks active at the same time rather than using the global mutex that is
+// critical-section.
+#[allow(unused_variables)]
+pub(crate) fn lock<T>(state: &LockState, f: impl FnOnce() -> T) -> T {
+    // In regards to disabling interrupts, we only need to disable
+    // the interrupts that may be calling this function.
+
+    #[cfg(not(multi_core))]
+    {
+        // Disabling interrupts is enough on single core chips to ensure mutual
+        // exclusion.
+
+        #[cfg(riscv)]
+        return riscv::interrupt::free(f);
+        #[cfg(xtensa)]
+        return xtensa_lx::interrupt::free(|_| f());
+    }
+
+    #[cfg(multi_core)]
+    {
+        use portable_atomic::Ordering;
+
+        let current_core = get_core() as usize;
+
+        let mut f = f;
+
+        loop {
+            let func = || {
+                // Use Acquire ordering in success to ensure `f()` "happens after" the lock is
+                // taken. Use Relaxed ordering in failure as there's no
+                // synchronisation happening.
+                if let Err(locked_core) = state.core.compare_exchange(
+                    LockState::UNLOCKED,
+                    current_core,
+                    Ordering::Acquire,
+                    Ordering::Relaxed,
+                ) {
+                    assert_ne!(
+                        locked_core, current_core,
+                        "esp_hal::lock is not re-entrant!"
+                    );
+
+                    Err(f)
+                } else {
+                    let result = f();
+
+                    // Use Release ordering here to ensure `f()` "happens before" this lock is
+                    // released.
+                    state.core.store(LockState::UNLOCKED, Ordering::Release);
+
+                    Ok(result)
+                }
+            };
+
+            #[cfg(riscv)]
+            let result = riscv::interrupt::free(func);
+            #[cfg(xtensa)]
+            let result = xtensa_lx::interrupt::free(|_| func());
+
+            match result {
+                Ok(result) => break result,
+                Err(the_function) => f = the_function,
+            }
+
+            // Consider using core::hint::spin_loop(); Might need SW_INT.
+        }
+    }
+}
+
 /// Default (unhandled) interrupt handler
 pub const DEFAULT_INTERRUPT_HANDLER: interrupt::InterruptHandler = interrupt::InterruptHandler::new(
     unsafe { core::mem::transmute::<*const (), extern "C" fn()>(EspDefaultHandler as *const ()) },
@@ -626,17 +704,56 @@ macro_rules! before_snippet {
     () => {
         r#"
 # #![no_std]
-# use esp_hal::peripherals::Peripherals;
-# use esp_hal::clock::ClockControl;
-# use esp_hal::system::SystemControl;
+# use esp_hal::prelude::*;
+# use procmacros::handler;
+# use esp_hal::interrupt;
 # #[panic_handler]
 # fn panic(_ : &core::panic::PanicInfo) -> ! {
 #     loop {}
 # }
 # fn main() {
-#   let peripherals = Peripherals::take();
-#   let system = SystemControl::new(peripherals.SYSTEM);
-#   let mut clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+#     let mut peripherals = esp_hal::init(esp_hal::Config::default());
 "#
     };
+}
+
+use crate::{
+    clock::{Clocks, CpuClock},
+    peripherals::Peripherals,
+};
+
+/// System configuration.
+#[non_exhaustive]
+#[derive(Default)]
+pub struct Config {
+    /// The CPU clock configuration.
+    pub cpu_clock: CpuClock,
+}
+
+/// Initialize the system.
+///
+/// This function sets up the CPU clock and returns the peripherals and clocks.
+pub fn init(config: Config) -> Peripherals {
+    let mut peripherals = Peripherals::take();
+
+    // RTC domain must be enabled before we try to disable
+    let mut rtc = crate::rtc_cntl::Rtc::new(&mut peripherals.LPWR);
+    #[cfg(not(any(esp32, esp32s2)))]
+    rtc.swd.disable();
+    rtc.rwdt.disable();
+
+    unsafe {
+        crate::timer::timg::Wdt::<self::peripherals::TIMG0, Blocking>::set_wdt_enabled(false);
+        #[cfg(timg1)]
+        crate::timer::timg::Wdt::<self::peripherals::TIMG1, Blocking>::set_wdt_enabled(false);
+    }
+
+    Clocks::init(config.cpu_clock);
+
+    #[cfg(xtensa)]
+    crate::interrupt::setup_interrupts();
+    #[cfg(esp32)]
+    crate::time::time_init();
+
+    peripherals
 }

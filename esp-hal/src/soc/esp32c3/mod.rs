@@ -9,9 +9,6 @@
 //!    * I2S_SCLK: 160_000_000 - I2S clock frequency
 //!    * I2S_DEFAULT_CLK_SRC: 2 - I2S clock source
 
-use self::peripherals::{LPWR, TIMG0, TIMG1};
-use crate::{rtc_cntl::Rtc, timer::timg::Wdt};
-
 pub mod efuse;
 pub mod gpio;
 pub mod peripherals;
@@ -55,15 +52,4 @@ pub(crate) mod constants {
 
     /// RC FAST Clock value (Hertz).
     pub const RC_FAST_CLK: fugit::HertzU32 = fugit::HertzU32::kHz(17500);
-}
-
-#[export_name = "__post_init"]
-unsafe fn post_init() {
-    // RTC domain must be enabled before we try to disable
-    let mut rtc = Rtc::new(LPWR::steal());
-    rtc.swd.disable();
-    rtc.rwdt.disable();
-
-    Wdt::<TIMG0, crate::Blocking>::set_wdt_enabled(false);
-    Wdt::<TIMG1, crate::Blocking>::set_wdt_enabled(false);
 }

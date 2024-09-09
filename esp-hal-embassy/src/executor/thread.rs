@@ -77,7 +77,7 @@ This will use software-interrupt 3 which isn't available for anything else to wa
     pub fn new() -> Self {
         #[cfg(multi_core)]
         unsafe {
-            esp_hal::system::SoftwareInterrupt::<3>::steal()
+            esp_hal::interrupt::software::SoftwareInterrupt::<3>::steal()
                 .set_interrupt_handler(software3_interrupt)
         }
 

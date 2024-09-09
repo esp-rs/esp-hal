@@ -1,10 +1,10 @@
 //! UART Test
 //!
 //! Folowing pins are used:
-//! TX    GPIP2
-//! RX    GPIO3
+//! TX    GPIO2 / GPIO9  (esp32s2 / esp32s3) / GPIO26 (esp32)
+//! RX    GPIO3 / GPIO10 (esp32s2 / esp32s3) / GPIO27 (esp32)
 //!
-//! Connect TX (GPIO2) and RX (GPIO3) pins.
+//! Connect TX and RX pins.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -13,11 +13,9 @@
 
 use embedded_hal_02::serial::{Read, Write};
 use esp_hal::{
-    clock::{ClockControl, Clocks},
     gpio::Io,
-    peripherals::{Peripherals, UART1},
+    peripherals::UART1,
     prelude::*,
-    system::SystemControl,
     uart::{ClockSource, Uart},
     Blocking,
 };
@@ -25,22 +23,7 @@ use hil_test as _;
 use nb::block;
 
 struct Context {
-    clocks: Clocks<'static>,
     uart: Uart<'static, UART1, Blocking>,
-}
-
-impl Context {
-    pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
-        let uart = Uart::new(peripherals.UART1, &clocks, io.pins.gpio2, io.pins.gpio3).unwrap();
-
-        Context { clocks, uart }
-    }
 }
 
 #[cfg(test)]
@@ -52,7 +35,15 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        Context::init()
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+
+        let (rx, tx) = hil_test::common_test_pins!(io);
+
+        let uart = Uart::new(peripherals.UART1, tx, rx).unwrap();
+
+        Context { uart }
     }
 
     #[test]
@@ -102,7 +93,7 @@ mod tests {
             #[cfg(not(any(feature = "esp32", feature = "esp32c3", feature = "esp32c2")))]
             {
                 // 9600 baud, RC FAST clock source:
-                ctx.uart.change_baud(9600, ClockSource::RcFast, &ctx.clocks);
+                ctx.uart.change_baud(9600, ClockSource::RcFast);
                 ctx.uart.write(7).ok();
                 let read = block!(ctx.uart.read());
                 assert_eq!(read, Ok(7));
@@ -111,14 +102,14 @@ mod tests {
             // 19,200 baud, XTAL clock source:
             #[cfg(not(feature = "esp32"))]
             {
-                ctx.uart.change_baud(19_200, ClockSource::Xtal, &ctx.clocks);
+                ctx.uart.change_baud(19_200, ClockSource::Xtal);
                 ctx.uart.write(55).ok();
                 let read = block!(ctx.uart.read());
                 assert_eq!(read, Ok(55));
             }
 
             // 921,600 baud, APB clock source:
-            ctx.uart.change_baud(921_600, ClockSource::Apb, &ctx.clocks);
+            ctx.uart.change_baud(921_600, ClockSource::Apb);
             ctx.uart.write(253).ok();
             let read = block!(ctx.uart.read());
             assert_eq!(read, Ok(253));
@@ -127,14 +118,13 @@ mod tests {
         #[cfg(feature = "esp32s2")]
         {
             // 9600 baud, REF TICK clock source:
-            ctx.uart
-                .change_baud(9600, ClockSource::RefTick, &ctx.clocks);
+            ctx.uart.change_baud(9600, ClockSource::RefTick);
             ctx.uart.write(7).ok();
             let read = block!(ctx.uart.read());
             assert_eq!(read, Ok(7));
 
             // 921,600 baud, APB clock source:
-            ctx.uart.change_baud(921_600, ClockSource::Apb, &ctx.clocks);
+            ctx.uart.change_baud(921_600, ClockSource::Apb);
             ctx.uart.write(253).ok();
             let read = block!(ctx.uart.read());
             assert_eq!(read, Ok(253));

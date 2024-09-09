@@ -1,10 +1,10 @@
 //! UART Test
 //!
 //! Folowing pins are used:
-//! TX    GPIP2
-//! RX    GPIO3
+//! TX    GPIO2 / GPIO9  (esp32s2 / esp32s3) / GPIO26 (esp32)
+//! RX    GPIO3 / GPIO10 (esp32s2 / esp32s3) / GPIO27 (esp32)
 //!
-//! Connect TX (GPIO2) and RX (GPIO3) pins.
+//! Connect TX and RX pins.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: generic-queue
@@ -12,32 +12,11 @@
 #![no_std]
 #![no_main]
 
-use esp_hal::{
-    clock::ClockControl,
-    gpio::Io,
-    peripherals::{Peripherals, UART0},
-    system::SystemControl,
-    uart::Uart,
-    Async,
-};
+use esp_hal::{gpio::Io, peripherals::UART0, uart::Uart, Async};
 use hil_test as _;
 
 struct Context {
     uart: Uart<'static, UART0, Async>,
-}
-
-impl Context {
-    pub fn init() -> Self {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
-        let uart =
-            Uart::new_async(peripherals.UART0, &clocks, io.pins.gpio2, io.pins.gpio3).unwrap();
-
-        Context { uart }
-    }
 }
 
 #[cfg(test)]
@@ -49,7 +28,15 @@ mod tests {
 
     #[init]
     async fn init() -> Context {
-        Context::init()
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+
+        let (rx, tx) = hil_test::common_test_pins!(io);
+
+        let uart = Uart::new_async(peripherals.UART0, rx, tx).unwrap();
+
+        Context { uart }
     }
 
     #[test]

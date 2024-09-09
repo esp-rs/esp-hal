@@ -1,10 +1,10 @@
 //! embassy serial
 //!
 //! This is an example of running the embassy executor and asynchronously
-//! writing to and reading from uart
+//! writing to and reading from UART.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: async embassy embassy-generic-timers
+//% FEATURES: embassy embassy-generic-timers
 
 #![no_std]
 #![no_main]
@@ -13,10 +13,8 @@ use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     gpio::Io,
-    peripherals::{Peripherals, UART0},
-    system::SystemControl,
+    peripherals::UART0,
     timer::timg::TimerGroup,
     uart::{
         config::{AtCmdConfig, Config},
@@ -80,12 +78,10 @@ async fn reader(
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
     esp_println::println!("Init!");
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0.timer0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_hal_embassy::init(timg0.timer0);
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -108,11 +104,10 @@ async fn main(spawner: Spawner) {
 
     let config = Config::default().rx_fifo_full_threshold(READ_BUF_SIZE as u16);
 
-    let mut uart0 =
-        Uart::new_async_with_config(peripherals.UART0, config, &clocks, tx_pin, rx_pin).unwrap();
+    let mut uart0 = Uart::new_async_with_config(peripherals.UART0, config, rx_pin, tx_pin).unwrap();
     uart0.set_at_cmd(AtCmdConfig::new(None, None, None, AT_CMD, None));
 
-    let (tx, rx) = uart0.split();
+    let (rx, tx) = uart0.split();
 
     static SIGNAL: StaticCell<Signal<NoopRawMutex, usize>> = StaticCell::new();
     let signal = &*SIGNAL.init(Signal::new());

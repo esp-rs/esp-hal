@@ -117,7 +117,7 @@ impl FlashStorage {
         offset: u32,
         bytes: &mut [u8],
     ) -> Result<(), FlashStorageError> {
-        check_rc(chip_specific::esp_rom_spiflash_read(
+        check_rc(chip_specific::spiflash_read(
             offset,
             bytes.as_ptr() as *mut u32,
             bytes.len() as u32,
@@ -127,7 +127,7 @@ impl FlashStorage {
     #[inline(always)]
     fn unlock_once(&mut self) -> Result<(), FlashStorageError> {
         if !self.unlocked {
-            if chip_specific::esp_rom_spiflash_unlock() != 0 {
+            if chip_specific::spiflash_unlock() != 0 {
                 return Err(FlashStorageError::CantUnlock);
             }
             self.unlocked = true;
@@ -140,7 +140,7 @@ impl FlashStorage {
     pub(crate) fn internal_erase(&mut self, sector: u32) -> Result<(), FlashStorageError> {
         self.unlock_once()?;
 
-        check_rc(chip_specific::esp_rom_spiflash_erase_sector(sector))
+        check_rc(chip_specific::spiflash_erase_sector(sector))
     }
 
     #[inline(never)]
@@ -152,7 +152,7 @@ impl FlashStorage {
     ) -> Result<(), FlashStorageError> {
         self.unlock_once()?;
 
-        check_rc(chip_specific::esp_rom_spiflash_write(
+        check_rc(chip_specific::spiflash_write(
             offset,
             bytes.as_ptr() as *const u32,
             bytes.len() as u32,

@@ -39,7 +39,6 @@ impl From<DmaError> for Error {
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 impl embedded_hal::spi::Error for Error {
     fn kind(&self) -> embedded_hal::spi::ErrorKind {
         embedded_hal::spi::ErrorKind::Other

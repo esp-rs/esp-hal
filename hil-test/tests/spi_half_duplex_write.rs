@@ -2,11 +2,11 @@
 //!
 //! Following pins are used:
 //! SCLK    GPIO0
-//! MOSI    GPIO2
+//! MOSI    GPIO2 / GPIO9  (esp32s2 / esp32s3) / GPIO26 (esp32)
 //!
-//! PCNT    GPIO3
+//! PCNT    GPIO3 / GPIO10 (esp32s2 / esp32s3) / GPIO27 (esp32)
 //!
-//! Connect MOSI (GPIO2) and PCNT (GPIO3) pins.
+//! Connect MOSI and PCNT pins.
 
 //% CHIPS: esp32 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -14,16 +14,15 @@
 #![no_main]
 
 use esp_hal::{
-    clock::ClockControl,
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{GpioPin, Io, Pull},
+    gpio::{AnyPin, Io, Pull},
     pcnt::{
         channel::{EdgeMode, PcntInputConfig, PcntSource},
         unit::Unit,
         Pcnt,
     },
-    peripherals::{Peripherals, SPI2},
+    peripherals::SPI2,
     prelude::*,
     spi::{
         master::{Address, Command, HalfDuplexReadWrite, Spi, SpiDma},
@@ -31,7 +30,6 @@ use esp_hal::{
         SpiDataMode,
         SpiMode,
     },
-    system::SystemControl,
     Blocking,
 };
 use hil_test as _;
@@ -50,7 +48,7 @@ cfg_if::cfg_if! {
 struct Context {
     spi: SpiDma<'static, SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
     pcnt_unit: Unit<'static, 0>,
-    mosi_mirror: GpioPin<3>,
+    mosi_mirror: AnyPin<'static>,
 }
 
 #[cfg(test)]
@@ -65,14 +63,13 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let peripherals = Peripherals::take();
-        let system = SystemControl::new(peripherals.SYSTEM);
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
-        let mosi = io.pins.gpio2;
-        let mosi_mirror = io.pins.gpio3;
+        let (mosi, mosi_mirror) = hil_test::common_test_pins!(io);
+
+        let mosi_mirror = AnyPin::new(mosi_mirror);
 
         let pcnt = Pcnt::new(peripherals.PCNT);
         let dma = Dma::new(peripherals.DMA);
@@ -85,7 +82,7 @@ mod tests {
             }
         }
 
-        let spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+        let spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
             .with_sck(sclk)
             .with_mosi(mosi)
             .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
@@ -102,7 +99,7 @@ mod tests {
     fn test_spi_writes_are_correctly_by_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
 
-        let (buffer, descriptors, _, _) = dma_buffers!(DMA_BUFFER_SIZE, 0);
+        let (_, _, buffer, descriptors) = dma_buffers!(0, DMA_BUFFER_SIZE);
         let mut dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
 
         let unit = ctx.pcnt_unit;
@@ -152,12 +149,12 @@ mod tests {
     fn test_spidmabus_writes_are_correctly_by_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
 
-        let (buffer, descriptors, rx, rxd) = dma_buffers!(DMA_BUFFER_SIZE, 1);
-        let dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
+        let (rx, rxd, buffer, descriptors) = dma_buffers!(1, DMA_BUFFER_SIZE);
         let dma_rx_buf = DmaRxBuf::new(rxd, rx).unwrap();
+        let dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
 
         let unit = ctx.pcnt_unit;
-        let mut spi = ctx.spi.with_buffers(dma_tx_buf, dma_rx_buf);
+        let mut spi = ctx.spi.with_buffers(dma_rx_buf, dma_tx_buf);
 
         unit.channel0.set_edge_signal(PcntSource::from_pin(
             ctx.mosi_mirror,

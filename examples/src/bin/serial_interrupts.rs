@@ -12,12 +12,10 @@ use core::{cell::RefCell, fmt::Write};
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
     delay::Delay,
     gpio::Io,
-    peripherals::{Peripherals, UART0},
+    peripherals::UART0,
     prelude::*,
-    system::SystemControl,
     uart::{
         config::{AtCmdConfig, Config},
         Uart,
@@ -29,11 +27,9 @@ static SERIAL: Mutex<RefCell<Option<Uart<UART0, Blocking>>>> = Mutex::new(RefCel
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let delay = Delay::new(&clocks);
+    let delay = Delay::new();
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -55,8 +51,7 @@ fn main() -> ! {
     }
     let config = Config::default().rx_fifo_full_threshold(30);
 
-    let mut uart0 =
-        Uart::new_with_config(peripherals.UART0, config, &clocks, tx_pin, rx_pin).unwrap();
+    let mut uart0 = Uart::new_with_config(peripherals.UART0, config, tx_pin, rx_pin).unwrap();
     uart0.set_interrupt_handler(interrupt_handler);
 
     critical_section::with(|cs| {

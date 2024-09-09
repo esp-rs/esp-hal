@@ -83,6 +83,13 @@ impl Write for BleConnector<'_> {
 pub mod asynch {
     use core::task::Poll;
 
+    use bt_hci::{
+        transport::{Transport, WithIndicator},
+        ControllerToHostPacket,
+        FromHciBytes,
+        HostToControllerPacket,
+        WriteHci,
+    };
     use embassy_sync::waitqueue::AtomicWaker;
     use embedded_io::ErrorType;
 
@@ -175,6 +182,67 @@ pub mod asynch {
             } else {
                 Poll::Pending
             }
+        }
+    }
+
+    fn parse_hci(data: &[u8]) -> Result<Option<ControllerToHostPacket<'_>>, BleConnectorError> {
+        match ControllerToHostPacket::from_hci_bytes_complete(data) {
+            Ok(p) => Ok(Some(p)),
+            Err(e) => {
+                if e == bt_hci::FromHciBytesError::InvalidSize {
+                    use bt_hci::{event::EventPacketHeader, PacketKind};
+
+                    // Some controllers emit a suprious command complete event at startup.
+                    let (kind, data) =
+                        PacketKind::from_hci_bytes(data).map_err(|_| BleConnectorError::Unknown)?;
+                    if kind == PacketKind::Event {
+                        let (header, _) = EventPacketHeader::from_hci_bytes(data)
+                            .map_err(|_| BleConnectorError::Unknown)?;
+                        const COMMAND_COMPLETE: u8 = 0x0E;
+                        if header.code == COMMAND_COMPLETE && header.params_len < 4 {
+                            return Ok(None);
+                        }
+                    }
+                }
+                warn!("[hci] error parsing packet: {:?}", e);
+
+                Err(BleConnectorError::Unknown)
+            }
+        }
+    }
+
+    impl<'d> Transport for BleConnector<'d> {
+        /// Read a complete HCI packet into the rx buffer
+        async fn read<'a>(
+            &self,
+            rx: &'a mut [u8],
+        ) -> Result<ControllerToHostPacket<'a>, Self::Error> {
+            loop {
+                if !have_hci_read_data() {
+                    HciReadyEventFuture.await;
+                }
+
+                // Workaround for borrow checker.
+                // Safety: we only return a reference to x once, if parsing is successful.
+                let rx =
+                    unsafe { &mut *core::ptr::slice_from_raw_parts_mut(rx.as_mut_ptr(), rx.len()) };
+
+                let len = crate::ble::read_next(rx);
+                if let Some(packet) = parse_hci(&rx[..len])? {
+                    return Ok(packet);
+                }
+            }
+        }
+
+        /// Write a complete HCI packet from the tx buffer
+        async fn write<T: HostToControllerPacket>(&self, val: &T) -> Result<(), Self::Error> {
+            let mut buf: [u8; 259] = [0; 259];
+            let w = WithIndicator::new(val);
+            let len = w.size();
+            w.write_hci(&mut buf[..])
+                .map_err(|_| BleConnectorError::Unknown)?;
+            send_hci(&buf[..len]);
+            Ok(())
         }
     }
 }

@@ -16,9 +16,8 @@
 //!
 //! - Use the [`FullDuplex`](embedded_hal_02::spi::FullDuplex) trait to
 //!   read/write single bytes at a time,
-//! - Use the [`SpiBus`](embedded_hal::spi::SpiBus) trait (requires the
-//!   "embedded-hal" feature) and its associated functions to initiate
-//!   transactions with simultaneous reads and writes, or
+//! - Use the [`SpiBus`](embedded_hal::spi::SpiBus) trait and its associated
+//!   functions to initiate transactions with simultaneous reads and writes, or
 //! - Use the `ExclusiveDevice` struct from [`embedded-hal-bus`] or `SpiDevice`
 //!   from [`embassy-embedded-hal`].
 //!
@@ -38,7 +37,6 @@
 //! ### SPI Initialization
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use crate::esp_hal::prelude::_fugit_RateExtU32;
 //! # use esp_hal::spi::SpiMode;
 //! # use esp_hal::spi::master::Spi;
 //! # use esp_hal::gpio::Io;
@@ -52,7 +50,6 @@
 //!     peripherals.SPI2,
 //!     100.kHz(),
 //!     SpiMode::Mode0,
-//!     &mut clocks,
 //! )
 //! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs));
 //! # }
@@ -511,10 +508,9 @@ where
         spi: impl Peripheral<P = T> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
-        clocks: &Clocks<'d>,
     ) -> Spi<'d, T, FullDuplexMode> {
         crate::into_ref!(spi);
-        Self::new_internal(spi, frequency, mode, clocks)
+        Self::new_internal(spi, frequency, mode)
     }
 
     /// Assign the SCK (Serial Clock) pin for the SPI instance.
@@ -546,7 +542,7 @@ where
     /// Sets the specified pin to input and connects it to the SPI MISO signal.
     pub fn with_miso<MISO: InputPin>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
         crate::into_ref!(miso);
-        miso.set_to_input(private::Internal);
+        miso.init_input(false, false, private::Internal);
         miso.connect_input_to_peripheral(self.spi.miso_signal(), private::Internal);
 
         self
@@ -597,7 +593,7 @@ where
 
         if let Some(miso) = miso {
             crate::into_ref!(miso);
-            miso.set_to_input(private::Internal);
+            miso.init_input(false, false, private::Internal);
             miso.connect_input_to_peripheral(self.spi.miso_signal(), private::Internal);
         }
 
@@ -614,7 +610,6 @@ where
         spi: PeripheralRef<'d, T>,
         frequency: HertzU32,
         mode: SpiMode,
-        clocks: &Clocks<'d>,
     ) -> Spi<'d, T, FullDuplexMode> {
         spi.reset_peripheral();
         spi.enable_peripheral();
@@ -623,7 +618,7 @@ where
             spi,
             _mode: PhantomData,
         };
-        spi.spi.setup(frequency, clocks);
+        spi.spi.setup(frequency);
         spi.spi.init();
         spi.spi.set_data_mode(mode);
 
@@ -634,8 +629,8 @@ where
     ///
     /// This method allows user to update the bus frequency for the SPI
     /// communication after the instance has been created.
-    pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks<'d>) {
-        self.spi.ch_bus_freq(frequency, clocks);
+    pub fn change_bus_frequency(&mut self, frequency: HertzU32) {
+        self.spi.ch_bus_freq(frequency);
     }
 }
 
@@ -651,10 +646,9 @@ where
         spi: impl Peripheral<P = T> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
-        clocks: &Clocks<'d>,
     ) -> Spi<'d, T, HalfDuplexMode> {
         crate::into_ref!(spi);
-        Self::new_internal(spi, frequency, mode, clocks)
+        Self::new_internal(spi, frequency, mode)
     }
 
     /// Assign the SCK (Serial Clock) pin for the SPI instance.
@@ -822,7 +816,6 @@ where
         spi: PeripheralRef<'d, T>,
         frequency: HertzU32,
         mode: SpiMode,
-        clocks: &Clocks<'d>,
     ) -> Spi<'d, T, HalfDuplexMode> {
         spi.reset_peripheral();
         spi.enable_peripheral();
@@ -831,7 +824,7 @@ where
             spi,
             _mode: PhantomData,
         };
-        spi.spi.setup(frequency, clocks);
+        spi.spi.setup(frequency);
         spi.spi.init();
         spi.spi.set_data_mode(mode);
 
@@ -842,8 +835,8 @@ where
     ///
     /// This method allows you to update the bus frequency for the SPI
     /// communication after the instance has been created.
-    pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks<'d>) {
-        self.spi.ch_bus_freq(frequency, clocks);
+    pub fn change_bus_frequency(&mut self, frequency: HertzU32) {
+        self.spi.ch_bus_freq(frequency);
     }
 
     /// Set the bit order for the SPI instance.
@@ -901,7 +894,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T> embedded_hal_02::spi::FullDuplex<u8> for Spi<'_, T, FullDuplexMode>
 where
     T: Instance,
@@ -917,7 +909,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T> embedded_hal_02::blocking::spi::Transfer<u8> for Spi<'_, T, FullDuplexMode>
 where
     T: Instance,
@@ -929,7 +920,6 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
 impl<T> embedded_hal_02::blocking::spi::Write<u8> for Spi<'_, T, FullDuplexMode>
 where
     T: Instance,
@@ -949,12 +939,11 @@ mod dma {
     };
 
     use super::*;
-    #[cfg(feature = "async")]
-    use crate::dma::asynch::{DmaRxFuture, DmaTxFuture};
     #[cfg(spi3)]
     use crate::dma::Spi3Peripheral;
     use crate::{
         dma::{
+            asynch::{DmaRxFuture, DmaTxFuture},
             Channel,
             DmaChannel,
             DmaRxBuf,
@@ -988,7 +977,7 @@ mod dma {
             C::P: SpiPeripheral + Spi2Peripheral,
             DmaMode: Mode,
         {
-            channel.tx.init_channel(); // no need to call this for both, TX and RX
+            channel.tx.init_channel(); // no need to call this for both, RX and TX
 
             SpiDma {
                 spi: self.spi,
@@ -1017,7 +1006,7 @@ mod dma {
             C::P: SpiPeripheral + Spi3Peripheral,
             DmaMode: Mode,
         {
-            channel.tx.init_channel(); // no need to call this for both, TX and RX
+            channel.tx.init_channel(); // no need to call this for both, RX and TX
 
             SpiDma {
                 spi: self.spi,
@@ -1135,8 +1124,8 @@ mod dma {
         M: Mode,
     {
         /// Changes the SPI bus frequency for the DMA-enabled SPI instance.
-        pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks<'d>) {
-            self.spi.ch_bus_freq(frequency, clocks);
+        pub fn change_bus_frequency(&mut self, frequency: HertzU32) {
+            self.spi.ch_bus_freq(frequency);
         }
     }
 
@@ -1150,15 +1139,15 @@ mod dma {
     {
         /// Configures the DMA buffers for the SPI instance.
         ///
-        /// This method sets up both TX and RX buffers for DMA transfers.
+        /// This method sets up both RX and TX buffers for DMA transfers.
         /// It returns an instance of `SpiDmaBus` that can be used for SPI
         /// communication.
         pub fn with_buffers(
             self,
-            dma_tx_buf: DmaTxBuf,
             dma_rx_buf: DmaRxBuf,
+            dma_tx_buf: DmaTxBuf,
         ) -> SpiDmaBus<'d, T, C, D, M> {
-            SpiDmaBus::new(self, dma_tx_buf, dma_rx_buf)
+            SpiDmaBus::new(self, dma_rx_buf, dma_tx_buf)
         }
     }
 
@@ -1203,7 +1192,7 @@ mod dma {
 
         /// Checks if the DMA transfer is complete.
         ///
-        /// This method returns `true` if both TX and RX operations are done,
+        /// This method returns `true` if both RX and TX operations are done,
         /// and the SPI instance is no longer busy.
         pub fn is_done(&self) -> bool {
             if self.is_tx && !self.tx_future_awaited && !self.spi_dma.channel.tx.is_done() {
@@ -1240,7 +1229,6 @@ mod dma {
         }
     }
 
-    #[cfg(feature = "async")]
     impl<'d, T, C, D, Buf> SpiDmaTransfer<'d, T, C, D, crate::Async, Buf>
     where
         T: Instance,
@@ -1250,7 +1238,7 @@ mod dma {
     {
         /// Waits for the DMA transfer to complete asynchronously.
         ///
-        /// This method awaits the completion of both TX and RX operations.
+        /// This method awaits the completion of both RX and TX operations.
         pub async fn wait_for_done(&mut self) {
             if self.is_tx && !self.tx_future_awaited {
                 let _ = DmaTxFuture::new(&mut self.spi_dma.channel.tx).await;
@@ -1333,39 +1321,39 @@ mod dma {
         /// the SPI instance. The maximum amount of data to be
         /// sent/received is 32736 bytes.
         #[allow(clippy::type_complexity)]
-        pub fn dma_transfer<TX: DmaTxBuffer, RX: DmaRxBuffer>(
+        pub fn dma_transfer<RX: DmaRxBuffer, TX: DmaTxBuffer>(
             mut self,
-            mut tx_buffer: TX,
             mut rx_buffer: RX,
-        ) -> Result<SpiDmaTransfer<'d, T, C, FullDuplexMode, M, (TX, RX)>, (Error, Self, TX, RX)>
+            mut tx_buffer: TX,
+        ) -> Result<SpiDmaTransfer<'d, T, C, FullDuplexMode, M, (RX, TX)>, (Error, Self, RX, TX)>
         {
-            let bytes_to_write = tx_buffer.length();
             let bytes_to_read = rx_buffer.length();
+            let bytes_to_write = tx_buffer.length();
 
             if bytes_to_write > MAX_DMA_SIZE || bytes_to_read > MAX_DMA_SIZE {
                 return Err((
                     Error::MaxDmaTransferSizeExceeded,
                     self,
-                    tx_buffer,
                     rx_buffer,
+                    tx_buffer,
                 ));
             }
 
             let result = unsafe {
                 self.spi.start_transfer_dma(
-                    &mut tx_buffer,
                     &mut rx_buffer,
-                    &mut self.channel.tx,
+                    &mut tx_buffer,
                     &mut self.channel.rx,
+                    &mut self.channel.tx,
                 )
             };
             if let Err(e) = result {
-                return Err((e, self, tx_buffer, rx_buffer));
+                return Err((e, self, rx_buffer, tx_buffer));
             }
 
             Ok(SpiDmaTransfer::new(
                 self,
-                (tx_buffer, rx_buffer),
+                (rx_buffer, tx_buffer),
                 true,
                 true,
             ))
@@ -1543,10 +1531,10 @@ mod dma {
         D: DuplexMode,
         M: Mode,
     {
-        Idle(SpiDma<'d, T, C, D, M>, DmaTxBuf, DmaRxBuf),
+        Idle(SpiDma<'d, T, C, D, M>, DmaRxBuf, DmaTxBuf),
         Reading(SpiDmaTransfer<'d, T, C, D, M, DmaRxBuf>, DmaTxBuf),
         Writing(SpiDmaTransfer<'d, T, C, D, M, DmaTxBuf>, DmaRxBuf),
-        Transferring(SpiDmaTransfer<'d, T, C, D, M, (DmaTxBuf, DmaRxBuf)>),
+        Transferring(SpiDmaTransfer<'d, T, C, D, M, (DmaRxBuf, DmaTxBuf)>),
         #[default]
         TemporarilyRemoved,
     }
@@ -1578,11 +1566,11 @@ mod dma {
         /// buffers.
         pub fn new(
             spi: SpiDma<'d, T, C, D, M>,
-            dma_tx_buf: DmaTxBuf,
             dma_rx_buf: DmaRxBuf,
+            dma_tx_buf: DmaTxBuf,
         ) -> Self {
             Self {
-                state: State::Idle(spi, dma_tx_buf, dma_rx_buf),
+                state: State::Idle(spi, dma_rx_buf, dma_tx_buf),
             }
         }
 
@@ -1590,33 +1578,33 @@ mod dma {
         ///
         /// Interrupts are not enabled at the peripheral level here.
         pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-            let (mut spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+            let (mut spi_dma, rx_buf, tx_buf) = self.wait_for_idle();
             spi_dma.set_interrupt_handler(handler);
-            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+            self.state = State::Idle(spi_dma, rx_buf, tx_buf);
         }
 
         /// Listen for the given interrupts
         #[cfg(not(any(esp32, esp32s2)))]
         pub fn listen(&mut self, interrupts: EnumSet<SpiInterrupt>) {
-            let (mut spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+            let (mut spi_dma, rx_buf, tx_buf) = self.wait_for_idle();
             spi_dma.listen(interrupts);
-            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+            self.state = State::Idle(spi_dma, rx_buf, tx_buf);
         }
 
         /// Unlisten the given interrupts
         #[cfg(not(any(esp32, esp32s2)))]
         pub fn unlisten(&mut self, interrupts: EnumSet<SpiInterrupt>) {
-            let (mut spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+            let (mut spi_dma, rx_buf, tx_buf) = self.wait_for_idle();
             spi_dma.unlisten(interrupts);
-            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+            self.state = State::Idle(spi_dma, rx_buf, tx_buf);
         }
 
         /// Gets asserted interrupts
         #[cfg(not(any(esp32, esp32s2)))]
         pub fn interrupts(&mut self) -> EnumSet<SpiInterrupt> {
-            let (mut spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+            let (mut spi_dma, rx_buf, tx_buf) = self.wait_for_idle();
             let interrupts = spi_dma.interrupts();
-            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+            self.state = State::Idle(spi_dma, rx_buf, tx_buf);
 
             interrupts
         }
@@ -1624,32 +1612,32 @@ mod dma {
         /// Resets asserted interrupts
         #[cfg(not(any(esp32, esp32s2)))]
         pub fn clear_interrupts(&mut self, interrupts: EnumSet<SpiInterrupt>) {
-            let (mut spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+            let (mut spi_dma, rx_buf, tx_buf) = self.wait_for_idle();
             spi_dma.clear_interrupts(interrupts);
-            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+            self.state = State::Idle(spi_dma, rx_buf, tx_buf);
         }
 
         /// Changes the SPI bus frequency for the DMA-enabled SPI instance.
-        pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks<'d>) {
-            let (mut spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
-            spi_dma.change_bus_frequency(frequency, clocks);
-            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+        pub fn change_bus_frequency(&mut self, frequency: HertzU32) {
+            let (mut spi_dma, rx_buf, tx_buf) = self.wait_for_idle();
+            spi_dma.change_bus_frequency(frequency);
+            self.state = State::Idle(spi_dma, rx_buf, tx_buf);
         }
 
-        fn wait_for_idle(&mut self) -> (SpiDma<'d, T, C, D, M>, DmaTxBuf, DmaRxBuf) {
+        fn wait_for_idle(&mut self) -> (SpiDma<'d, T, C, D, M>, DmaRxBuf, DmaTxBuf) {
             match core::mem::take(&mut self.state) {
-                State::Idle(spi, tx_buf, rx_buf) => (spi, tx_buf, rx_buf),
+                State::Idle(spi, rx_buf, tx_buf) => (spi, rx_buf, tx_buf),
                 State::Reading(transfer, tx_buf) => {
                     let (spi, rx_buf) = transfer.wait();
-                    (spi, tx_buf, rx_buf)
+                    (spi, rx_buf, tx_buf)
                 }
                 State::Writing(transfer, rx_buf) => {
                     let (spi, tx_buf) = transfer.wait();
-                    (spi, tx_buf, rx_buf)
+                    (spi, rx_buf, tx_buf)
                 }
                 State::Transferring(transfer) => {
-                    let (spi, (tx_buf, rx_buf)) = transfer.wait();
-                    (spi, tx_buf, rx_buf)
+                    let (spi, (rx_buf, tx_buf)) = transfer.wait();
+                    (spi, rx_buf, tx_buf)
                 }
                 State::TemporarilyRemoved => unreachable!(),
             }
@@ -1666,9 +1654,9 @@ mod dma {
     {
         /// Configures the interrupt handler for the DMA-enabled SPI instance.
         fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-            let (mut spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+            let (mut spi_dma, rx_buf, tx_buf) = self.wait_for_idle();
             SpiDma::set_interrupt_handler(&mut spi_dma, handler);
-            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+            self.state = State::Idle(spi_dma, rx_buf, tx_buf);
         }
     }
 
@@ -1691,7 +1679,7 @@ mod dma {
     {
         /// Reads data from the SPI bus using DMA.
         pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
-            let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle();
+            let (mut spi_dma, mut rx_buf, mut tx_buf) = self.wait_for_idle();
 
             for chunk in words.chunks_mut(rx_buf.capacity()) {
                 rx_buf.set_length(chunk.len());
@@ -1699,24 +1687,24 @@ mod dma {
                 match spi_dma.dma_read(rx_buf) {
                     Ok(transfer) => self.state = State::Reading(transfer, tx_buf),
                     Err((e, spi, rx)) => {
-                        self.state = State::Idle(spi, tx_buf, rx);
+                        self.state = State::Idle(spi, rx, tx_buf);
                         return Err(e);
                     }
                 }
-                (spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+                (spi_dma, rx_buf, tx_buf) = self.wait_for_idle();
 
                 let bytes_read = rx_buf.read_received_data(chunk);
                 debug_assert_eq!(bytes_read, chunk.len());
             }
 
-            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+            self.state = State::Idle(spi_dma, rx_buf, tx_buf);
 
             Ok(())
         }
 
         /// Writes data to the SPI bus using DMA.
         pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
-            let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle();
+            let (mut spi_dma, mut rx_buf, mut tx_buf) = self.wait_for_idle();
 
             for chunk in words.chunks(tx_buf.capacity()) {
                 tx_buf.fill(chunk);
@@ -1724,21 +1712,21 @@ mod dma {
                 match spi_dma.dma_write(tx_buf) {
                     Ok(transfer) => self.state = State::Writing(transfer, rx_buf),
                     Err((e, spi, tx)) => {
-                        self.state = State::Idle(spi, tx, rx_buf);
+                        self.state = State::Idle(spi, rx_buf, tx);
                         return Err(e);
                     }
                 }
-                (spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+                (spi_dma, rx_buf, tx_buf) = self.wait_for_idle();
             }
 
-            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+            self.state = State::Idle(spi_dma, rx_buf, tx_buf);
 
             Ok(())
         }
 
         /// Transfers data to and from the SPI bus simultaneously using DMA.
         pub fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
-            let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle();
+            let (mut spi_dma, mut rx_buf, mut tx_buf) = self.wait_for_idle();
 
             let chunk_size = min(tx_buf.capacity(), rx_buf.capacity());
 
@@ -1753,20 +1741,20 @@ mod dma {
                 tx_buf.fill(write_chunk);
                 rx_buf.set_length(read_chunk.len());
 
-                match spi_dma.dma_transfer(tx_buf, rx_buf) {
+                match spi_dma.dma_transfer(rx_buf, tx_buf) {
                     Ok(transfer) => self.state = State::Transferring(transfer),
-                    Err((e, spi, tx, rx)) => {
-                        self.state = State::Idle(spi, tx, rx);
+                    Err((e, spi, rx, tx)) => {
+                        self.state = State::Idle(spi, rx, tx);
                         return Err(e);
                     }
                 }
-                (spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+                (spi_dma, rx_buf, tx_buf) = self.wait_for_idle();
 
                 let bytes_read = rx_buf.read_received_data(read_chunk);
                 debug_assert_eq!(bytes_read, read_chunk.len());
             }
 
-            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+            self.state = State::Idle(spi_dma, rx_buf, tx_buf);
 
             if !read_remainder.is_empty() {
                 self.read(read_remainder)
@@ -1779,7 +1767,7 @@ mod dma {
 
         /// Transfers data in place on the SPI bus using DMA.
         pub fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Error> {
-            let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle();
+            let (mut spi_dma, mut rx_buf, mut tx_buf) = self.wait_for_idle();
 
             let chunk_size = min(tx_buf.capacity(), rx_buf.capacity());
 
@@ -1787,20 +1775,20 @@ mod dma {
                 tx_buf.fill(chunk);
                 rx_buf.set_length(chunk.len());
 
-                match spi_dma.dma_transfer(tx_buf, rx_buf) {
+                match spi_dma.dma_transfer(rx_buf, tx_buf) {
                     Ok(transfer) => self.state = State::Transferring(transfer),
-                    Err((e, spi, tx, rx)) => {
-                        self.state = State::Idle(spi, tx, rx);
+                    Err((e, spi, rx, tx)) => {
+                        self.state = State::Idle(spi, rx, tx);
                         return Err(e);
                     }
                 }
-                (spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+                (spi_dma, rx_buf, tx_buf) = self.wait_for_idle();
 
                 let bytes_read = rx_buf.read_received_data(chunk);
                 debug_assert_eq!(bytes_read, chunk.len());
             }
 
-            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+            self.state = State::Idle(spi_dma, rx_buf, tx_buf);
             Ok(())
         }
     }
@@ -1823,7 +1811,7 @@ mod dma {
             dummy: u8,
             buffer: &mut [u8],
         ) -> Result<(), Self::Error> {
-            let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle();
+            let (mut spi_dma, mut rx_buf, mut tx_buf) = self.wait_for_idle();
             if buffer.len() > rx_buf.capacity() {
                 return Err(super::Error::DmaError(DmaError::Overflow));
             }
@@ -1833,16 +1821,16 @@ mod dma {
             match spi_dma.read(data_mode, cmd, address, dummy, rx_buf) {
                 Ok(transfer) => self.state = State::Reading(transfer, tx_buf),
                 Err((e, spi, rx)) => {
-                    self.state = State::Idle(spi, tx_buf, rx);
+                    self.state = State::Idle(spi, rx, tx_buf);
                     return Err(e);
                 }
             }
-            (spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+            (spi_dma, rx_buf, tx_buf) = self.wait_for_idle();
 
             let bytes_read = rx_buf.read_received_data(buffer);
             debug_assert_eq!(bytes_read, buffer.len());
 
-            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+            self.state = State::Idle(spi_dma, rx_buf, tx_buf);
 
             Ok(())
         }
@@ -1856,7 +1844,7 @@ mod dma {
             dummy: u8,
             buffer: &[u8],
         ) -> Result<(), Self::Error> {
-            let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle();
+            let (mut spi_dma, mut rx_buf, mut tx_buf) = self.wait_for_idle();
             if buffer.len() > tx_buf.capacity() {
                 return Err(super::Error::DmaError(DmaError::Overflow));
             }
@@ -1866,19 +1854,18 @@ mod dma {
             match spi_dma.write(data_mode, cmd, address, dummy, tx_buf) {
                 Ok(transfer) => self.state = State::Writing(transfer, rx_buf),
                 Err((e, spi, tx)) => {
-                    self.state = State::Idle(spi, tx, rx_buf);
+                    self.state = State::Idle(spi, rx_buf, tx);
                     return Err(e);
                 }
             }
-            (spi_dma, tx_buf, rx_buf) = self.wait_for_idle();
+            (spi_dma, rx_buf, tx_buf) = self.wait_for_idle();
 
-            self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+            self.state = State::Idle(spi_dma, rx_buf, tx_buf);
 
             Ok(())
         }
     }
 
-    #[cfg(feature = "embedded-hal-02")]
     impl<'d, T, C> embedded_hal_02::blocking::spi::Transfer<u8>
         for SpiDmaBus<'d, T, C, FullDuplexMode, crate::Blocking>
     where
@@ -1894,7 +1881,6 @@ mod dma {
         }
     }
 
-    #[cfg(feature = "embedded-hal-02")]
     impl<'d, T, C> embedded_hal_02::blocking::spi::Write<u8>
         for SpiDmaBus<'d, T, C, FullDuplexMode, crate::Blocking>
     where
@@ -1911,7 +1897,6 @@ mod dma {
     }
 
     /// Async functionality
-    #[cfg(feature = "async")]
     mod asynch {
         use core::{cmp::min, mem::take};
 
@@ -1927,8 +1912,8 @@ mod dma {
                 &mut self,
             ) -> (
                 SpiDma<'d, T, C, FullDuplexMode, crate::Async>,
-                DmaTxBuf,
                 DmaRxBuf,
+                DmaTxBuf,
             ) {
                 match &mut self.state {
                     State::Idle(_, _, _) => (),
@@ -1938,18 +1923,18 @@ mod dma {
                     State::TemporarilyRemoved => unreachable!(),
                 }
                 match take(&mut self.state) {
-                    State::Idle(spi, tx_buf, rx_buf) => (spi, tx_buf, rx_buf),
+                    State::Idle(spi, rx_buf, tx_buf) => (spi, rx_buf, tx_buf),
                     State::Reading(transfer, tx_buf) => {
                         let (spi, rx_buf) = transfer.wait();
-                        (spi, tx_buf, rx_buf)
+                        (spi, rx_buf, tx_buf)
                     }
                     State::Writing(transfer, rx_buf) => {
                         let (spi, tx_buf) = transfer.wait();
-                        (spi, tx_buf, rx_buf)
+                        (spi, rx_buf, tx_buf)
                     }
                     State::Transferring(transfer) => {
-                        let (spi, (tx_buf, rx_buf)) = transfer.wait();
-                        (spi, tx_buf, rx_buf)
+                        let (spi, (rx_buf, tx_buf)) = transfer.wait();
+                        (spi, rx_buf, tx_buf)
                     }
                     State::TemporarilyRemoved => unreachable!(),
                 }
@@ -1958,7 +1943,7 @@ mod dma {
             /// Fill the given buffer with data from the bus.
             pub async fn read_async(&mut self, words: &mut [u8]) -> Result<(), super::Error> {
                 // Get previous transfer.
-                let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle_async().await;
+                let (mut spi_dma, mut rx_buf, mut tx_buf) = self.wait_for_idle_async().await;
 
                 for chunk in words.chunks_mut(rx_buf.capacity()) {
                     rx_buf.set_length(chunk.len());
@@ -1968,18 +1953,18 @@ mod dma {
                             self.state = State::Reading(transfer, tx_buf);
                         }
                         Err((e, spi, rx)) => {
-                            self.state = State::Idle(spi, tx_buf, rx);
+                            self.state = State::Idle(spi, rx, tx_buf);
                             return Err(e);
                         }
                     };
 
-                    (spi_dma, tx_buf, rx_buf) = self.wait_for_idle_async().await;
+                    (spi_dma, rx_buf, tx_buf) = self.wait_for_idle_async().await;
 
                     let bytes_read = rx_buf.read_received_data(chunk);
                     debug_assert_eq!(bytes_read, chunk.len());
                 }
 
-                self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+                self.state = State::Idle(spi_dma, rx_buf, tx_buf);
 
                 Ok(())
             }
@@ -1987,7 +1972,7 @@ mod dma {
             /// Transmit the given buffer to the bus.
             pub async fn write_async(&mut self, words: &[u8]) -> Result<(), super::Error> {
                 // Get previous transfer.
-                let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle_async().await;
+                let (mut spi_dma, mut rx_buf, mut tx_buf) = self.wait_for_idle_async().await;
 
                 for chunk in words.chunks(tx_buf.capacity()) {
                     tx_buf.fill(chunk);
@@ -1997,15 +1982,15 @@ mod dma {
                             self.state = State::Writing(transfer, rx_buf);
                         }
                         Err((e, spi, tx)) => {
-                            self.state = State::Idle(spi, tx, rx_buf);
+                            self.state = State::Idle(spi, rx_buf, tx);
                             return Err(e);
                         }
                     };
 
-                    (spi_dma, tx_buf, rx_buf) = self.wait_for_idle_async().await;
+                    (spi_dma, rx_buf, tx_buf) = self.wait_for_idle_async().await;
                 }
 
-                self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+                self.state = State::Idle(spi_dma, rx_buf, tx_buf);
 
                 Ok(())
             }
@@ -2018,7 +2003,7 @@ mod dma {
                 write: &[u8],
             ) -> Result<(), super::Error> {
                 // Get previous transfer.
-                let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle_async().await;
+                let (mut spi_dma, mut rx_buf, mut tx_buf) = self.wait_for_idle_async().await;
 
                 let chunk_size = min(tx_buf.capacity(), rx_buf.capacity());
 
@@ -2033,23 +2018,23 @@ mod dma {
                     tx_buf.fill(write_chunk);
                     rx_buf.set_length(read_chunk.len());
 
-                    match spi_dma.dma_transfer(tx_buf, rx_buf) {
+                    match spi_dma.dma_transfer(rx_buf, tx_buf) {
                         Ok(transfer) => {
                             self.state = State::Transferring(transfer);
                         }
-                        Err((e, spi, tx, rx)) => {
-                            self.state = State::Idle(spi, tx, rx);
+                        Err((e, spi, rx, tx)) => {
+                            self.state = State::Idle(spi, rx, tx);
                             return Err(e);
                         }
                     };
 
-                    (spi_dma, tx_buf, rx_buf) = self.wait_for_idle_async().await;
+                    (spi_dma, rx_buf, tx_buf) = self.wait_for_idle_async().await;
 
                     let bytes_read = rx_buf.read_received_data(read_chunk);
                     assert_eq!(bytes_read, read_chunk.len());
                 }
 
-                self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+                self.state = State::Idle(spi_dma, rx_buf, tx_buf);
 
                 if !read_remainder.is_empty() {
                     self.read_async(read_remainder).await
@@ -2067,18 +2052,18 @@ mod dma {
                 words: &mut [u8],
             ) -> Result<(), super::Error> {
                 // Get previous transfer.
-                let (mut spi_dma, mut tx_buf, mut rx_buf) = self.wait_for_idle_async().await;
+                let (mut spi_dma, mut rx_buf, mut tx_buf) = self.wait_for_idle_async().await;
 
                 for chunk in words.chunks_mut(tx_buf.capacity()) {
                     tx_buf.fill(chunk);
                     rx_buf.set_length(chunk.len());
 
-                    match spi_dma.dma_transfer(tx_buf, rx_buf) {
+                    match spi_dma.dma_transfer(rx_buf, tx_buf) {
                         Ok(transfer) => {
                             self.state = State::Transferring(transfer);
                         }
-                        Err((e, spi, tx, rx)) => {
-                            self.state = State::Idle(spi, tx, rx);
+                        Err((e, spi, rx, tx)) => {
+                            self.state = State::Idle(spi, rx, tx);
                             return Err(e);
                         }
                     };
@@ -2088,10 +2073,10 @@ mod dma {
                         _ => unreachable!(),
                     };
 
-                    (spi_dma, tx_buf, rx_buf) = match take(&mut self.state) {
+                    (spi_dma, rx_buf, tx_buf) = match take(&mut self.state) {
                         State::Transferring(transfer) => {
-                            let (spi, (tx_buf, rx_buf)) = transfer.wait();
-                            (spi, tx_buf, rx_buf)
+                            let (spi, (rx_buf, tx_buf)) = transfer.wait();
+                            (spi, rx_buf, tx_buf)
                         }
                         _ => unreachable!(),
                     };
@@ -2100,7 +2085,7 @@ mod dma {
                     debug_assert_eq!(bytes_read, chunk.len());
                 }
 
-                self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+                self.state = State::Idle(spi_dma, rx_buf, tx_buf);
 
                 Ok(())
             }
@@ -2108,8 +2093,8 @@ mod dma {
             /// Flush any pending data in the SPI peripheral.
             pub async fn flush_async(&mut self) -> Result<(), super::Error> {
                 // Get previous transfer.
-                let (spi_dma, tx_buf, rx_buf) = self.wait_for_idle_async().await;
-                self.state = State::Idle(spi_dma, tx_buf, rx_buf);
+                let (spi_dma, rx_buf, tx_buf) = self.wait_for_idle_async().await;
+                self.state = State::Idle(spi_dma, rx_buf, tx_buf);
                 Ok(())
             }
         }
@@ -2142,7 +2127,6 @@ mod dma {
         }
     }
 
-    #[cfg(feature = "embedded-hal")]
     mod ehal1 {
         use embedded_hal::spi::{ErrorType, SpiBus};
 
@@ -2189,7 +2173,6 @@ mod dma {
     }
 }
 
-#[cfg(feature = "embedded-hal")]
 mod ehal1 {
     use embedded_hal::spi::SpiBus;
     use embedded_hal_nb::spi::FullDuplex;
@@ -2289,18 +2272,18 @@ mod ehal1 {
 #[doc(hidden)]
 pub trait InstanceDma: Instance {
     #[allow(clippy::too_many_arguments)]
-    unsafe fn start_transfer_dma<TX: Tx, RX: Rx>(
+    unsafe fn start_transfer_dma<RX: Rx, TX: Tx>(
         &mut self,
-        tx_buffer: &mut impl DmaTxBuffer,
         rx_buffer: &mut impl DmaRxBuffer,
-        tx: &mut TX,
+        tx_buffer: &mut impl DmaTxBuffer,
         rx: &mut RX,
+        tx: &mut TX,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
         self.configure_datalen(usize::max(rx_buffer.length(), tx_buffer.length()) as u32 * 8);
 
-        tx.is_done();
         rx.is_done();
+        tx.is_done();
 
         // re-enable the MISO and MOSI
         reg_block
@@ -2312,10 +2295,10 @@ pub trait InstanceDma: Instance {
 
         self.clear_dma_interrupts();
         reset_dma_before_load_dma_dscr(reg_block);
-        tx.prepare_transfer(self.dma_peripheral(), tx_buffer)
-            .and_then(|_| tx.start_transfer())?;
         rx.prepare_transfer(self.dma_peripheral(), rx_buffer)
             .and_then(|_| rx.start_transfer())?;
+        tx.prepare_transfer(self.dma_peripheral(), tx_buffer)
+            .and_then(|_| tx.start_transfer())?;
 
         reset_dma_before_usr_cmd(reg_block);
 
@@ -2817,7 +2800,8 @@ pub trait Instance: private::Sealed {
     }
 
     // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
-    fn setup(&mut self, frequency: HertzU32, clocks: &Clocks<'_>) {
+    fn setup(&mut self, frequency: HertzU32) {
+        let clocks = Clocks::get();
         cfg_if::cfg_if! {
             if #[cfg(esp32h2)] {
                 // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
@@ -3019,7 +3003,7 @@ pub trait Instance: private::Sealed {
         self
     }
 
-    fn ch_bus_freq(&mut self, frequency: HertzU32, clocks: &Clocks<'_>) {
+    fn ch_bus_freq(&mut self, frequency: HertzU32) {
         // Disable clock source
         #[cfg(not(any(esp32, esp32s2)))]
         self.register_block().clk_gate().modify(|_, w| {
@@ -3032,7 +3016,7 @@ pub trait Instance: private::Sealed {
         });
 
         // Change clock frequency
-        self.setup(frequency, clocks);
+        self.setup(frequency);
 
         // Enable clock source
         #[cfg(not(any(esp32, esp32s2)))]
@@ -3636,7 +3620,7 @@ impl Instance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.bind_spi3_interrupt(handler.handler());
-        crate::interrupt::enable(crate::peripherals::Interrupt::SPI2, handler.priority()).unwrap();
+        crate::interrupt::enable(crate::peripherals::Interrupt::SPI3, handler.priority()).unwrap();
     }
 
     #[inline(always)]
@@ -3767,7 +3751,7 @@ impl Instance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.bind_spi3_interrupt(handler.handler());
-        crate::interrupt::enable(crate::peripherals::Interrupt::SPI2, handler.priority()).unwrap();
+        crate::interrupt::enable(crate::peripherals::Interrupt::SPI3, handler.priority()).unwrap();
     }
 
     #[inline(always)]
