@@ -205,6 +205,7 @@ pub mod asynch {
                     }
                 }
                 warn!("[hci] error parsing packet: {:?}", e);
+
                 Err(BleConnectorError::Unknown)
             }
         }

@@ -9,6 +9,7 @@ env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   RUSTDOCFLAGS: -Dwarnings
+  DEFMT_LOG: trace
 
 jobs:
 

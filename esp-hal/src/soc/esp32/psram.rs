@@ -199,6 +199,7 @@ pub(crate) mod utils {
     }
 
     #[derive(PartialEq, Eq, Clone, Copy, Debug)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     #[allow(unused)]
     enum PsramCacheSpeed {
         PsramCacheF80mS40m = 0,
@@ -220,6 +221,7 @@ pub(crate) mod utils {
     }
 
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     enum PsramClkMode {
         PsramClkModeNorm = 0, // Normal SPI mode
         PsramClkModeDclk = 1, // Two extra clock cycles after CS is set high level
