@@ -94,12 +94,12 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::Uart;
-//! use esp_hal::gpio::{AnyPin, Io};
+//! use esp_hal::gpio::Io;
 //!
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
-//! let rx = AnyPin::new_inverted(io.pins.gpio2);
-//! let tx = AnyPin::new_inverted(io.pins.gpio1);
+//! let rx = io.pins.gpio2.peripheral_input().inverted();
+//! let tx = io.pins.gpio1.into_peripheral_output().inverted();
 //! let mut uart1 = Uart::new(
 //!     peripherals.UART1,
 //!     rx,
@@ -112,7 +112,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{UartTx, UartRx};
-//! use esp_hal::gpio::{AnyPin, Io};
+//! use esp_hal::gpio::Io;
 //!
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!

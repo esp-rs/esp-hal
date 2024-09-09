@@ -11,7 +11,7 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp_hal::{
     delay::Delay,
-    gpio::{ErasedPin, Input, Io, Level, Output, Pin, Pull},
+    gpio::{AnyPin, Input, Io, Level, Output, Pin, Pull},
     macros::handler,
     timer::timg::TimerGroup,
     InterruptConfigurable,
@@ -22,8 +22,8 @@ static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
 static INPUT_PIN: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
 
 struct Context {
-    test_gpio1: ErasedPin,
-    test_gpio2: ErasedPin,
+    test_gpio1: AnyPin,
+    test_gpio2: AnyPin,
     delay: Delay,
 }
 
@@ -263,7 +263,7 @@ mod tests {
         assert_eq!(test_gpio2.is_set_low(), true);
     }
 
-    // Tests touch pin (GPIO2) as ErasedPin and Output
+    // Tests touch pin (GPIO2) as AnyPin and Output
     // https://github.com/esp-rs/esp-hal/issues/1943
     #[test]
     fn test_gpio_touch_anypin_output(ctx: Context) {
@@ -277,7 +277,7 @@ mod tests {
         assert_eq!(in_pin.is_high(), true);
     }
 
-    // Tests touch pin (GPIO2) as ErasedPin and Input
+    // Tests touch pin (GPIO2) as AnyPin and Input
     // https://github.com/esp-rs/esp-hal/issues/1943
     #[test]
     fn test_gpio_touch_anypin_input(ctx: Context) {

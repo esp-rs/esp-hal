@@ -21,7 +21,7 @@ use esp_backtrace as _;
 use esp_hal::{
     cpu_control::{CpuControl, Stack},
     get_core,
-    gpio::{ErasedPin, Io, Level, Output, Pin},
+    gpio::{AnyPin, Io, Level, Output, Pin},
     timer::{timg::TimerGroup, ErasedTimer},
 };
 use esp_hal_embassy::Executor;
@@ -34,7 +34,7 @@ static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 /// duration of time.
 #[embassy_executor::task]
 async fn control_led(
-    mut led: Output<'static, ErasedPin>,
+    mut led: Output<'static, AnyPin>,
     control: &'static Signal<CriticalSectionRawMutex, bool>,
 ) {
     println!("Starting control_led() on core {}", get_core() as usize);

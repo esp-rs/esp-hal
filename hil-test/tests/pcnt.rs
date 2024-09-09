@@ -7,7 +7,7 @@
 
 use esp_hal::{
     delay::Delay,
-    gpio::{ErasedPin, Io, Level, Output, Pin, Pull},
+    gpio::{AnyPin, Io, Level, Output, Pin, Pull},
     pcnt::{
         channel::{EdgeMode, PcntInputConfig, PcntSource},
         Pcnt,
@@ -17,8 +17,8 @@ use hil_test as _;
 
 struct Context<'d> {
     pcnt: Pcnt<'d>,
-    input: ErasedPin,
-    output: ErasedPin,
+    input: AnyPin,
+    output: AnyPin,
     delay: Delay,
 }
 

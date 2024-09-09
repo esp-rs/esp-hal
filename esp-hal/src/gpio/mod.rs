@@ -272,12 +272,12 @@ pub trait Pin: Sealed {
     /// GPIO number
     fn number(&self, _: private::Internal) -> u8;
 
-    /// Type-erase (degrade) this pin into an ErasedPin.
+    /// Type-erase (degrade) this pin into an AnyPin.
     ///
     /// This converts pin singletons (`GpioPin<0>`, …), which are all different
     /// types, into the same type. It is useful for creating arrays of pins,
     /// or avoiding generics.
-    fn degrade(self) -> ErasedPin
+    fn degrade(self) -> AnyPin
     where
         Self: Sized,
     {
@@ -285,7 +285,7 @@ pub trait Pin: Sealed {
     }
 
     #[doc(hidden)]
-    fn degrade_internal(&self, _: private::Internal) -> ErasedPin;
+    fn degrade_internal(&self, _: private::Internal) -> AnyPin;
 
     /// Enable/disable sleep-mode
     fn sleep_mode(&mut self, on: bool, _: private::Internal);
@@ -699,7 +699,7 @@ where
         GPIONUM
     }
 
-    fn degrade_internal(&self, _: private::Internal) -> ErasedPin {
+    fn degrade_internal(&self, _: private::Internal) -> AnyPin {
         self.degrade_pin(private::Internal)
     }
 
@@ -1027,7 +1027,7 @@ pub trait GpioProperties {
     type IsAnalog: BooleanType;
     type IsTouch: BooleanType;
 
-    fn degrade_pin(&self, _: private::Internal) -> ErasedPin;
+    fn degrade_pin(&self, _: private::Internal) -> AnyPin;
     fn output_signals() -> [Option<OutputSignal>; 6];
     fn input_signals() -> [Option<InputSignal>; 6];
 }
@@ -1104,8 +1104,8 @@ macro_rules! gpio {
                     type InterruptStatus = $crate::gpio::[< InterruptStatusRegisterAccessBank $bank >];
                     $crate::pin_types!($type);
 
-                    fn degrade_pin(&self, _: $crate::private::Internal) -> ErasedPin {
-                        ErasedPin($crate::gpio::ErasedPinInner::[< Gpio $gpionum >](unsafe { Self::steal() }))
+                    fn degrade_pin(&self, _: $crate::private::Internal) -> AnyPin {
+                        AnyPin($crate::gpio::AnyPinInner::[< Gpio $gpionum >](unsafe { Self::steal() }))
                     }
 
                     fn output_signals() -> [Option<OutputSignal>; 6]{
@@ -1143,29 +1143,29 @@ macro_rules! gpio {
                 )+
             }
 
-            pub(crate) enum ErasedPinInner {
+            pub(crate) enum AnyPinInner {
                 $(
                     [<Gpio $gpionum >](GpioPin<$gpionum>),
                 )+
             }
 
             /// Type-erased GPIO pin
-            pub struct ErasedPin(pub(crate) ErasedPinInner);
+            pub struct AnyPin(pub(crate) AnyPinInner);
 
-            impl ErasedPin {
+            impl AnyPin {
                 pub(crate) unsafe fn clone_unchecked(&self) -> Self {
                     match self.0 {
-                        $(ErasedPinInner::[<Gpio $gpionum >](_) => {
-                            Self(ErasedPinInner::[< Gpio $gpionum >](unsafe { GpioPin::steal() }))
+                        $(AnyPinInner::[<Gpio $gpionum >](_) => {
+                            Self(AnyPinInner::[< Gpio $gpionum >](unsafe { GpioPin::steal() }))
                         })+
                     }
                 }
             }
 
-            impl $crate::peripheral::Peripheral for ErasedPin {
-                type P = ErasedPin;
+            impl $crate::peripheral::Peripheral for AnyPin {
+                type P = AnyPin;
                 unsafe fn clone_unchecked(&mut self) ->  Self {
-                    ErasedPin::clone_unchecked(self)
+                    AnyPin::clone_unchecked(self)
                 }
             }
 
@@ -1177,7 +1177,7 @@ macro_rules! gpio {
                 ($this:expr, $inner:ident, $code:tt) => {
                     match $this {
                         $(
-                            ErasedPinInner::[<Gpio $gpionum >]($inner) => if_output_pin!($type, {
+                            AnyPinInner::[<Gpio $gpionum >]($inner) => if_output_pin!($type, {
                                 $code
                             } else {{
                                 let _ = $inner;
@@ -1194,7 +1194,7 @@ macro_rules! gpio {
                 ($this:expr, $inner:ident, $code:tt) => {
                     match $this {
                         $(
-                            ErasedPinInner::[<Gpio $gpionum >]($inner) => $code
+                            AnyPinInner::[<Gpio $gpionum >]($inner) => $code
                         )+
                     }
                 }
@@ -1284,7 +1284,7 @@ macro_rules! rtc_pins {
             ($this:expr, $inner:ident, $code:tt) => {
                 match $this {
                     $(
-                        paste::paste! { ErasedPinInner::[<Gpio $pin_num >]($inner) } => {
+                        paste::paste! { AnyPinInner::[<Gpio $pin_num >]($inner) } => {
                             $code
                         },
                     )+
@@ -1302,7 +1302,7 @@ macro_rules! rtc_pins {
                 match $this {
                     $(
                         $(
-                            paste::paste! { ErasedPinInner::[<Gpio $pin_num >]($inner) } => {
+                            paste::paste! { AnyPinInner::[<Gpio $pin_num >]($inner) } => {
                                 // FIXME: replace with $(ignore($rue)) once stable
                                 handle_rtcio_with_resistors!(@ignore $rue, $rde);
                                 $code
@@ -1374,7 +1374,7 @@ macro_rules! rtc_pins {
             ($this:expr, $inner:ident, $code:tt) => {
                 match $this {
                     $(
-                        paste::paste! { ErasedPinInner::[<Gpio $pin_num >]($inner) } => {
+                        paste::paste! { AnyPinInner::[<Gpio $pin_num >]($inner) } => {
                             $code
                         },
                     )+
@@ -1604,7 +1604,7 @@ macro_rules! touch {
 }
 
 /// GPIO output driver.
-pub struct Output<'d, P = ErasedPin> {
+pub struct Output<'d, P = AnyPin> {
     pin: Flex<'d, P>,
 }
 
@@ -1704,7 +1704,7 @@ where
 }
 
 /// GPIO input driver.
-pub struct Input<'d, P = ErasedPin> {
+pub struct Input<'d, P = AnyPin> {
     pin: Flex<'d, P>,
 }
 
@@ -1805,7 +1805,7 @@ where
 }
 
 /// GPIO open-drain output driver.
-pub struct OutputOpenDrain<'d, P = ErasedPin> {
+pub struct OutputOpenDrain<'d, P = AnyPin> {
     pin: Flex<'d, P>,
 }
 
@@ -1940,7 +1940,7 @@ where
 }
 
 /// Flexible pin driver.
-pub struct Flex<'d, P = ErasedPin> {
+pub struct Flex<'d, P = AnyPin> {
     pin: PeripheralRef<'d, P>,
 }
 
@@ -2125,12 +2125,12 @@ where
 pub(crate) mod internal {
     use super::*;
 
-    impl private::Sealed for ErasedPin {}
+    impl private::Sealed for AnyPin {}
 
-    impl ErasedPin {
+    impl AnyPin {
         /// Turns the pin object into a peripheral output.
         #[inline]
-        pub fn peripheral_input(self) -> interconnect::InputSignal {
+        pub fn peripheral_input(&self) -> interconnect::InputSignal {
             handle_gpio_input!(&self.0, target, { target.peripheral_input() })
         }
 
@@ -2141,12 +2141,12 @@ pub(crate) mod internal {
         }
     }
 
-    impl Pin for ErasedPin {
+    impl Pin for AnyPin {
         fn number(&self, _: private::Internal) -> u8 {
             handle_gpio_input!(&self.0, target, { Pin::number(target, private::Internal) })
         }
 
-        fn degrade_internal(&self, _: private::Internal) -> ErasedPin {
+        fn degrade_internal(&self, _: private::Internal) -> AnyPin {
             unsafe { self.clone_unchecked() }
         }
 
@@ -2163,7 +2163,7 @@ pub(crate) mod internal {
         }
     }
 
-    impl PeripheralInputPin for ErasedPin {
+    impl PeripheralInputPin for AnyPin {
         fn init_input(&self, pull_down: bool, pull_up: bool, _: private::Internal) {
             handle_gpio_input!(&self.0, target, {
                 PeripheralInputPin::init_input(target, pull_down, pull_up, private::Internal)
@@ -2211,7 +2211,7 @@ pub(crate) mod internal {
         }
     }
 
-    impl InputPin for ErasedPin {
+    impl InputPin for AnyPin {
         fn listen_with_options(
             &mut self,
             event: Event,
@@ -2257,7 +2257,7 @@ pub(crate) mod internal {
         }
     }
 
-    impl PeripheralOutputPin for ErasedPin {
+    impl PeripheralOutputPin for AnyPin {
         fn set_to_open_drain_output(&mut self, _: private::Internal) {
             handle_gpio_output!(&mut self.0, target, {
                 PeripheralOutputPin::set_to_open_drain_output(target, private::Internal)
@@ -2357,10 +2357,10 @@ pub(crate) mod internal {
         }
     }
 
-    impl OutputPin for ErasedPin {}
+    impl OutputPin for AnyPin {}
 
     #[cfg(any(xtensa, esp32c2, esp32c3, esp32c6))]
-    impl RtcPin for ErasedPin {
+    impl RtcPin for AnyPin {
         #[cfg(xtensa)]
         #[allow(unused_braces)] // False positive :/
         fn rtc_number(&self) -> u8 {
@@ -2389,7 +2389,7 @@ pub(crate) mod internal {
     }
 
     #[cfg(any(esp32c2, esp32c3, esp32c6, xtensa))]
-    impl RtcPinWithResistors for ErasedPin {
+    impl RtcPinWithResistors for AnyPin {
         fn rtcio_pullup(&mut self, enable: bool) {
             handle_rtcio_with_resistors!(&mut self.0, target, {
                 RtcPinWithResistors::rtcio_pullup(target, enable)

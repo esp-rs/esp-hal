@@ -43,6 +43,7 @@ use crate::{
     gpio::InputSignal,
     peripheral::{Peripheral, PeripheralRef},
     peripherals,
+    private::Internal,
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
 };
 
@@ -101,10 +102,12 @@ impl<'d> Usb<'d> {
                     .modify(|_, w| w.sw_hw_usb_phy_sel().set_bit().sw_usb_phy_sel().set_bit());
             }
 
-            crate::gpio::connect_high_to_peripheral(InputSignal::USB_OTG_IDDIG); // connected connector is mini-B side
-            crate::gpio::connect_high_to_peripheral(InputSignal::USB_SRP_BVALID); // HIGH to force USB device mode
-            crate::gpio::connect_high_to_peripheral(InputSignal::USB_OTG_VBUSVALID); // receiving a valid Vbus from device
-            crate::gpio::connect_low_to_peripheral(InputSignal::USB_OTG_AVALID);
+            use crate::gpio::{Level, PeripheralInputPin};
+
+            Level::High.connect_input_to_peripheral(InputSignal::USB_OTG_IDDIG, Internal); // connected connector is mini-B side
+            Level::High.connect_input_to_peripheral(InputSignal::USB_SRP_BVALID, Internal); // HIGH to force USB device mode
+            Level::High.connect_input_to_peripheral(InputSignal::USB_OTG_VBUSVALID, Internal); // receiving a valid Vbus from device
+            Level::Low.connect_input_to_peripheral(InputSignal::USB_OTG_AVALID, Internal);
         }
     }
 

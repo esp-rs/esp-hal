@@ -10,7 +10,7 @@
 use esp_hal::{
     dma::{Channel, Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{ErasedPin, Io, Level, Output},
+    gpio::{AnyPin, Io, Level, Output},
     prelude::*,
     spi::{
         master::{Address, Command, Spi, SpiDma},
@@ -36,7 +36,7 @@ cfg_if::cfg_if! {
 struct Context {
     spi: esp_hal::peripherals::SPI2,
     dma_channel: Channel<'static, DmaChannel0, Blocking>,
-    mosi: ErasedPin,
+    mosi: AnyPin,
     mosi_mirror: Output<'static>,
 }
 

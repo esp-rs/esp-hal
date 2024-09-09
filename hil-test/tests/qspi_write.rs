@@ -8,7 +8,7 @@
 use esp_hal::{
     dma::{Channel, Dma, DmaPriority, DmaTxBuf},
     dma_buffers,
-    gpio::{ErasedPin, Io, Pull},
+    gpio::{AnyPin, Io, Pull},
     pcnt::{
         channel::{EdgeMode, PcntInputConfig, PcntSource},
         unit::Unit,
@@ -41,7 +41,7 @@ struct Context {
     pcnt_source: PcntSource,
     pcnt: esp_hal::peripherals::PCNT,
     dma_channel: Channel<'static, DmaChannel0, Blocking>,
-    mosi: ErasedPin,
+    mosi: AnyPin,
 }
 
 fn execute(

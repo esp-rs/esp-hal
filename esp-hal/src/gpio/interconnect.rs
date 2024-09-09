@@ -4,9 +4,10 @@ use crate::{
     gpio::{
         self,
         AlternateFunction,
+        AnyPin,
         DummyPin,
-        ErasedPin,
         GpioPin,
+        GpioProperties,
         InputPin,
         Level,
         OutputSignalType,
@@ -25,7 +26,7 @@ use crate::{
 
 /// Multiple input signal can be connected to one pin.
 pub struct InputSignal {
-    pin: ErasedPin,
+    pin: AnyPin,
     is_inverted: bool,
 }
 
@@ -49,7 +50,7 @@ impl Peripheral for InputSignal {
 impl Sealed for InputSignal {}
 
 impl InputSignal {
-    pub(crate) fn new(pin: ErasedPin) -> Self {
+    pub(crate) fn new(pin: AnyPin) -> Self {
         Self {
             pin,
             is_inverted: false,
@@ -59,6 +60,12 @@ impl InputSignal {
     /// Inverts the peripheral's input signal.
     pub fn invert(&mut self) {
         self.is_inverted = !self.is_inverted;
+    }
+
+    /// Inverts the peripheral's input signal.
+    pub fn inverted(mut self) -> Self {
+        self.invert();
+        self
     }
 
     fn connect(&self, signal: usize, invert: bool, input: u8) {
@@ -147,7 +154,7 @@ impl PeripheralInputPin for InputSignal {
 
 /// Multiple pins can be connected to one output signal.
 pub struct OutputSignal {
-    pin: ErasedPin,
+    pin: AnyPin,
     is_inverted: bool,
 }
 
@@ -165,7 +172,7 @@ impl Peripheral for OutputSignal {
 impl Sealed for OutputSignal {}
 
 impl OutputSignal {
-    pub(crate) fn new(pin: ErasedPin) -> Self {
+    pub(crate) fn new(pin: AnyPin) -> Self {
         Self {
             is_inverted: false,
             pin,
@@ -175,6 +182,12 @@ impl OutputSignal {
     /// Inverts the peripheral's output signal.
     pub fn invert(&mut self) {
         self.is_inverted = !self.is_inverted;
+    }
+
+    /// Inverts the peripheral's input signal.
+    pub fn inverted(mut self) -> Self {
+        self.invert();
+        self
     }
 
     fn connect(
@@ -329,15 +342,15 @@ impl From<DummyPin> for AnyInputSignal {
     }
 }
 
-impl From<ErasedPin> for AnyInputSignal {
-    fn from(input: ErasedPin) -> Self {
+impl From<AnyPin> for AnyInputSignal {
+    fn from(input: AnyPin) -> Self {
         Self(AnyInputSignalInner::Input(input.peripheral_input()))
     }
 }
 
 impl<const GPIONUM: u8> From<GpioPin<GPIONUM>> for AnyInputSignal
 where
-    GpioPin<GPIONUM>: InputPin,
+    GpioPin<GPIONUM>: InputPin + GpioProperties,
 {
     fn from(pin: GpioPin<GPIONUM>) -> Self {
         Self(AnyInputSignalInner::Input(pin.peripheral_input()))
