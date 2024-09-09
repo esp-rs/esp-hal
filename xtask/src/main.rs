@@ -652,11 +652,12 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 }
 
                 Package::EspWifi => {
-                    let mut features = format!("--features={chip},async,ps-min-modem,defmt");
+                    let mut features = format!(
+                        "--features={chip},async,ps-min-modem,defmt,dump-packets,wifi-logs"
+                    );
 
                     if device.contains("wifi") {
-                        features
-                            .push_str(",wifi-default,esp-now,embedded-svc,embassy-net,dump-packets")
+                        features.push_str(",wifi-default,esp-now,embedded-svc,embassy-net,sniffer")
                     }
                     if device.contains("bt") {
                         features.push_str(",ble")
