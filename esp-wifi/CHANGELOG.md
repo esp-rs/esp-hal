@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - esp-wifi now allocates memory from the global allocator provided by `esp-alloc` (#2099)
 
 ### Fixed
+- Feature `wifi-logs` doesn't break the build anymore (#2117)
 
 ### Removed
 
