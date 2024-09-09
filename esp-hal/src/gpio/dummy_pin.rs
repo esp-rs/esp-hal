@@ -44,11 +44,18 @@ impl PeripheralInputPin for DummyPin {
     }
 
     fn connect_input_to_peripheral(&mut self, signal: InputSignal, _: private::Internal) {
-        if self.value {
-            connect_high_to_peripheral(signal);
-        } else {
-            connect_low_to_peripheral(signal);
-        }
+        let value = if self.value { ONE_INPUT } else { ZERO_INPUT };
+
+        unsafe { &*GPIO::PTR }
+            .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
+            .modify(|_, w| unsafe {
+                w.sel()
+                    .set_bit()
+                    .in_inv_sel()
+                    .bit(false)
+                    .in_sel()
+                    .bits(value)
+            });
     }
 
     fn disconnect_input_from_peripheral(&mut self, _signal: InputSignal, _: private::Internal) {}

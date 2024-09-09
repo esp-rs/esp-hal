@@ -602,34 +602,6 @@ impl BankGpioRegisterAccess for Bank1GpioRegisterAccess {
     }
 }
 
-/// Connect an always-low signal to the peripheral input signal
-pub fn connect_low_to_peripheral(signal: InputSignal) {
-    unsafe { &*GPIO::PTR }
-        .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
-        .modify(|_, w| unsafe {
-            w.sel()
-                .set_bit()
-                .in_inv_sel()
-                .bit(false)
-                .in_sel()
-                .bits(ZERO_INPUT)
-        });
-}
-
-/// Connect an always-high signal to the peripheral input signal
-pub fn connect_high_to_peripheral(signal: InputSignal) {
-    unsafe { &*GPIO::PTR }
-        .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
-        .modify(|_, w| unsafe {
-            w.sel()
-                .set_bit()
-                .in_inv_sel()
-                .bit(false)
-                .in_sel()
-                .bits(ONE_INPUT)
-        });
-}
-
 #[doc(hidden)]
 pub trait BooleanType {}
 
