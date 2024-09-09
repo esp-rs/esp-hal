@@ -29,7 +29,7 @@ runs:
     # Clippy and docs checks
     - name: Clippy
       shell: bash
-      run: DEFMT_LOG=trace cargo $LINTING_TOOLCHAIN xtask lint-packages --chips ${{ inputs.device }}
+      run: cargo $LINTING_TOOLCHAIN xtask lint-packages --chips ${{ inputs.device }}
     - name: Check doc-tests
       shell: bash
       run: cargo $LINTING_TOOLCHAIN xtask run-doc-test esp-hal ${{ inputs.device }}
