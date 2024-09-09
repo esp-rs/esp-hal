@@ -250,7 +250,7 @@ impl PeripheralOutputPin for OutputSignal {
             clipped_signal,
             self.is_inverted,
             false,
-            true,
+            false,
             self.pin.number(private::Internal),
         );
     }
