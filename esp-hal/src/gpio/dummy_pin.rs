@@ -1,4 +1,5 @@
-//! "Dummy" pins".
+//! Placeholder pins.
+//!
 //! These are useful to pass them into peripheral drivers where you don't want
 //! an actual pin but one is required.
 
@@ -26,20 +27,6 @@ impl crate::peripheral::Peripheral for DummyPin {
 }
 
 impl private::Sealed for DummyPin {}
-
-impl Pin for DummyPin {
-    fn number(&self, _: private::Internal) -> u8 {
-        panic!("DummyPin not supported here!");
-    }
-
-    fn degrade_internal(&self, _: private::Internal) -> ErasedPin {
-        panic!("Can not type erase the DummyPin!");
-    }
-
-    fn sleep_mode(&mut self, _on: bool, _: private::Internal) {}
-
-    fn set_alternate_function(&mut self, _alternate: AlternateFunction, _: private::Internal) {}
-}
 
 impl PeripheralInputPin for DummyPin {
     fn input_signals(&self, _: private::Internal) -> [Option<InputSignal>; 6] {
@@ -121,8 +108,6 @@ impl PeripheralOutputPin for DummyPin {
 
     fn disconnect_from_peripheral_output(&mut self, _signal: OutputSignal, _: private::Internal) {}
 }
-
-impl OutputPin for DummyPin {}
 
 impl embedded_hal_02::digital::v2::OutputPin for DummyPin {
     type Error = core::convert::Infallible;
