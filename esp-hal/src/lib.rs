@@ -314,6 +314,7 @@ pub(crate) mod private {
     }
 }
 
+#[doc(hidden)]
 pub use private::Internal;
 
 /// Marker trait for types that can be safely used in `#[ram(persistent)]`.
