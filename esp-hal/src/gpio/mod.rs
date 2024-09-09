@@ -2195,19 +2195,13 @@ pub(crate) mod internal {
         }
 
         fn connect_input_to_peripheral(&mut self, signal: InputSignal, _: private::Internal) {
-            handle_gpio_input!(&mut self.0, target, {
-                PeripheralInputPin::connect_input_to_peripheral(target, signal, private::Internal)
-            })
+            interconnect::InputSignal::new(self.degrade_internal(private::Internal))
+                .connect_input_to_peripheral(signal, private::Internal);
         }
 
         fn disconnect_input_from_peripheral(&mut self, signal: InputSignal, _: private::Internal) {
-            handle_gpio_input!(&mut self.0, target, {
-                PeripheralInputPin::disconnect_input_from_peripheral(
-                    target,
-                    signal,
-                    private::Internal,
-                )
-            })
+            interconnect::InputSignal::new(self.degrade_internal(private::Internal))
+                .disconnect_input_from_peripheral(signal, private::Internal);
         }
     }
 
@@ -2337,9 +2331,8 @@ pub(crate) mod internal {
         }
 
         fn connect_peripheral_to_output(&mut self, signal: OutputSignal, _: private::Internal) {
-            handle_gpio_output!(&mut self.0, target, {
-                PeripheralOutputPin::connect_peripheral_to_output(target, signal, private::Internal)
-            })
+            interconnect::OutputSignal::new(self.degrade_internal(private::Internal))
+                .connect_peripheral_to_output(signal, private::Internal);
         }
 
         fn disconnect_from_peripheral_output(
@@ -2347,13 +2340,8 @@ pub(crate) mod internal {
             signal: OutputSignal,
             _: private::Internal,
         ) {
-            handle_gpio_output!(&mut self.0, target, {
-                PeripheralOutputPin::disconnect_from_peripheral_output(
-                    target,
-                    signal,
-                    private::Internal,
-                )
-            })
+            interconnect::OutputSignal::new(self.degrade_internal(private::Internal))
+                .disconnect_from_peripheral_output(signal, private::Internal);
         }
     }
 
