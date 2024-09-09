@@ -73,7 +73,7 @@ use core::marker::PhantomData;
 use super::{Error, FullDuplexMode, SpiMode};
 use crate::{
     dma::{DescriptorChain, DmaPeripheral, Rx, Tx},
-    gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
+    gpio::{InputSignal, OutputSignal, PeripheralInputPin, PeripheralOutputPin},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
     private,
@@ -106,17 +106,23 @@ where
     T: Instance,
 {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new<SCK: InputPin, MOSI: InputPin, MISO: OutputPin, CS: InputPin>(
+    pub fn new<
+        SCK: PeripheralInputPin,
+        MOSI: PeripheralInputPin,
+        MISO: PeripheralOutputPin,
+        CS: PeripheralInputPin,
+    >(
         spi: impl Peripheral<P = T> + 'd,
-        sck: impl Peripheral<P = SCK> + 'd,
+        sclk: impl Peripheral<P = SCK> + 'd,
         mosi: impl Peripheral<P = MOSI> + 'd,
         miso: impl Peripheral<P = MISO> + 'd,
         cs: impl Peripheral<P = CS> + 'd,
         mode: SpiMode,
     ) -> Spi<'d, T, FullDuplexMode> {
-        crate::into_ref!(spi, sck, mosi, miso, cs);
-        sck.init_input(false, false, private::Internal);
-        sck.connect_input_to_peripheral(spi.sclk_signal(), private::Internal);
+        crate::into_ref!(spi, sclk, mosi, miso, cs);
+
+        sclk.init_input(false, false, private::Internal);
+        sclk.connect_input_to_peripheral(spi.sclk_signal(), private::Internal);
 
         mosi.init_input(false, false, private::Internal);
         mosi.connect_input_to_peripheral(spi.mosi_signal(), private::Internal);
@@ -148,7 +154,7 @@ where
     }
 }
 
-/// DMA (Direct Memory Access) funtionality (Slave).
+/// DMA (Direct Memory Access) functionality (Slave).
 pub mod dma {
     use super::*;
     #[cfg(spi3)]

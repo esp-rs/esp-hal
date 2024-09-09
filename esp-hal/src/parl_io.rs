@@ -49,7 +49,7 @@ use crate::{
         TxPrivate,
         WriteBuffer,
     },
-    gpio::{InputPin, OutputPin},
+    gpio::{PeripheralInputPin, PeripheralOutputPin},
     interrupt::InterruptHandler,
     peripheral::{self, Peripheral},
     peripherals,
@@ -279,13 +279,13 @@ pub fn no_clk_pin() -> &'static mut NoClkPin {
 /// Wraps a GPIO pin which will be used as the clock output signal
 pub struct ClkOutPin<'d, P>
 where
-    P: OutputPin,
+    P: PeripheralOutputPin,
 {
     pin: PeripheralRef<'d, P>,
 }
 impl<'d, P> ClkOutPin<'d, P>
 where
-    P: OutputPin,
+    P: PeripheralOutputPin,
 {
     /// Create a ClkOutPin
     pub fn new(pin: impl Peripheral<P = P> + 'd) -> Self {
@@ -295,7 +295,7 @@ where
 }
 impl<'d, P> TxClkPin for ClkOutPin<'d, P>
 where
-    P: OutputPin,
+    P: PeripheralOutputPin,
 {
     fn configure(&mut self) {
         self.pin.set_to_push_pull_output(crate::private::Internal);
@@ -309,13 +309,13 @@ where
 /// Wraps a GPIO pin which will be used as the TX clock input signal
 pub struct ClkInPin<'d, P>
 where
-    P: InputPin,
+    P: PeripheralInputPin,
 {
     pin: PeripheralRef<'d, P>,
 }
 impl<'d, P> ClkInPin<'d, P>
 where
-    P: InputPin,
+    P: PeripheralInputPin,
 {
     /// Create a new ClkInPin
     pub fn new(pin: impl Peripheral<P = P> + 'd) -> Self {
@@ -325,7 +325,7 @@ where
 }
 impl<'d, P> TxClkPin for ClkInPin<'d, P>
 where
-    P: InputPin,
+    P: PeripheralInputPin,
 {
     fn configure(&mut self) {
         let pcr = unsafe { &*crate::peripherals::PCR::PTR };
@@ -343,14 +343,14 @@ where
 /// Wraps a GPIO pin which will be used as the RX clock input signal
 pub struct RxClkInPin<'d, P>
 where
-    P: InputPin,
+    P: PeripheralInputPin,
 {
     pin: PeripheralRef<'d, P>,
     sample_edge: SampleEdge,
 }
 impl<'d, P> RxClkInPin<'d, P>
 where
-    P: InputPin,
+    P: PeripheralInputPin,
 {
     /// Create a new RxClkInPin
     pub fn new(pin: impl Peripheral<P = P> + 'd, sample_edge: SampleEdge) -> Self {
@@ -360,7 +360,7 @@ where
 }
 impl<'d, P> RxClkPin for RxClkInPin<'d, P>
 where
-    P: InputPin,
+    P: PeripheralInputPin,
 {
     fn configure(&mut self) {
         let pcr = unsafe { &*crate::peripherals::PCR::PTR };
@@ -381,7 +381,7 @@ where
 pub struct TxPinConfigWithValidPin<'d, P, VP>
 where
     P: NotContainsValidSignalPin + TxPins + ConfigurePins,
-    VP: OutputPin,
+    VP: PeripheralOutputPin,
 {
     tx_pins: P,
     valid_pin: PeripheralRef<'d, VP>,
@@ -390,7 +390,7 @@ where
 impl<'d, P, VP> TxPinConfigWithValidPin<'d, P, VP>
 where
     P: NotContainsValidSignalPin + TxPins + ConfigurePins,
-    VP: OutputPin,
+    VP: PeripheralOutputPin,
 {
     /// Create a [TxPinConfigWithValidPin]
     pub fn new(tx_pins: P, valid_pin: impl Peripheral<P = VP> + 'd) -> Self {
@@ -402,14 +402,14 @@ where
 impl<'d, P, VP> TxPins for TxPinConfigWithValidPin<'d, P, VP>
 where
     P: NotContainsValidSignalPin + TxPins + ConfigurePins,
-    VP: OutputPin,
+    VP: PeripheralOutputPin,
 {
 }
 
 impl<'d, P, VP> ConfigurePins for TxPinConfigWithValidPin<'d, P, VP>
 where
     P: NotContainsValidSignalPin + TxPins + ConfigurePins,
-    VP: OutputPin,
+    VP: PeripheralOutputPin,
 {
     fn configure(&mut self) -> Result<(), Error> {
         self.tx_pins.configure()?;
@@ -472,7 +472,7 @@ macro_rules! tx_pins {
 
             impl<'d, $($pin),+> $name<'d, $($pin),+>
             where
-                $($pin: OutputPin),+
+                $($pin: PeripheralOutputPin),+
             {
                 /// Create a new TX pin
                 #[allow(clippy::too_many_arguments)]
@@ -488,7 +488,7 @@ macro_rules! tx_pins {
 
             impl<'d, $($pin),+> ConfigurePins for $name<'d, $($pin),+>
             where
-                $($pin: OutputPin),+
+                $($pin: PeripheralOutputPin),+
             {
                 fn configure(&mut self) -> Result<(), Error>{
                     $(
@@ -590,7 +590,7 @@ impl<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
 pub struct RxPinConfigWithValidPin<'d, P, VP>
 where
     P: NotContainsValidSignalPin + RxPins + ConfigurePins,
-    VP: InputPin,
+    VP: PeripheralInputPin,
 {
     rx_pins: P,
     valid_pin: PeripheralRef<'d, VP>,
@@ -601,7 +601,7 @@ where
 impl<'d, P, VP> RxPinConfigWithValidPin<'d, P, VP>
 where
     P: NotContainsValidSignalPin + RxPins + ConfigurePins,
-    VP: InputPin,
+    VP: PeripheralInputPin,
 {
     /// Create a new [RxPinConfigWithValidPin]
     pub fn new(
@@ -623,14 +623,14 @@ where
 impl<'d, P, VP> RxPins for RxPinConfigWithValidPin<'d, P, VP>
 where
     P: NotContainsValidSignalPin + RxPins + ConfigurePins,
-    VP: InputPin,
+    VP: PeripheralInputPin,
 {
 }
 
 impl<'d, P, VP> ConfigurePins for RxPinConfigWithValidPin<'d, P, VP>
 where
     P: NotContainsValidSignalPin + RxPins + ConfigurePins,
-    VP: InputPin,
+    VP: PeripheralInputPin,
 {
     fn configure(&mut self) -> Result<(), Error> {
         self.rx_pins.configure()?;
@@ -719,7 +719,7 @@ macro_rules! rx_pins {
 
             impl<'d, $($pin),+> $name<'d, $($pin),+>
             where
-                $($pin: InputPin),+
+                $($pin: PeripheralInputPin),+
             {
                 /// Create a new RX pin
                 #[allow(clippy::too_many_arguments)]
@@ -735,12 +735,12 @@ macro_rules! rx_pins {
 
             impl<'d, $($pin),+> ConfigurePins for $name<'d, $($pin),+>
             where
-                $($pin: InputPin),+
+                $($pin: PeripheralInputPin),+
             {
                 fn configure(&mut self)  -> Result<(), Error> {
                     $(
                         self.[< pin_ $pin:lower >].init_input(false, false, $crate::private::Internal);
-                        self.[< pin_ $pin:lower >].connect_input_to_peripheral(crate::gpio::InputSignal::$signal, $crate::private::Internal);
+                        self.[< pin_ $pin:lower >].connect_input_to_peripheral(crate::gpio::InputSignal::$signal, crate::private::Internal);
                     )+
 
                     private::Instance::set_rx_bit_width( private::WidSel::[< Bits $width >]);

@@ -5,7 +5,7 @@
 use super::*;
 
 /// DummyPin, not useful everywhere as it panics if number() is called
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct DummyPin {
     value: bool,
 }
@@ -39,39 +39,52 @@ impl Pin for DummyPin {
     fn sleep_mode(&mut self, _on: bool, _: private::Internal) {}
 
     fn set_alternate_function(&mut self, _alternate: AlternateFunction, _: private::Internal) {}
+}
 
-    fn is_listening(&self, _: private::Internal) -> bool {
-        false
-    }
-
-    fn listen_with_options(
-        &mut self,
-        _event: Event,
-        _int_enable: bool,
-        _nmi_enable: bool,
-        _wake_up_from_light_sleep: bool,
-        _: private::Internal,
-    ) {
-    }
-
-    fn unlisten(&mut self, _: private::Internal) {}
-
-    fn is_interrupt_set(&self, _: private::Internal) -> bool {
-        false
-    }
-
-    fn clear_interrupt(&mut self, _: private::Internal) {}
-
+impl PeripheralInputPin for DummyPin {
     fn input_signals(&self, _: private::Internal) -> [Option<InputSignal>; 6] {
         [None; 6]
     }
 
-    fn output_signals(&self, _: private::Internal) -> [Option<OutputSignal>; 6] {
-        [None; 6]
+    fn init_input(&self, _pull_down: bool, _pull_up: bool, _: private::Internal) {}
+
+    fn enable_input(&mut self, _on: bool, _: private::Internal) {}
+
+    fn enable_input_in_sleep_mode(&mut self, _on: bool, _: private::Internal) {}
+
+    fn is_input_high(&self, _: private::Internal) -> bool {
+        self.value
+    }
+
+    fn connect_input_to_peripheral(&mut self, signal: InputSignal, _: private::Internal) {
+        if self.value {
+            connect_high_to_peripheral(signal);
+        } else {
+            connect_low_to_peripheral(signal);
+        }
+    }
+
+    fn disconnect_input_from_peripheral(&mut self, _signal: InputSignal, _: private::Internal) {}
+}
+
+impl PeripheralInputPin for Level {
+    delegate::delegate! {
+        to match self {
+            Level::High => DummyPin { value: true },
+            Level::Low => DummyPin { value: false },
+        }  {
+            fn input_signals(&self, _internal: private::Internal) -> [Option<InputSignal>; 6];
+            fn init_input(&self, _pd: bool, _pu: bool, _internal: private::Internal);
+            fn enable_input(&mut self, _on: bool, _internal: private::Internal);
+            fn enable_input_in_sleep_mode(&mut self, _on: bool, _internal: private::Internal);
+            fn is_input_high(&self, _internal: private::Internal) -> bool;
+            fn connect_input_to_peripheral(&mut self, _signal: InputSignal, _internal: private::Internal);
+            fn disconnect_input_from_peripheral(&mut self, _signal: InputSignal, _internal: private::Internal);
+        }
     }
 }
 
-impl OutputPin for DummyPin {
+impl PeripheralOutputPin for DummyPin {
     fn set_to_open_drain_output(&mut self, _: private::Internal) {}
 
     fn set_to_push_pull_output(&mut self, _: private::Internal) {}
@@ -96,50 +109,20 @@ impl OutputPin for DummyPin {
 
     fn internal_pull_down(&mut self, _on: bool, _: private::Internal) {}
 
-    fn connect_peripheral_to_output(&mut self, _signal: OutputSignal, _: private::Internal) {}
-
-    fn connect_peripheral_to_output_with_options(
-        &mut self,
-        _signal: OutputSignal,
-        _invert: bool,
-        _invert_enable: bool,
-        _enable_from_gpio: bool,
-        _force_via_gpio_mux: bool,
-        _: private::Internal,
-    ) {
-    }
-
-    fn disconnect_peripheral_from_output(&mut self, _: private::Internal) {}
-
     fn is_set_high(&self, _: private::Internal) -> bool {
         self.value
     }
-}
 
-impl InputPin for DummyPin {
-    fn init_input(&self, _pull_down: bool, _pull_up: bool, _: private::Internal) {}
-
-    fn enable_input(&mut self, _on: bool, _: private::Internal) {}
-
-    fn enable_input_in_sleep_mode(&mut self, _on: bool, _: private::Internal) {}
-
-    fn is_input_high(&self, _: private::Internal) -> bool {
-        self.value
+    fn output_signals(&self, _: private::Internal) -> [Option<OutputSignal>; 6] {
+        [None; 6]
     }
 
-    fn connect_input_to_peripheral(&mut self, _signal: InputSignal, _: private::Internal) {}
+    fn connect_peripheral_to_output(&mut self, _signal: OutputSignal, _: private::Internal) {}
 
-    fn connect_input_to_peripheral_with_options(
-        &mut self,
-        _signal: InputSignal,
-        _invert: bool,
-        _force_via_gpio_mux: bool,
-        _: private::Internal,
-    ) {
-    }
-
-    fn disconnect_input_from_peripheral(&mut self, _signal: InputSignal, _: private::Internal) {}
+    fn disconnect_from_peripheral_output(&mut self, _signal: OutputSignal, _: private::Internal) {}
 }
+
+impl OutputPin for DummyPin {}
 
 impl embedded_hal_02::digital::v2::OutputPin for DummyPin {
     type Error = core::convert::Infallible;
@@ -155,10 +138,10 @@ impl embedded_hal_02::digital::v2::OutputPin for DummyPin {
 }
 impl embedded_hal_02::digital::v2::StatefulOutputPin for DummyPin {
     fn is_set_high(&self) -> Result<bool, Self::Error> {
-        Ok(OutputPin::is_set_high(self, private::Internal))
+        Ok(PeripheralOutputPin::is_set_high(self, private::Internal))
     }
     fn is_set_low(&self) -> Result<bool, Self::Error> {
-        Ok(!OutputPin::is_set_high(self, private::Internal))
+        Ok(!PeripheralOutputPin::is_set_high(self, private::Internal))
     }
 }
 
@@ -180,10 +163,10 @@ impl embedded_hal::digital::OutputPin for DummyPin {
 
 impl embedded_hal::digital::StatefulOutputPin for DummyPin {
     fn is_set_high(&mut self) -> Result<bool, Self::Error> {
-        Ok(OutputPin::is_set_high(self, private::Internal))
+        Ok(PeripheralOutputPin::is_set_high(self, private::Internal))
     }
 
     fn is_set_low(&mut self) -> Result<bool, Self::Error> {
-        Ok(!OutputPin::is_set_high(self, private::Internal))
+        Ok(!PeripheralOutputPin::is_set_high(self, private::Internal))
     }
 }
