@@ -63,11 +63,11 @@ You now need to have a global allocator provided by `esp-alloc` providing alloca
 
 The size of the heap depends on what you are going to use esp-wifi for and if you are using the heap for your own allocations or not.
 
-e.g. when using `coex` you need around 92k, if not using `coex` going lower than 72k you will observe some failed allocations but it might still work - going even lower will make things fail
+E.g. when using `coex` you need around 92k. If not using `coex`, going lower than 72k you will observe some failed allocations but it might still work. Going even lower will make things fail.
 
 ### Using your own allocator
 
-You can also use your own allocator instead of using `esp-alloc`. To do that you need to opt-out of the default feature `esp-alloc` and provide two functions
+You can also use your own allocator instead of using `esp-alloc`. To do that you need to opt-out of the default feature `esp-alloc` and provide two functions:
 
 ```rust
 #[no_mangle]
@@ -75,8 +75,6 @@ pub extern "C" fn esp_wifi_free_internal_heap() -> usize {
     // return size of free allocatable RAM
 }
 
-#[cfg(feature = "esp-alloc")]
-#[doc(hidden)]
 #[no_mangle]
 pub extern "C" fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8 {
     // allocate memory of size `size` from internal memory
