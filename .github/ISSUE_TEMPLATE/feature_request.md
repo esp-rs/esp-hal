@@ -9,11 +9,7 @@ assignees: ''
 
 ## Motivations
 
-<!--
-If your feature request is related to a problem, please describe it.
--->
-
-- Would you like to implement this feature? [y/n]
+<!-- If your feature request is related to a problem, please describe it. -->
 
 ## Solution
 

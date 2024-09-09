@@ -11,15 +11,13 @@ assignees: ''
 
 <!-- A clear and concise description of what the bug is. -->
 
-- Would you like to work on a fix? [y/n]
-
 ## To Reproduce
 
 <!-- Steps to reproduce the behavior. -->
 1. ...
 2. ...
 
-<!-- Feel free to share the project where the bug can be reproduced. -->
+<!-- Please share the minimal repro of the issue where the bug can be reproduced. -->
 
 <!-- Make sure you are able to reproduce the bug in the `main` branch, too. -->
 
