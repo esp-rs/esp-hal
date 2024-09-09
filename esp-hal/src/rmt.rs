@@ -260,28 +260,28 @@ where
             return Err(Error::UnreachableTargetFrequency);
         }
 
+        // Calculate the greatest common divisor of a and b
+        fn gcd(mut a: u32, mut b: u32) -> u32 {
+            while b != 0 {
+                (a, b) = (b, (a % b))
+            }
+            a
+        }
+
         let mut div_a = 0;
         let mut div_b = 0;
         let remainder = src_clock.raw() % frequency.raw();
         if remainder > 0 {
-            let gcd = Self::gcd(frequency.raw(), remainder);
+            let gcd = gcd(frequency.raw(), remainder);
             let numerator = remainder / gcd;
             let denominator = frequency.raw() / gcd;
-            if numerator < (1<<5) && denominator < (1<<5) {
+            if numerator < (1 << 5) && denominator < (1 << 5) {
                 div_a = denominator;
                 div_b = numerator;
             }
         }
         self::chip_specific::configure_clock(div, div_a, div_b);
         Ok(())
-    }
-
-    // Calculate the greatest common divisor of a and b
-    fn gcd(mut a: u32, mut b: u32) -> u32 {
-        while b != 0 {
-            (a, b) = (b, (a % b))
-        }
-        a
     }
 }
 
