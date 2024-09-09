@@ -2044,6 +2044,7 @@ impl PromiscuousPkt<'_> {
 }
 
 #[cfg(feature = "sniffer")]
+#[allow(clippy::type_complexity)]
 static SNIFFER_CB: Mutex<RefCell<Option<fn(PromiscuousPkt)>>> = Mutex::new(RefCell::new(None));
 
 #[cfg(feature = "sniffer")]
