@@ -327,6 +327,14 @@ pub trait Pin: private::Sealed {
     fn wakeup_enable(&mut self, enable: bool, event: WakeEvent, _: private::Internal) {
         self.listen_with_options(event.into(), false, false, enable, private::Internal);
     }
+
+    /// Returns the list of input signals that can be connected to this pin
+    /// using IO_MUX.
+    fn input_signals(&self, _: private::Internal) -> [Option<InputSignal>; 6];
+
+    /// Returns the list of output signals that can be connected to this pin
+    /// using IO_MUX.
+    fn output_signals(&self, _: private::Internal) -> [Option<OutputSignal>; 6];
 }
 
 /// Trait implemented by pins which can be used as inputs
@@ -529,12 +537,6 @@ where
     fn app_cpu_nmi_status_read() -> u32 {
         RegisterAccess::app_cpu_nmi_status_read()
     }
-}
-
-#[doc(hidden)]
-pub trait GpioSignal {
-    fn output_signals() -> [Option<OutputSignal>; 6];
-    fn input_signals() -> [Option<InputSignal>; 6];
 }
 
 #[doc(hidden)]
@@ -804,10 +806,7 @@ where
             GPIO_FUNCTION
         } else {
             let mut res = GPIO_FUNCTION;
-            for (i, input_signal) in <Self as GpioProperties>::Signals::input_signals()
-                .iter()
-                .enumerate()
-            {
+            for (i, input_signal) in self.input_signals(private::Internal).iter().enumerate() {
                 if let Some(input_signal) = input_signal {
                     if *input_signal == signal {
                         res = match i {
@@ -911,6 +910,14 @@ where
 
     fn clear_interrupt(&mut self, _: private::Internal) {
         <Self as GpioProperties>::Bank::write_interrupt_status_clear(1 << (GPIONUM % 32));
+    }
+
+    fn input_signals(&self, _: private::Internal) -> [Option<InputSignal>; 6] {
+        <Self as GpioProperties>::input_signals()
+    }
+
+    fn output_signals(&self, _: private::Internal) -> [Option<OutputSignal>; 6] {
+        <Self as GpioProperties>::output_signals()
     }
 }
 
@@ -1038,10 +1045,7 @@ where
             GPIO_FUNCTION
         } else {
             let mut res = GPIO_FUNCTION;
-            for (i, output_signal) in <Self as GpioProperties>::Signals::output_signals()
-                .iter()
-                .enumerate()
-            {
+            for (i, output_signal) in self.output_signals(private::Internal).iter().enumerate() {
                 if let Some(output_signal) = output_signal {
                     if *output_signal == signal {
                         res = match i {
@@ -1174,13 +1178,14 @@ fn on_pin_irq(pin_nr: u8) {
 pub trait GpioProperties {
     type Bank: BankGpioRegisterAccess;
     type InterruptStatus: InterruptStatusRegisterAccess;
-    type Signals: GpioSignal;
 
     type IsOutput: BooleanType;
     type IsAnalog: BooleanType;
     type IsTouch: BooleanType;
 
     fn degrade_pin(&self, _: private::Internal) -> ErasedPin;
+    fn output_signals() -> [Option<OutputSignal>; 6];
+    fn input_signals() -> [Option<InputSignal>; 6];
 }
 
 #[doc(hidden)]
@@ -1253,21 +1258,15 @@ macro_rules! gpio {
                 impl $crate::gpio::GpioProperties for GpioPin<$gpionum> {
                     type Bank = $crate::gpio::[< Bank $bank GpioRegisterAccess >];
                     type InterruptStatus = $crate::gpio::[< InterruptStatusRegisterAccessBank $bank >];
-                    type Signals = [< Gpio $gpionum Signals >];
                     $crate::pin_types!($type);
 
                     fn degrade_pin(&self, _: $crate::private::Internal) -> ErasedPin {
                         ErasedPin($crate::gpio::ErasedPinInner::[< Gpio $gpionum >](unsafe { Self::steal() }))
                     }
-                }
 
-                #[doc(hidden)]
-                pub struct [<Gpio $gpionum Signals>];
-
-                impl $crate::gpio::GpioSignal for [<Gpio $gpionum Signals>] {
                     fn output_signals() -> [Option<OutputSignal>; 6]{
                         #[allow(unused_mut)]
-                        let mut output_signals = [None, None, None, None, None, None];
+                        let mut output_signals = [None; 6];
 
                         $(
                             $(
@@ -1279,7 +1278,7 @@ macro_rules! gpio {
                     }
                     fn input_signals() -> [Option<InputSignal>; 6] {
                         #[allow(unused_mut)]
-                        let mut input_signals = [None, None, None, None, None, None];
+                        let mut input_signals = [None; 6];
 
                         $(
                             $(
@@ -2307,6 +2306,18 @@ pub(crate) mod internal {
         fn clear_interrupt(&mut self, _: private::Internal) {
             handle_gpio_input!(&mut self.0, target, {
                 Pin::clear_interrupt(target, private::Internal)
+            })
+        }
+
+        fn input_signals(&self, _: private::Internal) -> [Option<InputSignal>; 6] {
+            handle_gpio_input!(&self.0, target, {
+                Pin::input_signals(target, private::Internal)
+            })
+        }
+
+        fn output_signals(&self, _: private::Internal) -> [Option<OutputSignal>; 6] {
+            handle_gpio_output!(&self.0, target, {
+                Pin::output_signals(target, private::Internal)
             })
         }
     }

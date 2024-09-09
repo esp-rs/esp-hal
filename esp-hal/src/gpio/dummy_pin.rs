@@ -61,6 +61,14 @@ impl Pin for DummyPin {
     }
 
     fn clear_interrupt(&mut self, _: private::Internal) {}
+
+    fn input_signals(&self, _: private::Internal) -> [Option<InputSignal>; 6] {
+        [None; 6]
+    }
+
+    fn output_signals(&self, _: private::Internal) -> [Option<OutputSignal>; 6] {
+        [None; 6]
+    }
 }
 
 impl OutputPin for DummyPin {

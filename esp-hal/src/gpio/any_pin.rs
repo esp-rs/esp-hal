@@ -78,6 +78,8 @@ impl<'d> Pin for AnyPin<'d> {
             fn unlisten(&mut self, _internal: private::Internal);
             fn is_interrupt_set(&self, _internal: private::Internal) -> bool;
             fn clear_interrupt(&mut self, _internal: private::Internal);
+            fn input_signals(&self, _internal: private::Internal) -> [Option<InputSignal>; 6];
+            fn output_signals(&self, _internal: private::Internal) -> [Option<OutputSignal>; 6];
         }
     }
 }
