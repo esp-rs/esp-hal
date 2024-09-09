@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added sleep and wakeup support for esp32c2 (#1922)
 - `Input`, `Output`, `OutputOpenDrain` and `Flex` now implement `Peripheral`. (#2094)
 - Previously unavailable memory is available via `.dram2_uninit` section (#2079)
+- You can now use `Input`, `Output`, `OutputOpenDrain` and `Flex` pins as EXTI and RTCIO wakeup sources (#2095)
 - Added `Rtc::set_current_time` to allow setting RTC time, and `Rtc::current_time` to getting RTC time while taking into account boot time (#1883)
 
 ### Changed

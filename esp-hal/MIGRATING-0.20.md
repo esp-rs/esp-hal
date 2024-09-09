@@ -52,6 +52,28 @@ let pin = Input::new(io.gpio0); // pin will have the type `Input<'some>` (or `In
 let pin = Input::new_typed(io.gpio0); // pin will have the type `Input<'some, GpioPin<0>>`
 ```
 
+### Wakeup using pin drivers
+
+You can now use pin drivers as wakeup sources.
+
+```rust
+use esp_hal::peripheral::Peripheral; // needed for `into_ref`
+
+let pin2 = Input::new(io.pins.gpio2, Pull::None);
+let mut pin3 = Input::new(io.pins.gpio3, Pull::None);
+// ... use pin2 as an input ..
+
+// Ext0
+let ext0 = Ext0WakeupSource::new(pin2, WakeupLevel::High);
+
+// Ext1
+let mut wakeup_pins: [&mut dyn RtcPin; 2] = [
+    &mut *pin_0.into_ref(),
+    &mut io.pins.gpio4, // unconfigured pins continue to work, too!
+];
+let ext1 = Ext1WakeupSource::new(&mut wakeup_pins, WakeupLevel::High);
+```
+
 ## `esp_hal::time::current_time` rename
 
 To avoid confusion with the `Rtc::current_time` wall clock time APIs, we've renamed `esp_hal::time::current_time` to `esp_hal::time::now()`.

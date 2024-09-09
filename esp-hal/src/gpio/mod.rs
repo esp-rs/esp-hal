@@ -1411,6 +1411,45 @@ macro_rules! rtc_pins {
         $(
             $crate::gpio::rtc_pins!($pin_num, $rtc_pin, $pin_reg, $prefix, $hold $(, $rue, $rde)?);
         )+
+
+        #[doc(hidden)]
+        #[macro_export]
+        macro_rules! handle_rtcio {
+            ($this:expr, $inner:ident, $code:tt) => {
+                match $this {
+                    $(
+                        paste::paste! { ErasedPinInner::[<Gpio $pin_num >]($inner) } => {
+                            $code
+                        },
+                    )+
+
+                    _ => panic!("Unsupported")
+                }
+            }
+        }
+
+        #[doc(hidden)]
+        #[macro_export]
+        macro_rules! handle_rtcio_with_resistors {
+            (@ignore $a:ident, $b:ident) => {};
+            ($this:expr, $inner:ident, $code:tt) => {
+                match $this {
+                    $(
+                        $(
+                            paste::paste! { ErasedPinInner::[<Gpio $pin_num >]($inner) } => {
+                                // FIXME: replace with $(ignore($rue)) once stable
+                                handle_rtcio_with_resistors!(@ignore $rue, $rde);
+                                $code
+                            },
+                        )?
+                    )+
+
+                    _ => panic!("Unsupported")
+                }
+            }
+        }
+        pub(crate) use handle_rtcio;
+        pub(crate) use handle_rtcio_with_resistors;
     };
 }
 
@@ -1458,10 +1497,30 @@ macro_rules! rtc_pins {
                 io_mux.gpio($pin_num).modify(|_, w| w.fun_wpd().bit(enable));
             }
         }
-
     };
 
-    ( $( $pin_num:expr )+ ) => { $( $crate::gpio::rtc_pins!($pin_num); )+ };
+    ( $( $pin_num:expr )+ ) => {
+        $( $crate::gpio::rtc_pins!($pin_num); )+
+
+        #[doc(hidden)]
+        #[macro_export]
+        macro_rules! handle_rtcio {
+            ($this:expr, $inner:ident, $code:tt) => {
+                match $this {
+                    $(
+                        paste::paste! { ErasedPinInner::[<Gpio $pin_num >]($inner) } => {
+                            $code
+                        },
+                    )+
+
+                    _ => panic!("Unsupported")
+                }
+            }
+        }
+
+        pub(crate) use handle_rtcio;
+        pub(crate) use handle_rtcio as handle_rtcio_with_resistors;
+    };
 }
 
 #[doc(hidden)]
@@ -2377,6 +2436,50 @@ pub(crate) mod internal {
         fn is_set_high(&self, _: private::Internal) -> bool {
             handle_gpio_output!(&self.0, target, {
                 OutputPin::is_set_high(target, private::Internal)
+            })
+        }
+    }
+
+    #[cfg(any(xtensa, esp32c2, esp32c3, esp32c6))]
+    impl RtcPin for ErasedPin {
+        #[cfg(xtensa)]
+        #[allow(unused_braces)] // False positive :/
+        fn rtc_number(&self) -> u8 {
+            handle_rtcio!(&self.0, target, { RtcPin::rtc_number(target) })
+        }
+
+        #[cfg(any(xtensa, esp32c6))]
+        fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: RtcFunction) {
+            handle_rtcio!(&mut self.0, target, {
+                RtcPin::rtc_set_config(target, input_enable, mux, func)
+            })
+        }
+
+        fn rtcio_pad_hold(&mut self, enable: bool) {
+            handle_rtcio!(&mut self.0, target, {
+                RtcPin::rtcio_pad_hold(target, enable)
+            })
+        }
+
+        #[cfg(any(esp32c2, esp32c3, esp32c6))]
+        unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
+            handle_rtcio!(&mut self.0, target, {
+                RtcPin::apply_wakeup(target, wakeup, level)
+            })
+        }
+    }
+
+    #[cfg(any(esp32c2, esp32c3, esp32c6, xtensa))]
+    impl RtcPinWithResistors for ErasedPin {
+        fn rtcio_pullup(&mut self, enable: bool) {
+            handle_rtcio_with_resistors!(&mut self.0, target, {
+                RtcPinWithResistors::rtcio_pullup(target, enable)
+            })
+        }
+
+        fn rtcio_pulldown(&mut self, enable: bool) {
+            handle_rtcio_with_resistors!(&mut self.0, target, {
+                RtcPinWithResistors::rtcio_pulldown(target, enable)
             })
         }
     }
