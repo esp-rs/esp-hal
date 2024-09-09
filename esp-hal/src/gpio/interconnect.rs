@@ -18,6 +18,7 @@ use crate::{
         INPUT_SIGNAL_MAX,
         OUTPUT_SIGNAL_MAX,
     },
+    peripheral::Peripheral,
     peripherals::GPIO,
     private::{self, Sealed},
 };
@@ -34,6 +35,14 @@ impl Clone for InputSignal {
             pin: unsafe { self.pin.clone_unchecked() },
             is_inverted: self.is_inverted,
         }
+    }
+}
+
+impl Peripheral for InputSignal {
+    type P = Self;
+
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        self.clone()
     }
 }
 
@@ -138,8 +147,19 @@ impl PeripheralInputPin for InputSignal {
 
 /// Multiple pins can be connected to one output signal.
 pub struct OutputSignal {
-    is_inverted: bool,
     pin: ErasedPin,
+    is_inverted: bool,
+}
+
+impl Peripheral for OutputSignal {
+    type P = Self;
+
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        Self {
+            pin: self.pin.clone_unchecked(),
+            is_inverted: self.is_inverted,
+        }
+    }
 }
 
 impl Sealed for OutputSignal {}
@@ -283,6 +303,14 @@ enum AnyInputSignalInner {
 #[derive(Clone)]
 pub struct AnyInputSignal(AnyInputSignalInner);
 
+impl Peripheral for AnyInputSignal {
+    type P = Self;
+
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        self.clone()
+    }
+}
+
 impl From<InputSignal> for AnyInputSignal {
     fn from(input: InputSignal) -> Self {
         Self(AnyInputSignalInner::Input(input))
@@ -298,6 +326,12 @@ impl From<Level> for AnyInputSignal {
 impl From<DummyPin> for AnyInputSignal {
     fn from(pin: DummyPin) -> Self {
         Self(AnyInputSignalInner::Dummy(pin))
+    }
+}
+
+impl From<ErasedPin> for AnyInputSignal {
+    fn from(input: ErasedPin) -> Self {
+        Self(AnyInputSignalInner::Input(input.peripheral_input()))
     }
 }
 

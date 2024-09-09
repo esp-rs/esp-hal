@@ -8,7 +8,7 @@
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{ErasedPin, Io, Level, Output, Pull},
+    gpio::{Io, Level, Output, Pull},
     pcnt::{
         channel::{EdgeMode, PcntInputConfig, PcntSource},
         unit::Unit,
@@ -38,9 +38,9 @@ cfg_if::cfg_if! {
 
 struct Context {
     spi: SpiDma<'static, SPI2, DmaChannel0, FullDuplexMode, Blocking>,
+    pcnt_source: PcntSource,
     pcnt_unit: Unit<'static, 0>,
     out_pin: Output<'static>,
-    mosi_mirror: ErasedPin,
 }
 
 #[cfg(test)]
@@ -56,7 +56,7 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
-        let (mosi_mirror, mosi) = hil_test::common_test_pins!(io);
+        let (_, mosi) = hil_test::common_test_pins!(io);
         let miso = io.pins.gpio4;
 
         let dma = Dma::new(peripherals.DMA);
@@ -69,6 +69,7 @@ mod tests {
             }
         }
 
+        let mosi_loopback = mosi.peripheral_input();
         let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
             .with_sck(sclk)
             .with_mosi(mosi)
@@ -80,13 +81,12 @@ mod tests {
         let mut out_pin = Output::new(io.pins.gpio5, Level::Low);
         out_pin.set_low();
         assert_eq!(out_pin.is_set_low(), true);
-        let mosi_mirror = mosi_mirror.degrade();
 
         Context {
             spi,
+            pcnt_source: PcntSource::from(mosi_loopback, PcntInputConfig { pull: Pull::Down }),
             pcnt_unit: pcnt.unit0,
             out_pin,
-            mosi_mirror,
         }
     }
 
@@ -101,10 +101,7 @@ mod tests {
         let unit = ctx.pcnt_unit;
         let mut spi = ctx.spi;
 
-        unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.mosi_mirror,
-            PcntInputConfig { pull: Pull::Down },
-        ));
+        unit.channel0.set_edge_signal(ctx.pcnt_source);
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
@@ -136,10 +133,7 @@ mod tests {
         let unit = ctx.pcnt_unit;
         let mut spi = ctx.spi;
 
-        unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.mosi_mirror,
-            PcntInputConfig { pull: Pull::Down },
-        ));
+        unit.channel0.set_edge_signal(ctx.pcnt_source);
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 

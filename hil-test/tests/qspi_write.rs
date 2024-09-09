@@ -8,7 +8,7 @@
 use esp_hal::{
     dma::{Channel, Dma, DmaPriority, DmaTxBuf},
     dma_buffers,
-    gpio::{AnyPin, Io, Pull},
+    gpio::{ErasedPin, Io, Pull},
     pcnt::{
         channel::{EdgeMode, PcntInputConfig, PcntSource},
         unit::Unit,
@@ -38,10 +38,10 @@ cfg_if::cfg_if! {
 
 struct Context {
     spi: esp_hal::peripherals::SPI2,
+    pcnt_source: PcntSource,
     pcnt: esp_hal::peripherals::PCNT,
     dma_channel: Channel<'static, DmaChannel0, Blocking>,
-    mosi: AnyPin<'static>,
-    mosi_mirror: AnyPin<'static>,
+    mosi: ErasedPin,
 }
 
 fn execute(
@@ -103,10 +103,9 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let (mosi, mosi_mirror) = hil_test::common_test_pins!(io);
+        let (mosi, _) = hil_test::common_test_pins!(io);
 
-        let mosi = AnyPin::new(mosi);
-        let mosi_mirror = AnyPin::new(mosi_mirror);
+        let mosi = mosi.degrade();
 
         let dma = Dma::new(peripherals.DMA);
 
@@ -122,10 +121,13 @@ mod tests {
 
         Context {
             spi: peripherals.SPI2,
+            pcnt_source: PcntSource::from(
+                mosi.peripheral_input(),
+                PcntInputConfig { pull: Pull::None },
+            ),
             pcnt: peripherals.PCNT,
             dma_channel,
             mosi,
-            mosi_mirror,
         }
     }
 
@@ -146,10 +148,7 @@ mod tests {
         let pcnt = Pcnt::new(ctx.pcnt);
         let unit = pcnt.unit0;
 
-        unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.mosi_mirror,
-            PcntInputConfig { pull: Pull::None },
-        ));
+        unit.channel0.set_edge_signal(ctx.pcnt_source);
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
@@ -173,10 +172,7 @@ mod tests {
         let pcnt = Pcnt::new(ctx.pcnt);
         let unit = pcnt.unit0;
 
-        unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.mosi_mirror,
-            PcntInputConfig { pull: Pull::None },
-        ));
+        unit.channel0.set_edge_signal(ctx.pcnt_source);
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
@@ -200,10 +196,7 @@ mod tests {
         let pcnt = Pcnt::new(ctx.pcnt);
         let unit = pcnt.unit0;
 
-        unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.mosi_mirror,
-            PcntInputConfig { pull: Pull::None },
-        ));
+        unit.channel0.set_edge_signal(ctx.pcnt_source);
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
@@ -227,10 +220,7 @@ mod tests {
         let pcnt = Pcnt::new(ctx.pcnt);
         let unit = pcnt.unit0;
 
-        unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.mosi_mirror,
-            PcntInputConfig { pull: Pull::None },
-        ));
+        unit.channel0.set_edge_signal(ctx.pcnt_source);
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 

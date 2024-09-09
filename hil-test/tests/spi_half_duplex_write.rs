@@ -8,7 +8,7 @@
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{AnyPin, Io, Pull},
+    gpio::{Io, Pull},
     pcnt::{
         channel::{EdgeMode, PcntInputConfig, PcntSource},
         unit::Unit,
@@ -40,7 +40,7 @@ cfg_if::cfg_if! {
 struct Context {
     spi: SpiDma<'static, SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
     pcnt_unit: Unit<'static, 0>,
-    mosi_mirror: AnyPin<'static>,
+    pcnt_source: PcntSource,
 }
 
 #[cfg(test)]
@@ -59,9 +59,7 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
-        let (mosi, mosi_mirror) = hil_test::common_test_pins!(io);
-
-        let mosi_mirror = AnyPin::new(mosi_mirror);
+        let (mosi, _) = hil_test::common_test_pins!(io);
 
         let pcnt = Pcnt::new(peripherals.PCNT);
         let dma = Dma::new(peripherals.DMA);
@@ -74,6 +72,8 @@ mod tests {
             }
         }
 
+        let mosi_loopback = mosi.peripheral_input();
+
         let spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
             .with_sck(sclk)
             .with_mosi(mosi)
@@ -81,7 +81,7 @@ mod tests {
 
         Context {
             spi,
-            mosi_mirror,
+            pcnt_source: PcntSource::from(mosi_loopback, PcntInputConfig { pull: Pull::Down }),
             pcnt_unit: pcnt.unit0,
         }
     }
@@ -97,10 +97,7 @@ mod tests {
         let unit = ctx.pcnt_unit;
         let mut spi = ctx.spi;
 
-        unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.mosi_mirror,
-            PcntInputConfig { pull: Pull::Down },
-        ));
+        unit.channel0.set_edge_signal(ctx.pcnt_source);
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
@@ -148,10 +145,7 @@ mod tests {
         let unit = ctx.pcnt_unit;
         let mut spi = ctx.spi.with_buffers(dma_rx_buf, dma_tx_buf);
 
-        unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.mosi_mirror,
-            PcntInputConfig { pull: Pull::Down },
-        ));
+        unit.channel0.set_edge_signal(ctx.pcnt_source);
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 

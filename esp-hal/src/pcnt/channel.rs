@@ -9,11 +9,7 @@
 
 use core::marker::PhantomData;
 
-use crate::{
-    gpio::{InputPin, InputSignal, Pull, ONE_INPUT, ZERO_INPUT},
-    peripheral::Peripheral,
-    peripherals::GPIO,
-};
+use crate::gpio::{interconnect::AnyInputSignal, InputSignal, PeripheralInputPin, Pull};
 
 /// Configuration for an PCNT input pin
 #[derive(Clone, Copy, Debug)]
@@ -32,55 +28,23 @@ impl Default for PcntInputConfig {
 pub use crate::peripherals::pcnt::unit::conf0::{CTRL_MODE as CtrlMode, EDGE_MODE as EdgeMode};
 
 /// PcntPin can be always high, always low, or an actual pin
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct PcntSource {
-    source: u8,
-    inverted: bool,
+    source: AnyInputSignal,
 }
 
 impl PcntSource {
     /// Creates a `PcntSource` from an input pin with the specified
     /// configuration.
-    pub fn from_pin<'a, P: InputPin>(
-        pin: impl Peripheral<P = P> + 'a,
-        pin_config: PcntInputConfig,
-    ) -> Self {
-        crate::into_ref!(pin);
-
-        pin.init_input(
+    pub fn from(source: impl Into<AnyInputSignal>, pin_config: PcntInputConfig) -> Self {
+        let source = source.into();
+        source.init_input(
             pin_config.pull == Pull::Down,
             pin_config.pull == Pull::Up,
             crate::private::Internal,
         );
 
-        Self {
-            source: pin.number(crate::private::Internal),
-            inverted: false,
-        }
-    }
-
-    /// Creates a `PcntSource` that is always high.
-    pub fn always_high() -> Self {
-        Self {
-            source: ONE_INPUT,
-            inverted: false,
-        }
-    }
-
-    /// Creates a `PcntSource` that is always low.
-    pub fn always_low() -> Self {
-        Self {
-            source: ZERO_INPUT,
-            inverted: false,
-        }
-    }
-
-    /// Inverts the `PcntSource` signal.
-    pub fn invert(self) -> Self {
-        Self {
-            source: self.source,
-            inverted: !self.inverted,
-        }
+        Self { source }
     }
 }
 
@@ -135,7 +99,7 @@ impl<'d, const UNIT: usize, const NUM: usize> Channel<'d, UNIT, NUM> {
     }
 
     /// Set the control signal (pin/high/low) for this channel
-    pub fn set_ctrl_signal(&self, source: PcntSource) -> &Self {
+    pub fn set_ctrl_signal(&self, mut source: PcntSource) -> &Self {
         let signal = match UNIT {
             0 => match NUM {
                 0 => InputSignal::PCNT0_CTRL_CH0,
@@ -185,19 +149,15 @@ impl<'d, const UNIT: usize, const NUM: usize> Channel<'d, UNIT, NUM> {
         };
 
         if (signal as usize) <= crate::gpio::INPUT_SIGNAL_MAX as usize {
-            unsafe { &*GPIO::PTR }
-                .func_in_sel_cfg(signal as usize)
-                .modify(|_, w| unsafe {
-                    w.sel().set_bit();
-                    w.in_inv_sel().bit(source.inverted);
-                    w.in_sel().bits(source.source)
-                });
+            source
+                .source
+                .connect_input_to_peripheral(signal, crate::private::Internal);
         }
         self
     }
 
     /// Set the edge signal (pin/high/low) for this channel
-    pub fn set_edge_signal(&self, source: PcntSource) -> &Self {
+    pub fn set_edge_signal(&self, mut source: PcntSource) -> &Self {
         let signal = match UNIT {
             0 => match NUM {
                 0 => InputSignal::PCNT0_SIG_CH0,
@@ -247,13 +207,9 @@ impl<'d, const UNIT: usize, const NUM: usize> Channel<'d, UNIT, NUM> {
         };
 
         if (signal as usize) <= crate::gpio::INPUT_SIGNAL_MAX as usize {
-            unsafe { &*GPIO::PTR }
-                .func_in_sel_cfg(signal as usize)
-                .modify(|_, w| unsafe {
-                    w.sel().set_bit();
-                    w.in_inv_sel().bit(source.inverted);
-                    w.in_sel().bits(source.source)
-                });
+            source
+                .source
+                .connect_input_to_peripheral(signal, crate::private::Internal);
         }
         self
     }

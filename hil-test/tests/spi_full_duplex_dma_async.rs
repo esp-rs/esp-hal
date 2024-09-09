@@ -42,9 +42,9 @@ const DMA_BUFFER_SIZE: usize = 5;
 
 struct Context {
     spi: SpiDmaBus<'static, SPI2, DmaChannel0, FullDuplexMode, Async>,
+    pcnt_source: PcntSource,
     pcnt_unit: Unit<'static, 0>,
     out_pin: Output<'static>,
-    mosi_mirror: ErasedPin,
 }
 
 #[cfg(test)]
@@ -62,9 +62,8 @@ mod tests {
         let pcnt = Pcnt::new(peripherals.PCNT);
         let sclk = io.pins.gpio0;
 
-        let (mosi_mirror, mosi) = hil_test::common_test_pins!(io);
+        let (_, mosi) = hil_test::common_test_pins!(io);
         let miso = io.pins.gpio4;
-        let mosi_mirror = mosi_mirror.degrade();
 
         let mut out_pin = Output::new(io.pins.gpio5, Level::Low);
         out_pin.set_low();
@@ -84,6 +83,7 @@ mod tests {
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
+        let mosi_loopback = mosi.peripheral_input();
         let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
             .with_sck(sclk)
             .with_mosi(mosi)
@@ -93,19 +93,19 @@ mod tests {
 
         Context {
             spi,
+            pcnt_source: PcntSource::from(
+                mosi_loopback,
+                PcntInputConfig { pull: Pull::Down },
+            ),
             pcnt_unit: pcnt.unit0,
             out_pin,
-            mosi_mirror,
         }
     }
 
     #[test]
     #[timeout(3)]
     async fn test_async_dma_read_dma_write_pcnt(mut ctx: Context) {
-        ctx.pcnt_unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.mosi_mirror,
-            PcntInputConfig { pull: Pull::Down },
-        ));
+        ctx.pcnt_unit.channel0.set_edge_signal(ctx.pcnt_source);
         ctx.pcnt_unit
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
@@ -130,10 +130,7 @@ mod tests {
     #[test]
     #[timeout(3)]
     async fn test_async_dma_read_dma_transfer_pcnt(mut ctx: Context) {
-        ctx.pcnt_unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.mosi_mirror,
-            PcntInputConfig { pull: Pull::Down },
-        ));
+        ctx.pcnt_unit.channel0.set_edge_signal(ctx.pcnt_source);
         ctx.pcnt_unit
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
