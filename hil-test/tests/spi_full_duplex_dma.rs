@@ -121,7 +121,7 @@ mod tests {
         // done to figure out what the  hardware wants from the driver to work
         // correctly.
 
-        #[cfg(any(feature = "esp32"))]
+        #[cfg(feature = "esp32")]
         {
             let transfer = _spi
                 .dma_transfer(dma_rx_buf, dma_tx_buf)
