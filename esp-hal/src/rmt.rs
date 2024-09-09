@@ -253,15 +253,35 @@ where
             return Err(Error::UnreachableTargetFrequency);
         }
 
-        let div = (src_clock / frequency) - 1;
+        let quotient = src_clock / frequency;
+        let div = quotient - 1;
 
         if div > u8::MAX as u32 {
             return Err(Error::UnreachableTargetFrequency);
         }
 
-        self::chip_specific::configure_clock(div);
-
+        let mut div_a = 0;
+        let mut div_b = 0;
+        let remainder = src_clock.raw() % frequency.raw();
+        if remainder > 0 {
+            let gcd = Self::gcd(frequency.raw(), remainder);
+            let numerator = remainder / gcd;
+            let denominator = frequency.raw() / gcd;
+            if numerator < (1<<5) && denominator < (1<<5) {
+                div_a = denominator;
+                div_b = numerator;
+            }
+        }
+        self::chip_specific::configure_clock(div, div_a, div_b);
         Ok(())
+    }
+
+    // Calculate the greatest common divisor of a and b
+    fn gcd(mut a: u32, mut b: u32) -> u32 {
+        while b != 0 {
+            (a, b) = (b, (a % b))
+        }
+        a
     }
 }
 
@@ -1604,7 +1624,7 @@ mod private {
 
 #[cfg(not(any(esp32, esp32s2)))]
 mod chip_specific {
-    pub fn configure_clock(div: u32) {
+    pub fn configure_clock(div: u32, div_a: u32, div_b: u32) {
         #[cfg(not(pcr))]
         {
             let rmt = unsafe { &*crate::peripherals::RMT::PTR };
@@ -1616,9 +1636,9 @@ mod chip_specific {
                     .sclk_div_num()
                     .bits(div as u8)
                     .sclk_div_a()
-                    .bits(0)
+                    .bits(div_a as u8)
                     .sclk_div_b()
-                    .bits(0)
+                    .bits(div_b as u8)
                     .apb_fifo_mask()
                     .set_bit()
             });
@@ -1631,9 +1651,9 @@ mod chip_specific {
                 w.sclk_div_num()
                     .bits(div as u8)
                     .sclk_div_a()
-                    .bits(0)
+                    .bits(div_a as u8)
                     .sclk_div_b()
-                    .bits(0)
+                    .bits(div_b as u8)
             });
 
             #[cfg(esp32c6)]
