@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Ask a question (Matrix Channel)
+    url: https://github.com/esp-rs/esp-hal/discussions/new
+    about: Ask questions in our Matrix channel.
+  - name: Ask a question (GitHub Discussions)
+    url: https://github.com/esp-rs/esp-hal/discussions/new
+    about: Ask questions and discuss via GitHub Discussions.
