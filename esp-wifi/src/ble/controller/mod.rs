@@ -204,13 +204,8 @@ pub mod asynch {
                         }
                     }
                 }
-                cfg_if::cfg_if! {
-                    if #[cfg(feature = "log")] {
-                        warn!("[hci] error parsing packet: {:?}", e);
-                    } else {
-                        warn!("[hci] error parsing packet");
-                    }
-                }
+                warn!("[hci] error parsing packet: {:?}", e);
+
                 Err(BleConnectorError::Unknown)
             }
         }

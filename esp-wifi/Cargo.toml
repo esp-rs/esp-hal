@@ -189,7 +189,7 @@ dhcpv4 = ["wifi", "utils", "smoltcp?/proto-dhcpv4", "smoltcp?/socket-dhcpv4"]
 wifi-default = ["ipv4", "tcp", "udp", "icmp", "igmp", "dns", "dhcpv4"]
 
 ## Enable support for `defmt`
-defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt"]
+defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt", "bt-hci?/defmt"]
 
 ## Enable support for the `log` crate
 log = ["dep:log", "esp-hal/log"]
