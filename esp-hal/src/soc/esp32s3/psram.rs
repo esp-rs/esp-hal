@@ -57,6 +57,7 @@ pub const PSRAM_BYTES: usize = PSRAM_SIZE as usize * 1024 * 1024;
     feature = "opsram-8m",
     feature = "opsram-16m"
 ))]
+#[procmacros::ram]
 pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::peripherals::PSRAM>) {
     const CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE: u32 = 0x4000;
     const CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS: u8 = 8;

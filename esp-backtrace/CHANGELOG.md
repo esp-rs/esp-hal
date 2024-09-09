@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+
+### Fixed
+
+### Removed
+
+## 0.14.1 - 2024-09-06
+
+### Added
+
+### Changed
 - Print a more helpful message in case of a `Cp0Disabled` exception (#2061)
 
 ### Fixed

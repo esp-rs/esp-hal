@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `have-strchr` feature to disable including `strchr` (#2096)
 
 ### Changed
+- esp-wifi now allocates memory from the global allocator provided by `esp-alloc` (#2099)
 
 ### Fixed
 
@@ -50,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implement `embedded_io::{ReadReady, WriteReady}` traits for `WifiStack` (#1882)
 - Implement `queue_msg_waiting` on the os_adapter (#1925)
 - Added API for promiscuous mode (#1935)
+- Implement `bt_hci::transport::Transport` traits for BLE (#1933)
 
 ### Changed
 

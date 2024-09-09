@@ -7,6 +7,7 @@
 #![no_main]
 
 use aligned::{Aligned, A64};
+use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
@@ -41,9 +42,6 @@ macro_rules! dma_alloc_buffer {
     }};
 }
 
-#[global_allocator]
-static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
-
 fn init_heap(psram: impl esp_hal::peripheral::Peripheral<P = esp_hal::peripherals::PSRAM>) {
     esp_hal::psram::init_psram(psram);
     info!(
@@ -51,10 +49,11 @@ fn init_heap(psram: impl esp_hal::peripheral::Peripheral<P = esp_hal::peripheral
         esp_hal::psram::psram_vaddr_start()
     );
     unsafe {
-        ALLOCATOR.init(
+        esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
             esp_hal::psram::psram_vaddr_start() as *mut u8,
             esp_hal::psram::PSRAM_BYTES,
-        );
+            esp_alloc::MemoryCapability::External.into(),
+        ));
     }
 }
 
