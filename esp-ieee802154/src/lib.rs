@@ -169,7 +169,7 @@ impl<'a> Ieee802154<'a> {
             let result = match maybe_decoded {
                 Ok((decoded, _)) => {
                     // crc is not written to rx buffer
-                    let rssi = if raw.data[0] as usize > raw.data.len() {
+                    let rssi = if (raw.data[0] as usize > raw.data.len()) || (raw.data[0] == 0) {
                         raw.data[raw.data.len() - 1] as i8
                     } else {
                         raw.data[raw.data[0] as usize - 1] as i8

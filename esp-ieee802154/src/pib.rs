@@ -19,7 +19,7 @@ use crate::hal::{
     set_tx_enhance_ack,
 };
 
-pub(crate) const CONFIG_IEEE802154_CCA_THRESHOLD: i8 = 1;
+pub(crate) const CONFIG_IEEE802154_CCA_THRESHOLD: i8 = -60;
 pub(crate) const IEEE802154_FRAME_EXT_ADDR_SIZE: usize = 8;
 
 const IEEE802154_MULTIPAN_0: u8 = 0;
@@ -227,15 +227,26 @@ fn ieee802154_set_multipan_hal(pib: &Pib) {
     }
 }
 
+// https://github.com/espressif/esp-idf/blob/release/v5.3/components/ieee802154/driver/esp_ieee802154_pib.c#L48
 fn ieee802154_txpower_convert(txpower: i8) -> u8 {
-    const IEEE802154_TXPOWER_VALUE_MAX: i8 = 13;
-    const IEEE802154_TXPOWER_VALUE_MIN: i8 = -32;
-
+    cfg_if::cfg_if! {
+        if #[cfg(feature="esp32h2")] {
+            // https://github.com/espressif/esp-idf/blob/release/v5.3/components/hal/esp32h2/include/hal/ieee802154_ll.h
+            const IEEE802154_TXPOWER_VALUE_MAX: i8 = 20;
+            const IEEE802154_TXPOWER_VALUE_MIN: i8 = -24;
+            const IEEE802154_TXPOWER_INDEX_MIN: i8 = 0;
+        } else if #[cfg(feature="esp32c6")]{
+            // https://github.com/espressif/esp-idf/blob/release/v5.3/components/hal/esp32c6/include/hal/ieee802154_ll.h
+            const IEEE802154_TXPOWER_VALUE_MAX: i8 = 20;
+            const IEEE802154_TXPOWER_VALUE_MIN: i8 = -15;
+            const IEEE802154_TXPOWER_INDEX_MIN: i8 = 3;
+        }
+    }
     if txpower > IEEE802154_TXPOWER_VALUE_MAX {
         15
-    } else if txpower < IEEE802154_TXPOWER_VALUE_MIN {
-        0
+    } else if txpower <= IEEE802154_TXPOWER_VALUE_MIN {
+        IEEE802154_TXPOWER_INDEX_MIN as u8
     } else {
-        ((txpower - IEEE802154_TXPOWER_VALUE_MIN) / 3) as u8
+        (((txpower - IEEE802154_TXPOWER_VALUE_MIN) / 3) + IEEE802154_TXPOWER_INDEX_MIN) as u8
     }
 }
