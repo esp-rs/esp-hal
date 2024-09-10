@@ -14,7 +14,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::{AnyPin, Input, Io, Level, Output, Pin, Pull},
+    gpio::{Input, Io, Level, Output, Pin, Pull},
     prelude::*,
 };
 
@@ -47,7 +47,7 @@ fn main() -> ! {
     }
 }
 
-fn toggle_pins(leds: &mut [Output<AnyPin>], button: &Input<AnyPin>) {
+fn toggle_pins(leds: &mut [Output], button: &Input) {
     for pin in leds.iter_mut() {
         pin.toggle();
     }
