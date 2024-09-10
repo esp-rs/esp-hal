@@ -2064,6 +2064,9 @@ mod asynch {
             rx: impl Peripheral<P = RX> + 'd,
             tx: impl Peripheral<P = TX> + 'd,
         ) -> Result<Self, Error> {
+            // FIXME: at the time of writing, the order of the pin assignments matters:
+            // first binding RX, then TX makes tests fail. This is bad and needs to be
+            // figured out.
             let mut this = UartBuilder::new(uart)
                 .with_tx(tx)
                 .with_rx(rx)
