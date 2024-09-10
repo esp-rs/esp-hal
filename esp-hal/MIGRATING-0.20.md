@@ -112,6 +112,18 @@ have been removed. Use `new` or `new_async` instead.
 
 The `ErasedTimer` has been renamed to `AnyTimer`.
 
+### Type-erased timers
+
+`PeriodicTimer` and `OneShotTimer` are now type-erased by default. This unfortunately requires the
+timer to implement `Into<AnyTimer>`. In case you want to use a timer that does not (for example
+because you've used the async timer APIs of the same instance before), you can use the `new_typed`
+constructor.
+
+```rust
+let timer = PeriodicTimer::new(timg0.timer0); // timer will have the type `PeriodicTimer<'some>` (or `PeriodicTimer<'some, AnyTimer>` if you want to be explicit about it)
+let timer = PeriodicTimer::new_typed(timg0.timer0); // timer will have the type `PeriodicTimer<'some, Timer<Timer0<TIMG0>, Blocking>>`
+```
+
 ### `esp_hal::time::current_time` rename
 
 To avoid confusion with the `Rtc::current_time` wall clock time APIs, we've renamed `esp_hal::time::current_time` to `esp_hal::time::now()`.

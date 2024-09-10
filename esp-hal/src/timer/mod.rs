@@ -111,8 +111,18 @@ pub trait Timer: crate::private::Sealed {
 }
 
 /// A one-shot timer.
-pub struct OneShotTimer<'d, T> {
+pub struct OneShotTimer<'d, T = AnyTimer> {
     inner: PeripheralRef<'d, T>,
+}
+
+impl<'d> OneShotTimer<'d, AnyTimer> {
+    /// Construct a new instance of [`OneShotTimer`] with the timer
+    /// type-erased.
+    pub fn new<T: Timer + Into<AnyTimer>>(mut inner: impl Peripheral<P = T> + 'd) -> Self {
+        let inner = unsafe { inner.clone_unchecked() }.into();
+
+        Self::new_typed(inner)
+    }
 }
 
 impl<'d, T> OneShotTimer<'d, T>
@@ -120,7 +130,7 @@ where
     T: Timer,
 {
     /// Construct a new instance of [`OneShotTimer`].
-    pub fn new(inner: impl Peripheral<P = T> + 'd) -> Self {
+    pub fn new_typed(inner: impl Peripheral<P = T> + 'd) -> Self {
         crate::into_ref!(inner);
 
         Self { inner }
@@ -242,8 +252,18 @@ where
 }
 
 /// A periodic timer.
-pub struct PeriodicTimer<'d, T> {
+pub struct PeriodicTimer<'d, T = AnyTimer> {
     inner: PeripheralRef<'d, T>,
+}
+
+impl<'d> PeriodicTimer<'d, AnyTimer> {
+    /// Construct a new instance of [`PeriodicTimer`] with the timer
+    /// type-erased.
+    pub fn new<T: Timer + Into<AnyTimer>>(mut inner: impl Peripheral<P = T> + 'd) -> Self {
+        let inner = unsafe { inner.clone_unchecked() }.into();
+
+        Self::new_typed(inner)
+    }
 }
 
 impl<'d, T> PeriodicTimer<'d, T>
@@ -251,7 +271,7 @@ where
     T: Timer,
 {
     /// Construct a new instance of [`PeriodicTimer`].
-    pub fn new(inner: impl Peripheral<P = T> + 'd) -> Self {
+    pub fn new_typed(inner: impl Peripheral<P = T> + 'd) -> Self {
         crate::into_ref!(inner);
 
         Self { inner }
@@ -382,7 +402,7 @@ impl crate::private::Sealed for AnyTimer {}
 macro_rules! any_timer {
     ($ty:path => $var:ident) => {
         impl $ty {
-            /// Convert this timer into an [`AnyTimer`][crate::timer::AnyTimer].
+            /// Convert this timer into an [`AnyTimer`].
             pub fn degrade(self) -> AnyTimer {
                 AnyTimer(AnyTimerInner::$var(self))
             }

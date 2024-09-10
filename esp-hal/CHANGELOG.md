@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed the parameters of `Spi::with_pins` to no longer be optional (#2133)
 - Renamed `DummyPin` to `NoPin` and removed all internal logic from it. (#2133)
 - The `NO_PIN` constant has been removed. (#2133)
+- `PeriodicTimer` and `OneShotTimer` are now type-erased by default. Use the new `new_typed` constructor to keep using the ZST pin types. (#?)
 
 ### Fixed
 
