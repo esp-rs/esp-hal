@@ -55,6 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `AnyInputOnlyPin` in favour of `AnyPin`. (#2071)
 - Removed the following functions from `GpioPin`: `is_high`, `is_low`, `set_high`, `set_low`, `set_state`, `is_set_high`, `is_set_low`, `toggle`. (#2094)
 - Removed `Rtc::get_time_raw` (#1883)
+- Removed `_with_default_pins` UART constructors (#2132)
+- Removed `uart::{DefaultRxPin, DefaultTxPin}` (#2132)
 
 ## [0.20.1] - 2024-08-30
 
