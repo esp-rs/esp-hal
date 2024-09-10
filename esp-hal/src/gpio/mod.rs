@@ -308,6 +308,9 @@ pub trait Pin: Sealed {
 
     /// Configure the alternate function
     fn set_alternate_function(&mut self, alternate: AlternateFunction, _: private::Internal);
+
+    /// Enable or disable the GPIO pin output buffer.
+    fn output_enable(&mut self, enable: bool, _: private::Internal);
 }
 
 /// Common trait implemented by signals which can be used as peripheral inputs
@@ -727,6 +730,10 @@ where
     fn set_alternate_function(&mut self, alternate: AlternateFunction, _: private::Internal) {
         get_io_mux_reg(GPIONUM).modify(|_, w| unsafe { w.mcu_sel().bits(alternate as u8) });
     }
+
+    fn output_enable(&mut self, enable: bool, _: private::Internal) {
+        self.write_out_en(enable);
+    }
 }
 
 impl<const GPIONUM: u8> PeripheralSignal for GpioPin<GPIONUM>
@@ -749,13 +756,6 @@ where
     Self: GpioProperties,
 {
     fn init_input(&self, pull: Pull, _: private::Internal) {
-        let gpio = unsafe { &*GPIO::PTR };
-
-        self.write_out_en(false);
-
-        gpio.func_out_sel_cfg(GPIONUM as usize)
-            .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
-
         self.pull_direction(pull, private::Internal);
 
         #[cfg(any(esp32c3, esp32s3))]
@@ -916,10 +916,9 @@ where
     Self: GpioProperties<IsOutput = True>,
 {
     fn init_output(&self, alternate: AlternateFunction, open_drain: bool) {
-        let gpio = unsafe { &*GPIO::PTR };
-
         self.write_out_en(true);
-        self.pull_direction(Pull::None, private::Internal);
+
+        let gpio = unsafe { &*GPIO::PTR };
 
         gpio.pin(GPIONUM as usize)
             .modify(|_, w| w.pad_driver().bit(open_drain));
@@ -1991,6 +1990,7 @@ where
     /// Set the GPIO to input mode.
     pub fn set_as_input(&mut self, pull: Pull) {
         self.pin.init_input(pull, private::Internal);
+        self.pin.output_enable(false, private::Internal);
     }
 
     /// Get whether the pin input level is high.
@@ -2162,6 +2162,12 @@ pub(crate) mod internal {
         fn set_alternate_function(&mut self, alternate: AlternateFunction, _: private::Internal) {
             handle_gpio_input!(&mut self.0, target, {
                 Pin::set_alternate_function(target, alternate, private::Internal)
+            })
+        }
+
+        fn output_enable(&mut self, enable: bool, _: private::Internal) {
+            handle_gpio_input!(&mut self.0, target, {
+                Pin::output_enable(target, enable, private::Internal)
             })
         }
     }
