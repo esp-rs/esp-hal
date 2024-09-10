@@ -26,7 +26,12 @@ use crate::{
     private::{self, Sealed},
 };
 
-/// Multiple input signal can be connected to one pin.
+/// A configurable input signal between a peripheral and a GPIO pin.
+///
+/// Obtained by calling [`GpioPin::peripheral_input()`],
+/// [`super::Flex::peripheral_input()`] or [`super::Input::peripheral_input()`].
+///
+/// Multiple input signals can be connected to one pin.
 pub struct InputSignal {
     pin: AnyPin,
     is_inverted: bool,
@@ -60,11 +65,16 @@ impl InputSignal {
     }
 
     /// Inverts the peripheral's input signal.
+    ///
+    /// Calling this function multiple times toggles the setting.
     pub fn invert(&mut self) {
         self.is_inverted = !self.is_inverted;
     }
 
-    /// Inverts the peripheral's input signal.
+    /// Consumed the signal and returns a new one that inverts the peripheral's
+    /// input signal.
+    ///
+    /// Calling this function multiple times toggles the setting.
     pub fn inverted(mut self) -> Self {
         self.invert();
         self
@@ -97,6 +107,10 @@ impl PeripheralSignal for InputSignal {
 
 impl PeripheralInput for InputSignal {
     /// Connect the pin to a peripheral input signal.
+    ///
+    /// Since there can only be one input signal connected to a peripheral at a
+    /// time, this function will disconnect any previously connected input
+    /// signals.
     fn connect_input_to_peripheral(&mut self, signal: gpio::InputSignal, _: private::Internal) {
         let signal_nr = signal as usize;
 
@@ -156,6 +170,12 @@ impl PeripheralInput for InputSignal {
     }
 }
 
+/// A configurable output signal between a peripheral and a GPIO pin.
+///
+/// Obtained by calling [`GpioPin::into_peripheral_output()`],
+/// [`super::Flex::into_peripheral_output()`] or
+/// [`super::Output::into_peripheral_output()`].
+///
 /// Multiple pins can be connected to one output signal.
 pub struct OutputSignal {
     pin: AnyPin,
@@ -184,11 +204,16 @@ impl OutputSignal {
     }
 
     /// Inverts the peripheral's output signal.
+    ///
+    /// Calling this function multiple times toggles the setting.
     pub fn invert(&mut self) {
         self.is_inverted = !self.is_inverted;
     }
 
-    /// Inverts the peripheral's input signal.
+    /// Consumed the signal and returns a new one that inverts the peripheral's
+    /// output signal.
+    ///
+    /// Calling this function multiple times toggles the setting.
     pub fn inverted(mut self) -> Self {
         self.invert();
         self
@@ -271,7 +296,7 @@ impl PeripheralOutput for OutputSignal {
     ///
     /// Clears the entry in the GPIO matrix / Io mux that associates this output
     /// pin with a previously connected [signal](`OutputSignal`). Any other
-    /// outputs connected to the signal remain intact.
+    /// outputs connected to the peripheral remain intact.
     fn disconnect_from_peripheral_output(
         &mut self,
         signal: gpio::OutputSignal,

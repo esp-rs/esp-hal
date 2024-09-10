@@ -2,8 +2,8 @@
 //!
 //! ## Overview
 //!
-//! Each pin can be used as a general-purpose I/O, or be connected to an
-//! internal peripheral signal.
+//! Each pin can be used as a general-purpose I/O, or be connected to one or
+//! more internal peripheral signals.
 //!
 //! ## Configuration
 //!
@@ -18,7 +18,7 @@
 //! provide a common interface for GPIO pins.
 //!
 //! To get access to the pins, you first need to convert them into a HAL
-//! designed struct from the pac struct `GPIO` and `IO_MUX` using `Io::new`.
+//! designed struct from the pac struct `GPIO` and `IO_MUX` using [`Io::new`].
 //!
 //! ### Pin Types
 //!
@@ -28,6 +28,12 @@
 //! - [AnyPin] is a type-erased GPIO pin with support for inverted signalling.
 //! - [DummyPin] is a useful for cases where peripheral driver requires a pin,
 //!   but real pin cannot be used.
+//!
+//! ### GPIO interconnect
+//!
+//! Each GPIO can be connected to one output signal and any number of input
+//! signals. This allows connections inside of the MCU without allocating and
+//! connecting multiple pins for loopback functionality.
 //!
 //! ## Examples
 //!
@@ -661,7 +667,10 @@ where
         }
     }
 
-    /// Turns the pin object into a peripheral input.
+    /// Returns a peripheral [input][interconnect::InputSignal] connected to
+    /// this pin.
+    ///
+    /// The input signal can be passed to peripherals in place of an input pin.
     #[inline]
     pub fn peripheral_input(&self) -> interconnect::InputSignal {
         interconnect::InputSignal::new(self.degrade_internal(private::Internal))
@@ -941,7 +950,11 @@ where
         });
     }
 
-    /// Turns the pin object into a peripheral output.
+    /// Turns the pin object into a peripheral
+    /// [output][interconnect::OutputSignal].
+    ///
+    /// The output signal can be passed to peripherals in place of an output
+    /// pin.
     #[inline]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
         interconnect::OutputSignal::new(self.degrade_internal(private::Internal))
@@ -1702,7 +1715,11 @@ where
         self.pin.set_drive_strength(strength);
     }
 
-    /// Turns the pin object into a peripheral output.
+    /// Turns the pin object into a peripheral
+    /// [output][interconnect::OutputSignal].
+    ///
+    /// The output signal can be passed to peripherals in place of an output
+    /// pin.
     #[inline]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
         self.pin.into_peripheral_output()
@@ -1803,7 +1820,10 @@ where
         self.pin.wakeup_enable(enable, event);
     }
 
-    /// Turns the pin object into a peripheral input.
+    /// Returns a peripheral [input][interconnect::InputSignal] connected to
+    /// this pin.
+    ///
+    /// The input signal can be passed to peripherals in place of an input pin.
     #[inline]
     pub fn peripheral_input(&self) -> interconnect::InputSignal {
         self.pin.peripheral_input()
@@ -1938,7 +1958,11 @@ where
         self.pin.set_drive_strength(strength);
     }
 
-    /// Turns the pin object into a peripheral output.
+    /// Turns the pin object into a peripheral
+    /// [output][interconnect::OutputSignal].
+    ///
+    /// The output signal can be passed to peripherals in place of an output
+    /// pin.
     #[inline]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
         self.pin.into_peripheral_output()
@@ -2042,7 +2066,10 @@ where
         self.pin.wakeup_enable(enable, event, private::Internal);
     }
 
-    /// Turns the pin object into a peripheral input.
+    /// Returns a peripheral [input][interconnect::InputSignal] connected to
+    /// this pin.
+    ///
+    /// The input signal can be passed to peripherals in place of an input pin.
     #[inline]
     pub fn peripheral_input(&self) -> interconnect::InputSignal {
         interconnect::InputSignal::new(self.pin.degrade_internal(private::Internal))
@@ -2107,7 +2134,11 @@ where
         self.pin.set_drive_strength(strength, private::Internal);
     }
 
-    /// Turns the pin object into a peripheral output.
+    /// Turns the pin object into a peripheral
+    /// [output][interconnect::OutputSignal].
+    ///
+    /// The output signal can be passed to peripherals in place of an output
+    /// pin.
     #[inline]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
         interconnect::OutputSignal::new(self.pin.degrade_internal(private::Internal))
@@ -2131,13 +2162,21 @@ pub(crate) mod internal {
     impl private::Sealed for AnyPin {}
 
     impl AnyPin {
-        /// Turns the pin object into a peripheral output.
+        /// Returns a peripheral [input][interconnect::InputSignal] connected to
+        /// this pin.
+        ///
+        /// The input signal can be passed to peripherals in place of an input
+        /// pin.
         #[inline]
         pub fn peripheral_input(&self) -> interconnect::InputSignal {
             handle_gpio_input!(&self.0, target, { target.peripheral_input() })
         }
 
-        /// Turns the pin object into a peripheral output.
+        /// Turns the pin object into a peripheral
+        /// [output][interconnect::OutputSignal].
+        ///
+        /// The output signal can be passed to peripherals in place of an output
+        /// pin.
         #[inline]
         pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
             handle_gpio_output!(self.0, target, { target.into_peripheral_output() })
