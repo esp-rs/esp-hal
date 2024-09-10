@@ -8,7 +8,7 @@
 use esp_hal::{
     dma::{Channel, Dma, DmaPriority, DmaRxBuf},
     dma_buffers,
-    gpio::{AnyPin, Io, Level, Output},
+    gpio::{AnyPin, Io, Level, NoPin, Output},
     prelude::*,
     spi::{
         master::{Address, Command, Spi, SpiDma},
@@ -123,14 +123,7 @@ mod tests {
     #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin_0(ctx: Context) {
         let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(
-                esp_hal::gpio::NO_PIN,
-                Some(ctx.miso),
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-            )
+            .with_pins(NoPin, ctx.miso, NoPin, NoPin, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
         // SPI should read '0b11101110'
@@ -141,14 +134,7 @@ mod tests {
     #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin_1(ctx: Context) {
         let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                Some(ctx.miso),
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-            )
+            .with_pins(NoPin, NoPin, ctx.miso, NoPin, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
         // SPI should read '0b11011101'
@@ -159,14 +145,7 @@ mod tests {
     #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin_2(ctx: Context) {
         let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                Some(ctx.miso),
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-            )
+            .with_pins(NoPin, NoPin, NoPin, ctx.miso, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
         // SPI should read '0b10111011'
@@ -177,14 +156,7 @@ mod tests {
     #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin_3(ctx: Context) {
         let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                Some(ctx.miso),
-                esp_hal::gpio::NO_PIN,
-            )
+            .with_pins(NoPin, NoPin, NoPin, NoPin, ctx.miso, NoPin)
             .with_dma(ctx.dma_channel);
 
         // SPI should read '0b01110111'

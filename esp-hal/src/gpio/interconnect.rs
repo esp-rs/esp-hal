@@ -5,11 +5,11 @@ use crate::{
         self,
         AlternateFunction,
         AnyPin,
-        DummyPin,
         GpioPin,
         GpioProperties,
         InputPin,
         Level,
+        NoPin,
         OutputSignalType,
         PeripheralInput,
         PeripheralOutput,
@@ -331,7 +331,7 @@ impl PeripheralOutput for OutputSignal {
 enum AnyInputSignalInner {
     Input(InputSignal),
     Constant(Level),
-    Dummy(DummyPin),
+    Dummy(NoPin),
 }
 
 /// A type-erased input signal.
@@ -358,8 +358,8 @@ impl From<Level> for AnyInputSignal {
     }
 }
 
-impl From<DummyPin> for AnyInputSignal {
-    fn from(pin: DummyPin) -> Self {
+impl From<NoPin> for AnyInputSignal {
+    fn from(pin: NoPin) -> Self {
         Self(AnyInputSignalInner::Dummy(pin))
     }
 }

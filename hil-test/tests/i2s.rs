@@ -12,7 +12,7 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::{DummyPin, Io},
+    gpio::{Io, NoPin},
     i2s::{DataFormat, I2s, I2sReadDma, I2sWriteDma, Standard},
     prelude::*,
 };
@@ -75,15 +75,15 @@ mod tests {
 
         let mut i2s_tx = i2s
             .i2s_tx
-            .with_bclk(DummyPin::new())
-            .with_ws(DummyPin::new())
+            .with_bclk(NoPin)
+            .with_ws(NoPin)
             .with_dout(dout)
             .build();
 
         let mut i2s_rx = i2s
             .i2s_rx
-            .with_bclk(DummyPin::new())
-            .with_ws(DummyPin::new())
+            .with_bclk(NoPin)
+            .with_ws(NoPin)
             .with_din(din)
             .build();
 

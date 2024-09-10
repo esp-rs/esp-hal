@@ -51,7 +51,7 @@
 //!     100.kHz(),
 //!     SpiMode::Mode0,
 //! )
-//! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs));
+//! .with_pins(sclk, mosi, miso, cs);
 //! # }
 //! ```
 //! 
@@ -82,7 +82,7 @@ use super::{
 use crate::{
     clock::Clocks,
     dma::{DmaPeripheral, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
-    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
+    gpio::{InputSignal, NoPin, OutputSignal, PeripheralInput, PeripheralOutput},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
@@ -575,7 +575,7 @@ where
 
     /// Setup pins for this SPI instance.
     ///
-    /// All pins are optional. Pass [crate::gpio::NO_PIN] if you don't need the
+    /// All pins are optional. Pass [crate::gpio::NoPin] if you don't need the
     /// given pin.
     pub fn with_pins<
         SCK: PeripheralOutput,
@@ -584,36 +584,15 @@ where
         CS: PeripheralOutput,
     >(
         self,
-        sck: Option<impl Peripheral<P = SCK> + 'd>,
-        mosi: Option<impl Peripheral<P = MOSI> + 'd>,
-        miso: Option<impl Peripheral<P = MISO> + 'd>,
-        cs: Option<impl Peripheral<P = CS> + 'd>,
+        sck: impl Peripheral<P = SCK> + 'd,
+        mosi: impl Peripheral<P = MOSI> + 'd,
+        miso: impl Peripheral<P = MISO> + 'd,
+        cs: impl Peripheral<P = CS> + 'd,
     ) -> Self {
-        let this = if let Some(sck) = sck {
-            self.with_sck(sck)
-        } else {
-            self
-        };
-
-        let this = if let Some(mosi) = mosi {
-            this.with_mosi(mosi)
-        } else {
-            this
-        };
-
-        let this = if let Some(miso) = miso {
-            this.with_miso(miso)
-        } else {
-            this
-        };
-
-        let this = if let Some(cs) = cs {
-            this.with_cs(cs)
-        } else {
-            this
-        };
-
-        this
+        self.with_sck(sck)
+            .with_mosi(mosi)
+            .with_miso(miso)
+            .with_cs(cs)
     }
 
     pub(crate) fn new_internal(
@@ -632,7 +611,8 @@ where
         spi.spi.init();
         spi.spi.set_data_mode(mode);
 
-        spi
+        // Disconnect any lingering connections
+        spi.with_pins(NoPin, NoPin, NoPin, NoPin)
     }
 
     /// Change the bus frequency of the SPI instance.
@@ -737,7 +717,7 @@ where
 
     /// Setup pins for this SPI instance.
     ///
-    /// All pins are optional. Pass [crate::gpio::NO_PIN] if you don't need the
+    /// All pins are optional. Pass [crate::gpio::NoPin] if you don't need the
     /// given pin.
     pub fn with_pins<
         SCK: PeripheralOutput,
@@ -748,50 +728,19 @@ where
         CS: PeripheralOutput,
     >(
         self,
-        sck: Option<impl Peripheral<P = SCK> + 'd>,
-        mosi: Option<impl Peripheral<P = MOSI> + 'd>,
-        miso: Option<impl Peripheral<P = MISO> + 'd>,
-        sio2: Option<impl Peripheral<P = SIO2> + 'd>,
-        sio3: Option<impl Peripheral<P = SIO3> + 'd>,
-        cs: Option<impl Peripheral<P = CS> + 'd>,
+        sck: impl Peripheral<P = SCK> + 'd,
+        mosi: impl Peripheral<P = MOSI> + 'd,
+        miso: impl Peripheral<P = MISO> + 'd,
+        sio2: impl Peripheral<P = SIO2> + 'd,
+        sio3: impl Peripheral<P = SIO3> + 'd,
+        cs: impl Peripheral<P = CS> + 'd,
     ) -> Self {
-        let this = if let Some(sck) = sck {
-            self.with_sck(sck)
-        } else {
-            self
-        };
-
-        let this = if let Some(mosi) = mosi {
-            this.with_mosi(mosi)
-        } else {
-            this
-        };
-
-        let this = if let Some(miso) = miso {
-            this.with_miso(miso)
-        } else {
-            this
-        };
-
-        let this = if let Some(sio2) = sio2 {
-            this.with_sio2(sio2)
-        } else {
-            this
-        };
-
-        let this = if let Some(sio3) = sio3 {
-            this.with_sio3(sio3)
-        } else {
-            this
-        };
-
-        let this = if let Some(cs) = cs {
-            this.with_cs(cs)
-        } else {
-            this
-        };
-
-        this
+        self.with_sck(sck)
+            .with_mosi(mosi)
+            .with_miso(miso)
+            .with_sio2(sio2)
+            .with_sio3(sio3)
+            .with_cs(cs)
     }
 
     pub(crate) fn new_internal(
@@ -804,13 +753,14 @@ where
 
         let mut spi = Spi {
             spi,
-            _mode: PhantomData,
+            _mode: PhantomData::<HalfDuplexMode>,
         };
         spi.spi.setup(frequency);
         spi.spi.init();
         spi.spi.set_data_mode(mode);
 
-        spi
+        // Disconnect any lingering connections
+        spi.with_pins(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin)
     }
 
     /// Change the bus frequency of the SPI instance in half-duplex mode.

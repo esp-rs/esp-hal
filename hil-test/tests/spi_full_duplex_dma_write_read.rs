@@ -67,7 +67,6 @@ mod tests {
 
         let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
             .with_sck(sclk)
-            .with_mosi(esp_hal::gpio::DummyPin::new())
             .with_miso(miso)
             .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
