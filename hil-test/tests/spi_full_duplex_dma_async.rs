@@ -10,7 +10,7 @@ use embedded_hal_async::spi::SpiBus;
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{Io, Level, Output, Pull},
+    gpio::{Io, Pull},
     pcnt::{
         channel::{EdgeMode, PcntInputConfig, PcntSource},
         unit::Unit,
@@ -44,7 +44,6 @@ struct Context {
     spi: SpiDmaBus<'static, SPI2, DmaChannel0, FullDuplexMode, Async>,
     pcnt_source: PcntSource,
     pcnt_unit: Unit<'static, 0>,
-    out_pin: Output<'static>,
 }
 
 #[cfg(test)]
@@ -63,11 +62,6 @@ mod tests {
         let sclk = io.pins.gpio0;
 
         let (_, mosi) = hil_test::common_test_pins!(io);
-        let miso = io.pins.gpio4;
-
-        let mut out_pin = Output::new(io.pins.gpio5, Level::Low);
-        out_pin.set_low();
-        assert_eq!(out_pin.is_set_low(), true);
 
         let dma = Dma::new(peripherals.DMA);
 
@@ -84,18 +78,18 @@ mod tests {
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
         let mosi_loopback = mosi.peripheral_input();
+        let mosi_loopback_pcnt = mosi.peripheral_input();
         let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
             .with_sck(sclk)
             .with_mosi(mosi)
-            .with_miso(miso)
+            .with_miso(mosi_loopback)
             .with_dma(dma_channel.configure_for_async(false, DmaPriority::Priority0))
             .with_buffers(dma_rx_buf, dma_tx_buf);
 
         Context {
             spi,
-            pcnt_source: PcntSource::from(mosi_loopback, PcntInputConfig { pull: Pull::Down }),
+            pcnt_source: PcntSource::from(mosi_loopback_pcnt, PcntInputConfig { pull: Pull::Down }),
             pcnt_unit: pcnt.unit0,
-            out_pin,
         }
     }
 
@@ -111,8 +105,6 @@ mod tests {
 
         // Fill the buffer where each byte has 3 pos edges.
         let transmit = [0b0110_1010; DMA_BUFFER_SIZE];
-
-        assert_eq!(ctx.out_pin.is_set_low(), true);
 
         for i in 1..4 {
             receive.copy_from_slice(&[5, 5, 5, 5, 5]);
@@ -136,8 +128,6 @@ mod tests {
 
         // Fill the buffer where each byte has 3 pos edges.
         let transmit = [0b0110_1010; DMA_BUFFER_SIZE];
-
-        assert_eq!(ctx.out_pin.is_set_low(), true);
 
         for i in 1..4 {
             receive.copy_from_slice(&[5, 5, 5, 5, 5]);
