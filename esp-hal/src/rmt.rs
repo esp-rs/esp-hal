@@ -247,40 +247,23 @@ where
 
     #[cfg(not(any(esp32, esp32s2)))]
     fn configure_clock(&self, frequency: HertzU32) -> Result<(), Error> {
+        use clock_divider_solver::ClockDivider;
+
         let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
-
-        if frequency > src_clock {
+        let Some(clock_divider) = ClockDivider::from_frequence(
+            src_clock.to_Hz(),
+            frequency.to_Hz(),
+            u8::MAX as u32,
+            0b11111,
+        ) else {
             return Err(Error::UnreachableTargetFrequency);
-        }
+        };
 
-        let quotient = src_clock / frequency;
-        let div = quotient - 1;
-
-        if div > u8::MAX as u32 {
-            return Err(Error::UnreachableTargetFrequency);
-        }
-
-        // Calculate the greatest common divisor of a and b
-        fn gcd(mut a: u32, mut b: u32) -> u32 {
-            while b != 0 {
-                (a, b) = (b, (a % b))
-            }
-            a
-        }
-
-        let mut div_a = 0;
-        let mut div_b = 0;
-        let remainder = src_clock.raw() % frequency.raw();
-        if remainder > 0 {
-            let gcd = gcd(frequency.raw(), remainder);
-            let numerator = remainder / gcd;
-            let denominator = frequency.raw() / gcd;
-            if numerator < (1 << 5) && denominator < (1 << 5) {
-                div_a = denominator;
-                div_b = numerator;
-            }
-        }
-        self::chip_specific::configure_clock(div, div_a, div_b);
+        self::chip_specific::configure_clock(
+            clock_divider.div_num,
+            clock_divider.div_a,
+            clock_divider.div_b,
+        );
         Ok(())
     }
 }
@@ -2448,4 +2431,124 @@ mod chip_specific {
 
     pub(crate) use impl_rx_channel;
     pub(crate) use impl_tx_channel;
+}
+
+#[cfg(not(any(esp32, esp32s2)))]
+mod clock_divider_solver {
+    // Calculate the greatest common divisor of a and b
+    const fn gcd(mut a: u32, mut b: u32) -> u32 {
+        while b != 0 {
+            (a, b) = (b, (a % b))
+        }
+        a
+    }
+
+    pub struct ClockDivider {
+        // Integral clock divider value.
+        pub div_num: u32,
+
+        // Fractional clock divider numerator value.
+        pub div_b: u32,
+
+        // Fractional clock divider denominator value.
+        pub div_a: u32,
+    }
+
+    impl ClockDivider {
+        pub const fn from_frequence(
+            source: u32,
+            target: u32,
+            integral_max: u32,
+            fractional_max: u32,
+        ) -> Option<Self> {
+            if target > source {
+                return None;
+            }
+
+            let quotient = source / target;
+            if quotient > integral_max {
+                return None;
+            }
+
+            let remainder = source % target;
+            if remainder == 0 {
+                return Some(Self {
+                    div_num: quotient,
+                    div_b: 0,
+                    div_a: 0,
+                });
+            }
+
+            let gcd = gcd(target, remainder);
+            let numerator = remainder / gcd;
+            let denominator = target / gcd;
+            if numerator <= fractional_max && denominator <= fractional_max {
+                return Some(Self {
+                    div_num: quotient,
+                    div_b: numerator,
+                    div_a: denominator,
+                });
+            }
+
+            // Search Stern-Brocot Tree
+            let target_frac = Fraction {
+                numerator,
+                denominator,
+            };
+            let mut l = Fraction {
+                numerator: 0,
+                denominator: 1,
+            };
+            let mut h = Fraction {
+                numerator: 1,
+                denominator: 1, // We only search the left harf part
+            };
+            loop {
+                let m = Fraction {
+                    numerator: l.numerator + h.numerator,
+                    denominator: l.denominator + h.denominator,
+                };
+                if m.numerator > fractional_max || m.denominator > fractional_max {
+                    // L and H, which is closer?
+
+                    // M - L
+                    let a = Fraction {
+                        numerator: m.numerator * l.denominator - m.denominator * l.numerator,
+                        denominator: m.denominator * l.denominator,
+                    };
+                    // H - M
+                    let b = Fraction {
+                        numerator: h.numerator * m.denominator - h.denominator * m.numerator,
+                        denominator: h.denominator * m.denominator,
+                    };
+
+                    // compare a and b
+                    let c = a.numerator * b.denominator;
+                    let d = a.denominator * b.numerator;
+                    let m = if c < d { l } else { h };
+                    return Some(Self {
+                        div_num: quotient,
+                        div_b: m.numerator,
+                        div_a: m.denominator,
+                    });
+                }
+
+                // compare M and target_frac
+                let a = m.numerator * target_frac.denominator;
+                let b = m.denominator * target_frac.numerator;
+                if a > b {
+                    h = m;
+                } else if a < b {
+                    l = m;
+                } else {
+                    unreachable!();
+                }
+            }
+        }
+    }
+
+    struct Fraction {
+        pub numerator: u32,
+        pub denominator: u32,
+    }
 }
