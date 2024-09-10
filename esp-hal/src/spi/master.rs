@@ -2304,6 +2304,14 @@ pub trait InstanceDma: Instance {
         tx: &mut TX,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
+
+        #[cfg(esp32s2)]
+        {
+            // without this a transfer after a write will fail
+            reg_block.dma_out_link().write(|w| w.bits(0));
+            reg_block.dma_in_link().write(|w| w.bits(0));
+        }
+
         self.configure_datalen(usize::max(read_buffer_len, write_buffer_len) as u32 * 8);
 
         rx.is_done();
@@ -2351,6 +2359,20 @@ pub trait InstanceDma: Instance {
                 .modify(|_, w| w.usr_miso().bit(false).usr_mosi().bit(true));
         }
 
+        #[cfg(esp32)]
+        {
+            // see https://github.com/espressif/esp-idf/commit/366e4397e9dae9d93fe69ea9d389b5743295886f
+            // see https://github.com/espressif/esp-idf/commit/0c3653b1fd7151001143451d4aa95dbf15ee8506
+            if full_duplex {
+                reg_block
+                    .dma_in_link()
+                    .modify(|_, w| unsafe { w.inlink_addr().bits(0) });
+                reg_block
+                    .dma_in_link()
+                    .modify(|_, w| w.inlink_start().set_bit());
+            }
+        }
+
         self.enable_dma();
         self.update();
 
@@ -2382,6 +2404,14 @@ pub trait InstanceDma: Instance {
         full_duplex: bool,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
+
+        #[cfg(esp32s2)]
+        {
+            // without this a read after a write will fail
+            reg_block.dma_out_link().write(|w| w.bits(0));
+            reg_block.dma_in_link().write(|w| w.bits(0));
+        }
+
         self.configure_datalen(data_length as u32 * 8);
 
         rx.is_done();
