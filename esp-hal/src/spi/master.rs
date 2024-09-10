@@ -559,7 +559,7 @@ where
     /// Sets the specified pin to input and connects it to the SPI MISO signal.
     pub fn with_miso<MISO: PeripheralInput>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
         crate::into_ref!(miso);
-        miso.init_input(false, false, private::Internal);
+        miso.init_input(crate::gpio::Pull::None, private::Internal);
         miso.connect_input_to_peripheral(self.spi.miso_signal(), private::Internal);
 
         self

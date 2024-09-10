@@ -133,7 +133,7 @@ use core::marker::PhantomData;
 
 use self::filter::{Filter, FilterType};
 use crate::{
-    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
+    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::twai0::RegisterBlock,
@@ -736,7 +736,7 @@ where
             .mode()
             .write(|w| w.reset_mode().set_bit());
 
-        rx_pin.init_input(false, false, crate::private::Internal);
+        rx_pin.init_input(Pull::None, crate::private::Internal);
         rx_pin.connect_input_to_peripheral(T::INPUT_SIGNAL, crate::private::Internal);
 
         if no_transceiver {

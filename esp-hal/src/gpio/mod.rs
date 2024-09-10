@@ -310,10 +310,17 @@ pub trait Pin: Sealed {
     fn set_alternate_function(&mut self, alternate: AlternateFunction, _: private::Internal);
 }
 
+/// Common trait implemented by signals which can be used as peripheral inputs
+/// or outputs.
+pub trait PeripheralSignal: Sealed {
+    /// Configure the pullup and pulldown resistors
+    fn pull_direction(&self, pull: Pull, _: private::Internal);
+}
+
 /// Trait implemented by pins which can be used as peripheral inputs.
-pub trait PeripheralInput: Sealed {
+pub trait PeripheralInput: PeripheralSignal {
     /// Init as input with the given pull-up/pull-down
-    fn init_input(&self, pull_down: bool, pull_up: bool, _: private::Internal);
+    fn init_input(&self, pull: Pull, _: private::Internal);
 
     /// Enable input for the pin
     fn enable_input(&mut self, on: bool, _: private::Internal);
@@ -336,7 +343,7 @@ pub trait PeripheralInput: Sealed {
 }
 
 /// Trait implemented by pins which can be used as peripheral outputs.
-pub trait PeripheralOutput: Sealed {
+pub trait PeripheralOutput: PeripheralSignal {
     /// Configure open-drain mode
     fn set_to_open_drain_output(&mut self, _: private::Internal);
 
@@ -363,12 +370,6 @@ pub trait PeripheralOutput: Sealed {
 
     /// Configure internal pull-down resistor in sleep mode
     fn internal_pull_down_in_sleep_mode(&mut self, on: bool, _: private::Internal);
-
-    /// Enable/disable internal pull-up resistor for normal operation
-    fn internal_pull_up(&mut self, on: bool, _: private::Internal);
-
-    /// Enable/disable internal pull-down resistor for normal operation
-    fn internal_pull_down(&mut self, on: bool, _: private::Internal);
 
     /// Is the output set to high
     fn is_set_high(&self, _: private::Internal) -> bool;
@@ -728,11 +729,26 @@ where
     }
 }
 
+impl<const GPIONUM: u8> PeripheralSignal for GpioPin<GPIONUM>
+where
+    Self: GpioProperties,
+{
+    fn pull_direction(&self, pull: Pull, _: private::Internal) {
+        let pull_up = pull == Pull::Up;
+        let pull_down = pull == Pull::Down;
+
+        #[cfg(esp32)]
+        crate::soc::gpio::errata36(GPIONUM, Some(pull_up), Some(pull_down));
+
+        get_io_mux_reg(GPIONUM).modify(|_, w| w.fun_wpd().bit(pull_down).fun_wpu().bit(pull_up));
+    }
+}
+
 impl<const GPIONUM: u8> PeripheralInput for GpioPin<GPIONUM>
 where
     Self: GpioProperties,
 {
-    fn init_input(&self, pull_down: bool, pull_up: bool, _: private::Internal) {
+    fn init_input(&self, pull: Pull, _: private::Internal) {
         let gpio = unsafe { &*GPIO::PTR };
 
         self.write_out_en(false);
@@ -740,8 +756,7 @@ where
         gpio.func_out_sel_cfg(GPIONUM as usize)
             .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
 
-        #[cfg(esp32)]
-        crate::soc::gpio::errata36(GPIONUM, Some(pull_up), Some(pull_down));
+        self.pull_direction(pull, private::Internal);
 
         #[cfg(any(esp32c3, esp32s3))]
         disable_usb_pads(GPIONUM);
@@ -751,10 +766,6 @@ where
                 .bits(GPIO_FUNCTION as u8)
                 .fun_ie()
                 .set_bit()
-                .fun_wpd()
-                .bit(pull_down)
-                .fun_wpu()
-                .bit(pull_up)
                 .slp_sel()
                 .clear_bit()
         });
@@ -879,20 +890,6 @@ where
         get_io_mux_reg(GPIONUM).modify(|_, w| w.mcu_oe().bit(on));
     }
 
-    fn internal_pull_up(&mut self, on: bool, _: private::Internal) {
-        #[cfg(esp32)]
-        crate::soc::gpio::errata36(GPIONUM, Some(on), None);
-
-        get_io_mux_reg(GPIONUM).modify(|_, w| w.fun_wpu().bit(on));
-    }
-
-    fn internal_pull_down(&mut self, on: bool, _: private::Internal) {
-        #[cfg(esp32)]
-        crate::soc::gpio::errata36(GPIONUM, None, Some(on));
-
-        get_io_mux_reg(GPIONUM).modify(|_, w| w.fun_wpd().bit(on));
-    }
-
     fn is_set_high(&self, _: private::Internal) -> bool {
         <Self as GpioProperties>::Bank::read_output() & (1 << (GPIONUM % 32)) != 0
     }
@@ -921,10 +918,8 @@ where
     fn init_output(&self, alternate: AlternateFunction, open_drain: bool) {
         let gpio = unsafe { &*GPIO::PTR };
 
-        #[cfg(esp32)]
-        crate::soc::gpio::errata36(GPIONUM, Some(false), Some(false));
-
         self.write_out_en(true);
+        self.pull_direction(Pull::None, private::Internal);
 
         gpio.pin(GPIONUM as usize)
             .modify(|_, w| w.pad_driver().bit(open_drain));
@@ -940,10 +935,6 @@ where
                 .bits(alternate as u8)
                 .fun_ie()
                 .bit(open_drain)
-                .fun_wpd()
-                .clear_bit()
-                .fun_wpu()
-                .clear_bit()
                 .fun_drv()
                 .bits(DriveStrength::I20mA as u8)
                 .slp_sel()
@@ -1999,8 +1990,7 @@ where
 {
     /// Set the GPIO to input mode.
     pub fn set_as_input(&mut self, pull: Pull) {
-        self.pin
-            .init_input(pull == Pull::Down, pull == Pull::Up, private::Internal);
+        self.pin.init_input(pull, private::Internal);
     }
 
     /// Get whether the pin input level is high.
@@ -2131,10 +2121,7 @@ where
     /// Set the GPIO to open-drain mode.
     pub fn set_as_open_drain(&mut self, pull: Pull) {
         self.pin.set_to_open_drain_output(private::Internal);
-        self.pin
-            .internal_pull_down(pull == Pull::Down, private::Internal);
-        self.pin
-            .internal_pull_up(pull == Pull::Up, private::Internal);
+        self.pin.pull_direction(pull, private::Internal);
     }
 }
 
@@ -2179,10 +2166,18 @@ pub(crate) mod internal {
         }
     }
 
-    impl PeripheralInput for AnyPin {
-        fn init_input(&self, pull_down: bool, pull_up: bool, _: private::Internal) {
+    impl PeripheralSignal for AnyPin {
+        fn pull_direction(&self, pull: Pull, _: private::Internal) {
             handle_gpio_input!(&self.0, target, {
-                PeripheralInput::init_input(target, pull_down, pull_up, private::Internal)
+                PeripheralSignal::pull_direction(target, pull, private::Internal)
+            })
+        }
+    }
+
+    impl PeripheralInput for AnyPin {
+        fn init_input(&self, pull: Pull, _: private::Internal) {
+            handle_gpio_input!(&self.0, target, {
+                PeripheralInput::init_input(target, pull, private::Internal)
             });
         }
 
@@ -2319,18 +2314,6 @@ pub(crate) mod internal {
         fn internal_pull_down_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
             handle_gpio_output!(&mut self.0, target, {
                 PeripheralOutput::internal_pull_down_in_sleep_mode(target, on, private::Internal)
-            });
-        }
-
-        fn internal_pull_up(&mut self, on: bool, _: private::Internal) {
-            handle_gpio_output!(&mut self.0, target, {
-                PeripheralOutput::internal_pull_up(target, on, private::Internal)
-            });
-        }
-
-        fn internal_pull_down(&mut self, on: bool, _: private::Internal) {
-            handle_gpio_output!(&mut self.0, target, {
-                PeripheralOutput::internal_pull_down(target, on, private::Internal)
             });
         }
 

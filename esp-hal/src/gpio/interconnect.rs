@@ -13,7 +13,9 @@ use crate::{
         OutputSignalType,
         PeripheralInput,
         PeripheralOutput,
+        PeripheralSignal,
         Pin,
+        Pull,
         FUNC_IN_SEL_OFFSET,
         GPIO_FUNCTION,
         INPUT_SIGNAL_MAX,
@@ -82,6 +84,14 @@ impl InputSignal {
     }
 }
 
+impl PeripheralSignal for InputSignal {
+    delegate::delegate! {
+        to self.pin {
+            fn pull_direction(&self, pull: Pull, _internal: private::Internal);
+        }
+    }
+}
+
 impl PeripheralInput for InputSignal {
     /// Connect the pin to a peripheral input signal.
     fn connect_input_to_peripheral(&mut self, signal: gpio::InputSignal, _: private::Internal) {
@@ -134,7 +144,7 @@ impl PeripheralInput for InputSignal {
 
     delegate::delegate! {
         to self.pin {
-            fn init_input(&self, pull_down: bool, pull_up: bool, _internal: private::Internal);
+            fn init_input(&self, pull: Pull, _internal: private::Internal);
             fn is_input_high(&self, _internal: private::Internal) -> bool;
             fn input_signals(&self, _internal: private::Internal) -> [Option<gpio::InputSignal>; 6];
             fn enable_input(&mut self, on: bool, _internal: private::Internal);
@@ -201,6 +211,14 @@ impl OutputSignal {
                     .oen_inv_sel()
                     .bit(invert_enable)
             });
+    }
+}
+
+impl PeripheralSignal for OutputSignal {
+    delegate::delegate! {
+        to self.pin {
+            fn pull_direction(&self, pull: Pull, _internal: private::Internal);
+        }
     }
 }
 
@@ -279,8 +297,6 @@ impl PeripheralOutput for OutputSignal {
             fn enable_output_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             fn internal_pull_up_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             fn internal_pull_down_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
-            fn internal_pull_up(&mut self, on: bool, _internal: private::Internal);
-            fn internal_pull_down(&mut self, on: bool, _internal: private::Internal);
             fn is_set_high(&self, _internal: private::Internal) -> bool;
             fn output_signals(&self, _internal: private::Internal) -> [Option<gpio::OutputSignal>; 6];
         }
@@ -340,6 +356,18 @@ where
 }
 
 impl Sealed for AnyInputSignal {}
+impl PeripheralSignal for AnyInputSignal {
+    delegate::delegate! {
+        to match &self.0 {
+            AnyInputSignalInner::Input(pin) => pin,
+            AnyInputSignalInner::Constant(level) => level,
+            AnyInputSignalInner::Dummy(pin) => pin,
+        } {
+            fn pull_direction(&self, pull: Pull, _internal: private::Internal);
+        }
+    }
+}
+
 impl PeripheralInput for AnyInputSignal {
     delegate::delegate! {
         to match &self.0 {
@@ -347,7 +375,7 @@ impl PeripheralInput for AnyInputSignal {
             AnyInputSignalInner::Constant(level) => level,
             AnyInputSignalInner::Dummy(pin) => pin,
         } {
-            fn init_input(&self, pull_down: bool, pull_up: bool, _internal: private::Internal);
+            fn init_input(&self, pull: Pull, _internal: private::Internal);
             fn is_input_high(&self, _internal: private::Internal) -> bool;
             fn input_signals(&self, _internal: private::Internal) -> [Option<gpio::InputSignal>; 6];
         }

@@ -33,7 +33,7 @@ impl PeripheralInput for DummyPin {
         [None; 6]
     }
 
-    fn init_input(&self, _pull_down: bool, _pull_up: bool, _: private::Internal) {}
+    fn init_input(&self, _pull: Pull, _: private::Internal) {}
 
     fn enable_input(&mut self, _on: bool, _: private::Internal) {}
 
@@ -61,21 +61,36 @@ impl PeripheralInput for DummyPin {
     fn disconnect_input_from_peripheral(&mut self, _signal: InputSignal, _: private::Internal) {}
 }
 
+impl PeripheralSignal for Level {
+    delegate::delegate! {
+        to match self {
+            Level::High => DummyPin { value: true },
+            Level::Low => DummyPin { value: false },
+        } {
+            fn pull_direction(&self, pull: Pull, _internal: private::Internal);
+        }
+    }
+}
+
 impl PeripheralInput for Level {
     delegate::delegate! {
         to match self {
             Level::High => DummyPin { value: true },
             Level::Low => DummyPin { value: false },
-        }  {
-            fn input_signals(&self, _internal: private::Internal) -> [Option<InputSignal>; 6];
-            fn init_input(&self, _pd: bool, _pu: bool, _internal: private::Internal);
+        } {
+            fn init_input(&self, _pull: Pull, _internal: private::Internal);
             fn enable_input(&mut self, _on: bool, _internal: private::Internal);
             fn enable_input_in_sleep_mode(&mut self, _on: bool, _internal: private::Internal);
             fn is_input_high(&self, _internal: private::Internal) -> bool;
             fn connect_input_to_peripheral(&mut self, _signal: InputSignal, _internal: private::Internal);
             fn disconnect_input_from_peripheral(&mut self, _signal: InputSignal, _internal: private::Internal);
+            fn input_signals(&self, _internal: private::Internal) -> [Option<InputSignal>; 6];
         }
     }
+}
+
+impl PeripheralSignal for DummyPin {
+    fn pull_direction(&self, _pull: Pull, _internal: private::Internal) {}
 }
 
 impl PeripheralOutput for DummyPin {
@@ -98,10 +113,6 @@ impl PeripheralOutput for DummyPin {
     fn internal_pull_up_in_sleep_mode(&mut self, _on: bool, _: private::Internal) {}
 
     fn internal_pull_down_in_sleep_mode(&mut self, _on: bool, _: private::Internal) {}
-
-    fn internal_pull_up(&mut self, _on: bool, _: private::Internal) {}
-
-    fn internal_pull_down(&mut self, _on: bool, _: private::Internal) {}
 
     fn is_set_high(&self, _: private::Internal) -> bool {
         self.value

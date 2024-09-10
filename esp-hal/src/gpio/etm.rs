@@ -152,11 +152,7 @@ impl<const C: u8> GpioEtmEventChannel<C> {
     {
         crate::into_ref!(pin);
 
-        pin.init_input(
-            pin_config.pull == Pull::Down,
-            pin_config.pull == Pull::Up,
-            private::Internal,
-        );
+        pin.init_input(pin_config.pull, private::Internal);
 
         enable_event_channel(C, pin.number(private::Internal));
         GpioEtmEventChannelRising { _pin: pin }
@@ -173,11 +169,7 @@ impl<const C: u8> GpioEtmEventChannel<C> {
     {
         crate::into_ref!(pin);
 
-        pin.init_input(
-            pin_config.pull == Pull::Down,
-            pin_config.pull == Pull::Up,
-            private::Internal,
-        );
+        pin.init_input(pin_config.pull, private::Internal);
 
         enable_event_channel(C, pin.number(private::Internal));
         GpioEtmEventChannelFalling { _pin: pin }
@@ -194,11 +186,7 @@ impl<const C: u8> GpioEtmEventChannel<C> {
     {
         crate::into_ref!(pin);
 
-        pin.init_input(
-            pin_config.pull == Pull::Down,
-            pin_config.pull == Pull::Up,
-            private::Internal,
-        );
+        pin.init_input(pin_config.pull, private::Internal);
 
         enable_event_channel(C, pin.number(private::Internal));
         GpioEtmEventChannelAny { _pin: pin }
@@ -318,8 +306,7 @@ impl<const C: u8> GpioEtmTaskChannel<C> {
 
         pin.set_output_high(pin_config.initial_state.into(), private::Internal);
         if pin_config.open_drain {
-            pin.internal_pull_down(pin_config.pull == Pull::Down, private::Internal);
-            pin.internal_pull_up(pin_config.pull == Pull::Up, private::Internal);
+            pin.pull_direction(pin_config.pull, private::Internal);
             pin.set_to_open_drain_output(private::Internal);
         } else {
             pin.set_to_push_pull_output(private::Internal);
@@ -342,8 +329,7 @@ impl<const C: u8> GpioEtmTaskChannel<C> {
 
         pin.set_output_high(pin_config.initial_state.into(), private::Internal);
         if pin_config.open_drain {
-            pin.internal_pull_down(pin_config.pull == Pull::Down, private::Internal);
-            pin.internal_pull_up(pin_config.pull == Pull::Up, private::Internal);
+            pin.pull_direction(pin_config.pull, private::Internal);
             pin.set_to_open_drain_output(private::Internal);
         } else {
             pin.set_to_push_pull_output(private::Internal);
@@ -366,8 +352,7 @@ impl<const C: u8> GpioEtmTaskChannel<C> {
 
         pin.set_output_high(pin_config.initial_state.into(), private::Internal);
         if pin_config.open_drain {
-            pin.internal_pull_down(pin_config.pull == Pull::Down, private::Internal);
-            pin.internal_pull_up(pin_config.pull == Pull::Up, private::Internal);
+            pin.pull_direction(pin_config.pull, private::Internal);
             pin.set_to_open_drain_output(private::Internal);
         } else {
             pin.set_to_push_pull_output(private::Internal);

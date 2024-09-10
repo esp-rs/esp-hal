@@ -57,7 +57,7 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
+    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::i2c0::{RegisterBlock, COMD},
@@ -358,7 +358,7 @@ where
 
         scl.set_to_open_drain_output(crate::private::Internal);
         scl.enable_input(true, crate::private::Internal);
-        scl.internal_pull_up(true, crate::private::Internal);
+        scl.pull_direction(Pull::Up, crate::private::Internal);
 
         scl.connect_input_to_peripheral(
             i2c.peripheral.scl_input_signal(),
@@ -371,7 +371,7 @@ where
 
         sda.set_to_open_drain_output(crate::private::Internal);
         sda.enable_input(true, crate::private::Internal);
-        sda.internal_pull_up(true, crate::private::Internal);
+        sda.pull_direction(Pull::Up, crate::private::Internal);
 
         sda.connect_input_to_peripheral(
             i2c.peripheral.sda_input_signal(),

@@ -38,11 +38,7 @@ impl PcntSource {
     /// configuration.
     pub fn from(source: impl Into<AnyInputSignal>, pin_config: PcntInputConfig) -> Self {
         let source = source.into();
-        source.init_input(
-            pin_config.pull == Pull::Down,
-            pin_config.pull == Pull::Up,
-            crate::private::Internal,
-        );
+        source.init_input(pin_config.pull, crate::private::Internal);
 
         Self { source }
     }

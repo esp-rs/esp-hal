@@ -928,7 +928,7 @@ mod private {
         {
             into_ref!(pin);
             pin.set_to_push_pull_output(private::Internal);
-            pin.connect_peripheral_to_output(T::bclk_signal(), crate::private::Internal);
+            pin.connect_peripheral_to_output(T::bclk_signal(), private::Internal);
 
             self
         }
@@ -939,7 +939,7 @@ mod private {
         {
             into_ref!(pin);
             pin.set_to_push_pull_output(private::Internal);
-            pin.connect_peripheral_to_output(T::ws_signal(), crate::private::Internal);
+            pin.connect_peripheral_to_output(T::ws_signal(), private::Internal);
 
             self
         }
@@ -950,7 +950,7 @@ mod private {
         {
             into_ref!(pin);
             pin.set_to_push_pull_output(private::Internal);
-            pin.connect_peripheral_to_output(T::dout_signal(), crate::private::Internal);
+            pin.connect_peripheral_to_output(T::dout_signal(), private::Internal);
 
             self
         }
@@ -983,8 +983,8 @@ mod private {
             P: PeripheralOutput,
         {
             into_ref!(pin);
-            pin.set_to_push_pull_output(crate::private::Internal);
-            pin.connect_peripheral_to_output(T::bclk_rx_signal(), crate::private::Internal);
+            pin.set_to_push_pull_output(private::Internal);
+            pin.connect_peripheral_to_output(T::bclk_rx_signal(), private::Internal);
 
             self
         }
@@ -994,8 +994,8 @@ mod private {
             P: PeripheralOutput,
         {
             into_ref!(pin);
-            pin.set_to_push_pull_output(crate::private::Internal);
-            pin.connect_peripheral_to_output(T::ws_rx_signal(), crate::private::Internal);
+            pin.set_to_push_pull_output(private::Internal);
+            pin.connect_peripheral_to_output(T::ws_rx_signal(), private::Internal);
 
             self
         }
@@ -1005,8 +1005,8 @@ mod private {
             P: PeripheralInput,
         {
             into_ref!(pin);
-            pin.init_input(false, false, crate::private::Internal);
-            pin.connect_input_to_peripheral(T::din_signal(), crate::private::Internal);
+            pin.init_input(crate::gpio::Pull::None, private::Internal);
+            pin.connect_input_to_peripheral(T::din_signal(), private::Internal);
 
             self
         }

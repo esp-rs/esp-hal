@@ -332,7 +332,8 @@ where
         pcr.parl_clk_tx_conf()
             .modify(|_, w| unsafe { w.parl_clk_tx_sel().bits(3).parl_clk_tx_div_num().bits(0) }); // PAD_CLK_TX, no divider
 
-        self.pin.init_input(false, false, crate::private::Internal);
+        self.pin
+            .init_input(crate::gpio::Pull::None, crate::private::Internal);
         self.pin.connect_input_to_peripheral(
             crate::gpio::InputSignal::PARL_TX_CLK,
             crate::private::Internal,
@@ -367,7 +368,8 @@ where
         pcr.parl_clk_rx_conf()
             .modify(|_, w| unsafe { w.parl_clk_rx_sel().bits(3).parl_clk_rx_div_num().bits(0) }); // PAD_CLK_TX, no divider
 
-        self.pin.init_input(false, false, crate::private::Internal);
+        self.pin
+            .init_input(crate::gpio::Pull::None, crate::private::Internal);
         self.pin.connect_input_to_peripheral(
             crate::gpio::InputSignal::PARL_RX_CLK,
             crate::private::Internal,
@@ -635,7 +637,7 @@ where
     fn configure(&mut self) -> Result<(), Error> {
         self.rx_pins.configure()?;
         self.valid_pin
-            .init_input(false, false, crate::private::Internal);
+            .init_input(crate::gpio::Pull::None, crate::private::Internal);
         self.valid_pin
             .connect_input_to_peripheral(Instance::rx_valid_pin_signal(), crate::private::Internal);
         Instance::set_rx_sw_en(false);
@@ -739,7 +741,7 @@ macro_rules! rx_pins {
             {
                 fn configure(&mut self)  -> Result<(), Error> {
                     $(
-                        self.[< pin_ $pin:lower >].init_input(false, false, $crate::private::Internal);
+                        self.[< pin_ $pin:lower >].init_input(crate::gpio::Pull::None, crate::private::Internal);
                         self.[< pin_ $pin:lower >].connect_input_to_peripheral(crate::gpio::InputSignal::$signal, crate::private::Internal);
                     )+
 

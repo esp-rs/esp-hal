@@ -73,7 +73,7 @@ use core::marker::PhantomData;
 use super::{Error, FullDuplexMode, SpiMode};
 use crate::{
     dma::{DescriptorChain, DmaPeripheral, Rx, Tx},
-    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
+    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
     private,
@@ -121,16 +121,16 @@ where
     ) -> Spi<'d, T, FullDuplexMode> {
         crate::into_ref!(spi, sclk, mosi, miso, cs);
 
-        sclk.init_input(false, false, private::Internal);
+        sclk.init_input(Pull::None, private::Internal);
         sclk.connect_input_to_peripheral(spi.sclk_signal(), private::Internal);
 
-        mosi.init_input(false, false, private::Internal);
+        mosi.init_input(Pull::None, private::Internal);
         mosi.connect_input_to_peripheral(spi.mosi_signal(), private::Internal);
 
         miso.set_to_push_pull_output(private::Internal);
         miso.connect_peripheral_to_output(spi.miso_signal(), private::Internal);
 
-        cs.init_input(false, false, private::Internal);
+        cs.init_input(Pull::None, private::Internal);
         cs.connect_input_to_peripheral(spi.cs_signal(), private::Internal);
 
         Self::new_internal(spi, mode)
