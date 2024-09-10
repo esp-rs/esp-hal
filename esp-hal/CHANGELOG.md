@@ -61,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `Rtc::get_time_raw` (#1883)
 - Removed `_with_default_pins` UART constructors (#2132)
 - Removed `uart::{DefaultRxPin, DefaultTxPin}` (#2132)
+- Removed `PcntSource` and `PcntInputConfig`. (#2134)
 
 ## [0.20.1] - 2024-08-30
 

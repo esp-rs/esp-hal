@@ -8,12 +8,8 @@
 use esp_hal::{
     dma::{Channel, Dma, DmaPriority, DmaTxBuf},
     dma_buffers,
-    gpio::{AnyPin, Io, Pull},
-    pcnt::{
-        channel::{EdgeMode, PcntInputConfig, PcntSource},
-        unit::Unit,
-        Pcnt,
-    },
+    gpio::{interconnect::InputSignal, AnyPin, Io, Pull},
+    pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
     prelude::*,
     spi::{
         master::{Address, Command, Spi, SpiDma},
@@ -38,7 +34,7 @@ cfg_if::cfg_if! {
 
 struct Context {
     spi: esp_hal::peripherals::SPI2,
-    pcnt_source: PcntSource,
+    pcnt_source: InputSignal,
     pcnt: esp_hal::peripherals::PCNT,
     dma_channel: Channel<'static, DmaChannel0, Blocking>,
     mosi: AnyPin,
@@ -121,10 +117,7 @@ mod tests {
 
         Context {
             spi: peripherals.SPI2,
-            pcnt_source: PcntSource::from(
-                mosi.peripheral_input(),
-                PcntInputConfig { pull: Pull::None },
-            ),
+            pcnt_source: mosi.peripheral_input(),
             pcnt: peripherals.PCNT,
             dma_channel,
             mosi,

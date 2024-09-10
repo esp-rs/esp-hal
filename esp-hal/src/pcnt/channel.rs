@@ -9,40 +9,11 @@
 
 use core::marker::PhantomData;
 
-use crate::gpio::{interconnect::AnyInputSignal, InputSignal, PeripheralInput, Pull};
-
-/// Configuration for an PCNT input pin
-#[derive(Clone, Copy, Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct PcntInputConfig {
-    /// Configuration for the internal pull-up resistors
-    pub pull: Pull,
-}
-
-impl Default for PcntInputConfig {
-    fn default() -> Self {
-        Self { pull: Pull::None }
-    }
-}
-
 pub use crate::peripherals::pcnt::unit::conf0::{CTRL_MODE as CtrlMode, EDGE_MODE as EdgeMode};
-
-/// PcntPin can be always high, always low, or an actual pin
-#[derive(Clone)]
-pub struct PcntSource {
-    source: AnyInputSignal,
-}
-
-impl PcntSource {
-    /// Creates a `PcntSource` from an input pin with the specified
-    /// configuration.
-    pub fn from(source: impl Into<AnyInputSignal>, pin_config: PcntInputConfig) -> Self {
-        let source = source.into();
-        source.init_input(pin_config.pull, crate::private::Internal);
-
-        Self { source }
-    }
-}
+use crate::{
+    gpio::{InputSignal, PeripheralInput},
+    peripheral::Peripheral,
+};
 
 /// Represents a channel within a pulse counter unit.
 pub struct Channel<'d, const UNIT: usize, const NUM: usize> {
@@ -95,7 +66,7 @@ impl<'d, const UNIT: usize, const NUM: usize> Channel<'d, UNIT, NUM> {
     }
 
     /// Set the control signal (pin/high/low) for this channel
-    pub fn set_ctrl_signal(&self, mut source: PcntSource) -> &Self {
+    pub fn set_ctrl_signal<P: PeripheralInput>(&self, source: impl Peripheral<P = P>) -> &Self {
         let signal = match UNIT {
             0 => match NUM {
                 0 => InputSignal::PCNT0_CTRL_CH0,
@@ -145,15 +116,15 @@ impl<'d, const UNIT: usize, const NUM: usize> Channel<'d, UNIT, NUM> {
         };
 
         if (signal as usize) <= crate::gpio::INPUT_SIGNAL_MAX as usize {
-            source
-                .source
-                .connect_input_to_peripheral(signal, crate::private::Internal);
+            crate::into_ref!(source);
+            source.enable_input(true, crate::private::Internal);
+            source.connect_input_to_peripheral(signal, crate::private::Internal);
         }
         self
     }
 
     /// Set the edge signal (pin/high/low) for this channel
-    pub fn set_edge_signal(&self, mut source: PcntSource) -> &Self {
+    pub fn set_edge_signal<P: PeripheralInput>(&self, source: impl Peripheral<P = P>) -> &Self {
         let signal = match UNIT {
             0 => match NUM {
                 0 => InputSignal::PCNT0_SIG_CH0,
@@ -203,9 +174,9 @@ impl<'d, const UNIT: usize, const NUM: usize> Channel<'d, UNIT, NUM> {
         };
 
         if (signal as usize) <= crate::gpio::INPUT_SIGNAL_MAX as usize {
-            source
-                .source
-                .connect_input_to_peripheral(signal, crate::private::Internal);
+            crate::into_ref!(source);
+            source.enable_input(true, crate::private::Internal);
+            source.connect_input_to_peripheral(signal, crate::private::Internal);
         }
         self
     }

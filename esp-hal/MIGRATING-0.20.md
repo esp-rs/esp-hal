@@ -125,3 +125,24 @@ let rtc = Rtc::new(peripherals.LPWR);
 - let current_time_ms = rtc.get_time_ms();
 + let current_time_ms = rtc.current_time().and_utc().timestamp_millis(); // assuming UTC
 ```
+
+## PCNT input config
+
+The `PcntSource` and `PcntInputConfig` have been removed. You can use `Input` or `Flex` instead to
+configure an input pin, and pass it to `set_edge_signal` or `set_ctrl_signal`.
+
+```diff
+-   let mut pin_a = io.pins.gpio4;
+-   ch0.set_ctrl_signal(PcntSource::from_pin(
+-       &mut pin_a,
+-       PcntInputConfig { pull: Pull::Up },
+-   ));
++   ch0.set_ctrl_signal(Input::new(io.pins.gpio4, Pull::Up));
+ 
+-   let mut pin_b = io.pins.gpio5;
+-   ch0.set_edge_signal(PcntSource::from_pin(
+-       &mut pin_b,
+-       PcntInputConfig { pull: Pull::Down },
+-   ));
++   ch0.set_edge_signal(Input::new(io.pins.gpio5, Pull::Down));
+```
