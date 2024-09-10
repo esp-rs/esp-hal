@@ -89,23 +89,14 @@ impl PeripheralInput for InputSignal {
 
         let af = if self.is_inverted {
             GPIO_FUNCTION
-        } else if let Some(af) = self
-            .pin
-            .input_signals(private::Internal)
-            .into_iter()
-            .position(|s| s == Some(signal))
-        {
-            match af {
-                0 => AlternateFunction::Function0,
-                1 => AlternateFunction::Function1,
-                2 => AlternateFunction::Function2,
-                3 => AlternateFunction::Function3,
-                4 => AlternateFunction::Function4,
-                5 => AlternateFunction::Function5,
-                _ => unreachable!(),
-            }
         } else {
-            GPIO_FUNCTION
+            self.pin
+                .input_signals(private::Internal)
+                .into_iter()
+                .position(|s| s == Some(signal))
+                .ok_or(())
+                .and_then(AlternateFunction::try_from)
+                .unwrap_or(GPIO_FUNCTION)
         };
 
         if af == GPIO_FUNCTION && signal_nr > INPUT_SIGNAL_MAX as usize {
@@ -232,23 +223,14 @@ impl PeripheralOutput for OutputSignal {
     fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal, _: private::Internal) {
         let af = if self.is_inverted {
             GPIO_FUNCTION
-        } else if let Some(af) = self
-            .pin
-            .output_signals(private::Internal)
-            .into_iter()
-            .position(|s| s == Some(signal))
-        {
-            match af {
-                0 => AlternateFunction::Function0,
-                1 => AlternateFunction::Function1,
-                2 => AlternateFunction::Function2,
-                3 => AlternateFunction::Function3,
-                4 => AlternateFunction::Function4,
-                5 => AlternateFunction::Function5,
-                _ => unreachable!(),
-            }
         } else {
-            GPIO_FUNCTION
+            self.pin
+                .output_signals(private::Internal)
+                .into_iter()
+                .position(|s| s == Some(signal))
+                .ok_or(())
+                .and_then(AlternateFunction::try_from)
+                .unwrap_or(GPIO_FUNCTION)
         };
 
         self.pin.set_alternate_function(af, private::Internal);

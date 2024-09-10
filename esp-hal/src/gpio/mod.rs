@@ -228,6 +228,22 @@ pub enum AlternateFunction {
     Function5 = 5,
 }
 
+impl TryFrom<usize> for AlternateFunction {
+    type Error = ();
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(AlternateFunction::Function0),
+            1 => Ok(AlternateFunction::Function1),
+            2 => Ok(AlternateFunction::Function2),
+            3 => Ok(AlternateFunction::Function3),
+            4 => Ok(AlternateFunction::Function4),
+            5 => Ok(AlternateFunction::Function5),
+            _ => Err(()),
+        }
+    }
+}
+
 /// RTC function
 #[derive(PartialEq)]
 pub enum RtcFunction {
