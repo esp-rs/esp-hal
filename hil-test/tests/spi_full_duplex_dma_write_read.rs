@@ -1,12 +1,7 @@
 //! SPI Full Duplex DMA write + read Test
 //! See issue #2059
 //!
-//! Folowing pins are used:
-//! SCLK    GPIO0
-//! MISO    GPIO2 / GPIO9  (esp32s2 / esp32s3) / GPIO26 (esp32)
-//! GPIO    GPIO3 / GPIO10 (esp32s2 / esp32s3) / GPIO27 (esp32)
-//!
-//! Connect MISO and GPIO pins.
+//! Uses the [hil_test::common_test_pins] pair connected to each other.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -58,7 +53,7 @@ mod tests {
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
         let (miso, gpio) = hil_test::common_test_pins!(io);
-        let _gpio = Output::new(gpio.degrade(), Level::High);
+        let _gpio = Output::new(gpio, Level::High);
 
         let dma = Dma::new(peripherals.DMA);
 
