@@ -74,15 +74,6 @@ let mut wakeup_pins: [&mut dyn RtcPin; 2] = [
 let ext1 = Ext1WakeupSource::new(&mut wakeup_pins, WakeupLevel::High);
 ```
 
-## `esp_hal::time::current_time` rename
-
-To avoid confusion with the `Rtc::current_time` wall clock time APIs, we've renamed `esp_hal::time::current_time` to `esp_hal::time::now()`.
-
-```diff
-- use esp_hal::time::current_time;
-+ use esp_hal::time::now;
-```
-
 ## RX/TX Order
 
 Previously, our API was pretty inconsistent with the RX/TX ordering, and different peripherals had different order. Now, all
@@ -115,7 +106,17 @@ When using the asymmetric variant of the macro to create DMA buffers and descrip
 The `Uart::new_with_default_pins` and `Uart::new_async_with_default_pins` constructors
 have been removed. Use `new` or `new_async` instead.
 
-## RTC Wall Clock APIs
+## Timer changes
+
+### `ErasedTimer` rename
+
+The `ErasedTimer` has been renamed to `AnyTimer`.
+
+### `esp_hal::time::current_time` rename
+
+To avoid confusion with the `Rtc::current_time` wall clock time APIs, we've renamed `esp_hal::time::current_time` to `esp_hal::time::now()`.
+
+### RTC Wall Clock APIs
 
 Instead of the `get_time_ms`, `get_time_us`, and `get_time_raw` functions, the `Rtc` struct now provides the `current_time` function, using `chrono`'s `NaiveDateTime` struct.
 

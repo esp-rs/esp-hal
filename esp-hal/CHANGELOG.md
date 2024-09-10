@@ -30,7 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reordered RX-TX pairs in all APIs to be consistent (#2074)
 - Make saving and restoring SHA digest state an explicit operation (#2049)
 - `Delay::new()` is now a `const` function (#1999)
-- You can now create an `AnyPin` out of an `ErasedPin`. (#2072)
 - `Input`, `Output`, `OutputOpenDrain` and `Flex` are now type-erased by default. Use the new `new_typed` constructor to keep using the ZST pin types. (#2075)
 - To avoid confusion with the `Rtc::current_time` wall clock time APIs, we've renamed `esp_hal::time::current_time` to `esp_hal::time::now`. (#2091)
 - Renamed `touch::Continous` to `touch::Continuous`. (#2094)
@@ -39,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed and merged `Rtc::get_time_us` and `Rtc::get_time_ms` into `Rtc::time_since_boot` (#1883)
 - ESP32: Added support for touch sensing on GPIO32 and 33 (#2109)
 - Replaced `AnyPin` with `InputSignal` and `OutputSignal` and renamed `ErasedPin` to `AnyPin` (#2128)
+- Replaced the `ErasedTimer` enum with the `AnyTimer` struct. (#?)
 
 ### Fixed
 

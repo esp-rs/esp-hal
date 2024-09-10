@@ -357,10 +357,8 @@ where
 
 impl<'d, T> embedded_hal_02::timer::Periodic for PeriodicTimer<'d, T> where T: Timer {}
 
-/// A type-erased timer
-///
-/// You can create an instance of this by just calling `.into()` on a timer.
-pub enum ErasedTimer {
+/// An enum of all timer types
+enum AnyTimerInner {
     /// Timer 0 of the TIMG0 peripheral in blocking mode.
     Timg0Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>),
     /// Timer 1 of the TIMG0 peripheral in blocking mode.
@@ -380,67 +378,68 @@ pub enum ErasedTimer {
     SystimerAlarmTarget(systimer::Alarm<'static, systimer::Target, Blocking>),
 }
 
-impl crate::private::Sealed for ErasedTimer {}
+/// A type-erased timer
+///
+/// You can create an instance of this by just calling `.into()` on a timer.
+pub struct AnyTimer(AnyTimerInner);
 
-impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>> for ErasedTimer {
+impl crate::private::Sealed for AnyTimer {}
+
+impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>> for AnyTimer {
     fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>) -> Self {
-        Self::Timg0Timer0(value)
+        Self(AnyTimerInner::Timg0Timer0(value))
     }
 }
 
 #[cfg(timg_timer1)]
-impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking>> for ErasedTimer {
+impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking>> for AnyTimer {
     fn from(value: timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking>) -> Self {
-        Self::Timg0Timer1(value)
+        Self(AnyTimerInner::Timg0Timer1(value))
     }
 }
 
 #[cfg(timg1)]
-impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking>> for ErasedTimer {
+impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking>> for AnyTimer {
     fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking>) -> Self {
-        Self::Timg1Timer0(value)
+        Self(AnyTimerInner::Timg1Timer0(value))
     }
 }
 
 #[cfg(all(timg1, timg_timer1))]
-impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>> for ErasedTimer {
+impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>> for AnyTimer {
     fn from(value: timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>) -> Self {
-        Self::Timg1Timer1(value)
+        Self(AnyTimerInner::Timg1Timer1(value))
     }
 }
 
 #[cfg(systimer)]
-impl From<systimer::Alarm<'static, systimer::Periodic, Blocking>> for ErasedTimer {
+impl From<systimer::Alarm<'static, systimer::Periodic, Blocking>> for AnyTimer {
     fn from(value: systimer::Alarm<'static, systimer::Periodic, Blocking>) -> Self {
-        Self::SystimerAlarmPeriodic(value)
+        Self(AnyTimerInner::SystimerAlarmPeriodic(value))
     }
 }
 
 #[cfg(systimer)]
-impl From<systimer::Alarm<'static, systimer::Target, Blocking>> for ErasedTimer {
+impl From<systimer::Alarm<'static, systimer::Target, Blocking>> for AnyTimer {
     fn from(value: systimer::Alarm<'static, systimer::Target, Blocking>) -> Self {
-        Self::SystimerAlarmTarget(value)
+        Self(AnyTimerInner::SystimerAlarmTarget(value))
     }
 }
 
-impl Timer for ErasedTimer {
-    // Rather than manually implementing `Timer` for each variant of `ErasedTimer`,
-    // we use `delegate::delegate!{}` to do this for us. Otherwise, each function
-    // implementation would require its own `match` block for each enum variant,
-    // which would very quickly result in a large amount of duplicated code.
+impl Timer for AnyTimer {
     delegate::delegate! {
-        to match self {
-            ErasedTimer::Timg0Timer0(inner) => inner,
+        to match &self.0 {
+            AnyTimerInner::Timg0Timer0(inner) => inner,
             #[cfg(timg_timer1)]
-            ErasedTimer::Timg0Timer1(inner) => inner,
+            AnyTimerInner::Timg0Timer1(inner) => inner,
             #[cfg(timg1)]
-            ErasedTimer::Timg1Timer0(inner) => inner,
+            AnyTimerInner::Timg1Timer0(inner) => inner,
             #[cfg(all(timg1,timg_timer1))]
-            ErasedTimer::Timg1Timer1(inner) => inner,
+            AnyTimerInner::Timg1Timer1(inner) => inner,
             #[cfg(systimer)]
-            ErasedTimer::SystimerAlarmPeriodic(inner) => inner,
+            AnyTimerInner::SystimerAlarmPeriodic(inner) => inner,
             #[cfg(systimer)]
-            ErasedTimer::SystimerAlarmTarget(inner) => inner,
+            AnyTimerInner::SystimerAlarmTarget(inner) => inner,
         } {
             fn start(&self);
             fn stop(&self);
@@ -458,7 +457,7 @@ impl Timer for ErasedTimer {
     }
 }
 
-impl Peripheral for ErasedTimer {
+impl Peripheral for AnyTimer {
     type P = Self;
 
     #[inline]

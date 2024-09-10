@@ -32,7 +32,7 @@ use fugit::MegahertzU32;
 use hal::{
     clock::Clocks,
     system::RadioClockController,
-    timer::{timg::Timer as TimgTimer, ErasedTimer, PeriodicTimer},
+    timer::{timg::Timer as TimgTimer, AnyTimer, PeriodicTimer},
 };
 #[cfg(feature = "wifi")]
 use wifi::WifiError;
@@ -140,7 +140,7 @@ const _: () = {
     core::assert!(CONFIG.rx_ba_win < (CONFIG.static_rx_buf_num * 2), "WiFi configuration check: rx_ba_win should not be larger than double of the static_rx_buf_num!");
 };
 
-type TimeBase = PeriodicTimer<'static, ErasedTimer>;
+type TimeBase = PeriodicTimer<'static, AnyTimer>;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -224,14 +224,14 @@ pub trait EspWifiTimerSource {
 
 /// Helper trait to reduce boilerplate.
 ///
-/// We can't blanket-implement for `Into<ErasedTimer>` because of possible
+/// We can't blanket-implement for `Into<AnyTimer>` because of possible
 /// conflicting implementations.
-trait IntoErasedTimer: Into<ErasedTimer> {}
+trait IntoErasedTimer: Into<AnyTimer> {}
 
 impl<T, DM> IntoErasedTimer for TimgTimer<T, DM>
 where
     DM: esp_hal::Mode,
-    Self: Into<ErasedTimer>,
+    Self: Into<AnyTimer>,
 {
 }
 
@@ -239,11 +239,11 @@ where
 impl<T, DM, COMP, UNIT> IntoErasedTimer for Alarm<'_, T, DM, COMP, UNIT>
 where
     DM: esp_hal::Mode,
-    Self: Into<ErasedTimer>,
+    Self: Into<AnyTimer>,
 {
 }
 
-impl IntoErasedTimer for ErasedTimer {}
+impl IntoErasedTimer for AnyTimer {}
 
 impl<T> EspWifiTimerSource for T
 where
@@ -269,7 +269,7 @@ impl EspWifiTimerSource for TimeBase {
 ///
 /// - A timg `Timer` instance
 /// - A systimer `Alarm` instance
-/// - An `ErasedTimer` instance
+/// - An `AnyTimer` instance
 /// - A `OneShotTimer` instance
 ///
 /// # Examples

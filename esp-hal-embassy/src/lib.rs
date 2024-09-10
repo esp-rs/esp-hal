@@ -38,7 +38,7 @@ mod fmt;
 
 #[cfg(not(feature = "esp32"))]
 use esp_hal::timer::systimer::Alarm;
-use esp_hal::timer::{timg::Timer as TimgTimer, ErasedTimer};
+use esp_hal::timer::{timg::Timer as TimgTimer, AnyTimer};
 pub use macros::main;
 
 #[cfg(feature = "executors")]
@@ -69,16 +69,16 @@ pub trait TimerCollection {
 
 /// Helper trait to reduce boilerplate.
 ///
-/// We can't blanket-implement for `Into<ErasedTimer>` because of possible
+/// We can't blanket-implement for `Into<AnyTimer>` because of possible
 /// conflicting implementations.
-trait IntoErasedTimer: Into<ErasedTimer> {}
+trait IntoErasedTimer: Into<AnyTimer> {}
 
-impl IntoErasedTimer for ErasedTimer {}
+impl IntoErasedTimer for AnyTimer {}
 
 impl<T, DM> IntoErasedTimer for TimgTimer<T, DM>
 where
     DM: esp_hal::Mode,
-    Self: Into<ErasedTimer>,
+    Self: Into<AnyTimer>,
 {
 }
 
@@ -86,7 +86,7 @@ where
 impl<T, DM, COMP, UNIT> IntoErasedTimer for Alarm<'_, T, DM, COMP, UNIT>
 where
     DM: esp_hal::Mode,
-    Self: Into<ErasedTimer>,
+    Self: Into<AnyTimer>,
 {
 }
 
@@ -143,11 +143,11 @@ impl_array!(4);
 ///
 /// - A timg `Timer` instance
 /// - A systimer `Alarm` instance
-/// - An `ErasedTimer` instance
+/// - An `AnyTimer` instance
 /// - A `OneShotTimer` instance
 /// - A mutable static slice of `OneShotTimer` instances
 /// - A mutable static array of `OneShotTimer` instances
-/// - A 2, 3, 4 element array of `ErasedTimer` instances
+/// - A 2, 3, 4 element array of `AnyTimer` instances
 ///
 /// # Examples
 ///
