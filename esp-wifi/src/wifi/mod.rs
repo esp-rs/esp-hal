@@ -67,6 +67,9 @@ use crate::{
         peripheral::{Peripheral, PeripheralRef},
     },
     EspWifiInitialization,
+    EspWifiOperationFor,
+    EspWifiDeinitialization,
+    EspWifiDeinitializationInternal,
 };
 
 const ETHERNET_FRAME_HEADER_SIZE: usize = 18;
@@ -93,6 +96,7 @@ use crate::{
             esp_wifi_disconnect,
             esp_wifi_get_mode,
             esp_wifi_init_internal,
+            esp_wifi_deinit_internal,
             esp_wifi_internal_free_rx_buffer,
             esp_wifi_internal_reg_rxcb,
             esp_wifi_internal_tx,
@@ -1434,6 +1438,39 @@ pub(crate) fn wifi_start() -> Result<(), WifiError> {
     }
 
     Ok(())
+}
+
+/// Stops and de-initializes Wi-Fi stack
+pub fn deinitialize(
+    deinit_for: EspWifiOperationFor,
+    controller: WifiController, 
+    stack: crate::wifi_interface::WifiStack<impl WifiDeviceMode>,
+) -> Result<EspWifiDeinitialization, WifiError> {
+
+    esp_wifi_result!(unsafe { esp_wifi_stop() })?;
+    esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
+
+    drop(controller);
+    drop(stack);
+
+    match deinit_for {
+        #[cfg(feature = "wifi")]
+        EspWifiOperationFor::Wifi => Ok(EspWifiDeinitialization::Wifi(EspWifiDeinitializationInternal)),
+        #[cfg(feature = "ble")]
+        EspWifiOperationFor::Ble => Ok(EspWifiDeinitialization::Ble(EspWifiDeinitializationInternal)),
+        #[cfg(coex)]
+        EspWifiOperationFor::WifiBle => Ok(EspWifiDeinitialization::WifiBle(EspWifiDeinitializationInternal)),
+    }
+}
+
+unsafe extern "C" fn coex_register_start_cb(
+    _cb: Option<unsafe extern "C" fn() -> c_types::c_int>,
+) -> c_types::c_int {
+    #[cfg(coex)]
+    return include::coex_register_start_cb(_cb);
+
+    #[cfg(not(coex))]
+    0
 }
 
 /// Configuration for active or passive scan. For details see the [WIFI Alliance FAQ](https://www.wi-fi.org/knowledge-center/faq/what-are-passive-and-active-scanning).

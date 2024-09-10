@@ -18,7 +18,7 @@ use esp_hal::{
     rng::Rng,
     timer::{timg::TimerGroup, AnyTimer, PeriodicTimer},
 };
-use esp_wifi::{initialize, wifi, EspWifiInitFor};
+use esp_wifi::{initialize, wifi, EspWifiOperationFor};
 use ieee80211::{
     common::{CapabilitiesInformation, FCFFlags},
     element_chain,
@@ -50,7 +50,7 @@ fn main() -> ! {
     let timer = PeriodicTimer::new(timer0);
 
     let init = initialize(
-        EspWifiInitFor::Wifi,
+        EspWifiOperationFor::Wifi,
         timer,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,

@@ -45,7 +45,7 @@ use esp_wifi::{
         WifiStaDevice,
         WifiState,
     },
-    EspWifiInitFor,
+    EspWifiOperationFor,
 };
 
 const SSID: &str = env!("SSID");
@@ -75,7 +75,7 @@ async fn main(spawner: Spawner) -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
     let init = initialize(
-        EspWifiInitFor::Wifi,
+        EspWifiOperationFor::Wifi,
         timg0.timer0,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
