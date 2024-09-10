@@ -23,7 +23,7 @@ mod binary_logs {
         syslog(_format, _args);
     }
 
-    pub unsafe extern "C" fn syslog(format: *const u8, args: VaListImpl) {
+    pub unsafe extern "C" fn syslog(format: *const u8, args: core::ffi::VaListImpl) {
         let mut buf = [0u8; 512];
         vsnprintf(&mut buf as *mut u8, 511, format, args);
         let res_str = core::ffi::CStr::from_ptr(core::ptr::addr_of!(buf).cast())

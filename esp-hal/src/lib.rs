@@ -291,8 +291,31 @@ impl crate::private::Sealed for Async {}
 pub(crate) mod private {
     pub trait Sealed {}
 
+    #[non_exhaustive]
+    #[doc(hidden)]
+    /// Magical incantation to gain access to internal APIs.
     pub struct Internal;
+
+    impl Internal {
+        /// Obtain magical powers to access internal APIs.
+        ///
+        /// # Safety
+        ///
+        /// By calling this function, you accept that you are using an internal
+        /// API that is not guaranteed to be documented, stable, working
+        /// and may change at any time.
+        ///
+        /// You declare that you have tried to look for other solutions, that
+        /// you have opened a feature request or an issue to discuss the
+        /// need for this function.
+        pub unsafe fn conjure() -> Self {
+            Self
+        }
+    }
 }
+
+#[doc(hidden)]
+pub use private::Internal;
 
 /// Marker trait for types that can be safely used in `#[ram(persistent)]`.
 ///
