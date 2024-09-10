@@ -359,21 +359,15 @@ impl<'d, T> embedded_hal_02::timer::Periodic for PeriodicTimer<'d, T> where T: T
 
 /// An enum of all timer types
 enum AnyTimerInner {
-    /// Timer 0 of the TIMG0 peripheral in blocking mode.
     Timg0Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>),
-    /// Timer 1 of the TIMG0 peripheral in blocking mode.
     #[cfg(timg_timer1)]
     Timg0Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking>),
-    /// Timer 0 of the TIMG1 peripheral in blocking mode.
     #[cfg(timg1)]
     Timg1Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking>),
-    /// Timer 1 of the TIMG1 peripheral in blocking mode.
     #[cfg(all(timg1, timg_timer1))]
     Timg1Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>),
-    /// Systimer Alarm in periodic mode with blocking behavior.
     #[cfg(systimer)]
     SystimerAlarmPeriodic(systimer::Alarm<'static, systimer::Periodic, Blocking>),
-    /// Systimer Target in periodic mode with blocking behavior.
     #[cfg(systimer)]
     SystimerAlarmTarget(systimer::Alarm<'static, systimer::Target, Blocking>),
 }
@@ -385,45 +379,47 @@ pub struct AnyTimer(AnyTimerInner);
 
 impl crate::private::Sealed for AnyTimer {}
 
-impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>> for AnyTimer {
-    fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>) -> Self {
-        Self(AnyTimerInner::Timg0Timer0(value))
-    }
+macro_rules! any_timer {
+    ($ty:path => $var:ident) => {
+        impl $ty {
+            /// Convert this timer into an [`AnyTimer`][crate::timer::AnyTimer].
+            pub fn degrade(self) -> AnyTimer {
+                AnyTimer(AnyTimerInner::$var(self))
+            }
+        }
+
+        impl From<$ty> for AnyTimer {
+            fn from(value: $ty) -> Self {
+                value.degrade()
+            }
+        }
+    };
+
+    (
+        $(
+            $(#[$cfg:meta])?
+            $ty:path => $var:ident,
+        )*
+    ) => {
+        $(
+            $(#[$cfg])?
+            any_timer!($ty => $var);
+        )*
+    };
 }
 
-#[cfg(timg_timer1)]
-impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking>> for AnyTimer {
-    fn from(value: timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking>) -> Self {
-        Self(AnyTimerInner::Timg0Timer1(value))
-    }
-}
-
-#[cfg(timg1)]
-impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking>> for AnyTimer {
-    fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking>) -> Self {
-        Self(AnyTimerInner::Timg1Timer0(value))
-    }
-}
-
-#[cfg(all(timg1, timg_timer1))]
-impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>> for AnyTimer {
-    fn from(value: timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>) -> Self {
-        Self(AnyTimerInner::Timg1Timer1(value))
-    }
-}
-
-#[cfg(systimer)]
-impl From<systimer::Alarm<'static, systimer::Periodic, Blocking>> for AnyTimer {
-    fn from(value: systimer::Alarm<'static, systimer::Periodic, Blocking>) -> Self {
-        Self(AnyTimerInner::SystimerAlarmPeriodic(value))
-    }
-}
-
-#[cfg(systimer)]
-impl From<systimer::Alarm<'static, systimer::Target, Blocking>> for AnyTimer {
-    fn from(value: systimer::Alarm<'static, systimer::Target, Blocking>) -> Self {
-        Self(AnyTimerInner::SystimerAlarmTarget(value))
-    }
+any_timer! {
+    timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking> => Timg0Timer0,
+    #[cfg(timg_timer1)]
+    timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking> => Timg0Timer1,
+    #[cfg(timg1)]
+    timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking> => Timg1Timer0,
+    #[cfg(all(timg1, timg_timer1))]
+    timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking> => Timg1Timer1,
+    #[cfg(systimer)]
+    systimer::Alarm<'static, systimer::Periodic, Blocking> => SystimerAlarmPeriodic,
+    #[cfg(systimer)]
+    systimer::Alarm<'static, systimer::Target, Blocking> => SystimerAlarmTarget,
 }
 
 impl Timer for AnyTimer {

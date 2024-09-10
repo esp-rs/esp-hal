@@ -46,12 +46,9 @@ fn main() -> ! {
     let delay = Delay::new();
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let timer0: AnyTimer = timg0.timer0.into();
-    let timer = PeriodicTimer::new(timer0);
-
     let init = initialize(
         EspWifiInitFor::Wifi,
-        timer,
+        timg0.timer0,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
     )
