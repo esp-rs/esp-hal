@@ -28,7 +28,7 @@ impl crate::peripheral::Peripheral for DummyPin {
 
 impl private::Sealed for DummyPin {}
 
-impl PeripheralInputPin for DummyPin {
+impl PeripheralInput for DummyPin {
     fn input_signals(&self, _: private::Internal) -> [Option<InputSignal>; 6] {
         [None; 6]
     }
@@ -61,7 +61,7 @@ impl PeripheralInputPin for DummyPin {
     fn disconnect_input_from_peripheral(&mut self, _signal: InputSignal, _: private::Internal) {}
 }
 
-impl PeripheralInputPin for Level {
+impl PeripheralInput for Level {
     delegate::delegate! {
         to match self {
             Level::High => DummyPin { value: true },
@@ -78,7 +78,7 @@ impl PeripheralInputPin for Level {
     }
 }
 
-impl PeripheralOutputPin for DummyPin {
+impl PeripheralOutput for DummyPin {
     fn set_to_open_drain_output(&mut self, _: private::Internal) {}
 
     fn set_to_push_pull_output(&mut self, _: private::Internal) {}
@@ -130,10 +130,10 @@ impl embedded_hal_02::digital::v2::OutputPin for DummyPin {
 }
 impl embedded_hal_02::digital::v2::StatefulOutputPin for DummyPin {
     fn is_set_high(&self) -> Result<bool, Self::Error> {
-        Ok(PeripheralOutputPin::is_set_high(self, private::Internal))
+        Ok(PeripheralOutput::is_set_high(self, private::Internal))
     }
     fn is_set_low(&self) -> Result<bool, Self::Error> {
-        Ok(!PeripheralOutputPin::is_set_high(self, private::Internal))
+        Ok(!PeripheralOutput::is_set_high(self, private::Internal))
     }
 }
 
@@ -155,10 +155,10 @@ impl embedded_hal::digital::OutputPin for DummyPin {
 
 impl embedded_hal::digital::StatefulOutputPin for DummyPin {
     fn is_set_high(&mut self) -> Result<bool, Self::Error> {
-        Ok(PeripheralOutputPin::is_set_high(self, private::Internal))
+        Ok(PeripheralOutput::is_set_high(self, private::Internal))
     }
 
     fn is_set_low(&mut self) -> Result<bool, Self::Error> {
-        Ok(!PeripheralOutputPin::is_set_high(self, private::Internal))
+        Ok(!PeripheralOutput::is_set_high(self, private::Internal))
     }
 }

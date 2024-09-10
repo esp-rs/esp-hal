@@ -107,7 +107,7 @@ use crate::{
         TxPrivate,
         WriteBuffer,
     },
-    gpio::PeripheralOutputPin,
+    gpio::PeripheralOutput,
     interrupt::InterruptHandler,
     into_ref,
     peripheral::Peripheral,
@@ -495,7 +495,7 @@ where
     }
 
     /// Configures the I2S peripheral to use a master clock (MCLK) output pin.
-    pub fn with_mclk<P: PeripheralOutputPin>(self, pin: impl Peripheral<P = P> + 'd) -> Self {
+    pub fn with_mclk<P: PeripheralOutput>(self, pin: impl Peripheral<P = P> + 'd) -> Self {
         into_ref!(pin);
         pin.set_to_push_pull_output(crate::private::Internal);
         pin.connect_peripheral_to_output(I::mclk_signal(), crate::private::Internal);
@@ -891,7 +891,7 @@ mod private {
     use crate::peripherals::{i2s1::RegisterBlock, I2S1};
     use crate::{
         dma::{ChannelRx, ChannelTx, DmaChannel, DmaDescriptor, DmaPeripheral},
-        gpio::{InputSignal, OutputSignal, PeripheralInputPin, PeripheralOutputPin},
+        gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
         interrupt::InterruptHandler,
         into_ref,
         peripherals::I2S0,
@@ -924,7 +924,7 @@ mod private {
 
         pub fn with_bclk<P>(self, pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
         where
-            P: PeripheralOutputPin,
+            P: PeripheralOutput,
         {
             into_ref!(pin);
             pin.set_to_push_pull_output(private::Internal);
@@ -935,7 +935,7 @@ mod private {
 
         pub fn with_ws<P>(self, pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
         where
-            P: PeripheralOutputPin,
+            P: PeripheralOutput,
         {
             into_ref!(pin);
             pin.set_to_push_pull_output(private::Internal);
@@ -946,7 +946,7 @@ mod private {
 
         pub fn with_dout<P>(self, pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
         where
-            P: PeripheralOutputPin,
+            P: PeripheralOutput,
         {
             into_ref!(pin);
             pin.set_to_push_pull_output(private::Internal);
@@ -980,7 +980,7 @@ mod private {
 
         pub fn with_bclk<P>(self, pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
         where
-            P: PeripheralOutputPin,
+            P: PeripheralOutput,
         {
             into_ref!(pin);
             pin.set_to_push_pull_output(crate::private::Internal);
@@ -991,7 +991,7 @@ mod private {
 
         pub fn with_ws<P>(self, pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
         where
-            P: PeripheralOutputPin,
+            P: PeripheralOutput,
         {
             into_ref!(pin);
             pin.set_to_push_pull_output(crate::private::Internal);
@@ -1002,7 +1002,7 @@ mod private {
 
         pub fn with_din<P>(self, pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
         where
-            P: PeripheralInputPin,
+            P: PeripheralInput,
         {
             into_ref!(pin);
             pin.init_input(false, false, crate::private::Internal);

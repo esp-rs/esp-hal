@@ -131,7 +131,7 @@ use core::marker::PhantomData;
 use self::config::Config;
 use crate::{
     clock::Clocks,
-    gpio::{InputSignal, OutputSignal, PeripheralInputPin, PeripheralOutputPin},
+    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{uart0::RegisterBlock, Interrupt},
@@ -451,7 +451,7 @@ where
         }
     }
 
-    fn with_rx<RX: InputPin>(self, rx: impl Peripheral<P = RX> + 'd) -> Self {
+    fn with_rx<RX: PeripheralInput>(self, rx: impl Peripheral<P = RX> + 'd) -> Self {
         crate::into_ref!(rx);
         rx.init_input(false, false, Internal);
         rx.connect_input_to_peripheral(T::rx_signal(), Internal);
@@ -459,7 +459,7 @@ where
         self
     }
 
-    fn with_tx<TX: OutputPin>(self, tx: impl Peripheral<P = TX> + 'd) -> Self {
+    fn with_tx<TX: PeripheralOutput>(self, tx: impl Peripheral<P = TX> + 'd) -> Self {
         crate::into_ref!(tx);
         tx.set_to_push_pull_output(Internal);
         tx.connect_peripheral_to_output(T::tx_signal(), Internal);
@@ -536,7 +536,7 @@ where
     }
 
     /// Configure RTS pin
-    pub fn with_rts<RTS: PeripheralOutputPin>(self, rts: impl Peripheral<P = RTS> + 'd) -> Self {
+    pub fn with_rts<RTS: PeripheralOutput>(self, rts: impl Peripheral<P = RTS> + 'd) -> Self {
         crate::into_ref!(rts);
         rts.set_to_push_pull_output(Internal);
         rts.connect_peripheral_to_output(T::rts_signal(), Internal);
@@ -581,7 +581,7 @@ where
     T: Instance + 'd,
 {
     /// Create a new UART TX instance in [`Blocking`] mode.
-    pub fn new<TX: PeripheralOutputPin>(
+    pub fn new<TX: PeripheralOutput>(
         uart: impl Peripheral<P = T> + 'd,
         tx: impl Peripheral<P = TX> + 'd,
     ) -> Result<Self, Error> {
@@ -590,7 +590,7 @@ where
 
     /// Create a new UART TX instance with configuration options in
     /// [`Blocking`] mode.
-    pub fn new_with_config<TX: PeripheralOutputPin>(
+    pub fn new_with_config<TX: PeripheralOutput>(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
         tx: impl Peripheral<P = TX> + 'd,
@@ -620,7 +620,7 @@ where
     }
 
     /// Configure CTS pin
-    pub fn with_cts<CTS: PeripheralInputPin>(self, cts: impl Peripheral<P = CTS> + 'd) -> Self {
+    pub fn with_cts<CTS: PeripheralInput>(self, cts: impl Peripheral<P = CTS> + 'd) -> Self {
         crate::into_ref!(cts);
         cts.init_input(false, false, Internal);
         cts.connect_input_to_peripheral(T::cts_signal(), Internal);
@@ -794,7 +794,7 @@ where
     T: Instance + 'd,
 {
     /// Create a new UART RX instance in [`Blocking`] mode.
-    pub fn new<RX: PeripheralInputPin>(
+    pub fn new<RX: PeripheralInput>(
         uart: impl Peripheral<P = T> + 'd,
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Result<Self, Error> {
@@ -803,7 +803,7 @@ where
 
     /// Create a new UART RX instance with configuration options in
     /// [`Blocking`] mode.
-    pub fn new_with_config<RX: PeripheralInputPin>(
+    pub fn new_with_config<RX: PeripheralInput>(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
         rx: impl Peripheral<P = RX> + 'd,
@@ -820,7 +820,7 @@ where
 {
     /// Create a new UART instance with configuration options in [`Blocking`]
     /// mode.
-    pub fn new_with_config<TX: PeripheralOutputPin, RX: PeripheralInputPin>(
+    pub fn new_with_config<TX: PeripheralOutput, RX: PeripheralInput>(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
         rx: impl Peripheral<P = RX> + 'd,
@@ -835,7 +835,7 @@ where
     }
 
     /// Create a new UART instance with defaults in [`Blocking`] mode.
-    pub fn new<TX: PeripheralOutputPin, RX: PeripheralInputPin>(
+    pub fn new<TX: PeripheralOutput, RX: PeripheralInput>(
         uart: impl Peripheral<P = T> + 'd,
         rx: impl Peripheral<P = RX> + 'd,
         tx: impl Peripheral<P = TX> + 'd,
@@ -857,7 +857,7 @@ where
     }
 
     /// Configure CTS pin
-    pub fn with_cts<CTS: PeripheralInputPin>(self, cts: impl Peripheral<P = CTS> + 'd) -> Self {
+    pub fn with_cts<CTS: PeripheralInput>(self, cts: impl Peripheral<P = CTS> + 'd) -> Self {
         crate::into_ref!(cts);
         cts.init_input(false, false, Internal);
         cts.connect_input_to_peripheral(T::cts_signal(), Internal);
@@ -866,7 +866,7 @@ where
     }
 
     /// Configure RTS pin
-    pub fn with_rts<RTS: PeripheralOutputPin>(self, rts: impl Peripheral<P = RTS> + 'd) -> Self {
+    pub fn with_rts<RTS: PeripheralOutput>(self, rts: impl Peripheral<P = RTS> + 'd) -> Self {
         crate::into_ref!(rts);
         rts.set_to_push_pull_output(Internal);
         rts.connect_peripheral_to_output(T::rts_signal(), Internal);
@@ -2058,7 +2058,7 @@ mod asynch {
     {
         /// Create a new UART instance with configuration options in [`Async`]
         /// mode.
-        pub fn new_async_with_config<RX: PeripheralInputPin, TX: PeripheralOutputPin>(
+        pub fn new_async_with_config<RX: PeripheralInput, TX: PeripheralOutput>(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
             rx: impl Peripheral<P = RX> + 'd,
@@ -2086,7 +2086,7 @@ mod asynch {
         }
 
         /// Create a new UART instance with defaults in [`Async`] mode.
-        pub fn new_async<RX: PeripheralInputPin, TX: PeripheralOutputPin>(
+        pub fn new_async<RX: PeripheralInput, TX: PeripheralOutput>(
             uart: impl Peripheral<P = T> + 'd,
             rx: impl Peripheral<P = RX> + 'd,
             tx: impl Peripheral<P = TX> + 'd,
@@ -2121,7 +2121,7 @@ mod asynch {
         T: Instance + 'd,
     {
         /// Create a new UART TX instance in [`Async`] mode.
-        pub fn new_async<TX: PeripheralOutputPin>(
+        pub fn new_async<TX: PeripheralOutput>(
             uart: impl Peripheral<P = T> + 'd,
             tx: impl Peripheral<P = TX> + 'd,
         ) -> Result<Self, Error> {
@@ -2130,7 +2130,7 @@ mod asynch {
 
         /// Create a new UART TX instance with configuration options in
         /// [`Async`] mode.
-        pub fn new_async_with_config<TX: PeripheralOutputPin>(
+        pub fn new_async_with_config<TX: PeripheralOutput>(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
             tx: impl Peripheral<P = TX> + 'd,
@@ -2202,7 +2202,7 @@ mod asynch {
         T: Instance + 'd,
     {
         /// Create a new UART RX instance in [`Async`] mode.
-        pub fn new_async<RX: PeripheralInputPin>(
+        pub fn new_async<RX: PeripheralInput>(
             uart: impl Peripheral<P = T> + 'd,
             rx: impl Peripheral<P = RX> + 'd,
         ) -> Result<Self, Error> {
@@ -2211,7 +2211,7 @@ mod asynch {
 
         /// Create a new UART RX instance with configuration options in
         /// [`Async`] mode.
-        pub fn new_async_with_config<RX: PeripheralInputPin>(
+        pub fn new_async_with_config<RX: PeripheralInput>(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
             rx: impl Peripheral<P = RX> + 'd,

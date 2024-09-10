@@ -57,7 +57,7 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    gpio::{InputSignal, OutputSignal, PeripheralInputPin, PeripheralOutputPin},
+    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::i2c0::{RegisterBlock, COMD},
@@ -322,8 +322,8 @@ where
     T: Instance,
 {
     fn new_internal<
-        SDA: PeripheralOutputPin + PeripheralInputPin,
-        SCL: PeripheralOutputPin + PeripheralInputPin,
+        SDA: PeripheralOutput + PeripheralInput,
+        SCL: PeripheralOutput + PeripheralInput,
     >(
         i2c: impl Peripheral<P = T> + 'd,
         sda: impl Peripheral<P = SDA> + 'd,
@@ -401,10 +401,7 @@ where
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new<
-        SDA: PeripheralOutputPin + PeripheralInputPin,
-        SCL: PeripheralOutputPin + PeripheralInputPin,
-    >(
+    pub fn new<SDA: PeripheralOutput + PeripheralInput, SCL: PeripheralOutput + PeripheralInput>(
         i2c: impl Peripheral<P = T> + 'd,
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
@@ -417,8 +414,8 @@ where
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
     pub fn new_with_timeout<
-        SDA: PeripheralOutputPin + PeripheralInputPin,
-        SCL: PeripheralOutputPin + PeripheralInputPin,
+        SDA: PeripheralOutput + PeripheralInput,
+        SCL: PeripheralOutput + PeripheralInput,
     >(
         i2c: impl Peripheral<P = T> + 'd,
         sda: impl Peripheral<P = SDA> + 'd,
@@ -449,8 +446,8 @@ where
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
     pub fn new_async<
-        SDA: PeripheralOutputPin + PeripheralInputPin,
-        SCL: PeripheralOutputPin + PeripheralInputPin,
+        SDA: PeripheralOutput + PeripheralInput,
+        SCL: PeripheralOutput + PeripheralInput,
     >(
         i2c: impl Peripheral<P = T> + 'd,
         sda: impl Peripheral<P = SDA> + 'd,
@@ -464,8 +461,8 @@ where
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
     pub fn new_with_timeout_async<
-        SDA: PeripheralOutputPin + PeripheralInputPin,
-        SCL: PeripheralOutputPin + PeripheralInputPin,
+        SDA: PeripheralOutput + PeripheralInput,
+        SCL: PeripheralOutput + PeripheralInput,
     >(
         i2c: impl Peripheral<P = T> + 'd,
         sda: impl Peripheral<P = SDA> + 'd,

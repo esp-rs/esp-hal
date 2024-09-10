@@ -9,7 +9,7 @@
 
 use core::marker::PhantomData;
 
-use crate::gpio::{interconnect::AnyInputSignal, InputSignal, PeripheralInputPin, Pull};
+use crate::gpio::{interconnect::AnyInputSignal, InputSignal, PeripheralInput, Pull};
 
 /// Configuration for an PCNT input pin
 #[derive(Clone, Copy, Debug)]

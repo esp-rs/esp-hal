@@ -11,8 +11,8 @@ use crate::{
         InputPin,
         Level,
         OutputSignalType,
-        PeripheralInputPin,
-        PeripheralOutputPin,
+        PeripheralInput,
+        PeripheralOutput,
         Pin,
         FUNC_IN_SEL_OFFSET,
         GPIO_FUNCTION,
@@ -82,7 +82,7 @@ impl InputSignal {
     }
 }
 
-impl PeripheralInputPin for InputSignal {
+impl PeripheralInput for InputSignal {
     /// Connect the pin to a peripheral input signal.
     fn connect_input_to_peripheral(&mut self, signal: gpio::InputSignal, _: private::Internal) {
         let signal_nr = signal as usize;
@@ -213,7 +213,7 @@ impl OutputSignal {
     }
 }
 
-impl PeripheralOutputPin for OutputSignal {
+impl PeripheralOutput for OutputSignal {
     /// Connect the pin to a peripheral output signal.
     // TODO: the following options should be part of the struct:
     /// invert: Configures whether or not to invert the output value
@@ -358,7 +358,7 @@ where
 }
 
 impl Sealed for AnyInputSignal {}
-impl PeripheralInputPin for AnyInputSignal {
+impl PeripheralInput for AnyInputSignal {
     delegate::delegate! {
         to match &self.0 {
             AnyInputSignalInner::Input(pin) => pin,

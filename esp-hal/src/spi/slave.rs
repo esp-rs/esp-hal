@@ -73,7 +73,7 @@ use core::marker::PhantomData;
 use super::{Error, FullDuplexMode, SpiMode};
 use crate::{
     dma::{DescriptorChain, DmaPeripheral, Rx, Tx},
-    gpio::{InputSignal, OutputSignal, PeripheralInputPin, PeripheralOutputPin},
+    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
     private,
@@ -107,10 +107,10 @@ where
 {
     /// Constructs an SPI instance in 8bit dataframe mode.
     pub fn new<
-        SCK: PeripheralInputPin,
-        MOSI: PeripheralInputPin,
-        MISO: PeripheralOutputPin,
-        CS: PeripheralInputPin,
+        SCK: PeripheralInput,
+        MOSI: PeripheralInput,
+        MISO: PeripheralOutput,
+        CS: PeripheralInput,
     >(
         spi: impl Peripheral<P = T> + 'd,
         sclk: impl Peripheral<P = SCK> + 'd,
