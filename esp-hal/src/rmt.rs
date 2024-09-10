@@ -2541,7 +2541,12 @@ mod clock_divider_solver {
                 } else if a < b {
                     l = m;
                 } else {
-                    unreachable!();
+                    // unreachable!();
+                    return Some(Self {
+                        div_num: quotient,
+                        div_b: m.numerator,
+                        div_a: m.denominator,
+                    });
                 }
             }
         }
