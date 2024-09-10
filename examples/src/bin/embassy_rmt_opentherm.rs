@@ -28,8 +28,7 @@ use esp_hal::{
 use esp_println::{print, println};
 
 use opentherm_boiler_controller_lib::{BoilerControl, TimeBaseRef, Instant};
-use opentherm_boiler_controller_lib::opentherm_interface::OpenThermEdgeTriggerBus;
-use opentherm_boiler_controller_lib::opentherm_interface::{DataOt, Error as OtError, OpenThermMessage};
+use opentherm_boiler_controller_lib::opentherm_interface::{OpenThermEdgeTriggerBus, DataOt, Error as OtError, OpenThermMessage};
 use opentherm_boiler_controller_lib::opentherm_interface::edge_trigger_capture_interface::{
     CaptureError, EdgeCaptureInterface, EdgeTriggerInterface, InitLevel, TriggerError,
 };
@@ -89,42 +88,25 @@ impl<E: EdgeCaptureInterface,T: EdgeTriggerInterface> EdgeCaptureInterface<VEC_S
 //  Used to pull in the implementation of OpenThermInterface:
 impl<E: EdgeCaptureInterface,T: EdgeTriggerInterface> OpenThermEdgeTriggerBus for EspOpenthermRmt<E, T> {}
 
-//  This part is use to connect pure trait implementation with our specific class which makes this
-//  ugly wrapper:
-impl<E: EdgeCaptureInterface,T: EdgeTriggerInterface> OpenThermInterface for EspOpenthermRmt<E, T> {
-    async fn send(&mut self, message: OpenThermMessage) -> Result<(), OtError> {
-        OpenThermEdgeTriggerBus::send(self, message).await
-    }
-    async fn listen(&mut self) -> Result<OpenThermMessage, OtError> {
-        OpenThermEdgeTriggerBus::listen(self).await
-    }
-    async fn write(&mut self, cmd: DataOt) -> Result<(), OtError> {
-        todo!()
-    }
-    async fn read(&mut self, cmd: DataOt) -> Result<DataOt, OtError> {
-        todo!()
-    }
-}
-
-pub struct RmtEdgeTrigger {
+pub struct RmtEdgeTrigger<const NegativeEdgeIsBinaryOne: bool> {
     rmt_channel_tx: esp_hal::rmt::Channel<Async,1>,
 }
 
-impl RmtEdgeTrigger {
+impl<const NegativeEdgeIsBinaryOne: bool> RmtEdgeTrigger<NegativeEdgeIsBinaryOne> {
     pub fn new(mut rmt_channel: esp_hal::rmt::Channel<Async,1>) -> Self {
         println!("Create new RmtEdgeTrigger dev");
         Self { rmt_channel_tx: rmt_channel }
     }
 }
 
-pub struct RmtEdgeCapture<const N: usize, const Inverted: bool = false> {
-    //  input_pin: Input<'d>,
+pub struct RmtEdgeCapture<'pin, const N: usize, const Inverted: bool = false> {
+    input_pin: AnyInput<'pin>,
     rmt_channel_rx: esp_hal::rmt::Channel<Async, 0>,
 }
 
-impl<'d, const N: usize, const Inverted: bool> RmtEdgeCapture<N, Inverted> {
-    pub fn new(mut rmt_channel: esp_hal::rmt::Channel<Async,0>) -> Self {
-        Self { rmt_channel_rx: rmt_channel }
+impl<'pin, const N: usize, const Inverted: bool> RmtEdgeCapture<'pin, N, Inverted> {
+    pub fn new(mut rmt_channel: esp_hal::rmt::Channel<Async,0>, input_pin_arg: AnyInput<'pin> ) -> Self {
+        Self { rmt_channel_rx: rmt_channel, input_pin: input_pin_arg }
     }
     #[inline]
     fn insert(
@@ -138,7 +120,7 @@ impl<'d, const N: usize, const Inverted: bool> RmtEdgeCapture<N, Inverted> {
 
 //  _____|''|_____|''|__|''|__    ___|''|__|'''''|__|''|___   //  0x200000003
 //  -----|  1  |  0  |  0  |      |  0  |  0  |  1  |  1  |
-impl EdgeTriggerInterface for RmtEdgeTrigger {
+impl<const NegativeEdgeIsBinaryOne: bool> EdgeTriggerInterface for RmtEdgeTrigger<NegativeEdgeIsBinaryOne> {
     async fn trigger(
         &mut self,
         iterator: impl Iterator<Item = bool>,
@@ -158,13 +140,19 @@ impl EdgeTriggerInterface for RmtEdgeTrigger {
         //  data[data.len() - 1] = PulseCode::default();
 
         for (i, entry) in iterator.enumerate() {
+            let entry = if NegativeEdgeIsBinaryOne {
+                !entry
+            } else {
+                entry
+            };
+            println!("[{i}],e={}", entry);
             match i%2 {
                 0 => {
-                    data[i/2].level1 = true;
+                    data[i/2].level1 = entry;
                     data[i/2].length1 = period;
                 },
                 _ => {
-                    data[i/2].level2 = false;
+                    data[i/2].level2 = entry;
                     data[i/2].length2 = period;
                 }
             }
@@ -191,8 +179,8 @@ impl EdgeTriggerInterface for RmtEdgeTrigger {
 
 // Inverted - invert polarity of the signal
 // N - output vec size
-impl<const N: usize, const Inverted: bool> EdgeCaptureInterface<N>
-    for RmtEdgeCapture<N, Inverted>
+impl<'pin, const N: usize, const Inverted: bool> EdgeCaptureInterface<N>
+    for RmtEdgeCapture<'pin, N, Inverted>
 {
     //  TODO:
     //  make a list
@@ -201,19 +189,38 @@ impl<const N: usize, const Inverted: bool> EdgeCaptureInterface<N>
         timeout_inactive_capture: core::time::Duration,
         timeout_till_active_capture: core::time::Duration,
     ) -> Result<(InitLevel, Vec<core::time::Duration, N>), CaptureError> {
-        // let init_state = match self.input_pin.is_high() {
-        //     true => InitLevel::High,
-        //     false => InitLevel::Low,
-        // };
+
+        let init_state = match self.input_pin.is_high() {
+            true => InitLevel::High,
+            false => InitLevel::Low,
+        };
 
         //  let mut capture_timestamp = start_timestamp;
         //  let mut current_level = init_state.clone();
         let mut timestamps = Vec::<core::time::Duration, N>::new();
 
-        todo!()
+        const CAPTURE_DATA_SIZE: usize = VEC_SIZE_OT;
+        let mut capture_data = [PulseCode {
+            level1: true,
+            length1: 1,
+            level2: false,
+            length2: 1,
+        }; CAPTURE_DATA_SIZE];
+
+        //  let mut capture_data: [u32; CAPTURE_DATA_SIZE] = [0; CAPTURE_DATA_SIZE];
+
+        //  TODO: implement timeout or just handle it here:
+        let timestamps = match self.rmt_channel_rx.receive(&mut capture_data).await {
+            Ok(()) => {  //  Convert the data and return them
+                timestamps
+            },
+            Err(_) => { return Err(CaptureError::GenericError); }
+        };
+
+        //  todo!()  //  Assert
 
         //  log::info!("Return InitLevel: {:?}", init_state);
-        //  Ok((init_state, timestamps))
+        Ok((init_state, timestamps))
     }
 }
 
@@ -359,11 +366,6 @@ async fn main(spawner: Spawner) {
         }
     };
 
-    {
-        //  let mut input = Input::new(io.pins.gpio27, Pull::Down);
-        //  let mut input = Input::new(io.pins.gpio4, Pull::Down);
-    }
-
     let mut button = AnyInput::new(io.pins.gpio0, Pull::Up);
     let mut led = Output::new(io.pins.gpio2, Level::High);
 
@@ -378,8 +380,8 @@ async fn main(spawner: Spawner) {
         TxChannelCreatorAsync::configure(rmt.channel1, io.pins.gpio27,
             TxChannelConfig{
                 clk_divider: RMT_CLK_DIV,
-                idle_output_level: false,
-                idle_output: false,
+                idle_output_level: true,
+                idle_output: true,
                 carrier_modulation: false,
                 //  carrier_high: 0u16,
                 //  carrier_low: 0u16,
@@ -398,8 +400,11 @@ async fn main(spawner: Spawner) {
         }
     }
 
-    let mut rmt_tx = RmtEdgeTrigger::new(channel_tx);
-    let mut rmt_rx: RmtEdgeCapture<128> = RmtEdgeCapture::new(channel_rx);
+    const NegativeEdgeIsBinaryOne: bool = true;
+    let mut rmt_tx = RmtEdgeTrigger::<NegativeEdgeIsBinaryOne>::new(channel_tx);
+    //  TODO: set correct pin number:
+    let capture_level_input = AnyInput::new(io.pins.gpio23, Pull::None);
+    let mut rmt_rx: RmtEdgeCapture<128> = RmtEdgeCapture::new(channel_rx, capture_level_input);
 
     let opentherm_device = EspOpenthermRmt::new(rmt_rx, rmt_tx);
     let esp_time = EspTime::new();
