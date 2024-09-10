@@ -70,6 +70,9 @@ impl InputSignal {
         self
     }
 
+    /// - signal: The input signal to connect to the pin
+    /// - invert: Configures whether or not to invert the input value
+    /// - input: The GPIO number to connect to the input signal
     fn connect(&self, signal: usize, invert: bool, input: u8) {
         unsafe { &*GPIO::PTR }
             .func_in_sel_cfg(signal - FUNC_IN_SEL_OFFSET)
@@ -175,8 +178,8 @@ impl Sealed for OutputSignal {}
 impl OutputSignal {
     pub(crate) fn new(pin: AnyPin) -> Self {
         Self {
-            is_inverted: false,
             pin,
+            is_inverted: false,
         }
     }
 
@@ -191,6 +194,16 @@ impl OutputSignal {
         self
     }
 
+    /// - signal: The output signal to connect to the pin
+    /// - invert: Configures whether or not to invert the output value
+    /// - invert_enable: Configures whether or not to invert the output enable
+    ///   signal
+    /// - enable_from_gpio: Configures to select the source of output enable
+    ///   signal.
+    ///   - false: Use output enable signal from peripheral
+    ///   - true: Force the output enable signal to be sourced from bit n of
+    ///     GPIO_ENABLE_REG
+    /// - output: The GPIO number to connect to the output signal
     fn connect(
         &self,
         signal: OutputSignalType,
@@ -224,20 +237,6 @@ impl PeripheralSignal for OutputSignal {
 
 impl PeripheralOutput for OutputSignal {
     /// Connect the pin to a peripheral output signal.
-    // TODO: the following options should be part of the struct:
-    /// invert: Configures whether or not to invert the output value
-    ///
-    /// invert_enable: Configures whether or not to invert the output enable
-    /// signal
-    ///
-    /// enable_from_gpio: Configures to select the source of output enable
-    /// signal.
-    /// - false = Use output enable signal from peripheral
-    /// - true = Force the output enable signal to be sourced from bit n of
-    ///   GPIO_ENABLE_REG
-    ///
-    /// force_via_gpio_mux: if true don't use the alternate function even if it
-    /// matches
     fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal, _: private::Internal) {
         let af = if self.is_inverted {
             GPIO_FUNCTION
