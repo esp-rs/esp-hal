@@ -66,8 +66,11 @@ use self::{
 };
 use crate::{
     gpio::OutputPin,
+    interrupt::{self, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
+    peripherals::Interrupt,
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    InterruptConfigurable,
 };
 
 pub mod channel;
@@ -83,7 +86,6 @@ pub enum LSGlobalClkSource {
 /// LEDC (LED PWM Controller)
 pub struct Ledc<'d> {
     _instance: PeripheralRef<'d, crate::peripherals::LEDC>,
-    ledc: &'d crate::peripherals::ledc::RegisterBlock,
 }
 
 #[cfg(esp32)]
@@ -116,15 +118,16 @@ impl<'d> Ledc<'d> {
         PeripheralClockControl::reset(PeripheralEnable::Ledc);
         PeripheralClockControl::enable(PeripheralEnable::Ledc);
 
-        let ledc = unsafe { &*crate::peripherals::LEDC::ptr() };
-        Ledc { _instance, ledc }
+        Ledc { _instance }
     }
 
     /// Set global slow clock source
     #[cfg(esp32)]
     pub fn set_global_slow_clock(&mut self, _clock_source: LSGlobalClkSource) {
-        self.ledc.conf().write(|w| w.apb_clk_sel().set_bit());
-        self.ledc
+        unsafe { &*crate::peripherals::LEDC::ptr() }
+            .conf()
+            .write(|w| w.apb_clk_sel().set_bit());
+        unsafe { &*crate::peripherals::LEDC::ptr() }
             .lstimer(0)
             .conf()
             .modify(|_, w| w.para_up().set_bit());
@@ -142,7 +145,7 @@ impl<'d> Ledc<'d> {
         match clock_source {
             LSGlobalClkSource::APBClk => {
                 #[cfg(not(any(esp32c6, esp32h2)))]
-                self.ledc
+                unsafe { &*crate::peripherals::LEDC::ptr() }
                     .conf()
                     .write(|w| unsafe { w.apb_clk_sel().bits(1) });
                 #[cfg(esp32c6)]
@@ -153,15 +156,15 @@ impl<'d> Ledc<'d> {
                     .write(|w| unsafe { w.ledc_sclk_sel().bits(0) });
             }
         }
-        self.ledc
+        unsafe { &*crate::peripherals::LEDC::ptr() }
             .timer(0)
             .conf()
             .modify(|_, w| w.para_up().set_bit());
     }
 
     /// Return a new timer
-    pub fn get_timer<S: TimerSpeed>(&self, number: timer::Number) -> Timer<'d, S> {
-        Timer::new(self.ledc, number)
+    pub fn get_timer<S: TimerSpeed>(&self, number: timer::Number) -> Timer<S> {
+        Timer::new(number)
     }
 
     /// Return a new channel
@@ -171,5 +174,16 @@ impl<'d> Ledc<'d> {
         output_pin: impl Peripheral<P = O> + 'd,
     ) -> Channel<'d, S, O> {
         Channel::new(number, output_pin)
+    }
+}
+
+impl<'d> crate::private::Sealed for Ledc<'d> {}
+
+impl<'d> InterruptConfigurable for Ledc<'d> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        unsafe {
+            interrupt::bind_interrupt(Interrupt::LEDC, handler.handler());
+            interrupt::enable(Interrupt::LEDC, handler.priority()).unwrap();
+        }
     }
 }

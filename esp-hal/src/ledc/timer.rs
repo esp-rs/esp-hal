@@ -16,7 +16,7 @@ use fugit::HertzU32;
 #[cfg(esp32)]
 use super::HighSpeed;
 use super::{LowSpeed, Speed};
-use crate::{clock::Clocks, peripherals::ledc};
+use crate::clock::Clocks;
 
 const LEDC_TIMER_DIV_NUM_MAX: u64 = 0x3FFFF;
 
@@ -132,7 +132,7 @@ pub mod config {
 /// Trait defining the type of timer source
 pub trait TimerSpeed: Speed {
     /// The type of clock source used by the timer in this speed mode.
-    type ClockSourceType;
+    type ClockSourceType: Sync;
 }
 
 /// Timer source type for LowSpeed timers
@@ -149,7 +149,7 @@ impl TimerSpeed for HighSpeed {
 }
 
 /// Interface for Timers
-pub trait TimerIFace<S: TimerSpeed> {
+pub trait TimerIFace<S: TimerSpeed>: Sync {
     /// Return the frequency of the timer
     fn get_freq(&self) -> Option<HertzU32>;
 
@@ -179,11 +179,19 @@ pub trait TimerHW<S: TimerSpeed> {
 
     /// Update the timer in HW
     fn update_hw(&self);
+
+    /// Pause the timer
+    fn pause(&self);
+
+    /// Resume the timer
+    fn resume(&self);
+
+    /// Reset the timer
+    fn reset(&self);
 }
 
 /// Timer struct
-pub struct Timer<'a, S: TimerSpeed> {
-    ledc: &'a crate::peripherals::ledc::RegisterBlock,
+pub struct Timer<S: TimerSpeed> {
     number: Number,
     duty: Option<config::Duty>,
     frequency: u32,
@@ -192,9 +200,9 @@ pub struct Timer<'a, S: TimerSpeed> {
     clock_source: Option<S::ClockSourceType>,
 }
 
-impl<'a, S: TimerSpeed> TimerIFace<S> for Timer<'a, S>
+impl<S: TimerSpeed> TimerIFace<S> for Timer<S>
 where
-    Timer<'a, S>: TimerHW<S>,
+    Timer<S>: TimerHW<S>,
 {
     /// Return the frequency of the timer
     fn get_freq(&self) -> Option<HertzU32> {
@@ -254,11 +262,10 @@ where
     }
 }
 
-impl<'a, S: TimerSpeed> Timer<'a, S> {
+impl<S: TimerSpeed> Timer<S> {
     /// Create a new instance of a timer
-    pub fn new(ledc: &'a ledc::RegisterBlock, number: Number) -> Self {
+    pub fn new(number: Number) -> Self {
         Timer {
-            ledc,
             number,
             duty: None,
             frequency: 0u32,
@@ -270,7 +277,7 @@ impl<'a, S: TimerSpeed> Timer<'a, S> {
 }
 
 /// Timer HW implementation for LowSpeed timers
-impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
+impl TimerHW<LowSpeed> for Timer<LowSpeed> {
     /// Get the current source timer frequency from the HW
     fn get_freq_hw(&self) -> Option<HertzU32> {
         self.clock_source.map(|source| match source {
@@ -287,7 +294,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
         let duty = unwrap!(self.duty) as u8;
         let use_apb = !self.use_ref_tick;
 
-        self.ledc
+        unsafe { &*crate::peripherals::LEDC::ptr() }
             .lstimer(self.number as usize)
             .conf()
             .modify(|_, w| unsafe {
@@ -305,7 +312,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
         let duty = unwrap!(self.duty) as u8;
         let use_ref_tick = self.use_ref_tick;
 
-        self.ledc
+        unsafe { &*crate::peripherals::LEDC::ptr() }
             .timer(self.number as usize)
             .conf()
             .modify(|_, w| unsafe {
@@ -321,19 +328,54 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
     fn update_hw(&self) {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
-                let tmr = self.ledc.lstimer(self.number as usize);
+                let tmr =  unsafe { &*crate::peripherals::LEDC::ptr() }.lstimer(self.number as usize);
             } else {
-                let tmr = self.ledc.timer(self.number as usize);
+                let tmr =  unsafe { &*crate::peripherals::LEDC::ptr() }.timer(self.number as usize);
             }
         }
 
         tmr.conf().modify(|_, w| w.para_up().set_bit());
     }
+
+    /// Pause the timer
+    fn pause(&self) {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                 unsafe { &*crate::peripherals::LEDC::ptr() }.lstimer(self.number as usize).conf().modify(|_, w| w.pause().set_bit());
+            } else {
+                 unsafe { &*crate::peripherals::LEDC::ptr() }.timer(self.number as usize).conf().modify(|_, w| w.pause().set_bit());
+            }
+        }
+    }
+
+    /// Resume the timer
+    fn resume(&self) {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                 unsafe { &*crate::peripherals::LEDC::ptr() }.lstimer(self.number as usize).conf().modify(|_, w| w.pause().clear_bit());
+            } else {
+                 unsafe { &*crate::peripherals::LEDC::ptr() }.timer(self.number as usize).conf().modify(|_, w| w.pause().clear_bit());
+            }
+        }
+    }
+
+    /// Reset the timer
+    fn reset(&self) {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                 unsafe { &*crate::peripherals::LEDC::ptr() }.lstimer(self.number as usize).conf().modify(|_, w| w.rst().set_bit());
+                 unsafe { &*crate::peripherals::LEDC::ptr() }.lstimer(self.number as usize).conf().modify(|_, w| w.rst().clear_bit());
+            } else {
+                 unsafe { &*crate::peripherals::LEDC::ptr() }.timer(self.number as usize).conf().modify(|_, w| w.rst().set_bit());
+                 unsafe { &*crate::peripherals::LEDC::ptr() }.timer(self.number as usize).conf().modify(|_, w| w.rst().clear_bit());
+            }
+        }
+    }
 }
 
 #[cfg(esp32)]
 /// Timer HW implementation for HighSpeed timers
-impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
+impl TimerHW<HighSpeed> for Timer<HighSpeed> {
     /// Get the current source timer frequency from the HW
     fn get_freq_hw(&self) -> Option<HertzU32> {
         self.clock_source.map(|source| match source {
@@ -349,7 +391,7 @@ impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
         let duty = unwrap!(self.duty) as u8;
         let sel_hstimer = self.clock_source == Some(HSClockSource::APBClk);
 
-        self.ledc
+        unsafe { &*crate::peripherals::LEDC::ptr() }
             .hstimer(self.number as usize)
             .conf()
             .modify(|_, w| unsafe {
@@ -364,5 +406,33 @@ impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
     /// Update the timer in HW
     fn update_hw(&self) {
         // Nothing to do for HS timers
+    }
+
+    /// Pause the timer
+    fn pause(&self) {
+        unsafe { &*crate::peripherals::LEDC::ptr() }
+            .hstimer(self.number as usize)
+            .conf()
+            .modify(|_, w| w.pause().set_bit());
+    }
+
+    /// Resume the timer
+    fn resume(&self) {
+        unsafe { &*crate::peripherals::LEDC::ptr() }
+            .hstimer(self.number as usize)
+            .conf()
+            .modify(|_, w| w.pause().clear_bit());
+    }
+
+    /// Reset the timer
+    fn reset(&self) {
+        unsafe { &*crate::peripherals::LEDC::ptr() }
+            .hstimer(self.number as usize)
+            .conf()
+            .modify(|_, w| w.rst().set_bit());
+        unsafe { &*crate::peripherals::LEDC::ptr() }
+            .hstimer(self.number as usize)
+            .conf()
+            .modify(|_, w| w.rst().clear_bit());
     }
 }
