@@ -183,18 +183,6 @@ impl From<Ack> for u32 {
     }
 }
 
-macro_rules! maybe_recover {
-    ($self:expr, $b:block) => {
-        match $b {
-            Err(err) => {
-                $self.recover();
-                Err(err)
-            }
-            Ok(ok) => Ok(ok),
-        }
-    };
-}
-
 /// I2C peripheral container (I2C)
 pub struct I2C<'d, T, DM: crate::Mode> {
     peripheral: PeripheralRef<'d, T>,
@@ -209,12 +197,18 @@ where
 {
     /// Reads enough bytes from slave with `address` to fill `buffer`
     pub fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Error> {
-        maybe_recover!(self, { self.peripheral.master_read(address, buffer) })
+        self.peripheral.master_read(address, buffer).or_else(|e| {
+            self.recover();
+            Err(e)
+        })
     }
 
     /// Writes bytes to slave with address `address`
     pub fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
-        maybe_recover!(self, { self.peripheral.master_write(addr, bytes) })
+        self.peripheral.master_write(addr, bytes).or_else(|e| {
+            self.recover();
+            Err(e)
+        })
     }
 
     /// Writes bytes to slave with address `address` and then reads enough bytes
@@ -225,9 +219,12 @@ where
         bytes: &[u8],
         buffer: &mut [u8],
     ) -> Result<(), Error> {
-        maybe_recover!(self, {
-            self.peripheral.master_write_read(address, bytes, buffer)
-        })
+        self.peripheral
+            .master_write_read(address, bytes, buffer)
+            .or_else(|e| {
+                self.recover();
+                Err(e)
+            })
     }
 }
 
@@ -238,7 +235,10 @@ where
     type Error = Error;
 
     fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Self::Error> {
-        maybe_recover!(self, { self.peripheral.master_read(address, buffer) })
+        self.peripheral.master_read(address, buffer).or_else(|e| {
+            self.recover();
+            Err(e)
+        })
     }
 }
 
@@ -249,7 +249,10 @@ where
     type Error = Error;
 
     fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Self::Error> {
-        maybe_recover!(self, { self.peripheral.master_write(addr, bytes) })
+        self.peripheral.master_write(addr, bytes).or_else(|e| {
+            self.recover();
+            Err(e)
+        })
     }
 }
 
@@ -265,9 +268,12 @@ where
         bytes: &[u8],
         buffer: &mut [u8],
     ) -> Result<(), Self::Error> {
-        maybe_recover!(self, {
-            self.peripheral.master_write_read(address, bytes, buffer)
-        })
+        self.peripheral
+            .master_write_read(address, bytes, buffer)
+            .or_else(|e| {
+                self.recover();
+                Err(e)
+            })
     }
 }
 
@@ -305,15 +311,18 @@ where
                     // execute a write operation:
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
-                    maybe_recover!(self, {
-                        self.peripheral.write_operation(
+                    self.peripheral
+                        .write_operation(
                             address,
                             bytes,
                             last_op != Op::Write,
                             next_op == Op::None,
                             cmd_iterator,
                         )
-                    })?;
+                        .or_else(|e| {
+                            self.recover();
+                            Err(e)
+                        })?;
                     last_op = Op::Write;
                 }
                 Operation::Read(buffer) => {
@@ -321,8 +330,8 @@ where
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
                     // - will_continue is true if there is another read operation next
-                    maybe_recover!(self, {
-                        self.peripheral.read_operation(
+                    self.peripheral
+                        .read_operation(
                             address,
                             buffer,
                             last_op != Op::Read,
@@ -330,7 +339,10 @@ where
                             next_op == Op::Read,
                             cmd_iterator,
                         )
-                    })?;
+                        .or_else(|e| {
+                            self.recover();
+                            Err(e)
+                        })?;
                     last_op = Op::Read;
                 }
             }
