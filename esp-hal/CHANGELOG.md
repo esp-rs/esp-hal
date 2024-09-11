@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue with DMA transfers potentially not waking up the correct async task (#2065)
 - Fixed an issue with LCD_CAM i8080 where it would send double the clocks in 16bit mode (#2085)
 - Fix i2c embedded-hal transaction (#2028)
+- Fix SPI DMA alternating `write` and `read` for ESP32 and ESP32-S2 (#2131)
 
 ### Removed
 
@@ -55,6 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `AnyInputOnlyPin` in favour of `AnyPin`. (#2071)
 - Removed the following functions from `GpioPin`: `is_high`, `is_low`, `set_high`, `set_low`, `set_state`, `is_set_high`, `is_set_low`, `toggle`. (#2094)
 - Removed `Rtc::get_time_raw` (#1883)
+- Removed `_with_default_pins` UART constructors (#2132)
+- Removed `uart::{DefaultRxPin, DefaultTxPin}` (#2132)
 
 ## [0.20.1] - 2024-08-30
 

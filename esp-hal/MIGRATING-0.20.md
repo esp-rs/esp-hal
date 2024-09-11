@@ -103,6 +103,11 @@ let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     .unwrap();
 ```
 
+## Removed UART constructors
+
+The `Uart::new_with_default_pins` and `Uart::new_async_with_default_pins` constructors
+have been removed. Use `new` or `new_async` instead.
+
 ## RTC Wall Clock APIs
 
 Instead of the `get_time_ms`, `get_time_us`, and `get_time_raw` functions, the `Rtc` struct now provides the `current_time` function, using `chrono`'s `NaiveDateTime` struct.

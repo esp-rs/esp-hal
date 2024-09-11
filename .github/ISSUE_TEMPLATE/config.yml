@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Ask questions in Matrix channel (Recommended)
+    url: https://matrix.to/#/#esp-rs:matrix.org
+    about: Ask any questions directly in our Matrix channel.
+  - name: Ask questions in GitHub Discussions
+    url: https://github.com/esp-rs/esp-hal/discussions/new
+    about: Post your questions and engage in discussions via GitHub.
