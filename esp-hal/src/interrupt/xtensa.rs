@@ -490,23 +490,33 @@ mod vectored {
             interrupt::get() & interrupt::get_mask() & CPU_INTERRUPT_LEVELS[level as usize];
 
         if cpu_interrupt_mask & CPU_INTERRUPT_INTERNAL != 0 {
+            // Let's handle CPU-internal interrupts (NMI, Timer, Software, Profiling).
+            // These are rarely used by the HAL.
+
+            // Mask the relevant bits
             let cpu_interrupt_mask = cpu_interrupt_mask & CPU_INTERRUPT_INTERNAL;
+
+            // Pick one
             let cpu_interrupt_nr = cpu_interrupt_mask.trailing_zeros();
 
-            if (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
+            // If the interrupt is edge triggered, we need to clear the request on the CPU's
+            // side.
+            if ((1 << cpu_interrupt_nr) & CPU_INTERRUPT_EDGE) != 0 {
                 interrupt::clear(1 << cpu_interrupt_nr);
             }
+
             if let Some(handler) = cpu_interrupt_nr_to_cpu_interrupt_handler(cpu_interrupt_nr) {
                 handler(level, save_frame);
             }
         } else if (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
-            let cpu_interrupt_mask = cpu_interrupt_mask & CPU_INTERRUPT_EDGE;
-            let cpu_interrupt_nr = cpu_interrupt_mask.trailing_zeros();
-            interrupt::clear(1 << cpu_interrupt_nr);
+            // Next, handle edge triggered peripheral interrupts.
 
-            // for edge interrupts cannot rely on the interrupt status
-            // register, therefore call all registered
-            // handlers for current level
+            // If the interrupt is edge triggered, we need to clear the
+            // request on the CPU's side
+            interrupt::clear(cpu_interrupt_mask & CPU_INTERRUPT_EDGE);
+
+            // For edge interrupts we cannot rely on the peripherals' interrupt status
+            // registers, therefore call all registered handlers for current level.
             let configured_interrupts =
                 get_configured_interrupts(core, chip_specific::INTERRUPT_EDGE, level);
 
@@ -516,8 +526,8 @@ mod vectored {
                 handle_interrupt(level, interrupt, save_frame);
             }
         } else {
-            // finally check peripheral sources and fire of handlers from pac
-            // peripheral mapped interrupts are cleared by the peripheral
+            // Finally, check level-triggered peripheral sources.
+            // These interrupts are cleared by the peripheral.
             let status = get_status(core);
             let configured_interrupts = get_configured_interrupts(core, status, level);
 
