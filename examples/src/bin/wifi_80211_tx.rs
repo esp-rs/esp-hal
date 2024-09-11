@@ -16,7 +16,7 @@ use esp_hal::{
     delay::Delay,
     prelude::*,
     rng::Rng,
-    timer::{timg::TimerGroup, ErasedTimer, PeriodicTimer},
+    timer::{timg::TimerGroup, AnyTimer, PeriodicTimer},
 };
 use esp_wifi::{initialize, wifi, EspWifiInitFor};
 use ieee80211::{
@@ -46,7 +46,7 @@ fn main() -> ! {
     let delay = Delay::new();
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let timer0: ErasedTimer = timg0.timer0.into();
+    let timer0: AnyTimer = timg0.timer0.into();
     let timer = PeriodicTimer::new(timer0);
 
     let init = initialize(
