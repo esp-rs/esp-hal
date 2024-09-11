@@ -81,7 +81,7 @@ use super::{
 };
 use crate::{
     clock::Clocks,
-    dma::{DmaDescriptor, DmaPeripheral, Rx, Tx},
+    dma::{DmaPeripheral, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
@@ -947,7 +947,9 @@ mod dma {
             Channel,
             DmaChannel,
             DmaRxBuf,
+            DmaRxBuffer,
             DmaTxBuf,
+            DmaTxBuffer,
             RxPrivate,
             Spi2Peripheral,
             SpiPeripheral,
@@ -1266,23 +1268,18 @@ mod dma {
         /// bytes.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-        pub fn dma_write(
+        pub fn dma_write<TX: DmaTxBuffer>(
             mut self,
-            buffer: DmaTxBuf,
-        ) -> Result<SpiDmaTransfer<'d, T, C, FullDuplexMode, M, DmaTxBuf>, (Error, Self, DmaTxBuf)>
-        {
-            let bytes_to_write = buffer.len();
+            mut buffer: TX,
+        ) -> Result<SpiDmaTransfer<'d, T, C, FullDuplexMode, M, TX>, (Error, Self, TX)> {
+            let bytes_to_write = buffer.length();
             if bytes_to_write > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
 
             let result = unsafe {
-                self.spi.start_write_bytes_dma(
-                    buffer.first(),
-                    bytes_to_write,
-                    &mut self.channel.tx,
-                    true,
-                )
+                self.spi
+                    .start_write_bytes_dma(&mut buffer, &mut self.channel.tx, true)
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
@@ -1298,23 +1295,18 @@ mod dma {
         /// received is 32736 bytes.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-        pub fn dma_read(
+        pub fn dma_read<RX: DmaRxBuffer>(
             mut self,
-            buffer: DmaRxBuf,
-        ) -> Result<SpiDmaTransfer<'d, T, C, FullDuplexMode, M, DmaRxBuf>, (Error, Self, DmaRxBuf)>
-        {
-            let bytes_to_read = buffer.len();
+            mut buffer: RX,
+        ) -> Result<SpiDmaTransfer<'d, T, C, FullDuplexMode, M, RX>, (Error, Self, RX)> {
+            let bytes_to_read = buffer.length();
             if bytes_to_read > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
 
             let result = unsafe {
-                self.spi.start_read_bytes_dma(
-                    buffer.first(),
-                    bytes_to_read,
-                    &mut self.channel.rx,
-                    true,
-                )
+                self.spi
+                    .start_read_bytes_dma(&mut buffer, &mut self.channel.rx, true)
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
@@ -1329,16 +1321,14 @@ mod dma {
         /// the SPI instance. The maximum amount of data to be
         /// sent/received is 32736 bytes.
         #[allow(clippy::type_complexity)]
-        pub fn dma_transfer(
+        pub fn dma_transfer<RX: DmaRxBuffer, TX: DmaTxBuffer>(
             mut self,
-            rx_buffer: DmaRxBuf,
-            tx_buffer: DmaTxBuf,
-        ) -> Result<
-            SpiDmaTransfer<'d, T, C, FullDuplexMode, M, (DmaRxBuf, DmaTxBuf)>,
-            (Error, Self, DmaRxBuf, DmaTxBuf),
-        > {
-            let bytes_to_read = rx_buffer.len();
-            let bytes_to_write = tx_buffer.len();
+            mut rx_buffer: RX,
+            mut tx_buffer: TX,
+        ) -> Result<SpiDmaTransfer<'d, T, C, FullDuplexMode, M, (RX, TX)>, (Error, Self, RX, TX)>
+        {
+            let bytes_to_read = rx_buffer.length();
+            let bytes_to_write = tx_buffer.length();
 
             if bytes_to_write > MAX_DMA_SIZE || bytes_to_read > MAX_DMA_SIZE {
                 return Err((
@@ -1351,10 +1341,8 @@ mod dma {
 
             let result = unsafe {
                 self.spi.start_transfer_dma(
-                    rx_buffer.first(),
-                    tx_buffer.first(),
-                    bytes_to_read,
-                    bytes_to_write,
+                    &mut rx_buffer,
+                    &mut tx_buffer,
                     &mut self.channel.rx,
                     &mut self.channel.tx,
                 )
@@ -1382,16 +1370,15 @@ mod dma {
         /// Perform a half-duplex read operation using DMA.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-        pub fn read(
+        pub fn read<RX: DmaRxBuffer>(
             mut self,
             data_mode: SpiDataMode,
             cmd: Command,
             address: Address,
             dummy: u8,
-            buffer: DmaRxBuf,
-        ) -> Result<SpiDmaTransfer<'d, T, C, HalfDuplexMode, M, DmaRxBuf>, (Error, Self, DmaRxBuf)>
-        {
-            let bytes_to_read = buffer.len();
+            mut buffer: RX,
+        ) -> Result<SpiDmaTransfer<'d, T, C, HalfDuplexMode, M, RX>, (Error, Self, RX)> {
+            let bytes_to_read = buffer.length();
             if bytes_to_read > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
@@ -1447,12 +1434,8 @@ mod dma {
             }
 
             let result = unsafe {
-                self.spi.start_read_bytes_dma(
-                    buffer.first(),
-                    bytes_to_read,
-                    &mut self.channel.rx,
-                    false,
-                )
+                self.spi
+                    .start_read_bytes_dma(&mut buffer, &mut self.channel.rx, false)
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
@@ -1464,16 +1447,15 @@ mod dma {
         /// Perform a half-duplex write operation using DMA.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-        pub fn write(
+        pub fn write<TX: DmaTxBuffer>(
             mut self,
             data_mode: SpiDataMode,
             cmd: Command,
             address: Address,
             dummy: u8,
-            buffer: DmaTxBuf,
-        ) -> Result<SpiDmaTransfer<'d, T, C, HalfDuplexMode, M, DmaTxBuf>, (Error, Self, DmaTxBuf)>
-        {
-            let bytes_to_write = buffer.len();
+            mut buffer: TX,
+        ) -> Result<SpiDmaTransfer<'d, T, C, HalfDuplexMode, M, TX>, (Error, Self, TX)> {
+            let bytes_to_write = buffer.length();
             if bytes_to_write > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
@@ -1529,12 +1511,8 @@ mod dma {
             }
 
             let result = unsafe {
-                self.spi.start_write_bytes_dma(
-                    buffer.first(),
-                    bytes_to_write,
-                    &mut self.channel.tx,
-                    false,
-                )
+                self.spi
+                    .start_write_bytes_dma(&mut buffer, &mut self.channel.tx, false)
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
@@ -2296,10 +2274,8 @@ pub trait InstanceDma: Instance {
     #[allow(clippy::too_many_arguments)]
     unsafe fn start_transfer_dma<RX: Rx, TX: Tx>(
         &mut self,
-        rx_desc: *mut DmaDescriptor,
-        tx_desc: *mut DmaDescriptor,
-        read_buffer_len: usize,
-        write_buffer_len: usize,
+        rx_buffer: &mut impl DmaRxBuffer,
+        tx_buffer: &mut impl DmaTxBuffer,
         rx: &mut RX,
         tx: &mut TX,
     ) -> Result<(), Error> {
@@ -2312,7 +2288,7 @@ pub trait InstanceDma: Instance {
             reg_block.dma_in_link().write(|w| w.bits(0));
         }
 
-        self.configure_datalen(usize::max(read_buffer_len, write_buffer_len) as u32 * 8);
+        self.configure_datalen(usize::max(rx_buffer.length(), tx_buffer.length()) as u32 * 8);
 
         rx.is_done();
         tx.is_done();
@@ -2327,9 +2303,9 @@ pub trait InstanceDma: Instance {
 
         self.clear_dma_interrupts();
         reset_dma_before_load_dma_dscr(reg_block);
-        rx.prepare_transfer(self.dma_peripheral(), rx_desc)
+        rx.prepare_transfer(self.dma_peripheral(), rx_buffer)
             .and_then(|_| rx.start_transfer())?;
-        tx.prepare_transfer(self.dma_peripheral(), tx_desc)
+        tx.prepare_transfer(self.dma_peripheral(), tx_buffer)
             .and_then(|_| tx.start_transfer())?;
 
         reset_dma_before_usr_cmd(reg_block);
@@ -2342,13 +2318,12 @@ pub trait InstanceDma: Instance {
     #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
     unsafe fn start_write_bytes_dma<TX: Tx>(
         &mut self,
-        first_desc: *mut DmaDescriptor,
-        len: usize,
+        buffer: &mut impl DmaTxBuffer,
         tx: &mut TX,
         full_duplex: bool,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
-        self.configure_datalen(len as u32 * 8);
+        self.configure_datalen(buffer.length() as u32 * 8);
 
         tx.is_done();
 
@@ -2379,7 +2354,7 @@ pub trait InstanceDma: Instance {
         reset_dma_before_load_dma_dscr(reg_block);
         self.clear_dma_interrupts();
 
-        tx.prepare_transfer(self.dma_peripheral(), first_desc)?;
+        tx.prepare_transfer(self.dma_peripheral(), buffer)?;
         tx.start_transfer()?;
         reset_dma_before_usr_cmd(reg_block);
 
@@ -2396,10 +2371,9 @@ pub trait InstanceDma: Instance {
     }
 
     #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-    unsafe fn start_read_bytes_dma<RX: Rx>(
+    unsafe fn start_read_bytes_dma<RX: Rx, BUF: DmaRxBuffer>(
         &mut self,
-        desc: *mut DmaDescriptor,
-        data_length: usize,
+        buffer: &mut BUF,
         rx: &mut RX,
         full_duplex: bool,
     ) -> Result<(), Error> {
@@ -2412,7 +2386,7 @@ pub trait InstanceDma: Instance {
             reg_block.dma_in_link().write(|w| w.bits(0));
         }
 
-        self.configure_datalen(data_length as u32 * 8);
+        self.configure_datalen(buffer.length() as u32 * 8);
 
         rx.is_done();
 
@@ -2431,7 +2405,7 @@ pub trait InstanceDma: Instance {
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
 
-        rx.prepare_transfer(self.dma_peripheral(), desc)?;
+        rx.prepare_transfer(self.dma_peripheral(), buffer)?;
         rx.start_transfer()?;
 
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
