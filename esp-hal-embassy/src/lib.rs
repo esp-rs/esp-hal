@@ -71,11 +71,11 @@ pub trait TimerCollection {
 ///
 /// We can't blanket-implement for `Into<AnyTimer>` because of possible
 /// conflicting implementations.
-trait IntoErasedTimer: Into<AnyTimer> {}
+trait IntoAnyTimer: Into<AnyTimer> {}
 
-impl IntoErasedTimer for AnyTimer {}
+impl IntoAnyTimer for AnyTimer {}
 
-impl<T, DM> IntoErasedTimer for TimgTimer<T, DM>
+impl<T, DM> IntoAnyTimer for TimgTimer<T, DM>
 where
     DM: esp_hal::Mode,
     Self: Into<AnyTimer>,
@@ -83,7 +83,7 @@ where
 }
 
 #[cfg(not(feature = "esp32"))]
-impl<T, DM, COMP, UNIT> IntoErasedTimer for Alarm<'_, T, DM, COMP, UNIT>
+impl<T, DM, COMP, UNIT> IntoAnyTimer for Alarm<'_, T, DM, COMP, UNIT>
 where
     DM: esp_hal::Mode,
     Self: Into<AnyTimer>,
@@ -92,7 +92,7 @@ where
 
 impl<T> TimerCollection for T
 where
-    T: IntoErasedTimer,
+    T: IntoAnyTimer,
 {
     fn timers(self) -> &'static mut [Timer] {
         Timer::new(self.into()).timers()
@@ -122,7 +122,7 @@ macro_rules! impl_array {
     ($n:literal) => {
         impl<T> TimerCollection for [T; $n]
         where
-            T: IntoErasedTimer,
+            T: IntoAnyTimer,
         {
             fn timers(self) -> &'static mut [Timer] {
                 mk_static!([Timer; $n], self.map(|t| Timer::new(t.into())))
