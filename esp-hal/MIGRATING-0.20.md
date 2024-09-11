@@ -85,8 +85,8 @@ To avoid confusion with the `Rtc::current_time` wall clock time APIs, we've rena
 
 ## RX/TX Order
 
-Previously, our API was pretty inconsitent with the RX/TX ordering, and different peripherals had different order. Now, all
-the peripherals use rx-tx. Make sure your methods are expecting the rigth RX/TX order, for example an SPI DMA app should be updated to:
+Previously, our API was pretty inconsistent with the RX/TX ordering, and different peripherals had different order. Now, all
+the peripherals use rx-tx. Make sure your methods are expecting the right RX/TX order, for example an SPI DMA app should be updated to:
 
 ```diff
 - let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(4);
@@ -101,6 +101,13 @@ let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 +    .dma_transfer(dma_rx_buf, dma_tx_buf)
     .map_err(|e| e.0)
     .unwrap();
+```
+
+When using the asymmetric variant of the macro to create DMA buffers and descriptors make sure to swap the order of parameters
+
+```diff
+- let (tx_buffer, tx_descriptors, _, _) = dma_buffers!(32000, 0);
++ let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, 32000);
 ```
 
 ## Removed UART constructors
