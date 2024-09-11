@@ -199,14 +199,14 @@ where
     pub fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Error> {
         self.peripheral
             .master_read(address, buffer)
-            .inspect_err(|_| self.recover())
+            .inspect_err(|_| self.internal_recover())
     }
 
     /// Writes bytes to slave with address `address`
     pub fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
         self.peripheral
             .master_write(addr, bytes)
-            .inspect_err(|_| self.recover())
+            .inspect_err(|_| self.internal_recover())
     }
 
     /// Writes bytes to slave with address `address` and then reads enough bytes
@@ -219,7 +219,7 @@ where
     ) -> Result<(), Error> {
         self.peripheral
             .master_write_read(address, bytes, buffer)
-            .inspect_err(|_| self.recover())
+            .inspect_err(|_| self.internal_recover())
     }
 }
 
@@ -232,7 +232,7 @@ where
     fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Self::Error> {
         self.peripheral
             .master_read(address, buffer)
-            .inspect_err(|_| self.recover())
+            .inspect_err(|_| self.internal_recover())
     }
 }
 
@@ -245,7 +245,7 @@ where
     fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Self::Error> {
         self.peripheral
             .master_write(addr, bytes)
-            .inspect_err(|_| self.recover())
+            .inspect_err(|_| self.internal_recover())
     }
 }
 
@@ -263,7 +263,7 @@ where
     ) -> Result<(), Self::Error> {
         self.peripheral
             .master_write_read(address, bytes, buffer)
-            .inspect_err(|_| self.recover())
+            .inspect_err(|_| self.internal_recover())
     }
 }
 
@@ -309,7 +309,7 @@ where
                             next_op == Op::None,
                             cmd_iterator,
                         )
-                        .inspect_err(|_| self.recover())?;
+                        .inspect_err(|_| self.internal_recover())?;
                     last_op = Op::Write;
                 }
                 Operation::Read(buffer) => {
@@ -326,7 +326,7 @@ where
                             next_op == Op::Read,
                             cmd_iterator,
                         )
-                        .inspect_err(|_| self.recover())?;
+                        .inspect_err(|_| self.internal_recover())?;
                     last_op = Op::Read;
                 }
             }
@@ -408,8 +408,7 @@ where
         }
     }
 
-    /// Recover from error condition
-    pub fn recover(&self) {
+    fn internal_recover(&self) {
         PeripheralClockControl::reset(match self.peripheral.i2c_number() {
             0 => crate::system::Peripheral::I2cExt0,
             #[cfg(i2c1)]
