@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue with LCD_CAM i8080 where it would send double the clocks in 16bit mode (#2085)
 - Fix i2c embedded-hal transaction (#2028)
 - Fix SPI DMA alternating `write` and `read` for ESP32 and ESP32-S2 (#2131)
+- Fix I2C ending up in a state when only re-creating the peripheral makes it useable again (#2141)
 
 ### Removed
 
