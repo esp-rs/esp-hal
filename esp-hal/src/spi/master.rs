@@ -66,7 +66,7 @@ use enumset::EnumSet;
 #[cfg(gdma)]
 use enumset::EnumSetType;
 use fugit::HertzU32;
-#[cfg(feature = "place-spi-driver-in-ram")]
+#[cfg(place_spi_driver_in_ram)]
 use procmacros::ram;
 
 use super::{
@@ -1199,7 +1199,7 @@ mod dma {
         /// SPI instance. The maximum amount of data to be sent is 32736
         /// bytes.
         #[allow(clippy::type_complexity)]
-        #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
+        #[cfg_attr(place_spi_driver_in_ram, ram)]
         pub fn dma_write<TX: DmaTxBuffer>(
             mut self,
             mut buffer: TX,
@@ -1226,7 +1226,7 @@ mod dma {
         /// the SPI instance. The maximum amount of data to be
         /// received is 32736 bytes.
         #[allow(clippy::type_complexity)]
-        #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
+        #[cfg_attr(place_spi_driver_in_ram, ram)]
         pub fn dma_read<RX: DmaRxBuffer>(
             mut self,
             mut buffer: RX,
@@ -1301,7 +1301,7 @@ mod dma {
     {
         /// Perform a half-duplex read operation using DMA.
         #[allow(clippy::type_complexity)]
-        #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
+        #[cfg_attr(place_spi_driver_in_ram, ram)]
         pub fn read<RX: DmaRxBuffer>(
             mut self,
             data_mode: SpiDataMode,
@@ -1378,7 +1378,7 @@ mod dma {
 
         /// Perform a half-duplex write operation using DMA.
         #[allow(clippy::type_complexity)]
-        #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
+        #[cfg_attr(place_spi_driver_in_ram, ram)]
         pub fn write<TX: DmaTxBuffer>(
             mut self,
             data_mode: SpiDataMode,
@@ -2247,7 +2247,7 @@ pub trait InstanceDma: Instance {
         Ok(())
     }
 
-    #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
+    #[cfg_attr(place_spi_driver_in_ram, ram)]
     unsafe fn start_write_bytes_dma<TX: Tx>(
         &mut self,
         buffer: &mut impl DmaTxBuffer,
@@ -2295,7 +2295,7 @@ pub trait InstanceDma: Instance {
         Ok(())
     }
 
-    #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
+    #[cfg_attr(place_spi_driver_in_ram, ram)]
     unsafe fn start_read_bytes_dma<RX: Rx, BUF: DmaRxBuffer>(
         &mut self,
         buffer: &mut BUF,
@@ -3050,7 +3050,7 @@ pub trait Instance: private::Sealed {
     /// all bytes of the last chunk to transmit have been sent to the wire. If
     /// you must ensure that the whole messages was written correctly, use
     /// [`Self::flush`].
-    #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
+    #[cfg_attr(place_spi_driver_in_ram, ram)]
     fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
         let num_chunks = words.len() / FIFO_SIZE;
 
@@ -3107,7 +3107,7 @@ pub trait Instance: private::Sealed {
     /// Sends out a stuffing byte for every byte to read. This function doesn't
     /// perform flushing. If you want to read the response to something you
     /// have written before, consider using [`Self::transfer`] instead.
-    #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
+    #[cfg_attr(place_spi_driver_in_ram, ram)]
     fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Error> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
 
@@ -3125,7 +3125,7 @@ pub trait Instance: private::Sealed {
     /// doesn't perform flushing. If you want to read the response to
     /// something you have written before, consider using [`Self::transfer`]
     /// instead.
-    #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
+    #[cfg_attr(place_spi_driver_in_ram, ram)]
     fn read_bytes_from_fifo(&mut self, words: &mut [u8]) -> Result<(), Error> {
         let reg_block = self.register_block();
 
@@ -3157,7 +3157,7 @@ pub trait Instance: private::Sealed {
         Ok(())
     }
 
-    #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
+    #[cfg_attr(place_spi_driver_in_ram, ram)]
     fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
             self.write_bytes(chunk)?;
