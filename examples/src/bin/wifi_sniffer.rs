@@ -24,7 +24,7 @@ use esp_hal::{
     timer::{timg::TimerGroup, AnyTimer, PeriodicTimer},
 };
 use esp_println::println;
-use esp_wifi::{initialize, wifi, EspWifiOperationFor};
+use esp_wifi::{initialize, wifi, EspWifiFor};
 use ieee80211::{match_frames, mgmt_frame::BeaconFrame};
 
 static KNOWN_SSIDS: Mutex<RefCell<BTreeSet<String>>> = Mutex::new(RefCell::new(BTreeSet::new()));
@@ -45,7 +45,7 @@ fn main() -> ! {
     let timer = PeriodicTimer::new(timer0);
 
     let init = initialize(
-        EspWifiOperationFor::Wifi,
+        EspWifiFor::Wifi,
         timer,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
