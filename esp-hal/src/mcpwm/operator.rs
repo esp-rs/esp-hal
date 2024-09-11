@@ -12,7 +12,7 @@
 use core::marker::PhantomData;
 
 use crate::{
-    gpio::OutputPin,
+    gpio::PeripheralOutput,
     mcpwm::{timer::Timer, PwmPeripheral},
     peripheral::{Peripheral, PeripheralRef},
     private,
@@ -204,7 +204,7 @@ impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
     }
 
     /// Use the A output with the given pin and configuration
-    pub fn with_pin_a<'d, Pin: OutputPin>(
+    pub fn with_pin_a<'d, Pin: PeripheralOutput>(
         self,
         pin: impl Peripheral<P = Pin> + 'd,
         config: PwmPinConfig<true>,
@@ -213,7 +213,7 @@ impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
     }
 
     /// Use the B output with the given pin and configuration
-    pub fn with_pin_b<'d, Pin: OutputPin>(
+    pub fn with_pin_b<'d, Pin: PeripheralOutput>(
         self,
         pin: impl Peripheral<P = Pin> + 'd,
         config: PwmPinConfig<false>,
@@ -222,7 +222,7 @@ impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
     }
 
     /// Use both the A and the B output with the given pins and configurations
-    pub fn with_pins<'d, PinA: OutputPin, PinB: OutputPin>(
+    pub fn with_pins<'d, PinA: PeripheralOutput, PinB: PeripheralOutput>(
         self,
         pin_a: impl Peripheral<P = PinA> + 'd,
         config_a: PwmPinConfig<true>,
@@ -239,7 +239,7 @@ impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
     ///
     /// This is useful for complementary or mirrored signals with or without
     /// configured deadtime
-    pub fn with_linked_pins<'d, PinA: OutputPin, PinB: OutputPin>(
+    pub fn with_linked_pins<'d, PinA: PeripheralOutput, PinB: PeripheralOutput>(
         self,
         pin_a: impl Peripheral<P = PinA> + 'd,
         config_a: PwmPinConfig<true>,
@@ -288,7 +288,7 @@ pub struct PwmPin<'d, Pin, PWM, const OP: u8, const IS_A: bool> {
     phantom: PhantomData<PWM>,
 }
 
-impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
+impl<'d, Pin: PeripheralOutput, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     PwmPin<'d, Pin, PWM, OP, IS_A>
 {
     fn new(pin: impl Peripheral<P = Pin> + 'd, config: PwmPinConfig<IS_A>) -> Self {
@@ -304,6 +304,7 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
         pin.pin
             .connect_peripheral_to_output(output_signal, private::Internal);
         pin.pin.enable_output(true, private::Internal);
+
         pin
     }
 
@@ -414,8 +415,8 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     }
 }
 
-impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal_02::PwmPin
-    for PwmPin<'d, Pin, PWM, OP, IS_A>
+impl<'d, Pin: PeripheralOutput, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
+    embedded_hal_02::PwmPin for PwmPin<'d, Pin, PWM, OP, IS_A>
 {
     type Duty = u16;
 
@@ -448,14 +449,14 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> emb
 }
 
 /// Implement no error type for the PwmPin because the method are infallible
-impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
+impl<'d, Pin: PeripheralOutput, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     embedded_hal::pwm::ErrorType for PwmPin<'d, Pin, PWM, OP, IS_A>
 {
     type Error = core::convert::Infallible;
 }
 
 /// Implement the trait SetDutyCycle for PwmPin
-impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
+impl<'d, Pin: PeripheralOutput, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     embedded_hal::pwm::SetDutyCycle for PwmPin<'d, Pin, PWM, OP, IS_A>
 {
     /// Get the max duty of the PwmPin
@@ -522,7 +523,7 @@ pub struct LinkedPins<'d, PinA, PinB, PWM, const OP: u8> {
     pin_b: PwmPin<'d, PinB, PWM, OP, false>,
 }
 
-impl<'d, PinA: OutputPin, PinB: OutputPin, PWM: PwmPeripheral, const OP: u8>
+impl<'d, PinA: PeripheralOutput, PinB: PeripheralOutput, PWM: PwmPeripheral, const OP: u8>
     LinkedPins<'d, PinA, PinB, PWM, OP>
 {
     fn new(

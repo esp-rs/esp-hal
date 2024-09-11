@@ -264,7 +264,7 @@ macro_rules! lp_gpio {
                 ($this:expr, $inner:ident, $code:tt) => {
                     match $this {
                         $(
-                            ErasedPinInner::[<Gpio $gpionum >]($inner) => {
+                            AnyPinInner::[<Gpio $gpionum >]($inner) => {
                                 $code
                             },
                         )+

@@ -73,7 +73,7 @@ use core::marker::PhantomData;
 use super::{Error, FullDuplexMode, SpiMode};
 use crate::{
     dma::{DescriptorChain, DmaPeripheral, Rx, Tx},
-    gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
+    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
     private,
@@ -106,25 +106,31 @@ where
     T: Instance,
 {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new<SCK: InputPin, MOSI: InputPin, MISO: OutputPin, CS: InputPin>(
+    pub fn new<
+        SCK: PeripheralInput,
+        MOSI: PeripheralInput,
+        MISO: PeripheralOutput,
+        CS: PeripheralInput,
+    >(
         spi: impl Peripheral<P = T> + 'd,
-        sck: impl Peripheral<P = SCK> + 'd,
+        sclk: impl Peripheral<P = SCK> + 'd,
         mosi: impl Peripheral<P = MOSI> + 'd,
         miso: impl Peripheral<P = MISO> + 'd,
         cs: impl Peripheral<P = CS> + 'd,
         mode: SpiMode,
     ) -> Spi<'d, T, FullDuplexMode> {
-        crate::into_ref!(spi, sck, mosi, miso, cs);
-        sck.init_input(false, false, private::Internal);
-        sck.connect_input_to_peripheral(spi.sclk_signal(), private::Internal);
+        crate::into_ref!(spi, sclk, mosi, miso, cs);
 
-        mosi.init_input(false, false, private::Internal);
+        sclk.init_input(Pull::None, private::Internal);
+        sclk.connect_input_to_peripheral(spi.sclk_signal(), private::Internal);
+
+        mosi.init_input(Pull::None, private::Internal);
         mosi.connect_input_to_peripheral(spi.mosi_signal(), private::Internal);
 
         miso.set_to_push_pull_output(private::Internal);
         miso.connect_peripheral_to_output(spi.miso_signal(), private::Internal);
 
-        cs.init_input(false, false, private::Internal);
+        cs.init_input(Pull::None, private::Internal);
         cs.connect_input_to_peripheral(spi.cs_signal(), private::Internal);
 
         Self::new_internal(spi, mode)
@@ -148,7 +154,7 @@ where
     }
 }
 
-/// DMA (Direct Memory Access) funtionality (Slave).
+/// DMA (Direct Memory Access) functionality (Slave).
 pub mod dma {
     use super::*;
     #[cfg(spi3)]

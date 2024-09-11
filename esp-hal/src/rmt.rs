@@ -85,7 +85,7 @@ use core::marker::PhantomData;
 use fugit::HertzU32;
 
 use crate::{
-    gpio::{InputPin, OutputPin},
+    gpio::{PeripheralInput, PeripheralOutput},
     interrupt::InterruptHandler,
     peripheral::Peripheral,
     rmt::private::CreateInstance,
@@ -295,10 +295,77 @@ impl<'d> Rmt<'d, crate::Async> {
     }
 }
 
+fn configure_rx_channel<
+    'd,
+    P: PeripheralInput,
+    T: private::RxChannelInternal<M>,
+    M: crate::Mode,
+>(
+    pin: impl Peripheral<P = P> + 'd,
+    config: RxChannelConfig,
+) -> Result<T, Error> {
+    if config.filter_threshold > 0b111_1111 {
+        return Err(Error::InvalidArgument);
+    }
+
+    cfg_if::cfg_if! {
+        if #[cfg(any(esp32, esp32s2))] {
+            let threshold = 0b111_1111_1111_1111;
+        } else {
+            let threshold = 0b11_1111_1111_1111;
+        }
+    }
+
+    if config.idle_threshold > threshold {
+        return Err(Error::InvalidArgument);
+    }
+
+    crate::into_ref!(pin);
+    pin.init_input(crate::gpio::Pull::None, crate::private::Internal);
+    pin.connect_input_to_peripheral(T::input_signal(), crate::private::Internal);
+
+    T::set_divider(config.clk_divider);
+    T::set_carrier(
+        config.carrier_modulation,
+        config.carrier_high,
+        config.carrier_low,
+        config.carrier_level,
+    );
+    T::set_filter_threshold(config.filter_threshold);
+    T::set_idle_threshold(config.idle_threshold);
+
+    Ok(T::new())
+}
+
+fn configure_tx_channel<
+    'd,
+    P: PeripheralOutput,
+    T: private::TxChannelInternal<M>,
+    M: crate::Mode,
+>(
+    pin: impl Peripheral<P = P> + 'd,
+    config: TxChannelConfig,
+) -> Result<T, Error> {
+    crate::into_ref!(pin);
+    pin.set_to_push_pull_output(crate::private::Internal);
+    pin.connect_peripheral_to_output(T::output_signal(), crate::private::Internal);
+
+    T::set_divider(config.clk_divider);
+    T::set_carrier(
+        config.carrier_modulation,
+        config.carrier_high,
+        config.carrier_low,
+        config.carrier_level,
+    );
+    T::set_idle_output(config.idle_output, config.idle_output_level);
+
+    Ok(T::new())
+}
+
 /// Creates a TX channel
 pub trait TxChannelCreator<'d, T, P>
 where
-    P: OutputPin,
+    P: PeripheralOutput,
     T: TxChannel,
 {
     /// Configure the TX channel
@@ -310,26 +377,14 @@ where
     where
         Self: Sized,
     {
-        crate::into_ref!(pin);
-        pin.set_to_push_pull_output(crate::private::Internal);
-        pin.connect_peripheral_to_output(T::output_signal(), crate::private::Internal);
-        T::set_divider(config.clk_divider);
-        T::set_carrier(
-            config.carrier_modulation,
-            config.carrier_high,
-            config.carrier_low,
-            config.carrier_level,
-        );
-        T::set_idle_output(config.idle_output, config.idle_output_level);
-
-        Ok(T::new())
+        configure_tx_channel(pin, config)
     }
 }
 
 /// Creates a TX channel in async mode
 pub trait TxChannelCreatorAsync<'d, T, P>
 where
-    P: OutputPin,
+    P: PeripheralOutput,
     T: TxChannelAsync,
 {
     /// Configure the TX channel
@@ -341,26 +396,14 @@ where
     where
         Self: Sized,
     {
-        crate::into_ref!(pin);
-        pin.set_to_push_pull_output(crate::private::Internal);
-        pin.connect_peripheral_to_output(T::output_signal(), crate::private::Internal);
-        T::set_divider(config.clk_divider);
-        T::set_carrier(
-            config.carrier_modulation,
-            config.carrier_high,
-            config.carrier_low,
-            config.carrier_level,
-        );
-        T::set_idle_output(config.idle_output, config.idle_output_level);
-
-        Ok(T::new())
+        configure_tx_channel(pin, config)
     }
 }
 
 /// Creates a RX channel
 pub trait RxChannelCreator<'d, T, P>
 where
-    P: InputPin,
+    P: PeripheralInput,
     T: RxChannel,
 {
     /// Configure the RX channel
@@ -372,41 +415,14 @@ where
     where
         Self: Sized,
     {
-        if config.filter_threshold > 0b111_1111 {
-            return Err(Error::InvalidArgument);
-        }
-
-        #[cfg(any(esp32, esp32s2))]
-        if config.idle_threshold > 0b111_1111_1111_1111 {
-            return Err(Error::InvalidArgument);
-        }
-
-        #[cfg(not(any(esp32, esp32s2)))]
-        if config.idle_threshold > 0b11_1111_1111_1111 {
-            return Err(Error::InvalidArgument);
-        }
-
-        crate::into_ref!(pin);
-        pin.init_input(false, false, crate::private::Internal);
-        pin.connect_input_to_peripheral(T::input_signal(), crate::private::Internal);
-        T::set_divider(config.clk_divider);
-        T::set_carrier(
-            config.carrier_modulation,
-            config.carrier_high,
-            config.carrier_low,
-            config.carrier_level,
-        );
-        T::set_filter_threshold(config.filter_threshold);
-        T::set_idle_threshold(config.idle_threshold);
-
-        Ok(T::new())
+        configure_rx_channel(pin, config)
     }
 }
 
 /// Creates a RX channel in async mode
 pub trait RxChannelCreatorAsync<'d, T, P>
 where
-    P: InputPin,
+    P: PeripheralInput,
     T: RxChannelAsync,
 {
     /// Configure the RX channel
@@ -418,34 +434,7 @@ where
     where
         Self: Sized,
     {
-        if config.filter_threshold > 0b111_1111 {
-            return Err(Error::InvalidArgument);
-        }
-
-        #[cfg(any(esp32, esp32s2))]
-        if config.idle_threshold > 0b111_1111_1111_1111 {
-            return Err(Error::InvalidArgument);
-        }
-
-        #[cfg(not(any(esp32, esp32s2)))]
-        if config.idle_threshold > 0b11_1111_1111_1111 {
-            return Err(Error::InvalidArgument);
-        }
-
-        crate::into_ref!(pin);
-        pin.init_input(false, false, crate::private::Internal);
-        pin.connect_input_to_peripheral(T::input_signal(), crate::private::Internal);
-        T::set_divider(config.clk_divider);
-        T::set_carrier(
-            config.carrier_modulation,
-            config.carrier_high,
-            config.carrier_low,
-            config.carrier_level,
-        );
-        T::set_filter_threshold(config.filter_threshold);
-        T::set_idle_threshold(config.idle_threshold);
-
-        Ok(T::new())
+        configure_rx_channel(pin, config)
     }
 }
 
@@ -586,7 +575,7 @@ macro_rules! impl_tx_channel_creator {
         impl<'d, P> $crate::rmt::TxChannelCreator<'d, $crate::rmt::Channel<$crate::Blocking, $channel>, P>
             for ChannelCreator<$crate::Blocking, $channel>
         where
-            P: $crate::gpio::OutputPin,
+            P: $crate::gpio::PeripheralOutput,
         {
         }
 
@@ -595,7 +584,7 @@ macro_rules! impl_tx_channel_creator {
         impl<'d, P> $crate::rmt::TxChannelCreatorAsync<'d, $crate::rmt::Channel<$crate::Async, $channel>, P>
             for ChannelCreator<$crate::Async, $channel>
         where
-            P: $crate::gpio::OutputPin,
+            P: $crate::gpio::PeripheralOutput,
         {
         }
 
@@ -608,7 +597,7 @@ macro_rules! impl_rx_channel_creator {
         impl<'d, P> $crate::rmt::RxChannelCreator<'d, $crate::rmt::Channel<$crate::Blocking, $channel>, P>
             for ChannelCreator<$crate::Blocking, $channel>
         where
-            P: $crate::gpio::InputPin,
+            P: $crate::gpio::PeripheralInput,
         {
         }
 
@@ -617,7 +606,7 @@ macro_rules! impl_rx_channel_creator {
         impl<'d, P> $crate::rmt::RxChannelCreatorAsync<'d, $crate::rmt::Channel<$crate::Async, $channel>, P>
         for ChannelCreator<$crate::Async, $channel>
         where
-            P: $crate::gpio::InputPin,
+            P: $crate::gpio::PeripheralInput,
         {
         }
 

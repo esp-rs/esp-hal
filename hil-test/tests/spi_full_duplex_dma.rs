@@ -48,7 +48,7 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
-        let (miso, mosi) = hil_test::common_test_pins!(io);
+        let (_, mosi) = hil_test::common_test_pins!(io);
 
         let dma = Dma::new(peripherals.DMA);
 
@@ -60,10 +60,11 @@ mod tests {
             }
         }
 
+        let mosi_loopback = mosi.peripheral_input();
         let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
             .with_sck(sclk)
             .with_mosi(mosi)
-            .with_miso(miso)
+            .with_miso(mosi_loopback)
             .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
         Context { spi }

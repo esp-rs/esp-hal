@@ -76,7 +76,7 @@ use crate::{
         ReadBuffer,
         TxPrivate,
     },
-    gpio::{OutputPin, OutputSignal},
+    gpio::{OutputSignal, PeripheralOutput},
     lcd_cam::{
         asynch::LcdDoneFuture,
         lcd::{i8080::private::TxPins, ClockMode, DelayMode, Phase, Polarity},
@@ -309,7 +309,7 @@ where
     }
 
     /// Associates a CS pin with the I8080 interface.
-    pub fn with_cs<CS: OutputPin>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
+    pub fn with_cs<CS: PeripheralOutput>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_ref!(cs);
         cs.set_to_push_pull_output(crate::private::Internal);
         cs.connect_peripheral_to_output(OutputSignal::LCD_CS, crate::private::Internal);
@@ -318,7 +318,7 @@ where
     }
 
     /// Configures the control pins for the I8080 interface.
-    pub fn with_ctrl_pins<DC: OutputPin, WRX: OutputPin>(
+    pub fn with_ctrl_pins<DC: PeripheralOutput, WRX: PeripheralOutput>(
         self,
         dc: impl Peripheral<P = DC> + 'd,
         wrx: impl Peripheral<P = WRX> + 'd,
@@ -593,14 +593,14 @@ pub struct TxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7> {
 
 impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> TxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
 where
-    P0: OutputPin,
-    P1: OutputPin,
-    P2: OutputPin,
-    P3: OutputPin,
-    P4: OutputPin,
-    P5: OutputPin,
-    P6: OutputPin,
-    P7: OutputPin,
+    P0: PeripheralOutput,
+    P1: PeripheralOutput,
+    P2: PeripheralOutput,
+    P3: PeripheralOutput,
+    P4: PeripheralOutput,
+    P5: PeripheralOutput,
+    P6: PeripheralOutput,
+    P7: PeripheralOutput,
 {
     #[allow(clippy::too_many_arguments)]
     /// Creates a new `TxEightBits` instance with the provided output pins.
@@ -638,14 +638,14 @@ where
 
 impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> TxPins for TxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
 where
-    P0: OutputPin,
-    P1: OutputPin,
-    P2: OutputPin,
-    P3: OutputPin,
-    P4: OutputPin,
-    P5: OutputPin,
-    P6: OutputPin,
-    P7: OutputPin,
+    P0: PeripheralOutput,
+    P1: PeripheralOutput,
+    P2: PeripheralOutput,
+    P3: PeripheralOutput,
+    P4: PeripheralOutput,
+    P5: PeripheralOutput,
+    P6: PeripheralOutput,
+    P7: PeripheralOutput,
 {
     type Word = u8;
 
@@ -701,22 +701,22 @@ pub struct TxSixteenBits<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P
 impl<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
     TxSixteenBits<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
 where
-    P0: OutputPin,
-    P1: OutputPin,
-    P2: OutputPin,
-    P3: OutputPin,
-    P4: OutputPin,
-    P5: OutputPin,
-    P6: OutputPin,
-    P7: OutputPin,
-    P8: OutputPin,
-    P9: OutputPin,
-    P10: OutputPin,
-    P11: OutputPin,
-    P12: OutputPin,
-    P13: OutputPin,
-    P14: OutputPin,
-    P15: OutputPin,
+    P0: PeripheralOutput,
+    P1: PeripheralOutput,
+    P2: PeripheralOutput,
+    P3: PeripheralOutput,
+    P4: PeripheralOutput,
+    P5: PeripheralOutput,
+    P6: PeripheralOutput,
+    P7: PeripheralOutput,
+    P8: PeripheralOutput,
+    P9: PeripheralOutput,
+    P10: PeripheralOutput,
+    P11: PeripheralOutput,
+    P12: PeripheralOutput,
+    P13: PeripheralOutput,
+    P14: PeripheralOutput,
+    P15: PeripheralOutput,
 {
     #[allow(clippy::too_many_arguments)]
     /// Creates a new `TxSixteenBits` instance with the provided output pins.
@@ -779,22 +779,22 @@ where
 impl<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15> TxPins
     for TxSixteenBits<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
 where
-    P0: OutputPin,
-    P1: OutputPin,
-    P2: OutputPin,
-    P3: OutputPin,
-    P4: OutputPin,
-    P5: OutputPin,
-    P6: OutputPin,
-    P7: OutputPin,
-    P8: OutputPin,
-    P9: OutputPin,
-    P10: OutputPin,
-    P11: OutputPin,
-    P12: OutputPin,
-    P13: OutputPin,
-    P14: OutputPin,
-    P15: OutputPin,
+    P0: PeripheralOutput,
+    P1: PeripheralOutput,
+    P2: PeripheralOutput,
+    P3: PeripheralOutput,
+    P4: PeripheralOutput,
+    P5: PeripheralOutput,
+    P6: PeripheralOutput,
+    P7: PeripheralOutput,
+    P8: PeripheralOutput,
+    P9: PeripheralOutput,
+    P10: PeripheralOutput,
+    P11: PeripheralOutput,
+    P12: PeripheralOutput,
+    P13: PeripheralOutput,
+    P14: PeripheralOutput,
+    P15: PeripheralOutput,
 {
     type Word = u16;
     fn configure(&mut self) {

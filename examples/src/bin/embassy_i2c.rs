@@ -6,7 +6,7 @@
 //! This is an example of running the embassy executor with IC2. It uses an
 //! LIS3DH to get accelerometer data.
 //!
-//! Folowing pins are used:
+//! Following pins are used:
 //! - SDA => GPIO4
 //! - SCL => GPIO5
 

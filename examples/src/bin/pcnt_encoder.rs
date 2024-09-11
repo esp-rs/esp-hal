@@ -53,15 +53,15 @@ fn main() -> ! {
 
     println!("setup channel 0");
     let ch0 = &u0.channel0;
-    let mut pin_a = io.pins.gpio4;
-    let mut pin_b = io.pins.gpio5;
+    let pin_a = io.pins.gpio4;
+    let pin_b = io.pins.gpio5;
 
-    ch0.set_ctrl_signal(PcntSource::from_pin(
-        &mut pin_a,
+    ch0.set_ctrl_signal(PcntSource::from(
+        pin_a.peripheral_input(),
         PcntInputConfig { pull: Pull::Up },
     ));
-    ch0.set_edge_signal(PcntSource::from_pin(
-        &mut pin_b,
+    ch0.set_edge_signal(PcntSource::from(
+        pin_b.peripheral_input(),
         PcntInputConfig { pull: Pull::Up },
     ));
     ch0.set_ctrl_mode(channel::CtrlMode::Reverse, channel::CtrlMode::Keep);
@@ -69,12 +69,12 @@ fn main() -> ! {
 
     println!("setup channel 1");
     let ch1 = &u0.channel1;
-    ch1.set_ctrl_signal(PcntSource::from_pin(
-        &mut pin_b,
+    ch1.set_ctrl_signal(PcntSource::from(
+        pin_b.peripheral_input(),
         PcntInputConfig { pull: Pull::Up },
     ));
-    ch1.set_edge_signal(PcntSource::from_pin(
-        &mut pin_a,
+    ch1.set_edge_signal(PcntSource::from(
+        pin_a.peripheral_input(),
         PcntInputConfig { pull: Pull::Up },
     ));
     ch1.set_ctrl_mode(channel::CtrlMode::Reverse, channel::CtrlMode::Keep);

@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Previously unavailable memory is available via `.dram2_uninit` section (#2079)
 - You can now use `Input`, `Output`, `OutputOpenDrain` and `Flex` pins as EXTI and RTCIO wakeup sources (#2095)
 - Added `Rtc::set_current_time` to allow setting RTC time, and `Rtc::current_time` to getting RTC time while taking into account boot time (#1883)
+- Added APIs to allow connecting signals through the GPIO matrix. (#2128)
 
 ### Changed
 
@@ -37,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The (previously undocumented) `ErasedPin` enum has been replaced with the `ErasedPin` struct. (#2094)
 - Renamed and merged `Rtc::get_time_us` and `Rtc::get_time_ms` into `Rtc::time_since_boot` (#1883)
 - ESP32: Added support for touch sensing on GPIO32 and 33 (#2109)
+- Replaced `AnyPin` with `InputSignal` and `OutputSignal` and renamed `ErasedPin` to `AnyPin` (#2128)
 
 ### Fixed
 

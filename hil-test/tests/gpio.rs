@@ -11,7 +11,7 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp_hal::{
     delay::Delay,
-    gpio::{AnyPin, ErasedPin, Input, Io, Level, Output, Pin, Pull},
+    gpio::{AnyPin, Input, Io, Level, Output, Pin, Pull},
     macros::handler,
     timer::timg::TimerGroup,
     InterruptConfigurable,
@@ -22,8 +22,8 @@ static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
 static INPUT_PIN: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
 
 struct Context {
-    test_gpio1: ErasedPin,
-    test_gpio2: ErasedPin,
+    test_gpio1: AnyPin,
+    test_gpio2: AnyPin,
     delay: Delay,
 }
 
@@ -267,8 +267,8 @@ mod tests {
     // https://github.com/esp-rs/esp-hal/issues/1943
     #[test]
     fn test_gpio_touch_anypin_output(ctx: Context) {
-        let any_pin2 = AnyPin::new(ctx.test_gpio1);
-        let any_pin3 = AnyPin::new(ctx.test_gpio2);
+        let any_pin2 = ctx.test_gpio1;
+        let any_pin3 = ctx.test_gpio2;
 
         let out_pin = Output::new(any_pin2, Level::High);
         let in_pin = Input::new(any_pin3, Pull::Down);
@@ -281,8 +281,8 @@ mod tests {
     // https://github.com/esp-rs/esp-hal/issues/1943
     #[test]
     fn test_gpio_touch_anypin_input(ctx: Context) {
-        let any_pin2 = AnyPin::new(ctx.test_gpio1);
-        let any_pin3 = AnyPin::new(ctx.test_gpio2);
+        let any_pin2 = ctx.test_gpio1;
+        let any_pin3 = ctx.test_gpio2;
 
         let out_pin = Output::new(any_pin3, Level::Low);
         let in_pin = Input::new(any_pin2, Pull::Down);
