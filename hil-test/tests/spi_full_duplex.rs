@@ -1,11 +1,4 @@
 //! SPI Full Duplex Test
-//!
-//! Folowing pins are used:
-//! SCLK    GPIO0
-//! MISO    GPIO2 / GPIO9  (esp32s2 / esp32s3) / GPIO26 (esp32)
-//! MOSI    GPIO3 / GPIO10 (esp32s2 / esp32s3) / GPIO27 (esp32)
-//!
-//! Connect MISO and MOSI pins.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 

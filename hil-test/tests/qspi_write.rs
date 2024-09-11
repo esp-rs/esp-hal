@@ -1,13 +1,4 @@
 //! QSPI Write Test
-//!
-//! This uses PCNT to count the edges of the MOSI signal
-//!
-//! Following pins are used:
-//! MOSI    GPIO2 / GPIO9 (esp32s2 and esp32s3)
-//!
-//! PCNT    GPIO3 / GPIO10 (esp32s2 and esp32s3)
-//!
-//! Connect MOSI and PCNT pins.
 
 //% CHIPS: esp32c6 esp32h2 esp32s2 esp32s3
 
