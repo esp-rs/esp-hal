@@ -11,9 +11,8 @@
 
 use esp_hal::{
     dma::{Dma, DmaPriority},
-    gpio::Io,
+    gpio::{DummyPin, Io},
     i2s::{asynch::*, DataFormat, I2s, I2sTx, Standard},
-    peripheral::Peripheral,
     peripherals::I2S0,
     prelude::*,
     Async,
@@ -125,15 +124,15 @@ mod tests {
 
         let i2s_tx = i2s
             .i2s_tx
-            .with_bclk(unsafe { io.pins.gpio0.clone_unchecked() })
-            .with_ws(unsafe { io.pins.gpio1.clone_unchecked() })
+            .with_bclk(DummyPin::new())
+            .with_ws(DummyPin::new())
             .with_dout(dout)
             .build();
 
         let i2s_rx = i2s
             .i2s_rx
-            .with_bclk(io.pins.gpio0)
-            .with_ws(io.pins.gpio1)
+            .with_bclk(DummyPin::new())
+            .with_ws(DummyPin::new())
             .with_din(din)
             .build();
 
