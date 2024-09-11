@@ -25,7 +25,10 @@ use static_cell::StaticCell;
 use trouble_host::{
     advertise::{AdStructure, Advertisement, BR_EDR_NOT_SUPPORTED, LE_GENERAL_DISCOVERABLE},
     attribute::{AttributeTable, CharacteristicProp, Service, Uuid},
-    Address, BleHost, BleHostResources, PacketQos,
+    Address,
+    BleHost,
+    BleHostResources,
+    PacketQos,
 };
 
 #[esp_hal_embassy::main]
