@@ -33,7 +33,7 @@ async fn main(_spawner: Spawner) {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(0, 32000);
+    let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(32000, 0);
 
     let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
