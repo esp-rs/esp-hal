@@ -37,6 +37,11 @@ mod tests {
     fn test_read_cali(mut ctx: Context) {
         let mut read_data = [0u8; 22];
 
+        // have a failing read which might could leave the peripheral in an undesirable
+        // state
+        ctx.i2c.write_read(0x55, &[0xaa], &mut read_data).ok();
+
+        // do the real read which should succeed
         ctx.i2c.write_read(0x77, &[0xaa], &mut read_data).ok();
 
         assert_ne!(read_data, [0u8; 22])
