@@ -197,18 +197,16 @@ where
 {
     /// Reads enough bytes from slave with `address` to fill `buffer`
     pub fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Error> {
-        self.peripheral.master_read(address, buffer).map_err(|e| {
-            self.recover();
-            e
-        })
+        self.peripheral
+            .master_read(address, buffer)
+            .inspect_err(|_| self.recover())
     }
 
     /// Writes bytes to slave with address `address`
     pub fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
-        self.peripheral.master_write(addr, bytes).map_err(|e| {
-            self.recover();
-            e
-        })
+        self.peripheral
+            .master_write(addr, bytes)
+            .inspect_err(|_| self.recover())
     }
 
     /// Writes bytes to slave with address `address` and then reads enough bytes
@@ -221,10 +219,7 @@ where
     ) -> Result<(), Error> {
         self.peripheral
             .master_write_read(address, bytes, buffer)
-            .map_err(|e| {
-                self.recover();
-                e
-            })
+            .inspect_err(|_| self.recover())
     }
 }
 
@@ -235,10 +230,9 @@ where
     type Error = Error;
 
     fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Self::Error> {
-        self.peripheral.master_read(address, buffer).map_err(|e| {
-            self.recover();
-            e
-        })
+        self.peripheral
+            .master_read(address, buffer)
+            .inspect_err(|_| self.recover())
     }
 }
 
@@ -249,10 +243,9 @@ where
     type Error = Error;
 
     fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Self::Error> {
-        self.peripheral.master_write(addr, bytes).map_err(|e| {
-            self.recover();
-            e
-        })
+        self.peripheral
+            .master_write(addr, bytes)
+            .inspect_err(|_| self.recover())
     }
 }
 
@@ -270,10 +263,7 @@ where
     ) -> Result<(), Self::Error> {
         self.peripheral
             .master_write_read(address, bytes, buffer)
-            .map_err(|e| {
-                self.recover();
-                e
-            })
+            .inspect_err(|_| self.recover())
     }
 }
 
@@ -319,10 +309,7 @@ where
                             next_op == Op::None,
                             cmd_iterator,
                         )
-                        .map_err(|e| {
-                            self.recover();
-                            e
-                        })?;
+                        .inspect_err(|_| self.recover())?;
                     last_op = Op::Write;
                 }
                 Operation::Read(buffer) => {
@@ -339,10 +326,7 @@ where
                             next_op == Op::Read,
                             cmd_iterator,
                         )
-                        .map_err(|e| {
-                            self.recover();
-                            e
-                        })?;
+                        .inspect_err(|_| self.recover())?;
                     last_op = Op::Read;
                 }
             }
