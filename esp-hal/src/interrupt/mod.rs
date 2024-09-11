@@ -110,12 +110,6 @@ impl InterruptHandler {
     pub fn priority(&self) -> Priority {
         self.prio
     }
-
-    /// Call the function
-    #[inline]
-    pub(crate) extern "C" fn call(&self) {
-        (self.f)()
-    }
 }
 
 #[cfg(large_intr_status)]

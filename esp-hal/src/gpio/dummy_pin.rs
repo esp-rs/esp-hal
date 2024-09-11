@@ -61,8 +61,6 @@ impl Pin for DummyPin {
     }
 
     fn clear_interrupt(&mut self, _: private::Internal) {}
-
-    fn wakeup_enable(&mut self, _enable: bool, _event: WakeEvent, _: private::Internal) {}
 }
 
 impl OutputPin for DummyPin {

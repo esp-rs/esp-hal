@@ -52,9 +52,9 @@
 //! [Commonly Used Setup]: ../index.html#commonly-used-setup
 //! [Inverting TX and RX Pins]: ../uart/index.html#inverting-tx-and-rx-pins
 
-use core::{cell::Cell, marker::PhantomData};
+use core::marker::PhantomData;
 
-use critical_section::Mutex;
+use portable_atomic::{AtomicPtr, Ordering};
 use procmacros::ram;
 
 #[cfg(any(adc, dac))]
@@ -89,7 +89,24 @@ pub mod rtc_io;
 /// Convenience constant for `Option::None` pin
 pub const NO_PIN: Option<DummyPin> = None;
 
-static USER_INTERRUPT_HANDLER: Mutex<Cell<Option<InterruptHandler>>> = Mutex::new(Cell::new(None));
+static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::NULL;
+
+struct CFnPtr(AtomicPtr<()>);
+impl CFnPtr {
+    #[allow(clippy::declare_interior_mutable_const)]
+    pub const NULL: Self = Self(AtomicPtr::new(core::ptr::null_mut()));
+
+    pub fn store(&self, f: extern "C" fn()) {
+        self.0.store(f as *mut (), Ordering::Relaxed);
+    }
+
+    pub fn call(&self) {
+        let ptr = self.0.load(Ordering::Relaxed);
+        if !ptr.is_null() {
+            unsafe { (core::mem::transmute::<*mut (), extern "C" fn()>(ptr))() };
+        }
+    }
+}
 
 /// Event used to trigger interrupts.
 #[derive(Copy, Clone)]
@@ -1124,27 +1141,33 @@ impl InterruptConfigurable for Io {
     /// Install the given interrupt handler replacing any previously set
     /// handler.
     ///
-    /// When the async feature is enabled the handler will be called first and
-    /// the internal async handler will run after. In that case it's
-    /// important to not reset the interrupt status when mixing sync and
-    /// async (i.e. using async wait) interrupt handling.
+    /// ⚠️ Be careful when using this together with the async API:
+    ///
+    /// - The async driver will disable any interrupts whose status is not
+    ///   cleared by the user handler.
+    /// - Clearing the interrupt status in the user handler will prevent the
+    ///   async driver from detecting the interrupt, silently disabling the
+    ///   corresponding pin's async API.
+    /// - You will not be notified if you make a mistake.
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        critical_section::with(|cs| {
-            crate::interrupt::enable(crate::peripherals::Interrupt::GPIO, handler.priority())
-                .unwrap();
-            USER_INTERRUPT_HANDLER.borrow(cs).set(Some(handler));
-        });
+        crate::interrupt::enable(crate::peripherals::Interrupt::GPIO, handler.priority()).unwrap();
+        USER_INTERRUPT_HANDLER.store(handler.handler());
     }
 }
 
 #[ram]
 extern "C" fn gpio_interrupt_handler() {
-    if let Some(user_handler) = critical_section::with(|cs| USER_INTERRUPT_HANDLER.borrow(cs).get())
-    {
-        user_handler.call();
-    }
+    USER_INTERRUPT_HANDLER.call();
 
-    asynch::handle_gpio_interrupt();
+    handle_pin_interrupts(on_pin_irq);
+}
+
+#[ram]
+fn on_pin_irq(pin_nr: u8) {
+    // FIXME: async handlers signal completion by disabling the interrupt, but this
+    // conflicts with user handlers.
+    set_int_enable(pin_nr, 0, 0, false);
+    asynch::PIN_WAKERS[pin_nr as usize].wake(); // wake task
 }
 
 #[doc(hidden)]
@@ -2506,6 +2529,35 @@ fn set_int_enable(gpio_num: u8, int_ena: u8, int_type: u8, wake_up_from_light_sl
     });
 }
 
+#[ram]
+fn handle_pin_interrupts(handle: impl Fn(u8)) {
+    let intrs_bank0 = InterruptStatusRegisterAccessBank0::interrupt_status_read();
+
+    #[cfg(any(esp32, esp32s2, esp32s3))]
+    let intrs_bank1 = InterruptStatusRegisterAccessBank1::interrupt_status_read();
+
+    let mut intr_bits = intrs_bank0;
+    while intr_bits != 0 {
+        let pin_nr = intr_bits.trailing_zeros();
+        handle(pin_nr as u8);
+        intr_bits -= 1 << pin_nr;
+    }
+
+    // clear interrupt bits
+    Bank0GpioRegisterAccess::write_interrupt_status_clear(intrs_bank0);
+
+    #[cfg(any(esp32, esp32s2, esp32s3))]
+    {
+        let mut intr_bits = intrs_bank1;
+        while intr_bits != 0 {
+            let pin_nr = intr_bits.trailing_zeros();
+            handle(pin_nr as u8 + 32);
+            intr_bits -= 1 << pin_nr;
+        }
+        Bank1GpioRegisterAccess::write_interrupt_status_clear(intrs_bank1);
+    }
+}
+
 mod asynch {
     use core::task::{Context, Poll};
 
@@ -2515,7 +2567,7 @@ mod asynch {
 
     #[allow(clippy::declare_interior_mutable_const)]
     const NEW_AW: AtomicWaker = AtomicWaker::new();
-    static PIN_WAKERS: [AtomicWaker; NUM_PINS] = [NEW_AW; NUM_PINS];
+    pub(super) static PIN_WAKERS: [AtomicWaker; NUM_PINS] = [NEW_AW; NUM_PINS];
 
     impl<'d, P> Flex<'d, P>
     where
@@ -2610,37 +2662,6 @@ mod asynch {
             } else {
                 Poll::Pending
             }
-        }
-    }
-
-    #[ram]
-    pub(super) fn handle_gpio_interrupt() {
-        let intrs_bank0 = InterruptStatusRegisterAccessBank0::interrupt_status_read();
-
-        #[cfg(any(esp32, esp32s2, esp32s3))]
-        let intrs_bank1 = InterruptStatusRegisterAccessBank1::interrupt_status_read();
-
-        let mut intr_bits = intrs_bank0;
-        while intr_bits != 0 {
-            let pin_nr = intr_bits.trailing_zeros();
-            set_int_enable(pin_nr as u8, 0, 0, false);
-            PIN_WAKERS[pin_nr as usize].wake(); // wake task
-            intr_bits -= 1 << pin_nr;
-        }
-
-        // clear interrupt bits
-        Bank0GpioRegisterAccess::write_interrupt_status_clear(intrs_bank0);
-
-        #[cfg(any(esp32, esp32s2, esp32s3))]
-        {
-            let mut intr_bits = intrs_bank1;
-            while intr_bits != 0 {
-                let pin_nr = intr_bits.trailing_zeros();
-                set_int_enable(pin_nr as u8 + 32, 0, 0, false);
-                PIN_WAKERS[pin_nr as usize + 32].wake(); // wake task
-                intr_bits -= 1 << pin_nr;
-            }
-            Bank1GpioRegisterAccess::write_interrupt_status_clear(intrs_bank1);
         }
     }
 }
