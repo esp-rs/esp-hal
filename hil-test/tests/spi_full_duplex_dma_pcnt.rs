@@ -1,17 +1,6 @@
 //! SPI Full Duplex DMA ASYNC Test with PCNT readback.
-//!
-//! Folowing pins are used:
-//! SCLK    GPIO0
-//! MOSI    GPIO3 / GPIO10 (esp32s3)
-//! PCNT    GPIO2 / GPIO9 (esp32s3)
-//! OUTPUT  GPIO5 (helper to keep MISO LOW)
-//!
-//! The idea of using PCNT (input) here is to connect MOSI to it and count the
-//! edges of whatever SPI writes (in this test case 3 pos edges).
-//!
-//! Connect MISO and MOSI pins.
 
-//% CHIPS: esp32c6 esp32h2 esp32s3
+//% CHIPS: esp32 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]

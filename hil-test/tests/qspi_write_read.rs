@@ -1,13 +1,6 @@
 //! QSPI Write + Read Test
 //!
 //! Make sure issue #1860 doesn't affect us
-//!
-//! Following pins are used:
-//! MOSI/MISO    GPIO2 / GPIO9 (esp32s2 and esp32s3)
-//!
-//! GPIO         GPIO3 / GPIO10 (esp32s2 and esp32s3)
-//!
-//! Connect MOSI/MISO and GPIO pins.
 
 //% CHIPS: esp32c6 esp32h2 esp32s2 esp32s3
 
