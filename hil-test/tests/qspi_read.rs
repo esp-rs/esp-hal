@@ -62,7 +62,7 @@ fn execute(
         .unwrap();
     (spi, dma_rx_buf) = transfer.wait();
 
-    assert_eq!(dma_rx_buf.as_slice(), &[wanted; DMA_BUFFER_SIZE]);
+    assert_eq!(dma_rx_buf.as_slice(), &[0; DMA_BUFFER_SIZE]);
 
     // SPI should read all '1's
     miso_mirror.set_high();
@@ -80,7 +80,7 @@ fn execute(
 
     (_, dma_rx_buf) = transfer.wait();
 
-    assert_eq!(dma_rx_buf.as_slice(), &[0xFF; DMA_BUFFER_SIZE]);
+    assert_eq!(dma_rx_buf.as_slice(), &[wanted; DMA_BUFFER_SIZE]);
 }
 
 #[cfg(test)]
@@ -126,8 +126,7 @@ mod tests {
             .with_pins(NoPin, ctx.miso, NoPin, NoPin, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
-        // SPI should read '0b11101110'
-        super::execute(spi, ctx.miso_mirror, 238);
+        super::execute(spi, ctx.miso_mirror, 0b0001_0001);
     }
 
     #[test]
@@ -137,8 +136,7 @@ mod tests {
             .with_pins(NoPin, NoPin, ctx.miso, NoPin, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
-        // SPI should read '0b11011101'
-        super::execute(spi, ctx.miso_mirror, 221);
+        super::execute(spi, ctx.miso_mirror, 0b0010_0010);
     }
 
     #[test]
@@ -149,7 +147,7 @@ mod tests {
             .with_dma(ctx.dma_channel);
 
         // SPI should read '0b10111011'
-        super::execute(spi, ctx.miso_mirror, 187);
+        super::execute(spi, ctx.miso_mirror, 0b0100_0100);
     }
 
     #[test]
@@ -160,6 +158,6 @@ mod tests {
             .with_dma(ctx.dma_channel);
 
         // SPI should read '0b01110111'
-        super::execute(spi, ctx.miso_mirror, 119);
+        super::execute(spi, ctx.miso_mirror, 0b1000_1000);
     }
 }

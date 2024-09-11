@@ -52,7 +52,7 @@ fn execute(
     let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let mut dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
 
-    dma_tx_buf.fill(&[0xff; DMA_BUFFER_SIZE]);
+    dma_tx_buf.fill(&[0x00; DMA_BUFFER_SIZE]);
 
     let transfer = spi
         .write(
@@ -69,7 +69,7 @@ fn execute(
         .unwrap();
     (spi, _) = transfer.wait();
 
-    mosi_mirror.set_low();
+    mosi_mirror.set_high();
 
     let transfer = spi
         .read(
@@ -128,7 +128,7 @@ mod tests {
             .with_pins(NoPin, ctx.mosi, NoPin, NoPin, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
-        super::execute(spi, ctx.mosi_mirror, !0b0001_0001);
+        super::execute(spi, ctx.mosi_mirror, 0b0001_0001);
     }
 
     #[test]
@@ -138,7 +138,7 @@ mod tests {
             .with_pins(NoPin, NoPin, ctx.mosi, NoPin, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
-        super::execute(spi, ctx.mosi_mirror, !0b0010_0010);
+        super::execute(spi, ctx.mosi_mirror, 0b0010_0010);
     }
 
     #[test]
@@ -148,7 +148,7 @@ mod tests {
             .with_pins(NoPin, NoPin, NoPin, ctx.mosi, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
-        super::execute(spi, ctx.mosi_mirror, !0b0100_0100);
+        super::execute(spi, ctx.mosi_mirror, 0b0100_0100);
     }
 
     #[test]
@@ -158,6 +158,6 @@ mod tests {
             .with_pins(NoPin, NoPin, NoPin, NoPin, ctx.mosi, NoPin)
             .with_dma(ctx.dma_channel);
 
-        super::execute(spi, ctx.mosi_mirror, !0b1000_1000);
+        super::execute(spi, ctx.mosi_mirror, 0b1000_1000);
     }
 }
