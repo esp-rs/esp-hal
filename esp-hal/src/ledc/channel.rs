@@ -13,7 +13,6 @@ use super::timer::{TimerIFace, TimerSpeed};
 use crate::{
     gpio::{OutputSignal, PeripheralOutput},
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::ledc::RegisterBlock,
 };
 
 /// Fade parameter sub-errors
@@ -141,11 +140,43 @@ pub trait ChannelHW<O: PeripheralOutput> {
 
     /// Check whether a duty-cycle fade is running HW
     fn is_duty_fade_running_hw(&self) -> bool;
+
+    /// Enable signal output on this channel by setting LEDC_SIG_OUT_EN_CHn.
+    /// The LEDC_SIG_OUT_EN_CHn register should also set when calling
+    /// [`ChannelHW::configure_hw`] and
+    /// [`ChannelHW::configure_hw_with_pin_config`].
+    fn enable_signal_output(&self);
+
+    /// Disable signal output on this channel by clearing LEDC_SIG_OUT_EN_CHn.
+    fn disable_signal_output(&self);
+
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32s3")] {
+            /// Enable the overflow counter and set the number of counter overflows needed to generate an interrupt.
+            fn enable_counter_with_overflow(&self, overflow_num: u16);
+
+            /// Disable the overflow counter by clearing the appropriate register.
+            fn disable_counter(&self);
+
+            /// Enables the overflow counting interrupt for this channel.
+            fn enable_overflow_interrupt(&self);
+
+            /// Disables the overflow counting interrupt for this channel.
+            fn disable_overflow_interrupt(&self);
+
+            /// Returns true if the overflow counting interrupt is active for this channel.
+            /// Note that this function will return from the raw interrupt status register
+            /// instead of the masked interrupt status register.
+            fn is_overflow_interrupt_active(&self) -> bool;
+
+            /// Clears the overflow counting interrupt flag for this channel.
+            fn clear_overflow_interrupt(&self);
+        }
+    }
 }
 
 /// Channel struct
 pub struct Channel<'a, S: TimerSpeed, O: PeripheralOutput> {
-    ledc: &'a RegisterBlock,
     timer: Option<&'a dyn TimerIFace<S>>,
     number: Number,
     output_pin: PeripheralRef<'a, O>,
@@ -155,9 +186,7 @@ impl<'a, S: TimerSpeed, O: PeripheralOutput> Channel<'a, S, O> {
     /// Return a new channel
     pub fn new(number: Number, output_pin: impl Peripheral<P = O> + 'a) -> Self {
         crate::into_ref!(output_pin);
-        let ledc = unsafe { &*crate::peripherals::LEDC::ptr() };
         Channel {
-            ledc,
             timer: None,
             number,
             output_pin,
@@ -341,12 +370,12 @@ impl<'a, O: PeripheralOutput, S: crate::ledc::timer::TimerSpeed> Channel<'a, S, 
     #[cfg(esp32)]
     fn set_channel(&mut self, timer_number: u8) {
         if S::IS_HS {
-            let ch = self.ledc.hsch(self.number as usize);
+            let ch = unsafe { &*crate::peripherals::LEDC::ptr() }.hsch(self.number as usize);
             ch.hpoint().write(|w| unsafe { w.hpoint().bits(0x0) });
             ch.conf0()
                 .modify(|_, w| unsafe { w.sig_out_en().set_bit().timer_sel().bits(timer_number) });
         } else {
-            let ch = self.ledc.lsch(self.number as usize);
+            let ch = unsafe { &*crate::peripherals::LEDC::ptr() }.lsch(self.number as usize);
             ch.hpoint().write(|w| unsafe { w.hpoint().bits(0x0) });
             ch.conf0()
                 .modify(|_, w| unsafe { w.sig_out_en().set_bit().timer_sel().bits(timer_number) });
@@ -356,7 +385,7 @@ impl<'a, O: PeripheralOutput, S: crate::ledc::timer::TimerSpeed> Channel<'a, S, 
     #[cfg(not(esp32))]
     fn set_channel(&mut self, timer_number: u8) {
         {
-            let ch = self.ledc.ch(self.number as usize);
+            let ch = unsafe { &*crate::peripherals::LEDC::ptr() }.ch(self.number as usize);
             ch.hpoint().write(|w| unsafe { w.hpoint().bits(0x0) });
             ch.conf0().modify(|_, w| {
                 w.sig_out_en().set_bit();
@@ -369,7 +398,7 @@ impl<'a, O: PeripheralOutput, S: crate::ledc::timer::TimerSpeed> Channel<'a, S, 
     #[cfg(esp32)]
     fn start_duty_without_fading(&self) {
         if S::IS_HS {
-            self.ledc
+            unsafe { &*crate::peripherals::LEDC::ptr() }
                 .hsch(self.number as usize)
                 .conf1()
                 .write(|w| unsafe {
@@ -380,7 +409,7 @@ impl<'a, O: PeripheralOutput, S: crate::ledc::timer::TimerSpeed> Channel<'a, S, 
                     w.duty_scale().bits(0x0)
                 });
         } else {
-            self.ledc
+            unsafe { &*crate::peripherals::LEDC::ptr() }
                 .lsch(self.number as usize)
                 .conf1()
                 .write(|w| unsafe {
@@ -395,30 +424,35 @@ impl<'a, O: PeripheralOutput, S: crate::ledc::timer::TimerSpeed> Channel<'a, S, 
     #[cfg(any(esp32c6, esp32h2))]
     fn start_duty_without_fading(&self) {
         let cnum = self.number as usize;
-        self.ledc
+        unsafe { &*crate::peripherals::LEDC::ptr() }
             .ch(cnum)
             .conf1()
             .write(|w| w.duty_start().set_bit());
-        self.ledc.ch_gamma_wr(cnum).write(|w| {
-            w.ch_gamma_duty_inc().set_bit();
-            unsafe {
-                w.ch_gamma_duty_num().bits(0x1);
-                w.ch_gamma_duty_cycle().bits(0x1);
-                w.ch_gamma_scale().bits(0x0)
-            }
-        });
+        unsafe { &*crate::peripherals::LEDC::ptr() }
+            .ch_gamma_wr(cnum)
+            .write(|w| {
+                w.ch_gamma_duty_inc().set_bit();
+                unsafe {
+                    w.ch_gamma_duty_num().bits(0x1);
+                    w.ch_gamma_duty_cycle().bits(0x1);
+                    w.ch_gamma_scale().bits(0x0)
+                }
+            });
     }
     #[cfg(not(any(esp32, esp32c6, esp32h2)))]
     fn start_duty_without_fading(&self) {
-        self.ledc.ch(self.number as usize).conf1().write(|w| {
-            w.duty_start().set_bit();
-            w.duty_inc().set_bit();
-            unsafe {
-                w.duty_num().bits(0x1);
-                w.duty_cycle().bits(0x1);
-                w.duty_scale().bits(0x0)
-            }
-        });
+        unsafe { &*crate::peripherals::LEDC::ptr() }
+            .ch(self.number as usize)
+            .conf1()
+            .write(|w| {
+                w.duty_start().set_bit();
+                w.duty_inc().set_bit();
+                unsafe {
+                    w.duty_num().bits(0x1);
+                    w.duty_cycle().bits(0x1);
+                    w.duty_scale().bits(0x0)
+                }
+            });
     }
 
     #[cfg(esp32)]
@@ -430,7 +464,7 @@ impl<'a, O: PeripheralOutput, S: crate::ledc::timer::TimerSpeed> Channel<'a, S, 
         duty_per_cycle: u16,
     ) {
         if S::IS_HS {
-            self.ledc
+            unsafe { &*crate::peripherals::LEDC::ptr() }
                 .hsch(self.number as usize)
                 .conf1()
                 .write(|w| unsafe {
@@ -446,7 +480,7 @@ impl<'a, O: PeripheralOutput, S: crate::ledc::timer::TimerSpeed> Channel<'a, S, 
                         .bits(duty_per_cycle)
                 });
         } else {
-            self.ledc
+            unsafe { &*crate::peripherals::LEDC::ptr() }
                 .lsch(self.number as usize)
                 .conf1()
                 .write(|w| unsafe {
@@ -473,24 +507,26 @@ impl<'a, O: PeripheralOutput, S: crate::ledc::timer::TimerSpeed> Channel<'a, S, 
         duty_per_cycle: u16,
     ) {
         let cnum = self.number as usize;
-        self.ledc
+        unsafe { &*crate::peripherals::LEDC::ptr() }
             .ch(cnum)
             .conf1()
             .write(|w| w.duty_start().set_bit());
-        self.ledc.ch_gamma_wr(cnum).write(|w| unsafe {
-            w.ch_gamma_duty_inc()
-                .variant(duty_inc)
-                .ch_gamma_duty_num() // count of incs before stopping
-                .bits(duty_steps)
-                .ch_gamma_duty_cycle() // overflows between incs
-                .bits(cycles_per_step)
-                .ch_gamma_scale()
-                .bits(duty_per_cycle)
-        });
-        self.ledc
+        unsafe { &*crate::peripherals::LEDC::ptr() }
+            .ch_gamma_wr(cnum)
+            .write(|w| unsafe {
+                w.ch_gamma_duty_inc()
+                    .variant(duty_inc)
+                    .ch_gamma_duty_num() // count of incs before stopping
+                    .bits(duty_steps)
+                    .ch_gamma_duty_cycle() // overflows between incs
+                    .bits(cycles_per_step)
+                    .ch_gamma_scale()
+                    .bits(duty_per_cycle)
+            });
+        unsafe { &*crate::peripherals::LEDC::ptr() }
             .ch_gamma_wr_addr(cnum)
             .write(|w| unsafe { w.ch_gamma_wr_addr().bits(0) });
-        self.ledc
+        unsafe { &*crate::peripherals::LEDC::ptr() }
             .ch_gamma_conf(cnum)
             .write(|w| unsafe { w.ch_gamma_entry_num().bits(0x1) });
     }
@@ -503,7 +539,7 @@ impl<'a, O: PeripheralOutput, S: crate::ledc::timer::TimerSpeed> Channel<'a, S, 
         cycles_per_step: u16,
         duty_per_cycle: u16,
     ) {
-        self.ledc
+        unsafe { &*crate::peripherals::LEDC::ptr() }
             .ch(self.number as usize)
             .conf1()
             .write(|w| unsafe {
@@ -520,7 +556,7 @@ impl<'a, O: PeripheralOutput, S: crate::ledc::timer::TimerSpeed> Channel<'a, S, 
     #[cfg(esp32)]
     fn update_channel(&self) {
         if !S::IS_HS {
-            self.ledc
+            unsafe { &*crate::peripherals::LEDC::ptr() }
                 .lsch(self.number as usize)
                 .conf0()
                 .modify(|_, w| w.para_up().set_bit());
@@ -528,7 +564,7 @@ impl<'a, O: PeripheralOutput, S: crate::ledc::timer::TimerSpeed> Channel<'a, S, 
     }
     #[cfg(not(esp32))]
     fn update_channel(&self) {
-        self.ledc
+        unsafe { &*crate::peripherals::LEDC::ptr() }
             .ch(self.number as usize)
             .conf0()
             .modify(|_, w| w.para_up().set_bit());
@@ -618,12 +654,12 @@ where
     #[cfg(esp32)]
     fn set_duty_hw(&self, duty: u32) {
         if S::IS_HS {
-            self.ledc
+            unsafe { &*crate::peripherals::LEDC::ptr() }
                 .hsch(self.number as usize)
                 .duty()
                 .write(|w| unsafe { w.duty().bits(duty << 4) });
         } else {
-            self.ledc
+            unsafe { &*crate::peripherals::LEDC::ptr() }
                 .lsch(self.number as usize)
                 .duty()
                 .write(|w| unsafe { w.duty().bits(duty << 4) });
@@ -635,7 +671,7 @@ where
     /// Set duty in channel HW
     #[cfg(not(esp32))]
     fn set_duty_hw(&self, duty: u32) {
-        self.ledc
+        unsafe { &*crate::peripherals::LEDC::ptr() }
             .ch(self.number as usize)
             .duty()
             .write(|w| unsafe { w.duty().bits(duty << 4) });
@@ -654,19 +690,19 @@ where
         duty_per_cycle: u16,
     ) {
         if S::IS_HS {
-            self.ledc
+            unsafe { &*crate::peripherals::LEDC::ptr() }
                 .hsch(self.number as usize)
                 .duty()
                 .write(|w| unsafe { w.duty().bits(start_duty << 4) });
-            self.ledc
+            unsafe { &*crate::peripherals::LEDC::ptr() }
                 .int_clr()
                 .write(|w| w.duty_chng_end_hsch(self.number as u8).clear_bit_by_one());
         } else {
-            self.ledc
+            unsafe { &*crate::peripherals::LEDC::ptr() }
                 .lsch(self.number as usize)
                 .duty()
                 .write(|w| unsafe { w.duty().bits(start_duty << 4) });
-            self.ledc
+            unsafe { &*crate::peripherals::LEDC::ptr() }
                 .int_clr()
                 .write(|w| w.duty_chng_end_lsch(self.number as u8).clear_bit_by_one());
         }
@@ -684,11 +720,11 @@ where
         cycles_per_step: u16,
         duty_per_cycle: u16,
     ) {
-        self.ledc
+        unsafe { &*crate::peripherals::LEDC::ptr() }
             .ch(self.number as usize)
             .duty()
             .write(|w| unsafe { w.duty().bits(start_duty << 4) });
-        self.ledc
+        unsafe { &*crate::peripherals::LEDC::ptr() }
             .int_clr()
             .write(|w| w.duty_chng_end_ch(self.number as u8).clear_bit_by_one());
         self.start_duty_fade_inner(duty_inc, duty_steps, cycles_per_step, duty_per_cycle);
@@ -697,7 +733,9 @@ where
 
     #[cfg(esp32)]
     fn is_duty_fade_running_hw(&self) -> bool {
-        let reg = self.ledc.int_raw().read();
+        let reg = unsafe { &*crate::peripherals::LEDC::ptr() }
+            .int_raw()
+            .read();
         if S::IS_HS {
             reg.duty_chng_end_hsch(self.number as u8).bit_is_clear()
         } else {
@@ -707,10 +745,110 @@ where
 
     #[cfg(not(esp32))]
     fn is_duty_fade_running_hw(&self) -> bool {
-        self.ledc
+        unsafe { &*crate::peripherals::LEDC::ptr() }
             .int_raw()
             .read()
             .duty_chng_end_ch(self.number as u8)
             .bit_is_clear()
+    }
+
+    /// Enable signal output on this channel by setting LEDC_SIG_OUT_EN_CHn.
+    /// The LEDC_SIG_OUT_EN_CHn register should also set when calling
+    /// [`ChannelHW::configure_hw`] and
+    /// [`ChannelHW::configure_hw_with_pin_config`].
+    #[cfg(esp32)]
+    fn enable_signal_output(&self) {
+        if S::IS_HS {
+            let ch = unsafe { &*crate::peripherals::LEDC::ptr() }.hsch(self.number as usize);
+            ch.conf0().modify(|_, w| w.sig_out_en().set_bit());
+        } else {
+            let ch = unsafe { &*crate::peripherals::LEDC::ptr() }.lsch(self.number as usize);
+            ch.conf0()
+                .modify(|_, w| w.sig_out_en().set_bit().para_up().set_bit());
+        }
+    }
+
+    /// Enable signal output on this channel by setting LEDC_SIG_OUT_EN_CHn.
+    /// The LEDC_SIG_OUT_EN_CHn register should also set when calling
+    /// [`ChannelHW::configure_hw`] and
+    /// [`ChannelHW::configure_hw_with_pin_config`].
+    #[cfg(not(esp32))]
+    fn enable_signal_output(&self) {
+        unsafe { &*crate::peripherals::LEDC::ptr() }
+            .ch(self.number as usize)
+            .conf0()
+            .modify(|_, w| w.sig_out_en().set_bit().para_up().set_bit());
+    }
+
+    /// Disable signal output on this channel by clearing LEDC_SIG_OUT_EN_CHn.
+    #[cfg(esp32)]
+    fn disable_signal_output(&self) {
+        if S::IS_HS {
+            let ch = unsafe { &*crate::peripherals::LEDC::ptr() }.hsch(self.number as usize);
+            ch.conf0().modify(|_, w| w.sig_out_en().clear_bit());
+        } else {
+            let ch = unsafe { &*crate::peripherals::LEDC::ptr() }.lsch(self.number as usize);
+            ch.conf0()
+                .modify(|_, w| w.sig_out_en().clear_bit().para_up().set_bit());
+        }
+    }
+
+    /// Disable signal output on this channel by clearing LEDC_SIG_OUT_EN_CHn.
+    #[cfg(not(esp32))]
+    fn disable_signal_output(&self) {
+        unsafe { &*crate::peripherals::LEDC::ptr() }
+            .ch(self.number as usize)
+            .conf0()
+            .modify(|_, w| w.sig_out_en().clear_bit().para_up().set_bit());
+    }
+
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32s3")] {
+    /// Enables the overflow counting interrupt for this channel.
+    fn enable_overflow_interrupt(&self) {
+        critical_section::with(|_cs| {
+            unsafe { &*crate::peripherals::LEDC::ptr() }.int_ena().modify(|_, w| w.ovf_cnt_ch(self.number as u8).set_bit())
+        })
+    }
+
+    /// Disables the overflow counting interrupt for this channel.
+    fn disable_overflow_interrupt(&self) {
+        critical_section::with(|_cs| {
+            unsafe { &*crate::peripherals::LEDC::ptr() }.int_ena().modify(|_, w| w.ovf_cnt_ch(self.number as u8).clear_bit())
+        })
+    }
+
+    /// Enable the overflow counter and set the number of counter overflows needed to generate an interrupt.
+    ///
+    /// # Arguments
+    ///
+    /// * `overflow_num` - The number of counter overflows before generating an interrupt.
+    ///                    This is a 10-bit number, so it should be in the range of 1 to 1024.
+    fn enable_counter_with_overflow(&self, overflow_num: u16) {
+        assert!(overflow_num > 0 && overflow_num <= 1024, "Overflow number must be in the range of 1 to 1024");
+        unsafe { &*crate::peripherals::LEDC::ptr() }.ch(self.number as usize).conf0().modify(|_, w| unsafe {
+            w.ovf_cnt_en().set_bit().ovf_num().bits(overflow_num - 1).para_up().set_bit()
+        });
+    }
+
+    /// Disable the overflow counter by clearing the appropriate register.
+    fn disable_counter(&self){
+        unsafe { &*crate::peripherals::LEDC::ptr() }.ch(self.number as usize).conf0().modify(|_, w| {
+            w.ovf_cnt_en().clear_bit().para_up().set_bit()
+        });
+    }
+
+    /// Returns true if the overflow counting interrupt is active for this channel.
+    /// Note that this function will return from the raw interrupt status register
+    /// instead of the masked interrupt status register.
+    fn is_overflow_interrupt_active(&self) -> bool {
+        unsafe { &*crate::peripherals::LEDC::ptr() }.int_raw().read().ovf_cnt_ch(self.number as u8).bit_is_set()
+    }
+
+    /// Clears the overflow counting interrupt flag for this channel.
+    fn clear_overflow_interrupt(&self) {
+        unsafe { &*crate::peripherals::LEDC::ptr() }.int_clr().write(|w| w.ovf_cnt_ch(self.number as u8).clear_bit_by_one())
+    }
+        }
     }
 }
