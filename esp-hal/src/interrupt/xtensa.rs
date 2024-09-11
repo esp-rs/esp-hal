@@ -508,29 +508,24 @@ mod vectored {
             if let Some(handler) = cpu_interrupt_nr_to_cpu_interrupt_handler(cpu_interrupt_nr) {
                 handler(level, save_frame);
             }
-        } else if (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
-            // Next, handle edge triggered peripheral interrupts.
-
-            // If the interrupt is edge triggered, we need to clear the
-            // request on the CPU's side
-            interrupt::clear(cpu_interrupt_mask & CPU_INTERRUPT_EDGE);
-
-            // For edge interrupts we cannot rely on the peripherals' interrupt status
-            // registers, therefore call all registered handlers for current level.
-            let configured_interrupts =
-                get_configured_interrupts(core, chip_specific::INTERRUPT_EDGE, level);
-
-            for interrupt_nr in configured_interrupts.iterator() {
-                // Don't use `Interrupt::try_from`. It's slower and placed in flash
-                let interrupt: Interrupt = unsafe { core::mem::transmute(interrupt_nr as u16) };
-                handle_interrupt(level, interrupt, save_frame);
-            }
         } else {
-            // Finally, check level-triggered peripheral sources.
-            // These interrupts are cleared by the peripheral.
-            let status = get_status(core);
-            let configured_interrupts = get_configured_interrupts(core, status, level);
+            let status = if (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
+                // Next, handle edge triggered peripheral interrupts.
 
+                // If the interrupt is edge triggered, we need to clear the
+                // request on the CPU's side
+                interrupt::clear(cpu_interrupt_mask & CPU_INTERRUPT_EDGE);
+
+                // For edge interrupts we cannot rely on the peripherals' interrupt status
+                // registers, therefore call all registered handlers for current level.
+                chip_specific::INTERRUPT_EDGE
+            } else {
+                // Finally, check level-triggered peripheral sources.
+                // These interrupts are cleared by the peripheral.
+                get_status(core)
+            };
+
+            let configured_interrupts = get_configured_interrupts(core, status, level);
             for interrupt_nr in configured_interrupts.iterator() {
                 // Don't use `Interrupt::try_from`. It's slower and placed in flash
                 let interrupt: Interrupt = unsafe { core::mem::transmute(interrupt_nr as u16) };
