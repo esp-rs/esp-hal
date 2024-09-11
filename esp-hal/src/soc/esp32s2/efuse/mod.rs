@@ -24,12 +24,11 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::efuse::Efuse;
-//! # use esp_hal::gpio::Io;
 //! # use esp_hal::uart::Uart;
 //! # use core::writeln;
 //! # use core::fmt::Write;
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! # let mut serial_tx = Uart::new(peripherals.UART0, io.pins.gpio4, io.pins.gpio5).unwrap();
+//! # let io = peripherals.GPIO.pins();
+//! # let mut serial_tx = Uart::new(peripherals.UART0, io.gpio4, io.gpio5).unwrap();
 //! let mac_address = Efuse::read_base_mac_address();
 //! writeln!(
 //!     serial_tx,

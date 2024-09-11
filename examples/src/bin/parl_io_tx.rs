@@ -18,7 +18,6 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::Io,
     parl_io::{
         BitPackOrder,
         ClkOutPin,
@@ -35,16 +34,16 @@ use esp_println::println;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = peripherals.GPIO.pins();
 
     let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, 32000);
 
     let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
-    let tx_pins = TxFourBits::new(io.pins.gpio1, io.pins.gpio2, io.pins.gpio3, io.pins.gpio4);
+    let tx_pins = TxFourBits::new(io.gpio1, io.gpio2, io.gpio3, io.gpio4);
 
-    let mut pin_conf = TxPinConfigWithValidPin::new(tx_pins, io.pins.gpio5);
+    let mut pin_conf = TxPinConfigWithValidPin::new(tx_pins, io.gpio5);
 
     let parl_io = ParlIoTxOnly::new(
         peripherals.PARL_IO,
@@ -54,7 +53,7 @@ fn main() -> ! {
     )
     .unwrap();
 
-    let mut clock_pin = ClkOutPin::new(io.pins.gpio6);
+    let mut clock_pin = ClkOutPin::new(io.gpio6);
 
     let mut parl_io_tx = parl_io
         .tx

@@ -7,7 +7,6 @@
 #![no_main]
 
 use esp_hal::{
-    gpio::Io,
     peripherals::{UART0, UART1},
     uart::{UartRx, UartTx},
     Async,
@@ -30,7 +29,7 @@ mod tests {
     async fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = peripherals.GPIO.pins();
 
         let (rx, tx) = hil_test::common_test_pins!(io);
 

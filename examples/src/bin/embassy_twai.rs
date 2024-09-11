@@ -25,7 +25,6 @@ use embassy_sync::{blocking_mutex::raw::NoopRawMutex, channel::Channel};
 use embedded_can::{Frame, Id};
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::Io,
     interrupt,
     peripherals::{self, TWAI0},
     timer::timg::TimerGroup,
@@ -87,10 +86,10 @@ async fn main(spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = peripherals.GPIO.pins();
 
-    let can_tx_pin = io.pins.gpio0;
-    let can_rx_pin = io.pins.gpio2;
+    let can_tx_pin = io.gpio0;
+    let can_rx_pin = io.gpio2;
 
     // The speed of the CAN bus.
     const CAN_BAUDRATE: twai::BaudRate = twai::BaudRate::B1000K;

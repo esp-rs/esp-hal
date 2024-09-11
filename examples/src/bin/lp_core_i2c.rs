@@ -27,10 +27,10 @@ use esp_println::println;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = peripherals.GPIO.pins();
 
-    let lp_sda = LowPowerOutputOpenDrain::new(io.pins.gpio6);
-    let lp_scl = LowPowerOutputOpenDrain::new(io.pins.gpio7);
+    let lp_sda = LowPowerOutputOpenDrain::new(io.gpio6);
+    let lp_scl = LowPowerOutputOpenDrain::new(io.gpio7);
 
     let lp_i2c = LpI2c::new(peripherals.LP_I2C0, lp_sda, lp_scl, 100.kHz());
 

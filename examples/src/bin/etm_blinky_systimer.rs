@@ -13,7 +13,6 @@ use esp_hal::{
     etm::Etm,
     gpio::{
         etm::{GpioEtmChannels, GpioEtmOutputConfig},
-        Io,
         Level,
         Pull,
     },
@@ -31,8 +30,8 @@ fn main() -> ! {
     let mut alarm0 = syst_alarms.alarm0;
     alarm0.set_period(1u32.secs());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let mut led = io.pins.gpio1;
+    let io = peripherals.GPIO.pins();
+    let mut led = io.gpio1;
 
     // setup ETM
     let gpio_ext = GpioEtmChannels::new(peripherals.GPIO_SD);

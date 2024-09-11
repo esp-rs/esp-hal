@@ -8,7 +8,7 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{gpio::Io, prelude::*, reset::software_reset, uart::Uart};
+use esp_hal::{prelude::*, reset::software_reset, uart::Uart};
 use esp_ieee802154::{Config, Ieee802154};
 use esp_println::println;
 
@@ -16,14 +16,14 @@ use esp_println::println;
 fn main() -> ! {
     let mut peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = peripherals.GPIO.pins();
 
     // Default pins for Uart/Serial communication
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32c6")] {
-            let (mut tx_pin, mut rx_pin) = (io.pins.gpio16, io.pins.gpio17);
+            let (mut tx_pin, mut rx_pin) = (io.gpio16, io.gpio17);
         } else if #[cfg(feature = "esp32h2")] {
-            let (mut tx_pin, mut rx_pin) = (io.pins.gpio24, io.pins.gpio23);
+            let (mut tx_pin, mut rx_pin) = (io.gpio24, io.gpio23);
         }
     }
 

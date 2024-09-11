@@ -483,8 +483,7 @@ impl<'d, Pin: PeripheralOutput, PWM: PwmPeripheral, const OP: u8, const IS_A: bo
 /// # use esp_hal::{mcpwm, prelude::*};
 /// # use esp_hal::mcpwm::{McPwm, PeripheralClockConfig};
 /// # use esp_hal::mcpwm::operator::{DeadTimeCfg, PwmPinConfig, PWMStream};
-/// # use esp_hal::gpio::Io;
-/// # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+/// # let io = peripherals.GPIO.pins();
 /// // active high complementary using PWMA input
 /// let bridge_active = DeadTimeCfg::new_ahc();
 /// // use PWMB as input for both outputs
@@ -501,9 +500,9 @@ impl<'d, Pin: PeripheralOutput, PWM: PwmPeripheral, const OP: u8, const IS_A: bo
 /// let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
 ///
 /// let mut pins = mcpwm.operator0.with_linked_pins(
-///     io.pins.gpio0,
+///     io.gpio0,
 ///     PwmPinConfig::UP_DOWN_ACTIVE_HIGH, // use PWMA as our main input
-///     io.pins.gpio1,
+///     io.gpio1,
 ///     PwmPinConfig::EMPTY, // keep PWMB "low"
 ///     bridge_off,
 /// );

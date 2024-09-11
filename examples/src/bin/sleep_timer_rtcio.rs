@@ -19,7 +19,7 @@ use esp_hal::{
     delay::Delay,
     entry,
     gpio,
-    gpio::{Input, Io, Pull},
+    gpio::{Input, Pull},
     peripheral::Peripheral,
     rtc_cntl::{
         get_reset_reason,
@@ -36,7 +36,7 @@ use esp_println::println;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = peripherals.GPIO.pins();
     let mut rtc = Rtc::new(peripherals.LPWR);
 
     println!("up and runnning!");
@@ -50,16 +50,16 @@ fn main() -> ! {
 
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32c3", feature = "esp32c2"))] {
-            let pin2 = Input::new(io.pins.gpio2, Pull::None);
-            let mut pin3 = io.pins.gpio3;
+            let pin2 = Input::new(io.gpio2, Pull::None);
+            let mut pin3 = io.gpio3;
 
             let wakeup_pins: &mut [(&mut dyn gpio::RtcPinWithResistors, WakeupLevel)] = &mut [
                 (&mut *pin2.into_ref(), WakeupLevel::Low),
                 (&mut pin3, WakeupLevel::High),
             ];
         } else if #[cfg(feature = "esp32s3")] {
-            let pin17 = Input::new(io.pins.gpio17, Pull::None);
-            let mut pin18 = io.pins.gpio18;
+            let pin17 = Input::new(io.gpio17, Pull::None);
+            let mut pin18 = io.gpio18;
 
             let wakeup_pins: &mut [(&mut dyn gpio::RtcPin, WakeupLevel)] = &mut [
                 (&mut *pin17.into_ref(), WakeupLevel::Low),

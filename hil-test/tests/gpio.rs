@@ -11,7 +11,7 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp_hal::{
     delay::Delay,
-    gpio::{AnyPin, Input, Io, Level, Output, Pin, Pull},
+    gpio::{AnyPin, Input, Level, Output, Pin, Pull},
     macros::handler,
     timer::timg::TimerGroup,
     InterruptConfigurable,
@@ -52,8 +52,7 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        io.set_interrupt_handler(interrupt_handler);
+        let io = peripherals.GPIO.pins();
 
         let delay = Delay::new();
 
@@ -143,6 +142,8 @@ mod tests {
     #[test]
     fn test_gpio_interrupt(ctx: Context) {
         let mut test_gpio1 = Input::new(ctx.test_gpio1, Pull::Down);
+        test_gpio1.set_interrupt_handler(interrupt_handler);
+
         let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low);
 
         critical_section::with(|cs| {

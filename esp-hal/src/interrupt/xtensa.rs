@@ -414,7 +414,7 @@ mod vectored {
         Ok(())
     }
 
-    /// Bind the given interrupt to the given handler
+    /// Binds the given interrupt to the given handler.
     ///
     /// # Safety
     ///

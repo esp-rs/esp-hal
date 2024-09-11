@@ -29,17 +29,17 @@ macro_rules! i2c_pins {
         // Order: (SDA, SCL)
         cfg_if::cfg_if! {
             if #[cfg(any(esp32s2, esp32s3))] {
-                ($io.pins.gpio2, $io.pins.gpio3)
+                ($io.gpio2, $io.gpio3)
             } else if #[cfg(esp32)] {
-                ($io.pins.gpio32, $io.pins.gpio33)
+                ($io.gpio32, $io.gpio33)
             } else if #[cfg(esp32c6)] {
-                ($io.pins.gpio6, $io.pins.gpio7)
+                ($io.gpio6, $io.gpio7)
             } else if #[cfg(esp32h2)] {
-                ($io.pins.gpio12, $io.pins.gpio22)
+                ($io.gpio12, $io.gpio22)
             } else if #[cfg(esp32c2)] {
-                ($io.pins.gpio18, $io.pins.gpio9)
+                ($io.gpio18, $io.gpio9)
             } else {
-                ($io.pins.gpio4, $io.pins.gpio5)
+                ($io.gpio4, $io.gpio5)
             }
         }
     }};
@@ -50,13 +50,13 @@ macro_rules! common_test_pins {
     ($io:expr) => {{
         cfg_if::cfg_if! {
             if #[cfg(any(esp32s2, esp32s3))] {
-                ($io.pins.gpio9, $io.pins.gpio10)
+                ($io.gpio9, $io.gpio10)
             }
             else if #[cfg(esp32)] {
-                ($io.pins.gpio26, $io.pins.gpio27)
+                ($io.gpio26, $io.gpio27)
             }
             else {
-                ($io.pins.gpio2, $io.pins.gpio3)
+                ($io.gpio2, $io.gpio3)
             }
         }
     }};

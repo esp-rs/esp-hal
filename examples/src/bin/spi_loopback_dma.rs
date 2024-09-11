@@ -23,7 +23,6 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::Io,
     prelude::*,
     spi::{master::Spi, SpiMode},
 };
@@ -33,11 +32,11 @@ use esp_println::println;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let sclk = io.pins.gpio0;
-    let miso = io.pins.gpio2;
-    let mosi = io.pins.gpio4;
-    let cs = io.pins.gpio5;
+    let io = peripherals.GPIO.pins();
+    let sclk = io.gpio0;
+    let miso = io.gpio2;
+    let mosi = io.gpio4;
+    let cs = io.gpio5;
 
     let dma = Dma::new(peripherals.DMA);
 

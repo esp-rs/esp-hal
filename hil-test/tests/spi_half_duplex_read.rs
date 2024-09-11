@@ -8,7 +8,7 @@
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{Io, Level, Output},
+    gpio::{Level, Output},
     peripherals::SPI2,
     prelude::*,
     spi::{
@@ -48,8 +48,8 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let sclk = io.pins.gpio0;
+        let io = peripherals.GPIO.pins();
+        let sclk = io.gpio0;
         let (miso, miso_mirror) = hil_test::common_test_pins!(io);
 
         let miso_mirror = Output::new(miso_mirror, Level::High);

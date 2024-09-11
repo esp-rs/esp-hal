@@ -11,7 +11,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::{Io, Level, Output},
+    gpio::{Level, Output},
     prelude::*,
 };
 
@@ -20,8 +20,8 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     // Set GPIO0 as an output, and set its state high initially.
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let mut led = Output::new(io.pins.gpio0, Level::High);
+    let io = peripherals.GPIO.pins();
+    let mut led = Output::new(io.gpio0, Level::High);
 
     let delay = Delay::new();
 

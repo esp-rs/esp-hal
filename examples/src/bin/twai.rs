@@ -26,7 +26,6 @@ const IS_FIRST_SENDER: bool = true;
 
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::Io,
     prelude::*,
     twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId, TwaiMode},
 };
@@ -37,10 +36,10 @@ use nb::block;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = peripherals.GPIO.pins();
 
-    let can_tx_pin = io.pins.gpio0;
-    let can_rx_pin = io.pins.gpio2;
+    let can_tx_pin = io.gpio0;
+    let can_rx_pin = io.gpio2;
 
     // The speed of the CAN bus.
     const CAN_BAUDRATE: twai::BaudRate = twai::BaudRate::B1000K;

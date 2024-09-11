@@ -12,7 +12,7 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::{Io, NoPin},
+    gpio::NoPin,
     i2s::{DataFormat, I2s, I2sReadDma, I2sWriteDma, Standard},
     prelude::*,
 };
@@ -52,7 +52,7 @@ mod tests {
     fn test_i2s_loopback() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = peripherals.GPIO.pins();
 
         let delay = Delay::new();
 

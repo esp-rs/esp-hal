@@ -13,7 +13,7 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::{Io, Level, Output},
+    gpio::{Level, Output},
     prelude::*,
     rmt::{asynch::RxChannelAsync, PulseCode, Rmt, RxChannelConfig, RxChannelCreatorAsync},
     timer::timg::TimerGroup,
@@ -44,7 +44,7 @@ async fn main(spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = peripherals.GPIO.pins();
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32h2")] {
@@ -63,16 +63,16 @@ async fn main(spawner: Spawner) {
 
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
-            let mut channel = rmt.channel0.configure(io.pins.gpio4, rx_config).unwrap();
+            let mut channel = rmt.channel0.configure(io.gpio4, rx_config).unwrap();
         } else if #[cfg(feature = "esp32s3")] {
-            let mut channel = rmt.channel7.configure(io.pins.gpio4, rx_config).unwrap();
+            let mut channel = rmt.channel7.configure(io.gpio4, rx_config).unwrap();
         } else {
-            let mut channel = rmt.channel2.configure(io.pins.gpio4, rx_config).unwrap();
+            let mut channel = rmt.channel2.configure(io.gpio4, rx_config).unwrap();
         }
     }
 
     spawner
-        .spawn(signal_task(Output::new(io.pins.gpio5, Level::Low)))
+        .spawn(signal_task(Output::new(io.gpio5, Level::Low)))
         .unwrap();
 
     let mut data = [PulseCode {

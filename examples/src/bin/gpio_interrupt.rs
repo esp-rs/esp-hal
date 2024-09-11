@@ -18,7 +18,7 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::{Event, Input, Io, Level, Output, Pull},
+    gpio::{Event, Input, Level, Output, Pull},
     macros::ram,
     prelude::*,
 };
@@ -30,19 +30,20 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     // Set GPIO2 as an output, and set its state high initially.
-    let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    io.set_interrupt_handler(handler);
-    let mut led = Output::new(io.pins.gpio2, Level::Low);
+    let io = peripherals.GPIO.pins();
+    let mut led = Output::new(io.gpio2, Level::Low);
 
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
-            let button = io.pins.gpio0;
+            let button = io.gpio0;
         } else {
-            let button = io.pins.gpio9;
+            let button = io.gpio9;
         }
     }
 
     let mut button = Input::new(button, Pull::Up);
+
+    button.set_interrupt_handler(handler);
 
     critical_section::with(|cs| {
         button.listen(Event::FallingEdge);

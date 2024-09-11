@@ -67,7 +67,7 @@
 //! # }
 //! use esp_hal::{
 //!     delay::Delay,
-//!     gpio::{Io, Level, Output},
+//!     gpio::{Level, Output},
 //!     prelude::*,
 //! };
 //!
@@ -76,8 +76,8 @@
 //!     let peripherals = esp_hal::init(esp_hal::Config::default());
 //!
 //!     // Set GPIO0 as an output, and set its state high initially.
-//!     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//!     let mut led = Output::new(io.pins.gpio0, Level::High);
+//!     let io = peripherals.GPIO.pins();
+//!     let mut led = Output::new(io.gpio0, Level::High);
 //!
 //!     let delay = Delay::new();
 //!
@@ -90,7 +90,7 @@
 //!
 //! The steps here are:
 //! - Call [`init`] with the desired [`CpuClock`] configuration
-//! - Create [`gpio::Io`] which provides access to the GPIO pins
+//! - Grab the pins using [`GPIO.pins()`][crate::peripherals::GPIO::pins].
 //! - Create an [`gpio::Output`] pin driver which lets us control the logical
 //!   level of an output pin
 //! - Create a [`delay::Delay`] driver

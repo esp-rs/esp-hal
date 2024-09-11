@@ -11,7 +11,7 @@
 
 use esp_hal::{
     dma::{Dma, DmaPriority},
-    gpio::{Io, NoPin},
+    gpio::NoPin,
     i2s::{asynch::*, DataFormat, I2s, I2sTx, Standard},
     peripherals::I2S0,
     prelude::*,
@@ -95,7 +95,7 @@ mod tests {
 
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = peripherals.GPIO.pins();
 
         let dma = Dma::new(peripherals.DMA);
 

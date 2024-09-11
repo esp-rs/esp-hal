@@ -7,7 +7,6 @@
 
 use embedded_hal_02::serial::{Read, Write};
 use esp_hal::{
-    gpio::Io,
     peripherals::UART1,
     prelude::*,
     uart::{ClockSource, Uart},
@@ -31,7 +30,7 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = peripherals.GPIO.pins();
 
         let (rx, tx) = hil_test::common_test_pins!(io);
 

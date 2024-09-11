@@ -30,7 +30,6 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::Io,
     prelude::*,
     spi::{
         master::{Address, Command, HalfDuplexReadWrite, Spi},
@@ -44,22 +43,22 @@ use esp_println::println;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = peripherals.GPIO.pins();
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
-            let sclk = io.pins.gpio0;
-            let miso = io.pins.gpio2;
-            let mosi = io.pins.gpio4;
-            let sio2 = io.pins.gpio5;
-            let sio3 = io.pins.gpio13;
-            let cs = io.pins.gpio14;
+            let sclk = io.gpio0;
+            let miso = io.gpio2;
+            let mosi = io.gpio4;
+            let sio2 = io.gpio5;
+            let sio3 = io.gpio13;
+            let cs = io.gpio14;
         } else {
-            let sclk = io.pins.gpio0;
-            let miso = io.pins.gpio1;
-            let mosi = io.pins.gpio2;
-            let sio2 = io.pins.gpio3;
-            let sio3 = io.pins.gpio4;
-            let cs = io.pins.gpio5;
+            let sclk = io.gpio0;
+            let miso = io.gpio1;
+            let mosi = io.gpio2;
+            let sio2 = io.gpio3;
+            let sio3 = io.gpio4;
+            let cs = io.gpio5;
         }
     }
 

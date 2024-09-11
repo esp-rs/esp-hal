@@ -404,7 +404,7 @@ mod vectored {
         }
     }
 
-    /// Enables a interrupt at a given priority
+    /// Enables a interrupt at a given priority.
     ///
     /// Note that interrupts still need to be enabled globally for interrupts
     /// to be serviced.
@@ -422,7 +422,7 @@ mod vectored {
         Ok(())
     }
 
-    /// Bind the given interrupt to the given handler
+    /// Binds the given interrupt to the given handler.
     ///
     /// # Safety
     ///
@@ -764,6 +764,7 @@ mod plic {
             .bits();
         core::mem::transmute::<u8, Priority>(prio)
     }
+
     #[no_mangle]
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _handle_priority() -> u32 {

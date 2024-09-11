@@ -5,7 +5,7 @@
 #![no_std]
 #![no_main]
 
-use esp_hal::{gpio::Io, i2c::I2C, peripherals::I2C0, prelude::*, Blocking};
+use esp_hal::{i2c::I2C, peripherals::I2C0, prelude::*, Blocking};
 use hil_test as _;
 
 struct Context {
@@ -21,7 +21,7 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = peripherals.GPIO.pins();
 
         let (sda, scl) = hil_test::i2c_pins!(io);
 

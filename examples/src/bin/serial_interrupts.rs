@@ -13,7 +13,6 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::Io,
     peripherals::UART0,
     prelude::*,
     uart::{
@@ -31,22 +30,22 @@ fn main() -> ! {
 
     let delay = Delay::new();
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = peripherals.GPIO.pins();
 
     // Default pins for Uart/Serial communication
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
-            let (tx_pin, rx_pin) = (io.pins.gpio1, io.pins.gpio3);
+            let (tx_pin, rx_pin) = (io.gpio1, io.gpio3);
         } else if #[cfg(feature = "esp32c2")] {
-            let (tx_pin, rx_pin) = (io.pins.gpio20, io.pins.gpio19);
+            let (tx_pin, rx_pin) = (io.gpio20, io.gpio19);
         } else if #[cfg(feature = "esp32c3")] {
-            let (tx_pin, rx_pin) = (io.pins.gpio21, io.pins.gpio20);
+            let (tx_pin, rx_pin) = (io.gpio21, io.gpio20);
         } else if #[cfg(feature = "esp32c6")] {
-            let (tx_pin, rx_pin) = (io.pins.gpio16, io.pins.gpio17);
+            let (tx_pin, rx_pin) = (io.gpio16, io.gpio17);
         } else if #[cfg(feature = "esp32h2")] {
-            let (tx_pin, rx_pin) = (io.pins.gpio24, io.pins.gpio23);
+            let (tx_pin, rx_pin) = (io.gpio24, io.gpio23);
         } else if #[cfg(any(feature = "esp32s2", feature = "esp32s3"))] {
-            let (tx_pin, rx_pin) = (io.pins.gpio43, io.pins.gpio44);
+            let (tx_pin, rx_pin) = (io.gpio43, io.gpio44);
         }
     }
     let config = Config::default().rx_fifo_full_threshold(30);

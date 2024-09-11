@@ -11,7 +11,6 @@
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::Io,
     peripherals::SPI2,
     prelude::*,
     spi::{
@@ -50,8 +49,8 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let sclk = io.pins.gpio0;
+        let io = peripherals.GPIO.pins();
+        let sclk = io.gpio0;
         let (miso, gpio) = hil_test::common_test_pins!(io);
         let _gpio = Output::new(gpio, Level::High);
 

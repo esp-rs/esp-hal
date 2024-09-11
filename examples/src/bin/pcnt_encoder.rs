@@ -20,7 +20,7 @@ use core::{cell::RefCell, cmp::min, sync::atomic::Ordering};
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::{Input, Io, Pull},
+    gpio::{Input, Pull},
     interrupt::Priority,
     pcnt::{channel, unit, Pcnt},
     prelude::*,
@@ -35,7 +35,7 @@ static VALUE: AtomicI32 = AtomicI32::new(0);
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = peripherals.GPIO.pins();
 
     // Set up a pulse counter:
     println!("setup pulse counter unit 0");

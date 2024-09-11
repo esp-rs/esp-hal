@@ -26,7 +26,7 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::{Io, Level, Output},
+    gpio::{Level, Output},
     lcd_cam::{
         lcd::i8080::{Config, TxEightBits, I8080},
         LcdCam,
@@ -39,13 +39,13 @@ use esp_println::println;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = peripherals.GPIO.pins();
 
-    let lcd_backlight = io.pins.gpio45;
-    let lcd_reset = io.pins.gpio4;
-    let lcd_rs = io.pins.gpio0; // Command/Data selection
-    let lcd_wr = io.pins.gpio47; // Write clock
-    let _lcd_te = io.pins.gpio48; // Frame sync
+    let lcd_backlight = io.gpio45;
+    let lcd_reset = io.gpio4;
+    let lcd_rs = io.gpio0; // Command/Data selection
+    let lcd_wr = io.gpio47; // Write clock
+    let _lcd_te = io.gpio48; // Frame sync
 
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0;
@@ -60,14 +60,7 @@ fn main() -> ! {
     let mut reset = Output::new(lcd_reset, Level::Low);
 
     let tx_pins = TxEightBits::new(
-        io.pins.gpio9,
-        io.pins.gpio46,
-        io.pins.gpio3,
-        io.pins.gpio8,
-        io.pins.gpio18,
-        io.pins.gpio17,
-        io.pins.gpio16,
-        io.pins.gpio15,
+        io.gpio9, io.gpio46, io.gpio3, io.gpio8, io.gpio18, io.gpio17, io.gpio16, io.gpio15,
     );
 
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);

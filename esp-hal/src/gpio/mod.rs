@@ -18,7 +18,7 @@
 //! provide a common interface for GPIO pins.
 //!
 //! To get access to the pins, you first need to convert them into a HAL
-//! designed struct from the pac struct `GPIO` and `IO_MUX` using [`Io::new`].
+//! designed struct using [`GPIO.pins()`][crate::peripherals::GPIO::pins].
 //!
 //! ### Pin Types
 //!
@@ -41,9 +41,9 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::gpio::{Io, Level, Output};
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let mut led = Output::new(io.pins.gpio5, Level::High);
+//! # use esp_hal::gpio::{Level, Output};
+//! let io = peripherals.GPIO.pins();
+//! let mut led = Output::new(io.gpio5, Level::High);
 //! # }
 //! ```
 //! 
@@ -58,7 +58,7 @@
 //! [Commonly Used Setup]: ../index.html#commonly-used-setup
 //! [Inverting TX and RX Pins]: ../uart/index.html#inverting-tx-and-rx-pins
 
-use portable_atomic::{AtomicPtr, Ordering};
+use portable_atomic::{AtomicPtr, AtomicUsize, Ordering};
 use procmacros::ram;
 
 #[cfg(any(adc, dac))]
@@ -70,9 +70,9 @@ pub use crate::soc::gpio::*;
 #[cfg(touch)]
 pub(crate) use crate::touch;
 use crate::{
-    interrupt::InterruptHandler,
+    interrupt::{InterruptHandler, Priority},
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::{GPIO, IO_MUX},
+    peripherals::GPIO,
     private::{self, Sealed},
     InterruptConfigurable,
 };
@@ -91,7 +91,7 @@ pub mod rtc_io;
 
 /// Convenience constant for `Option::None` pin
 
-static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::NULL;
+static USER_INTERRUPT_HANDLERS: [CFnPtr; NUM_PINS] = [CFnPtr::NULL; NUM_PINS];
 
 struct CFnPtr(AtomicPtr<()>);
 impl CFnPtr {
@@ -102,10 +102,16 @@ impl CFnPtr {
         self.0.store(f as *mut (), Ordering::Relaxed);
     }
 
-    pub fn call(&self) {
+    pub fn clear(&self) {
+        self.0.store(core::ptr::null_mut(), Ordering::Relaxed);
+    }
+
+    pub fn load(&self) -> Option<extern "C" fn()> {
         let ptr = self.0.load(Ordering::Relaxed);
         if !ptr.is_null() {
-            unsafe { (core::mem::transmute::<*mut (), extern "C" fn()>(ptr))() };
+            Some(unsafe { core::mem::transmute::<*mut (), extern "C" fn()>(ptr) })
+        } else {
+            None
         }
     }
 }
@@ -957,80 +963,64 @@ where
     }
 }
 
-/// General Purpose Input/Output driver
-pub struct Io {
-    _io_mux: IO_MUX,
-    /// The pins available on this chip
-    pub pins: Pins,
+impl<const GPIONUM: u8> InterruptConfigurable for GpioPin<GPIONUM>
+where
+    Self: Pin,
+{
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        raise_gpio_interrupt_priority(handler.priority());
+        USER_INTERRUPT_HANDLERS[GPIONUM as usize].store(handler.handler());
+    }
 }
 
-impl Io {
-    /// Initialize the I/O driver.
-    pub fn new(gpio: GPIO, io_mux: IO_MUX) -> Self {
-        Self::new_with_priority(gpio, io_mux, crate::interrupt::Priority::min())
-    }
+static MAX_PRIO: AtomicUsize = AtomicUsize::new(Priority::None as usize);
 
-    /// Initialize the I/O driver with a interrupt priority.
-    ///
-    /// This decides the priority for the interrupt when using async.
-    pub fn new_with_priority(
-        mut gpio: GPIO,
-        io_mux: IO_MUX,
-        prio: crate::interrupt::Priority,
-    ) -> Self {
-        gpio.bind_gpio_interrupt(gpio_interrupt_handler);
-        crate::interrupt::enable(crate::peripherals::Interrupt::GPIO, prio).unwrap();
-
-        Self::new_no_bind_interrupt(gpio, io_mux)
-    }
-
-    /// Initialize the I/O driver without enabling the GPIO interrupt or
-    /// binding an interrupt handler to it.
-    ///
-    /// *Note:* You probably don't want to use this, it is intended to be used
-    /// in very specific use cases. Async GPIO functionality will not work
-    /// when instantiating `Io` using this constructor.
-    pub fn new_no_bind_interrupt(gpio: GPIO, _io_mux: IO_MUX) -> Self {
-        Io {
-            _io_mux,
-            pins: gpio.pins(),
+fn raise_gpio_interrupt_priority(priority: Priority) {
+    #[cold]
+    fn do_raise_priority_level(current_prio: usize, priority: Priority) {
+        let priority_level = priority as usize;
+        loop {
+            match MAX_PRIO.compare_exchange(
+                current_prio,
+                priority_level,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => {
+                    unsafe {
+                        crate::interrupt::bind_interrupt(
+                            crate::peripherals::Interrupt::GPIO,
+                            gpio_interrupt_handler,
+                        );
+                    }
+                    crate::interrupt::enable(crate::peripherals::Interrupt::GPIO, priority)
+                        .unwrap();
+                }
+                Err(p) if p < priority_level => {}
+                Err(_) => break, // Interrupts are already enabled with an equal or higher priority
+            }
         }
     }
-}
 
-impl crate::private::Sealed for Io {}
+    let priority_level = priority as usize;
 
-impl InterruptConfigurable for Io {
-    /// Install the given interrupt handler replacing any previously set
-    /// handler.
-    ///
-    /// ⚠️ Be careful when using this together with the async API:
-    ///
-    /// - The async driver will disable any interrupts whose status is not
-    ///   cleared by the user handler.
-    /// - Clearing the interrupt status in the user handler will prevent the
-    ///   async driver from detecting the interrupt, silently disabling the
-    ///   corresponding pin's async API.
-    /// - You will not be notified if you make a mistake.
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        crate::interrupt::enable(crate::peripherals::Interrupt::GPIO, handler.priority()).unwrap();
-        USER_INTERRUPT_HANDLER.store(handler.handler());
+    // Do we need to raise the priority level?
+    let current_prio = MAX_PRIO.load(Ordering::Relaxed);
+    if current_prio < priority_level {
+        do_raise_priority_level(current_prio, priority);
     }
 }
 
 #[ram]
 extern "C" fn gpio_interrupt_handler() {
-    USER_INTERRUPT_HANDLER.call();
-
-    handle_pin_interrupts(on_pin_irq);
-}
-
-#[ram]
-fn on_pin_irq(pin_nr: u8) {
-    // FIXME: async handlers signal completion by disabling the interrupt, but this
-    // conflicts with user handlers.
-    set_int_enable(pin_nr, 0, 0, false);
-    asynch::PIN_WAKERS[pin_nr as usize].wake(); // wake task
+    handle_pin_interrupts(|pin_nr: u8| {
+        if let Some(handler) = USER_INTERRUPT_HANDLERS[pin_nr as usize].load() {
+            handler();
+        } else {
+            set_int_enable(pin_nr, 0, 0, false);
+            asynch::PIN_WAKERS[pin_nr as usize].wake(); // wake task
+        }
+    });
 }
 
 #[doc(hidden)]
@@ -1089,7 +1079,8 @@ macro_rules! gpio {
             }
 
             impl GPIO {
-                pub(crate) fn pins(self) -> Pins {
+                /// Returns the available GPIO pins.
+                pub fn pins(self) -> Pins {
                     Pins {
                         $(
                             [< gpio $gpionum >]: GpioPin::new(),
@@ -1481,7 +1472,7 @@ macro_rules! analog {
             impl $crate::gpio::AnalogPin for GpioPin<$pin_num> {
                 /// Configures the pin for analog mode.
                 fn set_analog(&self, _: $crate::private::Internal) {
-                    use $crate::peripherals::{GPIO};
+                    use $crate::peripherals::GPIO;
 
                     get_io_mux_reg($pin_num).modify(|_,w| unsafe {
                         w.mcu_sel().bits(1)
@@ -1490,7 +1481,7 @@ macro_rules! analog {
                             .fun_wpd().clear_bit()
                     });
 
-                    unsafe{ &*GPIO::PTR }.enable_w1tc().write(|w| unsafe { w.bits(1 << $pin_num) });
+                    unsafe { &*GPIO::PTR }.enable_w1tc().write(|w| unsafe { w.bits(1 << $pin_num) });
                 }
             }
         )+
@@ -1725,6 +1716,12 @@ impl<'d> Input<'d> {
         let pin = Flex::new(pin);
 
         Self::new_inner(pin, pull)
+    }
+}
+
+impl<'d, P: InterruptConfigurable> InterruptConfigurable for Input<'d, P> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.pin.set_interrupt_handler(handler);
     }
 }
 
@@ -2053,6 +2050,12 @@ where
     }
 }
 
+impl<'d, P: InterruptConfigurable> InterruptConfigurable for Flex<'d, P> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.pin.set_interrupt_handler(handler);
+    }
+}
+
 impl<'d, P> Flex<'d, P>
 where
     P: OutputPin,
@@ -2157,6 +2160,14 @@ pub(crate) mod internal {
         #[inline]
         pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
             handle_gpio_output!(self.0, target, { target.into_peripheral_output() })
+        }
+    }
+
+    impl InterruptConfigurable for AnyPin {
+        fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+            handle_gpio_input!(&mut self.0, target, {
+                InterruptConfigurable::set_interrupt_handler(target, handler)
+            })
         }
     }
 
@@ -2499,33 +2510,38 @@ mod asynch {
         /// Wait until the pin is high. If it is already high, return
         /// immediately.
         pub async fn wait_for_high(&mut self) {
+            let future = PinFuture::new(self.pin.number());
             self.listen(Event::HighLevel);
-            PinFuture::new(self.pin.number()).await
+            future.await
         }
 
         /// Wait until the pin is low. If it is already low, return immediately.
         pub async fn wait_for_low(&mut self) {
+            let future = PinFuture::new(self.pin.number());
             self.listen(Event::LowLevel);
-            PinFuture::new(self.pin.number()).await
+            future.await
         }
 
         /// Wait for the pin to undergo a transition from low to high.
         pub async fn wait_for_rising_edge(&mut self) {
+            let future = PinFuture::new(self.pin.number());
             self.listen(Event::RisingEdge);
-            PinFuture::new(self.pin.number()).await
+            future.await
         }
 
         /// Wait for the pin to undergo a transition from high to low.
         pub async fn wait_for_falling_edge(&mut self) {
+            let future = PinFuture::new(self.pin.number());
             self.listen(Event::FallingEdge);
-            PinFuture::new(self.pin.number()).await
+            future.await
         }
 
         /// Wait for the pin to undergo any transition, i.e low to high OR high
         /// to low.
         pub async fn wait_for_any_edge(&mut self) {
+            let future = PinFuture::new(self.pin.number());
             self.listen(Event::AnyEdge);
-            PinFuture::new(self.pin.number()).await
+            future.await
         }
     }
 
@@ -2568,6 +2584,8 @@ mod asynch {
 
     impl PinFuture {
         fn new(pin_num: u8) -> Self {
+            raise_gpio_interrupt_priority(Priority::min());
+            USER_INTERRUPT_HANDLERS[pin_num as usize].clear();
             Self { pin_num }
         }
     }

@@ -32,15 +32,14 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::i2c::I2C;
-//! # use esp_hal::gpio::Io;
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = peripherals.GPIO.pins();
 //!
 //! // Create a new peripheral object with the described wiring
 //! // and standard I2C clock speed.
 //! let mut i2c = I2C::new(
 //!     peripherals.I2C0,
-//!     io.pins.gpio1,
-//!     io.pins.gpio2,
+//!     io.gpio1,
+//!     io.gpio2,
 //!     100.kHz(),
 //! );
 //!

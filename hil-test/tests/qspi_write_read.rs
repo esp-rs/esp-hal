@@ -10,7 +10,7 @@
 use esp_hal::{
     dma::{Channel, Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{AnyPin, Io, Level, NoPin, Output},
+    gpio::{AnyPin, Level, NoPin, Output},
     prelude::*,
     spi::{
         master::{Address, Command, Spi, SpiDma},
@@ -94,7 +94,7 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = peripherals.GPIO.pins();
 
         let (mosi, mosi_mirror) = hil_test::common_test_pins!(io);
 

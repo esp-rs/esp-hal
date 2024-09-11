@@ -33,10 +33,9 @@
 //! # use esp_hal::i2s::Standard;
 //! # use esp_hal::i2s::DataFormat;
 //! # use esp_hal::i2s::I2sReadDma;
-//! # use esp_hal::gpio::Io;
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::{Dma, DmaPriority};
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! # let io = peripherals.GPIO.pins();
 //! let dma = Dma::new(peripherals.DMA);
 #![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.i2s0channel;")]
 #![cfg_attr(not(any(esp32, esp32s2)), doc = "let dma_channel = dma.channel0;")]
@@ -55,11 +54,11 @@
 //!     rx_descriptors,
 //!     tx_descriptors,
 //! );
-#![cfg_attr(not(esp32), doc = "let i2s = i2s.with_mclk(io.pins.gpio0);")]
+#![cfg_attr(not(esp32), doc = "let i2s = i2s.with_mclk(io.gpio0);")]
 //! let mut i2s_rx = i2s.i2s_rx
-//!     .with_bclk(io.pins.gpio1)
-//!     .with_ws(io.pins.gpio2)
-//!     .with_din(io.pins.gpio5)
+//!     .with_bclk(io.gpio1)
+//!     .with_ws(io.gpio2)
+//!     .with_din(io.gpio5)
 //!     .build();
 //!
 //! let mut transfer = i2s_rx.read_dma_circular(&mut rx_buffer).unwrap();

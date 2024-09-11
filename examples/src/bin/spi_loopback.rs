@@ -18,7 +18,6 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::Io,
     prelude::*,
     spi::{master::Spi, SpiMode},
 };
@@ -28,10 +27,10 @@ use esp_println::println;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let sclk = io.pins.gpio0;
-    let miso_mosi = io.pins.gpio2;
-    let cs = io.pins.gpio5;
+    let io = peripherals.GPIO.pins();
+    let sclk = io.gpio0;
+    let miso_mosi = io.gpio2;
+    let cs = io.gpio5;
 
     let miso = miso_mosi.peripheral_input();
     let mosi = miso_mosi.into_peripheral_output();

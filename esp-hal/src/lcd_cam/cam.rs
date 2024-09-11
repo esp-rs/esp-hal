@@ -16,12 +16,11 @@
 //! master mode.
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::gpio::Io;
 //! # use esp_hal::lcd_cam::{cam::{Camera, RxEightBits}, LcdCam};
 //! # use fugit::RateExtU32;
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::{Dma, DmaPriority};
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! # let io = peripherals.GPIO.pins();
 //!
 //! # let dma = Dma::new(peripherals.DMA);
 //! # let channel = dma.channel0;
@@ -33,19 +32,19 @@
 //! #     DmaPriority::Priority0,
 //! # );
 //!
-//! let mclk_pin = io.pins.gpio15;
-//! let vsync_pin = io.pins.gpio6;
-//! let href_pin = io.pins.gpio7;
-//! let pclk_pin = io.pins.gpio13;
+//! let mclk_pin = io.gpio15;
+//! let vsync_pin = io.gpio6;
+//! let href_pin = io.gpio7;
+//! let pclk_pin = io.gpio13;
 //! let data_pins = RxEightBits::new(
-//!     io.pins.gpio11,
-//!     io.pins.gpio9,
-//!     io.pins.gpio8,
-//!     io.pins.gpio10,
-//!     io.pins.gpio12,
-//!     io.pins.gpio18,
-//!     io.pins.gpio17,
-//!     io.pins.gpio16,
+//!     io.gpio11,
+//!     io.gpio9,
+//!     io.gpio8,
+//!     io.gpio10,
+//!     io.gpio12,
+//!     io.gpio18,
+//!     io.gpio17,
+//!     io.gpio16,
 //! );
 //!
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);

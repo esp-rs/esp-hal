@@ -11,11 +11,11 @@
 //! ## Example
 //!
 //! ```rust,ignore
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = peripherals.GPIO.pins();
 //! let rmt = Rmt::new(peripherals.RMT, 80.MHz(), None).unwrap();
 //!
 //! let rmt_buffer = smartLedBuffer!(1);
-//! let mut led = SmartLedsAdapter::new(rmt.channel0, io.pins.gpio2, rmt_buffer);
+//! let mut led = SmartLedsAdapter::new(rmt.channel0, io.gpio2, rmt_buffer);
 //! ```
 //!
 //! ## Feature Flags
