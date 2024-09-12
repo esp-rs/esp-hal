@@ -2242,6 +2242,8 @@ pub trait InstanceDma: Instance {
 
         reset_dma_before_usr_cmd(reg_block);
 
+        self.update();
+
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
 
         Ok(())
@@ -2291,6 +2293,8 @@ pub trait InstanceDma: Instance {
 
         reset_dma_before_usr_cmd(reg_block);
 
+        self.update();
+
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
 
         Ok(())
@@ -2334,6 +2338,8 @@ pub trait InstanceDma: Instance {
         rx.start_transfer()?;
 
         reset_dma_before_usr_cmd(reg_block);
+
+        self.update();
 
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
 
@@ -2414,15 +2420,6 @@ fn reset_dma_before_usr_cmd(_reg_block: &RegisterBlock) {
             .dma_afifo_rst()
             .set_bit()
     });
-
-    // Wait for a few clock cycles for the DMA to fill the SPI async FIFO,
-    // before starting the SPI
-    let cycles = 20;
-
-    #[cfg(riscv)]
-    riscv::asm::delay(cycles);
-    #[cfg(xtensa)]
-    xtensa_lx::timer::delay(cycles);
 }
 
 #[cfg(gdma)]
