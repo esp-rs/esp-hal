@@ -2231,9 +2231,8 @@ pub trait InstanceDma: Instance {
             .modify(|_, w| w.usr_miso().bit(true).usr_mosi().bit(true));
 
         self.enable_dma();
-        self.update();
-
         self.clear_dma_interrupts();
+
         reset_dma_before_load_dma_dscr(reg_block);
         rx.prepare_transfer(self.dma_peripheral(), rx_buffer)
             .and_then(|_| rx.start_transfer())?;
@@ -2242,9 +2241,7 @@ pub trait InstanceDma: Instance {
 
         reset_dma_before_usr_cmd(reg_block);
 
-        self.update();
-
-        reg_block.cmd().modify(|_, w| w.usr().set_bit());
+        self.start_operation();
 
         Ok(())
     }
@@ -2283,19 +2280,16 @@ pub trait InstanceDma: Instance {
         }
 
         self.enable_dma();
-        self.update();
+        self.clear_dma_interrupts();
 
         reset_dma_before_load_dma_dscr(reg_block);
-        self.clear_dma_interrupts();
 
         tx.prepare_transfer(self.dma_peripheral(), buffer)?;
         tx.start_transfer()?;
 
         reset_dma_before_usr_cmd(reg_block);
 
-        self.update();
-
-        reg_block.cmd().modify(|_, w| w.usr().set_bit());
+        self.start_operation();
 
         Ok(())
     }
@@ -2328,20 +2322,16 @@ pub trait InstanceDma: Instance {
         }
 
         self.enable_dma();
-        self.update();
+        self.clear_dma_interrupts();
 
         reset_dma_before_load_dma_dscr(reg_block);
-
-        self.clear_dma_interrupts();
 
         rx.prepare_transfer(self.dma_peripheral(), buffer)?;
         rx.start_transfer()?;
 
         reset_dma_before_usr_cmd(reg_block);
 
-        self.update();
-
-        reg_block.cmd().modify(|_, w| w.usr().set_bit());
+        self.start_operation();
 
         Ok(())
     }
@@ -3046,9 +3036,7 @@ pub trait Instance: private::Sealed {
         let reg_block = self.register_block();
         reg_block.w(0).write(|w| w.buf().set(word.into()));
 
-        self.update();
-
-        reg_block.cmd().modify(|_, w| w.usr().set_bit());
+        self.start_operation();
 
         Ok(())
     }
@@ -3101,9 +3089,7 @@ pub trait Instance: private::Sealed {
                 }
             }
 
-            self.update();
-
-            self.register_block().cmd().modify(|_, w| w.usr().set_bit());
+            self.start_operation();
 
             // Wait for all chunks to complete except the last one.
             // The function is allowed to return before the bus is idle.
@@ -3368,8 +3354,7 @@ pub trait Instance: private::Sealed {
         }
 
         self.configure_datalen(buffer.len() as u32 * 8);
-        self.update();
-        reg_block.cmd().modify(|_, w| w.usr().set_bit());
+        self.start_operation();
         self.flush()?;
         self.read_bytes_from_fifo(buffer)
     }
