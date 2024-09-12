@@ -253,7 +253,7 @@ where
         let Some(clock_divider) = ClockDivider::from_frequence(
             src_clock.to_Hz(),
             frequency.to_Hz(),
-            u8::MAX as u32,
+            256,
             0b11111,
         ) else {
             return Err(Error::UnreachableTargetFrequency);
