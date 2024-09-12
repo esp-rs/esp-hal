@@ -126,7 +126,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     // emit config
     generate_config(
         "esp_hal",
-        &[("place-spi-driver-in-ram", Value::Bool(false))],
+        &[(
+            "place-spi-driver-in-ram",
+            Value::Bool(false),
+            "Places the SPI driver in RAM for better performance",
+        )],
     );
 
     Ok(())

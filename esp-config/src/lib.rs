@@ -1,4 +1,10 @@
-use std::{collections::HashMap, env};
+use core::fmt::Write;
+use std::{collections::HashMap, env, fs, path::PathBuf};
+
+const TABLE_HEADER: &str = r#"
+| name | description | default value |
+|------|-------------|---------------|
+"#;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ParseError;
@@ -21,31 +27,54 @@ impl Value {
         };
         Ok(())
     }
+
+    fn as_string(&self) -> String {
+        match self {
+            Value::Bool(value) => String::from(if *value { "true" } else { "false" }),
+        }
+    }
 }
 
-/// Takes a array of configuration keys and default values
-pub fn generate_config(prefix: &str, config: &[(&str, Value)]) {
+/// This function will parse any screaming snake case environment variables that
+/// match the given prefix. It will then attempt to parse the [`Value`]. Once
+/// the config has been parsed, this function will emit snake case cfg's
+/// _without_ the prefix which can be used in the dependant crate. After that,
+/// it will create a markdown table in the `OUT_DIR` under the name
+/// `{prefix}_config_table.md` where prefix has also been converted
+/// to snake case. This can be included in crate documentation to outline the
+/// available configuration options for the crate.
+///
+/// The tuple ordering for the`config` array is key, default, description.
+///
+/// Unknown keys with the supplied prefix will cause this function to panic.
+pub fn generate_config(prefix: &str, config: &[(&str, Value, &str)]) {
+    let mut prefix = screaming_snake_case(prefix);
+
+    let mut doc_table = String::from(TABLE_HEADER);
+    for (key, default, desc) in config {
+        let key = screaming_snake_case(key);
+        let default = default.as_string();
+        writeln!(doc_table, "|**{prefix}_{key}**|{desc}|{default}|").unwrap();
+    }
+
     // only rebuild if build.rs changed. Otherwise Cargo will rebuild if any
     // other file changed.
     println!("cargo:rerun-if-changed=build.rs");
 
     // Generate the template for the config
     let mut configs = HashMap::new();
-    for (name, default) in config {
-        configs.insert(normalize_name(name), *default);
+    for (name, default, _) in config {
+        configs.insert(snake_case(name), *default);
 
         // Rebuild if config envvar changed.
         // Note this is currently buggy and requires a clean build - PR is pending https://github.com/rust-lang/cargo/pull/14058
         println!("cargo:rerun-if-env-changed={name}");
     }
 
-    let mut prefix = prefix.to_owned();
-    prefix.make_ascii_uppercase();
-
     // Try and capture input from the environment
     for (var, value) in env::vars() {
         if let Some(name) = var.strip_prefix(&format!("{prefix}_")) {
-            let name = normalize_name(name);
+            let name = snake_case(name);
             // TODO should this be lowered to a warning for unknown configuration options?
             // we could instead mark this as unknown and _not_ emit
             // println!("cargo:rustc-check-cfg=cfg({})", name);
@@ -66,14 +95,34 @@ pub fn generate_config(prefix: &str, config: &[(&str, Value)]) {
             _ => {}
         }
     }
+
+    // convert to snake case
+    prefix.make_ascii_lowercase();
+
+    let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
+    let out_file = out_dir
+        .join(format!("{prefix}_config_table.md"))
+        .to_string_lossy()
+        .to_string();
+    fs::write(out_file, doc_table).unwrap();
 }
 
 // Converts a symbol name like
 // "PLACE-spi_DRIVER-IN_ram"
 // to
 // "place_spi_driver_in_ram"
-fn normalize_name(name: &str) -> String {
+fn snake_case(name: &str) -> String {
     let mut name = name.replace("-", "_");
     name.make_ascii_lowercase();
+    name
+}
+
+// Converts a symbol name like
+// "PLACE-spi_DRIVER-IN_ram"
+// to
+// "PLACE_SPI_DRIVER_IN_RAM"
+fn screaming_snake_case(name: &str) -> String {
+    let mut name = name.replace("-", "_");
+    name.make_ascii_uppercase();
     name
 }
