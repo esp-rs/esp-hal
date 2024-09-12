@@ -377,28 +377,6 @@ where
 
 impl<'d, T> embedded_hal_02::timer::Periodic for PeriodicTimer<'d, T> where T: Timer {}
 
-/// An enum of all timer types
-enum AnyTimerInner {
-    Timg0Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>),
-    #[cfg(timg_timer1)]
-    Timg0Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking>),
-    #[cfg(timg1)]
-    Timg1Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking>),
-    #[cfg(all(timg1, timg_timer1))]
-    Timg1Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>),
-    #[cfg(systimer)]
-    SystimerAlarmPeriodic(systimer::Alarm<'static, systimer::Periodic, Blocking>),
-    #[cfg(systimer)]
-    SystimerAlarmTarget(systimer::Alarm<'static, systimer::Target, Blocking>),
-}
-
-/// A type-erased timer
-///
-/// You can create an instance of this by just calling `.into()` on a timer.
-pub struct AnyTimer(AnyTimerInner);
-
-impl crate::private::Sealed for AnyTimer {}
-
 macro_rules! any_timer {
     ($ty:path => $var:ident) => {
         impl $ty {
@@ -421,10 +399,42 @@ macro_rules! any_timer {
             $ty:path => $var:ident,
         )*
     ) => {
+        /// An enum of all timer types
+        enum AnyTimerInner {
+            $(
+                $(#[$cfg])?
+                $var($ty),
+            )*
+        }
+
         $(
             $(#[$cfg])?
             any_timer!($ty => $var);
         )*
+
+        impl Timer for AnyTimer {
+            delegate::delegate! {
+                to match &self.0 {
+                    $(
+                        $(#[$cfg])?
+                        AnyTimerInner::$var(inner) => inner,
+                    )*
+                } {
+                    fn start(&self);
+                    fn stop(&self);
+                    fn reset(&self);
+                    fn is_running(&self) -> bool;
+                    fn now(&self) -> Instant<u64, 1, 1_000_000>;
+                    fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error>;
+                    fn enable_auto_reload(&self, auto_reload: bool);
+                    fn enable_interrupt(&self, state: bool);
+                    fn clear_interrupt(&self);
+                    fn set_interrupt_handler(&self, handler: InterruptHandler);
+                    fn is_interrupt_set(&self) -> bool;
+                    fn set_alarm_active(&self, state: bool);
+                }
+            }
+        }
     };
 }
 
@@ -442,36 +452,12 @@ any_timer! {
     systimer::Alarm<'static, systimer::Target, Blocking> => SystimerAlarmTarget,
 }
 
-impl Timer for AnyTimer {
-    delegate::delegate! {
-        to match &self.0 {
-            AnyTimerInner::Timg0Timer0(inner) => inner,
-            #[cfg(timg_timer1)]
-            AnyTimerInner::Timg0Timer1(inner) => inner,
-            #[cfg(timg1)]
-            AnyTimerInner::Timg1Timer0(inner) => inner,
-            #[cfg(all(timg1,timg_timer1))]
-            AnyTimerInner::Timg1Timer1(inner) => inner,
-            #[cfg(systimer)]
-            AnyTimerInner::SystimerAlarmPeriodic(inner) => inner,
-            #[cfg(systimer)]
-            AnyTimerInner::SystimerAlarmTarget(inner) => inner,
-        } {
-            fn start(&self);
-            fn stop(&self);
-            fn reset(&self);
-            fn is_running(&self) -> bool;
-            fn now(&self) -> Instant<u64, 1, 1_000_000>;
-            fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error>;
-            fn enable_auto_reload(&self, auto_reload: bool);
-            fn enable_interrupt(&self, state: bool);
-            fn clear_interrupt(&self);
-            fn set_interrupt_handler(&self, handler: InterruptHandler);
-            fn is_interrupt_set(&self) -> bool;
-            fn set_alarm_active(&self, state: bool);
-        }
-    }
-}
+/// A type-erased timer
+///
+/// You can create an instance of this by just calling `.into()` on a timer.
+pub struct AnyTimer(AnyTimerInner);
+
+impl crate::private::Sealed for AnyTimer {}
 
 impl Peripheral for AnyTimer {
     type P = Self;
