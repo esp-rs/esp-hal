@@ -30,10 +30,11 @@ use esp_backtrace as _;
 use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_wifi::{
+    reinitialize,
     ble::controller::BleConnector,
     current_millis,
     initialize,
-    wifi::{utils::create_network_interface, ClientConfiguration, Configuration, WifiStaDevice},
+    wifi::{utils::create_network_interface, deinitialize, ClientConfiguration, Configuration, WifiStaDevice},
     wifi_interface::WifiStack,
     EspWifiFor,
 };
@@ -42,8 +43,10 @@ use smoltcp::{
     wire::{IpAddress, Ipv4Address},
 };
 
-const SSID: &str = env!("SSID");
-const PASSWORD: &str = env!("PASSWORD");
+const SSID: &str = "EspressifSystems";
+const PASSWORD: &str = "Espressif32";
+// const SSID: &str = env!("SSID");
+// const PASSWORD: &str = env!("PASSWORD");
 
 #[entry]
 fn main() -> ! {
@@ -85,7 +88,7 @@ fn main() -> ! {
     .unwrap();
 
     let mut wifi = peripherals.WIFI;
-    let bluetooth = peripherals.BT;
+    let mut bluetooth = peripherals.BT;
 
     let mut socket_set_entries: [SocketStorage; 2] = Default::default();
     let (iface, device, mut controller, sockets) =
@@ -134,9 +137,24 @@ fn main() -> ! {
         }
     }
 
-    let connector = BleConnector::new(&init, bluetooth);
+    
+    let connector = BleConnector::new(&init, &mut bluetooth);
     let hci = HciConnector::new(connector, esp_wifi::current_millis);
     let mut ble = Ble::new(&hci);
+    
+    let deinit = deinitialize(EspWifiFor::WifiBle, controller, wifi_stack).unwrap();
+    println!("DEINITED");
+
+    let init = reinitialize(
+        EspWifiFor::WifiBle,
+        deinit,
+    )
+    .unwrap();
+
+    let connector = BleConnector::new(&init, &mut bluetooth);
+    let hci = HciConnector::new(connector, esp_wifi::current_millis);
+    let mut ble = Ble::new(&hci);
+
 
     println!("{:?}", ble.init());
     println!("{:?}", ble.cmd_set_le_advertising_parameters());
@@ -157,45 +175,45 @@ fn main() -> ! {
 
     println!("Start busy loop on main");
 
-    let mut rx_buffer = [0u8; 128];
-    let mut tx_buffer = [0u8; 128];
-    let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
+    // let mut rx_buffer = [0u8; 128];
+    // let mut tx_buffer = [0u8; 128];
+    // let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
 
     loop {
-        println!("Making HTTP request");
-        socket.work();
+        // println!("Making HTTP request");
+        // socket.work();
 
-        socket
-            .open(IpAddress::Ipv4(Ipv4Address::new(142, 250, 185, 115)), 80)
-            .unwrap();
+        // socket
+        //     .open(IpAddress::Ipv4(Ipv4Address::new(142, 250, 185, 115)), 80)
+        //     .unwrap();
 
-        socket
-            .write(b"GET / HTTP/1.0\r\nHost: www.mobile-j.de\r\n\r\n")
-            .unwrap();
-        socket.flush().unwrap();
+        // socket
+        //     .write(b"GET / HTTP/1.0\r\nHost: www.mobile-j.de\r\n\r\n")
+        //     .unwrap();
+        // socket.flush().unwrap();
 
-        let wait_end = current_millis() + 20 * 1000;
-        loop {
-            let mut buffer = [0u8; 128];
-            if let Ok(len) = socket.read(&mut buffer) {
-                let to_print = unsafe { core::str::from_utf8_unchecked(&buffer[..len]) };
-                print!("{}", to_print);
-            } else {
-                break;
-            }
+        // let wait_end = current_millis() + 20 * 1000;
+        // loop {
+        //     let mut buffer = [0u8; 128];
+        //     if let Ok(len) = socket.read(&mut buffer) {
+        //         let to_print = unsafe { core::str::from_utf8_unchecked(&buffer[..len]) };
+        //         print!("{}", to_print);
+        //     } else {
+        //         break;
+        //     }
 
-            if current_millis() > wait_end {
-                println!("Timeout");
-                break;
-            }
-        }
-        println!();
+        //     if current_millis() > wait_end {
+        //         println!("Timeout");
+        //         break;
+        //     }
+        // }
+        // println!();
 
-        socket.disconnect();
+        // socket.disconnect();
 
-        let wait_end = current_millis() + 5 * 1000;
-        while current_millis() < wait_end {
-            socket.work();
-        }
+        // let wait_end = current_millis() + 5 * 1000;
+        // while current_millis() < wait_end {
+        //     socket.work();
+        // }
     }
 }

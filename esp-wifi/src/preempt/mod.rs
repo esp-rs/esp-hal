@@ -82,7 +82,6 @@ pub fn current_task() -> *mut Context {
     critical_section::with(|cs| unsafe { *CTX_NOW.borrow_ref(cs) })
 }
 
-#[cfg(feature = "wifi")]
 pub fn schedule_task_deletion(task: *mut Context) {
     use crate::timer::yield_task;
 

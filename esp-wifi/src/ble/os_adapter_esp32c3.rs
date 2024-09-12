@@ -409,3 +409,12 @@ pub(crate) unsafe extern "C" fn ets_backup_dma_copy(
 ) {
     todo!();
 }
+
+pub(crate) fn bt_deinit() {
+    extern "C" {
+        fn btdm_controller_deinit();
+        fn bt_controller_deinit_internal();
+    }
+
+    unsafe {btdm_controller_deinit();}
+}

@@ -89,6 +89,7 @@ use crate::{
             self,
             __BindgenBitfieldUnit,
             esp_err_t,
+            esp_bt_controller_deinit,
             esp_interface_t_ESP_IF_WIFI_AP,
             esp_interface_t_ESP_IF_WIFI_STA,
             esp_supplicant_init,
@@ -1450,6 +1451,8 @@ pub fn deinitialize(
     esp_wifi_result!(unsafe { esp_wifi_stop() })?;
     esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
 
+    crate::ble::btdm::ble_os_adapter_chip_specific::bt_deinit();
+    
     drop(controller);
     drop(stack);
 

@@ -20,8 +20,10 @@ use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_wifi::{
     current_millis,
+    reinitialize,
     initialize,
     wifi::{
+        deinitialize,
         utils::create_network_interface,
         AccessPointInfo,
         ClientConfiguration,
@@ -37,8 +39,11 @@ use smoltcp::{
     wire::{IpAddress, Ipv4Address},
 };
 
-const SSID: &str = env!("SSID");
-const PASSWORD: &str = env!("PASSWORD");
+const SSID: &str = "EspressifSystems";
+const PASSWORD: &str = "Espressif32";
+
+// const SSID: &str = env!("SSID");
+// const PASSWORD: &str = env!("PASSWORD");
 
 #[entry]
 fn main() -> ! {
@@ -53,10 +58,12 @@ fn main() -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
+    let rng = Rng::new(peripherals.RNG);
+
     let init = initialize(
         EspWifiFor::Wifi,
         timg0.timer0,
-        Rng::new(peripherals.RNG),
+        rng,
         peripherals.RADIO_CLK,
     )
     .unwrap();
@@ -122,6 +129,105 @@ fn main() -> ! {
 
     let mut rx_buffer = [0u8; 1536];
     let mut tx_buffer = [0u8; 1536];
+    let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
+
+    let mut rx_buffer2 = [0u8; 1536];
+    let mut tx_buffer2 = [0u8; 1536];
+    let mut socket2 = wifi_stack.get_socket(&mut rx_buffer2, &mut tx_buffer2);
+
+    println!("Making HTTP request");
+    socket.work();
+
+    socket
+        .open(IpAddress::Ipv4(Ipv4Address::new(142, 250, 185, 115)), 80)
+        .unwrap();
+
+    socket
+        .write(b"GET / HTTP/1.0\r\nHost: www.mobile-j.de\r\n\r\n")
+        .unwrap();
+    socket.flush().unwrap();
+
+    let wait_end = current_millis() + 20 * 1000;
+    loop {
+        let mut buffer = [0u8; 512];
+        if let Ok(len) = socket.read(&mut buffer) {
+            let to_print = unsafe { core::str::from_utf8_unchecked(&buffer[..len]) };
+            print!("{}", to_print);
+        } else {
+            break;
+        }
+
+        if current_millis() > wait_end {
+            println!("Timeout");
+            break;
+        }
+    }
+    println!();
+
+    socket.disconnect();
+    
+    // drop dependant Sockets.
+    drop(socket);
+    
+    // De-initialize and release `WifiStack` and controller
+    let deinit = deinitialize(EspWifiFor::Wifi, controller, wifi_stack).unwrap();
+
+    let init = reinitialize(
+        EspWifiFor::Wifi,
+        deinit,
+    )
+    .unwrap();
+
+    let mut socket_set_entries: [SocketStorage; 3] = Default::default();
+    let (iface, device, mut controller, sockets) =
+        create_network_interface(&init, &mut wifi, WifiStaDevice, &mut socket_set_entries).unwrap();
+    let mut wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
+
+    let res = controller.set_configuration(&client_config);
+    println!("wifi_set_configuration returned {:?}", res);
+    controller.start().unwrap();
+    println!("is wifi started: {:?}", controller.is_started());
+
+    println!("Start Wifi Scan");
+    let res: Result<(heapless::Vec<AccessPointInfo, 10>, usize), WifiError> = controller.scan_n();
+    if let Ok((res, _count)) = res {
+        for ap in res {
+            println!("{:?}", ap);
+        }
+    }
+
+    println!("{:?}", controller.get_capabilities());
+    println!("wifi_connect {:?}", controller.connect());
+
+    // wait to get connected
+    println!("Wait to get connected");
+    loop {
+        let res = controller.is_connected();
+        match res {
+            Ok(connected) => {
+                if connected {
+                    break;
+                }
+            }
+            Err(err) => {
+                println!("{:?}", err);
+                loop {}
+            }
+        }
+    }
+    println!("{:?}", controller.is_connected());
+
+    // wait for getting an ip address
+    println!("Wait to get an ip address");
+    loop {
+        wifi_stack.work();
+
+        if wifi_stack.is_iface_up() {
+            println!("got ip {:?}", wifi_stack.get_ip_info());
+            break;
+        }
+    }
+
     let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
 
     loop {
