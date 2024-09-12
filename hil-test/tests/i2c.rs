@@ -1,17 +1,4 @@
 //! I2C test
-//!
-//! Folowing pins are used:
-//! SDA     GPIO2   (esp32s2 and esp32s3)
-//!         GPIO6   (esp32c6)
-//!         GPIO18  (esp32c2)
-//!         GPIO4   (esp32h2 and esp32c3)
-//!         GPIO32  (esp32)
-//!
-//! SCL     GPIO3   (esp32s2 and esp32s3)
-//!         GPIO7   (esp32c6 and esp32c3)
-//!         GPIO22  (esp32h2)
-//!         GPIO19  (esp32c2)
-//!         GPIO33  (esp32)
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -50,6 +37,11 @@ mod tests {
     fn test_read_cali(mut ctx: Context) {
         let mut read_data = [0u8; 22];
 
+        // have a failing read which might could leave the peripheral in an undesirable
+        // state
+        ctx.i2c.write_read(0x55, &[0xaa], &mut read_data).ok();
+
+        // do the real read which should succeed
         ctx.i2c.write_read(0x77, &[0xaa], &mut read_data).ok();
 
         assert_ne!(read_data, [0u8; 22])

@@ -38,7 +38,7 @@ mod fmt;
 
 #[cfg(not(feature = "esp32"))]
 use esp_hal::timer::systimer::Alarm;
-use esp_hal::timer::{timg::Timer as TimgTimer, ErasedTimer};
+use esp_hal::timer::{timg::Timer as TimgTimer, AnyTimer};
 pub use macros::main;
 
 #[cfg(feature = "executors")]
@@ -69,30 +69,30 @@ pub trait TimerCollection {
 
 /// Helper trait to reduce boilerplate.
 ///
-/// We can't blanket-implement for `Into<ErasedTimer>` because of possible
+/// We can't blanket-implement for `Into<AnyTimer>` because of possible
 /// conflicting implementations.
-trait IntoErasedTimer: Into<ErasedTimer> {}
+trait IntoAnyTimer: Into<AnyTimer> {}
 
-impl IntoErasedTimer for ErasedTimer {}
+impl IntoAnyTimer for AnyTimer {}
 
-impl<T, DM> IntoErasedTimer for TimgTimer<T, DM>
+impl<T, DM> IntoAnyTimer for TimgTimer<T, DM>
 where
     DM: esp_hal::Mode,
-    Self: Into<ErasedTimer>,
+    Self: Into<AnyTimer>,
 {
 }
 
 #[cfg(not(feature = "esp32"))]
-impl<T, DM, COMP, UNIT> IntoErasedTimer for Alarm<'_, T, DM, COMP, UNIT>
+impl<T, DM, COMP, UNIT> IntoAnyTimer for Alarm<'_, T, DM, COMP, UNIT>
 where
     DM: esp_hal::Mode,
-    Self: Into<ErasedTimer>,
+    Self: Into<AnyTimer>,
 {
 }
 
 impl<T> TimerCollection for T
 where
-    T: IntoErasedTimer,
+    T: IntoAnyTimer,
 {
     fn timers(self) -> &'static mut [Timer] {
         Timer::new(self.into()).timers()
@@ -122,7 +122,7 @@ macro_rules! impl_array {
     ($n:literal) => {
         impl<T> TimerCollection for [T; $n]
         where
-            T: IntoErasedTimer,
+            T: IntoAnyTimer,
         {
             fn timers(self) -> &'static mut [Timer] {
                 mk_static!([Timer; $n], self.map(|t| Timer::new(t.into())))
@@ -143,11 +143,11 @@ impl_array!(4);
 ///
 /// - A timg `Timer` instance
 /// - A systimer `Alarm` instance
-/// - An `ErasedTimer` instance
+/// - An `AnyTimer` instance
 /// - A `OneShotTimer` instance
 /// - A mutable static slice of `OneShotTimer` instances
 /// - A mutable static array of `OneShotTimer` instances
-/// - A 2, 3, 4 element array of `ErasedTimer` instances
+/// - A 2, 3, 4 element array of `AnyTimer` instances
 ///
 /// # Examples
 ///

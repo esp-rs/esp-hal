@@ -12,12 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `have-strchr` feature to disable including `strchr` (#2096)
 
 ### Changed
+
 - esp-wifi now allocates memory from the global allocator provided by `esp-alloc` (#2099)
 
 ### Fixed
+
 - Feature `wifi-logs` doesn't break the build anymore (#2117)
 
 ### Removed
+
+- Removed the `clocks` parameter from `esp_wifi::initialize` (#1999)
 
 ## 0.9.1 - 2024-09-03
 
@@ -42,8 +46,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Removed
-
-- Removed the `clocks` parameter from `esp_wifi::initialize` (#1999)
 
 ## 0.8.0 - 2024-08-29
 

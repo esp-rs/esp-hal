@@ -2,16 +2,13 @@
 //!
 //! The following wiring is assumed:
 //! - SCLK => GPIO0
-//! - MISO => GPIO2
-//! - MOSI => GPIO4
+//! - MISO/MOSI => GPIO2
 //! - CS   => GPIO5
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
 //!
 //! This example transfers data via SPI.
-//! Connect MISO and MOSI pins to see the outgoing data is read as incoming
-//! data.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -21,7 +18,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::{AnyPin, Io},
+    gpio::Io,
     prelude::*,
     spi::{master::Spi, SpiMode},
 };
@@ -33,19 +30,14 @@ fn main() -> ! {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let sclk = io.pins.gpio0;
-    let miso = io.pins.gpio2;
-    let mosi = io.pins.gpio4;
+    let miso_mosi = io.pins.gpio2;
     let cs = io.pins.gpio5;
 
-    let miso = AnyPin::new(miso);
-    let mosi = AnyPin::new(mosi);
+    let miso = miso_mosi.peripheral_input();
+    let mosi = miso_mosi.into_peripheral_output();
 
-    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0).with_pins(
-        Some(sclk),
-        Some(mosi),
-        Some(miso),
-        Some(cs),
-    );
+    let mut spi =
+        Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0).with_pins(sclk, mosi, miso, cs);
 
     let delay = Delay::new();
 

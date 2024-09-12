@@ -75,19 +75,12 @@ fn main() -> ! {
         }
     }
 
-    let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(256, 320);
+    let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(320, 256);
     let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
     let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-        .with_pins(
-            Some(sclk),
-            Some(mosi),
-            Some(miso),
-            Some(sio2),
-            Some(sio3),
-            Some(cs),
-        )
+        .with_pins(sclk, mosi, miso, sio2, sio3, cs)
         .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
     let delay = Delay::new();

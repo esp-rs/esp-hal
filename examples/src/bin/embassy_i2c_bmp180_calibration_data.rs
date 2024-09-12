@@ -3,7 +3,7 @@
 //! This example dumps the calibration data from a BMP180 sensor by reading by reading
 //! with the direct I2C API and the embedded-hal-async I2C API.
 //!
-//! Folowing pins are used:
+//! Following pins are used:
 //! - SDA => GPIO4
 //! - SCL => GPIO5
 //!

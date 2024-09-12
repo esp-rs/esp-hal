@@ -94,12 +94,12 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::Uart;
-//! use esp_hal::gpio::{AnyPin, Io};
+//! use esp_hal::gpio::Io;
 //!
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
-//! let rx = AnyPin::new_inverted(io.pins.gpio2);
-//! let tx = AnyPin::new_inverted(io.pins.gpio1);
+//! let rx = io.pins.gpio2.peripheral_input().inverted();
+//! let tx = io.pins.gpio1.into_peripheral_output().inverted();
 //! let mut uart1 = Uart::new(
 //!     peripherals.UART1,
 //!     rx,
@@ -112,7 +112,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{UartTx, UartRx};
-//! use esp_hal::gpio::{AnyPin, Io};
+//! use esp_hal::gpio::Io;
 //!
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
@@ -131,9 +131,9 @@ use core::marker::PhantomData;
 use self::config::Config;
 use crate::{
     clock::Clocks,
-    gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
+    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
     interrupt::InterruptHandler,
-    peripheral::Peripheral,
+    peripheral::{Peripheral, PeripheralRef},
     peripherals::{uart0::RegisterBlock, Interrupt},
     private::Internal,
     system::PeripheralClockControl,
@@ -149,67 +149,6 @@ const UART_FIFO_SIZE: u16 = 128;
 use crate::soc::constants::RC_FAST_CLK;
 #[cfg(any(esp32, esp32s2))]
 use crate::soc::constants::REF_TICK;
-
-// Default TX and RX pins for Uart/Serial communication (UART0)
-cfg_if::cfg_if! {
-    if #[cfg(esp32)] {
-        /// Default TX pin for UART0 on ESP32.
-        /// Corresponds to GPIO1.
-        pub type DefaultTxPin = crate::gpio::GpioPin<1>;
-
-        /// Default RX pin for UART0 on ESP32.
-        /// Corresponds to GPIO3.
-        pub type DefaultRxPin = crate::gpio::GpioPin<3>;
-    } else if #[cfg(esp32c2)] {
-        /// Default TX pin for UART0 on ESP32-C2.
-        /// Corresponds to GPIO20.
-        pub type DefaultTxPin = crate::gpio::GpioPin<20>;
-
-        /// Default RX pin for UART0 on ESP32-C2.
-        /// Corresponds to GPIO19.
-        pub type DefaultRxPin = crate::gpio::GpioPin<19>;
-    } else if #[cfg(esp32c3)] {
-        /// Default TX pin for UART0 on ESP32-C3.
-        /// Corresponds to GPIO21.
-        pub type DefaultTxPin = crate::gpio::GpioPin<21>;
-
-        /// Default RX pin for UART0 on ESP32-C3.
-        /// Corresponds to GPIO20.
-        pub type DefaultRxPin = crate::gpio::GpioPin<20>;
-    } else if #[cfg(esp32c6)] {
-        /// Default TX pin for UART0 on ESP32-C6.
-        /// Corresponds to GPIO16.
-        pub type DefaultTxPin = crate::gpio::GpioPin<16>;
-
-        /// Default RX pin for UART0 on ESP32-C6.
-        /// Corresponds to GPIO17.
-        pub type DefaultRxPin = crate::gpio::GpioPin<17>;
-    } else if #[cfg(esp32h2)] {
-        /// Default TX pin for UART0 on ESP32-H2.
-        /// Corresponds to GPIO24.
-        pub type DefaultTxPin = crate::gpio::GpioPin<24>;
-
-        /// Default RX pin for UART0 on ESP32-H2.
-        /// Corresponds to GPIO23.
-        pub type DefaultRxPin = crate::gpio::GpioPin<23>;
-    } else if #[cfg(esp32s2)] {
-        /// Default TX pin for UART0 on ESP32-S2.
-        /// Corresponds to GPIO43.
-        pub type DefaultTxPin = crate::gpio::GpioPin<43>;
-
-        /// Default RX pin for UART0 on ESP32-S2.
-        /// Corresponds to GPIO44.
-        pub type DefaultRxPin = crate::gpio::GpioPin<44>;
-    } else if #[cfg(esp32s3)] {
-        /// Default TX pin for UART0 on ESP32-S3.
-        /// Corresponds to GPIO43.
-        pub type DefaultTxPin = crate::gpio::GpioPin<43>;
-
-        /// Default RX pin for UART0 on ESP32-S3.
-        /// Corresponds to GPIO44.
-        pub type DefaultRxPin = crate::gpio::GpioPin<44>;
-    }
-}
 
 /// UART Error
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -494,6 +433,77 @@ pub mod config {
     }
 }
 
+struct UartBuilder<'d, T, M> {
+    _uart: PeripheralRef<'d, T>,
+    phantom: PhantomData<M>,
+}
+
+impl<'d, T, M> UartBuilder<'d, T, M>
+where
+    T: Instance,
+    M: Mode,
+{
+    fn new(uart: impl Peripheral<P = T> + 'd) -> Self {
+        crate::into_ref!(uart);
+        Self {
+            _uart: uart,
+            phantom: PhantomData,
+        }
+    }
+
+    fn with_rx<RX: PeripheralInput>(self, rx: impl Peripheral<P = RX> + 'd) -> Self {
+        crate::into_ref!(rx);
+        rx.init_input(Pull::Up, Internal);
+        rx.connect_input_to_peripheral(T::rx_signal(), Internal);
+
+        self
+    }
+
+    fn with_tx<TX: PeripheralOutput>(self, tx: impl Peripheral<P = TX> + 'd) -> Self {
+        crate::into_ref!(tx);
+        tx.set_to_push_pull_output(Internal);
+        tx.connect_peripheral_to_output(T::tx_signal(), Internal);
+
+        self
+    }
+
+    fn init(self, config: Config) -> Result<Uart<'d, T, M>, Error> {
+        let mut serial = Uart {
+            rx: UartRx::new_inner(&config),
+            tx: UartTx::new_inner(),
+        };
+        serial.init();
+
+        serial
+            .rx
+            .set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)?;
+        serial.rx.set_rx_timeout(config.rx_timeout)?;
+        serial.change_baud_internal(config.baudrate, config.clock_source);
+        serial.change_data_bits(config.data_bits);
+        serial.change_parity(config.parity);
+        serial.change_stop_bits(config.stop_bits);
+
+        // Setting err_wr_mask stops uart from storing data when data is wrong according
+        // to reference manual
+        T::register_block()
+            .conf0()
+            .modify(|_, w| w.err_wr_mask().set_bit());
+
+        // Reset Tx/Rx FIFOs
+        serial.rxfifo_reset();
+        serial.txfifo_reset();
+        crate::rom::ets_delay_us(15);
+
+        // Make sure we are starting in a "clean state" - previous operations might have
+        // run into error conditions
+        T::register_block()
+            .int_clr()
+            .write(|w| unsafe { w.bits(u32::MAX) });
+
+        Ok(serial)
+    }
+}
+
 /// UART (Full-duplex)
 pub struct Uart<'d, T, M> {
     rx: UartRx<'d, T, M>,
@@ -526,7 +536,7 @@ where
     }
 
     /// Configure RTS pin
-    pub fn with_rts<RTS: OutputPin>(self, rts: impl Peripheral<P = RTS> + 'd) -> Self {
+    pub fn with_rts<RTS: PeripheralOutput>(self, rts: impl Peripheral<P = RTS> + 'd) -> Self {
         crate::into_ref!(rts);
         rts.set_to_push_pull_output(Internal);
         rts.connect_peripheral_to_output(T::rts_signal(), Internal);
@@ -571,7 +581,7 @@ where
     T: Instance + 'd,
 {
     /// Create a new UART TX instance in [`Blocking`] mode.
-    pub fn new<TX: OutputPin>(
+    pub fn new<TX: PeripheralOutput>(
         uart: impl Peripheral<P = T> + 'd,
         tx: impl Peripheral<P = TX> + 'd,
     ) -> Result<Self, Error> {
@@ -580,16 +590,15 @@ where
 
     /// Create a new UART TX instance with configuration options in
     /// [`Blocking`] mode.
-    pub fn new_with_config<TX: OutputPin>(
+    pub fn new_with_config<TX: PeripheralOutput>(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
         tx: impl Peripheral<P = TX> + 'd,
     ) -> Result<Self, Error> {
-        crate::into_ref!(tx);
-        tx.set_to_push_pull_output(Internal);
-        tx.connect_peripheral_to_output(T::tx_signal(), Internal);
-
-        let (_, uart_tx) = Uart::<'d, T, Blocking>::new_with_config_inner(uart, config)?.split();
+        let (_, uart_tx) = UartBuilder::<'d, T, Blocking>::new(uart)
+            .with_tx(tx)
+            .init(config)?
+            .split();
 
         Ok(uart_tx)
     }
@@ -600,20 +609,20 @@ where
     T: Instance,
     M: Mode,
 {
-    fn new_inner(#[cfg(not(esp32))] symbol_len: u8) -> Self {
+    fn new_inner(_config: &Config) -> Self {
         Self {
             phantom: PhantomData,
             at_cmd_config: None,
             rx_timeout_config: None,
             #[cfg(not(esp32))]
-            symbol_len,
+            symbol_len: _config.symbol_length(),
         }
     }
 
     /// Configure CTS pin
-    pub fn with_cts<CTS: InputPin>(self, cts: impl Peripheral<P = CTS> + 'd) -> Self {
+    pub fn with_cts<CTS: PeripheralInput>(self, cts: impl Peripheral<P = CTS> + 'd) -> Self {
         crate::into_ref!(cts);
-        cts.init_input(false, false, Internal);
+        cts.init_input(Pull::None, Internal);
         cts.connect_input_to_peripheral(T::cts_signal(), Internal);
 
         self
@@ -726,22 +735,31 @@ where
     /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, esp32s2`, esp32s3`: The
     ///   value you pass times the symbol size must be <= **0x3FF**
     fn set_rx_timeout(&mut self, timeout: Option<u8>) -> Result<(), Error> {
-        #[cfg(esp32)]
-        const MAX_THRHD: u8 = 0x7F; // 7 bits
-        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s2, esp32s3))]
-        const MAX_THRHD: u16 = 0x3FF; // 10 bits
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                const MAX_THRHD: u8 = 0x7F; // 7 bits
+            } else {
+                const MAX_THRHD: u16 = 0x3FF; // 10 bits
+            }
+        }
 
-        #[cfg(esp32)]
-        let reg_thrhd = &T::register_block().conf1();
-        #[cfg(any(esp32c6, esp32h2))]
-        let reg_thrhd = &T::register_block().tout_conf();
-        #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
-        let reg_thrhd = &T::register_block().mem_conf();
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                let reg_thrhd = &T::register_block().conf1();
+            } else if #[cfg(any(esp32c6, esp32h2))] {
+                let reg_thrhd = &T::register_block().tout_conf();
+            } else {
+                let reg_thrhd = &T::register_block().mem_conf();
+            }
+        }
 
-        #[cfg(any(esp32c6, esp32h2))]
-        let reg_en = &T::register_block().tout_conf();
-        #[cfg(any(esp32, esp32c2, esp32c3, esp32s2, esp32s3))]
-        let reg_en = &T::register_block().conf1();
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c6, esp32h2))] {
+                let reg_en = &T::register_block().tout_conf();
+            } else {
+                let reg_en = &T::register_block().conf1();
+            }
+        }
 
         match timeout {
             None => {
@@ -776,7 +794,7 @@ where
     T: Instance + 'd,
 {
     /// Create a new UART RX instance in [`Blocking`] mode.
-    pub fn new<RX: InputPin>(
+    pub fn new<RX: PeripheralInput>(
         uart: impl Peripheral<P = T> + 'd,
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Result<Self, Error> {
@@ -785,16 +803,12 @@ where
 
     /// Create a new UART RX instance with configuration options in
     /// [`Blocking`] mode.
-    pub fn new_with_config<RX: InputPin>(
+    pub fn new_with_config<RX: PeripheralInput>(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
         rx: impl Peripheral<P = RX> + 'd,
     ) -> Result<Self, Error> {
-        crate::into_ref!(rx);
-        rx.init_input(false, false, Internal);
-        rx.connect_input_to_peripheral(T::rx_signal(), Internal);
-
-        let (uart_rx, _) = Uart::<'d, T, Blocking>::new_with_config_inner(uart, config)?.split();
+        let (uart_rx, _) = UartBuilder::new(uart).with_rx(rx).init(config)?.split();
 
         Ok(uart_rx)
     }
@@ -806,51 +820,27 @@ where
 {
     /// Create a new UART instance with configuration options in [`Blocking`]
     /// mode.
-    pub fn new_with_config<TX: OutputPin, RX: InputPin>(
+    pub fn new_with_config<TX: PeripheralOutput, RX: PeripheralInput>(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
         rx: impl Peripheral<P = RX> + 'd,
         tx: impl Peripheral<P = TX> + 'd,
     ) -> Result<Self, Error> {
-        crate::into_ref!(tx);
-        crate::into_ref!(rx);
-        tx.set_to_push_pull_output(Internal);
-        tx.connect_peripheral_to_output(T::tx_signal(), Internal);
+        let this = UartBuilder::new(uart)
+            .with_tx(tx)
+            .with_rx(rx)
+            .init(config)?;
 
-        rx.init_input(false, false, Internal);
-        rx.connect_input_to_peripheral(T::rx_signal(), Internal);
-        Self::new_with_config_inner(uart, config)
+        Ok(this)
     }
 
     /// Create a new UART instance with defaults in [`Blocking`] mode.
-    pub fn new<TX: OutputPin, RX: InputPin>(
+    pub fn new<TX: PeripheralOutput, RX: PeripheralInput>(
         uart: impl Peripheral<P = T> + 'd,
         rx: impl Peripheral<P = RX> + 'd,
         tx: impl Peripheral<P = TX> + 'd,
     ) -> Result<Self, Error> {
-        crate::into_ref!(tx);
-        crate::into_ref!(rx);
-        tx.set_to_push_pull_output(Internal);
-        tx.connect_peripheral_to_output(T::tx_signal(), Internal);
-
-        rx.init_input(false, false, Internal);
-        rx.connect_input_to_peripheral(T::rx_signal(), Internal);
-        Self::new_inner(uart)
-    }
-
-    /// Create a new UART instance with defaults in [`Blocking`] mode.
-    /// Verify that the default pins (DefaultTxPin and DefaultRxPin) are used.
-    pub fn new_with_default_pins(
-        uart: impl Peripheral<P = T> + 'd,
-        rx: &mut DefaultRxPin,
-        tx: &mut DefaultTxPin,
-    ) -> Result<Self, Error> {
-        tx.set_to_push_pull_output(Internal);
-        tx.connect_peripheral_to_output(T::tx_signal(), Internal);
-
-        rx.init_input(false, false, Internal);
-        rx.connect_input_to_peripheral(T::rx_signal(), Internal);
-        Self::new_inner(uart)
+        Self::new_with_config(uart, Default::default(), rx, tx)
     }
 }
 
@@ -859,49 +849,6 @@ where
     T: Instance + 'd,
     M: Mode,
 {
-    pub(crate) fn new_with_config_inner(
-        _uart: impl Peripheral<P = T> + 'd,
-        config: Config,
-    ) -> Result<Self, Error> {
-        Self::init();
-
-        let mut serial = Uart {
-            rx: UartRx::new_inner(
-                #[cfg(not(esp32))]
-                config.symbol_length(),
-            ),
-            tx: UartTx::new_inner(),
-        };
-
-        serial
-            .rx
-            .set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)?;
-        serial.rx.set_rx_timeout(config.rx_timeout)?;
-        serial.change_baud_internal(config.baudrate, config.clock_source);
-        serial.change_data_bits(config.data_bits);
-        serial.change_parity(config.parity);
-        serial.change_stop_bits(config.stop_bits);
-
-        // Setting err_wr_mask stops uart from storing data when data is wrong according
-        // to reference manual
-        T::register_block()
-            .conf0()
-            .modify(|_, w| w.err_wr_mask().set_bit());
-
-        // Reset Tx/Rx FIFOs
-        serial.rxfifo_reset();
-        serial.txfifo_reset();
-        crate::rom::ets_delay_us(15);
-
-        // Make sure we are starting in a "clean state" - previous operations might have
-        // run into error conditions
-        T::register_block()
-            .int_clr()
-            .write(|w| unsafe { w.bits(u32::MAX) });
-
-        Ok(serial)
-    }
-
     fn inner_set_interrupt_handler(&mut self, handler: InterruptHandler) {
         unsafe {
             crate::interrupt::bind_interrupt(T::interrupt(), handler.handler());
@@ -909,21 +856,17 @@ where
         }
     }
 
-    fn new_inner(uart: impl Peripheral<P = T> + 'd) -> Result<Self, Error> {
-        Self::new_with_config_inner(uart, Default::default())
-    }
-
     /// Configure CTS pin
-    pub fn with_cts<CTS: InputPin>(self, cts: impl Peripheral<P = CTS> + 'd) -> Self {
+    pub fn with_cts<CTS: PeripheralInput>(self, cts: impl Peripheral<P = CTS> + 'd) -> Self {
         crate::into_ref!(cts);
-        cts.init_input(false, false, Internal);
+        cts.init_input(Pull::None, Internal);
         cts.connect_input_to_peripheral(T::cts_signal(), Internal);
 
         self
     }
 
     /// Configure RTS pin
-    pub fn with_rts<RTS: OutputPin>(self, rts: impl Peripheral<P = RTS> + 'd) -> Self {
+    pub fn with_rts<RTS: PeripheralOutput>(self, rts: impl Peripheral<P = RTS> + 'd) -> Self {
         crate::into_ref!(rts);
         rts.set_to_push_pull_output(Internal);
         rts.connect_peripheral_to_output(T::rts_signal(), Internal);
@@ -1273,23 +1216,6 @@ where
             .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
     }
 
-    #[cfg(any(esp32c2, esp32c3, esp32s3))]
-    #[inline(always)]
-    fn init() {
-        let system = unsafe { crate::peripherals::SYSTEM::steal() };
-        if !system.perip_clk_en0().read().uart_mem_clk_en().bit() {
-            system
-                .perip_clk_en0()
-                .modify(|_, w| w.uart_mem_clk_en().set_bit());
-        }
-
-        // initialize peripheral by setting clk_enable and clearing uart_reset bits
-        T::enable_peripheral();
-        Self::uart_peripheral_reset();
-        T::disable_rx_interrupts();
-        T::disable_tx_interrupts();
-    }
-
     /// Modify UART baud rate and reset TX/RX fifo.
     pub fn change_baud(&mut self, baudrate: u32, clock_source: ClockSource) {
         self.change_baud_internal(baudrate, clock_source);
@@ -1297,23 +1223,25 @@ where
         self.rxfifo_reset();
     }
 
-    #[cfg(any(esp32c6, esp32h2))]
     #[inline(always)]
-    fn init() {
-        T::register_block()
-            .conf0()
-            .modify(|_, w| w.mem_clk_en().set_bit());
+    fn init(&self) {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32s2))] {
+                // Nothing to do
+            } else if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
+                let system = unsafe { crate::peripherals::SYSTEM::steal() };
+                if !system.perip_clk_en0().read().uart_mem_clk_en().bit() {
+                    system
+                        .perip_clk_en0()
+                        .modify(|_, w| w.uart_mem_clk_en().set_bit());
+                }
+            } else {
+                T::register_block()
+                    .conf0()
+                    .modify(|_, w| w.mem_clk_en().set_bit());
+            }
+        };
 
-        // initialize peripheral by setting clk_enable and clearing uart_reset bits
-        T::enable_peripheral();
-        Self::uart_peripheral_reset();
-        T::disable_rx_interrupts();
-        T::disable_tx_interrupts();
-    }
-
-    #[cfg(any(esp32, esp32s2))]
-    #[inline(always)]
-    fn init() {
         T::enable_peripheral();
         Self::uart_peripheral_reset();
         T::disable_rx_interrupts();
@@ -2130,20 +2058,19 @@ mod asynch {
     {
         /// Create a new UART instance with configuration options in [`Async`]
         /// mode.
-        pub fn new_async_with_config<RX: InputPin, TX: OutputPin>(
+        pub fn new_async_with_config<RX: PeripheralInput, TX: PeripheralOutput>(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
             rx: impl Peripheral<P = RX> + 'd,
             tx: impl Peripheral<P = TX> + 'd,
         ) -> Result<Self, Error> {
-            crate::into_ref!(rx);
-            crate::into_ref!(tx);
-            tx.set_to_push_pull_output(Internal);
-            tx.connect_peripheral_to_output(T::tx_signal(), Internal);
-
-            rx.init_input(false, false, Internal);
-            rx.connect_input_to_peripheral(T::rx_signal(), Internal);
-            let mut this = Self::new_with_config_inner(uart, config)?;
+            // FIXME: at the time of writing, the order of the pin assignments matters:
+            // first binding RX, then TX makes tests fail. This is bad and needs to be
+            // figured out.
+            let mut this = UartBuilder::new(uart)
+                .with_tx(tx)
+                .with_rx(rx)
+                .init(config)?;
 
             this.inner_set_interrupt_handler(match T::uart_number() {
                 #[cfg(uart0)]
@@ -2159,19 +2086,10 @@ mod asynch {
         }
 
         /// Create a new UART instance with defaults in [`Async`] mode.
-        pub fn new_async<RX: InputPin, TX: OutputPin>(
+        pub fn new_async<RX: PeripheralInput, TX: PeripheralOutput>(
             uart: impl Peripheral<P = T> + 'd,
             rx: impl Peripheral<P = RX> + 'd,
             tx: impl Peripheral<P = TX> + 'd,
-        ) -> Result<Self, Error> {
-            Self::new_async_with_config(uart, Default::default(), rx, tx)
-        }
-
-        /// Create a new UART instance with defaults in [`Async`] mode.
-        pub fn new_async_with_default_pins(
-            uart: impl Peripheral<P = T> + 'd,
-            rx: DefaultRxPin,
-            tx: DefaultTxPin,
         ) -> Result<Self, Error> {
             Self::new_async_with_config(uart, Default::default(), rx, tx)
         }
@@ -2203,7 +2121,7 @@ mod asynch {
         T: Instance + 'd,
     {
         /// Create a new UART TX instance in [`Async`] mode.
-        pub fn new_async<TX: OutputPin>(
+        pub fn new_async<TX: PeripheralOutput>(
             uart: impl Peripheral<P = T> + 'd,
             tx: impl Peripheral<P = TX> + 'd,
         ) -> Result<Self, Error> {
@@ -2212,16 +2130,12 @@ mod asynch {
 
         /// Create a new UART TX instance with configuration options in
         /// [`Async`] mode.
-        pub fn new_async_with_config<TX: OutputPin>(
+        pub fn new_async_with_config<TX: PeripheralOutput>(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
             tx: impl Peripheral<P = TX> + 'd,
         ) -> Result<Self, Error> {
-            crate::into_ref!(tx);
-            tx.set_to_push_pull_output(Internal);
-            tx.connect_peripheral_to_output(T::tx_signal(), Internal);
-
-            let mut uart = Uart::<'d, T, Async>::new_with_config_inner(uart, config)?;
+            let mut uart = UartBuilder::new(uart).with_tx(tx).init(config)?;
 
             uart.inner_set_interrupt_handler(match T::uart_number() {
                 #[cfg(uart0)]
@@ -2288,7 +2202,7 @@ mod asynch {
         T: Instance + 'd,
     {
         /// Create a new UART RX instance in [`Async`] mode.
-        pub fn new_async<RX: InputPin>(
+        pub fn new_async<RX: PeripheralInput>(
             uart: impl Peripheral<P = T> + 'd,
             rx: impl Peripheral<P = RX> + 'd,
         ) -> Result<Self, Error> {
@@ -2297,16 +2211,12 @@ mod asynch {
 
         /// Create a new UART RX instance with configuration options in
         /// [`Async`] mode.
-        pub fn new_async_with_config<RX: InputPin>(
+        pub fn new_async_with_config<RX: PeripheralInput>(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
             rx: impl Peripheral<P = RX> + 'd,
         ) -> Result<Self, Error> {
-            crate::into_ref!(rx);
-            rx.init_input(false, false, Internal);
-            rx.connect_input_to_peripheral(T::rx_signal(), Internal);
-
-            let mut uart = Uart::<'d, T, Async>::new_with_config_inner(uart, config)?;
+            let mut uart = UartBuilder::new(uart).with_rx(rx).init(config)?;
 
             uart.inner_set_interrupt_handler(match T::uart_number() {
                 #[cfg(uart0)]

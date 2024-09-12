@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Implement `embedded-hal` output pin traits for `DummyPin` (#2019)
+- Introduce traits for the DMA buffer objects (#1976)
+- Implement `embedded-hal` output pin traits for `NoPin` (#2019, #2133)
 - Added `esp_hal::init` to simplify HAL initialisation (#1970, #1999)
 - Added GpioPin::degrade to create ErasePins easily. Same for AnyPin by accident. (#2075)
 - Added missing functions to `Flex`: `unlisten`, `is_interrupt_set`, `wakeup_enable`, `wait_for_high`, `wait_for_low`, `wait_for_rising_edge`, `wait_for_falling_edge`, `wait_for_any_edge`. (#2075)
@@ -21,7 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Previously unavailable memory is available via `.dram2_uninit` section (#2079)
 - You can now use `Input`, `Output`, `OutputOpenDrain` and `Flex` pins as EXTI and RTCIO wakeup sources (#2095)
 - Added `Rtc::set_current_time` to allow setting RTC time, and `Rtc::current_time` to getting RTC time while taking into account boot time (#1883)
-- Add RMT fractional divider support.
+- Added RMT fractional divider support.
+- Added APIs to allow connecting signals through the GPIO matrix. (#2128)
 
 ### Changed
 
@@ -29,7 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reordered RX-TX pairs in all APIs to be consistent (#2074)
 - Make saving and restoring SHA digest state an explicit operation (#2049)
 - `Delay::new()` is now a `const` function (#1999)
-- You can now create an `AnyPin` out of an `ErasedPin`. (#2072)
 - `Input`, `Output`, `OutputOpenDrain` and `Flex` are now type-erased by default. Use the new `new_typed` constructor to keep using the ZST pin types. (#2075)
 - To avoid confusion with the `Rtc::current_time` wall clock time APIs, we've renamed `esp_hal::time::current_time` to `esp_hal::time::now`. (#2091)
 - Renamed `touch::Continous` to `touch::Continuous`. (#2094)
@@ -37,6 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The (previously undocumented) `ErasedPin` enum has been replaced with the `ErasedPin` struct. (#2094)
 - Renamed and merged `Rtc::get_time_us` and `Rtc::get_time_ms` into `Rtc::time_since_boot` (#1883)
 - ESP32: Added support for touch sensing on GPIO32 and 33 (#2109)
+- Replaced `AnyPin` with `InputSignal` and `OutputSignal` and renamed `ErasedPin` to `AnyPin` (#2128)
+- Replaced the `ErasedTimer` enum with the `AnyTimer` struct. (#?)
+- Changed the parameters of `Spi::with_pins` to no longer be optional (#2133)
+- Renamed `DummyPin` to `NoPin` and removed all internal logic from it. (#2133)
+- The `NO_PIN` constant has been removed. (#2133)
 
 ### Fixed
 
@@ -45,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue with LCD_CAM i8080 where it would send double the clocks in 16bit mode (#2085)
 - Fix i2c embedded-hal transaction (#2028)
 - Fix SPI DMA alternating `write` and `read` for ESP32 and ESP32-S2 (#2131)
+- Fix I2C ending up in a state when only re-creating the peripheral makes it useable again (#2141)
 
 ### Removed
 
@@ -56,6 +63,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `AnyInputOnlyPin` in favour of `AnyPin`. (#2071)
 - Removed the following functions from `GpioPin`: `is_high`, `is_low`, `set_high`, `set_low`, `set_state`, `is_set_high`, `is_set_low`, `toggle`. (#2094)
 - Removed `Rtc::get_time_raw` (#1883)
+- Removed `_with_default_pins` UART constructors (#2132)
+- Removed `uart::{DefaultRxPin, DefaultTxPin}` (#2132)
+- Removed `PcntSource` and `PcntInputConfig`. (#2134)
 
 ## [0.20.1] - 2024-08-30
 

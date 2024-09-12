@@ -16,6 +16,7 @@ use embassy_executor::Spawner;
 use embassy_futures::join::join3;
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_time::{Duration, Timer};
+use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{prelude::*, timer::timg::TimerGroup};
 use esp_wifi::ble::controller::asynch::BleConnector;
@@ -38,6 +39,9 @@ async fn main(_s: Spawner) {
         config.cpu_clock = CpuClock::max();
         config
     });
+
+    esp_alloc::heap_allocator!(72 * 1024);
+
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
     let init = esp_wifi::initialize(

@@ -35,10 +35,10 @@ use core::{
 /// dedicated struct is memory efficiency:
 ///
 /// Peripheral singletons are typically either zero-sized (for concrete
-/// peripherals like `PA9` or `Spi4`) or very small (for example `AnyPin` which
-/// is 1 byte). However `&mut T` is always 4 bytes for 32-bit targets, even if T
-/// is zero-sized. PeripheralRef stores a copy of `T` instead, so it's the same
-/// size.
+/// peripherals like `PA9` or `Spi4`) or very small (for example `AnyPin`
+/// which is 1 byte). However `&mut T` is always 4 bytes for 32-bit targets,
+/// even if T is zero-sized. PeripheralRef stores a copy of `T` instead, so it's
+/// the same size.
 ///
 /// but it is the size of `T` not the size
 /// of a pointer. This is useful if T is a zero sized type.

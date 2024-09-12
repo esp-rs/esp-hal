@@ -8,7 +8,7 @@
 use esp_hal::{
     dma::{Dma, DmaDescriptor, DmaPriority},
     dma_buffers,
-    gpio::DummyPin,
+    gpio::NoPin,
     lcd_cam::{
         lcd::i8080::{Command, Config, TxEightBits, I8080},
         LcdCam,
@@ -50,16 +50,7 @@ mod tests {
     fn test_i8080_8bit(ctx: Context<'static>) {
         let channel = ctx.dma.channel0.configure(false, DmaPriority::Priority0);
 
-        let pins = TxEightBits::new(
-            DummyPin::new(),
-            DummyPin::new(),
-            DummyPin::new(),
-            DummyPin::new(),
-            DummyPin::new(),
-            DummyPin::new(),
-            DummyPin::new(),
-            DummyPin::new(),
-        );
+        let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
 
         let mut i8080 = I8080::new(
             ctx.lcd_cam.lcd,
@@ -82,16 +73,7 @@ mod tests {
             .dma
             .channel0
             .configure_for_async(false, DmaPriority::Priority0);
-        let pins = TxEightBits::new(
-            DummyPin::new(),
-            DummyPin::new(),
-            DummyPin::new(),
-            DummyPin::new(),
-            DummyPin::new(),
-            DummyPin::new(),
-            DummyPin::new(),
-            DummyPin::new(),
-        );
+        let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
 
         let mut i8080 = I8080::new(
             ctx.lcd_cam.lcd,

@@ -21,8 +21,8 @@ use esp_backtrace as _;
 use esp_hal::{
     cpu_control::{CpuControl, Stack},
     get_core,
-    gpio::{ErasedPin, Io, Level, Output, Pin},
-    timer::{timg::TimerGroup, ErasedTimer},
+    gpio::{Io, Level, Output, Pin},
+    timer::{timg::TimerGroup, AnyTimer},
 };
 use esp_hal_embassy::Executor;
 use esp_println::println;
@@ -34,7 +34,7 @@ static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 /// duration of time.
 #[embassy_executor::task]
 async fn control_led(
-    mut led: Output<'static, ErasedPin>,
+    mut led: Output<'static>,
     control: &'static Signal<CriticalSectionRawMutex, bool>,
 ) {
     println!("Starting control_led() on core {}", get_core() as usize);
@@ -56,8 +56,8 @@ async fn main(_spawner: Spawner) {
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let timer0: ErasedTimer = timg0.timer0.into();
-    let timer1: ErasedTimer = timg0.timer1.into();
+    let timer0: AnyTimer = timg0.timer0.into();
+    let timer1: AnyTimer = timg0.timer1.into();
     esp_hal_embassy::init([timer0, timer1]);
 
     let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);

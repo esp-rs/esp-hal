@@ -1,13 +1,4 @@
 //! QSPI Write Test
-//!
-//! This uses PCNT to count the edges of the MOSI signal
-//!
-//! Following pins are used:
-//! MOSI    GPIO2 / GPIO9 (esp32s2 and esp32s3)
-//!
-//! PCNT    GPIO3 / GPIO10 (esp32s2 and esp32s3)
-//!
-//! Connect MOSI and PCNT pins.
 
 //% CHIPS: esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -17,12 +8,8 @@
 use esp_hal::{
     dma::{Channel, Dma, DmaPriority, DmaTxBuf},
     dma_buffers,
-    gpio::{AnyPin, Io, Pull},
-    pcnt::{
-        channel::{EdgeMode, PcntInputConfig, PcntSource},
-        unit::Unit,
-        Pcnt,
-    },
+    gpio::{interconnect::InputSignal, AnyPin, Io, NoPin},
+    pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
     prelude::*,
     spi::{
         master::{Address, Command, Spi, SpiDma},
@@ -47,10 +34,10 @@ cfg_if::cfg_if! {
 
 struct Context {
     spi: esp_hal::peripherals::SPI2,
+    pcnt_source: InputSignal,
     pcnt: esp_hal::peripherals::PCNT,
     dma_channel: Channel<'static, DmaChannel0, Blocking>,
-    mosi: AnyPin<'static>,
-    mosi_mirror: AnyPin<'static>,
+    mosi: AnyPin,
 }
 
 fn execute(
@@ -112,10 +99,9 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let (mosi, mosi_mirror) = hil_test::common_test_pins!(io);
+        let (mosi, _) = hil_test::common_test_pins!(io);
 
-        let mosi = AnyPin::new(mosi);
-        let mosi_mirror = AnyPin::new(mosi_mirror);
+        let mosi = mosi.degrade();
 
         let dma = Dma::new(peripherals.DMA);
 
@@ -131,10 +117,10 @@ mod tests {
 
         Context {
             spi: peripherals.SPI2,
+            pcnt_source: mosi.peripheral_input(),
             pcnt: peripherals.PCNT,
             dma_channel,
             mosi,
-            mosi_mirror,
         }
     }
 
@@ -142,23 +128,13 @@ mod tests {
     #[timeout(3)]
     fn test_spi_writes_correctly_to_pin_0(ctx: Context) {
         let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(
-                esp_hal::gpio::NO_PIN,
-                Some(ctx.mosi),
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-            )
+            .with_pins(NoPin, ctx.mosi, NoPin, NoPin, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
         let pcnt = Pcnt::new(ctx.pcnt);
         let unit = pcnt.unit0;
 
-        unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.mosi_mirror,
-            PcntInputConfig { pull: Pull::None },
-        ));
+        unit.channel0.set_edge_signal(ctx.pcnt_source);
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
@@ -169,23 +145,13 @@ mod tests {
     #[timeout(3)]
     fn test_spi_writes_correctly_to_pin_1(ctx: Context) {
         let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                Some(ctx.mosi),
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-            )
+            .with_pins(NoPin, NoPin, ctx.mosi, NoPin, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
         let pcnt = Pcnt::new(ctx.pcnt);
         let unit = pcnt.unit0;
 
-        unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.mosi_mirror,
-            PcntInputConfig { pull: Pull::None },
-        ));
+        unit.channel0.set_edge_signal(ctx.pcnt_source);
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
@@ -196,23 +162,13 @@ mod tests {
     #[timeout(3)]
     fn test_spi_writes_correctly_to_pin_2(ctx: Context) {
         let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                Some(ctx.mosi),
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-            )
+            .with_pins(NoPin, NoPin, NoPin, ctx.mosi, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
         let pcnt = Pcnt::new(ctx.pcnt);
         let unit = pcnt.unit0;
 
-        unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.mosi_mirror,
-            PcntInputConfig { pull: Pull::None },
-        ));
+        unit.channel0.set_edge_signal(ctx.pcnt_source);
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
@@ -223,23 +179,13 @@ mod tests {
     #[timeout(3)]
     fn test_spi_writes_correctly_to_pin_3(ctx: Context) {
         let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                Some(ctx.mosi),
-                esp_hal::gpio::NO_PIN,
-            )
+            .with_pins(NoPin, NoPin, NoPin, NoPin, ctx.mosi, NoPin)
             .with_dma(ctx.dma_channel);
 
         let pcnt = Pcnt::new(ctx.pcnt);
         let unit = pcnt.unit0;
 
-        unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.mosi_mirror,
-            PcntInputConfig { pull: Pull::None },
-        ));
+        unit.channel0.set_edge_signal(ctx.pcnt_source);
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 

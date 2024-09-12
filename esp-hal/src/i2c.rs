@@ -57,7 +57,7 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
+    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::i2c0::{RegisterBlock, COMD},
@@ -187,6 +187,8 @@ impl From<Ack> for u32 {
 pub struct I2C<'d, T, DM: crate::Mode> {
     peripheral: PeripheralRef<'d, T>,
     phantom: PhantomData<DM>,
+    frequency: HertzU32,
+    timeout: Option<u32>,
 }
 
 impl<T> I2C<'_, T, crate::Blocking>
@@ -195,12 +197,16 @@ where
 {
     /// Reads enough bytes from slave with `address` to fill `buffer`
     pub fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Error> {
-        self.peripheral.master_read(address, buffer)
+        self.peripheral
+            .master_read(address, buffer)
+            .inspect_err(|_| self.internal_recover())
     }
 
     /// Writes bytes to slave with address `address`
     pub fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
-        self.peripheral.master_write(addr, bytes)
+        self.peripheral
+            .master_write(addr, bytes)
+            .inspect_err(|_| self.internal_recover())
     }
 
     /// Writes bytes to slave with address `address` and then reads enough bytes
@@ -211,7 +217,9 @@ where
         bytes: &[u8],
         buffer: &mut [u8],
     ) -> Result<(), Error> {
-        self.peripheral.master_write_read(address, bytes, buffer)
+        self.peripheral
+            .master_write_read(address, bytes, buffer)
+            .inspect_err(|_| self.internal_recover())
     }
 }
 
@@ -222,7 +230,9 @@ where
     type Error = Error;
 
     fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Self::Error> {
-        self.peripheral.master_read(address, buffer)
+        self.peripheral
+            .master_read(address, buffer)
+            .inspect_err(|_| self.internal_recover())
     }
 }
 
@@ -233,7 +243,9 @@ where
     type Error = Error;
 
     fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Self::Error> {
-        self.peripheral.master_write(addr, bytes)
+        self.peripheral
+            .master_write(addr, bytes)
+            .inspect_err(|_| self.internal_recover())
     }
 }
 
@@ -249,7 +261,9 @@ where
         bytes: &[u8],
         buffer: &mut [u8],
     ) -> Result<(), Self::Error> {
-        self.peripheral.master_write_read(address, bytes, buffer)
+        self.peripheral
+            .master_write_read(address, bytes, buffer)
+            .inspect_err(|_| self.internal_recover())
     }
 }
 
@@ -287,13 +301,15 @@ where
                     // execute a write operation:
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
-                    self.peripheral.write_operation(
-                        address,
-                        bytes,
-                        last_op != Op::Write,
-                        next_op == Op::None,
-                        cmd_iterator,
-                    )?;
+                    self.peripheral
+                        .write_operation(
+                            address,
+                            bytes,
+                            last_op != Op::Write,
+                            next_op == Op::None,
+                            cmd_iterator,
+                        )
+                        .inspect_err(|_| self.internal_recover())?;
                     last_op = Op::Write;
                 }
                 Operation::Read(buffer) => {
@@ -301,14 +317,16 @@ where
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
                     // - will_continue is true if there is another read operation next
-                    self.peripheral.read_operation(
-                        address,
-                        buffer,
-                        last_op != Op::Read,
-                        next_op == Op::None,
-                        next_op == Op::Read,
-                        cmd_iterator,
-                    )?;
+                    self.peripheral
+                        .read_operation(
+                            address,
+                            buffer,
+                            last_op != Op::Read,
+                            next_op == Op::None,
+                            next_op == Op::Read,
+                            cmd_iterator,
+                        )
+                        .inspect_err(|_| self.internal_recover())?;
                     last_op = Op::Read;
                 }
             }
@@ -321,7 +339,10 @@ impl<'d, T, DM: crate::Mode> I2C<'d, T, DM>
 where
     T: Instance,
 {
-    fn new_internal<SDA: OutputPin + InputPin, SCL: OutputPin + InputPin>(
+    fn new_internal<
+        SDA: PeripheralOutput + PeripheralInput,
+        SCL: PeripheralOutput + PeripheralInput,
+    >(
         i2c: impl Peripheral<P = T> + 'd,
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
@@ -344,9 +365,11 @@ where
             _ => unreachable!(), // will never happen
         });
 
-        let mut i2c = I2C {
+        let i2c = I2C {
             peripheral: i2c,
             phantom: PhantomData,
+            frequency,
+            timeout,
         };
 
         // avoid SCL/SDA going low during configuration
@@ -355,25 +378,27 @@ where
 
         scl.set_to_open_drain_output(crate::private::Internal);
         scl.enable_input(true, crate::private::Internal);
-        scl.internal_pull_up(true, crate::private::Internal);
-        scl.connect_peripheral_to_output(
-            i2c.peripheral.scl_output_signal(),
-            crate::private::Internal,
-        );
+        scl.pull_direction(Pull::Up, crate::private::Internal);
+
         scl.connect_input_to_peripheral(
             i2c.peripheral.scl_input_signal(),
+            crate::private::Internal,
+        );
+        scl.connect_peripheral_to_output(
+            i2c.peripheral.scl_output_signal(),
             crate::private::Internal,
         );
 
         sda.set_to_open_drain_output(crate::private::Internal);
         sda.enable_input(true, crate::private::Internal);
-        sda.internal_pull_up(true, crate::private::Internal);
-        sda.connect_peripheral_to_output(
-            i2c.peripheral.sda_output_signal(),
-            crate::private::Internal,
-        );
+        sda.pull_direction(Pull::Up, crate::private::Internal);
+
         sda.connect_input_to_peripheral(
             i2c.peripheral.sda_input_signal(),
+            crate::private::Internal,
+        );
+        sda.connect_peripheral_to_output(
+            i2c.peripheral.sda_output_signal(),
             crate::private::Internal,
         );
 
@@ -387,6 +412,24 @@ where
             crate::interrupt::enable(T::interrupt(), handler.priority()).unwrap();
         }
     }
+
+    fn internal_recover(&self) {
+        PeripheralClockControl::reset(match self.peripheral.i2c_number() {
+            0 => crate::system::Peripheral::I2cExt0,
+            #[cfg(i2c1)]
+            1 => crate::system::Peripheral::I2cExt1,
+            _ => unreachable!(), // will never happen
+        });
+
+        PeripheralClockControl::enable(match self.peripheral.i2c_number() {
+            0 => crate::system::Peripheral::I2cExt0,
+            #[cfg(i2c1)]
+            1 => crate::system::Peripheral::I2cExt1,
+            _ => unreachable!(), // will never happen
+        });
+
+        self.peripheral.setup(self.frequency, self.timeout);
+    }
 }
 
 impl<'d, T> I2C<'d, T, crate::Blocking>
@@ -396,7 +439,7 @@ where
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new<SDA: OutputPin + InputPin, SCL: OutputPin + InputPin>(
+    pub fn new<SDA: PeripheralOutput + PeripheralInput, SCL: PeripheralOutput + PeripheralInput>(
         i2c: impl Peripheral<P = T> + 'd,
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
@@ -408,7 +451,10 @@ where
     /// Create a new I2C instance with a custom timeout value.
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new_with_timeout<SDA: OutputPin + InputPin, SCL: OutputPin + InputPin>(
+    pub fn new_with_timeout<
+        SDA: PeripheralOutput + PeripheralInput,
+        SCL: PeripheralOutput + PeripheralInput,
+    >(
         i2c: impl Peripheral<P = T> + 'd,
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
@@ -437,7 +483,10 @@ where
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new_async<SDA: OutputPin + InputPin, SCL: OutputPin + InputPin>(
+    pub fn new_async<
+        SDA: PeripheralOutput + PeripheralInput,
+        SCL: PeripheralOutput + PeripheralInput,
+    >(
         i2c: impl Peripheral<P = T> + 'd,
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
@@ -449,7 +498,10 @@ where
     /// Create a new I2C instance with a custom timeout value.
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new_with_timeout_async<SDA: OutputPin + InputPin, SCL: OutputPin + InputPin>(
+    pub fn new_with_timeout_async<
+        SDA: PeripheralOutput + PeripheralInput,
+        SCL: PeripheralOutput + PeripheralInput,
+    >(
         i2c: impl Peripheral<P = T> + 'd,
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
@@ -1075,7 +1127,7 @@ pub trait Instance: crate::private::Sealed {
 
     /// Configures the I2C peripheral with the specified frequency, clocks, and
     /// optional timeout.
-    fn setup(&mut self, frequency: HertzU32, timeout: Option<u32>) {
+    fn setup(&self, frequency: HertzU32, timeout: Option<u32>) {
         self.register_block().ctr().modify(|_, w| unsafe {
             // Clear register
             w.bits(0)
@@ -1156,7 +1208,7 @@ pub trait Instance: crate::private::Sealed {
 
     /// Sets the filter with a supplied threshold in clock cycles for which a
     /// pulse must be present to pass the filter
-    fn set_filter(&mut self, sda_threshold: Option<u8>, scl_threshold: Option<u8>) {
+    fn set_filter(&self, sda_threshold: Option<u8>, scl_threshold: Option<u8>) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32s2))] {
                 let sda_register = &self.register_block().sda_filter_cfg();
@@ -1188,7 +1240,7 @@ pub trait Instance: crate::private::Sealed {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&mut self, source_clk: HertzU32, bus_freq: HertzU32, timeout: Option<u32>) {
+    fn set_frequency(&self, source_clk: HertzU32, bus_freq: HertzU32, timeout: Option<u32>) {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
 
@@ -1266,7 +1318,7 @@ pub trait Instance: crate::private::Sealed {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&mut self, source_clk: HertzU32, bus_freq: HertzU32, timeout: Option<u32>) {
+    fn set_frequency(&self, source_clk: HertzU32, bus_freq: HertzU32, timeout: Option<u32>) {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
 
@@ -1324,7 +1376,7 @@ pub trait Instance: crate::private::Sealed {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&mut self, source_clk: HertzU32, bus_freq: HertzU32, timeout: Option<u32>) {
+    fn set_frequency(&self, source_clk: HertzU32, bus_freq: HertzU32, timeout: Option<u32>) {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
 
@@ -1397,7 +1449,7 @@ pub trait Instance: crate::private::Sealed {
     #[allow(clippy::too_many_arguments, unused)]
     /// Configures the clock and timing parameters for the I2C peripheral.
     fn configure_clock(
-        &mut self,
+        &self,
         sclk_div: u32,
         scl_low_period: u32,
         scl_high_period: u32,
@@ -2064,7 +2116,7 @@ pub trait Instance: crate::private::Sealed {
 
     /// Send data bytes from the `bytes` array to a target slave with the
     /// address `addr`
-    fn master_write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
+    fn master_write(&self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
         // Clear all I2C interrupts
         self.clear_all_interrupts();
         self.write_operation(
@@ -2080,7 +2132,7 @@ pub trait Instance: crate::private::Sealed {
     /// Read bytes from a target slave with the address `addr`
     /// The number of read bytes is deterimed by the size of the `buffer`
     /// argument
-    fn master_read(&mut self, addr: u8, buffer: &mut [u8]) -> Result<(), Error> {
+    fn master_read(&self, addr: u8, buffer: &mut [u8]) -> Result<(), Error> {
         // Clear all I2C interrupts
         self.clear_all_interrupts();
         self.read_operation(
@@ -2096,12 +2148,7 @@ pub trait Instance: crate::private::Sealed {
 
     /// Write bytes from the `bytes` array first and then read n bytes into
     /// the `buffer` array with n being the size of the array.
-    fn master_write_read(
-        &mut self,
-        addr: u8,
-        bytes: &[u8],
-        buffer: &mut [u8],
-    ) -> Result<(), Error> {
+    fn master_write_read(&self, addr: u8, bytes: &[u8], buffer: &mut [u8]) -> Result<(), Error> {
         // it would be possible to combine the write and read
         // in one transaction but filling the tx fifo with
         // the current code is somewhat slow even in release mode

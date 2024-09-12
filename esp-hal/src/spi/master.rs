@@ -51,7 +51,7 @@
 //!     100.kHz(),
 //!     SpiMode::Mode0,
 //! )
-//! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs));
+//! .with_pins(sclk, mosi, miso, cs);
 //! # }
 //! ```
 //! 
@@ -81,8 +81,8 @@ use super::{
 };
 use crate::{
     clock::Clocks,
-    dma::{DmaDescriptor, DmaPeripheral, Rx, Tx},
-    gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
+    dma::{DmaPeripheral, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
+    gpio::{InputSignal, NoPin, OutputSignal, PeripheralInput, PeripheralOutput},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
@@ -457,6 +457,35 @@ pub struct Spi<'d, T, M> {
     _mode: PhantomData<M>,
 }
 
+impl<'d, T, M> Spi<'d, T, M>
+where
+    T: Instance,
+{
+    /// Assign the SCK (Serial Clock) pin for the SPI instance.
+    ///
+    /// Sets the specified pin to push-pull output and connects it to the SPI
+    /// clock signal.
+    pub fn with_sck<SCK: PeripheralOutput>(self, sclk: impl Peripheral<P = SCK> + 'd) -> Self {
+        crate::into_ref!(sclk);
+        sclk.set_to_push_pull_output(private::Internal);
+        sclk.connect_peripheral_to_output(self.spi.sclk_signal(), private::Internal);
+
+        self
+    }
+
+    /// Assign the CS (Chip Select) pin for the SPI instance.
+    ///
+    /// Sets the specified pin to push-pull output and connects it to the SPI CS
+    /// signal.
+    pub fn with_cs<CS: PeripheralOutput>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
+        crate::into_ref!(cs);
+        cs.set_to_push_pull_output(private::Internal);
+        cs.connect_peripheral_to_output(self.spi.cs_signal(), private::Internal);
+
+        self
+    }
+}
+
 impl<'d, T> Spi<'d, T, FullDuplexMode>
 where
     T: Instance,
@@ -513,23 +542,11 @@ where
         Self::new_internal(spi, frequency, mode)
     }
 
-    /// Assign the SCK (Serial Clock) pin for the SPI instance.
-    ///
-    /// Sets the specified pin to push-pull output and connects it to the SPI
-    /// clock signal.
-    pub fn with_sck<SCK: OutputPin>(self, sck: impl Peripheral<P = SCK> + 'd) -> Self {
-        crate::into_ref!(sck);
-        sck.set_to_push_pull_output(private::Internal);
-        sck.connect_peripheral_to_output(self.spi.sclk_signal(), private::Internal);
-
-        self
-    }
-
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
     ///
     /// Sets the specified pin to push-pull output and connects it to the SPI
     /// MOSI signal.
-    pub fn with_mosi<MOSI: OutputPin>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
+    pub fn with_mosi<MOSI: PeripheralOutput>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
         crate::into_ref!(mosi);
         mosi.set_to_push_pull_output(private::Internal);
         mosi.connect_peripheral_to_output(self.spi.mosi_signal(), private::Internal);
@@ -540,22 +557,10 @@ where
     /// Assign the MISO (Master In Slave Out) pin for the SPI instance.
     ///
     /// Sets the specified pin to input and connects it to the SPI MISO signal.
-    pub fn with_miso<MISO: InputPin>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
+    pub fn with_miso<MISO: PeripheralInput>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
         crate::into_ref!(miso);
-        miso.init_input(false, false, private::Internal);
+        miso.init_input(crate::gpio::Pull::None, private::Internal);
         miso.connect_input_to_peripheral(self.spi.miso_signal(), private::Internal);
-
-        self
-    }
-
-    /// Assign the CS (Chip Select) pin for the SPI instance.
-    ///
-    /// Sets the specified pin to push-pull output and connects it to the SPI CS
-    /// signal.
-    pub fn with_cs<CS: OutputPin>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
-        crate::into_ref!(cs);
-        cs.set_to_push_pull_output(private::Internal);
-        cs.connect_peripheral_to_output(self.spi.cs_signal(), private::Internal);
 
         self
     }
@@ -570,40 +575,24 @@ where
 
     /// Setup pins for this SPI instance.
     ///
-    /// All pins are optional. Pass [crate::gpio::NO_PIN] if you don't need the
+    /// All pins are optional. Pass [crate::gpio::NoPin] if you don't need the
     /// given pin.
-    pub fn with_pins<SCK: OutputPin, MOSI: OutputPin, MISO: InputPin, CS: OutputPin>(
+    pub fn with_pins<
+        SCK: PeripheralOutput,
+        MOSI: PeripheralOutput,
+        MISO: PeripheralInput,
+        CS: PeripheralOutput,
+    >(
         self,
-        sck: Option<impl Peripheral<P = SCK> + 'd>,
-        mosi: Option<impl Peripheral<P = MOSI> + 'd>,
-        miso: Option<impl Peripheral<P = MISO> + 'd>,
-        cs: Option<impl Peripheral<P = CS> + 'd>,
+        sck: impl Peripheral<P = SCK> + 'd,
+        mosi: impl Peripheral<P = MOSI> + 'd,
+        miso: impl Peripheral<P = MISO> + 'd,
+        cs: impl Peripheral<P = CS> + 'd,
     ) -> Self {
-        if let Some(sck) = sck {
-            crate::into_ref!(sck);
-            sck.set_to_push_pull_output(private::Internal);
-            sck.connect_peripheral_to_output(self.spi.sclk_signal(), private::Internal);
-        }
-
-        if let Some(mosi) = mosi {
-            crate::into_ref!(mosi);
-            mosi.set_to_push_pull_output(private::Internal);
-            mosi.connect_peripheral_to_output(self.spi.mosi_signal(), private::Internal);
-        }
-
-        if let Some(miso) = miso {
-            crate::into_ref!(miso);
-            miso.init_input(false, false, private::Internal);
-            miso.connect_input_to_peripheral(self.spi.miso_signal(), private::Internal);
-        }
-
-        if let Some(cs) = cs {
-            crate::into_ref!(cs);
-            cs.set_to_push_pull_output(private::Internal);
-            cs.connect_peripheral_to_output(self.spi.cs_signal(), private::Internal);
-        }
-
-        self
+        self.with_sck(sck)
+            .with_mosi(mosi)
+            .with_miso(miso)
+            .with_cs(cs)
     }
 
     pub(crate) fn new_internal(
@@ -622,7 +611,8 @@ where
         spi.spi.init();
         spi.spi.set_data_mode(mode);
 
-        spi
+        // Disconnect any lingering connections
+        spi.with_pins(NoPin, NoPin, NoPin, NoPin)
     }
 
     /// Change the bus frequency of the SPI instance.
@@ -651,32 +641,21 @@ where
         Self::new_internal(spi, frequency, mode)
     }
 
-    /// Assign the SCK (Serial Clock) pin for the SPI instance.
-    ///
-    /// Sets the specified pin to push-pull output and connects it to the SPI
-    /// clock signal.
-    pub fn with_sck<SCK: OutputPin>(self, sck: impl Peripheral<P = SCK> + 'd) -> Self {
-        crate::into_ref!(sck);
-        sck.set_to_push_pull_output(private::Internal);
-        sck.connect_peripheral_to_output(self.spi.sclk_signal(), private::Internal);
-
-        self
-    }
-
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance in
     /// half-duplex mode.
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MOSI signal and SIO0 input signal.
-    pub fn with_mosi<MOSI: OutputPin + InputPin>(
+    pub fn with_mosi<MOSI: PeripheralOutput + PeripheralInput>(
         self,
         mosi: impl Peripheral<P = MOSI> + 'd,
     ) -> Self {
         crate::into_ref!(mosi);
-        mosi.enable_output(true, private::Internal);
-        mosi.connect_peripheral_to_output(self.spi.mosi_signal(), private::Internal);
         mosi.enable_input(true, private::Internal);
+        mosi.enable_output(true, private::Internal);
+
         mosi.connect_input_to_peripheral(self.spi.sio0_input_signal(), private::Internal);
+        mosi.connect_peripheral_to_output(self.spi.mosi_signal(), private::Internal);
 
         self
     }
@@ -686,15 +665,16 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MISO signal and SIO1 input signal.
-    pub fn with_miso<MISO: OutputPin + InputPin>(
+    pub fn with_miso<MISO: PeripheralOutput + PeripheralInput>(
         self,
         miso: impl Peripheral<P = MISO> + 'd,
     ) -> Self {
         crate::into_ref!(miso);
-        miso.enable_output(true, private::Internal);
-        miso.connect_peripheral_to_output(self.spi.sio1_output_signal(), private::Internal);
         miso.enable_input(true, private::Internal);
+        miso.enable_output(true, private::Internal);
+
         miso.connect_input_to_peripheral(self.spi.miso_signal(), private::Internal);
+        miso.connect_peripheral_to_output(self.spi.sio1_output_signal(), private::Internal);
 
         self
     }
@@ -703,15 +683,16 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the SIO2 output and input signals.
-    pub fn with_sio2<SIO2: OutputPin + InputPin>(
+    pub fn with_sio2<SIO2: PeripheralOutput + PeripheralInput>(
         self,
         sio2: impl Peripheral<P = SIO2> + 'd,
     ) -> Self {
         crate::into_ref!(sio2);
-        sio2.enable_output(true, private::Internal);
-        sio2.connect_peripheral_to_output(self.spi.sio2_output_signal(), private::Internal);
         sio2.enable_input(true, private::Internal);
+        sio2.enable_output(true, private::Internal);
+
         sio2.connect_input_to_peripheral(self.spi.sio2_input_signal(), private::Internal);
+        sio2.connect_peripheral_to_output(self.spi.sio2_output_signal(), private::Internal);
 
         self
     }
@@ -720,96 +701,46 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the SIO3 output and input signals.
-    pub fn with_sio3<SIO3: OutputPin + InputPin>(
+    pub fn with_sio3<SIO3: PeripheralOutput + PeripheralInput>(
         self,
         sio3: impl Peripheral<P = SIO3> + 'd,
     ) -> Self {
         crate::into_ref!(sio3);
-        sio3.enable_output(true, private::Internal);
-        sio3.connect_peripheral_to_output(self.spi.sio3_output_signal(), private::Internal);
         sio3.enable_input(true, private::Internal);
+        sio3.enable_output(true, private::Internal);
+
         sio3.connect_input_to_peripheral(self.spi.sio3_input_signal(), private::Internal);
-
-        self
-    }
-
-    /// Assign the CS (Chip Select) pin for the SPI instance.
-    ///
-    /// Sets the specified pin to push-pull output and connects it to the SPI CS
-    /// signal.
-    pub fn with_cs<CS: OutputPin>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
-        crate::into_ref!(cs);
-        cs.set_to_push_pull_output(private::Internal);
-        cs.connect_peripheral_to_output(self.spi.cs_signal(), private::Internal);
+        sio3.connect_peripheral_to_output(self.spi.sio3_output_signal(), private::Internal);
 
         self
     }
 
     /// Setup pins for this SPI instance.
     ///
-    /// All pins are optional. Pass [crate::gpio::NO_PIN] if you don't need the
+    /// All pins are optional. Pass [crate::gpio::NoPin] if you don't need the
     /// given pin.
     pub fn with_pins<
-        SCK: OutputPin,
-        MOSI: OutputPin + InputPin,
-        MISO: OutputPin + InputPin,
-        SIO2: OutputPin + InputPin,
-        SIO3: OutputPin + InputPin,
-        CS: OutputPin,
+        SCK: PeripheralOutput,
+        MOSI: PeripheralOutput + PeripheralInput,
+        MISO: PeripheralOutput + PeripheralInput,
+        SIO2: PeripheralOutput + PeripheralInput,
+        SIO3: PeripheralOutput + PeripheralInput,
+        CS: PeripheralOutput,
     >(
         self,
-        sck: Option<impl Peripheral<P = SCK> + 'd>,
-        mosi: Option<impl Peripheral<P = MOSI> + 'd>,
-        miso: Option<impl Peripheral<P = MISO> + 'd>,
-        sio2: Option<impl Peripheral<P = SIO2> + 'd>,
-        sio3: Option<impl Peripheral<P = SIO3> + 'd>,
-        cs: Option<impl Peripheral<P = CS> + 'd>,
+        sck: impl Peripheral<P = SCK> + 'd,
+        mosi: impl Peripheral<P = MOSI> + 'd,
+        miso: impl Peripheral<P = MISO> + 'd,
+        sio2: impl Peripheral<P = SIO2> + 'd,
+        sio3: impl Peripheral<P = SIO3> + 'd,
+        cs: impl Peripheral<P = CS> + 'd,
     ) -> Self {
-        if let Some(sck) = sck {
-            crate::into_ref!(sck);
-            sck.set_to_push_pull_output(private::Internal);
-            sck.connect_peripheral_to_output(self.spi.sclk_signal(), private::Internal);
-        }
-
-        if let Some(mosi) = mosi {
-            crate::into_ref!(mosi);
-            mosi.enable_output(true, private::Internal);
-            mosi.connect_peripheral_to_output(self.spi.mosi_signal(), private::Internal);
-            mosi.enable_input(true, private::Internal);
-            mosi.connect_input_to_peripheral(self.spi.sio0_input_signal(), private::Internal);
-        }
-
-        if let Some(miso) = miso {
-            crate::into_ref!(miso);
-            miso.enable_output(true, private::Internal);
-            miso.connect_peripheral_to_output(self.spi.sio1_output_signal(), private::Internal);
-            miso.enable_input(true, private::Internal);
-            miso.connect_input_to_peripheral(self.spi.miso_signal(), private::Internal);
-        }
-
-        if let Some(sio2) = sio2 {
-            crate::into_ref!(sio2);
-            sio2.enable_output(true, private::Internal);
-            sio2.connect_peripheral_to_output(self.spi.sio2_output_signal(), private::Internal);
-            sio2.enable_input(true, private::Internal);
-            sio2.connect_input_to_peripheral(self.spi.sio2_input_signal(), private::Internal);
-        }
-
-        if let Some(sio3) = sio3 {
-            crate::into_ref!(sio3);
-            sio3.enable_output(true, private::Internal);
-            sio3.connect_peripheral_to_output(self.spi.sio3_output_signal(), private::Internal);
-            sio3.enable_input(true, private::Internal);
-            sio3.connect_input_to_peripheral(self.spi.sio3_input_signal(), private::Internal);
-        }
-
-        if let Some(cs) = cs {
-            crate::into_ref!(cs);
-            cs.set_to_push_pull_output(private::Internal);
-            cs.connect_peripheral_to_output(self.spi.cs_signal(), private::Internal);
-        }
-
-        self
+        self.with_sck(sck)
+            .with_mosi(mosi)
+            .with_miso(miso)
+            .with_sio2(sio2)
+            .with_sio3(sio3)
+            .with_cs(cs)
     }
 
     pub(crate) fn new_internal(
@@ -822,13 +753,14 @@ where
 
         let mut spi = Spi {
             spi,
-            _mode: PhantomData,
+            _mode: PhantomData::<HalfDuplexMode>,
         };
         spi.spi.setup(frequency);
         spi.spi.init();
         spi.spi.set_data_mode(mode);
 
-        spi
+        // Disconnect any lingering connections
+        spi.with_pins(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin)
     }
 
     /// Change the bus frequency of the SPI instance in half-duplex mode.
@@ -947,7 +879,9 @@ mod dma {
             Channel,
             DmaChannel,
             DmaRxBuf,
+            DmaRxBuffer,
             DmaTxBuf,
+            DmaTxBuffer,
             RxPrivate,
             Spi2Peripheral,
             SpiPeripheral,
@@ -1266,23 +1200,18 @@ mod dma {
         /// bytes.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-        pub fn dma_write(
+        pub fn dma_write<TX: DmaTxBuffer>(
             mut self,
-            buffer: DmaTxBuf,
-        ) -> Result<SpiDmaTransfer<'d, T, C, FullDuplexMode, M, DmaTxBuf>, (Error, Self, DmaTxBuf)>
-        {
-            let bytes_to_write = buffer.len();
+            mut buffer: TX,
+        ) -> Result<SpiDmaTransfer<'d, T, C, FullDuplexMode, M, TX>, (Error, Self, TX)> {
+            let bytes_to_write = buffer.length();
             if bytes_to_write > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
 
             let result = unsafe {
-                self.spi.start_write_bytes_dma(
-                    buffer.first(),
-                    bytes_to_write,
-                    &mut self.channel.tx,
-                    true,
-                )
+                self.spi
+                    .start_write_bytes_dma(&mut buffer, &mut self.channel.tx, true)
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
@@ -1298,23 +1227,18 @@ mod dma {
         /// received is 32736 bytes.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-        pub fn dma_read(
+        pub fn dma_read<RX: DmaRxBuffer>(
             mut self,
-            buffer: DmaRxBuf,
-        ) -> Result<SpiDmaTransfer<'d, T, C, FullDuplexMode, M, DmaRxBuf>, (Error, Self, DmaRxBuf)>
-        {
-            let bytes_to_read = buffer.len();
+            mut buffer: RX,
+        ) -> Result<SpiDmaTransfer<'d, T, C, FullDuplexMode, M, RX>, (Error, Self, RX)> {
+            let bytes_to_read = buffer.length();
             if bytes_to_read > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
 
             let result = unsafe {
-                self.spi.start_read_bytes_dma(
-                    buffer.first(),
-                    bytes_to_read,
-                    &mut self.channel.rx,
-                    true,
-                )
+                self.spi
+                    .start_read_bytes_dma(&mut buffer, &mut self.channel.rx, true)
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
@@ -1329,16 +1253,14 @@ mod dma {
         /// the SPI instance. The maximum amount of data to be
         /// sent/received is 32736 bytes.
         #[allow(clippy::type_complexity)]
-        pub fn dma_transfer(
+        pub fn dma_transfer<RX: DmaRxBuffer, TX: DmaTxBuffer>(
             mut self,
-            rx_buffer: DmaRxBuf,
-            tx_buffer: DmaTxBuf,
-        ) -> Result<
-            SpiDmaTransfer<'d, T, C, FullDuplexMode, M, (DmaRxBuf, DmaTxBuf)>,
-            (Error, Self, DmaRxBuf, DmaTxBuf),
-        > {
-            let bytes_to_read = rx_buffer.len();
-            let bytes_to_write = tx_buffer.len();
+            mut rx_buffer: RX,
+            mut tx_buffer: TX,
+        ) -> Result<SpiDmaTransfer<'d, T, C, FullDuplexMode, M, (RX, TX)>, (Error, Self, RX, TX)>
+        {
+            let bytes_to_read = rx_buffer.length();
+            let bytes_to_write = tx_buffer.length();
 
             if bytes_to_write > MAX_DMA_SIZE || bytes_to_read > MAX_DMA_SIZE {
                 return Err((
@@ -1351,10 +1273,8 @@ mod dma {
 
             let result = unsafe {
                 self.spi.start_transfer_dma(
-                    rx_buffer.first(),
-                    tx_buffer.first(),
-                    bytes_to_read,
-                    bytes_to_write,
+                    &mut rx_buffer,
+                    &mut tx_buffer,
                     &mut self.channel.rx,
                     &mut self.channel.tx,
                 )
@@ -1382,16 +1302,15 @@ mod dma {
         /// Perform a half-duplex read operation using DMA.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-        pub fn read(
+        pub fn read<RX: DmaRxBuffer>(
             mut self,
             data_mode: SpiDataMode,
             cmd: Command,
             address: Address,
             dummy: u8,
-            buffer: DmaRxBuf,
-        ) -> Result<SpiDmaTransfer<'d, T, C, HalfDuplexMode, M, DmaRxBuf>, (Error, Self, DmaRxBuf)>
-        {
-            let bytes_to_read = buffer.len();
+            mut buffer: RX,
+        ) -> Result<SpiDmaTransfer<'d, T, C, HalfDuplexMode, M, RX>, (Error, Self, RX)> {
+            let bytes_to_read = buffer.length();
             if bytes_to_read > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
@@ -1447,12 +1366,8 @@ mod dma {
             }
 
             let result = unsafe {
-                self.spi.start_read_bytes_dma(
-                    buffer.first(),
-                    bytes_to_read,
-                    &mut self.channel.rx,
-                    false,
-                )
+                self.spi
+                    .start_read_bytes_dma(&mut buffer, &mut self.channel.rx, false)
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
@@ -1464,16 +1379,15 @@ mod dma {
         /// Perform a half-duplex write operation using DMA.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-        pub fn write(
+        pub fn write<TX: DmaTxBuffer>(
             mut self,
             data_mode: SpiDataMode,
             cmd: Command,
             address: Address,
             dummy: u8,
-            buffer: DmaTxBuf,
-        ) -> Result<SpiDmaTransfer<'d, T, C, HalfDuplexMode, M, DmaTxBuf>, (Error, Self, DmaTxBuf)>
-        {
-            let bytes_to_write = buffer.len();
+            mut buffer: TX,
+        ) -> Result<SpiDmaTransfer<'d, T, C, HalfDuplexMode, M, TX>, (Error, Self, TX)> {
+            let bytes_to_write = buffer.length();
             if bytes_to_write > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
@@ -1529,12 +1443,8 @@ mod dma {
             }
 
             let result = unsafe {
-                self.spi.start_write_bytes_dma(
-                    buffer.first(),
-                    bytes_to_write,
-                    &mut self.channel.tx,
-                    false,
-                )
+                self.spi
+                    .start_write_bytes_dma(&mut buffer, &mut self.channel.tx, false)
             };
             if let Err(e) = result {
                 return Err((e, self, buffer));
@@ -2296,10 +2206,8 @@ pub trait InstanceDma: Instance {
     #[allow(clippy::too_many_arguments)]
     unsafe fn start_transfer_dma<RX: Rx, TX: Tx>(
         &mut self,
-        rx_desc: *mut DmaDescriptor,
-        tx_desc: *mut DmaDescriptor,
-        read_buffer_len: usize,
-        write_buffer_len: usize,
+        rx_buffer: &mut impl DmaRxBuffer,
+        tx_buffer: &mut impl DmaTxBuffer,
         rx: &mut RX,
         tx: &mut TX,
     ) -> Result<(), Error> {
@@ -2312,7 +2220,7 @@ pub trait InstanceDma: Instance {
             reg_block.dma_in_link().write(|w| w.bits(0));
         }
 
-        self.configure_datalen(usize::max(read_buffer_len, write_buffer_len) as u32 * 8);
+        self.configure_datalen(usize::max(rx_buffer.length(), tx_buffer.length()) as u32 * 8);
 
         rx.is_done();
         tx.is_done();
@@ -2327,9 +2235,9 @@ pub trait InstanceDma: Instance {
 
         self.clear_dma_interrupts();
         reset_dma_before_load_dma_dscr(reg_block);
-        rx.prepare_transfer(self.dma_peripheral(), rx_desc)
+        rx.prepare_transfer(self.dma_peripheral(), rx_buffer)
             .and_then(|_| rx.start_transfer())?;
-        tx.prepare_transfer(self.dma_peripheral(), tx_desc)
+        tx.prepare_transfer(self.dma_peripheral(), tx_buffer)
             .and_then(|_| tx.start_transfer())?;
 
         reset_dma_before_usr_cmd(reg_block);
@@ -2342,13 +2250,12 @@ pub trait InstanceDma: Instance {
     #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
     unsafe fn start_write_bytes_dma<TX: Tx>(
         &mut self,
-        first_desc: *mut DmaDescriptor,
-        len: usize,
+        buffer: &mut impl DmaTxBuffer,
         tx: &mut TX,
         full_duplex: bool,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
-        self.configure_datalen(len as u32 * 8);
+        self.configure_datalen(buffer.length() as u32 * 8);
 
         tx.is_done();
 
@@ -2379,7 +2286,7 @@ pub trait InstanceDma: Instance {
         reset_dma_before_load_dma_dscr(reg_block);
         self.clear_dma_interrupts();
 
-        tx.prepare_transfer(self.dma_peripheral(), first_desc)?;
+        tx.prepare_transfer(self.dma_peripheral(), buffer)?;
         tx.start_transfer()?;
         reset_dma_before_usr_cmd(reg_block);
 
@@ -2396,10 +2303,9 @@ pub trait InstanceDma: Instance {
     }
 
     #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
-    unsafe fn start_read_bytes_dma<RX: Rx>(
+    unsafe fn start_read_bytes_dma<RX: Rx, BUF: DmaRxBuffer>(
         &mut self,
-        desc: *mut DmaDescriptor,
-        data_length: usize,
+        buffer: &mut BUF,
         rx: &mut RX,
         full_duplex: bool,
     ) -> Result<(), Error> {
@@ -2412,7 +2318,7 @@ pub trait InstanceDma: Instance {
             reg_block.dma_in_link().write(|w| w.bits(0));
         }
 
-        self.configure_datalen(data_length as u32 * 8);
+        self.configure_datalen(buffer.length() as u32 * 8);
 
         rx.is_done();
 
@@ -2431,7 +2337,7 @@ pub trait InstanceDma: Instance {
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
 
-        rx.prepare_transfer(self.dma_peripheral(), desc)?;
+        rx.prepare_transfer(self.dma_peripheral(), buffer)?;
         rx.start_transfer()?;
 
         reg_block.cmd().modify(|_, w| w.usr().set_bit());

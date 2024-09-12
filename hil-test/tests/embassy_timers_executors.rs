@@ -13,7 +13,7 @@ use esp_hal::{
     interrupt::software::SoftwareInterruptControl,
     interrupt::Priority,
     timer::systimer::{Alarm, FrozenUnit, Periodic, SystemTimer, Target},
-    timer::ErasedTimer,
+    timer::AnyTimer,
 };
 use esp_hal::{
     peripherals::Peripherals,
@@ -216,10 +216,10 @@ mod test {
     #[cfg(not(feature = "esp32"))]
     async fn test_interrupt_executor(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        let timer0: ErasedTimer = timg0.timer0.into();
+        let timer0: AnyTimer = timg0.timer0.into();
 
         let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
-        let alarm0: ErasedTimer = systimer.alarm0.into();
+        let alarm0: AnyTimer = systimer.alarm0.into();
 
         esp_hal_embassy::init([timer0, alarm0]);
 

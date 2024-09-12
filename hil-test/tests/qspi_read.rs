@@ -1,11 +1,4 @@
 //! QSPI Read Test
-//!
-//! Following pins are used:
-//! MISO    GPIO2 / GPIO9 (esp32s2 and esp32s3)
-//!
-//! GPIO    GPIO3 / GPIO10 (esp32s2 and esp32s3)
-//!
-//! Connect MISO and GPIO pins.
 
 //% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -15,7 +8,7 @@
 use esp_hal::{
     dma::{Channel, Dma, DmaPriority, DmaRxBuf},
     dma_buffers,
-    gpio::{ErasedPin, Io, Level, Output},
+    gpio::{AnyPin, Io, Level, NoPin, Output},
     prelude::*,
     spi::{
         master::{Address, Command, Spi, SpiDma},
@@ -41,7 +34,7 @@ cfg_if::cfg_if! {
 struct Context {
     spi: esp_hal::peripherals::SPI2,
     dma_channel: Channel<'static, DmaChannel0, Blocking>,
-    miso: ErasedPin,
+    miso: AnyPin,
     miso_mirror: Output<'static>,
 }
 
@@ -69,7 +62,7 @@ fn execute(
         .unwrap();
     (spi, dma_rx_buf) = transfer.wait();
 
-    assert_eq!(dma_rx_buf.as_slice(), &[wanted; DMA_BUFFER_SIZE]);
+    assert_eq!(dma_rx_buf.as_slice(), &[0; DMA_BUFFER_SIZE]);
 
     // SPI should read all '1's
     miso_mirror.set_high();
@@ -87,7 +80,7 @@ fn execute(
 
     (_, dma_rx_buf) = transfer.wait();
 
-    assert_eq!(dma_rx_buf.as_slice(), &[0xFF; DMA_BUFFER_SIZE]);
+    assert_eq!(dma_rx_buf.as_slice(), &[wanted; DMA_BUFFER_SIZE]);
 }
 
 #[cfg(test)]
@@ -130,71 +123,41 @@ mod tests {
     #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin_0(ctx: Context) {
         let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(
-                esp_hal::gpio::NO_PIN,
-                Some(ctx.miso),
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-            )
+            .with_pins(NoPin, ctx.miso, NoPin, NoPin, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
-        // SPI should read '0b11101110'
-        super::execute(spi, ctx.miso_mirror, 238);
+        super::execute(spi, ctx.miso_mirror, 0b0001_0001);
     }
 
     #[test]
     #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin_1(ctx: Context) {
         let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                Some(ctx.miso),
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-            )
+            .with_pins(NoPin, NoPin, ctx.miso, NoPin, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
-        // SPI should read '0b11011101'
-        super::execute(spi, ctx.miso_mirror, 221);
+        super::execute(spi, ctx.miso_mirror, 0b0010_0010);
     }
 
     #[test]
     #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin_2(ctx: Context) {
         let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                Some(ctx.miso),
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-            )
+            .with_pins(NoPin, NoPin, NoPin, ctx.miso, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
         // SPI should read '0b10111011'
-        super::execute(spi, ctx.miso_mirror, 187);
+        super::execute(spi, ctx.miso_mirror, 0b0100_0100);
     }
 
     #[test]
     #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin_3(ctx: Context) {
         let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                Some(ctx.miso),
-                esp_hal::gpio::NO_PIN,
-            )
+            .with_pins(NoPin, NoPin, NoPin, NoPin, ctx.miso, NoPin)
             .with_dma(ctx.dma_channel);
 
         // SPI should read '0b01110111'
-        super::execute(spi, ctx.miso_mirror, 119);
+        super::execute(spi, ctx.miso_mirror, 0b1000_1000);
     }
 }

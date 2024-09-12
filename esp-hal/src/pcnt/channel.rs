@@ -9,80 +9,11 @@
 
 use core::marker::PhantomData;
 
-use crate::{
-    gpio::{InputPin, InputSignal, Pull, ONE_INPUT, ZERO_INPUT},
-    peripheral::Peripheral,
-    peripherals::GPIO,
-};
-
-/// Configuration for an PCNT input pin
-#[derive(Clone, Copy, Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct PcntInputConfig {
-    /// Configuration for the internal pull-up resistors
-    pub pull: Pull,
-}
-
-impl Default for PcntInputConfig {
-    fn default() -> Self {
-        Self { pull: Pull::None }
-    }
-}
-
 pub use crate::peripherals::pcnt::unit::conf0::{CTRL_MODE as CtrlMode, EDGE_MODE as EdgeMode};
-
-/// PcntPin can be always high, always low, or an actual pin
-#[derive(Clone, Copy)]
-pub struct PcntSource {
-    source: u8,
-    inverted: bool,
-}
-
-impl PcntSource {
-    /// Creates a `PcntSource` from an input pin with the specified
-    /// configuration.
-    pub fn from_pin<'a, P: InputPin>(
-        pin: impl Peripheral<P = P> + 'a,
-        pin_config: PcntInputConfig,
-    ) -> Self {
-        crate::into_ref!(pin);
-
-        pin.init_input(
-            pin_config.pull == Pull::Down,
-            pin_config.pull == Pull::Up,
-            crate::private::Internal,
-        );
-
-        Self {
-            source: pin.number(crate::private::Internal),
-            inverted: false,
-        }
-    }
-
-    /// Creates a `PcntSource` that is always high.
-    pub fn always_high() -> Self {
-        Self {
-            source: ONE_INPUT,
-            inverted: false,
-        }
-    }
-
-    /// Creates a `PcntSource` that is always low.
-    pub fn always_low() -> Self {
-        Self {
-            source: ZERO_INPUT,
-            inverted: false,
-        }
-    }
-
-    /// Inverts the `PcntSource` signal.
-    pub fn invert(self) -> Self {
-        Self {
-            source: self.source,
-            inverted: !self.inverted,
-        }
-    }
-}
+use crate::{
+    gpio::{InputSignal, PeripheralInput},
+    peripheral::Peripheral,
+};
 
 /// Represents a channel within a pulse counter unit.
 pub struct Channel<'d, const UNIT: usize, const NUM: usize> {
@@ -135,7 +66,7 @@ impl<'d, const UNIT: usize, const NUM: usize> Channel<'d, UNIT, NUM> {
     }
 
     /// Set the control signal (pin/high/low) for this channel
-    pub fn set_ctrl_signal(&self, source: PcntSource) -> &Self {
+    pub fn set_ctrl_signal<P: PeripheralInput>(&self, source: impl Peripheral<P = P>) -> &Self {
         let signal = match UNIT {
             0 => match NUM {
                 0 => InputSignal::PCNT0_CTRL_CH0,
@@ -185,19 +116,15 @@ impl<'d, const UNIT: usize, const NUM: usize> Channel<'d, UNIT, NUM> {
         };
 
         if (signal as usize) <= crate::gpio::INPUT_SIGNAL_MAX as usize {
-            unsafe { &*GPIO::PTR }
-                .func_in_sel_cfg(signal as usize)
-                .modify(|_, w| unsafe {
-                    w.sel().set_bit();
-                    w.in_inv_sel().bit(source.inverted);
-                    w.in_sel().bits(source.source)
-                });
+            crate::into_ref!(source);
+            source.enable_input(true, crate::private::Internal);
+            source.connect_input_to_peripheral(signal, crate::private::Internal);
         }
         self
     }
 
     /// Set the edge signal (pin/high/low) for this channel
-    pub fn set_edge_signal(&self, source: PcntSource) -> &Self {
+    pub fn set_edge_signal<P: PeripheralInput>(&self, source: impl Peripheral<P = P>) -> &Self {
         let signal = match UNIT {
             0 => match NUM {
                 0 => InputSignal::PCNT0_SIG_CH0,
@@ -247,13 +174,9 @@ impl<'d, const UNIT: usize, const NUM: usize> Channel<'d, UNIT, NUM> {
         };
 
         if (signal as usize) <= crate::gpio::INPUT_SIGNAL_MAX as usize {
-            unsafe { &*GPIO::PTR }
-                .func_in_sel_cfg(signal as usize)
-                .modify(|_, w| unsafe {
-                    w.sel().set_bit();
-                    w.in_inv_sel().bit(source.inverted);
-                    w.in_sel().bits(source.source)
-                });
+            crate::into_ref!(source);
+            source.enable_input(true, crate::private::Internal);
+            source.connect_input_to_peripheral(signal, crate::private::Internal);
         }
         self
     }

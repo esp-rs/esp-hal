@@ -48,7 +48,7 @@ You no longer have to spell out the GPIO pin type for `Input`, `Output`, `Output
 However, if you want to, you can keep using their typed form!
 
 ```rust
-let pin = Input::new(io.gpio0); // pin will have the type `Input<'some>` (or `Input<'some, ErasedPin>` if you want to be explicit about it)
+let pin = Input::new(io.gpio0); // pin will have the type `Input<'some>` (or `Input<'some, AnyPin>` if you want to be explicit about it)
 let pin = Input::new_typed(io.gpio0); // pin will have the type `Input<'some, GpioPin<0>>`
 ```
 
@@ -74,19 +74,10 @@ let mut wakeup_pins: [&mut dyn RtcPin; 2] = [
 let ext1 = Ext1WakeupSource::new(&mut wakeup_pins, WakeupLevel::High);
 ```
 
-## `esp_hal::time::current_time` rename
-
-To avoid confusion with the `Rtc::current_time` wall clock time APIs, we've renamed `esp_hal::time::current_time` to `esp_hal::time::now()`.
-
-```diff
-- use esp_hal::time::current_time;
-+ use esp_hal::time::now;
-```
-
 ## RX/TX Order
 
-Previously, our API was pretty inconsitent with the RX/TX ordering, and different peripherals had different order. Now, all
-the peripherals use rx-tx. Make sure your methods are expecting the rigth RX/TX order, for example an SPI DMA app should be updated to:
+Previously, our API was pretty inconsistent with the RX/TX ordering, and different peripherals had different order. Now, all
+the peripherals use rx-tx. Make sure your methods are expecting the right RX/TX order, for example an SPI DMA app should be updated to:
 
 ```diff
 - let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) = dma_buffers!(4);
@@ -103,7 +94,29 @@ let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     .unwrap();
 ```
 
-## RTC Wall Clock APIs
+When using the asymmetric variant of the macro to create DMA buffers and descriptors make sure to swap the order of parameters
+
+```diff
+- let (tx_buffer, tx_descriptors, _, _) = dma_buffers!(32000, 0);
++ let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, 32000);
+```
+
+## Removed UART constructors
+
+The `Uart::new_with_default_pins` and `Uart::new_async_with_default_pins` constructors
+have been removed. Use `new` or `new_async` instead.
+
+## Timer changes
+
+### `ErasedTimer` rename
+
+The `ErasedTimer` has been renamed to `AnyTimer`.
+
+### `esp_hal::time::current_time` rename
+
+To avoid confusion with the `Rtc::current_time` wall clock time APIs, we've renamed `esp_hal::time::current_time` to `esp_hal::time::now()`.
+
+### RTC Wall Clock APIs
 
 Instead of the `get_time_ms`, `get_time_us`, and `get_time_raw` functions, the `Rtc` struct now provides the `current_time` function, using `chrono`'s `NaiveDateTime` struct.
 
@@ -111,4 +124,38 @@ Instead of the `get_time_ms`, `get_time_us`, and `get_time_raw` functions, the `
 let rtc = Rtc::new(peripherals.LPWR);
 - let current_time_ms = rtc.get_time_ms();
 + let current_time_ms = rtc.current_time().and_utc().timestamp_millis(); // assuming UTC
+```
+
+## PCNT input config
+
+The `PcntSource` and `PcntInputConfig` have been removed. You can use `Input` or `Flex` instead to
+configure an input pin, and pass it to `set_edge_signal` or `set_ctrl_signal`.
+
+```diff
+-   let mut pin_a = io.pins.gpio4;
+-   ch0.set_ctrl_signal(PcntSource::from_pin(
+-       &mut pin_a,
+-       PcntInputConfig { pull: Pull::Up },
+-   ));
++   ch0.set_ctrl_signal(Input::new(io.pins.gpio4, Pull::Up));
+ 
+-   let mut pin_b = io.pins.gpio5;
+-   ch0.set_edge_signal(PcntSource::from_pin(
+-       &mut pin_b,
+-       PcntInputConfig { pull: Pull::Down },
+-   ));
++   ch0.set_edge_signal(Input::new(io.pins.gpio5, Pull::Down));
+```
+
+## SPI pins and `NO_PIN`
+
+Use `NoPin` in place of the now-removed `NO_PIN` constant.
+
+SPI pins, when using the `with_pin` function, are no longer optional.
+You can pass `NoPin` or `Level` as inputs, and `NoPin` as output if you don't need a particular pin.
+
+```diff
+ let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
+-    .with_pins(Some(sclk), Some(mosi), NO_PIN, NO_PIN);
++    .with_pins(sclk, mosi, Level::Low, NoPin);
 ```

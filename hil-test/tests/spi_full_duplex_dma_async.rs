@@ -1,19 +1,6 @@
 //! SPI Full Duplex DMA Test
-//!
-//! Following pins are used:
-//! SCLK    GPIO0
-//! MOSI    GPIO3 / GPIO10 (esp32s3)
-//! MISO    GPIO4
-//!
-//! PCNT    GPIO2 / GPIO9 (esp32s3)
-//! OUTPUT  GPIO5 (helper to keep MISO LOW)
-//!
-//! The idea of using PCNT (input) here is to connect MOSI to it and count the
-//! edges of whatever SPI writes (in this test case 3 pos edges).
-//!
-//! Connect PCNT and MOSI, MISO and GPIO5 pins.
 
-//% CHIPS: esp32c6 esp32h2 esp32s3
+//% CHIPS: esp32 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: generic-queue
 
 #![no_std]
@@ -23,12 +10,8 @@ use embedded_hal_async::spi::SpiBus;
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{ErasedPin, Io, Level, Output, Pull},
-    pcnt::{
-        channel::{EdgeMode, PcntInputConfig, PcntSource},
-        unit::Unit,
-        Pcnt,
-    },
+    gpio::{interconnect::InputSignal, Io},
+    pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
     peripherals::SPI2,
     prelude::*,
     spi::{
@@ -55,9 +38,8 @@ const DMA_BUFFER_SIZE: usize = 5;
 
 struct Context {
     spi: SpiDmaBus<'static, SPI2, DmaChannel0, FullDuplexMode, Async>,
+    pcnt_source: InputSignal,
     pcnt_unit: Unit<'static, 0>,
-    out_pin: Output<'static>,
-    mosi_mirror: ErasedPin,
 }
 
 #[cfg(test)]
@@ -75,13 +57,7 @@ mod tests {
         let pcnt = Pcnt::new(peripherals.PCNT);
         let sclk = io.pins.gpio0;
 
-        let (mosi_mirror, mosi) = hil_test::common_test_pins!(io);
-        let miso = io.pins.gpio4;
-        let mosi_mirror = mosi_mirror.degrade();
-
-        let mut out_pin = Output::new(io.pins.gpio5, Level::Low);
-        out_pin.set_low();
-        assert_eq!(out_pin.is_set_low(), true);
+        let (_, mosi) = hil_test::common_test_pins!(io);
 
         let dma = Dma::new(peripherals.DMA);
 
@@ -97,28 +73,26 @@ mod tests {
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
+        let mosi_loopback = mosi.peripheral_input();
+        let mosi_loopback_pcnt = mosi.peripheral_input();
         let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
             .with_sck(sclk)
             .with_mosi(mosi)
-            .with_miso(miso)
+            .with_miso(mosi_loopback)
             .with_dma(dma_channel.configure_for_async(false, DmaPriority::Priority0))
             .with_buffers(dma_rx_buf, dma_tx_buf);
 
         Context {
             spi,
+            pcnt_source: mosi_loopback_pcnt,
             pcnt_unit: pcnt.unit0,
-            out_pin,
-            mosi_mirror,
         }
     }
 
     #[test]
     #[timeout(3)]
     async fn test_async_dma_read_dma_write_pcnt(mut ctx: Context) {
-        ctx.pcnt_unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.mosi_mirror,
-            PcntInputConfig { pull: Pull::Down },
-        ));
+        ctx.pcnt_unit.channel0.set_edge_signal(ctx.pcnt_source);
         ctx.pcnt_unit
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
@@ -127,8 +101,6 @@ mod tests {
 
         // Fill the buffer where each byte has 3 pos edges.
         let transmit = [0b0110_1010; DMA_BUFFER_SIZE];
-
-        assert_eq!(ctx.out_pin.is_set_low(), true);
 
         for i in 1..4 {
             receive.copy_from_slice(&[5, 5, 5, 5, 5]);
@@ -143,10 +115,7 @@ mod tests {
     #[test]
     #[timeout(3)]
     async fn test_async_dma_read_dma_transfer_pcnt(mut ctx: Context) {
-        ctx.pcnt_unit.channel0.set_edge_signal(PcntSource::from_pin(
-            ctx.mosi_mirror,
-            PcntInputConfig { pull: Pull::Down },
-        ));
+        ctx.pcnt_unit.channel0.set_edge_signal(ctx.pcnt_source);
         ctx.pcnt_unit
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
@@ -155,8 +124,6 @@ mod tests {
 
         // Fill the buffer where each byte has 3 pos edges.
         let transmit = [0b0110_1010; DMA_BUFFER_SIZE];
-
-        assert_eq!(ctx.out_pin.is_set_low(), true);
 
         for i in 1..4 {
             receive.copy_from_slice(&[5, 5, 5, 5, 5]);

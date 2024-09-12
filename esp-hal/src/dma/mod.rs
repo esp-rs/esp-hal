@@ -35,7 +35,7 @@
 //!     100.kHz(),
 //!     SpiMode::Mode0,
 //! )
-//! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
+//! .with_pins(sclk, mosi, miso, cs)
 //! .with_dma(dma_channel.configure(
 //!     false,
 //!     DmaPriority::Priority0,
@@ -1187,10 +1187,10 @@ pub trait RxPrivate: crate::private::Sealed {
         chain: &DescriptorChain,
     ) -> Result<(), DmaError>;
 
-    unsafe fn prepare_transfer(
+    unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
         &mut self,
         peri: DmaPeripheral,
-        first_desc: *mut DmaDescriptor,
+        buffer: &mut BUF,
     ) -> Result<(), DmaError>;
 
     fn start_transfer(&mut self) -> Result<(), DmaError>;
@@ -1371,18 +1371,20 @@ where
             .prepare_transfer_without_start(chain.first() as _, peri)
     }
 
-    unsafe fn prepare_transfer(
+    unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
         &mut self,
         peri: DmaPeripheral,
-        first_desc: *mut DmaDescriptor,
+        buffer: &mut BUF,
     ) -> Result<(), DmaError> {
-        // TODO: Figure out burst mode for DmaBuf.
+        let preparation = buffer.prepare();
+
+        // TODO: Get burst mode from DmaBuf.
         if self.burst_mode {
             return Err(DmaError::InvalidAlignment);
         }
 
         self.rx_impl
-            .prepare_transfer_without_start(first_desc, peri)
+            .prepare_transfer_without_start(preparation.start, peri)
     }
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
@@ -1509,10 +1511,10 @@ pub trait TxPrivate: crate::private::Sealed {
         chain: &DescriptorChain,
     ) -> Result<(), DmaError>;
 
-    unsafe fn prepare_transfer(
+    unsafe fn prepare_transfer<BUF: DmaTxBuffer>(
         &mut self,
         peri: DmaPeripheral,
-        desc: *mut DmaDescriptor,
+        buffer: &mut BUF,
     ) -> Result<(), DmaError>;
 
     fn start_transfer(&mut self) -> Result<(), DmaError>;
@@ -1696,12 +1698,15 @@ where
             .prepare_transfer_without_start(chain.first() as _, peri)
     }
 
-    unsafe fn prepare_transfer(
+    unsafe fn prepare_transfer<BUF: DmaTxBuffer>(
         &mut self,
         peri: DmaPeripheral,
-        desc: *mut DmaDescriptor,
+        buffer: &mut BUF,
     ) -> Result<(), DmaError> {
-        self.tx_impl.prepare_transfer_without_start(desc, peri)
+        let preparation = buffer.prepare();
+
+        self.tx_impl
+            .prepare_transfer_without_start(preparation.start, peri)
     }
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
@@ -1934,6 +1939,49 @@ where
     }
 }
 
+/// Holds all the information needed to configure a DMA channel for a transfer.
+pub struct Preparation {
+    start: *mut DmaDescriptor,
+    // burst_mode, alignment, check_owner, etc.
+}
+
+/// [DmaTxBuffer] is a DMA descriptor + memory combo that can be used for
+/// transmitting data from a DMA channel to a peripheral's FIFO.
+pub trait DmaTxBuffer {
+    /// Prepares the buffer for an imminent transfer and returns
+    /// information required to use this buffer.
+    ///
+    /// Note: This operation is idempotent.
+    fn prepare(&mut self) -> Preparation;
+
+    /// Returns the maximum number of bytes that would be transmitted by this
+    /// buffer.
+    ///
+    /// This is a convenience hint for SPI. Most peripherals don't care how long
+    /// the transfer is.
+    fn length(&self) -> usize;
+}
+
+/// [DmaRxBuffer] is a DMA descriptor + memory combo that can be used for
+/// receiving data from a peripheral's FIFO to a DMA channel.
+///
+/// Note: Implementations of this trait may only support having a single EOF bit
+/// which resides in the last descriptor. There will be a separate trait in
+/// future to support multiple EOFs.
+pub trait DmaRxBuffer {
+    /// Prepares the buffer for an imminent transfer and returns
+    /// information required to use this buffer.
+    ///
+    /// Note: This operation is idempotent.
+    fn prepare(&mut self) -> Preparation;
+
+    /// Returns the maximum number of bytes that can be received by this buffer.
+    ///
+    /// This is a convenience hint for SPI. Most peripherals don't care how long
+    /// the transfer is.
+    fn length(&self) -> usize;
+}
+
 /// Error returned from Dma[Rx|Tx|RxTx]Buf operations.
 #[derive(Debug)]
 pub enum DmaBufError {
@@ -2072,9 +2120,26 @@ impl DmaTxBuf {
     pub fn as_slice(&self) -> &[u8] {
         self.buffer
     }
+}
 
-    pub(crate) fn first(&self) -> *mut DmaDescriptor {
-        self.descriptors.as_ptr() as _
+impl DmaTxBuffer for DmaTxBuf {
+    fn prepare(&mut self) -> Preparation {
+        for desc in self.descriptors.iter_mut() {
+            // Give ownership to the DMA
+            desc.set_owner(Owner::Dma);
+
+            if desc.next.is_null() {
+                break;
+            }
+        }
+
+        Preparation {
+            start: self.descriptors.as_mut_ptr(),
+        }
+    }
+
+    fn length(&self) -> usize {
+        self.len()
     }
 }
 
@@ -2283,9 +2348,34 @@ impl DmaRxBuf {
             Some(chunk)
         })
     }
+}
 
-    pub(crate) fn first(&self) -> *mut DmaDescriptor {
-        self.descriptors.as_ptr() as _
+impl DmaRxBuffer for DmaRxBuf {
+    fn prepare(&mut self) -> Preparation {
+        for desc in self.descriptors.iter_mut() {
+            // Give ownership to the DMA
+            desc.set_owner(Owner::Dma);
+
+            // Clear this to allow hardware to set it when the peripheral returns an EOF
+            // bit.
+            desc.set_suc_eof(false);
+
+            // Clear this to allow hardware to set it when it's
+            // done receiving data for this descriptor.
+            desc.set_length(0);
+
+            if desc.next.is_null() {
+                break;
+            }
+        }
+
+        Preparation {
+            start: self.descriptors.as_mut_ptr(),
+        }
+    }
+
+    fn length(&self) -> usize {
+        self.len()
     }
 }
 
@@ -2370,13 +2460,26 @@ impl DmaRxTxBuf {
         self.buffer.len()
     }
 
+    /// Return the number of bytes that would be transmitted by this buf.
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        let mut result = 0;
+        for desc in self.tx_descriptors.iter() {
+            result += desc.len();
+            if desc.next.is_null() {
+                break;
+            }
+        }
+        result
+    }
+
     /// Returns the entire buf as a slice than can be read.
     pub fn as_slice(&self) -> &[u8] {
         self.buffer
     }
 
     /// Returns the entire buf as a slice than can be written.
-    pub fn as_slice_mut(&mut self) -> &mut [u8] {
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
         &mut self.buffer[..]
     }
 
@@ -2444,6 +2547,56 @@ impl DmaRxTxBuf {
             remaining_length -= chunk_size;
         }
         debug_assert_eq!(remaining_length, 0);
+    }
+}
+
+impl DmaTxBuffer for DmaRxTxBuf {
+    fn prepare(&mut self) -> Preparation {
+        for desc in self.tx_descriptors.iter_mut() {
+            // Give ownership to the DMA
+            desc.set_owner(Owner::Dma);
+
+            if desc.next.is_null() {
+                break;
+            }
+        }
+
+        Preparation {
+            start: self.tx_descriptors.as_mut_ptr(),
+        }
+    }
+
+    fn length(&self) -> usize {
+        self.len()
+    }
+}
+
+impl DmaRxBuffer for DmaRxTxBuf {
+    fn prepare(&mut self) -> Preparation {
+        for desc in self.rx_descriptors.iter_mut() {
+            // Give ownership to the DMA
+            desc.set_owner(Owner::Dma);
+
+            // Clear this to allow hardware to set it when the peripheral returns an EOF
+            // bit.
+            desc.set_suc_eof(false);
+
+            // Clear this to allow hardware to set it when it's
+            // done receiving data for this descriptor.
+            desc.set_length(0);
+
+            if desc.next.is_null() {
+                break;
+            }
+        }
+
+        Preparation {
+            start: self.rx_descriptors.as_mut_ptr(),
+        }
+    }
+
+    fn length(&self) -> usize {
+        self.len()
     }
 }
 

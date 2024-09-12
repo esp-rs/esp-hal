@@ -63,14 +63,8 @@ fn main() -> ! {
         }
     }
 
-    let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0).with_pins(
-        Some(sclk),
-        Some(mosi),
-        Some(miso),
-        Some(sio2),
-        Some(sio3),
-        Some(cs),
-    );
+    let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
+        .with_pins(sclk, mosi, miso, sio2, sio3, cs);
 
     let delay = Delay::new();
 

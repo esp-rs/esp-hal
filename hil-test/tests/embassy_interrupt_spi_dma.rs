@@ -19,7 +19,7 @@ use esp_hal::{
         FullDuplexMode,
         SpiMode,
     },
-    timer::{timg::TimerGroup, ErasedTimer},
+    timer::{timg::TimerGroup, AnyTimer},
     Async,
 };
 use esp_hal_embassy::InterruptExecutor;
@@ -75,10 +75,7 @@ mod test {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_hal_embassy::init([
-            ErasedTimer::from(timg0.timer0),
-            ErasedTimer::from(timg0.timer1),
-        ]);
+        esp_hal_embassy::init([AnyTimer::from(timg0.timer0), AnyTimer::from(timg0.timer1)]);
 
         let dma = Dma::new(peripherals.DMA);
 

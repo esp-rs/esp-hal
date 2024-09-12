@@ -21,7 +21,7 @@ use esp_backtrace as _;
 use esp_hal::{
     prelude::*,
     rng::Rng,
-    timer::{timg::TimerGroup, ErasedTimer, PeriodicTimer},
+    timer::{timg::TimerGroup, AnyTimer, PeriodicTimer},
 };
 use esp_println::println;
 use esp_wifi::{initialize, wifi, EspWifiInitFor};
@@ -41,7 +41,7 @@ fn main() -> ! {
     esp_alloc::heap_allocator!(72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let timer0: ErasedTimer = timg0.timer0.into();
+    let timer0: AnyTimer = timg0.timer0.into();
     let timer = PeriodicTimer::new(timer0);
 
     let init = initialize(

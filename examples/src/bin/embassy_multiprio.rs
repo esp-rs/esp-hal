@@ -25,7 +25,7 @@ use embassy_time::{Duration, Instant, Ticker, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     interrupt::{software::SoftwareInterruptControl, Priority},
-    timer::{timg::TimerGroup, ErasedTimer},
+    timer::{timg::TimerGroup, AnyTimer},
 };
 use esp_hal_embassy::InterruptExecutor;
 use esp_println::println;
@@ -76,16 +76,16 @@ async fn main(low_prio_spawner: Spawner) {
     let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let timer0: ErasedTimer = timg0.timer0.into();
+    let timer0: AnyTimer = timg0.timer0.into();
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32c2")] {
             use esp_hal::timer::systimer::{SystemTimer, Target};
             let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
-            let timer1: ErasedTimer = systimer.alarm0.into();
+            let timer1: AnyTimer = systimer.alarm0.into();
         } else {
             let timg1 = TimerGroup::new(peripherals.TIMG1);
-            let timer1: ErasedTimer = timg1.timer0.into();
+            let timer1: AnyTimer = timg1.timer0.into();
         }
     }
 
