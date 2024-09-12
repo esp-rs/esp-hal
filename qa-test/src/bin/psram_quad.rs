@@ -2,8 +2,8 @@
 //!
 //! You need an ESP32, ESP32-S2 or ESP32-S3 with at least 2 MB of PSRAM memory.
 
-//% CHIPS: esp32 esp32s2 esp32s3
-//% FEATURES: esp-hal/quad-psram
+//% CHIPS: esp32 esp32s2 sp32s3
+//% FEATURES: esp-hal/quad-psram esp-alloc/internal-heap-stats
 
 #![no_std]
 #![no_main]
@@ -51,6 +51,8 @@ fn main() -> ! {
 
     let string = String::from("A string allocated in PSRAM");
     println!("'{}' allocated at {:p}", &string, string.as_ptr());
+
+    println!("{}", esp_alloc::get_info!());
 
     println!("done");
 
