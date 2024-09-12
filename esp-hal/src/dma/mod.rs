@@ -35,7 +35,7 @@
 //!     100.kHz(),
 //!     SpiMode::Mode0,
 //! )
-//! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
+//! .with_pins(sclk, mosi, miso, cs)
 //! .with_dma(dma_channel.configure(
 //!     false,
 //!     DmaPriority::Priority0,

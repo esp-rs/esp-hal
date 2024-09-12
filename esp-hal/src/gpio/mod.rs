@@ -26,8 +26,8 @@
 //! - [Output] and [OutputOpenDrain] pins can be used as digital outputs.
 //! - [Flex] pin is a pin that can be used as an input and output pin.
 //! - [AnyPin] is a type-erased GPIO pin with support for inverted signalling.
-//! - [DummyPin] is a useful for cases where peripheral driver requires a pin,
-//!   but real pin cannot be used.
+//! - [NoPin] is a useful for cases where peripheral driver requires a pin, but
+//!   real pin cannot be used.
 //!
 //! ### GPIO interconnect
 //!
@@ -77,10 +77,10 @@ use crate::{
     InterruptConfigurable,
 };
 
-mod dummy_pin;
 pub mod interconnect;
+mod placeholder;
 
-pub use dummy_pin::DummyPin;
+pub use placeholder::NoPin;
 
 #[cfg(soc_etm)]
 pub mod etm;
@@ -90,7 +90,6 @@ pub mod lp_io;
 pub mod rtc_io;
 
 /// Convenience constant for `Option::None` pin
-pub const NO_PIN: Option<DummyPin> = None;
 
 static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::NULL;
 
@@ -147,6 +146,14 @@ pub enum WakeEvent {
 }
 
 /// Digital input or output level.
+///
+/// `Level` can be used to control a GPIO output, and it can act as a peripheral
+/// signal and be connected to peripheral inputs and outputs.
+///
+/// When connected to a peripheral
+/// input, the peripheral will read the corresponding level from that signal.
+///
+/// When connected to a peripheral output, the level will be ignored.
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Level {

@@ -11,7 +11,7 @@
 
 use esp_hal::{
     dma::{Dma, DmaPriority},
-    gpio::{DummyPin, Io},
+    gpio::{Io, NoPin},
     i2s::{asynch::*, DataFormat, I2s, I2sTx, Standard},
     peripherals::I2S0,
     prelude::*,
@@ -124,15 +124,15 @@ mod tests {
 
         let i2s_tx = i2s
             .i2s_tx
-            .with_bclk(DummyPin::new())
-            .with_ws(DummyPin::new())
+            .with_bclk(NoPin)
+            .with_ws(NoPin)
             .with_dout(dout)
             .build();
 
         let i2s_rx = i2s
             .i2s_rx
-            .with_bclk(DummyPin::new())
-            .with_ws(DummyPin::new())
+            .with_bclk(NoPin)
+            .with_ws(NoPin)
             .with_din(din)
             .build();
 

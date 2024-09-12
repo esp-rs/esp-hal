@@ -10,7 +10,7 @@
 use esp_hal::{
     dma::{Channel, Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{AnyPin, Io, Level, Output},
+    gpio::{AnyPin, Io, Level, NoPin, Output},
     prelude::*,
     spi::{
         master::{Address, Command, Spi, SpiDma},
@@ -52,7 +52,7 @@ fn execute(
     let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let mut dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
 
-    dma_tx_buf.fill(&[0xff; DMA_BUFFER_SIZE]);
+    dma_tx_buf.fill(&[0x00; DMA_BUFFER_SIZE]);
 
     let transfer = spi
         .write(
@@ -69,7 +69,7 @@ fn execute(
         .unwrap();
     (spi, _) = transfer.wait();
 
-    mosi_mirror.set_low();
+    mosi_mirror.set_high();
 
     let transfer = spi
         .read(
@@ -125,67 +125,39 @@ mod tests {
     #[timeout(3)]
     fn test_spi_writes_correctly_to_pin_0(ctx: Context) {
         let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(
-                esp_hal::gpio::NO_PIN,
-                Some(ctx.mosi),
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-            )
+            .with_pins(NoPin, ctx.mosi, NoPin, NoPin, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
-        super::execute(spi, ctx.mosi_mirror, !0b0001_0001);
+        super::execute(spi, ctx.mosi_mirror, 0b0001_0001);
     }
 
     #[test]
     #[timeout(3)]
     fn test_spi_writes_correctly_to_pin_1(ctx: Context) {
         let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                Some(ctx.mosi),
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-            )
+            .with_pins(NoPin, NoPin, ctx.mosi, NoPin, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
-        super::execute(spi, ctx.mosi_mirror, !0b0010_0010);
+        super::execute(spi, ctx.mosi_mirror, 0b0010_0010);
     }
 
     #[test]
     #[timeout(3)]
     fn test_spi_writes_correctly_to_pin_2(ctx: Context) {
         let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                Some(ctx.mosi),
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-            )
+            .with_pins(NoPin, NoPin, NoPin, ctx.mosi, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
-        super::execute(spi, ctx.mosi_mirror, !0b0100_0100);
+        super::execute(spi, ctx.mosi_mirror, 0b0100_0100);
     }
 
     #[test]
     #[timeout(3)]
     fn test_spi_writes_correctly_to_pin_3(ctx: Context) {
         let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                esp_hal::gpio::NO_PIN,
-                Some(ctx.mosi),
-                esp_hal::gpio::NO_PIN,
-            )
+            .with_pins(NoPin, NoPin, NoPin, NoPin, ctx.mosi, NoPin)
             .with_dma(ctx.dma_channel);
 
-        super::execute(spi, ctx.mosi_mirror, !0b1000_1000);
+        super::execute(spi, ctx.mosi_mirror, 0b1000_1000);
     }
 }

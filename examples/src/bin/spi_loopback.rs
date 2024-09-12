@@ -36,12 +36,8 @@ fn main() -> ! {
     let miso = miso_mosi.peripheral_input();
     let mosi = miso_mosi.into_peripheral_output();
 
-    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0).with_pins(
-        Some(sclk),
-        Some(mosi),
-        Some(miso),
-        Some(cs),
-    );
+    let mut spi =
+        Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0).with_pins(sclk, mosi, miso, cs);
 
     let delay = Delay::new();
 

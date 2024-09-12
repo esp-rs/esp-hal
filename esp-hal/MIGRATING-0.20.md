@@ -146,3 +146,16 @@ configure an input pin, and pass it to `set_edge_signal` or `set_ctrl_signal`.
 -   ));
 +   ch0.set_edge_signal(Input::new(io.pins.gpio5, Pull::Down));
 ```
+
+## SPI pins and `NO_PIN`
+
+Use `NoPin` in place of the now-removed `NO_PIN` constant.
+
+SPI pins, when using the `with_pin` function, are no longer optional.
+You can pass `NoPin` or `Level` as inputs, and `NoPin` as output if you don't need a particular pin.
+
+```diff
+ let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
+-    .with_pins(Some(sclk), Some(mosi), NO_PIN, NO_PIN);
++    .with_pins(sclk, mosi, Level::Low, NoPin);
+```

@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Introduce traits for the DMA buffer objects (#1976)
-- Implement `embedded-hal` output pin traits for `DummyPin` (#2019)
+- Implement `embedded-hal` output pin traits for `NoPin` (#2019, #2133)
 - Added `esp_hal::init` to simplify HAL initialisation (#1970, #1999)
 - Added GpioPin::degrade to create ErasePins easily. Same for AnyPin by accident. (#2075)
 - Added missing functions to `Flex`: `unlisten`, `is_interrupt_set`, `wakeup_enable`, `wait_for_high`, `wait_for_low`, `wait_for_rising_edge`, `wait_for_falling_edge`, `wait_for_any_edge`. (#2075)
@@ -39,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32: Added support for touch sensing on GPIO32 and 33 (#2109)
 - Replaced `AnyPin` with `InputSignal` and `OutputSignal` and renamed `ErasedPin` to `AnyPin` (#2128)
 - Replaced the `ErasedTimer` enum with the `AnyTimer` struct. (#?)
+- Changed the parameters of `Spi::with_pins` to no longer be optional (#2133)
+- Renamed `DummyPin` to `NoPin` and removed all internal logic from it. (#2133)
+- The `NO_PIN` constant has been removed. (#2133)
 
 ### Fixed
 
