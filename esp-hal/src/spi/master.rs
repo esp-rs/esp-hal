@@ -61,9 +61,9 @@
 use core::marker::PhantomData;
 
 pub use dma::*;
-#[cfg(not(any(esp32, esp32s2)))]
+#[cfg(gdma)]
 use enumset::EnumSet;
-#[cfg(not(any(esp32, esp32s2)))]
+#[cfg(gdma)]
 use enumset::EnumSetType;
 use fugit::HertzU32;
 #[cfg(feature = "place-spi-driver-in-ram")]
@@ -91,7 +91,7 @@ use crate::{
 };
 
 /// Enumeration of possible SPI interrupt events.
-#[cfg(not(any(esp32, esp32s2)))]
+#[cfg(gdma)]
 #[derive(EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SpiInterrupt {
@@ -999,25 +999,25 @@ mod dma {
         }
 
         /// Listen for the given interrupts
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(gdma)]
         pub fn listen(&mut self, interrupts: EnumSet<SpiInterrupt>) {
             self.spi.listen(interrupts);
         }
 
         /// Unlisten the given interrupts
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(gdma)]
         pub fn unlisten(&mut self, interrupts: EnumSet<SpiInterrupt>) {
             self.spi.unlisten(interrupts);
         }
 
         /// Gets asserted interrupts
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(gdma)]
         pub fn interrupts(&mut self) -> EnumSet<SpiInterrupt> {
             self.spi.interrupts()
         }
 
         /// Resets asserted interrupts
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(gdma)]
         pub fn clear_interrupts(&mut self, interrupts: EnumSet<SpiInterrupt>) {
             self.spi.clear_interrupts(interrupts);
         }
@@ -1516,7 +1516,7 @@ mod dma {
         }
 
         /// Listen for the given interrupts
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(gdma)]
         pub fn listen(&mut self, interrupts: EnumSet<SpiInterrupt>) {
             let (mut spi_dma, rx_buf, tx_buf) = self.wait_for_idle();
             spi_dma.listen(interrupts);
@@ -1524,7 +1524,7 @@ mod dma {
         }
 
         /// Unlisten the given interrupts
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(gdma)]
         pub fn unlisten(&mut self, interrupts: EnumSet<SpiInterrupt>) {
             let (mut spi_dma, rx_buf, tx_buf) = self.wait_for_idle();
             spi_dma.unlisten(interrupts);
@@ -1532,7 +1532,7 @@ mod dma {
         }
 
         /// Gets asserted interrupts
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(gdma)]
         pub fn interrupts(&mut self) -> EnumSet<SpiInterrupt> {
             let (mut spi_dma, rx_buf, tx_buf) = self.wait_for_idle();
             let interrupts = spi_dma.interrupts();
@@ -1542,7 +1542,7 @@ mod dma {
         }
 
         /// Resets asserted interrupts
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(gdma)]
         pub fn clear_interrupts(&mut self, interrupts: EnumSet<SpiInterrupt>) {
             let (mut spi_dma, rx_buf, tx_buf) = self.wait_for_idle();
             spi_dma.clear_interrupts(interrupts);
@@ -2349,19 +2349,19 @@ pub trait InstanceDma: Instance {
         }
     }
 
-    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
+    #[cfg(gdma)]
     fn enable_dma(&self) {
         let reg_block = self.register_block();
         reg_block.dma_conf().modify(|_, w| w.dma_tx_ena().set_bit());
         reg_block.dma_conf().modify(|_, w| w.dma_rx_ena().set_bit());
     }
 
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(pdma)]
     fn enable_dma(&self) {
         // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
     }
 
-    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
+    #[cfg(gdma)]
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
         reg_block.dma_int_clr().write(|w| {
@@ -2378,7 +2378,7 @@ pub trait InstanceDma: Instance {
         });
     }
 
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(pdma)]
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
         reg_block.dma_int_clr().write(|w| {
@@ -2405,7 +2405,7 @@ pub trait InstanceDma: Instance {
 }
 
 fn reset_dma_before_usr_cmd(_reg_block: &RegisterBlock) {
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(gdma)]
     _reg_block.dma_conf().modify(|_, w| {
         w.rx_afifo_rst()
             .set_bit()
@@ -2425,10 +2425,10 @@ fn reset_dma_before_usr_cmd(_reg_block: &RegisterBlock) {
     xtensa_lx::timer::delay(cycles);
 }
 
-#[cfg(not(any(esp32, esp32s2)))]
+#[cfg(gdma)]
 fn reset_dma_before_load_dma_dscr(_reg_block: &RegisterBlock) {}
 
-#[cfg(any(esp32, esp32s2))]
+#[cfg(pdma)]
 fn reset_dma_before_load_dma_dscr(reg_block: &RegisterBlock) {
     reg_block.dma_conf().modify(|_, w| {
         w.out_rst()
@@ -2515,7 +2515,7 @@ pub trait Instance: private::Sealed {
                 .clear_bit()
         });
 
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(gdma)]
         reg_block.clk_gate().modify(|_, w| {
             w.clk_en()
                 .set_bit()
@@ -2534,7 +2534,7 @@ pub trait Instance: private::Sealed {
                 .modify(|_, w| w.spi2_clkm_sel().bits(1));
         }
 
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(gdma)]
         reg_block.ctrl().modify(|_, w| {
             w.q_pol()
                 .clear_bit()
@@ -2854,7 +2854,7 @@ pub trait Instance: private::Sealed {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler);
 
     /// Listen for the given interrupts
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(gdma)]
     fn listen(&mut self, interrupts: EnumSet<SpiInterrupt>) {
         let reg_block = self.register_block();
 
@@ -2870,7 +2870,7 @@ pub trait Instance: private::Sealed {
     }
 
     /// Unlisten the given interrupts
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(gdma)]
     fn unlisten(&mut self, interrupts: EnumSet<SpiInterrupt>) {
         let reg_block = self.register_block();
 
@@ -2886,7 +2886,7 @@ pub trait Instance: private::Sealed {
     }
 
     /// Gets asserted interrupts
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(gdma)]
     fn interrupts(&mut self) -> EnumSet<SpiInterrupt> {
         let mut res = EnumSet::new();
         let reg_block = self.register_block();
@@ -2901,7 +2901,7 @@ pub trait Instance: private::Sealed {
     }
 
     /// Resets asserted interrupts
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(gdma)]
     fn clear_interrupts(&mut self, interrupts: EnumSet<SpiInterrupt>) {
         let reg_block = self.register_block();
 
@@ -2968,7 +2968,7 @@ pub trait Instance: private::Sealed {
 
     fn ch_bus_freq(&mut self, frequency: HertzU32) {
         // Disable clock source
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(gdma)]
         self.register_block().clk_gate().modify(|_, w| {
             w.clk_en()
                 .clear_bit()
@@ -2982,7 +2982,7 @@ pub trait Instance: private::Sealed {
         self.setup(frequency);
 
         // Enable clock source
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(gdma)]
         self.register_block().clk_gate().modify(|_, w| {
             w.clk_en()
                 .set_bit()
@@ -3223,7 +3223,7 @@ pub trait Instance: private::Sealed {
                 .bit(command_state)
         });
 
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(gdma)]
         reg_block.clk_gate().modify(|_, w| {
             w.clk_en()
                 .set_bit()
@@ -3377,7 +3377,7 @@ pub trait Instance: private::Sealed {
         self.read_bytes_from_fifo(buffer)
     }
 
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(gdma)]
     fn update(&self) {
         let reg_block = self.register_block();
 
@@ -3388,7 +3388,7 @@ pub trait Instance: private::Sealed {
         }
     }
 
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(pdma)]
     fn update(&self) {
         // not need/available on ESP32/ESP32S2
     }
