@@ -250,12 +250,9 @@ where
         use clock_divider_solver::ClockDivider;
 
         let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
-        let Some(clock_divider) = ClockDivider::from_frequence(
-            src_clock.to_Hz(),
-            frequency.to_Hz(),
-            256,
-            0b11111,
-        ) else {
+        let Some(clock_divider) =
+            ClockDivider::from_frequence(src_clock.to_Hz(), frequency.to_Hz(), 256, 0b11111)
+        else {
             return Err(Error::UnreachableTargetFrequency);
         };
 
