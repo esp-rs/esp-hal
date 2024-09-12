@@ -12,9 +12,8 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::Io,
+    gpio::{DummyPin, Io},
     i2s::{DataFormat, I2s, I2sReadDma, I2sWriteDma, Standard},
-    peripheral::Peripheral,
     prelude::*,
 };
 use hil_test as _;
@@ -76,15 +75,15 @@ mod tests {
 
         let mut i2s_tx = i2s
             .i2s_tx
-            .with_bclk(unsafe { io.pins.gpio0.clone_unchecked() })
-            .with_ws(unsafe { io.pins.gpio1.clone_unchecked() })
+            .with_bclk(DummyPin::new())
+            .with_ws(DummyPin::new())
             .with_dout(dout)
             .build();
 
         let mut i2s_rx = i2s
             .i2s_rx
-            .with_bclk(io.pins.gpio0)
-            .with_ws(io.pins.gpio1)
+            .with_bclk(DummyPin::new())
+            .with_ws(DummyPin::new())
             .with_din(din)
             .build();
 
