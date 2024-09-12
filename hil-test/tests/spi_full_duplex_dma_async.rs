@@ -10,12 +10,8 @@ use embedded_hal_async::spi::SpiBus;
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{Io, Pull},
-    pcnt::{
-        channel::{EdgeMode, PcntInputConfig, PcntSource},
-        unit::Unit,
-        Pcnt,
-    },
+    gpio::{interconnect::InputSignal, Io},
+    pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
     peripherals::SPI2,
     prelude::*,
     spi::{
@@ -42,7 +38,7 @@ const DMA_BUFFER_SIZE: usize = 5;
 
 struct Context {
     spi: SpiDmaBus<'static, SPI2, DmaChannel0, FullDuplexMode, Async>,
-    pcnt_source: PcntSource,
+    pcnt_source: InputSignal,
     pcnt_unit: Unit<'static, 0>,
 }
 
@@ -88,7 +84,7 @@ mod tests {
 
         Context {
             spi,
-            pcnt_source: PcntSource::from(mosi_loopback_pcnt, PcntInputConfig { pull: Pull::Down }),
+            pcnt_source: mosi_loopback_pcnt,
             pcnt_unit: pcnt.unit0,
         }
     }

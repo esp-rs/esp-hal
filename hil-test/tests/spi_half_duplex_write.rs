@@ -8,12 +8,8 @@
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{Io, Pull},
-    pcnt::{
-        channel::{EdgeMode, PcntInputConfig, PcntSource},
-        unit::Unit,
-        Pcnt,
-    },
+    gpio::{interconnect::InputSignal, Io},
+    pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
     peripherals::SPI2,
     prelude::*,
     spi::{
@@ -40,7 +36,7 @@ cfg_if::cfg_if! {
 struct Context {
     spi: SpiDma<'static, SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
     pcnt_unit: Unit<'static, 0>,
-    pcnt_source: PcntSource,
+    pcnt_source: InputSignal,
 }
 
 #[cfg(test)]
@@ -81,8 +77,8 @@ mod tests {
 
         Context {
             spi,
-            pcnt_source: PcntSource::from(mosi_loopback, PcntInputConfig { pull: Pull::Down }),
             pcnt_unit: pcnt.unit0,
+            pcnt_source: mosi_loopback,
         }
     }
 
