@@ -74,6 +74,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::GPIO,
     private::{self, Sealed},
+    Cpu,
     InterruptConfigurable,
 };
 
@@ -89,14 +90,17 @@ pub mod lp_io;
 #[cfg(all(rtc_io, not(esp32)))]
 pub mod rtc_io;
 
-/// Convenience constant for `Option::None` pin
-
-static USER_INTERRUPT_HANDLERS: [CFnPtr; NUM_PINS] = [CFnPtr::NULL; NUM_PINS];
+#[allow(clippy::declare_interior_mutable_const)]
+const NULL_HANDLER: CFnPtr = CFnPtr::new();
+#[allow(clippy::declare_interior_mutable_const)]
+const NULL_HANDLER_ARR: [CFnPtr; NUM_PINS] = [NULL_HANDLER; NUM_PINS];
+static USER_INTERRUPT_HANDLERS: [[CFnPtr; NUM_PINS]; Cpu::COUNT] = [NULL_HANDLER_ARR; Cpu::COUNT];
 
 struct CFnPtr(AtomicPtr<()>);
 impl CFnPtr {
-    #[allow(clippy::declare_interior_mutable_const)]
-    pub const NULL: Self = Self(AtomicPtr::new(core::ptr::null_mut()));
+    const fn new() -> Self {
+        Self(AtomicPtr::new(core::ptr::null_mut()))
+    }
 
     pub fn store(&self, f: extern "C" fn()) {
         self.0.store(f as *mut (), Ordering::Relaxed);
@@ -968,22 +972,25 @@ where
     Self: Pin,
 {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        raise_gpio_interrupt_priority(handler.priority());
-        USER_INTERRUPT_HANDLERS[GPIONUM as usize].store(handler.handler());
+        let core = crate::get_core();
+        USER_INTERRUPT_HANDLERS[core as usize][GPIONUM as usize].store(handler.handler());
+        raise_gpio_interrupt_priority(core, handler.priority());
     }
 }
 
-static MAX_PRIO: AtomicUsize = AtomicUsize::new(Priority::None as usize);
+fn raise_gpio_interrupt_priority(core: Cpu, priority: Priority) {
+    #[allow(clippy::declare_interior_mutable_const)]
+    const NO_PRIO: AtomicUsize = AtomicUsize::new(Priority::None as usize);
+    static MAX_PRIO: [AtomicUsize; Cpu::COUNT] = [NO_PRIO; Cpu::COUNT];
 
-fn raise_gpio_interrupt_priority(priority: Priority) {
     #[cold]
-    fn do_raise_priority_level(current_prio: usize, priority: Priority) {
+    fn do_raise_priority_level(max: &AtomicUsize, mut current_prio: usize, priority: Priority) {
         let priority_level = priority as usize;
         loop {
-            match MAX_PRIO.compare_exchange(
+            match max.compare_exchange(
                 current_prio,
                 priority_level,
-                Ordering::Relaxed,
+                Ordering::Acquire,
                 Ordering::Relaxed,
             ) {
                 Ok(_) => {
@@ -996,7 +1003,7 @@ fn raise_gpio_interrupt_priority(priority: Priority) {
                     crate::interrupt::enable(crate::peripherals::Interrupt::GPIO, priority)
                         .unwrap();
                 }
-                Err(p) if p < priority_level => {}
+                Err(p) if p < priority_level => current_prio = p,
                 Err(_) => break, // Interrupts are already enabled with an equal or higher priority
             }
         }
@@ -1005,16 +1012,18 @@ fn raise_gpio_interrupt_priority(priority: Priority) {
     let priority_level = priority as usize;
 
     // Do we need to raise the priority level?
-    let current_prio = MAX_PRIO.load(Ordering::Relaxed);
+    let max = &MAX_PRIO[core as usize];
+    let current_prio = max.load(Ordering::Relaxed);
     if current_prio < priority_level {
-        do_raise_priority_level(current_prio, priority);
+        do_raise_priority_level(max, current_prio, priority);
     }
 }
 
 #[ram]
 extern "C" fn gpio_interrupt_handler() {
+    let core = crate::get_core() as usize;
     handle_pin_interrupts(|pin_nr: u8| {
-        if let Some(handler) = USER_INTERRUPT_HANDLERS[pin_nr as usize].load() {
+        if let Some(handler) = USER_INTERRUPT_HANDLERS[core][pin_nr as usize].load() {
             handler();
         } else {
             set_int_enable(pin_nr, 0, 0, false);
@@ -2584,8 +2593,9 @@ mod asynch {
 
     impl PinFuture {
         fn new(pin_num: u8) -> Self {
-            raise_gpio_interrupt_priority(Priority::min());
-            USER_INTERRUPT_HANDLERS[pin_num as usize].clear();
+            let core = crate::get_core();
+            USER_INTERRUPT_HANDLERS[core as usize][pin_num as usize].clear();
+            raise_gpio_interrupt_priority(core, Priority::min());
             Self { pin_num }
         }
     }
