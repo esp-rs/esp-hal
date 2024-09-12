@@ -11,7 +11,7 @@
 
 use esp_hal::{
     dma::{Dma, DmaPriority},
-    gpio::{NoPin, Io},
+    gpio::{Io, NoPin},
     i2s::{asynch::*, DataFormat, I2s, I2sTx, Standard},
     peripherals::I2S0,
     prelude::*,
