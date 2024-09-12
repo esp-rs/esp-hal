@@ -260,7 +260,7 @@ where
         };
 
         self::chip_specific::configure_clock(
-            clock_divider.div_num,
+            clock_divider.div_num - 1,
             clock_divider.div_a,
             clock_divider.div_b,
         );
