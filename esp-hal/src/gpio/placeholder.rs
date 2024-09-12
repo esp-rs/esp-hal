@@ -2,40 +2,10 @@
 //!
 //! These are useful to pass them into peripheral drivers where you don't want
 //! an actual pin but one is required.
+// This module also contains peripheral signal impls for `Level` to avoid
+// polluting the main module.
 
 use super::*;
-
-/// Placeholder pin, used when no pin is required when using a peripheral.
-#[derive(Default, Clone, Copy)]
-pub struct NoPin;
-
-impl crate::peripheral::Peripheral for NoPin {
-    type P = Self;
-
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
-        Self
-    }
-}
-
-impl private::Sealed for NoPin {}
-
-impl PeripheralSignal for NoPin {
-    fn pull_direction(&self, _pull: Pull, _internal: private::Internal) {}
-}
-
-impl PeripheralInput for NoPin {
-    delegate::delegate! {
-        to Level::Low {
-            fn init_input(&self, _pull: Pull, _internal: private::Internal);
-            fn enable_input(&mut self, _on: bool, _internal: private::Internal);
-            fn enable_input_in_sleep_mode(&mut self, _on: bool, _internal: private::Internal);
-            fn is_input_high(&self, _internal: private::Internal) -> bool;
-            fn connect_input_to_peripheral(&mut self, _signal: InputSignal, _internal: private::Internal);
-            fn disconnect_input_from_peripheral(&mut self, _signal: InputSignal, _internal: private::Internal);
-            fn input_signals(&self, _internal: private::Internal) -> [Option<InputSignal>; 6];
-        }
-    }
-}
 
 impl PeripheralSignal for Level {
     fn pull_direction(&self, _pull: Pull, _internal: private::Internal) {}
@@ -77,7 +47,7 @@ impl PeripheralInput for Level {
     fn disconnect_input_from_peripheral(&mut self, _signal: InputSignal, _: private::Internal) {}
 }
 
-impl PeripheralOutput for NoPin {
+impl PeripheralOutput for Level {
     fn set_to_open_drain_output(&mut self, _: private::Internal) {}
 
     fn set_to_push_pull_output(&mut self, _: private::Internal) {}
@@ -107,6 +77,60 @@ impl PeripheralOutput for NoPin {
     fn connect_peripheral_to_output(&mut self, _signal: OutputSignal, _: private::Internal) {}
 
     fn disconnect_from_peripheral_output(&mut self, _signal: OutputSignal, _: private::Internal) {}
+}
+
+/// Placeholder pin, used when no pin is required when using a peripheral.
+///
+/// When used as a peripheral signal, `NoPin` is equivalent to [`Level::Low`].
+#[derive(Default, Clone, Copy)]
+pub struct NoPin;
+
+impl crate::peripheral::Peripheral for NoPin {
+    type P = Self;
+
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        Self
+    }
+}
+
+impl private::Sealed for NoPin {}
+
+impl PeripheralSignal for NoPin {
+    fn pull_direction(&self, _pull: Pull, _internal: private::Internal) {}
+}
+
+impl PeripheralInput for NoPin {
+    delegate::delegate! {
+        to Level::Low {
+            fn init_input(&self, _pull: Pull, _internal: private::Internal);
+            fn enable_input(&mut self, _on: bool, _internal: private::Internal);
+            fn enable_input_in_sleep_mode(&mut self, _on: bool, _internal: private::Internal);
+            fn is_input_high(&self, _internal: private::Internal) -> bool;
+            fn connect_input_to_peripheral(&mut self, _signal: InputSignal, _internal: private::Internal);
+            fn disconnect_input_from_peripheral(&mut self, _signal: InputSignal, _internal: private::Internal);
+            fn input_signals(&self, _internal: private::Internal) -> [Option<InputSignal>; 6];
+        }
+    }
+}
+
+impl PeripheralOutput for NoPin {
+    delegate::delegate! {
+        to Level::Low {
+            fn set_to_open_drain_output(&mut self, _internal: private::Internal);
+            fn set_to_push_pull_output(&mut self, _internal: private::Internal);
+            fn enable_output(&mut self, _on: bool, _internal: private::Internal);
+            fn set_output_high(&mut self, _on: bool, _internal: private::Internal);
+            fn set_drive_strength(&mut self, _strength: DriveStrength, _internal: private::Internal);
+            fn enable_open_drain(&mut self, _on: bool, _internal: private::Internal);
+            fn enable_output_in_sleep_mode(&mut self, _on: bool, _internal: private::Internal);
+            fn internal_pull_up_in_sleep_mode(&mut self, _on: bool, _internal: private::Internal);
+            fn internal_pull_down_in_sleep_mode(&mut self, _on: bool, _internal: private::Internal);
+            fn is_set_high(&self, _internal: private::Internal) -> bool;
+            fn output_signals(&self, _internal: private::Internal) -> [Option<OutputSignal>; 6];
+            fn connect_peripheral_to_output(&mut self, _signal: OutputSignal, _internal: private::Internal);
+            fn disconnect_from_peripheral_output(&mut self, _signal: OutputSignal, _internal: private::Internal);
+        }
+    }
 }
 
 impl embedded_hal_02::digital::v2::OutputPin for NoPin {

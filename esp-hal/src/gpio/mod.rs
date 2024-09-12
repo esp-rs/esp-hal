@@ -146,6 +146,14 @@ pub enum WakeEvent {
 }
 
 /// Digital input or output level.
+///
+/// `Level` can be used to control a GPIO output, and it can act as a peripheral
+/// signal and be connected to peripheral inputs and outputs.
+///
+/// When connected to a peripheral
+/// input, the peripheral will read the corresponding level from that signal.
+///
+/// When connected to a peripheral output, the level will be ignored.
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Level {
