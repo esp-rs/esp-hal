@@ -16,7 +16,7 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::{lp_io::LowPowerOutputOpenDrain, Io},
+    gpio::lp_io::LowPowerOutputOpenDrain,
     i2c::lp_i2c::LpI2c,
     lp_core::{LpCore, LpCoreWakeupSource},
     prelude::*,

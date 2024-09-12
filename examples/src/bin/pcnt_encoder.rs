@@ -49,8 +49,8 @@ fn main() -> ! {
 
     println!("setup channel 0");
     let ch0 = &u0.channel0;
-    let pin_a = Input::new(io.pins.gpio4, Pull::Up);
-    let pin_b = Input::new(io.pins.gpio5, Pull::Up);
+    let pin_a = Input::new(io.gpio4, Pull::Up);
+    let pin_b = Input::new(io.gpio5, Pull::Up);
 
     ch0.set_ctrl_signal(pin_a.peripheral_input());
     ch0.set_edge_signal(pin_b.peripheral_input());

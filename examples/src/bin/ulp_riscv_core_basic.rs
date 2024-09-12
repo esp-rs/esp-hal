@@ -12,11 +12,7 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{
-    gpio::{rtc_io::*, Io},
-    prelude::*,
-    ulp_core,
-};
+use esp_hal::{gpio::rtc_io::*, prelude::*, ulp_core};
 use esp_println::{print, println};
 
 #[entry]
