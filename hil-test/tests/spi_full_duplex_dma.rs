@@ -60,32 +60,40 @@ mod tests {
             }
         }
 
-        let mosi_loopback = mosi.peripheral_input();
-        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
+        let miso = mosi.peripheral_input();
+        let spi = Spi::new(peripherals.SPI2, 10000.kHz(), SpiMode::Mode0)
             .with_sck(sclk)
             .with_mosi(mosi)
-            .with_miso(mosi_loopback)
+            .with_miso(miso)
             .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
         Context { spi }
     }
 
     #[test]
-    #[timeout(3)]
     fn test_symmetric_dma_transfer(ctx: Context) {
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
-        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+        // This test case sends a large amount of data, twice, to verify that
+        // https://github.com/esp-rs/esp-hal/issues/2151 is and remains fixed.
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
+        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        dma_tx_buf.fill(&[0xde, 0xad, 0xbe, 0xef]);
+        for (i, v) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
+            *v = (i % 255) as u8;
+        }
 
-        let transfer = ctx
-            .spi
-            .dma_transfer(dma_rx_buf, dma_tx_buf)
-            .map_err(|e| e.0)
-            .unwrap();
-        let (_, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
-        assert_eq!(dma_tx_buf.as_slice(), dma_rx_buf.as_slice());
+        let mut spi = ctx.spi;
+        for i in 0..4 {
+            dma_tx_buf.as_mut_slice()[0] = i as u8;
+            *dma_tx_buf.as_mut_slice().last_mut().unwrap() = i as u8;
+            let transfer = spi
+                .dma_transfer(dma_rx_buf, dma_tx_buf)
+                .map_err(|e| e.0)
+                .unwrap();
+
+            (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
+            assert_eq!(dma_tx_buf.as_slice(), dma_rx_buf.as_slice());
+        }
     }
 
     #[test]

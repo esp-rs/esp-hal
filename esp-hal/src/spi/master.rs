@@ -2288,14 +2288,8 @@ pub trait InstanceDma: Instance {
 
         tx.prepare_transfer(self.dma_peripheral(), buffer)?;
         tx.start_transfer()?;
-        reset_dma_before_usr_cmd(reg_block);
 
-        // Wait for at least one clock cycle for the DMA to fill the SPI async FIFO,
-        // before starting the SPI
-        #[cfg(riscv)]
-        riscv::asm::delay(1);
-        #[cfg(xtensa)]
-        xtensa_lx::timer::delay(1);
+        reset_dma_before_usr_cmd(reg_block);
 
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
 
@@ -2335,10 +2329,11 @@ pub trait InstanceDma: Instance {
         reset_dma_before_load_dma_dscr(reg_block);
 
         self.clear_dma_interrupts();
-        reset_dma_before_usr_cmd(reg_block);
 
         rx.prepare_transfer(self.dma_peripheral(), buffer)?;
         rx.start_transfer()?;
+
+        reset_dma_before_usr_cmd(reg_block);
 
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
 
@@ -2409,9 +2404,9 @@ pub trait InstanceDma: Instance {
     }
 }
 
-#[cfg(not(any(esp32, esp32s2)))]
-fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
-    reg_block.dma_conf().modify(|_, w| {
+fn reset_dma_before_usr_cmd(_reg_block: &RegisterBlock) {
+    #[cfg(not(any(esp32, esp32s2)))]
+    _reg_block.dma_conf().modify(|_, w| {
         w.rx_afifo_rst()
             .set_bit()
             .buf_afifo_rst()
@@ -2419,10 +2414,16 @@ fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
             .dma_afifo_rst()
             .set_bit()
     });
-}
 
-#[cfg(any(esp32, esp32s2))]
-fn reset_dma_before_usr_cmd(_reg_block: &RegisterBlock) {}
+    // Wait for a few clock cycles for the DMA to fill the SPI async FIFO,
+    // before starting the SPI
+    let cycles = 20;
+
+    #[cfg(riscv)]
+    riscv::asm::delay(cycles);
+    #[cfg(xtensa)]
+    xtensa_lx::timer::delay(cycles);
+}
 
 #[cfg(not(any(esp32, esp32s2)))]
 fn reset_dma_before_load_dma_dscr(_reg_block: &RegisterBlock) {}
