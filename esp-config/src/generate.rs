@@ -84,6 +84,7 @@ pub fn generate_config(prefix: &str, config: &[(&str, Value, &str)]) {
     }
 
     let mut unknown = Vec::new();
+    let mut failed = Vec::new();
 
     // Try and capture input from the environment
     for (var, value) in env::vars() {
@@ -94,9 +95,14 @@ pub fn generate_config(prefix: &str, config: &[(&str, Value, &str)]) {
                 continue;
             };
 
-            cfg.parse(&value)
-                .expect(&format!("Invalid value for env var {name}: {value}"));
+            if let Err(e) = cfg.parse(&value) {
+                failed.push(format!("{prefix}_{}: {e:?}", screaming_snake_case(&name)));
+            }
         }
+    }
+
+    if !failed.is_empty() {
+        panic!("Invalid configuration options detected: {:?}", failed);
     }
 
     if !unknown.is_empty() {
