@@ -859,12 +859,12 @@ impl InterruptStatusRegisterAccess {
     pub(crate) fn interrupt_status_read(self) -> u32 {
         match self {
             Self::Bank0 => match crate::get_core() {
-                crate::Core::ProCpu => unsafe { &*GPIO::PTR }.pcpu_int().read().bits(),
-                crate::Core::AppCpu => unsafe { &*GPIO::PTR }.acpu_int().read().bits(),
+                crate::Cpu::ProCpu => unsafe { &*GPIO::PTR }.pcpu_int().read().bits(),
+                crate::Cpu::AppCpu => unsafe { &*GPIO::PTR }.acpu_int().read().bits(),
             },
             Self::Bank1 => match crate::get_core() {
-                crate::Core::ProCpu => unsafe { &*GPIO::PTR }.pcpu_int1().read().bits(),
-                crate::Core::AppCpu => unsafe { &*GPIO::PTR }.acpu_int1().read().bits(),
+                crate::Cpu::ProCpu => unsafe { &*GPIO::PTR }.pcpu_int1().read().bits(),
+                crate::Cpu::AppCpu => unsafe { &*GPIO::PTR }.acpu_int1().read().bits(),
             },
         }
     }
