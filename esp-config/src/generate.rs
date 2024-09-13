@@ -83,20 +83,24 @@ pub fn generate_config(prefix: &str, config: &[(&str, Value, &str)]) {
         println!("cargo:rerun-if-env-changed={name}");
     }
 
+    let mut unknown = Vec::new();
+
     // Try and capture input from the environment
     for (var, value) in env::vars() {
         if let Some(name) = var.strip_prefix(&format!("{prefix}_")) {
             let name = snake_case(name);
-            // TODO should this be lowered to a warning for unknown configuration options?
-            // we could instead mark this as unknown and _not_ emit
-            // println!("cargo:rustc-check-cfg=cfg({})", name);
             let Some(cfg) = configs.get_mut(&name) else {
-                panic!("Unknown env var {name}")
+                unknown.push(format!("{prefix}_{}", screaming_snake_case(&name)));
+                continue;
             };
 
             cfg.parse(&value)
                 .expect(&format!("Invalid value for env var {name}: {value}"));
         }
+    }
+
+    if !unknown.is_empty() {
+        panic!("Unknown configuration options detected: {:?}", unknown);
     }
 
     // emit cfgs and set envs
