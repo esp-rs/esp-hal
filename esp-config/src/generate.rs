@@ -6,8 +6,8 @@ const TABLE_HEADER: &str = r#"
 |------|-------------|---------------|
 "#;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct ParseError(&'static str);
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ParseError(String);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Value {
@@ -22,7 +22,7 @@ impl Value {
             Value::Bool(_) => match s {
                 "false" | "no" | "n" => Value::Bool(false),
                 "true" | "yes" | "y" => Value::Bool(true),
-                _ => return Err(ParseError("Invalid boolean value")),
+                _ => return Err(ParseError(format!("Invalid boolean value: {}", s))),
             },
             Value::Number(_) => Value::Number(
                 match s.as_bytes() {
@@ -31,7 +31,7 @@ impl Value {
                     [b'0', b'b', ..] => usize::from_str_radix(&s[2..], 2),
                     _ => usize::from_str_radix(&s, 10),
                 }
-                .map_err(|_| ParseError("Invalid numerical value"))?,
+                .map_err(|_| ParseError(format!("Invalid numerical value: {}", s)))?,
             ),
             Value::String(_) => Value::String(String::from(s)),
         };
