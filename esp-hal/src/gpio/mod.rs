@@ -463,31 +463,82 @@ pub trait TouchPin: Pin {
 }
 
 #[doc(hidden)]
-pub struct Bank0GpioRegisterAccess;
-
-#[doc(hidden)]
-pub struct Bank1GpioRegisterAccess;
-
-#[doc(hidden)]
-pub trait BankGpioRegisterAccess {
-    fn write_out_en_clear(word: u32);
-
-    fn write_out_en_set(word: u32);
-
-    fn read_input() -> u32;
-
-    fn read_output() -> u32;
-
-    fn read_interrupt_status() -> u32;
-
-    fn write_interrupt_status_clear(word: u32);
-
-    fn write_output_set(word: u32);
-
-    fn write_output_clear(word: u32);
+#[derive(Clone, Copy)]
+pub enum GpioRegisterAccess {
+    Bank0,
+    #[cfg(any(esp32, esp32s2, esp32s3))]
+    Bank1,
 }
 
-impl BankGpioRegisterAccess for Bank0GpioRegisterAccess {
+impl GpioRegisterAccess {
+    fn write_out_en_clear(self, word: u32) {
+        match self {
+            Self::Bank0 => Bank0GpioRegisterAccess::write_out_en_clear(word),
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            Self::Bank1 => Bank1GpioRegisterAccess::write_out_en_clear(word),
+        }
+    }
+
+    fn write_out_en_set(self, word: u32) {
+        match self {
+            Self::Bank0 => Bank0GpioRegisterAccess::write_out_en_set(word),
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            Self::Bank1 => Bank1GpioRegisterAccess::write_out_en_set(word),
+        }
+    }
+
+    fn read_input(self) -> u32 {
+        match self {
+            Self::Bank0 => Bank0GpioRegisterAccess::read_input(),
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            Self::Bank1 => Bank1GpioRegisterAccess::read_input(),
+        }
+    }
+
+    fn read_output(self) -> u32 {
+        match self {
+            Self::Bank0 => Bank0GpioRegisterAccess::read_output(),
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            Self::Bank1 => Bank1GpioRegisterAccess::read_output(),
+        }
+    }
+
+    fn read_interrupt_status(self) -> u32 {
+        match self {
+            Self::Bank0 => Bank0GpioRegisterAccess::read_interrupt_status(),
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            Self::Bank1 => Bank1GpioRegisterAccess::read_interrupt_status(),
+        }
+    }
+
+    fn write_interrupt_status_clear(self, word: u32) {
+        match self {
+            Self::Bank0 => Bank0GpioRegisterAccess::write_interrupt_status_clear(word),
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            Self::Bank1 => Bank1GpioRegisterAccess::write_interrupt_status_clear(word),
+        }
+    }
+
+    fn write_output_set(self, word: u32) {
+        match self {
+            Self::Bank0 => Bank0GpioRegisterAccess::write_output_set(word),
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            Self::Bank1 => Bank1GpioRegisterAccess::write_output_set(word),
+        }
+    }
+
+    fn write_output_clear(self, word: u32) {
+        match self {
+            Self::Bank0 => Bank0GpioRegisterAccess::write_output_clear(word),
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            Self::Bank1 => Bank1GpioRegisterAccess::write_output_clear(word),
+        }
+    }
+}
+
+struct Bank0GpioRegisterAccess;
+
+impl Bank0GpioRegisterAccess {
     fn write_out_en_clear(word: u32) {
         unsafe { &*GPIO::PTR }
             .enable_w1tc()
@@ -531,8 +582,11 @@ impl BankGpioRegisterAccess for Bank0GpioRegisterAccess {
     }
 }
 
-#[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-impl BankGpioRegisterAccess for Bank1GpioRegisterAccess {
+#[cfg(any(esp32, esp32s2, esp32s3))]
+struct Bank1GpioRegisterAccess;
+
+#[cfg(any(esp32, esp32s2, esp32s3))]
+impl Bank1GpioRegisterAccess {
     fn write_out_en_clear(word: u32) {
         unsafe { &*GPIO::PTR }
             .enable1_w1tc()
@@ -609,9 +663,9 @@ where
 
     fn write_out_en(&self, enable: bool) {
         if enable {
-            <Self as GpioProperties>::Bank::write_out_en_set(1 << (GPIONUM % 32));
+            self.gpio_bank().write_out_en_set(1 << (GPIONUM % 32));
         } else {
-            <Self as GpioProperties>::Bank::write_out_en_clear(1 << (GPIONUM % 32));
+            self.gpio_bank().write_out_en_clear(1 << (GPIONUM % 32));
         }
     }
 
@@ -737,7 +791,7 @@ where
     }
 
     fn is_input_high(&self, _: private::Internal) -> bool {
-        <Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0
+        self.gpio_bank().read_input() & (1 << (GPIONUM % 32)) != 0
     }
 
     fn input_signals(&self, _: private::Internal) -> [Option<InputSignal>; 6] {
@@ -793,11 +847,12 @@ where
     }
 
     fn is_interrupt_set(&self, _: private::Internal) -> bool {
-        <Self as GpioProperties>::Bank::read_interrupt_status() & 1 << (GPIONUM % 32) != 0
+        self.gpio_bank().read_interrupt_status() & 1 << (GPIONUM % 32) != 0
     }
 
     fn clear_interrupt(&mut self, _: private::Internal) {
-        <Self as GpioProperties>::Bank::write_interrupt_status_clear(1 << (GPIONUM % 32));
+        self.gpio_bank()
+            .write_interrupt_status_clear(1 << (GPIONUM % 32));
     }
 }
 
@@ -819,9 +874,9 @@ where
 
     fn set_output_high(&mut self, high: bool, _: private::Internal) {
         if high {
-            <Self as GpioProperties>::Bank::write_output_set(1 << (GPIONUM % 32));
+            self.gpio_bank().write_output_set(1 << (GPIONUM % 32));
         } else {
-            <Self as GpioProperties>::Bank::write_output_clear(1 << (GPIONUM % 32));
+            self.gpio_bank().write_output_clear(1 << (GPIONUM % 32));
         }
     }
 
@@ -848,7 +903,7 @@ where
     }
 
     fn is_set_high(&self, _: private::Internal) -> bool {
-        <Self as GpioProperties>::Bank::read_output() & (1 << (GPIONUM % 32)) != 0
+        self.gpio_bank().read_output() & (1 << (GPIONUM % 32)) != 0
     }
 
     fn output_signals(&self, _: private::Internal) -> [Option<OutputSignal>; 6] {
@@ -987,8 +1042,6 @@ fn on_pin_irq(pin_nr: u8) {
 
 #[doc(hidden)]
 pub trait GpioProperties {
-    type Bank: BankGpioRegisterAccess;
-
     type IsOutput: BooleanType;
     type IsAnalog: BooleanType;
     type IsTouch: BooleanType;
@@ -996,6 +1049,7 @@ pub trait GpioProperties {
     fn degrade_pin(&self, _: private::Internal) -> AnyPin;
     fn output_signals() -> [Option<OutputSignal>; 6];
     fn input_signals() -> [Option<InputSignal>; 6];
+    fn gpio_bank(&self) -> GpioRegisterAccess;
     fn interrupt_status(&self) -> InterruptStatusRegisterAccess;
 }
 
@@ -1067,11 +1121,14 @@ macro_rules! gpio {
 
             $(
                 impl $crate::gpio::GpioProperties for GpioPin<$gpionum> {
-                    type Bank = $crate::gpio::[< Bank $bank GpioRegisterAccess >];
                     $crate::pin_types!($type);
 
                     fn interrupt_status(&self) -> $crate::gpio::InterruptStatusRegisterAccess {
                         $crate::gpio::InterruptStatusRegisterAccess::[<Bank $bank >]
+                    }
+
+                    fn gpio_bank(&self) -> $crate::gpio::GpioRegisterAccess {
+                        $crate::gpio::GpioRegisterAccess::[<Bank $bank >]
                     }
 
                     fn degrade_pin(&self, _: $crate::private::Internal) -> AnyPin {
