@@ -247,14 +247,10 @@ where
 
     #[cfg(not(any(esp32, esp32s2)))]
     fn configure_clock(&self, frequency: HertzU32) -> Result<(), Error> {
-        use clock_divider_solver::ClockDivider;
-
         let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
-        let Some(clock_divider) =
-            ClockDivider::from_frequency(src_clock.to_Hz(), frequency.to_Hz(), 256, 0b11111)
-        else {
-            return Err(Error::UnreachableTargetFrequency);
-        };
+        let clock_divider =
+            clock_divider_solver::solve(src_clock.to_Hz(), frequency.to_Hz(), 256, 0b11111)
+                .ok_or(Error::UnreachableTargetFrequency)?;
 
         self::chip_specific::configure_clock(
             clock_divider.div_num - 1,
@@ -2442,89 +2438,87 @@ mod clock_divider_solver {
         pub div_a: u32,
     }
 
-    impl ClockDivider {
-        pub fn from_frequency(
-            source: u32,
-            target: u32,
-            integral_max: u32,
-            fractional_max: u32,
-        ) -> Option<Self> {
-            if target > source {
-                return None;
-            }
+    pub fn solve(
+        source: u32,
+        target: u32,
+        integral_max: u32,
+        fractional_max: u32,
+    ) -> Option<ClockDivider> {
+        if target > source {
+            return None;
+        }
 
-            let quotient = source / target;
-            if quotient > integral_max {
-                return None;
-            }
+        let quotient = source / target;
+        if quotient > integral_max {
+            return None;
+        }
 
-            let remainder = source % target;
-            if remainder == 0 {
-                return Some(Self {
+        let remainder = source % target;
+        if remainder == 0 {
+            return Some(ClockDivider {
+                div_num: quotient,
+                div_b: 0,
+                div_a: 0,
+            });
+        }
+
+        let gcd = gcd(target, remainder);
+        let numerator = remainder / gcd;
+        let denominator = target / gcd;
+        if numerator <= fractional_max && denominator <= fractional_max {
+            return Some(ClockDivider {
+                div_num: quotient,
+                div_b: numerator,
+                div_a: denominator,
+            });
+        }
+
+        // Search Stern-Brocot Tree
+        let target_frac = Fraction {
+            numerator,
+            denominator,
+        };
+        let mut l = Fraction {
+            numerator: 0,
+            denominator: 1,
+        };
+        let mut h = Fraction {
+            numerator: 1,
+            denominator: 1, // We only search the left half part
+        };
+        loop {
+            let m = Fraction {
+                numerator: l.numerator + h.numerator,
+                denominator: l.denominator + h.denominator,
+            };
+
+            if m.numerator > fractional_max || m.denominator > fractional_max {
+                // L and H, which is closer?
+                let err_l = m.sub(&l);
+                let err_h = h.sub(&m);
+                let m = if err_l.lt(&err_h) { l } else { h };
+                return Some(ClockDivider {
                     div_num: quotient,
-                    div_b: 0,
-                    div_a: 0,
+                    div_b: m.numerator,
+                    div_a: m.denominator,
                 });
             }
 
-            let gcd = gcd(target, remainder);
-            let numerator = remainder / gcd;
-            let denominator = target / gcd;
-            if numerator <= fractional_max && denominator <= fractional_max {
-                return Some(Self {
-                    div_num: quotient,
-                    div_b: numerator,
-                    div_a: denominator,
-                });
-            }
-
-            // Search Stern-Brocot Tree
-            let target_frac = Fraction {
-                numerator,
-                denominator,
-            };
-            let mut l = Fraction {
-                numerator: 0,
-                denominator: 1,
-            };
-            let mut h = Fraction {
-                numerator: 1,
-                denominator: 1, // We only search the left half part
-            };
-            loop {
-                let m = Fraction {
-                    numerator: l.numerator + h.numerator,
-                    denominator: l.denominator + h.denominator,
-                };
-
-                if m.numerator > fractional_max || m.denominator > fractional_max {
-                    // L and H, which is closer?
-                    let err_l = m.sub(&l);
-                    let err_h = h.sub(&m);
-                    let m = if err_l.lt(&err_h) { l } else { h };
-                    return Some(Self {
-                        div_num: quotient,
-                        div_b: m.numerator,
-                        div_a: m.denominator,
-                    });
+            match m.cmp(&target_frac) {
+                Ordering::Less => {
+                    l = m;
                 }
-
-                match m.cmp(&target_frac) {
-                    Ordering::Less => {
-                        l = m;
-                    }
-                    Ordering::Greater => {
-                        h = m;
-                    }
-                    Ordering::Equal => {
-                        // SAFETY: Before search Stern-Brocot Tree,
-                        // we ensures that the simplest fractional
-                        // form of target_frac has a greater denominator
-                        // than the fractial_max. Therefore, in searches
-                        // within a smaller range, there will never be a
-                        // situation where M == targete_frac.
-                        unsafe { unreachable_unchecked() }
-                    }
+                Ordering::Greater => {
+                    h = m;
+                }
+                Ordering::Equal => {
+                    // SAFETY: Before search Stern-Brocot Tree,
+                    // we ensures that the simplest fractional
+                    // form of target_frac has a greater denominator
+                    // than the fractial_max. Therefore, in searches
+                    // within a smaller range, there will never be a
+                    // situation where M == targete_frac.
+                    unsafe { unreachable_unchecked() }
                 }
             }
         }
