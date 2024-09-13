@@ -24,59 +24,6 @@ If a cell contains an em dash (&mdash;) this means that the particular feature i
 
 Minimum supported Rust compiler version: 1.72.0.0
 
-## Usage
-
-### Importing
-
-Ensure that the right features are enabled for your chip. See [Examples](https://github.com/esp-rs/esp-hal/tree/main/examples#examples) for more examples.
-
-```toml
-[dependencies.esp-wifi]
-# A supported chip needs to be specified, as well as specific use-case features
-features = ["esp32s3", "wifi", "esp-now"]
-```
-
-### Link configuration
-
-Make sure to include the rom functions for your target:
-
-```toml
-# .cargo/config.toml
-rustflags = [
-    "-C", "link-arg=-Tlinkall.x",
-    "-C", "link-arg=-Trom_functions.x",
-]
-```
-
-At the time of writing, you will already have the `linkall` flag if you used `cargo generate`. Generating from a template does not include the `rom_functions` flag.
-
-### Optimization Level
-
-It is necessary to build with optimization level 2 or 3 since otherwise, it might not even be able to connect or advertise.
-
-To make it work also for your debug builds add this to your `Cargo.toml`
-
-```toml
-[profile.dev.package.esp-wifi]
-opt-level = 3
-```
-
-### Xtensa considerations
-
-Within this crate, `CCOMPARE0` CPU timer is used for timing, ensure that in your application you are not using this CPU timer.
-
-## USB-SERIAL-JTAG
-
-When using USB-SERIAL-JTAG (for example by selecting `jtag-serial` in [`esp-println`](https://crates.io/crates/esp-println)) you have to activate the feature `phy-enable-usb`.
-
-Don't use this feature if you are _not_ using USB-SERIAL-JTAG as it might reduce WiFi performance.
-
-## Tuning
-
-The defaults used by `esp-wifi` and the examples are rather conservative. It is possible to change a few of the important settings.
-
-See [Tuning](./tuning.md) for details
-
 ## Missing / To be done
 
 - Support for non-open SoftAP

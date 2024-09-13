@@ -9,10 +9,11 @@ const TABLE_HEADER: &str = r#"
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ParseError;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Value {
     Number(usize),
     Bool(bool),
+    String(String),
 }
 
 impl Value {
@@ -23,6 +24,7 @@ impl Value {
                 _ => Value::Bool(true), // TODO should existance of the key mean true?
             },
             Value::Number(_) => Value::Number(s.parse().map_err(|_| ParseError)?),
+            Value::String(_) => Value::String(String::from(s)),
         };
         Ok(())
     }
@@ -31,6 +33,7 @@ impl Value {
         match self {
             Value::Bool(value) => String::from(if *value { "true" } else { "false" }),
             Value::Number(value) => format!("{}", value),
+            Value::String(value) => value.clone(),
         }
     }
 }
@@ -64,7 +67,7 @@ pub fn generate_config(prefix: &str, config: &[(&str, Value, &str)]) {
     // Generate the template for the config
     let mut configs = HashMap::new();
     for (name, default, _) in config {
-        configs.insert(snake_case(name), *default);
+        configs.insert(snake_case(name), default.clone());
 
         // Rebuild if config envvar changed.
         // Note this is currently buggy and requires a clean build - PR is pending https://github.com/rust-lang/cargo/pull/14058

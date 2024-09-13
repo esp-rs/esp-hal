@@ -14,3 +14,20 @@ macro_rules! esp_config_int {
         };
     };
 }
+
+#[macro_export]
+macro_rules! esp_config_str {
+    ($var:expr) => {
+        env!($var)
+    };
+}
+
+#[macro_export]
+macro_rules! esp_config_bool {
+    ($var:expr) => {
+        match env!($var).as_bytes() {
+            b"false" => false,
+            _ => true,
+        }
+    };
+}

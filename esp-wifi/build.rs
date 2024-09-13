@@ -134,7 +134,36 @@ fn main() -> Result<(), Box<dyn Error>> {
     // emit config
     generate_config(
         "esp_wifi",
-        &[("dummy", Value::Number(44), "Tests something")],
+        &[
+            ("rx_queue_size", Value::Number(5), "Size of the RX queue in frames"),
+            ("tx_queue_size", Value::Number(3), "Size of the TX queue in frames"),
+            ("static_rx_buf_num", Value::Number(10), "WiFi static RX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"),
+            ("dynamic_rx_buf_num", Value::Number(32), "WiFi dynamic RX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"),
+            ("static_tx_buf_num", Value::Number(0), "WiFi static TX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"),
+            ("dynamic_tx_buf_num", Value::Number(32), "WiFi dynamic TX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"),
+            ("ampdu_rx_enable", Value::Bool(false), "WiFi AMPDU RX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"),
+            ("ampdu_tx_enable", Value::Bool(false), "WiFi AMPDU TX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"),
+            ("amsdu_tx_enable", Value::Bool(false), "WiFi AMSDU TX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"),
+            ("rx_ba_win", Value::Number(6), "WiFi Block Ack RX window size. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"),
+            ("max_burst_size", Value::Number(1), "See [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_burst_size)"),
+            (
+                "country_code",
+                Value::String("CN".to_owned()),
+                "Country code. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-country-code)",
+            ),
+            (
+                "country_code_operating_class",
+                Value::Number(0),
+                "If not 0: Operating Class table number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-country-code)",
+            ),
+            ("mtu", Value::Number(1492), "MTU, see [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_transmission_unit)"),
+            ("tick_rate_hz", Value::Number(100), "Tick rate of the internal task scheduler in hertz"),
+            ("listen_interval", Value::Number(3), "Interval for station to listen to beacon from AP. The unit of listen interval is one beacon interval. For example, if beacon interval is 100 ms and listen interval is 3, the interval for station to listen to beacon is 300 ms"),
+            ("beacon_timeout", Value::Number(6), "For Station, If the station does not receive a beacon frame from the connected SoftAP during the  inactive time, disconnect from SoftAP. Default 6s. Range 6-30"),
+            ("ap_beacon_timeout", Value::Number(300), "For SoftAP, If the SoftAP doesn’t receive any data from the connected STA during inactive time, the SoftAP will force deauth the STA. Default is 300s"),
+            ("failure_retry_cnt", Value::Number(1), "Number of connection retries station will do before moving to next AP. scan_method should be set as WIFI_ALL_CHANNEL_SCAN to use this config. Note: Enabling this may cause connection time to increase incase best AP doesn't behave properly. Defaults to 1"),
+            ("scan_method", Value::Number(0), "0 = WIFI_FAST_SCAN, 1 = WIFI_ALL_CHANNEL_SCAN, defaults to 0"),
+        ],
     );
 
     Ok(())
