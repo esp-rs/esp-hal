@@ -5,7 +5,7 @@
 //! The following wiring is assumed:
 //! - LED => GPIO0
 
-//% CHIPS: esp32s3
+//% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
@@ -19,7 +19,7 @@ use esp_hal::{
     interrupt::Priority,
     ledc::{
         channel::{self, Channel, ChannelIFace},
-        timer::{self, Timer, TimerIFace},
+        timer::{self, LSClockSource, Timer, TimerBuilder},
         LSGlobalClkSource,
         Ledc,
         LowSpeed,
@@ -31,7 +31,7 @@ use static_cell::StaticCell;
 
 const DESIRED_PULSE_COUNT: u16 = 100;
 
-static CHANNEL0: Mutex<RefCell<Option<Channel<'_, LowSpeed, GpioPin<0>>>>> =
+static CHANNEL0: Mutex<RefCell<Option<Channel<'_, LowSpeed, GpioPin<4>>>>> =
     Mutex::new(RefCell::new(None));
 
 #[entry]
@@ -39,7 +39,7 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let led = io.pins.gpio0;
+    let led = io.pins.gpio4;
 
     let mut ledc = Ledc::new(peripherals.LEDC);
 
@@ -49,15 +49,15 @@ fn main() -> ! {
     let lstimer0 = {
         static LSTIMER0: StaticCell<Timer<LowSpeed>> = StaticCell::new();
         LSTIMER0.init_with(|| {
-            let mut lstimer0 = ledc.get_timer::<LowSpeed>(timer::Number::Timer0);
-            lstimer0
-                .configure(timer::config::Config {
-                    duty: timer::config::Duty::Duty1Bit,
-                    clock_source: timer::LSClockSource::APBClk,
-                    frequency: 24.kHz(),
-                })
-                .unwrap();
-            lstimer0
+            TimerBuilder::<LowSpeed>::new(
+                &ledc,
+                timer::Number::Timer0,
+                timer::config::Duty::Duty5Bit,
+                LSClockSource::LedcPwmClk,
+                24.kHz(),
+            )
+            .unwrap()
+            .build()
         })
     };
 

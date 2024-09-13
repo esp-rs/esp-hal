@@ -27,7 +27,7 @@ pub use crate::ledc::{
         ChannelHW as _esp_hal_ledc_channel_ChannelHW,
         ChannelIFace as _esp_hal_ledc_channel_ChannelIFace,
     },
-    timer::{TimerHW as _esp_hal_ledc_timer_TimerHW, TimerIFace as _esp_hal_ledc_timer_TimerIFace},
+    timer::TimerIFace as _esp_hal_ledc_timer_TimerIFace,
 };
 #[cfg(any(timg0, timg1))]
 pub use crate::timer::timg::{

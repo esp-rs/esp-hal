@@ -60,15 +60,12 @@
 //! - Source clock selection is not supported
 //! - Interrupts are not supported
 
-use self::{
-    channel::Channel,
-    timer::{Timer, TimerSpeed},
-};
+use self::{channel::Channel, timer::TimerSpeed};
 use crate::{
     gpio::OutputPin,
     interrupt::{self, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::Interrupt,
+    peripherals::{ledc::RegisterBlock, Interrupt},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
     InterruptConfigurable,
 };
@@ -96,7 +93,7 @@ pub struct HighSpeed {}
 pub struct LowSpeed {}
 
 /// Trait representing the speed mode of a clock or peripheral.
-pub trait Speed {
+pub trait Speed: Send + Sync {
     /// Boolean constant indicating whether the speed is high-speed.
     const IS_HS: bool;
 }
@@ -121,16 +118,16 @@ impl<'d> Ledc<'d> {
         Ledc { _instance }
     }
 
+    fn register_block() -> &'static RegisterBlock {
+        unsafe { &*crate::peripherals::LEDC::ptr() }
+    }
+
     /// Set global slow clock source
     #[cfg(esp32)]
     pub fn set_global_slow_clock(&mut self, _clock_source: LSGlobalClkSource) {
-        unsafe { &*crate::peripherals::LEDC::ptr() }
+        Self::register_block()
             .conf()
             .write(|w| w.apb_clk_sel().set_bit());
-        unsafe { &*crate::peripherals::LEDC::ptr() }
-            .lstimer(0)
-            .conf()
-            .modify(|_, w| w.para_up().set_bit());
     }
 
     #[cfg(not(esp32))]
@@ -145,7 +142,7 @@ impl<'d> Ledc<'d> {
         match clock_source {
             LSGlobalClkSource::APBClk => {
                 #[cfg(not(any(esp32c6, esp32h2)))]
-                unsafe { &*crate::peripherals::LEDC::ptr() }
+                Self::register_block()
                     .conf()
                     .write(|w| unsafe { w.apb_clk_sel().bits(1) });
                 #[cfg(esp32c6)]
@@ -156,15 +153,38 @@ impl<'d> Ledc<'d> {
                     .write(|w| unsafe { w.ledc_sclk_sel().bits(0) });
             }
         }
-        unsafe { &*crate::peripherals::LEDC::ptr() }
-            .timer(0)
-            .conf()
-            .modify(|_, w| w.para_up().set_bit());
     }
 
-    /// Return a new timer
-    pub fn get_timer<S: TimerSpeed>(&self, number: timer::Number) -> Timer<S> {
-        Timer::new(number)
+    /// Get the global slow clock source
+    /// Returns `Some(LSGlobalClkSource)` if the source is APB clock, otherwise
+    /// `None`, which means the source clock is either unconfigured or not
+    /// supported.
+    pub fn get_global_slow_clock() -> Option<LSGlobalClkSource> {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                match Self::register_block().conf().read().apb_clk_sel().bit() {
+                    true => Some(LSGlobalClkSource::APBClk),
+                    false => None,
+                }
+            }else if #[cfg(esp32c6)] {
+                let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
+                match pcr.ledc_sclk_conf().read().ledc_sclk_sel().bits() {
+                    1 => Some(LSGlobalClkSource::APBClk),
+                    _ => None,
+                }
+            }else if #[cfg(esp32h2)] {
+                let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
+                match pcr.ledc_sclk_conf().read().ledc_sclk_sel().bits() {
+                    0 => Some(LSGlobalClkSource::APBClk),
+                    _ => None,
+                }
+            }else {
+                match Self::register_block().conf().read().apb_clk_sel().bits() {
+                    1 => Some(LSGlobalClkSource::APBClk),
+                    _ => None,
+                }
+            }
+        }
     }
 
     /// Return a new channel

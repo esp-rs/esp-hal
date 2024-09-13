@@ -14,7 +14,7 @@ use esp_hal::{
     gpio::Io,
     ledc::{
         channel::{self, ChannelIFace},
-        timer::{self, TimerIFace},
+        timer::{self, LSClockSource, TimerBuilder},
         LSGlobalClkSource,
         Ledc,
         LowSpeed,
@@ -33,15 +33,15 @@ fn main() -> ! {
 
     ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
 
-    let mut lstimer0 = ledc.get_timer::<LowSpeed>(timer::Number::Timer0);
-
-    lstimer0
-        .configure(timer::config::Config {
-            duty: timer::config::Duty::Duty5Bit,
-            clock_source: timer::LSClockSource::APBClk,
-            frequency: 24.kHz(),
-        })
-        .unwrap();
+    let lstimer0 = TimerBuilder::<LowSpeed>::new(
+        &ledc,
+        timer::Number::Timer0,
+        timer::config::Duty::Duty5Bit,
+        LSClockSource::LedcPwmClk,
+        24.kHz(),
+    )
+    .unwrap()
+    .build();
 
     let mut channel0 = ledc.get_channel(channel::Number::Channel0, led);
     channel0
