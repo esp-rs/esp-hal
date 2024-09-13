@@ -53,7 +53,7 @@ fn main() -> ! {
         .build();
 
     loop {
-        // Fill display bufffer with a centered text with two lines (and two text
+        // Fill display buffer with a centered text with two lines (and two text
         // styles)
         Text::with_alignment(
             "esp-hal",

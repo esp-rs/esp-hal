@@ -49,7 +49,7 @@
 //!
 //! let mut systimer = SystemTimer::new(peripherals.SYSTIMER);
 //!
-//! // Get the current timestamp, in microseconds:
+//! // Get the current tick count:
 //! let now = SystemTimer::now();
 //!
 //! let frozen_unit = FrozenUnit::new(&mut systimer.unit0);
