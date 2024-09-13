@@ -1409,11 +1409,11 @@ pub fn enable_iomux_clk_gate() {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! analog {
+    (@ignore $rue:literal) => {};
     (
         $(
             (
-                $pin_num:expr, $rtc_pin:expr, $pin_reg:expr,
-                $mux_sel:ident, $fun_sel:ident, $fun_ie:ident $(, $rue:ident, $rde:ident)?
+                $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $($rue:literal)?
             )
         )+
     ) => {
@@ -1431,7 +1431,7 @@ macro_rules! analog {
                     // handle indexed pins.
                     paste::paste! {
                         // disable input
-                        rtcio.$pin_reg.modify(|_,w| w.$fun_ie().bit([< false >]));
+                        rtcio.$pin_reg.modify(|_,w| w.[<$prefix fun_ie>]().bit(false));
 
                         // disable output
                         rtcio.enable_w1tc().write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
@@ -1440,18 +1440,20 @@ macro_rules! analog {
                         rtcio.pin($rtc_pin).modify(|_,w| w.pad_driver().bit(false));
 
                         rtcio.$pin_reg.modify(|_,w| {
-                            w.$fun_ie().clear_bit();
+                            w.[<$prefix fun_ie>]().clear_bit();
 
                             // Connect pin to analog / RTC module instead of standard GPIO
-                            w.$mux_sel().set_bit();
+                            w.[<$prefix mux_sel>]().set_bit();
 
                             // Select function "RTC function 1" (GPIO) for analog use
-                            unsafe { w.$fun_sel().bits(0b00) };
+                            unsafe { w.[<$prefix fun_sel>]().bits(0b00) };
 
                             // Disable pull-up and pull-down resistors on the pin, if it has them
                             $(
-                                w.$rue().bit(false);
-                                w.$rde().bit(false);
+                                // FIXME: replace with $(ignore($rue)) once stable
+                                $crate::analog!( @ignore $rue );
+                                w.[<$prefix rue>]().bit(false);
+                                w.[<$prefix rde>]().bit(false);
                             )?
 
                             w
