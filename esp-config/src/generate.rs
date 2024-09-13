@@ -2,12 +2,12 @@ use core::fmt::Write;
 use std::{collections::HashMap, env, fs, path::PathBuf};
 
 const TABLE_HEADER: &str = r#"
-| name | description | default value |
+| Name | Description | Default value |
 |------|-------------|---------------|
 "#;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct ParseError;
+pub struct ParseError(&'static str);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Value {
@@ -20,10 +20,19 @@ impl Value {
     fn parse(&mut self, s: &str) -> Result<(), ParseError> {
         *self = match self {
             Value::Bool(_) => match s {
-                "false" => Value::Bool(false),
-                _ => Value::Bool(true), // TODO should existance of the key mean true?
+                "false" | "no" | "n" => Value::Bool(false),
+                "true" | "yes" | "y" => Value::Bool(true),
+                _ => return Err(ParseError("Invalid boolean value")),
             },
-            Value::Number(_) => Value::Number(s.parse().map_err(|_| ParseError)?),
+            Value::Number(_) => Value::Number(
+                match s.as_bytes() {
+                    [b'0', b'x', ..] => usize::from_str_radix(&s[2..], 16),
+                    [b'0', b'o', ..] => usize::from_str_radix(&s[2..], 8),
+                    [b'0', b'b', ..] => usize::from_str_radix(&s[2..], 2),
+                    _ => usize::from_str_radix(&s, 10),
+                }
+                .map_err(|_| ParseError("Invalid numerical value"))?,
+            ),
             Value::String(_) => Value::String(String::from(s)),
         };
         Ok(())
@@ -135,4 +144,40 @@ fn screaming_snake_case(name: &str) -> String {
     let mut name = name.replace("-", "_");
     name.make_ascii_uppercase();
     name
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn value_number_formats() {
+        const INPUTS: &[&str] = &["0xAA", "0o252", "0b0000000010101010", "170"];
+        let mut v = Value::Number(0);
+
+        for input in INPUTS {
+            v.parse(input).unwrap();
+            // no matter the input format, the output format should be decimal
+            assert_eq!(v.as_string(), "170");
+        }
+    }
+
+    #[test]
+    fn value_bool_inputs() {
+        const TRUE_INPUTS: &[&str] = &["true", "y", "yes"];
+        const FALSE_INPUTS: &[&str] = &["false", "n", "no"];
+        let mut v = Value::Bool(false);
+
+        for input in TRUE_INPUTS {
+            v.parse(input).unwrap();
+            // no matter the input variant, the output format should be "true"
+            assert_eq!(v.as_string(), "true");
+        }
+
+        for input in FALSE_INPUTS {
+            v.parse(input).unwrap();
+            // no matter the input variant, the output format should be "false"
+            assert_eq!(v.as_string(), "false");
+        }
+    }
 }
