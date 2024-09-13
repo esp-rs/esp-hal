@@ -89,7 +89,6 @@
 // toolchain doesn't know about that lint, yet)
 #![allow(unknown_lints)]
 #![allow(non_local_definitions)]
-#![feature(const_int_from_str)] // stable in 1.82
 
 extern crate alloc;
 

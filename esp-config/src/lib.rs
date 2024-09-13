@@ -6,12 +6,19 @@ mod generate;
 pub use generate::*;
 
 #[macro_export]
+// TODO from 1.82 we can use <$ty>::from_str_radix(env!($var), 10) instead
 macro_rules! esp_config_int {
     ($ty:ty, $var:expr) => {
-        match <$ty>::from_str_radix(env!($var), 10) {
-            Ok(val) => val,
-            _ => unreachable!(),
-        };
+        const {
+            let mut bytes = env!($var).as_bytes();
+            let mut val: $ty = 0;
+            while let [byte, rest @ ..] = bytes {
+                core::assert!(b'0' <= *byte && *byte <= b'9', "invalid digit");
+                val = val * 10 + (*byte - b'0') as $ty;
+                bytes = rest;
+            }
+            val
+        }
     };
 }
 
