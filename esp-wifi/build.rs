@@ -1,6 +1,7 @@
 use std::{error::Error, str::FromStr};
 
 use esp_build::assert_unique_used_features;
+use esp_config::{generate_config, Value};
 use esp_metadata::{Chip, Config};
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -129,6 +130,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     }
+
+    // emit config
+    generate_config(
+        "esp_wifi",
+        &[("dummy", Value::Number(44), "Tests something")],
+    );
 
     Ok(())
 }

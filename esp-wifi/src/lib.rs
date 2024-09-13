@@ -18,6 +18,7 @@
 // toolchain doesn't know about that lint, yet)
 #![allow(unknown_lints)]
 #![allow(non_local_definitions)]
+#![feature(const_int_from_str)] // stable in 1.82
 
 extern crate alloc;
 
@@ -131,6 +132,9 @@ struct Config {
 // Validate the configuration at compile time
 #[allow(clippy::assertions_on_constants)]
 const _: () = {
+    use esp_config::esp_config_int;
+    const TEST: usize = esp_config_int!(usize, "ESP_WIFI_DUMMY");
+    core::assert!(TEST == 666);
     // We explicitely use `core` assert here because this evaluation happens at
     // compile time and won't bloat the binary
     core::assert!(
