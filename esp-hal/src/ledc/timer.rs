@@ -15,7 +15,7 @@ use fugit::HertzU32;
 
 #[cfg(esp32)]
 use super::HighSpeed;
-use super::{LowSpeed, Speed};
+use super::{Ledc, LowSpeed, Speed};
 use crate::clock::Clocks;
 
 const LEDC_TIMER_DIV_NUM_MAX: u64 = 0x3FFFF;
@@ -132,7 +132,7 @@ pub mod config {
 /// Trait defining the type of timer source
 pub trait TimerSpeed: Speed {
     /// The type of clock source used by the timer in this speed mode.
-    type ClockSourceType: Sync;
+    type ClockSourceType;
 }
 
 /// Timer source type for LowSpeed timers
@@ -149,7 +149,7 @@ impl TimerSpeed for HighSpeed {
 }
 
 /// Interface for Timers
-pub trait TimerIFace<S: TimerSpeed>: Sync {
+pub trait TimerIFace<S: TimerSpeed> {
     /// Return the frequency of the timer
     fn get_freq(&self) -> Option<HertzU32>;
 
@@ -294,7 +294,7 @@ impl TimerHW<LowSpeed> for Timer<LowSpeed> {
         let duty = unwrap!(self.duty) as u8;
         let use_apb = !self.use_ref_tick;
 
-        unsafe { &*crate::peripherals::LEDC::ptr() }
+        Ledc::register_block()
             .lstimer(self.number as usize)
             .conf()
             .modify(|_, w| unsafe {
@@ -312,7 +312,7 @@ impl TimerHW<LowSpeed> for Timer<LowSpeed> {
         let duty = unwrap!(self.duty) as u8;
         let use_ref_tick = self.use_ref_tick;
 
-        unsafe { &*crate::peripherals::LEDC::ptr() }
+        Ledc::register_block()
             .timer(self.number as usize)
             .conf()
             .modify(|_, w| unsafe {
@@ -328,9 +328,9 @@ impl TimerHW<LowSpeed> for Timer<LowSpeed> {
     fn update_hw(&self) {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
-                let tmr =  unsafe { &*crate::peripherals::LEDC::ptr() }.lstimer(self.number as usize);
+                let tmr =  Ledc::register_block().lstimer(self.number as usize);
             } else {
-                let tmr =  unsafe { &*crate::peripherals::LEDC::ptr() }.timer(self.number as usize);
+                let tmr =  Ledc::register_block().timer(self.number as usize);
             }
         }
 
@@ -341,9 +341,9 @@ impl TimerHW<LowSpeed> for Timer<LowSpeed> {
     fn pause(&self) {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
-                 unsafe { &*crate::peripherals::LEDC::ptr() }.lstimer(self.number as usize).conf().modify(|_, w| w.pause().set_bit());
+                 Ledc::register_block().lstimer(self.number as usize).conf().modify(|_, w| w.pause().set_bit());
             } else {
-                 unsafe { &*crate::peripherals::LEDC::ptr() }.timer(self.number as usize).conf().modify(|_, w| w.pause().set_bit());
+                 Ledc::register_block().timer(self.number as usize).conf().modify(|_, w| w.pause().set_bit());
             }
         }
     }
@@ -352,9 +352,9 @@ impl TimerHW<LowSpeed> for Timer<LowSpeed> {
     fn resume(&self) {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
-                 unsafe { &*crate::peripherals::LEDC::ptr() }.lstimer(self.number as usize).conf().modify(|_, w| w.pause().clear_bit());
+                 Ledc::register_block().lstimer(self.number as usize).conf().modify(|_, w| w.pause().clear_bit());
             } else {
-                 unsafe { &*crate::peripherals::LEDC::ptr() }.timer(self.number as usize).conf().modify(|_, w| w.pause().clear_bit());
+                 Ledc::register_block().timer(self.number as usize).conf().modify(|_, w| w.pause().clear_bit());
             }
         }
     }
@@ -363,11 +363,11 @@ impl TimerHW<LowSpeed> for Timer<LowSpeed> {
     fn reset(&self) {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
-                 unsafe { &*crate::peripherals::LEDC::ptr() }.lstimer(self.number as usize).conf().modify(|_, w| w.rst().set_bit());
-                 unsafe { &*crate::peripherals::LEDC::ptr() }.lstimer(self.number as usize).conf().modify(|_, w| w.rst().clear_bit());
+                 Ledc::register_block().lstimer(self.number as usize).conf().modify(|_, w| w.rst().set_bit());
+                 Ledc::register_block().lstimer(self.number as usize).conf().modify(|_, w| w.rst().clear_bit());
             } else {
-                 unsafe { &*crate::peripherals::LEDC::ptr() }.timer(self.number as usize).conf().modify(|_, w| w.rst().set_bit());
-                 unsafe { &*crate::peripherals::LEDC::ptr() }.timer(self.number as usize).conf().modify(|_, w| w.rst().clear_bit());
+                 Ledc::register_block().timer(self.number as usize).conf().modify(|_, w| w.rst().set_bit());
+                 Ledc::register_block().timer(self.number as usize).conf().modify(|_, w| w.rst().clear_bit());
             }
         }
     }
@@ -391,7 +391,7 @@ impl TimerHW<HighSpeed> for Timer<HighSpeed> {
         let duty = unwrap!(self.duty) as u8;
         let sel_hstimer = self.clock_source == Some(HSClockSource::APBClk);
 
-        unsafe { &*crate::peripherals::LEDC::ptr() }
+        Ledc::register_block()
             .hstimer(self.number as usize)
             .conf()
             .modify(|_, w| unsafe {
@@ -410,7 +410,7 @@ impl TimerHW<HighSpeed> for Timer<HighSpeed> {
 
     /// Pause the timer
     fn pause(&self) {
-        unsafe { &*crate::peripherals::LEDC::ptr() }
+        Ledc::register_block()
             .hstimer(self.number as usize)
             .conf()
             .modify(|_, w| w.pause().set_bit());
@@ -418,7 +418,7 @@ impl TimerHW<HighSpeed> for Timer<HighSpeed> {
 
     /// Resume the timer
     fn resume(&self) {
-        unsafe { &*crate::peripherals::LEDC::ptr() }
+        Ledc::register_block()
             .hstimer(self.number as usize)
             .conf()
             .modify(|_, w| w.pause().clear_bit());
@@ -426,11 +426,11 @@ impl TimerHW<HighSpeed> for Timer<HighSpeed> {
 
     /// Reset the timer
     fn reset(&self) {
-        unsafe { &*crate::peripherals::LEDC::ptr() }
+        Ledc::register_block()
             .hstimer(self.number as usize)
             .conf()
             .modify(|_, w| w.rst().set_bit());
-        unsafe { &*crate::peripherals::LEDC::ptr() }
+        Ledc::register_block()
             .hstimer(self.number as usize)
             .conf()
             .modify(|_, w| w.rst().clear_bit());
