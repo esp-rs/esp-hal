@@ -31,8 +31,12 @@ use static_cell::StaticCell;
 
 const DESIRED_PULSE_COUNT: u16 = 100;
 
-static CHANNEL0: Mutex<RefCell<Option<Channel<'_, LowSpeed, GpioPin<0>>>>> =
-    Mutex::new(RefCell::new(None));
+// TODO: AVOID THIS WORKAROUND
+struct WORKAROUND<'a>(Option<Channel<'a, LowSpeed, GpioPin<0>>>);
+
+unsafe impl<'a> Send for WORKAROUND<'a> {}
+
+static CHANNEL0: Mutex<RefCell<WORKAROUND>> = Mutex::new(RefCell::new(WORKAROUND(None)));
 
 #[entry]
 fn main() -> ! {
@@ -65,9 +69,9 @@ fn main() -> ! {
 
     channel0.enable_counter_with_overflow(DESIRED_PULSE_COUNT);
     critical_section::with(|cs| {
-        CHANNEL0.borrow_ref_mut(cs).replace(channel0);
+        CHANNEL0.borrow_ref_mut(cs).0.replace(channel0);
         let mut channel0 = CHANNEL0.borrow(cs).borrow_mut();
-        let channel0 = channel0.as_mut().unwrap();
+        let channel0 = channel0.0.as_mut().unwrap();
         channel0.enable_overflow_interrupt();
         channel0
             .configure(channel::config::Config {
@@ -86,7 +90,7 @@ fn main() -> ! {
 fn interrupt_handler() {
     critical_section::with(|cs| {
         let channel0 = CHANNEL0.borrow(cs).borrow();
-        if let Some(channel0) = channel0.as_ref() {
+        if let Some(channel0) = channel0.0.as_ref() {
             if channel0.is_overflow_interrupt_active() {
                 // Disable the signal output and clear the overflow interrupt
                 // Note that the timer is not stopped
