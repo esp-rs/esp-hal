@@ -204,6 +204,8 @@ extern "C" {
     #[cfg(esp32c2)]
     pub(crate) fn ble_controller_init(cfg: *const esp_bt_controller_config_t) -> i32;
 
+    pub(crate) fn ble_controller_deinit() -> i32;
+
     #[cfg(not(esp32c2))]
     pub(crate) fn r_ble_controller_init(cfg: *const esp_bt_controller_config_t) -> i32;
 
@@ -213,9 +215,13 @@ extern "C" {
     #[cfg(not(esp32c2))]
     pub(crate) fn r_ble_controller_enable(mode: u8) -> i32;
 
+    pub(crate) fn esp_unregister_ext_funcs();
+
     pub(crate) fn esp_register_ext_funcs(funcs: *const ExtFuncsT) -> i32;
 
     pub(crate) fn esp_register_npl_funcs(funcs: *const npl_funcs_t) -> i32;
+
+    pub(crate) fn esp_unregister_npl_funcs();
 
     #[cfg(esp32c2)]
     pub(crate) fn ble_get_npl_element_info(
@@ -795,8 +801,25 @@ unsafe extern "C" fn ble_npl_event_reset(event: *const ble_npl_event) {
     }
 }
 
-unsafe extern "C" fn ble_npl_event_deinit(_event: *const ble_npl_event) {
-    todo!()
+unsafe extern "C" fn ble_npl_event_deinit(event: *const ble_npl_event) {
+    trace!("ble_npl_event_deinit {:?}", event);
+
+    // Cast the event to a mutable pointer
+    let event = event as *mut ble_npl_event;
+
+    // Check if the event is uninitialized (dummy == 0)
+    if (*event).dummy == 0 {
+        panic!("Trying to deinitialize an uninitialized event");
+    } else {
+        // Get the index of the event in the EVENTS array using the dummy value
+        let idx = ((*event).dummy - 1) as usize;
+
+        // Reset the event in the EVENTS array
+        EVENTS[idx] = None;
+
+        // Reset the dummy field to indicate the event is uninitialized
+        (*event).dummy = 0;
+    }
 }
 
 unsafe extern "C" fn ble_npl_event_init(
@@ -908,8 +931,20 @@ unsafe extern "C" fn ble_npl_eventq_get(
     }
 }
 
-unsafe extern "C" fn ble_npl_eventq_deinit(_queue: *const ble_npl_eventq) {
-    todo!()
+unsafe extern "C" fn ble_npl_eventq_deinit(queue: *const ble_npl_eventq) {
+    trace!("ble_npl_eventq_deinit {:?}", queue);
+
+    let queue = queue as *mut ble_npl_eventq;
+
+    if (*queue).dummy == 0 {
+        panic!("Trying to deinitialize an uninitialized queue");
+    } else {
+        critical_section::with(|_| {
+            EVENT_QUEUE.dequeue();
+        });
+
+        (*queue).dummy = 0;
+    }
 }
 
 unsafe extern "C" fn ble_npl_callout_init(
@@ -1179,6 +1214,43 @@ pub(crate) fn ble_init() {
     }
 }
 
+pub(crate) fn ble_deinit() {
+    unsafe {
+        // HCI deinit
+        r_ble_hci_trans_cfg_hs(
+            Some(core::mem::transmute::<
+                *const (),
+                unsafe extern "C" fn(*const u8, *const c_void),
+            >(core::ptr::null())),
+            core::ptr::null(),
+            Some(core::mem::transmute::<
+                *const (),
+                unsafe extern "C" fn(*const OsMbuf, *const c_void),
+            >(core::ptr::null())),
+            core::ptr::null(),
+        );
+
+        // controller_sleep_deinit ?
+
+        let res = ble_controller_deinit();
+
+        if res != 0 {
+            panic!("ble_controller_init returned {}", res);
+        }
+
+        ble_os_adapter_chip_specific::bt_periph_module_enable();
+
+        #[cfg(esp32c2)]
+        os_msys_buf_free();
+
+        esp_unregister_npl_funcs();
+
+        esp_unregister_ext_funcs();
+
+        crate::common_adapter::chip_specific::phy_disable();
+    }
+}
+
 #[cfg(esp32c2)]
 fn os_msys_buf_alloc() -> bool {
     unsafe {
@@ -1239,7 +1311,24 @@ fn os_msys_init() {
     }
 }
 
-unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i32 {
+#[cfg(esp32c2)]
+fn os_msys_buf_free() {
+    unsafe {
+        // Free the memory for the first buffer, if allocated
+        if !OS_MSYS_INIT_1_DATA.is_null() {
+            crate::compat::malloc::free(OS_MSYS_INIT_1_DATA as *mut u8);
+            OS_MSYS_INIT_1_DATA = core::ptr::null_mut();
+        }
+
+        // Free the memory for the second buffer, if allocated
+        if !OS_MSYS_INIT_2_DATA.is_null() {
+            crate::compat::malloc::free(OS_MSYS_INIT_2_DATA as *mut u8);
+            OS_MSYS_INIT_2_DATA = core::ptr::null_mut();
+        }
+    }
+}
+
+unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) {
     trace!("ble_hs_hci_rx_evt {:?} {:?}", cmd, arg);
     debug!("$ cmd = {:x}", *cmd);
     debug!("$ len = {:x}", *(cmd.offset(1)));

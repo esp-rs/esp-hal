@@ -521,6 +521,17 @@ pub(crate) fn ble_init() {
     }
 }
 
+pub(crate) fn ble_deinit {
+    extern "C" {
+        fn btdm_controller_deinit();
+        fn bt_controller_deinit_internal();
+    }
+
+    unsafe {
+        btdm_controller_deinit();
+    }    
+}
+
 static mut BLE_HCI_READ_DATA: [u8; 256] = [0u8; 256];
 static mut BLE_HCI_READ_DATA_INDEX: usize = 0;
 static mut BLE_HCI_READ_DATA_LEN: usize = 0;

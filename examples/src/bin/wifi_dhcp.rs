@@ -20,8 +20,8 @@ use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_wifi::{
     current_millis,
-    reinitialize,
     initialize,
+    reinitialize,
     wifi::{
         deinitialize,
         utils::create_network_interface,
@@ -60,13 +60,7 @@ fn main() -> ! {
 
     let rng = Rng::new(peripherals.RNG);
 
-    let init = initialize(
-        EspWifiFor::Wifi,
-        timg0.timer0,
-        rng,
-        peripherals.RADIO_CLK,
-    )
-    .unwrap();
+    let init = initialize(EspWifiFor::Wifi, timg0.timer0, rng, peripherals.RADIO_CLK).unwrap();
 
     let mut wifi = peripherals.WIFI;
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
@@ -131,10 +125,6 @@ fn main() -> ! {
     let mut tx_buffer = [0u8; 1536];
     let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
 
-    let mut rx_buffer2 = [0u8; 1536];
-    let mut tx_buffer2 = [0u8; 1536];
-    let mut socket2 = wifi_stack.get_socket(&mut rx_buffer2, &mut tx_buffer2);
-
     println!("Making HTTP request");
     socket.work();
 
@@ -165,18 +155,14 @@ fn main() -> ! {
     println!();
 
     socket.disconnect();
-    
+
     // drop dependant Sockets.
     drop(socket);
-    
+
     // De-initialize and release `WifiStack` and controller
     let deinit = deinitialize(EspWifiFor::Wifi, controller, wifi_stack).unwrap();
 
-    let init = reinitialize(
-        EspWifiFor::Wifi,
-        deinit,
-    )
-    .unwrap();
+    let init = reinitialize(EspWifiFor::Wifi, deinit).unwrap();
 
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
     let (iface, device, mut controller, sockets) =

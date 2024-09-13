@@ -73,6 +73,10 @@ pub(crate) fn bt_periph_module_enable() {
     // nothing
 }
 
+pub(crate) fn bt_periph_module_disable() {
+    // nothing
+}
+
 pub(crate) fn disable_sleep_mode() {
     // nothing
 }
@@ -112,5 +116,14 @@ pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
     trace!("esp_reset_rpa_moudle");
     unsafe {
         unwrap!(RADIO_CLOCKS.as_mut()).reset_rpa();
+    }
+}
+
+pub(super) unsafe extern "C" fn ble_ll_random_override() -> u32 {
+    // this is not very random but good enough for now - it's not used for crypto
+    unsafe {
+        static mut VALUE: u32 = 0;
+        VALUE = VALUE.wrapping_add(3);
+        VALUE
     }
 }

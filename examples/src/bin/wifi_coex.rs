@@ -30,11 +30,17 @@ use esp_backtrace as _;
 use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_wifi::{
-    reinitialize,
     ble::controller::BleConnector,
     current_millis,
     initialize,
-    wifi::{utils::create_network_interface, deinitialize, ClientConfiguration, Configuration, WifiStaDevice},
+    reinitialize,
+    wifi::{
+        deinitialize,
+        utils::create_network_interface,
+        ClientConfiguration,
+        Configuration,
+        WifiStaDevice,
+    },
     wifi_interface::WifiStack,
     EspWifiFor,
 };
@@ -137,24 +143,18 @@ fn main() -> ! {
         }
     }
 
-    
     let connector = BleConnector::new(&init, &mut bluetooth);
     let hci = HciConnector::new(connector, esp_wifi::current_millis);
     let mut ble = Ble::new(&hci);
-    
+
     let deinit = deinitialize(EspWifiFor::WifiBle, controller, wifi_stack).unwrap();
     println!("DEINITED");
 
-    let init = reinitialize(
-        EspWifiFor::WifiBle,
-        deinit,
-    )
-    .unwrap();
+    let init = reinitialize(EspWifiFor::WifiBle, deinit).unwrap();
 
     let connector = BleConnector::new(&init, &mut bluetooth);
     let hci = HciConnector::new(connector, esp_wifi::current_millis);
     let mut ble = Ble::new(&hci);
-
 
     println!("{:?}", ble.init());
     println!("{:?}", ble.cmd_set_le_advertising_parameters());
