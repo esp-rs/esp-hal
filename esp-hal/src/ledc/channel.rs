@@ -161,6 +161,9 @@ pub trait ChannelHW<O: PeripheralOutput> {
             /// Disable the overflow counter by clearing the appropriate register.
             fn disable_counter(&self);
 
+            /// Resets the overflow counter by clearing `LEDC_OVF_CNT_RESET_CHn``.
+            fn reset_counter(&self);
+
             /// Enables the overflow counting interrupt for this channel.
             fn enable_overflow_interrupt(&self);
 
@@ -833,6 +836,14 @@ where
         Ledc::register_block().ch(self.number as usize).conf0().modify(|_, w| {
             w.ovf_cnt_en().clear_bit().para_up().set_bit()
         });
+    }
+
+    /// Resets the overflow counter by clearing `LEDC_OVF_CNT_RESET_CHn``.
+    fn reset_counter(&self) {
+        Ledc::register_block()
+            .ch(self.number as usize)
+            .conf0()
+            .modify(|_, w| w.ovf_cnt_reset().set_bit());
     }
 
     /// Returns true if the overflow counting interrupt is active for this channel.
