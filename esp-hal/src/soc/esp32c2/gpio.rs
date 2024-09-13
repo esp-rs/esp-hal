@@ -220,8 +220,4 @@ impl InterruptStatusRegisterAccess {
     pub(crate) fn interrupt_status_read(self) -> u32 {
         unsafe { &*GPIO::PTR }.pcpu_int().read().bits()
     }
-
-    pub(crate) fn nmi_status_read(self) -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int().read().bits()
-    }
 }
