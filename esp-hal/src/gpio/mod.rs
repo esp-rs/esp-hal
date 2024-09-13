@@ -1208,8 +1208,10 @@ macro_rules! gpio {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! rtc_pins {
+    ( @ignore $rue:literal ) => {};
+
     (
-        $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:ident, $rde:ident)?
+        $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:literal)?
     ) => {
         impl $crate::gpio::RtcPin for GpioPin<$pin_num>
         {
@@ -1252,13 +1254,15 @@ macro_rules! rtc_pins {
         }
 
         $(
+            // FIXME: replace with $(ignore($rue)) once stable
+            $crate::rtc_pins!(@ignore $rue);
             impl $crate::gpio::RtcPinWithResistors for GpioPin<$pin_num>
             {
                 fn rtcio_pullup(&mut self, enable: bool) {
                     let rtcio = unsafe { &*$crate::peripherals::RTC_IO::PTR };
 
                     paste::paste! {
-                        rtcio.$pin_reg.modify(|_, w| w.$rue().bit([< enable >]));
+                        rtcio.$pin_reg.modify(|_, w| w.[< $prefix rue >]().bit([< enable >]));
                     }
                 }
 
@@ -1266,7 +1270,7 @@ macro_rules! rtc_pins {
                     let rtcio = unsafe { &*$crate::peripherals::RTC_IO::PTR };
 
                     paste::paste! {
-                        rtcio.$pin_reg.modify(|_, w| w.$rde().bit([< enable >]));
+                        rtcio.$pin_reg.modify(|_, w| w.[< $prefix rde >]().bit([< enable >]));
                     }
                 }
             }
@@ -1274,10 +1278,10 @@ macro_rules! rtc_pins {
     };
 
     (
-        $( ( $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:ident, $rde:ident)? ) )+
+        $( ( $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:literal )? ) )+
     ) => {
         $(
-            $crate::gpio::rtc_pins!($pin_num, $rtc_pin, $pin_reg, $prefix, $hold $(, $rue, $rde)?);
+            $crate::gpio::rtc_pins!($pin_num, $rtc_pin, $pin_reg, $prefix, $hold $(, $rue )?);
         )+
 
         #[doc(hidden)]
@@ -1299,14 +1303,14 @@ macro_rules! rtc_pins {
         #[doc(hidden)]
         #[macro_export]
         macro_rules! handle_rtcio_with_resistors {
-            (@ignore $a:ident, $b:ident) => {};
+            (@ignore $a:tt) => {};
             ($this:expr, $inner:ident, $code:tt) => {
                 match $this {
                     $(
                         $(
                             paste::paste! { AnyPinInner::[<Gpio $pin_num >]($inner) } => {
                                 // FIXME: replace with $(ignore($rue)) once stable
-                                handle_rtcio_with_resistors!(@ignore $rue, $rde);
+                                handle_rtcio_with_resistors!(@ignore $rue);
                                 $code
                             },
                         )?
