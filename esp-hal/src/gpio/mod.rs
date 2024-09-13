@@ -1413,7 +1413,7 @@ macro_rules! analog {
     (
         $(
             (
-                $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $($rue:literal)?
+                $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat $(, $rue:literal)?
             )
         )+
     ) => {
