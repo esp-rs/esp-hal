@@ -32,11 +32,6 @@
 //!       * This enumeration defines output signals for the GPIO mux. Each
 //!         output signal is assigned a specific value.
 //!
-//! This module also implements the `InterruptStatusRegisterAccess` trait for
-//! two different banks:
-//!   * `InterruptStatusRegisterAccessBank0`
-//!   * `InterruptStatusRegisterAccessBank1`.
-//!
 //! This trait provides functions to read the interrupt status and NMI status
 //! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
 //! `gpio` peripheral to access the appropriate registers.
@@ -228,6 +223,7 @@ crate::gpio::gpio! {
     (21, 0, InputOutput () (0 => U0TXD))
 }
 
+// RTC pins 0 through 5 (inclusive) support GPIO wakeup
 crate::gpio::rtc_pins! {
     0
     1
@@ -246,11 +242,8 @@ crate::gpio::analog! {
     5
 }
 
-// RTC pins 0 through 5 (inclusive) support GPIO wakeup
-
-#[doc(hidden)]
 #[derive(Clone, Copy)]
-pub enum InterruptStatusRegisterAccess {
+pub(crate) enum InterruptStatusRegisterAccess {
     Bank0,
 }
 

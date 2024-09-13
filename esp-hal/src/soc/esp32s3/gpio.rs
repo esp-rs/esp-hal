@@ -32,11 +32,6 @@
 //!       * This enumeration defines output signals for the GPIO mux. Each
 //!         output signal is assigned a specific value.
 //!
-//! This module also implements the `InterruptStatusRegisterAccess` trait for
-//! two different banks:
-//!   * `InterruptStatusRegisterAccessBank0`
-//!   * `InterruptStatusRegisterAccessBank1`.
-//!
 //! This trait provides functions to read the interrupt status and NMI status
 //! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
 //! `gpio` peripheral to access the appropriate registers.
@@ -450,9 +445,8 @@ crate::gpio::rtc_pins! {
 
 // Whilst the S3 is a dual core chip, it shares the enable registers between
 // cores so treat it as a single core device
-#[doc(hidden)]
 #[derive(Clone, Copy)]
-pub enum InterruptStatusRegisterAccess {
+pub(crate) enum InterruptStatusRegisterAccess {
     Bank0,
     Bank1,
 }
