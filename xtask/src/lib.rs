@@ -36,6 +36,7 @@ pub enum Package {
     EspAlloc,
     EspBacktrace,
     EspBuild,
+    EspConfig,
     EspHal,
     EspHalEmbassy,
     EspHalProcmacros,
