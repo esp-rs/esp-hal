@@ -463,65 +463,6 @@ pub trait TouchPin: Pin {
 }
 
 #[doc(hidden)]
-pub trait InterruptStatusRegisterAccess {
-    fn pro_cpu_interrupt_status_read() -> u32;
-
-    fn pro_cpu_nmi_status_read() -> u32;
-
-    fn app_cpu_interrupt_status_read() -> u32 {
-        Self::pro_cpu_interrupt_status_read()
-    }
-
-    fn app_cpu_nmi_status_read() -> u32 {
-        Self::pro_cpu_nmi_status_read()
-    }
-
-    fn interrupt_status_read() -> u32 {
-        match crate::get_core() {
-            crate::Cpu::ProCpu => Self::pro_cpu_interrupt_status_read(),
-            #[cfg(multi_core)]
-            crate::Cpu::AppCpu => Self::app_cpu_interrupt_status_read(),
-        }
-    }
-
-    fn nmi_status_read() -> u32 {
-        match crate::get_core() {
-            crate::Cpu::ProCpu => Self::pro_cpu_nmi_status_read(),
-            #[cfg(multi_core)]
-            crate::Cpu::AppCpu => Self::app_cpu_nmi_status_read(),
-        }
-    }
-}
-
-#[doc(hidden)]
-pub struct InterruptStatusRegisterAccessBank0;
-
-#[doc(hidden)]
-pub struct InterruptStatusRegisterAccessBank1;
-
-#[doc(hidden)]
-pub trait InterruptStatusRegisters<RegisterAccess>
-where
-    RegisterAccess: InterruptStatusRegisterAccess,
-{
-    fn pro_cpu_interrupt_status_read() -> u32 {
-        RegisterAccess::pro_cpu_interrupt_status_read()
-    }
-
-    fn pro_cpu_nmi_status_read() -> u32 {
-        RegisterAccess::pro_cpu_nmi_status_read()
-    }
-
-    fn app_cpu_interrupt_status_read() -> u32 {
-        RegisterAccess::app_cpu_interrupt_status_read()
-    }
-
-    fn app_cpu_nmi_status_read() -> u32 {
-        RegisterAccess::app_cpu_nmi_status_read()
-    }
-}
-
-#[doc(hidden)]
 pub struct Bank0GpioRegisterAccess;
 
 #[doc(hidden)]
@@ -1047,7 +988,6 @@ fn on_pin_irq(pin_nr: u8) {
 #[doc(hidden)]
 pub trait GpioProperties {
     type Bank: BankGpioRegisterAccess;
-    type InterruptStatus: InterruptStatusRegisterAccess;
 
     type IsOutput: BooleanType;
     type IsAnalog: BooleanType;
@@ -1056,6 +996,7 @@ pub trait GpioProperties {
     fn degrade_pin(&self, _: private::Internal) -> AnyPin;
     fn output_signals() -> [Option<OutputSignal>; 6];
     fn input_signals() -> [Option<InputSignal>; 6];
+    fn interrupt_status(&self) -> InterruptStatusRegisterAccess;
 }
 
 #[doc(hidden)]
@@ -1127,8 +1068,11 @@ macro_rules! gpio {
             $(
                 impl $crate::gpio::GpioProperties for GpioPin<$gpionum> {
                     type Bank = $crate::gpio::[< Bank $bank GpioRegisterAccess >];
-                    type InterruptStatus = $crate::gpio::[< InterruptStatusRegisterAccessBank $bank >];
                     $crate::pin_types!($type);
+
+                    fn interrupt_status(&self) -> $crate::gpio::InterruptStatusRegisterAccess {
+                        $crate::gpio::InterruptStatusRegisterAccess::[<Bank $bank >]
+                    }
 
                     fn degrade_pin(&self, _: $crate::private::Internal) -> AnyPin {
                         AnyPin($crate::gpio::AnyPinInner::[< Gpio $gpionum >](unsafe { Self::steal() }))
@@ -2466,10 +2410,10 @@ fn set_int_enable(gpio_num: u8, int_ena: u8, int_type: u8, wake_up_from_light_sl
 
 #[ram]
 fn handle_pin_interrupts(handle: impl Fn(u8)) {
-    let intrs_bank0 = InterruptStatusRegisterAccessBank0::interrupt_status_read();
+    let intrs_bank0 = InterruptStatusRegisterAccess::Bank0.interrupt_status_read();
 
     #[cfg(any(esp32, esp32s2, esp32s3))]
-    let intrs_bank1 = InterruptStatusRegisterAccessBank1::interrupt_status_read();
+    let intrs_bank1 = InterruptStatusRegisterAccess::Bank1.interrupt_status_read();
 
     let mut intr_bits = intrs_bank0;
     while intr_bits != 0 {

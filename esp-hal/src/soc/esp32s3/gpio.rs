@@ -42,13 +42,7 @@
 //! `gpio` peripheral to access the appropriate registers.
 
 use crate::{
-    gpio::{
-        AlternateFunction,
-        GpioPin,
-        InterruptStatusRegisterAccess,
-        InterruptStatusRegisterAccessBank0,
-        InterruptStatusRegisterAccessBank1,
-    },
+    gpio::{AlternateFunction, GpioPin},
     peripherals::GPIO,
 };
 
@@ -456,39 +450,19 @@ crate::gpio::rtc_pins! {
 
 // Whilst the S3 is a dual core chip, it shares the enable registers between
 // cores so treat it as a single core device
-impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank0 {
-    fn pro_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int().read().bits()
-    }
-
-    fn pro_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int().read().bits()
-    }
-
-    fn interrupt_status_read() -> u32 {
-        Self::pro_cpu_interrupt_status_read()
-    }
-
-    fn nmi_status_read() -> u32 {
-        Self::pro_cpu_nmi_status_read()
-    }
+#[doc(hidden)]
+#[derive(Clone, Copy)]
+pub enum InterruptStatusRegisterAccess {
+    Bank0,
+    Bank1,
 }
 
-impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank1 {
-    fn pro_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int1().read().bits()
-    }
-
-    fn pro_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int1().read().bits()
-    }
-
-    fn interrupt_status_read() -> u32 {
-        Self::pro_cpu_interrupt_status_read()
-    }
-
-    fn nmi_status_read() -> u32 {
-        Self::pro_cpu_nmi_status_read()
+impl InterruptStatusRegisterAccess {
+    pub(crate) fn interrupt_status_read(self) -> u32 {
+        match self {
+            Self::Bank0 => unsafe { &*GPIO::PTR }.pcpu_int().read().bits(),
+            Self::Bank1 => unsafe { &*GPIO::PTR }.pcpu_int1().read().bits(),
+        }
     }
 }
 

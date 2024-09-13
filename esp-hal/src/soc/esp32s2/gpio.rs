@@ -55,13 +55,7 @@
 use core::mem::transmute;
 
 use crate::{
-    gpio::{
-        AlternateFunction,
-        GpioPin,
-        InterruptStatusRegisterAccess,
-        InterruptStatusRegisterAccessBank0,
-        InterruptStatusRegisterAccessBank1,
-    },
+    gpio::{AlternateFunction, GpioPin},
     peripherals::{io_mux, GPIO, IO_MUX},
 };
 
@@ -422,23 +416,19 @@ crate::gpio::rtc_pins! {
     (21, 21,  rtc_pad21(),    "",     pad21_hold,       rue,       rde)
 }
 
-impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank0 {
-    fn pro_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int().read().bits()
-    }
-
-    fn pro_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int().read().bits()
-    }
+#[doc(hidden)]
+#[derive(Clone, Copy)]
+pub enum InterruptStatusRegisterAccess {
+    Bank0,
+    Bank1,
 }
 
-impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank1 {
-    fn pro_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int1().read().bits()
-    }
-
-    fn pro_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int1().read().bits()
+impl InterruptStatusRegisterAccess {
+    pub(crate) fn interrupt_status_read(self) -> u32 {
+        match self {
+            Self::Bank0 => unsafe { &*GPIO::PTR }.pcpu_int().read().bits(),
+            Self::Bank1 => unsafe { &*GPIO::PTR }.pcpu_int1().read().bits(),
+        }
     }
 }
 

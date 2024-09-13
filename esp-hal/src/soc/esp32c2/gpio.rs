@@ -41,12 +41,7 @@
 //! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
 //! `gpio` peripheral to access the appropriate registers.
 use crate::{
-    gpio::{
-        AlternateFunction,
-        GpioPin,
-        InterruptStatusRegisterAccess,
-        InterruptStatusRegisterAccessBank0,
-    },
+    gpio::{AlternateFunction, GpioPin},
     peripherals::GPIO,
 };
 
@@ -215,12 +210,18 @@ crate::gpio::analog! {
     4
 }
 
-impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank0 {
-    fn pro_cpu_interrupt_status_read() -> u32 {
+#[doc(hidden)]
+#[derive(Clone, Copy)]
+pub enum InterruptStatusRegisterAccess {
+    Bank0,
+}
+
+impl InterruptStatusRegisterAccess {
+    pub(crate) fn interrupt_status_read(self) -> u32 {
         unsafe { &*GPIO::PTR }.pcpu_int().read().bits()
     }
 
-    fn pro_cpu_nmi_status_read() -> u32 {
+    pub(crate) fn nmi_status_read(self) -> u32 {
         unsafe { &*GPIO::PTR }.pcpu_nmi_int().read().bits()
     }
 }

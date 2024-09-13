@@ -48,13 +48,7 @@
 use core::mem::transmute;
 
 use crate::{
-    gpio::{
-        AlternateFunction,
-        GpioPin,
-        InterruptStatusRegisterAccess,
-        InterruptStatusRegisterAccessBank0,
-        InterruptStatusRegisterAccessBank1,
-    },
+    gpio::{AlternateFunction, GpioPin},
     peripherals::{io_mux, GPIO, IO_MUX},
     Cpu,
 };
@@ -860,38 +854,24 @@ crate::gpio::touch! {
     (9, 32, 9, sar_touch_out5, touch_meas_out9, sar_touch_thres5, touch_out_th9, false)
 }
 
-impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank0 {
-    fn pro_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int().read().bits()
-    }
-
-    fn pro_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int().read().bits()
-    }
-
-    fn app_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.acpu_int().read().bits()
-    }
-
-    fn app_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.acpu_nmi_int().read().bits()
-    }
+#[doc(hidden)]
+#[derive(Clone, Copy)]
+pub enum InterruptStatusRegisterAccess {
+    Bank0,
+    Bank1,
 }
 
-impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank1 {
-    fn pro_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int1().read().bits()
-    }
-
-    fn pro_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int1().read().bits()
-    }
-
-    fn app_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.acpu_int1().read().bits()
-    }
-
-    fn app_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.acpu_nmi_int1().read().bits()
+impl InterruptStatusRegisterAccess {
+    pub(crate) fn interrupt_status_read(self) -> u32 {
+        match self {
+            Self::Bank0 => match crate::get_core() {
+                crate::Core::ProCpu => unsafe { &*GPIO::PTR }.pcpu_int().read().bits(),
+                crate::Core::AppCpu => unsafe { &*GPIO::PTR }.acpu_int().read().bits(),
+            },
+            Self::Ban1 => match crate::get_core() {
+                crate::Core::ProCpu => unsafe { &*GPIO::PTR }.pcpu_int1().read().bits(),
+                crate::Core::AppCpu => unsafe { &*GPIO::PTR }.acpu_int1().read().bits(),
+            },
+        }
     }
 }
