@@ -251,7 +251,7 @@ where
 
         let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
         let Some(clock_divider) =
-            ClockDivider::from_frequence(src_clock.to_Hz(), frequency.to_Hz(), 256, 0b11111)
+            ClockDivider::from_frequency(src_clock.to_Hz(), frequency.to_Hz(), 256, 0b11111)
         else {
             return Err(Error::UnreachableTargetFrequency);
         };
@@ -2421,6 +2421,8 @@ mod chip_specific {
 
 #[cfg(not(any(esp32, esp32s2)))]
 mod clock_divider_solver {
+    use core::{cmp::Ordering, hint::unreachable_unchecked};
+
     // Calculate the greatest common divisor of a and b
     const fn gcd(mut a: u32, mut b: u32) -> u32 {
         while b != 0 {
@@ -2441,7 +2443,7 @@ mod clock_divider_solver {
     }
 
     impl ClockDivider {
-        pub const fn from_frequence(
+        pub fn from_frequency(
             source: u32,
             target: u32,
             integral_max: u32,
@@ -2487,31 +2489,19 @@ mod clock_divider_solver {
             };
             let mut h = Fraction {
                 numerator: 1,
-                denominator: 1, // We only search the left harf part
+                denominator: 1, // We only search the left half part
             };
             loop {
                 let m = Fraction {
                     numerator: l.numerator + h.numerator,
                     denominator: l.denominator + h.denominator,
                 };
+
                 if m.numerator > fractional_max || m.denominator > fractional_max {
                     // L and H, which is closer?
-
-                    // M - L
-                    let a = Fraction {
-                        numerator: m.numerator * l.denominator - m.denominator * l.numerator,
-                        denominator: m.denominator * l.denominator,
-                    };
-                    // H - M
-                    let b = Fraction {
-                        numerator: h.numerator * m.denominator - h.denominator * m.numerator,
-                        denominator: h.denominator * m.denominator,
-                    };
-
-                    // compare a and b
-                    let c = a.numerator * b.denominator;
-                    let d = a.denominator * b.numerator;
-                    let m = if c < d { l } else { h };
+                    let err_l = m.sub(&l);
+                    let err_h = h.sub(&m);
+                    let m = if err_l.lt(&err_h) { l } else { h };
                     return Some(Self {
                         div_num: quotient,
                         div_b: m.numerator,
@@ -2519,20 +2509,22 @@ mod clock_divider_solver {
                     });
                 }
 
-                // compare M and target_frac
-                let a = m.numerator * target_frac.denominator;
-                let b = m.denominator * target_frac.numerator;
-                if a > b {
-                    h = m;
-                } else if a < b {
-                    l = m;
-                } else {
-                    // unreachable!();
-                    return Some(Self {
-                        div_num: quotient,
-                        div_b: m.numerator,
-                        div_a: m.denominator,
-                    });
+                match m.cmp(&target_frac) {
+                    Ordering::Less => {
+                        l = m;
+                    }
+                    Ordering::Greater => {
+                        h = m;
+                    }
+                    Ordering::Equal => {
+                        // SAFETY: Before search Stern-Brocot Tree,
+                        // we ensures that the simplest fractional
+                        // form of target_frac has a greater denominator
+                        // than the fractial_max. Therefore, in searches
+                        // within a smaller range, there will never be a
+                        // situation where M == targete_frac.
+                        unsafe { unreachable_unchecked() }
+                    }
                 }
             }
         }
@@ -2541,5 +2533,26 @@ mod clock_divider_solver {
     struct Fraction {
         pub numerator: u32,
         pub denominator: u32,
+    }
+
+    impl Fraction {
+        fn cmp(&self, other: &Self) -> Ordering {
+            let a = self.numerator * other.denominator;
+            let b = self.denominator * other.numerator;
+            a.cmp(&b)
+        }
+
+        const fn lt(&self, other: &Self) -> bool {
+            let a = self.numerator * other.denominator;
+            let b = self.denominator * other.numerator;
+            a < b
+        }
+
+        const fn sub(&self, rhs: &Self) -> Self {
+            Self {
+                numerator: self.numerator * rhs.denominator - self.denominator * rhs.numerator,
+                denominator: self.denominator * rhs.denominator,
+            }
+        }
     }
 }
