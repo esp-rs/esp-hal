@@ -2143,9 +2143,9 @@ mod ehal1 {
         fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
             // Optimizations
             if read.is_empty() {
-                SpiBus::write(self, write)?;
+                return SpiBus::write(self, write);
             } else if write.is_empty() {
-                SpiBus::read(self, read)?;
+                return SpiBus::read(self, read);
             }
 
             let mut write_from = 0;
