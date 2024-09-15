@@ -229,7 +229,14 @@ impl Debug for DmaDescriptorFlags {
 #[cfg(feature = "defmt")]
 impl defmt::Format for DmaDescriptorFlags {
     fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(fmt, "DmaDescriptorFlags {{ size: {}, length: {}, suc_eof: {}, owner: {} }}", self.size(), self.length(), self.suc_eof(), if self.owner() { "DMA" } else { "CPU" });
+        defmt::write!(
+            fmt,
+            "DmaDescriptorFlags {{ size: {}, length: {}, suc_eof: {}, owner: {} }}",
+            self.size(),
+            self.length(),
+            self.suc_eof(),
+            if self.owner() { "DMA" } else { "CPU" }
+        );
     }
 }
 
@@ -1987,7 +1994,8 @@ where
 /// Holds all the information needed to configure a DMA channel for a transfer.
 pub struct Preparation {
     start: *mut DmaDescriptor,
-    /// block size for PSRAM transfers (TODO: enable burst mode for non external memory?)
+    /// block size for PSRAM transfers (TODO: enable burst mode for non external
+    /// memory?)
     block_size: Option<DmaBufBlkSize>,
     // burst_mode, alignment, check_owner, etc.
 }
@@ -2058,8 +2066,8 @@ pub enum DmaBufBlkSize {
 /// DMA transmit buffer
 ///
 /// This is a contiguous buffer linked together by DMA descriptors of length
-/// 4092 at most. It can only be used for transmitting data to a peripheral's FIFO.
-/// See [DmaRxBuf] for receiving data.
+/// 4092 at most. It can only be used for transmitting data to a peripheral's
+/// FIFO. See [DmaRxBuf] for receiving data.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct DmaTxBuf {
@@ -2231,7 +2239,12 @@ impl DmaTxBuffer for DmaTxBuf {
 
         #[cfg(esp32s3)]
         if crate::soc::is_valid_psram_address(self.buffer.as_ptr() as u32) {
-            unsafe {crate::soc::cache_writeback_addr(self.buffer.as_ptr() as u32, self.buffer.len() as u32)};
+            unsafe {
+                crate::soc::cache_writeback_addr(
+                    self.buffer.as_ptr() as u32,
+                    self.buffer.len() as u32,
+                )
+            };
         }
 
         Preparation {

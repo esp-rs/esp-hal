@@ -6,7 +6,7 @@
 #![no_main]
 use esp_alloc as _;
 use esp_hal::{
-    dma::{Dma, DmaPriority, DmaTxBuf, DmaBufBlkSize},
+    dma::{Dma, DmaBufBlkSize, DmaPriority, DmaTxBuf},
     dma_descriptors_chunk_size,
     gpio::{interconnect::InputSignal, Io},
     pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
@@ -107,7 +107,9 @@ mod tests {
 
         let (_, descriptors) = dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
         let buffer = dma_alloc_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT as usize);
-        let mut dma_tx_buf = DmaTxBuf::new_with_chunk_size(descriptors, buffer, DMA_CHUNK_SIZE, Some(DMA_ALIGNMENT)).unwrap();
+        let mut dma_tx_buf =
+            DmaTxBuf::new_with_chunk_size(descriptors, buffer, DMA_CHUNK_SIZE, Some(DMA_ALIGNMENT))
+                .unwrap();
 
         let unit = ctx.pcnt_unit;
         let mut spi = ctx.spi;
@@ -153,9 +155,10 @@ mod tests {
     // fn test_spidmabus_writes_are_correctly_by_pcnt(ctx: Context) {
     //     const DMA_BUFFER_SIZE: usize = 64;
 
-    //     let (rx, rxd, buffer, descriptors) = dma_buffers!(1, DMA_BUFFER_SIZE);
-    //     let dma_rx_buf = DmaRxBuf::new(rxd, rx).unwrap();
-    //     let dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
+    //     let (rx, rxd, buffer, descriptors) = dma_buffers!(1,
+    // DMA_BUFFER_SIZE);     let dma_rx_buf = DmaRxBuf::new(rxd,
+    // rx).unwrap();     let dma_tx_buf = DmaTxBuf::new(descriptors,
+    // buffer).unwrap();
 
     //     let unit = ctx.pcnt_unit;
     //     let mut spi = ctx.spi.with_buffers(dma_rx_buf, dma_tx_buf);

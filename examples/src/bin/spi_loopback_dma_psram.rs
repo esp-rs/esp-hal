@@ -22,7 +22,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf, DmaBufBlkSize},
+    dma::{Dma, DmaBufBlkSize, DmaPriority, DmaRxBuf, DmaTxBuf},
     gpio::Io,
     prelude::*,
     spi::{master::Spi, SpiMode},
@@ -47,7 +47,7 @@ macro_rules! dma_alloc_buffer {
 // TODO: the fist transfer fails in some conditions:
 // - if this is <= 8192 when chunk_size is 4032!?!?
 // - varing either DMA_CHUNK_SIZE or DMA_BUFFER_SIZE seems change the behavior
-const DMA_BUFFER_SIZE: usize = 16384; // the first request fails is this is <= 8192 when chunk_size is 4032!?!? 
+const DMA_BUFFER_SIZE: usize = 16384; // the first request fails is this is <= 8192 when chunk_size is 4032!?!?
 const DMA_CHUNK_SIZE: usize = 4032; // size is aligned to 64 bytes
 const DMA_ALIGNMENT: DmaBufBlkSize = DmaBufBlkSize::Size16;
 
@@ -68,12 +68,29 @@ fn main() -> ! {
     let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
-    let (_, tx_descriptors) = esp_hal::dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
+    let (_, tx_descriptors) =
+        esp_hal::dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
     let tx_buffer = dma_alloc_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT as usize);
-    info!("TX: {:p} len {} ({} descripters)", tx_buffer.as_ptr(), tx_buffer.len(), tx_descriptors.len());
-    let mut dma_tx_buf = DmaTxBuf::new_with_chunk_size(tx_descriptors, tx_buffer, DMA_CHUNK_SIZE, Some(DMA_ALIGNMENT)).unwrap();
+    info!(
+        "TX: {:p} len {} ({} descripters)",
+        tx_buffer.as_ptr(),
+        tx_buffer.len(),
+        tx_descriptors.len()
+    );
+    let mut dma_tx_buf = DmaTxBuf::new_with_chunk_size(
+        tx_descriptors,
+        tx_buffer,
+        DMA_CHUNK_SIZE,
+        Some(DMA_ALIGNMENT),
+    )
+    .unwrap();
     let (rx_buffer, rx_descriptors, _, _) = esp_hal::dma_buffers!(DMA_BUFFER_SIZE, 0);
-    info!("RX: {:p} len {} ({} descripters)", rx_buffer.as_ptr(), rx_buffer.len(), rx_descriptors.len());
+    info!(
+        "RX: {:p} len {} ({} descripters)",
+        rx_buffer.as_ptr(),
+        rx_buffer.len(),
+        rx_descriptors.len()
+    );
     let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
         .with_pins(sclk, mosi, miso, cs)
@@ -100,7 +117,12 @@ fn main() -> ! {
         (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
         for (i, v) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
             if dma_rx_buf.as_slice()[i] != *v {
-                error!("Mismatch at index {}: expected {}, got {}", i, *v, dma_rx_buf.as_slice()[i]);
+                error!(
+                    "Mismatch at index {}: expected {}, got {}",
+                    i,
+                    *v,
+                    dma_rx_buf.as_slice()[i]
+                );
                 break;
             }
         }
