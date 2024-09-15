@@ -226,6 +226,13 @@ impl Debug for DmaDescriptorFlags {
     }
 }
 
+#[cfg(feature = "defmt")]
+impl defmt::Format for DmaDescriptorFlags {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        defmt::write!(fmt, "DmaDescriptorFlags {{ size: {}, length: {}, suc_eof: {}, owner: {} }}", self.size(), self.length(), self.suc_eof(), if self.owner() { "DMA" } else { "CPU" });
+    }
+}
+
 /// A DMA transfer descriptor.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -286,7 +293,11 @@ use enumset::{EnumSet, EnumSetType};
 pub use self::gdma::*;
 #[cfg(pdma)]
 pub use self::pdma::*;
-use crate::{interrupt::InterruptHandler, soc::is_slice_in_dram, Mode};
+use crate::{
+    interrupt::InterruptHandler,
+    soc::{is_slice_in_dram, is_slice_in_psram},
+    Mode,
+};
 
 #[cfg(gdma)]
 mod gdma;
@@ -954,6 +965,16 @@ pub enum DmaExtMemBKSize {
     Size64 = 2,
 }
 
+impl From<DmaBufBlkSize> for DmaExtMemBKSize {
+    fn from(size: DmaBufBlkSize) -> Self {
+        match size {
+            DmaBufBlkSize::Size16 => DmaExtMemBKSize::Size16,
+            DmaBufBlkSize::Size32 => DmaExtMemBKSize::Size32,
+            DmaBufBlkSize::Size64 => DmaExtMemBKSize::Size64,
+        }
+    }
+}
+
 pub(crate) struct TxCircularState {
     write_offset: usize,
     write_descr_ptr: *mut DmaDescriptor,
@@ -1387,7 +1408,6 @@ where
                 if des.buffer as usize % alignment != 0 && des.size() % alignment != 0 {
                     return Err(DmaError::InvalidAlignment);
                 }
-                // TODO: make this optional?
                 crate::soc::cache_invalidate_addr(des.buffer as u32, des.size() as u32);
             }
         }
@@ -1704,6 +1724,7 @@ where
         peri: DmaPeripheral,
         chain: &DescriptorChain,
     ) -> Result<(), DmaError> {
+        // TODO: based on the ESP32-S3 TRM teh alignment check is not needed for TX!
         // for esp32s3 we check each descriptor buffer that points to psram for
         // alignment and writeback the cache for that buffer
         #[cfg(esp32s3)]
@@ -1729,7 +1750,11 @@ where
         buffer: &mut BUF,
     ) -> Result<(), DmaError> {
         let preparation = buffer.prepare();
-
+        #[cfg(esp32s3)]
+        if let Some(block_size) = preparation.block_size {
+            self.set_ext_mem_block_size(block_size.into());
+        }
+        // TODO: Get burst mode from DmaBuf.
         self.tx_impl
             .prepare_transfer_without_start(preparation.start, peri)
     }
@@ -1962,6 +1987,8 @@ where
 /// Holds all the information needed to configure a DMA channel for a transfer.
 pub struct Preparation {
     start: *mut DmaDescriptor,
+    /// block size for PSRAM transfers (TODO: enable burst mode for non external memory?)
+    block_size: Option<DmaBufBlkSize>,
     // burst_mode, alignment, check_owner, etc.
 }
 
@@ -2009,17 +2036,37 @@ pub enum DmaBufError {
     InsufficientDescriptors,
     /// Descriptors or buffers are not located in a supported memory region
     UnsupportedMemoryRegion,
+    /// Buffer is not aligned to the required size
+    InvalidAlignment,
+    /// Invalid chunk size: must be > 0 and <= 4092
+    InvalidChunkSize,
+}
+
+/// DMA buffer allignments
+#[cfg(all(esp32s3, psram))]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum DmaBufBlkSize {
+    /// 16 bytes
+    Size16 = 16,
+    /// 32 bytes
+    Size32 = 32,
+    /// 64 bytes
+    Size64 = 64,
 }
 
 /// DMA transmit buffer
 ///
 /// This is a contiguous buffer linked together by DMA descriptors of length
-/// 4092. It can only be used for transmitting data to a peripheral's FIFO.
+/// 4092 at most. It can only be used for transmitting data to a peripheral's FIFO.
 /// See [DmaRxBuf] for receiving data.
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct DmaTxBuf {
     descriptors: &'static mut [DmaDescriptor],
     buffer: &'static mut [u8],
+    chunk_size: usize,
+    block_size: Option<DmaBufBlkSize>,
 }
 
 impl DmaTxBuf {
@@ -2029,23 +2076,50 @@ impl DmaTxBuf {
     /// Each descriptor can handle 4092 bytes worth of buffer.
     ///
     /// Both the descriptors and buffer must be in DMA-capable memory.
-    /// Only DRAM is supported.
+    /// Only DRAM is supported for descriptors.
     pub fn new(
         descriptors: &'static mut [DmaDescriptor],
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
-        let min_descriptors = buffer.len().div_ceil(CHUNK_SIZE);
+        Self::new_with_chunk_size(descriptors, buffer, CHUNK_SIZE, None)
+    }
+
+    /// Creates a new [DmaTxBuf] from some descriptors and a buffer.
+    ///
+    /// There must be enough descriptors for the provided buffer.
+    /// Each descriptor can handle at most 4092 bytes worth of buffer.
+    /// The chunk size must be greater than 0 and less than or equal to 4092.
+    /// Optionally, a block size can be provided for PSRAM & Burst transfers.
+    ///
+    /// Both the descriptors and buffer must be in DMA-capable memory.
+    /// Only DRAM is supported for descriptors.
+    pub fn new_with_chunk_size(
+        descriptors: &'static mut [DmaDescriptor],
+        buffer: &'static mut [u8],
+        chunk_size: usize,
+        block_size: Option<DmaBufBlkSize>,
+    ) -> Result<Self, DmaBufError> {
+        if chunk_size == 0 || chunk_size > 4092 {
+            return Err(DmaBufError::InvalidChunkSize);
+        }
+        let min_descriptors = buffer.len().div_ceil(chunk_size);
         if descriptors.len() < min_descriptors {
             return Err(DmaBufError::InsufficientDescriptors);
         }
 
-        if !is_slice_in_dram(descriptors) || !is_slice_in_dram(buffer) {
+        // descriptors are required to be in DRAM
+        if !is_slice_in_dram(descriptors) {
+            return Err(DmaBufError::UnsupportedMemoryRegion);
+        }
+
+        // buffer can be either DRAM or PSRAM (if supported)
+        if !is_slice_in_dram(buffer) && !is_slice_in_psram(buffer) {
             return Err(DmaBufError::UnsupportedMemoryRegion);
         }
 
         // Setup size and buffer pointer as these will not change for the remainder of
         // this object's lifetime
-        let chunk_iter = descriptors.iter_mut().zip(buffer.chunks_mut(CHUNK_SIZE));
+        let chunk_iter = descriptors.iter_mut().zip(buffer.chunks_mut(chunk_size));
         for (desc, chunk) in chunk_iter {
             desc.set_size(chunk.len());
             desc.buffer = chunk.as_mut_ptr();
@@ -2054,6 +2128,8 @@ impl DmaTxBuf {
         let mut buf = Self {
             descriptors,
             buffer,
+            chunk_size,
+            block_size,
         };
         buf.set_length(buf.capacity());
 
@@ -2092,7 +2168,7 @@ impl DmaTxBuf {
         assert!(len <= self.buffer.len());
 
         // Get the minimum number of descriptors needed for this length of data.
-        let descriptor_count = len.div_ceil(CHUNK_SIZE).max(1);
+        let descriptor_count = len.div_ceil(self.chunk_size).max(1);
         let required_descriptors = &mut self.descriptors[0..descriptor_count];
 
         // Link up the relevant descriptors.
@@ -2153,8 +2229,14 @@ impl DmaTxBuffer for DmaTxBuf {
             }
         }
 
+        #[cfg(esp32s3)]
+        if crate::soc::is_valid_psram_address(self.buffer.as_ptr() as u32) {
+            unsafe {crate::soc::cache_writeback_addr(self.buffer.as_ptr() as u32, self.buffer.len() as u32)};
+        }
+
         Preparation {
             start: self.descriptors.as_mut_ptr(),
+            block_size: self.block_size,
         }
     }
 
@@ -2391,6 +2473,7 @@ impl DmaRxBuffer for DmaRxBuf {
 
         Preparation {
             start: self.descriptors.as_mut_ptr(),
+            block_size: None,
         }
     }
 
@@ -2583,6 +2666,7 @@ impl DmaTxBuffer for DmaRxTxBuf {
 
         Preparation {
             start: self.tx_descriptors.as_mut_ptr(),
+            block_size: None, // TODO: support block size!
         }
     }
 
@@ -2612,6 +2696,7 @@ impl DmaRxBuffer for DmaRxTxBuf {
 
         Preparation {
             start: self.rx_descriptors.as_mut_ptr(),
+            block_size: None, // TODO: support block size!
         }
     }
 
