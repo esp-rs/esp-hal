@@ -12,6 +12,9 @@
 //! This example transfers data via SPI.
 //! Connect MISO and MOSI pins to see the outgoing data is read as incoming
 //! data.
+//!
+//! If your module is quad PSRAM then you need to change the `psram` feature in the
+//! in the features line below to `psram-2m`.
 
 //% FEATURES: esp-hal/log opsram-2m
 //% CHIPS: esp32s3

@@ -1731,7 +1731,7 @@ where
         peri: DmaPeripheral,
         chain: &DescriptorChain,
     ) -> Result<(), DmaError> {
-        // TODO: based on the ESP32-S3 TRM teh alignment check is not needed for TX!
+        // TODO: based on the ESP32-S3 TRM the alignment check is not needed for TX!
         // for esp32s3 we check each descriptor buffer that points to psram for
         // alignment and writeback the cache for that buffer
         #[cfg(esp32s3)]
@@ -2051,7 +2051,6 @@ pub enum DmaBufError {
 }
 
 /// DMA buffer allignments
-#[cfg(all(esp32s3, psram))]
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaBufBlkSize {
