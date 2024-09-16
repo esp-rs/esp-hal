@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Bump MSRV to 1.77.0 (#1971)
+- Bump MSRV to 1.79.0 (#1971)
 
 ### Added
 

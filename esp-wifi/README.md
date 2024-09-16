@@ -22,7 +22,7 @@ If a cell contains an em dash (&mdash;) this means that the particular feature i
 | ESP32-S2 |                          ✓                           |                       &mdash;                       |                       &mdash;                        |    ✓    |
 | ESP32-S3 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |
 
-Minimum supported Rust compiler version: 1.77.0
+Minimum supported Rust compiler version: 1.79.0
 
 ## Missing / To be done
 
