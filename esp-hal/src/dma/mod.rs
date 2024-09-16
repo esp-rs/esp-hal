@@ -529,7 +529,7 @@ macro_rules! dma_circular_buffers_chunk_size {
 macro_rules! dma_descriptors_chunk_size {
     ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
         // these will check for size at compile time
-        const _: () = ::core::assert!($chunk_size <= 4092, "chunk size must be <= 4092");
+        const _: () = ::core::assert!($chunk_size <= 4095, "chunk size must be <= 4095");
         const _: () = ::core::assert!($chunk_size > 0, "chunk size must be > 0");
 
         static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor;
@@ -564,7 +564,7 @@ macro_rules! dma_descriptors_chunk_size {
 macro_rules! dma_circular_descriptors_chunk_size {
     ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
         // these will check for size at compile time
-        const _: () = ::core::assert!($chunk_size <= 4092, "chunk size must be <= 4092");
+        const _: () = ::core::assert!($chunk_size <= 4095, "chunk size must be <= 4095");
         const _: () = ::core::assert!($chunk_size > 0, "chunk size must be > 0");
 
         const rx_descriptor_len: usize = if $rx_size > $chunk_size * 2 {
@@ -2046,7 +2046,7 @@ pub enum DmaBufError {
     UnsupportedMemoryRegion,
     /// Buffer is not aligned to the required size
     InvalidAlignment,
-    /// Invalid chunk size: must be > 0 and <= 4092
+    /// Invalid chunk size: must be > 0 and <= 4095
     InvalidChunkSize,
 }
 
@@ -2065,7 +2065,7 @@ pub enum DmaBufBlkSize {
 /// DMA transmit buffer
 ///
 /// This is a contiguous buffer linked together by DMA descriptors of length
-/// 4092 at most. It can only be used for transmitting data to a peripheral's
+/// 4095 at most. It can only be used for transmitting data to a peripheral's
 /// FIFO. See [DmaRxBuf] for receiving data.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -2094,8 +2094,8 @@ impl DmaTxBuf {
     /// Creates a new [DmaTxBuf] from some descriptors and a buffer.
     ///
     /// There must be enough descriptors for the provided buffer.
-    /// Each descriptor can handle at most 4092 bytes worth of buffer.
-    /// The chunk size must be greater than 0 and less than or equal to 4092.
+    /// Each descriptor can handle at most 4095 bytes worth of buffer.
+    /// The chunk size must be greater than 0 and less than or equal to 4095.
     /// Optionally, a block size can be provided for PSRAM & Burst transfers.
     ///
     /// Both the descriptors and buffer must be in DMA-capable memory.
@@ -2106,7 +2106,7 @@ impl DmaTxBuf {
         chunk_size: usize,
         block_size: Option<DmaBufBlkSize>,
     ) -> Result<Self, DmaBufError> {
-        if chunk_size == 0 || chunk_size > 4092 {
+        if chunk_size == 0 || chunk_size > 4095 {
             return Err(DmaBufError::InvalidChunkSize);
         }
         let min_descriptors = buffer.len().div_ceil(chunk_size);
