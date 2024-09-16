@@ -63,7 +63,7 @@ impl RawQueue {
     }
 
     fn enqueue(&mut self, item: *mut c_void) -> i32 {
-        if (self.current_write - self.current_read) % self.count < self.count {
+        if self.count() < self.count {
             unsafe {
                 let p = self.storage.byte_add(self.item_size * self.current_write);
                 p.copy_from(item as *mut u8, self.item_size);
@@ -77,7 +77,7 @@ impl RawQueue {
     }
 
     fn try_dequeue(&mut self, item: *mut c_void) -> bool {
-        if (self.current_write - self.current_read) % self.count > 0 {
+        if self.count() > 0 {
             unsafe {
                 let p = self.storage.byte_add(self.item_size * self.current_read) as *const c_void;
                 item.copy_from(p, self.item_size);
@@ -90,7 +90,11 @@ impl RawQueue {
     }
 
     fn count(&self) -> usize {
-        (self.current_write - self.current_read) % self.count
+        if self.current_write >= self.current_read {
+            self.current_write - self.current_read
+        } else {
+            self.count - self.current_read + self.current_write
+        }
     }
 }
 
