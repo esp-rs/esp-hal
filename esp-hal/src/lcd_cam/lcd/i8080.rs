@@ -53,7 +53,7 @@
 //! )
 //! .with_ctrl_pins(io.pins.gpio0, io.pins.gpio47);
 //!
-//! i8080.send(0x3A, 0, &[0x55]).unwrap(); // RGB565
+//! i8080.send(0x3Au8, 0, &[0x55]).unwrap(); // RGB565
 //! # }
 //! ```
 
