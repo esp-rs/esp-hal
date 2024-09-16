@@ -14,7 +14,7 @@
 //!     static mut HEAP: MaybeUninit<[u8; HEAP_SIZE]> = MaybeUninit::uninit();
 //!
 //!     unsafe {
-//!         esp_alloc::INSTANCE.add_region(esp_alloc::HeapRegion::new(
+//!         esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
 //!             HEAP.as_mut_ptr() as *mut u8,
 //!             HEAP_SIZE,
 //!             esp_alloc::MemoryCapability::Internal.into(),
