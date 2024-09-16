@@ -48,6 +48,12 @@
 //! [profile.dev.package.esp-wifi]
 //! opt-level = 3
 //! ```
+//! ## Globally disable logging
+//!
+//! `esp-wifi` contains a lot of trace-level logging statements.
+//! For maximum performance you might want to disable logging via
+//! a feature flag of the `log` crate. See [documentation](https://docs.rs/log/0.4.19/log/#compile-time-filters).
+//! You should set it to `release_max_level_off`.
 //!
 //! ### Xtensa considerations
 //!
