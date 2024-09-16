@@ -25,7 +25,7 @@ use embassy_time::{Duration, Instant, Ticker, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     interrupt::{software::SoftwareInterruptControl, Priority},
-    timer::{timg::TimerGroup, AnyTimer},
+    timer::timg::TimerGroup,
 };
 use esp_hal_embassy::InterruptExecutor;
 use esp_println::println;

@@ -12,12 +12,7 @@ use core::marker::PhantomData;
 
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{
-    delay::Delay,
-    prelude::*,
-    rng::Rng,
-    timer::{timg::TimerGroup, AnyTimer, PeriodicTimer},
-};
+use esp_hal::{delay::Delay, prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_wifi::{initialize, wifi, EspWifiInitFor};
 use ieee80211::{
     common::{CapabilitiesInformation, FCFFlags},

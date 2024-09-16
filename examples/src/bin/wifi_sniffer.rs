@@ -18,11 +18,7 @@ use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_backtrace as _;
-use esp_hal::{
-    prelude::*,
-    rng::Rng,
-    timer::{timg::TimerGroup, AnyTimer, PeriodicTimer},
-};
+use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{initialize, wifi, EspWifiInitFor};
 use ieee80211::{match_frames, mgmt_frame::BeaconFrame};

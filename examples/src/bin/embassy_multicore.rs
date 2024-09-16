@@ -22,7 +22,7 @@ use esp_hal::{
     cpu_control::{CpuControl, Stack},
     get_core,
     gpio::{Io, Level, Output, Pin},
-    timer::{timg::TimerGroup, AnyTimer},
+    timer::timg::TimerGroup,
 };
 use esp_hal_embassy::Executor;
 use esp_println::println;

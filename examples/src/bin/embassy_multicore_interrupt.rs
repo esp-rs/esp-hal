@@ -23,7 +23,7 @@ use esp_hal::{
     gpio::{Io, Level, Output, Pin},
     interrupt::{software::SoftwareInterruptControl, Priority},
     prelude::*,
-    timer::{timg::TimerGroup, AnyTimer},
+    timer::timg::TimerGroup,
 };
 use esp_hal_embassy::InterruptExecutor;
 use esp_println::println;
