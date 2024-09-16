@@ -5,6 +5,7 @@
 //! The following wiring is assumed:
 //! - Backlight => GPIO45
 //! - Reset     => GPIO4
+//! - TE        => GPIO48
 //! - CD        => GPIO0
 //! - WR        => GPIO47
 //! - D0        => GPIO9
@@ -26,7 +27,7 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::{Io, Level, Output},
+    gpio::{Input, Io, Level, Output, Pull},
     lcd_cam::{
         lcd::i8080::{Config, TxEightBits, I8080},
         LcdCam,
@@ -45,7 +46,7 @@ fn main() -> ! {
     let lcd_reset = io.pins.gpio4;
     let lcd_rs = io.pins.gpio0; // Command/Data selection
     let lcd_wr = io.pins.gpio47; // Write clock
-    let _lcd_te = io.pins.gpio48; // Frame sync
+    let lcd_te = io.pins.gpio48; // Frame sync
 
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0;
@@ -58,6 +59,7 @@ fn main() -> ! {
 
     let mut backlight = Output::new(lcd_backlight, Level::Low);
     let mut reset = Output::new(lcd_reset, Level::Low);
+    let tear_effect = Input::new(lcd_te, Pull::None);
 
     let tx_pins = TxEightBits::new(
         io.pins.gpio9,
@@ -80,6 +82,13 @@ fn main() -> ! {
         Config::default(),
     )
     .with_ctrl_pins(lcd_rs, lcd_wr);
+
+    // This is here mostly to workaround https://github.com/esp-rs/esp-hal/issues/1532
+    let mut send_cmd = |cmd: u8, data: &[u8]| {
+        let buf = &mut tx_buffer[0..data.len()];
+        buf.copy_from_slice(data);
+        i8080.send(cmd, 0, buf).unwrap();
+    };
 
     {
         // https://gist.github.com/sukesh-ak/610508bc84779a26efdcf969bf51a2d1
@@ -106,13 +115,6 @@ fn main() -> ! {
         const CMD_GMCTRN1: u8 = 0xE1; // Negative Gamma Correction
         const CMD_DOCA: u8 = 0xE8; // Display Output Ctrl Adjust
         const CMD_CSCON: u8 = 0xF0; // Command Set Control
-
-        // This is here mostly to workaround https://github.com/esp-rs/esp-hal/issues/1532
-        let mut send_cmd = |cmd: u8, data: &[u8]| {
-            let buf = &mut tx_buffer[0..data.len()];
-            buf.copy_from_slice(data);
-            i8080.send(cmd, 0, buf).unwrap();
-        };
 
         send_cmd(CMD_CSCON, &[0xC3]); // Enable extension command 2 part I
         send_cmd(CMD_CSCON, &[0x96]); // Enable extension command 2 part II
@@ -171,6 +173,8 @@ fn main() -> ! {
         send_cmd(0x3A, &[0x55]); // RGB565
     }
 
+    send_cmd(0x35, &[0]); // Tear Effect Line On
+
     let width = 320u16;
     let height = 480u16;
     {
@@ -202,6 +206,18 @@ fn main() -> ! {
         let color = color.to_be_bytes();
         for chunk in buffer.chunks_mut(2) {
             chunk.copy_from_slice(&color);
+        }
+
+        // Naive implementation of tear prevention. A more robust implementation would use an
+        // interrupt handler to start shipping out the next frame the moment the tear effect pin
+        // goes high. async/await would be too slow and would risk missing the inter-refresh window.
+        {
+            // Wait for display to start refreshing.
+            while tear_effect.is_high() {}
+            // Wait for display to finish refreshing.
+            while tear_effect.is_low() {}
+
+            // Now we have the maximum amount of time between each refresh available, for drawing.
         }
 
         let mut bytes_left_to_write = total_bytes;
