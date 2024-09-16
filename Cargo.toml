@@ -8,7 +8,6 @@ exclude  = [
     "esp-hal",
     "esp-hal-embassy",
     "esp-hal-procmacros",
-    "esp-hal-smartled",
     "esp-ieee802154",
     "esp-lp-hal",
     "esp-metadata",

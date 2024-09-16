@@ -34,7 +34,6 @@ esp-alloc           = { path = "../esp-alloc" }
 esp-backtrace       = { path = "../esp-backtrace", features = ["exception-handler", "panic-handler", "println"] }
 esp-hal             = { path = "../esp-hal", features = ["log"] }
 esp-hal-embassy     = { path = "../esp-hal-embassy", optional = true }
-esp-hal-smartled    = { path = "../esp-hal-smartled", optional = true }
 esp-ieee802154      = { path = "../esp-ieee802154", optional = true }
 esp-println         = { path = "../esp-println", features = ["log"] }
 esp-storage         = { path = "../esp-storage", optional = true }
@@ -61,13 +60,13 @@ usb-device          = "0.3.2"
 usbd-serial         = "0.2.2"
 
 [features]
-esp32   = ["esp-hal/esp32",   "esp-backtrace/esp32",   "esp-hal-embassy?/esp32",   "esp-println/esp32",   "esp-storage?/esp32",   "esp-wifi?/esp32",   "esp-hal-smartled/esp32"]
+esp32   = ["esp-hal/esp32",   "esp-backtrace/esp32",   "esp-hal-embassy?/esp32",   "esp-println/esp32",   "esp-storage?/esp32",   "esp-wifi?/esp32"]
 esp32c2 = ["esp-hal/esp32c2", "esp-backtrace/esp32c2", "esp-hal-embassy?/esp32c2", "esp-println/esp32c2", "esp-storage?/esp32c2", "esp-wifi?/esp32c2", ]
-esp32c3 = ["esp-hal/esp32c3", "esp-backtrace/esp32c3", "esp-hal-embassy?/esp32c3", "esp-println/esp32c3", "esp-storage?/esp32c3", "esp-wifi?/esp32c3", "esp-hal-smartled/esp32c3"]
-esp32c6 = ["esp-hal/esp32c6", "esp-backtrace/esp32c6", "esp-hal-embassy?/esp32c6", "esp-println/esp32c6", "esp-storage?/esp32c6", "esp-wifi?/esp32c6", "esp-hal-smartled/esp32c6", "esp-ieee802154/esp32c6"]
-esp32h2 = ["esp-hal/esp32h2", "esp-backtrace/esp32h2", "esp-hal-embassy?/esp32h2", "esp-println/esp32h2", "esp-storage?/esp32h2", "esp-wifi?/esp32h2", "esp-hal-smartled/esp32h2", "esp-ieee802154/esp32h2"]
-esp32s2 = ["esp-hal/esp32s2", "esp-backtrace/esp32s2", "esp-hal-embassy?/esp32s2", "esp-println/esp32s2", "esp-storage?/esp32s2", "esp-wifi?/esp32s2", "esp-hal-smartled/esp32s2"]
-esp32s3 = ["esp-hal/esp32s3", "esp-backtrace/esp32s3", "esp-hal-embassy?/esp32s3", "esp-println/esp32s3", "esp-storage?/esp32s3", "esp-wifi?/esp32s3", "esp-hal-smartled/esp32s3"]
+esp32c3 = ["esp-hal/esp32c3", "esp-backtrace/esp32c3", "esp-hal-embassy?/esp32c3", "esp-println/esp32c3", "esp-storage?/esp32c3", "esp-wifi?/esp32c3"]
+esp32c6 = ["esp-hal/esp32c6", "esp-backtrace/esp32c6", "esp-hal-embassy?/esp32c6", "esp-println/esp32c6", "esp-storage?/esp32c6", "esp-wifi?/esp32c6", "esp-ieee802154/esp32c6"]
+esp32h2 = ["esp-hal/esp32h2", "esp-backtrace/esp32h2", "esp-hal-embassy?/esp32h2", "esp-println/esp32h2", "esp-storage?/esp32h2", "esp-wifi?/esp32h2", "esp-ieee802154/esp32h2"]
+esp32s2 = ["esp-hal/esp32s2", "esp-backtrace/esp32s2", "esp-hal-embassy?/esp32s2", "esp-println/esp32s2", "esp-storage?/esp32s2", "esp-wifi?/esp32s2"]
+esp32s3 = ["esp-hal/esp32s3", "esp-backtrace/esp32s3", "esp-hal-embassy?/esp32s3", "esp-println/esp32s3", "esp-storage?/esp32s3", "esp-wifi?/esp32s3"]
 
 esp-wifi = ["dep:esp-wifi"]
 

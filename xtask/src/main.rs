@@ -607,18 +607,6 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         )?;
                     }
                 }
-                Package::EspHalSmartled => {
-                    if device.contains("rmt") {
-                        lint_package(
-                            &path,
-                            &[
-                                "-Zbuild-std=core",
-                                &format!("--target={}", chip.target()),
-                                &format!("--features={chip}"),
-                            ],
-                        )?;
-                    }
-                }
 
                 Package::EspPrintln => {
                     lint_package(

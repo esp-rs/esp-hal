@@ -39,7 +39,6 @@ pub enum Package {
     EspHal,
     EspHalEmbassy,
     EspHalProcmacros,
-    EspHalSmartled,
     EspIeee802154,
     EspLpHal,
     EspMetadata,
