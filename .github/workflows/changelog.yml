@@ -37,8 +37,6 @@ jobs:
               - 'esp-hal/**'
             esp-hal-embassy:
               - 'esp-hal-embassy/**'
-            esp-hal-smartled:
-              - 'esp-hal-smartled/**'
             esp-ieee802154:
               - 'esp-ieee802154/**'
             esp-lp-hal:
@@ -85,14 +83,6 @@ jobs:
           changeLogPath: esp-hal-embassy/CHANGELOG.md
           skipLabels: "skip-changelog"
           missingUpdateErrorMessage: "Please add a changelog entry in the esp-hal-embassy/CHANGELOG.md file."
-
-      - name: Check that changelog updated (esp-hal-smartled)
-        if: steps.changes.outputs.esp-hal-smartled == 'true'
-        uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: esp-hal-smartled/CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the esp-hal-smartled/CHANGELOG.md file."
 
       - name: Check that changelog updated (esp-ieee802154)
         if: steps.changes.outputs.esp-ieee802154 == 'true'
@@ -141,5 +131,3 @@ jobs:
           changeLogPath: esp-wifi/CHANGELOG.md
           skipLabels: "skip-changelog"
           missingUpdateErrorMessage: "Please add a changelog entry in the esp-wifi/CHANGELOG.md file."
-
-
