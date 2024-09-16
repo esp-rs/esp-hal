@@ -2143,9 +2143,9 @@ mod ehal1 {
         fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
             // Optimizations
             if read.is_empty() {
-                SpiBus::write(self, write)?;
+                return SpiBus::write(self, write);
             } else if write.is_empty() {
-                SpiBus::read(self, read)?;
+                return SpiBus::read(self, read);
             }
 
             let mut write_from = 0;
@@ -2163,6 +2163,8 @@ mod ehal1 {
                     break;
                 }
 
+                // No need to flush here, `SpiBus::write` will do it for us
+
                 if write_to < read_to {
                     // Read more than we write, must pad writing part with zeros
                     let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
@@ -2172,9 +2174,8 @@ mod ehal1 {
                     SpiBus::write(self, &write[write_from..write_to])?;
                 }
 
-                SpiBus::flush(self)?;
-
                 if read_inc > 0 {
+                    SpiBus::flush(self)?;
                     self.spi
                         .read_bytes_from_fifo(&mut read[read_from..read_to])?;
                 }

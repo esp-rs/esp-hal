@@ -1,4 +1,4 @@
-//! SPI Full Duplex DMA ASYNC Test with PCNT readback.
+//! SPI Full Duplex DMA Test with PCNT readback.
 
 //% CHIPS: esp32 esp32c6 esp32h2 esp32s2 esp32s3
 
