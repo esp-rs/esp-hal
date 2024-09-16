@@ -40,7 +40,7 @@ You no longer have to set up clocks and pass them to `esp_wifi::initialize`.
 
 ## Memory allocation
 
-You now need to have a global allocator provided by `esp-alloc` providing allocations from internal memory
+By default the `esp-alloc` feature is enabled which means you need to have a global allocator provided by `esp-alloc` allowing allocations from internal memory
 
 ```diff
  #![no_std]
@@ -64,6 +64,9 @@ You now need to have a global allocator provided by `esp-alloc` providing alloca
 The size of the heap depends on what you are going to use esp-wifi for and if you are using the heap for your own allocations or not.
 
 E.g. when using `coex` you need around 92k. If not using `coex`, going lower than 72k you will observe some failed allocations but it might still work. Going even lower will make things fail.
+
+If you see linker errors regarding undefined symbols for `esp_wifi_free_internal_heap` and `esp_wifi_allocate_from_internal_ram` you either want to opt-in to use the `esp-alloc` feature 
+or provide your own allocator (see below)
 
 ### Using your own allocator
 
