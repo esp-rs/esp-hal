@@ -88,10 +88,7 @@ async fn main(low_prio_spawner: Spawner) {
         }
     }
 
-    esp_hal_embassy::init([
-        timg0.timer0.degrade(),
-        timer1.degrade(),
-    ]);
+    esp_hal_embassy::init([timg0.timer0.degrade(), timer1.degrade()]);
 
     static EXECUTOR: StaticCell<InterruptExecutor<2>> = StaticCell::new();
     let executor = InterruptExecutor::new(sw_ints.software_interrupt2);

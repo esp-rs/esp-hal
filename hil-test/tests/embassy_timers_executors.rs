@@ -218,10 +218,7 @@ mod test {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
 
-        esp_hal_embassy::init([
-            timg0.timer0.degrade(),
-            systimer.alarm0.degrade(),
-        ]);
+        esp_hal_embassy::init([timg0.timer0.degrade(), systimer.alarm0.degrade()]);
 
         let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 

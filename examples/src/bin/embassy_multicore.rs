@@ -56,10 +56,7 @@ async fn main(_spawner: Spawner) {
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_hal_embassy::init([
-        timg0.timer0.degrade(),
-        timg0.timer1.degrade(),
-    ]);
+    esp_hal_embassy::init([timg0.timer0.degrade(), timg0.timer1.degrade()]);
 
     let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 
