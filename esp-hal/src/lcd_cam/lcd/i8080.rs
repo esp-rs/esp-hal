@@ -91,21 +91,19 @@ use crate::{
 };
 
 /// Represents the I8080 LCD interface.
-pub struct I8080<'d, CH: DmaChannel, P, DM: Mode> {
+pub struct I8080<'d, CH: DmaChannel, DM: Mode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     tx_channel: ChannelTx<'d, CH>,
     tx_chain: DescriptorChain,
-    _pins: P,
     _phantom: PhantomData<DM>,
 }
 
-impl<'d, CH: DmaChannel, P: TxPins, DM: Mode> I8080<'d, CH, P, DM>
+impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM>
 where
     CH::P: LcdCamPeripheral,
-    P::Word: Into<u16>,
 {
     /// Creates a new instance of the I8080 LCD interface.
-    pub fn new(
+    pub fn new<P: TxPins>(
         lcd: Lcd<'d, DM>,
         mut channel: ChannelTx<'d, CH>,
         descriptors: &'static mut [DmaDescriptor],
@@ -113,8 +111,6 @@ where
         frequency: HertzU32,
         config: Config,
     ) -> Self {
-        let is_2byte_mode = size_of::<P::Word>() == 2;
-
         let lcd_cam = lcd.lcd_cam;
 
         let clocks = Clocks::get();
@@ -168,7 +164,7 @@ where
                 .lcd_byte_order()
                 .bit(false)
                 .lcd_2byte_en()
-                .bit(is_2byte_mode)
+                .bit(false)
         });
         lcd_cam.lcd_misc().write(|w| unsafe {
             // Set the threshold for Async Tx FIFO full event. (5 bits)
@@ -252,13 +248,12 @@ where
             lcd_cam,
             tx_channel: channel,
             tx_chain: DescriptorChain::new(descriptors),
-            _pins: pins,
             _phantom: PhantomData,
         }
     }
 }
 
-impl<'d, CH: DmaChannel, P: TxPins, DM: Mode> DmaSupport for I8080<'d, CH, P, DM> {
+impl<'d, CH: DmaChannel, DM: Mode> DmaSupport for I8080<'d, CH, DM> {
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         let lcd_user = self.lcd_cam.lcd_user();
         // Wait until LCD_START is cleared by hardware.
@@ -271,7 +266,7 @@ impl<'d, CH: DmaChannel, P: TxPins, DM: Mode> DmaSupport for I8080<'d, CH, P, DM
     }
 }
 
-impl<'d, CH: DmaChannel, P: TxPins, DM: Mode> DmaSupportTx for I8080<'d, CH, P, DM> {
+impl<'d, CH: DmaChannel, DM: Mode> DmaSupportTx for I8080<'d, CH, DM> {
     type TX = ChannelTx<'d, CH>;
 
     fn tx(&mut self) -> &mut Self::TX {
@@ -283,19 +278,15 @@ impl<'d, CH: DmaChannel, P: TxPins, DM: Mode> DmaSupportTx for I8080<'d, CH, P, 
     }
 }
 
-impl<'d, CH: DmaChannel, P: TxPins, DM: Mode> I8080<'d, CH, P, DM>
-where
-    P::Word: Into<u16>,
-{
+impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
     /// Configures the byte order for data transmission.
     pub fn set_byte_order(&mut self, byte_order: ByteOrder) -> &mut Self {
         let is_inverted = byte_order != ByteOrder::default();
         self.lcd_cam.lcd_user().modify(|_, w| {
-            if size_of::<P::Word>() == 2 {
-                w.lcd_byte_order().bit(is_inverted)
-            } else {
-                w.lcd_8bits_order().bit(is_inverted)
-            }
+            w.lcd_byte_order()
+                .bit(is_inverted)
+                .lcd_8bits_order()
+                .bit(is_inverted)
         });
         self
     }
@@ -336,11 +327,11 @@ where
     }
 
     /// Sends a command and data to the LCD using the I8080 interface.
-    pub fn send(
+    pub fn send<W: Copy + Into<u16>>(
         &mut self,
-        cmd: impl Into<Command<P::Word>>,
+        cmd: impl Into<Command<W>>,
         dummy: u8,
-        data: &[P::Word],
+        data: &[W],
     ) -> Result<(), DmaError> {
         self.setup_send(cmd.into(), dummy);
         self.start_write_bytes_dma(data.as_ptr() as _, core::mem::size_of_val(data))?;
@@ -356,13 +347,14 @@ where
     }
 
     /// Sends a command and data to the LCD using DMA.
-    pub fn send_dma<'t, TXBUF>(
+    pub fn send_dma<'t, W, TXBUF>(
         &'t mut self,
-        cmd: impl Into<Command<P::Word>>,
+        cmd: impl Into<Command<W>>,
         dummy: u8,
         data: &'t TXBUF,
     ) -> Result<DmaTransferTx<'_, Self>, DmaError>
     where
+        W: Copy + Into<u16>,
         TXBUF: ReadBuffer,
     {
         let (ptr, len) = unsafe { data.read_buffer() };
@@ -375,18 +367,16 @@ where
     }
 }
 
-impl<'d, CH: DmaChannel, P: TxPins> I8080<'d, CH, P, crate::Async>
-where
-    P::Word: Into<u16>,
-{
+impl<'d, CH: DmaChannel> I8080<'d, CH, crate::Async> {
     /// Asynchronously sends a command and data to the LCD using DMA.
-    pub async fn send_dma_async<'t, TXBUF>(
+    pub async fn send_dma_async<'t, W, TXBUF>(
         &'t mut self,
-        cmd: impl Into<Command<P::Word>>,
+        cmd: impl Into<Command<W>>,
         dummy: u8,
         data: &'t TXBUF,
     ) -> Result<(), DmaError>
     where
+        W: Copy + Into<u16>,
         TXBUF: ReadBuffer,
     {
         let (ptr, len) = unsafe { data.read_buffer() };
@@ -403,7 +393,7 @@ where
     }
 }
 
-impl<'d, CH: DmaChannel, P, DM: Mode> I8080<'d, CH, P, DM> {
+impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
     fn setup_send<T: Copy + Into<u16>>(&mut self, cmd: Command<T>, dummy: u8) {
         // Reset LCD control unit and Async Tx FIFO
         self.lcd_cam
@@ -439,8 +429,10 @@ impl<'d, CH: DmaChannel, P, DM: Mode> I8080<'d, CH, P, DM> {
             }
         }
 
-        // Set dummy length
+        let is_2byte_mode = size_of::<T>() == 2;
+
         self.lcd_cam.lcd_user().modify(|_, w| unsafe {
+            // Set dummy length
             if dummy > 0 {
                 // Enable DUMMY phase in LCD sequence when LCD starts.
                 w.lcd_dummy()
@@ -451,6 +443,8 @@ impl<'d, CH: DmaChannel, P, DM: Mode> I8080<'d, CH, P, DM> {
             } else {
                 w.lcd_dummy().clear_bit()
             }
+            .lcd_2byte_en()
+            .bit(is_2byte_mode)
         });
     }
 
@@ -508,7 +502,7 @@ impl<'d, CH: DmaChannel, P, DM: Mode> I8080<'d, CH, P, DM> {
     }
 }
 
-impl<'d, CH: DmaChannel, P, DM: Mode> core::fmt::Debug for I8080<'d, CH, P, DM> {
+impl<'d, CH: DmaChannel, DM: Mode> core::fmt::Debug for I8080<'d, CH, DM> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("I8080").finish()
     }
@@ -572,8 +566,14 @@ pub enum Command<T> {
     Two(T, T),
 }
 
-impl<T> From<T> for Command<T> {
-    fn from(value: T) -> Self {
+impl From<u8> for Command<u8> {
+    fn from(value: u8) -> Self {
+        Command::One(value)
+    }
+}
+
+impl From<u16> for Command<u16> {
+    fn from(value: u16) -> Self {
         Command::One(value)
     }
 }
@@ -647,8 +647,6 @@ where
     P6: PeripheralOutput,
     P7: PeripheralOutput,
 {
-    type Word = u8;
-
     fn configure(&mut self) {
         self.pin_0.set_to_push_pull_output(crate::private::Internal);
         self.pin_0
@@ -796,7 +794,6 @@ where
     P14: PeripheralOutput,
     P15: PeripheralOutput,
 {
-    type Word = u16;
     fn configure(&mut self) {
         self.pin_0.set_to_push_pull_output(crate::private::Internal);
         self.pin_0
@@ -857,7 +854,6 @@ where
 
 mod private {
     pub trait TxPins {
-        type Word: Copy;
         fn configure(&mut self);
     }
 }

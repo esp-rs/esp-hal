@@ -222,19 +222,19 @@ fn main() -> ! {
 
         let mut bytes_left_to_write = total_bytes;
 
-        let transfer = i8080.send_dma(0x2C, 0, &buffer).unwrap();
+        let transfer = i8080.send_dma(0x2Cu8, 0, &buffer).unwrap();
         transfer.wait().unwrap();
 
         bytes_left_to_write -= buffer.len();
 
         while bytes_left_to_write >= buffer.len() {
-            let transfer = i8080.send_dma(0x3C, 0, &buffer).unwrap();
+            let transfer = i8080.send_dma(0x3Cu8, 0, &buffer).unwrap();
             transfer.wait().unwrap();
 
             bytes_left_to_write -= buffer.len();
         }
         if bytes_left_to_write > 0 {
-            let transfer = i8080.send_dma(0x3C, 0, &buffer).unwrap();
+            let transfer = i8080.send_dma(0x3Cu8, 0, &buffer).unwrap();
             transfer.wait().unwrap();
         }
 
