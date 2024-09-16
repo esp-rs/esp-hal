@@ -1,9 +1,12 @@
-#![cfg_attr(not(feature = "std"), no_std)]
 #![doc = include_str!("../README.md")]
+//! ## Feature Flags
+#![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+#![cfg_attr(not(feature = "build"), no_std)]
 
-#[cfg(feature = "std")]
+#[cfg(feature = "build")]
 mod generate;
-#[cfg(feature = "std")]
+#[cfg(feature = "build")]
 pub use generate::*;
 
 #[macro_export]

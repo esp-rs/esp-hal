@@ -34,6 +34,16 @@ It's important to note that due to a [bug in cargo](https://github.com/rust-lang
 
 To see the final selected configuration another table is output to the `OUT_DIR` with the format `{prefix}_selected_config.md`.
 
+### Capturing configuration values in the downstream crate
+
+For all supported data types, there are helper macros that emit `const` code for parsing the configuration values.
+
+- Numbers - `esp_config_int!(integer_type, "ENV")`
+- Strings - `esp_config_str!("ENV")`
+- Bool - `esp_config_bool!("ENV")`
+
+In addition to environment variables, for boolean types rust `cfg`'s are emitted in snake case _without_ the prefix.
+
 ## Minimum Supported Rust Version (MSRV)
 
 This crate is guaranteed to compile on stable Rust 1.79 and up. It _might_

@@ -86,6 +86,10 @@
 #![doc = ""]
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_wifi_config_table.md"))]
 #![doc = ""]
+//! It's important to note that due to a [bug in cargo](https://github.com/rust-lang/cargo/issues/10358),
+//! any modifications to the environment, local or otherwise will only get
+//! picked up on a full clean build of the project.
+
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
 #![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]

@@ -97,6 +97,10 @@
 #![doc = ""]
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_hal_config_table.md"))]
 #![doc = ""]
+//! It's important to note that due to a [bug in cargo](https://github.com/rust-lang/cargo/issues/10358),
+//! any modifications to the environment, local or otherwise will only get
+//! picked up on a full clean build of the project.
+//!
 //! ## `Peripheral` Pattern
 //!
 //! Drivers take pins and peripherals as [peripheral::Peripheral] in most

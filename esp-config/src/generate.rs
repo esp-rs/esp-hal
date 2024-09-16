@@ -21,7 +21,7 @@ pub enum Value {
 }
 
 impl Value {
-    fn parse(&mut self, s: &str) -> Result<(), ParseError> {
+    fn parse_in_place(&mut self, s: &str) -> Result<(), ParseError> {
         *self = match self {
             Value::Bool(_) => match s {
                 "false" | "no" | "n" => Value::Bool(false),
@@ -51,13 +51,16 @@ impl Value {
     }
 }
 
-/// This function will parse any screaming snake case environment variables that
-/// match the given prefix. It will then attempt to parse the [`Value`]. Once
-/// the config has been parsed, this function will emit snake case cfg's
+/// Generate and parse config from a prefix, and array of key, default,
+/// description tuples.
+///
+/// This function will parse any `SCREAMING_SNAKE_CASE` environment variables
+/// that match the given prefix. It will then attempt to parse the [`Value`].
+/// Once the config has been parsed, this function will emit `snake_case` cfg's
 /// _without_ the prefix which can be used in the dependant crate. After that,
 /// it will create a markdown table in the `OUT_DIR` under the name
 /// `{prefix}_config_table.md` where prefix has also been converted
-/// to snake case. This can be included in crate documentation to outline the
+/// to `snake_case`. This can be included in crate documentation to outline the
 /// available configuration options for the crate.
 ///
 /// The tuple ordering for the`config` array is key, default, description.
@@ -99,7 +102,7 @@ pub fn generate_config(prefix: &str, config: &[(&str, Value, &str)]) {
                 continue;
             };
 
-            if let Err(e) = cfg.parse(&value) {
+            if let Err(e) = cfg.parse_in_place(&value) {
                 failed.push(format!("{prefix}_{}: {e:?}", screaming_snake_case(&name)));
             }
         }

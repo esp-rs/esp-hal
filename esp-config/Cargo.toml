@@ -5,6 +5,8 @@ edition = "2021"
 rust-version  = "1.79.0"
 
 [dependencies]
+document-features        = "0.2.10"
 
 [features]
-std = []
+## Enable the generation and parsing of a config
+build = []
