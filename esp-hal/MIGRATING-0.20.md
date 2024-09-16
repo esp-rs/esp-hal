@@ -198,3 +198,14 @@ let mut i8080 = I8080::new(....);
 - i8080.send(0x12, 0, &[0, 1, 2, 3, 4]);
 + i8080.send(0x12u8, 0, &[0, 1, 2, 3, 4]);
 ```
+
+### Placing drivers in RAM is now done via esp-config
+
+We've replaced some usage of features with [esp-config](https://docs.rs/esp-config). Please remove any reference to `place-spi-driver-in-ram` in your `Cargo.toml` and migrate to the `[env]` section of `.cargo/config.toml`.
+
+```diff
+# feature in Cargo.toml
+- esp-hal = { version = "0.20", features = ["place-spi-driver-in-ram"] }
+# key in .cargo/config.toml [env] section
++ ESP_HAL_PLACE_SPI_DRIVER_IN_RAM=true
+```

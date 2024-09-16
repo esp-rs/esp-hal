@@ -91,3 +91,14 @@ pub extern "C" fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8 {
 ```
 
 It's important to allocate from internal memory (i.e. not PSRAM)
+
+### Tunable parameters are now set via esp-config
+
+We've replaced usage of `cfg_toml` with [esp-config](https://docs.rs/esp-config). Please remove any esp-wifi entries from `cfg.toml` and migrate the key value pairs to the `[env]` section of `.cargo/config.toml`.
+
+```diff
+# key in cfg.toml
+- rx_queue_size = 40
+# key in .cargo/config.toml [env] section
++ ESP_WIFI_RX_QUEUE_SIZE=40
+```

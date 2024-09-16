@@ -8,6 +8,32 @@
 
 ## [Documentation](https://docs.rs/crate/esp-config)
 
+## Usage
+
+`esp-config` takes a prefix (usually the crate name) and a set of configuration keys and default values to produce a configuration system that supports:
+
+- Emitting rustc cfg's for boolean keys
+- Emitting environment variables for numbers
+  - Along with decimal parsing, it supports Hex, Octal and Binary with the respective `0x`, `0o` and `0b` prefixes.
+- Emitting environment variables string values
+
+### Viewing the configuration
+
+The possible configuration values are output as a markdown table in the crates `OUT_DIR` with the format `{prefix}_config_table.md`, this can then be included into the crates top level documentation. Here is an example of the output:
+
+
+| Name | Description | Default value |
+|------|-------------|---------------|
+|**ESP_HAL_PLACE_SPI_DRIVER_IN_RAM**|Places the SPI driver in RAM for better performance|false|
+
+### Setting configuration options
+
+For any available configuration option, the environment variable or cfg is _always_ set based on the default value specified in the table. Users can override this by setting environment variables locally in their shell _or_ the preferred option is to utilize cargo's [`env` section](https://doc.rust-lang.org/cargo/reference/config.html#env).
+
+It's important to note that due to a [bug in cargo](https://github.com/rust-lang/cargo/issues/10358), any modifications to the environment, local or otherwise will only get picked up on a full clean build of the project.
+
+To see the final selected configuration another table is output to the `OUT_DIR` with the format `{prefix}_selected_config.md`.
+
 ## Minimum Supported Rust Version (MSRV)
 
 This crate is guaranteed to compile on stable Rust 1.79 and up. It _might_
