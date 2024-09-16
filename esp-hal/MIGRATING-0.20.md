@@ -44,12 +44,32 @@ Instead of manually grabbing peripherals and setting up clocks, you should now c
 
 ### Type-erased GPIO drivers
 
-You no longer have to spell out the GPIO pin type for `Input`, `Output`, `OutputOpenDrain` or `Flex`.
-However, if you want to, you can keep using their typed form!
+The `AnyInput`, `AnyOutput`, `AnyOutputOpenDrain` and `AnyFlex` structures have been removed.
+Instead, you can use the non-`Any` counterparts. By default, the structures will use `AnyPin` in
+their type names, which you don't have to specify.
+
+```diff
+-let pin = AnyInput::new(io.gpio0, Pull::Up);
++let pin = Input::new(io.gpio0, Pull::Up); // pin will have the type `Input<'some>` (or `Input<'some, AnyPin>` if you want to be explicit about it)
+```
+
+You can use `new_typed` if you want to keep using the typed form:
 
 ```rust
-let pin = Input::new(io.gpio0, Pull::Up); // pin will have the type `Input<'some>` (or `Input<'some, AnyPin>` if you want to be explicit about it)
 let pin = Input::new_typed(io.gpio0, Pull::Up); // pin will have the type `Input<'some, GpioPin<0>>`
+```
+
+### Creating an `AnyPin`
+
+Instead of `AnyPin::new`, you can now use the `Pin` trait's `degrade` method to obtain an `AnyPin`.
+You can now create an `AnyPin` out of input only pins (like ESP32's IO34), but trying to use such
+pins as output (or, generally, trying to use pins in ways they don't support) will panic.
+
+```diff
++ use esp_hal::gpio::Pin;
+
+-let pin = AnyPin::new(io.gpio0);
++let pin = io.gpio0.degrade();
 ```
 
 ### Wakeup using pin drivers
