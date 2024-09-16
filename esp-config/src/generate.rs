@@ -67,14 +67,10 @@ impl Value {
 ///
 /// Unknown keys with the supplied prefix will cause this function to panic.
 pub fn generate_config(prefix: &str, config: &[(&str, Value, &str)]) {
+    // ensure that the prefix is `SCREAMING_SNAKE_CASE`
     let mut prefix = screaming_snake_case(prefix);
 
     let mut doc_table = String::from(DOC_TABLE_HEADER);
-    for (key, default, desc) in config {
-        let key = screaming_snake_case(key);
-        let default = default.as_string();
-        writeln!(doc_table, "|**{prefix}_{key}**|{desc}|{default}|").unwrap();
-    }
 
     // only rebuild if build.rs changed. Otherwise Cargo will rebuild if any
     // other file changed.
@@ -82,8 +78,14 @@ pub fn generate_config(prefix: &str, config: &[(&str, Value, &str)]) {
 
     // Generate the template for the config
     let mut configs = HashMap::new();
-    for (name, default, _) in config {
-        configs.insert(snake_case(name), default.clone());
+    for (name, default, desc) in config {
+        let name = format!("{prefix}_{}", screaming_snake_case(&name));
+        // insert into config
+        configs.insert(name.clone(), default.clone());
+
+        // write doc table line
+        let default = default.as_string();
+        writeln!(doc_table, "|**{name}**|{desc}|{default}|").unwrap();
 
         // Rebuild if config envvar changed.
         // Note this is currently buggy and requires a clean build - PR is pending https://github.com/rust-lang/cargo/pull/14058
@@ -98,12 +100,12 @@ pub fn generate_config(prefix: &str, config: &[(&str, Value, &str)]) {
         if let Some(name) = var.strip_prefix(&format!("{prefix}_")) {
             let name = snake_case(name);
             let Some(cfg) = configs.get_mut(&name) else {
-                unknown.push(format!("{prefix}_{}", screaming_snake_case(&name)));
+                unknown.push(var);
                 continue;
             };
 
             if let Err(e) = cfg.parse_in_place(&value) {
-                failed.push(format!("{prefix}_{}: {e:?}", screaming_snake_case(&name)));
+                failed.push(format!("{}: {e:?}", var));
             }
         }
     }
@@ -116,30 +118,27 @@ pub fn generate_config(prefix: &str, config: &[(&str, Value, &str)]) {
         panic!("Unknown configuration options detected: {:?}", unknown);
     }
 
+    let mut selected_config = String::from(CHOSEN_TABLE_HEADER);
+
     // emit cfgs and set envs
     for (name, value) in configs.into_iter() {
-        println!("cargo:rustc-check-cfg=cfg({})", name);
+        let cfg_name = snake_case(name.trim_start_matches(&format!("{prefix}_")));
+        println!("cargo:rustc-check-cfg=cfg({cfg_name})");
         match value {
-            Value::Bool(true) => println!("cargo:rustc-cfg={name}"),
+            Value::Bool(true) => {
+                println!("cargo:rustc-cfg={cfg_name}")
+            }
             _ => {}
         }
 
-        // values that haven't been seen will be output here with the default value
-        println!(
-            "cargo:rustc-env={}={}",
-            format!("{prefix}_{}", screaming_snake_case(&name)),
-            value.as_string()
-        );
-    }
-
-    let mut selected_config = String::from(CHOSEN_TABLE_HEADER);
-    for (key, value, _) in config {
-        let key = screaming_snake_case(key);
         let value = value.as_string();
-        writeln!(selected_config, "|**{prefix}_{key}**|{value}|").unwrap();
+        // values that haven't been seen will be output here with the default value
+        println!("cargo:rustc-env={}={}", name, value);
+
+        writeln!(selected_config, "|**{name}**|{value}|").unwrap();
     }
 
-    // convert to snake case
+    // convert to snake case for the file name
     prefix.make_ascii_lowercase();
 
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
