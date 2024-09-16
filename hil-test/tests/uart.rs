@@ -87,7 +87,7 @@ mod tests {
         // working as expected. We will also using different clock sources
         // while we're at it.
         let configs = [
-            #[cfg(not(any(esp32, esp32s2, esp32c3, esp32c2)))]
+            #[cfg(not(any(esp32, esp32s2)))]
             (9600, ClockSource::RcFast),
             #[cfg(not(any(esp32, esp32s2)))]
             (19_200, ClockSource::Xtal),
