@@ -48,8 +48,8 @@ You no longer have to spell out the GPIO pin type for `Input`, `Output`, `Output
 However, if you want to, you can keep using their typed form!
 
 ```rust
-let pin = Input::new(io.gpio0); // pin will have the type `Input<'some>` (or `Input<'some, AnyPin>` if you want to be explicit about it)
-let pin = Input::new_typed(io.gpio0); // pin will have the type `Input<'some, GpioPin<0>>`
+let pin = Input::new(io.gpio0, Pull::Up); // pin will have the type `Input<'some>` (or `Input<'some, AnyPin>` if you want to be explicit about it)
+let pin = Input::new_typed(io.gpio0, Pull::Up); // pin will have the type `Input<'some, GpioPin<0>>`
 ```
 
 ### Wakeup using pin drivers
