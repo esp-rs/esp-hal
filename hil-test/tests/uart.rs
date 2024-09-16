@@ -81,47 +81,23 @@ mod tests {
         // send/receive with some other common baud rates to ensure this is
         // working as expected. We will also using different clock sources
         // while we're at it.
+        let configs = [
+            #[cfg(not(any(esp32, esp32s2, esp32c3, esp32c2)))]
+            (9600, ClockSource::RcFast),
+            #[cfg(not(any(esp32, esp32s2)))]
+            (19_200, ClockSource::Xtal),
+            #[cfg(esp32s2)]
+            (9600, ClockSource::RefTick),
+            (921_600, ClockSource::Apb),
+        ];
 
-        #[cfg(not(feature = "esp32s2"))]
-        {
-            #[cfg(not(any(feature = "esp32", feature = "esp32c3", feature = "esp32c2")))]
-            {
-                // 9600 baud, RC FAST clock source:
-                ctx.uart.change_baud(9600, ClockSource::RcFast);
-                ctx.uart.write(7).ok();
-                let read = block!(ctx.uart.read());
-                assert_eq!(read, Ok(7));
-            }
-
-            // 19,200 baud, XTAL clock source:
-            #[cfg(not(feature = "esp32"))]
-            {
-                ctx.uart.change_baud(19_200, ClockSource::Xtal);
-                ctx.uart.write(55).ok();
-                let read = block!(ctx.uart.read());
-                assert_eq!(read, Ok(55));
-            }
-
-            // 921,600 baud, APB clock source:
-            ctx.uart.change_baud(921_600, ClockSource::Apb);
-            ctx.uart.write(253).ok();
+        let mut byte_to_write = 0xA5;
+        for (baud, clock_source) in &configs {
+            ctx.uart.change_baud(*baud, *clock_source);
+            ctx.uart.write(byte_to_write).ok();
             let read = block!(ctx.uart.read());
-            assert_eq!(read, Ok(253));
-        }
-
-        #[cfg(feature = "esp32s2")]
-        {
-            // 9600 baud, REF TICK clock source:
-            ctx.uart.change_baud(9600, ClockSource::RefTick);
-            ctx.uart.write(7).ok();
-            let read = block!(ctx.uart.read());
-            assert_eq!(read, Ok(7));
-
-            // 921,600 baud, APB clock source:
-            ctx.uart.change_baud(921_600, ClockSource::Apb);
-            ctx.uart.write(253).ok();
-            let read = block!(ctx.uart.read());
-            assert_eq!(read, Ok(253));
+            assert_eq!(read, Ok(byte_to_write));
+            byte_to_write = !byte_to_write;
         }
     }
 }
