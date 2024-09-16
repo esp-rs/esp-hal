@@ -6,7 +6,6 @@ exclude  = [
     "esp-backtrace",
     "esp-build",
     "esp-hal",
-    "esp-hal-buzzer",
     "esp-hal-embassy",
     "esp-hal-procmacros",
     "esp-ieee802154",

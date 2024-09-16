@@ -572,17 +572,6 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     )?;
                 }
 
-                Package::EspHalBuzzer => {
-                    lint_package(
-                        &path,
-                        &[
-                            "-Zbuild-std=core",
-                            &format!("--target={}", chip.target()),
-                            &format!("--features={chip}"),
-                        ],
-                    )?;
-                }
-
                 Package::EspHalEmbassy => {
                     lint_package(
                         &path,
