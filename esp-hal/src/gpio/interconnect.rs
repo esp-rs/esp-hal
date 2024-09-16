@@ -6,7 +6,6 @@ use crate::{
         AlternateFunction,
         AnyPin,
         GpioPin,
-        GpioProperties,
         InputPin,
         Level,
         NoPin,
@@ -117,8 +116,7 @@ impl PeripheralInput for InputSignal {
         let af = if self.is_inverted {
             GPIO_FUNCTION
         } else {
-            self.pin
-                .input_signals(private::Internal)
+            self.input_signals(private::Internal)
                 .into_iter()
                 .position(|s| s == Some(signal))
                 .ok_or(())
@@ -133,11 +131,7 @@ impl PeripheralInput for InputSignal {
         self.pin.set_alternate_function(af, private::Internal);
 
         if signal_nr <= INPUT_SIGNAL_MAX as usize {
-            self.connect(
-                signal_nr,
-                self.is_inverted,
-                self.pin.number(private::Internal),
-            );
+            self.connect(signal_nr, self.is_inverted, self.pin.number());
         }
     }
 
@@ -159,11 +153,14 @@ impl PeripheralInput for InputSignal {
             .modify(|_, w| w.sel().clear_bit());
     }
 
+    fn input_signals(&self, _: private::Internal) -> [Option<gpio::InputSignal>; 6] {
+        PeripheralInput::input_signals(&self.pin, private::Internal)
+    }
+
     delegate::delegate! {
         to self.pin {
             fn init_input(&self, pull: Pull, _internal: private::Internal);
             fn is_input_high(&self, _internal: private::Internal) -> bool;
-            fn input_signals(&self, _internal: private::Internal) -> [Option<gpio::InputSignal>; 6];
             fn enable_input(&mut self, on: bool, _internal: private::Internal);
             fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
         }
@@ -266,8 +263,7 @@ impl PeripheralOutput for OutputSignal {
         let af = if self.is_inverted {
             GPIO_FUNCTION
         } else {
-            self.pin
-                .output_signals(private::Internal)
+            self.output_signals(private::Internal)
                 .into_iter()
                 .position(|s| s == Some(signal))
                 .ok_or(())
@@ -288,7 +284,7 @@ impl PeripheralOutput for OutputSignal {
             self.is_inverted,
             false,
             false,
-            self.pin.number(private::Internal),
+            self.pin.number(),
         );
     }
 
@@ -310,6 +306,10 @@ impl PeripheralOutput for OutputSignal {
             .modify(|_, w| w.sel().clear_bit());
     }
 
+    fn output_signals(&self, _: private::Internal) -> [Option<gpio::OutputSignal>; 6] {
+        PeripheralOutput::output_signals(&self.pin, private::Internal)
+    }
+
     delegate::delegate! {
         to self.pin {
             fn set_to_open_drain_output(&mut self, _internal: private::Internal);
@@ -322,7 +322,6 @@ impl PeripheralOutput for OutputSignal {
             fn internal_pull_up_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             fn internal_pull_down_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             fn is_set_high(&self, _internal: private::Internal) -> bool;
-            fn output_signals(&self, _internal: private::Internal) -> [Option<gpio::OutputSignal>; 6];
         }
     }
 }
@@ -372,7 +371,7 @@ impl From<AnyPin> for AnyInputSignal {
 
 impl<const GPIONUM: u8> From<GpioPin<GPIONUM>> for AnyInputSignal
 where
-    GpioPin<GPIONUM>: InputPin + GpioProperties,
+    GpioPin<GPIONUM>: InputPin,
 {
     fn from(pin: GpioPin<GPIONUM>) -> Self {
         Self(AnyInputSignalInner::Input(pin.peripheral_input()))

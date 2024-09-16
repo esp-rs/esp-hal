@@ -154,7 +154,7 @@ impl<const C: u8> GpioEtmEventChannel<C> {
 
         pin.init_input(pin_config.pull, private::Internal);
 
-        enable_event_channel(C, pin.number(private::Internal));
+        enable_event_channel(C, pin.number());
         GpioEtmEventChannelRising { _pin: pin }
     }
 
@@ -171,7 +171,7 @@ impl<const C: u8> GpioEtmEventChannel<C> {
 
         pin.init_input(pin_config.pull, private::Internal);
 
-        enable_event_channel(C, pin.number(private::Internal));
+        enable_event_channel(C, pin.number());
         GpioEtmEventChannelFalling { _pin: pin }
     }
 
@@ -188,7 +188,7 @@ impl<const C: u8> GpioEtmEventChannel<C> {
 
         pin.init_input(pin_config.pull, private::Internal);
 
-        enable_event_channel(C, pin.number(private::Internal));
+        enable_event_channel(C, pin.number());
         GpioEtmEventChannelAny { _pin: pin }
     }
 }
@@ -312,7 +312,7 @@ impl<const C: u8> GpioEtmTaskChannel<C> {
             pin.set_to_push_pull_output(private::Internal);
         }
 
-        enable_task_channel(C, pin.number(private::Internal));
+        enable_task_channel(C, pin.number());
         GpioEtmTaskSet { _pin: pin }
     }
 
@@ -335,7 +335,7 @@ impl<const C: u8> GpioEtmTaskChannel<C> {
             pin.set_to_push_pull_output(private::Internal);
         }
 
-        enable_task_channel(C, pin.number(private::Internal));
+        enable_task_channel(C, pin.number());
         GpioEtmTaskClear { _pin: pin }
     }
 
@@ -358,7 +358,7 @@ impl<const C: u8> GpioEtmTaskChannel<C> {
             pin.set_to_push_pull_output(private::Internal);
         }
 
-        enable_task_channel(C, pin.number(private::Internal));
+        enable_task_channel(C, pin.number());
         GpioEtmTaskToggle { _pin: pin }
     }
 }
