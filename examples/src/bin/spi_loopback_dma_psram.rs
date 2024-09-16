@@ -51,8 +51,8 @@ macro_rules! dma_alloc_buffer {
 // - if this is <= 8192 when chunk_size is 4032!?!?
 // - varing either DMA_CHUNK_SIZE or DMA_BUFFER_SIZE seems change the behavior
 const DMA_BUFFER_SIZE: usize = 16384; // the first request fails is this is <= 8192 when chunk_size is 4032!?!?
-const DMA_CHUNK_SIZE: usize = 4032; // size is aligned to 64 bytes
 const DMA_ALIGNMENT: DmaBufBlkSize = DmaBufBlkSize::Size16;
+const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize;
 
 #[entry]
 fn main() -> ! {
@@ -80,13 +80,8 @@ fn main() -> ! {
         tx_buffer.len(),
         tx_descriptors.len()
     );
-    let mut dma_tx_buf = DmaTxBuf::new_with_chunk_size(
-        tx_descriptors,
-        tx_buffer,
-        DMA_CHUNK_SIZE,
-        Some(DMA_ALIGNMENT),
-    )
-    .unwrap();
+    let mut dma_tx_buf =
+        DmaTxBuf::new_with_block_size(tx_descriptors, tx_buffer, Some(DMA_ALIGNMENT)).unwrap();
     let (rx_buffer, rx_descriptors, _, _) = esp_hal::dma_buffers!(DMA_BUFFER_SIZE, 0);
     info!(
         "RX: {:p} len {} ({} descripters)",

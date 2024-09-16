@@ -97,14 +97,13 @@ mod tests {
     #[timeout(3)]
     fn test_spi_writes_are_correctly_by_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
-        const DMA_CHUNK_SIZE: usize = 4032; // 64 byte aligned
         const DMA_ALIGNMENT: DmaBufBlkSize = DmaBufBlkSize::Size32; // matches dcache line size
+        const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize; // 64 byte aligned
 
         let (_, descriptors) = dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
         let buffer = dma_alloc_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT as usize);
         let mut dma_tx_buf =
-            DmaTxBuf::new_with_chunk_size(descriptors, buffer, DMA_CHUNK_SIZE, Some(DMA_ALIGNMENT))
-                .unwrap();
+            DmaTxBuf::new_with_block_size(descriptors, buffer, Some(DMA_ALIGNMENT)).unwrap();
 
         let unit = ctx.pcnt_unit;
         let mut spi = ctx.spi;
@@ -148,14 +147,13 @@ mod tests {
     #[timeout(3)]
     fn test_spidmabus_writes_are_correctly_by_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
-        const DMA_CHUNK_SIZE: usize = 4032; // 64 byte aligned
         const DMA_ALIGNMENT: DmaBufBlkSize = DmaBufBlkSize::Size32; // matches dcache line size
+        const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize; // 64 byte aligned
 
         let (_, descriptors) = dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
         let buffer = dma_alloc_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT as usize);
         let dma_tx_buf =
-            DmaTxBuf::new_with_chunk_size(descriptors, buffer, DMA_CHUNK_SIZE, Some(DMA_ALIGNMENT))
-                .unwrap();
+            DmaTxBuf::new_with_block_size(descriptors, buffer, Some(DMA_ALIGNMENT)).unwrap();
 
         let (rx, rxd, _, _) = dma_buffers!(1, 0);
         let dma_rx_buf = DmaRxBuf::new(rxd, rx).unwrap();

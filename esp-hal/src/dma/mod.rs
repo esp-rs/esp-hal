@@ -1757,10 +1757,17 @@ where
         buffer: &mut BUF,
     ) -> Result<(), DmaError> {
         let preparation = buffer.prepare();
-        #[cfg(esp32s3)]
-        if let Some(block_size) = preparation.block_size {
-            self.set_ext_mem_block_size(block_size.into());
-        }
+        cfg_if::cfg_if!(
+            if #[cfg(esp32s3)] {
+                if let Some(block_size) = preparation.block_size {
+                    self.set_ext_mem_block_size(block_size.into());
+                }
+            } else {
+                if is_slice_in_psram(self.buffer) {
+                    return Err(DmaError::UnsupportedMemoryRegion);
+                }
+            }
+        );
         // TODO: Get burst mode from DmaBuf.
         self.tx_impl
             .prepare_transfer_without_start(preparation.start, peri)
@@ -2072,7 +2079,6 @@ pub enum DmaBufBlkSize {
 pub struct DmaTxBuf {
     descriptors: &'static mut [DmaDescriptor],
     buffer: &'static mut [u8],
-    chunk_size: usize,
     block_size: Option<DmaBufBlkSize>,
 }
 
@@ -2088,27 +2094,27 @@ impl DmaTxBuf {
         descriptors: &'static mut [DmaDescriptor],
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
-        Self::new_with_chunk_size(descriptors, buffer, CHUNK_SIZE, None)
+        Self::new_with_block_size(descriptors, buffer, None)
     }
 
     /// Creates a new [DmaTxBuf] from some descriptors and a buffer.
     ///
     /// There must be enough descriptors for the provided buffer.
     /// Each descriptor can handle at most 4095 bytes worth of buffer.
-    /// The chunk size must be greater than 0 and less than or equal to 4095.
     /// Optionally, a block size can be provided for PSRAM & Burst transfers.
     ///
     /// Both the descriptors and buffer must be in DMA-capable memory.
     /// Only DRAM is supported for descriptors.
-    pub fn new_with_chunk_size(
+    pub fn new_with_block_size(
         descriptors: &'static mut [DmaDescriptor],
         buffer: &'static mut [u8],
-        chunk_size: usize,
         block_size: Option<DmaBufBlkSize>,
     ) -> Result<Self, DmaBufError> {
-        if chunk_size == 0 || chunk_size > 4095 {
-            return Err(DmaBufError::InvalidChunkSize);
-        }
+        let chunk_size = match block_size {
+            Some(size) => 4096 - size as usize,
+            None => 4095, // max chunk_siize
+        };
+
         let min_descriptors = buffer.len().div_ceil(chunk_size);
         if descriptors.len() < min_descriptors {
             return Err(DmaBufError::InsufficientDescriptors);
@@ -2119,9 +2125,18 @@ impl DmaTxBuf {
             return Err(DmaBufError::UnsupportedMemoryRegion);
         }
 
-        // buffer can be either DRAM or PSRAM (if supported)
-        if !is_slice_in_dram(buffer) && !is_slice_in_psram(buffer) {
-            return Err(DmaBufError::UnsupportedMemoryRegion);
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s3)] {
+                // buffer can be either DRAM or PSRAM (if supported)
+                if !is_slice_in_dram(buffer) && !is_slice_in_psram(buffer) {
+                    return Err(DmaBufError::UnsupportedMemoryRegion);
+                }
+            } else {
+                // buffer can only be DRAM
+                if !is_slice_in_dram(buffer) {
+                    return Err(DmaBufError::UnsupportedMemoryRegion);
+                }
+            }
         }
 
         // Setup size and buffer pointer as these will not change for the remainder of
@@ -2135,7 +2150,6 @@ impl DmaTxBuf {
         let mut buf = Self {
             descriptors,
             buffer,
-            chunk_size,
             block_size,
         };
         buf.set_length(buf.capacity());
@@ -2175,7 +2189,7 @@ impl DmaTxBuf {
         assert!(len <= self.buffer.len());
 
         // Get the minimum number of descriptors needed for this length of data.
-        let descriptor_count = len.div_ceil(self.chunk_size).max(1);
+        let descriptor_count = len.div_ceil(self.descriptors[0].size()).max(1);
         let required_descriptors = &mut self.descriptors[0..descriptor_count];
 
         // Link up the relevant descriptors.
