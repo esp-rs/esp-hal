@@ -6,14 +6,15 @@
 #![no_main]
 use esp_alloc as _;
 use esp_hal::{
-    dma::{Dma, DmaBufBlkSize, DmaPriority, DmaTxBuf},
+    dma::{Dma, DmaBufBlkSize, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma_buffers,
     dma_descriptors_chunk_size,
     gpio::{interconnect::InputSignal, Io},
     pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
     peripherals::SPI2,
     prelude::*,
     spi::{
-        master::{Address, Command, Spi, SpiDma},
+        master::{Address, Command, HalfDuplexReadWrite, Spi, SpiDma},
         HalfDuplexMode,
         SpiDataMode,
         SpiMode,
@@ -76,13 +77,7 @@ mod tests {
         let pcnt = Pcnt::new(peripherals.PCNT);
         let dma = Dma::new(peripherals.DMA);
 
-        cfg_if::cfg_if! {
-            if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
-                let dma_channel = dma.spi2channel;
-            } else {
-                let dma_channel = dma.channel0;
-            }
-        }
+        let dma_channel = dma.channel0;
 
         let mosi_loopback = mosi.peripheral_input();
 
@@ -101,7 +96,7 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn test_spi_writes_are_correctly_by_pcnt(ctx: Context) {
-        const DMA_BUFFER_SIZE: usize = 64;
+        const DMA_BUFFER_SIZE: usize = 4;
         const DMA_CHUNK_SIZE: usize = 4032; // 64 byte aligned
         const DMA_ALIGNMENT: DmaBufBlkSize = DmaBufBlkSize::Size32; // matches dcache line size
 
@@ -149,46 +144,51 @@ mod tests {
         assert_eq!(unit.get_value(), (6 * DMA_BUFFER_SIZE) as _);
     }
 
-    // TODO: when the first test is working, we can add a second one!
-    // #[test]
-    // #[timeout(3)]
-    // fn test_spidmabus_writes_are_correctly_by_pcnt(ctx: Context) {
-    //     const DMA_BUFFER_SIZE: usize = 64;
+    #[test]
+    #[timeout(3)]
+    fn test_spidmabus_writes_are_correctly_by_pcnt(ctx: Context) {
+        const DMA_BUFFER_SIZE: usize = 4;
+        const DMA_CHUNK_SIZE: usize = 4032; // 64 byte aligned
+        const DMA_ALIGNMENT: DmaBufBlkSize = DmaBufBlkSize::Size32; // matches dcache line size
 
-    //     let (rx, rxd, buffer, descriptors) = dma_buffers!(1,
-    // DMA_BUFFER_SIZE);     let dma_rx_buf = DmaRxBuf::new(rxd,
-    // rx).unwrap();     let dma_tx_buf = DmaTxBuf::new(descriptors,
-    // buffer).unwrap();
+        let (_, descriptors) = dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
+        let buffer = dma_alloc_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT as usize);
+        let dma_tx_buf =
+            DmaTxBuf::new_with_chunk_size(descriptors, buffer, DMA_CHUNK_SIZE, Some(DMA_ALIGNMENT))
+                .unwrap();
 
-    //     let unit = ctx.pcnt_unit;
-    //     let mut spi = ctx.spi.with_buffers(dma_rx_buf, dma_tx_buf);
+        let (rx, rxd, _, _) = dma_buffers!(1, 0);
+        let dma_rx_buf = DmaRxBuf::new(rxd, rx).unwrap();
 
-    //     unit.channel0.set_edge_signal(ctx.pcnt_source);
-    //     unit.channel0
-    //         .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let unit = ctx.pcnt_unit;
+        let mut spi = ctx.spi.with_buffers(dma_rx_buf, dma_tx_buf);
 
-    //     let buffer = [0b0110_1010; DMA_BUFFER_SIZE];
-    //     // Write the buffer where each byte has 3 pos edges.
-    //     spi.write(
-    //         SpiDataMode::Single,
-    //         Command::None,
-    //         Address::None,
-    //         0,
-    //         &buffer,
-    //     )
-    //     .unwrap();
+        unit.channel0.set_edge_signal(ctx.pcnt_source);
+        unit.channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-    //     assert_eq!(unit.get_value(), (3 * DMA_BUFFER_SIZE) as _);
+        let buffer = [0b0110_1010; DMA_BUFFER_SIZE];
+        // Write the buffer where each byte has 3 pos edges.
+        spi.write(
+            SpiDataMode::Single,
+            Command::None,
+            Address::None,
+            0,
+            &buffer,
+        )
+        .unwrap();
 
-    //     spi.write(
-    //         SpiDataMode::Single,
-    //         Command::None,
-    //         Address::None,
-    //         0,
-    //         &buffer,
-    //     )
-    //     .unwrap();
+        assert_eq!(unit.get_value(), (3 * DMA_BUFFER_SIZE) as _);
 
-    //     assert_eq!(unit.get_value(), (6 * DMA_BUFFER_SIZE) as _);
-    // }
+        spi.write(
+            SpiDataMode::Single,
+            Command::None,
+            Address::None,
+            0,
+            &buffer,
+        )
+        .unwrap();
+
+        assert_eq!(unit.get_value(), (6 * DMA_BUFFER_SIZE) as _);
+    }
 }
