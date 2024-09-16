@@ -272,7 +272,7 @@ extern "C" fn EspDefaultHandler(_interrupt: peripherals::Interrupt) {
     );
 }
 
-/// A marker trait for intializing drivers in a specific mode.
+/// A marker trait for initializing drivers in a specific mode.
 pub trait Mode: crate::private::Sealed {}
 
 /// Driver initialized in blocking mode.
@@ -766,9 +766,9 @@ pub fn init(config: Config) -> Peripherals {
     rtc.rwdt.disable();
 
     unsafe {
-        crate::timer::timg::Wdt::<self::peripherals::TIMG0, Blocking>::set_wdt_enabled(false);
+        crate::timer::timg::Wdt::<self::peripherals::TIMG0>::set_wdt_enabled(false);
         #[cfg(timg1)]
-        crate::timer::timg::Wdt::<self::peripherals::TIMG1, Blocking>::set_wdt_enabled(false);
+        crate::timer::timg::Wdt::<self::peripherals::TIMG1>::set_wdt_enabled(false);
     }
 
     Clocks::init(config.cpu_clock);
