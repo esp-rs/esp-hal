@@ -1,9 +1,13 @@
 use core::fmt::Write;
 use std::{collections::HashMap, env, fs, path::PathBuf};
 
-const TABLE_HEADER: &str = r#"
+const DOC_TABLE_HEADER: &str = r#"
 | Name | Description | Default value |
 |------|-------------|---------------|
+"#;
+const CHOSEN_TABLE_HEADER: &str = r#"
+| Name | Chosen value |
+|------|--------------|
 "#;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -62,7 +66,7 @@ impl Value {
 pub fn generate_config(prefix: &str, config: &[(&str, Value, &str)]) {
     let mut prefix = screaming_snake_case(prefix);
 
-    let mut doc_table = String::from(TABLE_HEADER);
+    let mut doc_table = String::from(DOC_TABLE_HEADER);
     for (key, default, desc) in config {
         let key = screaming_snake_case(key);
         let default = default.as_string();
@@ -125,6 +129,13 @@ pub fn generate_config(prefix: &str, config: &[(&str, Value, &str)]) {
         );
     }
 
+    let mut selected_config = String::from(CHOSEN_TABLE_HEADER);
+    for (key, value, _) in config {
+        let key = screaming_snake_case(key);
+        let value = value.as_string();
+        writeln!(selected_config, "|**{prefix}_{key}**|{value}|").unwrap();
+    }
+
     // convert to snake case
     prefix.make_ascii_lowercase();
 
@@ -134,6 +145,13 @@ pub fn generate_config(prefix: &str, config: &[(&str, Value, &str)]) {
         .to_string_lossy()
         .to_string();
     fs::write(out_file, doc_table).unwrap();
+
+    let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
+    let out_file = out_dir
+        .join(format!("{prefix}_selected_config.md"))
+        .to_string_lossy()
+        .to_string();
+    fs::write(out_file, selected_config).unwrap();
 }
 
 // Converts a symbol name like
