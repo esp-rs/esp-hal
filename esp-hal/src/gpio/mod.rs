@@ -76,6 +76,7 @@ use crate::{
     private::{self, Sealed},
     Cpu,
     InterruptConfigurable,
+    DEFAULT_INTERRUPT_HANDLER,
 };
 
 pub mod interconnect;
@@ -982,6 +983,7 @@ fn raise_gpio_interrupt_priority(core: Cpu, priority: Priority) {
     #[allow(clippy::declare_interior_mutable_const)]
     const NO_PRIO: AtomicUsize = AtomicUsize::new(Priority::None as usize);
     static MAX_PRIO: [AtomicUsize; Cpu::COUNT] = [NO_PRIO; Cpu::COUNT];
+    static INTERNAL_HANDLER: extern "C" fn() = gpio_interrupt_handler;
 
     #[cold]
     fn do_raise_priority_level(max: &AtomicUsize, mut current_prio: usize, priority: Priority) {
@@ -994,12 +996,25 @@ fn raise_gpio_interrupt_priority(core: Cpu, priority: Priority) {
                 Ordering::Relaxed,
             ) {
                 Ok(_) => {
+                    let current_handler =
+                        crate::interrupt::bound_handler(crate::peripherals::Interrupt::GPIO);
+
+                    if let Some(handler) = current_handler {
+                        if handler != DEFAULT_INTERRUPT_HANDLER.handler() {
+                            assert!(
+                                handler == INTERNAL_HANDLER,
+                                "The GPIO interrupt handler is already bound."
+                            );
+                        }
+                    }
+
                     unsafe {
                         crate::interrupt::bind_interrupt(
                             crate::peripherals::Interrupt::GPIO,
-                            gpio_interrupt_handler,
+                            INTERNAL_HANDLER,
                         );
                     }
+
                     crate::interrupt::enable(crate::peripherals::Interrupt::GPIO, priority)
                         .unwrap();
                 }

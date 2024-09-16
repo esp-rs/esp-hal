@@ -329,7 +329,7 @@ mod peripheral_macros {
                         $(
                             paste::paste!{
                                 /// Binds an interrupt handler to the corresponding interrupt for this peripheral.
-                                pub fn [<bind_ $interrupt:lower _interrupt >](&mut self, handler: unsafe extern "C" fn() -> ()) {
+                                pub fn [<bind_ $interrupt:lower _interrupt >](&mut self, handler: unsafe extern "C" fn()) {
                                     unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$interrupt, handler); }
                                 }
                             }
