@@ -11,6 +11,8 @@
 //!
 //! LEDC uses APB as clock source.
 
+use core::marker::PhantomData;
+
 use fugit::HertzU32;
 
 #[cfg(esp32)]
@@ -191,18 +193,19 @@ pub trait TimerHW<S: TimerSpeed> {
 }
 
 /// Timer struct
-pub struct Timer<S: TimerSpeed> {
+pub struct Timer<'a, S: TimerSpeed> {
     number: Number,
     duty: Option<config::Duty>,
     frequency: u32,
     configured: bool,
     use_ref_tick: bool,
     clock_source: Option<S::ClockSourceType>,
+    phantom: PhantomData<&'a ()>,
 }
 
-impl<S: TimerSpeed> TimerIFace<S> for Timer<S>
+impl<'a, S: TimerSpeed> TimerIFace<S> for Timer<'a, S>
 where
-    Timer<S>: TimerHW<S>,
+    Timer<'a, S>: TimerHW<S>,
 {
     /// Return the frequency of the timer
     fn get_freq(&self) -> Option<HertzU32> {
@@ -262,7 +265,7 @@ where
     }
 }
 
-impl<S: TimerSpeed> Timer<S> {
+impl<'a, S: TimerSpeed> Timer<'a, S> {
     /// Create a new instance of a timer
     pub fn new(number: Number) -> Self {
         Timer {
@@ -272,12 +275,13 @@ impl<S: TimerSpeed> Timer<S> {
             configured: false,
             use_ref_tick: false,
             clock_source: None,
+            phantom: PhantomData,
         }
     }
 }
 
 /// Timer HW implementation for LowSpeed timers
-impl TimerHW<LowSpeed> for Timer<LowSpeed> {
+impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
     /// Get the current source timer frequency from the HW
     fn get_freq_hw(&self) -> Option<HertzU32> {
         self.clock_source.map(|source| match source {
@@ -375,7 +379,7 @@ impl TimerHW<LowSpeed> for Timer<LowSpeed> {
 
 #[cfg(esp32)]
 /// Timer HW implementation for HighSpeed timers
-impl TimerHW<HighSpeed> for Timer<HighSpeed> {
+impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
     /// Get the current source timer frequency from the HW
     fn get_freq_hw(&self) -> Option<HertzU32> {
         self.clock_source.map(|source| match source {

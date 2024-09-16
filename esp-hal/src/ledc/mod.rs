@@ -167,7 +167,7 @@ impl<'d> Ledc<'d> {
     }
 
     /// Return a new timer
-    pub fn get_timer<S: TimerSpeed>(&self, number: timer::Number) -> Timer<S> {
+    pub fn get_timer<S: TimerSpeed>(&self, number: timer::Number) -> Timer<'d, S> {
         Timer::new(number)
     }
 

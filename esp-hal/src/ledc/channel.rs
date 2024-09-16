@@ -153,6 +153,20 @@ pub trait ChannelHW<O: PeripheralOutput> {
     /// Disable signal output on this channel by clearing LEDC_SIG_OUT_EN_CHn.
     fn disable_signal_output(&self);
 
+    /// Set the hpoint value for the channel. When the counter reaches this
+    /// value, the output signal will be high. The counter will reset to 0
+    /// when it reaches the value set by [`Self::set_duty_hw`].
+    /// Here is a detailed table of the relationship between the counter value
+    /// and the output signal: | Counter Value        | Output Signal |
+    /// |----------------------|---------------|
+    /// | [0, hpoint - 1]      | Low           |
+    /// | [hpoint, lpoint - 1] | High          |
+    /// | [lpoint, overflow]   | Low           |
+    /// where lpoint equals hpoint + (1 << duty) * duty_pct / 100.
+    /// The specified hpoint value will be applied to the channel after the
+    /// overflow occurs.
+    fn set_hpoint(&self, hpoint: u32);
+
     cfg_if::cfg_if! {
         if #[cfg(not(esp32))] {
             /// Enable the overflow counter and set the number of counter overflows needed to generate an interrupt.
@@ -800,6 +814,23 @@ where
             .ch(self.number as usize)
             .conf0()
             .modify(|_, w| w.sig_out_en().clear_bit().para_up().set_bit());
+    }
+
+    #[cfg(esp32)]
+    fn set_hpoint(&self, hpoint: u32) {
+        if S::IS_HS {
+            let ch = Ledc::register_block().hsch(self.number as usize);
+            ch.hpoint().write(|w| unsafe { w.hpoint().bits(hpoint) });
+        } else {
+            let ch = Ledc::register_block().lsch(self.number as usize);
+            ch.hpoint().write(|w| unsafe { w.hpoint().bits(hpoint) });
+        }
+    }
+    #[cfg(not(esp32))]
+    fn set_hpoint(&self, hpoint: u32) {
+        let ch = Ledc::register_block().ch(self.number as usize);
+        ch.hpoint()
+            .write(|w| unsafe { w.hpoint().bits(hpoint as _) });
     }
 
     cfg_if::cfg_if! {
