@@ -113,7 +113,7 @@ pub fn generate_config(prefix: &str, config: &[(&str, Value, &str)]) {
     for (name, value) in configs.into_iter() {
         println!("cargo:rustc-check-cfg=cfg({})", name);
         match value {
-            Value::Bool(val) if val == true => println!("cargo:rustc-cfg={name}"),
+            Value::Bool(true) => println!("cargo:rustc-cfg={name}"),
             _ => {}
         }
 
