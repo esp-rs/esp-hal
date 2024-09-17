@@ -2224,24 +2224,20 @@ pub trait InstanceDma: Instance {
 
         self.configure_datalen(rx_buffer.length(), tx_buffer.length());
 
-        rx.is_done();
-        tx.is_done();
-
         // re-enable the MISO and MOSI
         reg_block
             .user()
             .modify(|_, w| w.usr_miso().bit(true).usr_mosi().bit(true));
 
         self.enable_dma();
-        self.clear_dma_interrupts();
 
-        reset_dma_before_load_dma_dscr(reg_block);
         rx.prepare_transfer(self.dma_peripheral(), rx_buffer)
             .and_then(|_| rx.start_transfer())?;
         tx.prepare_transfer(self.dma_peripheral(), tx_buffer)
             .and_then(|_| tx.start_transfer())?;
 
-        reset_dma_before_usr_cmd(reg_block);
+        #[cfg(gdma)]
+        self.reset_dma();
 
         self.start_operation();
 
@@ -2257,8 +2253,6 @@ pub trait InstanceDma: Instance {
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
         self.configure_datalen(0, buffer.length());
-
-        tx.is_done();
 
         // disable MISO and re-enable MOSI (DON'T do it for half-duplex)
         if full_duplex {
@@ -2282,14 +2276,12 @@ pub trait InstanceDma: Instance {
         }
 
         self.enable_dma();
-        self.clear_dma_interrupts();
 
-        reset_dma_before_load_dma_dscr(reg_block);
+        tx.prepare_transfer(self.dma_peripheral(), buffer)
+            .and_then(|_| tx.start_transfer())?;
 
-        tx.prepare_transfer(self.dma_peripheral(), buffer)?;
-        tx.start_transfer()?;
-
-        reset_dma_before_usr_cmd(reg_block);
+        #[cfg(gdma)]
+        self.reset_dma();
 
         self.start_operation();
 
@@ -2314,8 +2306,6 @@ pub trait InstanceDma: Instance {
 
         self.configure_datalen(buffer.length(), 0);
 
-        rx.is_done();
-
         // re-enable MISO and disable MOSI (DON'T do it for half-duplex)
         if full_duplex {
             reg_block
@@ -2324,14 +2314,12 @@ pub trait InstanceDma: Instance {
         }
 
         self.enable_dma();
-        self.clear_dma_interrupts();
 
-        reset_dma_before_load_dma_dscr(reg_block);
+        rx.prepare_transfer(self.dma_peripheral(), buffer)
+            .and_then(|_| rx.start_transfer())?;
 
-        rx.prepare_transfer(self.dma_peripheral(), buffer)?;
-        rx.start_transfer()?;
-
-        reset_dma_before_usr_cmd(reg_block);
+        #[cfg(gdma)]
+        self.reset_dma();
 
         self.start_operation();
 
@@ -2347,32 +2335,63 @@ pub trait InstanceDma: Instance {
         }
     }
 
-    #[cfg(gdma)]
     fn enable_dma(&self) {
-        let reg_block = self.register_block();
-        reg_block.dma_conf().modify(|_, w| w.dma_tx_ena().set_bit());
-        reg_block.dma_conf().modify(|_, w| w.dma_rx_ena().set_bit());
+        #[cfg(gdma)]
+        {
+            // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
+            let reg_block = self.register_block();
+            reg_block.dma_conf().modify(|_, w| {
+                w.dma_tx_ena().set_bit();
+                w.dma_rx_ena().set_bit()
+            });
+        }
+        #[cfg(pdma)]
+        self.reset_dma();
     }
 
-    #[cfg(pdma)]
-    fn enable_dma(&self) {
-        // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
+    fn reset_dma(&self) {
+        #[cfg(pdma)]
+        {
+            let reg_block = self.register_block();
+            reg_block.dma_conf().modify(|_, w| {
+                w.out_rst().set_bit();
+                w.in_rst().set_bit();
+                w.ahbm_fifo_rst().set_bit();
+                w.ahbm_rst().set_bit()
+            });
+            reg_block.dma_conf().modify(|_, w| {
+                w.out_rst().clear_bit();
+                w.in_rst().clear_bit();
+                w.ahbm_fifo_rst().clear_bit();
+                w.ahbm_rst().clear_bit()
+            });
+        }
+        #[cfg(gdma)]
+        {
+            let reg_block = self.register_block();
+            reg_block.dma_conf().modify(|_, w| {
+                w.rx_afifo_rst().set_bit();
+                w.buf_afifo_rst().set_bit();
+                w.dma_afifo_rst().set_bit()
+            });
+            reg_block.dma_conf().modify(|_, w| {
+                w.rx_afifo_rst().clear_bit();
+                w.buf_afifo_rst().clear_bit();
+                w.dma_afifo_rst().clear_bit()
+            });
+        }
+        self.clear_dma_interrupts();
     }
 
     #[cfg(gdma)]
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
         reg_block.dma_int_clr().write(|w| {
-            w.dma_infifo_full_err()
-                .clear_bit_by_one()
-                .dma_outfifo_empty_err()
-                .clear_bit_by_one()
-                .trans_done()
-                .clear_bit_by_one()
-                .mst_rx_afifo_wfull_err()
-                .clear_bit_by_one()
-                .mst_tx_afifo_rempty_err()
-                .clear_bit_by_one()
+            w.dma_infifo_full_err().clear_bit_by_one();
+            w.dma_outfifo_empty_err().clear_bit_by_one();
+            w.trans_done().clear_bit_by_one();
+            w.mst_rx_afifo_wfull_err().clear_bit_by_one();
+            w.mst_tx_afifo_rempty_err().clear_bit_by_one()
         });
     }
 
@@ -2380,66 +2399,17 @@ pub trait InstanceDma: Instance {
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
         reg_block.dma_int_clr().write(|w| {
-            w.inlink_dscr_empty()
-                .clear_bit_by_one()
-                .outlink_dscr_error()
-                .clear_bit_by_one()
-                .inlink_dscr_error()
-                .clear_bit_by_one()
-                .in_done()
-                .clear_bit_by_one()
-                .in_err_eof()
-                .clear_bit_by_one()
-                .in_suc_eof()
-                .clear_bit_by_one()
-                .out_done()
-                .clear_bit_by_one()
-                .out_eof()
-                .clear_bit_by_one()
-                .out_total_eof()
-                .clear_bit_by_one()
+            w.inlink_dscr_empty().clear_bit_by_one();
+            w.outlink_dscr_error().clear_bit_by_one();
+            w.inlink_dscr_error().clear_bit_by_one();
+            w.in_done().clear_bit_by_one();
+            w.in_err_eof().clear_bit_by_one();
+            w.in_suc_eof().clear_bit_by_one();
+            w.out_done().clear_bit_by_one();
+            w.out_eof().clear_bit_by_one();
+            w.out_total_eof().clear_bit_by_one()
         });
     }
-}
-
-fn reset_dma_before_usr_cmd(_reg_block: &RegisterBlock) {
-    #[cfg(gdma)]
-    _reg_block.dma_conf().modify(|_, w| {
-        w.rx_afifo_rst()
-            .set_bit()
-            .buf_afifo_rst()
-            .set_bit()
-            .dma_afifo_rst()
-            .set_bit()
-    });
-}
-
-#[cfg(gdma)]
-fn reset_dma_before_load_dma_dscr(_reg_block: &RegisterBlock) {}
-
-#[cfg(pdma)]
-fn reset_dma_before_load_dma_dscr(reg_block: &RegisterBlock) {
-    reg_block.dma_conf().modify(|_, w| {
-        w.out_rst()
-            .set_bit()
-            .in_rst()
-            .set_bit()
-            .ahbm_fifo_rst()
-            .set_bit()
-            .ahbm_rst()
-            .set_bit()
-    });
-
-    reg_block.dma_conf().modify(|_, w| {
-        w.out_rst()
-            .clear_bit()
-            .in_rst()
-            .clear_bit()
-            .ahbm_fifo_rst()
-            .clear_bit()
-            .ahbm_rst()
-            .clear_bit()
-    });
 }
 
 impl InstanceDma for crate::peripherals::SPI2 {}
