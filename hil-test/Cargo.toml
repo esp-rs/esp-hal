@@ -88,22 +88,6 @@ name    = "spi_full_duplex"
 harness = false
 
 [[test]]
-name    = "spi_full_duplex_dma"
-harness = false
-
-[[test]]
-name    = "spi_full_duplex_dma_async"
-harness = false
-
-[[test]]
-name    = "spi_full_duplex_dma_pcnt"
-harness = false
-
-[[test]]
-name    = "spi_full_duplex_dma_write_read"
-harness = false
-
-[[test]]
 name    = "spi_half_duplex_read"
 harness = false
 
