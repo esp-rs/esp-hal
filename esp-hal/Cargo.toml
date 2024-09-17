@@ -143,24 +143,11 @@ defmt = [
 ]
 
 #! ### PSRAM Feature Flags
-## Use externally connected PSRAM (2MB).
-psram-2m = []
-## Use externally connected PSRAM (4MB).
-psram-4m = []
-## Use externally connected PSRAM (8MB).
-psram-8m = []
-## PSRAM 80Mhz frequency support
-psram-80mhz = []
+## Use externally connected Quad PSRAM
+quad-psram = []
 
-#! ### Octal RAM Feature Flags
-## Use externally connected Octal RAM (2MB).
-opsram-2m = []
-## Use externally connected Octal RAM (4MB).
-opsram-4m = []
-## Use externally connected Octal RAM (8MB).
-opsram-8m = []
-## Use externally connected Octal RAM (16MB).
-opsram-16m = []
+## Use externally connected Octal RAM
+octal-psram = []
 
 # This feature is intended for testing; you probably don't want to enable it:
 ci = ["defmt", "bluetooth"]

@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `NO_PIN` constant has been removed. (#2133)
 - MSRV bump to 1.79 (#2156)
 - Allow handling interrupts while trying to lock critical section on multi-core chips. (#2197)
+- Removed the PS-RAM related features, replaced by `quad-psram`/`octal-psram`, `init_psram` takes a configuration parameter, it's now possible to auto-detect PS-RAM size (#2178)
 
 ### Fixed
 

@@ -73,9 +73,6 @@ esp-wifi = ["dep:esp-wifi"]
 embassy                = ["dep:esp-hal-embassy"]
 embassy-generic-timers = ["embassy-time/generic-queue-8"]
 
-opsram-2m = ["esp-hal/opsram-2m"]
-psram-2m  = ["esp-hal/psram-2m"]
-
 [profile.release]
 codegen-units    = 1
 debug            = 2

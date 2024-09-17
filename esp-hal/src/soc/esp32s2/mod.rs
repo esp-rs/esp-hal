@@ -16,7 +16,7 @@ use crate::rtc_cntl::SocResetReason;
 pub mod efuse;
 pub mod gpio;
 pub mod peripherals;
-#[cfg(psram)]
+#[cfg(feature = "quad-psram")]
 pub mod psram;
 pub mod radio_clocks;
 pub mod trng;

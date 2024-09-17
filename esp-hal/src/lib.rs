@@ -135,10 +135,13 @@
 #![allow(asm_sub_register, async_fn_in_trait, stable_features)]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![deny(missing_docs, rust_2018_idioms)]
+#![feature(doc_cfg)]
 #![no_std]
 
 // MUST be the first module
 mod fmt;
+
+use core::cell::UnsafeCell;
 
 #[cfg(riscv)]
 pub use esp_riscv_rt::{self, entry, riscv};
@@ -155,7 +158,9 @@ pub use self::soc::efuse;
 #[cfg(lp_core)]
 pub use self::soc::lp_core;
 pub use self::soc::peripherals;
-#[cfg(psram)]
+#[cfg_attr(psram, doc(cfg(feature = "quad-psram")))]
+#[cfg_attr(octal_psram, doc(cfg(feature = "octal-psram")))]
+#[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
 pub use self::soc::psram;
 #[cfg(ulp_riscv_core)]
 pub use self::soc::ulp_core;

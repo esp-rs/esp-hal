@@ -556,7 +556,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     }
                     if device.contains("psram") {
                         // TODO this doesn't test octal psram as it would require a separate build
-                        features.push_str(",psram-4m,psram-80mhz")
+                        features.push_str(",psram")
                     }
                     if matches!(chip, Chip::Esp32c6 | Chip::Esp32h2) {
                         features.push_str(",flip-link")
