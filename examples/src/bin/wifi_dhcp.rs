@@ -22,8 +22,8 @@ use esp_wifi::{
     current_millis,
     initialize,
     reinitialize,
+    deinitialize_wifi,
     wifi::{
-        deinitialize,
         utils::create_network_interface,
         AccessPointInfo,
         ClientConfiguration,
@@ -160,7 +160,7 @@ fn main() -> ! {
     drop(socket);
 
     // De-initialize and release `WifiStack` and controller
-    let deinit = deinitialize(EspWifiFor::Wifi, controller, wifi_stack).unwrap();
+    let deinit = deinitialize_wifi(controller, wifi_stack).unwrap();
 
     let init = reinitialize(EspWifiFor::Wifi, deinit).unwrap();
 

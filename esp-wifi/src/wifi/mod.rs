@@ -66,9 +66,6 @@ use crate::{
         macros::ram,
         peripheral::{Peripheral, PeripheralRef},
     },
-    EspWifiDeinitialization,
-    EspWifiDeinitializationInternal,
-    EspWifiFor,
     EspWifiInitialization,
 };
 
@@ -88,13 +85,11 @@ use crate::{
         include::{
             self,
             __BindgenBitfieldUnit,
-            esp_bt_controller_deinit,
             esp_err_t,
             esp_interface_t_ESP_IF_WIFI_AP,
             esp_interface_t_ESP_IF_WIFI_STA,
             esp_supplicant_init,
             esp_wifi_connect,
-            esp_wifi_deinit_internal,
             esp_wifi_disconnect,
             esp_wifi_get_mode,
             esp_wifi_init_internal,
@@ -1439,41 +1434,6 @@ pub(crate) fn wifi_start() -> Result<(), WifiError> {
     }
 
     Ok(())
-}
-
-/// Stops and de-initializes Wi-Fi stack
-#[cfg(any(feature = "ble", all(feature = "wifi", any(feature = "tcp", feature = "udp"))))]
-pub fn deinitialize(
-    deinit_for: EspWifiFor,
-    controller: WifiController,
-    stack: crate::wifi_interface::WifiStack<impl WifiDeviceMode>,
-) -> Result<EspWifiDeinitialization, WifiError> {
-    esp_wifi_result!(unsafe { esp_wifi_stop() })?;
-    esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
-
-    #[cfg(all(feature = "ble", any(esp32, esp32c3, esp32s3)))]
-    crate::ble::btdm::ble_deinit();
-
-    #[cfg(all(feature = "ble", any(esp32c2, esp32c6, esp32h2)))]
-    crate::ble::npl::ble_deinit();
-
-    drop(controller);
-    drop(stack);
-
-    match deinit_for {
-        #[cfg(feature = "wifi")]
-        EspWifiFor::Wifi => Ok(EspWifiDeinitialization::Wifi(
-            EspWifiDeinitializationInternal,
-        )),
-        #[cfg(feature = "ble")]
-        EspWifiFor::Ble => Ok(EspWifiDeinitialization::Ble(
-            EspWifiDeinitializationInternal,
-        )),
-        #[cfg(coex)]
-        EspWifiFor::WifiBle => Ok(EspWifiDeinitialization::WifiBle(
-            EspWifiDeinitializationInternal,
-        )),
-    }
 }
 
 unsafe extern "C" fn coex_register_start_cb(

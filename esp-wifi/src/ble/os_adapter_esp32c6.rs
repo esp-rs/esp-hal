@@ -1,8 +1,16 @@
 use crate::{
-    binary::include::esp_bt_controller_config_t,
+    binary::{include::esp_bt_controller_config_t, c_types::c_void},
     common_adapter::RADIO_CLOCKS,
     hal::system::{RadioClockController, RadioPeripherals},
+    ble::npl,
 };
+
+// use crate::{
+//     binary::{include::esp_bt_controller_config_t, c_types::c_void},
+//     common_adapter::RADIO_CLOCKS,
+//     hal::system::RadioClockController,
+//     ble::npl,
+// };
 
 pub(crate) static mut ISR_INTERRUPT_4: (
     *mut crate::binary::c_types::c_void,
@@ -71,6 +79,12 @@ pub(crate) fn bt_periph_module_enable() {
     }
 }
 
+pub(crate) fn bt_periph_module_disable() {
+    unsafe{
+        unwrap!(RADIO_CLOCKS.as_mut()).disable(RadioPeripherals::Bt);
+    }
+}
+
 pub(crate) fn disable_sleep_mode() {
     // nothing
 }
@@ -120,5 +134,37 @@ unsafe extern "C" fn jrand48(
         static mut VALUE: u32 = 0;
         VALUE = VALUE.wrapping_add(3);
         VALUE as i32
+    }
+}
+
+pub(super) fn deinit()
+{
+    unsafe{
+        info!("HCI deinit");
+        // HCI deinit
+        npl::r_ble_hci_trans_cfg_hs(
+            Some(core::mem::transmute::<
+                *const (),
+                unsafe extern "C" fn(*const u8, *const c_void),
+            >(core::ptr::null())),
+            core::ptr::null(),
+            Some(core::mem::transmute::<
+                *const (),
+                unsafe extern "C" fn(*const npl::OsMbuf, *const c_void),
+            >(core::ptr::null())),
+            core::ptr::null(),
+        );
+
+        npl::ble_controller_disable();
+
+        info!("phy disable");
+        crate::common_adapter::chip_specific::phy_disable();
+
+        info!("module disable");
+        bt_periph_module_disable();
+
+        npl::esp_unregister_npl_funcs();
+
+        npl::esp_unregister_ext_funcs();
     }
 }

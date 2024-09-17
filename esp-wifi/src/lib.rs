@@ -116,10 +116,23 @@ use hal::{
     system::RadioClockController,
     timer::{timg::Timer as TimgTimer, AnyTimer, PeriodicTimer},
 };
-#[cfg(feature = "wifi")]
-use wifi::WifiError;
 
 use crate::{common_adapter::init_rng, tasks::init_tasks, timer::setup_timer_isr};
+
+#[cfg(feature = "wifi")]
+use num_traits::FromPrimitive;
+#[cfg(feature = "wifi")]
+use crate::{
+    // esp_wifi_result,
+    binary::{
+        include::{
+            self,
+            esp_wifi_deinit_internal,
+            esp_wifi_stop,
+        },
+    },
+    wifi::{WifiDeviceMode, WifiController, WifiError},
+};
 
 mod binary {
     pub use esp_wifi_sys::*;
@@ -459,6 +472,78 @@ pub fn initialize(
         )),
     }
 }
+
+#[cfg(feature = "wifi")]
+pub fn deinitialize_wifi(
+    controller: WifiController,
+    stack: crate::wifi_interface::WifiStack<impl WifiDeviceMode>,
+) -> Result<EspWifiDeinitialization, WifiError> {
+    // Stop and deinitialize the WiFi stack
+    esp_wifi_result!(unsafe { esp_wifi_stop() })?;
+    esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
+
+    info!("WiFi deinited");
+
+    // Drop the WiFi controller and stack
+    drop(controller);
+    drop(stack);
+
+    // Return WiFi deinitialization state
+    Ok(EspWifiDeinitialization::Wifi(EspWifiDeinitializationInternal))
+}
+
+#[cfg(feature = "ble")]
+pub fn deinitialize_ble() -> Result<EspWifiDeinitialization, ()> {
+    // Deinitialize BLE based on the chip type
+    #[cfg(any(esp32, esp32c3, esp32s3))]
+    crate::ble::btdm::ble_deinit();
+
+    #[cfg(any(esp32c2, esp32c6, esp32h2))]
+    crate::ble::npl::ble_deinit();
+
+    info!("BLE deinited");
+
+    // Return BLE deinitialization state
+    Ok(EspWifiDeinitialization::Ble(EspWifiDeinitializationInternal))
+}
+
+
+#[cfg(coex)]
+pub fn deinitialize_all(
+    controller: WifiController,
+    stack: crate::wifi_interface::WifiStack<impl WifiDeviceMode>,
+) -> Result<EspWifiDeinitialization, WifiError> {
+    // Disable coexistence
+    unsafe { crate::wifi::os_adapter::coex_disable() };
+    unsafe { crate::wifi::os_adapter::coex_deinit() };
+
+    // Deinitialize WiFi
+    esp_wifi_result!(unsafe { esp_wifi_stop() })?;
+    esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
+
+    // Deinitialize BLE
+    #[cfg(any(esp32, esp32c3, esp32s3))]
+    crate::ble::btdm::ble_deinit();
+
+    #[cfg(any(esp32c2, esp32c6, esp32h2))]
+    crate::ble::npl::ble_deinit();
+
+    info!("WiFi and BLE coexistence deinited");
+
+    // Drop the WiFi controller and stack
+    drop(controller);
+    drop(stack);
+
+    // Return coexistence deinitialization state
+    Ok(EspWifiDeinitialization::WifiBle(EspWifiDeinitializationInternal))
+}
+
+
+
+
+
+
+
 
 pub fn reinitialize(
     init_for: EspWifiFor,

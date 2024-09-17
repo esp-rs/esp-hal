@@ -204,6 +204,9 @@ extern "C" {
     #[cfg(esp32c2)]
     pub(crate) fn ble_controller_init(cfg: *const esp_bt_controller_config_t) -> i32;
 
+    // #[cfg(not(esp32c2))]
+    pub(crate) fn ble_controller_disable() -> i32;
+
     pub(crate) fn ble_controller_deinit() -> i32;
 
     #[cfg(not(esp32c2))]
@@ -412,8 +415,15 @@ unsafe extern "C" fn task_create(
     1
 }
 
-unsafe extern "C" fn task_delete(_: *const c_void) {
-    todo!();
+unsafe extern "C" fn task_delete(task: *const c_void) {
+    trace!("task delete called for {:?}", task);
+
+    let task = if task.is_null() {
+        crate::preempt::current_task()
+    } else {
+        task as *mut _
+    };
+    crate::preempt::schedule_task_deletion(task);
 }
 
 unsafe extern "C" fn osi_assert(ln: u32, fn_name: *const c_void, param1: u32, param2: u32) {
@@ -934,13 +944,16 @@ unsafe extern "C" fn ble_npl_eventq_get(
 unsafe extern "C" fn ble_npl_eventq_deinit(queue: *const ble_npl_eventq) {
     trace!("ble_npl_eventq_deinit {:?}", queue);
 
-    let queue = queue as *mut ble_npl_eventq;
-
+    let queue = queue.cast_mut();
     if (*queue).dummy == 0 {
         panic!("Trying to deinitialize an uninitialized queue");
     } else {
         critical_section::with(|_| {
-            EVENT_QUEUE.dequeue();
+            while let Some(event_idx) = EVENT_QUEUE.dequeue() {
+                if let Some(event) = EVENTS[event_idx - 1].as_mut() {
+                    event.queued = false;
+                }
+            }
         });
 
         (*queue).dummy = 0;
@@ -964,6 +977,7 @@ unsafe extern "C" fn ble_npl_callout_init(
     if (*callout).dummy == 0 {
         let callout = callout.cast_mut();
         let idx = unwrap!(CALLOUTS.iter().position(|item| item.is_none()));
+        info!("IDX = {}", idx);
 
         let new_callout = CALLOUTS[idx].insert(Callout {
             _callout: callout,
@@ -1215,39 +1229,9 @@ pub(crate) fn ble_init() {
 }
 
 pub(crate) fn ble_deinit() {
-    unsafe {
-        // HCI deinit
-        r_ble_hci_trans_cfg_hs(
-            Some(core::mem::transmute::<
-                *const (),
-                unsafe extern "C" fn(*const u8, *const c_void),
-            >(core::ptr::null())),
-            core::ptr::null(),
-            Some(core::mem::transmute::<
-                *const (),
-                unsafe extern "C" fn(*const OsMbuf, *const c_void),
-            >(core::ptr::null())),
-            core::ptr::null(),
-        );
-
-        // controller_sleep_deinit ?
-
-        let res = ble_controller_deinit();
-
-        if res != 0 {
-            panic!("ble_controller_init returned {}", res);
-        }
-
-        ble_os_adapter_chip_specific::bt_periph_module_enable();
-
-        #[cfg(esp32c2)]
-        os_msys_buf_free();
-
-        esp_unregister_npl_funcs();
-
-        esp_unregister_ext_funcs();
-
-        crate::common_adapter::chip_specific::phy_disable();
+    ble_os_adapter_chip_specific::deinit();
+    unsafe{
+        CALLOUTS.iter_mut().for_each(|item| {item.take();});
     }
 }
 

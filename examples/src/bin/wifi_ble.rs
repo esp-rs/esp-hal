@@ -31,7 +31,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_wifi::{ble::controller::BleConnector, initialize, EspWifiFor};
+use esp_wifi::{ble::controller::BleConnector, initialize, reinitialize, deinitialize_ble, EspWifiFor};
 
 #[entry]
 fn main() -> ! {
@@ -69,6 +69,32 @@ fn main() -> ! {
     let mut bluetooth = peripherals.BT;
 
     loop {
+        let connector = BleConnector::new(&init, &mut bluetooth);
+        let hci = HciConnector::new(connector, esp_wifi::current_millis);
+        let mut ble = Ble::new(&hci);
+
+        println!("{:?}", ble.init());
+        println!("{:?}", ble.cmd_set_le_advertising_parameters());
+        println!(
+            "{:?}",
+            ble.cmd_set_le_advertising_data(
+                create_advertising_data(&[
+                    AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
+                    AdStructure::ServiceUuids16(&[Uuid::Uuid16(0x1809)]),
+                    AdStructure::CompleteLocalName(esp_hal::chip!()),
+                ])
+                .unwrap()
+            )
+        );
+        println!("{:?}", ble.cmd_set_le_advertise_enable(true));
+
+
+        println!("Deinitializing...");
+        let deinit = deinitialize_ble().unwrap();
+        println!("DEINITED");
+
+        let init = reinitialize(EspWifiFor::Ble, deinit).unwrap();
+
         let connector = BleConnector::new(&init, &mut bluetooth);
         let hci = HciConnector::new(connector, esp_wifi::current_millis);
         let mut ble = Ble::new(&hci);

@@ -34,8 +34,8 @@ use esp_wifi::{
     current_millis,
     initialize,
     reinitialize,
+    deinitialize_all,
     wifi::{
-        deinitialize,
         utils::create_network_interface,
         ClientConfiguration,
         Configuration,
@@ -63,7 +63,7 @@ fn main() -> ! {
         config
     });
 
-    static mut HEAP: core::mem::MaybeUninit<[u8; 72 * 1024]> = core::mem::MaybeUninit::uninit();
+    static mut HEAP: core::mem::MaybeUninit<[u8; 80 * 1024]> = core::mem::MaybeUninit::uninit();
 
     #[link_section = ".dram2_uninit"]
     static mut HEAP2: core::mem::MaybeUninit<[u8; 64 * 1024]> = core::mem::MaybeUninit::uninit();
@@ -147,10 +147,27 @@ fn main() -> ! {
     let hci = HciConnector::new(connector, esp_wifi::current_millis);
     let mut ble = Ble::new(&hci);
 
-    let deinit = deinitialize(EspWifiFor::WifiBle, controller, wifi_stack).unwrap();
+    println!("{:?}", ble.init());
+
+    println!("{:?}", ble.cmd_set_le_advertising_parameters());
+    println!(
+        "{:?}",
+        ble.cmd_set_le_advertising_data(
+            create_advertising_data(&[
+                AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
+                AdStructure::ServiceUuids16(&[Uuid::Uuid16(0x1809)]),
+                AdStructure::CompleteLocalName(esp_hal::chip!()),
+            ])
+            .unwrap()
+        )
+    );
+    println!("{:?}", ble.cmd_set_le_advertise_enable(true));
+
+    println!("Deinitializing...");
+    let deinit = deinitialize_all(controller, wifi_stack).unwrap();
     println!("DEINITED");
 
-    let init = reinitialize(EspWifiFor::WifiBle, deinit).unwrap();
+    let init = reinitialize(EspWifiFor::Ble, deinit).unwrap();
 
     let connector = BleConnector::new(&init, &mut bluetooth);
     let hci = HciConnector::new(connector, esp_wifi::current_millis);
