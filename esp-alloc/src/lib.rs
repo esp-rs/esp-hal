@@ -158,6 +158,13 @@ impl Display for RegionStats {
     }
 }
 
+#[cfg(feature = "defmt")]
+impl defmt::Format for RegionStats {
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "{}", defmt::Display2Format(self))
+    }
+}
+
 /// A memory region to be used as heap memory
 pub struct HeapRegion {
     heap: Heap,
@@ -250,6 +257,13 @@ impl Display for HeapStats {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for HeapStats {
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "{}", defmt::Display2Format(self))
     }
 }
 
