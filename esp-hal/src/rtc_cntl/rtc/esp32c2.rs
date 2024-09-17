@@ -55,6 +55,15 @@ pub(crate) fn init() {
 }
 
 pub(crate) fn configure_clock() {
+    unsafe {
+        // from esp_clk_init:
+        let rtc_cntl = &*esp32c2::RTC_CNTL::ptr();
+        // clk_ll_rc_fast_enable();
+        rtc_cntl.clk_conf().modify(|_, w| w.enb_ck8m().clear_bit());
+        rtc_cntl.timer1().modify(|_, w| w.ck8m_wait().bits(5));
+        // esp_rom_delay_us(SOC_DELAY_RC_FAST_ENABLE);
+        crate::rom::ets_delay_us(50);
+    }
     RtcClock::set_fast_freq(RtcFastClock::RtcFastClock8m);
 
     let cal_val = loop {

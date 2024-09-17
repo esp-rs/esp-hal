@@ -1,28 +1,4 @@
 //! # Exclusive peripheral access
-//!
-//! ## Overview
-//!
-//! The Peripheral module provides an exclusive access mechanism to peripherals
-//! on ESP chips. It includes the `PeripheralRef` struct, which represents an
-//! exclusive reference to a peripheral. It offers memory efficiency benefits
-//! for zero-sized types.
-//!
-//! ## Configuration
-//!
-//! The `PeripheralRef` struct is used to access and interact with peripherals.
-//! It implements the `Deref` and `DerefMut` traits, allowing you to dereference
-//! it to access the underlying peripheral. It also provides methods for cloning
-//! and re-borrowing the peripheral.
-//!
-//! The module also defines the `Peripheral` trait, which is implemented by
-//! types that can be used as peripherals. The trait allows conversion between
-//! owned and borrowed peripherals and provides an unsafe method for cloning the
-//! peripheral. By implementing this trait, a type can be used with the
-//! `PeripheralRef` struct.
-//!
-//! The module also includes a `peripheral_macros` module, which contains macros
-//! for generating peripheral structs and associated traits based on
-//! configuration options.
 
 use core::{
     marker::PhantomData,
@@ -35,7 +11,7 @@ use core::{
 /// dedicated struct is memory efficiency:
 ///
 /// Peripheral singletons are typically either zero-sized (for concrete
-/// peripherals like `PA9` or `Spi4`) or very small (for example `AnyPin`
+/// peripherals like `SPI2` or `UART0`) or very small (for example `AnyPin`
 /// which is 1 byte). However `&mut T` is always 4 bytes for 32-bit targets,
 /// even if T is zero-sized. PeripheralRef stores a copy of `T` instead, so it's
 /// the same size.
@@ -86,24 +62,6 @@ impl<'a, T> PeripheralRef<'a, T> {
         // self, so user code can't use both at the same time.
         PeripheralRef::new(unsafe { self.inner.clone_unchecked() })
     }
-
-    /// Map the inner peripheral using `Into`.
-    ///
-    /// This converts from `PeripheralRef<'a, T>` to `PeripheralRef<'a, U>`,
-    /// using an `Into` impl to convert from `T` to `U`.
-    ///
-    /// For example, this can be useful to degrade GPIO pins: converting from
-    /// PeripheralRef<'a, PB11>` to `PeripheralRef<'a, AnyPin>`.
-    #[inline]
-    pub fn map_into<U>(self) -> PeripheralRef<'a, U>
-    where
-        T: Into<U>,
-    {
-        PeripheralRef {
-            inner: self.inner.into(),
-            _lifetime: PhantomData,
-        }
-    }
 }
 
 impl<'a, T> Deref for PeripheralRef<'a, T> {
@@ -125,19 +83,19 @@ impl<'a, T> DerefMut for PeripheralRef<'a, T> {
 /// Trait for any type that can be used as a peripheral of type `P`.
 ///
 /// This is used in driver constructors, to allow passing either owned
-/// peripherals (e.g. `TWISPI0`), or borrowed peripherals (e.g. `&mut TWISPI0`).
+/// peripherals (e.g. `UART0`), or borrowed peripherals (e.g. `&mut UART0`).
 ///
 /// For example, if you have a driver with a constructor like this:
 ///
 /// ```rust, ignore
-/// impl<'d, T: Instance> Twim<'d, T> {
-///     pub fn new(
-///         twim: impl Peripheral<P = T> + 'd,
-///         irq: impl Peripheral<P = T::Interrupt> + 'd,
-///         sda: impl Peripheral<P = impl GpioPin> + 'd,
-///         scl: impl Peripheral<P = impl GpioPin> + 'd,
-///         config: Config,
-///     ) -> Self { .. }
+/// impl<'d, T> Uart<'d, T, Blocking> {
+///     pub fn new<TX: PeripheralOutput, RX: PeripheralInput>(
+///         uart: impl Peripheral<P = T> + 'd,
+///         rx: impl Peripheral<P = RX> + 'd,
+///         tx: impl Peripheral<P = TX> + 'd,
+///     ) -> Result<Self, Error> {
+///         Ok(Self { .. })
+///     }
 /// }
 /// ```
 ///
@@ -145,14 +103,14 @@ impl<'a, T> DerefMut for PeripheralRef<'a, T> {
 /// live forever (`'static`):
 ///
 /// ```rust, ignore
-/// let mut twi: Twim<'static, ...> = Twim::new(p.TWISPI0, irq, p.P0_03, p.P0_04, config);
+/// let mut uart: Uart<'static, ...> = Uart::new(p.UART0, pins.gpio0, pins.gpio1);
 /// ```
 ///
 /// Or you may call it with borrowed peripherals, which yields an instance that
 /// can only live for as long as the borrows last:
 ///
 /// ```rust, ignore
-/// let mut twi: Twim<'_, ...> = Twim::new(&mut p.TWISPI0, &mut irq, &mut p.P0_03, &mut p.P0_04, config);
+/// let mut uart: Uart<'_, ...> = Uart::new(&mut p.UART0, &mut pins.gpio0, &mut pins.gpio1);
 /// ```
 ///
 /// # Implementation details, for HAL authors
