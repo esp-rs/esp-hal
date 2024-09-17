@@ -131,6 +131,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             Value::Bool(false),
             "Places the SPI driver in RAM for better performance",
         )],
+        true,
     );
 
     Ok(())

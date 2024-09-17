@@ -6,8 +6,8 @@ const DOC_TABLE_HEADER: &str = r#"
 |------|-------------|---------------|
 "#;
 const CHOSEN_TABLE_HEADER: &str = r#"
-| Name | Chosen value |
-|------|--------------|
+| Name | Selected value |
+|------|----------------|
 "#;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -63,63 +63,43 @@ impl Value {
 /// to `snake_case`. This can be included in crate documentation to outline the
 /// available configuration options for the crate.
 ///
-/// The tuple ordering for the`config` array is key, default, description.
+/// Passing a value of true for the `emit_md_tables` argument will create and
+/// write markdown files of the available configuration and selected
+/// configuration which can be included in documentation.
 ///
 /// Unknown keys with the supplied prefix will cause this function to panic.
-pub fn generate_config(prefix: &str, config: &[(&str, Value, &str)]) {
-    // ensure that the prefix is `SCREAMING_SNAKE_CASE`
-    let mut prefix = screaming_snake_case(prefix);
-
-    let mut doc_table = String::from(DOC_TABLE_HEADER);
-
+pub fn generate_config(
+    prefix: &str,
+    config: &[(&str, Value, &str)],
+    emit_md_tables: bool,
+) -> HashMap<String, Value> {
     // only rebuild if build.rs changed. Otherwise Cargo will rebuild if any
     // other file changed.
     println!("cargo:rerun-if-changed=build.rs");
 
-    // Generate the template for the config
-    let mut configs = HashMap::new();
-    for (name, default, desc) in config {
-        let name = format!("{prefix}_{}", screaming_snake_case(&name));
-        // insert into config
-        configs.insert(name.clone(), default.clone());
-
-        // write doc table line
-        let default = default.as_string();
-        writeln!(doc_table, "|**{name}**|{desc}|{default}|").unwrap();
-
-        // Rebuild if config envvar changed.
-        // Note this is currently buggy and requires a clean build - PR is pending https://github.com/rust-lang/cargo/pull/14058
-        println!("cargo:rerun-if-env-changed={name}");
-    }
-
-    let mut unknown = Vec::new();
-    let mut failed = Vec::new();
-
-    // Try and capture input from the environment
-    for (var, value) in env::vars() {
-        if let Some(name) = var.strip_prefix(&format!("{prefix}_")) {
-            let name = snake_case(name);
-            let Some(cfg) = configs.get_mut(&name) else {
-                unknown.push(var);
-                continue;
-            };
-
-            if let Err(e) = cfg.parse_in_place(&value) {
-                failed.push(format!("{}: {e:?}", var));
-            }
-        }
-    }
-
-    if !failed.is_empty() {
-        panic!("Invalid configuration options detected: {:?}", failed);
-    }
-
-    if !unknown.is_empty() {
-        panic!("Unknown configuration options detected: {:?}", unknown);
-    }
-
+    // ensure that the prefix is `SCREAMING_SNAKE_CASE`
+    let mut prefix = screaming_snake_case(prefix);
+    let mut doc_table = String::from(DOC_TABLE_HEADER);
     let mut selected_config = String::from(CHOSEN_TABLE_HEADER);
 
+    let mut configs = create_config(&prefix, config, &mut doc_table);
+    capture_from_env(&prefix, &mut configs);
+    emit_configuration(&prefix, &configs, &mut selected_config);
+
+    if emit_md_tables {
+        // convert to snake case for the file name
+        prefix.make_ascii_lowercase();
+        write_config_tables(&prefix, doc_table, selected_config);
+    }
+
+    configs
+}
+
+fn emit_configuration(
+    prefix: &str,
+    configs: &HashMap<String, Value>,
+    selected_config: &mut String,
+) {
     // emit cfgs and set envs
     for (name, value) in configs.into_iter() {
         let cfg_name = snake_case(name.trim_start_matches(&format!("{prefix}_")));
@@ -137,10 +117,60 @@ pub fn generate_config(prefix: &str, config: &[(&str, Value, &str)]) {
 
         writeln!(selected_config, "|**{name}**|{value}|").unwrap();
     }
+}
 
-    // convert to snake case for the file name
-    prefix.make_ascii_lowercase();
+fn capture_from_env(prefix: &str, configs: &mut HashMap<String, Value>) {
+    let mut unknown = Vec::new();
+    let mut failed = Vec::new();
 
+    // Try and capture input from the environment
+    for (var, value) in env::vars() {
+        if let Some(_) = var.strip_prefix(&format!("{prefix}_")) {
+            let Some(cfg) = configs.get_mut(&var) else {
+                unknown.push(var);
+                continue;
+            };
+
+            if let Err(e) = cfg.parse_in_place(&value) {
+                failed.push(format!("{}: {e:?}", var));
+            }
+        }
+    }
+
+    if !failed.is_empty() {
+        panic!("Invalid configuration options detected: {:?}", failed);
+    }
+
+    if !unknown.is_empty() {
+        panic!("Unknown configuration options detected: {:?}", unknown);
+    }
+}
+
+fn create_config(
+    prefix: &str,
+    config: &[(&str, Value, &str)],
+    doc_table: &mut String,
+) -> HashMap<String, Value> {
+    // Generate the template for the config
+    let mut configs = HashMap::new();
+    for (name, default, desc) in config {
+        let name = format!("{prefix}_{}", screaming_snake_case(&name));
+        // insert into config
+        configs.insert(name.clone(), default.clone());
+
+        // write doc table line
+        let default = default.as_string();
+        writeln!(doc_table, "|**{name}**|{desc}|{default}|").unwrap();
+
+        // Rebuild if config envvar changed.
+        // Note this is currently buggy and requires a clean build - PR is pending https://github.com/rust-lang/cargo/pull/14058
+        println!("cargo:rerun-if-env-changed={name}");
+    }
+
+    configs
+}
+
+fn write_config_tables(prefix: &str, doc_table: String, selected_config: String) {
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     let out_file = out_dir
         .join(format!("{prefix}_config_table.md"))
@@ -186,7 +216,7 @@ mod test {
         let mut v = Value::Number(0);
 
         for input in INPUTS {
-            v.parse(input).unwrap();
+            v.parse_in_place(input).unwrap();
             // no matter the input format, the output format should be decimal
             assert_eq!(v.as_string(), "170");
         }
@@ -199,15 +229,56 @@ mod test {
         let mut v = Value::Bool(false);
 
         for input in TRUE_INPUTS {
-            v.parse(input).unwrap();
+            v.parse_in_place(input).unwrap();
             // no matter the input variant, the output format should be "true"
             assert_eq!(v.as_string(), "true");
         }
 
         for input in FALSE_INPUTS {
-            v.parse(input).unwrap();
+            v.parse_in_place(input).unwrap();
             // no matter the input variant, the output format should be "false"
             assert_eq!(v.as_string(), "false");
         }
+    }
+
+    #[test]
+    fn env_override() {
+        unsafe {
+            env::set_var("ESP_TEST_NUMBER", "0xaa");
+            env::set_var("ESP_TEST_STRING", "Hello world!");
+            env::set_var("ESP_TEST_BOOL", "true");
+        }
+
+        let configs = generate_config(
+            "esp-test",
+            &[
+                ("number", Value::Number(999), "NA"),
+                ("string", Value::String("Demo".to_owned()), "NA"),
+                ("bool", Value::Bool(false), "NA"),
+            ],
+            false,
+        );
+
+        assert_eq!(
+            match configs.get("ESP_TEST_NUMBER").unwrap() {
+                Value::Number(num) => *num,
+                _ => unreachable!(),
+            },
+            0xaa
+        );
+        assert_eq!(
+            match configs.get("ESP_TEST_STRING").unwrap() {
+                Value::String(val) => val,
+                _ => unreachable!(),
+            },
+            "Hello world!"
+        );
+        assert_eq!(
+            match configs.get("ESP_TEST_BOOL").unwrap() {
+                Value::Bool(val) => *val,
+                _ => unreachable!(),
+            },
+            true
+        );
     }
 }

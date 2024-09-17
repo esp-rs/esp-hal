@@ -164,6 +164,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             ("failure_retry_cnt", Value::Number(1), "Number of connection retries station will do before moving to next AP. scan_method should be set as WIFI_ALL_CHANNEL_SCAN to use this config. Note: Enabling this may cause connection time to increase incase best AP doesn't behave properly. Defaults to 1"),
             ("scan_method", Value::Number(0), "0 = WIFI_FAST_SCAN, 1 = WIFI_ALL_CHANNEL_SCAN, defaults to 0"),
         ],
+        true
     );
 
     Ok(())
