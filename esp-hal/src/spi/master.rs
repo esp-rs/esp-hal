@@ -109,9 +109,8 @@ const FIFO_SIZE: usize = 64;
 const FIFO_SIZE: usize = 72;
 
 /// Padding byte for empty write transfers
-const EMPTY_WRITE_PAD: u8 = 0x00u8;
+const EMPTY_WRITE_PAD: u8 = 0x00;
 
-#[allow(unused)]
 const MAX_DMA_SIZE: usize = 32736;
 
 /// SPI commands, each consisting of a 16-bit command value and a data mode.
@@ -490,7 +489,7 @@ impl<'d, T> Spi<'d, T, FullDuplexMode>
 where
     T: Instance,
 {
-    /// Read bytes from SPI.
+    /// Read a byte from SPI.
     ///
     /// Sends out a stuffing byte for every byte to read. This function doesn't
     /// perform flushing. If you want to read the response to something you

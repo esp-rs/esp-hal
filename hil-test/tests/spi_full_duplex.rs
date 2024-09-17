@@ -27,10 +27,7 @@ use esp_hal::{
 use hil_test as _;
 
 cfg_if::cfg_if! {
-    if #[cfg(any(
-        feature = "esp32",
-        feature = "esp32s2",
-    ))] {
+    if #[cfg(any(esp32, esp32s2))] {
         type DmaChannelCreator = esp_hal::dma::Spi2DmaChannelCreator;
     } else {
         type DmaChannelCreator = esp_hal::dma::ChannelCreator<0>;
@@ -64,7 +61,7 @@ mod tests {
         let dma = Dma::new(peripherals.DMA);
 
         cfg_if::cfg_if! {
-            if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
+            if #[cfg(any(esp32, esp32s2))] {
                 let dma_channel = dma.spi2channel;
             } else {
                 let dma_channel = dma.channel0;
