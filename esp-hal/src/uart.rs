@@ -1092,6 +1092,15 @@ where
             ClockSource::RcFast => RC_FAST_CLK.to_Hz(),
         };
 
+        if clock_source == ClockSource::RcFast {
+            let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+            rtc_cntl
+                .clk_conf()
+                .modify(|_, w| w.dig_clk8m_en().variant(true));
+            // esp_rom_delay_us(SOC_DELAY_RC_FAST_DIGI_SWITCH);
+            crate::rom::ets_delay_us(5);
+        }
+
         let max_div = 0b1111_1111_1111 - 1;
         let clk_div = ((clk) + (max_div * baudrate) - 1) / (max_div * baudrate);
         T::register_block().clk_conf().write(|w| unsafe {
@@ -1230,11 +1239,9 @@ where
                 // Nothing to do
             } else if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
                 let system = unsafe { crate::peripherals::SYSTEM::steal() };
-                if !system.perip_clk_en0().read().uart_mem_clk_en().bit() {
-                    system
-                        .perip_clk_en0()
-                        .modify(|_, w| w.uart_mem_clk_en().set_bit());
-                }
+                system
+                    .perip_clk_en0()
+                    .modify(|_, w| w.uart_mem_clk_en().set_bit());
             } else {
                 T::register_block()
                     .conf0()

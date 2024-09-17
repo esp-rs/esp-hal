@@ -54,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix SPI DMA alternating `write` and `read` for ESP32 and ESP32-S2 (#2131)
 - Fix I2C ending up in a state when only re-creating the peripheral makes it useable again (#2141)
 - Fix `SpiBus::transfer` transferring data twice in some cases (#2159)
+- Fixed UART freezing when using `RcFast` clock source on ESP32-C2/C3 (#2170)
 
 ### Removed
 
