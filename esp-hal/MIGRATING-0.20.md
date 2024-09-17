@@ -172,7 +172,7 @@ configure an input pin, and pass it to `set_edge_signal` or `set_ctrl_signal`.
 Use `NoPin` in place of the now-removed `NO_PIN` constant.
 
 SPI pins, when using the `with_pin` function, are no longer optional.
-You can pass `NoPin` or `Level` as inputs, and `NoPin` as output if you don't need a particular pin.
+You can pass `NoPin` or `Level` if you don't need a particular pin.
 
 ```diff
  let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
