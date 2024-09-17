@@ -328,8 +328,8 @@ impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
 
     /// Sends a command and data to the LCD using the I8080 interface.
     ///
-    /// Passing a Command<u8> will make this an 8-bit transfer and a
-    /// Command<u16> will make this a 16-bit transfer.
+    /// Passing a `Command<u8>` will make this an 8-bit transfer and a
+    /// `Command<u16>` will make this a 16-bit transfer.
     ///
     /// Note: A 16-bit transfer on an 8-bit bus will silently truncate the 2nd
     /// byte and an 8-bit transfer on a 16-bit bus will silently pad each
@@ -355,8 +355,8 @@ impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
 
     /// Sends a command and data to the LCD using DMA.
     ///
-    /// Passing a Command<u8> will make this an 8-bit transfer and a
-    /// Command<u16> will make this a 16-bit transfer.
+    /// Passing a `Command<u8>` will make this an 8-bit transfer and a
+    /// `Command<u16>` will make this a 16-bit transfer.
     ///
     /// Note: A 16-bit transfer on an 8-bit bus will silently truncate the 2nd
     /// byte and an 8-bit transfer on a 16-bit bus will silently pad each
@@ -384,8 +384,8 @@ impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
 impl<'d, CH: DmaChannel> I8080<'d, CH, crate::Async> {
     /// Asynchronously sends a command and data to the LCD using DMA.
     ///
-    /// Passing a Command<u8> will make this an 8-bit transfer and a
-    /// Command<u16> will make this a 16-bit transfer.
+    /// Passing a `Command<u8>` will make this an 8-bit transfer and a
+    /// `Command<u16>` will make this a 16-bit transfer.
     ///
     /// Note: A 16-bit transfer on an 8-bit bus will silently truncate the 2nd
     /// byte and an 8-bit transfer on a 16-bit bus will silently pad each
