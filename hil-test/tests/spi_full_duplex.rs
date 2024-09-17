@@ -14,7 +14,7 @@ use embedded_hal_async::spi::SpiBus as SpiBusAsync;
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{Io, Level},
+    gpio::{Io, Level, NoPin},
     peripherals::SPI2,
     prelude::*,
     spi::{master::Spi, FullDuplexMode, SpiMode},
@@ -465,6 +465,7 @@ mod tests {
     fn test_write_read(ctx: Context) {
         let spi = ctx
             .spi
+            .with_mosi(NoPin)
             .with_miso(Level::High)
             .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0));
 
