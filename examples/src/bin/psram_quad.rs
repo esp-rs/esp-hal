@@ -51,7 +51,7 @@ fn main() -> ! {
     let string = String::from("A string allocated in PSRAM");
     println!("'{}' allocated at {:p}", &string, string.as_ptr());
 
-    println!("{}", esp_alloc::get_info!());
+    println!("{}", esp_alloc::HEAP.stats());
 
     println!("done");
 

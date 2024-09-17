@@ -51,7 +51,28 @@
 //! ```rust
 //! let large_buffer: Vec<u8, _> = Vec::with_capacity_in(1048576, &PSRAM_ALLOCATOR);
 //! ```
-
+//!
+//! You can also gets stats about the heap usage at anytime with:
+//! ```rust
+//! let stats: HeapStats = esp_alloc::HEAP.stats();
+//! // HeapStats implements the Display trait, so you can pretty print the heap stats.
+//! println!("{}", stats);
+//! ```
+//!
+//! ```txt
+//! HEAP INFO
+//! Size: 2097152
+//! Current usage: 512028
+//! Max usage: 512028
+//! Total freed: 0
+//! Total allocated: 512028
+//! Memory Layout:
+//! External | ████████░░░░░░░░░░░░░░░░░░░░░░░░░░░ | Used: 512028 / Total: 2097152 (Free: 1585124)
+//! Unused   | ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ |
+//! Unused   | ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ |
+//! ```
+//! ## Feature Flags
+#![doc = document_features::document_features!()]
 #![no_std]
 #![cfg_attr(feature = "nightly", feature(allocator_api))]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
@@ -63,6 +84,7 @@ use core::alloc::{AllocError, Allocator};
 use core::{
     alloc::{GlobalAlloc, Layout},
     cell::RefCell,
+    fmt::Display,
     ptr::{self, NonNull},
 };
 
@@ -104,7 +126,7 @@ pub struct RegionStats {
     capabilities: EnumSet<MemoryCapability>,
 }
 
-impl core::fmt::Display for RegionStats {
+impl Display for RegionStats {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let used_blocks = BAR_WIDTH * self.used / self.size;
         let free_blocks = BAR_WIDTH - used_blocks;
@@ -174,6 +196,10 @@ impl HeapRegion {
     }
 }
 
+/// Stats for a heap allocator
+///
+/// Enable the "internal-heap-stats" feature if you want collect additional heap
+/// informations at the cost of extra cpu time during every alloc/dealloc.
 #[derive(Debug)]
 pub struct HeapStats {
     /// Granular stats for all the configured memory regions.
@@ -198,7 +224,7 @@ pub struct HeapStats {
     total_freed: usize,
 }
 
-impl core::fmt::Display for HeapStats {
+impl Display for HeapStats {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(f, "HEAP INFO")?;
         writeln!(f, "Size: {}", self.size)?;

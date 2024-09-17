@@ -41,16 +41,3 @@ macro_rules! psram_allocator {
         }
     }};
 }
-
-/// Gets the usage stats for the current memory heap
-///
-/// # Usage
-/// ```rust, no_run
-/// esp_alloc::get_info!();
-/// ```
-#[macro_export]
-macro_rules! get_info {
-    () => {{
-        $crate::HEAP.stats()
-    }};
-}
