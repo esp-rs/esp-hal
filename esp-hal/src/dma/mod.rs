@@ -397,6 +397,29 @@ macro_rules! dma_circular_descriptors {
     };
 }
 
+/// Declares a DMA buffer with a specific size, aligned to 4 bytes
+#[doc(hidden)]
+#[macro_export]
+macro_rules! declare_aligned_dma_buffer {
+    ($name:ident, $size:expr) => {
+        // ESP32 requires word alignment for DMA buffers.
+        // ESP32-S2 technically supports byte-aligned DMA buffers, but the
+        // transfer ends up writing out of bounds.
+        // if the buffer's length is 2 or 3 (mod 4).
+        static mut $name: [u32; ($size + 3) / 4] = [0; ($size + 3) / 4];
+    };
+}
+
+/// Turns the potentially oversized static `u32`` array reference into a
+/// correctly sized `u8` one
+#[doc(hidden)]
+#[macro_export]
+macro_rules! as_mut_byte_array {
+    ($name:ident, $size:expr) => {
+        unsafe { &mut *($name.as_mut_ptr() as *mut [u8; $size]) }
+    };
+}
+
 /// Convenience macro to create DMA buffers and descriptors with specific chunk
 /// size.
 ///
@@ -414,15 +437,15 @@ macro_rules! dma_circular_descriptors {
 #[macro_export]
 macro_rules! dma_buffers_chunk_size {
     ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
-        static mut RX_BUFFER: [u8; $rx_size] = [0u8; $rx_size];
-        static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
+        $crate::declare_aligned_dma_buffer!(RX_BUFFER, $rx_size);
+        $crate::declare_aligned_dma_buffer!(TX_BUFFER, $tx_size);
         let (mut rx_descriptors, mut tx_descriptors) =
             $crate::dma_descriptors_chunk_size!($rx_size, $tx_size, $chunk_size);
         unsafe {
             (
-                &mut RX_BUFFER,
+                $crate::as_mut_byte_array!(RX_BUFFER, $rx_size),
                 rx_descriptors,
-                &mut TX_BUFFER,
+                $crate::as_mut_byte_array!(TX_BUFFER, $tx_size),
                 tx_descriptors,
             )
         }
@@ -450,15 +473,15 @@ macro_rules! dma_buffers_chunk_size {
 #[macro_export]
 macro_rules! dma_circular_buffers_chunk_size {
     ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
-        static mut RX_BUFFER: [u8; $rx_size] = [0u8; $rx_size];
-        static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
+        $crate::declare_aligned_dma_buffer!(RX_BUFFER, $rx_size);
+        $crate::declare_aligned_dma_buffer!(TX_BUFFER, $tx_size);
         let (mut rx_descriptors, mut tx_descriptors) =
             $crate::dma_circular_descriptors_chunk_size!($rx_size, $tx_size, $chunk_size);
         unsafe {
             (
-                &mut RX_BUFFER,
+                $crate::as_mut_byte_array!(RX_BUFFER, $rx_size),
                 rx_descriptors,
-                &mut TX_BUFFER,
+                $crate::as_mut_byte_array!(TX_BUFFER, $tx_size),
                 tx_descriptors,
             )
         }

@@ -306,7 +306,7 @@ mod tests {
             .map_err(|e| e.0)
             .unwrap();
         let (_, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
-            assert_eq!(dma_tx_buf.as_slice()[0..2], dma_rx_buf.as_slice()[0..2]);
+        assert_eq!(dma_tx_buf.as_slice()[0..2], dma_rx_buf.as_slice()[0..2]);
     }
 
     #[test]
