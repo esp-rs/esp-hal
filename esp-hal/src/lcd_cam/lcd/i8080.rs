@@ -327,6 +327,9 @@ impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
     }
 
     /// Sends a command and data to the LCD using the I8080 interface.
+    ///
+    /// Note: A 16-bit transfer on an 8-bit bus will silently truncate the 2nd byte.
+    /// Note: An 8-bit transfer on a 16-bit bus will silently pad each byte to 2 bytes.
     pub fn send<W: Copy + Into<u16>>(
         &mut self,
         cmd: impl Into<Command<W>>,
@@ -347,6 +350,9 @@ impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
     }
 
     /// Sends a command and data to the LCD using DMA.
+    ///
+    /// Note: A 16-bit transfer on an 8-bit bus will silently truncate the 2nd byte.
+    /// Note: An 8-bit transfer on a 16-bit bus will silently pad each byte to 2 bytes.
     pub fn send_dma<'t, W, TXBUF>(
         &'t mut self,
         cmd: impl Into<Command<W>>,
@@ -369,6 +375,9 @@ impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
 
 impl<'d, CH: DmaChannel> I8080<'d, CH, crate::Async> {
     /// Asynchronously sends a command and data to the LCD using DMA.
+    ///
+    /// Note: A 16-bit transfer on an 8-bit bus will silently truncate the 2nd byte.
+    /// Note: An 8-bit transfer on a 16-bit bus will silently pad each byte to 2 bytes.
     pub async fn send_dma_async<'t, W, TXBUF>(
         &'t mut self,
         cmd: impl Into<Command<W>>,
