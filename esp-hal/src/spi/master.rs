@@ -1153,8 +1153,10 @@ mod dma {
         ///
         /// This method blocks until the transfer is finished and returns the
         /// `SpiDma` instance and the associated buffer.
-        pub fn wait(mut self) -> (SpiDma<'d, T, C, D, M>, Buf) {
-            self.spi_dma.spi.flush().ok();
+        pub fn wait(self) -> (SpiDma<'d, T, C, D, M>, Buf) {
+            while !self.is_done() {
+                // Wait for the transfer to complete
+            }
             fence(Ordering::Acquire);
             (self.spi_dma, self.dma_buf)
         }
