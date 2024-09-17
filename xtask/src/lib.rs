@@ -52,24 +52,18 @@ pub enum Package {
     XtensaLxRt,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct Metadata {
     example_path: PathBuf,
-    chips: Vec<Chip>,
+    chip: Chip,
     feature_set: Vec<String>,
 }
 
 impl Metadata {
-    pub fn new(example_path: &Path, chips: Vec<Chip>, feature_set: Vec<String>) -> Self {
-        let chips = if chips.is_empty() {
-            Chip::iter().collect()
-        } else {
-            chips
-        };
-
+    pub fn new(example_path: &Path, chip: Chip, feature_set: Vec<String>) -> Self {
         Self {
             example_path: example_path.to_path_buf(),
-            chips,
+            chip,
             feature_set,
         }
     }
@@ -95,7 +89,7 @@ impl Metadata {
 
     /// If the specified chip is in the list of chips, then it is supported.
     pub fn supports_chip(&self, chip: Chip) -> bool {
-        self.chips.contains(&chip)
+        self.chip == chip
     }
 }
 
@@ -161,7 +155,7 @@ pub fn load_examples(path: &Path, action: CargoAction) -> Result<Vec<Metadata>> 
         let text = fs::read_to_string(&path)
             .with_context(|| format!("Could not read {}", path.display()))?;
 
-        let mut chips = Vec::new();
+        let mut chips = Chip::iter().collect::<Vec<_>>();
         let mut feature_sets = Vec::new();
 
         // We will indicate metadata lines using the `//%` prefix:
@@ -200,7 +194,9 @@ pub fn load_examples(path: &Path, action: CargoAction) -> Result<Vec<Metadata>> 
             feature_sets.truncate(1);
         }
         for feature_set in feature_sets {
-            examples.push(Metadata::new(&path, chips.clone(), feature_set));
+            for chip in &chips {
+                examples.push(Metadata::new(&path, *chip, feature_set.clone()));
+            }
         }
     }
 
