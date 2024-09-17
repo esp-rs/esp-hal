@@ -294,8 +294,19 @@ mod tests {
             .dma_transfer(dma_rx_buf, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
+        let (spi, (dma_rx_buf, mut dma_tx_buf)) = transfer.wait();
+        assert_eq!(dma_tx_buf.as_slice()[0..2], dma_rx_buf.as_slice()[0..2]);
+
+        // Try transfer again to make sure DMA isn't in a broken state.
+
+        dma_tx_buf.fill(&[0xaa, 0xdd, 0xef, 0xbe]);
+
+        let transfer = spi
+            .dma_transfer(dma_rx_buf, dma_tx_buf)
+            .map_err(|e| e.0)
+            .unwrap();
         let (_, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
-        assert_eq!(dma_tx_buf.as_slice()[0..1], dma_rx_buf.as_slice()[0..1]);
+            assert_eq!(dma_tx_buf.as_slice()[0..2], dma_rx_buf.as_slice()[0..2]);
     }
 
     #[test]
