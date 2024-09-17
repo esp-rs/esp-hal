@@ -104,9 +104,9 @@ mod tests {
 
     #[test]
     fn test_i8080_8bit_is_seen_by_pcnt(ctx: Context<'static>) {
-        // FIXME: Update this test to exercise all the I8080 output signals once the issue with
-        // configuring pins as outputs after inputs have been sorted out.
-        // See https://github.com/esp-rs/esp-hal/pull/2173#issue-2529323702
+        // FIXME: Update this test to exercise all the I8080 output signals once the
+        // issue with configuring pins as outputs after inputs have been sorted
+        // out. See https://github.com/esp-rs/esp-hal/pull/2173#issue-2529323702
 
         let cs_signal = ctx.io.pins.gpio8;
         let unit0_signal = ctx.io.pins.gpio11;
@@ -222,9 +222,9 @@ mod tests {
 
     #[test]
     fn test_i8080_16bit_is_seen_by_pcnt(ctx: Context<'static>) {
-        // FIXME: Update this test to exercise all the I8080 output signals once the issue with
-        // configuring pins as outputs after inputs have been sorted out.
-        // See https://github.com/esp-rs/esp-hal/pull/2173#issue-2529323702
+        // FIXME: Update this test to exercise all the I8080 output signals once the
+        // issue with configuring pins as outputs after inputs have been sorted
+        // out. See https://github.com/esp-rs/esp-hal/pull/2173#issue-2529323702
 
         let cs_signal = ctx.io.pins.gpio8;
         let unit0_signal = ctx.io.pins.gpio11;
