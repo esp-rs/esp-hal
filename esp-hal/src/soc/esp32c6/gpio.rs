@@ -50,8 +50,8 @@ pub(crate) type OutputSignalType = u8;
 pub(crate) const OUTPUT_SIGNAL_MAX: u8 = 128;
 pub(crate) const INPUT_SIGNAL_MAX: u8 = 124;
 
-pub(crate) const ONE_INPUT: u8 = 0x1e;
-pub(crate) const ZERO_INPUT: u8 = 0x1f;
+pub(crate) const ONE_INPUT: u8 = 0x38;
+pub(crate) const ZERO_INPUT: u8 = 0x3c;
 
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function1;
 
