@@ -243,42 +243,94 @@ mod test {
 
     #[test]
     fn env_override() {
-        unsafe {
-            env::set_var("ESP_TEST_NUMBER", "0xaa");
-            env::set_var("ESP_TEST_STRING", "Hello world!");
-            env::set_var("ESP_TEST_BOOL", "true");
-        }
-
-        let configs = generate_config(
-            "esp-test",
-            &[
-                ("number", Value::Number(999), "NA"),
-                ("string", Value::String("Demo".to_owned()), "NA"),
-                ("bool", Value::Bool(false), "NA"),
+        temp_env::with_vars(
+            [
+                ("ESP_TEST_NUMBER", Some("0xaa")),
+                ("ESP_TEST_STRING", Some("Hello world!")),
+                ("ESP_TEST_BOOL", Some("true")),
             ],
-            false,
-        );
+            || {
+                let configs = generate_config(
+                    "esp-test",
+                    &[
+                        ("number", Value::Number(999), "NA"),
+                        ("string", Value::String("Demo".to_owned()), "NA"),
+                        ("bool", Value::Bool(false), "NA"),
+                        ("number_default", Value::Number(999), "NA"),
+                        ("string_default", Value::String("Demo".to_owned()), "NA"),
+                        ("bool_default", Value::Bool(false), "NA"),
+                    ],
+                    false,
+                );
 
-        assert_eq!(
-            match configs.get("ESP_TEST_NUMBER").unwrap() {
-                Value::Number(num) => *num,
-                _ => unreachable!(),
+                // some values have changed
+                assert_eq!(
+                    match configs.get("ESP_TEST_NUMBER").unwrap() {
+                        Value::Number(num) => *num,
+                        _ => unreachable!(),
+                    },
+                    0xaa
+                );
+                assert_eq!(
+                    match configs.get("ESP_TEST_STRING").unwrap() {
+                        Value::String(val) => val,
+                        _ => unreachable!(),
+                    },
+                    "Hello world!"
+                );
+                assert_eq!(
+                    match configs.get("ESP_TEST_BOOL").unwrap() {
+                        Value::Bool(val) => *val,
+                        _ => unreachable!(),
+                    },
+                    true
+                );
+
+                // the rest are the defaults
+                assert_eq!(
+                    match configs.get("ESP_TEST_NUMBER_DEFAULT").unwrap() {
+                        Value::Number(num) => *num,
+                        _ => unreachable!(),
+                    },
+                    999
+                );
+                assert_eq!(
+                    match configs.get("ESP_TEST_STRING_DEFAULT").unwrap() {
+                        Value::String(val) => val,
+                        _ => unreachable!(),
+                    },
+                    "Demo"
+                );
+                assert_eq!(
+                    match configs.get("ESP_TEST_BOOL_DEFAULT").unwrap() {
+                        Value::Bool(val) => *val,
+                        _ => unreachable!(),
+                    },
+                    false
+                );
             },
-            0xaa
-        );
-        assert_eq!(
-            match configs.get("ESP_TEST_STRING").unwrap() {
-                Value::String(val) => val,
-                _ => unreachable!(),
+        )
+    }
+
+    #[test]
+    #[should_panic]
+    fn env_unknown_bails() {
+        temp_env::with_vars(
+            [
+                ("ESP_TEST_NUMBER", Some("0xaa")),
+                ("ESP_TEST_RANDOM_VARIABLE", Some("")),
+            ],
+            || {
+                generate_config("esp-test", &[("number", Value::Number(999), "NA")], false);
             },
-            "Hello world!"
         );
-        assert_eq!(
-            match configs.get("ESP_TEST_BOOL").unwrap() {
-                Value::Bool(val) => *val,
-                _ => unreachable!(),
-            },
-            true
-        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn env_invalid_values_bails() {
+        temp_env::with_vars([("ESP_TEST_NUMBER", Some("Hello world"))], || {
+            generate_config("esp-test", &[("number", Value::Number(999), "NA")], false);
+        });
     }
 }
