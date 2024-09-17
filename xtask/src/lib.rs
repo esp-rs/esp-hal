@@ -1,5 +1,5 @@
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     fs::{self, File},
     io::Write as _,
     path::{Path, PathBuf},
@@ -157,6 +157,7 @@ pub fn load_examples(path: &Path, action: CargoAction) -> Result<Vec<Metadata>> 
 
         let mut chips = Chip::iter().collect::<Vec<_>>();
         let mut feature_sets = Vec::new();
+        let mut chip_features = HashMap::new();
 
         // We will indicate metadata lines using the `//%` prefix:
         for line in text.lines().filter(|line| line.starts_with("//%")) {
@@ -164,23 +165,48 @@ pub fn load_examples(path: &Path, action: CargoAction) -> Result<Vec<Metadata>> 
                 bail!("Metadata line is missing ':': {}", line);
             };
 
-            match key.trim() {
-                "CHIPS" => {
-                    chips = value
-                        .split_ascii_whitespace()
-                        .map(|s| Chip::from_str(s, false).unwrap())
-                        .collect::<Vec<_>>();
+            let key = key.trim();
+
+            if key == "CHIPS" {
+                chips = value
+                    .split_ascii_whitespace()
+                    .map(|s| Chip::from_str(s, false).unwrap())
+                    .collect::<Vec<_>>();
+            } else if key == "FEATURES" {
+                // Base feature set required to run the example.
+                // If multiple are specified, we compile the same example multiple times.
+                let mut values = value
+                    .split_ascii_whitespace()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>();
+
+                // Sort the features so they are in a deterministic order:
+                values.sort();
+
+                feature_sets.push(values);
+            } else if key.starts_with("CHIP-FEATURES(") {
+                // Additional features required for specific chips.
+                // These are appended to the base feature set(s).
+                // If multiple are specified, the last entry wins.
+                let chips = key
+                    .trim_start_matches("CHIP-FEATURES(")
+                    .trim_end_matches(')');
+
+                let chips = chips
+                    .split_ascii_whitespace()
+                    .map(|s| Chip::from_str(s, false).unwrap())
+                    .collect::<Vec<_>>();
+
+                let values = value
+                    .split_ascii_whitespace()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>();
+
+                for chip in chips {
+                    chip_features.insert(chip, values.clone());
                 }
-                "FEATURES" => {
-                    let mut values = value
-                        .split_ascii_whitespace()
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>();
-                    // Sort the features so they are in a deterministic order:
-                    values.sort();
-                    feature_sets.push(values);
-                }
-                other => log::warn!("Unrecognized metadata key '{other}', ignoring"),
+            } else {
+                log::warn!("Unrecognized metadata key '{key}', ignoring");
             }
         }
 
@@ -195,6 +221,14 @@ pub fn load_examples(path: &Path, action: CargoAction) -> Result<Vec<Metadata>> 
         }
         for feature_set in feature_sets {
             for chip in &chips {
+                let mut feature_set = feature_set.clone();
+                if let Some(chip_features) = chip_features.get(chip) {
+                    feature_set.extend(chip_features.iter().cloned());
+
+                    // Sort the features so they are in a deterministic order:
+                    feature_set.sort();
+                }
+
                 examples.push(Metadata::new(&path, *chip, feature_set.clone()));
             }
         }
