@@ -27,14 +27,16 @@ cfg-if                = "1.0.0"
 critical-section      = "1.1.3"
 enumset               = "1.1.5"
 linked_list_allocator = { version = "0.10.5", default-features = false, features = ["const_mut_refs"] }
+document-features = "0.2.10"
 
 [features]
 default = []
 nightly = []
 
-# Enable this feature if you want to keep stats about the internal heap usage such as:
-# - Max memory usage since initialization of the heap
-# - Total allocated memory since initialization of the heap
-# - Total freed memory since initialization of the heap
-# Note: Enabling this feature will require extra computation every time alloc/dealloc is called.
+## Enable this feature if you want to keep stats about the internal heap usage such as:
+## - Max memory usage since initialization of the heap
+## - Total allocated memory since initialization of the heap
+## - Total freed memory since initialization of the heap
+##
+## ⚠️ Note: Enabling this feature will require extra computation every time alloc/dealloc is called.
 internal-heap-stats = []
