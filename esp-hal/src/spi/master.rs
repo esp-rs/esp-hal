@@ -2220,7 +2220,7 @@ pub trait InstanceDma: Instance {
             reg_block.dma_in_link().write(|w| w.bits(0));
         }
 
-        self.configure_datalen(usize::max(rx_buffer.length(), tx_buffer.length()) as u32 * 8);
+        self.configure_datalen(rx_buffer.length(), tx_buffer.length());
 
         rx.is_done();
         tx.is_done();
@@ -2254,7 +2254,7 @@ pub trait InstanceDma: Instance {
         full_duplex: bool,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
-        self.configure_datalen(buffer.length() as u32 * 8);
+        self.configure_datalen(0, buffer.length());
 
         tx.is_done();
 
@@ -2310,7 +2310,7 @@ pub trait InstanceDma: Instance {
             reg_block.dma_in_link().write(|w| w.bits(0));
         }
 
-        self.configure_datalen(buffer.length() as u32 * 8);
+        self.configure_datalen(buffer.length(), 0);
 
         rx.is_done();
 
@@ -3031,7 +3031,7 @@ pub trait Instance: private::Sealed {
             return Err(nb::Error::WouldBlock);
         }
 
-        self.configure_datalen(8);
+        self.configure_datalen(0, 1);
 
         let reg_block = self.register_block();
         reg_block.w(0).write(|w| w.buf().set(word.into()));
@@ -3060,7 +3060,7 @@ pub trait Instance: private::Sealed {
         // The fifo has a limited fixed size, so the data must be chunked and then
         // transmitted
         for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
-            self.configure_datalen(chunk.len() as u32 * 8);
+            self.configure_datalen(0, chunk.len());
 
             {
                 // TODO: replace with `array_chunks` and `from_le_bytes`
@@ -3129,7 +3129,7 @@ pub trait Instance: private::Sealed {
         let reg_block = self.register_block();
 
         for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.configure_datalen(chunk.len() as u32 * 8);
+            self.configure_datalen(chunk.len(), 0);
 
             for (index, w_reg) in (0..chunk.len()).step_by(4).zip(reg_block.w_iter()) {
                 let reg_val = w_reg.read().bits();
@@ -3353,7 +3353,7 @@ pub trait Instance: private::Sealed {
                 .modify(|_, w| unsafe { w.usr_dummy_cyclelen().bits(dummy - 1) });
         }
 
-        self.configure_datalen(buffer.len() as u32 * 8);
+        self.configure_datalen(buffer.len(), 0);
         self.start_operation();
         self.flush()?;
         self.read_bytes_from_fifo(buffer)
@@ -3375,24 +3375,39 @@ pub trait Instance: private::Sealed {
         // not need/available on ESP32/ESP32S2
     }
 
-    fn configure_datalen(&self, len: u32) {
+    fn configure_datalen(&self, rx_len_bytes: usize, tx_len_bytes: usize) {
         let reg_block = self.register_block();
-        let len = if len > 0 { len - 1 } else { 0 };
 
-        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
-        reg_block
-            .ms_dlen()
-            .write(|w| unsafe { w.ms_data_bitlen().bits(len) });
+        let rx_len = rx_len_bytes as u32 * 8;
+        let tx_len = tx_len_bytes as u32 * 8;
 
-        #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3)))]
-        {
-            reg_block
-                .mosi_dlen()
-                .write(|w| unsafe { w.usr_mosi_dbitlen().bits(len) });
+        let rx_len = rx_len.saturating_sub(1);
+        let tx_len = tx_len.saturating_sub(1);
 
-            reg_block
-                .miso_dlen()
-                .write(|w| unsafe { w.usr_miso_dbitlen().bits(len) });
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                let len = rx_len.max(tx_len);
+                reg_block
+                    .mosi_dlen()
+                    .write(|w| unsafe { w.usr_mosi_dbitlen().bits(len) });
+
+                reg_block
+                    .miso_dlen()
+                    .write(|w| unsafe { w.usr_miso_dbitlen().bits(len) });
+            } else if #[cfg(esp32s2)] {
+                reg_block
+                    .mosi_dlen()
+                    .write(|w| unsafe { w.usr_mosi_dbitlen().bits(tx_len) });
+
+                reg_block
+                    .miso_dlen()
+                    .write(|w| unsafe { w.usr_miso_dbitlen().bits(rx_len) });
+            } else {
+                reg_block
+                    .ms_dlen()
+                    .write(|w| unsafe { w.ms_data_bitlen().bits(rx_len.max(tx_len)) });
+            }
+
         }
     }
 }
