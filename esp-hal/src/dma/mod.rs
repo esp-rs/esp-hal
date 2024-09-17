@@ -205,6 +205,7 @@ where
 bitfield::bitfield! {
     #[doc(hidden)]
     #[derive(Clone, Copy)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub struct DmaDescriptorFlags(u32);
 
     u16;
@@ -227,6 +228,7 @@ impl Debug for DmaDescriptorFlags {
 
 /// A DMA transfer descriptor.
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct DmaDescriptor {
     pub(crate) flags: DmaDescriptorFlags,
     pub(crate) buffer: *mut u8,
