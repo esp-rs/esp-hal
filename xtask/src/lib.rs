@@ -166,35 +166,27 @@ pub fn load_examples(path: &Path, action: CargoAction) -> Result<Vec<Metadata>> 
 
         // We will indicate metadata lines using the `//%` prefix:
         for line in text.lines().filter(|line| line.starts_with("//%")) {
-            let mut split = line
-                .trim_start_matches("//%")
-                .trim()
-                .split_ascii_whitespace()
-                .map(|s| s.to_string())
-                .collect::<Vec<_>>();
+            let Some((key, value)) = line.trim_start_matches("//%").split_once(':') else {
+                bail!("Metadata line is missing ':': {}", line);
+            };
 
-            if split.len() < 2 {
-                bail!(
-                    "Expected at least two elements (key, value), found {}",
-                    split.len()
-                );
-            }
-
-            // The trailing ':' on metadata keys is optional :)
-            let key = split.swap_remove(0);
-            let key = key.trim_end_matches(':');
-
-            if key == "CHIPS" {
-                chips = split
-                    .iter()
-                    .map(|s| Chip::from_str(s, false).unwrap())
-                    .collect::<Vec<_>>();
-            } else if key == "FEATURES" {
-                // Sort the features so they are in a deterministic order:
-                split.sort();
-                feature_sets.push(split);
-            } else {
-                log::warn!("Unrecognized metadata key '{key}', ignoring");
+            match key.trim() {
+                "CHIPS" => {
+                    chips = value
+                        .split_ascii_whitespace()
+                        .map(|s| Chip::from_str(s, false).unwrap())
+                        .collect::<Vec<_>>();
+                }
+                "FEATURES" => {
+                    let mut values = value
+                        .split_ascii_whitespace()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>();
+                    // Sort the features so they are in a deterministic order:
+                    values.sort();
+                    feature_sets.push(values);
+                }
+                other => log::warn!("Unrecognized metadata key '{other}', ignoring"),
             }
         }
 
