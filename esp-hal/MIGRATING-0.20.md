@@ -179,3 +179,22 @@ You can pass `NoPin` or `Level` as inputs, and `NoPin` as output if you don't ne
 -    .with_pins(Some(sclk), Some(mosi), NO_PIN, NO_PIN);
 +    .with_pins(sclk, mosi, Level::Low, NoPin);
 ```
+
+## I8080 type definition
+
+The I8080 driver no longer holds on to pins in its type definition.
+
+```diff
+- let _: I8080<'a, DmaChannel3, TxEightBits<AnyPin, AnyPin, AnyPin, ....>, Blocking>;
++ let _: I8080<'a, DmaChannel3, Blocking>;
+```
+
+## I8080 start transfer type inference
+
+The I8080 driver now decides bus width at transfer time, which means you don't get inference.
+
+```diff
+let mut i8080 = I8080::new(....);
+- i8080.send(0x12, 0, &[0, 1, 2, 3, 4]);
++ i8080.send(0x12u8, 0, &[0, 1, 2, 3, 4]);
+```

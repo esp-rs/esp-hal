@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The (previously undocumented) `ErasedPin` enum has been replaced with the `ErasedPin` struct. (#2094)
 - Renamed and merged `Rtc::get_time_us` and `Rtc::get_time_ms` into `Rtc::time_since_boot` (#1883)
 - ESP32: Added support for touch sensing on GPIO32 and 33 (#2109)
+- Removed gpio pin generics from I8080 driver type. (#2171)
+- I8080 driver now decides bus width at transfer time rather than construction time. (#2171)
 - Replaced `AnyPin` with `InputSignal` and `OutputSignal` and renamed `ErasedPin` to `AnyPin` (#2128)
 - Replaced the `ErasedTimer` enum with the `AnyTimer` struct. (#?)
 - Changed the parameters of `Spi::with_pins` to no longer be optional (#2133)
