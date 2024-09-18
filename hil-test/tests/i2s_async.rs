@@ -3,7 +3,7 @@
 //! This test uses I2S TX to transmit known data to I2S RX (forced to slave mode
 //! with loopback mode enabled). It's using circular DMA mode
 
-//% CHIPS: esp32c3 esp32c6 esp32s3 esp32h2
+//% CHIPS: esp32c3 esp32c6 esp32h2 esp32s3
 //% FEATURES: generic-queue
 
 #![no_std]
@@ -20,11 +20,8 @@ use esp_hal::{
 use hil_test as _;
 
 cfg_if::cfg_if! {
-    if #[cfg(any(
-        feature = "esp32",
-        feature = "esp32s2",
-    ))] {
-        use esp_hal::dma::Spi2DmaChannel as DmaChannel0;
+    if #[cfg(any(esp32, esp32s2))] {
+        use esp_hal::dma::I2s0DmaChannel as DmaChannel0;
     } else {
         use esp_hal::dma::DmaChannel0;
     }
@@ -95,13 +92,13 @@ mod tests {
 
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
         let dma = Dma::new(peripherals.DMA);
 
         cfg_if::cfg_if! {
-            if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
-                let dma_channel = dma.spi2channel;
+            if #[cfg(any(esp32, esp32s2))] {
+                let dma_channel = dma.i2s0channel;
             } else {
                 let dma_channel = dma.channel0;
             }
@@ -120,7 +117,9 @@ mod tests {
             tx_descriptors,
         );
 
-        let (dout, din) = hil_test::common_test_pins!(io);
+        let (_, dout) = hil_test::common_test_pins!(io);
+
+        let din = dout.peripheral_input();
 
         let i2s_tx = i2s
             .i2s_tx
