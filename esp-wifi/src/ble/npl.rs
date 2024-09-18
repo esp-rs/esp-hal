@@ -206,7 +206,7 @@ extern "C" {
 
     // #[cfg(not(esp32c2))]
     pub(crate) fn ble_controller_disable() -> i32;
-
+    // #[cfg(esp32c2)]
     pub(crate) fn ble_controller_deinit() -> i32;
 
     #[cfg(not(esp32c2))]
@@ -814,20 +814,13 @@ unsafe extern "C" fn ble_npl_event_reset(event: *const ble_npl_event) {
 unsafe extern "C" fn ble_npl_event_deinit(event: *const ble_npl_event) {
     trace!("ble_npl_event_deinit {:?}", event);
 
-    // Cast the event to a mutable pointer
-    let event = event as *mut ble_npl_event;
+    let event = event.cast_mut();
 
-    // Check if the event is uninitialized (dummy == 0)
     if (*event).dummy == 0 {
         panic!("Trying to deinitialize an uninitialized event");
     } else {
-        // Get the index of the event in the EVENTS array using the dummy value
         let idx = ((*event).dummy - 1) as usize;
-
-        // Reset the event in the EVENTS array
         EVENTS[idx] = None;
-
-        // Reset the dummy field to indicate the event is uninitialized
         (*event).dummy = 0;
     }
 }
@@ -977,7 +970,6 @@ unsafe extern "C" fn ble_npl_callout_init(
     if (*callout).dummy == 0 {
         let callout = callout.cast_mut();
         let idx = unwrap!(CALLOUTS.iter().position(|item| item.is_none()));
-        info!("IDX = {}", idx);
 
         let new_callout = CALLOUTS[idx].insert(Callout {
             _callout: callout,
@@ -1300,13 +1292,11 @@ fn os_msys_init() {
 #[cfg(esp32c2)]
 fn os_msys_buf_free() {
     unsafe {
-        // Free the memory for the first buffer, if allocated
         if !OS_MSYS_INIT_1_DATA.is_null() {
             crate::compat::malloc::free(OS_MSYS_INIT_1_DATA as *mut u8);
             OS_MSYS_INIT_1_DATA = core::ptr::null_mut();
         }
 
-        // Free the memory for the second buffer, if allocated
         if !OS_MSYS_INIT_2_DATA.is_null() {
             crate::compat::malloc::free(OS_MSYS_INIT_2_DATA as *mut u8);
             OS_MSYS_INIT_2_DATA = core::ptr::null_mut();

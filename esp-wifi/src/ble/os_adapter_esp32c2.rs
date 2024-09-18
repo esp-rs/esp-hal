@@ -131,7 +131,6 @@ pub(super) unsafe extern "C" fn ble_ll_random_override() -> u32 {
 
 pub(super) fn deinit() {
     unsafe {
-        info!("HCI deinit");
         // HCI deinit
         npl::r_ble_hci_trans_cfg_hs(
             Some(core::mem::transmute::<
@@ -146,19 +145,15 @@ pub(super) fn deinit() {
             core::ptr::null(),
         );
 
-        info!("controller deinit");
-
         let res = npl::ble_controller_deinit();
 
         if res != 0 {
             panic!("ble_controller_deinit returned {}", res);
         }
 
-        info!("module disable");
-
         bt_periph_module_disable();
 
-        npl::os_msys_buf_free();
+        // npl::os_msys_buf_free();
         npl::esp_unregister_npl_funcs();
         npl::esp_unregister_ext_funcs();
         crate::common_adapter::chip_specific::phy_disable();

@@ -121,7 +121,6 @@ use num_traits::FromPrimitive;
 
 #[cfg(feature = "wifi")]
 use crate::{
-    // esp_wifi_result,
     binary::include::{self, esp_wifi_deinit_internal, esp_wifi_stop},
     wifi::{WifiController, WifiDeviceMode, WifiError},
 };
@@ -475,7 +474,7 @@ pub fn deinitialize_wifi(
     esp_wifi_result!(unsafe { esp_wifi_stop() })?;
     esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
 
-    info!("WiFi deinited");
+    info!("WiFi deinitialized");
 
     // Drop the WiFi controller and stack
     drop(controller);
@@ -488,7 +487,7 @@ pub fn deinitialize_wifi(
 }
 
 #[cfg(feature = "ble")]
-pub fn deinitialize_ble() -> Result<EspWifiDeinitialization, ()> {
+pub fn deinitialize_ble(ble: bleps::Ble) -> Result<EspWifiDeinitialization, ()> {
     // Deinitialize BLE based on the chip type
     #[cfg(any(esp32, esp32c3, esp32s3))]
     crate::ble::btdm::ble_deinit();
@@ -496,7 +495,9 @@ pub fn deinitialize_ble() -> Result<EspWifiDeinitialization, ()> {
     #[cfg(any(esp32c2, esp32c6, esp32h2))]
     crate::ble::npl::ble_deinit();
 
-    info!("BLE deinited");
+    info!("BLE deinitialized");
+
+    drop(ble);
 
     // Return BLE deinitialization state
     Ok(EspWifiDeinitialization::Ble(
@@ -508,6 +509,7 @@ pub fn deinitialize_ble() -> Result<EspWifiDeinitialization, ()> {
 pub fn deinitialize_all(
     controller: WifiController,
     stack: crate::wifi_interface::WifiStack<impl WifiDeviceMode>,
+    ble: bleps::Ble,
 ) -> Result<EspWifiDeinitialization, WifiError> {
     // Disable coexistence
     unsafe { crate::wifi::os_adapter::coex_disable() };
@@ -524,11 +526,12 @@ pub fn deinitialize_all(
     #[cfg(any(esp32c2, esp32c6, esp32h2))]
     crate::ble::npl::ble_deinit();
 
-    info!("WiFi and BLE coexistence deinited");
+    info!("WiFi and BLE coexistence deinitialized");
 
     // Drop the WiFi controller and stack
     drop(controller);
     drop(stack);
+    drop(ble);
 
     // Return coexistence deinitialization state
     Ok(EspWifiDeinitialization::WifiBle(

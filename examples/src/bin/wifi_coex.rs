@@ -32,9 +32,7 @@ use esp_println::{print, println};
 use esp_wifi::{
     ble::controller::BleConnector,
     current_millis,
-    deinitialize_all,
     initialize,
-    reinitialize,
     wifi::{utils::create_network_interface, ClientConfiguration, Configuration, WifiStaDevice},
     wifi_interface::WifiStack,
     EspWifiFor,
@@ -44,10 +42,8 @@ use smoltcp::{
     wire::{IpAddress, Ipv4Address},
 };
 
-const SSID: &str = "EspressifSystems";
-const PASSWORD: &str = "Espressif32";
-// const SSID: &str = env!("SSID");
-// const PASSWORD: &str = env!("PASSWORD");
+const SSID: &str = env!("SSID");
+const PASSWORD: &str = env!("PASSWORD");
 
 #[entry]
 fn main() -> ! {
@@ -58,7 +54,7 @@ fn main() -> ! {
         config
     });
 
-    static mut HEAP: core::mem::MaybeUninit<[u8; 80 * 1024]> = core::mem::MaybeUninit::uninit();
+    static mut HEAP: core::mem::MaybeUninit<[u8; 72 * 1024]> = core::mem::MaybeUninit::uninit();
 
     #[link_section = ".dram2_uninit"]
     static mut HEAP2: core::mem::MaybeUninit<[u8; 64 * 1024]> = core::mem::MaybeUninit::uninit();
@@ -88,13 +84,13 @@ fn main() -> ! {
     )
     .unwrap();
 
-    let mut wifi = peripherals.WIFI;
-    let mut bluetooth = peripherals.BT;
+    let wifi = peripherals.WIFI;
+    let bluetooth = peripherals.BT;
 
     let mut socket_set_entries: [SocketStorage; 2] = Default::default();
     let (iface, device, mut controller, sockets) =
-        create_network_interface(&init, &mut wifi, WifiStaDevice, &mut socket_set_entries).unwrap();
-    let mut wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
+        create_network_interface(&init, wifi, WifiStaDevice, &mut socket_set_entries).unwrap();
+    let wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
 
     let client_config = Configuration::Client(ClientConfiguration {
         ssid: SSID.try_into().unwrap(),
@@ -138,33 +134,7 @@ fn main() -> ! {
         }
     }
 
-    let connector = BleConnector::new(&init, &mut bluetooth);
-    let hci = HciConnector::new(connector, esp_wifi::current_millis);
-    let mut ble = Ble::new(&hci);
-
-    println!("{:?}", ble.init());
-
-    println!("{:?}", ble.cmd_set_le_advertising_parameters());
-    println!(
-        "{:?}",
-        ble.cmd_set_le_advertising_data(
-            create_advertising_data(&[
-                AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
-                AdStructure::ServiceUuids16(&[Uuid::Uuid16(0x1809)]),
-                AdStructure::CompleteLocalName(esp_hal::chip!()),
-            ])
-            .unwrap()
-        )
-    );
-    println!("{:?}", ble.cmd_set_le_advertise_enable(true));
-
-    println!("Deinitializing...");
-    let deinit = deinitialize_all(controller, wifi_stack).unwrap();
-    println!("DEINITED");
-
-    let init = reinitialize(EspWifiFor::Ble, deinit).unwrap();
-
-    let connector = BleConnector::new(&init, &mut bluetooth);
+    let connector = BleConnector::new(&init, bluetooth);
     let hci = HciConnector::new(connector, esp_wifi::current_millis);
     let mut ble = Ble::new(&hci);
 
@@ -187,45 +157,45 @@ fn main() -> ! {
 
     println!("Start busy loop on main");
 
-    // let mut rx_buffer = [0u8; 128];
-    // let mut tx_buffer = [0u8; 128];
-    // let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
+    let mut rx_buffer = [0u8; 128];
+    let mut tx_buffer = [0u8; 128];
+    let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
 
     loop {
-        // println!("Making HTTP request");
-        // socket.work();
+        println!("Making HTTP request");
+        socket.work();
 
-        // socket
-        //     .open(IpAddress::Ipv4(Ipv4Address::new(142, 250, 185, 115)), 80)
-        //     .unwrap();
+        socket
+            .open(IpAddress::Ipv4(Ipv4Address::new(142, 250, 185, 115)), 80)
+            .unwrap();
 
-        // socket
-        //     .write(b"GET / HTTP/1.0\r\nHost: www.mobile-j.de\r\n\r\n")
-        //     .unwrap();
-        // socket.flush().unwrap();
+        socket
+            .write(b"GET / HTTP/1.0\r\nHost: www.mobile-j.de\r\n\r\n")
+            .unwrap();
+        socket.flush().unwrap();
 
-        // let wait_end = current_millis() + 20 * 1000;
-        // loop {
-        //     let mut buffer = [0u8; 128];
-        //     if let Ok(len) = socket.read(&mut buffer) {
-        //         let to_print = unsafe { core::str::from_utf8_unchecked(&buffer[..len]) };
-        //         print!("{}", to_print);
-        //     } else {
-        //         break;
-        //     }
+        let wait_end = current_millis() + 20 * 1000;
+        loop {
+            let mut buffer = [0u8; 128];
+            if let Ok(len) = socket.read(&mut buffer) {
+                let to_print = unsafe { core::str::from_utf8_unchecked(&buffer[..len]) };
+                print!("{}", to_print);
+            } else {
+                break;
+            }
 
-        //     if current_millis() > wait_end {
-        //         println!("Timeout");
-        //         break;
-        //     }
-        // }
-        // println!();
+            if current_millis() > wait_end {
+                println!("Timeout");
+                break;
+            }
+        }
+        println!();
 
-        // socket.disconnect();
+        socket.disconnect();
 
-        // let wait_end = current_millis() + 5 * 1000;
-        // while current_millis() < wait_end {
-        //     socket.work();
-        // }
+        let wait_end = current_millis() + 5 * 1000;
+        while current_millis() < wait_end {
+            socket.work();
+        }
     }
 }

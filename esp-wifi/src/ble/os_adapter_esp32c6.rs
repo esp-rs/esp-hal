@@ -139,7 +139,6 @@ unsafe extern "C" fn jrand48(
 
 pub(super) fn deinit() {
     unsafe {
-        info!("HCI deinit");
         // HCI deinit
         npl::r_ble_hci_trans_cfg_hs(
             Some(core::mem::transmute::<
@@ -155,11 +154,10 @@ pub(super) fn deinit() {
         );
 
         npl::ble_controller_disable();
+        npl::ble_controller_deinit();
 
-        info!("phy disable");
         crate::common_adapter::chip_specific::phy_disable();
 
-        info!("module disable");
         bt_periph_module_disable();
 
         npl::esp_unregister_npl_funcs();
