@@ -1984,7 +1984,7 @@ mod private {
         }
     }
 
-    #[cfg(any(esp32s3, esp32))]
+    #[cfg(i2s1)]
     impl RegBlock for I2S1 {
         fn register_block() -> &'static RegisterBlock {
             unsafe { &*I2S1::PTR.cast::<RegisterBlock>() }
@@ -2000,7 +2000,7 @@ mod private {
     }
     impl super::RegisterAccess for I2S0 {}
 
-    #[cfg(any(esp32s3, esp32))]
+    #[cfg(i2s1)]
     impl RegisterAccessPrivate for I2S1 {
         fn set_interrupt_handler(handler: InterruptHandler) {
             unsafe { crate::peripherals::I2S1::steal() }.bind_i2s1_interrupt(handler.handler());
@@ -2008,7 +2008,7 @@ mod private {
                 .unwrap();
         }
     }
-    #[cfg(any(esp32s3, esp32))]
+    #[cfg(i2s1)]
     impl super::RegisterAccess for I2S1 {}
 
     pub trait I2s0Instance {}
