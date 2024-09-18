@@ -76,6 +76,8 @@ pub fn generate_config(
     // only rebuild if build.rs changed. Otherwise Cargo will rebuild if any
     // other file changed.
     println!("cargo:rerun-if-changed=build.rs");
+    #[cfg(not(test))]
+    env_change_work_around();
 
     // ensure that the prefix is `SCREAMING_SNAKE_CASE`
     let prefix = format!("{}_", screaming_snake_case(prefix));
@@ -92,6 +94,36 @@ pub fn generate_config(
     }
 
     configs
+}
+
+// A work-around for https://github.com/rust-lang/cargo/issues/10358
+// This can be removed when https://github.com/rust-lang/cargo/pull/14058 is merged.
+// Unlikely to work on projects in workspaces
+#[cfg(not(test))]
+fn env_change_work_around() {
+    let mut out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
+
+    // We clean out_dir by removing all trailing directories, until it ends with
+    // target
+    while !out_dir.ends_with("target") {
+        if !out_dir.pop() {
+            // We ran out of directories...
+            return;
+        }
+    }
+    out_dir.pop();
+
+    let dotcargo = out_dir.join(".cargo/");
+    if dotcargo.exists() {
+        println!(
+            "cargo:rerun-if-changed={}",
+            dotcargo.clone().join("config.toml").to_str().unwrap()
+        );
+        println!(
+            "cargo:rerun-if-changed={}",
+            dotcargo.clone().join("config").to_str().unwrap()
+        );
+    }
 }
 
 fn emit_configuration(
