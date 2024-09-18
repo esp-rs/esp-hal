@@ -7,6 +7,14 @@
 
 use super::*;
 
+impl crate::peripheral::Peripheral for Level {
+    type P = Self;
+
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        *self
+    }
+}
+
 impl PeripheralSignal for Level {
     fn pull_direction(&self, _pull: Pull, _internal: private::Internal) {}
 }
