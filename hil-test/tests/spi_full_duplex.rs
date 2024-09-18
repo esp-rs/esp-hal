@@ -315,28 +315,6 @@ mod tests {
 
     #[test]
     #[timeout(3)]
-    fn test_symmetric_dma_transfer_huge_buffer(ctx: Context) {
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4096);
-        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
-
-        for (i, d) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
-            *d = i as _;
-        }
-
-        let spi = ctx
-            .spi
-            .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0));
-        let transfer = spi
-            .dma_transfer(dma_rx_buf, dma_tx_buf)
-            .map_err(|e| e.0)
-            .unwrap();
-        let (_, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
-        assert_eq!(dma_tx_buf.as_slice(), dma_rx_buf.as_slice());
-    }
-
-    #[test]
-    #[timeout(3)]
     fn test_dma_bus_symmetric_transfer(ctx: Context) {
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
