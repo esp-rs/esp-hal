@@ -12,7 +12,6 @@
 //! ## Feature Flags
 #![doc = document_features::document_features!()]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
-#![cfg_attr(feature = "binary-logs", feature(c_variadic))]
 #![no_std]
 
 use core::{cell::RefCell, marker::PhantomData};
@@ -34,7 +33,6 @@ pub use self::{
     raw::RawReceived,
 };
 
-mod compat;
 mod frame;
 mod hal;
 mod pib;
@@ -372,9 +370,4 @@ fn rx_available() {
             rx_available_callback_fn();
         }
     });
-}
-
-#[no_mangle]
-extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
-    0
 }
