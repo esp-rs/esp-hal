@@ -534,7 +534,7 @@ where
     DmaMode: Mode,
 {
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
-        self.wait_tx_dma_done().ok();
+        T::wait_for_tx_done();
     }
 
     fn peripheral_dma_stop(&mut self) {
@@ -629,13 +629,6 @@ where
 
         // start: set I2S_TX_START
         T::tx_start();
-
-        Ok(())
-    }
-
-    fn wait_tx_dma_done(&self) -> Result<(), Error> {
-        // wait until I2S_TX_IDLE is 1
-        T::wait_for_tx_done();
 
         Ok(())
     }
