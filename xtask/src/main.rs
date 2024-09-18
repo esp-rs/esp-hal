@@ -732,6 +732,8 @@ fn run_elfs(args: RunElfArgs) -> Result<()> {
             command.arg("--speed").arg("15000");
         };
 
+        command.arg("--verify");
+
         let mut command = command.spawn().context("Failed to execute probe-rs")?;
         let status = command
             .wait()
