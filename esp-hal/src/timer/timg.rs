@@ -304,51 +304,54 @@ where
 {
     /// Construct a new instance of [`TimerGroup`] in asynchronous mode
     pub fn new_async(_timer_group: impl Peripheral<P = T> + 'd) -> Self {
-        use crate::timer::timg::asynch::timg0_timer0_handler;
-        #[cfg(timg_timer1)]
-        use crate::timer::timg::asynch::timg0_timer1_handler;
-        #[cfg(timg1)]
-        use crate::timer::timg::asynch::timg1_timer0_handler;
-        #[cfg(all(timg1, timg_timer1))]
-        use crate::timer::timg::asynch::timg1_timer1_handler;
-
         match T::id() {
-            0 => unsafe {
-                interrupt::bind_interrupt(Interrupt::TG0_T0_LEVEL, timg0_timer0_handler.handler());
-                interrupt::enable(Interrupt::TG0_T0_LEVEL, timg0_timer0_handler.priority())
-                    .unwrap();
+            0 => {
+                use crate::timer::timg::asynch::timg0_timer0_handler;
+                unsafe {
+                    interrupt::bind_interrupt(
+                        Interrupt::TG0_T0_LEVEL,
+                        timg0_timer0_handler.handler(),
+                    );
+                    interrupt::enable(Interrupt::TG0_T0_LEVEL, timg0_timer0_handler.priority())
+                        .unwrap();
 
-                #[cfg(timg_timer1)]
-                {
-                    interrupt::bind_interrupt(
-                        Interrupt::TG0_T1_LEVEL,
-                        timg0_timer1_handler.handler(),
-                    );
-                    interrupt::enable(Interrupt::TG0_T1_LEVEL, timg0_timer1_handler.priority())
-                        .unwrap();
+                    #[cfg(timg_timer1)]
+                    {
+                        use crate::timer::timg::asynch::timg0_timer1_handler;
+
+                        interrupt::bind_interrupt(
+                            Interrupt::TG0_T1_LEVEL,
+                            timg0_timer1_handler.handler(),
+                        );
+                        interrupt::enable(Interrupt::TG0_T1_LEVEL, timg0_timer1_handler.priority())
+                            .unwrap();
+                    }
                 }
-            },
-            #[cfg(any(timg1, timg_timer1))]
-            1 => unsafe {
-                #[cfg(timg1)]
-                {
-                    interrupt::bind_interrupt(
-                        Interrupt::TG1_T0_LEVEL,
-                        timg1_timer0_handler.handler(),
-                    );
-                    interrupt::enable(Interrupt::TG1_T0_LEVEL, timg1_timer0_handler.priority())
-                        .unwrap();
+            }
+            #[cfg(timg1)]
+            1 => {
+                use crate::timer::timg::asynch::timg1_timer0_handler;
+                unsafe {
+                    {
+                        interrupt::bind_interrupt(
+                            Interrupt::TG1_T0_LEVEL,
+                            timg1_timer0_handler.handler(),
+                        );
+                        interrupt::enable(Interrupt::TG1_T0_LEVEL, timg1_timer0_handler.priority())
+                            .unwrap();
+                    }
+                    #[cfg(timg_timer1)]
+                    {
+                        use crate::timer::timg::asynch::timg1_timer1_handler;
+                        interrupt::bind_interrupt(
+                            Interrupt::TG1_T1_LEVEL,
+                            timg1_timer1_handler.handler(),
+                        );
+                        interrupt::enable(Interrupt::TG1_T1_LEVEL, timg1_timer1_handler.priority())
+                            .unwrap();
+                    }
                 }
-                #[cfg(all(timg1, timg_timer1))]
-                {
-                    interrupt::bind_interrupt(
-                        Interrupt::TG1_T1_LEVEL,
-                        timg1_timer1_handler.handler(),
-                    );
-                    interrupt::enable(Interrupt::TG1_T1_LEVEL, timg1_timer1_handler.priority())
-                        .unwrap();
-                }
-            },
+            }
             _ => unreachable!(),
         }
 
@@ -1154,7 +1157,6 @@ mod asynch {
             WAKERS[index as usize].register(ctx.waker());
 
             if self.event_bit_is_clear() {
-                self.timer.clear_interrupt();
                 Poll::Ready(())
             } else {
                 Poll::Pending
