@@ -197,7 +197,7 @@ mod tests {
 
     #[test]
     fn test_i2s_loopback(ctx: Context) {
-        let (mut rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(16000, 16000);
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(16000, 16000);
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -237,14 +237,14 @@ mod tests {
         let mut rcv = [0u8; 11000];
         let mut filler = [0x1u8; 12000];
 
-        let mut rx_transfer = i2s_rx.read_dma_circular(&mut rx_buffer).unwrap();
+        let mut rx_transfer = i2s_rx.read_dma_circular(rx_buffer).unwrap();
         // trying to pop data before calling `available` should just do nothing
         assert_eq!(0, rx_transfer.pop(&mut rcv[..100]).unwrap());
 
         // no data available yet
         assert_eq!(0, rx_transfer.available());
 
-        let mut tx_transfer = i2s_tx.write_dma_circular(&tx_buffer).unwrap();
+        let mut tx_transfer = i2s_tx.write_dma_circular(tx_buffer).unwrap();
 
         let mut iteration = 0;
         let mut sample_idx = 0;
