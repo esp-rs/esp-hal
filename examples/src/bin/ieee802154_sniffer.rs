@@ -14,7 +14,7 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let mut peripherals = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -50,7 +50,7 @@ fn main() -> ! {
         .unwrap();
 
     let radio = peripherals.IEEE802154;
-    let mut ieee802154 = Ieee802154::new(radio, &mut peripherals.RADIO_CLK);
+    let mut ieee802154 = Ieee802154::new(radio, peripherals.RADIO_CLK);
 
     ieee802154.set_config(Config {
         channel,

@@ -1449,8 +1449,7 @@ pub unsafe extern "C" fn log_write(
     format: *const crate::binary::c_types::c_char,
     args: ...
 ) {
-    #[allow(clippy::missing_transmute_annotations)]
-    crate::binary::log::syslog(level, format as *const u8, core::mem::transmute(args));
+    crate::binary::log::syslog(level, format as *const u8, args);
 }
 
 /// **************************************************************************
@@ -1475,12 +1474,13 @@ pub unsafe extern "C" fn log_writev(
     level: u32,
     _tag: *const crate::binary::c_types::c_char,
     format: *const crate::binary::c_types::c_char,
-    args: esp_wifi_sys::include::va_list,
+    args: crate::binary::include::va_list,
 ) {
-    // annotations on transmute here would require different types for RISC-V and
-    // Xtensa - so let's allow `missing_transmute_annotations` in this case
-    #[allow(clippy::missing_transmute_annotations)]
-    crate::binary::log::syslog(level, format as *const u8, core::mem::transmute(args));
+    crate::binary::log::syslog(
+        level,
+        format as *const u8,
+        core::mem::transmute::<crate::binary::include::va_list, core::ffi::VaListImpl<'_>>(args),
+    );
 }
 
 /// **************************************************************************
