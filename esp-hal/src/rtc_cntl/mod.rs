@@ -988,6 +988,11 @@ impl Swd {
         Self
     }
 
+    /// Enable the watchdog timer instance
+    pub fn enable(&mut self) {
+        self.set_enabled(true);
+    }
+
     /// Disable the watchdog timer instance
     pub fn disable(&mut self) {
         self.set_enabled(false);

@@ -732,12 +732,42 @@ use crate::{
     peripherals::Peripherals,
 };
 
+/// Watchdog status.
+#[derive(Default, PartialEq)]
+pub enum WatchdogStatus {
+    /// Enables a watchdog timer with the specified timeout.
+    Enabled(fugit::MicrosDurationU64),
+    /// Disables the watchdog timer.
+    #[default]
+    Disabled,
+}
+
+/// Watchdogs configuration.
+#[non_exhaustive]
+#[derive(Default)]
+pub struct WatchdogConfig {
+    #[cfg(not(any(esp32, esp32s2)))]
+    /// Enable the super watchdog timer, which is slightly less than one second.
+    pub swd: bool,
+    /// Configures the reset watchdog timer.
+    pub rwdt: WatchdogStatus,
+    /// Configures the timg0 watchdog timer.
+    pub timg0: WatchdogStatus,
+    #[cfg(timg1)]
+    /// Configures the timg1 watchdog timer.
+    ///
+    /// By default, the bootloader does not enables this watchdog timer.
+    pub timg1: WatchdogStatus,
+}
+
 /// System configuration.
 #[non_exhaustive]
 #[derive(Default)]
 pub struct Config {
     /// The CPU clock configuration.
     pub cpu_clock: CpuClock,
+    /// Enable watchdog timer(s).
+    pub watchdog: WatchdogConfig,
 }
 
 /// Initialize the system.
@@ -748,14 +778,45 @@ pub fn init(config: Config) -> Peripherals {
 
     // RTC domain must be enabled before we try to disable
     let mut rtc = crate::rtc_cntl::Rtc::new(&mut peripherals.LPWR);
-    #[cfg(not(any(esp32, esp32s2)))]
-    rtc.swd.disable();
-    rtc.rwdt.disable();
 
-    unsafe {
-        crate::timer::timg::Wdt::<self::peripherals::TIMG0>::set_wdt_enabled(false);
-        #[cfg(timg1)]
-        crate::timer::timg::Wdt::<self::peripherals::TIMG1>::set_wdt_enabled(false);
+    #[cfg(not(any(esp32, esp32s2)))]
+    if config.watchdog.swd {
+        rtc.swd.enable();
+    } else {
+        rtc.swd.disable();
+    }
+
+    match config.watchdog.rwdt {
+        WatchdogStatus::Enabled(duration) => {
+            rtc.rwdt.enable();
+            rtc.rwdt.set_timeout(duration);
+        }
+        WatchdogStatus::Disabled => {
+            rtc.rwdt.disable();
+        }
+    }
+
+    match config.watchdog.timg0 {
+        WatchdogStatus::Enabled(duration) => unsafe {
+            let mut timg0_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new();
+            crate::timer::timg::Wdt::<self::peripherals::TIMG0>::set_wdt_enabled(true);
+            timg0_wd.set_timeout(duration);
+        },
+        WatchdogStatus::Disabled => unsafe {
+            crate::timer::timg::Wdt::<self::peripherals::TIMG0>::set_wdt_enabled(false);
+        },
+    }
+
+    #[cfg(timg1)]
+    match config.watchdog.timg1 {
+        WatchdogStatus::Enabled(duration) => unsafe {
+            let mut timg0_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG1>::new();
+            crate::timer::timg::Wdt::<self::peripherals::TIMG1>::set_wdt_enabled(true);
+            timg0_wd.set_timeout(duration);
+        },
+        WatchdogStatus::Disabled => unsafe {
+            crate::timer::timg::Wdt::<self::peripherals::TIMG1>::set_wdt_enabled(false);
+        },
     }
 
     Clocks::init(config.cpu_clock);
