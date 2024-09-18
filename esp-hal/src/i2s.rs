@@ -753,7 +753,7 @@ where
 
         // Enable corresponding interrupts if needed
 
-        // configure DMA outlink
+        // configure DMA inlink
         unsafe {
             self.rx_chain.fill_for_rx(false, ptr, data.len())?;
             self.rx_channel
@@ -761,12 +761,10 @@ where
                 .and_then(|_| self.rx_channel.start_transfer())?;
         }
 
-        // set I2S_TX_STOP_EN if needed
-
-        // start: set I2S_TX_START
+        // start: set I2S_RX_START
         T::rx_start(data.len());
 
-        // wait until I2S_TX_IDLE is 1
+        // wait until I2S_RX_IDLE is 1
         T::wait_for_rx_done();
 
         Ok(())
@@ -786,20 +784,18 @@ where
             return Err(Error::IllegalArgument);
         }
 
-        // Reset TX unit and TX FIFO
+        // Reset RX unit and RX FIFO
         T::reset_rx();
 
         // Enable corresponding interrupts if needed
 
-        // configure DMA outlink
+        // configure DMA inlink
         unsafe {
             self.rx_chain.fill_for_rx(circular, ptr, len)?;
             self.rx_channel
                 .prepare_transfer_without_start(T::get_dma_peripheral(), &self.rx_chain)
                 .and_then(|_| self.rx_channel.start_transfer())?;
         }
-
-        // set I2S_TX_STOP_EN if needed
 
         // start: set I2S_RX_START
         T::rx_start(len);
@@ -2266,12 +2262,12 @@ pub mod asynch {
                 return Err(Error::IllegalArgument);
             }
 
-            // Reset TX unit and TX FIFO
+            // Reset RX unit and RX FIFO
             T::reset_rx();
 
             let future = DmaRxFuture::new(&mut self.rx_channel);
 
-            // configure DMA outlink
+            // configure DMA inlink
             unsafe {
                 self.rx_chain.fill_for_rx(false, ptr, len)?;
                 future
@@ -2279,8 +2275,6 @@ pub mod asynch {
                     .prepare_transfer_without_start(T::get_dma_peripheral(), &self.rx_chain)
                     .and_then(|_| future.rx.start_transfer())?;
             }
-
-            // set I2S_TX_STOP_EN if needed
 
             // start: set I2S_RX_START
             T::rx_start(len);
@@ -2303,20 +2297,18 @@ pub mod asynch {
                 return Err(Error::IllegalArgument);
             }
 
-            // Reset TX unit and TX FIFO
+            // Reset RX unit and RX FIFO
             T::reset_rx();
 
             // Enable corresponding interrupts if needed
 
-            // configure DMA outlink
+            // configure DMA inlink
             unsafe {
                 self.rx_chain.fill_for_rx(true, ptr, len)?;
                 self.rx_channel
                     .prepare_transfer_without_start(T::get_dma_peripheral(), &self.rx_chain)
                     .and_then(|_| self.rx_channel.start_transfer())?;
             }
-
-            // set I2S_TX_STOP_EN if needed
 
             // start: set I2S_RX_START
             T::rx_start(len);
