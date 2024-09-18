@@ -12,7 +12,7 @@ use esp_hal::{delay::Delay, prelude::*, rtc_cntl::Rtc};
 
 #[entry]
 fn main() -> ! {
-    let peripherals = esp_hal::init(esp_hal::config::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let rtc = Rtc::new(peripherals.LPWR);
     let delay = Delay::new();

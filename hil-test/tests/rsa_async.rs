@@ -57,7 +57,7 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        let peripherals = esp_hal::init(esp_hal::config::Config::default());
+        let peripherals = esp_hal::init(esp_hal::Config::default());
         let mut rsa = Rsa::new_async(peripherals.RSA);
         nb::block!(rsa.ready()).unwrap();
 

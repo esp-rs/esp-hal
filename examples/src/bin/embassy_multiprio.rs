@@ -71,7 +71,7 @@ async fn main(low_prio_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     println!("Init!");
 
-    let peripherals = esp_hal::init(esp_hal::config::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 

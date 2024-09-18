@@ -26,7 +26,7 @@ static SWINT3: Mutex<RefCell<Option<SoftwareInterrupt<3>>>> = Mutex::new(RefCell
 
 #[entry]
 fn main() -> ! {
-    let peripherals = esp_hal::init(esp_hal::config::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let mut sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 

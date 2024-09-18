@@ -72,7 +72,7 @@ mod test {
     #[test]
     #[timeout(3)]
     async fn run_interrupt_executor_test() {
-        let peripherals = esp_hal::init(esp_hal::config::Config::default());
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_hal_embassy::init([AnyTimer::from(timg0.timer0), AnyTimer::from(timg0.timer1)]);

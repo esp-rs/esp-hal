@@ -15,22 +15,20 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! let peripherals = esp_hal::init(esp_hal::config::Config::default());
+//! let peripherals = esp_hal::init(esp_hal::Config::default());
 //! # }
 //! ```
 //! 
 //! ### Custom initialization
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! let mut config = esp_hal::config::Config::default();
+//! let mut config = esp_hal::Config::default();
 //! config.cpu_clock = CpuClock::max();
 //! config.watchdog.rwdt =
 //!     esp_hal::config::WatchdogStatus::Enabled(fugit::MicrosDurationU64::millis(1000 as u64));
 //! let peripherals = esp_hal::init(config);
 //! # }
 //! ```
-
-use crate::clock::CpuClock;
 
 /// Watchdog status.
 #[derive(Default, PartialEq)]
@@ -58,14 +56,4 @@ pub struct WatchdogConfig {
     ///
     /// By default, the bootloader does not enables this watchdog timer.
     pub timg1: WatchdogStatus,
-}
-
-/// System configuration.
-#[non_exhaustive]
-#[derive(Default)]
-pub struct Config {
-    /// The CPU clock configuration.
-    pub cpu_clock: CpuClock,
-    /// Enable watchdog timer(s).
-    pub watchdog: WatchdogConfig,
 }

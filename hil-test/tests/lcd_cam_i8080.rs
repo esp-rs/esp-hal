@@ -41,7 +41,7 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        let peripherals = esp_hal::init(esp_hal::config::Config::default());
+        let peripherals = esp_hal::init(esp_hal::Config::default());
         let dma = Dma::new(peripherals.DMA);
         let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
         let pcnt = Pcnt::new(peripherals.PCNT);

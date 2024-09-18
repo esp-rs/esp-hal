@@ -31,7 +31,7 @@ static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
 
 #[entry]
 fn main() -> ! {
-    let peripherals = esp_hal::init(esp_hal::config::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let delay = Delay::new();
 

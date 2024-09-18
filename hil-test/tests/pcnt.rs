@@ -26,7 +26,7 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        let peripherals = esp_hal::init(esp_hal::config::Config::default());
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

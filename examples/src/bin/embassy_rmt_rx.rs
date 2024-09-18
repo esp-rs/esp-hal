@@ -39,7 +39,7 @@ async fn signal_task(mut pin: Output<'static>) {
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
     println!("Init!");
-    let peripherals = esp_hal::init(esp_hal::config::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);

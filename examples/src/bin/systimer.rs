@@ -47,7 +47,7 @@ static ALARM2: Mutex<
 
 #[entry]
 fn main() -> ! {
-    let peripherals = esp_hal::init(esp_hal::config::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
     println!("SYSTIMER Current value = {}", SystemTimer::now());

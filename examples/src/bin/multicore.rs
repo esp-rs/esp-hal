@@ -23,7 +23,7 @@ static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 
 #[entry]
 fn main() -> ! {
-    let peripherals = esp_hal::init(esp_hal::config::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let delay = Delay::new();
 

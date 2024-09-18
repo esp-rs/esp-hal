@@ -23,7 +23,7 @@ mod tests {
     #[test]
     #[timeout(1)]
     fn rmt_loopback() {
-        let peripherals = esp_hal::init(esp_hal::config::Config::default());
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

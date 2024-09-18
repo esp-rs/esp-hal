@@ -6,11 +6,12 @@
 #![no_main]
 
 use esp_hal::{
-    config::{Config, WatchdogStatus},
+    config::WatchdogStatus,
     delay::Delay,
     prelude::*,
     rtc_cntl::Rtc,
     timer::timg::TimerGroup,
+    Config,
 };
 use hil_test as _;
 

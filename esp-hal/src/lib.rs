@@ -73,7 +73,7 @@
 //!
 //! #[entry]
 //! fn main() -> ! {
-//!     let peripherals = esp_hal::init(esp_hal::config::Config::default());
+//!     let peripherals = esp_hal::init(esp_hal::Config::default());
 //!
 //!     // Set GPIO0 as an output, and set its state high initially.
 //!     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -725,16 +725,26 @@ macro_rules! before_snippet {
 #     loop {}
 # }
 # fn main() {
-#     let mut peripherals = esp_hal::init(esp_hal::config::Config::default());
+#     let mut peripherals = esp_hal::init(esp_hal::Config::default());
 "#
     };
 }
 
 use crate::{
-    clock::Clocks,
-    config::{Config, WatchdogStatus},
+    clock::{Clocks, CpuClock},
+    config::{WatchdogConfig, WatchdogStatus},
     peripherals::Peripherals,
 };
+
+/// System configuration.
+#[non_exhaustive]
+#[derive(Default)]
+pub struct Config {
+    /// The CPU clock configuration.
+    pub cpu_clock: CpuClock,
+    /// Enable watchdog timer(s).
+    pub watchdog: WatchdogConfig,
+}
 
 /// Initialize the system.
 ///

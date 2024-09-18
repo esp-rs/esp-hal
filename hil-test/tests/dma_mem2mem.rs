@@ -38,7 +38,7 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let peripherals = esp_hal::init(esp_hal::config::Config::default());
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let dma = Dma::new(peripherals.DMA);
         let channel = dma.channel0.configure(false, DmaPriority::Priority0);

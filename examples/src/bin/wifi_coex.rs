@@ -49,7 +49,7 @@ const PASSWORD: &str = env!("PASSWORD");
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init({
-        let mut config = esp_hal::config::Config::default();
+        let mut config = esp_hal::Config::default();
         config.cpu_clock = CpuClock::max();
         config
     });

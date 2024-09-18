@@ -78,7 +78,7 @@ async fn reader(
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
     esp_println::println!("Init!");
-    let peripherals = esp_hal::init(esp_hal::config::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
