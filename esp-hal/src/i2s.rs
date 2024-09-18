@@ -575,7 +575,7 @@ where
     }
 
     fn write_bytes(&mut self, data: &[u8]) -> Result<(), Error> {
-        let ptr = data as *const _ as *const u8;
+        let ptr = data.as_ptr();
 
         // Reset TX unit and TX FIFO
         T::reset_tx();
@@ -650,10 +650,7 @@ where
 {
     fn write(&mut self, words: &[W]) -> Result<(), Error> {
         self.write_bytes(unsafe {
-            core::slice::from_raw_parts(
-                words as *const _ as *const u8,
-                core::mem::size_of_val(words),
-            )
+            core::slice::from_raw_parts(words.as_ptr().cast::<u8>(), core::mem::size_of_val(words))
         })
     }
 }
@@ -756,7 +753,7 @@ where
     }
 
     fn read_bytes(&mut self, data: &mut [u8]) -> Result<(), Error> {
-        let ptr = data as *mut _ as *mut u8;
+        let ptr = data.as_mut_ptr();
 
         // Reset RX unit and RX FIFO
         T::reset_rx();
@@ -831,7 +828,7 @@ where
 
         self.read_bytes(unsafe {
             core::slice::from_raw_parts_mut(
-                words as *mut _ as *mut u8,
+                words.as_mut_ptr().cast::<u8>(),
                 core::mem::size_of_val(words),
             )
         })
