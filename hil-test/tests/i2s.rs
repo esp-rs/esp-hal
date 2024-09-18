@@ -3,7 +3,7 @@
 //! This test uses I2S TX to transmit known data to I2S RX (forced to slave mode
 //! with loopback mode enabled). It's using circular DMA mode
 
-//% CHIPS: esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
@@ -46,6 +46,8 @@ impl Iterator for SampleSource {
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
+    use defmt::assert_eq;
+
     use super::*;
 
     #[test]
@@ -100,7 +102,7 @@ mod tests {
         unsafe {
             let i2s = esp_hal::peripherals::I2S0::steal();
             cfg_if::cfg_if! {
-                if #[cfg(esp32s2)] {
+                if #[cfg(any(esp32, esp32s2))] {
                     i2s.conf().modify(|_, w| w.sig_loopback().set_bit());
                     i2s.conf().modify(|_, w| w.rx_slave_mod().set_bit());
                 } else {
