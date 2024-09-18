@@ -60,10 +60,6 @@ name    = "i2s"
 harness = false
 
 [[test]]
-name    = "i2s_async"
-harness = false
-
-[[test]]
 name    = "lcd_cam_i8080"
 harness = false
 
