@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `Rtc::set_current_time` to allow setting RTC time, and `Rtc::current_time` to getting RTC time while taking into account boot time (#1883)
 - Added APIs to allow connecting signals through the GPIO matrix. (#2128)
 - Implement `TryFrom<u32>` for `ledc::timer::config::Duty` (#1984)
+- Expose `RtcClock::get_xtal_freq` and `RtcClock::get_slow_freq` publically for all chips (#2183)
 
 ### Changed
 

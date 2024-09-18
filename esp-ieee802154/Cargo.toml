@@ -31,3 +31,4 @@ cfg-if            = "1.0.0"
 [features]
 esp32c6 = ["esp-hal/esp32c6", "esp-wifi-sys/esp32c6"]
 esp32h2 = ["esp-hal/esp32h2", "esp-wifi-sys/esp32h2"]
+binary-logs = ["esp-wifi-sys/binary-logs"]

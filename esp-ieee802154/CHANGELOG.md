@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Modified CCA threshold value to default of -60 
+- Modified CCA threshold value to default of -60
+- The driver now take `RADIO_CLK` by value to avoid a collision with esp-wifi's usage (#2183)
 
 ### Fixed
 

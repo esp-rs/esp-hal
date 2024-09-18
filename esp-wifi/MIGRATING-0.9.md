@@ -102,3 +102,10 @@ We've replaced usage of `cfg_toml` with [esp-config](https://docs.rs/esp-config)
 # key in .cargo/config.toml [env] section
 + ESP_WIFI_RX_QUEUE_SIZE=40
 ```
+
+### `wifi-logs` feature renamed to `binary-logs`
+
+```diff
+- features = ["wifi-logs"]
++ features = ["binary-logs"]
+```
