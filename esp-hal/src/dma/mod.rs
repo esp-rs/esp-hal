@@ -1519,6 +1519,8 @@ pub trait TxPrivate: crate::private::Sealed {
 
     fn start_transfer(&mut self) -> Result<(), DmaError>;
 
+    fn stop_transfer(&mut self);
+
     #[cfg(esp32s3)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
 
@@ -1592,6 +1594,10 @@ where
         } else {
             Ok(())
         }
+    }
+
+    fn stop_transfer(&mut self) {
+        R::stop_out()
     }
 
     fn clear_ch_out_done(&self) {
@@ -1713,6 +1719,10 @@ where
         self.tx_impl.start_transfer()
     }
 
+    fn stop_transfer(&mut self) {
+        self.tx_impl.stop_transfer();
+    }
+
     #[cfg(esp32s3)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
         CH::Channel::set_out_ext_mem_block_size(size);
@@ -1806,6 +1816,7 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn has_out_descriptor_error() -> bool;
     fn set_out_peripheral(peripheral: u8);
     fn start_out();
+    fn stop_out();
     fn clear_ch_out_done();
     fn is_ch_out_done_set() -> bool;
     fn listen_ch_out_done();

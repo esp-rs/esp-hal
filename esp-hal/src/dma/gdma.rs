@@ -167,6 +167,12 @@ impl<const N: u8> RegisterAccess for Channel<N> {
             .modify(|_, w| w.outlink_start().set_bit());
     }
 
+    fn stop_out() {
+        Self::ch()
+            .out_link()
+            .modify(|_, w| w.outlink_stop().set_bit());
+    }
+
     fn clear_ch_out_done() {
         Self::out_int()
             .clr()

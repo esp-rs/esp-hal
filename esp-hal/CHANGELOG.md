@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - You can now use `Input`, `Output`, `OutputOpenDrain` and `Flex` pins as EXTI and RTCIO wakeup sources (#2095)
 - Added `Rtc::set_current_time` to allow setting RTC time, and `Rtc::current_time` to getting RTC time while taking into account boot time (#1883)
 - Added APIs to allow connecting signals through the GPIO matrix. (#2128)
+- Allow I8080 transfers to be cancelled on the spot (#2191)
 - Implement `TryFrom<u32>` for `ledc::timer::config::Duty` (#1984)
 
 ### Changed
@@ -40,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32: Added support for touch sensing on GPIO32 and 33 (#2109)
 - Removed gpio pin generics from I8080 driver type. (#2171)
 - I8080 driver now decides bus width at transfer time rather than construction time. (#2171)
+- Migrate the I8080 driver to a move based API (#2191)
 - Replaced `AnyPin` with `InputSignal` and `OutputSignal` and renamed `ErasedPin` to `AnyPin` (#2128)
 - Replaced the `ErasedTimer` enum with the `AnyTimer` struct. (#?)
 - Changed the parameters of `Spi::with_pins` to no longer be optional (#2133)

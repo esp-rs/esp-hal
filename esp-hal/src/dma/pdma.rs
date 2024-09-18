@@ -122,6 +122,11 @@ macro_rules! ImplSpiChannel {
                     spi.dma_out_link().modify(|_, w| w.outlink_start().set_bit());
                 }
 
+                fn stop_out() {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_out_link().modify(|_, w| w.outlink_stop().set_bit());
+                }
+
                 fn clear_ch_out_done() {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
                     spi.dma_int_clr().write(|w| w.out_done().clear_bit_by_one());
@@ -514,6 +519,11 @@ macro_rules! ImplI2sChannel {
                 fn start_out() {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
                     reg_block.out_link().modify(|_, w| w.outlink_start().set_bit());
+                }
+
+                fn stop_out() {
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.out_link().modify(|_, w| w.outlink_stop().set_bit());
                 }
 
                 fn clear_ch_out_done() {
