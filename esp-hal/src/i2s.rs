@@ -1112,24 +1112,18 @@ mod private {
             i2s.clkm_conf().modify(|_, w| w.clka_ena().clear_bit());
 
             i2s.clkm_conf().modify(|_, w| unsafe {
-                w.clk_en()
-                    .set_bit()
-                    .clkm_div_num()
-                    .bits(clock_settings.mclk_divider as u8)
+                w.clk_en().set_bit();
+                w.clkm_div_num().bits(clock_settings.mclk_divider as u8)
             });
 
             i2s.clkm_conf().modify(|_, w| unsafe {
-                w.clkm_div_a()
-                    .bits(clock_settings.denominator as u8)
-                    .clkm_div_b()
-                    .bits(clock_settings.numerator as u8)
+                w.clkm_div_a().bits(clock_settings.denominator as u8);
+                w.clkm_div_b().bits(clock_settings.numerator as u8)
             });
 
             i2s.sample_rate_conf().modify(|_, w| unsafe {
-                w.tx_bck_div_num()
-                    .bits(clock_settings.bclk_divider as u8)
-                    .rx_bck_div_num()
-                    .bits(clock_settings.bclk_divider as u8)
+                w.tx_bck_div_num().bits(clock_settings.bclk_divider as u8);
+                w.rx_bck_div_num().bits(clock_settings.bclk_divider as u8)
             });
         }
 
@@ -1147,58 +1141,49 @@ mod private {
                 .modify(|_, w| unsafe { w.rx_bits_mod().bits(data_format.channel_bits()) });
 
             i2s.conf().modify(|_, w| {
-                w.tx_slave_mod()
-                    .clear_bit()
-                    .rx_slave_mod()
-                    .clear_bit()
-                    .tx_msb_shift()
-                    .set_bit() // ?
-                    .rx_msb_shift()
-                    .set_bit() // ?
-                    .tx_short_sync()
-                    .bit(false) //??
-                    .rx_short_sync()
-                    .bit(false) //??
-                    .tx_msb_right()
-                    .clear_bit()
-                    .rx_msb_right()
-                    .clear_bit()
-                    .tx_right_first()
-                    .clear_bit()
-                    .rx_right_first()
-                    .clear_bit()
-                    .tx_mono()
-                    .clear_bit()
-                    .rx_mono()
-                    .clear_bit()
-                    .sig_loopback()
-                    .clear_bit()
+                w.tx_slave_mod().clear_bit();
+                w.rx_slave_mod().clear_bit();
+                w.tx_msb_shift().set_bit(); // ?
+                w.rx_msb_shift().set_bit(); // ?
+                w.tx_short_sync().bit(false); //??
+                w.rx_short_sync().bit(false); //??
+                w.tx_msb_right().clear_bit();
+                w.rx_msb_right().clear_bit();
+                w.tx_right_first().clear_bit();
+                w.rx_right_first().clear_bit();
+                w.tx_mono().clear_bit();
+                w.rx_mono().clear_bit();
+                w.sig_loopback().clear_bit()
             });
 
             i2s.fifo_conf().modify(|_, w| unsafe {
-                w.tx_fifo_mod()
-                    .bits(fifo_mod)
-                    .tx_fifo_mod_force_en()
-                    .set_bit()
-                    .dscr_en()
-                    .set_bit()
-                    .rx_fifo_mod()
-                    .bits(fifo_mod)
-                    .rx_fifo_mod_force_en()
-                    .set_bit()
+                w.tx_fifo_mod().bits(fifo_mod);
+                w.tx_fifo_mod_force_en().set_bit();
+                w.dscr_en().set_bit();
+                w.rx_fifo_mod().bits(fifo_mod);
+                w.rx_fifo_mod_force_en().set_bit()
             });
 
-            i2s.conf_chan()
-                .modify(|_, w| unsafe { w.tx_chan_mod().bits(0).rx_chan_mod().bits(0) }); // for now only stereo
+            i2s.conf_chan().modify(|_, w| unsafe {
+                // for now only stereo
+                w.tx_chan_mod().bits(0);
+                w.rx_chan_mod().bits(0)
+            });
 
-            i2s.conf1()
-                .modify(|_, w| w.tx_pcm_bypass().set_bit().rx_pcm_bypass().set_bit());
+            i2s.conf1().modify(|_, w| {
+                w.tx_pcm_bypass().set_bit();
+                w.rx_pcm_bypass().set_bit()
+            });
 
-            i2s.pd_conf()
-                .modify(|_, w| w.fifo_force_pu().set_bit().fifo_force_pd().clear_bit());
+            i2s.pd_conf().modify(|_, w| {
+                w.fifo_force_pu().set_bit();
+                w.fifo_force_pd().clear_bit()
+            });
 
-            i2s.conf2()
-                .modify(|_, w| w.camera_en().clear_bit().lcd_en().clear_bit());
+            i2s.conf2().modify(|_, w| {
+                w.camera_en().clear_bit();
+                w.lcd_en().clear_bit()
+            });
         }
 
         fn set_master() {
@@ -1213,19 +1198,21 @@ mod private {
 
         fn reset_tx() {
             let i2s = Self::register_block();
-            i2s.conf()
-                .modify(|_, w| w.tx_reset().set_bit().tx_fifo_reset().set_bit());
-            i2s.conf()
-                .modify(|_, w| w.tx_reset().clear_bit().tx_fifo_reset().clear_bit());
+            i2s.conf().modify(|_, w| {
+                w.tx_reset().set_bit();
+                w.tx_fifo_reset().set_bit()
+            });
+            i2s.conf().modify(|_, w| {
+                w.tx_reset().clear_bit();
+                w.tx_fifo_reset().clear_bit()
+            });
 
             i2s.lc_conf().modify(|_, w| w.out_rst().set_bit());
             i2s.lc_conf().modify(|_, w| w.out_rst().clear_bit());
 
             i2s.int_clr().write(|w| {
-                w.out_done()
-                    .clear_bit_by_one()
-                    .out_total_eof()
-                    .clear_bit_by_one()
+                w.out_done().clear_bit_by_one();
+                w.out_total_eof().clear_bit_by_one()
             });
         }
 
@@ -1254,19 +1241,21 @@ mod private {
 
         fn reset_rx() {
             let i2s = Self::register_block();
-            i2s.conf()
-                .modify(|_, w| w.rx_reset().set_bit().rx_fifo_reset().set_bit());
-            i2s.conf()
-                .modify(|_, w| w.rx_reset().clear_bit().rx_fifo_reset().clear_bit());
+            i2s.conf().modify(|_, w| {
+                w.rx_reset().set_bit();
+                w.rx_fifo_reset().set_bit()
+            });
+            i2s.conf().modify(|_, w| {
+                w.rx_reset().clear_bit();
+                w.rx_fifo_reset().clear_bit()
+            });
 
             i2s.lc_conf().modify(|_, w| w.in_rst().set_bit());
             i2s.lc_conf().modify(|_, w| w.in_rst().clear_bit());
 
             i2s.int_clr().write(|w| {
-                w.in_done()
-                    .clear_bit_by_one()
-                    .in_suc_eof()
-                    .clear_bit_by_one()
+                w.in_done().clear_bit_by_one();
+                w.in_suc_eof().clear_bit_by_one()
             });
         }
 
@@ -1432,14 +1421,10 @@ mod private {
             }
 
             i2s.tx_clkm_div_conf().modify(|_, w| unsafe {
-                w.tx_clkm_div_x()
-                    .bits(clkm_div_x as u16)
-                    .tx_clkm_div_y()
-                    .bits(clkm_div_y as u16)
-                    .tx_clkm_div_yn1()
-                    .bit(clkm_div_yn1 != 0)
-                    .tx_clkm_div_z()
-                    .bits(clkm_div_z as u16)
+                w.tx_clkm_div_x().bits(clkm_div_x as u16);
+                w.tx_clkm_div_y().bits(clkm_div_y as u16);
+                w.tx_clkm_div_yn1().bit(clkm_div_yn1 != 0);
+                w.tx_clkm_div_z().bits(clkm_div_z as u16)
             });
 
             i2s.tx_clkm_conf().modify(|_, w| unsafe {
@@ -1459,25 +1444,19 @@ mod private {
             });
 
             i2s.rx_clkm_div_conf().modify(|_, w| unsafe {
-                w.rx_clkm_div_x()
-                    .bits(clkm_div_x as u16)
-                    .rx_clkm_div_y()
-                    .bits(clkm_div_y as u16)
-                    .rx_clkm_div_yn1()
-                    .bit(clkm_div_yn1 != 0)
-                    .rx_clkm_div_z()
-                    .bits(clkm_div_z as u16)
+                w.rx_clkm_div_x().bits(clkm_div_x as u16);
+                w.rx_clkm_div_y().bits(clkm_div_y as u16);
+                w.rx_clkm_div_yn1().bit(clkm_div_yn1 != 0);
+                w.rx_clkm_div_z().bits(clkm_div_z as u16)
             });
 
             i2s.rx_clkm_conf().modify(|_, w| unsafe {
-                w.rx_clk_active()
-                    .set_bit()
-                    .rx_clk_sel()
-                    .bits(crate::soc::constants::I2S_DEFAULT_CLK_SRC) // for now fixed at 160MHz
-                    .rx_clkm_div_num()
-                    .bits(clock_settings.mclk_divider as u8)
-                    .mclk_sel()
-                    .bit(true)
+                w.rx_clk_active().set_bit();
+                // for now fixed at 160MHz
+                w.rx_clk_sel()
+                    .bits(crate::soc::constants::I2S_DEFAULT_CLK_SRC);
+                w.rx_clkm_div_num().bits(clock_settings.mclk_divider as u8);
+                w.mclk_sel().bit(true)
             });
 
             i2s.rx_conf1().modify(|_, w| unsafe {
@@ -1531,22 +1510,18 @@ mod private {
             }
 
             pcr.i2s_tx_clkm_div_conf().modify(|_, w| unsafe {
-                w.i2s_tx_clkm_div_x()
-                    .bits(clkm_div_x as u16)
-                    .i2s_tx_clkm_div_y()
-                    .bits(clkm_div_y as u16)
-                    .i2s_tx_clkm_div_yn1()
-                    .bit(clkm_div_yn1 != 0)
-                    .i2s_tx_clkm_div_z()
-                    .bits(clkm_div_z as u16)
+                w.i2s_tx_clkm_div_x().bits(clkm_div_x as u16);
+                w.i2s_tx_clkm_div_y().bits(clkm_div_y as u16);
+                w.i2s_tx_clkm_div_yn1().bit(clkm_div_yn1 != 0);
+                w.i2s_tx_clkm_div_z().bits(clkm_div_z as u16)
             });
 
             pcr.i2s_tx_clkm_conf().modify(|_, w| unsafe {
-                w.i2s_tx_clkm_en()
-                    .set_bit()
-                    .i2s_tx_clkm_sel()
-                    .bits(crate::soc::constants::I2S_DEFAULT_CLK_SRC) // for now fixed at 160MHz for C6 and 96MHz for H2
-                    .i2s_tx_clkm_div_num()
+                w.i2s_tx_clkm_en().set_bit();
+                // for now fixed at 160MHz for C6 and 96MHz for H2
+                w.i2s_tx_clkm_sel()
+                    .bits(crate::soc::constants::I2S_DEFAULT_CLK_SRC);
+                w.i2s_tx_clkm_div_num()
                     .bits(clock_settings.mclk_divider as u8)
             });
 
@@ -1562,25 +1537,20 @@ mod private {
             });
 
             pcr.i2s_rx_clkm_div_conf().modify(|_, w| unsafe {
-                w.i2s_rx_clkm_div_x()
-                    .bits(clkm_div_x as u16)
-                    .i2s_rx_clkm_div_y()
-                    .bits(clkm_div_y as u16)
-                    .i2s_rx_clkm_div_yn1()
-                    .bit(clkm_div_yn1 != 0)
-                    .i2s_rx_clkm_div_z()
-                    .bits(clkm_div_z as u16)
+                w.i2s_rx_clkm_div_x().bits(clkm_div_x as u16);
+                w.i2s_rx_clkm_div_y().bits(clkm_div_y as u16);
+                w.i2s_rx_clkm_div_yn1().bit(clkm_div_yn1 != 0);
+                w.i2s_rx_clkm_div_z().bits(clkm_div_z as u16)
             });
 
             pcr.i2s_rx_clkm_conf().modify(|_, w| unsafe {
-                w.i2s_rx_clkm_en()
-                    .set_bit()
-                    .i2s_rx_clkm_sel()
-                    .bits(crate::soc::constants::I2S_DEFAULT_CLK_SRC) // for now fixed at 160MHz for C6 and 96MHz for H2
-                    .i2s_rx_clkm_div_num()
-                    .bits(clock_settings.mclk_divider as u8)
-                    .i2s_mclk_sel()
-                    .bit(true)
+                w.i2s_rx_clkm_en().set_bit();
+                // for now fixed at 160MHz for C6 and 96MHz for H2
+                w.i2s_rx_clkm_sel()
+                    .bits(crate::soc::constants::I2S_DEFAULT_CLK_SRC);
+                w.i2s_rx_clkm_div_num()
+                    .bits(clock_settings.mclk_divider as u8);
+                w.i2s_mclk_sel().bit(true)
             });
             #[cfg(not(esp32h2))]
             i2s.rx_conf1().modify(|_, w| unsafe {
@@ -1600,88 +1570,55 @@ mod private {
             #[allow(clippy::useless_conversion)]
             i2s.tx_conf1().modify(|_, w| unsafe {
                 w.tx_tdm_ws_width()
-                    .bits((data_format.channel_bits() - 1).into())
-                    .tx_bits_mod()
-                    .bits(data_format.data_bits() - 1)
-                    .tx_tdm_chan_bits()
-                    .bits(data_format.channel_bits() - 1)
-                    .tx_half_sample_bits()
-                    .bits(data_format.channel_bits() - 1)
+                    .bits((data_format.channel_bits() - 1).into());
+                w.tx_bits_mod().bits(data_format.data_bits() - 1);
+                w.tx_tdm_chan_bits().bits(data_format.channel_bits() - 1);
+                w.tx_half_sample_bits().bits(data_format.channel_bits() - 1)
             });
             #[cfg(not(esp32h2))]
             i2s.tx_conf1().modify(|_, w| w.tx_msb_shift().set_bit());
             #[cfg(esp32h2)]
             i2s.tx_conf().modify(|_, w| w.tx_msb_shift().set_bit());
             i2s.tx_conf().modify(|_, w| unsafe {
-                w.tx_mono()
-                    .clear_bit()
-                    .tx_mono_fst_vld()
-                    .set_bit()
-                    .tx_stop_en()
-                    .set_bit()
-                    .tx_chan_equal()
-                    .clear_bit()
-                    .tx_tdm_en()
-                    .set_bit()
-                    .tx_pdm_en()
-                    .clear_bit()
-                    .tx_pcm_bypass()
-                    .set_bit()
-                    .tx_big_endian()
-                    .clear_bit()
-                    .tx_bit_order()
-                    .clear_bit()
-                    .tx_chan_mod()
-                    .bits(0)
+                w.tx_mono().clear_bit();
+                w.tx_mono_fst_vld().set_bit();
+                w.tx_stop_en().set_bit();
+                w.tx_chan_equal().clear_bit();
+                w.tx_tdm_en().set_bit();
+                w.tx_pdm_en().clear_bit();
+                w.tx_pcm_bypass().set_bit();
+                w.tx_big_endian().clear_bit();
+                w.tx_bit_order().clear_bit();
+                w.tx_chan_mod().bits(0)
             });
 
             i2s.tx_tdm_ctrl().modify(|_, w| unsafe {
-                w.tx_tdm_tot_chan_num()
-                    .bits(1)
-                    .tx_tdm_chan0_en()
-                    .set_bit()
-                    .tx_tdm_chan1_en()
-                    .set_bit()
-                    .tx_tdm_chan2_en()
-                    .clear_bit()
-                    .tx_tdm_chan3_en()
-                    .clear_bit()
-                    .tx_tdm_chan4_en()
-                    .clear_bit()
-                    .tx_tdm_chan5_en()
-                    .clear_bit()
-                    .tx_tdm_chan6_en()
-                    .clear_bit()
-                    .tx_tdm_chan7_en()
-                    .clear_bit()
-                    .tx_tdm_chan8_en()
-                    .clear_bit()
-                    .tx_tdm_chan9_en()
-                    .clear_bit()
-                    .tx_tdm_chan10_en()
-                    .clear_bit()
-                    .tx_tdm_chan11_en()
-                    .clear_bit()
-                    .tx_tdm_chan12_en()
-                    .clear_bit()
-                    .tx_tdm_chan13_en()
-                    .clear_bit()
-                    .tx_tdm_chan14_en()
-                    .clear_bit()
-                    .tx_tdm_chan15_en()
-                    .clear_bit()
+                w.tx_tdm_tot_chan_num().bits(1);
+                w.tx_tdm_chan0_en().set_bit();
+                w.tx_tdm_chan1_en().set_bit();
+                w.tx_tdm_chan2_en().clear_bit();
+                w.tx_tdm_chan3_en().clear_bit();
+                w.tx_tdm_chan4_en().clear_bit();
+                w.tx_tdm_chan5_en().clear_bit();
+                w.tx_tdm_chan6_en().clear_bit();
+                w.tx_tdm_chan7_en().clear_bit();
+                w.tx_tdm_chan8_en().clear_bit();
+                w.tx_tdm_chan9_en().clear_bit();
+                w.tx_tdm_chan10_en().clear_bit();
+                w.tx_tdm_chan11_en().clear_bit();
+                w.tx_tdm_chan12_en().clear_bit();
+                w.tx_tdm_chan13_en().clear_bit();
+                w.tx_tdm_chan14_en().clear_bit();
+                w.tx_tdm_chan15_en().clear_bit()
             });
 
             #[allow(clippy::useless_conversion)]
             i2s.rx_conf1().modify(|_, w| unsafe {
                 w.rx_tdm_ws_width()
-                    .bits((data_format.channel_bits() - 1).into())
-                    .rx_bits_mod()
-                    .bits(data_format.data_bits() - 1)
-                    .rx_tdm_chan_bits()
-                    .bits(data_format.channel_bits() - 1)
-                    .rx_half_sample_bits()
-                    .bits(data_format.channel_bits() - 1)
+                    .bits((data_format.channel_bits() - 1).into());
+                w.rx_bits_mod().bits(data_format.data_bits() - 1);
+                w.rx_tdm_chan_bits().bits(data_format.channel_bits() - 1);
+                w.rx_half_sample_bits().bits(data_format.channel_bits() - 1)
             });
             #[cfg(not(esp32h2))]
             i2s.rx_conf1().modify(|_, w| w.rx_msb_shift().set_bit());
@@ -1689,59 +1626,34 @@ mod private {
             i2s.rx_conf().modify(|_, w| w.rx_msb_shift().set_bit());
 
             i2s.rx_conf().modify(|_, w| unsafe {
-                w.rx_mono()
-                    .clear_bit()
-                    .rx_mono_fst_vld()
-                    .set_bit()
-                    .rx_stop_mode()
-                    .bits(2)
-                    .rx_tdm_en()
-                    .set_bit()
-                    .rx_pdm_en()
-                    .clear_bit()
-                    .rx_pcm_bypass()
-                    .set_bit()
-                    .rx_big_endian()
-                    .clear_bit()
-                    .rx_bit_order()
-                    .clear_bit()
+                w.rx_mono().clear_bit();
+                w.rx_mono_fst_vld().set_bit();
+                w.rx_stop_mode().bits(2);
+                w.rx_tdm_en().set_bit();
+                w.rx_pdm_en().clear_bit();
+                w.rx_pcm_bypass().set_bit();
+                w.rx_big_endian().clear_bit();
+                w.rx_bit_order().clear_bit()
             });
 
             i2s.rx_tdm_ctrl().modify(|_, w| unsafe {
-                w.rx_tdm_tot_chan_num()
-                    .bits(1)
-                    .rx_tdm_pdm_chan0_en()
-                    .set_bit()
-                    .rx_tdm_pdm_chan1_en()
-                    .set_bit()
-                    .rx_tdm_pdm_chan2_en()
-                    .clear_bit()
-                    .rx_tdm_pdm_chan3_en()
-                    .clear_bit()
-                    .rx_tdm_pdm_chan4_en()
-                    .clear_bit()
-                    .rx_tdm_pdm_chan5_en()
-                    .clear_bit()
-                    .rx_tdm_pdm_chan6_en()
-                    .clear_bit()
-                    .rx_tdm_pdm_chan7_en()
-                    .clear_bit()
-                    .rx_tdm_chan8_en()
-                    .clear_bit()
-                    .rx_tdm_chan9_en()
-                    .clear_bit()
-                    .rx_tdm_chan10_en()
-                    .clear_bit()
-                    .rx_tdm_chan11_en()
-                    .clear_bit()
-                    .rx_tdm_chan12_en()
-                    .clear_bit()
-                    .rx_tdm_chan13_en()
-                    .clear_bit()
-                    .rx_tdm_chan14_en()
-                    .clear_bit()
-                    .rx_tdm_chan15_en()
-                    .clear_bit()
+                w.rx_tdm_tot_chan_num().bits(1);
+                w.rx_tdm_pdm_chan0_en().set_bit();
+                w.rx_tdm_pdm_chan1_en().set_bit();
+                w.rx_tdm_pdm_chan2_en().clear_bit();
+                w.rx_tdm_pdm_chan3_en().clear_bit();
+                w.rx_tdm_pdm_chan4_en().clear_bit();
+                w.rx_tdm_pdm_chan5_en().clear_bit();
+                w.rx_tdm_pdm_chan6_en().clear_bit();
+                w.rx_tdm_pdm_chan7_en().clear_bit();
+                w.rx_tdm_chan8_en().clear_bit();
+                w.rx_tdm_chan9_en().clear_bit();
+                w.rx_tdm_chan10_en().clear_bit();
+                w.rx_tdm_chan11_en().clear_bit();
+                w.rx_tdm_chan12_en().clear_bit();
+                w.rx_tdm_chan13_en().clear_bit();
+                w.rx_tdm_chan14_en().clear_bit();
+                w.rx_tdm_chan15_en().clear_bit()
             });
         }
 
@@ -1762,13 +1674,19 @@ mod private {
 
         fn reset_tx() {
             let i2s = Self::register_block();
-            i2s.tx_conf()
-                .modify(|_, w| w.tx_reset().set_bit().tx_fifo_reset().set_bit());
-            i2s.tx_conf()
-                .modify(|_, w| w.tx_reset().clear_bit().tx_fifo_reset().clear_bit());
+            i2s.tx_conf().modify(|_, w| {
+                w.tx_reset().set_bit();
+                w.tx_fifo_reset().set_bit()
+            });
+            i2s.tx_conf().modify(|_, w| {
+                w.tx_reset().clear_bit();
+                w.tx_fifo_reset().clear_bit()
+            });
 
-            i2s.int_clr()
-                .write(|w| w.tx_done().clear_bit_by_one().tx_hung().clear_bit_by_one());
+            i2s.int_clr().write(|w| {
+                w.tx_done().clear_bit_by_one();
+                w.tx_hung().clear_bit_by_one()
+            });
         }
 
         fn tx_start() {
@@ -1792,13 +1710,19 @@ mod private {
 
         fn reset_rx() {
             let i2s = Self::register_block();
-            i2s.rx_conf()
-                .modify(|_, w| w.rx_reset().set_bit().rx_fifo_reset().set_bit());
-            i2s.rx_conf()
-                .modify(|_, w| w.rx_reset().clear_bit().rx_fifo_reset().clear_bit());
+            i2s.rx_conf().modify(|_, w| {
+                w.rx_reset().set_bit();
+                w.rx_fifo_reset().set_bit()
+            });
+            i2s.rx_conf().modify(|_, w| {
+                w.rx_reset().clear_bit();
+                w.rx_fifo_reset().clear_bit()
+            });
 
-            i2s.int_clr()
-                .write(|w| w.rx_done().clear_bit_by_one().rx_hung().clear_bit_by_one());
+            i2s.int_clr().write(|w| {
+                w.rx_done().clear_bit_by_one();
+                w.rx_hung().clear_bit_by_one()
+            });
         }
 
         fn rx_start(len: usize) {
