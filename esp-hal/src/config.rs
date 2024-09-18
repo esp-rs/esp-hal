@@ -14,17 +14,20 @@
 //! ### Default initialization
 //!
 //! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! let peripherals = esp_hal::init(esp_hal::config::Config::default());
+//! # }
 //! ```
-//!
+//! 
 //! ### Custom initialization
-//!
 //! ```rust, no_run
+#![doc = crate::before_snippet!()]
 //! let mut config = esp_hal::config::Config::default();
-//! config.cpu_clock = CpuClock::max()
+//! config.cpu_clock = CpuClock::max();
 //! config.watchdog.rwdt =
 //!     esp_hal::config::WatchdogStatus::Enabled(fugit::MicrosDurationU64::millis(1000 as u64));
 //! let peripherals = esp_hal::init(config);
+//! # }
 //! ```
 
 use crate::clock::CpuClock;
