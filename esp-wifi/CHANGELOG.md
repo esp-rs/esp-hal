@@ -14,11 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - esp-wifi now allocates memory from the global allocator provided by `esp-alloc` (#2099)
-- Renamed the `wifi-logs` feature to `binary-logs` for consistency (#2183)
+- Renamed the `wifi-logs` feature to `sys-logs` for consistency (#2183)
 
 ### Fixed
 
-- Feature `binary-logs` doesn't break the build anymore (#2117)
+- Feature `sys-logs` doesn't break the build anymore (#2117)
 - Fixed a panic when overflow-checks are enabled (#2164)
 
 ### Removed

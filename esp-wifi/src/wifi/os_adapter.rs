@@ -1442,7 +1442,7 @@ pub unsafe extern "C" fn get_time(
 ///   None
 ///
 /// *************************************************************************
-#[cfg(feature = "binary-logs")]
+#[cfg(feature = "sys-logs")]
 pub unsafe extern "C" fn log_write(
     level: u32,
     _tag: *const crate::binary::c_types::c_char,
@@ -1468,7 +1468,7 @@ pub unsafe extern "C" fn log_write(
 ///   None
 ///
 /// *************************************************************************
-#[cfg(feature = "binary-logs")]
+#[cfg(feature = "sys-logs")]
 #[allow(improper_ctypes_definitions)]
 pub unsafe extern "C" fn log_writev(
     level: u32,

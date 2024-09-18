@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed possible integer underflow in array access
-- Fixed compile error when building binary-logs feature
+- Fixed compile error when building sys-logs feature
 
 ### Removed
 
