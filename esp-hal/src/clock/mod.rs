@@ -107,11 +107,11 @@ pub trait Clock {
 pub enum CpuClock {
     /// 80MHz CPU clock
     #[cfg(not(esp32h2))]
-    Clock80MHz = 80,
+    Clock80MHz  = 80,
 
     /// 96MHz CPU clock
     #[cfg(esp32h2)]
-    Clock96MHz = 96,
+    Clock96MHz  = 96,
 
     /// 120MHz CPU clock
     #[cfg(esp32c2)]

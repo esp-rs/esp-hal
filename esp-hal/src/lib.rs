@@ -738,7 +738,8 @@ use crate::{
 
 /// Initialize the system.
 ///
-/// This function sets up the CPU clock and watchdog, then, returns the peripherals and clocks.
+/// This function sets up the CPU clock and watchdog, then, returns the
+/// peripherals and clocks.
 pub fn init(config: Config) -> Peripherals {
     let mut peripherals = Peripherals::take();
 

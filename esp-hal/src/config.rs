@@ -4,7 +4,8 @@
 //! This module contains the initial configuation for the system.
 //!
 //! ## Configuration
-//! In the esp_hal::init method, we can configure different parameters for the system:
+//! In the esp_hal::init method, we can configure different parameters for the
+//! system:
 //! - CPU clock configuration.
 //! - Watchdog configuration.
 //!
