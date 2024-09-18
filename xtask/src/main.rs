@@ -641,7 +641,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
                 Package::EspWifi => {
                     let mut features = format!(
-                        "--features={chip},async,ps-min-modem,defmt,dump-packets,wifi-logs"
+                        "--features={chip},async,ps-min-modem,defmt,dump-packets,binary-logs"
                     );
 
                     if device.contains("wifi") {

@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Feature `wifi-logs` doesn't break the build anymore (#2117)
+- Feature `binary-logs` doesn't break the build anymore (#2117)
 - Fixed a panic when overflow-checks are enabled (#2164)
 
 ### Removed

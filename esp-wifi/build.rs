@@ -79,8 +79,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    println!("cargo:rustc-cfg={}", device_name);
-
+    println!("cargo:rustc-check-cfg=cfg(coex)");
     #[cfg(feature = "coex")]
     {
         #[cfg(all(feature = "wifi", feature = "ble"))]
