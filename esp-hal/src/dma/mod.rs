@@ -2980,11 +2980,6 @@ pub(crate) mod asynch {
         pub fn new(rx: &'a mut RX) -> Self {
             Self { rx }
         }
-
-        #[allow(dead_code)] // Dead on the C2
-        pub fn rx(&mut self) -> &mut RX {
-            self.rx
-        }
     }
 
     impl<'a, RX> core::future::Future for DmaRxFuture<'a, RX>

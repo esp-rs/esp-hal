@@ -2148,10 +2148,10 @@ pub mod asynch {
                 self.tx_chain.fill_for_tx(false, ptr, len)?;
                 future
                     .tx
-                    .prepare_transfer_without_start(T::get_dma_peripheral(), &self.tx_chain)?;
+                    .prepare_transfer_without_start(T::get_dma_peripheral(), &self.tx_chain)
+                    .and_then(|_| future.tx.start_transfer())?;
             }
 
-            future.tx.start_transfer()?;
             T::tx_start();
             future.await?;
 
@@ -2279,16 +2279,16 @@ pub mod asynch {
             // Reset TX unit and TX FIFO
             T::reset_rx();
 
-            let mut future = DmaRxFuture::new(&mut self.rx_channel);
+            let future = DmaRxFuture::new(&mut self.rx_channel);
 
             // configure DMA outlink
             unsafe {
                 self.rx_chain.fill_for_rx(false, ptr, len)?;
                 future
-                    .rx()
-                    .prepare_transfer_without_start(T::get_dma_peripheral(), &self.rx_chain)?;
+                    .rx
+                    .prepare_transfer_without_start(T::get_dma_peripheral(), &self.rx_chain)
+                    .and_then(|_| future.rx.start_transfer())?;
             }
-            future.rx().start_transfer()?;
 
             // set I2S_TX_STOP_EN if needed
 
