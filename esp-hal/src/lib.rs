@@ -248,28 +248,13 @@ mod soc;
 #[cfg(xtensa)]
 #[no_mangle]
 extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt) {
-    #[cfg(not(feature = "defmt"))]
     panic!("Unhandled level {} interrupt: {:?}", _level, _interrupt);
-
-    #[cfg(feature = "defmt")]
-    panic!(
-        "Unhandled level {} interrupt: {:?}",
-        _level,
-        defmt::Debug2Format(&_interrupt)
-    );
 }
 
 #[cfg(riscv)]
 #[no_mangle]
 extern "C" fn EspDefaultHandler(_interrupt: peripherals::Interrupt) {
-    #[cfg(not(feature = "defmt"))]
     panic!("Unhandled interrupt: {:?}", _interrupt);
-
-    #[cfg(feature = "defmt")]
-    panic!(
-        "Unhandled interrupt: {:?}",
-        defmt::Debug2Format(&_interrupt)
-    );
 }
 
 /// A marker trait for initializing drivers in a specific mode.
