@@ -304,12 +304,13 @@ where
 {
     /// Construct a new instance of [`TimerGroup`] in asynchronous mode
     pub fn new_async(_timer_group: impl Peripheral<P = T> + 'd) -> Self {
-        use crate::timer::timg::asynch::{
-            timg0_timer0_handler,
-            timg0_timer1_handler,
-            timg1_timer0_handler,
-            timg1_timer1_handler,
-        };
+        use crate::timer::timg::asynch::timg0_timer0_handler;
+        #[cfg(timg_timer1)]
+        use crate::timer::timg::asynch::timg0_timer1_handler;
+        #[cfg(timg1)]
+        use crate::timer::timg::asynch::timg1_timer0_handler;
+        #[cfg(all(timg1, timg_timer1))]
+        use crate::timer::timg::asynch::timg1_timer1_handler;
 
         match T::id() {
             0 => unsafe {
@@ -327,6 +328,7 @@ where
                         .unwrap();
                 }
             },
+            #[cfg(any(timg1, timg_timer1))]
             1 => unsafe {
                 #[cfg(timg1)]
                 {
