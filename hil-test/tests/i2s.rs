@@ -3,7 +3,7 @@
 //! This test uses I2S TX to transmit known data to I2S RX (forced to slave mode
 //! with loopback mode enabled).
 
-//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: generic-queue
 
 #![no_std]
@@ -27,7 +27,7 @@ cfg_if::cfg_if! {
         type DmaChannel0Creator = esp_hal::dma::I2s0DmaChannelCreator;
     } else {
         use esp_hal::dma::DmaChannel0;
-        type DmaChannel0Creator = esp_hal::dma::DmaChannelCreator<0>;
+        type DmaChannel0Creator = esp_hal::dma::ChannelCreator<0>;
     }
 }
 
