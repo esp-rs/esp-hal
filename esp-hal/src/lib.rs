@@ -168,6 +168,9 @@ pub mod analog;
 pub mod assist_debug;
 #[cfg(any(dport, hp_sys, pcr, system))]
 pub mod clock;
+
+pub mod config;
+
 #[cfg(any(xtensa, all(riscv, systimer)))]
 pub mod delay;
 #[cfg(any(gdma, pdma))]
@@ -728,51 +731,14 @@ macro_rules! before_snippet {
 }
 
 use crate::{
-    clock::{Clocks, CpuClock},
+    clock::Clocks,
+    config::{Config, WatchdogStatus},
     peripherals::Peripherals,
 };
 
-/// Watchdog status.
-#[derive(Default, PartialEq)]
-pub enum WatchdogStatus {
-    /// Enables a watchdog timer with the specified timeout.
-    Enabled(fugit::MicrosDurationU64),
-    /// Disables the watchdog timer.
-    #[default]
-    Disabled,
-}
-
-/// Watchdogs configuration.
-#[non_exhaustive]
-#[derive(Default)]
-pub struct WatchdogConfig {
-    #[cfg(not(any(esp32, esp32s2)))]
-    /// Enable the super watchdog timer, which is slightly less than one second.
-    pub swd: bool,
-    /// Configures the reset watchdog timer.
-    pub rwdt: WatchdogStatus,
-    /// Configures the timg0 watchdog timer.
-    pub timg0: WatchdogStatus,
-    #[cfg(timg1)]
-    /// Configures the timg1 watchdog timer.
-    ///
-    /// By default, the bootloader does not enables this watchdog timer.
-    pub timg1: WatchdogStatus,
-}
-
-/// System configuration.
-#[non_exhaustive]
-#[derive(Default)]
-pub struct Config {
-    /// The CPU clock configuration.
-    pub cpu_clock: CpuClock,
-    /// Enable watchdog timer(s).
-    pub watchdog: WatchdogConfig,
-}
-
 /// Initialize the system.
 ///
-/// This function sets up the CPU clock and returns the peripherals and clocks.
+/// This function sets up the CPU clock and watchdog, then, returns the peripherals and clocks.
 pub fn init(config: Config) -> Peripherals {
     let mut peripherals = Peripherals::take();
 
