@@ -78,7 +78,7 @@ pub fn generate_config(
     println!("cargo:rerun-if-changed=build.rs");
 
     // ensure that the prefix is `SCREAMING_SNAKE_CASE`
-    let mut prefix = screaming_snake_case(prefix);
+    let prefix = format!("{}_", screaming_snake_case(prefix));
     let mut doc_table = String::from(DOC_TABLE_HEADER);
     let mut selected_config = String::from(CHOSEN_TABLE_HEADER);
 
@@ -87,9 +87,8 @@ pub fn generate_config(
     emit_configuration(&prefix, &configs, &mut selected_config);
 
     if emit_md_tables {
-        // convert to snake case for the file name
-        prefix.make_ascii_lowercase();
-        write_config_tables(&prefix, doc_table, selected_config);
+        let file_name = snake_case(&prefix);
+        write_config_tables(&file_name, doc_table, selected_config);
     }
 
     configs
@@ -102,7 +101,7 @@ fn emit_configuration(
 ) {
     // emit cfgs and set envs
     for (name, value) in configs.into_iter() {
-        let cfg_name = snake_case(name.trim_start_matches(&format!("{prefix}_")));
+        let cfg_name = snake_case(name.trim_start_matches(prefix));
         println!("cargo:rustc-check-cfg=cfg({cfg_name})");
         match value {
             Value::Bool(true) => {
@@ -125,7 +124,7 @@ fn capture_from_env(prefix: &str, configs: &mut HashMap<String, Value>) {
 
     // Try and capture input from the environment
     for (var, value) in env::vars() {
-        if let Some(_) = var.strip_prefix(&format!("{prefix}_")) {
+        if let Some(_) = var.strip_prefix(prefix) {
             let Some(cfg) = configs.get_mut(&var) else {
                 unknown.push(var);
                 continue;
@@ -154,8 +153,7 @@ fn create_config(
     // Generate the template for the config
     let mut configs = HashMap::new();
     for (name, default, desc) in config {
-        let name = format!("{prefix}_{}", screaming_snake_case(&name));
-        // insert into config
+        let name = format!("{prefix}{}", screaming_snake_case(&name));
         configs.insert(name.clone(), default.clone());
 
         // write doc table line
@@ -163,7 +161,6 @@ fn create_config(
         writeln!(doc_table, "|**{name}**|{desc}|{default}|").unwrap();
 
         // Rebuild if config envvar changed.
-        // Note this is currently buggy and requires a clean build - PR is pending https://github.com/rust-lang/cargo/pull/14058
         println!("cargo:rerun-if-env-changed={name}");
     }
 
@@ -173,14 +170,14 @@ fn create_config(
 fn write_config_tables(prefix: &str, doc_table: String, selected_config: String) {
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     let out_file = out_dir
-        .join(format!("{prefix}_config_table.md"))
+        .join(format!("{prefix}config_table.md"))
         .to_string_lossy()
         .to_string();
     fs::write(out_file, doc_table).unwrap();
 
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     let out_file = out_dir
-        .join(format!("{prefix}_selected_config.md"))
+        .join(format!("{prefix}selected_config.md"))
         .to_string_lossy()
         .to_string();
     fs::write(out_file, selected_config).unwrap();
