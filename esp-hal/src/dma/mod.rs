@@ -613,7 +613,7 @@ macro_rules! dma_tx_buffer {
         static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
         static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; TX_DESCRIPTOR_LEN] =
             [$crate::dma::DmaDescriptor::EMPTY; TX_DESCRIPTOR_LEN];
-        let tx_buffer, tx_descriptors = unsafe {
+        let (tx_buffer, tx_descriptors) = unsafe {
             (
                 &mut TX_BUFFER,
                 &mut TX_DESCRIPTORS,
