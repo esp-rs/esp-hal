@@ -251,7 +251,7 @@ mod tests {
 
     #[test]
     fn test_symmetric_dma_transfer(ctx: Context) {
-        // This test case sends a large amount of data, twice, to verify that
+        // This test case sends a large amount of data, multiple times to verify that
         // https://github.com/esp-rs/esp-hal/issues/2151 is and remains fixed.
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
         let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
@@ -274,7 +274,11 @@ mod tests {
                 .unwrap();
 
             (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
-            assert_eq!(dma_tx_buf.as_slice(), dma_rx_buf.as_slice());
+            if dma_tx_buf.as_slice() != dma_rx_buf.as_slice() {
+                defmt::info!("dma_tx_buf: {:?}", dma_tx_buf.as_slice()[0..100]);
+                defmt::info!("dma_rx_buf: {:?}", dma_rx_buf.as_slice()[0..100]);
+                panic!("Mismatch at iteration {}", i);
+            }
         }
     }
 
