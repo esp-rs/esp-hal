@@ -609,16 +609,12 @@ macro_rules! dma_circular_descriptors_chunk_size {
 #[macro_export]
 macro_rules! dma_tx_buffer {
     ($tx_size:expr, $tx_align:expr) => {{
-        const TX_DESCRIPTOR_LEN: usize = $crate::dma::DmaTxBuf::compute_descriptor_count($tx_size, $tx_align);
+        const TX_DESCRIPTOR_LEN: usize =
+            $crate::dma::DmaTxBuf::compute_descriptor_count($tx_size, $tx_align);
         static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
         static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; TX_DESCRIPTOR_LEN] =
             [$crate::dma::DmaDescriptor::EMPTY; TX_DESCRIPTOR_LEN];
-        let (tx_buffer, tx_descriptors) = unsafe {
-            (
-                &mut TX_BUFFER,
-                &mut TX_DESCRIPTORS,
-            )
-        };
+        let (tx_buffer, tx_descriptors) = unsafe { (&mut TX_BUFFER, &mut TX_DESCRIPTORS) };
         $crate::dma::DmaTxBuf::new_with_block_size(tx_descriptors, tx_buffer, $tx_align)
     }};
 
@@ -2147,7 +2143,10 @@ impl DmaTxBuf {
     pub const fn compute_chunk_size(block_size: Option<DmaBufBlkSize>) -> usize {
         match block_size {
             Some(size) => 4096 - size as usize,
-            None => 4095, // TODO: does this need to be chip specific?
+            #[cfg(esp32)]
+            None => 4092, // esp32 requires 4 byte alignment
+            #[cfg(not(esp32))]
+            None => 4095,
         }
     }
 
