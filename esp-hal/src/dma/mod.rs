@@ -591,6 +591,42 @@ macro_rules! dma_circular_descriptors_chunk_size {
     };
 }
 
+/// Convenience macro to create a DmaTxBuf from buffer size and optional
+/// alignment. The buffer and descriptors are statically allocated used to
+/// create the `DmaTxBuf` with the passed alignment. With one ardument, the
+/// alignment is set to `None`.
+///
+/// ## Usage
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::dma_tx_buffer;
+/// use esp_hal::dma::DmaBufBlkSize;
+///
+/// let tx_buf =
+///     dma_tx_buffer!(32000, Some(DmaBufBlkSize::Size32));
+/// # }
+/// ```
+#[macro_export]
+macro_rules! dma_tx_buffer {
+    ($tx_size:expr, $tx_align:expr) => {{
+        const TX_DESCRIPTOR_LEN: usize = $crate::dma::DmaTxBuf::compute_descriptor_count($tx_size, $tx_align);
+        static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
+        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; TX_DESCRIPTOR_LEN] =
+            [$crate::dma::DmaDescriptor::EMPTY; TX_DESCRIPTOR_LEN];
+        let tx_buffer, tx_descriptors = unsafe {
+            (
+                &mut TX_BUFFER,
+                &mut TX_DESCRIPTORS,
+            )
+        };
+        $crate::dma::DmaTxBuf::new_with_block_size(tx_descriptors, tx_buffer, $tx_align)
+    }};
+
+    ($tx_size:expr) => {
+        $crate::dma_tx_buffer!($tx_size, None)
+    };
+}
+
 /// DMA Errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1763,8 +1799,17 @@ where
                     self.set_ext_mem_block_size(block_size.into());
                 }
             } else {
-                if is_slice_in_psram(self.buffer) {
-                    return Err(DmaError::UnsupportedMemoryRegion);
+                // we check here to insure that no descriptor points to PSRAM as
+                // that is only supported on esp32s3
+                let mut descriptor = Some(*preparation.start);
+                while let Some(current) = descriptor {
+                    if is_slice_in_psram(core::slice::from_raw_parts(current.buffer, current.len())) {
+                        return Err(DmaError::UnsupportedMemoryRegion);
+                    }
+                    descriptor = match current.next {
+                        next if !next.is_null() => Some(unsafe { *next }),
+                        _ => None,
+                    };
                 }
             }
         );
@@ -2003,6 +2048,7 @@ pub struct Preparation {
     start: *mut DmaDescriptor,
     /// block size for PSRAM transfers (TODO: enable burst mode for non external
     /// memory?)
+    #[cfg_attr(not(esp32s3), allow(dead_code))]
     block_size: Option<DmaBufBlkSize>,
     // burst_mode, alignment, check_owner, etc.
 }
@@ -2097,6 +2143,23 @@ impl DmaTxBuf {
         Self::new_with_block_size(descriptors, buffer, None)
     }
 
+    /// Compute max chunk size based on block size
+    pub const fn compute_chunk_size(block_size: Option<DmaBufBlkSize>) -> usize {
+        match block_size {
+            Some(size) => 4096 - size as usize,
+            None => 4095, // TODO: does this need to be chip specific?
+        }
+    }
+
+    /// Compute the number of descriptors required for a given block size and
+    /// buffer size
+    pub const fn compute_descriptor_count(
+        buffer_size: usize,
+        block_size: Option<DmaBufBlkSize>,
+    ) -> usize {
+        buffer_size.div_ceil(Self::compute_chunk_size(block_size))
+    }
+
     /// Creates a new [DmaTxBuf] from some descriptors and a buffer.
     ///
     /// There must be enough descriptors for the provided buffer.
@@ -2110,12 +2173,8 @@ impl DmaTxBuf {
         buffer: &'static mut [u8],
         block_size: Option<DmaBufBlkSize>,
     ) -> Result<Self, DmaBufError> {
-        let chunk_size = match block_size {
-            Some(size) => 4096 - size as usize,
-            None => 4095, // max chunk_siize
-        };
-
-        let min_descriptors = buffer.len().div_ceil(chunk_size);
+        let chunk_size = Self::compute_chunk_size(block_size);
+        let min_descriptors = Self::compute_descriptor_count(buffer.len(), block_size);
         if descriptors.len() < min_descriptors {
             return Err(DmaBufError::InsufficientDescriptors);
         }
