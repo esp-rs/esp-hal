@@ -1271,21 +1271,21 @@ mod private {
         }
 
         fn rx_start(len: usize) {
-            #[cfg(not(esp32))]
-            let len = len - 1;
-
             let i2s = Self::register_block();
 
             i2s.int_clr().write(|w| w.in_suc_eof().clear_bit_by_one());
 
-            #[cfg(not(esp32))]
-            i2s.rxeof_num()
-                .modify(|_, w| unsafe { w.rx_eof_num().bits(len as u32) });
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    // On ESP32, the eof_num count in words.
+                    let eof_num = len / 4;
+                } else {
+                    let eof_num = len - 1;
+                }
+            }
 
-            // On ESP32, the eof_num count in words.
-            #[cfg(esp32)]
             i2s.rxeof_num()
-                .modify(|_, w| unsafe { w.rx_eof_num().bits((len / 4) as u32) });
+                .modify(|_, w| unsafe { w.rx_eof_num().bits(eof_num as u32) });
 
             i2s.conf().modify(|_, w| w.rx_start().set_bit());
         }
@@ -2369,10 +2369,6 @@ pub mod asynch {
             // set I2S_TX_STOP_EN if needed
 
             // start: set I2S_RX_START
-            #[cfg(not(esp32))]
-            T::rx_start(len - 1);
-
-            #[cfg(esp32)]
             T::rx_start(len);
 
             future.await?;
@@ -2409,10 +2405,6 @@ pub mod asynch {
             // set I2S_TX_STOP_EN if needed
 
             // start: set I2S_RX_START
-            #[cfg(not(esp32))]
-            T::rx_start(len - 1);
-
-            #[cfg(esp32)]
             T::rx_start(len);
 
             let state = RxCircularState::new(&mut self.rx_chain);
