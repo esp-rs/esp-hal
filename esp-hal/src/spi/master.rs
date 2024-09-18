@@ -3331,20 +3331,22 @@ pub trait Instance: private::Sealed {
         self.read_bytes_from_fifo(buffer)
     }
 
-    #[cfg(gdma)]
     fn update(&self) {
-        let reg_block = self.register_block();
+        cfg_if::cfg_if! {
+            if #[cfg(gdma)] {
+                let reg_block = self.register_block();
 
-        reg_block.cmd().modify(|_, w| w.update().set_bit());
+                reg_block.cmd().modify(|_, w| w.update().set_bit());
 
-        while reg_block.cmd().read().update().bit_is_set() {
-            // wait
+                while reg_block.cmd().read().update().bit_is_set() {
+                    // wait
+                }
+            } else if #[cfg(esp32)] {
+                xtensa_lx::timer::delay(1);
+            } else {
+                // Doesn't seem to be needed for ESP32-S2
+            }
         }
-    }
-
-    #[cfg(pdma)]
-    fn update(&self) {
-        // not need/available on ESP32/ESP32S2
     }
 
     fn configure_datalen(&self, rx_len_bytes: usize, tx_len_bytes: usize) {
