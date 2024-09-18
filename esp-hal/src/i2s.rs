@@ -1129,10 +1129,14 @@ mod private {
             i2s.conf().modify(|_, w| {
                 w.tx_slave_mod().clear_bit();
                 w.rx_slave_mod().clear_bit();
-                w.tx_msb_shift().set_bit(); // ?
-                w.rx_msb_shift().set_bit(); // ?
-                w.tx_short_sync().bit(false); //??
-                w.rx_short_sync().bit(false); //??
+                // If the I2S_RX_MSB_SHIFT bit and the I2S_TX_MSB_SHIFT bit of register
+                // I2S_CONF_REG are set to 1, respectively, the I2S module will use the Philips
+                // standard when receiving and transmitting data.
+                w.tx_msb_shift().set_bit();
+                w.rx_msb_shift().set_bit();
+                // Short frame synchronization
+                w.tx_short_sync().bit(false);
+                w.rx_short_sync().bit(false);
                 w.tx_msb_right().clear_bit();
                 w.rx_msb_right().clear_bit();
                 w.tx_right_first().clear_bit();
