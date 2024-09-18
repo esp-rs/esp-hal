@@ -3,7 +3,7 @@
 //! This test uses I2S TX to transmit known data to I2S RX (forced to slave mode
 //! with loopback mode enabled). It's using circular DMA mode
 
-//% CHIPS: esp32c3 esp32c6 esp32s3 esp32h2
+//% CHIPS: esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
@@ -52,12 +52,19 @@ mod tests {
     fn test_i2s_loopback() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
         let delay = Delay::new();
 
         let dma = Dma::new(peripherals.DMA);
-        let dma_channel = dma.channel0;
+
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32s2))] {
+                let dma_channel = dma.i2s0channel;
+            } else {
+                let dma_channel = dma.channel0;
+            }
+        }
 
         let (mut rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(16000, 16000);
 
@@ -71,7 +78,9 @@ mod tests {
             tx_descriptors,
         );
 
-        let (dout, din) = hil_test::common_test_pins!(io);
+        let (_, dout) = hil_test::common_test_pins!(io);
+
+        let din = dout.peripheral_input();
 
         let mut i2s_tx = i2s
             .i2s_tx
@@ -90,15 +99,18 @@ mod tests {
         // enable loopback testing
         unsafe {
             let i2s = esp_hal::peripherals::I2S0::steal();
-            i2s.tx_conf().modify(|_, w| w.sig_loopback().set_bit());
+            cfg_if::cfg_if! {
+                if #[cfg(esp32s2)] {
+                    i2s.conf().modify(|_, w| w.sig_loopback().set_bit());
+                    i2s.conf().modify(|_, w| w.rx_slave_mod().set_bit());
+                } else {
+                    i2s.tx_conf().modify(|_, w| w.sig_loopback().set_bit());
+                    i2s.rx_conf().modify(|_, w| w.rx_slave_mod().set_bit());
 
-            i2s.rx_conf().modify(|_, w| w.rx_slave_mod().set_bit());
-
-            i2s.tx_conf().modify(|_, w| w.tx_update().clear_bit());
-            i2s.tx_conf().modify(|_, w| w.tx_update().set_bit());
-
-            i2s.rx_conf().modify(|_, w| w.rx_update().clear_bit());
-            i2s.rx_conf().modify(|_, w| w.rx_update().set_bit());
+                    i2s.tx_conf().modify(|_, w| w.tx_update().set_bit());
+                    i2s.rx_conf().modify(|_, w| w.rx_update().set_bit());
+                }
+            }
         }
 
         let mut samples = SampleSource::new();
