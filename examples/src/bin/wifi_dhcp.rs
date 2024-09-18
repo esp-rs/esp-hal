@@ -43,7 +43,7 @@ const PASSWORD: &str = env!("PASSWORD");
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
-    let mut peripherals = esp_hal::init({
+    let peripherals = esp_hal::init({
         let mut config = esp_hal::Config::default();
         config.cpu_clock = CpuClock::max();
         config
@@ -52,8 +52,7 @@ fn main() -> ! {
     esp_alloc::heap_allocator!(72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let mut ieee802154 =
-        esp_ieee802154::Ieee802154::new(peripherals.IEEE802154, &mut peripherals.RADIO_CLK);
+
     let init = initialize(
         EspWifiInitFor::Wifi,
         timg0.timer0,

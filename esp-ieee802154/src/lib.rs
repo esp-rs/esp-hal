@@ -105,8 +105,8 @@ pub struct Ieee802154<'a> {
 
 impl<'a> Ieee802154<'a> {
     /// Construct a new driver, enabling the IEEE 802.15.4 radio in the process
-    pub fn new(_radio: IEEE802154, radio_clocks: &mut RADIO_CLK) -> Self {
-        esp_ieee802154_enable(radio_clocks);
+    pub fn new(_radio: IEEE802154, mut radio_clocks: RADIO_CLK) -> Self {
+        esp_ieee802154_enable(&mut radio_clocks);
 
         Self {
             _align: 0,
