@@ -31,7 +31,13 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_wifi::{ble::controller::BleConnector, initialize, reinitialize, deinitialize_ble, EspWifiFor};
+use esp_wifi::{
+    ble::controller::BleConnector,
+    deinitialize_ble,
+    initialize,
+    reinitialize,
+    EspWifiFor,
+};
 
 #[entry]
 fn main() -> ! {
@@ -87,7 +93,6 @@ fn main() -> ! {
             )
         );
         println!("{:?}", ble.cmd_set_le_advertise_enable(true));
-
 
         println!("Deinitializing...");
         let deinit = deinitialize_ble().unwrap();

@@ -116,23 +116,16 @@ use hal::{
     system::RadioClockController,
     timer::{timg::Timer as TimgTimer, AnyTimer, PeriodicTimer},
 };
-
-use crate::{common_adapter::init_rng, tasks::init_tasks, timer::setup_timer_isr};
-
 #[cfg(feature = "wifi")]
 use num_traits::FromPrimitive;
+
 #[cfg(feature = "wifi")]
 use crate::{
     // esp_wifi_result,
-    binary::{
-        include::{
-            self,
-            esp_wifi_deinit_internal,
-            esp_wifi_stop,
-        },
-    },
-    wifi::{WifiDeviceMode, WifiController, WifiError},
+    binary::include::{self, esp_wifi_deinit_internal, esp_wifi_stop},
+    wifi::{WifiController, WifiDeviceMode, WifiError},
 };
+use crate::{common_adapter::init_rng, tasks::init_tasks, timer::setup_timer_isr};
 
 mod binary {
     pub use esp_wifi_sys::*;
@@ -489,7 +482,9 @@ pub fn deinitialize_wifi(
     drop(stack);
 
     // Return WiFi deinitialization state
-    Ok(EspWifiDeinitialization::Wifi(EspWifiDeinitializationInternal))
+    Ok(EspWifiDeinitialization::Wifi(
+        EspWifiDeinitializationInternal,
+    ))
 }
 
 #[cfg(feature = "ble")]
@@ -504,9 +499,10 @@ pub fn deinitialize_ble() -> Result<EspWifiDeinitialization, ()> {
     info!("BLE deinited");
 
     // Return BLE deinitialization state
-    Ok(EspWifiDeinitialization::Ble(EspWifiDeinitializationInternal))
+    Ok(EspWifiDeinitialization::Ble(
+        EspWifiDeinitializationInternal,
+    ))
 }
-
 
 #[cfg(coex)]
 pub fn deinitialize_all(
@@ -535,15 +531,10 @@ pub fn deinitialize_all(
     drop(stack);
 
     // Return coexistence deinitialization state
-    Ok(EspWifiDeinitialization::WifiBle(EspWifiDeinitializationInternal))
+    Ok(EspWifiDeinitialization::WifiBle(
+        EspWifiDeinitializationInternal,
+    ))
 }
-
-
-
-
-
-
-
 
 pub fn reinitialize(
     init_for: EspWifiFor,

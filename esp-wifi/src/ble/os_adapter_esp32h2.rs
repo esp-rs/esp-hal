@@ -1,8 +1,8 @@
 use crate::{
-    binary::{include::esp_bt_controller_config_t, c_types::c_void},
+    binary::{c_types::c_void, include::esp_bt_controller_config_t},
+    ble::npl,
     common_adapter::RADIO_CLOCKS,
     hal::system::{RadioClockController, RadioPeripherals},
-    ble::npl,
 };
 
 pub(crate) static mut ISR_INTERRUPT_15: (
@@ -73,7 +73,7 @@ pub(crate) fn bt_periph_module_enable() {
 }
 
 pub(crate) fn bt_periph_module_disable() {
-    unsafe{
+    unsafe {
         unwrap!(RADIO_CLOCKS.as_mut()).disable(RadioPeripherals::Bt);
     }
 }
@@ -130,9 +130,8 @@ unsafe extern "C" fn jrand48(
     }
 }
 
-pub(super) fn deinit()
-{
-    unsafe{
+pub(super) fn deinit() {
+    unsafe {
         info!("HCI deinit");
         // HCI deinit
         npl::r_ble_hci_trans_cfg_hs(

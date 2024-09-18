@@ -1230,8 +1230,10 @@ pub(crate) fn ble_init() {
 
 pub(crate) fn ble_deinit() {
     ble_os_adapter_chip_specific::deinit();
-    unsafe{
-        CALLOUTS.iter_mut().for_each(|item| {item.take();});
+    unsafe {
+        CALLOUTS.iter_mut().for_each(|item| {
+            item.take();
+        });
     }
 }
 

@@ -20,9 +20,9 @@ use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_wifi::{
     current_millis,
+    deinitialize_wifi,
     initialize,
     reinitialize,
-    deinitialize_wifi,
     wifi::{
         utils::create_network_interface,
         AccessPointInfo,
