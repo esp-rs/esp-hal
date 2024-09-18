@@ -51,7 +51,7 @@ async fn control_led(
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
-    let peripherals = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::config::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 

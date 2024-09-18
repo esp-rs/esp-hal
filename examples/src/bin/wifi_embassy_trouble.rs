@@ -35,7 +35,7 @@ use trouble_host::{
 async fn main(_s: Spawner) {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init({
-        let mut config = esp_hal::Config::default();
+        let mut config = esp_hal::config::Config::default();
         config.cpu_clock = CpuClock::max();
         config
     });

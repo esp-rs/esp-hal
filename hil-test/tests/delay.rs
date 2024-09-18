@@ -20,7 +20,7 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let _peripherals = esp_hal::init(esp_hal::Config::default());
+        let _peripherals = esp_hal::init(esp_hal::config::Config::default());
         let delay = Delay::new();
 
         Context { delay }

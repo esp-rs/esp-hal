@@ -32,7 +32,7 @@ compile_error!("PSRAM example must be built in release mode!");
 
 #[entry]
 fn main() -> ! {
-    let peripherals = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::config::Config::default());
 
     psram::init_psram(peripherals.PSRAM);
     init_psram_heap();

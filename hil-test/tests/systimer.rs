@@ -102,7 +102,7 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(esp_hal::config::Config::default());
 
         let systimer = SystemTimer::new(peripherals.SYSTIMER);
         static UNIT0: StaticCell<SpecificUnit<'static, 0>> = StaticCell::new();

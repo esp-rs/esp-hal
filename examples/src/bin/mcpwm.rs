@@ -18,7 +18,7 @@ use esp_hal::{
 
 #[entry]
 fn main() -> ! {
-    let peripherals = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::config::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let pin = io.pins.gpio0;

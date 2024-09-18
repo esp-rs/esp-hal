@@ -30,7 +30,7 @@ Instead of manually grabbing peripherals and setting up clocks, you should now c
 -    let peripherals = Peripherals::take();
 -    let system = SystemControl::new(peripherals.SYSTEM);
 -    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-+    let peripherals = esp_hal::init(esp_hal::Config::default());
++    let peripherals = esp_hal::init(esp_hal::config::Config::default());
 
      // ...
  }
@@ -158,7 +158,7 @@ configure an input pin, and pass it to `set_edge_signal` or `set_ctrl_signal`.
 -       PcntInputConfig { pull: Pull::Up },
 -   ));
 +   ch0.set_ctrl_signal(Input::new(io.pins.gpio4, Pull::Up));
- 
+
 -   let mut pin_b = io.pins.gpio5;
 -   ch0.set_edge_signal(PcntSource::from_pin(
 -       &mut pin_b,

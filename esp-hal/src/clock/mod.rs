@@ -49,14 +49,14 @@
 //! # fn main() {
 //! // Initialize with the highest possible frequency for this chip
 //! let peripherals = esp_hal::init({
-//!     let mut config = esp_hal::Config::default();
+//!     let mut config = esp_hal::config::Config::default();
 //!     config.cpu_clock = CpuClock::max();
 //!     config
 //! });
 //!
 //! // Initialize with custom clock frequency
 //! // let peripherals = esp_hal::init({
-//! //    let mut config = esp_hal::Config::default();
+//! //    let mut config = esp_hal::config::Config::default();
 #![cfg_attr(
     not(any(esp32c2, esp32h2)),
     doc = "//    config.cpu_clock = CpuClock::Clock160MHz;"
@@ -67,7 +67,7 @@
 //! // });
 //! //
 //! // Initialize with default clock frequency for this chip
-//! // let peripherals = esp_hal::init(esp_hal::Config::default());
+//! // let peripherals = esp_hal::init(esp_hal::config::Config::default());
 //! # }
 //! ```
 
@@ -107,11 +107,11 @@ pub trait Clock {
 pub enum CpuClock {
     /// 80MHz CPU clock
     #[cfg(not(esp32h2))]
-    Clock80MHz  = 80,
+    Clock80MHz = 80,
 
     /// 96MHz CPU clock
     #[cfg(esp32h2)]
-    Clock96MHz  = 96,
+    Clock96MHz = 96,
 
     /// 120MHz CPU clock
     #[cfg(esp32c2)]

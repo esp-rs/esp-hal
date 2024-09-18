@@ -28,7 +28,7 @@ mod tests {
 
     #[init]
     fn init() -> Peripherals {
-        esp_hal::init(esp_hal::Config::default())
+        esp_hal::init(esp_hal::config::Config::default())
     }
 
     #[test]

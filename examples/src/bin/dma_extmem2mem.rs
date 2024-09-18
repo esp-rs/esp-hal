@@ -61,7 +61,7 @@ fn init_heap(psram: impl esp_hal::peripheral::Peripheral<P = esp_hal::peripheral
 fn main() -> ! {
     esp_println::logger::init_logger(log::LevelFilter::Info);
 
-    let peripherals = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::config::Config::default());
 
     init_heap(peripherals.PSRAM);
     let delay = Delay::new();

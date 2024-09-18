@@ -29,7 +29,7 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::config::Config::default());
 
     let mut rtc = Rtc::new(peripherals.LPWR);
 

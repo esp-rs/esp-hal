@@ -40,7 +40,7 @@ use esp_wifi::{ble::controller::asynch::BleConnector, initialize, EspWifiInitFor
 async fn main(_spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init({
-        let mut config = esp_hal::Config::default();
+        let mut config = esp_hal::config::Config::default();
         config.cpu_clock = CpuClock::max();
         config
     });

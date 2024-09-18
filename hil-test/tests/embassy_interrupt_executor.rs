@@ -44,7 +44,7 @@ mod test {
 
     #[init]
     fn init() -> SoftwareInterrupt<1> {
-        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(esp_hal::config::Config::default());
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_hal_embassy::init(timg0.timer0);

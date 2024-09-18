@@ -20,7 +20,7 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(esp_hal::config::Config::default());
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
         let (sda, scl) = hil_test::i2c_pins!(io);

@@ -50,7 +50,7 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(esp_hal::config::Config::default());
 
         let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         io.set_interrupt_handler(interrupt_handler);

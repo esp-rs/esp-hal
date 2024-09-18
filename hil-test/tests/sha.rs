@@ -170,9 +170,9 @@ mod tests {
         cfg_if::cfg_if! {
             if #[cfg(feature = "esp32")] {
                 // FIXME: max speed fails...?
-                let config = esp_hal::Config::default();
+                let config = esp_hal::config::Config::default();
             } else {
-                let mut config = esp_hal::Config::default();
+                let mut config = esp_hal::config::Config::default();
                 config.cpu_clock = CpuClock::max();
             }
         }

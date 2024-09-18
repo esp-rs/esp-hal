@@ -23,7 +23,7 @@ static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0>, esp_hal::Blocking>>>> =
 
 #[entry]
 fn main() -> ! {
-    let peripherals = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::config::Config::default());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let timer0 = timg0.timer0;
