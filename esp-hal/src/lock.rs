@@ -2,101 +2,74 @@ struct CriticalSection;
 
 critical_section::set_impl!(CriticalSection);
 
-#[cfg(xtensa)]
-mod xtensa {
-    // PS has 15 useful bits. Bits 12..16 and 19..32 are unused, so we can use bit
-    // #31 as our reentry flag.
-    #[cfg(multi_core)]
-    const REENTRY_FLAG: u32 = 1 << 31;
+unsafe impl critical_section::Impl for CriticalSection {
+    unsafe fn acquire() -> critical_section::RawRestoreState {
+        #[cfg_attr(single_core, allow(unused_mut))]
+        let mut tkn = single_core::disable_interrupts();
 
-    unsafe impl critical_section::Impl for super::CriticalSection {
-        unsafe fn acquire() -> critical_section::RawRestoreState {
-            let mut tkn: critical_section::RawRestoreState;
-            core::arch::asm!("rsil {0}, 5", out(reg) tkn);
-            #[cfg(multi_core)]
-            {
-                use super::multicore::{LockKind, MULTICORE_LOCK};
+        #[cfg(multi_core)]
+        {
+            use multicore::{LockKind, MULTICORE_LOCK, REENTRY_FLAG};
 
-                match MULTICORE_LOCK.lock() {
-                    LockKind::Lock => {
-                        // We can assume the reserved bit is 0 otherwise
-                        // rsil - wsr pairings would be undefined behavior
-                    }
-                    LockKind::Reentry => tkn |= REENTRY_FLAG,
-                }
+            // FIXME: don't spin with interrupts disabled
+            match MULTICORE_LOCK.lock() {
+                LockKind::Lock => {}
+                LockKind::Reentry => tkn |= REENTRY_FLAG,
             }
-            tkn
         }
 
-        unsafe fn release(token: critical_section::RawRestoreState) {
-            #[cfg(multi_core)]
-            {
-                use super::multicore::MULTICORE_LOCK;
+        tkn
+    }
 
-                debug_assert!(MULTICORE_LOCK.is_owned_by_current_thread());
+    unsafe fn release(token: critical_section::RawRestoreState) {
+        #[cfg(multi_core)]
+        {
+            use multicore::{MULTICORE_LOCK, REENTRY_FLAG};
 
-                if token & REENTRY_FLAG != 0 {
-                    return;
-                }
+            debug_assert!(MULTICORE_LOCK.is_owned_by_current_thread());
 
-                MULTICORE_LOCK.unlock();
+            if token & REENTRY_FLAG != 0 {
+                return;
             }
 
-            const RESERVED_MASK: u32 = 0b1111_1111_1111_1000_1111_0000_0000_0000;
-            debug_assert!(token & RESERVED_MASK == 0);
-
-            core::arch::asm!(
-                    "wsr.ps {0}",
-                    "rsync", in(reg) token)
+            MULTICORE_LOCK.unlock();
         }
+
+        single_core::reenable_interrupts(token);
     }
 }
 
-#[cfg(riscv)]
-mod riscv {
-    // The restore state is a u8 that is casted from a bool, so it has a value of
-    // 0x00 or 0x01 before we add the reentry flag to it.
-    #[cfg(multi_core)]
-    const REENTRY_FLAG: u8 = 1 << 7;
-
-    unsafe impl critical_section::Impl for super::CriticalSection {
-        unsafe fn acquire() -> critical_section::RawRestoreState {
-            let mut mstatus = 0u32;
-            core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
-
-            #[cfg_attr(single_core, allow(unused_mut))]
-            let mut tkn = ((mstatus & 0b1000) != 0) as critical_section::RawRestoreState;
-
-            #[cfg(multi_core)]
-            {
-                use super::multicore::{LockKind, MULTICORE_LOCK};
-
-                // FIXME: don't spin with interrupts disabled
-                match MULTICORE_LOCK.lock() {
-                    LockKind::Lock => {}
-                    LockKind::Reentry => tkn |= REENTRY_FLAG,
-                }
+mod single_core {
+    pub unsafe fn disable_interrupts() -> critical_section::RawRestoreState {
+        cfg_if::cfg_if! {
+            if #[cfg(riscv)] {
+                let mut mstatus = 0u32;
+                core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
+                ((mstatus & 0b1000) != 0) as critical_section::RawRestoreState
+            } else if #[cfg(xtensa)] {
+                let token: critical_section::RawRestoreState;
+                core::arch::asm!("rsil {0}, 5", out(reg) token);
+                token
+            } else {
+                panic!()
             }
-
-            tkn
         }
+    }
 
-        unsafe fn release(token: critical_section::RawRestoreState) {
-            #[cfg(multi_core)]
-            {
-                use super::multicore::MULTICORE_LOCK;
-
-                debug_assert!(MULTICORE_LOCK.is_owned_by_current_thread());
-
-                if token & REENTRY_FLAG != 0 {
-                    return;
+    pub unsafe fn reenable_interrupts(token: critical_section::RawRestoreState) {
+        cfg_if::cfg_if! {
+            if #[cfg(riscv)] {
+                if token != 0 {
+                    esp_riscv_rt::riscv::interrupt::enable();
                 }
-
-                MULTICORE_LOCK.unlock();
-            }
-
-            if token != 0 {
-                esp_riscv_rt::riscv::interrupt::enable();
+            } else if #[cfg(xtensa)] {
+                const RESERVED_MASK: u32 = 0b1111_1111_1111_1000_1111_0000_0000_0000;
+                debug_assert!(token & RESERVED_MASK == 0);
+                core::arch::asm!(
+                            "wsr.ps {0}",
+                            "rsync", in(reg) token)
+            } else {
+                panic!()
             }
         }
     }
@@ -105,6 +78,18 @@ mod riscv {
 #[cfg(multi_core)]
 mod multicore {
     use portable_atomic::{AtomicUsize, Ordering};
+
+    cfg_if::cfg_if! {
+        if #[cfg(riscv)] {
+            // The restore state is a u8 that is casted from a bool, so it has a value of
+            // 0x00 or 0x01 before we add the reentry flag to it.
+            pub const REENTRY_FLAG: u8 = 1 << 7;
+        } else if #[cfg(xtensa)] {
+            // PS has 15 useful bits. Bits 12..16 and 19..32 are unused, so we can use bit
+            // #31 as our reentry flag.
+            pub const REENTRY_FLAG: u32 = 1 << 31;
+        }
+    }
 
     // We're using a value that we know get_raw_core() will never return. This
     // avoids an unnecessary increment of the core ID.
