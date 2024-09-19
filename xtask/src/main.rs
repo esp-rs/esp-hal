@@ -585,12 +585,13 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
                 Package::EspIeee802154 => {
                     if device.contains("ieee802154") {
+                        let features = format!("--features={chip},sys-logs");
                         lint_package(
                             &path,
                             &[
                                 "-Zbuild-std=core",
                                 &format!("--target={}", chip.target()),
-                                &format!("--features={chip}"),
+                                &features,
                             ],
                         )?;
                     }
@@ -640,9 +641,8 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 }
 
                 Package::EspWifi => {
-                    let mut features = format!(
-                        "--features={chip},async,ps-min-modem,defmt,dump-packets,wifi-logs"
-                    );
+                    let mut features =
+                        format!("--features={chip},async,ps-min-modem,defmt,dump-packets,sys-logs");
 
                     if device.contains("wifi") {
                         features.push_str(",wifi-default,esp-now,embedded-svc,embassy-net,sniffer")

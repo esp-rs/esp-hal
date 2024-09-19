@@ -223,7 +223,6 @@ impl Default for AccessPointConfiguration {
 
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
 pub struct ClientConfiguration {
     pub ssid: heapless::String<32>,
     pub bssid: Option<[u8; 6]>,
@@ -258,7 +257,6 @@ impl Default for ClientConfiguration {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
 pub struct EapFastConfig {
     pub fast_provisioning: u8,
     pub fast_max_pac_list_len: u8,
@@ -267,7 +265,6 @@ pub struct EapFastConfig {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
 pub enum TtlsPhase2Method {
     Eap,
     Mschapv2,
@@ -300,7 +297,6 @@ impl TtlsPhase2Method {
 
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
 pub struct EapClientConfiguration {
     pub ssid: heapless::String<32>,
     pub bssid: Option<[u8; 6]>,
@@ -1093,13 +1089,13 @@ static g_wifi_osi_funcs: wifi_osi_funcs_t = wifi_osi_funcs_t {
     _get_random: Some(get_random),
     _get_time: Some(get_time),
     _random: Some(random),
-    #[cfg(feature = "wifi-logs")]
+    #[cfg(feature = "sys-logs")]
     _log_write: Some(log_write),
-    #[cfg(not(feature = "wifi-logs"))]
+    #[cfg(not(feature = "sys-logs"))]
     _log_write: None,
-    #[cfg(feature = "wifi-logs")]
+    #[cfg(feature = "sys-logs")]
     _log_writev: Some(log_writev),
-    #[cfg(not(feature = "wifi-logs"))]
+    #[cfg(not(feature = "sys-logs"))]
     _log_writev: None,
     _log_timestamp: Some(log_timestamp),
     _malloc_internal: Some(malloc_internal),

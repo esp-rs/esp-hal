@@ -93,7 +93,7 @@
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
 #![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
-#![cfg_attr(any(feature = "wifi-logs", nightly), feature(c_variadic))]
+#![cfg_attr(feature = "sys-logs", feature(c_variadic))]
 #![allow(rustdoc::bare_urls)]
 // allow until num-derive doesn't generate this warning anymore (unknown_lints because Xtensa
 // toolchain doesn't know about that lint, yet)
@@ -450,9 +450,9 @@ impl From<WifiError> for InitializationError {
 }
 
 /// Enable verbose logging within the WiFi driver
-/// Does nothing unless the `wifi-logs` feature is enabled.
+/// Does nothing unless the `sys-logs` feature is enabled.
 pub fn wifi_set_log_verbose() {
-    #[cfg(feature = "wifi-logs")]
+    #[cfg(feature = "sys-logs")]
     unsafe {
         use crate::binary::include::{
             esp_wifi_internal_set_log_level,
