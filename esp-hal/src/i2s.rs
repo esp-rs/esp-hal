@@ -1137,10 +1137,15 @@ mod private {
                 // Short frame synchronization
                 w.tx_short_sync().bit(false);
                 w.rx_short_sync().bit(false);
-                w.tx_msb_right().clear_bit();
-                w.rx_msb_right().clear_bit();
-                w.tx_right_first().clear_bit();
-                w.rx_right_first().clear_bit();
+                // Send MSB to the right channel to be consistent with ESP32-S3 et al.
+                w.tx_msb_right().set_bit();
+                w.rx_msb_right().set_bit();
+                // ESP32 generates two clock pulses first. If the WS is low, those first clock
+                // pulses are indistinguishable from real data, which corrupts the first few
+                // samples. So we send the right channel first (which means WS is high during
+                // the first sample) to prevent this issue.
+                w.tx_right_first().set_bit();
+                w.rx_right_first().set_bit();
                 w.tx_mono().clear_bit();
                 w.rx_mono().clear_bit();
                 w.sig_loopback().clear_bit()
