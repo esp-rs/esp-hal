@@ -38,7 +38,7 @@ struct Context {
 fn execute(
     mut spi: SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
     mut miso_mirror: Output<'static>,
-    wanted: u8,
+    expected: u8,
 ) {
     const DMA_BUFFER_SIZE: usize = 4;
 
@@ -61,7 +61,7 @@ fn execute(
 
     assert_eq!(dma_rx_buf.as_slice(), &[0; DMA_BUFFER_SIZE]);
 
-    // SPI should read all '1's
+    // Set two bits in the written bytes to 1
     miso_mirror.set_high();
 
     let transfer = spi
@@ -77,7 +77,7 @@ fn execute(
 
     (_, dma_rx_buf) = transfer.wait();
 
-    assert_eq!(dma_rx_buf.as_slice(), &[wanted; DMA_BUFFER_SIZE]);
+    assert_eq!(dma_rx_buf.as_slice(), &[expected; DMA_BUFFER_SIZE]);
 }
 
 #[cfg(test)]
@@ -143,7 +143,6 @@ mod tests {
             .with_pins(NoPin, NoPin, NoPin, ctx.miso, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
-        // SPI should read '0b10111011'
         super::execute(spi, ctx.miso_mirror, 0b0100_0100);
     }
 
@@ -154,7 +153,6 @@ mod tests {
             .with_pins(NoPin, NoPin, NoPin, NoPin, ctx.miso, NoPin)
             .with_dma(ctx.dma_channel);
 
-        // SPI should read '0b01110111'
         super::execute(spi, ctx.miso_mirror, 0b1000_1000);
     }
 }

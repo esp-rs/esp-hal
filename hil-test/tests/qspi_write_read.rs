@@ -40,7 +40,7 @@ struct Context {
 fn execute(
     mut spi: SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
     mut mosi_mirror: Output<'static>,
-    wanted: u8,
+    expected: u8,
 ) {
     const DMA_BUFFER_SIZE: usize = 4;
 
@@ -54,9 +54,9 @@ fn execute(
     let transfer = spi
         .write(
             SpiDataMode::Quad,
-            Command::Command8(wanted as u16, SpiDataMode::Quad),
+            Command::Command8(expected as u16, SpiDataMode::Quad),
             Address::Address24(
-                wanted as u32 | (wanted as u32) << 8 | (wanted as u32) << 16,
+                expected as u32 | (expected as u32) << 8 | (expected as u32) << 16,
                 SpiDataMode::Quad,
             ),
             0,
@@ -79,7 +79,7 @@ fn execute(
         .map_err(|e| e.0)
         .unwrap();
     (_, dma_rx_buf) = transfer.wait();
-    assert_eq!(dma_rx_buf.as_slice(), &[wanted; DMA_BUFFER_SIZE]);
+    assert_eq!(dma_rx_buf.as_slice(), &[expected; DMA_BUFFER_SIZE]);
 }
 
 #[cfg(test)]
