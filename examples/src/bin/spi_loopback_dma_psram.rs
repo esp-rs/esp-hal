@@ -47,11 +47,8 @@ macro_rules! dma_alloc_buffer {
     }};
 }
 
-// TODO: the fist transfer fails in some conditions:
-// - if this is <= 8192 when chunk_size is 4032!?!?
-// - varing either DMA_CHUNK_SIZE or DMA_BUFFER_SIZE seems change the behavior
-const DMA_BUFFER_SIZE: usize = 16384; // the first request fails is this is <= 8192 when chunk_size is 4032!?!?
-const DMA_ALIGNMENT: DmaBufBlkSize = DmaBufBlkSize::Size16;
+const DMA_BUFFER_SIZE: usize = 8192;
+const DMA_ALIGNMENT: DmaBufBlkSize = DmaBufBlkSize::Size64;
 const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize;
 
 #[entry]
