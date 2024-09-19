@@ -1,4 +1,4 @@
-use core::cell::RefCell;
+use core::{cell::RefCell, ptr::addr_of};
 
 use critical_section::Mutex;
 use esp_hal::{
@@ -382,7 +382,7 @@ fn ZB_MAC() {
     if events & Event::RxDone != 0 {
         trace!("rx done");
         unsafe {
-            trace!("Received raw {:x?}", RX_BUFFER);
+            trace!("Received raw {:x?}", &*addr_of!(RX_BUFFER));
             critical_section::with(|cs| {
                 let mut queue = RX_QUEUE.borrow_ref_mut(cs);
                 if !queue.is_full() {
