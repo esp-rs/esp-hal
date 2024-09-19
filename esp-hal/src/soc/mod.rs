@@ -1,6 +1,7 @@
 use portable_atomic::{AtomicU8, Ordering};
 
 pub use self::implementation::*;
+#[cfg(psram)]
 use crate::Locked;
 
 #[cfg_attr(esp32, path = "esp32/mod.rs")]
@@ -20,6 +21,7 @@ mod psram_common;
 #[cfg(psram)]
 static MAPPED_PSRAM: Locked<MappedPsram> = Locked::new(MappedPsram { start: 0, end: 0 });
 
+#[cfg(psram)]
 pub struct MappedPsram {
     start: usize,
     end: usize,
