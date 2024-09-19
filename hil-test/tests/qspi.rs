@@ -1,6 +1,7 @@
 //! QSPI Test Suite
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: defmt
 
 #![no_std]
 #![no_main]
@@ -161,7 +162,7 @@ mod tests {
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
         let (pin, pin_mirror) = hil_test::common_test_pins!(io);
-        let (unconnected_pin, _) = hil_test::i2c_pins!(io);
+        let unconnected_pin = hil_test::unconnected_pin!(io);
 
         let dma = Dma::new(peripherals.DMA);
 
@@ -296,7 +297,9 @@ mod tests {
     #[timeout(3)]
     #[cfg(pcnt)]
     fn test_spi_writes_correctly_to_pin_0(ctx: Context) {
-        let [mosi, _, _] = ctx.gpios;
+        // For PCNT-using tests we swap the pins around so that the PCNT is not pulled
+        // up by a resistor if the command phase doesn't drive its line.
+        let [_, _, mosi] = ctx.gpios;
 
         let pcnt = Pcnt::new(ctx.pcnt);
         let unit = pcnt.unit0;
@@ -316,7 +319,9 @@ mod tests {
     #[timeout(3)]
     #[cfg(pcnt)]
     fn test_spi_writes_correctly_to_pin_1(ctx: Context) {
-        let [mosi, _, gpio] = ctx.gpios;
+        // For PCNT-using tests we swap the pins around so that the PCNT is not pulled
+        // up by a resistor if the command phase doesn't drive its line.
+        let [gpio, _, mosi] = ctx.gpios;
 
         let pcnt = Pcnt::new(ctx.pcnt);
         let unit = pcnt.unit0;
@@ -340,7 +345,9 @@ mod tests {
     #[timeout(3)]
     #[cfg(pcnt)]
     fn test_spi_writes_correctly_to_pin_2(ctx: Context) {
-        let [mosi, _, gpio] = ctx.gpios;
+        // For PCNT-using tests we swap the pins around so that the PCNT is not pulled
+        // up by a resistor if the command phase doesn't drive its line.
+        let [gpio, _, mosi] = ctx.gpios;
 
         let pcnt = Pcnt::new(ctx.pcnt);
         let unit = pcnt.unit0;
@@ -364,7 +371,9 @@ mod tests {
     #[timeout(3)]
     #[cfg(pcnt)]
     fn test_spi_writes_correctly_to_pin_3(ctx: Context) {
-        let [mosi, _, gpio] = ctx.gpios;
+        // For PCNT-using tests we swap the pins around so that the PCNT is not pulled
+        // up by a resistor if the command phase doesn't drive its line.
+        let [gpio, _, mosi] = ctx.gpios;
 
         let pcnt = Pcnt::new(ctx.pcnt);
         let unit = pcnt.unit0;

@@ -60,11 +60,23 @@ macro_rules! common_test_pins {
     }};
 }
 
+// A GPIO that's not connected to anything. We use the BOOT pin for this, but
+// beware: it has a pullup.
 #[macro_export]
-macro_rules! unconnected_test_pins {
+macro_rules! unconnected_pin {
     ($io:expr) => {{
-        let (a, _) = $crate::common_test_pins!($io);
-        let (_, b) = $crate::i2c_pins!($io);
-        (a, b)
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32s2, esp32s3))] {
+                $io.pins.gpio0
+            } else if #[cfg(esp32c6)] {
+                $io.pins.gpio9
+            } else if #[cfg(esp32h2)] {
+                $io.pins.gpio9
+            } else if #[cfg(esp32c2)] {
+                $io.pins.gpio8
+            } else {
+                $io.pins.gpio9
+            }
+        }
     }};
 }
