@@ -278,7 +278,7 @@ impl DmaDescriptor {
     }
 }
 
-use enumset::{enum_set, EnumSet, EnumSetType};
+use enumset::{EnumSet, EnumSetType};
 
 #[cfg(gdma)]
 pub use self::gdma::*;
@@ -2895,20 +2895,20 @@ pub(crate) mod asynch {
             if self.rx.is_done() {
                 self.rx.clear_interrupts();
                 Poll::Ready(Ok(()))
-            } else if !self.rx.available_in_interrupts().is_disjoint(enum_set!(
+            } else if !self.rx.available_in_interrupts().is_disjoint(
                 DmaRxInterrupt::DescriptorError
                     | DmaRxInterrupt::DescriptorEmpty
-                    | DmaRxInterrupt::ErrorEof
-            )) {
+                    | DmaRxInterrupt::ErrorEof,
+            ) {
                 self.rx.clear_interrupts();
                 Poll::Ready(Err(DmaError::DescriptorError))
             } else {
-                self.rx.listen_in(enum_set!(
+                self.rx.listen_in(
                     DmaRxInterrupt::SuccessfulEof
                         | DmaRxInterrupt::DescriptorError
                         | DmaRxInterrupt::DescriptorEmpty
-                        | DmaRxInterrupt::ErrorEof
-                ));
+                        | DmaRxInterrupt::ErrorEof,
+                );
                 Poll::Pending
             }
         }
@@ -3029,20 +3029,20 @@ pub(crate) mod asynch {
             {
                 self.rx.clear_in(DmaRxInterrupt::Done);
                 Poll::Ready(Ok(()))
-            } else if !self.rx.available_in_interrupts().is_disjoint(enum_set!(
+            } else if !self.rx.available_in_interrupts().is_disjoint(
                 DmaRxInterrupt::DescriptorError
                     | DmaRxInterrupt::DescriptorEmpty
-                    | DmaRxInterrupt::ErrorEof
-            )) {
+                    | DmaRxInterrupt::ErrorEof,
+            ) {
                 self.rx.clear_interrupts();
                 Poll::Ready(Err(DmaError::DescriptorError))
             } else {
-                self.rx.listen_in(enum_set!(
+                self.rx.listen_in(
                     DmaRxInterrupt::Done
                         | DmaRxInterrupt::DescriptorError
                         | DmaRxInterrupt::DescriptorEmpty
-                        | DmaRxInterrupt::ErrorEof
-                ));
+                        | DmaRxInterrupt::ErrorEof,
+                );
                 Poll::Pending
             }
         }
@@ -3054,35 +3054,35 @@ pub(crate) mod asynch {
         RX: Rx,
     {
         fn drop(&mut self) {
-            self.rx.unlisten_in(enum_set!(
+            self.rx.unlisten_in(
                 DmaRxInterrupt::Done
                     | DmaRxInterrupt::DescriptorError
                     | DmaRxInterrupt::DescriptorEmpty
-                    | DmaRxInterrupt::ErrorEof
-            ));
+                    | DmaRxInterrupt::ErrorEof,
+            );
         }
     }
 
     fn handle_interrupt<Channel: RegisterAccess, Rx: RxChannel<Channel>, Tx: TxChannel<Channel>>() {
-        if Channel::available_in_interrupts().is_disjoint(enum_set!(
+        if Channel::available_in_interrupts().is_disjoint(
             DmaRxInterrupt::DescriptorError
                 | DmaRxInterrupt::DescriptorEmpty
-                | DmaRxInterrupt::ErrorEof
-        )) {
-            Channel::unlisten_in(enum_set!(
+                | DmaRxInterrupt::ErrorEof,
+        ) {
+            Channel::unlisten_in(
                 DmaRxInterrupt::DescriptorError
                     | DmaRxInterrupt::DescriptorEmpty
                     | DmaRxInterrupt::ErrorEof
                     | DmaRxInterrupt::SuccessfulEof
-                    | DmaRxInterrupt::Done
-            ));
+                    | DmaRxInterrupt::Done,
+            );
             Rx::waker().wake()
         }
 
         if Channel::available_out_interrupts().contains(DmaTxInterrupt::DescriptorError) {
-            Channel::unlisten_out(enum_set!(
-                DmaTxInterrupt::DescriptorError | DmaTxInterrupt::TotalEof | DmaTxInterrupt::Done
-            ));
+            Channel::unlisten_out(
+                DmaTxInterrupt::DescriptorError | DmaTxInterrupt::TotalEof | DmaTxInterrupt::Done,
+            );
             Tx::waker().wake()
         }
 
