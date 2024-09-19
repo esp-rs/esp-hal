@@ -35,6 +35,26 @@ struct Context {
     miso_mirror: Output<'static>,
 }
 
+fn transfer(
+    spi: SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
+    dma_rx_buf: DmaRxBuf,
+) -> (
+    SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
+    DmaRxBuf,
+) {
+    let transfer = spi
+        .read(
+            SpiDataMode::Quad,
+            Command::None,
+            Address::None,
+            0,
+            dma_rx_buf,
+        )
+        .map_err(|e| e.0)
+        .unwrap();
+    transfer.wait()
+}
+
 fn execute(
     mut spi: SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
     mut miso_mirror: Output<'static>,
@@ -46,37 +66,12 @@ fn execute(
     let mut dma_rx_buf = DmaRxBuf::new(descriptors, buffer).unwrap();
 
     miso_mirror.set_low();
-
-    let transfer = spi
-        .read(
-            SpiDataMode::Quad,
-            Command::None,
-            Address::None,
-            0,
-            dma_rx_buf,
-        )
-        .map_err(|e| e.0)
-        .unwrap();
-    (spi, dma_rx_buf) = transfer.wait();
-
+    (spi, dma_rx_buf) = transfer(spi, dma_rx_buf);
     assert_eq!(dma_rx_buf.as_slice(), &[0; DMA_BUFFER_SIZE]);
 
     // Set two bits in the written bytes to 1
     miso_mirror.set_high();
-
-    let transfer = spi
-        .read(
-            SpiDataMode::Quad,
-            Command::None,
-            Address::None,
-            0,
-            dma_rx_buf,
-        )
-        .map_err(|e| e.0)
-        .unwrap();
-
-    (_, dma_rx_buf) = transfer.wait();
-
+    (_, dma_rx_buf) = transfer(spi, dma_rx_buf);
     assert_eq!(dma_rx_buf.as_slice(), &[expected; DMA_BUFFER_SIZE]);
 }
 
