@@ -2525,56 +2525,14 @@ pub trait Instance: private::Sealed {
         data_mode: SpiDataMode,
     ) {
         let reg_block = self.register_block();
-        match cmd_mode {
-            SpiDataMode::Single => reg_block
-                .ctrl()
-                .modify(|_, w| w.fcmd_dual().clear_bit().fcmd_quad().clear_bit()),
-            SpiDataMode::Dual => reg_block
-                .ctrl()
-                .modify(|_, w| w.fcmd_dual().set_bit().fcmd_quad().clear_bit()),
-            SpiDataMode::Quad => reg_block
-                .ctrl()
-                .modify(|_, w| w.fcmd_dual().clear_bit().fcmd_quad().set_bit()),
-        }
-
-        match address_mode {
-            SpiDataMode::Single => reg_block
-                .ctrl()
-                .modify(|_, w| w.faddr_dual().clear_bit().faddr_quad().clear_bit()),
-            SpiDataMode::Dual => reg_block
-                .ctrl()
-                .modify(|_, w| w.faddr_dual().set_bit().faddr_quad().clear_bit()),
-            SpiDataMode::Quad => reg_block
-                .ctrl()
-                .modify(|_, w| w.faddr_dual().clear_bit().faddr_quad().set_bit()),
-        }
-
-        match data_mode {
-            SpiDataMode::Single => {
-                reg_block
-                    .ctrl()
-                    .modify(|_, w| w.fread_dual().clear_bit().fread_quad().clear_bit());
-                reg_block
-                    .user()
-                    .modify(|_, w| w.fwrite_dual().clear_bit().fwrite_quad().clear_bit());
-            }
-            SpiDataMode::Dual => {
-                reg_block
-                    .ctrl()
-                    .modify(|_, w| w.fread_dual().set_bit().fread_quad().clear_bit());
-                reg_block
-                    .user()
-                    .modify(|_, w| w.fwrite_dual().set_bit().fwrite_quad().clear_bit());
-            }
-            SpiDataMode::Quad => {
-                reg_block
-                    .ctrl()
-                    .modify(|_, w| w.fread_quad().set_bit().fread_dual().clear_bit());
-                reg_block
-                    .user()
-                    .modify(|_, w| w.fwrite_quad().set_bit().fwrite_dual().clear_bit());
-            }
-        }
+        reg_block.ctrl().modify(|_, w| {
+            w.fcmd_dual().bit(cmd_mode == SpiDataMode::Dual);
+            w.fcmd_quad().bit(cmd_mode == SpiDataMode::Quad);
+            w.faddr_dual().bit(address_mode == SpiDataMode::Dual);
+            w.faddr_quad().bit(address_mode == SpiDataMode::Quad);
+            w.fread_dual().bit(data_mode == SpiDataMode::Dual);
+            w.fread_quad().bit(data_mode == SpiDataMode::Quad)
+        });
     }
 
     #[cfg(esp32)]
@@ -2590,134 +2548,38 @@ pub trait Instance: private::Sealed {
             _ => panic!("Only 1-bit command supported"),
         }
 
-        match (address_mode, data_mode) {
-            (SpiDataMode::Single, SpiDataMode::Single) => {
+        match address_mode {
+            SpiDataMode::Single => {
                 reg_block.ctrl().modify(|_, w| {
-                    w.fread_dio()
-                        .clear_bit()
-                        .fread_qio()
-                        .clear_bit()
-                        .fread_dual()
-                        .clear_bit()
-                        .fread_quad()
-                        .clear_bit()
+                    w.fread_dio().clear_bit();
+                    w.fread_qio().clear_bit();
+                    w.fread_dual().bit(data_mode == SpiDataMode::Dual);
+                    w.fread_quad().bit(data_mode == SpiDataMode::Quad)
                 });
 
                 reg_block.user().modify(|_, w| {
-                    w.fwrite_dio()
-                        .clear_bit()
-                        .fwrite_qio()
-                        .clear_bit()
-                        .fwrite_dual()
-                        .clear_bit()
-                        .fwrite_quad()
-                        .clear_bit()
+                    w.fwrite_dio().clear_bit();
+                    w.fwrite_qio().clear_bit();
+                    w.fwrite_dual().bit(data_mode == SpiDataMode::Dual);
+                    w.fwrite_quad().bit(data_mode == SpiDataMode::Quad)
                 });
             }
-            (SpiDataMode::Single, SpiDataMode::Dual) => {
+            address_mode if address_mode == data_mode => {
                 reg_block.ctrl().modify(|_, w| {
-                    w.fread_dio()
-                        .clear_bit()
-                        .fread_qio()
-                        .clear_bit()
-                        .fread_dual()
-                        .set_bit()
-                        .fread_quad()
-                        .clear_bit()
+                    w.fread_dio().bit(address_mode == SpiDataMode::Dual);
+                    w.fread_qio().bit(address_mode == SpiDataMode::Quad);
+                    w.fread_dual().clear_bit();
+                    w.fread_quad().clear_bit()
                 });
 
                 reg_block.user().modify(|_, w| {
-                    w.fwrite_dio()
-                        .clear_bit()
-                        .fwrite_qio()
-                        .clear_bit()
-                        .fwrite_dual()
-                        .set_bit()
-                        .fwrite_quad()
-                        .clear_bit()
+                    w.fwrite_dio().bit(address_mode == SpiDataMode::Dual);
+                    w.fwrite_qio().bit(address_mode == SpiDataMode::Quad);
+                    w.fwrite_dual().clear_bit();
+                    w.fwrite_quad().clear_bit()
                 });
             }
-            (SpiDataMode::Single, SpiDataMode::Quad) => {
-                reg_block.ctrl().modify(|_, w| {
-                    w.fread_dio()
-                        .clear_bit()
-                        .fread_qio()
-                        .clear_bit()
-                        .fread_dual()
-                        .clear_bit()
-                        .fread_quad()
-                        .set_bit()
-                });
-
-                reg_block.user().modify(|_, w| {
-                    w.fwrite_dio()
-                        .clear_bit()
-                        .fwrite_qio()
-                        .clear_bit()
-                        .fwrite_dual()
-                        .clear_bit()
-                        .fwrite_quad()
-                        .set_bit()
-                });
-            }
-            (SpiDataMode::Dual, SpiDataMode::Single) => {
-                panic!("Unsupported combination of data-modes")
-            }
-            (SpiDataMode::Dual, SpiDataMode::Dual) => {
-                reg_block.ctrl().modify(|_, w| {
-                    w.fread_dio()
-                        .set_bit()
-                        .fread_qio()
-                        .clear_bit()
-                        .fread_dual()
-                        .clear_bit()
-                        .fread_quad()
-                        .clear_bit()
-                });
-
-                reg_block.user().modify(|_, w| {
-                    w.fwrite_dio()
-                        .set_bit()
-                        .fwrite_qio()
-                        .clear_bit()
-                        .fwrite_dual()
-                        .clear_bit()
-                        .fwrite_quad()
-                        .clear_bit()
-                });
-            }
-            (SpiDataMode::Dual, SpiDataMode::Quad) => {
-                panic!("Unsupported combination of data-modes")
-            }
-            (SpiDataMode::Quad, SpiDataMode::Single) => {
-                panic!("Unsupported combination of data-modes")
-            }
-            (SpiDataMode::Quad, SpiDataMode::Dual) => {
-                panic!("Unsupported combination of data-modes")
-            }
-            (SpiDataMode::Quad, SpiDataMode::Quad) => {
-                reg_block.ctrl().modify(|_, w| {
-                    w.fread_dio()
-                        .clear_bit()
-                        .fread_qio()
-                        .set_bit()
-                        .fread_dual()
-                        .clear_bit()
-                        .fread_quad()
-                        .clear_bit()
-                });
-
-                reg_block.user().modify(|_, w| {
-                    w.fwrite_dio()
-                        .clear_bit()
-                        .fwrite_qio()
-                        .set_bit()
-                        .fwrite_dual()
-                        .clear_bit()
-                        .fwrite_quad()
-                        .clear_bit()
-                });
-            }
+            _ => panic!("Unsupported combination of data-modes"),
         }
     }
 
