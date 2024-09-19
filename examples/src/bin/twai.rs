@@ -1,6 +1,6 @@
-//! This example sends a CAN message to another ESP and receives it back.
+//! This example sends a TWAI message to another ESP and receives it back.
 //!
-//! This example works without CAN Transceivers by:
+//! This example works without TWAI transceivers by:
 //! * setting the tx pins to open drain
 //! * connecting all rx and tx pins together
 //! * adding a pull-up to the signal pins
@@ -43,7 +43,7 @@ fn main() -> ! {
     let rx_pin = io.pins.gpio2;
 
     // The speed of the CAN bus.
-    const CAN_BAUDRATE: twai::BaudRate = twai::BaudRate::B1000K;
+    const TWAI_BAUDRATE: twai::BaudRate = twai::BaudRate::B1000K;
 
     // !!! Use `new` when using a transceiver. `new_no_transceiver` sets TX to open-drain
     // Self-testing also works using the regular `new` function.
@@ -55,7 +55,7 @@ fn main() -> ! {
         peripherals.TWAI0,
         rx_pin,
         tx_pin,
-        CAN_BAUDRATE,
+        TWAI_BAUDRATE,
         TwaiMode::Normal,
     );
 
