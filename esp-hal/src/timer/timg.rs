@@ -76,7 +76,7 @@ use crate::soc::constants::TIMG_DEFAULT_CLK_SRC;
 use crate::{
     clock::Clocks,
     interrupt::{self, InterruptHandler},
-    lock,
+    lock::{lock, LockState},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{timg0::RegisterBlock, Interrupt, TIMG0},
     private::Sealed,
@@ -84,7 +84,6 @@ use crate::{
     Async,
     Blocking,
     InterruptConfigurable,
-    LockState,
     Mode,
 };
 
