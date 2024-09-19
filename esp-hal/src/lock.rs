@@ -10,7 +10,7 @@ mod single_core {
                 core::arch::asm!("rsil {0}, 5", out(reg) token);
                 token
             } else {
-                panic!()
+                compile_error!("Unsupported architecture")
             }
         }
     }
@@ -28,7 +28,7 @@ mod single_core {
                     "wsr.ps {0}",
                     "rsync", in(reg) token)
             } else {
-                panic!()
+                compile_error!("Unsupported architecture")
             }
         }
     }
