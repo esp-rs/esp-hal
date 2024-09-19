@@ -22,6 +22,7 @@ mod single_core {
                     esp_riscv_rt::riscv::interrupt::enable();
                 }
             } else if #[cfg(xtensa)] {
+                // Reserved bits in the PS register, these must be written as 0.
                 const RESERVED_MASK: u32 = 0b1111_1111_1111_1000_1111_0000_0000_0000;
                 debug_assert!(token & RESERVED_MASK == 0);
                 core::arch::asm!(
@@ -46,6 +47,9 @@ mod multicore {
         } else if #[cfg(xtensa)] {
             // PS has 15 useful bits. Bits 12..16 and 19..32 are unused, so we can use bit
             // #31 as our reentry flag.
+            // We can assume the reserved bit is 0 otherwise rsil - wsr pairings would be
+            // undefined behavior: Quoting the ISA summary, table 64:
+            // Writing a non-zero value to these fields results in undefined processor behavior.
             pub const REENTRY_FLAG: u32 = 1 << 31;
         }
     }
