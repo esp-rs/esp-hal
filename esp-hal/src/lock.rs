@@ -131,21 +131,18 @@ mod multicore {
         pub fn lock(&self) -> LockKind {
             let current_thread_id = thread_id();
 
-            if self.try_lock(current_thread_id) {
-                return LockKind::Lock;
+            match self.try_lock(current_thread_id) {
+                Ok(_) => LockKind::Lock,
+                Err(owner) if owner == current_thread_id => LockKind::Reentry,
+                Err(_) => {
+                    while self.try_lock(current_thread_id).is_ok() {}
+
+                    LockKind::Lock
+                }
             }
-
-            let current_owner = self.owner.load(Ordering::Relaxed);
-            if current_owner == current_thread_id {
-                return LockKind::Reentry;
-            }
-
-            while !self.try_lock(current_thread_id) {}
-
-            LockKind::Lock
         }
 
-        pub fn try_lock(&self, new_owner: usize) -> bool {
+        pub fn try_lock(&self, new_owner: usize) -> Result<(), usize> {
             self.owner
                 .compare_exchange(
                     UNUSED_THREAD_ID_VALUE,
@@ -153,7 +150,7 @@ mod multicore {
                     Ordering::Acquire,
                     Ordering::Relaxed,
                 )
-                .is_ok()
+                .map(|_| ())
         }
 
         pub fn unlock(&self) {
@@ -210,25 +207,25 @@ pub(crate) fn lock<T>(state: &LockState, f: impl FnOnce() -> T) -> T {
                 // If we allow reentrancy, the interrupt handler would technically be a different
                 // context with the same `current_thread_id`, so it would be allowed to lock the
                 // resource in a theoretically incorrect way.
-                let func = || {
+                let try_run_locked = || {
                     // Only use `try_lock` here so that we don't spin in interrupt-free context.
-                    if state.inner.try_lock(current_thread_id) {
-                        let result = f();
+                    match state.inner.try_lock(current_thread_id) {
+                        Ok(()) => {
+                            let result = f();
 
-                        state.inner.unlock();
+                            state.inner.unlock();
 
-                        Ok(result)
-                    } else {
-                        assert!(
-                            !state.inner.is_owned_by(current_thread_id),
-                            "lock is not re-entrant!"
-                        );
+                            Ok(result)
+                        }
+                        Err(owner) => {
+                            assert!(owner != current_thread_id, "lock is not re-entrant!");
 
-                        Err(f)
+                            Err(f)
+                        }
                     }
                 };
 
-                match interrupt_free(func) {
+                match interrupt_free(try_run_locked) {
                     Ok(result) => return result,
                     Err(the_function) => f = the_function,
                 }
