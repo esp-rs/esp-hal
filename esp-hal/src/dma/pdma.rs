@@ -165,10 +165,10 @@ macro_rules! ImplSpiChannel {
                     spi.dma_in_link().modify(|_, w| w.inlink_start().set_bit());
                 }
 
-                fn listen_out(interrupts: EnumSet<DmaTxInterrupt>) {
+                fn listen_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
                     spi.dma_int_ena().modify(|_, w| {
-                        for interrupt in interrupts {
+                        for interrupt in interrupts.into() {
                             match interrupt {
                                 DmaTxInterrupt::TotalEof => w.out_total_eof().set_bit(),
                                 DmaTxInterrupt::DescriptorError => w.outlink_dscr_error().set_bit(),
@@ -180,10 +180,10 @@ macro_rules! ImplSpiChannel {
                     })
                 }
 
-                fn unlisten_out(interrupts: EnumSet<DmaTxInterrupt>) {
+                fn unlisten_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
                     spi.dma_int_ena().modify(|_, w| {
-                        for interrupt in interrupts {
+                        for interrupt in interrupts.into() {
                             match interrupt {
                                 DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit(),
                                 DmaTxInterrupt::DescriptorError => w.outlink_dscr_error().clear_bit(),
@@ -237,10 +237,10 @@ macro_rules! ImplSpiChannel {
                     result
                 }
 
-                fn clear_out(interrupts: EnumSet<DmaTxInterrupt>) {
+                fn clear_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
                     spi.dma_int_clr().write(|w| {
-                        for interrupt in interrupts {
+                        for interrupt in interrupts.into() {
                             match interrupt {
                                 DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit_by_one(),
                                 DmaTxInterrupt::DescriptorError => w.outlink_dscr_error().clear_bit_by_one(),
@@ -252,10 +252,10 @@ macro_rules! ImplSpiChannel {
                     })
                 }
 
-                fn listen_in(interrupts: EnumSet<DmaRxInterrupt>) {
+                fn listen_in(interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
                     spi.dma_int_ena().modify(|_, w| {
-                        for interrupt in interrupts {
+                        for interrupt in interrupts.into() {
                             match interrupt {
                                 DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().set_bit(),
                                 DmaRxInterrupt::ErrorEof => w.in_err_eof().set_bit(),
@@ -268,10 +268,10 @@ macro_rules! ImplSpiChannel {
                     })
                 }
 
-                fn unlisten_in(interrupts: EnumSet<DmaRxInterrupt>) {
+                fn unlisten_in(interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
                     spi.dma_int_ena().modify(|_, w| {
-                        for interrupt in interrupts {
+                        for interrupt in interrupts.into() {
                             match interrupt {
                                 DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit(),
                                 DmaRxInterrupt::ErrorEof => w.in_err_eof().clear_bit(),
@@ -332,10 +332,10 @@ macro_rules! ImplSpiChannel {
                     result
                 }
 
-                fn clear_in(interrupts: EnumSet<DmaRxInterrupt>) {
+                fn clear_in(interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
                     spi.dma_int_clr().modify(|_, w| {
-                        for interrupt in interrupts {
+                        for interrupt in interrupts.into() {
                             match interrupt {
                                 DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit_by_one(),
                                 DmaRxInterrupt::ErrorEof => w.in_err_eof().clear_bit_by_one(),
@@ -559,10 +559,10 @@ macro_rules! ImplI2sChannel {
                     reg_block.in_link().modify(|_, w| w.inlink_start().set_bit());
                 }
 
-                fn listen_out(interrupts: EnumSet<DmaTxInterrupt>) {
+                fn listen_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
                     reg_block.int_ena().modify(|_, w| {
-                        for interrupt in interrupts {
+                        for interrupt in interrupts.into() {
                             match interrupt {
                                 DmaTxInterrupt::TotalEof => w.out_total_eof().set_bit(),
                                 DmaTxInterrupt::DescriptorError => w.out_dscr_err().set_bit(),
@@ -574,10 +574,10 @@ macro_rules! ImplI2sChannel {
                     })
                 }
 
-                fn unlisten_out(interrupts: EnumSet<DmaTxInterrupt>) {
+                fn unlisten_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
                     reg_block.int_ena().modify(|_, w| {
-                        for interrupt in interrupts {
+                        for interrupt in interrupts.into() {
                             match interrupt {
                                 DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit(),
                                 DmaTxInterrupt::DescriptorError => w.out_dscr_err().clear_bit(),
@@ -631,10 +631,10 @@ macro_rules! ImplI2sChannel {
                     result
                 }
 
-                fn clear_out(interrupts: EnumSet<DmaTxInterrupt>) {
+                fn clear_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
                     reg_block.int_clr().write(|w| {
-                        for interrupt in interrupts {
+                        for interrupt in interrupts.into() {
                             match interrupt {
                                 DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit_by_one(),
                                 DmaTxInterrupt::DescriptorError => w.out_dscr_err().clear_bit_by_one(),
@@ -646,10 +646,10 @@ macro_rules! ImplI2sChannel {
                     })
                 }
 
-                fn listen_in(interrupts: EnumSet<DmaRxInterrupt>) {
+                fn listen_in(interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
                     reg_block.int_ena().modify(|_, w| {
-                        for interrupt in interrupts {
+                        for interrupt in interrupts.into() {
                             match interrupt {
                                 DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().set_bit(),
                                 DmaRxInterrupt::ErrorEof => w.in_err_eof().set_bit(),
@@ -662,10 +662,10 @@ macro_rules! ImplI2sChannel {
                     })
                 }
 
-                fn unlisten_in(interrupts: EnumSet<DmaRxInterrupt>) {
+                fn unlisten_in(interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
                     reg_block.int_ena().modify(|_, w| {
-                        for interrupt in interrupts {
+                        for interrupt in interrupts.into() {
                             match interrupt {
                                 DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit(),
                                 DmaRxInterrupt::ErrorEof => w.in_err_eof().clear_bit(),
@@ -726,10 +726,10 @@ macro_rules! ImplI2sChannel {
                     result
                 }
 
-                fn clear_in(interrupts: EnumSet<DmaRxInterrupt>) {
+                fn clear_in(interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
                     reg_block.int_clr().write(|w| {
-                        for interrupt in interrupts {
+                        for interrupt in interrupts.into() {
                             match interrupt {
                                 DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit_by_one(),
                                 DmaRxInterrupt::ErrorEof => w.in_err_eof().clear_bit_by_one(),

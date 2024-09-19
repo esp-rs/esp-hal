@@ -243,9 +243,9 @@ impl<const N: u8> RegisterAccess for Channel<N> {
             .modify(|_, w| w.inlink_start().set_bit());
     }
 
-    fn listen_out(interrupts: EnumSet<DmaTxInterrupt>) {
+    fn listen_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
         Self::out_int().ena().modify(|_, w| {
-            for interrupt in interrupts {
+            for interrupt in interrupts.into() {
                 match interrupt {
                     DmaTxInterrupt::TotalEof => w.out_total_eof().set_bit(),
                     DmaTxInterrupt::DescriptorError => w.out_dscr_err().set_bit(),
@@ -257,9 +257,9 @@ impl<const N: u8> RegisterAccess for Channel<N> {
         })
     }
 
-    fn unlisten_out(interrupts: EnumSet<DmaTxInterrupt>) {
+    fn unlisten_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
         Self::out_int().ena().modify(|_, w| {
-            for interrupt in interrupts {
+            for interrupt in interrupts.into() {
                 match interrupt {
                     DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit(),
                     DmaTxInterrupt::DescriptorError => w.out_dscr_err().clear_bit(),
@@ -311,9 +311,9 @@ impl<const N: u8> RegisterAccess for Channel<N> {
         result
     }
 
-    fn clear_out(interrupts: EnumSet<DmaTxInterrupt>) {
+    fn clear_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
         Self::out_int().clr().write(|w| {
-            for interrupt in interrupts {
+            for interrupt in interrupts.into() {
                 match interrupt {
                     DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit_by_one(),
                     DmaTxInterrupt::DescriptorError => w.out_dscr_err().clear_bit_by_one(),
@@ -325,9 +325,9 @@ impl<const N: u8> RegisterAccess for Channel<N> {
         })
     }
 
-    fn listen_in(interrupts: EnumSet<DmaRxInterrupt>) {
+    fn listen_in(interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
         Self::in_int().ena().modify(|_, w| {
-            for interrupt in interrupts {
+            for interrupt in interrupts.into() {
                 match interrupt {
                     DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().set_bit(),
                     DmaRxInterrupt::ErrorEof => w.in_err_eof().set_bit(),
@@ -340,9 +340,9 @@ impl<const N: u8> RegisterAccess for Channel<N> {
         })
     }
 
-    fn unlisten_in(interrupts: EnumSet<DmaRxInterrupt>) {
+    fn unlisten_in(interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
         Self::in_int().ena().modify(|_, w| {
-            for interrupt in interrupts {
+            for interrupt in interrupts.into() {
                 match interrupt {
                     DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit(),
                     DmaRxInterrupt::ErrorEof => w.in_err_eof().clear_bit(),
@@ -401,9 +401,9 @@ impl<const N: u8> RegisterAccess for Channel<N> {
         result
     }
 
-    fn clear_in(interrupts: EnumSet<DmaRxInterrupt>) {
+    fn clear_in(interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
         Self::in_int().clr().write(|w| {
-            for interrupt in interrupts {
+            for interrupt in interrupts.into() {
                 match interrupt {
                     DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit_by_one(),
                     DmaRxInterrupt::ErrorEof => w.in_err_eof().clear_bit_by_one(),
