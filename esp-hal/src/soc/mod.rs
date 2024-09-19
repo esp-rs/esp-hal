@@ -1,5 +1,3 @@
-use core::ops::Range;
-
 use portable_atomic::{AtomicU8, Ordering};
 
 pub use self::implementation::*;
@@ -25,7 +23,7 @@ static MAPPED_PSRAM: Locked<MappedPsram> = Locked::new(MappedPsram { memory_rang
 
 #[cfg(psram)]
 pub struct MappedPsram {
-    memory_range: Range<usize>,
+    memory_range: core::ops::Range<usize>,
 }
 
 // Indicates the state of setting the mac address
