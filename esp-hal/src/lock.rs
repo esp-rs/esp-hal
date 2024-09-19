@@ -112,7 +112,7 @@ mod multicore {
     // value. TODO when we have HIL tests ensure this is the case!
     const UNUSED_THREAD_ID_VALUE: usize = 0x100;
 
-    fn thread_id() -> usize {
+    pub fn thread_id() -> usize {
         crate::get_raw_core()
     }
 
@@ -128,17 +128,21 @@ mod multicore {
     }
 
     impl ReentrantMutex {
-        const fn new() -> Self {
+        pub const fn new() -> Self {
             Self {
                 owner: AtomicUsize::new(UNUSED_THREAD_ID_VALUE),
             }
         }
 
         pub fn is_owned_by_current_thread(&self) -> bool {
-            self.owner.load(Ordering::Relaxed) == thread_id()
+            self.is_owned_by(thread_id())
         }
 
-        pub(super) fn lock(&self) -> LockKind {
+        pub fn is_owned_by(&self, thread: usize) -> bool {
+            self.owner.load(Ordering::Relaxed) == thread
+        }
+
+        pub fn lock(&self) -> LockKind {
             let current_thread_id = thread_id();
 
             if self.try_lock(current_thread_id) {
@@ -155,7 +159,7 @@ mod multicore {
             LockKind::Lock
         }
 
-        fn try_lock(&self, new_owner: usize) -> bool {
+        pub fn try_lock(&self, new_owner: usize) -> bool {
             self.owner
                 .compare_exchange(
                     UNUSED_THREAD_ID_VALUE,
@@ -166,7 +170,7 @@ mod multicore {
                 .is_ok()
         }
 
-        pub(super) fn unlock(&self) {
+        pub fn unlock(&self) {
             self.owner.store(UNUSED_THREAD_ID_VALUE, Ordering::Release);
         }
     }
@@ -175,17 +179,26 @@ mod multicore {
 // The state of a re-entrant lock
 pub(crate) struct LockState {
     #[cfg(multi_core)]
-    core: portable_atomic::AtomicUsize,
+    inner: multicore::ReentrantMutex,
 }
 
 impl LockState {
-    #[cfg(multi_core)]
-    const UNLOCKED: usize = usize::MAX;
-
     pub const fn new() -> Self {
         Self {
             #[cfg(multi_core)]
-            core: portable_atomic::AtomicUsize::new(Self::UNLOCKED),
+            inner: multicore::ReentrantMutex::new(),
+        }
+    }
+}
+
+fn interrupt_free<T>(f: impl FnOnce() -> T) -> T {
+    cfg_if::cfg_if! {
+        if #[cfg(riscv)] {
+            esp_riscv_rt::riscv::interrupt::free(f)
+        } else if #[cfg(xtensa)] {
+            xtensa_lx::interrupt::free(|_| f())
+        } else {
+            panic!()
         }
     }
 }
@@ -198,64 +211,39 @@ pub(crate) fn lock<T>(state: &LockState, f: impl FnOnce() -> T) -> T {
     // In regards to disabling interrupts, we only need to disable
     // the interrupts that may be calling this function.
 
-    #[cfg(not(multi_core))]
-    {
-        // Disabling interrupts is enough on single core chips to ensure mutual
-        // exclusion.
+    cfg_if::cfg_if! {
+        if #[cfg(multi_core)] {
+            let mut f = f;
+            let current_thread_id = multicore::thread_id();
+            loop {
+                let func = || {
+                    if state.inner.try_lock(current_thread_id) {
+                        let result = f();
 
-        #[cfg(riscv)]
-        return esp_riscv_rt::riscv::interrupt::free(f);
-        #[cfg(xtensa)]
-        return xtensa_lx::interrupt::free(|_| f());
-    }
+                        state.inner.unlock();
 
-    #[cfg(multi_core)]
-    {
-        use portable_atomic::Ordering;
+                        Ok(result)
+                    } else {
+                        assert!(
+                            !state.inner.is_owned_by(current_thread_id),
+                            "lock is not re-entrant!"
+                        );
 
-        let current_core = crate::get_core() as usize;
+                        Err(f)
+                    }
+                };
 
-        let mut f = f;
-
-        loop {
-            let func = || {
-                // Use Acquire ordering in success to ensure `f()` "happens after" the lock is
-                // taken. Use Relaxed ordering in failure as there's no
-                // synchronisation happening.
-                if let Err(locked_core) = state.core.compare_exchange(
-                    LockState::UNLOCKED,
-                    current_core,
-                    Ordering::Acquire,
-                    Ordering::Relaxed,
-                ) {
-                    assert_ne!(
-                        locked_core, current_core,
-                        "esp_hal::lock is not re-entrant!"
-                    );
-
-                    Err(f)
-                } else {
-                    let result = f();
-
-                    // Use Release ordering here to ensure `f()` "happens before" this lock is
-                    // released.
-                    state.core.store(LockState::UNLOCKED, Ordering::Release);
-
-                    Ok(result)
+                match interrupt_free(func) {
+                    Ok(result) => return result,
+                    Err(the_function) => f = the_function,
                 }
-            };
 
-            #[cfg(riscv)]
-            let result = riscv::interrupt::free(func);
-            #[cfg(xtensa)]
-            let result = xtensa_lx::interrupt::free(|_| func());
-
-            match result {
-                Ok(result) => break result,
-                Err(the_function) => f = the_function,
+                // Consider using core::hint::spin_loop(); Might need SW_INT.
             }
-
-            // Consider using core::hint::spin_loop(); Might need SW_INT.
+        } else {
+            // Disabling interrupts is enough on single core chips to ensure mutual
+            // exclusion.
+            interrupt_free(f)
         }
     }
 }
