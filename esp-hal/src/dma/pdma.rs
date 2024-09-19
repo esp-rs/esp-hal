@@ -108,11 +108,6 @@ macro_rules! ImplSpiChannel {
                         .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
                 }
 
-                fn has_out_descriptor_error() -> bool {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_raw().read().outlink_dscr_error().bit()
-                }
-
                 fn set_out_peripheral(_peripheral: u8) {
                     // no-op
                 }
@@ -122,52 +117,9 @@ macro_rules! ImplSpiChannel {
                     spi.dma_out_link().modify(|_, w| w.outlink_start().set_bit());
                 }
 
-                fn clear_ch_out_done() {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_clr().write(|w| w.out_done().clear_bit_by_one());
-                }
-
-                fn is_ch_out_done_set() -> bool {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_raw().read().out_done().bit()
-                }
-
-                fn listen_ch_out_done() {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().modify(|_, w| w.out_done().set_bit());
-                }
-
-                fn unlisten_ch_out_done() {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().modify(|_, w| w.out_done().clear_bit());
-                }
-
-                fn is_listening_ch_out_done() -> bool {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().read().out_done().bit()
-                }
-
-                fn is_out_done() -> bool {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_raw().read().out_total_eof().bit()
-                }
-
                 fn last_out_dscr_address() -> usize {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
                     spi.out_eof_des_addr().read().dma_out_eof_des_addr().bits() as usize
-                }
-
-                fn is_out_eof_interrupt_set() -> bool {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_raw().read().out_eof().bit()
-                }
-
-                fn reset_out_eof_interrupt() {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_clr().write(|w| {
-                        w.out_eof()
-                            .clear_bit_by_one()
-                    });
                 }
 
                 fn set_in_burstmode(burst_mode: bool) {
@@ -204,21 +156,6 @@ macro_rules! ImplSpiChannel {
                         .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
                 }
 
-                fn has_in_descriptor_error() -> bool {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_raw().read().inlink_dscr_error().bit()
-                }
-
-                fn has_in_descriptor_error_dscr_empty() -> bool {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_raw().read().inlink_dscr_empty().bit()
-                }
-
-                fn has_in_descriptor_error_err_eof() -> bool {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_raw().read().in_err_eof().bit()
-                }
-
                 fn set_in_peripheral(_peripheral: u8) {
                     // no-op
                 }
@@ -228,124 +165,187 @@ macro_rules! ImplSpiChannel {
                     spi.dma_in_link().modify(|_, w| w.inlink_start().set_bit());
                 }
 
-                fn is_in_done() -> bool {
+                fn listen_out(interrupts: EnumSet<DmaTxInterrupt>) {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_raw().read().in_done().bit()
+                    spi.dma_int_ena().modify(|_, w| {
+                        for interrupt in interrupts {
+                            match interrupt {
+                                DmaTxInterrupt::TotalEof => w.out_total_eof().set_bit(),
+                                DmaTxInterrupt::DescriptorError => w.outlink_dscr_error().set_bit(),
+                                DmaTxInterrupt::Eof => w.out_eof().set_bit(),
+                                DmaTxInterrupt::Done => w.out_done().set_bit(),
+                            };
+                        }
+                        w
+                    })
                 }
 
-                fn is_listening_in_eof() -> bool {
+                fn unlisten_out(interrupts: EnumSet<DmaTxInterrupt>) {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().read().in_suc_eof().bit_is_set()
+                    spi.dma_int_ena().modify(|_, w| {
+                        for interrupt in interrupts {
+                            match interrupt {
+                                DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit(),
+                                DmaTxInterrupt::DescriptorError => w.outlink_dscr_error().clear_bit(),
+                                DmaTxInterrupt::Eof => w.out_eof().clear_bit(),
+                                DmaTxInterrupt::Done => w.out_done().clear_bit(),
+                            };
+                        }
+                        w
+                    })
                 }
 
-                fn is_listening_out_eof() -> bool {
+                fn is_listening_out() -> EnumSet<DmaTxInterrupt> {
+                    let mut result = EnumSet::new();
+
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().read().out_total_eof().bit_is_set()
+                    let int_ena = spi.dma_int_ena().read();
+                    if int_ena.out_total_eof().bit_is_set() {
+                        result |= DmaTxInterrupt::TotalEof;
+                    }
+                    if int_ena.outlink_dscr_error().bit_is_set() {
+                        result |= DmaTxInterrupt::DescriptorError;
+                    }
+                    if int_ena.out_eof().bit_is_set() {
+                        result |= DmaTxInterrupt::Eof;
+                    }
+                    if int_ena.out_done().bit_is_set() {
+                        result |= DmaTxInterrupt::Done;
+                    }
+
+                    result
                 }
 
-                fn listen_in_eof() {
+                fn available_out_interrupts() -> EnumSet<DmaTxInterrupt> {
+                    let mut result = EnumSet::new();
+
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().modify(|_, w| w.in_suc_eof().set_bit());
+                    let int_raw = spi.dma_int_raw().read();
+                    if int_raw.out_total_eof().bit_is_set() {
+                        result |= DmaTxInterrupt::TotalEof;
+                    }
+                    if int_raw.outlink_dscr_error().bit_is_set() {
+                        result |= DmaTxInterrupt::DescriptorError;
+                    }
+                    if int_raw.out_eof().bit_is_set() {
+                        result |= DmaTxInterrupt::Eof;
+                    }
+                    if int_raw.out_done().bit_is_set() {
+                        result |= DmaTxInterrupt::Done;
+                    }
+
+                    result
                 }
 
-                fn listen_out_eof() {
+                fn clear_out(interrupts: EnumSet<DmaTxInterrupt>) {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().modify(|_, w| w.out_total_eof().set_bit());
+                    spi.dma_int_clr().write(|w| {
+                        for interrupt in interrupts {
+                            match interrupt {
+                                DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit_by_one(),
+                                DmaTxInterrupt::DescriptorError => w.outlink_dscr_error().clear_bit_by_one(),
+                                DmaTxInterrupt::Eof => w.out_eof().clear_bit_by_one(),
+                                DmaTxInterrupt::Done => w.out_done().clear_bit_by_one(),
+                            };
+                        }
+                        w
+                    })
                 }
 
-                fn unlisten_in_eof() {
+                fn listen_in(interrupts: EnumSet<DmaRxInterrupt>) {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().modify(|_, w| w.in_suc_eof().clear_bit());
+                    spi.dma_int_ena().modify(|_, w| {
+                        for interrupt in interrupts {
+                            match interrupt {
+                                DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().set_bit(),
+                                DmaRxInterrupt::ErrorEof => w.in_err_eof().set_bit(),
+                                DmaRxInterrupt::DescriptorError => w.inlink_dscr_error().set_bit(),
+                                DmaRxInterrupt::DescriptorEmpty => w.inlink_dscr_empty().set_bit(),
+                                DmaRxInterrupt::Done => w.in_done().set_bit(),
+                            };
+                        }
+                        w
+                    })
                 }
 
-                fn unlisten_out_eof() {
+                fn unlisten_in(interrupts: EnumSet<DmaRxInterrupt>) {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().modify(|_, w| w.out_total_eof().clear_bit());
+                    spi.dma_int_ena().modify(|_, w| {
+                        for interrupt in interrupts {
+                            match interrupt {
+                                DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit(),
+                                DmaRxInterrupt::ErrorEof => w.in_err_eof().clear_bit(),
+                                DmaRxInterrupt::DescriptorError => w.inlink_dscr_error().clear_bit(),
+                                DmaRxInterrupt::DescriptorEmpty => w.inlink_dscr_empty().clear_bit(),
+                                DmaRxInterrupt::Done => w.in_done().clear_bit(),
+                            };
+                        }
+                        w
+                    })
                 }
 
-                fn listen_ch_in_done(){
+                fn is_listening_in() -> EnumSet<DmaRxInterrupt> {
+                    let mut result = EnumSet::new();
+
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().modify(|_, w| w.in_done().set_bit());
+                    let int_ena = spi.dma_int_ena().read();
+                    if int_ena.inlink_dscr_error().bit_is_set() {
+                        result |= DmaRxInterrupt::DescriptorError;
+                    }
+                    if int_ena.inlink_dscr_empty().bit_is_set() {
+                        result |= DmaRxInterrupt::DescriptorEmpty;
+                    }
+                    if int_ena.in_suc_eof().bit_is_set() {
+                        result |= DmaRxInterrupt::SuccessfulEof;
+                    }
+                    if int_ena.in_err_eof().bit_is_set() {
+                        result |= DmaRxInterrupt::ErrorEof;
+                    }
+                    if int_ena.in_done().bit_is_set() {
+                        result |= DmaRxInterrupt::Done;
+                    }
+
+                    result
                 }
 
-                fn clear_ch_in_done(){
+                fn available_in_interrupts() -> EnumSet<DmaRxInterrupt> {
+                    let mut result = EnumSet::new();
+
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_clr().write(|w| w.in_done().clear_bit_by_one());
+                    let int_raw = spi.dma_int_raw().read();
+                    if int_raw.inlink_dscr_error().bit_is_set() {
+                        result |= DmaRxInterrupt::DescriptorError;
+                    }
+                    if int_raw.inlink_dscr_empty().bit_is_set() {
+                        result |= DmaRxInterrupt::DescriptorEmpty;
+                    }
+                    if int_raw.in_suc_eof().bit_is_set() {
+                        result |= DmaRxInterrupt::SuccessfulEof;
+                    }
+                    if int_raw.in_err_eof().bit_is_set() {
+                        result |= DmaRxInterrupt::ErrorEof;
+                    }
+                    if int_raw.in_done().bit_is_set() {
+                        result |= DmaRxInterrupt::Done;
+                    }
+
+                    result
                 }
 
-                fn is_ch_in_done_set() -> bool {
+                fn clear_in(interrupts: EnumSet<DmaRxInterrupt>) {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_raw().read().in_done().bit()
-                }
-
-                fn unlisten_ch_in_done() {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().modify(|_, w| w.in_done().clear_bit());
-                }
-
-                fn is_listening_ch_in_done() -> bool {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().read().in_done().bit()
-                }
-
-                fn listen_in_descriptor_error() {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().modify(|_,w| w.inlink_dscr_error().set_bit())
-                }
-
-                fn unlisten_in_descriptor_error() {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().modify(|_,w| w.inlink_dscr_error().clear_bit())
-                }
-
-                fn is_listening_in_descriptor_error() -> bool {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().read().inlink_dscr_error().bit()
-                }
-
-                fn listen_in_descriptor_error_dscr_empty() {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().modify(|_,w| w.inlink_dscr_empty().set_bit())
-                }
-
-                fn unlisten_in_descriptor_error_dscr_empty() {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().modify(|_,w| w.inlink_dscr_empty().clear_bit())
-                }
-
-                fn is_listening_in_descriptor_error_dscr_empty() -> bool {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().read().inlink_dscr_empty().bit()
-                }
-
-                fn listen_in_descriptor_error_err_eof() {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().modify(|_,w| w.in_err_eof().set_bit())
-                }
-
-                fn unlisten_in_descriptor_error_err_eof() {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().modify(|_,w| w.in_err_eof().clear_bit())
-                }
-
-                fn is_listening_in_descriptor_error_err_eof() -> bool{
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().read().in_err_eof().bit()
-                }
-
-                fn listen_out_descriptor_error() {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().modify(|_,w| w.outlink_dscr_error().set_bit())
-                }
-
-                fn unlisten_out_descriptor_error() {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().modify(|_,w| w.outlink_dscr_error().clear_bit())
-                }
-
-                fn is_listening_out_descriptor_error() -> bool {
-                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_ena().read().outlink_dscr_error().bit()
+                    spi.dma_int_clr().modify(|_, w| {
+                        for interrupt in interrupts {
+                            match interrupt {
+                                DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit_by_one(),
+                                DmaRxInterrupt::ErrorEof => w.in_err_eof().clear_bit_by_one(),
+                                DmaRxInterrupt::DescriptorError => w.inlink_dscr_error().clear_bit_by_one(),
+                                DmaRxInterrupt::DescriptorEmpty => w.inlink_dscr_empty().clear_bit_by_one(),
+                                DmaRxInterrupt::Done => w.in_done().clear_bit_by_one(),
+                            };
+                        }
+                        w
+                    })
                 }
             }
 
@@ -502,11 +502,6 @@ macro_rules! ImplI2sChannel {
                         .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
                 }
 
-                fn has_out_descriptor_error() -> bool {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_raw().read().out_dscr_err().bit()
-                }
-
                 fn set_out_peripheral(_peripheral: u8) {
                     // no-op
                 }
@@ -516,52 +511,9 @@ macro_rules! ImplI2sChannel {
                     reg_block.out_link().modify(|_, w| w.outlink_start().set_bit());
                 }
 
-                fn clear_ch_out_done() {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_clr().write(|w| w.out_done().clear_bit_by_one());
-                }
-
-                fn is_ch_out_done_set() -> bool {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_raw().read().out_done().bit()
-                }
-
-                fn listen_ch_out_done() {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().modify(|_, w| w.out_done().set_bit());
-                }
-
-                fn unlisten_ch_out_done() {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().modify(|_, w| w.out_done().clear_bit());
-                }
-
-                fn is_listening_ch_out_done() -> bool {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().read().out_done().bit()
-                }
-
-                fn is_out_done() -> bool {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_raw().read().out_eof().bit()
-                }
-
                 fn last_out_dscr_address() -> usize {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
                     reg_block.out_eof_des_addr().read().out_eof_des_addr().bits() as usize
-                }
-
-                fn is_out_eof_interrupt_set() -> bool {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_raw().read().out_eof().bit()
-                }
-
-                fn reset_out_eof_interrupt() {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_clr().write(|w| {
-                        w.out_eof()
-                            .clear_bit_by_one()
-                    });
                 }
 
                 fn set_in_burstmode(burst_mode: bool) {
@@ -598,21 +550,6 @@ macro_rules! ImplI2sChannel {
                         .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
                 }
 
-                fn has_in_descriptor_error() -> bool {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_raw().read().in_dscr_err().bit()
-                }
-
-                fn has_in_descriptor_error_dscr_empty() -> bool {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_raw().read().in_dscr_empty().bit()
-                }
-
-                fn has_in_descriptor_error_err_eof() -> bool {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_raw().read().in_err_eof().bit()
-                }
-
                 fn set_in_peripheral(_peripheral: u8) {
                     // no-op
                 }
@@ -622,124 +559,187 @@ macro_rules! ImplI2sChannel {
                     reg_block.in_link().modify(|_, w| w.inlink_start().set_bit());
                 }
 
-                fn is_in_done() -> bool {
+                fn listen_out(interrupts: EnumSet<DmaTxInterrupt>) {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_raw().read().in_done().bit()
+                    reg_block.int_ena().modify(|_, w| {
+                        for interrupt in interrupts {
+                            match interrupt {
+                                DmaTxInterrupt::TotalEof => w.out_total_eof().set_bit(),
+                                DmaTxInterrupt::DescriptorError => w.out_dscr_err().set_bit(),
+                                DmaTxInterrupt::Eof => w.out_eof().set_bit(),
+                                DmaTxInterrupt::Done => w.out_done().set_bit(),
+                            };
+                        }
+                        w
+                    })
                 }
 
-                fn is_listening_in_eof() -> bool {
+                fn unlisten_out(interrupts: EnumSet<DmaTxInterrupt>) {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().read().in_suc_eof().bit()
+                    reg_block.int_ena().modify(|_, w| {
+                        for interrupt in interrupts {
+                            match interrupt {
+                                DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit(),
+                                DmaTxInterrupt::DescriptorError => w.out_dscr_err().clear_bit(),
+                                DmaTxInterrupt::Eof => w.out_eof().clear_bit(),
+                                DmaTxInterrupt::Done => w.out_done().clear_bit(),
+                            };
+                        }
+                        w
+                    })
                 }
 
-                fn is_listening_out_eof() -> bool {
+                fn is_listening_out() -> EnumSet<DmaTxInterrupt> {
+                    let mut result = EnumSet::new();
+
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().read().out_eof().bit()
+                    let int_ena = reg_block.int_ena().read();
+                    if int_ena.out_total_eof().bit_is_set() {
+                        result |= DmaTxInterrupt::TotalEof;
+                    }
+                    if int_ena.out_dscr_err().bit_is_set() {
+                        result |= DmaTxInterrupt::DescriptorError;
+                    }
+                    if int_ena.out_eof().bit_is_set() {
+                        result |= DmaTxInterrupt::Eof;
+                    }
+                    if int_ena.out_done().bit_is_set() {
+                        result |= DmaTxInterrupt::Done;
+                    }
+
+                    result
                 }
 
-                fn listen_in_eof() {
+                fn available_out_interrupts() -> EnumSet<DmaTxInterrupt> {
+                    let mut result = EnumSet::new();
+
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().modify(|_,w| w.in_suc_eof().set_bit() );
+                    let int_raw = reg_block.int_raw().read();
+                    if int_raw.out_total_eof().bit_is_set() {
+                        result |= DmaTxInterrupt::TotalEof;
+                    }
+                    if int_raw.out_dscr_err().bit_is_set() {
+                        result |= DmaTxInterrupt::DescriptorError;
+                    }
+                    if int_raw.out_eof().bit_is_set() {
+                        result |= DmaTxInterrupt::Eof;
+                    }
+                    if int_raw.out_done().bit_is_set() {
+                        result |= DmaTxInterrupt::Done;
+                    }
+
+                    result
                 }
 
-                fn listen_out_eof() {
+                fn clear_out(interrupts: EnumSet<DmaTxInterrupt>) {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().modify(|_,w| w.out_eof().set_bit() );
+                    reg_block.int_clr().write(|w| {
+                        for interrupt in interrupts {
+                            match interrupt {
+                                DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit_by_one(),
+                                DmaTxInterrupt::DescriptorError => w.out_dscr_err().clear_bit_by_one(),
+                                DmaTxInterrupt::Eof => w.out_eof().clear_bit_by_one(),
+                                DmaTxInterrupt::Done => w.out_done().clear_bit_by_one(),
+                            };
+                        }
+                        w
+                    })
                 }
 
-                fn unlisten_in_eof() {
+                fn listen_in(interrupts: EnumSet<DmaRxInterrupt>) {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().modify(|_,w| w.in_suc_eof().clear_bit() );
+                    reg_block.int_ena().modify(|_, w| {
+                        for interrupt in interrupts {
+                            match interrupt {
+                                DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().set_bit(),
+                                DmaRxInterrupt::ErrorEof => w.in_err_eof().set_bit(),
+                                DmaRxInterrupt::DescriptorError => w.in_dscr_err().set_bit(),
+                                DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().set_bit(),
+                                DmaRxInterrupt::Done => w.in_done().set_bit(),
+                            };
+                        }
+                        w
+                    })
                 }
 
-                fn unlisten_out_eof() {
+                fn unlisten_in(interrupts: EnumSet<DmaRxInterrupt>) {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().modify(|_,w| w.out_eof().clear_bit() );
+                    reg_block.int_ena().modify(|_, w| {
+                        for interrupt in interrupts {
+                            match interrupt {
+                                DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit(),
+                                DmaRxInterrupt::ErrorEof => w.in_err_eof().clear_bit(),
+                                DmaRxInterrupt::DescriptorError => w.in_dscr_err().clear_bit(),
+                                DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().clear_bit(),
+                                DmaRxInterrupt::Done => w.in_done().clear_bit(),
+                            };
+                        }
+                        w
+                    })
                 }
 
-                fn listen_ch_in_done(){
+                fn is_listening_in() -> EnumSet<DmaRxInterrupt> {
+                    let mut result = EnumSet::new();
+
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().modify(|_, w| w.in_done().set_bit());
+                    let int_ena = reg_block.int_ena().read();
+                    if int_ena.in_dscr_err().bit_is_set() {
+                        result |= DmaRxInterrupt::DescriptorError;
+                    }
+                    if int_ena.in_dscr_empty().bit_is_set() {
+                        result |= DmaRxInterrupt::DescriptorEmpty;
+                    }
+                    if int_ena.in_suc_eof().bit_is_set() {
+                        result |= DmaRxInterrupt::SuccessfulEof;
+                    }
+                    if int_ena.in_err_eof().bit_is_set() {
+                        result |= DmaRxInterrupt::ErrorEof;
+                    }
+                    if int_ena.in_done().bit_is_set() {
+                        result |= DmaRxInterrupt::Done;
+                    }
+
+                    result
                 }
 
-                fn clear_ch_in_done(){
+                fn available_in_interrupts() -> EnumSet<DmaRxInterrupt> {
+                    let mut result = EnumSet::new();
+
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_clr().write(|w| w.in_done().clear_bit_by_one());
+                    let int_raw = reg_block.int_raw().read();
+                    if int_raw.in_dscr_err().bit_is_set() {
+                        result |= DmaRxInterrupt::DescriptorError;
+                    }
+                    if int_raw.in_dscr_empty().bit_is_set() {
+                        result |= DmaRxInterrupt::DescriptorEmpty;
+                    }
+                    if int_raw.in_suc_eof().bit_is_set() {
+                        result |= DmaRxInterrupt::SuccessfulEof;
+                    }
+                    if int_raw.in_err_eof().bit_is_set() {
+                        result |= DmaRxInterrupt::ErrorEof;
+                    }
+                    if int_raw.in_done().bit_is_set() {
+                        result |= DmaRxInterrupt::Done;
+                    }
+
+                    result
                 }
 
-                fn is_ch_in_done_set() -> bool {
+                fn clear_in(interrupts: EnumSet<DmaRxInterrupt>) {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_raw().read().in_done().bit()
-                }
-
-                fn unlisten_ch_in_done() {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().modify(|_, w| w.in_done().clear_bit());
-                }
-
-                fn is_listening_ch_in_done() -> bool {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().read().in_done().bit()
-                }
-
-                fn listen_in_descriptor_error(){
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().modify(|_, w| w.in_dscr_err().set_bit());
-                }
-
-                fn unlisten_in_descriptor_error() {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().modify(|_, w| w.in_dscr_err().clear_bit());
-                }
-
-                fn is_listening_in_descriptor_error() -> bool {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().read().in_dscr_err().bit()
-                }
-
-                fn listen_in_descriptor_error_dscr_empty() {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().modify(|_, w| w.in_dscr_empty().set_bit());
-                }
-
-                fn unlisten_in_descriptor_error_dscr_empty() {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().modify(|_, w| w.in_dscr_empty().clear_bit());
-                }
-
-                fn is_listening_in_descriptor_error_dscr_empty() -> bool{
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().read().in_dscr_empty().bit()
-                }
-
-                fn listen_in_descriptor_error_err_eof() {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().modify(|_, w| w.in_err_eof().set_bit());
-                }
-
-                fn unlisten_in_descriptor_error_err_eof() {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().modify(|_, w| w.in_err_eof().clear_bit());
-                }
-
-                fn is_listening_in_descriptor_error_err_eof() -> bool{
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().read().in_err_eof().bit()
-                }
-
-                fn listen_out_descriptor_error() {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().modify(|_, w| w.out_dscr_err().set_bit());
-                }
-
-                fn unlisten_out_descriptor_error() {
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().modify(|_, w| w.out_dscr_err().clear_bit());
-                }
-
-                fn is_listening_out_descriptor_error() -> bool{
-                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_ena().read().out_dscr_err().bit()
+                    reg_block.int_clr().write(|w| {
+                        for interrupt in interrupts {
+                            match interrupt {
+                                DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit_by_one(),
+                                DmaRxInterrupt::ErrorEof => w.in_err_eof().clear_bit_by_one(),
+                                DmaRxInterrupt::DescriptorError => w.in_dscr_err().clear_bit_by_one(),
+                                DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().clear_bit_by_one(),
+                                DmaRxInterrupt::Done => w.in_done().clear_bit_by_one(),
+                            };
+                        }
+                        w
+                    })
                 }
             }
 

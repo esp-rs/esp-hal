@@ -278,7 +278,7 @@ impl DmaDescriptor {
     }
 }
 
-use enumset::{EnumSet, EnumSetType};
+use enumset::{enum_set, EnumSet, EnumSetType};
 
 #[cfg(gdma)]
 pub use self::gdma::*;
@@ -298,6 +298,53 @@ pub enum DmaInterrupt {
     RxDone,
     /// TX is done
     TxDone,
+}
+
+/// Types of interrupts emitted by the TX channel.
+#[derive(EnumSetType)]
+pub enum DmaTxInterrupt {
+    /// Triggered when all data corresponding to a linked list (including
+    /// multiple descriptors) have been sent via transmit channel.
+    TotalEof,
+
+    /// Triggered when an error is detected in a transmit descriptor on transmit
+    /// channel.
+    DescriptorError,
+
+    /// Triggered when EOF in a transmit descriptor is true and data
+    /// corresponding to this descriptor have been sent via transmit
+    /// channel.
+    Eof,
+
+    /// Triggered when all data corresponding to a transmit descriptor have been
+    /// sent via transmit channel.
+    Done,
+}
+
+/// Types of interrupts emitted by the RX channel.
+#[derive(EnumSetType)]
+pub enum DmaRxInterrupt {
+    /// Triggered when the size of the buffer pointed by receive descriptors
+    /// is smaller than the length of data to be received via receive channel.
+    DescriptorEmpty,
+
+    /// Triggered when an error is detected in a receive descriptor on receive
+    /// channel.
+    DescriptorError,
+
+    /// Triggered when an error is detected in the data segment corresponding to
+    /// a descriptor received via receive channel n.
+    /// This interrupt is used only for UHCI0 peripheral (UART0 or UART1).
+    ErrorEof,
+
+    /// Triggered when the suc_eof bit in a receive descriptor is 1 and the data
+    /// corresponding to this receive descriptor has been received via receive
+    /// channel.
+    SuccessfulEof,
+
+    /// Triggered when all data corresponding to a receive descriptor have been
+    /// received via receive channel.
+    Done,
 }
 
 /// The default chunk size used for DMA transfers.
@@ -1803,17 +1850,49 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn clear_out_interrupts();
     fn reset_out();
     fn set_out_descriptors(address: u32);
-    fn has_out_descriptor_error() -> bool;
+    fn has_out_descriptor_error() -> bool {
+        Self::available_out_interrupts().contains(DmaTxInterrupt::DescriptorError)
+    }
     fn set_out_peripheral(peripheral: u8);
     fn start_out();
-    fn clear_ch_out_done();
-    fn is_ch_out_done_set() -> bool;
-    fn listen_ch_out_done();
-    fn unlisten_ch_out_done();
-    fn is_listening_ch_out_done() -> bool;
-    fn is_out_done() -> bool;
-    fn is_out_eof_interrupt_set() -> bool;
-    fn reset_out_eof_interrupt();
+
+    fn listen_out(interrupts: EnumSet<DmaTxInterrupt>);
+    fn unlisten_out(interrupts: EnumSet<DmaTxInterrupt>);
+    fn is_listening_out() -> EnumSet<DmaTxInterrupt>;
+    fn clear_out(interrupts: EnumSet<DmaTxInterrupt>);
+    fn available_out_interrupts() -> EnumSet<DmaTxInterrupt>;
+
+    fn listen_in(interrupts: EnumSet<DmaRxInterrupt>);
+    fn unlisten_in(interrupts: EnumSet<DmaRxInterrupt>);
+    fn is_listening_in() -> EnumSet<DmaRxInterrupt>;
+    fn clear_in(interrupts: EnumSet<DmaRxInterrupt>);
+    fn available_in_interrupts() -> EnumSet<DmaRxInterrupt>;
+
+    fn clear_ch_out_done() {
+        Self::clear_out(enum_set!(DmaTxInterrupt::Done));
+    }
+    fn is_ch_out_done_set() -> bool {
+        Self::available_out_interrupts().contains(DmaTxInterrupt::Done)
+    }
+    fn listen_ch_out_done() {
+        Self::listen_out(enum_set!(DmaTxInterrupt::Done));
+    }
+    fn unlisten_ch_out_done() {
+        Self::unlisten_out(enum_set!(DmaTxInterrupt::Done));
+    }
+    fn is_listening_ch_out_done() -> bool {
+        Self::is_listening_out().contains(DmaTxInterrupt::Done)
+    }
+    fn is_out_done() -> bool {
+        // Note: I2S PDMA used Eof instead of TotalEof
+        Self::available_out_interrupts().contains(DmaTxInterrupt::TotalEof)
+    }
+    fn is_out_eof_interrupt_set() -> bool {
+        Self::available_out_interrupts().contains(DmaTxInterrupt::Eof)
+    }
+    fn reset_out_eof_interrupt() {
+        Self::clear_out(enum_set!(DmaTxInterrupt::Eof));
+    }
     fn last_out_dscr_address() -> usize;
 
     #[cfg(esp32s3)]
@@ -1823,42 +1902,100 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn clear_in_interrupts();
     fn reset_in();
     fn set_in_descriptors(address: u32);
-    fn has_in_descriptor_error() -> bool;
-    fn has_in_descriptor_error_dscr_empty() -> bool;
-    fn has_in_descriptor_error_err_eof() -> bool;
+    fn has_in_descriptor_error() -> bool {
+        Self::available_in_interrupts().contains(DmaRxInterrupt::DescriptorError)
+    }
+    fn has_in_descriptor_error_dscr_empty() -> bool {
+        Self::available_in_interrupts().contains(DmaRxInterrupt::DescriptorEmpty)
+    }
+    fn has_in_descriptor_error_err_eof() -> bool {
+        Self::available_in_interrupts().contains(DmaRxInterrupt::ErrorEof)
+    }
     fn set_in_peripheral(peripheral: u8);
     fn start_in();
-    fn is_in_done() -> bool;
+    fn is_in_done() -> bool {
+        // Note: PDMA used Done instead of SuccessfulEof
+        Self::available_in_interrupts().contains(DmaRxInterrupt::SuccessfulEof)
+    }
 
-    fn is_listening_in_eof() -> bool;
-    fn is_listening_out_eof() -> bool;
+    fn is_listening_in_eof() -> bool {
+        Self::is_listening_in().contains(DmaRxInterrupt::SuccessfulEof)
+    }
+    fn is_listening_out_eof() -> bool {
+        // Note: I2S PDMA considers this to be Eof instead of TotalEof
+        Self::is_listening_out().contains(DmaTxInterrupt::TotalEof)
+    }
 
-    fn listen_in_eof();
-    fn listen_out_eof();
-    fn unlisten_in_eof();
-    fn unlisten_out_eof();
+    fn listen_in_eof() {
+        Self::listen_in(enum_set!(DmaRxInterrupt::SuccessfulEof));
+    }
+    fn listen_out_eof() {
+        // Note: I2S PDMA considers this to be Eof instead of TotalEof
+        Self::listen_out(enum_set!(DmaTxInterrupt::TotalEof));
+    }
+    fn unlisten_in_eof() {
+        Self::unlisten_in(enum_set!(DmaRxInterrupt::SuccessfulEof));
+    }
+    fn unlisten_out_eof() {
+        // Note: I2S PDMA considers this to be Eof instead of TotalEof
+        Self::unlisten_out(enum_set!(DmaTxInterrupt::TotalEof));
+    }
 
-    fn listen_in_descriptor_error();
-    fn unlisten_in_descriptor_error();
-    fn is_listening_in_descriptor_error() -> bool;
+    fn listen_in_descriptor_error() {
+        Self::listen_in(enum_set!(DmaRxInterrupt::DescriptorError))
+    }
+    fn unlisten_in_descriptor_error() {
+        Self::unlisten_in(enum_set!(DmaRxInterrupt::DescriptorError))
+    }
+    fn is_listening_in_descriptor_error() -> bool {
+        Self::is_listening_in().contains(DmaRxInterrupt::DescriptorError)
+    }
 
-    fn listen_in_descriptor_error_dscr_empty();
-    fn unlisten_in_descriptor_error_dscr_empty();
-    fn is_listening_in_descriptor_error_dscr_empty() -> bool;
+    fn listen_in_descriptor_error_dscr_empty() {
+        Self::listen_in(enum_set!(DmaRxInterrupt::DescriptorEmpty))
+    }
+    fn unlisten_in_descriptor_error_dscr_empty() {
+        Self::unlisten_in(enum_set!(DmaRxInterrupt::DescriptorEmpty))
+    }
+    fn is_listening_in_descriptor_error_dscr_empty() -> bool {
+        Self::is_listening_in().contains(DmaRxInterrupt::DescriptorEmpty)
+    }
 
-    fn listen_in_descriptor_error_err_eof();
-    fn unlisten_in_descriptor_error_err_eof();
-    fn is_listening_in_descriptor_error_err_eof() -> bool;
+    fn listen_in_descriptor_error_err_eof() {
+        Self::listen_in(enum_set!(DmaRxInterrupt::ErrorEof))
+    }
+    fn unlisten_in_descriptor_error_err_eof() {
+        Self::unlisten_in(enum_set!(DmaRxInterrupt::ErrorEof))
+    }
+    fn is_listening_in_descriptor_error_err_eof() -> bool {
+        Self::is_listening_in().contains(DmaRxInterrupt::ErrorEof)
+    }
 
-    fn listen_out_descriptor_error();
-    fn unlisten_out_descriptor_error();
-    fn is_listening_out_descriptor_error() -> bool;
+    fn listen_out_descriptor_error() {
+        Self::listen_out(enum_set!(DmaTxInterrupt::DescriptorError));
+    }
+    fn unlisten_out_descriptor_error() {
+        Self::unlisten_out(enum_set!(DmaTxInterrupt::DescriptorError));
+    }
+    fn is_listening_out_descriptor_error() -> bool {
+        Self::is_listening_out().contains(DmaTxInterrupt::DescriptorError)
+    }
 
-    fn listen_ch_in_done();
-    fn clear_ch_in_done();
-    fn is_ch_in_done_set() -> bool;
-    fn unlisten_ch_in_done();
-    fn is_listening_ch_in_done() -> bool;
+    fn listen_ch_in_done() {
+        Self::listen_in(enum_set!(DmaRxInterrupt::Done));
+    }
+    fn clear_ch_in_done() {
+        Self::clear_in(enum_set!(DmaRxInterrupt::Done));
+    }
+    fn is_ch_in_done_set() -> bool {
+        Self::available_in_interrupts().contains(DmaRxInterrupt::Done)
+    }
+    fn unlisten_ch_in_done() {
+        Self::unlisten_in(enum_set!(DmaRxInterrupt::Done));
+    }
+    fn is_listening_ch_in_done() -> bool {
+        Self::is_listening_in().contains(DmaRxInterrupt::Done)
+    }
 }
 
 #[doc(hidden)]
