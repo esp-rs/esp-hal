@@ -591,10 +591,8 @@ macro_rules! dma_circular_descriptors_chunk_size {
     };
 }
 
-/// Convenience macro to create a DmaTxBuf from buffer size and optional
-/// alignment. The buffer and descriptors are statically allocated used to
-/// create the `DmaTxBuf` with the passed alignment. With one ardument, the
-/// alignment is set to `None`.
+/// Convenience macro to create a DmaTxBuf from buffer size. The buffer and
+/// descriptors are statically allocated and used to create the `DmaTxBuf`.
 ///
 /// ## Usage
 /// ```rust,no_run
@@ -608,19 +606,15 @@ macro_rules! dma_circular_descriptors_chunk_size {
 /// ```
 #[macro_export]
 macro_rules! dma_tx_buffer {
-    ($tx_size:expr, $tx_align:expr) => {{
+    ($tx_size:expr) => {{
         const TX_DESCRIPTOR_LEN: usize =
-            $crate::dma::DmaTxBuf::compute_descriptor_count($tx_size, $tx_align);
+            $crate::dma::DmaTxBuf::compute_descriptor_count($tx_size, None);
         static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
         static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; TX_DESCRIPTOR_LEN] =
             [$crate::dma::DmaDescriptor::EMPTY; TX_DESCRIPTOR_LEN];
         let (tx_buffer, tx_descriptors) = unsafe { (&mut TX_BUFFER, &mut TX_DESCRIPTORS) };
-        $crate::dma::DmaTxBuf::new_with_block_size(tx_descriptors, tx_buffer, $tx_align)
+        $crate::dma::DmaTxBuf::new(tx_descriptors, tx_buffer)
     }};
-
-    ($tx_size:expr) => {
-        $crate::dma_tx_buffer!($tx_size, None)
-    };
 }
 
 /// DMA Errors
