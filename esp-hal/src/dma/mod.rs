@@ -601,7 +601,7 @@ macro_rules! dma_circular_descriptors_chunk_size {
 /// use esp_hal::dma::DmaBufBlkSize;
 ///
 /// let tx_buf =
-///     dma_tx_buffer!(32000, Some(DmaBufBlkSize::Size32));
+///     dma_tx_buffer!(32000);
 /// # }
 /// ```
 #[macro_export]
