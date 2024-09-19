@@ -1,4 +1,4 @@
-//! QSPI Read Test
+//! QSPI Test Suite
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -30,6 +30,17 @@ cfg_if::cfg_if! {
     }
 }
 
+cfg_if::cfg_if! {
+    if #[cfg(esp32)] {
+        const COMMAND_DATA_MODES: [SpiDataMode; 1] = [SpiDataMode::Single];
+    } else {
+        const COMMAND_DATA_MODES: [SpiDataMode; 2] = [SpiDataMode::Single, SpiDataMode::Quad];
+    }
+}
+
+type SpiUnderTest =
+    SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>;
+
 struct Context {
     spi: esp_hal::peripherals::SPI2,
     #[cfg(pcnt)]
@@ -39,110 +50,23 @@ struct Context {
 }
 
 fn transfer_read(
-    spi: SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
+    spi: SpiUnderTest,
     dma_rx_buf: DmaRxBuf,
-) -> (
-    SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
-    DmaRxBuf,
-) {
+    command: Command,
+) -> (SpiUnderTest, DmaRxBuf) {
     let transfer = spi
-        .read(
-            SpiDataMode::Quad,
-            Command::None,
-            Address::None,
-            0,
-            dma_rx_buf,
-        )
+        .read(SpiDataMode::Quad, command, Address::None, 0, dma_rx_buf)
         .map_err(|e| e.0)
         .unwrap();
     transfer.wait()
 }
 
-fn execute_read(
-    mut spi: SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
-    mut miso_mirror: Output<'static>,
-    expected: u8,
-) {
-    const DMA_BUFFER_SIZE: usize = 4;
-
-    let (_, _, buffer, descriptors) = dma_buffers!(0, DMA_BUFFER_SIZE);
-    let mut dma_rx_buf = DmaRxBuf::new(descriptors, buffer).unwrap();
-
-    miso_mirror.set_low();
-    (spi, dma_rx_buf) = transfer_read(spi, dma_rx_buf);
-    assert_eq!(dma_rx_buf.as_slice(), &[0; DMA_BUFFER_SIZE]);
-
-    // Set two bits in the written bytes to 1
-    miso_mirror.set_high();
-    (_, dma_rx_buf) = transfer_read(spi, dma_rx_buf);
-    assert_eq!(dma_rx_buf.as_slice(), &[expected; DMA_BUFFER_SIZE]);
-}
-
-// Regression test for https://github.com/esp-rs/esp-hal/issues/1860
-fn execute_write_read(
-    mut spi: SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
-    mut mosi_mirror: Output<'static>,
-    expected: u8,
-) {
-    const DMA_BUFFER_SIZE: usize = 4;
-
-    let (rx_buffer, rx_descriptors, buffer, descriptors) =
-        dma_buffers!(DMA_BUFFER_SIZE, DMA_BUFFER_SIZE);
-    let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-    let mut dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
-
-    dma_tx_buf.fill(&[0x00; DMA_BUFFER_SIZE]);
-
-    cfg_if::cfg_if! {
-        if #[cfg(esp32)] {
-            let modes = [SpiDataMode::Single];
-        } else {
-            let modes = [SpiDataMode::Single, SpiDataMode::Quad];
-        }
-    }
-    for command_data_mode in modes {
-        let transfer = spi
-            .write(
-                SpiDataMode::Quad,
-                Command::Command8(expected as u16, command_data_mode),
-                Address::Address24(
-                    expected as u32 | (expected as u32) << 8 | (expected as u32) << 16,
-                    SpiDataMode::Quad,
-                ),
-                0,
-                dma_tx_buf,
-            )
-            .map_err(|e| e.0)
-            .unwrap();
-        (spi, dma_tx_buf) = transfer.wait();
-
-        mosi_mirror.set_high();
-
-        let transfer = spi
-            .read(
-                SpiDataMode::Quad,
-                Command::Command8(expected as u16, command_data_mode),
-                Address::None,
-                0,
-                dma_rx_buf,
-            )
-            .map_err(|e| e.0)
-            .unwrap();
-        (spi, dma_rx_buf) = transfer.wait();
-        assert_eq!(dma_rx_buf.as_slice(), &[expected; DMA_BUFFER_SIZE]);
-    }
-}
-
-#[cfg(pcnt)]
 fn transfer_write(
-    spi: SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
+    spi: SpiUnderTest,
     dma_tx_buf: DmaTxBuf,
     write: u8,
     command_data_mode: SpiDataMode,
-) -> (
-    SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
-    DmaTxBuf,
-) {
+) -> (SpiUnderTest, DmaTxBuf) {
     let transfer = spi
         .write(
             SpiDataMode::Quad,
@@ -159,25 +83,55 @@ fn transfer_write(
     transfer.wait()
 }
 
+fn execute_read(mut spi: SpiUnderTest, mut miso_mirror: Output<'static>, expected: u8) {
+    const DMA_BUFFER_SIZE: usize = 4;
+
+    let (_, _, buffer, descriptors) = dma_buffers!(0, DMA_BUFFER_SIZE);
+    let mut dma_rx_buf = DmaRxBuf::new(descriptors, buffer).unwrap();
+
+    miso_mirror.set_low();
+    (spi, dma_rx_buf) = transfer_read(spi, dma_rx_buf, Command::None);
+    assert_eq!(dma_rx_buf.as_slice(), &[0; DMA_BUFFER_SIZE]);
+
+    // Set two bits in the written bytes to 1
+    miso_mirror.set_high();
+    (_, dma_rx_buf) = transfer_read(spi, dma_rx_buf, Command::None);
+    assert_eq!(dma_rx_buf.as_slice(), &[expected; DMA_BUFFER_SIZE]);
+}
+
+// Regression test for https://github.com/esp-rs/esp-hal/issues/1860
+fn execute_write_read(mut spi: SpiUnderTest, mut mosi_mirror: Output<'static>, expected: u8) {
+    const DMA_BUFFER_SIZE: usize = 4;
+
+    let (rx_buffer, rx_descriptors, buffer, descriptors) =
+        dma_buffers!(DMA_BUFFER_SIZE, DMA_BUFFER_SIZE);
+    let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+    let mut dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
+
+    dma_tx_buf.fill(&[0x00; DMA_BUFFER_SIZE]);
+
+    for command_data_mode in COMMAND_DATA_MODES {
+        (spi, dma_tx_buf) = transfer_write(spi, dma_tx_buf, expected, command_data_mode);
+
+        mosi_mirror.set_high();
+
+        (spi, dma_rx_buf) = transfer_read(
+            spi,
+            dma_rx_buf,
+            Command::Command8(expected as u16, command_data_mode),
+        );
+        assert_eq!(dma_rx_buf.as_slice(), &[expected; DMA_BUFFER_SIZE]);
+    }
+}
+
 #[cfg(pcnt)]
-fn execute_write(
-    unit: Unit<'static, 0>,
-    mut spi: SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
-    write: u8,
-) {
+fn execute_write(unit: Unit<'static, 0>, mut spi: SpiUnderTest, write: u8) {
     const DMA_BUFFER_SIZE: usize = 4;
 
     let (_, _, buffer, descriptors) = dma_buffers!(0, DMA_BUFFER_SIZE);
     let mut dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
 
-    cfg_if::cfg_if! {
-        if #[cfg(esp32)] {
-            let modes = [SpiDataMode::Single];
-        } else {
-            let modes = [SpiDataMode::Single, SpiDataMode::Quad];
-        }
-    }
-    for command_data_mode in modes {
+    for command_data_mode in COMMAND_DATA_MODES {
         dma_tx_buf.fill(&[write; DMA_BUFFER_SIZE]);
 
         // Send command + data.
