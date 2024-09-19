@@ -10,11 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added board-specific consts for c6 and h2 when caluclating transmit power conversion
+- Added `defmt` and `log` features (#2183)
 
 ### Changed
 
 - Modified CCA threshold value to default of -60
 - The driver now take `RADIO_CLK` by value to avoid a collision with esp-wifi's usage (#2183)
+- `binary-logs` feature renamed to `sys-logs` (#2183)
 
 ### Fixed
 
