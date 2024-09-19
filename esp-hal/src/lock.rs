@@ -71,6 +71,7 @@ mod riscv {
             {
                 use super::multicore::{LockKind, MULTICORE_LOCK};
 
+                // FIXME: don't spin with interrupts disabled
                 match MULTICORE_LOCK.lock() {
                     LockKind::Lock => {}
                     LockKind::Reentry => tkn |= REENTRY_FLAG,
@@ -216,7 +217,16 @@ pub(crate) fn lock<T>(state: &LockState, f: impl FnOnce() -> T) -> T {
             let mut f = f;
             let current_thread_id = multicore::thread_id();
             loop {
+                // We acquire the lock inside an interrupt-free context to prevent a subtle
+                // race condition:
+                // In case an interrupt handler tries to lock the same resource, it could win if
+                // the current thread is holding the lock but isn't yet in interrupt-free context.
+                // If we maintain non-reentrant semantics, this situation would panic.
+                // If we allow reentrancy, the interrupt handler would technically be a different
+                // context with the same `current_thread_id`, so it would be allowed to lock the
+                // resource in a theoretically incorrect way.
                 let func = || {
+                    // Only use `try_lock` here so that we don't spin in interrupt-free context.
                     if state.inner.try_lock(current_thread_id) {
                         let result = f();
 
