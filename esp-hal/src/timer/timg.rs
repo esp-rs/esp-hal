@@ -87,7 +87,9 @@ use crate::{
     Mode,
 };
 
-static INT_ENA_LOCK: Lock = Lock::new();
+const NUM_TIMG: usize = 1 + cfg!(timg1) as usize;
+
+static INT_ENA_LOCK: [Lock; NUM_TIMG] = [const { Lock::new() }; NUM_TIMG];
 
 /// A timer group consisting of
 #[cfg_attr(not(timg_timer1), doc = "a general purpose timer")]
@@ -474,7 +476,7 @@ where
             .config()
             .modify(|_, w| w.level_int_en().set_bit());
 
-        lock(&INT_ENA_LOCK, || {
+        lock(&INT_ENA_LOCK[self.timer_group() as usize], || {
             self.register_block()
                 .int_ena()
                 .modify(|_, w| w.t(self.timer_number()).bit(state));
@@ -693,7 +695,7 @@ where
             .config()
             .modify(|_, w| w.level_int_en().set_bit());
 
-        lock(&INT_ENA_LOCK, || {
+        lock(&INT_ENA_LOCK[self.timer_group() as usize], || {
             self.register_block()
                 .int_ena()
                 .modify(|_, w| w.t(T).set_bit());
@@ -701,7 +703,7 @@ where
     }
 
     fn unlisten(&self) {
-        lock(&INT_ENA_LOCK, || {
+        lock(&INT_ENA_LOCK[self.timer_group() as usize], || {
             self.register_block()
                 .int_ena()
                 .modify(|_, w| w.t(T).clear_bit());
