@@ -1330,7 +1330,7 @@ where
     fn start_transfer(&mut self) -> Result<(), DmaError> {
         R::start_in();
 
-        if R::has_in_descriptor_error() {
+        if R::available_in_interrupts().contains(DmaRxInterrupt::DescriptorError) {
             Err(DmaError::DescriptorError)
         } else {
             Ok(())
@@ -1338,7 +1338,7 @@ where
     }
 
     fn is_done(&self) -> bool {
-        R::is_in_done()
+        R::available_in_interrupts().contains(DmaRxInterrupt::SuccessfulEof)
     }
 
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
@@ -1449,23 +1449,23 @@ where
     }
 
     fn listen_ch_in_done(&self) {
-        CH::Channel::listen_ch_in_done();
+        CH::Channel::listen_in(enum_set!(DmaRxInterrupt::Done));
     }
 
     fn clear_ch_in_done(&self) {
-        CH::Channel::clear_ch_in_done();
+        CH::Channel::clear_in(enum_set!(DmaRxInterrupt::Done));
     }
 
     fn is_ch_in_done_set(&self) -> bool {
-        CH::Channel::is_ch_in_done_set()
+        CH::Channel::available_in_interrupts().contains(DmaRxInterrupt::Done)
     }
 
     fn unlisten_ch_in_done(&self) {
-        CH::Channel::unlisten_ch_in_done();
+        CH::Channel::unlisten_in(enum_set!(DmaRxInterrupt::Done));
     }
 
     fn is_listening_ch_in_done(&self) -> bool {
-        CH::Channel::is_listening_ch_in_done()
+        CH::Channel::is_listening_in().contains(DmaRxInterrupt::Done)
     }
 
     fn is_done(&self) -> bool {
@@ -1477,63 +1477,63 @@ where
     }
 
     fn is_listening_eof(&self) -> bool {
-        CH::Channel::is_listening_in_eof()
+        CH::Channel::is_listening_in().contains(DmaRxInterrupt::SuccessfulEof)
     }
 
     fn listen_eof(&self) {
-        CH::Channel::listen_in_eof()
+        CH::Channel::listen_in(enum_set!(DmaRxInterrupt::SuccessfulEof));
     }
 
     fn unlisten_eof(&self) {
-        CH::Channel::unlisten_in_eof()
+        CH::Channel::unlisten_in(enum_set!(DmaRxInterrupt::SuccessfulEof));
     }
 
     fn has_error(&self) -> bool {
-        CH::Channel::has_in_descriptor_error()
+        CH::Channel::available_in_interrupts().contains(DmaRxInterrupt::DescriptorError)
     }
 
     fn has_dscr_empty_error(&self) -> bool {
-        CH::Channel::has_in_descriptor_error_dscr_empty()
+        CH::Channel::available_in_interrupts().contains(DmaRxInterrupt::DescriptorEmpty)
     }
 
     fn has_eof_error(&self) -> bool {
-        CH::Channel::has_in_descriptor_error_err_eof()
+        CH::Channel::available_in_interrupts().contains(DmaRxInterrupt::ErrorEof)
     }
 
     fn is_listening_in_descriptor_error(&self) -> bool {
-        CH::Channel::is_listening_in_descriptor_error()
+        CH::Channel::is_listening_in().contains(DmaRxInterrupt::DescriptorError)
     }
 
     fn listen_in_descriptor_error(&self) {
-        CH::Channel::listen_in_descriptor_error();
+        CH::Channel::listen_in(enum_set!(DmaRxInterrupt::DescriptorError));
     }
 
     fn unlisten_in_descriptor_error(&self) {
-        CH::Channel::unlisten_in_descriptor_error();
+        CH::Channel::unlisten_in(enum_set!(DmaRxInterrupt::DescriptorError));
     }
 
     fn is_listening_in_descriptor_error_dscr_empty(&self) -> bool {
-        CH::Channel::is_listening_in_descriptor_error_dscr_empty()
+        CH::Channel::is_listening_in().contains(DmaRxInterrupt::DescriptorEmpty)
     }
 
     fn listen_in_descriptor_error_dscr_empty(&self) {
-        CH::Channel::listen_in_descriptor_error_dscr_empty();
+        CH::Channel::listen_in(enum_set!(DmaRxInterrupt::DescriptorEmpty));
     }
 
     fn unlisten_in_descriptor_error_dscr_empty(&self) {
-        CH::Channel::unlisten_in_descriptor_error_dscr_empty();
+        CH::Channel::unlisten_in(enum_set!(DmaRxInterrupt::DescriptorEmpty));
     }
 
     fn is_listening_in_descriptor_error_err_eof(&self) -> bool {
-        CH::Channel::is_listening_in_descriptor_error_err_eof()
+        CH::Channel::is_listening_in().contains(DmaRxInterrupt::ErrorEof)
     }
 
     fn listen_in_descriptor_error_err_eof(&self) {
-        CH::Channel::listen_in_descriptor_error_err_eof();
+        CH::Channel::listen_in(enum_set!(DmaRxInterrupt::ErrorEof));
     }
 
     fn unlisten_in_descriptor_error_err_eof(&self) {
-        CH::Channel::unlisten_in_descriptor_error_err_eof();
+        CH::Channel::unlisten_in(enum_set!(DmaRxInterrupt::ErrorEof));
     }
 
     fn clear_interrupts(&self) {
@@ -1634,7 +1634,7 @@ where
     fn start_transfer(&mut self) -> Result<(), DmaError> {
         R::start_out();
 
-        if R::has_out_descriptor_error() {
+        if R::available_out_interrupts().contains(DmaTxInterrupt::DescriptorError) {
             Err(DmaError::DescriptorError)
         } else {
             Ok(())
@@ -1642,35 +1642,35 @@ where
     }
 
     fn clear_ch_out_done(&self) {
-        R::clear_ch_out_done();
+        R::clear_out(enum_set!(DmaTxInterrupt::Done));
     }
 
     fn is_ch_out_done_set(&self) -> bool {
-        R::is_ch_out_done_set()
+        R::available_out_interrupts().contains(DmaTxInterrupt::Done)
     }
 
     fn listen_ch_out_done(&self) {
-        R::listen_ch_out_done();
+        R::listen_out(enum_set!(DmaTxInterrupt::Done));
     }
 
     fn unlisten_ch_out_done(&self) {
-        R::unlisten_ch_out_done();
+        R::unlisten_out(enum_set!(DmaTxInterrupt::Done));
     }
 
     fn is_listening_ch_out_done(&self) -> bool {
-        R::is_listening_ch_out_done()
+        R::is_listening_out().contains(DmaTxInterrupt::Done)
     }
 
     fn is_done(&self) -> bool {
-        R::is_out_done()
+        R::available_out_interrupts().contains(DmaTxInterrupt::TotalEof)
     }
 
     fn descriptors_handled(&self) -> bool {
-        R::is_out_eof_interrupt_set()
+        R::available_out_interrupts().contains(DmaTxInterrupt::Eof)
     }
 
     fn reset_descriptors_handled(&self) {
-        R::reset_out_eof_interrupt();
+        R::clear_out(enum_set!(DmaTxInterrupt::Eof));
     }
 
     fn last_out_dscr_address(&self) -> usize {
@@ -1790,19 +1790,19 @@ where
     }
 
     fn is_listening_eof(&self) -> bool {
-        CH::Channel::is_listening_out_eof()
+        CH::Channel::is_listening_out().contains(DmaTxInterrupt::TotalEof)
     }
 
     fn listen_eof(&self) {
-        CH::Channel::listen_out_eof()
+        CH::Channel::listen_out(enum_set!(DmaTxInterrupt::TotalEof));
     }
 
     fn unlisten_eof(&self) {
-        CH::Channel::unlisten_out_eof()
+        CH::Channel::unlisten_out(enum_set!(DmaTxInterrupt::TotalEof));
     }
 
     fn has_error(&self) -> bool {
-        CH::Channel::has_out_descriptor_error()
+        CH::Channel::available_out_interrupts().contains(DmaTxInterrupt::DescriptorError)
     }
 
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
@@ -1810,15 +1810,15 @@ where
     }
 
     fn is_listening_out_descriptor_error(&self) -> bool {
-        CH::Channel::is_listening_out_descriptor_error()
+        CH::Channel::is_listening_out().contains(DmaTxInterrupt::DescriptorError)
     }
 
     fn listen_out_descriptor_error(&self) {
-        CH::Channel::listen_out_descriptor_error();
+        CH::Channel::listen_out(enum_set!(DmaTxInterrupt::DescriptorError));
     }
 
     fn unlisten_out_descriptor_error(&self) {
-        CH::Channel::unlisten_out_descriptor_error();
+        CH::Channel::unlisten_out(enum_set!(DmaTxInterrupt::DescriptorError));
     }
 
     fn clear_interrupts(&self) {
@@ -1850,9 +1850,6 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn clear_out_interrupts();
     fn reset_out();
     fn set_out_descriptors(address: u32);
-    fn has_out_descriptor_error() -> bool {
-        Self::available_out_interrupts().contains(DmaTxInterrupt::DescriptorError)
-    }
     fn set_out_peripheral(peripheral: u8);
     fn start_out();
 
@@ -1868,31 +1865,6 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn clear_in(interrupts: EnumSet<DmaRxInterrupt>);
     fn available_in_interrupts() -> EnumSet<DmaRxInterrupt>;
 
-    fn clear_ch_out_done() {
-        Self::clear_out(enum_set!(DmaTxInterrupt::Done));
-    }
-    fn is_ch_out_done_set() -> bool {
-        Self::available_out_interrupts().contains(DmaTxInterrupt::Done)
-    }
-    fn listen_ch_out_done() {
-        Self::listen_out(enum_set!(DmaTxInterrupt::Done));
-    }
-    fn unlisten_ch_out_done() {
-        Self::unlisten_out(enum_set!(DmaTxInterrupt::Done));
-    }
-    fn is_listening_ch_out_done() -> bool {
-        Self::is_listening_out().contains(DmaTxInterrupt::Done)
-    }
-    fn is_out_done() -> bool {
-        // Note: I2S PDMA used Eof instead of TotalEof
-        Self::available_out_interrupts().contains(DmaTxInterrupt::TotalEof)
-    }
-    fn is_out_eof_interrupt_set() -> bool {
-        Self::available_out_interrupts().contains(DmaTxInterrupt::Eof)
-    }
-    fn reset_out_eof_interrupt() {
-        Self::clear_out(enum_set!(DmaTxInterrupt::Eof));
-    }
     fn last_out_dscr_address() -> usize;
 
     #[cfg(esp32s3)]
@@ -1902,100 +1874,8 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn clear_in_interrupts();
     fn reset_in();
     fn set_in_descriptors(address: u32);
-    fn has_in_descriptor_error() -> bool {
-        Self::available_in_interrupts().contains(DmaRxInterrupt::DescriptorError)
-    }
-    fn has_in_descriptor_error_dscr_empty() -> bool {
-        Self::available_in_interrupts().contains(DmaRxInterrupt::DescriptorEmpty)
-    }
-    fn has_in_descriptor_error_err_eof() -> bool {
-        Self::available_in_interrupts().contains(DmaRxInterrupt::ErrorEof)
-    }
     fn set_in_peripheral(peripheral: u8);
     fn start_in();
-    fn is_in_done() -> bool {
-        // Note: PDMA used Done instead of SuccessfulEof
-        Self::available_in_interrupts().contains(DmaRxInterrupt::SuccessfulEof)
-    }
-
-    fn is_listening_in_eof() -> bool {
-        Self::is_listening_in().contains(DmaRxInterrupt::SuccessfulEof)
-    }
-    fn is_listening_out_eof() -> bool {
-        // Note: I2S PDMA considers this to be Eof instead of TotalEof
-        Self::is_listening_out().contains(DmaTxInterrupt::TotalEof)
-    }
-
-    fn listen_in_eof() {
-        Self::listen_in(enum_set!(DmaRxInterrupt::SuccessfulEof));
-    }
-    fn listen_out_eof() {
-        // Note: I2S PDMA considers this to be Eof instead of TotalEof
-        Self::listen_out(enum_set!(DmaTxInterrupt::TotalEof));
-    }
-    fn unlisten_in_eof() {
-        Self::unlisten_in(enum_set!(DmaRxInterrupt::SuccessfulEof));
-    }
-    fn unlisten_out_eof() {
-        // Note: I2S PDMA considers this to be Eof instead of TotalEof
-        Self::unlisten_out(enum_set!(DmaTxInterrupt::TotalEof));
-    }
-
-    fn listen_in_descriptor_error() {
-        Self::listen_in(enum_set!(DmaRxInterrupt::DescriptorError))
-    }
-    fn unlisten_in_descriptor_error() {
-        Self::unlisten_in(enum_set!(DmaRxInterrupt::DescriptorError))
-    }
-    fn is_listening_in_descriptor_error() -> bool {
-        Self::is_listening_in().contains(DmaRxInterrupt::DescriptorError)
-    }
-
-    fn listen_in_descriptor_error_dscr_empty() {
-        Self::listen_in(enum_set!(DmaRxInterrupt::DescriptorEmpty))
-    }
-    fn unlisten_in_descriptor_error_dscr_empty() {
-        Self::unlisten_in(enum_set!(DmaRxInterrupt::DescriptorEmpty))
-    }
-    fn is_listening_in_descriptor_error_dscr_empty() -> bool {
-        Self::is_listening_in().contains(DmaRxInterrupt::DescriptorEmpty)
-    }
-
-    fn listen_in_descriptor_error_err_eof() {
-        Self::listen_in(enum_set!(DmaRxInterrupt::ErrorEof))
-    }
-    fn unlisten_in_descriptor_error_err_eof() {
-        Self::unlisten_in(enum_set!(DmaRxInterrupt::ErrorEof))
-    }
-    fn is_listening_in_descriptor_error_err_eof() -> bool {
-        Self::is_listening_in().contains(DmaRxInterrupt::ErrorEof)
-    }
-
-    fn listen_out_descriptor_error() {
-        Self::listen_out(enum_set!(DmaTxInterrupt::DescriptorError));
-    }
-    fn unlisten_out_descriptor_error() {
-        Self::unlisten_out(enum_set!(DmaTxInterrupt::DescriptorError));
-    }
-    fn is_listening_out_descriptor_error() -> bool {
-        Self::is_listening_out().contains(DmaTxInterrupt::DescriptorError)
-    }
-
-    fn listen_ch_in_done() {
-        Self::listen_in(enum_set!(DmaRxInterrupt::Done));
-    }
-    fn clear_ch_in_done() {
-        Self::clear_in(enum_set!(DmaRxInterrupt::Done));
-    }
-    fn is_ch_in_done_set() -> bool {
-        Self::available_in_interrupts().contains(DmaRxInterrupt::Done)
-    }
-    fn unlisten_ch_in_done() {
-        Self::unlisten_in(enum_set!(DmaRxInterrupt::Done));
-    }
-    fn is_listening_ch_in_done() -> bool {
-        Self::is_listening_in().contains(DmaRxInterrupt::Done)
-    }
 }
 
 #[doc(hidden)]
@@ -3281,42 +3161,47 @@ pub(crate) mod asynch {
     }
 
     fn handle_interrupt<Channel: RegisterAccess, Rx: RxChannel<Channel>, Tx: TxChannel<Channel>>() {
-        if Channel::has_in_descriptor_error()
-            || Channel::has_in_descriptor_error_dscr_empty()
-            || Channel::has_in_descriptor_error_err_eof()
+        if Channel::available_in_interrupts().is_disjoint(enum_set!(
+            DmaRxInterrupt::DescriptorError
+                | DmaRxInterrupt::DescriptorEmpty
+                | DmaRxInterrupt::ErrorEof
+        )) {
+            Channel::unlisten_in(enum_set!(
+                DmaRxInterrupt::DescriptorError
+                    | DmaRxInterrupt::DescriptorEmpty
+                    | DmaRxInterrupt::ErrorEof
+                    | DmaRxInterrupt::SuccessfulEof
+                    | DmaRxInterrupt::Done
+            ));
+            Rx::waker().wake()
+        }
+
+        if Channel::available_out_interrupts().contains(DmaTxInterrupt::DescriptorError) {
+            Channel::unlisten_out(enum_set!(
+                DmaTxInterrupt::DescriptorError | DmaTxInterrupt::TotalEof | DmaTxInterrupt::Done
+            ));
+            Tx::waker().wake()
+        }
+
+        if Channel::available_in_interrupts().contains(DmaRxInterrupt::SuccessfulEof) {
+            Channel::unlisten_in(enum_set!(DmaRxInterrupt::SuccessfulEof));
+            Rx::waker().wake()
+        }
+
+        if Channel::available_in_interrupts().contains(DmaRxInterrupt::Done) {
+            Channel::unlisten_in(enum_set!(DmaRxInterrupt::Done));
+            Rx::waker().wake()
+        }
+
+        if Channel::available_out_interrupts().contains(DmaTxInterrupt::TotalEof)
+            && Channel::is_listening_out().contains(DmaTxInterrupt::TotalEof)
         {
-            Channel::unlisten_in_descriptor_error();
-            Channel::unlisten_in_descriptor_error_dscr_empty();
-            Channel::unlisten_in_descriptor_error_err_eof();
-            Channel::unlisten_in_eof();
-            Channel::unlisten_ch_in_done();
-            Rx::waker().wake()
-        }
-
-        if Channel::has_out_descriptor_error() {
-            Channel::unlisten_out_descriptor_error();
-            Channel::unlisten_out_eof();
-            Channel::unlisten_ch_out_done();
+            Channel::unlisten_out(enum_set!(DmaTxInterrupt::TotalEof));
             Tx::waker().wake()
         }
 
-        if Channel::is_in_done() && Channel::is_listening_in_eof() {
-            Channel::unlisten_in_eof();
-            Rx::waker().wake()
-        }
-
-        if Channel::is_ch_in_done_set() {
-            Channel::unlisten_ch_in_done();
-            Rx::waker().wake()
-        }
-
-        if Channel::is_out_done() && Channel::is_listening_out_eof() {
-            Channel::unlisten_out_eof();
-            Tx::waker().wake()
-        }
-
-        if Channel::is_ch_out_done_set() {
-            Channel::unlisten_ch_out_done();
+        if Channel::available_out_interrupts().contains(DmaTxInterrupt::Done) {
+            Channel::unlisten_out(enum_set!(DmaTxInterrupt::Done));
             Tx::waker().wake()
         }
     }
