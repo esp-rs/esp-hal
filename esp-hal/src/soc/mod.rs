@@ -1,3 +1,5 @@
+use core::ops::Range;
+
 use portable_atomic::{AtomicU8, Ordering};
 
 pub use self::implementation::*;
@@ -19,12 +21,11 @@ mod efuse_field;
 mod psram_common;
 
 #[cfg(psram)]
-static MAPPED_PSRAM: Locked<MappedPsram> = Locked::new(MappedPsram { start: 0, end: 0 });
+static MAPPED_PSRAM: Locked<MappedPsram> = Locked::new(MappedPsram { memory_range: 0..0 });
 
 #[cfg(psram)]
 pub struct MappedPsram {
-    start: usize,
-    end: usize,
+    memory_range: Range<usize>,
 }
 
 // Indicates the state of setting the mac address
@@ -99,8 +100,8 @@ pub(crate) fn is_slice_in_dram<T>(slice: &[T]) -> bool {
 pub(crate) fn is_valid_psram_address(address: u32) -> bool {
     #[cfg(psram)]
     {
-        let (start, end) = MAPPED_PSRAM.with(|mapped_psram| (mapped_psram.start, mapped_psram.end));
-        (start..end).contains(&(address as usize))
+        let memory_range = MAPPED_PSRAM.with(|mapped_psram| mapped_psram.memory_range.clone());
+        memory_range.contains(&(address as usize))
     }
     #[cfg(not(psram))]
     false

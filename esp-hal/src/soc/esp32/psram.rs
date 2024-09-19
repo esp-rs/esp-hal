@@ -87,8 +87,7 @@ pub fn init_psram(_peripheral: crate::peripherals::PSRAM, config: PsramConfig) -
     }
 
     crate::soc::MAPPED_PSRAM.with(|mapped_psram| {
-        mapped_psram.start = EXTMEM_ORIGIN;
-        mapped_psram.end = EXTMEM_ORIGIN + config.size.get();
+        mapped_psram.memory_range = EXTMEM_ORIGIN..EXTMEM_ORIGIN + config.size.get();
     });
 
     (EXTMEM_ORIGIN as *mut u8, config.size.get())
