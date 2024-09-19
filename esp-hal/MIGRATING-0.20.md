@@ -229,7 +229,7 @@ The feature `psram-80mhz` is removed and replaced by `PsramConfig`
 Diff of the `psram_quad.rs` example
 ```diff
 -//% FEATURES: psram-2m
-+//% FEATURES: esp-hal/psram
++//% FEATURES: esp-hal/quad-psram
 
 ...
 
