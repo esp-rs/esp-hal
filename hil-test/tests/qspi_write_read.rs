@@ -2,7 +2,7 @@
 //!
 //! Make sure issue #1860 doesn't affect us
 
-//% CHIPS: esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
@@ -23,10 +23,7 @@ use esp_hal::{
 use hil_test as _;
 
 cfg_if::cfg_if! {
-    if #[cfg(any(
-        feature = "esp32",
-        feature = "esp32s2",
-    ))] {
+    if #[cfg(any(esp32, esp32s2))] {
         use esp_hal::dma::Spi2DmaChannel as DmaChannel0;
     } else {
         use esp_hal::dma::DmaChannel0;
@@ -104,7 +101,7 @@ mod tests {
         let dma = Dma::new(peripherals.DMA);
 
         cfg_if::cfg_if! {
-            if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
+            if #[cfg(any(esp32, esp32s2))] {
                 let dma_channel = dma.spi2channel;
             } else {
                 let dma_channel = dma.channel0;
