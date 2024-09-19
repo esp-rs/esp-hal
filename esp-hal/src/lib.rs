@@ -88,31 +88,33 @@
 //! }
 //! ```
 //!
-//! The steps here are:
-//! - Call [`init`] with the desired [`CpuClock`] configuration
-//! - Create [`gpio::Io`] which provides access to the GPIO pins
-//! - Create an [`gpio::Output`] pin driver which lets us control the logical
-//!   level of an output pin
-//! - Create a [`delay::Delay`] driver
-//! - In a loop, toggle the output pin's logical level with a delay of 1000 ms
+//! ## Additional configuration
 //!
-//! ## `PeripheralRef` Pattern
+//! We've exposed some configuration options that don't fit into cargo
+//! features. These can be set via environment variables, or via cargo's `[env]`
+//! section inside `.cargo/config.toml`. Below is a table of tunable parameters
+//! for this crate:
+#![doc = ""]
+#![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_hal_config_table.md"))]
+#![doc = ""]
+//! It's important to note that due to a [bug in cargo](https://github.com/rust-lang/cargo/issues/10358),
+//! any modifications to the environment, local or otherwise will only get
+//! picked up on a full clean build of the project.
 //!
-//! Generally drivers take pins and peripherals as [peripheral::PeripheralRef].
-//! This means you can pass the pin/peripheral or a mutable reference to the
-//! pin/peripheral.
+//! ## `Peripheral` Pattern
+//!
+//! Drivers take pins and peripherals as [peripheral::Peripheral] in most
+//! circumstances. This means you can pass the pin/peripheral or a mutable
+//! reference to the pin/peripheral.
 //!
 //! The latter can be used to regain access to the pin when the driver gets
 //! dropped. Then it's possible to reuse the pin/peripheral for a different
 //! purpose.
 //!
-//! ## Don't use [core::mem::forget]
+//! ## Don't use `core::mem::forget`
 //!
-//! In general drivers are _NOT_ safe to use with [core::mem::forget]
-//!
-//! You should never use [core::mem::forget] on any type defined in the HAL.
-//!
-//! Some types heavily rely on their [Drop] implementation to not leave the
+//! You should never use `core::mem::forget` on any type defined in the HAL.
+//! Some types heavily rely on their `Drop` implementation to not leave the
 //! hardware in undefined state and causing UB.
 //!
 //! You might want to consider using [`#[deny(clippy::mem_forget)`](https://rust-lang.github.io/rust-clippy/v0.0.212/index.html#mem_forget) in your project.

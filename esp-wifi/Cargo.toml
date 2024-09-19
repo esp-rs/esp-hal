@@ -2,7 +2,7 @@
 name = "esp-wifi"
 version = "0.9.1"
 edition = "2021"
-rust-version  = "1.77.0"
+rust-version  = "1.79.0"
 authors = ["The ESP-RS team"]
 description = "A WiFi, Bluetooth and ESP-NOW driver for use with Espressif chips and bare-metal Rust"
 repository = "https://github.com/esp-rs/esp-hal"
@@ -52,10 +52,12 @@ atomic-waker = { version = "1.1.2", default-features = false, features = [
   "portable-atomic",
 ] }
 bt-hci = { version = "0.1.0", optional = true }
+esp-config = { version = "0.1.0", path = "../esp-config" }
 
 [build-dependencies]
 toml-cfg     = "0.2.0"
 esp-build    = { version = "0.1.0", path = "../esp-build" }
+esp-config   = { version = "0.1.0", path = "../esp-config", features = ["build"] }
 esp-metadata = { version = "0.3.0", path = "../esp-metadata" }
 
 [features]

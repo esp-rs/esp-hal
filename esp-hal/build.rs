@@ -8,6 +8,7 @@ use std::{
 };
 
 use esp_build::assert_unique_used_features;
+use esp_config::{generate_config, Value};
 use esp_metadata::{Chip, Config};
 
 #[cfg(debug_assertions)]
@@ -121,6 +122,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     // remaining linker scripts which are common to all devices:
     copy_dir_all(&config_symbols, "ld/sections", &out)?;
     copy_dir_all(&config_symbols, format!("ld/{device_name}"), &out)?;
+
+    // emit config
+    generate_config(
+        "esp_hal",
+        &[(
+            "place-spi-driver-in-ram",
+            Value::Bool(false),
+            "Places the SPI driver in RAM for better performance",
+        )],
+        true,
+    );
 
     Ok(())
 }

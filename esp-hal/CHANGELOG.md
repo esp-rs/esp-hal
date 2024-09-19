@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Bump MSRV to 1.77.0 (#1971)
+- Bump MSRV to 1.79.0 (#1971)
 
 ### Added
 
@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed the parameters of `Spi::with_pins` to no longer be optional (#2133)
 - Renamed `DummyPin` to `NoPin` and removed all internal logic from it. (#2133)
 - The `NO_PIN` constant has been removed. (#2133)
+- MSRV bump to 1.79 (#2156)
 
 ### Fixed
 
@@ -70,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `_with_default_pins` UART constructors (#2132)
 - Removed `uart::{DefaultRxPin, DefaultTxPin}` (#2132)
 - Removed `PcntSource` and `PcntInputConfig`. (#2134)
+- Removed the `place-spi-driver-in-ram` feature, this is now enabled via [esp-config](https://docs.rs/esp-config) (#2156)
 
 ## [0.20.1] - 2024-08-30
 

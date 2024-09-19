@@ -1,3 +1,72 @@
+//! This documentation is built for the
+#![cfg_attr(esp32, doc = "**ESP32**")]
+#![cfg_attr(esp32s2, doc = "**ESP32-S2**")]
+#![cfg_attr(esp32s3, doc = "**ESP32-S3**")]
+#![cfg_attr(esp32c2, doc = "**ESP32-C2**")]
+#![cfg_attr(esp32c3, doc = "**ESP32-C3**")]
+#![cfg_attr(esp32c6, doc = "**ESP32-C6**")]
+#![cfg_attr(esp32h2, doc = "**ESP32-H2**")]
+//! . Please ensure you are reading the correct documentation for your target
+//! device.
+//!
+//! ## Usage
+//!
+//! ### Importing
+//!
+//! Ensure that the right features are enabled for your chip. See [Examples](https://github.com/esp-rs/esp-hal/tree/main/examples#examples) for more examples.
+//!
+//! ```toml
+//! [dependencies.esp-wifi]
+//! # A supported chip needs to be specified, as well as specific use-case features
+//! features = ["esp32s3", "wifi", "esp-now"]
+//! ```
+//!
+//! ### Link configuration
+//!
+//! Make sure to include the rom functions for your target:
+//!
+//! ```toml
+//! # .cargo/config.toml
+//! rustflags = [
+//!     "-C", "link-arg=-Tlinkall.x",
+//!     "-C", "link-arg=-Trom_functions.x",
+//! ]
+//! ```
+//!
+//! At the time of writing, you will already have the `linkall` flag if you used
+//! `cargo generate`. Generating from a template does not include the
+//! `rom_functions` flag.
+//!
+//! ### Optimization Level
+//!
+//! It is necessary to build with optimization level 2 or 3 since otherwise, it
+//! might not even be able to connect or advertise.
+//!
+//! To make it work also for your debug builds add this to your `Cargo.toml`
+//!
+//! ```toml
+//! [profile.dev.package.esp-wifi]
+//! opt-level = 3
+//! ```
+//! ## Globally disable logging
+//!
+//! `esp-wifi` contains a lot of trace-level logging statements.
+//! For maximum performance you might want to disable logging via
+//! a feature flag of the `log` crate. See [documentation](https://docs.rs/log/0.4.19/log/#compile-time-filters).
+//! You should set it to `release_max_level_off`.
+//!
+//! ### Xtensa considerations
+//!
+//! Within this crate, `CCOMPARE0` CPU timer is used for timing, ensure that in
+//! your application you are not using this CPU timer.
+//!
+//! ## USB-SERIAL-JTAG
+//!
+//! When using USB-SERIAL-JTAG (for example by selecting `jtag-serial` in [`esp-println`](https://crates.io/crates/esp-println)) you have to activate the feature `phy-enable-usb`.
+//!
+//! Don't use this feature if you are _not_ using USB-SERIAL-JTAG as it might
+//! reduce WiFi performance.
+//!
 //! # Features flags
 //!
 //! Note that not all features are available on every MCU. For example, `ble`
@@ -8,7 +77,19 @@
 //! For more information see
 //! [extras/esp-wifishark/README.md](../extras/esp-wifishark/README.md)
 #![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
-#![doc = include_str!("../README.md")]
+//! ## Additional configuration
+//!
+//! We've exposed some configuration options that don't fit into cargo
+//! features. These can be set via environment variables, or via cargo's `[env]`
+//! section inside `.cargo/config.toml`. Below is a table of tunable parameters
+//! for this crate:
+#![doc = ""]
+#![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_wifi_config_table.md"))]
+#![doc = ""]
+//! It's important to note that due to a [bug in cargo](https://github.com/rust-lang/cargo/issues/10358),
+//! any modifications to the environment, local or otherwise will only get
+//! picked up on a full clean build of the project.
+
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
 #![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
@@ -25,6 +106,7 @@ extern crate alloc;
 mod fmt;
 
 use common_adapter::{chip_specific::phy_mem_init, init_radio_clock_control, RADIO_CLOCKS};
+use esp_config::*;
 use esp_hal as hal;
 #[cfg(not(feature = "esp32"))]
 use esp_hal::timer::systimer::Alarm;
@@ -73,60 +155,55 @@ pub fn current_millis() -> u64 {
     ticks_to_millis(get_systimer_count())
 }
 
-#[allow(unused)]
-#[cfg(debug_assertions)]
-const DEFAULT_TICK_RATE_HZ: u32 = 50;
-
-#[allow(unused)]
-#[cfg(not(debug_assertions))]
-const DEFAULT_TICK_RATE_HZ: u32 = 100;
-
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[toml_cfg::toml_config]
 /// Tunable parameters for the WiFi driver
+#[allow(unused)] // currently there are no ble tunables
 struct Config {
-    #[default(5)]
     rx_queue_size: usize,
-    #[default(3)]
     tx_queue_size: usize,
-    #[default(10)]
     static_rx_buf_num: usize,
-    #[default(32)]
     dynamic_rx_buf_num: usize,
-    #[default(0)]
     static_tx_buf_num: usize,
-    #[default(32)]
     dynamic_tx_buf_num: usize,
-    #[default(0)]
-    ampdu_rx_enable: usize,
-    #[default(0)]
-    ampdu_tx_enable: usize,
-    #[default(0)]
-    amsdu_tx_enable: usize,
-    #[default(6)]
+    ampdu_rx_enable: bool,
+    ampdu_tx_enable: bool,
+    amsdu_tx_enable: bool,
     rx_ba_win: usize,
-    #[default(1)]
     max_burst_size: usize,
-    #[default("CN")]
     country_code: &'static str,
-    #[default(0)]
     country_code_operating_class: u8,
-    #[default(1492)]
     mtu: usize,
-    #[default(DEFAULT_TICK_RATE_HZ)]
     tick_rate_hz: u32,
-    #[default(3)]
     listen_interval: u16,
-    #[default(6)]
     beacon_timeout: u16,
-    #[default(300)]
     ap_beacon_timeout: u16,
-    #[default(1)]
     failure_retry_cnt: u8,
-    #[default(0)]
     scan_method: u32,
 }
+
+pub(crate) const CONFIG: Config = Config {
+    rx_queue_size: esp_config_int!(usize, "ESP_WIFI_RX_QUEUE_SIZE"),
+    tx_queue_size: esp_config_int!(usize, "ESP_WIFI_TX_QUEUE_SIZE"),
+    static_rx_buf_num: esp_config_int!(usize, "ESP_WIFI_STATIC_RX_BUF_NUM"),
+    dynamic_rx_buf_num: esp_config_int!(usize, "ESP_WIFI_DYNAMIC_RX_BUF_NUM"),
+    static_tx_buf_num: esp_config_int!(usize, "ESP_WIFI_STATIC_TX_BUF_NUM"),
+    dynamic_tx_buf_num: esp_config_int!(usize, "ESP_WIFI_DYNAMIC_TX_BUF_NUM"),
+    ampdu_rx_enable: esp_config_bool!("ESP_WIFI_AMPDU_RX_ENABLE"),
+    ampdu_tx_enable: esp_config_bool!("ESP_WIFI_AMPDU_TX_ENABLE"),
+    amsdu_tx_enable: esp_config_bool!("ESP_WIFI_AMSDU_TX_ENABLE"),
+    rx_ba_win: esp_config_int!(usize, "ESP_WIFI_RX_BA_WIN"),
+    max_burst_size: esp_config_int!(usize, "ESP_WIFI_MAX_BURST_SIZE"),
+    country_code: esp_config_str!("ESP_WIFI_COUNTRY_CODE"),
+    country_code_operating_class: esp_config_int!(u8, "ESP_WIFI_COUNTRY_CODE_OPERATING_CLASS"),
+    mtu: esp_config_int!(usize, "ESP_WIFI_MTU"),
+    tick_rate_hz: esp_config_int!(u32, "ESP_WIFI_TICK_RATE_HZ"),
+    listen_interval: esp_config_int!(u16, "ESP_WIFI_LISTEN_INTERVAL"),
+    beacon_timeout: esp_config_int!(u16, "ESP_WIFI_BEACON_TIMEOUT"),
+    ap_beacon_timeout: esp_config_int!(u16, "ESP_WIFI_AP_BEACON_TIMEOUT"),
+    failure_retry_cnt: esp_config_int!(u8, "ESP_WIFI_FAILURE_RETRY_CNT"),
+    scan_method: esp_config_int!(u32, "ESP_WIFI_SCAN_METHOD"),
+};
 
 // Validate the configuration at compile time
 #[allow(clippy::assertions_on_constants)]

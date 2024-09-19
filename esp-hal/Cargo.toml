@@ -2,7 +2,7 @@
 name          = "esp-hal"
 version       = "0.20.1"
 edition       = "2021"
-rust-version  = "1.77.0"
+rust-version  = "1.79.0"
 description   = "Bare-metal HAL for Espressif devices"
 documentation = "https://docs.esp-rs.org/esp-hal/"
 repository    = "https://github.com/esp-rs/esp-hal"
@@ -74,6 +74,7 @@ basic-toml   = "0.1.9"
 cfg-if       = "1.0.0"
 esp-build    = { version = "0.1.0", path = "../esp-build" }
 esp-metadata = { version = "0.3.0", path = "../esp-metadata" }
+esp-config   = { version = "0.1.0", path = "../esp-config", features = ["build"] }
 serde        = { version = "1.0.209", features = ["derive"] }
 
 [features]
@@ -100,8 +101,6 @@ debug = [
 ]
 ## Enable logging output using the `log` crate.
 log = ["dep:log"]
-## Configuration for placing device drivers in the IRAM for faster access.
-place-spi-driver-in-ram = []
 
 # Chip Support Feature Flags
 # Target the ESP32.
@@ -164,7 +163,7 @@ opsram-8m = []
 opsram-16m = []
 
 # This feature is intended for testing; you probably don't want to enable it:
-ci = ["defmt", "bluetooth", "place-spi-driver-in-ram"]
+ci = ["defmt", "bluetooth"]
 
 [lints.clippy]
 mixed_attributes_style = "allow"

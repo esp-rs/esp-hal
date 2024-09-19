@@ -5,6 +5,7 @@ exclude  = [
     "esp-alloc",
     "esp-backtrace",
     "esp-build",
+    "esp-config",
     "esp-hal",
     "esp-hal-embassy",
     "esp-hal-procmacros",
