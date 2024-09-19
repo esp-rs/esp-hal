@@ -1795,17 +1795,9 @@ where
                     self.set_ext_mem_block_size(block_size.into());
                 }
             } else {
-                // we check here to insure that no descriptor points to PSRAM as
-                // that is only supported on esp32s3
-                let mut descriptor = Some(*preparation.start);
-                while let Some(current) = descriptor {
-                    if is_slice_in_psram(core::slice::from_raw_parts(current.buffer, current.len())) {
-                        return Err(DmaError::UnsupportedMemoryRegion);
-                    }
-                    descriptor = match current.next {
-                        next if !next.is_null() => Some(unsafe { *next }),
-                        _ => None,
-                    };
+                // we insure that block_size is some only for PSRAM addresses
+                if preperation.block_size.is_some() {
+                    return Err(DmaError::UnsupportedMemoryRegion);
                 }
             }
         );
@@ -2211,7 +2203,10 @@ impl DmaTxBuf {
             block_size,
         };
         buf.set_length(buf.capacity());
-
+        // no need for block size if the buffer is in DRAM
+        if is_slice_in_dram(buf.buffer) {
+            buf.block_size = None;
+        }
         Ok(buf)
     }
 
