@@ -59,3 +59,12 @@ macro_rules! common_test_pins {
         }
     }};
 }
+
+#[macro_export]
+macro_rules! unconnected_test_pins {
+    ($io:expr) => {{
+        let (a, _) = $crate::common_test_pins!($io);
+        let (_, b) = $crate::i2c_pins!($io);
+        (a, b)
+    }};
+}
