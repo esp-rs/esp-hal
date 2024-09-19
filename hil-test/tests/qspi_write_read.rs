@@ -51,35 +51,44 @@ fn execute(
 
     dma_tx_buf.fill(&[0x00; DMA_BUFFER_SIZE]);
 
-    let transfer = spi
-        .write(
-            SpiDataMode::Quad,
-            Command::Command8(expected as u16, SpiDataMode::Quad),
-            Address::Address24(
-                expected as u32 | (expected as u32) << 8 | (expected as u32) << 16,
+    cfg_if::cfg_if! {
+        if #[cfg(esp32)] {
+            let modes = [SpiDataMode::Single];
+        } else {
+            let modes = [SpiDataMode::Single, SpiDataMode::Quad];
+        }
+    }
+    for command_data_mode in modes {
+        let transfer = spi
+            .write(
                 SpiDataMode::Quad,
-            ),
-            0,
-            dma_tx_buf,
-        )
-        .map_err(|e| e.0)
-        .unwrap();
-    (spi, _) = transfer.wait();
+                Command::Command8(expected as u16, command_data_mode),
+                Address::Address24(
+                    expected as u32 | (expected as u32) << 8 | (expected as u32) << 16,
+                    SpiDataMode::Quad,
+                ),
+                0,
+                dma_tx_buf,
+            )
+            .map_err(|e| e.0)
+            .unwrap();
+        (spi, dma_tx_buf) = transfer.wait();
 
-    mosi_mirror.set_high();
+        mosi_mirror.set_high();
 
-    let transfer = spi
-        .read(
-            SpiDataMode::Quad,
-            Command::None,
-            Address::None,
-            0,
-            dma_rx_buf,
-        )
-        .map_err(|e| e.0)
-        .unwrap();
-    (_, dma_rx_buf) = transfer.wait();
-    assert_eq!(dma_rx_buf.as_slice(), &[expected; DMA_BUFFER_SIZE]);
+        let transfer = spi
+            .read(
+                SpiDataMode::Quad,
+                Command::Command8(expected as u16, command_data_mode),
+                Address::None,
+                0,
+                dma_rx_buf,
+            )
+            .map_err(|e| e.0)
+            .unwrap();
+        (spi, dma_rx_buf) = transfer.wait();
+        assert_eq!(dma_rx_buf.as_slice(), &[expected; DMA_BUFFER_SIZE]);
+    }
 }
 
 #[cfg(test)]
