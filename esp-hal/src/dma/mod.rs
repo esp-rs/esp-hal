@@ -299,11 +299,9 @@ use enumset::{EnumSet, EnumSetType};
 pub use self::gdma::*;
 #[cfg(pdma)]
 pub use self::pdma::*;
-use crate::{
-    interrupt::InterruptHandler,
-    soc::{is_slice_in_dram, is_slice_in_psram},
-    Mode,
-};
+#[cfg(esp32s3)]
+use crate::soc::is_slice_in_psram;
+use crate::{interrupt::InterruptHandler, soc::is_slice_in_dram, Mode};
 
 #[cfg(gdma)]
 mod gdma;
@@ -1789,7 +1787,7 @@ where
                 }
             } else {
                 // we insure that block_size is some only for PSRAM addresses
-                if preperation.block_size.is_some() {
+                if preparation.block_size.is_some() {
                     return Err(DmaError::UnsupportedMemoryRegion);
                 }
             }
