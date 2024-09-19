@@ -27,10 +27,7 @@ use esp_hal::{
 use hil_test as _;
 
 cfg_if::cfg_if! {
-    if #[cfg(any(
-        feature = "esp32",
-        feature = "esp32s2",
-    ))] {
+    if #[cfg(any(esp32, esp32s2))] {
         type DmaChannelCreator = esp_hal::dma::Spi2DmaChannelCreator;
     } else {
         type DmaChannelCreator = esp_hal::dma::ChannelCreator<0>;
@@ -64,7 +61,7 @@ mod tests {
         let dma = Dma::new(peripherals.DMA);
 
         cfg_if::cfg_if! {
-            if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
+            if #[cfg(any(esp32, esp32s2))] {
                 let dma_channel = dma.spi2channel;
             } else {
                 let dma_channel = dma.channel0;
@@ -253,9 +250,8 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(esp32))]
     fn test_symmetric_dma_transfer(ctx: Context) {
-        // This test case sends a large amount of data, twice, to verify that
+        // This test case sends a large amount of data, multiple times to verify that
         // https://github.com/esp-rs/esp-hal/issues/2151 is and remains fixed.
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
         let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
@@ -278,13 +274,16 @@ mod tests {
                 .unwrap();
 
             (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
-            assert_eq!(dma_tx_buf.as_slice(), dma_rx_buf.as_slice());
+            if dma_tx_buf.as_slice() != dma_rx_buf.as_slice() {
+                defmt::info!("dma_tx_buf: {:?}", dma_tx_buf.as_slice()[0..100]);
+                defmt::info!("dma_rx_buf: {:?}", dma_rx_buf.as_slice()[0..100]);
+                panic!("Mismatch at iteration {}", i);
+            }
         }
     }
 
     #[test]
     #[timeout(3)]
-    #[cfg(not(feature = "esp32s2"))]
     fn test_asymmetric_dma_transfer(ctx: Context) {
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(2, 4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
@@ -299,30 +298,19 @@ mod tests {
             .dma_transfer(dma_rx_buf, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
-        let (_, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
-        assert_eq!(dma_tx_buf.as_slice()[0..1], dma_rx_buf.as_slice()[0..1]);
-    }
+        let (spi, (dma_rx_buf, mut dma_tx_buf)) = transfer.wait();
+        assert_eq!(dma_tx_buf.as_slice()[0..2], dma_rx_buf.as_slice()[0..2]);
 
-    #[test]
-    #[timeout(3)]
-    fn test_symmetric_dma_transfer_huge_buffer(ctx: Context) {
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4096);
-        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        // Try transfer again to make sure DMA isn't in a broken state.
 
-        for (i, d) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
-            *d = i as _;
-        }
+        dma_tx_buf.fill(&[0xaa, 0xdd, 0xef, 0xbe]);
 
-        let spi = ctx
-            .spi
-            .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0));
         let transfer = spi
             .dma_transfer(dma_rx_buf, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
         let (_, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
-        assert_eq!(dma_tx_buf.as_slice(), dma_rx_buf.as_slice());
+        assert_eq!(dma_tx_buf.as_slice()[0..2], dma_rx_buf.as_slice()[0..2]);
     }
 
     #[test]

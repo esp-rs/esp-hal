@@ -59,6 +59,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix `SpiBus::transfer` transferring data twice in some cases (#2159)
 - Fixed UART freezing when using `RcFast` clock source on ESP32-C2/C3 (#2170)
 - I2S: on ESP32 and ESP32-S2 data is now output to the right (WS=1) channel first. (#2194)
+- SPI: Fixed an issue where unexpected data was written outside of the read buffer (#2179)
+- SPI: Fixed an issue where `wait` has returned before the DMA has finished writing the memory (#2179)
+- SPI: Fixed an issue where repeated calls to `dma_transfer` may end up looping indefinitely (#2179)
+- SPI: Fixed an issue that prevented correctly reading the first byte in a transaction (#2179)
 
 ### Removed
 
