@@ -85,7 +85,7 @@ pub(crate) fn esp_ieee802154_enable(radio_clock_control: &mut RADIO_CLK) {
     ieee802154_mac_init();
 
     unsafe { phy_version_print() }; // libphy.a
-    log::info!("date={:x}", mac_date());
+    info!("date={:x}", mac_date());
 }
 
 fn esp_phy_enable() {
@@ -355,34 +355,34 @@ fn next_operation() {
 
 #[handler(priority = "Priority::Priority1")]
 fn ZB_MAC() {
-    log::trace!("ZB_MAC interrupt");
+    trace!("ZB_MAC interrupt");
 
     let events = get_events();
     clear_events(events);
 
-    log::trace!("events = {:032b}", events);
+    trace!("events = {:032b}", events);
 
     if events & Event::RxSfdDone != 0 {
         // IEEE802154_STATE_TX && IEEE802154_STATE_TX_CCA && IEEE802154_STATE_TX_ENH_ACK
         // for isr processing delay
-        log::trace!("rx sfd done");
+        trace!("rx sfd done");
     }
 
     if events & Event::TxSfdDone != 0 {
         // IEEE802154_STATE_RX for isr processing delay, only 821
         // IEEE802154_STATE_TX_ACK for workaround jira ZB-81.
-        log::trace!("tx sfd done");
+        trace!("tx sfd done");
     }
 
     if events & Event::TxDone != 0 {
-        log::trace!("tx done");
+        trace!("tx done");
         next_operation();
     }
 
     if events & Event::RxDone != 0 {
-        log::trace!("rx done");
+        trace!("rx done");
         unsafe {
-            log::trace!("Received raw {:x?}", RX_BUFFER);
+            trace!("Received raw {:x?}", RX_BUFFER);
             critical_section::with(|cs| {
                 let mut queue = RX_QUEUE.borrow_ref_mut(cs);
                 if !queue.is_full() {
@@ -392,11 +392,11 @@ fn ZB_MAC() {
                     };
                     queue.enqueue(item).ok();
                 } else {
-                    log::warn!("Receive queue full");
+                    warn!("Receive queue full");
                 }
 
                 let frm = if RX_BUFFER[0] >= FRAME_SIZE as u8 {
-                    log::warn!("RX_BUFFER[0] {:} is larger than frame size", RX_BUFFER[0]);
+                    warn!("RX_BUFFER[0] {:} is larger than frame size", RX_BUFFER[0]);
                     &RX_BUFFER[1..][..FRAME_SIZE - 1]
                 } else {
                     &RX_BUFFER[1..][..RX_BUFFER[0] as usize]
@@ -414,21 +414,21 @@ fn ZB_MAC() {
     }
 
     if events & Event::AckRxDone != 0 {
-        log::info!("EventAckRxDone");
+        info!("EventAckRxDone");
     }
 
     if events & Event::AckTxDone != 0 {
-        log::trace!("EventAckTxDone");
+        trace!("EventAckTxDone");
         next_operation();
     }
 
     if events & Event::TxAbort != 0 {
-        log::trace!("TxAbort");
+        trace!("TxAbort");
         abort_tx();
     }
 
     if events & Event::RxAbort != 0 {
-        log::trace!("RxAbort");
+        trace!("RxAbort");
         abort_rx();
     }
 }

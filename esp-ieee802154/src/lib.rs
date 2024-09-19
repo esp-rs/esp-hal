@@ -334,7 +334,7 @@ static TX_DONE_CALLBACK_FN: Mutex<RefCell<Option<fn()>>> = Mutex::new(RefCell::n
 static RX_AVAILABLE_CALLBACK_FN: Mutex<RefCell<Option<fn()>>> = Mutex::new(RefCell::new(None));
 
 fn tx_done() {
-    log::trace!("tx_done callback");
+    trace!("tx_done callback");
 
     critical_section::with(|cs| {
         let mut tx_done_callback = TX_DONE_CALLBACK.borrow_ref_mut(cs);
@@ -354,7 +354,7 @@ fn tx_done() {
 }
 
 fn rx_available() {
-    log::trace!("rx available callback");
+    trace!("rx available callback");
 
     critical_section::with(|cs| {
         let mut rx_available_callback = RX_AVAILABLE_CALLBACK.borrow_ref_mut(cs);
