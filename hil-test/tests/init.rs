@@ -41,6 +41,27 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
+    fn test_feeding_timg0_wdt_max_clock() {
+        let peripherals = esp_hal::init({
+            let mut config = Config::default();
+            config.cpu_clock = CpuClock::max();
+            config.watchdog.timg0 =
+                WatchdogStatus::Enabled(fugit::MicrosDurationU64::millis(500 as u64));
+            config
+        });
+
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        let mut wdt0 = timg0.wdt;
+        let delay = Delay::new();
+
+        for _ in 0..4 {
+            wdt0.feed();
+            delay.delay(250.millis());
+        }
+    }
+
+    #[test]
     #[timeout(4)]
     fn test_feeding_rtc_wdt() {
         let peripherals = esp_hal::init({
