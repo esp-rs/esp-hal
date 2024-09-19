@@ -111,8 +111,18 @@ pub trait Timer: crate::private::Sealed {
 }
 
 /// A one-shot timer.
-pub struct OneShotTimer<'d, T> {
+pub struct OneShotTimer<'d, T = AnyTimer> {
     inner: PeripheralRef<'d, T>,
+}
+
+impl<'d> OneShotTimer<'d, AnyTimer> {
+    /// Construct a new instance of [`OneShotTimer`] with the timer
+    /// type-erased.
+    pub fn new<T: Timer + Into<AnyTimer>>(mut inner: impl Peripheral<P = T> + 'd) -> Self {
+        let inner = unsafe { inner.clone_unchecked() }.into();
+
+        Self::new_typed(inner)
+    }
 }
 
 impl<'d, T> OneShotTimer<'d, T>
@@ -120,7 +130,7 @@ where
     T: Timer,
 {
     /// Construct a new instance of [`OneShotTimer`].
-    pub fn new(inner: impl Peripheral<P = T> + 'd) -> Self {
+    pub fn new_typed(inner: impl Peripheral<P = T> + 'd) -> Self {
         crate::into_ref!(inner);
 
         Self { inner }
@@ -242,8 +252,18 @@ where
 }
 
 /// A periodic timer.
-pub struct PeriodicTimer<'d, T> {
+pub struct PeriodicTimer<'d, T = AnyTimer> {
     inner: PeripheralRef<'d, T>,
+}
+
+impl<'d> PeriodicTimer<'d, AnyTimer> {
+    /// Construct a new instance of [`PeriodicTimer`] with the timer
+    /// type-erased.
+    pub fn new<T: Timer + Into<AnyTimer>>(mut inner: impl Peripheral<P = T> + 'd) -> Self {
+        let inner = unsafe { inner.clone_unchecked() }.into();
+
+        Self::new_typed(inner)
+    }
 }
 
 impl<'d, T> PeriodicTimer<'d, T>
@@ -251,7 +271,7 @@ where
     T: Timer,
 {
     /// Construct a new instance of [`PeriodicTimer`].
-    pub fn new(inner: impl Peripheral<P = T> + 'd) -> Self {
+    pub fn new_typed(inner: impl Peripheral<P = T> + 'd) -> Self {
         crate::into_ref!(inner);
 
         Self { inner }
@@ -357,25 +377,79 @@ where
 
 impl<'d, T> embedded_hal_02::timer::Periodic for PeriodicTimer<'d, T> where T: Timer {}
 
-/// An enum of all timer types
-enum AnyTimerInner {
-    /// Timer 0 of the TIMG0 peripheral in blocking mode.
-    Timg0Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>),
-    /// Timer 1 of the TIMG0 peripheral in blocking mode.
+macro_rules! any_timer {
+    ($ty:path => $var:ident) => {
+        impl $ty {
+            /// Convert this timer into an [`AnyTimer`].
+            pub fn degrade(self) -> AnyTimer {
+                AnyTimer(AnyTimerInner::$var(self))
+            }
+        }
+
+        impl From<$ty> for AnyTimer {
+            fn from(value: $ty) -> Self {
+                value.degrade()
+            }
+        }
+    };
+
+    (
+        $(
+            $(#[$cfg:meta])?
+            $ty:path => $var:ident,
+        )*
+    ) => {
+        /// An enum of all timer types
+        enum AnyTimerInner {
+            $(
+                $(#[$cfg])?
+                $var($ty),
+            )*
+        }
+
+        $(
+            $(#[$cfg])?
+            any_timer!($ty => $var);
+        )*
+
+        impl Timer for AnyTimer {
+            delegate::delegate! {
+                to match &self.0 {
+                    $(
+                        $(#[$cfg])?
+                        AnyTimerInner::$var(inner) => inner,
+                    )*
+                } {
+                    fn start(&self);
+                    fn stop(&self);
+                    fn reset(&self);
+                    fn is_running(&self) -> bool;
+                    fn now(&self) -> Instant<u64, 1, 1_000_000>;
+                    fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error>;
+                    fn enable_auto_reload(&self, auto_reload: bool);
+                    fn enable_interrupt(&self, state: bool);
+                    fn clear_interrupt(&self);
+                    fn set_interrupt_handler(&self, handler: InterruptHandler);
+                    fn is_interrupt_set(&self) -> bool;
+                    fn set_alarm_active(&self, state: bool);
+                }
+            }
+        }
+    };
+}
+
+any_timer! {
+    timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking> => Timg0Timer0,
     #[cfg(timg_timer1)]
-    Timg0Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking>),
-    /// Timer 0 of the TIMG1 peripheral in blocking mode.
+    timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking> => Timg0Timer1,
     #[cfg(timg1)]
-    Timg1Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking>),
-    /// Timer 1 of the TIMG1 peripheral in blocking mode.
+    timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking> => Timg1Timer0,
     #[cfg(all(timg1, timg_timer1))]
-    Timg1Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>),
-    /// Systimer Alarm in periodic mode with blocking behavior.
+    timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking> => Timg1Timer1,
     #[cfg(systimer)]
-    SystimerAlarmPeriodic(systimer::Alarm<'static, systimer::Periodic, Blocking>),
-    /// Systimer Target in periodic mode with blocking behavior.
+    systimer::Alarm<'static, systimer::Periodic, Blocking> => SystimerAlarmPeriodic,
     #[cfg(systimer)]
-    SystimerAlarmTarget(systimer::Alarm<'static, systimer::Target, Blocking>),
+    systimer::Alarm<'static, systimer::Target, Blocking> => SystimerAlarmTarget,
 }
 
 /// A type-erased timer
@@ -384,78 +458,6 @@ enum AnyTimerInner {
 pub struct AnyTimer(AnyTimerInner);
 
 impl crate::private::Sealed for AnyTimer {}
-
-impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>> for AnyTimer {
-    fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>) -> Self {
-        Self(AnyTimerInner::Timg0Timer0(value))
-    }
-}
-
-#[cfg(timg_timer1)]
-impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking>> for AnyTimer {
-    fn from(value: timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking>) -> Self {
-        Self(AnyTimerInner::Timg0Timer1(value))
-    }
-}
-
-#[cfg(timg1)]
-impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking>> for AnyTimer {
-    fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking>) -> Self {
-        Self(AnyTimerInner::Timg1Timer0(value))
-    }
-}
-
-#[cfg(all(timg1, timg_timer1))]
-impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>> for AnyTimer {
-    fn from(value: timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>) -> Self {
-        Self(AnyTimerInner::Timg1Timer1(value))
-    }
-}
-
-#[cfg(systimer)]
-impl From<systimer::Alarm<'static, systimer::Periodic, Blocking>> for AnyTimer {
-    fn from(value: systimer::Alarm<'static, systimer::Periodic, Blocking>) -> Self {
-        Self(AnyTimerInner::SystimerAlarmPeriodic(value))
-    }
-}
-
-#[cfg(systimer)]
-impl From<systimer::Alarm<'static, systimer::Target, Blocking>> for AnyTimer {
-    fn from(value: systimer::Alarm<'static, systimer::Target, Blocking>) -> Self {
-        Self(AnyTimerInner::SystimerAlarmTarget(value))
-    }
-}
-
-impl Timer for AnyTimer {
-    delegate::delegate! {
-        to match &self.0 {
-            AnyTimerInner::Timg0Timer0(inner) => inner,
-            #[cfg(timg_timer1)]
-            AnyTimerInner::Timg0Timer1(inner) => inner,
-            #[cfg(timg1)]
-            AnyTimerInner::Timg1Timer0(inner) => inner,
-            #[cfg(all(timg1,timg_timer1))]
-            AnyTimerInner::Timg1Timer1(inner) => inner,
-            #[cfg(systimer)]
-            AnyTimerInner::SystimerAlarmPeriodic(inner) => inner,
-            #[cfg(systimer)]
-            AnyTimerInner::SystimerAlarmTarget(inner) => inner,
-        } {
-            fn start(&self);
-            fn stop(&self);
-            fn reset(&self);
-            fn is_running(&self) -> bool;
-            fn now(&self) -> Instant<u64, 1, 1_000_000>;
-            fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error>;
-            fn enable_auto_reload(&self, auto_reload: bool);
-            fn enable_interrupt(&self, state: bool);
-            fn clear_interrupt(&self);
-            fn set_interrupt_handler(&self, handler: InterruptHandler);
-            fn is_interrupt_set(&self) -> bool;
-            fn set_alarm_active(&self, state: bool);
-        }
-    }
-}
 
 impl Peripheral for AnyTimer {
     type P = Self;

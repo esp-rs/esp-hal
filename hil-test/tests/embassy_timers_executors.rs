@@ -64,7 +64,7 @@ mod test_cases {
     }
 
     pub fn run_test_periodic_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
-        let mut periodic = PeriodicTimer::new(timer);
+        let mut periodic = PeriodicTimer::new_typed(timer);
 
         let t1 = esp_hal::time::now();
         periodic.start(100.millis()).unwrap();
@@ -81,7 +81,7 @@ mod test_cases {
     }
 
     pub fn run_test_oneshot_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
-        let timer = OneShotTimer::new(timer);
+        let timer = OneShotTimer::new_typed(timer);
 
         let t1 = esp_hal::time::now();
         timer.delay_millis(50);
@@ -216,12 +216,9 @@ mod test {
     #[cfg(not(feature = "esp32"))]
     async fn test_interrupt_executor(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        let timer0: AnyTimer = timg0.timer0.into();
-
         let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
-        let alarm0: AnyTimer = systimer.alarm0.into();
 
-        esp_hal_embassy::init([timer0, alarm0]);
+        esp_hal_embassy::init([timg0.timer0.degrade(), systimer.alarm0.degrade()]);
 
         let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 

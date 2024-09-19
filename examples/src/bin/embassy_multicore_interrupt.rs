@@ -23,7 +23,7 @@ use esp_hal::{
     gpio::{Io, Level, Output, Pin},
     interrupt::{software::SoftwareInterruptControl, Priority},
     prelude::*,
-    timer::{timg::TimerGroup, AnyTimer},
+    timer::timg::TimerGroup,
 };
 use esp_hal_embassy::InterruptExecutor;
 use esp_println::println;
@@ -78,9 +78,7 @@ fn main() -> ! {
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let timer0: AnyTimer = timg0.timer0.into();
-    let timer1: AnyTimer = timg0.timer1.into();
-    esp_hal_embassy::init([timer0, timer1]);
+    esp_hal_embassy::init([timg0.timer0.degrade(), timg0.timer1.degrade()]);
 
     let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 
