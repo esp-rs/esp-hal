@@ -56,4 +56,13 @@ mod tests {
         rtc.rwdt.feed();
         delay.delay(2500.millis());
     }
+
+    #[test]
+    #[timeout(3)]
+    fn test_default_config() {
+        esp_hal::init(Config::default());
+
+        let delay = Delay::new();
+        delay.delay(2000.millis());
+    }
 }
