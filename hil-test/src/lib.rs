@@ -51,11 +51,9 @@ macro_rules! common_test_pins {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32s2, esp32s3))] {
                 ($io.pins.gpio9, $io.pins.gpio10)
-            }
-            else if #[cfg(esp32)] {
+            } else if #[cfg(esp32)] {
                 ($io.pins.gpio26, $io.pins.gpio27)
-            }
-            else {
+            } else {
                 ($io.pins.gpio2, $io.pins.gpio3)
             }
         }
