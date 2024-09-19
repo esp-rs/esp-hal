@@ -76,7 +76,7 @@ use crate::soc::constants::TIMG_DEFAULT_CLK_SRC;
 use crate::{
     clock::Clocks,
     interrupt::{self, InterruptHandler},
-    lock::{lock, LockState},
+    lock::{lock, Lock},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{timg0::RegisterBlock, Interrupt, TIMG0},
     private::Sealed,
@@ -87,7 +87,7 @@ use crate::{
     Mode,
 };
 
-static INT_ENA_LOCK: LockState = LockState::new();
+static INT_ENA_LOCK: Lock = Lock::new();
 
 /// A timer group consisting of
 #[cfg_attr(not(timg_timer1), doc = "a general purpose timer")]

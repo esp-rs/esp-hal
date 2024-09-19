@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed `DummyPin` to `NoPin` and removed all internal logic from it. (#2133)
 - The `NO_PIN` constant has been removed. (#2133)
 - MSRV bump to 1.79 (#2156)
+- Allow handling interrupts while trying to lock critical section on multi-core chips. (#2197)
 
 ### Fixed
 
