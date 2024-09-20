@@ -2172,6 +2172,10 @@ impl DmaTxBuf {
                 if !is_slice_in_dram(buffer) && !is_slice_in_psram(buffer) {
                     return Err(DmaBufError::UnsupportedMemoryRegion);
                 }
+                // if its PSRAM, the block_size/alignment must be specified
+                if block_size.is_none() {
+                    return Err(DmaBufError::InvalidAlignment);
+                }
             } else {
                 // buffer can only be DRAM
                 if !is_slice_in_dram(buffer) {
