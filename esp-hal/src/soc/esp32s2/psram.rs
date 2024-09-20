@@ -9,42 +9,42 @@
 //! present on the `ESP32-S2` chip. `PSRAM` provides additional external memory
 //! to supplement the internal memory of the `ESP32-S2`, allowing for increased
 //! storage capacity and improved performance in certain applications.
-//!
-//! The `PSRAM` module is accessed through a virtual address, defined as
-//! `PSRAM_VADDR`. The starting virtual address for the PSRAM module is
-//! 0x3f500000. The `PSRAM` module size depends on the configuration specified
-//! during the compilation process. The available `PSRAM` sizes are `2MB`,
-//! `4MB`, and `8MB`.
-const PSRAM_VADDR: u32 = 0x3f500000;
 
-/// Returns the start address of the PSRAM virtual address space.
-pub fn psram_vaddr_start() -> usize {
-    PSRAM_VADDR_START
+pub use crate::soc::psram_common::*;
+
+const EXTMEM_ORIGIN: usize = 0x3f500000;
+
+// Cache Speed
+#[derive(PartialEq, Eq, Debug, Copy, Clone, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(missing_docs)]
+pub enum PsramCacheSpeed {
+    PsramCacheS80m = 1,
+    PsramCacheS40m,
+    PsramCacheS26m,
+    PsramCacheS20m,
+    #[default]
+    PsramCacheMax,
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "psram-2m")] {
-        const PSRAM_SIZE: u32 = 2;
-    } else if #[cfg(feature = "psram-4m")] {
-        const PSRAM_SIZE: u32 = 4;
-    } else if #[cfg(feature = "psram-8m")] {
-        const PSRAM_SIZE: u32 = 8;
-    } else {
-        const PSRAM_SIZE: u32 = 0;
-    }
+/// PSRAM configuration
+#[derive(Copy, Clone, Debug, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct PsramConfig {
+    /// PSRAM size
+    pub size: PsramSize,
+    /// Cache Speed
+    pub speed: PsramCacheSpeed,
 }
-
-/// The total size of the PSRAM in bytes, calculated from the PSRAM size
-/// constant.
-pub const PSRAM_BYTES: usize = PSRAM_SIZE as usize * 1024 * 1024;
-
-/// The start address of the PSRAM virtual address space.
-pub const PSRAM_VADDR_START: usize = PSRAM_VADDR as usize;
 
 /// Initialize PSRAM to be used for data.
-#[cfg(any(feature = "psram-2m", feature = "psram-4m", feature = "psram-8m"))]
+///
+/// Returns the start of the mapped memory and the size
 #[procmacros::ram]
-pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::peripherals::PSRAM>) {
+pub fn init_psram(_peripheral: crate::peripherals::PSRAM, config: PsramConfig) -> (*mut u8, usize) {
+    let mut config = config;
+    utils::psram_init(&mut config);
+
     #[allow(unused)]
     enum CacheLayout {
         Invalid    = 0,
@@ -120,10 +120,10 @@ pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::per
 
         if cache_dbus_mmu_set(
             MMU_ACCESS_SPIRAM,
-            PSRAM_VADDR,
+            EXTMEM_ORIGIN as u32,
             START_PAGE << 16,
             64,
-            PSRAM_SIZE * 1024 / 64, // number of pages to map
+            config.size.get() as u32 / 1024 / 64, // number of pages to map
             0,
         ) != 0
         {
@@ -139,31 +139,94 @@ pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::per
                 .pro_dcache_mask_bus2()
                 .clear_bit()
         });
-
-        utils::psram_init();
     }
+
+    crate::soc::MAPPED_PSRAM.with(|mapped_psram| {
+        mapped_psram.memory_range = EXTMEM_ORIGIN..EXTMEM_ORIGIN + config.size.get();
+    });
+
+    (EXTMEM_ORIGIN as *mut u8, config.size.get())
 }
 
-#[cfg(any(feature = "psram-2m", feature = "psram-4m", feature = "psram-8m"))]
 pub(crate) mod utils {
+    use super::*;
+
+    const PSRAM_RESET_EN: u16 = 0x66;
+    const PSRAM_RESET: u16 = 0x99;
+    const PSRAM_DEVICE_ID: u16 = 0x9F;
+    const CS_PSRAM_SEL: u8 = 1 << 1;
+
+    /// PS-RAM addressing mode
+    #[derive(PartialEq, Eq, Debug, Copy, Clone, Default)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[allow(unused)]
+    pub enum PsramVaddrMode {
+        /// App and pro CPU use their own flash cache for external RAM access
+        #[default]
+        Normal = 0,
+        /// App and pro CPU share external RAM caches: pro CPU has low2M, app
+        /// CPU has high 2M
+        Lowhigh,
+        /// App and pro CPU share external RAM caches: pro CPU does even 32yte
+        /// ranges, app does odd ones.
+        Evenodd,
+    }
+
     // Function initializes the PSRAM by configuring GPIO pins, resetting the PSRAM,
     // and enabling Quad I/O (QIO) mode. It also calls the psram_cache_init
     // function to configure cache parameters and read/write commands.
-    pub(crate) fn psram_init() {
+    pub(crate) fn psram_init(config: &mut PsramConfig) {
         psram_gpio_config();
+
+        if config.size.is_auto() {
+            // read chip id
+            let mut dev_id = 0u32;
+            psram_exec_cmd(
+                CommandMode::PsramCmdSpi,
+                PSRAM_DEVICE_ID,
+                8, // command and command bit len
+                0,
+                24, // address and address bit len
+                0,  // dummy bit len
+                core::ptr::null(),
+                0, // tx data and tx bit len
+                &mut dev_id as *mut _ as *mut u8,
+                24,           // rx data and rx bit len
+                CS_PSRAM_SEL, // cs bit mask
+                false,
+            );
+            info!("chip id = {:x}", dev_id);
+
+            const PSRAM_ID_EID_S: u32 = 16;
+            const PSRAM_ID_EID_M: u32 = 0xff;
+            const PSRAM_EID_SIZE_M: u32 = 0x07;
+            const PSRAM_EID_SIZE_S: u32 = 5;
+
+            let size_id = (((dev_id) >> PSRAM_ID_EID_S) & PSRAM_ID_EID_M) >> PSRAM_EID_SIZE_S
+                & PSRAM_EID_SIZE_M;
+
+            const PSRAM_EID_SIZE_32MBITS: u32 = 1;
+            const PSRAM_EID_SIZE_64MBITS: u32 = 2;
+
+            let size = match size_id {
+                PSRAM_EID_SIZE_64MBITS => 16 / 8 * 1024 * 1024,
+                PSRAM_EID_SIZE_32MBITS => 16 / 8 * 1024 * 1024,
+                _ => 16 / 8 * 1024 * 1024,
+            };
+
+            info!("size is {}", size);
+
+            config.size = PsramSize::Size(size);
+        }
 
         psram_reset_mode();
         psram_enable_qio_mode();
 
-        psram_cache_init(PsramCacheSpeed::PsramCacheMax, PsramVaddrMode::Normal);
+        psram_cache_init(config.speed, PsramVaddrMode::Normal);
     }
 
     // send reset command to psram, in spi mode
     fn psram_reset_mode() {
-        const PSRAM_RESET_EN: u16 = 0x66;
-        const PSRAM_RESET: u16 = 0x99;
-        const CS_PSRAM_SEL: u8 = 1 << 1;
-
         psram_exec_cmd(
             CommandMode::PsramCmdSpi,
             PSRAM_RESET_EN,
@@ -224,6 +287,7 @@ pub(crate) mod utils {
     }
 
     #[allow(clippy::too_many_arguments)]
+    #[inline(always)]
     fn psram_exec_cmd(
         mode: CommandMode,
         cmd: u16,
@@ -265,7 +329,7 @@ pub(crate) mod utils {
             _psram_exec_cmd(
                 cmd,
                 cmd_bit_len,
-                addr,
+                &addr,
                 addr_bit_len,
                 dummy_bits,
                 mosi_data,
@@ -289,10 +353,11 @@ pub(crate) mod utils {
     }
 
     #[allow(clippy::too_many_arguments)]
+    #[inline(always)]
     fn _psram_exec_cmd(
         cmd: u16,
         cmd_bit_len: u16,
-        addr: u32,
+        addr: *const u32,
         addr_bit_len: u32,
         dummy_bits: u32,
         mosi_data: *const u8,
@@ -323,7 +388,7 @@ pub(crate) mod utils {
         let conf = esp_rom_spi_cmd_t {
             cmd,
             cmd_bit_len,
-            addr: addr as *const u32,
+            addr,
             addr_bit_len,
             tx_data: mosi_data as *const u32,
             tx_data_bit_len: mosi_bit_len,
@@ -432,29 +497,6 @@ pub(crate) mod utils {
             esp_rom_spiflash_select_qio_pins(psram_io.psram_spiwp_sd3_io, spiconfig);
             // s_psram_cs_io = psram_io.psram_cs_io;
         }
-    }
-
-    #[derive(PartialEq, Eq, Debug)]
-    #[allow(unused)]
-    enum PsramCacheSpeed {
-        PsramCacheS80m = 1,
-        PsramCacheS40m,
-        PsramCacheS26m,
-        PsramCacheS20m,
-        PsramCacheMax,
-    }
-
-    #[derive(PartialEq, Eq, Debug)]
-    #[allow(unused)]
-    enum PsramVaddrMode {
-        /// App and pro CPU use their own flash cache for external RAM access
-        Normal = 0,
-        /// App and pro CPU share external RAM caches: pro CPU has low2M, app
-        /// CPU has high 2M
-        Lowhigh,
-        /// App and pro CPU share external RAM caches: pro CPU does even 32yte
-        /// ranges, app does odd ones.
-        Evenodd,
     }
 
     const PSRAM_IO_MATRIX_DUMMY_20M: u32 = 0;

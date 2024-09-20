@@ -155,7 +155,7 @@ pub use self::soc::efuse;
 #[cfg(lp_core)]
 pub use self::soc::lp_core;
 pub use self::soc::peripherals;
-#[cfg(psram)]
+#[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
 pub use self::soc::psram;
 #[cfg(ulp_riscv_core)]
 pub use self::soc::ulp_core;

@@ -209,3 +209,49 @@ We've replaced some usage of features with [esp-config](https://docs.rs/esp-conf
 # key in .cargo/config.toml [env] section
 + ESP_HAL_PLACE_SPI_DRIVER_IN_RAM=true
 ```
+
+## PS-RAM
+
+Initializing PS-RAM now takes a chip specific config and returns start of the mapped memory and the size.
+
+Example
+```rust
+let (start, size) = psram::init_psram(peripherals.PSRAM, psram::PsramConfig::default());
+```
+
+If you don't specify the size of PS-RAM via `PsramConfig::size` the size of PS-RAM is derived from the RAM-chip id (or via probing in case of ESP32).
+
+`psram::psram_vaddr_start()` and `psram::PSRAM_BYTES` are removed.
+
+The features `psram-Xm` and `opsram-Xm` are removed and replaced by `quad-psram`/`octal-psram`.
+The feature `psram-80mhz` is removed and replaced by `PsramConfig`
+
+Diff of the `psram_quad.rs` example
+```diff
+-//% FEATURES: psram-2m
++//% FEATURES: esp-hal/quad-psram
+
+...
+
+-fn init_psram_heap() {
++fn init_psram_heap(start: *mut u8, size: usize) {
+     unsafe {
+         esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
+-            psram::psram_vaddr_start() as *mut u8,
+-            psram::PSRAM_BYTES,
++            start,
++            size,
+             esp_alloc::MemoryCapability::External.into(),
+         ));
+     }
+
+...
+
+-    psram::init_psram(peripherals.PSRAM);
+-    init_psram_heap();
++    let (start, size) = psram::init_psram(peripherals.PSRAM, psram::PsramConfig::default());
++    init_psram_heap(start, size);
+
+...
+
+```

@@ -3,7 +3,7 @@
 //! You need an ESP32-S3 with at least 2 MB of PSRAM memory.
 
 //% CHIPS: esp32s3
-//% FEATURES: opsram-2m
+//% FEATURES: esp-hal/octal-psram
 
 #![no_std]
 #![no_main]
@@ -17,11 +17,11 @@ use esp_backtrace as _;
 use esp_hal::{prelude::*, psram};
 use esp_println::println;
 
-fn init_psram_heap() {
+fn init_psram_heap(start: *mut u8, size: usize) {
     unsafe {
         esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
-            psram::psram_vaddr_start() as *mut u8,
-            psram::PSRAM_BYTES,
+            start,
+            size,
             esp_alloc::MemoryCapability::External.into(),
         ));
     }
@@ -32,10 +32,11 @@ compile_error!("PSRAM example must be built in release mode!");
 
 #[entry]
 fn main() -> ! {
+    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    psram::init_psram(peripherals.PSRAM);
-    init_psram_heap();
+    let (start, size) = psram::init_psram(peripherals.PSRAM, psram::PsramConfig::default());
+    init_psram_heap(start, size);
 
     println!("Going to access PSRAM");
     let mut large_vec: Vec<u32> = Vec::with_capacity(500 * 1024 / 4);

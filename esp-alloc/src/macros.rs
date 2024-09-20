@@ -31,11 +31,11 @@ macro_rules! heap_allocator {
 macro_rules! psram_allocator {
     ($peripheral:expr,$psram_module:path) => {{
         use $psram_module as _psram;
-        _psram::init_psram($peripheral);
+        let (start, size) = _psram::init_psram($peripheral, _psram::PsramConfig::default());
         unsafe {
             $crate::HEAP.add_region($crate::HeapRegion::new(
-                _psram::psram_vaddr_start() as *mut u8,
-                _psram::PSRAM_BYTES,
+                start,
+                size,
                 $crate::MemoryCapability::External.into(),
             ));
         }

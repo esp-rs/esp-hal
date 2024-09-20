@@ -1,6 +1,6 @@
 //! Uses DMA to copy psram to internal memory.
 
-//% FEATURES: esp-hal/log opsram-2m aligned
+//% FEATURES: esp-hal/log esp-hal/octal-psram aligned
 //% CHIPS: esp32s3
 
 #![no_std]
@@ -42,16 +42,13 @@ macro_rules! dma_alloc_buffer {
     }};
 }
 
-fn init_heap(psram: impl esp_hal::peripheral::Peripheral<P = esp_hal::peripherals::PSRAM>) {
-    esp_hal::psram::init_psram(psram);
-    info!(
-        "init_heap: start: 0x{:0x}",
-        esp_hal::psram::psram_vaddr_start()
-    );
+fn init_heap(psram: esp_hal::peripherals::PSRAM) {
+    let (start, size) = esp_hal::psram::init_psram(psram, esp_hal::psram::PsramConfig::default());
+    info!("init_heap: start: {:p}", start);
     unsafe {
         esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
-            esp_hal::psram::psram_vaddr_start() as *mut u8,
-            esp_hal::psram::PSRAM_BYTES,
+            start,
+            size,
             esp_alloc::MemoryCapability::External.into(),
         ));
     }

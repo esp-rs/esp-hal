@@ -1,3 +1,5 @@
+use core::cell::UnsafeCell;
+
 mod single_core {
     pub unsafe fn disable_interrupts() -> critical_section::RawRestoreState {
         cfg_if::cfg_if! {
@@ -209,6 +211,31 @@ pub(crate) fn lock<T>(lock: &Lock, f: impl FnOnce() -> T) -> T {
     let _token = LockGuard::new(lock);
     f()
 }
+
+/// Data protected by a [Lock]
+#[allow(unused)]
+pub(crate) struct Locked<T> {
+    lock_state: Lock,
+    data: UnsafeCell<T>,
+}
+
+#[allow(unused)]
+impl<T> Locked<T> {
+    /// Create a new instance
+    pub(crate) const fn new(data: T) -> Self {
+        Self {
+            lock_state: Lock::new(),
+            data: UnsafeCell::new(data),
+        }
+    }
+
+    /// Provide exclusive access to the protected data to the given closure
+    pub(crate) fn with<R>(&self, f: impl FnOnce(&mut T) -> R) -> R {
+        lock(&self.lock_state, || f(unsafe { &mut *self.data.get() }))
+    }
+}
+
+unsafe impl<T> Sync for Locked<T> {}
 
 struct CriticalSection;
 
