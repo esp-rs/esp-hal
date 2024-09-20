@@ -2903,7 +2903,7 @@ pub trait Instance: private::Sealed {
         let reg_block = self.register_block();
         reg_block.user().modify(|_, w| {
             w.usr_miso_highpart().clear_bit();
-            w.usr_miso_highpart().clear_bit();
+            w.usr_mosi_highpart().clear_bit();
             w.doutdin().clear_bit();
             w.usr_miso().bit(!is_write && !no_mosi_miso);
             w.usr_mosi().bit(is_write && !no_mosi_miso);
