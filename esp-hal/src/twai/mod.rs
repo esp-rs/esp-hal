@@ -755,8 +755,8 @@ where
         crate::into_ref!(tx_pin, rx_pin);
 
         // Enable the peripheral clock for the TWAI peripheral.
-        T::reset_peripheral();
         T::enable_peripheral();
+        T::reset_peripheral();
 
         // Set RESET bit to 1
         T::register_block()
@@ -1495,7 +1495,7 @@ impl Instance for crate::peripherals::TWAI0 {
     }
 
     fn reset_peripheral() {
-        PeripheralClockControl::enable(crate::system::Peripheral::Twai0);
+        PeripheralClockControl::reset(crate::system::Peripheral::Twai0);
     }
 
     fn enable_peripheral() {
