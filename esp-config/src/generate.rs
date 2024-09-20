@@ -15,7 +15,7 @@ pub struct ParseError(String);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Value {
-    Number(usize),
+    Integer(isize),
     Bool(bool),
     String(String),
 }
@@ -24,16 +24,16 @@ impl Value {
     fn parse_in_place(&mut self, s: &str) -> Result<(), ParseError> {
         *self = match self {
             Value::Bool(_) => match s {
-                "false" | "no" | "n" => Value::Bool(false),
-                "true" | "yes" | "y" => Value::Bool(true),
+                "false" | "no" | "n" | "f" | "FALSE" | "NO" | "N" | "F" => Value::Bool(false),
+                "true" | "yes" | "y" | "t" | "TRUE" | "YES" | "Y" | "T" => Value::Bool(true),
                 _ => return Err(ParseError(format!("Invalid boolean value: {}", s))),
             },
-            Value::Number(_) => Value::Number(
+            Value::Integer(_) => Value::Integer(
                 match s.as_bytes() {
-                    [b'0', b'x', ..] => usize::from_str_radix(&s[2..], 16),
-                    [b'0', b'o', ..] => usize::from_str_radix(&s[2..], 8),
-                    [b'0', b'b', ..] => usize::from_str_radix(&s[2..], 2),
-                    _ => usize::from_str_radix(&s, 10),
+                    [b'0', b'x', ..] => isize::from_str_radix(&s[2..], 16),
+                    [b'0', b'o', ..] => isize::from_str_radix(&s[2..], 8),
+                    [b'0', b'b', ..] => isize::from_str_radix(&s[2..], 2),
+                    _ => isize::from_str_radix(&s, 10),
                 }
                 .map_err(|_| ParseError(format!("Invalid numerical value: {}", s)))?,
             ),
@@ -45,7 +45,7 @@ impl Value {
     fn as_string(&self) -> String {
         match self {
             Value::Bool(value) => String::from(if *value { "true" } else { "false" }),
-            Value::Number(value) => format!("{}", value),
+            Value::Integer(value) => format!("{}", value),
             Value::String(value) => value.clone(),
         }
     }
@@ -242,7 +242,7 @@ mod test {
     #[test]
     fn value_number_formats() {
         const INPUTS: &[&str] = &["0xAA", "0o252", "0b0000000010101010", "170"];
-        let mut v = Value::Number(0);
+        let mut v = Value::Integer(0);
 
         for input in INPUTS {
             v.parse_in_place(input).unwrap();
@@ -282,10 +282,10 @@ mod test {
                 let configs = generate_config(
                     "esp-test",
                     &[
-                        ("number", Value::Number(999), "NA"),
+                        ("number", Value::Integer(999), "NA"),
                         ("string", Value::String("Demo".to_owned()), "NA"),
                         ("bool", Value::Bool(false), "NA"),
-                        ("number_default", Value::Number(999), "NA"),
+                        ("number_default", Value::Integer(999), "NA"),
                         ("string_default", Value::String("Demo".to_owned()), "NA"),
                         ("bool_default", Value::Bool(false), "NA"),
                     ],
@@ -295,7 +295,7 @@ mod test {
                 // some values have changed
                 assert_eq!(
                     match configs.get("ESP_TEST_NUMBER").unwrap() {
-                        Value::Number(num) => *num,
+                        Value::Integer(num) => *num,
                         _ => unreachable!(),
                     },
                     0xaa
@@ -318,7 +318,7 @@ mod test {
                 // the rest are the defaults
                 assert_eq!(
                     match configs.get("ESP_TEST_NUMBER_DEFAULT").unwrap() {
-                        Value::Number(num) => *num,
+                        Value::Integer(num) => *num,
                         _ => unreachable!(),
                     },
                     999
@@ -350,7 +350,7 @@ mod test {
                 ("ESP_TEST_RANDOM_VARIABLE", Some("")),
             ],
             || {
-                generate_config("esp-test", &[("number", Value::Number(999), "NA")], false);
+                generate_config("esp-test", &[("number", Value::Integer(999), "NA")], false);
             },
         );
     }
@@ -359,7 +359,7 @@ mod test {
     #[should_panic]
     fn env_invalid_values_bails() {
         temp_env::with_vars([("ESP_TEST_NUMBER", Some("Hello world"))], || {
-            generate_config("esp-test", &[("number", Value::Number(999), "NA")], false);
+            generate_config("esp-test", &[("number", Value::Integer(999), "NA")], false);
         });
     }
 }
