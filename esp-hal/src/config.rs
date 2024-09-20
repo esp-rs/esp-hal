@@ -30,6 +30,8 @@
 //! # }
 //! ```
 
+use crate::clock::CpuClock;
+
 /// Watchdog status.
 #[derive(Default, PartialEq)]
 pub enum WatchdogStatus {
@@ -56,4 +58,15 @@ pub struct WatchdogConfig {
     ///
     /// By default, the bootloader does not enables this watchdog timer.
     pub timg1: WatchdogStatus,
+}
+
+/// System configuration.
+#[non_exhaustive]
+#[doc(hidden)]
+#[derive(Default)]
+pub struct Config {
+    /// The CPU clock configuration.
+    pub cpu_clock: CpuClock,
+    /// Enable watchdog timer(s).
+    pub watchdog: WatchdogConfig,
 }
