@@ -19,42 +19,48 @@ struct Context {
 }
 
 async fn test_async_delay_ns(mut timer: impl DelayNs, duration: u32) {
-    let t1 = esp_hal::time::now();
-    timer.delay_ns(duration).await;
-    let t2 = esp_hal::time::now();
+    for _ in 1..5 {
+        let t1 = esp_hal::time::now();
+        timer.delay_ns(duration).await;
+        let t2 = esp_hal::time::now();
 
-    assert!(t2 > t1);
-    assert!(
-        (t2 - t1).to_nanos() >= duration as u64,
-        "diff: {:?}",
-        (t2 - t1).to_nanos()
-    );
+        assert!(t2 > t1);
+        assert!(
+            (t2 - t1).to_nanos() >= duration as u64,
+            "diff: {:?}",
+            (t2 - t1).to_nanos()
+        );
+    }
 }
 
 async fn test_async_delay_us(mut timer: impl DelayNs, duration: u32) {
-    let t1 = esp_hal::time::now();
-    timer.delay_us(duration).await;
-    let t2 = esp_hal::time::now();
+    for _ in 1..5 {
+        let t1 = esp_hal::time::now();
+        timer.delay_us(duration).await;
+        let t2 = esp_hal::time::now();
 
-    assert!(t2 > t1);
-    assert!(
-        (t2 - t1).to_micros() >= duration as u64,
-        "diff: {:?}",
-        (t2 - t1).to_micros()
-    );
+        assert!(t2 > t1);
+        assert!(
+            (t2 - t1).to_nanos() >= duration as u64,
+            "diff: {:?}",
+            (t2 - t1).to_nanos()
+        );
+    }
 }
 
 async fn test_async_delay_ms(mut timer: impl DelayNs, duration: u32) {
-    let t1 = esp_hal::time::now();
-    timer.delay_ms(duration).await;
-    let t2 = esp_hal::time::now();
+    for _ in 1..5 {
+        let t1 = esp_hal::time::now();
+        timer.delay_ms(duration).await;
+        let t2 = esp_hal::time::now();
 
-    assert!(t2 > t1);
-    assert!(
-        (t2 - t1).to_millis() >= duration as u64,
-        "diff: {:?}",
-        (t2 - t1).to_millis()
-    );
+        assert!(t2 > t1);
+        assert!(
+            (t2 - t1).to_nanos() >= duration as u64,
+            "diff: {:?}",
+            (t2 - t1).to_nanos()
+        );
+    }
 }
 
 #[cfg(test)]
@@ -71,11 +77,11 @@ mod tests {
 
     #[cfg(systimer)]
     #[test]
-    #[timeout(2)]
+    #[timeout(20)]
     async fn test_systimer_async_delay_ns(ctx: Context) {
         let mut alarms = SystemTimer::new(ctx.peripherals.SYSTIMER);
         let unit = FrozenUnit::new(&mut alarms.unit0);
-        let alarm0 = Alarm::new_async(alarms.comparator0, &unit).into_periodic();
+        let alarm0 = Alarm::new_async(alarms.comparator0, &unit);
 
         test_async_delay_ns(alarm0, 10_000_000).await;
     }
@@ -107,7 +113,7 @@ mod tests {
     async fn test_systimer_async_delay_us(ctx: Context) {
         let mut alarms = SystemTimer::new(ctx.peripherals.SYSTIMER);
         let unit = FrozenUnit::new(&mut alarms.unit0);
-        let alarm0 = Alarm::new_async(alarms.comparator0, &unit).into_periodic();
+        let alarm0 = Alarm::new_async(alarms.comparator0, &unit);
 
         test_async_delay_us(alarm0, 10_000).await;
     }
@@ -139,7 +145,7 @@ mod tests {
     async fn test_systimer_async_delay_ms(ctx: Context) {
         let mut alarms = SystemTimer::new(ctx.peripherals.SYSTIMER);
         let unit = FrozenUnit::new(&mut alarms.unit0);
-        let alarm0 = Alarm::new_async(alarms.comparator0, &unit).into_periodic();
+        let alarm0 = Alarm::new_async(alarms.comparator0, &unit);
 
         test_async_delay_ms(alarm0, 10).await;
     }

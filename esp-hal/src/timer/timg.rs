@@ -1164,6 +1164,15 @@ mod asynch {
         }
     }
 
+    impl<'a, T> Drop for TimerFuture<'a, T>
+    where
+        T: Instance,
+    {
+        fn drop(&mut self) {
+            self.timer.clear_interrupt();
+        }
+    }
+
     impl<T> embedded_hal_async::delay::DelayNs for Timer<T, crate::Async>
     where
         T: Instance,
@@ -1180,6 +1189,10 @@ mod asynch {
         }
     }
 
+    // INT_ENA means that when the interrupt occurs, it will show up in the INT_ST.
+    // Clearing INT_ENA that it won't show up on INT_ST but if interrupt is
+    // already there, it won't clear it - that's why we need to clear the INT_CLR as
+    // well.
     #[handler]
     pub(crate) fn timg0_timer0_handler() {
         lock(&INT_ENA_LOCK, || {
