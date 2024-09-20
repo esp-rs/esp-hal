@@ -79,7 +79,7 @@ use fugit::{Instant, MicrosDurationU32, MicrosDurationU64};
 use super::{Error, Timer as _};
 use crate::{
     interrupt::{self, InterruptHandler},
-    lock,
+    lock::{lock, Lock},
     peripheral::Peripheral,
     peripherals::{Interrupt, SYSTIMER},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
@@ -87,7 +87,6 @@ use crate::{
     Blocking,
     Cpu,
     InterruptConfigurable,
-    LockState,
     Mode,
 };
 
@@ -1009,8 +1008,8 @@ where
     }
 }
 
-static CONF_LOCK: LockState = LockState::new();
-static INT_ENA_LOCK: LockState = LockState::new();
+static CONF_LOCK: Lock = Lock::new();
+static INT_ENA_LOCK: Lock = Lock::new();
 
 // Async functionality of the system timer.
 mod asynch {
