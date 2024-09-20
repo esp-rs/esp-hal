@@ -170,7 +170,6 @@ pub mod assist_debug;
 pub mod clock;
 
 pub mod config;
-pub use config::Config;
 
 #[cfg(any(xtensa, all(riscv, systimer)))]
 pub mod delay;
@@ -731,7 +730,21 @@ macro_rules! before_snippet {
     };
 }
 
-use crate::{clock::Clocks, config::WatchdogStatus, peripherals::Peripherals};
+use crate::{
+    clock::{Clocks, CpuClock},
+    config::{WatchdogConfig, WatchdogStatus},
+    peripherals::Peripherals,
+};
+
+/// System configuration.
+#[non_exhaustive]
+#[derive(Default)]
+pub struct Config {
+    /// The CPU clock configuration.
+    pub cpu_clock: CpuClock,
+    /// Enable watchdog timer(s).
+    pub watchdog: WatchdogConfig,
+}
 
 /// Initialize the system.
 ///
