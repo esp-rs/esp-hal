@@ -305,12 +305,10 @@ pub mod dma {
     {
         fn with_dma(
             self,
-            mut channel: Channel<'d, C, crate::Blocking>,
+            channel: Channel<'d, C, crate::Blocking>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> AesDma<'d, C> {
-            channel.tx.init_channel(); // no need to call this for both, TX and RX
-
             AesDma {
                 aes: self,
                 channel,

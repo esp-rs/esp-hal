@@ -1121,12 +1121,12 @@ where
     /// Create a new instance of [ParlIoFullDuplex]
     pub fn new(
         _parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
-        mut dma_channel: Channel<'d, CH, DM>,
+        dma_channel: Channel<'d, CH, DM>,
         tx_descriptors: &'static mut [DmaDescriptor],
         rx_descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
     ) -> Result<Self, Error> {
-        internal_init(&mut dma_channel, frequency)?;
+        internal_init(frequency)?;
 
         Ok(Self {
             tx: TxCreatorFullDuplex {
@@ -1215,11 +1215,11 @@ where
     /// Create a new [ParlIoTxOnly]
     pub fn new(
         _parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
-        mut dma_channel: Channel<'d, CH, DM>,
+        dma_channel: Channel<'d, CH, DM>,
         descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
     ) -> Result<Self, Error> {
-        internal_init(&mut dma_channel, frequency)?;
+        internal_init(frequency)?;
 
         Ok(Self {
             tx: TxCreator {
@@ -1303,11 +1303,11 @@ where
     /// Create a new [ParlIoRxOnly] instance
     pub fn new(
         _parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
-        mut dma_channel: Channel<'d, CH, DM>,
+        dma_channel: Channel<'d, CH, DM>,
         descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
     ) -> Result<Self, Error> {
-        internal_init(&mut dma_channel, frequency)?;
+        internal_init(frequency)?;
 
         Ok(Self {
             rx: RxCreator {
@@ -1370,15 +1370,7 @@ where
     }
 }
 
-fn internal_init<CH, DM>(
-    dma_channel: &mut Channel<'_, CH, DM>,
-    frequency: HertzU32,
-) -> Result<(), Error>
-where
-    CH: DmaChannel,
-    CH::P: ParlIoPeripheral,
-    DM: Mode,
-{
+fn internal_init(frequency: HertzU32) -> Result<(), Error> {
     if frequency.raw() > 40_000_000 {
         return Err(Error::UnreachableClockRate);
     }
@@ -1395,27 +1387,19 @@ where
     let divider = divider as u16;
 
     pcr.parl_clk_tx_conf().modify(|_, w| unsafe {
-        w.parl_clk_tx_en()
-            .set_bit()
-            .parl_clk_tx_sel()
-            .bits(1) // PLL
-            .parl_clk_tx_div_num()
-            .bits(divider)
+        w.parl_clk_tx_en().set_bit();
+        w.parl_clk_tx_sel().bits(1); // PLL
+        w.parl_clk_tx_div_num().bits(divider)
     });
 
     pcr.parl_clk_rx_conf().modify(|_, w| unsafe {
-        w.parl_clk_rx_en()
-            .set_bit()
-            .parl_clk_rx_sel()
-            .bits(1) // PLL
-            .parl_clk_rx_div_num()
-            .bits(divider)
+        w.parl_clk_rx_en().set_bit();
+        w.parl_clk_rx_sel().bits(1); // PLL
+        w.parl_clk_rx_div_num().bits(divider)
     });
     Instance::set_rx_sw_en(true);
     Instance::set_rx_sample_mode(SampleMode::InternalSoftwareEnable);
 
-    dma_channel.tx.init_channel();
-    dma_channel.rx.init_channel();
     Ok(())
 }
 

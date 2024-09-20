@@ -72,10 +72,6 @@ impl<const N: u8> Channel<N> {
 }
 
 impl<const N: u8> RegisterAccess for Channel<N> {
-    fn init_channel() {
-        // nothing special to be done here
-    }
-
     #[cfg(gdma)]
     fn set_mem2mem_mode(value: bool) {
         Self::ch()
@@ -486,15 +482,11 @@ macro_rules! impl_channel {
             }
 
             impl ChannelCreator<$num> {
-                /// Configure the channel for use with blocking APIs
-                ///
-                /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
-                /// transfer buffers of size `1..=4092`, you need 1 descriptor.
-                pub fn configure<'a>(
+                fn do_configure<'a, M: crate::Mode>(
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> crate::dma::Channel<'a, [<DmaChannel $num>], crate::Blocking> {
+                ) -> crate::dma::Channel<'a, [<DmaChannel $num>], M> {
                     let mut tx_impl = ChannelTxImpl {};
                     tx_impl.init(burst_mode, priority);
 
@@ -508,6 +500,18 @@ macro_rules! impl_channel {
                     }
                 }
 
+                /// Configure the channel for use with blocking APIs
+                ///
+                /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
+                /// transfer buffers of size `1..=4092`, you need 1 descriptor.
+                pub fn configure<'a>(
+                    self,
+                    burst_mode: bool,
+                    priority: DmaPriority,
+                ) -> crate::dma::Channel<'a, [<DmaChannel $num>], crate::Blocking> {
+                    self.do_configure(burst_mode, priority)
+                }
+
                 /// Configure the channel for use with async APIs
                 ///
                 /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
@@ -517,19 +521,11 @@ macro_rules! impl_channel {
                     burst_mode: bool,
                     priority: DmaPriority,
                 ) -> crate::dma::Channel<'a, [<DmaChannel $num>], $crate::Async> {
-                    let mut tx_impl = ChannelTxImpl {};
-                    tx_impl.init(burst_mode, priority);
-
-                    let mut rx_impl = ChannelRxImpl {};
-                    rx_impl.init(burst_mode, priority);
+                    let this = self.do_configure(burst_mode, priority);
 
                     <Channel<$num> as ChannelTypes>::set_isr($async_handler);
 
-                    crate::dma::Channel {
-                        tx: ChannelTx::new(tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_impl, burst_mode),
-                        phantom: PhantomData,
-                    }
+                    this
                 }
             }
         }
@@ -695,7 +691,7 @@ mod m2m {
         /// You must ensure that your not using DMA for the same peripheral and
         /// that your the only one using the DmaPeripheral.
         pub unsafe fn new_unsafe(
-            mut channel: Channel<'d, C, MODE>,
+            channel: Channel<'d, C, MODE>,
             peripheral: DmaPeripheral,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
@@ -707,8 +703,6 @@ mod m2m {
             if tx_descriptors.is_empty() || rx_descriptors.is_empty() {
                 return Err(DmaError::OutOfDescriptors);
             }
-            channel.tx.init_channel();
-            channel.rx.init_channel();
             Ok(Mem2Mem {
                 channel,
                 peripheral,

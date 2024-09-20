@@ -113,7 +113,7 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
     }
 
     // continue with default reset handler
-    xtensa_lx_rt::Reset();
+    xtensa_lx_rt::Reset()
 }
 
 /// The ESP32 has a first stage bootloader that handles loading program data

@@ -1255,8 +1255,6 @@ pub trait DmaChannel: crate::private::Sealed {
 pub trait RxPrivate: crate::private::Sealed {
     fn init(&mut self, burst_mode: bool, priority: DmaPriority);
 
-    fn init_channel(&mut self);
-
     unsafe fn prepare_transfer_without_start(
         &mut self,
         peri: DmaPeripheral,
@@ -1480,10 +1478,6 @@ where
             .contains(DmaRxInterrupt::SuccessfulEof)
     }
 
-    fn init_channel(&mut self) {
-        CH::Channel::init_channel();
-    }
-
     fn clear_interrupts(&self) {
         CH::Channel::clear_in_interrupts();
     }
@@ -1497,8 +1491,6 @@ where
 #[doc(hidden)]
 pub trait TxPrivate: crate::private::Sealed {
     fn init(&mut self, burst_mode: bool, priority: DmaPriority);
-
-    fn init_channel(&mut self);
 
     unsafe fn prepare_transfer_without_start(
         &mut self,
@@ -1635,10 +1627,6 @@ where
         self.tx_impl.init(burst_mode, priority);
     }
 
-    fn init_channel(&mut self) {
-        CH::Channel::init_channel();
-    }
-
     unsafe fn prepare_transfer_without_start(
         &mut self,
         peri: DmaPeripheral,
@@ -1718,7 +1706,6 @@ where
 
 #[doc(hidden)]
 pub trait RegisterAccess: crate::private::Sealed {
-    fn init_channel();
     #[cfg(gdma)]
     fn set_mem2mem_mode(value: bool);
     #[cfg(esp32s3)]
