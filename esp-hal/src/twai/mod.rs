@@ -468,7 +468,7 @@ impl EspTwaiFrame {
         }
 
         let mut d: [u8; 8] = [0; 8];
-        (&mut d[..data.len()]).copy_from_slice(data);
+        d[..data.len()].copy_from_slice(data);
 
         Some(EspTwaiFrame {
             id: id.into(),
@@ -504,7 +504,7 @@ impl EspTwaiFrame {
         }
 
         let mut d: [u8; 8] = [0; 8];
-        (&mut d[..data.len()]).copy_from_slice(data);
+        d[..data.len()].copy_from_slice(data);
 
         Some(EspTwaiFrame {
             id: id.into(),
