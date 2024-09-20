@@ -326,8 +326,8 @@ pub unsafe extern "C" fn recursive_mutex_create() -> *mut crate::binary::c_types
 ///   None
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn mutex_delete(_mutex: *mut crate::binary::c_types::c_void) {
-    todo!("mutex_delete")
+pub unsafe extern "C" fn mutex_delete(mutex: *mut crate::binary::c_types::c_void) {
+    crate::compat::common::mutex_delete(mutex);
 }
 
 /// **************************************************************************
