@@ -838,9 +838,11 @@ where
         // have 1 subtracted from them before being stored into the register.
         let timing = baud_rate.timing();
 
+        #[cfg_attr(not(esp32), allow(unused_mut))]
         let mut prescaler = timing.baud_rate_prescaler;
 
-        if cfg!(esp32) {
+        #[cfg(esp32)]
+        {
             if timing.baud_rate_prescaler > 128 {
                 // Enable /2 baudrate divider
                 T::register_block()
@@ -961,8 +963,14 @@ where
             .rx_err_cnt()
             .write(|w| unsafe { w.rx_err_cnt().bits(rec) });
 
-        // Clear any interrupts
-        _ = T::register_block().int_raw().read();
+        // Clear any interrupts by reading the status register
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
+                let _ = T::register_block().int_raw().read();
+            } else {
+                let _ = T::register_block().interrupt().read();
+            }
+        }
 
         // Put the peripheral into operation mode by clearing the reset mode bit.
         T::register_block()
