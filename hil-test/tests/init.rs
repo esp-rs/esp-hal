@@ -51,7 +51,7 @@ mod tests {
             config
         });
 
-        let timg1 = TimerGroup::new(peripherals.TIMG0);
+        let timg1 = TimerGroup::new(peripherals.TIMG1);
         let mut wdt1 = timg1.wdt;
         let delay = Delay::new();
 
