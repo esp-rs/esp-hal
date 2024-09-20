@@ -736,6 +736,7 @@ impl BaudRate {
 pub struct TwaiConfiguration<'d, T, DM: crate::Mode> {
     peripheral: PhantomData<&'d PeripheralRef<'d, T>>,
     phantom: PhantomData<DM>,
+    mode: TwaiMode,
 }
 
 impl<'d, T, DM> TwaiConfiguration<'d, T, DM>
@@ -763,6 +764,12 @@ where
             .mode()
             .write(|w| w.reset_mode().set_bit());
 
+        // Enable extended register layout
+        #[cfg(esp32)]
+        T::register_block()
+            .clock_divider()
+            .modify(|r, w| unsafe { w.bits(r.bits() | 0x80) });
+
         if no_transceiver {
             tx_pin.set_to_open_drain_output(crate::private::Internal);
         } else {
@@ -776,12 +783,8 @@ where
         rx_pin.init_input(Pull::None, crate::private::Internal);
         rx_pin.connect_input_to_peripheral(T::INPUT_SIGNAL, crate::private::Internal);
 
-        // Set the operating mode based on provided option
-        T::register_block().mode().modify(|_, w| {
-            // self-test mode turns off acknowledgement requirement
-            w.self_test_mode().bit(mode == TwaiMode::SelfTest);
-            w.listen_only_mode().bit(mode == TwaiMode::ListenOnly)
-        });
+        // Freeze REC by changing to LOM mode
+        Self::set_mode(TwaiMode::ListenOnly);
 
         // Set TEC to 0
         T::register_block()
@@ -801,6 +804,7 @@ where
         let mut cfg = TwaiConfiguration {
             peripheral: PhantomData,
             phantom: PhantomData,
+            mode,
         };
 
         cfg.set_baud_rate(baud_rate);
@@ -892,9 +896,32 @@ where
             .write(|w| unsafe { w.err_warning_limit().bits(limit) });
     }
 
+    fn mode() -> TwaiMode {
+        let mode = T::register_block().mode().read();
+
+        if mode.self_test_mode().bit_is_set() {
+            TwaiMode::SelfTest
+        } else if mode.listen_only_mode().bit_is_set() {
+            TwaiMode::ListenOnly
+        } else {
+            TwaiMode::Normal
+        }
+    }
+
+    /// Set the operating mode based on provided option
+    fn set_mode(mode: TwaiMode) {
+        T::register_block().mode().modify(|_, w| {
+            // self-test mode turns off acknowledgement requirement
+            w.self_test_mode().bit(mode == TwaiMode::SelfTest);
+            w.listen_only_mode().bit(mode == TwaiMode::ListenOnly)
+        });
+    }
+
     /// Put the peripheral into Operation Mode, allowing the transmission and
     /// reception of packets using the new object.
     pub fn start(self) -> Twai<'d, T, DM> {
+        Self::set_mode(self.mode);
+
         // Put the peripheral into operation mode by clearing the reset mode bit.
         T::register_block()
             .mode()
@@ -1022,6 +1049,7 @@ where
         TwaiConfiguration {
             peripheral: PhantomData,
             phantom: PhantomData,
+            mode: TwaiConfiguration::<T, DM>::mode(),
         }
     }
 
