@@ -44,14 +44,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed gpio pin generics from I8080 driver type. (#2171)
 - I8080 driver now decides bus width at transfer time rather than construction time. (#2171)
 - Replaced `AnyPin` with `InputSignal` and `OutputSignal` and renamed `ErasedPin` to `AnyPin` (#2128)
-- Replaced the `ErasedTimer` enum with the `AnyTimer` struct. (#?)
+- Replaced the `ErasedTimer` enum with the `AnyTimer` struct. (#2144)
 - Changed the parameters of `Spi::with_pins` to no longer be optional (#2133)
 - Renamed `DummyPin` to `NoPin` and removed all internal logic from it. (#2133)
 - The `NO_PIN` constant has been removed. (#2133)
 - MSRV bump to 1.79 (#2156)
 - Allow handling interrupts while trying to lock critical section on multi-core chips. (#2197)
 - Removed the PS-RAM related features, replaced by `quad-psram`/`octal-psram`, `init_psram` takes a configuration parameter, it's now possible to auto-detect PS-RAM size (#2178)
-- `EspTwaiFrame` constructors now accept any type that converts into `esp_hal::twai::Id` (#?)
+- `EspTwaiFrame` constructors now accept any type that converts into `esp_hal::twai::Id` (#2207)
 
 ### Fixed
 
@@ -68,6 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SPI: Fixed an issue where `wait` has returned before the DMA has finished writing the memory (#2179)
 - SPI: Fixed an issue where repeated calls to `dma_transfer` may end up looping indefinitely (#2179)
 - SPI: Fixed an issue that prevented correctly reading the first byte in a transaction (#2179)
+- TWAI on ESP32 (#2207)
 
 ### Removed
 
