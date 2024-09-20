@@ -1327,10 +1327,11 @@ pub trait Instance: crate::private::Sealed {
     fn write_frame(frame: &EspTwaiFrame) {
         // Assemble the frame information into the data_0 byte.
         let frame_format: u8 = matches!(frame.id, Id::Extended(_)) as u8;
+        let self_reception: u8 = frame.self_reception as u8;
         let rtr_bit: u8 = frame.is_remote as u8;
         let dlc_bits: u8 = frame.dlc as u8 & 0b1111;
 
-        let data_0: u8 = frame_format << 7 | rtr_bit << 6 | dlc_bits;
+        let data_0: u8 = frame_format << 7 | rtr_bit << 6 | self_reception << 4 | dlc_bits;
 
         let register_block = Self::register_block();
 
@@ -1338,8 +1339,9 @@ pub trait Instance: crate::private::Sealed {
             .data_0()
             .write(|w| unsafe { w.tx_byte_0().bits(data_0) });
 
-        // Assemble the identifier information of the packet.
-        match frame.id {
+        // Assemble the identifier information of the packet and return where the data
+        // buffer starts.
+        let data_ptr = match frame.id {
             Id::Standard(id) => {
                 let id = id.as_raw();
 
@@ -1350,6 +1352,8 @@ pub trait Instance: crate::private::Sealed {
                 register_block
                     .data_2()
                     .write(|w| unsafe { w.tx_byte_2().bits((id << 5) as u8) });
+
+                register_block.data_3().as_ptr()
             }
             Id::Extended(id) => {
                 let id = id.as_raw();
@@ -1366,33 +1370,20 @@ pub trait Instance: crate::private::Sealed {
                 register_block
                     .data_4()
                     .write(|w| unsafe { w.tx_byte_4().bits((id << 3) as u8) });
+
+                register_block.data_5().as_ptr()
             }
-        }
+        };
 
         // Store the data portion of the packet into the transmit buffer.
-        if !frame.is_remote {
-            match frame.id {
-                Id::Standard(_) => unsafe {
-                    copy_to_data_register(
-                        register_block.data_3().as_ptr(),
-                        match frame.is_remote {
-                            true => &[],
-                            false => &frame.data[0..frame.dlc],
-                        },
-                    )
+        unsafe {
+            copy_to_data_register(
+                data_ptr,
+                match frame.is_remote {
+                    true => &[], // RTR frame, so no data is included.
+                    false => &frame.data[0..frame.dlc],
                 },
-                Id::Extended(_) => unsafe {
-                    copy_to_data_register(
-                        register_block.data_5().as_ptr(),
-                        match frame.is_remote {
-                            true => &[],
-                            false => &frame.data[0..frame.dlc],
-                        },
-                    )
-                },
-            }
-        } else {
-            // Is RTR frame, so no data is included.
+            )
         }
 
         // Trigger the appropriate transmission request based on self_reception flag
