@@ -1195,7 +1195,7 @@ mod asynch {
     // well.
     #[handler]
     pub(crate) fn timg0_timer0_handler() {
-        lock(&INT_ENA_LOCK, || {
+        lock(&INT_ENA_LOCK[0], || {
             unsafe { &*crate::peripherals::TIMG0::PTR }
                 .int_ena()
                 .modify(|_, w| w.t(0).clear_bit())
@@ -1211,7 +1211,7 @@ mod asynch {
     #[cfg(timg1)]
     #[handler]
     pub(crate) fn timg1_timer0_handler() {
-        lock(&INT_ENA_LOCK, || {
+        lock(&INT_ENA_LOCK[1], || {
             unsafe { &*crate::peripherals::TIMG1::PTR }
                 .int_ena()
                 .modify(|_, w| w.t(0).clear_bit())
@@ -1226,7 +1226,7 @@ mod asynch {
     #[cfg(timg_timer1)]
     #[handler]
     pub(crate) fn timg0_timer1_handler() {
-        lock(&INT_ENA_LOCK, || {
+        lock(&INT_ENA_LOCK[0], || {
             unsafe { &*crate::peripherals::TIMG0::PTR }
                 .int_ena()
                 .modify(|_, w| w.t(1).clear_bit())
@@ -1241,7 +1241,7 @@ mod asynch {
     #[cfg(all(timg1, timg_timer1))]
     #[handler]
     pub(crate) fn timg1_timer1_handler() {
-        lock(&INT_ENA_LOCK, || {
+        lock(&INT_ENA_LOCK[1], || {
             unsafe { &*crate::peripherals::TIMG1::PTR }
                 .int_ena()
                 .modify(|_, w| w.t(1).clear_bit())
