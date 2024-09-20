@@ -20,20 +20,6 @@ use crate::{
 macro_rules! ImplSpiChannel {
     ($num: literal) => {
         paste::paste! {
-            #[non_exhaustive]
-            #[doc(hidden)]
-            pub struct [<Channel $num InterruptBinder>] {}
-
-            impl $crate::private::Sealed for [<Channel $num InterruptBinder>] {}
-
-            impl InterruptBinder for [<Channel $num InterruptBinder>] {
-                fn set_isr(handler: $crate::interrupt::InterruptHandler) {
-                    let mut spi = unsafe { $crate::peripherals::[< SPI $num >]::steal() };
-                    spi.[< bind_spi $num _dma_interrupt>](handler.handler());
-                    $crate::interrupt::enable($crate::peripherals::Interrupt::[< SPI $num _DMA >], handler.priority()).unwrap();
-                }
-            }
-
             #[doc = concat!("DMA channel suitable for SPI", $num)]
             #[non_exhaustive]
             pub struct [<Spi $num DmaChannel>] {}
@@ -48,7 +34,11 @@ macro_rules! ImplSpiChannel {
             impl $crate::private::Sealed for [<Spi $num DmaChannel>] {}
 
             impl ChannelTypes for [<Spi $num DmaChannel>] {
-                type Binder = [<Channel $num InterruptBinder>];
+                fn set_isr(handler: $crate::interrupt::InterruptHandler) {
+                    let mut spi = unsafe { $crate::peripherals::[< SPI $num >]::steal() };
+                    spi.[< bind_spi $num _dma_interrupt>](handler.handler());
+                    $crate::interrupt::enable($crate::peripherals::Interrupt::[< SPI $num _DMA >], handler.priority()).unwrap();
+                }
             }
 
             impl RegisterAccess for [<Spi $num DmaChannel>] {
@@ -57,20 +47,9 @@ macro_rules! ImplSpiChannel {
                     #[cfg(esp32)]
                     {
                         let dport = unsafe { &*crate::peripherals::DPORT::PTR };
-
-                        match $num {
-                            2 => {
-                                dport
-                                .spi_dma_chan_sel()
-                                .modify(|_, w| unsafe { w.spi2_dma_chan_sel().bits(1) });
-                            },
-                            3 => {
-                                dport
-                                .spi_dma_chan_sel()
-                                .modify(|_, w| unsafe { w.spi3_dma_chan_sel().bits(2) });
-                            },
-                            _ => panic!("Only SPI2 and SPI3 supported"),
-                        }
+                        dport
+                            .spi_dma_chan_sel()
+                            .modify(|_, w| unsafe { w.[< spi $num _dma_chan_sel>]().bits($num - 1) });
                     }
                 }
 
@@ -85,14 +64,10 @@ macro_rules! ImplSpiChannel {
                 fn clear_out_interrupts() {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
                     spi.dma_int_clr().write(|w| {
-                        w.out_done()
-                            .clear_bit_by_one()
-                            .out_eof()
-                            .clear_bit_by_one()
-                            .out_total_eof()
-                            .clear_bit_by_one()
-                            .outlink_dscr_error()
-                            .clear_bit_by_one()
+                        w.out_done().clear_bit_by_one();
+                        w.out_eof().clear_bit_by_one();
+                        w.out_total_eof().clear_bit_by_one();
+                        w.outlink_dscr_error().clear_bit_by_one()
                     });
                 }
 
@@ -165,8 +140,7 @@ macro_rules! ImplSpiChannel {
                 fn reset_out_eof_interrupt() {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
                     spi.dma_int_clr().write(|w| {
-                        w.out_eof()
-                            .clear_bit_by_one()
+                        w.out_eof().clear_bit_by_one()
                     });
                 }
 
@@ -181,14 +155,10 @@ macro_rules! ImplSpiChannel {
                 fn clear_in_interrupts() {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
                     spi.dma_int_clr().write(|w| {
-                        w.in_done()
-                            .clear_bit_by_one()
-                            .in_err_eof()
-                            .clear_bit_by_one()
-                            .in_suc_eof()
-                            .clear_bit_by_one()
-                            .inlink_dscr_error()
-                            .clear_bit_by_one()
+                        w.in_done().clear_bit_by_one();
+                        w.in_err_eof().clear_bit_by_one();
+                        w.in_suc_eof().clear_bit_by_one();
+                        w.inlink_dscr_error().clear_bit_by_one()
                     });
                 }
 
@@ -417,7 +387,7 @@ macro_rules! ImplSpiChannel {
                     let mut rx_impl = [<Spi $num DmaChannelRxImpl>] {};
                     rx_impl.init(burst_mode, priority);
 
-                    <[<Spi $num DmaChannel>] as ChannelTypes>::Binder::set_isr(super::asynch::interrupt::[< interrupt_handler_spi $num _dma >]);
+                    <[<Spi $num DmaChannel>] as ChannelTypes>::set_isr(super::asynch::interrupt::[< interrupt_handler_spi $num _dma >]);
 
                     Channel {
                         tx: ChannelTx::new(tx_impl, burst_mode),
@@ -433,20 +403,6 @@ macro_rules! ImplSpiChannel {
 macro_rules! ImplI2sChannel {
     ($num: literal, $peripheral: literal) => {
         paste::paste! {
-            #[non_exhaustive]
-            #[doc(hidden)]
-            pub struct [<Channel $num InterruptBinder>] {}
-
-            impl $crate::private::Sealed for [<Channel $num InterruptBinder>] {}
-
-            impl InterruptBinder for [<Channel $num InterruptBinder>] {
-                fn set_isr(handler:  $crate::interrupt::InterruptHandler) {
-                    let mut i2s = unsafe { $crate::peripherals::[< I2S $num >]::steal() };
-                    i2s.[< bind_i2s $num _interrupt>](handler.handler());
-                    $crate::interrupt::enable($crate::peripherals::Interrupt::[< I2S $num  >], handler.priority()).unwrap();
-                }
-            }
-
             #[doc = concat!("DMA channel suitable for I2S", $num)]
             pub struct [<I2s $num DmaChannel>] {}
 
@@ -460,7 +416,11 @@ macro_rules! ImplI2sChannel {
             }
 
             impl ChannelTypes for [<I2s $num DmaChannel>] {
-                type Binder = [<Channel $num InterruptBinder>];
+                fn set_isr(handler:  $crate::interrupt::InterruptHandler) {
+                    let mut i2s = unsafe { $crate::peripherals::[< I2S $num >]::steal() };
+                    i2s.[< bind_i2s $num _interrupt>](handler.handler());
+                    $crate::interrupt::enable($crate::peripherals::Interrupt::[< I2S $num  >], handler.priority()).unwrap();
+                }
             }
 
             impl RegisterAccess for [<I2s $num DmaChannel>] {
@@ -808,7 +768,7 @@ macro_rules! ImplI2sChannel {
                     let mut rx_impl = [<I2s $num DmaChannelRxImpl>] {};
                     rx_impl.init(burst_mode, priority);
 
-                    <[<I2s $num DmaChannel>] as ChannelTypes>::Binder::set_isr(super::asynch::interrupt::[< interrupt_handler_i2s $num >]);
+                    <[<I2s $num DmaChannel>] as ChannelTypes>::set_isr(super::asynch::interrupt::[< interrupt_handler_i2s $num >]);
 
                     Channel {
                         tx: ChannelTx::new(tx_impl, burst_mode),

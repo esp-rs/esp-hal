@@ -12,10 +12,6 @@
 //! GDMA peripheral can be initializes using the `new` function, which requires
 //! a DMA peripheral instance and a clock control reference.
 //!
-//! ## Usage
-//! This module implements DMA channels, such as `channel0`, `channel1` and so
-//! on. Each channel struct implements the `ChannelTypes` trait, which provides
-//! associated types for peripheral configuration.
 //! <em>PS: Note that the number of DMA channels is chip-specific.</em>
 
 use crate::{
@@ -28,12 +24,6 @@ use crate::{
 pub struct Channel<const N: u8> {}
 
 impl<const N: u8> crate::private::Sealed for Channel<N> {}
-
-#[doc(hidden)]
-#[non_exhaustive]
-pub struct ChannelInterruptBinder<const N: u8> {}
-
-impl<const N: u8> crate::private::Sealed for ChannelInterruptBinder<N> {}
 
 impl<const N: u8> Channel<N> {
     #[inline(always)]
@@ -102,10 +92,8 @@ impl<const N: u8> RegisterAccess for Channel<N> {
 
     fn set_out_burstmode(burst_mode: bool) {
         Self::ch().out_conf0().modify(|_, w| {
-            w.out_data_burst_en()
-                .bit(burst_mode)
-                .outdscr_burst_en()
-                .bit(burst_mode)
+            w.out_data_burst_en().bit(burst_mode);
+            w.outdscr_burst_en().bit(burst_mode)
         });
     }
 
@@ -222,10 +210,8 @@ impl<const N: u8> RegisterAccess for Channel<N> {
 
     fn set_in_burstmode(burst_mode: bool) {
         Self::ch().in_conf0().modify(|_, w| {
-            w.in_data_burst_en()
-                .bit(burst_mode)
-                .indscr_burst_en()
-                .bit(burst_mode)
+            w.in_data_burst_en().bit(burst_mode);
+            w.indscr_burst_en().bit(burst_mode)
         });
     }
 
@@ -422,12 +408,8 @@ pub struct ChannelTxImpl<const N: u8> {}
 
 use embassy_sync::waitqueue::AtomicWaker;
 
-#[allow(clippy::declare_interior_mutable_const)]
-const INIT: AtomicWaker = AtomicWaker::new();
-
-static TX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [INIT; CHANNEL_COUNT];
-
-static RX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [INIT; CHANNEL_COUNT];
+static TX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [const { AtomicWaker::new() }; CHANNEL_COUNT];
+static RX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [const { AtomicWaker::new() }; CHANNEL_COUNT];
 
 impl<const N: u8> crate::private::Sealed for ChannelTxImpl<N> {}
 
@@ -479,22 +461,7 @@ impl<const N: u8> LcdCamPeripheral for SuitablePeripheral<N> {}
 macro_rules! impl_channel {
     ($num: literal, $async_handler: path, $($interrupt: ident),* ) => {
         paste::paste! {
-            #[doc(hidden)]
-            pub type [<Channel $num>] = Channel<$num>;
-
-            #[doc(hidden)]
-            pub type [<Channel $num TxImpl>] = ChannelTxImpl<$num>;
-
-            #[doc(hidden)]
-            pub type [<Channel $num RxImpl>] = ChannelRxImpl<$num>;
-
-            #[doc(hidden)]
-            pub type [<ChannelCreator $num>] = ChannelCreator<$num>;
-
-            #[doc(hidden)]
-            pub type [<Channel $num InterruptBinder>] = ChannelInterruptBinder<$num>;
-
-            impl InterruptBinder for ChannelInterruptBinder<$num> {
+            impl ChannelTypes for Channel<$num> {
                 fn set_isr(handler: $crate::interrupt::InterruptHandler) {
                     let mut dma = unsafe { crate::peripherals::DMA::steal() };
                     $(
@@ -502,10 +469,6 @@ macro_rules! impl_channel {
                         $crate::interrupt::enable($crate::peripherals::Interrupt::$interrupt, handler.priority()).unwrap();
                     )*
                 }
-            }
-
-            impl ChannelTypes for Channel<$num> {
-                type Binder = ChannelInterruptBinder<$num>;
             }
 
             /// A description of a GDMA channel
@@ -559,7 +522,7 @@ macro_rules! impl_channel {
                     let mut rx_impl = ChannelRxImpl {};
                     rx_impl.init(burst_mode, priority);
 
-                    <Channel<$num> as ChannelTypes>::Binder::set_isr($async_handler);
+                    <Channel<$num> as ChannelTypes>::set_isr($async_handler);
 
                     crate::dma::Channel {
                         tx: ChannelTx::new(tx_impl, burst_mode),
@@ -593,7 +556,7 @@ cfg_if::cfg_if! {
         impl_channel!(2, super::asynch::interrupt::interrupt_handler_ch2, DMA_IN_CH2, DMA_OUT_CH2);
         impl_channel!(3, super::asynch::interrupt::interrupt_handler_ch3, DMA_IN_CH3, DMA_OUT_CH3);
         impl_channel!(4, super::asynch::interrupt::interrupt_handler_ch4, DMA_IN_CH4, DMA_OUT_CH4);
-  }
+    }
 }
 
 /// GDMA Peripheral

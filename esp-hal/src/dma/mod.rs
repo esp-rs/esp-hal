@@ -1888,11 +1888,6 @@ pub trait RegisterAccess: crate::private::Sealed {
 
 #[doc(hidden)]
 pub trait ChannelTypes: crate::private::Sealed {
-    type Binder: InterruptBinder;
-}
-
-#[doc(hidden)]
-pub trait InterruptBinder: crate::private::Sealed {
     fn set_isr(handler: InterruptHandler);
 }
 
@@ -1918,7 +1913,7 @@ where
     ///
     /// Interrupts are not enabled at the peripheral level here.
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        <C::Channel as ChannelTypes>::Binder::set_isr(handler);
+        <C::Channel as ChannelTypes>::set_isr(handler);
     }
 
     /// Listen for the given interrupts
@@ -3213,65 +3208,39 @@ pub(crate) mod asynch {
     pub(crate) mod interrupt {
         use procmacros::handler;
 
-        use super::*;
+        pub(crate) fn interrupt_handler_ch<const CH: u8>() {
+            use crate::dma::gdma::{Channel, ChannelRxImpl, ChannelTxImpl};
+
+            super::handle_interrupt::<Channel<CH>, ChannelRxImpl<CH>, ChannelTxImpl<CH>>();
+        }
 
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_ch0() {
-            use crate::dma::gdma::{
-                Channel0 as Channel,
-                Channel0RxImpl as ChannelRxImpl,
-                Channel0TxImpl as ChannelTxImpl,
-            };
-
-            handle_interrupt::<Channel, ChannelRxImpl, ChannelTxImpl>();
+            interrupt_handler_ch::<0>();
         }
 
         #[cfg(not(esp32c2))]
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_ch1() {
-            use crate::dma::gdma::{
-                Channel1 as Channel,
-                Channel1RxImpl as ChannelRxImpl,
-                Channel1TxImpl as ChannelTxImpl,
-            };
-
-            handle_interrupt::<Channel, ChannelRxImpl, ChannelTxImpl>();
+            interrupt_handler_ch::<1>();
         }
 
         #[cfg(not(esp32c2))]
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_ch2() {
-            use crate::dma::gdma::{
-                Channel2 as Channel,
-                Channel2RxImpl as ChannelRxImpl,
-                Channel2TxImpl as ChannelTxImpl,
-            };
-
-            handle_interrupt::<Channel, ChannelRxImpl, ChannelTxImpl>();
+            interrupt_handler_ch::<2>();
         }
 
         #[cfg(esp32s3)]
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_ch3() {
-            use crate::dma::gdma::{
-                Channel3 as Channel,
-                Channel3RxImpl as ChannelRxImpl,
-                Channel3TxImpl as ChannelTxImpl,
-            };
-
-            handle_interrupt::<Channel, ChannelRxImpl, ChannelTxImpl>();
+            interrupt_handler_ch::<3>();
         }
 
         #[cfg(esp32s3)]
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_ch4() {
-            use crate::dma::gdma::{
-                Channel4 as Channel,
-                Channel4RxImpl as ChannelRxImpl,
-                Channel4TxImpl as ChannelTxImpl,
-            };
-
-            handle_interrupt::<Channel, ChannelRxImpl, ChannelTxImpl>();
+            interrupt_handler_ch::<4>();
         }
     }
 
