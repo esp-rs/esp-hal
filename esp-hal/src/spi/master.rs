@@ -2385,7 +2385,7 @@ pub trait Instance: private::Sealed {
         let reg_block = self.register_block();
         reg_block.user().modify(|_, w| {
             w.usr_miso_highpart().clear_bit();
-            w.usr_miso_highpart().clear_bit();
+            w.usr_mosi_highpart().clear_bit();
             w.doutdin().set_bit();
             w.usr_miso().set_bit();
             w.usr_mosi().set_bit();
