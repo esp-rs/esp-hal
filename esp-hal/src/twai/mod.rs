@@ -56,9 +56,8 @@
 //!
 //! // Partially filter the incoming messages to reduce overhead of receiving
 //! // undesired messages
-//! const FILTER: twai::filter::SingleStandardFilter =
-//!     SingleStandardFilter::new(b"xxxxxxxxxx0", b"x", [b"xxxxxxxx",
-//! b"xxxxxxxx"]); can_config.set_filter(FILTER);
+//! can_config.set_filter(const { SingleStandardFilter::new(b"xxxxxxxxxx0",
+//! b"x", [b"xxxxxxxx", b"xxxxxxxx"]) });
 //!
 //! // Start the peripheral. This locks the configuration settings of the
 //! // peripheral and puts it into operation mode, allowing packets to be sent
@@ -110,10 +109,8 @@
 //!
 //! // Partially filter the incoming messages to reduce overhead of receiving
 //! // undesired messages
-//! const FILTER: twai::filter::SingleStandardFilter =
-//!     SingleStandardFilter::new(b"xxxxxxxxxx0", b"x",
-//!         [b"xxxxxxxx", b"xxxxxxxx"]);
-//! can_config.set_filter(FILTER);
+//! can_config.set_filter(const { SingleStandardFilter::new(b"xxxxxxxxxx0",
+//! b"x", [b"xxxxxxxx", b"xxxxxxxx"]) });
 //!
 //! // Start the peripheral. This locks the configuration settings of the
 //! // peripheral and puts it into operation mode, allowing packets to be sent
@@ -861,6 +858,9 @@ where
     /// experience an 11-bit filter match against a 29-bit frame and vice
     /// versa. Your application should check the id again once a frame has
     /// been received to make sure it is the expected value.
+    ///
+    /// You may use a `const {}` block to ensure that the filter is parsed
+    /// during program compilation.
     ///
     /// [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf#subsubsection.29.4.6)
     pub fn set_filter(&mut self, filter: impl Filter) {
