@@ -641,7 +641,7 @@ pub enum DmaPeripheral {
     Spi2      = 0,
     #[cfg(any(pdma, esp32s3))]
     Spi3      = 1,
-    #[cfg(any(esp32c6, esp32h2))]
+    #[cfg(any(esp32c2, esp32c6, esp32h2))]
     Mem2Mem1  = 1,
     #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
     Uhci0     = 2,
