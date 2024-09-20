@@ -212,7 +212,7 @@ pub(crate) fn lock<T>(lock: &Lock, f: impl FnOnce() -> T) -> T {
     f()
 }
 
-/// Data protected by [LockState]
+/// Data protected by a [Lock]
 #[allow(unused)]
 pub(crate) struct Locked<T> {
     lock_state: Lock,
