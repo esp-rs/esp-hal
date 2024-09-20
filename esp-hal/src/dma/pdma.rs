@@ -854,7 +854,7 @@ impl PeripheralMarker for I2s1DmaSuitablePeripheral {}
 impl I2sPeripheral for I2s1DmaSuitablePeripheral {}
 impl I2s1Peripheral for I2s1DmaSuitablePeripheral {}
 
-#[cfg(esp32)]
+#[cfg(i2s1)]
 ImplI2sChannel!(1, "I2S1");
 
 /// DMA Peripheral
@@ -885,7 +885,7 @@ impl<'d> Dma<'d> {
             spi2channel: Spi2DmaChannelCreator {},
             spi3channel: Spi3DmaChannelCreator {},
             i2s0channel: I2s0DmaChannelCreator {},
-            #[cfg(esp32)]
+            #[cfg(i2s1)]
             i2s1channel: I2s1DmaChannelCreator {},
         }
     }

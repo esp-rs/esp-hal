@@ -461,10 +461,13 @@ impl<const N: u8> PeripheralMarker for SuitablePeripheral<N> {}
 // with GDMA every channel can be used for any peripheral
 impl<const N: u8> SpiPeripheral for SuitablePeripheral<N> {}
 impl<const N: u8> Spi2Peripheral for SuitablePeripheral<N> {}
-#[cfg(esp32s3)]
+#[cfg(spi3)]
 impl<const N: u8> Spi3Peripheral for SuitablePeripheral<N> {}
+#[cfg(any(i2s0, i2s1))]
 impl<const N: u8> I2sPeripheral for SuitablePeripheral<N> {}
+#[cfg(i2s0)]
 impl<const N: u8> I2s0Peripheral for SuitablePeripheral<N> {}
+#[cfg(i2s1)]
 impl<const N: u8> I2s1Peripheral for SuitablePeripheral<N> {}
 #[cfg(parl_io)]
 impl<const N: u8> ParlIoPeripheral for SuitablePeripheral<N> {}

@@ -3292,6 +3292,7 @@ pub(crate) mod asynch {
             handle_interrupt::<Channel, ChannelRxImpl, ChannelTxImpl>();
         }
 
+        #[cfg(spi3)]
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_spi3_dma() {
             use crate::dma::pdma::{
@@ -3303,6 +3304,7 @@ pub(crate) mod asynch {
             handle_interrupt::<Channel, ChannelRxImpl, ChannelTxImpl>();
         }
 
+        #[cfg(i2s0)]
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_i2s0() {
             use crate::dma::pdma::{
