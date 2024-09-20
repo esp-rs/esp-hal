@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Feature `sys-logs` doesn't break the build anymore (#2117)
 - Fixed a panic when overflow-checks are enabled (#2164)
+- Create mutexes in heap memory, fixes running out of mutexes when connecting and disconnecting to a WPA2-ENTERPRISE ap multiple times (#2202)
 
 ### Removed
 
