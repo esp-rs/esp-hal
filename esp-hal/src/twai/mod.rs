@@ -1486,33 +1486,20 @@ pub trait Instance: crate::private::Sealed {
         let dlc = (data_0 & 0b1111) as usize;
 
         // Read the payload from the packet and construct a frame.
-        let frame = if is_standard_format {
+        let (id, data_ptr) = if is_standard_format {
             // Frame uses standard 11 bit id.
             let data_1 = register_block.data_1().read().tx_byte_1().bits();
-
             let data_2 = register_block.data_2().read().tx_byte_2().bits();
 
             let raw_id: u16 = ((data_1 as u16) << 3) | ((data_2 as u16) >> 5);
 
-            let id = StandardId::new(raw_id).unwrap();
-
-            if is_data_frame {
-                // Create a new frame from the contents of the appropriate TWAI_DATA_x_REG
-                // registers.
-                unsafe {
-                    EspTwaiFrame::new_from_data_registers(id, register_block.data_3().as_ptr(), dlc)
-                }
-            } else {
-                EspTwaiFrame::new_remote(id, dlc).unwrap()
-            }
+            let id = Id::from(StandardId::new(raw_id).unwrap());
+            (id, register_block.data_3().as_ptr())
         } else {
             // Frame uses extended 29 bit id.
             let data_1 = register_block.data_1().read().tx_byte_1().bits();
-
             let data_2 = register_block.data_2().read().tx_byte_2().bits();
-
             let data_3 = register_block.data_3().read().tx_byte_3().bits();
-
             let data_4 = register_block.data_4().read().tx_byte_4().bits();
 
             let raw_id: u32 = (data_1 as u32) << 21
@@ -1520,20 +1507,19 @@ pub trait Instance: crate::private::Sealed {
                 | (data_3 as u32) << 5
                 | (data_4 as u32) >> 3;
 
-            let id = ExtendedId::new(raw_id).unwrap();
+            let id = Id::from(ExtendedId::new(raw_id).unwrap());
+            (id, register_block.data_5().as_ptr())
+        };
 
-            if is_data_frame {
-                unsafe {
-                    EspTwaiFrame::new_from_data_registers(id, register_block.data_5().as_ptr(), dlc)
-                }
-            } else {
-                EspTwaiFrame::new_remote(id, dlc).unwrap()
-            }
+        let frame = if is_data_frame {
+            unsafe { EspTwaiFrame::new_from_data_registers(id, data_ptr, dlc) }
+        } else {
+            EspTwaiFrame::new_remote(id, dlc).unwrap()
         };
 
         // Release the packet we read from the FIFO, allowing the peripheral to prepare
         // the next packet.
-        register_block.cmd().write(|w| w.release_buf().set_bit());
+        Self::release_receive_fifo();
 
         frame
     }
