@@ -96,18 +96,13 @@ impl EmbassyTimer {
     fn on_interrupt(&self, id: usize) {
         let cb = critical_section::with(|cs| {
             let mut timers = TIMERS.borrow_ref_mut(cs);
-            let timers = timers.as_mut().expect("Time driver not initialized");
+            let timers = unwrap!(timers.as_mut(), "Time driver not initialized");
             let timer = &mut timers[id];
 
             timer.clear_interrupt();
 
             let alarm = &self.alarms.borrow(cs)[id];
-
-            if let Some((f, ctx)) = alarm.callback.get() {
-                Some((f, ctx))
-            } else {
-                None
-            }
+            alarm.callback.get()
         });
 
         if let Some((f, ctx)) = cb {
@@ -120,7 +115,7 @@ impl EmbassyTimer {
         let ts = timestamp.micros();
         // if the TS is already in the past make the timer fire immediately
         let timeout = if ts > now { ts - now } else { 0.micros() };
-        timer.schedule(timeout).unwrap();
+        unwrap!(timer.schedule(timeout));
         timer.enable_interrupt(true);
     }
 }
@@ -168,7 +163,7 @@ impl Driver for EmbassyTimer {
         // soon as possible, but not synchronously.)
         critical_section::with(|cs| {
             let mut timers = TIMERS.borrow_ref_mut(cs);
-            let timers = timers.as_mut().expect("Time driver not initialized");
+            let timers = unwrap!(timers.as_mut(), "Time driver not initialized");
             let timer = &mut timers[alarm.id() as usize];
 
             Self::arm(timer, timestamp);
