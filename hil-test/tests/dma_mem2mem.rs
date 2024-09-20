@@ -24,13 +24,7 @@ cfg_if::cfg_if! {
     }
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(any(esp32, esp32s2))] {
-        use esp_hal::dma::Spi2DmaChannel as DmaChannel0;
-    } else {
-        use esp_hal::dma::DmaChannel0;
-    }
-}
+use esp_hal::dma::DmaChannel0;
 
 struct Context {
     channel: Channel<'static, DmaChannel0, Blocking>,
@@ -49,14 +43,7 @@ mod tests {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let dma = Dma::new(peripherals.DMA);
-
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
-                let dma_channel = dma.spi2channel;
-            } else {
-                let dma_channel = dma.channel0;
-            }
-        }
+        let dma_channel = dma.channel0;
 
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c2, esp32c6, esp32h2))] {
