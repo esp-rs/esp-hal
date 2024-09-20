@@ -1,6 +1,6 @@
 //! TWAI test
 
-//% CHIPS: esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
@@ -33,19 +33,21 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let (tx_pin, rx_pin) = hil_test::common_test_pins!(io);
+        let (loopback_pin, _) = hil_test::common_test_pins!(io);
 
         let mut config = twai::TwaiConfiguration::new(
             peripherals.TWAI0,
-            rx_pin,
-            tx_pin,
+            loopback_pin.peripheral_input(),
+            loopback_pin,
             twai::BaudRate::B1000K,
             TwaiMode::SelfTest,
         );
 
-        const FILTER: SingleStandardFilter =
-            SingleStandardFilter::new(b"00000000000", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
-        config.set_filter(FILTER);
+        config.set_filter(SingleStandardFilter::new(
+            b"00000000000",
+            b"x",
+            [b"xxxxxxxx", b"xxxxxxxx"],
+        ));
 
         let twai = config.start();
 

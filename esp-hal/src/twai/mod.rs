@@ -770,15 +770,18 @@ where
             .mode()
             .write(|w| w.reset_mode().set_bit());
 
-        rx_pin.init_input(Pull::None, crate::private::Internal);
-        rx_pin.connect_input_to_peripheral(T::INPUT_SIGNAL, crate::private::Internal);
-
         if no_transceiver {
             tx_pin.set_to_open_drain_output(crate::private::Internal);
         } else {
             tx_pin.set_to_push_pull_output(crate::private::Internal);
         }
         tx_pin.connect_peripheral_to_output(T::OUTPUT_SIGNAL, crate::private::Internal);
+
+        // Setting up RX pin later allows us to use a single pin in tests.
+        // `set_to_push_pull_output` disables input, here we re-enable it if rx_pin
+        // uses the same GPIO.
+        rx_pin.init_input(Pull::None, crate::private::Internal);
+        rx_pin.connect_input_to_peripheral(T::INPUT_SIGNAL, crate::private::Internal);
 
         // Set the operating mode based on provided option
         match mode {
