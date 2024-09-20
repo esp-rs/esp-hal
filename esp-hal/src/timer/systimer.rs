@@ -1098,10 +1098,10 @@ mod asynch {
     }
 
     impl<'d, COMP: Comparator, UNIT: Unit> embedded_hal_async::delay::DelayNs
-        for Alarm<'d, Target, crate::Async, COMP, UNIT> // TODO this changed
+        for Alarm<'d, Target, crate::Async, COMP, UNIT>
     {
         async fn delay_ns(&mut self, ns: u32) {
-            self.set_target(SystemTimer::now() + SystemTimer::ns_to_ticks(ns as u64 / 1000) as u64);
+            self.set_target(SystemTimer::now() + SystemTimer::ns_to_ticks(ns as u64 / 1000));
 
             AlarmFuture::new(self).await;
         }
