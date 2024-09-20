@@ -11,7 +11,7 @@ use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
 use esp_hal::{
     dma::{Channel, Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{AnyPin, Io, Level, NoPin, Output},
+    gpio::{AnyPin, Input, Io, Level, NoPin, Output, Pull},
     prelude::*,
     spi::{
         master::{Address, Command, Spi, SpiDma},
@@ -161,8 +161,13 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let (pin, pin_mirror) = hil_test::common_test_pins!(io);
-        let unconnected_pin = hil_test::unconnected_pin!(io);
+        let (mut pin, mut pin_mirror) = hil_test::common_test_pins!(io);
+        let mut unconnected_pin = hil_test::unconnected_pin!(io);
+
+        // Make sure pins have no pullups
+        let _ = Input::new(&mut pin, Pull::None);
+        let _ = Input::new(&mut pin_mirror, Pull::None);
+        let _ = Input::new(&mut unconnected_pin, Pull::None);
 
         let dma = Dma::new(peripherals.DMA);
 
