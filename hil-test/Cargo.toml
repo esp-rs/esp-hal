@@ -241,7 +241,7 @@ generic-queue = [
 integrated-timers = [
     "esp-hal-embassy/integrated-timers",
 ]
-psram = ["esp-hal/opsram-2m", "dep:esp-alloc"]
+octal-psram = ["esp-hal/octal-psram", "dep:esp-alloc"]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html#test
 # Test and bench profiles inherit from dev and release respectively.

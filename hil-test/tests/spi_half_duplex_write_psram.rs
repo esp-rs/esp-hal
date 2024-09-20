@@ -1,5 +1,5 @@
 //! SPI Half Duplex Write Test
-//% FEATURES: psram
+//% FEATURES: octal-psram
 //% CHIPS: esp32s3
 
 #![no_std]
