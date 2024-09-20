@@ -922,6 +922,29 @@ where
     pub fn start(self) -> Twai<'d, T, DM> {
         Self::set_mode(self.mode);
 
+        // Clear the TEC and REC
+        T::register_block()
+            .tx_err_cnt()
+            .write(|w| unsafe { w.tx_err_cnt().bits(0) });
+
+        let rec =
+            if cfg!(any(esp32, esp32s2, esp32s3, esp32c3)) && self.mode == TwaiMode::ListenOnly {
+                // Errata workaround: Prevent transmission of dominant error frame while in
+                // listen only mode by setting REC to 128 before exiting reset mode.
+                // This forces the controller to be error passive (thus only transmits recessive
+                // bits). The TEC/REC remain frozen in listen only mode thus
+                // ensuring we remain error passive.
+                128
+            } else {
+                0
+            };
+        T::register_block()
+            .rx_err_cnt()
+            .write(|w| unsafe { w.rx_err_cnt().bits(rec) });
+
+        // Clear any interrupts
+        _ = T::register_block().int_raw().read();
+
         // Put the peripheral into operation mode by clearing the reset mode bit.
         T::register_block()
             .mode()
