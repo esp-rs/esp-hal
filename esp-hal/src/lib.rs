@@ -168,6 +168,9 @@ pub mod analog;
 pub mod assist_debug;
 #[cfg(any(dport, hp_sys, pcr, system))]
 pub mod clock;
+
+pub mod config;
+
 #[cfg(any(xtensa, all(riscv, systimer)))]
 pub mod delay;
 #[cfg(any(gdma, pdma))]
@@ -466,6 +469,7 @@ macro_rules! before_snippet {
 
 use crate::{
     clock::{Clocks, CpuClock},
+    config::{WatchdogConfig, WatchdogStatus},
     peripherals::Peripherals,
 };
 
@@ -475,24 +479,58 @@ use crate::{
 pub struct Config {
     /// The CPU clock configuration.
     pub cpu_clock: CpuClock,
+    /// Enable watchdog timer(s).
+    pub watchdog: WatchdogConfig,
 }
 
 /// Initialize the system.
 ///
-/// This function sets up the CPU clock and returns the peripherals and clocks.
+/// This function sets up the CPU clock and watchdog, then, returns the
+/// peripherals and clocks.
 pub fn init(config: Config) -> Peripherals {
     let mut peripherals = Peripherals::take();
 
     // RTC domain must be enabled before we try to disable
     let mut rtc = crate::rtc_cntl::Rtc::new(&mut peripherals.LPWR);
-    #[cfg(not(any(esp32, esp32s2)))]
-    rtc.swd.disable();
-    rtc.rwdt.disable();
 
-    unsafe {
-        crate::timer::timg::Wdt::<self::peripherals::TIMG0>::set_wdt_enabled(false);
-        #[cfg(timg1)]
-        crate::timer::timg::Wdt::<self::peripherals::TIMG1>::set_wdt_enabled(false);
+    #[cfg(not(any(esp32, esp32s2)))]
+    if config.watchdog.swd {
+        rtc.swd.enable();
+    } else {
+        rtc.swd.disable();
+    }
+
+    match config.watchdog.rwdt {
+        WatchdogStatus::Enabled(duration) => {
+            rtc.rwdt.enable();
+            rtc.rwdt.set_timeout(duration);
+        }
+        WatchdogStatus::Disabled => {
+            rtc.rwdt.disable();
+        }
+    }
+
+    match config.watchdog.timg0 {
+        WatchdogStatus::Enabled(duration) => {
+            let mut timg0_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new();
+            timg0_wd.enable();
+            timg0_wd.set_timeout(duration);
+        }
+        WatchdogStatus::Disabled => {
+            crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new().disable();
+        }
+    }
+
+    #[cfg(timg1)]
+    match config.watchdog.timg1 {
+        WatchdogStatus::Enabled(duration) => {
+            let mut timg1_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG1>::new();
+            timg1_wd.enable();
+            timg1_wd.set_timeout(duration);
+        }
+        WatchdogStatus::Disabled => {
+            crate::timer::timg::Wdt::<self::peripherals::TIMG1>::new().disable();
+        }
     }
 
     Clocks::init(config.cpu_clock);

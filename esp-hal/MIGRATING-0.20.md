@@ -158,7 +158,7 @@ configure an input pin, and pass it to `set_edge_signal` or `set_ctrl_signal`.
 -       PcntInputConfig { pull: Pull::Up },
 -   ));
 +   ch0.set_ctrl_signal(Input::new(io.pins.gpio4, Pull::Up));
- 
+
 -   let mut pin_b = io.pins.gpio5;
 -   ch0.set_edge_signal(PcntSource::from_pin(
 -       &mut pin_b,

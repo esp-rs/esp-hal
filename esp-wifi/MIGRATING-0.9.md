@@ -15,7 +15,7 @@ You no longer have to set up clocks and pass them to `esp_wifi::initialize`.
      initialize,
      // ...
  };
- 
+
  #[entry]
  fn main() -> ! {
 -    let peripherals = Peripherals::take();
@@ -65,7 +65,7 @@ The size of the heap depends on what you are going to use esp-wifi for and if yo
 
 E.g. when using `coex` you need around 92k. If not using `coex`, going lower than 72k you will observe some failed allocations but it might still work. Going even lower will make things fail.
 
-If you see linker errors regarding undefined symbols for `esp_wifi_free_internal_heap` and `esp_wifi_allocate_from_internal_ram` you either want to opt-in to use the `esp-alloc` feature 
+If you see linker errors regarding undefined symbols for `esp_wifi_free_internal_heap` and `esp_wifi_allocate_from_internal_ram` you either want to opt-in to use the `esp-alloc` feature
 or provide your own allocator (see below)
 
 ### Using your own allocator
