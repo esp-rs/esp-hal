@@ -187,7 +187,7 @@ macro_rules! ImplSpiChannel {
                     result
                 }
 
-                fn out_interrupts() -> EnumSet<DmaTxInterrupt> {
+                fn pending_out_interrupts() -> EnumSet<DmaTxInterrupt> {
                     let mut result = EnumSet::new();
 
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
@@ -279,7 +279,7 @@ macro_rules! ImplSpiChannel {
                     result
                 }
 
-                fn in_interrupts() -> EnumSet<DmaRxInterrupt> {
+                fn pending_in_interrupts() -> EnumSet<DmaRxInterrupt> {
                     let mut result = EnumSet::new();
 
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
@@ -571,7 +571,7 @@ macro_rules! ImplI2sChannel {
                     result
                 }
 
-                fn out_interrupts() -> EnumSet<DmaTxInterrupt> {
+                fn pending_out_interrupts() -> EnumSet<DmaTxInterrupt> {
                     let mut result = EnumSet::new();
 
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
@@ -663,7 +663,7 @@ macro_rules! ImplI2sChannel {
                     result
                 }
 
-                fn in_interrupts() -> EnumSet<DmaRxInterrupt> {
+                fn pending_in_interrupts() -> EnumSet<DmaRxInterrupt> {
                     let mut result = EnumSet::new();
 
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
