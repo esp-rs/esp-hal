@@ -140,8 +140,6 @@
 // MUST be the first module
 mod fmt;
 
-use core::cell::UnsafeCell;
-
 #[cfg(riscv)]
 pub use esp_riscv_rt::{self, entry, riscv};
 pub use procmacros as macros;
