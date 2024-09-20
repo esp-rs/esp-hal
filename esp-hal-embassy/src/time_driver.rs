@@ -36,11 +36,8 @@ pub(super) struct EmbassyTimer {
     alarms: Mutex<[AlarmState; MAX_SUPPORTED_ALARM_COUNT]>,
 }
 
-#[allow(clippy::declare_interior_mutable_const)]
-const ALARM_STATE_NONE: AlarmState = AlarmState::new();
-
 embassy_time_driver::time_driver_impl!(static DRIVER: EmbassyTimer = EmbassyTimer {
-    alarms: Mutex::new([ALARM_STATE_NONE; MAX_SUPPORTED_ALARM_COUNT]),
+    alarms: Mutex::new([const { AlarmState::new() }; MAX_SUPPORTED_ALARM_COUNT]),
 });
 
 impl EmbassyTimer {

@@ -536,9 +536,8 @@ mod asynch {
 
     const NUM_TOUCH_PINS: usize = 10;
 
-    #[allow(clippy::declare_interior_mutable_const)]
-    const NEW_AW: AtomicWaker = AtomicWaker::new();
-    static TOUCH_WAKERS: [AtomicWaker; NUM_TOUCH_PINS] = [NEW_AW; NUM_TOUCH_PINS];
+    static TOUCH_WAKERS: [AtomicWaker; NUM_TOUCH_PINS] =
+        [const { AtomicWaker::new() }; NUM_TOUCH_PINS];
 
     // Helper variable to store which pins need handling.
     static TOUCHED_PINS: AtomicU16 = AtomicU16::new(0);

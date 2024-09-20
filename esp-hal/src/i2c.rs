@@ -533,23 +533,14 @@ mod asynch {
         task::{Context, Poll},
     };
 
-    use cfg_if::cfg_if;
     use embassy_sync::waitqueue::AtomicWaker;
     use embedded_hal::i2c::Operation;
     use procmacros::handler;
 
     use super::*;
 
-    cfg_if! {
-        if #[cfg(all(i2c0, i2c1))] {
-            const NUM_I2C: usize = 2;
-        } else if #[cfg(i2c0)] {
-            const NUM_I2C: usize = 1;
-        }
-    }
-    #[allow(clippy::declare_interior_mutable_const)]
-    const INIT: AtomicWaker = AtomicWaker::new();
-    static WAKERS: [AtomicWaker; NUM_I2C] = [INIT; NUM_I2C];
+    const NUM_I2C: usize = 1 + cfg!(i2c1) as usize;
+    static WAKERS: [AtomicWaker; NUM_I2C] = [const { AtomicWaker::new() }; NUM_I2C];
 
     #[cfg_attr(esp32, allow(dead_code))]
     pub(crate) enum Event {

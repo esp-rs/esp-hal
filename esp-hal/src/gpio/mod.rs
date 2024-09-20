@@ -91,12 +91,13 @@ pub mod rtc_io;
 
 /// Convenience constant for `Option::None` pin
 
-static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::NULL;
+static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
 
 struct CFnPtr(AtomicPtr<()>);
 impl CFnPtr {
-    #[allow(clippy::declare_interior_mutable_const)]
-    pub const NULL: Self = Self(AtomicPtr::new(core::ptr::null_mut()));
+    pub const fn new() -> Self {
+        Self(AtomicPtr::new(core::ptr::null_mut()))
+    }
 
     pub fn store(&self, f: extern "C" fn()) {
         self.0.store(f as *mut (), Ordering::Relaxed);
@@ -2488,9 +2489,8 @@ mod asynch {
 
     use super::*;
 
-    #[allow(clippy::declare_interior_mutable_const)]
-    const NEW_AW: AtomicWaker = AtomicWaker::new();
-    pub(super) static PIN_WAKERS: [AtomicWaker; NUM_PINS] = [NEW_AW; NUM_PINS];
+    pub(super) static PIN_WAKERS: [AtomicWaker; NUM_PINS] =
+        [const { AtomicWaker::new() }; NUM_PINS];
 
     impl<'d, P> Flex<'d, P>
     where
