@@ -2173,7 +2173,7 @@ impl DmaTxBuf {
                     return Err(DmaBufError::UnsupportedMemoryRegion);
                 }
                 // if its PSRAM, the block_size/alignment must be specified
-                if block_size.is_none() {
+                if is_slice_in_psram(buffer) && block_size.is_none() {
                     return Err(DmaBufError::InvalidAlignment);
                 }
             } else {

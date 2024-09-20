@@ -97,8 +97,8 @@ mod tests {
     #[timeout(3)]
     fn test_spi_writes_are_correctly_by_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
-        const DMA_ALIGNMENT: DmaBufBlkSize = DmaBufBlkSize::Size32; // matches dcache line size
-        const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize; // 64 byte aligned
+        const DMA_ALIGNMENT: DmaBufBlkSize = DmaBufBlkSize::Size32;
+        const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize;
 
         let (_, descriptors) = dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
         let buffer = dma_alloc_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT as usize);
