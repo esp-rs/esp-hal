@@ -57,7 +57,7 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn test_send_receive(mut ctx: Context) {
-        let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO.into(), &[1, 2, 3]).unwrap();
+        let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO, &[1, 2, 3]).unwrap();
         block!(ctx.twai.transmit(&frame)).unwrap();
 
         let frame = block!(ctx.twai.receive()).unwrap();

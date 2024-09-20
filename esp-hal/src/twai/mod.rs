@@ -120,9 +120,8 @@
 //! // and received.
 //! let mut can = can_config.start();
 //!
-//! let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO.into(),
-//!     &[1, 2, 3]).unwrap();
-//! // Wait for a frame to be received.
+//! let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO,
+//!     &[1, 2, 3]).unwrap(); // Wait for a frame to be received.
 //! let frame = block!(can.receive()).unwrap();
 //!
 //! # loop {}
@@ -464,18 +463,17 @@ pub struct EspTwaiFrame {
 
 impl EspTwaiFrame {
     /// Creates a new `EspTwaiFrame` with the specified ID and data payload.
-    pub fn new(id: Id, data: &[u8]) -> Option<Self> {
+    pub fn new(id: impl Into<Id>, data: &[u8]) -> Option<Self> {
         // TWAI frames cannot contain more than 8 bytes of data.
         if data.len() > 8 {
             return None;
         }
 
         let mut d: [u8; 8] = [0; 8];
-        let (left, _unused) = d.split_at_mut(data.len());
-        left.clone_from_slice(data);
+        (&mut d[..data.len()]).copy_from_slice(data);
 
         Some(EspTwaiFrame {
-            id,
+            id: id.into(),
             data: d,
             dlc: data.len(),
             is_remote: false,
@@ -485,14 +483,14 @@ impl EspTwaiFrame {
 
     /// Creates a new `EspTwaiFrame` for a transmission request with the
     /// specified ID and data length (DLC).
-    pub fn new_remote(id: Id, dlc: usize) -> Option<Self> {
+    pub fn new_remote(id: impl Into<Id>, dlc: usize) -> Option<Self> {
         // TWAI frames cannot have more than 8 bytes.
         if dlc > 8 {
             return None;
         }
 
         Some(EspTwaiFrame {
-            id,
+            id: id.into(),
             data: [0; 8],
             dlc,
             is_remote: true,
@@ -502,17 +500,16 @@ impl EspTwaiFrame {
 
     /// Creates a new `EspTwaiFrame` ready for self-reception with the specified
     /// ID and data payload.
-    pub fn new_self_reception(id: Id, data: &[u8]) -> Option<Self> {
+    pub fn new_self_reception(id: impl Into<Id>, data: &[u8]) -> Option<Self> {
         if data.len() > 8 {
             return None;
         }
 
         let mut d: [u8; 8] = [0; 8];
-        let (left, _unused) = d.split_at_mut(data.len());
-        left.clone_from_slice(data);
+        (&mut d[..data.len()]).copy_from_slice(data);
 
         Some(EspTwaiFrame {
-            id,
+            id: id.into(),
             data: d,
             dlc: data.len(),
             is_remote: false,
@@ -547,12 +544,10 @@ impl EspTwaiFrame {
 
 impl embedded_hal_02::can::Frame for EspTwaiFrame {
     fn new(id: impl Into<embedded_hal_02::can::Id>, data: &[u8]) -> Option<Self> {
-        let id: embedded_hal_02::can::Id = id.into();
         Self::new(id.into(), data)
     }
 
     fn new_remote(id: impl Into<embedded_hal_02::can::Id>, dlc: usize) -> Option<Self> {
-        let id: embedded_hal_02::can::Id = id.into();
         Self::new_remote(id.into(), dlc)
     }
 
@@ -587,12 +582,10 @@ impl embedded_hal_02::can::Frame for EspTwaiFrame {
 
 impl embedded_can::Frame for EspTwaiFrame {
     fn new(id: impl Into<embedded_can::Id>, data: &[u8]) -> Option<Self> {
-        let id: embedded_can::Id = id.into();
         Self::new(id.into(), data)
     }
 
     fn new_remote(id: impl Into<embedded_can::Id>, dlc: usize) -> Option<Self> {
-        let id: embedded_can::Id = id.into();
         Self::new_remote(id.into(), dlc)
     }
 
@@ -1467,7 +1460,7 @@ pub trait OperationInstance: Instance {
                     EspTwaiFrame::new_from_data_registers(id, register_block.data_3().as_ptr(), dlc)
                 }
             } else {
-                EspTwaiFrame::new_remote(id.into(), dlc).unwrap()
+                EspTwaiFrame::new_remote(id, dlc).unwrap()
             }
         } else {
             // Frame uses extended 29 bit id.
@@ -1491,7 +1484,7 @@ pub trait OperationInstance: Instance {
                     EspTwaiFrame::new_from_data_registers(id, register_block.data_5().as_ptr(), dlc)
                 }
             } else {
-                EspTwaiFrame::new_remote(id.into(), dlc).unwrap()
+                EspTwaiFrame::new_remote(id, dlc).unwrap()
             }
         };
 
