@@ -41,44 +41,45 @@ macro_rules! esp_config_bool {
 }
 
 #[macro_export]
-#[doc(hidden)] // to avoid confusion with esp_config_int
-/// Parse a string like "777" into an integer at compile time
+#[doc(hidden)] // to avoid confusion with esp_config_int, let's hide this
+/// Parse a string like "777" into an integer, which _can_ be used in a `const`
+/// context
 macro_rules! esp_config_int_parse {
-    ($ty:ty, $bytes:expr) => {
-        const {
-            let mut bytes = $bytes;
-            let mut val: $ty = 0;
-            let mut sign_seen = false;
-            let mut is_negative = false;
-            while let [byte, rest @ ..] = bytes {
-                match *byte {
-                    b'0'..=b'9' => {
-                        val = val * 10 + (*byte - b'0') as $ty;
-                    }
-                    b'-' | b'+' if !sign_seen => {
-                        if *byte == b'-' {
-                            is_negative = true;
-                        }
-                        sign_seen = true;
-                    }
-                    _ => panic!("invalid digit"),
+    ($ty:ty, $bytes:expr) => {{
+        #[allow(clippy::assign_op_pattern)] // required as this might not be used in const code
+        let mut bytes = $bytes;
+        let mut val: $ty = 0;
+        let mut sign_seen = false;
+        let mut is_negative = false;
+        while let [byte, rest @ ..] = bytes {
+            match *byte {
+                b'0'..=b'9' => {
+                    val = val * 10 + (*byte - b'0') as $ty;
                 }
-                bytes = rest;
+                b'-' | b'+' if !sign_seen => {
+                    if *byte == b'-' {
+                        is_negative = true;
+                    }
+                    sign_seen = true;
+                }
+                _ => ::core::panic!("invalid digit"),
             }
-            if is_negative {
-                let original = val;
-                // subtract twice to get the negative
-                val = val - original;
-                val = val - original;
-            }
-            val
+            bytes = rest;
         }
-    };
+        if is_negative {
+            let original = val;
+            // subtract twice to get the negative
+            val = val - original;
+            val = val - original;
+        }
+        val
+    }};
 }
 
 #[cfg(test)]
 mod test {
 
+    // We can only test success in the const context
     const _: () = {
         core::assert!(esp_config_int_parse!(i64, "-77777".as_bytes()) == -77777);
         core::assert!(esp_config_int_parse!(isize, "-7777".as_bytes()) == -7777);
@@ -92,4 +93,10 @@ mod test {
         core::assert!(esp_config_int_parse!(u16, "99".as_bytes()) == 99);
         core::assert!(esp_config_int_parse!(u8, "9".as_bytes()) == 9);
     };
+
+    #[test]
+    #[should_panic]
+    fn test_expect_positive() {
+        esp_config_int_parse!(u8, "-5".as_bytes());
+    }
 }
