@@ -110,21 +110,21 @@ unsafe extern "C" fn strnlen(chars: *const u8, maxlen: usize) -> usize {
 }
 
 pub fn sem_create(max: u32, init: u32) -> *mut c_void {
-    critical_section::with(|_| unsafe {
+    unsafe {
         let ptr = malloc(4) as *mut u32;
         ptr.write_volatile(init);
 
         trace!("sem created res = {:?}", ptr);
         ptr.cast()
-    })
+    }
 }
 
 pub fn sem_delete(semphr: *mut c_void) {
     trace!(">>> sem delete");
 
-    critical_section::with(|_| unsafe {
+    unsafe {
         free(semphr.cast());
-    })
+    }
 }
 
 pub fn sem_take(semphr: *mut c_void, tick: u32) -> i32 {
@@ -181,29 +181,27 @@ pub fn thread_sem_get() -> *mut c_void {
 }
 
 pub fn create_recursive_mutex() -> *mut c_void {
-    critical_section::with(|_| unsafe {
-        let mutex = Mutex {
-            locking_pid: 0xffff_ffff,
-            count: 0,
-            recursive: true,
-        };
+    let mutex = Mutex {
+        locking_pid: 0xffff_ffff,
+        count: 0,
+        recursive: true,
+    };
 
-        let ptr = unsafe { malloc(size_of_val(&mutex) as u32) as *mut Mutex };
-        unsafe {
-            ptr.write(mutex);
-        }
-        memory_fence();
+    let ptr = unsafe { malloc(size_of_val(&mutex) as u32) as *mut Mutex };
+    unsafe {
+        ptr.write(mutex);
+    }
+    memory_fence();
 
-        trace!("recursive_mutex_create called {:?}", ptr);
-        ptr as *mut c_void
-    })
+    trace!("recursive_mutex_create called {:?}", ptr);
+    ptr as *mut c_void
 }
 
 pub fn mutex_delete(mutex: *mut c_void) {
     let ptr = mutex as *mut Mutex;
-    critical_section::with(|_| unsafe {
+    unsafe {
         free(mutex.cast());
-    });
+    }
 }
 
 /// Lock a mutex. Block until successful.
