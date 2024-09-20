@@ -175,27 +175,35 @@ pub enum ErrorKind {
     Other,
 }
 
-impl core::fmt::Display for ErrorKind {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::Overrun => write!(f, "The peripheral receive buffer was overrun"),
-            Self::Bit => write!(
-                f,
-                "Bit value that is monitored differs from the bit value sent"
-            ),
-            Self::Stuff => write!(f, "Sixth consecutive equal bits detected"),
-            Self::Crc => write!(f, "Calculated CRC sequence does not equal the received one"),
-            Self::Form => write!(
-                f,
-                "A fixed-form bit field contains one or more illegal bits"
-            ),
-            Self::Acknowledge => write!(f, "Transmitted frame was not acknowledged"),
-            Self::Other => write!(
-                f,
-                "A different error occurred. The original error may contain more information"
-            ),
+macro_rules! impl_display {
+    ($($kind:ident => $msg:expr),* $(,)?) => {
+        impl core::fmt::Display for ErrorKind {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                match self {
+                    $(Self::$kind => write!(f, $msg)),*
+                }
+            }
         }
-    }
+
+        #[cfg(feature = "defmt")]
+        impl defmt::Format for ErrorKind {
+            fn format(&self, f: defmt::Formatter<'_>) {
+                match self {
+                    $(Self::$kind => defmt::write!(f, $msg)),*
+                }
+            }
+        }
+    };
+}
+
+impl_display! {
+    Overrun => "The peripheral receive buffer was overrun",
+    Bit => "Bit value that is monitored differs from the bit value sent",
+    Stuff => "Sixth consecutive equal bits detected",
+    Crc => "Calculated CRC sequence does not equal the received one",
+    Form => "A fixed-form bit field contains one or more illegal bits",
+    Acknowledge => "Transmitted frame was not acknowledged",
+    Other => "A different error occurred. The original error may contain more information",
 }
 
 impl From<ErrorKind> for embedded_hal_02::can::ErrorKind {
@@ -1589,7 +1597,7 @@ impl Instance for crate::peripherals::TWAI0 {
 #[cfg(any(esp32h2, esp32c6))]
 impl OperationInstance for crate::peripherals::TWAI0 {}
 
-#[cfg(esp32c6)]
+#[cfg(twai1)]
 impl Instance for crate::peripherals::TWAI1 {
     const SYSTEM_PERIPHERAL: system::Peripheral = system::Peripheral::Twai1;
     const NUMBER: usize = 1;
@@ -1648,7 +1656,7 @@ mod asynch {
 
     use super::*;
     use crate::peripherals::TWAI0;
-    #[cfg(esp32c6)]
+    #[cfg(twai1)]
     use crate::peripherals::TWAI1;
 
     pub struct TwaiAsyncState {
