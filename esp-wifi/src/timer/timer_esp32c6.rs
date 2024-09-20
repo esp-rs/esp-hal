@@ -33,6 +33,15 @@ pub fn setup_radio_isr() {
     }
 }
 
+pub fn shutdown_radio_isr() {
+    #[cfg(feature = "ble")]
+    {
+        unwrap!(interrupt::disable(Interrupt::LP_TIMER));
+        unwrap!(interrupt::disable(Interrupt::BT_MAC));
+    }
+}
+
+
 #[cfg(feature = "wifi")]
 #[no_mangle]
 extern "C" fn WIFI_MAC() {

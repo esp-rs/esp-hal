@@ -22,6 +22,18 @@ pub fn setup_radio_isr() {
     }
 }
 
+pub fn shutdown_radio_isr()
+{
+    #[cfg(feature = "ble")]
+    {
+        unwrap!(interrupt::disable(crate::hal::Cpu::ProCpu, peripherals::Interrupt::RWBT));
+        unwrap!(interrupt::disable(crate::hal::Cpu::ProCpu, peripherals::Interrupt::BT_BB));
+
+        unwrap!(interrupt::enable(crate::hal::Cpu::ProCpu, peripherals::Interrupt::ETH_MAC));
+        unwrap!(interrupt::enable(crate::hal::Cpu::ProCpu, peripherals::Interrupt::UART0));
+    }
+}
+
 #[cfg(feature = "ble")]
 #[allow(non_snake_case)]
 #[no_mangle]

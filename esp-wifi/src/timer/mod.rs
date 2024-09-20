@@ -1,3 +1,6 @@
+use core::cell::RefCell;
+use critical_section::Mutex;
+
 #[cfg_attr(esp32, path = "timer_esp32.rs")]
 #[cfg_attr(esp32c2, path = "timer_esp32c2.rs")]
 #[cfg_attr(esp32c3, path = "timer_esp32c3.rs")]
@@ -16,6 +19,8 @@ pub use chip_specific::*;
 
 use crate::TimeBase;
 
+pub(crate) static TIMER: Mutex<RefCell<Option<TimeBase>>> = Mutex::new(RefCell::new(None));
+
 pub fn setup_timer_isr(timebase: TimeBase) -> Result<(), esp_hal::timer::Error> {
     setup_radio_isr();
 
@@ -24,6 +29,14 @@ pub fn setup_timer_isr(timebase: TimeBase) -> Result<(), esp_hal::timer::Error> 
     setup_multitasking();
 
     yield_task();
+    Ok(())
+}
+
+pub fn shutdown_timer_isr() -> Result<(), esp_hal::timer::Error> {
+    shutdown_radio_isr();
+
+    disable_timer();
+
     Ok(())
 }
 

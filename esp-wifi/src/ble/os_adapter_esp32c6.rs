@@ -5,13 +5,6 @@ use crate::{
     hal::system::{RadioClockController, RadioPeripherals},
 };
 
-// use crate::{
-//     binary::{include::esp_bt_controller_config_t, c_types::c_void},
-//     common_adapter::RADIO_CLOCKS,
-//     hal::system::RadioClockController,
-//     ble::npl,
-// };
-
 pub(crate) static mut ISR_INTERRUPT_4: (
     *mut crate::binary::c_types::c_void,
     *mut crate::binary::c_types::c_void,

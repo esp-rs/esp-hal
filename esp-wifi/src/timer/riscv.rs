@@ -1,6 +1,3 @@
-use core::cell::RefCell;
-
-use critical_section::Mutex;
 use esp_hal::interrupt::InterruptHandler;
 #[cfg(any(feature = "esp32c6", feature = "esp32h2"))]
 use peripherals::INTPRI as SystemPeripheral;
@@ -18,12 +15,13 @@ use crate::{
 };
 
 /// The timer responsible for time slicing.
-static ALARM0: Mutex<RefCell<Option<TimeBase>>> = Mutex::new(RefCell::new(None));
 const TIMESLICE_FREQUENCY: fugit::HertzU64 =
     fugit::HertzU64::from_raw(crate::CONFIG.tick_rate_hz as u64);
 
 // Time keeping
 pub const TICKS_PER_SECOND: u64 = 1_000_000;
+
+use super::TIMER;
 
 pub fn setup_timer(mut alarm0: TimeBase) -> Result<(), esp_hal::timer::Error> {
     // make sure the scheduling won't start before everything is setup
@@ -34,8 +32,23 @@ pub fn setup_timer(mut alarm0: TimeBase) -> Result<(), esp_hal::timer::Error> {
     alarm0.start(TIMESLICE_FREQUENCY.into_duration())?;
     critical_section::with(|cs| {
         alarm0.enable_interrupt(true);
-        ALARM0.borrow_ref_mut(cs).replace(alarm0);
+        TIMER.borrow_ref_mut(cs).replace(alarm0);
     });
+
+    Ok(())
+}
+
+pub fn disable_timer() -> Result<(), esp_hal::timer::Error> {
+    let mut timer: Option<TimeBase> = None;
+
+    critical_section::with(|cs| {
+        timer = crate::timer::TIMER.borrow_ref_mut(cs).take();
+    });
+
+    if let Some(mut alarm) = timer {
+        alarm.cancel()?;
+        alarm.enable_interrupt(false);
+    }
 
     Ok(())
 }
@@ -51,10 +64,19 @@ pub fn setup_multitasking() {
     }
 }
 
+pub fn disable_multitasking() {
+    unwrap!(interrupt::disable(Interrupt::FROM_CPU_INTR3));
+
+    // TODO (?)
+    // unsafe {
+    //     riscv::interrupt::enable();
+    // }
+}
+
 extern "C" fn handler(trap_frame: &mut TrapFrame) {
     // clear the systimer intr
     critical_section::with(|cs| {
-        unwrap!(ALARM0.borrow_ref_mut(cs).as_mut()).clear_interrupt();
+        unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).clear_interrupt();
     });
 
     task_switch(trap_frame);
@@ -70,7 +92,7 @@ extern "C" fn FROM_CPU_INTR3(trap_frame: &mut TrapFrame) {
     }
 
     critical_section::with(|cs| {
-        let mut alarm0 = ALARM0.borrow_ref_mut(cs);
+        let mut alarm0 = TIMER.borrow_ref_mut(cs);
         let alarm0 = unwrap!(alarm0.as_mut());
         alarm0.clear_interrupt();
     });
