@@ -764,11 +764,13 @@ where
             .mode()
             .write(|w| w.reset_mode().set_bit());
 
-        // Enable extended register layout
         #[cfg(esp32)]
-        T::register_block()
-            .clock_divider()
-            .modify(|r, w| unsafe { w.bits(r.bits() | 0x80) });
+        {
+            // Enable extended register layout
+            T::register_block()
+                .clock_divider()
+                .modify(|r, w| unsafe { w.bits(r.bits() | 0x80) });
+        }
 
         if no_transceiver {
             tx_pin.set_to_open_drain_output(crate::private::Internal);
@@ -836,7 +838,24 @@ where
         // have 1 subtracted from them before being stored into the register.
         let timing = baud_rate.timing();
 
-        let prescale = (timing.baud_rate_prescaler / 2) - 1;
+        let mut prescaler = timing.baud_rate_prescaler;
+
+        if cfg!(esp32) {
+            if timing.baud_rate_prescaler > 128 {
+                // Enable /2 baudrate divider
+                T::register_block()
+                    .int_ena()
+                    .modify(|r, w| unsafe { w.bits(r.bits() | 0x08) });
+                prescaler = timing.baud_rate_prescaler / 2;
+            } else {
+                // Disable /2 baudrate divider
+                T::register_block()
+                    .int_ena()
+                    .modify(|r, w| unsafe { w.bits(r.bits() & !0xF7) });
+            }
+        }
+
+        let prescale = (prescaler / 2) - 1;
         let sjw = timing.sync_jump_width - 1;
         let tseg_1 = timing.tseg_1 - 1;
         let tseg_2 = timing.tseg_2 - 1;
