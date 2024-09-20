@@ -42,6 +42,7 @@ mod tests {
 
     #[test]
     #[timeout(3)]
+    #[cfg(timg1)]
     fn test_feeding_timg1_wdt() {
         let peripherals = esp_hal::init({
             let mut config = Config::default();
