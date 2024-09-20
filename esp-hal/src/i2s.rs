@@ -84,7 +84,7 @@ use core::marker::PhantomData;
 use enumset::{EnumSet, EnumSetType};
 use private::*;
 
-#[cfg(any(esp32, esp32s3))]
+#[cfg(i2s1)]
 use crate::dma::I2s1Peripheral;
 use crate::{
     dma::{
@@ -469,7 +469,7 @@ where
     /// Construct a new I2S peripheral driver instance for the second I2S
     /// peripheral
     #[allow(clippy::too_many_arguments)]
-    #[cfg(any(esp32s3, esp32))]
+    #[cfg(i2s1)]
     pub fn new_i2s1(
         i2s: impl Peripheral<P = I> + 'd,
         standard: Standard,

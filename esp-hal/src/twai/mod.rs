@@ -1671,9 +1671,8 @@ mod asynch {
     }
 
     const NUM_TWAI: usize = 1 + cfg!(twai1) as usize;
-    #[allow(clippy::declare_interior_mutable_const)]
-    const NEW_STATE: TwaiAsyncState = TwaiAsyncState::new();
-    pub(crate) static TWAI_STATE: [TwaiAsyncState; NUM_TWAI] = [NEW_STATE; NUM_TWAI];
+    pub(crate) static TWAI_STATE: [TwaiAsyncState; NUM_TWAI] =
+        [const { TwaiAsyncState::new() }; NUM_TWAI];
 
     impl<T> Twai<'_, T, crate::Async>
     where
