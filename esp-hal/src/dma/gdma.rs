@@ -291,7 +291,7 @@ impl<const N: u8> RegisterAccess for Channel<N> {
         result
     }
 
-    fn available_out_interrupts() -> EnumSet<DmaTxInterrupt> {
+    fn out_interrupts() -> EnumSet<DmaTxInterrupt> {
         let mut result = EnumSet::new();
 
         let int_raw = Self::out_int().raw().read();
@@ -378,7 +378,7 @@ impl<const N: u8> RegisterAccess for Channel<N> {
         result
     }
 
-    fn available_in_interrupts() -> EnumSet<DmaRxInterrupt> {
+    fn in_interrupts() -> EnumSet<DmaRxInterrupt> {
         let mut result = EnumSet::new();
 
         let int_raw = Self::in_int().raw().read();

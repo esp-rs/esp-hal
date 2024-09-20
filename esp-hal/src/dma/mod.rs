@@ -1005,10 +1005,7 @@ impl TxCircularState {
     where
         T: TxPrivate,
     {
-        if channel
-            .available_out_interrupts()
-            .contains(DmaTxInterrupt::Eof)
-        {
+        if channel.out_interrupts().contains(DmaTxInterrupt::Eof) {
             channel.clear_out(DmaTxInterrupt::Eof);
 
             let descr_address = channel.last_out_dscr_address() as *mut DmaDescriptor;
@@ -1260,23 +1257,22 @@ pub trait RxPrivate: crate::private::Sealed {
 
     fn clear_in(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>);
 
-    fn available_in_interrupts(&self) -> EnumSet<DmaRxInterrupt>;
+    fn in_interrupts(&self) -> EnumSet<DmaRxInterrupt>;
 
     fn is_done(&self) -> bool;
 
     fn has_error(&self) -> bool {
-        self.available_in_interrupts()
+        self.in_interrupts()
             .contains(DmaRxInterrupt::DescriptorError)
     }
 
     fn has_dscr_empty_error(&self) -> bool {
-        self.available_in_interrupts()
+        self.in_interrupts()
             .contains(DmaRxInterrupt::DescriptorEmpty)
     }
 
     fn has_eof_error(&self) -> bool {
-        self.available_in_interrupts()
-            .contains(DmaRxInterrupt::ErrorEof)
+        self.in_interrupts().contains(DmaRxInterrupt::ErrorEof)
     }
 
     fn clear_interrupts(&self);
@@ -1316,7 +1312,7 @@ where
     fn start_transfer(&mut self) -> Result<(), DmaError> {
         R::start_in();
 
-        if R::available_in_interrupts().contains(DmaRxInterrupt::DescriptorError) {
+        if R::in_interrupts().contains(DmaRxInterrupt::DescriptorError) {
             Err(DmaError::DescriptorError)
         } else {
             Ok(())
@@ -1446,13 +1442,12 @@ where
         CH::Channel::clear_in(interrupts);
     }
 
-    fn available_in_interrupts(&self) -> EnumSet<DmaRxInterrupt> {
-        CH::Channel::available_in_interrupts()
+    fn in_interrupts(&self) -> EnumSet<DmaRxInterrupt> {
+        CH::Channel::in_interrupts()
     }
 
     fn is_done(&self) -> bool {
-        self.available_in_interrupts()
-            .contains(DmaRxInterrupt::SuccessfulEof)
+        self.in_interrupts().contains(DmaRxInterrupt::SuccessfulEof)
     }
 
     fn init_channel(&mut self) {
@@ -1495,7 +1490,7 @@ pub trait TxPrivate: crate::private::Sealed {
 
     fn clear_out(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>);
 
-    fn available_out_interrupts(&self) -> EnumSet<DmaTxInterrupt>;
+    fn out_interrupts(&self) -> EnumSet<DmaTxInterrupt>;
 
     fn start_transfer(&mut self) -> Result<(), DmaError>;
 
@@ -1503,12 +1498,11 @@ pub trait TxPrivate: crate::private::Sealed {
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
 
     fn is_done(&self) -> bool {
-        self.available_out_interrupts()
-            .contains(DmaTxInterrupt::TotalEof)
+        self.out_interrupts().contains(DmaTxInterrupt::TotalEof)
     }
 
     fn has_error(&self) -> bool {
-        self.available_out_interrupts()
+        self.out_interrupts()
             .contains(DmaTxInterrupt::DescriptorError)
     }
 
@@ -1547,7 +1541,7 @@ where
     fn start_transfer(&mut self) -> Result<(), DmaError> {
         R::start_out();
 
-        if R::available_out_interrupts().contains(DmaTxInterrupt::DescriptorError) {
+        if R::out_interrupts().contains(DmaTxInterrupt::DescriptorError) {
             Err(DmaError::DescriptorError)
         } else {
             Ok(())
@@ -1566,8 +1560,8 @@ where
     fn clear_out(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
         R::clear_out(interrupts)
     }
-    fn available_out_interrupts(&self) -> EnumSet<DmaTxInterrupt> {
-        R::available_out_interrupts()
+    fn out_interrupts(&self) -> EnumSet<DmaTxInterrupt> {
+        R::out_interrupts()
     }
 
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
@@ -1674,8 +1668,8 @@ where
         CH::Channel::clear_out(interrupts);
     }
 
-    fn available_out_interrupts(&self) -> EnumSet<DmaTxInterrupt> {
-        CH::Channel::available_out_interrupts()
+    fn out_interrupts(&self) -> EnumSet<DmaTxInterrupt> {
+        CH::Channel::out_interrupts()
     }
 
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
@@ -1710,13 +1704,13 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn unlisten_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>);
     fn is_listening_out() -> EnumSet<DmaTxInterrupt>;
     fn clear_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>);
-    fn available_out_interrupts() -> EnumSet<DmaTxInterrupt>;
+    fn out_interrupts() -> EnumSet<DmaTxInterrupt>;
 
     fn listen_in(interrupts: impl Into<EnumSet<DmaRxInterrupt>>);
     fn unlisten_in(interrupts: impl Into<EnumSet<DmaRxInterrupt>>);
     fn is_listening_in() -> EnumSet<DmaRxInterrupt>;
     fn clear_in(interrupts: impl Into<EnumSet<DmaRxInterrupt>>);
-    fn available_in_interrupts() -> EnumSet<DmaRxInterrupt>;
+    fn in_interrupts() -> EnumSet<DmaRxInterrupt>;
 
     fn last_out_dscr_address() -> usize;
 
@@ -2537,7 +2531,7 @@ where
         if self
             .instance
             .tx()
-            .available_out_interrupts()
+            .out_interrupts()
             .contains(DmaTxInterrupt::DescriptorError)
         {
             Err(DmaError::DescriptorError)
@@ -2590,7 +2584,7 @@ where
         if self
             .instance
             .rx()
-            .available_in_interrupts()
+            .in_interrupts()
             .contains(DmaRxInterrupt::DescriptorError)
         {
             Err(DmaError::DescriptorError)
@@ -2644,12 +2638,12 @@ where
         if self
             .instance
             .tx()
-            .available_out_interrupts()
+            .out_interrupts()
             .contains(DmaTxInterrupt::DescriptorError)
             || self
                 .instance
                 .rx()
-                .available_in_interrupts()
+                .in_interrupts()
                 .contains(DmaRxInterrupt::DescriptorError)
         {
             Err(DmaError::DescriptorError)
@@ -2727,7 +2721,7 @@ where
         if self
             .instance
             .tx()
-            .available_out_interrupts()
+            .out_interrupts()
             .contains(DmaTxInterrupt::DescriptorError)
         {
             Err(DmaError::DescriptorError)
@@ -2841,7 +2835,7 @@ pub(crate) mod asynch {
                 Poll::Ready(Ok(()))
             } else if self
                 .tx
-                .available_out_interrupts()
+                .out_interrupts()
                 .contains(DmaTxInterrupt::DescriptorError)
             {
                 self.tx.clear_interrupts();
@@ -2895,7 +2889,7 @@ pub(crate) mod asynch {
             if self.rx.is_done() {
                 self.rx.clear_interrupts();
                 Poll::Ready(Ok(()))
-            } else if !self.rx.available_in_interrupts().is_disjoint(
+            } else if !self.rx.in_interrupts().is_disjoint(
                 DmaRxInterrupt::DescriptorError
                     | DmaRxInterrupt::DescriptorEmpty
                     | DmaRxInterrupt::ErrorEof,
@@ -2958,16 +2952,12 @@ pub(crate) mod asynch {
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
             TX::waker().register(cx.waker());
-            if self
-                .tx
-                .available_out_interrupts()
-                .contains(DmaTxInterrupt::Done)
-            {
+            if self.tx.out_interrupts().contains(DmaTxInterrupt::Done) {
                 self.tx.clear_out(DmaTxInterrupt::Done);
                 Poll::Ready(Ok(()))
             } else if self
                 .tx
-                .available_out_interrupts()
+                .out_interrupts()
                 .contains(DmaTxInterrupt::DescriptorError)
             {
                 self.tx.clear_interrupts();
@@ -3022,14 +3012,10 @@ pub(crate) mod asynch {
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
             RX::waker().register(cx.waker());
-            if self
-                .rx
-                .available_in_interrupts()
-                .contains(DmaRxInterrupt::Done)
-            {
+            if self.rx.in_interrupts().contains(DmaRxInterrupt::Done) {
                 self.rx.clear_in(DmaRxInterrupt::Done);
                 Poll::Ready(Ok(()))
-            } else if !self.rx.available_in_interrupts().is_disjoint(
+            } else if !self.rx.in_interrupts().is_disjoint(
                 DmaRxInterrupt::DescriptorError
                     | DmaRxInterrupt::DescriptorEmpty
                     | DmaRxInterrupt::ErrorEof,
@@ -3064,7 +3050,7 @@ pub(crate) mod asynch {
     }
 
     fn handle_interrupt<Channel: RegisterAccess, Rx: RxChannel<Channel>, Tx: TxChannel<Channel>>() {
-        if Channel::available_in_interrupts().is_disjoint(
+        if Channel::in_interrupts().is_disjoint(
             DmaRxInterrupt::DescriptorError
                 | DmaRxInterrupt::DescriptorEmpty
                 | DmaRxInterrupt::ErrorEof,
@@ -3079,31 +3065,31 @@ pub(crate) mod asynch {
             Rx::waker().wake()
         }
 
-        if Channel::available_out_interrupts().contains(DmaTxInterrupt::DescriptorError) {
+        if Channel::out_interrupts().contains(DmaTxInterrupt::DescriptorError) {
             Channel::unlisten_out(
                 DmaTxInterrupt::DescriptorError | DmaTxInterrupt::TotalEof | DmaTxInterrupt::Done,
             );
             Tx::waker().wake()
         }
 
-        if Channel::available_in_interrupts().contains(DmaRxInterrupt::SuccessfulEof) {
+        if Channel::in_interrupts().contains(DmaRxInterrupt::SuccessfulEof) {
             Channel::unlisten_in(DmaRxInterrupt::SuccessfulEof);
             Rx::waker().wake()
         }
 
-        if Channel::available_in_interrupts().contains(DmaRxInterrupt::Done) {
+        if Channel::in_interrupts().contains(DmaRxInterrupt::Done) {
             Channel::unlisten_in(DmaRxInterrupt::Done);
             Rx::waker().wake()
         }
 
-        if Channel::available_out_interrupts().contains(DmaTxInterrupt::TotalEof)
+        if Channel::out_interrupts().contains(DmaTxInterrupt::TotalEof)
             && Channel::is_listening_out().contains(DmaTxInterrupt::TotalEof)
         {
             Channel::unlisten_out(DmaTxInterrupt::TotalEof);
             Tx::waker().wake()
         }
 
-        if Channel::available_out_interrupts().contains(DmaTxInterrupt::Done) {
+        if Channel::out_interrupts().contains(DmaTxInterrupt::Done) {
             Channel::unlisten_out(DmaTxInterrupt::Done);
             Tx::waker().wake()
         }
