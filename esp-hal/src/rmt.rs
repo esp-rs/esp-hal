@@ -1124,9 +1124,7 @@ pub mod asynch {
     #[cfg(not(any(esp32, esp32s3)))]
     const NUM_CHANNELS: usize = 4;
 
-    #[allow(clippy::declare_interior_mutable_const)]
-    const INIT: AtomicWaker = AtomicWaker::new();
-    static WAKER: [AtomicWaker; NUM_CHANNELS] = [INIT; NUM_CHANNELS];
+    static WAKER: [AtomicWaker; NUM_CHANNELS] = [const { AtomicWaker::new() }; NUM_CHANNELS];
 
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct RmtTxFuture<T>

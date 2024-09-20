@@ -56,6 +56,10 @@ name    = "i2c"
 harness = false
 
 [[test]]
+name    = "init"
+harness = false
+
+[[test]]
 name    = "i2s"
 harness = false
 

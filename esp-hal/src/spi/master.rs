@@ -109,9 +109,8 @@ const FIFO_SIZE: usize = 64;
 const FIFO_SIZE: usize = 72;
 
 /// Padding byte for empty write transfers
-const EMPTY_WRITE_PAD: u8 = 0x00u8;
+const EMPTY_WRITE_PAD: u8 = 0x00;
 
-#[allow(unused)]
 const MAX_DMA_SIZE: usize = 32736;
 
 /// SPI commands, each consisting of a 16-bit command value and a data mode.
@@ -490,7 +489,7 @@ impl<'d, T> Spi<'d, T, FullDuplexMode>
 where
     T: Instance,
 {
-    /// Read bytes from SPI.
+    /// Read a byte from SPI.
     ///
     /// Sends out a stuffing byte for every byte to read. This function doesn't
     /// perform flushing. If you want to read the response to something you
@@ -1154,8 +1153,10 @@ mod dma {
         ///
         /// This method blocks until the transfer is finished and returns the
         /// `SpiDma` instance and the associated buffer.
-        pub fn wait(mut self) -> (SpiDma<'d, T, C, D, M>, Buf) {
-            self.spi_dma.spi.flush().ok();
+        pub fn wait(self) -> (SpiDma<'d, T, C, D, M>, Buf) {
+            while !self.is_done() {
+                // Wait for the transfer to complete
+            }
             fence(Ordering::Acquire);
             (self.spi_dma, self.dma_buf)
         }
@@ -2221,10 +2222,7 @@ pub trait InstanceDma: Instance {
             reg_block.dma_in_link().write(|w| w.bits(0));
         }
 
-        self.configure_datalen(usize::max(rx_buffer.length(), tx_buffer.length()) as u32 * 8);
-
-        rx.is_done();
-        tx.is_done();
+        self.configure_datalen(rx_buffer.length(), tx_buffer.length());
 
         // re-enable the MISO and MOSI
         reg_block
@@ -2232,15 +2230,14 @@ pub trait InstanceDma: Instance {
             .modify(|_, w| w.usr_miso().bit(true).usr_mosi().bit(true));
 
         self.enable_dma();
-        self.clear_dma_interrupts();
 
-        reset_dma_before_load_dma_dscr(reg_block);
         rx.prepare_transfer(self.dma_peripheral(), rx_buffer)
             .and_then(|_| rx.start_transfer())?;
         tx.prepare_transfer(self.dma_peripheral(), tx_buffer)
             .and_then(|_| tx.start_transfer())?;
 
-        reset_dma_before_usr_cmd(reg_block);
+        #[cfg(gdma)]
+        self.reset_dma();
 
         self.start_operation();
 
@@ -2255,9 +2252,7 @@ pub trait InstanceDma: Instance {
         full_duplex: bool,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
-        self.configure_datalen(buffer.length() as u32 * 8);
-
-        tx.is_done();
+        self.configure_datalen(0, buffer.length());
 
         // disable MISO and re-enable MOSI (DON'T do it for half-duplex)
         if full_duplex {
@@ -2281,14 +2276,12 @@ pub trait InstanceDma: Instance {
         }
 
         self.enable_dma();
-        self.clear_dma_interrupts();
 
-        reset_dma_before_load_dma_dscr(reg_block);
+        tx.prepare_transfer(self.dma_peripheral(), buffer)
+            .and_then(|_| tx.start_transfer())?;
 
-        tx.prepare_transfer(self.dma_peripheral(), buffer)?;
-        tx.start_transfer()?;
-
-        reset_dma_before_usr_cmd(reg_block);
+        #[cfg(gdma)]
+        self.reset_dma();
 
         self.start_operation();
 
@@ -2311,9 +2304,7 @@ pub trait InstanceDma: Instance {
             reg_block.dma_in_link().write(|w| w.bits(0));
         }
 
-        self.configure_datalen(buffer.length() as u32 * 8);
-
-        rx.is_done();
+        self.configure_datalen(buffer.length(), 0);
 
         // re-enable MISO and disable MOSI (DON'T do it for half-duplex)
         if full_duplex {
@@ -2323,14 +2314,12 @@ pub trait InstanceDma: Instance {
         }
 
         self.enable_dma();
-        self.clear_dma_interrupts();
 
-        reset_dma_before_load_dma_dscr(reg_block);
+        rx.prepare_transfer(self.dma_peripheral(), buffer)
+            .and_then(|_| rx.start_transfer())?;
 
-        rx.prepare_transfer(self.dma_peripheral(), buffer)?;
-        rx.start_transfer()?;
-
-        reset_dma_before_usr_cmd(reg_block);
+        #[cfg(gdma)]
+        self.reset_dma();
 
         self.start_operation();
 
@@ -2346,32 +2335,63 @@ pub trait InstanceDma: Instance {
         }
     }
 
-    #[cfg(gdma)]
     fn enable_dma(&self) {
-        let reg_block = self.register_block();
-        reg_block.dma_conf().modify(|_, w| w.dma_tx_ena().set_bit());
-        reg_block.dma_conf().modify(|_, w| w.dma_rx_ena().set_bit());
+        #[cfg(gdma)]
+        {
+            // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
+            let reg_block = self.register_block();
+            reg_block.dma_conf().modify(|_, w| {
+                w.dma_tx_ena().set_bit();
+                w.dma_rx_ena().set_bit()
+            });
+        }
+        #[cfg(pdma)]
+        self.reset_dma();
     }
 
-    #[cfg(pdma)]
-    fn enable_dma(&self) {
-        // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
+    fn reset_dma(&self) {
+        #[cfg(pdma)]
+        {
+            let reg_block = self.register_block();
+            reg_block.dma_conf().modify(|_, w| {
+                w.out_rst().set_bit();
+                w.in_rst().set_bit();
+                w.ahbm_fifo_rst().set_bit();
+                w.ahbm_rst().set_bit()
+            });
+            reg_block.dma_conf().modify(|_, w| {
+                w.out_rst().clear_bit();
+                w.in_rst().clear_bit();
+                w.ahbm_fifo_rst().clear_bit();
+                w.ahbm_rst().clear_bit()
+            });
+        }
+        #[cfg(gdma)]
+        {
+            let reg_block = self.register_block();
+            reg_block.dma_conf().modify(|_, w| {
+                w.rx_afifo_rst().set_bit();
+                w.buf_afifo_rst().set_bit();
+                w.dma_afifo_rst().set_bit()
+            });
+            reg_block.dma_conf().modify(|_, w| {
+                w.rx_afifo_rst().clear_bit();
+                w.buf_afifo_rst().clear_bit();
+                w.dma_afifo_rst().clear_bit()
+            });
+        }
+        self.clear_dma_interrupts();
     }
 
     #[cfg(gdma)]
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
         reg_block.dma_int_clr().write(|w| {
-            w.dma_infifo_full_err()
-                .clear_bit_by_one()
-                .dma_outfifo_empty_err()
-                .clear_bit_by_one()
-                .trans_done()
-                .clear_bit_by_one()
-                .mst_rx_afifo_wfull_err()
-                .clear_bit_by_one()
-                .mst_tx_afifo_rempty_err()
-                .clear_bit_by_one()
+            w.dma_infifo_full_err().clear_bit_by_one();
+            w.dma_outfifo_empty_err().clear_bit_by_one();
+            w.trans_done().clear_bit_by_one();
+            w.mst_rx_afifo_wfull_err().clear_bit_by_one();
+            w.mst_tx_afifo_rempty_err().clear_bit_by_one()
         });
     }
 
@@ -2379,66 +2399,17 @@ pub trait InstanceDma: Instance {
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
         reg_block.dma_int_clr().write(|w| {
-            w.inlink_dscr_empty()
-                .clear_bit_by_one()
-                .outlink_dscr_error()
-                .clear_bit_by_one()
-                .inlink_dscr_error()
-                .clear_bit_by_one()
-                .in_done()
-                .clear_bit_by_one()
-                .in_err_eof()
-                .clear_bit_by_one()
-                .in_suc_eof()
-                .clear_bit_by_one()
-                .out_done()
-                .clear_bit_by_one()
-                .out_eof()
-                .clear_bit_by_one()
-                .out_total_eof()
-                .clear_bit_by_one()
+            w.inlink_dscr_empty().clear_bit_by_one();
+            w.outlink_dscr_error().clear_bit_by_one();
+            w.inlink_dscr_error().clear_bit_by_one();
+            w.in_done().clear_bit_by_one();
+            w.in_err_eof().clear_bit_by_one();
+            w.in_suc_eof().clear_bit_by_one();
+            w.out_done().clear_bit_by_one();
+            w.out_eof().clear_bit_by_one();
+            w.out_total_eof().clear_bit_by_one()
         });
     }
-}
-
-fn reset_dma_before_usr_cmd(_reg_block: &RegisterBlock) {
-    #[cfg(gdma)]
-    _reg_block.dma_conf().modify(|_, w| {
-        w.rx_afifo_rst()
-            .set_bit()
-            .buf_afifo_rst()
-            .set_bit()
-            .dma_afifo_rst()
-            .set_bit()
-    });
-}
-
-#[cfg(gdma)]
-fn reset_dma_before_load_dma_dscr(_reg_block: &RegisterBlock) {}
-
-#[cfg(pdma)]
-fn reset_dma_before_load_dma_dscr(reg_block: &RegisterBlock) {
-    reg_block.dma_conf().modify(|_, w| {
-        w.out_rst()
-            .set_bit()
-            .in_rst()
-            .set_bit()
-            .ahbm_fifo_rst()
-            .set_bit()
-            .ahbm_rst()
-            .set_bit()
-    });
-
-    reg_block.dma_conf().modify(|_, w| {
-        w.out_rst()
-            .clear_bit()
-            .in_rst()
-            .clear_bit()
-            .ahbm_fifo_rst()
-            .clear_bit()
-            .ahbm_rst()
-            .clear_bit()
-    });
 }
 
 impl InstanceDma for crate::peripherals::SPI2 {}
@@ -3032,7 +3003,7 @@ pub trait Instance: private::Sealed {
             return Err(nb::Error::WouldBlock);
         }
 
-        self.configure_datalen(8);
+        self.configure_datalen(0, 1);
 
         let reg_block = self.register_block();
         reg_block.w(0).write(|w| w.buf().set(word.into()));
@@ -3061,7 +3032,7 @@ pub trait Instance: private::Sealed {
         // The fifo has a limited fixed size, so the data must be chunked and then
         // transmitted
         for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
-            self.configure_datalen(chunk.len() as u32 * 8);
+            self.configure_datalen(0, chunk.len());
 
             {
                 // TODO: replace with `array_chunks` and `from_le_bytes`
@@ -3130,7 +3101,7 @@ pub trait Instance: private::Sealed {
         let reg_block = self.register_block();
 
         for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.configure_datalen(chunk.len() as u32 * 8);
+            self.configure_datalen(chunk.len(), 0);
 
             for (index, w_reg) in (0..chunk.len()).step_by(4).zip(reg_block.w_iter()) {
                 let reg_val = w_reg.read().bits();
@@ -3354,46 +3325,63 @@ pub trait Instance: private::Sealed {
                 .modify(|_, w| unsafe { w.usr_dummy_cyclelen().bits(dummy - 1) });
         }
 
-        self.configure_datalen(buffer.len() as u32 * 8);
+        self.configure_datalen(buffer.len(), 0);
         self.start_operation();
         self.flush()?;
         self.read_bytes_from_fifo(buffer)
     }
 
-    #[cfg(gdma)]
     fn update(&self) {
-        let reg_block = self.register_block();
+        cfg_if::cfg_if! {
+            if #[cfg(gdma)] {
+                let reg_block = self.register_block();
 
-        reg_block.cmd().modify(|_, w| w.update().set_bit());
+                reg_block.cmd().modify(|_, w| w.update().set_bit());
 
-        while reg_block.cmd().read().update().bit_is_set() {
-            // wait
+                while reg_block.cmd().read().update().bit_is_set() {
+                    // wait
+                }
+            } else if #[cfg(esp32)] {
+                xtensa_lx::timer::delay(1);
+            } else {
+                // Doesn't seem to be needed for ESP32-S2
+            }
         }
     }
 
-    #[cfg(pdma)]
-    fn update(&self) {
-        // not need/available on ESP32/ESP32S2
-    }
-
-    fn configure_datalen(&self, len: u32) {
+    fn configure_datalen(&self, rx_len_bytes: usize, tx_len_bytes: usize) {
         let reg_block = self.register_block();
-        let len = if len > 0 { len - 1 } else { 0 };
 
-        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
-        reg_block
-            .ms_dlen()
-            .write(|w| unsafe { w.ms_data_bitlen().bits(len) });
+        let rx_len = rx_len_bytes as u32 * 8;
+        let tx_len = tx_len_bytes as u32 * 8;
 
-        #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3)))]
-        {
-            reg_block
-                .mosi_dlen()
-                .write(|w| unsafe { w.usr_mosi_dbitlen().bits(len) });
+        let rx_len = rx_len.saturating_sub(1);
+        let tx_len = tx_len.saturating_sub(1);
 
-            reg_block
-                .miso_dlen()
-                .write(|w| unsafe { w.usr_miso_dbitlen().bits(len) });
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                let len = rx_len.max(tx_len);
+                reg_block
+                    .mosi_dlen()
+                    .write(|w| unsafe { w.usr_mosi_dbitlen().bits(len) });
+
+                reg_block
+                    .miso_dlen()
+                    .write(|w| unsafe { w.usr_miso_dbitlen().bits(len) });
+            } else if #[cfg(esp32s2)] {
+                reg_block
+                    .mosi_dlen()
+                    .write(|w| unsafe { w.usr_mosi_dbitlen().bits(tx_len) });
+
+                reg_block
+                    .miso_dlen()
+                    .write(|w| unsafe { w.usr_miso_dbitlen().bits(rx_len) });
+            } else {
+                reg_block
+                    .ms_dlen()
+                    .write(|w| unsafe { w.ms_data_bitlen().bits(rx_len.max(tx_len)) });
+            }
+
         }
     }
 }

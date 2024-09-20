@@ -1849,7 +1849,6 @@ where
 mod asynch {
     use core::task::Poll;
 
-    use cfg_if::cfg_if;
     use embassy_sync::waitqueue::AtomicWaker;
     use enumset::{EnumSet, EnumSetType};
     use procmacros::handler;
@@ -1857,20 +1856,10 @@ mod asynch {
     use super::*;
     use crate::Async;
 
-    cfg_if! {
-        if #[cfg(all(uart0, uart1, uart2))] {
-            const NUM_UART: usize = 3;
-        } else if #[cfg(all(uart0, uart1))] {
-            const NUM_UART: usize = 2;
-        } else if #[cfg(uart0)] {
-            const NUM_UART: usize = 1;
-        }
-    }
+    const NUM_UART: usize = 1 + cfg!(uart1) as usize + cfg!(uart2) as usize;
 
-    #[allow(clippy::declare_interior_mutable_const)]
-    const INIT: AtomicWaker = AtomicWaker::new();
-    static TX_WAKERS: [AtomicWaker; NUM_UART] = [INIT; NUM_UART];
-    static RX_WAKERS: [AtomicWaker; NUM_UART] = [INIT; NUM_UART];
+    static TX_WAKERS: [AtomicWaker; NUM_UART] = [const { AtomicWaker::new() }; NUM_UART];
+    static RX_WAKERS: [AtomicWaker; NUM_UART] = [const { AtomicWaker::new() }; NUM_UART];
 
     #[derive(EnumSetType, Debug)]
     pub(crate) enum TxEvent {

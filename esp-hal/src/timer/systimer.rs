@@ -79,7 +79,7 @@ use fugit::{Instant, MicrosDurationU32, MicrosDurationU64};
 use super::{Error, Timer as _};
 use crate::{
     interrupt::{self, InterruptHandler},
-    lock,
+    lock::{lock, Lock},
     peripheral::Peripheral,
     peripherals::{Interrupt, SYSTIMER},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
@@ -87,7 +87,6 @@ use crate::{
     Blocking,
     Cpu,
     InterruptConfigurable,
-    LockState,
     Mode,
 };
 
@@ -1009,8 +1008,8 @@ where
     }
 }
 
-static CONF_LOCK: LockState = LockState::new();
-static INT_ENA_LOCK: LockState = LockState::new();
+static CONF_LOCK: Lock = Lock::new();
+static INT_ENA_LOCK: Lock = Lock::new();
 
 // Async functionality of the system timer.
 mod asynch {
@@ -1026,9 +1025,7 @@ mod asynch {
 
     const NUM_ALARMS: usize = 3;
 
-    #[allow(clippy::declare_interior_mutable_const)]
-    const INIT: AtomicWaker = AtomicWaker::new();
-    static WAKERS: [AtomicWaker; NUM_ALARMS] = [INIT; NUM_ALARMS];
+    static WAKERS: [AtomicWaker; NUM_ALARMS] = [const { AtomicWaker::new() }; NUM_ALARMS];
 
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct AlarmFuture<'a, COMP: Comparator, UNIT: Unit> {

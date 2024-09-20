@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `Rtc::set_current_time` to allow setting RTC time, and `Rtc::current_time` to getting RTC time while taking into account boot time (#1883)
 - Added APIs to allow connecting signals through the GPIO matrix. (#2128)
 - Implement `TryFrom<u32>` for `ledc::timer::config::Duty` (#1984)
+- Expose `RtcClock::get_xtal_freq` and `RtcClock::get_slow_freq` publically for all chips (#2183)
+- TWAI support for ESP32-H2 (#2199)
+- Added a way to configure watchdogs in `esp_hal::init` (#2180)
 
 ### Changed
 
@@ -46,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed `DummyPin` to `NoPin` and removed all internal logic from it. (#2133)
 - The `NO_PIN` constant has been removed. (#2133)
 - MSRV bump to 1.79 (#2156)
+- Allow handling interrupts while trying to lock critical section on multi-core chips. (#2197)
+- Removed the PS-RAM related features, replaced by `quad-psram`/`octal-psram`, `init_psram` takes a configuration parameter, it's now possible to auto-detect PS-RAM size (#2178)
 
 ### Fixed
 
@@ -58,6 +63,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix I2C ending up in a state when only re-creating the peripheral makes it useable again (#2141)
 - Fix `SpiBus::transfer` transferring data twice in some cases (#2159)
 - Fixed UART freezing when using `RcFast` clock source on ESP32-C2/C3 (#2170)
+- I2S: on ESP32 and ESP32-S2 data is now output to the right (WS=1) channel first. (#2194)
+- SPI: Fixed an issue where unexpected data was written outside of the read buffer (#2179)
+- SPI: Fixed an issue where `wait` has returned before the DMA has finished writing the memory (#2179)
+- SPI: Fixed an issue where repeated calls to `dma_transfer` may end up looping indefinitely (#2179)
+- SPI: Fixed an issue that prevented correctly reading the first byte in a transaction (#2179)
 
 ### Removed
 

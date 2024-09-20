@@ -188,11 +188,10 @@ mod peripheral_macros {
                     $crate::create_peripheral!($(#[$cfg])? $name <= $from_pac);
                 )*
 
-
                 $crate::impl_dma_eligible!(SPI2,Spi2);
                 #[cfg(any(pdma, esp32s3))]
                 $crate::impl_dma_eligible!(SPI3,Spi3);
-                #[cfg(any(esp32c6, esp32h2))]
+                #[cfg(any(esp32c2, esp32c6, esp32h2))]
                 $crate::impl_dma_eligible!(MEM2MEM1,Mem2Mem1);
                 #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
                 $crate::impl_dma_eligible!(UHCI0,Uhci0);

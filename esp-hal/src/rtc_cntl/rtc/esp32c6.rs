@@ -1372,7 +1372,7 @@ impl Clock for RtcFastClock {
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 /// RTC SLOW_CLK frequency values
-pub(crate) enum RtcSlowClock {
+pub enum RtcSlowClock {
     /// Select RC_SLOW_CLK as RTC_SLOW_CLK source
     RtcSlowClockRcSlow  = 0,
     /// Select XTAL32K_CLK as RTC_SLOW_CLK source
@@ -1426,7 +1426,7 @@ impl RtcClock {
     const CAL_FRACT: u32 = 19;
 
     // rtc_clk_xtal_freq_get
-    fn get_xtal_freq_mhz() -> u32 {
+    pub(crate) fn get_xtal_freq_mhz() -> u32 {
         let xtal_freq_reg = unsafe { lp_aon().store4().read().bits() };
 
         // Values of RTC_XTAL_FREQ_REG and RTC_APB_FREQ_REG are stored as two copies in
@@ -1447,7 +1447,7 @@ impl RtcClock {
     /// Get main XTAL frequency
     /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the
     /// bootloader, as passed to rtc_clk_init function.
-    fn get_xtal_freq() -> XtalClock {
+    pub fn get_xtal_freq() -> XtalClock {
         match Self::get_xtal_freq_mhz() {
             40 => XtalClock::RtcXtalFreq40M,
             other => XtalClock::RtcXtalFreqOther(other),
@@ -1455,7 +1455,7 @@ impl RtcClock {
     }
 
     /// Get the RTC_SLOW_CLK source
-    pub(crate) fn get_slow_freq() -> RtcSlowClock {
+    pub fn get_slow_freq() -> RtcSlowClock {
         let lp_clrst = unsafe { lp_clkrst() };
 
         let slow_freq = lp_clrst.lp_clk_conf().read().slow_clk_sel().bits();

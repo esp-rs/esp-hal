@@ -1,8 +1,6 @@
 pub mod common;
 pub mod malloc;
 pub mod misc;
-#[cfg(any(feature = "wifi-logs", nightly))]
-pub mod syslog;
 pub mod timer_compat;
 
 pub mod queue {

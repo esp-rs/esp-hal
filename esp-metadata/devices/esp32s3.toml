@@ -68,6 +68,7 @@ symbols = [
     "bt",
     "wifi",
     "psram",
+    "octal_psram",
     "ulp_riscv_core",
     "timg_timer1",
     "very_large_intr_status",

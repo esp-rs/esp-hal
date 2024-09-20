@@ -205,6 +205,7 @@ where
 bitfield::bitfield! {
     #[doc(hidden)]
     #[derive(Clone, Copy)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub struct DmaDescriptorFlags(u32);
 
     u16;
@@ -227,6 +228,7 @@ impl Debug for DmaDescriptorFlags {
 
 /// A DMA transfer descriptor.
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct DmaDescriptor {
     pub(crate) flags: DmaDescriptorFlags,
     pub(crate) buffer: *mut u8,
@@ -444,6 +446,29 @@ macro_rules! dma_circular_descriptors {
     };
 }
 
+/// Declares a DMA buffer with a specific size, aligned to 4 bytes
+#[doc(hidden)]
+#[macro_export]
+macro_rules! declare_aligned_dma_buffer {
+    ($name:ident, $size:expr) => {
+        // ESP32 requires word alignment for DMA buffers.
+        // ESP32-S2 technically supports byte-aligned DMA buffers, but the
+        // transfer ends up writing out of bounds.
+        // if the buffer's length is 2 or 3 (mod 4).
+        static mut $name: [u32; ($size + 3) / 4] = [0; ($size + 3) / 4];
+    };
+}
+
+/// Turns the potentially oversized static `u32`` array reference into a
+/// correctly sized `u8` one
+#[doc(hidden)]
+#[macro_export]
+macro_rules! as_mut_byte_array {
+    ($name:ident, $size:expr) => {
+        unsafe { &mut *($name.as_mut_ptr() as *mut [u8; $size]) }
+    };
+}
+
 /// Convenience macro to create DMA buffers and descriptors with specific chunk
 /// size.
 ///
@@ -461,15 +486,15 @@ macro_rules! dma_circular_descriptors {
 #[macro_export]
 macro_rules! dma_buffers_chunk_size {
     ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
-        static mut RX_BUFFER: [u8; $rx_size] = [0u8; $rx_size];
-        static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
+        $crate::declare_aligned_dma_buffer!(RX_BUFFER, $rx_size);
+        $crate::declare_aligned_dma_buffer!(TX_BUFFER, $tx_size);
         let (mut rx_descriptors, mut tx_descriptors) =
             $crate::dma_descriptors_chunk_size!($rx_size, $tx_size, $chunk_size);
         unsafe {
             (
-                &mut RX_BUFFER,
+                $crate::as_mut_byte_array!(RX_BUFFER, $rx_size),
                 rx_descriptors,
-                &mut TX_BUFFER,
+                $crate::as_mut_byte_array!(TX_BUFFER, $tx_size),
                 tx_descriptors,
             )
         }
@@ -497,15 +522,15 @@ macro_rules! dma_buffers_chunk_size {
 #[macro_export]
 macro_rules! dma_circular_buffers_chunk_size {
     ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
-        static mut RX_BUFFER: [u8; $rx_size] = [0u8; $rx_size];
-        static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
+        $crate::declare_aligned_dma_buffer!(RX_BUFFER, $rx_size);
+        $crate::declare_aligned_dma_buffer!(TX_BUFFER, $tx_size);
         let (mut rx_descriptors, mut tx_descriptors) =
             $crate::dma_circular_descriptors_chunk_size!($rx_size, $tx_size, $chunk_size);
         unsafe {
             (
-                &mut RX_BUFFER,
+                $crate::as_mut_byte_array!(RX_BUFFER, $rx_size),
                 rx_descriptors,
-                &mut TX_BUFFER,
+                $crate::as_mut_byte_array!(TX_BUFFER, $tx_size),
                 tx_descriptors,
             )
         }
@@ -663,7 +688,7 @@ pub enum DmaPeripheral {
     Spi2      = 0,
     #[cfg(any(pdma, esp32s3))]
     Spi3      = 1,
-    #[cfg(any(esp32c6, esp32h2))]
+    #[cfg(any(esp32c2, esp32c6, esp32h2))]
     Mem2Mem1  = 1,
     #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
     Uhci0     = 2,
@@ -1727,11 +1752,6 @@ pub trait RegisterAccess: crate::private::Sealed {
 
 #[doc(hidden)]
 pub trait ChannelTypes: crate::private::Sealed {
-    type Binder: InterruptBinder;
-}
-
-#[doc(hidden)]
-pub trait InterruptBinder: crate::private::Sealed {
     fn set_isr(handler: InterruptHandler);
 }
 
@@ -1757,7 +1777,7 @@ where
     ///
     /// Interrupts are not enabled at the peripheral level here.
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        <C::Channel as ChannelTypes>::Binder::set_isr(handler);
+        <C::Channel as ChannelTypes>::set_isr(handler);
     }
 
     /// Listen for the given interrupts
@@ -3099,65 +3119,39 @@ pub(crate) mod asynch {
     pub(crate) mod interrupt {
         use procmacros::handler;
 
-        use super::*;
+        pub(crate) fn interrupt_handler_ch<const CH: u8>() {
+            use crate::dma::gdma::{Channel, ChannelRxImpl, ChannelTxImpl};
+
+            super::handle_interrupt::<Channel<CH>, ChannelRxImpl<CH>, ChannelTxImpl<CH>>();
+        }
 
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_ch0() {
-            use crate::dma::gdma::{
-                Channel0 as Channel,
-                Channel0RxImpl as ChannelRxImpl,
-                Channel0TxImpl as ChannelTxImpl,
-            };
-
-            handle_interrupt::<Channel, ChannelRxImpl, ChannelTxImpl>();
+            interrupt_handler_ch::<0>();
         }
 
         #[cfg(not(esp32c2))]
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_ch1() {
-            use crate::dma::gdma::{
-                Channel1 as Channel,
-                Channel1RxImpl as ChannelRxImpl,
-                Channel1TxImpl as ChannelTxImpl,
-            };
-
-            handle_interrupt::<Channel, ChannelRxImpl, ChannelTxImpl>();
+            interrupt_handler_ch::<1>();
         }
 
         #[cfg(not(esp32c2))]
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_ch2() {
-            use crate::dma::gdma::{
-                Channel2 as Channel,
-                Channel2RxImpl as ChannelRxImpl,
-                Channel2TxImpl as ChannelTxImpl,
-            };
-
-            handle_interrupt::<Channel, ChannelRxImpl, ChannelTxImpl>();
+            interrupt_handler_ch::<2>();
         }
 
         #[cfg(esp32s3)]
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_ch3() {
-            use crate::dma::gdma::{
-                Channel3 as Channel,
-                Channel3RxImpl as ChannelRxImpl,
-                Channel3TxImpl as ChannelTxImpl,
-            };
-
-            handle_interrupt::<Channel, ChannelRxImpl, ChannelTxImpl>();
+            interrupt_handler_ch::<3>();
         }
 
         #[cfg(esp32s3)]
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_ch4() {
-            use crate::dma::gdma::{
-                Channel4 as Channel,
-                Channel4RxImpl as ChannelRxImpl,
-                Channel4TxImpl as ChannelTxImpl,
-            };
-
-            handle_interrupt::<Channel, ChannelRxImpl, ChannelTxImpl>();
+            interrupt_handler_ch::<4>();
         }
     }
 
@@ -3178,6 +3172,7 @@ pub(crate) mod asynch {
             handle_interrupt::<Channel, ChannelRxImpl, ChannelTxImpl>();
         }
 
+        #[cfg(spi3)]
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_spi3_dma() {
             use crate::dma::pdma::{
@@ -3189,6 +3184,7 @@ pub(crate) mod asynch {
             handle_interrupt::<Channel, ChannelRxImpl, ChannelTxImpl>();
         }
 
+        #[cfg(i2s0)]
         #[handler(priority = crate::interrupt::Priority::max())]
         pub(crate) fn interrupt_handler_i2s0() {
             use crate::dma::pdma::{

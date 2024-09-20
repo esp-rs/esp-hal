@@ -556,7 +556,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     }
                     if device.contains("psram") {
                         // TODO this doesn't test octal psram as it would require a separate build
-                        features.push_str(",psram-4m,psram-80mhz")
+                        features.push_str(",quad-psram")
                     }
                     if matches!(chip, Chip::Esp32c6 | Chip::Esp32h2) {
                         features.push_str(",flip-link")
@@ -585,12 +585,13 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
                 Package::EspIeee802154 => {
                     if device.contains("ieee802154") {
+                        let features = format!("--features={chip},sys-logs");
                         lint_package(
                             &path,
                             &[
                                 "-Zbuild-std=core",
                                 &format!("--target={}", chip.target()),
-                                &format!("--features={chip}"),
+                                &features,
                             ],
                         )?;
                     }
@@ -640,9 +641,8 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 }
 
                 Package::EspWifi => {
-                    let mut features = format!(
-                        "--features={chip},async,ps-min-modem,defmt,dump-packets,wifi-logs"
-                    );
+                    let mut features =
+                        format!("--features={chip},async,ps-min-modem,defmt,dump-packets,sys-logs");
 
                     if device.contains("wifi") {
                         features.push_str(",wifi-default,esp-now,embedded-svc,embassy-net,sniffer")

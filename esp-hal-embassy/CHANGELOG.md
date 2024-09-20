@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- MSRV bump to 1.79 (#2156)
+
 ### Fixed
 
 ### Removed

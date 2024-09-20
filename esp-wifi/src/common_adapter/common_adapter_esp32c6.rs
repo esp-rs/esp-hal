@@ -130,9 +130,3 @@ pub(crate) unsafe fn phy_disable_clock() {
     unwrap!(RADIO_CLOCKS.as_mut()).disable(RadioPeripherals::Phy);
     trace!("phy_disable_clock done!");
 }
-
-#[no_mangle]
-pub extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
-    // JUST SUPPORT 40MHz XTAL for now
-    40
-}

@@ -26,13 +26,6 @@ struct Mutex {
     recursive: bool,
 }
 
-static mut MUTEXES: [Mutex; 10] = [Mutex {
-    locking_pid: 0xffff_ffff,
-    count: 0,
-    recursive: false,
-}; 10];
-static mut MUTEX_IDX_CURRENT: usize = 0;
-
 /// A naive and pretty much unsafe queue to back the queues used in drivers and
 /// supplicant code
 struct RawQueue {
@@ -117,33 +110,21 @@ unsafe extern "C" fn strnlen(chars: *const u8, maxlen: usize) -> usize {
 }
 
 pub fn sem_create(max: u32, init: u32) -> *mut c_void {
-    critical_section::with(|_| unsafe {
+    unsafe {
         let ptr = malloc(4) as *mut u32;
         ptr.write_volatile(init);
 
         trace!("sem created res = {:?}", ptr);
         ptr.cast()
-    })
+    }
 }
 
 pub fn sem_delete(semphr: *mut c_void) {
     trace!(">>> sem delete");
 
-    // TODO remove this once fixed in esp_supplicant AND we updated to the fixed -
-    // JIRA: WIFI-6676
     unsafe {
-        if semphr as usize > addr_of!(MUTEXES) as usize
-            && semphr as usize
-                <= unsafe { addr_of!(MUTEXES).byte_add(size_of_val(&*addr_of!(MUTEXES))) } as usize
-        {
-            warn!("trying to remove a mutex via sem_delete");
-            return;
-        }
-    }
-
-    critical_section::with(|_| unsafe {
         free(semphr.cast());
-    })
+    }
 }
 
 pub fn sem_take(semphr: *mut c_void, tick: u32) -> i32 {
@@ -200,14 +181,27 @@ pub fn thread_sem_get() -> *mut c_void {
 }
 
 pub fn create_recursive_mutex() -> *mut c_void {
-    critical_section::with(|_| unsafe {
-        let ptr = &mut MUTEXES[MUTEX_IDX_CURRENT] as *mut Mutex;
-        (*ptr).recursive = true;
-        MUTEX_IDX_CURRENT += 1;
-        memory_fence();
-        trace!("recursive_mutex_create called {:?}", ptr);
-        ptr as *mut c_void
-    })
+    let mutex = Mutex {
+        locking_pid: 0xffff_ffff,
+        count: 0,
+        recursive: true,
+    };
+
+    let ptr = unsafe { malloc(size_of_val(&mutex) as u32) as *mut Mutex };
+    unsafe {
+        ptr.write(mutex);
+    }
+    memory_fence();
+
+    trace!("recursive_mutex_create called {:?}", ptr);
+    ptr as *mut c_void
+}
+
+pub fn mutex_delete(mutex: *mut c_void) {
+    let ptr = mutex as *mut Mutex;
+    unsafe {
+        free(mutex.cast());
+    }
 }
 
 /// Lock a mutex. Block until successful.

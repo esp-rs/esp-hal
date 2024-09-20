@@ -122,8 +122,13 @@ pub fn build_documentation(
 
     let mut features = vec![chip.to_string()];
 
+    // future enhancement: see https://github.com/esp-rs/esp-hal/issues/2195
     if matches!(package, Package::EspHal) {
-        features.push("ci".to_owned())
+        features.push("ci".to_owned());
+
+        if [Chip::Esp32, Chip::Esp32s2, Chip::Esp32s3].contains(&chip) {
+            features.push("quad-psram".to_owned());
+        }
     }
 
     // Build up an array of command-line arguments to pass to `cargo`:

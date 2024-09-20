@@ -219,52 +219,6 @@ pub unsafe extern "C" fn puts(s: *const u8) {
     info!("{}", cstr);
 }
 
-#[cfg(feature = "wifi-logs")]
-mod log {
-    #[no_mangle]
-    pub unsafe extern "C" fn rtc_printf(s: *const u8, args: ...) {
-        crate::compat::syslog::syslog(0, s, args);
-    }
-
-    #[no_mangle]
-    pub unsafe extern "C" fn phy_printf(s: *const u8, args: ...) {
-        crate::compat::syslog::syslog(0, s, args);
-    }
-
-    #[no_mangle]
-    pub unsafe extern "C" fn coexist_printf(s: *const u8, args: ...) {
-        crate::compat::syslog::syslog(0, s, args);
-    }
-
-    #[no_mangle]
-    pub unsafe extern "C" fn net80211_printf(s: *const u8, args: ...) {
-        crate::compat::syslog::syslog(0, s, args);
-    }
-
-    #[no_mangle]
-    pub unsafe extern "C" fn pp_printf(s: *const u8, args: ...) {
-        crate::compat::syslog::syslog(0, s, args);
-    }
-}
-
-#[cfg(not(feature = "wifi-logs"))]
-mod log {
-    #[no_mangle]
-    pub unsafe extern "C" fn rtc_printf(_s: *const u8, _args: *const ()) {}
-
-    #[no_mangle]
-    pub unsafe extern "C" fn phy_printf(_s: *const u8, _args: *const ()) {}
-
-    #[no_mangle]
-    pub unsafe extern "C" fn coexist_printf(_s: *const u8, _args: *const ()) {}
-
-    #[no_mangle]
-    pub unsafe extern "C" fn net80211_printf(_s: *const u8, _args: *const ()) {}
-
-    #[no_mangle]
-    pub unsafe extern "C" fn pp_printf(_s: *const u8, _args: *const ()) {}
-}
-
 // #define ESP_EVENT_DEFINE_BASE(id) esp_event_base_t id = #id
 static mut EVT: i8 = 0;
 #[no_mangle]

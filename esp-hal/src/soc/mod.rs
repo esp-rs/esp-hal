@@ -1,6 +1,8 @@
 use portable_atomic::{AtomicU8, Ordering};
 
 pub use self::implementation::*;
+#[cfg(psram)]
+use crate::lock::Locked;
 
 #[cfg_attr(esp32, path = "esp32/mod.rs")]
 #[cfg_attr(esp32c2, path = "esp32c2/mod.rs")]
@@ -12,6 +14,17 @@ pub use self::implementation::*;
 mod implementation;
 
 mod efuse_field;
+
+#[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+mod psram_common;
+
+#[cfg(psram)]
+static MAPPED_PSRAM: Locked<MappedPsram> = Locked::new(MappedPsram { memory_range: 0..0 });
+
+#[cfg(psram)]
+pub struct MappedPsram {
+    memory_range: core::ops::Range<usize>,
+}
 
 // Indicates the state of setting the mac address
 // 0 -- unset
@@ -59,7 +72,7 @@ impl self::efuse::Efuse {
     /// Get base mac address
     ///
     /// By default this reads the base mac address from eFuse, but it can be
-    /// overriden by `set_mac_address`.
+    /// overridden by `set_mac_address`.
     pub fn get_mac_address() -> [u8; 6] {
         if MAC_OVERRIDE_STATE.load(Ordering::Relaxed) == 2 {
             unsafe { MAC_OVERRIDE }
@@ -85,9 +98,8 @@ pub(crate) fn is_slice_in_dram<T>(slice: &[T]) -> bool {
 pub(crate) fn is_valid_psram_address(address: u32) -> bool {
     #[cfg(psram)]
     {
-        let start = crate::psram::psram_vaddr_start() as u32;
-        let end = start + crate::psram::PSRAM_BYTES as u32;
-        (start..=end).contains(&address)
+        let memory_range = MAPPED_PSRAM.with(|mapped_psram| mapped_psram.memory_range.clone());
+        memory_range.contains(&(address as usize))
     }
     #[cfg(not(psram))]
     false

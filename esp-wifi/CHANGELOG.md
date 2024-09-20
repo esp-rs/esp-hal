@@ -14,11 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - esp-wifi now allocates memory from the global allocator provided by `esp-alloc` (#2099)
+- Renamed the `wifi-logs` feature to `sys-logs` for consistency (#2183)
 
 ### Fixed
 
-- Feature `wifi-logs` doesn't break the build anymore (#2117)
+- Feature `sys-logs` doesn't break the build anymore (#2117)
 - Fixed a panic when overflow-checks are enabled (#2164)
+- Create mutexes in heap memory, fixes running out of mutexes when connecting and disconnecting to a WPA2-ENTERPRISE ap multiple times (#2202)
 
 ### Removed
 

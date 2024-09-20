@@ -662,8 +662,8 @@ impl BaudRate {
     /// Convert the BaudRate into the timings that the peripheral needs.
     // See: https://github.com/espressif/esp-idf/tree/master/components/hal/include/hal/twai_types.h
     const fn timing(self) -> TimingConfig {
-        #[allow(unused_mut)]
-        let mut timing = match self {
+        #[cfg(not(esp32h2))]
+        let timing = match self {
             Self::B125K => TimingConfig {
                 baud_rate_prescaler: 32,
                 sync_jump_width: 3,
@@ -695,11 +695,45 @@ impl BaudRate {
             Self::Custom(timing_config) => timing_config,
         };
 
+        #[cfg(esp32h2)]
+        let timing = match self {
+            Self::B125K => TimingConfig {
+                baud_rate_prescaler: 8,
+                sync_jump_width: 3,
+                tseg_1: 23,
+                tseg_2: 8,
+                triple_sample: false,
+            },
+            Self::B250K => TimingConfig {
+                baud_rate_prescaler: 8,
+                sync_jump_width: 3,
+                tseg_1: 11,
+                tseg_2: 4,
+                triple_sample: false,
+            },
+            Self::B500K => TimingConfig {
+                baud_rate_prescaler: 4,
+                sync_jump_width: 3,
+                tseg_1: 11,
+                tseg_2: 4,
+                triple_sample: false,
+            },
+            Self::B1000K => TimingConfig {
+                baud_rate_prescaler: 2,
+                sync_jump_width: 3,
+                tseg_1: 11,
+                tseg_2: 4,
+                triple_sample: false,
+            },
+            Self::Custom(timing_config) => timing_config,
+        };
+
+        // clock source on ESP32-C6 is xtal (40MHz)
         #[cfg(esp32c6)]
-        {
-            // clock source on ESP32-C6 is xtal (40MHz)
-            timing.baud_rate_prescaler /= 2;
-        }
+        let timing = TimingConfig {
+            baud_rate_prescaler: timing.baud_rate_prescaler / 2,
+            ..timing
+        };
 
         timing
     }
@@ -802,7 +836,7 @@ where
     fn set_baud_rate(&mut self, baud_rate: BaudRate) {
         // TWAI is clocked from the APB_CLK according to Table 6-4 [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf)
         // Included timings are all for 80MHz so assert that we are running at 80MHz.
-        #[cfg(not(esp32c6))]
+        #[cfg(not(any(esp32h2, esp32c6)))]
         {
             let apb_clock = crate::clock::Clocks::get().apb_clock;
             assert!(apb_clock == fugit::HertzU32::MHz(80));
@@ -820,22 +854,17 @@ where
         let tseg_2 = timing.tseg_2 - 1;
         let triple_sample = timing.triple_sample;
 
-        #[cfg(esp32)]
-        let prescale = prescale as u8;
-
         // Set up the prescaler and sync jump width.
-        T::register_block()
-            .bus_timing_0()
-            .modify(|_, w| unsafe { w.baud_presc().bits(prescale).sync_jump_width().bits(sjw) });
+        T::register_block().bus_timing_0().modify(|_, w| unsafe {
+            w.baud_presc().bits(prescale as _);
+            w.sync_jump_width().bits(sjw)
+        });
 
         // Set up the time segment 1, time segment 2, and triple sample.
         T::register_block().bus_timing_1().modify(|_, w| unsafe {
-            w.time_seg1()
-                .bits(tseg_1)
-                .time_seg2()
-                .bits(tseg_2)
-                .time_samp()
-                .bit(triple_sample)
+            w.time_seg1().bits(tseg_1);
+            w.time_seg2().bits(tseg_2);
+            w.time_samp().bit(triple_sample)
         });
     }
 
@@ -1510,7 +1539,7 @@ impl Instance for crate::peripherals::TWAI0 {
 #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))]
 impl OperationInstance for crate::peripherals::TWAI0 {}
 
-#[cfg(esp32c6)]
+#[cfg(any(esp32h2, esp32c6))]
 impl Instance for crate::peripherals::TWAI0 {
     const SYSTEM_PERIPHERAL: system::Peripheral = system::Peripheral::Twai0;
     const NUMBER: usize = 0;
@@ -1554,7 +1583,7 @@ impl Instance for crate::peripherals::TWAI0 {
     }
 }
 
-#[cfg(esp32c6)]
+#[cfg(any(esp32h2, esp32c6))]
 impl OperationInstance for crate::peripherals::TWAI0 {}
 
 #[cfg(esp32c6)]
@@ -1641,10 +1670,9 @@ mod asynch {
         }
     }
 
-    const NUM_TWAI: usize = 2;
-    #[allow(clippy::declare_interior_mutable_const)]
-    const NEW_STATE: TwaiAsyncState = TwaiAsyncState::new();
-    pub(crate) static TWAI_STATE: [TwaiAsyncState; NUM_TWAI] = [NEW_STATE; NUM_TWAI];
+    const NUM_TWAI: usize = 1 + cfg!(twai1) as usize;
+    pub(crate) static TWAI_STATE: [TwaiAsyncState; NUM_TWAI] =
+        [const { TwaiAsyncState::new() }; NUM_TWAI];
 
     impl<T> Twai<'_, T, crate::Async>
     where
@@ -1768,7 +1796,7 @@ mod asynch {
         }
     }
 
-    #[cfg(esp32c6)]
+    #[cfg(any(esp32h2, esp32c6))]
     #[handler]
     pub(super) fn twai0() {
         let register_block = TWAI0::register_block();

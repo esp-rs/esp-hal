@@ -84,7 +84,7 @@ use core::marker::PhantomData;
 use enumset::{EnumSet, EnumSetType};
 use private::*;
 
-#[cfg(any(esp32, esp32s3))]
+#[cfg(i2s1)]
 use crate::dma::I2s1Peripheral;
 use crate::{
     dma::{
@@ -469,7 +469,7 @@ where
     /// Construct a new I2S peripheral driver instance for the second I2S
     /// peripheral
     #[allow(clippy::too_many_arguments)]
-    #[cfg(any(esp32s3, esp32))]
+    #[cfg(i2s1)]
     pub fn new_i2s1(
         i2s: impl Peripheral<P = I> + 'd,
         standard: Standard,
@@ -1137,10 +1137,15 @@ mod private {
                 // Short frame synchronization
                 w.tx_short_sync().bit(false);
                 w.rx_short_sync().bit(false);
-                w.tx_msb_right().clear_bit();
-                w.rx_msb_right().clear_bit();
-                w.tx_right_first().clear_bit();
-                w.rx_right_first().clear_bit();
+                // Send MSB to the right channel to be consistent with ESP32-S3 et al.
+                w.tx_msb_right().set_bit();
+                w.rx_msb_right().set_bit();
+                // ESP32 generates two clock pulses first. If the WS is low, those first clock
+                // pulses are indistinguishable from real data, which corrupts the first few
+                // samples. So we send the right channel first (which means WS is high during
+                // the first sample) to prevent this issue.
+                w.tx_right_first().set_bit();
+                w.rx_right_first().set_bit();
                 w.tx_mono().clear_bit();
                 w.rx_mono().clear_bit();
                 w.sig_loopback().clear_bit()

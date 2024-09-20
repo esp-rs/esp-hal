@@ -137,10 +137,3 @@ pub(crate) unsafe fn phy_disable_clock() {
 
     trace!("phy_disable_clock done!");
 }
-
-#[no_mangle]
-pub extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
-    use crate::hal::clock::Clock;
-    let xtal = crate::hal::rtc_cntl::RtcClock::get_xtal_freq();
-    xtal.mhz() as i32
-}
