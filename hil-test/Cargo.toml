@@ -24,6 +24,10 @@ name    = "crc"
 harness = false
 
 [[test]]
+name    = "critical_section"
+harness = false
+
+[[test]]
 name    = "delay"
 harness = false
 

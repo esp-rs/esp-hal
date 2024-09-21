@@ -76,10 +76,10 @@ use crate::soc::constants::TIMG_DEFAULT_CLK_SRC;
 use crate::{
     clock::Clocks,
     interrupt::{self, InterruptHandler},
-    lock::{lock, Lock},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{timg0::RegisterBlock, Interrupt, TIMG0},
     private::Sealed,
+    sync::{lock, Lock},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
     Async,
     Blocking,

@@ -1,23 +1,38 @@
+//! Under construction: This is public only for tests, please avoid using it.
+
+#[cfg(single_core)]
+use core::cell::Cell;
 use core::cell::UnsafeCell;
 
 mod single_core {
+    use core::sync::atomic::{compiler_fence, Ordering};
+
     pub unsafe fn disable_interrupts() -> critical_section::RawRestoreState {
         cfg_if::cfg_if! {
             if #[cfg(riscv)] {
                 let mut mstatus = 0u32;
                 core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
-                ((mstatus & 0b1000) != 0) as critical_section::RawRestoreState
+                let token = ((mstatus & 0b1000) != 0) as critical_section::RawRestoreState;
             } else if #[cfg(xtensa)] {
                 let token: critical_section::RawRestoreState;
                 core::arch::asm!("rsil {0}, 5", out(reg) token);
-                token
             } else {
                 compile_error!("Unsupported architecture")
             }
-        }
+        };
+
+        // Ensure no subsequent memory accesses are reordered to before interrupts are
+        // disabled.
+        compiler_fence(Ordering::SeqCst);
+
+        token
     }
 
     pub unsafe fn reenable_interrupts(token: critical_section::RawRestoreState) {
+        // Ensure no preceeding memory accesses are reordered to after interrupts are
+        // enabled.
+        compiler_fence(Ordering::SeqCst);
+
         cfg_if::cfg_if! {
             if #[cfg(riscv)] {
                 if token != 0 {
@@ -40,21 +55,6 @@ mod single_core {
 #[cfg(multi_core)]
 mod multicore {
     use portable_atomic::{AtomicUsize, Ordering};
-
-    cfg_if::cfg_if! {
-        if #[cfg(riscv)] {
-            // The restore state is a u8 that is casted from a bool, so it has a value of
-            // 0x00 or 0x01 before we add the reentry flag to it.
-            pub const REENTRY_FLAG: u8 = 1 << 7;
-        } else if #[cfg(xtensa)] {
-            // PS has 15 useful bits. Bits 12..16 and 19..32 are unused, so we can use bit
-            // #31 as our reentry flag.
-            // We can assume the reserved bit is 0 otherwise rsil - wsr pairings would be
-            // undefined behavior: Quoting the ISA summary, table 64:
-            // Writing a non-zero value to these fields results in undefined processor behavior.
-            pub const REENTRY_FLAG: u32 = 1 << 31;
-        }
-    }
 
     // Safety: Ensure that when adding new chips `get_raw_core` doesn't return this
     // value.
@@ -106,23 +106,65 @@ mod multicore {
     }
 }
 
-pub(crate) struct Lock {
+cfg_if::cfg_if! {
+    if #[cfg(riscv)] {
+        // The restore state is a u8 that is casted from a bool, so it has a value of
+        // 0x00 or 0x01 before we add the reentry flag to it.
+        pub const REENTRY_FLAG: u8 = 1 << 7;
+    } else if #[cfg(xtensa)] {
+        // PS has 15 useful bits. Bits 12..16 and 19..32 are unused, so we can use bit
+        // #31 as our reentry flag.
+        // We can assume the reserved bit is 0 otherwise rsil - wsr pairings would be
+        // undefined behavior: Quoting the ISA summary, table 64:
+        // Writing a non-zero value to these fields results in undefined processor behavior.
+        pub const REENTRY_FLAG: u32 = 1 << 31;
+    }
+}
+
+/// A lock that can be used to protect shared resources.
+pub struct Lock {
     #[cfg(multi_core)]
     inner: multicore::AtomicLock,
+    #[cfg(single_core)]
+    is_locked: Cell<bool>,
+}
+
+unsafe impl Sync for Lock {}
+
+impl Default for Lock {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Lock {
+    /// Create a new lock.
     pub const fn new() -> Self {
         Self {
             #[cfg(multi_core)]
             inner: multicore::AtomicLock::new(),
+            #[cfg(single_core)]
+            is_locked: Cell::new(false),
         }
     }
 
-    fn acquire(&self) -> critical_section::RawRestoreState {
+    /// Acquires the lock.
+    ///
+    /// # Safety
+    ///
+    /// - Each release call must be paired with an acquire call.
+    /// - The returned token must be passed to the corresponding `release` call.
+    /// - The caller must ensure to release the locks in the reverse order they
+    ///   were acquired.
+    pub unsafe fn acquire(&self) -> critical_section::RawRestoreState {
         cfg_if::cfg_if! {
             if #[cfg(single_core)] {
-                unsafe { single_core::disable_interrupts() }
+                let mut tkn = unsafe { single_core::disable_interrupts() };
+                let was_locked = self.is_locked.replace(true);
+                if was_locked {
+                    tkn |= REENTRY_FLAG;
+                }
+                tkn
             } else if #[cfg(multi_core)] {
                 // We acquire the lock inside an interrupt-free context to prevent a subtle
                 // race condition:
@@ -138,7 +180,7 @@ impl Lock {
                     match self.inner.try_lock(current_thread_id) {
                         Ok(()) => Some(tkn),
                         Err(owner) if owner == current_thread_id => {
-                            tkn |= multicore::REENTRY_FLAG;
+                            tkn |= REENTRY_FLAG;
                             Some(tkn)
                         }
                         Err(_) => {
@@ -158,27 +200,31 @@ impl Lock {
         }
     }
 
+    /// Releases the lock.
+    ///
     /// # Safety
-    /// This function must only be called if the lock was acquired by the
-    /// current thread.
-    unsafe fn release(&self, token: critical_section::RawRestoreState) {
-        #[cfg(multi_core)]
-        {
-            if token & multicore::REENTRY_FLAG != 0 {
-                return;
-            }
-
+    ///
+    /// - This function must only be called if the lock was acquired by the
+    ///   current thread.
+    /// - The caller must ensure to release the locks in the reverse order they
+    ///   were acquired.
+    /// - Each release call must be paired with an acquire call.
+    pub unsafe fn release(&self, token: critical_section::RawRestoreState) {
+        if token & REENTRY_FLAG == 0 {
+            #[cfg(multi_core)]
             self.inner.unlock();
-        }
 
-        single_core::reenable_interrupts(token);
+            #[cfg(single_core)]
+            self.is_locked.set(false);
+
+            single_core::reenable_interrupts(token);
+        }
     }
 }
 
 // This is preferred over critical-section as this allows you to have multiple
 // locks active at the same time rather than using the global mutex that is
 // critical-section.
-#[allow(unused_variables)]
 pub(crate) fn lock<T>(lock: &Lock, f: impl FnOnce() -> T) -> T {
     // In regards to disabling interrupts, we only need to disable
     // the interrupts that may be calling this function.
@@ -190,13 +236,13 @@ pub(crate) fn lock<T>(lock: &Lock, f: impl FnOnce() -> T) -> T {
 
     impl<'a> LockGuard<'a> {
         fn new(lock: &'a Lock) -> Self {
-            let token = lock.acquire();
-
-            #[cfg(multi_core)]
-            assert!(
-                token & multicore::REENTRY_FLAG == 0,
-                "lock is not reentrant"
-            );
+            let token = unsafe {
+                // SAFETY: the same lock will be released when dropping the guard.
+                // This ensures that the lock is released on the same thread, in the reverse
+                // order it was acquired.
+                lock.acquire()
+            };
+            assert!(token & REENTRY_FLAG == 0, "lock is not reentrant");
 
             Self { lock, token }
         }
@@ -212,25 +258,26 @@ pub(crate) fn lock<T>(lock: &Lock, f: impl FnOnce() -> T) -> T {
     f()
 }
 
-/// Data protected by a [Lock]
-#[allow(unused)]
-pub(crate) struct Locked<T> {
+/// Data protected by a [Lock].
+///
+/// This is largely equivalent to a `Mutex<RefCell<T>>`, but accessing the inner
+/// data doesn't hold a critical section on multi-core systems.
+pub struct Locked<T> {
     lock_state: Lock,
     data: UnsafeCell<T>,
 }
 
-#[allow(unused)]
 impl<T> Locked<T> {
     /// Create a new instance
-    pub(crate) const fn new(data: T) -> Self {
+    pub const fn new(data: T) -> Self {
         Self {
             lock_state: Lock::new(),
             data: UnsafeCell::new(data),
         }
     }
 
-    /// Provide exclusive access to the protected data to the given closure
-    pub(crate) fn with<R>(&self, f: impl FnOnce(&mut T) -> R) -> R {
+    /// Provide exclusive access to the protected data to the given closure.
+    pub fn with<R>(&self, f: impl FnOnce(&mut T) -> R) -> R {
         lock(&self.lock_state, || f(unsafe { &mut *self.data.get() }))
     }
 }
