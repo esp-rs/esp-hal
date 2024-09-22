@@ -5,6 +5,8 @@
 #![no_std]
 #![no_main]
 
+#[cfg(esp32c6)]
+use esp_hal::parl_io::{TxPinConfigWithValidPin, TxSixteenBits};
 use esp_hal::{
     dma::{ChannelCreator, Dma, DmaPriority},
     gpio::{interconnect::InputSignal, AnyPin, Io, NoPin},
@@ -15,8 +17,6 @@ use esp_hal::{
         SampleEdge,
         TxEightBits,
         TxPinConfigIncludingValidPin,
-        TxPinConfigWithValidPin,
-        TxSixteenBits,
     },
     pcnt::{
         channel::{CtrlMode, EdgeMode},
@@ -76,6 +76,7 @@ mod tests {
         }
     }
 
+    #[cfg(esp32c6)]
     #[test]
     #[timeout(3)]
     fn test_parl_io_tx_16bit_valid_clock_count(ctx: Context) {
@@ -136,8 +137,25 @@ mod tests {
         let tx_buffer = [0u8; BUFFER_SIZE];
         let (_, tx_descriptors) = esp_hal::dma_descriptors!(0, 2 * BUFFER_SIZE);
 
-        let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
+        let pins = TxEightBits::new(
+            NoPin,
+            NoPin,
+            NoPin,
+            NoPin,
+            NoPin,
+            NoPin,
+            NoPin,
+            #[cfg(esp32h2)]
+            ctx.valid,
+            #[cfg(esp32c6)]
+            NoPin,
+        );
+
+        #[cfg(esp32h2)]
+        let mut pins = TxPinConfigIncludingValidPin::new(pins);
+        #[cfg(esp32c6)]
         let mut pins = TxPinConfigWithValidPin::new(pins, ctx.valid);
+
         let mut clock_pin = ClkOutPin::new(ctx.clock);
 
         let pio = ParlIoTxOnly::new(
