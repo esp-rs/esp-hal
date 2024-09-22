@@ -97,7 +97,7 @@ mod tests {
             ctx.dma_channel
                 .configure_for_async(false, DmaPriority::Priority0),
             tx_descriptors,
-            20.MHz(),
+            10.MHz(),
         )
         .unwrap();
 
@@ -164,7 +164,7 @@ mod tests {
             ctx.dma_channel
                 .configure_for_async(false, DmaPriority::Priority0),
             tx_descriptors,
-            20.MHz(),
+            10.MHz(),
         )
         .unwrap();
 

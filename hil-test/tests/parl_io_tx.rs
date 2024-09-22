@@ -1,7 +1,6 @@
 //! PARL_IO TX test
 
 //% CHIPS: esp32c6 esp32h2
-
 #![no_std]
 #![no_main]
 
@@ -95,7 +94,7 @@ mod tests {
             ctx.parl_io,
             ctx.dma_channel.configure(false, DmaPriority::Priority0),
             tx_descriptors,
-            20.MHz(),
+            10.MHz(),
         )
         .unwrap();
 
@@ -162,7 +161,7 @@ mod tests {
             ctx.parl_io,
             ctx.dma_channel.configure(false, DmaPriority::Priority0),
             tx_descriptors,
-            20.MHz(),
+            10.MHz(),
         )
         .unwrap();
 
