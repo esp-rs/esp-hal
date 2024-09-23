@@ -1047,7 +1047,7 @@ mod asynch {
                 interrupt::enable(interrupt, handler.priority()).unwrap();
             }
 
-            alarm.set_interrupt_handler(target0_handler);
+            alarm.set_interrupt_handler(handler);
 
             alarm.enable_interrupt(true);
 
