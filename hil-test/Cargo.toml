@@ -72,15 +72,7 @@ name    = "lcd_cam_i8080_async"
 harness = false
 
 [[test]]
-name    = "qspi_read"
-harness = false
-
-[[test]]
-name    = "qspi_write"
-harness = false
-
-[[test]]
-name    = "qspi_write_read"
+name    = "qspi"
 harness = false
 
 [[test]]
