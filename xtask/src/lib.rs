@@ -1,5 +1,5 @@
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     fs::{self, File},
     io::Write as _,
     path::{Path, PathBuf},
@@ -53,24 +53,18 @@ pub enum Package {
     XtensaLxRt,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct Metadata {
     example_path: PathBuf,
-    chips: Vec<Chip>,
+    chip: Chip,
     feature_set: Vec<String>,
 }
 
 impl Metadata {
-    pub fn new(example_path: &Path, chips: Vec<Chip>, feature_set: Vec<String>) -> Self {
-        let chips = if chips.is_empty() {
-            Chip::iter().collect()
-        } else {
-            chips
-        };
-
+    pub fn new(example_path: &Path, chip: Chip, feature_set: Vec<String>) -> Self {
         Self {
             example_path: example_path.to_path_buf(),
-            chips,
+            chip,
             feature_set,
         }
     }
@@ -96,7 +90,7 @@ impl Metadata {
 
     /// If the specified chip is in the list of chips, then it is supported.
     pub fn supports_chip(&self, chip: Chip) -> bool {
-        self.chips.contains(&chip)
+        self.chip == chip
     }
 }
 
@@ -167,38 +161,56 @@ pub fn load_examples(path: &Path, action: CargoAction) -> Result<Vec<Metadata>> 
         let text = fs::read_to_string(&path)
             .with_context(|| format!("Could not read {}", path.display()))?;
 
-        let mut chips = Vec::new();
+        let mut chips = Chip::iter().collect::<Vec<_>>();
         let mut feature_sets = Vec::new();
+        let mut chip_features = HashMap::new();
 
         // We will indicate metadata lines using the `//%` prefix:
         for line in text.lines().filter(|line| line.starts_with("//%")) {
-            let mut split = line
-                .trim_start_matches("//%")
-                .trim()
-                .split_ascii_whitespace()
-                .map(|s| s.to_string())
-                .collect::<Vec<_>>();
+            let Some((key, value)) = line.trim_start_matches("//%").split_once(':') else {
+                bail!("Metadata line is missing ':': {}", line);
+            };
 
-            if split.len() < 2 {
-                bail!(
-                    "Expected at least two elements (key, value), found {}",
-                    split.len()
-                );
-            }
-
-            // The trailing ':' on metadata keys is optional :)
-            let key = split.swap_remove(0);
-            let key = key.trim_end_matches(':');
+            let key = key.trim();
 
             if key == "CHIPS" {
-                chips = split
-                    .iter()
+                chips = value
+                    .split_ascii_whitespace()
                     .map(|s| Chip::from_str(s, false).unwrap())
                     .collect::<Vec<_>>();
             } else if key == "FEATURES" {
+                // Base feature set required to run the example.
+                // If multiple are specified, we compile the same example multiple times.
+                let mut values = value
+                    .split_ascii_whitespace()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>();
+
                 // Sort the features so they are in a deterministic order:
-                split.sort();
-                feature_sets.push(split);
+                values.sort();
+
+                feature_sets.push(values);
+            } else if key.starts_with("CHIP-FEATURES(") {
+                // Additional features required for specific chips.
+                // These are appended to the base feature set(s).
+                // If multiple are specified, the last entry wins.
+                let chips = key
+                    .trim_start_matches("CHIP-FEATURES(")
+                    .trim_end_matches(')');
+
+                let chips = chips
+                    .split_ascii_whitespace()
+                    .map(|s| Chip::from_str(s, false).unwrap())
+                    .collect::<Vec<_>>();
+
+                let values = value
+                    .split_ascii_whitespace()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>();
+
+                for chip in chips {
+                    chip_features.insert(chip, values.clone());
+                }
             } else {
                 log::warn!("Unrecognized metadata key '{key}', ignoring");
             }
@@ -214,7 +226,17 @@ pub fn load_examples(path: &Path, action: CargoAction) -> Result<Vec<Metadata>> 
             feature_sets.truncate(1);
         }
         for feature_set in feature_sets {
-            examples.push(Metadata::new(&path, chips.clone(), feature_set));
+            for chip in &chips {
+                let mut feature_set = feature_set.clone();
+                if let Some(chip_features) = chip_features.get(chip) {
+                    feature_set.extend(chip_features.iter().cloned());
+
+                    // Sort the features so they are in a deterministic order:
+                    feature_set.sort();
+                }
+
+                examples.push(Metadata::new(&path, *chip, feature_set.clone()));
+            }
         }
     }
 

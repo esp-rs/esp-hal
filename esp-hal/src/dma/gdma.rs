@@ -139,10 +139,6 @@ impl<const N: u8> RegisterAccess for Channel<N> {
             .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
     }
 
-    fn has_out_descriptor_error() -> bool {
-        Self::out_int().raw().read().out_dscr_err().bit()
-    }
-
     fn set_out_peripheral(peripheral: u8) {
         Self::ch()
             .out_peri_sel()
@@ -155,50 +151,12 @@ impl<const N: u8> RegisterAccess for Channel<N> {
             .modify(|_, w| w.outlink_start().set_bit());
     }
 
-    fn clear_ch_out_done() {
-        Self::out_int()
-            .clr()
-            .write(|w| w.out_done().clear_bit_by_one());
-    }
-
-    fn is_ch_out_done_set() -> bool {
-        Self::out_int().raw().read().out_done().bit()
-    }
-
-    fn listen_ch_out_done() {
-        Self::out_int().ena().modify(|_, w| w.out_done().set_bit())
-    }
-
-    fn unlisten_ch_out_done() {
-        Self::out_int()
-            .ena()
-            .modify(|_, w| w.out_done().clear_bit())
-    }
-
-    fn is_listening_ch_out_done() -> bool {
-        Self::out_int().ena().read().out_done().bit()
-    }
-
-    fn is_out_done() -> bool {
-        Self::out_int().raw().read().out_total_eof().bit()
-    }
-
     fn last_out_dscr_address() -> usize {
         Self::ch()
             .out_eof_des_addr()
             .read()
             .out_eof_des_addr()
             .bits() as _
-    }
-
-    fn is_out_eof_interrupt_set() -> bool {
-        Self::out_int().raw().read().out_eof().bit()
-    }
-
-    fn reset_out_eof_interrupt() {
-        Self::out_int()
-            .clr()
-            .write(|w| w.out_eof().clear_bit_by_one());
     }
 
     #[cfg(esp32s3)]
@@ -259,18 +217,6 @@ impl<const N: u8> RegisterAccess for Channel<N> {
             .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
     }
 
-    fn has_in_descriptor_error() -> bool {
-        Self::in_int().raw().read().in_dscr_err().bit()
-    }
-
-    fn has_in_descriptor_error_dscr_empty() -> bool {
-        Self::in_int().raw().read().in_dscr_empty().bit()
-    }
-
-    fn has_in_descriptor_error_err_eof() -> bool {
-        Self::in_int().raw().read().in_err_eof().bit()
-    }
-
     fn set_in_peripheral(peripheral: u8) {
         Self::ch()
             .in_peri_sel()
@@ -283,122 +229,177 @@ impl<const N: u8> RegisterAccess for Channel<N> {
             .modify(|_, w| w.inlink_start().set_bit());
     }
 
-    fn is_in_done() -> bool {
-        Self::in_int().raw().read().in_suc_eof().bit()
+    fn listen_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+        Self::out_int().ena().modify(|_, w| {
+            for interrupt in interrupts.into() {
+                match interrupt {
+                    DmaTxInterrupt::TotalEof => w.out_total_eof().set_bit(),
+                    DmaTxInterrupt::DescriptorError => w.out_dscr_err().set_bit(),
+                    DmaTxInterrupt::Eof => w.out_eof().set_bit(),
+                    DmaTxInterrupt::Done => w.out_done().set_bit(),
+                };
+            }
+            w
+        })
     }
 
-    fn is_listening_in_eof() -> bool {
-        Self::in_int().ena().read().in_suc_eof().bit_is_set()
+    fn unlisten_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+        Self::out_int().ena().modify(|_, w| {
+            for interrupt in interrupts.into() {
+                match interrupt {
+                    DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit(),
+                    DmaTxInterrupt::DescriptorError => w.out_dscr_err().clear_bit(),
+                    DmaTxInterrupt::Eof => w.out_eof().clear_bit(),
+                    DmaTxInterrupt::Done => w.out_done().clear_bit(),
+                };
+            }
+            w
+        })
     }
 
-    fn is_listening_out_eof() -> bool {
-        Self::out_int().ena().read().out_total_eof().bit_is_set()
+    fn is_listening_out() -> EnumSet<DmaTxInterrupt> {
+        let mut result = EnumSet::new();
+
+        let int_ena = Self::out_int().ena().read();
+        if int_ena.out_total_eof().bit_is_set() {
+            result |= DmaTxInterrupt::TotalEof;
+        }
+        if int_ena.out_dscr_err().bit_is_set() {
+            result |= DmaTxInterrupt::DescriptorError;
+        }
+        if int_ena.out_eof().bit_is_set() {
+            result |= DmaTxInterrupt::Eof;
+        }
+        if int_ena.out_done().bit_is_set() {
+            result |= DmaTxInterrupt::Done;
+        }
+
+        result
     }
 
-    fn listen_in_eof() {
-        Self::in_int().ena().modify(|_, w| w.in_suc_eof().set_bit());
+    fn pending_out_interrupts() -> EnumSet<DmaTxInterrupt> {
+        let mut result = EnumSet::new();
+
+        let int_raw = Self::out_int().raw().read();
+        if int_raw.out_total_eof().bit_is_set() {
+            result |= DmaTxInterrupt::TotalEof;
+        }
+        if int_raw.out_dscr_err().bit_is_set() {
+            result |= DmaTxInterrupt::DescriptorError;
+        }
+        if int_raw.out_eof().bit_is_set() {
+            result |= DmaTxInterrupt::Eof;
+        }
+        if int_raw.out_done().bit_is_set() {
+            result |= DmaTxInterrupt::Done;
+        }
+
+        result
     }
 
-    fn listen_out_eof() {
-        Self::out_int()
-            .ena()
-            .modify(|_, w| w.out_total_eof().set_bit());
+    fn clear_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+        Self::out_int().clr().write(|w| {
+            for interrupt in interrupts.into() {
+                match interrupt {
+                    DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit_by_one(),
+                    DmaTxInterrupt::DescriptorError => w.out_dscr_err().clear_bit_by_one(),
+                    DmaTxInterrupt::Eof => w.out_eof().clear_bit_by_one(),
+                    DmaTxInterrupt::Done => w.out_done().clear_bit_by_one(),
+                };
+            }
+            w
+        })
     }
 
-    fn unlisten_in_eof() {
-        Self::in_int()
-            .ena()
-            .modify(|_, w| w.in_suc_eof().clear_bit());
+    fn listen_in(interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
+        Self::in_int().ena().modify(|_, w| {
+            for interrupt in interrupts.into() {
+                match interrupt {
+                    DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().set_bit(),
+                    DmaRxInterrupt::ErrorEof => w.in_err_eof().set_bit(),
+                    DmaRxInterrupt::DescriptorError => w.in_dscr_err().set_bit(),
+                    DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().set_bit(),
+                    DmaRxInterrupt::Done => w.in_done().set_bit(),
+                };
+            }
+            w
+        })
     }
 
-    fn unlisten_out_eof() {
-        Self::out_int()
-            .ena()
-            .modify(|_, w| w.out_total_eof().clear_bit());
+    fn unlisten_in(interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
+        Self::in_int().ena().modify(|_, w| {
+            for interrupt in interrupts.into() {
+                match interrupt {
+                    DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit(),
+                    DmaRxInterrupt::ErrorEof => w.in_err_eof().clear_bit(),
+                    DmaRxInterrupt::DescriptorError => w.in_dscr_err().clear_bit(),
+                    DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().clear_bit(),
+                    DmaRxInterrupt::Done => w.in_done().clear_bit(),
+                };
+            }
+            w
+        })
     }
 
-    fn listen_ch_in_done() {
-        Self::in_int().ena().modify(|_, w| w.in_done().set_bit())
+    fn is_listening_in() -> EnumSet<DmaRxInterrupt> {
+        let mut result = EnumSet::new();
+
+        let int_ena = Self::in_int().ena().read();
+        if int_ena.in_dscr_err().bit_is_set() {
+            result |= DmaRxInterrupt::DescriptorError;
+        }
+        if int_ena.in_dscr_empty().bit_is_set() {
+            result |= DmaRxInterrupt::DescriptorEmpty;
+        }
+        if int_ena.in_suc_eof().bit_is_set() {
+            result |= DmaRxInterrupt::SuccessfulEof;
+        }
+        if int_ena.in_err_eof().bit_is_set() {
+            result |= DmaRxInterrupt::ErrorEof;
+        }
+        if int_ena.in_done().bit_is_set() {
+            result |= DmaRxInterrupt::Done;
+        }
+
+        result
     }
 
-    fn clear_ch_in_done() {
-        Self::in_int()
-            .clr()
-            .write(|w| w.in_done().clear_bit_by_one());
+    fn pending_in_interrupts() -> EnumSet<DmaRxInterrupt> {
+        let mut result = EnumSet::new();
+
+        let int_raw = Self::in_int().raw().read();
+        if int_raw.in_dscr_err().bit_is_set() {
+            result |= DmaRxInterrupt::DescriptorError;
+        }
+        if int_raw.in_dscr_empty().bit_is_set() {
+            result |= DmaRxInterrupt::DescriptorEmpty;
+        }
+        if int_raw.in_suc_eof().bit_is_set() {
+            result |= DmaRxInterrupt::SuccessfulEof;
+        }
+        if int_raw.in_err_eof().bit_is_set() {
+            result |= DmaRxInterrupt::ErrorEof;
+        }
+        if int_raw.in_done().bit_is_set() {
+            result |= DmaRxInterrupt::Done;
+        }
+
+        result
     }
 
-    fn is_ch_in_done_set() -> bool {
-        Self::in_int().raw().read().in_done().bit()
-    }
-
-    fn unlisten_ch_in_done() {
-        Self::in_int().ena().modify(|_, w| w.in_done().clear_bit());
-    }
-
-    fn is_listening_ch_in_done() -> bool {
-        Self::in_int().ena().read().in_done().bit()
-    }
-
-    fn listen_in_descriptor_error() {
-        Self::in_int()
-            .ena()
-            .modify(|_, w| w.in_dscr_err().set_bit())
-    }
-
-    fn unlisten_in_descriptor_error() {
-        Self::in_int()
-            .ena()
-            .modify(|_, w| w.in_dscr_err().clear_bit())
-    }
-
-    fn is_listening_in_descriptor_error() -> bool {
-        Self::in_int().ena().read().in_dscr_err().bit()
-    }
-
-    fn listen_in_descriptor_error_dscr_empty() {
-        Self::in_int()
-            .ena()
-            .modify(|_, w| w.in_dscr_empty().set_bit())
-    }
-
-    fn unlisten_in_descriptor_error_dscr_empty() {
-        Self::in_int()
-            .ena()
-            .modify(|_, w| w.in_dscr_empty().clear_bit())
-    }
-
-    fn is_listening_in_descriptor_error_dscr_empty() -> bool {
-        Self::in_int().ena().read().in_dscr_empty().bit()
-    }
-
-    fn listen_in_descriptor_error_err_eof() {
-        Self::in_int().ena().modify(|_, w| w.in_err_eof().set_bit())
-    }
-
-    fn unlisten_in_descriptor_error_err_eof() {
-        Self::in_int()
-            .ena()
-            .modify(|_, w| w.in_err_eof().clear_bit())
-    }
-
-    fn is_listening_in_descriptor_error_err_eof() -> bool {
-        Self::in_int().ena().read().in_err_eof().bit()
-    }
-
-    fn listen_out_descriptor_error() {
-        Self::out_int()
-            .ena()
-            .modify(|_, w| w.out_dscr_err().set_bit())
-    }
-
-    fn unlisten_out_descriptor_error() {
-        Self::out_int()
-            .ena()
-            .modify(|_, w| w.out_dscr_err().clear_bit())
-    }
-
-    fn is_listening_out_descriptor_error() -> bool {
-        Self::out_int().ena().read().out_dscr_err().bit()
+    fn clear_in(interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
+        Self::in_int().clr().write(|w| {
+            for interrupt in interrupts.into() {
+                match interrupt {
+                    DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit_by_one(),
+                    DmaRxInterrupt::ErrorEof => w.in_err_eof().clear_bit_by_one(),
+                    DmaRxInterrupt::DescriptorError => w.in_dscr_err().clear_bit_by_one(),
+                    DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().clear_bit_by_one(),
+                    DmaRxInterrupt::Done => w.in_done().clear_bit_by_one(),
+                };
+            }
+            w
+        })
     }
 }
 

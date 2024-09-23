@@ -73,6 +73,7 @@ pub enum Cores {
     Eq,
     PartialOrd,
     Ord,
+    Hash,
     serde::Deserialize,
     serde::Serialize,
     strum::Display,

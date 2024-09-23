@@ -1329,42 +1329,7 @@ mod dma {
 
             // set cmd, address, dummy cycles
             let reg_block = self.spi.register_block();
-            if !cmd.is_none() {
-                reg_block.user2().modify(|_, w| unsafe {
-                    w.usr_command_bitlen()
-                        .bits((cmd.width() - 1) as u8)
-                        .usr_command_value()
-                        .bits(cmd.value())
-                });
-            }
-
-            #[cfg(not(esp32))]
-            if !address.is_none() {
-                reg_block.user1().modify(|_, w| unsafe {
-                    w.usr_addr_bitlen().bits((address.width() - 1) as u8)
-                });
-
-                let addr = address.value() << (32 - address.width());
-                reg_block
-                    .addr()
-                    .write(|w| unsafe { w.usr_addr_value().bits(addr) });
-            }
-
-            #[cfg(esp32)]
-            if !address.is_none() {
-                reg_block.user1().modify(|r, w| unsafe {
-                    w.bits(r.bits() & !(0x3f << 26) | (((address.width() - 1) as u32) & 0x3f) << 26)
-                });
-
-                let addr = address.value() << (32 - address.width());
-                reg_block.addr().write(|w| unsafe { w.bits(addr) });
-            }
-
-            if dummy > 0 {
-                reg_block
-                    .user1()
-                    .modify(|_, w| unsafe { w.usr_dummy_cyclelen().bits(dummy - 1) });
-            }
+            set_up_common_phases(reg_block, cmd, address, dummy);
 
             let result = unsafe {
                 self.spi
@@ -1406,42 +1371,7 @@ mod dma {
 
             // set cmd, address, dummy cycles
             let reg_block = self.spi.register_block();
-            if !cmd.is_none() {
-                reg_block.user2().modify(|_, w| unsafe {
-                    w.usr_command_bitlen()
-                        .bits((cmd.width() - 1) as u8)
-                        .usr_command_value()
-                        .bits(cmd.value())
-                });
-            }
-
-            #[cfg(not(esp32))]
-            if !address.is_none() {
-                reg_block.user1().modify(|_, w| unsafe {
-                    w.usr_addr_bitlen().bits((address.width() - 1) as u8)
-                });
-
-                let addr = address.value() << (32 - address.width());
-                reg_block
-                    .addr()
-                    .write(|w| unsafe { w.usr_addr_value().bits(addr) });
-            }
-
-            #[cfg(esp32)]
-            if !address.is_none() {
-                reg_block.user1().modify(|r, w| unsafe {
-                    w.bits(r.bits() & !(0x3f << 26) | (((address.width() - 1) as u32) & 0x3f) << 26)
-                });
-
-                let addr = address.value() << (32 - address.width());
-                reg_block.addr().write(|w| unsafe { w.bits(addr) });
-            }
-
-            if dummy > 0 {
-                reg_block
-                    .user1()
-                    .modify(|_, w| unsafe { w.usr_dummy_cyclelen().bits(dummy - 1) });
-            }
+            set_up_common_phases(reg_block, cmd, address, dummy);
 
             let result = unsafe {
                 self.spi
@@ -2454,34 +2384,22 @@ pub trait Instance: private::Sealed {
     fn init(&mut self) {
         let reg_block = self.register_block();
         reg_block.user().modify(|_, w| {
-            w.usr_miso_highpart()
-                .clear_bit()
-                .usr_miso_highpart()
-                .clear_bit()
-                .doutdin()
-                .set_bit()
-                .usr_miso()
-                .set_bit()
-                .usr_mosi()
-                .set_bit()
-                .cs_hold()
-                .set_bit()
-                .usr_dummy_idle()
-                .set_bit()
-                .usr_addr()
-                .clear_bit()
-                .usr_command()
-                .clear_bit()
+            w.usr_miso_highpart().clear_bit();
+            w.usr_mosi_highpart().clear_bit();
+            w.doutdin().set_bit();
+            w.usr_miso().set_bit();
+            w.usr_mosi().set_bit();
+            w.cs_hold().set_bit();
+            w.usr_dummy_idle().set_bit();
+            w.usr_addr().clear_bit();
+            w.usr_command().clear_bit()
         });
 
         #[cfg(gdma)]
         reg_block.clk_gate().modify(|_, w| {
-            w.clk_en()
-                .set_bit()
-                .mst_clk_active()
-                .set_bit()
-                .mst_clk_sel()
-                .set_bit()
+            w.clk_en().set_bit();
+            w.mst_clk_active().set_bit();
+            w.mst_clk_sel().set_bit()
         });
 
         #[cfg(any(esp32c6, esp32h2))]
@@ -2495,18 +2413,17 @@ pub trait Instance: private::Sealed {
 
         #[cfg(gdma)]
         reg_block.ctrl().modify(|_, w| {
-            w.q_pol()
-                .clear_bit()
-                .d_pol()
-                .clear_bit()
-                .hold_pol()
-                .clear_bit()
+            w.q_pol().clear_bit();
+            w.d_pol().clear_bit();
+            w.hold_pol().clear_bit()
         });
 
         #[cfg(esp32s2)]
-        reg_block
-            .ctrl()
-            .modify(|_, w| w.q_pol().clear_bit().d_pol().clear_bit().wp().clear_bit());
+        reg_block.ctrl().modify(|_, w| {
+            w.q_pol().clear_bit();
+            w.d_pol().clear_bit();
+            w.wp().clear_bit()
+        });
 
         #[cfg(esp32)]
         reg_block.ctrl().modify(|_, w| w.wp().clear_bit());
@@ -2525,56 +2442,14 @@ pub trait Instance: private::Sealed {
         data_mode: SpiDataMode,
     ) {
         let reg_block = self.register_block();
-        match cmd_mode {
-            SpiDataMode::Single => reg_block
-                .ctrl()
-                .modify(|_, w| w.fcmd_dual().clear_bit().fcmd_quad().clear_bit()),
-            SpiDataMode::Dual => reg_block
-                .ctrl()
-                .modify(|_, w| w.fcmd_dual().set_bit().fcmd_quad().clear_bit()),
-            SpiDataMode::Quad => reg_block
-                .ctrl()
-                .modify(|_, w| w.fcmd_dual().clear_bit().fcmd_quad().set_bit()),
-        }
-
-        match address_mode {
-            SpiDataMode::Single => reg_block
-                .ctrl()
-                .modify(|_, w| w.faddr_dual().clear_bit().faddr_quad().clear_bit()),
-            SpiDataMode::Dual => reg_block
-                .ctrl()
-                .modify(|_, w| w.faddr_dual().set_bit().faddr_quad().clear_bit()),
-            SpiDataMode::Quad => reg_block
-                .ctrl()
-                .modify(|_, w| w.faddr_dual().clear_bit().faddr_quad().set_bit()),
-        }
-
-        match data_mode {
-            SpiDataMode::Single => {
-                reg_block
-                    .ctrl()
-                    .modify(|_, w| w.fread_dual().clear_bit().fread_quad().clear_bit());
-                reg_block
-                    .user()
-                    .modify(|_, w| w.fwrite_dual().clear_bit().fwrite_quad().clear_bit());
-            }
-            SpiDataMode::Dual => {
-                reg_block
-                    .ctrl()
-                    .modify(|_, w| w.fread_dual().set_bit().fread_quad().clear_bit());
-                reg_block
-                    .user()
-                    .modify(|_, w| w.fwrite_dual().set_bit().fwrite_quad().clear_bit());
-            }
-            SpiDataMode::Quad => {
-                reg_block
-                    .ctrl()
-                    .modify(|_, w| w.fread_quad().set_bit().fread_dual().clear_bit());
-                reg_block
-                    .user()
-                    .modify(|_, w| w.fwrite_quad().set_bit().fwrite_dual().clear_bit());
-            }
-        }
+        reg_block.ctrl().modify(|_, w| {
+            w.fcmd_dual().bit(cmd_mode == SpiDataMode::Dual);
+            w.fcmd_quad().bit(cmd_mode == SpiDataMode::Quad);
+            w.faddr_dual().bit(address_mode == SpiDataMode::Dual);
+            w.faddr_quad().bit(address_mode == SpiDataMode::Quad);
+            w.fread_dual().bit(data_mode == SpiDataMode::Dual);
+            w.fread_quad().bit(data_mode == SpiDataMode::Quad)
+        });
     }
 
     #[cfg(esp32)]
@@ -2590,134 +2465,38 @@ pub trait Instance: private::Sealed {
             _ => panic!("Only 1-bit command supported"),
         }
 
-        match (address_mode, data_mode) {
-            (SpiDataMode::Single, SpiDataMode::Single) => {
+        match address_mode {
+            SpiDataMode::Single => {
                 reg_block.ctrl().modify(|_, w| {
-                    w.fread_dio()
-                        .clear_bit()
-                        .fread_qio()
-                        .clear_bit()
-                        .fread_dual()
-                        .clear_bit()
-                        .fread_quad()
-                        .clear_bit()
+                    w.fread_dio().clear_bit();
+                    w.fread_qio().clear_bit();
+                    w.fread_dual().bit(data_mode == SpiDataMode::Dual);
+                    w.fread_quad().bit(data_mode == SpiDataMode::Quad)
                 });
 
                 reg_block.user().modify(|_, w| {
-                    w.fwrite_dio()
-                        .clear_bit()
-                        .fwrite_qio()
-                        .clear_bit()
-                        .fwrite_dual()
-                        .clear_bit()
-                        .fwrite_quad()
-                        .clear_bit()
+                    w.fwrite_dio().clear_bit();
+                    w.fwrite_qio().clear_bit();
+                    w.fwrite_dual().bit(data_mode == SpiDataMode::Dual);
+                    w.fwrite_quad().bit(data_mode == SpiDataMode::Quad)
                 });
             }
-            (SpiDataMode::Single, SpiDataMode::Dual) => {
+            address_mode if address_mode == data_mode => {
                 reg_block.ctrl().modify(|_, w| {
-                    w.fread_dio()
-                        .clear_bit()
-                        .fread_qio()
-                        .clear_bit()
-                        .fread_dual()
-                        .set_bit()
-                        .fread_quad()
-                        .clear_bit()
+                    w.fread_dio().bit(address_mode == SpiDataMode::Dual);
+                    w.fread_qio().bit(address_mode == SpiDataMode::Quad);
+                    w.fread_dual().clear_bit();
+                    w.fread_quad().clear_bit()
                 });
 
                 reg_block.user().modify(|_, w| {
-                    w.fwrite_dio()
-                        .clear_bit()
-                        .fwrite_qio()
-                        .clear_bit()
-                        .fwrite_dual()
-                        .set_bit()
-                        .fwrite_quad()
-                        .clear_bit()
+                    w.fwrite_dio().bit(address_mode == SpiDataMode::Dual);
+                    w.fwrite_qio().bit(address_mode == SpiDataMode::Quad);
+                    w.fwrite_dual().clear_bit();
+                    w.fwrite_quad().clear_bit()
                 });
             }
-            (SpiDataMode::Single, SpiDataMode::Quad) => {
-                reg_block.ctrl().modify(|_, w| {
-                    w.fread_dio()
-                        .clear_bit()
-                        .fread_qio()
-                        .clear_bit()
-                        .fread_dual()
-                        .clear_bit()
-                        .fread_quad()
-                        .set_bit()
-                });
-
-                reg_block.user().modify(|_, w| {
-                    w.fwrite_dio()
-                        .clear_bit()
-                        .fwrite_qio()
-                        .clear_bit()
-                        .fwrite_dual()
-                        .clear_bit()
-                        .fwrite_quad()
-                        .set_bit()
-                });
-            }
-            (SpiDataMode::Dual, SpiDataMode::Single) => {
-                panic!("Unsupported combination of data-modes")
-            }
-            (SpiDataMode::Dual, SpiDataMode::Dual) => {
-                reg_block.ctrl().modify(|_, w| {
-                    w.fread_dio()
-                        .set_bit()
-                        .fread_qio()
-                        .clear_bit()
-                        .fread_dual()
-                        .clear_bit()
-                        .fread_quad()
-                        .clear_bit()
-                });
-
-                reg_block.user().modify(|_, w| {
-                    w.fwrite_dio()
-                        .set_bit()
-                        .fwrite_qio()
-                        .clear_bit()
-                        .fwrite_dual()
-                        .clear_bit()
-                        .fwrite_quad()
-                        .clear_bit()
-                });
-            }
-            (SpiDataMode::Dual, SpiDataMode::Quad) => {
-                panic!("Unsupported combination of data-modes")
-            }
-            (SpiDataMode::Quad, SpiDataMode::Single) => {
-                panic!("Unsupported combination of data-modes")
-            }
-            (SpiDataMode::Quad, SpiDataMode::Dual) => {
-                panic!("Unsupported combination of data-modes")
-            }
-            (SpiDataMode::Quad, SpiDataMode::Quad) => {
-                reg_block.ctrl().modify(|_, w| {
-                    w.fread_dio()
-                        .clear_bit()
-                        .fread_qio()
-                        .set_bit()
-                        .fread_dual()
-                        .clear_bit()
-                        .fread_quad()
-                        .clear_bit()
-                });
-
-                reg_block.user().modify(|_, w| {
-                    w.fwrite_dio()
-                        .clear_bit()
-                        .fwrite_qio()
-                        .set_bit()
-                        .fwrite_dual()
-                        .clear_bit()
-                        .fwrite_quad()
-                        .clear_bit()
-                });
-            }
+            _ => panic!("Unsupported combination of data-modes"),
         }
     }
 
@@ -2875,53 +2654,26 @@ pub trait Instance: private::Sealed {
         }
     }
 
-    #[cfg(not(esp32))]
     fn set_data_mode(&mut self, data_mode: SpiMode) -> &mut Self {
         let reg_block = self.register_block();
 
-        match data_mode {
-            SpiMode::Mode0 => {
-                reg_block.misc().modify(|_, w| w.ck_idle_edge().clear_bit());
-                reg_block.user().modify(|_, w| w.ck_out_edge().clear_bit());
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                let pin_reg = reg_block.pin();
+            } else {
+                let pin_reg = reg_block.misc();
             }
-            SpiMode::Mode1 => {
-                reg_block.misc().modify(|_, w| w.ck_idle_edge().clear_bit());
-                reg_block.user().modify(|_, w| w.ck_out_edge().set_bit());
-            }
-            SpiMode::Mode2 => {
-                reg_block.misc().modify(|_, w| w.ck_idle_edge().set_bit());
-                reg_block.user().modify(|_, w| w.ck_out_edge().set_bit());
-            }
-            SpiMode::Mode3 => {
-                reg_block.misc().modify(|_, w| w.ck_idle_edge().set_bit());
-                reg_block.user().modify(|_, w| w.ck_out_edge().clear_bit());
-            }
-        }
-        self
-    }
+        };
 
-    #[cfg(esp32)]
-    fn set_data_mode(&mut self, data_mode: SpiMode) -> &mut Self {
-        let reg_block = self.register_block();
+        pin_reg.modify(|_, w| {
+            w.ck_idle_edge()
+                .bit(matches!(data_mode, SpiMode::Mode2 | SpiMode::Mode3))
+        });
+        reg_block.user().modify(|_, w| {
+            w.ck_out_edge()
+                .bit(matches!(data_mode, SpiMode::Mode1 | SpiMode::Mode2))
+        });
 
-        match data_mode {
-            SpiMode::Mode0 => {
-                reg_block.pin().modify(|_, w| w.ck_idle_edge().clear_bit());
-                reg_block.user().modify(|_, w| w.ck_out_edge().clear_bit());
-            }
-            SpiMode::Mode1 => {
-                reg_block.pin().modify(|_, w| w.ck_idle_edge().clear_bit());
-                reg_block.user().modify(|_, w| w.ck_out_edge().set_bit());
-            }
-            SpiMode::Mode2 => {
-                reg_block.pin().modify(|_, w| w.ck_idle_edge().set_bit());
-                reg_block.user().modify(|_, w| w.ck_out_edge().set_bit());
-            }
-            SpiMode::Mode3 => {
-                reg_block.pin().modify(|_, w| w.ck_idle_edge().set_bit());
-                reg_block.user().modify(|_, w| w.ck_out_edge().clear_bit());
-            }
-        }
         self
     }
 
@@ -2929,12 +2681,9 @@ pub trait Instance: private::Sealed {
         // Disable clock source
         #[cfg(gdma)]
         self.register_block().clk_gate().modify(|_, w| {
-            w.clk_en()
-                .clear_bit()
-                .mst_clk_active()
-                .clear_bit()
-                .mst_clk_sel()
-                .clear_bit()
+            w.clk_en().clear_bit();
+            w.mst_clk_active().clear_bit();
+            w.mst_clk_sel().clear_bit()
         });
 
         // Change clock frequency
@@ -2943,12 +2692,9 @@ pub trait Instance: private::Sealed {
         // Enable clock source
         #[cfg(gdma)]
         self.register_block().clk_gate().modify(|_, w| {
-            w.clk_en()
-                .set_bit()
-                .mst_clk_active()
-                .set_bit()
-                .mst_clk_sel()
-                .set_bit()
+            w.clk_en().set_bit();
+            w.mst_clk_active().set_bit();
+            w.mst_clk_sel().set_bit()
         });
     }
 
@@ -3156,36 +2902,23 @@ pub trait Instance: private::Sealed {
     ) {
         let reg_block = self.register_block();
         reg_block.user().modify(|_, w| {
-            w.usr_miso_highpart()
-                .clear_bit()
-                .usr_miso_highpart()
-                .clear_bit()
-                .doutdin()
-                .clear_bit()
-                .usr_miso()
-                .bit(!is_write && !no_mosi_miso)
-                .usr_mosi()
-                .bit(is_write && !no_mosi_miso)
-                .cs_hold()
-                .set_bit()
-                .usr_dummy_idle()
-                .bit(dummy_idle)
-                .usr_dummy()
-                .bit(dummy_state)
-                .usr_addr()
-                .bit(address_state)
-                .usr_command()
-                .bit(command_state)
+            w.usr_miso_highpart().clear_bit();
+            w.usr_mosi_highpart().clear_bit();
+            w.doutdin().clear_bit();
+            w.usr_miso().bit(!is_write && !no_mosi_miso);
+            w.usr_mosi().bit(is_write && !no_mosi_miso);
+            w.cs_hold().set_bit();
+            w.usr_dummy_idle().bit(dummy_idle);
+            w.usr_dummy().bit(dummy_state);
+            w.usr_addr().bit(address_state);
+            w.usr_command().bit(command_state)
         });
 
         #[cfg(gdma)]
         reg_block.clk_gate().modify(|_, w| {
-            w.clk_en()
-                .set_bit()
-                .mst_clk_active()
-                .set_bit()
-                .mst_clk_sel()
-                .set_bit()
+            w.clk_en().set_bit();
+            w.mst_clk_active().set_bit();
+            w.mst_clk_sel().set_bit()
         });
 
         #[cfg(any(esp32c6, esp32h2))]
@@ -3223,42 +2956,7 @@ pub trait Instance: private::Sealed {
 
         // set cmd, address, dummy cycles
         let reg_block = self.register_block();
-        if !cmd.is_none() {
-            reg_block.user2().modify(|_, w| unsafe {
-                w.usr_command_bitlen()
-                    .bits((cmd.width() - 1) as u8)
-                    .usr_command_value()
-                    .bits(cmd.value())
-            });
-        }
-
-        #[cfg(not(esp32))]
-        if !address.is_none() {
-            reg_block
-                .user1()
-                .modify(|_, w| unsafe { w.usr_addr_bitlen().bits((address.width() - 1) as u8) });
-
-            let addr = address.value() << (32 - address.width());
-            reg_block
-                .addr()
-                .write(|w| unsafe { w.usr_addr_value().bits(addr) });
-        }
-
-        #[cfg(esp32)]
-        if !address.is_none() {
-            reg_block.user1().modify(|r, w| unsafe {
-                w.bits(r.bits() & !(0x3f << 26) | (((address.width() - 1) as u32) & 0x3f) << 26)
-            });
-
-            let addr = address.value() << (32 - address.width());
-            reg_block.addr().write(|w| unsafe { w.bits(addr) });
-        }
-
-        if dummy > 0 {
-            reg_block
-                .user1()
-                .modify(|_, w| unsafe { w.usr_dummy_cyclelen().bits(dummy - 1) });
-        }
+        set_up_common_phases(reg_block, cmd, address, dummy);
 
         if !buffer.is_empty() {
             // re-using the full-duplex write here
@@ -3288,42 +2986,7 @@ pub trait Instance: private::Sealed {
 
         // set cmd, address, dummy cycles
         let reg_block = self.register_block();
-        if !cmd.is_none() {
-            reg_block.user2().modify(|_, w| unsafe {
-                w.usr_command_bitlen()
-                    .bits((cmd.width() - 1) as u8)
-                    .usr_command_value()
-                    .bits(cmd.value())
-            });
-        }
-
-        #[cfg(not(esp32))]
-        if !address.is_none() {
-            reg_block
-                .user1()
-                .modify(|_, w| unsafe { w.usr_addr_bitlen().bits((address.width() - 1) as u8) });
-
-            let addr = address.value() << (32 - address.width());
-            reg_block
-                .addr()
-                .write(|w| unsafe { w.usr_addr_value().bits(addr) });
-        }
-
-        #[cfg(esp32)]
-        if !address.is_none() {
-            reg_block.user1().modify(|r, w| unsafe {
-                w.bits(r.bits() & !(0x3f << 26) | (((address.width() - 1) as u32) & 0x3f) << 26)
-            });
-
-            let addr = address.value() << (32 - address.width());
-            reg_block.addr().write(|w| unsafe { w.bits(addr) });
-        }
-
-        if dummy > 0 {
-            reg_block
-                .user1()
-                .modify(|_, w| unsafe { w.usr_dummy_cyclelen().bits(dummy - 1) });
-        }
+        set_up_common_phases(reg_block, cmd, address, dummy);
 
         self.configure_datalen(buffer.len(), 0);
         self.start_operation();
@@ -3383,6 +3046,43 @@ pub trait Instance: private::Sealed {
             }
 
         }
+    }
+}
+
+fn set_up_common_phases(reg_block: &RegisterBlock, cmd: Command, address: Address, dummy: u8) {
+    if !cmd.is_none() {
+        reg_block.user2().modify(|_, w| unsafe {
+            w.usr_command_bitlen().bits((cmd.width() - 1) as u8);
+            w.usr_command_value().bits(cmd.value())
+        });
+    }
+
+    #[cfg(not(esp32))]
+    if !address.is_none() {
+        reg_block
+            .user1()
+            .modify(|_, w| unsafe { w.usr_addr_bitlen().bits((address.width() - 1) as u8) });
+
+        let addr = address.value() << (32 - address.width());
+        reg_block
+            .addr()
+            .write(|w| unsafe { w.usr_addr_value().bits(addr) });
+    }
+
+    #[cfg(esp32)]
+    if !address.is_none() {
+        reg_block.user1().modify(|r, w| unsafe {
+            w.bits(r.bits() & !(0x3f << 26) | (((address.width() - 1) as u32) & 0x3f) << 26)
+        });
+
+        let addr = address.value() << (32 - address.width());
+        reg_block.addr().write(|w| unsafe { w.bits(addr) });
+    }
+
+    if dummy > 0 {
+        reg_block
+            .user1()
+            .modify(|_, w| unsafe { w.usr_dummy_cyclelen().bits(dummy - 1) });
     }
 }
 

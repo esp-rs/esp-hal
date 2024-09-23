@@ -72,15 +72,7 @@ name    = "lcd_cam_i8080_async"
 harness = false
 
 [[test]]
-name    = "qspi_read"
-harness = false
-
-[[test]]
-name    = "qspi_write"
-harness = false
-
-[[test]]
-name    = "qspi_write_read"
+name    = "qspi"
 harness = false
 
 [[test]]
@@ -97,6 +89,14 @@ harness = false
 
 [[test]]
 name    = "systimer"
+harness = false
+
+[[test]]
+name    = "parl_io_tx"
+harness = false
+
+[[test]]
+name    = "parl_io_tx_async"
 harness = false
 
 [[test]]
