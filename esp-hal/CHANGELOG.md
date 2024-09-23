@@ -68,6 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SPI: Fixed an issue where `wait` has returned before the DMA has finished writing the memory (#2179)
 - SPI: Fixed an issue where repeated calls to `dma_transfer` may end up looping indefinitely (#2179)
 - SPI: Fixed an issue that prevented correctly reading the first byte in a transaction (#2179)
+- PARL_IO: Fixed an issue that caused garbage to be output at the start of some requests (#2211)
 
 ### Removed
 
