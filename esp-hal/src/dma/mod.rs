@@ -1837,7 +1837,12 @@ pub struct Preparation {
 
 /// [DmaTxBuffer] is a DMA descriptor + memory combo that can be used for
 /// transmitting data from a DMA channel to a peripheral's FIFO.
-pub trait DmaTxBuffer {
+///
+/// # Safety
+///
+/// The implementing type must keep all its descriptors and the buffers they
+/// point to valid between each call to [Self::prepare].
+pub unsafe trait DmaTxBuffer {
     /// Prepares the buffer for an imminent transfer and returns
     /// information required to use this buffer.
     ///
@@ -1858,7 +1863,12 @@ pub trait DmaTxBuffer {
 /// Note: Implementations of this trait may only support having a single EOF bit
 /// which resides in the last descriptor. There will be a separate trait in
 /// future to support multiple EOFs.
-pub trait DmaRxBuffer {
+///
+/// # Safety
+///
+/// The implementing type must keep all its descriptors and the buffers they
+/// point to valid between each call to [Self::prepare].
+pub unsafe trait DmaRxBuffer {
     /// Prepares the buffer for an imminent transfer and returns
     /// information required to use this buffer.
     ///
@@ -2012,7 +2022,7 @@ impl DmaTxBuf {
     }
 }
 
-impl DmaTxBuffer for DmaTxBuf {
+unsafe impl DmaTxBuffer for DmaTxBuf {
     fn prepare(&mut self) -> Preparation {
         for desc in self.descriptors.iter_mut() {
             // Give ownership to the DMA
@@ -2240,7 +2250,7 @@ impl DmaRxBuf {
     }
 }
 
-impl DmaRxBuffer for DmaRxBuf {
+unsafe impl DmaRxBuffer for DmaRxBuf {
     fn prepare(&mut self) -> Preparation {
         for desc in self.descriptors.iter_mut() {
             // Give ownership to the DMA
@@ -2440,7 +2450,7 @@ impl DmaRxTxBuf {
     }
 }
 
-impl DmaTxBuffer for DmaRxTxBuf {
+unsafe impl DmaTxBuffer for DmaRxTxBuf {
     fn prepare(&mut self) -> Preparation {
         for desc in self.tx_descriptors.iter_mut() {
             // Give ownership to the DMA
@@ -2461,7 +2471,7 @@ impl DmaTxBuffer for DmaRxTxBuf {
     }
 }
 
-impl DmaRxBuffer for DmaRxTxBuf {
+unsafe impl DmaRxBuffer for DmaRxTxBuf {
     fn prepare(&mut self) -> Preparation {
         for desc in self.rx_descriptors.iter_mut() {
             // Give ownership to the DMA
