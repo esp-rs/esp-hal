@@ -65,9 +65,9 @@ fn main() -> ! {
     // be explicitly checked in the application instead of fully relying on
     // these partial acceptance filters to exactly match.
     // A filter that matches StandardId::ZERO.
-    const FILTER: SingleStandardFilter =
-        SingleStandardFilter::new(b"00000000000", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
-    twai_config.set_filter(FILTER);
+    twai_config.set_filter(
+        const { SingleStandardFilter::new(b"00000000000", b"x", [b"xxxxxxxx", b"xxxxxxxx"]) },
+    );
 
     // Start the peripheral. This locks the configuration settings of the peripheral
     // and puts it into operation mode, allowing packets to be sent and
@@ -77,7 +77,7 @@ fn main() -> ! {
     if IS_FIRST_SENDER {
         // Send a frame to the other ESP
         // Use `new_self_reception` if you want to use self-testing.
-        let frame = EspTwaiFrame::new(StandardId::ZERO.into(), &[1, 2, 3]).unwrap();
+        let frame = EspTwaiFrame::new(StandardId::ZERO, &[1, 2, 3]).unwrap();
         block!(can.transmit(&frame)).unwrap();
         println!("Sent a frame");
     }
