@@ -46,7 +46,6 @@ macro_rules! esp_config_bool {
 /// context
 macro_rules! esp_config_int_parse {
     ($ty:ty, $bytes:expr) => {{
-        #[allow(clippy::assign_op_pattern)] // required as this might not be used in const code
         let mut bytes = $bytes;
         let mut val: $ty = 0;
         let mut sign_seen = false;
@@ -69,8 +68,8 @@ macro_rules! esp_config_int_parse {
         if is_negative {
             let original = val;
             // subtract twice to get the negative
-            val = val - original;
-            val = val - original;
+            val -= original;
+            val -= original;
         }
         val
     }};
