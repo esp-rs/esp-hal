@@ -1578,6 +1578,7 @@ mod dma {
         pub fn cancel(&mut self) {
             if !self.is_done() {
                 self.spi_dma.spi_mut().configure_datalen(0, 0);
+                self.spi_dma.spi_mut().update();
                 if self.is_tx {
                     self.spi_dma.channel_mut().tx.stop_transfer();
                     self.is_tx = false;
