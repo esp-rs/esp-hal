@@ -1874,7 +1874,7 @@ mod dma {
         C::P: SpiPeripheral,
         M: Mode,
     {
-        type Error = super::Error;
+        type Error = Error;
 
         /// Half-duplex read.
         fn read(
@@ -1886,7 +1886,7 @@ mod dma {
             buffer: &mut [u8],
         ) -> Result<(), Self::Error> {
             if buffer.len() > self.rx_buf.capacity() {
-                return Err(super::Error::DmaError(DmaError::Overflow));
+                return Err(Error::DmaError(DmaError::Overflow));
             }
             self.rx_buf.set_length(buffer.len());
 
@@ -1918,7 +1918,7 @@ mod dma {
             buffer: &[u8],
         ) -> Result<(), Self::Error> {
             if buffer.len() > self.tx_buf.capacity() {
-                return Err(super::Error::DmaError(DmaError::Overflow));
+                return Err(Error::DmaError(DmaError::Overflow));
             }
             self.tx_buf.fill(buffer);
 
@@ -1946,7 +1946,7 @@ mod dma {
         C: DmaChannel,
         C::P: SpiPeripheral,
     {
-        type Error = super::Error;
+        type Error = Error;
 
         fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Self::Error> {
             self.transfer_in_place(words)?;
@@ -1961,7 +1961,7 @@ mod dma {
         C: DmaChannel,
         C::P: SpiPeripheral,
     {
-        type Error = super::Error;
+        type Error = Error;
 
         fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
             self.write(words)?;
@@ -1982,7 +1982,7 @@ mod dma {
             C::P: SpiPeripheral,
         {
             /// Fill the given buffer with data from the bus.
-            pub async fn read_async(&mut self, words: &mut [u8]) -> Result<(), super::Error> {
+            pub async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
                 let chunk_size = self.rx_buf.capacity();
 
                 for chunk in words.chunks_mut(chunk_size) {
@@ -2003,7 +2003,7 @@ mod dma {
             }
 
             /// Transmit the given buffer to the bus.
-            pub async fn write_async(&mut self, words: &[u8]) -> Result<(), super::Error> {
+            pub async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
                 let chunk_size = self.tx_buf.capacity();
 
                 for chunk in words.chunks(chunk_size) {
@@ -2024,7 +2024,7 @@ mod dma {
                 &mut self,
                 read: &mut [u8],
                 write: &[u8],
-            ) -> Result<(), super::Error> {
+            ) -> Result<(), Error> {
                 let chunk_size = min(self.tx_buf.capacity(), self.rx_buf.capacity());
 
                 let common_length = min(read.len(), write.len());
@@ -2060,10 +2060,7 @@ mod dma {
 
             /// Transfer by writing out a buffer and reading the response from
             /// the bus into the same buffer.
-            pub async fn transfer_in_place_async(
-                &mut self,
-                words: &mut [u8],
-            ) -> Result<(), super::Error> {
+            pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
                 for chunk in words.chunks_mut(self.tx_buf.capacity()) {
                     self.tx_buf.fill(chunk);
                     self.rx_buf.set_length(chunk.len());
@@ -2165,7 +2162,7 @@ mod ehal1 {
     use super::*;
 
     impl<T, M> embedded_hal::spi::ErrorType for Spi<'_, T, M> {
-        type Error = super::Error;
+        type Error = Error;
     }
 
     impl<T> FullDuplex for Spi<'_, T, FullDuplexMode>
