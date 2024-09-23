@@ -1452,8 +1452,6 @@ where
         let pcr = unsafe { &*crate::peripherals::PCR::PTR };
         pcr.parl_clk_tx_conf()
             .modify(|_, w| w.parl_tx_rst_en().set_bit());
-        pcr.parl_clk_tx_conf()
-            .modify(|_, w| w.parl_tx_rst_en().clear_bit());
 
         Instance::clear_tx_interrupts();
         Instance::set_tx_bytes(len as u16);
@@ -1474,6 +1472,10 @@ where
         }
 
         Instance::set_tx_start(true);
+
+        pcr.parl_clk_tx_conf()
+            .modify(|_, w| w.parl_tx_rst_en().clear_bit());
+
         Ok(())
     }
 }
