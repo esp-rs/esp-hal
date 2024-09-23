@@ -12,7 +12,7 @@ use embedded_hal::spi::SpiBus;
 #[cfg(pcnt)]
 use embedded_hal_async::spi::SpiBus as SpiBusAsync;
 use esp_hal::{
-    dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma::{Dma, DmaDescriptor, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{Io, Level, NoPin},
     peripherals::SPI2,
@@ -37,6 +37,11 @@ cfg_if::cfg_if! {
 struct Context {
     spi: Spi<'static, SPI2, FullDuplexMode>,
     dma_channel: DmaChannelCreator,
+    // Reuse the really large buffer so we don't run out of DRAM with many tests
+    rx_buffer: &'static mut [u8],
+    rx_descriptors: &'static mut [DmaDescriptor],
+    tx_buffer: &'static mut [u8],
+    tx_descriptors: &'static mut [DmaDescriptor],
     #[cfg(pcnt)]
     pcnt_source: InputSignal,
     #[cfg(pcnt)]
@@ -74,17 +79,21 @@ mod tests {
             .with_mosi(mosi)
             .with_miso(mosi_loopback);
 
-        cfg_if::cfg_if! {
-            if #[cfg(pcnt)] {
-                let pcnt = Pcnt::new(peripherals.PCNT);
-                Context {
-                    spi, dma_channel,
-                    pcnt_source: mosi_loopback_pcnt,
-                    pcnt_unit: pcnt.unit0,
-                }
-            } else {
-                Context { spi, dma_channel }
-            }
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
+
+        #[cfg(pcnt)]
+        let pcnt = Pcnt::new(peripherals.PCNT);
+        Context {
+            spi,
+            dma_channel,
+            rx_buffer,
+            rx_descriptors,
+            tx_buffer,
+            tx_descriptors,
+            #[cfg(pcnt)]
+            pcnt_source: mosi_loopback_pcnt,
+            #[cfg(pcnt)]
+            pcnt_unit: pcnt.unit0,
         }
     }
 
@@ -251,9 +260,8 @@ mod tests {
     fn test_symmetric_dma_transfer(ctx: Context) {
         // This test case sends a large amount of data, multiple times to verify that
         // https://github.com/esp-rs/esp-hal/issues/2151 is and remains fixed.
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
-        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let mut dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
+        let mut dma_tx_buf = DmaTxBuf::new(ctx.tx_descriptors, ctx.tx_buffer).unwrap();
 
         for (i, v) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
             *v = (i % 255) as u8;
@@ -477,5 +485,65 @@ mod tests {
         let (_, dma_rx_buf) = transfer.wait();
 
         assert_eq!(&[0xff, 0xff, 0xff, 0xff], dma_rx_buf.as_slice());
+    }
+
+    #[test]
+    #[timeout(3)]
+    fn cancel_stops_transaction(mut ctx: Context) {
+        // Slow down
+        ctx.spi.change_bus_frequency(100.Hz());
+
+        // Set up a large buffer that would trigger a timeout
+        let dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
+        let dma_tx_buf = DmaTxBuf::new(ctx.tx_descriptors, ctx.tx_buffer).unwrap();
+
+        let spi = ctx
+            .spi
+            .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0));
+
+        let mut transfer = spi
+            .dma_transfer(dma_rx_buf, dma_tx_buf)
+            .map_err(|e| e.0)
+            .unwrap();
+
+        transfer.cancel();
+        transfer.wait();
+    }
+
+    #[test]
+    #[timeout(3)]
+    fn can_transmit_after_cancel(mut ctx: Context) {
+        // Slow down
+        ctx.spi.change_bus_frequency(100.Hz());
+
+        // Set up a large buffer that would trigger a timeout
+        let mut dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
+        let mut dma_tx_buf = DmaTxBuf::new(ctx.tx_descriptors, ctx.tx_buffer).unwrap();
+
+        let mut spi = ctx
+            .spi
+            .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0));
+
+        let mut transfer = spi
+            .dma_transfer(dma_rx_buf, dma_tx_buf)
+            .map_err(|e| e.0)
+            .unwrap();
+
+        transfer.cancel();
+        (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
+
+        spi.change_bus_frequency(10000.kHz());
+
+        let transfer = spi
+            .dma_transfer(dma_rx_buf, dma_tx_buf)
+            .map_err(|e| e.0)
+            .unwrap();
+
+        let (_, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
+        if dma_tx_buf.as_slice() != dma_rx_buf.as_slice() {
+            defmt::info!("dma_tx_buf: {:?}", dma_tx_buf.as_slice()[0..100]);
+            defmt::info!("dma_rx_buf: {:?}", dma_rx_buf.as_slice()[0..100]);
+            panic!("Failed to transmit after cancel");
+        }
     }
 }

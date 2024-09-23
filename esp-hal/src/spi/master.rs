@@ -908,6 +908,7 @@ where
 mod dma {
     use core::{
         cmp::min,
+        mem::ManuallyDrop,
         sync::atomic::{fence, Ordering},
     };
 
@@ -1234,10 +1235,10 @@ mod dma {
         fn spi_mut(&mut self) -> &mut Self::T {
             &mut self.spi
         }
-        fn channel(&self) -> &Channel<'d, Self::CH, M> {
+        fn channel(&self) -> &Channel<'d, C, M> {
             &self.channel
         }
-        fn channel_mut(&mut self) -> &mut Channel<'d, Self::CH, M> {
+        fn channel_mut(&mut self) -> &mut Channel<'d, C, M> {
             &mut self.channel
         }
 
@@ -1497,8 +1498,8 @@ mod dma {
     where
         R: SpiBusRef<'d>,
     {
-        spi_dma: R,
-        dma_buf: Buf,
+        spi_dma: ManuallyDrop<R>,
+        dma_buf: ManuallyDrop<Buf>,
         is_rx: bool,
         is_tx: bool,
 
@@ -1514,8 +1515,8 @@ mod dma {
     {
         fn new(spi_dma: R, dma_buf: Buf, is_rx: bool, is_tx: bool) -> Self {
             Self {
-                spi_dma,
-                dma_buf,
+                spi_dma: ManuallyDrop::new(spi_dma),
+                dma_buf: ManuallyDrop::new(dma_buf),
                 is_rx,
                 is_tx,
                 rx_future_awaited: false,
@@ -1552,16 +1553,50 @@ mod dma {
             true
         }
 
-        /// Waits for the DMA transfer to complete.
-        ///
-        /// This method blocks until the transfer is finished and returns the
-        /// `SpiDma` instance and the associated buffer.
-        pub fn wait(self) -> (R, Buf) {
+        fn do_wait(&self) {
             while !self.is_done() {
                 // Wait for the transfer to complete
             }
             fence(Ordering::Acquire);
-            (self.spi_dma, self.dma_buf)
+        }
+
+        /// Waits for the DMA transfer to complete.
+        ///
+        /// This method blocks until the transfer is finished and returns the
+        /// `SpiDma` instance and the associated buffer.
+        pub fn wait(mut self) -> (R, Buf) {
+            self.do_wait();
+            unsafe {
+                (
+                    ManuallyDrop::take(&mut self.spi_dma),
+                    ManuallyDrop::take(&mut self.dma_buf),
+                )
+            }
+        }
+
+        /// Cancels the DMA transfer.
+        pub fn cancel(&mut self) {
+            if !self.is_done() {
+                self.spi_dma.spi_mut().configure_datalen(0, 0);
+                if self.is_tx {
+                    self.spi_dma.channel_mut().tx.stop_transfer();
+                    self.is_tx = false;
+                }
+                if self.is_rx {
+                    self.spi_dma.channel_mut().rx.stop_transfer();
+                    self.is_rx = false;
+                }
+            }
+        }
+    }
+
+    impl<'d, R, Buf> Drop for SpiDmaTransfer<'d, R, Buf>
+    where
+        R: SpiBusRef<'d>,
+    {
+        fn drop(&mut self) {
+            self.cancel();
+            self.do_wait();
         }
     }
 
@@ -1782,14 +1817,12 @@ mod dma {
                 self.rx_buf.set_length(chunk.len());
 
                 match (&mut self.spi_dma).do_dma_read(&mut self.rx_buf) {
-                    Ok(transfer) => {
-                        transfer.wait();
-
-                        let bytes_read = self.rx_buf.read_received_data(chunk);
-                        debug_assert_eq!(bytes_read, chunk.len());
-                    }
+                    Ok(transfer) => transfer.wait(),
                     Err((e, _, _)) => return Err(e),
-                }
+                };
+
+                let bytes_read = self.rx_buf.read_received_data(chunk);
+                debug_assert_eq!(bytes_read, chunk.len());
             }
 
             Ok(())
@@ -1825,14 +1858,12 @@ mod dma {
                 self.rx_buf.set_length(read_chunk.len());
 
                 match (&mut self.spi_dma).do_dma_transfer(&mut self.rx_buf, &mut self.tx_buf) {
-                    Ok(transfer) => {
-                        transfer.wait();
-
-                        let bytes_read = self.rx_buf.read_received_data(read_chunk);
-                        debug_assert_eq!(bytes_read, read_chunk.len());
-                    }
+                    Ok(transfer) => transfer.wait(),
                     Err((e, _, _, _)) => return Err(e),
-                }
+                };
+
+                let bytes_read = self.rx_buf.read_received_data(read_chunk);
+                debug_assert_eq!(bytes_read, read_chunk.len());
             }
 
             if !read_remainder.is_empty() {
@@ -1853,14 +1884,12 @@ mod dma {
                 self.rx_buf.set_length(chunk.len());
 
                 match (&mut self.spi_dma).do_dma_transfer(&mut self.rx_buf, &mut self.tx_buf) {
-                    Ok(transfer) => {
-                        transfer.wait();
-
-                        let bytes_read = self.rx_buf.read_received_data(chunk);
-                        debug_assert_eq!(bytes_read, chunk.len());
-                    }
+                    Ok(transfer) => transfer.wait(),
                     Err((e, _, _, _)) => return Err(e),
-                }
+                };
+
+                let bytes_read = self.rx_buf.read_received_data(chunk);
+                debug_assert_eq!(bytes_read, chunk.len());
             }
 
             Ok(())
@@ -1897,15 +1926,14 @@ mod dma {
                 dummy,
                 &mut self.rx_buf,
             ) {
-                Ok(transfer) => {
-                    transfer.wait();
-
-                    let bytes_read = self.rx_buf.read_received_data(buffer);
-                    debug_assert_eq!(bytes_read, buffer.len());
-                    Ok(())
-                }
+                Ok(transfer) => transfer.wait(),
                 Err((e, _, _)) => return Err(e),
-            }
+            };
+
+            let bytes_read = self.rx_buf.read_received_data(buffer);
+            debug_assert_eq!(bytes_read, buffer.len());
+
+            Ok(())
         }
 
         /// Half-duplex write.
@@ -1989,14 +2017,12 @@ mod dma {
                     self.rx_buf.set_length(chunk.len());
 
                     match (&mut self.spi_dma).do_dma_read(&mut self.rx_buf) {
-                        Ok(mut transfer) => {
-                            transfer.wait_for_done().await;
-
-                            let bytes_read = self.rx_buf.read_received_data(chunk);
-                            debug_assert_eq!(bytes_read, chunk.len());
-                        }
+                        Ok(mut transfer) => transfer.wait_for_done().await,
                         Err((e, _, _)) => return Err(e),
-                    };
+                    }
+
+                    let bytes_read = self.rx_buf.read_received_data(chunk);
+                    debug_assert_eq!(bytes_read, chunk.len());
                 }
 
                 Ok(())
@@ -2039,14 +2065,12 @@ mod dma {
                     self.rx_buf.set_length(read_chunk.len());
 
                     match (&mut self.spi_dma).do_dma_transfer(&mut self.rx_buf, &mut self.tx_buf) {
-                        Ok(mut transfer) => {
-                            transfer.wait_for_done().await;
-
-                            let bytes_read = self.rx_buf.read_received_data(read_chunk);
-                            assert_eq!(bytes_read, read_chunk.len());
-                        }
+                        Ok(mut transfer) => transfer.wait_for_done().await,
                         Err((e, _, _, _)) => return Err(e),
                     }
+
+                    let bytes_read = self.rx_buf.read_received_data(read_chunk);
+                    assert_eq!(bytes_read, read_chunk.len());
                 }
 
                 if !read_remainder.is_empty() {
@@ -2066,14 +2090,12 @@ mod dma {
                     self.rx_buf.set_length(chunk.len());
 
                     match (&mut self.spi_dma).do_dma_transfer(&mut self.rx_buf, &mut self.tx_buf) {
-                        Ok(mut transfer) => {
-                            transfer.wait_for_done().await;
-
-                            let bytes_read = self.rx_buf.read_received_data(chunk);
-                            assert_eq!(bytes_read, chunk.len());
-                        }
+                        Ok(mut transfer) => transfer.wait_for_done().await,
                         Err((e, _, _, _)) => return Err(e),
                     }
+
+                    let bytes_read = self.rx_buf.read_received_data(chunk);
+                    assert_eq!(bytes_read, chunk.len());
                 }
 
                 Ok(())
