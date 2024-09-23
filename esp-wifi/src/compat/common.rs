@@ -10,14 +10,13 @@ use esp_wifi_sys::include::malloc;
 
 use super::malloc::free;
 use crate::{
-    binary::{
-        c_types::{c_int, c_void},
-        include::OSI_FUNCS_TIME_BLOCKING,
-    },
+    binary::c_types::{c_int, c_void},
     memory_fence::memory_fence,
     preempt::current_task,
     timer::yield_task,
 };
+
+pub(crate) const OSI_FUNCS_TIME_BLOCKING: u32 = u32::MAX;
 
 #[derive(Clone, Copy, Debug)]
 struct Mutex {
@@ -324,7 +323,7 @@ pub fn number_of_messages_in_queue(queue: *const c_void) -> u32 {
 /// Implementation of sleep() from newlib in esp-idf.
 /// components/newlib/time.c
 #[no_mangle]
-unsafe extern "C" fn sleep(
+pub(crate) unsafe extern "C" fn sleep(
     seconds: crate::binary::c_types::c_uint,
 ) -> crate::binary::c_types::c_uint {
     trace!("sleep");

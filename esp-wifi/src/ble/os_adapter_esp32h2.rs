@@ -15,7 +15,7 @@ pub(crate) static mut ISR_INTERRUPT_3: (
 ) = (core::ptr::null_mut(), core::ptr::null_mut());
 
 pub(crate) static BLE_CONFIG: esp_bt_controller_config_t = esp_bt_controller_config_t {
-    config_version: 0x20231124,
+    config_version: 0x20240422,
     ble_ll_resolv_list_size: 4,
     ble_hci_evt_hi_buf_count: 30,
     ble_hci_evt_lo_buf_count: 8,
@@ -47,13 +47,6 @@ pub(crate) static BLE_CONFIG: esp_bt_controller_config_t = esp_bt_controller_con
     controller_run_cpu: 0,
     enable_qa_test: 0,
     enable_bqb_test: 0,
-    enable_uart_hci: 0,
-    ble_hci_uart_port: 0,
-    ble_hci_uart_baud: 0,
-    ble_hci_uart_data_bits: 0,
-    ble_hci_uart_stop_bits: 0,
-    ble_hci_uart_flow_ctrl: 0,
-    ble_hci_uart_uart_parity: 0,
     enable_tx_cca: 0,
     cca_rssi_thresh: (256 - 50) as u8,
     sleep_en: 0,

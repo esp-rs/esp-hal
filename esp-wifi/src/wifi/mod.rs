@@ -33,6 +33,7 @@ use esp_wifi_sys::include::{
     esp_eap_fast_config,
     esp_wifi_sta_enterprise_enable,
     wifi_pkt_rx_ctrl_t,
+    wifi_scan_channel_bitmap_t,
     WIFI_PROTOCOL_11AX,
     WIFI_PROTOCOL_11B,
     WIFI_PROTOCOL_11G,
@@ -830,21 +831,54 @@ pub enum WifiEvent {
     StaConnected,
     StaDisconnected,
     StaAuthmodeChange,
+
     StaWpsErSuccess,
     StaWpsErFailed,
     StaWpsErTimeout,
     StaWpsErPin,
     StaWpsErPbcOverlap,
+
     ApStart,
     ApStop,
     ApStaconnected,
     ApStadisconnected,
     ApProbereqrecved,
+
     FtmReport,
+
     StaBssRssiLow,
     ActionTxStatus,
     RocDone,
+
     StaBeaconTimeout,
+
+    ConnectionlessModuleWakeIntervalStart, // Connectionless module wake interval start
+
+    ApWpsRgSuccess,    // Soft-AP wps succeeds in registrar mode
+    ApWpsRgFailed,     // Soft-AP wps fails in registrar mode
+    ApWpsRgTimeout,    // Soft-AP wps timeout in registrar mode
+    ApWpsRgPin,        // Soft-AP wps pin code in registrar mode
+    ApWpsRgPbcOverlap, // Soft-AP wps overlap in registrar mode
+
+    ItwtSetup,    // iTWT setup
+    ItwtTeardown, // iTWT teardown
+    ItwtProbe,    // iTWT probe
+    ItwtSuspend,  // iTWT suspend
+    TwtWakeup,    // TWT wakeup
+    BtwtSetup,    // bTWT setup
+    BtwtTeardown, // bTWT teardown
+
+    NanStarted,        // NAN Discovery has started
+    NanStopped,        // NAN Discovery has stopped
+    NanSvcMatch,       // NAN Service Discovery match found
+    NanReplied,        // Replied to a NAN peer with Service Discovery match
+    NanReceive,        // Received a Follow-up message
+    NdpIndication,     // Received NDP Request from a NAN Peer
+    NdpConfirm,        // NDP Confirm Indication
+    NdpTerminated,     // NAN Datapath terminated indication
+    HomeChannelChange, // WiFi home channel change，doesn't occur when scanning
+
+    StaNeighborRep, // Received Neighbor Report response
 }
 
 /// Error originating from the underlying drivers
@@ -1141,24 +1175,24 @@ static g_wifi_osi_funcs: wifi_osi_funcs_t = wifi_osi_funcs_t {
     _sleep_retention_find_link_by_id: Some(
         os_adapter_chip_specific::sleep_retention_find_link_by_id_dummy,
     ),
-    #[cfg(esp32c6)]
-    _sleep_retention_entries_create: Some(
-        os_adapter_chip_specific::sleep_retention_entries_create_dummy,
-    ),
-    #[cfg(esp32c6)]
-    _sleep_retention_entries_destroy: Some(
-        os_adapter_chip_specific::sleep_retention_entries_destroy_dummy,
-    ),
-
     _coex_schm_process_restart: Some(coex_schm_process_restart_wrapper),
     _coex_schm_register_cb: Some(coex_schm_register_cb_wrapper),
 
     _magic: ESP_WIFI_OS_ADAPTER_MAGIC as i32,
+
+    _coex_schm_flexible_period_set: Some(coex_schm_flexible_period_set),
+    _coex_schm_flexible_period_get: Some(coex_schm_flexible_period_get),
 };
 
-const CONFIG_FEATURE_WPA3_SAE_BIT: u64 = 1 << 0;
+const WIFI_ENABLE_WPA3_SAE: u64 = 1 << 0;
+const WIFI_ENABLE_ENTERPRISE: u64 = 1 << 7;
+// const WIFI_FTM_INITIATOR: u64 = 1 << 2;
+// const WIFI_FTM_RESPONDER: u64 = 1 << 3;
+// const WIFI_ENABLE_GCMP: u64 = 1 << 4;
+// const WIFI_ENABLE_GMAC: u64 = 1 << 5;
+// const WIFI_ENABLE_11R: u64 = 1 << 6;
 
-const WIFI_FEATURE_CAPS: u64 = CONFIG_FEATURE_WPA3_SAE_BIT;
+const WIFI_FEATURE_CAPS: u64 = WIFI_ENABLE_WPA3_SAE | WIFI_ENABLE_ENTERPRISE;
 
 #[no_mangle]
 static mut g_wifi_feature_caps: u64 = WIFI_FEATURE_CAPS;
@@ -1220,6 +1254,9 @@ static mut G_CONFIG: wifi_init_config_t = wifi_init_config_t {
     sta_disconnected_pm: false,
     espnow_max_encrypt_num: 7, // 2 for ESP32-C2
     magic: WIFI_INIT_CONFIG_MAGIC as i32,
+
+    tx_hetb_queue_num: 3,
+    dump_hesigb_enable: false,
 };
 
 /// Get the STA MAC address
@@ -1399,16 +1436,6 @@ pub(crate) fn wifi_start() -> Result<(), WifiError> {
     Ok(())
 }
 
-unsafe extern "C" fn coex_register_start_cb(
-    _cb: Option<unsafe extern "C" fn() -> c_types::c_int>,
-) -> c_types::c_int {
-    #[cfg(coex)]
-    return include::coex_register_start_cb(_cb);
-
-    #[cfg(not(coex))]
-    0
-}
-
 /// Configuration for active or passive scan. For details see the [WIFI Alliance FAQ](https://www.wi-fi.org/knowledge-center/faq/what-are-passive-and-active-scanning).
 ///
 /// # Comparison of active and passive scan
@@ -1542,6 +1569,10 @@ pub(crate) fn wifi_start_scan(
         scan_type,
         scan_time,
         home_chan_dwell_time: 0,
+        channel_bitmap: wifi_scan_channel_bitmap_t {
+            ghz_2_channels: 0,
+            ghz_5_channels: 0,
+        },
     };
 
     unsafe { esp_wifi_scan_start(&scan_config, block) }
@@ -2425,6 +2456,8 @@ fn apply_ap_config(config: &AccessPointConfiguration) -> Result<(), WifiError> {
                 required: false,
             },
             sae_pwe_h2e: 0,
+            csa_count: 3,
+            dtim_period: 2,
         },
     };
 
@@ -3090,6 +3123,98 @@ mod asynch {
                     &WAKER
                 }
                 WifiEvent::StaBeaconTimeout => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::ConnectionlessModuleWakeIntervalStart => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::ApWpsRgSuccess => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::ApWpsRgFailed => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::ApWpsRgTimeout => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::ApWpsRgPin => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::ApWpsRgPbcOverlap => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::ItwtSetup => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::ItwtTeardown => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::ItwtProbe => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::ItwtSuspend => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::TwtWakeup => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::BtwtSetup => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::BtwtTeardown => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::NanStarted => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::NanStopped => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::NanSvcMatch => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::NanReplied => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::NanReceive => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::NdpIndication => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::NdpConfirm => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::NdpTerminated => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::HomeChannelChange => {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
+                    &WAKER
+                }
+                WifiEvent::StaNeighborRep => {
                     static WAKER: AtomicWaker = AtomicWaker::new();
                     &WAKER
                 }

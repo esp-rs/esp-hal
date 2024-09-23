@@ -232,7 +232,7 @@ unsafe extern "C" fn queue_recv(queue: *const (), item: *const (), block_time_ms
         block_time_ms
     );
 
-    let forever = block_time_ms == OSI_FUNCS_TIME_BLOCKING;
+    let forever = block_time_ms == crate::compat::common::OSI_FUNCS_TIME_BLOCKING;
     let start = crate::timer::get_systimer_count();
     let block_ticks = crate::timer::millis_to_ticks(block_time_ms as u64);
 
