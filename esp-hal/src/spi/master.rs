@@ -1560,6 +1560,27 @@ mod dma {
             fence(Ordering::Acquire);
         }
 
+        fn do_cancel(&mut self) {
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    // TODO: examine what happens exactly. (0, 0) just doesn't take effect.
+                    self.spi_dma.spi_mut().configure_datalen(1, 1);
+                } else {
+                    self.spi_dma.spi_mut().configure_datalen(0, 0);
+                }
+            };
+            self.spi_dma.spi_mut().update();
+
+            if self.is_tx {
+                self.spi_dma.channel_mut().tx.stop_transfer();
+                self.is_tx = false;
+            }
+            if self.is_rx {
+                self.spi_dma.channel_mut().rx.stop_transfer();
+                self.is_rx = false;
+            }
+        }
+
         /// Waits for the DMA transfer to complete.
         ///
         /// This method blocks until the transfer is finished and returns the
@@ -1577,16 +1598,7 @@ mod dma {
         /// Cancels the DMA transfer.
         pub fn cancel(&mut self) {
             if !self.is_done() {
-                self.spi_dma.spi_mut().configure_datalen(0, 0);
-                self.spi_dma.spi_mut().update();
-                if self.is_tx {
-                    self.spi_dma.channel_mut().tx.stop_transfer();
-                    self.is_tx = false;
-                }
-                if self.is_rx {
-                    self.spi_dma.channel_mut().rx.stop_transfer();
-                    self.is_rx = false;
-                }
+                self.do_cancel();
             }
         }
     }
@@ -1596,8 +1608,10 @@ mod dma {
         R: SpiBusRef<'d>,
     {
         fn drop(&mut self) {
-            self.cancel();
-            self.do_wait();
+            if !self.is_done() {
+                self.do_cancel();
+                self.do_wait();
+            }
         }
     }
 
@@ -1620,6 +1634,17 @@ mod dma {
                 let _ = DmaRxFuture::new(&mut self.spi_dma.channel_mut().rx).await;
                 self.rx_future_awaited = true;
             }
+
+            core::future::poll_fn(|cx| {
+                use core::task::Poll;
+                if self.is_done() {
+                    Poll::Ready(())
+                } else {
+                    cx.waker().wake_by_ref();
+                    Poll::Pending
+                }
+            })
+            .await;
         }
     }
 
