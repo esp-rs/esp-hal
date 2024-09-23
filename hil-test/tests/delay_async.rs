@@ -77,7 +77,7 @@ mod tests {
 
     #[cfg(systimer)]
     #[test]
-    #[timeout(20)]
+    #[timeout(2)]
     async fn test_systimer_async_delay_ns(ctx: Context) {
         let mut alarms = SystemTimer::new(ctx.peripherals.SYSTIMER);
         let unit = FrozenUnit::new(&mut alarms.unit0);

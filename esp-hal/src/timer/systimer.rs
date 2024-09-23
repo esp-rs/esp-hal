@@ -145,25 +145,6 @@ impl<'d> SystemTimer<'d> {
         xtal_freq_mhz as u64 * MULTIPLIER
     }
 
-    /// Convert nanoseconds to ticks.
-    // IDF source: uint64_t systimer_ticks_to_us(uint64_t ticks)
-    pub(crate) fn ns_to_ticks(ticks: u64) -> u64 {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s2)] {
-                ticks * 80
-            } else if #[cfg(esp32c2)] {
-                use crate::rtc_cntl::RtcClock;
-                if RtcClock::estimate_xtal_frequency() > 33 {
-                    ticks * 16 // 40MHz
-                } else {
-                    ticks * 52 / 5 // 26MHz
-                }
-            } else {
-                ticks * 16
-            }
-        }
-    }
-
     /// Create a new instance.
     pub fn new(_systimer: impl Peripheral<P = SYSTIMER> + 'd) -> Self {
         // Don't reset Systimer as it will break `time::now`, only enable it
@@ -1067,7 +1048,6 @@ mod asynch {
             }
 
             alarm.set_interrupt_handler(target0_handler);
-            // alarm.set_target(SystemTimer::now() + (SystemTimer::ticks_per_second() * 2));
 
             alarm.enable_interrupt(true);
 
@@ -1100,8 +1080,11 @@ mod asynch {
     impl<'d, COMP: Comparator, UNIT: Unit> embedded_hal_async::delay::DelayNs
         for Alarm<'d, Target, crate::Async, COMP, UNIT>
     {
-        async fn delay_ns(&mut self, ns: u32) {
-            self.set_target(SystemTimer::now() + SystemTimer::ns_to_ticks(ns as u64 / 1000));
+        async fn delay_ns(&mut self, nanos: u32) {
+            self.set_target(
+                self.unit.read_count()
+                    + (nanos as u64 * SystemTimer::ticks_per_second()).div_ceil(1_000_000_000),
+            );
 
             AlarmFuture::new(self).await;
         }
