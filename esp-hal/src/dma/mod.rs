@@ -1841,7 +1841,7 @@ pub struct Preparation {
 /// # Safety
 ///
 /// The implementing type must keep all its descriptors and the buffers they
-/// point to valid between each call to [Self::prepare].
+/// point to valid while the buffer is being transferred.
 pub unsafe trait DmaTxBuffer {
     /// Prepares the buffer for an imminent transfer and returns
     /// information required to use this buffer.
@@ -1867,7 +1867,7 @@ pub unsafe trait DmaTxBuffer {
 /// # Safety
 ///
 /// The implementing type must keep all its descriptors and the buffers they
-/// point to valid between each call to [Self::prepare].
+/// point to valid while the buffer is being transferred.
 pub unsafe trait DmaRxBuffer {
     /// Prepares the buffer for an imminent transfer and returns
     /// information required to use this buffer.
