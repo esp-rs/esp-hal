@@ -141,7 +141,7 @@ where
     /// Creates a new `Camera` instance with DMA support.
     pub fn new<P: RxPins>(
         cam: Cam<'d>,
-        mut channel: ChannelRx<'d, CH>,
+        channel: ChannelRx<'d, CH>,
         descriptors: &'static mut [DmaDescriptor],
         _pins: P,
         frequency: HertzU32,
@@ -161,43 +161,26 @@ where
         lcd_cam.cam_ctrl().write(|w| {
             // Force enable the clock for all configuration registers.
             unsafe {
-                w.cam_clk_sel()
-                    .bits((i + 1) as _)
-                    .cam_clkm_div_num()
-                    .bits(divider.div_num as _)
-                    .cam_clkm_div_b()
-                    .bits(divider.div_b as _)
-                    .cam_clkm_div_a()
-                    .bits(divider.div_a as _)
-                    .cam_vsync_filter_thres()
-                    .bits(0)
-                    .cam_vs_eof_en()
-                    .set_bit()
-                    .cam_line_int_en()
-                    .clear_bit()
-                    .cam_stop_en()
-                    .clear_bit()
+                w.cam_clk_sel().bits((i + 1) as _);
+                w.cam_clkm_div_num().bits(divider.div_num as _);
+                w.cam_clkm_div_b().bits(divider.div_b as _);
+                w.cam_clkm_div_a().bits(divider.div_a as _);
+                w.cam_vsync_filter_thres().bits(0);
+                w.cam_vs_eof_en().set_bit();
+                w.cam_line_int_en().clear_bit();
+                w.cam_stop_en().clear_bit()
             }
         });
         lcd_cam.cam_ctrl1().write(|w| unsafe {
-            w.cam_vh_de_mode_en()
-                .set_bit()
-                .cam_rec_data_bytelen()
-                .bits(0)
-                .cam_line_int_num()
-                .bits(0)
-                .cam_vsync_filter_en()
-                .clear_bit()
-                .cam_2byte_en()
-                .clear_bit()
-                .cam_clk_inv()
-                .clear_bit()
-                .cam_de_inv()
-                .clear_bit()
-                .cam_hsync_inv()
-                .clear_bit()
-                .cam_vsync_inv()
-                .clear_bit()
+            w.cam_vh_de_mode_en().set_bit();
+            w.cam_rec_data_bytelen().bits(0);
+            w.cam_line_int_num().bits(0);
+            w.cam_vsync_filter_en().clear_bit();
+            w.cam_2byte_en().clear_bit();
+            w.cam_clk_inv().clear_bit();
+            w.cam_de_inv().clear_bit();
+            w.cam_hsync_inv().clear_bit();
+            w.cam_vsync_inv().clear_bit()
         });
 
         lcd_cam
@@ -205,8 +188,6 @@ where
             .write(|w| w.cam_conv_bypass().clear_bit());
 
         lcd_cam.cam_ctrl().modify(|_, w| w.cam_update().set_bit());
-
-        channel.init_channel();
 
         Self {
             lcd_cam,

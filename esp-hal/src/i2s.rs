@@ -345,7 +345,7 @@ where
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
-        mut channel: Channel<'d, CH, DmaMode>,
+        channel: Channel<'d, CH, DmaMode>,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
     ) -> Self {
@@ -353,7 +353,6 @@ where
         // could be configured totally independently but for now handle all
         // the targets the same and force same configuration for both, TX and RX
 
-        channel.tx.init_channel();
         PeripheralClockControl::reset(I::get_peripheral());
         PeripheralClockControl::enable(I::get_peripheral());
         I::set_clock(calculate_clock(sample_rate, 2, data_format.channel_bits()));

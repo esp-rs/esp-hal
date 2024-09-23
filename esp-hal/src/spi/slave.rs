@@ -225,12 +225,10 @@ pub mod dma {
     {
         fn with_dma(
             self,
-            mut channel: Channel<'d, C, DmaMode>,
+            channel: Channel<'d, C, DmaMode>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> SpiDma<'d, crate::peripherals::SPI2, C, DmaMode> {
-            channel.tx.init_channel(); // no need to call this for both, TX and RX
-
             SpiDma {
                 spi: self.spi,
                 channel,
@@ -250,12 +248,10 @@ pub mod dma {
     {
         fn with_dma(
             self,
-            mut channel: Channel<'d, C, DmaMode>,
+            channel: Channel<'d, C, DmaMode>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> SpiDma<'d, crate::peripherals::SPI3, C, DmaMode> {
-            channel.tx.init_channel(); // no need to call this for both, TX and RX
-
             SpiDma {
                 spi: self.spi,
                 channel,

@@ -105,7 +105,7 @@ where
     /// Creates a new instance of the I8080 LCD interface.
     pub fn new<P: TxPins>(
         lcd: Lcd<'d, DM>,
-        mut channel: ChannelTx<'d, CH>,
+        channel: ChannelTx<'d, CH>,
         descriptors: &'static mut [DmaDescriptor],
         mut pins: P,
         frequency: HertzU32,
@@ -128,24 +128,16 @@ where
 
         lcd_cam.lcd_clock().write(|w| unsafe {
             // Force enable the clock for all configuration registers.
-            w.clk_en()
-                .set_bit()
-                .lcd_clk_sel()
-                .bits((i + 1) as _)
-                .lcd_clkm_div_num()
-                .bits(divider.div_num as _)
-                .lcd_clkm_div_b()
-                .bits(divider.div_b as _)
-                .lcd_clkm_div_a()
-                .bits(divider.div_a as _)
-                // LCD_PCLK = LCD_CLK / 2
-                .lcd_clk_equ_sysclk()
-                .clear_bit()
-                .lcd_clkcnt_n()
-                .bits(2 - 1) // Must not be 0.
-                .lcd_ck_idle_edge()
-                .bit(config.clock_mode.polarity == Polarity::IdleHigh)
-                .lcd_ck_out_edge()
+            w.clk_en().set_bit();
+            w.lcd_clk_sel().bits((i + 1) as _);
+            w.lcd_clkm_div_num().bits(divider.div_num as _);
+            w.lcd_clkm_div_b().bits(divider.div_b as _);
+            w.lcd_clkm_div_a().bits(divider.div_a as _); // LCD_PCLK = LCD_CLK / 2
+            w.lcd_clk_equ_sysclk().clear_bit();
+            w.lcd_clkcnt_n().bits(2 - 1); // Must not be 0.
+            w.lcd_ck_idle_edge()
+                .bit(config.clock_mode.polarity == Polarity::IdleHigh);
+            w.lcd_ck_out_edge()
                 .bit(config.clock_mode.phase == Phase::ShiftHigh)
         });
 
@@ -157,91 +149,66 @@ where
             .write(|w| w.lcd_conv_bypass().clear_bit());
 
         lcd_cam.lcd_user().modify(|_, w| {
-            w.lcd_8bits_order()
-                .bit(false)
-                .lcd_bit_order()
-                .bit(false)
-                .lcd_byte_order()
-                .bit(false)
-                .lcd_2byte_en()
-                .bit(false)
+            w.lcd_8bits_order().bit(false);
+            w.lcd_bit_order().bit(false);
+            w.lcd_byte_order().bit(false);
+            w.lcd_2byte_en().bit(false)
         });
         lcd_cam.lcd_misc().write(|w| unsafe {
             // Set the threshold for Async Tx FIFO full event. (5 bits)
-            w.lcd_afifo_threshold_num()
-                .bits(0)
-                // Configure the setup cycles in LCD non-RGB mode. Setup cycles
-                // expected = this value + 1. (6 bit)
-                .lcd_vfk_cyclelen()
-                .bits(config.setup_cycles.saturating_sub(1) as _)
-                // Configure the hold time cycles in LCD non-RGB mode. Hold
-                // cycles expected = this value + 1.
-                .lcd_vbk_cyclelen()
-                .bits(config.hold_cycles.saturating_sub(1) as _)
-                // 1: Send the next frame data when the current frame is sent out.
-                // 0: LCD stops when the current frame is sent out.
-                .lcd_next_frame_en()
-                .clear_bit()
-                // Enable blank region when LCD sends data out.
-                .lcd_bk_en()
-                .set_bit()
-                // 1: LCD_CD = !LCD_CAM_LCD_CD_IDLE_EDGE when LCD is in DOUT phase.
-                // 0: LCD_CD = LCD_CAM_LCD_CD_IDLE_EDGE.
-                .lcd_cd_data_set()
-                .bit(config.cd_data_edge != config.cd_idle_edge)
-                // 1: LCD_CD = !LCD_CAM_LCD_CD_IDLE_EDGE when LCD is in DUMMY phase.
-                // 0: LCD_CD = LCD_CAM_LCD_CD_IDLE_EDGE.
-                .lcd_cd_dummy_set()
-                .bit(config.cd_dummy_edge != config.cd_idle_edge)
-                // 1: LCD_CD = !LCD_CAM_LCD_CD_IDLE_EDGE when LCD is in CMD phase.
-                // 0: LCD_CD = LCD_CAM_LCD_CD_IDLE_EDGE.
-                .lcd_cd_cmd_set()
-                .bit(config.cd_cmd_edge != config.cd_idle_edge)
-                // The default value of LCD_CD
-                .lcd_cd_idle_edge()
-                .bit(config.cd_idle_edge)
+            w.lcd_afifo_threshold_num().bits(0);
+            // Configure the setup cycles in LCD non-RGB mode. Setup cycles
+            // expected = this value + 1. (6 bit)
+            w.lcd_vfk_cyclelen()
+                .bits(config.setup_cycles.saturating_sub(1) as _);
+            // Configure the hold time cycles in LCD non-RGB mode. Hold
+            // cycles expected = this value + 1.
+            w.lcd_vbk_cyclelen()
+                .bits(config.hold_cycles.saturating_sub(1) as _);
+            // 1: Send the next frame data when the current frame is sent out.
+            // 0: LCD stops when the current frame is sent out.
+            w.lcd_next_frame_en().clear_bit();
+            // Enable blank region when LCD sends data out.
+            w.lcd_bk_en().set_bit();
+            // 1: LCD_CD = !LCD_CAM_LCD_CD_IDLE_EDGE when LCD is in DOUT phase.
+            // 0: LCD_CD = LCD_CAM_LCD_CD_IDLE_EDGE.
+            w.lcd_cd_data_set()
+                .bit(config.cd_data_edge != config.cd_idle_edge);
+            // 1: LCD_CD = !LCD_CAM_LCD_CD_IDLE_EDGE when LCD is in DUMMY phase.
+            // 0: LCD_CD = LCD_CAM_LCD_CD_IDLE_EDGE.
+            w.lcd_cd_dummy_set()
+                .bit(config.cd_dummy_edge != config.cd_idle_edge);
+            // 1: LCD_CD = !LCD_CAM_LCD_CD_IDLE_EDGE when LCD is in CMD phase.
+            // 0: LCD_CD = LCD_CAM_LCD_CD_IDLE_EDGE.
+            w.lcd_cd_cmd_set()
+                .bit(config.cd_cmd_edge != config.cd_idle_edge);
+            // The default value of LCD_CD
+            w.lcd_cd_idle_edge().bit(config.cd_idle_edge)
         });
         lcd_cam
             .lcd_dly_mode()
             .write(|w| unsafe { w.lcd_cd_mode().bits(config.cd_mode as u8) });
         lcd_cam.lcd_data_dout_mode().write(|w| unsafe {
-            w.dout0_mode()
-                .bits(config.output_bit_mode as u8)
-                .dout1_mode()
-                .bits(config.output_bit_mode as u8)
-                .dout2_mode()
-                .bits(config.output_bit_mode as u8)
-                .dout3_mode()
-                .bits(config.output_bit_mode as u8)
-                .dout4_mode()
-                .bits(config.output_bit_mode as u8)
-                .dout5_mode()
-                .bits(config.output_bit_mode as u8)
-                .dout6_mode()
-                .bits(config.output_bit_mode as u8)
-                .dout7_mode()
-                .bits(config.output_bit_mode as u8)
-                .dout8_mode()
-                .bits(config.output_bit_mode as u8)
-                .dout9_mode()
-                .bits(config.output_bit_mode as u8)
-                .dout10_mode()
-                .bits(config.output_bit_mode as u8)
-                .dout11_mode()
-                .bits(config.output_bit_mode as u8)
-                .dout12_mode()
-                .bits(config.output_bit_mode as u8)
-                .dout13_mode()
-                .bits(config.output_bit_mode as u8)
-                .dout14_mode()
-                .bits(config.output_bit_mode as u8)
-                .dout15_mode()
-                .bits(config.output_bit_mode as u8)
+            w.dout0_mode().bits(config.output_bit_mode as u8);
+            w.dout1_mode().bits(config.output_bit_mode as u8);
+            w.dout2_mode().bits(config.output_bit_mode as u8);
+            w.dout3_mode().bits(config.output_bit_mode as u8);
+            w.dout4_mode().bits(config.output_bit_mode as u8);
+            w.dout5_mode().bits(config.output_bit_mode as u8);
+            w.dout6_mode().bits(config.output_bit_mode as u8);
+            w.dout7_mode().bits(config.output_bit_mode as u8);
+            w.dout8_mode().bits(config.output_bit_mode as u8);
+            w.dout9_mode().bits(config.output_bit_mode as u8);
+            w.dout10_mode().bits(config.output_bit_mode as u8);
+            w.dout11_mode().bits(config.output_bit_mode as u8);
+            w.dout12_mode().bits(config.output_bit_mode as u8);
+            w.dout13_mode().bits(config.output_bit_mode as u8);
+            w.dout14_mode().bits(config.output_bit_mode as u8);
+            w.dout15_mode().bits(config.output_bit_mode as u8)
         });
 
         lcd_cam.lcd_user().modify(|_, w| w.lcd_update().set_bit());
 
-        channel.init_channel();
         pins.configure();
 
         Self {
@@ -283,10 +250,8 @@ impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
     pub fn set_byte_order(&mut self, byte_order: ByteOrder) -> &mut Self {
         let is_inverted = byte_order != ByteOrder::default();
         self.lcd_cam.lcd_user().modify(|_, w| {
-            w.lcd_byte_order()
-                .bit(is_inverted)
-                .lcd_8bits_order()
-                .bit(is_inverted)
+            w.lcd_byte_order().bit(is_inverted);
+            w.lcd_8bits_order().bit(is_inverted)
         });
         self
     }
@@ -432,17 +397,19 @@ impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
                     .modify(|_, w| w.lcd_cmd().clear_bit());
             }
             Command::One(value) => {
-                self.lcd_cam
-                    .lcd_user()
-                    .modify(|_, w| w.lcd_cmd().set_bit().lcd_cmd_2_cycle_en().clear_bit());
+                self.lcd_cam.lcd_user().modify(|_, w| {
+                    w.lcd_cmd().set_bit();
+                    w.lcd_cmd_2_cycle_en().clear_bit()
+                });
                 self.lcd_cam
                     .lcd_cmd_val()
                     .write(|w| unsafe { w.lcd_cmd_value().bits(value.into() as _) });
             }
             Command::Two(first, second) => {
-                self.lcd_cam
-                    .lcd_user()
-                    .modify(|_, w| w.lcd_cmd().set_bit().lcd_cmd_2_cycle_en().set_bit());
+                self.lcd_cam.lcd_user().modify(|_, w| {
+                    w.lcd_cmd().set_bit();
+                    w.lcd_cmd_2_cycle_en().set_bit()
+                });
                 let cmd = first.into() as u32 | (second.into() as u32) << 16;
                 self.lcd_cam
                     .lcd_cmd_val()
@@ -479,9 +446,10 @@ impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
         // Otherwise, some garbage data will be sent out
         crate::rom::ets_delay_us(1);
 
-        self.lcd_cam
-            .lcd_user()
-            .modify(|_, w| w.lcd_update().set_bit().lcd_start().set_bit());
+        self.lcd_cam.lcd_user().modify(|_, w| {
+            w.lcd_update().set_bit();
+            w.lcd_start().set_bit()
+        });
     }
 
     fn tear_down_send(&mut self) {
@@ -508,9 +476,10 @@ impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
             // > i. LCD_CAM_LCD_START is cleared;
             // > ii. or LCD_CAM_LCD_RESET is set;
             // > iii. or all the data in GDMA is sent out.
-            self.lcd_cam
-                .lcd_user()
-                .modify(|_, w| w.lcd_always_out_en().set_bit().lcd_dout().set_bit());
+            self.lcd_cam.lcd_user().modify(|_, w| {
+                w.lcd_always_out_en().set_bit();
+                w.lcd_dout().set_bit()
+            });
 
             unsafe {
                 self.tx_chain.fill_for_tx(false, ptr, len)?;
