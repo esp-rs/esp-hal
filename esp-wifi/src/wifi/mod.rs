@@ -2273,8 +2273,14 @@ impl<'d> WifiController<'d> {
 // see https://docs.rs/smoltcp/0.7.1/smoltcp/phy/index.html
 #[cfg(feature = "smoltcp")]
 impl<MODE: WifiDeviceMode> Device for WifiDevice<'_, MODE> {
-    type RxToken<'a> = WifiRxToken<MODE> where Self: 'a;
-    type TxToken<'a> = WifiTxToken<MODE> where Self: 'a;
+    type RxToken<'a>
+        = WifiRxToken<MODE>
+    where
+        Self: 'a;
+    type TxToken<'a>
+        = WifiTxToken<MODE>
+    where
+        Self: 'a;
 
     fn receive(
         &mut self,
@@ -2804,8 +2810,14 @@ pub(crate) mod embassy {
     }
 
     impl<MODE: WifiDeviceMode> Driver for WifiDevice<'_, MODE> {
-        type RxToken<'a> = WifiRxToken<MODE> where Self: 'a;
-        type TxToken<'a> = WifiTxToken<MODE> where Self: 'a;
+        type RxToken<'a>
+            = WifiRxToken<MODE>
+        where
+            Self: 'a;
+        type TxToken<'a>
+            = WifiTxToken<MODE>
+        where
+            Self: 'a;
 
         fn receive(
             &mut self,
