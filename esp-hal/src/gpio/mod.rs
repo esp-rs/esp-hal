@@ -761,16 +761,11 @@ fn disable_usb_pads(gpionum: u8) {
         unsafe { &*crate::peripherals::USB_DEVICE::PTR }
             .conf0()
             .modify(|_, w| {
-                w.usb_pad_enable()
-                    .clear_bit()
-                    .dm_pullup()
-                    .clear_bit()
-                    .dm_pulldown()
-                    .clear_bit()
-                    .dp_pullup()
-                    .clear_bit()
-                    .dp_pulldown()
-                    .clear_bit()
+                w.usb_pad_enable().clear_bit();
+                w.dm_pullup().clear_bit();
+                w.dm_pulldown().clear_bit();
+                w.dp_pullup().clear_bit();
+                w.dp_pulldown().clear_bit()
             });
     }
 }
@@ -799,7 +794,10 @@ where
         #[cfg(esp32)]
         crate::soc::gpio::errata36(GPIONUM, Some(pull_up), Some(pull_down));
 
-        get_io_mux_reg(GPIONUM).modify(|_, w| w.fun_wpd().bit(pull_down).fun_wpu().bit(pull_up));
+        get_io_mux_reg(GPIONUM).modify(|_, w| {
+            w.fun_wpd().bit(pull_down);
+            w.fun_wpu().bit(pull_up)
+        });
     }
 }
 
@@ -814,12 +812,9 @@ where
         disable_usb_pads(GPIONUM);
 
         get_io_mux_reg(GPIONUM).modify(|_, w| unsafe {
-            w.mcu_sel()
-                .bits(GPIO_FUNCTION as u8)
-                .fun_ie()
-                .set_bit()
-                .slp_sel()
-                .clear_bit()
+            w.mcu_sel().bits(GPIO_FUNCTION as u8);
+            w.fun_ie().set_bit();
+            w.slp_sel().clear_bit()
         });
     }
 
@@ -936,14 +931,10 @@ where
         disable_usb_pads(GPIONUM);
 
         get_io_mux_reg(GPIONUM).modify(|_, w| unsafe {
-            w.mcu_sel()
-                .bits(alternate as u8)
-                .fun_ie()
-                .bit(open_drain)
-                .fun_drv()
-                .bits(DriveStrength::I20mA as u8)
-                .slp_sel()
-                .clear_bit()
+            w.mcu_sel().bits(alternate as u8);
+            w.fun_ie().bit(open_drain);
+            w.fun_drv().bits(DriveStrength::I20mA as u8);
+            w.slp_sel().clear_bit()
         });
     }
 
@@ -1231,10 +1222,10 @@ macro_rules! rtc_pins {
 
                 // disable input
                 paste::paste!{
-                    rtcio.$pin_reg.modify(|_,w| unsafe {w
-                        .[<$prefix fun_ie>]().bit(input_enable)
-                        .[<$prefix mux_sel>]().bit(mux)
-                        .[<$prefix fun_sel>]().bits(func as u8)
+                    rtcio.$pin_reg.modify(|_,w| unsafe {
+                        w.[<$prefix fun_ie>]().bit(input_enable);
+                        w.[<$prefix mux_sel>]().bit(mux);
+                        w.[<$prefix fun_sel>]().bits(func as u8)
                     });
                 }
             }
@@ -1485,10 +1476,10 @@ macro_rules! analog {
                     use $crate::peripherals::{GPIO};
 
                     get_io_mux_reg($pin_num).modify(|_,w| unsafe {
-                        w.mcu_sel().bits(1)
-                            .fun_ie().clear_bit()
-                            .fun_wpu().clear_bit()
-                            .fun_wpd().clear_bit()
+                        w.mcu_sel().bits(1);
+                        w.fun_ie().clear_bit();
+                        w.fun_wpu().clear_bit();
+                        w.fun_wpd().clear_bit()
                     });
 
                     unsafe{ &*GPIO::PTR }.enable_w1tc().write(|w| unsafe { w.bits(1 << $pin_num) });
@@ -1505,29 +1496,27 @@ macro_rules! touch {
     (@pin_specific $touch_num:expr, true) => {
         paste::paste! {
             unsafe { &*RTC_IO::ptr() }.[< touch_pad $touch_num >]().write(|w| unsafe {
-                w
-                .xpd().set_bit()
+                w.xpd().set_bit();
                 // clear input_enable
-                .fun_ie().clear_bit()
+                w.fun_ie().clear_bit();
                 // Connect pin to analog / RTC module instead of standard GPIO
-                .mux_sel().set_bit()
+                w.mux_sel().set_bit();
                 // Disable pull-up and pull-down resistors on the pin
-                .rue().clear_bit()
-                .rde().clear_bit()
-                .tie_opt().clear_bit()
+                w.rue().clear_bit();
+                w.rde().clear_bit();
+                w.tie_opt().clear_bit();
                 // Select function "RTC function 1" (GPIO) for analog use
-                .fun_sel().bits(0b00)
+                w.fun_sel().bits(0b00)
             });
         }
     };
 
     (@pin_specific $touch_num:expr, false) => {
         paste::paste! {
-            unsafe { &*RTC_IO::ptr() }.[< touch_pad $touch_num >]().write(|w|
-                w
-                .xpd().set_bit()
-                .tie_opt().clear_bit()
-            );
+            unsafe { &*RTC_IO::ptr() }.[< touch_pad $touch_num >]().write(|w| {
+                w.xpd().set_bit();
+                w.tie_opt().clear_bit()
+            });
         }
     };
 
@@ -2444,12 +2433,9 @@ fn is_listening(pin_num: u8) -> bool {
 fn set_int_enable(gpio_num: u8, int_ena: u8, int_type: u8, wake_up_from_light_sleep: bool) {
     let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
     gpio.pin(gpio_num as usize).modify(|_, w| unsafe {
-        w.int_ena()
-            .bits(int_ena)
-            .int_type()
-            .bits(int_type)
-            .wakeup_enable()
-            .bit(wake_up_from_light_sleep)
+        w.int_ena().bits(int_ena);
+        w.int_type().bits(int_type);
+        w.wakeup_enable().bit(wake_up_from_light_sleep)
     });
 }
 
@@ -2496,36 +2482,36 @@ mod asynch {
     where
         P: InputPin,
     {
+        async fn wait_for(&mut self, event: Event) {
+            self.listen(event);
+            PinFuture::new(self.pin.number()).await
+        }
+
         /// Wait until the pin is high. If it is already high, return
         /// immediately.
         pub async fn wait_for_high(&mut self) {
-            self.listen(Event::HighLevel);
-            PinFuture::new(self.pin.number()).await
+            self.wait_for(Event::HighLevel).await
         }
 
         /// Wait until the pin is low. If it is already low, return immediately.
         pub async fn wait_for_low(&mut self) {
-            self.listen(Event::LowLevel);
-            PinFuture::new(self.pin.number()).await
+            self.wait_for(Event::LowLevel).await
         }
 
         /// Wait for the pin to undergo a transition from low to high.
         pub async fn wait_for_rising_edge(&mut self) {
-            self.listen(Event::RisingEdge);
-            PinFuture::new(self.pin.number()).await
+            self.wait_for(Event::RisingEdge).await
         }
 
         /// Wait for the pin to undergo a transition from high to low.
         pub async fn wait_for_falling_edge(&mut self) {
-            self.listen(Event::FallingEdge);
-            PinFuture::new(self.pin.number()).await
+            self.wait_for(Event::FallingEdge).await
         }
 
         /// Wait for the pin to undergo any transition, i.e low to high OR high
         /// to low.
         pub async fn wait_for_any_edge(&mut self) {
-            self.listen(Event::AnyEdge);
-            PinFuture::new(self.pin.number()).await
+            self.wait_for(Event::AnyEdge).await
         }
     }
 
