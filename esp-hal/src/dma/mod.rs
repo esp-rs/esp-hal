@@ -2037,7 +2037,7 @@ impl DmaTxBuf {
                 }
             } else {
                 #[cfg(any(esp32,esp32s2))]
-                if buffer.len() % 4 != 0 && buffer.as_ptr().is_aligned_to(4) {
+                if buffer.len() % 4 != 0 && buffer.as_ptr() as usize % 4 != 0 {
                     // ESP32 requires word alignment for DMA buffers.
                     // ESP32-S2 technically supports byte-aligned DMA buffers, but the
                     // transfer ends up writing out of bounds if the buffer's length
