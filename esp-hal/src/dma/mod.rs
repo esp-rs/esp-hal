@@ -1238,7 +1238,7 @@ impl RxCircularState {
 /// A description of a DMA Channel.
 pub trait DmaChannel: crate::private::Sealed {
     #[doc(hidden)]
-    type Channel: ChannelTypes + RegisterAccess;
+    type Channel: RegisterAccess;
 
     /// A description of the RX half of a DMA Channel.
     type Rx: RxChannel<Self::Channel>;
@@ -1248,6 +1248,9 @@ pub trait DmaChannel: crate::private::Sealed {
 
     /// A suitable peripheral for this DMA channel.
     type P: PeripheralMarker;
+
+    #[doc(hidden)]
+    fn set_isr(handler: InterruptHandler);
 }
 
 /// The functions here are not meant to be used outside the HAL
@@ -1743,11 +1746,6 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn start_in();
 }
 
-#[doc(hidden)]
-pub trait ChannelTypes: crate::private::Sealed {
-    fn set_isr(handler: InterruptHandler);
-}
-
 /// DMA Channel
 pub struct Channel<'d, CH, MODE>
 where
@@ -1770,7 +1768,7 @@ where
     ///
     /// Interrupts are not enabled at the peripheral level here.
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        <C::Channel as ChannelTypes>::set_isr(handler);
+        C::set_isr(handler);
     }
 
     /// Listen for the given interrupts
