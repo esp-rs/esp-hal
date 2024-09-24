@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expose `RtcClock::get_xtal_freq` and `RtcClock::get_slow_freq` publically for all chips (#2183)
 - TWAI support for ESP32-H2 (#2199)
 - Added a way to configure watchdogs in `esp_hal::init` (#2180)
+- Implement `embedded_hal_async::delay::DelayNs` for `TIMGx` timers (#2084)
 
 ### Changed
 

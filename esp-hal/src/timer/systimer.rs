@@ -1029,11 +1029,11 @@ mod asynch {
 
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct AlarmFuture<'a, COMP: Comparator, UNIT: Unit> {
-        alarm: &'a Alarm<'a, Periodic, crate::Async, COMP, UNIT>,
+        alarm: &'a Alarm<'a, Target, crate::Async, COMP, UNIT>,
     }
 
     impl<'a, COMP: Comparator, UNIT: Unit> AlarmFuture<'a, COMP, UNIT> {
-        pub(crate) fn new(alarm: &'a Alarm<'a, Periodic, crate::Async, COMP, UNIT>) -> Self {
+        pub(crate) fn new(alarm: &'a Alarm<'a, Target, crate::Async, COMP, UNIT>) -> Self {
             alarm.clear_interrupt();
 
             let (interrupt, handler) = match alarm.comparator.channel() {
@@ -1046,6 +1046,8 @@ mod asynch {
                 interrupt::bind_interrupt(interrupt, handler.handler());
                 interrupt::enable(interrupt, handler.priority()).unwrap();
             }
+
+            alarm.set_interrupt_handler(handler);
 
             alarm.enable_interrupt(true);
 
@@ -1076,11 +1078,13 @@ mod asynch {
     }
 
     impl<'d, COMP: Comparator, UNIT: Unit> embedded_hal_async::delay::DelayNs
-        for Alarm<'d, Periodic, crate::Async, COMP, UNIT>
+        for Alarm<'d, Target, crate::Async, COMP, UNIT>
     {
-        async fn delay_ns(&mut self, ns: u32) {
-            let period = MicrosDurationU32::from_ticks(ns / 1000);
-            self.set_period(period);
+        async fn delay_ns(&mut self, nanos: u32) {
+            self.set_target(
+                self.unit.read_count()
+                    + (nanos as u64 * SystemTimer::ticks_per_second()).div_ceil(1_000_000_000),
+            );
 
             AlarmFuture::new(self).await;
         }
