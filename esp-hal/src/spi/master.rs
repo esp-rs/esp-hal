@@ -1637,6 +1637,8 @@ mod dma {
         }
 
         fn do_cancel(&mut self) {
+            // The SPI peripheral is controlling how much data we transfer, so let's
+            // update its counter.
             // 0 doesn't take effect on ESP32 and cuts the currently transmitted byte
             // immediately.
             // 1 seems to stop after transmitting the current byte which is somewhat less
@@ -1644,6 +1646,7 @@ mod dma {
             self.spi_dma.spi_mut().configure_datalen(1, 1);
             self.spi_dma.spi_mut().update();
 
+            // We need to stop the DMA transfer, too.
             if self.spi_dma.is_tx_in_progress() {
                 self.spi_dma.channel_mut().tx.stop_transfer();
                 self.spi_dma.set_tx_in_progress(false);
