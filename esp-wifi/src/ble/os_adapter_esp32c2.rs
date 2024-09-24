@@ -1,5 +1,5 @@
 use crate::{
-    binary::{c_types::c_void, include::esp_bt_controller_config_t},
+    binary::include::esp_bt_controller_config_t,
     ble::npl,
     common_adapter::RADIO_CLOCKS,
     hal::system::RadioClockController,
@@ -132,18 +132,7 @@ pub(super) unsafe extern "C" fn ble_ll_random_override() -> u32 {
 pub(super) fn deinit() {
     unsafe {
         // HCI deinit
-        npl::r_ble_hci_trans_cfg_hs(
-            Some(core::mem::transmute::<
-                *const (),
-                unsafe extern "C" fn(*const u8, *const c_void),
-            >(core::ptr::null())),
-            core::ptr::null(),
-            Some(core::mem::transmute::<
-                *const (),
-                unsafe extern "C" fn(*const npl::OsMbuf, *const c_void),
-            >(core::ptr::null())),
-            core::ptr::null(),
-        );
+        npl::r_ble_hci_trans_cfg_hs(None, core::ptr::null(), None, core::ptr::null());
 
         let res = npl::ble_controller_deinit();
 
@@ -153,7 +142,6 @@ pub(super) fn deinit() {
 
         bt_periph_module_disable();
 
-        // npl::os_msys_buf_free();
         npl::esp_unregister_npl_funcs();
         npl::esp_unregister_ext_funcs();
         crate::common_adapter::chip_specific::phy_disable();

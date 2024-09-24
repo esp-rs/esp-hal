@@ -1,5 +1,5 @@
 use crate::{
-    binary::{c_types::c_void, include::esp_bt_controller_config_t},
+    binary::include::esp_bt_controller_config_t,
     ble::npl,
     common_adapter::RADIO_CLOCKS,
     hal::system::{RadioClockController, RadioPeripherals},
@@ -133,18 +133,7 @@ unsafe extern "C" fn jrand48(
 pub(super) fn deinit() {
     unsafe {
         // HCI deinit
-        npl::r_ble_hci_trans_cfg_hs(
-            Some(core::mem::transmute::<
-                *const (),
-                unsafe extern "C" fn(*const u8, *const c_void),
-            >(core::ptr::null())),
-            core::ptr::null(),
-            Some(core::mem::transmute::<
-                *const (),
-                unsafe extern "C" fn(*const npl::OsMbuf, *const c_void),
-            >(core::ptr::null())),
-            core::ptr::null(),
-        );
+        npl::r_ble_hci_trans_cfg_hs(None, core::ptr::null(), None, core::ptr::null());
 
         npl::ble_controller_disable();
         npl::ble_controller_deinit();

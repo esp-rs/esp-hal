@@ -84,7 +84,7 @@ pub(crate) fn delete_main_task() {
         let main_task = *ctx_now_ref;
 
         free((*main_task).allocated_stack as *mut u8);
-        *ctx_now_ref = core::ptr::null_mut(); // Correctly set CTX_NOW to null
+        *ctx_now_ref = core::ptr::null_mut();
 
         memory_fence();
     });

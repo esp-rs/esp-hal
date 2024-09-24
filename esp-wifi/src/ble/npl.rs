@@ -204,9 +204,9 @@ extern "C" {
     #[cfg(esp32c2)]
     pub(crate) fn ble_controller_init(cfg: *const esp_bt_controller_config_t) -> i32;
 
-    // #[cfg(not(esp32c2))]
+    #[cfg(not(esp32c2))]
     pub(crate) fn ble_controller_disable() -> i32;
-    // #[cfg(esp32c2)]
+
     pub(crate) fn ble_controller_deinit() -> i32;
 
     #[cfg(not(esp32c2))]
@@ -1285,21 +1285,6 @@ fn os_msys_init() {
         let rc = r_os_msys_register(addr_of!(OS_MSYS_INIT_2_MBUF_POOL));
         if rc != 0 {
             panic!("r_os_msys_register failed");
-        }
-    }
-}
-
-#[cfg(esp32c2)]
-fn os_msys_buf_free() {
-    unsafe {
-        if !OS_MSYS_INIT_1_DATA.is_null() {
-            crate::compat::malloc::free(OS_MSYS_INIT_1_DATA as *mut u8);
-            OS_MSYS_INIT_1_DATA = core::ptr::null_mut();
-        }
-
-        if !OS_MSYS_INIT_2_DATA.is_null() {
-            crate::compat::malloc::free(OS_MSYS_INIT_2_DATA as *mut u8);
-            OS_MSYS_INIT_2_DATA = core::ptr::null_mut();
         }
     }
 }
