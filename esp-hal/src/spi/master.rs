@@ -1404,31 +1404,44 @@ mod dma {
         ///
         /// Interrupts are not enabled at the peripheral level here.
         pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+            self.wait_for_idle();
             self.spi.set_interrupt_handler(handler);
         }
 
         /// Listen for the given interrupts
         #[cfg(gdma)]
         pub fn listen(&mut self, interrupts: EnumSet<SpiInterrupt>) {
+            self.wait_for_idle();
             self.spi.listen(interrupts);
         }
 
         /// Unlisten the given interrupts
         #[cfg(gdma)]
         pub fn unlisten(&mut self, interrupts: EnumSet<SpiInterrupt>) {
+            self.wait_for_idle();
             self.spi.unlisten(interrupts);
         }
 
         /// Gets asserted interrupts
         #[cfg(gdma)]
         pub fn interrupts(&mut self) -> EnumSet<SpiInterrupt> {
+            self.wait_for_idle();
             self.spi.interrupts()
         }
 
         /// Resets asserted interrupts
         #[cfg(gdma)]
         pub fn clear_interrupts(&mut self, interrupts: EnumSet<SpiInterrupt>) {
+            self.wait_for_idle();
             self.spi.clear_interrupts(interrupts);
+        }
+
+        fn wait_for_idle(&self) {
+            // TODO: don't ignore DMA status. We can move the transfer's logic here.
+            while self.spi.busy() {
+                // Wait for the SPI to become idle
+            }
+            fence(Ordering::Acquire);
         }
     }
 
@@ -1668,6 +1681,8 @@ mod dma {
             self,
             buffer: TX,
         ) -> Result<SpiDmaTransfer<'d, Self, TX>, (Error, Self, TX)> {
+            self.wait_for_idle();
+
             self.do_dma_write(buffer)
         }
 
@@ -1682,6 +1697,8 @@ mod dma {
             self,
             buffer: RX,
         ) -> Result<SpiDmaTransfer<'d, Self, RX>, (Error, Self, RX)> {
+            self.wait_for_idle();
+
             self.do_dma_read(buffer)
         }
 
@@ -1696,6 +1713,8 @@ mod dma {
             rx_buffer: RX,
             tx_buffer: TX,
         ) -> Result<SpiDmaTransfer<'d, Self, (RX, TX)>, (Error, Self, RX, TX)> {
+            self.wait_for_idle();
+
             self.do_dma_transfer(rx_buffer, tx_buffer)
         }
     }
@@ -1718,6 +1737,8 @@ mod dma {
             dummy: u8,
             buffer: RX,
         ) -> Result<SpiDmaTransfer<'d, Self, RX>, (Error, Self, RX)> {
+            self.wait_for_idle();
+
             self.do_half_duplex_read(data_mode, cmd, address, dummy, buffer)
         }
 
@@ -1732,6 +1753,8 @@ mod dma {
             dummy: u8,
             buffer: TX,
         ) -> Result<SpiDmaTransfer<'d, Self, TX>, (Error, Self, TX)> {
+            self.wait_for_idle();
+
             self.do_half_duplex_write(data_mode, cmd, address, dummy, buffer)
         }
     }
@@ -1769,6 +1792,10 @@ mod dma {
                 rx_buf,
                 tx_buf,
             }
+        }
+
+        fn wait_for_idle(&mut self) {
+            self.spi_dma.wait_for_idle();
         }
 
         /// Sets the interrupt handler
@@ -1841,6 +1868,7 @@ mod dma {
     {
         /// Reads data from the SPI bus using DMA.
         pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
+            self.wait_for_idle();
             for chunk in words.chunks_mut(self.rx_buf.capacity()) {
                 self.rx_buf.set_length(chunk.len());
 
@@ -1859,6 +1887,7 @@ mod dma {
 
         /// Writes data to the SPI bus using DMA.
         pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
+            self.wait_for_idle();
             for chunk in words.chunks(self.tx_buf.capacity()) {
                 self.tx_buf.fill(chunk);
 
@@ -1874,6 +1903,7 @@ mod dma {
 
         /// Transfers data to and from the SPI bus simultaneously using DMA.
         pub fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
+            self.wait_for_idle();
             let chunk_size = min(self.tx_buf.capacity(), self.rx_buf.capacity());
 
             let common_length = min(read.len(), write.len());
@@ -1909,6 +1939,7 @@ mod dma {
 
         /// Transfers data in place on the SPI bus using DMA.
         pub fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Error> {
+            self.wait_for_idle();
             let chunk_size = min(self.tx_buf.capacity(), self.rx_buf.capacity());
 
             for chunk in words.chunks_mut(chunk_size) {
@@ -1951,6 +1982,7 @@ mod dma {
             if buffer.len() > self.rx_buf.capacity() {
                 return Err(Error::DmaError(DmaError::Overflow));
             }
+            self.wait_for_idle();
             self.rx_buf.set_length(buffer.len());
 
             let rx_buffer = DmaRxBufferRef::new(&mut self.rx_buf);
@@ -1978,6 +2010,7 @@ mod dma {
             if buffer.len() > self.tx_buf.capacity() {
                 return Err(Error::DmaError(DmaError::Overflow));
             }
+            self.wait_for_idle();
             self.tx_buf.fill(buffer);
 
             let tx_buffer = DmaTxBufferRef::new(&mut self.tx_buf);
@@ -2036,8 +2069,22 @@ mod dma {
             C: DmaChannel,
             C::P: SpiPeripheral,
         {
+            async fn wait_for_idle_async(&mut self) {
+                core::future::poll_fn(|cx| {
+                    use core::task::Poll;
+                    if !self.spi_dma.spi().busy() {
+                        Poll::Ready(())
+                    } else {
+                        cx.waker().wake_by_ref();
+                        Poll::Pending
+                    }
+                })
+                .await;
+            }
+
             /// Fill the given buffer with data from the bus.
             pub async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
+                self.wait_for_idle_async().await;
                 let chunk_size = self.rx_buf.capacity();
 
                 for chunk in words.chunks_mut(chunk_size) {
@@ -2058,6 +2105,7 @@ mod dma {
 
             /// Transmit the given buffer to the bus.
             pub async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
+                self.wait_for_idle_async().await;
                 let chunk_size = self.tx_buf.capacity();
 
                 for chunk in words.chunks(chunk_size) {
@@ -2080,6 +2128,7 @@ mod dma {
                 read: &mut [u8],
                 write: &[u8],
             ) -> Result<(), Error> {
+                self.wait_for_idle_async().await;
                 let chunk_size = min(self.tx_buf.capacity(), self.rx_buf.capacity());
 
                 let common_length = min(read.len(), write.len());
@@ -2116,6 +2165,7 @@ mod dma {
             /// Transfer by writing out a buffer and reading the response from
             /// the bus into the same buffer.
             pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
+                self.wait_for_idle_async().await;
                 for chunk in words.chunks_mut(self.tx_buf.capacity()) {
                     self.tx_buf.fill(chunk);
                     self.rx_buf.set_length(chunk.len());
