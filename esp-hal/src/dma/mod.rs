@@ -653,10 +653,11 @@ macro_rules! dma_tx_buffer {
     ($tx_size:expr) => {{
         const TX_DESCRIPTOR_LEN: usize =
             $crate::dma::DmaTxBuf::compute_descriptor_count($tx_size, None);
-        static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
+        $crate::declare_aligned_dma_buffer!(TX_BUFFER, $tx_size);
         static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; TX_DESCRIPTOR_LEN] =
             [$crate::dma::DmaDescriptor::EMPTY; TX_DESCRIPTOR_LEN];
-        let (tx_buffer, tx_descriptors) = unsafe { (&mut TX_BUFFER, &mut TX_DESCRIPTORS) };
+        let tx_buffer = $crate::as_mut_byte_array!(TX_BUFFER, $tx_size);
+        let tx_descriptors = unsafe { &mut TX_DESCRIPTORS };
         $crate::dma::DmaTxBuf::new(tx_descriptors, tx_buffer)
     }};
 }
@@ -1928,6 +1929,7 @@ pub trait DmaRxBuffer {
 
 /// Error returned from Dma[Rx|Tx|RxTx]Buf operations.
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaBufError {
     /// More descriptors are needed for the buffer size
     InsufficientDescriptors,
@@ -2034,6 +2036,14 @@ impl DmaTxBuf {
                     return Err(DmaBufError::InvalidAlignment);
                 }
             } else {
+                #[cfg(any(esp32,esp32s2))]
+                if buffer.len() % 4 != 0 && buffer.as_ptr() as usize % 4 != 0 {
+                    // ESP32 requires word alignment for DMA buffers.
+                    // ESP32-S2 technically supports byte-aligned DMA buffers, but the
+                    // transfer ends up writing out of bounds if the buffer's length
+                    // is 2 or 3 (mod 4).
+                    return Err(DmaBufError::InvalidAlignment);
+                }
                 // buffer can only be DRAM
                 if !is_slice_in_dram(buffer) {
                     return Err(DmaBufError::UnsupportedMemoryRegion);
