@@ -2,7 +2,7 @@ use portable_atomic::{AtomicU8, Ordering};
 
 pub use self::implementation::*;
 #[cfg(psram)]
-use crate::lock::Locked;
+use crate::sync::Locked;
 
 #[cfg_attr(esp32, path = "esp32/mod.rs")]
 #[cfg_attr(esp32c2, path = "esp32c2/mod.rs")]

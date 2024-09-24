@@ -79,9 +79,9 @@ use fugit::{Instant, MicrosDurationU32, MicrosDurationU64};
 use super::{Error, Timer as _};
 use crate::{
     interrupt::{self, InterruptHandler},
-    lock::{lock, Lock},
     peripheral::Peripheral,
     peripherals::{Interrupt, SYSTIMER},
+    sync::{lock, Lock},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
     Async,
     Blocking,
