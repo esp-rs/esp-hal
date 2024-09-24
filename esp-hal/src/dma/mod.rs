@@ -2008,7 +2008,7 @@ pub unsafe trait DmaRxBuffer {
 }
 
 /// Error returned from Dma[Rx|Tx|RxTx]Buf operations.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaBufError {
     /// More descriptors are needed for the buffer size
@@ -2033,6 +2033,196 @@ pub enum DmaBufBlkSize {
     Size64 = 64,
 }
 
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+struct DescriptorSet<'a> {
+    descriptors: &'a mut [DmaDescriptor],
+    block_size: Option<DmaBufBlkSize>,
+}
+
+impl<'a> DescriptorSet<'a> {
+    fn new(
+        descriptors: &'a mut [DmaDescriptor],
+        buffer: &mut [u8],
+        block_size: Option<DmaBufBlkSize>,
+    ) -> Result<Self, DmaBufError> {
+        if !is_slice_in_dram(descriptors) {
+            return Err(DmaBufError::UnsupportedMemoryRegion);
+        }
+
+        descriptors.fill(DmaDescriptor::EMPTY);
+
+        unsafe { Self::new_from_unchecked(descriptors, buffer, block_size) }
+    }
+
+    /// # Safety
+    ///
+    /// The caller must ensure that the descriptors are in a supported memory
+    /// region.
+    unsafe fn new_from_unchecked(
+        descriptors: &'a mut [DmaDescriptor],
+        buffer: &mut [u8],
+        block_size: Option<DmaBufBlkSize>,
+    ) -> Result<Self, DmaBufError> {
+        let mut this = Self {
+            descriptors,
+            block_size,
+        };
+
+        this.link_with_buffer(buffer)?;
+
+        Ok(this)
+    }
+
+    fn into_inner(self) -> &'a mut [DmaDescriptor] {
+        self.descriptors
+    }
+
+    fn head(&mut self) -> *mut DmaDescriptor {
+        self.descriptors.as_mut_ptr()
+    }
+
+    /// Prepares descriptors for transferring `len` bytes of data.
+    fn prepare_descriptors(&mut self, len: usize, prepare: fn(&mut DmaDescriptor, usize)) {
+        // First, pick enough descriptors to cover the buffer.
+        let chunk_size = DmaTxBuf::compute_chunk_size(self.block_size);
+        let descriptor_count = len.div_ceil(chunk_size).max(1);
+        let descriptors = &mut self.descriptors[..descriptor_count];
+
+        // Link up the descriptors.
+        let mut next = core::ptr::null_mut();
+        for desc in descriptors.iter_mut().rev() {
+            desc.next = next;
+            next = desc;
+        }
+
+        // Prepare each descriptor.
+        let mut remaining_length = len;
+        for desc in descriptors.iter_mut() {
+            let chunk_size = min(chunk_size, remaining_length);
+            prepare(desc, chunk_size);
+            remaining_length -= chunk_size;
+        }
+        debug_assert_eq!(remaining_length, 0);
+    }
+
+    fn prepare_rx_descriptors(&mut self, len: usize) {
+        self.prepare_descriptors(len, |desc, chunk_size| {
+            // Calling this before prepare() isn't strictly necessary but setting up
+            // descriptors early helps debugging.
+            Self::reset_for_rx(desc);
+
+            desc.set_size(chunk_size);
+        });
+    }
+
+    fn prepare_tx_descriptors(&mut self, len: usize) {
+        self.prepare_descriptors(len, |desc, chunk_size| {
+            // Calling this before prepare() isn't strictly necessary but setting up
+            // descriptors early helps debugging.
+            Self::reset_for_tx(desc);
+
+            desc.set_length(chunk_size);
+        });
+    }
+
+    fn reset_for_rx(desc: &mut DmaDescriptor) {
+        // Give ownership to the DMA
+        desc.set_owner(Owner::Dma);
+
+        // Clear this to allow hardware to set it when the peripheral returns an EOF
+        // bit.
+        desc.set_suc_eof(false);
+
+        // Clear this to allow hardware to set it when it's
+        // done receiving data for this descriptor.
+        desc.set_length(0);
+    }
+
+    fn reset_for_tx(desc: &mut DmaDescriptor) {
+        // Give ownership to the DMA
+        desc.set_owner(Owner::Dma);
+
+        // As this is a simple dma buffer implementation we won't
+        // be making use of this feature. Only set for the last descriptor.
+        desc.set_suc_eof(desc.next.is_null());
+    }
+
+    /// Returns an iterator over the linked descriptors.
+    fn iter(&self) -> impl Iterator<Item = &DmaDescriptor> {
+        let mut was_last = false;
+        self.descriptors.iter().take_while(move |d| {
+            if was_last {
+                false
+            } else {
+                was_last = d.next.is_null();
+                true
+            }
+        })
+    }
+
+    /// Returns an iterator over the linked descriptors.
+    fn iter_mut(&mut self) -> impl Iterator<Item = &mut DmaDescriptor> {
+        let mut was_last = false;
+        self.descriptors.iter_mut().take_while(move |d| {
+            if was_last {
+                false
+            } else {
+                was_last = d.next.is_null();
+                true
+            }
+        })
+    }
+
+    /// Associate each descriptor with a chunk of the buffer. This function does
+    /// not set up descriptor states for tx or rx, call
+    /// `prepare_rx_descriptors` or `prepare_tx_descriptors` after this
+    /// function to do that.
+    fn link_with_buffer(&mut self, buffer: &mut [u8]) -> Result<(), DmaBufError> {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s3)] {
+                // buffer can be either DRAM or PSRAM (if supported)
+                if !is_slice_in_dram(buffer) && !is_slice_in_psram(buffer) {
+                    return Err(DmaBufError::UnsupportedMemoryRegion);
+                }
+                // if its PSRAM, the block_size/alignment must be specified
+                if is_slice_in_psram(buffer) && self.block_size.is_none() {
+                    return Err(DmaBufError::InvalidAlignment);
+                }
+            } else {
+                #[cfg(any(esp32,esp32s2))]
+                if buffer.len() % 4 != 0 && buffer.as_ptr() as usize % 4 != 0 {
+                    // ESP32 requires word alignment for DMA buffers.
+                    // ESP32-S2 technically supports byte-aligned DMA buffers, but the
+                    // transfer ends up writing out of bounds if the buffer's length
+                    // is 2 or 3 (mod 4).
+                    return Err(DmaBufError::InvalidAlignment);
+                }
+                // buffer can only be DRAM
+                if !is_slice_in_dram(buffer) {
+                    return Err(DmaBufError::UnsupportedMemoryRegion);
+                }
+            }
+        }
+
+        let chunk_size = DmaTxBuf::compute_chunk_size(self.block_size);
+        let min_descriptors = buffer.len().div_ceil(chunk_size);
+        if self.descriptors.len() < min_descriptors {
+            return Err(DmaBufError::InsufficientDescriptors);
+        }
+
+        let descriptors = self.descriptors.iter_mut();
+        let chunks = buffer.chunks_mut(chunk_size);
+
+        for (desc, chunk) in descriptors.zip(chunks) {
+            desc.set_size(chunk.len());
+            desc.buffer = chunk.as_mut_ptr();
+        }
+
+        Ok(())
+    }
+}
+
 /// DMA transmit buffer
 ///
 /// This is a contiguous buffer linked together by DMA descriptors of length
@@ -2041,9 +2231,8 @@ pub enum DmaBufBlkSize {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct DmaTxBuf {
-    descriptors: &'static mut [DmaDescriptor],
+    descriptors: DescriptorSet<'static>,
     buffer: &'static mut [u8],
-    block_size: Option<DmaBufBlkSize>,
 }
 
 impl DmaTxBuf {
@@ -2094,67 +2283,23 @@ impl DmaTxBuf {
         buffer: &'static mut [u8],
         block_size: Option<DmaBufBlkSize>,
     ) -> Result<Self, DmaBufError> {
-        let chunk_size = Self::compute_chunk_size(block_size);
-        let min_descriptors = Self::compute_descriptor_count(buffer.len(), block_size);
-        if descriptors.len() < min_descriptors {
-            return Err(DmaBufError::InsufficientDescriptors);
-        }
-
-        // descriptors are required to be in DRAM
-        if !is_slice_in_dram(descriptors) {
-            return Err(DmaBufError::UnsupportedMemoryRegion);
-        }
-
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s3)] {
-                // buffer can be either DRAM or PSRAM (if supported)
-                if !is_slice_in_dram(buffer) && !is_slice_in_psram(buffer) {
-                    return Err(DmaBufError::UnsupportedMemoryRegion);
-                }
-                // if its PSRAM, the block_size/alignment must be specified
-                if is_slice_in_psram(buffer) && block_size.is_none() {
-                    return Err(DmaBufError::InvalidAlignment);
-                }
-            } else {
-                #[cfg(any(esp32,esp32s2))]
-                if buffer.len() % 4 != 0 && buffer.as_ptr() as usize % 4 != 0 {
-                    // ESP32 requires word alignment for DMA buffers.
-                    // ESP32-S2 technically supports byte-aligned DMA buffers, but the
-                    // transfer ends up writing out of bounds if the buffer's length
-                    // is 2 or 3 (mod 4).
-                    return Err(DmaBufError::InvalidAlignment);
-                }
-                // buffer can only be DRAM
-                if !is_slice_in_dram(buffer) {
-                    return Err(DmaBufError::UnsupportedMemoryRegion);
-                }
-            }
-        }
-
-        // Setup size and buffer pointer as these will not change for the remainder of
-        // this object's lifetime
-        let chunk_iter = descriptors.iter_mut().zip(buffer.chunks_mut(chunk_size));
-        for (desc, chunk) in chunk_iter {
-            desc.set_size(chunk.len());
-            desc.buffer = chunk.as_mut_ptr();
-        }
-
+        let block_size = if is_slice_in_dram(buffer) {
+            // no need for block size if the buffer is in DRAM
+            None
+        } else {
+            block_size
+        };
         let mut buf = Self {
-            descriptors,
+            descriptors: DescriptorSet::new(descriptors, buffer, block_size)?,
             buffer,
-            block_size,
         };
         buf.set_length(buf.capacity());
-        // no need for block size if the buffer is in DRAM
-        if is_slice_in_dram(buf.buffer) {
-            buf.block_size = None;
-        }
         Ok(buf)
     }
 
     /// Consume the buf, returning the descriptors and buffer.
     pub fn split(self) -> (&'static mut [DmaDescriptor], &'static mut [u8]) {
-        (self.descriptors, self.buffer)
+        (self.descriptors.into_inner(), self.buffer)
     }
 
     /// Returns the size of the underlying buffer
@@ -2165,14 +2310,7 @@ impl DmaTxBuf {
     /// Return the number of bytes that would be transmitted by this buf.
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
-        let mut result = 0;
-        for desc in self.descriptors.iter() {
-            result += desc.len();
-            if desc.next.is_null() {
-                break;
-            }
-        }
-        result
+        self.descriptors.iter().map(|d| d.len()).sum::<usize>()
     }
 
     /// Reset the descriptors to only transmit `len` amount of bytes from this
@@ -2183,34 +2321,7 @@ impl DmaTxBuf {
     pub fn set_length(&mut self, len: usize) {
         assert!(len <= self.buffer.len());
 
-        // Get the minimum number of descriptors needed for this length of data.
-        let descriptor_count = len.div_ceil(self.descriptors[0].size()).max(1);
-        let required_descriptors = &mut self.descriptors[0..descriptor_count];
-
-        // Link up the relevant descriptors.
-        let mut next = core::ptr::null_mut();
-        for desc in required_descriptors.iter_mut().rev() {
-            desc.next = next;
-            next = desc;
-        }
-
-        let mut remaining_length = len;
-        for desc in required_descriptors.iter_mut() {
-            // As this is a simple dma buffer implementation we won't
-            // be making use of this feature.
-            desc.set_suc_eof(false);
-
-            // This isn't strictly needed for this simple implementation,
-            // but it is useful for debugging.
-            desc.set_owner(Owner::Dma);
-
-            let chunk_size = min(remaining_length, desc.flags.size() as usize);
-            desc.set_length(chunk_size);
-            remaining_length -= chunk_size;
-        }
-        debug_assert_eq!(remaining_length, 0);
-
-        required_descriptors.last_mut().unwrap().set_suc_eof(true);
+        self.descriptors.prepare_tx_descriptors(len);
     }
 
     /// Fills the TX buffer with the bytes provided in `data` and reset the
@@ -2225,7 +2336,7 @@ impl DmaTxBuf {
 
     /// Returns the buf as a mutable slice than can be written.
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
-        &mut self.buffer[..]
+        self.buffer
     }
 
     /// Returns the buf as a slice than can be read.
@@ -2237,12 +2348,7 @@ impl DmaTxBuf {
 unsafe impl DmaTxBuffer for DmaTxBuf {
     fn prepare(&mut self) -> Preparation {
         for desc in self.descriptors.iter_mut() {
-            // Give ownership to the DMA
-            desc.set_owner(Owner::Dma);
-
-            if desc.next.is_null() {
-                break;
-            }
+            DescriptorSet::reset_for_tx(desc);
         }
 
         #[cfg(esp32s3)]
@@ -2256,8 +2362,8 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
         }
 
         Preparation {
-            start: self.descriptors.as_mut_ptr(),
-            block_size: self.block_size,
+            start: self.descriptors.head(),
+            block_size: self.descriptors.block_size,
         }
     }
 
@@ -2272,7 +2378,7 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
 /// 4092. It can only be used for receiving data from a peripheral's FIFO.
 /// See [DmaTxBuf] for transmitting data.
 pub struct DmaRxBuf {
-    descriptors: &'static mut [DmaDescriptor],
+    descriptors: DescriptorSet<'static>,
     buffer: &'static mut [u8],
 }
 
@@ -2288,25 +2394,8 @@ impl DmaRxBuf {
         descriptors: &'static mut [DmaDescriptor],
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
-        let min_descriptors = buffer.len().div_ceil(CHUNK_SIZE);
-        if descriptors.len() < min_descriptors {
-            return Err(DmaBufError::InsufficientDescriptors);
-        }
-
-        if !is_slice_in_dram(descriptors) || !is_slice_in_dram(buffer) {
-            return Err(DmaBufError::UnsupportedMemoryRegion);
-        }
-
-        // Setup size and buffer pointer as these will not change for the remainder of
-        // this object's lifetime
-        let chunk_iter = descriptors.iter_mut().zip(buffer.chunks_mut(CHUNK_SIZE));
-        for (desc, chunk) in chunk_iter {
-            desc.set_size(chunk.len());
-            desc.buffer = chunk.as_mut_ptr();
-        }
-
         let mut buf = Self {
-            descriptors,
+            descriptors: DescriptorSet::new(descriptors, buffer, None)?,
             buffer,
         };
 
@@ -2317,7 +2406,7 @@ impl DmaRxBuf {
 
     /// Consume the buf, returning the descriptors and buffer.
     pub fn split(self) -> (&'static mut [DmaDescriptor], &'static mut [u8]) {
-        (self.descriptors, self.buffer)
+        (self.descriptors.into_inner(), self.buffer)
     }
 
     /// Returns the size of the underlying buffer
@@ -2329,14 +2418,7 @@ impl DmaRxBuf {
     /// receive.
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
-        let mut result = 0;
-        for desc in self.descriptors.iter() {
-            result += desc.flags.size() as usize;
-            if desc.next.is_null() {
-                break;
-            }
-        }
-        result
+        self.descriptors.iter().map(|d| d.size()).sum::<usize>()
     }
 
     /// Reset the descriptors to only receive `len` amount of bytes into this
@@ -2347,37 +2429,7 @@ impl DmaRxBuf {
     pub fn set_length(&mut self, len: usize) {
         assert!(len <= self.buffer.len());
 
-        // Get the minimum number of descriptors needed for this length of data.
-        let descriptor_count = len.div_ceil(CHUNK_SIZE).max(1);
-        let required_descriptors = &mut self.descriptors[..descriptor_count];
-
-        // Link up the relevant descriptors.
-        let mut next = core::ptr::null_mut();
-        for desc in required_descriptors.iter_mut().rev() {
-            desc.next = next;
-            next = desc;
-        }
-
-        // Get required part of the buffer.
-        let mut remaining_length = len;
-        for desc in required_descriptors.iter_mut() {
-            // Clear this to allow hardware to set it when the peripheral returns an EOF
-            // bit.
-            desc.set_suc_eof(false);
-
-            // This isn't strictly needed for this simple implementation,
-            // but it is useful for debugging.
-            desc.set_owner(Owner::Dma);
-
-            // Clear this to allow hardware to set it when it's
-            // done receiving data for this descriptor.
-            desc.set_length(0);
-
-            let chunk_size = min(CHUNK_SIZE, remaining_length);
-            desc.set_size(chunk_size);
-            remaining_length -= chunk_size;
-        }
-        debug_assert_eq!(remaining_length, 0);
+        self.descriptors.prepare_rx_descriptors(len);
     }
 
     /// Returns the entire underlying buffer as a slice than can be read.
@@ -2387,19 +2439,12 @@ impl DmaRxBuf {
 
     /// Returns the entire underlying buffer as a slice than can be written.
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
-        &mut self.buffer[..]
+        self.buffer
     }
 
     /// Return the number of bytes that was received by this buf.
     pub fn number_of_received_bytes(&self) -> usize {
-        let mut result = 0;
-        for desc in self.descriptors.iter() {
-            result += desc.len();
-            if desc.next.is_null() {
-                break;
-            }
-        }
-        result
+        self.descriptors.iter().map(|d| d.len()).sum::<usize>()
     }
 
     /// Reads the received data into the provided `buf`.
@@ -2411,7 +2456,7 @@ impl DmaRxBuf {
     pub fn read_received_data(&self, buf: &mut [u8]) -> usize {
         let mut remaining = &mut buf[..];
 
-        let mut buffer_offset = 0;
+        let mut internal = &*self.buffer;
         for desc in self.descriptors.iter() {
             if remaining.is_empty() {
                 break;
@@ -2420,13 +2465,10 @@ impl DmaRxBuf {
             let amount_to_copy = min(desc.len(), remaining.len());
 
             let (to_fill, to_remain) = remaining.split_at_mut(amount_to_copy);
-            to_fill.copy_from_slice(&self.buffer[buffer_offset..][..amount_to_copy]);
+            to_fill.copy_from_slice(&internal[..amount_to_copy]);
             remaining = to_remain;
 
-            if desc.next.is_null() {
-                break;
-            }
-            buffer_offset += desc.flags.size() as usize;
+            internal = &internal[amount_to_copy..];
         }
 
         let remaining_bytes = remaining.len();
@@ -2436,8 +2478,7 @@ impl DmaRxBuf {
     /// Returns the received data as an iterator of slices.
     pub fn received_data(&self) -> impl Iterator<Item = &[u8]> {
         let mut descriptors = self.descriptors.iter();
-        #[allow(clippy::redundant_slicing)] // Clippy can't see why this is needed.
-        let mut buf = &self.buffer[..];
+        let mut buf = &*self.buffer;
 
         core::iter::from_fn(move || {
             let mut chunk_size = 0;
@@ -2476,24 +2517,11 @@ impl DmaRxBuf {
 unsafe impl DmaRxBuffer for DmaRxBuf {
     fn prepare(&mut self) -> Preparation {
         for desc in self.descriptors.iter_mut() {
-            // Give ownership to the DMA
-            desc.set_owner(Owner::Dma);
-
-            // Clear this to allow hardware to set it when the peripheral returns an EOF
-            // bit.
-            desc.set_suc_eof(false);
-
-            // Clear this to allow hardware to set it when it's
-            // done receiving data for this descriptor.
-            desc.set_length(0);
-
-            if desc.next.is_null() {
-                break;
-            }
+            DescriptorSet::reset_for_rx(desc);
         }
 
         Preparation {
-            start: self.descriptors.as_mut_ptr(),
+            start: self.descriptors.head(),
             block_size: None,
         }
     }
@@ -2510,8 +2538,8 @@ unsafe impl DmaRxBuffer for DmaRxBuf {
 /// It can be used for simultaneously transmitting to and receiving from a
 /// peripheral's FIFO. These are typically full-duplex transfers.
 pub struct DmaRxTxBuf {
-    rx_descriptors: &'static mut [DmaDescriptor],
-    tx_descriptors: &'static mut [DmaDescriptor],
+    rx_descriptors: DescriptorSet<'static>,
+    tx_descriptors: DescriptorSet<'static>,
     buffer: &'static mut [u8],
 }
 
@@ -2528,38 +2556,9 @@ impl DmaRxTxBuf {
         tx_descriptors: &'static mut [DmaDescriptor],
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
-        let min_descriptors = buffer.len().div_ceil(CHUNK_SIZE);
-        if rx_descriptors.len() < min_descriptors {
-            return Err(DmaBufError::InsufficientDescriptors);
-        }
-        if tx_descriptors.len() < min_descriptors {
-            return Err(DmaBufError::InsufficientDescriptors);
-        }
-
-        if !is_slice_in_dram(rx_descriptors)
-            || !is_slice_in_dram(tx_descriptors)
-            || !is_slice_in_dram(buffer)
-        {
-            return Err(DmaBufError::UnsupportedMemoryRegion);
-        }
-
-        // Reset the provided descriptors
-        rx_descriptors.fill(DmaDescriptor::EMPTY);
-        tx_descriptors.fill(DmaDescriptor::EMPTY);
-
-        let descriptors = tx_descriptors.iter_mut().zip(rx_descriptors.iter_mut());
-        let chunks = buffer.chunks_mut(CHUNK_SIZE);
-
-        for ((rx_desc, tx_desc), chunk) in descriptors.zip(chunks) {
-            rx_desc.set_size(chunk.len());
-            rx_desc.buffer = chunk.as_mut_ptr();
-            tx_desc.set_size(chunk.len());
-            tx_desc.buffer = chunk.as_mut_ptr();
-        }
-
         let mut buf = Self {
-            rx_descriptors,
-            tx_descriptors,
+            rx_descriptors: DescriptorSet::new(rx_descriptors, buffer, None)?,
+            tx_descriptors: DescriptorSet::new(tx_descriptors, buffer, None)?,
             buffer,
         };
         buf.set_length(buf.capacity());
@@ -2576,7 +2575,11 @@ impl DmaRxTxBuf {
         &'static mut [DmaDescriptor],
         &'static mut [u8],
     ) {
-        (self.rx_descriptors, self.tx_descriptors, self.buffer)
+        (
+            self.rx_descriptors.into_inner(),
+            self.tx_descriptors.into_inner(),
+            self.buffer,
+        )
     }
 
     /// Return the size of the underlying buffer.
@@ -2587,14 +2590,7 @@ impl DmaRxTxBuf {
     /// Return the number of bytes that would be transmitted by this buf.
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
-        let mut result = 0;
-        for desc in self.tx_descriptors.iter() {
-            result += desc.len();
-            if desc.next.is_null() {
-                break;
-            }
-        }
-        result
+        self.tx_descriptors.iter().map(|d| d.len()).sum::<usize>()
     }
 
     /// Returns the entire buf as a slice than can be read.
@@ -2604,7 +2600,7 @@ impl DmaRxTxBuf {
 
     /// Returns the entire buf as a slice than can be written.
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
-        &mut self.buffer[..]
+        self.buffer
     }
 
     /// Reset the descriptors to only transmit/receive `len` amount of bytes
@@ -2614,79 +2610,19 @@ impl DmaRxTxBuf {
     pub fn set_length(&mut self, len: usize) {
         assert!(len <= self.buffer.len());
 
-        // Get the minimum number of descriptors needed for this length of data.
-        let descriptor_count = len.div_ceil(CHUNK_SIZE).max(1);
-
-        let relevant_rx_descriptors = &mut self.rx_descriptors[..descriptor_count];
-        let relevant_tx_descriptors = &mut self.tx_descriptors[..descriptor_count];
-
-        // Link up the relevant descriptors.
-        for descriptors in [
-            &mut relevant_rx_descriptors[..],
-            &mut relevant_tx_descriptors[..],
-        ] {
-            let mut next = core::ptr::null_mut();
-            for desc in descriptors.iter_mut().rev() {
-                desc.next = next;
-                next = desc;
-            }
-        }
-
-        let mut remaining_length = len;
-        for desc in relevant_tx_descriptors.iter_mut() {
-            // As this is a simple dma buffer implementation we won't
-            // be making use of this feature.
-            desc.set_suc_eof(false);
-
-            // This isn't strictly needed for this simple implementation,
-            // but it is useful for debugging.
-            desc.set_owner(Owner::Dma);
-
-            let chunk_size = min(desc.size(), remaining_length);
-            desc.set_length(chunk_size);
-            remaining_length -= chunk_size;
-        }
-        debug_assert_eq!(remaining_length, 0);
-        relevant_tx_descriptors
-            .last_mut()
-            .unwrap()
-            .set_suc_eof(true);
-
-        let mut remaining_length = len;
-        for desc in relevant_rx_descriptors.iter_mut() {
-            // Clear this to allow hardware to set it when the peripheral returns an EOF
-            // bit.
-            desc.set_suc_eof(false);
-
-            // This isn't strictly needed for this simple implementation,
-            // but it is useful for debugging.
-            desc.set_owner(Owner::Dma);
-
-            // Clear this to allow hardware to set it when it is
-            // done receiving data for this descriptor.
-            desc.set_length(0);
-
-            let chunk_size = min(CHUNK_SIZE, remaining_length);
-            desc.set_size(chunk_size);
-            remaining_length -= chunk_size;
-        }
-        debug_assert_eq!(remaining_length, 0);
+        self.rx_descriptors.prepare_rx_descriptors(len);
+        self.tx_descriptors.prepare_tx_descriptors(len);
     }
 }
 
 unsafe impl DmaTxBuffer for DmaRxTxBuf {
     fn prepare(&mut self) -> Preparation {
         for desc in self.tx_descriptors.iter_mut() {
-            // Give ownership to the DMA
-            desc.set_owner(Owner::Dma);
-
-            if desc.next.is_null() {
-                break;
-            }
+            DescriptorSet::reset_for_tx(desc);
         }
 
         Preparation {
-            start: self.tx_descriptors.as_mut_ptr(),
+            start: self.tx_descriptors.head(),
             block_size: None, // TODO: support block size!
         }
     }
@@ -2699,24 +2635,11 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
 unsafe impl DmaRxBuffer for DmaRxTxBuf {
     fn prepare(&mut self) -> Preparation {
         for desc in self.rx_descriptors.iter_mut() {
-            // Give ownership to the DMA
-            desc.set_owner(Owner::Dma);
-
-            // Clear this to allow hardware to set it when the peripheral returns an EOF
-            // bit.
-            desc.set_suc_eof(false);
-
-            // Clear this to allow hardware to set it when it's
-            // done receiving data for this descriptor.
-            desc.set_length(0);
-
-            if desc.next.is_null() {
-                break;
-            }
+            DescriptorSet::reset_for_rx(desc);
         }
 
         Preparation {
-            start: self.rx_descriptors.as_mut_ptr(),
+            start: self.rx_descriptors.head(),
             block_size: None, // TODO: support block size!
         }
     }
