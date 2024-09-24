@@ -23,7 +23,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  MSRV: "1.77.0"
+  MSRV: "1.79.0"
   RUSTDOCFLAGS: -Dwarnings
   DEFMT_LOG: trace
 
@@ -179,3 +179,19 @@ jobs:
 
       # Check the formatting of all packages:
       - run: cargo xtask fmt-packages --check
+
+  # --------------------------------------------------------------------------
+  # host tests
+
+  host-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+
+      # Check the formatting of all packages:
+      - run: cd esp-config && cargo test --features build

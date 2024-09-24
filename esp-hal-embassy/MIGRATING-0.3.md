@@ -13,7 +13,7 @@ You no longer have to set up clocks and pass them to `esp_hal_embassy::init`.
      prelude::*,
 -    system::SystemControl,
  };
- 
+
  #[esp_hal_embassy::main]
  async fn main(_spawner: Spawner) -> ! {
 -    let peripherals = Peripherals::take();

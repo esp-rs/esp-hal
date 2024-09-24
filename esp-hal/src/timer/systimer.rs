@@ -79,7 +79,7 @@ use fugit::{Instant, MicrosDurationU32, MicrosDurationU64};
 use super::{Error, Timer as _};
 use crate::{
     interrupt::{self, InterruptHandler},
-    lock,
+    lock::{lock, Lock},
     peripheral::Peripheral,
     peripherals::{Interrupt, SYSTIMER},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
@@ -87,7 +87,6 @@ use crate::{
     Blocking,
     Cpu,
     InterruptConfigurable,
-    LockState,
     Mode,
 };
 
@@ -1009,8 +1008,8 @@ where
     }
 }
 
-static CONF_LOCK: LockState = LockState::new();
-static INT_ENA_LOCK: LockState = LockState::new();
+static CONF_LOCK: Lock = Lock::new();
+static INT_ENA_LOCK: Lock = Lock::new();
 
 // Async functionality of the system timer.
 mod asynch {
@@ -1026,17 +1025,15 @@ mod asynch {
 
     const NUM_ALARMS: usize = 3;
 
-    #[allow(clippy::declare_interior_mutable_const)]
-    const INIT: AtomicWaker = AtomicWaker::new();
-    static WAKERS: [AtomicWaker; NUM_ALARMS] = [INIT; NUM_ALARMS];
+    static WAKERS: [AtomicWaker; NUM_ALARMS] = [const { AtomicWaker::new() }; NUM_ALARMS];
 
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct AlarmFuture<'a, COMP: Comparator, UNIT: Unit> {
-        alarm: &'a Alarm<'a, Periodic, crate::Async, COMP, UNIT>,
+        alarm: &'a Alarm<'a, Target, crate::Async, COMP, UNIT>,
     }
 
     impl<'a, COMP: Comparator, UNIT: Unit> AlarmFuture<'a, COMP, UNIT> {
-        pub(crate) fn new(alarm: &'a Alarm<'a, Periodic, crate::Async, COMP, UNIT>) -> Self {
+        pub(crate) fn new(alarm: &'a Alarm<'a, Target, crate::Async, COMP, UNIT>) -> Self {
             alarm.clear_interrupt();
 
             let (interrupt, handler) = match alarm.comparator.channel() {
@@ -1049,6 +1046,8 @@ mod asynch {
                 interrupt::bind_interrupt(interrupt, handler.handler());
                 interrupt::enable(interrupt, handler.priority()).unwrap();
             }
+
+            alarm.set_interrupt_handler(handler);
 
             alarm.enable_interrupt(true);
 
@@ -1079,11 +1078,13 @@ mod asynch {
     }
 
     impl<'d, COMP: Comparator, UNIT: Unit> embedded_hal_async::delay::DelayNs
-        for Alarm<'d, Periodic, crate::Async, COMP, UNIT>
+        for Alarm<'d, Target, crate::Async, COMP, UNIT>
     {
-        async fn delay_ns(&mut self, ns: u32) {
-            let period = MicrosDurationU32::from_ticks(ns / 1000);
-            self.set_period(period);
+        async fn delay_ns(&mut self, nanos: u32) {
+            self.set_target(
+                self.unit.read_count()
+                    + (nanos as u64 * SystemTimer::ticks_per_second()).div_ceil(1_000_000_000),
+            );
 
             AlarmFuture::new(self).await;
         }

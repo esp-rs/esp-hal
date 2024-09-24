@@ -2,7 +2,7 @@
 name         = "esp-hal-embassy"
 version      = "0.3.0"
 edition      = "2021"
-rust-version = "1.76.0"
+rust-version = "1.79.0"
 description  = "Embassy support for esp-hal"
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"

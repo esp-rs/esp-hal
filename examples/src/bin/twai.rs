@@ -1,6 +1,6 @@
-//! This example sends a CAN message to another ESP and receives it back.
+//! This example sends a TWAI message to another ESP and receives it back.
 //!
-//! This example works without CAN Transceivers by:
+//! This example works without TWAI transceivers by:
 //! * setting the tx pins to open drain
 //! * connecting all rx and tx pins together
 //! * adding a pull-up to the signal pins
@@ -17,7 +17,7 @@
 //! In case you want to use `self-testing`, get rid of everything related to the aforementioned `IS_FIRST_SENDER`
 //! and follow the advice in the comments related to this mode.
 
-//% CHIPS: esp32c3 esp32c6 esp32s2 esp32s3
+//% CHIPS: esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
@@ -39,11 +39,11 @@ fn main() -> ! {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let can_tx_pin = io.pins.gpio0;
-    let can_rx_pin = io.pins.gpio2;
+    let tx_pin = io.pins.gpio0;
+    let rx_pin = io.pins.gpio2;
 
     // The speed of the CAN bus.
-    const CAN_BAUDRATE: twai::BaudRate = twai::BaudRate::B1000K;
+    const TWAI_BAUDRATE: twai::BaudRate = twai::BaudRate::B1000K;
 
     // !!! Use `new` when using a transceiver. `new_no_transceiver` sets TX to open-drain
     // Self-testing also works using the regular `new` function.
@@ -51,11 +51,11 @@ fn main() -> ! {
     // Begin configuring the TWAI peripheral. The peripheral is in a reset like
     // state that prevents transmission but allows configuration.
     // For self-testing use `SelfTest` mode of the TWAI peripheral.
-    let mut can_config = twai::TwaiConfiguration::new_no_transceiver(
+    let mut twai_config = twai::TwaiConfiguration::new_no_transceiver(
         peripherals.TWAI0,
-        can_rx_pin,
-        can_tx_pin,
-        CAN_BAUDRATE,
+        rx_pin,
+        tx_pin,
+        TWAI_BAUDRATE,
         TwaiMode::Normal,
     );
 
@@ -65,19 +65,19 @@ fn main() -> ! {
     // be explicitly checked in the application instead of fully relying on
     // these partial acceptance filters to exactly match.
     // A filter that matches StandardId::ZERO.
-    const FILTER: SingleStandardFilter =
-        SingleStandardFilter::new(b"00000000000", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
-    can_config.set_filter(FILTER);
+    twai_config.set_filter(
+        const { SingleStandardFilter::new(b"00000000000", b"x", [b"xxxxxxxx", b"xxxxxxxx"]) },
+    );
 
     // Start the peripheral. This locks the configuration settings of the peripheral
     // and puts it into operation mode, allowing packets to be sent and
     // received.
-    let mut can = can_config.start();
+    let mut can = twai_config.start();
 
     if IS_FIRST_SENDER {
         // Send a frame to the other ESP
         // Use `new_self_reception` if you want to use self-testing.
-        let frame = EspTwaiFrame::new(StandardId::ZERO.into(), &[1, 2, 3]).unwrap();
+        let frame = EspTwaiFrame::new(StandardId::ZERO, &[1, 2, 3]).unwrap();
         block!(can.transmit(&frame)).unwrap();
         println!("Sent a frame");
     }

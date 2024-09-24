@@ -21,7 +21,7 @@ use esp_backtrace as _;
 use esp_hal::{
     cpu_control::{CpuControl, Stack},
     get_core,
-    gpio::{Io, Level, Output, Pin},
+    gpio::{Io, Level, Output},
     timer::{timg::TimerGroup, AnyTimer},
 };
 use esp_hal_embassy::Executor;
@@ -65,7 +65,7 @@ async fn main(_spawner: Spawner) {
     static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
     let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
 
-    let led = Output::new(io.pins.gpio0.degrade(), Level::Low);
+    let led = Output::new(io.pins.gpio0, Level::Low);
 
     let _guard = cpu_control
         .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {

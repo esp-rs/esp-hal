@@ -1,9 +1,10 @@
 //! I2S Loopback Test
 //!
 //! This test uses I2S TX to transmit known data to I2S RX (forced to slave mode
-//! with loopback mode enabled). It's using circular DMA mode
+//! with loopback mode enabled).
 
-//% CHIPS: esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: generic-queue
 
 #![no_std]
 #![no_main]
@@ -13,10 +14,24 @@ use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::{Io, NoPin},
-    i2s::{DataFormat, I2s, I2sReadDma, I2sWriteDma, Standard},
+    i2s::{asynch::*, DataFormat, I2s, I2sReadDma, I2sTx, I2sWriteDma, Standard},
+    peripherals::I2S0,
     prelude::*,
+    Async,
 };
 use hil_test as _;
+
+cfg_if::cfg_if! {
+    if #[cfg(any(esp32, esp32s2))] {
+        use esp_hal::dma::I2s0DmaChannel as DmaChannel0;
+        type DmaChannel0Creator = esp_hal::dma::I2s0DmaChannelCreator;
+    } else {
+        use esp_hal::dma::DmaChannel0;
+        type DmaChannel0Creator = esp_hal::dma::ChannelCreator<0>;
+    }
+}
+
+const BUFFER_SIZE: usize = 2000;
 
 #[derive(Clone)]
 struct SampleSource {
@@ -43,18 +58,67 @@ impl Iterator for SampleSource {
     }
 }
 
+#[embassy_executor::task]
+async fn writer(tx_buffer: &'static mut [u8], i2s_tx: I2sTx<'static, I2S0, DmaChannel0, Async>) {
+    let mut samples = SampleSource::new();
+    for b in tx_buffer.iter_mut() {
+        *b = samples.next().unwrap();
+    }
+
+    let mut tx_transfer = i2s_tx.write_dma_circular_async(tx_buffer).unwrap();
+
+    loop {
+        tx_transfer
+            .push_with(|buffer| {
+                for b in buffer.iter_mut() {
+                    *b = samples.next().unwrap();
+                }
+                buffer.len()
+            })
+            .await
+            .unwrap();
+    }
+}
+
+fn enable_loopback() {
+    unsafe {
+        let i2s = esp_hal::peripherals::I2S0::steal();
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32s2))] {
+                i2s.conf().modify(|_, w| w.sig_loopback().set_bit());
+                i2s.conf().modify(|_, w| w.rx_slave_mod().set_bit());
+            } else {
+                i2s.tx_conf().modify(|_, w| w.sig_loopback().set_bit());
+                i2s.rx_conf().modify(|_, w| w.rx_slave_mod().set_bit());
+
+                i2s.tx_conf().modify(|_, w| w.tx_update().set_bit());
+                i2s.rx_conf().modify(|_, w| w.rx_update().set_bit());
+            }
+        }
+    }
+}
+
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
 mod tests {
+    // defmt::* is load-bearing, it ensures that the assert in dma_buffers! is not
+    // using defmt's non-const assert. Doing so would result in a compile error.
+    #[allow(unused_imports)]
+    use defmt::{assert, assert_eq, *};
+
     use super::*;
 
-    #[test]
-    fn test_i2s_loopback() {
+    struct Context {
+        io: Io,
+        dma_channel: DmaChannel0Creator,
+        i2s: I2S0,
+    }
+
+    #[init]
+    fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
-        let delay = Delay::new();
 
         let dma = Dma::new(peripherals.DMA);
 
@@ -66,19 +130,86 @@ mod tests {
             }
         }
 
-        let (mut rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(16000, 16000);
+        Context {
+            io,
+            dma_channel,
+            i2s: peripherals.I2S0,
+        }
+    }
+
+    #[test]
+    async fn test_i2s_loopback_async(ctx: Context) {
+        let spawner = embassy_executor::Spawner::for_current_executor().await;
+
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
+            esp_hal::dma_circular_buffers!(BUFFER_SIZE, BUFFER_SIZE);
 
         let i2s = I2s::new(
-            peripherals.I2S0,
+            ctx.i2s,
             Standard::Philips,
             DataFormat::Data16Channel16,
             16000.Hz(),
-            dma_channel.configure(false, DmaPriority::Priority0),
+            ctx.dma_channel
+                .configure_for_async(false, DmaPriority::Priority0),
             rx_descriptors,
             tx_descriptors,
         );
 
-        let (_, dout) = hil_test::common_test_pins!(io);
+        let (_, dout) = hil_test::common_test_pins!(ctx.io);
+
+        let din = dout.peripheral_input();
+
+        let i2s_tx = i2s
+            .i2s_tx
+            .with_bclk(NoPin)
+            .with_ws(NoPin)
+            .with_dout(dout)
+            .build();
+
+        let i2s_rx = i2s
+            .i2s_rx
+            .with_bclk(NoPin)
+            .with_ws(NoPin)
+            .with_din(din)
+            .build();
+
+        enable_loopback();
+
+        let mut rx_transfer = i2s_rx.read_dma_circular_async(rx_buffer).unwrap();
+        spawner.must_spawn(writer(tx_buffer, i2s_tx));
+
+        let mut rcv = [0u8; BUFFER_SIZE];
+        let mut sample_idx = 0;
+        let mut samples = SampleSource::new();
+        for _ in 0..30 {
+            let len = rx_transfer.pop(&mut rcv).await.unwrap();
+            for &b in &rcv[..len] {
+                let expected = samples.next().unwrap();
+                assert_eq!(
+                    b, expected,
+                    "Sample #{} does not match ({} != {})",
+                    sample_idx, b, expected
+                );
+                sample_idx += 1;
+            }
+        }
+    }
+
+    #[test]
+    fn test_i2s_loopback(ctx: Context) {
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(16000, 16000);
+
+        let i2s = I2s::new(
+            ctx.i2s,
+            Standard::Philips,
+            DataFormat::Data16Channel16,
+            16000.Hz(),
+            ctx.dma_channel.configure(false, DmaPriority::Priority0),
+            rx_descriptors,
+            tx_descriptors,
+        );
+
+        let (_, dout) = hil_test::common_test_pins!(ctx.io);
 
         let din = dout.peripheral_input();
 
@@ -96,22 +227,7 @@ mod tests {
             .with_din(din)
             .build();
 
-        // enable loopback testing
-        unsafe {
-            let i2s = esp_hal::peripherals::I2S0::steal();
-            cfg_if::cfg_if! {
-                if #[cfg(esp32s2)] {
-                    i2s.conf().modify(|_, w| w.sig_loopback().set_bit());
-                    i2s.conf().modify(|_, w| w.rx_slave_mod().set_bit());
-                } else {
-                    i2s.tx_conf().modify(|_, w| w.sig_loopback().set_bit());
-                    i2s.rx_conf().modify(|_, w| w.rx_slave_mod().set_bit());
-
-                    i2s.tx_conf().modify(|_, w| w.tx_update().set_bit());
-                    i2s.rx_conf().modify(|_, w| w.rx_update().set_bit());
-                }
-            }
-        }
+        enable_loopback();
 
         let mut samples = SampleSource::new();
         for b in tx_buffer.iter_mut() {
@@ -121,14 +237,14 @@ mod tests {
         let mut rcv = [0u8; 11000];
         let mut filler = [0x1u8; 12000];
 
-        let mut rx_transfer = i2s_rx.read_dma_circular(&mut rx_buffer).unwrap();
+        let mut rx_transfer = i2s_rx.read_dma_circular(rx_buffer).unwrap();
         // trying to pop data before calling `available` should just do nothing
         assert_eq!(0, rx_transfer.pop(&mut rcv[..100]).unwrap());
 
         // no data available yet
         assert_eq!(0, rx_transfer.available());
 
-        let mut tx_transfer = i2s_tx.write_dma_circular(&tx_buffer).unwrap();
+        let mut tx_transfer = i2s_tx.write_dma_circular(tx_buffer).unwrap();
 
         let mut iteration = 0;
         let mut sample_idx = 0;
@@ -180,7 +296,7 @@ mod tests {
                 if iteration == 1 {
                     // delay to make it likely `available` will need to handle more than one
                     // descriptor next time
-                    delay.delay_millis(160);
+                    Delay::new().delay_millis(160);
                 }
             }
 

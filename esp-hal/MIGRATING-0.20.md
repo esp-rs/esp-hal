@@ -158,7 +158,7 @@ configure an input pin, and pass it to `set_edge_signal` or `set_ctrl_signal`.
 -       PcntInputConfig { pull: Pull::Up },
 -   ));
 +   ch0.set_ctrl_signal(Input::new(io.pins.gpio4, Pull::Up));
- 
+
 -   let mut pin_b = io.pins.gpio5;
 -   ch0.set_edge_signal(PcntSource::from_pin(
 -       &mut pin_b,
@@ -214,4 +214,61 @@ let mut i8080 = I8080::new(
 + let transfer = i8080.send(0x12u8, 0, dma_buf).unwrap();
 + // transfer.wait_for_done().await;
 + (_, i8080, dma_buf) = transfer.wait();
+```
+
+### Placing drivers in RAM is now done via esp-config
+
+We've replaced some usage of features with [esp-config](https://docs.rs/esp-config). Please remove any reference to `place-spi-driver-in-ram` in your `Cargo.toml` and migrate to the `[env]` section of `.cargo/config.toml`.
+
+```diff
+# feature in Cargo.toml
+- esp-hal = { version = "0.20", features = ["place-spi-driver-in-ram"] }
+# key in .cargo/config.toml [env] section
++ ESP_HAL_PLACE_SPI_DRIVER_IN_RAM=true
+```
+
+## PS-RAM
+
+Initializing PS-RAM now takes a chip specific config and returns start of the mapped memory and the size.
+
+Example
+```rust
+let (start, size) = psram::init_psram(peripherals.PSRAM, psram::PsramConfig::default());
+```
+
+If you don't specify the size of PS-RAM via `PsramConfig::size` the size of PS-RAM is derived from the RAM-chip id (or via probing in case of ESP32).
+
+`psram::psram_vaddr_start()` and `psram::PSRAM_BYTES` are removed.
+
+The features `psram-Xm` and `opsram-Xm` are removed and replaced by `quad-psram`/`octal-psram`.
+The feature `psram-80mhz` is removed and replaced by `PsramConfig`
+
+Diff of the `psram_quad.rs` example
+```diff
+-//% FEATURES: psram-2m
++//% FEATURES: esp-hal/quad-psram
+
+...
+
+-fn init_psram_heap() {
++fn init_psram_heap(start: *mut u8, size: usize) {
+     unsafe {
+         esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
+-            psram::psram_vaddr_start() as *mut u8,
+-            psram::PSRAM_BYTES,
++            start,
++            size,
+             esp_alloc::MemoryCapability::External.into(),
+         ));
+     }
+
+...
+
+-    psram::init_psram(peripherals.PSRAM);
+-    init_psram_heap();
++    let (start, size) = psram::init_psram(peripherals.PSRAM, psram::PsramConfig::default());
++    init_psram_heap(start, size);
+
+...
+
 ```

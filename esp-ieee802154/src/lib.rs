@@ -12,7 +12,6 @@
 //! ## Feature Flags
 #![doc = document_features::document_features!()]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
-#![cfg_attr(feature = "binary-logs", feature(c_variadic))]
 #![no_std]
 
 use core::{cell::RefCell, marker::PhantomData};
@@ -34,7 +33,7 @@ pub use self::{
     raw::RawReceived,
 };
 
-mod compat;
+mod fmt;
 mod frame;
 mod hal;
 mod pib;
@@ -107,8 +106,8 @@ pub struct Ieee802154<'a> {
 
 impl<'a> Ieee802154<'a> {
     /// Construct a new driver, enabling the IEEE 802.15.4 radio in the process
-    pub fn new(_radio: IEEE802154, radio_clocks: &mut RADIO_CLK) -> Self {
-        esp_ieee802154_enable(radio_clocks);
+    pub fn new(_radio: IEEE802154, mut radio_clocks: RADIO_CLK) -> Self {
+        esp_ieee802154_enable(&mut radio_clocks);
 
         Self {
             _align: 0,
@@ -335,7 +334,7 @@ static TX_DONE_CALLBACK_FN: Mutex<RefCell<Option<fn()>>> = Mutex::new(RefCell::n
 static RX_AVAILABLE_CALLBACK_FN: Mutex<RefCell<Option<fn()>>> = Mutex::new(RefCell::new(None));
 
 fn tx_done() {
-    log::trace!("tx_done callback");
+    trace!("tx_done callback");
 
     critical_section::with(|cs| {
         let mut tx_done_callback = TX_DONE_CALLBACK.borrow_ref_mut(cs);
@@ -355,7 +354,7 @@ fn tx_done() {
 }
 
 fn rx_available() {
-    log::trace!("rx available callback");
+    trace!("rx available callback");
 
     critical_section::with(|cs| {
         let mut rx_available_callback = RX_AVAILABLE_CALLBACK.borrow_ref_mut(cs);
@@ -372,9 +371,4 @@ fn rx_available() {
             rx_available_callback_fn();
         }
     });
-}
-
-#[no_mangle]
-extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
-    0
 }

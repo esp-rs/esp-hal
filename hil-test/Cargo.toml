@@ -28,6 +28,10 @@ name    = "delay"
 harness = false
 
 [[test]]
+name    = "delay_async"
+harness = false
+
+[[test]]
 name    = "dma_macros"
 harness = false
 
@@ -56,11 +60,11 @@ name    = "i2c"
 harness = false
 
 [[test]]
-name    = "i2s"
+name    = "init"
 harness = false
 
 [[test]]
-name    = "i2s_async"
+name    = "i2s"
 harness = false
 
 [[test]]
@@ -72,15 +76,7 @@ name    = "lcd_cam_i8080_async"
 harness = false
 
 [[test]]
-name    = "qspi_read"
-harness = false
-
-[[test]]
-name    = "qspi_write"
-harness = false
-
-[[test]]
-name    = "qspi_write_read"
+name    = "qspi"
 harness = false
 
 [[test]]
@@ -97,6 +93,14 @@ harness = false
 
 [[test]]
 name    = "systimer"
+harness = false
+
+[[test]]
+name    = "parl_io_tx"
+harness = false
+
+[[test]]
+name    = "parl_io_tx_async"
 harness = false
 
 [[test]]
@@ -161,12 +165,12 @@ harness = false
 
 [dependencies]
 cfg-if             = "1.0.0"
-critical-section   = "1.1.2"
+critical-section   = "1.1.3"
 defmt              = "0.3.8"
 defmt-rtt          = { version = "0.4.1", optional = true }
 embassy-futures    = "0.1.1"
 embassy-sync       = "0.6.0"
-embassy-time       = { version = "0.3.1" }
+embassy-time       = "0.3.2"
 embedded-hal       = "1.0.0"
 embedded-hal-02    = { version = "0.2.7", package = "embedded-hal", features = ["unproven"] }
 embedded-hal-async = "1.0.0"
@@ -174,7 +178,7 @@ embedded-hal-nb    = { version = "1.0.0", optional = true }
 esp-backtrace      = { path = "../esp-backtrace", default-features = false, features = ["exception-handler", "panic-handler", "defmt", "semihosting"] }
 esp-hal            = { path = "../esp-hal", features = ["defmt", "digest"], optional = true }
 esp-hal-embassy    = { path = "../esp-hal-embassy", optional = true }
-portable-atomic    = "1.6.0"
+portable-atomic    = "1.7.0"
 static_cell        = { version = "2.1.0", features = ["nightly"] }
 
 [dev-dependencies]
@@ -193,8 +197,8 @@ sha1                = { version = "0.10.6", default-features = false }
 sha2                = { version = "0.10.8", default-features = false }
 
 [build-dependencies]
-esp-build    = { version = "0.1.0", path = "../esp-build" }
-esp-metadata = { version = "0.3.0", path = "../esp-metadata" }
+esp-build    = { path = "../esp-build" }
+esp-metadata = { path = "../esp-metadata" }
 
 [features]
 default = ["embassy"]

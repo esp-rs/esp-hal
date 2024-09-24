@@ -103,7 +103,7 @@ pub(crate) fn get_io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0 {
             37 => transmute::<&'static io_mux::GPIO37, &'static io_mux::GPIO0>(iomux.gpio37()),
             38 => transmute::<&'static io_mux::GPIO38, &'static io_mux::GPIO0>(iomux.gpio38()),
             39 => transmute::<&'static io_mux::GPIO39, &'static io_mux::GPIO0>(iomux.gpio39()),
-            _ => panic!(),
+            other => panic!("GPIO {} does not exist", other),
         }
     }
 }
@@ -467,7 +467,8 @@ pub enum OutputSignal {
     PWM2_4H                  = 120,
     PWM2_4L                  = 121,
     TWAI_TX                  = 123,
-    CAN_BUS_OFF_ON           = 124,
+    TWAI_BUS_OFF_ON          = 124,
+    TWAI_CLKOUT              = 125,
     SPID4                    = 128,
     SPID5                    = 129,
     SPID6                    = 130,

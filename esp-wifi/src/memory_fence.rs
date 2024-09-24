@@ -1,10 +1,10 @@
 pub(crate) fn memory_fence() {
-    #[cfg(target_arch = "xtensa")]
+    #[cfg(xtensa)]
     unsafe {
         core::arch::asm!("memw");
     }
 
-    #[cfg(target_arch = "riscv")]
+    #[cfg(riscv)]
     unsafe {
         core::arch::asm!("fence");
     }

@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Bump MSRV to 1.77.0 (#1971)
+- Bump MSRV to 1.79.0 (#1971)
 
 ### Added
 
@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added APIs to allow connecting signals through the GPIO matrix. (#2128)
 - Allow I8080 transfers to be cancelled on the spot (#2191)
 - Implement `TryFrom<u32>` for `ledc::timer::config::Duty` (#1984)
+- Expose `RtcClock::get_xtal_freq` and `RtcClock::get_slow_freq` publically for all chips (#2183)
+- TWAI support for ESP32-H2 (#2199)
+- Added a way to configure watchdogs in `esp_hal::init` (#2180)
+- Implement `embedded_hal_async::delay::DelayNs` for `TIMGx` timers (#2084)
 
 ### Changed
 
@@ -43,10 +47,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - I8080 driver now decides bus width at transfer time rather than construction time. (#2171)
 - Migrate the I8080 driver to a move based API (#2191)
 - Replaced `AnyPin` with `InputSignal` and `OutputSignal` and renamed `ErasedPin` to `AnyPin` (#2128)
-- Replaced the `ErasedTimer` enum with the `AnyTimer` struct. (#?)
+- Replaced the `ErasedTimer` enum with the `AnyTimer` struct. (#2144)
 - Changed the parameters of `Spi::with_pins` to no longer be optional (#2133)
 - Renamed `DummyPin` to `NoPin` and removed all internal logic from it. (#2133)
 - The `NO_PIN` constant has been removed. (#2133)
+- MSRV bump to 1.79 (#2156)
+- Allow handling interrupts while trying to lock critical section on multi-core chips. (#2197)
+- Removed the PS-RAM related features, replaced by `quad-psram`/`octal-psram`, `init_psram` takes a configuration parameter, it's now possible to auto-detect PS-RAM size (#2178)
+- `EspTwaiFrame` constructors now accept any type that converts into `esp_hal::twai::Id` (#2207)
 
 ### Fixed
 
@@ -54,10 +62,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue with DMA transfers potentially not waking up the correct async task (#2065)
 - Fixed an issue with LCD_CAM i8080 where it would send double the clocks in 16bit mode (#2085)
 - Fix i2c embedded-hal transaction (#2028)
+- Fix some inconsistencies in DMA interrupt bits (#2169)
 - Fix SPI DMA alternating `write` and `read` for ESP32 and ESP32-S2 (#2131)
 - Fix I2C ending up in a state when only re-creating the peripheral makes it useable again (#2141)
 - Fix `SpiBus::transfer` transferring data twice in some cases (#2159)
 - Fixed UART freezing when using `RcFast` clock source on ESP32-C2/C3 (#2170)
+- I2S: on ESP32 and ESP32-S2 data is now output to the right (WS=1) channel first. (#2194)
+- SPI: Fixed an issue where unexpected data was written outside of the read buffer (#2179)
+- SPI: Fixed an issue where `wait` has returned before the DMA has finished writing the memory (#2179)
+- SPI: Fixed an issue where repeated calls to `dma_transfer` may end up looping indefinitely (#2179)
+- SPI: Fixed an issue that prevented correctly reading the first byte in a transaction (#2179)
+- PARL_IO: Fixed an issue that caused garbage to be output at the start of some requests (#2211)
+- TWAI on ESP32 (#2207)
 
 ### Removed
 
@@ -72,6 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `_with_default_pins` UART constructors (#2132)
 - Removed `uart::{DefaultRxPin, DefaultTxPin}` (#2132)
 - Removed `PcntSource` and `PcntInputConfig`. (#2134)
+- Removed the `place-spi-driver-in-ram` feature, this is now enabled via [esp-config](https://docs.rs/esp-config) (#2156)
 
 ## [0.20.1] - 2024-08-30
 

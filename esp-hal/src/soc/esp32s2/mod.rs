@@ -16,7 +16,7 @@ use crate::rtc_cntl::SocResetReason;
 pub mod efuse;
 pub mod gpio;
 pub mod peripherals;
-#[cfg(psram)]
+#[cfg(feature = "quad-psram")]
 pub mod psram;
 pub mod radio_clocks;
 pub mod trng;
@@ -113,7 +113,7 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
     }
 
     // continue with default reset handler
-    xtensa_lx_rt::Reset();
+    xtensa_lx_rt::Reset()
 }
 
 /// The ESP32 has a first stage bootloader that handles loading program data

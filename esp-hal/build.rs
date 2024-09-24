@@ -8,6 +8,7 @@ use std::{
 };
 
 use esp_build::assert_unique_used_features;
+use esp_config::{generate_config, Value};
 use esp_metadata::{Chip, Config};
 
 #[cfg(debug_assertions)]
@@ -57,10 +58,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let config = Config::for_chip(&chip);
 
     // Check PSRAM features are only given if the target supports PSRAM:
-    if !config.contains(&String::from("psram"))
-        && (cfg!(feature = "psram-2m") || cfg!(feature = "psram-4m") || cfg!(feature = "psram-8m"))
-    {
+    if !config.contains(&String::from("psram")) && cfg!(feature = "quad-psram") {
         panic!("The target does not support PSRAM");
+    }
+
+    if !config.contains(&String::from("octal_psram")) && cfg!(feature = "octal-psram") {
+        panic!("The target does not support Octal PSRAM");
     }
 
     // Define all necessary configuration symbols for the configured device:
@@ -121,6 +124,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     // remaining linker scripts which are common to all devices:
     copy_dir_all(&config_symbols, "ld/sections", &out)?;
     copy_dir_all(&config_symbols, format!("ld/{device_name}"), &out)?;
+
+    // emit config
+    generate_config(
+        "esp_hal",
+        &[(
+            "place-spi-driver-in-ram",
+            Value::Bool(false),
+            "Places the SPI driver in RAM for better performance",
+        )],
+        true,
+    );
 
     Ok(())
 }
@@ -214,11 +228,7 @@ fn generate_memory_extras() -> Vec<u8> {
 
 #[cfg(feature = "esp32s2")]
 fn generate_memory_extras() -> Vec<u8> {
-    let reserved_cache = if cfg!(any(
-        feature = "psram-2m",
-        feature = "psram-4m",
-        feature = "psram-8m"
-    )) {
+    let reserved_cache = if cfg!(feature = "quad-psram") {
         "0x4000"
     } else {
         "0x2000"

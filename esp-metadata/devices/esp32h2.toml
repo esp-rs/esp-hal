@@ -54,7 +54,7 @@ peripherals = [
     "timg0",
     "timg1",
     "trace0",
-    # "twai0",
+    "twai0",
     "uart0",
     "uart1",
     "uhci0",
