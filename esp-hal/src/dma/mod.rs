@@ -644,8 +644,7 @@ macro_rules! dma_circular_descriptors_chunk_size {
 /// use esp_hal::dma_tx_buffer;
 /// use esp_hal::dma::DmaBufBlkSize;
 ///
-/// let tx_buf =
-///     dma_tx_buffer!(32000);
+/// let tx_buf = dma_tx_buffer!(32000);
 /// # }
 /// ```
 #[macro_export]
@@ -1939,7 +1938,7 @@ pub enum DmaBufError {
     InvalidChunkSize,
 }
 
-/// DMA buffer allignments
+/// DMA buffer alignments
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaBufBlkSize {
