@@ -1,4 +1,5 @@
 use core::cell::RefCell;
+
 use critical_section::Mutex;
 
 #[cfg_attr(esp32, path = "timer_esp32.rs")]
@@ -35,8 +36,9 @@ pub fn setup_timer_isr(timebase: TimeBase) -> Result<(), esp_hal::timer::Error> 
 pub fn shutdown_timer_isr() -> Result<(), esp_hal::timer::Error> {
     shutdown_radio_isr();
 
-    disable_timer();
+    disable_timer()?;
 
+    disable_multitasking();
     Ok(())
 }
 

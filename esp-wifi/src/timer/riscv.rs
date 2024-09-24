@@ -39,16 +39,13 @@ pub fn setup_timer(mut alarm0: TimeBase) -> Result<(), esp_hal::timer::Error> {
 }
 
 pub fn disable_timer() -> Result<(), esp_hal::timer::Error> {
-    let mut timer: Option<TimeBase> = None;
+    // make sure the scheduling won't start before everything is setup
+    riscv::interrupt::disable();
 
     critical_section::with(|cs| {
-        timer = crate::timer::TIMER.borrow_ref_mut(cs).take();
+        unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).enable_interrupt(false);
+        unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).cancel().unwrap();
     });
-
-    if let Some(mut alarm) = timer {
-        alarm.cancel()?;
-        alarm.enable_interrupt(false);
-    }
 
     Ok(())
 }
@@ -65,12 +62,11 @@ pub fn setup_multitasking() {
 }
 
 pub fn disable_multitasking() {
-    unwrap!(interrupt::disable(Interrupt::FROM_CPU_INTR3));
+    interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::FROM_CPU_INTR3);
 
-    // TODO (?)
-    // unsafe {
-    //     riscv::interrupt::enable();
-    // }
+    unsafe {
+        riscv::interrupt::enable();
+    }
 }
 
 extern "C" fn handler(trap_frame: &mut TrapFrame) {

@@ -282,7 +282,7 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
     /// Create a new [Socket]
     #[cfg(feature = "tcp")]
     pub fn get_socket<'s>(
-        &'s mut self,
+        &'s self,
         rx_buffer: &'a mut [u8],
         tx_buffer: &'a mut [u8],
     ) -> Socket<'s, 'a, MODE>

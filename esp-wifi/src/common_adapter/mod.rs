@@ -1,7 +1,7 @@
 use core::ptr::addr_of;
 
 use esp_wifi_sys::include::timeval;
-use hal::{macros::ram, rng::Rng, peripheral::PeripheralRef};
+use hal::{macros::ram, rng::Rng};
 
 use crate::{
     binary::include::{esp_event_base_t, esp_timer_get_time},
@@ -40,12 +40,8 @@ pub(crate) fn init_radio_clock_control(rcc: hal::peripherals::RADIO_CLK) {
 }
 
 pub(crate) fn deinit_radio_clock_control() -> Option<hal::peripherals::RADIO_CLK> {
-    unsafe {
-        // Use `take()` to move the RADIO_CLOCKS value out, leaving None in its place
-        RADIO_CLOCKS.take()
-    }
+    unsafe { RADIO_CLOCKS.take() }
 }
-
 
 /// **************************************************************************
 /// Name: esp_semphr_create

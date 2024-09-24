@@ -1,4 +1,3 @@
-use critical_section::Mutex;
 use esp_hal::interrupt::InterruptHandler;
 
 use crate::{
@@ -36,18 +35,11 @@ pub fn setup_timer(mut timer1: TimeBase) -> Result<(), esp_hal::timer::Error> {
 }
 
 pub fn disable_timer() -> Result<(), esp_hal::timer::Error> {
-    let mut timer: Option<TimeBase> = None;
-
     // Take the timer from the static reference
     critical_section::with(|cs| {
-        timer = crate::timer::TIMER.borrow_ref_mut(cs).take();
+        unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).enable_interrupt(false);
+        unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).cancel().unwrap();
     });
-
-    // If the timer exists, stop it and disable its interrupt
-    if let Some(mut alarm) = timer {
-        alarm.cancel()?;
-        alarm.enable_interrupt(false);
-    }
 
     Ok(())
 }
@@ -64,19 +56,12 @@ pub fn setup_multitasking() {
 }
 
 pub fn disable_multitasking() {
-    unsafe {
-        // let enabled = xtensa_lx::interrupt::enable();
-        xtensa_lx::interrupt::disable_mask(
-            1 << 29 // Disable Software1
+    // let enabled = xtensa_lx::interrupt::enable();
+    xtensa_lx::interrupt::disable_mask(
+        1 << 29 // Disable Software1
                 | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level2.mask()
-                | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level6.mask() //| enabled,
-        );
-    }
-
-    // TODO (?)
-    // unsafe {
-    //     riscv::interrupt::enable();
-    // }
+                | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level6.mask(), //| enabled,
+    );
 }
 
 fn do_task_switch(context: &mut TrapFrame) {

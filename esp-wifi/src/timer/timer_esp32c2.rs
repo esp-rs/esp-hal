@@ -23,9 +23,8 @@ pub fn setup_radio_isr() {
 pub fn shutdown_radio_isr() {
     #[cfg(feature = "ble")]
     {
-        unwrap!(interrupt::disable(Interrupt::LP_TIMER));
-        unwrap!(interrupt::disable(Interrupt::BT_MAC));
-
+        interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::LP_TIMER);
+        interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::BT_MAC);
     }
 }
 

@@ -54,7 +54,7 @@ fn next_task() {
 /// Delete the given task.
 ///
 /// This will also free the memory (stack and context) allocated for it.
-fn delete_task(task: *mut Context) {
+pub(crate) fn delete_task(task: *mut Context) {
     critical_section::with(|cs| unsafe {
         let mut ptr = *CTX_NOW.borrow_ref_mut(cs);
         let initial = ptr;
@@ -73,6 +73,18 @@ fn delete_task(task: *mut Context) {
                 break;
             }
         }
+
+        memory_fence();
+    });
+}
+
+pub(crate) fn delete_main_task() {
+    critical_section::with(|cs| unsafe {
+        let mut ctx_now_ref = CTX_NOW.borrow_ref_mut(cs);
+        let main_task = *ctx_now_ref;
+
+        free((*main_task).allocated_stack as *mut u8);
+        *ctx_now_ref = core::ptr::null_mut(); // Correctly set CTX_NOW to null
 
         memory_fence();
     });

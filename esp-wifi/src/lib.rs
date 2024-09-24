@@ -122,9 +122,13 @@ use num_traits::FromPrimitive;
 #[cfg(feature = "wifi")]
 use crate::{
     binary::include::{self, esp_wifi_deinit_internal, esp_wifi_stop},
-    wifi::{WifiController, WifiDeviceMode, WifiError},
+    wifi::WifiError,
 };
-use crate::{common_adapter::init_rng, tasks::init_tasks, timer::setup_timer_isr};
+use crate::{
+    common_adapter::init_rng,
+    tasks::{deinit_tasks, init_tasks},
+    timer::{setup_timer_isr, shutdown_timer_isr},
+};
 
 mod binary {
     pub use esp_wifi_sys::*;
@@ -281,27 +285,8 @@ impl EspWifiInitialization {
 
 #[derive(Debug, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-/// An internal struct designed to make [`EspWifiDeinitialization`] uncreatable
-/// outside of this crate.
-pub struct EspWifiDeinitializationInternal;
-
-#[derive(Debug, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-/// Represents the state of being deinitialized for WiFi, Bluetooth or both.
-pub enum EspWifiDeinitialization {
-    #[cfg(feature = "wifi")]
-    Wifi(EspWifiDeinitializationInternal),
-    #[cfg(feature = "ble")]
-    Ble(EspWifiDeinitializationInternal),
-    #[cfg(coex)]
-    WifiBle(EspWifiDeinitializationInternal),
-}
-
-#[derive(Debug, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Initialize the driver for WiFi, Bluetooth or both.
-pub enum EspWifiFor {
+pub enum EspWifiInitFor {
     #[cfg(feature = "wifi")]
     Wifi,
     #[cfg(feature = "ble")]
@@ -310,12 +295,12 @@ pub enum EspWifiFor {
     WifiBle,
 }
 
-impl EspWifiFor {
+impl EspWifiInitFor {
     #[allow(unused)]
     fn is_wifi(&self) -> bool {
         match self {
             #[cfg(feature = "ble")]
-            EspWifiFor::Ble => false,
+            EspWifiInitFor::Ble => false,
             _ => true,
         }
     }
@@ -324,7 +309,7 @@ impl EspWifiFor {
     fn is_ble(&self) -> bool {
         match self {
             #[cfg(feature = "wifi")]
-            EspWifiFor::Wifi => false,
+            EspWifiInitFor::Wifi => false,
             _ => true,
         }
     }
@@ -394,11 +379,11 @@ impl EspWifiTimerSource for TimeBase {
 /// ```rust, no_run
 #[doc = esp_hal::before_snippet!()]
 /// use esp_hal::{rng::Rng, timg::TimerGroup};
-/// use esp_wifi::EspWifiFor;
+/// use esp_wifi::EspWifiInitFor;
 ///
 /// let timg0 = TimerGroup::new(peripherals.TIMG0);
 /// let init = esp_wifi::init(
-///     EspWifiFor::Wifi,
+///     EspWifiInitFor::Wifi,
 ///     timg0.timer0,
 ///     Rng::new(peripherals.RNG),
 ///     peripherals.RADIO_CLK,
@@ -407,11 +392,10 @@ impl EspWifiTimerSource for TimeBase {
 /// # }
 /// ```
 pub fn init<'d>(
-    init_for: EspWifiFor,
+    init_for: EspWifiInitFor,
     timer: impl EspWifiTimerSource,
     rng: hal::rng::Rng,
     radio_clocks: hal::peripherals::RADIO_CLK,
-    // radio_clocks: impl esp_hal::peripheral::Peripheral<P = crate::hal::peripherals::RADIO_CLK> + 'd,
 ) -> Result<EspWifiInitialization, InitializationError> {
     // A minimum clock of 80MHz is required to operate WiFi module.
     const MIN_CLOCK: u32 = 80;
@@ -420,14 +404,8 @@ pub fn init<'d>(
         return Err(InitializationError::WrongClockConfig);
     }
 
-    // esp_hal::into_ref!(timer);
-    // esp_hal::into_ref!(rng);
-    // crate::hal::into_ref!(radio_clocks);
-
     info!("esp-wifi configuration {:?}", crate::CONFIG);
-
     crate::common_adapter::chip_specific::enable_wifi_power_domain();
-
     phy_mem_init();
     init_radio_clock_control(radio_clocks);
     init_rng(rng);
@@ -461,147 +439,58 @@ pub fn init<'d>(
 
     match init_for {
         #[cfg(feature = "wifi")]
-        EspWifiFor::Wifi => Ok(EspWifiInitialization::Wifi(EspWifiInitializationInternal)),
+        EspWifiInitFor::Wifi => Ok(EspWifiInitialization::Wifi(EspWifiInitializationInternal)),
         #[cfg(feature = "ble")]
-        EspWifiFor::Ble => Ok(EspWifiInitialization::Ble(EspWifiInitializationInternal)),
+        EspWifiInitFor::Ble => Ok(EspWifiInitialization::Ble(EspWifiInitializationInternal)),
         #[cfg(coex)]
-        EspWifiFor::WifiBle => Ok(EspWifiInitialization::WifiBle(
+        EspWifiInitFor::WifiBle => Ok(EspWifiInitialization::WifiBle(
             EspWifiInitializationInternal,
         )),
     }
 }
 
-#[cfg(feature = "wifi")]
-pub fn deinitialize_wifi(
-    _controller: WifiController,
-    _stack: crate::wifi_interface::WifiStack<impl WifiDeviceMode>,
+pub fn deinit(
+    _init: EspWifiInitialization,
 ) -> Result<(TimeBase, hal::peripherals::RADIO_CLK), InitializationError> {
-    // Stop and deinitialize the WiFi stack
-    esp_wifi_result!(unsafe { esp_wifi_stop() })?;
-    esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
-
-    info!("WiFi deinitialized");
-
-    // let timer = crate::timer::TIMER.borrow_mut().take();
-
-    let mut timer = None;
-
-    critical_section::with(|cs| {
-        timer = crate::timer::TIMER.borrow_ref_mut(cs).take();
-    });
-
-    // Return the timer (if it was Some), or None if there was no timer stored
-    if let Some(timer) = timer {
-        if let Some(radio_clocks) = deinit_radio_clock_control(){
-            Ok((timer, radio_clocks))
-        }
-        else {
-            Err(InitializationError::Timer(hal::timer::Error::TimerInactive))    
-        }
-    } else {
-        // Handle the case where the timer was not found
-        Err(InitializationError::Timer(hal::timer::Error::TimerInactive))
-    }
-    
-
-    // Return WiFi deinitialization state
-    // Ok(EspWifiDeinitialization::Wifi(
-    //     EspWifiDeinitializationInternal,
-    // ))
+    unsafe { deinit_unsafe() }
 }
 
-#[cfg(feature = "ble")]
-pub fn deinitialize_ble(ble: bleps::Ble) -> Result<EspWifiDeinitialization, ()> {
-    // Deinitialize BLE based on the chip type
-    #[cfg(any(esp32, esp32c3, esp32s3))]
-    crate::ble::btdm::ble_deinit();
-
-    #[cfg(any(esp32c2, esp32c6, esp32h2))]
-    crate::ble::npl::ble_deinit();
-
-    info!("BLE deinitialized");
-
-    // Return BLE deinitialization state
-    Ok(EspWifiDeinitialization::Ble(
-        EspWifiDeinitializationInternal,
-    ))
-}
-
-#[cfg(coex)]
-pub fn deinitialize_all(
-    controller: WifiController,
-    stack: crate::wifi_interface::WifiStack<impl WifiDeviceMode>,
-    ble: bleps::Ble,
-) -> Result<EspWifiDeinitialization, WifiError> {
+pub unsafe fn deinit_unsafe() -> Result<(TimeBase, hal::peripherals::RADIO_CLK), InitializationError>
+{
     // Disable coexistence
-    unsafe { crate::wifi::os_adapter::coex_disable() };
-    unsafe { crate::wifi::os_adapter::coex_deinit() };
+    #[cfg(coex)]
+    {
+        unsafe { crate::wifi::os_adapter::coex_disable() };
+        unsafe { crate::wifi::os_adapter::coex_deinit() };
+    }
 
     // Deinitialize WiFi
-    deinitialize_wifi(controller, stack);
+    #[cfg(feature = "wifi")]
+    {
+        esp_wifi_result!(unsafe { esp_wifi_stop() })?;
+        esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
+    }
 
     // Deinitialize BLE
-    deinitialize_ble(ble);
-
-    info!("WiFi and BLE coexistence deinitialized");
-
-    // Return coexistence deinitialization state
-    Ok(EspWifiDeinitialization::WifiBle(
-        EspWifiDeinitializationInternal,
-    ))
-}
-
-pub fn reinitialize(
-    init_for: EspWifiFor,
-    _deinit_state: EspWifiDeinitialization,
-) -> Result<EspWifiInitialization, InitializationError> {
-    // A minimum clock of 80MHz is required to operate WiFi module.
-    const MIN_CLOCK: u32 = 80;
-    let clocks = Clocks::get();
-    if clocks.cpu_clock < MegahertzU32::MHz(MIN_CLOCK) {
-        return Err(InitializationError::WrongClockConfig);
-    }
-
-    info!("esp-wifi configuration {:?}", crate::CONFIG);
-
-    crate::common_adapter::chip_specific::enable_wifi_power_domain();
-
-    phy_mem_init();
-    wifi_set_log_verbose();
-    init_clocks();
-
-    #[cfg(coex)]
-    match crate::wifi::coex_initialize() {
-        0 => {}
-        error => return Err(InitializationError::General(error)),
-    }
-
-    #[cfg(feature = "wifi")]
-    if init_for.is_wifi() {
-        debug!("wifi init");
-        // wifi init
-        crate::wifi::wifi_init()?;
-    }
-
     #[cfg(feature = "ble")]
-    if init_for.is_ble() {
-        // ble init
-        // for some reason things don't work when initializing things the other way
-        // around while the original implementation in NuttX does it like that
-        debug!("ble init");
-        crate::ble::ble_init();
+    {
+        #[cfg(any(esp32, esp32c3, esp32s3))]
+        crate::ble::btdm::ble_deinit();
+
+        #[cfg(any(esp32c2, esp32c6, esp32h2))]
+        crate::ble::npl::ble_deinit();
     }
 
-    match init_for {
-        #[cfg(feature = "wifi")]
-        EspWifiFor::Wifi => Ok(EspWifiInitialization::Wifi(EspWifiInitializationInternal)),
-        #[cfg(feature = "ble")]
-        EspWifiFor::Ble => Ok(EspWifiInitialization::Ble(EspWifiInitializationInternal)),
-        #[cfg(coex)]
-        EspWifiFor::WifiBle => Ok(EspWifiInitialization::WifiBle(
-            EspWifiInitializationInternal,
-        )),
-    }
+    shutdown_timer_isr().unwrap();
+    deinit_tasks();
+
+    let timer = critical_section::with(|cs| crate::timer::TIMER.borrow_ref_mut(cs).take())
+        .ok_or_else(|| InitializationError::TimerUnavailable)?;
+
+    let radio_clocks =
+        deinit_radio_clock_control().ok_or_else(|| InitializationError::RadioClockUnavailable)?;
+
+    Ok((timer, radio_clocks))
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -613,6 +502,8 @@ pub enum InitializationError {
     WifiError(WifiError),
     WrongClockConfig,
     Timer(hal::timer::Error),
+    TimerUnavailable,
+    RadioClockUnavailable,
 }
 
 impl From<hal::timer::Error> for InitializationError {
