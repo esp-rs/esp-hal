@@ -2902,6 +2902,7 @@ pub trait Instance: private::Sealed {
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn setup_half_duplex(
         &mut self,
         is_write: bool,
