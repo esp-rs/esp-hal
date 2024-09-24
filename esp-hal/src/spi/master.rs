@@ -1637,14 +1637,11 @@ mod dma {
         }
 
         fn do_cancel(&mut self) {
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
-                    // TODO: examine what happens exactly. (0, 0) just doesn't take effect.
-                    self.spi_dma.spi_mut().configure_datalen(1, 1);
-                } else {
-                    self.spi_dma.spi_mut().configure_datalen(0, 0);
-                }
-            };
+            // 0 doesn't take effect on ESP32 and cuts the currently transmitted byte
+            // immediately.
+            // 1 seems to stop after transmitting the current byte which is somewhat less
+            // impolite.
+            self.spi_dma.spi_mut().configure_datalen(1, 1);
             self.spi_dma.spi_mut().update();
 
             if self.spi_dma.is_tx_in_progress() {
