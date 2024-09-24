@@ -1654,6 +1654,14 @@ mod dma {
             }
         }
 
+        /// Checks if the transfer is complete.
+        ///
+        /// This method returns `true` if both RX and TX operations are done,
+        /// and the SPI instance is no longer busy.
+        pub fn is_done(&self) -> bool {
+            self.spi_dma.is_done()
+        }
+
         /// Waits for the DMA transfer to complete.
         ///
         /// This method blocks until the transfer is finished and returns the
