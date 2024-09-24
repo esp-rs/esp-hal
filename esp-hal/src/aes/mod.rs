@@ -245,8 +245,8 @@ pub mod dma {
             DmaPeripheral,
             DmaTransferRxTx,
             ReadBuffer,
-            RxPrivate,
-            TxPrivate,
+            Rx,
+            Tx,
             WriteBuffer,
         },
     };

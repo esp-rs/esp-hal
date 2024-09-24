@@ -619,8 +619,8 @@ mod m2m {
         DmaPeripheral,
         DmaTransferRx,
         ReadBuffer,
-        RxPrivate,
-        TxPrivate,
+        Rx,
+        Tx,
         WriteBuffer,
     };
 

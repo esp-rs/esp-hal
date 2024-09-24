@@ -74,7 +74,7 @@ use crate::{
         DmaTransferTx,
         LcdCamPeripheral,
         ReadBuffer,
-        TxPrivate,
+        Tx,
     },
     gpio::{OutputSignal, PeripheralOutput},
     lcd_cam::{
