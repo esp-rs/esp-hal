@@ -106,6 +106,13 @@ pub(crate) fn is_valid_psram_address(address: u32) -> bool {
 }
 
 #[allow(unused)]
+pub(crate) fn is_slice_in_psram<T>(slice: &[T]) -> bool {
+    let start = slice.as_ptr() as u32;
+    let end = start + slice.len() as u32;
+    is_valid_psram_address(start) && is_valid_psram_address(end)
+}
+
+#[allow(unused)]
 pub(crate) fn is_valid_memory_address(address: u32) -> bool {
     is_valid_ram_address(address) || is_valid_psram_address(address)
 }

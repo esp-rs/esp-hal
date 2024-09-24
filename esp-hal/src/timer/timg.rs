@@ -304,6 +304,57 @@ where
 {
     /// Construct a new instance of [`TimerGroup`] in asynchronous mode
     pub fn new_async(_timer_group: impl Peripheral<P = T> + 'd) -> Self {
+        match T::id() {
+            0 => {
+                use crate::timer::timg::asynch::timg0_timer0_handler;
+                unsafe {
+                    interrupt::bind_interrupt(
+                        Interrupt::TG0_T0_LEVEL,
+                        timg0_timer0_handler.handler(),
+                    );
+                    interrupt::enable(Interrupt::TG0_T0_LEVEL, timg0_timer0_handler.priority())
+                        .unwrap();
+
+                    #[cfg(timg_timer1)]
+                    {
+                        use crate::timer::timg::asynch::timg0_timer1_handler;
+
+                        interrupt::bind_interrupt(
+                            Interrupt::TG0_T1_LEVEL,
+                            timg0_timer1_handler.handler(),
+                        );
+                        interrupt::enable(Interrupt::TG0_T1_LEVEL, timg0_timer1_handler.priority())
+                            .unwrap();
+                    }
+                }
+            }
+            #[cfg(timg1)]
+            1 => {
+                use crate::timer::timg::asynch::timg1_timer0_handler;
+                unsafe {
+                    {
+                        interrupt::bind_interrupt(
+                            Interrupt::TG1_T0_LEVEL,
+                            timg1_timer0_handler.handler(),
+                        );
+                        interrupt::enable(Interrupt::TG1_T0_LEVEL, timg1_timer0_handler.priority())
+                            .unwrap();
+                    }
+                    #[cfg(timg_timer1)]
+                    {
+                        use crate::timer::timg::asynch::timg1_timer1_handler;
+                        interrupt::bind_interrupt(
+                            Interrupt::TG1_T1_LEVEL,
+                            timg1_timer1_handler.handler(),
+                        );
+                        interrupt::enable(Interrupt::TG1_T1_LEVEL, timg1_timer1_handler.priority())
+                            .unwrap();
+                    }
+                }
+            }
+            _ => unreachable!(),
+        }
+
         Self::new_inner(_timer_group)
     }
 }
@@ -1037,6 +1088,168 @@ where
 {
     fn feed(&mut self) {
         self.feed();
+    }
+}
+
+// Async functionality of the timer groups.
+mod asynch {
+    use core::{
+        pin::Pin,
+        task::{Context, Poll},
+    };
+
+    use embassy_sync::waitqueue::AtomicWaker;
+    use procmacros::handler;
+
+    use super::*;
+
+    cfg_if::cfg_if! {
+        if #[cfg(all(timg1, timg_timer1))] {
+            const NUM_WAKERS: usize = 4;
+        } else if #[cfg(timg1)] {
+            const NUM_WAKERS: usize = 2;
+        } else {
+            const NUM_WAKERS: usize = 1;
+        }
+    }
+
+    static WAKERS: [AtomicWaker; NUM_WAKERS] = [const { AtomicWaker::new() }; NUM_WAKERS];
+
+    pub(crate) struct TimerFuture<'a, T>
+    where
+        T: Instance,
+    {
+        timer: &'a Timer<T, crate::Async>,
+    }
+
+    impl<'a, T> TimerFuture<'a, T>
+    where
+        T: Instance,
+    {
+        pub(crate) fn new(timer: &'a Timer<T, crate::Async>) -> Self {
+            use crate::timer::Timer;
+
+            timer.enable_interrupt(true);
+
+            Self { timer }
+        }
+
+        fn event_bit_is_clear(&self) -> bool {
+            self.timer
+                .register_block()
+                .int_ena()
+                .read()
+                .t(self.timer.timer_number())
+                .bit_is_clear()
+        }
+    }
+
+    impl<'a, T> core::future::Future for TimerFuture<'a, T>
+    where
+        T: Instance,
+    {
+        type Output = ();
+
+        fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+            let index = (self.timer.timer_number() << 1) | self.timer.timer_group();
+            WAKERS[index as usize].register(ctx.waker());
+
+            if self.event_bit_is_clear() {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        }
+    }
+
+    impl<'a, T> Drop for TimerFuture<'a, T>
+    where
+        T: Instance,
+    {
+        fn drop(&mut self) {
+            self.timer.clear_interrupt();
+        }
+    }
+
+    impl<T> embedded_hal_async::delay::DelayNs for Timer<T, crate::Async>
+    where
+        T: Instance,
+    {
+        async fn delay_ns(&mut self, ns: u32) {
+            use crate::timer::Timer as _;
+
+            let period = MicrosDurationU64::from_ticks(ns.div_ceil(1000) as u64);
+            self.load_value(period).unwrap();
+            self.start();
+            self.listen();
+
+            TimerFuture::new(self).await;
+        }
+    }
+
+    // INT_ENA means that when the interrupt occurs, it will show up in the INT_ST.
+    // Clearing INT_ENA that it won't show up on INT_ST but if interrupt is
+    // already there, it won't clear it - that's why we need to clear the INT_CLR as
+    // well.
+    #[handler]
+    pub(crate) fn timg0_timer0_handler() {
+        lock(&INT_ENA_LOCK[0], || {
+            unsafe { &*crate::peripherals::TIMG0::PTR }
+                .int_ena()
+                .modify(|_, w| w.t(0).clear_bit())
+        });
+
+        unsafe { &*crate::peripherals::TIMG0::PTR }
+            .int_clr()
+            .write(|w| w.t(0).clear_bit_by_one());
+
+        WAKERS[0].wake();
+    }
+
+    #[cfg(timg1)]
+    #[handler]
+    pub(crate) fn timg1_timer0_handler() {
+        lock(&INT_ENA_LOCK[1], || {
+            unsafe { &*crate::peripherals::TIMG1::PTR }
+                .int_ena()
+                .modify(|_, w| w.t(0).clear_bit())
+        });
+        unsafe { &*crate::peripherals::TIMG1::PTR }
+            .int_clr()
+            .write(|w| w.t(0).clear_bit_by_one());
+
+        WAKERS[1].wake();
+    }
+
+    #[cfg(timg_timer1)]
+    #[handler]
+    pub(crate) fn timg0_timer1_handler() {
+        lock(&INT_ENA_LOCK[0], || {
+            unsafe { &*crate::peripherals::TIMG0::PTR }
+                .int_ena()
+                .modify(|_, w| w.t(1).clear_bit())
+        });
+        unsafe { &*crate::peripherals::TIMG0::PTR }
+            .int_clr()
+            .write(|w| w.t(1).clear_bit_by_one());
+
+        WAKERS[2].wake();
+    }
+
+    #[cfg(all(timg1, timg_timer1))]
+    #[handler]
+    pub(crate) fn timg1_timer1_handler() {
+        lock(&INT_ENA_LOCK[1], || {
+            unsafe { &*crate::peripherals::TIMG1::PTR }
+                .int_ena()
+                .modify(|_, w| w.t(1).clear_bit())
+        });
+
+        unsafe { &*crate::peripherals::TIMG1::PTR }
+            .int_clr()
+            .write(|w| w.t(1).clear_bit_by_one());
+
+        WAKERS[3].wake();
     }
 }
 

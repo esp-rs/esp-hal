@@ -201,4 +201,25 @@ mod tests {
             compute_circular_size(TX_SIZE, CHUNK_SIZE)
         );
     }
+
+    #[test]
+    fn test_dma_tx_buffer() {
+        use esp_hal::dma::{DmaBufError, DmaTxBuf};
+        const TX_SIZE: usize = DATA_SIZE;
+
+        fn check(result: Result<DmaTxBuf, DmaBufError>, size: usize) {
+            match result {
+                Ok(tx_buf) => {
+                    assert_eq!(tx_buf.len(), size);
+                }
+                Err(_) => {
+                    panic!("Failed to create DmaTxBuf");
+                }
+            }
+        }
+        check(esp_hal::dma_tx_buffer!(TX_SIZE), TX_SIZE);
+        check(esp_hal::dma_tx_buffer!(TX_SIZE + 1), TX_SIZE + 1);
+        check(esp_hal::dma_tx_buffer!(TX_SIZE + 2), TX_SIZE + 2);
+        check(esp_hal::dma_tx_buffer!(TX_SIZE + 3), TX_SIZE + 3);
+    }
 }

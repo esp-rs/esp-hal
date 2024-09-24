@@ -901,15 +901,13 @@ mod dma {
         /// instance of `SpiDma` that supports DMA operations.
         pub fn with_dma<C, DmaMode>(
             self,
-            mut channel: Channel<'d, C, DmaMode>,
+            channel: Channel<'d, C, DmaMode>,
         ) -> SpiDma<'d, crate::peripherals::SPI2, C, M, DmaMode>
         where
             C: DmaChannel,
             C::P: SpiPeripheral + Spi2Peripheral,
             DmaMode: Mode,
         {
-            channel.tx.init_channel(); // no need to call this for both, RX and TX
-
             SpiDma {
                 spi: self.spi,
                 channel,
@@ -930,15 +928,13 @@ mod dma {
         /// operations.
         pub fn with_dma<C, DmaMode>(
             self,
-            mut channel: Channel<'d, C, DmaMode>,
+            channel: Channel<'d, C, DmaMode>,
         ) -> SpiDma<'d, crate::peripherals::SPI3, C, M, DmaMode>
         where
             C: DmaChannel,
             C::P: SpiPeripheral + Spi3Peripheral,
             DmaMode: Mode,
         {
-            channel.tx.init_channel(); // no need to call this for both, RX and TX
-
             SpiDma {
                 spi: self.spi,
                 channel,
