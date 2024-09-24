@@ -1114,8 +1114,7 @@ mod asynch {
     }
 
     #[allow(clippy::declare_interior_mutable_const)]
-    const INIT: AtomicWaker = AtomicWaker::new();
-    static WAKERS: [AtomicWaker; NUM_WAKERS] = [INIT; NUM_WAKERS];
+    static WAKERS: [AtomicWaker; NUM_WAKERS] = [const { AtomicWaker::new() }; NUM_WAKERS];
 
     pub(crate) struct TimerFuture<'a, T>
     where
