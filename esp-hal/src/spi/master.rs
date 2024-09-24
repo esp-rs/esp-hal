@@ -922,8 +922,10 @@ mod dma {
             DmaChannel,
             DmaRxBuf,
             DmaRxBuffer,
+            DmaRxBufferRef,
             DmaTxBuf,
             DmaTxBuffer,
+            DmaTxBufferRef,
             Rx,
             Spi2Peripheral,
             SpiPeripheral,
@@ -1842,7 +1844,8 @@ mod dma {
             for chunk in words.chunks_mut(self.rx_buf.capacity()) {
                 self.rx_buf.set_length(chunk.len());
 
-                match (&mut self.spi_dma).do_dma_read(&mut self.rx_buf) {
+                let rx_buffer = DmaRxBufferRef::new(&mut self.rx_buf);
+                match (&mut self.spi_dma).do_dma_read(rx_buffer) {
                     Ok(transfer) => transfer.wait(),
                     Err((e, _, _)) => return Err(e),
                 };
@@ -1859,7 +1862,8 @@ mod dma {
             for chunk in words.chunks(self.tx_buf.capacity()) {
                 self.tx_buf.fill(chunk);
 
-                match (&mut self.spi_dma).do_dma_write(&mut self.tx_buf) {
+                let tx_buffer = DmaTxBufferRef::new(&mut self.tx_buf);
+                match (&mut self.spi_dma).do_dma_write(tx_buffer) {
                     Ok(transfer) => transfer.wait(),
                     Err((e, _, _)) => return Err(e),
                 };
@@ -1883,7 +1887,9 @@ mod dma {
                 self.tx_buf.fill(write_chunk);
                 self.rx_buf.set_length(read_chunk.len());
 
-                match (&mut self.spi_dma).do_dma_transfer(&mut self.rx_buf, &mut self.tx_buf) {
+                let rx_buffer = DmaRxBufferRef::new(&mut self.rx_buf);
+                let tx_buffer = DmaTxBufferRef::new(&mut self.tx_buf);
+                match (&mut self.spi_dma).do_dma_transfer(rx_buffer, tx_buffer) {
                     Ok(transfer) => transfer.wait(),
                     Err((e, _, _, _)) => return Err(e),
                 };
@@ -1909,7 +1915,9 @@ mod dma {
                 self.tx_buf.fill(chunk);
                 self.rx_buf.set_length(chunk.len());
 
-                match (&mut self.spi_dma).do_dma_transfer(&mut self.rx_buf, &mut self.tx_buf) {
+                let tx_buffer = DmaTxBufferRef::new(&mut self.tx_buf);
+                let rx_buffer = DmaRxBufferRef::new(&mut self.rx_buf);
+                match (&mut self.spi_dma).do_dma_transfer(rx_buffer, tx_buffer) {
                     Ok(transfer) => transfer.wait(),
                     Err((e, _, _, _)) => return Err(e),
                 };
@@ -1945,13 +1953,9 @@ mod dma {
             }
             self.rx_buf.set_length(buffer.len());
 
-            match (&mut self.spi_dma).do_half_duplex_read(
-                data_mode,
-                cmd,
-                address,
-                dummy,
-                &mut self.rx_buf,
-            ) {
+            let rx_buffer = DmaRxBufferRef::new(&mut self.rx_buf);
+            match (&mut self.spi_dma).do_half_duplex_read(data_mode, cmd, address, dummy, rx_buffer)
+            {
                 Ok(transfer) => transfer.wait(),
                 Err((e, _, _)) => return Err(e),
             };
@@ -1976,13 +1980,10 @@ mod dma {
             }
             self.tx_buf.fill(buffer);
 
-            match (&mut self.spi_dma).do_half_duplex_write(
-                data_mode,
-                cmd,
-                address,
-                dummy,
-                &mut self.tx_buf,
-            ) {
+            let tx_buffer = DmaTxBufferRef::new(&mut self.tx_buf);
+            match (&mut self.spi_dma)
+                .do_half_duplex_write(data_mode, cmd, address, dummy, tx_buffer)
+            {
                 Ok(transfer) => {
                     transfer.wait();
 
@@ -2042,7 +2043,8 @@ mod dma {
                 for chunk in words.chunks_mut(chunk_size) {
                     self.rx_buf.set_length(chunk.len());
 
-                    match (&mut self.spi_dma).do_dma_read(&mut self.rx_buf) {
+                    let rx_buffer = DmaRxBufferRef::new(&mut self.rx_buf);
+                    match (&mut self.spi_dma).do_dma_read(rx_buffer) {
                         Ok(mut transfer) => transfer.wait_for_done().await,
                         Err((e, _, _)) => return Err(e),
                     }
@@ -2061,7 +2063,8 @@ mod dma {
                 for chunk in words.chunks(chunk_size) {
                     self.tx_buf.fill(chunk);
 
-                    match (&mut self.spi_dma).do_dma_write(&mut self.tx_buf) {
+                    let tx_buffer = DmaTxBufferRef::new(&mut self.tx_buf);
+                    match (&mut self.spi_dma).do_dma_write(tx_buffer) {
                         Ok(mut transfer) => transfer.wait_for_done().await,
                         Err((e, _, _)) => return Err(e),
                     }
@@ -2090,7 +2093,9 @@ mod dma {
                     self.tx_buf.fill(write_chunk);
                     self.rx_buf.set_length(read_chunk.len());
 
-                    match (&mut self.spi_dma).do_dma_transfer(&mut self.rx_buf, &mut self.tx_buf) {
+                    let rx_buffer = DmaRxBufferRef::new(&mut self.rx_buf);
+                    let tx_buffer = DmaTxBufferRef::new(&mut self.tx_buf);
+                    match (&mut self.spi_dma).do_dma_transfer(rx_buffer, tx_buffer) {
                         Ok(mut transfer) => transfer.wait_for_done().await,
                         Err((e, _, _, _)) => return Err(e),
                     }
@@ -2115,7 +2120,9 @@ mod dma {
                     self.tx_buf.fill(chunk);
                     self.rx_buf.set_length(chunk.len());
 
-                    match (&mut self.spi_dma).do_dma_transfer(&mut self.rx_buf, &mut self.tx_buf) {
+                    let rx_buffer = DmaRxBufferRef::new(&mut self.rx_buf);
+                    let tx_buffer = DmaTxBufferRef::new(&mut self.tx_buf);
+                    match (&mut self.spi_dma).do_dma_transfer(rx_buffer, tx_buffer) {
                         Ok(mut transfer) => transfer.wait_for_done().await,
                         Err((e, _, _, _)) => return Err(e),
                     }
