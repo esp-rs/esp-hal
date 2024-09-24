@@ -554,9 +554,10 @@ mod tests {
         let dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(ctx.tx_descriptors, ctx.tx_buffer).unwrap();
 
-        let spi = ctx
-            .spi
-            .with_dma(ctx.dma_channel.configure_for_async(false, DmaPriority::Priority0));
+        let spi = ctx.spi.with_dma(
+            ctx.dma_channel
+                .configure_for_async(false, DmaPriority::Priority0),
+        );
 
         let mut transfer = spi
             .dma_transfer(dma_rx_buf, dma_tx_buf)
