@@ -2,12 +2,33 @@ name: Documentation
 
 on:
   workflow_dispatch:
+    inputs:
+      esp-hal:
+        description: "esp-hal tag"
+        required: true
+      esp-wifi:
+        description: "esp-wifi tag"
+        required: true
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      packages: '[
+            { "name": "esp-hal",  "tag": "${{ github.event.inputs.esp-hal }}" },
+            { "name": "esp-wifi", "tag": "esp-wifi-${{ github.event.inputs.esp-wifi }}" }
+          ]'
+    steps:
+      - run: echo "Setup complete!"
   build:
+    needs: setup
+    strategy:
+      fail-fast: true
+      matrix:
+        packages: ${{ fromJson(needs.setup.outputs.packages) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,21 +37,48 @@ jobs:
           default: true
           ldproxy: false
 
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          repository: esp-rs/esp-hal
+          ref: ${{ matrix.packages.tag }}
+
       - name: Build documentation
-        run: cargo xtask build-documentation --packages=esp-hal,esp-wifi
+        run: cargo xtask build-documentation --packages=${{ matrix.packages.name }}
 
       # https://github.com/actions/deploy-pages/issues/303#issuecomment-1951207879
       - name: Remove problematic '.lock' files
         run: find docs -name ".lock" -exec rm -f {} \;
 
+      - name: Upload docs for ${{ matrix.packages.name }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.packages.name }}
+          path: "docs/${{ matrix.packages.name }}"
+
+  assemble:
+    needs: [setup, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare
+        run: mkdir docs
+      - name: Download all docs
+        uses: actions/download-artifact@v4
+        with:
+          path: "docs/"
+      
+      - name: Create index.html
+        run: "cargo xtask build-documentation-index --packages=$(echo '${{ needs.setup.outputs.packages }}' | jq -r '[.[].name] | join(\",\")')"
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: "docs"
+          path: "docs/"
 
   deploy:
-    # Add a dependency to the build job:
-    needs: build
+    # Add a dependency to the assemble job:
+    needs: assemble
 
     # Grant GITHUB_TOKEN the permissions required to make a Pages deployment:
     permissions:

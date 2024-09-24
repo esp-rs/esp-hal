@@ -23,6 +23,8 @@ use xtask::{
 #[derive(Debug, Parser)]
 enum Cli {
     /// Build documentation for the specified chip.
+    BuildDocumentationIndex(BuildDocumentationArgs),
+    /// Build documentation for the specified chip.
     BuildDocumentation(BuildDocumentationArgs),
     /// Build all examples for the specified chip.
     BuildExamples(ExampleArgs),
@@ -163,6 +165,7 @@ fn main() -> Result<()> {
 
     match Cli::parse() {
         Cli::BuildDocumentation(args) => build_documentation(&workspace, args),
+        Cli::BuildDocumentationIndex(args) => build_documentation_index(&workspace, args),
         Cli::BuildExamples(args) => examples(&workspace, args, CargoAction::Build),
         Cli::BuildPackage(args) => build_package(&workspace, args),
         Cli::BuildTests(args) => tests(&workspace, args, CargoAction::Build),
@@ -360,7 +363,6 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
 
 fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result<()> {
     let output_path = workspace.join("docs");
-    let resources = workspace.join("resources");
 
     fs::create_dir_all(&output_path)
         .with_context(|| format!("Failed to create {}", output_path.display()))?;
@@ -373,6 +375,31 @@ fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result
         );
     }
 
+    generate_index(workspace, &packages)?;
+
+    Ok(())
+}
+
+fn build_documentation_index(workspace: &Path, args: BuildDocumentationArgs) -> Result<()> {
+    let mut packages = HashMap::new();
+    for package in args.packages {
+        packages.insert(
+            package,
+            generate_documentation_meta_for_package(workspace, package, &args.chips)?,
+        );
+    }
+
+    generate_index(workspace, &packages)?;
+
+    Ok(())
+}
+
+fn generate_index(workspace: &Path, packages: &HashMap<Package, Vec<Value>>) -> Result<()> {
+    let output_path = workspace.join("docs");
+    let resources = workspace.join("resources");
+
+    fs::create_dir_all(&output_path)
+        .with_context(|| format!("Failed to create {}", output_path.display()))?;
     // Copy any additional assets to the documentation's output path:
     fs::copy(resources.join("esp-rs.svg"), output_path.join("esp-rs.svg"))
         .context("Failed to copy esp-rs.svg")?;
@@ -400,8 +427,6 @@ fn build_documentation_for_package(
     let output_path = workspace.join("docs");
 
     let version = xtask::package_version(workspace, package)?;
-
-    let mut metadata = Vec::new();
 
     for chip in chips {
         // Ensure that the package/chip combination provided are valid:
@@ -436,6 +461,25 @@ fn build_documentation_for_package(
                 output_path.display()
             )
         })?;
+    }
+
+    Ok(generate_documentation_meta_for_package(
+        workspace, package, chips,
+    )?)
+}
+
+fn generate_documentation_meta_for_package(
+    workspace: &Path,
+    package: Package,
+    chips: &[Chip],
+) -> Result<Vec<Value>> {
+    let version = xtask::package_version(workspace, package)?;
+
+    let mut metadata = Vec::new();
+
+    for chip in chips {
+        // Ensure that the package/chip combination provided are valid:
+        validate_package_chip(&package, chip)?;
 
         // Build the context object required for rendering this particular build's
         // information on the documentation index:
