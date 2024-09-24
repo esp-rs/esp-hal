@@ -546,4 +546,28 @@ mod tests {
             panic!("Failed to transmit after cancel");
         }
     }
+
+    #[test]
+    #[timeout(3)]
+    async fn cancelling_an_awaited_transfer_does_nothing(ctx: Context) {
+        // Set up a large buffer that would trigger a timeout
+        let dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
+        let dma_tx_buf = DmaTxBuf::new(ctx.tx_descriptors, ctx.tx_buffer).unwrap();
+
+        let spi = ctx
+            .spi
+            .with_dma(ctx.dma_channel.configure_for_async(false, DmaPriority::Priority0));
+
+        let mut transfer = spi
+            .dma_transfer(dma_rx_buf, dma_tx_buf)
+            .map_err(|e| e.0)
+            .unwrap();
+
+        transfer.wait_for_done().await;
+        transfer.cancel();
+
+        transfer.wait_for_done().await;
+        transfer.cancel();
+        _ = transfer.wait();
+    }
 }

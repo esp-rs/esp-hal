@@ -991,6 +991,91 @@ mod dma {
         fn channel(&self) -> &Channel<'d, Self::CH, Self::M>;
         fn channel_mut(&mut self) -> &mut Channel<'d, Self::CH, Self::M>;
 
+        fn is_rx_in_progress(&self) -> bool;
+        fn is_tx_in_progress(&self) -> bool;
+        fn set_rx_in_progress(&mut self, in_progress: bool);
+        fn set_tx_in_progress(&mut self, in_progress: bool);
+
+        fn is_done(&self) -> bool;
+
+        fn wait_for_idle(&self) {
+            while !self.is_done() {
+                // Wait for the SPI to become idle
+            }
+            fence(Ordering::Acquire);
+        }
+
+        async fn wait_for_idle_async(&mut self) {
+            // As a future enhancement, setup Spi Future in here as well.
+
+            /// An optional future.
+            enum OptionalFuture<T: Future> {
+                Future(T),
+                Value(T::Output),
+            }
+
+            impl<T: Future> OptionalFuture<T> {
+                fn some(future: T) -> Self {
+                    Self::Future(future)
+                }
+
+                fn none(value: T::Output) -> Self {
+                    Self::Value(value)
+                }
+            }
+
+            use core::{
+                future::Future,
+                pin::{pin, Pin},
+                task::{Context, Poll},
+            };
+            impl<T> Future for OptionalFuture<T>
+            where
+                T: Future + Unpin,
+                T::Output: Copy + Unpin,
+            {
+                type Output = T::Output;
+
+                fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                    match self.get_mut() {
+                        Self::Future(future) => pin!(future).poll(cx),
+                        Self::Value(value) => Poll::Ready(*value),
+                    }
+                }
+            }
+
+            let is_rx = self.is_rx_in_progress();
+            let is_tx = self.is_tx_in_progress();
+            let channels = self.channel_mut();
+
+            let rx_future = if is_rx {
+                OptionalFuture::some(DmaRxFuture::new(&mut channels.rx))
+            } else {
+                OptionalFuture::none(Ok(()))
+            };
+            let tx_future = if is_tx {
+                OptionalFuture::some(DmaTxFuture::new(&mut channels.tx))
+            } else {
+                OptionalFuture::none(Ok(()))
+            };
+
+            _ = embassy_futures::join::join(rx_future, tx_future).await;
+
+            self.set_rx_in_progress(false);
+            self.set_tx_in_progress(false);
+
+            core::future::poll_fn(|cx| {
+                use core::task::Poll;
+                if self.is_done() {
+                    Poll::Ready(())
+                } else {
+                    cx.waker().wake_by_ref();
+                    Poll::Pending
+                }
+            })
+            .await;
+        }
+
         fn start_write_bytes_dma<TX: DmaTxBuffer>(
             &mut self,
             buffer: &mut TX,
@@ -1169,51 +1254,43 @@ mod dma {
         type DM = T::DM;
         type M = T::M;
 
-        fn spi(&self) -> &Self::T {
-            (**self).spi()
-        }
-        fn spi_mut(&mut self) -> &mut Self::T {
-            (**self).spi_mut()
-        }
-        fn channel(&self) -> &Channel<'d, Self::CH, Self::M> {
-            (**self).channel()
-        }
-        fn channel_mut(&mut self) -> &mut Channel<'d, Self::CH, Self::M> {
-            (**self).channel_mut()
-        }
+        delegate::delegate! {
+            to (**self) {
+                fn spi(&self) -> &Self::T;
+                fn spi_mut(&mut self) -> &mut Self::T;
+                fn channel(&self) -> &Channel<'d, Self::CH, Self::M>;
+                fn channel_mut(&mut self) -> &mut Channel<'d, Self::CH, Self::M>;
 
-        fn start_write_bytes_dma<TX: DmaTxBuffer>(
-            &mut self,
-            buffer: &mut TX,
-            full_duplex: bool,
-        ) -> Result<(), Error> {
-            (**self).start_write_bytes_dma(buffer, full_duplex)
-        }
+                fn is_rx_in_progress(&self) -> bool;
+                fn is_tx_in_progress(&self) -> bool;
+                fn set_rx_in_progress(&mut self, in_progress: bool);
+                fn set_tx_in_progress(&mut self, in_progress: bool);
 
-        fn start_read_bytes_dma<RX: DmaRxBuffer>(
-            &mut self,
-            buffer: &mut RX,
-            full_duplex: bool,
-        ) -> Result<(), Error> {
-            (**self).start_read_bytes_dma(buffer, full_duplex)
-        }
+                fn is_done(&self) -> bool;
 
-        fn start_transfer_dma<RX: DmaRxBuffer, TX: DmaTxBuffer>(
-            &mut self,
-            rx_buffer: &mut RX,
-            tx_buffer: &mut TX,
-        ) -> Result<(), Error> {
-            (**self).start_transfer_dma(rx_buffer, tx_buffer)
-        }
-
-        #[cfg(all(esp32, spi_address_workaround))]
-        fn set_up_address_workaround(
-            &mut self,
-            cmd: Command,
-            address: Address,
-            dummy: u8,
-        ) -> Result<(), Error> {
-            (**self).set_up_address_workaround(cmd, address, dummy)
+                fn start_write_bytes_dma<TX: DmaTxBuffer>(
+                    &mut self,
+                    buffer: &mut TX,
+                    full_duplex: bool,
+                ) -> Result<(), Error>;
+                fn start_read_bytes_dma<RX: DmaRxBuffer>(
+                    &mut self,
+                    buffer: &mut RX,
+                    full_duplex: bool,
+                ) -> Result<(), Error>;
+                fn start_transfer_dma<RX: DmaRxBuffer, TX: DmaTxBuffer>(
+                    &mut self,
+                    rx_buffer: &mut RX,
+                    tx_buffer: &mut TX,
+                ) -> Result<(), Error>;
+                #[cfg(all(esp32, spi_address_workaround))]
+                fn set_up_address_workaround(
+                    &mut self,
+                    cmd: Command,
+                    address: Address,
+                    dummy: u8,
+                ) -> Result<(), Error>;
+            }
         }
     }
 
@@ -1241,6 +1318,44 @@ mod dma {
         }
         fn channel_mut(&mut self) -> &mut Channel<'d, C, M> {
             &mut self.channel
+        }
+
+        fn is_rx_in_progress(&self) -> bool {
+            self.rx_transfer_in_progress
+        }
+
+        fn is_tx_in_progress(&self) -> bool {
+            self.tx_transfer_in_progress
+        }
+
+        fn set_rx_in_progress(&mut self, in_progress: bool) {
+            self.rx_transfer_in_progress = in_progress;
+        }
+
+        fn set_tx_in_progress(&mut self, in_progress: bool) {
+            self.tx_transfer_in_progress = in_progress;
+        }
+
+        fn is_done(&self) -> bool {
+            if self.tx_transfer_in_progress && !self.channel().tx.is_done() {
+                return false;
+            }
+            if self.spi().busy() {
+                return false;
+            }
+            if self.rx_transfer_in_progress {
+                // If this is an asymmetric transfer and the RX side is smaller, the RX channel
+                // will never be "done" as it won't have enough descriptors/buffer to receive
+                // the EOF bit from the SPI. So instead the RX channel will hit
+                // a "descriptor empty" which means the DMA is written as much
+                // of the received data as possible into the buffer and
+                // discarded the rest. The user doesn't care about this discarded data.
+
+                if !self.channel().rx.is_done() && !self.channel().rx.has_dscr_empty_error() {
+                    return false;
+                }
+            }
+            true
         }
 
         fn start_write_bytes_dma<TX: DmaTxBuffer>(
@@ -1330,6 +1445,8 @@ mod dma {
     {
         pub(crate) spi: PeripheralRef<'d, T>,
         pub(crate) channel: Channel<'d, C, M>,
+        tx_transfer_in_progress: bool,
+        rx_transfer_in_progress: bool,
         #[cfg(all(esp32, spi_address_workaround))]
         address_buffer: DmaTxBuf,
         _mode: PhantomData<D>,
@@ -1383,6 +1500,8 @@ mod dma {
                     Self {
                         spi,
                         channel,
+                        tx_transfer_in_progress: false,
+                        rx_transfer_in_progress: false,
                         address_buffer: unwrap!(DmaTxBuf::new(
                             unsafe { &mut DESCRIPTORS[id] },
                             crate::as_mut_byte_array!(BUFFERS[id], 4)
@@ -1393,6 +1512,8 @@ mod dma {
                     Self {
                         spi,
                         channel,
+                        tx_transfer_in_progress: false,
+                        rx_transfer_in_progress: false,
                         _mode: PhantomData,
                     }
                 }
@@ -1434,14 +1555,6 @@ mod dma {
             self.wait_for_idle();
             self.spi.clear_interrupts(interrupts);
         }
-
-        fn wait_for_idle(&self) {
-            // TODO: don't ignore DMA status. We can move the transfer's logic here.
-            while self.spi.busy() {
-                // Wait for the SPI to become idle
-            }
-            fence(Ordering::Acquire);
-        }
     }
 
     impl<'d, T, C, D, M> crate::private::Sealed for SpiDma<'d, T, C, D, M>
@@ -1480,16 +1593,7 @@ mod dma {
         pub fn change_bus_frequency(&mut self, frequency: HertzU32) {
             self.spi.ch_bus_freq(frequency);
         }
-    }
 
-    impl<'d, T, C, D, M> SpiDma<'d, T, C, D, M>
-    where
-        T: InstanceDma,
-        C: DmaChannel,
-        C::P: SpiPeripheral,
-        D: DuplexMode,
-        M: Mode,
-    {
         /// Configures the DMA buffers for the SPI instance.
         ///
         /// This method sets up both RX and TX buffers for DMA transfers.
@@ -1514,11 +1618,6 @@ mod dma {
     {
         spi_dma: ManuallyDrop<R>,
         dma_buf: ManuallyDrop<Buf>,
-        is_rx: bool,
-        is_tx: bool,
-
-        rx_future_awaited: bool,
-        tx_future_awaited: bool,
 
         _marker: PhantomData<&'d ()>,
     }
@@ -1527,51 +1626,14 @@ mod dma {
     where
         R: SpiBusRef<'d>,
     {
-        fn new(spi_dma: R, dma_buf: Buf, is_rx: bool, is_tx: bool) -> Self {
+        fn new(mut spi_dma: R, dma_buf: Buf, is_rx: bool, is_tx: bool) -> Self {
+            spi_dma.set_rx_in_progress(is_rx);
+            spi_dma.set_tx_in_progress(is_tx);
             Self {
                 spi_dma: ManuallyDrop::new(spi_dma),
                 dma_buf: ManuallyDrop::new(dma_buf),
-                is_rx,
-                is_tx,
-                rx_future_awaited: false,
-                tx_future_awaited: false,
                 _marker: PhantomData,
             }
-        }
-
-        /// Checks if the DMA transfer is complete.
-        ///
-        /// This method returns `true` if both RX and TX operations are done,
-        /// and the SPI instance is no longer busy.
-        pub fn is_done(&self) -> bool {
-            if self.is_tx && !self.tx_future_awaited && !self.spi_dma.channel().tx.is_done() {
-                return false;
-            }
-            if self.spi_dma.spi().busy() {
-                return false;
-            }
-            if self.is_rx && !self.rx_future_awaited {
-                // If this is an asymmetric transfer and the RX side is smaller, the RX channel
-                // will never be "done" as it won't have enough descriptors/buffer to receive
-                // the EOF bit from the SPI. So instead the RX channel will hit
-                // a "descriptor empty" which means the DMA is written as much
-                // of the received data as possible into the buffer and
-                // discarded the rest. The user doesn't care about this discarded data.
-
-                if !self.spi_dma.channel().rx.is_done()
-                    && !self.spi_dma.channel().rx.has_dscr_empty_error()
-                {
-                    return false;
-                }
-            }
-            true
-        }
-
-        fn do_wait(&self) {
-            while !self.is_done() {
-                // Wait for the transfer to complete
-            }
-            fence(Ordering::Acquire);
         }
 
         fn do_cancel(&mut self) {
@@ -1585,13 +1647,13 @@ mod dma {
             };
             self.spi_dma.spi_mut().update();
 
-            if self.is_tx {
+            if self.spi_dma.is_tx_in_progress() {
                 self.spi_dma.channel_mut().tx.stop_transfer();
-                self.is_tx = false;
+                self.spi_dma.set_tx_in_progress(false);
             }
-            if self.is_rx {
+            if self.spi_dma.is_rx_in_progress() {
                 self.spi_dma.channel_mut().rx.stop_transfer();
-                self.is_rx = false;
+                self.spi_dma.set_rx_in_progress(false);
             }
         }
 
@@ -1600,7 +1662,7 @@ mod dma {
         /// This method blocks until the transfer is finished and returns the
         /// `SpiDma` instance and the associated buffer.
         pub fn wait(mut self) -> (R, Buf) {
-            self.do_wait();
+            self.spi_dma.wait_for_idle();
             unsafe {
                 (
                     ManuallyDrop::take(&mut self.spi_dma),
@@ -1611,7 +1673,7 @@ mod dma {
 
         /// Cancels the DMA transfer.
         pub fn cancel(&mut self) {
-            if !self.is_done() {
+            if !self.spi_dma.is_done() {
                 self.do_cancel();
             }
         }
@@ -1622,9 +1684,9 @@ mod dma {
         R: SpiBusRef<'d>,
     {
         fn drop(&mut self) {
-            if !self.is_done() {
+            if !self.spi_dma.is_done() {
                 self.do_cancel();
-                self.do_wait();
+                self.spi_dma.wait_for_idle()
             }
         }
     }
@@ -1637,28 +1699,7 @@ mod dma {
         ///
         /// This method awaits the completion of both RX and TX operations.
         pub async fn wait_for_done(&mut self) {
-            if self.is_tx && !self.tx_future_awaited {
-                let _ = DmaTxFuture::new(&mut self.spi_dma.channel_mut().tx).await;
-                self.tx_future_awaited = true;
-            }
-
-            // As a future enhancement, setup Spi Future in here as well.
-
-            if self.is_rx && !self.rx_future_awaited {
-                let _ = DmaRxFuture::new(&mut self.spi_dma.channel_mut().rx).await;
-                self.rx_future_awaited = true;
-            }
-
-            core::future::poll_fn(|cx| {
-                use core::task::Poll;
-                if self.is_done() {
-                    Poll::Ready(())
-                } else {
-                    cx.waker().wake_by_ref();
-                    Poll::Pending
-                }
-            })
-            .await;
+            self.spi_dma.wait_for_idle_async().await;
         }
     }
 
@@ -2068,22 +2109,9 @@ mod dma {
             C: DmaChannel,
             C::P: SpiPeripheral,
         {
-            async fn wait_for_idle_async(&mut self) {
-                core::future::poll_fn(|cx| {
-                    use core::task::Poll;
-                    if !self.spi_dma.spi().busy() {
-                        Poll::Ready(())
-                    } else {
-                        cx.waker().wake_by_ref();
-                        Poll::Pending
-                    }
-                })
-                .await;
-            }
-
             /// Fill the given buffer with data from the bus.
             pub async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-                self.wait_for_idle_async().await;
+                self.spi_dma.wait_for_idle_async().await;
                 let chunk_size = self.rx_buf.capacity();
 
                 for chunk in words.chunks_mut(chunk_size) {
@@ -2104,7 +2132,7 @@ mod dma {
 
             /// Transmit the given buffer to the bus.
             pub async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
-                self.wait_for_idle_async().await;
+                self.spi_dma.wait_for_idle_async().await;
                 let chunk_size = self.tx_buf.capacity();
 
                 for chunk in words.chunks(chunk_size) {
@@ -2127,7 +2155,7 @@ mod dma {
                 read: &mut [u8],
                 write: &[u8],
             ) -> Result<(), Error> {
-                self.wait_for_idle_async().await;
+                self.spi_dma.wait_for_idle_async().await;
                 let chunk_size = min(self.tx_buf.capacity(), self.rx_buf.capacity());
 
                 let common_length = min(read.len(), write.len());
@@ -2164,7 +2192,7 @@ mod dma {
             /// Transfer by writing out a buffer and reading the response from
             /// the bus into the same buffer.
             pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-                self.wait_for_idle_async().await;
+                self.spi_dma.wait_for_idle_async().await;
                 for chunk in words.chunks_mut(self.tx_buf.capacity()) {
                     self.tx_buf.fill(chunk);
                     self.rx_buf.set_length(chunk.len());
