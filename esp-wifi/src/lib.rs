@@ -391,7 +391,7 @@ impl EspWifiTimerSource for TimeBase {
 /// .unwrap();
 /// # }
 /// ```
-pub fn init<'d>(
+pub fn init(
     init_for: EspWifiInitFor,
     timer: impl EspWifiTimerSource,
     rng: hal::rng::Rng,
@@ -455,6 +455,9 @@ pub fn deinit(
     unsafe { deinit_unsafe() }
 }
 
+///
+/// # Safety TODO
+///
 pub unsafe fn deinit_unsafe() -> Result<(TimeBase, hal::peripherals::RADIO_CLK), InitializationError>
 {
     // Disable coexistence
@@ -485,10 +488,10 @@ pub unsafe fn deinit_unsafe() -> Result<(TimeBase, hal::peripherals::RADIO_CLK),
     deinit_tasks();
 
     let timer = critical_section::with(|cs| crate::timer::TIMER.borrow_ref_mut(cs).take())
-        .ok_or_else(|| InitializationError::TimerUnavailable)?;
+        .ok_or(InitializationError::TimerUnavailable)?;
 
     let radio_clocks =
-        deinit_radio_clock_control().ok_or_else(|| InitializationError::RadioClockUnavailable)?;
+        deinit_radio_clock_control().ok_or(InitializationError::RadioClockUnavailable)?;
 
     Ok((timer, radio_clocks))
 }
