@@ -300,11 +300,7 @@ impl DmaDescriptor {
         self.set_owner(Owner::Dma);
 
         // The `suc_eof` bit doesn't affect the transfer itself, but signals when the
-        // hardware should trigger an interrupt request. In circular mode,
-        // we set the `suc_eof` bit for every buffer we send. We use this for
-        // I2S to track progress of a transfer by checking OUTLINK_DSCR_ADDR.
-        // In non-circular mode, we only set it for the last descriptor to signal the
-        // end of the transfer.
+        // hardware should trigger an interrupt request.
         self.set_suc_eof(set_eof);
     }
 
@@ -972,6 +968,10 @@ impl DescriptorChain {
         len: usize,
     ) -> Result<(), DmaError> {
         self.fill(is_circular, data.cast_mut(), len, |desc, chunk_size| {
+            // In circular mode, we set the `suc_eof` bit for every buffer we send. We use
+            // this for I2S to track progress of a transfer by checking OUTLINK_DSCR_ADDR.
+            // In non-circular mode, we only set `suc_eof` for the last descriptor to signal
+            // the end of the transfer.
             desc.reset_for_tx(desc.next.is_null() || is_circular);
             desc.set_length(chunk_size); // align to 32 bits?
         })
@@ -2351,6 +2351,8 @@ impl DmaTxBuf {
 unsafe impl DmaTxBuffer for DmaTxBuf {
     fn prepare(&mut self) -> Preparation {
         for desc in self.descriptors.linked_iter_mut() {
+            // In non-circular mode, we only set `suc_eof` for the last descriptor to signal
+            // the end of the transfer.
             desc.reset_for_tx(desc.next.is_null());
         }
 
@@ -2646,6 +2648,8 @@ impl DmaRxTxBuf {
 unsafe impl DmaTxBuffer for DmaRxTxBuf {
     fn prepare(&mut self) -> Preparation {
         for desc in self.tx_descriptors.linked_iter_mut() {
+            // In non-circular mode, we only set `suc_eof` for the last descriptor to signal
+            // the end of the transfer.
             desc.reset_for_tx(desc.next.is_null());
         }
 
