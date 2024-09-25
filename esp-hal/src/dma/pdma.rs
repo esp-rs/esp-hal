@@ -79,6 +79,11 @@ macro_rules! ImplSpiChannel {
                     spi.dma_out_link().modify(|_, w| w.outlink_start().set_bit());
                 }
 
+                fn stop_out() {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_out_link().modify(|_, w| w.outlink_stop().set_bit());
+                }
+
                 fn last_out_dscr_address() -> usize {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
                     spi.out_eof_des_addr().read().dma_out_eof_des_addr().bits() as usize
@@ -121,6 +126,11 @@ macro_rules! ImplSpiChannel {
                 fn start_in() {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
                     spi.dma_in_link().modify(|_, w| w.inlink_start().set_bit());
+                }
+
+                fn stop_in() {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_in_link().modify(|_, w| w.inlink_stop().set_bit());
                 }
 
                 fn listen_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
@@ -462,6 +472,11 @@ macro_rules! ImplI2sChannel {
                     reg_block.out_link().modify(|_, w| w.outlink_start().set_bit());
                 }
 
+                fn stop_out() {
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.out_link().modify(|_, w| w.outlink_stop().set_bit());
+                }
+
                 fn last_out_dscr_address() -> usize {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
                     reg_block.out_eof_des_addr().read().out_eof_des_addr().bits() as usize
@@ -508,6 +523,11 @@ macro_rules! ImplI2sChannel {
                 fn start_in() {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
                     reg_block.in_link().modify(|_, w| w.inlink_start().set_bit());
+                }
+
+                fn stop_in() {
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.in_link().modify(|_, w| w.inlink_stop().set_bit());
                 }
 
                 fn listen_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
