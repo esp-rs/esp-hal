@@ -689,7 +689,13 @@ macro_rules! dma_descriptor_count {
             ::core::assert!($chunk_size <= 4095, "chunk size must be <= 4095");
             ::core::assert!($chunk_size > 0, "chunk size must be > 0");
         }
-        $crate::dma::DescriptorSet::descriptor_count($size, $chunk_size, $is_circular)
+
+        // We allow 0 in the macros as a "not needed" case.
+        if $size == 0 {
+            0
+        } else {
+            $crate::dma::DescriptorSet::descriptor_count($size, $chunk_size, $is_circular)
+        }
     }};
 }
 
