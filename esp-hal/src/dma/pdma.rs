@@ -29,17 +29,15 @@ macro_rules! ImplSpiChannel {
                 type Rx = [<Spi $num DmaChannelRxImpl>];
                 type Tx = [<Spi $num DmaChannelTxImpl>];
                 type P = [<Spi $num DmaSuitablePeripheral>];
-            }
 
-            impl $crate::private::Sealed for [<Spi $num DmaChannel>] {}
-
-            impl ChannelTypes for [<Spi $num DmaChannel>] {
                 fn set_isr(handler: $crate::interrupt::InterruptHandler) {
                     let mut spi = unsafe { $crate::peripherals::[< SPI $num >]::steal() };
                     spi.[< bind_spi $num _dma_interrupt>](handler.handler());
                     $crate::interrupt::enable($crate::peripherals::Interrupt::[< SPI $num _DMA >], handler.priority()).unwrap();
                 }
             }
+
+            impl $crate::private::Sealed for [<Spi $num DmaChannel>] {}
 
             impl RegisterAccess for [<Spi $num DmaChannel>] {
                 fn set_out_burstmode(burst_mode: bool) {
@@ -395,7 +393,7 @@ macro_rules! ImplSpiChannel {
                 ) -> Channel<'a, [<Spi $num DmaChannel>], $crate::Async> {
                     let this = Self::do_configure(self, burst_mode, priority);
 
-                    <[<Spi $num DmaChannel>] as ChannelTypes>::set_isr(super::asynch::interrupt::[< interrupt_handler_spi $num _dma >]);
+                    [<Spi $num DmaChannel>]::set_isr(super::asynch::interrupt::[< interrupt_handler_spi $num _dma >]);
 
                     this
                 }
@@ -417,9 +415,7 @@ macro_rules! ImplI2sChannel {
                 type Rx = [<I2s $num DmaChannelRxImpl>];
                 type Tx = [<I2s $num DmaChannelTxImpl>];
                 type P = [<I2s $num DmaSuitablePeripheral>];
-            }
 
-            impl ChannelTypes for [<I2s $num DmaChannel>] {
                 fn set_isr(handler:  $crate::interrupt::InterruptHandler) {
                     let mut i2s = unsafe { $crate::peripherals::[< I2S $num >]::steal() };
                     i2s.[< bind_i2s $num _interrupt>](handler.handler());
@@ -777,7 +773,7 @@ macro_rules! ImplI2sChannel {
                 ) -> Channel<'a, [<I2s $num DmaChannel>], $crate::Async> {
                     let this = Self::do_configure(self, burst_mode, priority);
 
-                    <[<I2s $num DmaChannel>] as ChannelTypes>::set_isr(super::asynch::interrupt::[< interrupt_handler_i2s $num >]);
+                    [<I2s $num DmaChannel>]::set_isr(super::asynch::interrupt::[< interrupt_handler_i2s $num >]);
 
                     this
                 }

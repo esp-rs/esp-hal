@@ -2,7 +2,7 @@ use portable_atomic::{AtomicU8, Ordering};
 
 pub use self::implementation::*;
 #[cfg(psram)]
-use crate::lock::Locked;
+use crate::sync::Locked;
 
 #[cfg_attr(esp32, path = "esp32/mod.rs")]
 #[cfg_attr(esp32c2, path = "esp32c2/mod.rs")]
@@ -103,6 +103,13 @@ pub(crate) fn is_valid_psram_address(address: u32) -> bool {
     }
     #[cfg(not(psram))]
     false
+}
+
+#[allow(unused)]
+pub(crate) fn is_slice_in_psram<T>(slice: &[T]) -> bool {
+    let start = slice.as_ptr() as u32;
+    let end = start + slice.len() as u32;
+    is_valid_psram_address(start) && is_valid_psram_address(end)
 }
 
 #[allow(unused)]

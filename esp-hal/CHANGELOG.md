@@ -55,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Allow handling interrupts while trying to lock critical section on multi-core chips. (#2197)
 - Removed the PS-RAM related features, replaced by `quad-psram`/`octal-psram`, `init_psram` takes a configuration parameter, it's now possible to auto-detect PS-RAM size (#2178)
 - `EspTwaiFrame` constructors now accept any type that converts into `esp_hal::twai::Id` (#2207)
+- Change `DmaTxBuf` to support PSRAM on `esp32s3` (#2161)
 
 ### Fixed
 

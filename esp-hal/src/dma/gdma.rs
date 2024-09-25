@@ -464,16 +464,6 @@ impl<const N: u8> LcdCamPeripheral for SuitablePeripheral<N> {}
 macro_rules! impl_channel {
     ($num: literal, $async_handler: path, $($interrupt: ident),* ) => {
         paste::paste! {
-            impl ChannelTypes for Channel<$num> {
-                fn set_isr(handler: $crate::interrupt::InterruptHandler) {
-                    let mut dma = unsafe { crate::peripherals::DMA::steal() };
-                    $(
-                        dma.[< bind_ $interrupt:lower _interrupt >](handler.handler());
-                        $crate::interrupt::enable($crate::peripherals::Interrupt::$interrupt, handler.priority()).unwrap();
-                    )*
-                }
-            }
-
             /// A description of a GDMA channel
             #[non_exhaustive]
             pub struct [<DmaChannel $num>] {}
@@ -485,6 +475,14 @@ macro_rules! impl_channel {
                 type Rx = ChannelRxImpl<$num>;
                 type Tx = ChannelTxImpl<$num>;
                 type P = SuitablePeripheral<$num>;
+
+                fn set_isr(handler: $crate::interrupt::InterruptHandler) {
+                    let mut dma = unsafe { crate::peripherals::DMA::steal() };
+                    $(
+                        dma.[< bind_ $interrupt:lower _interrupt >](handler.handler());
+                        $crate::interrupt::enable($crate::peripherals::Interrupt::$interrupt, handler.priority()).unwrap();
+                    )*
+                }
             }
 
             impl ChannelCreator<$num> {
@@ -529,7 +527,7 @@ macro_rules! impl_channel {
                 ) -> crate::dma::Channel<'a, [<DmaChannel $num>], $crate::Async> {
                     let this = self.do_configure(burst_mode, priority);
 
-                    <Channel<$num> as ChannelTypes>::set_isr($async_handler);
+                    [<DmaChannel $num>]::set_isr($async_handler);
 
                     this
                 }
@@ -627,8 +625,8 @@ mod m2m {
         DmaPeripheral,
         DmaTransferRx,
         ReadBuffer,
-        RxPrivate,
-        TxPrivate,
+        Rx,
+        Tx,
         WriteBuffer,
     };
 

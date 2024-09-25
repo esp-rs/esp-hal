@@ -78,7 +78,7 @@ use crate::{
         DmaTransferRx,
         DmaTransferRxCircular,
         LcdCamPeripheral,
-        RxPrivate,
+        Rx,
         WriteBuffer,
     },
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal, Pull},

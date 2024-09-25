@@ -237,7 +237,9 @@ pub mod uart;
 pub mod usb_serial_jtag;
 
 pub mod debugger;
-mod lock;
+
+#[doc(hidden)]
+pub mod sync;
 
 /// State of the CPU saved when entering exception or interrupt
 pub mod trapframe {
