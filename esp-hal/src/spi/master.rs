@@ -801,9 +801,20 @@ where
             return Err(Error::Unsupported);
         }
 
-        self.spi
-            .init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
-        self.spi.read_bytes_half_duplex(cmd, address, dummy, buffer)
+        self.spi.setup_half_duplex(
+            false,
+            cmd,
+            address,
+            false,
+            dummy,
+            buffer.is_empty(),
+            data_mode,
+        );
+
+        self.spi.configure_datalen(buffer.len(), 0);
+        self.spi.start_operation();
+        self.spi.flush()?;
+        self.spi.read_bytes_from_fifo(buffer)
     }
 
     fn write(
@@ -818,10 +829,24 @@ where
             return Err(Error::FifoSizeExeeded);
         }
 
-        self.spi
-            .init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
-        self.spi
-            .write_bytes_half_duplex(cmd, address, dummy, buffer)
+        self.spi.setup_half_duplex(
+            true,
+            cmd,
+            address,
+            false,
+            dummy,
+            buffer.is_empty(),
+            data_mode,
+        );
+
+        if !buffer.is_empty() {
+            // re-using the full-duplex write here
+            self.spi.write_bytes(buffer)?;
+        } else {
+            self.spi.start_operation();
+        }
+
+        self.spi.flush()
     }
 }
 
@@ -1312,20 +1337,15 @@ mod dma {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
 
-            self.spi.init_half_duplex(
+            self.spi.setup_half_duplex(
                 false,
-                !cmd.is_none(),
-                !address.is_none(),
+                cmd,
+                address,
                 false,
-                dummy != 0,
+                dummy,
                 bytes_to_read == 0,
+                data_mode,
             );
-            self.spi
-                .init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
-
-            // set cmd, address, dummy cycles
-            let reg_block = self.spi.register_block();
-            set_up_common_phases(reg_block, cmd, address, dummy);
 
             let result = unsafe {
                 self.spi
@@ -1354,20 +1374,15 @@ mod dma {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
 
-            self.spi.init_half_duplex(
+            self.spi.setup_half_duplex(
                 true,
-                !cmd.is_none(),
-                !address.is_none(),
+                cmd,
+                address,
                 false,
-                dummy != 0,
+                dummy,
                 bytes_to_write == 0,
+                data_mode,
             );
-            self.spi
-                .init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
-
-            // set cmd, address, dummy cycles
-            let reg_block = self.spi.register_block();
-            set_up_common_phases(reg_block, cmd, address, dummy);
 
             let result = unsafe {
                 self.spi
@@ -2887,15 +2902,19 @@ pub trait Instance: private::Sealed {
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
     }
 
-    fn init_half_duplex(
+    #[allow(clippy::too_many_arguments)]
+    fn setup_half_duplex(
         &mut self,
         is_write: bool,
-        command_state: bool,
-        address_state: bool,
+        cmd: Command,
+        address: Address,
         dummy_idle: bool,
-        dummy_state: bool,
+        dummy: u8,
         no_mosi_miso: bool,
+        data_mode: SpiDataMode,
     ) {
+        self.init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
+
         let reg_block = self.register_block();
         reg_block.user().modify(|_, w| {
             w.usr_miso_highpart().clear_bit();
@@ -2905,9 +2924,9 @@ pub trait Instance: private::Sealed {
             w.usr_mosi().bit(is_write && !no_mosi_miso);
             w.cs_hold().set_bit();
             w.usr_dummy_idle().bit(dummy_idle);
-            w.usr_dummy().bit(dummy_state);
-            w.usr_addr().bit(address_state);
-            w.usr_command().bit(command_state)
+            w.usr_dummy().bit(dummy != 0);
+            w.usr_addr().bit(!address.is_none());
+            w.usr_command().bit(!cmd.is_none())
         });
 
         #[cfg(gdma)]
@@ -2932,62 +2951,9 @@ pub trait Instance: private::Sealed {
         reg_block.slave().write(|w| unsafe { w.bits(0) });
 
         self.update();
-    }
-
-    fn write_bytes_half_duplex(
-        &mut self,
-        cmd: Command,
-        address: Address,
-        dummy: u8,
-        buffer: &[u8],
-    ) -> Result<(), Error> {
-        self.init_half_duplex(
-            true,
-            !cmd.is_none(),
-            !address.is_none(),
-            false,
-            dummy != 0,
-            buffer.is_empty(),
-        );
 
         // set cmd, address, dummy cycles
-        let reg_block = self.register_block();
         set_up_common_phases(reg_block, cmd, address, dummy);
-
-        if !buffer.is_empty() {
-            // re-using the full-duplex write here
-            self.write_bytes(buffer)?;
-        } else {
-            self.start_operation();
-        }
-
-        self.flush()
-    }
-
-    fn read_bytes_half_duplex(
-        &mut self,
-        cmd: Command,
-        address: Address,
-        dummy: u8,
-        buffer: &mut [u8],
-    ) -> Result<(), Error> {
-        self.init_half_duplex(
-            false,
-            !cmd.is_none(),
-            !address.is_none(),
-            false,
-            dummy != 0,
-            buffer.is_empty(),
-        );
-
-        // set cmd, address, dummy cycles
-        let reg_block = self.register_block();
-        set_up_common_phases(reg_block, cmd, address, dummy);
-
-        self.configure_datalen(buffer.len(), 0);
-        self.start_operation();
-        self.flush()?;
-        self.read_bytes_from_fifo(buffer)
     }
 
     fn update(&self) {
