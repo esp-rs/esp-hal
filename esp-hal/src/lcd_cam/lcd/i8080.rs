@@ -65,15 +65,7 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    dma::{
-        ChannelTx,
-        DmaChannel,
-        DmaError,
-        DmaPeripheral,
-        DmaTxBuffer,
-        LcdCamPeripheral,
-        Tx,
-    },
+    dma::{ChannelTx, DmaChannel, DmaError, DmaPeripheral, DmaTxBuffer, LcdCamPeripheral, Tx},
     gpio::{OutputSignal, PeripheralOutput},
     lcd_cam::{
         asynch::LCD_DONE_WAKER,
