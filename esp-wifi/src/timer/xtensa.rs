@@ -55,12 +55,8 @@ pub fn setup_multitasking() {
 }
 
 pub fn disable_multitasking() {
-    let config = unsafe { xtensa_lx::interrupt::enable() };
-    xtensa_lx::interrupt::disable_mask(!config);
     xtensa_lx::interrupt::disable_mask(
-        1 << 29 // Disable Software1
-            | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level2.mask()
-            | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level6.mask(),
+        1 << 29, // Disable Software1
     );
 }
 

@@ -76,7 +76,7 @@ fn main() -> ! {
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
     let (iface, device, mut controller, sockets) =
         create_network_interface(&init, &mut wifi, WifiStaDevice, &mut socket_set_entries).unwrap();
-    let mut wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
+    let wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
 
     let client_config = Configuration::Client(ClientConfiguration {
         ssid: SSID.try_into().unwrap(),

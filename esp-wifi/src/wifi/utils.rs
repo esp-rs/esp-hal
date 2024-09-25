@@ -44,7 +44,7 @@ fn setup_iface<'a, MODE: WifiDeviceMode>(
 /// storage.
 pub fn create_network_interface<'a, 'd, MODE: WifiDeviceMode>(
     inited: &EspWifiInitialization,
-    device: &'d mut (impl crate::hal::peripheral::Peripheral<P = crate::hal::peripherals::WIFI> + 'd),
+    device: impl crate::hal::peripheral::Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
     mode: MODE,
     storage: &'a mut [SocketStorage<'a>],
 ) -> Result<
