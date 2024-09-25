@@ -456,36 +456,25 @@ pub fn init(
 
 /// Deinitializes WiFi and/or BLE
 ///
-/// # Examples
+/// After user calls this function, WiFi and/or BLE (depending on what has been
+/// initialized) are fully stopped and deinitialized. After that, they should
+/// not be used until they have been reinitialized with the `init` function.
 ///
-/// ```rust, no_run
-#[doc = esp_hal::before_snippet!()]
-/// use esp_hal::{rng::Rng, timg::TimerGroup};
-/// use esp_wifi::EspWifiInitFor;
+/// The function also disables the corresponding interrupts, deinitializes
+/// the timer and radio clock, freeing these resources and returning them.
 ///
-/// let timg0 = TimerGroup::new(peripherals.TIMG0);
-/// let init = esp_wifi::init(
-///     EspWifiInitFor::Wifi,
-///     timg0.timer0,
-///     Rng::new(peripherals.RNG),
-///     peripherals.RADIO_CLK,
-/// )
-/// .unwrap();
-/// # }
+/// Calling this while still using WiFi/BLE will cause crashes or undefined
+/// behavior.
 ///
-/// unsafe {
-///     let (timer, radio_clocks) = esp_wifi::deinit_unchecked(init).unwrap();
-/// }
-/// # }
-/// ```
-/// 
 /// # Safety
-/// Actual implementation assumes that the user takes responsibility for how the function is used.
-/// For example, after using this function, user should not use BLE or WiFi stack or controller
-/// instances (it is possible to reinitialize communication using the `init` function),
-/// not to call `deinit_unsafe` before the first initialization, and so on.
-/// Also, there is currently no way to track whether a peripheral has been initialized,
-/// so deinitialization is done based on the activated feature (`wifi`, `ble` and/or `coex`).
+/// Actual implementation assumes that the user takes responsibility for how the
+/// function is used. For example, after using this function, user should not
+/// use BLE or WiFi stack or controller instances (it is possible to
+/// reinitialize communication using the `init` function), not to call
+/// `deinit_unsafe` before the first initialization, and so on. Also, there is
+/// currently no way to track whether a peripheral has been initialized,
+/// so deinitialization is done based on the activated feature (`wifi`, `ble`
+/// and/or `coex`).
 pub unsafe fn deinit_unchecked(
     init: EspWifiInitialization,
 ) -> Result<(TimeBase, hal::peripherals::RADIO_CLK), InitializationError> {
