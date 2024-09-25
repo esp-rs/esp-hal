@@ -129,13 +129,13 @@ fn env_change_work_around() {
         if dotcargo.join("config.toml").exists() {
             println!(
                 "cargo:rerun-if-changed={}",
-                dotcargo.clone().join("config.toml").to_str().unwrap()
+                dotcargo.join("config.toml").to_str().unwrap()
             );
         }
         if dotcargo.join("config").exists() {
             println!(
                 "cargo:rerun-if-changed={}",
-                dotcargo.clone().join("config").to_str().unwrap()
+                dotcargo.join("config").to_str().unwrap()
             );
         }
     }
