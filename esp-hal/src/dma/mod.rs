@@ -292,8 +292,10 @@ impl DmaDescriptor {
         self.set_length(0);
     }
 
-    /// Resets the descriptor for a new transmit transfer.
-    pub fn reset_for_tx(&mut self, is_circular: bool) {
+    /// Resets the descriptor for a new transmit transfer. See
+    /// [DmaDescriptorFlags::suc_eof] for more details on the `set_eof`
+    /// parameter.
+    pub fn reset_for_tx(&mut self, set_eof: bool) {
         // Give ownership to the DMA
         self.set_owner(Owner::Dma);
 
@@ -303,7 +305,7 @@ impl DmaDescriptor {
         // I2S to track progress of a transfer by checking OUTLINK_DSCR_ADDR.
         // In non-circular mode, we only set it for the last descriptor to signal the
         // end of the transfer.
-        self.set_suc_eof(self.next.is_null() || is_circular);
+        self.set_suc_eof(set_eof);
     }
 
     /// Set the size of the buffer. See [DmaDescriptorFlags::size].
@@ -965,12 +967,12 @@ impl DescriptorChain {
     #[allow(clippy::not_unsafe_ptr_arg_deref)]
     pub fn fill_for_tx(
         &mut self,
-        circular: bool,
+        is_circular: bool,
         data: *const u8,
         len: usize,
     ) -> Result<(), DmaError> {
-        self.fill(circular, data.cast_mut(), len, |desc, chunk_size| {
-            desc.reset_for_tx(circular);
+        self.fill(is_circular, data.cast_mut(), len, |desc, chunk_size| {
+            desc.reset_for_tx(desc.next.is_null() || is_circular);
             desc.set_length(chunk_size); // align to 32 bits?
         })
     }
@@ -1164,8 +1166,6 @@ impl<'a> DescriptorSet<'a> {
     /// See `prepare_descriptors_impl` for more details.
     fn prepare_rx_descriptors(&mut self, len: usize) -> Result<(), DmaBufError> {
         self.prepare_descriptors(len, |desc, chunk_size| {
-            // Calling this before prepare() isn't strictly necessary but setting up
-            // descriptors early helps debugging.
             desc.reset_for_rx();
 
             desc.set_size(chunk_size);
@@ -1177,9 +1177,7 @@ impl<'a> DescriptorSet<'a> {
     /// See `prepare_descriptors_impl` for more details.
     fn prepare_tx_descriptors(&mut self, len: usize) -> Result<(), DmaBufError> {
         self.prepare_descriptors(len, |desc, chunk_size| {
-            // Calling this before prepare() isn't strictly necessary but setting up
-            // descriptors early helps debugging.
-            desc.reset_for_tx(false);
+            desc.reset_for_tx(desc.next.is_null());
 
             desc.set_length(chunk_size);
         })
@@ -2375,7 +2373,7 @@ impl DmaTxBuf {
 unsafe impl DmaTxBuffer for DmaTxBuf {
     fn prepare(&mut self) -> Preparation {
         for desc in self.descriptors.linked_iter_mut() {
-            desc.reset_for_tx(false);
+            desc.reset_for_tx(desc.next.is_null());
         }
 
         #[cfg(esp32s3)]
@@ -2664,7 +2662,7 @@ impl DmaRxTxBuf {
 unsafe impl DmaTxBuffer for DmaRxTxBuf {
     fn prepare(&mut self) -> Preparation {
         for desc in self.tx_descriptors.linked_iter_mut() {
-            desc.reset_for_tx(false);
+            desc.reset_for_tx(desc.next.is_null());
         }
 
         Preparation {
