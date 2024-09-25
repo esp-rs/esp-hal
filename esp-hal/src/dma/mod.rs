@@ -959,24 +959,19 @@ impl DescriptorChain {
 
         let max_chunk_size = self.max_chunk_size(len, circular)?;
 
-        let required_descriptors = DescriptorSet::descriptor_count(len, max_chunk_size, circular);
-        if self.descriptors.len() < required_descriptors {
-            return Err(DmaError::OutOfDescriptors);
-        }
         DescriptorSet::link_with_buffer_impl(
             unsafe { core::slice::from_raw_parts_mut(data, len) },
-            &mut self.descriptors[..required_descriptors],
+            &mut self.descriptors,
             max_chunk_size,
             circular,
         )?;
-        DescriptorSet::link_up_descriptors(&mut self.descriptors[..required_descriptors], circular);
         DescriptorSet::prepare_descriptors_impl(
-            &mut self.descriptors[..required_descriptors],
+            &mut self.descriptors,
             len,
             max_chunk_size,
             circular,
             prepare_descriptor,
-        );
+        )?;
 
         Ok(())
     }
@@ -1058,13 +1053,27 @@ impl<'a> DescriptorSet<'a> {
     }
 
     /// Prepares descriptors for transferring `len` bytes of data.
-    fn prepare_descriptors(&mut self, len: usize, prepare: fn(&mut DmaDescriptor, usize)) {
-        // First, pick enough descriptors to cover the buffer.
+    fn prepare_descriptors(
+        &mut self,
+        len: usize,
+        prepare: fn(&mut DmaDescriptor, usize),
+    ) -> Result<(), DmaBufError> {
         let chunk_size = Self::chunk_size(self.block_size);
-        let descriptor_count = Self::descriptor_count(len, chunk_size, false);
-        let descriptors = &mut self.descriptors[..descriptor_count];
+        Self::prepare_descriptors_impl(self.descriptors, len, chunk_size, false, prepare)
+    }
 
-        Self::prepare_descriptors_impl(descriptors, len, chunk_size, false, prepare);
+    fn descriptors_for_buffer_len<'d>(
+        descriptors: &'d mut [DmaDescriptor],
+        len: usize,
+        chunk_size: usize,
+        is_circular: bool,
+    ) -> Result<&'d mut [DmaDescriptor], DmaBufError> {
+        // First, pick enough descriptors to cover the buffer.
+        let required_descriptors = Self::descriptor_count(len, chunk_size, is_circular);
+        if descriptors.len() < required_descriptors {
+            return Err(DmaBufError::InsufficientDescriptors);
+        }
+        Ok(&mut descriptors[..required_descriptors])
     }
 
     fn prepare_descriptors_impl(
@@ -1073,7 +1082,10 @@ impl<'a> DescriptorSet<'a> {
         chunk_size: usize,
         is_circular: bool,
         prepare: impl Fn(&mut DmaDescriptor, usize),
-    ) {
+    ) -> Result<(), DmaBufError> {
+        let descriptors =
+            Self::descriptors_for_buffer_len(descriptors, len, chunk_size, is_circular)?;
+
         // Link up the descriptors.
         Self::link_up_descriptors(descriptors, is_circular);
 
@@ -1085,26 +1097,28 @@ impl<'a> DescriptorSet<'a> {
             remaining_length -= chunk_size;
         }
         debug_assert_eq!(remaining_length, 0);
+
+        Ok(())
     }
 
-    fn prepare_rx_descriptors(&mut self, len: usize) {
+    fn prepare_rx_descriptors(&mut self, len: usize) -> Result<(), DmaBufError> {
         self.prepare_descriptors(len, |desc, chunk_size| {
             // Calling this before prepare() isn't strictly necessary but setting up
             // descriptors early helps debugging.
             Self::reset_for_rx(desc);
 
             desc.set_size(chunk_size);
-        });
+        })
     }
 
-    fn prepare_tx_descriptors(&mut self, len: usize) {
+    fn prepare_tx_descriptors(&mut self, len: usize) -> Result<(), DmaBufError> {
         self.prepare_descriptors(len, |desc, chunk_size| {
             // Calling this before prepare() isn't strictly necessary but setting up
             // descriptors early helps debugging.
             Self::reset_for_tx(desc, false);
 
             desc.set_length(chunk_size);
-        });
+        })
     }
 
     fn reset_for_rx(desc: &mut DmaDescriptor) {
@@ -1191,7 +1205,7 @@ impl<'a> DescriptorSet<'a> {
         }
 
         let chunk_size = Self::chunk_size(self.block_size);
-        Self::link_with_buffer_impl(buffer, &mut self.descriptors, chunk_size, false)
+        Self::link_with_buffer_impl(buffer, self.descriptors, chunk_size, false)
     }
 
     /// Associate each descriptor with a chunk of the buffer. This function does
@@ -1204,15 +1218,11 @@ impl<'a> DescriptorSet<'a> {
         chunk_size: usize,
         is_circular: bool,
     ) -> Result<(), DmaBufError> {
-        let min_descriptors = Self::descriptor_count(buffer.len(), chunk_size, is_circular);
-        if descriptors.len() < min_descriptors {
-            return Err(DmaBufError::InsufficientDescriptors);
-        }
+        let descriptors =
+            Self::descriptors_for_buffer_len(descriptors, buffer.len(), chunk_size, is_circular)?;
 
-        let descriptors = descriptors.iter_mut();
         let chunks = buffer.chunks_mut(chunk_size);
-
-        for (desc, chunk) in descriptors.zip(chunks) {
+        for (desc, chunk) in descriptors.iter_mut().zip(chunks) {
             desc.set_size(chunk.len());
             desc.buffer = chunk.as_mut_ptr();
         }
@@ -2290,7 +2300,7 @@ impl DmaTxBuf {
     pub fn set_length(&mut self, len: usize) {
         assert!(len <= self.buffer.len());
 
-        self.descriptors.prepare_tx_descriptors(len);
+        unwrap!(self.descriptors.prepare_tx_descriptors(len));
     }
 
     /// Fills the TX buffer with the bytes provided in `data` and reset the
@@ -2398,7 +2408,7 @@ impl DmaRxBuf {
     pub fn set_length(&mut self, len: usize) {
         assert!(len <= self.buffer.len());
 
-        self.descriptors.prepare_rx_descriptors(len);
+        unwrap!(self.descriptors.prepare_rx_descriptors(len));
     }
 
     /// Returns the entire underlying buffer as a slice than can be read.
@@ -2579,8 +2589,8 @@ impl DmaRxTxBuf {
     pub fn set_length(&mut self, len: usize) {
         assert!(len <= self.buffer.len());
 
-        self.rx_descriptors.prepare_rx_descriptors(len);
-        self.tx_descriptors.prepare_tx_descriptors(len);
+        unwrap!(self.rx_descriptors.prepare_rx_descriptors(len));
+        unwrap!(self.tx_descriptors.prepare_tx_descriptors(len));
     }
 }
 
