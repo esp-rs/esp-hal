@@ -140,7 +140,7 @@ fn execute_write(
     for command_data_mode in COMMAND_DATA_MODES {
         dma_tx_buf.fill(&[write; DMA_BUFFER_SIZE]);
 
-        // Send command + data.
+        // Send command + address + data.
         // Should read 8 high bits: 1 command bit, 3 address bits, 4 data bits
         unit0.clear();
         unit1.clear();

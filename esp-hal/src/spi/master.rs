@@ -2919,6 +2919,16 @@ pub trait Instance: private::Sealed {
     ) {
         self.init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
 
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)]
+            {
+                // Workaround: Without mosi and/or miso state, the addressing phase reverts to
+                // single bit mode.
+                _ = no_mosi_miso;
+                let no_mosi_miso = false;
+            }
+        }
+
         let reg_block = self.register_block();
         reg_block.user().modify(|_, w| {
             w.usr_miso_highpart().clear_bit();
