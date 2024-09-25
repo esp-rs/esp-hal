@@ -2498,6 +2498,7 @@ pub trait Instance: private::Sealed {
             }
             address_mode if address_mode == data_mode => {
                 reg_block.ctrl().modify(|_, w| {
+                    w.fastrd_mode().set_bit();
                     w.fread_dio().bit(address_mode == SpiDataMode::Dual);
                     w.fread_qio().bit(address_mode == SpiDataMode::Quad);
                     w.fread_dual().clear_bit();
@@ -2918,16 +2919,6 @@ pub trait Instance: private::Sealed {
         data_mode: SpiDataMode,
     ) {
         self.init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
-
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)]
-            {
-                // Workaround: Without mosi and/or miso state, the addressing phase reverts to
-                // single bit mode.
-                _ = no_mosi_miso;
-                let no_mosi_miso = false;
-            }
-        }
 
         let reg_block = self.register_block();
         reg_block.user().modify(|_, w| {
