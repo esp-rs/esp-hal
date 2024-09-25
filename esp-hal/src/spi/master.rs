@@ -2461,6 +2461,10 @@ pub trait Instance: private::Sealed {
             w.fread_dual().bit(data_mode == SpiDataMode::Dual);
             w.fread_quad().bit(data_mode == SpiDataMode::Quad)
         });
+        reg_block.user().modify(|_, w| {
+            w.fwrite_dual().bit(data_mode == SpiDataMode::Dual);
+            w.fwrite_quad().bit(data_mode == SpiDataMode::Quad)
+        });
     }
 
     #[cfg(esp32)]
