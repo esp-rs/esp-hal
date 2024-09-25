@@ -461,7 +461,7 @@ pub fn init(
 /// ```rust, no_run
 #[doc = esp_hal::before_snippet!()]
 /// use esp_hal::{rng::Rng, timg::TimerGroup};
-/// use esp_wifi::{EspWifiInitFor, deinit};
+/// use esp_wifi::EspWifiInitFor;
 ///
 /// let timg0 = TimerGroup::new(peripherals.TIMG0);
 /// let init = esp_wifi::init(
@@ -471,31 +471,10 @@ pub fn init(
 ///     peripherals.RADIO_CLK,
 /// )
 /// .unwrap();
-///
-/// let (timer, radio_clocks) = deinit(init).unwrap();
 /// # }
-/// ```
-/// 
-/// # Safety
-/// At this point, we can only guarantee safety if
-/// the `init` function output has not been passed somewhere
-/// further into the initialization of the wifi/ble stack.
-pub fn deinit(
-    _init: EspWifiInitialization,
-) -> Result<(TimeBase, hal::peripherals::RADIO_CLK), InitializationError> {
-    unsafe { deinit_unchecked() }
-}
-
-/// Deinitializes WiFi and/or BLE
-///
-/// # Examples
-///
-/// ```rust, no_run
-#[doc = esp_hal::before_snippet!()]
-/// use esp_wifi::deinit_unchecked;
 ///
 /// unsafe {
-///     let (timer, radio_clocks) = deinit_unchecked().unwrap();
+///     let (timer, radio_clocks) = esp_wifi::deinit_unchecked(init).unwrap();
 /// }
 /// # }
 /// ```
@@ -508,6 +487,7 @@ pub fn deinit(
 /// Also, there is currently no way to track whether a peripheral has been initialized,
 /// so deinitialization is done based on the activated feature (`wifi`, `ble` and/or `coex`).
 pub unsafe fn deinit_unchecked(
+    init: EspWifiInitialization,
 ) -> Result<(TimeBase, hal::peripherals::RADIO_CLK), InitializationError> {
     // Disable coexistence
     #[cfg(coex)]
@@ -518,14 +498,14 @@ pub unsafe fn deinit_unchecked(
 
     // Deinitialize WiFi
     #[cfg(feature = "wifi")]
-    {
+    if init.is_wifi() {
         esp_wifi_result!(unsafe { esp_wifi_stop() })?;
         esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
     }
 
     // Deinitialize BLE
     #[cfg(feature = "ble")]
-    {
+    if init.is_ble() {
         #[cfg(any(esp32, esp32c3, esp32s3))]
         crate::ble::btdm::ble_deinit();
 
