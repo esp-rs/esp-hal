@@ -989,12 +989,12 @@ impl DescriptorChain {
 
         DescriptorSet::link_with_buffer_impl(
             unsafe { core::slice::from_raw_parts_mut(data, len) },
-            &mut self.descriptors,
+            self.descriptors,
             max_chunk_size,
             circular,
         )?;
         DescriptorSet::prepare_descriptors_impl(
-            &mut self.descriptors,
+            self.descriptors,
             len,
             max_chunk_size,
             circular,
@@ -1222,12 +1222,12 @@ impl<'a> DescriptorSet<'a> {
     }
 
     /// Returns a slice of descriptors that can cover a buffer of length `len`.
-    fn descriptors_for_buffer_len<'d>(
-        descriptors: &'d mut [DmaDescriptor],
+    fn descriptors_for_buffer_len(
+        descriptors: &mut [DmaDescriptor],
         len: usize,
         chunk_size: usize,
         is_circular: bool,
-    ) -> Result<&'d mut [DmaDescriptor], DmaBufError> {
+    ) -> Result<&mut [DmaDescriptor], DmaBufError> {
         // First, pick enough descriptors to cover the buffer.
         let required_descriptors = Self::descriptor_count(len, chunk_size, is_circular);
         if descriptors.len() < required_descriptors {
