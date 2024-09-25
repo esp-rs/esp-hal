@@ -607,18 +607,6 @@ macro_rules! dma_buffers_impl {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! dma_descriptors_impl {
-    (@count $size:expr, $chunk_size:expr, is_circular = true) => {
-        if $size > $chunk_size * 2 {
-            ($size as usize).div_ceil($chunk_size)
-        } else {
-            3
-        }
-    };
-
-    (@count $size:expr, $chunk_size:expr, is_circular = false) => {
-        ($size as usize).div_ceil($chunk_size)
-    };
-
     ($rx_size:expr, $tx_size:expr, $chunk_size:expr, is_circular = $circular:tt) => {{
         let rx = $crate::dma_descriptors_impl!($rx_size, $chunk_size, is_circular = $circular);
         let tx = $crate::dma_descriptors_impl!($tx_size, $chunk_size, is_circular = $circular);
@@ -626,17 +614,38 @@ macro_rules! dma_descriptors_impl {
     }};
 
     ($size:expr, $chunk_size:expr, is_circular = $circular:tt) => {{
-        // these will check for size at compile time
-        const _: () = ::core::assert!($chunk_size <= 4095, "chunk size must be <= 4095");
-        const _: () = ::core::assert!($chunk_size > 0, "chunk size must be > 0");
-
         const COUNT: usize =
-        $crate::dma_descriptors_impl!(@count $size, $chunk_size, is_circular = $circular);
+            $crate::dma_descriptor_count!($size, $chunk_size, is_circular = $circular);
 
         static mut DESCRIPTORS: [$crate::dma::DmaDescriptor; COUNT] =
             [$crate::dma::DmaDescriptor::EMPTY; COUNT];
 
         unsafe { &mut DESCRIPTORS }
+    }};
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! dma_descriptor_count {
+    (@validate_chunk_size $chunk_size:expr) => {
+        const {
+            ::core::assert!($chunk_size <= 4095, "chunk size must be <= 4095");
+            ::core::assert!($chunk_size > 0, "chunk size must be > 0");
+        }
+    };
+
+    ($size:expr, $chunk_size:expr, is_circular = true) => {{
+        $crate::dma_descriptor_count!(@validate_chunk_size $chunk_size);
+        if $size > $chunk_size * 2 {
+            ($size as usize).div_ceil($chunk_size)
+        } else {
+            3
+        }
+    }};
+
+    ($size:expr, $chunk_size:expr, is_circular = false) => {{
+        $crate::dma_descriptor_count!(@validate_chunk_size $chunk_size);
+        ($size as usize).div_ceil($chunk_size)
     }};
 }
 
