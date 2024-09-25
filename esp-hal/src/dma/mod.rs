@@ -830,14 +830,6 @@ pub trait AesPeripheral: PeripheralMarker {}
 #[doc(hidden)]
 pub trait LcdCamPeripheral: PeripheralMarker {}
 
-/// DMA Rx
-#[doc(hidden)]
-pub trait Rx: RxPrivate {}
-
-/// DMA Tx
-#[doc(hidden)]
-pub trait Tx: TxPrivate {}
-
 /// Marker trait
 #[doc(hidden)]
 pub trait PeripheralMarker {}
@@ -1080,7 +1072,7 @@ impl TxCircularState {
 
     pub(crate) fn update<T>(&mut self, channel: &T)
     where
-        T: TxPrivate,
+        T: Tx,
     {
         if channel
             .pending_out_interrupts()
@@ -1307,7 +1299,7 @@ pub trait DmaChannel: crate::private::Sealed {
 
 /// The functions here are not meant to be used outside the HAL
 #[doc(hidden)]
-pub trait RxPrivate: crate::private::Sealed {
+pub trait Rx: crate::private::Sealed {
     fn init(&mut self, burst_mode: bool, priority: DmaPriority);
 
     unsafe fn prepare_transfer_without_start(
@@ -1429,11 +1421,9 @@ where
     }
 }
 
-impl<'a, CH> Rx for ChannelRx<'a, CH> where CH: DmaChannel {}
-
 impl<'a, CH> crate::private::Sealed for ChannelRx<'a, CH> where CH: DmaChannel {}
 
-impl<'a, CH> RxPrivate for ChannelRx<'a, CH>
+impl<'a, CH> Rx for ChannelRx<'a, CH>
 where
     CH: DmaChannel,
 {
@@ -1543,7 +1533,7 @@ where
 
 /// The functions here are not meant to be used outside the HAL
 #[doc(hidden)]
-pub trait TxPrivate: crate::private::Sealed {
+pub trait Tx: crate::private::Sealed {
     fn init(&mut self, burst_mode: bool, priority: DmaPriority);
 
     unsafe fn prepare_transfer_without_start(
@@ -1669,11 +1659,9 @@ where
     }
 }
 
-impl<'a, CH> Tx for ChannelTx<'a, CH> where CH: DmaChannel {}
-
 impl<'a, CH> crate::private::Sealed for ChannelTx<'a, CH> where CH: DmaChannel {}
 
-impl<'a, CH> TxPrivate for ChannelTx<'a, CH>
+impl<'a, CH> Tx for ChannelTx<'a, CH>
 where
     CH: DmaChannel,
 {
