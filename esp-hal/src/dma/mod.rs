@@ -968,14 +968,7 @@ impl DescriptorChain {
             &mut self.descriptors[..required_descriptors],
             max_chunk_size,
             circular,
-        )
-        .map_err(|e| match e {
-            // TODO: DmaError::InvalidBuffer(e)
-            DmaBufError::InsufficientDescriptors => DmaError::OutOfDescriptors,
-            DmaBufError::UnsupportedMemoryRegion => DmaError::UnsupportedMemoryRegion,
-            DmaBufError::InvalidAlignment => DmaError::InvalidAlignment,
-            DmaBufError::InvalidChunkSize => DmaError::InvalidChunkSize,
-        })?;
+        )?;
         DescriptorSet::link_up_descriptors(&mut self.descriptors[..required_descriptors], circular);
         DescriptorSet::prepare_descriptors_impl(
             &mut self.descriptors[..required_descriptors],
