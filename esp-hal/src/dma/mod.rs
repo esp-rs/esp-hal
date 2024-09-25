@@ -930,19 +930,13 @@ impl DescriptorChain {
             return Err(DmaError::UnsupportedMemoryRegion);
         }
 
-        if self.descriptors.len() < len.div_ceil(self.chunk_size) {
+        let max_chunk_size = self.max_chunk_size(len, circular)?;
+
+        let required_descriptors = DescriptorSet::descriptor_count(len, max_chunk_size, circular);
+        if self.descriptors.len() < required_descriptors {
             return Err(DmaError::OutOfDescriptors);
         }
-
-        if circular && len <= 3 {
-            return Err(DmaError::BufferTooSmall);
-        }
-
-        let max_chunk_size = if !circular || len > self.chunk_size * 2 {
-            self.chunk_size
-        } else {
-            len / 3 + len % 3
-        };
+        DescriptorSet::link_up_descriptors(&mut self.descriptors[..required_descriptors], circular);
 
         let mut processed = 0;
         let mut descr = 0;
@@ -953,10 +947,8 @@ impl DescriptorChain {
             // buffer flags
             let dw0 = &mut self.descriptors[descr];
 
-            dw0.set_suc_eof(false);
-            dw0.set_owner(Owner::Dma);
+            DescriptorSet::reset_for_rx(dw0);
             dw0.set_size(chunk_size); // align to 32 bits?
-            dw0.set_length(0); // hardware will fill in the received number of bytes
 
             // pointer to current data
             dw0.buffer = unsafe { data.add(processed) };
@@ -968,7 +960,6 @@ impl DescriptorChain {
                 break;
             }
         }
-        DescriptorSet::link_up_descriptors(&mut self.descriptors[..descr], circular);
 
         Ok(())
     }
@@ -988,19 +979,13 @@ impl DescriptorChain {
             return Err(DmaError::UnsupportedMemoryRegion);
         }
 
-        if circular && len <= 3 {
-            return Err(DmaError::BufferTooSmall);
-        }
+        let max_chunk_size = self.max_chunk_size(len, circular)?;
 
-        if self.descriptors.len() < len.div_ceil(self.chunk_size) {
+        let required_descriptors = DescriptorSet::descriptor_count(len, max_chunk_size, circular);
+        if self.descriptors.len() < required_descriptors {
             return Err(DmaError::OutOfDescriptors);
         }
-
-        let max_chunk_size = if !circular || len > self.chunk_size * 2 {
-            self.chunk_size
-        } else {
-            len / 3 + len % 3
-        };
+        DescriptorSet::link_up_descriptors(&mut self.descriptors[..required_descriptors], circular);
 
         let mut processed = 0;
         let mut descr = 0;
@@ -1015,10 +1000,13 @@ impl DescriptorChain {
             // hardware should trigger an interrupt request. In circular mode,
             // we set the `suc_eof` bit for every buffer we send. We use this for
             // I2S to track progress of a transfer by checking OUTLINK_DSCR_ADDR.
-            dw0.set_suc_eof(circular || last);
-            dw0.set_owner(Owner::Dma);
-            dw0.set_size(chunk_size); // align to 32 bits?
+            if circular {
+                DescriptorSet::reset_for_tx_circular(dw0);
+            } else {
+                DescriptorSet::reset_for_tx(dw0);
+            }
             dw0.set_length(chunk_size); // the hardware will transmit this many bytes
+            dw0.set_size(chunk_size); // align to 32 bits?
 
             // pointer to current data
             dw0.buffer = unsafe { data.cast_mut().add(processed) };
@@ -1031,9 +1019,20 @@ impl DescriptorChain {
             }
         }
 
-        DescriptorSet::link_up_descriptors(&mut self.descriptors[..descr], circular);
-
         Ok(())
+    }
+
+    fn max_chunk_size(&self, len: usize, circular: bool) -> Result<usize, DmaError> {
+        let max_chunk_size = if circular && len <= self.chunk_size * 2 {
+            if len <= 3 {
+                return Err(DmaError::BufferTooSmall);
+            }
+            len / 3 + len % 3
+        } else {
+            self.chunk_size
+        };
+
+        Ok(max_chunk_size)
     }
 }
 
@@ -2106,6 +2105,12 @@ impl<'a> DescriptorSet<'a> {
         // As this is a simple dma buffer implementation we won't
         // be making use of this feature. Only set for the last descriptor.
         desc.set_suc_eof(desc.next.is_null());
+    }
+
+    fn reset_for_tx_circular(desc: &mut DmaDescriptor) {
+        // Give ownership to the DMA
+        desc.set_owner(Owner::Dma);
+        desc.set_suc_eof(true);
     }
 
     /// Returns an iterator over the linked descriptors.
