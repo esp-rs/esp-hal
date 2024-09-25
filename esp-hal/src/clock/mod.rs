@@ -319,15 +319,16 @@ impl Clocks {
         })
     }
 
-    fn try_get() -> Option<&'static Clocks> {
+    fn try_get<'a>() -> Option<&'a Clocks> {
         unsafe {
             // Safety: ACTIVE_CLOCKS is only set in `init` and never modified after that.
-            ACTIVE_CLOCKS.as_ref()
+            let clocks = &*core::ptr::addr_of!(ACTIVE_CLOCKS);
+            clocks.as_ref()
         }
     }
 
     /// Get the active clock configuration.
-    pub fn get() -> &'static Clocks {
+    pub fn get<'a>() -> &'a Clocks {
         unwrap!(Self::try_get())
     }
 
