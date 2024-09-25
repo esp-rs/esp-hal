@@ -1143,6 +1143,11 @@ impl<'a> DescriptorSet<'a> {
     fn reset_for_tx_circular(desc: &mut DmaDescriptor) {
         // Give ownership to the DMA
         desc.set_owner(Owner::Dma);
+
+        // The `suc_eof` bit doesn't affect the transfer itself, but signals when the
+        // hardware should trigger an interrupt request. In circular mode,
+        // we set the `suc_eof` bit for every buffer we send. We use this for
+        // I2S to track progress of a transfer by checking OUTLINK_DSCR_ADDR.
         desc.set_suc_eof(true);
     }
 
