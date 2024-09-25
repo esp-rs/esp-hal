@@ -956,7 +956,7 @@ impl DescriptorChain {
     ) -> Result<(), DmaError> {
         self.fill(circular, data, len, |desc, _| {
             desc.reset_for_rx();
-            // Descriptor::size has been set up by `link_with_buffer_impl`
+            // Descriptor::size has been set up by `fill`
         })
     }
 
@@ -993,7 +993,14 @@ impl DescriptorChain {
             return Err(DmaError::UnsupportedMemoryRegion);
         }
 
-        let max_chunk_size = self.max_chunk_size(len, circular)?;
+        let max_chunk_size = if circular && len <= self.chunk_size * 2 {
+            if len <= 3 {
+                return Err(DmaError::BufferTooSmall);
+            }
+            len / 3 + len % 3
+        } else {
+            self.chunk_size
+        };
 
         DescriptorSet::set_up_buffer_ptrs(
             unsafe { core::slice::from_raw_parts_mut(data, len) },
@@ -1010,19 +1017,6 @@ impl DescriptorChain {
         )?;
 
         Ok(())
-    }
-
-    fn max_chunk_size(&self, len: usize, circular: bool) -> Result<usize, DmaError> {
-        let max_chunk_size = if circular && len <= self.chunk_size * 2 {
-            if len <= 3 {
-                return Err(DmaError::BufferTooSmall);
-            }
-            len / 3 + len % 3
-        } else {
-            self.chunk_size
-        };
-
-        Ok(max_chunk_size)
     }
 }
 
@@ -1042,7 +1036,7 @@ pub const fn descriptor_count(buffer_size: usize, chunk_size: usize, is_circular
 }
 
 /// Compute max chunk size based on block size.
-const fn chunk_size(block_size: Option<DmaBufBlkSize>) -> usize {
+const fn max_chunk_size(block_size: Option<DmaBufBlkSize>) -> usize {
     match block_size {
         Some(size) => 4096 - size as usize,
         #[cfg(esp32)]
@@ -1124,7 +1118,7 @@ impl<'a> DescriptorSet<'a> {
     ///
     /// This function checks the alignment and location of the buffer.
     ///
-    /// See `link_with_buffer_impl` for more details.
+    /// See [`Self::set_up_buffer_ptrs`] for more details.
     fn link_with_buffer(
         &mut self,
         buffer: &mut [u8],
@@ -1135,7 +1129,7 @@ impl<'a> DescriptorSet<'a> {
 
     /// Prepares descriptors for transferring `len` bytes of data.
     ///
-    /// See `prepare_descriptors_impl` for more details.
+    /// See [`Self::set_up_descriptors`] for more details.
     fn set_length(
         &mut self,
         len: usize,
@@ -1147,7 +1141,7 @@ impl<'a> DescriptorSet<'a> {
 
     /// Prepares descriptors for reading `len` bytes of data.
     ///
-    /// See `prepare_descriptors_impl` for more details.
+    /// See [`Self::set_up_descriptors`] for more details.
     fn set_rx_length(&mut self, len: usize, chunk_size: usize) -> Result<(), DmaBufError> {
         self.set_length(len, chunk_size, |desc, chunk_size| {
             desc.set_size(chunk_size);
@@ -1156,7 +1150,7 @@ impl<'a> DescriptorSet<'a> {
 
     /// Prepares descriptors for writing `len` bytes of data.
     ///
-    /// See `prepare_descriptors_impl` for more details.
+    /// See [`Self::set_up_descriptors`] for more details.
     fn set_tx_length(&mut self, len: usize, chunk_size: usize) -> Result<(), DmaBufError> {
         self.set_length(len, chunk_size, |desc, chunk_size| {
             desc.set_length(chunk_size);
@@ -2225,7 +2219,7 @@ impl DmaTxBuf {
 
     /// Compute max chunk size based on block size
     pub const fn compute_chunk_size(block_size: Option<DmaBufBlkSize>) -> usize {
-        chunk_size(block_size)
+        max_chunk_size(block_size)
     }
 
     /// Compute the number of descriptors required for a given block size and
@@ -2289,7 +2283,7 @@ impl DmaTxBuf {
         };
 
         buf.descriptors
-            .link_with_buffer(buf.buffer, chunk_size(block_size))?;
+            .link_with_buffer(buf.buffer, max_chunk_size(block_size))?;
         buf.set_length(buf.capacity());
 
         Ok(buf)
@@ -2324,7 +2318,7 @@ impl DmaTxBuf {
 
         unwrap!(self
             .descriptors
-            .set_tx_length(len, chunk_size(self.block_size)));
+            .set_tx_length(len, max_chunk_size(self.block_size)));
     }
 
     /// Fills the TX buffer with the bytes provided in `data` and reset the
@@ -2409,7 +2403,7 @@ impl DmaRxBuf {
         };
 
         buf.descriptors
-            .link_with_buffer(buf.buffer, chunk_size(None))?;
+            .link_with_buffer(buf.buffer, max_chunk_size(None))?;
         buf.set_length(buf.capacity());
 
         Ok(buf)
@@ -2443,7 +2437,7 @@ impl DmaRxBuf {
     pub fn set_length(&mut self, len: usize) {
         assert!(len <= self.buffer.len());
 
-        unwrap!(self.descriptors.set_rx_length(len, chunk_size(None)));
+        unwrap!(self.descriptors.set_rx_length(len, max_chunk_size(None)));
     }
 
     /// Returns the entire underlying buffer as a slice than can be read.
@@ -2585,9 +2579,9 @@ impl DmaRxTxBuf {
             buffer,
         };
         buf.rx_descriptors
-            .link_with_buffer(buf.buffer, chunk_size(None))?;
+            .link_with_buffer(buf.buffer, max_chunk_size(None))?;
         buf.tx_descriptors
-            .link_with_buffer(buf.buffer, chunk_size(None))?;
+            .link_with_buffer(buf.buffer, max_chunk_size(None))?;
         buf.set_length(buf.capacity());
 
         Ok(buf)
@@ -2640,8 +2634,8 @@ impl DmaRxTxBuf {
     pub fn set_length(&mut self, len: usize) {
         assert!(len <= self.buffer.len());
 
-        unwrap!(self.rx_descriptors.set_rx_length(len, chunk_size(None)));
-        unwrap!(self.tx_descriptors.set_tx_length(len, chunk_size(None)));
+        unwrap!(self.rx_descriptors.set_rx_length(len, max_chunk_size(None)));
+        unwrap!(self.tx_descriptors.set_tx_length(len, max_chunk_size(None)));
     }
 }
 
