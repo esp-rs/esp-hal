@@ -501,18 +501,7 @@ macro_rules! as_mut_byte_array {
 #[macro_export]
 macro_rules! dma_buffers_chunk_size {
     ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
-        $crate::declare_aligned_dma_buffer!(RX_BUFFER, $rx_size);
-        $crate::declare_aligned_dma_buffer!(TX_BUFFER, $tx_size);
-        let (mut rx_descriptors, mut tx_descriptors) =
-            $crate::dma_descriptors_chunk_size!($rx_size, $tx_size, $chunk_size);
-        unsafe {
-            (
-                $crate::as_mut_byte_array!(RX_BUFFER, $rx_size),
-                rx_descriptors,
-                $crate::as_mut_byte_array!(TX_BUFFER, $tx_size),
-                tx_descriptors,
-            )
-        }
+        $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size, is_circular = false)
     }};
 
     ($size:expr, $chunk_size:expr) => {
@@ -537,18 +526,7 @@ macro_rules! dma_buffers_chunk_size {
 #[macro_export]
 macro_rules! dma_circular_buffers_chunk_size {
     ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
-        $crate::declare_aligned_dma_buffer!(RX_BUFFER, $rx_size);
-        $crate::declare_aligned_dma_buffer!(TX_BUFFER, $tx_size);
-        let (mut rx_descriptors, mut tx_descriptors) =
-            $crate::dma_circular_descriptors_chunk_size!($rx_size, $tx_size, $chunk_size);
-        unsafe {
-            (
-                $crate::as_mut_byte_array!(RX_BUFFER, $rx_size),
-                rx_descriptors,
-                $crate::as_mut_byte_array!(TX_BUFFER, $tx_size),
-                tx_descriptors,
-            )
-        }
+        $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size, is_circular = true)
     }};
 
     ($size:expr, $chunk_size:expr) => {{
@@ -572,17 +550,7 @@ macro_rules! dma_circular_buffers_chunk_size {
 #[macro_export]
 macro_rules! dma_descriptors_chunk_size {
     ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
-        // these will check for size at compile time
-        const _: () = ::core::assert!($chunk_size <= 4095, "chunk size must be <= 4095");
-        const _: () = ::core::assert!($chunk_size > 0, "chunk size must be > 0");
-
-        static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor;
-            ($rx_size + $chunk_size - 1) / $chunk_size] =
-            [$crate::dma::DmaDescriptor::EMPTY; ($rx_size + $chunk_size - 1) / $chunk_size];
-        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor;
-            ($tx_size + $chunk_size - 1) / $chunk_size] =
-            [$crate::dma::DmaDescriptor::EMPTY; ($tx_size + $chunk_size - 1) / $chunk_size];
-        unsafe { (&mut RX_DESCRIPTORS, &mut TX_DESCRIPTORS) }
+        $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size, is_circular = false)
     }};
 
     ($size:expr, $chunk_size:expr) => {
@@ -607,32 +575,78 @@ macro_rules! dma_descriptors_chunk_size {
 #[macro_export]
 macro_rules! dma_circular_descriptors_chunk_size {
     ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
-        // these will check for size at compile time
-        const _: () = ::core::assert!($chunk_size <= 4095, "chunk size must be <= 4095");
-        const _: () = ::core::assert!($chunk_size > 0, "chunk size must be > 0");
-
-        const rx_descriptor_len: usize = if $rx_size > $chunk_size * 2 {
-            ($rx_size + $chunk_size - 1) / $chunk_size
-        } else {
-            3
-        };
-
-        const tx_descriptor_len: usize = if $tx_size > $chunk_size * 2 {
-            ($tx_size + $chunk_size - 1) / $chunk_size
-        } else {
-            3
-        };
-
-        static mut RX_DESCRIPTORS: [$crate::dma::DmaDescriptor; rx_descriptor_len] =
-            [$crate::dma::DmaDescriptor::EMPTY; rx_descriptor_len];
-        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; tx_descriptor_len] =
-            [$crate::dma::DmaDescriptor::EMPTY; tx_descriptor_len];
-        unsafe { (&mut RX_DESCRIPTORS, &mut TX_DESCRIPTORS) }
+        $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size, is_circular = true)
     }};
 
     ($size:expr, $chunk_size:expr) => {
         $crate::dma_circular_descriptors_chunk_size!($size, $size, $chunk_size)
     };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! dma_buffers_impl {
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr, is_circular = $circular:tt) => {{
+        let rx = $crate::dma_buffers_impl!($rx_size, $chunk_size, is_circular = $circular);
+        let tx = $crate::dma_buffers_impl!($tx_size, $chunk_size, is_circular = $circular);
+        (rx.0, rx.1, tx.0, tx.1)
+    }};
+
+    ($size:expr, $chunk_size:expr, is_circular = $circular:tt) => {{
+        $crate::declare_aligned_dma_buffer!(BUFFER, $size);
+
+        unsafe {
+            (
+                $crate::as_mut_byte_array!(BUFFER, $size),
+                $crate::dma_descriptors_impl!($size, $chunk_size, is_circular = $circular),
+            )
+        }
+    }};
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! dma_descriptors_impl {
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr, is_circular = $circular:tt) => {{
+        let rx = $crate::dma_descriptors_impl!($rx_size, $chunk_size, is_circular = $circular);
+        let tx = $crate::dma_descriptors_impl!($tx_size, $chunk_size, is_circular = $circular);
+        (rx, tx)
+    }};
+
+    ($size:expr, $chunk_size:expr, is_circular = $circular:tt) => {{
+        const COUNT: usize =
+            $crate::dma_descriptor_count!($size, $chunk_size, is_circular = $circular);
+
+        static mut DESCRIPTORS: [$crate::dma::DmaDescriptor; COUNT] =
+            [$crate::dma::DmaDescriptor::EMPTY; COUNT];
+
+        unsafe { &mut DESCRIPTORS }
+    }};
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! dma_descriptor_count {
+    (@validate_chunk_size $chunk_size:expr) => {
+        const {
+            ::core::assert!($chunk_size <= 4095, "chunk size must be <= 4095");
+            ::core::assert!($chunk_size > 0, "chunk size must be > 0");
+        }
+    };
+
+    ($size:expr, $chunk_size:expr, is_circular = true) => {{
+        $crate::dma_descriptor_count!(@validate_chunk_size $chunk_size);
+        if $size > $chunk_size * 2 {
+            ($size as usize).div_ceil($chunk_size)
+        } else {
+            3
+        }
+    }};
+
+    ($size:expr, $chunk_size:expr, is_circular = false) => {{
+        $crate::dma_descriptor_count!(@validate_chunk_size $chunk_size);
+        ($size as usize).div_ceil($chunk_size)
+    }};
 }
 
 /// Convenience macro to create a DmaTxBuf from buffer size. The buffer and
@@ -644,20 +658,18 @@ macro_rules! dma_circular_descriptors_chunk_size {
 /// use esp_hal::dma_tx_buffer;
 /// use esp_hal::dma::DmaBufBlkSize;
 ///
-/// let tx_buf =
-///     dma_tx_buffer!(32000);
+/// let tx_buf = dma_tx_buffer!(32000);
 /// # }
 /// ```
 #[macro_export]
 macro_rules! dma_tx_buffer {
     ($tx_size:expr) => {{
-        const TX_DESCRIPTOR_LEN: usize =
-            $crate::dma::DmaTxBuf::compute_descriptor_count($tx_size, None);
-        $crate::declare_aligned_dma_buffer!(TX_BUFFER, $tx_size);
-        static mut TX_DESCRIPTORS: [$crate::dma::DmaDescriptor; TX_DESCRIPTOR_LEN] =
-            [$crate::dma::DmaDescriptor::EMPTY; TX_DESCRIPTOR_LEN];
-        let tx_buffer = $crate::as_mut_byte_array!(TX_BUFFER, $tx_size);
-        let tx_descriptors = unsafe { &mut TX_DESCRIPTORS };
+        let (tx_buffer, tx_descriptors) = $crate::dma_buffers_impl!(
+            $tx_size,
+            $crate::dma::DmaTxBuf::compute_chunk_size(None),
+            is_circular = false
+        );
+
         $crate::dma::DmaTxBuf::new(tx_descriptors, tx_buffer)
     }};
 }
@@ -1927,7 +1939,7 @@ pub enum DmaBufError {
     InvalidChunkSize,
 }
 
-/// DMA buffer allignments
+/// DMA buffer alignments
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaBufBlkSize {
