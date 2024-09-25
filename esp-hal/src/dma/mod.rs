@@ -1057,6 +1057,8 @@ impl<'a> DescriptorSet<'a> {
         buffer_size.div_ceil(chunk_size)
     }
 
+    /// Creates a new `DescriptorSet` from a slice of descriptors and associates
+    /// them with the given buffer.
     fn new(
         descriptors: &'a mut [DmaDescriptor],
         buffer: &mut [u8],
@@ -1071,6 +1073,9 @@ impl<'a> DescriptorSet<'a> {
         unsafe { Self::new_from_unchecked(descriptors, buffer, block_size) }
     }
 
+    /// Creates a new `DescriptorSet` from a slice of descriptors and associates
+    /// them with the given buffer.
+    ///
     /// # Safety
     ///
     /// The caller must ensure that the descriptors are in a supported memory
@@ -1090,10 +1095,12 @@ impl<'a> DescriptorSet<'a> {
         Ok(this)
     }
 
+    /// Consumes the `DescriptorSet` and returns the inner slice of descriptors.
     fn into_inner(self) -> &'a mut [DmaDescriptor] {
         self.descriptors
     }
 
+    /// Returns a pointer to the first descriptor in the chain.
     fn head(&mut self) -> *mut DmaDescriptor {
         self.descriptors.as_mut_ptr()
     }
@@ -1124,10 +1131,11 @@ impl<'a> DescriptorSet<'a> {
         })
     }
 
-    /// Associate each descriptor with a chunk of the buffer. This function does
-    /// not set up descriptor states for tx or rx, call
-    /// `prepare_rx_descriptors` or `prepare_tx_descriptors` after this
-    /// function to do that.
+    /// Associate each descriptor with a chunk of the buffer.
+    ///
+    /// This function checks the alignment and location of the buffer.
+    ///
+    /// See `link_with_buffer_impl` for more details.
     fn link_with_buffer(&mut self, buffer: &mut [u8]) -> Result<(), DmaBufError> {
         cfg_if::cfg_if! {
             if #[cfg(esp32s3)] {
@@ -1160,6 +1168,8 @@ impl<'a> DescriptorSet<'a> {
     }
 
     /// Prepares descriptors for transferring `len` bytes of data.
+    ///
+    /// See `prepare_descriptors_impl` for more details.
     fn prepare_descriptors(
         &mut self,
         len: usize,
@@ -1169,6 +1179,9 @@ impl<'a> DescriptorSet<'a> {
         Self::prepare_descriptors_impl(self.descriptors, len, chunk_size, false, prepare)
     }
 
+    /// Prepares descriptors for reading `len` bytes of data.
+    ///
+    /// See `prepare_descriptors_impl` for more details.
     fn prepare_rx_descriptors(&mut self, len: usize) -> Result<(), DmaBufError> {
         self.prepare_descriptors(len, |desc, chunk_size| {
             // Calling this before prepare() isn't strictly necessary but setting up
@@ -1179,6 +1192,9 @@ impl<'a> DescriptorSet<'a> {
         })
     }
 
+    /// Prepares descriptors for writing `len` bytes of data.
+    ///
+    /// See `prepare_descriptors_impl` for more details.
     fn prepare_tx_descriptors(&mut self, len: usize) -> Result<(), DmaBufError> {
         self.prepare_descriptors(len, |desc, chunk_size| {
             // Calling this before prepare() isn't strictly necessary but setting up
@@ -1189,6 +1205,10 @@ impl<'a> DescriptorSet<'a> {
         })
     }
 
+    /// Creates a linked list from the given descriptors.
+    ///
+    /// If `is_circular` is true, the last descriptor will point to the first
+    /// descriptor, creating a circular linked list.
     fn link_up_descriptors(descriptors: &mut [DmaDescriptor], is_circular: bool) {
         let mut next = if is_circular {
             descriptors.as_mut_ptr()
@@ -1201,6 +1221,7 @@ impl<'a> DescriptorSet<'a> {
         }
     }
 
+    /// Returns a slice of descriptors that can cover a buffer of length `len`.
     fn descriptors_for_buffer_len<'d>(
         descriptors: &'d mut [DmaDescriptor],
         len: usize,
@@ -1215,6 +1236,13 @@ impl<'a> DescriptorSet<'a> {
         Ok(&mut descriptors[..required_descriptors])
     }
 
+    /// Prepares descriptors for transferring `len` bytes of data.
+    ///
+    /// `Prepare` means setting up the descriptor lengths and flags, as well as
+    /// linking the descriptors into a linked list.
+    ///
+    /// The actual descriptor setup is done in a callback, because different
+    /// transfer directions require different descriptor setup.
     fn prepare_descriptors_impl(
         descriptors: &mut [DmaDescriptor],
         len: usize,
@@ -1240,10 +1268,19 @@ impl<'a> DescriptorSet<'a> {
         Ok(())
     }
 
-    /// Associate each descriptor with a chunk of the buffer. This function does
-    /// not set up descriptor states for tx or rx, call
+    /// Associate each descriptor with a chunk of the buffer.
+    ///
+    /// This function does not check the alignment and location of the buffer,
+    /// because some callers may not have enough information currently.
+    ///
+    /// This function does not set up descriptor states for tx or rx, call
     /// `prepare_rx_descriptors` or `prepare_tx_descriptors` after this
     /// function to do that.
+    ///
+    /// This function also does not link descriptors into a linked list. This is
+    /// intentional, because it is done in `prepare_descriptors` to support
+    /// changing length without requiring buffer pointers to be set
+    /// repeatedly.
     fn link_with_buffer_impl(
         buffer: &mut [u8],
         descriptors: &mut [DmaDescriptor],
