@@ -922,46 +922,10 @@ impl DescriptorChain {
         data: *mut u8,
         len: usize,
     ) -> Result<(), DmaError> {
-        if !crate::soc::is_valid_ram_address(self.first() as usize)
-            || !crate::soc::is_valid_ram_address(self.last() as usize)
-            || !crate::soc::is_valid_memory_address(data as usize)
-            || !crate::soc::is_valid_memory_address(unsafe { data.add(len) } as usize)
-        {
-            return Err(DmaError::UnsupportedMemoryRegion);
-        }
-
-        let max_chunk_size = self.max_chunk_size(len, circular)?;
-
-        let required_descriptors = DescriptorSet::descriptor_count(len, max_chunk_size, circular);
-        if self.descriptors.len() < required_descriptors {
-            return Err(DmaError::OutOfDescriptors);
-        }
-        DescriptorSet::link_up_descriptors(&mut self.descriptors[..required_descriptors], circular);
-
-        let mut processed = 0;
-        let mut descr = 0;
-        loop {
-            let chunk_size = usize::min(max_chunk_size, len - processed);
-            let last = processed + chunk_size >= len;
-
-            // buffer flags
-            let dw0 = &mut self.descriptors[descr];
-
-            DescriptorSet::reset_for_rx(dw0);
-            dw0.set_size(chunk_size); // align to 32 bits?
-
-            // pointer to current data
-            dw0.buffer = unsafe { data.add(processed) };
-
-            processed += chunk_size;
-            descr += 1;
-
-            if last {
-                break;
-            }
-        }
-
-        Ok(())
+        self.fill(circular, data, len, |desc, _| {
+            DescriptorSet::reset_for_rx(desc);
+            // Descriptor::size has been set up by `link_with_buffer_impl`
+        })
     }
 
     #[allow(clippy::not_unsafe_ptr_arg_deref)]
@@ -970,6 +934,24 @@ impl DescriptorChain {
         circular: bool,
         data: *const u8,
         len: usize,
+    ) -> Result<(), DmaError> {
+        self.fill(circular, data.cast_mut(), len, |desc, chunk_size| {
+            if circular {
+                DescriptorSet::reset_for_tx_circular(desc);
+            } else {
+                DescriptorSet::reset_for_tx(desc);
+            }
+            desc.set_length(chunk_size); // align to 32 bits?
+        })
+    }
+
+    #[allow(clippy::not_unsafe_ptr_arg_deref)]
+    pub fn fill(
+        &mut self,
+        circular: bool,
+        data: *mut u8,
+        len: usize,
+        prepare_descriptor: impl Fn(&mut DmaDescriptor, usize),
     ) -> Result<(), DmaError> {
         if !crate::soc::is_valid_ram_address(self.first() as usize)
             || !crate::soc::is_valid_ram_address(self.last() as usize)
@@ -985,39 +967,27 @@ impl DescriptorChain {
         if self.descriptors.len() < required_descriptors {
             return Err(DmaError::OutOfDescriptors);
         }
+        DescriptorSet::link_with_buffer_impl(
+            unsafe { core::slice::from_raw_parts_mut(data, len) },
+            &mut self.descriptors[..required_descriptors],
+            max_chunk_size,
+            circular,
+        )
+        .map_err(|e| match e {
+            // TODO: DmaError::InvalidBuffer(e)
+            DmaBufError::InsufficientDescriptors => DmaError::OutOfDescriptors,
+            DmaBufError::UnsupportedMemoryRegion => DmaError::UnsupportedMemoryRegion,
+            DmaBufError::InvalidAlignment => DmaError::InvalidAlignment,
+            DmaBufError::InvalidChunkSize => DmaError::InvalidChunkSize,
+        })?;
         DescriptorSet::link_up_descriptors(&mut self.descriptors[..required_descriptors], circular);
-
-        let mut processed = 0;
-        let mut descr = 0;
-        loop {
-            let chunk_size = usize::min(max_chunk_size, len - processed);
-            let last = processed + chunk_size >= len;
-
-            // buffer flags
-            let dw0 = &mut self.descriptors[descr];
-
-            // The `suc_eof` bit doesn't affect the transfer itself, but signals when the
-            // hardware should trigger an interrupt request. In circular mode,
-            // we set the `suc_eof` bit for every buffer we send. We use this for
-            // I2S to track progress of a transfer by checking OUTLINK_DSCR_ADDR.
-            if circular {
-                DescriptorSet::reset_for_tx_circular(dw0);
-            } else {
-                DescriptorSet::reset_for_tx(dw0);
-            }
-            dw0.set_length(chunk_size); // the hardware will transmit this many bytes
-            dw0.set_size(chunk_size); // align to 32 bits?
-
-            // pointer to current data
-            dw0.buffer = unsafe { data.cast_mut().add(processed) };
-
-            processed += chunk_size;
-            descr += 1;
-
-            if last {
-                break;
-            }
-        }
+        DescriptorSet::prepare_descriptors_impl(
+            &mut self.descriptors[..required_descriptors],
+            len,
+            max_chunk_size,
+            circular,
+            prepare_descriptor,
+        );
 
         Ok(())
     }
@@ -1036,7 +1006,7 @@ impl DescriptorChain {
     }
 }
 
-/// Block size for transfers to/from psram
+/// Block size for transfers to/from PSRAM
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum DmaExtMemBKSize {
     /// External memory block size of 16 bytes.
@@ -2052,8 +2022,18 @@ impl<'a> DescriptorSet<'a> {
         let descriptor_count = Self::descriptor_count(len, chunk_size, false);
         let descriptors = &mut self.descriptors[..descriptor_count];
 
+        Self::prepare_descriptors_impl(descriptors, len, chunk_size, false, prepare);
+    }
+
+    fn prepare_descriptors_impl(
+        descriptors: &mut [DmaDescriptor],
+        len: usize,
+        chunk_size: usize,
+        is_circular: bool,
+        prepare: impl Fn(&mut DmaDescriptor, usize),
+    ) {
         // Link up the descriptors.
-        Self::link_up_descriptors(descriptors, false);
+        Self::link_up_descriptors(descriptors, is_circular);
 
         // Prepare each descriptor.
         let mut remaining_length = len;
@@ -2171,12 +2151,25 @@ impl<'a> DescriptorSet<'a> {
         }
 
         let chunk_size = Self::chunk_size(self.block_size);
-        let min_descriptors = Self::descriptor_count(buffer.len(), chunk_size, false);
-        if self.descriptors.len() < min_descriptors {
+        Self::link_with_buffer_impl(buffer, &mut self.descriptors, chunk_size, false)
+    }
+
+    /// Associate each descriptor with a chunk of the buffer. This function does
+    /// not set up descriptor states for tx or rx, call
+    /// `prepare_rx_descriptors` or `prepare_tx_descriptors` after this
+    /// function to do that.
+    fn link_with_buffer_impl(
+        buffer: &mut [u8],
+        descriptors: &mut [DmaDescriptor],
+        chunk_size: usize,
+        is_circular: bool,
+    ) -> Result<(), DmaBufError> {
+        let min_descriptors = Self::descriptor_count(buffer.len(), chunk_size, is_circular);
+        if descriptors.len() < min_descriptors {
             return Err(DmaBufError::InsufficientDescriptors);
         }
 
-        let descriptors = self.descriptors.iter_mut();
+        let descriptors = descriptors.iter_mut();
         let chunks = buffer.chunks_mut(chunk_size);
 
         for (desc, chunk) in descriptors.zip(chunks) {
