@@ -5,6 +5,7 @@
 #![no_std]
 #![no_main]
 
+use defmt::assert_eq;
 #[cfg(pcnt)]
 use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
 use esp_hal::{
