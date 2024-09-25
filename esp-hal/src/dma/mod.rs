@@ -716,7 +716,7 @@ macro_rules! dma_tx_buffer {
     ($tx_size:expr) => {{
         let (tx_buffer, tx_descriptors) = $crate::dma_buffers_impl!(
             $tx_size,
-            $crate::dma::DescriptorSet::chunk_size(None),
+            $crate::dma::DmaTxBuf::compute_chunk_size(None),
             is_circular = false
         );
 
