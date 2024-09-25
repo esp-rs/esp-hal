@@ -905,10 +905,7 @@ pub struct DescriptorChain {
 
 impl DescriptorChain {
     pub fn new(descriptors: &'static mut [DmaDescriptor]) -> Self {
-        Self {
-            descriptors,
-            chunk_size: CHUNK_SIZE,
-        }
+        Self::new_with_chunk_size(descriptors, CHUNK_SIZE)
     }
 
     pub fn new_with_chunk_size(
