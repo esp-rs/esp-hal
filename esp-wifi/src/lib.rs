@@ -105,7 +105,12 @@ extern crate alloc;
 // MUST be the first module
 mod fmt;
 
-use common_adapter::{chip_specific::phy_mem_init, deinit_radio_clock_control, init_radio_clock_control, RADIO_CLOCKS};
+use common_adapter::{
+    chip_specific::phy_mem_init,
+    deinit_radio_clock_control,
+    init_radio_clock_control,
+    RADIO_CLOCKS,
+};
 use esp_config::*;
 use esp_hal as hal;
 #[cfg(not(feature = "esp32"))]
@@ -449,17 +454,61 @@ pub fn init(
     }
 }
 
+/// Deinitializes WiFi and/or BLE
+///
+/// # Examples
+///
+/// ```rust, no_run
+#[doc = esp_hal::before_snippet!()]
+/// use esp_hal::{rng::Rng, timg::TimerGroup};
+/// use esp_wifi::{EspWifiInitFor, deinit};
+///
+/// let timg0 = TimerGroup::new(peripherals.TIMG0);
+/// let init = esp_wifi::init(
+///     EspWifiInitFor::Wifi,
+///     timg0.timer0,
+///     Rng::new(peripherals.RNG),
+///     peripherals.RADIO_CLK,
+/// )
+/// .unwrap();
+///
+/// let (timer, radio_clocks) = deinit(init).unwrap();
+/// # }
+/// ```
+/// 
+/// # Safety
+/// At this point, we can only guarantee safety if
+/// the `init` function output has not been passed somewhere
+/// further into the initialization of the wifi/ble stack.
 pub fn deinit(
     _init: EspWifiInitialization,
 ) -> Result<(TimeBase, hal::peripherals::RADIO_CLK), InitializationError> {
-    unsafe { deinit_unsafe() }
+    unsafe { deinit_unchecked() }
 }
 
+/// Deinitializes WiFi and/or BLE
 ///
-/// # Safety TODO
+/// # Examples
 ///
-pub unsafe fn deinit_unsafe() -> Result<(TimeBase, hal::peripherals::RADIO_CLK), InitializationError>
-{
+/// ```rust, no_run
+#[doc = esp_hal::before_snippet!()]
+/// use esp_wifi::deinit_unchecked;
+///
+/// unsafe {
+///     let (timer, radio_clocks) = deinit_unchecked().unwrap();
+/// }
+/// # }
+/// ```
+/// 
+/// # Safety
+/// Actual implementation assumes that the user takes responsibility for how the function is used.
+/// For example, after using this function, user should not use BLE or WiFi stack or controller
+/// instances (it is possible to reinitialize communication using the `init` function),
+/// not to call `deinit_unsafe` before the first initialization, and so on.
+/// Also, there is currently no way to track whether a peripheral has been initialized,
+/// so deinitialization is done based on the activated feature (`wifi`, `ble` and/or `coex`).
+pub unsafe fn deinit_unchecked(
+) -> Result<(TimeBase, hal::peripherals::RADIO_CLK), InitializationError> {
     // Disable coexistence
     #[cfg(coex)]
     {

@@ -20,7 +20,7 @@ use esp_hal::{delay::Delay, prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{
     current_millis,
-    initialize,
+    init,
     wifi::{
         utils::create_network_interface,
         AccessPointInfo,

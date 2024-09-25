@@ -21,7 +21,7 @@ use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_wifi::{
     current_millis,
-    initialize,
+    init,
     wifi::{
         utils::{create_ap_sta_network_interface, ApStaInterface},
         AccessPointConfiguration,

@@ -34,7 +34,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_wifi::{ble::controller::asynch::BleConnector, initialize, EspWifiInitFor};
+use esp_wifi::{ble::controller::asynch::BleConnector, init, EspWifiInitFor};
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) -> ! {
