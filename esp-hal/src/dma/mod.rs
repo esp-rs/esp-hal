@@ -1143,32 +1143,6 @@ impl<'a> DescriptorSet<'a> {
     ///
     /// See `link_with_buffer_impl` for more details.
     fn link_with_buffer(&mut self, buffer: &mut [u8]) -> Result<(), DmaBufError> {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s3)] {
-                // buffer can be either DRAM or PSRAM (if supported)
-                if !is_slice_in_dram(buffer) && !is_slice_in_psram(buffer) {
-                    return Err(DmaBufError::UnsupportedMemoryRegion);
-                }
-                // if its PSRAM, the block_size/alignment must be specified
-                if is_slice_in_psram(buffer) && self.block_size.is_none() {
-                    return Err(DmaBufError::InvalidAlignment);
-                }
-            } else {
-                #[cfg(any(esp32,esp32s2))]
-                if buffer.len() % 4 != 0 && buffer.as_ptr() as usize % 4 != 0 {
-                    // ESP32 requires word alignment for DMA buffers.
-                    // ESP32-S2 technically supports byte-aligned DMA buffers, but the
-                    // transfer ends up writing out of bounds if the buffer's length
-                    // is 2 or 3 (mod 4).
-                    return Err(DmaBufError::InvalidAlignment);
-                }
-                // buffer can only be DRAM
-                if !is_slice_in_dram(buffer) {
-                    return Err(DmaBufError::UnsupportedMemoryRegion);
-                }
-            }
-        }
-
         let chunk_size = Self::chunk_size(self.block_size);
         Self::link_with_buffer_impl(buffer, self.descriptors, chunk_size, false)
     }
@@ -2307,6 +2281,32 @@ impl DmaTxBuf {
         buffer: &'static mut [u8],
         block_size: Option<DmaBufBlkSize>,
     ) -> Result<Self, DmaBufError> {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s3)] {
+                // buffer can be either DRAM or PSRAM (if supported)
+                if !is_slice_in_dram(buffer) && !is_slice_in_psram(buffer) {
+                    return Err(DmaBufError::UnsupportedMemoryRegion);
+                }
+                // if its PSRAM, the block_size/alignment must be specified
+                if is_slice_in_psram(buffer) && block_size.is_none() {
+                    return Err(DmaBufError::InvalidAlignment);
+                }
+            } else {
+                #[cfg(any(esp32,esp32s2))]
+                if buffer.len() % 4 != 0 && buffer.as_ptr() as usize % 4 != 0 {
+                    // ESP32 requires word alignment for DMA buffers.
+                    // ESP32-S2 technically supports byte-aligned DMA buffers, but the
+                    // transfer ends up writing out of bounds if the buffer's length
+                    // is 2 or 3 (mod 4).
+                    return Err(DmaBufError::InvalidAlignment);
+                }
+                // buffer can only be DRAM
+                if !is_slice_in_dram(buffer) {
+                    return Err(DmaBufError::UnsupportedMemoryRegion);
+                }
+            }
+        }
+
         let block_size = if is_slice_in_dram(buffer) {
             // no need for block size if the buffer is in DRAM
             None
@@ -2418,6 +2418,10 @@ impl DmaRxBuf {
         descriptors: &'static mut [DmaDescriptor],
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
+        if !is_slice_in_dram(buffer) {
+            return Err(DmaBufError::UnsupportedMemoryRegion);
+        }
+
         let mut buf = Self {
             descriptors: DescriptorSet::new(descriptors, buffer, None)?,
             buffer,
@@ -2582,6 +2586,10 @@ impl DmaRxTxBuf {
         tx_descriptors: &'static mut [DmaDescriptor],
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
+        if !is_slice_in_dram(buffer) {
+            return Err(DmaBufError::UnsupportedMemoryRegion);
+        }
+
         let mut buf = Self {
             rx_descriptors: DescriptorSet::new(rx_descriptors, buffer, None)?,
             tx_descriptors: DescriptorSet::new(tx_descriptors, buffer, None)?,
