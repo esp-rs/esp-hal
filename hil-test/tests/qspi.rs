@@ -193,9 +193,9 @@ mod tests {
         let mut unconnected_pin = hil_test::unconnected_pin!(io);
 
         // Make sure pins have no pullups
-        let _ = Input::new(&mut pin, Pull::None);
-        let _ = Input::new(&mut pin_mirror, Pull::None);
-        let _ = Input::new(&mut unconnected_pin, Pull::None);
+        let _ = Input::new(&mut pin, Pull::Down);
+        let _ = Input::new(&mut pin_mirror, Pull::Down);
+        let _ = Input::new(&mut unconnected_pin, Pull::Down);
 
         let dma = Dma::new(peripherals.DMA);
 
