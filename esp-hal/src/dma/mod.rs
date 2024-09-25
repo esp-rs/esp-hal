@@ -696,7 +696,7 @@ macro_rules! dma_descriptor_count {
         if $size == 0 {
             0
         } else {
-            $crate::dma::DescriptorSet::descriptor_count($size, $chunk_size, $is_circular)
+            $crate::dma::descriptor_count($size, $chunk_size, $is_circular)
         }
     }};
 }
@@ -1026,10 +1026,24 @@ impl DescriptorChain {
     }
 }
 
-#[doc(hidden)]
+/// Computes the number of descriptors required for a given buffer size with
+/// a given chunk size.
+pub const fn descriptor_count(buffer_size: usize, chunk_size: usize, is_circular: bool) -> usize {
+    if is_circular && buffer_size <= chunk_size * 2 {
+        return 3;
+    }
+
+    if buffer_size < chunk_size {
+        // At least one descriptor is always required.
+        return 1;
+    }
+
+    buffer_size.div_ceil(chunk_size)
+}
+
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct DescriptorSet<'a> {
+struct DescriptorSet<'a> {
     descriptors: &'a mut [DmaDescriptor],
     block_size: Option<DmaBufBlkSize>,
 }
@@ -1044,25 +1058,6 @@ impl<'a> DescriptorSet<'a> {
             #[cfg(not(esp32))]
             None => 4095,
         }
-    }
-
-    /// Compute the number of descriptors required for a given buffer size with
-    /// a given chunk size.
-    pub const fn descriptor_count(
-        buffer_size: usize,
-        chunk_size: usize,
-        is_circular: bool,
-    ) -> usize {
-        if is_circular && buffer_size <= chunk_size * 2 {
-            return 3;
-        }
-
-        if buffer_size < chunk_size {
-            // At least one descriptor is always required.
-            return 1;
-        }
-
-        buffer_size.div_ceil(chunk_size)
     }
 
     /// Creates a new `DescriptorSet` from a slice of descriptors and associates
@@ -1187,7 +1182,7 @@ impl<'a> DescriptorSet<'a> {
         is_circular: bool,
     ) -> Result<&mut [DmaDescriptor], DmaBufError> {
         // First, pick enough descriptors to cover the buffer.
-        let required_descriptors = Self::descriptor_count(len, chunk_size, is_circular);
+        let required_descriptors = descriptor_count(len, chunk_size, is_circular);
         if descriptors.len() < required_descriptors {
             return Err(DmaBufError::InsufficientDescriptors);
         }
@@ -2251,7 +2246,7 @@ impl DmaTxBuf {
         buffer_size: usize,
         block_size: Option<DmaBufBlkSize>,
     ) -> usize {
-        DescriptorSet::descriptor_count(buffer_size, Self::compute_chunk_size(block_size), false)
+        descriptor_count(buffer_size, Self::compute_chunk_size(block_size), false)
     }
 
     /// Creates a new [DmaTxBuf] from some descriptors and a buffer.
