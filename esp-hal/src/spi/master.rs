@@ -829,6 +829,23 @@ where
             return Err(Error::FifoSizeExeeded);
         }
 
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                let mut buffer = buffer;
+                let mut data_mode = data_mode;
+                let mut address = address;
+                let address_data;
+                if buffer.is_empty() && !address.is_none() {
+                    // If the buffer is empty, we need to send a dummy byte
+                    // to trigger the address phase.
+                    address_data = address.value().to_le_bytes();
+                    buffer = &address_data[..address.width().div_ceil(8)];
+                    data_mode = address.mode();
+                    address = Address::None;
+                }
+            }
+        }
+
         self.spi.setup_half_duplex(
             true,
             cmd,
@@ -1372,6 +1389,26 @@ mod dma {
             let bytes_to_write = buffer.length();
             if bytes_to_write > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
+            }
+
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    // On the ESP32, if we don't have data, the address is always sent
+                    // on a single line, regardless of its data mode.
+                    let mut address = address;
+                    let mut data_mode = data_mode;
+                    let mut bytes_to_write = bytes_to_write;
+                    if bytes_to_write == 0 && address.mode() != SpiDataMode::Single {
+                        let addr_bytes = address.value().to_le_bytes();
+                        let addr_bytes = &addr_bytes[..address.width().div_ceil(8)];
+                        if let Err(e) = buffer.extend_from_slice(addr_bytes) {
+                            return Err((Error::DmaError(DmaError::from(e)), self, buffer));
+                        }
+                        data_mode = address.mode();
+                        bytes_to_write = addr_bytes.len();
+                        address = Address::None;
+                    }
+                }
             }
 
             self.spi.setup_half_duplex(

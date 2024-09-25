@@ -731,6 +731,18 @@ pub enum DmaError {
     InvalidChunkSize,
 }
 
+impl From<DmaBufError> for DmaError {
+    fn from(error: DmaBufError) -> Self {
+        // FIXME: use nested errors
+        match error {
+            DmaBufError::InsufficientDescriptors => DmaError::OutOfDescriptors,
+            DmaBufError::UnsupportedMemoryRegion => DmaError::UnsupportedMemoryRegion,
+            DmaBufError::InvalidAlignment => DmaError::InvalidAlignment,
+            DmaBufError::InvalidChunkSize => DmaError::InvalidChunkSize,
+        }
+    }
+}
+
 /// DMA Priorities
 #[cfg(gdma)]
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -1929,6 +1941,15 @@ pub struct Preparation {
 /// [DmaTxBuffer] is a DMA descriptor + memory combo that can be used for
 /// transmitting data from a DMA channel to a peripheral's FIFO.
 pub trait DmaTxBuffer {
+    /// Appends a single byte to the buffer.
+    fn push(&mut self, data: u8) -> Result<(), DmaBufError> {
+        self.extend_from_slice(&[data])?;
+        Ok(())
+    }
+
+    /// Appends a slice of bytes to the buffer.
+    fn extend_from_slice(&mut self, data: &[u8]) -> Result<usize, DmaBufError>;
+
     /// Prepares the buffer for an imminent transfer and returns
     /// information required to use this buffer.
     ///
@@ -2191,6 +2212,16 @@ impl DmaTxBuf {
 }
 
 impl DmaTxBuffer for DmaTxBuf {
+    fn extend_from_slice(&mut self, data: &[u8]) -> Result<usize, DmaBufError> {
+        let current_len = self.len();
+        if current_len + data.len() > self.capacity() {
+            return Err(DmaBufError::InsufficientDescriptors);
+        }
+        self.buffer[current_len..][..data.len()].copy_from_slice(data);
+        self.set_length(current_len + data.len());
+        Ok(data.len())
+    }
+
     fn prepare(&mut self) -> Preparation {
         for desc in self.descriptors.iter_mut() {
             // Give ownership to the DMA
@@ -2631,6 +2662,16 @@ impl DmaRxTxBuf {
 }
 
 impl DmaTxBuffer for DmaRxTxBuf {
+    fn extend_from_slice(&mut self, data: &[u8]) -> Result<usize, DmaBufError> {
+        let current_len = self.len();
+        if current_len + data.len() > self.capacity() {
+            return Err(DmaBufError::InsufficientDescriptors);
+        }
+        self.buffer[current_len..][..data.len()].copy_from_slice(data);
+        self.set_length(current_len + data.len());
+        Ok(data.len())
+    }
+
     fn prepare(&mut self) -> Preparation {
         for desc in self.tx_descriptors.iter_mut() {
             // Give ownership to the DMA
