@@ -1112,7 +1112,7 @@ impl<'a> DescriptorSet<'a> {
     }
 
     /// Returns an iterator over the linked descriptors.
-    fn iter(&self) -> impl Iterator<Item = &DmaDescriptor> {
+    fn linked_iter(&self) -> impl Iterator<Item = &DmaDescriptor> {
         let mut was_last = false;
         self.descriptors.iter().take_while(move |d| {
             if was_last {
@@ -1125,7 +1125,7 @@ impl<'a> DescriptorSet<'a> {
     }
 
     /// Returns an iterator over the linked descriptors.
-    fn iter_mut(&mut self) -> impl Iterator<Item = &mut DmaDescriptor> {
+    fn linked_iter_mut(&mut self) -> impl Iterator<Item = &mut DmaDescriptor> {
         let mut was_last = false;
         self.descriptors.iter_mut().take_while(move |d| {
             if was_last {
@@ -2334,7 +2334,10 @@ impl DmaTxBuf {
     /// Return the number of bytes that would be transmitted by this buf.
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
-        self.descriptors.iter().map(|d| d.len()).sum::<usize>()
+        self.descriptors
+            .linked_iter()
+            .map(|d| d.len())
+            .sum::<usize>()
     }
 
     /// Reset the descriptors to only transmit `len` amount of bytes from this
@@ -2371,7 +2374,7 @@ impl DmaTxBuf {
 
 unsafe impl DmaTxBuffer for DmaTxBuf {
     fn prepare(&mut self) -> Preparation {
-        for desc in self.descriptors.iter_mut() {
+        for desc in self.descriptors.linked_iter_mut() {
             desc.reset_for_tx(false);
         }
 
@@ -2446,7 +2449,10 @@ impl DmaRxBuf {
     /// receive.
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
-        self.descriptors.iter().map(|d| d.size()).sum::<usize>()
+        self.descriptors
+            .linked_iter()
+            .map(|d| d.size())
+            .sum::<usize>()
     }
 
     /// Reset the descriptors to only receive `len` amount of bytes into this
@@ -2472,7 +2478,10 @@ impl DmaRxBuf {
 
     /// Return the number of bytes that was received by this buf.
     pub fn number_of_received_bytes(&self) -> usize {
-        self.descriptors.iter().map(|d| d.len()).sum::<usize>()
+        self.descriptors
+            .linked_iter()
+            .map(|d| d.len())
+            .sum::<usize>()
     }
 
     /// Reads the received data into the provided `buf`.
@@ -2484,7 +2493,7 @@ impl DmaRxBuf {
     pub fn read_received_data(&self, buf: &mut [u8]) -> usize {
         let mut remaining = &mut buf[..];
 
-        for desc in self.descriptors.iter() {
+        for desc in self.descriptors.linked_iter() {
             if remaining.is_empty() {
                 break;
             }
@@ -2507,7 +2516,7 @@ impl DmaRxBuf {
 
     /// Returns the received data as an iterator of slices.
     pub fn received_data(&self) -> impl Iterator<Item = &[u8]> {
-        let mut descriptors = self.descriptors.iter();
+        let mut descriptors = self.descriptors.linked_iter();
         let mut buf = &*self.buffer;
 
         core::iter::from_fn(move || {
@@ -2546,7 +2555,7 @@ impl DmaRxBuf {
 
 unsafe impl DmaRxBuffer for DmaRxBuf {
     fn prepare(&mut self) -> Preparation {
-        for desc in self.descriptors.iter_mut() {
+        for desc in self.descriptors.linked_iter_mut() {
             desc.reset_for_rx();
         }
 
@@ -2624,7 +2633,10 @@ impl DmaRxTxBuf {
     /// Return the number of bytes that would be transmitted by this buf.
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
-        self.tx_descriptors.iter().map(|d| d.len()).sum::<usize>()
+        self.tx_descriptors
+            .linked_iter()
+            .map(|d| d.len())
+            .sum::<usize>()
     }
 
     /// Returns the entire buf as a slice than can be read.
@@ -2651,7 +2663,7 @@ impl DmaRxTxBuf {
 
 unsafe impl DmaTxBuffer for DmaRxTxBuf {
     fn prepare(&mut self) -> Preparation {
-        for desc in self.tx_descriptors.iter_mut() {
+        for desc in self.tx_descriptors.linked_iter_mut() {
             desc.reset_for_tx(false);
         }
 
@@ -2668,7 +2680,7 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
 
 unsafe impl DmaRxBuffer for DmaRxTxBuf {
     fn prepare(&mut self) -> Preparation {
-        for desc in self.rx_descriptors.iter_mut() {
+        for desc in self.rx_descriptors.linked_iter_mut() {
             desc.reset_for_rx();
         }
 
