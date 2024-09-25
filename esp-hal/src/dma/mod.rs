@@ -53,13 +53,7 @@
 //!
 //! For convenience you can use the [crate::dma_buffers] macro.
 
-use core::{
-    cmp::min,
-    fmt::Debug,
-    marker::PhantomData,
-    ptr::addr_of_mut,
-    sync::atomic::compiler_fence,
-};
+use core::{cmp::min, fmt::Debug, marker::PhantomData, sync::atomic::compiler_fence};
 
 trait Word: crate::private::Sealed {}
 
@@ -957,8 +951,6 @@ impl DescriptorChain {
             return Err(DmaError::BufferTooSmall);
         }
 
-        self.descriptors.fill(DmaDescriptor::EMPTY);
-
         let max_chunk_size = if !circular || len > self.chunk_size * 2 {
             self.chunk_size
         } else {
@@ -971,16 +963,6 @@ impl DescriptorChain {
             let chunk_size = usize::min(max_chunk_size, len - processed);
             let last = processed + chunk_size >= len;
 
-            let next = if last {
-                if circular {
-                    addr_of_mut!(self.descriptors[0])
-                } else {
-                    core::ptr::null_mut()
-                }
-            } else {
-                addr_of_mut!(self.descriptors[descr + 1])
-            };
-
             // buffer flags
             let dw0 = &mut self.descriptors[descr];
 
@@ -992,16 +974,14 @@ impl DescriptorChain {
             // pointer to current data
             dw0.buffer = unsafe { data.add(processed) };
 
-            // pointer to next descriptor
-            dw0.next = next;
+            processed += chunk_size;
+            descr += 1;
 
             if last {
                 break;
             }
-
-            processed += chunk_size;
-            descr += 1;
         }
+        DescriptorSet::link_up_descriptors(&mut self.descriptors[..descr], circular);
 
         Ok(())
     }
@@ -1029,8 +1009,6 @@ impl DescriptorChain {
             return Err(DmaError::OutOfDescriptors);
         }
 
-        self.descriptors.fill(DmaDescriptor::EMPTY);
-
         let max_chunk_size = if !circular || len > self.chunk_size * 2 {
             self.chunk_size
         } else {
@@ -1042,16 +1020,6 @@ impl DescriptorChain {
         loop {
             let chunk_size = usize::min(max_chunk_size, len - processed);
             let last = processed + chunk_size >= len;
-
-            let next = if last {
-                if circular {
-                    addr_of_mut!(self.descriptors[0])
-                } else {
-                    core::ptr::null_mut()
-                }
-            } else {
-                addr_of_mut!(self.descriptors[descr + 1])
-            };
 
             // buffer flags
             let dw0 = &mut self.descriptors[descr];
@@ -1068,16 +1036,15 @@ impl DescriptorChain {
             // pointer to current data
             dw0.buffer = unsafe { data.cast_mut().add(processed) };
 
-            // pointer to next descriptor
-            dw0.next = next;
+            processed += chunk_size;
+            descr += 1;
 
             if last {
                 break;
             }
-
-            processed += chunk_size;
-            descr += 1;
         }
+
+        DescriptorSet::link_up_descriptors(&mut self.descriptors[..descr], circular);
 
         Ok(())
     }
@@ -2079,6 +2046,18 @@ impl<'a> DescriptorSet<'a> {
         self.descriptors.as_mut_ptr()
     }
 
+    fn link_up_descriptors(descriptors: &mut [DmaDescriptor], is_circular: bool) {
+        let mut next = if is_circular {
+            descriptors.as_mut_ptr()
+        } else {
+            core::ptr::null_mut()
+        };
+        for desc in descriptors.iter_mut().rev() {
+            desc.next = next;
+            next = desc;
+        }
+    }
+
     /// Prepares descriptors for transferring `len` bytes of data.
     fn prepare_descriptors(&mut self, len: usize, prepare: fn(&mut DmaDescriptor, usize)) {
         // First, pick enough descriptors to cover the buffer.
@@ -2087,11 +2066,7 @@ impl<'a> DescriptorSet<'a> {
         let descriptors = &mut self.descriptors[..descriptor_count];
 
         // Link up the descriptors.
-        let mut next = core::ptr::null_mut();
-        for desc in descriptors.iter_mut().rev() {
-            desc.next = next;
-            next = desc;
-        }
+        Self::link_up_descriptors(descriptors, false);
 
         // Prepare each descriptor.
         let mut remaining_length = len;
