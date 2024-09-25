@@ -936,11 +936,7 @@ impl DescriptorChain {
         len: usize,
     ) -> Result<(), DmaError> {
         self.fill(circular, data.cast_mut(), len, |desc, chunk_size| {
-            if circular {
-                DescriptorSet::reset_for_tx_circular(desc);
-            } else {
-                DescriptorSet::reset_for_tx(desc);
-            }
+            DescriptorSet::reset_for_tx(desc, circular);
             desc.set_length(chunk_size); // align to 32 bits?
         })
     }
@@ -1112,7 +1108,7 @@ impl<'a> DescriptorSet<'a> {
         self.prepare_descriptors(len, |desc, chunk_size| {
             // Calling this before prepare() isn't strictly necessary but setting up
             // descriptors early helps debugging.
-            Self::reset_for_tx(desc);
+            Self::reset_for_tx(desc, false);
 
             desc.set_length(chunk_size);
         });
@@ -1131,16 +1127,7 @@ impl<'a> DescriptorSet<'a> {
         desc.set_length(0);
     }
 
-    fn reset_for_tx(desc: &mut DmaDescriptor) {
-        // Give ownership to the DMA
-        desc.set_owner(Owner::Dma);
-
-        // As this is a simple dma buffer implementation we won't
-        // be making use of this feature. Only set for the last descriptor.
-        desc.set_suc_eof(desc.next.is_null());
-    }
-
-    fn reset_for_tx_circular(desc: &mut DmaDescriptor) {
+    fn reset_for_tx(desc: &mut DmaDescriptor, is_circular: bool) {
         // Give ownership to the DMA
         desc.set_owner(Owner::Dma);
 
@@ -1148,7 +1135,9 @@ impl<'a> DescriptorSet<'a> {
         // hardware should trigger an interrupt request. In circular mode,
         // we set the `suc_eof` bit for every buffer we send. We use this for
         // I2S to track progress of a transfer by checking OUTLINK_DSCR_ADDR.
-        desc.set_suc_eof(true);
+        // In non-circular mode, we only set it for the last descriptor to signal the
+        // end of the transfer.
+        desc.set_suc_eof(desc.next.is_null() || is_circular);
     }
 
     /// Returns an iterator over the linked descriptors.
@@ -2335,7 +2324,7 @@ impl DmaTxBuf {
 unsafe impl DmaTxBuffer for DmaTxBuf {
     fn prepare(&mut self) -> Preparation {
         for desc in self.descriptors.iter_mut() {
-            DescriptorSet::reset_for_tx(desc);
+            DescriptorSet::reset_for_tx(desc, false);
         }
 
         #[cfg(esp32s3)]
@@ -2605,7 +2594,7 @@ impl DmaRxTxBuf {
 unsafe impl DmaTxBuffer for DmaRxTxBuf {
     fn prepare(&mut self) -> Preparation {
         for desc in self.tx_descriptors.iter_mut() {
-            DescriptorSet::reset_for_tx(desc);
+            DescriptorSet::reset_for_tx(desc, false);
         }
 
         Preparation {
