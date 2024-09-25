@@ -2480,19 +2480,21 @@ impl DmaRxBuf {
     pub fn read_received_data(&self, buf: &mut [u8]) -> usize {
         let mut remaining = &mut buf[..];
 
-        let mut internal = &*self.buffer;
         for desc in self.descriptors.iter() {
             if remaining.is_empty() {
                 break;
             }
 
             let amount_to_copy = min(desc.len(), remaining.len());
+            let buf_slice = unsafe {
+                // SAFETY: We set up the descriptor to point to a subslice of the buffer, and
+                // here we are only recreating that slice with a perhaps shorter length.
+                core::slice::from_raw_parts(desc.buffer.cast_const(), amount_to_copy)
+            };
 
             let (to_fill, to_remain) = remaining.split_at_mut(amount_to_copy);
-            to_fill.copy_from_slice(&internal[..amount_to_copy]);
+            to_fill.copy_from_slice(buf_slice);
             remaining = to_remain;
-
-            internal = &internal[amount_to_copy..];
         }
 
         let remaining_bytes = remaining.len();
