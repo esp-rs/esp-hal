@@ -278,6 +278,34 @@ impl DmaDescriptor {
         next: core::ptr::null_mut(),
     };
 
+    /// Resets the descriptor for a new receive transfer.
+    pub fn reset_for_rx(&mut self) {
+        // Give ownership to the DMA
+        self.set_owner(Owner::Dma);
+
+        // Clear this to allow hardware to set it when the peripheral returns an EOF
+        // bit.
+        self.set_suc_eof(false);
+
+        // Clear this to allow hardware to set it when it's
+        // done receiving data for this descriptor.
+        self.set_length(0);
+    }
+
+    /// Resets the descriptor for a new transmit transfer.
+    pub fn reset_for_tx(&mut self, is_circular: bool) {
+        // Give ownership to the DMA
+        self.set_owner(Owner::Dma);
+
+        // The `suc_eof` bit doesn't affect the transfer itself, but signals when the
+        // hardware should trigger an interrupt request. In circular mode,
+        // we set the `suc_eof` bit for every buffer we send. We use this for
+        // I2S to track progress of a transfer by checking OUTLINK_DSCR_ADDR.
+        // In non-circular mode, we only set it for the last descriptor to signal the
+        // end of the transfer.
+        self.set_suc_eof(self.next.is_null() || is_circular);
+    }
+
     /// Set the size of the buffer. See [DmaDescriptorFlags::size].
     pub fn set_size(&mut self, len: usize) {
         self.flags.set_size(len as u16)
@@ -923,7 +951,7 @@ impl DescriptorChain {
         len: usize,
     ) -> Result<(), DmaError> {
         self.fill(circular, data, len, |desc, _| {
-            DescriptorSet::reset_for_rx(desc);
+            desc.reset_for_rx();
             // Descriptor::size has been set up by `link_with_buffer_impl`
         })
     }
@@ -936,7 +964,7 @@ impl DescriptorChain {
         len: usize,
     ) -> Result<(), DmaError> {
         self.fill(circular, data.cast_mut(), len, |desc, chunk_size| {
-            DescriptorSet::reset_for_tx(desc, circular);
+            desc.reset_for_tx(circular);
             desc.set_length(chunk_size); // align to 32 bits?
         })
     }
@@ -999,6 +1027,36 @@ pub struct DescriptorSet<'a> {
 }
 
 impl<'a> DescriptorSet<'a> {
+    /// Compute max chunk size based on block size.
+    pub const fn chunk_size(block_size: Option<DmaBufBlkSize>) -> usize {
+        match block_size {
+            Some(size) => 4096 - size as usize,
+            #[cfg(esp32)]
+            None => 4092, // esp32 requires 4 byte alignment
+            #[cfg(not(esp32))]
+            None => 4095,
+        }
+    }
+
+    /// Compute the number of descriptors required for a given buffer size with
+    /// a given chunk size.
+    pub const fn descriptor_count(
+        buffer_size: usize,
+        chunk_size: usize,
+        is_circular: bool,
+    ) -> usize {
+        if is_circular && buffer_size <= chunk_size * 2 {
+            return 3;
+        }
+
+        if buffer_size < chunk_size {
+            // At least one descriptor is always required.
+            return 1;
+        }
+
+        buffer_size.div_ceil(chunk_size)
+    }
+
     fn new(
         descriptors: &'a mut [DmaDescriptor],
         buffer: &mut [u8],
@@ -1038,113 +1096,6 @@ impl<'a> DescriptorSet<'a> {
 
     fn head(&mut self) -> *mut DmaDescriptor {
         self.descriptors.as_mut_ptr()
-    }
-
-    fn link_up_descriptors(descriptors: &mut [DmaDescriptor], is_circular: bool) {
-        let mut next = if is_circular {
-            descriptors.as_mut_ptr()
-        } else {
-            core::ptr::null_mut()
-        };
-        for desc in descriptors.iter_mut().rev() {
-            desc.next = next;
-            next = desc;
-        }
-    }
-
-    /// Prepares descriptors for transferring `len` bytes of data.
-    fn prepare_descriptors(
-        &mut self,
-        len: usize,
-        prepare: fn(&mut DmaDescriptor, usize),
-    ) -> Result<(), DmaBufError> {
-        let chunk_size = Self::chunk_size(self.block_size);
-        Self::prepare_descriptors_impl(self.descriptors, len, chunk_size, false, prepare)
-    }
-
-    fn descriptors_for_buffer_len<'d>(
-        descriptors: &'d mut [DmaDescriptor],
-        len: usize,
-        chunk_size: usize,
-        is_circular: bool,
-    ) -> Result<&'d mut [DmaDescriptor], DmaBufError> {
-        // First, pick enough descriptors to cover the buffer.
-        let required_descriptors = Self::descriptor_count(len, chunk_size, is_circular);
-        if descriptors.len() < required_descriptors {
-            return Err(DmaBufError::InsufficientDescriptors);
-        }
-        Ok(&mut descriptors[..required_descriptors])
-    }
-
-    fn prepare_descriptors_impl(
-        descriptors: &mut [DmaDescriptor],
-        len: usize,
-        chunk_size: usize,
-        is_circular: bool,
-        prepare: impl Fn(&mut DmaDescriptor, usize),
-    ) -> Result<(), DmaBufError> {
-        let descriptors =
-            Self::descriptors_for_buffer_len(descriptors, len, chunk_size, is_circular)?;
-
-        // Link up the descriptors.
-        Self::link_up_descriptors(descriptors, is_circular);
-
-        // Prepare each descriptor.
-        let mut remaining_length = len;
-        for desc in descriptors.iter_mut() {
-            let chunk_size = min(chunk_size, remaining_length);
-            prepare(desc, chunk_size);
-            remaining_length -= chunk_size;
-        }
-        debug_assert_eq!(remaining_length, 0);
-
-        Ok(())
-    }
-
-    fn prepare_rx_descriptors(&mut self, len: usize) -> Result<(), DmaBufError> {
-        self.prepare_descriptors(len, |desc, chunk_size| {
-            // Calling this before prepare() isn't strictly necessary but setting up
-            // descriptors early helps debugging.
-            Self::reset_for_rx(desc);
-
-            desc.set_size(chunk_size);
-        })
-    }
-
-    fn prepare_tx_descriptors(&mut self, len: usize) -> Result<(), DmaBufError> {
-        self.prepare_descriptors(len, |desc, chunk_size| {
-            // Calling this before prepare() isn't strictly necessary but setting up
-            // descriptors early helps debugging.
-            Self::reset_for_tx(desc, false);
-
-            desc.set_length(chunk_size);
-        })
-    }
-
-    fn reset_for_rx(desc: &mut DmaDescriptor) {
-        // Give ownership to the DMA
-        desc.set_owner(Owner::Dma);
-
-        // Clear this to allow hardware to set it when the peripheral returns an EOF
-        // bit.
-        desc.set_suc_eof(false);
-
-        // Clear this to allow hardware to set it when it's
-        // done receiving data for this descriptor.
-        desc.set_length(0);
-    }
-
-    fn reset_for_tx(desc: &mut DmaDescriptor, is_circular: bool) {
-        // Give ownership to the DMA
-        desc.set_owner(Owner::Dma);
-
-        // The `suc_eof` bit doesn't affect the transfer itself, but signals when the
-        // hardware should trigger an interrupt request. In circular mode,
-        // we set the `suc_eof` bit for every buffer we send. We use this for
-        // I2S to track progress of a transfer by checking OUTLINK_DSCR_ADDR.
-        // In non-circular mode, we only set it for the last descriptor to signal the
-        // end of the transfer.
-        desc.set_suc_eof(desc.next.is_null() || is_circular);
     }
 
     /// Returns an iterator over the linked descriptors.
@@ -1208,6 +1159,87 @@ impl<'a> DescriptorSet<'a> {
         Self::link_with_buffer_impl(buffer, self.descriptors, chunk_size, false)
     }
 
+    /// Prepares descriptors for transferring `len` bytes of data.
+    fn prepare_descriptors(
+        &mut self,
+        len: usize,
+        prepare: fn(&mut DmaDescriptor, usize),
+    ) -> Result<(), DmaBufError> {
+        let chunk_size = Self::chunk_size(self.block_size);
+        Self::prepare_descriptors_impl(self.descriptors, len, chunk_size, false, prepare)
+    }
+
+    fn prepare_rx_descriptors(&mut self, len: usize) -> Result<(), DmaBufError> {
+        self.prepare_descriptors(len, |desc, chunk_size| {
+            // Calling this before prepare() isn't strictly necessary but setting up
+            // descriptors early helps debugging.
+            desc.reset_for_rx();
+
+            desc.set_size(chunk_size);
+        })
+    }
+
+    fn prepare_tx_descriptors(&mut self, len: usize) -> Result<(), DmaBufError> {
+        self.prepare_descriptors(len, |desc, chunk_size| {
+            // Calling this before prepare() isn't strictly necessary but setting up
+            // descriptors early helps debugging.
+            desc.reset_for_tx(false);
+
+            desc.set_length(chunk_size);
+        })
+    }
+
+    fn link_up_descriptors(descriptors: &mut [DmaDescriptor], is_circular: bool) {
+        let mut next = if is_circular {
+            descriptors.as_mut_ptr()
+        } else {
+            core::ptr::null_mut()
+        };
+        for desc in descriptors.iter_mut().rev() {
+            desc.next = next;
+            next = desc;
+        }
+    }
+
+    fn descriptors_for_buffer_len<'d>(
+        descriptors: &'d mut [DmaDescriptor],
+        len: usize,
+        chunk_size: usize,
+        is_circular: bool,
+    ) -> Result<&'d mut [DmaDescriptor], DmaBufError> {
+        // First, pick enough descriptors to cover the buffer.
+        let required_descriptors = Self::descriptor_count(len, chunk_size, is_circular);
+        if descriptors.len() < required_descriptors {
+            return Err(DmaBufError::InsufficientDescriptors);
+        }
+        Ok(&mut descriptors[..required_descriptors])
+    }
+
+    fn prepare_descriptors_impl(
+        descriptors: &mut [DmaDescriptor],
+        len: usize,
+        chunk_size: usize,
+        is_circular: bool,
+        prepare: impl Fn(&mut DmaDescriptor, usize),
+    ) -> Result<(), DmaBufError> {
+        let descriptors =
+            Self::descriptors_for_buffer_len(descriptors, len, chunk_size, is_circular)?;
+
+        // Link up the descriptors.
+        Self::link_up_descriptors(descriptors, is_circular);
+
+        // Prepare each descriptor.
+        let mut remaining_length = len;
+        for desc in descriptors.iter_mut() {
+            let chunk_size = min(chunk_size, remaining_length);
+            prepare(desc, chunk_size);
+            remaining_length -= chunk_size;
+        }
+        debug_assert_eq!(remaining_length, 0);
+
+        Ok(())
+    }
+
     /// Associate each descriptor with a chunk of the buffer. This function does
     /// not set up descriptor states for tx or rx, call
     /// `prepare_rx_descriptors` or `prepare_tx_descriptors` after this
@@ -1228,36 +1260,6 @@ impl<'a> DescriptorSet<'a> {
         }
 
         Ok(())
-    }
-
-    /// Compute max chunk size based on block size.
-    pub const fn chunk_size(block_size: Option<DmaBufBlkSize>) -> usize {
-        match block_size {
-            Some(size) => 4096 - size as usize,
-            #[cfg(esp32)]
-            None => 4092, // esp32 requires 4 byte alignment
-            #[cfg(not(esp32))]
-            None => 4095,
-        }
-    }
-
-    /// Compute the number of descriptors required for a given buffer size with
-    /// a given chunk size.
-    pub const fn descriptor_count(
-        buffer_size: usize,
-        chunk_size: usize,
-        is_circular: bool,
-    ) -> usize {
-        if is_circular && buffer_size <= chunk_size * 2 {
-            return 3;
-        }
-
-        if buffer_size < chunk_size {
-            // At least one descriptor is always required.
-            return 1;
-        }
-
-        buffer_size.div_ceil(chunk_size)
     }
 }
 
@@ -2327,7 +2329,7 @@ impl DmaTxBuf {
 unsafe impl DmaTxBuffer for DmaTxBuf {
     fn prepare(&mut self) -> Preparation {
         for desc in self.descriptors.iter_mut() {
-            DescriptorSet::reset_for_tx(desc, false);
+            desc.reset_for_tx(false);
         }
 
         #[cfg(esp32s3)]
@@ -2496,7 +2498,7 @@ impl DmaRxBuf {
 unsafe impl DmaRxBuffer for DmaRxBuf {
     fn prepare(&mut self) -> Preparation {
         for desc in self.descriptors.iter_mut() {
-            DescriptorSet::reset_for_rx(desc);
+            desc.reset_for_rx();
         }
 
         Preparation {
@@ -2597,7 +2599,7 @@ impl DmaRxTxBuf {
 unsafe impl DmaTxBuffer for DmaRxTxBuf {
     fn prepare(&mut self) -> Preparation {
         for desc in self.tx_descriptors.iter_mut() {
-            DescriptorSet::reset_for_tx(desc, false);
+            desc.reset_for_tx(false);
         }
 
         Preparation {
@@ -2614,7 +2616,7 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
 unsafe impl DmaRxBuffer for DmaRxTxBuf {
     fn prepare(&mut self) -> Preparation {
         for desc in self.rx_descriptors.iter_mut() {
-            DescriptorSet::reset_for_rx(desc);
+            desc.reset_for_rx();
         }
 
         Preparation {
