@@ -656,25 +656,12 @@ macro_rules! dma_descriptors_impl {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! dma_descriptor_count {
-    (@validate_chunk_size $chunk_size:expr) => {
+    ($size:expr, $chunk_size:expr, is_circular = $is_circular:tt) => {{
         const {
             ::core::assert!($chunk_size <= 4095, "chunk size must be <= 4095");
             ::core::assert!($chunk_size > 0, "chunk size must be > 0");
         }
-    };
-
-    ($size:expr, $chunk_size:expr, is_circular = true) => {{
-        $crate::dma_descriptor_count!(@validate_chunk_size $chunk_size);
-        if $size > $chunk_size * 2 {
-            ($size as usize).div_ceil($chunk_size)
-        } else {
-            3
-        }
-    }};
-
-    ($size:expr, $chunk_size:expr, is_circular = false) => {{
-        $crate::dma_descriptor_count!(@validate_chunk_size $chunk_size);
-        ($size as usize).div_ceil($chunk_size)
+        $crate::dma::DescriptorSet::descriptor_count($size, $chunk_size, $is_circular)
     }};
 }
 
@@ -695,7 +682,7 @@ macro_rules! dma_tx_buffer {
     ($tx_size:expr) => {{
         let (tx_buffer, tx_descriptors) = $crate::dma_buffers_impl!(
             $tx_size,
-            $crate::dma::DmaTxBuf::compute_chunk_size(None),
+            $crate::dma::DescriptorSet::chunk_size(None),
             is_circular = false
         );
 
@@ -1997,9 +1984,10 @@ pub enum DmaBufBlkSize {
     Size64 = 64,
 }
 
+#[doc(hidden)]
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-struct DescriptorSet<'a> {
+pub struct DescriptorSet<'a> {
     descriptors: &'a mut [DmaDescriptor],
     block_size: Option<DmaBufBlkSize>,
 }
@@ -2061,8 +2049,8 @@ impl<'a> DescriptorSet<'a> {
     /// Prepares descriptors for transferring `len` bytes of data.
     fn prepare_descriptors(&mut self, len: usize, prepare: fn(&mut DmaDescriptor, usize)) {
         // First, pick enough descriptors to cover the buffer.
-        let chunk_size = DmaTxBuf::compute_chunk_size(self.block_size);
-        let descriptor_count = len.div_ceil(chunk_size).max(1);
+        let chunk_size = Self::chunk_size(self.block_size);
+        let descriptor_count = Self::descriptor_count(len, chunk_size, false);
         let descriptors = &mut self.descriptors[..descriptor_count];
 
         // Link up the descriptors.
@@ -2177,8 +2165,8 @@ impl<'a> DescriptorSet<'a> {
             }
         }
 
-        let chunk_size = DmaTxBuf::compute_chunk_size(self.block_size);
-        let min_descriptors = buffer.len().div_ceil(chunk_size);
+        let chunk_size = Self::chunk_size(self.block_size);
+        let min_descriptors = Self::descriptor_count(buffer.len(), chunk_size, false);
         if self.descriptors.len() < min_descriptors {
             return Err(DmaBufError::InsufficientDescriptors);
         }
@@ -2192,6 +2180,36 @@ impl<'a> DescriptorSet<'a> {
         }
 
         Ok(())
+    }
+
+    /// Compute max chunk size based on block size.
+    pub const fn chunk_size(block_size: Option<DmaBufBlkSize>) -> usize {
+        match block_size {
+            Some(size) => 4096 - size as usize,
+            #[cfg(esp32)]
+            None => 4092, // esp32 requires 4 byte alignment
+            #[cfg(not(esp32))]
+            None => 4095,
+        }
+    }
+
+    /// Compute the number of descriptors required for a given buffer size with
+    /// a given chunk size.
+    pub const fn descriptor_count(
+        buffer_size: usize,
+        chunk_size: usize,
+        is_circular: bool,
+    ) -> usize {
+        if is_circular && buffer_size <= chunk_size * 2 {
+            return 3;
+        }
+
+        if buffer_size < chunk_size {
+            // At least one descriptor is always required.
+            return 1;
+        }
+
+        buffer_size.div_ceil(chunk_size)
     }
 }
 
@@ -2224,13 +2242,7 @@ impl DmaTxBuf {
 
     /// Compute max chunk size based on block size
     pub const fn compute_chunk_size(block_size: Option<DmaBufBlkSize>) -> usize {
-        match block_size {
-            Some(size) => 4096 - size as usize,
-            #[cfg(esp32)]
-            None => 4092, // esp32 requires 4 byte alignment
-            #[cfg(not(esp32))]
-            None => 4095,
-        }
+        DescriptorSet::chunk_size(block_size)
     }
 
     /// Compute the number of descriptors required for a given block size and
@@ -2239,7 +2251,7 @@ impl DmaTxBuf {
         buffer_size: usize,
         block_size: Option<DmaBufBlkSize>,
     ) -> usize {
-        buffer_size.div_ceil(Self::compute_chunk_size(block_size))
+        DescriptorSet::descriptor_count(buffer_size, Self::compute_chunk_size(block_size), false)
     }
 
     /// Creates a new [DmaTxBuf] from some descriptors and a buffer.
