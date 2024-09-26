@@ -46,10 +46,3 @@ pub extern "C" fn timer_task(_param: *mut esp_wifi_sys::c_types::c_void) {
         yield_task();
     }
 }
-
-pub fn deinit_tasks() {
-    // Delete timer task
-    crate::preempt::delete_task(crate::preempt::current_task());
-    // Delete main task
-    crate::preempt::delete_main_task();
-}

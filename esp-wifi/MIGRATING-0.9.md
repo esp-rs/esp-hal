@@ -25,7 +25,7 @@ You no longer have to set up clocks and pass them to `esp_wifi::init`.
 
      let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-     let init = init(
+     let init initialize(
          EspWifiInitFor::Wifi,
          timg0.timer0,
          Rng::new(peripherals.RNG),

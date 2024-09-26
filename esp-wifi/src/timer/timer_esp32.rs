@@ -27,15 +27,6 @@ pub fn shutdown_radio_isr() {
     {
         interrupt::disable(crate::hal::Cpu::ProCpu, peripherals::Interrupt::RWBT);
         interrupt::disable(crate::hal::Cpu::ProCpu, peripherals::Interrupt::BT_BB);
-
-        unwrap!(interrupt::enable(
-            peripherals::Interrupt::ETH_MAC,
-            interrupt::Priority::Priority1
-        ));
-        unwrap!(interrupt::enable(
-            peripherals::Interrupt::UART0,
-            interrupt::Priority::Priority1
-        ));
     }
 }
 

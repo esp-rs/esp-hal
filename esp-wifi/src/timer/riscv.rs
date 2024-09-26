@@ -39,9 +39,6 @@ pub fn setup_timer(mut alarm0: TimeBase) -> Result<(), esp_hal::timer::Error> {
 }
 
 pub fn disable_timer() -> Result<(), esp_hal::timer::Error> {
-    // make sure the scheduling won't start before everything is setup
-    riscv::interrupt::disable();
-
     critical_section::with(|cs| {
         unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).enable_interrupt(false);
         unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).cancel().unwrap();
@@ -63,10 +60,6 @@ pub fn setup_multitasking() {
 
 pub fn disable_multitasking() {
     interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::FROM_CPU_INTR3);
-
-    unsafe {
-        riscv::interrupt::enable();
-    }
 }
 
 extern "C" fn handler(trap_frame: &mut TrapFrame) {

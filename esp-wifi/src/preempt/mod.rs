@@ -78,12 +78,30 @@ pub(crate) fn delete_task(task: *mut Context) {
     });
 }
 
-pub(crate) fn delete_main_task() {
+pub(crate) fn delete_all_tasks() {
     critical_section::with(|cs| unsafe {
         let mut ctx_now_ref = CTX_NOW.borrow_ref_mut(cs);
-        let main_task = *ctx_now_ref;
+        let current_task = *ctx_now_ref;
 
-        free((*main_task).allocated_stack as *mut u8);
+        if current_task.is_null() {
+            return;
+        }
+
+        let mut task_to_delete = current_task;
+
+        loop {
+            let next_task = (*task_to_delete).next;
+
+            free((*task_to_delete).allocated_stack as *mut u8);
+            free(task_to_delete as *mut u8);
+
+            if next_task == current_task {
+                break;
+            }
+
+            task_to_delete = next_task;
+        }
+
         *ctx_now_ref = core::ptr::null_mut();
 
         memory_fence();

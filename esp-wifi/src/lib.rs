@@ -131,7 +131,7 @@ use crate::{
 };
 use crate::{
     common_adapter::init_rng,
-    tasks::{deinit_tasks, init_tasks},
+    tasks::init_tasks,
     timer::{setup_timer_isr, shutdown_timer_isr},
 };
 
@@ -396,7 +396,7 @@ impl EspWifiTimerSource for TimeBase {
 /// .unwrap();
 /// # }
 /// ```
-pub fn init(
+pub fn initialize(
     init_for: EspWifiInitFor,
     timer: impl EspWifiTimerSource,
     rng: hal::rng::Rng,
@@ -503,7 +503,7 @@ pub unsafe fn deinit_unchecked(
     }
 
     shutdown_timer_isr().unwrap();
-    deinit_tasks();
+    crate::preempt::delete_all_tasks();
 
     let timer = critical_section::with(|cs| crate::timer::TIMER.borrow_ref_mut(cs).take())
         .ok_or(InitializationError::TimerUnavailable)?;

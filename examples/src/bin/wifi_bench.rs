@@ -20,7 +20,7 @@ use esp_hal::{delay::Delay, prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{
     current_millis,
-    init,
+    initialize,
     wifi::{
         utils::create_network_interface,
         AccessPointInfo,
@@ -64,7 +64,7 @@ fn main() -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let init = init(
+    let init = initialize(
         EspWifiInitFor::Wifi,
         timg0.timer0,
         Rng::new(peripherals.RNG),
