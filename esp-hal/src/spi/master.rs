@@ -830,7 +830,7 @@ where
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+            if #[cfg(all(esp32, esp32_spi_address_workaround))] {
                 let mut buffer = buffer;
                 let mut data_mode = data_mode;
                 let mut address = address;
@@ -950,11 +950,7 @@ mod dma {
             C::P: SpiPeripheral + Spi2Peripheral,
             DmaMode: Mode,
         {
-            SpiDma {
-                spi: self.spi,
-                channel,
-                _mode: PhantomData,
-            }
+            SpiDma::new(self.spi, channel)
         }
     }
 
@@ -977,11 +973,7 @@ mod dma {
             C::P: SpiPeripheral + Spi3Peripheral,
             DmaMode: Mode,
         {
-            SpiDma {
-                spi: self.spi,
-                channel,
-                _mode: PhantomData,
-            }
+            SpiDma::new(self.spi, channel)
         }
     }
 
@@ -1001,6 +993,8 @@ mod dma {
     {
         pub(crate) spi: PeripheralRef<'d, T>,
         pub(crate) channel: Channel<'d, C, M>,
+        #[cfg(all(esp32, esp32_spi_address_workaround))]
+        address_buffer: DmaTxBuf,
         _mode: PhantomData<D>,
     }
 
@@ -1028,6 +1022,36 @@ mod dma {
         D: DuplexMode,
         M: Mode,
     {
+        fn new(spi: PeripheralRef<'d, T>, channel: Channel<'d, C, M>) -> Self {
+            cfg_if::cfg_if! {
+                if #[cfg(all(esp32, esp32_spi_address_workaround))] {
+                    use crate::dma::DmaDescriptor;
+                    const SPI_NUM: usize = 2;
+                    static mut DESCRIPTORS: [[DmaDescriptor; 1]; SPI_NUM] =
+                        [[DmaDescriptor::EMPTY]; SPI_NUM];
+                    static mut BUFFERS: [[u32; 1]; SPI_NUM] = [[0; 1]; SPI_NUM];
+
+                    let id = spi.spi_num() as usize - 2;
+
+                    Self {
+                        spi,
+                        channel,
+                        address_buffer: unwrap!(DmaTxBuf::new(
+                            unsafe { &mut DESCRIPTORS[id] },
+                            crate::as_mut_byte_array!(BUFFERS[id], 4)
+                        )),
+                        _mode: PhantomData,
+                    }
+                } else {
+                    Self {
+                        spi,
+                        channel,
+                        _mode: PhantomData,
+                    }
+                }
+            }
+        }
+
         /// Sets the interrupt handler
         ///
         /// Interrupts are not enabled at the peripheral level here.
@@ -1391,23 +1415,38 @@ mod dma {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
 
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
-                    // On the ESP32, if we don't have data, the address is always sent
-                    // on a single line, regardless of its data mode.
-                    let mut address = address;
-                    let mut data_mode = data_mode;
-                    let mut bytes_to_write = bytes_to_write;
-                    if bytes_to_write == 0 && address.mode() != SpiDataMode::Single {
-                        let addr_bytes = address.value().to_le_bytes();
-                        let addr_bytes = &addr_bytes[..address.width().div_ceil(8)];
-                        if let Err(e) = buffer.extend_from_slice(addr_bytes) {
-                            return Err((Error::DmaError(DmaError::from(e)), self, buffer));
-                        }
-                        data_mode = address.mode();
-                        bytes_to_write = addr_bytes.len();
-                        address = Address::None;
+            #[cfg(all(esp32, esp32_spi_address_workaround))]
+            {
+                // On the ESP32, if we don't have data, the address is always sent
+                // on a single line, regardless of its data mode.
+                if bytes_to_write == 0 && address.mode() != SpiDataMode::Single {
+                    let bytes_to_write = address.width().div_ceil(8);
+                    let addr_bytes = address.value().to_le_bytes();
+                    let addr_bytes = &addr_bytes[..bytes_to_write];
+                    self.address_buffer.fill(addr_bytes);
+
+                    self.spi.setup_half_duplex(
+                        true,
+                        cmd,
+                        Address::None,
+                        false,
+                        dummy,
+                        bytes_to_write == 0,
+                        address.mode(),
+                    );
+
+                    let result = unsafe {
+                        self.spi.start_write_bytes_dma(
+                            &mut self.address_buffer,
+                            &mut self.channel.tx,
+                            false,
+                        )
+                    };
+                    if let Err(e) = result {
+                        return Err((e, self, buffer));
                     }
+
+                    return Ok(SpiDmaTransfer::new(self, buffer, false, bytes_to_write > 0));
                 }
             }
 

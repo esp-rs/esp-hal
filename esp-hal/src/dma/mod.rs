@@ -514,7 +514,7 @@ macro_rules! declare_aligned_dma_buffer {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! as_mut_byte_array {
-    ($name:ident, $size:expr) => {
+    ($name:expr, $size:expr) => {
         unsafe { &mut *($name.as_mut_ptr() as *mut [u8; $size]) }
     };
 }

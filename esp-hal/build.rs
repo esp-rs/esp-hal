@@ -128,11 +128,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     // emit config
     generate_config(
         "esp_hal",
-        &[(
-            "place-spi-driver-in-ram",
-            Value::Bool(false),
-            "Places the SPI driver in RAM for better performance",
-        )],
+        &[
+            (
+                "place-spi-driver-in-ram",
+                Value::Bool(false),
+                "Places the SPI driver in RAM for better performance",
+            ),
+            (
+                "esp32-spi-address-workaround",
+                Value::Bool(true),
+                "Enables a workaround for the issue where SPI incorrectly transmits the address on a single line if the data buffer is empty."
+            ),
+        ],
         true,
     );
 
