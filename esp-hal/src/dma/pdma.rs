@@ -128,6 +128,11 @@ macro_rules! ImplSpiChannel {
                     spi.dma_in_link().modify(|_, w| w.inlink_start().set_bit());
                 }
 
+                fn stop_in() {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_in_link().modify(|_, w| w.inlink_stop().set_bit());
+                }
+
                 fn listen_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
                     spi.dma_int_ena().modify(|_, w| {
@@ -518,6 +523,11 @@ macro_rules! ImplI2sChannel {
                 fn start_in() {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
                     reg_block.in_link().modify(|_, w| w.inlink_start().set_bit());
+                }
+
+                fn stop_in() {
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.in_link().modify(|_, w| w.inlink_stop().set_bit());
                 }
 
                 fn listen_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {

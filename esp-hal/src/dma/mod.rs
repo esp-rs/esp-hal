@@ -203,15 +203,36 @@ where
 }
 
 bitfield::bitfield! {
-    #[doc(hidden)]
+    /// DMA descriptor flags.
     #[derive(Clone, Copy)]
     pub struct DmaDescriptorFlags(u32);
 
     u16;
-    size, set_size: 11, 0;
-    length, set_length: 23, 12;
-    suc_eof, set_suc_eof: 30;
-    owner, set_owner: 31;
+
+    /// Specifies the size of the buffer that this descriptor points to.
+    pub size, set_size: 11, 0;
+
+    /// Specifies the number of valid bytes in the buffer that this descriptor points to.
+    ///
+    /// This field in a transmit descriptor is written by software and indicates how many bytes can
+    /// be read from the buffer.
+    ///
+    /// This field in a receive descriptor is written by hardware automatically and indicates how
+    /// many valid bytes have been stored into the buffer.
+    pub length, set_length: 23, 12;
+
+    /// For receive descriptors, software needs to clear this bit to 0, and hardware will set it to 1 after receiving
+    /// data containing the EOF flag.
+    /// For transmit descriptors, software needs to set this bit to 1 as needed.
+    /// If software configures this bit to 1 in a descriptor, the DMA will include the EOF flag in the data sent to
+    /// the corresponding peripheral, indicating to the peripheral that this data segment marks the end of one
+    /// transfer phase.
+    pub suc_eof, set_suc_eof: 30;
+
+    /// Specifies who is allowed to access the buffer that this descriptor points to.
+    /// - 0: CPU can access the buffer;
+    /// - 1: The GDMA controller can access the buffer.
+    pub owner, set_owner: 31;
 }
 
 impl Debug for DmaDescriptorFlags {
@@ -243,9 +264,16 @@ impl defmt::Format for DmaDescriptorFlags {
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct DmaDescriptor {
-    pub(crate) flags: DmaDescriptorFlags,
-    pub(crate) buffer: *mut u8,
-    pub(crate) next: *mut DmaDescriptor,
+    /// Descriptor flags.
+    pub flags: DmaDescriptorFlags,
+
+    /// Address of the buffer.
+    pub buffer: *mut u8,
+
+    /// Address of the next descriptor.
+    /// If the current descriptor is the last one, this value is 0.
+    /// This field can only point to internal RAM.
+    pub next: *mut DmaDescriptor,
 }
 
 impl DmaDescriptor {
@@ -256,28 +284,34 @@ impl DmaDescriptor {
         next: core::ptr::null_mut(),
     };
 
-    fn set_size(&mut self, len: usize) {
+    /// Set the size of the buffer. See [DmaDescriptorFlags::size].
+    pub fn set_size(&mut self, len: usize) {
         self.flags.set_size(len as u16)
     }
 
-    fn set_length(&mut self, len: usize) {
+    /// Set the length of the descriptor. See [DmaDescriptorFlags::length].
+    pub fn set_length(&mut self, len: usize) {
         self.flags.set_length(len as u16)
     }
 
-    #[allow(unused)]
-    fn size(&self) -> usize {
+    /// Returns the size of the buffer. See [DmaDescriptorFlags::size].
+    pub fn size(&self) -> usize {
         self.flags.size() as usize
     }
 
-    fn len(&self) -> usize {
+    /// Returns the length of the descriptor. See [DmaDescriptorFlags::length].
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
         self.flags.length() as usize
     }
 
-    fn set_suc_eof(&mut self, suc_eof: bool) {
+    /// Set the suc_eof bit. See [DmaDescriptorFlags::suc_eof].
+    pub fn set_suc_eof(&mut self, suc_eof: bool) {
         self.flags.set_suc_eof(suc_eof)
     }
 
-    fn set_owner(&mut self, owner: Owner) {
+    /// Set the owner. See [DmaDescriptorFlags::owner].
+    pub fn set_owner(&mut self, owner: Owner) {
         let owner = match owner {
             Owner::Cpu => false,
             Owner::Dma => true,
@@ -285,7 +319,8 @@ impl DmaDescriptor {
         self.flags.set_owner(owner)
     }
 
-    fn owner(&self) -> Owner {
+    /// Returns the owner. See [DmaDescriptorFlags::owner].
+    pub fn owner(&self) -> Owner {
         match self.flags.owner() {
             false => Owner::Cpu,
             true => Owner::Dma,
@@ -479,7 +514,7 @@ macro_rules! declare_aligned_dma_buffer {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! as_mut_byte_array {
-    ($name:ident, $size:expr) => {
+    ($name:expr, $size:expr) => {
         unsafe { &mut *($name.as_mut_ptr() as *mut [u8; $size]) }
     };
 }
@@ -696,6 +731,18 @@ pub enum DmaError {
     InvalidChunkSize,
 }
 
+impl From<DmaBufError> for DmaError {
+    fn from(error: DmaBufError) -> Self {
+        // FIXME: use nested errors
+        match error {
+            DmaBufError::InsufficientDescriptors => DmaError::OutOfDescriptors,
+            DmaBufError::UnsupportedMemoryRegion => DmaError::UnsupportedMemoryRegion,
+            DmaBufError::InvalidAlignment => DmaError::InvalidAlignment,
+            DmaBufError::InvalidChunkSize => DmaError::InvalidChunkSize,
+        }
+    }
+}
+
 /// DMA Priorities
 #[cfg(gdma)]
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -780,9 +827,12 @@ pub enum DmaPeripheral {
     Mem2Mem15 = 15,
 }
 
+/// The owner bit of a DMA descriptor.
 #[derive(PartialEq, PartialOrd)]
-enum Owner {
+pub enum Owner {
+    /// Owned by CPU
     Cpu = 0,
+    /// Owned by DMA
     Dma = 1,
 }
 
@@ -1328,6 +1378,8 @@ pub trait Rx: crate::private::Sealed {
 
     fn start_transfer(&mut self) -> Result<(), DmaError>;
 
+    fn stop_transfer(&mut self);
+
     #[cfg(esp32s3)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
 
@@ -1403,6 +1455,10 @@ where
         } else {
             Ok(())
         }
+    }
+
+    fn stop_transfer(&mut self) {
+        R::stop_in();
     }
 
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
@@ -1497,6 +1553,10 @@ where
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
         self.rx_impl.start_transfer()
+    }
+
+    fn stop_transfer(&mut self) {
+        self.rx_impl.stop_transfer()
     }
 
     #[cfg(esp32s3)]
@@ -1630,7 +1690,7 @@ where
     }
 
     fn stop_transfer(&mut self) {
-        R::stop_out()
+        R::stop_out();
     }
 
     fn listen_out(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
@@ -1740,7 +1800,7 @@ where
     }
 
     fn stop_transfer(&mut self) {
-        self.tx_impl.stop_transfer();
+        self.tx_impl.stop_transfer()
     }
 
     #[cfg(esp32s3)]
@@ -1819,6 +1879,7 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn set_in_descriptors(address: u32);
     fn set_in_peripheral(peripheral: u8);
     fn start_in();
+    fn stop_in();
 }
 
 /// DMA Channel
