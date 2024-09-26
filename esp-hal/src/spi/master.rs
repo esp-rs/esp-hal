@@ -830,7 +830,7 @@ where
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(all(esp32, esp32_spi_address_workaround))] {
+            if #[cfg(all(esp32, spi_address_workaround))] {
                 let mut buffer = buffer;
                 let mut data_mode = data_mode;
                 let mut address = address;
@@ -993,12 +993,12 @@ mod dma {
     {
         pub(crate) spi: PeripheralRef<'d, T>,
         pub(crate) channel: Channel<'d, C, M>,
-        #[cfg(all(esp32, esp32_spi_address_workaround))]
+        #[cfg(all(esp32, spi_address_workaround))]
         address_buffer: DmaTxBuf,
         _mode: PhantomData<D>,
     }
 
-    #[cfg(all(esp32, esp32_spi_address_workaround))]
+    #[cfg(all(esp32, spi_address_workaround))]
     unsafe impl<'d, T, C, D, M> Send for SpiDma<'d, T, C, D, M>
     where
         C: DmaChannel,
@@ -1034,7 +1034,7 @@ mod dma {
     {
         fn new(spi: PeripheralRef<'d, T>, channel: Channel<'d, C, M>) -> Self {
             cfg_if::cfg_if! {
-                if #[cfg(all(esp32, esp32_spi_address_workaround))] {
+                if #[cfg(all(esp32, spi_address_workaround))] {
                     use crate::dma::DmaDescriptor;
                     const SPI_NUM: usize = 2;
                     static mut DESCRIPTORS: [[DmaDescriptor; 1]; SPI_NUM] =
@@ -1425,7 +1425,7 @@ mod dma {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
 
-            #[cfg(all(esp32, esp32_spi_address_workaround))]
+            #[cfg(all(esp32, spi_address_workaround))]
             {
                 // On the ESP32, if we don't have data, the address is always sent
                 // on a single line, regardless of its data mode.

@@ -135,9 +135,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "Places the SPI driver in RAM for better performance",
             ),
             (
-                "esp32-spi-address-workaround",
+                "spi-address-workaround",
                 Value::Bool(true),
-                "Enables a workaround for the issue where SPI incorrectly transmits the address on a single line if the data buffer is empty."
+                "(ESP32 only) Enables a workaround for the issue where SPI in half-duplex mode incorrectly transmits the address on a single line if the data buffer is empty.",
             ),
         ],
         true,
