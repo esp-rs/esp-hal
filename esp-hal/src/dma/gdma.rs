@@ -147,6 +147,12 @@ impl<const N: u8> RegisterAccess for Channel<N> {
             .modify(|_, w| w.outlink_start().set_bit());
     }
 
+    fn stop_out() {
+        Self::ch()
+            .out_link()
+            .modify(|_, w| w.outlink_stop().set_bit());
+    }
+
     fn last_out_dscr_address() -> usize {
         Self::ch()
             .out_eof_des_addr()
@@ -223,6 +229,12 @@ impl<const N: u8> RegisterAccess for Channel<N> {
         Self::ch()
             .in_link()
             .modify(|_, w| w.inlink_start().set_bit());
+    }
+
+    fn stop_in() {
+        Self::ch()
+            .in_link()
+            .modify(|_, w| w.inlink_stop().set_bit());
     }
 
     fn listen_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {

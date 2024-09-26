@@ -1378,6 +1378,8 @@ pub trait Rx: crate::private::Sealed {
 
     fn start_transfer(&mut self) -> Result<(), DmaError>;
 
+    fn stop_transfer(&mut self);
+
     #[cfg(esp32s3)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
 
@@ -1453,6 +1455,10 @@ where
         } else {
             Ok(())
         }
+    }
+
+    fn stop_transfer(&mut self) {
+        R::stop_in();
     }
 
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
@@ -1549,6 +1555,10 @@ where
         self.rx_impl.start_transfer()
     }
 
+    fn stop_transfer(&mut self) {
+        self.rx_impl.stop_transfer()
+    }
+
     #[cfg(esp32s3)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
         CH::Channel::set_in_ext_mem_block_size(size);
@@ -1622,6 +1632,8 @@ pub trait Tx: crate::private::Sealed {
 
     fn start_transfer(&mut self) -> Result<(), DmaError>;
 
+    fn stop_transfer(&mut self);
+
     #[cfg(esp32s3)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
 
@@ -1675,6 +1687,10 @@ where
         } else {
             Ok(())
         }
+    }
+
+    fn stop_transfer(&mut self) {
+        R::stop_out();
     }
 
     fn listen_out(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
@@ -1783,6 +1799,10 @@ where
         self.tx_impl.start_transfer()
     }
 
+    fn stop_transfer(&mut self) {
+        self.tx_impl.stop_transfer()
+    }
+
     #[cfg(esp32s3)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
         CH::Channel::set_out_ext_mem_block_size(size);
@@ -1834,6 +1854,7 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn set_out_descriptors(address: u32);
     fn set_out_peripheral(peripheral: u8);
     fn start_out();
+    fn stop_out();
 
     fn listen_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>);
     fn unlisten_out(interrupts: impl Into<EnumSet<DmaTxInterrupt>>);
@@ -1858,6 +1879,7 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn set_in_descriptors(address: u32);
     fn set_in_peripheral(peripheral: u8);
     fn start_in();
+    fn stop_in();
 }
 
 /// DMA Channel
