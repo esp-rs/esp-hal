@@ -834,12 +834,15 @@ where
                 let mut buffer = buffer;
                 let mut data_mode = data_mode;
                 let mut address = address;
-                let address_data;
+                let addr_bytes;
                 if buffer.is_empty() && !address.is_none() {
                     // If the buffer is empty, we need to send a dummy byte
                     // to trigger the address phase.
-                    address_data = address.value().to_le_bytes();
-                    buffer = &address_data[..address.width().div_ceil(8)];
+                    let bytes_to_write = address.width().div_ceil(8);
+                    // The address register is read in big-endian order,
+                    // we have to prepare the emulated write in the same way.
+                    addr_bytes = address.value().to_be_bytes();
+                    buffer = &addr_bytes[4 - bytes_to_write..][..bytes_to_write];
                     data_mode = address.mode();
                     address = Address::None;
                 }
@@ -1431,8 +1434,10 @@ mod dma {
                 // on a single line, regardless of its data mode.
                 if bytes_to_write == 0 && address.mode() != SpiDataMode::Single {
                     let bytes_to_write = address.width().div_ceil(8);
-                    let addr_bytes = address.value().to_le_bytes();
-                    let addr_bytes = &addr_bytes[..bytes_to_write];
+                    // The address register is read in big-endian order,
+                    // we have to prepare the emulated write in the same way.
+                    let addr_bytes = address.value().to_be_bytes();
+                    let addr_bytes = &addr_bytes[4 - bytes_to_write..][..bytes_to_write];
                     self.address_buffer.fill(addr_bytes);
 
                     self.spi.setup_half_duplex(
@@ -3120,7 +3125,7 @@ fn set_up_common_phases(reg_block: &RegisterBlock, cmd: Command, address: Addres
         reg_block
             .addr()
             .write(|w| unsafe { w.usr_addr_value().bits(addr) });
-    #[cfg(esp32)]
+        #[cfg(esp32)]
         reg_block.addr().write(|w| unsafe { w.bits(addr) });
     }
 
