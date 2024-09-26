@@ -3110,25 +3110,17 @@ fn set_up_common_phases(reg_block: &RegisterBlock, cmd: Command, address: Addres
         });
     }
 
-    #[cfg(not(esp32))]
     if !address.is_none() {
         reg_block
             .user1()
             .modify(|_, w| unsafe { w.usr_addr_bitlen().bits((address.width() - 1) as u8) });
 
         let addr = address.value() << (32 - address.width());
+        #[cfg(not(esp32))]
         reg_block
             .addr()
             .write(|w| unsafe { w.usr_addr_value().bits(addr) });
-    }
-
     #[cfg(esp32)]
-    if !address.is_none() {
-        reg_block.user1().modify(|r, w| unsafe {
-            w.bits(r.bits() & !(0x3f << 26) | (((address.width() - 1) as u32) & 0x3f) << 26)
-        });
-
-        let addr = address.value() << (32 - address.width());
         reg_block.addr().write(|w| unsafe { w.bits(addr) });
     }
 
