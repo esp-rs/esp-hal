@@ -1479,6 +1479,30 @@ pub fn send_hci(data: &[u8]) {
     }
 }
 
+pub(crate) fn deinit_common() {
+    unsafe {
+        // HCI deinit
+        npl::r_ble_hci_trans_cfg_hs(None, core::ptr::null(), None, core::ptr::null());
+
+        #[cfg(not(esp32c2))]
+        npl::ble_controller_disable();
+
+        let res = npl::ble_controller_deinit();
+
+        if res != 0 {
+            panic!("ble_controller_deinit returned {}", res);
+        }
+
+        ble_os_adapter_chip_specific::bt_periph_module_disable();
+
+        npl::esp_unregister_npl_funcs();
+
+        npl::esp_unregister_ext_funcs();
+
+        crate::common_adapter::chip_specific::phy_disable();
+    }
+}
+
 #[allow(unreachable_code, unused_variables)]
 fn dump_packet_info(buffer: &[u8]) {
     #[cfg(not(feature = "dump-packets"))]

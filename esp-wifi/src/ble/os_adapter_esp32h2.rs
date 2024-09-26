@@ -131,17 +131,5 @@ unsafe extern "C" fn jrand48(
 }
 
 pub(super) fn deinit() {
-    unsafe {
-        // HCI deinit
-        npl::r_ble_hci_trans_cfg_hs(None, core::ptr::null(), None, core::ptr::null());
-
-        npl::ble_controller_disable();
-        npl::ble_controller_deinit();
-
-        bt_periph_module_disable();
-
-        npl::esp_unregister_npl_funcs();
-
-        npl::esp_unregister_ext_funcs();
-    }
+    npl::deinit_common();
 }

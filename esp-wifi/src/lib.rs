@@ -387,7 +387,7 @@ impl EspWifiTimerSource for TimeBase {
 /// use esp_wifi::EspWifiInitFor;
 ///
 /// let timg0 = TimerGroup::new(peripherals.TIMG0);
-/// let init = esp_wifi::init(
+/// let init = esp_wifi::initialize(
 ///     EspWifiInitFor::Wifi,
 ///     timg0.timer0,
 ///     Rng::new(peripherals.RNG),
