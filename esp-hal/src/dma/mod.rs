@@ -514,7 +514,7 @@ macro_rules! declare_aligned_dma_buffer {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! as_mut_byte_array {
-    ($name:ident, $size:expr) => {
+    ($name:expr, $size:expr) => {
         unsafe { &mut *($name.as_mut_ptr() as *mut [u8; $size]) }
     };
 }
@@ -729,6 +729,18 @@ pub enum DmaError {
     UnsupportedMemoryRegion,
     /// Invalid DMA chunk size
     InvalidChunkSize,
+}
+
+impl From<DmaBufError> for DmaError {
+    fn from(error: DmaBufError) -> Self {
+        // FIXME: use nested errors
+        match error {
+            DmaBufError::InsufficientDescriptors => DmaError::OutOfDescriptors,
+            DmaBufError::UnsupportedMemoryRegion => DmaError::UnsupportedMemoryRegion,
+            DmaBufError::InvalidAlignment => DmaError::InvalidAlignment,
+            DmaBufError::InvalidChunkSize => DmaError::InvalidChunkSize,
+        }
+    }
 }
 
 /// DMA Priorities

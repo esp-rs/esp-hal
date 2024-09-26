@@ -829,6 +829,26 @@ where
             return Err(Error::FifoSizeExeeded);
         }
 
+        cfg_if::cfg_if! {
+            if #[cfg(all(esp32, spi_address_workaround))] {
+                let mut buffer = buffer;
+                let mut data_mode = data_mode;
+                let mut address = address;
+                let addr_bytes;
+                if buffer.is_empty() && !address.is_none() {
+                    // If the buffer is empty, we need to send a dummy byte
+                    // to trigger the address phase.
+                    let bytes_to_write = address.width().div_ceil(8);
+                    // The address register is read in big-endian order,
+                    // we have to prepare the emulated write in the same way.
+                    addr_bytes = address.value().to_be_bytes();
+                    buffer = &addr_bytes[4 - bytes_to_write..][..bytes_to_write];
+                    data_mode = address.mode();
+                    address = Address::None;
+                }
+            }
+        }
+
         self.spi.setup_half_duplex(
             true,
             cmd,
@@ -933,11 +953,7 @@ mod dma {
             C::P: SpiPeripheral + Spi2Peripheral,
             DmaMode: Mode,
         {
-            SpiDma {
-                spi: self.spi,
-                channel,
-                _mode: PhantomData,
-            }
+            SpiDma::new(self.spi, channel)
         }
     }
 
@@ -960,11 +976,7 @@ mod dma {
             C::P: SpiPeripheral + Spi3Peripheral,
             DmaMode: Mode,
         {
-            SpiDma {
-                spi: self.spi,
-                channel,
-                _mode: PhantomData,
-            }
+            SpiDma::new(self.spi, channel)
         }
     }
 
@@ -984,7 +996,19 @@ mod dma {
     {
         pub(crate) spi: PeripheralRef<'d, T>,
         pub(crate) channel: Channel<'d, C, M>,
+        #[cfg(all(esp32, spi_address_workaround))]
+        address_buffer: DmaTxBuf,
         _mode: PhantomData<D>,
+    }
+
+    #[cfg(all(esp32, spi_address_workaround))]
+    unsafe impl<'d, T, C, D, M> Send for SpiDma<'d, T, C, D, M>
+    where
+        C: DmaChannel,
+        C::P: SpiPeripheral,
+        D: DuplexMode,
+        M: Mode,
+    {
     }
 
     impl<'d, T, C, D, M> core::fmt::Debug for SpiDma<'d, T, C, D, M>
@@ -1011,6 +1035,36 @@ mod dma {
         D: DuplexMode,
         M: Mode,
     {
+        fn new(spi: PeripheralRef<'d, T>, channel: Channel<'d, C, M>) -> Self {
+            cfg_if::cfg_if! {
+                if #[cfg(all(esp32, spi_address_workaround))] {
+                    use crate::dma::DmaDescriptor;
+                    const SPI_NUM: usize = 2;
+                    static mut DESCRIPTORS: [[DmaDescriptor; 1]; SPI_NUM] =
+                        [[DmaDescriptor::EMPTY]; SPI_NUM];
+                    static mut BUFFERS: [[u32; 1]; SPI_NUM] = [[0; 1]; SPI_NUM];
+
+                    let id = spi.spi_num() as usize - 2;
+
+                    Self {
+                        spi,
+                        channel,
+                        address_buffer: unwrap!(DmaTxBuf::new(
+                            unsafe { &mut DESCRIPTORS[id] },
+                            crate::as_mut_byte_array!(BUFFERS[id], 4)
+                        )),
+                        _mode: PhantomData,
+                    }
+                } else {
+                    Self {
+                        spi,
+                        channel,
+                        _mode: PhantomData,
+                    }
+                }
+            }
+        }
+
         /// Sets the interrupt handler
         ///
         /// Interrupts are not enabled at the peripheral level here.
@@ -1372,6 +1426,43 @@ mod dma {
             let bytes_to_write = buffer.length();
             if bytes_to_write > MAX_DMA_SIZE {
                 return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
+            }
+
+            #[cfg(all(esp32, spi_address_workaround))]
+            {
+                // On the ESP32, if we don't have data, the address is always sent
+                // on a single line, regardless of its data mode.
+                if bytes_to_write == 0 && address.mode() != SpiDataMode::Single {
+                    let bytes_to_write = address.width().div_ceil(8);
+                    // The address register is read in big-endian order,
+                    // we have to prepare the emulated write in the same way.
+                    let addr_bytes = address.value().to_be_bytes();
+                    let addr_bytes = &addr_bytes[4 - bytes_to_write..][..bytes_to_write];
+                    self.address_buffer.fill(addr_bytes);
+
+                    self.spi.setup_half_duplex(
+                        true,
+                        cmd,
+                        Address::None,
+                        false,
+                        dummy,
+                        bytes_to_write == 0,
+                        address.mode(),
+                    );
+
+                    let result = unsafe {
+                        self.spi.start_write_bytes_dma(
+                            &mut self.address_buffer,
+                            &mut self.channel.tx,
+                            false,
+                        )
+                    };
+                    if let Err(e) = result {
+                        return Err((e, self, buffer));
+                    }
+
+                    return Ok(SpiDmaTransfer::new(self, buffer, false, bytes_to_write > 0));
+                }
             }
 
             self.spi.setup_half_duplex(
@@ -2461,6 +2552,10 @@ pub trait Instance: private::Sealed {
             w.fread_dual().bit(data_mode == SpiDataMode::Dual);
             w.fread_quad().bit(data_mode == SpiDataMode::Quad)
         });
+        reg_block.user().modify(|_, w| {
+            w.fwrite_dual().bit(data_mode == SpiDataMode::Dual);
+            w.fwrite_quad().bit(data_mode == SpiDataMode::Quad)
+        });
     }
 
     #[cfg(esp32)]
@@ -2494,6 +2589,7 @@ pub trait Instance: private::Sealed {
             }
             address_mode if address_mode == data_mode => {
                 reg_block.ctrl().modify(|_, w| {
+                    w.fastrd_mode().set_bit();
                     w.fread_dio().bit(address_mode == SpiDataMode::Dual);
                     w.fread_qio().bit(address_mode == SpiDataMode::Quad);
                     w.fread_dual().clear_bit();
@@ -3019,25 +3115,17 @@ fn set_up_common_phases(reg_block: &RegisterBlock, cmd: Command, address: Addres
         });
     }
 
-    #[cfg(not(esp32))]
     if !address.is_none() {
         reg_block
             .user1()
             .modify(|_, w| unsafe { w.usr_addr_bitlen().bits((address.width() - 1) as u8) });
 
         let addr = address.value() << (32 - address.width());
+        #[cfg(not(esp32))]
         reg_block
             .addr()
             .write(|w| unsafe { w.usr_addr_value().bits(addr) });
-    }
-
-    #[cfg(esp32)]
-    if !address.is_none() {
-        reg_block.user1().modify(|r, w| unsafe {
-            w.bits(r.bits() & !(0x3f << 26) | (((address.width() - 1) as u32) & 0x3f) << 26)
-        });
-
-        let addr = address.value() << (32 - address.width());
+        #[cfg(esp32)]
         reg_block.addr().write(|w| unsafe { w.bits(addr) });
     }
 

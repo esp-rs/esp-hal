@@ -5,6 +5,7 @@
 #![no_std]
 #![no_main]
 
+use defmt::assert_eq;
 #[cfg(pcnt)]
 use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
 use esp_hal::{
@@ -125,7 +126,13 @@ fn execute_write_read(mut spi: SpiUnderTest, mut mosi_mirror: Output<'static>, e
 }
 
 #[cfg(pcnt)]
-fn execute_write(unit: Unit<'static, 0>, mut spi: SpiUnderTest, write: u8) {
+fn execute_write(
+    unit0: Unit<'static, 0>,
+    unit1: Unit<'static, 1>,
+    mut spi: SpiUnderTest,
+    write: u8,
+    data_on_multiple_pins: bool,
+) {
     const DMA_BUFFER_SIZE: usize = 4;
 
     let (_, _, buffer, descriptors) = dma_buffers!(0, DMA_BUFFER_SIZE);
@@ -134,18 +141,40 @@ fn execute_write(unit: Unit<'static, 0>, mut spi: SpiUnderTest, write: u8) {
     for command_data_mode in COMMAND_DATA_MODES {
         dma_tx_buf.fill(&[write; DMA_BUFFER_SIZE]);
 
-        // Send command + data.
-        // Should read 8 bits: 1 command bit, 3 address bits, 4 data bits
-        unit.clear();
+        // Send command + address + data.
+        // Should read 8 high bits: 1 command bit, 3 address bits, 4 data bits
+        unit0.clear();
+        unit1.clear();
         (spi, dma_tx_buf) = transfer_write(spi, dma_tx_buf, write, command_data_mode);
-        assert_eq!(unit.get_value(), 8);
+        assert_eq!(unit0.get_value() + unit1.get_value(), 8);
+
+        if data_on_multiple_pins {
+            if command_data_mode == SpiDataMode::Single {
+                assert_eq!(unit0.get_value(), 1);
+                assert_eq!(unit1.get_value(), 7);
+            } else {
+                assert_eq!(unit0.get_value(), 0);
+                assert_eq!(unit1.get_value(), 8);
+            }
+        }
 
         // Send command + address only
-        // Should read 4 bits: 1 command bit, 3 address bits
+        // Should read 4 bits high: 1 command bit, 3 address bits
         dma_tx_buf.set_length(0);
-        unit.clear();
+        unit0.clear();
+        unit1.clear();
         (spi, dma_tx_buf) = transfer_write(spi, dma_tx_buf, write, command_data_mode);
-        assert_eq!(unit.get_value(), 4);
+        assert_eq!(unit0.get_value() + unit1.get_value(), 4);
+
+        if data_on_multiple_pins {
+            if command_data_mode == SpiDataMode::Single {
+                assert_eq!(unit0.get_value(), 1);
+                assert_eq!(unit1.get_value(), 3);
+            } else {
+                assert_eq!(unit0.get_value(), 0);
+                assert_eq!(unit1.get_value(), 4);
+            }
+        }
     }
 }
 
@@ -164,9 +193,9 @@ mod tests {
         let mut unconnected_pin = hil_test::unconnected_pin!(io);
 
         // Make sure pins have no pullups
-        let _ = Input::new(&mut pin, Pull::None);
-        let _ = Input::new(&mut pin_mirror, Pull::None);
-        let _ = Input::new(&mut unconnected_pin, Pull::None);
+        let _ = Input::new(&mut pin, Pull::Down);
+        let _ = Input::new(&mut pin_mirror, Pull::Down);
+        let _ = Input::new(&mut unconnected_pin, Pull::Down);
 
         let dma = Dma::new(peripherals.DMA);
 
@@ -306,17 +335,19 @@ mod tests {
         let [_, _, mosi] = ctx.gpios;
 
         let pcnt = Pcnt::new(ctx.pcnt);
-        let unit = pcnt.unit0;
+        let unit0 = pcnt.unit0;
+        let unit1 = pcnt.unit1;
 
-        unit.channel0.set_edge_signal(mosi.peripheral_input());
-        unit.channel0
+        unit0.channel0.set_edge_signal(mosi.peripheral_input());
+        unit0
+            .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
         let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
             .with_pins(NoPin, mosi, NoPin, NoPin, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
-        super::execute_write(unit, spi, 0b0000_0001);
+        super::execute_write(unit0, unit1, spi, 0b0000_0001, false);
     }
 
     #[test]
@@ -328,21 +359,24 @@ mod tests {
         let [gpio, _, mosi] = ctx.gpios;
 
         let pcnt = Pcnt::new(ctx.pcnt);
-        let unit = pcnt.unit0;
+        let unit0 = pcnt.unit0;
+        let unit1 = pcnt.unit1;
 
-        unit.channel0.set_edge_signal(mosi.peripheral_input());
-        unit.channel0
+        unit0.channel0.set_edge_signal(mosi.peripheral_input());
+        unit0
+            .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        unit.channel1.set_edge_signal(gpio.peripheral_input());
-        unit.channel1
+        unit1.channel0.set_edge_signal(gpio.peripheral_input());
+        unit1
+            .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
         let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
             .with_pins(NoPin, mosi, gpio, NoPin, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
-        super::execute_write(unit, spi, 0b0000_0010);
+        super::execute_write(unit0, unit1, spi, 0b0000_0010, true);
     }
 
     #[test]
@@ -354,21 +388,24 @@ mod tests {
         let [gpio, _, mosi] = ctx.gpios;
 
         let pcnt = Pcnt::new(ctx.pcnt);
-        let unit = pcnt.unit0;
+        let unit0 = pcnt.unit0;
+        let unit1 = pcnt.unit1;
 
-        unit.channel0.set_edge_signal(mosi.peripheral_input());
-        unit.channel0
+        unit0.channel0.set_edge_signal(mosi.peripheral_input());
+        unit0
+            .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        unit.channel1.set_edge_signal(gpio.peripheral_input());
-        unit.channel1
+        unit1.channel0.set_edge_signal(gpio.peripheral_input());
+        unit1
+            .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
         let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
             .with_pins(NoPin, mosi, NoPin, gpio, NoPin, NoPin)
             .with_dma(ctx.dma_channel);
 
-        super::execute_write(unit, spi, 0b0000_0100);
+        super::execute_write(unit0, unit1, spi, 0b0000_0100, true);
     }
 
     #[test]
@@ -380,20 +417,23 @@ mod tests {
         let [gpio, _, mosi] = ctx.gpios;
 
         let pcnt = Pcnt::new(ctx.pcnt);
-        let unit = pcnt.unit0;
+        let unit0 = pcnt.unit0;
+        let unit1 = pcnt.unit1;
 
-        unit.channel0.set_edge_signal(mosi.peripheral_input());
-        unit.channel0
+        unit0.channel0.set_edge_signal(mosi.peripheral_input());
+        unit0
+            .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        unit.channel1.set_edge_signal(gpio.peripheral_input());
-        unit.channel1
+        unit1.channel0.set_edge_signal(gpio.peripheral_input());
+        unit1
+            .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
         let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
             .with_pins(NoPin, mosi, NoPin, NoPin, gpio, NoPin)
             .with_dma(ctx.dma_channel);
 
-        super::execute_write(unit, spi, 0b0000_1000);
+        super::execute_write(unit0, unit1, spi, 0b0000_1000, true);
     }
 }
