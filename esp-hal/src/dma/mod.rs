@@ -203,7 +203,7 @@ where
 }
 
 bitfield::bitfield! {
-    #[doc(hidden)]
+    /// DMA descriptor flags.
     #[derive(Clone, Copy)]
     pub struct DmaDescriptorFlags(u32);
 
@@ -224,14 +224,14 @@ bitfield::bitfield! {
     /// For receive descriptors, software needs to clear this bit to 0, and hardware will set it to 1 after receiving
     /// data containing the EOF flag.
     /// For transmit descriptors, software needs to set this bit to 1 as needed.
-    /// If software configures this bit to 1 in a descriptor, the GDMA will include the EOF flag in the data sent to
+    /// If software configures this bit to 1 in a descriptor, the DMA will include the EOF flag in the data sent to
     /// the corresponding peripheral, indicating to the peripheral that this data segment marks the end of one
     /// transfer phase.
     pub suc_eof, set_suc_eof: 30;
 
     /// Specifies who is allowed to access the buffer that this descriptor points to.
-    /// - 1’b0: CPU can access the buffer;
-    /// - 1’b1: The GDMA controller can access the buffer.
+    /// - 0: CPU can access the buffer;
+    /// - 1: The GDMA controller can access the buffer.
     pub owner, set_owner: 31;
 }
 
@@ -284,33 +284,33 @@ impl DmaDescriptor {
         next: core::ptr::null_mut(),
     };
 
-    /// Set the size of the buffer.
+    /// Set the size of the buffer. See [DmaDescriptorFlags::size].
     pub fn set_size(&mut self, len: usize) {
         self.flags.set_size(len as u16)
     }
 
-    /// Set the length of the descriptor
+    /// Set the length of the descriptor. See [DmaDescriptorFlags::length].
     pub fn set_length(&mut self, len: usize) {
         self.flags.set_length(len as u16)
     }
 
-    /// Get the size of the buffer
+    /// Returns the size of the buffer. See [DmaDescriptorFlags::size].
     pub fn size(&self) -> usize {
         self.flags.size() as usize
     }
 
-    /// Get the length of the descriptor
+    /// Returns the length of the descriptor. See [DmaDescriptorFlags::length].
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.flags.length() as usize
     }
 
-    /// Set the suc_eof bit.
+    /// Set the suc_eof bit. See [DmaDescriptorFlags::suc_eof].
     pub fn set_suc_eof(&mut self, suc_eof: bool) {
         self.flags.set_suc_eof(suc_eof)
     }
 
-    /// Set the owner
+    /// Set the owner. See [DmaDescriptorFlags::owner].
     pub fn set_owner(&mut self, owner: Owner) {
         let owner = match owner {
             Owner::Cpu => false,
@@ -319,7 +319,7 @@ impl DmaDescriptor {
         self.flags.set_owner(owner)
     }
 
-    /// Get the owner
+    /// Returns the owner. See [DmaDescriptorFlags::owner].
     pub fn owner(&self) -> Owner {
         match self.flags.owner() {
             false => Owner::Cpu,
@@ -815,7 +815,7 @@ pub enum DmaPeripheral {
     Mem2Mem15 = 15,
 }
 
-/// An enum describing the owner of the buffer pointed to be a DMA descriptor.
+/// The owner bit of a DMA descriptor.
 #[derive(PartialEq, PartialOrd)]
 pub enum Owner {
     /// Owned by CPU
