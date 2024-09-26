@@ -300,6 +300,7 @@ impl DmaDescriptor {
     }
 
     /// Get the length of the descriptor
+    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.flags.length() as usize
     }
