@@ -998,6 +998,16 @@ mod dma {
         _mode: PhantomData<D>,
     }
 
+    #[cfg(all(esp32, esp32_spi_address_workaround))]
+    unsafe impl<'d, T, C, D, M> Send for SpiDma<'d, T, C, D, M>
+    where
+        C: DmaChannel,
+        C::P: SpiPeripheral,
+        D: DuplexMode,
+        M: Mode,
+    {
+    }
+
     impl<'d, T, C, D, M> core::fmt::Debug for SpiDma<'d, T, C, D, M>
     where
         C: DmaChannel,
