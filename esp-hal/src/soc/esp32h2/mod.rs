@@ -54,9 +54,9 @@ pub(crate) mod constants {
     pub const PARL_IO_SCLK: u32 = 96_000_000;
 
     /// Start address of the system's DRAM (low range).
-    pub const SOC_DRAM_LOW: u32 = 0x4080_0000;
+    pub const SOC_DRAM_LOW: usize = 0x4080_0000;
     /// End address of the system's DRAM (high range).
-    pub const SOC_DRAM_HIGH: u32 = 0x4085_0000;
+    pub const SOC_DRAM_HIGH: usize = 0x4085_0000;
 
     /// RC FAST Clock value (Hertz).
     pub const RC_FAST_CLK: fugit::HertzU32 = fugit::HertzU32::kHz(17500);

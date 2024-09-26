@@ -1,3 +1,5 @@
+use core::ops::Range;
+
 use portable_atomic::{AtomicU8, Ordering};
 
 pub use self::implementation::*;
@@ -20,6 +22,18 @@ mod psram_common;
 
 #[cfg(psram)]
 static MAPPED_PSRAM: Locked<MappedPsram> = Locked::new(MappedPsram { memory_range: 0..0 });
+
+fn psram_range() -> Range<usize> {
+    cfg_if::cfg_if! {
+        if #[cfg(psram)] {
+            MAPPED_PSRAM.with(|mapped_psram| mapped_psram.memory_range.clone())
+        } else {
+            0..0
+        }
+    }
+}
+
+const DRAM: Range<usize> = self::constants::SOC_DRAM_LOW..self::constants::SOC_DRAM_HIGH;
 
 #[cfg(psram)]
 pub struct MappedPsram {
@@ -83,36 +97,40 @@ impl self::efuse::Efuse {
 }
 
 #[allow(unused)]
-pub(crate) fn is_valid_ram_address(address: u32) -> bool {
-    (self::constants::SOC_DRAM_LOW..=self::constants::SOC_DRAM_HIGH).contains(&address)
+pub(crate) fn is_valid_ram_address(address: usize) -> bool {
+    addr_in_range(address, DRAM)
 }
 
 #[allow(unused)]
 pub(crate) fn is_slice_in_dram<T>(slice: &[T]) -> bool {
-    let start = slice.as_ptr() as u32;
-    let end = start + slice.len() as u32;
-    self::constants::SOC_DRAM_LOW <= start && end <= self::constants::SOC_DRAM_HIGH
+    slice_in_range(slice, DRAM)
 }
 
 #[allow(unused)]
-pub(crate) fn is_valid_psram_address(address: u32) -> bool {
-    #[cfg(psram)]
-    {
-        let memory_range = MAPPED_PSRAM.with(|mapped_psram| mapped_psram.memory_range.clone());
-        memory_range.contains(&(address as usize))
-    }
-    #[cfg(not(psram))]
-    false
+pub(crate) fn is_valid_psram_address(address: usize) -> bool {
+    addr_in_range(address, psram_range())
 }
 
 #[allow(unused)]
 pub(crate) fn is_slice_in_psram<T>(slice: &[T]) -> bool {
-    let start = slice.as_ptr() as u32;
-    let end = start + slice.len() as u32;
-    is_valid_psram_address(start) && is_valid_psram_address(end)
+    slice_in_range(slice, psram_range())
 }
 
 #[allow(unused)]
-pub(crate) fn is_valid_memory_address(address: u32) -> bool {
+pub(crate) fn is_valid_memory_address(address: usize) -> bool {
     is_valid_ram_address(address) || is_valid_psram_address(address)
+}
+
+fn slice_in_range<T>(slice: &[T], range: Range<usize>) -> bool {
+    let slice = slice.as_ptr_range();
+    let start = slice.start as usize;
+    let end = slice.end as usize;
+    // `end` is >= `start`, so we don't need to check that `end > range.start`
+    // `end` is also one past the last element, so it can be equal to the range's
+    // end which is also one past the memory region's last valid address.
+    addr_in_range(start, range.clone()) && end <= range.end
+}
+
+fn addr_in_range(addr: usize, range: Range<usize>) -> bool {
+    range.contains(&addr)
 }

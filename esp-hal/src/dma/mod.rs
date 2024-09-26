@@ -944,10 +944,10 @@ impl DescriptorChain {
         data: *mut u8,
         len: usize,
     ) -> Result<(), DmaError> {
-        if !crate::soc::is_valid_ram_address(self.first() as u32)
-            || !crate::soc::is_valid_ram_address(self.last() as u32)
-            || !crate::soc::is_valid_memory_address(data as u32)
-            || !crate::soc::is_valid_memory_address(unsafe { data.add(len) } as u32)
+        if !crate::soc::is_valid_ram_address(self.first() as usize)
+            || !crate::soc::is_valid_ram_address(self.last() as usize)
+            || !crate::soc::is_valid_memory_address(data as usize)
+            || !crate::soc::is_valid_memory_address(unsafe { data.add(len) } as usize)
         {
             return Err(DmaError::UnsupportedMemoryRegion);
         }
@@ -1016,10 +1016,10 @@ impl DescriptorChain {
         data: *const u8,
         len: usize,
     ) -> Result<(), DmaError> {
-        if !crate::soc::is_valid_ram_address(self.first() as u32)
-            || !crate::soc::is_valid_ram_address(self.last() as u32)
-            || !crate::soc::is_valid_memory_address(data as u32)
-            || !crate::soc::is_valid_memory_address(unsafe { data.add(len) } as u32)
+        if !crate::soc::is_valid_ram_address(self.first() as usize)
+            || !crate::soc::is_valid_ram_address(self.last() as usize)
+            || !crate::soc::is_valid_memory_address(data as usize)
+            || !crate::soc::is_valid_memory_address(unsafe { data.add(len) } as usize)
         {
             return Err(DmaError::UnsupportedMemoryRegion);
         }
@@ -1522,7 +1522,7 @@ where
             // we are forcing the DMA alignment to the cache line size
             // required when we are using dcache
             let alignment = crate::soc::cache_get_dcache_line_size() as usize;
-            if crate::soc::is_valid_psram_address(des.buffer as u32) {
+            if crate::soc::is_valid_psram_address(des.buffer as usize) {
                 // both the size and address of the buffer must be aligned
                 if des.buffer as usize % alignment != 0 && des.size() % alignment != 0 {
                     return Err(DmaError::InvalidAlignment);
@@ -1760,7 +1760,7 @@ where
             // we are forcing the DMA alignment to the cache line size
             // required when we are using dcache
             let alignment = crate::soc::cache_get_dcache_line_size() as usize;
-            if crate::soc::is_valid_psram_address(des.buffer as u32) {
+            if crate::soc::is_valid_psram_address(des.buffer as usize) {
                 // both the size and address of the buffer must be aligned
                 if des.buffer as usize % alignment != 0 && des.size() % alignment != 0 {
                     return Err(DmaError::InvalidAlignment);
@@ -2236,7 +2236,7 @@ impl DmaTxBuffer for DmaTxBuf {
         }
 
         #[cfg(esp32s3)]
-        if crate::soc::is_valid_psram_address(self.buffer.as_ptr() as u32) {
+        if crate::soc::is_valid_psram_address(self.buffer.as_ptr() as usize) {
             unsafe {
                 crate::soc::cache_writeback_addr(
                     self.buffer.as_ptr() as u32,

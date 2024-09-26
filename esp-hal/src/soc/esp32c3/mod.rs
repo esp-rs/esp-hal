@@ -42,13 +42,13 @@ pub(crate) mod constants {
     pub const RMT_CHANNEL_RAM_SIZE: usize = 48;
     /// RMT Clock source value.
     pub const RMT_CLOCK_SRC: u8 = 1;
-    /// RMT Clock source frequence.
+    /// RMT Clock source frequency.
     pub const RMT_CLOCK_SRC_FREQ: fugit::HertzU32 = fugit::HertzU32::MHz(80);
 
     /// The lower bound of the system's DRAM (Data RAM) address space.
-    pub const SOC_DRAM_LOW: u32 = 0x3FC8_0000;
+    pub const SOC_DRAM_LOW: usize = 0x3FC8_0000;
     /// The upper bound of the system's DRAM (Data RAM) address space.
-    pub const SOC_DRAM_HIGH: u32 = 0x3FCE_0000;
+    pub const SOC_DRAM_HIGH: usize = 0x3FCE_0000;
 
     /// RC FAST Clock value (Hertz).
     pub const RC_FAST_CLK: fugit::HertzU32 = fugit::HertzU32::kHz(17500);
