@@ -752,10 +752,10 @@ mod m2m {
                     64 => DmaExtMemBKSize::Size64,
                     _ => panic!("unsupported cache line size"),
                 };
-                if crate::soc::is_valid_psram_address(tx_ptr as u32) {
+                if crate::soc::is_valid_psram_address(tx_ptr as usize) {
                     self.channel.tx.set_ext_mem_block_size(align);
                 }
-                if crate::soc::is_valid_psram_address(rx_ptr as u32) {
+                if crate::soc::is_valid_psram_address(rx_ptr as usize) {
                     self.channel.rx.set_ext_mem_block_size(align);
                 }
             }
