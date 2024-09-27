@@ -26,7 +26,7 @@
 //! # let dma = Dma::new(peripherals.DMA);
 //! # let channel = dma.channel0;
 //!
-//! # let dma_buf = dma_rx_stream_buffer!(20 * 1000, chunk_size = 1000);
+//! # let dma_buf = dma_rx_stream_buffer!(20 * 1000, 1000);
 //!
 //! # let channel = channel.configure(
 //! #     false,

@@ -747,7 +747,7 @@ macro_rules! dma_tx_buffer {
 #[macro_export]
 macro_rules! dma_rx_stream_buffer {
     ($rx_size:expr) => {
-        dma_rx_stream_buffer!($rx_size, chunk_size = 4095)
+        $crate::dma_rx_stream_buffer!($rx_size, 4095)
     };
     ($rx_size:expr, $chunk_size:expr) => {{
         let (buffer, descriptors) =
@@ -1625,13 +1625,15 @@ where
         &mut self,
         first_desc: *mut DmaDescriptor,
         peri: DmaPeripheral,
-    ) {
+    ) -> Result<(), DmaError> {
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
         R::clear_in_interrupts();
         R::reset_in();
         R::set_in_descriptors(first_desc as u32);
         R::set_in_peripheral(peri as u8);
+
+        Ok(())
     }
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
@@ -1719,8 +1721,7 @@ where
         }
 
         self.rx_impl
-            .prepare_transfer_without_start(chain.first() as _, peri);
-        Ok(())
+            .prepare_transfer_without_start(chain.first() as _, peri)
     }
 
     unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
@@ -1736,9 +1737,7 @@ where
         }
 
         self.rx_impl
-            .prepare_transfer_without_start(preparation.start, peri);
-
-        Ok(())
+            .prepare_transfer_without_start(preparation.start, peri)
     }
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
