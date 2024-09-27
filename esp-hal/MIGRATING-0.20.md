@@ -210,6 +210,49 @@ We've replaced some usage of features with [esp-config](https://docs.rs/esp-conf
 + ESP_HAL_PLACE_SPI_DRIVER_IN_RAM=true
 ```
 
+## `Camera` driver now uses `DmaRxBuffer` and moves the driver into the transfer object.
+
+For one shot transfers.
+```diff
+let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(32678, 0);
++ let dma_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+
+let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
+let mut camera = Camera::new(
+     lcd_cam.cam,
+     channel.rx,
+-    rx_descriptors,
+     data_pins,
+     20u32.MHz(),
+);
+
+- let transfer = camera.read_dma(rx_buffer).unwrap();
+- transfer.wait();
++ let transfer = camera.receive(dma_buf).unwrap();
++ let (_, camera, buf) = transfer.wait();
+```
+
+For circular transfers.
+```diff
+- let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(32678, 0);
++ let dma_buf = dma_rx_stream_buffer!(32678);
+
+let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
+let mut camera = Camera::new(
+     lcd_cam.cam,
+     channel.rx,
+-    rx_descriptors,
+     data_pins,
+     20u32.MHz(),
+);
+
+- let mut transfer = camera.read_dma_circular(rx_buffer).unwrap();
++ let mut transfer = camera.receive(dma_buf).unwrap();
+transfer.pop(&mut [.....]);
+transfer.pop(&mut [.....]);
+transfer.pop(&mut [.....]);
+```
+
 ## PS-RAM
 
 Initializing PS-RAM now takes a chip specific config and returns start of the mapped memory and the size.
