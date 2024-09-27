@@ -299,9 +299,9 @@ pub(crate) unsafe extern "C" fn interrupt_set(
         "interrupt_set {} {} {} {} {}",
         cpu_no,
         intr_source,
-        handler as u32,
+        handler as usize,
         arg as u32,
-        ret_handle as u32,
+        ret_handle as usize,
     );
 
     interrupt_handler_set(intr_source, handler, arg);

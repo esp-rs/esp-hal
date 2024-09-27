@@ -2007,7 +2007,7 @@ pub unsafe extern "C" fn coex_register_start_cb(
     _cb: Option<unsafe extern "C" fn() -> esp_wifi_sys::c_types::c_int>,
 ) -> esp_wifi_sys::c_types::c_int {
     #[cfg(coex)]
-    return include::coex_register_start_cb(_cb);
+    return esp_wifi_sys::include::coex_register_start_cb(_cb);
 
     #[cfg(not(coex))]
     0
