@@ -71,16 +71,7 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    dma::{
-        ChannelRx,
-        DmaBufferView,
-        DmaChannel,
-        DmaError,
-        DmaPeripheral,
-        DmaRxBuffer,
-        LcdCamPeripheral,
-        Rx,
-    },
+    dma::{ChannelRx, DmaChannel, DmaError, DmaPeripheral, DmaRxBuffer, LcdCamPeripheral, Rx},
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal, Pull},
     lcd_cam::{cam::private::RxPins, private::calculate_clkm, BitOrder, ByteOrder},
     peripheral::{Peripheral, PeripheralRef},
@@ -306,7 +297,7 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
     /// Starts a DMA transfer to receive data from the camera peripheral.
     pub fn receive<BUF: DmaRxBuffer>(
         mut self,
-        buf: BUF,
+        mut buf: BUF,
     ) -> Result<CameraTransfer<'d, CH, BUF>, (DmaError, Self, BUF)> {
         // Reset Camera control unit and Async Rx FIFO
         self.lcd_cam
@@ -323,13 +314,15 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
             .modify(|_, w| w.cam_afifo_reset().clear_bit());
 
         // Start DMA to receive incoming transfer.
-        let view = match self
-            .rx_channel
-            .prepare_and_start(DmaPeripheral::LcdCam, buf)
-        {
-            Ok(view) => view,
-            Err((err, buf)) => return Err((err, self, buf)),
+        let result = unsafe {
+            self.rx_channel
+                .prepare_transfer(DmaPeripheral::LcdCam, &mut buf)
+                .and_then(|_| self.rx_channel.start_transfer())
         };
+
+        if let Err(e) = result {
+            return Err((e, self, buf));
+        }
 
         // Start the Camera unit to listen for incoming DVP stream.
         self.lcd_cam.cam_ctrl().modify(|_, w| {
@@ -344,7 +337,7 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
 
         Ok(CameraTransfer {
             camera: self,
-            buffer_view: view,
+            buffer_view: buf.into_view(),
         })
     }
 }
@@ -387,7 +380,7 @@ impl<'d, CH: DmaChannel, BUF: DmaRxBuffer> CameraTransfer<'d, CH, BUF> {
     pub fn stop(mut self) -> (Camera<'d, CH>, BUF) {
         self.stop_peripherals();
         let (camera, view) = self.release();
-        (camera, view.release())
+        (camera, BUF::from_view(view))
     }
 
     /// Waits for the transfer to stop and returns the peripheral and buffer.
@@ -411,7 +404,7 @@ impl<'d, CH: DmaChannel, BUF: DmaRxBuffer> CameraTransfer<'d, CH, BUF> {
             Ok(())
         };
 
-        (result, camera, view.release())
+        (result, camera, BUF::from_view(view))
     }
 
     fn release(self) -> (Camera<'d, CH>, BUF::View) {

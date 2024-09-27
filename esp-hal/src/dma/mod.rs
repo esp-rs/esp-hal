@@ -741,7 +741,7 @@ macro_rules! dma_tx_buffer {
 /// use esp_hal::dma_rx_stream_buffer;
 ///
 /// let buf = dma_rx_stream_buffer!(32000);
-/// let buf = dma_rx_stream_buffer!(32000, chunk_size = 1000);
+/// let buf = dma_rx_stream_buffer!(32000, 1000);
 /// # }
 /// ```
 #[macro_export]
@@ -1553,27 +1553,17 @@ pub trait DmaChannel: crate::private::Sealed {
 pub trait Rx: crate::private::Sealed {
     fn init(&mut self, burst_mode: bool, priority: DmaPriority);
 
-    /// TODO: In the future, this will be removed in favour of
-    /// [Self::prepare_and_start];
     unsafe fn prepare_transfer_without_start(
         &mut self,
         peri: DmaPeripheral,
         chain: &DescriptorChain,
     ) -> Result<(), DmaError>;
 
-    /// TODO: In the future, this will be removed in favour of
-    /// [Self::prepare_and_start];
     unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
         &mut self,
         peri: DmaPeripheral,
         buffer: &mut BUF,
     ) -> Result<(), DmaError>;
-
-    fn prepare_and_start<BUF: DmaRxBuffer>(
-        &mut self,
-        peri: DmaPeripheral,
-        buffer: BUF,
-    ) -> Result<BUF::View, (DmaError, BUF)>;
 
     fn start_transfer(&mut self) -> Result<(), DmaError>;
 
@@ -1644,8 +1634,6 @@ where
         R::set_in_peripheral(peri as u8);
     }
 
-    /// TODO: In the future, this will be removed in favour of [Self::start].
-    /// The error checking done in here can be deferred.
     fn start_transfer(&mut self) -> Result<(), DmaError> {
         R::start_in();
 
@@ -1658,10 +1646,6 @@ where
 
     fn stop_transfer(&mut self) {
         R::stop_in();
-    }
-
-    fn start(&mut self) {
-        R::start_in();
     }
 
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
@@ -1744,7 +1728,7 @@ where
         peri: DmaPeripheral,
         buffer: &mut BUF,
     ) -> Result<(), DmaError> {
-        let preparation = buffer.prepare_mut();
+        let preparation = buffer.prepare();
 
         // TODO: Get burst mode from DmaBuf.
         if self.burst_mode {
@@ -1755,30 +1739,6 @@ where
             .prepare_transfer_without_start(preparation.start, peri);
 
         Ok(())
-    }
-
-    fn prepare_and_start<BUF: DmaRxBuffer>(
-        &mut self,
-        peri: DmaPeripheral,
-        buffer: BUF,
-    ) -> Result<BUF::View, (DmaError, BUF)> {
-        // TODO: Get burst mode from DmaBuf.
-        if self.burst_mode {
-            return Err((DmaError::InvalidAlignment, buffer));
-        }
-
-        let (preparation, view) = buffer.prepare();
-
-        // SAFETY: DmaRxBuffer ensures user has kept to lifetime and validity
-        // guarantees.
-        unsafe {
-            self.rx_impl
-                .prepare_transfer_without_start(preparation.start, peri);
-        }
-
-        self.rx_impl.start();
-
-        Ok(view)
     }
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
@@ -2007,7 +1967,7 @@ where
         peri: DmaPeripheral,
         buffer: &mut BUF,
     ) -> Result<(), DmaError> {
-        let preparation = buffer.prepare_mut();
+        let preparation = buffer.prepare();
         cfg_if::cfg_if!(
             if #[cfg(esp32s3)] {
                 if let Some(block_size) = preparation.block_size {
@@ -2200,36 +2160,19 @@ pub struct Preparation {
 pub unsafe trait DmaTxBuffer {
     /// A type providing operations that are safe to perform on the buffer
     /// whilst the DMA is actively using it.
-    type View: DmaBufferView<DmaBuffer = Self>;
+    type View;
+
     /// Prepares the buffer for an imminent transfer and returns
     /// information required to use this buffer.
     ///
     /// Note: This operation is idempotent.
-    ///
-    /// In the future this will be deprecated in favour of [Self::prepare].
-    fn prepare_mut(&mut self) -> Preparation;
+    fn prepare(&mut self) -> Preparation;
 
-    /// This method allows users to let the buffer implementation know that
-    /// [Self::prepare] will likely be called next.
-    ///
-    /// If [Self::prepare] is expensive, implementations are strongly encouraged
-    /// to do the expensive part in this function where possible.
-    ///
-    /// Users are encouraged to call this method if there are spare CPU cycles
-    /// available. This is typically whilst waiting for a previous transfer
-    /// to complete.
-    ///
-    /// This method may never be called so do not rely on it for correct
-    /// function.
-    ///
-    /// Note: This operation is idempotent.
-    fn prepare_hint(&mut self) {
-        // This method is optional.
-    }
+    /// This is called before the DMA starts using the buffer.
+    fn into_view(self) -> Self::View;
 
-    /// Prepares the buffer for an imminent transfer and returns
-    /// information required to use this buffer.
-    fn prepare(self) -> (Preparation, Self::View);
+    /// This is called after the DMA is done using the buffer.
+    fn from_view(view: Self::View) -> Self;
 
     /// Returns the maximum number of bytes that would be transmitted by this
     /// buffer.
@@ -2253,55 +2196,25 @@ pub unsafe trait DmaTxBuffer {
 pub unsafe trait DmaRxBuffer {
     /// A type providing operations that are safe to perform on the buffer
     /// whilst the DMA is actively using it.
-    type View: DmaBufferView<DmaBuffer = Self>;
+    type View;
+
     /// Prepares the buffer for an imminent transfer and returns
     /// information required to use this buffer.
     ///
     /// Note: This operation is idempotent.
-    fn prepare_mut(&mut self) -> Preparation;
+    fn prepare(&mut self) -> Preparation;
 
-    /// This method allows users to let the buffer implementation know that
-    /// [Self::prepare] will likely be called next.
-    ///
-    /// If [Self::prepare] is expensive, implementations are strongly encouraged
-    /// to do the expensive part in this function where possible.
-    ///
-    /// Users are encouraged to call this method if there are spare CPU cycles
-    /// available. This is typically whilst waiting for a previous transfer
-    /// to complete.
-    ///
-    /// This method may never be called so do not rely on it for correct
-    /// function.
-    ///
-    /// Note: This operation is idempotent.
-    fn prepare_hint(&mut self) {
-        // This method is optional.
-    }
+    /// This is called before the DMA starts using the buffer.
+    fn into_view(self) -> Self::View;
 
-    /// Prepares the buffer for an imminent transfer and returns
-    /// information required to use this buffer.
-    fn prepare(self) -> (Preparation, Self::View);
+    /// This is called after the DMA is done using the buffer.
+    fn from_view(view: Self::View) -> Self;
 
     /// Returns the maximum number of bytes that can be received by this buffer.
     ///
     /// This is a convenience hint for SPI. Most peripherals don't care how long
     /// the transfer is.
     fn length(&self) -> usize;
-}
-
-/// This trait represents the subset of operations allowed to be performed on a
-/// [DmaTxBuffer]/[DmaRxBuffer] whilst it is being used by the DMA.
-///
-/// # Safety
-///
-/// The implementing type must keep all its descriptors and the buffers they
-/// point to valid until [Self::release] is called.
-pub unsafe trait DmaBufferView {
-    /// The buffer type that made this view.
-    type DmaBuffer;
-
-    /// This is called after the DMA is done using the buffer.
-    fn release(self) -> Self::DmaBuffer;
 }
 
 /// An in-progress view into [DmaRxBuf]/[DmaTxBuf].
@@ -2492,7 +2405,7 @@ impl DmaTxBuf {
 unsafe impl DmaTxBuffer for DmaTxBuf {
     type View = BufView<DmaTxBuf>;
 
-    fn prepare_mut(&mut self) -> Preparation {
+    fn prepare(&mut self) -> Preparation {
         for desc in self.descriptors.linked_iter_mut() {
             // In non-circular mode, we only set `suc_eof` for the last descriptor to signal
             // the end of the transfer.
@@ -2515,21 +2428,16 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
         }
     }
 
-    fn prepare(mut self) -> (Preparation, BufView<DmaTxBuf>) {
-        let preparation = self.prepare_mut();
-        (preparation, BufView(self))
+    fn into_view(self) -> BufView<DmaTxBuf> {
+        BufView(self)
+    }
+
+    fn from_view(view: Self::View) -> Self {
+        view.0
     }
 
     fn length(&self) -> usize {
         self.len()
-    }
-}
-
-unsafe impl DmaBufferView for BufView<DmaTxBuf> {
-    type DmaBuffer = DmaTxBuf;
-
-    fn release(self) -> Self::DmaBuffer {
-        self.0
     }
 }
 
@@ -2655,7 +2563,7 @@ impl DmaRxBuf {
 unsafe impl DmaRxBuffer for DmaRxBuf {
     type View = BufView<DmaRxBuf>;
 
-    fn prepare_mut(&mut self) -> Preparation {
+    fn prepare(&mut self) -> Preparation {
         for desc in self.descriptors.linked_iter_mut() {
             desc.reset_for_rx();
         }
@@ -2666,21 +2574,16 @@ unsafe impl DmaRxBuffer for DmaRxBuf {
         }
     }
 
-    fn prepare(mut self) -> (Preparation, BufView<DmaRxBuf>) {
-        let preparation = self.prepare_mut();
-        (preparation, BufView(self))
+    fn into_view(self) -> BufView<DmaRxBuf> {
+        BufView(self)
+    }
+
+    fn from_view(view: Self::View) -> Self {
+        view.0
     }
 
     fn length(&self) -> usize {
         self.len()
-    }
-}
-
-unsafe impl DmaBufferView for BufView<DmaRxBuf> {
-    type DmaBuffer = DmaRxBuf;
-
-    fn release(self) -> Self::DmaBuffer {
-        self.0
     }
 }
 
@@ -2779,16 +2682,10 @@ impl DmaRxTxBuf {
     }
 }
 
-/// A transmitting view into a [DmaRxTxBuf].
-pub struct DmaRxTxBufTxView(DmaRxTxBuf);
-
-/// A receiving view into a [DmaRxTxBuf].
-pub struct DmaRxTxBufRxView(DmaRxTxBuf);
-
 unsafe impl DmaTxBuffer for DmaRxTxBuf {
-    type View = DmaRxTxBufTxView;
+    type View = BufView<DmaRxTxBuf>;
 
-    fn prepare_mut(&mut self) -> Preparation {
+    fn prepare(&mut self) -> Preparation {
         for desc in self.tx_descriptors.linked_iter_mut() {
             // In non-circular mode, we only set `suc_eof` for the last descriptor to signal
             // the end of the transfer.
@@ -2801,9 +2698,12 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
         }
     }
 
-    fn prepare(mut self) -> (Preparation, DmaRxTxBufTxView) {
-        let preparation = DmaTxBuffer::prepare_mut(&mut self);
-        (preparation, DmaRxTxBufTxView(self))
+    fn into_view(self) -> BufView<DmaRxTxBuf> {
+        BufView(self)
+    }
+
+    fn from_view(view: Self::View) -> Self {
+        view.0
     }
 
     fn length(&self) -> usize {
@@ -2812,9 +2712,9 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
 }
 
 unsafe impl DmaRxBuffer for DmaRxTxBuf {
-    type View = DmaRxTxBufRxView;
+    type View = BufView<DmaRxTxBuf>;
 
-    fn prepare_mut(&mut self) -> Preparation {
+    fn prepare(&mut self) -> Preparation {
         for desc in self.rx_descriptors.linked_iter_mut() {
             desc.reset_for_rx();
         }
@@ -2825,29 +2725,16 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
         }
     }
 
-    fn prepare(mut self) -> (Preparation, DmaRxTxBufRxView) {
-        let preparation = DmaRxBuffer::prepare_mut(&mut self);
-        (preparation, DmaRxTxBufRxView(self))
+    fn into_view(self) -> BufView<DmaRxTxBuf> {
+        BufView(self)
+    }
+
+    fn from_view(view: Self::View) -> Self {
+        view.0
     }
 
     fn length(&self) -> usize {
         self.len()
-    }
-}
-
-unsafe impl DmaBufferView for DmaRxTxBufRxView {
-    type DmaBuffer = DmaRxTxBuf;
-
-    fn release(self) -> Self::DmaBuffer {
-        self.0
-    }
-}
-
-unsafe impl DmaBufferView for DmaRxTxBufTxView {
-    type DmaBuffer = DmaRxTxBuf;
-
-    fn release(self) -> Self::DmaBuffer {
-        self.0
     }
 }
 
@@ -2964,30 +2851,26 @@ impl DmaRxStreamBuf {
 unsafe impl DmaRxBuffer for DmaRxStreamBuf {
     type View = DmaRxStreamBufView;
 
-    fn prepare_mut(&mut self) -> Preparation {
-        // It does not make sense to use this type without viewing it. Prefer DmaRxBuf
-        // for one shot transfers.
-
-        unimplemented!()
-    }
-
-    fn prepare(self) -> (Preparation, DmaRxStreamBufView) {
+    fn prepare(&mut self) -> Preparation {
         for desc in self.descriptors.iter_mut() {
             desc.reset_for_rx();
         }
-
-        let preparation = Preparation {
+        Preparation {
             start: self.descriptors.as_mut_ptr(),
             block_size: None,
-        };
-        (
-            preparation,
-            DmaRxStreamBufView {
-                buf: self,
-                descriptor_idx: 0,
-                descriptor_offset: 0,
-            },
-        )
+        }
+    }
+
+    fn into_view(self) -> DmaRxStreamBufView {
+        DmaRxStreamBufView {
+            buf: self,
+            descriptor_idx: 0,
+            descriptor_offset: 0,
+        }
+    }
+
+    fn from_view(view: Self::View) -> Self {
+        view.buf
     }
 
     fn length(&self) -> usize {
@@ -2995,7 +2878,7 @@ unsafe impl DmaRxBuffer for DmaRxStreamBuf {
     }
 }
 
-/// A [DmaBufferView] into a [DmaRxStreamBuf]
+/// A view into a [DmaRxStreamBuf]
 pub struct DmaRxStreamBufView {
     buf: DmaRxStreamBuf,
     descriptor_idx: usize,
@@ -3163,14 +3046,6 @@ impl DmaRxStreamBufView {
                 found_eof,
             )
         }
-    }
-}
-
-unsafe impl DmaBufferView for DmaRxStreamBufView {
-    type DmaBuffer = DmaRxStreamBuf;
-
-    fn release(self) -> Self::DmaBuffer {
-        self.buf
     }
 }
 
