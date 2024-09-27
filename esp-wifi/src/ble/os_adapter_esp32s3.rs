@@ -152,23 +152,52 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     coex_bt_wakeup_request_end: Some(coex_bt_wakeup_request_end),
 };
 
-extern "C" fn coex_schm_register_btdm_callback(_callback: *const ()) -> i32 {
+extern "C" fn coex_schm_register_btdm_callback(callback: *const ()) -> i32 {
     trace!("coex_schm_register_btdm_callback");
+
+    #[cfg(coex)]
+    unsafe {
+        // COEX_SCHM_CALLBACK_TYPE_BT
+        coex_schm_register_callback(1, callback as *mut esp_wifi_sys::c_types::c_void)
+    }
+
+    #[cfg(not(coex))]
     0
 }
 
 extern "C" fn coex_schm_interval_get() -> i32 {
     trace!("coex_schm_interval_get");
+
+    #[cfg(coex)]
+    unsafe {
+        esp_wifi_sys::include::coex_schm_interval_get() as i32
+    }
+
+    #[cfg(not(coex))]
     0
 }
 
 extern "C" fn coex_schm_curr_period_get() -> u8 {
     trace!("coex_schm_curr_period_get");
+
+    #[cfg(coex)]
+    unsafe {
+        esp_wifi_sys::include::coex_schm_curr_period_get()
+    }
+
+    #[cfg(not(coex))]
     0
 }
 
 extern "C" fn coex_schm_curr_phase_get() -> *const () {
     trace!("coex_schm_curr_phase_get");
+
+    #[cfg(coex)]
+    unsafe {
+        esp_wifi_sys::include::coex_schm_curr_phase_get().cast()
+    }
+
+    #[cfg(not(coex))]
     core::ptr::null()
 }
 
