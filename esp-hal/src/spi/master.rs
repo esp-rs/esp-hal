@@ -507,10 +507,7 @@ where
     ///
     /// Copies the content of `words` in chunks of 64 bytes into the SPI
     /// transmission FIFO. If `words` is longer than 64 bytes, multiple
-    /// sequential transfers are performed. This function will return before
-    /// all bytes of the last chunk to transmit have been sent to the wire. If
-    /// you must ensure that the whole messages was written correctly, use
-    /// `flush`.
+    /// sequential transfers are performed.
     pub fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
         self.spi.write_bytes(words)?;
         self.spi.flush()?;
