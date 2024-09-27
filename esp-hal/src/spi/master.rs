@@ -3351,35 +3351,71 @@ impl Instance for crate::peripherals::SPI3 {
     }
 }
 
-#[cfg(all(spi3, esp32s3))]
+#[cfg(all(spi3, any(esp32, esp32s3)))]
 impl ExtendedInstance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn sio0_input_signal(&self) -> InputSignal {
-        InputSignal::SPI3_D
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                InputSignal::HSPID
+            } else {
+                InputSignal::SPI3_D
+            }
+        }
     }
 
     #[inline(always)]
     fn sio1_output_signal(&self) -> OutputSignal {
-        OutputSignal::SPI3_Q
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                OutputSignal::HSPIQ
+            } else {
+                OutputSignal::SPI3_Q
+            }
+        }
     }
 
     #[inline(always)]
     fn sio2_output_signal(&self) -> OutputSignal {
-        OutputSignal::SPI3_WP
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                OutputSignal::HSPIWP
+            } else {
+                OutputSignal::SPI3_WP
+            }
+        }
     }
 
     #[inline(always)]
     fn sio2_input_signal(&self) -> InputSignal {
-        InputSignal::SPI3_WP
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                InputSignal::HSPIWP
+            } else {
+                InputSignal::SPI3_WP
+            }
+        }
     }
 
     #[inline(always)]
     fn sio3_output_signal(&self) -> OutputSignal {
-        OutputSignal::SPI3_HD
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                OutputSignal::HSPIHD
+            } else {
+                OutputSignal::SPI3_HD
+            }
+        }
     }
 
     #[inline(always)]
     fn sio3_input_signal(&self) -> InputSignal {
-        InputSignal::SPI3_HD
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                InputSignal::HSPIHD
+            } else {
+                InputSignal::SPI3_HD
+            }
+        }
     }
 }
