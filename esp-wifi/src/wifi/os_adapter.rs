@@ -1993,13 +1993,35 @@ pub unsafe extern "C" fn coex_schm_register_cb_wrapper(
     )
 }
 
-pub unsafe extern "C" fn coex_schm_flexible_period_set(arg1: u8) -> i32 {
-    trace!("coex_schm_flexible_period_set {}", arg1);
+pub unsafe extern "C" fn coex_schm_flexible_period_set(period: u8) -> i32 {
+    trace!("coex_schm_flexible_period_set {}", period);
+
+    #[cfg(coex)]
+    unsafe {
+        extern "C" {
+            fn coex_schm_flexible_period_set(period: u8) -> i32;
+        }
+
+        coex_schm_flexible_period_set(period)
+    }
+
+    #[cfg(not(coex))]
     0
 }
 
 pub unsafe extern "C" fn coex_schm_flexible_period_get() -> u8 {
     trace!("coex_schm_flexible_period_get");
+
+    #[cfg(coex)]
+    unsafe {
+        extern "C" {
+            fn coex_schm_flexible_period_get() -> u8;
+        }
+
+        coex_schm_flexible_period_get()
+    }
+
+    #[cfg(not(coex))]
     0
 }
 
