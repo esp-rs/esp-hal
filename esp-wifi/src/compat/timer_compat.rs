@@ -83,12 +83,14 @@ pub fn compat_timer_disarm(ets_timer: *mut ets_timer) {
 
 pub fn compat_timer_done(ets_timer: *mut ets_timer) {
     critical_section::with(|_| unsafe {
-        if let Some(timer) = TIMERS.iter_mut().find(|t| t.ets_timer == ets_timer) {
+        if let Some((idx,timer)) = TIMERS.iter_mut().enumerate().find(|(_,t)| t.ets_timer == ets_timer) {
             debug!("timer_done {:x}", timer.id());
             timer.active = false;
 
             (*ets_timer).priv_ = core::ptr::null_mut();
             (*ets_timer).expire = 0;
+
+            TIMERS.remove(idx);
         } else {
             debug!("timer_done {:x} not found", ets_timer as usize);
         }
