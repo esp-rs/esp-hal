@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Introduce traits for the DMA buffer objects (#1976)
+- Introduce traits for the DMA buffer objects (#1976, #2213)
 - Implement `embedded-hal` output pin traits for `NoPin` (#2019, #2133)
 - Added `esp_hal::init` to simplify HAL initialisation (#1970, #1999)
 - Added GpioPin::degrade to create ErasePins easily. Same for AnyPin by accident. (#2075)
