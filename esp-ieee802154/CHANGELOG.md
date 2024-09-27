@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Modified CCA threshold value to default of -60
 - The driver now take `RADIO_CLK` by value to avoid a collision with esp-wifi's usage (#2183)
 - `binary-logs` feature renamed to `sys-logs` (#2183)
+- Updated PHY driver to v5.3.1 (#2239)
 
 ### Fixed
 
