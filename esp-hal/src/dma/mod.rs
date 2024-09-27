@@ -2462,58 +2462,28 @@ impl DmaRxBuf {
     /// first `buf.len()` bytes of received data is written into `buf`.
     ///
     /// Returns the number of bytes in written to `buf`.
-    pub fn read_received_data(&self, buf: &mut [u8]) -> usize {
-        let mut remaining = &mut buf[..];
-
-        for desc in self.descriptors.linked_iter() {
-            if remaining.is_empty() {
+    pub fn read_received_data(&self, mut buf: &mut [u8]) -> usize {
+        let capacity = buf.len();
+        for chunk in self.received_data() {
+            if buf.is_empty() {
                 break;
             }
-
-            let amount_to_copy = min(desc.len(), remaining.len());
-            let buf_slice = unsafe {
-                // SAFETY: We set up the descriptor to point to a subslice of the buffer, and
-                // here we are only recreating that slice with a perhaps shorter length.
-                // We are also not accessing `self.buffer` while this slice is alive, so we
-                // are not violating any aliasing rules.
-                core::slice::from_raw_parts(desc.buffer.cast_const(), amount_to_copy)
-            };
-
-            let (to_fill, to_remain) = remaining.split_at_mut(amount_to_copy);
-            to_fill.copy_from_slice(buf_slice);
-            remaining = to_remain;
+            let to_fill;
+            (to_fill, buf) = buf.split_at_mut(chunk.len());
+            to_fill.copy_from_slice(chunk);
         }
 
-        let remaining_bytes = remaining.len();
-        buf.len() - remaining_bytes
+        capacity - buf.len()
     }
 
     /// Returns the received data as an iterator of slices.
     pub fn received_data(&self) -> impl Iterator<Item = &[u8]> {
-        let mut descriptors = self.descriptors.linked_iter();
-        let mut buf = &*self.buffer;
-
-        core::iter::from_fn(move || {
-            let mut chunk_size = 0;
-            let mut skip_size = 0;
-            while let Some(desc) = descriptors.next() {
-                chunk_size += desc.len();
-                skip_size += desc.flags.size() as usize;
-
-                // This typically happens when the DMA gets an EOF bit from the peripheral.
-                // It can also happen if the DMA is restarted.
-                if desc.len() < desc.flags.size() as usize {
-                    break;
-                }
-            }
-
-            if chunk_size == 0 {
-                return None;
-            }
-
-            let chunk = &buf[..chunk_size];
-            buf = &buf[skip_size..];
-            Some(chunk)
+        self.descriptors.linked_iter().map(|desc| {
+            // SAFETY: We set up the descriptor to point to a subslice of the buffer, and
+            // here we are only recreating that slice with a perhaps shorter length.
+            // We are also not accessing `self.buffer` while this slice is alive, so we
+            // are not violating any aliasing rules.
+            unsafe { core::slice::from_raw_parts(desc.buffer.cast_const(), desc.len()) }
         })
     }
 }
