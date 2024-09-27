@@ -151,13 +151,13 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     coex_bt_wakeup_request_end: Some(coex_bt_wakeup_request_end),
 };
 
-extern "C" fn coex_schm_register_btdm_callback(callback: *const ()) -> i32 {
+extern "C" fn coex_schm_register_btdm_callback(_callback: *const ()) -> i32 {
     trace!("coex_schm_register_btdm_callback");
 
     #[cfg(coex)]
     unsafe {
         // COEX_SCHM_CALLBACK_TYPE_BT
-        coex_schm_register_callback(1, callback as *mut esp_wifi_sys::c_types::c_void)
+        coex_schm_register_callback(1, _callback as *mut esp_wifi_sys::c_types::c_void)
     }
 
     #[cfg(not(coex))]
