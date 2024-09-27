@@ -1062,7 +1062,7 @@ impl<'a> DescriptorSet<'a> {
 
         descriptors.fill(DmaDescriptor::EMPTY);
 
-        unsafe { Self::new_from_unchecked(descriptors) }
+        Ok(unsafe { Self::new_unchecked(descriptors) })
     }
 
     /// Creates a new `DescriptorSet` from a slice of descriptors and associates
@@ -1070,12 +1070,10 @@ impl<'a> DescriptorSet<'a> {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that the descriptors are in a supported memory
-    /// region.
-    unsafe fn new_from_unchecked(
-        descriptors: &'a mut [DmaDescriptor],
-    ) -> Result<Self, DmaBufError> {
-        Ok(Self { descriptors })
+    /// The caller must ensure that the descriptors are located in a supported
+    /// memory region.
+    unsafe fn new_unchecked(descriptors: &'a mut [DmaDescriptor]) -> Self {
+        Self { descriptors }
     }
 
     /// Consumes the `DescriptorSet` and returns the inner slice of descriptors.
@@ -2476,6 +2474,8 @@ impl DmaRxBuf {
             let buf_slice = unsafe {
                 // SAFETY: We set up the descriptor to point to a subslice of the buffer, and
                 // here we are only recreating that slice with a perhaps shorter length.
+                // We are also not accessing `self.buffer` while this slice is alive, so we
+                // are not violating any aliasing rules.
                 core::slice::from_raw_parts(desc.buffer.cast_const(), amount_to_copy)
             };
 
@@ -2499,15 +2499,6 @@ impl DmaRxBuf {
             while let Some(desc) = descriptors.next() {
                 chunk_size += desc.len();
                 skip_size += desc.flags.size() as usize;
-
-                // If this is the end of the linked list, we can skip the remaining descriptors.
-                if desc.next.is_null() {
-                    while descriptors.next().is_some() {
-                        // Drain the iterator so the next call to from_fn return
-                        // None.
-                    }
-                    break;
-                }
 
                 // This typically happens when the DMA gets an EOF bit from the peripheral.
                 // It can also happen if the DMA is restarted.
