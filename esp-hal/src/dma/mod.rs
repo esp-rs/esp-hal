@@ -1509,8 +1509,13 @@ pub trait DmaChannel: crate::private::Sealed {
 
 #[doc(hidden)]
 pub trait DmaChannelExt: DmaChannel {
+    type Degraded: DmaChannel;
+
     fn get_rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt>;
     fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt>;
+
+    fn degrade_rx(rx: Self::Rx) -> <Self::Degraded as DmaChannel>::Rx;
+    fn degrade_tx(tx: Self::Tx) -> <Self::Degraded as DmaChannel>::Tx;
 
     #[doc(hidden)]
     fn set_isr(handler: InterruptHandler);
@@ -1593,6 +1598,18 @@ where
         Self {
             burst_mode,
             rx_impl,
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Return a type-erased (degraded) version of this channel.
+    pub fn degrade(self) -> ChannelRx<'a, CH::Degraded>
+    where
+        CH: DmaChannelExt,
+    {
+        ChannelRx {
+            burst_mode: self.burst_mode,
+            rx_impl: CH::degrade_rx(self.rx_impl),
             _phantom: PhantomData,
         }
     }
@@ -1798,6 +1815,18 @@ where
         Self {
             burst_mode,
             tx_impl,
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Return a type-erased (degraded) version of this channel.
+    pub fn degrade(self) -> ChannelTx<'a, CH::Degraded>
+    where
+        CH: DmaChannelExt,
+    {
+        ChannelTx {
+            burst_mode: self.burst_mode,
+            tx_impl: CH::degrade_tx(self.tx_impl),
             _phantom: PhantomData,
         }
     }
@@ -2050,6 +2079,21 @@ where
                 DmaInterrupt::RxDone => self.rx.clear_in(DmaRxInterrupt::Done),
                 DmaInterrupt::TxDone => self.tx.clear_out(DmaTxInterrupt::Done),
             }
+        }
+    }
+}
+
+impl<'d, C, M: Mode> Channel<'d, C, M>
+where
+    C: DmaChannelExt,
+{
+    /// Return a type-erased (degraded) version of this channel (both rx and
+    /// tx).
+    pub fn degrade(self) -> Channel<'d, C::Degraded, M> {
+        Channel {
+            rx: self.rx.degrade(),
+            tx: self.tx.degrade(),
+            phantom: PhantomData,
         }
     }
 }
