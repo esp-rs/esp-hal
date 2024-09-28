@@ -502,14 +502,6 @@ macro_rules! impl_channel {
                 type Rx = ChannelRxImpl<$num>;
                 type Tx = ChannelTxImpl<$num>;
                 type P = SuitablePeripheral<$num>;
-
-                fn set_isr(handler: $crate::interrupt::InterruptHandler) {
-                    let mut dma = unsafe { crate::peripherals::DMA::steal() };
-                    $(
-                        dma.[< bind_ $interrupt:lower _interrupt >](handler.handler());
-                        $crate::interrupt::enable($crate::peripherals::Interrupt::$interrupt, handler.priority()).unwrap();
-                    )*
-                }
             }
 
             impl DmaChannelExt for [<DmaChannel $num>] {
@@ -519,6 +511,14 @@ macro_rules! impl_channel {
 
                 fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
                     ChannelTxImpl::<$num> {}
+                }
+
+                fn set_isr(handler: $crate::interrupt::InterruptHandler) {
+                    let mut dma = unsafe { crate::peripherals::DMA::steal() };
+                    $(
+                        dma.[< bind_ $interrupt:lower _interrupt >](handler.handler());
+                        $crate::interrupt::enable($crate::peripherals::Interrupt::$interrupt, handler.priority()).unwrap();
+                    )*
                 }
             }
 

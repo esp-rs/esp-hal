@@ -368,14 +368,6 @@ macro_rules! ImplSpiChannel {
                 type Rx = SpiDmaRxChannelImpl<Self>;
                 type Tx = SpiDmaTxChannelImpl<Self>;
                 type P = [<Spi $num DmaSuitablePeripheral>];
-
-                fn set_isr(handler: InterruptHandler) {
-                    let interrupt = $crate::peripherals::Interrupt::[< SPI $num _DMA >];
-                    unsafe {
-                        crate::interrupt::bind_interrupt(interrupt, handler.handler());
-                    }
-                    crate::interrupt::enable(interrupt, handler.priority()).unwrap();
-                }
             }
 
             impl DmaChannelExt for [<Spi $num DmaChannel>] {
@@ -384,6 +376,14 @@ macro_rules! ImplSpiChannel {
                 }
                 fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
                     SpiDmaTxChannelImpl::<Self>(PhantomData)
+                }
+
+                fn set_isr(handler: InterruptHandler) {
+                    let interrupt = $crate::peripherals::Interrupt::[< SPI $num _DMA >];
+                    unsafe {
+                        crate::interrupt::bind_interrupt(interrupt, handler.handler());
+                    }
+                    crate::interrupt::enable(interrupt, handler.priority()).unwrap();
                 }
             }
 
@@ -827,14 +827,6 @@ macro_rules! ImplI2sChannel {
                 type Rx = I2sDmaRxChannelImpl<Self>;
                 type Tx = I2sDmaTxChannelImpl<Self>;
                 type P = [<I2s $num DmaSuitablePeripheral>];
-
-                fn set_isr(handler: InterruptHandler) {
-                    let interrupt = $crate::peripherals::Interrupt::[< I2S $num  >];
-                    unsafe {
-                        crate::interrupt::bind_interrupt(interrupt, handler.handler());
-                    }
-                    crate::interrupt::enable(interrupt, handler.priority()).unwrap();
-                }
             }
 
             impl DmaChannelExt for [<I2s $num DmaChannel>] {
@@ -843,6 +835,14 @@ macro_rules! ImplI2sChannel {
                 }
                 fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
                     I2sDmaTxChannelImpl::<Self>(PhantomData)
+                }
+
+                fn set_isr(handler: InterruptHandler) {
+                    let interrupt = $crate::peripherals::Interrupt::[< I2S $num  >];
+                    unsafe {
+                        crate::interrupt::bind_interrupt(interrupt, handler.handler());
+                    }
+                    crate::interrupt::enable(interrupt, handler.priority()).unwrap();
                 }
             }
 

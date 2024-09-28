@@ -1505,15 +1505,15 @@ pub trait DmaChannel: crate::private::Sealed {
 
     /// A suitable peripheral for this DMA channel.
     type P: PeripheralMarker;
-
-    #[doc(hidden)]
-    fn set_isr(handler: InterruptHandler);
 }
 
 #[doc(hidden)]
 pub trait DmaChannelExt: DmaChannel {
     fn get_rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt>;
     fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt>;
+
+    #[doc(hidden)]
+    fn set_isr(handler: InterruptHandler);
 }
 
 /// The functions here are not meant to be used outside the HAL
@@ -2004,7 +2004,10 @@ where
     /// with [crate::interrupt::Priority::max()]
     ///
     /// Interrupts are not enabled at the peripheral level here.
-    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler)
+    where
+        C: DmaChannelExt,
+    {
         C::set_isr(handler);
     }
 
