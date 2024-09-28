@@ -251,6 +251,11 @@ pub mod dma {
         },
     };
 
+    #[cfg(gdma)]
+    type DefaultChannel = crate::dma::AnyDmaChannel;
+    #[cfg(pdma)]
+    type DefaultChannel = (); // Replace with PDMA channel once support is added.
+
     const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 
     /// Specifies the block cipher modes available for AES operations.
@@ -270,7 +275,7 @@ pub mod dma {
     }
 
     /// A DMA capable AES instance.
-    pub struct AesDma<'d, C>
+    pub struct AesDma<'d, C = DefaultChannel>
     where
         C: DmaChannel,
         C::P: AesPeripheral,
