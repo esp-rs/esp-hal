@@ -65,7 +65,10 @@
 //! # }
 //! ```
 
-use core::ops::{Deref, DerefMut};
+use core::{
+    mem::ManuallyDrop,
+    ops::{Deref, DerefMut},
+};
 
 use fugit::HertzU32;
 
@@ -336,8 +339,8 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
             .modify(|_, w| w.cam_start().set_bit());
 
         Ok(CameraTransfer {
-            camera: self,
-            buffer_view: buf.into_view(),
+            camera: ManuallyDrop::new(self),
+            buffer_view: ManuallyDrop::new(buf.into_view()),
         })
     }
 }
@@ -345,8 +348,8 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
 /// Represents an ongoing (or potentially stopped) transfer from the Camera to a
 /// DMA buffer.
 pub struct CameraTransfer<'d, CH: DmaChannel, BUF: DmaRxBuffer> {
-    camera: Camera<'d, CH>,
-    buffer_view: BUF::View,
+    camera: ManuallyDrop<Camera<'d, CH>>,
+    buffer_view: ManuallyDrop<BUF::View>,
 }
 
 impl<'d, CH: DmaChannel, BUF: DmaRxBuffer> CameraTransfer<'d, CH, BUF> {
@@ -407,13 +410,16 @@ impl<'d, CH: DmaChannel, BUF: DmaRxBuffer> CameraTransfer<'d, CH, BUF> {
         (result, camera, BUF::from_view(view))
     }
 
-    fn release(self) -> (Camera<'d, CH>, BUF::View) {
-        unsafe {
-            let camera = core::ptr::read(&self.camera);
-            let view = core::ptr::read(&self.buffer_view);
-            core::mem::forget(self);
+    fn release(mut self) -> (Camera<'d, CH>, BUF::View) {
+        // SAFETY: Since forget is called on self, we know that self.camera and
+        // self.buffer_view won't be touched again.
+        let result = unsafe {
+            let camera = ManuallyDrop::take(&mut self.camera);
+            let view = ManuallyDrop::take(&mut self.buffer_view);
             (camera, view)
-        }
+        };
+        core::mem::forget(self);
+        result
     }
 
     fn stop_peripherals(&mut self) {
@@ -445,6 +451,13 @@ impl<'d, CH: DmaChannel, BUF: DmaRxBuffer> DerefMut for CameraTransfer<'d, CH, B
 impl<'d, CH: DmaChannel, BUF: DmaRxBuffer> Drop for CameraTransfer<'d, CH, BUF> {
     fn drop(&mut self) {
         self.stop_peripherals();
+
+        // SAFETY: This is Drop, we know that self.camera and self.buffer_view
+        // won't be touched again.
+        unsafe {
+            ManuallyDrop::drop(&mut self.camera);
+            ManuallyDrop::drop(&mut self.buffer_view);
+        }
     }
 }
 
