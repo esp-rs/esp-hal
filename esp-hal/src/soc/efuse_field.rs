@@ -1,3 +1,5 @@
+use bytemuck::AnyBitPattern;
+
 use crate::soc::efuse::{Efuse, EfuseBlock};
 
 /// The bit field for get access to efuse data
@@ -21,7 +23,7 @@ impl EfuseField {
 impl Efuse {
     /// Read field value in a little-endian order
     #[inline(always)]
-    pub fn read_field_le<T: Sized + 'static>(field: EfuseField) -> T {
+    pub fn read_field_le<T: AnyBitPattern>(field: EfuseField) -> T {
         let mut output = core::mem::MaybeUninit::<T>::uninit();
         // represent output value as a bytes slice
         let mut bytes = unsafe {
@@ -89,7 +91,7 @@ impl Efuse {
 
     /// Read field value in a big-endian order
     #[inline(always)]
-    pub fn read_field_be<T: Sized + 'static>(field: EfuseField) -> T {
+    pub fn read_field_be<T: AnyBitPattern>(field: EfuseField) -> T {
         // read value in a little-endian order
         let mut output = Self::read_field_le::<T>(field);
         // represent output value as a byte slice
@@ -102,5 +104,14 @@ impl Efuse {
         // reverse byte order
         bytes.reverse();
         output
+    }
+
+    /// Read bit value.
+    ///
+    /// This function panics if the field's bit length is not equal to 1.
+    #[inline(always)]
+    pub fn read_bit(field: EfuseField) -> bool {
+        assert_eq!(field.bit_len, 1);
+        Self::read_field_le::<u8>(field) != 0
     }
 }
