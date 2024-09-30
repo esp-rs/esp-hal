@@ -126,7 +126,7 @@ use num_traits::FromPrimitive;
 
 #[cfg(feature = "wifi")]
 use crate::{
-    binary::include::{self, esp_wifi_deinit_internal, esp_wifi_stop},
+    binary::include::{self, esp_supplicant_deinit, esp_wifi_deinit_internal, esp_wifi_stop},
     wifi::WifiError,
 };
 use crate::{
@@ -490,6 +490,7 @@ pub unsafe fn deinit_unchecked(
     if init.is_wifi() {
         esp_wifi_result!(unsafe { esp_wifi_stop() })?;
         esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
+        esp_wifi_result!(esp_supplicant_deinit())?;
     }
 
     // Deinitialize BLE
