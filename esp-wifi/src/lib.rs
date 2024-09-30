@@ -157,14 +157,18 @@ pub fn current_millis() -> u64 {
 
 // this is just to verify that we use the correct defaults in `build.rs`
 const _: () = {
-    core::assert!(binary::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM == 10);
-    core::assert!(binary::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
-    core::assert!(binary::include::WIFI_STATIC_TX_BUFFER_NUM == 0);
-    core::assert!(binary::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
-    core::assert!(binary::include::CONFIG_ESP_WIFI_AMPDU_RX_ENABLED == 1);
-    core::assert!(binary::include::CONFIG_ESP_WIFI_AMPDU_TX_ENABLED == 1);
-    core::assert!(binary::include::WIFI_AMSDU_TX_ENABLED == 0);
-    core::assert!(binary::include::CONFIG_ESP32_WIFI_RX_BA_WIN == 6);
+    cfg_if::cfg_if! {
+        if #[cfg(not(esp32h2))]{
+            core::assert!(binary::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM == 10);
+            core::assert!(binary::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
+            core::assert!(binary::include::WIFI_STATIC_TX_BUFFER_NUM == 0);
+            core::assert!(binary::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
+            core::assert!(binary::include::CONFIG_ESP_WIFI_AMPDU_RX_ENABLED == 1);
+            core::assert!(binary::include::CONFIG_ESP_WIFI_AMPDU_TX_ENABLED == 1);
+            core::assert!(binary::include::WIFI_AMSDU_TX_ENABLED == 0);
+            core::assert!(binary::include::CONFIG_ESP32_WIFI_RX_BA_WIN == 6);
+        }
+    };
 };
 
 #[derive(Debug)]
