@@ -1,6 +1,6 @@
 use crate::binary::{
     c_types,
-    include::{esp_timer_create_args_t, esp_timer_handle_t, ets_timer},
+    include::{esp_timer_create_args_t, ets_timer},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -140,37 +140,4 @@ pub fn compat_timer_setfn(
     if !set {
         warn!("Failed to set timer function {:x}", ets_timer as usize);
     }
-}
-
-pub fn compat_esp_timer_create(
-    args: *const esp_timer_create_args_t,
-    out_handle: *mut esp_timer_handle_t,
-) -> i32 {
-    unsafe {
-        debug!("esp_timer_create {:?} {:?}", (*args).callback, (*args).arg);
-    }
-
-    critical_section::with(|_| unsafe {
-        if TIMERS.is_full() {
-            // TODO: should we return -1 instead?
-            panic!("ran out of timers");
-        }
-
-        let ets_timer =
-            crate::compat::malloc::calloc(1, core::mem::size_of::<ets_timer>()).cast::<ets_timer>();
-
-        _ = TIMERS.push(Timer {
-            ets_timer,
-            started: 0,
-            timeout: 0,
-            active: false,
-            periodic: false,
-            callback: TimerCallback::from(unwrap!(args.as_ref())),
-        });
-
-        debug!("esp_timer_create {:x}", ets_timer as usize);
-        *out_handle = ets_timer as _;
-
-        0
-    })
 }
