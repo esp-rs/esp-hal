@@ -28,9 +28,6 @@ mod tests {
 
     use super::*;
 
-    #[init]
-    fn init() {}
-
     #[test]
     fn test_dma_descriptors_same_size() {
         use esp_hal::dma::CHUNK_SIZE;
