@@ -24,7 +24,10 @@ pub(crate) const fn compute_circular_size(size: usize, chunk_size: usize) -> usi
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    use defmt::assert_eq;
+    // defmt::* is load-bearing, it ensures that the assert in dma_buffers! is not
+    // using defmt's non-const assert. Doing so would result in a compile error.
+    #[allow(unused_imports)]
+    use defmt::*;
 
     use super::*;
 
@@ -32,9 +35,9 @@ mod tests {
     fn test_dma_descriptors_same_size() {
         use esp_hal::dma::CHUNK_SIZE;
         let (rx_descriptors, tx_descriptors) = esp_hal::dma_descriptors!(DATA_SIZE);
-        assert_eq!(rx_descriptors.len(), tx_descriptors.len());
-        assert_eq!(rx_descriptors.len(), compute_size(DATA_SIZE, CHUNK_SIZE));
-        assert_eq!(tx_descriptors.len(), compute_size(DATA_SIZE, CHUNK_SIZE));
+        core::assert_eq!(rx_descriptors.len(), tx_descriptors.len());
+        core::assert_eq!(rx_descriptors.len(), compute_size(DATA_SIZE, CHUNK_SIZE));
+        core::assert_eq!(tx_descriptors.len(), compute_size(DATA_SIZE, CHUNK_SIZE));
     }
 
     #[test]
@@ -43,20 +46,20 @@ mod tests {
         const RX_SIZE: usize = DATA_SIZE / 2;
         const TX_SIZE: usize = DATA_SIZE;
         let (rx_descriptors, tx_descriptors) = esp_hal::dma_descriptors!(RX_SIZE, TX_SIZE);
-        assert_eq!(rx_descriptors.len(), compute_size(RX_SIZE, CHUNK_SIZE));
-        assert_eq!(tx_descriptors.len(), compute_size(TX_SIZE, CHUNK_SIZE));
+        core::assert_eq!(rx_descriptors.len(), compute_size(RX_SIZE, CHUNK_SIZE));
+        core::assert_eq!(tx_descriptors.len(), compute_size(TX_SIZE, CHUNK_SIZE));
     }
 
     #[test]
     fn test_dma_circular_descriptors_same_size() {
         use esp_hal::dma::CHUNK_SIZE;
         let (rx_descriptors, tx_descriptors) = esp_hal::dma_circular_descriptors!(DATA_SIZE);
-        assert_eq!(rx_descriptors.len(), tx_descriptors.len());
-        assert_eq!(
+        core::assert_eq!(rx_descriptors.len(), tx_descriptors.len());
+        core::assert_eq!(
             rx_descriptors.len(),
             compute_circular_size(DATA_SIZE, CHUNK_SIZE)
         );
-        assert_eq!(
+        core::assert_eq!(
             tx_descriptors.len(),
             compute_circular_size(DATA_SIZE, CHUNK_SIZE)
         );
@@ -68,11 +71,11 @@ mod tests {
         const RX_SIZE: usize = DATA_SIZE / 2;
         const TX_SIZE: usize = CHUNK_SIZE * 2;
         let (rx_descriptors, tx_descriptors) = esp_hal::dma_circular_descriptors!(RX_SIZE, TX_SIZE);
-        assert_eq!(
+        core::assert_eq!(
             rx_descriptors.len(),
             compute_circular_size(RX_SIZE, CHUNK_SIZE)
         );
-        assert_eq!(
+        core::assert_eq!(
             tx_descriptors.len(),
             compute_circular_size(TX_SIZE, CHUNK_SIZE)
         );
@@ -83,11 +86,11 @@ mod tests {
         use esp_hal::dma::CHUNK_SIZE;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
             esp_hal::dma_buffers!(DATA_SIZE);
-        assert_eq!(rx_buffer.len(), DATA_SIZE);
-        assert_eq!(tx_buffer.len(), DATA_SIZE);
-        assert_eq!(tx_descriptors.len(), rx_descriptors.len());
-        assert_eq!(rx_descriptors.len(), compute_size(DATA_SIZE, CHUNK_SIZE));
-        assert_eq!(tx_descriptors.len(), compute_size(DATA_SIZE, CHUNK_SIZE));
+        core::assert_eq!(rx_buffer.len(), DATA_SIZE);
+        core::assert_eq!(tx_buffer.len(), DATA_SIZE);
+        core::assert_eq!(tx_descriptors.len(), rx_descriptors.len());
+        core::assert_eq!(rx_descriptors.len(), compute_size(DATA_SIZE, CHUNK_SIZE));
+        core::assert_eq!(tx_descriptors.len(), compute_size(DATA_SIZE, CHUNK_SIZE));
     }
 
     #[test]
@@ -98,10 +101,10 @@ mod tests {
 
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
             esp_hal::dma_buffers!(RX_SIZE, TX_SIZE);
-        assert_eq!(rx_buffer.len(), RX_SIZE);
-        assert_eq!(tx_buffer.len(), TX_SIZE);
-        assert_eq!(rx_descriptors.len(), compute_size(RX_SIZE, CHUNK_SIZE));
-        assert_eq!(tx_descriptors.len(), compute_size(TX_SIZE, CHUNK_SIZE));
+        core::assert_eq!(rx_buffer.len(), RX_SIZE);
+        core::assert_eq!(tx_buffer.len(), TX_SIZE);
+        core::assert_eq!(rx_descriptors.len(), compute_size(RX_SIZE, CHUNK_SIZE));
+        core::assert_eq!(tx_descriptors.len(), compute_size(TX_SIZE, CHUNK_SIZE));
     }
 
     #[test]
@@ -109,14 +112,14 @@ mod tests {
         use esp_hal::dma::CHUNK_SIZE;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
             esp_hal::dma_circular_buffers!(DATA_SIZE);
-        assert_eq!(rx_buffer.len(), DATA_SIZE);
-        assert_eq!(tx_buffer.len(), DATA_SIZE);
-        assert_eq!(rx_descriptors.len(), tx_descriptors.len());
-        assert_eq!(
+        core::assert_eq!(rx_buffer.len(), DATA_SIZE);
+        core::assert_eq!(tx_buffer.len(), DATA_SIZE);
+        core::assert_eq!(rx_descriptors.len(), tx_descriptors.len());
+        core::assert_eq!(
             rx_descriptors.len(),
             compute_circular_size(DATA_SIZE, CHUNK_SIZE)
         );
-        assert_eq!(
+        core::assert_eq!(
             tx_descriptors.len(),
             compute_circular_size(DATA_SIZE, CHUNK_SIZE)
         );
@@ -129,13 +132,13 @@ mod tests {
         const TX_SIZE: usize = CHUNK_SIZE * 4;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
             esp_hal::dma_circular_buffers!(RX_SIZE, TX_SIZE);
-        assert_eq!(rx_buffer.len(), RX_SIZE);
-        assert_eq!(tx_buffer.len(), TX_SIZE);
-        assert_eq!(
+        core::assert_eq!(rx_buffer.len(), RX_SIZE);
+        core::assert_eq!(tx_buffer.len(), TX_SIZE);
+        core::assert_eq!(
             rx_descriptors.len(),
             compute_circular_size(RX_SIZE, CHUNK_SIZE)
         );
-        assert_eq!(
+        core::assert_eq!(
             tx_descriptors.len(),
             compute_circular_size(TX_SIZE, CHUNK_SIZE)
         );
@@ -146,9 +149,9 @@ mod tests {
         const CHUNK_SIZE: usize = 2048;
         let (rx_descriptors, tx_descriptors) =
             esp_hal::dma_descriptors_chunk_size!(DATA_SIZE, CHUNK_SIZE);
-        assert_eq!(rx_descriptors.len(), tx_descriptors.len());
-        assert_eq!(rx_descriptors.len(), compute_size(DATA_SIZE, CHUNK_SIZE));
-        assert_eq!(tx_descriptors.len(), compute_size(DATA_SIZE, CHUNK_SIZE));
+        core::assert_eq!(rx_descriptors.len(), tx_descriptors.len());
+        core::assert_eq!(rx_descriptors.len(), compute_size(DATA_SIZE, CHUNK_SIZE));
+        core::assert_eq!(tx_descriptors.len(), compute_size(DATA_SIZE, CHUNK_SIZE));
     }
 
     #[test]
@@ -158,8 +161,8 @@ mod tests {
         const TX_SIZE: usize = DATA_SIZE;
         let (rx_descriptors, tx_descriptors) =
             esp_hal::dma_descriptors_chunk_size!(RX_SIZE, TX_SIZE, CHUNK_SIZE);
-        assert_eq!(rx_descriptors.len(), compute_size(RX_SIZE, CHUNK_SIZE));
-        assert_eq!(tx_descriptors.len(), compute_size(TX_SIZE, CHUNK_SIZE));
+        core::assert_eq!(rx_descriptors.len(), compute_size(RX_SIZE, CHUNK_SIZE));
+        core::assert_eq!(tx_descriptors.len(), compute_size(TX_SIZE, CHUNK_SIZE));
     }
 
     #[test]
@@ -167,14 +170,14 @@ mod tests {
         const CHUNK_SIZE: usize = 2048;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
             esp_hal::dma_circular_buffers_chunk_size!(DATA_SIZE, CHUNK_SIZE);
-        assert_eq!(rx_buffer.len(), DATA_SIZE);
-        assert_eq!(tx_buffer.len(), DATA_SIZE);
-        assert_eq!(rx_descriptors.len(), tx_descriptors.len());
-        assert_eq!(
+        core::assert_eq!(rx_buffer.len(), DATA_SIZE);
+        core::assert_eq!(tx_buffer.len(), DATA_SIZE);
+        core::assert_eq!(rx_descriptors.len(), tx_descriptors.len());
+        core::assert_eq!(
             rx_descriptors.len(),
             compute_circular_size(DATA_SIZE, CHUNK_SIZE)
         );
-        assert_eq!(
+        core::assert_eq!(
             tx_descriptors.len(),
             compute_circular_size(DATA_SIZE, CHUNK_SIZE)
         );
@@ -187,13 +190,13 @@ mod tests {
         const TX_SIZE: usize = DATA_SIZE;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
             esp_hal::dma_circular_buffers_chunk_size!(RX_SIZE, TX_SIZE, CHUNK_SIZE);
-        assert_eq!(rx_buffer.len(), RX_SIZE);
-        assert_eq!(tx_buffer.len(), TX_SIZE);
-        assert_eq!(
+        core::assert_eq!(rx_buffer.len(), RX_SIZE);
+        core::assert_eq!(tx_buffer.len(), TX_SIZE);
+        core::assert_eq!(
             rx_descriptors.len(),
             compute_circular_size(RX_SIZE, CHUNK_SIZE)
         );
-        assert_eq!(
+        core::assert_eq!(
             tx_descriptors.len(),
             compute_circular_size(TX_SIZE, CHUNK_SIZE)
         );
@@ -207,10 +210,10 @@ mod tests {
         fn check(result: Result<DmaTxBuf, DmaBufError>, size: usize) {
             match result {
                 Ok(tx_buf) => {
-                    assert_eq!(tx_buf.len(), size);
+                    core::assert_eq!(tx_buf.len(), size);
                 }
                 Err(_) => {
-                    panic!("Failed to create DmaTxBuf");
+                    core::panic!("Failed to create DmaTxBuf");
                 }
             }
         }

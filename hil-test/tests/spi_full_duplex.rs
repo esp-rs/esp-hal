@@ -46,8 +46,6 @@ struct Context {
 #[cfg(test)]
 #[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
 mod tests {
-    use defmt::assert_eq;
-
     use super::*;
 
     #[init]
@@ -104,12 +102,12 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn test_asymmetric_transfer(mut ctx: Context) {
-        let write = [0xde, 0xad, 0xbe, 0xef];
+        let write = [0xde, 0xad, 0xbe, 0xee];
         let mut read: [u8; 4] = [0x00; 4];
 
         SpiBus::transfer(&mut ctx.spi, &mut read[0..2], &write[..])
             .expect("Asymmetric transfer failed");
-        assert_eq!(write[0], read[0]);
+        assert_eq!(write[0], read[1]);
         assert_eq!(read[2], 0x00u8);
     }
 

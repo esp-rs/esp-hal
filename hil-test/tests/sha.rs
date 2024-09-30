@@ -160,9 +160,6 @@ pub struct Context {
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
-    use defmt::assert_eq;
-
     use super::*;
 
     #[init]

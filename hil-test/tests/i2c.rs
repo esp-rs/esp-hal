@@ -14,8 +14,6 @@ struct Context {
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    use defmt::assert_ne;
-
     use super::*;
 
     #[init]

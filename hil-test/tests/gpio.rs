@@ -41,7 +41,6 @@ pub fn interrupt_handler() {
 #[cfg(test)]
 #[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
 mod tests {
-    use defmt::assert_eq;
     use embassy_time::{Duration, Timer};
     use esp_hal::gpio::{Event, Flex, OutputOpenDrain};
     use portable_atomic::{AtomicUsize, Ordering};
