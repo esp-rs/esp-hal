@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the `clocks` parameter from `esp_wifi::initialize` (#1999)
 - `cfg_toml` configuration system has been removed in favour of [esp-config](https://docs.rs/esp-config) (#2156)
 - Removed the `embedded-svc` traits and feature (#2235)
+- Removed the `log` feature from default features (#2253)
 
 ## 0.9.1 - 2024-09-03
 
