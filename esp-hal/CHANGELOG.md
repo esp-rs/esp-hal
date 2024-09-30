@@ -75,6 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SPI: ESP32: Send address with correct data mode even when no data is sent. (#2231)
 - PARL_IO: Fixed an issue that caused garbage to be output at the start of some requests (#2211)
 - TWAI on ESP32 (#2207)
+- TWAI should no longer panic when receiving a non-compliant frame (#2255)
 
 ### Removed
 
