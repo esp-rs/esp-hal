@@ -1371,8 +1371,6 @@ mod dma {
     {
         spi_dma: ManuallyDrop<SpiDma<'d, T, C, D, M>>,
         dma_buf: ManuallyDrop<Buf>,
-
-        _marker: PhantomData<&'d ()>,
     }
 
     impl<'d, T, C, D, M, Buf> SpiDmaTransfer<'d, T, C, D, M, Buf>
@@ -1387,7 +1385,6 @@ mod dma {
             Self {
                 spi_dma: ManuallyDrop::new(spi_dma),
                 dma_buf: ManuallyDrop::new(dma_buf),
-                _marker: PhantomData,
             }
         }
 
