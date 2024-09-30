@@ -59,7 +59,7 @@ esp-config   = { version = "0.1.0", path = "../esp-config", features = ["build"]
 esp-metadata = { version = "0.3.0", path = "../esp-metadata" }
 
 [features]
-default = ["log", "esp-alloc"]
+default = ["esp-alloc"]
 
 ## Use `esp-alloc` for dynamic allocations.
 ##
