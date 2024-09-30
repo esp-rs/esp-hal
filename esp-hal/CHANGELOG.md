@@ -89,6 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the following functions from `GpioPin`: `is_high`, `is_low`, `set_high`, `set_low`, `set_state`, `is_set_high`, `is_set_low`, `toggle`. (#2094)
 - Removed `Rtc::get_time_raw` (#1883)
 - Removed `_with_default_pins` UART constructors (#2132)
+- Removed transfer methods `send`, `send_dma` and `send_dma_async` from `I8080` (#2191)
 - Removed `uart::{DefaultRxPin, DefaultTxPin}` (#2132)
 - Removed `PcntSource` and `PcntInputConfig`. (#2134)
 - Removed the `place-spi-driver-in-ram` feature, this is now enabled via [esp-config](https://docs.rs/esp-config) (#2156)

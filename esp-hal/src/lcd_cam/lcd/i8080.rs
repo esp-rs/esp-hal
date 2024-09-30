@@ -17,15 +17,14 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::Io;
 //! # use esp_hal::lcd_cam::{LcdCam, lcd::i8080::{Config, I8080, TxEightBits}};
-//! # use esp_hal::dma_buffers;
+//! # use esp_hal::dma_tx_buffer;
 //! # use esp_hal::dma::{Dma, DmaPriority, DmaTxBuf};
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
 //! # let dma = Dma::new(peripherals.DMA);
 //! # let channel = dma.channel0;
 //!
-//! # let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, 32678);
-//! # let mut dma_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+//! # let mut dma_buf = dma_tx_buffer!(32678).unwrap();
 //!
 //! # let channel = channel.configure(
 //! #     false,
@@ -59,7 +58,11 @@
 //! # }
 //! ```
 
-use core::{fmt::Formatter, marker::PhantomData, mem::size_of};
+use core::{
+    fmt::Formatter,
+    marker::PhantomData,
+    mem::{size_of, ManuallyDrop},
+};
 
 use fugit::HertzU32;
 
@@ -266,7 +269,7 @@ impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
         cmd: impl Into<Command<W>>,
         dummy: u8,
         mut data: BUF,
-    ) -> Result<I8080Transfer<'d, CH, DM, BUF>, (DmaError, Self, BUF)> {
+    ) -> Result<I8080Transfer<'d, BUF, CH, DM>, (DmaError, Self, BUF)> {
         let cmd = cmd.into();
 
         // Reset LCD control unit and Async Tx FIFO
@@ -356,8 +359,8 @@ impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
         });
 
         Ok(I8080Transfer {
-            i8080: self,
-            tx_buf: data,
+            i8080: ManuallyDrop::new(self),
+            tx_buf: ManuallyDrop::new(data),
         })
     }
 }
@@ -370,12 +373,12 @@ impl<'d, CH: DmaChannel, DM: Mode> core::fmt::Debug for I8080<'d, CH, DM> {
 
 /// Represents an ongoing (or potentially finished) transfer using the I8080 LCD
 /// interface
-pub struct I8080Transfer<'d, CH: DmaChannel, DM: Mode, BUF> {
-    i8080: I8080<'d, CH, DM>,
-    tx_buf: BUF,
+pub struct I8080Transfer<'d, BUF, CH: DmaChannel, DM: Mode> {
+    i8080: ManuallyDrop<I8080<'d, CH, DM>>,
+    tx_buf: ManuallyDrop<BUF>,
 }
 
-impl<'d, CH: DmaChannel, DM: Mode, BUF> I8080Transfer<'d, CH, DM, BUF> {
+impl<'d, BUF, CH: DmaChannel, DM: Mode> I8080Transfer<'d, BUF, CH, DM> {
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
         self.i8080
@@ -397,7 +400,7 @@ impl<'d, CH: DmaChannel, DM: Mode, BUF> I8080Transfer<'d, CH, DM, BUF> {
     ///
     /// Note: This also clears the transfer interrupt so it can be used in
     /// interrupt handlers to "handle" the interrupt.
-    pub fn wait(self) -> (Result<(), DmaError>, I8080<'d, CH, DM>, BUF) {
+    pub fn wait(mut self) -> (Result<(), DmaError>, I8080<'d, CH, DM>, BUF) {
         while !self.is_done() {}
 
         // Clear "done" interrupt.
@@ -406,19 +409,22 @@ impl<'d, CH: DmaChannel, DM: Mode, BUF> I8080Transfer<'d, CH, DM, BUF> {
             .lc_dma_int_clr()
             .write(|w| w.lcd_trans_done_int_clr().set_bit());
 
-        unsafe {
-            let i8080 = core::ptr::read(&self.i8080);
-            let tx_buf = core::ptr::read(&self.tx_buf);
+        // SAFETY: Since forget is called on self, we know that self.i8080 and
+        // self.tx_buf won't be touched again.
+        let (i8080, tx_buf) = unsafe {
+            let i8080 = ManuallyDrop::take(&mut self.i8080);
+            let tx_buf = ManuallyDrop::take(&mut self.tx_buf);
             core::mem::forget(self);
+            (i8080, tx_buf)
+        };
 
-            let result = if i8080.tx_channel.has_error() {
-                Err(DmaError::DescriptorError)
-            } else {
-                Ok(())
-            };
+        let result = if i8080.tx_channel.has_error() {
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok(())
+        };
 
-            (result, i8080, tx_buf)
-        }
+        (result, i8080, tx_buf)
     }
 
     fn stop_peripherals(&mut self) {
@@ -433,7 +439,7 @@ impl<'d, CH: DmaChannel, DM: Mode, BUF> I8080Transfer<'d, CH, DM, BUF> {
     }
 }
 
-impl<'d, CH: DmaChannel, BUF> I8080Transfer<'d, CH, crate::Async, BUF> {
+impl<'d, BUF, CH: DmaChannel> I8080Transfer<'d, BUF, CH, crate::Async> {
     /// Waits for [Self::is_done] to return true.
     pub async fn wait_for_done(&mut self) {
         use core::{
@@ -472,9 +478,16 @@ impl<'d, CH: DmaChannel, BUF> I8080Transfer<'d, CH, crate::Async, BUF> {
     }
 }
 
-impl<'d, CH: DmaChannel, DM: Mode, BUF> Drop for I8080Transfer<'d, CH, DM, BUF> {
+impl<'d, BUF, CH: DmaChannel, DM: Mode> Drop for I8080Transfer<'d, BUF, CH, DM> {
     fn drop(&mut self) {
         self.stop_peripherals();
+
+        // SAFETY: This is Drop, we know that self.i8080 and self.tx_buf
+        // won't be touched again.
+        unsafe {
+            ManuallyDrop::drop(&mut self.i8080);
+            ManuallyDrop::drop(&mut self.tx_buf);
+        }
     }
 }
 

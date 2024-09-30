@@ -26,7 +26,7 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaChannel0, DmaPriority, DmaTxBuf},
-    dma_buffers,
+    dma_tx_buffer,
     gpio::{Input, Io, Level, Output, Pull},
     lcd_cam::{
         lcd::i8080::{Config, TxEightBits, I8080},
@@ -52,8 +52,7 @@ fn main() -> ! {
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0;
 
-    let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, 4000);
-    let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+    let dma_tx_buf = dma_tx_buffer!(4000).unwrap();
 
     let channel = channel.configure(false, DmaPriority::Priority0);
 
