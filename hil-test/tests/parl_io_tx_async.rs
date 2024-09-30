@@ -42,6 +42,8 @@ struct Context {
 #[cfg(test)]
 #[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
 mod tests {
+    use defmt::info;
+
     use super::*;
 
     #[init]

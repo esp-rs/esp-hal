@@ -4,6 +4,7 @@
 
 #![no_std]
 #![no_main]
+use defmt::error;
 use esp_alloc as _;
 use esp_hal::{
     dma::{Dma, DmaBufBlkSize, DmaPriority, DmaRxBuf, DmaTxBuf},

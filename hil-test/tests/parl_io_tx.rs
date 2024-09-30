@@ -40,6 +40,8 @@ struct Context {
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
+    use defmt::info;
+
     use super::*;
 
     #[init]
