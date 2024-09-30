@@ -79,7 +79,7 @@ extern "C" fn RWBT() {
 #[no_mangle]
 extern "C" fn RWBLE() {
     unsafe {
-        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION5;
+        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION8;
 
         trace!("interrupt RWBLE {:?} {:?}", fnc, arg);
 
@@ -96,7 +96,7 @@ extern "C" fn RWBLE() {
 #[no_mangle]
 extern "C" fn BT_BB(_trap_frame: &mut crate::hal::interrupt::TrapFrame) {
     unsafe {
-        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION8;
+        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION5;
 
         trace!("interrupt BT_BB {:?} {:?}", fnc, arg);
 

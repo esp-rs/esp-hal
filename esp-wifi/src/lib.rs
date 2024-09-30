@@ -452,7 +452,7 @@ impl From<WifiError> for InitializationError {
 /// Enable verbose logging within the WiFi driver
 /// Does nothing unless the `sys-logs` feature is enabled.
 pub fn wifi_set_log_verbose() {
-    #[cfg(feature = "sys-logs")]
+    #[cfg(all(feature = "sys-logs", not(esp32h2)))]
     unsafe {
         use crate::binary::include::{
             esp_wifi_internal_set_log_level,

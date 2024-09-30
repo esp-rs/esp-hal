@@ -109,11 +109,12 @@ pub(super) struct osi_funcs_s {
             *mut crate::binary::c_types::c_uint,
         ) -> crate::binary::c_types::c_int,
     >,
+    patch_apply: Option<unsafe extern "C" fn()>,
     magic: u32,
 }
 
 pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
-    version: 0x00010004,
+    version: 0x00010005,
     set_isr: Some(ble_os_adapter_chip_specific::set_isr),
     ints_on: Some(ble_os_adapter_chip_specific::ints_on),
     interrupt_disable: Some(interrupt_disable),
@@ -178,8 +179,23 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     interrupt_l3_restore: Some(interrupt_l3_restore),
     custom_queue_create: Some(custom_queue_create),
     coex_version_get: Some(coex_version_get_wrapper),
+    patch_apply: Some(patch_apply),
     magic: 0xfadebead,
 };
+
+extern "C" fn patch_apply() {
+    trace!("patch apply");
+
+    extern "C" {
+        fn config_ble_funcs_reset();
+        fn config_btdm_funcs_reset();
+    }
+
+    unsafe {
+        config_btdm_funcs_reset();
+        config_ble_funcs_reset();
+    }
+}
 
 extern "C" fn coex_version_get_wrapper(major: *mut u32, minor: *mut u32, patch: *mut u32) -> i32 {
     unsafe {
@@ -287,7 +303,9 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
         pcm_polar: 0,
         hli: false,
         dup_list_refresh_period: 0,
-        magic: 0x20221207,
+        ble_scan_backoff: false,
+        pcm_fsyncshp: 0,
+        magic: 0x20240722,
     }
 }
 

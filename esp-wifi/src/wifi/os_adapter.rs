@@ -1993,6 +1993,48 @@ pub unsafe extern "C" fn coex_schm_register_cb_wrapper(
     )
 }
 
+pub unsafe extern "C" fn coex_schm_flexible_period_set(period: u8) -> i32 {
+    trace!("coex_schm_flexible_period_set {}", period);
+
+    #[cfg(coex)]
+    unsafe {
+        extern "C" {
+            fn coex_schm_flexible_period_set(period: u8) -> i32;
+        }
+
+        coex_schm_flexible_period_set(period)
+    }
+
+    #[cfg(not(coex))]
+    0
+}
+
+pub unsafe extern "C" fn coex_schm_flexible_period_get() -> u8 {
+    trace!("coex_schm_flexible_period_get");
+
+    #[cfg(coex)]
+    unsafe {
+        extern "C" {
+            fn coex_schm_flexible_period_get() -> u8;
+        }
+
+        coex_schm_flexible_period_get()
+    }
+
+    #[cfg(not(coex))]
+    0
+}
+
+pub unsafe extern "C" fn coex_register_start_cb(
+    _cb: Option<unsafe extern "C" fn() -> esp_wifi_sys::c_types::c_int>,
+) -> esp_wifi_sys::c_types::c_int {
+    #[cfg(coex)]
+    return esp_wifi_sys::include::coex_register_start_cb(_cb);
+
+    #[cfg(not(coex))]
+    0
+}
+
 /// **************************************************************************
 /// Name: esp_clk_slowclk_cal_get_wrapper
 ///

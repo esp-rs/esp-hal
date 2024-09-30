@@ -21,7 +21,7 @@ use crate::{
 #[cfg_attr(esp32h2, path = "os_adapter_esp32h2.rs")]
 pub(crate) mod ble_os_adapter_chip_specific;
 
-const TIME_FOREVER: u32 = u32::MAX;
+const TIME_FOREVER: u32 = crate::compat::common::OSI_FUNCS_TIME_BLOCKING;
 
 #[cfg(esp32c2)]
 const OS_MSYS_1_BLOCK_COUNT: i32 = 24;
@@ -169,30 +169,6 @@ pub struct OsMbuf {
     om_databuf: u32,
 }
 
-#[repr(C)]
-pub struct OsMempoolExt {
-    mpe_mp: OsMempool,
-
-    // Callback that is executed immediately when a block is freed.
-    mpe_put_cb: OsMempoolPutFn,
-    mpe_put_arg: *const c_void,
-}
-
-type OsMempoolPutFn = Option<
-    unsafe extern "C" fn(ome: *const OsMempoolExt, data: *const c_void, arg: *const c_void) -> i32,
->;
-
-#[repr(C)]
-pub struct BleHciTransFuncsT {
-    ble_hci_trans_hs_acl_tx: Option<unsafe extern "C" fn(om: *const OsMbuf) -> i32>,
-    ble_hci_trans_hs_cmd_tx: Option<unsafe extern "C" fn(cmd: *const u8) -> i32>,
-    ble_hci_trans_ll_acl_tx: Option<unsafe extern "C" fn(om: *const OsMbuf) -> i32>,
-    ble_hci_trans_ll_evt_tx: Option<unsafe extern "C" fn(hci_ev: *const u8) -> i32>,
-    ble_hci_trans_reset: Option<unsafe extern "C" fn() -> i32>,
-    ble_hci_trans_set_acl_free_cb:
-        Option<unsafe extern "C" fn(cb: OsMempoolPutFn, arg: *const c_void) -> i32>,
-}
-
 #[cfg(esp32c2)]
 pub(crate) static mut OS_MSYS_INIT_1_DATA: *mut OsMembufT = core::ptr::null_mut();
 #[cfg(esp32c2)]
@@ -208,34 +184,65 @@ pub(crate) static mut OS_MSYS_INIT_2_MBUF_POOL: OsMbufPool = OsMbufPool::zeroed(
 pub(crate) static mut OS_MSYS_INIT_2_MEMPOOL: OsMempool = OsMempool::zeroed();
 
 extern "C" {
-    static ble_hci_trans_funcs_ptr: &'static BleHciTransFuncsT;
+    // Sends ACL data from host to controller.
+    //
+    // om                    The ACL data packet to send.
+    //
+    // 0 on success;
+    // A BLE_ERR_[...] error code on failure.
+    pub(crate) fn r_ble_hci_trans_hs_acl_tx(om: *const OsMbuf) -> i32;
+
+    // Sends an HCI command from the host to the controller.
+    //
+    // cmd                   The HCI command to send.  This buffer must be
+    //                                  allocated via ble_hci_trans_buf_alloc().
+    //
+    // 0 on success;
+    // A BLE_ERR_[...] error code on failure.
+    pub(crate) fn r_ble_hci_trans_hs_cmd_tx(cmd: *const u8) -> i32;
 
     #[cfg(esp32c2)]
-    static mut r_ble_stub_funcs_ptr: *mut u32;
-
     pub(crate) fn ble_controller_init(cfg: *const esp_bt_controller_config_t) -> i32;
 
+    #[cfg(not(esp32c2))]
+    pub(crate) fn r_ble_controller_init(cfg: *const esp_bt_controller_config_t) -> i32;
+
+    #[cfg(esp32c2)]
     pub(crate) fn ble_controller_enable(mode: u8) -> i32;
 
-    pub(crate) fn esp_register_ext_funcs(funcs: *const ext_funcs_t) -> i32;
+    #[cfg(not(esp32c2))]
+    pub(crate) fn r_ble_controller_enable(mode: u8) -> i32;
+
+    pub(crate) fn esp_register_ext_funcs(funcs: *const ExtFuncsT) -> i32;
 
     pub(crate) fn esp_register_npl_funcs(funcs: *const npl_funcs_t) -> i32;
 
+    #[cfg(esp32c2)]
     pub(crate) fn ble_get_npl_element_info(
         cfg: *const esp_bt_controller_config_t,
-        npl_info: *const ble_npl_count_info_t,
+        npl_info: *const BleNplCountInfoT,
+    ) -> i32;
+
+    #[cfg(not(esp32c2))]
+    pub(crate) fn r_ble_get_npl_element_info(
+        cfg: *const esp_bt_controller_config_t,
+        npl_info: *const BleNplCountInfoT,
     ) -> i32;
 
     pub(crate) fn bt_bb_v2_init_cmplx(value: u8);
 
     pub(crate) fn r_ble_hci_trans_cfg_hs(
-        evt: Option<unsafe extern "C" fn(cmd: *const u8, arg: *const c_void)>, /* ble_hci_trans_rx_cmd_fn */
+        evt: Option<unsafe extern "C" fn(cmd: *const u8, arg: *const c_void) -> i32>, /* ble_hci_trans_rx_cmd_fn */
         evt_arg: *const c_void,
-        acl_cb: Option<unsafe extern "C" fn(om: *const OsMbuf, arg: *const c_void)>, /* ble_hci_trans_rx_acl_fn */
+        acl_cb: Option<unsafe extern "C" fn(om: *const OsMbuf, arg: *const c_void) -> i32>, /* ble_hci_trans_rx_acl_fn */
         acl_arg: *const c_void,
     );
 
+    #[cfg(esp32c2)]
     pub(crate) fn esp_ble_ll_set_public_addr(addr: *const u8);
+
+    #[cfg(not(esp32c2))]
+    pub(crate) fn r_esp_ble_ll_set_public_addr(addr: *const u8);
 
     #[cfg(esp32c2)]
     pub(crate) fn r_mem_init_mbuf_pool(
@@ -254,7 +261,7 @@ extern "C" {
     pub(crate) fn r_os_msys_register(mbuf_pool: *const OsMbufPool) -> i32;
 
     #[allow(unused)]
-    pub(crate) fn ble_osi_coex_funcs_register(coex_funcs: *const osi_coex_funcs_t) -> i32;
+    pub(crate) fn ble_osi_coex_funcs_register(coex_funcs: *const OsiCoexFuncsT) -> i32;
 
     pub(crate) fn r_os_msys_get_pkthdr(dsize: u16, user_hdr_len: u16) -> *mut OsMbuf;
 
@@ -265,12 +272,10 @@ extern "C" {
     pub(crate) fn r_ble_hci_trans_buf_alloc(typ: i32) -> *const u8;
 
     pub(crate) fn r_ble_hci_trans_buf_free(buf: *const u8);
-
-    static mut ble_hci_trans_env_p: u32;
 }
 
 #[repr(C)]
-pub struct ext_funcs_t {
+pub struct ExtFuncsT {
     ext_version: u32,
     esp_intr_alloc: Option<
         unsafe extern "C" fn(
@@ -284,13 +289,19 @@ pub struct ext_funcs_t {
     esp_intr_free: Option<unsafe extern "C" fn(ret_handle: *mut *mut c_void) -> i32>,
     malloc: Option<unsafe extern "C" fn(size: u32) -> *mut c_void>,
     free: Option<unsafe extern "C" fn(*mut c_void)>,
+    #[cfg(esp32c2)]
     hal_uart_start_tx: Option<unsafe extern "C" fn(i32)>,
+    #[cfg(esp32c2)]
     hal_uart_init_cbs: Option<
         unsafe extern "C" fn(i32, *const c_void, *const c_void, *const c_void, c_void) -> i32,
     >,
+    #[cfg(esp32c2)]
     hal_uart_config: Option<unsafe extern "C" fn(i32, i32, u8, u8, u8, u8) -> i32>,
+    #[cfg(esp32c2)]
     hal_uart_close: Option<unsafe extern "C" fn(i32) -> i32>,
+    #[cfg(esp32c2)]
     hal_uart_blocking_tx: Option<unsafe extern "C" fn(i32, u8)>,
+    #[cfg(esp32c2)]
     hal_uart_init: Option<unsafe extern "C" fn(i32, *const c_void) -> i32>,
     task_create: Option<
         unsafe extern "C" fn(
@@ -314,17 +325,27 @@ pub struct ext_funcs_t {
     magic: u32,
 }
 
-static G_OSI_FUNCS: ext_funcs_t = ext_funcs_t {
+static G_OSI_FUNCS: ExtFuncsT = ExtFuncsT {
+    #[cfg(not(esp32c2))]
+    ext_version: 0x20240422,
+    #[cfg(esp32c2)]
     ext_version: 0x20221122,
+
     esp_intr_alloc: Some(self::ble_os_adapter_chip_specific::esp_intr_alloc),
     esp_intr_free: Some(esp_intr_free),
     malloc: Some(crate::ble::malloc),
     free: Some(crate::ble::free),
+    #[cfg(esp32c2)]
     hal_uart_start_tx: None,
+    #[cfg(esp32c2)]
     hal_uart_init_cbs: None,
+    #[cfg(esp32c2)]
     hal_uart_config: None,
+    #[cfg(esp32c2)]
     hal_uart_close: None,
+    #[cfg(esp32c2)]
     hal_uart_blocking_tx: None,
+    #[cfg(esp32c2)]
     hal_uart_init: None,
     task_create: Some(task_create),
     task_delete: Some(task_delete),
@@ -535,7 +556,7 @@ static mut G_NPL_FUNCS: npl_funcs_t = npl_funcs_t {
 };
 
 #[repr(C)]
-pub struct osi_coex_funcs_t {
+pub struct OsiCoexFuncsT {
     magic: u32,
     version: u32,
     coex_wifi_sleep_set: Option<unsafe extern "C" fn(sleep: bool)>,
@@ -546,7 +567,7 @@ pub struct osi_coex_funcs_t {
 }
 
 #[allow(unused)]
-static G_COEX_FUNCS: osi_coex_funcs_t = osi_coex_funcs_t {
+static G_COEX_FUNCS: OsiCoexFuncsT = OsiCoexFuncsT {
     magic: 0xFADEBEAD,
     version: 0x00010006,
     coex_wifi_sleep_set: Some(coex_wifi_sleep_set),
@@ -974,7 +995,7 @@ unsafe extern "C" fn ble_npl_os_started() -> bool {
 }
 
 #[repr(C)]
-pub struct ble_npl_count_info_t {
+pub struct BleNplCountInfoT {
     evt_count: u16,
     evtq_count: u16,
     co_count: u16,
@@ -1001,9 +1022,21 @@ pub(crate) fn ble_init() {
 
         let cfg = ble_os_adapter_chip_specific::BLE_CONFIG;
 
-        let res = esp_register_ext_funcs(&G_OSI_FUNCS as *const ext_funcs_t);
+        let res = esp_register_ext_funcs(&G_OSI_FUNCS as *const ExtFuncsT);
         if res != 0 {
             panic!("esp_register_ext_funcs returned {}", res);
+        }
+
+        #[cfg(esp32c2)]
+        {
+            debug!("Init esp_ble_rom_func_ptr_init_all");
+            extern "C" {
+                fn esp_ble_rom_func_ptr_init_all() -> i32;
+            }
+            let res = esp_ble_rom_func_ptr_init_all();
+            if res != 0 {
+                panic!("esp_ble_rom_func_ptr_init_all returned {}", res);
+            }
         }
 
         #[cfg(coex)]
@@ -1023,16 +1056,22 @@ pub(crate) fn ble_init() {
             panic!("esp_register_npl_funcs returned {}", res);
         }
 
-        let npl_info = ble_npl_count_info_t {
+        let npl_info = BleNplCountInfoT {
             evt_count: 0,
             evtq_count: 0,
             co_count: 0,
             sem_count: 0,
             mutex_count: 0,
         };
+        #[cfg(esp32c2)]
         let res = ble_get_npl_element_info(
             &cfg as *const esp_bt_controller_config_t,
-            &npl_info as *const ble_npl_count_info_t,
+            &npl_info as *const BleNplCountInfoT,
+        );
+        #[cfg(not(esp32c2))]
+        let res = r_ble_get_npl_element_info(
+            &cfg as *const esp_bt_controller_config_t,
+            &npl_info as *const BleNplCountInfoT,
         );
         if res != 0 {
             panic!("ble_get_npl_element_info returned {}", res);
@@ -1057,22 +1096,35 @@ pub(crate) fn ble_init() {
 
         #[cfg(coex)]
         {
-            let rc = ble_osi_coex_funcs_register(&G_COEX_FUNCS as *const osi_coex_funcs_t);
+            let rc = ble_osi_coex_funcs_register(&G_COEX_FUNCS as *const OsiCoexFuncsT);
             if rc != 0 {
                 panic!("ble_osi_coex_funcs_register returned {}", rc);
             }
         }
 
+        #[cfg(not(esp32c2))]
+        {
+            extern "C" {
+                fn esp_ble_register_bb_funcs() -> i32;
+            }
+            let res = esp_ble_register_bb_funcs();
+            if res != 0 {
+                panic!("esp_ble_register_bb_funcs returned {}", res);
+            }
+        }
+
+        #[cfg(esp32c2)]
         let res = ble_controller_init(&cfg as *const esp_bt_controller_config_t);
+        #[cfg(not(esp32c2))]
+        let res = r_ble_controller_init(&cfg as *const esp_bt_controller_config_t);
 
         if res != 0 {
             panic!("ble_controller_init returned {}", res);
         }
-
         #[cfg(not(esp32c2))]
         {
             extern "C" {
-                fn esp_ble_msys_init(
+                fn r_esp_ble_msys_init(
                     msys_size1: u16,
                     msys_size2: u16,
                     msys_cnt1: u16,
@@ -1081,7 +1133,7 @@ pub(crate) fn ble_init() {
                 ) -> i32;
             }
 
-            let res = esp_ble_msys_init(256, 320, 12, 24, 1);
+            let res = r_esp_ble_msys_init(256, 320, 12, 24, 1);
             if res != 0 {
                 panic!("esp_ble_msys_init returned {}", res);
             }
@@ -1094,7 +1146,15 @@ pub(crate) fn ble_init() {
         crate::common_adapter::read_mac(mac.as_mut_ptr(), 2);
         mac.reverse();
 
+        #[cfg(esp32c2)]
         esp_ble_ll_set_public_addr(&mac as *const u8);
+        #[cfg(not(esp32c2))]
+        r_esp_ble_ll_set_public_addr(&mac as *const u8);
+
+        extern "C" {
+            fn r_ble_hci_trans_init(m: u8);
+        }
+        r_ble_hci_trans_init(0);
 
         r_ble_hci_trans_cfg_hs(
             Some(ble_hs_hci_rx_evt),
@@ -1103,30 +1163,17 @@ pub(crate) fn ble_init() {
             core::ptr::null(),
         );
 
+        #[cfg(esp32c2)]
         let res = ble_controller_enable(1); // 1 = BLE
+        #[cfg(not(esp32c2))]
+        let res = r_ble_controller_enable(1); // 1 = BLE
         if res != 0 {
             panic!("ble_controller_enable returned {}", res);
         }
 
-        // "patch" r_ble_ll_random - it needs syscall_table_ptr
-        // probably long term we should rather initialize syscall_table_ptr
-        #[cfg(esp32c2)]
-        {
-            *(r_ble_stub_funcs_ptr.offset(0x7dc / 4)) =
-                self::ble_os_adapter_chip_specific::ble_ll_random_override as *const u32 as u32;
-        }
-
         // this is to avoid (ASSERT r_ble_hci_ram_hs_cmd_tx:34 0 0)
-        // r_ble_hci_trans_cfg_ll initializes ble_hci_trans_env_p + 0x34
-        // it's called by r_ble_ll_task which is run in another task
-        // in r_ble_hci_ram_hs_cmd_tx this is checked for non-null
-        while (ble_hci_trans_env_p as *const u32)
-            .add(0x34 / 4)
-            .read_volatile()
-            == 0
-        {
-            // wait
-        }
+        // we wait a bit to make sure the ble task initialized everything
+        crate::compat::common::sleep(10);
 
         debug!("The ble_controller_init was initialized");
     }
@@ -1192,7 +1239,7 @@ fn os_msys_init() {
     }
 }
 
-unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) {
+unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i32 {
     trace!("ble_hs_hci_rx_evt {:?} {:?}", cmd, arg);
     debug!("$ cmd = {:x}", *cmd);
     debug!("$ len = {:x}", *(cmd.offset(1)));
@@ -1228,9 +1275,11 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) {
 
     #[cfg(feature = "async")]
     crate::ble::controller::asynch::hci_read_data_available();
+
+    0
 }
 
-unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) {
+unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i32 {
     trace!("ble_hs_rx_data {:?} {:?}", om, arg);
 
     let data_ptr = (*om).om_data;
@@ -1261,6 +1310,8 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) {
 
     #[cfg(feature = "async")]
     crate::ble::controller::asynch::hci_read_data_available();
+
+    0
 }
 
 static mut BLE_HCI_READ_DATA: [u8; 256] = [0u8; 256];
@@ -1344,7 +1395,7 @@ pub fn send_hci(data: &[u8]) {
                         packet.len() - 1,
                     );
 
-                    let res = unwrap!(ble_hci_trans_funcs_ptr.ble_hci_trans_hs_cmd_tx)(cmd);
+                    let res = r_ble_hci_trans_hs_cmd_tx(cmd);
 
                     if res != 0 {
                         warn!("ble_hci_trans_hs_cmd_tx res == {}", res);
@@ -1365,7 +1416,7 @@ pub fn send_hci(data: &[u8]) {
                     // received by the other side
                     *((*om).om_data as *mut u8).offset(1) = 0;
 
-                    let res = unwrap!(ble_hci_trans_funcs_ptr.ble_hci_trans_hs_acl_tx)(om);
+                    let res = r_ble_hci_trans_hs_acl_tx(om);
                     if res != 0 {
                         panic!("ble_hci_trans_hs_acl_tx returned {}", res);
                     }

@@ -42,14 +42,7 @@ pub(crate) unsafe fn phy_enable() {
 
                 let init_data = &PHY_INIT_DATA_DEFAULT;
 
-                #[cfg(feature = "phy-enable-usb")]
-                {
-                    extern "C" {
-                        pub fn phy_bbpll_en_usb(param: bool);
-                    }
-
-                    phy_bbpll_en_usb(true);
-                }
+                // DON'T CALL `phy_bbpll_en_usb` on ESP32-C2
 
                 register_chipv7_phy(
                     init_data,
