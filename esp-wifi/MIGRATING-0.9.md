@@ -2,7 +2,7 @@
 
 ## Initialization
 
-You no longer have to set up clocks and pass them to `esp_wifi::init`.
+You no longer have to set up clocks and pass them to `esp_wifi::initialize`.
 
 ```diff
  use esp_hal::{
@@ -12,7 +12,7 @@ You no longer have to set up clocks and pass them to `esp_wifi::init`.
 -    system::SystemControl,
  };
  use esp_wifi::{
-     init,
+     initialize,
      // ...
  };
 
