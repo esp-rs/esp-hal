@@ -1436,16 +1436,6 @@ pub(crate) fn wifi_start() -> Result<(), WifiError> {
     Ok(())
 }
 
-unsafe extern "C" fn coex_register_start_cb(
-    _cb: Option<unsafe extern "C" fn() -> c_types::c_int>,
-) -> c_types::c_int {
-    #[cfg(coex)]
-    return include::coex_register_start_cb(_cb);
-
-    #[cfg(not(coex))]
-    0
-}
-
 /// Configuration for active or passive scan. For details see the [WIFI Alliance FAQ](https://www.wi-fi.org/knowledge-center/faq/what-are-passive-and-active-scanning).
 ///
 /// # Comparison of active and passive scan

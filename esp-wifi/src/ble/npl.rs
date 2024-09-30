@@ -1289,7 +1289,7 @@ fn os_msys_init() {
     }
 }
 
-unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) {
+unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i32 {
     trace!("ble_hs_hci_rx_evt {:?} {:?}", cmd, arg);
     debug!("$ cmd = {:x}", *cmd);
     debug!("$ len = {:x}", *(cmd.offset(1)));

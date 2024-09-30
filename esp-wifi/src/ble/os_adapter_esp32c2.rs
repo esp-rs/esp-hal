@@ -120,15 +120,6 @@ pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
     }
 }
 
-pub(super) unsafe extern "C" fn ble_ll_random_override() -> u32 {
-    // this is not very random but good enough for now - it's not used for crypto
-    unsafe {
-        static mut VALUE: u32 = 0;
-        VALUE = VALUE.wrapping_add(3);
-        VALUE
-    }
-}
-
 pub(super) fn deinit() {
     npl::deinit_common();
 }

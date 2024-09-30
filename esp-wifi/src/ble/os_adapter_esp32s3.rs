@@ -299,14 +299,18 @@ pub(crate) unsafe extern "C" fn interrupt_on(intr_num: i32) -> i32 {
         Interrupt::try_from(intr_num as u16).unwrap(),
         interrupt::Priority::Priority1,
     ));
+
+    0
 }
 
-pub(crate) unsafe extern "C" fn interrupt_off(intr_num: i32) {
+pub(crate) unsafe extern "C" fn interrupt_off(intr_num: i32) -> i32 {
     trace!("interrupt_off {}", intr_num);
     interrupt::disable(
         crate::hal::Cpu::ProCpu,
         Interrupt::try_from(intr_num as u16).unwrap(),
     );
+
+    0
 }
 
 pub(crate) fn btdm_controller_mem_init() {
