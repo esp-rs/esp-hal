@@ -1434,7 +1434,12 @@ mod dma {
         fn drop(&mut self) {
             if !self.is_done() {
                 self.spi_dma.cancel_transfer();
-                self.spi_dma.wait_for_idle()
+                self.spi_dma.wait_for_idle();
+
+                unsafe {
+                    ManuallyDrop::drop(&mut self.spi_dma);
+                    ManuallyDrop::drop(&mut self.dma_buf);
+                }
             }
         }
     }
