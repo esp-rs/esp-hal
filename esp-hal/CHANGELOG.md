@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Make `DmaDescriptor` methods public (#2237)
 - Added a way to configure watchdogs in `esp_hal::init` (#2180)
 - Implement `embedded_hal_async::delay::DelayNs` for `TIMGx` timers (#2084)
-- Added `Efuse::read_bit` (#?)
+- Added `Efuse::read_bit` (#2259)
 
 ### Changed
 
@@ -79,7 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - TWAI on ESP32 (#2207)
 - TWAI should no longer panic when receiving a non-compliant frame (#2255)
 - OneShotTimer: fixed `delay_nanos` behaviour (#2256)
-- Fixed unsoundness around `Efuse` (#?)
+- Fixed unsoundness around `Efuse` (#2259)
 
 ### Removed
 
