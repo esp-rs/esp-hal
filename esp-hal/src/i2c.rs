@@ -22,7 +22,7 @@
 //!
 //! The I2C driver implements a number of third-party traits, with the
 //! intention of making the HAL inter-compatible with various device drivers
-//! from the community. This includes the [embedded-hal] for both 0.2.x and
+//! from the community. This includes the [`embedded-hal`] for both 0.2.x and
 //! 1.0.x versions.
 //!
 //! ## Examples
@@ -50,10 +50,12 @@
 //! }
 //! # }
 //! ```
+//! [`embedded-hal`]: https://crates.io/crates/embedded-hal
 
 use core::marker::PhantomData;
 
 use fugit::HertzU32;
+use private::{I2cOperation, OpKind};
 
 use crate::{
     clock::Clocks,
@@ -72,6 +74,13 @@ cfg_if::cfg_if! {
         const I2C_LL_INTR_MASK: u32 = 0x3ffff;
     }
 }
+
+// Chunk writes/reads by this size
+#[cfg(any(esp32, esp32s2))]
+const I2C_CHUNK_SIZE: usize = 32;
+
+#[cfg(not(any(esp32, esp32s2)))]
+const I2C_CHUNK_SIZE: usize = 254;
 
 // on ESP32 there is a chance to get trapped in `wait_for_completion` forever
 const MAX_ITERATIONS: u32 = 1_000_000;
@@ -96,27 +105,15 @@ pub enum Error {
     InvalidZeroLength,
 }
 
-#[derive(PartialEq)]
-// This enum is used to keep track of the last/next operation that was/will be
-// performed in an embedded-hal(-async) I2C::transaction. It is used to
-// determine whether a START condition should be issued at the start of the
-// current operation and whether a read needs an ack or a nack for the final
-// byte.
-enum Op {
-    Write,
-    Read,
-    None,
-}
+/// I2C operation.
+///
+/// Several operations can be combined as part of a transaction.
+pub enum Operation<'a> {
+    /// Write data from the provided buffer.
+    Write(&'a [u8]),
 
-impl From<Option<&&mut embedded_hal::i2c::Operation<'_>>> for Op {
-    fn from(op: Option<&&mut embedded_hal::i2c::Operation<'_>>) -> Self {
-        use embedded_hal::i2c::Operation;
-        match op {
-            Some(Operation::Write(_)) => Op::Write,
-            Some(Operation::Read(_)) => Op::Read,
-            None => Op::None,
-        }
-    }
+    /// Read data into the provided buffer.
+    Read(&'a mut [u8]),
 }
 
 impl embedded_hal::i2c::Error for Error {
@@ -197,16 +194,49 @@ where
 {
     /// Reads enough bytes from slave with `address` to fill `buffer`
     pub fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Error> {
-        self.peripheral
-            .master_read(address, buffer)
-            .inspect_err(|_| self.internal_recover())
+        let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
+        for (idx, chunk) in buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
+            // Clear all I2C interrupts
+            self.peripheral.clear_all_interrupts();
+
+            let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
+
+            self.peripheral
+                .read_operation(
+                    address,
+                    chunk,
+                    idx == 0,
+                    idx == chunk_count - 1,
+                    idx < chunk_count - 1,
+                    cmd_iterator,
+                )
+                .inspect_err(|_| self.internal_recover())?;
+        }
+
+        Ok(())
     }
 
     /// Writes bytes to slave with address `address`
-    pub fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
-        self.peripheral
-            .master_write(addr, bytes)
-            .inspect_err(|_| self.internal_recover())
+    pub fn write(&mut self, address: u8, buffer: &[u8]) -> Result<(), Error> {
+        let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
+        for (idx, chunk) in buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
+            // Clear all I2C interrupts
+            self.peripheral.clear_all_interrupts();
+
+            let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
+
+            self.peripheral
+                .write_operation(
+                    address,
+                    chunk,
+                    idx == 0,
+                    idx == chunk_count - 1,
+                    cmd_iterator,
+                )
+                .inspect_err(|_| self.internal_recover())?;
+        }
+
+        Ok(())
     }
 
     /// Writes bytes to slave with address `address` and then reads enough bytes
@@ -214,12 +244,123 @@ where
     pub fn write_read(
         &mut self,
         address: u8,
-        bytes: &[u8],
-        buffer: &mut [u8],
+        write_buffer: &[u8],
+        read_buffer: &mut [u8],
     ) -> Result<(), Error> {
-        self.peripheral
-            .master_write_read(address, bytes, buffer)
-            .inspect_err(|_| self.internal_recover())
+        let chunk_count = write_buffer.len().div_ceil(I2C_CHUNK_SIZE);
+        for (idx, chunk) in write_buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
+            // Clear all I2C interrupts
+            self.peripheral.clear_all_interrupts();
+
+            let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
+
+            self.peripheral
+                .write_operation(
+                    address,
+                    chunk,
+                    idx == 0,
+                    idx == chunk_count - 1,
+                    cmd_iterator,
+                )
+                .inspect_err(|_| self.internal_recover())?;
+        }
+
+        let chunk_count = read_buffer.len().div_ceil(I2C_CHUNK_SIZE);
+        for (idx, chunk) in read_buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
+            // Clear all I2C interrupts
+            self.peripheral.clear_all_interrupts();
+
+            let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
+
+            self.peripheral
+                .read_operation(
+                    address,
+                    chunk,
+                    idx == 0,
+                    idx == chunk_count - 1,
+                    idx < chunk_count - 1,
+                    cmd_iterator,
+                )
+                .inspect_err(|_| self.internal_recover())?;
+        }
+
+        Ok(())
+    }
+
+    /// Execute the provided operations on the I2C bus.
+    ///
+    /// Transaction contract:
+    /// - Before executing the first operation an ST is sent automatically. This
+    ///   is followed by SAD+R/W as appropriate.
+    /// - Data from adjacent operations of the same type are sent after each
+    ///   other without an SP or SR.
+    /// - Between adjacent operations of a different type an SR and SAD+R/W is
+    ///   sent.
+    /// - After executing the last operation an SP is sent automatically.
+    /// - If the last operation is a `Read` the master does not send an
+    ///   acknowledge for the last byte.
+    ///
+    /// - `ST` = start condition
+    /// - `SAD+R/W` = slave address followed by bit 1 to indicate reading or 0
+    ///   to indicate writing
+    /// - `SR` = repeated start condition
+    /// - `SP` = stop condition
+    pub fn transaction<'a>(
+        &mut self,
+        address: u8,
+        operations: &mut [impl I2cOperation<'a>],
+    ) -> Result<(), Error> {
+        let mut last_op: Option<OpKind> = None;
+        // filter out 0 length read operations
+        let mut op_iter = operations
+            .iter_mut()
+            .filter(|op| if op.is_write() { true } else { !op.is_empty() })
+            .peekable();
+
+        while let Some(op) = op_iter.next() {
+            let next_op = op_iter.peek().map(|v| v.kind());
+            let kind = op.kind();
+            // Clear all I2C interrupts
+            self.peripheral.clear_all_interrupts();
+
+            let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
+            match kind {
+                OpKind::Write => {
+                    // execute a write operation:
+                    // - issue START/RSTART if op is different from previous
+                    // - issue STOP if op is the last one
+                    self.peripheral
+                        .write_operation(
+                            address,
+                            op.write_buffer().unwrap(),
+                            !matches!(last_op, Some(OpKind::Write)),
+                            next_op.is_none(),
+                            cmd_iterator,
+                        )
+                        .inspect_err(|_| self.internal_recover())?;
+                }
+                OpKind::Read => {
+                    // execute a read operation:
+                    // - issue START/RSTART if op is different from previous
+                    // - issue STOP if op is the last one
+                    // - will_continue is true if there is another read operation next
+                    self.peripheral
+                        .read_operation(
+                            address,
+                            op.read_buffer().unwrap(),
+                            !matches!(last_op, Some(OpKind::Read)),
+                            next_op.is_none(),
+                            matches!(next_op, Some(OpKind::Read)),
+                            cmd_iterator,
+                        )
+                        .inspect_err(|_| self.internal_recover())?;
+                }
+            }
+
+            last_op = Some(kind);
+        }
+
+        Ok(())
     }
 }
 
@@ -230,9 +371,7 @@ where
     type Error = Error;
 
     fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Self::Error> {
-        self.peripheral
-            .master_read(address, buffer)
-            .inspect_err(|_| self.internal_recover())
+        self.read(address, buffer)
     }
 }
 
@@ -243,9 +382,7 @@ where
     type Error = Error;
 
     fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Self::Error> {
-        self.peripheral
-            .master_write(addr, bytes)
-            .inspect_err(|_| self.internal_recover())
+        self.write(addr, bytes)
     }
 }
 
@@ -261,9 +398,7 @@ where
         bytes: &[u8],
         buffer: &mut [u8],
     ) -> Result<(), Self::Error> {
-        self.peripheral
-            .master_write_read(address, bytes, buffer)
-            .inspect_err(|_| self.internal_recover())
+        self.write_read(address, bytes, buffer)
     }
 }
 
@@ -271,7 +406,7 @@ impl<T, DM: crate::Mode> embedded_hal::i2c::ErrorType for I2C<'_, T, DM> {
     type Error = Error;
 }
 
-impl<T, DM: crate::Mode> embedded_hal::i2c::I2c for I2C<'_, T, DM>
+impl<T> embedded_hal::i2c::I2c for I2C<'_, T, crate::Blocking>
 where
     T: Instance,
 {
@@ -280,58 +415,7 @@ where
         address: u8,
         operations: &mut [embedded_hal::i2c::Operation<'_>],
     ) -> Result<(), Self::Error> {
-        use embedded_hal::i2c::Operation;
-        let mut last_op = Op::None;
-        // filter out 0 length read operations
-        let mut op_iter = operations
-            .iter_mut()
-            .filter(|op| match op {
-                Operation::Write(_) => true,
-                Operation::Read(buffer) => !buffer.is_empty(),
-            })
-            .peekable();
-        while let Some(op) = op_iter.next() {
-            let next_op: Op = op_iter.peek().into();
-            // Clear all I2C interrupts
-            self.peripheral.clear_all_interrupts();
-
-            let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
-            match op {
-                Operation::Write(bytes) => {
-                    // execute a write operation:
-                    // - issue START/RSTART if op is different from previous
-                    // - issue STOP if op is the last one
-                    self.peripheral
-                        .write_operation(
-                            address,
-                            bytes,
-                            last_op != Op::Write,
-                            next_op == Op::None,
-                            cmd_iterator,
-                        )
-                        .inspect_err(|_| self.internal_recover())?;
-                    last_op = Op::Write;
-                }
-                Operation::Read(buffer) => {
-                    // execute a read operation:
-                    // - issue START/RSTART if op is different from previous
-                    // - issue STOP if op is the last one
-                    // - will_continue is true if there is another read operation next
-                    self.peripheral
-                        .read_operation(
-                            address,
-                            buffer,
-                            last_op != Op::Read,
-                            next_op == Op::None,
-                            next_op == Op::Read,
-                            cmd_iterator,
-                        )
-                        .inspect_err(|_| self.internal_recover())?;
-                    last_op = Op::Read;
-                }
-            }
-        }
-        Ok(())
+        self.transaction(address, operations)
     }
 }
 
@@ -885,87 +969,48 @@ mod asynch {
             Ok(())
         }
 
-        /// Send data bytes from the `bytes` array to a target slave with the
-        /// address `addr`
-        async fn master_write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
-            // Clear all I2C interrupts
-            self.peripheral.clear_all_interrupts();
-            self.write_operation(
-                addr,
-                bytes,
-                true,
-                true,
-                &mut self.peripheral.register_block().comd_iter(),
-            )
-            .await?;
-            Ok(())
-        }
-
-        /// Read bytes from a target slave with the address `addr`
-        /// The number of read bytes is deterimed by the size of the `buffer`
-        /// argument
-        async fn master_read(&mut self, addr: u8, buffer: &mut [u8]) -> Result<(), Error> {
-            // Clear all I2C interrupts
-            self.peripheral.clear_all_interrupts();
-            self.read_operation(
-                addr,
-                buffer,
-                true,
-                true,
-                false,
-                &mut self.peripheral.register_block().comd_iter(),
-            )
-            .await?;
-            Ok(())
-        }
-
-        /// Write bytes from the `bytes` array first and then read n bytes into
-        /// the `buffer` array with n being the size of the array.
-        async fn master_write_read(
-            &mut self,
-            addr: u8,
-            bytes: &[u8],
-            buffer: &mut [u8],
-        ) -> Result<(), Error> {
-            // it would be possible to combine the write and read
-            // in one transaction but filling the tx fifo with
-            // the current code is somewhat slow even in release mode
-            // which can cause issues
-
-            // Clear all I2C interrupts
-            self.peripheral.clear_all_interrupts();
-            self.write_operation(
-                addr,
-                bytes,
-                true,
-                buffer.is_empty(), // if the read buffer is empty, then issue a stop
-                &mut self.peripheral.register_block().comd_iter(),
-            )
-            .await?;
-            self.peripheral.clear_all_interrupts();
-            // this will be a no-op if the buffer is empty, in that case we issued the stop
-            // with the write
-            self.read_operation(
-                addr,
-                buffer,
-                true,
-                true,
-                false,
-                &mut self.peripheral.register_block().comd_iter(),
-            )
-            .await?;
-            Ok(())
-        }
-
         /// Writes bytes to slave with address `address`
-        pub async fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
-            self.master_write(addr, bytes).await?;
+        pub async fn write(&mut self, address: u8, buffer: &[u8]) -> Result<(), Error> {
+            let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
+            for (idx, chunk) in buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
+                // Clear all I2C interrupts
+                self.peripheral.clear_all_interrupts();
+
+                let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
+
+                self.write_operation(
+                    address,
+                    chunk,
+                    idx == 0,
+                    idx == chunk_count - 1,
+                    cmd_iterator,
+                )
+                .await?;
+            }
+
             Ok(())
         }
 
         /// Reads enough bytes from slave with `address` to fill `buffer`
-        pub async fn read(&mut self, addr: u8, buffer: &mut [u8]) -> Result<(), Error> {
-            self.master_read(addr, buffer).await?;
+        pub async fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Error> {
+            let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
+            for (idx, chunk) in buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
+                // Clear all I2C interrupts
+                self.peripheral.clear_all_interrupts();
+
+                let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
+
+                self.read_operation(
+                    address,
+                    chunk,
+                    idx == 0,
+                    idx == chunk_count - 1,
+                    idx < chunk_count - 1,
+                    cmd_iterator,
+                )
+                .await?;
+            }
+
             Ok(())
         }
 
@@ -973,11 +1018,120 @@ mod asynch {
         /// bytes to fill `buffer` *in a single transaction*
         pub async fn write_read(
             &mut self,
-            addr: u8,
-            bytes: &[u8],
-            buffer: &mut [u8],
+            address: u8,
+            write_buffer: &[u8],
+            read_buffer: &mut [u8],
         ) -> Result<(), Error> {
-            self.master_write_read(addr, bytes, buffer).await?;
+            let chunk_count = write_buffer.len().div_ceil(I2C_CHUNK_SIZE);
+            for (idx, chunk) in write_buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
+                // Clear all I2C interrupts
+                self.peripheral.clear_all_interrupts();
+
+                let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
+
+                self.write_operation(
+                    address,
+                    chunk,
+                    idx == 0,
+                    idx == chunk_count - 1,
+                    cmd_iterator,
+                )
+                .await?;
+            }
+
+            let chunk_count = read_buffer.len().div_ceil(I2C_CHUNK_SIZE);
+            for (idx, chunk) in read_buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
+                // Clear all I2C interrupts
+                self.peripheral.clear_all_interrupts();
+
+                let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
+
+                self.read_operation(
+                    address,
+                    chunk,
+                    idx == 0,
+                    idx == chunk_count - 1,
+                    idx < chunk_count - 1,
+                    cmd_iterator,
+                )
+                .await?;
+            }
+
+            Ok(())
+        }
+
+        /// Execute the provided operations on the I2C bus as a single
+        /// transaction.
+        ///
+        /// Transaction contract:
+        /// - Before executing the first operation an ST is sent automatically.
+        ///   This is followed by SAD+R/W as appropriate.
+        /// - Data from adjacent operations of the same type are sent after each
+        ///   other without an SP or SR.
+        /// - Between adjacent operations of a different type an SR and SAD+R/W
+        ///   is sent.
+        /// - After executing the last operation an SP is sent automatically.
+        /// - If the last operation is a `Read` the master does not send an
+        ///   acknowledge for the last byte.
+        ///
+        /// - `ST` = start condition
+        /// - `SAD+R/W` = slave address followed by bit 1 to indicate reading or
+        ///   0 to indicate writing
+        /// - `SR` = repeated start condition
+        /// - `SP` = stop condition
+        async fn transaction(
+            &mut self,
+            address: u8,
+            operations: &mut [Operation<'_>],
+        ) -> Result<(), Error> {
+            let mut last_op: Option<OpKind> = None;
+            // filter out 0 length read operations
+            let mut op_iter = operations
+                .iter_mut()
+                .filter(|op| if op.is_write() { true } else { !op.is_empty() })
+                .peekable();
+
+            while let Some(op) = op_iter.next() {
+                let next_op = op_iter.peek().map(|v| v.kind());
+                let kind = op.kind();
+                // Clear all I2C interrupts
+                self.peripheral.clear_all_interrupts();
+
+                let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
+                match kind {
+                    OpKind::Write => {
+                        // execute a write operation:
+                        // - issue START/RSTART if op is different from previous
+                        // - issue STOP if op is the last one
+                        self.write_operation(
+                            address,
+                            op.write_buffer().unwrap(),
+                            !matches!(last_op, Some(OpKind::Write)),
+                            next_op.is_none(),
+                            cmd_iterator,
+                        )
+                        .await?;
+                    }
+                    OpKind::Read => {
+                        // execute a read operation:
+                        // - issue START/RSTART if op is different from previous
+                        // - issue STOP if op is the last one
+                        // - will_continue is true if there is another read operation next
+                        self.read_operation(
+                            address,
+                            op.read_buffer().unwrap(),
+                            !matches!(last_op, Some(OpKind::Read)),
+                            next_op.is_none(),
+                            matches!(next_op, Some(OpKind::Read)),
+                            cmd_iterator,
+                        )
+                        .await?;
+                    }
+                }
+
+                last_op = Some(kind);
+            }
+
             Ok(())
         }
     }
@@ -991,51 +1145,7 @@ mod asynch {
             address: u8,
             operations: &mut [Operation<'_>],
         ) -> Result<(), Self::Error> {
-            let mut last_op = Op::None;
-            // filter out 0 length read operations
-            let mut op_iter = operations
-                .iter_mut()
-                .filter(|op| match op {
-                    Operation::Write(_) => true,
-                    Operation::Read(buffer) => !buffer.is_empty(),
-                })
-                .peekable();
-            while let Some(op) = op_iter.next() {
-                let next_op: Op = op_iter.peek().into();
-                // Clear all I2C interrupts
-                self.peripheral.clear_all_interrupts();
-
-                let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
-                match op {
-                    Operation::Write(bytes) => {
-                        self.write_operation(
-                            address,
-                            bytes,
-                            last_op != Op::Write,
-                            next_op == Op::None,
-                            cmd_iterator,
-                        )
-                        .await?;
-                        last_op = Op::Write;
-                    }
-                    Operation::Read(buffer) => {
-                        // execute a read operation:
-                        // - issue START/RSTART if op is different from previous
-                        // - issue STOP if op is the last one
-                        self.read_operation(
-                            address,
-                            buffer,
-                            last_op != Op::Read,
-                            next_op == Op::None,
-                            next_op == Op::Read,
-                            cmd_iterator,
-                        )
-                        .await?;
-                        last_op = Op::Read;
-                    }
-                }
-            }
-            Ok(())
+            self.transaction(address, operations).await
         }
     }
 
@@ -1093,7 +1203,114 @@ mod asynch {
     }
 }
 
+mod private {
+    use super::Operation;
+
+    #[derive(PartialEq)]
+    // This enum is used to keep track of the last/next operation that was/will be
+    // performed in an embedded-hal(-async) I2C::transaction. It is used to
+    // determine whether a START condition should be issued at the start of the
+    // current operation and whether a read needs an ack or a nack for the final
+    // byte.
+    pub enum OpKind {
+        Write,
+        Read,
+    }
+
+    #[doc(hidden)]
+    pub trait I2cOperation<'a> {
+        fn is_write(&self) -> bool;
+
+        fn is_read(&self) -> bool;
+
+        fn write_buffer(&self) -> Option<&'a [u8]>;
+
+        fn read_buffer(&mut self) -> Option<&mut [u8]>;
+
+        fn is_empty(&self) -> bool;
+
+        fn kind(&self) -> OpKind;
+    }
+
+    impl<'a> I2cOperation<'a> for Operation<'a> {
+        fn is_write(&self) -> bool {
+            matches!(self, Operation::Write(_))
+        }
+
+        fn is_read(&self) -> bool {
+            matches!(self, Operation::Read(_))
+        }
+
+        fn write_buffer(&self) -> Option<&'a [u8]> {
+            match self {
+                Operation::Write(buffer) => Some(buffer),
+                Operation::Read(_) => None,
+            }
+        }
+
+        fn read_buffer(&mut self) -> Option<&mut [u8]> {
+            match self {
+                Operation::Write(_) => None,
+                Operation::Read(buffer) => Some(*buffer),
+            }
+        }
+
+        fn kind(&self) -> OpKind {
+            match self {
+                Operation::Write(_) => OpKind::Write,
+                Operation::Read(_) => OpKind::Read,
+            }
+        }
+
+        fn is_empty(&self) -> bool {
+            match self {
+                Operation::Write(buffer) => buffer.is_empty(),
+                Operation::Read(buffer) => buffer.is_empty(),
+            }
+        }
+    }
+
+    impl<'a> I2cOperation<'a> for embedded_hal::i2c::Operation<'a> {
+        fn is_write(&self) -> bool {
+            matches!(self, embedded_hal::i2c::Operation::Write(_))
+        }
+
+        fn is_read(&self) -> bool {
+            matches!(self, embedded_hal::i2c::Operation::Read(_))
+        }
+
+        fn write_buffer(&self) -> Option<&'a [u8]> {
+            match self {
+                embedded_hal::i2c::Operation::Write(buffer) => Some(buffer),
+                embedded_hal::i2c::Operation::Read(_) => None,
+            }
+        }
+
+        fn read_buffer(&mut self) -> Option<&mut [u8]> {
+            match self {
+                embedded_hal::i2c::Operation::Write(_) => None,
+                embedded_hal::i2c::Operation::Read(buffer) => Some(*buffer),
+            }
+        }
+
+        fn kind(&self) -> OpKind {
+            match self {
+                embedded_hal::i2c::Operation::Write(_) => OpKind::Write,
+                embedded_hal::i2c::Operation::Read(_) => OpKind::Read,
+            }
+        }
+
+        fn is_empty(&self) -> bool {
+            match self {
+                embedded_hal::i2c::Operation::Write(buffer) => buffer.is_empty(),
+                embedded_hal::i2c::Operation::Read(buffer) => buffer.is_empty(),
+            }
+        }
+    }
+}
+
 /// I2C Peripheral Instance
+#[doc(hidden)]
 pub trait Instance: crate::private::Sealed {
     /// The identifier number for this I2C instance.
     const I2C_NUMBER: usize;
@@ -2102,69 +2319,6 @@ pub trait Instance: crate::private::Sealed {
         self.start_transmission();
         self.read_all_from_fifo(buffer)?;
         self.wait_for_completion(!stop)?;
-        Ok(())
-    }
-
-    /// Send data bytes from the `bytes` array to a target slave with the
-    /// address `addr`
-    fn master_write(&self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
-        // Clear all I2C interrupts
-        self.clear_all_interrupts();
-        self.write_operation(
-            addr,
-            bytes,
-            true,
-            true,
-            &mut self.register_block().comd_iter(),
-        )?;
-        Ok(())
-    }
-
-    /// Read bytes from a target slave with the address `addr`
-    /// The number of read bytes is deterimed by the size of the `buffer`
-    /// argument
-    fn master_read(&self, addr: u8, buffer: &mut [u8]) -> Result<(), Error> {
-        // Clear all I2C interrupts
-        self.clear_all_interrupts();
-        self.read_operation(
-            addr,
-            buffer,
-            true,
-            true,
-            false,
-            &mut self.register_block().comd_iter(),
-        )?;
-        Ok(())
-    }
-
-    /// Write bytes from the `bytes` array first and then read n bytes into
-    /// the `buffer` array with n being the size of the array.
-    fn master_write_read(&self, addr: u8, bytes: &[u8], buffer: &mut [u8]) -> Result<(), Error> {
-        // it would be possible to combine the write and read
-        // in one transaction but filling the tx fifo with
-        // the current code is somewhat slow even in release mode
-        // which can cause issues
-
-        // Clear all I2C interrupts
-        self.clear_all_interrupts();
-        self.write_operation(
-            addr,
-            bytes,
-            true,
-            buffer.is_empty(), // if the read buffer is empty, then issue a stop
-            &mut self.register_block().comd_iter(),
-        )?;
-        self.clear_all_interrupts();
-        // this will be a no-op if the buffer is empty, in that case we issued the stop
-        // with the write
-        self.read_operation(
-            addr,
-            buffer,
-            true,
-            true,
-            false,
-            &mut self.register_block().comd_iter(),
-        )?;
         Ok(())
     }
 }
