@@ -435,7 +435,7 @@ where
 impl<'d, I, CH, DmaMode> I2s<'d, I, CH, DmaMode>
 where
     I: RegisterAccess,
-    CH: PeripheralDmaChannel,
+    CH: DmaChannel,
     DmaMode: Mode,
 {
     /// Construct a new I2S peripheral driver instance for the first I2S
@@ -452,6 +452,7 @@ where
     ) -> Self
     where
         I: I2s0Instance,
+        CH: PeripheralDmaChannel,
         CH::P: I2sPeripheral + I2s0Peripheral,
         DmaMode: Mode,
     {
@@ -481,6 +482,7 @@ where
     ) -> Self
     where
         I: I2s1Instance,
+        CH: PeripheralDmaChannel,
         CH::P: I2sPeripheral + I2s1Peripheral,
     {
         Self::new_internal(

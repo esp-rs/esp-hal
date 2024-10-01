@@ -236,6 +236,7 @@ pub mod dma {
         dma::{
             dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
             AesPeripheral,
+            AnyDmaChannel,
             Channel,
             ChannelRx,
             ChannelTx,
@@ -251,8 +252,6 @@ pub mod dma {
             WriteBuffer,
         },
     };
-
-    type DefaultChannel = crate::dma::AnyDmaChannel;
 
     const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 
@@ -273,7 +272,7 @@ pub mod dma {
     }
 
     /// A DMA capable AES instance.
-    pub struct AesDma<'d, C = DefaultChannel>
+    pub struct AesDma<'d, C = AnyDmaChannel>
     where
         C: DmaChannel,
     {
@@ -285,32 +284,33 @@ pub mod dma {
         tx_chain: DescriptorChain,
     }
 
-    /// Functionality for using AES with DMA.
-    pub trait WithDmaAes<'d, C>
-    where
-        C: PeripheralDmaChannel,
-        C::P: AesPeripheral,
-    {
+    impl<'d> crate::aes::Aes<'d> {
         /// Enable DMA for the current instance of the AES driver
-        fn with_dma(
+        pub fn with_dma<C>(
             self,
             channel: Channel<'d, C, crate::Blocking>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> AesDma<'d, C>;
-    }
+        ) -> AesDma<'d>
+        where
+            Self: Sized,
+            C: PeripheralDmaChannel,
+            C::P: AesPeripheral,
+        {
+            self.with_dma_typed(channel.degrade(), rx_descriptors, tx_descriptors)
+        }
 
-    impl<'d, C> WithDmaAes<'d, C> for crate::aes::Aes<'d>
-    where
-        C: PeripheralDmaChannel,
-        C::P: AesPeripheral,
-    {
-        fn with_dma(
+        /// Enable DMA for the current instance of the AES driver
+        pub fn with_dma_typed<C>(
             self,
             channel: Channel<'d, C, crate::Blocking>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> AesDma<'d, C> {
+        ) -> AesDma<'d, C>
+        where
+            C: PeripheralDmaChannel,
+            C::P: AesPeripheral,
+        {
             AesDma {
                 aes: self,
                 channel,

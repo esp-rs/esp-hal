@@ -1099,8 +1099,7 @@ where
 
 impl<'d, CH, DM> ParlIoFullDuplex<'d, CH, DM>
 where
-    CH: PeripheralDmaChannel,
-    CH::P: ParlIoPeripheral,
+    CH: DmaChannel,
     DM: Mode,
 {
     /// Create a new instance of [ParlIoFullDuplex]
@@ -1110,7 +1109,11 @@ where
         tx_descriptors: &'static mut [DmaDescriptor],
         rx_descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, Error>
+    where
+        CH: PeripheralDmaChannel,
+        CH::P: ParlIoPeripheral,
+    {
         internal_init(frequency)?;
 
         Ok(Self {
@@ -1185,8 +1188,7 @@ where
 
 impl<'d, CH, DM> ParlIoTxOnly<'d, CH, DM>
 where
-    CH: PeripheralDmaChannel,
-    CH::P: ParlIoPeripheral,
+    CH: DmaChannel,
     DM: Mode,
 {
     /// Create a new [ParlIoTxOnly]
@@ -1195,7 +1197,11 @@ where
         dma_channel: Channel<'d, CH, DM>,
         descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, Error>
+    where
+        CH: PeripheralDmaChannel,
+        CH::P: ParlIoPeripheral,
+    {
         internal_init(frequency)?;
 
         Ok(Self {
@@ -1265,8 +1271,7 @@ where
 
 impl<'d, CH, DM> ParlIoRxOnly<'d, CH, DM>
 where
-    CH: PeripheralDmaChannel,
-    CH::P: ParlIoPeripheral,
+    CH: DmaChannel,
     DM: Mode,
 {
     /// Create a new [ParlIoRxOnly] instance
@@ -1275,7 +1280,11 @@ where
         dma_channel: Channel<'d, CH, DM>,
         descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, Error>
+    where
+        CH: PeripheralDmaChannel,
+        CH::P: ParlIoPeripheral,
+    {
         internal_init(frequency)?;
 
         Ok(Self {

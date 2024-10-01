@@ -69,7 +69,16 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    dma::{ChannelTx, DmaChannel, DmaError, DmaPeripheral, DmaTxBuffer, LcdCamPeripheral, Tx},
+    dma::{
+        ChannelTx,
+        DmaChannel,
+        DmaError,
+        DmaPeripheral,
+        DmaTxBuffer,
+        LcdCamPeripheral,
+        PeripheralDmaChannel,
+        Tx,
+    },
     gpio::{OutputSignal, PeripheralOutput},
     lcd_cam::{
         asynch::LCD_DONE_WAKER,
@@ -91,10 +100,7 @@ pub struct I8080<'d, CH: DmaChannel, DM: Mode> {
     _phantom: PhantomData<DM>,
 }
 
-impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM>
-where
-    CH::P: LcdCamPeripheral,
-{
+impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
     /// Creates a new instance of the I8080 LCD interface.
     pub fn new<P: TxPins>(
         lcd: Lcd<'d, DM>,
@@ -102,7 +108,11 @@ where
         mut pins: P,
         frequency: HertzU32,
         config: Config,
-    ) -> Self {
+    ) -> Self
+    where
+        CH: PeripheralDmaChannel,
+        CH::P: LcdCamPeripheral,
+    {
         let lcd_cam = lcd.lcd_cam;
 
         let clocks = Clocks::get();

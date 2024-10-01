@@ -82,6 +82,7 @@ use crate::{
         DmaPeripheral,
         DmaRxBuffer,
         LcdCamPeripheral,
+        PeripheralDmaChannel,
         Rx,
     },
     gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
@@ -134,17 +135,35 @@ pub struct Camera<'d, CH: DmaChannel = AnyDmaChannel> {
     rx_channel: ChannelRx<'d, CH>,
 }
 
-impl<'d, CH: DmaChannel> Camera<'d, CH>
-where
-    CH::P: LcdCamPeripheral,
-{
+impl<'d> Camera<'d> {
     /// Creates a new `Camera` instance with DMA support.
-    pub fn new<P: RxPins>(
+    pub fn new<P: RxPins, CH>(
+        cam: Cam<'d>,
+        channel: ChannelRx<'d, CH>,
+        descriptors: &'static mut [DmaDescriptor],
+        pins: P,
+        frequency: HertzU32,
+    ) -> Self
+    where
+        CH: PeripheralDmaChannel,
+        CH::P: LcdCamPeripheral,
+    {
+        Self::new_typed(cam, channel.degrade(), descriptors, pins, frequency)
+    }
+}
+
+impl<'d, CH: DmaChannel> Camera<'d, CH> {
+    /// Creates a new `Camera` instance with DMA support.
+    pub fn new_typed<P: RxPins>(
         cam: Cam<'d>,
         channel: ChannelRx<'d, CH>,
         _pins: P,
         frequency: HertzU32,
-    ) -> Self {
+    ) -> Self
+    where
+        CH: PeripheralDmaChannel,
+        CH::P: LcdCamPeripheral,
+    {
         let lcd_cam = cam.lcd_cam;
 
         let clocks = Clocks::get();
