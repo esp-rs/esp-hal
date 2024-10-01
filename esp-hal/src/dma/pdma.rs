@@ -24,35 +24,35 @@ type I2sRegisterBlock = crate::peripherals::i2s0::RegisterBlock;
 
 #[doc(hidden)]
 pub trait SpiPdmaChannel: crate::private::Sealed {
-    fn register_block() -> &'static SpiRegisterBlock;
-    fn tx_waker() -> &'static AtomicWaker;
-    fn rx_waker() -> &'static AtomicWaker;
+    fn register_block(&self) -> &SpiRegisterBlock;
+    fn tx_waker(&self) -> &AtomicWaker;
+    fn rx_waker(&self) -> &AtomicWaker;
 }
 
 #[doc(hidden)]
 pub trait I2sPdmaChannel: crate::private::Sealed {
-    fn register_block() -> &'static I2sRegisterBlock;
-    fn tx_waker() -> &'static AtomicWaker;
-    fn rx_waker() -> &'static AtomicWaker;
+    fn register_block(&self) -> &I2sRegisterBlock;
+    fn tx_waker(&self) -> &AtomicWaker;
+    fn rx_waker(&self) -> &AtomicWaker;
 }
 
 #[doc(hidden)]
-pub struct SpiDmaTxChannelImpl<C>(PhantomData<C>);
+pub struct SpiDmaTxChannelImpl<C>(C);
 #[doc(hidden)]
-pub struct SpiDmaRxChannelImpl<C>(PhantomData<C>);
+pub struct SpiDmaRxChannelImpl<C>(C);
 
 impl<C> crate::private::Sealed for SpiDmaTxChannelImpl<C> {}
 impl<C> crate::private::Sealed for SpiDmaRxChannelImpl<C> {}
 
 impl<C: SpiPdmaChannel> RegisterAccess for SpiDmaTxChannelImpl<C> {
     fn reset(&self) {
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         spi.dma_conf().modify(|_, w| w.out_rst().set_bit());
         spi.dma_conf().modify(|_, w| w.out_rst().clear_bit());
     }
 
     fn set_burst_mode(&self, burst_mode: bool) {
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         spi.dma_conf()
             .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
     }
@@ -64,24 +64,24 @@ impl<C: SpiPdmaChannel> RegisterAccess for SpiDmaTxChannelImpl<C> {
     }
 
     fn set_link_addr(&self, address: u32) {
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         spi.dma_out_link()
             .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
     }
 
     fn start(&self) {
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         spi.dma_out_link()
             .modify(|_, w| w.outlink_start().set_bit());
     }
 
     fn stop(&self) {
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         spi.dma_out_link().modify(|_, w| w.outlink_stop().set_bit());
     }
 
     fn restart(&self) {
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         spi.dma_out_link()
             .modify(|_, w| w.outlink_restart().set_bit());
     }
@@ -89,14 +89,14 @@ impl<C: SpiPdmaChannel> RegisterAccess for SpiDmaTxChannelImpl<C> {
 
 impl<C: SpiPdmaChannel> TxRegisterAccess for SpiDmaTxChannelImpl<C> {
     fn last_dscr_address(&self) -> usize {
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         spi.out_eof_des_addr().read().dma_out_eof_des_addr().bits() as usize
     }
 }
 
 impl<C: SpiPdmaChannel> InterruptAccess<DmaTxInterrupt> for SpiDmaTxChannelImpl<C> {
     fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         spi.dma_int_ena().modify(|_, w| {
             for interrupt in interrupts {
                 match interrupt {
@@ -113,7 +113,7 @@ impl<C: SpiPdmaChannel> InterruptAccess<DmaTxInterrupt> for SpiDmaTxChannelImpl<
     fn is_listening(&self) -> EnumSet<DmaTxInterrupt> {
         let mut result = EnumSet::new();
 
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         let int_ena = spi.dma_int_ena().read();
         if int_ena.out_total_eof().bit_is_set() {
             result |= DmaTxInterrupt::TotalEof;
@@ -132,7 +132,7 @@ impl<C: SpiPdmaChannel> InterruptAccess<DmaTxInterrupt> for SpiDmaTxChannelImpl<
     }
 
     fn clear(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         spi.dma_int_clr().write(|w| {
             for interrupt in interrupts.into() {
                 match interrupt {
@@ -149,7 +149,7 @@ impl<C: SpiPdmaChannel> InterruptAccess<DmaTxInterrupt> for SpiDmaTxChannelImpl<
     fn pending_interrupts(&self) -> EnumSet<DmaTxInterrupt> {
         let mut result = EnumSet::new();
 
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         let int_raw = spi.dma_int_raw().read();
         if int_raw.out_total_eof().bit_is_set() {
             result |= DmaTxInterrupt::TotalEof;
@@ -167,20 +167,20 @@ impl<C: SpiPdmaChannel> InterruptAccess<DmaTxInterrupt> for SpiDmaTxChannelImpl<
         result
     }
 
-    fn waker(&self) -> &'static AtomicWaker {
-        C::tx_waker()
+    fn waker(&self) -> &AtomicWaker {
+        self.0.tx_waker()
     }
 }
 
 impl<C: SpiPdmaChannel> RegisterAccess for SpiDmaRxChannelImpl<C> {
     fn reset(&self) {
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         spi.dma_conf().modify(|_, w| w.in_rst().set_bit());
         spi.dma_conf().modify(|_, w| w.in_rst().clear_bit());
     }
 
     fn set_burst_mode(&self, burst_mode: bool) {
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         spi.dma_conf()
             .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
     }
@@ -192,23 +192,23 @@ impl<C: SpiPdmaChannel> RegisterAccess for SpiDmaRxChannelImpl<C> {
     }
 
     fn set_link_addr(&self, address: u32) {
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         spi.dma_in_link()
             .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
     }
 
     fn start(&self) {
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         spi.dma_in_link().modify(|_, w| w.inlink_start().set_bit());
     }
 
     fn stop(&self) {
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         spi.dma_in_link().modify(|_, w| w.inlink_stop().set_bit());
     }
 
     fn restart(&self) {
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         spi.dma_in_link()
             .modify(|_, w| w.inlink_restart().set_bit());
     }
@@ -218,7 +218,7 @@ impl<C: SpiPdmaChannel> RxRegisterAccess for SpiDmaRxChannelImpl<C> {}
 
 impl<C: SpiPdmaChannel> InterruptAccess<DmaRxInterrupt> for SpiDmaRxChannelImpl<C> {
     fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         spi.dma_int_ena().modify(|_, w| {
             for interrupt in interrupts {
                 match interrupt {
@@ -236,7 +236,7 @@ impl<C: SpiPdmaChannel> InterruptAccess<DmaRxInterrupt> for SpiDmaRxChannelImpl<
     fn is_listening(&self) -> EnumSet<DmaRxInterrupt> {
         let mut result = EnumSet::new();
 
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         let int_ena = spi.dma_int_ena().read();
         if int_ena.inlink_dscr_error().bit_is_set() {
             result |= DmaRxInterrupt::DescriptorError;
@@ -258,7 +258,7 @@ impl<C: SpiPdmaChannel> InterruptAccess<DmaRxInterrupt> for SpiDmaRxChannelImpl<
     }
 
     fn clear(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         spi.dma_int_clr().modify(|_, w| {
             for interrupt in interrupts.into() {
                 match interrupt {
@@ -276,7 +276,7 @@ impl<C: SpiPdmaChannel> InterruptAccess<DmaRxInterrupt> for SpiDmaRxChannelImpl<
     fn pending_interrupts(&self) -> EnumSet<DmaRxInterrupt> {
         let mut result = EnumSet::new();
 
-        let spi = C::register_block();
+        let spi = self.0.register_block();
         let int_raw = spi.dma_int_raw().read();
         if int_raw.inlink_dscr_error().bit_is_set() {
             result |= DmaRxInterrupt::DescriptorError;
@@ -297,8 +297,8 @@ impl<C: SpiPdmaChannel> InterruptAccess<DmaRxInterrupt> for SpiDmaRxChannelImpl<
         result
     }
 
-    fn waker(&self) -> &'static AtomicWaker {
-        C::rx_waker()
+    fn waker(&self) -> &AtomicWaker {
+        self.0.rx_waker()
     }
 }
 
@@ -324,10 +324,10 @@ macro_rules! ImplSpiChannel {
                 type Degraded = Self;
 
                 fn get_rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-                    SpiDmaRxChannelImpl::<Self>(PhantomData)
+                    SpiDmaRxChannelImpl(Self {})
                 }
                 fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-                    SpiDmaTxChannelImpl::<Self>(PhantomData)
+                    SpiDmaTxChannelImpl(Self {})
                 }
 
                 fn degrade_rx(rx: Self::Rx) -> Self::Rx {
@@ -347,14 +347,14 @@ macro_rules! ImplSpiChannel {
             }
 
             impl SpiPdmaChannel for [<Spi $num DmaChannel>] {
-                fn register_block() -> &'static SpiRegisterBlock {
+                fn register_block(&self) -> &SpiRegisterBlock {
                     unsafe { &*crate::peripherals::[<SPI $num>]::PTR }
                 }
-                fn tx_waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
+                fn tx_waker(&self) -> &embassy_sync::waitqueue::AtomicWaker {
                     static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
                     &WAKER
                 }
-                fn rx_waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
+                fn rx_waker(&self) -> &embassy_sync::waitqueue::AtomicWaker {
                     static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
                     &WAKER
                 }
@@ -381,11 +381,11 @@ macro_rules! ImplSpiChannel {
                             .modify(|_, w| unsafe { w.[< spi $num _dma_chan_sel>]().bits($num - 1) });
                     }
 
-                    let tx_impl = SpiDmaTxChannelImpl(PhantomData);
+                    let tx_impl = SpiDmaTxChannelImpl([<Spi $num DmaChannel>] {});
                     tx_impl.set_burst_mode(burst_mode);
                     tx_impl.set_priority(priority);
 
-                    let rx_impl = SpiDmaRxChannelImpl(PhantomData);
+                    let rx_impl = SpiDmaRxChannelImpl([<Spi $num DmaChannel>] {});
                     rx_impl.set_burst_mode(burst_mode);
                     rx_impl.set_priority(priority);
 
@@ -429,16 +429,16 @@ macro_rules! ImplSpiChannel {
 }
 
 #[doc(hidden)]
-pub struct I2sDmaTxChannelImpl<C>(PhantomData<C>);
+pub struct I2sDmaTxChannelImpl<C>(C);
 #[doc(hidden)]
-pub struct I2sDmaRxChannelImpl<C>(PhantomData<C>);
+pub struct I2sDmaRxChannelImpl<C>(C);
 
 impl<C> crate::private::Sealed for I2sDmaTxChannelImpl<C> {}
 impl<C> crate::private::Sealed for I2sDmaRxChannelImpl<C> {}
 
 impl<C: I2sPdmaChannel> RegisterAccess for I2sDmaTxChannelImpl<C> {
     fn set_burst_mode(&self, burst_mode: bool) {
-        let reg_block = C::register_block();
+        let reg_block = self.0.register_block();
         reg_block
             .lc_conf()
             .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
@@ -447,13 +447,13 @@ impl<C: I2sPdmaChannel> RegisterAccess for I2sDmaTxChannelImpl<C> {
     fn set_priority(&self, _priority: DmaPriority) {}
 
     fn reset(&self) {
-        let reg_block = C::register_block();
+        let reg_block = self.0.register_block();
         reg_block.lc_conf().modify(|_, w| w.out_rst().set_bit());
         reg_block.lc_conf().modify(|_, w| w.out_rst().clear_bit());
     }
 
     fn set_link_addr(&self, address: u32) {
-        let reg_block = C::register_block();
+        let reg_block = self.0.register_block();
         reg_block
             .out_link()
             .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
@@ -464,21 +464,21 @@ impl<C: I2sPdmaChannel> RegisterAccess for I2sDmaTxChannelImpl<C> {
     }
 
     fn start(&self) {
-        let reg_block = C::register_block();
+        let reg_block = self.0.register_block();
         reg_block
             .out_link()
             .modify(|_, w| w.outlink_start().set_bit());
     }
 
     fn stop(&self) {
-        let reg_block = C::register_block();
+        let reg_block = self.0.register_block();
         reg_block
             .out_link()
             .modify(|_, w| w.outlink_stop().set_bit());
     }
 
     fn restart(&self) {
-        let reg_block = C::register_block();
+        let reg_block = self.0.register_block();
         reg_block
             .out_link()
             .modify(|_, w| w.outlink_restart().set_bit());
@@ -487,7 +487,7 @@ impl<C: I2sPdmaChannel> RegisterAccess for I2sDmaTxChannelImpl<C> {
 
 impl<C: I2sPdmaChannel> TxRegisterAccess for I2sDmaTxChannelImpl<C> {
     fn last_dscr_address(&self) -> usize {
-        let reg_block = C::register_block();
+        let reg_block = self.0.register_block();
         reg_block
             .out_eof_des_addr()
             .read()
@@ -498,7 +498,7 @@ impl<C: I2sPdmaChannel> TxRegisterAccess for I2sDmaTxChannelImpl<C> {
 
 impl<C: I2sPdmaChannel> InterruptAccess<DmaTxInterrupt> for I2sDmaTxChannelImpl<C> {
     fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
-        let reg_block = C::register_block();
+        let reg_block = self.0.register_block();
         reg_block.int_ena().modify(|_, w| {
             for interrupt in interrupts {
                 match interrupt {
@@ -515,7 +515,7 @@ impl<C: I2sPdmaChannel> InterruptAccess<DmaTxInterrupt> for I2sDmaTxChannelImpl<
     fn is_listening(&self) -> EnumSet<DmaTxInterrupt> {
         let mut result = EnumSet::new();
 
-        let reg_block = C::register_block();
+        let reg_block = self.0.register_block();
         let int_ena = reg_block.int_ena().read();
         if int_ena.out_total_eof().bit_is_set() {
             result |= DmaTxInterrupt::TotalEof;
@@ -536,7 +536,7 @@ impl<C: I2sPdmaChannel> InterruptAccess<DmaTxInterrupt> for I2sDmaTxChannelImpl<
     fn pending_interrupts(&self) -> EnumSet<DmaTxInterrupt> {
         let mut result = EnumSet::new();
 
-        let reg_block = C::register_block();
+        let reg_block = self.0.register_block();
         let int_raw = reg_block.int_raw().read();
         if int_raw.out_total_eof().bit_is_set() {
             result |= DmaTxInterrupt::TotalEof;
@@ -555,7 +555,7 @@ impl<C: I2sPdmaChannel> InterruptAccess<DmaTxInterrupt> for I2sDmaTxChannelImpl<
     }
 
     fn clear(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
-        let reg_block = C::register_block();
+        let reg_block = self.0.register_block();
         reg_block.int_clr().write(|w| {
             for interrupt in interrupts.into() {
                 match interrupt {
@@ -569,14 +569,14 @@ impl<C: I2sPdmaChannel> InterruptAccess<DmaTxInterrupt> for I2sDmaTxChannelImpl<
         })
     }
 
-    fn waker(&self) -> &'static AtomicWaker {
-        C::tx_waker()
+    fn waker(&self) -> &AtomicWaker {
+        self.0.tx_waker()
     }
 }
 
 impl<C: I2sPdmaChannel> RegisterAccess for I2sDmaRxChannelImpl<C> {
     fn set_burst_mode(&self, burst_mode: bool) {
-        let reg_block = C::register_block();
+        let reg_block = self.0.register_block();
         reg_block
             .lc_conf()
             .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
@@ -585,13 +585,13 @@ impl<C: I2sPdmaChannel> RegisterAccess for I2sDmaRxChannelImpl<C> {
     fn set_priority(&self, _priority: DmaPriority) {}
 
     fn reset(&self) {
-        let reg_block = C::register_block();
+        let reg_block = self.0.register_block();
         reg_block.lc_conf().modify(|_, w| w.in_rst().set_bit());
         reg_block.lc_conf().modify(|_, w| w.in_rst().clear_bit());
     }
 
     fn set_link_addr(&self, address: u32) {
-        let reg_block = C::register_block();
+        let reg_block = self.0.register_block();
         reg_block
             .in_link()
             .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
@@ -602,19 +602,19 @@ impl<C: I2sPdmaChannel> RegisterAccess for I2sDmaRxChannelImpl<C> {
     }
 
     fn start(&self) {
-        let reg_block = C::register_block();
+        let reg_block = self.0.register_block();
         reg_block
             .in_link()
             .modify(|_, w| w.inlink_start().set_bit());
     }
 
     fn stop(&self) {
-        let reg_block = C::register_block();
+        let reg_block = self.0.register_block();
         reg_block.in_link().modify(|_, w| w.inlink_stop().set_bit());
     }
 
     fn restart(&self) {
-        let reg_block = C::register_block();
+        let reg_block = self.0.register_block();
         reg_block
             .in_link()
             .modify(|_, w| w.inlink_restart().set_bit());
@@ -625,7 +625,7 @@ impl<C: I2sPdmaChannel> RxRegisterAccess for I2sDmaRxChannelImpl<C> {}
 
 impl<C: I2sPdmaChannel> InterruptAccess<DmaRxInterrupt> for I2sDmaRxChannelImpl<C> {
     fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
-        let reg_block = C::register_block();
+        let spi = self.0.register_block();
         reg_block.int_ena().modify(|_, w| {
             for interrupt in interrupts {
                 match interrupt {
@@ -643,7 +643,7 @@ impl<C: I2sPdmaChannel> InterruptAccess<DmaRxInterrupt> for I2sDmaRxChannelImpl<
     fn is_listening(&self) -> EnumSet<DmaRxInterrupt> {
         let mut result = EnumSet::new();
 
-        let reg_block = C::register_block();
+        let reg_block = self.0.register_block();
         let int_ena = reg_block.int_ena().read();
         if int_ena.in_dscr_err().bit_is_set() {
             result |= DmaRxInterrupt::DescriptorError;
@@ -667,7 +667,7 @@ impl<C: I2sPdmaChannel> InterruptAccess<DmaRxInterrupt> for I2sDmaRxChannelImpl<
     fn pending_interrupts(&self) -> EnumSet<DmaRxInterrupt> {
         let mut result = EnumSet::new();
 
-        let reg_block = C::register_block();
+        let reg_block = self.0.register_block();
         let int_raw = reg_block.int_raw().read();
         if int_raw.in_dscr_err().bit_is_set() {
             result |= DmaRxInterrupt::DescriptorError;
@@ -689,7 +689,7 @@ impl<C: I2sPdmaChannel> InterruptAccess<DmaRxInterrupt> for I2sDmaRxChannelImpl<
     }
 
     fn clear(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
-        let reg_block = C::register_block();
+        let reg_block = self.0.register_block();
         reg_block.int_clr().write(|w| {
             for interrupt in interrupts.into() {
                 match interrupt {
@@ -704,8 +704,8 @@ impl<C: I2sPdmaChannel> InterruptAccess<DmaRxInterrupt> for I2sDmaRxChannelImpl<
         })
     }
 
-    fn waker(&self) -> &'static AtomicWaker {
-        C::rx_waker()
+    fn waker(&self) -> &AtomicWaker {
+        self.0.rx_waker()
     }
 }
 
@@ -727,10 +727,10 @@ macro_rules! ImplI2sChannel {
                 type Degraded = Self;
 
                 fn get_rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-                    I2sDmaRxChannelImpl::<Self>(PhantomData)
+                    I2sDmaRxChannelImpl(Self {})
                 }
                 fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-                    I2sDmaTxChannelImpl::<Self>(PhantomData)
+                    I2sDmaTxChannelImpl(Self {})
                 }
 
                 fn degrade_rx(rx: Self::Rx) -> Self::Rx {
@@ -750,14 +750,14 @@ macro_rules! ImplI2sChannel {
             }
 
             impl I2sPdmaChannel for [<I2s $num DmaChannel>] {
-                fn register_block() -> &'static I2sRegisterBlock {
+                fn register_block(&self) -> &I2sRegisterBlock {
                     unsafe { &*crate::peripherals::[< I2S $num >]::PTR }
                 }
-                fn tx_waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
+                fn tx_waker(&self) -> &embassy_sync::waitqueue::AtomicWaker {
                     static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
                     &WAKER
                 }
-                fn rx_waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
+                fn rx_waker(&self) -> &embassy_sync::waitqueue::AtomicWaker {
                     static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
                     &WAKER
                 }
@@ -772,11 +772,11 @@ macro_rules! ImplI2sChannel {
                     burst_mode: bool,
                     priority: DmaPriority,
                 ) -> Channel<'a, [<I2s $num DmaChannel>], M> {
-                    let tx_impl = I2sDmaTxChannelImpl(PhantomData);
+                    let tx_impl = I2sDmaTxChannelImpl([<I2s $num DmaChannel>] {});
                     tx_impl.set_burst_mode(burst_mode);
                     tx_impl.set_priority(priority);
 
-                    let rx_impl = I2sDmaRxChannelImpl(PhantomData);
+                    let rx_impl = I2sDmaRxChannelImpl([<I2s $num DmaChannel>] {});
                     rx_impl.set_burst_mode(burst_mode);
                     rx_impl.set_priority(priority);
 

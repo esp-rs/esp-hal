@@ -56,26 +56,26 @@ impl<C: GdmaChannel> crate::private::Sealed for ChannelTxImpl<C> {}
 
 impl<C: GdmaChannel> ChannelTxImpl<C> {
     #[inline(always)]
-    fn ch(&self) -> &'static crate::peripherals::dma::ch::CH {
+    fn ch(&self) -> &crate::peripherals::dma::ch::CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.ch(self.0.number() as usize)
     }
 
     #[cfg(any(esp32c2, esp32c3))]
     #[inline(always)]
-    fn int(&self) -> &'static crate::peripherals::dma::int_ch::INT_CH {
+    fn int(&self) -> &crate::peripherals::dma::int_ch::INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.int_ch(self.0.number() as usize)
     }
     #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))]
-    fn int(&self) -> &'static crate::peripherals::dma::out_int_ch::OUT_INT_CH {
+    fn int(&self) -> &crate::peripherals::dma::out_int_ch::OUT_INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.out_int_ch(self.0.number() as usize)
     }
     #[cfg(esp32s3)]
     #[inline(always)]
-    fn int(&self) -> &'static crate::peripherals::dma::ch::out_int::OUT_INT {
+    fn int(&self) -> &crate::peripherals::dma::ch::out_int::OUT_INT {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.ch(self.0.number() as usize).out_int()
     }
@@ -222,7 +222,7 @@ impl<C: GdmaChannel> InterruptAccess<DmaTxInterrupt> for ChannelTxImpl<C> {
         result
     }
 
-    fn waker(&self) -> &'static AtomicWaker {
+    fn waker(&self) -> &AtomicWaker {
         &TX_WAKERS[self.0.number() as usize]
     }
 }
@@ -235,28 +235,28 @@ impl<C: GdmaChannel> crate::private::Sealed for ChannelRxImpl<C> {}
 
 impl<C: GdmaChannel> ChannelRxImpl<C> {
     #[inline(always)]
-    fn ch(&self) -> &'static crate::peripherals::dma::ch::CH {
+    fn ch(&self) -> &crate::peripherals::dma::ch::CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.ch(self.0.number() as usize)
     }
 
     #[cfg(any(esp32c2, esp32c3))]
     #[inline(always)]
-    fn int(&self) -> &'static crate::peripherals::dma::int_ch::INT_CH {
+    fn int(&self) -> &crate::peripherals::dma::int_ch::INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.int_ch(self.0.number() as usize)
     }
 
     #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))]
-    fn int(&self) -> &'static crate::peripherals::dma::in_int_ch::IN_INT_CH {
+    fn int(&self) -> &crate::peripherals::dma::in_int_ch::IN_INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.in_int_ch(self.0.number() as usize)
     }
 
     #[cfg(esp32s3)]
     #[inline(always)]
-    fn int(&self) -> &'static crate::peripherals::dma::ch::in_int::IN_INT {
+    fn int(&self) -> &crate::peripherals::dma::ch::in_int::IN_INT {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.ch(self.0.number() as usize).in_int()
     }
@@ -407,7 +407,7 @@ impl<C: GdmaChannel> InterruptAccess<DmaRxInterrupt> for ChannelRxImpl<C> {
         result
     }
 
-    fn waker(&self) -> &'static AtomicWaker {
+    fn waker(&self) -> &AtomicWaker {
         &RX_WAKERS[self.0.number() as usize]
     }
 }
