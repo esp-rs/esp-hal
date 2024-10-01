@@ -74,7 +74,16 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    dma::{AnyDmaChannel, ChannelRx, DmaChannel, DmaError, DmaPeripheral, DmaRxBuffer, LcdCamPeripheral, Rx},
+    dma::{
+        AnyDmaChannel,
+        ChannelRx,
+        DmaChannel,
+        DmaError,
+        DmaPeripheral,
+        DmaRxBuffer,
+        LcdCamPeripheral,
+        Rx,
+    },
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal, Pull},
     lcd_cam::{cam::private::RxPins, private::calculate_clkm, BitOrder, ByteOrder},
     peripheral::{Peripheral, PeripheralRef},
@@ -301,7 +310,7 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
     pub fn receive<BUF: DmaRxBuffer>(
         mut self,
         mut buf: BUF,
-    ) -> Result<CameraTransfer<'d, CH, BUF>, (DmaError, Self, BUF)> {
+    ) -> Result<CameraTransfer<'d, BUF, CH>, (DmaError, Self, BUF)> {
         // Reset Camera control unit and Async Rx FIFO
         self.lcd_cam
             .cam_ctrl1()
@@ -347,12 +356,12 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
 
 /// Represents an ongoing (or potentially stopped) transfer from the Camera to a
 /// DMA buffer.
-pub struct CameraTransfer<'d, CH: DmaChannel, BUF: DmaRxBuffer> {
+pub struct CameraTransfer<'d, BUF: DmaRxBuffer, CH: DmaChannel = AnyDmaChannel> {
     camera: ManuallyDrop<Camera<'d, CH>>,
     buffer_view: ManuallyDrop<BUF::View>,
 }
 
-impl<'d, CH: DmaChannel, BUF: DmaRxBuffer> CameraTransfer<'d, CH, BUF> {
+impl<'d, BUF: DmaRxBuffer, CH: DmaChannel> CameraTransfer<'d, BUF, CH> {
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
         // This peripheral doesn't really "complete". As long the camera (or anything
@@ -434,7 +443,7 @@ impl<'d, CH: DmaChannel, BUF: DmaRxBuffer> CameraTransfer<'d, CH, BUF> {
     }
 }
 
-impl<'d, CH: DmaChannel, BUF: DmaRxBuffer> Deref for CameraTransfer<'d, CH, BUF> {
+impl<'d, BUF: DmaRxBuffer, CH: DmaChannel> Deref for CameraTransfer<'d, BUF, CH> {
     type Target = BUF::View;
 
     fn deref(&self) -> &Self::Target {
@@ -442,13 +451,13 @@ impl<'d, CH: DmaChannel, BUF: DmaRxBuffer> Deref for CameraTransfer<'d, CH, BUF>
     }
 }
 
-impl<'d, CH: DmaChannel, BUF: DmaRxBuffer> DerefMut for CameraTransfer<'d, CH, BUF> {
+impl<'d, BUF: DmaRxBuffer, CH: DmaChannel> DerefMut for CameraTransfer<'d, BUF, CH> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.buffer_view
     }
 }
 
-impl<'d, CH: DmaChannel, BUF: DmaRxBuffer> Drop for CameraTransfer<'d, CH, BUF> {
+impl<'d, BUF: DmaRxBuffer, CH: DmaChannel> Drop for CameraTransfer<'d, BUF, CH> {
     fn drop(&mut self) {
         self.stop_peripherals();
 
