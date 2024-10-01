@@ -244,6 +244,7 @@ pub mod dma {
             DmaDescriptor,
             DmaPeripheral,
             DmaTransferRxTx,
+            PeripheralDmaChannel,
             ReadBuffer,
             Rx,
             Tx,
@@ -251,10 +252,7 @@ pub mod dma {
         },
     };
 
-    #[cfg(gdma)]
     type DefaultChannel = crate::dma::AnyDmaChannel;
-    #[cfg(pdma)]
-    type DefaultChannel = (); // Replace with PDMA channel once support is added.
 
     const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 
@@ -278,7 +276,6 @@ pub mod dma {
     pub struct AesDma<'d, C = DefaultChannel>
     where
         C: DmaChannel,
-        C::P: AesPeripheral,
     {
         /// The underlying [`Aes`](super::Aes) driver
         pub aes: super::Aes<'d>,
@@ -291,7 +288,7 @@ pub mod dma {
     /// Functionality for using AES with DMA.
     pub trait WithDmaAes<'d, C>
     where
-        C: DmaChannel,
+        C: PeripheralDmaChannel,
         C::P: AesPeripheral,
     {
         /// Enable DMA for the current instance of the AES driver
@@ -305,7 +302,7 @@ pub mod dma {
 
     impl<'d, C> WithDmaAes<'d, C> for crate::aes::Aes<'d>
     where
-        C: DmaChannel,
+        C: PeripheralDmaChannel,
         C::P: AesPeripheral,
     {
         fn with_dma(
@@ -326,7 +323,6 @@ pub mod dma {
     impl<'d, C> core::fmt::Debug for AesDma<'d, C>
     where
         C: DmaChannel,
-        C::P: AesPeripheral,
     {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             f.debug_struct("AesDma").finish()
@@ -336,7 +332,6 @@ pub mod dma {
     impl<'d, C> DmaSupport for AesDma<'d, C>
     where
         C: DmaChannel,
-        C::P: AesPeripheral,
     {
         fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
             while self.aes.aes.state().read().state().bits() != 2 // DMA status DONE == 2
@@ -356,7 +351,6 @@ pub mod dma {
     impl<'d, C> DmaSupportTx for AesDma<'d, C>
     where
         C: DmaChannel,
-        C::P: AesPeripheral,
     {
         type TX = ChannelTx<'d, C>;
 
@@ -372,7 +366,6 @@ pub mod dma {
     impl<'d, C> DmaSupportRx for AesDma<'d, C>
     where
         C: DmaChannel,
-        C::P: AesPeripheral,
     {
         type RX = ChannelRx<'d, C>;
 
@@ -388,7 +381,6 @@ pub mod dma {
     impl<'d, C> AesDma<'d, C>
     where
         C: DmaChannel,
-        C::P: AesPeripheral,
     {
         /// Writes the encryption key to the AES hardware, checking that its
         /// length matches expected constraints.

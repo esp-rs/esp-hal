@@ -44,6 +44,7 @@ use crate::{
         DmaTransferRx,
         DmaTransferTx,
         ParlIoPeripheral,
+        PeripheralDmaChannel,
         ReadBuffer,
         Rx,
         Tx,
@@ -1086,7 +1087,6 @@ fn internal_clear_interrupts(interrupts: EnumSet<ParlIoInterrupt>) {
 pub struct ParlIoFullDuplex<'d, CH, DM>
 where
     CH: DmaChannel,
-    CH::P: ParlIoPeripheral,
     DM: Mode,
 {
     /// The transmitter (TX) channel responsible for handling DMA transfers in
@@ -1099,7 +1099,7 @@ where
 
 impl<'d, CH, DM> ParlIoFullDuplex<'d, CH, DM>
 where
-    CH: DmaChannel,
+    CH: PeripheralDmaChannel,
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
@@ -1131,7 +1131,6 @@ where
 impl<'d, CH> ParlIoFullDuplex<'d, CH, Blocking>
 where
     CH: DmaChannel,
-    CH::P: ParlIoPeripheral,
 {
     /// Sets the interrupt handler, enables it with
     /// [crate::interrupt::Priority::min()]
@@ -1162,17 +1161,11 @@ where
     }
 }
 
-impl<'d, CH> crate::private::Sealed for ParlIoFullDuplex<'d, CH, Blocking>
-where
-    CH: DmaChannel,
-    CH::P: ParlIoPeripheral,
-{
-}
+impl<'d, CH> crate::private::Sealed for ParlIoFullDuplex<'d, CH, Blocking> where CH: DmaChannel {}
 
 impl<'d, CH> InterruptConfigurable for ParlIoFullDuplex<'d, CH, Blocking>
 where
     CH: DmaChannel,
-    CH::P: ParlIoPeripheral,
 {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoFullDuplex::set_interrupt_handler(self, handler);
@@ -1183,7 +1176,6 @@ where
 pub struct ParlIoTxOnly<'d, CH, DM>
 where
     CH: DmaChannel,
-    CH::P: ParlIoPeripheral,
     DM: Mode,
 {
     /// The transmitter (TX) channel responsible for handling DMA transfers in
@@ -1193,7 +1185,7 @@ where
 
 impl<'d, CH, DM> ParlIoTxOnly<'d, CH, DM>
 where
-    CH: DmaChannel,
+    CH: PeripheralDmaChannel,
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
@@ -1219,7 +1211,6 @@ where
 impl<'d, CH> ParlIoTxOnly<'d, CH, Blocking>
 where
     CH: DmaChannel,
-    CH::P: ParlIoPeripheral,
 {
     /// Sets the interrupt handler, enables it with
     /// [crate::interrupt::Priority::min()]
@@ -1250,17 +1241,11 @@ where
     }
 }
 
-impl<'d, CH> crate::private::Sealed for ParlIoTxOnly<'d, CH, Blocking>
-where
-    CH: DmaChannel,
-    CH::P: ParlIoPeripheral,
-{
-}
+impl<'d, CH> crate::private::Sealed for ParlIoTxOnly<'d, CH, Blocking> where CH: DmaChannel {}
 
 impl<'d, CH> InterruptConfigurable for ParlIoTxOnly<'d, CH, Blocking>
 where
     CH: DmaChannel,
-    CH::P: ParlIoPeripheral,
 {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoTxOnly::set_interrupt_handler(self, handler);
@@ -1271,7 +1256,6 @@ where
 pub struct ParlIoRxOnly<'d, CH, DM>
 where
     CH: DmaChannel,
-    CH::P: ParlIoPeripheral,
     DM: Mode,
 {
     /// The receiver (RX) channel responsible for handling DMA transfers in the
@@ -1281,7 +1265,7 @@ where
 
 impl<'d, CH, DM> ParlIoRxOnly<'d, CH, DM>
 where
-    CH: DmaChannel,
+    CH: PeripheralDmaChannel,
     CH::P: ParlIoPeripheral,
     DM: Mode,
 {
@@ -1307,7 +1291,6 @@ where
 impl<'d, CH> ParlIoRxOnly<'d, CH, Blocking>
 where
     CH: DmaChannel,
-    CH::P: ParlIoPeripheral,
 {
     /// Sets the interrupt handler, enables it with
     /// [crate::interrupt::Priority::min()]
@@ -1338,17 +1321,11 @@ where
     }
 }
 
-impl<'d, CH> crate::private::Sealed for ParlIoRxOnly<'d, CH, Blocking>
-where
-    CH: DmaChannel,
-    CH::P: ParlIoPeripheral,
-{
-}
+impl<'d, CH> crate::private::Sealed for ParlIoRxOnly<'d, CH, Blocking> where CH: DmaChannel {}
 
 impl<'d, CH> InterruptConfigurable for ParlIoRxOnly<'d, CH, Blocking>
 where
     CH: DmaChannel,
-    CH::P: ParlIoPeripheral,
 {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoRxOnly::set_interrupt_handler(self, handler);
@@ -1391,7 +1368,6 @@ fn internal_init(frequency: HertzU32) -> Result<(), Error> {
 impl<'d, CH, DM> ParlIoTx<'d, CH, DM>
 where
     CH: DmaChannel,
-    CH::P: ParlIoPeripheral,
     DM: Mode,
 {
     /// Perform a DMA write.
@@ -1452,7 +1428,6 @@ where
 impl<'d, CH, DM> DmaSupport for ParlIoTx<'d, CH, DM>
 where
     CH: DmaChannel,
-    CH::P: ParlIoPeripheral,
     DM: Mode,
 {
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
@@ -1469,7 +1444,6 @@ where
 impl<'d, CH, DM> DmaSupportTx for ParlIoTx<'d, CH, DM>
 where
     CH: DmaChannel,
-    CH::P: ParlIoPeripheral,
     DM: Mode,
 {
     type TX = ChannelTx<'d, CH>;
@@ -1486,7 +1460,6 @@ where
 impl<'d, CH, DM> ParlIoRx<'d, CH, DM>
 where
     CH: DmaChannel,
-    CH::P: ParlIoPeripheral,
     DM: Mode,
 {
     /// Perform a DMA read.
@@ -1547,7 +1520,6 @@ where
 impl<'d, CH, DM> DmaSupport for ParlIoRx<'d, CH, DM>
 where
     CH: DmaChannel,
-    CH::P: ParlIoPeripheral,
     DM: Mode,
 {
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
@@ -1571,7 +1543,6 @@ where
 impl<'d, CH, DM> DmaSupportRx for ParlIoRx<'d, CH, DM>
 where
     CH: DmaChannel,
-    CH::P: ParlIoPeripheral,
     DM: Mode,
 {
     type RX = ChannelRx<'d, CH>;
@@ -1638,7 +1609,7 @@ pub mod asynch {
 
     use super::{private::Instance, Error, ParlIoRx, ParlIoTx, MAX_DMA_SIZE};
     use crate::{
-        dma::{asynch::DmaRxFuture, DmaChannel, ParlIoPeripheral, ReadBuffer, WriteBuffer},
+        dma::{asynch::DmaRxFuture, DmaChannel, ReadBuffer, WriteBuffer},
         peripherals::Interrupt,
     };
 
@@ -1696,7 +1667,6 @@ pub mod asynch {
     impl<'d, CH> ParlIoTx<'d, CH, crate::Async>
     where
         CH: DmaChannel,
-        CH::P: ParlIoPeripheral,
     {
         /// Perform a DMA write.
         ///
@@ -1722,7 +1692,6 @@ pub mod asynch {
     impl<'d, CH> ParlIoRx<'d, CH, crate::Async>
     where
         CH: DmaChannel,
-        CH::P: ParlIoPeripheral,
     {
         /// Perform a DMA write.
         ///

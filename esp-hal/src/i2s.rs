@@ -102,6 +102,7 @@ use crate::{
         DmaTransferTxCircular,
         I2s0Peripheral,
         I2sPeripheral,
+        PeripheralDmaChannel,
         ReadBuffer,
         Rx,
         Tx,
@@ -434,7 +435,7 @@ where
 impl<'d, I, CH, DmaMode> I2s<'d, I, CH, DmaMode>
 where
     I: RegisterAccess,
-    CH: DmaChannel,
+    CH: PeripheralDmaChannel,
     DmaMode: Mode,
 {
     /// Construct a new I2S peripheral driver instance for the first I2S

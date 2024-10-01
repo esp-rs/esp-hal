@@ -164,6 +164,7 @@ pub mod dma {
             DmaTransferRx,
             DmaTransferRxTx,
             DmaTransferTx,
+            PeripheralDmaChannel,
             ReadBuffer,
             Rx,
             Spi2Peripheral,
@@ -185,7 +186,7 @@ pub mod dma {
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> SpiDma<'d, crate::peripherals::SPI2, C, DmaMode>
         where
-            C: DmaChannel,
+            C: PeripheralDmaChannel,
             C::P: SpiPeripheral + Spi2Peripheral,
             DmaMode: Mode,
         {
@@ -211,7 +212,7 @@ pub mod dma {
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> SpiDma<'d, crate::peripherals::SPI3, C, DmaMode>
         where
-            C: DmaChannel,
+            C: PeripheralDmaChannel,
             C::P: SpiPeripheral + Spi3Peripheral,
             DmaMode: Mode,
         {
@@ -229,7 +230,6 @@ pub mod dma {
     pub struct SpiDma<'d, T, C, DmaMode>
     where
         C: DmaChannel,
-        C::P: SpiPeripheral,
         DmaMode: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
@@ -241,7 +241,6 @@ pub mod dma {
     impl<'d, T, C, DmaMode> core::fmt::Debug for SpiDma<'d, T, C, DmaMode>
     where
         C: DmaChannel,
-        C::P: SpiPeripheral,
         DmaMode: Mode,
     {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -253,7 +252,6 @@ pub mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
         DmaMode: Mode,
     {
         fn peripheral_wait_dma(&mut self, is_rx: bool, is_tx: bool) {
@@ -274,7 +272,6 @@ pub mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
         DmaMode: Mode,
     {
         type TX = ChannelTx<'d, C>;
@@ -292,7 +289,6 @@ pub mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
         DmaMode: Mode,
     {
         type RX = ChannelRx<'d, C>;
@@ -310,7 +306,6 @@ pub mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
         DmaMode: Mode,
     {
         /// Register a buffer for a DMA write.

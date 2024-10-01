@@ -222,7 +222,7 @@ impl<C: GdmaChannel> InterruptAccess<DmaTxInterrupt> for ChannelTxImpl<C> {
         result
     }
 
-    fn waker(&self) -> &AtomicWaker {
+    fn waker(&self) -> &'static AtomicWaker {
         &TX_WAKERS[self.0.number() as usize]
     }
 }
@@ -407,7 +407,7 @@ impl<C: GdmaChannel> InterruptAccess<DmaRxInterrupt> for ChannelRxImpl<C> {
         result
     }
 
-    fn waker(&self) -> &AtomicWaker {
+    fn waker(&self) -> &'static AtomicWaker {
         &RX_WAKERS[self.0.number() as usize]
     }
 }
@@ -439,15 +439,12 @@ impl AesPeripheral for SuitablePeripheral {}
 #[cfg(lcd_cam)]
 impl LcdCamPeripheral for SuitablePeripheral {}
 
-/// A description of any GDMA channel
-#[non_exhaustive]
-pub struct AnyDmaChannel {}
-
-impl crate::private::Sealed for AnyDmaChannel {}
-
 impl DmaChannel for AnyDmaChannel {
     type Rx = ChannelRxImpl<AnyGdmaChannel>;
     type Tx = ChannelTxImpl<AnyGdmaChannel>;
+}
+
+impl PeripheralDmaChannel for AnyDmaChannel {
     type P = SuitablePeripheral;
 }
 
@@ -463,6 +460,8 @@ macro_rules! impl_channel {
             impl DmaChannel for [<DmaChannel $num>] {
                 type Rx = ChannelRxImpl<SpecificGdmaChannel<$num>>;
                 type Tx = ChannelTxImpl<SpecificGdmaChannel<$num>>;
+            }
+            impl PeripheralDmaChannel for [<DmaChannel $num>] {
                 type P = SuitablePeripheral;
             }
 

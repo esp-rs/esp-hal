@@ -924,6 +924,7 @@ mod dma {
             DmaRxBuffer,
             DmaTxBuf,
             DmaTxBuffer,
+            PeripheralDmaChannel,
             Rx,
             Spi2Peripheral,
             SpiPeripheral,
@@ -947,7 +948,7 @@ mod dma {
             channel: Channel<'d, C, DmaMode>,
         ) -> SpiDma<'d, crate::peripherals::SPI2, C, M, DmaMode>
         where
-            C: DmaChannel,
+            C: PeripheralDmaChannel,
             C::P: SpiPeripheral + Spi2Peripheral,
             DmaMode: Mode,
         {
@@ -970,7 +971,7 @@ mod dma {
             channel: Channel<'d, C, DmaMode>,
         ) -> SpiDma<'d, crate::peripherals::SPI3, C, M, DmaMode>
         where
-            C: DmaChannel,
+            C: PeripheralDmaChannel,
             C::P: SpiPeripheral + Spi3Peripheral,
             DmaMode: Mode,
         {
@@ -988,7 +989,6 @@ mod dma {
     pub struct SpiDma<'d, T, C, D, M>
     where
         C: DmaChannel,
-        C::P: SpiPeripheral,
         D: DuplexMode,
         M: Mode,
     {
@@ -1005,7 +1005,6 @@ mod dma {
     unsafe impl<'d, T, C, D, M> Send for SpiDma<'d, T, C, D, M>
     where
         C: DmaChannel,
-        C::P: SpiPeripheral,
         D: DuplexMode,
         M: Mode,
     {
@@ -1014,7 +1013,6 @@ mod dma {
     impl<'d, T, C, D, M> core::fmt::Debug for SpiDma<'d, T, C, D, M>
     where
         C: DmaChannel,
-        C::P: SpiPeripheral,
         D: DuplexMode,
         M: Mode,
     {
@@ -1031,11 +1029,14 @@ mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
         D: DuplexMode,
         M: Mode,
     {
-        fn new(spi: PeripheralRef<'d, T>, channel: Channel<'d, C, M>) -> Self {
+        fn new(spi: PeripheralRef<'d, T>, channel: Channel<'d, C, M>) -> Self
+        where
+            C: PeripheralDmaChannel,
+            C::P: SpiPeripheral,
+        {
             #[cfg(all(esp32, spi_address_workaround))]
             let address_buffer = {
                 use crate::dma::DmaDescriptor;
@@ -1267,7 +1268,6 @@ mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
         D: DuplexMode,
         M: Mode,
     {
@@ -1277,7 +1277,6 @@ mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
         D: DuplexMode,
         M: Mode,
     {
@@ -1291,7 +1290,6 @@ mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
         D: DuplexMode,
         M: Mode,
     {
@@ -1322,7 +1320,6 @@ mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
         D: DuplexMode,
         M: Mode,
     {
@@ -1334,7 +1331,6 @@ mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
         D: DuplexMode,
         M: Mode,
     {
@@ -1381,7 +1377,6 @@ mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
         D: DuplexMode,
         M: Mode,
     {
@@ -1402,7 +1397,6 @@ mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
         D: DuplexMode,
     {
         /// Waits for the DMA transfer to complete asynchronously.
@@ -1417,7 +1411,6 @@ mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
         M: Mode,
     {
         /// # Safety:
@@ -1530,7 +1523,6 @@ mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
         M: Mode,
     {
         /// # Safety:
@@ -1655,7 +1647,6 @@ mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
         D: DuplexMode,
         M: Mode,
     {
@@ -1668,7 +1659,6 @@ mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
         D: DuplexMode,
         M: Mode,
     {
@@ -1727,7 +1717,6 @@ mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
         D: DuplexMode,
         M: Mode,
     {
@@ -1741,7 +1730,6 @@ mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
         D: DuplexMode,
         M: Mode,
     {
@@ -1751,7 +1739,6 @@ mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
         M: Mode,
     {
         /// Reads data from the SPI bus using DMA.
@@ -1847,7 +1834,6 @@ mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
         M: Mode,
     {
         type Error = Error;
@@ -1921,7 +1907,6 @@ mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
     {
         type Error = Error;
 
@@ -1936,7 +1921,6 @@ mod dma {
     where
         T: InstanceDma,
         C: DmaChannel,
-        C::P: SpiPeripheral,
     {
         type Error = Error;
 
@@ -1997,7 +1981,6 @@ mod dma {
         where
             T: InstanceDma,
             C: DmaChannel,
-            C::P: SpiPeripheral,
         {
             /// Fill the given buffer with data from the bus.
             pub async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
@@ -2115,7 +2098,6 @@ mod dma {
         where
             T: InstanceDma,
             C: DmaChannel,
-            C::P: SpiPeripheral,
         {
             async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
                 self.read_async(words).await
@@ -2149,7 +2131,6 @@ mod dma {
         where
             T: InstanceDma,
             C: DmaChannel,
-            C::P: SpiPeripheral,
             M: Mode,
         {
             type Error = Error;
@@ -2159,7 +2140,6 @@ mod dma {
         where
             T: InstanceDma,
             C: DmaChannel,
-            C::P: SpiPeripheral,
             M: Mode,
         {
             fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
