@@ -349,6 +349,13 @@ macro_rules! ImplSpiChannel {
             impl DmaChannel for [<Spi $num DmaChannel>] {
                 type Rx = SpiDmaRxChannelImpl<Self>;
                 type Tx = SpiDmaTxChannelImpl<Self>;
+
+                fn degrade_rx(rx: Self::Rx) -> AnyPdmaRxChannelImpl {
+                    rx.degrade()
+                }
+                fn degrade_tx(tx: Self::Tx) -> AnyPdmaTxChannelImpl {
+                    tx.degrade()
+                }
             }
             impl PeripheralDmaChannel for [<Spi $num DmaChannel>] {
                 type P = [<Spi $num DmaSuitablePeripheral>];
@@ -360,13 +367,6 @@ macro_rules! ImplSpiChannel {
                 }
                 fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
                     SpiDmaTxChannelImpl(Self {})
-                }
-
-                fn degrade_rx(rx: Self::Rx) -> AnyPdmaRxChannelImpl {
-                    rx.degrade()
-                }
-                fn degrade_tx(tx: Self::Tx) -> AnyPdmaTxChannelImpl {
-                    tx.degrade()
                 }
 
                 fn set_isr(handler: InterruptHandler) {
@@ -784,6 +784,13 @@ macro_rules! ImplI2sChannel {
             impl DmaChannel for [<I2s $num DmaChannel>] {
                 type Rx = I2sDmaRxChannelImpl<Self>;
                 type Tx = I2sDmaTxChannelImpl<Self>;
+
+                fn degrade_rx(rx: Self::Rx) -> AnyPdmaRxChannelImpl {
+                    rx.degrade()
+                }
+                fn degrade_tx(tx: Self::Tx) -> AnyPdmaTxChannelImpl {
+                    tx.degrade()
+                }
             }
             impl PeripheralDmaChannel for [<I2s $num DmaChannel>] {
                 type P = [<I2s $num DmaSuitablePeripheral>];
@@ -795,13 +802,6 @@ macro_rules! ImplI2sChannel {
                 }
                 fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
                     I2sDmaTxChannelImpl(Self {})
-                }
-
-                fn degrade_rx(rx: Self::Rx) -> AnyPdmaRxChannelImpl {
-                    rx.degrade()
-                }
-                fn degrade_tx(tx: Self::Tx) -> AnyPdmaTxChannelImpl {
-                    tx.degrade()
                 }
 
                 fn set_isr(handler: InterruptHandler) {
@@ -965,6 +965,14 @@ pub enum AnyPdmaChannel {
 impl DmaChannel for AnyDmaChannel {
     type Rx = AnyPdmaRxChannelImpl;
     type Tx = AnyPdmaTxChannelImpl;
+
+    fn degrade_rx(rx: Self::Rx) -> AnyPdmaRxChannelImpl {
+        rx
+    }
+
+    fn degrade_tx(tx: Self::Tx) -> AnyPdmaTxChannelImpl {
+        tx
+    }
 }
 
 #[doc(hidden)]

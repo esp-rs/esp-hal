@@ -442,6 +442,13 @@ impl LcdCamPeripheral for SuitablePeripheral {}
 impl DmaChannel for AnyDmaChannel {
     type Rx = ChannelRxImpl<AnyGdmaChannel>;
     type Tx = ChannelTxImpl<AnyGdmaChannel>;
+
+    fn degrade_rx(rx: Self::Rx) -> ChannelRxImpl<AnyGdmaChannel> {
+        rx
+    }
+    fn degrade_tx(tx: Self::Tx) -> ChannelTxImpl<AnyGdmaChannel> {
+        tx
+    }
 }
 
 impl PeripheralDmaChannel for AnyDmaChannel {
@@ -460,6 +467,13 @@ macro_rules! impl_channel {
             impl DmaChannel for [<DmaChannel $num>] {
                 type Rx = ChannelRxImpl<SpecificGdmaChannel<$num>>;
                 type Tx = ChannelTxImpl<SpecificGdmaChannel<$num>>;
+
+                fn degrade_rx(rx: Self::Rx) -> ChannelRxImpl<AnyGdmaChannel> {
+                    rx.degrade()
+                }
+                fn degrade_tx(tx: Self::Tx) -> ChannelTxImpl<AnyGdmaChannel> {
+                    tx.degrade()
+                }
             }
             impl PeripheralDmaChannel for [<DmaChannel $num>] {
                 type P = SuitablePeripheral;
@@ -472,13 +486,6 @@ macro_rules! impl_channel {
 
                 fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
                     ChannelTxImpl(SpecificGdmaChannel::<$num> {})
-                }
-
-                fn degrade_rx(rx: Self::Rx) -> ChannelRxImpl<AnyGdmaChannel> {
-                    rx.degrade()
-                }
-                fn degrade_tx(tx: Self::Tx) -> ChannelTxImpl<AnyGdmaChannel> {
-                    tx.degrade()
                 }
 
                 fn set_isr(handler: $crate::interrupt::InterruptHandler) {
