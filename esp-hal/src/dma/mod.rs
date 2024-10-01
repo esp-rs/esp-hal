@@ -1550,13 +1550,11 @@ impl crate::private::Sealed for AnyDmaChannel {}
 
 #[doc(hidden)]
 pub trait DmaChannelExt: DmaChannel {
-    type Degraded: DmaChannel;
-
     fn get_rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt>;
     fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt>;
 
-    fn degrade_rx(rx: Self::Rx) -> <Self::Degraded as DmaChannel>::Rx;
-    fn degrade_tx(tx: Self::Tx) -> <Self::Degraded as DmaChannel>::Tx;
+    fn degrade_rx(rx: Self::Rx) -> <AnyDmaChannel as DmaChannel>::Rx;
+    fn degrade_tx(tx: Self::Tx) -> <AnyDmaChannel as DmaChannel>::Tx;
 
     #[doc(hidden)]
     fn set_isr(handler: InterruptHandler);
@@ -1644,7 +1642,7 @@ where
     }
 
     /// Return a type-erased (degraded) version of this channel.
-    pub fn degrade(self) -> ChannelRx<'a, CH::Degraded>
+    pub fn degrade(self) -> ChannelRx<'a, AnyDmaChannel>
     where
         CH: DmaChannelExt,
     {
@@ -1861,7 +1859,7 @@ where
     }
 
     /// Return a type-erased (degraded) version of this channel.
-    pub fn degrade(self) -> ChannelTx<'a, CH::Degraded>
+    pub fn degrade(self) -> ChannelTx<'a, AnyDmaChannel>
     where
         CH: DmaChannelExt,
     {
@@ -2137,7 +2135,7 @@ where
 {
     /// Return a type-erased (degraded) version of this channel (both rx and
     /// tx).
-    pub fn degrade(self) -> Channel<'d, C::Degraded, M> {
+    pub fn degrade(self) -> Channel<'d, AnyDmaChannel, M> {
         Channel {
             rx: self.rx.degrade(),
             tx: self.tx.degrade(),

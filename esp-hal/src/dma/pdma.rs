@@ -355,8 +355,6 @@ macro_rules! ImplSpiChannel {
             }
 
             impl DmaChannelExt for [<Spi $num DmaChannel>] {
-                type Degraded = AnyDmaChannel;
-
                 fn get_rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
                     SpiDmaRxChannelImpl(Self {})
                 }
@@ -792,8 +790,6 @@ macro_rules! ImplI2sChannel {
             }
 
             impl DmaChannelExt for [<I2s $num DmaChannel>] {
-                type Degraded = AnyDmaChannel;
-
                 fn get_rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
                     I2sDmaRxChannelImpl(Self {})
                 }

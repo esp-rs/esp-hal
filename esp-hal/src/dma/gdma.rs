@@ -466,8 +466,6 @@ macro_rules! impl_channel {
             }
 
             impl DmaChannelExt for [<DmaChannel $num>] {
-                type Degraded = AnyDmaChannel;
-
                 fn get_rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
                     ChannelRxImpl(SpecificGdmaChannel::<$num> {})
                 }
