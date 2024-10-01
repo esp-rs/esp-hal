@@ -205,7 +205,7 @@ pub mod dma {
         ) -> SpiDma<'d, crate::peripherals::SPI3, C, DmaMode>
         where
             C: DmaChannel,
-            C::P: SpiPeripheral + Spi2Peripheral,
+            C::P: SpiPeripheral + Spi3Peripheral,
             DmaMode: Mode,
         {
             SpiDma {
