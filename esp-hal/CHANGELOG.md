@@ -107,6 +107,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the `place-spi-driver-in-ram` feature, this is now enabled via [esp-config](https://docs.rs/esp-config) (#2156)
 - Removed `esp_hal::spi::slave::prelude` (#2260)
 - Removed `esp_hal::spi::slave::WithDmaSpiN` traits (#2260)
+- The `WithDmaAes` trait has been removed (#2261)
 
 ## [0.20.1] - 2024-08-30
 
