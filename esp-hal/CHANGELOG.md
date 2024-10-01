@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a way to configure watchdogs in `esp_hal::init` (#2180)
 - Introduce `DmaRxStreamBuf` (#2242)
 - Implement `embedded_hal_async::delay::DelayNs` for `TIMGx` timers (#2084)
+- Added `Efuse::read_bit` (#2259)
 
 ### Changed
 
@@ -48,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - I8080 driver now decides bus width at transfer time rather than construction time. (#2171)
 - Replaced `AnyPin` with `InputSignal` and `OutputSignal` and renamed `ErasedPin` to `AnyPin` (#2128)
 - Replaced the `ErasedTimer` enum with the `AnyTimer` struct. (#2144)
+- `Camera` and `AesDma` now support erasing the DMA channel type (#2258)
 - Changed the parameters of `Spi::with_pins` to no longer be optional (#2133)
 - Renamed `DummyPin` to `NoPin` and removed all internal logic from it. (#2133)
 - The `NO_PIN` constant has been removed. (#2133)
@@ -75,8 +77,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SPI: Fixed an issue where repeated calls to `dma_transfer` may end up looping indefinitely (#2179)
 - SPI: Fixed an issue that prevented correctly reading the first byte in a transaction (#2179)
 - SPI: ESP32: Send address with correct data mode even when no data is sent. (#2231)
+- SPI: ESP32: Allow using QSPI mode on SPI3. (#2245)
 - PARL_IO: Fixed an issue that caused garbage to be output at the start of some requests (#2211)
 - TWAI on ESP32 (#2207)
+- TWAI should no longer panic when receiving a non-compliant frame (#2255)
+- OneShotTimer: fixed `delay_nanos` behaviour (#2256)
+- Fixed unsoundness around `Efuse` (#2259)
 
 ### Removed
 

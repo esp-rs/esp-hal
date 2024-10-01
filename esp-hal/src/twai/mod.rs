@@ -1240,12 +1240,7 @@ where
             )));
         }
 
-        // Safety:
-        // - We have a `&mut self` and have unique access to the peripheral.
-        // - There is a message in the FIFO because we checked status
-        let frame = T::read_frame();
-
-        Ok(frame)
+        Ok(T::read_frame()?)
     }
 }
 
@@ -1253,27 +1248,32 @@ where
 /// This enum defines the possible errors that can be encountered when
 /// interacting with the TWAI peripheral.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EspTwaiError {
     /// TWAI peripheral has entered a bus-off state.
     BusOff,
+    /// The received frame contains an invalid DLC.
+    NonCompliantDlc(u8),
     /// Encapsulates errors defined by the embedded-hal crate.
     EmbeddedHAL(ErrorKind),
 }
 
 impl embedded_hal_02::can::Error for EspTwaiError {
     fn kind(&self) -> embedded_hal_02::can::ErrorKind {
-        match self {
-            Self::BusOff => embedded_hal_02::can::ErrorKind::Other,
-            Self::EmbeddedHAL(kind) => (*kind).into(),
+        if let Self::EmbeddedHAL(kind) = self {
+            (*kind).into()
+        } else {
+            embedded_hal_02::can::ErrorKind::Other
         }
     }
 }
 
 impl embedded_can::Error for EspTwaiError {
     fn kind(&self) -> embedded_can::ErrorKind {
-        match self {
-            Self::BusOff => embedded_can::ErrorKind::Other,
-            Self::EmbeddedHAL(kind) => (*kind).into(),
+        if let Self::EmbeddedHAL(kind) = self {
+            (*kind).into()
+        } else {
+            embedded_can::ErrorKind::Other
         }
     }
 }
@@ -1483,7 +1483,7 @@ pub trait Instance: crate::private::Sealed {
     }
 
     /// Read a frame from the peripheral.
-    fn read_frame() -> EspTwaiFrame {
+    fn read_frame() -> Result<EspTwaiFrame, EspTwaiError> {
         let register_block = Self::register_block();
 
         // Read the frame information and extract the frame id format and dlc.
@@ -1491,7 +1491,16 @@ pub trait Instance: crate::private::Sealed {
 
         let is_standard_format = data_0 & 0b1 << 7 == 0;
         let is_data_frame = data_0 & 0b1 << 6 == 0;
-        let dlc = (data_0 & 0b1111) as usize;
+        let dlc = data_0 & 0b1111;
+
+        if dlc > 8 {
+            // Release the packet we read from the FIFO, allowing the peripheral to prepare
+            // the next packet.
+            Self::release_receive_fifo();
+
+            return Err(EspTwaiError::NonCompliantDlc(dlc));
+        }
+        let dlc = dlc as usize;
 
         // Read the payload from the packet and construct a frame.
         let (id, data_ptr) = if is_standard_format {
@@ -1529,7 +1538,7 @@ pub trait Instance: crate::private::Sealed {
         // the next packet.
         Self::release_receive_fifo();
 
-        frame
+        Ok(frame)
     }
 }
 
@@ -1748,10 +1757,8 @@ mod asynch {
         }
     }
 
-    #[handler]
-    pub(super) fn twai0() {
-        let register_block = TWAI0::register_block();
-
+    fn handle_interrupt<T: Instance>() {
+        let register_block = T::register_block();
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
                 let intr_enable = register_block.int_ena().read();
@@ -1772,7 +1779,7 @@ mod asynch {
             }
         }
 
-        let async_state = TWAI0::async_state();
+        let async_state = T::async_state();
 
         if tx_int_status.bit_is_set() {
             async_state.tx_waker.wake();
@@ -1791,11 +1798,12 @@ mod asynch {
                 let _ = rx_queue.try_send(Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun)));
             }
 
-            let frame = TWAI0::read_frame();
-
-            let _ = rx_queue.try_send(Ok(frame));
-
-            register_block.cmd().write(|w| w.release_buf().set_bit());
+            match T::read_frame() {
+                Ok(frame) => {
+                    let _ = rx_queue.try_send(Ok(frame));
+                }
+                Err(e) => warn!("Error reading frame: {:?}", e),
+            }
         }
 
         if intr_status.bits() & 0b11111100 > 0 {
@@ -1808,48 +1816,14 @@ mod asynch {
         }
     }
 
+    #[handler]
+    pub(super) fn twai0() {
+        handle_interrupt::<TWAI0>();
+    }
+
     #[cfg(twai1)]
     #[handler]
     pub(super) fn twai1() {
-        let register_block = TWAI1::register_block();
-
-        let intr_enable = register_block.interrupt_enable().read();
-        let intr_status = register_block.interrupt().read();
-
-        let async_state = TWAI1::async_state();
-
-        if intr_status.transmit_int_st().bit_is_set() {
-            async_state.tx_waker.wake();
-        }
-
-        if intr_status.receive_int_st().bit_is_set() {
-            let status = register_block.status().read();
-
-            let rx_queue = &async_state.rx_queue;
-
-            if status.bus_off_st().bit_is_set() {
-                let _ = rx_queue.try_send(Err(EspTwaiError::BusOff));
-            }
-
-            if status.miss_st().bit_is_set() {
-                let _ = rx_queue.try_send(Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun)));
-            }
-
-            let frame = TWAI1::read_frame();
-
-            let _ = rx_queue.try_send(Ok(frame));
-
-            register_block.cmd().write(|w| w.release_buf().set_bit());
-        }
-
-        if intr_status.bits() & 0b11111100 > 0 {
-            async_state.err_waker.wake();
-        }
-
-        unsafe {
-            register_block
-                .interrupt_enable()
-                .modify(|_, w| w.bits(intr_enable.bits() & (!intr_status.bits() | 1)));
-        }
+        handle_interrupt::<TWAI1>();
     }
 }

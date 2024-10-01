@@ -291,7 +291,7 @@ where
 
             // On the esp32c3, and esp32s3 the USB_EXCHG_PINS efuse is bugged and
             // doesn't swap the pullups too, this works around that.
-            if Efuse::read_field_le(USB_EXCHG_PINS) {
+            if Efuse::read_bit(USB_EXCHG_PINS) {
                 USB_DEVICE::register_block().conf0().modify(|_, w| {
                     w.pad_pull_override()
                         .set_bit()

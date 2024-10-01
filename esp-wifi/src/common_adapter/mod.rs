@@ -4,12 +4,7 @@ use esp_wifi_sys::include::timeval;
 use hal::{macros::ram, rng::Rng};
 
 use crate::{
-    binary::include::{
-        esp_event_base_t,
-        esp_timer_create_args_t,
-        esp_timer_get_time,
-        esp_timer_handle_t,
-    },
+    binary::include::{esp_event_base_t, esp_timer_get_time},
     compat::{common::*, timer_compat::*},
     hal,
 };
@@ -315,29 +310,6 @@ pub unsafe extern "C" fn esp_fill_random(dst: *mut u8, len: u32) {
             chunk.copy_from_slice(&bytes[..chunk.len()]);
         }
     }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn esp_timer_stop(_handle: *mut ()) {
-    todo!("esp_timer_stop");
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn esp_timer_delete(_handle: *mut ()) {
-    todo!("esp_timer_delete");
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn esp_timer_start_once(_handle: *mut (), _timeout_us: u64) -> i32 {
-    todo!("esp_timer_start_once");
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn esp_timer_create(
-    args: *const esp_timer_create_args_t,
-    out_handle: *mut esp_timer_handle_t,
-) -> i32 {
-    compat_esp_timer_create(args, out_handle)
 }
 
 #[no_mangle]

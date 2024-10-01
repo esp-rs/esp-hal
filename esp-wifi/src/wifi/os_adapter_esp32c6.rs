@@ -83,21 +83,6 @@ pub(crate) unsafe extern "C" fn sleep_retention_find_link_by_id_dummy(
     todo!()
 }
 
-pub(crate) unsafe extern "C" fn sleep_retention_entries_create_dummy(
-    _arg1: *const esp_wifi_sys::c_types::c_void,
-    _arg2: esp_wifi_sys::c_types::c_int,
-    _arg3: esp_wifi_sys::c_types::c_int,
-    _arg4: esp_wifi_sys::c_types::c_int,
-) -> esp_wifi_sys::c_types::c_int {
-    todo!()
-}
-
-pub(crate) unsafe extern "C" fn sleep_retention_entries_destroy_dummy(
-    _arg1: esp_wifi_sys::c_types::c_int,
-) {
-    todo!()
-}
-
 /// **************************************************************************
 /// Name: esp_set_isr
 ///

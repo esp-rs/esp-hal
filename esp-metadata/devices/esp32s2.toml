@@ -34,7 +34,6 @@ peripherals = [
     "spi1",
     "spi2",
     "spi3",
-    "spi4",
     "system",
     "systimer",
     "timg0",

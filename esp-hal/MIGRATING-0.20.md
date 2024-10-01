@@ -298,3 +298,7 @@ Diff of the `psram_quad.rs` example
 ...
 
 ```
+
+## eFuse
+
+Calling `Efuse::read_field_le::<bool>()` no longer compiles. Use `Efuse::read_bit()` instead.

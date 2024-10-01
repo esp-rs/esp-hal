@@ -1,6 +1,6 @@
 use crate::binary::{
     c_types,
-    include::{esp_timer_create_args_t, esp_timer_handle_t, ets_timer},
+    include::{esp_timer_create_args_t, ets_timer},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -83,12 +83,18 @@ pub fn compat_timer_disarm(ets_timer: *mut ets_timer) {
 
 pub fn compat_timer_done(ets_timer: *mut ets_timer) {
     critical_section::with(|_| unsafe {
-        if let Some(timer) = TIMERS.iter_mut().find(|t| t.ets_timer == ets_timer) {
+        if let Some((idx, timer)) = TIMERS
+            .iter_mut()
+            .enumerate()
+            .find(|(_, t)| t.ets_timer == ets_timer)
+        {
             debug!("timer_done {:x}", timer.id());
             timer.active = false;
 
             (*ets_timer).priv_ = core::ptr::null_mut();
             (*ets_timer).expire = 0;
+
+            TIMERS.swap_remove(idx);
         } else {
             debug!("timer_done {:x} not found", ets_timer as usize);
         }
@@ -134,37 +140,4 @@ pub fn compat_timer_setfn(
     if !set {
         warn!("Failed to set timer function {:x}", ets_timer as usize);
     }
-}
-
-pub fn compat_esp_timer_create(
-    args: *const esp_timer_create_args_t,
-    out_handle: *mut esp_timer_handle_t,
-) -> i32 {
-    unsafe {
-        debug!("esp_timer_create {:?} {:?}", (*args).callback, (*args).arg);
-    }
-
-    critical_section::with(|_| unsafe {
-        if TIMERS.is_full() {
-            // TODO: should we return -1 instead?
-            panic!("ran out of timers");
-        }
-
-        let ets_timer =
-            crate::compat::malloc::calloc(1, core::mem::size_of::<ets_timer>()).cast::<ets_timer>();
-
-        _ = TIMERS.push(Timer {
-            ets_timer,
-            started: 0,
-            timeout: 0,
-            active: false,
-            periodic: false,
-            callback: TimerCallback::from(unwrap!(args.as_ref())),
-        });
-
-        debug!("esp_timer_create {:x}", ets_timer as usize);
-        *out_handle = ets_timer as _;
-
-        0
-    })
 }

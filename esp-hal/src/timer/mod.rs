@@ -138,7 +138,7 @@ where
 
     /// Pauses execution for *at least* `ns` nanoseconds.
     pub fn delay_nanos(&self, ns: u32) {
-        self.delay((ns as u64 / 1000).micros())
+        self.delay((ns.div_ceil(1000) as u64).micros())
     }
 
     fn delay(&self, us: MicrosDurationU64) {

@@ -15,11 +15,13 @@ pub static mut ISR_INTERRUPT_8: (
 pub(super) struct osi_funcs_s {
     magic: u32,
     version: u32,
-    interrupt_set: Option<unsafe extern "C" fn(i32, i32, i32, i32)>,
-    interrupt_clear: Option<unsafe extern "C" fn(i32, i32)>,
+    interrupt_alloc: Option<
+        unsafe extern "C" fn(i32, i32, extern "C" fn(*const ()), *const (), *mut *const ()) -> i32,
+    >,
+    interrupt_free: Option<unsafe extern "C" fn(*const ()) -> i32>,
     interrupt_handler_set: Option<unsafe extern "C" fn(i32, extern "C" fn(*const ()), *const ())>,
     interrupt_disable: Option<unsafe extern "C" fn()>,
-    interrupt_enable: Option<unsafe extern "C" fn()>,
+    interrupt_restore: Option<unsafe extern "C" fn()>,
     task_yield: Option<unsafe extern "C" fn()>,
     task_yield_from_isr: Option<unsafe extern "C" fn()>,
     semphr_create: Option<unsafe extern "C" fn(u32, u32) -> *const ()>,
@@ -68,25 +70,31 @@ pub(super) struct osi_funcs_s {
     btdm_sleep_exit_phase3: Option<unsafe extern "C" fn()>,
     coex_wifi_sleep_set: Option<unsafe extern "C" fn(i32)>,
     coex_core_ble_conn_dyn_prio_get: Option<unsafe extern "C" fn(*mut i32, *mut i32) -> i32>,
+    coex_schm_register_btdm_callback: Option<unsafe extern "C" fn(*const ()) -> i32>,
     coex_schm_status_bit_set: Option<unsafe extern "C" fn(i32, i32)>,
     coex_schm_status_bit_clear: Option<unsafe extern "C" fn(i32, i32)>,
-    interrupt_on: Option<unsafe extern "C" fn(i32)>,
-    interrupt_off: Option<unsafe extern "C" fn(i32)>,
+    coex_schm_interval_get: Option<unsafe extern "C" fn() -> i32>,
+    coex_schm_curr_period_get: Option<unsafe extern "C" fn() -> u8>,
+    coex_schm_curr_phase_get: Option<unsafe extern "C" fn() -> *const ()>,
+    interrupt_on: Option<unsafe extern "C" fn(i32) -> i32>,
+    interrupt_off: Option<unsafe extern "C" fn(i32) -> i32>,
     esp_hw_power_down: Option<unsafe extern "C" fn()>,
     esp_hw_power_up: Option<unsafe extern "C" fn()>,
     ets_backup_dma_copy: Option<unsafe extern "C" fn(u32, u32, u32, i32)>,
     ets_delay_us: Option<unsafe extern "C" fn(u32)>,
     btdm_rom_table_ready: Option<unsafe extern "C" fn()>,
+    coex_bt_wakeup_request: Option<unsafe extern "C" fn()>,
+    coex_bt_wakeup_request_end: Option<unsafe extern "C" fn()>,
 }
 
 pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     magic: 0xfadebead,
-    version: 0x00010007,
-    interrupt_set: Some(ble_os_adapter_chip_specific::interrupt_set),
-    interrupt_clear: Some(ble_os_adapter_chip_specific::interrupt_clear),
+    version: 0x00010009,
+    interrupt_alloc: Some(ble_os_adapter_chip_specific::interrupt_set),
+    interrupt_free: Some(ble_os_adapter_chip_specific::interrupt_clear),
     interrupt_handler_set: Some(ble_os_adapter_chip_specific::interrupt_handler_set),
     interrupt_disable: Some(interrupt_disable),
-    interrupt_enable: Some(interrupt_enable),
+    interrupt_restore: Some(interrupt_enable),
     task_yield: Some(task_yield),
     task_yield_from_isr: Some(task_yield_from_isr),
     semphr_create: Some(semphr_create),
@@ -127,8 +135,12 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     coex_core_ble_conn_dyn_prio_get: Some(
         ble_os_adapter_chip_specific::coex_core_ble_conn_dyn_prio_get,
     ),
+    coex_schm_register_btdm_callback: Some(coex_schm_register_btdm_callback),
     coex_schm_status_bit_set: Some(coex_schm_status_bit_set),
     coex_schm_status_bit_clear: Some(coex_schm_status_bit_clear),
+    coex_schm_interval_get: Some(coex_schm_interval_get),
+    coex_schm_curr_period_get: Some(coex_schm_curr_period_get),
+    coex_schm_curr_phase_get: Some(coex_schm_curr_phase_get),
     interrupt_on: Some(ble_os_adapter_chip_specific::interrupt_on),
     interrupt_off: Some(ble_os_adapter_chip_specific::interrupt_off),
     esp_hw_power_down: Some(ble_os_adapter_chip_specific::esp_hw_power_down),
@@ -136,7 +148,82 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     ets_backup_dma_copy: Some(ble_os_adapter_chip_specific::ets_backup_dma_copy),
     ets_delay_us: Some(ets_delay_us_wrapper),
     btdm_rom_table_ready: Some(btdm_rom_table_ready_wrapper),
+    coex_bt_wakeup_request: Some(coex_bt_wakeup_request),
+    coex_bt_wakeup_request_end: Some(coex_bt_wakeup_request_end),
 };
+
+extern "C" fn coex_schm_register_btdm_callback(_callback: *const ()) -> i32 {
+    trace!("coex_schm_register_btdm_callback");
+
+    #[cfg(coex)]
+    unsafe {
+        // COEX_SCHM_CALLBACK_TYPE_BT
+        coex_schm_register_callback(1, _callback as *mut esp_wifi_sys::c_types::c_void)
+    }
+
+    #[cfg(not(coex))]
+    0
+}
+
+extern "C" fn coex_schm_interval_get() -> i32 {
+    trace!("coex_schm_interval_get");
+
+    #[cfg(coex)]
+    unsafe {
+        esp_wifi_sys::include::coex_schm_interval_get() as i32
+    }
+
+    #[cfg(not(coex))]
+    0
+}
+
+extern "C" fn coex_schm_curr_period_get() -> u8 {
+    trace!("coex_schm_curr_period_get");
+
+    #[cfg(coex)]
+    unsafe {
+        esp_wifi_sys::include::coex_schm_curr_period_get()
+    }
+
+    #[cfg(not(coex))]
+    0
+}
+
+extern "C" fn coex_schm_curr_phase_get() -> *const () {
+    trace!("coex_schm_curr_phase_get");
+
+    #[cfg(coex)]
+    unsafe {
+        esp_wifi_sys::include::coex_schm_curr_phase_get().cast()
+    }
+
+    #[cfg(not(coex))]
+    core::ptr::null()
+}
+
+extern "C" fn coex_bt_wakeup_request() {
+    trace!("coex_bt_wakeup_request");
+
+    extern "C" {
+        fn btdm_wakeup_request();
+    }
+
+    unsafe {
+        btdm_wakeup_request();
+    }
+}
+
+extern "C" fn coex_bt_wakeup_request_end() {
+    trace!("coex_bt_wakeup_request_end");
+
+    extern "C" {
+        fn btdm_in_wakeup_requesting_set(set: bool);
+    }
+
+    unsafe {
+        btdm_in_wakeup_requesting_set(false);
+    }
+}
 
 extern "C" fn ets_delay_us_wrapper(us: u32) {
     extern "C" {
@@ -163,7 +250,7 @@ extern "C" {
 pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
     esp_bt_controller_config_t {
         magic: 0x5a5aa5a5,
-        version: 0x02307120,
+        version: 0x02404010,
         controller_task_stack_size: 8192,
         controller_task_prio: 200,
         controller_task_run_cpu: 0,
@@ -196,15 +283,21 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
         scan_backoff_upperlimitmax: 0,
         ble_50_feat_supp: true, // BT_CTRL_50_FEATURE_SUPPORT
         ble_cca_mode: 0,
+
+        ble_chan_ass_en: 0,
+        ble_data_lenth_zero_aux: 0,
+        ble_ping_en: 0,
     }
 }
 
-pub(crate) unsafe extern "C" fn interrupt_on(intr_num: i32) {
+pub(crate) unsafe extern "C" fn interrupt_on(intr_num: i32) -> i32 {
     trace!("interrupt_on {}", intr_num);
-    unsafe { crate::hal::xtensa_lx::interrupt::enable_mask(1 << 1) };
+
+    // NO-OP
+    0
 }
 
-pub(crate) unsafe extern "C" fn interrupt_off(_intr_num: i32) {
+pub(crate) unsafe extern "C" fn interrupt_off(_intr_num: i32) -> i32 {
     todo!();
 }
 
@@ -227,19 +320,25 @@ pub(crate) fn disable_sleep_mode() {
 pub(crate) unsafe extern "C" fn interrupt_set(
     cpu_no: i32,
     intr_source: i32,
-    interrupt_no: i32,
-    interrupt_prio: i32,
-) {
+    handler: extern "C" fn(*const ()),
+    arg: *const (),
+    ret_handle: *mut *const (),
+) -> i32 {
     trace!(
-        "interrupt_set {} {} {} {}",
+        "interrupt_set {} {} {} {} {}",
         cpu_no,
         intr_source,
-        interrupt_no,
-        interrupt_prio
+        handler as usize,
+        arg as u32,
+        ret_handle as usize,
     );
+
+    interrupt_handler_set(intr_source, handler, arg);
+
+    0
 }
 
-pub(crate) unsafe extern "C" fn interrupt_clear(_interrupt_source: i32, _interrupt_no: i32) {
+pub(crate) unsafe extern "C" fn interrupt_clear(_handler: *const ()) -> i32 {
     todo!();
 }
 

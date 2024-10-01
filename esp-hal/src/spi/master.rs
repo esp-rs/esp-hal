@@ -507,10 +507,7 @@ where
     ///
     /// Copies the content of `words` in chunks of 64 bytes into the SPI
     /// transmission FIFO. If `words` is longer than 64 bytes, multiple
-    /// sequential transfers are performed. This function will return before
-    /// all bytes of the last chunk to transmit have been sent to the wire. If
-    /// you must ensure that the whole messages was written correctly, use
-    /// `flush`.
+    /// sequential transfers are performed.
     pub fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
         self.spi.write_bytes(words)?;
         self.spi.flush()?;
@@ -2466,6 +2463,8 @@ pub trait ExtendedInstance: Instance {
 
 #[doc(hidden)]
 pub trait Instance: private::Sealed {
+    fn peripheral(&self) -> crate::system::Peripheral;
+
     fn register_block(&self) -> &RegisterBlock;
 
     fn sclk_signal(&self) -> OutputSignal;
@@ -2476,9 +2475,15 @@ pub trait Instance: private::Sealed {
 
     fn cs_signal(&self) -> OutputSignal;
 
-    fn enable_peripheral(&self);
+    #[inline(always)]
+    fn enable_peripheral(&self) {
+        PeripheralClockControl::enable(self.peripheral());
+    }
 
-    fn reset_peripheral(&self);
+    #[inline(always)]
+    fn reset_peripheral(&self) {
+        PeripheralClockControl::reset(self.peripheral());
+    }
 
     fn spi_num(&self) -> u8;
 
@@ -3136,11 +3141,21 @@ fn set_up_common_phases(reg_block: &RegisterBlock, cmd: Command, address: Addres
     }
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
+#[cfg(spi2)]
 impl Instance for crate::peripherals::SPI2 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
+    }
+
+    #[inline(always)]
+    fn spi_num(&self) -> u8 {
+        2
+    }
+
+    #[inline(always)]
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::Spi2
     }
 
     #[inline(always)]
@@ -3151,154 +3166,135 @@ impl Instance for crate::peripherals::SPI2 {
 
     #[inline(always)]
     fn sclk_signal(&self) -> OutputSignal {
-        OutputSignal::FSPICLK_MUX
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                OutputSignal::HSPICLK
+            } else if #[cfg(any(esp32s2, esp32s3))] {
+                OutputSignal::FSPICLK
+            } else {
+                OutputSignal::FSPICLK_MUX
+            }
+        }
     }
 
     #[inline(always)]
     fn mosi_signal(&self) -> OutputSignal {
-        OutputSignal::FSPID
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                OutputSignal::HSPID
+            } else {
+                OutputSignal::FSPID
+            }
+        }
     }
 
     #[inline(always)]
     fn miso_signal(&self) -> InputSignal {
-        InputSignal::FSPIQ
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                InputSignal::HSPIQ
+            } else {
+                InputSignal::FSPIQ
+            }
+        }
     }
 
     #[inline(always)]
     fn cs_signal(&self) -> OutputSignal {
-        OutputSignal::FSPICS0
-    }
-
-    #[inline(always)]
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(crate::system::Peripheral::Spi2);
-    }
-
-    #[inline(always)]
-    fn reset_peripheral(&self) {
-        PeripheralClockControl::reset(crate::system::Peripheral::Spi2);
-    }
-
-    #[inline(always)]
-    fn spi_num(&self) -> u8 {
-        2
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                OutputSignal::HSPICS0
+            } else {
+                OutputSignal::FSPICS0
+            }
+        }
     }
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
+#[cfg(spi2)]
 impl ExtendedInstance for crate::peripherals::SPI2 {
     #[inline(always)]
     fn sio0_input_signal(&self) -> InputSignal {
-        InputSignal::FSPID
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                InputSignal::HSPID
+            } else {
+                InputSignal::FSPID
+            }
+        }
     }
 
     #[inline(always)]
     fn sio1_output_signal(&self) -> OutputSignal {
-        OutputSignal::FSPIQ
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                OutputSignal::HSPIQ
+            } else {
+                OutputSignal::FSPIQ
+            }
+        }
     }
 
     #[inline(always)]
     fn sio2_output_signal(&self) -> OutputSignal {
-        OutputSignal::FSPIWP
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                OutputSignal::HSPIWP
+            } else {
+                OutputSignal::FSPIWP
+            }
+        }
     }
 
     #[inline(always)]
     fn sio2_input_signal(&self) -> InputSignal {
-        InputSignal::FSPIWP
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                InputSignal::HSPIWP
+            } else {
+                InputSignal::FSPIWP
+            }
+        }
     }
 
     #[inline(always)]
     fn sio3_output_signal(&self) -> OutputSignal {
-        OutputSignal::FSPIHD
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                OutputSignal::HSPIHD
+            } else {
+                OutputSignal::FSPIHD
+            }
+        }
     }
 
     #[inline(always)]
     fn sio3_input_signal(&self) -> InputSignal {
-        InputSignal::FSPIHD
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                InputSignal::HSPIHD
+            } else {
+                InputSignal::FSPIHD
+            }
+        }
     }
 }
 
-#[cfg(esp32)]
-impl Instance for crate::peripherals::SPI2 {
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
-    }
-
-    #[inline(always)]
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        self.bind_spi2_interrupt(handler.handler());
-        crate::interrupt::enable(crate::peripherals::Interrupt::SPI2, handler.priority()).unwrap();
-    }
-
-    #[inline(always)]
-    fn sclk_signal(&self) -> OutputSignal {
-        OutputSignal::HSPICLK
-    }
-
-    #[inline(always)]
-    fn mosi_signal(&self) -> OutputSignal {
-        OutputSignal::HSPID
-    }
-
-    #[inline(always)]
-    fn miso_signal(&self) -> InputSignal {
-        InputSignal::HSPIQ
-    }
-
-    #[inline(always)]
-    fn cs_signal(&self) -> OutputSignal {
-        OutputSignal::HSPICS0
-    }
-
-    #[inline(always)]
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(crate::system::Peripheral::Spi2);
-    }
-
-    #[inline(always)]
-    fn reset_peripheral(&self) {
-        PeripheralClockControl::reset(crate::system::Peripheral::Spi2);
-    }
-
-    #[inline(always)]
-    fn spi_num(&self) -> u8 {
-        2
-    }
-}
-
-#[cfg(esp32)]
-impl ExtendedInstance for crate::peripherals::SPI2 {
-    fn sio0_input_signal(&self) -> InputSignal {
-        InputSignal::HSPID
-    }
-
-    fn sio1_output_signal(&self) -> OutputSignal {
-        OutputSignal::HSPIQ
-    }
-
-    fn sio2_output_signal(&self) -> OutputSignal {
-        OutputSignal::HSPIWP
-    }
-
-    fn sio2_input_signal(&self) -> InputSignal {
-        InputSignal::HSPIWP
-    }
-
-    fn sio3_output_signal(&self) -> OutputSignal {
-        OutputSignal::HSPIHD
-    }
-
-    fn sio3_input_signal(&self) -> InputSignal {
-        InputSignal::HSPIHD
-    }
-}
-
-#[cfg(esp32)]
+#[cfg(spi3)]
 impl Instance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
+    }
+
+    #[inline(always)]
+    fn spi_num(&self) -> u8 {
+        3
+    }
+
+    #[inline(always)]
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::Spi3
     }
 
     #[inline(always)]
@@ -3309,200 +3305,114 @@ impl Instance for crate::peripherals::SPI3 {
 
     #[inline(always)]
     fn sclk_signal(&self) -> OutputSignal {
-        OutputSignal::VSPICLK
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                OutputSignal::VSPICLK
+            } else {
+                OutputSignal::SPI3_CLK
+            }
+        }
     }
 
     #[inline(always)]
     fn mosi_signal(&self) -> OutputSignal {
-        OutputSignal::VSPID
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                OutputSignal::VSPID
+            } else {
+                OutputSignal::SPI3_D
+            }
+        }
     }
 
     #[inline(always)]
     fn miso_signal(&self) -> InputSignal {
-        InputSignal::VSPIQ
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                InputSignal::VSPIQ
+            } else {
+                InputSignal::SPI3_Q
+            }
+        }
     }
 
     #[inline(always)]
     fn cs_signal(&self) -> OutputSignal {
-        OutputSignal::VSPICS0
-    }
-
-    #[inline(always)]
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(crate::system::Peripheral::Spi3)
-    }
-
-    #[inline(always)]
-    fn reset_peripheral(&self) {
-        PeripheralClockControl::reset(crate::system::Peripheral::Spi3)
-    }
-
-    #[inline(always)]
-    fn spi_num(&self) -> u8 {
-        3
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                OutputSignal::VSPICS0
+            } else {
+                OutputSignal::SPI3_CS0
+            }
+        }
     }
 }
 
-#[cfg(any(esp32s2, esp32s3))]
-impl Instance for crate::peripherals::SPI2 {
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
-    }
-
-    #[inline(always)]
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        self.bind_spi2_interrupt(handler.handler());
-        crate::interrupt::enable(crate::peripherals::Interrupt::SPI2, handler.priority()).unwrap();
-    }
-
-    #[inline(always)]
-    fn sclk_signal(&self) -> OutputSignal {
-        OutputSignal::FSPICLK
-    }
-
-    #[inline(always)]
-    fn mosi_signal(&self) -> OutputSignal {
-        OutputSignal::FSPID
-    }
-
-    #[inline(always)]
-    fn miso_signal(&self) -> InputSignal {
-        InputSignal::FSPIQ
-    }
-
-    #[inline(always)]
-    fn cs_signal(&self) -> OutputSignal {
-        OutputSignal::FSPICS0
-    }
-
-    #[inline(always)]
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(crate::system::Peripheral::Spi2)
-    }
-
-    #[inline(always)]
-    fn reset_peripheral(&self) {
-        PeripheralClockControl::reset(crate::system::Peripheral::Spi2)
-    }
-
-    #[inline(always)]
-    fn spi_num(&self) -> u8 {
-        2
-    }
-}
-
-#[cfg(any(esp32s2, esp32s3))]
-impl ExtendedInstance for crate::peripherals::SPI2 {
-    #[inline(always)]
-    fn sio0_input_signal(&self) -> InputSignal {
-        InputSignal::FSPID
-    }
-
-    #[inline(always)]
-    fn sio1_output_signal(&self) -> OutputSignal {
-        OutputSignal::FSPIQ
-    }
-
-    #[inline(always)]
-    fn sio2_output_signal(&self) -> OutputSignal {
-        OutputSignal::FSPIWP
-    }
-
-    #[inline(always)]
-    fn sio2_input_signal(&self) -> InputSignal {
-        InputSignal::FSPIWP
-    }
-
-    #[inline(always)]
-    fn sio3_output_signal(&self) -> OutputSignal {
-        OutputSignal::FSPIHD
-    }
-
-    #[inline(always)]
-    fn sio3_input_signal(&self) -> InputSignal {
-        InputSignal::FSPIHD
-    }
-}
-
-#[cfg(any(esp32s2, esp32s3))]
-impl Instance for crate::peripherals::SPI3 {
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
-    }
-
-    #[inline(always)]
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        self.bind_spi3_interrupt(handler.handler());
-        crate::interrupt::enable(crate::peripherals::Interrupt::SPI3, handler.priority()).unwrap();
-    }
-
-    #[inline(always)]
-    fn sclk_signal(&self) -> OutputSignal {
-        OutputSignal::SPI3_CLK
-    }
-
-    #[inline(always)]
-    fn mosi_signal(&self) -> OutputSignal {
-        OutputSignal::SPI3_D
-    }
-
-    #[inline(always)]
-    fn miso_signal(&self) -> InputSignal {
-        InputSignal::SPI3_Q
-    }
-
-    #[inline(always)]
-    fn cs_signal(&self) -> OutputSignal {
-        OutputSignal::SPI3_CS0
-    }
-
-    #[inline(always)]
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(crate::system::Peripheral::Spi3)
-    }
-
-    #[inline(always)]
-    fn reset_peripheral(&self) {
-        PeripheralClockControl::reset(crate::system::Peripheral::Spi3)
-    }
-
-    #[inline(always)]
-    fn spi_num(&self) -> u8 {
-        3
-    }
-}
-
-#[cfg(esp32s3)]
+#[cfg(all(spi3, any(esp32, esp32s3)))]
 impl ExtendedInstance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn sio0_input_signal(&self) -> InputSignal {
-        InputSignal::SPI3_D
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                InputSignal::HSPID
+            } else {
+                InputSignal::SPI3_D
+            }
+        }
     }
 
     #[inline(always)]
     fn sio1_output_signal(&self) -> OutputSignal {
-        OutputSignal::SPI3_Q
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                OutputSignal::HSPIQ
+            } else {
+                OutputSignal::SPI3_Q
+            }
+        }
     }
 
     #[inline(always)]
     fn sio2_output_signal(&self) -> OutputSignal {
-        OutputSignal::SPI3_WP
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                OutputSignal::HSPIWP
+            } else {
+                OutputSignal::SPI3_WP
+            }
+        }
     }
 
     #[inline(always)]
     fn sio2_input_signal(&self) -> InputSignal {
-        InputSignal::SPI3_WP
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                InputSignal::HSPIWP
+            } else {
+                InputSignal::SPI3_WP
+            }
+        }
     }
 
     #[inline(always)]
     fn sio3_output_signal(&self) -> OutputSignal {
-        OutputSignal::SPI3_HD
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                OutputSignal::HSPIHD
+            } else {
+                OutputSignal::SPI3_HD
+            }
+        }
     }
 
     #[inline(always)]
     fn sio3_input_signal(&self) -> InputSignal {
-        InputSignal::SPI3_HD
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                InputSignal::HSPIHD
+            } else {
+                InputSignal::SPI3_HD
+            }
+        }
     }
 }

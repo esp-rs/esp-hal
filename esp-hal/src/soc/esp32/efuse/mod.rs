@@ -85,7 +85,7 @@ impl Efuse {
     /// CPU and application CPU), the application CPU is unavailable on
     /// some.
     pub fn get_core_count() -> u32 {
-        if Self::read_field_le::<bool>(DISABLE_APP_CPU) {
+        if Self::read_bit(DISABLE_APP_CPU) {
             1
         } else {
             2
@@ -97,8 +97,8 @@ impl Efuse {
     /// Note that the actual clock may be lower, depending on the current power
     /// configuration of the chip, clock source, and other settings.
     pub fn get_max_cpu_frequency() -> HertzU32 {
-        let has_rating = Self::read_field_le::<bool>(CHIP_CPU_FREQ_RATED);
-        let has_low_rating = Self::read_field_le::<bool>(CHIP_CPU_FREQ_LOW);
+        let has_rating = Self::read_bit(CHIP_CPU_FREQ_RATED);
+        let has_low_rating = Self::read_bit(CHIP_CPU_FREQ_LOW);
 
         if has_rating && has_low_rating {
             160.MHz()
@@ -109,7 +109,7 @@ impl Efuse {
 
     /// Returns the CHIP_VER_DIS_BT eFuse value.
     pub fn is_bluetooth_enabled() -> bool {
-        !Self::read_field_le::<bool>(DISABLE_BT)
+        !Self::read_bit(DISABLE_BT)
     }
 
     /// Returns the CHIP_VER_PKG eFuse value.
