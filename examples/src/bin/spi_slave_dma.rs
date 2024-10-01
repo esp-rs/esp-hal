@@ -36,10 +36,7 @@ use esp_hal::{
     dma_buffers,
     gpio::{Input, Io, Level, Output, Pull},
     prelude::*,
-    spi::{
-        slave::{prelude::*, Spi},
-        SpiMode,
-    },
+    spi::{slave::Spi, SpiMode},
 };
 use esp_println::println;
 
