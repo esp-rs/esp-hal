@@ -69,6 +69,7 @@ use crate::{
     clock::Clocks,
     dma::{
         dma_private::{DmaSupport, DmaSupportRx},
+        AnyDmaChannel,
         ChannelRx,
         DescriptorChain,
         DmaChannel,
@@ -126,7 +127,7 @@ pub struct Cam<'d> {
 }
 
 /// Represents the camera interface with DMA support.
-pub struct Camera<'d, CH: DmaChannel> {
+pub struct Camera<'d, CH: DmaChannel = AnyDmaChannel> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     rx_channel: ChannelRx<'d, CH>,
     rx_chain: DescriptorChain,

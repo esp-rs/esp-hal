@@ -371,11 +371,20 @@ macro_rules! ImplSpiChannel {
             }
 
             impl DmaChannelExt for [<Spi $num DmaChannel>] {
+                type Degraded = Self;
+
                 fn get_rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
                     SpiDmaRxChannelImpl::<Self>(PhantomData)
                 }
                 fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
                     SpiDmaTxChannelImpl::<Self>(PhantomData)
+                }
+
+                fn degrade_rx(rx: Self::Rx) -> Self::Rx {
+                    rx
+                }
+                fn degrade_tx(tx: Self::Tx) -> Self::Tx {
+                    tx
                 }
 
                 fn set_isr(handler: InterruptHandler) {
@@ -830,11 +839,20 @@ macro_rules! ImplI2sChannel {
             }
 
             impl DmaChannelExt for [<I2s $num DmaChannel>] {
+                type Degraded = Self;
+
                 fn get_rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
                     I2sDmaRxChannelImpl::<Self>(PhantomData)
                 }
                 fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
                     I2sDmaTxChannelImpl::<Self>(PhantomData)
+                }
+
+                fn degrade_rx(rx: Self::Rx) -> Self::Rx {
+                    rx
+                }
+                fn degrade_tx(tx: Self::Tx) -> Self::Tx {
+                    tx
                 }
 
                 fn set_isr(handler: InterruptHandler) {

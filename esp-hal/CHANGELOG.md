@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - I8080 driver now decides bus width at transfer time rather than construction time. (#2171)
 - Replaced `AnyPin` with `InputSignal` and `OutputSignal` and renamed `ErasedPin` to `AnyPin` (#2128)
 - Replaced the `ErasedTimer` enum with the `AnyTimer` struct. (#2144)
+- `Camera` and `AesDma` now support erasing the DMA channel type (#2258)
 - Changed the parameters of `Spi::with_pins` to no longer be optional (#2133)
 - Renamed `DummyPin` to `NoPin` and removed all internal logic from it. (#2133)
 - The `NO_PIN` constant has been removed. (#2133)
