@@ -2143,6 +2143,19 @@ pub struct Preparation {
     // burst_mode, alignment, check_owner, etc.
 }
 
+impl Preparation {
+    /// Preparation for a bare minimum DMA transfer.
+    /// - Internal RAM only.
+    /// - Burst mode disabled.
+    /// - Maximum aligment.
+    pub fn minimal(start: *mut DmaDescriptor) -> Self {
+        Preparation {
+            start,
+            block_size: None,
+        }
+    }
+}
+
 /// [DmaTxBuffer] is a DMA descriptor + memory combo that can be used for
 /// transmitting data from a DMA channel to a peripheral's FIFO.
 ///

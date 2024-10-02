@@ -25,7 +25,16 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{Dma, DmaChannel0, DmaPriority, DmaTxBuf},
+    dma::{
+        Dma,
+        DmaChannel0,
+        DmaDescriptor,
+        DmaPriority,
+        DmaTxBuf,
+        DmaTxBuffer,
+        Owner,
+        Preparation,
+    },
     dma_tx_buffer,
     gpio::{Input, Io, Level, Output, Pull},
     lcd_cam::{
@@ -36,6 +45,7 @@ use esp_hal::{
     Blocking,
 };
 use esp_println::println;
+use static_cell::ConstStaticCell;
 
 #[entry]
 fn main() -> ! {
@@ -206,13 +216,14 @@ fn main() -> ! {
     // Tearing Effect Line On
     bus.send(0x35, &[0]);
 
-    let width = 320u16;
-    let height = 480u16;
+    const WIDTH: usize = 320;
+    const HEIGHT: usize = 480;
+
     {
         println!("Set addresses");
 
-        let width_b = width.to_be_bytes();
-        let height_b = height.to_be_bytes();
+        let width_b = (WIDTH as u16).to_be_bytes();
+        let height_b = (HEIGHT as u16).to_be_bytes();
         bus.send(0x2A, &[0, 0, width_b[0], width_b[1]]); // CASET
         bus.send(0x2B, &[0, 0, height_b[0], height_b[1]]) // PASET
     }
@@ -220,18 +231,19 @@ fn main() -> ! {
     println!("Drawing");
 
     const RED: u16 = 0b00000_000000_11111;
+    const GREEN: u16 = 0b00000_111111_00000;
     const BLUE: u16 = 0b11111_000000_00000;
 
     backlight.set_high();
 
-    let total_pixels = width as usize * height as usize;
+    let total_pixels = WIDTH * HEIGHT;
     let total_bytes = total_pixels * 2;
 
     let (mut i8080, mut dma_tx_buf) = bus.resources.take().unwrap();
 
     dma_tx_buf.set_length(dma_tx_buf.capacity());
 
-    for color in [RED, BLUE].iter().cycle() {
+    for color in [RED, BLUE].iter().cycle().take(4) {
         let color = color.to_be_bytes();
         for chunk in dma_tx_buf.as_mut_slice().chunks_mut(2) {
             chunk.copy_from_slice(&color);
@@ -268,7 +280,120 @@ fn main() -> ! {
         delay.delay_millis(1_000);
     }
 
+    // This compressed buffer works out to 160 DMA descriptors and a 1920 byte buffer, using up a
+    // total of 3,840 bytes (160 * (4 * 3) + 1920). This is much more space efficient than the
+    // 307,200 bytes (320 * 480 * 2) it would have taken to send out a full frame buffer at once.
+    // It is also more time/CPU efficient than sending out the frame in chunks, as you don't have
+    // to pay for the latency of starting each chunk, and the CPU has more time to do other things.
+    let mut compressed_buffer = {
+        const DESCRIPTOR_COUNT: usize = 160;
+        const BUFFER_SIZE: usize = 1920;
+
+        static DESCRIPTORS: ConstStaticCell<[DmaDescriptor; DESCRIPTOR_COUNT]> =
+            ConstStaticCell::new([DmaDescriptor::EMPTY; DESCRIPTOR_COUNT]);
+        static SHARED_BUFFER: ConstStaticCell<[u8; BUFFER_SIZE]> =
+            ConstStaticCell::new([0; BUFFER_SIZE]);
+
+        let descriptors = DESCRIPTORS.take();
+        let shared_buffer = SHARED_BUFFER.take();
+
+        CompressedBuffer::new(descriptors, shared_buffer)
+    };
+
+    for color in [RED, GREEN, BLUE].iter().cycle() {
+        // This is very quick as it only sets 1920 bytes, but it can also be skipped by having one
+        // compressed buffer for each color.
+        compressed_buffer.set_color(*color);
+
+        // Naive implementation of tear prevention.
+        {
+            // Wait for display to start refreshing.
+            while tear_effect.is_high() {}
+            // Wait for display to finish refreshing.
+            while tear_effect.is_low() {}
+
+            // Now we have the maximum amount of time between each refresh available, for drawing.
+        }
+
+        // Send an entire frame buffer in a single transfer.
+        (_, i8080, compressed_buffer) = i8080
+            .send(0x2Cu8, 0, compressed_buffer)
+            .map_err(|e| e.0)
+            .unwrap()
+            .wait();
+
+        delay.delay_millis(300);
+    }
+
     loop {
         delay.delay_millis(1_000);
     }
 }
+
+/// A simple implementation of a compressed solid frame buffer, using several descriptors to send
+/// out the same buffer multiple times.
+///
+/// To draw text or shapes in this, one can simply modify a small subset of the descriptors to
+/// point to a different buffer. This will need some kind of allocation scheme.
+struct CompressedBuffer {
+    descriptors: &'static mut [DmaDescriptor],
+    buffer: &'static mut [u8],
+}
+
+impl CompressedBuffer {
+    fn new(
+        descriptors: &'static mut [DmaDescriptor],
+        buffer: &'static mut [u8],
+    ) -> CompressedBuffer {
+        assert!(buffer.len() < 4096);
+        assert!(buffer.len() > 0);
+
+        let mut next = core::ptr::null_mut();
+        for desc in descriptors.iter_mut().rev() {
+            // Setup the linked list
+            desc.next = next;
+            next = desc;
+
+            // Use the shared buffer.
+            desc.buffer = buffer.as_mut_ptr();
+            desc.set_size(buffer.len());
+            desc.set_length(buffer.len());
+
+            // Optional but no harm in doing it.
+            desc.set_owner(Owner::Dma);
+        }
+
+        CompressedBuffer {
+            descriptors,
+            buffer,
+        }
+    }
+
+    fn set_color(&mut self, color: u16) {
+        for chunk in self.buffer.chunks_mut(2) {
+            chunk.copy_from_slice(&color.to_be_bytes());
+        }
+    }
+}
+
+unsafe impl DmaTxBuffer for CompressedBuffer {
+    type View = CompressedBufferView;
+
+    fn prepare(&mut self) -> Preparation {
+        Preparation::minimal(self.descriptors.as_mut_ptr())
+    }
+
+    fn into_view(self) -> Self::View {
+        CompressedBufferView(self)
+    }
+
+    fn from_view(view: Self::View) -> Self {
+        view.0
+    }
+
+    fn length(&self) -> usize {
+        unimplemented!()
+    }
+}
+
+struct CompressedBufferView(CompressedBuffer);
