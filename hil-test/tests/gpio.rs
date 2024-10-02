@@ -141,6 +141,100 @@ mod tests {
     }
 
     #[test]
+    fn test_gpio_output_embedded_hal_0_2(ctx: Context) {
+        let test_gpio1 = Input::new(ctx.test_gpio1, Pull::Down);
+        let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low);
+
+        fn set<T>(pin: &mut T, state: bool)
+        where
+            T: embedded_hal_02::digital::v2::OutputPin,
+        {
+            if state {
+                pin.set_high().ok();
+            } else {
+                pin.set_low().ok();
+            }
+        }
+
+        fn toggle<T>(pin: &mut T)
+        where
+            T: embedded_hal_02::digital::v2::ToggleableOutputPin,
+        {
+            pin.toggle().ok();
+        }
+
+        // `StatefulOutputPin`:
+        assert_eq!(test_gpio2.is_set_low(), true);
+        assert_eq!(test_gpio2.is_set_high(), false);
+        assert_eq!(test_gpio1.is_low(), true);
+        assert_eq!(test_gpio1.is_high(), false);
+        set(&mut test_gpio2, true);
+        assert_eq!(test_gpio2.is_set_low(), false);
+        assert_eq!(test_gpio2.is_set_high(), true);
+        assert_eq!(test_gpio1.is_low(), false);
+        assert_eq!(test_gpio1.is_high(), true);
+
+        // `ToggleableOutputPin`:
+        toggle(&mut test_gpio2);
+        assert_eq!(test_gpio2.is_set_low(), true);
+        assert_eq!(test_gpio2.is_set_high(), false);
+        assert_eq!(test_gpio1.is_low(), true);
+        assert_eq!(test_gpio1.is_high(), false);
+        toggle(&mut test_gpio2);
+        assert_eq!(test_gpio2.is_set_low(), false);
+        assert_eq!(test_gpio2.is_set_high(), true);
+        assert_eq!(test_gpio1.is_low(), false);
+        assert_eq!(test_gpio1.is_high(), true);
+    }
+
+    #[test]
+    fn test_gpio_output_embedded_hal_1_0(ctx: Context) {
+        let test_gpio1 = Input::new(ctx.test_gpio1, Pull::Down);
+        let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low);
+
+        fn set<T>(pin: &mut T, state: bool)
+        where
+            T: embedded_hal::digital::OutputPin,
+        {
+            if state {
+                pin.set_high().ok();
+            } else {
+                pin.set_low().ok();
+            }
+        }
+
+        fn toggle<T>(pin: &mut T)
+        where
+            T: embedded_hal::digital::StatefulOutputPin,
+        {
+            pin.toggle().ok();
+        }
+
+        // `StatefulOutputPin`:
+        assert_eq!(test_gpio2.is_set_low(), true);
+        assert_eq!(test_gpio2.is_set_high(), false);
+        assert_eq!(test_gpio1.is_low(), true);
+        assert_eq!(test_gpio1.is_high(), false);
+        set(&mut test_gpio2, true);
+        assert_eq!(test_gpio2.is_set_low(), false);
+        assert_eq!(test_gpio2.is_set_high(), true);
+        assert_eq!(test_gpio1.is_low(), false);
+        assert_eq!(test_gpio1.is_high(), true);
+
+        // `ToggleableOutputPin`:
+        toggle(&mut test_gpio2);
+        assert_eq!(test_gpio2.is_set_low(), true);
+        assert_eq!(test_gpio2.is_set_high(), false);
+        assert_eq!(test_gpio1.is_low(), true);
+        assert_eq!(test_gpio1.is_high(), false);
+        toggle(&mut test_gpio2);
+        assert_eq!(test_gpio2.is_set_low(), false);
+        assert_eq!(test_gpio2.is_set_high(), true);
+        assert_eq!(test_gpio1.is_low(), false);
+        assert_eq!(test_gpio1.is_high(), true);
+    }
+
+    #[test]
     fn test_gpio_interrupt(ctx: Context) {
         let mut test_gpio1 = Input::new(ctx.test_gpio1, Pull::Down);
         let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low);

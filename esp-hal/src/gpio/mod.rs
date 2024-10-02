@@ -2601,11 +2601,11 @@ mod embedded_hal_02_impls {
         type Error = core::convert::Infallible;
 
         fn set_high(&mut self) -> Result<(), Self::Error> {
-            self.pin.is_set_high();
+            self.pin.set_high();
             Ok(())
         }
         fn set_low(&mut self) -> Result<(), Self::Error> {
-            self.pin.is_set_low();
+            self.pin.set_low();
             Ok(())
         }
     }
