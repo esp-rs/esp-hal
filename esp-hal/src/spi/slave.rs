@@ -243,7 +243,7 @@ pub mod dma {
 
     impl<'d, T, C, DmaMode> DmaSupport for SpiDma<'d, T, C, DmaMode>
     where
-        T: InstanceDma<ChannelRx<'d, C>, ChannelTx<'d, C>>,
+        T: InstanceDma,
         C: DmaChannel,
         C::P: SpiPeripheral,
         DmaMode: Mode,
@@ -264,7 +264,7 @@ pub mod dma {
 
     impl<'d, T, C, DmaMode> DmaSupportTx for SpiDma<'d, T, C, DmaMode>
     where
-        T: InstanceDma<ChannelRx<'d, C>, ChannelTx<'d, C>>,
+        T: InstanceDma,
         C: DmaChannel,
         C::P: SpiPeripheral,
         DmaMode: Mode,
@@ -282,7 +282,7 @@ pub mod dma {
 
     impl<'d, T, C, DmaMode> DmaSupportRx for SpiDma<'d, T, C, DmaMode>
     where
-        T: InstanceDma<ChannelRx<'d, C>, ChannelTx<'d, C>>,
+        T: InstanceDma,
         C: DmaChannel,
         C::P: SpiPeripheral,
         DmaMode: Mode,
@@ -300,7 +300,7 @@ pub mod dma {
 
     impl<'d, T, C, DmaMode> SpiDma<'d, T, C, DmaMode>
     where
-        T: InstanceDma<ChannelRx<'d, C>, ChannelTx<'d, C>>,
+        T: InstanceDma,
         C: DmaChannel,
         C::P: SpiPeripheral,
         DmaMode: Mode,
@@ -399,13 +399,11 @@ pub mod dma {
 }
 
 #[doc(hidden)]
-pub trait InstanceDma<RX, TX>: Instance
-where
-    RX: Rx,
-    TX: Tx,
-{
+pub trait InstanceDma: Instance {
+    fn dma_peripheral(&self) -> DmaPeripheral;
+
     #[allow(clippy::too_many_arguments)]
-    unsafe fn start_transfer_dma(
+    unsafe fn start_transfer_dma<RX, TX>(
         &mut self,
         rx_chain: &mut DescriptorChain,
         tx_chain: &mut DescriptorChain,
@@ -415,7 +413,11 @@ where
         write_buffer_len: usize,
         rx: &mut RX,
         tx: &mut TX,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        RX: Rx,
+        TX: Tx,
+    {
         let reg_block = self.register_block();
 
         rx.is_done();
@@ -447,13 +449,16 @@ where
         Ok(())
     }
 
-    unsafe fn start_write_bytes_dma(
+    unsafe fn start_write_bytes_dma<TX>(
         &mut self,
         tx_chain: &mut DescriptorChain,
         ptr: *const u8,
         len: usize,
         tx: &mut TX,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        TX: Tx,
+    {
         let reg_block = self.register_block();
 
         tx.is_done();
@@ -480,13 +485,16 @@ where
         Ok(())
     }
 
-    unsafe fn start_read_bytes_dma(
+    unsafe fn start_read_bytes_dma<RX>(
         &mut self,
         rx_chain: &mut DescriptorChain,
         ptr: *mut u8,
         len: usize,
         rx: &mut RX,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        RX: Rx,
+    {
         let reg_block = self.register_block();
 
         rx.is_done();
@@ -512,25 +520,13 @@ where
         Ok(())
     }
 
-    fn dma_peripheral(&self) -> DmaPeripheral {
-        match self.spi_num() {
-            2 => DmaPeripheral::Spi2,
-            #[cfg(spi3)]
-            3 => DmaPeripheral::Spi3,
-            _ => panic!("Illegal SPI instance"),
-        }
-    }
-
     #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
     fn enable_dma(&self) {
         let reg_block = self.register_block();
         reg_block.dma_conf().modify(|_, w| {
-            w.dma_tx_ena()
-                .set_bit()
-                .dma_rx_ena()
-                .set_bit()
-                .rx_eof_en()
-                .clear_bit()
+            w.dma_tx_ena().set_bit();
+            w.dma_rx_ena().set_bit();
+            w.rx_eof_en().clear_bit()
         });
     }
 
@@ -543,16 +539,11 @@ where
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
         reg_block.dma_int_clr().write(|w| {
-            w.dma_infifo_full_err()
-                .clear_bit_by_one()
-                .dma_outfifo_empty_err()
-                .clear_bit_by_one()
-                .trans_done()
-                .clear_bit_by_one()
-                .mst_rx_afifo_wfull_err()
-                .clear_bit_by_one()
-                .mst_tx_afifo_rempty_err()
-                .clear_bit_by_one()
+            w.dma_infifo_full_err().clear_bit_by_one();
+            w.dma_outfifo_empty_err().clear_bit_by_one();
+            w.trans_done().clear_bit_by_one();
+            w.mst_rx_afifo_wfull_err().clear_bit_by_one();
+            w.mst_tx_afifo_rempty_err().clear_bit_by_one()
         });
     }
 
@@ -560,24 +551,15 @@ where
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
         reg_block.dma_int_clr().write(|w| {
-            w.inlink_dscr_empty()
-                .clear_bit_by_one()
-                .outlink_dscr_error()
-                .clear_bit_by_one()
-                .inlink_dscr_error()
-                .clear_bit_by_one()
-                .in_done()
-                .clear_bit_by_one()
-                .in_err_eof()
-                .clear_bit_by_one()
-                .in_suc_eof()
-                .clear_bit_by_one()
-                .out_done()
-                .clear_bit_by_one()
-                .out_eof()
-                .clear_bit_by_one()
-                .out_total_eof()
-                .clear_bit_by_one()
+            w.inlink_dscr_empty().clear_bit_by_one();
+            w.outlink_dscr_error().clear_bit_by_one();
+            w.inlink_dscr_error().clear_bit_by_one();
+            w.in_done().clear_bit_by_one();
+            w.in_err_eof().clear_bit_by_one();
+            w.in_suc_eof().clear_bit_by_one();
+            w.out_done().clear_bit_by_one();
+            w.out_eof().clear_bit_by_one();
+            w.out_total_eof().clear_bit_by_one()
         });
     }
 }
@@ -585,12 +567,9 @@ where
 #[cfg(not(esp32s2))]
 fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
     reg_block.dma_conf().modify(|_, w| {
-        w.rx_afifo_rst()
-            .set_bit()
-            .buf_afifo_rst()
-            .set_bit()
-            .dma_afifo_rst()
-            .set_bit()
+        w.rx_afifo_rst().set_bit();
+        w.buf_afifo_rst().set_bit();
+        w.dma_afifo_rst().set_bit()
     });
 }
 
@@ -606,14 +585,10 @@ fn reset_dma_before_load_dma_dscr(_reg_block: &RegisterBlock) {}
 #[cfg(esp32s2)]
 fn reset_dma_before_load_dma_dscr(reg_block: &RegisterBlock) {
     reg_block.dma_conf().modify(|_, w| {
-        w.out_rst()
-            .set_bit()
-            .in_rst()
-            .set_bit()
-            .ahbm_fifo_rst()
-            .set_bit()
-            .ahbm_rst()
-            .set_bit()
+        w.out_rst().set_bit();
+        w.in_rst().set_bit();
+        w.ahbm_fifo_rst().set_bit();
+        w.ahbm_rst().set_bit()
     });
 
     #[cfg(esp32s2)]
@@ -622,14 +597,10 @@ fn reset_dma_before_load_dma_dscr(reg_block: &RegisterBlock) {
         .modify(|_, w| w.dma_infifo_full_clr().set_bit());
 
     reg_block.dma_conf().modify(|_, w| {
-        w.out_rst()
-            .clear_bit()
-            .in_rst()
-            .clear_bit()
-            .ahbm_fifo_rst()
-            .clear_bit()
-            .ahbm_rst()
-            .clear_bit()
+        w.out_rst().clear_bit();
+        w.in_rst().clear_bit();
+        w.ahbm_fifo_rst().clear_bit();
+        w.ahbm_rst().clear_bit()
     });
 
     #[cfg(esp32s2)]
@@ -638,19 +609,16 @@ fn reset_dma_before_load_dma_dscr(reg_block: &RegisterBlock) {
         .modify(|_, w| w.dma_infifo_full_clr().clear_bit());
 }
 
-impl<TX, RX> InstanceDma<RX, TX> for crate::peripherals::SPI2
-where
-    RX: Rx,
-    TX: Tx,
-{
+impl InstanceDma for crate::peripherals::SPI2 {
+    fn dma_peripheral(&self) -> DmaPeripheral {
+        DmaPeripheral::Spi2
+    }
 }
-
 #[cfg(spi3)]
-impl<TX, RX> InstanceDma<RX, TX> for crate::peripherals::SPI3
-where
-    RX: Rx,
-    TX: Tx,
-{
+impl InstanceDma for crate::peripherals::SPI3 {
+    fn dma_peripheral(&self) -> DmaPeripheral {
+        DmaPeripheral::Spi3
+    }
 }
 
 #[doc(hidden)]
@@ -680,48 +648,32 @@ pub trait Instance: private::Sealed {
         reg_block.slave().write(|w| w.mode().set_bit());
 
         reg_block.user().modify(|_, w| {
-            w.usr_miso_highpart()
-                .clear_bit()
-                .doutdin()
-                .set_bit()
-                .usr_miso()
-                .clear_bit()
-                .usr_mosi()
-                .clear_bit()
-                .usr_dummy_idle()
-                .clear_bit()
-                .usr_addr()
-                .clear_bit()
-                .usr_command()
-                .clear_bit()
-                .sio()
-                .clear_bit()
+            w.usr_miso_highpart().clear_bit();
+            w.doutdin().set_bit();
+            w.usr_miso().clear_bit();
+            w.usr_mosi().clear_bit();
+            w.usr_dummy_idle().clear_bit();
+            w.usr_addr().clear_bit();
+            w.usr_command().clear_bit();
+            w.sio().clear_bit()
         });
 
         #[cfg(not(esp32s2))]
         reg_block.clk_gate().modify(|_, w| {
-            w.clk_en()
-                .clear_bit()
-                .mst_clk_active()
-                .clear_bit()
-                .mst_clk_sel()
-                .clear_bit()
+            w.clk_en().clear_bit();
+            w.mst_clk_active().clear_bit();
+            w.mst_clk_sel().clear_bit()
         });
 
-        #[cfg(not(esp32s2))]
         reg_block.ctrl().modify(|_, w| {
-            w.q_pol()
-                .clear_bit()
-                .d_pol()
-                .clear_bit()
-                .hold_pol()
-                .clear_bit()
+            w.q_pol().clear_bit();
+            w.d_pol().clear_bit();
+            #[cfg(not(esp32s2))]
+            w.hold_pol().clear_bit();
+            #[cfg(esp32s2)]
+            w.wp().clear_bit();
+            w
         });
-
-        #[cfg(esp32s2)]
-        reg_block
-            .ctrl()
-            .modify(|_, w| w.q_pol().clear_bit().d_pol().clear_bit().wp().clear_bit());
 
         reg_block.misc().write(|w| unsafe { w.bits(0) });
     }
@@ -729,44 +681,24 @@ pub trait Instance: private::Sealed {
     fn set_data_mode(&mut self, data_mode: SpiMode) -> &mut Self {
         let reg_block = self.register_block();
 
-        match data_mode {
-            SpiMode::Mode0 => {
-                reg_block
-                    .user()
-                    .modify(|_, w| w.tsck_i_edge().clear_bit().rsck_i_edge().clear_bit());
-                #[cfg(esp32s2)]
-                reg_block.ctrl1().modify(|_, w| w.clk_mode_13().clear_bit());
-                #[cfg(not(esp32s2))]
-                reg_block.slave().modify(|_, w| w.clk_mode_13().clear_bit());
-            }
-            SpiMode::Mode1 => {
-                reg_block
-                    .user()
-                    .modify(|_, w| w.tsck_i_edge().set_bit().rsck_i_edge().set_bit());
-                #[cfg(esp32s2)]
-                reg_block.ctrl1().modify(|_, w| w.clk_mode_13().set_bit());
-                #[cfg(not(esp32s2))]
-                reg_block.slave().modify(|_, w| w.clk_mode_13().set_bit());
-            }
-            SpiMode::Mode2 => {
-                reg_block
-                    .user()
-                    .modify(|_, w| w.tsck_i_edge().set_bit().rsck_i_edge().set_bit());
-                #[cfg(esp32s2)]
-                reg_block.ctrl1().modify(|_, w| w.clk_mode_13().clear_bit());
-                #[cfg(not(esp32s2))]
-                reg_block.slave().modify(|_, w| w.clk_mode_13().clear_bit());
-            }
-            SpiMode::Mode3 => {
-                reg_block
-                    .user()
-                    .modify(|_, w| w.tsck_i_edge().clear_bit().rsck_i_edge().clear_bit());
-                #[cfg(esp32s2)]
-                reg_block.ctrl1().modify(|_, w| w.clk_mode_13().set_bit());
-                #[cfg(not(esp32s2))]
-                reg_block.slave().modify(|_, w| w.clk_mode_13().set_bit());
+        reg_block.user().modify(|_, w| {
+            w.tsck_i_edge()
+                .bit(matches!(data_mode, SpiMode::Mode1 | SpiMode::Mode2));
+            w.rsck_i_edge()
+                .bit(matches!(data_mode, SpiMode::Mode1 | SpiMode::Mode2))
+        });
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s2)] {
+                let ctrl1_reg = reg_block.ctrl1();
+            } else {
+                let ctrl1_reg = reg_block.slave();
             }
         }
+        ctrl1_reg.modify(|_, w| {
+            w.clk_mode_13()
+                .bit(matches!(data_mode, SpiMode::Mode1 | SpiMode::Mode3))
+        });
+
         self
     }
 
