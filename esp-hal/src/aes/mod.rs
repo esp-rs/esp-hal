@@ -241,7 +241,6 @@ pub mod dma {
             ChannelRx,
             ChannelTx,
             DescriptorChain,
-            DmaChannel,
             DmaDescriptor,
             DmaPeripheral,
             DmaTransferRxTx,
@@ -272,14 +271,11 @@ pub mod dma {
     }
 
     /// A DMA capable AES instance.
-    pub struct AesDma<'d, C = AnyDmaChannel>
-    where
-        C: DmaChannel,
-    {
+    pub struct AesDma<'d> {
         /// The underlying [`Aes`](super::Aes) driver
         pub aes: super::Aes<'d>,
 
-        pub(crate) channel: Channel<'d, C, crate::Blocking>,
+        channel: Channel<'d, AnyDmaChannel, crate::Blocking>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
     }
@@ -297,42 +293,22 @@ pub mod dma {
             C: PeripheralDmaChannel,
             C::P: AesPeripheral,
         {
-            self.with_dma_typed(channel.degrade(), rx_descriptors, tx_descriptors)
-        }
-
-        /// Enable DMA for the current instance of the AES driver
-        pub fn with_dma_typed<C>(
-            self,
-            channel: Channel<'d, C, crate::Blocking>,
-            rx_descriptors: &'static mut [DmaDescriptor],
-            tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> AesDma<'d, C>
-        where
-            C: PeripheralDmaChannel,
-            C::P: AesPeripheral,
-        {
             AesDma {
                 aes: self,
-                channel,
+                channel: channel.degrade(),
                 rx_chain: DescriptorChain::new(rx_descriptors),
                 tx_chain: DescriptorChain::new(tx_descriptors),
             }
         }
     }
 
-    impl<'d, C> core::fmt::Debug for AesDma<'d, C>
-    where
-        C: DmaChannel,
-    {
+    impl<'d> core::fmt::Debug for AesDma<'d> {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             f.debug_struct("AesDma").finish()
         }
     }
 
-    impl<'d, C> DmaSupport for AesDma<'d, C>
-    where
-        C: DmaChannel,
-    {
+    impl<'d> DmaSupport for AesDma<'d> {
         fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
             while self.aes.aes.state().read().state().bits() != 2 // DMA status DONE == 2
             && !self.channel.tx.is_done()
@@ -348,11 +324,8 @@ pub mod dma {
         }
     }
 
-    impl<'d, C> DmaSupportTx for AesDma<'d, C>
-    where
-        C: DmaChannel,
-    {
-        type TX = ChannelTx<'d, C>;
+    impl<'d> DmaSupportTx for AesDma<'d> {
+        type TX = ChannelTx<'d, AnyDmaChannel>;
 
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
@@ -363,11 +336,8 @@ pub mod dma {
         }
     }
 
-    impl<'d, C> DmaSupportRx for AesDma<'d, C>
-    where
-        C: DmaChannel,
-    {
-        type RX = ChannelRx<'d, C>;
+    impl<'d> DmaSupportRx for AesDma<'d> {
+        type RX = ChannelRx<'d, AnyDmaChannel>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx
@@ -378,10 +348,7 @@ pub mod dma {
         }
     }
 
-    impl<'d, C> AesDma<'d, C>
-    where
-        C: DmaChannel,
-    {
+    impl<'d> AesDma<'d> {
         /// Writes the encryption key to the AES hardware, checking that its
         /// length matches expected constraints.
         pub fn write_key<K>(&mut self, key: K)

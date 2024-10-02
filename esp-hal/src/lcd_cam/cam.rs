@@ -77,7 +77,6 @@ use crate::{
     dma::{
         AnyDmaChannel,
         ChannelRx,
-        DmaChannel,
         DmaError,
         DmaPeripheral,
         DmaRxBuffer,
@@ -130,31 +129,14 @@ pub struct Cam<'d> {
 }
 
 /// Represents the camera interface with DMA support.
-pub struct Camera<'d, CH: DmaChannel = AnyDmaChannel> {
+pub struct Camera<'d> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
-    rx_channel: ChannelRx<'d, CH>,
+    rx_channel: ChannelRx<'d, AnyDmaChannel>,
 }
 
 impl<'d> Camera<'d> {
     /// Creates a new `Camera` instance with DMA support.
-    pub fn new<P: RxPins, CH>(
-        cam: Cam<'d>,
-        channel: ChannelRx<'d, CH>,
-        descriptors: &'static mut [DmaDescriptor],
-        pins: P,
-        frequency: HertzU32,
-    ) -> Self
-    where
-        CH: PeripheralDmaChannel,
-        CH::P: LcdCamPeripheral,
-    {
-        Self::new_typed(cam, channel.degrade(), descriptors, pins, frequency)
-    }
-}
-
-impl<'d, CH: DmaChannel> Camera<'d, CH> {
-    /// Creates a new `Camera` instance with DMA support.
-    pub fn new_typed<P: RxPins>(
+    pub fn new<P, CH>(
         cam: Cam<'d>,
         channel: ChannelRx<'d, CH>,
         _pins: P,
@@ -163,6 +145,7 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
     where
         CH: PeripheralDmaChannel,
         CH::P: LcdCamPeripheral,
+        P: RxPins,
     {
         let lcd_cam = cam.lcd_cam;
 
@@ -209,12 +192,12 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
 
         Self {
             lcd_cam,
-            rx_channel: channel,
+            rx_channel: channel.degrade(),
         }
     }
 }
 
-impl<'d, CH: DmaChannel> Camera<'d, CH> {
+impl<'d> Camera<'d> {
     /// Configures the byte order for the camera data.
     pub fn set_byte_order(&mut self, byte_order: ByteOrder) -> &mut Self {
         self.lcd_cam
@@ -339,7 +322,7 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
     pub fn receive<BUF: DmaRxBuffer>(
         mut self,
         mut buf: BUF,
-    ) -> Result<CameraTransfer<'d, BUF, CH>, (DmaError, Self, BUF)> {
+    ) -> Result<CameraTransfer<'d, BUF>, (DmaError, Self, BUF)> {
         // Reset Camera control unit and Async Rx FIFO
         self.lcd_cam
             .cam_ctrl1()
@@ -385,12 +368,12 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
 
 /// Represents an ongoing (or potentially stopped) transfer from the Camera to a
 /// DMA buffer.
-pub struct CameraTransfer<'d, BUF: DmaRxBuffer, CH: DmaChannel = AnyDmaChannel> {
-    camera: ManuallyDrop<Camera<'d, CH>>,
+pub struct CameraTransfer<'d, BUF: DmaRxBuffer> {
+    camera: ManuallyDrop<Camera<'d>>,
     buffer_view: ManuallyDrop<BUF::View>,
 }
 
-impl<'d, BUF: DmaRxBuffer, CH: DmaChannel> CameraTransfer<'d, BUF, CH> {
+impl<'d, BUF: DmaRxBuffer> CameraTransfer<'d, BUF> {
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
         // This peripheral doesn't really "complete". As long the camera (or anything
@@ -418,7 +401,7 @@ impl<'d, BUF: DmaRxBuffer, CH: DmaChannel> CameraTransfer<'d, BUF, CH> {
     }
 
     /// Stops this transfer on the spot and returns the peripheral and buffer.
-    pub fn stop(mut self) -> (Camera<'d, CH>, BUF) {
+    pub fn stop(mut self) -> (Camera<'d>, BUF) {
         self.stop_peripherals();
         let (camera, view) = self.release();
         (camera, BUF::from_view(view))
@@ -429,7 +412,7 @@ impl<'d, BUF: DmaRxBuffer, CH: DmaChannel> CameraTransfer<'d, BUF, CH> {
     /// Note: The camera doesn't really "finish" its transfer, so what you're
     /// really waiting for here is a DMA Error. You typically just want to
     /// call [Self::stop] once you have the data you need.
-    pub fn wait(mut self) -> (Result<(), DmaError>, Camera<'d, CH>, BUF) {
+    pub fn wait(mut self) -> (Result<(), DmaError>, Camera<'d>, BUF) {
         while !self.is_done() {}
 
         // Stop the DMA as it doesn't know that the camera has stopped.
@@ -448,7 +431,7 @@ impl<'d, BUF: DmaRxBuffer, CH: DmaChannel> CameraTransfer<'d, BUF, CH> {
         (result, camera, BUF::from_view(view))
     }
 
-    fn release(mut self) -> (Camera<'d, CH>, BUF::View) {
+    fn release(mut self) -> (Camera<'d>, BUF::View) {
         // SAFETY: Since forget is called on self, we know that self.camera and
         // self.buffer_view won't be touched again.
         let result = unsafe {
@@ -472,7 +455,7 @@ impl<'d, BUF: DmaRxBuffer, CH: DmaChannel> CameraTransfer<'d, BUF, CH> {
     }
 }
 
-impl<'d, BUF: DmaRxBuffer, CH: DmaChannel> Deref for CameraTransfer<'d, BUF, CH> {
+impl<'d, BUF: DmaRxBuffer> Deref for CameraTransfer<'d, BUF> {
     type Target = BUF::View;
 
     fn deref(&self) -> &Self::Target {
@@ -480,13 +463,13 @@ impl<'d, BUF: DmaRxBuffer, CH: DmaChannel> Deref for CameraTransfer<'d, BUF, CH>
     }
 }
 
-impl<'d, BUF: DmaRxBuffer, CH: DmaChannel> DerefMut for CameraTransfer<'d, BUF, CH> {
+impl<'d, BUF: DmaRxBuffer> DerefMut for CameraTransfer<'d, BUF> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.buffer_view
     }
 }
 
-impl<'d, BUF: DmaRxBuffer, CH: DmaChannel> Drop for CameraTransfer<'d, BUF, CH> {
+impl<'d, BUF: DmaRxBuffer> Drop for CameraTransfer<'d, BUF> {
     fn drop(&mut self) {
         self.stop_peripherals();
 

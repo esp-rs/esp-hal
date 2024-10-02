@@ -805,7 +805,7 @@ macro_rules! ImplI2sChannel {
                 }
 
                 fn set_isr(handler: InterruptHandler) {
-                    let interrupt = $crate::peripherals::Interrupt::[< I2S $num  >];
+                    let interrupt = $crate::peripherals::Interrupt::[< I2S $num >];
                     unsafe {
                         crate::interrupt::bind_interrupt(interrupt, handler.handler());
                     }

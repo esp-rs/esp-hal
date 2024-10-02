@@ -630,21 +630,25 @@ pub use m2m::*;
 mod m2m {
     #[cfg(esp32s3)]
     use crate::dma::DmaExtMemBKSize;
-    use crate::dma::{
-        dma_private::{DmaSupport, DmaSupportRx},
-        Channel,
-        ChannelRx,
-        DescriptorChain,
-        DmaChannel,
-        DmaDescriptor,
-        DmaEligible,
-        DmaError,
-        DmaPeripheral,
-        DmaTransferRx,
-        ReadBuffer,
-        Rx,
-        Tx,
-        WriteBuffer,
+    use crate::{
+        dma::{
+            dma_private::{DmaSupport, DmaSupportRx},
+            AnyDmaChannel,
+            Channel,
+            ChannelRx,
+            DescriptorChain,
+            DmaChannel,
+            DmaDescriptor,
+            DmaEligible,
+            DmaError,
+            DmaPeripheral,
+            DmaTransferRx,
+            ReadBuffer,
+            Rx,
+            Tx,
+            WriteBuffer,
+        },
+        Mode,
     };
 
     /// DMA Memory to Memory pseudo-Peripheral
@@ -652,29 +656,30 @@ mod m2m {
     /// This is a pseudo-peripheral that allows for memory to memory transfers.
     /// It is not a real peripheral, but a way to use the DMA engine for memory
     /// to memory transfers.
-    pub struct Mem2Mem<'d, C, MODE>
+    pub struct Mem2Mem<'d, M>
     where
-        C: DmaChannel,
-        MODE: crate::Mode,
+        M: Mode,
     {
-        channel: Channel<'d, C, MODE>,
+        channel: Channel<'d, AnyDmaChannel, M>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
         peripheral: DmaPeripheral,
     }
 
-    impl<'d, C, MODE> Mem2Mem<'d, C, MODE>
+    impl<'d, M> Mem2Mem<'d, M>
     where
-        C: DmaChannel,
-        MODE: crate::Mode,
+        M: Mode,
     {
         /// Create a new Mem2Mem instance.
-        pub fn new(
-            channel: Channel<'d, C, MODE>,
+        pub fn new<CH>(
+            channel: Channel<'d, CH, M>,
             peripheral: impl DmaEligible,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> Result<Self, DmaError> {
+        ) -> Result<Self, DmaError>
+        where
+            CH: DmaChannel,
+        {
             unsafe {
                 Self::new_unsafe(
                     channel,
@@ -687,13 +692,16 @@ mod m2m {
         }
 
         /// Create a new Mem2Mem instance with specific chunk size.
-        pub fn new_with_chunk_size(
-            channel: Channel<'d, C, MODE>,
+        pub fn new_with_chunk_size<CH>(
+            channel: Channel<'d, CH, M>,
             peripheral: impl DmaEligible,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
             chunk_size: usize,
-        ) -> Result<Self, DmaError> {
+        ) -> Result<Self, DmaError>
+        where
+            CH: DmaChannel,
+        {
             unsafe {
                 Self::new_unsafe(
                     channel,
@@ -711,13 +719,16 @@ mod m2m {
         ///
         /// You must ensure that your not using DMA for the same peripheral and
         /// that your the only one using the DmaPeripheral.
-        pub unsafe fn new_unsafe(
-            channel: Channel<'d, C, MODE>,
+        pub unsafe fn new_unsafe<CH>(
+            channel: Channel<'d, CH, M>,
             peripheral: DmaPeripheral,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
             chunk_size: usize,
-        ) -> Result<Self, DmaError> {
+        ) -> Result<Self, DmaError>
+        where
+            CH: DmaChannel,
+        {
             if !(1..=4092).contains(&chunk_size) {
                 return Err(DmaError::InvalidChunkSize);
             }
@@ -725,7 +736,7 @@ mod m2m {
                 return Err(DmaError::OutOfDescriptors);
             }
             Ok(Mem2Mem {
-                channel,
+                channel: channel.degrade(),
                 peripheral,
                 rx_chain: DescriptorChain::new_with_chunk_size(rx_descriptors, chunk_size),
                 tx_chain: DescriptorChain::new_with_chunk_size(tx_descriptors, chunk_size),
@@ -776,10 +787,9 @@ mod m2m {
         }
     }
 
-    impl<'d, C, MODE> DmaSupport for Mem2Mem<'d, C, MODE>
+    impl<'d, MODE> DmaSupport for Mem2Mem<'d, MODE>
     where
-        C: DmaChannel,
-        MODE: crate::Mode,
+        MODE: Mode,
     {
         fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
             while !self.channel.rx.is_done() {}
@@ -790,12 +800,11 @@ mod m2m {
         }
     }
 
-    impl<'d, C, MODE> DmaSupportRx for Mem2Mem<'d, C, MODE>
+    impl<'d, MODE> DmaSupportRx for Mem2Mem<'d, MODE>
     where
-        C: DmaChannel,
-        MODE: crate::Mode,
+        MODE: Mode,
     {
-        type RX = ChannelRx<'d, C>;
+        type RX = ChannelRx<'d, AnyDmaChannel>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx

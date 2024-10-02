@@ -155,6 +155,7 @@ pub mod dma {
     use crate::{
         dma::{
             dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
+            AnyDmaChannel,
             Channel,
             ChannelRx,
             ChannelTx,
@@ -184,19 +185,14 @@ pub mod dma {
             channel: Channel<'d, C, DmaMode>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> SpiDma<'d, crate::peripherals::SPI2, C, DmaMode>
+        ) -> SpiDma<'d, crate::peripherals::SPI2, DmaMode>
         where
             C: PeripheralDmaChannel,
             C::P: SpiPeripheral + Spi2Peripheral,
             DmaMode: Mode,
         {
             self.spi.set_data_mode(self.data_mode, true);
-            SpiDma {
-                spi: self.spi,
-                channel,
-                rx_chain: DescriptorChain::new(rx_descriptors),
-                tx_chain: DescriptorChain::new(tx_descriptors),
-            }
+            SpiDma::new(self.spi, channel, rx_descriptors, tx_descriptors)
         }
     }
 
@@ -210,37 +206,30 @@ pub mod dma {
             channel: Channel<'d, C, DmaMode>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> SpiDma<'d, crate::peripherals::SPI3, C, DmaMode>
+        ) -> SpiDma<'d, crate::peripherals::SPI3, DmaMode>
         where
             C: PeripheralDmaChannel,
             C::P: SpiPeripheral + Spi3Peripheral,
             DmaMode: Mode,
         {
             self.spi.set_data_mode(self.data_mode, true);
-            SpiDma {
-                spi: self.spi,
-                channel,
-                rx_chain: DescriptorChain::new(rx_descriptors),
-                tx_chain: DescriptorChain::new(tx_descriptors),
-            }
+            SpiDma::new(self.spi, channel, rx_descriptors, tx_descriptors)
         }
     }
 
     /// A DMA capable SPI instance.
-    pub struct SpiDma<'d, T, C, DmaMode>
+    pub struct SpiDma<'d, T, DmaMode>
     where
-        C: DmaChannel,
         DmaMode: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, C, DmaMode>,
+        pub(crate) channel: Channel<'d, AnyDmaChannel, DmaMode>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
     }
 
-    impl<'d, T, C, DmaMode> core::fmt::Debug for SpiDma<'d, T, C, DmaMode>
+    impl<'d, T, DmaMode> core::fmt::Debug for SpiDma<'d, T, DmaMode>
     where
-        C: DmaChannel,
         DmaMode: Mode,
     {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -248,10 +237,9 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, C, DmaMode> DmaSupport for SpiDma<'d, T, C, DmaMode>
+    impl<'d, T, DmaMode> DmaSupport for SpiDma<'d, T, DmaMode>
     where
         T: InstanceDma,
-        C: DmaChannel,
         DmaMode: Mode,
     {
         fn peripheral_wait_dma(&mut self, is_rx: bool, is_tx: bool) {
@@ -268,13 +256,12 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, C, DmaMode> DmaSupportTx for SpiDma<'d, T, C, DmaMode>
+    impl<'d, T, DmaMode> DmaSupportTx for SpiDma<'d, T, DmaMode>
     where
         T: InstanceDma,
-        C: DmaChannel,
         DmaMode: Mode,
     {
-        type TX = ChannelTx<'d, C>;
+        type TX = ChannelTx<'d, AnyDmaChannel>;
 
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
@@ -285,13 +272,12 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, C, DmaMode> DmaSupportRx for SpiDma<'d, T, C, DmaMode>
+    impl<'d, T, DmaMode> DmaSupportRx for SpiDma<'d, T, DmaMode>
     where
         T: InstanceDma,
-        C: DmaChannel,
         DmaMode: Mode,
     {
-        type RX = ChannelRx<'d, C>;
+        type RX = ChannelRx<'d, AnyDmaChannel>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx
@@ -302,12 +288,27 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, C, DmaMode> SpiDma<'d, T, C, DmaMode>
+    impl<'d, T, DmaMode> SpiDma<'d, T, DmaMode>
     where
         T: InstanceDma,
-        C: DmaChannel,
         DmaMode: Mode,
     {
+        fn new<CH>(
+            spi: PeripheralRef<'d, T>,
+            channel: Channel<'d, CH, DmaMode>,
+            rx_descriptors: &'static mut [DmaDescriptor],
+            tx_descriptors: &'static mut [DmaDescriptor],
+        ) -> Self
+        where
+            CH: DmaChannel,
+        {
+            Self {
+                spi,
+                channel: channel.degrade(),
+                rx_chain: DescriptorChain::new(rx_descriptors),
+                tx_chain: DescriptorChain::new(tx_descriptors),
+            }
+        }
         /// Register a buffer for a DMA write.
         ///
         /// This will return a [DmaTransferTx]. The maximum amount of data to be
