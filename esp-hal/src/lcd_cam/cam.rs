@@ -19,14 +19,14 @@
 //! # use esp_hal::gpio::Io;
 //! # use esp_hal::lcd_cam::{cam::{Camera, RxEightBits}, LcdCam};
 //! # use fugit::RateExtU32;
-//! # use esp_hal::dma_buffers;
+//! # use esp_hal::dma_rx_stream_buffer;
 //! # use esp_hal::dma::{Dma, DmaPriority};
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
 //! # let dma = Dma::new(peripherals.DMA);
 //! # let channel = dma.channel0;
 //!
-//! # let (_, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32678, 0);
+//! # let dma_buf = dma_rx_stream_buffer!(20 * 1000, 1000);
 //!
 //! # let channel = channel.configure(
 //! #     false,
@@ -52,7 +52,6 @@
 //! let mut camera = Camera::new(
 //!     lcd_cam.cam,
 //!     channel.rx,
-//!     rx_descriptors,
 //!     data_pins,
 //!     20u32.MHz(),
 //! )
@@ -60,27 +59,30 @@
 //! .with_master_clock(mclk_pin)
 //! .with_pixel_clock(pclk_pin)
 //! .with_ctrl_pins(vsync_pin, href_pin);
+//!
+//! let transfer = camera.receive(dma_buf).map_err(|e| e.0).unwrap();
+//!
 //! # }
 //! ```
+
+use core::{
+    mem::ManuallyDrop,
+    ops::{Deref, DerefMut},
+};
 
 use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
     dma::{
-        dma_private::{DmaSupport, DmaSupportRx},
         AnyDmaChannel,
         ChannelRx,
-        DescriptorChain,
         DmaChannel,
-        DmaDescriptor,
         DmaError,
         DmaPeripheral,
-        DmaTransferRx,
-        DmaTransferRxCircular,
+        DmaRxBuffer,
         LcdCamPeripheral,
         Rx,
-        WriteBuffer,
     },
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal, Pull},
     lcd_cam::{cam::private::RxPins, private::calculate_clkm, BitOrder, ByteOrder},
@@ -130,9 +132,6 @@ pub struct Cam<'d> {
 pub struct Camera<'d, CH: DmaChannel = AnyDmaChannel> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     rx_channel: ChannelRx<'d, CH>,
-    rx_chain: DescriptorChain,
-    // 1 or 2
-    bus_width: usize,
 }
 
 impl<'d, CH: DmaChannel> Camera<'d, CH>
@@ -143,7 +142,6 @@ where
     pub fn new<P: RxPins>(
         cam: Cam<'d>,
         channel: ChannelRx<'d, CH>,
-        descriptors: &'static mut [DmaDescriptor],
         _pins: P,
         frequency: HertzU32,
     ) -> Self {
@@ -177,7 +175,7 @@ where
             w.cam_rec_data_bytelen().bits(0);
             w.cam_line_int_num().bits(0);
             w.cam_vsync_filter_en().clear_bit();
-            w.cam_2byte_en().clear_bit();
+            w.cam_2byte_en().bit(P::BUS_WIDTH == 2);
             w.cam_clk_inv().clear_bit();
             w.cam_de_inv().clear_bit();
             w.cam_hsync_inv().clear_bit();
@@ -193,46 +191,7 @@ where
         Self {
             lcd_cam,
             rx_channel: channel,
-            rx_chain: DescriptorChain::new(descriptors),
-            bus_width: P::BUS_WIDTH,
         }
-    }
-}
-
-impl<'d, CH: DmaChannel> DmaSupport for Camera<'d, CH> {
-    fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
-        loop {
-            // Wait for IN_SUC_EOF (i.e. VSYNC)
-            if self.rx_channel.is_done() {
-                break;
-            }
-
-            // Or for IN_DSCR_EMPTY (i.e. No more buffer space)
-            if self.rx_channel.has_dscr_empty_error() {
-                break;
-            }
-
-            // Or for IN_DSCR_ERR (i.e. bad descriptor)
-            if self.rx_channel.has_error() {
-                break;
-            }
-        }
-    }
-
-    fn peripheral_dma_stop(&mut self) {
-        // TODO: Stop DMA?? self.instance.rx_channel.stop_transfer();
-    }
-}
-
-impl<'d, CH: DmaChannel> DmaSupportRx for Camera<'d, CH> {
-    type RX = ChannelRx<'d, CH>;
-
-    fn rx(&mut self) -> &mut Self::RX {
-        &mut self.rx_channel
-    }
-
-    fn chain(&mut self) -> &mut DescriptorChain {
-        &mut self.rx_chain
     }
 }
 
@@ -347,8 +306,12 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
         self
     }
 
-    // Reset Camera control unit and Async Rx FIFO
-    fn reset_unit_and_fifo(&self) {
+    /// Starts a DMA transfer to receive data from the camera peripheral.
+    pub fn receive<BUF: DmaRxBuffer>(
+        mut self,
+        mut buf: BUF,
+    ) -> Result<CameraTransfer<'d, BUF, CH>, (DmaError, Self, BUF)> {
+        // Reset Camera control unit and Async Rx FIFO
         self.lcd_cam
             .cam_ctrl1()
             .modify(|_, w| w.cam_reset().set_bit());
@@ -361,60 +324,149 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
         self.lcd_cam
             .cam_ctrl1()
             .modify(|_, w| w.cam_afifo_reset().clear_bit());
-    }
 
-    // Start the Camera unit to listen for incoming DVP stream.
-    fn start_unit(&self) {
-        self.lcd_cam
-            .cam_ctrl()
-            .modify(|_, w| w.cam_update().set_bit());
+        // Start DMA to receive incoming transfer.
+        let result = unsafe {
+            self.rx_channel
+                .prepare_transfer(DmaPeripheral::LcdCam, &mut buf)
+                .and_then(|_| self.rx_channel.start_transfer())
+        };
+
+        if let Err(e) = result {
+            return Err((e, self, buf));
+        }
+
+        // Start the Camera unit to listen for incoming DVP stream.
+        self.lcd_cam.cam_ctrl().modify(|_, w| {
+            // Automatically stops the camera unit once the GDMA Rx FIFO is full.
+            w.cam_stop_en().set_bit();
+
+            w.cam_update().set_bit()
+        });
         self.lcd_cam
             .cam_ctrl1()
             .modify(|_, w| w.cam_start().set_bit());
+
+        Ok(CameraTransfer {
+            camera: ManuallyDrop::new(self),
+            buffer_view: ManuallyDrop::new(buf.into_view()),
+        })
+    }
+}
+
+/// Represents an ongoing (or potentially stopped) transfer from the Camera to a
+/// DMA buffer.
+pub struct CameraTransfer<'d, BUF: DmaRxBuffer, CH: DmaChannel = AnyDmaChannel> {
+    camera: ManuallyDrop<Camera<'d, CH>>,
+    buffer_view: ManuallyDrop<BUF::View>,
+}
+
+impl<'d, BUF: DmaRxBuffer, CH: DmaChannel> CameraTransfer<'d, BUF, CH> {
+    /// Returns true when [Self::wait] will not block.
+    pub fn is_done(&self) -> bool {
+        // This peripheral doesn't really "complete". As long the camera (or anything
+        // pretending to be :D) sends data, it will receive it and pass it to the DMA.
+        // This implementation of is_done is an opinionated one. When the transfer is
+        // started, the CAM_STOP_EN bit is set, which tells the LCD_CAM to stop
+        // itself when the DMA stops emptying its async RX FIFO. This will
+        // typically be because the DMA ran out descriptors but there could be other
+        // reasons as well.
+
+        // In the future, a user of esp_hal may not want this behaviour, which would be
+        // a reasonable ask. At which point is_done and wait would go away, and
+        // the driver will stop pretending that this peripheral has some kind of
+        // finish line.
+
+        // For now, most people probably want this behaviour, so it shall be kept for
+        // the sake of familiarity and similarity with other drivers.
+
+        self.camera
+            .lcd_cam
+            .cam_ctrl1()
+            .read()
+            .cam_start()
+            .bit_is_clear()
     }
 
-    fn start_dma<RXBUF: WriteBuffer>(
-        &mut self,
-        circular: bool,
-        buf: &mut RXBUF,
-    ) -> Result<(), DmaError> {
-        let (ptr, len) = unsafe { buf.write_buffer() };
+    /// Stops this transfer on the spot and returns the peripheral and buffer.
+    pub fn stop(mut self) -> (Camera<'d, CH>, BUF) {
+        self.stop_peripherals();
+        let (camera, view) = self.release();
+        (camera, BUF::from_view(view))
+    }
 
-        assert!(len % self.bus_width == 0);
+    /// Waits for the transfer to stop and returns the peripheral and buffer.
+    ///
+    /// Note: The camera doesn't really "finish" its transfer, so what you're
+    /// really waiting for here is a DMA Error. You typically just want to
+    /// call [Self::stop] once you have the data you need.
+    pub fn wait(mut self) -> (Result<(), DmaError>, Camera<'d, CH>, BUF) {
+        while !self.is_done() {}
 
+        // Stop the DMA as it doesn't know that the camera has stopped.
+        self.camera.rx_channel.stop_transfer();
+
+        // Note: There is no "done" interrupt to clear.
+
+        let (camera, view) = self.release();
+
+        let result = if camera.rx_channel.has_error() {
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok(())
+        };
+
+        (result, camera, BUF::from_view(view))
+    }
+
+    fn release(mut self) -> (Camera<'d, CH>, BUF::View) {
+        // SAFETY: Since forget is called on self, we know that self.camera and
+        // self.buffer_view won't be touched again.
+        let result = unsafe {
+            let camera = ManuallyDrop::take(&mut self.camera);
+            let view = ManuallyDrop::take(&mut self.buffer_view);
+            (camera, view)
+        };
+        core::mem::forget(self);
+        result
+    }
+
+    fn stop_peripherals(&mut self) {
+        // Stop the LCD_CAM peripheral.
+        self.camera
+            .lcd_cam
+            .cam_ctrl1()
+            .modify(|_, w| w.cam_start().clear_bit());
+
+        // Stop the DMA
+        self.camera.rx_channel.stop_transfer();
+    }
+}
+
+impl<'d, BUF: DmaRxBuffer, CH: DmaChannel> Deref for CameraTransfer<'d, BUF, CH> {
+    type Target = BUF::View;
+
+    fn deref(&self) -> &Self::Target {
+        &self.buffer_view
+    }
+}
+
+impl<'d, BUF: DmaRxBuffer, CH: DmaChannel> DerefMut for CameraTransfer<'d, BUF, CH> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buffer_view
+    }
+}
+
+impl<'d, BUF: DmaRxBuffer, CH: DmaChannel> Drop for CameraTransfer<'d, BUF, CH> {
+    fn drop(&mut self) {
+        self.stop_peripherals();
+
+        // SAFETY: This is Drop, we know that self.camera and self.buffer_view
+        // won't be touched again.
         unsafe {
-            self.rx_chain.fill_for_rx(circular, ptr as _, len)?;
-            self.rx_channel
-                .prepare_transfer_without_start(DmaPeripheral::LcdCam, &self.rx_chain)?;
+            ManuallyDrop::drop(&mut self.camera);
+            ManuallyDrop::drop(&mut self.buffer_view);
         }
-        self.rx_channel.start_transfer()
-    }
-
-    /// Starts a DMA transfer to receive data from the camera peripheral.
-    pub fn read_dma<'t, RXBUF: WriteBuffer>(
-        &'t mut self,
-        buf: &'t mut RXBUF,
-    ) -> Result<DmaTransferRx<'_, Self>, DmaError> {
-        self.reset_unit_and_fifo();
-        // Start DMA to receive incoming transfer.
-        self.start_dma(false, buf)?;
-        self.start_unit();
-
-        Ok(DmaTransferRx::new(self))
-    }
-
-    /// Starts a circular DMA transfer to receive data from the camera
-    /// peripheral.
-    pub fn read_dma_circular<'t, RXBUF: WriteBuffer>(
-        &'t mut self,
-        buf: &'t mut RXBUF,
-    ) -> Result<DmaTransferRxCircular<'_, Self>, DmaError> {
-        self.reset_unit_and_fifo();
-        // Start DMA to receive incoming transfer.
-        self.start_dma(true, buf)?;
-        self.start_unit();
-
-        Ok(DmaTransferRxCircular::new(self))
     }
 }
 

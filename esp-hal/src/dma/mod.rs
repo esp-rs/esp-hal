@@ -53,7 +53,13 @@
 //!
 //! For convenience you can use the [crate::dma_buffers] macro.
 
-use core::{cmp::min, fmt::Debug, marker::PhantomData, sync::atomic::compiler_fence};
+use core::{
+    cmp::min,
+    fmt::Debug,
+    marker::PhantomData,
+    ptr::null_mut,
+    sync::atomic::compiler_fence,
+};
 
 trait Word: crate::private::Sealed {}
 
@@ -719,6 +725,35 @@ macro_rules! dma_tx_buffer {
         );
 
         $crate::dma::DmaTxBuf::new(tx_descriptors, tx_buffer)
+    }};
+}
+
+/// Convenience macro to create a [DmaRxStreamBuf] from buffer size and
+/// optional chunk size (uses max if unspecified).
+/// The buffer and descriptors are statically allocated and
+/// used to create the [DmaRxStreamBuf].
+///
+/// Smaller chunk sizes are recommended for lower latency.
+///
+/// ## Usage
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::dma_rx_stream_buffer;
+///
+/// let buf = dma_rx_stream_buffer!(32000);
+/// let buf = dma_rx_stream_buffer!(32000, 1000);
+/// # }
+/// ```
+#[macro_export]
+macro_rules! dma_rx_stream_buffer {
+    ($rx_size:expr) => {
+        $crate::dma_rx_stream_buffer!($rx_size, 4095)
+    };
+    ($rx_size:expr, $chunk_size:expr) => {{
+        let (buffer, descriptors) =
+            $crate::dma_buffers_impl!($rx_size, $chunk_size, is_circular = false);
+
+        $crate::dma::DmaRxStreamBuf::new(descriptors, buffer).unwrap()
     }};
 }
 
@@ -2116,11 +2151,21 @@ pub struct Preparation {
 /// The implementing type must keep all its descriptors and the buffers they
 /// point to valid while the buffer is being transferred.
 pub unsafe trait DmaTxBuffer {
+    /// A type providing operations that are safe to perform on the buffer
+    /// whilst the DMA is actively using it.
+    type View;
+
     /// Prepares the buffer for an imminent transfer and returns
     /// information required to use this buffer.
     ///
     /// Note: This operation is idempotent.
     fn prepare(&mut self) -> Preparation;
+
+    /// This is called before the DMA starts using the buffer.
+    fn into_view(self) -> Self::View;
+
+    /// This is called after the DMA is done using the buffer.
+    fn from_view(view: Self::View) -> Self;
 
     /// Returns the maximum number of bytes that would be transmitted by this
     /// buffer.
@@ -2142,11 +2187,21 @@ pub unsafe trait DmaTxBuffer {
 /// The implementing type must keep all its descriptors and the buffers they
 /// point to valid while the buffer is being transferred.
 pub unsafe trait DmaRxBuffer {
+    /// A type providing operations that are safe to perform on the buffer
+    /// whilst the DMA is actively using it.
+    type View;
+
     /// Prepares the buffer for an imminent transfer and returns
     /// information required to use this buffer.
     ///
     /// Note: This operation is idempotent.
     fn prepare(&mut self) -> Preparation;
+
+    /// This is called before the DMA starts using the buffer.
+    fn into_view(self) -> Self::View;
+
+    /// This is called after the DMA is done using the buffer.
+    fn from_view(view: Self::View) -> Self;
 
     /// Returns the maximum number of bytes that can be received by this buffer.
     ///
@@ -2154,6 +2209,12 @@ pub unsafe trait DmaRxBuffer {
     /// the transfer is.
     fn length(&self) -> usize;
 }
+
+/// An in-progress view into [DmaRxBuf]/[DmaTxBuf].
+///
+/// In the future, this could support peeking into state of the
+/// descriptors/buffers.
+pub struct BufView<T>(T);
 
 /// Error returned from Dma[Rx|Tx|RxTx]Buf operations.
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -2335,6 +2396,8 @@ impl DmaTxBuf {
 }
 
 unsafe impl DmaTxBuffer for DmaTxBuf {
+    type View = BufView<DmaTxBuf>;
+
     fn prepare(&mut self) -> Preparation {
         for desc in self.descriptors.linked_iter_mut() {
             // In non-circular mode, we only set `suc_eof` for the last descriptor to signal
@@ -2356,6 +2419,14 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
             start: self.descriptors.head(),
             block_size: self.block_size,
         }
+    }
+
+    fn into_view(self) -> BufView<DmaTxBuf> {
+        BufView(self)
+    }
+
+    fn from_view(view: Self::View) -> Self {
+        view.0
     }
 
     fn length(&self) -> usize {
@@ -2483,6 +2554,8 @@ impl DmaRxBuf {
 }
 
 unsafe impl DmaRxBuffer for DmaRxBuf {
+    type View = BufView<DmaRxBuf>;
+
     fn prepare(&mut self) -> Preparation {
         for desc in self.descriptors.linked_iter_mut() {
             desc.reset_for_rx();
@@ -2492,6 +2565,14 @@ unsafe impl DmaRxBuffer for DmaRxBuf {
             start: self.descriptors.head(),
             block_size: None,
         }
+    }
+
+    fn into_view(self) -> BufView<DmaRxBuf> {
+        BufView(self)
+    }
+
+    fn from_view(view: Self::View) -> Self {
+        view.0
     }
 
     fn length(&self) -> usize {
@@ -2595,6 +2676,8 @@ impl DmaRxTxBuf {
 }
 
 unsafe impl DmaTxBuffer for DmaRxTxBuf {
+    type View = BufView<DmaRxTxBuf>;
+
     fn prepare(&mut self) -> Preparation {
         for desc in self.tx_descriptors.linked_iter_mut() {
             // In non-circular mode, we only set `suc_eof` for the last descriptor to signal
@@ -2608,12 +2691,22 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
         }
     }
 
+    fn into_view(self) -> BufView<DmaRxTxBuf> {
+        BufView(self)
+    }
+
+    fn from_view(view: Self::View) -> Self {
+        view.0
+    }
+
     fn length(&self) -> usize {
         self.len()
     }
 }
 
 unsafe impl DmaRxBuffer for DmaRxTxBuf {
+    type View = BufView<DmaRxTxBuf>;
+
     fn prepare(&mut self) -> Preparation {
         for desc in self.rx_descriptors.linked_iter_mut() {
             desc.reset_for_rx();
@@ -2625,8 +2718,327 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
         }
     }
 
+    fn into_view(self) -> BufView<DmaRxTxBuf> {
+        BufView(self)
+    }
+
+    fn from_view(view: Self::View) -> Self {
+        view.0
+    }
+
     fn length(&self) -> usize {
         self.len()
+    }
+}
+
+/// DMA Streaming Receive Buffer.
+///
+/// This is a contiguous buffer linked together by DMA descriptors, and the
+/// buffer is evenly distributed between each descriptor provided.
+///
+/// It is used for continuously streaming data from a peripheral's FIFO.
+///
+/// It does so by maintaining sliding window of descriptors that progresses when
+/// you call [DmaRxStreamBufView::consume].
+///
+/// The list starts out like so `A (empty) -> B (empty) -> C (empty) -> D
+/// (empty) -> NULL`.
+///
+/// As the DMA writes to the buffers the list progresses like so:
+/// - `A (empty) -> B (empty) -> C (empty) -> D (empty) -> NULL`
+/// - `A (full)  -> B (empty) -> C (empty) -> D (empty) -> NULL`
+/// - `A (full)  -> B (full)  -> C (empty) -> D (empty) -> NULL`
+/// - `A (full)  -> B (full)  -> C (full)  -> D (empty) -> NULL`
+///
+/// As you call [DmaRxStreamBufView::consume] the list (approximately)
+/// progresses like so:
+/// - `A (full)  -> B (full)  -> C (full)  -> D (empty) -> NULL`
+/// - `B (full)  -> C (full)  -> D (empty) -> A (empty) -> NULL`
+/// - `C (full)  -> D (empty) -> A (empty) -> B (empty) -> NULL`
+/// - `D (empty) -> A (empty) -> B (empty) -> C (empty) -> NULL`
+///
+/// If all the descriptors fill up, the [DmaRxInterrupt::DescriptorEmpty]
+/// interrupt will fire and the DMA will stop writing, at which point it is up
+/// to you to resume/restart the transfer.
+///
+/// Note: This buffer will not tell you when this condition occurs, you should
+/// check with the driver to see if the DMA has stopped.
+///
+/// When constructing this buffer, it is important to tune the ratio between the
+/// chunk size and buffer size appropriately. Smaller chunk sizes means you
+/// receive data more frequently but this means the DMA interrupts
+/// ([DmaRxInterrupt::Done]) also fire more frequently (if you use them).
+///
+/// See [DmaRxStreamBufView] for APIs available whilst a transfer is in
+/// progress.
+pub struct DmaRxStreamBuf {
+    descriptors: &'static mut [DmaDescriptor],
+    buffer: &'static mut [u8],
+}
+
+impl DmaRxStreamBuf {
+    /// Creates a new [DmaRxStreamBuf] evenly distributing the buffer between
+    /// the provided descriptors.
+    pub fn new(
+        descriptors: &'static mut [DmaDescriptor],
+        buffer: &'static mut [u8],
+    ) -> Result<Self, DmaBufError> {
+        if !is_slice_in_dram(descriptors) {
+            return Err(DmaBufError::UnsupportedMemoryRegion);
+        }
+        if !is_slice_in_dram(buffer) {
+            return Err(DmaBufError::UnsupportedMemoryRegion);
+        }
+
+        if descriptors.is_empty() {
+            return Err(DmaBufError::InsufficientDescriptors);
+        }
+
+        // Evenly distribute the buffer between the descriptors.
+        let chunk_size = buffer.len() / descriptors.len();
+
+        if chunk_size > 4095 {
+            return Err(DmaBufError::InsufficientDescriptors);
+        }
+
+        // Check that the last descriptor can hold the excess
+        let excess = buffer.len() % descriptors.len();
+        if chunk_size + excess > 4095 {
+            return Err(DmaBufError::InsufficientDescriptors);
+        }
+
+        // Link up all the descriptors (but not in a circle).
+        let mut next = null_mut();
+        for desc in descriptors.iter_mut().rev() {
+            desc.next = next;
+            next = desc;
+        }
+
+        let mut chunks = buffer.chunks_exact_mut(chunk_size);
+        for (desc, chunk) in descriptors.iter_mut().zip(chunks.by_ref()) {
+            desc.buffer = chunk.as_mut_ptr();
+            desc.set_size(chunk.len());
+        }
+
+        let remainder = chunks.into_remainder();
+        debug_assert_eq!(remainder.len(), excess);
+
+        if !remainder.is_empty() {
+            // Append any excess to the last descriptor.
+            let last_descriptor = descriptors.last_mut().unwrap();
+            last_descriptor.set_size(last_descriptor.size() + remainder.len());
+        }
+
+        Ok(Self {
+            descriptors,
+            buffer,
+        })
+    }
+
+    /// Consume the buf, returning the descriptors and buffer.
+    pub fn split(self) -> (&'static mut [DmaDescriptor], &'static mut [u8]) {
+        (self.descriptors, self.buffer)
+    }
+}
+
+unsafe impl DmaRxBuffer for DmaRxStreamBuf {
+    type View = DmaRxStreamBufView;
+
+    fn prepare(&mut self) -> Preparation {
+        for desc in self.descriptors.iter_mut() {
+            desc.reset_for_rx();
+        }
+        Preparation {
+            start: self.descriptors.as_mut_ptr(),
+            block_size: None,
+        }
+    }
+
+    fn into_view(self) -> DmaRxStreamBufView {
+        DmaRxStreamBufView {
+            buf: self,
+            descriptor_idx: 0,
+            descriptor_offset: 0,
+        }
+    }
+
+    fn from_view(view: Self::View) -> Self {
+        view.buf
+    }
+
+    fn length(&self) -> usize {
+        panic!("DmaCircularBuf doesn't have a length")
+    }
+}
+
+/// A view into a [DmaRxStreamBuf]
+pub struct DmaRxStreamBufView {
+    buf: DmaRxStreamBuf,
+    descriptor_idx: usize,
+    descriptor_offset: usize,
+}
+
+impl DmaRxStreamBufView {
+    /// Returns the number of bytes that are available to read from the buf.
+    pub fn available_bytes(&self) -> usize {
+        let (tail, head) = self.buf.descriptors.split_at(self.descriptor_idx);
+        let mut result = 0;
+        for desc in head.iter().chain(tail) {
+            if desc.owner() == Owner::Dma {
+                break;
+            }
+            result += desc.len();
+        }
+        result - self.descriptor_offset
+    }
+
+    /// Reads as much as possible into the buf from the available data.
+    pub fn pop(&mut self, buf: &mut [u8]) -> usize {
+        if buf.is_empty() {
+            return 0;
+        }
+        let total_bytes = buf.len();
+
+        let mut remaining = buf;
+        loop {
+            let available = self.peek();
+            if available.len() >= remaining.len() {
+                remaining.copy_from_slice(&available[0..remaining.len()]);
+                self.consume(remaining.len());
+                let consumed = remaining.len();
+                remaining = &mut remaining[consumed..];
+                break;
+            } else {
+                let to_consume = available.len();
+                remaining[0..to_consume].copy_from_slice(available);
+                self.consume(to_consume);
+                remaining = &mut remaining[to_consume..];
+            }
+        }
+
+        total_bytes - remaining.len()
+    }
+
+    /// Returns a slice into the buffer containing available data.
+    /// This will be the longest possible contiguous slice into the buffer that
+    /// contains data that is available to read.
+    ///
+    /// Note: This function ignores EOFs, see [Self::peek_until_eof] if you need
+    /// EOF support.
+    pub fn peek(&self) -> &[u8] {
+        let (slice, _) = self.peek_internal(false);
+        slice
+    }
+
+    /// Same as [Self::peek] but will not skip over any EOFs.
+    ///
+    /// It also returns a boolean indicating whether this slice ends with an EOF
+    /// or not.
+    pub fn peek_until_eof(&self) -> (&[u8], bool) {
+        self.peek_internal(true)
+    }
+
+    /// Consumes the first `n` bytes from the available data, returning any
+    /// fully consumed descriptors back to the DMA.
+    /// This is typically called after [Self::peek]/[Self::peek_until_eof].
+    ///
+    /// Returns the number of bytes that were actually consumed.
+    pub fn consume(&mut self, n: usize) -> usize {
+        let mut remaining_bytes_to_consume = n;
+
+        loop {
+            let desc = &mut self.buf.descriptors[self.descriptor_idx];
+
+            if desc.owner() == Owner::Dma {
+                // Descriptor is still owned by DMA so it can't be read yet.
+                // This should only happen when there is no more data available to read.
+                break;
+            }
+
+            let remaining_bytes_in_descriptor = desc.len() - self.descriptor_offset;
+            if remaining_bytes_to_consume < remaining_bytes_in_descriptor {
+                self.descriptor_offset += remaining_bytes_to_consume;
+                remaining_bytes_to_consume = 0;
+                break;
+            }
+
+            // Reset the descriptor for reuse.
+            desc.set_owner(Owner::Dma);
+            desc.set_suc_eof(false);
+            desc.set_length(0);
+
+            // Before connecting this descriptor to the end of the list, the next descriptor
+            // must be disconnected from this one to prevent the DMA from
+            // overtaking.
+            desc.next = null_mut();
+
+            let desc_ptr: *mut _ = desc;
+
+            let prev_descriptor_index = self
+                .descriptor_idx
+                .checked_sub(1)
+                .unwrap_or(self.buf.descriptors.len() - 1);
+
+            // Connect this consumed descriptor to the end of the chain.
+            self.buf.descriptors[prev_descriptor_index].next = desc_ptr;
+
+            self.descriptor_idx += 1;
+            if self.descriptor_idx >= self.buf.descriptors.len() {
+                self.descriptor_idx = 0;
+            }
+            self.descriptor_offset = 0;
+
+            remaining_bytes_to_consume -= remaining_bytes_in_descriptor;
+        }
+
+        n - remaining_bytes_to_consume
+    }
+
+    fn peek_internal(&self, stop_at_eof: bool) -> (&[u8], bool) {
+        let descriptors = &self.buf.descriptors[self.descriptor_idx..];
+
+        // There must be at least one descriptor.
+        debug_assert!(!descriptors.is_empty());
+
+        if descriptors.len() == 1 {
+            let last_descriptor = &descriptors[0];
+            if last_descriptor.owner() == Owner::Dma {
+                // No data available.
+                (&[], false)
+            } else {
+                let length = last_descriptor.len() - self.descriptor_offset;
+                (
+                    &self.buf.buffer[self.buf.buffer.len() - length..],
+                    last_descriptor.flags.suc_eof(),
+                )
+            }
+        } else {
+            let chunk_size = descriptors[0].size();
+            let mut found_eof = false;
+
+            let mut number_of_contiguous_bytes = 0;
+            for desc in descriptors {
+                if desc.owner() == Owner::Dma {
+                    break;
+                }
+                number_of_contiguous_bytes += desc.len();
+
+                if stop_at_eof && desc.flags.suc_eof() {
+                    found_eof = true;
+                    break;
+                }
+                // If the length is smaller than the size, the contiguous-ness ends here.
+                if desc.len() < desc.size() {
+                    break;
+                }
+            }
+
+            (
+                &self.buf.buffer[chunk_size * self.descriptor_idx..][..number_of_contiguous_bytes]
+                    [self.descriptor_offset..],
+                found_eof,
+            )
+        }
     }
 }
 
