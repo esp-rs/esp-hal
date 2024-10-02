@@ -25,14 +25,15 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{Dma, DmaPriority},
-    dma_buffers,
+    dma::{Dma, DmaChannel0, DmaPriority, DmaTxBuf},
+    dma_tx_buffer,
     gpio::{Input, Io, Level, Output, Pull},
     lcd_cam::{
         lcd::i8080::{Config, TxEightBits, I8080},
         LcdCam,
     },
     prelude::*,
+    Blocking,
 };
 use esp_println::println;
 
@@ -51,7 +52,7 @@ fn main() -> ! {
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0;
 
-    let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, 32678);
+    let dma_tx_buf = dma_tx_buffer!(4000).unwrap();
 
     let channel = channel.configure(false, DmaPriority::Priority0);
 
@@ -73,21 +74,50 @@ fn main() -> ! {
     );
 
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-    let mut i8080 = I8080::new(
+    let i8080 = I8080::new(
         lcd_cam.lcd,
         channel.tx,
-        tx_descriptors,
         tx_pins,
         20.MHz(),
         Config::default(),
     )
     .with_ctrl_pins(lcd_rs, lcd_wr);
 
-    // This is here mostly to workaround https://github.com/esp-rs/esp-hal/issues/1532
-    let mut send_cmd = |cmd: u8, data: &[u8]| {
-        let buf = &mut tx_buffer[0..data.len()];
-        buf.copy_from_slice(data);
-        i8080.send(cmd, 0, buf).unwrap();
+    // Note: This isn't provided in the HAL since different drivers may require different
+    // considerations, like how to manage the CS pin, the CD pin, cancellation semantics,
+    // 8 vs 16 bit, non-native primitives like Rgb565, Rgb888, etc. This Bus is just provided as
+    // an example of how to implement your own.
+    struct Bus<'d> {
+        resources: Option<(I8080<'d, DmaChannel0, Blocking>, DmaTxBuf)>,
+    }
+    impl<'d> Bus<'d> {
+        fn use_resources<T>(
+            &mut self,
+            func: impl FnOnce(
+                I8080<'d, DmaChannel0, Blocking>,
+                DmaTxBuf,
+            ) -> (T, I8080<'d, DmaChannel0, Blocking>, DmaTxBuf),
+        ) -> T {
+            let (i8080, buf) = self.resources.take().unwrap();
+            let (result, i8080, buf) = func(i8080, buf);
+            self.resources = Some((i8080, buf));
+            result
+        }
+
+        pub fn send(&mut self, cmd: u8, data: &[u8]) {
+            self.use_resources(|i8080, mut buf| {
+                buf.fill(data);
+                match i8080.send(cmd, 0, buf) {
+                    Ok(transfer) => transfer.wait(),
+                    Err((result, i8080, buf)) => (Err(result), i8080, buf),
+                }
+            })
+            .unwrap();
+        }
+    }
+
+    let mut bus = Bus {
+        resources: Some((i8080, dma_tx_buf)),
     };
 
     {
@@ -116,10 +146,10 @@ fn main() -> ! {
         const CMD_DOCA: u8 = 0xE8; // Display Output Ctrl Adjust
         const CMD_CSCON: u8 = 0xF0; // Command Set Control
 
-        send_cmd(CMD_CSCON, &[0xC3]); // Enable extension command 2 part I
-        send_cmd(CMD_CSCON, &[0x96]); // Enable extension command 2 part II
-        send_cmd(CMD_INVCTR, &[0x01]); // 1-dot inversion
-        send_cmd(
+        bus.send(CMD_CSCON, &[0xC3]); // Enable extension command 2 part I
+        bus.send(CMD_CSCON, &[0x96]); // Enable extension command 2 part II
+        bus.send(CMD_INVCTR, &[0x01]); // 1-dot inversion
+        bus.send(
             CMD_DFUNCTR,
             &[
                 0x80, // Display Function Control //Bypass
@@ -128,7 +158,7 @@ fn main() -> ! {
                 0x3B,
             ],
         ); // LCD Drive Line=8*(59+1)
-        send_cmd(
+        bus.send(
             CMD_DOCA,
             &[
                 0x40, 0x8A, 0x00, 0x00, 0x29, // Source eqaulizing period time= 22.5 us
@@ -137,43 +167,44 @@ fn main() -> ! {
                 0x33,
             ],
         );
-        send_cmd(CMD_PWCTR2, &[0x06]); // Power control2   //VAP(GVDD)=3.85+( vcom+vcom offset), VAN(GVCL)=-3.85+(
+        bus.send(CMD_PWCTR2, &[0x06]); // Power control2   //VAP(GVDD)=3.85+( vcom+vcom offset), VAN(GVCL)=-3.85+(
                                        // vcom+vcom offset)
-        send_cmd(CMD_PWCTR3, &[0xA7]); // Power control 3  //Source driving current level=low, Gamma driving current
+        bus.send(CMD_PWCTR3, &[0xA7]); // Power control 3  //Source driving current level=low, Gamma driving current
                                        // level=High
-        send_cmd(CMD_VMCTR, &[0x18]); // VCOM Control    //VCOM=0.9
+        bus.send(CMD_VMCTR, &[0x18]); // VCOM Control    //VCOM=0.9
         delay.delay_micros(120_000);
-        send_cmd(
+        bus.send(
             CMD_GMCTRP1,
             &[
                 0xF0, 0x09, 0x0B, 0x06, 0x04, 0x15, 0x2F, 0x54, 0x42, 0x3C, 0x17, 0x14, 0x18, 0x1B,
             ],
         );
-        send_cmd(
+        bus.send(
             CMD_GMCTRN1,
             &[
                 0xE0, 0x09, 0x0B, 0x06, 0x04, 0x03, 0x2B, 0x43, 0x42, 0x3B, 0x16, 0x14, 0x17, 0x1B,
             ],
         );
         delay.delay_micros(120_000);
-        send_cmd(CMD_CSCON, &[0x3C]); // Command Set control // Disable extension command 2 partI
-        send_cmd(CMD_CSCON, &[0x69]); // Command Set control // Disable
+        bus.send(CMD_CSCON, &[0x3C]); // Command Set control // Disable extension command 2 partI
+        bus.send(CMD_CSCON, &[0x69]); // Command Set control // Disable
                                       // extension command 2 partII
 
-        send_cmd(0x11, &[]); // ExitSleepMode
+        bus.send(0x11, &[]); // ExitSleepMode
         delay.delay_micros(130_000);
-        send_cmd(0x38, &[]); // ExitIdleMode
-        send_cmd(0x29, &[]); // SetDisplayOn
+        bus.send(0x38, &[]); // ExitIdleMode
+        bus.send(0x29, &[]); // SetDisplayOn
 
-        send_cmd(0x21, &[]); // SetInvertMode(ColorInversion::Inverted)
+        bus.send(0x21, &[]); // SetInvertMode(ColorInversion::Inverted)
 
         // let madctl = SetAddressMode::from(options);
-        // send_cmd(madctl)?;
+        // bus.send(madctl)?;
 
-        send_cmd(0x3A, &[0x55]); // RGB565
+        bus.send(0x3A, &[0x55]); // RGB565
     }
 
-    send_cmd(0x35, &[0]); // Tear Effect Line On
+    // Tearing Effect Line On
+    bus.send(0x35, &[0]);
 
     let width = 320u16;
     let height = 480u16;
@@ -182,12 +213,8 @@ fn main() -> ! {
 
         let width_b = width.to_be_bytes();
         let height_b = height.to_be_bytes();
-        i8080
-            .send(0x2A, 0, &[0, 0, width_b[0], width_b[1]])
-            .unwrap(); // CASET
-        i8080
-            .send(0x2B, 0, &[0, 0, height_b[0], height_b[1]])
-            .unwrap(); // PASET
+        bus.send(0x2A, &[0, 0, width_b[0], width_b[1]]); // CASET
+        bus.send(0x2B, &[0, 0, height_b[0], height_b[1]]) // PASET
     }
 
     println!("Drawing");
@@ -200,11 +227,13 @@ fn main() -> ! {
     let total_pixels = width as usize * height as usize;
     let total_bytes = total_pixels * 2;
 
-    let buffer = tx_buffer;
+    let (mut i8080, mut dma_tx_buf) = bus.resources.take().unwrap();
+
+    dma_tx_buf.set_length(dma_tx_buf.capacity());
 
     for color in [RED, BLUE].iter().cycle() {
         let color = color.to_be_bytes();
-        for chunk in buffer.chunks_mut(2) {
+        for chunk in dma_tx_buf.as_mut_slice().chunks_mut(2) {
             chunk.copy_from_slice(&color);
         }
 
@@ -222,20 +251,18 @@ fn main() -> ! {
 
         let mut bytes_left_to_write = total_bytes;
 
-        let transfer = i8080.send_dma(0x2Cu8, 0, &buffer).unwrap();
-        transfer.wait().unwrap();
+        (_, i8080, dma_tx_buf) = i8080.send(0x2Cu8, 0, dma_tx_buf).unwrap().wait();
 
-        bytes_left_to_write -= buffer.len();
+        bytes_left_to_write -= dma_tx_buf.len();
 
-        while bytes_left_to_write >= buffer.len() {
-            let transfer = i8080.send_dma(0x3Cu8, 0, &buffer).unwrap();
-            transfer.wait().unwrap();
-
-            bytes_left_to_write -= buffer.len();
+        while bytes_left_to_write >= dma_tx_buf.len() {
+            (_, i8080, dma_tx_buf) = i8080.send(0x3Cu8, 0, dma_tx_buf).unwrap().wait();
+            bytes_left_to_write -= dma_tx_buf.len();
         }
         if bytes_left_to_write > 0 {
-            let transfer = i8080.send_dma(0x3Cu8, 0, &buffer).unwrap();
-            transfer.wait().unwrap();
+            dma_tx_buf.set_length(bytes_left_to_write);
+            (_, i8080, dma_tx_buf) = i8080.send(0x3Cu8, 0, dma_tx_buf).unwrap().wait();
+            dma_tx_buf.set_length(dma_tx_buf.capacity());
         }
 
         delay.delay_millis(1_000);

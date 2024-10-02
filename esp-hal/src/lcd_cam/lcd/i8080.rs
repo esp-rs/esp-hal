@@ -17,14 +17,14 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::Io;
 //! # use esp_hal::lcd_cam::{LcdCam, lcd::i8080::{Config, I8080, TxEightBits}};
-//! # use esp_hal::dma_buffers;
-//! # use esp_hal::dma::{Dma, DmaPriority};
+//! # use esp_hal::dma_tx_buffer;
+//! # use esp_hal::dma::{Dma, DmaPriority, DmaTxBuf};
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
 //! # let dma = Dma::new(peripherals.DMA);
 //! # let channel = dma.channel0;
 //!
-//! # let ( _, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32678, 0);
+//! # let mut dma_buf = dma_tx_buffer!(32678).unwrap();
 //!
 //! # let channel = channel.configure(
 //! #     false,
@@ -46,41 +46,34 @@
 //! let mut i8080 = I8080::new(
 //!     lcd_cam.lcd,
 //!     channel.tx,
-//!     tx_descriptors,
 //!     tx_pins,
 //!     20.MHz(),
 //!     Config::default(),
 //! )
 //! .with_ctrl_pins(io.pins.gpio0, io.pins.gpio47);
 //!
-//! i8080.send(0x3Au8, 0, &[0x55]).unwrap(); // RGB565
+//! dma_buf.fill(&[0x55]);
+//! let transfer = i8080.send(0x3Au8, 0, dma_buf).unwrap(); // RGB565
+//! transfer.wait();
 //! # }
 //! ```
 
-use core::{fmt::Formatter, marker::PhantomData, mem::size_of};
+use core::{
+    fmt::Formatter,
+    marker::PhantomData,
+    mem::{size_of, ManuallyDrop},
+};
 
 use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    dma::{
-        dma_private::{DmaSupport, DmaSupportTx},
-        ChannelTx,
-        DescriptorChain,
-        DmaChannel,
-        DmaDescriptor,
-        DmaError,
-        DmaPeripheral,
-        DmaTransferTx,
-        LcdCamPeripheral,
-        ReadBuffer,
-        Tx,
-    },
+    dma::{ChannelTx, DmaChannel, DmaError, DmaPeripheral, DmaTxBuffer, LcdCamPeripheral, Tx},
     gpio::{OutputSignal, PeripheralOutput},
     lcd_cam::{
-        asynch::LcdDoneFuture,
+        asynch::LCD_DONE_WAKER,
         lcd::{i8080::private::TxPins, ClockMode, DelayMode, Phase, Polarity},
-        private::calculate_clkm,
+        private::{calculate_clkm, Instance},
         BitOrder,
         ByteOrder,
         Lcd,
@@ -94,7 +87,6 @@ use crate::{
 pub struct I8080<'d, CH: DmaChannel, DM: Mode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     tx_channel: ChannelTx<'d, CH>,
-    tx_chain: DescriptorChain,
     _phantom: PhantomData<DM>,
 }
 
@@ -106,7 +98,6 @@ where
     pub fn new<P: TxPins>(
         lcd: Lcd<'d, DM>,
         channel: ChannelTx<'d, CH>,
-        descriptors: &'static mut [DmaDescriptor],
         mut pins: P,
         frequency: HertzU32,
         config: Config,
@@ -214,34 +205,8 @@ where
         Self {
             lcd_cam,
             tx_channel: channel,
-            tx_chain: DescriptorChain::new(descriptors),
             _phantom: PhantomData,
         }
-    }
-}
-
-impl<'d, CH: DmaChannel, DM: Mode> DmaSupport for I8080<'d, CH, DM> {
-    fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
-        let lcd_user = self.lcd_cam.lcd_user();
-        // Wait until LCD_START is cleared by hardware.
-        while lcd_user.read().lcd_start().bit_is_set() {}
-        self.tear_down_send();
-    }
-
-    fn peripheral_dma_stop(&mut self) {
-        unreachable!("unsupported")
-    }
-}
-
-impl<'d, CH: DmaChannel, DM: Mode> DmaSupportTx for I8080<'d, CH, DM> {
-    type TX = ChannelTx<'d, CH>;
-
-    fn tx(&mut self) -> &mut Self::TX {
-        &mut self.tx_channel
-    }
-
-    fn chain(&mut self) -> &mut DescriptorChain {
-        &mut self.tx_chain
     }
 }
 
@@ -291,33 +256,6 @@ impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
         self
     }
 
-    /// Sends a command and data to the LCD using the I8080 interface.
-    ///
-    /// Passing a `Command<u8>` will make this an 8-bit transfer and a
-    /// `Command<u16>` will make this a 16-bit transfer.
-    ///
-    /// Note: A 16-bit transfer on an 8-bit bus will silently truncate the 2nd
-    /// byte and an 8-bit transfer on a 16-bit bus will silently pad each
-    /// byte to 2 bytes.
-    pub fn send<W: Copy + Into<u16>>(
-        &mut self,
-        cmd: impl Into<Command<W>>,
-        dummy: u8,
-        data: &[W],
-    ) -> Result<(), DmaError> {
-        self.setup_send(cmd.into(), dummy);
-        self.start_write_bytes_dma(data.as_ptr() as _, core::mem::size_of_val(data))?;
-        self.start_send();
-
-        let lcd_user = self.lcd_cam.lcd_user();
-        // Wait until LCD_START is cleared by hardware.
-        while lcd_user.read().lcd_start().bit_is_set() {}
-
-        self.tear_down_send();
-
-        Ok(())
-    }
-
     /// Sends a command and data to the LCD using DMA.
     ///
     /// Passing a `Command<u8>` will make this an 8-bit transfer and a
@@ -326,61 +264,14 @@ impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
     /// Note: A 16-bit transfer on an 8-bit bus will silently truncate the 2nd
     /// byte and an 8-bit transfer on a 16-bit bus will silently pad each
     /// byte to 2 bytes.
-    pub fn send_dma<'t, W, TXBUF>(
-        &'t mut self,
+    pub fn send<W: Into<u16> + Copy, BUF: DmaTxBuffer>(
+        mut self,
         cmd: impl Into<Command<W>>,
         dummy: u8,
-        data: &'t TXBUF,
-    ) -> Result<DmaTransferTx<'_, Self>, DmaError>
-    where
-        W: Copy + Into<u16>,
-        TXBUF: ReadBuffer,
-    {
-        let (ptr, len) = unsafe { data.read_buffer() };
+        mut data: BUF,
+    ) -> Result<I8080Transfer<'d, BUF, CH, DM>, (DmaError, Self, BUF)> {
+        let cmd = cmd.into();
 
-        self.setup_send(cmd.into(), dummy);
-        self.start_write_bytes_dma(ptr as _, len)?;
-        self.start_send();
-
-        Ok(DmaTransferTx::new(self))
-    }
-}
-
-impl<'d, CH: DmaChannel> I8080<'d, CH, crate::Async> {
-    /// Asynchronously sends a command and data to the LCD using DMA.
-    ///
-    /// Passing a `Command<u8>` will make this an 8-bit transfer and a
-    /// `Command<u16>` will make this a 16-bit transfer.
-    ///
-    /// Note: A 16-bit transfer on an 8-bit bus will silently truncate the 2nd
-    /// byte and an 8-bit transfer on a 16-bit bus will silently pad each
-    /// byte to 2 bytes.
-    pub async fn send_dma_async<'t, W, TXBUF>(
-        &'t mut self,
-        cmd: impl Into<Command<W>>,
-        dummy: u8,
-        data: &'t TXBUF,
-    ) -> Result<(), DmaError>
-    where
-        W: Copy + Into<u16>,
-        TXBUF: ReadBuffer,
-    {
-        let (ptr, len) = unsafe { data.read_buffer() };
-
-        self.setup_send(cmd.into(), dummy);
-        self.start_write_bytes_dma(ptr as _, len)?;
-        self.start_send();
-
-        LcdDoneFuture::new().await;
-        if self.tx_channel.has_error() {
-            return Err(DmaError::DescriptorError);
-        }
-        Ok(())
-    }
-}
-
-impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
-    fn setup_send<T: Copy + Into<u16>>(&mut self, cmd: Command<T>, dummy: u8) {
         // Reset LCD control unit and Async Tx FIFO
         self.lcd_cam
             .lcd_user()
@@ -417,7 +308,7 @@ impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
             }
         }
 
-        let is_2byte_mode = size_of::<T>() == 2;
+        let is_2byte_mode = size_of::<W>() == 2;
 
         self.lcd_cam.lcd_user().modify(|_, w| unsafe {
             // Set dummy length
@@ -434,9 +325,25 @@ impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
             .lcd_2byte_en()
             .bit(is_2byte_mode)
         });
-    }
 
-    fn start_send(&mut self) {
+        // Use continous mode for DMA. FROM the S3 TRM:
+        // > In a continuous output, LCD module keeps sending data till:
+        // > i. LCD_CAM_LCD_START is cleared;
+        // > ii. or LCD_CAM_LCD_RESET is set;
+        // > iii. or all the data in GDMA is sent out.
+        self.lcd_cam
+            .lcd_user()
+            .modify(|_, w| w.lcd_always_out_en().set_bit().lcd_dout().set_bit());
+
+        let result = unsafe {
+            self.tx_channel
+                .prepare_transfer(DmaPeripheral::LcdCam, &mut data)
+        }
+        .and_then(|_| self.tx_channel.start_transfer());
+        if let Err(err) = result {
+            return Err((err, self, data));
+        }
+
         // Setup interrupts.
         self.lcd_cam
             .lc_dma_int_clr()
@@ -450,51 +357,137 @@ impl<'d, CH: DmaChannel, DM: Mode> I8080<'d, CH, DM> {
             w.lcd_update().set_bit();
             w.lcd_start().set_bit()
         });
-    }
 
-    fn tear_down_send(&mut self) {
-        // This will already be cleared unless the user is trying to cancel,
-        // which is why this is still here.
-        self.lcd_cam
-            .lcd_user()
-            .modify(|_, w| w.lcd_start().clear_bit());
-
-        self.lcd_cam
-            .lc_dma_int_clr()
-            .write(|w| w.lcd_trans_done_int_clr().set_bit());
-    }
-
-    fn start_write_bytes_dma(&mut self, ptr: *const u8, len: usize) -> Result<(), DmaError> {
-        if len == 0 {
-            // Set transfer length.
-            self.lcd_cam
-                .lcd_user()
-                .modify(|_, w| w.lcd_dout().clear_bit());
-        } else {
-            // Use continous mode for DMA. FROM the S3 TRM:
-            // > In a continuous output, LCD module keeps sending data till:
-            // > i. LCD_CAM_LCD_START is cleared;
-            // > ii. or LCD_CAM_LCD_RESET is set;
-            // > iii. or all the data in GDMA is sent out.
-            self.lcd_cam.lcd_user().modify(|_, w| {
-                w.lcd_always_out_en().set_bit();
-                w.lcd_dout().set_bit()
-            });
-
-            unsafe {
-                self.tx_chain.fill_for_tx(false, ptr, len)?;
-                self.tx_channel
-                    .prepare_transfer_without_start(DmaPeripheral::LcdCam, &self.tx_chain)?;
-            }
-            self.tx_channel.start_transfer()?;
-        }
-        Ok(())
+        Ok(I8080Transfer {
+            i8080: ManuallyDrop::new(self),
+            tx_buf: ManuallyDrop::new(data),
+        })
     }
 }
 
 impl<'d, CH: DmaChannel, DM: Mode> core::fmt::Debug for I8080<'d, CH, DM> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("I8080").finish()
+    }
+}
+
+/// Represents an ongoing (or potentially finished) transfer using the I8080 LCD
+/// interface
+pub struct I8080Transfer<'d, BUF, CH: DmaChannel, DM: Mode> {
+    i8080: ManuallyDrop<I8080<'d, CH, DM>>,
+    tx_buf: ManuallyDrop<BUF>,
+}
+
+impl<'d, BUF, CH: DmaChannel, DM: Mode> I8080Transfer<'d, BUF, CH, DM> {
+    /// Returns true when [Self::wait] will not block.
+    pub fn is_done(&self) -> bool {
+        self.i8080
+            .lcd_cam
+            .lcd_user()
+            .read()
+            .lcd_start()
+            .bit_is_clear()
+    }
+
+    /// Stops this transfer on the spot and returns the peripheral and buffer.
+    pub fn cancel(mut self) -> (I8080<'d, CH, DM>, BUF) {
+        self.stop_peripherals();
+        let (_, i8080, buf) = self.wait();
+        (i8080, buf)
+    }
+
+    /// Waits for the transfer to finish and returns the peripheral and buffer.
+    ///
+    /// Note: This also clears the transfer interrupt so it can be used in
+    /// interrupt handlers to "handle" the interrupt.
+    pub fn wait(mut self) -> (Result<(), DmaError>, I8080<'d, CH, DM>, BUF) {
+        while !self.is_done() {}
+
+        // Clear "done" interrupt.
+        self.i8080
+            .lcd_cam
+            .lc_dma_int_clr()
+            .write(|w| w.lcd_trans_done_int_clr().set_bit());
+
+        // SAFETY: Since forget is called on self, we know that self.i8080 and
+        // self.tx_buf won't be touched again.
+        let (i8080, tx_buf) = unsafe {
+            let i8080 = ManuallyDrop::take(&mut self.i8080);
+            let tx_buf = ManuallyDrop::take(&mut self.tx_buf);
+            core::mem::forget(self);
+            (i8080, tx_buf)
+        };
+
+        let result = if i8080.tx_channel.has_error() {
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok(())
+        };
+
+        (result, i8080, tx_buf)
+    }
+
+    fn stop_peripherals(&mut self) {
+        // Stop the LCD_CAM peripheral.
+        self.i8080
+            .lcd_cam
+            .lcd_user()
+            .modify(|_, w| w.lcd_start().clear_bit());
+
+        // Stop the DMA
+        self.i8080.tx_channel.stop_transfer();
+    }
+}
+
+impl<'d, BUF, CH: DmaChannel> I8080Transfer<'d, BUF, CH, crate::Async> {
+    /// Waits for [Self::is_done] to return true.
+    pub async fn wait_for_done(&mut self) {
+        use core::{
+            future::Future,
+            pin::Pin,
+            task::{Context, Poll},
+        };
+
+        struct LcdDoneFuture {}
+
+        impl Future for LcdDoneFuture {
+            type Output = ();
+
+            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                LCD_DONE_WAKER.register(cx.waker());
+                if Instance::is_lcd_done_set() {
+                    // Interrupt bit will be cleared in Self::wait.
+                    // This allows `wait_for_done` to be called more than once.
+                    //
+                    // Instance::clear_lcd_done();
+                    Poll::Ready(())
+                } else {
+                    Instance::listen_lcd_done();
+                    Poll::Pending
+                }
+            }
+        }
+
+        impl Drop for LcdDoneFuture {
+            fn drop(&mut self) {
+                Instance::unlisten_lcd_done();
+            }
+        }
+
+        LcdDoneFuture {}.await
+    }
+}
+
+impl<'d, BUF, CH: DmaChannel, DM: Mode> Drop for I8080Transfer<'d, BUF, CH, DM> {
+    fn drop(&mut self) {
+        self.stop_peripherals();
+
+        // SAFETY: This is Drop, we know that self.i8080 and self.tx_buf
+        // won't be touched again.
+        unsafe {
+            ManuallyDrop::drop(&mut self.i8080);
+            ManuallyDrop::drop(&mut self.tx_buf);
+        }
     }
 }
 

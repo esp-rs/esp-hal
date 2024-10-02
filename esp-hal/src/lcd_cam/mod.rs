@@ -118,54 +118,19 @@ pub enum ByteOrder {
 
 #[doc(hidden)]
 pub mod asynch {
-    use core::task::Poll;
-
     use embassy_sync::waitqueue::AtomicWaker;
     use procmacros::handler;
 
     use super::private::Instance;
 
-    static TX_WAKER: AtomicWaker = AtomicWaker::new();
-
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub(crate) struct LcdDoneFuture {}
-
-    impl LcdDoneFuture {
-        pub(crate) fn new() -> Self {
-            Self {}
-        }
-    }
-
-    impl core::future::Future for LcdDoneFuture {
-        type Output = ();
-
-        fn poll(
-            self: core::pin::Pin<&mut Self>,
-            cx: &mut core::task::Context<'_>,
-        ) -> core::task::Poll<Self::Output> {
-            TX_WAKER.register(cx.waker());
-            if Instance::is_lcd_done_set() {
-                Instance::clear_lcd_done();
-                Poll::Ready(())
-            } else {
-                Instance::listen_lcd_done();
-                Poll::Pending
-            }
-        }
-    }
-
-    impl Drop for LcdDoneFuture {
-        fn drop(&mut self) {
-            Instance::unlisten_lcd_done();
-        }
-    }
+    pub(crate) static LCD_DONE_WAKER: AtomicWaker = AtomicWaker::new();
 
     #[handler]
     pub(crate) fn interrupt_handler() {
         // TODO: this is a shared interrupt with Camera and here we ignore that!
         if Instance::is_lcd_done_set() {
             Instance::unlisten_lcd_done();
-            TX_WAKER.wake()
+            LCD_DONE_WAKER.wake()
         }
     }
 }
@@ -198,13 +163,6 @@ mod private {
                 .read()
                 .lcd_trans_done_int_raw()
                 .bit()
-        }
-
-        pub(crate) fn clear_lcd_done() {
-            let lcd_cam = unsafe { crate::peripherals::LCD_CAM::steal() };
-            lcd_cam
-                .lc_dma_int_clr()
-                .write(|w| w.lcd_trans_done_int_clr().set_bit());
         }
     }
     pub struct ClockDivider {

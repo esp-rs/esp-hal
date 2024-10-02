@@ -6,7 +6,7 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{Dma, DmaDescriptor, DmaPriority},
+    dma::{Dma, DmaPriority, DmaTxBuf},
     dma_buffers,
     gpio::{Io, NoPin},
     lcd_cam::{
@@ -21,7 +21,6 @@ use esp_hal::{
     prelude::*,
 };
 use hil_test as _;
-use static_cell::ConstStaticCell;
 
 const DATA_SIZE: usize = 1024 * 10;
 
@@ -30,8 +29,7 @@ struct Context<'d> {
     pcnt: Pcnt<'d>,
     io: Io,
     dma: Dma<'d>,
-    tx_buffer: &'static mut [u8],
-    tx_descriptors: &'static mut [DmaDescriptor],
+    dma_buf: DmaTxBuf,
 }
 
 #[cfg(test)]
@@ -47,14 +45,14 @@ mod tests {
         let pcnt = Pcnt::new(peripherals.PCNT);
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, DATA_SIZE);
+        let dma_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
         Context {
             lcd_cam,
             dma,
             pcnt,
             io,
-            tx_buffer,
-            tx_descriptors,
+            dma_buf,
         }
     }
 
@@ -64,19 +62,16 @@ mod tests {
 
         let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
 
-        let mut i8080 = I8080::new(
+        let i8080 = I8080::new(
             ctx.lcd_cam.lcd,
             channel.tx,
-            ctx.tx_descriptors,
             pins,
             20.MHz(),
             Config::default(),
         );
 
-        let xfer = i8080
-            .send_dma(Command::<u8>::None, 0, &ctx.tx_buffer)
-            .unwrap();
-        xfer.wait().unwrap();
+        let xfer = i8080.send(Command::<u8>::None, 0, ctx.dma_buf).unwrap();
+        xfer.wait().0.unwrap();
     }
 
     #[test]
@@ -87,19 +82,16 @@ mod tests {
             .configure_for_async(false, DmaPriority::Priority0);
         let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
 
-        let mut i8080 = I8080::new(
+        let i8080 = I8080::new(
             ctx.lcd_cam.lcd,
             channel.tx,
-            ctx.tx_descriptors,
             pins,
             20.MHz(),
             Config::default(),
         );
 
-        let xfer = i8080
-            .send_dma(Command::<u8>::None, 0, &ctx.tx_buffer)
-            .unwrap();
-        xfer.wait().unwrap();
+        let xfer = i8080.send(Command::<u8>::None, 0, ctx.dma_buf).unwrap();
+        xfer.wait().0.unwrap();
     }
 
     #[test]
@@ -163,7 +155,6 @@ mod tests {
         let mut i8080 = I8080::new(
             ctx.lcd_cam.lcd,
             channel.tx,
-            ctx.tx_descriptors,
             pins,
             20.MHz(),
             Config::default(),
@@ -202,12 +193,12 @@ mod tests {
             0b1000_0000,
         ];
 
-        let tx_buffer = ctx.tx_buffer;
-        tx_buffer.fill(0);
-        tx_buffer[..data_to_send.len()].copy_from_slice(&data_to_send);
+        let mut dma_buf = ctx.dma_buf;
+        dma_buf.as_mut_slice().fill(0);
+        dma_buf.as_mut_slice()[..data_to_send.len()].copy_from_slice(&data_to_send);
 
-        let xfer = i8080.send_dma(Command::<u8>::None, 0, &tx_buffer).unwrap();
-        xfer.wait().unwrap();
+        let xfer = i8080.send(Command::<u8>::None, 0, dma_buf).unwrap();
+        xfer.wait().0.unwrap();
 
         let actual = [
             pcnt.unit0.get_value(),
@@ -289,7 +280,6 @@ mod tests {
         let mut i8080 = I8080::new(
             ctx.lcd_cam.lcd,
             channel.tx,
-            ctx.tx_descriptors,
             pins,
             20.MHz(),
             Config::default(),
@@ -316,7 +306,7 @@ mod tests {
         pcnt.unit3.resume();
 
         let data_to_send = [
-            0b0000_0000_0000_0000,
+            0b0000_0000_0000_0000u16,
             0b0001_0000_0001_0000,
             0b0000_0001_0001_0000,
             0b0001_0001_0001_0000,
@@ -328,12 +318,20 @@ mod tests {
             0b0001_0000_0000_0000,
         ];
 
-        static TX_BUF: ConstStaticCell<[u16; 10]> = ConstStaticCell::new([0; 10]);
-        let tx_buffer = TX_BUF.take();
-        tx_buffer.copy_from_slice(&data_to_send);
+        let mut dma_buf = ctx.dma_buf;
 
-        let xfer = i8080.send_dma(Command::<u16>::None, 0, &tx_buffer).unwrap();
-        xfer.wait().unwrap();
+        // FIXME: Replace this 16 -> 8 bit copy once DmaTxBuf takes a generic parameter.
+        // i.e. DmaTxBuf<u16>
+
+        // Copy 16 bit array into 8 bit buffer.
+        dma_buf
+            .as_mut_slice()
+            .iter_mut()
+            .zip(data_to_send.iter().flat_map(|&d| d.to_ne_bytes()))
+            .for_each(|(d, s)| *d = s);
+
+        let xfer = i8080.send(Command::<u16>::None, 0, dma_buf).unwrap();
+        xfer.wait().0.unwrap();
 
         let actual = [
             pcnt.unit0.get_value(),

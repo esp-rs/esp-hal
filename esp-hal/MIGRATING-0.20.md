@@ -189,14 +189,31 @@ The I8080 driver no longer holds on to pins in its type definition.
 + let _: I8080<'a, DmaChannel3, Blocking>;
 ```
 
-## I8080 start transfer type inference
+## I8080 transfer API changes
 
-The I8080 driver now decides bus width at transfer time, which means you don't get inference.
+- The I8080 driver now decides bus width at transfer time, which means you don't get type inference anymore.
+- Starting a transfer moves the driver into the transfer object, allowing you to store it in a `static` or struct.
+- The transfer API no longer works with plain slices, it now works with `DmaTxBuffer`s which allow to bring your own DMA data structure and implement efficient queueing of transfers.
+- The three transfer methods (`send`, `send_dma`, `send_dma_async`) have been merged into one `send` method.
 
 ```diff
-let mut i8080 = I8080::new(....);
+let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, 32678);
++ let mut dma_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+
+let mut i8080 = I8080::new(
+    lcd_cam.lcd,
+    channel.tx,
+-   tx_descriptors,
+    tx_pins,
+    20.MHz(),
+    Config::default(),
+)
+
 - i8080.send(0x12, 0, &[0, 1, 2, 3, 4]);
-+ i8080.send(0x12u8, 0, &[0, 1, 2, 3, 4]);
++ dma_buf.fill(&[0, 1, 2, 3, 4]);
++ let transfer = i8080.send(0x12u8, 0, dma_buf).unwrap();
++ // transfer.wait_for_done().await;
++ (_, i8080, dma_buf) = transfer.wait();
 ```
 
 ### Placing drivers in RAM is now done via esp-config
