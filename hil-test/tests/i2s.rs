@@ -23,10 +23,8 @@ use hil_test as _;
 
 cfg_if::cfg_if! {
     if #[cfg(any(esp32, esp32s2))] {
-        use esp_hal::dma::I2s0DmaChannel as DmaChannel0;
         type DmaChannel0Creator = esp_hal::dma::I2s0DmaChannelCreator;
     } else {
-        use esp_hal::dma::DmaChannel0;
         type DmaChannel0Creator = esp_hal::dma::ChannelCreator<0>;
     }
 }
@@ -59,7 +57,7 @@ impl Iterator for SampleSource {
 }
 
 #[embassy_executor::task]
-async fn writer(tx_buffer: &'static mut [u8], i2s_tx: I2sTx<'static, I2S0, DmaChannel0, Async>) {
+async fn writer(tx_buffer: &'static mut [u8], i2s_tx: I2sTx<'static, I2S0, Async>) {
     let mut samples = SampleSource::new();
     for b in tx_buffer.iter_mut() {
         *b = samples.next().unwrap();

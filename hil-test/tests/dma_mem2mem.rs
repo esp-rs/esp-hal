@@ -6,7 +6,7 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{Channel, Dma, DmaError, DmaPriority, Mem2Mem},
+    dma::{AnyDmaChannel, Channel, Dma, DmaError, DmaPriority, Mem2Mem},
     dma_buffers,
     dma_buffers_chunk_size,
     dma_descriptors,
@@ -24,10 +24,8 @@ cfg_if::cfg_if! {
     }
 }
 
-use esp_hal::dma::DmaChannel0;
-
 struct Context {
-    channel: Channel<'static, DmaChannel0, Blocking>,
+    channel: Channel<'static, AnyDmaChannel, Blocking>,
     dma_peripheral: DmaPeripheralType,
 }
 
@@ -52,7 +50,9 @@ mod tests {
         }
 
         Context {
-            channel: dma_channel.configure(false, DmaPriority::Priority0),
+            channel: dma_channel
+                .configure(false, DmaPriority::Priority0)
+                .degrade(),
             dma_peripheral,
         }
     }

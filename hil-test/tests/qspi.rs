@@ -8,7 +8,7 @@
 #[cfg(pcnt)]
 use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
 use esp_hal::{
-    dma::{Channel, Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma::{AnyDmaChannel, Channel, Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{AnyPin, Input, Io, Level, NoPin, Output, Pull},
     prelude::*,
@@ -23,14 +23,6 @@ use esp_hal::{
 use hil_test as _;
 
 cfg_if::cfg_if! {
-    if #[cfg(any(esp32, esp32s2))] {
-        use esp_hal::dma::Spi2DmaChannel as DmaChannel0;
-    } else {
-        use esp_hal::dma::DmaChannel0;
-    }
-}
-
-cfg_if::cfg_if! {
     if #[cfg(esp32)] {
         const COMMAND_DATA_MODES: [SpiDataMode; 1] = [SpiDataMode::Single];
     } else {
@@ -38,14 +30,13 @@ cfg_if::cfg_if! {
     }
 }
 
-type SpiUnderTest =
-    SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>;
+type SpiUnderTest = SpiDma<'static, esp_hal::peripherals::SPI2, HalfDuplexMode, Blocking>;
 
 struct Context {
     spi: esp_hal::peripherals::SPI2,
     #[cfg(pcnt)]
     pcnt: esp_hal::peripherals::PCNT,
-    dma_channel: Channel<'static, DmaChannel0, Blocking>,
+    dma_channel: Channel<'static, AnyDmaChannel, Blocking>,
     gpios: [AnyPin; 3],
 }
 
@@ -206,7 +197,9 @@ mod tests {
             }
         }
 
-        let dma_channel = dma_channel.configure(false, DmaPriority::Priority0);
+        let dma_channel = dma_channel
+            .configure(false, DmaPriority::Priority0)
+            .degrade();
 
         Context {
             spi: peripherals.SPI2,
