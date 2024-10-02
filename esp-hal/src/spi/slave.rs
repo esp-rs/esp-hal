@@ -18,7 +18,7 @@
 //! # use esp_hal::dma::DmaPriority;
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::spi::SpiMode;
-//! # use esp_hal::spi::slave::{prelude::*, Spi};
+//! # use esp_hal::spi::slave::Spi;
 //! # use esp_hal::dma::Dma;
 //! # use esp_hal::gpio::Io;
 //! let dma = Dma::new(peripherals.DMA);
@@ -79,17 +79,6 @@ use crate::{
     private,
     system::PeripheralClockControl,
 };
-
-/// Prelude for the SPI (Slave) driver
-pub mod prelude {
-    #[cfg(spi3)]
-    pub use super::dma::WithDmaSpi3 as _esp_hal_spi_slave_dma_WithDmaSpi3;
-    pub use super::{
-        dma::WithDmaSpi2 as _esp_hal_spi_slave_dma_WithDmaSpi2,
-        Instance as _esp_hal_spi_slave_Instance,
-        InstanceDma as _esp_hal_spi_slave_InstanceDma,
-    };
-}
 
 const MAX_DMA_SIZE: usize = 32768 - 32;
 
@@ -181,54 +170,20 @@ pub mod dma {
         Mode,
     };
 
-    /// Trait for configuring DMA with SPI2 peripherals in slave mode.
-    pub trait WithDmaSpi2<'d, C, DmaMode>
-    where
-        C: DmaChannel,
-        C::P: SpiPeripheral,
-        DmaMode: Mode,
-    {
-        /// Configures the SPI2 peripheral with the provided DMA channel and
-        /// descriptors.
-        fn with_dma(
-            self,
-            channel: Channel<'d, C, DmaMode>,
-            rx_descriptors: &'static mut [DmaDescriptor],
-            tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> SpiDma<'d, crate::peripherals::SPI2, C, DmaMode>;
-    }
-
-    /// Trait for configuring DMA with SPI3 peripherals in slave mode.
-    #[cfg(spi3)]
-    pub trait WithDmaSpi3<'d, C, DmaMode>
-    where
-        C: DmaChannel,
-        C::P: SpiPeripheral,
-        DmaMode: Mode,
-    {
+    impl<'d> Spi<'d, crate::peripherals::SPI2, FullDuplexMode> {
         /// Configures the SPI3 peripheral with the provided DMA channel and
         /// descriptors.
-        fn with_dma(
+        pub fn with_dma<C, DmaMode>(
             self,
             channel: Channel<'d, C, DmaMode>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> SpiDma<'d, crate::peripherals::SPI3, C, DmaMode>;
-    }
-
-    impl<'d, C, DmaMode> WithDmaSpi2<'d, C, DmaMode>
-        for Spi<'d, crate::peripherals::SPI2, FullDuplexMode>
-    where
-        C: DmaChannel,
-        C::P: SpiPeripheral + Spi2Peripheral,
-        DmaMode: Mode,
-    {
-        fn with_dma(
-            self,
-            channel: Channel<'d, C, DmaMode>,
-            rx_descriptors: &'static mut [DmaDescriptor],
-            tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> SpiDma<'d, crate::peripherals::SPI2, C, DmaMode> {
+        ) -> SpiDma<'d, crate::peripherals::SPI2, C, DmaMode>
+        where
+            C: DmaChannel,
+            C::P: SpiPeripheral + Spi2Peripheral,
+            DmaMode: Mode,
+        {
             SpiDma {
                 spi: self.spi,
                 channel,
@@ -239,19 +194,20 @@ pub mod dma {
     }
 
     #[cfg(spi3)]
-    impl<'d, C, DmaMode> WithDmaSpi3<'d, C, DmaMode>
-        for Spi<'d, crate::peripherals::SPI3, FullDuplexMode>
-    where
-        C: DmaChannel,
-        C::P: SpiPeripheral + Spi3Peripheral,
-        DmaMode: Mode,
-    {
-        fn with_dma(
+    impl<'d> Spi<'d, crate::peripherals::SPI3, FullDuplexMode> {
+        /// Configures the SPI3 peripheral with the provided DMA channel and
+        /// descriptors.
+        pub fn with_dma<C, DmaMode>(
             self,
             channel: Channel<'d, C, DmaMode>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> SpiDma<'d, crate::peripherals::SPI3, C, DmaMode> {
+        ) -> SpiDma<'d, crate::peripherals::SPI3, C, DmaMode>
+        where
+            C: DmaChannel,
+            C::P: SpiPeripheral + Spi3Peripheral,
+            DmaMode: Mode,
+        {
             SpiDma {
                 spi: self.spi,
                 channel,
