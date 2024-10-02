@@ -95,6 +95,8 @@ pub enum Chip {
     Esp32c6,
     /// ESP32-H2
     Esp32h2,
+    /// ESP32-P4
+    Esp32p4,
     /// ESP32-S2
     Esp32s2,
     /// ESP32-S3
@@ -109,6 +111,7 @@ impl Chip {
             Esp32 => "xtensa-esp32-none-elf",
             Esp32c2 | Esp32c3 => "riscv32imc-unknown-none-elf",
             Esp32c6 | Esp32h2 => "riscv32imac-unknown-none-elf",
+            Esp32p4 => "riscv32imafc-unknown-none-elf",
             Esp32s2 => "xtensa-esp32s2-none-elf",
             Esp32s3 => "xtensa-esp32s3-none-elf",
         }
@@ -124,7 +127,7 @@ impl Chip {
         use Chip::*;
 
         match self {
-            Esp32c6 => Ok("riscv32imac-unknown-none-elf"),
+            Esp32c6 | Esp32p4 => Ok("riscv32imac-unknown-none-elf"),
             Esp32s2 | Esp32s3 => Ok("riscv32imc-unknown-none-elf"),
             _ => bail!("Chip does not contain an LP core: '{}'", self),
         }
@@ -137,6 +140,7 @@ impl Chip {
             Chip::Esp32c3 => "ESP32-C3",
             Chip::Esp32c6 => "ESP32-C6",
             Chip::Esp32h2 => "ESP32-H2",
+            Chip::Esp32p4 => "ESP32-P4",
             Chip::Esp32s2 => "ESP32-S2",
             Chip::Esp32s3 => "ESP32-S3",
         }
@@ -175,6 +179,7 @@ impl Config {
             Chip::Esp32c3 => include_toml!(Config, "../devices/esp32c3.toml"),
             Chip::Esp32c6 => include_toml!(Config, "../devices/esp32c6.toml"),
             Chip::Esp32h2 => include_toml!(Config, "../devices/esp32h2.toml"),
+            Chip::Esp32p4 => include_toml!(Config, "../devices/esp32p4.toml"),
             Chip::Esp32s2 => include_toml!(Config, "../devices/esp32s2.toml"),
             Chip::Esp32s3 => include_toml!(Config, "../devices/esp32s3.toml"),
         }
