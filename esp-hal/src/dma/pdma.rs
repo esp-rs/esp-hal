@@ -116,8 +116,8 @@ impl<C: SpiPdmaChannel> TxRegisterAccess for SpiDmaTxChannelImpl<C> {
 
 impl<C: SpiPdmaChannel> InterruptAccess<DmaTxInterrupt> for SpiDmaTxChannelImpl<C> {
     fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
-        let spi = self.0.register_block();
-        spi.dma_int_ena().modify(|_, w| {
+        let reg_block = self.0.register_block();
+        reg_block.dma_int_ena().modify(|_, w| {
             for interrupt in interrupts {
                 match interrupt {
                     DmaTxInterrupt::TotalEof => w.out_total_eof().bit(enable),
@@ -238,8 +238,8 @@ impl<C: SpiPdmaChannel> RxRegisterAccess for SpiDmaRxChannelImpl<C> {}
 
 impl<C: SpiPdmaChannel> InterruptAccess<DmaRxInterrupt> for SpiDmaRxChannelImpl<C> {
     fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
-        let spi = self.0.register_block();
-        spi.dma_int_ena().modify(|_, w| {
+        let reg_block = self.0.register_block();
+        reg_block.dma_int_ena().modify(|_, w| {
             for interrupt in interrupts {
                 match interrupt {
                     DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().bit(enable),
@@ -677,7 +677,7 @@ impl<C: I2sPdmaChannel> RxRegisterAccess for I2sDmaRxChannelImpl<C> {}
 
 impl<C: I2sPdmaChannel> InterruptAccess<DmaRxInterrupt> for I2sDmaRxChannelImpl<C> {
     fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
-        let spi = self.0.register_block();
+        let reg_block = self.0.register_block();
         reg_block.int_ena().modify(|_, w| {
             for interrupt in interrupts {
                 match interrupt {
@@ -980,8 +980,7 @@ impl InterruptAccess<DmaRxInterrupt> for AnyPdmaRxChannelImpl {
             #[cfg(i2s1)]
             AnyPdmaChannel::I2s1(channel) => unsafe { I2sDmaRxChannelImpl(channel.clone_unchecked()) },
         } {
-            fn listen(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>);
-            fn unlisten(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>);
+            fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool);
             fn is_listening(&self) -> EnumSet<DmaRxInterrupt>;
             fn clear(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>);
             fn pending_interrupts(&self) -> EnumSet<DmaRxInterrupt>;
@@ -1000,7 +999,6 @@ impl RegisterAccess for AnyPdmaRxChannelImpl {
         } {
             fn set_burst_mode(&self, burst_mode: bool);
             fn set_priority(&self, priority: DmaPriority);
-            fn clear_interrupts(&self);
             fn reset(&self);
             fn set_link_addr(&self, address: u32);
             fn set_peripheral(&self, peripheral: u8);
@@ -1025,8 +1023,7 @@ impl InterruptAccess<DmaTxInterrupt> for AnyPdmaTxChannelImpl {
             #[cfg(i2s1)]
             AnyPdmaChannel::I2s1(channel) => unsafe { I2sDmaTxChannelImpl(channel.clone_unchecked()) },
         } {
-            fn listen(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>);
-            fn unlisten(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>);
+            fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool);
             fn is_listening(&self) -> EnumSet<DmaTxInterrupt>;
             fn clear(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>);
             fn pending_interrupts(&self) -> EnumSet<DmaTxInterrupt>;
@@ -1045,7 +1042,6 @@ impl RegisterAccess for AnyPdmaTxChannelImpl {
         } {
             fn set_burst_mode(&self, burst_mode: bool);
             fn set_priority(&self, priority: DmaPriority);
-            fn clear_interrupts(&self);
             fn reset(&self);
             fn set_link_addr(&self, address: u32);
             fn set_peripheral(&self, peripheral: u8);
