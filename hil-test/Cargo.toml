@@ -100,6 +100,10 @@ name    = "spi_half_duplex_write_psram"
 harness = false
 
 [[test]]
+name    = "spi_slave"
+harness = false
+
+[[test]]
 name    = "systimer"
 harness = false
 
