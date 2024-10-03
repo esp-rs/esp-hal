@@ -126,6 +126,10 @@ When using the asymmetric variant of the macro to create DMA buffers and descrip
 The `Uart::new_with_default_pins` and `Uart::new_async_with_default_pins` constructors
 have been removed. Use `new` or `new_async` instead.
 
+## Removed I2S1-specific constructor
+
+The `I2s::new_i2s1` constructor has been removed. Use `I2s::new` instead.
+
 ## Timer changes
 
 ### `ErasedTimer` rename

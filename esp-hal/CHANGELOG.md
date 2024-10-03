@@ -108,6 +108,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `esp_hal::spi::slave::prelude` (#2260)
 - Removed `esp_hal::spi::slave::WithDmaSpiN` traits (#2260)
 - The `WithDmaAes` trait has been removed (#2261)
+- The `I2s::new_i2s1` constructor has been removed (#2261)
 
 ## [0.20.1] - 2024-08-30
 
