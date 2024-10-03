@@ -1128,57 +1128,14 @@ mod dma {
         async fn wait_for_idle_async(&mut self) {
             // As a future enhancement, setup Spi Future in here as well.
 
-            /// An optional future.
-            enum OptionalFuture<T: Future> {
-                Future(T),
-                Value(T::Output),
+            if self.rx_transfer_in_progress {
+                _ = DmaRxFuture::new(&mut self.channel.rx).await;
+                self.rx_transfer_in_progress = false;
             }
-
-            impl<T: Future> OptionalFuture<T> {
-                fn some(future: T) -> Self {
-                    Self::Future(future)
-                }
-
-                fn none(value: T::Output) -> Self {
-                    Self::Value(value)
-                }
+            if self.tx_transfer_in_progress {
+                _ = DmaTxFuture::new(&mut self.channel.tx).await;
+                self.tx_transfer_in_progress = false;
             }
-
-            use core::{
-                future::Future,
-                pin::{pin, Pin},
-                task::{Context, Poll},
-            };
-            impl<T> Future for OptionalFuture<T>
-            where
-                T: Future + Unpin,
-                T::Output: Copy + Unpin,
-            {
-                type Output = T::Output;
-
-                fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                    match self.get_mut() {
-                        Self::Future(future) => pin!(future).poll(cx),
-                        Self::Value(value) => Poll::Ready(*value),
-                    }
-                }
-            }
-
-            let rx_future = if self.rx_transfer_in_progress {
-                OptionalFuture::some(DmaRxFuture::new(&mut self.channel.rx))
-            } else {
-                OptionalFuture::none(Ok(()))
-            };
-            let tx_future = if self.tx_transfer_in_progress {
-                OptionalFuture::some(DmaTxFuture::new(&mut self.channel.tx))
-            } else {
-                OptionalFuture::none(Ok(()))
-            };
-
-            _ = embassy_futures::join::join(rx_future, tx_future).await;
-
-            self.rx_transfer_in_progress = false;
-            self.tx_transfer_in_progress = false;
 
             core::future::poll_fn(|cx| {
                 use core::task::Poll;
