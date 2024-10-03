@@ -38,13 +38,12 @@ use crate::{
         ChannelRx,
         ChannelTx,
         DescriptorChain,
+        DmaChannel,
         DmaDescriptor,
         DmaError,
         DmaPeripheral,
         DmaTransferRx,
         DmaTransferTx,
-        ParlIoPeripheral,
-        PeripheralDmaChannel,
         ReadBuffer,
         Rx,
         Tx,
@@ -1101,8 +1100,7 @@ where
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        CH: PeripheralDmaChannel,
-        CH::P: ParlIoPeripheral,
+        CH: DmaChannel,
     {
         internal_init(frequency)?;
 
@@ -1182,8 +1180,7 @@ where
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        CH: PeripheralDmaChannel,
-        CH::P: ParlIoPeripheral,
+        CH: DmaChannel,
     {
         internal_init(frequency)?;
 
@@ -1258,8 +1255,7 @@ where
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        CH: PeripheralDmaChannel,
-        CH::P: ParlIoPeripheral,
+        CH: DmaChannel,
     {
         internal_init(frequency)?;
 
