@@ -451,7 +451,6 @@ where
     ) -> I2s<'d, I2S0, CH, DmaMode>
     where
         CH::P: I2sPeripheral + I2s0Peripheral,
-        DmaMode: Mode,
     {
         I2s::new_internal(
             i2s,
