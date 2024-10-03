@@ -900,46 +900,28 @@ pub trait DmaEligible {
     }
 }
 
-/// Marks channels as useable for SPI
-#[doc(hidden)]
-pub trait SpiPeripheral: PeripheralMarker {}
-
-/// Marks channels as useable for SPI2
-#[doc(hidden)]
-pub trait Spi2Peripheral: SpiPeripheral + PeripheralMarker {}
-
-/// Marks channels as useable for SPI3
-#[cfg(any(esp32, esp32s2, esp32s3))]
-#[doc(hidden)]
-pub trait Spi3Peripheral: SpiPeripheral + PeripheralMarker {}
-
-/// Marks channels as useable for I2S
-#[doc(hidden)]
-pub trait I2sPeripheral: PeripheralMarker {}
-
-/// Marks channels as useable for I2S0
-#[doc(hidden)]
-pub trait I2s0Peripheral: I2sPeripheral + PeripheralMarker {}
-
-/// Marks channels as useable for I2S1
-#[doc(hidden)]
-pub trait I2s1Peripheral: I2sPeripheral + PeripheralMarker {}
-
-/// Marks channels as useable for PARL_IO
-#[doc(hidden)]
-pub trait ParlIoPeripheral: PeripheralMarker {}
-
-/// Marks channels as useable for AES
-#[doc(hidden)]
-pub trait AesPeripheral: PeripheralMarker {}
-
-/// Marks channels as usable for LCD_CAM
-#[doc(hidden)]
-pub trait LcdCamPeripheral: PeripheralMarker {}
-
 /// Marker trait
 #[doc(hidden)]
 pub trait PeripheralMarker {}
+
+#[doc(hidden)]
+pub trait DmaCompatible {}
+
+#[cfg(gdma)]
+impl<CH, P> DmaCompatible for (CH, P)
+where
+    CH: DmaChannel,
+    P: PeripheralMarker,
+{
+}
+
+#[cfg(pdma)]
+impl<CH, P> DmaCompatible for (CH, P)
+where
+    CH: PeripheralDmaChannel<P = P>,
+    P: PeripheralMarker,
+{
+}
 
 #[doc(hidden)]
 #[derive(Debug)]
@@ -1543,6 +1525,7 @@ pub trait DmaChannel: crate::private::Sealed {
 }
 
 /// A description of a DMA Channel that can be used with a peripheral.
+#[cfg(pdma)]
 pub trait PeripheralDmaChannel: DmaChannel {
     /// A suitable peripheral for this DMA channel.
     type P: PeripheralMarker;

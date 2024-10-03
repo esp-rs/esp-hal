@@ -235,16 +235,15 @@ pub mod dma {
         aes::{Key, Mode},
         dma::{
             dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
-            AesPeripheral,
             AnyDmaChannel,
             Channel,
             ChannelRx,
             ChannelTx,
             DescriptorChain,
+            DmaChannel,
             DmaDescriptor,
             DmaPeripheral,
             DmaTransferRxTx,
-            PeripheralDmaChannel,
             ReadBuffer,
             Rx,
             Tx,
@@ -290,8 +289,7 @@ pub mod dma {
         ) -> AesDma<'d>
         where
             Self: Sized,
-            C: PeripheralDmaChannel,
-            C::P: AesPeripheral,
+            C: DmaChannel,
         {
             AesDma {
                 aes: self,

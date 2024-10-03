@@ -69,16 +69,7 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    dma::{
-        AnyDmaChannel,
-        ChannelTx,
-        DmaError,
-        DmaPeripheral,
-        DmaTxBuffer,
-        LcdCamPeripheral,
-        PeripheralDmaChannel,
-        Tx,
-    },
+    dma::{AnyDmaChannel, ChannelTx, DmaChannel, DmaError, DmaPeripheral, DmaTxBuffer, Tx},
     gpio::{OutputSignal, PeripheralOutput},
     lcd_cam::{
         asynch::LCD_DONE_WAKER,
@@ -110,8 +101,7 @@ impl<'d, DM: Mode> I8080<'d, DM> {
         config: Config,
     ) -> Self
     where
-        CH: PeripheralDmaChannel,
-        CH::P: LcdCamPeripheral,
+        CH: DmaChannel,
         P: TxPins,
     {
         let lcd_cam = lcd.lcd_cam;

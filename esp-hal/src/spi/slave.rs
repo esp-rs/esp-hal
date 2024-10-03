@@ -150,8 +150,6 @@ where
 /// DMA (Direct Memory Access) functionality (Slave).
 pub mod dma {
     use super::*;
-    #[cfg(spi3)]
-    use crate::dma::Spi3Peripheral;
     use crate::{
         dma::{
             dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
@@ -165,17 +163,18 @@ pub mod dma {
             DmaTransferRx,
             DmaTransferRxTx,
             DmaTransferTx,
-            PeripheralDmaChannel,
             ReadBuffer,
             Rx,
-            Spi2Peripheral,
             Tx,
             WriteBuffer,
         },
         Mode,
     };
 
-    impl<'d> Spi<'d, crate::peripherals::SPI2, FullDuplexMode> {
+    impl<'d, T> Spi<'d, T, FullDuplexMode>
+    where
+        T: InstanceDma,
+    {
         /// Configures the SPI3 peripheral with the provided DMA channel and
         /// descriptors.
         #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
@@ -184,31 +183,10 @@ pub mod dma {
             channel: Channel<'d, CH, DmaMode>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> SpiDma<'d, crate::peripherals::SPI2, DmaMode>
+        ) -> SpiDma<'d, T, DmaMode>
         where
-            CH: PeripheralDmaChannel,
-            CH::P: Spi2Peripheral,
-            DmaMode: Mode,
-        {
-            self.spi.set_data_mode(self.data_mode, true);
-            SpiDma::new(self.spi, channel, rx_descriptors, tx_descriptors)
-        }
-    }
-
-    #[cfg(spi3)]
-    impl<'d> Spi<'d, crate::peripherals::SPI3, FullDuplexMode> {
-        /// Configures the SPI3 peripheral with the provided DMA channel and
-        /// descriptors.
-        #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
-        pub fn with_dma<CH, DmaMode>(
-            mut self,
-            channel: Channel<'d, CH, DmaMode>,
-            rx_descriptors: &'static mut [DmaDescriptor],
-            tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> SpiDma<'d, crate::peripherals::SPI3, DmaMode>
-        where
-            CH: PeripheralDmaChannel,
-            CH::P: Spi3Peripheral,
+            CH: DmaChannel,
+            (CH, T::Peripheral): crate::dma::DmaCompatible,
             DmaMode: Mode,
         {
             self.spi.set_data_mode(self.data_mode, true);
@@ -421,6 +399,8 @@ pub mod dma {
 
 #[doc(hidden)]
 pub trait InstanceDma: Instance {
+    type Peripheral;
+
     fn dma_peripheral(&self) -> DmaPeripheral;
 
     #[allow(clippy::too_many_arguments)]
@@ -565,12 +545,22 @@ fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
 }
 
 impl InstanceDma for crate::peripherals::SPI2 {
+    #[cfg(pdma)]
+    type Peripheral = crate::dma::Spi2DmaSuitablePeripheral;
+    #[cfg(gdma)]
+    type Peripheral = crate::dma::SuitablePeripheral;
+
     fn dma_peripheral(&self) -> DmaPeripheral {
         DmaPeripheral::Spi2
     }
 }
 #[cfg(spi3)]
 impl InstanceDma for crate::peripherals::SPI3 {
+    #[cfg(pdma)]
+    type Peripheral = crate::dma::Spi3DmaSuitablePeripheral;
+    #[cfg(gdma)]
+    type Peripheral = crate::dma::SuitablePeripheral;
+
     fn dma_peripheral(&self) -> DmaPeripheral {
         DmaPeripheral::Spi3
     }

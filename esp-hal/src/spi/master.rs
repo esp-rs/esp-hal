@@ -485,6 +485,29 @@ where
     }
 }
 
+impl<'d, T, M> Spi<'d, T, M>
+where
+    T: InstanceDma,
+    M: DuplexMode,
+{
+    /// Configures the SPI3 instance to use DMA with the specified channel.
+    ///
+    /// This method prepares the SPI instance for DMA transfers using SPI3
+    /// and returns an instance of `SpiDma` that supports DMA
+    /// operations.
+    pub fn with_dma<CH, DmaMode>(
+        self,
+        channel: crate::dma::Channel<'d, CH, DmaMode>,
+    ) -> SpiDma<'d, T, M, DmaMode>
+    where
+        CH: crate::dma::DmaChannel,
+        (CH, T::Peripheral): crate::dma::DmaCompatible,
+        DmaMode: crate::Mode,
+    {
+        SpiDma::new(self.spi, channel)
+    }
+}
+
 impl<'d, T> Spi<'d, T, FullDuplexMode>
 where
     T: Instance,
@@ -913,71 +936,22 @@ mod dma {
     };
 
     use super::*;
-    #[cfg(spi3)]
-    use crate::dma::Spi3Peripheral;
     use crate::{
         dma::{
             asynch::{DmaRxFuture, DmaTxFuture},
             AnyDmaChannel,
             Channel,
+            DmaChannel,
             DmaRxBuf,
             DmaRxBuffer,
             DmaTxBuf,
             DmaTxBuffer,
-            PeripheralDmaChannel,
             Rx,
-            Spi2Peripheral,
-            SpiPeripheral,
             Tx,
         },
         InterruptConfigurable,
         Mode,
     };
-
-    impl<'d, M> Spi<'d, crate::peripherals::SPI2, M>
-    where
-        M: DuplexMode,
-    {
-        /// Configures the SPI instance to use DMA with the specified channel.
-        ///
-        /// This method prepares the SPI instance for DMA transfers. It
-        /// initializes the DMA channel for transmission and returns an
-        /// instance of `SpiDma` that supports DMA operations.
-        pub fn with_dma<CH, DmaMode>(
-            self,
-            channel: Channel<'d, CH, DmaMode>,
-        ) -> SpiDma<'d, crate::peripherals::SPI2, M, DmaMode>
-        where
-            CH: PeripheralDmaChannel,
-            CH::P: Spi2Peripheral,
-            DmaMode: Mode,
-        {
-            SpiDma::new(self.spi, channel)
-        }
-    }
-
-    #[cfg(spi3)]
-    impl<'d, M> Spi<'d, crate::peripherals::SPI3, M>
-    where
-        M: DuplexMode,
-    {
-        /// Configures the SPI3 instance to use DMA with the specified channel.
-        ///
-        /// This method prepares the SPI instance for DMA transfers using SPI3
-        /// and returns an instance of `SpiDma` that supports DMA
-        /// operations.
-        pub fn with_dma<CH, DmaMode>(
-            self,
-            channel: Channel<'d, CH, DmaMode>,
-        ) -> SpiDma<'d, crate::peripherals::SPI3, M, DmaMode>
-        where
-            CH: PeripheralDmaChannel,
-            CH::P: Spi3Peripheral,
-            DmaMode: Mode,
-        {
-            SpiDma::new(self.spi, channel)
-        }
-    }
 
     /// A DMA capable SPI instance.
     ///
@@ -1028,10 +1002,9 @@ mod dma {
         D: DuplexMode,
         M: Mode,
     {
-        fn new<CH>(spi: PeripheralRef<'d, T>, channel: Channel<'d, CH, M>) -> Self
+        pub(super) fn new<CH>(spi: PeripheralRef<'d, T>, channel: Channel<'d, CH, M>) -> Self
         where
-            CH: PeripheralDmaChannel,
-            CH::P: SpiPeripheral,
+            CH: DmaChannel,
         {
             #[cfg(all(esp32, spi_address_workaround))]
             let address_buffer = {
@@ -2240,6 +2213,8 @@ mod ehal1 {
 
 #[doc(hidden)]
 pub trait InstanceDma: Instance {
+    type Peripheral;
+
     #[allow(clippy::too_many_arguments)]
     unsafe fn start_transfer_dma<RX: Rx, TX: Tx>(
         &mut self,
@@ -2447,10 +2422,20 @@ pub trait InstanceDma: Instance {
     }
 }
 
-impl InstanceDma for crate::peripherals::SPI2 {}
+impl InstanceDma for crate::peripherals::SPI2 {
+    #[cfg(pdma)]
+    type Peripheral = crate::dma::Spi2DmaSuitablePeripheral;
+    #[cfg(gdma)]
+    type Peripheral = crate::dma::SuitablePeripheral;
+}
 
 #[cfg(spi3)]
-impl InstanceDma for crate::peripherals::SPI3 {}
+impl InstanceDma for crate::peripherals::SPI3 {
+    #[cfg(pdma)]
+    type Peripheral = crate::dma::Spi3DmaSuitablePeripheral;
+    #[cfg(gdma)]
+    type Peripheral = crate::dma::SuitablePeripheral;
+}
 
 #[doc(hidden)]
 pub trait ExtendedInstance: Instance {

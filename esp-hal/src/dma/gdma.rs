@@ -421,24 +421,6 @@ pub struct ChannelCreator<const N: u8> {}
 pub struct SuitablePeripheral {}
 impl PeripheralMarker for SuitablePeripheral {}
 
-// with GDMA every channel can be used for any peripheral
-impl SpiPeripheral for SuitablePeripheral {}
-impl Spi2Peripheral for SuitablePeripheral {}
-#[cfg(spi3)]
-impl Spi3Peripheral for SuitablePeripheral {}
-#[cfg(any(i2s0, i2s1))]
-impl I2sPeripheral for SuitablePeripheral {}
-#[cfg(i2s0)]
-impl I2s0Peripheral for SuitablePeripheral {}
-#[cfg(i2s1)]
-impl I2s1Peripheral for SuitablePeripheral {}
-#[cfg(parl_io)]
-impl ParlIoPeripheral for SuitablePeripheral {}
-#[cfg(aes)]
-impl AesPeripheral for SuitablePeripheral {}
-#[cfg(lcd_cam)]
-impl LcdCamPeripheral for SuitablePeripheral {}
-
 impl DmaChannel for AnyDmaChannel {
     type Rx = ChannelRxImpl<AnyGdmaChannel>;
     type Tx = ChannelTxImpl<AnyGdmaChannel>;
@@ -449,10 +431,6 @@ impl DmaChannel for AnyDmaChannel {
     fn degrade_tx(tx: Self::Tx) -> ChannelTxImpl<AnyGdmaChannel> {
         tx
     }
-}
-
-impl PeripheralDmaChannel for AnyDmaChannel {
-    type P = SuitablePeripheral;
 }
 
 macro_rules! impl_channel {
@@ -474,9 +452,6 @@ macro_rules! impl_channel {
                 fn degrade_tx(tx: Self::Tx) -> ChannelTxImpl<AnyGdmaChannel> {
                     tx.degrade()
                 }
-            }
-            impl PeripheralDmaChannel for [<DmaChannel $num>] {
-                type P = SuitablePeripheral;
             }
 
             impl DmaChannelExt for [<DmaChannel $num>] {

@@ -84,8 +84,6 @@ use core::marker::PhantomData;
 use enumset::{EnumSet, EnumSetType};
 use private::*;
 
-#[cfg(i2s1)]
-use crate::dma::I2s1Peripheral;
 use crate::{
     dma::{
         dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
@@ -101,8 +99,6 @@ use crate::{
         DmaTransferRxCircular,
         DmaTransferTx,
         DmaTransferTxCircular,
-        I2s0Peripheral,
-        PeripheralDmaChannel,
         ReadBuffer,
         Rx,
         Tx,
@@ -444,39 +440,9 @@ where
         tx_descriptors: &'static mut [DmaDescriptor],
     ) -> Self
     where
-        I: I2s0Instance,
-        CH: PeripheralDmaChannel,
-        CH::P: I2s0Peripheral,
+        CH: crate::dma::DmaChannel,
+        (CH, I::Peripheral): crate::dma::DmaCompatible,
         DmaMode: Mode,
-    {
-        Self::new_internal(
-            i2s,
-            standard,
-            data_format,
-            sample_rate,
-            channel,
-            rx_descriptors,
-            tx_descriptors,
-        )
-    }
-
-    /// Construct a new I2S peripheral driver instance for the second I2S
-    /// peripheral
-    #[allow(clippy::too_many_arguments)]
-    #[cfg(i2s1)]
-    pub fn new_i2s1<CH>(
-        i2s: impl Peripheral<P = I> + 'd,
-        standard: Standard,
-        data_format: DataFormat,
-        sample_rate: impl Into<fugit::HertzU32>,
-        channel: Channel<'d, CH, DmaMode>,
-        rx_descriptors: &'static mut [DmaDescriptor],
-        tx_descriptors: &'static mut [DmaDescriptor],
-    ) -> Self
-    where
-        I: I2s1Instance,
-        CH: PeripheralDmaChannel,
-        CH::P: I2s1Peripheral,
     {
         Self::new_internal(
             i2s,
@@ -840,6 +806,7 @@ where
 
 /// Provides an abstraction for accessing the I2S peripheral registers.
 pub trait RegisterAccess: RegisterAccessPrivate {}
+impl<T> RegisterAccess for T where T: RegisterAccessPrivate {}
 
 mod private {
     use core::marker::PhantomData;
@@ -1007,6 +974,8 @@ mod private {
 
     #[cfg(any(esp32, esp32s2))]
     pub trait RegisterAccessPrivate: Signals + RegBlock {
+        type Peripheral;
+
         fn set_interrupt_handler(handler: InterruptHandler);
 
         fn enable_listen(interrupts: EnumSet<I2sInterrupt>, enable: bool) {
@@ -1261,6 +1230,8 @@ mod private {
 
     #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
     pub trait RegisterAccessPrivate: Signals + RegBlock {
+        type Peripheral;
+
         fn set_interrupt_handler(handler: InterruptHandler);
 
         fn enable_listen(interrupts: EnumSet<I2sInterrupt>, enable: bool) {
@@ -1939,34 +1910,31 @@ mod private {
     }
 
     impl RegisterAccessPrivate for I2S0 {
+        #[cfg(pdma)]
+        type Peripheral = crate::dma::I2s0DmaSuitablePeripheral;
+        #[cfg(gdma)]
+        type Peripheral = crate::dma::SuitablePeripheral;
+
         fn set_interrupt_handler(handler: InterruptHandler) {
             unsafe { crate::peripherals::I2S0::steal() }.bind_i2s0_interrupt(handler.handler());
             crate::interrupt::enable(crate::peripherals::Interrupt::I2S0, handler.priority())
                 .unwrap();
         }
     }
-    impl super::RegisterAccess for I2S0 {}
 
     #[cfg(i2s1)]
     impl RegisterAccessPrivate for I2S1 {
+        #[cfg(pdma)]
+        type Peripheral = crate::dma::I2s1DmaSuitablePeripheral;
+        #[cfg(gdma)]
+        type Peripheral = crate::dma::SuitablePeripheral;
+
         fn set_interrupt_handler(handler: InterruptHandler) {
             unsafe { crate::peripherals::I2S1::steal() }.bind_i2s1_interrupt(handler.handler());
             crate::interrupt::enable(crate::peripherals::Interrupt::I2S1, handler.priority())
                 .unwrap();
         }
     }
-    #[cfg(i2s1)]
-    impl super::RegisterAccess for I2S1 {}
-
-    pub trait I2s0Instance {}
-
-    #[cfg(any(esp32s3, esp32))]
-    pub trait I2s1Instance {}
-
-    impl I2s0Instance for I2S0 {}
-
-    #[cfg(any(esp32s3, esp32))]
-    impl I2s1Instance for I2S1 {}
 
     pub struct I2sClockDividers {
         mclk_divider: u32,

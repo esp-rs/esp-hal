@@ -887,35 +887,27 @@ macro_rules! ImplI2sChannel {
 #[non_exhaustive]
 pub struct Spi2DmaSuitablePeripheral {}
 impl PeripheralMarker for Spi2DmaSuitablePeripheral {}
-impl SpiPeripheral for Spi2DmaSuitablePeripheral {}
-impl Spi2Peripheral for Spi2DmaSuitablePeripheral {}
 
 #[doc(hidden)]
 #[non_exhaustive]
 pub struct Spi3DmaSuitablePeripheral {}
 impl PeripheralMarker for Spi3DmaSuitablePeripheral {}
-impl SpiPeripheral for Spi3DmaSuitablePeripheral {}
-impl Spi3Peripheral for Spi3DmaSuitablePeripheral {}
 
 ImplSpiChannel!(2);
+#[cfg(spi3)]
 ImplSpiChannel!(3);
 
 #[doc(hidden)]
 #[non_exhaustive]
 pub struct I2s0DmaSuitablePeripheral {}
 impl PeripheralMarker for I2s0DmaSuitablePeripheral {}
-impl I2sPeripheral for I2s0DmaSuitablePeripheral {}
-impl I2s0Peripheral for I2s0DmaSuitablePeripheral {}
-
-ImplI2sChannel!(0);
 
 #[doc(hidden)]
 #[non_exhaustive]
 pub struct I2s1DmaSuitablePeripheral {}
 impl PeripheralMarker for I2s1DmaSuitablePeripheral {}
-impl I2sPeripheral for I2s1DmaSuitablePeripheral {}
-impl I2s1Peripheral for I2s1DmaSuitablePeripheral {}
 
+ImplI2sChannel!(0);
 #[cfg(i2s1)]
 ImplI2sChannel!(1);
 
