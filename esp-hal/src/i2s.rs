@@ -102,7 +102,6 @@ use crate::{
         DmaTransferTx,
         DmaTransferTxCircular,
         I2s0Peripheral,
-        I2sPeripheral,
         PeripheralDmaChannel,
         ReadBuffer,
         Rx,
@@ -447,7 +446,7 @@ where
     where
         I: I2s0Instance,
         CH: PeripheralDmaChannel,
-        CH::P: I2sPeripheral + I2s0Peripheral,
+        CH::P: I2s0Peripheral,
         DmaMode: Mode,
     {
         Self::new_internal(
@@ -477,7 +476,7 @@ where
     where
         I: I2s1Instance,
         CH: PeripheralDmaChannel,
-        CH::P: I2sPeripheral + I2s1Peripheral,
+        CH::P: I2s1Peripheral,
     {
         Self::new_internal(
             i2s,

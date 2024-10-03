@@ -943,13 +943,13 @@ mod dma {
         /// This method prepares the SPI instance for DMA transfers. It
         /// initializes the DMA channel for transmission and returns an
         /// instance of `SpiDma` that supports DMA operations.
-        pub fn with_dma<C, DmaMode>(
+        pub fn with_dma<CH, DmaMode>(
             self,
-            channel: Channel<'d, C, DmaMode>,
+            channel: Channel<'d, CH, DmaMode>,
         ) -> SpiDma<'d, crate::peripherals::SPI2, M, DmaMode>
         where
-            C: PeripheralDmaChannel,
-            C::P: SpiPeripheral + Spi2Peripheral,
+            CH: PeripheralDmaChannel,
+            CH::P: Spi2Peripheral,
             DmaMode: Mode,
         {
             SpiDma::new(self.spi, channel)
@@ -966,13 +966,13 @@ mod dma {
         /// This method prepares the SPI instance for DMA transfers using SPI3
         /// and returns an instance of `SpiDma` that supports DMA
         /// operations.
-        pub fn with_dma<C, DmaMode>(
+        pub fn with_dma<CH, DmaMode>(
             self,
-            channel: Channel<'d, C, DmaMode>,
+            channel: Channel<'d, CH, DmaMode>,
         ) -> SpiDma<'d, crate::peripherals::SPI3, M, DmaMode>
         where
-            C: PeripheralDmaChannel,
-            C::P: SpiPeripheral + Spi3Peripheral,
+            CH: PeripheralDmaChannel,
+            CH::P: Spi3Peripheral,
             DmaMode: Mode,
         {
             SpiDma::new(self.spi, channel)

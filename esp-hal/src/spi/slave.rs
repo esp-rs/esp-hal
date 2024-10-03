@@ -169,7 +169,6 @@ pub mod dma {
             ReadBuffer,
             Rx,
             Spi2Peripheral,
-            SpiPeripheral,
             Tx,
             WriteBuffer,
         },
@@ -180,15 +179,15 @@ pub mod dma {
         /// Configures the SPI3 peripheral with the provided DMA channel and
         /// descriptors.
         #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
-        pub fn with_dma<C, DmaMode>(
+        pub fn with_dma<CH, DmaMode>(
             mut self,
-            channel: Channel<'d, C, DmaMode>,
+            channel: Channel<'d, CH, DmaMode>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> SpiDma<'d, crate::peripherals::SPI2, DmaMode>
         where
-            C: PeripheralDmaChannel,
-            C::P: SpiPeripheral + Spi2Peripheral,
+            CH: PeripheralDmaChannel,
+            CH::P: Spi2Peripheral,
             DmaMode: Mode,
         {
             self.spi.set_data_mode(self.data_mode, true);
@@ -201,15 +200,15 @@ pub mod dma {
         /// Configures the SPI3 peripheral with the provided DMA channel and
         /// descriptors.
         #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
-        pub fn with_dma<C, DmaMode>(
+        pub fn with_dma<CH, DmaMode>(
             mut self,
-            channel: Channel<'d, C, DmaMode>,
+            channel: Channel<'d, CH, DmaMode>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> SpiDma<'d, crate::peripherals::SPI3, DmaMode>
         where
-            C: PeripheralDmaChannel,
-            C::P: SpiPeripheral + Spi3Peripheral,
+            CH: PeripheralDmaChannel,
+            CH::P: Spi3Peripheral,
             DmaMode: Mode,
         {
             self.spi.set_data_mode(self.data_mode, true);
