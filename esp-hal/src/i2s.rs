@@ -331,7 +331,6 @@ where
     pub i2s_rx: RxCreator<'d, I, CH, DmaMode>,
     /// Handles the transmission (TX) side of the I2S peripheral.
     pub i2s_tx: TxCreator<'d, I, CH, DmaMode>,
-    phantom: PhantomData<DmaMode>,
 }
 
 impl<'d, I, CH, DmaMode> I2s<'d, I, CH, DmaMode>
@@ -374,7 +373,6 @@ where
                 descriptors: tx_descriptors,
                 phantom: PhantomData,
             },
-            phantom: PhantomData,
         }
     }
 }
