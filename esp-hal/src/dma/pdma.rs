@@ -923,7 +923,7 @@ pub struct Dma<'d> {
     /// DMA channel for I2S0
     pub i2s0channel: I2s0DmaChannelCreator,
     /// DMA channel for I2S1
-    #[cfg(esp32)]
+    #[cfg(i2s1)]
     pub i2s1channel: I2s1DmaChannelCreator,
 }
 
