@@ -98,10 +98,18 @@ mod tests {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let (mosi_pin, miso_pin) = hil_test::i2c_pins!(io);
-        let (sclk_pin, sclk_gpio) = hil_test::common_test_pins!(io);
-        let cs_pin = hil_test::unconnected_pin!(io);
-
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                // FIXME revert this
+                let (sclk_pin, miso_pin) = (io.pins.gpio2, io.pins.gpio4);
+                let mosi_pin = io.pins.gpio32;
+                let cs_pin = io.pins.gpio33;
+            } else {
+                let (mosi_pin, miso_pin) = hil_test::i2c_pins!(io);
+                let (sclk_pin, sclk_gpio) = hil_test::common_test_pins!(io);
+                let cs_pin = hil_test::unconnected_pin!(io);
+            }
+        }
         let dma = Dma::new(peripherals.DMA);
 
         cfg_if::cfg_if! {
@@ -115,14 +123,15 @@ mod tests {
         let cs = cs_pin.peripheral_input();
         let mosi = mosi_pin.peripheral_input();
         let mut miso = miso_pin.peripheral_input();
+        let sclk_signal = sclk_pin.peripheral_input();
 
         let mosi_gpio = Output::new(mosi_pin, Level::Low);
         let cs_gpio = Output::new(cs_pin, Level::High);
-        let sclk_gpio = Output::new(sclk_gpio, Level::Low);
+        let sclk_gpio = Output::new(sclk_pin, Level::Low);
 
         let spi = Spi::new(
             peripherals.SPI2,
-            sclk_pin,
+            sclk_signal,
             mosi,
             miso_pin,
             cs,
@@ -145,8 +154,8 @@ mod tests {
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DMA_SIZE);
         let mut spi = ctx.spi.with_dma(
             ctx.dma_channel.configure(false, DmaPriority::Priority0),
-            tx_descriptors,
             rx_descriptors,
+            tx_descriptors,
         );
         let slave_send = tx_buffer;
         let slave_receive = rx_buffer;

@@ -586,11 +586,6 @@ pub trait Instance: private::Sealed {
 
     fn peripheral(&self) -> crate::system::Peripheral;
 
-    #[inline(always)]
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(self.peripheral())
-    }
-
     fn sclk_signal(&self) -> InputSignal;
 
     fn mosi_signal(&self) -> InputSignal;
@@ -598,8 +593,6 @@ pub trait Instance: private::Sealed {
     fn miso_signal(&self) -> OutputSignal;
 
     fn cs_signal(&self) -> InputSignal;
-
-    fn peripheral(&self) -> crate::system::Peripheral;
 
     #[inline(always)]
     fn reset_peripheral(&self) {
