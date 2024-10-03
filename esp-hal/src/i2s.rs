@@ -85,7 +85,7 @@ use enumset::{EnumSet, EnumSetType};
 use private::*;
 
 #[cfg(i2s1)]
-use crate::dma::I2s1Peripheral;
+use crate::{dma::I2s1Peripheral, peripherals::I2S1};
 use crate::{
     dma::{
         dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
@@ -111,6 +111,7 @@ use crate::{
     interrupt::InterruptHandler,
     into_ref,
     peripheral::Peripheral,
+    peripherals::I2S0,
     system::PeripheralClockControl,
     InterruptConfigurable,
     Mode,
@@ -431,9 +432,8 @@ where
     }
 }
 
-impl<'d, I, CH, DmaMode> I2s<'d, I, CH, DmaMode>
+impl<'d, CH, DmaMode> I2s<'d, I2S0, CH, DmaMode>
 where
-    I: RegisterAccess,
     CH: DmaChannel,
     DmaMode: Mode,
 {
@@ -441,20 +441,19 @@ where
     /// peripheral
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        i2s: impl Peripheral<P = I> + 'd,
+        i2s: impl Peripheral<P = I2S0> + 'd,
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
         channel: Channel<'d, CH, DmaMode>,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
-    ) -> Self
+    ) -> I2s<'d, I2S0, CH, DmaMode>
     where
-        I: I2s0Instance,
         CH::P: I2sPeripheral + I2s0Peripheral,
         DmaMode: Mode,
     {
-        Self::new_internal(
+        I2s::new_internal(
             i2s,
             standard,
             data_format,
@@ -470,19 +469,18 @@ where
     #[allow(clippy::too_many_arguments)]
     #[cfg(i2s1)]
     pub fn new_i2s1(
-        i2s: impl Peripheral<P = I> + 'd,
+        i2s: impl Peripheral<P = I2S1> + 'd,
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
         channel: Channel<'d, CH, DmaMode>,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
-    ) -> Self
+    ) -> I2s<'d, I2S1, CH, DmaMode>
     where
-        I: I2s1Instance,
         CH::P: I2sPeripheral + I2s1Peripheral,
     {
-        Self::new_internal(
+        I2s::new_internal(
             i2s,
             standard,
             data_format,
@@ -492,7 +490,14 @@ where
             tx_descriptors,
         )
     }
+}
 
+impl<'d, I, CH, DmaMode> I2s<'d, I, CH, DmaMode>
+where
+    I: RegisterAccess,
+    CH: DmaChannel,
+    DmaMode: Mode,
+{
     /// Configures the I2S peripheral to use a master clock (MCLK) output pin.
     pub fn with_mclk<P: PeripheralOutput>(self, pin: impl Peripheral<P = P> + 'd) -> Self {
         into_ref!(pin);
@@ -2004,16 +2009,6 @@ mod private {
     }
     #[cfg(i2s1)]
     impl super::RegisterAccess for I2S1 {}
-
-    pub trait I2s0Instance {}
-
-    #[cfg(any(esp32s3, esp32))]
-    pub trait I2s1Instance {}
-
-    impl I2s0Instance for I2S0 {}
-
-    #[cfg(any(esp32s3, esp32))]
-    impl I2s1Instance for I2S1 {}
 
     pub struct I2sClockDividers {
         mclk_divider: u32,
