@@ -15,6 +15,8 @@ use crate::peripherals::SYSTEM;
 // FIXME: This enum needs to be public because it's exposed via a bunch of traits, but it's not
 // useful to users.
 #[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Peripheral {
     /// SPI2 peripheral.
     #[cfg(spi2)]

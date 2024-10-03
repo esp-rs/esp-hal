@@ -27,6 +27,7 @@ pub trait SpiPdmaChannel: crate::private::Sealed {
     fn register_block(&self) -> &SpiRegisterBlock;
     fn tx_waker(&self) -> &'static AtomicWaker;
     fn rx_waker(&self) -> &'static AtomicWaker;
+    fn is_compatible_with<P: PeripheralMarker>(&self, peripheral: P) -> bool;
 }
 
 #[doc(hidden)]
@@ -34,6 +35,7 @@ pub trait I2sPdmaChannel: crate::private::Sealed {
     fn register_block(&self) -> &I2sRegisterBlock;
     fn tx_waker(&self) -> &'static AtomicWaker;
     fn rx_waker(&self) -> &'static AtomicWaker;
+    fn is_compatible_with<P: PeripheralMarker>(&self, peripheral: P) -> bool;
 }
 
 #[doc(hidden)]
@@ -104,6 +106,10 @@ impl<C: SpiPdmaChannel> RegisterAccess for SpiDmaTxChannelImpl<C> {
         let spi = self.0.register_block();
         spi.dma_out_link()
             .modify(|_, w| w.outlink_restart().set_bit());
+    }
+
+    fn is_compatible_with<P: PeripheralMarker>(&self, peripheral: P) -> bool {
+        self.0.is_compatible_with(peripheral)
     }
 }
 
@@ -231,6 +237,10 @@ impl<C: SpiPdmaChannel> RegisterAccess for SpiDmaRxChannelImpl<C> {
         let spi = self.0.register_block();
         spi.dma_in_link()
             .modify(|_, w| w.inlink_restart().set_bit());
+    }
+
+    fn is_compatible_with<P: PeripheralMarker>(&self, peripheral: P) -> bool {
+        self.0.is_compatible_with(peripheral)
     }
 }
 
@@ -390,6 +400,10 @@ macro_rules! ImplSpiChannel {
                     static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
                     &WAKER
                 }
+
+                fn is_compatible_with<P: PeripheralMarker>(&self, peripheral: P) -> bool {
+                    p.peripheral() == crate::system::Peripheral::[<Spi $num>]
+                }
             }
 
             impl $crate::private::Sealed for [<Spi $num DmaChannel>] {}
@@ -535,6 +549,10 @@ impl<C: I2sPdmaChannel> RegisterAccess for I2sDmaTxChannelImpl<C> {
             .out_link()
             .modify(|_, w| w.outlink_restart().set_bit());
     }
+
+    fn is_compatible_with<P: PeripheralMarker>(&self, peripheral: P) -> bool {
+        self.0.is_compatible_with(peripheral)
+    }
 }
 
 impl<C: I2sPdmaChannel> TxRegisterAccess for I2sDmaTxChannelImpl<C> {
@@ -670,6 +688,10 @@ impl<C: I2sPdmaChannel> RegisterAccess for I2sDmaRxChannelImpl<C> {
         reg_block
             .in_link()
             .modify(|_, w| w.inlink_restart().set_bit());
+    }
+
+    fn is_compatible_with<P: PeripheralMarker>(&self, peripheral: P) -> bool {
+        self.0.is_compatible_with(peripheral)
     }
 }
 
@@ -825,6 +847,9 @@ macro_rules! ImplI2sChannel {
                     static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
                     &WAKER
                 }
+                fn is_compatible_with<P: PeripheralMarker>(&self, peripheral: P) -> bool {
+                    p.peripheral() == crate::system::Peripheral::[<I2s $num>]
+                }
             }
 
             #[doc = concat!("Creates a channel for I2S", $num)]
@@ -885,13 +910,21 @@ macro_rules! ImplI2sChannel {
 
 #[doc(hidden)]
 #[non_exhaustive]
-pub struct Spi2DmaSuitablePeripheral {}
-impl PeripheralMarker for Spi2DmaSuitablePeripheral {}
+pub struct Spi2DmaSuitablePeripheral;
+impl PeripheralMarker for Spi2DmaSuitablePeripheral {
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::Spi2
+    }
+}
 
 #[doc(hidden)]
 #[non_exhaustive]
-pub struct Spi3DmaSuitablePeripheral {}
-impl PeripheralMarker for Spi3DmaSuitablePeripheral {}
+pub struct Spi3DmaSuitablePeripheral;
+impl PeripheralMarker for Spi3DmaSuitablePeripheral {
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::Spi3
+    }
+}
 
 ImplSpiChannel!(2);
 #[cfg(spi3)]
@@ -899,13 +932,23 @@ ImplSpiChannel!(3);
 
 #[doc(hidden)]
 #[non_exhaustive]
-pub struct I2s0DmaSuitablePeripheral {}
-impl PeripheralMarker for I2s0DmaSuitablePeripheral {}
+pub struct I2s0DmaSuitablePeripheral;
+impl PeripheralMarker for I2s0DmaSuitablePeripheral {
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::I2s0
+    }
+}
 
 #[doc(hidden)]
 #[non_exhaustive]
-pub struct I2s1DmaSuitablePeripheral {}
-impl PeripheralMarker for I2s1DmaSuitablePeripheral {}
+#[cfg(i2s1)]
+pub struct I2s1DmaSuitablePeripheral;
+#[cfg(i2s1)]
+impl PeripheralMarker for I2s1DmaSuitablePeripheral {
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::I2s1
+    }
+}
 
 ImplI2sChannel!(0);
 #[cfg(i2s1)]
@@ -1005,6 +1048,7 @@ impl RegisterAccess for AnyPdmaRxChannelImpl {
             fn start(&self);
             fn stop(&self);
             fn restart(&self);
+            fn is_compatible_with<P: PeripheralMarker>(&self, peripheral: P) -> bool;
         }
     }
 }
@@ -1048,6 +1092,7 @@ impl RegisterAccess for AnyPdmaTxChannelImpl {
             fn start(&self);
             fn stop(&self);
             fn restart(&self);
+            fn is_compatible_with<P: PeripheralMarker>(&self, peripheral: P) -> bool;
         }
     }
 }
@@ -1064,3 +1109,28 @@ impl TxRegisterAccess for AnyPdmaTxChannelImpl {
         }
     }
 }
+
+impl<'d, C, M: Mode> Channel<'d, C, M>
+where
+    C: DmaChannel,
+{
+    /// Asserts that the channel is compatible with the given peripheral.
+    pub fn runtime_ensure_compatible<P: PeripheralMarker>(&self, peripheral: P) {
+        assert!(
+            self.tx.tx_impl.is_compatible_with(p),
+            "This DMA channel is not compatible with {:?}",
+            p.peripheral()
+        );
+    }
+}
+
+#[cfg(pdma)]
+impl<CH, P> DmaCompatible for (CH, P)
+where
+    CH: PeripheralDmaChannel<P = P>,
+    P: PeripheralMarker,
+{
+}
+
+#[cfg(pdma)]
+impl<P> DmaCompatible for (AnyDmaChannel, P) where P: PeripheralMarker {}

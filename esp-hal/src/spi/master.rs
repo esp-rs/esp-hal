@@ -81,7 +81,7 @@ use super::{
 };
 use crate::{
     clock::Clocks,
-    dma::{DmaPeripheral, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
+    dma::{DmaPeripheral, DmaRxBuffer, DmaTxBuffer, PeripheralMarker, Rx, Tx},
     gpio::{InputSignal, NoPin, OutputSignal, PeripheralInput, PeripheralOutput},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
@@ -1006,6 +1006,7 @@ mod dma {
         where
             CH: DmaChannel,
         {
+            channel.runtime_ensure_compatible(spi.dma_peripheral_marker());
             #[cfg(all(esp32, spi_address_workaround))]
             let address_buffer = {
                 use crate::dma::DmaDescriptor;
@@ -2213,7 +2214,9 @@ mod ehal1 {
 
 #[doc(hidden)]
 pub trait InstanceDma: Instance {
-    type Peripheral;
+    type Peripheral: PeripheralMarker;
+
+    fn dma_peripheral_marker(&self) -> Self::Peripheral;
 
     #[allow(clippy::too_many_arguments)]
     unsafe fn start_transfer_dma<RX: Rx, TX: Tx>(
@@ -2427,6 +2430,16 @@ impl InstanceDma for crate::peripherals::SPI2 {
     type Peripheral = crate::dma::Spi2DmaSuitablePeripheral;
     #[cfg(gdma)]
     type Peripheral = crate::dma::SuitablePeripheral;
+
+    fn dma_peripheral_marker(&self) -> Self::Peripheral {
+        cfg_if::cfg_if! {
+            if #[cfg(pdma)] {
+                crate::dma::Spi2DmaSuitablePeripheral
+            } else {
+                crate::dma::SuitablePeripheral
+            }
+        }
+    }
 }
 
 #[cfg(spi3)]
@@ -2435,6 +2448,16 @@ impl InstanceDma for crate::peripherals::SPI3 {
     type Peripheral = crate::dma::Spi3DmaSuitablePeripheral;
     #[cfg(gdma)]
     type Peripheral = crate::dma::SuitablePeripheral;
+
+    fn dma_peripheral_marker(&self) -> Self::Peripheral {
+        cfg_if::cfg_if! {
+            if #[cfg(pdma)] {
+                crate::dma::Spi3DmaSuitablePeripheral
+            } else {
+                crate::dma::SuitablePeripheral
+            }
+        }
+    }
 }
 
 #[doc(hidden)]

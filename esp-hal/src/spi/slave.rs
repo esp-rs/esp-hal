@@ -73,7 +73,7 @@ use core::marker::PhantomData;
 
 use super::{Error, FullDuplexMode, SpiMode};
 use crate::{
-    dma::{DescriptorChain, DmaPeripheral, Rx, Tx},
+    dma::{DescriptorChain, DmaPeripheral, PeripheralMarker, Rx, Tx},
     gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
@@ -279,6 +279,7 @@ pub mod dma {
         where
             CH: DmaChannel,
         {
+            channel.runtime_ensure_compatible(spi.dma_peripheral_marker());
             Self {
                 spi,
                 channel: channel.degrade(),
@@ -399,7 +400,9 @@ pub mod dma {
 
 #[doc(hidden)]
 pub trait InstanceDma: Instance {
-    type Peripheral;
+    type Peripheral: PeripheralMarker;
+
+    fn dma_peripheral_marker(&self) -> Self::Peripheral;
 
     fn dma_peripheral(&self) -> DmaPeripheral;
 
@@ -550,6 +553,16 @@ impl InstanceDma for crate::peripherals::SPI2 {
     #[cfg(gdma)]
     type Peripheral = crate::dma::SuitablePeripheral;
 
+    fn dma_peripheral_marker(&self) -> Self::Peripheral {
+        cfg_if::cfg_if! {
+            if #[cfg(pdma)] {
+                crate::dma::Spi2DmaSuitablePeripheral
+            } else {
+                crate::dma::SuitablePeripheral
+            }
+        }
+    }
+
     fn dma_peripheral(&self) -> DmaPeripheral {
         DmaPeripheral::Spi2
     }
@@ -560,6 +573,16 @@ impl InstanceDma for crate::peripherals::SPI3 {
     type Peripheral = crate::dma::Spi3DmaSuitablePeripheral;
     #[cfg(gdma)]
     type Peripheral = crate::dma::SuitablePeripheral;
+
+    fn dma_peripheral_marker(&self) -> Self::Peripheral {
+        cfg_if::cfg_if! {
+            if #[cfg(pdma)] {
+                crate::dma::Spi3DmaSuitablePeripheral
+            } else {
+                crate::dma::SuitablePeripheral
+            }
+        }
+    }
 
     fn dma_peripheral(&self) -> DmaPeripheral {
         DmaPeripheral::Spi3

@@ -418,7 +418,7 @@ pub struct ChannelCreator<const N: u8> {}
 
 #[non_exhaustive]
 #[doc(hidden)]
-pub struct SuitablePeripheral {}
+pub struct SuitablePeripheral;
 impl PeripheralMarker for SuitablePeripheral {}
 
 impl DmaChannel for AnyDmaChannel {
@@ -431,6 +431,20 @@ impl DmaChannel for AnyDmaChannel {
     fn degrade_tx(tx: Self::Tx) -> ChannelTxImpl<AnyGdmaChannel> {
         tx
     }
+}
+
+impl<CH: DmaChannel, M: Mode> Channel<'_, CH, M> {
+    /// Asserts that the channel is compatible with the given peripheral.
+    pub fn runtime_ensure_compatible<P: PeripheralMarker>(&self, _peripheral: P) {
+        // GDMA channels are compatible with any peripheral
+    }
+}
+
+impl<CH, P> DmaCompatible for (CH, P)
+where
+    CH: DmaChannel,
+    P: PeripheralMarker,
+{
 }
 
 macro_rules! impl_channel {

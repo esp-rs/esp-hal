@@ -902,26 +902,13 @@ pub trait DmaEligible {
 
 /// Marker trait
 #[doc(hidden)]
-pub trait PeripheralMarker {}
+pub trait PeripheralMarker {
+    #[cfg(pdma)]
+    fn peripheral(&self) -> crate::system::Peripheral;
+}
 
 #[doc(hidden)]
 pub trait DmaCompatible {}
-
-#[cfg(gdma)]
-impl<CH, P> DmaCompatible for (CH, P)
-where
-    CH: DmaChannel,
-    P: PeripheralMarker,
-{
-}
-
-#[cfg(pdma)]
-impl<CH, P> DmaCompatible for (CH, P)
-where
-    CH: PeripheralDmaChannel<P = P>,
-    P: PeripheralMarker,
-{
-}
 
 #[doc(hidden)]
 #[derive(Debug)]
@@ -2004,6 +1991,9 @@ pub trait RegisterAccess: crate::private::Sealed {
 
     #[cfg(esp32s3)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
+
+    #[cfg(pdma)]
+    fn is_compatible_with<P: PeripheralMarker>(&self, peripheral: P) -> bool;
 }
 
 #[doc(hidden)]

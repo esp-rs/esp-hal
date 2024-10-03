@@ -334,7 +334,7 @@ where
 {
     #[allow(clippy::too_many_arguments)]
     fn new_internal<CH: DmaChannel>(
-        _i2s: impl Peripheral<P = I> + 'd,
+        i2s: impl Peripheral<P = I> + 'd,
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
@@ -342,6 +342,8 @@ where
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
     ) -> Self {
+        crate::into_ref!(i2s);
+        channel.runtime_ensure_compatible(i2s.dma_peripheral_marker());
         // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
         // could be configured totally independently but for now handle all
         // the targets the same and force same configuration for both, TX and RX
@@ -830,7 +832,14 @@ mod private {
     #[cfg(any(esp32, esp32s3))]
     use crate::peripherals::{i2s1::RegisterBlock, I2S1};
     use crate::{
-        dma::{AnyDmaChannel, ChannelRx, ChannelTx, DmaDescriptor, DmaPeripheral},
+        dma::{
+            AnyDmaChannel,
+            ChannelRx,
+            ChannelTx,
+            DmaDescriptor,
+            DmaPeripheral,
+            PeripheralMarker,
+        },
         gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
         interrupt::InterruptHandler,
         into_ref,
@@ -974,7 +983,9 @@ mod private {
 
     #[cfg(any(esp32, esp32s2))]
     pub trait RegisterAccessPrivate: Signals + RegBlock {
-        type Peripheral;
+        type Peripheral: PeripheralMarker;
+
+        fn dma_peripheral_marker(&self) -> Self::Peripheral;
 
         fn set_interrupt_handler(handler: InterruptHandler);
 
@@ -1230,7 +1241,9 @@ mod private {
 
     #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
     pub trait RegisterAccessPrivate: Signals + RegBlock {
-        type Peripheral;
+        type Peripheral: PeripheralMarker;
+
+        fn dma_peripheral_marker(&self) -> Self::Peripheral;
 
         fn set_interrupt_handler(handler: InterruptHandler);
 
@@ -1915,6 +1928,16 @@ mod private {
         #[cfg(gdma)]
         type Peripheral = crate::dma::SuitablePeripheral;
 
+        fn dma_peripheral_marker(&self) -> Self::Peripheral {
+            cfg_if::cfg_if! {
+                if #[cfg(pdma)] {
+                    crate::dma::I2s0DmaSuitablePeripheral
+                } else {
+                    crate::dma::SuitablePeripheral
+                }
+            }
+        }
+
         fn set_interrupt_handler(handler: InterruptHandler) {
             unsafe { crate::peripherals::I2S0::steal() }.bind_i2s0_interrupt(handler.handler());
             crate::interrupt::enable(crate::peripherals::Interrupt::I2S0, handler.priority())
@@ -1928,6 +1951,16 @@ mod private {
         type Peripheral = crate::dma::I2s1DmaSuitablePeripheral;
         #[cfg(gdma)]
         type Peripheral = crate::dma::SuitablePeripheral;
+
+        fn dma_peripheral_marker(&self) -> Self::Peripheral {
+            cfg_if::cfg_if! {
+                if #[cfg(pdma)] {
+                    crate::dma::I2s1DmaSuitablePeripheral
+                } else {
+                    crate::dma::SuitablePeripheral
+                }
+            }
+        }
 
         fn set_interrupt_handler(handler: InterruptHandler) {
             unsafe { crate::peripherals::I2S1::steal() }.bind_i2s1_interrupt(handler.handler());
