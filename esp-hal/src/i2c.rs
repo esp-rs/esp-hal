@@ -308,7 +308,7 @@ where
     pub fn transaction<'a>(
         &mut self,
         address: u8,
-        operations: &mut [impl I2cOperation<'a>],
+        operations: &mut [impl I2cOperation],
     ) -> Result<(), Error> {
         let mut last_op: Option<OpKind> = None;
         // filter out 0 length read operations
@@ -1082,7 +1082,7 @@ mod asynch {
         async fn transaction<'a>(
             &mut self,
             address: u8,
-            operations: &mut [impl I2cOperation<'a>],
+            operations: &mut [impl I2cOperation],
         ) -> Result<(), Error> {
             let mut last_op: Option<OpKind> = None;
             // filter out 0 length read operations
@@ -1218,12 +1218,12 @@ mod private {
     }
 
     #[doc(hidden)]
-    pub trait I2cOperation<'a> {
+    pub trait I2cOperation {
         fn is_write(&self) -> bool;
 
         fn is_read(&self) -> bool;
 
-        fn write_buffer(&self) -> Option<&'a [u8]>;
+        fn write_buffer(&self) -> Option<&[u8]>;
 
         fn read_buffer(&mut self) -> Option<&mut [u8]>;
 
@@ -1232,7 +1232,7 @@ mod private {
         fn kind(&self) -> OpKind;
     }
 
-    impl<'a> I2cOperation<'a> for Operation<'a> {
+    impl<'a> I2cOperation for Operation<'a> {
         fn is_write(&self) -> bool {
             matches!(self, Operation::Write(_))
         }
@@ -1241,7 +1241,7 @@ mod private {
             matches!(self, Operation::Read(_))
         }
 
-        fn write_buffer(&self) -> Option<&'a [u8]> {
+        fn write_buffer(&self) -> Option<&[u8]> {
             match self {
                 Operation::Write(buffer) => Some(buffer),
                 Operation::Read(_) => None,
@@ -1270,7 +1270,7 @@ mod private {
         }
     }
 
-    impl<'a> I2cOperation<'a> for embedded_hal::i2c::Operation<'a> {
+    impl<'a> I2cOperation for embedded_hal::i2c::Operation<'a> {
         fn is_write(&self) -> bool {
             matches!(self, embedded_hal::i2c::Operation::Write(_))
         }
@@ -1279,7 +1279,7 @@ mod private {
             matches!(self, embedded_hal::i2c::Operation::Read(_))
         }
 
-        fn write_buffer(&self) -> Option<&'a [u8]> {
+        fn write_buffer(&self) -> Option<&[u8]> {
             match self {
                 embedded_hal::i2c::Operation::Write(buffer) => Some(buffer),
                 embedded_hal::i2c::Operation::Read(_) => None,
