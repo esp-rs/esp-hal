@@ -135,30 +135,6 @@ impl<C: GdmaChannel> RegisterAccess for ChannelTxImpl<C> {
             .modify(|_, w| w.outlink_restart().set_bit());
     }
 
-    fn clear_interrupts(&self) {
-        #[cfg(not(esp32s3))]
-        self.int().clr().write(|w| {
-            w.out_eof().clear_bit_by_one();
-            w.out_dscr_err().clear_bit_by_one();
-            w.out_done().clear_bit_by_one();
-            w.out_total_eof().clear_bit_by_one();
-            w.outfifo_ovf().clear_bit_by_one();
-            w.outfifo_udf().clear_bit_by_one()
-        });
-
-        #[cfg(esp32s3)]
-        self.int().clr().write(|w| {
-            w.out_eof().clear_bit_by_one();
-            w.out_dscr_err().clear_bit_by_one();
-            w.out_done().clear_bit_by_one();
-            w.out_total_eof().clear_bit_by_one();
-            w.outfifo_ovf_l1().clear_bit_by_one();
-            w.outfifo_ovf_l3().clear_bit_by_one();
-            w.outfifo_udf_l1().clear_bit_by_one();
-            w.outfifo_udf_l3().clear_bit_by_one()
-        });
-    }
-
     #[cfg(esp32s3)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
         self.ch()
@@ -178,28 +154,14 @@ impl<C: GdmaChannel> TxRegisterAccess for ChannelTxImpl<C> {
 }
 
 impl<C: GdmaChannel> InterruptAccess<DmaTxInterrupt> for ChannelTxImpl<C> {
-    fn listen(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+    fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
         self.int().ena().modify(|_, w| {
-            for interrupt in interrupts.into() {
+            for interrupt in interrupts {
                 match interrupt {
-                    DmaTxInterrupt::TotalEof => w.out_total_eof().set_bit(),
-                    DmaTxInterrupt::DescriptorError => w.out_dscr_err().set_bit(),
-                    DmaTxInterrupt::Eof => w.out_eof().set_bit(),
-                    DmaTxInterrupt::Done => w.out_done().set_bit(),
-                };
-            }
-            w
-        })
-    }
-
-    fn unlisten(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
-        self.int().ena().modify(|_, w| {
-            for interrupt in interrupts.into() {
-                match interrupt {
-                    DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit(),
-                    DmaTxInterrupt::DescriptorError => w.out_dscr_err().clear_bit(),
-                    DmaTxInterrupt::Eof => w.out_eof().clear_bit(),
-                    DmaTxInterrupt::Done => w.out_done().clear_bit(),
+                    DmaTxInterrupt::TotalEof => w.out_total_eof().bit(enable),
+                    DmaTxInterrupt::DescriptorError => w.out_dscr_err().bit(enable),
+                    DmaTxInterrupt::Eof => w.out_eof().bit(enable),
+                    DmaTxInterrupt::Done => w.out_done().bit(enable),
                 };
             }
             w
@@ -352,32 +314,6 @@ impl<C: GdmaChannel> RegisterAccess for ChannelRxImpl<C> {
             .modify(|_, w| w.inlink_restart().set_bit());
     }
 
-    fn clear_interrupts(&self) {
-        #[cfg(not(esp32s3))]
-        self.int().clr().write(|w| {
-            w.in_suc_eof().clear_bit_by_one();
-            w.in_err_eof().clear_bit_by_one();
-            w.in_dscr_err().clear_bit_by_one();
-            w.in_dscr_empty().clear_bit_by_one();
-            w.in_done().clear_bit_by_one();
-            w.infifo_ovf().clear_bit_by_one();
-            w.infifo_udf().clear_bit_by_one()
-        });
-
-        #[cfg(esp32s3)]
-        self.int().clr().write(|w| {
-            w.in_suc_eof().clear_bit_by_one();
-            w.in_err_eof().clear_bit_by_one();
-            w.in_dscr_err().clear_bit_by_one();
-            w.in_dscr_empty().clear_bit_by_one();
-            w.in_done().clear_bit_by_one();
-            w.infifo_ovf_l1().clear_bit_by_one();
-            w.infifo_ovf_l3().clear_bit_by_one();
-            w.infifo_udf_l1().clear_bit_by_one();
-            w.infifo_udf_l3().clear_bit_by_one()
-        });
-    }
-
     #[cfg(esp32s3)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
         self.ch()
@@ -395,34 +331,19 @@ impl<C: GdmaChannel> RxRegisterAccess for ChannelRxImpl<C> {
 }
 
 impl<C: GdmaChannel> InterruptAccess<DmaRxInterrupt> for ChannelRxImpl<C> {
-    fn listen(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
+    fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
         self.int().ena().modify(|_, w| {
-            for interrupt in interrupts.into() {
+            for interrupt in interrupts {
                 match interrupt {
-                    DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().set_bit(),
-                    DmaRxInterrupt::ErrorEof => w.in_err_eof().set_bit(),
-                    DmaRxInterrupt::DescriptorError => w.in_dscr_err().set_bit(),
-                    DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().set_bit(),
-                    DmaRxInterrupt::Done => w.in_done().set_bit(),
+                    DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().bit(enable),
+                    DmaRxInterrupt::ErrorEof => w.in_err_eof().bit(enable),
+                    DmaRxInterrupt::DescriptorError => w.in_dscr_err().bit(enable),
+                    DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().bit(enable),
+                    DmaRxInterrupt::Done => w.in_done().bit(enable),
                 };
             }
             w
         });
-    }
-
-    fn unlisten(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
-        self.int().ena().modify(|_, w| {
-            for interrupt in interrupts.into() {
-                match interrupt {
-                    DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit(),
-                    DmaRxInterrupt::ErrorEof => w.in_err_eof().clear_bit(),
-                    DmaRxInterrupt::DescriptorError => w.in_dscr_err().clear_bit(),
-                    DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().clear_bit(),
-                    DmaRxInterrupt::Done => w.in_done().clear_bit(),
-                };
-            }
-            w
-        })
     }
 
     fn is_listening(&self) -> EnumSet<DmaRxInterrupt> {

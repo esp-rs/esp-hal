@@ -1033,32 +1033,17 @@ fn internal_set_interrupt_handler(handler: InterruptHandler) {
     }
 }
 
-fn internal_listen(interrupts: EnumSet<ParlIoInterrupt>) {
+fn internal_listen(interrupts: EnumSet<ParlIoInterrupt>, enable: bool) {
     let parl_io = unsafe { crate::peripherals::PARL_IO::steal() };
     for interrupt in interrupts {
         match interrupt {
             ParlIoInterrupt::TxFifoReEmpty => parl_io
                 .int_ena()
-                .modify(|_, w| w.tx_fifo_rempty().set_bit()),
-            ParlIoInterrupt::RxFifoWOvf => {
-                parl_io.int_ena().modify(|_, w| w.rx_fifo_wovf().set_bit())
-            }
-            ParlIoInterrupt::TxEof => parl_io.int_ena().write(|w| w.tx_eof().set_bit()),
-        }
-    }
-}
-
-fn internal_unlisten(interrupts: EnumSet<ParlIoInterrupt>) {
-    let parl_io = unsafe { crate::peripherals::PARL_IO::steal() };
-    for interrupt in interrupts {
-        match interrupt {
-            ParlIoInterrupt::TxFifoReEmpty => parl_io
-                .int_ena()
-                .modify(|_, w| w.tx_fifo_rempty().clear_bit()),
+                .modify(|_, w| w.tx_fifo_rempty().bit(enable)),
             ParlIoInterrupt::RxFifoWOvf => parl_io
                 .int_ena()
-                .modify(|_, w| w.rx_fifo_wovf().clear_bit()),
-            ParlIoInterrupt::TxEof => parl_io.int_ena().write(|w| w.tx_eof().clear_bit()),
+                .modify(|_, w| w.rx_fifo_wovf().bit(enable)),
+            ParlIoInterrupt::TxEof => parl_io.int_ena().write(|w| w.tx_eof().bit(enable)),
         }
     }
 }
@@ -1157,13 +1142,13 @@ where
     }
 
     /// Listen for the given interrupts
-    pub fn listen(&mut self, interrupts: EnumSet<ParlIoInterrupt>) {
-        internal_listen(interrupts);
+    pub fn listen(&mut self, interrupts: impl Into<EnumSet<ParlIoInterrupt>>) {
+        internal_listen(interrupts.into(), true);
     }
 
     /// Unlisten the given interrupts
-    pub fn unlisten(&mut self, interrupts: EnumSet<ParlIoInterrupt>) {
-        internal_unlisten(interrupts);
+    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<ParlIoInterrupt>>) {
+        internal_listen(interrupts.into(), false);
     }
 
     /// Gets asserted interrupts
@@ -1246,12 +1231,12 @@ where
 
     /// Listen for the given interrupts
     pub fn listen(&mut self, interrupts: EnumSet<ParlIoInterrupt>) {
-        internal_listen(interrupts);
+        internal_listen(interrupts, true);
     }
 
     /// Unlisten the given interrupts
     pub fn unlisten(&mut self, interrupts: EnumSet<ParlIoInterrupt>) {
-        internal_unlisten(interrupts);
+        internal_listen(interrupts, false);
     }
 
     /// Gets asserted interrupts
@@ -1334,12 +1319,12 @@ where
 
     /// Listen for the given interrupts
     pub fn listen(&mut self, interrupts: EnumSet<ParlIoInterrupt>) {
-        internal_listen(interrupts);
+        internal_listen(interrupts, true);
     }
 
     /// Unlisten the given interrupts
     pub fn unlisten(&mut self, interrupts: EnumSet<ParlIoInterrupt>) {
-        internal_unlisten(interrupts);
+        internal_listen(interrupts, false);
     }
 
     /// Gets asserted interrupts

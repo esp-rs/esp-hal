@@ -80,16 +80,6 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDma
         spi.dma_out_link()
             .modify(|_, w| w.outlink_restart().set_bit());
     }
-
-    fn clear_interrupts(&self) {
-        let spi = C::register_block();
-        spi.dma_int_clr().write(|w| {
-            w.out_done().clear_bit_by_one();
-            w.out_eof().clear_bit_by_one();
-            w.out_total_eof().clear_bit_by_one();
-            w.outlink_dscr_error().clear_bit_by_one()
-        });
-    }
 }
 
 impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> TxRegisterAccess for SpiDmaTxChannelImpl<C> {
@@ -102,30 +92,15 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> TxRegisterAccess for SpiD
 impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> InterruptAccess<DmaTxInterrupt>
     for SpiDmaTxChannelImpl<C>
 {
-    fn listen(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+    fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
         let spi = C::register_block();
         spi.dma_int_ena().modify(|_, w| {
-            for interrupt in interrupts.into() {
+            for interrupt in interrupts {
                 match interrupt {
-                    DmaTxInterrupt::TotalEof => w.out_total_eof().set_bit(),
-                    DmaTxInterrupt::DescriptorError => w.outlink_dscr_error().set_bit(),
-                    DmaTxInterrupt::Eof => w.out_eof().set_bit(),
-                    DmaTxInterrupt::Done => w.out_done().set_bit(),
-                };
-            }
-            w
-        })
-    }
-
-    fn unlisten(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
-        let spi = C::register_block();
-        spi.dma_int_ena().modify(|_, w| {
-            for interrupt in interrupts.into() {
-                match interrupt {
-                    DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit(),
-                    DmaTxInterrupt::DescriptorError => w.outlink_dscr_error().clear_bit(),
-                    DmaTxInterrupt::Eof => w.out_eof().clear_bit(),
-                    DmaTxInterrupt::Done => w.out_done().clear_bit(),
+                    DmaTxInterrupt::TotalEof => w.out_total_eof().bit(enable),
+                    DmaTxInterrupt::DescriptorError => w.outlink_dscr_error().bit(enable),
+                    DmaTxInterrupt::Eof => w.out_eof().bit(enable),
+                    DmaTxInterrupt::Done => w.out_done().bit(enable),
                 };
             }
             w
@@ -234,16 +209,6 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDma
         spi.dma_in_link()
             .modify(|_, w| w.inlink_restart().set_bit());
     }
-
-    fn clear_interrupts(&self) {
-        let spi = C::register_block();
-        spi.dma_int_clr().write(|w| {
-            w.in_done().clear_bit_by_one();
-            w.in_err_eof().clear_bit_by_one();
-            w.in_suc_eof().clear_bit_by_one();
-            w.inlink_dscr_error().clear_bit_by_one()
-        });
-    }
 }
 
 impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RxRegisterAccess for SpiDmaRxChannelImpl<C> {}
@@ -251,32 +216,16 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RxRegisterAccess for SpiD
 impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> InterruptAccess<DmaRxInterrupt>
     for SpiDmaRxChannelImpl<C>
 {
-    fn listen(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
+    fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
         let spi = C::register_block();
         spi.dma_int_ena().modify(|_, w| {
-            for interrupt in interrupts.into() {
+            for interrupt in interrupts {
                 match interrupt {
-                    DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().set_bit(),
-                    DmaRxInterrupt::ErrorEof => w.in_err_eof().set_bit(),
-                    DmaRxInterrupt::DescriptorError => w.inlink_dscr_error().set_bit(),
-                    DmaRxInterrupt::DescriptorEmpty => w.inlink_dscr_empty().set_bit(),
-                    DmaRxInterrupt::Done => w.in_done().set_bit(),
-                };
-            }
-            w
-        })
-    }
-
-    fn unlisten(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
-        let spi = C::register_block();
-        spi.dma_int_ena().modify(|_, w| {
-            for interrupt in interrupts.into() {
-                match interrupt {
-                    DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit(),
-                    DmaRxInterrupt::ErrorEof => w.in_err_eof().clear_bit(),
-                    DmaRxInterrupt::DescriptorError => w.inlink_dscr_error().clear_bit(),
-                    DmaRxInterrupt::DescriptorEmpty => w.inlink_dscr_empty().clear_bit(),
-                    DmaRxInterrupt::Done => w.in_done().clear_bit(),
+                    DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().bit(enable),
+                    DmaRxInterrupt::ErrorEof => w.in_err_eof().bit(enable),
+                    DmaRxInterrupt::DescriptorError => w.inlink_dscr_error().bit(enable),
+                    DmaRxInterrupt::DescriptorEmpty => w.inlink_dscr_empty().bit(enable),
+                    DmaRxInterrupt::Done => w.in_done().bit(enable),
                 };
             }
             w
@@ -498,20 +447,6 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDma
 
     fn set_priority(&self, _priority: DmaPriority) {}
 
-    fn clear_interrupts(&self) {
-        let reg_block = C::register_block();
-        reg_block.int_clr().write(|w| {
-            w.out_done()
-                .clear_bit_by_one()
-                .out_eof()
-                .clear_bit_by_one()
-                .out_total_eof()
-                .clear_bit_by_one()
-                .out_dscr_err()
-                .clear_bit_by_one()
-        });
-    }
-
     fn reset(&self) {
         let reg_block = C::register_block();
         reg_block.lc_conf().modify(|_, w| w.out_rst().set_bit());
@@ -565,30 +500,15 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> TxRegisterAccess for I2sD
 impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> InterruptAccess<DmaTxInterrupt>
     for I2sDmaTxChannelImpl<C>
 {
-    fn listen(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+    fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
         let reg_block = C::register_block();
         reg_block.int_ena().modify(|_, w| {
-            for interrupt in interrupts.into() {
+            for interrupt in interrupts {
                 match interrupt {
-                    DmaTxInterrupt::TotalEof => w.out_total_eof().set_bit(),
-                    DmaTxInterrupt::DescriptorError => w.out_dscr_err().set_bit(),
-                    DmaTxInterrupt::Eof => w.out_eof().set_bit(),
-                    DmaTxInterrupt::Done => w.out_done().set_bit(),
-                };
-            }
-            w
-        })
-    }
-
-    fn unlisten(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
-        let reg_block = C::register_block();
-        reg_block.int_ena().modify(|_, w| {
-            for interrupt in interrupts.into() {
-                match interrupt {
-                    DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit(),
-                    DmaTxInterrupt::DescriptorError => w.out_dscr_err().clear_bit(),
-                    DmaTxInterrupt::Eof => w.out_eof().clear_bit(),
-                    DmaTxInterrupt::Done => w.out_done().clear_bit(),
+                    DmaTxInterrupt::TotalEof => w.out_total_eof().bit(enable),
+                    DmaTxInterrupt::DescriptorError => w.out_dscr_err().bit(enable),
+                    DmaTxInterrupt::Eof => w.out_eof().bit(enable),
+                    DmaTxInterrupt::Done => w.out_done().bit(enable),
                 };
             }
             w
@@ -667,20 +587,6 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDma
 
     fn set_priority(&self, _priority: DmaPriority) {}
 
-    fn clear_interrupts(&self) {
-        let reg_block = C::register_block();
-        reg_block.int_clr().write(|w| {
-            w.in_done()
-                .clear_bit_by_one()
-                .in_err_eof()
-                .clear_bit_by_one()
-                .in_suc_eof()
-                .clear_bit_by_one()
-                .in_dscr_err()
-                .clear_bit_by_one()
-        });
-    }
-
     fn reset(&self) {
         let reg_block = C::register_block();
         reg_block.lc_conf().modify(|_, w| w.in_rst().set_bit());
@@ -723,32 +629,16 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RxRegisterAccess for I2sD
 impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> InterruptAccess<DmaRxInterrupt>
     for I2sDmaRxChannelImpl<C>
 {
-    fn listen(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
+    fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
         let reg_block = C::register_block();
         reg_block.int_ena().modify(|_, w| {
-            for interrupt in interrupts.into() {
+            for interrupt in interrupts {
                 match interrupt {
-                    DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().set_bit(),
-                    DmaRxInterrupt::ErrorEof => w.in_err_eof().set_bit(),
-                    DmaRxInterrupt::DescriptorError => w.in_dscr_err().set_bit(),
-                    DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().set_bit(),
-                    DmaRxInterrupt::Done => w.in_done().set_bit(),
-                };
-            }
-            w
-        })
-    }
-
-    fn unlisten(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
-        let reg_block = C::register_block();
-        reg_block.int_ena().modify(|_, w| {
-            for interrupt in interrupts.into() {
-                match interrupt {
-                    DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit(),
-                    DmaRxInterrupt::ErrorEof => w.in_err_eof().clear_bit(),
-                    DmaRxInterrupt::DescriptorError => w.in_dscr_err().clear_bit(),
-                    DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().clear_bit(),
-                    DmaRxInterrupt::Done => w.in_done().clear_bit(),
+                    DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().bit(enable),
+                    DmaRxInterrupt::ErrorEof => w.in_err_eof().bit(enable),
+                    DmaRxInterrupt::DescriptorError => w.in_dscr_err().bit(enable),
+                    DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().bit(enable),
+                    DmaRxInterrupt::Done => w.in_done().bit(enable),
                 };
             }
             w
