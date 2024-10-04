@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix build when not using `panic-handler` (#2257)
+
 ### Removed
 
 ## 0.14.1 - 2024-09-06

@@ -6,6 +6,8 @@
 // development, and when a test fails. In these cases, you can enable
 // the `defmt` feature to get the output.
 
+use esp_hal as _;
+
 #[cfg(not(feature = "defmt"))]
 #[defmt::global_logger]
 struct Logger;

@@ -14,6 +14,11 @@ use hil_test as _;
 mod tests {
     use esp_hal::sync::Locked;
 
+    #[init]
+    fn init() {
+        esp_hal::init(esp_hal::Config::default());
+    }
+
     #[test]
     fn critical_section_is_reentrant() {
         let mut flag = false;
