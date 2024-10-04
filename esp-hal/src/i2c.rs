@@ -314,7 +314,7 @@ where
         // filter out 0 length read operations
         let mut op_iter = operations
             .iter_mut()
-            .filter(|op| if op.is_write() { true } else { !op.is_empty() })
+            .filter(|op| op.is_write() || !op.is_empty())
             .peekable();
 
         while let Some(op) = op_iter.next() {
@@ -1088,7 +1088,7 @@ mod asynch {
             // filter out 0 length read operations
             let mut op_iter = operations
                 .iter_mut()
-                .filter(|op| if op.is_write() { true } else { !op.is_empty() })
+                .filter(|op| op.is_write() || !op.is_empty())
                 .peekable();
 
             while let Some(op) = op_iter.next() {
