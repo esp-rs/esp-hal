@@ -488,10 +488,12 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
+    #[timeout(2)]
     fn cancel_stops_transaction(mut ctx: Context) {
-        // Slow down
-        ctx.spi.change_bus_frequency(100.Hz());
+        // Slow down. At 80kHz, the transfer is supposed to take a bit over 3 seconds.
+        // This means that without working cancellation, the test case should
+        // fail.
+        ctx.spi.change_bus_frequency(80.kHz());
 
         // Set up a large buffer that would trigger a timeout
         let dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
@@ -513,8 +515,8 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn can_transmit_after_cancel(mut ctx: Context) {
-        // Slow down
-        ctx.spi.change_bus_frequency(100.Hz());
+        // Slow down. At 80kHz, the transfer is supposed to take a bit over 3 seconds.
+        ctx.spi.change_bus_frequency(80.kHz());
 
         // Set up a large buffer that would trigger a timeout
         let mut dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
