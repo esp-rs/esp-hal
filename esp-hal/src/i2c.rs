@@ -1590,16 +1590,6 @@ pub trait Instance: crate::private::Sealed {
                 w.scl_high_period().bits(scl_high_period as u16)
             });
 
-            // we already did that above but on S2 we need this to make it work
-            // FIXME: do we need this twice on S2?
-            #[cfg(esp32s2)]
-            self.register_block().scl_high_period().write(|w| {
-                w.scl_wait_high_period()
-                    .bits(scl_wait_high_period as u16)
-                    .scl_high_period()
-                    .bits(scl_high_period as u16)
-            });
-
             // sda sample
             self.register_block()
                 .sda_hold()
