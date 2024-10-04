@@ -453,7 +453,7 @@ where
         address: u8,
         operations: &mut [embedded_hal::i2c::Operation<'_>],
     ) -> Result<(), Self::Error> {
-        self.transaction(address, operations.iter_mut().map(|op| Operation::from(op)))
+        self.transaction(address, operations.iter_mut().map(Operation::from))
     }
 }
 
@@ -1152,7 +1152,7 @@ mod asynch {
             address: u8,
             operations: &mut [EhalOperation<'_>],
         ) -> Result<(), Self::Error> {
-            self.transaction(address, operations.iter_mut().map(|op| Operation::from(op)))
+            self.transaction(address, operations.iter_mut().map(Operation::from))
                 .await
         }
     }
