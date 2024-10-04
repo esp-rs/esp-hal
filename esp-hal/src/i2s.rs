@@ -1025,34 +1025,26 @@ mod private {
     pub trait RegisterAccessPrivate: Signals + RegBlock {
         fn set_interrupt_handler(handler: InterruptHandler);
 
-        fn listen(interrupts: EnumSet<I2sInterrupt>) {
+        fn enable_listen(interrupts: EnumSet<I2sInterrupt>, enable: bool) {
             let reg_block = Self::register_block();
 
-            for interrupt in interrupts {
-                match interrupt {
-                    I2sInterrupt::RxHung => {
-                        reg_block.int_ena().modify(|_, w| w.rx_hung().set_bit())
-                    }
-                    I2sInterrupt::TxHung => {
-                        reg_block.int_ena().modify(|_, w| w.tx_hung().set_bit())
-                    }
+            reg_block.int_ena().modify(|_, w| {
+                for interrupt in interrupts {
+                    match interrupt {
+                        I2sInterrupt::RxHung => w.rx_hung().bit(enable),
+                        I2sInterrupt::TxHung => w.tx_hung().bit(enable),
+                    };
                 }
-            }
+                w
+            });
         }
 
-        fn unlisten(interrupts: EnumSet<I2sInterrupt>) {
-            let reg_block = Self::register_block();
+        fn listen(interrupts: impl Into<EnumSet<I2sInterrupt>>) {
+            Self::enable_listen(interrupts.into(), true);
+        }
 
-            for interrupt in interrupts {
-                match interrupt {
-                    I2sInterrupt::RxHung => {
-                        reg_block.int_ena().modify(|_, w| w.rx_hung().clear_bit())
-                    }
-                    I2sInterrupt::TxHung => {
-                        reg_block.int_ena().modify(|_, w| w.tx_hung().clear_bit())
-                    }
-                }
-            }
+        fn unlisten(interrupts: impl Into<EnumSet<I2sInterrupt>>) {
+            Self::enable_listen(interrupts.into(), false);
         }
 
         fn interrupts() -> EnumSet<I2sInterrupt> {
@@ -1287,46 +1279,28 @@ mod private {
     pub trait RegisterAccessPrivate: Signals + RegBlock {
         fn set_interrupt_handler(handler: InterruptHandler);
 
-        fn listen(interrupts: EnumSet<I2sInterrupt>) {
+        fn enable_listen(interrupts: EnumSet<I2sInterrupt>, enable: bool) {
             let reg_block = Self::register_block();
 
-            for interrupt in interrupts {
-                match interrupt {
-                    I2sInterrupt::RxHung => {
-                        reg_block.int_ena().modify(|_, w| w.rx_hung().set_bit())
-                    }
-                    I2sInterrupt::TxHung => {
-                        reg_block.int_ena().modify(|_, w| w.tx_hung().set_bit())
-                    }
-                    I2sInterrupt::RxDone => {
-                        reg_block.int_ena().modify(|_, w| w.rx_done().set_bit())
-                    }
-                    I2sInterrupt::TxDone => {
-                        reg_block.int_ena().modify(|_, w| w.tx_done().set_bit())
-                    }
+            reg_block.int_ena().modify(|_, w| {
+                for interrupt in interrupts {
+                    match interrupt {
+                        I2sInterrupt::RxHung => w.rx_hung().bit(enable),
+                        I2sInterrupt::TxHung => w.tx_hung().bit(enable),
+                        I2sInterrupt::RxDone => w.rx_done().bit(enable),
+                        I2sInterrupt::TxDone => w.tx_done().bit(enable),
+                    };
                 }
-            }
+                w
+            });
         }
 
-        fn unlisten(interrupts: EnumSet<I2sInterrupt>) {
-            let reg_block = Self::register_block();
+        fn listen(interrupts: impl Into<EnumSet<I2sInterrupt>>) {
+            Self::enable_listen(interrupts.into(), true);
+        }
 
-            for interrupt in interrupts {
-                match interrupt {
-                    I2sInterrupt::RxHung => {
-                        reg_block.int_ena().modify(|_, w| w.rx_hung().clear_bit())
-                    }
-                    I2sInterrupt::TxHung => {
-                        reg_block.int_ena().modify(|_, w| w.tx_hung().clear_bit())
-                    }
-                    I2sInterrupt::RxDone => {
-                        reg_block.int_ena().modify(|_, w| w.rx_done().clear_bit())
-                    }
-                    I2sInterrupt::TxDone => {
-                        reg_block.int_ena().modify(|_, w| w.tx_done().clear_bit())
-                    }
-                }
-            }
+        fn unlisten(interrupts: impl Into<EnumSet<I2sInterrupt>>) {
+            Self::enable_listen(interrupts.into(), false);
         }
 
         fn interrupts() -> EnumSet<I2sInterrupt> {
@@ -1353,22 +1327,17 @@ mod private {
         fn clear_interrupts(interrupts: EnumSet<I2sInterrupt>) {
             let reg_block = Self::register_block();
 
-            for interrupt in interrupts {
-                match interrupt {
-                    I2sInterrupt::RxHung => reg_block
-                        .int_clr()
-                        .write(|w| w.rx_hung().clear_bit_by_one()),
-                    I2sInterrupt::TxHung => reg_block
-                        .int_clr()
-                        .write(|w| w.tx_hung().clear_bit_by_one()),
-                    I2sInterrupt::RxDone => reg_block
-                        .int_clr()
-                        .write(|w| w.rx_done().clear_bit_by_one()),
-                    I2sInterrupt::TxDone => reg_block
-                        .int_clr()
-                        .write(|w| w.tx_done().clear_bit_by_one()),
+            reg_block.int_clr().write(|w| {
+                for interrupt in interrupts {
+                    match interrupt {
+                        I2sInterrupt::RxHung => w.rx_hung().clear_bit_by_one(),
+                        I2sInterrupt::TxHung => w.tx_hung().clear_bit_by_one(),
+                        I2sInterrupt::RxDone => w.rx_done().clear_bit_by_one(),
+                        I2sInterrupt::TxDone => w.tx_done().clear_bit_by_one(),
+                    };
                 }
-            }
+                w
+            });
         }
 
         #[cfg(any(esp32c3, esp32s3))]

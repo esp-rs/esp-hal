@@ -1684,7 +1684,7 @@ where
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
-        self.rx_impl.clear_interrupts();
+        self.rx_impl.clear_all();
         self.rx_impl.reset();
         self.rx_impl.set_link_addr(chain.first() as u32);
         self.rx_impl.set_peripheral(peri as u8);
@@ -1706,7 +1706,7 @@ where
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
-        self.rx_impl.clear_interrupts();
+        self.rx_impl.clear_all();
         self.rx_impl.reset();
         self.rx_impl.set_link_addr(preparation.start as u32);
         self.rx_impl.set_peripheral(peri as u8);
@@ -1767,7 +1767,7 @@ where
     }
 
     fn clear_interrupts(&self) {
-        self.rx_impl.clear_interrupts();
+        self.rx_impl.clear_all();
     }
 
     fn waker(&self) -> &'static embassy_sync::waitqueue::AtomicWaker {
@@ -1891,7 +1891,7 @@ where
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
-        self.tx_impl.clear_interrupts();
+        self.tx_impl.clear_all();
         self.tx_impl.reset();
         self.tx_impl.set_link_addr(chain.first() as u32);
         self.tx_impl.set_peripheral(peri as u8);
@@ -1921,7 +1921,7 @@ where
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
-        self.tx_impl.clear_interrupts();
+        self.tx_impl.clear_all();
         self.tx_impl.reset();
         self.tx_impl.set_link_addr(preparation.start as u32);
         self.tx_impl.set_peripheral(peri as u8);
@@ -1976,7 +1976,7 @@ where
     }
 
     fn clear_interrupts(&self) {
-        self.tx_impl.clear_interrupts();
+        self.tx_impl.clear_all();
     }
 
     fn last_out_dscr_address(&self) -> usize {
@@ -2012,9 +2012,6 @@ pub trait RegisterAccess: crate::private::Sealed {
     /// Mount a new descriptor.
     fn restart(&self);
 
-    /// Clear all interrupt bits
-    fn clear_interrupts(&self);
-
     #[cfg(esp32s3)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
 }
@@ -2033,8 +2030,18 @@ pub trait TxRegisterAccess: RegisterAccess {
 
 #[doc(hidden)]
 pub trait InterruptAccess<T: EnumSetType>: crate::private::Sealed {
-    fn listen(&self, interrupts: impl Into<EnumSet<T>>);
-    fn unlisten(&self, interrupts: impl Into<EnumSet<T>>);
+    fn listen(&self, interrupts: impl Into<EnumSet<T>>) {
+        self.enable_listen(interrupts.into(), true)
+    }
+    fn unlisten(&self, interrupts: impl Into<EnumSet<T>>) {
+        self.enable_listen(interrupts.into(), false)
+    }
+
+    fn clear_all(&self) {
+        self.clear(EnumSet::all());
+    }
+
+    fn enable_listen(&self, interrupts: EnumSet<T>, enable: bool);
     fn is_listening(&self) -> EnumSet<T>;
     fn clear(&self, interrupts: impl Into<EnumSet<T>>);
     fn pending_interrupts(&self) -> EnumSet<T>;

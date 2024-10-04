@@ -2703,36 +2703,31 @@ pub trait Instance: private::Sealed {
     /// Set the interrupt handler
     fn set_interrupt_handler(&mut self, handler: InterruptHandler);
 
-    /// Listen for the given interrupts
+    /// Enable or disable listening for the given interrupts.
     #[cfg(gdma)]
-    fn listen(&mut self, interrupts: EnumSet<SpiInterrupt>) {
+    fn enable_listen(&mut self, interrupts: EnumSet<SpiInterrupt>, enable: bool) {
         let reg_block = self.register_block();
 
-        for interrupt in interrupts {
-            match interrupt {
-                SpiInterrupt::TransDone => {
-                    reg_block
-                        .dma_int_ena()
-                        .modify(|_, w| w.trans_done().set_bit());
-                }
+        reg_block.dma_int_ena().modify(|_, w| {
+            for interrupt in interrupts {
+                match interrupt {
+                    SpiInterrupt::TransDone => w.trans_done().bit(enable),
+                };
             }
-        }
+            w
+        });
+    }
+
+    /// Listen for the given interrupts
+    #[cfg(gdma)]
+    fn listen(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
+        self.enable_listen(interrupts.into(), true);
     }
 
     /// Unlisten the given interrupts
     #[cfg(gdma)]
-    fn unlisten(&mut self, interrupts: EnumSet<SpiInterrupt>) {
-        let reg_block = self.register_block();
-
-        for interrupt in interrupts {
-            match interrupt {
-                SpiInterrupt::TransDone => {
-                    reg_block
-                        .dma_int_ena()
-                        .modify(|_, w| w.trans_done().clear_bit());
-                }
-            }
-        }
+    fn unlisten(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
+        self.enable_listen(interrupts.into(), false);
     }
 
     /// Gets asserted interrupts
@@ -2755,15 +2750,14 @@ pub trait Instance: private::Sealed {
     fn clear_interrupts(&mut self, interrupts: EnumSet<SpiInterrupt>) {
         let reg_block = self.register_block();
 
-        for interrupt in interrupts {
-            match interrupt {
-                SpiInterrupt::TransDone => {
-                    reg_block
-                        .dma_int_clr()
-                        .write(|w| w.trans_done().clear_bit_by_one());
-                }
+        reg_block.dma_int_clr().write(|w| {
+            for interrupt in interrupts {
+                match interrupt {
+                    SpiInterrupt::TransDone => w.trans_done().clear_bit_by_one(),
+                };
             }
-        }
+            w
+        });
     }
 
     fn set_data_mode(&mut self, data_mode: SpiMode) -> &mut Self {
