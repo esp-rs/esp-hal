@@ -58,10 +58,10 @@ mod tests {
 
         // do the real read which should succeed
         ctx.i2c
-            .transaction(0x77, &mut [Operation::Write(&[0x55])])
-            .ok();
-        ctx.i2c
-            .transaction(0x77, &mut [Operation::Read(&mut read_data)])
+            .transaction(
+                0x77,
+                &mut [Operation::Write(&[0xaa]), Operation::Read(&mut read_data)],
+            )
             .ok();
 
         assert_ne!(read_data, [0u8; 22])
