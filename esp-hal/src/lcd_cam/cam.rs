@@ -84,7 +84,7 @@ use crate::{
         LcdCamPeripheral,
         Rx,
     },
-    gpio::{InputPin, InputSignal, OutputPin, OutputSignal, Pull},
+    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
     lcd_cam::{cam::private::RxPins, private::calculate_clkm, BitOrder, ByteOrder},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
@@ -241,7 +241,10 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
     }
 
     /// Configures the master clock (MCLK) pin for the camera interface.
-    pub fn with_master_clock<MCLK: OutputPin>(self, mclk: impl Peripheral<P = MCLK> + 'd) -> Self {
+    pub fn with_master_clock<MCLK: PeripheralOutput>(
+        self,
+        mclk: impl Peripheral<P = MCLK> + 'd,
+    ) -> Self {
         crate::into_ref!(mclk);
         mclk.set_to_push_pull_output(crate::private::Internal);
         mclk.connect_peripheral_to_output(OutputSignal::CAM_CLK, crate::private::Internal);
@@ -249,7 +252,10 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
     }
 
     /// Configures the pixel clock (PCLK) pin for the camera interface.
-    pub fn with_pixel_clock<PCLK: InputPin>(self, pclk: impl Peripheral<P = PCLK> + 'd) -> Self {
+    pub fn with_pixel_clock<PCLK: PeripheralInput>(
+        self,
+        pclk: impl Peripheral<P = PCLK> + 'd,
+    ) -> Self {
         crate::into_ref!(pclk);
 
         pclk.init_input(Pull::None, crate::private::Internal);
@@ -260,7 +266,7 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
 
     /// Configures the control pins for the camera interface (VSYNC and
     /// HENABLE).
-    pub fn with_ctrl_pins<VSYNC: InputPin, HENABLE: InputPin>(
+    pub fn with_ctrl_pins<VSYNC: PeripheralInput, HENABLE: PeripheralInput>(
         self,
         vsync: impl Peripheral<P = VSYNC> + 'd,
         h_enable: impl Peripheral<P = HENABLE> + 'd,
@@ -282,7 +288,11 @@ impl<'d, CH: DmaChannel> Camera<'d, CH> {
 
     /// Configures the control pins for the camera interface (VSYNC, HSYNC, and
     /// HENABLE) with DE (data enable).
-    pub fn with_ctrl_pins_and_de<VSYNC: InputPin, HSYNC: InputPin, HENABLE: InputPin>(
+    pub fn with_ctrl_pins_and_de<
+        VSYNC: PeripheralInput,
+        HSYNC: PeripheralInput,
+        HENABLE: PeripheralInput,
+    >(
         self,
         vsync: impl Peripheral<P = VSYNC> + 'd,
         hsync: impl Peripheral<P = HSYNC> + 'd,
@@ -491,14 +501,14 @@ impl RxEightBits {
         pin_7: impl Peripheral<P = P7> + 'd,
     ) -> Self
     where
-        P0: InputPin,
-        P1: InputPin,
-        P2: InputPin,
-        P3: InputPin,
-        P4: InputPin,
-        P5: InputPin,
-        P6: InputPin,
-        P7: InputPin,
+        P0: PeripheralInput,
+        P1: PeripheralInput,
+        P2: PeripheralInput,
+        P3: PeripheralInput,
+        P4: PeripheralInput,
+        P5: PeripheralInput,
+        P6: PeripheralInput,
+        P7: PeripheralInput,
     {
         crate::into_ref!(pin_0);
         crate::into_ref!(pin_1);
@@ -563,22 +573,22 @@ impl RxSixteenBits {
         pin_15: impl Peripheral<P = P15> + 'd,
     ) -> Self
     where
-        P0: InputPin,
-        P1: InputPin,
-        P2: InputPin,
-        P3: InputPin,
-        P4: InputPin,
-        P5: InputPin,
-        P6: InputPin,
-        P7: InputPin,
-        P8: InputPin,
-        P9: InputPin,
-        P10: InputPin,
-        P11: InputPin,
-        P12: InputPin,
-        P13: InputPin,
-        P14: InputPin,
-        P15: InputPin,
+        P0: PeripheralInput,
+        P1: PeripheralInput,
+        P2: PeripheralInput,
+        P3: PeripheralInput,
+        P4: PeripheralInput,
+        P5: PeripheralInput,
+        P6: PeripheralInput,
+        P7: PeripheralInput,
+        P8: PeripheralInput,
+        P9: PeripheralInput,
+        P10: PeripheralInput,
+        P11: PeripheralInput,
+        P12: PeripheralInput,
+        P13: PeripheralInput,
+        P14: PeripheralInput,
+        P15: PeripheralInput,
     {
         crate::into_ref!(pin_0);
         crate::into_ref!(pin_1);
