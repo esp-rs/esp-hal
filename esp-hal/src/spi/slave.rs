@@ -610,13 +610,12 @@ pub trait Instance: private::Sealed {
     fn prepare_length_and_lines(&self, rx_len: usize, tx_len: usize) {
         let reg_block = self.register_block();
 
-        let len = rx_len.max(tx_len) as u32;
         reg_block
             .slv_rdbuf_dlen()
-            .write(|w| unsafe { w.bits((len / 8).saturating_sub(1)) });
+            .write(|w| unsafe { w.bits((rx_len as u32 * 8).saturating_sub(1)) });
         reg_block
             .slv_wrbuf_dlen()
-            .write(|w| unsafe { w.bits((len / 8).saturating_sub(1)) });
+            .write(|w| unsafe { w.bits((tx_len as u32 * 8).saturating_sub(1)) });
 
         // SPI Slave mode on ESP32 requires MOSI/MISO enable
         reg_block.user().modify(|_, w| {
