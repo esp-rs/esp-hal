@@ -135,6 +135,15 @@ impl<'a, 'b> From<&'a mut embedded_hal::i2c::Operation<'b>> for Operation<'a> {
     }
 }
 
+impl<'a, 'b> From<&'a mut Operation<'b>> for Operation<'a> {
+    fn from(value: &'a mut Operation<'b>) -> Self {
+        match value {
+            Operation::Write(buffer) => Operation::Write(buffer),
+            Operation::Read(buffer) => Operation::Read(buffer),
+        }
+    }
+}
+
 impl Operation<'_> {
     fn is_write(&self) -> bool {
         matches!(self, Operation::Write(_))
@@ -347,6 +356,14 @@ where
     pub fn transaction<'a>(
         &mut self,
         address: u8,
+        operations: impl IntoIterator<Item = &'a mut Operation<'a>>,
+    ) -> Result<(), Error> {
+        self.transaction_impl(address, operations.into_iter().map(Operation::from))
+    }
+
+    fn transaction_impl<'a>(
+        &mut self,
+        address: u8,
         operations: impl Iterator<Item = Operation<'a>>,
     ) -> Result<(), Error> {
         let mut last_op: Option<OpKind> = None;
@@ -453,7 +470,7 @@ where
         address: u8,
         operations: &mut [embedded_hal::i2c::Operation<'_>],
     ) -> Result<(), Self::Error> {
-        self.transaction(address, operations.iter_mut().map(Operation::from))
+        self.transaction_impl(address, operations.iter_mut().map(Operation::from))
     }
 }
 
@@ -1087,10 +1104,19 @@ mod asynch {
         ///   0 to indicate writing
         /// - `SR` = repeated start condition
         /// - `SP` = stop condition
-        async fn transaction(
+        pub async fn transaction<'a>(
             &mut self,
             address: u8,
-            operations: impl Iterator<Item = Operation<'_>>,
+            operations: impl IntoIterator<Item = &'a mut Operation<'a>>,
+        ) -> Result<(), Error> {
+            self.transaction_impl(address, operations.into_iter().map(Operation::from))
+                .await
+        }
+
+        async fn transaction_impl<'a>(
+            &mut self,
+            address: u8,
+            operations: impl Iterator<Item = Operation<'a>>,
         ) -> Result<(), Error> {
             let mut last_op: Option<OpKind> = None;
             // filter out 0 length read operations
@@ -1152,7 +1178,7 @@ mod asynch {
             address: u8,
             operations: &mut [EhalOperation<'_>],
         ) -> Result<(), Self::Error> {
-            self.transaction(address, operations.iter_mut().map(Operation::from))
+            self.transaction_impl(address, operations.iter_mut().map(Operation::from))
                 .await
         }
     }
