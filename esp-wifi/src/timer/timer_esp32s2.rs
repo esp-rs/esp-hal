@@ -7,6 +7,10 @@ pub fn setup_radio_isr() {
     // ble not supported
 }
 
+pub fn shutdown_radio_isr() {
+    // ble not supported
+}
+
 #[cfg(feature = "wifi")]
 #[no_mangle]
 extern "C" fn WIFI_MAC() {

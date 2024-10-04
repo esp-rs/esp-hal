@@ -205,6 +205,15 @@ extern "C" {
     pub(crate) fn ble_controller_init(cfg: *const esp_bt_controller_config_t) -> i32;
 
     #[cfg(not(esp32c2))]
+    pub(crate) fn r_ble_controller_disable() -> i32;
+
+    #[cfg(not(esp32c2))]
+    pub(crate) fn r_ble_controller_deinit() -> i32;
+
+    #[cfg(esp32c2)]
+    pub(crate) fn ble_controller_deinit() -> i32;
+
+    #[cfg(not(esp32c2))]
     pub(crate) fn r_ble_controller_init(cfg: *const esp_bt_controller_config_t) -> i32;
 
     #[cfg(esp32c2)]
@@ -213,9 +222,13 @@ extern "C" {
     #[cfg(not(esp32c2))]
     pub(crate) fn r_ble_controller_enable(mode: u8) -> i32;
 
+    pub(crate) fn esp_unregister_ext_funcs();
+
     pub(crate) fn esp_register_ext_funcs(funcs: *const ExtFuncsT) -> i32;
 
     pub(crate) fn esp_register_npl_funcs(funcs: *const npl_funcs_t) -> i32;
+
+    pub(crate) fn esp_unregister_npl_funcs();
 
     #[cfg(esp32c2)]
     pub(crate) fn ble_get_npl_element_info(
@@ -406,8 +419,15 @@ unsafe extern "C" fn task_create(
     1
 }
 
-unsafe extern "C" fn task_delete(_: *const c_void) {
-    todo!();
+unsafe extern "C" fn task_delete(task: *const c_void) {
+    trace!("task delete called for {:?}", task);
+
+    let task = if task.is_null() {
+        crate::preempt::current_task()
+    } else {
+        task as *mut _
+    };
+    crate::preempt::schedule_task_deletion(task);
 }
 
 unsafe extern "C" fn osi_assert(ln: u32, fn_name: *const c_void, param1: u32, param2: u32) {
@@ -795,8 +815,18 @@ unsafe extern "C" fn ble_npl_event_reset(event: *const ble_npl_event) {
     }
 }
 
-unsafe extern "C" fn ble_npl_event_deinit(_event: *const ble_npl_event) {
-    todo!()
+unsafe extern "C" fn ble_npl_event_deinit(event: *const ble_npl_event) {
+    trace!("ble_npl_event_deinit {:?}", event);
+
+    let event = event.cast_mut();
+
+    if (*event).dummy == 0 {
+        panic!("Trying to deinitialize an uninitialized event");
+    } else {
+        let idx = ((*event).dummy - 1) as usize;
+        EVENTS[idx] = None;
+        (*event).dummy = 0;
+    }
 }
 
 unsafe extern "C" fn ble_npl_event_init(
@@ -908,8 +938,23 @@ unsafe extern "C" fn ble_npl_eventq_get(
     }
 }
 
-unsafe extern "C" fn ble_npl_eventq_deinit(_queue: *const ble_npl_eventq) {
-    todo!()
+unsafe extern "C" fn ble_npl_eventq_deinit(queue: *const ble_npl_eventq) {
+    trace!("ble_npl_eventq_deinit {:?}", queue);
+
+    let queue = queue.cast_mut();
+    if (*queue).dummy == 0 {
+        panic!("Trying to deinitialize an uninitialized queue");
+    } else {
+        critical_section::with(|_| {
+            while let Some(event_idx) = EVENT_QUEUE.dequeue() {
+                if let Some(event) = EVENTS[event_idx - 1].as_mut() {
+                    event.queued = false;
+                }
+            }
+        });
+
+        (*queue).dummy = 0;
+    }
 }
 
 unsafe extern "C" fn ble_npl_callout_init(
@@ -1176,6 +1221,36 @@ pub(crate) fn ble_init() {
         crate::compat::common::sleep(10);
 
         debug!("The ble_controller_init was initialized");
+    }
+}
+
+pub(crate) fn ble_deinit() {
+    unsafe {
+        // HCI deinit
+        npl::r_ble_hci_trans_cfg_hs(None, core::ptr::null(), None, core::ptr::null());
+
+        #[cfg(not(esp32c2))]
+        npl::r_ble_controller_disable();
+
+        #[cfg(not(esp32c2))]
+        let res = npl::r_ble_controller_deinit();
+
+        #[cfg(esp32c2)]
+        let res = npl::ble_controller_deinit();
+
+        if res != 0 {
+            panic!("ble_controller_deinit returned {}", res);
+        }
+
+        npl::esp_unregister_npl_funcs();
+
+        npl::esp_unregister_ext_funcs();
+
+        crate::common_adapter::chip_specific::phy_disable();
+
+        CALLOUTS.iter_mut().for_each(|item| {
+            item.take();
+        });
     }
 }
 

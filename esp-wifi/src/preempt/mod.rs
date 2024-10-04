@@ -54,7 +54,7 @@ fn next_task() {
 /// Delete the given task.
 ///
 /// This will also free the memory (stack and context) allocated for it.
-fn delete_task(task: *mut Context) {
+pub(crate) fn delete_task(task: *mut Context) {
     critical_section::with(|cs| unsafe {
         let mut ptr = *CTX_NOW.borrow_ref_mut(cs);
         let initial = ptr;
@@ -78,11 +78,40 @@ fn delete_task(task: *mut Context) {
     });
 }
 
+pub(crate) fn delete_all_tasks() {
+    critical_section::with(|cs| unsafe {
+        let mut ctx_now_ref = CTX_NOW.borrow_ref_mut(cs);
+        let current_task = *ctx_now_ref;
+
+        if current_task.is_null() {
+            return;
+        }
+
+        let mut task_to_delete = current_task;
+
+        loop {
+            let next_task = (*task_to_delete).next;
+
+            free((*task_to_delete).allocated_stack as *mut u8);
+            free(task_to_delete as *mut u8);
+
+            if next_task == current_task {
+                break;
+            }
+
+            task_to_delete = next_task;
+        }
+
+        *ctx_now_ref = core::ptr::null_mut();
+
+        memory_fence();
+    });
+}
+
 pub fn current_task() -> *mut Context {
     critical_section::with(|cs| unsafe { *CTX_NOW.borrow_ref(cs) })
 }
 
-#[cfg(feature = "wifi")]
 pub fn schedule_task_deletion(task: *mut Context) {
     use crate::timer::yield_task;
 

@@ -105,7 +105,12 @@ extern crate alloc;
 // MUST be the first module
 mod fmt;
 
-use common_adapter::{chip_specific::phy_mem_init, init_radio_clock_control, RADIO_CLOCKS};
+use common_adapter::{
+    chip_specific::phy_mem_init,
+    deinit_radio_clock_control,
+    init_radio_clock_control,
+    RADIO_CLOCKS,
+};
 use esp_config::*;
 use esp_hal as hal;
 #[cfg(not(feature = "esp32"))]
@@ -117,9 +122,18 @@ use hal::{
     timer::{timg::Timer as TimgTimer, AnyTimer, PeriodicTimer},
 };
 #[cfg(feature = "wifi")]
-use wifi::WifiError;
+use num_traits::FromPrimitive;
 
-use crate::{common_adapter::init_rng, tasks::init_tasks, timer::setup_timer_isr};
+#[cfg(feature = "wifi")]
+use crate::{
+    binary::include::{self, esp_supplicant_deinit, esp_wifi_deinit_internal, esp_wifi_stop},
+    wifi::WifiError,
+};
+use crate::{
+    common_adapter::init_rng,
+    tasks::init_tasks,
+    timer::{setup_timer_isr, shutdown_timer_isr},
+};
 
 mod binary {
     pub use esp_wifi_sys::*;
@@ -396,14 +410,13 @@ pub fn initialize(
     }
 
     info!("esp-wifi configuration {:?}", crate::CONFIG);
-
     crate::common_adapter::chip_specific::enable_wifi_power_domain();
-
     phy_mem_init();
     init_radio_clock_control(radio_clocks);
     init_rng(rng);
     init_tasks();
     setup_timer_isr(timer.timer())?;
+
     wifi_set_log_verbose();
     init_clocks();
 
@@ -441,15 +454,80 @@ pub fn initialize(
     }
 }
 
+/// Deinitializes WiFi and/or BLE
+///
+/// After user calls this function, WiFi and/or BLE (depending on what has been
+/// initialized) are fully stopped and deinitialized. After that, they should
+/// not be used until they have been reinitialized with the `init` function.
+///
+/// The function also disables the corresponding interrupts, deinitializes
+/// the timer and radio clock, freeing these resources and returning them.
+///
+/// Calling this while still using WiFi/BLE will cause crashes or undefined
+/// behavior.
+///
+/// # Safety
+/// Actual implementation assumes that the user takes responsibility for how the
+/// function is used. For example, after using this function, user should not
+/// use BLE or WiFi stack or controller instances (it is possible to
+/// reinitialize communication using the `init` function), not to call
+/// `deinit_unsafe` before the first initialization, and so on. Also, there is
+/// currently no way to track whether a peripheral has been initialized,
+/// so deinitialization is done based on the activated feature (`wifi`, `ble`
+/// and/or `coex`).
+/// Before deinitializing, chips with NPL bluetooth (esp32c2, esp32c6, esp32h2)
+///  users must make sure to stop BLE advertising before.
+pub unsafe fn deinit_unchecked(
+    init: EspWifiInitialization,
+) -> Result<(TimeBase, hal::peripherals::RADIO_CLK), InitializationError> {
+    // Disable coexistence
+    #[cfg(coex)]
+    {
+        unsafe { crate::wifi::os_adapter::coex_disable() };
+        unsafe { crate::wifi::os_adapter::coex_deinit() };
+    }
+
+    // Deinitialize WiFi
+    #[cfg(feature = "wifi")]
+    if init.is_wifi() {
+        esp_wifi_result!(unsafe { esp_wifi_stop() })?;
+        esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
+        esp_wifi_result!(esp_supplicant_deinit())?;
+    }
+
+    // Deinitialize BLE
+    #[cfg(feature = "ble")]
+    if init.is_ble() {
+        #[cfg(any(esp32, esp32c3, esp32s3))]
+        crate::ble::btdm::ble_deinit();
+
+        #[cfg(any(esp32c2, esp32c6, esp32h2))]
+        crate::ble::npl::ble_deinit();
+    }
+
+    shutdown_timer_isr().unwrap();
+    crate::preempt::delete_all_tasks();
+
+    let timer = critical_section::with(|cs| crate::timer::TIMER.borrow_ref_mut(cs).take())
+        .ok_or(InitializationError::TimerUnavailable)?;
+
+    let radio_clocks =
+        deinit_radio_clock_control().ok_or(InitializationError::RadioClockUnavailable)?;
+
+    Ok((timer, radio_clocks))
+}
+
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-/// Error which can be returned during [`initialize`].
+/// Error which can be returned during [`init`].
 pub enum InitializationError {
     General(i32),
     #[cfg(feature = "wifi")]
     WifiError(WifiError),
     WrongClockConfig,
     Timer(hal::timer::Error),
+    TimerUnavailable,
+    RadioClockUnavailable,
 }
 
 impl From<hal::timer::Error> for InitializationError {

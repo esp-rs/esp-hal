@@ -39,6 +39,10 @@ pub(crate) fn init_radio_clock_control(rcc: hal::peripherals::RADIO_CLK) {
     unsafe { RADIO_CLOCKS = Some(rcc) };
 }
 
+pub(crate) fn deinit_radio_clock_control() -> Option<hal::peripherals::RADIO_CLK> {
+    unsafe { RADIO_CLOCKS.take() }
+}
+
 /// **************************************************************************
 /// Name: esp_semphr_create
 ///

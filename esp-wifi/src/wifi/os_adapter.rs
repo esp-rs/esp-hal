@@ -1704,7 +1704,10 @@ pub unsafe extern "C" fn wifi_delete_queue(queue: *mut crate::binary::c_types::c
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn coex_deinit() {
-    warn!("coex_deinit - not implemented");
+    trace!("coex_deinit");
+
+    #[cfg(coex)]
+    crate::binary::include::coex_deinit();
 }
 
 /// **************************************************************************

@@ -22,6 +22,14 @@ pub fn setup_radio_isr() {
     }
 }
 
+pub fn shutdown_radio_isr() {
+    #[cfg(feature = "ble")]
+    {
+        interrupt::disable(crate::hal::Cpu::ProCpu, peripherals::Interrupt::RWBT);
+        interrupt::disable(crate::hal::Cpu::ProCpu, peripherals::Interrupt::BT_BB);
+    }
+}
+
 #[cfg(feature = "ble")]
 #[allow(non_snake_case)]
 #[no_mangle]

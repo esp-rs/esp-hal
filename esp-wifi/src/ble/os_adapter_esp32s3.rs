@@ -1,5 +1,8 @@
 use super::*;
-use crate::binary::include::esp_bt_controller_config_t;
+use crate::{
+    binary::include::esp_bt_controller_config_t,
+    hal::{interrupt, peripherals::Interrupt},
+};
 
 pub static mut ISR_INTERRUPT_5: (
     *mut crate::binary::c_types::c_void,
@@ -292,13 +295,22 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
 
 pub(crate) unsafe extern "C" fn interrupt_on(intr_num: i32) -> i32 {
     trace!("interrupt_on {}", intr_num);
+    unwrap!(interrupt::enable(
+        Interrupt::try_from(intr_num as u16).unwrap(),
+        interrupt::Priority::Priority1,
+    ));
 
-    // NO-OP
     0
 }
 
-pub(crate) unsafe extern "C" fn interrupt_off(_intr_num: i32) -> i32 {
-    todo!();
+pub(crate) unsafe extern "C" fn interrupt_off(intr_num: i32) -> i32 {
+    trace!("interrupt_off {}", intr_num);
+    interrupt::disable(
+        crate::hal::Cpu::ProCpu,
+        Interrupt::try_from(intr_num as u16).unwrap(),
+    );
+
+    0
 }
 
 pub(crate) fn btdm_controller_mem_init() {

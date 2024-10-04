@@ -316,8 +316,15 @@ unsafe extern "C" fn task_create(
     1
 }
 
-unsafe extern "C" fn task_delete(_task: *const ()) {
-    todo!();
+unsafe extern "C" fn task_delete(task: *const ()) {
+    trace!("task delete called for {:?}", task);
+
+    let task = if task.is_null() {
+        crate::preempt::current_task()
+    } else {
+        task as *mut _
+    };
+    crate::preempt::schedule_task_deletion(task);
 }
 
 #[ram]
@@ -511,6 +518,17 @@ pub(crate) fn ble_init() {
         btdm_controller_enable(esp_bt_mode_t_ESP_BT_MODE_BLE);
 
         API_vhci_host_register_callback(&VHCI_HOST_CALLBACK);
+    }
+}
+
+pub(crate) fn ble_deinit() {
+    extern "C" {
+        fn btdm_controller_deinit();
+    }
+
+    unsafe {
+        btdm_controller_deinit();
+        crate::common_adapter::chip_specific::phy_disable();
     }
 }
 

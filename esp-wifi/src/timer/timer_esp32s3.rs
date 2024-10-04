@@ -1,19 +1,27 @@
 #[cfg(any(feature = "wifi", feature = "ble"))]
 #[allow(unused_imports)]
-use crate::hal::{interrupt, peripherals};
+use crate::hal::{interrupt, peripherals::Interrupt};
 
 pub fn setup_radio_isr() {
     // wifi enabled in set_isr
     #[cfg(feature = "ble")]
     {
         unwrap!(interrupt::enable(
-            peripherals::Interrupt::BT_BB,
+            Interrupt::BT_BB,
             interrupt::Priority::Priority1,
         ));
         unwrap!(interrupt::enable(
-            peripherals::Interrupt::RWBLE,
+            Interrupt::RWBLE,
             interrupt::Priority::Priority1,
         ));
+    }
+}
+
+pub fn shutdown_radio_isr() {
+    #[cfg(feature = "ble")]
+    {
+        interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::BT_BB);
+        interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::RWBLE);
     }
 }
 

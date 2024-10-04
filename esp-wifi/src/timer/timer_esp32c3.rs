@@ -24,6 +24,15 @@ pub fn setup_radio_isr() {
     }
 }
 
+pub fn shutdown_radio_isr() {
+    #[cfg(feature = "ble")]
+    {
+        interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::RWBT);
+        interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::RWBLE);
+        interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::BT_BB);
+    }
+}
+
 #[cfg(feature = "wifi")]
 #[no_mangle]
 extern "C" fn WIFI_MAC() {

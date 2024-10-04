@@ -18,6 +18,14 @@ pub fn setup_radio_isr() {
     }
 }
 
+pub fn shutdown_radio_isr() {
+    #[cfg(feature = "ble")]
+    {
+        interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::LP_BLE_TIMER);
+        interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::BT_MAC);
+    }
+}
+
 #[cfg(feature = "ble")]
 #[no_mangle]
 extern "C" fn LP_BLE_TIMER() {
