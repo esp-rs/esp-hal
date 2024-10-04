@@ -84,6 +84,7 @@ impl BitbangSpi {
         for (tx, rx) in tx.iter().zip(rx.iter_mut()) {
             *rx = self.shift_byte(*tx);
         }
+        self.sclk.set_level(Level::Low);
         self.deassert_cs();
     }
 }
