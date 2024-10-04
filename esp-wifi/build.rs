@@ -93,6 +93,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // emit config
+    //
+    // keep the defaults aligned with `esp_wifi_sys::include::*` e.g.
+    // `esp_wifi_sys::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM`
     generate_config(
         "esp_wifi",
         &[
@@ -102,8 +105,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             ("dynamic_rx_buf_num", Value::UnsignedInteger(32), "WiFi dynamic RX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"),
             ("static_tx_buf_num", Value::UnsignedInteger(0), "WiFi static TX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"),
             ("dynamic_tx_buf_num", Value::UnsignedInteger(32), "WiFi dynamic TX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"),
-            ("ampdu_rx_enable", Value::Bool(false), "WiFi AMPDU RX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"),
-            ("ampdu_tx_enable", Value::Bool(false), "WiFi AMPDU TX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"),
+            ("ampdu_rx_enable", Value::Bool(true), "WiFi AMPDU RX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"),
+            ("ampdu_tx_enable", Value::Bool(true), "WiFi AMPDU TX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"),
             ("amsdu_tx_enable", Value::Bool(false), "WiFi AMSDU TX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"),
             ("rx_ba_win", Value::UnsignedInteger(6), "WiFi Block Ack RX window size. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"),
             ("max_burst_size", Value::UnsignedInteger(1), "See [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_burst_size)"),
