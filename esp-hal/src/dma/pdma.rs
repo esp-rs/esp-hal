@@ -915,7 +915,6 @@ macro_rules! ImplI2sChannel {
 }
 
 ImplSpiChannel!(2);
-#[cfg(spi3)]
 ImplSpiChannel!(3);
 
 ImplI2sChannel!(0);
