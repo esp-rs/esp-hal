@@ -295,7 +295,9 @@ where
         write_buffer: &[u8],
         read_buffer: &mut [u8],
     ) -> Result<(), Error> {
-        let chunk_count = write_buffer.len().div_ceil(I2C_CHUNK_SIZE);
+        let write_count = write_buffer.len().div_ceil(I2C_CHUNK_SIZE);
+        let read_count = read_buffer.len().div_ceil(I2C_CHUNK_SIZE);
+
         for (idx, chunk) in write_buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
             // Clear all I2C interrupts
             self.peripheral.clear_all_interrupts();
@@ -307,13 +309,12 @@ where
                     address,
                     chunk,
                     idx == 0,
-                    idx == chunk_count - 1,
+                    idx == write_count - 1 && read_count == 0,
                     cmd_iterator,
                 )
                 .inspect_err(|_| self.internal_recover())?;
         }
 
-        let chunk_count = read_buffer.len().div_ceil(I2C_CHUNK_SIZE);
         for (idx, chunk) in read_buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
             // Clear all I2C interrupts
             self.peripheral.clear_all_interrupts();
@@ -325,8 +326,8 @@ where
                     address,
                     chunk,
                     idx == 0,
-                    idx == chunk_count - 1,
-                    idx < chunk_count - 1,
+                    idx == read_count - 1,
+                    idx < read_count - 1,
                     cmd_iterator,
                 )
                 .inspect_err(|_| self.internal_recover())?;
@@ -1047,7 +1048,8 @@ mod asynch {
             write_buffer: &[u8],
             read_buffer: &mut [u8],
         ) -> Result<(), Error> {
-            let chunk_count = write_buffer.len().div_ceil(I2C_CHUNK_SIZE);
+            let write_count = write_buffer.len().div_ceil(I2C_CHUNK_SIZE);
+            let read_count = read_buffer.len().div_ceil(I2C_CHUNK_SIZE);
             for (idx, chunk) in write_buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
                 // Clear all I2C interrupts
                 self.peripheral.clear_all_interrupts();
@@ -1058,13 +1060,12 @@ mod asynch {
                     address,
                     chunk,
                     idx == 0,
-                    idx == chunk_count - 1,
+                    idx == write_count - 1 && read_count == 0,
                     cmd_iterator,
                 )
                 .await?;
             }
 
-            let chunk_count = read_buffer.len().div_ceil(I2C_CHUNK_SIZE);
             for (idx, chunk) in read_buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
                 // Clear all I2C interrupts
                 self.peripheral.clear_all_interrupts();
@@ -1075,8 +1076,8 @@ mod asynch {
                     address,
                     chunk,
                     idx == 0,
-                    idx == chunk_count - 1,
-                    idx < chunk_count - 1,
+                    idx == read_count - 1,
+                    idx < read_count - 1,
                     cmd_iterator,
                 )
                 .await?;
