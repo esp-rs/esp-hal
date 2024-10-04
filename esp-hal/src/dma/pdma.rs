@@ -23,16 +23,10 @@ type SpiRegisterBlock = crate::peripherals::spi2::RegisterBlock;
 type I2sRegisterBlock = crate::peripherals::i2s0::RegisterBlock;
 
 #[doc(hidden)]
-pub trait SpiPdmaChannel: crate::private::Sealed {
-    fn register_block(&self) -> &SpiRegisterBlock;
-    fn tx_waker(&self) -> &'static AtomicWaker;
-    fn rx_waker(&self) -> &'static AtomicWaker;
-    fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool;
-}
+pub trait PdmaChannel: crate::private::Sealed {
+    type RegisterBlock;
 
-#[doc(hidden)]
-pub trait I2sPdmaChannel: crate::private::Sealed {
-    fn register_block(&self) -> &I2sRegisterBlock;
+    fn register_block(&self) -> &Self::RegisterBlock;
     fn tx_waker(&self) -> &'static AtomicWaker;
     fn rx_waker(&self) -> &'static AtomicWaker;
     fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool;
@@ -43,7 +37,7 @@ pub struct SpiDmaRxChannelImpl<C>(C);
 
 impl<C> crate::private::Sealed for SpiDmaRxChannelImpl<C> {}
 
-impl<C: SpiPdmaChannel> SpiDmaRxChannelImpl<C>
+impl<C: PdmaChannel> SpiDmaRxChannelImpl<C>
 where
     AnyPdmaChannel: From<C>,
 {
@@ -57,7 +51,7 @@ pub struct SpiDmaTxChannelImpl<C>(C);
 
 impl<C> crate::private::Sealed for SpiDmaTxChannelImpl<C> {}
 
-impl<C: SpiPdmaChannel> SpiDmaTxChannelImpl<C>
+impl<C: PdmaChannel> SpiDmaTxChannelImpl<C>
 where
     AnyPdmaChannel: From<C>,
 {
@@ -66,7 +60,7 @@ where
     }
 }
 
-impl<C: SpiPdmaChannel> RegisterAccess for SpiDmaTxChannelImpl<C> {
+impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDmaTxChannelImpl<C> {
     fn reset(&self) {
         let spi = self.0.register_block();
         spi.dma_conf().modify(|_, w| w.out_rst().set_bit());
@@ -113,14 +107,16 @@ impl<C: SpiPdmaChannel> RegisterAccess for SpiDmaTxChannelImpl<C> {
     }
 }
 
-impl<C: SpiPdmaChannel> TxRegisterAccess for SpiDmaTxChannelImpl<C> {
+impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> TxRegisterAccess for SpiDmaTxChannelImpl<C> {
     fn last_dscr_address(&self) -> usize {
         let spi = self.0.register_block();
         spi.out_eof_des_addr().read().dma_out_eof_des_addr().bits() as usize
     }
 }
 
-impl<C: SpiPdmaChannel> InterruptAccess<DmaTxInterrupt> for SpiDmaTxChannelImpl<C> {
+impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> InterruptAccess<DmaTxInterrupt>
+    for SpiDmaTxChannelImpl<C>
+{
     fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
         let reg_block = self.0.register_block();
         reg_block.dma_int_ena().modify(|_, w| {
@@ -198,7 +194,7 @@ impl<C: SpiPdmaChannel> InterruptAccess<DmaTxInterrupt> for SpiDmaTxChannelImpl<
     }
 }
 
-impl<C: SpiPdmaChannel> RegisterAccess for SpiDmaRxChannelImpl<C> {
+impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDmaRxChannelImpl<C> {
     fn reset(&self) {
         let spi = self.0.register_block();
         spi.dma_conf().modify(|_, w| w.in_rst().set_bit());
@@ -244,9 +240,11 @@ impl<C: SpiPdmaChannel> RegisterAccess for SpiDmaRxChannelImpl<C> {
     }
 }
 
-impl<C: SpiPdmaChannel> RxRegisterAccess for SpiDmaRxChannelImpl<C> {}
+impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RxRegisterAccess for SpiDmaRxChannelImpl<C> {}
 
-impl<C: SpiPdmaChannel> InterruptAccess<DmaRxInterrupt> for SpiDmaRxChannelImpl<C> {
+impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> InterruptAccess<DmaRxInterrupt>
+    for SpiDmaRxChannelImpl<C>
+{
     fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
         let reg_block = self.0.register_block();
         reg_block.dma_int_ena().modify(|_, w| {
@@ -388,7 +386,9 @@ macro_rules! ImplSpiChannel {
                 }
             }
 
-            impl SpiPdmaChannel for [<Spi $num DmaChannel>] {
+            impl PdmaChannel for [<Spi $num DmaChannel>] {
+                type RegisterBlock = SpiRegisterBlock;
+
                 fn register_block(&self) -> &SpiRegisterBlock {
                     unsafe { &*crate::peripherals::[<SPI $num>]::PTR }
                 }
@@ -479,7 +479,7 @@ pub struct I2sDmaRxChannelImpl<C>(C);
 
 impl<C> crate::private::Sealed for I2sDmaRxChannelImpl<C> {}
 
-impl<C: I2sPdmaChannel> I2sDmaRxChannelImpl<C>
+impl<C: PdmaChannel> I2sDmaRxChannelImpl<C>
 where
     AnyPdmaChannel: From<C>,
 {
@@ -493,7 +493,7 @@ pub struct I2sDmaTxChannelImpl<C>(C);
 
 impl<C> crate::private::Sealed for I2sDmaTxChannelImpl<C> {}
 
-impl<C: I2sPdmaChannel> I2sDmaTxChannelImpl<C>
+impl<C: PdmaChannel> I2sDmaTxChannelImpl<C>
 where
     AnyPdmaChannel: From<C>,
 {
@@ -502,7 +502,7 @@ where
     }
 }
 
-impl<C: I2sPdmaChannel> RegisterAccess for I2sDmaTxChannelImpl<C> {
+impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDmaTxChannelImpl<C> {
     fn set_burst_mode(&self, burst_mode: bool) {
         let reg_block = self.0.register_block();
         reg_block
@@ -555,7 +555,7 @@ impl<C: I2sPdmaChannel> RegisterAccess for I2sDmaTxChannelImpl<C> {
     }
 }
 
-impl<C: I2sPdmaChannel> TxRegisterAccess for I2sDmaTxChannelImpl<C> {
+impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> TxRegisterAccess for I2sDmaTxChannelImpl<C> {
     fn last_dscr_address(&self) -> usize {
         let reg_block = self.0.register_block();
         reg_block
@@ -566,7 +566,9 @@ impl<C: I2sPdmaChannel> TxRegisterAccess for I2sDmaTxChannelImpl<C> {
     }
 }
 
-impl<C: I2sPdmaChannel> InterruptAccess<DmaTxInterrupt> for I2sDmaTxChannelImpl<C> {
+impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> InterruptAccess<DmaTxInterrupt>
+    for I2sDmaTxChannelImpl<C>
+{
     fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
         let reg_block = self.0.register_block();
         reg_block.int_ena().modify(|_, w| {
@@ -644,7 +646,7 @@ impl<C: I2sPdmaChannel> InterruptAccess<DmaTxInterrupt> for I2sDmaTxChannelImpl<
     }
 }
 
-impl<C: I2sPdmaChannel> RegisterAccess for I2sDmaRxChannelImpl<C> {
+impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDmaRxChannelImpl<C> {
     fn set_burst_mode(&self, burst_mode: bool) {
         let reg_block = self.0.register_block();
         reg_block
@@ -695,9 +697,11 @@ impl<C: I2sPdmaChannel> RegisterAccess for I2sDmaRxChannelImpl<C> {
     }
 }
 
-impl<C: I2sPdmaChannel> RxRegisterAccess for I2sDmaRxChannelImpl<C> {}
+impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RxRegisterAccess for I2sDmaRxChannelImpl<C> {}
 
-impl<C: I2sPdmaChannel> InterruptAccess<DmaRxInterrupt> for I2sDmaRxChannelImpl<C> {
+impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> InterruptAccess<DmaRxInterrupt>
+    for I2sDmaRxChannelImpl<C>
+{
     fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
         let reg_block = self.0.register_block();
         reg_block.int_ena().modify(|_, w| {
@@ -835,7 +839,9 @@ macro_rules! ImplI2sChannel {
                 }
             }
 
-            impl I2sPdmaChannel for [<I2s $num DmaChannel>] {
+            impl PdmaChannel for [<I2s $num DmaChannel>] {
+                type RegisterBlock = I2sRegisterBlock;
+
                 fn register_block(&self) -> &I2sRegisterBlock {
                     unsafe { &*crate::peripherals::[< I2S $num >]::PTR }
                 }
