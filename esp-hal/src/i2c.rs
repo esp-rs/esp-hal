@@ -1079,10 +1079,10 @@ mod asynch {
         ///   0 to indicate writing
         /// - `SR` = repeated start condition
         /// - `SP` = stop condition
-        async fn transaction(
+        async fn transaction<'a>(
             &mut self,
             address: u8,
-            operations: &mut [Operation<'_>],
+            operations: &mut [impl I2cOperation<'a>],
         ) -> Result<(), Error> {
             let mut last_op: Option<OpKind> = None;
             // filter out 0 length read operations
