@@ -65,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Change `DmaTxBuf` to support PSRAM on `esp32s3` (#2161)
 - I2c `transaction` is now also available as a inherent function, lift size limit on `write`,`read` and `write_read` (#2262)
 - SPI transactions are now cancelled if the transfer object (or async Future) is dropped. (#2216)
+- The DMA channel types have been removed from peripherals (#2261)
 
 ### Fixed
 
