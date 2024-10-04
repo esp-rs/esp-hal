@@ -63,6 +63,11 @@ impl InputSignal {
         }
     }
 
+    /// Returns the current signal level.
+    pub fn get_level(&self) -> Level {
+        self.is_input_high(private::Internal).into()
+    }
+
     /// Inverts the peripheral's input signal.
     ///
     /// Calling this function multiple times toggles the setting.

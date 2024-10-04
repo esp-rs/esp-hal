@@ -73,7 +73,7 @@ use core::marker::PhantomData;
 use super::{Error, FullDuplexMode, SpiMode};
 use crate::{
     dma::{DescriptorChain, DmaPeripheral, Rx, Tx},
-    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
+    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
     private,
@@ -110,16 +110,16 @@ where
     ) -> Spi<'d, T, FullDuplexMode> {
         crate::into_ref!(spi, sclk, mosi, miso, cs);
 
-        sclk.init_input(Pull::None, private::Internal);
+        sclk.enable_input(true, private::Internal);
         sclk.connect_input_to_peripheral(spi.sclk_signal(), private::Internal);
 
-        mosi.init_input(Pull::None, private::Internal);
+        mosi.enable_input(true, private::Internal);
         mosi.connect_input_to_peripheral(spi.mosi_signal(), private::Internal);
 
         miso.set_to_push_pull_output(private::Internal);
         miso.connect_peripheral_to_output(spi.miso_signal(), private::Internal);
 
-        cs.init_input(Pull::None, private::Internal);
+        cs.enable_input(true, private::Internal);
         cs.connect_input_to_peripheral(spi.cs_signal(), private::Internal);
 
         Self::new_internal(spi, mode)
@@ -129,6 +129,7 @@ where
         spi: PeripheralRef<'d, T>,
         mode: SpiMode,
     ) -> Spi<'d, T, FullDuplexMode> {
+        spi.reset_peripheral();
         spi.enable_peripheral();
 
         let mut spi = Spi {
@@ -366,8 +367,8 @@ pub mod dma {
         /// line.
         pub fn dma_transfer<'t, RXBUF, TXBUF>(
             &'t mut self,
-            words: &'t TXBUF,
             read_buffer: &'t mut RXBUF,
+            words: &'t TXBUF,
         ) -> Result<DmaTransferRxTx<'t, Self>, Error>
         where
             RXBUF: WriteBuffer,
@@ -633,7 +634,17 @@ pub trait Instance: private::Sealed {
 
     fn cs_signal(&self) -> InputSignal;
 
-    fn enable_peripheral(&self);
+    fn peripheral(&self) -> crate::system::Peripheral;
+
+    #[inline(always)]
+    fn reset_peripheral(&self) {
+        PeripheralClockControl::reset(self.peripheral());
+    }
+
+    #[inline(always)]
+    fn enable_peripheral(&self) {
+        PeripheralClockControl::enable(self.peripheral());
+    }
 
     fn spi_num(&self) -> u8;
 
@@ -737,11 +748,20 @@ pub trait Instance: private::Sealed {
     }
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
 impl Instance for crate::peripherals::SPI2 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
+    }
+
+    #[inline(always)]
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::Spi2
+    }
+
+    #[inline(always)]
+    fn spi_num(&self) -> u8 {
+        2
     }
 
     #[inline(always)]
@@ -763,61 +783,23 @@ impl Instance for crate::peripherals::SPI2 {
     fn cs_signal(&self) -> InputSignal {
         InputSignal::FSPICS0
     }
-
-    #[inline(always)]
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(crate::system::Peripheral::Spi2);
-    }
-
-    #[inline(always)]
-    fn spi_num(&self) -> u8 {
-        2
-    }
 }
 
-#[cfg(any(esp32s2, esp32s3))]
-impl Instance for crate::peripherals::SPI2 {
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
-    }
-
-    #[inline(always)]
-    fn sclk_signal(&self) -> InputSignal {
-        InputSignal::FSPICLK
-    }
-
-    #[inline(always)]
-    fn mosi_signal(&self) -> InputSignal {
-        InputSignal::FSPID
-    }
-
-    #[inline(always)]
-    fn miso_signal(&self) -> OutputSignal {
-        OutputSignal::FSPIQ
-    }
-
-    #[inline(always)]
-    fn cs_signal(&self) -> InputSignal {
-        InputSignal::FSPICS0
-    }
-
-    #[inline(always)]
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(crate::system::Peripheral::Spi2)
-    }
-
-    #[inline(always)]
-    fn spi_num(&self) -> u8 {
-        2
-    }
-}
-
-#[cfg(any(esp32s2, esp32s3))]
+#[cfg(spi3)]
 impl Instance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
+    }
+
+    #[inline(always)]
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::Spi3
+    }
+
+    #[inline(always)]
+    fn spi_num(&self) -> u8 {
+        3
     }
 
     #[inline(always)]
@@ -838,15 +820,5 @@ impl Instance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn cs_signal(&self) -> InputSignal {
         InputSignal::SPI3_CS0
-    }
-
-    #[inline(always)]
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(crate::system::Peripheral::Spi3)
-    }
-
-    #[inline(always)]
-    fn spi_num(&self) -> u8 {
-        3
     }
 }
