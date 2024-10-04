@@ -428,7 +428,7 @@ impl DmaChannel for AnyDmaChannel {
     }
 }
 
-impl<CH: DmaChannel, M: Mode> Channel<'_, CH, M> {
+impl<CH: DmaChannel, M: Mode> Channel<'_, M, CH> {
     /// Asserts that the channel is compatible with the given peripheral.
     pub fn runtime_ensure_compatible<P: PeripheralMarker + DmaEligible>(
         &self,
@@ -490,7 +490,7 @@ macro_rules! impl_channel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> crate::dma::Channel<'a, [<DmaChannel $num>], M> {
+                ) -> crate::dma::Channel<'a, M, [<DmaChannel $num>]> {
                     let tx_impl = ChannelTxImpl(SpecificGdmaChannel::<$num> {});
                     tx_impl.set_burst_mode(burst_mode);
                     tx_impl.set_priority(priority);
@@ -517,7 +517,7 @@ macro_rules! impl_channel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> crate::dma::Channel<'a, [<DmaChannel $num>], crate::Blocking> {
+                ) -> crate::dma::Channel<'a, crate::Blocking, [<DmaChannel $num>]> {
                     self.do_configure(burst_mode, priority)
                 }
 
@@ -529,7 +529,7 @@ macro_rules! impl_channel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> crate::dma::Channel<'a, [<DmaChannel $num>], $crate::Async> {
+                ) -> crate::dma::Channel<'a, $crate::Async, [<DmaChannel $num>]> {
                     let this = self.do_configure(burst_mode, priority);
 
                     [<DmaChannel $num>]::set_isr($async_handler);
@@ -648,7 +648,7 @@ mod m2m {
     where
         M: Mode,
     {
-        channel: Channel<'d, AnyDmaChannel, M>,
+        channel: Channel<'d, M>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
         peripheral: DmaPeripheral,
@@ -660,7 +660,7 @@ mod m2m {
     {
         /// Create a new Mem2Mem instance.
         pub fn new<CH>(
-            channel: Channel<'d, CH, M>,
+            channel: Channel<'d, M, CH>,
             peripheral: impl DmaEligible,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
@@ -681,7 +681,7 @@ mod m2m {
 
         /// Create a new Mem2Mem instance with specific chunk size.
         pub fn new_with_chunk_size<CH>(
-            channel: Channel<'d, CH, M>,
+            channel: Channel<'d, M, CH>,
             peripheral: impl DmaEligible,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
@@ -708,7 +708,7 @@ mod m2m {
         /// You must ensure that your not using DMA for the same peripheral and
         /// that your the only one using the DmaPeripheral.
         pub unsafe fn new_unsafe<CH>(
-            channel: Channel<'d, CH, M>,
+            channel: Channel<'d, M, CH>,
             peripheral: DmaPeripheral,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],

@@ -340,6 +340,15 @@ A non-exhausitve list demonstrating this change:
 +SpiDma<'static, esp_hal::peripherals::SPI2, HalfDuplexMode, Blocking>
 ```
 
-You can now call `dma_channel.degrade()` to obtain a type-erased version of `Channel`. Note that
-on ESP32 and ESP32-S2, passing this channel to an incompatible peripheral (for example an
+The type parameters of `Channel` have been reordered. The channel type
+has been moved to the last position. For example:
+
+```diff
+-Channel<'d, DmaChannel0, Async>
++Channel<'d, Async, DmaChannel0>
+```
+
+You can now call `dma_channel.degrade()` to obtain a type-erased version of `Channel`. You
+don't have to spell out `Channel<'d, Mode, AnyDmaChannel>`, you can use `Channel<'d, Mode>` instead.
+Note that on ESP32 and ESP32-S2, passing this channel to an incompatible peripheral (for example an
 I2S-specific DMA channel to SPI) will result in a panic.

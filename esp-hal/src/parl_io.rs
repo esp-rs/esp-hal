@@ -33,7 +33,6 @@ use private::*;
 use crate::{
     dma::{
         dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
-        AnyDmaChannel,
         Channel,
         ChannelRx,
         ChannelTx,
@@ -904,7 +903,7 @@ pub struct ParlIoTx<'d, DM>
 where
     DM: Mode,
 {
-    tx_channel: ChannelTx<'d, AnyDmaChannel>,
+    tx_channel: ChannelTx<'d>,
     tx_chain: DescriptorChain,
     phantom: PhantomData<DM>,
 }
@@ -983,7 +982,7 @@ pub struct ParlIoRx<'d, DM>
 where
     DM: Mode,
 {
-    rx_channel: ChannelRx<'d, AnyDmaChannel>,
+    rx_channel: ChannelRx<'d>,
     rx_chain: DescriptorChain,
     phantom: PhantomData<DM>,
 }
@@ -1094,7 +1093,7 @@ where
     /// Create a new instance of [ParlIoFullDuplex]
     pub fn new<CH>(
         _parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
-        dma_channel: Channel<'d, CH, DM>,
+        dma_channel: Channel<'d, DM, CH>,
         tx_descriptors: &'static mut [DmaDescriptor],
         rx_descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
@@ -1175,7 +1174,7 @@ where
     // TODO: only take a TX DMA channel?
     pub fn new<CH>(
         _parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
-        dma_channel: Channel<'d, CH, DM>,
+        dma_channel: Channel<'d, DM, CH>,
         descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
     ) -> Result<Self, Error>
@@ -1250,7 +1249,7 @@ where
     // TODO: only take a RX DMA channel?
     pub fn new<CH>(
         _parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
-        dma_channel: Channel<'d, CH, DM>,
+        dma_channel: Channel<'d, DM, CH>,
         descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
     ) -> Result<Self, Error>
@@ -1418,7 +1417,7 @@ impl<'d, DM> DmaSupportTx for ParlIoTx<'d, DM>
 where
     DM: Mode,
 {
-    type TX = ChannelTx<'d, AnyDmaChannel>;
+    type TX = ChannelTx<'d>;
 
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
@@ -1460,7 +1459,7 @@ where
     }
 
     fn start_receive_bytes_dma(
-        rx_channel: &mut ChannelRx<'d, AnyDmaChannel>,
+        rx_channel: &mut ChannelRx<'d>,
         rx_chain: &mut DescriptorChain,
         ptr: *mut u8,
         len: usize,
@@ -1514,7 +1513,7 @@ impl<'d, DM> DmaSupportRx for ParlIoRx<'d, DM>
 where
     DM: Mode,
 {
-    type RX = ChannelRx<'d, AnyDmaChannel>;
+    type RX = ChannelRx<'d>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
@@ -1530,7 +1529,7 @@ pub struct TxCreator<'d, DM>
 where
     DM: Mode,
 {
-    tx_channel: ChannelTx<'d, AnyDmaChannel>,
+    tx_channel: ChannelTx<'d>,
     descriptors: &'static mut [DmaDescriptor],
     phantom: PhantomData<DM>,
 }
@@ -1540,7 +1539,7 @@ pub struct RxCreator<'d, DM>
 where
     DM: Mode,
 {
-    rx_channel: ChannelRx<'d, AnyDmaChannel>,
+    rx_channel: ChannelRx<'d>,
     descriptors: &'static mut [DmaDescriptor],
     phantom: PhantomData<DM>,
 }
@@ -1550,7 +1549,7 @@ pub struct TxCreatorFullDuplex<'d, DM>
 where
     DM: Mode,
 {
-    tx_channel: ChannelTx<'d, AnyDmaChannel>,
+    tx_channel: ChannelTx<'d>,
     descriptors: &'static mut [DmaDescriptor],
     phantom: PhantomData<DM>,
 }
@@ -1560,7 +1559,7 @@ pub struct RxCreatorFullDuplex<'d, DM>
 where
     DM: Mode,
 {
-    rx_channel: ChannelRx<'d, AnyDmaChannel>,
+    rx_channel: ChannelRx<'d>,
     descriptors: &'static mut [DmaDescriptor],
     phantom: PhantomData<DM>,
 }

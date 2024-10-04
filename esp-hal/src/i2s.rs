@@ -87,7 +87,6 @@ use private::*;
 use crate::{
     dma::{
         dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
-        AnyDmaChannel,
         Channel,
         ChannelRx,
         ChannelTx,
@@ -338,7 +337,7 @@ where
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
-        channel: Channel<'d, CH, DmaMode>,
+        channel: Channel<'d, DmaMode, CH>,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
     ) -> Self {
@@ -437,7 +436,7 @@ where
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
-        channel: Channel<'d, CH, DmaMode>,
+        channel: Channel<'d, DmaMode, CH>,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
     ) -> Self
@@ -473,7 +472,7 @@ where
     T: RegisterAccess,
 {
     register_access: PhantomData<T>,
-    tx_channel: ChannelTx<'d, AnyDmaChannel>,
+    tx_channel: ChannelTx<'d>,
     tx_chain: DescriptorChain,
     phantom: PhantomData<DmaMode>,
 }
@@ -507,7 +506,7 @@ where
     T: RegisterAccess,
     DmaMode: Mode,
 {
-    type TX = ChannelTx<'d, AnyDmaChannel>;
+    type TX = ChannelTx<'d>;
 
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
@@ -523,10 +522,7 @@ where
     T: RegisterAccess,
     DmaMode: Mode,
 {
-    fn new(
-        tx_channel: ChannelTx<'d, AnyDmaChannel>,
-        descriptors: &'static mut [DmaDescriptor],
-    ) -> Self {
+    fn new(tx_channel: ChannelTx<'d>, descriptors: &'static mut [DmaDescriptor]) -> Self {
         Self {
             register_access: PhantomData,
             tx_channel,
@@ -640,7 +636,7 @@ where
     DmaMode: Mode,
 {
     register_access: PhantomData<T>,
-    rx_channel: ChannelRx<'d, AnyDmaChannel>,
+    rx_channel: ChannelRx<'d>,
     rx_chain: DescriptorChain,
     phantom: PhantomData<DmaMode>,
 }
@@ -674,7 +670,7 @@ where
     T: RegisterAccess,
     DmaMode: Mode,
 {
-    type RX = ChannelRx<'d, AnyDmaChannel>;
+    type RX = ChannelRx<'d>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
@@ -690,10 +686,7 @@ where
     T: RegisterAccess,
     DmaMode: Mode,
 {
-    fn new(
-        rx_channel: ChannelRx<'d, AnyDmaChannel>,
-        descriptors: &'static mut [DmaDescriptor],
-    ) -> Self {
+    fn new(rx_channel: ChannelRx<'d>, descriptors: &'static mut [DmaDescriptor]) -> Self {
         Self {
             register_access: PhantomData,
             rx_channel,
@@ -832,15 +825,7 @@ mod private {
     #[cfg(any(esp32, esp32s3))]
     use crate::peripherals::{i2s1::RegisterBlock, I2S1};
     use crate::{
-        dma::{
-            AnyDmaChannel,
-            ChannelRx,
-            ChannelTx,
-            DmaDescriptor,
-            DmaEligible,
-            DmaPeripheral,
-            PeripheralMarker,
-        },
+        dma::{ChannelRx, ChannelTx, DmaDescriptor, DmaEligible, DmaPeripheral, PeripheralMarker},
         gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
         interrupt::InterruptHandler,
         into_ref,
@@ -856,7 +841,7 @@ mod private {
         DmaMode: Mode,
     {
         pub register_access: PhantomData<T>,
-        pub tx_channel: ChannelTx<'d, AnyDmaChannel>,
+        pub tx_channel: ChannelTx<'d>,
         pub descriptors: &'static mut [DmaDescriptor],
         pub(crate) phantom: PhantomData<DmaMode>,
     }
@@ -910,7 +895,7 @@ mod private {
         DmaMode: Mode,
     {
         pub register_access: PhantomData<T>,
-        pub rx_channel: ChannelRx<'d, AnyDmaChannel>,
+        pub rx_channel: ChannelRx<'d>,
         pub descriptors: &'static mut [DmaDescriptor],
         pub(crate) phantom: PhantomData<DmaMode>,
     }

@@ -153,7 +153,6 @@ pub mod dma {
     use crate::{
         dma::{
             dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
-            AnyDmaChannel,
             Channel,
             ChannelRx,
             ChannelTx,
@@ -180,7 +179,7 @@ pub mod dma {
         #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
         pub fn with_dma<CH, DmaMode>(
             mut self,
-            channel: Channel<'d, CH, DmaMode>,
+            channel: Channel<'d, DmaMode, CH>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> SpiDma<'d, T, DmaMode>
@@ -200,7 +199,7 @@ pub mod dma {
         DmaMode: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, AnyDmaChannel, DmaMode>,
+        pub(crate) channel: Channel<'d, DmaMode>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
     }
@@ -238,7 +237,7 @@ pub mod dma {
         T: InstanceDma,
         DmaMode: Mode,
     {
-        type TX = ChannelTx<'d, AnyDmaChannel>;
+        type TX = ChannelTx<'d>;
 
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
@@ -254,7 +253,7 @@ pub mod dma {
         T: InstanceDma,
         DmaMode: Mode,
     {
-        type RX = ChannelRx<'d, AnyDmaChannel>;
+        type RX = ChannelRx<'d>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx
@@ -272,7 +271,7 @@ pub mod dma {
     {
         fn new<CH>(
             spi: PeripheralRef<'d, T>,
-            channel: Channel<'d, CH, DmaMode>,
+            channel: Channel<'d, DmaMode, CH>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> Self
