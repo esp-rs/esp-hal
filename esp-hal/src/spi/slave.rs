@@ -441,7 +441,6 @@ pub trait InstanceDma: Instance {
         self.enable_dma();
 
         reset_spi(reg_block);
-        reset_dma_before_load_dma_dscr(reg_block);
 
         if read_buffer_len > 0 {
             rx_chain.fill_for_rx(false, read_buffer_ptr, read_buffer_len)?;
@@ -479,16 +478,34 @@ pub trait InstanceDma: Instance {
     }
 
     fn enable_dma(&self) {
+        let reg_block = self.register_block();
         #[cfg(gdma)]
         {
-            let reg_block = self.register_block();
             reg_block.dma_conf().modify(|_, w| {
                 w.dma_tx_ena().set_bit();
                 w.dma_rx_ena().set_bit();
                 w.rx_eof_en().clear_bit()
             });
         }
-        // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
+
+        #[cfg(pdma)]
+        {
+            fn set_rst_bit(reg_block: &RegisterBlock, bit: bool) {
+                reg_block.dma_conf().modify(|_, w| {
+                    w.in_rst().bit(bit);
+                    w.out_rst().bit(bit);
+                    w.ahbm_fifo_rst().bit(bit);
+                    w.ahbm_rst().bit(bit)
+                });
+
+                #[cfg(esp32s2)]
+                reg_block
+                    .dma_conf()
+                    .modify(|_, w| w.dma_infifo_full_clr().bit(bit));
+            }
+            set_rst_bit(reg_block, true);
+            set_rst_bit(reg_block, false);
+        }
     }
 
     fn clear_dma_interrupts(&self) {
@@ -542,30 +559,6 @@ fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
 
     #[cfg(pdma)]
     let _ = reg_block;
-}
-
-fn reset_dma_before_load_dma_dscr(reg_block: &RegisterBlock) {
-    #[cfg(gdma)]
-    let _ = reg_block;
-
-    #[cfg(pdma)]
-    {
-        fn set_rst_bit(reg_block: &RegisterBlock, bit: bool) {
-            reg_block.dma_conf().modify(|_, w| {
-                w.in_rst().bit(bit);
-                w.out_rst().bit(bit);
-                w.ahbm_fifo_rst().bit(bit);
-                w.ahbm_rst().bit(bit)
-            });
-
-            #[cfg(esp32s2)]
-            reg_block
-                .dma_conf()
-                .modify(|_, w| w.dma_infifo_full_clr().bit(bit));
-        }
-        set_rst_bit(reg_block, true);
-        set_rst_bit(reg_block, false);
-    }
 }
 
 impl InstanceDma for crate::peripherals::SPI2 {
