@@ -473,19 +473,8 @@ where
     ) -> Self {
         crate::into_ref!(i2c, sda, scl);
 
-        PeripheralClockControl::reset(match i2c.i2c_number() {
-            0 => crate::system::Peripheral::I2cExt0,
-            #[cfg(i2c1)]
-            1 => crate::system::Peripheral::I2cExt1,
-            _ => unreachable!(), // will never happen
-        });
-
-        PeripheralClockControl::enable(match i2c.i2c_number() {
-            0 => crate::system::Peripheral::I2cExt0,
-            #[cfg(i2c1)]
-            1 => crate::system::Peripheral::I2cExt1,
-            _ => unreachable!(), // will never happen
-        });
+        PeripheralClockControl::reset(T::peripheral());
+        PeripheralClockControl::enable(T::peripheral());
 
         let i2c = I2C {
             peripheral: i2c,
@@ -536,19 +525,8 @@ where
     }
 
     fn internal_recover(&self) {
-        PeripheralClockControl::reset(match self.peripheral.i2c_number() {
-            0 => crate::system::Peripheral::I2cExt0,
-            #[cfg(i2c1)]
-            1 => crate::system::Peripheral::I2cExt1,
-            _ => unreachable!(), // will never happen
-        });
-
-        PeripheralClockControl::enable(match self.peripheral.i2c_number() {
-            0 => crate::system::Peripheral::I2cExt0,
-            #[cfg(i2c1)]
-            1 => crate::system::Peripheral::I2cExt1,
-            _ => unreachable!(), // will never happen
-        });
+        PeripheralClockControl::reset(T::peripheral());
+        PeripheralClockControl::enable(T::peripheral());
 
         self.peripheral.setup(self.frequency, self.timeout);
     }
@@ -1249,6 +1227,8 @@ pub trait Instance: crate::private::Sealed {
 
     /// Returns the interrupt associated with this I2C peripheral.
     fn interrupt() -> crate::peripherals::Interrupt;
+
+    fn peripheral() -> crate::system::Peripheral;
 
     /// Returns the SCL output signal for this I2C peripheral.
     fn scl_output_signal(&self) -> OutputSignal;
@@ -2343,6 +2323,11 @@ impl Instance for crate::peripherals::I2C0 {
     const I2C_NUMBER: usize = 0;
 
     #[inline(always)]
+    fn peripheral() -> crate::system::Peripheral {
+        crate::system::Peripheral::I2cExt0
+    }
+
+    #[inline(always)]
     fn scl_output_signal(&self) -> OutputSignal {
         OutputSignal::I2CEXT0_SCL
     }
@@ -2379,6 +2364,11 @@ impl Instance for crate::peripherals::I2C0 {
 #[cfg(i2c1)]
 impl Instance for crate::peripherals::I2C1 {
     const I2C_NUMBER: usize = 1;
+
+    #[inline(always)]
+    fn peripheral() -> crate::system::Peripheral {
+        crate::system::Peripheral::I2cExt1
+    }
 
     #[inline(always)]
     fn scl_output_signal(&self) -> OutputSignal {
