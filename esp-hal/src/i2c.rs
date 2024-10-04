@@ -305,7 +305,7 @@ where
     ///   to indicate writing
     /// - `SR` = repeated start condition
     /// - `SP` = stop condition
-    pub fn transaction<'a>(
+    pub fn transaction(
         &mut self,
         address: u8,
         operations: &mut [impl I2cOperation],
@@ -1079,7 +1079,7 @@ mod asynch {
         ///   0 to indicate writing
         /// - `SR` = repeated start condition
         /// - `SP` = stop condition
-        async fn transaction<'a>(
+        async fn transaction(
             &mut self,
             address: u8,
             operations: &mut [impl I2cOperation],
