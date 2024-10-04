@@ -499,10 +499,11 @@ impl<'d, BUF: DmaTxBuffer, CH: DmaChannel, DM: Mode> Drop for I8080Transfer<'d, 
 
         // SAFETY: This is Drop, we know that self.i8080 and self.buf_view
         // won't be touched again.
-        unsafe {
+        let view = unsafe {
             ManuallyDrop::drop(&mut self.i8080);
-            ManuallyDrop::drop(&mut self.buf_view);
-        }
+            ManuallyDrop::take(&mut self.buf_view)
+        };
+        let _ = BUF::from_view(view);
     }
 }
 
