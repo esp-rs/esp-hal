@@ -2334,6 +2334,7 @@ impl Instance for crate::peripherals::I2C0 {
         OutputSignal::I2CEXT0_SDA
     }
 
+    #[inline(always)]
     fn sda_input_signal(&self) -> InputSignal {
         InputSignal::I2CEXT0_SDA
     }
@@ -2348,6 +2349,7 @@ impl Instance for crate::peripherals::I2C0 {
         0
     }
 
+    #[inline(always)]
     fn interrupt() -> crate::peripherals::Interrupt {
         crate::peripherals::Interrupt::I2C_EXT0
     }
@@ -2380,6 +2382,7 @@ impl Instance for crate::peripherals::I2C1 {
         OutputSignal::I2CEXT1_SDA
     }
 
+    #[inline(always)]
     fn sda_input_signal(&self) -> InputSignal {
         InputSignal::I2CEXT1_SDA
     }
@@ -2394,6 +2397,7 @@ impl Instance for crate::peripherals::I2C1 {
         1
     }
 
+    #[inline(always)]
     fn interrupt() -> crate::peripherals::Interrupt {
         crate::peripherals::Interrupt::I2C_EXT1
     }
