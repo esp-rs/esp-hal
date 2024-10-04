@@ -22,8 +22,8 @@
 //! # use esp_hal::dma::Dma;
 //! # use esp_hal::gpio::Io;
 //! let dma = Dma::new(peripherals.DMA);
-#![cfg_attr(esp32s2, doc = "let dma_channel = dma.spi2channel;")]
-#![cfg_attr(not(esp32s2), doc = "let dma_channel = dma.channel0;")]
+#![cfg_attr(pdma, doc = "let dma_channel = dma.spi2channel;")]
+#![cfg_attr(gdma, doc = "let dma_channel = dma.channel0;")]
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let sclk = io.pins.gpio0;
 //! let miso = io.pins.gpio1;
@@ -58,16 +58,17 @@
 //! ## Implementation State
 //!
 //! There are several options for working with the SPI peripheral in slave mode,
-//! but the code currently only supports single transfers (not segmented
-//! transfers), full duplex, single bit (not dual or quad SPI), and DMA mode
-//! (not CPU mode). It also does not support blocking operations, as the actual
+//! but the code currently only supports:
+//! - Single transfers (not segmented transfers)
+//! - Full duplex, single bit (not dual or quad SPI)
+//! - DMA mode (not CPU mode).
+#![cfg_attr(esp32, doc = "- ESP32 only supports SPI mode 1 and 3.\n\n")]
+//! It also does not support blocking operations, as the actual
 //! transfer is controlled by the SPI master; if these are necessary,
-//! then the DmaTransfer trait instance can be wait()ed on or polled for
-//! is_done().
-//! - ESP32 does not support SPI Slave. See [tracking issue].
+//! then the `DmaTransfer` object can be `wait()`ed on or polled for
+//! `is_done()`.
 //!
-//! [tracking issue]: https://github.com/esp-rs/esp-hal/issues/469
-
+//! See [tracking issue](https://github.com/esp-rs/esp-hal/issues/469) for more information.
 use core::marker::PhantomData;
 
 use super::{Error, FullDuplexMode, SpiMode};
@@ -82,7 +83,9 @@ use crate::{
 
 const MAX_DMA_SIZE: usize = 32768 - 32;
 
-/// SPI peripheral driver
+/// SPI peripheral driver.
+///
+/// See the [module-level documentation][self] for more details.
 pub struct Spi<'d, T, M> {
     spi: PeripheralRef<'d, T>,
     #[allow(dead_code)]
@@ -174,7 +177,7 @@ pub mod dma {
     impl<'d> Spi<'d, crate::peripherals::SPI2, FullDuplexMode> {
         /// Configures the SPI3 peripheral with the provided DMA channel and
         /// descriptors.
-        #[cfg_attr(esp32, doc = "\nNote: ESP32 only supports Mode 1 and 3")]
+        #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
         pub fn with_dma<C, DmaMode>(
             mut self,
             channel: Channel<'d, C, DmaMode>,
@@ -200,7 +203,7 @@ pub mod dma {
     impl<'d> Spi<'d, crate::peripherals::SPI3, FullDuplexMode> {
         /// Configures the SPI3 peripheral with the provided DMA channel and
         /// descriptors.
-        #[cfg_attr(esp32, doc = "\nNote: ESP32 only supports Mode 1 and 3")]
+        #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
         pub fn with_dma<C, DmaMode>(
             mut self,
             channel: Channel<'d, C, DmaMode>,
