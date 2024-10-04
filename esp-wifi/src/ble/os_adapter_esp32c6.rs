@@ -1,6 +1,5 @@
 use crate::{
     binary::include::esp_bt_controller_config_t,
-    ble::npl,
     common_adapter::RADIO_CLOCKS,
     hal::system::{RadioClockController, RadioPeripherals},
 };
@@ -72,12 +71,6 @@ pub(crate) fn bt_periph_module_enable() {
     }
 }
 
-pub(crate) fn bt_periph_module_disable() {
-    unsafe {
-        unwrap!(RADIO_CLOCKS.as_mut()).disable(RadioPeripherals::Bt);
-    }
-}
-
 pub(crate) fn disable_sleep_mode() {
     // nothing
 }
@@ -128,8 +121,4 @@ unsafe extern "C" fn jrand48(
         VALUE = VALUE.wrapping_add(3);
         VALUE as i32
     }
-}
-
-pub(super) fn deinit() {
-    npl::deinit_common();
 }

@@ -1,6 +1,5 @@
 use crate::{
     binary::include::esp_bt_controller_config_t,
-    ble::npl,
     common_adapter::RADIO_CLOCKS,
     hal::system::RadioClockController,
 };
@@ -74,10 +73,6 @@ pub(crate) fn bt_periph_module_enable() {
     // nothing
 }
 
-pub(crate) fn bt_periph_module_disable() {
-    // nothing
-}
-
 pub(crate) fn disable_sleep_mode() {
     // nothing
 }
@@ -118,8 +113,4 @@ pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
     unsafe {
         unwrap!(RADIO_CLOCKS.as_mut()).reset_rpa();
     }
-}
-
-pub(super) fn deinit() {
-    npl::deinit_common();
 }

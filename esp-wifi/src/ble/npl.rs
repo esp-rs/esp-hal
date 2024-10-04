@@ -205,8 +205,12 @@ extern "C" {
     pub(crate) fn ble_controller_init(cfg: *const esp_bt_controller_config_t) -> i32;
 
     #[cfg(not(esp32c2))]
-    pub(crate) fn ble_controller_disable() -> i32;
+    pub(crate) fn r_ble_controller_disable() -> i32;
 
+    #[cfg(not(esp32c2))]
+    pub(crate) fn r_ble_controller_deinit() -> i32;
+
+    #[cfg(esp32c2)]
     pub(crate) fn ble_controller_deinit() -> i32;
 
     #[cfg(not(esp32c2))]
@@ -1221,8 +1225,29 @@ pub(crate) fn ble_init() {
 }
 
 pub(crate) fn ble_deinit() {
-    ble_os_adapter_chip_specific::deinit();
     unsafe {
+        // HCI deinit
+        npl::r_ble_hci_trans_cfg_hs(None, core::ptr::null(), None, core::ptr::null());
+
+        #[cfg(not(esp32c2))]
+        npl::r_ble_controller_disable();
+
+        #[cfg(not(esp32c2))]
+        let res = npl::r_ble_controller_deinit();
+
+        #[cfg(esp32c2)]
+        let res = npl::ble_controller_deinit();
+
+        if res != 0 {
+            panic!("ble_controller_deinit returned {}", res);
+        }
+
+        npl::esp_unregister_npl_funcs();
+
+        npl::esp_unregister_ext_funcs();
+
+        crate::common_adapter::chip_specific::phy_disable();
+
         CALLOUTS.iter_mut().for_each(|item| {
             item.take();
         });
@@ -1476,30 +1501,6 @@ pub fn send_hci(data: &[u8]) {
         }
 
         hci_out.reset();
-    }
-}
-
-pub(crate) fn deinit_common() {
-    unsafe {
-        // HCI deinit
-        npl::r_ble_hci_trans_cfg_hs(None, core::ptr::null(), None, core::ptr::null());
-
-        #[cfg(not(esp32c2))]
-        npl::ble_controller_disable();
-
-        let res = npl::ble_controller_deinit();
-
-        if res != 0 {
-            panic!("ble_controller_deinit returned {}", res);
-        }
-
-        ble_os_adapter_chip_specific::bt_periph_module_disable();
-
-        npl::esp_unregister_npl_funcs();
-
-        npl::esp_unregister_ext_funcs();
-
-        crate::common_adapter::chip_specific::phy_disable();
     }
 }
 

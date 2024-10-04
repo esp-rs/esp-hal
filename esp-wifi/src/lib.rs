@@ -475,6 +475,9 @@ pub fn initialize(
 /// currently no way to track whether a peripheral has been initialized,
 /// so deinitialization is done based on the activated feature (`wifi`, `ble`
 /// and/or `coex`).
+/// Before deinitializing, chips with NPL bluetooth (esp32c2, esp32c6, esp32h2)
+/// users must first wait for the central device to connect and, when it
+/// disconnects, deinitialize and reinitialize again.
 pub unsafe fn deinit_unchecked(
     init: EspWifiInitialization,
 ) -> Result<(TimeBase, hal::peripherals::RADIO_CLK), InitializationError> {
