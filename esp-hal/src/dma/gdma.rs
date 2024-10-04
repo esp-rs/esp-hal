@@ -416,11 +416,6 @@ impl<C: GdmaChannel> InterruptAccess<DmaRxInterrupt> for ChannelRxImpl<C> {
 #[non_exhaustive]
 pub struct ChannelCreator<const N: u8> {}
 
-#[non_exhaustive]
-#[doc(hidden)]
-pub struct SuitablePeripheral;
-impl PeripheralMarker for SuitablePeripheral {}
-
 impl DmaChannel for AnyDmaChannel {
     type Rx = ChannelRxImpl<AnyGdmaChannel>;
     type Tx = ChannelTxImpl<AnyGdmaChannel>;
@@ -435,15 +430,19 @@ impl DmaChannel for AnyDmaChannel {
 
 impl<CH: DmaChannel, M: Mode> Channel<'_, CH, M> {
     /// Asserts that the channel is compatible with the given peripheral.
-    pub fn runtime_ensure_compatible<P: PeripheralMarker>(&self, _peripheral: P) {
-        // GDMA channels are compatible with any peripheral
+    pub fn runtime_ensure_compatible<P: PeripheralMarker + DmaEligible>(
+        &self,
+        _peripheral: &PeripheralRef<'_, P>,
+    ) {
+        // No runtime checks; GDMA channels are compatible with any peripheral
     }
 }
 
+// Every DMA channel is compatible with every (DMA eligible) peripheral.
 impl<CH, P> DmaCompatible for (CH, P)
 where
     CH: DmaChannel,
-    P: PeripheralMarker,
+    P: PeripheralMarker + DmaEligible,
 {
 }
 

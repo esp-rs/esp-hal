@@ -343,7 +343,7 @@ where
         tx_descriptors: &'static mut [DmaDescriptor],
     ) -> Self {
         crate::into_ref!(i2s);
-        channel.runtime_ensure_compatible(i2s.dma_peripheral_marker());
+        channel.runtime_ensure_compatible(&i2s);
         // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
         // could be configured totally independently but for now handle all
         // the targets the same and force same configuration for both, TX and RX
@@ -443,7 +443,7 @@ where
     ) -> Self
     where
         CH: crate::dma::DmaChannel,
-        (CH, I::Peripheral): crate::dma::DmaCompatible,
+        (CH, I): crate::dma::DmaCompatible,
         DmaMode: Mode,
     {
         Self::new_internal(
@@ -837,6 +837,7 @@ mod private {
             ChannelRx,
             ChannelTx,
             DmaDescriptor,
+            DmaEligible,
             DmaPeripheral,
             PeripheralMarker,
         },
@@ -977,16 +978,12 @@ mod private {
         fn din_signal() -> InputSignal;
     }
 
-    pub trait RegBlock {
+    pub trait RegBlock: PeripheralMarker + DmaEligible {
         fn register_block() -> &'static RegisterBlock;
     }
 
     #[cfg(any(esp32, esp32s2))]
     pub trait RegisterAccessPrivate: Signals + RegBlock {
-        type Peripheral: PeripheralMarker;
-
-        fn dma_peripheral_marker(&self) -> Self::Peripheral;
-
         fn set_interrupt_handler(handler: InterruptHandler);
 
         fn enable_listen(interrupts: EnumSet<I2sInterrupt>, enable: bool) {
@@ -1241,10 +1238,6 @@ mod private {
 
     #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
     pub trait RegisterAccessPrivate: Signals + RegBlock {
-        type Peripheral: PeripheralMarker;
-
-        fn dma_peripheral_marker(&self) -> Self::Peripheral;
-
         fn set_interrupt_handler(handler: InterruptHandler);
 
         fn enable_listen(interrupts: EnumSet<I2sInterrupt>, enable: bool) {
@@ -1909,6 +1902,19 @@ mod private {
         }
     }
 
+    impl PeripheralMarker for I2S0 {
+        fn peripheral(&self) -> crate::system::Peripheral {
+            crate::system::Peripheral::I2s0
+        }
+    }
+
+    #[cfg(i2s1)]
+    impl PeripheralMarker for I2S1 {
+        fn peripheral(&self) -> crate::system::Peripheral {
+            crate::system::Peripheral::I2s1
+        }
+    }
+
     impl RegBlock for I2S0 {
         fn register_block() -> &'static RegisterBlock {
             unsafe { &*I2S0::PTR.cast::<RegisterBlock>() }
@@ -1923,21 +1929,6 @@ mod private {
     }
 
     impl RegisterAccessPrivate for I2S0 {
-        #[cfg(pdma)]
-        type Peripheral = crate::dma::I2s0DmaSuitablePeripheral;
-        #[cfg(gdma)]
-        type Peripheral = crate::dma::SuitablePeripheral;
-
-        fn dma_peripheral_marker(&self) -> Self::Peripheral {
-            cfg_if::cfg_if! {
-                if #[cfg(pdma)] {
-                    crate::dma::I2s0DmaSuitablePeripheral
-                } else {
-                    crate::dma::SuitablePeripheral
-                }
-            }
-        }
-
         fn set_interrupt_handler(handler: InterruptHandler) {
             unsafe { crate::peripherals::I2S0::steal() }.bind_i2s0_interrupt(handler.handler());
             crate::interrupt::enable(crate::peripherals::Interrupt::I2S0, handler.priority())
@@ -1947,21 +1938,6 @@ mod private {
 
     #[cfg(i2s1)]
     impl RegisterAccessPrivate for I2S1 {
-        #[cfg(pdma)]
-        type Peripheral = crate::dma::I2s1DmaSuitablePeripheral;
-        #[cfg(gdma)]
-        type Peripheral = crate::dma::SuitablePeripheral;
-
-        fn dma_peripheral_marker(&self) -> Self::Peripheral {
-            cfg_if::cfg_if! {
-                if #[cfg(pdma)] {
-                    crate::dma::I2s1DmaSuitablePeripheral
-                } else {
-                    crate::dma::SuitablePeripheral
-                }
-            }
-        }
-
         fn set_interrupt_handler(handler: InterruptHandler) {
             unsafe { crate::peripherals::I2S1::steal() }.bind_i2s1_interrupt(handler.handler());
             crate::interrupt::enable(crate::peripherals::Interrupt::I2S1, handler.priority())

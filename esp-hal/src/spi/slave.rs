@@ -73,7 +73,7 @@ use core::marker::PhantomData;
 
 use super::{Error, FullDuplexMode, SpiMode};
 use crate::{
-    dma::{DescriptorChain, DmaPeripheral, PeripheralMarker, Rx, Tx},
+    dma::{DescriptorChain, DmaEligible, PeripheralMarker, Rx, Tx},
     gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
@@ -186,7 +186,7 @@ pub mod dma {
         ) -> SpiDma<'d, T, DmaMode>
         where
             CH: DmaChannel,
-            (CH, T::Peripheral): crate::dma::DmaCompatible,
+            (CH, T): crate::dma::DmaCompatible,
             DmaMode: Mode,
         {
             self.spi.set_data_mode(self.data_mode, true);
@@ -279,7 +279,7 @@ pub mod dma {
         where
             CH: DmaChannel,
         {
-            channel.runtime_ensure_compatible(spi.dma_peripheral_marker());
+            channel.runtime_ensure_compatible(&spi);
             Self {
                 spi,
                 channel: channel.degrade(),
@@ -399,13 +399,7 @@ pub mod dma {
 }
 
 #[doc(hidden)]
-pub trait InstanceDma: Instance {
-    type Peripheral: PeripheralMarker;
-
-    fn dma_peripheral_marker(&self) -> Self::Peripheral;
-
-    fn dma_peripheral(&self) -> DmaPeripheral;
-
+pub trait InstanceDma: Instance + DmaEligible {
     #[allow(clippy::too_many_arguments)]
     unsafe fn start_transfer_dma<RX, TX>(
         &mut self,
@@ -547,50 +541,12 @@ fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
     let _ = reg_block;
 }
 
-impl InstanceDma for crate::peripherals::SPI2 {
-    #[cfg(pdma)]
-    type Peripheral = crate::dma::Spi2DmaSuitablePeripheral;
-    #[cfg(gdma)]
-    type Peripheral = crate::dma::SuitablePeripheral;
-
-    fn dma_peripheral_marker(&self) -> Self::Peripheral {
-        cfg_if::cfg_if! {
-            if #[cfg(pdma)] {
-                crate::dma::Spi2DmaSuitablePeripheral
-            } else {
-                crate::dma::SuitablePeripheral
-            }
-        }
-    }
-
-    fn dma_peripheral(&self) -> DmaPeripheral {
-        DmaPeripheral::Spi2
-    }
-}
+impl InstanceDma for crate::peripherals::SPI2 {}
 #[cfg(spi3)]
-impl InstanceDma for crate::peripherals::SPI3 {
-    #[cfg(pdma)]
-    type Peripheral = crate::dma::Spi3DmaSuitablePeripheral;
-    #[cfg(gdma)]
-    type Peripheral = crate::dma::SuitablePeripheral;
-
-    fn dma_peripheral_marker(&self) -> Self::Peripheral {
-        cfg_if::cfg_if! {
-            if #[cfg(pdma)] {
-                crate::dma::Spi3DmaSuitablePeripheral
-            } else {
-                crate::dma::SuitablePeripheral
-            }
-        }
-    }
-
-    fn dma_peripheral(&self) -> DmaPeripheral {
-        DmaPeripheral::Spi3
-    }
-}
+impl InstanceDma for crate::peripherals::SPI3 {}
 
 #[doc(hidden)]
-pub trait Instance: private::Sealed {
+pub trait Instance: private::Sealed + PeripheralMarker {
     fn register_block(&self) -> &RegisterBlock;
 
     fn peripheral(&self) -> crate::system::Peripheral;

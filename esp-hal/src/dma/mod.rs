@@ -890,7 +890,6 @@ impl From<u32> for Owner {
     }
 }
 
-/// Marks channels as useable for SPI
 #[doc(hidden)]
 pub trait DmaEligible {
     /// The DMA peripheral
@@ -903,10 +902,12 @@ pub trait DmaEligible {
 /// Marker trait
 #[doc(hidden)]
 pub trait PeripheralMarker {
-    #[cfg(pdma)]
     fn peripheral(&self) -> crate::system::Peripheral;
 }
 
+/// Trait implemented for (DmaChannel, Peripheral) pairs that are compatible.
+/// This is used to statically verify that the DMA channel is compatible with
+/// the peripheral.
 #[doc(hidden)]
 pub trait DmaCompatible {}
 
@@ -1993,7 +1994,7 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
 
     #[cfg(pdma)]
-    fn is_compatible_with<P: PeripheralMarker>(&self, peripheral: P) -> bool;
+    fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool;
 }
 
 #[doc(hidden)]
