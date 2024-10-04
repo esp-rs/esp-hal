@@ -518,10 +518,8 @@ where
     }
 
     fn internal_set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        unsafe {
-            crate::interrupt::bind_interrupt(T::interrupt(), handler.handler());
-            crate::interrupt::enable(T::interrupt(), handler.priority()).unwrap();
-        }
+        unsafe { crate::interrupt::bind_interrupt(T::interrupt(), handler.handler()) };
+        unwrap!(crate::interrupt::enable(T::interrupt(), handler.priority()));
     }
 
     fn internal_recover(&self) {
@@ -610,13 +608,7 @@ where
     ) -> Self {
         let mut this = Self::new_internal(i2c, sda, scl, frequency, timeout);
 
-        let handler = match T::I2C_NUMBER {
-            0 => asynch::i2c0_handler,
-            #[cfg(i2c1)]
-            1 => asynch::i2c1_handler,
-            _ => panic!("Unexpected I2C peripheral"),
-        };
-        this.internal_set_interrupt_handler(handler);
+        this.internal_set_interrupt_handler(T::async_handler());
 
         this
     }
@@ -1169,14 +1161,10 @@ mod asynch {
     pub(super) fn i2c0_handler() {
         let regs = unsafe { &*crate::peripherals::I2C0::PTR };
         regs.int_ena().modify(|_, w| {
-            w.end_detect()
-                .clear_bit()
-                .trans_complete()
-                .clear_bit()
-                .arbitration_lost()
-                .clear_bit()
-                .time_out()
-                .clear_bit()
+            w.end_detect().clear_bit();
+            w.trans_complete().clear_bit();
+            w.arbitration_lost().clear_bit();
+            w.time_out().clear_bit()
         });
 
         #[cfg(not(any(esp32, esp32s2)))]
@@ -1222,11 +1210,10 @@ mod asynch {
 /// I2C Peripheral Instance
 #[doc(hidden)]
 pub trait Instance: crate::private::Sealed {
-    /// The identifier number for this I2C instance.
-    const I2C_NUMBER: usize;
-
     /// Returns the interrupt associated with this I2C peripheral.
     fn interrupt() -> crate::peripherals::Interrupt;
+
+    fn async_handler() -> InterruptHandler;
 
     fn peripheral() -> crate::system::Peripheral;
 
@@ -1587,10 +1574,8 @@ pub trait Instance: crate::private::Sealed {
             // divider
             #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
             self.register_block().clk_conf().modify(|_, w| {
-                w.sclk_sel()
-                    .clear_bit()
-                    .sclk_div_num()
-                    .bits((sclk_div - 1) as u8)
+                w.sclk_sel().clear_bit();
+                w.sclk_div_num().bits((sclk_div - 1) as u8)
             });
 
             // scl period
@@ -1598,26 +1583,15 @@ pub trait Instance: crate::private::Sealed {
                 .scl_low_period()
                 .write(|w| w.scl_low_period().bits(scl_low_period as u16));
 
-            // for high/wait_high we have to differentiate between the chips
-            // as the EPS32 does not have a wait_high field
-            cfg_if::cfg_if! {
-                if #[cfg(not(esp32))] {
-                    self.register_block().scl_high_period().write(|w| {
-                        w.scl_high_period()
-                            .bits(scl_high_period as u16)
-                            .scl_wait_high_period()
-                            .bits(scl_wait_high_period.try_into().unwrap())
-                    });
-                }
-                else {
-                    self.register_block().scl_high_period().write(|w| {
-                        w.scl_high_period()
-                            .bits(scl_high_period as u16)
-                    });
-                }
-            }
+            self.register_block().scl_high_period().write(|w| {
+                #[cfg(not(esp32))] // ESP32 does not have a wait_high field
+                w.scl_wait_high_period()
+                    .bits(scl_wait_high_period.try_into().unwrap());
+                w.scl_high_period().bits(scl_high_period as u16)
+            });
 
             // we already did that above but on S2 we need this to make it work
+            // FIXME: do we need this twice on S2?
             #[cfg(esp32s2)]
             self.register_block().scl_high_period().write(|w| {
                 w.scl_wait_high_period()
@@ -1658,8 +1632,7 @@ pub trait Instance: crate::private::Sealed {
                     self.register_block()
                         .to()
                         .write(|w| w.time_out().bits(time_out_value));
-                }
-                else {
+                } else {
                     // timeout
                     // FIXME: Enable timout for other chips!
                     #[allow(clippy::useless_conversion)]
@@ -2320,11 +2293,14 @@ fn write_fifo(register_block: &RegisterBlock, data: u8) {
 }
 
 impl Instance for crate::peripherals::I2C0 {
-    const I2C_NUMBER: usize = 0;
-
     #[inline(always)]
     fn peripheral() -> crate::system::Peripheral {
         crate::system::Peripheral::I2cExt0
+    }
+
+    #[inline(always)]
+    fn async_handler() -> InterruptHandler {
+        asynch::i2c0_handler
     }
 
     #[inline(always)]
@@ -2363,11 +2339,14 @@ impl Instance for crate::peripherals::I2C0 {
 
 #[cfg(i2c1)]
 impl Instance for crate::peripherals::I2C1 {
-    const I2C_NUMBER: usize = 1;
-
     #[inline(always)]
     fn peripheral() -> crate::system::Peripheral {
         crate::system::Peripheral::I2cExt1
+    }
+
+    #[inline(always)]
+    fn async_handler() -> InterruptHandler {
+        asynch::i2c1_handler
     }
 
     #[inline(always)]
