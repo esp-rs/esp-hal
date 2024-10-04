@@ -55,7 +55,6 @@
 use core::marker::PhantomData;
 
 use fugit::HertzU32;
-use private::{I2cOperation, OpKind};
 
 use crate::{
     clock::Clocks,
@@ -105,6 +104,17 @@ pub enum Error {
     InvalidZeroLength,
 }
 
+#[derive(PartialEq)]
+// This enum is used to keep track of the last/next operation that was/will be
+// performed in an embedded-hal(-async) I2C::transaction. It is used to
+// determine whether a START condition should be issued at the start of the
+// current operation and whether a read needs an ack or a nack for the final
+// byte.
+enum OpKind {
+    Write,
+    Read,
+}
+
 /// I2C operation.
 ///
 /// Several operations can be combined as part of a transaction.
@@ -114,6 +124,35 @@ pub enum Operation<'a> {
 
     /// Read data into the provided buffer.
     Read(&'a mut [u8]),
+}
+
+impl<'a, 'b> From<&'a mut embedded_hal::i2c::Operation<'b>> for Operation<'a> {
+    fn from(value: &'a mut embedded_hal::i2c::Operation<'b>) -> Self {
+        match value {
+            embedded_hal::i2c::Operation::Write(buffer) => Operation::Write(buffer),
+            embedded_hal::i2c::Operation::Read(buffer) => Operation::Read(buffer),
+        }
+    }
+}
+
+impl Operation<'_> {
+    fn is_write(&self) -> bool {
+        matches!(self, Operation::Write(_))
+    }
+
+    fn kind(&self) -> OpKind {
+        match self {
+            Operation::Write(_) => OpKind::Write,
+            Operation::Read(_) => OpKind::Read,
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            Operation::Write(buffer) => buffer.is_empty(),
+            Operation::Read(buffer) => buffer.is_empty(),
+        }
+    }
 }
 
 impl embedded_hal::i2c::Error for Error {
@@ -305,15 +344,14 @@ where
     ///   to indicate writing
     /// - `SR` = repeated start condition
     /// - `SP` = stop condition
-    pub fn transaction(
+    pub fn transaction<'a>(
         &mut self,
         address: u8,
-        operations: &mut [impl I2cOperation],
+        operations: impl Iterator<Item = Operation<'a>>,
     ) -> Result<(), Error> {
         let mut last_op: Option<OpKind> = None;
         // filter out 0 length read operations
         let mut op_iter = operations
-            .iter_mut()
             .filter(|op| op.is_write() || !op.is_empty())
             .peekable();
 
@@ -324,22 +362,22 @@ where
             self.peripheral.clear_all_interrupts();
 
             let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
-            match kind {
-                OpKind::Write => {
+            match op {
+                Operation::Write(buffer) => {
                     // execute a write operation:
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
                     self.peripheral
                         .write_operation(
                             address,
-                            op.write_buffer().unwrap(),
+                            buffer,
                             !matches!(last_op, Some(OpKind::Write)),
                             next_op.is_none(),
                             cmd_iterator,
                         )
                         .inspect_err(|_| self.internal_recover())?;
                 }
-                OpKind::Read => {
+                Operation::Read(buffer) => {
                     // execute a read operation:
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
@@ -347,7 +385,7 @@ where
                     self.peripheral
                         .read_operation(
                             address,
-                            op.read_buffer().unwrap(),
+                            buffer,
                             !matches!(last_op, Some(OpKind::Read)),
                             next_op.is_none(),
                             matches!(next_op, Some(OpKind::Read)),
@@ -415,7 +453,7 @@ where
         address: u8,
         operations: &mut [embedded_hal::i2c::Operation<'_>],
     ) -> Result<(), Self::Error> {
-        self.transaction(address, operations)
+        self.transaction(address, operations.iter_mut().map(|op| Operation::from(op)))
     }
 }
 
@@ -618,7 +656,7 @@ mod asynch {
     };
 
     use embassy_sync::waitqueue::AtomicWaker;
-    use embedded_hal::i2c::Operation;
+    use embedded_hal::i2c::Operation as EhalOperation;
     use procmacros::handler;
 
     use super::*;
@@ -1082,12 +1120,11 @@ mod asynch {
         async fn transaction(
             &mut self,
             address: u8,
-            operations: &mut [impl I2cOperation],
+            operations: impl Iterator<Item = Operation<'_>>,
         ) -> Result<(), Error> {
             let mut last_op: Option<OpKind> = None;
             // filter out 0 length read operations
             let mut op_iter = operations
-                .iter_mut()
                 .filter(|op| op.is_write() || !op.is_empty())
                 .peekable();
 
@@ -1098,28 +1135,28 @@ mod asynch {
                 self.peripheral.clear_all_interrupts();
 
                 let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
-                match kind {
-                    OpKind::Write => {
+                match op {
+                    Operation::Write(buffer) => {
                         // execute a write operation:
                         // - issue START/RSTART if op is different from previous
                         // - issue STOP if op is the last one
                         self.write_operation(
                             address,
-                            op.write_buffer().unwrap(),
+                            buffer,
                             !matches!(last_op, Some(OpKind::Write)),
                             next_op.is_none(),
                             cmd_iterator,
                         )
                         .await?;
                     }
-                    OpKind::Read => {
+                    Operation::Read(buffer) => {
                         // execute a read operation:
                         // - issue START/RSTART if op is different from previous
                         // - issue STOP if op is the last one
                         // - will_continue is true if there is another read operation next
                         self.read_operation(
                             address,
-                            op.read_buffer().unwrap(),
+                            buffer,
                             !matches!(last_op, Some(OpKind::Read)),
                             next_op.is_none(),
                             matches!(next_op, Some(OpKind::Read)),
@@ -1143,9 +1180,10 @@ mod asynch {
         async fn transaction(
             &mut self,
             address: u8,
-            operations: &mut [Operation<'_>],
+            operations: &mut [EhalOperation<'_>],
         ) -> Result<(), Self::Error> {
-            self.transaction(address, operations).await
+            self.transaction(address, operations.iter_mut().map(|op| Operation::from(op)))
+                .await
         }
     }
 
@@ -1200,112 +1238,6 @@ mod asynch {
         regs.int_ena().modify(|_, w| w.ack_err().clear_bit());
 
         WAKERS[1].wake();
-    }
-}
-
-mod private {
-    use super::Operation;
-
-    #[derive(PartialEq)]
-    // This enum is used to keep track of the last/next operation that was/will be
-    // performed in an embedded-hal(-async) I2C::transaction. It is used to
-    // determine whether a START condition should be issued at the start of the
-    // current operation and whether a read needs an ack or a nack for the final
-    // byte.
-    pub enum OpKind {
-        Write,
-        Read,
-    }
-
-    #[doc(hidden)]
-    pub trait I2cOperation {
-        fn is_write(&self) -> bool;
-
-        fn is_read(&self) -> bool;
-
-        fn write_buffer(&self) -> Option<&[u8]>;
-
-        fn read_buffer(&mut self) -> Option<&mut [u8]>;
-
-        fn is_empty(&self) -> bool;
-
-        fn kind(&self) -> OpKind;
-    }
-
-    impl<'a> I2cOperation for Operation<'a> {
-        fn is_write(&self) -> bool {
-            matches!(self, Operation::Write(_))
-        }
-
-        fn is_read(&self) -> bool {
-            matches!(self, Operation::Read(_))
-        }
-
-        fn write_buffer(&self) -> Option<&[u8]> {
-            match self {
-                Operation::Write(buffer) => Some(buffer),
-                Operation::Read(_) => None,
-            }
-        }
-
-        fn read_buffer(&mut self) -> Option<&mut [u8]> {
-            match self {
-                Operation::Write(_) => None,
-                Operation::Read(buffer) => Some(*buffer),
-            }
-        }
-
-        fn kind(&self) -> OpKind {
-            match self {
-                Operation::Write(_) => OpKind::Write,
-                Operation::Read(_) => OpKind::Read,
-            }
-        }
-
-        fn is_empty(&self) -> bool {
-            match self {
-                Operation::Write(buffer) => buffer.is_empty(),
-                Operation::Read(buffer) => buffer.is_empty(),
-            }
-        }
-    }
-
-    impl<'a> I2cOperation for embedded_hal::i2c::Operation<'a> {
-        fn is_write(&self) -> bool {
-            matches!(self, embedded_hal::i2c::Operation::Write(_))
-        }
-
-        fn is_read(&self) -> bool {
-            matches!(self, embedded_hal::i2c::Operation::Read(_))
-        }
-
-        fn write_buffer(&self) -> Option<&[u8]> {
-            match self {
-                embedded_hal::i2c::Operation::Write(buffer) => Some(buffer),
-                embedded_hal::i2c::Operation::Read(_) => None,
-            }
-        }
-
-        fn read_buffer(&mut self) -> Option<&mut [u8]> {
-            match self {
-                embedded_hal::i2c::Operation::Write(_) => None,
-                embedded_hal::i2c::Operation::Read(buffer) => Some(*buffer),
-            }
-        }
-
-        fn kind(&self) -> OpKind {
-            match self {
-                embedded_hal::i2c::Operation::Write(_) => OpKind::Write,
-                embedded_hal::i2c::Operation::Read(_) => OpKind::Read,
-            }
-        }
-
-        fn is_empty(&self) -> bool {
-            match self {
-                embedded_hal::i2c::Operation::Write(buffer) => buffer.is_empty(),
-                embedded_hal::i2c::Operation::Read(buffer) => buffer.is_empty(),
-            }
-        }
     }
 }
 
