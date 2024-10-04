@@ -1,4 +1,7 @@
 //! SPI slave mode test suite.
+//!
+//! ESP32 does not support Modes 0 and 2 (properly, at least), so here we're
+//! testing Mode 1.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -51,20 +54,22 @@ impl BitbangSpi {
     }
 
     fn assert_cs(&mut self) {
+        self.sclk.set_level(Level::Low);
         self.cs.set_level(Level::Low);
     }
 
     fn deassert_cs(&mut self) {
+        self.sclk.set_level(Level::Low);
         self.cs.set_level(Level::High);
     }
 
-    // Mode 0, so sampled on the rising edge and set on the falling edge.
+    // Mode 1, so sampled on the rising edge and set on the falling edge.
     fn shift_bit(&mut self, bit: bool) -> bool {
         self.mosi.set_level(Level::from(bit));
-        self.sclk.set_level(Level::Low);
+        self.sclk.set_level(Level::High);
 
         let miso = self.miso.get_level().into();
-        self.sclk.set_level(Level::High);
+        self.sclk.set_level(Level::Low);
 
         miso
     }
@@ -84,7 +89,6 @@ impl BitbangSpi {
         for (tx, rx) in tx.iter().zip(rx.iter_mut()) {
             *rx = self.shift_byte(*tx);
         }
-        self.sclk.set_level(Level::Low);
         self.deassert_cs();
     }
 }
@@ -99,18 +103,11 @@ mod tests {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                // FIXME revert this
-                let (sclk_pin, miso_pin) = (io.pins.gpio2, io.pins.gpio4);
-                let mosi_pin = io.pins.gpio32;
-                let cs_pin = io.pins.gpio33;
-            } else {
-                let (mosi_pin, miso_pin) = hil_test::i2c_pins!(io);
-                let (sclk_pin, sclk_gpio) = hil_test::common_test_pins!(io);
-                let cs_pin = hil_test::unconnected_pin!(io);
-            }
-        }
+
+        let (mosi_pin, miso_pin) = hil_test::i2c_pins!(io);
+        let (sclk_pin, sclk_gpio) = hil_test::common_test_pins!(io);
+        let cs_pin = hil_test::unconnected_pin!(io);
+
         let dma = Dma::new(peripherals.DMA);
 
         cfg_if::cfg_if! {
@@ -128,7 +125,7 @@ mod tests {
 
         let mosi_gpio = Output::new(mosi_pin, Level::Low);
         let cs_gpio = Output::new(cs_pin, Level::High);
-        let sclk_gpio = Output::new(sclk_pin, Level::Low);
+        let sclk_gpio = Output::new(sclk_gpio, Level::Low);
 
         let spi = Spi::new(
             peripherals.SPI2,
@@ -136,7 +133,7 @@ mod tests {
             mosi,
             miso_pin,
             cs,
-            SpiMode::Mode0,
+            SpiMode::Mode1,
         );
 
         miso.enable_input(true, unsafe { esp_hal::Internal::conjure() });

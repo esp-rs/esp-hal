@@ -174,6 +174,7 @@ pub mod dma {
     impl<'d> Spi<'d, crate::peripherals::SPI2, FullDuplexMode> {
         /// Configures the SPI3 peripheral with the provided DMA channel and
         /// descriptors.
+        #[cfg_attr(esp32, doc = "\nNote: ESP32 only supports Mode 1 and 3")]
         pub fn with_dma<C, DmaMode>(
             mut self,
             channel: Channel<'d, C, DmaMode>,
@@ -199,6 +200,7 @@ pub mod dma {
     impl<'d> Spi<'d, crate::peripherals::SPI3, FullDuplexMode> {
         /// Configures the SPI3 peripheral with the provided DMA channel and
         /// descriptors.
+        #[cfg_attr(esp32, doc = "\nNote: ESP32 only supports Mode 1 and 3")]
         pub fn with_dma<C, DmaMode>(
             mut self,
             channel: Channel<'d, C, DmaMode>,
@@ -684,31 +686,11 @@ pub trait Instance: private::Sealed {
             });
 
             if dma {
-                match data_mode {
-                    SpiMode::Mode0 => {
-                        reg_block.pin().modify(|_, w| w.ck_idle_edge().clear_bit());
-                        reg_block.user().modify(|_, w| w.ck_i_edge().set_bit());
-
-                        reg_block.ctrl2().modify(|_, w| unsafe {
-                            w.miso_delay_mode().bits(0);
-                            w.miso_delay_num().bits(0);
-                            w.mosi_delay_mode().bits(2);
-                            w.mosi_delay_num().bits(2)
-                        });
-                    }
-                    SpiMode::Mode2 => {
-                        reg_block.pin().modify(|_, w| w.ck_idle_edge().set_bit());
-                        reg_block.user().modify(|_, w| w.ck_i_edge().clear_bit());
-
-                        reg_block.ctrl2().modify(|_, w| unsafe {
-                            w.miso_delay_mode().bits(0);
-                            w.miso_delay_num().bits(2);
-                            w.mosi_delay_mode().bits(0);
-                            w.mosi_delay_num().bits(3)
-                        });
-                    }
-                    _ => {}
-                }
+                assert!(
+                    matches!(data_mode, SpiMode::Mode1 | SpiMode::Mode3),
+                    "Mode {:?} is not supported with DMA",
+                    data_mode
+                );
             }
         }
 
