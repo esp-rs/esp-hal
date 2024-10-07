@@ -5,7 +5,13 @@
 #![no_std]
 #![no_main]
 
-use esp_hal::{gpio::Io, i2c::I2C, peripherals::I2C0, prelude::*, Blocking};
+use esp_hal::{
+    gpio::Io,
+    i2c::{Operation, I2C},
+    peripherals::I2C0,
+    prelude::*,
+    Blocking,
+};
 use hil_test as _;
 
 struct Context {
@@ -41,6 +47,22 @@ mod tests {
 
         // do the real read which should succeed
         ctx.i2c.write_read(0x77, &[0xaa], &mut read_data).ok();
+
+        assert_ne!(read_data, [0u8; 22])
+    }
+
+    #[test]
+    #[timeout(3)]
+    fn test_read_cali_with_transactions(mut ctx: Context) {
+        let mut read_data = [0u8; 22];
+
+        // do the real read which should succeed
+        ctx.i2c
+            .transaction(
+                0x77,
+                &mut [Operation::Write(&[0xaa]), Operation::Read(&mut read_data)],
+            )
+            .ok();
 
         assert_ne!(read_data, [0u8; 22])
     }

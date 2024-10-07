@@ -376,7 +376,7 @@ pub(crate) fn disable_sleep_mode() {
 }
 
 pub(crate) unsafe extern "C" fn coex_bt_wakeup_request() -> bool {
-    debug!("coex_bt_wakeup_request");
+    trace!("coex_bt_wakeup_request");
     #[cfg(coex)]
     return async_wakeup_request(BTDM_ASYNC_WAKEUP_REQ_COEX);
 
@@ -393,7 +393,7 @@ pub(crate) unsafe extern "C" fn coex_bt_wakeup_request_end() {
 
 #[allow(unused_variables)]
 pub(crate) unsafe extern "C" fn coex_bt_request(event: u32, latency: u32, duration: u32) -> i32 {
-    debug!("coex_bt_request");
+    trace!("coex_bt_request");
     extern "C" {
         #[cfg(coex)]
         fn coex_bt_request(event: u32, latency: u32, duration: u32) -> i32;
@@ -408,7 +408,7 @@ pub(crate) unsafe extern "C" fn coex_bt_request(event: u32, latency: u32, durati
 
 #[allow(unused_variables)]
 pub(crate) unsafe extern "C" fn coex_bt_release(event: u32) -> i32 {
-    debug!("coex_bt_release");
+    trace!("coex_bt_release");
     extern "C" {
         #[cfg(coex)]
         fn coex_bt_release(event: u32) -> i32;
@@ -438,7 +438,7 @@ pub(crate) unsafe extern "C" fn coex_register_bt_cb_wrapper(
 }
 
 pub(crate) unsafe extern "C" fn coex_bb_reset_lock() -> u32 {
-    debug!("coex_bb_reset_lock");
+    trace!("coex_bb_reset_lock");
     extern "C" {
         #[cfg(coex)]
         fn coex_bb_reset_lock() -> u32;
@@ -453,7 +453,7 @@ pub(crate) unsafe extern "C" fn coex_bb_reset_lock() -> u32 {
 
 #[allow(unused_variables)]
 pub(crate) unsafe extern "C" fn coex_bb_reset_unlock(event: u32) {
-    debug!("coex_bb_reset_unlock");
+    trace!("coex_bb_reset_unlock");
     extern "C" {
         #[cfg(coex)]
         fn coex_bb_reset_unlock(event: u32);
@@ -480,7 +480,7 @@ pub(crate) unsafe extern "C" fn coex_schm_register_btdm_callback_wrapper(
 }
 
 pub(crate) unsafe extern "C" fn coex_schm_interval_get() -> u32 {
-    debug!("coex_schm_interval_get");
+    trace!("coex_schm_interval_get");
 
     #[cfg(coex)]
     return crate::binary::include::coex_schm_interval_get();
@@ -490,7 +490,7 @@ pub(crate) unsafe extern "C" fn coex_schm_interval_get() -> u32 {
 }
 
 pub(crate) unsafe extern "C" fn coex_schm_curr_period_get() -> u8 {
-    debug!("coex_schm_curr_period_get");
+    trace!("coex_schm_curr_period_get");
 
     #[cfg(coex)]
     return crate::binary::include::coex_schm_curr_period_get();
@@ -500,7 +500,7 @@ pub(crate) unsafe extern "C" fn coex_schm_curr_period_get() -> u8 {
 }
 
 pub(crate) unsafe extern "C" fn coex_schm_curr_phase_get() -> *const () {
-    debug!("coex_schm_curr_phase_get");
+    trace!("coex_schm_curr_phase_get");
 
     #[cfg(coex)]
     return crate::binary::include::coex_schm_curr_phase_get() as *const ();

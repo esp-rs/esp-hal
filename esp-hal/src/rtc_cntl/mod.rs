@@ -392,6 +392,25 @@ impl<'d> Rtc<'d> {
         config.start_sleep(wakeup_triggers);
         config.finish_sleep();
     }
+
+    /// Temporarily disable log messages of the ROM bootloader.
+    ///
+    /// If you need to permanently disable the ROM bootloader messages, you'll
+    /// need to set the corresponding eFuse.
+    #[cfg(any(esp32s3, esp32h2))]
+    pub fn disable_rom_message_printing(&self) {
+        // Corresponding documentation:
+        // ESP32-S3: TRM v1.5 chapter 8.3
+        // ESP32-H2: TRM v0.5 chapter 8.2.3
+
+        #[cfg(esp32s3)]
+        let rtc_cntl = unsafe { &*LPWR::ptr() };
+        #[cfg(esp32h2)]
+        let rtc_cntl = unsafe { &*LP_AON::ptr() };
+        rtc_cntl
+            .store4()
+            .modify(|r, w| unsafe { w.bits(r.bits() & 1) });
+    }
 }
 impl<'d> crate::private::Sealed for Rtc<'d> {}
 

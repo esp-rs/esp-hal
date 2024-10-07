@@ -55,7 +55,6 @@
 use core::marker::PhantomData;
 
 use fugit::HertzU32;
-use private::{I2cOperation, OpKind};
 
 use crate::{
     clock::Clocks,
@@ -105,6 +104,17 @@ pub enum Error {
     InvalidZeroLength,
 }
 
+#[derive(PartialEq)]
+// This enum is used to keep track of the last/next operation that was/will be
+// performed in an embedded-hal(-async) I2C::transaction. It is used to
+// determine whether a START condition should be issued at the start of the
+// current operation and whether a read needs an ack or a nack for the final
+// byte.
+enum OpKind {
+    Write,
+    Read,
+}
+
 /// I2C operation.
 ///
 /// Several operations can be combined as part of a transaction.
@@ -114,6 +124,44 @@ pub enum Operation<'a> {
 
     /// Read data into the provided buffer.
     Read(&'a mut [u8]),
+}
+
+impl<'a, 'b> From<&'a mut embedded_hal::i2c::Operation<'b>> for Operation<'a> {
+    fn from(value: &'a mut embedded_hal::i2c::Operation<'b>) -> Self {
+        match value {
+            embedded_hal::i2c::Operation::Write(buffer) => Operation::Write(buffer),
+            embedded_hal::i2c::Operation::Read(buffer) => Operation::Read(buffer),
+        }
+    }
+}
+
+impl<'a, 'b> From<&'a mut Operation<'b>> for Operation<'a> {
+    fn from(value: &'a mut Operation<'b>) -> Self {
+        match value {
+            Operation::Write(buffer) => Operation::Write(buffer),
+            Operation::Read(buffer) => Operation::Read(buffer),
+        }
+    }
+}
+
+impl Operation<'_> {
+    fn is_write(&self) -> bool {
+        matches!(self, Operation::Write(_))
+    }
+
+    fn kind(&self) -> OpKind {
+        match self {
+            Operation::Write(_) => OpKind::Write,
+            Operation::Read(_) => OpKind::Read,
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            Operation::Write(buffer) => buffer.is_empty(),
+            Operation::Read(buffer) => buffer.is_empty(),
+        }
+    }
 }
 
 impl embedded_hal::i2c::Error for Error {
@@ -247,7 +295,9 @@ where
         write_buffer: &[u8],
         read_buffer: &mut [u8],
     ) -> Result<(), Error> {
-        let chunk_count = write_buffer.len().div_ceil(I2C_CHUNK_SIZE);
+        let write_count = write_buffer.len().div_ceil(I2C_CHUNK_SIZE);
+        let read_count = read_buffer.len().div_ceil(I2C_CHUNK_SIZE);
+
         for (idx, chunk) in write_buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
             // Clear all I2C interrupts
             self.peripheral.clear_all_interrupts();
@@ -259,13 +309,12 @@ where
                     address,
                     chunk,
                     idx == 0,
-                    idx == chunk_count - 1,
+                    idx == write_count - 1 && read_count == 0,
                     cmd_iterator,
                 )
                 .inspect_err(|_| self.internal_recover())?;
         }
 
-        let chunk_count = read_buffer.len().div_ceil(I2C_CHUNK_SIZE);
         for (idx, chunk) in read_buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
             // Clear all I2C interrupts
             self.peripheral.clear_all_interrupts();
@@ -277,8 +326,8 @@ where
                     address,
                     chunk,
                     idx == 0,
-                    idx == chunk_count - 1,
-                    idx < chunk_count - 1,
+                    idx == read_count - 1,
+                    idx < read_count - 1,
                     cmd_iterator,
                 )
                 .inspect_err(|_| self.internal_recover())?;
@@ -305,15 +354,22 @@ where
     ///   to indicate writing
     /// - `SR` = repeated start condition
     /// - `SP` = stop condition
-    pub fn transaction(
+    pub fn transaction<'a>(
         &mut self,
         address: u8,
-        operations: &mut [impl I2cOperation],
+        operations: impl IntoIterator<Item = &'a mut Operation<'a>>,
+    ) -> Result<(), Error> {
+        self.transaction_impl(address, operations.into_iter().map(Operation::from))
+    }
+
+    fn transaction_impl<'a>(
+        &mut self,
+        address: u8,
+        operations: impl Iterator<Item = Operation<'a>>,
     ) -> Result<(), Error> {
         let mut last_op: Option<OpKind> = None;
         // filter out 0 length read operations
         let mut op_iter = operations
-            .iter_mut()
             .filter(|op| op.is_write() || !op.is_empty())
             .peekable();
 
@@ -324,22 +380,22 @@ where
             self.peripheral.clear_all_interrupts();
 
             let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
-            match kind {
-                OpKind::Write => {
+            match op {
+                Operation::Write(buffer) => {
                     // execute a write operation:
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
                     self.peripheral
                         .write_operation(
                             address,
-                            op.write_buffer().unwrap(),
+                            buffer,
                             !matches!(last_op, Some(OpKind::Write)),
                             next_op.is_none(),
                             cmd_iterator,
                         )
                         .inspect_err(|_| self.internal_recover())?;
                 }
-                OpKind::Read => {
+                Operation::Read(buffer) => {
                     // execute a read operation:
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
@@ -347,7 +403,7 @@ where
                     self.peripheral
                         .read_operation(
                             address,
-                            op.read_buffer().unwrap(),
+                            buffer,
                             !matches!(last_op, Some(OpKind::Read)),
                             next_op.is_none(),
                             matches!(next_op, Some(OpKind::Read)),
@@ -415,7 +471,7 @@ where
         address: u8,
         operations: &mut [embedded_hal::i2c::Operation<'_>],
     ) -> Result<(), Self::Error> {
-        self.transaction(address, operations)
+        self.transaction_impl(address, operations.iter_mut().map(Operation::from))
     }
 }
 
@@ -435,19 +491,8 @@ where
     ) -> Self {
         crate::into_ref!(i2c, sda, scl);
 
-        PeripheralClockControl::reset(match i2c.i2c_number() {
-            0 => crate::system::Peripheral::I2cExt0,
-            #[cfg(i2c1)]
-            1 => crate::system::Peripheral::I2cExt1,
-            _ => unreachable!(), // will never happen
-        });
-
-        PeripheralClockControl::enable(match i2c.i2c_number() {
-            0 => crate::system::Peripheral::I2cExt0,
-            #[cfg(i2c1)]
-            1 => crate::system::Peripheral::I2cExt1,
-            _ => unreachable!(), // will never happen
-        });
+        PeripheralClockControl::reset(T::peripheral());
+        PeripheralClockControl::enable(T::peripheral());
 
         let i2c = I2C {
             peripheral: i2c,
@@ -491,26 +536,13 @@ where
     }
 
     fn internal_set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        unsafe {
-            crate::interrupt::bind_interrupt(T::interrupt(), handler.handler());
-            crate::interrupt::enable(T::interrupt(), handler.priority()).unwrap();
-        }
+        unsafe { crate::interrupt::bind_interrupt(T::interrupt(), handler.handler()) };
+        unwrap!(crate::interrupt::enable(T::interrupt(), handler.priority()));
     }
 
     fn internal_recover(&self) {
-        PeripheralClockControl::reset(match self.peripheral.i2c_number() {
-            0 => crate::system::Peripheral::I2cExt0,
-            #[cfg(i2c1)]
-            1 => crate::system::Peripheral::I2cExt1,
-            _ => unreachable!(), // will never happen
-        });
-
-        PeripheralClockControl::enable(match self.peripheral.i2c_number() {
-            0 => crate::system::Peripheral::I2cExt0,
-            #[cfg(i2c1)]
-            1 => crate::system::Peripheral::I2cExt1,
-            _ => unreachable!(), // will never happen
-        });
+        PeripheralClockControl::reset(T::peripheral());
+        PeripheralClockControl::enable(T::peripheral());
 
         self.peripheral.setup(self.frequency, self.timeout);
     }
@@ -594,13 +626,7 @@ where
     ) -> Self {
         let mut this = Self::new_internal(i2c, sda, scl, frequency, timeout);
 
-        let handler = match T::I2C_NUMBER {
-            0 => asynch::i2c0_handler,
-            #[cfg(i2c1)]
-            1 => asynch::i2c1_handler,
-            _ => panic!("Unexpected I2C peripheral"),
-        };
-        this.internal_set_interrupt_handler(handler);
+        this.internal_set_interrupt_handler(T::async_handler());
 
         this
     }
@@ -618,7 +644,7 @@ mod asynch {
     };
 
     use embassy_sync::waitqueue::AtomicWaker;
-    use embedded_hal::i2c::Operation;
+    use embedded_hal::i2c::Operation as EhalOperation;
     use procmacros::handler;
 
     use super::*;
@@ -1022,7 +1048,8 @@ mod asynch {
             write_buffer: &[u8],
             read_buffer: &mut [u8],
         ) -> Result<(), Error> {
-            let chunk_count = write_buffer.len().div_ceil(I2C_CHUNK_SIZE);
+            let write_count = write_buffer.len().div_ceil(I2C_CHUNK_SIZE);
+            let read_count = read_buffer.len().div_ceil(I2C_CHUNK_SIZE);
             for (idx, chunk) in write_buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
                 // Clear all I2C interrupts
                 self.peripheral.clear_all_interrupts();
@@ -1033,13 +1060,12 @@ mod asynch {
                     address,
                     chunk,
                     idx == 0,
-                    idx == chunk_count - 1,
+                    idx == write_count - 1 && read_count == 0,
                     cmd_iterator,
                 )
                 .await?;
             }
 
-            let chunk_count = read_buffer.len().div_ceil(I2C_CHUNK_SIZE);
             for (idx, chunk) in read_buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
                 // Clear all I2C interrupts
                 self.peripheral.clear_all_interrupts();
@@ -1050,8 +1076,8 @@ mod asynch {
                     address,
                     chunk,
                     idx == 0,
-                    idx == chunk_count - 1,
-                    idx < chunk_count - 1,
+                    idx == read_count - 1,
+                    idx < read_count - 1,
                     cmd_iterator,
                 )
                 .await?;
@@ -1079,15 +1105,23 @@ mod asynch {
         ///   0 to indicate writing
         /// - `SR` = repeated start condition
         /// - `SP` = stop condition
-        async fn transaction(
+        pub async fn transaction<'a>(
             &mut self,
             address: u8,
-            operations: &mut [impl I2cOperation],
+            operations: impl IntoIterator<Item = &'a mut Operation<'a>>,
+        ) -> Result<(), Error> {
+            self.transaction_impl(address, operations.into_iter().map(Operation::from))
+                .await
+        }
+
+        async fn transaction_impl<'a>(
+            &mut self,
+            address: u8,
+            operations: impl Iterator<Item = Operation<'a>>,
         ) -> Result<(), Error> {
             let mut last_op: Option<OpKind> = None;
             // filter out 0 length read operations
             let mut op_iter = operations
-                .iter_mut()
                 .filter(|op| op.is_write() || !op.is_empty())
                 .peekable();
 
@@ -1098,28 +1132,28 @@ mod asynch {
                 self.peripheral.clear_all_interrupts();
 
                 let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
-                match kind {
-                    OpKind::Write => {
+                match op {
+                    Operation::Write(buffer) => {
                         // execute a write operation:
                         // - issue START/RSTART if op is different from previous
                         // - issue STOP if op is the last one
                         self.write_operation(
                             address,
-                            op.write_buffer().unwrap(),
+                            buffer,
                             !matches!(last_op, Some(OpKind::Write)),
                             next_op.is_none(),
                             cmd_iterator,
                         )
                         .await?;
                     }
-                    OpKind::Read => {
+                    Operation::Read(buffer) => {
                         // execute a read operation:
                         // - issue START/RSTART if op is different from previous
                         // - issue STOP if op is the last one
                         // - will_continue is true if there is another read operation next
                         self.read_operation(
                             address,
-                            op.read_buffer().unwrap(),
+                            buffer,
                             !matches!(last_op, Some(OpKind::Read)),
                             next_op.is_none(),
                             matches!(next_op, Some(OpKind::Read)),
@@ -1143,9 +1177,10 @@ mod asynch {
         async fn transaction(
             &mut self,
             address: u8,
-            operations: &mut [Operation<'_>],
+            operations: &mut [EhalOperation<'_>],
         ) -> Result<(), Self::Error> {
-            self.transaction(address, operations).await
+            self.transaction_impl(address, operations.iter_mut().map(Operation::from))
+                .await
         }
     }
 
@@ -1153,14 +1188,10 @@ mod asynch {
     pub(super) fn i2c0_handler() {
         let regs = unsafe { &*crate::peripherals::I2C0::PTR };
         regs.int_ena().modify(|_, w| {
-            w.end_detect()
-                .clear_bit()
-                .trans_complete()
-                .clear_bit()
-                .arbitration_lost()
-                .clear_bit()
-                .time_out()
-                .clear_bit()
+            w.end_detect().clear_bit();
+            w.trans_complete().clear_bit();
+            w.arbitration_lost().clear_bit();
+            w.time_out().clear_bit()
         });
 
         #[cfg(not(any(esp32, esp32s2)))]
@@ -1203,120 +1234,15 @@ mod asynch {
     }
 }
 
-mod private {
-    use super::Operation;
-
-    #[derive(PartialEq)]
-    // This enum is used to keep track of the last/next operation that was/will be
-    // performed in an embedded-hal(-async) I2C::transaction. It is used to
-    // determine whether a START condition should be issued at the start of the
-    // current operation and whether a read needs an ack or a nack for the final
-    // byte.
-    pub enum OpKind {
-        Write,
-        Read,
-    }
-
-    #[doc(hidden)]
-    pub trait I2cOperation {
-        fn is_write(&self) -> bool;
-
-        fn is_read(&self) -> bool;
-
-        fn write_buffer(&self) -> Option<&[u8]>;
-
-        fn read_buffer(&mut self) -> Option<&mut [u8]>;
-
-        fn is_empty(&self) -> bool;
-
-        fn kind(&self) -> OpKind;
-    }
-
-    impl<'a> I2cOperation for Operation<'a> {
-        fn is_write(&self) -> bool {
-            matches!(self, Operation::Write(_))
-        }
-
-        fn is_read(&self) -> bool {
-            matches!(self, Operation::Read(_))
-        }
-
-        fn write_buffer(&self) -> Option<&[u8]> {
-            match self {
-                Operation::Write(buffer) => Some(buffer),
-                Operation::Read(_) => None,
-            }
-        }
-
-        fn read_buffer(&mut self) -> Option<&mut [u8]> {
-            match self {
-                Operation::Write(_) => None,
-                Operation::Read(buffer) => Some(*buffer),
-            }
-        }
-
-        fn kind(&self) -> OpKind {
-            match self {
-                Operation::Write(_) => OpKind::Write,
-                Operation::Read(_) => OpKind::Read,
-            }
-        }
-
-        fn is_empty(&self) -> bool {
-            match self {
-                Operation::Write(buffer) => buffer.is_empty(),
-                Operation::Read(buffer) => buffer.is_empty(),
-            }
-        }
-    }
-
-    impl<'a> I2cOperation for embedded_hal::i2c::Operation<'a> {
-        fn is_write(&self) -> bool {
-            matches!(self, embedded_hal::i2c::Operation::Write(_))
-        }
-
-        fn is_read(&self) -> bool {
-            matches!(self, embedded_hal::i2c::Operation::Read(_))
-        }
-
-        fn write_buffer(&self) -> Option<&[u8]> {
-            match self {
-                embedded_hal::i2c::Operation::Write(buffer) => Some(buffer),
-                embedded_hal::i2c::Operation::Read(_) => None,
-            }
-        }
-
-        fn read_buffer(&mut self) -> Option<&mut [u8]> {
-            match self {
-                embedded_hal::i2c::Operation::Write(_) => None,
-                embedded_hal::i2c::Operation::Read(buffer) => Some(*buffer),
-            }
-        }
-
-        fn kind(&self) -> OpKind {
-            match self {
-                embedded_hal::i2c::Operation::Write(_) => OpKind::Write,
-                embedded_hal::i2c::Operation::Read(_) => OpKind::Read,
-            }
-        }
-
-        fn is_empty(&self) -> bool {
-            match self {
-                embedded_hal::i2c::Operation::Write(buffer) => buffer.is_empty(),
-                embedded_hal::i2c::Operation::Read(buffer) => buffer.is_empty(),
-            }
-        }
-    }
-}
-
 /// I2C Peripheral Instance
 #[doc(hidden)]
 pub trait Instance: crate::private::Sealed {
-    /// The identifier number for this I2C instance.
-    const I2C_NUMBER: usize;
-
     /// Returns the interrupt associated with this I2C peripheral.
     fn interrupt() -> crate::peripherals::Interrupt;
+
+    fn async_handler() -> InterruptHandler;
+
+    fn peripheral() -> crate::system::Peripheral;
 
     /// Returns the SCL output signal for this I2C peripheral.
     fn scl_output_signal(&self) -> OutputSignal;
@@ -1675,10 +1601,8 @@ pub trait Instance: crate::private::Sealed {
             // divider
             #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
             self.register_block().clk_conf().modify(|_, w| {
-                w.sclk_sel()
-                    .clear_bit()
-                    .sclk_div_num()
-                    .bits((sclk_div - 1) as u8)
+                w.sclk_sel().clear_bit();
+                w.sclk_div_num().bits((sclk_div - 1) as u8)
             });
 
             // scl period
@@ -1686,32 +1610,11 @@ pub trait Instance: crate::private::Sealed {
                 .scl_low_period()
                 .write(|w| w.scl_low_period().bits(scl_low_period as u16));
 
-            // for high/wait_high we have to differentiate between the chips
-            // as the EPS32 does not have a wait_high field
-            cfg_if::cfg_if! {
-                if #[cfg(not(esp32))] {
-                    self.register_block().scl_high_period().write(|w| {
-                        w.scl_high_period()
-                            .bits(scl_high_period as u16)
-                            .scl_wait_high_period()
-                            .bits(scl_wait_high_period.try_into().unwrap())
-                    });
-                }
-                else {
-                    self.register_block().scl_high_period().write(|w| {
-                        w.scl_high_period()
-                            .bits(scl_high_period as u16)
-                    });
-                }
-            }
-
-            // we already did that above but on S2 we need this to make it work
-            #[cfg(esp32s2)]
             self.register_block().scl_high_period().write(|w| {
+                #[cfg(not(esp32))] // ESP32 does not have a wait_high field
                 w.scl_wait_high_period()
-                    .bits(scl_wait_high_period as u16)
-                    .scl_high_period()
-                    .bits(scl_high_period as u16)
+                    .bits(scl_wait_high_period.try_into().unwrap());
+                w.scl_high_period().bits(scl_high_period as u16)
             });
 
             // sda sample
@@ -1746,8 +1649,7 @@ pub trait Instance: crate::private::Sealed {
                     self.register_block()
                         .to()
                         .write(|w| w.time_out().bits(time_out_value));
-                }
-                else {
+                } else {
                     // timeout
                     // FIXME: Enable timout for other chips!
                     #[allow(clippy::useless_conversion)]
@@ -2408,7 +2310,15 @@ fn write_fifo(register_block: &RegisterBlock, data: u8) {
 }
 
 impl Instance for crate::peripherals::I2C0 {
-    const I2C_NUMBER: usize = 0;
+    #[inline(always)]
+    fn peripheral() -> crate::system::Peripheral {
+        crate::system::Peripheral::I2cExt0
+    }
+
+    #[inline(always)]
+    fn async_handler() -> InterruptHandler {
+        asynch::i2c0_handler
+    }
 
     #[inline(always)]
     fn scl_output_signal(&self) -> OutputSignal {
@@ -2425,6 +2335,7 @@ impl Instance for crate::peripherals::I2C0 {
         OutputSignal::I2CEXT0_SDA
     }
 
+    #[inline(always)]
     fn sda_input_signal(&self) -> InputSignal {
         InputSignal::I2CEXT0_SDA
     }
@@ -2439,6 +2350,7 @@ impl Instance for crate::peripherals::I2C0 {
         0
     }
 
+    #[inline(always)]
     fn interrupt() -> crate::peripherals::Interrupt {
         crate::peripherals::Interrupt::I2C_EXT0
     }
@@ -2446,7 +2358,15 @@ impl Instance for crate::peripherals::I2C0 {
 
 #[cfg(i2c1)]
 impl Instance for crate::peripherals::I2C1 {
-    const I2C_NUMBER: usize = 1;
+    #[inline(always)]
+    fn peripheral() -> crate::system::Peripheral {
+        crate::system::Peripheral::I2cExt1
+    }
+
+    #[inline(always)]
+    fn async_handler() -> InterruptHandler {
+        asynch::i2c1_handler
+    }
 
     #[inline(always)]
     fn scl_output_signal(&self) -> OutputSignal {
@@ -2463,6 +2383,7 @@ impl Instance for crate::peripherals::I2C1 {
         OutputSignal::I2CEXT1_SDA
     }
 
+    #[inline(always)]
     fn sda_input_signal(&self) -> InputSignal {
         InputSignal::I2CEXT1_SDA
     }
@@ -2477,6 +2398,7 @@ impl Instance for crate::peripherals::I2C1 {
         1
     }
 
+    #[inline(always)]
     fn interrupt() -> crate::peripherals::Interrupt {
         crate::peripherals::Interrupt::I2C_EXT1
     }

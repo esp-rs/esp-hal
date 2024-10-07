@@ -235,7 +235,7 @@ extern "C" fn ets_delay_us_wrapper(us: u32) {
 }
 
 extern "C" fn btdm_rom_table_ready_wrapper() {
-    debug!("btdm_rom_table_ready_wrapper not implemented");
+    trace!("btdm_rom_table_ready_wrapper not implemented");
 
     // #if BT_BLE_CCA_MODE == 2
     // btdm_cca_feature_enable();
@@ -370,7 +370,7 @@ pub(crate) unsafe extern "C" fn interrupt_handler_set(
 }
 
 pub(crate) unsafe extern "C" fn coex_wifi_sleep_set(sleep: i32) {
-    debug!(
+    trace!(
         "ignored coex_wifi_sleep_set {} - because original implementation does the same",
         sleep
     );
@@ -384,7 +384,7 @@ pub(crate) unsafe extern "C" fn coex_core_ble_conn_dyn_prio_get(
     extern "C" {
         fn coex_core_ble_conn_dyn_prio_get(low: *mut i32, high: *mut i32) -> i32;
     }
-    debug!("coex_core_ble_conn_dyn_prio_get");
+    trace!("coex_core_ble_conn_dyn_prio_get");
 
     #[cfg(coex)]
     return coex_core_ble_conn_dyn_prio_get(low, high);
