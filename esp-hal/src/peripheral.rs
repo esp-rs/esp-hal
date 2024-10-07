@@ -171,7 +171,9 @@ mod peripheral_macros {
     macro_rules! impl_dma_eligible {
         ($name:ident => $dma:ident) => {
             impl $crate::dma::DmaEligible for $name {
-                const DMA_PERIPHERAL: $crate::dma::DmaPeripheral = $crate::dma::DmaPeripheral::$dma;
+                fn dma_peripheral(&self) -> $crate::dma::DmaPeripheral {
+                    $crate::dma::DmaPeripheral::$dma
+                }
             }
         };
 

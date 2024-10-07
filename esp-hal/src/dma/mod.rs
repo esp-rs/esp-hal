@@ -892,11 +892,7 @@ impl From<u32> for Owner {
 
 #[doc(hidden)]
 pub trait DmaEligible {
-    /// The DMA peripheral
-    const DMA_PERIPHERAL: DmaPeripheral;
-    fn dma_peripheral(&self) -> DmaPeripheral {
-        Self::DMA_PERIPHERAL
-    }
+    fn dma_peripheral(&self) -> DmaPeripheral;
 }
 
 /// Marker trait
