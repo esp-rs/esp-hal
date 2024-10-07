@@ -32,6 +32,10 @@ fn main() {
         );
     }
 
+    if std::env::var("ESP_LOGLEVEL").is_ok() || std::env::var("ESP_LOGFILTER").is_ok() {
+        panic!("`ESP_LOGLEVEL` and `ESP_LOGFILTER` is not supported anymore. Please use `ESP_LOG` instead.");
+    }
+
     generate_filter_snippet();
 
     #[cfg(target_os = "windows")]
