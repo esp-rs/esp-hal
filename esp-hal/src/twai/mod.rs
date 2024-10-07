@@ -877,6 +877,11 @@ where
             w.time_seg2().bits(tseg_2);
             w.time_samp().bit(triple_sample)
         });
+
+        // disable CLKOUT
+        T::register_block()
+            .clock_divider()
+            .modify(|_, w| w.clock_off().set_bit());
     }
 
     /// Set up the acceptance filter on the device.
