@@ -153,7 +153,6 @@ pub mod dma {
     use crate::{
         dma::{
             dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
-            AnyDmaChannel,
             Channel,
             ChannelRx,
             ChannelTx,
@@ -185,7 +184,7 @@ pub mod dma {
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> SpiDma<'d, T, DmaMode>
         where
-            CH: DmaChannel,
+            CH: DmaChannel<Degraded = T::Dma>,
             (CH, T): crate::dma::DmaCompatible,
             DmaMode: Mode,
         {
@@ -197,16 +196,18 @@ pub mod dma {
     /// A DMA capable SPI instance.
     pub struct SpiDma<'d, T, DmaMode>
     where
+        T: InstanceDma,
         DmaMode: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, AnyDmaChannel, DmaMode>,
+        pub(crate) channel: Channel<'d, T::Dma, DmaMode>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
     }
 
     impl<'d, T, DmaMode> core::fmt::Debug for SpiDma<'d, T, DmaMode>
     where
+        T: InstanceDma,
         DmaMode: Mode,
     {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -238,7 +239,7 @@ pub mod dma {
         T: InstanceDma,
         DmaMode: Mode,
     {
-        type TX = ChannelTx<'d, AnyDmaChannel>;
+        type TX = ChannelTx<'d, T::Dma>;
 
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
@@ -254,7 +255,7 @@ pub mod dma {
         T: InstanceDma,
         DmaMode: Mode,
     {
-        type RX = ChannelRx<'d, AnyDmaChannel>;
+        type RX = ChannelRx<'d, T::Dma>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx
@@ -277,7 +278,7 @@ pub mod dma {
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> Self
         where
-            CH: DmaChannel,
+            CH: DmaChannel<Degraded = T::Dma>,
         {
             channel.runtime_ensure_compatible(&spi);
             Self {

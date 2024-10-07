@@ -81,13 +81,23 @@ use super::{
 };
 use crate::{
     clock::Clocks,
-    dma::{DmaEligible, DmaRxBuffer, DmaTxBuffer, PeripheralMarker, Rx, Tx},
+    dma::{
+        DmaChannel,
+        DmaCompatible,
+        DmaEligible,
+        DmaRxBuffer,
+        DmaTxBuffer,
+        PeripheralMarker,
+        Rx,
+        Tx,
+    },
     gpio::{InputSignal, NoPin, OutputSignal, PeripheralInput, PeripheralOutput},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
     private,
     system::PeripheralClockControl,
+    Mode,
 };
 
 /// Enumeration of possible SPI interrupt events.
@@ -500,9 +510,9 @@ where
         channel: crate::dma::Channel<'d, CH, DmaMode>,
     ) -> SpiDma<'d, T, M, DmaMode>
     where
-        CH: crate::dma::DmaChannel,
-        (CH, T): crate::dma::DmaCompatible,
-        DmaMode: crate::Mode,
+        CH: DmaChannel<Degraded = T::Dma>,
+        (CH, T): DmaCompatible,
+        DmaMode: Mode,
     {
         SpiDma::new(self.spi, channel)
     }
@@ -939,7 +949,6 @@ mod dma {
     use crate::{
         dma::{
             asynch::{DmaRxFuture, DmaTxFuture},
-            AnyDmaChannel,
             Channel,
             DmaChannel,
             DmaRxBuf,
@@ -962,11 +971,12 @@ mod dma {
     /// embedded-hal traits.
     pub struct SpiDma<'d, T, D, M>
     where
+        T: InstanceDma,
         D: DuplexMode,
         M: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, AnyDmaChannel, M>,
+        pub(crate) channel: Channel<'d, T::Dma, M>,
         tx_transfer_in_progress: bool,
         rx_transfer_in_progress: bool,
         #[cfg(all(esp32, spi_address_workaround))]
@@ -977,6 +987,7 @@ mod dma {
     #[cfg(all(esp32, spi_address_workaround))]
     unsafe impl<'d, T, D, M> Send for SpiDma<'d, T, D, M>
     where
+        T: InstanceDma,
         D: DuplexMode,
         M: Mode,
     {
@@ -984,6 +995,7 @@ mod dma {
 
     impl<'d, T, D, M> core::fmt::Debug for SpiDma<'d, T, D, M>
     where
+        T: InstanceDma,
         D: DuplexMode,
         M: Mode,
     {
@@ -1004,7 +1016,7 @@ mod dma {
     {
         pub(super) fn new<CH>(spi: PeripheralRef<'d, T>, channel: Channel<'d, CH, M>) -> Self
         where
-            CH: DmaChannel,
+            CH: DmaChannel<Degraded = T::Dma>,
         {
             channel.runtime_ensure_compatible(&spi);
             #[cfg(all(esp32, spi_address_workaround))]

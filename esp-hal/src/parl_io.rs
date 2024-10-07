@@ -33,13 +33,13 @@ use private::*;
 use crate::{
     dma::{
         dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
-        AnyDmaChannel,
         Channel,
         ChannelRx,
         ChannelTx,
         DescriptorChain,
         DmaChannel,
         DmaDescriptor,
+        DmaEligible,
         DmaError,
         DmaPeripheral,
         DmaTransferRx,
@@ -52,7 +52,7 @@ use crate::{
     gpio::{PeripheralInput, PeripheralOutput},
     interrupt::InterruptHandler,
     peripheral::{self, Peripheral},
-    peripherals,
+    peripherals::{self, PARL_IO},
     system::PeripheralClockControl,
     Blocking,
     InterruptConfigurable,
@@ -904,7 +904,7 @@ pub struct ParlIoTx<'d, DM>
 where
     DM: Mode,
 {
-    tx_channel: ChannelTx<'d, AnyDmaChannel>,
+    tx_channel: ChannelTx<'d, <PARL_IO as DmaEligible>::Dma>,
     tx_chain: DescriptorChain,
     phantom: PhantomData<DM>,
 }
@@ -983,7 +983,7 @@ pub struct ParlIoRx<'d, DM>
 where
     DM: Mode,
 {
-    rx_channel: ChannelRx<'d, AnyDmaChannel>,
+    rx_channel: ChannelRx<'d, <PARL_IO as DmaEligible>::Dma>,
     rx_chain: DescriptorChain,
     phantom: PhantomData<DM>,
 }
@@ -1000,17 +1000,15 @@ where
 fn internal_set_interrupt_handler(handler: InterruptHandler) {
     #[cfg(esp32c6)]
     {
-        unsafe { crate::peripherals::PARL_IO::steal() }.bind_parl_io_interrupt(handler.handler());
+        unsafe { PARL_IO::steal() }.bind_parl_io_interrupt(handler.handler());
 
         crate::interrupt::enable(crate::peripherals::Interrupt::PARL_IO, handler.priority())
             .unwrap();
     }
     #[cfg(esp32h2)]
     {
-        unsafe { crate::peripherals::PARL_IO::steal() }
-            .bind_parl_io_tx_interrupt(handler.handler());
-        unsafe { crate::peripherals::PARL_IO::steal() }
-            .bind_parl_io_rx_interrupt(handler.handler());
+        unsafe { PARL_IO::steal() }.bind_parl_io_tx_interrupt(handler.handler());
+        unsafe { PARL_IO::steal() }.bind_parl_io_rx_interrupt(handler.handler());
 
         crate::interrupt::enable(
             crate::peripherals::Interrupt::PARL_IO_TX,
@@ -1026,7 +1024,7 @@ fn internal_set_interrupt_handler(handler: InterruptHandler) {
 }
 
 fn internal_listen(interrupts: EnumSet<ParlIoInterrupt>, enable: bool) {
-    let parl_io = unsafe { crate::peripherals::PARL_IO::steal() };
+    let parl_io = unsafe { PARL_IO::steal() };
     for interrupt in interrupts {
         match interrupt {
             ParlIoInterrupt::TxFifoReEmpty => parl_io
@@ -1042,7 +1040,7 @@ fn internal_listen(interrupts: EnumSet<ParlIoInterrupt>, enable: bool) {
 
 fn internal_interrupts() -> EnumSet<ParlIoInterrupt> {
     let mut res = EnumSet::new();
-    let parl_io = unsafe { crate::peripherals::PARL_IO::steal() };
+    let parl_io = unsafe { PARL_IO::steal() };
     let ints = parl_io.int_st().read();
     if ints.tx_fifo_rempty().bit() {
         res.insert(ParlIoInterrupt::TxFifoReEmpty);
@@ -1058,7 +1056,7 @@ fn internal_interrupts() -> EnumSet<ParlIoInterrupt> {
 }
 
 fn internal_clear_interrupts(interrupts: EnumSet<ParlIoInterrupt>) {
-    let parl_io = unsafe { crate::peripherals::PARL_IO::steal() };
+    let parl_io = unsafe { PARL_IO::steal() };
     for interrupt in interrupts {
         match interrupt {
             ParlIoInterrupt::TxFifoReEmpty => parl_io
@@ -1100,7 +1098,7 @@ where
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        CH: DmaChannel,
+        CH: DmaChannel<Degraded = <PARL_IO as DmaEligible>::Dma>,
     {
         internal_init(frequency)?;
 
@@ -1180,7 +1178,7 @@ where
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        CH: DmaChannel,
+        CH: DmaChannel<Degraded = <PARL_IO as DmaEligible>::Dma>,
     {
         internal_init(frequency)?;
 
@@ -1255,7 +1253,7 @@ where
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        CH: DmaChannel,
+        CH: DmaChannel<Degraded = <PARL_IO as DmaEligible>::Dma>,
     {
         internal_init(frequency)?;
 
@@ -1384,11 +1382,7 @@ where
                 .and_then(|_| self.tx_channel.start_transfer())?;
         }
 
-        loop {
-            if Instance::is_tx_ready() {
-                break;
-            }
-        }
+        while !Instance::is_tx_ready() {}
 
         Instance::set_tx_start(true);
 
@@ -1418,7 +1412,7 @@ impl<'d, DM> DmaSupportTx for ParlIoTx<'d, DM>
 where
     DM: Mode,
 {
-    type TX = ChannelTx<'d, AnyDmaChannel>;
+    type TX = ChannelTx<'d, <PARL_IO as DmaEligible>::Dma>;
 
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
@@ -1460,7 +1454,7 @@ where
     }
 
     fn start_receive_bytes_dma(
-        rx_channel: &mut ChannelRx<'d, AnyDmaChannel>,
+        rx_channel: &mut ChannelRx<'d, <PARL_IO as DmaEligible>::Dma>,
         rx_chain: &mut DescriptorChain,
         ptr: *mut u8,
         len: usize,
@@ -1514,7 +1508,7 @@ impl<'d, DM> DmaSupportRx for ParlIoRx<'d, DM>
 where
     DM: Mode,
 {
-    type RX = ChannelRx<'d, AnyDmaChannel>;
+    type RX = ChannelRx<'d, <PARL_IO as DmaEligible>::Dma>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
@@ -1530,7 +1524,7 @@ pub struct TxCreator<'d, DM>
 where
     DM: Mode,
 {
-    tx_channel: ChannelTx<'d, AnyDmaChannel>,
+    tx_channel: ChannelTx<'d, <PARL_IO as DmaEligible>::Dma>,
     descriptors: &'static mut [DmaDescriptor],
     phantom: PhantomData<DM>,
 }
@@ -1540,7 +1534,7 @@ pub struct RxCreator<'d, DM>
 where
     DM: Mode,
 {
-    rx_channel: ChannelRx<'d, AnyDmaChannel>,
+    rx_channel: ChannelRx<'d, <PARL_IO as DmaEligible>::Dma>,
     descriptors: &'static mut [DmaDescriptor],
     phantom: PhantomData<DM>,
 }
@@ -1550,7 +1544,7 @@ pub struct TxCreatorFullDuplex<'d, DM>
 where
     DM: Mode,
 {
-    tx_channel: ChannelTx<'d, AnyDmaChannel>,
+    tx_channel: ChannelTx<'d, <PARL_IO as DmaEligible>::Dma>,
     descriptors: &'static mut [DmaDescriptor],
     phantom: PhantomData<DM>,
 }
@@ -1560,7 +1554,7 @@ pub struct RxCreatorFullDuplex<'d, DM>
 where
     DM: Mode,
 {
-    rx_channel: ChannelRx<'d, AnyDmaChannel>,
+    rx_channel: ChannelRx<'d, <PARL_IO as DmaEligible>::Dma>,
     descriptors: &'static mut [DmaDescriptor],
     phantom: PhantomData<DM>,
 }

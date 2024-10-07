@@ -171,6 +171,11 @@ mod peripheral_macros {
     macro_rules! impl_dma_eligible {
         ($name:ident => $dma:ident) => {
             impl $crate::dma::DmaEligible for $name {
+                #[cfg(pdma)]
+                type Dma = $crate::dma::AnyPdmaChannel;
+                #[cfg(gdma)]
+                type Dma = $crate::dma::AnyGdmaChannel;
+
                 fn dma_peripheral(&self) -> $crate::dma::DmaPeripheral {
                     $crate::dma::DmaPeripheral::$dma
                 }

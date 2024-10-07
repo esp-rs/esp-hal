@@ -343,6 +343,7 @@ macro_rules! ImplSpiChannel {
             pub struct [<Spi $num DmaChannel>] {}
 
             impl DmaChannel for [<Spi $num DmaChannel>] {
+                type Degraded = AnyPdmaChannel;
                 type Rx = SpiDmaRxChannelImpl<Self>;
                 type Tx = SpiDmaTxChannelImpl<Self>;
 
@@ -784,6 +785,7 @@ macro_rules! ImplI2sChannel {
             impl $crate::private::Sealed for [<I2s $num DmaChannel>] {}
 
             impl DmaChannel for [<I2s $num DmaChannel>] {
+                type Degraded = AnyPdmaChannel;
                 type Rx = I2sDmaRxChannelImpl<Self>;
                 type Tx = I2sDmaTxChannelImpl<Self>;
 
@@ -955,18 +957,13 @@ macro_rules! define_enum {
     }
 }
 
-define_enum! {
-    #[doc(hidden)]
-    pub enum AnyPdmaChannel {
-        Spi2(Spi2DmaChannel),
-        Spi3(Spi3DmaChannel),
-        I2s0(I2s0DmaChannel),
-        #[cfg(i2s1)]
-        I2s1(I2s1DmaChannel),
-    }
-}
+/// An arbitrary PDMA channel
+#[non_exhaustive]
+pub struct AnyPdmaChannel;
+impl crate::private::Sealed for AnyPdmaChannel {}
 
-impl DmaChannel for AnyDmaChannel {
+impl DmaChannel for AnyPdmaChannel {
+    type Degraded = Self;
     type Rx = AnyPdmaRxChannelImpl;
     type Tx = AnyPdmaTxChannelImpl;
 
@@ -1128,4 +1125,4 @@ where
 }
 
 #[cfg(pdma)]
-impl<P> DmaCompatible for (AnyDmaChannel, P) where P: PeripheralMarker {}
+impl<P> DmaCompatible for (AnyPdmaChannel, P) where P: PeripheralMarker {}

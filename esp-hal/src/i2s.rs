@@ -87,12 +87,12 @@ use private::*;
 use crate::{
     dma::{
         dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
-        AnyDmaChannel,
         Channel,
         ChannelRx,
         ChannelTx,
         DescriptorChain,
         DmaChannel,
+        DmaCompatible,
         DmaDescriptor,
         DmaError,
         DmaTransferRx,
@@ -333,7 +333,7 @@ where
     DmaMode: Mode,
 {
     #[allow(clippy::too_many_arguments)]
-    fn new_internal<CH: DmaChannel>(
+    fn new_internal<CH>(
         i2s: impl Peripheral<P = I> + 'd,
         standard: Standard,
         data_format: DataFormat,
@@ -341,7 +341,10 @@ where
         channel: Channel<'d, CH, DmaMode>,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
-    ) -> Self {
+    ) -> Self
+    where
+        CH: DmaChannel<Degraded = I::Dma>,
+    {
         crate::into_ref!(i2s);
         channel.runtime_ensure_compatible(&i2s);
         // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
@@ -442,8 +445,8 @@ where
         tx_descriptors: &'static mut [DmaDescriptor],
     ) -> Self
     where
-        CH: crate::dma::DmaChannel,
-        (CH, I): crate::dma::DmaCompatible,
+        CH: DmaChannel<Degraded = I::Dma>,
+        (CH, I): DmaCompatible,
         DmaMode: Mode,
     {
         Self::new_internal(
@@ -473,7 +476,7 @@ where
     T: RegisterAccess,
 {
     register_access: PhantomData<T>,
-    tx_channel: ChannelTx<'d, AnyDmaChannel>,
+    tx_channel: ChannelTx<'d, T::Dma>,
     tx_chain: DescriptorChain,
     phantom: PhantomData<DmaMode>,
 }
@@ -507,7 +510,7 @@ where
     T: RegisterAccess,
     DmaMode: Mode,
 {
-    type TX = ChannelTx<'d, AnyDmaChannel>;
+    type TX = ChannelTx<'d, T::Dma>;
 
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
@@ -523,10 +526,7 @@ where
     T: RegisterAccess,
     DmaMode: Mode,
 {
-    fn new(
-        tx_channel: ChannelTx<'d, AnyDmaChannel>,
-        descriptors: &'static mut [DmaDescriptor],
-    ) -> Self {
+    fn new(tx_channel: ChannelTx<'d, T::Dma>, descriptors: &'static mut [DmaDescriptor]) -> Self {
         Self {
             register_access: PhantomData,
             tx_channel,
@@ -640,7 +640,7 @@ where
     DmaMode: Mode,
 {
     register_access: PhantomData<T>,
-    rx_channel: ChannelRx<'d, AnyDmaChannel>,
+    rx_channel: ChannelRx<'d, T::Dma>,
     rx_chain: DescriptorChain,
     phantom: PhantomData<DmaMode>,
 }
@@ -674,7 +674,7 @@ where
     T: RegisterAccess,
     DmaMode: Mode,
 {
-    type RX = ChannelRx<'d, AnyDmaChannel>;
+    type RX = ChannelRx<'d, T::Dma>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
@@ -690,10 +690,7 @@ where
     T: RegisterAccess,
     DmaMode: Mode,
 {
-    fn new(
-        rx_channel: ChannelRx<'d, AnyDmaChannel>,
-        descriptors: &'static mut [DmaDescriptor],
-    ) -> Self {
+    fn new(rx_channel: ChannelRx<'d, T::Dma>, descriptors: &'static mut [DmaDescriptor]) -> Self {
         Self {
             register_access: PhantomData,
             rx_channel,
@@ -832,15 +829,7 @@ mod private {
     #[cfg(any(esp32, esp32s3))]
     use crate::peripherals::{i2s1::RegisterBlock, I2S1};
     use crate::{
-        dma::{
-            AnyDmaChannel,
-            ChannelRx,
-            ChannelTx,
-            DmaDescriptor,
-            DmaEligible,
-            DmaPeripheral,
-            PeripheralMarker,
-        },
+        dma::{ChannelRx, ChannelTx, DmaDescriptor, DmaEligible, DmaPeripheral, PeripheralMarker},
         gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
         interrupt::InterruptHandler,
         into_ref,
@@ -856,7 +845,7 @@ mod private {
         DmaMode: Mode,
     {
         pub register_access: PhantomData<T>,
-        pub tx_channel: ChannelTx<'d, AnyDmaChannel>,
+        pub tx_channel: ChannelTx<'d, T::Dma>,
         pub descriptors: &'static mut [DmaDescriptor],
         pub(crate) phantom: PhantomData<DmaMode>,
     }
@@ -910,7 +899,7 @@ mod private {
         DmaMode: Mode,
     {
         pub register_access: PhantomData<T>,
-        pub rx_channel: ChannelRx<'d, AnyDmaChannel>,
+        pub rx_channel: ChannelRx<'d, T::Dma>,
         pub descriptors: &'static mut [DmaDescriptor],
         pub(crate) phantom: PhantomData<DmaMode>,
     }

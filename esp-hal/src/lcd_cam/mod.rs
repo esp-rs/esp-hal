@@ -136,6 +136,14 @@ pub mod asynch {
 }
 
 mod private {
+    use crate::{dma::PeripheralMarker, peripherals::LCD_CAM};
+
+    impl PeripheralMarker for LCD_CAM {
+        fn peripheral(&self) -> crate::system::Peripheral {
+            crate::system::Peripheral::LcdCam
+        }
+    }
+
     pub(crate) struct Instance;
 
     // NOTE: the LCD_CAM interrupt registers are shared between LCD and Camera and
@@ -143,21 +151,21 @@ mod private {
     // CriticalSection will be needed to protect these shared registers.
     impl Instance {
         pub(crate) fn listen_lcd_done() {
-            let lcd_cam = unsafe { crate::peripherals::LCD_CAM::steal() };
+            let lcd_cam = unsafe { LCD_CAM::steal() };
             lcd_cam
                 .lc_dma_int_ena()
                 .modify(|_, w| w.lcd_trans_done_int_ena().set_bit());
         }
 
         pub(crate) fn unlisten_lcd_done() {
-            let lcd_cam = unsafe { crate::peripherals::LCD_CAM::steal() };
+            let lcd_cam = unsafe { LCD_CAM::steal() };
             lcd_cam
                 .lc_dma_int_ena()
                 .modify(|_, w| w.lcd_trans_done_int_ena().clear_bit());
         }
 
         pub(crate) fn is_lcd_done_set() -> bool {
-            let lcd_cam = unsafe { crate::peripherals::LCD_CAM::steal() };
+            let lcd_cam = unsafe { LCD_CAM::steal() };
             lcd_cam
                 .lc_dma_int_raw()
                 .read()

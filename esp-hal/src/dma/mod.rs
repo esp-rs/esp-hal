@@ -892,6 +892,8 @@ impl From<u32> for Owner {
 
 #[doc(hidden)]
 pub trait DmaEligible {
+    type Dma: DmaChannel;
+
     fn dma_peripheral(&self) -> DmaPeripheral;
 }
 
@@ -1495,6 +1497,9 @@ impl RxCircularState {
 
 /// A description of a DMA Channel.
 pub trait DmaChannel: crate::private::Sealed {
+    /// The type-erased version of this DMA channel type.
+    type Degraded: DmaChannel;
+
     /// A description of the RX half of a DMA Channel.
     type Rx: RxRegisterAccess + InterruptAccess<DmaRxInterrupt>;
 
@@ -1503,9 +1508,9 @@ pub trait DmaChannel: crate::private::Sealed {
 
     // TODO: maybe document
     #[doc(hidden)]
-    fn degrade_rx(rx: Self::Rx) -> <AnyDmaChannel as DmaChannel>::Rx;
+    fn degrade_rx(rx: Self::Rx) -> <Self::Degraded as DmaChannel>::Rx;
     #[doc(hidden)]
-    fn degrade_tx(tx: Self::Tx) -> <AnyDmaChannel as DmaChannel>::Tx;
+    fn degrade_tx(tx: Self::Tx) -> <Self::Degraded as DmaChannel>::Tx;
 }
 
 /// A description of a DMA Channel that can be used with a peripheral.
@@ -1514,12 +1519,6 @@ pub trait PeripheralDmaChannel: DmaChannel {
     /// A suitable peripheral for this DMA channel.
     type P: PeripheralMarker;
 }
-
-/// A description of any DMA channel
-#[non_exhaustive]
-pub struct AnyDmaChannel {}
-
-impl crate::private::Sealed for AnyDmaChannel {}
 
 #[doc(hidden)]
 pub trait DmaChannelExt: DmaChannel {
@@ -1612,7 +1611,7 @@ where
     }
 
     /// Return a type-erased (degraded) version of this channel.
-    pub fn degrade(self) -> ChannelRx<'a, AnyDmaChannel> {
+    pub fn degrade(self) -> ChannelRx<'a, CH::Degraded> {
         ChannelRx {
             burst_mode: self.burst_mode,
             rx_impl: CH::degrade_rx(self.rx_impl),
@@ -1826,7 +1825,7 @@ where
     }
 
     /// Return a type-erased (degraded) version of this channel.
-    pub fn degrade(self) -> ChannelTx<'a, AnyDmaChannel> {
+    pub fn degrade(self) -> ChannelTx<'a, CH::Degraded> {
         ChannelTx {
             burst_mode: self.burst_mode,
             tx_impl: CH::degrade_tx(self.tx_impl),
@@ -2096,13 +2095,13 @@ where
     }
 }
 
-impl<'d, C, M: Mode> Channel<'d, C, M>
+impl<'d, CH, M: Mode> Channel<'d, CH, M>
 where
-    C: DmaChannel,
+    CH: DmaChannel,
 {
     /// Return a type-erased (degraded) version of this channel (both rx and
     /// tx).
-    pub fn degrade(self) -> Channel<'d, AnyDmaChannel, M> {
+    pub fn degrade(self) -> Channel<'d, CH::Degraded, M> {
         Channel {
             rx: self.rx.degrade(),
             tx: self.tx.degrade(),

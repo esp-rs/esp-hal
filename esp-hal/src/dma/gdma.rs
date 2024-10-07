@@ -25,9 +25,24 @@ pub trait GdmaChannel {
     fn number(&self) -> u8;
 }
 
+/// An arbitrary GDMA channel
 #[non_exhaustive]
-#[doc(hidden)]
 pub struct AnyGdmaChannel(u8);
+
+impl crate::private::Sealed for AnyGdmaChannel {}
+impl DmaChannel for AnyGdmaChannel {
+    type Degraded = Self;
+    type Rx = ChannelRxImpl<Self>;
+    type Tx = ChannelTxImpl<Self>;
+
+    fn degrade_rx(rx: Self::Rx) -> ChannelRxImpl<Self> {
+        rx
+    }
+    fn degrade_tx(tx: Self::Tx) -> ChannelTxImpl<Self> {
+        tx
+    }
+}
+
 #[non_exhaustive]
 #[doc(hidden)]
 pub struct SpecificGdmaChannel<const N: u8> {}
@@ -416,18 +431,6 @@ impl<C: GdmaChannel> InterruptAccess<DmaRxInterrupt> for ChannelRxImpl<C> {
 #[non_exhaustive]
 pub struct ChannelCreator<const N: u8> {}
 
-impl DmaChannel for AnyDmaChannel {
-    type Rx = ChannelRxImpl<AnyGdmaChannel>;
-    type Tx = ChannelTxImpl<AnyGdmaChannel>;
-
-    fn degrade_rx(rx: Self::Rx) -> ChannelRxImpl<AnyGdmaChannel> {
-        rx
-    }
-    fn degrade_tx(tx: Self::Tx) -> ChannelTxImpl<AnyGdmaChannel> {
-        tx
-    }
-}
-
 impl<CH: DmaChannel, M: Mode> Channel<'_, CH, M> {
     /// Asserts that the channel is compatible with the given peripheral.
     pub fn runtime_ensure_compatible<P: PeripheralMarker + DmaEligible>(
@@ -456,6 +459,7 @@ macro_rules! impl_channel {
             impl crate::private::Sealed for [<DmaChannel $num>] {}
 
             impl DmaChannel for [<DmaChannel $num>] {
+                type Degraded = AnyGdmaChannel;
                 type Rx = ChannelRxImpl<SpecificGdmaChannel<$num>>;
                 type Tx = ChannelTxImpl<SpecificGdmaChannel<$num>>;
 
@@ -621,7 +625,7 @@ mod m2m {
     use crate::{
         dma::{
             dma_private::{DmaSupport, DmaSupportRx},
-            AnyDmaChannel,
+            AnyGdmaChannel,
             Channel,
             ChannelRx,
             DescriptorChain,
@@ -648,7 +652,7 @@ mod m2m {
     where
         M: Mode,
     {
-        channel: Channel<'d, AnyDmaChannel, M>,
+        channel: Channel<'d, AnyGdmaChannel, M>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
         peripheral: DmaPeripheral,
@@ -666,7 +670,7 @@ mod m2m {
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> Result<Self, DmaError>
         where
-            CH: DmaChannel,
+            CH: DmaChannel<Degraded = AnyGdmaChannel>,
         {
             unsafe {
                 Self::new_unsafe(
@@ -688,7 +692,7 @@ mod m2m {
             chunk_size: usize,
         ) -> Result<Self, DmaError>
         where
-            CH: DmaChannel,
+            CH: DmaChannel<Degraded = AnyGdmaChannel>,
         {
             unsafe {
                 Self::new_unsafe(
@@ -715,7 +719,7 @@ mod m2m {
             chunk_size: usize,
         ) -> Result<Self, DmaError>
         where
-            CH: DmaChannel,
+            CH: DmaChannel<Degraded = AnyGdmaChannel>,
         {
             if !(1..=4092).contains(&chunk_size) {
                 return Err(DmaError::InvalidChunkSize);
@@ -792,7 +796,7 @@ mod m2m {
     where
         MODE: Mode,
     {
-        type RX = ChannelRx<'d, AnyDmaChannel>;
+        type RX = ChannelRx<'d, AnyGdmaChannel>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx
