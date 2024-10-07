@@ -1222,6 +1222,7 @@ pub(crate) fn ble_init() {
 
         debug!("The ble_controller_init was initialized");
     }
+    crate::flags::BLE.store(true, Ordering::Release);
 }
 
 pub(crate) fn ble_deinit() {
@@ -1252,6 +1253,7 @@ pub(crate) fn ble_deinit() {
             item.take();
         });
     }
+    crate::flags::BLE.store(false, Ordering::Release);
 }
 
 #[cfg(esp32c2)]
