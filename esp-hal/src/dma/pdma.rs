@@ -901,6 +901,15 @@ ImplI2sChannel!(0);
 #[cfg(i2s1)]
 ImplI2sChannel!(1);
 
+// Specific peripherals use specific channels. Note that this may be overly
+// restrictive (ESP32 allows configuring 2 SPI DMA channels between 3 different
+// peripherals), but for the current set of restrictions this is sufficient.
+crate::impl_dma_eligible!([Spi2DmaChannel] SPI2 => Spi2);
+crate::impl_dma_eligible!([Spi3DmaChannel] SPI3 => Spi3);
+crate::impl_dma_eligible!([I2s0DmaChannel] I2S0 => I2s0);
+#[cfg(i2s1)]
+crate::impl_dma_eligible!([I2s1DmaChannel] I2S1 => I2s1);
+
 /// DMA Peripheral
 ///
 /// This offers the available DMA channels.
@@ -959,7 +968,9 @@ macro_rules! define_enum {
     }
 }
 
-/// An arbitrary PDMA channel
+/// An arbitrary PDMA channel.
+// NOTE: this is unused currently (peripherals prescribe a specific channel) but type-erased
+// peripherals will require type-erased channels.
 #[non_exhaustive]
 pub struct AnyPdmaChannel;
 impl crate::private::Sealed for AnyPdmaChannel {}

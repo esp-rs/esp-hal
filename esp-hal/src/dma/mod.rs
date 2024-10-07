@@ -898,6 +898,31 @@ pub trait DmaEligible {
     fn dma_peripheral(&self) -> DmaPeripheral;
 }
 
+#[doc(hidden)]
+#[macro_export]
+macro_rules! impl_dma_eligible {
+    ([$dma_ch:ident] $name:ident => $dma:ident) => {
+        impl $crate::dma::DmaEligible for $crate::peripherals::$name {
+            type Dma = $dma_ch;
+
+            fn dma_peripheral(&self) -> $crate::dma::DmaPeripheral {
+                $crate::dma::DmaPeripheral::$dma
+            }
+        }
+    };
+
+    (
+        $dma_ch:ident {
+            $($(#[$cfg:meta])? $name:ident => $dma:ident,)*
+        }
+    ) => {
+        $(
+            $(#[$cfg])?
+            $crate::impl_dma_eligible!([$dma_ch] $name => $dma);
+        )*
+    };
+}
+
 /// Marker trait
 #[doc(hidden)]
 pub trait PeripheralMarker {
@@ -1615,7 +1640,7 @@ where
         }
     }
 
-    /// Return a type-erased (degraded) version of this channel.
+    /// Return a less specific (degraded) version of this channel.
     pub fn degrade<DEG: DmaChannel>(self) -> ChannelRx<'a, DEG>
     where
         CH: DmaChannelConvert<DEG>,
@@ -1832,7 +1857,7 @@ where
         }
     }
 
-    /// Return a type-erased (degraded) version of this channel.
+    /// Return a less specific (degraded) version of this channel.
     pub fn degrade<DEG: DmaChannel>(self) -> ChannelTx<'a, DEG>
     where
         CH: DmaChannelConvert<DEG>,
@@ -2110,7 +2135,7 @@ impl<'d, CH, M: Mode> Channel<'d, CH, M>
 where
     CH: DmaChannel,
 {
-    /// Return a type-erased (degraded) version of this channel (both rx and
+    /// Return a less specific (degraded) version of this channel (both rx and
     /// tx).
     pub fn degrade<DEG: DmaChannel>(self) -> Channel<'d, DEG, M>
     where

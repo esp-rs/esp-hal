@@ -554,6 +554,57 @@ cfg_if::cfg_if! {
     }
 }
 
+crate::impl_dma_eligible! {
+    AnyGdmaChannel {
+        #[cfg(spi2)]
+        SPI2 => Spi2,
+
+        #[cfg(spi3)]
+        SPI3 => Spi3,
+
+        #[cfg(uhci0)]
+        UHCI0 => Uhci0,
+
+        #[cfg(i2s0)]
+        I2S0 => I2s0,
+
+        #[cfg(i2s1)]
+        I2S1 => I2s1,
+
+        #[cfg(all(gdma, aes))]
+        AES => Aes,
+
+        #[cfg(all(gdma, sha))]
+        SHA => Sha,
+
+        #[cfg(any(esp32c3, esp32c6, esp32h2))]
+        ADC1 => Adc,
+
+        #[cfg(esp32c3)]
+        ADC2 => Adc,
+
+        #[cfg(parl_io)]
+        PARL_IO => ParlIo,
+
+        #[cfg(any(esp32c2, esp32c6, esp32h2))]
+        MEM2MEM1 => Mem2Mem1,
+    }
+}
+
+#[cfg(any(esp32c6, esp32h2))]
+crate::impl_dma_eligible! {
+    AnyGdmaChannel {
+        MEM2MEM4 => Mem2Mem4,
+        MEM2MEM5 => Mem2Mem5,
+        MEM2MEM10 => Mem2Mem10,
+        MEM2MEM11 => Mem2Mem11,
+        MEM2MEM12 => Mem2Mem12,
+        MEM2MEM13 => Mem2Mem13,
+        MEM2MEM14 => Mem2Mem14,
+        MEM2MEM15 => Mem2Mem15,
+    }
+}
+
 /// GDMA Peripheral
 ///
 /// This offers the available DMA channels.
