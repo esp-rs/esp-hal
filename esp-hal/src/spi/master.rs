@@ -490,9 +490,9 @@ where
     T: InstanceDma,
     M: DuplexMode,
 {
-    /// Configures the SPI3 instance to use DMA with the specified channel.
+    /// Configures the SPI instance to use DMA with the specified channel.
     ///
-    /// This method prepares the SPI instance for DMA transfers using SPI3
+    /// This method prepares the SPI instance for DMA transfers using SPI
     /// and returns an instance of `SpiDma` that supports DMA
     /// operations.
     pub fn with_dma<CH, DmaMode>(
