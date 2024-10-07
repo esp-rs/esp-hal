@@ -954,7 +954,10 @@ macro_rules! define_enum {
     ) => {
         $(#[$meta])*
         $vis enum $ty {
-            $($variant($inner)),*
+            $(
+                $(#[$cfg])?
+                $variant($inner),
+            )*
         }
 
         $(
