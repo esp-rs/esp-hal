@@ -1,11 +1,14 @@
-use core::str::FromStr;
-
-use log::LevelFilter;
-
 use super::println;
 
-const LOG_TARGETS: Option<&'static str> = option_env!("ESP_LOGTARGETS");
+#[cfg(not(host_is_windows))]
+include!(concat!(env!("OUT_DIR"), "/log_filter.rs"));
 
+#[cfg(host_is_windows)]
+include!(concat!(env!("OUT_DIR"), "\\log_filter.rs"));
+
+/// Initialize the logger with the given maximum log level.
+///
+/// `ESP_LOG` environment variable will still be honored if set.
 pub fn init_logger(level: log::LevelFilter) {
     unsafe {
         log::set_logger_racy(&EspLogger).unwrap();
@@ -13,37 +16,27 @@ pub fn init_logger(level: log::LevelFilter) {
     }
 }
 
+/// Initialize the logger from the `ESP_LOG` environment variable.
 pub fn init_logger_from_env() {
     unsafe {
         log::set_logger_racy(&EspLogger).unwrap();
-    }
-
-    const LEVEL: Option<&'static str> = option_env!("ESP_LOGLEVEL");
-
-    if let Some(lvl) = LEVEL {
-        let level = LevelFilter::from_str(lvl).unwrap_or_else(|_| LevelFilter::Off);
-        unsafe { log::set_max_level_racy(level) };
+        log::set_max_level_racy(FILTER_MAX);
     }
 }
 
 struct EspLogger;
 
 impl log::Log for EspLogger {
-    fn enabled(&self, _metadata: &log::Metadata) -> bool {
-        true
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
+        let level = metadata.level();
+        let target = metadata.target();
+        is_enabled(level, target)
     }
 
     #[allow(unused)]
     fn log(&self, record: &log::Record) {
-        // check enabled log targets if any
-        if let Some(targets) = LOG_TARGETS {
-            if targets
-                .split(",")
-                .find(|v| record.target().starts_with(v))
-                .is_none()
-            {
-                return;
-            }
+        if !self.enabled(&record.metadata()) {
+            return;
         }
 
         const RESET: &str = "\u{001B}[0m";
