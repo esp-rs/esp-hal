@@ -100,7 +100,7 @@ fn generate_filter_snippet() {
                 }
             }
             snippet.push_str(" false");
-            snippet.push_str("}");
+            snippet.push('}');
             snippet
         }
     } else {
