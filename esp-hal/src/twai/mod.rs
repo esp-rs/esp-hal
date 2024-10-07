@@ -772,19 +772,21 @@ where
                 .modify(|r, w| unsafe { w.bits(r.bits() | 0x80) });
         }
 
+        let rx_pull;
         if no_transceiver {
             tx_pin.set_to_open_drain_output(crate::private::Internal);
             tx_pin.pull_direction(Pull::Up, crate::private::Internal);
-            rx_pin.pull_direction(Pull::Up, crate::private::Internal);
+            rx_pull = Pull::Up;
         } else {
             tx_pin.set_to_push_pull_output(crate::private::Internal);
+            rx_pull = Pull::None;
         }
         tx_pin.connect_peripheral_to_output(T::OUTPUT_SIGNAL, crate::private::Internal);
 
         // Setting up RX pin later allows us to use a single pin in tests.
         // `set_to_push_pull_output` disables input, here we re-enable it if rx_pin
         // uses the same GPIO.
-        // rx_pin.init_input(Pull::None, crate::private::Internal);
+        rx_pin.init_input(rx_pull, crate::private::Internal);
         rx_pin.connect_input_to_peripheral(T::INPUT_SIGNAL, crate::private::Internal);
 
         // Freeze REC by changing to LOM mode
@@ -855,7 +857,7 @@ where
                 // Disable /2 baudrate divider
                 T::register_block()
                     .int_ena()
-                    .modify(|r, w| unsafe { w.bits(r.bits() & !0xEF) });
+                    .modify(|r, w| unsafe { w.bits(r.bits() & !0x10) });
             }
         }
 

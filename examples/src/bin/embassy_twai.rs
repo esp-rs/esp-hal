@@ -1,5 +1,5 @@
-//! This example demonstrates use of the twai peripheral running the embassy
-//! executor and asynchronously receiving and transmitting twai frames.
+//! This example demonstrates use of the TWAI peripheral running the embassy
+//! executor and asynchronously receiving and transmitting TWAI frames.
 //!
 //! The `receiver` task waits to receive a frame and puts it into a channel
 //! which will be picked up by the `transmitter` task.
@@ -8,13 +8,23 @@
 //! it.
 //!
 //! This example should work with another ESP board running the `twai` example
-//! with `IS_SENDER` set to `true`.
+//! with `IS_FIRST_SENDER` set to `true`.
 //!
 //! The following wiring is assumed:
-//! - TX => GPIO0
-//! - RX => GPIO2
+//! - TX/RX => GPIO2, connected internally and with internal pull-up resistor.
+//!
+//! ESP1/GND --- ESP2/GND
+//! ESP1/GPIO2 --- ESP2/GPIO2
+//!
+//! Notes for external transciever use:
+//!
+//! The default setup assumes that two microcontrollers are connected directly without an external
+//! transceiver. If you want to use an external transceiver, you need to:
+//! * uncomment the `rx_pin` line
+//! * use `new()` function to create the TWAI configuration.
+//! * change the `tx_pin` and `rx_pin` to the appropriate pins for your boards.
 
-//% CHIPS: esp32c3 esp32c6 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c3 esp32c6 esp32s2 esp32s3
 //% FEATURES: embassy embassy-generic-timers
 
 #![no_std]
@@ -90,8 +100,11 @@ async fn main(spawner: Spawner) {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let can_tx_pin = io.pins.gpio2;
-    let can_rx_pin = io.pins.gpio3;
+    let tx_pin = io.pins.gpio2;
+    // let rx_pin = io.pins.gpio0; // Uncomment if you want to use an external transciever.
+
+    // Without an external transciever, we only need a single line between the two MCUs.
+    let rx_pin = tx_pin.peripheral_input(); // Comment this line if you want to use an external transciever.
 
     // The speed of the CAN bus.
     const CAN_BAUDRATE: twai::BaudRate = twai::BaudRate::B125K;
@@ -100,10 +113,10 @@ async fn main(spawner: Spawner) {
 
     // Begin configuring the TWAI peripheral. The peripheral is in a reset like
     // state that prevents transmission but allows configuration.
-    let mut can_config = twai::TwaiConfiguration::new_async_no_transceiver(
+    let mut twai_config = twai::TwaiConfiguration::new_async_no_transceiver(
         peripherals.TWAI0,
-        can_rx_pin,
-        can_tx_pin,
+        rx_pin,
+        tx_pin,
         CAN_BAUDRATE,
         TwaiMode::Normal,
     );
@@ -116,15 +129,15 @@ async fn main(spawner: Spawner) {
     // standard ids of an even value.
     const FILTER: twai::filter::SingleStandardFilter =
         twai::filter::SingleStandardFilter::new(b"xxxxxxxxxxx", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
-    can_config.set_filter(FILTER);
+    twai_config.set_filter(FILTER);
 
     // Start the peripheral. This locks the configuration settings of the peripheral
     // and puts it into operation mode, allowing packets to be sent and
     // received.
-    let can = can_config.start();
+    let twai = twai_config.start();
 
     // Get separate transmit and receive halves of the peripheral.
-    let (rx, tx) = can.split();
+    let (rx, tx) = twai.split();
 
     interrupt::enable(
         peripherals::Interrupt::TWAI0,

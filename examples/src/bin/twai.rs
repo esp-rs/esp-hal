@@ -1,21 +1,23 @@
 //! This example sends a TWAI message to another ESP and receives it back.
 //!
-//! This example works without TWAI transceivers by:
-//! * setting the tx pins to open drain
-//! * connecting all rx and tx pins together
-//! * adding a pull-up to the signal pins
-//!
-//! The following wiring is assumed:
-//! - TX => GPIO0
-//! - RX => GPIO2
-//!
-//! ESP1/GND --- ESP2/GND
-//! ESP1/GPIO0 --- ESP1/GPIO2 --- ESP2/GPIO0 --- ESP2/GPIO2 --- 4.8kOhm --- ESP1/5V
-//!
 //! `IS_FIRST_SENDER` below must be set to false on one of the ESP's
 //!
 //! In case you want to use `self-testing`, get rid of everything related to the aforementioned `IS_FIRST_SENDER`
 //! and follow the advice in the comments related to this mode.
+//!
+//! The following wiring is assumed:
+//! - TX/RX => GPIO2, connected internally and with internal pull-up resistor.
+//!
+//! ESP1/GND --- ESP2/GND
+//! ESP1/GPIO2 --- ESP2/GPIO2
+//!
+//! Notes for external transciever use:
+//!
+//! The default setup assumes that two microcontrollers are connected directly without an external
+//! transceiver. If you want to use an external transceiver, you need to:
+//! * uncomment the `rx_pin` line
+//! * use `new()` function to create the TWAI configuration.
+//! * change the `tx_pin` and `rx_pin` to the appropriate pins for your boards.
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -41,7 +43,10 @@ fn main() -> ! {
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let tx_pin = io.pins.gpio2;
-    let rx_pin = io.pins.gpio4;
+    // let rx_pin = io.pins.gpio0; // Uncomment if you want to use an external transciever.
+
+    // Without an external transciever, we only need a single line between the two MCUs.
+    let rx_pin = tx_pin.peripheral_input(); // Comment this line if you want to use an external transciever.
 
     // The speed of the CAN bus.
     const TWAI_BAUDRATE: twai::BaudRate = twai::BaudRate::B125K;
