@@ -892,6 +892,7 @@ impl From<u32> for Owner {
 
 #[doc(hidden)]
 pub trait DmaEligible {
+    /// The most specific DMA channel type usable by this peripheral.
     type Dma: DmaChannel;
 
     fn dma_peripheral(&self) -> DmaPeripheral;
@@ -902,12 +903,6 @@ pub trait DmaEligible {
 pub trait PeripheralMarker {
     fn peripheral(&self) -> crate::system::Peripheral;
 }
-
-/// Trait implemented for (DmaChannel, Peripheral) pairs that are compatible.
-/// This is used to statically verify that the DMA channel is compatible with
-/// the peripheral.
-#[doc(hidden)]
-pub trait DmaCompatible {}
 
 #[doc(hidden)]
 #[derive(Debug)]
@@ -1497,20 +1492,11 @@ impl RxCircularState {
 
 /// A description of a DMA Channel.
 pub trait DmaChannel: crate::private::Sealed {
-    /// The type-erased version of this DMA channel type.
-    type Degraded: DmaChannel;
-
     /// A description of the RX half of a DMA Channel.
     type Rx: RxRegisterAccess + InterruptAccess<DmaRxInterrupt>;
 
     /// A description of the TX half of a DMA Channel.
     type Tx: TxRegisterAccess + InterruptAccess<DmaTxInterrupt>;
-
-    // TODO: maybe document
-    #[doc(hidden)]
-    fn degrade_rx(rx: Self::Rx) -> <Self::Degraded as DmaChannel>::Rx;
-    #[doc(hidden)]
-    fn degrade_tx(tx: Self::Tx) -> <Self::Degraded as DmaChannel>::Tx;
 }
 
 /// A description of a DMA Channel that can be used with a peripheral.
@@ -1527,6 +1513,25 @@ pub trait DmaChannelExt: DmaChannel {
 
     #[doc(hidden)]
     fn set_isr(handler: InterruptHandler);
+}
+
+#[doc(hidden)]
+pub trait DmaChannelConvert<DEG: DmaChannel>: DmaChannel {
+    // TODO: maybe document
+    #[doc(hidden)]
+    fn degrade_rx(rx: Self::Rx) -> DEG::Rx;
+    #[doc(hidden)]
+    fn degrade_tx(tx: Self::Tx) -> DEG::Tx;
+}
+
+impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
+    fn degrade_rx(rx: Self::Rx) -> DEG::Rx {
+        rx
+    }
+
+    fn degrade_tx(tx: Self::Tx) -> DEG::Tx {
+        tx
+    }
 }
 
 /// The functions here are not meant to be used outside the HAL
@@ -1611,7 +1616,10 @@ where
     }
 
     /// Return a type-erased (degraded) version of this channel.
-    pub fn degrade(self) -> ChannelRx<'a, CH::Degraded> {
+    pub fn degrade<DEG: DmaChannel>(self) -> ChannelRx<'a, DEG>
+    where
+        CH: DmaChannelConvert<DEG>,
+    {
         ChannelRx {
             burst_mode: self.burst_mode,
             rx_impl: CH::degrade_rx(self.rx_impl),
@@ -1825,7 +1833,10 @@ where
     }
 
     /// Return a type-erased (degraded) version of this channel.
-    pub fn degrade(self) -> ChannelTx<'a, CH::Degraded> {
+    pub fn degrade<DEG: DmaChannel>(self) -> ChannelTx<'a, DEG>
+    where
+        CH: DmaChannelConvert<DEG>,
+    {
         ChannelTx {
             burst_mode: self.burst_mode,
             tx_impl: CH::degrade_tx(self.tx_impl),
@@ -2101,7 +2112,10 @@ where
 {
     /// Return a type-erased (degraded) version of this channel (both rx and
     /// tx).
-    pub fn degrade(self) -> Channel<'d, CH::Degraded, M> {
+    pub fn degrade<DEG: DmaChannel>(self) -> Channel<'d, DEG, M>
+    where
+        CH: DmaChannelConvert<DEG>,
+    {
         Channel {
             rx: self.rx.degrade(),
             tx: self.tx.degrade(),

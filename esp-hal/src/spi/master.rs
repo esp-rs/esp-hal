@@ -81,16 +81,7 @@ use super::{
 };
 use crate::{
     clock::Clocks,
-    dma::{
-        DmaChannel,
-        DmaCompatible,
-        DmaEligible,
-        DmaRxBuffer,
-        DmaTxBuffer,
-        PeripheralMarker,
-        Rx,
-        Tx,
-    },
+    dma::{DmaChannelConvert, DmaEligible, DmaRxBuffer, DmaTxBuffer, PeripheralMarker, Rx, Tx},
     gpio::{InputSignal, NoPin, OutputSignal, PeripheralInput, PeripheralOutput},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
@@ -510,8 +501,7 @@ where
         channel: crate::dma::Channel<'d, CH, DmaMode>,
     ) -> SpiDma<'d, T, M, DmaMode>
     where
-        CH: DmaChannel<Degraded = T::Dma>,
-        (CH, T): DmaCompatible,
+        CH: DmaChannelConvert<T::Dma>,
         DmaMode: Mode,
     {
         SpiDma::new(self.spi, channel)
@@ -950,7 +940,6 @@ mod dma {
         dma::{
             asynch::{DmaRxFuture, DmaTxFuture},
             Channel,
-            DmaChannel,
             DmaRxBuf,
             DmaRxBuffer,
             DmaTxBuf,
@@ -1016,7 +1005,7 @@ mod dma {
     {
         pub(super) fn new<CH>(spi: PeripheralRef<'d, T>, channel: Channel<'d, CH, M>) -> Self
         where
-            CH: DmaChannel<Degraded = T::Dma>,
+            CH: DmaChannelConvert<T::Dma>,
         {
             channel.runtime_ensure_compatible(&spi);
             #[cfg(all(esp32, spi_address_workaround))]

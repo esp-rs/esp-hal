@@ -73,7 +73,7 @@ use core::marker::PhantomData;
 
 use super::{Error, FullDuplexMode, SpiMode};
 use crate::{
-    dma::{DescriptorChain, DmaEligible, PeripheralMarker, Rx, Tx},
+    dma::{DescriptorChain, DmaChannelConvert, DmaEligible, PeripheralMarker, Rx, Tx},
     gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
@@ -157,7 +157,6 @@ pub mod dma {
             ChannelRx,
             ChannelTx,
             DescriptorChain,
-            DmaChannel,
             DmaDescriptor,
             DmaTransferRx,
             DmaTransferRxTx,
@@ -184,8 +183,7 @@ pub mod dma {
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> SpiDma<'d, T, DmaMode>
         where
-            CH: DmaChannel<Degraded = T::Dma>,
-            (CH, T): crate::dma::DmaCompatible,
+            CH: DmaChannelConvert<T::Dma>,
             DmaMode: Mode,
         {
             self.spi.set_data_mode(self.data_mode, true);
@@ -278,7 +276,7 @@ pub mod dma {
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> Self
         where
-            CH: DmaChannel<Degraded = T::Dma>,
+            CH: DmaChannelConvert<T::Dma>,
         {
             channel.runtime_ensure_compatible(&spi);
             Self {

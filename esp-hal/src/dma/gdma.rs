@@ -31,16 +31,8 @@ pub struct AnyGdmaChannel(u8);
 
 impl crate::private::Sealed for AnyGdmaChannel {}
 impl DmaChannel for AnyGdmaChannel {
-    type Degraded = Self;
     type Rx = ChannelRxImpl<Self>;
     type Tx = ChannelTxImpl<Self>;
-
-    fn degrade_rx(rx: Self::Rx) -> ChannelRxImpl<Self> {
-        rx
-    }
-    fn degrade_tx(tx: Self::Tx) -> ChannelTxImpl<Self> {
-        tx
-    }
 }
 
 #[non_exhaustive]
@@ -441,14 +433,6 @@ impl<CH: DmaChannel, M: Mode> Channel<'_, CH, M> {
     }
 }
 
-// Every DMA channel is compatible with every (DMA eligible) peripheral.
-impl<CH, P> DmaCompatible for (CH, P)
-where
-    CH: DmaChannel,
-    P: PeripheralMarker + DmaEligible,
-{
-}
-
 macro_rules! impl_channel {
     ($num: literal, $async_handler: path, $($interrupt: ident),* ) => {
         paste::paste! {
@@ -459,10 +443,11 @@ macro_rules! impl_channel {
             impl crate::private::Sealed for [<DmaChannel $num>] {}
 
             impl DmaChannel for [<DmaChannel $num>] {
-                type Degraded = AnyGdmaChannel;
                 type Rx = ChannelRxImpl<SpecificGdmaChannel<$num>>;
                 type Tx = ChannelTxImpl<SpecificGdmaChannel<$num>>;
+            }
 
+            impl DmaChannelConvert<AnyGdmaChannel> for [<DmaChannel $num>] {
                 fn degrade_rx(rx: Self::Rx) -> ChannelRxImpl<AnyGdmaChannel> {
                     rx.degrade()
                 }
@@ -629,7 +614,7 @@ mod m2m {
             Channel,
             ChannelRx,
             DescriptorChain,
-            DmaChannel,
+            DmaChannelConvert,
             DmaDescriptor,
             DmaEligible,
             DmaError,
@@ -670,7 +655,7 @@ mod m2m {
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> Result<Self, DmaError>
         where
-            CH: DmaChannel<Degraded = AnyGdmaChannel>,
+            CH: DmaChannelConvert<AnyGdmaChannel>,
         {
             unsafe {
                 Self::new_unsafe(
@@ -692,7 +677,7 @@ mod m2m {
             chunk_size: usize,
         ) -> Result<Self, DmaError>
         where
-            CH: DmaChannel<Degraded = AnyGdmaChannel>,
+            CH: DmaChannelConvert<AnyGdmaChannel>,
         {
             unsafe {
                 Self::new_unsafe(
@@ -719,7 +704,7 @@ mod m2m {
             chunk_size: usize,
         ) -> Result<Self, DmaError>
         where
-            CH: DmaChannel<Degraded = AnyGdmaChannel>,
+            CH: DmaChannelConvert<AnyGdmaChannel>,
         {
             if !(1..=4092).contains(&chunk_size) {
                 return Err(DmaError::InvalidChunkSize);

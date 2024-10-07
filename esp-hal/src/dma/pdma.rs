@@ -343,10 +343,11 @@ macro_rules! ImplSpiChannel {
             pub struct [<Spi $num DmaChannel>] {}
 
             impl DmaChannel for [<Spi $num DmaChannel>] {
-                type Degraded = AnyPdmaChannel;
                 type Rx = SpiDmaRxChannelImpl<Self>;
                 type Tx = SpiDmaTxChannelImpl<Self>;
+            }
 
+            impl DmaChannelConvert<AnyPdmaChannel> for [<Spi $num DmaChannel>] {
                 fn degrade_rx(rx: Self::Rx) -> AnyPdmaRxChannelImpl {
                     rx.degrade()
                 }
@@ -785,10 +786,11 @@ macro_rules! ImplI2sChannel {
             impl $crate::private::Sealed for [<I2s $num DmaChannel>] {}
 
             impl DmaChannel for [<I2s $num DmaChannel>] {
-                type Degraded = AnyPdmaChannel;
                 type Rx = I2sDmaRxChannelImpl<Self>;
                 type Tx = I2sDmaTxChannelImpl<Self>;
+            }
 
+            impl DmaChannelConvert<AnyPdmaChannel> for [<I2s $num DmaChannel>] {
                 fn degrade_rx(rx: Self::Rx) -> AnyPdmaRxChannelImpl {
                     rx.degrade()
                 }
@@ -963,17 +965,8 @@ pub struct AnyPdmaChannel;
 impl crate::private::Sealed for AnyPdmaChannel {}
 
 impl DmaChannel for AnyPdmaChannel {
-    type Degraded = Self;
     type Rx = AnyPdmaRxChannelImpl;
     type Tx = AnyPdmaTxChannelImpl;
-
-    fn degrade_rx(rx: Self::Rx) -> AnyPdmaRxChannelImpl {
-        rx
-    }
-
-    fn degrade_tx(tx: Self::Tx) -> AnyPdmaTxChannelImpl {
-        tx
-    }
 }
 
 define_enum! {
@@ -1111,18 +1104,3 @@ where
         );
     }
 }
-
-// Every DMA channel is compatible with a single peripheral.
-// TODO: While on ESP32 we have two DMA channels for three SPI peripherals, we
-// currently only support 2 out of the 3 SPI peripherals. Complicating this
-// further to cover SPI1 is not useful right now.
-#[cfg(pdma)]
-impl<CH, P> DmaCompatible for (CH, P)
-where
-    CH: PeripheralDmaChannel<P = P>,
-    P: PeripheralMarker,
-{
-}
-
-#[cfg(pdma)]
-impl<P> DmaCompatible for (AnyPdmaChannel, P) where P: PeripheralMarker {}

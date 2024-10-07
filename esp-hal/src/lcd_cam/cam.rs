@@ -74,16 +74,7 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    dma::{
-        ChannelRx,
-        DmaChannel,
-        DmaCompatible,
-        DmaEligible,
-        DmaError,
-        DmaPeripheral,
-        DmaRxBuffer,
-        Rx,
-    },
+    dma::{ChannelRx, DmaChannelConvert, DmaEligible, DmaError, DmaPeripheral, DmaRxBuffer, Rx},
     gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
     lcd_cam::{cam::private::RxPins, private::calculate_clkm, BitOrder, ByteOrder},
     peripheral::{Peripheral, PeripheralRef},
@@ -143,8 +134,7 @@ impl<'d> Camera<'d> {
         frequency: HertzU32,
     ) -> Self
     where
-        CH: DmaChannel<Degraded = <LCD_CAM as DmaEligible>::Dma>,
-        (CH, LCD_CAM): DmaCompatible,
+        CH: DmaChannelConvert<<LCD_CAM as DmaEligible>::Dma>,
         P: RxPins,
     {
         let lcd_cam = cam.lcd_cam;

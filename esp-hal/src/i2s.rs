@@ -91,8 +91,7 @@ use crate::{
         ChannelRx,
         ChannelTx,
         DescriptorChain,
-        DmaChannel,
-        DmaCompatible,
+        DmaChannelConvert,
         DmaDescriptor,
         DmaError,
         DmaTransferRx,
@@ -343,7 +342,7 @@ where
         tx_descriptors: &'static mut [DmaDescriptor],
     ) -> Self
     where
-        CH: DmaChannel<Degraded = I::Dma>,
+        CH: DmaChannelConvert<I::Dma>,
     {
         crate::into_ref!(i2s);
         channel.runtime_ensure_compatible(&i2s);
@@ -445,8 +444,7 @@ where
         tx_descriptors: &'static mut [DmaDescriptor],
     ) -> Self
     where
-        CH: DmaChannel<Degraded = I::Dma>,
-        (CH, I): DmaCompatible,
+        CH: DmaChannelConvert<I::Dma>,
         DmaMode: Mode,
     {
         Self::new_internal(

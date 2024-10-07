@@ -239,7 +239,7 @@ pub mod dma {
             ChannelRx,
             ChannelTx,
             DescriptorChain,
-            DmaChannel,
+            DmaChannelConvert,
             DmaDescriptor,
             DmaEligible,
             DmaPeripheral,
@@ -290,7 +290,7 @@ pub mod dma {
         ) -> AesDma<'d>
         where
             Self: Sized,
-            C: DmaChannel<Degraded = <AES as DmaEligible>::Dma>,
+            C: DmaChannelConvert<<AES as DmaEligible>::Dma>,
         {
             AesDma {
                 aes: self,

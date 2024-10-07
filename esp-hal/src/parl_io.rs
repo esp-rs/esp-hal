@@ -37,7 +37,7 @@ use crate::{
         ChannelRx,
         ChannelTx,
         DescriptorChain,
-        DmaChannel,
+        DmaChannelConvert,
         DmaDescriptor,
         DmaEligible,
         DmaError,
@@ -1098,7 +1098,7 @@ where
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        CH: DmaChannel<Degraded = <PARL_IO as DmaEligible>::Dma>,
+        CH: DmaChannelConvert<<PARL_IO as DmaEligible>::Dma>,
     {
         internal_init(frequency)?;
 
@@ -1178,7 +1178,7 @@ where
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        CH: DmaChannel<Degraded = <PARL_IO as DmaEligible>::Dma>,
+        CH: DmaChannelConvert<<PARL_IO as DmaEligible>::Dma>,
     {
         internal_init(frequency)?;
 
@@ -1253,7 +1253,7 @@ where
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        CH: DmaChannel<Degraded = <PARL_IO as DmaEligible>::Dma>,
+        CH: DmaChannelConvert<<PARL_IO as DmaEligible>::Dma>,
     {
         internal_init(frequency)?;
 
