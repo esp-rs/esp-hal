@@ -616,7 +616,7 @@ pub struct EspNow<'d> {
 impl<'d> EspNow<'d> {
     /// Creates an `EspNow` instance.
     pub fn new(
-        inited: &EspWifiInitialization,
+        inited: &'d EspWifiController<'d>,
         device: impl Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
     ) -> Result<EspNow<'d>, EspNowError> {
         EspNow::new_internal(inited, Some(device.into_ref()))
@@ -624,7 +624,7 @@ impl<'d> EspNow<'d> {
 
     /// Creates an `EspNow` instance with support for Wi-Fi coexistence.
     pub fn new_with_wifi(
-        inited: &EspWifiInitialization,
+        inited: &'d EspWifiController<'d>,
         _token: EspNowWithWifiCreateToken,
     ) -> Result<EspNow<'d>, EspNowError> {
         EspNow::new_internal(
@@ -634,7 +634,7 @@ impl<'d> EspNow<'d> {
     }
 
     fn new_internal(
-        inited: &EspWifiInitialization,
+        inited: &'d EspWifiController<'d>,
         device: Option<PeripheralRef<'d, crate::hal::peripherals::WIFI>>,
     ) -> Result<EspNow<'d>, EspNowError> {
         if !inited.is_wifi() {
