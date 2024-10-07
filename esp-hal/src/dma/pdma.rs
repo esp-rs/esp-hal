@@ -39,10 +39,10 @@ impl<C> crate::private::Sealed for SpiDmaRxChannelImpl<C> {}
 
 impl<C: PdmaChannel> SpiDmaRxChannelImpl<C>
 where
-    AnyPdmaChannel: From<C>,
+    AnyPdmaRxChannel: From<Self>,
 {
     fn degrade(self) -> AnyPdmaRxChannelImpl {
-        AnyPdmaRxChannelImpl(AnyPdmaChannel::from(self.0))
+        AnyPdmaRxChannelImpl(AnyPdmaRxChannel::from(self))
     }
 }
 
@@ -53,10 +53,10 @@ impl<C> crate::private::Sealed for SpiDmaTxChannelImpl<C> {}
 
 impl<C: PdmaChannel> SpiDmaTxChannelImpl<C>
 where
-    AnyPdmaChannel: From<C>,
+    AnyPdmaTxChannel: From<Self>,
 {
     fn degrade(self) -> AnyPdmaTxChannelImpl {
-        AnyPdmaTxChannelImpl(AnyPdmaChannel::from(self.0))
+        AnyPdmaTxChannelImpl(AnyPdmaTxChannel::from(self))
     }
 }
 
@@ -342,18 +342,6 @@ macro_rules! ImplSpiChannel {
             #[non_exhaustive]
             pub struct [<Spi $num DmaChannel>] {}
 
-            impl [<Spi $num DmaChannel>] {
-                unsafe fn clone_unchecked(&self) -> Self {
-                    Self {}
-                }
-            }
-
-            impl From<[<Spi $num DmaChannel>]> for AnyPdmaChannel {
-                fn from(channel: [<Spi $num DmaChannel>]) -> Self {
-                    AnyPdmaChannel::[<Spi $num>](channel)
-                }
-            }
-
             impl DmaChannel for [<Spi $num DmaChannel>] {
                 type Rx = SpiDmaRxChannelImpl<Self>;
                 type Tx = SpiDmaTxChannelImpl<Self>;
@@ -481,10 +469,10 @@ impl<C> crate::private::Sealed for I2sDmaRxChannelImpl<C> {}
 
 impl<C: PdmaChannel> I2sDmaRxChannelImpl<C>
 where
-    AnyPdmaChannel: From<C>,
+    AnyPdmaRxChannel: From<Self>,
 {
     fn degrade(self) -> AnyPdmaRxChannelImpl {
-        AnyPdmaRxChannelImpl(AnyPdmaChannel::from(self.0))
+        AnyPdmaRxChannelImpl(AnyPdmaRxChannel::from(self))
     }
 }
 
@@ -495,10 +483,10 @@ impl<C> crate::private::Sealed for I2sDmaTxChannelImpl<C> {}
 
 impl<C: PdmaChannel> I2sDmaTxChannelImpl<C>
 where
-    AnyPdmaChannel: From<C>,
+    AnyPdmaTxChannel: From<Self>,
 {
     fn degrade(self) -> AnyPdmaTxChannelImpl {
-        AnyPdmaTxChannelImpl(AnyPdmaChannel::from(self.0))
+        AnyPdmaTxChannelImpl(AnyPdmaTxChannel::from(self))
     }
 }
 
@@ -793,18 +781,6 @@ macro_rules! ImplI2sChannel {
             #[doc = concat!("DMA channel suitable for I2S", $num)]
             pub struct [<I2s $num DmaChannel>] {}
 
-            impl [<I2s $num DmaChannel>] {
-                unsafe fn clone_unchecked(&self) -> Self {
-                    Self {}
-                }
-            }
-
-            impl From<[<I2s $num DmaChannel>]> for AnyPdmaChannel {
-                fn from(channel: [<I2s $num DmaChannel>]) -> Self {
-                    AnyPdmaChannel::[<I2s $num>](channel)
-                }
-            }
-
             impl $crate::private::Sealed for [<I2s $num DmaChannel>] {}
 
             impl DmaChannel for [<I2s $num DmaChannel>] {
@@ -955,13 +931,39 @@ impl<'d> Dma<'d> {
     }
 }
 
-#[doc(hidden)]
-pub enum AnyPdmaChannel {
-    Spi2(Spi2DmaChannel),
-    Spi3(Spi3DmaChannel),
-    I2s0(I2s0DmaChannel),
-    #[cfg(i2s1)]
-    I2s1(I2s1DmaChannel),
+macro_rules! define_enum {
+    (
+        $(#[$meta:meta])*
+        $vis:vis enum $ty:ident {
+            $($(#[$cfg:meta])?
+            $variant:ident($inner:ty),)*
+        }
+    ) => {
+        $(#[$meta])*
+        $vis enum $ty {
+            $($variant($inner)),*
+        }
+
+        $(
+            $(#[$cfg])?
+            impl From<$inner> for $ty {
+                fn from(inner: $inner) -> Self {
+                    Self::$variant(inner)
+                }
+            }
+        )*
+    }
+}
+
+define_enum! {
+    #[doc(hidden)]
+    pub enum AnyPdmaChannel {
+        Spi2(Spi2DmaChannel),
+        Spi3(Spi3DmaChannel),
+        I2s0(I2s0DmaChannel),
+        #[cfg(i2s1)]
+        I2s1(I2s1DmaChannel),
+    }
 }
 
 impl DmaChannel for AnyDmaChannel {
@@ -977,18 +979,29 @@ impl DmaChannel for AnyDmaChannel {
     }
 }
 
+define_enum! {
+    #[doc(hidden)]
+    pub enum AnyPdmaRxChannel {
+        Spi2(SpiDmaRxChannelImpl<Spi2DmaChannel>),
+        Spi3(SpiDmaRxChannelImpl<Spi3DmaChannel>),
+        I2s0(I2sDmaRxChannelImpl<I2s0DmaChannel>),
+        #[cfg(i2s1)]
+        I2s1(I2sDmaRxChannelImpl<I2s1DmaChannel>),
+    }
+}
+
 #[doc(hidden)]
-pub struct AnyPdmaRxChannelImpl(AnyPdmaChannel);
+pub struct AnyPdmaRxChannelImpl(AnyPdmaRxChannel);
 
 impl crate::private::Sealed for AnyPdmaRxChannelImpl {}
 impl InterruptAccess<DmaRxInterrupt> for AnyPdmaRxChannelImpl {
     delegate::delegate! {
         to match &self.0 {
-            AnyPdmaChannel::Spi2(channel) => unsafe { SpiDmaRxChannelImpl(channel.clone_unchecked()) },
-            AnyPdmaChannel::Spi3(channel) => unsafe { SpiDmaRxChannelImpl(channel.clone_unchecked()) },
-            AnyPdmaChannel::I2s0(channel) => unsafe { I2sDmaRxChannelImpl(channel.clone_unchecked()) },
+            AnyPdmaRxChannel::Spi2(channel) => channel,
+            AnyPdmaRxChannel::Spi3(channel) => channel,
+            AnyPdmaRxChannel::I2s0(channel) => channel,
             #[cfg(i2s1)]
-            AnyPdmaChannel::I2s1(channel) => unsafe { I2sDmaRxChannelImpl(channel.clone_unchecked()) },
+            AnyPdmaRxChannel::I2s1(channel) => channel,
         } {
             fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool);
             fn is_listening(&self) -> EnumSet<DmaRxInterrupt>;
@@ -1001,11 +1014,11 @@ impl InterruptAccess<DmaRxInterrupt> for AnyPdmaRxChannelImpl {
 impl RegisterAccess for AnyPdmaRxChannelImpl {
     delegate::delegate! {
         to match &self.0 {
-            AnyPdmaChannel::Spi2(channel) => unsafe { SpiDmaRxChannelImpl(channel.clone_unchecked()) },
-            AnyPdmaChannel::Spi3(channel) => unsafe { SpiDmaRxChannelImpl(channel.clone_unchecked()) },
-            AnyPdmaChannel::I2s0(channel) => unsafe { I2sDmaRxChannelImpl(channel.clone_unchecked()) },
+            AnyPdmaRxChannel::Spi2(channel) => channel,
+            AnyPdmaRxChannel::Spi3(channel) => channel,
+            AnyPdmaRxChannel::I2s0(channel) => channel,
             #[cfg(i2s1)]
-            AnyPdmaChannel::I2s1(channel) => unsafe { I2sDmaRxChannelImpl(channel.clone_unchecked()) },
+            AnyPdmaRxChannel::I2s1(channel) => channel,
         } {
             fn set_burst_mode(&self, burst_mode: bool);
             fn set_priority(&self, priority: DmaPriority);
@@ -1021,18 +1034,29 @@ impl RegisterAccess for AnyPdmaRxChannelImpl {
 }
 impl RxRegisterAccess for AnyPdmaRxChannelImpl {}
 
+define_enum! {
+    #[doc(hidden)]
+    pub enum AnyPdmaTxChannel {
+        Spi2(SpiDmaTxChannelImpl<Spi2DmaChannel>),
+        Spi3(SpiDmaTxChannelImpl<Spi3DmaChannel>),
+        I2s0(I2sDmaTxChannelImpl<I2s0DmaChannel>),
+        #[cfg(i2s1)]
+        I2s1(I2sDmaTxChannelImpl<I2s1DmaChannel>),
+    }
+}
+
 #[doc(hidden)]
-pub struct AnyPdmaTxChannelImpl(AnyPdmaChannel);
+pub struct AnyPdmaTxChannelImpl(AnyPdmaTxChannel);
 
 impl crate::private::Sealed for AnyPdmaTxChannelImpl {}
 impl InterruptAccess<DmaTxInterrupt> for AnyPdmaTxChannelImpl {
     delegate::delegate! {
         to match &self.0 {
-            AnyPdmaChannel::Spi2(channel) => unsafe { SpiDmaTxChannelImpl(channel.clone_unchecked()) },
-            AnyPdmaChannel::Spi3(channel) => unsafe { SpiDmaTxChannelImpl(channel.clone_unchecked()) },
-            AnyPdmaChannel::I2s0(channel) => unsafe { I2sDmaTxChannelImpl(channel.clone_unchecked()) },
+            AnyPdmaTxChannel::Spi2(channel) => channel,
+            AnyPdmaTxChannel::Spi3(channel) => channel,
+            AnyPdmaTxChannel::I2s0(channel) => channel,
             #[cfg(i2s1)]
-            AnyPdmaChannel::I2s1(channel) => unsafe { I2sDmaTxChannelImpl(channel.clone_unchecked()) },
+            AnyPdmaTxChannel::I2s1(channel) => channel,
         } {
             fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool);
             fn is_listening(&self) -> EnumSet<DmaTxInterrupt>;
@@ -1045,11 +1069,11 @@ impl InterruptAccess<DmaTxInterrupt> for AnyPdmaTxChannelImpl {
 impl RegisterAccess for AnyPdmaTxChannelImpl {
     delegate::delegate! {
         to match &self.0 {
-            AnyPdmaChannel::Spi2(channel) => unsafe { SpiDmaTxChannelImpl(channel.clone_unchecked()) },
-            AnyPdmaChannel::Spi3(channel) => unsafe { SpiDmaTxChannelImpl(channel.clone_unchecked()) },
-            AnyPdmaChannel::I2s0(channel) => unsafe { I2sDmaTxChannelImpl(channel.clone_unchecked()) },
+            AnyPdmaTxChannel::Spi2(channel) => channel,
+            AnyPdmaTxChannel::Spi3(channel) => channel,
+            AnyPdmaTxChannel::I2s0(channel) => channel,
             #[cfg(i2s1)]
-            AnyPdmaChannel::I2s1(channel) => unsafe { I2sDmaTxChannelImpl(channel.clone_unchecked()) },
+            AnyPdmaTxChannel::I2s1(channel) => channel,
         } {
             fn set_burst_mode(&self, burst_mode: bool);
             fn set_priority(&self, priority: DmaPriority);
@@ -1066,11 +1090,11 @@ impl RegisterAccess for AnyPdmaTxChannelImpl {
 impl TxRegisterAccess for AnyPdmaTxChannelImpl {
     delegate::delegate! {
         to match &self.0 {
-            AnyPdmaChannel::Spi2(channel) => unsafe { SpiDmaTxChannelImpl(channel.clone_unchecked()) },
-            AnyPdmaChannel::Spi3(channel) => unsafe { SpiDmaTxChannelImpl(channel.clone_unchecked()) },
-            AnyPdmaChannel::I2s0(channel) => unsafe { I2sDmaTxChannelImpl(channel.clone_unchecked()) },
+            AnyPdmaTxChannel::Spi2(channel) => channel,
+            AnyPdmaTxChannel::Spi3(channel) => channel,
+            AnyPdmaTxChannel::I2s0(channel) => channel,
             #[cfg(i2s1)]
-            AnyPdmaChannel::I2s1(channel) => unsafe { I2sDmaTxChannelImpl(channel.clone_unchecked()) },
+            AnyPdmaTxChannel::I2s1(channel) => channel,
         } {
             fn last_dscr_address(&self) -> usize;
         }
