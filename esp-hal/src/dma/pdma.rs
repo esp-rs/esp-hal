@@ -37,28 +37,10 @@ pub struct SpiDmaRxChannelImpl<C>(C);
 
 impl<C> crate::private::Sealed for SpiDmaRxChannelImpl<C> {}
 
-impl<C: PdmaChannel> SpiDmaRxChannelImpl<C>
-where
-    AnyPdmaRxChannel: From<Self>,
-{
-    fn degrade(self) -> AnyPdmaRxChannelImpl {
-        AnyPdmaRxChannelImpl(AnyPdmaRxChannel::from(self))
-    }
-}
-
 #[doc(hidden)]
 pub struct SpiDmaTxChannelImpl<C>(C);
 
 impl<C> crate::private::Sealed for SpiDmaTxChannelImpl<C> {}
-
-impl<C: PdmaChannel> SpiDmaTxChannelImpl<C>
-where
-    AnyPdmaTxChannel: From<Self>,
-{
-    fn degrade(self) -> AnyPdmaTxChannelImpl {
-        AnyPdmaTxChannelImpl(AnyPdmaTxChannel::from(self))
-    }
-}
 
 impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDmaTxChannelImpl<C> {
     fn reset(&self) {
@@ -347,14 +329,6 @@ macro_rules! ImplSpiChannel {
                 type Tx = SpiDmaTxChannelImpl<Self>;
             }
 
-            impl DmaChannelConvert<AnyPdmaChannel> for [<Spi $num DmaChannel>] {
-                fn degrade_rx(rx: Self::Rx) -> AnyPdmaRxChannelImpl {
-                    rx.degrade()
-                }
-                fn degrade_tx(tx: Self::Tx) -> AnyPdmaTxChannelImpl {
-                    tx.degrade()
-                }
-            }
             impl PeripheralDmaChannel for [<Spi $num DmaChannel>] {
                 type P = crate::peripherals::[<SPI $num>];
             }
@@ -469,28 +443,10 @@ pub struct I2sDmaRxChannelImpl<C>(C);
 
 impl<C> crate::private::Sealed for I2sDmaRxChannelImpl<C> {}
 
-impl<C: PdmaChannel> I2sDmaRxChannelImpl<C>
-where
-    AnyPdmaRxChannel: From<Self>,
-{
-    fn degrade(self) -> AnyPdmaRxChannelImpl {
-        AnyPdmaRxChannelImpl(AnyPdmaRxChannel::from(self))
-    }
-}
-
 #[doc(hidden)]
 pub struct I2sDmaTxChannelImpl<C>(C);
 
 impl<C> crate::private::Sealed for I2sDmaTxChannelImpl<C> {}
-
-impl<C: PdmaChannel> I2sDmaTxChannelImpl<C>
-where
-    AnyPdmaTxChannel: From<Self>,
-{
-    fn degrade(self) -> AnyPdmaTxChannelImpl {
-        AnyPdmaTxChannelImpl(AnyPdmaTxChannel::from(self))
-    }
-}
 
 impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDmaTxChannelImpl<C> {
     fn set_burst_mode(&self, burst_mode: bool) {
@@ -790,14 +746,6 @@ macro_rules! ImplI2sChannel {
                 type Tx = I2sDmaTxChannelImpl<Self>;
             }
 
-            impl DmaChannelConvert<AnyPdmaChannel> for [<I2s $num DmaChannel>] {
-                fn degrade_rx(rx: Self::Rx) -> AnyPdmaRxChannelImpl {
-                    rx.degrade()
-                }
-                fn degrade_tx(tx: Self::Tx) -> AnyPdmaTxChannelImpl {
-                    tx.degrade()
-                }
-            }
             impl PeripheralDmaChannel for [<I2s $num DmaChannel>] {
                 type P = crate::peripherals::[<I2S $num>];
             }
@@ -940,167 +888,6 @@ impl<'d> Dma<'d> {
             i2s0channel: I2s0DmaChannelCreator {},
             #[cfg(i2s1)]
             i2s1channel: I2s1DmaChannelCreator {},
-        }
-    }
-}
-
-macro_rules! define_enum {
-    (
-        $(#[$meta:meta])*
-        $vis:vis enum $ty:ident {
-            $($(#[$cfg:meta])?
-            $variant:ident($inner:ty),)*
-        }
-    ) => {
-        $(#[$meta])*
-        $vis enum $ty {
-            $(
-                $(#[$cfg])?
-                $variant($inner),
-            )*
-        }
-
-        $(
-            $(#[$cfg])?
-            impl From<$inner> for $ty {
-                fn from(inner: $inner) -> Self {
-                    Self::$variant(inner)
-                }
-            }
-        )*
-    }
-}
-
-/// An arbitrary PDMA channel.
-// NOTE: this is unused currently (peripherals prescribe a specific channel) but type-erased
-// peripherals will require type-erased channels.
-#[non_exhaustive]
-pub struct AnyPdmaChannel;
-impl crate::private::Sealed for AnyPdmaChannel {}
-
-impl DmaChannel for AnyPdmaChannel {
-    type Rx = AnyPdmaRxChannelImpl;
-    type Tx = AnyPdmaTxChannelImpl;
-}
-
-define_enum! {
-    #[doc(hidden)]
-    pub enum AnyPdmaRxChannel {
-        Spi2(SpiDmaRxChannelImpl<Spi2DmaChannel>),
-        Spi3(SpiDmaRxChannelImpl<Spi3DmaChannel>),
-        I2s0(I2sDmaRxChannelImpl<I2s0DmaChannel>),
-        #[cfg(i2s1)]
-        I2s1(I2sDmaRxChannelImpl<I2s1DmaChannel>),
-    }
-}
-
-#[doc(hidden)]
-pub struct AnyPdmaRxChannelImpl(AnyPdmaRxChannel);
-
-impl crate::private::Sealed for AnyPdmaRxChannelImpl {}
-impl InterruptAccess<DmaRxInterrupt> for AnyPdmaRxChannelImpl {
-    delegate::delegate! {
-        to match &self.0 {
-            AnyPdmaRxChannel::Spi2(channel) => channel,
-            AnyPdmaRxChannel::Spi3(channel) => channel,
-            AnyPdmaRxChannel::I2s0(channel) => channel,
-            #[cfg(i2s1)]
-            AnyPdmaRxChannel::I2s1(channel) => channel,
-        } {
-            fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool);
-            fn is_listening(&self) -> EnumSet<DmaRxInterrupt>;
-            fn clear(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>);
-            fn pending_interrupts(&self) -> EnumSet<DmaRxInterrupt>;
-            fn waker(&self) -> &'static AtomicWaker;
-        }
-    }
-}
-impl RegisterAccess for AnyPdmaRxChannelImpl {
-    delegate::delegate! {
-        to match &self.0 {
-            AnyPdmaRxChannel::Spi2(channel) => channel,
-            AnyPdmaRxChannel::Spi3(channel) => channel,
-            AnyPdmaRxChannel::I2s0(channel) => channel,
-            #[cfg(i2s1)]
-            AnyPdmaRxChannel::I2s1(channel) => channel,
-        } {
-            fn set_burst_mode(&self, burst_mode: bool);
-            fn set_priority(&self, priority: DmaPriority);
-            fn reset(&self);
-            fn set_link_addr(&self, address: u32);
-            fn set_peripheral(&self, peripheral: u8);
-            fn start(&self);
-            fn stop(&self);
-            fn restart(&self);
-            fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool;
-        }
-    }
-}
-impl RxRegisterAccess for AnyPdmaRxChannelImpl {}
-
-define_enum! {
-    #[doc(hidden)]
-    pub enum AnyPdmaTxChannel {
-        Spi2(SpiDmaTxChannelImpl<Spi2DmaChannel>),
-        Spi3(SpiDmaTxChannelImpl<Spi3DmaChannel>),
-        I2s0(I2sDmaTxChannelImpl<I2s0DmaChannel>),
-        #[cfg(i2s1)]
-        I2s1(I2sDmaTxChannelImpl<I2s1DmaChannel>),
-    }
-}
-
-#[doc(hidden)]
-pub struct AnyPdmaTxChannelImpl(AnyPdmaTxChannel);
-
-impl crate::private::Sealed for AnyPdmaTxChannelImpl {}
-impl InterruptAccess<DmaTxInterrupt> for AnyPdmaTxChannelImpl {
-    delegate::delegate! {
-        to match &self.0 {
-            AnyPdmaTxChannel::Spi2(channel) => channel,
-            AnyPdmaTxChannel::Spi3(channel) => channel,
-            AnyPdmaTxChannel::I2s0(channel) => channel,
-            #[cfg(i2s1)]
-            AnyPdmaTxChannel::I2s1(channel) => channel,
-        } {
-            fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool);
-            fn is_listening(&self) -> EnumSet<DmaTxInterrupt>;
-            fn clear(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>);
-            fn pending_interrupts(&self) -> EnumSet<DmaTxInterrupt>;
-            fn waker(&self) -> &'static AtomicWaker;
-        }
-    }
-}
-impl RegisterAccess for AnyPdmaTxChannelImpl {
-    delegate::delegate! {
-        to match &self.0 {
-            AnyPdmaTxChannel::Spi2(channel) => channel,
-            AnyPdmaTxChannel::Spi3(channel) => channel,
-            AnyPdmaTxChannel::I2s0(channel) => channel,
-            #[cfg(i2s1)]
-            AnyPdmaTxChannel::I2s1(channel) => channel,
-        } {
-            fn set_burst_mode(&self, burst_mode: bool);
-            fn set_priority(&self, priority: DmaPriority);
-            fn reset(&self);
-            fn set_link_addr(&self, address: u32);
-            fn set_peripheral(&self, peripheral: u8);
-            fn start(&self);
-            fn stop(&self);
-            fn restart(&self);
-            fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool;
-        }
-    }
-}
-impl TxRegisterAccess for AnyPdmaTxChannelImpl {
-    delegate::delegate! {
-        to match &self.0 {
-            AnyPdmaTxChannel::Spi2(channel) => channel,
-            AnyPdmaTxChannel::Spi3(channel) => channel,
-            AnyPdmaTxChannel::I2s0(channel) => channel,
-            #[cfg(i2s1)]
-            AnyPdmaTxChannel::I2s1(channel) => channel,
-        } {
-            fn last_dscr_address(&self) -> usize;
         }
     }
 }
