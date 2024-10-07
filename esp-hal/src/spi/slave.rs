@@ -548,8 +548,6 @@ impl InstanceDma for crate::peripherals::SPI3 {}
 pub trait Instance: private::Sealed + PeripheralMarker {
     fn register_block(&self) -> &RegisterBlock;
 
-    fn peripheral(&self) -> crate::system::Peripheral;
-
     fn sclk_signal(&self) -> InputSignal;
 
     fn mosi_signal(&self) -> InputSignal;
@@ -736,11 +734,6 @@ impl Instance for crate::peripherals::SPI2 {
     }
 
     #[inline(always)]
-    fn peripheral(&self) -> crate::system::Peripheral {
-        crate::system::Peripheral::Spi2
-    }
-
-    #[inline(always)]
     fn sclk_signal(&self) -> InputSignal {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
@@ -795,11 +788,6 @@ impl Instance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn spi_num(&self) -> u8 {
         3
-    }
-
-    #[inline(always)]
-    fn peripheral(&self) -> crate::system::Peripheral {
-        crate::system::Peripheral::Spi3
     }
 
     #[inline(always)]
