@@ -372,7 +372,7 @@ unsafe extern "C" fn btdm_hus_2_lpcycles(us: u32) -> u32 {
 
     // Converts a duration in half us into a number of low power clock cycles.
     let cycles: u64 = (us as u64) << (g_btdm_lpcycle_us_frac as u64 / g_btdm_lpcycle_us as u64);
-    debug!("*** NOT implemented btdm_hus_2_lpcycles {} {}", us, cycles);
+    trace!("btdm_hus_2_lpcycles {} {}", us, cycles);
     // probably not right ... NX returns half of the values we calculate here
 
     cycles as u32
@@ -403,13 +403,13 @@ unsafe extern "C" fn btdm_sleep_exit_phase3() {
 }
 
 unsafe extern "C" fn coex_schm_status_bit_set(_typ: i32, status: i32) {
-    debug!("coex_schm_status_bit_set {} {}", _typ, status);
+    trace!("coex_schm_status_bit_set {} {}", _typ, status);
     #[cfg(coex)]
     crate::binary::include::coex_schm_status_bit_set(_typ as u32, status as u32);
 }
 
 unsafe extern "C" fn coex_schm_status_bit_clear(_typ: i32, status: i32) {
-    debug!("coex_schm_status_bit_clear {} {}", _typ, status);
+    trace!("coex_schm_status_bit_clear {} {}", _typ, status);
     #[cfg(coex)]
     crate::binary::include::coex_schm_status_bit_clear(_typ as u32, status as u32);
 }

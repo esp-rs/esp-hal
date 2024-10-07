@@ -1316,13 +1316,13 @@ fn os_msys_init() {
 
 unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i32 {
     trace!("ble_hs_hci_rx_evt {:?} {:?}", cmd, arg);
-    debug!("$ cmd = {:x}", *cmd);
-    debug!("$ len = {:x}", *(cmd.offset(1)));
+    trace!("$ cmd = {:x}", *cmd);
+    trace!("$ len = {:x}", *(cmd.offset(1)));
 
     let event = *cmd;
     let len = *(cmd.offset(1)) as usize;
     let payload = core::slice::from_raw_parts(cmd.offset(2), len);
-    debug!("$ pld = {:?}", payload);
+    trace!("$ pld = {:?}", payload);
 
     critical_section::with(|cs| {
         let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
