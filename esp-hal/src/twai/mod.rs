@@ -695,10 +695,10 @@ impl BaudRate {
         #[cfg(esp32h2)]
         let timing = match self {
             Self::B125K => TimingConfig {
-                baud_rate_prescaler: 8,
+                baud_rate_prescaler: 16,
                 sync_jump_width: 3,
-                tseg_1: 23,
-                tseg_2: 8,
+                tseg_1: 11,
+                tseg_2: 4,
                 triple_sample: false,
             },
             Self::B250K => TimingConfig {
