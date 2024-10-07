@@ -107,8 +107,8 @@ async fn main(spawner: Spawner) {
     // Without an external transciever, we only need a single line between the two MCUs.
     let rx_pin = tx_pin.peripheral_input(); // Comment this line if you want to use an external transciever.
 
-    // The speed of the CAN bus.
-    const CAN_BAUDRATE: twai::BaudRate = twai::BaudRate::B125K;
+    // The speed of the bus.
+    const TWAI_BAUDRATE: twai::BaudRate = twai::BaudRate::B125K;
 
     // !!! Use `new_async` when using a transceiver. `new_async_no_transceiver` sets TX to open-drain
 
@@ -118,7 +118,7 @@ async fn main(spawner: Spawner) {
         peripherals.TWAI0,
         rx_pin,
         tx_pin,
-        CAN_BAUDRATE,
+        TWAI_BAUDRATE,
         TwaiMode::Normal,
     );
 

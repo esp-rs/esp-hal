@@ -48,7 +48,7 @@ fn main() -> ! {
     // Without an external transciever, we only need a single line between the two MCUs.
     let rx_pin = tx_pin.peripheral_input(); // Comment this line if you want to use an external transciever.
 
-    // The speed of the CAN bus.
+    // The speed of the bus.
     const TWAI_BAUDRATE: twai::BaudRate = twai::BaudRate::B125K;
 
     // !!! Use `new` when using a transceiver. `new_no_transceiver` sets TX to open-drain
@@ -78,27 +78,27 @@ fn main() -> ! {
     // Start the peripheral. This locks the configuration settings of the peripheral
     // and puts it into operation mode, allowing packets to be sent and
     // received.
-    let mut can = twai_config.start();
+    let mut twai = twai_config.start();
 
     if IS_FIRST_SENDER {
         // Send a frame to the other ESP
         // Use `new_self_reception` if you want to use self-testing.
         let frame = EspTwaiFrame::new(StandardId::ZERO, &[1, 2, 3]).unwrap();
-        block!(can.transmit(&frame)).unwrap();
+        block!(twai.transmit(&frame)).unwrap();
         println!("Sent a frame");
     }
 
     let delay = Delay::new();
     loop {
         // Wait for a frame to be received.
-        let frame = block!(can.receive()).unwrap();
+        let frame = block!(twai.receive()).unwrap();
 
         println!("Received a frame: {frame:?}");
         delay.delay_millis(250);
 
         let frame = EspTwaiFrame::new(StandardId::ZERO, &[1, 2, 3]).unwrap();
         // Transmit a new frame back to the other ESP
-        block!(can.transmit(&frame)).unwrap();
+        block!(twai.transmit(&frame)).unwrap();
         println!("Sent a frame");
     }
 }

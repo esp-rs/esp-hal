@@ -221,7 +221,7 @@ pub const DIS_USB_SERIAL_JTAG: EfuseField = EfuseField::new(EfuseBlock::Block0, 
 /// `[]` Set this bit to disable the function that forces chip into download
 /// mode
 pub const DIS_FORCE_DOWNLOAD: EfuseField = EfuseField::new(EfuseBlock::Block0, 44, 1);
-/// `[DIS_CAN]` Set this bit to disable CAN function
+/// `[DIS_CAN]` Set this bit to disable TWAI function
 pub const DIS_TWAI: EfuseField = EfuseField::new(EfuseBlock::Block0, 46, 1);
 /// `[]` Set this bit to enable selection between usb_to_jtag and pad_to_jtag
 /// through strapping gpio10 when both reg_dis_usb_jtag and reg_dis_pad_jtag are

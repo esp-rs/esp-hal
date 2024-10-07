@@ -269,7 +269,7 @@ pub const DIS_DOWNLOAD_DCACHE: EfuseField = EfuseField::new(EfuseBlock::Block0, 
 pub const DIS_FORCE_DOWNLOAD: EfuseField = EfuseField::new(EfuseBlock::Block0, 44, 1);
 /// `[DIS_USB]` Set this bit to disable USB function
 pub const DIS_USB_OTG: EfuseField = EfuseField::new(EfuseBlock::Block0, 45, 1);
-/// `[DIS_CAN]` Set this bit to disable CAN function
+/// `[DIS_CAN]` Set this bit to disable TWAI function
 pub const DIS_TWAI: EfuseField = EfuseField::new(EfuseBlock::Block0, 46, 1);
 /// `[]` Disable app cpu
 pub const DIS_APP_CPU: EfuseField = EfuseField::new(EfuseBlock::Block0, 47, 1);
