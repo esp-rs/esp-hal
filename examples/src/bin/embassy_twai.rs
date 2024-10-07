@@ -24,7 +24,7 @@
 //! * use `new()` function to create the TWAI configuration.
 //! * change the `tx_pin` and `rx_pin` to the appropriate pins for your boards.
 
-//% CHIPS: esp32 esp32c3 esp32c6 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: embassy embassy-generic-timers
 
 #![no_std]
@@ -149,7 +149,7 @@ async fn main(spawner: Spawner) {
     let channel = &*CHANNEL.init(Channel::new());
 
     spawner.spawn(receiver(rx, channel)).ok();
-    //spawner.spawn(transmitter(tx, channel)).ok();
+    spawner.spawn(transmitter(tx, channel)).ok();
 }
 
 fn print_frame(frame: &EspTwaiFrame) {

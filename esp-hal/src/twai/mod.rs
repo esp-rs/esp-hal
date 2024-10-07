@@ -1790,19 +1790,12 @@ mod asynch {
 
         let async_state = T::async_state();
 
-        log::info!("irq: {:?}", intr_status.bits());
         if tx_int_status.bit_is_set() {
-            log::info!("tx irq");
             async_state.tx_waker.wake();
         }
 
         if rx_int_status.bit_is_set() {
             let status = register_block.status().read();
-            log::info!(
-                "rx irq: {:?} {:?}",
-                status.bus_off_st().bit_is_set(),
-                status.miss_st().bit_is_set(),
-            );
 
             let rx_queue = &async_state.rx_queue;
 
