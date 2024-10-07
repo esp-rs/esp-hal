@@ -497,7 +497,7 @@ where
     /// operations.
     pub fn with_dma<CH, DmaMode>(
         self,
-        channel: crate::dma::Channel<'d, DmaMode, CH>,
+        channel: crate::dma::Channel<'d, CH, DmaMode>,
     ) -> SpiDma<'d, T, M, DmaMode>
     where
         CH: crate::dma::DmaChannel,
@@ -939,6 +939,7 @@ mod dma {
     use crate::{
         dma::{
             asynch::{DmaRxFuture, DmaTxFuture},
+            AnyDmaChannel,
             Channel,
             DmaChannel,
             DmaRxBuf,
@@ -965,7 +966,7 @@ mod dma {
         M: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, M>,
+        pub(crate) channel: Channel<'d, AnyDmaChannel, M>,
         tx_transfer_in_progress: bool,
         rx_transfer_in_progress: bool,
         #[cfg(all(esp32, spi_address_workaround))]
@@ -1001,7 +1002,7 @@ mod dma {
         D: DuplexMode,
         M: Mode,
     {
-        pub(super) fn new<CH>(spi: PeripheralRef<'d, T>, channel: Channel<'d, M, CH>) -> Self
+        pub(super) fn new<CH>(spi: PeripheralRef<'d, T>, channel: Channel<'d, CH, M>) -> Self
         where
             CH: DmaChannel,
         {

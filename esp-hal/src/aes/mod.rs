@@ -235,6 +235,7 @@ pub mod dma {
         aes::{Key, Mode},
         dma::{
             dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
+            AnyDmaChannel,
             Channel,
             ChannelRx,
             ChannelTx,
@@ -273,7 +274,7 @@ pub mod dma {
         /// The underlying [`Aes`](super::Aes) driver
         pub aes: super::Aes<'d>,
 
-        channel: Channel<'d, crate::Blocking>,
+        channel: Channel<'d, AnyDmaChannel, crate::Blocking>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
     }
@@ -282,7 +283,7 @@ pub mod dma {
         /// Enable DMA for the current instance of the AES driver
         pub fn with_dma<C>(
             self,
-            channel: Channel<'d, crate::Blocking, C>,
+            channel: Channel<'d, C, crate::Blocking>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> AesDma<'d>
@@ -322,7 +323,7 @@ pub mod dma {
     }
 
     impl<'d> DmaSupportTx for AesDma<'d> {
-        type TX = ChannelTx<'d>;
+        type TX = ChannelTx<'d, AnyDmaChannel>;
 
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
@@ -334,7 +335,7 @@ pub mod dma {
     }
 
     impl<'d> DmaSupportRx for AesDma<'d> {
-        type RX = ChannelRx<'d>;
+        type RX = ChannelRx<'d, AnyDmaChannel>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx

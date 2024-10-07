@@ -405,7 +405,7 @@ macro_rules! ImplSpiChannel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> Channel<'a, M, [<Spi $num DmaChannel>]> {
+                ) -> Channel<'a, [<Spi $num DmaChannel>], M> {
                     #[cfg(esp32)]
                     {
                         // (only) on ESP32 we need to configure DPORT for the SPI DMA channels
@@ -438,7 +438,7 @@ macro_rules! ImplSpiChannel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> Channel<'a, $crate::Blocking, [<Spi $num DmaChannel>]> {
+                ) -> Channel<'a, [<Spi $num DmaChannel>], $crate::Blocking> {
                     Self::do_configure(self, burst_mode, priority)
                 }
 
@@ -450,7 +450,7 @@ macro_rules! ImplSpiChannel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> Channel<'a, $crate::Async, [<Spi $num DmaChannel>]> {
+                ) -> Channel<'a, [<Spi $num DmaChannel>], $crate::Async> {
                     let this = Self::do_configure(self, burst_mode, priority);
 
                     [<Spi $num DmaChannel>]::set_isr(super::asynch::interrupt::[< interrupt_handler_spi $num _dma >]);
@@ -842,7 +842,7 @@ macro_rules! ImplI2sChannel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> Channel<'a, M, [<I2s $num DmaChannel>]> {
+                ) -> Channel<'a, [<I2s $num DmaChannel>], M> {
                     let tx_impl = I2sDmaTxChannelImpl([<I2s $num DmaChannel>] {});
                     tx_impl.set_burst_mode(burst_mode);
                     tx_impl.set_priority(priority);
@@ -866,7 +866,7 @@ macro_rules! ImplI2sChannel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> Channel<'a, $crate::Blocking, [<I2s $num DmaChannel>]> {
+                ) -> Channel<'a, [<I2s $num DmaChannel>], $crate::Blocking> {
                     Self::do_configure(self, burst_mode, priority)
                 }
 
@@ -878,7 +878,7 @@ macro_rules! ImplI2sChannel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> Channel<'a, $crate::Async, [<I2s $num DmaChannel>]> {
+                ) -> Channel<'a, [<I2s $num DmaChannel>], $crate::Async> {
                     let this = Self::do_configure(self, burst_mode, priority);
 
                     [<I2s $num DmaChannel>]::set_isr(super::asynch::interrupt::[< interrupt_handler_i2s $num >]);
@@ -1101,9 +1101,9 @@ impl TxRegisterAccess for AnyPdmaTxChannelImpl {
     }
 }
 
-impl<'d, CH, M: Mode> Channel<'d, M, CH>
+impl<'d, C, M: Mode> Channel<'d, C, M>
 where
-    CH: DmaChannel,
+    C: DmaChannel,
 {
     /// Asserts that the channel is compatible with the given peripheral.
     pub fn runtime_ensure_compatible(&self, peripheral: &PeripheralRef<'_, impl PeripheralMarker>) {

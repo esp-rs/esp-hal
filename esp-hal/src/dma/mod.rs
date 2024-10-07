@@ -1590,7 +1590,7 @@ pub trait Rx: crate::private::Sealed {
 // DMA receive channel
 #[non_exhaustive]
 #[doc(hidden)]
-pub struct ChannelRx<'a, CH = AnyDmaChannel>
+pub struct ChannelRx<'a, CH>
 where
     CH: DmaChannel,
 {
@@ -1612,7 +1612,7 @@ where
     }
 
     /// Return a type-erased (degraded) version of this channel.
-    pub fn degrade(self) -> ChannelRx<'a> {
+    pub fn degrade(self) -> ChannelRx<'a, AnyDmaChannel> {
         ChannelRx {
             burst_mode: self.burst_mode,
             rx_impl: CH::degrade_rx(self.rx_impl),
@@ -1803,7 +1803,7 @@ pub trait Tx: crate::private::Sealed {
 
 /// DMA transmit channel
 #[doc(hidden)]
-pub struct ChannelTx<'a, CH = AnyDmaChannel>
+pub struct ChannelTx<'a, CH>
 where
     CH: DmaChannel,
 {
@@ -1826,7 +1826,7 @@ where
     }
 
     /// Return a type-erased (degraded) version of this channel.
-    pub fn degrade(self) -> ChannelTx<'a> {
+    pub fn degrade(self) -> ChannelTx<'a, AnyDmaChannel> {
         ChannelTx {
             burst_mode: self.burst_mode,
             tx_impl: CH::degrade_tx(self.tx_impl),
@@ -2026,7 +2026,7 @@ pub trait InterruptAccess<T: EnumSetType>: crate::private::Sealed {
 }
 
 /// DMA Channel
-pub struct Channel<'d, MODE, CH = AnyDmaChannel>
+pub struct Channel<'d, CH, MODE>
 where
     CH: DmaChannel,
     MODE: Mode,
@@ -2038,7 +2038,7 @@ where
     phantom: PhantomData<MODE>,
 }
 
-impl<'d, C> Channel<'d, crate::Blocking, C>
+impl<'d, C> Channel<'d, C, crate::Blocking>
 where
     C: DmaChannel,
 {
@@ -2096,13 +2096,13 @@ where
     }
 }
 
-impl<'d, C, M: Mode> Channel<'d, M, C>
+impl<'d, C, M: Mode> Channel<'d, C, M>
 where
     C: DmaChannel,
 {
     /// Return a type-erased (degraded) version of this channel (both rx and
     /// tx).
-    pub fn degrade(self) -> Channel<'d, M> {
+    pub fn degrade(self) -> Channel<'d, AnyDmaChannel, M> {
         Channel {
             rx: self.rx.degrade(),
             tx: self.tx.degrade(),
