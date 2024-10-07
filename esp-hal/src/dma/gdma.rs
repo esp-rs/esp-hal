@@ -571,17 +571,23 @@ crate::impl_dma_eligible! {
         #[cfg(i2s1)]
         I2S1 => I2s1,
 
+        #[cfg(esp32s3)]
+        LCD_CAM => LcdCam,
+
         #[cfg(all(gdma, aes))]
         AES => Aes,
 
         #[cfg(all(gdma, sha))]
         SHA => Sha,
 
-        #[cfg(any(esp32c3, esp32c6, esp32h2))]
+        #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
         ADC1 => Adc,
 
-        #[cfg(esp32c3)]
+        #[cfg(any(esp32c3, esp32s3))]
         ADC2 => Adc,
+
+        #[cfg(esp32s3)]
+        RMT => Rmt,
 
         #[cfg(parl_io)]
         PARL_IO => ParlIo,
