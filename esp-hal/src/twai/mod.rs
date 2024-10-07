@@ -611,6 +611,8 @@ impl embedded_can::Frame for EspTwaiFrame {
 }
 
 /// The underlying timings for the TWAI peripheral.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct TimingConfig {
     /// The baudrate prescaler is used to determine the period of each time
     /// quantum by dividing the TWAI controller's source clock.
@@ -635,6 +637,8 @@ pub struct TimingConfig {
 /// A selection of pre-determined baudrates for the TWAI driver.
 /// Currently these timings are sourced from the ESP IDF C driver which assumes
 /// an APB clock of 80MHz.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum BaudRate {
     /// A baud rate of 125 Kbps.
     B125K,
