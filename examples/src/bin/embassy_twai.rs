@@ -39,7 +39,7 @@ use esp_hal::{
     interrupt,
     peripherals::{self, TWAI0},
     timer::timg::TimerGroup,
-    twai::{self, EspTwaiFrame, TwaiMode, TwaiRx, TwaiTx},
+    twai::{self, EspTwaiFrame, StandardId, TwaiMode, TwaiRx, TwaiTx},
 };
 use esp_println::println;
 use static_cell::StaticCell;
@@ -59,7 +59,8 @@ async fn receiver(
                 println!("Received a frame:");
                 print_frame(&frame);
 
-                // repeat the frame back
+                // Send a response
+                let frame = EspTwaiFrame::new(StandardId::new(1).unwrap(), &[4, 5, 6, 7, 8]).unwrap();
                 channel.send(frame).await;
             }
             Err(e) => {
@@ -128,7 +129,7 @@ async fn main(spawner: Spawner) {
     // these partial acceptance filters to exactly match. A filter that matches
     // standard ids of an even value.
     const FILTER: twai::filter::SingleStandardFilter =
-        twai::filter::SingleStandardFilter::new(b"xxxxxxxxxxx", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
+        twai::filter::SingleStandardFilter::new(b"xxxxxxxxxx0", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
     twai_config.set_filter(FILTER);
 
     // Start the peripheral. This locks the configuration settings of the peripheral

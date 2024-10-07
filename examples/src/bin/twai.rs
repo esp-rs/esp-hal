@@ -72,7 +72,7 @@ fn main() -> ! {
     // these partial acceptance filters to exactly match.
     // A filter that matches StandardId::ZERO.
     twai_config.set_filter(
-        const { SingleStandardFilter::new(b"00000000000", b"x", [b"xxxxxxxx", b"xxxxxxxx"]) },
+        const { SingleStandardFilter::new(b"xxxxxxxxxx1", b"x", [b"xxxxxxxx", b"xxxxxxxx"]) },
     );
 
     // Start the peripheral. This locks the configuration settings of the peripheral
@@ -96,7 +96,8 @@ fn main() -> ! {
         println!("Received a frame: {frame:?}");
         delay.delay_millis(250);
 
-        // Transmit the frame back to the other ESP
+        let frame = EspTwaiFrame::new(StandardId::ZERO, &[1, 2, 3]).unwrap();
+        // Transmit a new frame back to the other ESP
         block!(can.transmit(&frame)).unwrap();
         println!("Sent a frame");
     }
