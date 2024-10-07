@@ -3,7 +3,7 @@ use embedded_io::{Error, ErrorType, Read, Write};
 use super::{read_hci, read_next, send_hci};
 use crate::{
     hal::peripheral::{Peripheral, PeripheralRef},
-    EspWifiInitialization,
+    EspWifiController,
 };
 
 /// A blocking HCI connector
@@ -11,14 +11,18 @@ pub struct BleConnector<'d> {
     _device: PeripheralRef<'d, crate::hal::peripherals::BT>,
 }
 
+impl<'d> Drop for BleConnector<'d> {
+    fn drop(&mut self) {
+        crate::ble::ble_deinit();
+    }
+}
+
 impl<'d> BleConnector<'d> {
     pub fn new(
-        init: &EspWifiInitialization,
+        _init: &'d EspWifiController<'d>,
         device: impl Peripheral<P = crate::hal::peripherals::BT> + 'd,
     ) -> BleConnector<'d> {
-        if !init.is_ble() {
-            panic!("Not initialized for BLE use");
-        }
+        crate::ble::ble_init();
 
         Self {
             _device: device.into_ref(),
@@ -113,7 +117,7 @@ pub mod asynch {
 
     impl<'d> BleConnector<'d> {
         pub fn new(
-            init: &EspWifiInitialization,
+            init: &'d EspWifiController<'d>,
             device: impl Peripheral<P = crate::hal::peripherals::BT> + 'd,
         ) -> BleConnector<'d> {
             if !init.is_ble() {

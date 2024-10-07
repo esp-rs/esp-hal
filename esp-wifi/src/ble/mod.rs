@@ -8,7 +8,7 @@ pub(crate) mod npl;
 
 use core::mem::MaybeUninit;
 
-pub(crate) use ble::{ble_init, read_hci, read_next, send_hci};
+pub(crate) use ble::{ble_deinit, ble_init, read_hci, read_next, send_hci};
 
 #[cfg(any(esp32, esp32c3, esp32s3))]
 use self::btdm as ble;
