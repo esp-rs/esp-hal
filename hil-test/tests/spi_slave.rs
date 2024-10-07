@@ -1,6 +1,9 @@
 //! SPI slave mode test suite.
+//!
+//! ESP32 does not support Modes 0 and 2 (properly, at least), so here we're
+//! testing Mode 1.
 
-//% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
@@ -51,20 +54,22 @@ impl BitbangSpi {
     }
 
     fn assert_cs(&mut self) {
+        self.sclk.set_level(Level::Low);
         self.cs.set_level(Level::Low);
     }
 
     fn deassert_cs(&mut self) {
+        self.sclk.set_level(Level::Low);
         self.cs.set_level(Level::High);
     }
 
-    // Mode 0, so sampled on the rising edge and set on the falling edge.
+    // Mode 1, so sampled on the rising edge and set on the falling edge.
     fn shift_bit(&mut self, bit: bool) -> bool {
         self.mosi.set_level(Level::from(bit));
-        self.sclk.set_level(Level::Low);
+        self.sclk.set_level(Level::High);
 
         let miso = self.miso.get_level().into();
-        self.sclk.set_level(Level::High);
+        self.sclk.set_level(Level::Low);
 
         miso
     }
@@ -98,6 +103,7 @@ mod tests {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+
         let (mosi_pin, miso_pin) = hil_test::i2c_pins!(io);
         let (sclk_pin, sclk_gpio) = hil_test::common_test_pins!(io);
         let cs_pin = hil_test::unconnected_pin!(io);
@@ -115,6 +121,7 @@ mod tests {
         let cs = cs_pin.peripheral_input();
         let mosi = mosi_pin.peripheral_input();
         let mut miso = miso_pin.peripheral_input();
+        let sclk_signal = sclk_pin.peripheral_input();
 
         let mosi_gpio = Output::new(mosi_pin, Level::Low);
         let cs_gpio = Output::new(cs_pin, Level::High);
@@ -122,11 +129,11 @@ mod tests {
 
         let spi = Spi::new(
             peripherals.SPI2,
-            sclk_pin,
+            sclk_signal,
             mosi,
             miso_pin,
             cs,
-            SpiMode::Mode0,
+            SpiMode::Mode1,
         );
 
         miso.enable_input(true, unsafe { esp_hal::Internal::conjure() });
@@ -145,8 +152,8 @@ mod tests {
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DMA_SIZE);
         let mut spi = ctx.spi.with_dma(
             ctx.dma_channel.configure(false, DmaPriority::Priority0),
-            tx_descriptors,
             rx_descriptors,
+            tx_descriptors,
         );
         let slave_send = tx_buffer;
         let slave_receive = rx_buffer;

@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Introduce `DmaRxStreamBuf` (#2242)
 - Implement `embedded_hal_async::delay::DelayNs` for `TIMGx` timers (#2084)
 - Added `Efuse::read_bit` (#2259)
+- Limited SPI slave support for ESP32 (Modes 1 and 3 only) (#2278)
 - Added `Rtc::disable_rom_message_printing` (S3 and H2 only) (#2280)
 
 ### Changed

@@ -364,7 +364,8 @@ mod gdma;
 mod pdma;
 
 /// Kinds of interrupt to listen to.
-#[derive(EnumSetType)]
+#[derive(Debug, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaInterrupt {
     /// RX is done
     RxDone,
@@ -373,7 +374,8 @@ pub enum DmaInterrupt {
 }
 
 /// Types of interrupts emitted by the TX channel.
-#[derive(EnumSetType)]
+#[derive(Debug, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaTxInterrupt {
     /// Triggered when all data corresponding to a linked list (including
     /// multiple descriptors) have been sent via transmit channel.
@@ -394,7 +396,8 @@ pub enum DmaTxInterrupt {
 }
 
 /// Types of interrupts emitted by the RX channel.
-#[derive(EnumSetType)]
+#[derive(Debug, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaRxInterrupt {
     /// Triggered when the size of the buffer pointed by receive descriptors
     /// is smaller than the length of data to be received via receive channel.
