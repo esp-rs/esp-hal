@@ -116,14 +116,8 @@ pub fn build_documentation(
 
     let mut features = vec![chip.to_string()];
 
-    // future enhancement: see https://github.com/esp-rs/esp-hal/issues/2195
-    if matches!(package, Package::EspHal) {
-        features.push("ci".to_owned());
-
-        if [Chip::Esp32, Chip::Esp32s2, Chip::Esp32s3].contains(&chip) {
-            features.push("quad-psram".to_owned());
-        }
-    }
+    // Add chip-specific features for a package.
+    features.extend(apply_feature_rules(&chip, &package));
 
     let chip = Config::for_chip(&chip);
 
@@ -172,6 +166,28 @@ pub fn build_documentation(
     );
 
     Ok(docs_path)
+}
+
+fn apply_feature_rules(chip: &Chip, package: &Package) -> Vec<String> {
+    // If we need to activate a feature for documentation build for particular
+    // package for chip, add a matching by chip/package/both according to the
+    // existing example.
+    let rules: Vec<fn(&Chip, &Package) -> Vec<String>> = vec![|chip, pkg| {
+        if matches!(pkg, Package::EspHal) {
+            let mut features = vec!["ci".to_owned()];
+            if matches!(chip, Chip::Esp32 | Chip::Esp32s2 | Chip::Esp32s3) {
+                features.push("quad-psram".to_owned());
+            }
+            features
+        } else {
+            vec![]
+        }
+    }];
+
+    rules
+        .into_iter()
+        .flat_map(|rule| rule(chip, package))
+        .collect()
 }
 
 /// Load all examples at the given path, and parse their metadata.
