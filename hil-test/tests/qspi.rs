@@ -8,7 +8,7 @@
 #[cfg(pcnt)]
 use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
 use esp_hal::{
-    dma::{AnyDmaChannel, Channel, Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma::{Channel, Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{AnyPin, Input, Io, Level, NoPin, Output, Pull},
     prelude::*,
@@ -21,6 +21,14 @@ use esp_hal::{
     Blocking,
 };
 use hil_test as _;
+
+cfg_if::cfg_if! {
+    if #[cfg(pdma)] {
+        use esp_hal::dma::Spi2DmaChannel as DmaChannel0;
+    } else {
+        use esp_hal::dma::DmaChannel0;
+    }
+}
 
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
@@ -36,7 +44,7 @@ struct Context {
     spi: esp_hal::peripherals::SPI2,
     #[cfg(pcnt)]
     pcnt: esp_hal::peripherals::PCNT,
-    dma_channel: Channel<'static, AnyDmaChannel, Blocking>,
+    dma_channel: Channel<'static, DmaChannel0, Blocking>,
     gpios: [AnyPin; 3],
 }
 
