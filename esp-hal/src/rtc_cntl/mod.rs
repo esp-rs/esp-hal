@@ -409,7 +409,7 @@ impl<'d> Rtc<'d> {
         let rtc_cntl = unsafe { &*LP_AON::ptr() };
         rtc_cntl
             .store4()
-            .modify(|r, w| unsafe { w.bits(r.bits() & 1) });
+            .modify(|r, w| unsafe { w.bits(r.bits() | 1) });
     }
 }
 impl<'d> crate::private::Sealed for Rtc<'d> {}
