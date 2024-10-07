@@ -80,14 +80,24 @@ fn main() -> ! {
     // received.
     let mut can = twai_config.start();
 
-    loop {
+    if IS_FIRST_SENDER {
         // Send a frame to the other ESP
         // Use `new_self_reception` if you want to use self-testing.
         let frame = EspTwaiFrame::new(StandardId::ZERO, &[1, 2, 3]).unwrap();
-        println!("Sending a frame");
         block!(can.transmit(&frame)).unwrap();
         println!("Sent a frame");
+    }
 
-        Delay::new().delay_millis(500u32);
+    let delay = Delay::new();
+    loop {
+        // Wait for a frame to be received.
+        let frame = block!(can.receive()).unwrap();
+
+        println!("Received a frame: {frame:?}");
+        delay.delay_millis(250);
+
+        // Transmit the frame back to the other ESP
+        block!(can.transmit(&frame)).unwrap();
+        println!("Sent a frame");
     }
 }
