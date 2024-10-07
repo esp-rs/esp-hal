@@ -1542,10 +1542,7 @@ pub trait DmaChannelExt: DmaChannel {
 
 #[doc(hidden)]
 pub trait DmaChannelConvert<DEG: DmaChannel>: DmaChannel {
-    // TODO: maybe document
-    #[doc(hidden)]
     fn degrade_rx(rx: Self::Rx) -> DEG::Rx;
-    #[doc(hidden)]
     fn degrade_tx(tx: Self::Tx) -> DEG::Tx;
 }
 
@@ -1641,6 +1638,7 @@ where
     }
 
     /// Return a less specific (degraded) version of this channel.
+    #[doc(hidden)]
     pub fn degrade<DEG: DmaChannel>(self) -> ChannelRx<'a, DEG>
     where
         CH: DmaChannelConvert<DEG>,
@@ -1858,6 +1856,7 @@ where
     }
 
     /// Return a less specific (degraded) version of this channel.
+    #[doc(hidden)]
     pub fn degrade<DEG: DmaChannel>(self) -> ChannelTx<'a, DEG>
     where
         CH: DmaChannelConvert<DEG>,
@@ -2137,6 +2136,7 @@ where
 {
     /// Return a less specific (degraded) version of this channel (both rx and
     /// tx).
+    #[doc(hidden)]
     pub fn degrade<DEG: DmaChannel>(self) -> Channel<'d, DEG, M>
     where
         CH: DmaChannelConvert<DEG>,

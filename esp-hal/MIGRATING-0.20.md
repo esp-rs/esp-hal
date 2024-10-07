@@ -339,7 +339,3 @@ A non-exhausitve list demonstrating this change:
 -SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>
 +SpiDma<'static, esp_hal::peripherals::SPI2, HalfDuplexMode, Blocking>
 ```
-
-You can now call `dma_channel.degrade()` to obtain a type-erased version of `Channel`. Note that
-on ESP32 and ESP32-S2, passing this channel to an incompatible peripheral (for example an
-I2S-specific DMA channel to SPI) will result in a panic.
