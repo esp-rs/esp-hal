@@ -244,6 +244,7 @@ impl embedded_can::Error for ErrorKind {
 
 /// Specifies in which mode the TWAI controller will operate.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum TwaiMode {
     /// Normal operating mode
     Normal,
@@ -256,6 +257,7 @@ pub enum TwaiMode {
 
 /// Standard 11-bit TWAI Identifier (`0..=0x7FF`).
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct StandardId(u16);
 
 impl StandardId {
@@ -321,6 +323,7 @@ impl From<embedded_can::StandardId> for StandardId {
 
 /// Extended 29-bit TWAI Identifier (`0..=1FFF_FFFF`).
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ExtendedId(u32);
 
 impl ExtendedId {
@@ -392,6 +395,7 @@ impl From<embedded_can::ExtendedId> for ExtendedId {
 
 /// A TWAI Identifier (standard or extended).
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Id {
     /// Standard 11-bit Identifier (`0..=0x7FF`).
     Standard(StandardId),
@@ -451,6 +455,7 @@ impl From<embedded_can::Id> for Id {
 
 /// Structure backing the embedded_hal_02::can::Frame/embedded_can::Frame trait.
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct EspTwaiFrame {
     id: Id,
     dlc: usize,
@@ -776,15 +781,14 @@ where
                 .modify(|r, w| unsafe { w.bits(r.bits() | 0x80) });
         }
 
-        let rx_pull;
-        if no_transceiver {
+        let rx_pull = if no_transceiver {
             tx_pin.set_to_open_drain_output(crate::private::Internal);
             tx_pin.pull_direction(Pull::Up, crate::private::Internal);
-            rx_pull = Pull::Up;
+            Pull::Up
         } else {
             tx_pin.set_to_push_pull_output(crate::private::Internal);
-            rx_pull = Pull::None;
-        }
+            Pull::None
+        };
         tx_pin.connect_peripheral_to_output(T::OUTPUT_SIGNAL, crate::private::Internal);
 
         // Setting up RX pin later allows us to use a single pin in tests.

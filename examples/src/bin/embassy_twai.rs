@@ -60,7 +60,8 @@ async fn receiver(
                 print_frame(&frame);
 
                 // Send a response
-                let frame = EspTwaiFrame::new(StandardId::new(1).unwrap(), &[4, 5, 6, 7, 8]).unwrap();
+                let frame =
+                    EspTwaiFrame::new(StandardId::new(1).unwrap(), &[4, 5, 6, 7, 8]).unwrap();
                 channel.send(frame).await;
             }
             Err(e) => {
