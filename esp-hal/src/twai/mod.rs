@@ -535,7 +535,7 @@ impl EspTwaiFrame {
             data,
             dlc,
             is_remote: false,
-            self_reception: true,
+            self_reception: false,
         }
     }
 }
@@ -1504,6 +1504,7 @@ pub trait Instance: crate::private::Sealed {
 
         let is_standard_format = data_0 & 0b1 << 7 == 0;
         let is_data_frame = data_0 & 0b1 << 6 == 0;
+        let self_reception = data_0 & 0b1 << 4 != 0;
         let dlc = data_0 & 0b1111;
 
         if dlc > 8 {
@@ -1541,11 +1542,12 @@ pub trait Instance: crate::private::Sealed {
             (id, register_block.data_5().as_ptr())
         };
 
-        let frame = if is_data_frame {
+        let mut frame = if is_data_frame {
             unsafe { EspTwaiFrame::new_from_data_registers(id, data_ptr, dlc) }
         } else {
             EspTwaiFrame::new_remote(id, dlc).unwrap()
         };
+        frame.self_reception = self_reception;
 
         // Release the packet we read from the FIFO, allowing the peripheral to prepare
         // the next packet.
