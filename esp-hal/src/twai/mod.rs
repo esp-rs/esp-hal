@@ -774,6 +774,8 @@ where
 
         if no_transceiver {
             tx_pin.set_to_open_drain_output(crate::private::Internal);
+            tx_pin.pull_direction(Pull::Up, crate::private::Internal);
+            rx_pin.pull_direction(Pull::Up, crate::private::Internal);
         } else {
             tx_pin.set_to_push_pull_output(crate::private::Internal);
         }
@@ -782,7 +784,7 @@ where
         // Setting up RX pin later allows us to use a single pin in tests.
         // `set_to_push_pull_output` disables input, here we re-enable it if rx_pin
         // uses the same GPIO.
-        rx_pin.init_input(Pull::None, crate::private::Internal);
+        // rx_pin.init_input(Pull::None, crate::private::Internal);
         rx_pin.connect_input_to_peripheral(T::INPUT_SIGNAL, crate::private::Internal);
 
         // Freeze REC by changing to LOM mode
@@ -847,13 +849,13 @@ where
                 // Enable /2 baudrate divider
                 T::register_block()
                     .int_ena()
-                    .modify(|r, w| unsafe { w.bits(r.bits() | 0x08) });
+                    .modify(|r, w| unsafe { w.bits(r.bits() | 0x10) });
                 prescaler = timing.baud_rate_prescaler / 2;
             } else {
                 // Disable /2 baudrate divider
                 T::register_block()
                     .int_ena()
-                    .modify(|r, w| unsafe { w.bits(r.bits() & !0xF7) });
+                    .modify(|r, w| unsafe { w.bits(r.bits() & !0xEF) });
             }
         }
 
@@ -1781,12 +1783,19 @@ mod asynch {
 
         let async_state = T::async_state();
 
+        log::info!("irq: {:?}", intr_status.bits());
         if tx_int_status.bit_is_set() {
+            log::info!("tx irq");
             async_state.tx_waker.wake();
         }
 
         if rx_int_status.bit_is_set() {
             let status = register_block.status().read();
+            log::info!(
+                "rx irq: {:?} {:?}",
+                status.bus_off_st().bit_is_set(),
+                status.miss_st().bit_is_set(),
+            );
 
             let rx_queue = &async_state.rx_queue;
 

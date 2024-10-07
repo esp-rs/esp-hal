@@ -17,7 +17,7 @@
 //! In case you want to use `self-testing`, get rid of everything related to the aforementioned `IS_FIRST_SENDER`
 //! and follow the advice in the comments related to this mode.
 
-//% CHIPS: esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
@@ -26,6 +26,7 @@ const IS_FIRST_SENDER: bool = true;
 
 use esp_backtrace as _;
 use esp_hal::{
+    delay::Delay,
     gpio::Io,
     prelude::*,
     twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId, TwaiMode},
@@ -39,11 +40,11 @@ fn main() -> ! {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let tx_pin = io.pins.gpio0;
-    let rx_pin = io.pins.gpio2;
+    let tx_pin = io.pins.gpio2;
+    let rx_pin = io.pins.gpio4;
 
     // The speed of the CAN bus.
-    const TWAI_BAUDRATE: twai::BaudRate = twai::BaudRate::B1000K;
+    const TWAI_BAUDRATE: twai::BaudRate = twai::BaudRate::B125K;
 
     // !!! Use `new` when using a transceiver. `new_no_transceiver` sets TX to open-drain
     // Self-testing also works using the regular `new` function.
@@ -74,24 +75,14 @@ fn main() -> ! {
     // received.
     let mut can = twai_config.start();
 
-    if IS_FIRST_SENDER {
+    loop {
         // Send a frame to the other ESP
         // Use `new_self_reception` if you want to use self-testing.
         let frame = EspTwaiFrame::new(StandardId::ZERO, &[1, 2, 3]).unwrap();
+        println!("Sending a frame");
         block!(can.transmit(&frame)).unwrap();
         println!("Sent a frame");
+
+        Delay::new().delay_millis(500u32);
     }
-
-    // Wait for a frame to be received.
-    let frame = block!(can.receive()).unwrap();
-
-    println!("Received a frame: {frame:?}");
-
-    if !IS_FIRST_SENDER {
-        // Transmit the frame back to the other ESP
-        block!(can.transmit(&frame)).unwrap();
-        println!("Sent a frame");
-    }
-
-    loop {}
 }

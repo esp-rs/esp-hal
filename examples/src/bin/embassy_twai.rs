@@ -82,6 +82,7 @@ async fn transmitter(
 
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
+    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
@@ -89,11 +90,11 @@ async fn main(spawner: Spawner) {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let can_tx_pin = io.pins.gpio0;
-    let can_rx_pin = io.pins.gpio2;
+    let can_tx_pin = io.pins.gpio2;
+    let can_rx_pin = io.pins.gpio3;
 
     // The speed of the CAN bus.
-    const CAN_BAUDRATE: twai::BaudRate = twai::BaudRate::B1000K;
+    const CAN_BAUDRATE: twai::BaudRate = twai::BaudRate::B125K;
 
     // !!! Use `new_async` when using a transceiver. `new_async_no_transceiver` sets TX to open-drain
 
@@ -114,7 +115,7 @@ async fn main(spawner: Spawner) {
     // these partial acceptance filters to exactly match. A filter that matches
     // standard ids of an even value.
     const FILTER: twai::filter::SingleStandardFilter =
-        twai::filter::SingleStandardFilter::new(b"xxxxxxxxxx0", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
+        twai::filter::SingleStandardFilter::new(b"xxxxxxxxxxx", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
     can_config.set_filter(FILTER);
 
     // Start the peripheral. This locks the configuration settings of the peripheral
@@ -135,7 +136,7 @@ async fn main(spawner: Spawner) {
     let channel = &*CHANNEL.init(Channel::new());
 
     spawner.spawn(receiver(rx, channel)).ok();
-    spawner.spawn(transmitter(tx, channel)).ok();
+    //spawner.spawn(transmitter(tx, channel)).ok();
 }
 
 fn print_frame(frame: &EspTwaiFrame) {
