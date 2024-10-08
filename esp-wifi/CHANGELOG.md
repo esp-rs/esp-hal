@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the `embedded-svc` traits and feature (#2235)
 - Removed the `log` feature from default features (#2253)
 - Removed the `enumset` feature (#2297)
+- Removed `esp_wifi::current_millis` (#2304)
 
 ## 0.9.1 - 2024-09-03
 

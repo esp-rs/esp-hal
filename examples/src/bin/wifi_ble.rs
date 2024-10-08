@@ -28,6 +28,7 @@ use esp_hal::{
     gpio::{Input, Io, Pull},
     prelude::*,
     rng::Rng,
+    time,
     timer::timg::TimerGroup,
 };
 use esp_println::println;
@@ -68,9 +69,10 @@ fn main() -> ! {
 
     let mut bluetooth = peripherals.BT;
 
+    let now = || time::now().duration_since_epoch().to_millis();
     loop {
         let connector = BleConnector::new(&init, &mut bluetooth);
-        let hci = HciConnector::new(connector, esp_wifi::current_millis);
+        let hci = HciConnector::new(connector, now);
         let mut ble = Ble::new(&hci);
 
         println!("{:?}", ble.init());
