@@ -554,12 +554,12 @@ where
     /// All pins are optional. Setup these pins using
     /// [with_pins](Self::with_pins) or individual methods for each pin.
     pub fn new(
-        spi: impl Peripheral<P = T> + 'd,
+        spi: impl Peripheral<P = impl Into<T> + 'd> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
     ) -> Spi<'d, FullDuplexMode, T> {
         crate::into_ref!(spi);
-        Self::new_internal(spi, frequency, mode)
+        Self::new_internal(spi.map_into(), frequency, mode)
     }
 
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
@@ -653,12 +653,12 @@ where
     /// All pins are optional. Setup these pins using
     /// [with_pins](Self::with_pins) or individual methods for each pin.
     pub fn new_half_duplex(
-        spi: impl Peripheral<P = T> + 'd,
+        spi: impl Peripheral<P = impl Into<T> + 'd> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
     ) -> Spi<'d, HalfDuplexMode, T> {
         crate::into_ref!(spi);
-        Self::new_internal(spi, frequency, mode)
+        Self::new_internal(spi.map_into(), frequency, mode)
     }
 
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance in
