@@ -855,14 +855,18 @@ where
 
         #[cfg(esp32)]
         {
+            // From <https://github.com/espressif/esp-idf/blob/6e5a178b3120dced7fa5c29c655cc22ea182df3d/components/soc/esp32/register/soc/twai_struct.h#L79>
+            // and <https://github.com/espressif/esp-idf/blob/6e5a178b3120dced7fa5c29c655cc22ea182df3d/components/hal/esp32/include/hal/twai_ll.h#L528-L534>:
             if timing.baud_rate_prescaler > 128 {
-                // Enable /2 baudrate divider
+                // Enable /2 baudrate divider by setting `brp_div`.
+                // `brp_div` is not an interrupt, it will prescale BRP by 2. Only available on
+                // ESP32 Revision 2 or later. Reserved otherwise.
                 T::register_block()
                     .int_ena()
                     .modify(|r, w| unsafe { w.bits(r.bits() | 0x10) });
                 prescaler = timing.baud_rate_prescaler / 2;
             } else {
-                // Disable /2 baudrate divider
+                // Disable /2 baudrate divider by clearing brp_div.
                 T::register_block()
                     .int_ena()
                     .modify(|r, w| unsafe { w.bits(r.bits() & !0x10) });
