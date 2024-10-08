@@ -119,3 +119,13 @@ You can use `esp_hal::time::now()` instead.
 - let now = esp_wifi::current_millis();
 + let now = time::now().duration_since_epoch().to_millis();
 ```
+
+## `esp-wifi` no longer selects the device feature of `esp-hal-embassy`
+
+You'll need to explicitly select your device in your `Cargo.toml`, in case you've been
+previously relying on `esp-wifi` to do this for you.
+
+```diff
+-esp-hal-embassy = "0.3.0"
++esp-hal-embassy = { version = "0.3.0", features = ["esp32s3"] }
+```

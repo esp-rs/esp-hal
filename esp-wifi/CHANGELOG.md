@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed the `wifi-logs` feature to `sys-logs` for consistency (#2183)
 - Updated drivers to v5.3.1 (#2239)
 - Rename `initialize` to `init` (#2295)
+- `esp-wifi` no longer enables features on `esp-hal-embassy` (like `esp-hal-embassy/esp32c6`) (#2306)
 
 ### Fixed
 
