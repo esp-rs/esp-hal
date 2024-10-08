@@ -49,7 +49,7 @@ fn main() -> ! {
     let timer0: AnyTimer = timg0.timer0.into();
     let timer = PeriodicTimer::new(timer0);
 
-    let init = initialize(
+    let init = init(
         EspWifiInitFor::Wifi,
         timer,
         Rng::new(peripherals.RNG),

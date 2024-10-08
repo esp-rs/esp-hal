@@ -5,6 +5,7 @@ edition = "2021"
 rust-version  = "1.79.0"
 authors = ["The ESP-RS team"]
 description = "A WiFi, Bluetooth and ESP-NOW driver for use with Espressif chips and bare-metal Rust"
+documentation = "https://docs.esp-rs.org/esp-hal/"
 repository = "https://github.com/esp-rs/esp-hal"
 license = "MIT OR Apache-2.0"
 

@@ -125,6 +125,19 @@ pub fn build_documentation(
         }
     }
 
+    if matches!(package, Package::EspWifi) {
+        features.push("utils".to_owned());
+        features.push("wifi".to_owned());
+        features.push("wifi-default".to_owned());
+        features.push("ble".to_owned());
+        features.push("coex".to_owned());
+        features.push("esp-now".to_owned());
+        features.push("sniffer".to_owned());
+        features.push("async".to_owned());
+        features.push("embassy-net".to_owned());
+        features.push("esp-hal/default".to_owned());
+    }
+
     // Build up an array of command-line arguments to pass to `cargo`:
     let builder = CargoArgsBuilder::default()
         .subcommand("doc")
