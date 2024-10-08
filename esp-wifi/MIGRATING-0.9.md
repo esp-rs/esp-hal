@@ -2,7 +2,7 @@
 
 ## Initialization
 
-You no longer have to set up clocks and pass them to `esp_wifi::initialize`.
+You no longer have to set up clocks and pass them to `esp_wifi::init` and the `esp_wifi:initialize` function is renamed to `esp_wifi::init`.
 
 ```diff
  use esp_hal::{
@@ -25,7 +25,8 @@ You no longer have to set up clocks and pass them to `esp_wifi::initialize`.
 
      let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-     let init = initialize(
+-     let init = initialize(
++     let init = init(
          EspWifiInitFor::Wifi,
          timg0.timer0,
          Rng::new(peripherals.RNG),
