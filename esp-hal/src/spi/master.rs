@@ -951,6 +951,13 @@ mod dma {
         Mode,
     };
 
+    fn empty_rx_buf() -> DmaRxBuf {
+        unwrap!(DmaRxBuf::new(&mut [], &mut []))
+    }
+    fn empty_tx_buf() -> DmaTxBuf {
+        unwrap!(DmaTxBuf::new(&mut [], &mut []))
+    }
+
     /// A DMA capable SPI instance.
     ///
     /// Using `SpiDma` is not recommended unless you wish
@@ -1126,42 +1133,9 @@ mod dma {
         /// The caller must ensure to not access the buffer contents while the
         /// transfer is in progress. Moving the buffer itself is allowed.
         #[cfg_attr(place_spi_driver_in_ram, ram)]
-        unsafe fn start_write_bytes_dma<TX: DmaTxBuffer>(
-            &mut self,
-            buffer: &mut TX,
-            full_duplex: bool,
-        ) -> Result<(), Error> {
-            self.tx_transfer_in_progress = buffer.length() > 0;
-            unsafe {
-                self.spi
-                    .start_write_bytes_dma(buffer, &mut self.channel.tx, full_duplex)
-            }
-        }
-
-        /// # Safety:
-        ///
-        /// The caller must ensure to not access the buffer contents while the
-        /// transfer is in progress. Moving the buffer itself is allowed.
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
-        unsafe fn start_read_bytes_dma<RX: DmaRxBuffer>(
-            &mut self,
-            buffer: &mut RX,
-            full_duplex: bool,
-        ) -> Result<(), Error> {
-            self.rx_transfer_in_progress = buffer.length() > 0;
-            unsafe {
-                self.spi
-                    .start_read_bytes_dma(buffer, &mut self.channel.rx, full_duplex)
-            }
-        }
-
-        /// # Safety:
-        ///
-        /// The caller must ensure to not access the buffer contents while the
-        /// transfer is in progress. Moving the buffer itself is allowed.
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
         unsafe fn start_transfer_dma<RX: DmaRxBuffer, TX: DmaTxBuffer>(
             &mut self,
+            full_duplex: bool,
             rx_buffer: &mut RX,
             tx_buffer: &mut TX,
         ) -> Result<(), Error> {
@@ -1169,6 +1143,7 @@ mod dma {
             self.tx_transfer_in_progress = tx_buffer.length() > 0;
             unsafe {
                 self.spi.start_transfer_dma(
+                    full_duplex,
                     rx_buffer,
                     tx_buffer,
                     &mut self.channel.rx,
@@ -1203,10 +1178,12 @@ mod dma {
 
             self.tx_transfer_in_progress = true;
             unsafe {
-                self.spi.start_write_bytes_dma(
-                    &mut self.address_buffer,
-                    &mut self.channel.tx,
+                self.spi.start_transfer_dma(
                     false,
+                    &mut empty_rx_buf(),
+                    &mut self.address_buffer,
+                    &mut self.channel.rx,
+                    &mut self.channel.tx,
                 )
             }
         }
@@ -1387,7 +1364,13 @@ mod dma {
                 return Err(Error::MaxDmaTransferSizeExceeded);
             }
 
-            self.start_write_bytes_dma(buffer, true)
+            self.spi.start_transfer_dma(
+                true,
+                &mut empty_rx_buf(),
+                buffer,
+                &mut self.channel.rx,
+                &mut self.channel.tx,
+            )
         }
 
         /// Perform a DMA write.
@@ -1420,7 +1403,13 @@ mod dma {
                 return Err(Error::MaxDmaTransferSizeExceeded);
             }
 
-            self.start_read_bytes_dma(buffer, true)
+            self.spi.start_transfer_dma(
+                false,
+                buffer,
+                &mut empty_tx_buf(),
+                &mut self.channel.rx,
+                &mut self.channel.tx,
+            )
         }
 
         /// Perform a DMA read.
@@ -1458,7 +1447,7 @@ mod dma {
                 return Err(Error::MaxDmaTransferSizeExceeded);
             }
 
-            self.start_transfer_dma(rx_buffer, tx_buffer)
+            self.start_transfer_dma(true, rx_buffer, tx_buffer)
         }
 
         /// Perform a DMA transfer
@@ -1515,7 +1504,13 @@ mod dma {
                 data_mode,
             );
 
-            self.start_read_bytes_dma(buffer, false)
+            self.spi.start_transfer_dma(
+                false,
+                buffer,
+                &mut empty_tx_buf(),
+                &mut self.channel.rx,
+                &mut self.channel.tx,
+            )
         }
 
         /// Perform a half-duplex read operation using DMA.
@@ -1576,7 +1571,13 @@ mod dma {
                 data_mode,
             );
 
-            self.start_write_bytes_dma(buffer, false)
+            self.spi.start_transfer_dma(
+                false,
+                &mut empty_rx_buf(),
+                buffer,
+                &mut self.channel.rx,
+                &mut self.channel.tx,
+            )
         }
 
         /// Perform a half-duplex write operation using DMA.
@@ -1704,7 +1705,11 @@ mod dma {
             for chunk in words.chunks_mut(self.rx_buf.capacity()) {
                 self.rx_buf.set_length(chunk.len());
 
-                unsafe { self.spi_dma.start_dma_read(&mut self.rx_buf)? };
+                unsafe {
+                    self.spi_dma
+                        .start_dma_transfer(&mut self.rx_buf, &mut empty_tx_buf())?;
+                }
+
                 self.wait_for_idle();
 
                 let bytes_read = self.rx_buf.read_received_data(chunk);
@@ -1721,8 +1726,10 @@ mod dma {
                 self.tx_buf.fill(chunk);
 
                 unsafe {
-                    self.spi_dma.start_dma_write(&mut self.tx_buf)?;
+                    self.spi_dma
+                        .start_dma_transfer(&mut empty_rx_buf(), &mut self.tx_buf)?;
                 }
+
                 self.wait_for_idle();
             }
 
@@ -1945,9 +1952,8 @@ mod dma {
 
                     let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
 
-                    unsafe {
-                        spi.start_dma_read(&mut self.rx_buf)?;
-                    }
+                    unsafe { spi.start_dma_transfer(&mut self.rx_buf, &mut empty_tx_buf())? };
+
                     spi.wait_for_idle_async().await;
 
                     let bytes_read = self.rx_buf.read_received_data(chunk);
@@ -1969,9 +1975,8 @@ mod dma {
                 for chunk in words.chunks(chunk_size) {
                     self.tx_buf.fill(chunk);
 
-                    unsafe {
-                        spi.start_dma_write(&mut self.tx_buf)?;
-                    }
+                    unsafe { spi.start_dma_transfer(&mut empty_rx_buf(), &mut self.tx_buf)? };
+
                     spi.wait_for_idle_async().await;
                 }
                 spi.defuse();
@@ -2215,9 +2220,10 @@ mod ehal1 {
 
 #[doc(hidden)]
 pub trait InstanceDma: Instance + DmaEligible {
-    #[allow(clippy::too_many_arguments)]
+    #[cfg_attr(place_spi_driver_in_ram, ram)]
     unsafe fn start_transfer_dma<RX: Rx, TX: Tx>(
         &mut self,
+        _full_duplex: bool,
         rx_buffer: &mut impl DmaRxBuffer,
         tx_buffer: &mut impl DmaTxBuffer,
         rx: &mut RX,
@@ -2232,101 +2238,39 @@ pub trait InstanceDma: Instance + DmaEligible {
             reg_block.dma_in_link().write(|w| w.bits(0));
         }
 
-        self.configure_datalen(rx_buffer.length(), tx_buffer.length());
+        let rx_len = rx_buffer.length();
+        let tx_len = tx_buffer.length();
+        self.configure_datalen(rx_len, tx_len);
 
         // re-enable the MISO and MOSI
         reg_block
             .user()
-            .modify(|_, w| w.usr_miso().bit(true).usr_mosi().bit(true));
+            .modify(|_, w| w.usr_miso().bit(rx_len > 0).usr_mosi().bit(tx_len > 0));
 
         self.enable_dma();
 
-        rx.prepare_transfer(self.dma_peripheral(), rx_buffer)
-            .and_then(|_| rx.start_transfer())?;
-        tx.prepare_transfer(self.dma_peripheral(), tx_buffer)
-            .and_then(|_| tx.start_transfer())?;
-
-        #[cfg(gdma)]
-        self.reset_dma();
-
-        self.start_operation();
-
-        Ok(())
-    }
-
-    #[cfg_attr(place_spi_driver_in_ram, ram)]
-    unsafe fn start_write_bytes_dma<TX: Tx>(
-        &mut self,
-        buffer: &mut impl DmaTxBuffer,
-        tx: &mut TX,
-        full_duplex: bool,
-    ) -> Result<(), Error> {
-        let reg_block = self.register_block();
-        self.configure_datalen(0, buffer.length());
-
-        // disable MISO and re-enable MOSI (DON'T do it for half-duplex)
-        if full_duplex {
-            reg_block
-                .user()
-                .modify(|_, w| w.usr_miso().bit(false).usr_mosi().bit(true));
-        }
-
-        #[cfg(esp32)]
-        {
-            // see https://github.com/espressif/esp-idf/commit/366e4397e9dae9d93fe69ea9d389b5743295886f
-            // see https://github.com/espressif/esp-idf/commit/0c3653b1fd7151001143451d4aa95dbf15ee8506
-            if full_duplex {
-                reg_block
-                    .dma_in_link()
-                    .modify(|_, w| unsafe { w.inlink_addr().bits(0) });
-                reg_block
-                    .dma_in_link()
-                    .modify(|_, w| w.inlink_start().set_bit());
+        if rx_len > 0 {
+            rx.prepare_transfer(self.dma_peripheral(), rx_buffer)
+                .and_then(|_| rx.start_transfer())?;
+        } else {
+            #[cfg(esp32)]
+            {
+                // see https://github.com/espressif/esp-idf/commit/366e4397e9dae9d93fe69ea9d389b5743295886f
+                // see https://github.com/espressif/esp-idf/commit/0c3653b1fd7151001143451d4aa95dbf15ee8506
+                if _full_duplex {
+                    reg_block
+                        .dma_in_link()
+                        .modify(|_, w| unsafe { w.inlink_addr().bits(0) });
+                    reg_block
+                        .dma_in_link()
+                        .modify(|_, w| w.inlink_start().set_bit());
+                }
             }
         }
-
-        self.enable_dma();
-
-        tx.prepare_transfer(self.dma_peripheral(), buffer)
-            .and_then(|_| tx.start_transfer())?;
-
-        #[cfg(gdma)]
-        self.reset_dma();
-
-        self.start_operation();
-
-        Ok(())
-    }
-
-    #[cfg_attr(place_spi_driver_in_ram, ram)]
-    unsafe fn start_read_bytes_dma<RX: Rx, BUF: DmaRxBuffer>(
-        &mut self,
-        buffer: &mut BUF,
-        rx: &mut RX,
-        full_duplex: bool,
-    ) -> Result<(), Error> {
-        let reg_block = self.register_block();
-
-        #[cfg(esp32s2)]
-        {
-            // without this a read after a write will fail
-            reg_block.dma_out_link().write(|w| w.bits(0));
-            reg_block.dma_in_link().write(|w| w.bits(0));
+        if tx_len > 0 {
+            tx.prepare_transfer(self.dma_peripheral(), tx_buffer)
+                .and_then(|_| tx.start_transfer())?;
         }
-
-        self.configure_datalen(buffer.length(), 0);
-
-        // re-enable MISO and disable MOSI (DON'T do it for half-duplex)
-        if full_duplex {
-            reg_block
-                .user()
-                .modify(|_, w| w.usr_miso().bit(true).usr_mosi().bit(false));
-        }
-
-        self.enable_dma();
-
-        rx.prepare_transfer(self.dma_peripheral(), buffer)
-            .and_then(|_| rx.start_transfer())?;
 
         #[cfg(gdma)]
         self.reset_dma();

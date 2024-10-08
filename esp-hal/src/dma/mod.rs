@@ -1076,11 +1076,13 @@ impl<'a> DescriptorSet<'a> {
     /// Creates a new `DescriptorSet` from a slice of descriptors and associates
     /// them with the given buffer.
     fn new(descriptors: &'a mut [DmaDescriptor]) -> Result<Self, DmaBufError> {
-        if !is_slice_in_dram(descriptors) {
-            return Err(DmaBufError::UnsupportedMemoryRegion);
-        }
+        if !descriptors.is_empty() {
+            if !is_slice_in_dram(descriptors) {
+                return Err(DmaBufError::UnsupportedMemoryRegion);
+            }
 
-        descriptors.fill(DmaDescriptor::EMPTY);
+            descriptors.fill(DmaDescriptor::EMPTY);
+        }
 
         Ok(unsafe { Self::new_unchecked(descriptors) })
     }
