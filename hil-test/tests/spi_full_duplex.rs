@@ -35,7 +35,7 @@ cfg_if::cfg_if! {
 }
 
 struct Context {
-    spi: Spi<'static, SPI2, FullDuplexMode>,
+    spi: Spi<'static, FullDuplexMode, SPI2>,
     dma_channel: DmaChannelCreator,
     // Reuse the really large buffer so we don't run out of DRAM with many tests
     rx_buffer: &'static mut [u8],
