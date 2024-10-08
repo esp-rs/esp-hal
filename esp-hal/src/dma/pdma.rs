@@ -329,10 +329,6 @@ macro_rules! ImplSpiChannel {
                 type Tx = SpiDmaTxChannelImpl<Self>;
             }
 
-            impl PeripheralDmaChannel for [<Spi $num DmaChannel>] {
-                type P = crate::peripherals::[<SPI $num>];
-            }
-
             impl DmaChannelExt for [<Spi $num DmaChannel>] {
                 fn get_rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
                     SpiDmaRxChannelImpl(Self {})
@@ -744,10 +740,6 @@ macro_rules! ImplI2sChannel {
             impl DmaChannel for [<I2s $num DmaChannel>] {
                 type Rx = I2sDmaRxChannelImpl<Self>;
                 type Tx = I2sDmaTxChannelImpl<Self>;
-            }
-
-            impl PeripheralDmaChannel for [<I2s $num DmaChannel>] {
-                type P = crate::peripherals::[<I2S $num>];
             }
 
             impl DmaChannelExt for [<I2s $num DmaChannel>] {

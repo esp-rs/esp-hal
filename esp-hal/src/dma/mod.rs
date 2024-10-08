@@ -1524,13 +1524,6 @@ pub trait DmaChannel: crate::private::Sealed {
     type Tx: TxRegisterAccess + InterruptAccess<DmaTxInterrupt>;
 }
 
-/// A description of a DMA Channel that can be used with a peripheral.
-#[cfg(pdma)]
-pub trait PeripheralDmaChannel: DmaChannel {
-    /// A suitable peripheral for this DMA channel.
-    type P: PeripheralMarker;
-}
-
 #[doc(hidden)]
 pub trait DmaChannelExt: DmaChannel {
     fn get_rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt>;
