@@ -545,6 +545,20 @@ where
     }
 }
 
+impl<'d> Spi<'d, FullDuplexMode> {
+    /// Constructs an SPI instance in 8bit dataframe mode.
+    ///
+    /// All pins are optional. Setup these pins using
+    /// [with_pins](Self::with_pins) or individual methods for each pin.
+    pub fn new(
+        spi: impl Peripheral<P = impl Into<AnySpi> + 'd> + 'd,
+        frequency: HertzU32,
+        mode: SpiMode,
+    ) -> Spi<'d, FullDuplexMode> {
+        Self::new_typed(spi, frequency, mode)
+    }
+}
+
 impl<'d, T> Spi<'d, FullDuplexMode, T>
 where
     T: Instance,
@@ -553,7 +567,7 @@ where
     ///
     /// All pins are optional. Setup these pins using
     /// [with_pins](Self::with_pins) or individual methods for each pin.
-    pub fn new(
+    pub fn new_typed(
         spi: impl Peripheral<P = impl Into<T> + 'd> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
@@ -644,6 +658,20 @@ where
     }
 }
 
+impl<'d> Spi<'d, HalfDuplexMode> {
+    /// Constructs an SPI instance in half-duplex mode.
+    ///
+    /// All pins are optional. Setup these pins using
+    /// [with_pins](Self::with_pins) or individual methods for each pin.
+    pub fn new_half_duplex(
+        spi: impl Peripheral<P = impl Into<AnySpi> + 'd> + 'd,
+        frequency: HertzU32,
+        mode: SpiMode,
+    ) -> Spi<'d, HalfDuplexMode> {
+        Self::new_half_duplex_typed(spi, frequency, mode)
+    }
+}
+
 impl<'d, T> Spi<'d, HalfDuplexMode, T>
 where
     T: ExtendedInstance,
@@ -652,7 +680,7 @@ where
     ///
     /// All pins are optional. Setup these pins using
     /// [with_pins](Self::with_pins) or individual methods for each pin.
-    pub fn new_half_duplex(
+    pub fn new_half_duplex_typed(
         spi: impl Peripheral<P = impl Into<T> + 'd> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
