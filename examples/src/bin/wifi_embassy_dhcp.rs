@@ -21,7 +21,7 @@ use esp_backtrace as _;
 use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{
-    initialize,
+    init,
     wifi::{
         ClientConfiguration,
         Configuration,

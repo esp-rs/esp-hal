@@ -31,7 +31,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_wifi::{ble::controller::BleConnector, initialize, EspWifiInitFor};
+use esp_wifi::{ble::controller::BleConnector, init, EspWifiInitFor};
 
 #[entry]
 fn main() -> ! {

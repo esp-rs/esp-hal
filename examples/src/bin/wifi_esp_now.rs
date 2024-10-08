@@ -15,7 +15,7 @@ use esp_println::println;
 use esp_wifi::{
     current_millis,
     esp_now::{PeerInfo, BROADCAST_ADDRESS},
-    initialize,
+    init,
     EspWifiInitFor,
 };
 

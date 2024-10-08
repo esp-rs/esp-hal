@@ -32,7 +32,7 @@ use esp_println::{print, println};
 use esp_wifi::{
     ble::controller::BleConnector,
     current_millis,
-    initialize,
+    init,
     wifi::{utils::create_network_interface, ClientConfiguration, Configuration, WifiStaDevice},
     wifi_interface::WifiStack,
     EspWifiInitFor,

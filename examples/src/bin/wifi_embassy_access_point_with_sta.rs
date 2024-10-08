@@ -33,7 +33,7 @@ use esp_backtrace as _;
 use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_wifi::{
-    initialize,
+    init,
     wifi::{
         AccessPointConfiguration,
         ClientConfiguration,
