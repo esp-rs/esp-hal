@@ -78,6 +78,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
     private,
+    spi::AnySpi,
     system::PeripheralClockControl,
 };
 
@@ -86,7 +87,7 @@ const MAX_DMA_SIZE: usize = 32768 - 32;
 /// SPI peripheral driver.
 ///
 /// See the [module-level documentation][self] for more details.
-pub struct Spi<'d, M, T> {
+pub struct Spi<'d, M, T = AnySpi> {
     spi: PeripheralRef<'d, T>,
     #[allow(dead_code)]
     data_mode: SpiMode,
@@ -192,7 +193,7 @@ pub mod dma {
     }
 
     /// A DMA capable SPI instance.
-    pub struct SpiDma<'d, DmaMode, T>
+    pub struct SpiDma<'d, DmaMode, T = AnySpi>
     where
         T: InstanceDma,
         DmaMode: Mode,
@@ -566,8 +567,6 @@ pub trait Instance: private::Sealed + PeripheralMarker {
         PeripheralClockControl::enable(self.peripheral());
     }
 
-    fn spi_num(&self) -> u8;
-
     #[cfg(esp32)]
     fn prepare_length_and_lines(&self, rx_len: usize, tx_len: usize) {
         let reg_block = self.register_block();
@@ -729,11 +728,6 @@ impl Instance for crate::peripherals::SPI2 {
     }
 
     #[inline(always)]
-    fn spi_num(&self) -> u8 {
-        2
-    }
-
-    #[inline(always)]
     fn sclk_signal(&self) -> InputSignal {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
@@ -786,11 +780,6 @@ impl Instance for crate::peripherals::SPI3 {
     }
 
     #[inline(always)]
-    fn spi_num(&self) -> u8 {
-        3
-    }
-
-    #[inline(always)]
     fn sclk_signal(&self) -> InputSignal {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
@@ -834,3 +823,21 @@ impl Instance for crate::peripherals::SPI3 {
         }
     }
 }
+
+impl Instance for super::AnySpi {
+    delegate::delegate! {
+        to match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi,
+            #[cfg(spi3)]
+            super::AnySpiInner::Spi3(spi) => spi,
+        } {
+            fn register_block(&self) -> &RegisterBlock;
+            fn sclk_signal(&self) -> InputSignal;
+            fn mosi_signal(&self) -> InputSignal;
+            fn miso_signal(&self) -> OutputSignal;
+            fn cs_signal(&self) -> InputSignal;
+        }
+    }
+}
+
+impl InstanceDma for super::AnySpi {}
