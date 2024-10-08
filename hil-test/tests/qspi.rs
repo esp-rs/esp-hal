@@ -205,9 +205,7 @@ mod tests {
             }
         }
 
-        let dma_channel = dma_channel
-            .configure(false, DmaPriority::Priority0)
-            .degrade();
+        let dma_channel = dma_channel.configure(false, DmaPriority::Priority0);
 
         Context {
             spi: peripherals.SPI2,
