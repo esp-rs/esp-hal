@@ -2236,7 +2236,7 @@ pub trait InstanceDma: Instance + DmaEligible {
         let tx_len = tx_buffer.length();
         self.configure_datalen(rx_len, tx_len);
 
-        // re-enable the MISO and MOSI
+        // enable the MISO and MOSI if needed
         reg_block
             .user()
             .modify(|_, w| w.usr_miso().bit(rx_len > 0).usr_mosi().bit(tx_len > 0));
