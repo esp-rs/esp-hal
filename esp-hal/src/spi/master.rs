@@ -2295,36 +2295,24 @@ pub trait InstanceDma: Instance + DmaEligible {
     }
 
     fn reset_dma(&self) {
-        #[cfg(pdma)]
-        {
-            let reg_block = self.register_block();
+        fn set_reset_bit(reg_block: &RegisterBlock, bit: bool) {
+            #[cfg(pdma)]
             reg_block.dma_conf().modify(|_, w| {
-                w.out_rst().set_bit();
-                w.in_rst().set_bit();
-                w.ahbm_fifo_rst().set_bit();
-                w.ahbm_rst().set_bit()
+                w.out_rst().bit(bit);
+                w.in_rst().bit(bit);
+                w.ahbm_fifo_rst().bit(bit);
+                w.ahbm_rst().bit(bit)
             });
+            #[cfg(gdma)]
             reg_block.dma_conf().modify(|_, w| {
-                w.out_rst().clear_bit();
-                w.in_rst().clear_bit();
-                w.ahbm_fifo_rst().clear_bit();
-                w.ahbm_rst().clear_bit()
-            });
-        }
-        #[cfg(gdma)]
-        {
-            let reg_block = self.register_block();
-            reg_block.dma_conf().modify(|_, w| {
-                w.rx_afifo_rst().set_bit();
-                w.buf_afifo_rst().set_bit();
-                w.dma_afifo_rst().set_bit()
-            });
-            reg_block.dma_conf().modify(|_, w| {
-                w.rx_afifo_rst().clear_bit();
-                w.buf_afifo_rst().clear_bit();
-                w.dma_afifo_rst().clear_bit()
+                w.rx_afifo_rst().bit(bit);
+                w.buf_afifo_rst().bit(bit);
+                w.dma_afifo_rst().bit(bit)
             });
         }
+        let reg_block = self.register_block();
+        set_reset_bit(reg_block, true);
+        set_reset_bit(reg_block, false);
         self.clear_dma_interrupts();
     }
 
