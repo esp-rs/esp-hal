@@ -15,7 +15,7 @@ features = ["spin"]
 
 [dependencies]
 bare-metal        = "1.0.0"
-document-features = "0.2.8"
+document-features = "0.2.10"
 mutex-trait       = "0.2.0"
 spin              = { version = "0.9.8", optional = true }
 

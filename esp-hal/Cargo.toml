@@ -16,7 +16,7 @@ rustdoc-args   = ["--cfg", "docsrs"]
 
 [dependencies]
 bitflags                 = "2.6.0"
-bytemuck                 = "1.17.1"
+bytemuck                 = "1.18.0"
 bitfield                 = "0.16.1"
 cfg-if                   = "1.0.0"
 chrono                   = { version = "0.4.38", default-features = false }
@@ -42,7 +42,7 @@ fugit                    = "0.3.7"
 log                      = { version = "0.4.22", optional = true }
 nb                       = "1.1.0"
 paste                    = "1.0.15"
-portable-atomic          = { version = "1.7.0", default-features = false }
+portable-atomic          = { version = "1.9.0", default-features = false }
 procmacros               = { version = "0.13.0", features = ["enum-dispatch", "interrupt", "ram"], package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 riscv                    = { version = "0.11.1", optional = true }
 strum                    = { version = "0.26.3", default-features = false, features = ["derive"] }
@@ -75,7 +75,7 @@ cfg-if       = "1.0.0"
 esp-build    = { version = "0.1.0", path = "../esp-build" }
 esp-metadata = { version = "0.3.0", path = "../esp-metadata" }
 esp-config   = { version = "0.1.0", path = "../esp-config", features = ["build"] }
-serde        = { version = "1.0.209", features = ["derive"] }
+serde        = { version = "1.0.210", features = ["derive"] }
 
 [features]
 default = []
