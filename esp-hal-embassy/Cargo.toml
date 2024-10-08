@@ -20,7 +20,7 @@ embassy-time-driver = { version = "0.1.0", features = [ "tick-hz-1_000_000" ] }
 esp-hal             = { version = "0.20.0", path = "../esp-hal" }
 log                 = { version = "0.4.22", optional = true }
 macros              = { version = "0.13.0", features = ["embassy"], package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
-portable-atomic     = "1.7.0"
+portable-atomic     = "1.9.0"
 static_cell         = "2.1.0"
 
 [build-dependencies]
