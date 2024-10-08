@@ -105,7 +105,7 @@ where
         MISO: PeripheralOutput,
         CS: PeripheralInput,
     >(
-        spi: impl Peripheral<P = T> + 'd,
+        spi: impl Peripheral<P = impl Instance + Into<T> + 'd> + 'd,
         sclk: impl Peripheral<P = SCK> + 'd,
         mosi: impl Peripheral<P = MOSI> + 'd,
         miso: impl Peripheral<P = MISO> + 'd,
@@ -126,7 +126,7 @@ where
         cs.enable_input(true, private::Internal);
         cs.connect_input_to_peripheral(spi.cs_signal(), private::Internal);
 
-        Self::new_internal(spi, mode)
+        Self::new_internal(spi.map_into(), mode)
     }
 
     pub(crate) fn new_internal(
