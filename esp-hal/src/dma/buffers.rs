@@ -914,7 +914,7 @@ impl DmaRxStreamBufView {
     }
 }
 
-static mut EMPTY: &mut [DmaDescriptor] = &mut [DmaDescriptor::EMPTY];
+static mut EMPTY: [DmaDescriptor; 1] = [DmaDescriptor::EMPTY];
 
 /// An empty buffer that can be used when you don't need to transfer any data.
 pub struct EmptyBuf;
