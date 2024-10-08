@@ -137,8 +137,6 @@ smoltcp = ["dep:smoltcp"]
 ## Provide utilities for smoltcp initialization. Adds smoltcp dependency
 utils = ["smoltcp"]
 
-enumset = []
-
 ## Enable WiFi support
 wifi = ["dep:enumset", "dep:no-std-net"]
 
