@@ -26,7 +26,7 @@ cfg_if::cfg_if! {
 }
 
 struct Context {
-    spi: Spi<'static, SPI2, FullDuplexMode>,
+    spi: Spi<'static, FullDuplexMode, SPI2>,
     dma_channel: DmaChannelCreator,
     bitbang_spi: BitbangSpi,
 }
