@@ -27,11 +27,15 @@ use bleps::{
 use embedded_io::*;
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{
+    prelude::*,
+    rng::Rng,
+    time::{self, Duration},
+    timer::timg::TimerGroup,
+};
 use esp_println::{print, println};
 use esp_wifi::{
     ble::controller::BleConnector,
-    current_millis,
     init,
     wifi::{utils::create_network_interface, ClientConfiguration, Configuration, WifiStaDevice},
     wifi_interface::WifiStack,
@@ -90,7 +94,9 @@ fn main() -> ! {
     let mut socket_set_entries: [SocketStorage; 2] = Default::default();
     let (iface, device, mut controller, sockets) =
         create_network_interface(&init, &mut wifi, WifiStaDevice, &mut socket_set_entries).unwrap();
-    let wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
+
+    let now = || time::now().duration_since_epoch().to_millis();
+    let wifi_stack = WifiStack::new(iface, device, sockets, now);
 
     let client_config = Configuration::Client(ClientConfiguration {
         ssid: SSID.try_into().unwrap(),
@@ -108,13 +114,9 @@ fn main() -> ! {
     // wait to get connected
     println!("Wait to get connected");
     loop {
-        let res = controller.is_connected();
-        match res {
-            Ok(connected) => {
-                if connected {
-                    break;
-                }
-            }
+        match controller.is_connected() {
+            Ok(true) => break,
+            Ok(false) => {}
             Err(err) => {
                 println!("{:?}", err);
                 loop {}
@@ -135,7 +137,7 @@ fn main() -> ! {
     }
 
     let connector = BleConnector::new(&init, bluetooth);
-    let hci = HciConnector::new(connector, esp_wifi::current_millis);
+    let hci = HciConnector::new(connector, now);
     let mut ble = Ble::new(&hci);
 
     println!("{:?}", ble.init());
@@ -174,17 +176,13 @@ fn main() -> ! {
             .unwrap();
         socket.flush().unwrap();
 
-        let wait_end = current_millis() + 20 * 1000;
-        loop {
-            let mut buffer = [0u8; 128];
-            if let Ok(len) = socket.read(&mut buffer) {
-                let to_print = unsafe { core::str::from_utf8_unchecked(&buffer[..len]) };
-                print!("{}", to_print);
-            } else {
-                break;
-            }
+        let deadline = time::now() + Duration::secs(20);
+        let mut buffer = [0u8; 128];
+        while let Ok(len) = socket.read(&mut buffer) {
+            let to_print = unsafe { core::str::from_utf8_unchecked(&buffer[..len]) };
+            print!("{}", to_print);
 
-            if current_millis() > wait_end {
+            if time::now() > deadline {
                 println!("Timeout");
                 break;
             }
@@ -193,8 +191,8 @@ fn main() -> ! {
 
         socket.disconnect();
 
-        let wait_end = current_millis() + 5 * 1000;
-        while current_millis() < wait_end {
+        let deadline = time::now() + Duration::secs(5);
+        while time::now() < deadline {
             socket.work();
         }
     }

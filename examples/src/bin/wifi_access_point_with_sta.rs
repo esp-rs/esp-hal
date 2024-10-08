@@ -17,10 +17,14 @@
 use embedded_io::*;
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{
+    prelude::*,
+    rng::Rng,
+    time::{self, Duration},
+    timer::timg::TimerGroup,
+};
 use esp_println::{print, println};
 use esp_wifi::{
-    current_millis,
     init,
     wifi::{
         utils::{create_ap_sta_network_interface, ApStaInterface},
@@ -81,8 +85,9 @@ fn main() -> ! {
     )
     .unwrap();
 
-    let mut wifi_ap_stack = WifiStack::new(ap_interface, ap_device, ap_socket_set, current_millis);
-    let wifi_sta_stack = WifiStack::new(sta_interface, sta_device, sta_socket_set, current_millis);
+    let now = || time::now().duration_since_epoch().to_millis();
+    let mut wifi_ap_stack = WifiStack::new(ap_interface, ap_device, ap_socket_set, now);
+    let wifi_sta_stack = WifiStack::new(sta_interface, sta_device, sta_socket_set, now);
 
     let client_config = Configuration::Mixed(
         ClientConfiguration {
@@ -156,7 +161,7 @@ fn main() -> ! {
             println!("Connected");
 
             let mut time_out = false;
-            let wait_end = current_millis() + 20 * 1000;
+            let deadline = time::now() + Duration::secs(20);
             let mut buffer = [0u8; 1024];
             let mut pos = 0;
             loop {
@@ -175,7 +180,7 @@ fn main() -> ! {
                     break;
                 }
 
-                if current_millis() > wait_end {
+                if time::now() > deadline {
                     println!("Timeout");
                     time_out = true;
                     break;
@@ -195,7 +200,7 @@ fn main() -> ! {
                     .unwrap();
                 sta_socket.flush().unwrap();
 
-                let wait_end = current_millis() + 20 * 1000;
+                let deadline = time::now() + Duration::secs(20);
                 loop {
                     let mut buffer = [0u8; 512];
                     if let Ok(len) = sta_socket.read(&mut buffer) {
@@ -205,7 +210,7 @@ fn main() -> ! {
                         break;
                     }
 
-                    if current_millis() > wait_end {
+                    if time::now() > deadline {
                         println!("Timeout");
                         break;
                     }
@@ -221,8 +226,8 @@ fn main() -> ! {
             println!();
         }
 
-        let wait_end = current_millis() + 5 * 1000;
-        while current_millis() < wait_end {
+        let deadline = time::now() + Duration::secs(5);
+        while time::now() < deadline {
             ap_socket.work();
         }
     }

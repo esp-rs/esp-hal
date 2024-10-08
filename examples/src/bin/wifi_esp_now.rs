@@ -10,10 +10,14 @@
 
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{
+    prelude::*,
+    rng::Rng,
+    time::{self, Duration},
+    timer::timg::TimerGroup,
+};
 use esp_println::println;
 use esp_wifi::{
-    current_millis,
     esp_now::{PeerInfo, BROADCAST_ADDRESS},
     init,
     EspWifiInitFor,
@@ -45,7 +49,7 @@ fn main() -> ! {
 
     println!("esp-now version {}", esp_now.get_version().unwrap());
 
-    let mut next_send_time = current_millis() + 5 * 1000;
+    let mut next_send_time = time::now() + Duration::secs(5);
     loop {
         let r = esp_now.receive();
         if let Some(r) = r {
@@ -70,8 +74,8 @@ fn main() -> ! {
             }
         }
 
-        if current_millis() >= next_send_time {
-            next_send_time = current_millis() + 5 * 1000;
+        if time::now() >= next_send_time {
+            next_send_time = time::now() + Duration::secs(5);
             println!("Send");
             let status = esp_now
                 .send(&BROADCAST_ADDRESS, b"0123456789")

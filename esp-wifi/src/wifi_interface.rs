@@ -17,7 +17,7 @@ use smoltcp::{
 };
 
 use crate::{
-    current_millis,
+    timestamp,
     wifi::{ipv4, WifiDevice, WifiDeviceMode},
 };
 
@@ -509,11 +509,6 @@ impl Display for WifiStackError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{:?}", self)
     }
-}
-
-/// [current_millis] as an Instant
-pub fn timestamp() -> Instant {
-    Instant::from_millis(current_millis() as i64)
 }
 
 impl<MODE: WifiDeviceMode> WifiStack<'_, MODE> {

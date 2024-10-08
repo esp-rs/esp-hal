@@ -31,6 +31,7 @@ use esp_hal::{
     gpio::{Input, Io, Pull},
     prelude::*,
     rng::Rng,
+    time,
     timer::timg::TimerGroup,
 };
 use esp_println::println;
@@ -80,7 +81,9 @@ async fn main(_spawner: Spawner) -> ! {
     let mut bluetooth = peripherals.BT;
 
     let connector = BleConnector::new(&init, &mut bluetooth);
-    let mut ble = Ble::new(connector, esp_wifi::current_millis);
+
+    let now = || time::now().duration_since_epoch().to_millis();
+    let mut ble = Ble::new(connector, now);
     println!("Connector created");
 
     let pin_ref = RefCell::new(button);

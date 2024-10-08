@@ -4,12 +4,11 @@
 use smoltcp::socket::dhcpv4::Socket as Dhcpv4Socket;
 use smoltcp::{
     iface::{Config, Interface, SocketSet, SocketStorage},
-    time::Instant,
     wire::{EthernetAddress, HardwareAddress},
 };
 
 use super::{WifiApDevice, WifiController, WifiDevice, WifiDeviceMode, WifiError, WifiStaDevice};
-use crate::{current_millis, EspWifiInitialization};
+use crate::{timestamp, EspWifiInitialization};
 
 fn setup_iface<'a, MODE: WifiDeviceMode>(
     device: &mut WifiDevice<'_, MODE>,
@@ -20,11 +19,7 @@ fn setup_iface<'a, MODE: WifiDeviceMode>(
     let hw_address = HardwareAddress::Ethernet(EthernetAddress::from_bytes(&mac));
 
     let config = Config::new(hw_address);
-    let iface = Interface::new(
-        config,
-        device,
-        Instant::from_millis(current_millis() as i64),
-    );
+    let iface = Interface::new(config, device, timestamp());
 
     #[allow(unused_mut)]
     let mut socket_set = SocketSet::new(storage);

@@ -16,10 +16,15 @@
 use embedded_io::*;
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{delay::Delay, prelude::*, rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{
+    delay::Delay,
+    prelude::*,
+    rng::Rng,
+    time::{self, Duration},
+    timer::timg::TimerGroup,
+};
 use esp_println::println;
 use esp_wifi::{
-    current_millis,
     init,
     wifi::{
         utils::create_network_interface,
@@ -41,7 +46,7 @@ const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 const HOST_IP: &str = env!("HOST_IP");
 
-const TEST_DURATION: usize = 15;
+const TEST_DURATION: Duration = Duration::secs(15);
 const RX_BUFFER_SIZE: usize = 16384;
 const TX_BUFFER_SIZE: usize = 16384;
 const IO_BUFFER_SIZE: usize = 1024;
@@ -76,7 +81,8 @@ fn main() -> ! {
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
     let (iface, device, mut controller, sockets) =
         create_network_interface(&init, &mut wifi, WifiStaDevice, &mut socket_set_entries).unwrap();
-    let wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
+    let now = || time::now().duration_since_epoch().to_millis();
+    let wifi_stack = WifiStack::new(iface, device, sockets, now);
 
     let client_config = Configuration::Client(ClientConfiguration {
         ssid: SSID.try_into().unwrap(),
@@ -103,13 +109,9 @@ fn main() -> ! {
     // wait to get connected
     println!("Wait to get connected");
     loop {
-        let res = controller.is_connected();
-        match res {
-            Ok(connected) => {
-                if connected {
-                    break;
-                }
-            }
+        match controller.is_connected() {
+            Ok(true) => break,
+            Ok(false) => {}
             Err(err) => {
                 println!("{:?}", err);
                 loop {}
@@ -162,21 +164,21 @@ fn test_download<'a>(
     let mut buf = [0; IO_BUFFER_SIZE];
 
     let mut total = 0;
-    let wait_end = current_millis() + (TEST_DURATION as u64 * 1000);
+    let deadline = time::now() + TEST_DURATION;
     loop {
         socket.work();
         if let Ok(len) = socket.read(&mut buf) {
-            total += len;
+            total += len as u64;
         } else {
             break;
         }
 
-        if current_millis() > wait_end {
+        if time::now() > deadline {
             break;
         }
     }
 
-    let kbps = (total + 512) / 1024 / TEST_DURATION;
+    let kbps = (total + 512) / 1024 / TEST_DURATION.to_secs();
     println!("download: {} kB/s", kbps);
 
     socket.disconnect();
@@ -196,21 +198,21 @@ fn test_upload<'a>(
     let buf = [0; IO_BUFFER_SIZE];
 
     let mut total = 0;
-    let wait_end = current_millis() + (TEST_DURATION as u64 * 1000);
+    let deadline = time::now() + TEST_DURATION;
     loop {
         socket.work();
         if let Ok(len) = socket.write(&buf) {
-            total += len;
+            total += len as u64;
         } else {
             break;
         }
 
-        if current_millis() > wait_end {
+        if time::now() > deadline {
             break;
         }
     }
 
-    let kbps = (total + 512) / 1024 / TEST_DURATION;
+    let kbps = (total + 512) / 1024 / TEST_DURATION.to_secs();
     println!("upload: {} kB/s", kbps);
 
     socket.disconnect();
@@ -231,7 +233,7 @@ fn test_upload_download<'a>(
     let mut rx_buf = [0; IO_BUFFER_SIZE];
 
     let mut total = 0;
-    let wait_end = current_millis() + (TEST_DURATION as u64 * 1000);
+    let deadline = time::now() + TEST_DURATION;
     loop {
         socket.work();
         if let Err(_) = socket.write(&tx_buf) {
@@ -241,17 +243,17 @@ fn test_upload_download<'a>(
         socket.work();
 
         if let Ok(len) = socket.read(&mut rx_buf) {
-            total += len;
+            total += len as u64;
         } else {
             break;
         }
 
-        if current_millis() > wait_end {
+        if time::now() > deadline {
             break;
         }
     }
 
-    let kbps = (total + 512) / 1024 / TEST_DURATION;
+    let kbps = (total + 512) / 1024 / TEST_DURATION.to_secs();
     println!("upload+download: {} kB/s", kbps);
 
     socket.disconnect();
