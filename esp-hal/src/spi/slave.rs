@@ -94,12 +94,31 @@ pub struct Spi<'d, M, T = AnySpi> {
     _mode: PhantomData<M>,
 }
 
+impl<'d> Spi<'d, FullDuplexMode> {
+    /// Constructs an SPI instance in 8bit dataframe mode.
+    pub fn new<
+        SCK: PeripheralInput,
+        MOSI: PeripheralInput,
+        MISO: PeripheralOutput,
+        CS: PeripheralInput,
+    >(
+        spi: impl Peripheral<P = impl Instance + Into<AnySpi> + 'd> + 'd,
+        sclk: impl Peripheral<P = SCK> + 'd,
+        mosi: impl Peripheral<P = MOSI> + 'd,
+        miso: impl Peripheral<P = MISO> + 'd,
+        cs: impl Peripheral<P = CS> + 'd,
+        mode: SpiMode,
+    ) -> Spi<'d, FullDuplexMode> {
+        Self::new_typed(spi, sclk, mosi, miso, cs, mode)
+    }
+}
+
 impl<'d, T> Spi<'d, FullDuplexMode, T>
 where
     T: Instance,
 {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new<
+    pub fn new_typed<
         SCK: PeripheralInput,
         MOSI: PeripheralInput,
         MISO: PeripheralOutput,
