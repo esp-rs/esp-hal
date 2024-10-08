@@ -24,7 +24,6 @@ portable-atomic     = "1.9.0"
 static_cell         = "2.1.0"
 
 [build-dependencies]
-cfg-if       = "1.0.0"
 esp-build    = { version = "0.1.0", path = "../esp-build" }
 esp-metadata = { version = "0.3.0", path = "../esp-metadata" }
 
