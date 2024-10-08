@@ -40,7 +40,7 @@ macro_rules! dma_alloc_buffer {
 }
 
 struct Context {
-    spi: SpiDma<'static, SPI2, HalfDuplexMode, Blocking>,
+    spi: SpiDma<'static, HalfDuplexMode, Blocking, SPI2>,
     pcnt_unit: Unit<'static, 0>,
     pcnt_source: InputSignal,
 }

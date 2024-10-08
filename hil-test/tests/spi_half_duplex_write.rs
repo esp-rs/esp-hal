@@ -23,7 +23,7 @@ use esp_hal::{
 use hil_test as _;
 
 struct Context {
-    spi: SpiDma<'static, SPI2, HalfDuplexMode, Blocking>,
+    spi: SpiDma<'static, HalfDuplexMode, Blocking, SPI2>,
     pcnt_unit: Unit<'static, 0>,
     pcnt_source: InputSignal,
 }
