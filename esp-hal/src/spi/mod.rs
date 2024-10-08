@@ -9,7 +9,10 @@
 //! more information on these modes, please refer to the documentation in their
 //! respective modules.
 
-use crate::dma::{DmaError, PeripheralMarker};
+use crate::{
+    dma::{DmaEligible, DmaError, PeripheralMarker},
+    peripheral::Peripheral,
+};
 
 pub mod master;
 pub mod slave;
@@ -114,5 +117,74 @@ impl PeripheralMarker for crate::peripherals::SPI3 {
     #[inline(always)]
     fn peripheral(&self) -> crate::system::Peripheral {
         crate::system::Peripheral::Spi3
+    }
+}
+
+/// Any SPI peripheral.
+pub struct AnySpi(AnySpiInner);
+
+impl crate::private::Sealed for AnySpi {}
+
+#[cfg(spi2)]
+impl From<crate::peripherals::SPI2> for AnySpi {
+    fn from(spi: crate::peripherals::SPI2) -> Self {
+        AnySpi(AnySpiInner::Spi2(spi))
+    }
+}
+
+#[cfg(spi3)]
+impl From<crate::peripherals::SPI3> for AnySpi {
+    fn from(spi: crate::peripherals::SPI3) -> Self {
+        AnySpi(AnySpiInner::Spi3(spi))
+    }
+}
+
+enum AnySpiInner {
+    #[cfg(spi2)]
+    Spi2(crate::peripherals::SPI2),
+    #[cfg(spi3)]
+    Spi3(crate::peripherals::SPI3),
+}
+
+impl Peripheral for AnySpi {
+    type P = AnySpi;
+
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        unsafe {
+            match &mut self.0 {
+                #[cfg(spi2)]
+                AnySpiInner::Spi2(spi) => AnySpi::from(spi.clone_unchecked()),
+                #[cfg(spi3)]
+                AnySpiInner::Spi3(spi) => AnySpi::from(spi.clone_unchecked()),
+            }
+        }
+    }
+}
+
+impl PeripheralMarker for AnySpi {
+    #[inline(always)]
+    fn peripheral(&self) -> crate::system::Peripheral {
+        match &self.0 {
+            #[cfg(spi2)]
+            AnySpiInner::Spi2(spi) => spi.peripheral(),
+            #[cfg(spi3)]
+            AnySpiInner::Spi3(spi) => spi.peripheral(),
+        }
+    }
+}
+
+impl DmaEligible for AnySpi {
+    #[cfg(gdma)]
+    type Dma = crate::dma::AnyGdmaChannel;
+    //#[cfg(pdma)]
+    // type Dma = crate::dma::AnyPdmaSpiChannel;
+
+    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
+        match &self.0 {
+            #[cfg(spi2)]
+            AnySpiInner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
+            #[cfg(spi3)]
+            AnySpiInner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
+        }
     }
 }

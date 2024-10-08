@@ -87,6 +87,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
     private,
+    spi::AnySpi,
     system::PeripheralClockControl,
     Mode,
 };
@@ -452,7 +453,7 @@ pub trait HalfDuplexReadWrite {
 }
 
 /// SPI peripheral driver
-pub struct Spi<'d, M, T> {
+pub struct Spi<'d, M, T = AnySpi> {
     spi: PeripheralRef<'d, T>,
     _mode: PhantomData<M>,
 }
@@ -959,7 +960,7 @@ mod dma {
     /// [`SpiDmaBus`] via `with_buffers` to get access
     /// to a DMA capable SPI bus that implements the
     /// embedded-hal traits.
-    pub struct SpiDma<'d, D, M, T>
+    pub struct SpiDma<'d, D, M, T = AnySpi>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -1255,7 +1256,7 @@ mod dma {
     ///
     /// This structure holds references to the SPI instance, DMA buffers, and
     /// transfer status.
-    pub struct SpiDmaTransfer<'d, D, M, Buf, T>
+    pub struct SpiDmaTransfer<'d, D, M, Buf, T = AnySpi>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -1600,7 +1601,7 @@ mod dma {
     ///
     /// This structure is responsible for managing SPI transfers using DMA
     /// buffers.
-    pub struct SpiDmaBus<'d, D, M, T>
+    pub struct SpiDmaBus<'d, D, M, T = AnySpi>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -3293,6 +3294,118 @@ impl ExtendedInstance for crate::peripherals::SPI3 {
             } else {
                 InputSignal::SPI3_HD
             }
+        }
+    }
+}
+
+impl Instance for super::AnySpi {
+    delegate::delegate! {
+        to match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi,
+            #[cfg(spi3)]
+            super::AnySpiInner::Spi3(spi) => spi,
+        } {
+            fn register_block(&self) -> &RegisterBlock;
+            fn spi_num(&self) -> u8;
+            fn sclk_signal(&self) -> OutputSignal;
+            fn mosi_signal(&self) -> OutputSignal;
+            fn miso_signal(&self) -> InputSignal;
+            fn cs_signal(&self) -> OutputSignal;
+        }
+    }
+    delegate::delegate! {
+        to match &mut self.0 {
+            super::AnySpiInner::Spi2(spi) => spi,
+            #[cfg(spi3)]
+            super::AnySpiInner::Spi3(spi) => spi,
+        } {
+            fn set_interrupt_handler(&mut self, handler: InterruptHandler);
+        }
+    }
+}
+
+impl ExtendedInstance for super::AnySpi {
+    fn sio0_input_signal(&self) -> InputSignal {
+        match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi.sio0_input_signal(),
+
+            #[cfg(all(spi3, any(esp32, esp32s3)))]
+            super::AnySpiInner::Spi3(spi) => spi.sio0_input_signal(),
+
+            #[cfg(not(all(spi3, any(esp32, esp32s3))))]
+            super::AnySpiInner::Spi3(_) => unimplemented!("SPI3 is does not support QSPI"),
+        }
+    }
+
+    fn sio1_output_signal(&self) -> OutputSignal {
+        match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi.sio1_output_signal(),
+
+            #[cfg(all(spi3, any(esp32, esp32s3)))]
+            super::AnySpiInner::Spi3(spi) => spi.sio1_output_signal(),
+
+            #[cfg(not(all(spi3, any(esp32, esp32s3))))]
+            super::AnySpiInner::Spi3(_) => unimplemented!("SPI3 is does not support QSPI"),
+        }
+    }
+
+    fn sio2_output_signal(&self) -> OutputSignal {
+        match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi.sio2_output_signal(),
+
+            #[cfg(all(spi3, any(esp32, esp32s3)))]
+            super::AnySpiInner::Spi3(spi) => spi.sio2_output_signal(),
+
+            #[cfg(not(all(spi3, any(esp32, esp32s3))))]
+            super::AnySpiInner::Spi3(_) => unimplemented!("SPI3 is does not support QSPI"),
+        }
+    }
+
+    fn sio2_input_signal(&self) -> InputSignal {
+        match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi.sio2_input_signal(),
+
+            #[cfg(all(spi3, any(esp32, esp32s3)))]
+            super::AnySpiInner::Spi3(spi) => spi.sio2_input_signal(),
+
+            #[cfg(not(all(spi3, any(esp32, esp32s3))))]
+            super::AnySpiInner::Spi3(_) => unimplemented!("SPI3 is does not support QSPI"),
+        }
+    }
+
+    fn sio3_output_signal(&self) -> OutputSignal {
+        match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi.sio3_output_signal(),
+
+            #[cfg(all(spi3, any(esp32, esp32s3)))]
+            super::AnySpiInner::Spi3(spi) => spi.sio3_output_signal(),
+
+            #[cfg(not(all(spi3, any(esp32, esp32s3))))]
+            super::AnySpiInner::Spi3(_) => unimplemented!("SPI3 is does not support QSPI"),
+        }
+    }
+
+    fn sio3_input_signal(&self) -> InputSignal {
+        match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi.sio3_input_signal(),
+
+            #[cfg(all(spi3, any(esp32, esp32s3)))]
+            super::AnySpiInner::Spi3(spi) => spi.sio3_input_signal(),
+
+            #[cfg(not(all(spi3, any(esp32, esp32s3))))]
+            super::AnySpiInner::Spi3(_) => unimplemented!("SPI3 is does not support QSPI"),
+        }
+    }
+}
+
+impl InstanceDma for super::AnySpi {
+    delegate::delegate! {
+        to match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi,
+            #[cfg(spi3)]
+            super::AnySpiInner::Spi3(spi) => spi,
+        } {
+            fn clear_dma_interrupts(&self);
         }
     }
 }
