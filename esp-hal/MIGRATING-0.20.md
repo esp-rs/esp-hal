@@ -121,10 +121,16 @@ When using the asymmetric variant of the macro to create DMA buffers and descrip
 + let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, 32000);
 ```
 
-## Removed UART constructors
+## Removed constructors
+
+### UART
 
 The `Uart::new_with_default_pins` and `Uart::new_async_with_default_pins` constructors
 have been removed. Use `new` or `new_async` instead.
+
+### I2S1
+
+The `I2s::new_i2s1` constructor has been removed. Use `I2s::new` instead.
 
 ## Timer changes
 
@@ -319,3 +325,17 @@ Diff of the `psram_quad.rs` example
 ## eFuse
 
 Calling `Efuse::read_field_le::<bool>()` no longer compiles. Use `Efuse::read_bit()` instead.
+
+## DMA
+
+The DMA channel types have been removed from peripherals.
+
+A non-exhausitve list demonstrating this change:
+
+```diff
+-I2sTx<'static, I2S0, DmaChannel0, Async>
++I2sTx<'static, I2S0, Async>
+
+-SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>
++SpiDma<'static, esp_hal::peripherals::SPI2, HalfDuplexMode, Blocking>
+```

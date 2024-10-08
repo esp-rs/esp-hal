@@ -25,17 +25,6 @@ use esp_hal::{
 use esp_hal_embassy::InterruptExecutor;
 use hil_test as _;
 
-cfg_if::cfg_if! {
-    if #[cfg(any(
-        feature = "esp32",
-        feature = "esp32s2",
-    ))] {
-        use esp_hal::dma::Spi3DmaChannel as DmaChannel1;
-    } else {
-        use esp_hal::dma::DmaChannel1;
-    }
-}
-
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
         static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
@@ -46,7 +35,7 @@ macro_rules! mk_static {
 }
 
 #[embassy_executor::task]
-async fn interrupt_driven_task(spi: SpiDma<'static, SPI3, DmaChannel1, FullDuplexMode, Async>) {
+async fn interrupt_driven_task(spi: SpiDma<'static, SPI3, FullDuplexMode, Async>) {
     let mut ticker = Ticker::every(Duration::from_millis(1));
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(128);

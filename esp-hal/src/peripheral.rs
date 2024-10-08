@@ -168,23 +168,6 @@ impl<T> crate::private::Sealed for &mut T where T: crate::private::Sealed {}
 mod peripheral_macros {
     #[doc(hidden)]
     #[macro_export]
-    macro_rules! impl_dma_eligible {
-        ($name:ident => $dma:ident) => {
-            impl $crate::dma::DmaEligible for $name {
-                const DMA_PERIPHERAL: $crate::dma::DmaPeripheral = $crate::dma::DmaPeripheral::$dma;
-            }
-        };
-
-        ($($(#[$cfg:meta])? $name:ident => $dma:ident),*) => {
-            $(
-                $(#[$cfg])?
-                $crate::impl_dma_eligible!($name => $dma);
-            )*
-        };
-    }
-
-    #[doc(hidden)]
-    #[macro_export]
     macro_rules! peripherals {
         ($($(#[$cfg:meta])? $name:ident <= $from_pac:tt $(($($interrupt:ident),*))? ),*$(,)?) => {
 
@@ -194,59 +177,6 @@ mod peripheral_macros {
                 $(
                     $crate::create_peripheral!($(#[$cfg])? $name <= $from_pac);
                 )*
-
-                $crate::impl_dma_eligible! {
-                    #[cfg(spi2)]
-                    SPI2 => Spi2,
-
-                    #[cfg(spi3)]
-                    SPI3 => Spi3,
-
-                    #[cfg(all(uhci0, gdma))] // TODO: S2?
-                    UHCI0 => Uhci0,
-
-                    #[cfg(i2s0)]
-                    I2S0 => I2s0,
-
-                    #[cfg(i2s1)]
-                    I2S1 => I2s1,
-
-                    #[cfg(esp32s3)]
-                    LCD_CAM => LcdCam,
-
-                    #[cfg(all(gdma, aes))]
-                    AES => Aes,
-
-                    #[cfg(all(gdma, sha))]
-                    SHA => Sha,
-
-                    #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
-                    ADC1 => Adc,
-
-                    #[cfg(any(esp32c3, esp32s3))]
-                    ADC2 => Adc,
-
-                    #[cfg(esp32s3)]
-                    RMT => Rmt,
-
-                    #[cfg(parl_io)]
-                    PARL_IO => ParlIo,
-
-                    #[cfg(any(esp32c2, esp32c6, esp32h2))]
-                    MEM2MEM1 => Mem2Mem1
-                }
-
-                #[cfg(any(esp32c6, esp32h2))]
-                $crate::impl_dma_eligible! {
-                    MEM2MEM4 => Mem2Mem4,
-                    MEM2MEM5 => Mem2Mem5,
-                    MEM2MEM10 => Mem2Mem10,
-                    MEM2MEM11 => Mem2Mem11,
-                    MEM2MEM12 => Mem2Mem12,
-                    MEM2MEM13 => Mem2Mem13,
-                    MEM2MEM14 => Mem2Mem14,
-                    MEM2MEM15 => Mem2Mem15
-                }
             }
 
             /// The `Peripherals` struct provides access to all of the hardware peripherals on the chip.

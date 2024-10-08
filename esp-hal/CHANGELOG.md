@@ -66,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Change `DmaTxBuf` to support PSRAM on `esp32s3` (#2161)
 - I2c `transaction` is now also available as a inherent function, lift size limit on `write`,`read` and `write_read` (#2262)
 - SPI transactions are now cancelled if the transfer object (or async Future) is dropped. (#2216)
+- The DMA channel types have been removed from peripherals (#2261)
 
 ### Fixed
 
@@ -108,6 +109,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the `place-spi-driver-in-ram` feature, this is now enabled via [esp-config](https://docs.rs/esp-config) (#2156)
 - Removed `esp_hal::spi::slave::prelude` (#2260)
 - Removed `esp_hal::spi::slave::WithDmaSpiN` traits (#2260)
+- The `WithDmaAes` trait has been removed (#2261)
+- The `I2s::new_i2s1` constructor has been removed (#2261)
 
 ## [0.20.1] - 2024-08-30
 

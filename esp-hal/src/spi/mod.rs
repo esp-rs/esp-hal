@@ -9,7 +9,7 @@
 //! more information on these modes, please refer to the documentation in their
 //! respective modules.
 
-use crate::dma::DmaError;
+use crate::dma::{DmaError, PeripheralMarker};
 
 pub mod master;
 pub mod slave;
@@ -100,3 +100,19 @@ impl crate::private::Sealed for FullDuplexMode {}
 pub struct HalfDuplexMode {}
 impl DuplexMode for HalfDuplexMode {}
 impl crate::private::Sealed for HalfDuplexMode {}
+
+#[cfg(spi2)]
+impl PeripheralMarker for crate::peripherals::SPI2 {
+    #[inline(always)]
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::Spi2
+    }
+}
+
+#[cfg(spi3)]
+impl PeripheralMarker for crate::peripherals::SPI3 {
+    #[inline(always)]
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::Spi3
+    }
+}

@@ -25,9 +25,16 @@ pub trait GdmaChannel {
     fn number(&self) -> u8;
 }
 
+/// An arbitrary GDMA channel
 #[non_exhaustive]
-#[doc(hidden)]
 pub struct AnyGdmaChannel(u8);
+
+impl crate::private::Sealed for AnyGdmaChannel {}
+impl DmaChannel for AnyGdmaChannel {
+    type Rx = ChannelRxImpl<Self>;
+    type Tx = ChannelTxImpl<Self>;
+}
+
 #[non_exhaustive]
 #[doc(hidden)]
 pub struct SpecificGdmaChannel<const N: u8> {}
@@ -56,26 +63,26 @@ impl<C: GdmaChannel> crate::private::Sealed for ChannelTxImpl<C> {}
 
 impl<C: GdmaChannel> ChannelTxImpl<C> {
     #[inline(always)]
-    fn ch(&self) -> &'static crate::peripherals::dma::ch::CH {
+    fn ch(&self) -> &crate::peripherals::dma::ch::CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.ch(self.0.number() as usize)
     }
 
     #[cfg(any(esp32c2, esp32c3))]
     #[inline(always)]
-    fn int(&self) -> &'static crate::peripherals::dma::int_ch::INT_CH {
+    fn int(&self) -> &crate::peripherals::dma::int_ch::INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.int_ch(self.0.number() as usize)
     }
     #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))]
-    fn int(&self) -> &'static crate::peripherals::dma::out_int_ch::OUT_INT_CH {
+    fn int(&self) -> &crate::peripherals::dma::out_int_ch::OUT_INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.out_int_ch(self.0.number() as usize)
     }
     #[cfg(esp32s3)]
     #[inline(always)]
-    fn int(&self) -> &'static crate::peripherals::dma::ch::out_int::OUT_INT {
+    fn int(&self) -> &crate::peripherals::dma::ch::out_int::OUT_INT {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.ch(self.0.number() as usize).out_int()
     }
@@ -235,28 +242,28 @@ impl<C: GdmaChannel> crate::private::Sealed for ChannelRxImpl<C> {}
 
 impl<C: GdmaChannel> ChannelRxImpl<C> {
     #[inline(always)]
-    fn ch(&self) -> &'static crate::peripherals::dma::ch::CH {
+    fn ch(&self) -> &crate::peripherals::dma::ch::CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.ch(self.0.number() as usize)
     }
 
     #[cfg(any(esp32c2, esp32c3))]
     #[inline(always)]
-    fn int(&self) -> &'static crate::peripherals::dma::int_ch::INT_CH {
+    fn int(&self) -> &crate::peripherals::dma::int_ch::INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.int_ch(self.0.number() as usize)
     }
 
     #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))]
-    fn int(&self) -> &'static crate::peripherals::dma::in_int_ch::IN_INT_CH {
+    fn int(&self) -> &crate::peripherals::dma::in_int_ch::IN_INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.in_int_ch(self.0.number() as usize)
     }
 
     #[cfg(esp32s3)]
     #[inline(always)]
-    fn int(&self) -> &'static crate::peripherals::dma::ch::in_int::IN_INT {
+    fn int(&self) -> &crate::peripherals::dma::ch::in_int::IN_INT {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.ch(self.0.number() as usize).in_int()
     }
@@ -416,39 +423,14 @@ impl<C: GdmaChannel> InterruptAccess<DmaRxInterrupt> for ChannelRxImpl<C> {
 #[non_exhaustive]
 pub struct ChannelCreator<const N: u8> {}
 
-#[non_exhaustive]
-#[doc(hidden)]
-pub struct SuitablePeripheral {}
-impl PeripheralMarker for SuitablePeripheral {}
-
-// with GDMA every channel can be used for any peripheral
-impl SpiPeripheral for SuitablePeripheral {}
-impl Spi2Peripheral for SuitablePeripheral {}
-#[cfg(spi3)]
-impl Spi3Peripheral for SuitablePeripheral {}
-#[cfg(any(i2s0, i2s1))]
-impl I2sPeripheral for SuitablePeripheral {}
-#[cfg(i2s0)]
-impl I2s0Peripheral for SuitablePeripheral {}
-#[cfg(i2s1)]
-impl I2s1Peripheral for SuitablePeripheral {}
-#[cfg(parl_io)]
-impl ParlIoPeripheral for SuitablePeripheral {}
-#[cfg(aes)]
-impl AesPeripheral for SuitablePeripheral {}
-#[cfg(lcd_cam)]
-impl LcdCamPeripheral for SuitablePeripheral {}
-
-/// A description of any GDMA channel
-#[non_exhaustive]
-pub struct AnyDmaChannel {}
-
-impl crate::private::Sealed for AnyDmaChannel {}
-
-impl DmaChannel for AnyDmaChannel {
-    type Rx = ChannelRxImpl<AnyGdmaChannel>;
-    type Tx = ChannelTxImpl<AnyGdmaChannel>;
-    type P = SuitablePeripheral;
+impl<CH: DmaChannel, M: Mode> Channel<'_, CH, M> {
+    /// Asserts that the channel is compatible with the given peripheral.
+    pub fn runtime_ensure_compatible<P: PeripheralMarker + DmaEligible>(
+        &self,
+        _peripheral: &PeripheralRef<'_, P>,
+    ) {
+        // No runtime checks; GDMA channels are compatible with any peripheral
+    }
 }
 
 macro_rules! impl_channel {
@@ -463,25 +445,24 @@ macro_rules! impl_channel {
             impl DmaChannel for [<DmaChannel $num>] {
                 type Rx = ChannelRxImpl<SpecificGdmaChannel<$num>>;
                 type Tx = ChannelTxImpl<SpecificGdmaChannel<$num>>;
-                type P = SuitablePeripheral;
+            }
+
+            impl DmaChannelConvert<AnyGdmaChannel> for [<DmaChannel $num>] {
+                fn degrade_rx(rx: Self::Rx) -> ChannelRxImpl<AnyGdmaChannel> {
+                    rx.degrade()
+                }
+                fn degrade_tx(tx: Self::Tx) -> ChannelTxImpl<AnyGdmaChannel> {
+                    tx.degrade()
+                }
             }
 
             impl DmaChannelExt for [<DmaChannel $num>] {
-                type Degraded = AnyDmaChannel;
-
                 fn get_rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
                     ChannelRxImpl(SpecificGdmaChannel::<$num> {})
                 }
 
                 fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
                     ChannelTxImpl(SpecificGdmaChannel::<$num> {})
-                }
-
-                fn degrade_rx(rx: Self::Rx) -> ChannelRxImpl<AnyGdmaChannel> {
-                    rx.degrade()
-                }
-                fn degrade_tx(tx: Self::Tx) -> ChannelTxImpl<AnyGdmaChannel> {
-                    tx.degrade()
                 }
 
                 fn set_isr(handler: $crate::interrupt::InterruptHandler) {
@@ -573,6 +554,63 @@ cfg_if::cfg_if! {
     }
 }
 
+crate::impl_dma_eligible! {
+    AnyGdmaChannel {
+        #[cfg(spi2)]
+        SPI2 => Spi2,
+
+        #[cfg(spi3)]
+        SPI3 => Spi3,
+
+        #[cfg(uhci0)]
+        UHCI0 => Uhci0,
+
+        #[cfg(i2s0)]
+        I2S0 => I2s0,
+
+        #[cfg(i2s1)]
+        I2S1 => I2s1,
+
+        #[cfg(esp32s3)]
+        LCD_CAM => LcdCam,
+
+        #[cfg(all(gdma, aes))]
+        AES => Aes,
+
+        #[cfg(all(gdma, sha))]
+        SHA => Sha,
+
+        #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
+        ADC1 => Adc,
+
+        #[cfg(any(esp32c3, esp32s3))]
+        ADC2 => Adc,
+
+        #[cfg(esp32s3)]
+        RMT => Rmt,
+
+        #[cfg(parl_io)]
+        PARL_IO => ParlIo,
+
+        #[cfg(any(esp32c2, esp32c6, esp32h2))]
+        MEM2MEM1 => Mem2Mem1,
+    }
+}
+
+#[cfg(any(esp32c6, esp32h2))]
+crate::impl_dma_eligible! {
+    AnyGdmaChannel {
+        MEM2MEM4 => Mem2Mem4,
+        MEM2MEM5 => Mem2Mem5,
+        MEM2MEM10 => Mem2Mem10,
+        MEM2MEM11 => Mem2Mem11,
+        MEM2MEM12 => Mem2Mem12,
+        MEM2MEM13 => Mem2Mem13,
+        MEM2MEM14 => Mem2Mem14,
+        MEM2MEM15 => Mem2Mem15,
+    }
+}
+
 /// GDMA Peripheral
 ///
 /// This offers the available DMA channels.
@@ -626,21 +664,25 @@ pub use m2m::*;
 mod m2m {
     #[cfg(esp32s3)]
     use crate::dma::DmaExtMemBKSize;
-    use crate::dma::{
-        dma_private::{DmaSupport, DmaSupportRx},
-        Channel,
-        ChannelRx,
-        DescriptorChain,
-        DmaChannel,
-        DmaDescriptor,
-        DmaEligible,
-        DmaError,
-        DmaPeripheral,
-        DmaTransferRx,
-        ReadBuffer,
-        Rx,
-        Tx,
-        WriteBuffer,
+    use crate::{
+        dma::{
+            dma_private::{DmaSupport, DmaSupportRx},
+            AnyGdmaChannel,
+            Channel,
+            ChannelRx,
+            DescriptorChain,
+            DmaChannelConvert,
+            DmaDescriptor,
+            DmaEligible,
+            DmaError,
+            DmaPeripheral,
+            DmaTransferRx,
+            ReadBuffer,
+            Rx,
+            Tx,
+            WriteBuffer,
+        },
+        Mode,
     };
 
     /// DMA Memory to Memory pseudo-Peripheral
@@ -648,29 +690,30 @@ mod m2m {
     /// This is a pseudo-peripheral that allows for memory to memory transfers.
     /// It is not a real peripheral, but a way to use the DMA engine for memory
     /// to memory transfers.
-    pub struct Mem2Mem<'d, C, MODE>
+    pub struct Mem2Mem<'d, M>
     where
-        C: DmaChannel,
-        MODE: crate::Mode,
+        M: Mode,
     {
-        channel: Channel<'d, C, MODE>,
+        channel: Channel<'d, AnyGdmaChannel, M>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
         peripheral: DmaPeripheral,
     }
 
-    impl<'d, C, MODE> Mem2Mem<'d, C, MODE>
+    impl<'d, M> Mem2Mem<'d, M>
     where
-        C: DmaChannel,
-        MODE: crate::Mode,
+        M: Mode,
     {
         /// Create a new Mem2Mem instance.
-        pub fn new(
-            channel: Channel<'d, C, MODE>,
+        pub fn new<CH>(
+            channel: Channel<'d, CH, M>,
             peripheral: impl DmaEligible,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> Result<Self, DmaError> {
+        ) -> Result<Self, DmaError>
+        where
+            CH: DmaChannelConvert<AnyGdmaChannel>,
+        {
             unsafe {
                 Self::new_unsafe(
                     channel,
@@ -683,13 +726,16 @@ mod m2m {
         }
 
         /// Create a new Mem2Mem instance with specific chunk size.
-        pub fn new_with_chunk_size(
-            channel: Channel<'d, C, MODE>,
+        pub fn new_with_chunk_size<CH>(
+            channel: Channel<'d, CH, M>,
             peripheral: impl DmaEligible,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
             chunk_size: usize,
-        ) -> Result<Self, DmaError> {
+        ) -> Result<Self, DmaError>
+        where
+            CH: DmaChannelConvert<AnyGdmaChannel>,
+        {
             unsafe {
                 Self::new_unsafe(
                     channel,
@@ -707,13 +753,16 @@ mod m2m {
         ///
         /// You must ensure that your not using DMA for the same peripheral and
         /// that your the only one using the DmaPeripheral.
-        pub unsafe fn new_unsafe(
-            channel: Channel<'d, C, MODE>,
+        pub unsafe fn new_unsafe<CH>(
+            channel: Channel<'d, CH, M>,
             peripheral: DmaPeripheral,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
             chunk_size: usize,
-        ) -> Result<Self, DmaError> {
+        ) -> Result<Self, DmaError>
+        where
+            CH: DmaChannelConvert<AnyGdmaChannel>,
+        {
             if !(1..=4092).contains(&chunk_size) {
                 return Err(DmaError::InvalidChunkSize);
             }
@@ -721,7 +770,7 @@ mod m2m {
                 return Err(DmaError::OutOfDescriptors);
             }
             Ok(Mem2Mem {
-                channel,
+                channel: channel.degrade(),
                 peripheral,
                 rx_chain: DescriptorChain::new_with_chunk_size(rx_descriptors, chunk_size),
                 tx_chain: DescriptorChain::new_with_chunk_size(tx_descriptors, chunk_size),
@@ -772,10 +821,9 @@ mod m2m {
         }
     }
 
-    impl<'d, C, MODE> DmaSupport for Mem2Mem<'d, C, MODE>
+    impl<'d, MODE> DmaSupport for Mem2Mem<'d, MODE>
     where
-        C: DmaChannel,
-        MODE: crate::Mode,
+        MODE: Mode,
     {
         fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
             while !self.channel.rx.is_done() {}
@@ -786,12 +834,11 @@ mod m2m {
         }
     }
 
-    impl<'d, C, MODE> DmaSupportRx for Mem2Mem<'d, C, MODE>
+    impl<'d, MODE> DmaSupportRx for Mem2Mem<'d, MODE>
     where
-        C: DmaChannel,
-        MODE: crate::Mode,
+        MODE: Mode,
     {
-        type RX = ChannelRx<'d, C>;
+        type RX = ChannelRx<'d, AnyGdmaChannel>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx

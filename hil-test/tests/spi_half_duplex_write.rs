@@ -22,19 +22,8 @@ use esp_hal::{
 };
 use hil_test as _;
 
-cfg_if::cfg_if! {
-    if #[cfg(any(
-        feature = "esp32",
-        feature = "esp32s2",
-    ))] {
-        use esp_hal::dma::Spi2DmaChannel as DmaChannel0;
-    } else {
-        use esp_hal::dma::DmaChannel0;
-    }
-}
-
 struct Context {
-    spi: SpiDma<'static, SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
+    spi: SpiDma<'static, SPI2, HalfDuplexMode, Blocking>,
     pcnt_unit: Unit<'static, 0>,
     pcnt_source: InputSignal,
 }

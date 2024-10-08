@@ -73,7 +73,7 @@ use core::marker::PhantomData;
 
 use super::{Error, FullDuplexMode, SpiMode};
 use crate::{
-    dma::{DescriptorChain, DmaPeripheral, Rx, Tx},
+    dma::{DescriptorChain, DmaChannelConvert, DmaEligible, PeripheralMarker, Rx, Tx},
     gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
@@ -150,8 +150,6 @@ where
 /// DMA (Direct Memory Access) functionality (Slave).
 pub mod dma {
     use super::*;
-    #[cfg(spi3)]
-    use crate::dma::Spi3Peripheral;
     use crate::{
         dma::{
             dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
@@ -159,89 +157,55 @@ pub mod dma {
             ChannelRx,
             ChannelTx,
             DescriptorChain,
-            DmaChannel,
             DmaDescriptor,
             DmaTransferRx,
             DmaTransferRxTx,
             DmaTransferTx,
             ReadBuffer,
             Rx,
-            Spi2Peripheral,
-            SpiPeripheral,
             Tx,
             WriteBuffer,
         },
         Mode,
     };
 
-    impl<'d> Spi<'d, crate::peripherals::SPI2, FullDuplexMode> {
+    impl<'d, T> Spi<'d, T, FullDuplexMode>
+    where
+        T: InstanceDma,
+    {
         /// Configures the SPI3 peripheral with the provided DMA channel and
         /// descriptors.
         #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
-        pub fn with_dma<C, DmaMode>(
+        pub fn with_dma<CH, DmaMode>(
             mut self,
-            channel: Channel<'d, C, DmaMode>,
+            channel: Channel<'d, CH, DmaMode>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> SpiDma<'d, crate::peripherals::SPI2, C, DmaMode>
+        ) -> SpiDma<'d, T, DmaMode>
         where
-            C: DmaChannel,
-            C::P: SpiPeripheral + Spi2Peripheral,
+            CH: DmaChannelConvert<T::Dma>,
             DmaMode: Mode,
         {
             self.spi.set_data_mode(self.data_mode, true);
-            SpiDma {
-                spi: self.spi,
-                channel,
-                rx_chain: DescriptorChain::new(rx_descriptors),
-                tx_chain: DescriptorChain::new(tx_descriptors),
-            }
-        }
-    }
-
-    #[cfg(spi3)]
-    impl<'d> Spi<'d, crate::peripherals::SPI3, FullDuplexMode> {
-        /// Configures the SPI3 peripheral with the provided DMA channel and
-        /// descriptors.
-        #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
-        pub fn with_dma<C, DmaMode>(
-            mut self,
-            channel: Channel<'d, C, DmaMode>,
-            rx_descriptors: &'static mut [DmaDescriptor],
-            tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> SpiDma<'d, crate::peripherals::SPI3, C, DmaMode>
-        where
-            C: DmaChannel,
-            C::P: SpiPeripheral + Spi3Peripheral,
-            DmaMode: Mode,
-        {
-            self.spi.set_data_mode(self.data_mode, true);
-            SpiDma {
-                spi: self.spi,
-                channel,
-                rx_chain: DescriptorChain::new(rx_descriptors),
-                tx_chain: DescriptorChain::new(tx_descriptors),
-            }
+            SpiDma::new(self.spi, channel, rx_descriptors, tx_descriptors)
         }
     }
 
     /// A DMA capable SPI instance.
-    pub struct SpiDma<'d, T, C, DmaMode>
+    pub struct SpiDma<'d, T, DmaMode>
     where
-        C: DmaChannel,
-        C::P: SpiPeripheral,
+        T: InstanceDma,
         DmaMode: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, C, DmaMode>,
+        pub(crate) channel: Channel<'d, T::Dma, DmaMode>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
     }
 
-    impl<'d, T, C, DmaMode> core::fmt::Debug for SpiDma<'d, T, C, DmaMode>
+    impl<'d, T, DmaMode> core::fmt::Debug for SpiDma<'d, T, DmaMode>
     where
-        C: DmaChannel,
-        C::P: SpiPeripheral,
+        T: InstanceDma,
         DmaMode: Mode,
     {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -249,11 +213,9 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, C, DmaMode> DmaSupport for SpiDma<'d, T, C, DmaMode>
+    impl<'d, T, DmaMode> DmaSupport for SpiDma<'d, T, DmaMode>
     where
         T: InstanceDma,
-        C: DmaChannel,
-        C::P: SpiPeripheral,
         DmaMode: Mode,
     {
         fn peripheral_wait_dma(&mut self, is_rx: bool, is_tx: bool) {
@@ -270,14 +232,12 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, C, DmaMode> DmaSupportTx for SpiDma<'d, T, C, DmaMode>
+    impl<'d, T, DmaMode> DmaSupportTx for SpiDma<'d, T, DmaMode>
     where
         T: InstanceDma,
-        C: DmaChannel,
-        C::P: SpiPeripheral,
         DmaMode: Mode,
     {
-        type TX = ChannelTx<'d, C>;
+        type TX = ChannelTx<'d, T::Dma>;
 
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
@@ -288,14 +248,12 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, C, DmaMode> DmaSupportRx for SpiDma<'d, T, C, DmaMode>
+    impl<'d, T, DmaMode> DmaSupportRx for SpiDma<'d, T, DmaMode>
     where
         T: InstanceDma,
-        C: DmaChannel,
-        C::P: SpiPeripheral,
         DmaMode: Mode,
     {
-        type RX = ChannelRx<'d, C>;
+        type RX = ChannelRx<'d, T::Dma>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx
@@ -306,13 +264,28 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, C, DmaMode> SpiDma<'d, T, C, DmaMode>
+    impl<'d, T, DmaMode> SpiDma<'d, T, DmaMode>
     where
         T: InstanceDma,
-        C: DmaChannel,
-        C::P: SpiPeripheral,
         DmaMode: Mode,
     {
+        fn new<CH>(
+            spi: PeripheralRef<'d, T>,
+            channel: Channel<'d, CH, DmaMode>,
+            rx_descriptors: &'static mut [DmaDescriptor],
+            tx_descriptors: &'static mut [DmaDescriptor],
+        ) -> Self
+        where
+            CH: DmaChannelConvert<T::Dma>,
+        {
+            channel.runtime_ensure_compatible(&spi);
+            Self {
+                spi,
+                channel: channel.degrade(),
+                rx_chain: DescriptorChain::new(rx_descriptors),
+                tx_chain: DescriptorChain::new(tx_descriptors),
+            }
+        }
         /// Register a buffer for a DMA write.
         ///
         /// This will return a [DmaTransferTx]. The maximum amount of data to be
@@ -425,9 +398,7 @@ pub mod dma {
 }
 
 #[doc(hidden)]
-pub trait InstanceDma: Instance {
-    fn dma_peripheral(&self) -> DmaPeripheral;
-
+pub trait InstanceDma: Instance + DmaEligible {
     #[allow(clippy::too_many_arguments)]
     unsafe fn start_transfer_dma<RX, TX>(
         &mut self,
@@ -569,23 +540,13 @@ fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
     let _ = reg_block;
 }
 
-impl InstanceDma for crate::peripherals::SPI2 {
-    fn dma_peripheral(&self) -> DmaPeripheral {
-        DmaPeripheral::Spi2
-    }
-}
+impl InstanceDma for crate::peripherals::SPI2 {}
 #[cfg(spi3)]
-impl InstanceDma for crate::peripherals::SPI3 {
-    fn dma_peripheral(&self) -> DmaPeripheral {
-        DmaPeripheral::Spi3
-    }
-}
+impl InstanceDma for crate::peripherals::SPI3 {}
 
 #[doc(hidden)]
-pub trait Instance: private::Sealed {
+pub trait Instance: private::Sealed + PeripheralMarker {
     fn register_block(&self) -> &RegisterBlock;
-
-    fn peripheral(&self) -> crate::system::Peripheral;
 
     fn sclk_signal(&self) -> InputSignal;
 
@@ -773,11 +734,6 @@ impl Instance for crate::peripherals::SPI2 {
     }
 
     #[inline(always)]
-    fn peripheral(&self) -> crate::system::Peripheral {
-        crate::system::Peripheral::Spi2
-    }
-
-    #[inline(always)]
     fn sclk_signal(&self) -> InputSignal {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
@@ -832,11 +788,6 @@ impl Instance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn spi_num(&self) -> u8 {
         3
-    }
-
-    #[inline(always)]
-    fn peripheral(&self) -> crate::system::Peripheral {
-        crate::system::Peripheral::Spi3
     }
 
     #[inline(always)]

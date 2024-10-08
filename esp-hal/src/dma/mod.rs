@@ -890,56 +890,44 @@ impl From<u32> for Owner {
     }
 }
 
-/// Marks channels as useable for SPI
 #[doc(hidden)]
 pub trait DmaEligible {
-    /// The DMA peripheral
-    const DMA_PERIPHERAL: DmaPeripheral;
-    fn dma_peripheral(&self) -> DmaPeripheral {
-        Self::DMA_PERIPHERAL
-    }
+    /// The most specific DMA channel type usable by this peripheral.
+    type Dma: DmaChannel;
+
+    fn dma_peripheral(&self) -> DmaPeripheral;
 }
 
-/// Marks channels as useable for SPI
 #[doc(hidden)]
-pub trait SpiPeripheral: PeripheralMarker {}
+#[macro_export]
+macro_rules! impl_dma_eligible {
+    ([$dma_ch:ident] $name:ident => $dma:ident) => {
+        impl $crate::dma::DmaEligible for $crate::peripherals::$name {
+            type Dma = $dma_ch;
 
-/// Marks channels as useable for SPI2
-#[doc(hidden)]
-pub trait Spi2Peripheral: SpiPeripheral + PeripheralMarker {}
+            fn dma_peripheral(&self) -> $crate::dma::DmaPeripheral {
+                $crate::dma::DmaPeripheral::$dma
+            }
+        }
+    };
 
-/// Marks channels as useable for SPI3
-#[cfg(any(esp32, esp32s2, esp32s3))]
-#[doc(hidden)]
-pub trait Spi3Peripheral: SpiPeripheral + PeripheralMarker {}
-
-/// Marks channels as useable for I2S
-#[doc(hidden)]
-pub trait I2sPeripheral: PeripheralMarker {}
-
-/// Marks channels as useable for I2S0
-#[doc(hidden)]
-pub trait I2s0Peripheral: I2sPeripheral + PeripheralMarker {}
-
-/// Marks channels as useable for I2S1
-#[doc(hidden)]
-pub trait I2s1Peripheral: I2sPeripheral + PeripheralMarker {}
-
-/// Marks channels as useable for PARL_IO
-#[doc(hidden)]
-pub trait ParlIoPeripheral: PeripheralMarker {}
-
-/// Marks channels as useable for AES
-#[doc(hidden)]
-pub trait AesPeripheral: PeripheralMarker {}
-
-/// Marks channels as usable for LCD_CAM
-#[doc(hidden)]
-pub trait LcdCamPeripheral: PeripheralMarker {}
+    (
+        $dma_ch:ident {
+            $($(#[$cfg:meta])? $name:ident => $dma:ident,)*
+        }
+    ) => {
+        $(
+            $(#[$cfg])?
+            $crate::impl_dma_eligible!([$dma_ch] $name => $dma);
+        )*
+    };
+}
 
 /// Marker trait
 #[doc(hidden)]
-pub trait PeripheralMarker {}
+pub trait PeripheralMarker {
+    fn peripheral(&self) -> crate::system::Peripheral;
+}
 
 #[doc(hidden)]
 #[derive(Debug)]
@@ -1534,23 +1522,31 @@ pub trait DmaChannel: crate::private::Sealed {
 
     /// A description of the TX half of a DMA Channel.
     type Tx: TxRegisterAccess + InterruptAccess<DmaTxInterrupt>;
-
-    /// A suitable peripheral for this DMA channel.
-    type P: PeripheralMarker;
 }
 
 #[doc(hidden)]
 pub trait DmaChannelExt: DmaChannel {
-    type Degraded: DmaChannel;
-
     fn get_rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt>;
     fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt>;
 
-    fn degrade_rx(rx: Self::Rx) -> <Self::Degraded as DmaChannel>::Rx;
-    fn degrade_tx(tx: Self::Tx) -> <Self::Degraded as DmaChannel>::Tx;
-
     #[doc(hidden)]
     fn set_isr(handler: InterruptHandler);
+}
+
+#[doc(hidden)]
+pub trait DmaChannelConvert<DEG: DmaChannel>: DmaChannel {
+    fn degrade_rx(rx: Self::Rx) -> DEG::Rx;
+    fn degrade_tx(tx: Self::Tx) -> DEG::Tx;
+}
+
+impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
+    fn degrade_rx(rx: Self::Rx) -> DEG::Rx {
+        rx
+    }
+
+    fn degrade_tx(tx: Self::Tx) -> DEG::Tx {
+        tx
+    }
 }
 
 /// The functions here are not meant to be used outside the HAL
@@ -1634,10 +1630,11 @@ where
         }
     }
 
-    /// Return a type-erased (degraded) version of this channel.
-    pub fn degrade(self) -> ChannelRx<'a, CH::Degraded>
+    /// Return a less specific (degraded) version of this channel.
+    #[doc(hidden)]
+    pub fn degrade<DEG: DmaChannel>(self) -> ChannelRx<'a, DEG>
     where
-        CH: DmaChannelExt,
+        CH: DmaChannelConvert<DEG>,
     {
         ChannelRx {
             burst_mode: self.burst_mode,
@@ -1851,10 +1848,11 @@ where
         }
     }
 
-    /// Return a type-erased (degraded) version of this channel.
-    pub fn degrade(self) -> ChannelTx<'a, CH::Degraded>
+    /// Return a less specific (degraded) version of this channel.
+    #[doc(hidden)]
+    pub fn degrade<DEG: DmaChannel>(self) -> ChannelTx<'a, DEG>
     where
-        CH: DmaChannelExt,
+        CH: DmaChannelConvert<DEG>,
     {
         ChannelTx {
             burst_mode: self.burst_mode,
@@ -2017,6 +2015,9 @@ pub trait RegisterAccess: crate::private::Sealed {
 
     #[cfg(esp32s3)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
+
+    #[cfg(pdma)]
+    fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool;
 }
 
 #[doc(hidden)]
@@ -2122,13 +2123,17 @@ where
     }
 }
 
-impl<'d, C, M: Mode> Channel<'d, C, M>
+impl<'d, CH, M: Mode> Channel<'d, CH, M>
 where
-    C: DmaChannelExt,
+    CH: DmaChannel,
 {
-    /// Return a type-erased (degraded) version of this channel (both rx and
+    /// Return a less specific (degraded) version of this channel (both rx and
     /// tx).
-    pub fn degrade(self) -> Channel<'d, C::Degraded, M> {
+    #[doc(hidden)]
+    pub fn degrade<DEG: DmaChannel>(self) -> Channel<'d, DEG, M>
+    where
+        CH: DmaChannelConvert<DEG>,
+    {
         Channel {
             rx: self.rx.degrade(),
             tx: self.tx.degrade(),

@@ -23,7 +23,7 @@ use esp_hal::{
 use hil_test as _;
 
 cfg_if::cfg_if! {
-    if #[cfg(any(esp32, esp32s2))] {
+    if #[cfg(pdma)] {
         use esp_hal::dma::Spi2DmaChannel as DmaChannel0;
     } else {
         use esp_hal::dma::DmaChannel0;
@@ -38,8 +38,7 @@ cfg_if::cfg_if! {
     }
 }
 
-type SpiUnderTest =
-    SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>;
+type SpiUnderTest = SpiDma<'static, esp_hal::peripherals::SPI2, HalfDuplexMode, Blocking>;
 
 struct Context {
     spi: esp_hal::peripherals::SPI2,

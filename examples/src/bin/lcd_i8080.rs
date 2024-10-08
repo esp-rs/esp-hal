@@ -25,7 +25,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{Dma, DmaChannel0, DmaPriority, DmaTxBuf},
+    dma::{Dma, DmaPriority, DmaTxBuf},
     dma_tx_buffer,
     gpio::{Input, Io, Level, Output, Pull},
     lcd_cam::{
@@ -88,15 +88,12 @@ fn main() -> ! {
     // 8 vs 16 bit, non-native primitives like Rgb565, Rgb888, etc. This Bus is just provided as
     // an example of how to implement your own.
     struct Bus<'d> {
-        resources: Option<(I8080<'d, DmaChannel0, Blocking>, DmaTxBuf)>,
+        resources: Option<(I8080<'d, Blocking>, DmaTxBuf)>,
     }
     impl<'d> Bus<'d> {
         fn use_resources<T>(
             &mut self,
-            func: impl FnOnce(
-                I8080<'d, DmaChannel0, Blocking>,
-                DmaTxBuf,
-            ) -> (T, I8080<'d, DmaChannel0, Blocking>, DmaTxBuf),
+            func: impl FnOnce(I8080<'d, Blocking>, DmaTxBuf) -> (T, I8080<'d, Blocking>, DmaTxBuf),
         ) -> T {
             let (i8080, buf) = self.resources.take().unwrap();
             let (result, i8080, buf) = func(i8080, buf);
