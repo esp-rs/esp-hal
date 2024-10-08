@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- Replace environment variables `ESP_LOGLEVEL` and `ESP_LOGFILTER` with just one environment variable: `ESP_LOG` (#2291)
 
 ### Fixed
 

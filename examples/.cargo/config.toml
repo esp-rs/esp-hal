@@ -27,7 +27,7 @@ rustflags = [
 ]
 
 [env]
-ESP_LOGLEVEL = "info"
+ESP_LOG = "info"
 SSID = "SSID"
 PASSWORD = "PASSWORD"
 STATIC_IP = "1.1.1.1 "
