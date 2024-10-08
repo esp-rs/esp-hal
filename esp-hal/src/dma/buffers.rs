@@ -142,11 +142,6 @@ impl DmaTxBuf {
         Self::new_with_block_size(descriptors, buffer, None)
     }
 
-    /// Creates an empty [DmaTxBuf].
-    pub fn empty() -> Self {
-        unwrap!(Self::new(&mut [], &mut []))
-    }
-
     /// Compute max chunk size based on block size
     pub const fn compute_chunk_size(block_size: Option<DmaBufBlkSize>) -> usize {
         max_chunk_size(block_size)
@@ -174,31 +169,28 @@ impl DmaTxBuf {
         buffer: &'static mut [u8],
         block_size: Option<DmaBufBlkSize>,
     ) -> Result<Self, DmaBufError> {
-        #[allow(clippy::collapsible_if)] // Kind of a false positive with cfg_if
-        if !buffer.is_empty() {
-            cfg_if::cfg_if! {
-                if #[cfg(esp32s3)] {
-                    // buffer can be either DRAM or PSRAM (if supported)
-                    if !is_slice_in_dram(buffer) && !is_slice_in_psram(buffer) {
-                        return Err(DmaBufError::UnsupportedMemoryRegion);
-                    }
-                    // if its PSRAM, the block_size/alignment must be specified
-                    if is_slice_in_psram(buffer) && block_size.is_none() {
-                        return Err(DmaBufError::InvalidAlignment);
-                    }
-                } else {
-                    #[cfg(any(esp32,esp32s2))]
-                    if buffer.len() % 4 != 0 && buffer.as_ptr() as usize % 4 != 0 {
-                        // ESP32 requires word alignment for DMA buffers.
-                        // ESP32-S2 technically supports byte-aligned DMA buffers, but the
-                        // transfer ends up writing out of bounds if the buffer's length
-                        // is 2 or 3 (mod 4).
-                        return Err(DmaBufError::InvalidAlignment);
-                    }
-                    // buffer can only be DRAM
-                    if !is_slice_in_dram(buffer) {
-                        return Err(DmaBufError::UnsupportedMemoryRegion);
-                    }
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s3)] {
+                // buffer can be either DRAM or PSRAM (if supported)
+                if !is_slice_in_dram(buffer) && !is_slice_in_psram(buffer) {
+                    return Err(DmaBufError::UnsupportedMemoryRegion);
+                }
+                // if its PSRAM, the block_size/alignment must be specified
+                if is_slice_in_psram(buffer) && block_size.is_none() {
+                    return Err(DmaBufError::InvalidAlignment);
+                }
+            } else {
+                #[cfg(any(esp32,esp32s2))]
+                if buffer.len() % 4 != 0 && buffer.as_ptr() as usize % 4 != 0 {
+                    // ESP32 requires word alignment for DMA buffers.
+                    // ESP32-S2 technically supports byte-aligned DMA buffers, but the
+                    // transfer ends up writing out of bounds if the buffer's length
+                    // is 2 or 3 (mod 4).
+                    return Err(DmaBufError::InvalidAlignment);
+                }
+                // buffer can only be DRAM
+                if !is_slice_in_dram(buffer) {
+                    return Err(DmaBufError::UnsupportedMemoryRegion);
                 }
             }
         }
@@ -215,11 +207,9 @@ impl DmaTxBuf {
             block_size,
         };
 
-        if !buf.descriptors.descriptors.is_empty() || !buf.buffer.is_empty() {
-            buf.descriptors
-                .link_with_buffer(buf.buffer, max_chunk_size(block_size))?;
-            buf.set_length(buf.capacity());
-        }
+        buf.descriptors
+            .link_with_buffer(buf.buffer, max_chunk_size(block_size))?;
+        buf.set_length(buf.capacity());
 
         Ok(buf)
     }
@@ -338,7 +328,7 @@ impl DmaRxBuf {
         descriptors: &'static mut [DmaDescriptor],
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
-        if !buffer.is_empty() && !is_slice_in_dram(buffer) {
+        if !is_slice_in_dram(buffer) {
             return Err(DmaBufError::UnsupportedMemoryRegion);
         }
 
@@ -347,18 +337,11 @@ impl DmaRxBuf {
             buffer,
         };
 
-        if !buf.descriptors.descriptors.is_empty() || !buf.buffer.is_empty() {
-            buf.descriptors
-                .link_with_buffer(buf.buffer, max_chunk_size(None))?;
-            buf.set_length(buf.capacity());
-        }
+        buf.descriptors
+            .link_with_buffer(buf.buffer, max_chunk_size(None))?;
+        buf.set_length(buf.capacity());
 
         Ok(buf)
-    }
-
-    /// Creates an empty [DmaRxBuf].
-    pub fn empty() -> Self {
-        unwrap!(Self::new(&mut [], &mut []))
     }
 
     /// Consume the buf, returning the descriptors and buffer.
@@ -494,7 +477,7 @@ impl DmaRxTxBuf {
         tx_descriptors: &'static mut [DmaDescriptor],
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
-        if !buffer.is_empty() && !is_slice_in_dram(buffer) {
+        if !is_slice_in_dram(buffer) {
             return Err(DmaBufError::UnsupportedMemoryRegion);
         }
 
@@ -503,23 +486,13 @@ impl DmaRxTxBuf {
             tx_descriptors: DescriptorSet::new(tx_descriptors)?,
             buffer,
         };
-        if !buf.rx_descriptors.descriptors.is_empty()
-            || !buf.tx_descriptors.descriptors.is_empty()
-            || !buf.buffer.is_empty()
-        {
-            buf.rx_descriptors
-                .link_with_buffer(buf.buffer, max_chunk_size(None))?;
-            buf.tx_descriptors
-                .link_with_buffer(buf.buffer, max_chunk_size(None))?;
-            buf.set_length(buf.capacity());
-        }
+        buf.rx_descriptors
+            .link_with_buffer(buf.buffer, max_chunk_size(None))?;
+        buf.tx_descriptors
+            .link_with_buffer(buf.buffer, max_chunk_size(None))?;
+        buf.set_length(buf.capacity());
 
         Ok(buf)
-    }
-
-    /// Creates an empty [DmaRxTxBuf].
-    pub fn empty() -> Self {
-        unwrap!(Self::new(&mut [], &mut [], &mut []))
     }
 
     /// Consume the buf, returning the rx descriptors, tx descriptors and
@@ -938,5 +911,56 @@ impl DmaRxStreamBufView {
                 found_eof,
             )
         }
+    }
+}
+
+static mut EMPTY: &mut [DmaDescriptor] = &mut [DmaDescriptor::EMPTY];
+
+/// An empty buffer that can be used when you don't need to transfer any data.
+pub struct EmptyBuf;
+
+unsafe impl DmaTxBuffer for EmptyBuf {
+    type View = EmptyBuf;
+
+    fn prepare(&mut self) -> Preparation {
+        Preparation {
+            start: unsafe { EMPTY.as_mut_ptr() },
+            block_size: None,
+        }
+    }
+
+    fn into_view(self) -> EmptyBuf {
+        self
+    }
+
+    fn from_view(view: Self::View) -> Self {
+        view
+    }
+
+    fn length(&self) -> usize {
+        0
+    }
+}
+
+unsafe impl DmaRxBuffer for EmptyBuf {
+    type View = EmptyBuf;
+
+    fn prepare(&mut self) -> Preparation {
+        Preparation {
+            start: unsafe { EMPTY.as_mut_ptr() },
+            block_size: None,
+        }
+    }
+
+    fn into_view(self) -> EmptyBuf {
+        self
+    }
+
+    fn from_view(view: Self::View) -> Self {
+        view
+    }
+
+    fn length(&self) -> usize {
+        0
     }
 }

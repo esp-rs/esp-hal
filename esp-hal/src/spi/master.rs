@@ -944,6 +944,7 @@ mod dma {
             DmaRxBuffer,
             DmaTxBuf,
             DmaTxBuffer,
+            EmptyBuf,
             Rx,
             Tx,
         },
@@ -1173,7 +1174,7 @@ mod dma {
             unsafe {
                 self.spi.start_transfer_dma(
                     false,
-                    &mut DmaRxBuf::empty(),
+                    &mut EmptyBuf,
                     &mut self.address_buffer,
                     &mut self.channel.rx,
                     &mut self.channel.tx,
@@ -1359,7 +1360,7 @@ mod dma {
 
             self.spi.start_transfer_dma(
                 true,
-                &mut DmaRxBuf::empty(),
+                &mut EmptyBuf,
                 buffer,
                 &mut self.channel.rx,
                 &mut self.channel.tx,
@@ -1399,7 +1400,7 @@ mod dma {
             self.spi.start_transfer_dma(
                 false,
                 buffer,
-                &mut DmaTxBuf::empty(),
+                &mut EmptyBuf,
                 &mut self.channel.rx,
                 &mut self.channel.tx,
             )
@@ -1500,7 +1501,7 @@ mod dma {
             self.spi.start_transfer_dma(
                 false,
                 buffer,
-                &mut DmaTxBuf::empty(),
+                &mut EmptyBuf,
                 &mut self.channel.rx,
                 &mut self.channel.tx,
             )
@@ -1566,7 +1567,7 @@ mod dma {
 
             self.spi.start_transfer_dma(
                 false,
-                &mut DmaRxBuf::empty(),
+                &mut EmptyBuf,
                 buffer,
                 &mut self.channel.rx,
                 &mut self.channel.tx,
@@ -1700,7 +1701,7 @@ mod dma {
 
                 unsafe {
                     self.spi_dma
-                        .start_dma_transfer(&mut self.rx_buf, &mut DmaTxBuf::empty())?;
+                        .start_dma_transfer(&mut self.rx_buf, &mut EmptyBuf)?;
                 }
 
                 self.wait_for_idle();
@@ -1720,7 +1721,7 @@ mod dma {
 
                 unsafe {
                     self.spi_dma
-                        .start_dma_transfer(&mut DmaRxBuf::empty(), &mut self.tx_buf)?;
+                        .start_dma_transfer(&mut EmptyBuf, &mut self.tx_buf)?;
                 }
 
                 self.wait_for_idle();
@@ -1945,7 +1946,7 @@ mod dma {
 
                     let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
 
-                    unsafe { spi.start_dma_transfer(&mut self.rx_buf, &mut DmaTxBuf::empty())? };
+                    unsafe { spi.start_dma_transfer(&mut self.rx_buf, &mut EmptyBuf)? };
 
                     spi.wait_for_idle_async().await;
 
@@ -1968,7 +1969,7 @@ mod dma {
                 for chunk in words.chunks(chunk_size) {
                     self.tx_buf.fill(chunk);
 
-                    unsafe { spi.start_dma_transfer(&mut DmaRxBuf::empty(), &mut self.tx_buf)? };
+                    unsafe { spi.start_dma_transfer(&mut EmptyBuf, &mut self.tx_buf)? };
 
                     spi.wait_for_idle_async().await;
                 }
