@@ -142,6 +142,11 @@ impl DmaTxBuf {
         Self::new_with_block_size(descriptors, buffer, None)
     }
 
+    /// Creates an empty [DmaTxBuf].
+    pub fn empty() -> Self {
+        unwrap!(Self::new(&mut [], &mut []))
+    }
+
     /// Compute max chunk size based on block size
     pub const fn compute_chunk_size(block_size: Option<DmaBufBlkSize>) -> usize {
         max_chunk_size(block_size)
@@ -351,6 +356,11 @@ impl DmaRxBuf {
         Ok(buf)
     }
 
+    /// Creates an empty [DmaRxBuf].
+    pub fn empty() -> Self {
+        unwrap!(Self::new(&mut [], &mut []))
+    }
+
     /// Consume the buf, returning the descriptors and buffer.
     pub fn split(self) -> (&'static mut [DmaDescriptor], &'static mut [u8]) {
         (self.descriptors.into_inner(), self.buffer)
@@ -484,7 +494,7 @@ impl DmaRxTxBuf {
         tx_descriptors: &'static mut [DmaDescriptor],
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
-        if !is_slice_in_dram(buffer) {
+        if !buffer.is_empty() && !is_slice_in_dram(buffer) {
             return Err(DmaBufError::UnsupportedMemoryRegion);
         }
 
@@ -493,13 +503,23 @@ impl DmaRxTxBuf {
             tx_descriptors: DescriptorSet::new(tx_descriptors)?,
             buffer,
         };
-        buf.rx_descriptors
-            .link_with_buffer(buf.buffer, max_chunk_size(None))?;
-        buf.tx_descriptors
-            .link_with_buffer(buf.buffer, max_chunk_size(None))?;
-        buf.set_length(buf.capacity());
+        if !buf.rx_descriptors.descriptors.is_empty()
+            || !buf.tx_descriptors.descriptors.is_empty()
+            || !buf.buffer.is_empty()
+        {
+            buf.rx_descriptors
+                .link_with_buffer(buf.buffer, max_chunk_size(None))?;
+            buf.tx_descriptors
+                .link_with_buffer(buf.buffer, max_chunk_size(None))?;
+            buf.set_length(buf.capacity());
+        }
 
         Ok(buf)
+    }
+
+    /// Creates an empty [DmaRxTxBuf].
+    pub fn empty() -> Self {
+        unwrap!(Self::new(&mut [], &mut [], &mut []))
     }
 
     /// Consume the buf, returning the rx descriptors, tx descriptors and
