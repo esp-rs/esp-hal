@@ -913,3 +913,54 @@ impl DmaRxStreamBufView {
         }
     }
 }
+
+static mut EMPTY: [DmaDescriptor; 1] = [DmaDescriptor::EMPTY];
+
+/// An empty buffer that can be used when you don't need to transfer any data.
+pub struct EmptyBuf;
+
+unsafe impl DmaTxBuffer for EmptyBuf {
+    type View = EmptyBuf;
+
+    fn prepare(&mut self) -> Preparation {
+        Preparation {
+            start: unsafe { EMPTY.as_mut_ptr() },
+            block_size: None,
+        }
+    }
+
+    fn into_view(self) -> EmptyBuf {
+        self
+    }
+
+    fn from_view(view: Self::View) -> Self {
+        view
+    }
+
+    fn length(&self) -> usize {
+        0
+    }
+}
+
+unsafe impl DmaRxBuffer for EmptyBuf {
+    type View = EmptyBuf;
+
+    fn prepare(&mut self) -> Preparation {
+        Preparation {
+            start: unsafe { EMPTY.as_mut_ptr() },
+            block_size: None,
+        }
+    }
+
+    fn into_view(self) -> EmptyBuf {
+        self
+    }
+
+    fn from_view(view: Self::View) -> Self {
+        view
+    }
+
+    fn length(&self) -> usize {
+        0
+    }
+}
