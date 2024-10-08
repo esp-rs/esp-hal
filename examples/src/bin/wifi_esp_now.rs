@@ -15,7 +15,7 @@ use esp_println::println;
 use esp_wifi::{
     current_millis,
     esp_now::{PeerInfo, BROADCAST_ADDRESS},
-    initialize,
+    init,
     EspWifiInitFor,
 };
 
@@ -32,7 +32,7 @@ fn main() -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let init = initialize(
+    let init = init(
         EspWifiInitFor::Wifi,
         timg0.timer0,
         Rng::new(peripherals.RNG),

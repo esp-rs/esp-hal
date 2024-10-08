@@ -1,3 +1,7 @@
+#![cfg_attr(
+    docsrs,
+    doc = "<div style='padding:30px;background:#810;color:#fff;text-align:center;'><p>You might want to <a href='https://docs.esp-rs.org/esp-wifi/'>browse the <code>esp-wifi</code> documentation on the esp-rs website</a> instead.</p><p>The documentation here on <a href='https://docs.rs'>docs.rs</a> is built for a single chip only (ESP32-C3, in particular), while on the esp-rs website you can select your exact chip from the list of supported devices. Available peripherals and their APIs might change depending on the chip.</p></div>\n\n<br/>\n\n"
+)]
 //! This documentation is built for the
 #![cfg_attr(esp32, doc = "**ESP32**")]
 #![cfg_attr(esp32s2, doc = "**ESP32-S2**")]
@@ -387,7 +391,7 @@ impl EspWifiTimerSource for TimeBase {
 /// use esp_wifi::EspWifiInitFor;
 ///
 /// let timg0 = TimerGroup::new(peripherals.TIMG0);
-/// let init = esp_wifi::initialize(
+/// let init = esp_wifi::init(
 ///     EspWifiInitFor::Wifi,
 ///     timg0.timer0,
 ///     Rng::new(peripherals.RNG),
@@ -396,7 +400,7 @@ impl EspWifiTimerSource for TimeBase {
 /// .unwrap();
 /// # }
 /// ```
-pub fn initialize(
+pub fn init(
     init_for: EspWifiInitFor,
     timer: impl EspWifiTimerSource,
     rng: hal::rng::Rng,

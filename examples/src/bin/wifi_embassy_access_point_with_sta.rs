@@ -33,7 +33,7 @@ use esp_backtrace as _;
 use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_wifi::{
-    initialize,
+    init,
     wifi::{
         AccessPointConfiguration,
         ClientConfiguration,
@@ -74,7 +74,7 @@ async fn main(spawner: Spawner) -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let init = initialize(
+    let init = init(
         EspWifiInitFor::Wifi,
         timg0.timer0,
         Rng::new(peripherals.RNG),

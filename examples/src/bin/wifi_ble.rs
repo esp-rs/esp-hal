@@ -31,7 +31,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_wifi::{ble::controller::BleConnector, initialize, EspWifiInitFor};
+use esp_wifi::{ble::controller::BleConnector, init, EspWifiInitFor};
 
 #[entry]
 fn main() -> ! {
@@ -46,7 +46,7 @@ fn main() -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let init = initialize(
+    let init = init(
         EspWifiInitFor::Ble,
         timg0.timer0,
         Rng::new(peripherals.RNG),
