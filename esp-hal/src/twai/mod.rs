@@ -244,6 +244,7 @@ impl embedded_can::Error for ErrorKind {
 
 /// Specifies in which mode the TWAI controller will operate.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum TwaiMode {
     /// Normal operating mode
     Normal,
@@ -256,6 +257,7 @@ pub enum TwaiMode {
 
 /// Standard 11-bit TWAI Identifier (`0..=0x7FF`).
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct StandardId(u16);
 
 impl StandardId {
@@ -321,6 +323,7 @@ impl From<embedded_can::StandardId> for StandardId {
 
 /// Extended 29-bit TWAI Identifier (`0..=1FFF_FFFF`).
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ExtendedId(u32);
 
 impl ExtendedId {
@@ -392,6 +395,7 @@ impl From<embedded_can::ExtendedId> for ExtendedId {
 
 /// A TWAI Identifier (standard or extended).
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Id {
     /// Standard 11-bit Identifier (`0..=0x7FF`).
     Standard(StandardId),
@@ -451,6 +455,7 @@ impl From<embedded_can::Id> for Id {
 
 /// Structure backing the embedded_hal_02::can::Frame/embedded_can::Frame trait.
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct EspTwaiFrame {
     id: Id,
     dlc: usize,
@@ -535,7 +540,7 @@ impl EspTwaiFrame {
             data,
             dlc,
             is_remote: false,
-            self_reception: true,
+            self_reception: false,
         }
     }
 }
@@ -611,6 +616,8 @@ impl embedded_can::Frame for EspTwaiFrame {
 }
 
 /// The underlying timings for the TWAI peripheral.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct TimingConfig {
     /// The baudrate prescaler is used to determine the period of each time
     /// quantum by dividing the TWAI controller's source clock.
@@ -635,6 +642,8 @@ pub struct TimingConfig {
 /// A selection of pre-determined baudrates for the TWAI driver.
 /// Currently these timings are sourced from the ESP IDF C driver which assumes
 /// an APB clock of 80MHz.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum BaudRate {
     /// A baud rate of 125 Kbps.
     B125K,
@@ -691,10 +700,10 @@ impl BaudRate {
         #[cfg(esp32h2)]
         let timing = match self {
             Self::B125K => TimingConfig {
-                baud_rate_prescaler: 8,
+                baud_rate_prescaler: 16,
                 sync_jump_width: 3,
-                tseg_1: 23,
-                tseg_2: 8,
+                tseg_1: 11,
+                tseg_2: 4,
                 triple_sample: false,
             },
             Self::B250K => TimingConfig {
@@ -772,17 +781,20 @@ where
                 .modify(|r, w| unsafe { w.bits(r.bits() | 0x80) });
         }
 
-        if no_transceiver {
+        let rx_pull = if no_transceiver {
             tx_pin.set_to_open_drain_output(crate::private::Internal);
+            tx_pin.pull_direction(Pull::Up, crate::private::Internal);
+            Pull::Up
         } else {
             tx_pin.set_to_push_pull_output(crate::private::Internal);
-        }
+            Pull::None
+        };
         tx_pin.connect_peripheral_to_output(T::OUTPUT_SIGNAL, crate::private::Internal);
 
         // Setting up RX pin later allows us to use a single pin in tests.
         // `set_to_push_pull_output` disables input, here we re-enable it if rx_pin
         // uses the same GPIO.
-        rx_pin.init_input(Pull::None, crate::private::Internal);
+        rx_pin.init_input(rx_pull, crate::private::Internal);
         rx_pin.connect_input_to_peripheral(T::INPUT_SIGNAL, crate::private::Internal);
 
         // Freeze REC by changing to LOM mode
@@ -843,17 +855,21 @@ where
 
         #[cfg(esp32)]
         {
+            // From <https://github.com/espressif/esp-idf/blob/6e5a178b3120dced7fa5c29c655cc22ea182df3d/components/soc/esp32/register/soc/twai_struct.h#L79>
+            // and <https://github.com/espressif/esp-idf/blob/6e5a178b3120dced7fa5c29c655cc22ea182df3d/components/hal/esp32/include/hal/twai_ll.h#L528-L534>:
             if timing.baud_rate_prescaler > 128 {
-                // Enable /2 baudrate divider
+                // Enable /2 baudrate divider by setting `brp_div`.
+                // `brp_div` is not an interrupt, it will prescale BRP by 2. Only available on
+                // ESP32 Revision 2 or later. Reserved otherwise.
                 T::register_block()
                     .int_ena()
-                    .modify(|r, w| unsafe { w.bits(r.bits() | 0x08) });
+                    .modify(|r, w| unsafe { w.bits(r.bits() | 0x10) });
                 prescaler = timing.baud_rate_prescaler / 2;
             } else {
-                // Disable /2 baudrate divider
+                // Disable /2 baudrate divider by clearing brp_div.
                 T::register_block()
                     .int_ena()
-                    .modify(|r, w| unsafe { w.bits(r.bits() & !0xF7) });
+                    .modify(|r, w| unsafe { w.bits(r.bits() & !0x10) });
             }
         }
 
@@ -875,6 +891,11 @@ where
             w.time_seg2().bits(tseg_2);
             w.time_samp().bit(triple_sample)
         });
+
+        // disable CLKOUT
+        T::register_block()
+            .clock_divider()
+            .modify(|_, w| w.clock_off().set_bit());
     }
 
     /// Set up the acceptance filter on the device.
@@ -1491,6 +1512,7 @@ pub trait Instance: crate::private::Sealed {
 
         let is_standard_format = data_0 & 0b1 << 7 == 0;
         let is_data_frame = data_0 & 0b1 << 6 == 0;
+        let self_reception = data_0 & 0b1 << 4 != 0;
         let dlc = data_0 & 0b1111;
 
         if dlc > 8 {
@@ -1528,11 +1550,12 @@ pub trait Instance: crate::private::Sealed {
             (id, register_block.data_5().as_ptr())
         };
 
-        let frame = if is_data_frame {
+        let mut frame = if is_data_frame {
             unsafe { EspTwaiFrame::new_from_data_registers(id, data_ptr, dlc) }
         } else {
             EspTwaiFrame::new_remote(id, dlc).unwrap()
         };
+        frame.self_reception = self_reception;
 
         // Release the packet we read from the FIFO, allowing the peripheral to prepare
         // the next packet.
