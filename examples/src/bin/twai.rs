@@ -11,7 +11,7 @@
 //! ESP1/GND --- ESP2/GND
 //! ESP1/GPIO2 --- ESP2/GPIO2
 //!
-//! Notes for external transciever use:
+//! Notes for external transceiver use:
 //!
 //! The default setup assumes that two microcontrollers are connected directly without an external
 //! transceiver. If you want to use an external transceiver, you need to:
@@ -43,10 +43,10 @@ fn main() -> ! {
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let tx_pin = io.pins.gpio2;
-    // let rx_pin = io.pins.gpio0; // Uncomment if you want to use an external transciever.
+    // let rx_pin = io.pins.gpio0; // Uncomment if you want to use an external transceiver.
 
-    // Without an external transciever, we only need a single line between the two MCUs.
-    let rx_pin = tx_pin.peripheral_input(); // Comment this line if you want to use an external transciever.
+    // Without an external transceiver, we only need a single line between the two MCUs.
+    let rx_pin = tx_pin.peripheral_input(); // Comment this line if you want to use an external transceiver.
 
     // The speed of the bus.
     const TWAI_BAUDRATE: twai::BaudRate = twai::BaudRate::B125K;
