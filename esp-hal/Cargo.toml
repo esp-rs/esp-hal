@@ -97,6 +97,7 @@ debug = [
     "esp32c3?/impl-register-debug",
     "esp32c6?/impl-register-debug",
     "esp32h2?/impl-register-debug",
+    "esp32p4?/impl-register-debug",
     "esp32s2?/impl-register-debug",
     "esp32s3?/impl-register-debug",
 ]
@@ -114,6 +115,8 @@ esp32c3 = ["dep:esp32c3", "riscv",  "portable-atomic/unsafe-assume-single-core",
 esp32c6 = ["dep:esp32c6", "riscv",  "procmacros/has-lp-core", "esp-riscv-rt/rtc-ram"]
 # Target the ESP32-H2.
 esp32h2 = ["dep:esp32h2", "riscv", "esp-riscv-rt/rtc-ram"]
+# Target the ESP32-P4.
+esp32p4 = ["dep:esp32p4", "riscv"]
 # Target the ESP32-S2.
 esp32s2 = ["dep:esp32s2", "xtensa", "portable-atomic/critical-section", "procmacros/has-ulp-core", "xtensa-lx-rt/esp32s2", "usb-otg"]
 # Target the ESP32-S3.
@@ -138,6 +141,7 @@ defmt = [
     "esp32c3?/defmt",
     "esp32c6?/defmt",
     "esp32h2?/defmt",
+    "esp32p4?/defmt",
     "esp32s2?/defmt",
     "esp32s3?/defmt",
     "fugit/defmt",
