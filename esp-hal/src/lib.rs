@@ -476,7 +476,7 @@ use crate::{
 };
 
 /// System configuration.
-#[non_exhaustive]
+// #[non_exhaustive]
 #[derive(Default)]
 pub struct Config {
     /// The CPU clock configuration.
@@ -519,7 +519,7 @@ pub fn init(config: Config) -> Peripherals {
             timg0_wd.set_timeout(duration);
         }
         WatchdogStatus::Disabled => {
-            crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new().disable();
+            // crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new().disable();
         }
     }
 

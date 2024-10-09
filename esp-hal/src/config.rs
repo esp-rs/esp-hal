@@ -41,7 +41,7 @@ pub enum WatchdogStatus {
 }
 
 /// Watchdogs configuration.
-#[non_exhaustive]
+// #[non_exhaustive]
 #[derive(Default)]
 pub struct WatchdogConfig {
     #[cfg(not(any(esp32, esp32s2)))]
