@@ -1,11 +1,13 @@
 [package]
-name = "esp-config"
-version = "0.1.0"
-edition = "2021"
-rust-version  = "1.79.0"
+name         = "esp-config"
+version      = "0.1.0"
+edition      = "2021"
+rust-version = "1.79.0"
+repository   = "https://github.com/esp-rs/esp-hal"
+license      = "MIT OR Apache-2.0"
 
 [dependencies]
-document-features        = "0.2.10"
+document-features = "0.2.10"
 
 [dev-dependencies]
 temp-env = "0.3.6"
