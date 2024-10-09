@@ -43,11 +43,16 @@ pub struct Context {
     pub M1: u32,
     pub M2: u32,
     pub M3: u32,
-    #[cfg(XCHAL_HAVE_DFP_ACCEL)]
+    #[cfg(XCHAL_HAVE_CP)]
+    // Either F64R_LO or CPENABLE depending on `float-save-restore`.
     pub F64R_LO_CPENABLE: u32,
-    #[cfg(all(feature = "float-save-restore", XCHAL_HAVE_DFP_ACCEL))]
+    // F64R_HI is only meaningful with cfg!(XCHAL_HAVE_DFP_ACCEL) but it's present in the stack
+    // frame unconditionally
+    #[cfg(feature = "float-save-restore")]
     pub F64R_HI: u32,
-    #[cfg(all(feature = "float-save-restore", XCHAL_HAVE_DFP_ACCEL))]
+    // F64S is only meaningful with cfg!(XCHAL_HAVE_DFP_ACCEL) but it's present in the stack frame
+    // unconditionally
+    #[cfg(feature = "float-save-restore")]
     pub F64S: u32,
     #[cfg(all(feature = "float-save-restore", XCHAL_HAVE_FP))]
     pub FCR: u32,

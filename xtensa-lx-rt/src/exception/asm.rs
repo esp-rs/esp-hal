@@ -8,6 +8,12 @@ use crate::cfg_asm;
 // we could cut that memory usage.
 // However in order to conveniently use `addmi` we need 256-byte alignment
 // anyway so wasting a bit more stack space seems to be the better option.
+//
+// The only exception is XT_STK_F64R_LO_CPENABLE which combines two register
+// values depending on `float-save-restore` feature. This is done so that their
+// position stays the same in `Context` without creating a large hole in the
+// struct.
+//
 // Additionally there is a chunk of memory reserved for spilled registers.
 //
 // With the exception of XT_STK_TMP, the fields must be aligned with the
