@@ -58,6 +58,7 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
+    dma::PeripheralMarker,
     gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
@@ -500,8 +501,8 @@ where
     ) -> Self {
         crate::into_ref!(i2c, sda, scl);
 
-        PeripheralClockControl::reset(T::peripheral());
-        PeripheralClockControl::enable(T::peripheral());
+        PeripheralClockControl::reset(i2c.peripheral());
+        PeripheralClockControl::enable(i2c.peripheral());
 
         let i2c = I2c {
             peripheral: i2c,
@@ -545,13 +546,16 @@ where
     }
 
     fn internal_set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        unsafe { crate::interrupt::bind_interrupt(T::interrupt(), handler.handler()) };
-        unwrap!(crate::interrupt::enable(T::interrupt(), handler.priority()));
+        unsafe { crate::interrupt::bind_interrupt(self.peripheral.interrupt(), handler.handler()) };
+        unwrap!(crate::interrupt::enable(
+            self.peripheral.interrupt(),
+            handler.priority()
+        ));
     }
 
     fn internal_recover(&self) {
-        PeripheralClockControl::reset(T::peripheral());
-        PeripheralClockControl::enable(T::peripheral());
+        PeripheralClockControl::reset(self.peripheral.peripheral());
+        PeripheralClockControl::enable(self.peripheral.peripheral());
 
         self.peripheral.setup(self.frequency, self.timeout);
     }
@@ -635,7 +639,7 @@ where
     ) -> Self {
         let mut this = Self::new_internal(i2c, sda, scl, frequency, timeout);
 
-        this.internal_set_interrupt_handler(T::async_handler());
+        this.internal_set_interrupt_handler(this.peripheral.async_handler());
 
         this
     }
@@ -1193,9 +1197,7 @@ mod asynch {
         }
     }
 
-    #[handler]
-    pub(super) fn i2c0_handler() {
-        let regs = unsafe { &*crate::peripherals::I2C0::PTR };
+    fn handler(regs: &RegisterBlock) {
         regs.int_ena().modify(|_, w| {
             w.end_detect().clear_bit();
             w.trans_complete().clear_bit();
@@ -1211,6 +1213,12 @@ mod asynch {
 
         #[cfg(esp32)]
         regs.int_ena().modify(|_, w| w.ack_err().clear_bit());
+    }
+
+    #[handler]
+    pub(super) fn i2c0_handler() {
+        let regs = unsafe { &*crate::peripherals::I2C0::PTR };
+        handler(regs);
 
         WAKERS[0].wake();
     }
@@ -1219,25 +1227,7 @@ mod asynch {
     #[handler]
     pub(super) fn i2c1_handler() {
         let regs = unsafe { &*crate::peripherals::I2C1::PTR };
-        regs.int_ena().modify(|_, w| {
-            w.end_detect()
-                .clear_bit()
-                .trans_complete()
-                .clear_bit()
-                .arbitration_lost()
-                .clear_bit()
-                .time_out()
-                .clear_bit()
-        });
-
-        #[cfg(not(any(esp32, esp32s2)))]
-        regs.int_ena().modify(|_, w| w.txfifo_wm().clear_bit());
-
-        #[cfg(not(esp32))]
-        regs.int_ena().modify(|_, w| w.nack().clear_bit());
-
-        #[cfg(esp32)]
-        regs.int_ena().modify(|_, w| w.ack_err().clear_bit());
+        handler(regs);
 
         WAKERS[1].wake();
     }
@@ -1245,13 +1235,11 @@ mod asynch {
 
 /// I2C Peripheral Instance
 #[doc(hidden)]
-pub trait Instance: crate::private::Sealed {
+pub trait Instance: crate::private::Sealed + PeripheralMarker {
     /// Returns the interrupt associated with this I2C peripheral.
-    fn interrupt() -> crate::peripherals::Interrupt;
+    fn interrupt(&self) -> crate::peripherals::Interrupt;
 
-    fn async_handler() -> InterruptHandler;
-
-    fn peripheral() -> crate::system::Peripheral;
+    fn async_handler(&self) -> InterruptHandler;
 
     /// Returns the SCL output signal for this I2C peripheral.
     fn scl_output_signal(&self) -> OutputSignal;
@@ -1271,25 +1259,17 @@ pub trait Instance: crate::private::Sealed {
     /// Configures the I2C peripheral with the specified frequency, clocks, and
     /// optional timeout.
     fn setup(&self, frequency: HertzU32, timeout: Option<u32>) {
-        self.register_block().ctr().modify(|_, w| unsafe {
-            // Clear register
-            w.bits(0)
-                // Set I2C controller to master mode
-                .ms_mode()
-                .set_bit()
-                // Use open drain output for SDA and SCL
-                .sda_force_out()
-                .set_bit()
-                .scl_force_out()
-                .set_bit()
-                // Use Most Significant Bit first for sending and receiving data
-                .tx_lsb_first()
-                .clear_bit()
-                .rx_lsb_first()
-                .clear_bit()
-                // Ensure that clock is enabled
-                .clk_en()
-                .set_bit()
+        self.register_block().ctr().write(|w| {
+            // Set I2C controller to master mode
+            w.ms_mode().set_bit();
+            // Use open drain output for SDA and SCL
+            w.sda_force_out().set_bit();
+            w.scl_force_out().set_bit();
+            // Use Most Significant Bit first for sending and receiving data
+            w.tx_lsb_first().clear_bit();
+            w.rx_lsb_first().clear_bit();
+            // Ensure that clock is enabled
+            w.clk_en().set_bit()
         });
 
         #[cfg(esp32s2)]
@@ -1305,13 +1285,14 @@ pub trait Instance: crate::private::Sealed {
         let clocks = Clocks::get();
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
-                self.set_frequency(clocks.i2c_clock.convert(), frequency, timeout);
+                let clock = clocks.i2c_clock.convert();
             } else if #[cfg(esp32s2)] {
-                self.set_frequency(clocks.apb_clock.convert(), frequency, timeout);
+                let clock = clocks.apb_clock.convert();
             } else {
-                self.set_frequency(clocks.xtal_clock.convert(), frequency, timeout);
+                let clock = clocks.xtal_clock.convert();
             }
         }
+        self.set_frequency(clock, frequency, timeout);
 
         self.update_config();
 
@@ -1394,12 +1375,8 @@ pub trait Instance: crate::private::Sealed {
         let sda_sample = scl_high / 2;
         let setup = half_cycle;
         let hold = half_cycle;
-        let tout = if let Some(timeout) = timeout {
-            timeout
-        } else {
-            // default we set the timeout value to 10 bus cycles
-            half_cycle * 20
-        };
+        // default we set the timeout value to 10 bus cycles
+        let time_out_value = timeout.unwrap_or(half_cycle * 20);
 
         // SCL period. According to the TRM, we should always subtract 1 to SCL low
         // period
@@ -1439,7 +1416,6 @@ pub trait Instance: crate::private::Sealed {
         // hold
         let scl_start_hold_time = hold;
         let scl_stop_hold_time = hold;
-        let time_out_value = tout;
 
         self.configure_clock(
             0,
@@ -1476,12 +1452,8 @@ pub trait Instance: crate::private::Sealed {
         let sda_sample = half_cycle / 2 - 1;
         let setup = half_cycle;
         let hold = half_cycle;
-        let tout = if let Some(timeout) = timeout {
-            timeout
-        } else {
-            // default we set the timeout value to 10 bus cycles
-            half_cycle * 20
-        };
+        // default we set the timeout value to 10 bus cycles
+        let time_out_value = timeout.unwrap_or(half_cycle * 20);
 
         // scl period
         let scl_low_period = scl_low - 1;
@@ -1496,7 +1468,6 @@ pub trait Instance: crate::private::Sealed {
         // hold
         let scl_start_hold_time = hold - 1;
         let scl_stop_hold_time = hold;
-        let time_out_value = tout;
         let time_out_en = true;
 
         self.configure_clock(
@@ -1543,7 +1514,7 @@ pub trait Instance: crate::private::Sealed {
         let setup = half_cycle;
         let hold = half_cycle;
 
-        let tout = if let Some(timeout) = timeout {
+        let time_out_value = if let Some(timeout) = timeout {
             timeout
         } else {
             // default we set the timeout value to about 10 bus cycles
@@ -1570,7 +1541,6 @@ pub trait Instance: crate::private::Sealed {
         // hold
         let scl_start_hold_time = hold - 1;
         let scl_stop_hold_time = hold - 1;
-        let time_out_value = tout;
         let time_out_en = true;
 
         self.configure_clock(
@@ -1911,36 +1881,36 @@ pub trait Instance: crate::private::Sealed {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
                 // Handle error cases
-                if interrupts.time_out().bit_is_set() {
-                    self.reset();
-                    return Err(Error::TimeOut);
+                let retval = if interrupts.time_out().bit_is_set() {
+                    Err(Error::TimeOut)
                 } else if interrupts.ack_err().bit_is_set() {
-                    self.reset();
-                    return Err(Error::AckCheckFailed);
+                    Err(Error::AckCheckFailed)
                 } else if interrupts.arbitration_lost().bit_is_set() {
-                    self.reset();
-                    return Err(Error::ArbitrationLost);
-                }
-            }
-            else {
+                    Err(Error::ArbitrationLost)
+                } else {
+                    Ok(())
+                };
+            } else {
                 // Handle error cases
-                if interrupts.time_out().bit_is_set() {
-                    self.reset();
-                    return Err(Error::TimeOut);
+                let retval = if interrupts.time_out().bit_is_set() {
+                    Err(Error::TimeOut)
                 } else if interrupts.nack().bit_is_set() {
-                    self.reset();
-                    return Err(Error::AckCheckFailed);
+                    Err(Error::AckCheckFailed)
                 } else if interrupts.arbitration_lost().bit_is_set() {
-                    self.reset();
-                    return Err(Error::ArbitrationLost);
-                } else if  interrupts.trans_complete().bit_is_set() && self.register_block().sr().read().resp_rec().bit_is_clear() {
-                    self.reset();
-                    return Err(Error::AckCheckFailed);
-                }
+                    Err(Error::ArbitrationLost)
+                } else if interrupts.trans_complete().bit_is_set() && self.register_block().sr().read().resp_rec().bit_is_clear() {
+                    Err(Error::AckCheckFailed)
+                } else {
+                    Ok(())
+                };
             }
         }
 
-        Ok(())
+        if retval.is_err() {
+            self.reset();
+        }
+
+        retval
     }
 
     /// Updates the configuration of the I2C peripheral.
@@ -2085,29 +2055,22 @@ pub trait Instance: crate::private::Sealed {
     fn reset_fifo(&self) {
         // First, reset the fifo buffers
         self.register_block().fifo_conf().modify(|_, w| unsafe {
-            w.tx_fifo_rst()
-                .set_bit()
-                .rx_fifo_rst()
-                .set_bit()
-                .nonfifo_en()
-                .clear_bit()
-                .fifo_prt_en()
-                .set_bit()
-                .rxfifo_wm_thrhd()
-                .bits(1)
-                .txfifo_wm_thrhd()
-                .bits(8)
+            w.tx_fifo_rst().set_bit();
+            w.rx_fifo_rst().set_bit();
+            w.nonfifo_en().clear_bit();
+            w.fifo_prt_en().set_bit();
+            w.rxfifo_wm_thrhd().bits(1);
+            w.txfifo_wm_thrhd().bits(8)
         });
 
-        self.register_block()
-            .fifo_conf()
-            .modify(|_, w| w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit());
+        self.register_block().fifo_conf().modify(|_, w| {
+            w.tx_fifo_rst().clear_bit();
+            w.rx_fifo_rst().clear_bit()
+        });
 
         self.register_block().int_clr().write(|w| {
-            w.rxfifo_wm()
-                .clear_bit_by_one()
-                .txfifo_wm()
-                .clear_bit_by_one()
+            w.rxfifo_wm().clear_bit_by_one();
+            w.txfifo_wm().clear_bit_by_one()
         });
 
         self.update_config();
@@ -2118,21 +2081,17 @@ pub trait Instance: crate::private::Sealed {
     fn reset_fifo(&self) {
         // First, reset the fifo buffers
         self.register_block().fifo_conf().modify(|_, w| unsafe {
-            w.tx_fifo_rst()
-                .set_bit()
-                .rx_fifo_rst()
-                .set_bit()
-                .nonfifo_en()
-                .clear_bit()
-                .nonfifo_rx_thres()
-                .bits(1)
-                .nonfifo_tx_thres()
-                .bits(32)
+            w.tx_fifo_rst().set_bit();
+            w.rx_fifo_rst().set_bit();
+            w.nonfifo_en().clear_bit();
+            w.nonfifo_rx_thres().bits(1);
+            w.nonfifo_tx_thres().bits(32)
         });
 
-        self.register_block()
-            .fifo_conf()
-            .modify(|_, w| w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit());
+        self.register_block().fifo_conf().modify(|_, w| {
+            w.tx_fifo_rst().clear_bit();
+            w.rx_fifo_rst().clear_bit()
+        });
 
         self.register_block()
             .int_clr()
@@ -2240,44 +2199,37 @@ where
     I: Iterator<Item = &'a COMD>,
 {
     let cmd = cmd_iterator.next().ok_or(Error::CommandNrExceeded)?;
-    unsafe {
-        match command {
-            Command::Start => {
-                cmd.write(|w| w.opcode().rstart());
-            }
-            Command::Stop => {
-                cmd.write(|w| w.opcode().stop());
-            }
-            Command::End => {
-                cmd.write(|w| w.opcode().end());
-            }
-            Command::Write {
-                ack_exp,
-                ack_check_en,
-                length,
-            } => {
-                cmd.write(|w| {
-                    w.opcode().write();
-                    w.ack_exp().bit(ack_exp == Ack::Nack);
-                    w.ack_check_en().bit(ack_check_en);
-                    w.byte_num().bits(length);
-                    w
-                });
-            }
-            Command::Read { ack_value, length } => {
-                cmd.write(|w| {
-                    w.opcode().read();
-                    w.ack_value().bit(ack_value == Ack::Nack);
-                    w.byte_num().bits(length);
-                    w
-                });
-            }
+
+    match command {
+        Command::Start => cmd.write(|w| w.opcode().rstart()),
+        Command::Stop => cmd.write(|w| w.opcode().stop()),
+        Command::End => cmd.write(|w| w.opcode().end()),
+        Command::Write {
+            ack_exp,
+            ack_check_en,
+            length,
+        } => {
+            cmd.write(|w| unsafe {
+                w.opcode().write();
+                w.ack_exp().bit(ack_exp == Ack::Nack);
+                w.ack_check_en().bit(ack_check_en);
+                w.byte_num().bits(length);
+                w
+            });
+        }
+        Command::Read { ack_value, length } => {
+            cmd.write(|w| unsafe {
+                w.opcode().read();
+                w.ack_value().bit(ack_value == Ack::Nack);
+                w.byte_num().bits(length);
+                w
+            });
         }
     }
     Ok(())
 }
 
-#[cfg(not(any(esp32, esp32s2)))]
+#[cfg(not(esp32s2))]
 fn read_fifo(register_block: &RegisterBlock) -> u8 {
     register_block.data().read().fifo_rdata().bits()
 }
@@ -2301,11 +2253,6 @@ fn read_fifo(register_block: &RegisterBlock) -> u8 {
 }
 
 #[cfg(esp32)]
-fn read_fifo(register_block: &RegisterBlock) -> u8 {
-    register_block.data().read().fifo_rdata().bits()
-}
-
-#[cfg(esp32)]
 fn write_fifo(register_block: &RegisterBlock, data: u8) {
     let base_addr = register_block.scl_low_period().as_ptr();
     let fifo_ptr = (if base_addr as u32 == 0x3FF53000 {
@@ -2318,14 +2265,16 @@ fn write_fifo(register_block: &RegisterBlock, data: u8) {
     }
 }
 
-impl Instance for crate::peripherals::I2C0 {
+impl PeripheralMarker for crate::peripherals::I2C0 {
     #[inline(always)]
-    fn peripheral() -> crate::system::Peripheral {
+    fn peripheral(&self) -> crate::system::Peripheral {
         crate::system::Peripheral::I2cExt0
     }
+}
 
+impl Instance for crate::peripherals::I2C0 {
     #[inline(always)]
-    fn async_handler() -> InterruptHandler {
+    fn async_handler(&self) -> InterruptHandler {
         asynch::i2c0_handler
     }
 
@@ -2360,20 +2309,23 @@ impl Instance for crate::peripherals::I2C0 {
     }
 
     #[inline(always)]
-    fn interrupt() -> crate::peripherals::Interrupt {
+    fn interrupt(&self) -> crate::peripherals::Interrupt {
         crate::peripherals::Interrupt::I2C_EXT0
+    }
+}
+
+#[cfg(i2c1)]
+impl PeripheralMarker for crate::peripherals::I2C1 {
+    #[inline(always)]
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::I2cExt1
     }
 }
 
 #[cfg(i2c1)]
 impl Instance for crate::peripherals::I2C1 {
     #[inline(always)]
-    fn peripheral() -> crate::system::Peripheral {
-        crate::system::Peripheral::I2cExt1
-    }
-
-    #[inline(always)]
-    fn async_handler() -> InterruptHandler {
+    fn async_handler(&self) -> InterruptHandler {
         asynch::i2c1_handler
     }
 
@@ -2408,7 +2360,7 @@ impl Instance for crate::peripherals::I2C1 {
     }
 
     #[inline(always)]
-    fn interrupt() -> crate::peripherals::Interrupt {
+    fn interrupt(&self) -> crate::peripherals::Interrupt {
         crate::peripherals::Interrupt::I2C_EXT1
     }
 }
