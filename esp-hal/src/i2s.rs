@@ -468,25 +468,7 @@ where
     DmaMode: Mode,
 {
     fn write_bytes(&mut self, data: &[u8]) -> Result<(), Error> {
-        let ptr = data.as_ptr();
-
-        // Reset TX unit and TX FIFO
-        self.i2s.reset_tx();
-
-        // Enable corresponding interrupts if needed
-
-        // configure DMA outlink
-        unsafe {
-            self.tx_chain.fill_for_tx(false, ptr, data.len())?;
-            self.tx_channel
-                .prepare_transfer_without_start(self.i2s.dma_peripheral(), &self.tx_chain)
-                .and_then(|_| self.tx_channel.start_transfer())?;
-        }
-
-        // set I2S_TX_STOP_EN if needed
-
-        // start: set I2S_TX_START
-        self.i2s.tx_start();
+        self.start_tx_transfer(&data, false)?;
 
         // wait until I2S_TX_IDLE is 1
         self.i2s.wait_for_tx_done();
@@ -618,24 +600,8 @@ where
     T: RegisterAccess,
     DmaMode: Mode,
 {
-    fn read_bytes(&mut self, data: &mut [u8]) -> Result<(), Error> {
-        let ptr = data.as_mut_ptr();
-
-        // Reset RX unit and RX FIFO
-        self.i2s.reset_rx();
-
-        // Enable corresponding interrupts if needed
-
-        // configure DMA inlink
-        unsafe {
-            self.rx_chain.fill_for_rx(false, ptr, data.len())?;
-            self.rx_channel
-                .prepare_transfer_without_start(self.i2s.dma_peripheral(), &self.rx_chain)
-                .and_then(|_| self.rx_channel.start_transfer())?;
-        }
-
-        // start: set I2S_RX_START
-        self.i2s.rx_start(data.len());
+    fn read_bytes(&mut self, mut data: &mut [u8]) -> Result<(), Error> {
+        self.start_rx_transfer(&mut data, false)?;
 
         // wait until I2S_RX_IDLE is 1
         self.i2s.wait_for_rx_done();
