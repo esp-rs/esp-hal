@@ -461,6 +461,8 @@ where
 
     fn with_tx<TX: PeripheralOutput>(self, tx: impl Peripheral<P = TX> + 'd) -> Self {
         crate::into_ref!(tx);
+        // Make sure we don't cause an unexpected low pulse on the pin.
+        tx.set_output_high(true, Internal);
         tx.set_to_push_pull_output(Internal);
         tx.connect_peripheral_to_output(T::tx_signal(), Internal);
 
