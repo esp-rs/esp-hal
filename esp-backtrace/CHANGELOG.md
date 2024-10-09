@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
 
 ### Added
 
@@ -13,15 +13,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix build when not using `panic-handler` (#2257)
-
 ### Removed
+
+## 0.14.2 - 2024-10-10
+
+### Fixed
+
+- Fix build when not using `panic-handler` (#2257)
 
 ## 0.14.1 - 2024-09-06
 
 ### Added
 
 ### Changed
+
 - Print a more helpful message in case of a `Cp0Disabled` exception (#2061)
 
 ### Fixed
@@ -54,3 +59,5 @@ No changes - published to avoid conflicts with `esp-println`
 
 - Fix compilation for nightly after 2024-06-12. (#1681)
 - Only prints float registers on targets which have them. (#1690)
+
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-backtrace?since=2024-10-10

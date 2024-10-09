@@ -15,10 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+## 0.3.1 - 2024-10-10
+
 ## 0.3.0 - 2023-08-16
 
 ## 0.2.0 - 2023-07-05
 
 ## 0.1.0 - 2022-09-26
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-storage?since=2023-08-17
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-storage?since=2024-10-10

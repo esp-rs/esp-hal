@@ -5,15 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
 
 ### Added
 
 ### Changed
 
-- MSRV bump to 1.79 (#2156)
-
 ### Fixed
+
+### Removed
+
+## 0.4.0 - 2024-10-10
+
+### Changed
+
+- MSRV bump to 1.79 (#2156)
 
 ### Removed
 
@@ -42,3 +48,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the TIMG and SYSTIMER time drivers, replaced by a generic time driver taking `OneShotTimer<ErasedTimer>` (#1753)
 
 ## 0.1.0 - 2024-06-04
+
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-hal-embassy?since=2024-10-10
