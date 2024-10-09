@@ -9,7 +9,7 @@
 #[embedded_test::tests]
 mod tests {
     use esp_hal::{
-        gpio::Io,
+        gpio::{Io, PeripheralOutput},
         prelude::*,
         uart::{UartRx, UartTx},
     };
@@ -23,12 +23,14 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let (rx, tx) = hil_test::common_test_pins!(io);
+        let (rx, mut tx) = hil_test::common_test_pins!(io);
 
         let mut rx = UartRx::new(peripherals.UART1, rx).unwrap();
 
         // start reception
         _ = rx.read_byte(); // this will just return WouldBlock
+
+        unsafe { tx.set_output_high(false, esp_hal::Internal::conjure()) };
 
         // set up TX and send a byte
         let mut tx = UartTx::new(peripherals.UART0, tx).unwrap();
