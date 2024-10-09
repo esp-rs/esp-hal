@@ -3360,7 +3360,7 @@ impl ExtendedInstance for super::AnySpi {
             #[cfg(all(spi3, any(esp32, esp32s3)))]
             super::AnySpiInner::Spi3(spi) => spi.sio0_input_signal(),
 
-            #[cfg(not(all(spi3, any(esp32, esp32s3))))]
+            #[cfg(all(spi3, not(any(esp32, esp32s3))))]
             super::AnySpiInner::Spi3(_) => unimplemented!("SPI3 is does not support QSPI"),
         }
     }
@@ -3372,7 +3372,7 @@ impl ExtendedInstance for super::AnySpi {
             #[cfg(all(spi3, any(esp32, esp32s3)))]
             super::AnySpiInner::Spi3(spi) => spi.sio1_output_signal(),
 
-            #[cfg(not(all(spi3, any(esp32, esp32s3))))]
+            #[cfg(all(spi3, not(any(esp32, esp32s3))))]
             super::AnySpiInner::Spi3(_) => unimplemented!("SPI3 is does not support QSPI"),
         }
     }
@@ -3384,7 +3384,7 @@ impl ExtendedInstance for super::AnySpi {
             #[cfg(all(spi3, any(esp32, esp32s3)))]
             super::AnySpiInner::Spi3(spi) => spi.sio2_output_signal(),
 
-            #[cfg(not(all(spi3, any(esp32, esp32s3))))]
+            #[cfg(all(spi3, not(any(esp32, esp32s3))))]
             super::AnySpiInner::Spi3(_) => unimplemented!("SPI3 is does not support QSPI"),
         }
     }
@@ -3396,7 +3396,7 @@ impl ExtendedInstance for super::AnySpi {
             #[cfg(all(spi3, any(esp32, esp32s3)))]
             super::AnySpiInner::Spi3(spi) => spi.sio2_input_signal(),
 
-            #[cfg(not(all(spi3, any(esp32, esp32s3))))]
+            #[cfg(all(spi3, not(any(esp32, esp32s3))))]
             super::AnySpiInner::Spi3(_) => unimplemented!("SPI3 is does not support QSPI"),
         }
     }
@@ -3408,7 +3408,7 @@ impl ExtendedInstance for super::AnySpi {
             #[cfg(all(spi3, any(esp32, esp32s3)))]
             super::AnySpiInner::Spi3(spi) => spi.sio3_output_signal(),
 
-            #[cfg(not(all(spi3, any(esp32, esp32s3))))]
+            #[cfg(all(spi3, not(any(esp32, esp32s3))))]
             super::AnySpiInner::Spi3(_) => unimplemented!("SPI3 is does not support QSPI"),
         }
     }
@@ -3420,7 +3420,7 @@ impl ExtendedInstance for super::AnySpi {
             #[cfg(all(spi3, any(esp32, esp32s3)))]
             super::AnySpiInner::Spi3(spi) => spi.sio3_input_signal(),
 
-            #[cfg(not(all(spi3, any(esp32, esp32s3))))]
+            #[cfg(all(spi3, not(any(esp32, esp32s3))))]
             super::AnySpiInner::Spi3(_) => unimplemented!("SPI3 is does not support QSPI"),
         }
     }
