@@ -32,7 +32,6 @@
 //! # use esp_hal::i2s::I2s;
 //! # use esp_hal::i2s::Standard;
 //! # use esp_hal::i2s::DataFormat;
-//! # use esp_hal::i2s::I2sReadDma;
 //! # use esp_hal::gpio::Io;
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::{Dma, DmaPriority};
@@ -135,7 +134,8 @@ const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 9;
 
 const I2S_LL_MCLK_DIVIDER_MAX: usize = (1 << I2S_LL_MCLK_DIVIDER_BIT_WIDTH) - 1;
 
-trait AcceptedWord {}
+/// Data types that the I2S peripheral can work with.
+pub trait AcceptedWord {}
 impl AcceptedWord for u8 {}
 impl AcceptedWord for u16 {}
 impl AcceptedWord for u32 {}
@@ -249,68 +249,6 @@ impl DataFormat {
             DataFormat::Data16Channel16 => 16,
         }
     }
-}
-
-/// Blocking I2s Write
-pub trait I2sWrite<W> {
-    /// Writes a slice of data to the I2S peripheral.
-    fn write(&mut self, words: &[W]) -> Result<(), Error>;
-}
-
-/// Initiate a DMA tx transfer
-pub trait I2sWriteDma<'d, T, TXBUF, DmaMode>
-where
-    T: RegisterAccess,
-    DmaMode: Mode,
-    Self: DmaSupportTx + Sized,
-{
-    /// Write I2S.
-    /// Returns [DmaTransferTx] which represents the in-progress DMA
-    /// transfer
-    fn write_dma<'t>(&'t mut self, words: &'t TXBUF) -> Result<DmaTransferTx<'t, Self>, Error>
-    where
-        TXBUF: ReadBuffer;
-
-    /// Continuously write to I2S. Returns [DmaTransferTxCircular] which
-    /// represents the in-progress DMA transfer
-    fn write_dma_circular<'t>(
-        &'t mut self,
-        words: &'t TXBUF,
-    ) -> Result<DmaTransferTxCircular<'t, Self>, Error>
-    where
-        TXBUF: ReadBuffer;
-}
-
-/// Blocking I2S Read
-pub trait I2sRead<W> {
-    /// Reads a slice of data from the I2S peripheral and stores it in the
-    /// provided buffer.
-    fn read(&mut self, words: &mut [W]) -> Result<(), Error>;
-}
-
-/// Initiate a DMA rx transfer
-pub trait I2sReadDma<'d, T, RXBUF, DmaMode>
-where
-    T: RegisterAccess,
-    DmaMode: Mode,
-    Self: DmaSupportRx + Sized,
-{
-    /// Read I2S.
-    /// Returns [DmaTransferRx] which represents the in-progress DMA
-    /// transfer
-    fn read_dma<'t>(&'t mut self, words: &'t mut RXBUF) -> Result<DmaTransferRx<'t, Self>, Error>
-    where
-        RXBUF: WriteBuffer;
-
-    /// Continuously read from I2S.
-    /// Returns [DmaTransferRxCircular] which represents the in-progress DMA
-    /// transfer
-    fn read_dma_circular<'t>(
-        &'t mut self,
-        words: &'t mut RXBUF,
-    ) -> Result<DmaTransferRxCircular<'t, Self>, Error>
-    where
-        RXBUF: WriteBuffer;
 }
 
 /// Instance of the I2S peripheral driver
@@ -587,40 +525,36 @@ where
 
         Ok(())
     }
-}
 
-impl<'d, T, W, DmaMode> I2sWrite<W> for I2sTx<'d, T, DmaMode>
-where
-    T: RegisterAccess,
-    W: AcceptedWord,
-    DmaMode: Mode,
-{
-    fn write(&mut self, words: &[W]) -> Result<(), Error> {
+    /// Writes a slice of data to the I2S peripheral.
+    pub fn write(&mut self, words: &[impl AcceptedWord]) -> Result<(), Error> {
         self.write_bytes(unsafe {
             core::slice::from_raw_parts(words.as_ptr().cast::<u8>(), core::mem::size_of_val(words))
         })
     }
-}
 
-impl<'d, T, TXBUF, DmaMode> I2sWriteDma<'d, T, TXBUF, DmaMode> for I2sTx<'d, T, DmaMode>
-where
-    T: RegisterAccess,
-    DmaMode: Mode,
-{
-    fn write_dma<'t>(&'t mut self, words: &'t TXBUF) -> Result<DmaTransferTx<'t, Self>, Error>
+    /// Write I2S.
+    /// Returns [DmaTransferTx] which represents the in-progress DMA
+    /// transfer
+    pub fn write_dma<'t>(
+        &'t mut self,
+        words: &'t impl ReadBuffer,
+    ) -> Result<DmaTransferTx<'t, Self>, Error>
     where
-        TXBUF: ReadBuffer,
+        Self: DmaSupportTx,
     {
         self.start_tx_transfer(words, false)?;
         Ok(DmaTransferTx::new(self))
     }
 
-    fn write_dma_circular<'t>(
+    /// Continuously write to I2S. Returns [DmaTransferTxCircular] which
+    /// represents the in-progress DMA transfer
+    pub fn write_dma_circular<'t>(
         &'t mut self,
-        words: &'t TXBUF,
+        words: &'t impl ReadBuffer,
     ) -> Result<DmaTransferTxCircular<'t, Self>, Error>
     where
-        TXBUF: ReadBuffer,
+        Self: DmaSupportTx,
     {
         self.start_tx_transfer(words, true)?;
         Ok(DmaTransferTxCircular::new(self))
@@ -740,15 +674,10 @@ where
         self.i2s.rx_start(len);
         Ok(())
     }
-}
 
-impl<'d, W, T, DmaMode> I2sRead<W> for I2sRx<'d, T, DmaMode>
-where
-    T: RegisterAccess,
-    W: AcceptedWord,
-    DmaMode: Mode,
-{
-    fn read(&mut self, words: &mut [W]) -> Result<(), Error> {
+    /// Reads a slice of data from the I2S peripheral and stores it in the
+    /// provided buffer.
+    pub fn read(&mut self, words: &mut [impl AcceptedWord]) -> Result<(), Error> {
         if core::mem::size_of_val(words) > 4096 || words.is_empty() {
             return Err(Error::IllegalArgument);
         }
@@ -760,28 +689,30 @@ where
             )
         })
     }
-}
 
-impl<'d, T, RXBUF, DmaMode> I2sReadDma<'d, T, RXBUF, DmaMode> for I2sRx<'d, T, DmaMode>
-where
-    T: RegisterAccess,
-    DmaMode: Mode,
-    Self: DmaSupportRx + Sized,
-{
-    fn read_dma<'t>(&'t mut self, words: &'t mut RXBUF) -> Result<DmaTransferRx<'t, Self>, Error>
+    /// Read I2S.
+    /// Returns [DmaTransferRx] which represents the in-progress DMA
+    /// transfer
+    pub fn read_dma<'t>(
+        &'t mut self,
+        words: &'t mut impl WriteBuffer,
+    ) -> Result<DmaTransferRx<'t, Self>, Error>
     where
-        RXBUF: WriteBuffer,
+        Self: DmaSupportRx,
     {
         self.start_rx_transfer(words, false)?;
         Ok(DmaTransferRx::new(self))
     }
 
-    fn read_dma_circular<'t>(
+    /// Continuously read from I2S.
+    /// Returns [DmaTransferRxCircular] which represents the in-progress DMA
+    /// transfer
+    pub fn read_dma_circular<'t>(
         &'t mut self,
-        words: &'t mut RXBUF,
+        words: &'t mut impl WriteBuffer,
     ) -> Result<DmaTransferRxCircular<'t, Self>, Error>
     where
-        RXBUF: WriteBuffer,
+        Self: DmaSupportRx,
     {
         self.start_rx_transfer(words, true)?;
         Ok(DmaTransferRxCircular::new(self))
@@ -1917,28 +1848,12 @@ pub mod asynch {
         Async,
     };
 
-    /// Initiate an async DMA tx transfer
-    pub trait I2sWriteDmaAsync<'d, T>
+    impl<'d, T> I2sTx<'d, T, Async>
     where
         T: RegisterAccess,
     {
         /// One-shot write I2S.
-        async fn write_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error>;
-
-        /// Continuously write to I2S. Returns [I2sWriteDmaTransferAsync]
-        fn write_dma_circular_async<TXBUF>(
-            self,
-            words: TXBUF,
-        ) -> Result<I2sWriteDmaTransferAsync<'d, T, TXBUF>, Error>
-        where
-            TXBUF: ReadBuffer;
-    }
-
-    impl<'d, T> I2sWriteDmaAsync<'d, T> for super::I2sTx<'d, T, Async>
-    where
-        T: RegisterAccess,
-    {
-        async fn write_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        pub async fn write_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
             let (ptr, len) = (words.as_ptr(), words.len());
 
             self.i2s.reset_tx();
@@ -1959,13 +1874,11 @@ pub mod asynch {
             Ok(())
         }
 
-        fn write_dma_circular_async<TXBUF>(
+        /// Continuously write to I2S. Returns [I2sWriteDmaTransferAsync]
+        pub fn write_dma_circular_async<TXBUF: ReadBuffer>(
             mut self,
             words: TXBUF,
-        ) -> Result<I2sWriteDmaTransferAsync<'d, T, TXBUF>, Error>
-        where
-            TXBUF: ReadBuffer,
-        {
+        ) -> Result<I2sWriteDmaTransferAsync<'d, T, TXBUF>, Error> {
             let (ptr, len) = unsafe { words.read_buffer() };
 
             // Reset TX unit and TX FIFO
@@ -2045,28 +1958,12 @@ pub mod asynch {
         }
     }
 
-    /// Initiate an async DMA rx transfer
-    pub trait I2sReadDmaAsync<'d, T>
+    impl<'d, T> I2sRx<'d, T, Async>
     where
         T: RegisterAccess,
     {
         /// One-shot read I2S.
-        async fn read_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error>;
-
-        /// Continuously read from I2S. Returns [I2sReadDmaTransferAsync]
-        fn read_dma_circular_async<RXBUF>(
-            self,
-            words: RXBUF,
-        ) -> Result<I2sReadDmaTransferAsync<'d, T, RXBUF>, Error>
-        where
-            RXBUF: WriteBuffer;
-    }
-
-    impl<'d, T> I2sReadDmaAsync<'d, T> for super::I2sRx<'d, T, Async>
-    where
-        T: RegisterAccess,
-    {
-        async fn read_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        pub async fn read_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
             let (ptr, len) = (words.as_mut_ptr(), words.len());
 
             if len % 4 != 0 {
@@ -2095,7 +1992,8 @@ pub mod asynch {
             Ok(())
         }
 
-        fn read_dma_circular_async<RXBUF>(
+        /// Continuously read from I2S. Returns [I2sReadDmaTransferAsync]
+        pub fn read_dma_circular_async<RXBUF>(
             mut self,
             mut words: RXBUF,
         ) -> Result<I2sReadDmaTransferAsync<'d, T, RXBUF>, Error>
