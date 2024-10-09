@@ -799,12 +799,24 @@ impl RtcClock {
 /// Behavior of the RWDT stage if it times out.
 #[allow(unused)]
 #[derive(Debug, Clone, Copy)]
-enum RwdtStageAction {
+pub enum RwdtStageAction {
+    /// No effect on the system.
     Off         = 0,
+    /// Trigger an interrupt.
     Interrupt   = 1,
+    /// Reset the CPU core.
     ResetCpu    = 2,
-    ResetSystem = 3,
-    ResetRtc    = 4,
+    /// Reset the main system (MWDT, CPU, and all peripherals).
+    /// The power management unit and RTC peripherals will not be reset.
+    ResetCore   = 3,
+    /// Reset the main system, power management unit and RTC peripherals.
+    ResetSystem = 4,
+}
+
+/// RWDT related errors.
+pub enum RwdtError {
+    /// Trying to configure the wrong stage.
+    InvalidStage,
 }
 
 /// RTC Watchdog Timer.
@@ -818,7 +830,7 @@ pub struct Rwdt {
 impl Default for Rwdt {
     fn default() -> Self {
         Self {
-            stg0_action: RwdtStageAction::ResetRtc,
+            stg0_action: RwdtStageAction::ResetSystem,
             stg1_action: RwdtStageAction::Off,
             stg2_action: RwdtStageAction::Off,
             stg3_action: RwdtStageAction::Off,
@@ -860,7 +872,7 @@ impl Rwdt {
     pub fn unlisten(&mut self) {
         let rtc_cntl = unsafe { lp_wdt() };
 
-        self.stg0_action = RwdtStageAction::ResetRtc;
+        self.stg0_action = RwdtStageAction::ResetSystem;
 
         self.set_write_protection(false);
 
@@ -965,6 +977,54 @@ impl Rwdt {
         }
 
         self.set_write_protection(true);
+    }
+
+    /// Set the action for a specific stage.
+    pub fn set_stage_action(
+        &mut self,
+        stage: usize,
+        action: RwdtStageAction,
+    ) -> Result<(), RwdtError> {
+        #[cfg(not(any(esp32c6, esp32h2)))]
+        let rtc_cntl = unsafe { &*LPWR::PTR };
+        #[cfg(any(esp32c6, esp32h2))]
+        let rtc_cntl = unsafe { &*LP_WDT::PTR };
+
+        self.set_write_protection(false);
+
+        match stage {
+            0 => {
+                self.stg0_action = action;
+                rtc_cntl
+                    .wdtconfig0()
+                    .modify(|_, w| unsafe { w.wdt_stg0().bits(action as u8) });
+            }
+            1 => {
+                self.stg1_action = action;
+                rtc_cntl
+                    .wdtconfig0()
+                    .modify(|_, w| unsafe { w.wdt_stg1().bits(action as u8) });
+            }
+            2 => {
+                self.stg2_action = action;
+                rtc_cntl
+                    .wdtconfig0()
+                    .modify(|_, w| unsafe { w.wdt_stg2().bits(action as u8) });
+            }
+            3 => {
+                self.stg3_action = action;
+                rtc_cntl
+                    .wdtconfig0()
+                    .modify(|_, w| unsafe { w.wdt_stg3().bits(action as u8) });
+            }
+            _ => {
+                return Err(RwdtError::InvalidStage);
+            }
+        }
+
+        self.set_write_protection(true);
+
+        Ok(())
     }
 }
 
