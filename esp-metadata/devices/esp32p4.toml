@@ -22,7 +22,7 @@ peripherals = [
     # "h264_dma",
     # "h264",
     # "hmac",
-    # "hp_sys_clkrst",
+    "hp_sys_clkrst",
     "hp_sys",
     # "i2c0",
     # "i2c1",
@@ -77,9 +77,9 @@ peripherals = [
     # "spi1",
     # "spi2",
     # "spi3",
-    # "systimer",
-    # "timg0",
-    # "timg1",
+    "systimer",
+    "timg0",
+    "timg1",
     # "trace0",
     # "trace1",
     # "twai0",
@@ -94,5 +94,6 @@ peripherals = [
 symbols = [
     # Additional peripherals defined by us (the developers):
     "clic",
+    "timg_timer1",
     "very_large_intr_status",
 ]

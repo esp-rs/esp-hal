@@ -5,6 +5,7 @@
 //! This `system` module defines the available radio peripherals and provides an
 //! interface to control and configure radio clocks.
 
+#[cfg(not(esp32p4))]
 use crate::peripherals::SYSTEM;
 
 /// Peripherals which can be enabled via `PeripheralClockControl`.
@@ -12,8 +13,8 @@ use crate::peripherals::SYSTEM;
 /// This enum represents various hardware peripherals that can be enabled
 /// by the system's clock control. Depending on the target device, different
 /// peripherals will be available for enabling.
-// FIXME: This enum needs to be public because it's exposed via a bunch of traits, but it's not
-// useful to users.
+// NOTE: This enum needs to be public because it's exposed via a bunch of
+//       traits, but it's not useful to users.
 #[doc(hidden)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -125,7 +126,7 @@ pub enum Peripheral {
 /// Controls the enablement of peripheral clocks.
 pub(crate) struct PeripheralClockControl;
 
-#[cfg(not(any(esp32c6, esp32h2)))]
+#[cfg(not(any(esp32c6, esp32h2, esp32p4)))]
 impl PeripheralClockControl {
     /// Enables and resets the given peripheral
     pub(crate) fn enable(peripheral: Peripheral) {
@@ -140,7 +141,7 @@ impl PeripheralClockControl {
                 &system.peri_rst_en(),
             )
         };
-        #[cfg(not(any(esp32, esp32p4)))] // FIXME?
+        #[cfg(not(esp32))]
         let (perip_clk_en0, perip_rst_en0) = { (&system.perip_clk_en0(), &system.perip_rst_en0()) };
 
         #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
@@ -354,7 +355,7 @@ impl PeripheralClockControl {
 
         #[cfg(esp32)]
         let (perip_rst_en0, peri_rst_en) = { (&system.perip_rst_en(), &system.peri_rst_en()) };
-        #[cfg(not(any(esp32, esp32p4)))] // FIXME?
+        #[cfg(not(esp32))]
         let perip_rst_en0 = { &system.perip_rst_en0() };
 
         #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
@@ -983,6 +984,43 @@ impl PeripheralClockControl {
                     .modify(|_, w| w.systimer_rst_en().clear_bit());
             }
         }
+    }
+}
+
+#[cfg(esp32p4)]
+impl PeripheralClockControl {
+    /// Enables and resets the given peripheral
+    pub(crate) fn enable(peripheral: Peripheral) {
+        let system = unsafe { &*crate::peripherals::HP_SYS_CLKRST::PTR };
+
+        match peripheral {
+            Peripheral::Systimer => {
+                system
+                    .peri_clk_ctrl21()
+                    .modify(|_, w| w.systimer_clk_en().set_bit());
+            }
+            Peripheral::Timg0 => {
+                system.peri_clk_ctrl20().modify(|_, w| {
+                    w.timergrp0_t0_clk_en().set_bit();
+                    w.timergrp0_t1_clk_en().set_bit();
+                    w
+                });
+            }
+            Peripheral::Timg1 => {
+                system.peri_clk_ctrl21().modify(|_, w| {
+                    w.timergrp1_t0_clk_en().set_bit();
+                    w.timergrp1_t1_clk_en().set_bit();
+                    w
+                });
+            }
+            #[allow(unreachable_patterns)]
+            _ => {}
+        }
+    }
+
+    /// Resets the given peripheral
+    pub(crate) fn reset(peripheral: Peripheral) {
+        let _ = peripheral;
     }
 }
 
