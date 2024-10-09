@@ -176,8 +176,8 @@ impl PeripheralMarker for AnySpi {
 impl DmaEligible for AnySpi {
     #[cfg(gdma)]
     type Dma = crate::dma::AnyGdmaChannel;
-    //#[cfg(pdma)]
-    // type Dma = crate::dma::AnyPdmaSpiChannel;
+    #[cfg(pdma)]
+    type Dma = crate::dma::AnyPdmaSpiChannel;
 
     fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
         match &self.0 {
