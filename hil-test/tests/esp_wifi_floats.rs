@@ -13,6 +13,7 @@ use critical_section::Mutex;
 use esp_hal::{
     delay::Delay,
     interrupt::software::{SoftwareInterrupt, SoftwareInterruptControl},
+    peripherals::Peripherals,
     prelude::*,
     rng::Rng,
     timer::timg::TimerGroup,
@@ -31,16 +32,40 @@ static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> = Mutex::new(RefCell
 
 #[handler]
 fn wait() {
+    // Ensure esp-wifi interrupts this handler.
     Delay::new().delay_millis(100);
     critical_section::with(|cs| {
         SWINT0.borrow_ref(cs).as_ref().unwrap().reset();
     });
 }
 
+cfg_if::cfg_if! {
+    if #[cfg(multi_core)] {
+        use core::sync::atomic::{AtomicBool, Ordering};
+
+        use esp_hal::cpu_control::CpuControl;
+
+        static DONE: AtomicBool = AtomicBool::new(false);
+        static mut APP_CORE_STACK: esp_hal::cpu_control::Stack<8192> =
+            esp_hal::cpu_control::Stack::new();
+    }
+}
+
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
     use super::*;
+
+    #[init]
+    fn test_init() -> Peripherals {
+        esp_alloc::heap_allocator!(72 * 1024);
+
+        esp_hal::init({
+            let mut config = esp_hal::Config::default();
+            config.cpu_clock = CpuClock::max();
+            config
+        })
+    }
 
     #[test]
     fn fpu_is_enabled() {
@@ -49,30 +74,9 @@ mod tests {
     }
 
     #[cfg(multi_core)]
-    static mut APP_CORE_STACK: esp_hal::cpu_control::Stack<8192> =
-        esp_hal::cpu_control::Stack::new();
-
-    #[init]
-    fn test_init() {
-        esp_alloc::heap_allocator!(72 * 1024);
-    }
-
-    #[cfg(multi_core)]
     #[test]
     #[timeout(3)]
-    fn fpu_is_enabled_on_core1() {
-        use core::sync::atomic::{AtomicBool, Ordering};
-
-        use esp_hal::cpu_control::CpuControl;
-
-        let peripherals = esp_hal::init({
-            let mut config = esp_hal::Config::default();
-            config.cpu_clock = CpuClock::max();
-            config
-        });
-
-        static DONE: AtomicBool = AtomicBool::new(false);
-
+    fn fpu_is_enabled_on_core1(peripherals: Peripherals) {
         let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 
         let _guard = cpu_control
@@ -96,13 +100,7 @@ mod tests {
 
     #[test]
     #[timeout(3)]
-    fn fpu_stays_enabled_with_wifi() {
-        let peripherals = esp_hal::init({
-            let mut config = esp_hal::Config::default();
-            config.cpu_clock = CpuClock::max();
-            config
-        });
-
+    fn fpu_stays_enabled_with_wifi(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         let _init = init(
             EspWifiInitFor::Wifi,
@@ -133,19 +131,7 @@ mod tests {
     #[cfg(multi_core)]
     #[test]
     #[timeout(3)]
-    fn fpu_stays_enabled_with_wifi_on_core1() {
-        use core::sync::atomic::{AtomicBool, Ordering};
-
-        use esp_hal::cpu_control::CpuControl;
-
-        let peripherals = esp_hal::init({
-            let mut config = esp_hal::Config::default();
-            config.cpu_clock = CpuClock::max();
-            config
-        });
-
-        static DONE: AtomicBool = AtomicBool::new(false);
-
+    fn fpu_stays_enabled_with_wifi_on_core1(peripherals: Peripherals) {
         let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 
         let _guard = cpu_control
