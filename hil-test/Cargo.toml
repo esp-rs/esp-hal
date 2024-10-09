@@ -196,7 +196,8 @@ esp-alloc          = { path = "../esp-alloc", optional = true }
 esp-backtrace      = { path = "../esp-backtrace", default-features = false, features = ["exception-handler", "defmt", "semihosting"] }
 esp-hal            = { path = "../esp-hal", features = ["digest"], optional = true }
 esp-hal-embassy    = { path = "../esp-hal-embassy", optional = true }
-esp-wifi           = { path = "../esp-wifi", optional = true, features = ["wifi"] }
+esp-wifi           = { path = "../esp-wifi", optional = true, features = ["wifi", "wifi-default"] }
+smoltcp            = { version = "0.11", optional = true, default-features = false }
 portable-atomic    = "1.9.0"
 static_cell        = { version = "2.1.0", features = ["nightly"] }
 semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }

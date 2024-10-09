@@ -1,8 +1,8 @@
 //! Cp0Disable exception regression test
 
 //% CHIPS: esp32 esp32s2 esp32s3
-//% FEATURES: esp-wifi esp-alloc
-//% FEATURES: esp-wifi esp-alloc xtensa-lx-rt/float-save-restore
+//% FEATURES: esp-wifi smoltcp esp-alloc
+//% FEATURES: esp-wifi smoltcp esp-alloc xtensa-lx-rt/float-save-restore
 
 #![no_std]
 #![no_main]
@@ -20,6 +20,7 @@ use esp_hal::{
 };
 use esp_wifi::{init, EspWifiInitFor};
 use hil_test as _;
+use smoltcp::iface::SocketStorage;
 
 #[inline(never)]
 fn run_float_calc(x: f32) -> f32 {
@@ -175,5 +176,40 @@ mod tests {
 
         let result = super::run_float_calc(2.0);
         assert_eq!(result, 4.0);
+    }
+
+    #[test]
+    #[timeout(5)]
+    fn esp_wifi_can_start(mut peripherals: Peripherals) {
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        let init = init(
+            EspWifiInitFor::Wifi,
+            timg0.timer1,
+            Rng::new(peripherals.RNG),
+            peripherals.RADIO_CLK,
+        )
+        .unwrap();
+
+        let mut socket_set_entries: [SocketStorage; 3] = Default::default();
+        let (iface, device, mut controller, sockets) =
+            esp_wifi::wifi::utils::create_network_interface(
+                &init,
+                &mut peripherals.WIFI,
+                esp_wifi::wifi::WifiStaDevice,
+                &mut socket_set_entries,
+            )
+            .unwrap();
+        let now = || esp_hal::time::now().duration_since_epoch().to_millis();
+        let _wifi_stack = esp_wifi::wifi_interface::WifiStack::new(iface, device, sockets, now);
+
+        let client_config =
+            esp_wifi::wifi::Configuration::Client(esp_wifi::wifi::ClientConfiguration {
+                ssid: "SSID".try_into().unwrap(),
+                password: "PASSWORD".try_into().unwrap(),
+                ..Default::default()
+            });
+        let _res = controller.set_configuration(&client_config);
+
+        controller.start().unwrap();
     }
 }
