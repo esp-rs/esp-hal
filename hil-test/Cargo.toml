@@ -149,6 +149,10 @@ harness           = false
 required-features = ["embassy"]
 
 [[test]]
+name    = "uart_regression"
+harness = false
+
+[[test]]
 name    = "uart_tx_rx"
 harness = false
 
