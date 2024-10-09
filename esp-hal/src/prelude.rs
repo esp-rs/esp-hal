@@ -6,10 +6,10 @@
 //! things, particularly traits, which are used in almost every single Rust
 //! program.
 
-pub use prelude::*;
+pub use imp::*;
 
 #[doc(hidden)]
-mod prelude {
+mod imp {
     #[doc(hidden)]
     pub use fugit::{ExtU64 as _, RateExtU32 as _};
     #[doc(hidden)]

@@ -96,7 +96,7 @@
 
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
-#![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
+#![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![cfg_attr(feature = "sys-logs", feature(c_variadic))]
 #![allow(rustdoc::bare_urls)]
 // allow until num-derive doesn't generate this warning anymore (unknown_lints because Xtensa
