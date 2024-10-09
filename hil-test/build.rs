@@ -37,5 +37,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Define all necessary configuration symbols for the configured device:
     config.define_symbols();
 
+    if cfg!(feature = "esp-wifi") {
+        println!("cargo::rustc-link-arg=-Trom_functions.x");
+    }
+
     Ok(())
 }
