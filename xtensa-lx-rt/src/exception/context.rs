@@ -4,7 +4,7 @@ use super::ExceptionCause;
 
 /// State of the CPU saved when entering exception or interrupt
 ///
-/// Must be aligned with assembly frame format in assembly_esp32
+/// Must be aligned with assembly frame format in asm.rs
 #[repr(C)]
 #[allow(non_snake_case)]
 #[derive(Debug, Clone, Copy)]
@@ -43,8 +43,8 @@ pub struct Context {
     pub M1: u32,
     pub M2: u32,
     pub M3: u32,
-    #[cfg(all(feature = "float-save-restore", XCHAL_HAVE_DFP_ACCEL))]
-    pub F64R_LO: u32,
+    #[cfg(XCHAL_HAVE_DFP_ACCEL)]
+    pub F64R_LO_CPENABLE: u32,
     #[cfg(all(feature = "float-save-restore", XCHAL_HAVE_DFP_ACCEL))]
     pub F64R_HI: u32,
     #[cfg(all(feature = "float-save-restore", XCHAL_HAVE_DFP_ACCEL))]
