@@ -92,6 +92,7 @@ use crate::{
         DescriptorChain,
         DmaChannelConvert,
         DmaDescriptor,
+        DmaEligible,
         DmaError,
         DmaTransferRx,
         DmaTransferRxCircular,
@@ -252,26 +253,26 @@ impl DataFormat {
 }
 
 /// Instance of the I2S peripheral driver
-pub struct I2s<'d, T, DmaMode>
+pub struct I2s<'d, DmaMode, T = AnyI2s>
 where
     T: RegisterAccess,
     DmaMode: Mode,
 {
     /// Handles the reception (RX) side of the I2S peripheral.
-    pub i2s_rx: RxCreator<'d, T, DmaMode>,
+    pub i2s_rx: RxCreator<'d, DmaMode, T>,
     /// Handles the transmission (TX) side of the I2S peripheral.
-    pub i2s_tx: TxCreator<'d, T, DmaMode>,
+    pub i2s_tx: TxCreator<'d, DmaMode, T>,
     phantom: PhantomData<DmaMode>,
 }
 
-impl<'d, T, DmaMode> I2s<'d, T, DmaMode>
+impl<'d, DmaMode, T> I2s<'d, DmaMode, T>
 where
     T: RegisterAccess,
     DmaMode: Mode,
 {
     #[allow(clippy::too_many_arguments)]
     fn new_internal<CH>(
-        i2s: impl Peripheral<P = T> + 'd,
+        i2s: PeripheralRef<'d, T>,
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
@@ -282,7 +283,6 @@ where
     where
         CH: DmaChannelConvert<T::Dma>,
     {
-        crate::into_ref!(i2s);
         channel.runtime_ensure_compatible(&i2s);
         // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
         // could be configured totally independently but for now handle all
@@ -314,7 +314,7 @@ where
     }
 }
 
-impl<'d, T, DmaMode> I2s<'d, T, DmaMode>
+impl<'d, DmaMode, T> I2s<'d, DmaMode, T>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -352,14 +352,14 @@ where
     }
 }
 
-impl<'d, I, DmaMode> crate::private::Sealed for I2s<'d, I, DmaMode>
+impl<'d, DmaMode, I> crate::private::Sealed for I2s<'d, DmaMode, I>
 where
     I: RegisterAccess,
     DmaMode: Mode,
 {
 }
 
-impl<'d, I, DmaMode> InterruptConfigurable for I2s<'d, I, DmaMode>
+impl<'d, DmaMode, I> InterruptConfigurable for I2s<'d, DmaMode, I>
 where
     I: RegisterAccess,
     DmaMode: Mode,
@@ -369,7 +369,40 @@ where
     }
 }
 
-impl<'d, T, DmaMode> I2s<'d, T, DmaMode>
+impl<'d, DmaMode> I2s<'d, DmaMode>
+where
+    DmaMode: Mode,
+{
+    /// Construct a new I2S peripheral driver instance for the first I2S
+    /// peripheral
+    #[allow(clippy::too_many_arguments)]
+    pub fn new<CH, T>(
+        i2s: impl Peripheral<P = T> + 'd,
+        standard: Standard,
+        data_format: DataFormat,
+        sample_rate: impl Into<fugit::HertzU32>,
+        channel: Channel<'d, CH, DmaMode>,
+        rx_descriptors: &'static mut [DmaDescriptor],
+        tx_descriptors: &'static mut [DmaDescriptor],
+    ) -> Self
+    where
+        T: Into<AnyI2s> + 'd + RegisterAccess,
+        CH: DmaChannelConvert<<AnyI2s as DmaEligible>::Dma>,
+        DmaMode: Mode,
+    {
+        Self::new_typed(
+            i2s,
+            standard,
+            data_format,
+            sample_rate,
+            channel,
+            rx_descriptors,
+            tx_descriptors,
+        )
+    }
+}
+
+impl<'d, DmaMode, T> I2s<'d, DmaMode, T>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -377,8 +410,8 @@ where
     /// Construct a new I2S peripheral driver instance for the first I2S
     /// peripheral
     #[allow(clippy::too_many_arguments)]
-    pub fn new<CH>(
-        i2s: impl Peripheral<P = T> + 'd,
+    pub fn new_typed<CH>(
+        i2s: impl Peripheral<P = impl Into<T> + 'd> + 'd,
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
@@ -390,8 +423,9 @@ where
         CH: DmaChannelConvert<T::Dma>,
         DmaMode: Mode,
     {
+        crate::into_ref!(i2s);
         Self::new_internal(
-            i2s,
+            i2s.map_into(),
             standard,
             data_format,
             sample_rate,
@@ -412,7 +446,7 @@ where
 }
 
 /// I2S TX channel
-pub struct I2sTx<'d, T, DmaMode>
+pub struct I2sTx<'d, DmaMode, T = AnyI2s>
 where
     T: RegisterAccess,
 {
@@ -422,7 +456,7 @@ where
     phantom: PhantomData<DmaMode>,
 }
 
-impl<'d, T, DmaMode> core::fmt::Debug for I2sTx<'d, T, DmaMode>
+impl<'d, DmaMode, T> core::fmt::Debug for I2sTx<'d, DmaMode, T>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -432,7 +466,7 @@ where
     }
 }
 
-impl<'d, T, DmaMode> DmaSupport for I2sTx<'d, T, DmaMode>
+impl<'d, DmaMode, T> DmaSupport for I2sTx<'d, DmaMode, T>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -446,7 +480,7 @@ where
     }
 }
 
-impl<'d, T, DmaMode> DmaSupportTx for I2sTx<'d, T, DmaMode>
+impl<'d, DmaMode, T> DmaSupportTx for I2sTx<'d, DmaMode, T>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -462,7 +496,7 @@ where
     }
 }
 
-impl<'d, T, DmaMode> I2sTx<'d, T, DmaMode>
+impl<'d, DmaMode, T> I2sTx<'d, DmaMode, T>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -544,7 +578,7 @@ where
 }
 
 /// I2S RX channel
-pub struct I2sRx<'d, T, DmaMode>
+pub struct I2sRx<'d, DmaMode, T = AnyI2s>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -555,7 +589,7 @@ where
     phantom: PhantomData<DmaMode>,
 }
 
-impl<'d, T, DmaMode> core::fmt::Debug for I2sRx<'d, T, DmaMode>
+impl<'d, DmaMode, T> core::fmt::Debug for I2sRx<'d, DmaMode, T>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -565,7 +599,7 @@ where
     }
 }
 
-impl<'d, T, DmaMode> DmaSupport for I2sRx<'d, T, DmaMode>
+impl<'d, DmaMode, T> DmaSupport for I2sRx<'d, DmaMode, T>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -579,7 +613,7 @@ where
     }
 }
 
-impl<'d, T, DmaMode> DmaSupportRx for I2sRx<'d, T, DmaMode>
+impl<'d, DmaMode, T> DmaSupportRx for I2sRx<'d, DmaMode, T>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -595,7 +629,7 @@ where
     }
 }
 
-impl<'d, T, DmaMode> I2sRx<'d, T, DmaMode>
+impl<'d, DmaMode, T> I2sRx<'d, DmaMode, T>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -728,7 +762,7 @@ mod private {
         Mode,
     };
 
-    pub struct TxCreator<'d, T, DmaMode>
+    pub struct TxCreator<'d, DmaMode, T>
     where
         T: RegisterAccess,
         DmaMode: Mode,
@@ -739,12 +773,12 @@ mod private {
         pub(crate) phantom: PhantomData<DmaMode>,
     }
 
-    impl<'d, T, DmaMode> TxCreator<'d, T, DmaMode>
+    impl<'d, DmaMode, T> TxCreator<'d, DmaMode, T>
     where
         T: RegisterAccess,
         DmaMode: Mode,
     {
-        pub fn build(self) -> I2sTx<'d, T, DmaMode> {
+        pub fn build(self) -> I2sTx<'d, DmaMode, T> {
             I2sTx {
                 i2s: self.i2s,
                 tx_channel: self.tx_channel,
@@ -787,7 +821,7 @@ mod private {
         }
     }
 
-    pub struct RxCreator<'d, T, DmaMode>
+    pub struct RxCreator<'d, DmaMode, T>
     where
         T: RegisterAccess,
         DmaMode: Mode,
@@ -798,12 +832,12 @@ mod private {
         pub(crate) phantom: PhantomData<DmaMode>,
     }
 
-    impl<'d, T, DmaMode> RxCreator<'d, T, DmaMode>
+    impl<'d, DmaMode, T> RxCreator<'d, DmaMode, T>
     where
         T: RegisterAccess,
         DmaMode: Mode,
     {
-        pub fn build(self) -> I2sRx<'d, T, DmaMode> {
+        pub fn build(self) -> I2sRx<'d, DmaMode, T> {
             I2sRx {
                 i2s: self.i2s,
                 rx_channel: self.rx_channel,
@@ -1559,7 +1593,6 @@ mod private {
         }
     }
 
-    #[cfg(i2s0)]
     impl Signals for crate::peripherals::I2S0 {
         fn mclk_signal(&self) -> OutputSignal {
             cfg_if::cfg_if! {
@@ -1709,6 +1742,48 @@ mod private {
         }
     }
 
+    impl RegBlock for super::AnyI2s {
+        delegate::delegate! {
+            to match &self.0 {
+                super::AnyI2sInner::I2s0(i2s) => i2s,
+                #[cfg(i2s1)]
+                super::AnyI2sInner::I2s1(i2s) => i2s,
+            } {
+                fn register_block(&self) -> &RegisterBlock;
+            }
+        }
+    }
+
+    impl RegisterAccessPrivate for super::AnyI2s {
+        delegate::delegate! {
+            to match &self.0 {
+                super::AnyI2sInner::I2s0(i2s) => i2s,
+                #[cfg(i2s1)]
+                super::AnyI2sInner::I2s1(i2s) => i2s,
+            } {
+                fn set_interrupt_handler(&self, handler: InterruptHandler);
+            }
+        }
+    }
+
+    impl Signals for super::AnyI2s {
+        delegate::delegate! {
+            to match &self.0 {
+                super::AnyI2sInner::I2s0(i2s) => i2s,
+                #[cfg(i2s1)]
+                super::AnyI2sInner::I2s1(i2s) => i2s,
+            } {
+                fn mclk_signal(&self) -> OutputSignal;
+                fn bclk_signal(&self) -> OutputSignal;
+                fn ws_signal(&self) -> OutputSignal;
+                fn dout_signal(&self) -> OutputSignal;
+                fn bclk_rx_signal(&self) -> OutputSignal;
+                fn ws_rx_signal(&self) -> OutputSignal;
+                fn din_signal(&self) -> InputSignal;
+            }
+        }
+    }
+
     pub struct I2sClockDividers {
         mclk_divider: u32,
         bclk_divider: u32,
@@ -1801,7 +1876,7 @@ pub mod asynch {
         Async,
     };
 
-    impl<'d, T> I2sTx<'d, T, Async>
+    impl<'d, T> I2sTx<'d, Async, T>
     where
         T: RegisterAccess,
     {
@@ -1831,7 +1906,7 @@ pub mod asynch {
         pub fn write_dma_circular_async<TXBUF: ReadBuffer>(
             mut self,
             words: TXBUF,
-        ) -> Result<I2sWriteDmaTransferAsync<'d, T, TXBUF>, Error> {
+        ) -> Result<I2sWriteDmaTransferAsync<'d, TXBUF, T>, Error> {
             let (ptr, len) = unsafe { words.read_buffer() };
 
             // Reset TX unit and TX FIFO
@@ -1862,16 +1937,16 @@ pub mod asynch {
     }
 
     /// An in-progress async circular DMA write transfer.
-    pub struct I2sWriteDmaTransferAsync<'d, T, BUFFER>
+    pub struct I2sWriteDmaTransferAsync<'d, BUFFER, T = super::AnyI2s>
     where
         T: RegisterAccess,
     {
-        i2s_tx: I2sTx<'d, T, Async>,
+        i2s_tx: I2sTx<'d, Async, T>,
         state: TxCircularState,
         _buffer: BUFFER,
     }
 
-    impl<'d, T, BUFFER> I2sWriteDmaTransferAsync<'d, T, BUFFER>
+    impl<'d, T, BUFFER> I2sWriteDmaTransferAsync<'d, BUFFER, T>
     where
         T: RegisterAccess,
     {
@@ -1911,7 +1986,7 @@ pub mod asynch {
         }
     }
 
-    impl<'d, T> I2sRx<'d, T, Async>
+    impl<'d, T> I2sRx<'d, Async, T>
     where
         T: RegisterAccess,
     {
@@ -1949,7 +2024,7 @@ pub mod asynch {
         pub fn read_dma_circular_async<RXBUF>(
             mut self,
             mut words: RXBUF,
-        ) -> Result<I2sReadDmaTransferAsync<'d, T, RXBUF>, Error>
+        ) -> Result<I2sReadDmaTransferAsync<'d, RXBUF, T>, Error>
         where
             RXBUF: WriteBuffer,
         {
@@ -1985,16 +2060,16 @@ pub mod asynch {
     }
 
     /// An in-progress async circular DMA read transfer.
-    pub struct I2sReadDmaTransferAsync<'d, T, BUFFER>
+    pub struct I2sReadDmaTransferAsync<'d, BUFFER, T = super::AnyI2s>
     where
         T: RegisterAccess,
     {
-        i2s_rx: I2sRx<'d, T, Async>,
+        i2s_rx: I2sRx<'d, Async, T>,
         state: RxCircularState,
         _buffer: BUFFER,
     }
 
-    impl<'d, T, BUFFER> I2sReadDmaTransferAsync<'d, T, BUFFER>
+    impl<'d, T, BUFFER> I2sReadDmaTransferAsync<'d, BUFFER, T>
     where
         T: RegisterAccess,
     {
@@ -2019,6 +2094,31 @@ pub mod asynch {
             let avail = self.available().await?;
             let to_rcv = usize::min(avail, data.len());
             Ok(self.state.pop(&mut data[..to_rcv])?)
+        }
+    }
+}
+
+crate::any_peripheral! {
+    /// Any SPI peripheral.
+    pub peripheral AnyI2s {
+        #[cfg(i2s0)]
+        I2s0(crate::peripherals::I2S0),
+        #[cfg(i2s1)]
+        I2s1(crate::peripherals::I2S1),
+    }
+}
+
+impl DmaEligible for AnyI2s {
+    #[cfg(gdma)]
+    type Dma = crate::dma::AnyGdmaChannel;
+    #[cfg(pdma)]
+    type Dma = crate::dma::AnyI2sDmaChannel;
+
+    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
+        match &self.0 {
+            AnyI2sInner::I2s0(_) => crate::dma::DmaPeripheral::I2s0,
+            #[cfg(i2s1)]
+            AnyI2sInner::I2s1(_) => crate::dma::DmaPeripheral::I2s1,
         }
     }
 }

@@ -14,11 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add burst transfer support to DMA buffers (#2336)
 - `AnyPin` now implements `From<GpioPin<N>>`. (#2326)
 - Added `AnySpi` and `AnySpiDmaChannel`. (#2334)
+- Added `AnyI2s` and `AnyI2sDmaChannel`. (#2367)
 - `Pins::steal()` to unsafely obtain GPIO. (#2335)
 
 ### Changed
 
 - Peripheral type erasure for SPI (#2334)
+- Peripheral type erasure for I2S (#2367)
 
 ### Fixed
 

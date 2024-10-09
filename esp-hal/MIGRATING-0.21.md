@@ -29,6 +29,7 @@ You no longer have to specify the peripheral instance in the driver's type for t
 peripherals:
 
 - SPI (both master and slave)
+- I2S
 
 ```diff
 -Spi<'static, SPI2, FullDuplexMode>
@@ -36,6 +37,9 @@ peripherals:
 
 -SpiDma<'static, SPI2, HalfDuplexMode, Blocking>
 +SpiDma<'static, HalfDuplexMode, Blocking>
+
+-I2sTx<'static, I2S0, Async>
++I2sTx<'static, Async>
 ```
 
 Note that you may still specify the instance if you need to. To do this, we provide `_typed`
