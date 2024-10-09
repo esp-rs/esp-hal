@@ -49,13 +49,13 @@
 //! 
 //! ### Blink an LED
 //!
-//! See the [Commonly Used Setup] section of the crate documentation.
+//! See the [Blinky] section of the crate documentation.
 //!
 //! ### Inverting a signal using `AnyPin`
 //! See the [Inverting TX and RX Pins] example of the UART documentation.
 //!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
-//! [Commonly Used Setup]: ../index.html#commonly-used-setup
+//! [Blinky]: ../index.html#blinky
 //! [Inverting TX and RX Pins]: ../uart/index.html#inverting-tx-and-rx-pins
 
 use portable_atomic::{AtomicPtr, Ordering};

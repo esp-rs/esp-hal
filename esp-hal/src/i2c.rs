@@ -31,7 +31,7 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::i2c::I2C;
+//! # use esp_hal::i2c::I2c;
 //! # use esp_hal::gpio::Io;
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
@@ -228,15 +228,15 @@ impl From<Ack> for u32 {
     }
 }
 
-/// I2C peripheral container (I2C)
-pub struct I2C<'d, T, DM: crate::Mode> {
+/// I2C driver
+pub struct I2c<'d, T, DM: crate::Mode> {
     peripheral: PeripheralRef<'d, T>,
     phantom: PhantomData<DM>,
     frequency: HertzU32,
     timeout: Option<u32>,
 }
 
-impl<T> I2C<'_, T, crate::Blocking>
+impl<T> I2c<'_, T, crate::Blocking>
 where
     T: Instance,
 {
@@ -420,7 +420,7 @@ where
     }
 }
 
-impl<T> embedded_hal_02::blocking::i2c::Read for I2C<'_, T, crate::Blocking>
+impl<T> embedded_hal_02::blocking::i2c::Read for I2c<'_, T, crate::Blocking>
 where
     T: Instance,
 {
@@ -431,7 +431,7 @@ where
     }
 }
 
-impl<T> embedded_hal_02::blocking::i2c::Write for I2C<'_, T, crate::Blocking>
+impl<T> embedded_hal_02::blocking::i2c::Write for I2c<'_, T, crate::Blocking>
 where
     T: Instance,
 {
@@ -442,7 +442,7 @@ where
     }
 }
 
-impl<T> embedded_hal_02::blocking::i2c::WriteRead for I2C<'_, T, crate::Blocking>
+impl<T> embedded_hal_02::blocking::i2c::WriteRead for I2c<'_, T, crate::Blocking>
 where
     T: Instance,
 {
@@ -458,11 +458,11 @@ where
     }
 }
 
-impl<T, DM: crate::Mode> embedded_hal::i2c::ErrorType for I2C<'_, T, DM> {
+impl<T, DM: crate::Mode> embedded_hal::i2c::ErrorType for I2c<'_, T, DM> {
     type Error = Error;
 }
 
-impl<T> embedded_hal::i2c::I2c for I2C<'_, T, crate::Blocking>
+impl<T> embedded_hal::i2c::I2c for I2c<'_, T, crate::Blocking>
 where
     T: Instance,
 {
@@ -475,7 +475,7 @@ where
     }
 }
 
-impl<'d, T, DM: crate::Mode> I2C<'d, T, DM>
+impl<'d, T, DM: crate::Mode> I2c<'d, T, DM>
 where
     T: Instance,
 {
@@ -548,7 +548,7 @@ where
     }
 }
 
-impl<'d, T> I2C<'d, T, crate::Blocking>
+impl<'d, T> I2c<'d, T, crate::Blocking>
 where
     T: Instance,
 {
@@ -581,9 +581,9 @@ where
     }
 }
 
-impl<'d, T> crate::private::Sealed for I2C<'d, T, crate::Blocking> where T: Instance {}
+impl<'d, T> crate::private::Sealed for I2c<'d, T, crate::Blocking> where T: Instance {}
 
-impl<'d, T> InterruptConfigurable for I2C<'d, T, crate::Blocking>
+impl<'d, T> InterruptConfigurable for I2c<'d, T, crate::Blocking>
 where
     T: Instance,
 {
@@ -592,7 +592,7 @@ where
     }
 }
 
-impl<'d, T> I2C<'d, T, crate::Async>
+impl<'d, T> I2c<'d, T, crate::Async>
 where
     T: Instance,
 {
@@ -779,7 +779,7 @@ mod asynch {
         }
     }
 
-    impl<T> I2C<'_, T, crate::Async>
+    impl<T> I2c<'_, T, crate::Async>
     where
         T: Instance,
     {
@@ -1170,7 +1170,7 @@ mod asynch {
         }
     }
 
-    impl<'d, T> embedded_hal_async::i2c::I2c for I2C<'d, T, crate::Async>
+    impl<'d, T> embedded_hal_async::i2c::I2c for I2c<'d, T, crate::Async>
     where
         T: Instance,
     {
