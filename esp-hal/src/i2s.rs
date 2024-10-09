@@ -1009,16 +1009,15 @@ mod private {
         fn clear_interrupts(&self, interrupts: EnumSet<I2sInterrupt>) {
             let reg_block = self.register_block();
 
-            for interrupt in interrupts {
-                match interrupt {
-                    I2sInterrupt::RxHung => reg_block
-                        .int_clr()
-                        .write(|w| w.rx_hung().clear_bit_by_one()),
-                    I2sInterrupt::TxHung => reg_block
-                        .int_clr()
-                        .write(|w| w.tx_hung().clear_bit_by_one()),
+            reg_block.int_clr().write(|w| {
+                for interrupt in interrupts {
+                    match interrupt {
+                        I2sInterrupt::RxHung => w.rx_hung().clear_bit_by_one(),
+                        I2sInterrupt::TxHung => w.tx_hung().clear_bit_by_one(),
+                    };
                 }
-            }
+                w
+            });
         }
 
         fn set_clock(&self, clock_settings: I2sClockDividers) {
@@ -1335,14 +1334,12 @@ mod private {
             });
 
             i2s.tx_clkm_conf().modify(|_, w| unsafe {
-                w.clk_en()
-                    .set_bit()
-                    .tx_clk_active()
-                    .set_bit()
-                    .tx_clk_sel()
+                w.clk_en().set_bit();
+                w.tx_clk_active().set_bit();
+                w.tx_clk_sel()
                     .bits(crate::soc::constants::I2S_DEFAULT_CLK_SRC) // for now fixed at 160MHz
-                    .tx_clkm_div_num()
-                    .bits(clock_settings.mclk_divider as u8)
+                    ;
+                w.tx_clkm_div_num().bits(clock_settings.mclk_divider as u8)
             });
 
             i2s.tx_conf1().modify(|_, w| unsafe {
@@ -1651,215 +1648,15 @@ mod private {
         }
     }
 
-    #[cfg(any(esp32c3, esp32c6, esp32h2))]
-    impl Signals for crate::peripherals::I2S0 {
-        fn mclk_signal(&self) -> OutputSignal {
-            OutputSignal::I2S_MCLK
-        }
-
-        fn bclk_signal(&self) -> OutputSignal {
-            OutputSignal::I2SO_BCK
-        }
-
-        fn ws_signal(&self) -> OutputSignal {
-            OutputSignal::I2SO_WS
-        }
-
-        fn dout_signal(&self) -> OutputSignal {
-            OutputSignal::I2SO_SD
-        }
-
-        fn bclk_rx_signal(&self) -> OutputSignal {
-            OutputSignal::I2SI_BCK
-        }
-
-        fn ws_rx_signal(&self) -> OutputSignal {
-            OutputSignal::I2SI_WS
-        }
-
-        fn din_signal(&self) -> InputSignal {
-            InputSignal::I2SI_SD
-        }
-    }
-
-    #[cfg(esp32s3)]
-    impl Signals for crate::peripherals::I2S0 {
-        fn mclk_signal(&self) -> OutputSignal {
-            OutputSignal::I2S0_MCLK
-        }
-
-        fn bclk_signal(&self) -> OutputSignal {
-            OutputSignal::I2S0O_BCK
-        }
-
-        fn ws_signal(&self) -> OutputSignal {
-            OutputSignal::I2S0O_WS
-        }
-
-        fn dout_signal(&self) -> OutputSignal {
-            OutputSignal::I2S0O_SD
-        }
-
-        fn bclk_rx_signal(&self) -> OutputSignal {
-            OutputSignal::I2S0I_BCK
-        }
-
-        fn ws_rx_signal(&self) -> OutputSignal {
-            OutputSignal::I2S0I_WS
-        }
-
-        fn din_signal(&self) -> InputSignal {
-            InputSignal::I2S0I_SD
-        }
-    }
-
-    #[cfg(esp32s3)]
-    impl Signals for crate::peripherals::I2S1 {
-        fn mclk_signal(&self) -> OutputSignal {
-            OutputSignal::I2S1_MCLK
-        }
-
-        fn bclk_signal(&self) -> OutputSignal {
-            OutputSignal::I2S1O_BCK
-        }
-
-        fn ws_signal(&self) -> OutputSignal {
-            OutputSignal::I2S1O_WS
-        }
-
-        fn dout_signal(&self) -> OutputSignal {
-            OutputSignal::I2S1O_SD
-        }
-
-        fn bclk_rx_signal(&self) -> OutputSignal {
-            OutputSignal::I2S1I_BCK
-        }
-
-        fn ws_rx_signal(&self) -> OutputSignal {
-            OutputSignal::I2S1I_WS
-        }
-
-        fn din_signal(&self) -> InputSignal {
-            InputSignal::I2S1I_SD
-        }
-    }
-
-    #[cfg(esp32)]
-    impl Signals for crate::peripherals::I2S0 {
-        fn mclk_signal(&self) -> OutputSignal {
-            panic!("MCLK currently not supported on ESP32");
-        }
-
-        fn bclk_signal(&self) -> OutputSignal {
-            OutputSignal::I2S0O_BCK
-        }
-
-        fn ws_signal(&self) -> OutputSignal {
-            OutputSignal::I2S0O_WS
-        }
-
-        fn dout_signal(&self) -> OutputSignal {
-            OutputSignal::I2S0O_DATA_23
-        }
-
-        fn bclk_rx_signal(&self) -> OutputSignal {
-            OutputSignal::I2S0I_BCK
-        }
-
-        fn ws_rx_signal(&self) -> OutputSignal {
-            OutputSignal::I2S0I_WS
-        }
-
-        fn din_signal(&self) -> InputSignal {
-            InputSignal::I2S0I_DATA_15
-        }
-    }
-
-    #[cfg(esp32)]
-    impl Signals for crate::peripherals::I2S1 {
-        fn mclk_signal(&self) -> OutputSignal {
-            panic!("MCLK currently not supported on ESP32");
-        }
-
-        fn bclk_signal(&self) -> OutputSignal {
-            OutputSignal::I2S1O_BCK
-        }
-
-        fn ws_signal(&self) -> OutputSignal {
-            OutputSignal::I2S1O_WS
-        }
-
-        fn dout_signal(&self) -> OutputSignal {
-            OutputSignal::I2S1O_DATA_23
-        }
-
-        fn bclk_rx_signal(&self) -> OutputSignal {
-            OutputSignal::I2S1I_BCK
-        }
-
-        fn ws_rx_signal(&self) -> OutputSignal {
-            OutputSignal::I2S1I_WS
-        }
-
-        fn din_signal(&self) -> InputSignal {
-            InputSignal::I2S1I_DATA_15
-        }
-    }
-
-    #[cfg(esp32s2)]
-    impl Signals for crate::peripherals::I2S0 {
-        fn mclk_signal(&self) -> OutputSignal {
-            OutputSignal::CLK_I2S
-        }
-
-        fn bclk_signal(&self) -> OutputSignal {
-            OutputSignal::I2S0O_BCK
-        }
-
-        fn ws_signal(&self) -> OutputSignal {
-            OutputSignal::I2S0O_WS
-        }
-
-        fn dout_signal(&self) -> OutputSignal {
-            OutputSignal::I2S0O_DATA_OUT23
-        }
-
-        fn bclk_rx_signal(&self) -> OutputSignal {
-            OutputSignal::I2S0I_BCK
-        }
-
-        fn ws_rx_signal(&self) -> OutputSignal {
-            OutputSignal::I2S0I_WS
-        }
-
-        fn din_signal(&self) -> InputSignal {
-            InputSignal::I2S0I_DATA_IN15
-        }
-    }
-
     impl PeripheralMarker for I2S0 {
         fn peripheral(&self) -> crate::system::Peripheral {
             crate::system::Peripheral::I2s0
         }
     }
 
-    #[cfg(i2s1)]
-    impl PeripheralMarker for I2S1 {
-        fn peripheral(&self) -> crate::system::Peripheral {
-            crate::system::Peripheral::I2s1
-        }
-    }
-
     impl RegBlock for I2S0 {
         fn register_block(&self) -> &RegisterBlock {
-            unsafe { &*I2S0::PTR }
-        }
-    }
-
-    #[cfg(i2s1)]
-    impl RegBlock for I2S1 {
-        fn register_block(&self) -> &RegisterBlock {
-            unsafe { &*I2S1::PTR }
+            unsafe { &*I2S0::PTR.cast::<RegisterBlock>() }
         }
     }
 
@@ -1871,12 +1668,160 @@ mod private {
         }
     }
 
+    #[cfg(i2s0)]
+    impl Signals for crate::peripherals::I2S0 {
+        fn mclk_signal(&self) -> OutputSignal {
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    panic!("MCLK currently not supported on ESP32");
+                } else if #[cfg(esp32s2)] {
+                    OutputSignal::CLK_I2S
+                } else if #[cfg(esp32s3)] {
+                    OutputSignal::I2S0_MCLK
+                } else {
+                    OutputSignal::I2S_MCLK
+                }
+            }
+        }
+
+        fn bclk_signal(&self) -> OutputSignal {
+            cfg_if::cfg_if! {
+                if #[cfg(any(esp32, esp32s2, esp32s3))] {
+                    OutputSignal::I2S0O_BCK
+                } else {
+                    OutputSignal::I2SO_BCK
+                }
+            }
+        }
+
+        fn ws_signal(&self) -> OutputSignal {
+            cfg_if::cfg_if! {
+                if #[cfg(any(esp32, esp32s2, esp32s3))] {
+                    OutputSignal::I2S0O_WS
+                } else {
+                    OutputSignal::I2SO_WS
+                }
+            }
+        }
+
+        fn dout_signal(&self) -> OutputSignal {
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    OutputSignal::I2S0O_DATA_23
+                } else if #[cfg(esp32s2)] {
+                    OutputSignal::I2S0O_DATA_OUT23
+                } else if #[cfg(esp32s3)] {
+                    OutputSignal::I2S0O_SD
+                } else {
+                    OutputSignal::I2SO_SD
+                }
+            }
+        }
+
+        fn bclk_rx_signal(&self) -> OutputSignal {
+            cfg_if::cfg_if! {
+                if #[cfg(any(esp32, esp32s2, esp32s3))] {
+                    OutputSignal::I2S0I_BCK
+                } else {
+                    OutputSignal::I2SI_BCK
+                }
+            }
+        }
+
+        fn ws_rx_signal(&self) -> OutputSignal {
+            cfg_if::cfg_if! {
+                if #[cfg(any(esp32, esp32s2, esp32s3))] {
+                    OutputSignal::I2S0I_WS
+                } else {
+                    OutputSignal::I2SI_WS
+                }
+            }
+        }
+
+        fn din_signal(&self) -> InputSignal {
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    InputSignal::I2S0I_DATA_15
+                } else if #[cfg(esp32s2)] {
+                    InputSignal::I2S0I_DATA_IN15
+                } else if #[cfg(esp32s3)] {
+                    InputSignal::I2S0I_SD
+                } else {
+                    InputSignal::I2SI_SD
+                }
+            }
+        }
+    }
+
+    #[cfg(i2s1)]
+    impl PeripheralMarker for I2S1 {
+        fn peripheral(&self) -> crate::system::Peripheral {
+            crate::system::Peripheral::I2s1
+        }
+    }
+
+    #[cfg(i2s1)]
+    impl RegBlock for I2S1 {
+        fn register_block(&self) -> &RegisterBlock {
+            unsafe { &*I2S1::PTR.cast::<RegisterBlock>() }
+        }
+    }
+
     #[cfg(i2s1)]
     impl RegisterAccessPrivate for I2S1 {
         fn set_interrupt_handler(&self, handler: InterruptHandler) {
             unsafe { crate::peripherals::I2S1::steal() }.bind_i2s1_interrupt(handler.handler());
             crate::interrupt::enable(crate::peripherals::Interrupt::I2S1, handler.priority())
                 .unwrap();
+        }
+    }
+
+    #[cfg(i2s1)]
+    impl Signals for crate::peripherals::I2S1 {
+        fn mclk_signal(&self) -> OutputSignal {
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    panic!("MCLK currently not supported on ESP32");
+                } else {
+                    OutputSignal::I2S1_MCLK
+                }
+            }
+        }
+
+        fn bclk_signal(&self) -> OutputSignal {
+            OutputSignal::I2S1O_BCK
+        }
+
+        fn ws_signal(&self) -> OutputSignal {
+            OutputSignal::I2S1O_WS
+        }
+
+        fn dout_signal(&self) -> OutputSignal {
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    OutputSignal::I2S1O_DATA_23
+                } else {
+                    OutputSignal::I2S1O_SD
+                }
+            }
+        }
+
+        fn bclk_rx_signal(&self) -> OutputSignal {
+            OutputSignal::I2S1I_BCK
+        }
+
+        fn ws_rx_signal(&self) -> OutputSignal {
+            OutputSignal::I2S1I_WS
+        }
+
+        fn din_signal(&self) -> InputSignal {
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    InputSignal::I2S1I_DATA_15
+                } else {
+                    InputSignal::I2S1I_SD
+                }
+            }
         }
     }
 
