@@ -22,7 +22,7 @@ pub fn allocate_main_task() -> *mut Context {
         }
 
         let ptr = malloc(size_of::<Context>() as u32) as *mut Context;
-        core::ptr::write_bytes(ptr, 0, 1);
+        core::ptr::write(ptr, Context::new());
         (*ptr).next = ptr;
         *ctx_now = ptr;
         ptr
@@ -37,7 +37,7 @@ fn allocate_task() -> *mut Context {
         }
 
         let ptr = malloc(size_of::<Context>() as u32) as *mut Context;
-        core::ptr::write_bytes(ptr, 0, 1);
+        core::ptr::write(ptr, Context::new());
         (*ptr).next = (**ctx_now).next;
         (**ctx_now).next = ptr;
         ptr
