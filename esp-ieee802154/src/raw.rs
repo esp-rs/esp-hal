@@ -257,8 +257,9 @@ fn stop_current_operation() {
 }
 
 fn set_next_rx_buffer() {
+    #[allow(unused_unsafe)] // stable compiler needs unsafe, nightly complains about it
     unsafe {
-        set_rx_addr(RX_BUFFER.as_mut_ptr());
+        set_rx_addr(core::ptr::addr_of_mut!(RX_BUFFER).cast());
     }
 }
 

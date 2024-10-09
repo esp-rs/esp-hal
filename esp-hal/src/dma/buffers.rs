@@ -923,8 +923,9 @@ unsafe impl DmaTxBuffer for EmptyBuf {
     type View = EmptyBuf;
 
     fn prepare(&mut self) -> Preparation {
+        #[allow(unused_unsafe)] // stable requires unsafe, nightly complains about it
         Preparation {
-            start: unsafe { EMPTY.as_mut_ptr() },
+            start: unsafe { core::ptr::addr_of_mut!(EMPTY).cast() },
             block_size: None,
         }
     }
@@ -946,8 +947,9 @@ unsafe impl DmaRxBuffer for EmptyBuf {
     type View = EmptyBuf;
 
     fn prepare(&mut self) -> Preparation {
+        #[allow(unused_unsafe)] // stable requires unsafe, nightly complains about it
         Preparation {
-            start: unsafe { EMPTY.as_mut_ptr() },
+            start: unsafe { core::ptr::addr_of_mut!(EMPTY).cast() },
             block_size: None,
         }
     }
