@@ -37,7 +37,7 @@
 //!
 //! // Create a new peripheral object with the described wiring
 //! // and standard I2C clock speed.
-//! let mut i2c = I2C::new(
+//! let mut i2c = I2c::new(
 //!     peripherals.I2C0,
 //!     io.pins.gpio1,
 //!     io.pins.gpio2,
@@ -106,7 +106,7 @@ pub enum Error {
 
 #[derive(PartialEq)]
 // This enum is used to keep track of the last/next operation that was/will be
-// performed in an embedded-hal(-async) I2C::transaction. It is used to
+// performed in an embedded-hal(-async) I2c::transaction. It is used to
 // determine whether a START condition should be issued at the start of the
 // current operation and whether a read needs an ack or a nack for the final
 // byte.
@@ -494,7 +494,7 @@ where
         PeripheralClockControl::reset(T::peripheral());
         PeripheralClockControl::enable(T::peripheral());
 
-        let i2c = I2C {
+        let i2c = I2c {
             peripheral: i2c,
             phantom: PhantomData,
             frequency,
