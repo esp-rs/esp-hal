@@ -57,7 +57,7 @@ impl Iterator for SampleSource {
 }
 
 #[embassy_executor::task]
-async fn writer(tx_buffer: &'static mut [u8], i2s_tx: I2sTx<'static, I2S0, Async>) {
+async fn writer(tx_buffer: &'static mut [u8], i2s_tx: I2sTx<'static, Async>) {
     let mut samples = SampleSource::new();
     for b in tx_buffer.iter_mut() {
         *b = samples.next().unwrap();
