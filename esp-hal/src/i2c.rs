@@ -501,9 +501,6 @@ where
     ) -> Self {
         crate::into_ref!(i2c, sda, scl);
 
-        PeripheralClockControl::reset(i2c.peripheral());
-        PeripheralClockControl::enable(i2c.peripheral());
-
         let i2c = I2c {
             i2c,
             phantom: PhantomData,
@@ -511,6 +508,10 @@ where
             timeout,
         };
 
+        PeripheralClockControl::reset(i2c.i2c.peripheral());
+        PeripheralClockControl::enable(i2c.i2c.peripheral());
+
+        // TODO: implement with_pins et. al.
         // avoid SCL/SDA going low during configuration
         scl.set_output_high(true, crate::private::Internal);
         sda.set_output_high(true, crate::private::Internal);
