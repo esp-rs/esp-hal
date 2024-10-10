@@ -136,13 +136,7 @@ pub mod asynch {
 }
 
 mod private {
-    use crate::{dma::PeripheralMarker, peripherals::LCD_CAM};
-
-    impl PeripheralMarker for LCD_CAM {
-        fn peripheral(&self) -> crate::system::Peripheral {
-            crate::system::Peripheral::LcdCam
-        }
-    }
+    use crate::peripherals::LCD_CAM;
 
     pub(crate) struct Instance;
 
