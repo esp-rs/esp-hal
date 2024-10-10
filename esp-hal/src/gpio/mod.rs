@@ -1407,7 +1407,7 @@ macro_rules! analog {
             impl $crate::gpio::AnalogPin for GpioPin<$pin_num> {
                 /// Configures the pin for analog mode.
                 fn set_analog(&self, _: $crate::private::Internal) {
-                    use $crate::peripherals::{GPIO};
+                    use $crate::peripherals::GPIO;
 
                     get_io_mux_reg($pin_num).modify(|_,w| unsafe {
                         w.mcu_sel().bits(1);
