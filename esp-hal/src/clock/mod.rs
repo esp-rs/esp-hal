@@ -20,15 +20,11 @@
 //! The `CPU clock` is responsible for defining the speed at which the central
 //! processing unit (CPU) operates. This driver provides predefined options for
 //! different CPU clock speeds, such as
-//!
-//!   * 80 MHz
-//!   * 96 MHz
-//!   * 120 MHz
-//!   * 160 MHz
-//!   * 240 MHz
-//!
-//! and others, depending on the microcontroller model.
-//!
+#![cfg_attr(not(esp32h2), doc = "* 80MHz")]
+#![cfg_attr(esp32h2, doc = "* 96MHz")]
+#![cfg_attr(esp32c2, doc = "* 120MHz")]
+#![cfg_attr(not(any(esp32c2, esp32h2)), doc = "* 160MHz")]
+#![cfg_attr(xtensa, doc = "* 240MHz")]
 //! ### Frozen Clock Frequencies
 //!
 //! Once the clock configuration is applied, the clock frequencies become
@@ -40,13 +36,7 @@
 //!
 //! ### Initialize With Different Clock Frequencies
 //! ```rust, no_run
-//! # #![no_std]
-//! # use esp_hal::prelude::*;
-//! # #[panic_handler]
-//! # fn panic(_ : &core::panic::PanicInfo) -> ! {
-//! #     loop {}
-//! # }
-//! # fn main() {
+#![doc = crate::before_snippet!()]
 //! // Initialize with the highest possible frequency for this chip
 //! let peripherals = esp_hal::init({
 //!     let mut config = esp_hal::Config::default();

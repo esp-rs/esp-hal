@@ -30,7 +30,7 @@ use esp_hal::{
     dma_rx_stream_buffer,
     gpio::Io,
     i2c,
-    i2c::I2C,
+    i2c::I2c,
     lcd_cam::{
         cam::{Camera, RxEightBits},
         LcdCam,
@@ -80,7 +80,7 @@ fn main() -> ! {
 
     delay.delay_millis(500u32);
 
-    let i2c = I2C::new(peripherals.I2C0, cam_siod, cam_sioc, 100u32.kHz());
+    let i2c = I2c::new(peripherals.I2C0, cam_siod, cam_sioc, 100u32.kHz());
 
     let mut sccb = Sccb::new(i2c);
 
@@ -165,14 +165,14 @@ fn main() -> ! {
 pub const OV2640_ADDRESS: u8 = 0x30;
 
 pub struct Sccb<'d, T> {
-    i2c: I2C<'d, T, Blocking>,
+    i2c: I2c<'d, T, Blocking>,
 }
 
 impl<'d, T> Sccb<'d, T>
 where
     T: i2c::Instance,
 {
-    pub fn new(i2c: I2C<'d, T, Blocking>) -> Self {
+    pub fn new(i2c: I2c<'d, T, Blocking>) -> Self {
         Self { i2c }
     }
 

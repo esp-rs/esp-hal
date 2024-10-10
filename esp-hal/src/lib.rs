@@ -52,7 +52,7 @@
 //! cargo generate -a esp-rs/esp-template
 //! ```
 //!
-//! ## Commonly Used Setup
+//! ## Blinky
 //!
 //! Some minimal code to blink an LED looks like this:
 //!

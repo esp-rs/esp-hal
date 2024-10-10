@@ -12,7 +12,6 @@
 //! # use esp_hal::cpu_control::{CpuControl, Stack};
 //! # use core::{cell::RefCell, ptr::addr_of_mut};
 //! # use critical_section::Mutex;
-//! # use esp_hal::prelude::*;
 //! static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 //!
 //! # let delay = Delay::new();
@@ -36,7 +35,6 @@
 //! // Where `cpu1_task()` may be defined as:
 //! # use esp_hal::delay::Delay;
 //! # use core::cell::RefCell;
-//! # use esp_hal::prelude::*;
 //! fn cpu1_task(
 //!     delay: &Delay,
 //!     counter: &critical_section::Mutex<RefCell<i32>>,

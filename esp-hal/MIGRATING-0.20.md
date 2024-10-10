@@ -339,3 +339,7 @@ A non-exhausitve list demonstrating this change:
 -SpiDma<'static, esp_hal::peripherals::SPI2, DmaChannel0, HalfDuplexMode, Blocking>
 +SpiDma<'static, esp_hal::peripherals::SPI2, HalfDuplexMode, Blocking>
 ```
+
+## `I2C` driver renamed to `I2c`
+
+To firstly match the naming in `embedded-hal`, but also because types should be `UpperCamelCase`.
