@@ -491,11 +491,7 @@ pub trait InputPin: Pin + PeripheralInput + Into<AnyPin> + 'static {
     /// Stop listening for interrupts
     #[doc(hidden)]
     fn unlisten(&mut self, _: private::Internal) {
-        unsafe {
-            (*GPIO::PTR)
-                .pin(self.number() as usize)
-                .modify(|_, w| w.int_ena().bits(0).int_type().bits(0).int_ena().bits(0));
-        }
+        set_int_enable(self.number(), 0, 0, false);
     }
 
     /// Checks if the interrupt status bit for this Pin is set
@@ -2416,7 +2412,7 @@ fn is_listening(pin_num: u8) -> bool {
 }
 
 fn set_int_enable(gpio_num: u8, int_ena: u8, int_type: u8, wake_up_from_light_sleep: bool) {
-    let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
+    let gpio = unsafe { &*GPIO::PTR };
     gpio.pin(gpio_num as usize).modify(|_, w| unsafe {
         w.int_ena().bits(int_ena);
         w.int_type().bits(int_type);
