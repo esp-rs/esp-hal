@@ -72,10 +72,10 @@ INSERT BEFORE .rodata;
 /* end of esp32c6 fixups */
 
 /* Shared sections - ordering matters */
-INCLUDE "text.x"
 INCLUDE "rwtext.x"
-INCLUDE "rodata.x"
+INCLUDE "text.x"
 INCLUDE "rwdata.x"
+INCLUDE "rodata.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "stack.x"
 INCLUDE "dram2.x"

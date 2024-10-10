@@ -69,18 +69,50 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Define all necessary configuration symbols for the configured device:
     config.define_symbols();
 
-    #[allow(unused_mut)]
-    let mut config_symbols = config.all().collect::<Vec<_>>();
-    #[cfg(feature = "flip-link")]
-    config_symbols.push("flip-link");
-
     // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
     // files:
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     println!("cargo:rustc-link-search={}", out.display());
 
+    // emit config
+    let cfg = generate_config(
+        "esp_hal",
+        &[
+            (
+                "place-spi-driver-in-ram",
+                Value::Bool(false),
+                "Places the SPI driver in RAM for better performance",
+            ),
+            (
+                "spi-address-workaround",
+                Value::Bool(true),
+                "(ESP32 only) Enables a workaround for the issue where SPI in half-duplex mode incorrectly transmits the address on a single line if the data buffer is empty.",
+            ),
+            (
+                "place-more-rodata-in-ram",
+                Value::Bool(false),
+                "Places more data (lookup-tables, switch-tables etc.) into RAM - resulting in better performance (especially for interrupts) but more RAM consumption",
+            )
+        ],
+        true,
+    );
+
     // RISC-V and Xtensa devices each require some special handling and processing
     // of linker scripts:
+
+    #[allow(unused_mut)]
+    let mut config_symbols = config.all().collect::<Vec<_>>();
+    #[cfg(feature = "flip-link")]
+    config_symbols.push("flip-link");
+
+    for (key, value) in &cfg {
+        match value {
+            Value::Bool(true) => {
+                config_symbols.push(&key);
+            }
+            _ => (),
+        }
+    }
 
     if cfg!(feature = "esp32") || cfg!(feature = "esp32s2") || cfg!(feature = "esp32s3") {
         // Xtensa devices:
@@ -124,24 +156,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // remaining linker scripts which are common to all devices:
     copy_dir_all(&config_symbols, "ld/sections", &out)?;
     copy_dir_all(&config_symbols, format!("ld/{device_name}"), &out)?;
-
-    // emit config
-    generate_config(
-        "esp_hal",
-        &[
-            (
-                "place-spi-driver-in-ram",
-                Value::Bool(false),
-                "Places the SPI driver in RAM for better performance",
-            ),
-            (
-                "spi-address-workaround",
-                Value::Bool(true),
-                "(ESP32 only) Enables a workaround for the issue where SPI in half-duplex mode incorrectly transmits the address on a single line if the data buffer is empty.",
-            ),
-        ],
-        true,
-    );
 
     Ok(())
 }

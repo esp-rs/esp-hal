@@ -65,10 +65,10 @@ SECTIONS {
 INSERT BEFORE .rodata;
 
 /* Shared sections - ordering matters */
-INCLUDE "text.x"
 INCLUDE "rwtext.x"
-INCLUDE "rodata.x"
+INCLUDE "text.x"
 INCLUDE "rwdata.x"
+INCLUDE "rodata.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "stack.x"
 INCLUDE "dram2.x"
