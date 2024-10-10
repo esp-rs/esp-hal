@@ -12,7 +12,30 @@ pub struct Preparation {
     /// memory?)
     #[cfg_attr(not(esp32s3), allow(dead_code))]
     pub(super) block_size: Option<DmaBufBlkSize>,
-    // burst_mode, alignment, check_owner, etc.
+
+    /// Most DMA channels allow software to configure whether the hardware
+    /// checks that [DmaDescriptor::owner] is set to [Owner::Dma] before
+    /// consuming the descriptor. If this check fails, the channel stops
+    /// operating and fires
+    /// [DmaRxInterrupt::DescriptorError]/[DmaTxInterrupt::DescriptorError].
+    ///
+    /// This field allows buffer implementation to configure this behaviour.
+    ///
+    /// Some buffer implementations may require that the DMA channel performs
+    /// this check before consuming the descriptor to ensure correct
+    /// behaviour. e.g. To prevent wrap-around in a circular transfer.
+    ///
+    /// Some buffer implementations may require that the DMA channel does NOT
+    /// perform this check as the ownership bit will not be set before the
+    /// channel tries to consume the descriptor.
+    ///
+    /// Most implementations won't have any such requirements and will work
+    /// correctly regardless of whether the DMA channel checks or not.
+    ///
+    /// Note: If the DMA channel doesn't support the provided option,
+    /// preparation will fail.
+    pub(super) check_owner: Option<bool>,
+    // burst_mode, alignment, etc.
 }
 
 /// [DmaTxBuffer] is a DMA descriptor + memory combo that can be used for
@@ -290,6 +313,7 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
         Preparation {
             start: self.descriptors.head(),
             block_size: self.block_size,
+            check_owner: None,
         }
     }
 
@@ -436,6 +460,7 @@ unsafe impl DmaRxBuffer for DmaRxBuf {
         Preparation {
             start: self.descriptors.head(),
             block_size: None,
+            check_owner: None,
         }
     }
 
@@ -560,6 +585,7 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
         Preparation {
             start: self.tx_descriptors.head(),
             block_size: None, // TODO: support block size!
+            check_owner: None,
         }
     }
 
@@ -587,6 +613,7 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
         Preparation {
             start: self.rx_descriptors.head(),
             block_size: None, // TODO: support block size!
+            check_owner: None,
         }
     }
 
@@ -723,6 +750,12 @@ unsafe impl DmaRxBuffer for DmaRxStreamBuf {
         Preparation {
             start: self.descriptors.as_mut_ptr(),
             block_size: None,
+
+            // Whilst we give ownership of the descriptors the DMA, the correctness of this buffer
+            // implementation doesn't rely on the DMA checking for descriptor ownership.
+            // No descriptor is added back to the end of the stream before it's ready for the DMA
+            // to consume it.
+            check_owner: None,
         }
     }
 
@@ -927,6 +960,10 @@ unsafe impl DmaTxBuffer for EmptyBuf {
         Preparation {
             start: unsafe { core::ptr::addr_of_mut!(EMPTY).cast() },
             block_size: None,
+
+            // As we don't give ownership of the descriptor to the DMA, it's important that the DMA
+            // channel does *NOT* check for ownership, otherwise the channel will return an error.
+            check_owner: Some(false),
         }
     }
 
@@ -951,6 +988,10 @@ unsafe impl DmaRxBuffer for EmptyBuf {
         Preparation {
             start: unsafe { core::ptr::addr_of_mut!(EMPTY).cast() },
             block_size: None,
+
+            // As we don't give ownership of the descriptor to the DMA, it's important that the DMA
+            // channel does *NOT* check for ownership, otherwise the channel will return an error.
+            check_owner: Some(false),
         }
     }
 
