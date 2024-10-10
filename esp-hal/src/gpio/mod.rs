@@ -91,7 +91,6 @@ pub mod rtc_io;
 
 /// Convenience constant for `Option::None` pin
 
-#[ram]
 static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
 
 struct CFnPtr(AtomicPtr<()>);
