@@ -62,6 +62,24 @@ impl<'a, T> PeripheralRef<'a, T> {
         // self, so user code can't use both at the same time.
         PeripheralRef::new(unsafe { self.inner.clone_unchecked() })
     }
+
+    /// Map the inner peripheral using `Into`.
+    ///
+    /// This converts from `PeripheralRef<'a, T>` to `PeripheralRef<'a, U>`,
+    /// using an `Into` impl to convert from `T` to `U`.
+    ///
+    /// For example, this can be useful to degrade GPIO pins: converting from
+    /// PeripheralRef<'a, GpioPin<11>>` to `PeripheralRef<'a, AnyPin>`.
+    #[inline]
+    pub fn map_into<U>(self) -> PeripheralRef<'a, U>
+    where
+        T: Into<U>,
+    {
+        PeripheralRef {
+            inner: self.inner.into(),
+            _lifetime: PhantomData,
+        }
+    }
 }
 
 impl<'a, T> Deref for PeripheralRef<'a, T> {
