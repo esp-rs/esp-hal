@@ -907,33 +907,6 @@ where
     }
 }
 
-// Shorthand to define enums with From implementations.
-macro_rules! any_enum {
-    ($(#[$meta:meta])* $vis:vis enum $name:ident {
-        $(
-            $(#[$variant_meta:meta])*
-            $variant:ident($inner:ty)
-        ),* $(,)?
-    }) => {
-        $(#[$meta])*
-        $vis enum $name {
-            $(
-                $(#[$variant_meta])*
-                $variant($inner),
-            )*
-        }
-
-        $(
-            $(#[$variant_meta])*
-            impl From<$inner> for $name {
-                fn from(inner: $inner) -> Self {
-                    $name::$variant(inner)
-                }
-            }
-        )*
-    };
-}
-
 /// A marker for SPI-compatible type-erased DMA channels.
 pub struct AnyPdmaSpiChannel;
 
@@ -944,7 +917,7 @@ impl DmaChannel for AnyPdmaSpiChannel {
     type Tx = SpiDmaTxChannelImpl<AnySpiDmaChannel>;
 }
 
-any_enum! {
+crate::any_enum! {
     #[doc(hidden)]
     pub enum AnySpiDmaChannel {
         Spi2(Spi2DmaChannel),
