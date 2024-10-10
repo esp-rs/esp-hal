@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `ESP_HAL_EMBASSY_LOW_POWER_WAIT` configuration option. (#2329)
+
 ### Changed
 
 - Reduce memory footprint by 4 bytes on multi-core MCUs.
