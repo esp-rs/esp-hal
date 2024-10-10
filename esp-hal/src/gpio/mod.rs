@@ -1131,6 +1131,13 @@ macro_rules! gpio {
                         input_signals
                     }
                 }
+
+                impl From<GpioPin<$gpionum>> for AnyPin {
+                    fn from(pin: GpioPin<$gpionum>) -> Self {
+                        use $crate::gpio::Pin;
+                        pin.degrade()
+                    }
+                }
             )+
 
             pub(crate) enum AnyPinInner {
@@ -1604,12 +1611,14 @@ impl<'d, P> Peripheral for Output<'d, P> {
 }
 
 impl<'d> Output<'d> {
-    /// Create GPIO output driver for a [GpioPin] with the provided level
+    /// Create GPIO open-drain output driver for a [Pin] with the provided
+    /// initial output-level and [Pull] configuration.
     #[inline]
-    pub fn new<P: OutputPin>(pin: impl Peripheral<P = P> + 'd, initial_output: Level) -> Self {
-        let pin = Flex::new(pin);
-
-        Self::new_inner(pin, initial_output)
+    pub fn new(pin: impl Peripheral<P = impl OutputPin> + 'd, initial_output: Level) -> Self {
+        Self::new_typed(
+            pin.into_ref().degrade_pin(private::Internal),
+            initial_output,
+        )
     }
 }
 
@@ -1711,10 +1720,8 @@ impl<'d> Input<'d> {
     /// Create GPIO input driver for a [Pin] with the provided [Pull]
     /// configuration.
     #[inline]
-    pub fn new<P: InputPin>(pin: impl Peripheral<P = P> + 'd, pull: Pull) -> Self {
-        let pin = Flex::new(pin);
-
-        Self::new_inner(pin, pull)
+    pub fn new(pin: impl Peripheral<P = impl InputPin> + 'd, pull: Pull) -> Self {
+        Self::new_typed(pin.into_ref().degrade_pin(private::Internal), pull)
     }
 }
 
@@ -1726,12 +1733,8 @@ where
     /// configuration.
     #[inline]
     pub fn new_typed(pin: impl Peripheral<P = P> + 'd, pull: Pull) -> Self {
-        let pin = Flex::new_typed(pin);
+        let mut pin = Flex::new_typed(pin);
 
-        Self::new_inner(pin, pull)
-    }
-
-    fn new_inner(mut pin: Flex<'d, P>, pull: Pull) -> Self {
         pin.set_as_input(pull);
 
         Self { pin }
@@ -1815,14 +1818,16 @@ impl<'d> OutputOpenDrain<'d> {
     /// Create GPIO open-drain output driver for a [Pin] with the provided
     /// initial output-level and [Pull] configuration.
     #[inline]
-    pub fn new<P: InputPin + OutputPin>(
-        pin: impl Peripheral<P = P> + 'd,
+    pub fn new(
+        pin: impl Peripheral<P = impl InputPin + OutputPin> + 'd,
         initial_output: Level,
         pull: Pull,
     ) -> Self {
-        let pin = Flex::new(pin);
-
-        Self::new_inner(pin, initial_output, pull)
+        Self::new_typed(
+            pin.into_ref().degrade_pin(private::Internal),
+            initial_output,
+            pull,
+        )
     }
 }
 
@@ -1834,15 +1839,9 @@ where
     /// initial output-level and [Pull] configuration.
     #[inline]
     pub fn new_typed(pin: impl Peripheral<P = P> + 'd, initial_output: Level, pull: Pull) -> Self {
-        let pin = Flex::new_typed(pin);
+        let mut pin = Flex::new_typed(pin);
 
-        Self::new_inner(pin, initial_output, pull)
-    }
-
-    fn new_inner(mut pin: Flex<'d, P>, initial_output: Level, pull: Pull) -> Self {
-        pin.pin
-            .set_output_high(initial_output.into(), private::Internal);
-
+        pin.set_level(initial_output);
         pin.set_as_open_drain(pull);
 
         Self { pin }
@@ -1954,10 +1953,8 @@ impl<'d> Flex<'d> {
     /// Create flexible pin driver for a [Pin].
     /// No mode change happens.
     #[inline]
-    pub fn new<P: Pin>(pin: impl Peripheral<P = P> + 'd) -> Self {
-        crate::into_ref!(pin);
-        let pin = pin.degrade_pin(private::Internal);
-        Self::new_typed(pin)
+    pub fn new(pin: impl Peripheral<P = impl Pin> + 'd) -> Self {
+        Self::new_typed(pin.into_ref().degrade_pin(private::Internal))
     }
 }
 
