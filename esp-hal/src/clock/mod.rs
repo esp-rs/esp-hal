@@ -15,20 +15,13 @@
 //! ## Configuration
 //!
 //! During HAL initialization, specify a CPU clock speed to configure the
-//! desired clock frequencies.
+//! desired clock frequencies. The CPU clock is responsible for defining the
+//! speed at which the central processing unit (CPU) operates.
 //!
-//! The `CPU clock` is responsible for defining the speed at which the central
-//! processing unit (CPU) operates. This driver provides predefined options for
-//! different CPU clock speeds, such as
-#![cfg_attr(not(esp32h2), doc = "* 80MHz")]
-#![cfg_attr(esp32h2, doc = "* 96MHz")]
-#![cfg_attr(esp32c2, doc = "* 120MHz")]
-#![cfg_attr(not(any(esp32c2, esp32h2)), doc = "* 160MHz")]
-#![cfg_attr(xtensa, doc = "* 240MHz")]
 //! ### Frozen Clock Frequencies
 //!
 //! Once the clock configuration is applied, the clock frequencies become
-//! `frozen` and cannot be changed. The `Clocks` struct is returned as part of
+//! frozen and cannot be changed. The `Clocks` struct is returned as part of
 //! the `System` struct, providing read-only access to the configured clock
 //! frequencies.
 //!
@@ -71,6 +64,7 @@ use crate::rtc_cntl::RtcClock;
 #[cfg_attr(esp32c3, path = "clocks_ll/esp32c3.rs")]
 #[cfg_attr(esp32c6, path = "clocks_ll/esp32c6.rs")]
 #[cfg_attr(esp32h2, path = "clocks_ll/esp32h2.rs")]
+#[cfg_attr(esp32p4, path = "clocks_ll/esp32p4.rs")]
 #[cfg_attr(esp32s2, path = "clocks_ll/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "clocks_ll/esp32s3.rs")]
 pub(crate) mod clocks_ll;
@@ -91,6 +85,7 @@ pub trait Clock {
     }
 }
 
+// TODO: Properly update to included supported frequencies for ESP32-P4
 /// CPU clock speed
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -114,6 +109,10 @@ pub enum CpuClock {
     /// 240MHz CPU clock
     #[cfg(xtensa)]
     Clock240MHz = 240,
+
+    /// 400MHz CPU clock
+    #[cfg(esp32p4)]
+    Clock400Mhz = 400,
 }
 
 impl Default for CpuClock {
@@ -139,6 +138,8 @@ impl CpuClock {
                 Self::Clock160MHz
             } else if #[cfg(esp32h2)] {
                 Self::Clock96MHz
+            } else if #[cfg(esp32p4)] {
+                Self::Clock400Mhz
             } else {
                 Self::Clock240MHz
             }
@@ -525,6 +526,18 @@ impl Clocks {
             crypto_clock: HertzU32::MHz(96),
             pll_96m_clock: HertzU32::MHz(96),
         }
+    }
+}
+
+#[cfg(esp32p4)]
+impl Clocks {
+    fn measure_xtal_frequency() -> XtalClock {
+        todo!()
+    }
+
+    /// Configure the CPU clock speed.
+    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
+        todo!()
     }
 }
 
