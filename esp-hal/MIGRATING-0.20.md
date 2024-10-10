@@ -1,4 +1,4 @@
-# Migration Guide from 0.20.x to vNext
+# Migration Guide from 0.20.x to v0.21.x
 
 ## Cargo Features
 
@@ -13,7 +13,7 @@ A number of trait implementations which were previously feature-gated are now im
 
 If your project enables any of these features, simply remove them from your Cargo manifest and things should continue to work as expected.
 
-## HAL Initialisation
+## HAL Initialization
 
 Instead of manually grabbing peripherals and setting up clocks, you should now call `esp_hal::init`.
 
@@ -38,9 +38,9 @@ Instead of manually grabbing peripherals and setting up clocks, you should now c
 
 ## GPIO changes
 
- - The `GpioN` type aliasses are no longer available. You can use `GpioPin<N>` instead.
- - The `AnyInputOnlyPin` has been removed. Replace any use with `AnyPin`.
- - The `NoPinType` has been removed. You can use `DummyPin` in its place.
+- The `GpioN` type aliasses are no longer available. You can use `GpioPin<N>` instead.
+- The `AnyInputOnlyPin` has been removed. Replace any use with `AnyPin`.
+- The `NoPinType` has been removed. You can use `DummyPin` in its place.
 
 ### Type-erased GPIO drivers
 
@@ -236,6 +236,7 @@ We've replaced some usage of features with [esp-config](https://docs.rs/esp-conf
 ## `Camera` driver now uses `DmaRxBuffer` and moves the driver into the transfer object.
 
 For one shot transfers.
+
 ```diff
 let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(32678, 0);
 + let dma_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
@@ -256,6 +257,7 @@ let mut camera = Camera::new(
 ```
 
 For circular transfers.
+
 ```diff
 - let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(32678, 0);
 + let dma_buf = dma_rx_stream_buffer!(32678);
@@ -281,6 +283,7 @@ transfer.pop(&mut [.....]);
 Initializing PS-RAM now takes a chip specific config and returns start of the mapped memory and the size.
 
 Example
+
 ```rust
 let (start, size) = psram::init_psram(peripherals.PSRAM, psram::PsramConfig::default());
 ```
@@ -293,6 +296,7 @@ The features `psram-Xm` and `opsram-Xm` are removed and replaced by `quad-psram`
 The feature `psram-80mhz` is removed and replaced by `PsramConfig`
 
 Diff of the `psram_quad.rs` example
+
 ```diff
 -//% FEATURES: psram-2m
 +//% FEATURES: esp-hal/quad-psram

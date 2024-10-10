@@ -1,8 +1,6 @@
-Migration Guide from 0.3.x to vNext
-====================================
+# Migration Guide from 0.3.x to v0.4.x
 
-Initialsation
--------------
+## Initialization
 
 You no longer have to set up clocks and pass them to `esp_hal_embassy::init`.
 
