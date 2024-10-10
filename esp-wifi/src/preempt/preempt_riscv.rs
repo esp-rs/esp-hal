@@ -11,6 +11,17 @@ pub struct Context {
     pub allocated_stack: *const u8,
 }
 
+impl Context {
+    pub fn new() -> Self {
+        Context {
+            trap_frame: TrapFrame::default(),
+            thread_semaphore: 0,
+            next: core::ptr::null_mut(),
+            allocated_stack: core::ptr::null(),
+        }
+    }
+}
+
 pub fn task_create(
     task: extern "C" fn(*mut c_types::c_void),
     param: *mut c_types::c_void,

@@ -2,7 +2,6 @@
 
 //% CHIPS: esp32 esp32s2 esp32s3
 //% FEATURES: esp-wifi esp-alloc
-//% FEATURES: esp-wifi esp-alloc xtensa-lx-rt/float-save-restore
 
 #![no_std]
 #![no_main]

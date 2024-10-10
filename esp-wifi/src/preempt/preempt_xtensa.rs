@@ -11,6 +11,17 @@ pub struct Context {
     pub allocated_stack: *const u8,
 }
 
+impl Context {
+    pub fn new() -> Self {
+        Context {
+            trap_frame: TrapFrame::new(),
+            thread_semaphore: 0,
+            next: core::ptr::null_mut(),
+            allocated_stack: core::ptr::null(),
+        }
+    }
+}
+
 pub fn task_create(
     task: extern "C" fn(*mut c_types::c_void),
     param: *mut c_types::c_void,
@@ -28,7 +39,7 @@ pub fn task_create(
 
         // stack must be aligned by 16
         let task_stack_ptr = stack as usize + task_stack_size;
-        let stack_ptr = task_stack_ptr - (task_stack_ptr % 0x10);
+        let stack_ptr = task_stack_ptr - (task_stack_ptr % 16);
         (*ctx).trap_frame.A1 = stack_ptr as u32;
 
         (*ctx).trap_frame.PS = 0x00040000 | (1 & 3) << 16; // For windowed ABI set WOE and CALLINC (pretend task was 'call4'd).
