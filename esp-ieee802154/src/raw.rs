@@ -33,7 +33,8 @@ use crate::{
 const PHY_ENABLE_VERSION_PRINT: u32 = 1;
 
 static mut RX_BUFFER: [u8; FRAME_SIZE] = [0u8; FRAME_SIZE];
-static RX_QUEUE: Mutex<RefCell<Queue<RawReceived, 20>>> = Mutex::new(RefCell::new(Queue::new()));
+static RX_QUEUE: Mutex<RefCell<Queue<RawReceived, { crate::CONFIG.rx_queue_size }>>> =
+    Mutex::new(RefCell::new(Queue::new()));
 static STATE: Mutex<RefCell<Ieee802154State>> = Mutex::new(RefCell::new(Ieee802154State::Idle));
 
 extern "C" {
