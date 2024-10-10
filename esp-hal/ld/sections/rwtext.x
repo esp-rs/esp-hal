@@ -4,8 +4,6 @@ SECTIONS {
     . = ALIGN (4);
     #IF ESP_HAL_PLACE_MORE_RODATA_IN_RAM
       *(.rodata.*_esp_hal_internal_handler*)
-      *(.rodata.str.*)
-      *(.rodata.handle_interrupts)
       *(.rodata..Lswitch.table.*)
     #ENDIF    
     *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
