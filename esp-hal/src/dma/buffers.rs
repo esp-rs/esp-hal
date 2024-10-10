@@ -8,11 +8,22 @@ use crate::soc::is_slice_in_psram;
 /// Holds all the information needed to configure a DMA channel for a transfer.
 pub struct Preparation {
     pub(super) start: *mut DmaDescriptor,
-    /// block size for PSRAM transfers (TODO: enable burst mode for non external
-    /// memory?)
+
+    /// block size for PSRAM transfers
     #[cfg_attr(not(esp32s3), allow(dead_code))]
     pub(super) block_size: Option<DmaBufBlkSize>,
-    // burst_mode, alignment, check_owner, etc.
+
+    /// Specifies whether descriptor linked list specified in `start` conforms
+    /// to the alignment requirements required to enable burst transfers.
+    ///
+    /// Note: This only applies to burst transfer of the buffer data, not the
+    /// descriptors themselves.
+    ///
+    /// There are no additional alignment requirements for TX burst transfers,
+    /// but RX transfers require all descriptors to have buffer pointers and
+    /// sizes that are a multiple of 4 (word aligned).
+    pub(super) is_burstable: bool,
+    // alignment, check_owner, etc.
 }
 
 /// [DmaTxBuffer] is a DMA descriptor + memory combo that can be used for
@@ -290,6 +301,8 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
         Preparation {
             start: self.descriptors.head(),
             block_size: self.block_size,
+            // This is TX, the DMA channel is free to do a burst transfer.
+            is_burstable: true,
         }
     }
 
@@ -436,6 +449,10 @@ unsafe impl DmaRxBuffer for DmaRxBuf {
         Preparation {
             start: self.descriptors.head(),
             block_size: None,
+            // DmaRxBuf doesn't currently enforce the alignment requirements required for bursting.
+            // In the future, it could either enforce the alignment or calculate if the alignment
+            // requirements happen to be met.
+            is_burstable: false,
         }
     }
 
@@ -560,6 +577,9 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
         Preparation {
             start: self.tx_descriptors.head(),
             block_size: None, // TODO: support block size!
+
+            // This is TX, the DMA channel is free to do a burst transfer.
+            is_burstable: true,
         }
     }
 
@@ -587,6 +607,10 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
         Preparation {
             start: self.rx_descriptors.head(),
             block_size: None, // TODO: support block size!
+
+            // DmaRxTxBuf doesn't currently enforce the alignment requirements required for
+            // bursting.
+            is_burstable: false,
         }
     }
 
@@ -723,6 +747,10 @@ unsafe impl DmaRxBuffer for DmaRxStreamBuf {
         Preparation {
             start: self.descriptors.as_mut_ptr(),
             block_size: None,
+
+            // DmaRxStreamBuf doesn't currently enforce the alignment requirements required for
+            // bursting.
+            is_burstable: false,
         }
     }
 
@@ -927,6 +955,9 @@ unsafe impl DmaTxBuffer for EmptyBuf {
         Preparation {
             start: unsafe { core::ptr::addr_of_mut!(EMPTY).cast() },
             block_size: None,
+
+            // This is TX, the DMA channel is free to do a burst transfer.
+            is_burstable: true,
         }
     }
 
@@ -951,6 +982,9 @@ unsafe impl DmaRxBuffer for EmptyBuf {
         Preparation {
             start: unsafe { core::ptr::addr_of_mut!(EMPTY).cast() },
             block_size: None,
+
+            // As much as bursting is meaningless here, the descriptor does meet the requirements.
+            is_burstable: true,
         }
     }
 
