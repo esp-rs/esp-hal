@@ -10,6 +10,8 @@ pub mod lcd;
 
 use core::marker::PhantomData;
 
+use enumset::{EnumSet, EnumSetType};
+
 use crate::{
     interrupt::InterruptHandler,
     lcd_cam::{cam::Cam, lcd::Lcd},
@@ -20,14 +22,16 @@ use crate::{
 };
 
 /// Represents a combined LCD and Camera interface.
-pub struct LcdCam<'d, DM: crate::Mode> {
+pub struct LcdCam<'d> {
     /// The LCD interface.
-    pub lcd: Lcd<'d, DM>,
+    pub lcd: Lcd<'d>,
     /// The Camera interface.
     pub cam: Cam<'d>,
+    /// Interrupts
+    pub interrupts: NamesAreHard<'d>,
 }
 
-impl<'d> LcdCam<'d, crate::Blocking> {
+impl<'d> LcdCam<'d> {
     /// Creates a new `LcdCam` instance.
     pub fn new(lcd_cam: impl Peripheral<P = LCD_CAM> + 'd) -> Self {
         crate::into_ref!(lcd_cam);
@@ -38,19 +42,168 @@ impl<'d> LcdCam<'d, crate::Blocking> {
         Self {
             lcd: Lcd {
                 lcd_cam: unsafe { lcd_cam.clone_unchecked() },
-                _mode: PhantomData,
             },
             cam: Cam {
                 lcd_cam: unsafe { lcd_cam.clone_unchecked() },
             },
+            interrupts: NamesAreHard(PhantomData),
         }
     }
 }
 
-impl<'d> crate::private::Sealed for LcdCam<'d, crate::Blocking> {}
-// TODO: This interrupt is shared with the Camera module, we should handle this
-// in a similar way to the gpio::IO
-impl<'d> InterruptConfigurable for LcdCam<'d, crate::Blocking> {
+/// Types of interrupts emitted by the LCD_CAM.
+#[derive(Debug, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum LcdCamInterrupt {
+    /// Triggered when the total number of received lines by camera is greater
+    /// than or equal to LCD_CAM_CAM_LINE_INT_NUM + 1.
+    CamHsync,
+
+    /// Triggered when the camera received a VSYNC signal.
+    CamVsync,
+
+    /// Triggered when the LCD transmitted all the data. (Only relevant in I8080
+    /// mode)
+    LcdTransDone,
+
+    /// Triggered when the LCD transmitted a VSYNC signal. (Only relevant in RGB
+    /// mode)
+    LcdVsync,
+}
+
+/// Access to the interrupt bits of the LCD_CAM.
+pub struct NamesAreHard<'d>(PhantomData<&'d ()>);
+
+impl<'d> NamesAreHard<'d> {
+    /// Listen for the given interrupts.
+    pub fn listen(&self, interrupts: impl Into<EnumSet<LcdCamInterrupt>>) {
+        self.enable_listen(interrupts.into(), true)
+    }
+
+    /// Stop listening for the given interrupts.
+    pub fn unlisten(&self, interrupts: impl Into<EnumSet<LcdCamInterrupt>>) {
+        self.enable_listen(interrupts.into(), false)
+    }
+
+    fn enable_listen(&self, interrupts: EnumSet<LcdCamInterrupt>, enable: bool) {
+        let lcd_cam = unsafe { LCD_CAM::steal() };
+        lcd_cam.lc_dma_int_ena().modify(|_, w| {
+            for interrupt in interrupts {
+                match interrupt {
+                    LcdCamInterrupt::CamHsync => w.cam_hs_int_ena().bit(enable),
+                    LcdCamInterrupt::CamVsync => w.cam_vsync_int_ena().bit(enable),
+                    LcdCamInterrupt::LcdTransDone => w.lcd_trans_done_int_ena().bit(enable),
+                    LcdCamInterrupt::LcdVsync => w.lcd_vsync_int_ena().bit(enable),
+                };
+            }
+            w
+        })
+    }
+
+    /// Reset the given interrupts.
+    pub fn clear(&self, interrupts: impl Into<EnumSet<LcdCamInterrupt>>) {
+        let interrupts = interrupts.into();
+
+        let lcd_cam = unsafe { esp32s3::LCD_CAM::steal() };
+        lcd_cam.lc_dma_int_clr().modify(|_, w| {
+            for interrupt in interrupts {
+                match interrupt {
+                    LcdCamInterrupt::CamHsync => w.cam_hs_int_clr().set_bit(),
+                    LcdCamInterrupt::CamVsync => w.cam_vsync_int_clr().set_bit(),
+                    LcdCamInterrupt::LcdTransDone => w.lcd_trans_done_int_clr().set_bit(),
+                    LcdCamInterrupt::LcdVsync => w.lcd_vsync_int_clr().set_bit(),
+                };
+            }
+            w
+        });
+    }
+
+    /// Returns the set of interrupts being listened to.
+    pub fn is_listening(&self) -> EnumSet<LcdCamInterrupt> {
+        let lcd_cam = unsafe { LCD_CAM::steal() };
+
+        let int_ena = lcd_cam.lc_dma_int_ena().read();
+
+        let mut result = EnumSet::empty();
+
+        if int_ena.cam_hs_int_ena().bit_is_set() {
+            result |= LcdCamInterrupt::CamHsync;
+        }
+        if int_ena.cam_vsync_int_ena().bit_is_set() {
+            result |= LcdCamInterrupt::CamVsync;
+        }
+        if int_ena.lcd_trans_done_int_ena().bit_is_set() {
+            result |= LcdCamInterrupt::LcdTransDone;
+        }
+        if int_ena.lcd_vsync_int_ena().bit_is_set() {
+            result |= LcdCamInterrupt::LcdVsync;
+        }
+
+        result
+    }
+
+    /// Returns the set of asserted interrupts.
+    pub fn pending_interrupts(&self) -> EnumSet<LcdCamInterrupt> {
+        let lcd_cam = unsafe { LCD_CAM::steal() };
+
+        let int_raw = lcd_cam.lc_dma_int_raw().read();
+
+        let mut result = EnumSet::empty();
+
+        if int_raw.cam_hs_int_raw().bit_is_set() {
+            result |= LcdCamInterrupt::CamHsync;
+        }
+        if int_raw.cam_vsync_int_raw().bit_is_set() {
+            result |= LcdCamInterrupt::CamVsync;
+        }
+        if int_raw.lcd_trans_done_int_raw().bit_is_set() {
+            result |= LcdCamInterrupt::LcdTransDone;
+        }
+        if int_raw.lcd_vsync_int_raw().bit_is_set() {
+            result |= LcdCamInterrupt::LcdVsync;
+        }
+
+        result
+    }
+
+    /// Returns the set of asserted interrupts that are being listened to.
+    pub fn active_interrupts(&self) -> EnumSet<LcdCamInterrupt> {
+        let lcd_cam = unsafe { LCD_CAM::steal() };
+
+        let int_st = lcd_cam.lc_dma_int_st().read();
+
+        let mut result = EnumSet::empty();
+
+        if int_st.cam_hs_int_st().bit_is_set() {
+            result |= LcdCamInterrupt::CamHsync;
+        }
+        if int_st.cam_vsync_int_st().bit_is_set() {
+            result |= LcdCamInterrupt::CamVsync;
+        }
+        if int_st.lcd_trans_done_int_st().bit_is_set() {
+            result |= LcdCamInterrupt::LcdTransDone;
+        }
+        if int_st.lcd_vsync_int_st().bit_is_set() {
+            result |= LcdCamInterrupt::LcdVsync;
+        }
+
+        result
+    }
+
+    /// Unsafely create an instance of this type.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that only one instance of this type is in use at
+    /// one time.
+    pub unsafe fn steal() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<'d> crate::private::Sealed for NamesAreHard {}
+
+impl<'d> InterruptConfigurable for NamesAreHard<'d> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         unsafe {
             crate::interrupt::bind_interrupt(
@@ -59,37 +212,6 @@ impl<'d> InterruptConfigurable for LcdCam<'d, crate::Blocking> {
             );
             crate::interrupt::enable(crate::peripherals::Interrupt::LCD_CAM, handler.priority())
                 .unwrap();
-        }
-    }
-}
-
-impl<'d> LcdCam<'d, crate::Async> {
-    /// Creates a new `LcdCam` instance for asynchronous operation.
-    pub fn new_async(lcd_cam: impl Peripheral<P = LCD_CAM> + 'd) -> Self {
-        crate::into_ref!(lcd_cam);
-
-        PeripheralClockControl::enable(system::Peripheral::LcdCam);
-
-        unsafe {
-            crate::interrupt::bind_interrupt(
-                crate::peripherals::Interrupt::LCD_CAM,
-                asynch::interrupt_handler.handler(),
-            );
-        }
-        crate::interrupt::enable(
-            crate::peripherals::Interrupt::LCD_CAM,
-            asynch::interrupt_handler.priority(),
-        )
-        .unwrap();
-
-        Self {
-            lcd: Lcd {
-                lcd_cam: unsafe { lcd_cam.clone_unchecked() },
-                _mode: PhantomData,
-            },
-            cam: Cam {
-                lcd_cam: unsafe { lcd_cam.clone_unchecked() },
-            },
         }
     }
 }
@@ -121,16 +243,18 @@ pub mod asynch {
     use embassy_sync::waitqueue::AtomicWaker;
     use procmacros::handler;
 
-    use super::private::Instance;
+    use crate::lcd_cam::NamesAreHard;
 
-    pub(crate) static LCD_DONE_WAKER: AtomicWaker = AtomicWaker::new();
+    pub(crate) static WAKER: AtomicWaker = AtomicWaker::new();
 
     #[handler]
     pub(crate) fn interrupt_handler() {
-        // TODO: this is a shared interrupt with Camera and here we ignore that!
-        if Instance::is_lcd_done_set() {
-            Instance::unlisten_lcd_done();
-            LCD_DONE_WAKER.wake()
+        let int_access = unsafe { NamesAreHard::steal() };
+
+        let active_interrupts = int_access.active_interrupts();
+        if !active_interrupts.is_empty() {
+            int_access.unlisten(active_interrupts);
+            WAKER.wake();
         }
     }
 }
@@ -144,35 +268,6 @@ mod private {
         }
     }
 
-    pub(crate) struct Instance;
-
-    // NOTE: the LCD_CAM interrupt registers are shared between LCD and Camera and
-    // this is only implemented for the LCD side, when the Camera is implemented a
-    // CriticalSection will be needed to protect these shared registers.
-    impl Instance {
-        pub(crate) fn listen_lcd_done() {
-            let lcd_cam = unsafe { LCD_CAM::steal() };
-            lcd_cam
-                .lc_dma_int_ena()
-                .modify(|_, w| w.lcd_trans_done_int_ena().set_bit());
-        }
-
-        pub(crate) fn unlisten_lcd_done() {
-            let lcd_cam = unsafe { LCD_CAM::steal() };
-            lcd_cam
-                .lc_dma_int_ena()
-                .modify(|_, w| w.lcd_trans_done_int_ena().clear_bit());
-        }
-
-        pub(crate) fn is_lcd_done_set() -> bool {
-            let lcd_cam = unsafe { LCD_CAM::steal() };
-            lcd_cam
-                .lc_dma_int_raw()
-                .read()
-                .lcd_trans_done_int_raw()
-                .bit()
-        }
-    }
     pub struct ClockDivider {
         // Integral LCD clock divider value. (8 bits)
         // Value 0 is treated as 256

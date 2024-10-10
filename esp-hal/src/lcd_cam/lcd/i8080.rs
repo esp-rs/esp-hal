@@ -65,6 +65,7 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
+use enumset::EnumSet;
 use fugit::HertzU32;
 
 use crate::{
@@ -72,16 +73,22 @@ use crate::{
     dma::{ChannelTx, DmaChannelConvert, DmaEligible, DmaError, DmaPeripheral, DmaTxBuffer, Tx},
     gpio::{OutputSignal, PeripheralOutput},
     lcd_cam::{
-        asynch::LCD_DONE_WAKER,
+        asynch::{interrupt_handler, WAKER},
         lcd::{i8080::private::TxPins, ClockMode, DelayMode, Phase, Polarity},
-        private::{calculate_clkm, Instance},
+        private::calculate_clkm,
         BitOrder,
         ByteOrder,
+        NamesAreHard,
         Lcd,
+        LcdCamInterrupt,
     },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
+    Async,
+    Blocking,
+    InterruptConfigurable,
     Mode,
+    DEFAULT_INTERRUPT_HANDLER,
 };
 
 /// Represents the I8080 LCD interface.
@@ -91,10 +98,10 @@ pub struct I8080<'d, DM: Mode> {
     _phantom: PhantomData<DM>,
 }
 
-impl<'d, DM: Mode> I8080<'d, DM> {
+impl<'d> I8080<'d, Blocking> {
     /// Creates a new instance of the I8080 LCD interface.
     pub fn new<P, CH>(
-        lcd: Lcd<'d, DM>,
+        lcd: Lcd<'d>,
         channel: ChannelTx<'d, CH>,
         mut pins: P,
         frequency: HertzU32,
@@ -209,6 +216,43 @@ impl<'d, DM: Mode> I8080<'d, DM> {
             tx_channel: channel.degrade(),
             _phantom: PhantomData,
         }
+    }
+
+    /// Convert this blocking driver into an async one.
+    pub fn into_async(self, mut interrupts: NamesAreHard<'d>) -> I8080<'d, Async> {
+        // Disable any active interrupts for safety.
+        interrupts.unlisten(EnumSet::all());
+
+        // Set the built-in interrupt handler.
+        interrupts.set_interrupt_handler(interrupt_handler);
+
+        I8080 {
+            lcd_cam: self.lcd_cam,
+            tx_channel: self.tx_channel,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'d> I8080<'d, Async> {
+    /// Convert this async driver into a blocking one.
+    pub fn into_blocking(self) -> (I8080<'d, Blocking>, NamesAreHard<'d>) {
+        let mut interrupts = unsafe { NamesAreHard::steal() };
+
+        // Disable any active interrupts for safety.
+        interrupts.unlisten(EnumSet::all());
+
+        // "Unset" interrupt handler.
+        interrupts.set_interrupt_handler(DEFAULT_INTERRUPT_HANDLER);
+
+        (
+            I8080 {
+                lcd_cam: self.lcd_cam,
+                tx_channel: self.tx_channel,
+                _phantom: PhantomData,
+            },
+            interrupts,
+        )
     }
 }
 
@@ -455,7 +499,7 @@ impl<'d, BUF: DmaTxBuffer, DM: Mode> DerefMut for I8080Transfer<'d, BUF, DM> {
     }
 }
 
-impl<'d, BUF: DmaTxBuffer> I8080Transfer<'d, BUF, crate::Async> {
+impl<'d, BUF: DmaTxBuffer> I8080Transfer<'d, BUF, Async> {
     /// Waits for [Self::is_done] to return true.
     pub async fn wait_for_done(&mut self) {
         use core::{
@@ -470,15 +514,17 @@ impl<'d, BUF: DmaTxBuffer> I8080Transfer<'d, BUF, crate::Async> {
             type Output = ();
 
             fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                LCD_DONE_WAKER.register(cx.waker());
-                if Instance::is_lcd_done_set() {
+                let interrupts = unsafe { NamesAreHard::steal() };
+                WAKER.register(cx.waker());
+                if interrupts
+                    .pending_interrupts()
+                    .contains(LcdCamInterrupt::LcdTransDone)
+                {
                     // Interrupt bit will be cleared in Self::wait.
                     // This allows `wait_for_done` to be called more than once.
-                    //
-                    // Instance::clear_lcd_done();
                     Poll::Ready(())
                 } else {
-                    Instance::listen_lcd_done();
+                    interrupts.listen(LcdCamInterrupt::LcdTransDone);
                     Poll::Pending
                 }
             }
@@ -486,7 +532,8 @@ impl<'d, BUF: DmaTxBuffer> I8080Transfer<'d, BUF, crate::Async> {
 
         impl Drop for LcdDoneFuture {
             fn drop(&mut self) {
-                Instance::unlisten_lcd_done();
+                let interrupts = unsafe { NamesAreHard::steal() };
+                interrupts.unlisten(LcdCamInterrupt::LcdTransDone);
             }
         }
 

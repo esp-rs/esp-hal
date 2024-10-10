@@ -21,7 +21,7 @@ use hil_test as _;
 const DATA_SIZE: usize = 1024 * 10;
 
 struct Context<'d> {
-    lcd_cam: LcdCam<'d, esp_hal::Async>,
+    lcd_cam: LcdCam<'d>,
     dma: Dma<'d>,
     dma_buf: DmaTxBuf,
 }
@@ -36,7 +36,7 @@ mod tests {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let dma = Dma::new(peripherals.DMA);
-        let lcd_cam = LcdCam::new_async(peripherals.LCD_CAM);
+        let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
         let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, DATA_SIZE);
         let dma_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
@@ -58,7 +58,8 @@ mod tests {
             pins,
             20.MHz(),
             Config::default(),
-        );
+        )
+        .into_async(ctx.lcd_cam.interrupts);
 
         let mut transfer = i8080.send(Command::<u8>::None, 0, ctx.dma_buf).unwrap();
 
@@ -84,7 +85,8 @@ mod tests {
             pins,
             20.MHz(),
             Config::default(),
-        );
+        )
+        .into_async(ctx.lcd_cam.interrupts);
 
         let mut transfer = i8080.send(Command::<u8>::None, 0, ctx.dma_buf).unwrap();
 
