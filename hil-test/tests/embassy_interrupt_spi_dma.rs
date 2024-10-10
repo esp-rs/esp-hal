@@ -12,7 +12,6 @@ use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     interrupt::{software::SoftwareInterruptControl, Priority},
-    peripherals::SPI3,
     prelude::*,
     spi::{
         master::{Spi, SpiDma},
@@ -35,7 +34,7 @@ macro_rules! mk_static {
 }
 
 #[embassy_executor::task]
-async fn interrupt_driven_task(spi: SpiDma<'static, SPI3, FullDuplexMode, Async>) {
+async fn interrupt_driven_task(spi: SpiDma<'static, FullDuplexMode, Async>) {
     let mut ticker = Ticker::every(Duration::from_millis(1));
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(128);
