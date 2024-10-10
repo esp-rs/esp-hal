@@ -27,10 +27,10 @@ INCLUDE "fixups/rtc_fast_rwdata_dummy.x"
 /* End of fixups for esp32s2 */
 
 /* Shared sections - ordering matters */
-INCLUDE "text.x"
-INCLUDE "rodata.x"
 INCLUDE "rwtext.x"
+INCLUDE "text.x"
 INCLUDE "rwdata.x"
+INCLUDE "rodata.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "rtc_slow.x"
 INCLUDE "stack.x"

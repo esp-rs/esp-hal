@@ -95,7 +95,8 @@ pub enum CpuInterrupt {
 }
 
 /// The interrupts reserved by the HAL
-pub const RESERVED_INTERRUPTS: &[usize] = &[
+#[cfg_attr(place_more_rodata_in_ram, link_section = ".rwtext")]
+pub static RESERVED_INTERRUPTS: &[usize] = &[
     CpuInterrupt::Interrupt1LevelPriority1 as _,
     CpuInterrupt::Interrupt19LevelPriority2 as _,
     CpuInterrupt::Interrupt23LevelPriority3 as _,
@@ -447,7 +448,8 @@ mod vectored {
     }
 
     // TODO use CpuInterrupt::LevelX.mask() // TODO make it const
-    const CPU_INTERRUPT_LEVELS: [u32; 8] = [
+    #[cfg_attr(place_more_rodata_in_ram, link_section = ".rwtext")]
+    static CPU_INTERRUPT_LEVELS: [u32; 8] = [
         0b_0000_0000_0000_0000_0000_0000_0000_0000, // Dummy level 0
         0b_0000_0000_0000_0110_0011_0111_1111_1111, // Level_1
         0b_0000_0000_0011_1000_0000_0000_0000_0000, // Level 2
@@ -457,8 +459,10 @@ mod vectored {
         0b_0000_0000_0000_0000_0000_0000_0000_0000, // Level 6
         0b_0000_0000_0000_0000_0100_0000_0000_0000, // Level 7
     ];
-    const CPU_INTERRUPT_INTERNAL: u32 = 0b_0010_0000_0000_0001_1000_1000_1100_0000;
-    const CPU_INTERRUPT_EDGE: u32 = 0b_0111_0000_0100_0000_0000_1100_1000_0000;
+    #[cfg_attr(place_more_rodata_in_ram, link_section = ".rwtext")]
+    static CPU_INTERRUPT_INTERNAL: u32 = 0b_0010_0000_0000_0001_1000_1000_1100_0000;
+    #[cfg_attr(place_more_rodata_in_ram, link_section = ".rwtext")]
+    static CPU_INTERRUPT_EDGE: u32 = 0b_0111_0000_0100_0000_0000_1100_1000_0000;
 
     #[inline]
     fn cpu_interrupt_nr_to_cpu_interrupt_handler(
@@ -558,7 +562,8 @@ mod vectored {
     #[cfg(esp32)]
     mod chip_specific {
         use super::*;
-        pub const INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
+        #[cfg_attr(place_more_rodata_in_ram, link_section = ".rwtext")]
+        pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
             0b0000_0000_0000_0000_0000_0000_0000_0000,
             0b1111_1100_0000_0000_0000_0000_0000_0000,
             0b0000_0000_0000_0000_0000_0000_0000_0011,
@@ -583,7 +588,8 @@ mod vectored {
     #[cfg(esp32s2)]
     mod chip_specific {
         use super::*;
-        pub const INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
+        #[cfg_attr(place_more_rodata_in_ram, link_section = ".rwtext")]
+        pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
             0b0000_0000_0000_0000_0000_0000_0000_0000,
             0b1100_0000_0000_0000_0000_0000_0000_0000,
             0b0000_0000_0000_0000_0000_0011_1011_1111,
@@ -611,7 +617,8 @@ mod vectored {
     #[cfg(esp32s3)]
     mod chip_specific {
         use super::*;
-        pub const INTERRUPT_EDGE: InterruptStatus = InterruptStatus::empty();
+        #[cfg_attr(place_more_rodata_in_ram, link_section = ".rwtext")]
+        pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::empty();
         #[inline]
         pub fn interrupt_is_edge(_interrupt: Interrupt) -> bool {
             false

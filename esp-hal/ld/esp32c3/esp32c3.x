@@ -80,10 +80,10 @@ PROVIDE(__global_pointer$ = _data_start + 0x800);
 /* end of esp32c3 fixups */
 
 /* Shared sections - ordering matters */
-INCLUDE "text.x"
-INCLUDE "rodata.x"
 INCLUDE "rwtext.x"
+INCLUDE "text.x"
 INCLUDE "rwdata.x"
+INCLUDE "rodata.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "stack.x"
 INCLUDE "dram2.x"
