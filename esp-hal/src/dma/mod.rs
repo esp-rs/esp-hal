@@ -353,6 +353,8 @@ use enumset::{EnumSet, EnumSetType};
 pub use self::buffers::*;
 #[cfg(gdma)]
 pub use self::gdma::*;
+#[cfg(gdma)]
+pub use self::m2m::*;
 #[cfg(pdma)]
 pub use self::pdma::*;
 use crate::{interrupt::InterruptHandler, soc::is_slice_in_dram, Mode};
@@ -360,6 +362,8 @@ use crate::{interrupt::InterruptHandler, soc::is_slice_in_dram, Mode};
 mod buffers;
 #[cfg(gdma)]
 mod gdma;
+#[cfg(gdma)]
+mod m2m;
 #[cfg(pdma)]
 mod pdma;
 
