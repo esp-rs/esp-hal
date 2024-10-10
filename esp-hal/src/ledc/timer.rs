@@ -11,12 +11,14 @@
 //!
 //! LEDC uses APB as clock source.
 
+use core::marker::PhantomData;
+
 use fugit::HertzU32;
 
 #[cfg(esp32)]
 use super::HighSpeed;
-use super::{LowSpeed, Speed};
-use crate::{clock::Clocks, peripherals::ledc};
+use super::{Ledc, LowSpeed, Speed};
+use crate::clock::Clocks;
 
 const LEDC_TIMER_DIV_NUM_MAX: u64 = 0x3FFFF;
 
@@ -215,17 +217,26 @@ pub trait TimerHW<S: TimerSpeed> {
 
     /// Update the timer in HW
     fn update_hw(&self);
+
+    /// Pause the timer
+    fn pause(&self);
+
+    /// Resume the timer
+    fn resume(&self);
+
+    /// Reset the timer
+    fn reset(&self);
 }
 
 /// Timer struct
 pub struct Timer<'a, S: TimerSpeed> {
-    ledc: &'a crate::peripherals::ledc::RegisterBlock,
     number: Number,
     duty: Option<config::Duty>,
     frequency: u32,
     configured: bool,
     use_ref_tick: bool,
     clock_source: Option<S::ClockSourceType>,
+    phantom: PhantomData<&'a ()>,
 }
 
 impl<'a, S: TimerSpeed> TimerIFace<S> for Timer<'a, S>
@@ -292,15 +303,15 @@ where
 
 impl<'a, S: TimerSpeed> Timer<'a, S> {
     /// Create a new instance of a timer
-    pub fn new(ledc: &'a ledc::RegisterBlock, number: Number) -> Self {
+    pub fn new(number: Number) -> Self {
         Timer {
-            ledc,
             number,
             duty: None,
             frequency: 0u32,
             configured: false,
             use_ref_tick: false,
             clock_source: None,
+            phantom: PhantomData,
         }
     }
 }
@@ -323,7 +334,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
         let duty = unwrap!(self.duty) as u8;
         let use_apb = !self.use_ref_tick;
 
-        self.ledc
+        Ledc::register_block()
             .lstimer(self.number as usize)
             .conf()
             .modify(|_, w| unsafe {
@@ -341,7 +352,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
         let duty = unwrap!(self.duty) as u8;
         let use_ref_tick = self.use_ref_tick;
 
-        self.ledc
+        Ledc::register_block()
             .timer(self.number as usize)
             .conf()
             .modify(|_, w| unsafe {
@@ -357,13 +368,48 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
     fn update_hw(&self) {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
-                let tmr = self.ledc.lstimer(self.number as usize);
+                let tmr =  Ledc::register_block().lstimer(self.number as usize);
             } else {
-                let tmr = self.ledc.timer(self.number as usize);
+                let tmr =  Ledc::register_block().timer(self.number as usize);
             }
         }
 
         tmr.conf().modify(|_, w| w.para_up().set_bit());
+    }
+
+    /// Pause the timer
+    fn pause(&self) {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                 Ledc::register_block().lstimer(self.number as usize).conf().modify(|_, w| w.pause().set_bit());
+            } else {
+                 Ledc::register_block().timer(self.number as usize).conf().modify(|_, w| w.pause().set_bit());
+            }
+        }
+    }
+
+    /// Resume the timer
+    fn resume(&self) {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                 Ledc::register_block().lstimer(self.number as usize).conf().modify(|_, w| w.pause().clear_bit());
+            } else {
+                 Ledc::register_block().timer(self.number as usize).conf().modify(|_, w| w.pause().clear_bit());
+            }
+        }
+    }
+
+    /// Reset the timer
+    fn reset(&self) {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                 Ledc::register_block().lstimer(self.number as usize).conf().modify(|_, w| w.rst().set_bit());
+                 Ledc::register_block().lstimer(self.number as usize).conf().modify(|_, w| w.rst().clear_bit());
+            } else {
+                 Ledc::register_block().timer(self.number as usize).conf().modify(|_, w| w.rst().set_bit());
+                 Ledc::register_block().timer(self.number as usize).conf().modify(|_, w| w.rst().clear_bit());
+            }
+        }
     }
 }
 
@@ -385,7 +431,7 @@ impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
         let duty = unwrap!(self.duty) as u8;
         let sel_hstimer = self.clock_source == Some(HSClockSource::APBClk);
 
-        self.ledc
+        Ledc::register_block()
             .hstimer(self.number as usize)
             .conf()
             .modify(|_, w| unsafe {
@@ -400,5 +446,33 @@ impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
     /// Update the timer in HW
     fn update_hw(&self) {
         // Nothing to do for HS timers
+    }
+
+    /// Pause the timer
+    fn pause(&self) {
+        Ledc::register_block()
+            .hstimer(self.number as usize)
+            .conf()
+            .modify(|_, w| w.pause().set_bit());
+    }
+
+    /// Resume the timer
+    fn resume(&self) {
+        Ledc::register_block()
+            .hstimer(self.number as usize)
+            .conf()
+            .modify(|_, w| w.pause().clear_bit());
+    }
+
+    /// Reset the timer
+    fn reset(&self) {
+        Ledc::register_block()
+            .hstimer(self.number as usize)
+            .conf()
+            .modify(|_, w| w.rst().set_bit());
+        Ledc::register_block()
+            .hstimer(self.number as usize)
+            .conf()
+            .modify(|_, w| w.rst().clear_bit());
     }
 }
