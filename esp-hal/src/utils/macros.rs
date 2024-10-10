@@ -102,6 +102,16 @@ macro_rules! any_peripheral {
                     }
                 }
             )*
+
+            $(
+                $(#[cfg($variant_meta)])*
+                impl $inner {
+                    /// Returns a type-erased version of this peripheral.
+                    pub fn degrade(self) -> $name {
+                        self.into()
+                    }
+                }
+            )*
         }
     };
 }
