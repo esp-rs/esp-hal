@@ -44,6 +44,8 @@ portable_atomic_enum = { version = "0.3.1", features = ["portable-atomic"] }
 bt-hci = { version = "0.1.1", optional = true }
 esp-config = { version = "0.1.0", path = "../esp-config" }
 
+xtensa-lx-rt = { version = "0.17.1", path = "../xtensa-lx-rt", optional = true }
+
 [build-dependencies]
 esp-build    = { version = "0.1.0", path = "../esp-build" }
 esp-config   = { version = "0.1.0", path = "../esp-config", features = ["build"] }
@@ -83,16 +85,19 @@ esp32h2 = [
 esp32 = [
   "esp-hal/esp32",
   "esp-wifi-sys/esp32",
+  "xtensa-lx-rt/float-save-restore",
 ]
 # Target the ESP32-S2.
 esp32s2 = [
   "esp-hal/esp32s2",
   "esp-wifi-sys/esp32s2",
+  "xtensa-lx-rt/float-save-restore",
 ]
 # Target the ESP32-S3.
 esp32s3 = [
   "esp-hal/esp32s3",
   "esp-wifi-sys/esp32s3",
+  "xtensa-lx-rt/float-save-restore",
 ]
 
 ## Enable Async support

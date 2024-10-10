@@ -99,24 +99,9 @@ impl Default for Context {
 }
 
 impl Context {
-    /// Creates a new, (mostly) zeroed out context. CPENABLE is saved from the
-    /// current one.
-    pub fn new() -> Self {
-        #[cfg(all(XCHAL_HAVE_CP, not(feature = "float-save-restore")))]
-        {
-            let mut this: Self = unsafe { core::mem::zeroed() };
-
-            unsafe {
-                asm!("rsr {0}, CPENABLE", out(reg) this.F64R_LO_CPENABLE);
-            }
-
-            this
-        }
-
-        #[cfg(any(not(XCHAL_HAVE_CP), feature = "float-save-restore"))]
-        {
-            unsafe { core::mem::zeroed() }
-        }
+    /// Creates a new, zeroed out context.
+    pub const fn new() -> Self {
+        unsafe { core::mem::zeroed() }
     }
 }
 
