@@ -14,7 +14,7 @@ use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::{Io, NoPin},
-    i2s::{asynch::*, DataFormat, I2s, I2sReadDma, I2sTx, I2sWriteDma, Standard},
+    i2s::{DataFormat, I2s, I2sTx, Standard},
     peripherals::I2S0,
     prelude::*,
     Async,
