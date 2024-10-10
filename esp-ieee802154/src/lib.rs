@@ -18,6 +18,7 @@ use core::{cell::RefCell, marker::PhantomData};
 
 use byte::{BytesExt, TryRead};
 use critical_section::Mutex;
+use esp_config::*;
 use esp_hal::peripherals::{IEEE802154, RADIO_CLK};
 use heapless::Vec;
 use ieee802154::mac::{self, FooterMode, FrameSerDesContext};
@@ -57,6 +58,14 @@ impl From<byte::Error> for Error {
         }
     }
 }
+
+struct QueueConfig {
+    rx_queue_size: usize,
+}
+
+pub(crate) const CONFIG: QueueConfig = QueueConfig {
+    rx_queue_size: esp_config_int!(usize, "ESP_IEEE802154_RX_QUEUE_SIZE"),
+};
 
 /// IEEE 802.15.4 driver configuration
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
