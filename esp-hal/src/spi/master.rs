@@ -462,6 +462,26 @@ impl<'d, M, T> Spi<'d, M, T>
 where
     T: Instance,
 {
+    fn new_internal(
+        spi: impl Peripheral<P = impl Into<T> + 'd> + 'd,
+        frequency: HertzU32,
+        mode: SpiMode,
+    ) -> Spi<'d, M, T> {
+        crate::into_ref!(spi);
+
+        let mut spi = Spi {
+            spi: spi.map_into(),
+            _mode: PhantomData,
+        };
+        spi.spi.reset_peripheral();
+        spi.spi.enable_peripheral();
+        spi.spi.setup(frequency);
+        spi.spi.init();
+        spi.spi.set_data_mode(mode);
+
+        spi
+    }
+
     /// Assign the SCK (Serial Clock) pin for the SPI instance.
     ///
     /// Sets the specified pin to push-pull output and connects it to the SPI
@@ -572,8 +592,10 @@ where
         frequency: HertzU32,
         mode: SpiMode,
     ) -> Spi<'d, FullDuplexMode, T> {
-        crate::into_ref!(spi);
-        Self::new_internal(spi.map_into(), frequency, mode)
+        let spi = Spi::<FullDuplexMode, T>::new_internal(spi, frequency, mode);
+
+        // Disconnect any lingering connections
+        spi.with_pins(NoPin, NoPin, NoPin, NoPin)
     }
 
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
@@ -629,26 +651,6 @@ where
             .with_cs(cs)
     }
 
-    pub(crate) fn new_internal(
-        spi: PeripheralRef<'d, T>,
-        frequency: HertzU32,
-        mode: SpiMode,
-    ) -> Spi<'d, FullDuplexMode, T> {
-        spi.reset_peripheral();
-        spi.enable_peripheral();
-
-        let mut spi = Spi {
-            spi,
-            _mode: PhantomData,
-        };
-        spi.spi.setup(frequency);
-        spi.spi.init();
-        spi.spi.set_data_mode(mode);
-
-        // Disconnect any lingering connections
-        spi.with_pins(NoPin, NoPin, NoPin, NoPin)
-    }
-
     /// Change the bus frequency of the SPI instance.
     ///
     /// This method allows user to update the bus frequency for the SPI
@@ -685,8 +687,10 @@ where
         frequency: HertzU32,
         mode: SpiMode,
     ) -> Spi<'d, HalfDuplexMode, T> {
-        crate::into_ref!(spi);
-        Self::new_internal(spi.map_into(), frequency, mode)
+        let spi = Spi::<HalfDuplexMode, T>::new_internal(spi, frequency, mode);
+
+        // Disconnect any lingering connections
+        spi.with_pins(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin)
     }
 
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance in
@@ -790,27 +794,6 @@ where
             .with_sio3(sio3)
             .with_cs(cs)
     }
-
-    pub(crate) fn new_internal(
-        spi: PeripheralRef<'d, T>,
-        frequency: HertzU32,
-        mode: SpiMode,
-    ) -> Spi<'d, HalfDuplexMode, T> {
-        spi.reset_peripheral();
-        spi.enable_peripheral();
-
-        let mut spi = Spi {
-            spi,
-            _mode: PhantomData::<HalfDuplexMode>,
-        };
-        spi.spi.setup(frequency);
-        spi.spi.init();
-        spi.spi.set_data_mode(mode);
-
-        // Disconnect any lingering connections
-        spi.with_pins(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin)
-    }
-
     /// Change the bus frequency of the SPI instance in half-duplex mode.
     ///
     /// This method allows you to update the bus frequency for the SPI
@@ -2709,24 +2692,21 @@ pub trait Instance: private::Sealed + PeripheralMarker {
     }
 
     fn ch_bus_freq(&mut self, frequency: HertzU32) {
-        // Disable clock source
-        #[cfg(gdma)]
-        self.register_block().clk_gate().modify(|_, w| {
-            w.clk_en().clear_bit();
-            w.mst_clk_active().clear_bit();
-            w.mst_clk_sel().clear_bit()
-        });
+        fn enable_clocks(_reg_block: &RegisterBlock, _enable: bool) {
+            #[cfg(gdma)]
+            _reg_block.clk_gate().modify(|_, w| {
+                w.clk_en().bit(_enable);
+                w.mst_clk_active().bit(_enable);
+                w.mst_clk_sel().bit(_enable)
+            });
+        }
+
+        enable_clocks(self.register_block(), false);
 
         // Change clock frequency
         self.setup(frequency);
 
-        // Enable clock source
-        #[cfg(gdma)]
-        self.register_block().clk_gate().modify(|_, w| {
-            w.clk_en().set_bit();
-            w.mst_clk_active().set_bit();
-            w.mst_clk_sel().set_bit()
-        });
+        enable_clocks(self.register_block(), true);
     }
 
     #[cfg(not(any(esp32, esp32c3, esp32s2)))]

@@ -102,7 +102,7 @@ impl<'d> Spi<'d, FullDuplexMode> {
         MISO: PeripheralOutput,
         CS: PeripheralInput,
     >(
-        spi: impl Peripheral<P = impl Instance + Into<AnySpi> + 'd> + 'd,
+        spi: impl Peripheral<P = impl Into<AnySpi> + 'd> + 'd,
         sclk: impl Peripheral<P = SCK> + 'd,
         mosi: impl Peripheral<P = MOSI> + 'd,
         miso: impl Peripheral<P = MISO> + 'd,
@@ -124,42 +124,46 @@ where
         MISO: PeripheralOutput,
         CS: PeripheralInput,
     >(
-        spi: impl Peripheral<P = impl Instance + Into<T> + 'd> + 'd,
+        spi: impl Peripheral<P = impl Into<T> + 'd> + 'd,
         sclk: impl Peripheral<P = SCK> + 'd,
         mosi: impl Peripheral<P = MOSI> + 'd,
         miso: impl Peripheral<P = MISO> + 'd,
         cs: impl Peripheral<P = CS> + 'd,
         mode: SpiMode,
     ) -> Spi<'d, FullDuplexMode, T> {
-        crate::into_ref!(spi, sclk, mosi, miso, cs);
+        crate::into_ref!(sclk, mosi, miso, cs);
 
+        let this = Self::new_internal(spi, mode);
+
+        // TODO: with_pins et. al.
         sclk.enable_input(true, private::Internal);
-        sclk.connect_input_to_peripheral(spi.sclk_signal(), private::Internal);
+        sclk.connect_input_to_peripheral(this.spi.sclk_signal(), private::Internal);
 
         mosi.enable_input(true, private::Internal);
-        mosi.connect_input_to_peripheral(spi.mosi_signal(), private::Internal);
+        mosi.connect_input_to_peripheral(this.spi.mosi_signal(), private::Internal);
 
         miso.set_to_push_pull_output(private::Internal);
-        miso.connect_peripheral_to_output(spi.miso_signal(), private::Internal);
+        miso.connect_peripheral_to_output(this.spi.miso_signal(), private::Internal);
 
         cs.enable_input(true, private::Internal);
-        cs.connect_input_to_peripheral(spi.cs_signal(), private::Internal);
+        cs.connect_input_to_peripheral(this.spi.cs_signal(), private::Internal);
 
-        Self::new_internal(spi.map_into(), mode)
+        this
     }
 
     pub(crate) fn new_internal(
-        spi: PeripheralRef<'d, T>,
+        spi: impl Peripheral<P = impl Into<T> + 'd> + 'd,
         mode: SpiMode,
     ) -> Spi<'d, FullDuplexMode, T> {
-        spi.reset_peripheral();
-        spi.enable_peripheral();
+        crate::into_ref!(spi);
 
         let mut spi = Spi {
-            spi,
+            spi: spi.map_into(),
             data_mode: mode,
             _mode: PhantomData,
         };
+        spi.spi.reset_peripheral();
+        spi.spi.enable_peripheral();
         spi.spi.init();
         spi.spi.set_data_mode(mode, false);
 
