@@ -44,7 +44,7 @@ impl<'a, T> PeripheralRef<'a, T> {
     /// You should strongly prefer using `reborrow()` instead. It returns a
     /// `PeripheralRef` that borrows `self`, which allows the borrow checker
     /// to enforce this at compile time.
-    pub unsafe fn clone_unchecked(&mut self) -> PeripheralRef<'a, T>
+    pub unsafe fn clone_unchecked(&self) -> PeripheralRef<'a, T>
     where
         T: Peripheral<P = T>,
     {
@@ -155,14 +155,14 @@ pub trait Peripheral: Sized + crate::private::Sealed {
     /// You should strongly prefer using `into_ref()` instead. It returns a
     /// `PeripheralRef`, which allows the borrow checker to enforce this at
     /// compile time.
-    unsafe fn clone_unchecked(&mut self) -> Self::P;
+    unsafe fn clone_unchecked(&self) -> Self::P;
 
     /// Convert a value into a `PeripheralRef`.
     ///
     /// When called on an owned `T`, yields a `PeripheralRef<'static, T>`.
     /// When called on an `&'a mut T`, yields a `PeripheralRef<'a, T>`.
     #[inline]
-    fn into_ref<'a>(mut self) -> PeripheralRef<'a, Self::P>
+    fn into_ref<'a>(self) -> PeripheralRef<'a, Self::P>
     where
         Self: 'a,
     {
@@ -176,7 +176,7 @@ where
 {
     type P = P;
 
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
+    unsafe fn clone_unchecked(&self) -> Self::P {
         T::clone_unchecked(self)
     }
 }
@@ -316,7 +316,7 @@ mod peripheral_macros {
                 type P = $name;
 
                 #[inline]
-                unsafe fn clone_unchecked(&mut self) -> Self::P {
+                unsafe fn clone_unchecked(&self) -> Self::P {
                     Self::steal()
                 }
             }
@@ -374,7 +374,7 @@ mod peripheral_macros {
                 type P = $name;
 
                 #[inline]
-                unsafe fn clone_unchecked(&mut self) -> Self::P {
+                unsafe fn clone_unchecked(&self) -> Self::P {
                     Self::steal()
                 }
             }
