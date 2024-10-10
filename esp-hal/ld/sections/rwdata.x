@@ -5,6 +5,12 @@ SECTIONS {
   {
     _data_start = ABSOLUTE(.);
     . = ALIGN (4);
+
+    #IF ESP_HAL_PLACE_MORE_RODATA_IN_RAM
+        *(.rodata..Lanon .rodata..Lanon.*)
+        *(.rodata.cst*)
+    #ENDIF
+
     *(.sdata .sdata.* .sdata2 .sdata2.*);
     *(.data .data.*);
     *(.data1)
