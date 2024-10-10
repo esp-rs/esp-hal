@@ -10,7 +10,7 @@ use super::*;
 impl crate::peripheral::Peripheral for Level {
     type P = Self;
 
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
+    unsafe fn clone_unchecked(&self) -> Self::P {
         *self
     }
 }
@@ -96,7 +96,7 @@ pub struct NoPin;
 impl crate::peripheral::Peripheral for NoPin {
     type P = Self;
 
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
+    unsafe fn clone_unchecked(&self) -> Self::P {
         Self
     }
 }

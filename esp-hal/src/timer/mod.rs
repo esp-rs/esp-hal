@@ -461,7 +461,7 @@ impl Peripheral for AnyTimer {
     type P = Self;
 
     #[inline]
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
+    unsafe fn clone_unchecked(&self) -> Self::P {
         core::ptr::read(self as *const _)
     }
 }

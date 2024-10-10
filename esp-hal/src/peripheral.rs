@@ -44,7 +44,7 @@ impl<'a, T> PeripheralRef<'a, T> {
     /// You should strongly prefer using `reborrow()` instead. It returns a
     /// `PeripheralRef` that borrows `self`, which allows the borrow checker
     /// to enforce this at compile time.
-    pub unsafe fn clone_unchecked(&mut self) -> PeripheralRef<'a, T>
+    pub unsafe fn clone_unchecked(&self) -> PeripheralRef<'a, T>
     where
         T: Peripheral<P = T>,
     {
@@ -61,6 +61,24 @@ impl<'a, T> PeripheralRef<'a, T> {
         // safety: we're returning the clone inside a new PeripheralRef that borrows
         // self, so user code can't use both at the same time.
         PeripheralRef::new(unsafe { self.inner.clone_unchecked() })
+    }
+
+    /// Map the inner peripheral using `Into`.
+    ///
+    /// This converts from `PeripheralRef<'a, T>` to `PeripheralRef<'a, U>`,
+    /// using an `Into` impl to convert from `T` to `U`.
+    ///
+    /// For example, this can be useful to degrade GPIO pins: converting from
+    /// PeripheralRef<'a, GpioPin<11>>` to `PeripheralRef<'a, AnyPin>`.
+    #[inline]
+    pub fn map_into<U>(self) -> PeripheralRef<'a, U>
+    where
+        T: Into<U>,
+    {
+        PeripheralRef {
+            inner: self.inner.into(),
+            _lifetime: PhantomData,
+        }
     }
 }
 
@@ -137,14 +155,14 @@ pub trait Peripheral: Sized + crate::private::Sealed {
     /// You should strongly prefer using `into_ref()` instead. It returns a
     /// `PeripheralRef`, which allows the borrow checker to enforce this at
     /// compile time.
-    unsafe fn clone_unchecked(&mut self) -> Self::P;
+    unsafe fn clone_unchecked(&self) -> Self::P;
 
     /// Convert a value into a `PeripheralRef`.
     ///
     /// When called on an owned `T`, yields a `PeripheralRef<'static, T>`.
     /// When called on an `&'a mut T`, yields a `PeripheralRef<'a, T>`.
     #[inline]
-    fn into_ref<'a>(mut self) -> PeripheralRef<'a, Self::P>
+    fn into_ref<'a>(self) -> PeripheralRef<'a, Self::P>
     where
         Self: 'a,
     {
@@ -158,7 +176,7 @@ where
 {
     type P = P;
 
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
+    unsafe fn clone_unchecked(&self) -> Self::P {
         T::clone_unchecked(self)
     }
 }
@@ -169,13 +187,17 @@ mod peripheral_macros {
     #[doc(hidden)]
     #[macro_export]
     macro_rules! peripherals {
-        ($($(#[$cfg:meta])? $name:ident <= $from_pac:tt $(($($interrupt:ident),*))? ),*$(,)?) => {
+        (
+            $(
+                $([$enum_variant:ident])? $name:ident <= $from_pac:tt $(($($interrupt:ident),*))?
+            ), *$(,)?
+        ) => {
 
             /// Contains the generated peripherals which implement [`Peripheral`]
             mod peripherals {
                 pub use super::pac::*;
                 $(
-                    $crate::create_peripheral!($(#[$cfg])? $name <= $from_pac);
+                    $crate::create_peripheral!($([$enum_variant])? $name <= $from_pac);
                 )*
             }
 
@@ -183,7 +205,6 @@ mod peripheral_macros {
             #[allow(non_snake_case)]
             pub struct Peripherals {
                 $(
-                    $(#[$cfg])?
                     /// Each field represents a hardware peripheral.
                     pub $name: peripherals::$name,
                 )*
@@ -204,9 +225,7 @@ mod peripheral_macros {
                         Self::steal()
                     })
                 }
-            }
 
-            impl Peripherals {
                 /// Unsafely create an instance of this peripheral out of thin air.
                 ///
                 /// # Safety
@@ -216,7 +235,6 @@ mod peripheral_macros {
                 pub unsafe fn steal() -> Self {
                     Self {
                         $(
-                            $(#[$cfg])?
                             $name: peripherals::$name::steal(),
                         )*
                     }
@@ -261,8 +279,7 @@ mod peripheral_macros {
     #[macro_export]
     /// Macro to create a peripheral structure.
     macro_rules! create_peripheral {
-        ($(#[$cfg:meta])? $name:ident <= virtual) => {
-            $(#[$cfg])?
+        ($([$enum_variant:ident])? $name:ident <= virtual) => {
             #[derive(Debug)]
             #[allow(non_camel_case_types)]
             /// Represents a virtual peripheral with no associated hardware.
@@ -271,7 +288,6 @@ mod peripheral_macros {
             /// is defined as virtual.
             pub struct $name { _inner: () }
 
-            $(#[$cfg])?
             impl $name {
                 /// Unsafely create an instance of this peripheral out of thin air.
                 ///
@@ -288,35 +304,27 @@ mod peripheral_macros {
                 type P = $name;
 
                 #[inline]
-                unsafe fn clone_unchecked(&mut self) -> Self::P {
+                unsafe fn clone_unchecked(&self) -> Self::P {
                     Self::steal()
                 }
             }
 
             impl $crate::private::Sealed for $name {}
-        };
-        ($(#[$cfg:meta])? $name:ident <= $base:ident) => {
-            $(#[$cfg])?
-            #[derive(Debug)]
-            #[allow(non_camel_case_types)]
-            /// Represents a concrete hardware peripheral.
-            ///
-            /// This struct is generated by the `create_peripheral!` macro when the peripheral
-            /// is tied to an actual hardware device.
-            pub struct $name { _inner: () }
 
-            $(#[$cfg])?
-            impl $name {
-                /// Unsafely create an instance of this peripheral out of thin air.
-                ///
-                /// # Safety
-                ///
-                /// You must ensure that you're only using one instance of this type at a time.
-                #[inline]
-                pub unsafe fn steal() -> Self {
-                    Self { _inner: () }
+            $(
+                impl $crate::dma::PeripheralMarker for $crate::peripherals::$name {
+                    #[inline(always)]
+                    fn peripheral(&self) -> $crate::system::Peripheral {
+                        $crate::system::Peripheral::$enum_variant
+                    }
                 }
+            )?
+        };
 
+        ($([$enum_variant:ident])? $name:ident <= $base:ident) => {
+            $crate::create_peripheral!($([$enum_variant])? $name <= virtual);
+
+            impl $name {
                 #[doc = r"Pointer to the register block"]
                 pub const PTR: *const <super::pac::$base as core::ops::Deref>::Target = super::pac::$base::PTR;
 
@@ -336,22 +344,10 @@ mod peripheral_macros {
             }
 
             impl core::ops::DerefMut for $name {
-
                 fn deref_mut(&mut self) -> &mut Self::Target {
                     unsafe { &mut *(Self::PTR as *mut _)  }
                 }
             }
-
-            impl $crate::peripheral::Peripheral for $name {
-                type P = $name;
-
-                #[inline]
-                unsafe fn clone_unchecked(&mut self) -> Self::P {
-                    Self::steal()
-                }
-            }
-
-            impl $crate::private::Sealed for $name {}
         };
     }
 }

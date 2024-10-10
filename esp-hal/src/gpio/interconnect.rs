@@ -48,7 +48,7 @@ impl Clone for InputSignal {
 impl Peripheral for InputSignal {
     type P = Self;
 
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
+    unsafe fn clone_unchecked(&self) -> Self::P {
         self.clone()
     }
 }
@@ -187,7 +187,7 @@ pub struct OutputSignal {
 impl Peripheral for OutputSignal {
     type P = Self;
 
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
+    unsafe fn clone_unchecked(&self) -> Self::P {
         Self {
             pin: self.pin.clone_unchecked(),
             is_inverted: self.is_inverted,
@@ -345,7 +345,7 @@ pub struct AnyInputSignal(AnyInputSignalInner);
 impl Peripheral for AnyInputSignal {
     type P = Self;
 
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
+    unsafe fn clone_unchecked(&self) -> Self::P {
         self.clone()
     }
 }
