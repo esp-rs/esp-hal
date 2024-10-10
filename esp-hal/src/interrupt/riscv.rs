@@ -15,8 +15,10 @@
 pub use esp_riscv_rt::TrapFrame;
 use riscv::register::{mcause, mtvec};
 
-#[cfg(not(plic))]
+#[cfg(not(any(clic, plic)))]
 pub use self::classic::*;
+#[cfg(clic)]
+pub use self::clic::*;
 #[cfg(plic)]
 pub use self::plic::*;
 pub use self::vectored::*;
@@ -561,7 +563,7 @@ mod vectored {
     interrupt_handler!(19);
 }
 
-#[cfg(not(plic))]
+#[cfg(not(any(clic, plic)))]
 mod classic {
     use super::{CpuInterrupt, InterruptKind, Priority};
     use crate::Cpu;
@@ -681,6 +683,74 @@ mod classic {
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
         intr.cpu_int_thresh().write(|w| w.bits(stored_prio));
     }
+}
+
+// TODO: Actually implement the functions in this module :)
+#[cfg(clic)]
+mod clic {
+    use super::{CpuInterrupt, InterruptKind, Priority};
+    use crate::Cpu;
+
+    pub(super) const DISABLED_CPU_INTERRUPT: u32 = 31;
+
+    pub(super) const EXTERNAL_INTERRUPT_OFFSET: u32 = 0;
+
+    // don't use interrupts reserved for CLIC (0,3,4,7)
+    // for some reason also CPU interrupt 8 doesn't work by default since it's
+    // disabled after reset - so don't use that, too
+    pub(super) const PRIORITY_TO_INTERRUPT: &[usize] = &[];
+
+    pub(super) const INTERRUPT_TO_PRIORITY: &[usize] = &[];
+
+    /// Enable a CPU interrupt
+    ///
+    /// # Safety
+    ///
+    /// Make sure there is an interrupt handler registered.
+    pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {}
+
+    /// Set the interrupt kind (i.e. level or edge) of an CPU interrupt
+    ///
+    /// The vectored interrupt handler will take care of clearing edge interrupt
+    /// bits.
+    pub fn set_kind(_core: Cpu, which: CpuInterrupt, kind: InterruptKind) {}
+
+    /// Set the priority level of an CPU interrupt
+    ///
+    /// # Safety
+    ///
+    /// Great care must be taken when using this function; avoid changing the
+    /// priority of interrupts 1 - 15.
+    pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {}
+
+    /// Clear a CPU interrupt
+    #[inline]
+    pub fn clear(_core: Cpu, which: CpuInterrupt) {}
+
+    /// Get interrupt priority
+    #[inline]
+    pub(super) unsafe extern "C" fn get_priority_by_core(
+        _core: Cpu,
+        cpu_interrupt: CpuInterrupt,
+    ) -> Priority {
+        Priority::None
+    }
+
+    /// Get interrupt priority - called by assembly code
+    #[inline]
+    pub(super) unsafe extern "C" fn get_priority(cpu_interrupt: CpuInterrupt) -> Priority {
+        Priority::None
+    }
+
+    #[no_mangle]
+    #[link_section = ".trap"]
+    pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
+        Priority::None as u32
+    }
+
+    #[no_mangle]
+    #[link_section = ".trap"]
+    pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {}
 }
 
 #[cfg(plic)]

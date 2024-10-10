@@ -140,7 +140,7 @@ impl PeripheralClockControl {
                 &system.peri_rst_en(),
             )
         };
-        #[cfg(not(esp32))]
+        #[cfg(not(any(esp32, esp32p4)))] // FIXME?
         let (perip_clk_en0, perip_rst_en0) = { (&system.perip_clk_en0(), &system.perip_rst_en0()) };
 
         #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
@@ -354,7 +354,7 @@ impl PeripheralClockControl {
 
         #[cfg(esp32)]
         let (perip_rst_en0, peri_rst_en) = { (&system.perip_rst_en(), &system.peri_rst_en()) };
-        #[cfg(not(esp32))]
+        #[cfg(not(any(esp32, esp32p4)))] // FIXME?
         let perip_rst_en0 = { &system.perip_rst_en0() };
 
         #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
