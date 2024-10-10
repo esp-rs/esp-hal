@@ -776,7 +776,7 @@ where
 {
     type P = GpioPin<GPIONUM>;
 
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
+    unsafe fn clone_unchecked(&self) -> Self::P {
         core::ptr::read(self as *const _)
     }
 }
@@ -1149,20 +1149,14 @@ macro_rules! gpio {
             /// Type-erased GPIO pin
             pub struct AnyPin(pub(crate) AnyPinInner);
 
-            impl AnyPin {
-                pub(crate) unsafe fn clone_unchecked(&self) -> Self {
+            impl $crate::peripheral::Peripheral for AnyPin {
+                type P = AnyPin;
+                unsafe fn clone_unchecked(&self) ->  Self {
                     match self.0 {
                         $(AnyPinInner::[<Gpio $gpionum >](_) => {
                             Self(AnyPinInner::[< Gpio $gpionum >](unsafe { GpioPin::steal() }))
                         })+
                     }
-                }
-            }
-
-            impl $crate::peripheral::Peripheral for AnyPin {
-                type P = AnyPin;
-                unsafe fn clone_unchecked(&mut self) ->  Self {
-                    AnyPin::clone_unchecked(self)
                 }
             }
 
@@ -1605,7 +1599,7 @@ impl<P> private::Sealed for Output<'_, P> {}
 
 impl<'d, P> Peripheral for Output<'d, P> {
     type P = P;
-    unsafe fn clone_unchecked(&mut self) -> P {
+    unsafe fn clone_unchecked(&self) -> P {
         self.pin.clone_unchecked()
     }
 }
@@ -1711,7 +1705,7 @@ impl<P> private::Sealed for Input<'_, P> {}
 
 impl<'d, P> Peripheral for Input<'d, P> {
     type P = P;
-    unsafe fn clone_unchecked(&mut self) -> P {
+    unsafe fn clone_unchecked(&self) -> P {
         self.pin.clone_unchecked()
     }
 }
@@ -1809,7 +1803,7 @@ impl<P> private::Sealed for OutputOpenDrain<'_, P> {}
 
 impl<'d, P> Peripheral for OutputOpenDrain<'d, P> {
     type P = P;
-    unsafe fn clone_unchecked(&mut self) -> P {
+    unsafe fn clone_unchecked(&self) -> P {
         self.pin.clone_unchecked()
     }
 }
@@ -1944,7 +1938,7 @@ impl<P> private::Sealed for Flex<'_, P> {}
 
 impl<'d, P> Peripheral for Flex<'d, P> {
     type P = P;
-    unsafe fn clone_unchecked(&mut self) -> P {
+    unsafe fn clone_unchecked(&self) -> P {
         core::ptr::read(&*self.pin as *const _)
     }
 }
