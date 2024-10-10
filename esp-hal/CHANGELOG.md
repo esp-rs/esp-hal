@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `AnyPin` now implements `From<GpioPin<N>>`. (#2326)
+- `Pins::steal()` to unsafely obtain GPIO. (#2335)
 
 ### Changed
 
