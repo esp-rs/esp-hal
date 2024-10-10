@@ -149,9 +149,9 @@ enum AnySpiInner {
 impl Peripheral for AnySpi {
     type P = AnySpi;
 
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
+    unsafe fn clone_unchecked(&self) -> Self::P {
         unsafe {
-            match &mut self.0 {
+            match &self.0 {
                 #[cfg(spi2)]
                 AnySpiInner::Spi2(spi) => AnySpi::from(spi.clone_unchecked()),
                 #[cfg(spi3)]
