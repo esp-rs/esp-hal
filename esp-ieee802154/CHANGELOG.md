@@ -15,7 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-## 0.4.0 - 2024-10-10
+## 0.3.1 - 2024-10-10
+
+- Bumped esp-wifi-sys to `v0.6.0`
+
+## 0.3.0 - 2024-10-10 - YANKED
 
 ### Added
 
