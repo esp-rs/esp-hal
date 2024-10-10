@@ -722,17 +722,13 @@ impl<const GPIONUM: u8> GpioPin<GPIONUM>
 where
     Self: Pin,
 {
-    pub(crate) fn new() -> Self {
-        Self
-    }
-
     /// Create a pin out of thin air.
     ///
     /// # Safety
     ///
     /// Ensure that only one instance of a pin exists at one time.
     pub unsafe fn steal() -> Self {
-        Self::new()
+        Self
     }
 
     /// Returns a peripheral [input][interconnect::InputSignal] connected to
@@ -982,10 +978,10 @@ impl Io {
     /// *Note:* You probably don't want to use this, it is intended to be used
     /// in very specific use cases. Async GPIO functionality will not work
     /// when instantiating `Io` using this constructor.
-    pub fn new_no_bind_interrupt(gpio: GPIO, _io_mux: IO_MUX) -> Self {
+    pub fn new_no_bind_interrupt(_gpio: GPIO, _io_mux: IO_MUX) -> Self {
         Io {
             _io_mux,
-            pins: gpio.pins(),
+            pins: unsafe { Pins::steal() },
         }
     }
 }
@@ -1080,11 +1076,16 @@ macro_rules! gpio {
                 )+
             }
 
-            impl GPIO {
-                pub(crate) fn pins(self) -> Pins {
-                    Pins {
+            impl Pins {
+                /// Unsafely create GPIO pins.
+                ///
+                /// # Safety
+                ///
+                /// The caller must ensure that only one instance of a pin is in use at one time.
+                pub unsafe fn steal() -> Self {
+                    Self {
                         $(
-                            [< gpio $gpionum >]: GpioPin::new(),
+                            [< gpio $gpionum >]: GpioPin::steal(),
                         )+
                     }
                 }
