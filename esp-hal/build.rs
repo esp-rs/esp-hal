@@ -106,11 +106,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     config_symbols.push("flip-link");
 
     for (key, value) in &cfg {
-        match value {
-            Value::Bool(true) => {
-                config_symbols.push(&key);
-            }
-            _ => (),
+        if let Value::Bool(true) = value {
+            config_symbols.push(key);
         }
     }
 
