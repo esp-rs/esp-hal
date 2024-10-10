@@ -792,7 +792,7 @@ where
         let pull_down = pull == Pull::Down;
 
         #[cfg(esp32)]
-        crate::soc::gpio::errata36(GPIONUM, Some(pull_up), Some(pull_down));
+        crate::soc::gpio::errata36(self.degrade_pin(private::Internal), pull_up, pull_down);
 
         get_io_mux_reg(GPIONUM).modify(|_, w| {
             w.fun_wpd().bit(pull_down);
