@@ -9,7 +9,7 @@ use std::{
 use anyhow::{bail, Context, Result};
 use cargo::CargoAction;
 use clap::ValueEnum;
-use esp_metadata::Chip;
+use esp_metadata::{Chip, Config};
 use strum::{Display, EnumIter, IntoEnumIterator as _};
 
 use self::cargo::CargoArgsBuilder;
@@ -125,17 +125,26 @@ pub fn build_documentation(
         }
     }
 
+    let chip = Config::for_chip(&chip);
+
     if matches!(package, Package::EspWifi) {
-        features.push("utils".to_owned());
-        features.push("wifi".to_owned());
-        features.push("wifi-default".to_owned());
-        features.push("ble".to_owned());
-        features.push("coex".to_owned());
-        features.push("esp-now".to_owned());
-        features.push("sniffer".to_owned());
+        let wifi = chip.contains("wifi");
+        let ble = chip.contains("ble");
+        if wifi {
+            features.push("wifi".to_owned());
+            features.push("wifi-default".to_owned());
+            features.push("esp-now".to_owned());
+            features.push("sniffer".to_owned());
+            features.push("utils".to_owned());
+            features.push("embassy-net".to_owned());
+        }
+        if ble {
+            features.push("ble".to_owned());
+        }
+        if wifi && ble {
+            features.push("coex".to_owned());
+        }
         features.push("async".to_owned());
-        features.push("embassy-net".to_owned());
-        features.push("esp-hal/default".to_owned());
     }
 
     // Build up an array of command-line arguments to pass to `cargo`:
