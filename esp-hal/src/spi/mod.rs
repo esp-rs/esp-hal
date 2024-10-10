@@ -9,10 +9,7 @@
 //! more information on these modes, please refer to the documentation in their
 //! respective modules.
 
-use crate::{
-    dma::{DmaEligible, DmaError, PeripheralMarker},
-    peripheral::Peripheral,
-};
+use crate::dma::{DmaEligible, DmaError, PeripheralMarker};
 
 pub mod master;
 pub mod slave;
@@ -120,56 +117,13 @@ impl PeripheralMarker for crate::peripherals::SPI3 {
     }
 }
 
-/// Any SPI peripheral.
-pub struct AnySpi(AnySpiInner);
-
-impl crate::private::Sealed for AnySpi {}
-
-#[cfg(spi2)]
-impl From<crate::peripherals::SPI2> for AnySpi {
-    fn from(spi: crate::peripherals::SPI2) -> Self {
-        AnySpi(AnySpiInner::Spi2(spi))
-    }
-}
-
-#[cfg(spi3)]
-impl From<crate::peripherals::SPI3> for AnySpi {
-    fn from(spi: crate::peripherals::SPI3) -> Self {
-        AnySpi(AnySpiInner::Spi3(spi))
-    }
-}
-
-enum AnySpiInner {
-    #[cfg(spi2)]
-    Spi2(crate::peripherals::SPI2),
-    #[cfg(spi3)]
-    Spi3(crate::peripherals::SPI3),
-}
-
-impl Peripheral for AnySpi {
-    type P = AnySpi;
-
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        unsafe {
-            match &self.0 {
-                #[cfg(spi2)]
-                AnySpiInner::Spi2(spi) => AnySpi::from(spi.clone_unchecked()),
-                #[cfg(spi3)]
-                AnySpiInner::Spi3(spi) => AnySpi::from(spi.clone_unchecked()),
-            }
-        }
-    }
-}
-
-impl PeripheralMarker for AnySpi {
-    #[inline(always)]
-    fn peripheral(&self) -> crate::system::Peripheral {
-        match &self.0 {
-            #[cfg(spi2)]
-            AnySpiInner::Spi2(spi) => spi.peripheral(),
-            #[cfg(spi3)]
-            AnySpiInner::Spi3(spi) => spi.peripheral(),
-        }
+crate::any_peripheral! {
+    /// Any SPI peripheral.
+    pub peripheral AnySpi {
+        #[cfg(spi2)]
+        Spi2(crate::peripherals::SPI2),
+        #[cfg(spi3)]
+        Spi3(crate::peripherals::SPI3),
     }
 }
 
