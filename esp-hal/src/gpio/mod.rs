@@ -872,21 +872,28 @@ fn on_pin_irq(pin_nr: u8) {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! if_output_pin {
-    (InputOutputAnalog, { $($then:tt)* } else { $($else:tt)* } ) => { $($then)* };
-    (InputOutputAnalogTouch, { $($then:tt)* } else { $($else:tt)* } ) => { $($then)* };
-    (InputOutput, { $($then:tt)* } else { $($else:tt)* } ) => { $($then)* };
-    ($other:ident, { $($then:tt)* } else { $($else:tt)* } ) => { $($else)* };
+    // Base case: not an Output pin, substitute the else branch
+    ({ $($then:tt)* } else { $($else:tt)* } ) => { $($else)* };
+
+    // First is an output pin, skip checking and substitute the then branch
+    (Output $(, $other:ident)* { $($then:tt)* } else { $($else:tt)* } ) => { $($then)* };
+
+    // First is not an output pin, check the rest
+    ($not_output:ident $(, $other:ident)* { $($then:tt)* } else { $($else:tt)* } ) => {
+        $crate::if_output_pin!($($other),* { $($then)* } else { $($else)* })
+    };
 }
-pub(crate) use if_output_pin;
 
 #[doc(hidden)]
 #[macro_export]
-macro_rules! io_types {
-    (InputOnly, $gpionum:literal) => {
+macro_rules! io_type {
+    (Input, $gpionum:literal) => {
         impl $crate::gpio::InputPin for GpioPin<$gpionum> {}
     };
-    (InputOnlyAnalog, $gpionum:literal) => {
-        impl $crate::gpio::InputPin for GpioPin<$gpionum> {}
+    (Output, $gpionum:literal) => {
+        impl $crate::gpio::OutputPin for GpioPin<$gpionum> {}
+    };
+    (Analog, $gpionum:literal) => {
         impl $crate::gpio::AnalogPin for GpioPin<$gpionum> {
             #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
             fn set_analog(&self, internal: $crate::private::Internal) {
@@ -894,29 +901,7 @@ macro_rules! io_types {
             }
         }
     };
-    (InputOutput, $gpionum:literal) => {
-        impl $crate::gpio::InputPin for GpioPin<$gpionum> {}
-        impl $crate::gpio::OutputPin for GpioPin<$gpionum> {}
-    };
-    (InputOutputAnalog, $gpionum:literal) => {
-        impl $crate::gpio::InputPin for GpioPin<$gpionum> {}
-        impl $crate::gpio::OutputPin for GpioPin<$gpionum> {}
-        impl $crate::gpio::AnalogPin for GpioPin<$gpionum> {
-            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-            fn set_analog(&self, internal: $crate::private::Internal) {
-                self.set_as_analog(internal)
-            }
-        }
-    };
-    (InputOutputAnalogTouch, $gpionum:literal) => {
-        impl $crate::gpio::InputPin for GpioPin<$gpionum> {}
-        impl $crate::gpio::OutputPin for GpioPin<$gpionum> {}
-        impl $crate::gpio::AnalogPin for GpioPin<$gpionum> {
-            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-            fn set_analog(&self, internal: $crate::private::Internal) {
-                self.set_as_analog(internal)
-            }
-        }
+    (Touch, $gpionum:literal) => {
         impl $crate::gpio::TouchPin for GpioPin<$gpionum> {
             fn set_touch(&self, internal: $crate::private::Internal) {
                 self.set_touch_impl(internal)
@@ -939,7 +924,7 @@ macro_rules! io_types {
 macro_rules! gpio {
     (
         $(
-            ($gpionum:literal, $bank:literal, $type:ident
+            ($gpionum:literal, $bank:literal, [$($type:tt),*]
                 $(
                     ( $( $af_input_num:literal => $af_input_signal:ident )* )
                     ( $( $af_output_num:literal => $af_output_signal:ident )* )
@@ -972,7 +957,9 @@ macro_rules! gpio {
             }
 
             $(
-                $crate::io_types!($type, $gpionum);
+                $(
+                    $crate::io_type!($type, $gpionum);
+                )*
 
                 impl $crate::gpio::Pin for GpioPin<$gpionum> {
                     fn number(&self) -> u8 {
@@ -1049,7 +1036,7 @@ macro_rules! gpio {
                 ($this:expr, $inner:ident, $code:tt) => {
                     match $this {
                         $(
-                            AnyPinInner::[<Gpio $gpionum >]($inner) => if_output_pin!($type, {
+                            AnyPinInner::[<Gpio $gpionum >]($inner) => $crate::if_output_pin!($($type),* {
                                 $code
                             } else {{
                                 let _ = $inner;
