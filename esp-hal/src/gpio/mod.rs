@@ -1510,15 +1510,9 @@ where
     /// Create GPIO output driver for a [GpioPin] with the provided level
     #[inline]
     pub fn new_typed(pin: impl Peripheral<P = P> + 'd, initial_output: Level) -> Self {
-        let pin = Flex::new_typed(pin);
+        let mut pin = Flex::new_typed(pin);
 
-        Self::new_inner(pin, initial_output)
-    }
-
-    fn new_inner(mut pin: Flex<'d, P>, initial_output: Level) -> Self {
-        pin.pin
-            .set_output_high(initial_output.into(), private::Internal);
-
+        pin.set_level(initial_output);
         pin.set_as_output();
 
         Self { pin }
