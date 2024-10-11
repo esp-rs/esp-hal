@@ -1188,7 +1188,7 @@ macro_rules! rtc_pins {
                     let rtcio = unsafe { &*$crate::peripherals::RTC_IO::PTR };
 
                     paste::paste! {
-                        rtcio.$pin_reg.modify(|_, w| w.[< $prefix rue >]().bit([< enable >]));
+                        rtcio.$pin_reg.modify(|_, w| w.[< $prefix rue >]().bit(enable));
                     }
                 }
 
@@ -1196,7 +1196,7 @@ macro_rules! rtc_pins {
                     let rtcio = unsafe { &*$crate::peripherals::RTC_IO::PTR };
 
                     paste::paste! {
-                        rtcio.$pin_reg.modify(|_, w| w.[< $prefix rde >]().bit([< enable >]));
+                        rtcio.$pin_reg.modify(|_, w| w.[< $prefix rde >]().bit(enable));
                     }
                 }
             }
@@ -1209,6 +1209,23 @@ macro_rules! rtc_pins {
         $(
             $crate::gpio::rtc_pins!($pin_num, $rtc_pin, $pin_reg, $prefix, $hold $(, $rue )?);
         )+
+
+        #[cfg(esp32)]
+        pub(crate) fn errata36(mut pin: AnyPin, pull_up: bool, pull_down: bool) {
+            use $crate::gpio::{Pin, RtcPinWithResistors};
+
+            let has_pullups = match pin.number() {
+                $(
+                    $( $pin_num => $rue, )?
+                )+
+                _ => false,
+            };
+
+            if has_pullups {
+                pin.rtcio_pullup(pull_up);
+                pin.rtcio_pulldown(pull_down);
+            }
+        }
 
         #[doc(hidden)]
         #[macro_export]
