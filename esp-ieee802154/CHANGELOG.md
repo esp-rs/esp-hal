@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Automatically include the necessary linker scripts (#2339)
+
 ### Fixed
 
 ### Removed

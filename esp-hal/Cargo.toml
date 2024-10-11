@@ -89,6 +89,7 @@ usb-otg = ["dep:embassy-usb-driver", "dep:embassy-usb-synopsys-otg", "dep:esp-sy
 
 __esp_hal_embassy = []
 __include_rom_functions = []
+__include_rom_coexist_and_phy = []
 
 ## Enable debug features in the HAL (used for development).
 debug = [
