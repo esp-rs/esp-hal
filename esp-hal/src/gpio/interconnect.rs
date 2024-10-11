@@ -1,7 +1,5 @@
 //! Peripheral signal interconnect using IOMUX or GPIOMUX.
 
-#![allow(missing_docs)] // TODO before documenting, decide on a public API
-
 use crate::{
     gpio::{
         self,
@@ -384,7 +382,10 @@ enum AnyOutputSignalInner {
     Dummy(NoPin),
 }
 
-/// A type-erased output signal.
+/// A type-erased (input and) output signal, intended for internal use.
+///
+/// Peripheral drivers are supposed to take this and [`InputConnection`] as
+/// arguments instead of pin types.
 pub struct OutputConnection(AnyOutputSignalInner);
 
 impl Sealed for OutputConnection {}
@@ -429,6 +430,7 @@ where
 
 impl OutputConnection {
     delegate::delegate! {
+        #[doc(hidden)]
         to match &self.0 {
             AnyOutputSignalInner::Output(pin) => pin,
             AnyOutputSignalInner::Dummy(pin) => pin,
@@ -442,6 +444,7 @@ impl OutputConnection {
             pub fn output_signals(&self, _internal: private::Internal) -> [Option<gpio::OutputSignal>; 6];
         }
 
+        #[doc(hidden)]
         to match &mut self.0 {
             AnyOutputSignalInner::Output(pin) => pin,
             AnyOutputSignalInner::Dummy(pin) => pin,
@@ -473,7 +476,10 @@ enum AnyInputSignalInner {
     Dummy(NoPin),
 }
 
-/// A type-erased input signal.
+/// A type-erased input signal, intended for internal use.
+///
+/// Peripheral drivers are supposed to take this and [`OutputConnection`] as
+/// arguments instead of pin types.
 #[derive(Clone)]
 pub struct InputConnection(AnyInputSignalInner);
 
@@ -522,6 +528,7 @@ where
 
 impl InputConnection {
     delegate::delegate! {
+        #[doc(hidden)]
         to match &self.0 {
             AnyInputSignalInner::Input(pin) => pin,
             AnyInputSignalInner::Constant(level) => level,
@@ -533,6 +540,7 @@ impl InputConnection {
             pub fn input_signals(&self, _internal: private::Internal) -> [Option<gpio::InputSignal>; 6];
         }
 
+        #[doc(hidden)]
         to match &mut self.0 {
             AnyInputSignalInner::Input(pin) => pin,
             AnyInputSignalInner::Constant(level) => level,

@@ -388,14 +388,6 @@ pub trait InputPin: IsInputPin + Into<AnyPin> + 'static {
     /// The current state of the input
     #[doc(hidden)]
     fn is_input_high(&self, _: private::Internal) -> bool;
-
-    /// Connect the pin to a peripheral.
-    #[doc(hidden)]
-    fn connect_input_to_peripheral(&mut self, signal: InputSignal, _: private::Internal);
-
-    /// Disconnect the pin from a peripheral.
-    #[doc(hidden)]
-    fn disconnect_input_from_peripheral(&mut self, signal: InputSignal, _: private::Internal);
 }
 
 /// Trait implemented by pins which can be used as outputs.
@@ -439,14 +431,6 @@ pub trait OutputPin: IsOutputPin + Into<AnyPin> + 'static {
     /// Is the output set to high
     #[doc(hidden)]
     fn is_set_high(&self, _: private::Internal) -> bool;
-
-    /// Connect the pin to a peripheral.
-    #[doc(hidden)]
-    fn connect_peripheral_to_output(&mut self, signal: OutputSignal, _: private::Internal);
-
-    /// Disconnect the pin from a peripheral.
-    #[doc(hidden)]
-    fn disconnect_from_peripheral_output(&mut self, signal: OutputSignal, _: private::Internal);
 }
 
 /// Trait implemented by pins which can be used as analog pins
@@ -741,16 +725,6 @@ where
     fn is_input_high(&self, _: private::Internal) -> bool {
         self.gpio_bank(private::Internal).read_input() & (1 << (GPIONUM % 32)) != 0
     }
-
-    fn connect_input_to_peripheral(&mut self, signal: InputSignal, _: private::Internal) {
-        self.peripheral_input()
-            .connect_input_to_peripheral(signal, private::Internal);
-    }
-
-    fn disconnect_input_from_peripheral(&mut self, signal: InputSignal, _: private::Internal) {
-        self.peripheral_input()
-            .disconnect_input_from_peripheral(signal, private::Internal);
-    }
 }
 
 impl<const GPIONUM: u8> OutputPin for GpioPin<GPIONUM>
@@ -803,16 +777,6 @@ where
 
     fn is_set_high(&self, _: private::Internal) -> bool {
         self.gpio_bank(private::Internal).read_output() & (1 << (GPIONUM % 32)) != 0
-    }
-
-    fn connect_peripheral_to_output(&mut self, signal: OutputSignal, _: private::Internal) {
-        self.degrade_pin(private::Internal)
-            .connect_peripheral_to_output(signal, private::Internal);
-    }
-
-    fn disconnect_from_peripheral_output(&mut self, signal: OutputSignal, _: private::Internal) {
-        self.degrade_pin(private::Internal)
-            .disconnect_from_peripheral_output(signal, private::Internal);
     }
 }
 
@@ -2167,16 +2131,6 @@ pub(crate) mod internal {
                 InputPin::is_input_high(target, private::Internal)
             })
         }
-
-        fn connect_input_to_peripheral(&mut self, signal: InputSignal, _: private::Internal) {
-            interconnect::InputSignal::new(self.degrade_pin(private::Internal))
-                .connect_input_to_peripheral(signal, private::Internal);
-        }
-
-        fn disconnect_input_from_peripheral(&mut self, signal: InputSignal, _: private::Internal) {
-            interconnect::InputSignal::new(self.degrade_pin(private::Internal))
-                .disconnect_input_from_peripheral(signal, private::Internal);
-        }
     }
 
     impl IsOutputPin for AnyPin {}
@@ -2239,20 +2193,6 @@ pub(crate) mod internal {
             handle_gpio_output!(&self.0, target, {
                 OutputPin::is_set_high(target, private::Internal)
             })
-        }
-
-        fn connect_peripheral_to_output(&mut self, signal: OutputSignal, _: private::Internal) {
-            interconnect::OutputSignal::new(self.degrade_pin(private::Internal))
-                .connect_peripheral_to_output(signal, private::Internal);
-        }
-
-        fn disconnect_from_peripheral_output(
-            &mut self,
-            signal: OutputSignal,
-            _: private::Internal,
-        ) {
-            interconnect::OutputSignal::new(self.degrade_pin(private::Internal))
-                .disconnect_from_peripheral_output(signal, private::Internal);
         }
     }
 
