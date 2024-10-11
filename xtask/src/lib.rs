@@ -116,30 +116,9 @@ pub fn build_documentation(
 
     let mut features = vec![chip.to_string()];
 
-    // Add chip-specific features for a package.
-    features.extend(apply_feature_rules(&chip, &package));
-
     let chip = Config::for_chip(&chip);
 
-    if matches!(package, Package::EspWifi) {
-        let wifi = chip.contains("wifi");
-        let ble = chip.contains("ble");
-        if wifi {
-            features.push("wifi".to_owned());
-            features.push("wifi-default".to_owned());
-            features.push("esp-now".to_owned());
-            features.push("sniffer".to_owned());
-            features.push("utils".to_owned());
-            features.push("embassy-net".to_owned());
-        }
-        if ble {
-            features.push("ble".to_owned());
-        }
-        if wifi && ble {
-            features.push("coex".to_owned());
-        }
-        features.push("async".to_owned());
-    }
+    features.extend(apply_feature_rules(&package, chip));
 
     // Build up an array of command-line arguments to pass to `cargo`:
     let builder = CargoArgsBuilder::default()
@@ -168,26 +147,35 @@ pub fn build_documentation(
     Ok(docs_path)
 }
 
-fn apply_feature_rules(chip: &Chip, package: &Package) -> Vec<String> {
-    // If we need to activate a feature for documentation build for particular
-    // package for chip, add a matching by chip/package/both according to the
-    // existing example.
-    let rules: Vec<fn(&Chip, &Package) -> Vec<String>> = vec![|chip, pkg| {
-        if matches!(pkg, Package::EspHal) {
-            let mut features = vec!["ci".to_owned()];
-            if matches!(chip, Chip::Esp32 | Chip::Esp32s2 | Chip::Esp32s3) {
-                features.push("quad-psram".to_owned());
-            }
-            features
-        } else {
-            vec![]
-        }
-    }];
+fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
+    let chip_name = &config.name();
 
-    rules
-        .into_iter()
-        .flat_map(|rule| rule(chip, package))
-        .collect()
+    match (package, chip_name.as_str()) {
+        (Package::EspHal, "esp32") => vec!["quad-psram".to_owned(), "ci".to_owned()],
+        (Package::EspHal, "esp32s2") => vec!["quad-psram".to_owned(), "ci".to_owned()],
+        (Package::EspHal, "esp32s3") => vec!["quad-psram".to_owned(), "ci".to_owned()],
+        (Package::EspHal, _) => vec!["ci".to_owned()],
+        (Package::EspWifi, _) => {
+            let mut features = vec![];
+            if config.contains("wifi") {
+                features.push("wifi".to_owned());
+                features.push("wifi-default".to_owned());
+                features.push("esp-now".to_owned());
+                features.push("sniffer".to_owned());
+                features.push("utils".to_owned());
+                features.push("embassy-net".to_owned());
+            }
+            if config.contains("ble") {
+                features.push("ble".to_owned());
+            }
+            if config.contains("wifi") && config.contains("ble") {
+                features.push("coex".to_owned());
+            }
+            features.push("async".to_owned());
+            features
+        }
+        _ => vec![],
+    }
 }
 
 /// Load all examples at the given path, and parse their metadata.
