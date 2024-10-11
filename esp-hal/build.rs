@@ -90,7 +90,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             ),
             (
                 "place-switch-tables-in-ram",
-                Value::Bool(false),
+                Value::Bool(true),
                 "Places switch-tables, some lookup tables and constants related to interrupt handling into RAM - resulting in better performance but slightly more RAM consumption.",
             ),
             (
