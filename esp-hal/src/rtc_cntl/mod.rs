@@ -33,7 +33,7 @@
 //! let mut rtc = Rtc::new(peripherals.LPWR);
 //!
 //! rtc.set_interrupt_handler(interrupt_handler);
-//! rtc.rwdt.set_timeout(2000.millis());
+//! rtc.rwdt.set_timeout(0, 2000.millis());
 //! rtc.rwdt.listen();
 //!
 //! critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
@@ -59,7 +59,7 @@
 //!
 //!         // esp_println::println!("Restarting in 5 seconds...");
 //!
-//!         rwdt.set_timeout(5000u64.millis());
+//!         rwdt.set_timeout(0, 5000u64.millis());
 //!         rwdt.unlisten();
 //!     });
 //! }

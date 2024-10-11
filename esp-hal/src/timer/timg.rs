@@ -54,7 +54,7 @@
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! let mut wdt = timg0.wdt;
 //!
-//! wdt.set_timeout(5_000.millis());
+//! wdt.set_timeout(0, 5_000.millis());
 //! wdt.enable();
 //!
 //! loop {
