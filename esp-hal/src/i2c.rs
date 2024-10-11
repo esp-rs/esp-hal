@@ -58,15 +58,7 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    gpio::{
-        interconnect::OutputConnection,
-        InputSignal,
-        OutputSignal,
-        PeripheralInput,
-        PeripheralOutput,
-        PeripheralSignal,
-        Pull,
-    },
+    gpio::{interconnect::OutputConnection, InputSignal, OutputSignal, Pull},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::i2c0::{RegisterBlock, COMD},

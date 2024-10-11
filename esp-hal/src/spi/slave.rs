@@ -78,8 +78,6 @@ use crate::{
         interconnect::{InputConnection, OutputConnection},
         InputSignal,
         OutputSignal,
-        PeripheralInput,
-        PeripheralOutput,
     },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,

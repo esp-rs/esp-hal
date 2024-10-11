@@ -85,11 +85,7 @@ use core::marker::PhantomData;
 use fugit::HertzU32;
 
 use crate::{
-    gpio::{
-        interconnect::{InputConnection, OutputConnection},
-        PeripheralInput,
-        PeripheralOutput,
-    },
+    gpio::interconnect::{InputConnection, OutputConnection},
     interrupt::InterruptHandler,
     peripheral::Peripheral,
     rmt::private::CreateInstance,

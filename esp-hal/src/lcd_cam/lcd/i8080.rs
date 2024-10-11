@@ -70,7 +70,7 @@ use fugit::HertzU32;
 use crate::{
     clock::Clocks,
     dma::{ChannelTx, DmaChannelConvert, DmaEligible, DmaError, DmaPeripheral, DmaTxBuffer, Tx},
-    gpio::{interconnect::OutputConnection, OutputSignal, PeripheralOutput},
+    gpio::{interconnect::OutputConnection, OutputSignal},
     lcd_cam::{
         asynch::LCD_DONE_WAKER,
         lcd::{i8080::private::TxPins, ClockMode, DelayMode, Phase, Polarity},
