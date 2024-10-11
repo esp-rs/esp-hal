@@ -527,7 +527,7 @@ pub enum OutputSignal {
     MTDO,
 }
 
-crate::gpio::gpio! {
+crate::gpio! {
     (0, 0, InputOutputAnalogTouch (5 => EMAC_TX_CLK) (1 => CLK_OUT1))
     (1, 0, InputOutput (5 => EMAC_RXD2) (0 => U0TXD 1 => CLK_OUT3))
     (2, 0, InputOutputAnalogTouch (1 => HSPIWP 3 => HS2_DATA0 4 => SD_DATA0) (3 => HS2_DATA0 4 => SD_DATA0))
@@ -566,28 +566,7 @@ crate::gpio::gpio! {
     (39, 1, InputOnlyAnalog)
 }
 
-crate::gpio::analog! {
-    (36, 0,  sensor_pads(),  "sense1_"    )
-    (37, 1,  sensor_pads(),  "sense2_"    )
-    (38, 2,  sensor_pads(),  "sense3_"    )
-    (39, 3,  sensor_pads(),  "sense4_"    )
-    (34, 4,  adc_pad(),      "adc1_"      )
-    (35, 5,  adc_pad(),      "adc2_"      )
-    (25, 6,  pad_dac1(),     "",      true)
-    (26, 7,  pad_dac2(),     "",      true)
-    (33, 8,  xtal_32k_pad(), "x32p_", true)
-    (32, 9,  xtal_32k_pad(), "x32n_", true)
-    (4,  10, touch_pad0(),   "",      true)
-    (0,  11, touch_pad1(),   "",      true)
-    (2,  12, touch_pad2(),   "",      true)
-    (15, 13, touch_pad3(),   "",      true)
-    (13, 14, touch_pad4(),   "",      true)
-    (12, 15, touch_pad5(),   "",      true)
-    (14, 16, touch_pad6(),   "",      true)
-    (27, 17, touch_pad7(),   "",      true)
-}
-
-crate::gpio::rtc_pins! {
+crate::rtcio_analog! {
     (36, 0,  sensor_pads(),    sense1_, sense1_hold_force          )
     (37, 1,  sensor_pads(),    sense2_, sense2_hold_force          )
     (38, 2,  sensor_pads(),    sense3_, sense3_hold_force          )
@@ -608,7 +587,7 @@ crate::gpio::rtc_pins! {
     (27, 17, touch_pad7(),     "",      touch_pad7_hold_force, true)
 }
 
-crate::gpio::touch! {
+crate::touch! {
     // touch_nr, pin_nr, rtc_pin, touch_out_reg, meas_field, touch_thres_reg, touch_thres_field, normal_pin
     (0, 4,  10, sar_touch_out1, touch_meas_out0, sar_touch_thres1, touch_out_th0, true)
     (1, 0,  11, sar_touch_out1, touch_meas_out1, sar_touch_thres1, touch_out_th1, true)

@@ -198,7 +198,7 @@ pub enum OutputSignal {
     GPIO             = 128,
 }
 
-crate::gpio::gpio! {
+crate::gpio! {
     (0, 0, InputOutputAnalog)
     (1, 0, InputOutputAnalog)
     (2, 0, InputOutputAnalog (2 => FSPIQ) (2 => FSPIQ))
@@ -224,7 +224,7 @@ crate::gpio::gpio! {
 }
 
 // RTC pins 0 through 5 (inclusive) support GPIO wakeup
-crate::gpio::rtc_pins! {
+crate::rtc_pins! {
     0
     1
     2
