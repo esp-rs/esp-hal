@@ -168,7 +168,7 @@ impl Priority {
 }
 
 /// The interrupts reserved by the HAL
-#[cfg_attr(place_more_rodata_in_ram, link_section = ".rwtext")]
+#[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
 pub static RESERVED_INTERRUPTS: &[usize] = INTERRUPT_TO_PRIORITY;
 
 /// # Safety
@@ -550,17 +550,17 @@ mod classic {
     use super::{CpuInterrupt, InterruptKind, Priority};
     use crate::Cpu;
 
-    #[cfg_attr(place_more_rodata_in_ram, link_section = ".rwtext")]
+    #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
     pub(super) static DISABLED_CPU_INTERRUPT: u32 = 0;
 
-    #[cfg_attr(place_more_rodata_in_ram, link_section = ".rwtext")]
+    #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
     pub(super) static EXTERNAL_INTERRUPT_OFFSET: u32 = 0;
 
-    #[cfg_attr(place_more_rodata_in_ram, link_section = ".rwtext")]
+    #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
     pub(super) static PRIORITY_TO_INTERRUPT: &[usize] =
         &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
-    #[cfg_attr(place_more_rodata_in_ram, link_section = ".rwtext")]
+    #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
     pub(super) static INTERRUPT_TO_PRIORITY: &[usize] =
         &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
@@ -672,20 +672,20 @@ mod plic {
     use super::{CpuInterrupt, InterruptKind, Priority};
     use crate::Cpu;
 
-    #[cfg_attr(place_more_rodata_in_ram, link_section = ".rwtext")]
+    #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
     pub(super) static DISABLED_CPU_INTERRUPT: u32 = 31;
 
-    #[cfg_attr(place_more_rodata_in_ram, link_section = ".rwtext")]
+    #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
     pub(super) static EXTERNAL_INTERRUPT_OFFSET: u32 = 0;
 
     // don't use interrupts reserved for CLIC (0,3,4,7)
     // for some reason also CPU interrupt 8 doesn't work by default since it's
     // disabled after reset - so don't use that, too
-    #[cfg_attr(place_more_rodata_in_ram, link_section = ".rwtext")]
+    #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
     pub(super) static PRIORITY_TO_INTERRUPT: &[usize] =
         &[1, 2, 5, 6, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
 
-    #[cfg_attr(place_more_rodata_in_ram, link_section = ".rwtext")]
+    #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
     pub(super) static INTERRUPT_TO_PRIORITY: &[usize] = &[
         1, 2, 0, 0, 3, 4, 0, 0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
     ];

@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- A new config option `PLACE_MORE_RODATA_IN_RAM` to improve performance (especially for interrupts) at the cost of RAM usage (#2331)
+- A new config option `PLACE_SWITCH_TABLES_IN_RAM` to improve performance (especially for interrupts) at the cost of slightly more RAM usage (#2331)
+- A new config option `PLACE_ANON_IN_RAM` to improve performance (especially for interrupts) at the cost of RAM usage (#2331)
 
 ### Changed
 

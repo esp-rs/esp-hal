@@ -2,7 +2,7 @@ SECTIONS {
   .rwtext : ALIGN(4)
   {
     . = ALIGN (4);
-    #IF ESP_HAL_PLACE_MORE_RODATA_IN_RAM
+    #IF ESP_HAL_PLACE_SWITCH_TABLES_IN_RAM
       *(.rodata.*_esp_hal_internal_handler*)
       *(.rodata..Lswitch.table.*)
     #ENDIF    
