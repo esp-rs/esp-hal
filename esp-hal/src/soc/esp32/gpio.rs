@@ -527,13 +527,6 @@ pub enum OutputSignal {
     MTDO,
 }
 
-pub(crate) fn errata36(mut pin: AnyPin, pull_up: bool, pull_down: bool) {
-    use crate::gpio::RtcPinWithResistors;
-
-    pin.rtcio_pullup(pull_up);
-    pin.rtcio_pulldown(pull_down);
-}
-
 crate::gpio::gpio! {
     (0, 0, InputOutputAnalogTouch (5 => EMAC_TX_CLK) (1 => CLK_OUT1))
     (1, 0, InputOutput (5 => EMAC_RXD2) (0 => U0TXD 1 => CLK_OUT3))
