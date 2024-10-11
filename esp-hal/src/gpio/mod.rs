@@ -675,13 +675,19 @@ where
 
 /// Workaround to make D+ and D- work on the ESP32-C3 and ESP32-S3, which by
 /// default are assigned to the `USB_SERIAL_JTAG` peripheral.
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(usb_device)]
 fn disable_usb_pads(gpionum: u8) {
     cfg_if::cfg_if! {
         if #[cfg(esp32c3)] {
             let pins = [18, 19];
+        } else if #[cfg(esp32c6)] {
+            let pins = [12, 13];
+        } else if #[cfg(esp32h2)] {
+            let pins = [26, 27];
         } else if #[cfg(esp32s3)] {
             let pins = [19, 20];
+        } else {
+            compile_error!("Please define USB pins for this chip");
         }
     }
 
@@ -736,7 +742,7 @@ where
     fn init_input(&self, pull: Pull, _: private::Internal) {
         self.pull_direction(pull, private::Internal);
 
-        #[cfg(any(esp32c3, esp32s3))]
+        #[cfg(usb_device)]
         disable_usb_pads(GPIONUM);
 
         get_io_mux_reg(GPIONUM).modify(|_, w| unsafe {
