@@ -435,13 +435,29 @@ impl OutputConnection {
         #[doc(hidden)]
         to match &self.0 {
             OutputConnectionInner::Output(pin) => pin,
-            OutputConnectionInner::Dummy(pin) => pin,
+            OutputConnectionInner::Dummy(_) => Level::Low,
         } {
             pub fn pull_direction(&self, pull: Pull, _internal: private::Internal);
             pub fn init_input(&self, pull: Pull, _internal: private::Internal);
             pub fn is_input_high(&self, _internal: private::Internal) -> bool;
             pub fn input_signals(&self, _internal: private::Internal) -> [Option<gpio::InputSignal>; 6];
+        }
+        #[doc(hidden)]
+        to match &mut self.0 {
+            OutputConnectionInner::Output(pin) => pin,
+            OutputConnectionInner::Dummy(_) => Level::Low,
+        } {
+            pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
+            pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
+            pub fn connect_input_to_peripheral(&mut self, signal: crate::gpio::InputSignal, _internal: private::Internal);
+            pub fn disconnect_input_from_peripheral(&mut self, signal: crate::gpio::InputSignal, _internal: private::Internal);
+        }
 
+        #[doc(hidden)]
+        to match &self.0 {
+            OutputConnectionInner::Output(pin) => pin,
+            OutputConnectionInner::Dummy(pin) => pin,
+        } {
             pub fn is_set_high(&self, _internal: private::Internal) -> bool;
             pub fn output_signals(&self, _internal: private::Internal) -> [Option<gpio::OutputSignal>; 6];
         }
@@ -451,11 +467,6 @@ impl OutputConnection {
             OutputConnectionInner::Output(pin) => pin,
             OutputConnectionInner::Dummy(pin) => pin,
         } {
-            pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
-            pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
-            pub fn connect_input_to_peripheral(&mut self, signal: crate::gpio::InputSignal, _internal: private::Internal);
-            pub fn disconnect_input_from_peripheral(&mut self, signal: crate::gpio::InputSignal, _internal: private::Internal);
-
             pub fn set_to_open_drain_output(&mut self, _internal: private::Internal);
             pub fn set_to_push_pull_output(&mut self, _internal: private::Internal);
             pub fn enable_output(&mut self, on: bool, _internal: private::Internal);
@@ -475,7 +486,6 @@ impl OutputConnection {
 enum InputConnectionInner {
     Input(InputSignal),
     Constant(Level),
-    Dummy(NoPin),
 }
 
 /// A type-erased input signal, intended for internal use.
@@ -508,8 +518,8 @@ impl From<Level> for InputConnection {
 }
 
 impl From<NoPin> for InputConnection {
-    fn from(pin: NoPin) -> Self {
-        Self(InputConnectionInner::Dummy(pin))
+    fn from(_pin: NoPin) -> Self {
+        Self(InputConnectionInner::Constant(Level::Low))
     }
 }
 
@@ -534,7 +544,6 @@ impl InputConnection {
         to match &self.0 {
             InputConnectionInner::Input(pin) => pin,
             InputConnectionInner::Constant(level) => level,
-            InputConnectionInner::Dummy(pin) => pin,
         } {
             pub fn pull_direction(&self, pull: Pull, _internal: private::Internal);
             pub fn init_input(&self, pull: Pull, _internal: private::Internal);
@@ -546,7 +555,6 @@ impl InputConnection {
         to match &mut self.0 {
             InputConnectionInner::Input(pin) => pin,
             InputConnectionInner::Constant(level) => level,
-            InputConnectionInner::Dummy(pin) => pin,
         } {
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
             pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
