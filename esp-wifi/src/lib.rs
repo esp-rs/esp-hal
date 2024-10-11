@@ -175,9 +175,10 @@ fn timestamp() -> smoltcp::time::Instant {
 }
 
 // this is just to verify that we use the correct defaults in `build.rs`
+#[allow(clippy::assertions_on_constants)] // TODO: try assert_eq once it's usable in const context
 const _: () = {
     cfg_if::cfg_if! {
-        if #[cfg(not(esp32h2))]{
+        if #[cfg(not(esp32h2))] {
             core::assert!(binary::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM == 10);
             core::assert!(binary::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
             core::assert!(binary::include::WIFI_STATIC_TX_BUFFER_NUM == 0);
