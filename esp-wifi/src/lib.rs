@@ -25,22 +25,6 @@
 //! features = ["esp32s3", "wifi", "esp-now"]
 //! ```
 //!
-//! ### Link configuration
-//!
-//! Make sure to include the rom functions for your target:
-//!
-//! ```toml
-//! # .cargo/config.toml
-//! rustflags = [
-//!     "-C", "link-arg=-Tlinkall.x",
-//!     "-C", "link-arg=-Trom_functions.x",
-//! ]
-//! ```
-//!
-//! At the time of writing, you will already have the `linkall` flag if you used
-//! `cargo generate`. Generating from a template does not include the
-//! `rom_functions` flag.
-//!
 //! ### Optimization Level
 //!
 //! It is necessary to build with optimization level 2 or 3 since otherwise, it

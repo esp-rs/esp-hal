@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- No need to manually add `rom_functions.x` to the linker scripts (#2339)
+
 ### Fixed
 
 ### Removed

@@ -88,6 +88,7 @@ bluetooth = []
 usb-otg = ["dep:embassy-usb-driver", "dep:embassy-usb-synopsys-otg", "dep:esp-synopsys-usb-otg", "dep:usb-device"]
 
 __esp_hal_embassy = []
+__include_rom_functions = []
 
 ## Enable debug features in the HAL (used for development).
 debug = [
@@ -151,9 +152,6 @@ octal-psram = []
 
 # This feature is intended for testing; you probably don't want to enable it:
 ci = ["defmt", "bluetooth"]
-
-# Internal feature set by esp-wifi
-__include_rom_functions = []
 
 [lints.clippy]
 mixed_attributes_style = "allow"
