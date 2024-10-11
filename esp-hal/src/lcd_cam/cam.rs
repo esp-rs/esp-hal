@@ -79,8 +79,6 @@ use crate::{
         interconnect::{InputConnection, OutputConnection},
         InputSignal,
         OutputSignal,
-        PeripheralInput,
-        PeripheralOutput,
         Pull,
     },
     lcd_cam::{cam::private::RxPins, private::calculate_clkm, BitOrder, ByteOrder},

@@ -11,7 +11,7 @@ use core::marker::PhantomData;
 
 pub use crate::peripherals::pcnt::unit::conf0::{CTRL_MODE as CtrlMode, EDGE_MODE as EdgeMode};
 use crate::{
-    gpio::{interconnect::InputConnection, InputSignal, PeripheralInput},
+    gpio::{interconnect::InputConnection, InputSignal},
     peripheral::Peripheral,
 };
 

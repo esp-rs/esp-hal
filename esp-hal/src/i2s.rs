@@ -103,7 +103,7 @@ use crate::{
         Tx,
         WriteBuffer,
     },
-    gpio::{interconnect::OutputConnection, PeripheralOutput},
+    gpio::interconnect::OutputConnection,
     interrupt::InterruptHandler,
     into_ref,
     peripheral::Peripheral,
@@ -459,7 +459,10 @@ where
     }
 
     /// Configures the I2S peripheral to use a master clock (MCLK) output pin.
-    pub fn with_mclk(self, pin: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd) -> Self {
+    pub fn with_mclk(
+        self,
+        pin: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+    ) -> Self {
         into_ref!(pin);
         let mut pin = pin.map_into();
         pin.set_to_push_pull_output(crate::private::Internal);
@@ -833,8 +836,6 @@ mod private {
             interconnect::{InputConnection, OutputConnection},
             InputSignal,
             OutputSignal,
-            PeripheralInput,
-            PeripheralOutput,
         },
         interrupt::InterruptHandler,
         into_ref,
