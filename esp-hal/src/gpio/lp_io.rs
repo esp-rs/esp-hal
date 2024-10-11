@@ -257,24 +257,6 @@ macro_rules! lp_gpio {
                     }
                 }
             )+
-
-            #[doc(hidden)]
-            #[macro_export]
-            macro_rules! handle_rtcio {
-                ($this:expr, $inner:ident, $code:tt) => {
-                    match $this {
-                        $(
-                            AnyPinInner::[<Gpio $gpionum >]($inner) => {
-                                $code
-                            },
-                        )+
-
-                        _ => panic!("Unsupported")
-                    }
-                }
-            }
-            pub(crate) use handle_rtcio;
-            pub(crate) use handle_rtcio as handle_rtcio_with_resistors;
         }
     }
 }

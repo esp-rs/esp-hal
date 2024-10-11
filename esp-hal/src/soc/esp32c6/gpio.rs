@@ -285,14 +285,14 @@ pub enum OutputSignal {
 }
 
 crate::gpio! {
-    (0, 0, [Input, Output, Analog])
-    (1, 0, [Input, Output, Analog])
-    (2, 0, [Input, Output, Analog] (2 => FSPIQ) (2 => FSPIQ))
-    (3, 0, [Input, Output, Analog])
-    (4, 0, [Input, Output, Analog] (2 => FSPIHD) (0 => USB_JTAG_TMS 2 => FSPIHD))
-    (5, 0, [Input, Output, Analog] (2 => FSPIWP) (0 => USB_JTAG_TDI 2 => FSPIWP))
-    (6, 0, [Input, Output, Analog] (2 => FSPICLK) (0 => USB_JTAG_TCK 2 => FSPICLK_MUX))
-    (7, 0, [Input, Output, Analog] (2 => FSPID) (0 => USB_JTAG_TDO 2 => FSPID))
+    (0, 0, [Input, Output, Analog, RtcIo])
+    (1, 0, [Input, Output, Analog, RtcIo])
+    (2, 0, [Input, Output, Analog, RtcIo] (2 => FSPIQ) (2 => FSPIQ))
+    (3, 0, [Input, Output, Analog, RtcIo])
+    (4, 0, [Input, Output, Analog, RtcIo] (2 => FSPIHD) (0 => USB_JTAG_TMS 2 => FSPIHD))
+    (5, 0, [Input, Output, Analog, RtcIo] (2 => FSPIWP) (0 => USB_JTAG_TDI 2 => FSPIWP))
+    (6, 0, [Input, Output, Analog, RtcIo] (2 => FSPICLK) (0 => USB_JTAG_TCK 2 => FSPICLK_MUX))
+    (7, 0, [Input, Output, Analog, RtcIo] (2 => FSPID) (0 => USB_JTAG_TDO 2 => FSPID))
     (8, 0, [Input, Output])
     (9, 0, [Input, Output])
     (10, 0, [Input, Output])

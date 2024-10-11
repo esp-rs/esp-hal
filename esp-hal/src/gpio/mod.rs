@@ -873,14 +873,29 @@ fn on_pin_irq(pin_nr: u8) {
 #[macro_export]
 macro_rules! if_output_pin {
     // Base case: not an Output pin, substitute the else branch
-    ({ $($then:tt)* } else { $($else:tt)* } ) => { $($else)* };
+    ({ $($then:tt)* } else { $($else:tt)* }) => { $($else)* };
 
-    // First is an output pin, skip checking and substitute the then branch
-    (Output $(, $other:ident)* { $($then:tt)* } else { $($else:tt)* } ) => { $($then)* };
+    // First is an Output pin, skip checking and substitute the then branch
+    (Output $(, $other:ident)* { $($then:tt)* } else { $($else:tt)* }) => { $($then)* };
 
-    // First is not an output pin, check the rest
-    ($not_output:ident $(, $other:ident)* { $($then:tt)* } else { $($else:tt)* } ) => {
+    // First is not an Output pin, check the rest
+    ($not:ident $(, $other:ident)* { $($then:tt)* } else { $($else:tt)* }) => {
         $crate::if_output_pin!($($other),* { $($then)* } else { $($else)* })
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! if_rtcio_pin {
+    // Base case: not an RtcIo pin, substitute the else branch
+    ({ $($then:tt)* } else { $($else:tt)* }) => { $($else)* };
+
+    // First is an RtcIo pin, skip checking and substitute the then branch
+    (RtcIo $(, $other:ident)* { $($then:tt)* } else { $($else:tt)* }) => { $($then)* };
+
+    // First is not an RtcIo pin, check the rest
+    ($not:ident $(, $other:ident)* { $($then:tt)* } else { $($else:tt)* }) => {
+        $crate::if_rtcio_pin!($($other),* { $($then)* } else { $($else)* })
     };
 }
 
@@ -917,6 +932,7 @@ macro_rules! io_type {
             }
         }
     };
+    (RtcIo, $gpionum:literal) => {};
 }
 
 #[doc(hidden)]
@@ -1059,8 +1075,50 @@ macro_rules! gpio {
                 }
             }
 
+            #[doc(hidden)]
+            #[macro_export]
+            macro_rules! handle_rtcio {
+                ($this:expr, $inner:ident, $code:tt) => {
+                    match $this {
+                        $(
+                            AnyPinInner::[<Gpio $gpionum >]($inner) => $crate::if_rtcio_pin!($($type),* {
+                                $code
+                            } else {{
+                                let _ = $inner;
+                                panic!("Unsupported")
+                            }}),
+                        )+
+                    }
+                }
+            }
+
+            #[doc(hidden)]
+            #[macro_export]
+            macro_rules! handle_rtcio_with_resistors {
+                ($this:expr, $inner:ident, $code:tt) => {
+                    match $this {
+                        $(
+                            AnyPinInner::[<Gpio $gpionum >]($inner) => $crate::if_rtcio_pin!($($type),* {
+                                $crate::if_output_pin!($($type),* {
+                                    $code
+                                } else {{
+                                    let _ = $inner;
+                                    panic!("Unsupported")
+                                }})
+                            } else {{
+                                let _ = $inner;
+                                panic!("Unsupported")
+                            }}),
+                        )+
+                    }
+                }
+            }
+
             pub(crate) use handle_gpio_output;
             pub(crate) use handle_gpio_input;
+
+            pub(crate) use handle_rtcio;
+            pub(crate) use handle_rtcio_with_resistors;
         }
     };
 }
@@ -1110,25 +1168,6 @@ macro_rules! rtc_pins {
 
     ( $( $pin_num:expr )+ ) => {
         $( $crate::rtc_pins!($pin_num); )+
-
-        #[doc(hidden)]
-        #[macro_export]
-        macro_rules! handle_rtcio {
-            ($this:expr, $inner:ident, $code:tt) => {
-                match $this {
-                    $(
-                        paste::paste! { AnyPinInner::[<Gpio $pin_num >]($inner) } => {
-                            $code
-                        },
-                    )+
-
-                    _ => panic!("Unsupported")
-                }
-            }
-        }
-
-        pub(crate) use handle_rtcio;
-        pub(crate) use handle_rtcio as handle_rtcio_with_resistors;
     };
 }
 
@@ -1292,45 +1331,6 @@ macro_rules! rtcio_analog {
                 pin.rtcio_pulldown(pull_down);
             }
         }
-
-        #[doc(hidden)]
-        #[macro_export]
-        macro_rules! handle_rtcio {
-            ($this:expr, $inner:ident, $code:tt) => {
-                match $this {
-                    $(
-                        paste::paste! { AnyPinInner::[<Gpio $pin_num >]($inner) } => {
-                            $code
-                        },
-                    )+
-
-                    _ => panic!("Unsupported")
-                }
-            }
-        }
-
-        #[doc(hidden)]
-        #[macro_export]
-        macro_rules! handle_rtcio_with_resistors {
-            (@ignore $a:tt) => {};
-            ($this:expr, $inner:ident, $code:tt) => {
-                match $this {
-                    $(
-                        $(
-                            paste::paste! { AnyPinInner::[<Gpio $pin_num >]($inner) } => {
-                                // FIXME: replace with $(ignore($rue)) once stable
-                                handle_rtcio_with_resistors!(@ignore $rue);
-                                $code
-                            },
-                        )?
-                    )+
-
-                    _ => panic!("Unsupported")
-                }
-            }
-        }
-        pub(crate) use handle_rtcio;
-        pub(crate) use handle_rtcio_with_resistors;
     };
 }
 
