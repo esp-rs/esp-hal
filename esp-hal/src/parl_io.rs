@@ -49,11 +49,7 @@ use crate::{
         Tx,
         WriteBuffer,
     },
-    gpio::{
-        interconnect::{AnyInputSignal, AnyOutputSignal},
-        PeripheralInput,
-        PeripheralOutput,
-    },
+    gpio::interconnect::{InputConnection, OutputConnection},
     interrupt::InterruptHandler,
     peripheral::{self, Peripheral},
     peripherals::{self, PARL_IO},
@@ -282,11 +278,11 @@ pub fn no_clk_pin() -> &'static mut NoClkPin {
 
 /// Wraps a GPIO pin which will be used as the clock output signal
 pub struct ClkOutPin<'d> {
-    pin: PeripheralRef<'d, AnyOutputSignal>,
+    pin: PeripheralRef<'d, OutputConnection>,
 }
 impl<'d> ClkOutPin<'d> {
     /// Create a ClkOutPin
-    pub fn new(pin: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd) -> Self {
+    pub fn new(pin: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd) -> Self {
         crate::into_ref!(pin);
         Self {
             pin: pin.map_into(),
@@ -305,11 +301,11 @@ impl TxClkPin for ClkOutPin<'_> {
 
 /// Wraps a GPIO pin which will be used as the TX clock input signal
 pub struct ClkInPin<'d> {
-    pin: PeripheralRef<'d, AnyInputSignal>,
+    pin: PeripheralRef<'d, InputConnection>,
 }
 impl<'d> ClkInPin<'d> {
     /// Create a new ClkInPin
-    pub fn new(pin: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd) -> Self {
+    pub fn new(pin: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd) -> Self {
         crate::into_ref!(pin);
         Self {
             pin: pin.map_into(),
@@ -333,13 +329,13 @@ impl TxClkPin for ClkInPin<'_> {
 
 /// Wraps a GPIO pin which will be used as the RX clock input signal
 pub struct RxClkInPin<'d> {
-    pin: PeripheralRef<'d, AnyInputSignal>,
+    pin: PeripheralRef<'d, InputConnection>,
     sample_edge: SampleEdge,
 }
 impl<'d> RxClkInPin<'d> {
     /// Create a new RxClkInPin
     pub fn new(
-        pin: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
         sample_edge: SampleEdge,
     ) -> Self {
         crate::into_ref!(pin);
@@ -372,7 +368,7 @@ where
     P: NotContainsValidSignalPin + TxPins + ConfigurePins,
 {
     tx_pins: P,
-    valid_pin: PeripheralRef<'d, AnyOutputSignal>,
+    valid_pin: PeripheralRef<'d, OutputConnection>,
 }
 
 impl<'d, P> TxPinConfigWithValidPin<'d, P>
@@ -382,7 +378,7 @@ where
     /// Create a [TxPinConfigWithValidPin]
     pub fn new(
         tx_pins: P,
-        valid_pin: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
+        valid_pin: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
     ) -> Self {
         crate::into_ref!(valid_pin);
         Self {
@@ -456,7 +452,7 @@ macro_rules! tx_pins {
             #[doc = "bit output mode"]
             pub struct $name<'d> {
                 $(
-                    [< pin_ $pin:lower >] : PeripheralRef<'d, AnyOutputSignal>,
+                    [< pin_ $pin:lower >] : PeripheralRef<'d, OutputConnection>,
                 )+
             }
 
@@ -466,7 +462,7 @@ macro_rules! tx_pins {
                 #[allow(clippy::too_many_arguments)]
                 pub fn new(
                     $(
-                        [< pin_ $pin:lower >] : impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
+                        [< pin_ $pin:lower >] : impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
                     )+
                 ) -> Self {
                     crate::into_ref!($( [< pin_ $pin:lower >] ),+);
@@ -560,7 +556,7 @@ where
     P: NotContainsValidSignalPin + RxPins + ConfigurePins,
 {
     rx_pins: P,
-    valid_pin: PeripheralRef<'d, AnyInputSignal>,
+    valid_pin: PeripheralRef<'d, InputConnection>,
     enable_mode: EnableMode,
     eof_mode: EofMode,
 }
@@ -572,7 +568,7 @@ where
     /// Create a new [RxPinConfigWithValidPin]
     pub fn new(
         rx_pins: P,
-        valid_pin: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        valid_pin: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
         enable_mode: EnableMode,
         eof_mode: EofMode,
     ) -> Self {
@@ -676,7 +672,7 @@ macro_rules! rx_pins {
             #[doc = "bit input mode"]
             pub struct $name<'d> {
                 $(
-                    [< pin_ $pin:lower >] : PeripheralRef<'d, AnyInputSignal>,
+                    [< pin_ $pin:lower >] : PeripheralRef<'d, InputConnection>,
                 )+
             }
 
@@ -686,7 +682,7 @@ macro_rules! rx_pins {
                 #[allow(clippy::too_many_arguments)]
                 pub fn new(
                     $(
-                        [< pin_ $pin:lower >] : impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+                        [< pin_ $pin:lower >] : impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
                     )+
                 ) -> Self {
                     crate::into_ref!($( [< pin_ $pin:lower >] ),+);

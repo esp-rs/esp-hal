@@ -367,9 +367,9 @@ pub trait Pin: Sealed {
 }
 
 #[doc(hidden)]
-pub trait IsInputPin: Pin {}
+pub trait IsInputPin: Pin + Into<AnyPin> + 'static {}
 #[doc(hidden)]
-pub trait IsOutputPin: Pin {}
+pub trait IsOutputPin: Pin + Into<AnyPin> + 'static {}
 
 /// Trait implemented by pins which can be used as inputs.
 pub trait InputPin: IsInputPin + Into<AnyPin> + 'static {

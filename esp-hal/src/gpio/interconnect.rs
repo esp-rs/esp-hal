@@ -377,7 +377,7 @@ impl OutputSignal {
     }
 }
 
-enum AnyOutputSignalInner {
+enum OutputConnectionInner {
     Output(OutputSignal),
     Dummy(NoPin),
 }
@@ -386,7 +386,7 @@ enum AnyOutputSignalInner {
 ///
 /// Peripheral drivers are supposed to take this and [`InputConnection`] as
 /// arguments instead of pin types.
-pub struct OutputConnection(AnyOutputSignalInner);
+pub struct OutputConnection(OutputConnectionInner);
 
 impl Sealed for OutputConnection {}
 
@@ -395,27 +395,29 @@ impl Peripheral for OutputConnection {
 
     unsafe fn clone_unchecked(&self) -> Self::P {
         match self {
-            Self(AnyOutputSignalInner::Output(signal)) => Self::from(signal.clone_unchecked()),
-            Self(AnyOutputSignalInner::Dummy(pin)) => Self::from(*pin),
+            Self(OutputConnectionInner::Output(signal)) => Self::from(signal.clone_unchecked()),
+            Self(OutputConnectionInner::Dummy(pin)) => Self::from(*pin),
         }
     }
 }
 
 impl From<NoPin> for OutputConnection {
     fn from(pin: NoPin) -> Self {
-        Self(AnyOutputSignalInner::Dummy(pin))
+        Self(OutputConnectionInner::Dummy(pin))
     }
 }
 
 impl From<AnyPin> for OutputConnection {
     fn from(input: AnyPin) -> Self {
-        Self(AnyOutputSignalInner::Output(input.into_peripheral_output()))
+        Self(OutputConnectionInner::Output(
+            input.into_peripheral_output(),
+        ))
     }
 }
 
 impl From<OutputSignal> for OutputConnection {
     fn from(signal: OutputSignal) -> Self {
-        Self(AnyOutputSignalInner::Output(signal))
+        Self(OutputConnectionInner::Output(signal))
     }
 }
 
@@ -424,7 +426,7 @@ where
     GpioPin<GPIONUM>: OutputPin,
 {
     fn from(pin: GpioPin<GPIONUM>) -> Self {
-        Self(AnyOutputSignalInner::Output(pin.into_peripheral_output()))
+        Self(OutputConnectionInner::Output(pin.into_peripheral_output()))
     }
 }
 
@@ -432,8 +434,8 @@ impl OutputConnection {
     delegate::delegate! {
         #[doc(hidden)]
         to match &self.0 {
-            AnyOutputSignalInner::Output(pin) => pin,
-            AnyOutputSignalInner::Dummy(pin) => pin,
+            OutputConnectionInner::Output(pin) => pin,
+            OutputConnectionInner::Dummy(pin) => pin,
         } {
             pub fn pull_direction(&self, pull: Pull, _internal: private::Internal);
             pub fn init_input(&self, pull: Pull, _internal: private::Internal);
@@ -446,8 +448,8 @@ impl OutputConnection {
 
         #[doc(hidden)]
         to match &mut self.0 {
-            AnyOutputSignalInner::Output(pin) => pin,
-            AnyOutputSignalInner::Dummy(pin) => pin,
+            OutputConnectionInner::Output(pin) => pin,
+            OutputConnectionInner::Dummy(pin) => pin,
         } {
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
             pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
@@ -470,7 +472,7 @@ impl OutputConnection {
 }
 
 #[derive(Clone)]
-enum AnyInputSignalInner {
+enum InputConnectionInner {
     Input(InputSignal),
     Constant(Level),
     Dummy(NoPin),
@@ -481,7 +483,7 @@ enum AnyInputSignalInner {
 /// Peripheral drivers are supposed to take this and [`OutputConnection`] as
 /// arguments instead of pin types.
 #[derive(Clone)]
-pub struct InputConnection(AnyInputSignalInner);
+pub struct InputConnection(InputConnectionInner);
 
 impl Sealed for InputConnection {}
 
@@ -495,25 +497,25 @@ impl Peripheral for InputConnection {
 
 impl From<InputSignal> for InputConnection {
     fn from(input: InputSignal) -> Self {
-        Self(AnyInputSignalInner::Input(input))
+        Self(InputConnectionInner::Input(input))
     }
 }
 
 impl From<Level> for InputConnection {
     fn from(level: Level) -> Self {
-        Self(AnyInputSignalInner::Constant(level))
+        Self(InputConnectionInner::Constant(level))
     }
 }
 
 impl From<NoPin> for InputConnection {
     fn from(pin: NoPin) -> Self {
-        Self(AnyInputSignalInner::Dummy(pin))
+        Self(InputConnectionInner::Dummy(pin))
     }
 }
 
 impl From<AnyPin> for InputConnection {
     fn from(input: AnyPin) -> Self {
-        Self(AnyInputSignalInner::Input(input.peripheral_input()))
+        Self(InputConnectionInner::Input(input.peripheral_input()))
     }
 }
 
@@ -522,7 +524,7 @@ where
     GpioPin<GPIONUM>: InputPin,
 {
     fn from(pin: GpioPin<GPIONUM>) -> Self {
-        Self(AnyInputSignalInner::Input(pin.peripheral_input()))
+        Self(InputConnectionInner::Input(pin.peripheral_input()))
     }
 }
 
@@ -530,9 +532,9 @@ impl InputConnection {
     delegate::delegate! {
         #[doc(hidden)]
         to match &self.0 {
-            AnyInputSignalInner::Input(pin) => pin,
-            AnyInputSignalInner::Constant(level) => level,
-            AnyInputSignalInner::Dummy(pin) => pin,
+            InputConnectionInner::Input(pin) => pin,
+            InputConnectionInner::Constant(level) => level,
+            InputConnectionInner::Dummy(pin) => pin,
         } {
             pub fn pull_direction(&self, pull: Pull, _internal: private::Internal);
             pub fn init_input(&self, pull: Pull, _internal: private::Internal);
@@ -542,9 +544,9 @@ impl InputConnection {
 
         #[doc(hidden)]
         to match &mut self.0 {
-            AnyInputSignalInner::Input(pin) => pin,
-            AnyInputSignalInner::Constant(level) => level,
-            AnyInputSignalInner::Dummy(pin) => pin,
+            InputConnectionInner::Input(pin) => pin,
+            InputConnectionInner::Constant(level) => level,
+            InputConnectionInner::Dummy(pin) => pin,
         } {
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
             pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
