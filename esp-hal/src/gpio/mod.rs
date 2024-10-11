@@ -201,6 +201,8 @@ pub enum Pull {
 }
 
 /// Drive strength (values are approximates)
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DriveStrength {
     /// Drive strength of approximately 5mA.
     I5mA  = 0,
@@ -219,7 +221,8 @@ pub enum DriveStrength {
 /// The `AlternateFunction` enum allows to select one of several functions that
 /// a pin can perform, rather than using it as a general-purpose input or
 /// output.
-#[derive(PartialEq)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum AlternateFunction {
     /// Alternate function 0.
     Function0 = 0,
@@ -252,7 +255,8 @@ impl TryFrom<usize> for AlternateFunction {
 }
 
 /// RTC function
-#[derive(PartialEq)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum RtcFunction {
     /// RTC mode.
     Rtc     = 0,
