@@ -37,7 +37,7 @@ impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
     /// Create a new output pin for use by the low-power core
     pub fn new<P>(_pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
     where
-        P: super::OutputPin + RtcPin,
+        P: super::OutputPin + super::RtcPin,
     {
         crate::gpio::lp_io::init_low_power_pin(PIN);
 
@@ -72,7 +72,7 @@ impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
     /// Create a new input pin for use by the low-power core
     pub fn new<P>(_pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
     where
-        P: super::InputPin + RtcPin,
+        P: super::InputPin + super::RtcPin,
     {
         crate::gpio::lp_io::init_low_power_pin(PIN);
 
@@ -110,7 +110,7 @@ impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     /// Create a new output pin for use by the low-power core
     pub fn new<P>(_pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
     where
-        P: super::InputPin + super::OutputPin + RtcPin,
+        P: super::InputPin + super::OutputPin + super::RtcPin,
     {
         crate::gpio::lp_io::init_low_power_pin(PIN);
 
@@ -278,7 +278,3 @@ macro_rules! lp_gpio {
         }
     }
 }
-
-pub(crate) use lp_gpio;
-
-use super::RtcPin;
