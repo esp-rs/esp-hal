@@ -887,8 +887,12 @@ macro_rules! io_types {
     };
     (InputOnlyAnalog, $gpionum:literal) => {
         impl $crate::gpio::InputPin for GpioPin<$gpionum> {}
-        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
-        impl $crate::gpio::AnalogPin for GpioPin<$gpionum> {}
+        impl $crate::gpio::AnalogPin for GpioPin<$gpionum> {
+            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+            fn set_analog(&self, internal: $crate::private::Internal) {
+                self.set_as_analog(internal)
+            }
+        }
     };
     (InputOutput, $gpionum:literal) => {
         impl $crate::gpio::InputPin for GpioPin<$gpionum> {}
@@ -897,14 +901,36 @@ macro_rules! io_types {
     (InputOutputAnalog, $gpionum:literal) => {
         impl $crate::gpio::InputPin for GpioPin<$gpionum> {}
         impl $crate::gpio::OutputPin for GpioPin<$gpionum> {}
-        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
-        impl $crate::gpio::AnalogPin for GpioPin<$gpionum> {}
+        impl $crate::gpio::AnalogPin for GpioPin<$gpionum> {
+            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+            fn set_analog(&self, internal: $crate::private::Internal) {
+                self.set_as_analog(internal)
+            }
+        }
     };
     (InputOutputAnalogTouch, $gpionum:literal) => {
         impl $crate::gpio::InputPin for GpioPin<$gpionum> {}
         impl $crate::gpio::OutputPin for GpioPin<$gpionum> {}
-        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
-        impl $crate::gpio::AnalogPin for GpioPin<$gpionum> {}
+        impl $crate::gpio::AnalogPin for GpioPin<$gpionum> {
+            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+            fn set_analog(&self, internal: $crate::private::Internal) {
+                self.set_as_analog(internal)
+            }
+        }
+        impl $crate::gpio::TouchPin for GpioPin<$gpionum> {
+            fn set_touch(&self, internal: $crate::private::Internal) {
+                self.set_touch_impl(internal)
+            }
+            fn get_touch_measurement(&self, internal: $crate::private::Internal) -> u16 {
+                self.get_touch_measurement_impl(internal)
+            }
+            fn get_touch_nr(&self, internal: $crate::private::Internal) -> u8 {
+                self.get_touch_nr_impl(internal)
+            }
+            fn set_threshold(&self, threshold: u16, internal: $crate::private::Internal) {
+                self.set_threshold_impl(threshold, internal)
+            }
+        }
     };
 }
 
@@ -1144,9 +1170,9 @@ macro_rules! rtcio_analog {
 
     (@analog_pin $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat $(, $rue:literal)?) => {
         #[cfg(any(adc, dac))]
-        impl $crate::gpio::AnalogPin for GpioPin<$pin_num> {
+        impl GpioPin<$pin_num> {
             /// Configures the pin for analog mode.
-            fn set_analog(&self, _: $crate::private::Internal) {
+            fn set_as_analog(&self, _: $crate::private::Internal) {
                 let rtcio = unsafe{ &*$crate::peripherals::RTC_IO::ptr() };
 
                 #[cfg(esp32s2)]
@@ -1360,8 +1386,8 @@ macro_rules! touch {
         )+
     ) => {
         $(
-        impl $crate::gpio::TouchPin for GpioPin<$pin_num> {
-            fn set_touch(&self, _: $crate::private::Internal) {
+        impl GpioPin<$pin_num> {
+            fn set_touch_impl(&self, _: $crate::private::Internal) {
                 use $crate::peripherals::{GPIO, RTC_IO, SENS};
 
                 let gpio = unsafe { &*GPIO::ptr() };
@@ -1394,7 +1420,7 @@ macro_rules! touch {
                 }
             }
 
-            fn get_touch_measurement(&self, _: $crate::private::Internal) -> u16 {
+            fn get_touch_measurement_impl(&self, _: $crate::private::Internal) -> u16 {
                 paste::paste! {
                     unsafe { &* $crate::peripherals::SENS::ptr() }
                         . $touch_out_reg ()
@@ -1404,11 +1430,11 @@ macro_rules! touch {
                 }
             }
 
-            fn get_touch_nr(&self, _: $crate::private::Internal) -> u8 {
+            fn get_touch_nr_impl(&self, _: $crate::private::Internal) -> u8 {
                 $touch_num
             }
 
-            fn set_threshold(&self, threshold: u16, _: $crate::private::Internal) {
+            fn set_threshold_impl(&self, threshold: u16, _: $crate::private::Internal) {
                 paste::paste! {
                     unsafe { &* $crate::peripherals::SENS::ptr() }
                         . $touch_thres_reg ()
