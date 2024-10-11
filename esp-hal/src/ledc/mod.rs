@@ -65,7 +65,7 @@ use self::{
     timer::{Timer, TimerSpeed},
 };
 use crate::{
-    gpio::OutputPin,
+    gpio::interconnect::AnyOutputSignal,
     peripheral::{Peripheral, PeripheralRef},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
 };
@@ -165,11 +165,11 @@ impl<'d> Ledc<'d> {
     }
 
     /// Return a new channel
-    pub fn get_channel<S: TimerSpeed, O: OutputPin>(
+    pub fn get_channel<S: TimerSpeed>(
         &self,
         number: channel::Number,
-        output_pin: impl Peripheral<P = O> + 'd,
-    ) -> Channel<'d, S, O> {
+        output_pin: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
+    ) -> Channel<'d, S> {
         Channel::new(number, output_pin)
     }
 }

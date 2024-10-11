@@ -11,7 +11,7 @@
 
 use super::timer::{TimerIFace, TimerSpeed};
 use crate::{
-    gpio::{OutputSignal, PeripheralOutput},
+    gpio::{interconnect::AnyOutputSignal, OutputSignal, PeripheralOutput},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::ledc::RegisterBlock,
 };
@@ -84,9 +84,9 @@ pub mod config {
 
     /// Channel configuration
     #[derive(Copy, Clone)]
-    pub struct Config<'a, S: TimerSpeed> {
+    pub struct Config<'d, S: TimerSpeed> {
         /// A reference to the timer associated with this channel.
-        pub timer: &'a dyn TimerIFace<S>,
+        pub timer: &'d dyn TimerIFace<S>,
         /// The duty cycle percentage (0-100).
         pub duty_pct: u8,
         /// The pin configuration (PushPull or OpenDrain).
@@ -95,12 +95,9 @@ pub mod config {
 }
 
 /// Channel interface
-pub trait ChannelIFace<'a, S: TimerSpeed + 'a, O: PeripheralOutput + 'a>
-where
-    Channel<'a, S, O>: ChannelHW<O>,
-{
+pub trait ChannelIFace<'d, S: TimerSpeed> {
     /// Configure channel
-    fn configure(&mut self, config: config::Config<'a, S>) -> Result<(), Error>;
+    fn configure(&mut self, config: config::Config<'d, S>) -> Result<(), Error>;
 
     /// Set channel duty HW
     fn set_duty(&self, duty_pct: u8) -> Result<(), Error>;
@@ -118,7 +115,7 @@ where
 }
 
 /// Channel HW interface
-pub trait ChannelHW<O: PeripheralOutput> {
+pub trait ChannelHW {
     /// Configure Channel HW except for the duty which is set via
     /// [`Self::set_duty_hw`].
     fn configure_hw(&mut self) -> Result<(), Error>;
@@ -144,33 +141,36 @@ pub trait ChannelHW<O: PeripheralOutput> {
 }
 
 /// Channel struct
-pub struct Channel<'a, S: TimerSpeed, O: PeripheralOutput> {
-    ledc: &'a RegisterBlock,
-    timer: Option<&'a dyn TimerIFace<S>>,
+pub struct Channel<'d, S: TimerSpeed> {
+    ledc: &'d RegisterBlock,
+    timer: Option<&'d dyn TimerIFace<S>>,
     number: Number,
-    output_pin: PeripheralRef<'a, O>,
+    output_pin: PeripheralRef<'d, AnyOutputSignal>,
 }
 
-impl<'a, S: TimerSpeed, O: PeripheralOutput> Channel<'a, S, O> {
+impl<'d, S: TimerSpeed> Channel<'d, S> {
     /// Return a new channel
-    pub fn new(number: Number, output_pin: impl Peripheral<P = O> + 'a) -> Self {
+    pub fn new(
+        number: Number,
+        output_pin: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
+    ) -> Self {
         crate::into_ref!(output_pin);
         let ledc = unsafe { &*crate::peripherals::LEDC::ptr() };
         Channel {
             ledc,
             timer: None,
             number,
-            output_pin,
+            output_pin: output_pin.map_into(),
         }
     }
 }
 
-impl<'a, S: TimerSpeed, O: PeripheralOutput> ChannelIFace<'a, S, O> for Channel<'a, S, O>
+impl<'d, S: TimerSpeed> ChannelIFace<'d, S> for Channel<'d, S>
 where
-    Channel<'a, S, O>: ChannelHW<O>,
+    Self: ChannelHW,
 {
     /// Configure channel
-    fn configure(&mut self, config: config::Config<'a, S>) -> Result<(), Error> {
+    fn configure(&mut self, config: config::Config<'d, S>) -> Result<(), Error> {
         self.timer = Some(config.timer);
 
         self.set_duty(config.duty_pct)?;
@@ -298,7 +298,7 @@ mod ehal1 {
     use embedded_hal::pwm::{self, ErrorKind, ErrorType, SetDutyCycle};
 
     use super::{Channel, ChannelHW, Error};
-    use crate::{gpio::OutputPin, ledc::timer::TimerSpeed};
+    use crate::ledc::timer::TimerSpeed;
 
     impl pwm::Error for Error {
         fn kind(&self) -> pwm::ErrorKind {
@@ -306,13 +306,13 @@ mod ehal1 {
         }
     }
 
-    impl<'a, S: TimerSpeed, O: OutputPin> ErrorType for Channel<'a, S, O> {
+    impl<S: TimerSpeed> ErrorType for Channel<'_, S> {
         type Error = Error;
     }
 
-    impl<'a, S: TimerSpeed, O: OutputPin> SetDutyCycle for Channel<'a, S, O>
+    impl<S: TimerSpeed> SetDutyCycle for Channel<'_, S>
     where
-        Channel<'a, S, O>: ChannelHW<O>,
+        Self: ChannelHW,
     {
         fn max_duty_cycle(&self) -> u16 {
             let duty_exp;
@@ -337,7 +337,7 @@ mod ehal1 {
     }
 }
 
-impl<'a, O: PeripheralOutput, S: crate::ledc::timer::TimerSpeed> Channel<'a, S, O> {
+impl<S: crate::ledc::timer::TimerSpeed> Channel<'_, S> {
     #[cfg(esp32)]
     fn set_channel(&mut self, timer_number: u8) {
         if S::IS_HS {
@@ -535,9 +535,8 @@ impl<'a, O: PeripheralOutput, S: crate::ledc::timer::TimerSpeed> Channel<'a, S, 
     }
 }
 
-impl<'a, O, S> ChannelHW<O> for Channel<'a, S, O>
+impl<S> ChannelHW for Channel<'_, S>
 where
-    O: PeripheralOutput,
     S: crate::ledc::timer::TimerSpeed,
 {
     /// Configure Channel HW
