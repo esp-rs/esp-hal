@@ -331,6 +331,69 @@ impl PeripheralOutput for OutputSignal {
     }
 }
 
+enum AnyOutputSignalInner {
+    Output(OutputSignal),
+    Dummy(NoPin),
+}
+
+/// A type-erased output signal.
+pub struct AnyOutputSignal(AnyOutputSignalInner);
+
+impl From<NoPin> for AnyOutputSignal {
+    fn from(pin: NoPin) -> Self {
+        Self(AnyOutputSignalInner::Dummy(pin))
+    }
+}
+
+impl From<AnyPin> for AnyOutputSignal {
+    fn from(input: AnyPin) -> Self {
+        Self(AnyOutputSignalInner::Output(input.into_peripheral_output()))
+    }
+}
+
+impl Sealed for AnyOutputSignal {}
+impl PeripheralSignal for AnyOutputSignal {
+    delegate::delegate! {
+        to match &self.0 {
+            AnyOutputSignalInner::Output(pin) => pin,
+            AnyOutputSignalInner::Dummy(pin) => pin,
+        } {
+            fn pull_direction(&self, pull: Pull, _internal: private::Internal);
+        }
+    }
+}
+
+impl PeripheralOutput for AnyOutputSignal {
+    delegate::delegate! {
+        to match &mut self.0 {
+            AnyOutputSignalInner::Output(pin) => pin,
+            AnyOutputSignalInner::Dummy(pin) => pin,
+        } {
+            fn set_to_open_drain_output(&mut self, _internal: private::Internal);
+            fn set_to_push_pull_output(&mut self, _internal: private::Internal);
+            fn enable_output(&mut self, on: bool, _internal: private::Internal);
+            fn set_output_high(&mut self, on: bool, _internal: private::Internal);
+            fn set_drive_strength(&mut self, strength: gpio::DriveStrength, _internal: private::Internal);
+            fn enable_open_drain(&mut self, on: bool, _internal: private::Internal);
+            fn enable_output_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
+            fn internal_pull_up_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
+            fn internal_pull_down_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
+            fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal, _internal: private::Internal);
+            fn disconnect_from_peripheral_output(&mut self, signal: gpio::OutputSignal, _internal: private::Internal);
+        }
+    }
+
+    delegate::delegate! {
+        to match &self.0 {
+            AnyOutputSignalInner::Output(pin) => pin,
+            AnyOutputSignalInner::Dummy(pin) => pin,
+        } {
+            fn is_set_high(&self, _internal: private::Internal) -> bool;
+            fn output_signals(&self, _internal: private::Internal) -> [Option<gpio::OutputSignal>; 6];
+        }
+    }
+}
+
 #[derive(Clone)]
 enum AnyInputSignalInner {
     Input(InputSignal),

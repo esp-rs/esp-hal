@@ -911,33 +911,42 @@ mod private {
             I2sRx::new(self.rx_channel, self.descriptors)
         }
 
-        pub fn with_bclk<P>(self, pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
-        where
-            P: PeripheralOutput,
-        {
+        pub fn with_bclk(
+            self,
+            pin: impl crate::peripheral::Peripheral<
+                P = impl Into<crate::gpio::interconnect::AnyOutputSignal>,
+            >,
+        ) -> Self {
             into_ref!(pin);
+            let mut pin = pin.map_into();
             pin.set_to_push_pull_output(private::Internal);
             pin.connect_peripheral_to_output(T::bclk_rx_signal(), private::Internal);
 
             self
         }
 
-        pub fn with_ws<P>(self, pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
-        where
-            P: PeripheralOutput,
-        {
+        pub fn with_ws(
+            self,
+            pin: impl crate::peripheral::Peripheral<
+                P = impl Into<crate::gpio::interconnect::AnyOutputSignal>,
+            >,
+        ) -> Self {
             into_ref!(pin);
+            let mut pin = pin.map_into();
             pin.set_to_push_pull_output(private::Internal);
             pin.connect_peripheral_to_output(T::ws_rx_signal(), private::Internal);
 
             self
         }
 
-        pub fn with_din<P>(self, pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
-        where
-            P: PeripheralInput,
-        {
+        pub fn with_din(
+            self,
+            pin: impl crate::peripheral::Peripheral<
+                    P = impl Into<crate::gpio::interconnect::AnyInputSignal>,
+                > + 'd,
+        ) -> Self {
             into_ref!(pin);
+            let mut pin = pin.map_into();
             pin.init_input(crate::gpio::Pull::None, private::Internal);
             pin.connect_input_to_peripheral(T::din_signal(), private::Internal);
 
