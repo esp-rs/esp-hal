@@ -407,21 +407,21 @@ enum AnyOutputSignalInner {
 }
 
 /// A type-erased output signal.
-pub struct AnyOutputSignal(AnyOutputSignalInner);
+pub struct OutputConnection(AnyOutputSignalInner);
 
-impl From<NoPin> for AnyOutputSignal {
+impl From<NoPin> for OutputConnection {
     fn from(pin: NoPin) -> Self {
         Self(AnyOutputSignalInner::Dummy(pin))
     }
 }
 
-impl From<AnyPin> for AnyOutputSignal {
+impl From<AnyPin> for OutputConnection {
     fn from(input: AnyPin) -> Self {
         Self(AnyOutputSignalInner::Output(input.into_peripheral_output()))
     }
 }
 
-impl<const GPIONUM: u8> From<GpioPin<GPIONUM>> for AnyOutputSignal
+impl<const GPIONUM: u8> From<GpioPin<GPIONUM>> for OutputConnection
 where
     GpioPin<GPIONUM>: OutputPin,
 {
@@ -430,8 +430,8 @@ where
     }
 }
 
-impl Sealed for AnyOutputSignal {}
-impl PeripheralSignal for AnyOutputSignal {
+impl Sealed for OutputConnection {}
+impl PeripheralSignal for OutputConnection {
     delegate::delegate! {
         to match &self.0 {
             AnyOutputSignalInner::Output(pin) => pin,
@@ -442,7 +442,7 @@ impl PeripheralSignal for AnyOutputSignal {
     }
 }
 
-impl PeripheralInput for AnyOutputSignal {
+impl PeripheralInput for OutputConnection {
     delegate::delegate! {
         to match &self.0 {
             AnyOutputSignalInner::Output(pin) => pin,
@@ -465,7 +465,7 @@ impl PeripheralInput for AnyOutputSignal {
     }
 }
 
-impl PeripheralOutput for AnyOutputSignal {
+impl PeripheralOutput for OutputConnection {
     delegate::delegate! {
         to match &mut self.0 {
             AnyOutputSignalInner::Output(pin) => pin,
@@ -505,9 +505,9 @@ enum AnyInputSignalInner {
 
 /// A type-erased input signal.
 #[derive(Clone)]
-pub struct AnyInputSignal(AnyInputSignalInner);
+pub struct InputConnection(AnyInputSignalInner);
 
-impl Peripheral for AnyInputSignal {
+impl Peripheral for InputConnection {
     type P = Self;
 
     unsafe fn clone_unchecked(&self) -> Self::P {
@@ -515,31 +515,31 @@ impl Peripheral for AnyInputSignal {
     }
 }
 
-impl From<InputSignal> for AnyInputSignal {
+impl From<InputSignal> for InputConnection {
     fn from(input: InputSignal) -> Self {
         Self(AnyInputSignalInner::Input(input))
     }
 }
 
-impl From<Level> for AnyInputSignal {
+impl From<Level> for InputConnection {
     fn from(level: Level) -> Self {
         Self(AnyInputSignalInner::Constant(level))
     }
 }
 
-impl From<NoPin> for AnyInputSignal {
+impl From<NoPin> for InputConnection {
     fn from(pin: NoPin) -> Self {
         Self(AnyInputSignalInner::Dummy(pin))
     }
 }
 
-impl From<AnyPin> for AnyInputSignal {
+impl From<AnyPin> for InputConnection {
     fn from(input: AnyPin) -> Self {
         Self(AnyInputSignalInner::Input(input.peripheral_input()))
     }
 }
 
-impl<const GPIONUM: u8> From<GpioPin<GPIONUM>> for AnyInputSignal
+impl<const GPIONUM: u8> From<GpioPin<GPIONUM>> for InputConnection
 where
     GpioPin<GPIONUM>: InputPin,
 {
@@ -548,8 +548,8 @@ where
     }
 }
 
-impl Sealed for AnyInputSignal {}
-impl PeripheralSignal for AnyInputSignal {
+impl Sealed for InputConnection {}
+impl PeripheralSignal for InputConnection {
     delegate::delegate! {
         to match &self.0 {
             AnyInputSignalInner::Input(pin) => pin,
@@ -561,7 +561,7 @@ impl PeripheralSignal for AnyInputSignal {
     }
 }
 
-impl PeripheralInput for AnyInputSignal {
+impl PeripheralInput for InputConnection {
     delegate::delegate! {
         to match &self.0 {
             AnyInputSignalInner::Input(pin) => pin,
