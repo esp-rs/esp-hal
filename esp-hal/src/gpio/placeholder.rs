@@ -110,18 +110,8 @@ impl crate::peripheral::Peripheral for NoPin {
 impl private::Sealed for NoPin {}
 
 impl NoPin {
-    pub(crate) fn pull_direction(&self, _pull: Pull, _internal: private::Internal) {}
-
     delegate::delegate! {
         to Level::Low {
-            pub(crate) fn init_input(&self, _pull: Pull, _internal: private::Internal);
-            pub(crate) fn enable_input(&mut self, _on: bool, _internal: private::Internal);
-            pub(crate) fn enable_input_in_sleep_mode(&mut self, _on: bool, _internal: private::Internal);
-            pub(crate) fn is_input_high(&self, _internal: private::Internal) -> bool;
-            pub(crate) fn connect_input_to_peripheral(&mut self, _signal: InputSignal, _internal: private::Internal);
-            pub(crate) fn disconnect_input_from_peripheral(&mut self, _signal: InputSignal, _internal: private::Internal);
-            pub(crate) fn input_signals(&self, _internal: private::Internal) -> [Option<InputSignal>; 6];
-
             pub(crate) fn set_to_open_drain_output(&mut self, _internal: private::Internal);
             pub(crate) fn set_to_push_pull_output(&mut self, _internal: private::Internal);
             pub(crate) fn enable_output(&mut self, _on: bool, _internal: private::Internal);
