@@ -12,7 +12,7 @@
 use core::marker::PhantomData;
 
 use crate::{
-    gpio::PeripheralOutput,
+    gpio::{interconnect::AnyOutputSignal, PeripheralOutput},
     mcpwm::{timer::Timer, PwmPeripheral},
     peripheral::{Peripheral, PeripheralRef},
     private,
@@ -204,34 +204,31 @@ impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
     }
 
     /// Use the A output with the given pin and configuration
-    pub fn with_pin_a<'d, Pin: PeripheralOutput>(
+    pub fn with_pin_a<'d>(
         self,
-        pin: impl Peripheral<P = Pin> + 'd,
+        pin: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
         config: PwmPinConfig<true>,
-    ) -> PwmPin<'d, Pin, PWM, OP, true> {
+    ) -> PwmPin<'d, PWM, OP, true> {
         PwmPin::new(pin, config)
     }
 
     /// Use the B output with the given pin and configuration
-    pub fn with_pin_b<'d, Pin: PeripheralOutput>(
+    pub fn with_pin_b<'d>(
         self,
-        pin: impl Peripheral<P = Pin> + 'd,
+        pin: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
         config: PwmPinConfig<false>,
-    ) -> PwmPin<'d, Pin, PWM, OP, false> {
+    ) -> PwmPin<'d, PWM, OP, false> {
         PwmPin::new(pin, config)
     }
 
     /// Use both the A and the B output with the given pins and configurations
-    pub fn with_pins<'d, PinA: PeripheralOutput, PinB: PeripheralOutput>(
+    pub fn with_pins<'d>(
         self,
-        pin_a: impl Peripheral<P = PinA> + 'd,
+        pin_a: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
         config_a: PwmPinConfig<true>,
-        pin_b: impl Peripheral<P = PinB> + 'd,
+        pin_b: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
         config_b: PwmPinConfig<false>,
-    ) -> (
-        PwmPin<'d, PinA, PWM, OP, true>,
-        PwmPin<'d, PinB, PWM, OP, false>,
-    ) {
+    ) -> (PwmPin<'d, PWM, OP, true>, PwmPin<'d, PWM, OP, false>) {
         (PwmPin::new(pin_a, config_a), PwmPin::new(pin_b, config_b))
     }
 
@@ -239,14 +236,14 @@ impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
     ///
     /// This is useful for complementary or mirrored signals with or without
     /// configured deadtime
-    pub fn with_linked_pins<'d, PinA: PeripheralOutput, PinB: PeripheralOutput>(
+    pub fn with_linked_pins<'d>(
         self,
-        pin_a: impl Peripheral<P = PinA> + 'd,
+        pin_a: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
         config_a: PwmPinConfig<true>,
-        pin_b: impl Peripheral<P = PinB> + 'd,
+        pin_b: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
         config_b: PwmPinConfig<false>,
         config_dt: DeadTimeCfg,
-    ) -> LinkedPins<'d, PinA, PinB, PWM, OP> {
+    ) -> LinkedPins<'d, PWM, OP> {
         LinkedPins::new(pin_a, config_a, pin_b, config_b, config_dt)
     }
 }
@@ -283,18 +280,19 @@ impl<const IS_A: bool> PwmPinConfig<IS_A> {
 }
 
 /// A pin driven by an MCPWM operator
-pub struct PwmPin<'d, Pin, PWM, const OP: u8, const IS_A: bool> {
-    pin: PeripheralRef<'d, Pin>,
+pub struct PwmPin<'d, PWM, const OP: u8, const IS_A: bool> {
+    pin: PeripheralRef<'d, AnyOutputSignal>,
     phantom: PhantomData<PWM>,
 }
 
-impl<'d, Pin: PeripheralOutput, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
-    PwmPin<'d, Pin, PWM, OP, IS_A>
-{
-    fn new(pin: impl Peripheral<P = Pin> + 'd, config: PwmPinConfig<IS_A>) -> Self {
+impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP, IS_A> {
+    fn new(
+        pin: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
+        config: PwmPinConfig<IS_A>,
+    ) -> Self {
         crate::into_ref!(pin);
         let mut pin = PwmPin {
-            pin,
+            pin: pin.map_into(),
             phantom: PhantomData,
         };
         pin.set_actions(config.actions);
@@ -415,8 +413,8 @@ impl<'d, Pin: PeripheralOutput, PWM: PwmPeripheral, const OP: u8, const IS_A: bo
     }
 }
 
-impl<'d, Pin: PeripheralOutput, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
-    embedded_hal_02::PwmPin for PwmPin<'d, Pin, PWM, OP, IS_A>
+impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal_02::PwmPin
+    for PwmPin<'d, PWM, OP, IS_A>
 {
     type Duty = u16;
 
@@ -449,15 +447,15 @@ impl<'d, Pin: PeripheralOutput, PWM: PwmPeripheral, const OP: u8, const IS_A: bo
 }
 
 /// Implement no error type for the PwmPin because the method are infallible
-impl<'d, Pin: PeripheralOutput, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
-    embedded_hal::pwm::ErrorType for PwmPin<'d, Pin, PWM, OP, IS_A>
+impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::ErrorType
+    for PwmPin<'d, PWM, OP, IS_A>
 {
     type Error = core::convert::Infallible;
 }
 
 /// Implement the trait SetDutyCycle for PwmPin
-impl<'d, Pin: PeripheralOutput, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
-    embedded_hal::pwm::SetDutyCycle for PwmPin<'d, Pin, PWM, OP, IS_A>
+impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetDutyCycle
+    for PwmPin<'d, PWM, OP, IS_A>
 {
     /// Get the max duty of the PwmPin
     fn max_duty_cycle(&self) -> u16 {
@@ -518,18 +516,16 @@ impl<'d, Pin: PeripheralOutput, PWM: PwmPeripheral, const OP: u8, const IS_A: bo
 /// // pin_b: ------_________-----------_________-----
 /// # }
 /// ```
-pub struct LinkedPins<'d, PinA, PinB, PWM, const OP: u8> {
-    pin_a: PwmPin<'d, PinA, PWM, OP, true>,
-    pin_b: PwmPin<'d, PinB, PWM, OP, false>,
+pub struct LinkedPins<'d, PWM, const OP: u8> {
+    pin_a: PwmPin<'d, PWM, OP, true>,
+    pin_b: PwmPin<'d, PWM, OP, false>,
 }
 
-impl<'d, PinA: PeripheralOutput, PinB: PeripheralOutput, PWM: PwmPeripheral, const OP: u8>
-    LinkedPins<'d, PinA, PinB, PWM, OP>
-{
+impl<'d, PWM: PwmPeripheral, const OP: u8> LinkedPins<'d, PWM, OP> {
     fn new(
-        pin_a: impl Peripheral<P = PinA> + 'd,
+        pin_a: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
         config_a: PwmPinConfig<true>,
-        pin_b: impl Peripheral<P = PinB> + 'd,
+        pin_b: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
         config_b: PwmPinConfig<false>,
         config_dt: DeadTimeCfg,
     ) -> Self {

@@ -9,6 +9,7 @@ use crate::{
         InputPin,
         Level,
         NoPin,
+        OutputPin,
         OutputSignalType,
         PeripheralInput,
         PeripheralOutput,
@@ -91,12 +92,9 @@ impl InputSignal {
         unsafe { &*GPIO::PTR }
             .func_in_sel_cfg(signal - FUNC_IN_SEL_OFFSET)
             .modify(|_, w| unsafe {
-                w.sel()
-                    .set_bit()
-                    .in_inv_sel()
-                    .bit(invert)
-                    .in_sel()
-                    .bits(input)
+                w.sel().set_bit();
+                w.in_inv_sel().bit(invert);
+                w.in_sel().bits(input)
             });
     }
 }
@@ -242,14 +240,23 @@ impl OutputSignal {
         unsafe { &*GPIO::PTR }
             .func_out_sel_cfg(output as usize)
             .modify(|_, w| unsafe {
-                w.out_sel()
-                    .bits(signal)
-                    .inv_sel()
-                    .bit(invert)
-                    .oen_sel()
-                    .bit(enable_from_gpio)
-                    .oen_inv_sel()
-                    .bit(invert_enable)
+                w.out_sel().bits(signal);
+                w.inv_sel().bit(invert);
+                w.oen_sel().bit(enable_from_gpio);
+                w.oen_inv_sel().bit(invert_enable)
+            });
+    }
+
+    /// - signal: The input signal to connect to the pin
+    /// - invert: Configures whether or not to invert the input value
+    /// - input: The GPIO number to connect to the input signal
+    fn connect_input(&self, signal: usize, invert: bool, input: u8) {
+        unsafe { &*GPIO::PTR }
+            .func_in_sel_cfg(signal - FUNC_IN_SEL_OFFSET)
+            .modify(|_, w| unsafe {
+                w.sel().set_bit();
+                w.in_inv_sel().bit(invert);
+                w.in_sel().bits(input)
             });
     }
 }
@@ -258,6 +265,69 @@ impl PeripheralSignal for OutputSignal {
     delegate::delegate! {
         to self.pin {
             fn pull_direction(&self, pull: Pull, _internal: private::Internal);
+        }
+    }
+}
+
+impl PeripheralInput for OutputSignal {
+    /// Connect the pin to a peripheral input signal.
+    ///
+    /// Since there can only be one input signal connected to a peripheral at a
+    /// time, this function will disconnect any previously connected input
+    /// signals.
+    fn connect_input_to_peripheral(&mut self, signal: gpio::InputSignal, _: private::Internal) {
+        let signal_nr = signal as usize;
+
+        let af = if self.is_inverted {
+            GPIO_FUNCTION
+        } else {
+            self.input_signals(private::Internal)
+                .into_iter()
+                .position(|s| s == Some(signal))
+                .ok_or(())
+                .and_then(AlternateFunction::try_from)
+                .unwrap_or(GPIO_FUNCTION)
+        };
+
+        if af == GPIO_FUNCTION && signal_nr > INPUT_SIGNAL_MAX as usize {
+            panic!("Cannot connect GPIO to this peripheral");
+        }
+
+        self.pin.set_alternate_function(af, private::Internal);
+
+        if signal_nr <= INPUT_SIGNAL_MAX as usize {
+            self.connect_input(signal_nr, self.is_inverted, self.pin.number());
+        }
+    }
+
+    /// Remove this pin from a connected peripheral input.
+    ///
+    /// Clears the entry in the GPIO matrix / Io mux that associates this input
+    /// pin with the given [input `signal`](`InputSignal`). Any other
+    /// connected signals remain intact.
+    fn disconnect_input_from_peripheral(
+        &mut self,
+        signal: gpio::InputSignal,
+        _: private::Internal,
+    ) {
+        self.pin
+            .set_alternate_function(GPIO_FUNCTION, private::Internal);
+
+        unsafe { &*GPIO::PTR }
+            .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
+            .modify(|_, w| w.sel().clear_bit());
+    }
+
+    fn input_signals(&self, _: private::Internal) -> [Option<gpio::InputSignal>; 6] {
+        PeripheralInput::input_signals(&self.pin, private::Internal)
+    }
+
+    delegate::delegate! {
+        to self.pin {
+            fn init_input(&self, pull: Pull, _internal: private::Internal);
+            fn is_input_high(&self, _internal: private::Internal) -> bool;
+            fn enable_input(&mut self, on: bool, _internal: private::Internal);
+            fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
         }
     }
 }
@@ -351,6 +421,15 @@ impl From<AnyPin> for AnyOutputSignal {
     }
 }
 
+impl<const GPIONUM: u8> From<GpioPin<GPIONUM>> for AnyOutputSignal
+where
+    GpioPin<GPIONUM>: OutputPin,
+{
+    fn from(pin: GpioPin<GPIONUM>) -> Self {
+        Self(AnyOutputSignalInner::Output(pin.into_peripheral_output()))
+    }
+}
+
 impl Sealed for AnyOutputSignal {}
 impl PeripheralSignal for AnyOutputSignal {
     delegate::delegate! {
@@ -359,6 +438,29 @@ impl PeripheralSignal for AnyOutputSignal {
             AnyOutputSignalInner::Dummy(pin) => pin,
         } {
             fn pull_direction(&self, pull: Pull, _internal: private::Internal);
+        }
+    }
+}
+
+impl PeripheralInput for AnyOutputSignal {
+    delegate::delegate! {
+        to match &self.0 {
+            AnyOutputSignalInner::Output(pin) => pin,
+            AnyOutputSignalInner::Dummy(pin) => pin,
+        } {
+            fn init_input(&self, pull: Pull, _internal: private::Internal);
+            fn is_input_high(&self, _internal: private::Internal) -> bool;
+            fn input_signals(&self, _internal: private::Internal) -> [Option<gpio::InputSignal>; 6];
+        }
+
+        to match &mut self.0 {
+            AnyOutputSignalInner::Output(pin) => pin,
+            AnyOutputSignalInner::Dummy(pin) => pin,
+        } {
+            fn enable_input(&mut self, on: bool, _internal: private::Internal);
+            fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
+            fn connect_input_to_peripheral(&mut self, signal: crate::gpio::InputSignal, _internal: private::Internal);
+            fn disconnect_input_from_peripheral(&mut self, signal: crate::gpio::InputSignal, _internal: private::Internal);
         }
     }
 }
