@@ -198,7 +198,7 @@ impl<'d> Rtc<'d> {
 
         let this = Self {
             _inner: rtc_cntl.into_ref(),
-            rwdt: Rwdt::default(),
+            rwdt: Rwdt::new(),
             #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
             swd: Swd::new(),
         };
@@ -785,7 +785,7 @@ pub enum RwdtStageAction {
     Interrupt   = 1,
     /// Reset the CPU core.
     ResetCpu    = 2,
-    /// Reset the main system (MWDT, CPU, and all peripherals).
+    /// Reset the main system.
     /// The power management unit and RTC peripherals will not be reset.
     ResetCore   = 3,
     /// Reset the main system, power management unit and RTC peripherals.
@@ -793,33 +793,31 @@ pub enum RwdtStageAction {
 }
 
 /// RWDT related errors.
+#[derive(Debug)]
 pub enum RwdtError {
     /// Trying to configure the wrong stage.
     InvalidStage,
 }
 
 /// RTC Watchdog Timer.
-pub struct Rwdt {
-    stg0_action: RwdtStageAction,
-    stg1_action: RwdtStageAction,
-    stg2_action: RwdtStageAction,
-    stg3_action: RwdtStageAction,
-}
+pub struct Rwdt;
 
 impl Default for Rwdt {
     fn default() -> Self {
-        Self {
-            stg0_action: RwdtStageAction::ResetSystem,
-            stg1_action: RwdtStageAction::Off,
-            stg2_action: RwdtStageAction::Off,
-            stg3_action: RwdtStageAction::Off,
-        }
+        Self::new()
     }
 }
 
 /// RTC Watchdog Timer driver.
 impl Rwdt {
+    /// Create a new RTC watchdog timer instance
+    pub fn new() -> Self {
+        Self
+    }
+
     /// Enable the watchdog timer instance.
+    /// Watchdog starts with default settings (`stage 0`` resets the system, the
+    /// others are deactivated)
     pub fn enable(&mut self) {
         self.set_enabled(true);
     }
@@ -829,42 +827,38 @@ impl Rwdt {
         self.set_enabled(false);
     }
 
-    /// Listen for interrupts.
+    /// Listen for interrupts on stage 0.
     pub fn listen(&mut self) {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let rtc_cntl = unsafe { &*LPWR::PTR };
         #[cfg(any(esp32c6, esp32h2))]
         let rtc_cntl = unsafe { &*LP_WDT::PTR };
 
-        self.stg0_action = RwdtStageAction::Interrupt;
-
         self.set_write_protection(false);
 
         // Configure STAGE0 to trigger an interrupt upon expiration
         rtc_cntl
             .wdtconfig0()
-            .modify(|_, w| unsafe { w.wdt_stg0().bits(self.stg0_action as u8) });
+            .modify(|_, w| unsafe { w.wdt_stg0().bits(RwdtStageAction::Interrupt as u8) });
 
         rtc_cntl.int_ena().modify(|_, w| w.wdt().set_bit());
 
         self.set_write_protection(true);
     }
 
-    /// Stop listening for interrupts.
+    /// Stop listening for interrupts on stage 0.
     pub fn unlisten(&mut self) {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let rtc_cntl = unsafe { &*LPWR::PTR };
         #[cfg(any(esp32c6, esp32h2))]
         let rtc_cntl = unsafe { &*LP_WDT::PTR };
 
-        self.stg0_action = RwdtStageAction::ResetSystem;
-
         self.set_write_protection(false);
 
         // Configure STAGE0 to reset the main system and the RTC upon expiration.
         rtc_cntl
             .wdtconfig0()
-            .modify(|_, w| unsafe { w.wdt_stg0().bits(self.stg0_action as u8) });
+            .modify(|_, w| unsafe { w.wdt_stg0().bits(RwdtStageAction::ResetSystem as u8) });
 
         rtc_cntl.int_ena().modify(|_, w| w.wdt().clear_bit());
 
@@ -918,7 +912,7 @@ impl Rwdt {
         rtc_cntl.wdtwprotect().write(|w| unsafe { w.bits(wkey) });
     }
 
-    fn set_enabled(&mut self, enable: bool) {
+    fn set_enabled(&mut self, enabled: bool) {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let rtc_cntl = unsafe { &*LPWR::PTR };
         #[cfg(any(esp32c6, esp32h2))]
@@ -926,15 +920,47 @@ impl Rwdt {
 
         self.set_write_protection(false);
 
-        rtc_cntl
-            .wdtconfig0()
-            .modify(|_, w| w.wdt_en().bit(enable).wdt_flashboot_mod_en().bit(enable));
+        if !enabled {
+            rtc_cntl.wdtconfig0().modify(|_, w| unsafe { w.bits(0) });
+        } else {
+            rtc_cntl
+                .wdtconfig0()
+                .write(|w| w.wdt_flashboot_mod_en().bit(false));
+
+            rtc_cntl
+                .wdtconfig0()
+                .modify(|_, w| w.wdt_en().bit(enabled).wdt_pause_in_slp().bit(enabled));
+
+            // Apply default settings for WDT
+            unsafe {
+                rtc_cntl.wdtconfig0().modify(|_, w| {
+                    w.wdt_stg0()
+                        .bits(RwdtStageAction::ResetSystem as u8)
+                        .wdt_cpu_reset_length()
+                        .bits(7)
+                        .wdt_sys_reset_length()
+                        .bits(7)
+                        .wdt_stg1()
+                        .bits(RwdtStageAction::Off as u8)
+                        .wdt_stg2()
+                        .bits(RwdtStageAction::Off as u8)
+                        .wdt_stg3()
+                        .bits(RwdtStageAction::Off as u8)
+                        .wdt_en()
+                        .set_bit()
+                });
+            }
+        }
 
         self.set_write_protection(true);
     }
 
-    /// Configure timeout value in ms.
-    pub fn set_timeout(&mut self, timeout: MicrosDurationU64) {
+    /// Configure timeout value in ms for the selected stage.
+    pub fn set_timeout(
+        &mut self,
+        stage: usize,
+        timeout: MicrosDurationU64,
+    ) -> Result<(), RwdtError> {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let rtc_cntl = unsafe { &*LPWR::PTR };
         #[cfg(any(esp32c6, esp32h2))]
@@ -945,41 +971,68 @@ impl Rwdt {
 
         unsafe {
             #[cfg(esp32)]
-            rtc_cntl
-                .wdtconfig1()
-                .modify(|_, w| w.wdt_stg0_hold().bits(timeout_raw));
+            match stage {
+                0 => rtc_cntl
+                    .wdtconfig1()
+                    .modify(|_, w| w.wdt_stg0_hold().bits(timeout_raw)),
+                1 => rtc_cntl
+                    .wdtconfig2()
+                    .modify(|_, w| w.wdt_stg1_hold().bits(timeout_raw)),
+                2 => rtc_cntl
+                    .wdtconfig3()
+                    .modify(|_, w| w.wdt_stg2_hold().bits(timeout_raw)),
+                3 => rtc_cntl
+                    .wdtconfig4()
+                    .modify(|_, w| w.wdt_stg3_hold().bits(timeout_raw)),
+                _ => return Err(RwdtError::InvalidStage),
+            }
 
             #[cfg(any(esp32c6, esp32h2))]
-            rtc_cntl.config1().modify(|_, w| {
-                w.wdt_stg0_hold()
-                    .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
-            });
+            match stage {
+                0 => rtc_cntl.config1().modify(|_, w| {
+                    w.wdt_stg0_hold()
+                        .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
+                }),
+                1 => rtc_cntl.config2().modify(|_, w| {
+                    w.wdt_stg1_hold()
+                        .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
+                }),
+                2 => rtc_cntl.config3().modify(|_, w| {
+                    w.wdt_stg2_hold()
+                        .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
+                }),
+                3 => rtc_cntl.config4().modify(|_, w| {
+                    w.wdt_stg3_hold()
+                        .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
+                }),
+                _ => return Err(RwdtError::InvalidStage),
+            }
 
             #[cfg(not(any(esp32, esp32c6, esp32h2)))]
-            rtc_cntl.wdtconfig1().modify(|_, w| {
-                w.wdt_stg0_hold()
-                    .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
-            });
-
-            rtc_cntl.wdtconfig0().modify(|_, w| {
-                w.wdt_stg0()
-                    .bits(self.stg0_action as u8)
-                    .wdt_cpu_reset_length()
-                    .bits(7)
-                    .wdt_sys_reset_length()
-                    .bits(7)
-                    .wdt_stg1()
-                    .bits(self.stg1_action as u8)
-                    .wdt_stg2()
-                    .bits(self.stg2_action as u8)
-                    .wdt_stg3()
-                    .bits(self.stg3_action as u8)
-                    .wdt_en()
-                    .set_bit()
-            });
+            match stage {
+                0 => rtc_cntl.wdtconfig1().modify(|_, w| {
+                    w.wdt_stg0_hold()
+                        .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
+                }),
+                1 => rtc_cntl.wdtconfig2().modify(|_, w| {
+                    w.wdt_stg1_hold()
+                        .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
+                }),
+                2 => rtc_cntl.wdtconfig3().modify(|_, w| {
+                    w.wdt_stg2_hold()
+                        .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
+                }),
+                3 => rtc_cntl.wdtconfig4().modify(|_, w| {
+                    w.wdt_stg3_hold()
+                        .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
+                }),
+                _ => return Err(RwdtError::InvalidStage),
+            }
         }
 
         self.set_write_protection(true);
+
+        Ok(())
     }
 
     /// Set the action for a specific stage.
@@ -997,25 +1050,21 @@ impl Rwdt {
 
         match stage {
             0 => {
-                self.stg0_action = action;
                 rtc_cntl
                     .wdtconfig0()
                     .modify(|_, w| unsafe { w.wdt_stg0().bits(action as u8) });
             }
             1 => {
-                self.stg1_action = action;
                 rtc_cntl
                     .wdtconfig0()
                     .modify(|_, w| unsafe { w.wdt_stg1().bits(action as u8) });
             }
             2 => {
-                self.stg2_action = action;
                 rtc_cntl
                     .wdtconfig0()
                     .modify(|_, w| unsafe { w.wdt_stg2().bits(action as u8) });
             }
             3 => {
-                self.stg3_action = action;
                 rtc_cntl
                     .wdtconfig0()
                     .modify(|_, w| unsafe { w.wdt_stg3().bits(action as u8) });
@@ -1044,7 +1093,7 @@ impl embedded_hal_02::watchdog::WatchdogEnable for Rwdt {
     where
         T: Into<Self::Time>,
     {
-        self.set_timeout(period.into());
+        self.set_timeout(0, period.into()).unwrap();
     }
 }
 
