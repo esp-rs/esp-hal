@@ -167,9 +167,9 @@ impl InputSignal {
     delegate::delegate! {
         #[doc(hidden)]
         to self.pin {
-            pub fn pull_direction(&self, pull: Pull, _internal: private::Internal);
+            pub fn pull_direction(&mut self, pull: Pull, _internal: private::Internal);
             pub fn input_signals(&self, _internal: private::Internal) -> [Option<gpio::InputSignal>; 6];
-            pub fn init_input(&self, pull: Pull, _internal: private::Internal);
+            pub fn init_input(&mut self, pull: Pull, _internal: private::Internal);
             pub fn is_input_high(&self, _internal: private::Internal) -> bool;
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
             pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
@@ -376,9 +376,9 @@ impl OutputSignal {
     delegate::delegate! {
         #[doc(hidden)]
         to self.pin {
-            pub fn pull_direction(&self, pull: Pull, _internal: private::Internal);
+            pub fn pull_direction(&mut self, pull: Pull, _internal: private::Internal);
             pub fn input_signals(&self, _internal: private::Internal) -> [Option<gpio::InputSignal>; 6];
-            pub fn init_input(&self, pull: Pull, _internal: private::Internal);
+            pub fn init_input(&mut self, pull: Pull, _internal: private::Internal);
             pub fn is_input_high(&self, _internal: private::Internal) -> bool;
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
             pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
@@ -458,8 +458,6 @@ impl OutputConnection {
             OutputConnectionInner::Output(pin) => pin,
             OutputConnectionInner::Dummy(_) => Level::Low,
         } {
-            pub fn pull_direction(&self, pull: Pull, _internal: private::Internal);
-            pub fn init_input(&self, pull: Pull, _internal: private::Internal);
             pub fn is_input_high(&self, _internal: private::Internal) -> bool;
             pub fn input_signals(&self, _internal: private::Internal) -> [Option<gpio::InputSignal>; 6];
         }
@@ -468,6 +466,8 @@ impl OutputConnection {
             OutputConnectionInner::Output(pin) => pin,
             OutputConnectionInner::Dummy(_) => Level::Low,
         } {
+            pub fn pull_direction(&mut self, pull: Pull, _internal: private::Internal);
+            pub fn init_input(&mut self, pull: Pull, _internal: private::Internal);
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
             pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             pub fn connect_input_to_peripheral(&mut self, signal: crate::gpio::InputSignal, _internal: private::Internal);
@@ -580,8 +580,6 @@ impl InputConnection {
             InputConnectionInner::Input(pin) => pin,
             InputConnectionInner::Constant(level) => level,
         } {
-            pub fn pull_direction(&self, pull: Pull, _internal: private::Internal);
-            pub fn init_input(&self, pull: Pull, _internal: private::Internal);
             pub fn is_input_high(&self, _internal: private::Internal) -> bool;
             pub fn input_signals(&self, _internal: private::Internal) -> [Option<gpio::InputSignal>; 6];
         }
@@ -591,6 +589,8 @@ impl InputConnection {
             InputConnectionInner::Input(pin) => pin,
             InputConnectionInner::Constant(level) => level,
         } {
+            pub fn pull_direction(&mut self, pull: Pull, _internal: private::Internal);
+            pub fn init_input(&mut self, pull: Pull, _internal: private::Internal);
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
             pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             pub fn connect_input_to_peripheral(&mut self, signal: crate::gpio::InputSignal, _internal: private::Internal);
