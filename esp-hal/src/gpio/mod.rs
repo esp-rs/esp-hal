@@ -2251,30 +2251,30 @@ fn set_int_enable(gpio_num: u8, int_ena: u8, int_type: u8, wake_up_from_light_sl
 
 #[ram]
 fn handle_pin_interrupts(handle: impl Fn(u8)) {
-    let intrs_bank0 = InterruptStatusRegisterAccess::Bank0.interrupt_status_read();
+    let banks = [
+        (
+            InterruptStatusRegisterAccess::Bank0,
+            GpioRegisterAccess::Bank0,
+            0,
+        ),
+        #[cfg(any(esp32, esp32s2, esp32s3))]
+        (
+            InterruptStatusRegisterAccess::Bank1,
+            GpioRegisterAccess::Bank1,
+            32,
+        ),
+    ];
 
-    #[cfg(any(esp32, esp32s2, esp32s3))]
-    let intrs_bank1 = InterruptStatusRegisterAccess::Bank1.interrupt_status_read();
-
-    let mut intr_bits = intrs_bank0;
-    while intr_bits != 0 {
-        let pin_nr = intr_bits.trailing_zeros();
-        handle(pin_nr as u8);
-        intr_bits -= 1 << pin_nr;
-    }
-
-    // clear interrupt bits
-    Bank0GpioRegisterAccess::write_interrupt_status_clear(intrs_bank0);
-
-    #[cfg(any(esp32, esp32s2, esp32s3))]
-    {
-        let mut intr_bits = intrs_bank1;
+    for (intr, status, offset) in banks {
+        let intrs_bank = intr.interrupt_status_read();
+        let mut intr_bits = intrs_bank;
         while intr_bits != 0 {
             let pin_nr = intr_bits.trailing_zeros();
-            handle(pin_nr as u8 + 32);
+            handle(pin_nr as u8 + offset);
             intr_bits -= 1 << pin_nr;
         }
-        Bank1GpioRegisterAccess::write_interrupt_status_clear(intrs_bank1);
+
+        status.write_interrupt_status_clear(intrs_bank);
     }
 }
 
