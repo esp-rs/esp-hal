@@ -983,7 +983,34 @@ where
         if !enabled {
             reg_block.wdtconfig0().write(|w| unsafe { w.bits(0) });
         } else {
+            reg_block
+                .wdtconfig0()
+                .write(|w| w.wdt_flashboot_mod_en().bit(false));
+
             reg_block.wdtconfig0().write(|w| w.wdt_en().bit(true));
+
+            #[cfg_attr(esp32, allow(unused_unsafe))]
+            reg_block.wdtconfig0().write(|w| unsafe {
+                w.wdt_en()
+                    .bit(true)
+                    .wdt_stg0()
+                    .bits(MwdtStageAction::Off as u8)
+                    .wdt_cpu_reset_length()
+                    .bits(7)
+                    .wdt_sys_reset_length()
+                    .bits(7)
+                    .wdt_stg1()
+                    .bits(MwdtStageAction::Off as u8)
+                    .wdt_stg2()
+                    .bits(MwdtStageAction::Off as u8)
+                    .wdt_stg3()
+                    .bits(MwdtStageAction::Off as u8)
+            });
+
+            #[cfg(any(esp32c2, esp32c3, esp32c6))]
+            reg_block
+                .wdtconfig0()
+                .modify(|_, w| w.wdt_conf_update_en().set_bit());
         }
 
         self.set_write_protection(true);
@@ -1011,7 +1038,11 @@ where
     }
 
     /// Set the timeout, in microseconds, of the watchdog timer
-    pub fn set_timeout(&mut self, timeout: MicrosDurationU64) {
+    pub fn set_timeout(
+        &mut self,
+        stage: usize,
+        timeout: MicrosDurationU64,
+    ) -> Result<(), MwdtError> {
         let timeout_raw = (timeout.to_nanos() * 10 / 125) as u32;
 
         let reg_block = unsafe { &*TG::register_block() };
@@ -1022,27 +1053,23 @@ where
             .wdtconfig1()
             .write(|w| unsafe { w.wdt_clk_prescale().bits(1) });
 
-        reg_block
-            .wdtconfig2()
-            .write(|w| unsafe { w.wdt_stg0_hold().bits(timeout_raw) });
-
-        #[cfg_attr(esp32, allow(unused_unsafe))]
-        reg_block.wdtconfig0().write(|w| unsafe {
-            w.wdt_en()
-                .bit(true)
-                .wdt_stg0()
-                .bits(MwdtStageAction::ResetSystem as u8)
-                .wdt_cpu_reset_length()
-                .bits(1)
-                .wdt_sys_reset_length()
-                .bits(1)
-                .wdt_stg1()
-                .bits(MwdtStageAction::Off as u8)
-                .wdt_stg2()
-                .bits(MwdtStageAction::Off as u8)
-                .wdt_stg3()
-                .bits(MwdtStageAction::Off as u8)
-        });
+        unsafe {
+            match stage {
+                0 => reg_block
+                    .wdtconfig2()
+                    .write(|w| w.wdt_stg0_hold().bits(timeout_raw)),
+                1 => reg_block
+                    .wdtconfig3()
+                    .write(|w| w.wdt_stg1_hold().bits(timeout_raw)),
+                2 => reg_block
+                    .wdtconfig4()
+                    .write(|w| w.wdt_stg2_hold().bits(timeout_raw)),
+                3 => reg_block
+                    .wdtconfig5()
+                    .write(|w| w.wdt_stg3_hold().bits(timeout_raw)),
+                _ => return Err(MwdtError::InvalidStage),
+            }
+        }
 
         #[cfg(any(esp32c2, esp32c3, esp32c6))]
         reg_block
@@ -1050,6 +1077,8 @@ where
             .modify(|_, w| w.wdt_conf_update_en().set_bit());
 
         self.set_write_protection(true);
+
+        Ok(())
     }
 
     /// Set the stage action of the MWDT for a specific stage.
@@ -1137,7 +1166,7 @@ where
         T: Into<Self::Time>,
     {
         self.enable();
-        self.set_timeout(period.into());
+        self.set_timeout(0, period.into()).unwrap();
     }
 }
 
