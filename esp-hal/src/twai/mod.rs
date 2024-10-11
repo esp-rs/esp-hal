@@ -129,7 +129,15 @@ use core::marker::PhantomData;
 
 use self::filter::{Filter, FilterType};
 use crate::{
-    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
+    gpio::{
+        interconnect::{AnyInputSignal, AnyOutputSignal},
+        InputSignal,
+        OutputSignal,
+        PeripheralInput,
+        PeripheralOutput,
+        PeripheralSignal,
+        Pull,
+    },
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::twai0::RegisterBlock,
@@ -753,16 +761,19 @@ where
     T: Instance,
     DM: crate::Mode,
 {
-    fn new_internal<TX: PeripheralOutput, RX: PeripheralInput>(
+    fn new_internal(
         _peripheral: impl Peripheral<P = T> + 'd,
-        rx_pin: impl Peripheral<P = RX> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
+        rx_pin: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        tx_pin: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
         baud_rate: BaudRate,
         no_transceiver: bool,
         mode: TwaiMode,
     ) -> Self {
         // Set up the GPIO pins.
         crate::into_ref!(tx_pin, rx_pin);
+
+        let mut tx_pin = tx_pin.map_into();
+        let mut rx_pin = rx_pin.map_into();
 
         // Enable the peripheral clock for the TWAI peripheral.
         T::enable_peripheral();
@@ -1019,10 +1030,10 @@ where
     /// Create a new instance of [TwaiConfiguration]
     ///
     /// You will need to use a transceiver to connect to the TWAI bus
-    pub fn new<RX: PeripheralInput, TX: PeripheralOutput>(
+    pub fn new(
         peripheral: impl Peripheral<P = T> + 'd,
-        rx_pin: impl Peripheral<P = RX> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
+        rx_pin: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        tx_pin: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
@@ -1034,10 +1045,10 @@ where
     ///
     /// You don't need a transceiver by following the description in the
     /// `twai.rs` example
-    pub fn new_no_transceiver<RX: PeripheralInput, TX: PeripheralOutput>(
+    pub fn new_no_transceiver(
         peripheral: impl Peripheral<P = T> + 'd,
-        rx_pin: impl Peripheral<P = RX> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
+        rx_pin: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        tx_pin: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
@@ -1063,10 +1074,10 @@ where
     /// Create a new instance of [TwaiConfiguration] in async mode
     ///
     /// You will need to use a transceiver to connect to the TWAI bus
-    pub fn new_async<RX: PeripheralInput, TX: PeripheralOutput>(
+    pub fn new_async(
         peripheral: impl Peripheral<P = T> + 'd,
-        rx_pin: impl Peripheral<P = RX> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
+        rx_pin: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        tx_pin: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
@@ -1080,10 +1091,10 @@ where
     ///
     /// You don't need a transceiver by following the description in the
     /// `twai.rs` example
-    pub fn new_async_no_transceiver<RX: PeripheralInput, TX: PeripheralOutput>(
+    pub fn new_async_no_transceiver(
         peripheral: impl Peripheral<P = T> + 'd,
-        rx_pin: impl Peripheral<P = RX> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
+        rx_pin: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        tx_pin: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {

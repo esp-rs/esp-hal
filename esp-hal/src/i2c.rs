@@ -58,7 +58,15 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
+    gpio::{
+        interconnect::AnyOutputSignal,
+        InputSignal,
+        OutputSignal,
+        PeripheralInput,
+        PeripheralOutput,
+        PeripheralSignal,
+        Pull,
+    },
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::i2c0::{RegisterBlock, COMD},
@@ -488,17 +496,17 @@ impl<'d, T, DM: Mode> I2c<'d, T, DM>
 where
     T: Instance,
 {
-    fn new_internal<
-        SDA: PeripheralOutput + PeripheralInput,
-        SCL: PeripheralOutput + PeripheralInput,
-    >(
+    fn new_internal(
         i2c: impl Peripheral<P = T> + 'd,
-        sda: impl Peripheral<P = SDA> + 'd,
-        scl: impl Peripheral<P = SCL> + 'd,
+        sda: impl crate::peripheral::Peripheral<P = impl Into<AnyOutputSignal>>,
+        scl: impl crate::peripheral::Peripheral<P = impl Into<AnyOutputSignal>>,
         frequency: HertzU32,
         timeout: Option<u32>,
     ) -> Self {
         crate::into_ref!(i2c, sda, scl);
+
+        let mut sda = sda.map_into();
+        let mut scl = scl.map_into();
 
         PeripheralClockControl::reset(T::peripheral());
         PeripheralClockControl::enable(T::peripheral());
@@ -564,10 +572,10 @@ where
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new<SDA: PeripheralOutput + PeripheralInput, SCL: PeripheralOutput + PeripheralInput>(
+    pub fn new(
         i2c: impl Peripheral<P = T> + 'd,
-        sda: impl Peripheral<P = SDA> + 'd,
-        scl: impl Peripheral<P = SCL> + 'd,
+        sda: impl crate::peripheral::Peripheral<P = impl Into<AnyOutputSignal>>,
+        scl: impl crate::peripheral::Peripheral<P = impl Into<AnyOutputSignal>>,
         frequency: HertzU32,
     ) -> Self {
         Self::new_with_timeout(i2c, sda, scl, frequency, None)
@@ -576,13 +584,10 @@ where
     /// Create a new I2C instance with a custom timeout value.
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new_with_timeout<
-        SDA: PeripheralOutput + PeripheralInput,
-        SCL: PeripheralOutput + PeripheralInput,
-    >(
+    pub fn new_with_timeout(
         i2c: impl Peripheral<P = T> + 'd,
-        sda: impl Peripheral<P = SDA> + 'd,
-        scl: impl Peripheral<P = SCL> + 'd,
+        sda: impl crate::peripheral::Peripheral<P = impl Into<AnyOutputSignal>>,
+        scl: impl crate::peripheral::Peripheral<P = impl Into<AnyOutputSignal>>,
         frequency: HertzU32,
         timeout: Option<u32>,
     ) -> Self {
@@ -608,13 +613,10 @@ where
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new_async<
-        SDA: PeripheralOutput + PeripheralInput,
-        SCL: PeripheralOutput + PeripheralInput,
-    >(
+    pub fn new_async(
         i2c: impl Peripheral<P = T> + 'd,
-        sda: impl Peripheral<P = SDA> + 'd,
-        scl: impl Peripheral<P = SCL> + 'd,
+        sda: impl crate::peripheral::Peripheral<P = impl Into<AnyOutputSignal>>,
+        scl: impl crate::peripheral::Peripheral<P = impl Into<AnyOutputSignal>>,
         frequency: HertzU32,
     ) -> Self {
         Self::new_with_timeout_async(i2c, sda, scl, frequency, None)
@@ -623,13 +625,10 @@ where
     /// Create a new I2C instance with a custom timeout value.
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new_with_timeout_async<
-        SDA: PeripheralOutput + PeripheralInput,
-        SCL: PeripheralOutput + PeripheralInput,
-    >(
+    pub fn new_with_timeout_async(
         i2c: impl Peripheral<P = T> + 'd,
-        sda: impl Peripheral<P = SDA> + 'd,
-        scl: impl Peripheral<P = SCL> + 'd,
+        sda: impl crate::peripheral::Peripheral<P = impl Into<AnyOutputSignal>>,
+        scl: impl crate::peripheral::Peripheral<P = impl Into<AnyOutputSignal>>,
         frequency: HertzU32,
         timeout: Option<u32>,
     ) -> Self {

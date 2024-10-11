@@ -75,7 +75,14 @@ use fugit::HertzU32;
 use crate::{
     clock::Clocks,
     dma::{ChannelRx, DmaChannelConvert, DmaEligible, DmaError, DmaPeripheral, DmaRxBuffer, Rx},
-    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
+    gpio::{
+        interconnect::{AnyInputSignal, AnyOutputSignal},
+        InputSignal,
+        OutputSignal,
+        PeripheralInput,
+        PeripheralOutput,
+        Pull,
+    },
     lcd_cam::{cam::private::RxPins, private::calculate_clkm, BitOrder, ByteOrder},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
@@ -233,23 +240,25 @@ impl<'d> Camera<'d> {
     }
 
     /// Configures the master clock (MCLK) pin for the camera interface.
-    pub fn with_master_clock<MCLK: PeripheralOutput>(
+    pub fn with_master_clock(
         self,
-        mclk: impl Peripheral<P = MCLK> + 'd,
+        mclk: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
     ) -> Self {
         crate::into_ref!(mclk);
+        let mut mclk = mclk.map_into();
         mclk.set_to_push_pull_output(crate::private::Internal);
         mclk.connect_peripheral_to_output(OutputSignal::CAM_CLK, crate::private::Internal);
         self
     }
 
     /// Configures the pixel clock (PCLK) pin for the camera interface.
-    pub fn with_pixel_clock<PCLK: PeripheralInput>(
+    pub fn with_pixel_clock(
         self,
-        pclk: impl Peripheral<P = PCLK> + 'd,
+        pclk: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
     ) -> Self {
         crate::into_ref!(pclk);
 
+        let mut pclk = pclk.map_into();
         pclk.init_input(Pull::None, crate::private::Internal);
         pclk.connect_input_to_peripheral(InputSignal::CAM_PCLK, crate::private::Internal);
 
@@ -258,14 +267,16 @@ impl<'d> Camera<'d> {
 
     /// Configures the control pins for the camera interface (VSYNC and
     /// HENABLE).
-    pub fn with_ctrl_pins<VSYNC: PeripheralInput, HENABLE: PeripheralInput>(
+    pub fn with_ctrl_pins(
         self,
-        vsync: impl Peripheral<P = VSYNC> + 'd,
-        h_enable: impl Peripheral<P = HENABLE> + 'd,
+        vsync: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        h_enable: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
     ) -> Self {
         crate::into_ref!(vsync);
         crate::into_ref!(h_enable);
 
+        let mut vsync = vsync.map_into();
+        let mut h_enable = h_enable.map_into();
         vsync.init_input(Pull::None, crate::private::Internal);
         vsync.connect_input_to_peripheral(InputSignal::CAM_V_SYNC, crate::private::Internal);
         h_enable.init_input(Pull::None, crate::private::Internal);
@@ -280,20 +291,19 @@ impl<'d> Camera<'d> {
 
     /// Configures the control pins for the camera interface (VSYNC, HSYNC, and
     /// HENABLE) with DE (data enable).
-    pub fn with_ctrl_pins_and_de<
-        VSYNC: PeripheralInput,
-        HSYNC: PeripheralInput,
-        HENABLE: PeripheralInput,
-    >(
+    pub fn with_ctrl_pins_and_de(
         self,
-        vsync: impl Peripheral<P = VSYNC> + 'd,
-        hsync: impl Peripheral<P = HSYNC> + 'd,
-        h_enable: impl Peripheral<P = HENABLE> + 'd,
+        vsync: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        hsync: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        h_enable: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
     ) -> Self {
         crate::into_ref!(vsync);
         crate::into_ref!(hsync);
         crate::into_ref!(h_enable);
 
+        let mut vsync = vsync.map_into();
+        let mut hsync = hsync.map_into();
+        let mut h_enable = h_enable.map_into();
         vsync.init_input(Pull::None, crate::private::Internal);
         vsync.connect_input_to_peripheral(InputSignal::CAM_V_SYNC, crate::private::Internal);
         hsync.init_input(Pull::None, crate::private::Internal);
@@ -482,26 +492,16 @@ impl RxEightBits {
     #[allow(clippy::too_many_arguments)]
     /// Creates a new instance of `RxEightBits`, configuring the specified pins
     /// as the 8-bit data bus.
-    pub fn new<'d, P0, P1, P2, P3, P4, P5, P6, P7>(
-        pin_0: impl Peripheral<P = P0> + 'd,
-        pin_1: impl Peripheral<P = P1> + 'd,
-        pin_2: impl Peripheral<P = P2> + 'd,
-        pin_3: impl Peripheral<P = P3> + 'd,
-        pin_4: impl Peripheral<P = P4> + 'd,
-        pin_5: impl Peripheral<P = P5> + 'd,
-        pin_6: impl Peripheral<P = P6> + 'd,
-        pin_7: impl Peripheral<P = P7> + 'd,
-    ) -> Self
-    where
-        P0: PeripheralInput,
-        P1: PeripheralInput,
-        P2: PeripheralInput,
-        P3: PeripheralInput,
-        P4: PeripheralInput,
-        P5: PeripheralInput,
-        P6: PeripheralInput,
-        P7: PeripheralInput,
-    {
+    pub fn new<'d>(
+        pin_0: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_1: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_2: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_3: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_4: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_5: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_6: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_7: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+    ) -> Self {
         crate::into_ref!(pin_0);
         crate::into_ref!(pin_1);
         crate::into_ref!(pin_2);
@@ -510,6 +510,15 @@ impl RxEightBits {
         crate::into_ref!(pin_5);
         crate::into_ref!(pin_6);
         crate::into_ref!(pin_7);
+
+        let mut pin_0 = pin_0.map_into();
+        let mut pin_1 = pin_1.map_into();
+        let mut pin_2 = pin_2.map_into();
+        let mut pin_3 = pin_3.map_into();
+        let mut pin_4 = pin_4.map_into();
+        let mut pin_5 = pin_5.map_into();
+        let mut pin_6 = pin_6.map_into();
+        let mut pin_7 = pin_7.map_into();
 
         pin_0.init_input(Pull::None, crate::private::Internal);
         pin_0.connect_input_to_peripheral(InputSignal::CAM_DATA_0, crate::private::Internal);
@@ -546,42 +555,24 @@ impl RxSixteenBits {
     #[allow(clippy::too_many_arguments)]
     /// Creates a new instance of `RxSixteenBits`, configuring the specified
     /// pins as the 16-bit data bus.
-    pub fn new<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>(
-        pin_0: impl Peripheral<P = P0> + 'd,
-        pin_1: impl Peripheral<P = P1> + 'd,
-        pin_2: impl Peripheral<P = P2> + 'd,
-        pin_3: impl Peripheral<P = P3> + 'd,
-        pin_4: impl Peripheral<P = P4> + 'd,
-        pin_5: impl Peripheral<P = P5> + 'd,
-        pin_6: impl Peripheral<P = P6> + 'd,
-        pin_7: impl Peripheral<P = P7> + 'd,
-        pin_8: impl Peripheral<P = P8> + 'd,
-        pin_9: impl Peripheral<P = P9> + 'd,
-        pin_10: impl Peripheral<P = P10> + 'd,
-        pin_11: impl Peripheral<P = P11> + 'd,
-        pin_12: impl Peripheral<P = P12> + 'd,
-        pin_13: impl Peripheral<P = P13> + 'd,
-        pin_14: impl Peripheral<P = P14> + 'd,
-        pin_15: impl Peripheral<P = P15> + 'd,
-    ) -> Self
-    where
-        P0: PeripheralInput,
-        P1: PeripheralInput,
-        P2: PeripheralInput,
-        P3: PeripheralInput,
-        P4: PeripheralInput,
-        P5: PeripheralInput,
-        P6: PeripheralInput,
-        P7: PeripheralInput,
-        P8: PeripheralInput,
-        P9: PeripheralInput,
-        P10: PeripheralInput,
-        P11: PeripheralInput,
-        P12: PeripheralInput,
-        P13: PeripheralInput,
-        P14: PeripheralInput,
-        P15: PeripheralInput,
-    {
+    pub fn new<'d>(
+        pin_0: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_1: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_2: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_3: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_4: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_5: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_6: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_7: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_8: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_9: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_10: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_11: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_12: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_13: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_14: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+        pin_15: impl Peripheral<P = impl Into<AnyInputSignal> + 'd> + 'd,
+    ) -> Self {
         crate::into_ref!(pin_0);
         crate::into_ref!(pin_1);
         crate::into_ref!(pin_2);
@@ -598,6 +589,23 @@ impl RxSixteenBits {
         crate::into_ref!(pin_13);
         crate::into_ref!(pin_14);
         crate::into_ref!(pin_15);
+
+        let mut pin_0 = pin_0.map_into();
+        let mut pin_1 = pin_1.map_into();
+        let mut pin_2 = pin_2.map_into();
+        let mut pin_3 = pin_3.map_into();
+        let mut pin_4 = pin_4.map_into();
+        let mut pin_5 = pin_5.map_into();
+        let mut pin_6 = pin_6.map_into();
+        let mut pin_7 = pin_7.map_into();
+        let mut pin_8 = pin_8.map_into();
+        let mut pin_9 = pin_9.map_into();
+        let mut pin_10 = pin_10.map_into();
+        let mut pin_11 = pin_11.map_into();
+        let mut pin_12 = pin_12.map_into();
+        let mut pin_13 = pin_13.map_into();
+        let mut pin_14 = pin_14.map_into();
+        let mut pin_15 = pin_15.map_into();
 
         pin_0.init_input(Pull::None, crate::private::Internal);
         pin_0.connect_input_to_peripheral(InputSignal::CAM_DATA_0, crate::private::Internal);

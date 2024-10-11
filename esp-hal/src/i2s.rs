@@ -102,7 +102,7 @@ use crate::{
         Tx,
         WriteBuffer,
     },
-    gpio::PeripheralOutput,
+    gpio::{interconnect::AnyOutputSignal, PeripheralOutput},
     interrupt::InterruptHandler,
     into_ref,
     peripheral::{Peripheral, PeripheralRef},
@@ -402,8 +402,9 @@ where
     }
 
     /// Configures the I2S peripheral to use a master clock (MCLK) output pin.
-    pub fn with_mclk<P: PeripheralOutput>(self, pin: impl Peripheral<P = P> + 'd) -> Self {
+    pub fn with_mclk(self, pin: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd) -> Self {
         into_ref!(pin);
+        let mut pin = pin.map_into();
         pin.set_to_push_pull_output(crate::private::Internal);
         pin.connect_peripheral_to_output(self.i2s_tx.i2s.mclk_signal(), crate::private::Internal);
 
@@ -719,7 +720,13 @@ mod private {
             DmaEligible,
             PeripheralMarker,
         },
-        gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
+        gpio::{
+            interconnect::{AnyInputSignal, AnyOutputSignal},
+            InputSignal,
+            OutputSignal,
+            PeripheralInput,
+            PeripheralOutput,
+        },
         interrupt::InterruptHandler,
         into_ref,
         peripheral::PeripheralRef,
@@ -753,33 +760,36 @@ mod private {
             }
         }
 
-        pub fn with_bclk<P>(self, pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
-        where
-            P: PeripheralOutput,
-        {
+        pub fn with_bclk<P>(
+            self,
+            pin: impl crate::peripheral::Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
+        ) -> Self {
             into_ref!(pin);
+            let mut pin = pin.map_into();
             pin.set_to_push_pull_output(private::Internal);
             pin.connect_peripheral_to_output(self.i2s.bclk_signal(), private::Internal);
 
             self
         }
 
-        pub fn with_ws<P>(self, pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
-        where
-            P: PeripheralOutput,
-        {
+        pub fn with_ws<P>(
+            self,
+            pin: impl crate::peripheral::Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
+        ) -> Self {
             into_ref!(pin);
+            let mut pin = pin.map_into();
             pin.set_to_push_pull_output(private::Internal);
             pin.connect_peripheral_to_output(self.i2s.ws_signal(), private::Internal);
 
             self
         }
 
-        pub fn with_dout<P>(self, pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
-        where
-            P: PeripheralOutput,
-        {
+        pub fn with_dout<P>(
+            self,
+            pin: impl crate::peripheral::Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
+        ) -> Self {
             into_ref!(pin);
+            let mut pin = pin.map_into();
             pin.set_to_push_pull_output(private::Internal);
             pin.connect_peripheral_to_output(self.i2s.dout_signal(), private::Internal);
 
@@ -814,9 +824,7 @@ mod private {
 
         pub fn with_bclk(
             self,
-            pin: impl crate::peripheral::Peripheral<
-                P = impl Into<crate::gpio::interconnect::AnyOutputSignal>,
-            >,
+            pin: impl crate::peripheral::Peripheral<P = impl Into<AnyOutputSignal>>,
         ) -> Self {
             into_ref!(pin);
             let mut pin = pin.map_into();
@@ -828,9 +836,7 @@ mod private {
 
         pub fn with_ws(
             self,
-            pin: impl crate::peripheral::Peripheral<
-                P = impl Into<crate::gpio::interconnect::AnyOutputSignal>,
-            >,
+            pin: impl crate::peripheral::Peripheral<P = impl Into<AnyOutputSignal>>,
         ) -> Self {
             into_ref!(pin);
             let mut pin = pin.map_into();
@@ -842,9 +848,7 @@ mod private {
 
         pub fn with_din(
             self,
-            pin: impl crate::peripheral::Peripheral<
-                    P = impl Into<crate::gpio::interconnect::AnyInputSignal>,
-                > + 'd,
+            pin: impl crate::peripheral::Peripheral<P = impl Into<AnyInputSignal>> + 'd,
         ) -> Self {
             into_ref!(pin);
             let mut pin = pin.map_into();
