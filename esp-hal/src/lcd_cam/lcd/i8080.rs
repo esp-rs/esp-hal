@@ -70,7 +70,7 @@ use fugit::HertzU32;
 use crate::{
     clock::Clocks,
     dma::{ChannelTx, DmaChannelConvert, DmaEligible, DmaError, DmaPeripheral, DmaTxBuffer, Tx},
-    gpio::{interconnect::AnyOutputSignal, OutputSignal, PeripheralOutput},
+    gpio::{interconnect::OutputConnection, OutputSignal, PeripheralOutput},
     lcd_cam::{
         asynch::LCD_DONE_WAKER,
         lcd::{i8080::private::TxPins, ClockMode, DelayMode, Phase, Polarity},
@@ -232,7 +232,7 @@ impl<'d, DM: Mode> I8080<'d, DM> {
     }
 
     /// Associates a CS pin with the I8080 interface.
-    pub fn with_cs(self, cs: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd) -> Self {
+    pub fn with_cs(self, cs: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd) -> Self {
         crate::into_ref!(cs);
         let mut cs = cs.map_into();
         cs.set_to_push_pull_output(crate::private::Internal);
@@ -244,8 +244,8 @@ impl<'d, DM: Mode> I8080<'d, DM> {
     /// Configures the control pins for the I8080 interface.
     pub fn with_ctrl_pins(
         self,
-        dc: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        wrx: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
+        dc: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        wrx: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
     ) -> Self {
         crate::into_ref!(dc, wrx);
 
@@ -584,21 +584,21 @@ impl From<u16> for Command<u16> {
 /// Represents a group of 8 output pins configured for 8-bit parallel data
 /// transmission.
 pub struct TxEightBits<'d> {
-    pins: [PeripheralRef<'d, AnyOutputSignal>; 8],
+    pins: [PeripheralRef<'d, OutputConnection>; 8],
 }
 
 impl<'d> TxEightBits<'d> {
     #[allow(clippy::too_many_arguments)]
     /// Creates a new `TxEightBits` instance with the provided output pins.
     pub fn new(
-        pin_0: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_1: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_2: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_3: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_4: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_5: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_6: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_7: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
+        pin_0: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_1: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_2: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_3: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_4: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_5: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_6: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_7: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
     ) -> Self {
         crate::into_ref!(pin_0);
         crate::into_ref!(pin_1);
@@ -646,29 +646,29 @@ impl TxPins for TxEightBits<'_> {
 /// Represents a group of 16 output pins configured for 16-bit parallel data
 /// transmission.
 pub struct TxSixteenBits<'d> {
-    pins: [PeripheralRef<'d, AnyOutputSignal>; 16],
+    pins: [PeripheralRef<'d, OutputConnection>; 16],
 }
 
 impl<'d> TxSixteenBits<'d> {
     #[allow(clippy::too_many_arguments)]
     /// Creates a new `TxSixteenBits` instance with the provided output pins.
     pub fn new(
-        pin_0: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_1: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_2: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_3: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_4: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_5: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_6: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_7: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_8: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_9: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_10: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_11: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_12: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_13: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_14: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
-        pin_15: impl Peripheral<P = impl Into<AnyOutputSignal> + 'd> + 'd,
+        pin_0: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_1: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_2: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_3: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_4: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_5: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_6: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_7: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_8: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_9: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_10: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_11: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_12: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_13: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_14: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_15: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
     ) -> Self {
         crate::into_ref!(pin_0);
         crate::into_ref!(pin_1);
