@@ -789,7 +789,7 @@ where
     /// pin.
     #[inline]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
-        interconnect::OutputSignal::new(self.degrade_pin(private::Internal))
+        interconnect::OutputSignal::new(self.degrade())
     }
 }
 
