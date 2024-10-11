@@ -865,7 +865,7 @@ mod private {
             I2sTx::new(self.tx_channel, self.descriptors)
         }
 
-        pub fn with_bclk<P>(
+        pub fn with_bclk(
             self,
             pin: impl crate::peripheral::Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
         ) -> Self {
@@ -877,7 +877,7 @@ mod private {
             self
         }
 
-        pub fn with_ws<P>(
+        pub fn with_ws(
             self,
             pin: impl crate::peripheral::Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
         ) -> Self {
@@ -889,7 +889,7 @@ mod private {
             self
         }
 
-        pub fn with_dout<P>(
+        pub fn with_dout(
             self,
             pin: impl crate::peripheral::Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
         ) -> Self {
