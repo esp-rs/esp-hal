@@ -152,6 +152,9 @@ octal-psram = []
 # This feature is intended for testing; you probably don't want to enable it:
 ci = ["defmt", "bluetooth"]
 
+# Internal feature set by esp-wifi
+__include_rom_functions = []
+
 [lints.clippy]
 mixed_attributes_style = "allow"
 

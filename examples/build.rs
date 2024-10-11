@@ -5,10 +5,6 @@ fn main() {
         println!("cargo::rustc-link-arg=-Trom_phy.x");
     }
 
-    if cfg!(feature = "esp-wifi") {
-        println!("cargo::rustc-link-arg=-Trom_functions.x");
-    }
-
     // Allow building examples in CI in debug mode
     println!("cargo:rustc-check-cfg=cfg(is_not_release)");
     println!("cargo:rerun-if-env-changed=CI");

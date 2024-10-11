@@ -74,6 +74,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(feature = "flip-link")]
     config_symbols.push("flip-link");
 
+    #[cfg(feature = "__include_rom_functions")]
+    config_symbols.push("__include_rom_functions");
+
     // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
     // files:
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
