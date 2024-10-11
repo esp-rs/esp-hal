@@ -509,7 +509,7 @@ pub fn init(config: Config) -> Peripherals {
     match config.watchdog.rwdt {
         WatchdogStatus::Enabled(duration) => {
             rtc.rwdt.enable();
-            rtc.rwdt.set_timeout(duration);
+            rtc.rwdt.set_timeout(0, duration).unwrap();
         }
         WatchdogStatus::Disabled => {
             rtc.rwdt.disable();
@@ -520,7 +520,7 @@ pub fn init(config: Config) -> Peripherals {
         WatchdogStatus::Enabled(duration) => {
             let mut timg0_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new();
             timg0_wd.enable();
-            timg0_wd.set_timeout(duration);
+            timg0_wd.set_timeout(0, duration).unwrap();
         }
         WatchdogStatus::Disabled => {
             crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new().disable();
@@ -532,7 +532,7 @@ pub fn init(config: Config) -> Peripherals {
         WatchdogStatus::Enabled(duration) => {
             let mut timg1_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG1>::new();
             timg1_wd.enable();
-            timg1_wd.set_timeout(duration);
+            timg1_wd.set_timeout(0, duration).unwrap();
         }
         WatchdogStatus::Disabled => {
             crate::timer::timg::Wdt::<self::peripherals::TIMG1>::new().disable();
