@@ -233,15 +233,6 @@ crate::gpio::rtc_pins! {
     5
 }
 
-crate::gpio::analog! {
-    0
-    1
-    2
-    3
-    4
-    5
-}
-
 #[derive(Clone, Copy)]
 pub(crate) enum InterruptStatusRegisterAccess {
     Bank0,

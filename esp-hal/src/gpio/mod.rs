@@ -61,7 +61,7 @@
 use portable_atomic::{AtomicPtr, Ordering};
 use procmacros::ram;
 
-#[cfg(any(adc, dac))]
+#[cfg(all(any(adc, dac), xtensa))]
 pub(crate) use crate::analog;
 pub(crate) use crate::gpio;
 #[cfg(any(xtensa, esp32c3, esp32c2))]
@@ -919,10 +919,12 @@ macro_rules! io_types {
     (InputOutputAnalog, $gpionum:literal) => {
         impl $crate::gpio::IsInputPin for GpioPin<$gpionum> {}
         impl $crate::gpio::IsOutputPin for GpioPin<$gpionum> {}
+        impl $crate::gpio::IsAnalogPin for GpioPin<$gpionum> {}
     };
     (InputOutputAnalogTouch, $gpionum:literal) => {
         impl $crate::gpio::IsInputPin for GpioPin<$gpionum> {}
         impl $crate::gpio::IsOutputPin for GpioPin<$gpionum> {}
+        impl $crate::gpio::IsAnalogPin for GpioPin<$gpionum> {}
     };
 }
 
@@ -1353,30 +1355,24 @@ macro_rules! analog {
 }
 
 #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
-#[doc(hidden)]
-#[macro_export]
-macro_rules! analog {
-    (
-        $($pin_num:literal)+
-    ) => {
-        $(
-            #[cfg(any(adc, dac))]
-            impl $crate::gpio::AnalogPin for GpioPin<$pin_num> {
-                /// Configures the pin for analog mode.
-                fn set_analog(&self, _: $crate::private::Internal) {
-                    use $crate::peripherals::GPIO;
+impl<const GPIONUM: u8> crate::gpio::AnalogPin for GpioPin<GPIONUM>
+where
+    Self: IsAnalogPin,
+{
+    /// Configures the pin for analog mode.
+    fn set_analog(&self, _: crate::private::Internal) {
+        use crate::peripherals::GPIO;
 
-                    get_io_mux_reg($pin_num).modify(|_,w| unsafe {
-                        w.mcu_sel().bits(1);
-                        w.fun_ie().clear_bit();
-                        w.fun_wpu().clear_bit();
-                        w.fun_wpd().clear_bit()
-                    });
+        get_io_mux_reg(self.number()).modify(|_, w| unsafe {
+            w.mcu_sel().bits(1);
+            w.fun_ie().clear_bit();
+            w.fun_wpu().clear_bit();
+            w.fun_wpd().clear_bit()
+        });
 
-                    unsafe{ &*GPIO::PTR }.enable_w1tc().write(|w| unsafe { w.bits(1 << $pin_num) });
-                }
-            }
-        )+
+        unsafe { &*GPIO::PTR }
+            .enable_w1tc()
+            .write(|w| unsafe { w.bits(1 << self.number()) });
     }
 }
 

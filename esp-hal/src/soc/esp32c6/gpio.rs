@@ -318,17 +318,6 @@ crate::gpio::gpio! {
     (30, 0, InputOutput (0 => SPID) (0 => SPID))
 }
 
-crate::gpio::analog! {
-    0
-    1
-    2
-    3
-    4
-    5
-    6
-    7
-}
-
 crate::gpio::lp_io::lp_gpio! {
     0
     1

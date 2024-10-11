@@ -280,14 +280,6 @@ crate::gpio::gpio! {
     (27, 0, InputOutput () (2 => FSPICS5))
 }
 
-crate::gpio::analog! {
-    1
-    2
-    3
-    4
-    5
-}
-
 #[derive(Clone, Copy)]
 pub(crate) enum InterruptStatusRegisterAccess {
     Bank0,
