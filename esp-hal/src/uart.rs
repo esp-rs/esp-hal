@@ -135,8 +135,6 @@ use crate::{
         interconnect::{InputConnection, OutputConnection},
         InputSignal,
         OutputSignal,
-        PeripheralInput,
-        PeripheralOutput,
         Pull,
     },
     interrupt::InterruptHandler,

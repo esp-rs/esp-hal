@@ -11,7 +11,7 @@
 
 use super::timer::{TimerIFace, TimerSpeed};
 use crate::{
-    gpio::{interconnect::OutputConnection, OutputSignal, PeripheralOutput},
+    gpio::{interconnect::OutputConnection, OutputSignal},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::ledc::RegisterBlock,
 };

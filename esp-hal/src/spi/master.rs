@@ -87,8 +87,6 @@ use crate::{
         InputSignal,
         NoPin,
         OutputSignal,
-        PeripheralInput,
-        PeripheralOutput,
     },
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},

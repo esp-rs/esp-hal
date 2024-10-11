@@ -12,7 +12,7 @@
 use core::marker::PhantomData;
 
 use crate::{
-    gpio::{interconnect::OutputConnection, PeripheralOutput},
+    gpio::interconnect::OutputConnection,
     mcpwm::{timer::Timer, PwmPeripheral},
     peripheral::{Peripheral, PeripheralRef},
     private,
