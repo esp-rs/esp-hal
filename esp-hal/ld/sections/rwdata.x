@@ -7,11 +7,13 @@ SECTIONS {
     . = ALIGN (4);
 
     #IF ESP_HAL_PLACE_SWITCH_TABLES_IN_RAM
-        *(.rodata.cst*)
+      *(.rodata.*_esp_hal_internal_handler*)
+      *(.rodata..Lswitch.table.*)
+      *(.rodata.cst*)
     #ENDIF
 
     #IF ESP_HAL_PLACE_ANON_IN_RAM
-        *(.rodata..Lanon .rodata..Lanon.*)
+      *(.rodata..Lanon .rodata..Lanon.*)
     #ENDIF
 
     *(.sdata .sdata.* .sdata2 .sdata2.*);
