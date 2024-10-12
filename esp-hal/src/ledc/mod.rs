@@ -168,7 +168,7 @@ impl<'d> Ledc<'d> {
     pub fn get_channel<S: TimerSpeed>(
         &self,
         number: channel::Number,
-        output_pin: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        output_pin: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
     ) -> Channel<'d, S> {
         Channel::new(number, output_pin)
     }

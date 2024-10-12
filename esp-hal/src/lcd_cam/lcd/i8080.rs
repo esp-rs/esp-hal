@@ -232,7 +232,7 @@ impl<'d, DM: Mode> I8080<'d, DM> {
     }
 
     /// Associates a CS pin with the I8080 interface.
-    pub fn with_cs(self, cs: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd) -> Self {
+    pub fn with_cs(self, cs: impl Peripheral<P = impl Into<OutputConnection>> + 'd) -> Self {
         crate::into_ref!(cs);
         let mut cs = cs.map_into();
         cs.set_to_push_pull_output(crate::private::Internal);
@@ -244,8 +244,8 @@ impl<'d, DM: Mode> I8080<'d, DM> {
     /// Configures the control pins for the I8080 interface.
     pub fn with_ctrl_pins(
         self,
-        dc: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        wrx: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        dc: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        wrx: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
     ) -> Self {
         crate::into_ref!(dc, wrx);
 
@@ -591,35 +591,18 @@ impl<'d> TxEightBits<'d> {
     #[allow(clippy::too_many_arguments)]
     /// Creates a new `TxEightBits` instance with the provided output pins.
     pub fn new(
-        pin_0: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_1: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_2: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_3: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_4: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_5: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_6: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_7: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_0: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_1: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_2: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_3: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_4: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_5: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_6: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_7: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
     ) -> Self {
-        crate::into_ref!(pin_0);
-        crate::into_ref!(pin_1);
-        crate::into_ref!(pin_2);
-        crate::into_ref!(pin_3);
-        crate::into_ref!(pin_4);
-        crate::into_ref!(pin_5);
-        crate::into_ref!(pin_6);
-        crate::into_ref!(pin_7);
-
+        crate::into_mapped_ref!(pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7);
         Self {
-            pins: [
-                pin_0.map_into(),
-                pin_1.map_into(),
-                pin_2.map_into(),
-                pin_3.map_into(),
-                pin_4.map_into(),
-                pin_5.map_into(),
-                pin_6.map_into(),
-                pin_7.map_into(),
-            ],
+            pins: [pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7],
         }
     }
 }
@@ -653,58 +636,31 @@ impl<'d> TxSixteenBits<'d> {
     #[allow(clippy::too_many_arguments)]
     /// Creates a new `TxSixteenBits` instance with the provided output pins.
     pub fn new(
-        pin_0: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_1: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_2: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_3: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_4: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_5: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_6: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_7: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_8: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_9: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_10: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_11: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_12: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_13: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_14: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        pin_15: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin_0: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_1: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_2: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_3: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_4: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_5: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_6: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_7: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_8: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_9: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_10: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_11: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_12: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_13: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_14: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin_15: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
     ) -> Self {
-        crate::into_ref!(pin_0);
-        crate::into_ref!(pin_1);
-        crate::into_ref!(pin_2);
-        crate::into_ref!(pin_3);
-        crate::into_ref!(pin_4);
-        crate::into_ref!(pin_5);
-        crate::into_ref!(pin_6);
-        crate::into_ref!(pin_7);
-        crate::into_ref!(pin_8);
-        crate::into_ref!(pin_9);
-        crate::into_ref!(pin_10);
-        crate::into_ref!(pin_11);
-        crate::into_ref!(pin_12);
-        crate::into_ref!(pin_13);
-        crate::into_ref!(pin_14);
-        crate::into_ref!(pin_15);
-
+        crate::into_mapped_ref!(
+            pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7, pin_8, pin_9, pin_10, pin_11,
+            pin_12, pin_13, pin_14, pin_15
+        );
         Self {
             pins: [
-                pin_0.map_into(),
-                pin_1.map_into(),
-                pin_2.map_into(),
-                pin_3.map_into(),
-                pin_4.map_into(),
-                pin_5.map_into(),
-                pin_6.map_into(),
-                pin_7.map_into(),
-                pin_8.map_into(),
-                pin_9.map_into(),
-                pin_10.map_into(),
-                pin_11.map_into(),
-                pin_12.map_into(),
-                pin_13.map_into(),
-                pin_14.map_into(),
-                pin_15.map_into(),
+                pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7, pin_8, pin_9, pin_10,
+                pin_11, pin_12, pin_13, pin_14, pin_15,
             ],
         }
     }

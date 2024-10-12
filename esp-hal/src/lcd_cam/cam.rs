@@ -240,7 +240,7 @@ impl<'d> Camera<'d> {
     /// Configures the master clock (MCLK) pin for the camera interface.
     pub fn with_master_clock(
         self,
-        mclk: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        mclk: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
     ) -> Self {
         crate::into_ref!(mclk);
         let mut mclk = mclk.map_into();
@@ -252,7 +252,7 @@ impl<'d> Camera<'d> {
     /// Configures the pixel clock (PCLK) pin for the camera interface.
     pub fn with_pixel_clock(
         self,
-        pclk: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
+        pclk: impl Peripheral<P = impl Into<InputConnection>> + 'd,
     ) -> Self {
         crate::into_ref!(pclk);
 
@@ -267,8 +267,8 @@ impl<'d> Camera<'d> {
     /// HENABLE).
     pub fn with_ctrl_pins(
         self,
-        vsync: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        h_enable: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
+        vsync: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        h_enable: impl Peripheral<P = impl Into<InputConnection>> + 'd,
     ) -> Self {
         crate::into_ref!(vsync);
         crate::into_ref!(h_enable);
@@ -291,9 +291,9 @@ impl<'d> Camera<'d> {
     /// HENABLE) with DE (data enable).
     pub fn with_ctrl_pins_and_de(
         self,
-        vsync: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        hsync: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        h_enable: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
+        vsync: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        hsync: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        h_enable: impl Peripheral<P = impl Into<InputConnection>> + 'd,
     ) -> Self {
         crate::into_ref!(vsync);
         crate::into_ref!(hsync);
@@ -491,49 +491,33 @@ impl RxEightBits {
     /// Creates a new instance of `RxEightBits`, configuring the specified pins
     /// as the 8-bit data bus.
     pub fn new<'d>(
-        pin_0: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_1: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_2: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_3: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_4: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_5: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_6: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_7: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
+        pin_0: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_1: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_2: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_3: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_4: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_5: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_6: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_7: impl Peripheral<P = impl Into<InputConnection>> + 'd,
     ) -> Self {
-        crate::into_ref!(pin_0);
-        crate::into_ref!(pin_1);
-        crate::into_ref!(pin_2);
-        crate::into_ref!(pin_3);
-        crate::into_ref!(pin_4);
-        crate::into_ref!(pin_5);
-        crate::into_ref!(pin_6);
-        crate::into_ref!(pin_7);
+        crate::into_mapped_ref!(pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7);
 
-        let mut pin_0 = pin_0.map_into();
-        let mut pin_1 = pin_1.map_into();
-        let mut pin_2 = pin_2.map_into();
-        let mut pin_3 = pin_3.map_into();
-        let mut pin_4 = pin_4.map_into();
-        let mut pin_5 = pin_5.map_into();
-        let mut pin_6 = pin_6.map_into();
-        let mut pin_7 = pin_7.map_into();
+        let pins = [pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7];
+        let signals = [
+            InputSignal::CAM_DATA_0,
+            InputSignal::CAM_DATA_1,
+            InputSignal::CAM_DATA_2,
+            InputSignal::CAM_DATA_3,
+            InputSignal::CAM_DATA_4,
+            InputSignal::CAM_DATA_5,
+            InputSignal::CAM_DATA_6,
+            InputSignal::CAM_DATA_7,
+        ];
 
-        pin_0.init_input(Pull::None, crate::private::Internal);
-        pin_0.connect_input_to_peripheral(InputSignal::CAM_DATA_0, crate::private::Internal);
-        pin_1.init_input(Pull::None, crate::private::Internal);
-        pin_1.connect_input_to_peripheral(InputSignal::CAM_DATA_1, crate::private::Internal);
-        pin_2.init_input(Pull::None, crate::private::Internal);
-        pin_2.connect_input_to_peripheral(InputSignal::CAM_DATA_2, crate::private::Internal);
-        pin_3.init_input(Pull::None, crate::private::Internal);
-        pin_3.connect_input_to_peripheral(InputSignal::CAM_DATA_3, crate::private::Internal);
-        pin_4.init_input(Pull::None, crate::private::Internal);
-        pin_4.connect_input_to_peripheral(InputSignal::CAM_DATA_4, crate::private::Internal);
-        pin_5.init_input(Pull::None, crate::private::Internal);
-        pin_5.connect_input_to_peripheral(InputSignal::CAM_DATA_5, crate::private::Internal);
-        pin_6.init_input(Pull::None, crate::private::Internal);
-        pin_6.connect_input_to_peripheral(InputSignal::CAM_DATA_6, crate::private::Internal);
-        pin_7.init_input(Pull::None, crate::private::Internal);
-        pin_7.connect_input_to_peripheral(InputSignal::CAM_DATA_7, crate::private::Internal);
+        for (mut pin, signal) in pins.into_iter().zip(signals.into_iter()) {
+            pin.init_input(Pull::None, crate::private::Internal);
+            pin.connect_input_to_peripheral(signal, crate::private::Internal);
+        }
 
         Self { _pins: () }
     }
@@ -554,89 +538,55 @@ impl RxSixteenBits {
     /// Creates a new instance of `RxSixteenBits`, configuring the specified
     /// pins as the 16-bit data bus.
     pub fn new<'d>(
-        pin_0: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_1: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_2: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_3: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_4: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_5: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_6: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_7: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_8: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_9: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_10: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_11: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_12: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_13: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_14: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        pin_15: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
+        pin_0: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_1: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_2: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_3: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_4: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_5: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_6: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_7: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_8: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_9: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_10: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_11: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_12: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_13: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_14: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_15: impl Peripheral<P = impl Into<InputConnection>> + 'd,
     ) -> Self {
-        crate::into_ref!(pin_0);
-        crate::into_ref!(pin_1);
-        crate::into_ref!(pin_2);
-        crate::into_ref!(pin_3);
-        crate::into_ref!(pin_4);
-        crate::into_ref!(pin_5);
-        crate::into_ref!(pin_6);
-        crate::into_ref!(pin_7);
-        crate::into_ref!(pin_8);
-        crate::into_ref!(pin_9);
-        crate::into_ref!(pin_10);
-        crate::into_ref!(pin_11);
-        crate::into_ref!(pin_12);
-        crate::into_ref!(pin_13);
-        crate::into_ref!(pin_14);
-        crate::into_ref!(pin_15);
+        crate::into_mapped_ref!(
+            pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7, pin_8, pin_9, pin_10, pin_11,
+            pin_12, pin_13, pin_14, pin_15
+        );
 
-        let mut pin_0 = pin_0.map_into();
-        let mut pin_1 = pin_1.map_into();
-        let mut pin_2 = pin_2.map_into();
-        let mut pin_3 = pin_3.map_into();
-        let mut pin_4 = pin_4.map_into();
-        let mut pin_5 = pin_5.map_into();
-        let mut pin_6 = pin_6.map_into();
-        let mut pin_7 = pin_7.map_into();
-        let mut pin_8 = pin_8.map_into();
-        let mut pin_9 = pin_9.map_into();
-        let mut pin_10 = pin_10.map_into();
-        let mut pin_11 = pin_11.map_into();
-        let mut pin_12 = pin_12.map_into();
-        let mut pin_13 = pin_13.map_into();
-        let mut pin_14 = pin_14.map_into();
-        let mut pin_15 = pin_15.map_into();
+        let pins = [
+            pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7, pin_8, pin_9, pin_10, pin_11,
+            pin_12, pin_13, pin_14, pin_15,
+        ];
+        let signals = [
+            InputSignal::CAM_DATA_0,
+            InputSignal::CAM_DATA_1,
+            InputSignal::CAM_DATA_2,
+            InputSignal::CAM_DATA_3,
+            InputSignal::CAM_DATA_4,
+            InputSignal::CAM_DATA_5,
+            InputSignal::CAM_DATA_6,
+            InputSignal::CAM_DATA_7,
+            InputSignal::CAM_DATA_8,
+            InputSignal::CAM_DATA_9,
+            InputSignal::CAM_DATA_10,
+            InputSignal::CAM_DATA_11,
+            InputSignal::CAM_DATA_12,
+            InputSignal::CAM_DATA_13,
+            InputSignal::CAM_DATA_14,
+            InputSignal::CAM_DATA_15,
+        ];
 
-        pin_0.init_input(Pull::None, crate::private::Internal);
-        pin_0.connect_input_to_peripheral(InputSignal::CAM_DATA_0, crate::private::Internal);
-        pin_1.init_input(Pull::None, crate::private::Internal);
-        pin_1.connect_input_to_peripheral(InputSignal::CAM_DATA_1, crate::private::Internal);
-        pin_2.init_input(Pull::None, crate::private::Internal);
-        pin_2.connect_input_to_peripheral(InputSignal::CAM_DATA_2, crate::private::Internal);
-        pin_3.init_input(Pull::None, crate::private::Internal);
-        pin_3.connect_input_to_peripheral(InputSignal::CAM_DATA_3, crate::private::Internal);
-        pin_4.init_input(Pull::None, crate::private::Internal);
-        pin_4.connect_input_to_peripheral(InputSignal::CAM_DATA_4, crate::private::Internal);
-        pin_5.init_input(Pull::None, crate::private::Internal);
-        pin_5.connect_input_to_peripheral(InputSignal::CAM_DATA_5, crate::private::Internal);
-        pin_6.init_input(Pull::None, crate::private::Internal);
-        pin_6.connect_input_to_peripheral(InputSignal::CAM_DATA_6, crate::private::Internal);
-        pin_7.init_input(Pull::None, crate::private::Internal);
-        pin_7.connect_input_to_peripheral(InputSignal::CAM_DATA_7, crate::private::Internal);
-        pin_8.init_input(Pull::None, crate::private::Internal);
-        pin_8.connect_input_to_peripheral(InputSignal::CAM_DATA_8, crate::private::Internal);
-        pin_9.init_input(Pull::None, crate::private::Internal);
-        pin_9.connect_input_to_peripheral(InputSignal::CAM_DATA_9, crate::private::Internal);
-        pin_10.init_input(Pull::None, crate::private::Internal);
-        pin_10.connect_input_to_peripheral(InputSignal::CAM_DATA_10, crate::private::Internal);
-        pin_11.init_input(Pull::None, crate::private::Internal);
-        pin_11.connect_input_to_peripheral(InputSignal::CAM_DATA_11, crate::private::Internal);
-        pin_12.init_input(Pull::None, crate::private::Internal);
-        pin_12.connect_input_to_peripheral(InputSignal::CAM_DATA_12, crate::private::Internal);
-        pin_13.init_input(Pull::None, crate::private::Internal);
-        pin_13.connect_input_to_peripheral(InputSignal::CAM_DATA_13, crate::private::Internal);
-        pin_14.init_input(Pull::None, crate::private::Internal);
-        pin_14.connect_input_to_peripheral(InputSignal::CAM_DATA_14, crate::private::Internal);
-        pin_15.init_input(Pull::None, crate::private::Internal);
-        pin_15.connect_input_to_peripheral(InputSignal::CAM_DATA_15, crate::private::Internal);
+        for (mut pin, signal) in pins.into_iter().zip(signals.into_iter()) {
+            pin.init_input(Pull::None, crate::private::Internal);
+            pin.connect_input_to_peripheral(signal, crate::private::Internal);
+        }
 
         Self { _pins: () }
     }

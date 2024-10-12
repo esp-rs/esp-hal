@@ -296,7 +296,7 @@ impl<'d> Rmt<'d, crate::Async> {
 }
 
 fn configure_rx_channel<'d, T: private::RxChannelInternal<M>, M: crate::Mode>(
-    pin: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
+    pin: impl Peripheral<P = impl Into<InputConnection>> + 'd,
     config: RxChannelConfig,
 ) -> Result<T, Error> {
     if config.filter_threshold > 0b111_1111 {
@@ -334,7 +334,7 @@ fn configure_rx_channel<'d, T: private::RxChannelInternal<M>, M: crate::Mode>(
 }
 
 fn configure_tx_channel<'d, T: private::TxChannelInternal<M>, M: crate::Mode>(
-    pin: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+    pin: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
     config: TxChannelConfig,
 ) -> Result<T, Error> {
     crate::into_ref!(pin);
@@ -362,7 +362,7 @@ where
     /// Configure the TX channel
     fn configure(
         self,
-        pin: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
         config: TxChannelConfig,
     ) -> Result<T, Error>
     where
@@ -380,7 +380,7 @@ where
     /// Configure the TX channel
     fn configure(
         self,
-        pin: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        pin: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
         config: TxChannelConfig,
     ) -> Result<T, Error>
     where
@@ -398,7 +398,7 @@ where
     /// Configure the RX channel
     fn configure(
         self,
-        pin: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
+        pin: impl Peripheral<P = impl Into<InputConnection>> + 'd,
         config: RxChannelConfig,
     ) -> Result<T, Error>
     where
@@ -416,7 +416,7 @@ where
     /// Configure the RX channel
     fn configure(
         self,
-        pin: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
+        pin: impl Peripheral<P = impl Into<InputConnection>> + 'd,
         config: RxChannelConfig,
     ) -> Result<T, Error>
     where

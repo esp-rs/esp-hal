@@ -282,11 +282,9 @@ pub struct ClkOutPin<'d> {
 }
 impl<'d> ClkOutPin<'d> {
     /// Create a ClkOutPin
-    pub fn new(pin: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd) -> Self {
-        crate::into_ref!(pin);
-        Self {
-            pin: pin.map_into(),
-        }
+    pub fn new(pin: impl Peripheral<P = impl Into<OutputConnection>> + 'd) -> Self {
+        crate::into_mapped_ref!(pin);
+        Self { pin }
     }
 }
 impl TxClkPin for ClkOutPin<'_> {
@@ -305,11 +303,9 @@ pub struct ClkInPin<'d> {
 }
 impl<'d> ClkInPin<'d> {
     /// Create a new ClkInPin
-    pub fn new(pin: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd) -> Self {
-        crate::into_ref!(pin);
-        Self {
-            pin: pin.map_into(),
-        }
+    pub fn new(pin: impl Peripheral<P = impl Into<InputConnection>> + 'd) -> Self {
+        crate::into_mapped_ref!(pin);
+        Self { pin }
     }
 }
 impl TxClkPin for ClkInPin<'_> {
@@ -335,14 +331,11 @@ pub struct RxClkInPin<'d> {
 impl<'d> RxClkInPin<'d> {
     /// Create a new RxClkInPin
     pub fn new(
-        pin: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
+        pin: impl Peripheral<P = impl Into<InputConnection>> + 'd,
         sample_edge: SampleEdge,
     ) -> Self {
-        crate::into_ref!(pin);
-        Self {
-            pin: pin.map_into(),
-            sample_edge,
-        }
+        crate::into_mapped_ref!(pin);
+        Self { pin, sample_edge }
     }
 }
 impl<'d> RxClkPin for RxClkInPin<'d> {
@@ -378,13 +371,10 @@ where
     /// Create a [TxPinConfigWithValidPin]
     pub fn new(
         tx_pins: P,
-        valid_pin: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        valid_pin: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
     ) -> Self {
-        crate::into_ref!(valid_pin);
-        Self {
-            tx_pins,
-            valid_pin: valid_pin.map_into(),
-        }
+        crate::into_mapped_ref!(valid_pin);
+        Self { tx_pins, valid_pin }
     }
 }
 
@@ -462,11 +452,11 @@ macro_rules! tx_pins {
                 #[allow(clippy::too_many_arguments)]
                 pub fn new(
                     $(
-                        [< pin_ $pin:lower >] : impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+                        [< pin_ $pin:lower >] : impl Peripheral<P = impl Into<OutputConnection> > + 'd,
                     )+
                 ) -> Self {
-                    crate::into_ref!($( [< pin_ $pin:lower >] ),+);
-                    Self { $( [< pin_ $pin:lower >]: [< pin_ $pin:lower >].map_into() ),+ }
+                    crate::into_mapped_ref!($( [< pin_ $pin:lower >] ),+);
+                    Self { $( [< pin_ $pin:lower >] ),+ }
                 }
             }
 
@@ -568,14 +558,14 @@ where
     /// Create a new [RxPinConfigWithValidPin]
     pub fn new(
         rx_pins: P,
-        valid_pin: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
+        valid_pin: impl Peripheral<P = impl Into<InputConnection>> + 'd,
         enable_mode: EnableMode,
         eof_mode: EofMode,
     ) -> Self {
-        crate::into_ref!(valid_pin);
+        crate::into_mapped_ref!(valid_pin);
         Self {
             rx_pins,
-            valid_pin: valid_pin.map_into(),
+            valid_pin,
             enable_mode,
             eof_mode,
         }
@@ -682,11 +672,11 @@ macro_rules! rx_pins {
                 #[allow(clippy::too_many_arguments)]
                 pub fn new(
                     $(
-                        [< pin_ $pin:lower >] : impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
+                        [< pin_ $pin:lower >] : impl Peripheral<P = impl Into<InputConnection> > + 'd,
                     )+
                 ) -> Self {
-                    crate::into_ref!($( [< pin_ $pin:lower >] ),+);
-                    Self { $( [< pin_ $pin:lower >]: [< pin_ $pin:lower >].map_into() ),+ }
+                    crate::into_mapped_ref!($( [< pin_ $pin:lower >] ),+);
+                    Self { $( [< pin_ $pin:lower >] ),+ }
                 }
             }
 

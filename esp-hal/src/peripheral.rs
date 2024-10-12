@@ -109,8 +109,8 @@ impl<'a, T> DerefMut for PeripheralRef<'a, T> {
 /// impl<'d, T> Uart<'d, T, Blocking> {
 ///     pub fn new(
 ///         uart: impl Peripheral<P = T> + 'd,
-///         rx_pin: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-///         tx_pin: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+///         rx_pin: impl Peripheral<P = impl Into<InputConnection> > + 'd,
+///         tx_pin: impl Peripheral<P = impl Into<OutputConnection> > + 'd,
 ///     ) -> Result<Self, Error> {
 ///         Ok(Self { .. })
 ///     }
