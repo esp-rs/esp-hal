@@ -265,6 +265,7 @@ pub enum RtcFunction {
 }
 
 /// Trait implemented by RTC pins
+#[cfg(any(lp_io, rtc_cntl))]
 pub trait RtcPin: Pin {
     /// RTC number of the pin
     #[cfg(xtensa)]
@@ -287,6 +288,7 @@ pub trait RtcPin: Pin {
 
 /// Trait implemented by RTC pins which supporting internal pull-up / pull-down
 /// resistors.
+#[cfg(any(lp_io, rtc_cntl))]
 pub trait RtcPinWithResistors: RtcPin {
     /// Enable/disable the internal pull-up resistor
     fn rtcio_pullup(&mut self, enable: bool);
@@ -1075,50 +1077,54 @@ macro_rules! gpio {
                 }
             }
 
-            #[doc(hidden)]
-            #[macro_export]
-            macro_rules! handle_rtcio {
-                ($this:expr, $inner:ident, $code:tt) => {
-                    match $this {
-                        $(
-                            AnyPinInner::[<Gpio $gpionum >]($inner) => $crate::if_rtcio_pin!($($type),* {
-                                $code
-                            } else {{
-                                let _ = $inner;
-                                panic!("Unsupported")
-                            }}),
-                        )+
-                    }
-                }
-            }
-
-            #[doc(hidden)]
-            #[macro_export]
-            macro_rules! handle_rtcio_with_resistors {
-                ($this:expr, $inner:ident, $code:tt) => {
-                    match $this {
-                        $(
-                            AnyPinInner::[<Gpio $gpionum >]($inner) => $crate::if_rtcio_pin!($($type),* {
-                                $crate::if_output_pin!($($type),* {
-                                    $code
-                                } else {{
-                                    let _ = $inner;
-                                    panic!("Unsupported")
-                                }})
-                            } else {{
-                                let _ = $inner;
-                                panic!("Unsupported")
-                            }}),
-                        )+
-                    }
-                }
-            }
-
             pub(crate) use handle_gpio_output;
             pub(crate) use handle_gpio_input;
 
-            pub(crate) use handle_rtcio;
-            pub(crate) use handle_rtcio_with_resistors;
+            cfg_if::cfg_if! {
+                if #[cfg(any(lp_io, rtc_cntl))] {
+                    #[doc(hidden)]
+                    #[macro_export]
+                    macro_rules! handle_rtcio {
+                        ($this:expr, $inner:ident, $code:tt) => {
+                            match $this {
+                                $(
+                                    AnyPinInner::[<Gpio $gpionum >]($inner) => $crate::if_rtcio_pin!($($type),* {
+                                        $code
+                                    } else {{
+                                        let _ = $inner;
+                                        panic!("Unsupported")
+                                    }}),
+                                )+
+                            }
+                        }
+                    }
+
+                    #[doc(hidden)]
+                    #[macro_export]
+                    macro_rules! handle_rtcio_with_resistors {
+                        ($this:expr, $inner:ident, $code:tt) => {
+                            match $this {
+                                $(
+                                    AnyPinInner::[<Gpio $gpionum >]($inner) => $crate::if_rtcio_pin!($($type),* {
+                                        $crate::if_output_pin!($($type),* {
+                                            $code
+                                        } else {{
+                                            let _ = $inner;
+                                            panic!("Unsupported")
+                                        }})
+                                    } else {{
+                                        let _ = $inner;
+                                        panic!("Unsupported")
+                                    }}),
+                                )+
+                            }
+                        }
+                    }
+
+                    pub(crate) use handle_rtcio;
+                    pub(crate) use handle_rtcio_with_resistors;
+                }
+            }
         }
     };
 }
@@ -2136,7 +2142,7 @@ pub(crate) mod internal {
         }
     }
 
-    #[cfg(any(xtensa, esp32c2, esp32c3, esp32c6))]
+    #[cfg(any(lp_io, rtc_cntl))]
     impl RtcPin for AnyPin {
         #[cfg(xtensa)]
         #[allow(unused_braces)] // False positive :/
