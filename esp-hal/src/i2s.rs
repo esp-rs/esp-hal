@@ -459,10 +459,7 @@ where
     }
 
     /// Configures the I2S peripheral to use a master clock (MCLK) output pin.
-    pub fn with_mclk(
-        self,
-        pin: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-    ) -> Self {
+    pub fn with_mclk(self, pin: impl Peripheral<P = impl Into<OutputConnection>> + 'd) -> Self {
         into_ref!(pin);
         let mut pin = pin.map_into();
         pin.set_to_push_pull_output(crate::private::Internal);
@@ -867,7 +864,7 @@ mod private {
 
         pub fn with_bclk(
             self,
-            pin: impl crate::peripheral::Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+            pin: impl crate::peripheral::Peripheral<P = impl Into<OutputConnection>> + 'd,
         ) -> Self {
             into_ref!(pin);
             let mut pin = pin.map_into();
@@ -879,7 +876,7 @@ mod private {
 
         pub fn with_ws(
             self,
-            pin: impl crate::peripheral::Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+            pin: impl crate::peripheral::Peripheral<P = impl Into<OutputConnection>> + 'd,
         ) -> Self {
             into_ref!(pin);
             let mut pin = pin.map_into();
@@ -891,7 +888,7 @@ mod private {
 
         pub fn with_dout(
             self,
-            pin: impl crate::peripheral::Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+            pin: impl crate::peripheral::Peripheral<P = impl Into<OutputConnection>> + 'd,
         ) -> Self {
             into_ref!(pin);
             let mut pin = pin.map_into();
