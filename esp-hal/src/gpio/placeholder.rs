@@ -18,8 +18,11 @@ impl crate::peripheral::Peripheral for Level {
 impl Level {
     pub(crate) fn pull_direction(&self, _pull: Pull, _internal: private::Internal) {}
 
-    pub(crate) fn input_signals(&self, _: private::Internal) -> [Option<InputSignal>; 6] {
-        [None; 6]
+    pub(crate) fn input_signals(
+        &self,
+        _internal: private::Internal,
+    ) -> &[(AlternateFunction, InputSignal)] {
+        &[]
     }
 
     pub(crate) fn init_input(&self, _pull: Pull, _: private::Internal) {}
@@ -75,8 +78,11 @@ impl Level {
         false
     }
 
-    pub(crate) fn output_signals(&self, _: private::Internal) -> [Option<OutputSignal>; 6] {
-        [None; 6]
+    pub(crate) fn output_signals(
+        &self,
+        _internal: private::Internal,
+    ) -> &[(AlternateFunction, OutputSignal)] {
+        &[]
     }
 
     pub(crate) fn connect_peripheral_to_output(
@@ -122,7 +128,7 @@ impl NoPin {
             pub(crate) fn internal_pull_up_in_sleep_mode(&mut self, _on: bool, _internal: private::Internal);
             pub(crate) fn internal_pull_down_in_sleep_mode(&mut self, _on: bool, _internal: private::Internal);
             pub(crate) fn is_set_high(&self, _internal: private::Internal) -> bool;
-            pub(crate) fn output_signals(&self, _internal: private::Internal) -> [Option<OutputSignal>; 6];
+            pub(crate) fn output_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, OutputSignal)];
             pub(crate) fn connect_peripheral_to_output(&mut self, _signal: OutputSignal, _internal: private::Internal);
             pub(crate) fn disconnect_from_peripheral_output(&mut self, _signal: OutputSignal, _internal: private::Internal);
         }

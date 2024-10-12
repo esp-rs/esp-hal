@@ -347,10 +347,10 @@ pub trait Pin: Sealed {
     }
 
     #[doc(hidden)]
-    fn output_signals(&self, _: private::Internal) -> [Option<OutputSignal>; 6];
+    fn output_signals(&self, _: private::Internal) -> &[(AlternateFunction, OutputSignal)];
 
     #[doc(hidden)]
-    fn input_signals(&self, _: private::Internal) -> [Option<InputSignal>; 6];
+    fn input_signals(&self, _: private::Internal) -> &[(AlternateFunction, InputSignal)];
 
     #[doc(hidden)]
     fn gpio_bank(&self, _: private::Internal) -> GpioRegisterAccess;
@@ -992,29 +992,28 @@ macro_rules! gpio {
                         $crate::gpio::GpioRegisterAccess::[<Bank $bank >]
                     }
 
-                    fn output_signals(&self, _: $crate::private::Internal) -> [Option<OutputSignal>; 6]{
-                        #[allow(unused_mut)]
-                        let mut output_signals = [None; 6];
-
-                        $(
+                    fn output_signals(&self, _: $crate::private::Internal) -> &[(AlternateFunction, OutputSignal)]{
+                        static OUTPUT_SIGNALS: &[(AlternateFunction, OutputSignal)] = &[
                             $(
-                                output_signals[ $af_output_num ] = Some( OutputSignal::$af_output_signal );
-                            )*
-                        )?
+                                $(
+                                    (AlternateFunction::[< Function $af_output_num >], OutputSignal::$af_output_signal ),
+                                )*
+                            )?
+                        ];
 
-                        output_signals
+
+                        OUTPUT_SIGNALS
                     }
-                    fn input_signals(&self, _: $crate::private::Internal) -> [Option<InputSignal>; 6] {
-                        #[allow(unused_mut)]
-                        let mut input_signals = [None; 6];
-
-                        $(
+                    fn input_signals(&self, _: $crate::private::Internal) -> &[(AlternateFunction, InputSignal)] {
+                        static INPUT_SIGNALS: &[(AlternateFunction, InputSignal)] = &[
                             $(
-                                input_signals[ $af_input_num ] = Some( InputSignal::$af_input_signal );
-                            )*
-                        )?
+                                $(
+                                    (AlternateFunction::[< Function $af_input_num >], InputSignal::$af_input_signal ),
+                                )*
+                            )?
+                        ];
 
-                        input_signals
+                        INPUT_SIGNALS
                     }
                 }
 
@@ -2041,13 +2040,13 @@ pub(crate) mod internal {
             });
         }
 
-        fn output_signals(&self, _: private::Internal) -> [Option<OutputSignal>; 6] {
+        fn output_signals(&self, _: private::Internal) -> &[(AlternateFunction, OutputSignal)] {
             handle_gpio_input!(&self.0, target, {
                 Pin::output_signals(target, private::Internal)
             })
         }
 
-        fn input_signals(&self, _: private::Internal) -> [Option<InputSignal>; 6] {
+        fn input_signals(&self, _: private::Internal) -> &[(AlternateFunction, InputSignal)] {
             handle_gpio_input!(&self.0, target, {
                 Pin::input_signals(target, private::Internal)
             })

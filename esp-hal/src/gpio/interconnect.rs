@@ -127,10 +127,9 @@ impl InputSignal {
             GPIO_FUNCTION
         } else {
             self.input_signals(private::Internal)
-                .into_iter()
-                .position(|s| s == Some(signal))
-                .ok_or(())
-                .and_then(AlternateFunction::try_from)
+                .iter()
+                .find(|(_af, s)| *s == signal)
+                .map(|(af, _)| *af)
                 .unwrap_or(GPIO_FUNCTION)
         };
 
@@ -168,7 +167,7 @@ impl InputSignal {
         #[doc(hidden)]
         to self.pin {
             pub fn pull_direction(&mut self, pull: Pull, _internal: private::Internal);
-            pub fn input_signals(&self, _internal: private::Internal) -> [Option<gpio::InputSignal>; 6];
+            pub fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)];
             pub fn init_input(&mut self, pull: Pull, _internal: private::Internal);
             pub fn is_input_high(&self, _internal: private::Internal) -> bool;
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
@@ -282,10 +281,9 @@ impl OutputSignal {
             GPIO_FUNCTION
         } else {
             self.input_signals(private::Internal)
-                .into_iter()
-                .position(|s| s == Some(signal))
-                .ok_or(())
-                .and_then(AlternateFunction::try_from)
+                .iter()
+                .find(|(_af, s)| *s == signal)
+                .map(|(af, _)| *af)
                 .unwrap_or(GPIO_FUNCTION)
         };
 
@@ -330,10 +328,9 @@ impl OutputSignal {
             GPIO_FUNCTION
         } else {
             self.output_signals(private::Internal)
-                .into_iter()
-                .position(|s| s == Some(signal))
-                .ok_or(())
-                .and_then(AlternateFunction::try_from)
+                .iter()
+                .find(|(_af, s)| *s == signal)
+                .map(|(af, _)| *af)
                 .unwrap_or(GPIO_FUNCTION)
         };
 
@@ -377,13 +374,13 @@ impl OutputSignal {
         #[doc(hidden)]
         to self.pin {
             pub fn pull_direction(&mut self, pull: Pull, _internal: private::Internal);
-            pub fn input_signals(&self, _internal: private::Internal) -> [Option<gpio::InputSignal>; 6];
+            pub fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)];
             pub fn init_input(&mut self, pull: Pull, _internal: private::Internal);
             pub fn is_input_high(&self, _internal: private::Internal) -> bool;
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
             pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
 
-            pub fn output_signals(&self, _internal: private::Internal) -> [Option<gpio::OutputSignal>; 6];
+            pub fn output_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::OutputSignal)];
             pub fn set_to_open_drain_output(&mut self, _internal: private::Internal);
             pub fn set_to_push_pull_output(&mut self, _internal: private::Internal);
             pub fn enable_output(&mut self, on: bool, _internal: private::Internal);
@@ -459,7 +456,7 @@ impl OutputConnection {
             OutputConnectionInner::Dummy(_) => Level::Low,
         } {
             pub fn is_input_high(&self, _internal: private::Internal) -> bool;
-            pub fn input_signals(&self, _internal: private::Internal) -> [Option<gpio::InputSignal>; 6];
+            pub fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)];
         }
         #[doc(hidden)]
         to match &mut self.0 {
@@ -480,7 +477,7 @@ impl OutputConnection {
             OutputConnectionInner::Dummy(pin) => pin,
         } {
             pub fn is_set_high(&self, _internal: private::Internal) -> bool;
-            pub fn output_signals(&self, _internal: private::Internal) -> [Option<gpio::OutputSignal>; 6];
+            pub fn output_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::OutputSignal)];
         }
 
         #[doc(hidden)]
@@ -581,7 +578,7 @@ impl InputConnection {
             InputConnectionInner::Constant(level) => level,
         } {
             pub fn is_input_high(&self, _internal: private::Internal) -> bool;
-            pub fn input_signals(&self, _internal: private::Internal) -> [Option<gpio::InputSignal>; 6];
+            pub fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)];
         }
 
         #[doc(hidden)]
