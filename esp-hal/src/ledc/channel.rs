@@ -152,15 +152,14 @@ impl<'d, S: TimerSpeed> Channel<'d, S> {
     /// Return a new channel
     pub fn new(
         number: Number,
-        output_pin: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
+        output_pin: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
     ) -> Self {
-        crate::into_ref!(output_pin);
         let ledc = unsafe { &*crate::peripherals::LEDC::ptr() };
         Channel {
             ledc,
             timer: None,
             number,
-            output_pin: output_pin.map_into(),
+            output_pin: output_pin.map_into().into_ref(),
         }
     }
 }

@@ -104,10 +104,10 @@ where
     /// Constructs an SPI instance in 8bit dataframe mode.
     pub fn new(
         spi: impl Peripheral<P = T> + 'd,
-        sclk: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        mosi: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
-        miso: impl Peripheral<P = impl Into<OutputConnection> + 'd> + 'd,
-        cs: impl Peripheral<P = impl Into<InputConnection> + 'd> + 'd,
+        sclk: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        mosi: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        miso: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        cs: impl Peripheral<P = impl Into<InputConnection>> + 'd,
         mode: SpiMode,
     ) -> Spi<'d, T, FullDuplexMode> {
         crate::into_ref!(spi, sclk, mosi, miso, cs);
