@@ -5,7 +5,6 @@ use crate::{
         self,
         AlternateFunction,
         AnyPin,
-        GpioPin,
         InputPin,
         Level,
         NoPin,
@@ -25,7 +24,7 @@ use crate::{
 
 /// A configurable input signal between a peripheral and a GPIO pin.
 ///
-/// Obtained by calling [`GpioPin::peripheral_input()`],
+/// Obtained by calling [`super::GpioPin::peripheral_input()`],
 /// [`super::Flex::peripheral_input()`] or [`super::Input::peripheral_input()`].
 ///
 /// Multiple input signals can be connected to one pin.
@@ -160,7 +159,7 @@ impl InputSignal {
 
 /// A configurable output signal between a peripheral and a GPIO pin.
 ///
-/// Obtained by calling [`GpioPin::into_peripheral_output()`],
+/// Obtained by calling [`super::GpioPin::into_peripheral_output()`],
 /// [`super::Flex::into_peripheral_output()`] or
 /// [`super::Output::into_peripheral_output()`].
 ///
@@ -407,10 +406,13 @@ impl From<NoPin> for OutputConnection {
     }
 }
 
-impl From<AnyPin> for OutputConnection {
-    fn from(input: AnyPin) -> Self {
+impl<P> From<P> for OutputConnection
+where
+    P: OutputPin,
+{
+    fn from(input: P) -> Self {
         Self(OutputConnectionInner::Output(
-            input.into_peripheral_output(),
+            input.degrade().into_peripheral_output(),
         ))
     }
 }
@@ -418,15 +420,6 @@ impl From<AnyPin> for OutputConnection {
 impl From<OutputSignal> for OutputConnection {
     fn from(signal: OutputSignal) -> Self {
         Self(OutputConnectionInner::Output(signal))
-    }
-}
-
-impl<const GPIONUM: u8> From<GpioPin<GPIONUM>> for OutputConnection
-where
-    GpioPin<GPIONUM>: OutputPin,
-{
-    fn from(pin: GpioPin<GPIONUM>) -> Self {
-        Self(OutputConnectionInner::Output(pin.into_peripheral_output()))
     }
 }
 
@@ -523,18 +516,14 @@ impl From<NoPin> for InputConnection {
     }
 }
 
-impl From<AnyPin> for InputConnection {
-    fn from(input: AnyPin) -> Self {
-        Self(InputConnectionInner::Input(input.peripheral_input()))
-    }
-}
-
-impl<const GPIONUM: u8> From<GpioPin<GPIONUM>> for InputConnection
+impl<P> From<P> for InputConnection
 where
-    GpioPin<GPIONUM>: InputPin,
+    P: InputPin,
 {
-    fn from(pin: GpioPin<GPIONUM>) -> Self {
-        Self(InputConnectionInner::Input(pin.peripheral_input()))
+    fn from(input: P) -> Self {
+        Self(InputConnectionInner::Input(
+            input.degrade().peripheral_input(),
+        ))
     }
 }
 
