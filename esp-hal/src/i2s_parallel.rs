@@ -2,6 +2,10 @@
 //!
 //! ## Overview
 //!
+//! ## Notes
+//!
+//! - In 16 bit mode the buffer needs to be interleaved and is expected to have
+//!   a length thats a multiple of 32 bits
 //!
 //! ## Configuration
 //!
@@ -12,13 +16,26 @@
 //!   - `GPIO`
 //!   - `DMA`
 //!   - `system` (to configure and enable the I2S peripheral)
-use core::{marker::PhantomData, mem::ManuallyDrop, ops::{Deref, DerefMut}};
+use core::{
+    marker::PhantomData,
+    mem::ManuallyDrop,
+    ops::{Deref, DerefMut},
+};
 
 use fugit::HertzU32;
 use private::TxPins;
 
 use crate::{
-    dma::{Channel, ChannelTx, DmaChannelConvert, DmaEligible, DmaError, DmaTxBuffer, PeripheralMarker, Tx},
+    dma::{
+        Channel,
+        ChannelTx,
+        DmaChannelConvert,
+        DmaEligible,
+        DmaError,
+        DmaTxBuffer,
+        PeripheralMarker,
+        Tx,
+    },
     gpio::{OutputSignal, PeripheralOutput},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{i2s0::RegisterBlock, I2S0, I2S1},
@@ -208,6 +225,108 @@ where
     }
 }
 
+/// Represents a group of 8 output pins configured for 8-bit parallel data
+/// transmission.
+pub struct TxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7> {
+    pin_0: PeripheralRef<'d, P0>,
+    pin_1: PeripheralRef<'d, P1>,
+    pin_2: PeripheralRef<'d, P2>,
+    pin_3: PeripheralRef<'d, P3>,
+    pin_4: PeripheralRef<'d, P4>,
+    pin_5: PeripheralRef<'d, P5>,
+    pin_6: PeripheralRef<'d, P6>,
+    pin_7: PeripheralRef<'d, P7>,
+}
+
+impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> TxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
+where
+    P0: PeripheralOutput,
+    P1: PeripheralOutput,
+    P2: PeripheralOutput,
+    P3: PeripheralOutput,
+    P4: PeripheralOutput,
+    P5: PeripheralOutput,
+    P6: PeripheralOutput,
+    P7: PeripheralOutput,
+{
+    #[allow(clippy::too_many_arguments)]
+    /// Creates a new `TxSixteenBits` instance with the provided output pins.
+    pub fn new(
+        pin_0: impl Peripheral<P = P0> + 'd,
+        pin_1: impl Peripheral<P = P1> + 'd,
+        pin_2: impl Peripheral<P = P2> + 'd,
+        pin_3: impl Peripheral<P = P3> + 'd,
+        pin_4: impl Peripheral<P = P4> + 'd,
+        pin_5: impl Peripheral<P = P5> + 'd,
+        pin_6: impl Peripheral<P = P6> + 'd,
+        pin_7: impl Peripheral<P = P7> + 'd,
+    ) -> Self {
+        crate::into_ref!(pin_0);
+        crate::into_ref!(pin_1);
+        crate::into_ref!(pin_2);
+        crate::into_ref!(pin_3);
+        crate::into_ref!(pin_4);
+        crate::into_ref!(pin_5);
+        crate::into_ref!(pin_6);
+        crate::into_ref!(pin_7);
+
+        Self {
+            pin_0,
+            pin_1,
+            pin_2,
+            pin_3,
+            pin_4,
+            pin_5,
+            pin_6,
+            pin_7,
+        }
+    }
+}
+
+impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> TxPins for TxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
+where
+    P0: PeripheralOutput,
+    P1: PeripheralOutput,
+    P2: PeripheralOutput,
+    P3: PeripheralOutput,
+    P4: PeripheralOutput,
+    P5: PeripheralOutput,
+    P6: PeripheralOutput,
+    P7: PeripheralOutput,
+{
+    fn bits(&self) -> u8 {
+        8
+    }
+
+    fn configure<I: Instance>(&mut self, _instance: &PeripheralRef<'_, I>) {
+        let bits: u8 = self.bits();
+        self.pin_0.set_to_push_pull_output(crate::private::Internal);
+        self.pin_0
+            .connect_peripheral_to_output(I::data_out_signal(0, bits), crate::private::Internal);
+        self.pin_1.set_to_push_pull_output(crate::private::Internal);
+        self.pin_1
+            .connect_peripheral_to_output(I::data_out_signal(1, bits), crate::private::Internal);
+        self.pin_2.set_to_push_pull_output(crate::private::Internal);
+        self.pin_2
+            .connect_peripheral_to_output(I::data_out_signal(2, bits), crate::private::Internal);
+        self.pin_3.set_to_push_pull_output(crate::private::Internal);
+        self.pin_3
+            .connect_peripheral_to_output(I::data_out_signal(3, bits), crate::private::Internal);
+        self.pin_4.set_to_push_pull_output(crate::private::Internal);
+        self.pin_4
+            .connect_peripheral_to_output(I::data_out_signal(4, bits), crate::private::Internal);
+        self.pin_5.set_to_push_pull_output(crate::private::Internal);
+        self.pin_5
+            .connect_peripheral_to_output(I::data_out_signal(5, bits), crate::private::Internal);
+        self.pin_6.set_to_push_pull_output(crate::private::Internal);
+        self.pin_6
+            .connect_peripheral_to_output(I::data_out_signal(6, bits), crate::private::Internal);
+        self.pin_7.set_to_push_pull_output(crate::private::Internal);
+        self.pin_7
+            .connect_peripheral_to_output(I::data_out_signal(7, bits), crate::private::Internal);
+    }
+}
+
 /// I2S Parallel Interface
 pub struct I2sParallel<'d, I: Instance, DM: Mode> {
     tx_channel: ChannelTx<'d, <I as DmaEligible>::Dma>,
@@ -250,13 +369,18 @@ impl<'d, I: Instance, DM: Mode> I2sParallel<'d, I, DM> {
     }
 
     /// Write data to the I2S peripheral
-    pub fn send<BUF: DmaTxBuffer>(mut self, mut data: BUF) -> Result<I2sParallelTransfer<'d, I, BUF, DM>, (DmaError, Self, BUF)>  {
+    pub fn send<BUF: DmaTxBuffer>(
+        mut self,
+        mut data: BUF,
+    ) -> Result<I2sParallelTransfer<'d, I, BUF, DM>, (DmaError, Self, BUF)> {
         I::tx_reset();
         I::tx_fifo_reset();
         I::tx_dma_reset();
         let result = unsafe {
-            self.tx_channel.prepare_transfer(I::get_dma_peripheral(), &mut data)
-        }.and_then(|_| self.tx_channel.start_transfer());
+            self.tx_channel
+                .prepare_transfer(I::get_dma_peripheral(), &mut data)
+        }
+        .and_then(|_| self.tx_channel.start_transfer());
         if let Err(err) = result {
             return Err((err, self, data));
         }
@@ -275,8 +399,8 @@ impl<'d, I: Instance, DM: Mode> I2sParallel<'d, I, DM> {
     }
 }
 
-/// Represents an ongoing (or potentially finished) transfer using the i2s parallel
-/// interface
+/// Represents an ongoing (or potentially finished) transfer using the i2s
+/// parallel interface
 pub struct I2sParallelTransfer<'d, I, BUF, DM>
 where
     I: Instance,
@@ -430,7 +554,7 @@ pub trait Instance: Signals + RegBlock {
         }
 
         r.conf().modify(|_, w| w.tx_start().clear_bit());
-}
+    }
 
     fn setup(frequency: impl Into<fugit::HertzU32>, bits: u8) {
         let frequency: HertzU32 = frequency.into();
@@ -499,7 +623,6 @@ pub trait Instance: Signals + RegBlock {
             w.fifo_force_pu().set_bit();
             w.fifo_force_pd().clear_bit()
         });
-
     }
 
     #[cfg(all(feature = "debug", feature = "log"))]
@@ -519,7 +642,6 @@ pub trait Instance: Signals + RegBlock {
         info!("int_ena: {:#?}", r.int_ena().read());
         info!("state: {:#?}", r.state().read());
     }
-    
 }
 
 impl RegBlock for I2S0 {
@@ -542,7 +664,11 @@ impl Signals for I2S0 {
     }
     fn data_out_signal(i: usize, bits: u8) -> OutputSignal {
         // Because of... reasons... the 16-bit values for i2s1 appear on d8...d23
-        let offset = if bits == 16 { 8 } else { 0 };
+        let offset = match bits {
+            8 => 8,
+            16 => 8,
+            _ => panic!("Invalid number of bits"),
+        };
         match i + offset {
             0 => OutputSignal::I2S0O_DATA_0,
             1 => OutputSignal::I2S0O_DATA_1,
@@ -618,7 +744,7 @@ impl Signals for I2S1 {
             21 => OutputSignal::I2S1O_DATA_21,
             22 => OutputSignal::I2S1O_DATA_22,
             23 => OutputSignal::I2S1O_DATA_23,
-             _ => panic!("Invalid I2S1 Dout pin"),
+            _ => panic!("Invalid I2S1 Dout pin"),
         }
     }
 }
