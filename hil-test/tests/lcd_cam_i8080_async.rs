@@ -59,7 +59,7 @@ mod tests {
             20.MHz(),
             Config::default(),
         )
-        .into_async(ctx.lcd_cam.interrupts);
+        .into_async();
 
         let mut transfer = i8080.send(Command::<u8>::None, 0, ctx.dma_buf).unwrap();
 
@@ -86,7 +86,7 @@ mod tests {
             20.MHz(),
             Config::default(),
         )
-        .into_async(ctx.lcd_cam.interrupts);
+        .into_async();
 
         let mut transfer = i8080.send(Command::<u8>::None, 0, ctx.dma_buf).unwrap();
 

@@ -10,14 +10,17 @@
 //! ## Implementation State
 //! - RGB is not supported yet
 
+use core::marker::PhantomData;
+
 use crate::{peripheral::PeripheralRef, peripherals::LCD_CAM};
 
 pub mod i8080;
 
 /// Represents an LCD interface.
-pub struct Lcd<'d> {
+pub struct Lcd<'d, M> {
     /// The `LCD_CAM` peripheral reference for managing the LCD functionality.
     pub(crate) lcd_cam: PeripheralRef<'d, LCD_CAM>,
+    pub(super) mode: PhantomData<M>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]

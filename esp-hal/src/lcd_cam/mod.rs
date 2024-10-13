@@ -18,20 +18,19 @@ use crate::{
     peripheral::Peripheral,
     peripherals::LCD_CAM,
     system::{self, PeripheralClockControl},
+    Blocking,
     InterruptConfigurable,
 };
 
 /// Represents a combined LCD and Camera interface.
-pub struct LcdCam<'d> {
+pub struct LcdCam<'d, M = BlockingWithInterrupts> {
     /// The LCD interface.
-    pub lcd: Lcd<'d>,
+    pub lcd: Lcd<'d, M>,
     /// The Camera interface.
     pub cam: Cam<'d>,
-    /// Interrupts
-    pub interrupts: NamesAreHard<'d>,
 }
 
-impl<'d> LcdCam<'d> {
+impl<'d> LcdCam<'d, BlockingWithInterrupts> {
     /// Creates a new `LcdCam` instance.
     pub fn new(lcd_cam: impl Peripheral<P = LCD_CAM> + 'd) -> Self {
         crate::into_ref!(lcd_cam);
@@ -42,12 +41,27 @@ impl<'d> LcdCam<'d> {
         Self {
             lcd: Lcd {
                 lcd_cam: unsafe { lcd_cam.clone_unchecked() },
+                mode: PhantomData,
             },
             cam: Cam {
                 lcd_cam: unsafe { lcd_cam.clone_unchecked() },
             },
-            interrupts: NamesAreHard(PhantomData),
         }
+    }
+
+    /// Split out the [InterruptControl] from the driver.
+    pub fn split_interrupts(self) -> (LcdCam<'d, Blocking>, InterruptControl<'d>) {
+        let interrupts = unsafe { InterruptControl::steal() };
+        (
+            LcdCam {
+                lcd: Lcd {
+                    lcd_cam: self.lcd.lcd_cam,
+                    mode: PhantomData,
+                },
+                cam: self.cam,
+            },
+            interrupts,
+        )
     }
 }
 
@@ -72,9 +86,9 @@ pub enum LcdCamInterrupt {
 }
 
 /// Access to the interrupt bits of the LCD_CAM.
-pub struct NamesAreHard<'d>(PhantomData<&'d ()>);
+pub struct InterruptControl<'d>(PhantomData<&'d ()>);
 
-impl<'d> NamesAreHard<'d> {
+impl<'d> InterruptControl<'d> {
     /// Listen for the given interrupts.
     pub fn listen(&self, interrupts: impl Into<EnumSet<LcdCamInterrupt>>) {
         self.enable_listen(interrupts.into(), true)
@@ -105,7 +119,7 @@ impl<'d> NamesAreHard<'d> {
         let interrupts = interrupts.into();
 
         let lcd_cam = unsafe { esp32s3::LCD_CAM::steal() };
-        lcd_cam.lc_dma_int_clr().modify(|_, w| {
+        lcd_cam.lc_dma_int_clr().write(|w| {
             for interrupt in interrupts {
                 match interrupt {
                     LcdCamInterrupt::CamHsync => w.cam_hs_int_clr().set_bit(),
@@ -201,9 +215,9 @@ impl<'d> NamesAreHard<'d> {
     }
 }
 
-impl<'d> crate::private::Sealed for NamesAreHard {}
+impl<'d> crate::private::Sealed for InterruptControl<'d> {}
 
-impl<'d> InterruptConfigurable for NamesAreHard<'d> {
+impl<'d> InterruptConfigurable for InterruptControl<'d> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         unsafe {
             crate::interrupt::bind_interrupt(
@@ -215,6 +229,9 @@ impl<'d> InterruptConfigurable for NamesAreHard<'d> {
         }
     }
 }
+
+/// Same as [Blocking] but with interrupts access.
+pub struct BlockingWithInterrupts;
 
 /// LCD_CAM bit order
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -243,13 +260,13 @@ pub mod asynch {
     use embassy_sync::waitqueue::AtomicWaker;
     use procmacros::handler;
 
-    use crate::lcd_cam::NamesAreHard;
+    use crate::lcd_cam::InterruptControl;
 
     pub(crate) static WAKER: AtomicWaker = AtomicWaker::new();
 
     #[handler]
     pub(crate) fn interrupt_handler() {
-        let int_access = unsafe { NamesAreHard::steal() };
+        let int_access = unsafe { InterruptControl::steal() };
 
         let active_interrupts = int_access.active_interrupts();
         if !active_interrupts.is_empty() {
