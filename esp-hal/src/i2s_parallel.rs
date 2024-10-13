@@ -268,6 +268,7 @@ impl<'d, I: Instance, DM: Mode> I2sParallel<'d, I, DM> {
         })
     }
 
+    #[cfg(all(feature = "debug", feature = "log"))]
     /// Dump the I2S peripheral configuration
     pub fn dump(&self) {
         I::dump();
@@ -305,6 +306,7 @@ where
         (i2s, BUF::from_view(view))
     }
 
+    #[cfg(all(feature = "debug", feature = "log"))]
     /// Dump the I2S peripheral configuration
     pub fn dump(&self) {
         I::dump();
@@ -422,11 +424,13 @@ pub trait Instance: Signals + RegBlock {
     }
 
     fn tx_wait_done() {
-        while !Self::is_tx_done() {
+        let r = Self::register_block();
+        while r.state().read().tx_idle().bit_is_clear() {
             // wait
         }
-        Self::tx_stop();
-    }
+
+        r.conf().modify(|_, w| w.tx_start().clear_bit());
+}
 
     fn setup(frequency: impl Into<fugit::HertzU32>, bits: u8) {
         let frequency: HertzU32 = frequency.into();
@@ -490,23 +494,30 @@ pub trait Instance: Signals + RegBlock {
             w.tx_right_first().set_bit()
         });
         r.timing().reset();
+
+        r.pd_conf().modify(|_, w| {
+            w.fifo_force_pu().set_bit();
+            w.fifo_force_pd().clear_bit()
+        });
+
     }
 
-        /// Dump the I2S peripheral configuration
+    #[cfg(all(feature = "debug", feature = "log"))]
+    /// Dump the I2S peripheral configuration
     fn dump() {
         let r = Self::register_block();
-        log::info!("conf: {:#?}", r.conf().read());
-        log::info!("conf1: {:#?}", r.conf1().read());
-        log::info!("conf2: {:#?}", r.conf2().read());
-        log::info!("conf_chan: {:#?}", r.conf_chan().read());
-        log::info!("timing: {:#?}", r.timing().read());
-        log::info!("sample_rate_conf: {:#?}", r.sample_rate_conf().read());
-        log::info!("fifo_conf: {:#?}", r.fifo_conf().read());
-        log::info!("lc_conf: {:#?}", r.lc_conf().read());
-        log::info!("int_raw: {:#?}", r.int_raw().read());
-        log::info!("int_st: {:#?}", r.int_st().read());
-        log::info!("int_ena: {:#?}", r.int_ena().read());
-        log::info!("state: {:#?}", r.state().read());
+        info!("conf: {:#?}", r.conf().read());
+        info!("conf1: {:#?}", r.conf1().read());
+        info!("conf2: {:#?}", r.conf2().read());
+        info!("conf_chan: {:#?}", r.conf_chan().read());
+        info!("timing: {:#?}", r.timing().read());
+        info!("sample_rate_conf: {:#?}", r.sample_rate_conf().read());
+        info!("fifo_conf: {:#?}", r.fifo_conf().read());
+        info!("lc_conf: {:#?}", r.lc_conf().read());
+        info!("int_raw: {:#?}", r.int_raw().read());
+        info!("int_st: {:#?}", r.int_st().read());
+        info!("int_ena: {:#?}", r.int_ena().read());
+        info!("state: {:#?}", r.state().read());
     }
     
 }
