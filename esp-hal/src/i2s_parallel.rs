@@ -479,7 +479,7 @@ mod private {
 
     pub trait TxPins {
         fn bits(&self) -> u8;
-        fn configure<'a, I: super::Instance>(&mut self, instance: &PeripheralRef<'a, I>);
+        fn configure<I: super::Instance>(&mut self, instance: &PeripheralRef<'_, I>);
     }
 }
 
@@ -586,8 +586,8 @@ pub trait Instance: Signals + RegBlock {
         r.conf2().write(|w| w.lcd_en().set_bit());
 
         r.sample_rate_conf().write(|w| unsafe {
-            w.rx_bits_mod().bits(bits as u8);
-            w.tx_bits_mod().bits(bits as u8);
+            w.rx_bits_mod().bits(bits);
+            w.tx_bits_mod().bits(bits);
             w.rx_bck_div_num().bits(2); // I think this is the number of "bclocks" per "sample"
             w.tx_bck_div_num().bits(2) // ??
         });
