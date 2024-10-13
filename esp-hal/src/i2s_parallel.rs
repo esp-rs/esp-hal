@@ -27,6 +27,7 @@ use private::TxPins;
 
 use crate::{
     dma::{
+        asynch::DmaTxFuture,
         Channel,
         ChannelTx,
         DmaChannelConvert,
@@ -434,6 +435,18 @@ where
     /// Dump the I2S peripheral configuration
     pub fn dump(&self) {
         I::dump();
+    }
+}
+
+impl<'d, I, BUF> I2sParallelTransfer<'d, I, BUF, crate::Async>
+where
+    I: Instance,
+    BUF: DmaTxBuffer,
+{
+    /// Wait for the transfer to finish
+    pub async fn wait_for_done(&mut self) -> Result<(), DmaError> {
+        let future = DmaTxFuture::new(&mut self.i2s.tx_channel);
+        future.await
     }
 }
 
