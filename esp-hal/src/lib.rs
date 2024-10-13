@@ -476,6 +476,13 @@ use crate::{
 };
 
 /// System configuration.
+///
+/// This `struct` is marked with `#[non_exhaustive]` and can't be instantiated
+/// directly. This is done to prevent breaking changes when new fields are added
+/// to the `struct`. Instead, use the [`Config::default()`] method to create a
+/// new instance.
+///
+/// For usage examples, see the [config module documentation](crate::config).
 #[non_exhaustive]
 #[derive(Default)]
 pub struct Config {
