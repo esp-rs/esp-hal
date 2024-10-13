@@ -183,7 +183,7 @@ sniffer = ["wifi"]
 have-strchr = []
 
 # Implement serde Serialize / Deserialize
-serde = ["dep:serde"]
+serde = ["dep:serde", "enumset?/serde", "heapless/serde"]
 
 [package.metadata.docs.rs]
 features = [
