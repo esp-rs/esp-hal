@@ -63,7 +63,10 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::i2c0::{RegisterBlock, COMD},
     system::PeripheralClockControl,
+    Async,
+    Blocking,
     InterruptConfigurable,
+    Mode,
 };
 
 cfg_if::cfg_if! {
@@ -229,14 +232,77 @@ impl From<Ack> for u32 {
 }
 
 /// I2C driver
-pub struct I2c<'d, T, DM: crate::Mode> {
+pub struct I2c<'d, T, DM: Mode> {
     peripheral: PeripheralRef<'d, T>,
     phantom: PhantomData<DM>,
     frequency: HertzU32,
     timeout: Option<u32>,
 }
 
-impl<T> I2c<'_, T, crate::Blocking>
+impl<T, DM> I2c<'_, T, DM>
+where
+    T: Instance,
+    DM: Mode,
+{
+    fn transaction_impl<'a>(
+        &mut self,
+        address: u8,
+        operations: impl Iterator<Item = Operation<'a>>,
+    ) -> Result<(), Error> {
+        let mut last_op: Option<OpKind> = None;
+        // filter out 0 length read operations
+        let mut op_iter = operations
+            .filter(|op| op.is_write() || !op.is_empty())
+            .peekable();
+
+        while let Some(op) = op_iter.next() {
+            let next_op = op_iter.peek().map(|v| v.kind());
+            let kind = op.kind();
+            // Clear all I2C interrupts
+            self.peripheral.clear_all_interrupts();
+
+            let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
+            match op {
+                Operation::Write(buffer) => {
+                    // execute a write operation:
+                    // - issue START/RSTART if op is different from previous
+                    // - issue STOP if op is the last one
+                    self.peripheral
+                        .write_operation(
+                            address,
+                            buffer,
+                            !matches!(last_op, Some(OpKind::Write)),
+                            next_op.is_none(),
+                            cmd_iterator,
+                        )
+                        .inspect_err(|_| self.internal_recover())?;
+                }
+                Operation::Read(buffer) => {
+                    // execute a read operation:
+                    // - issue START/RSTART if op is different from previous
+                    // - issue STOP if op is the last one
+                    // - will_continue is true if there is another read operation next
+                    self.peripheral
+                        .read_operation(
+                            address,
+                            buffer,
+                            !matches!(last_op, Some(OpKind::Read)),
+                            next_op.is_none(),
+                            matches!(next_op, Some(OpKind::Read)),
+                            cmd_iterator,
+                        )
+                        .inspect_err(|_| self.internal_recover())?;
+                }
+            }
+
+            last_op = Some(kind);
+        }
+
+        Ok(())
+    }
+}
+
+impl<T> I2c<'_, T, Blocking>
 where
     T: Instance,
 {
@@ -361,66 +427,9 @@ where
     ) -> Result<(), Error> {
         self.transaction_impl(address, operations.into_iter().map(Operation::from))
     }
-
-    fn transaction_impl<'a>(
-        &mut self,
-        address: u8,
-        operations: impl Iterator<Item = Operation<'a>>,
-    ) -> Result<(), Error> {
-        let mut last_op: Option<OpKind> = None;
-        // filter out 0 length read operations
-        let mut op_iter = operations
-            .filter(|op| op.is_write() || !op.is_empty())
-            .peekable();
-
-        while let Some(op) = op_iter.next() {
-            let next_op = op_iter.peek().map(|v| v.kind());
-            let kind = op.kind();
-            // Clear all I2C interrupts
-            self.peripheral.clear_all_interrupts();
-
-            let cmd_iterator = &mut self.peripheral.register_block().comd_iter();
-            match op {
-                Operation::Write(buffer) => {
-                    // execute a write operation:
-                    // - issue START/RSTART if op is different from previous
-                    // - issue STOP if op is the last one
-                    self.peripheral
-                        .write_operation(
-                            address,
-                            buffer,
-                            !matches!(last_op, Some(OpKind::Write)),
-                            next_op.is_none(),
-                            cmd_iterator,
-                        )
-                        .inspect_err(|_| self.internal_recover())?;
-                }
-                Operation::Read(buffer) => {
-                    // execute a read operation:
-                    // - issue START/RSTART if op is different from previous
-                    // - issue STOP if op is the last one
-                    // - will_continue is true if there is another read operation next
-                    self.peripheral
-                        .read_operation(
-                            address,
-                            buffer,
-                            !matches!(last_op, Some(OpKind::Read)),
-                            next_op.is_none(),
-                            matches!(next_op, Some(OpKind::Read)),
-                            cmd_iterator,
-                        )
-                        .inspect_err(|_| self.internal_recover())?;
-                }
-            }
-
-            last_op = Some(kind);
-        }
-
-        Ok(())
-    }
 }
 
-impl<T> embedded_hal_02::blocking::i2c::Read for I2c<'_, T, crate::Blocking>
+impl<T> embedded_hal_02::blocking::i2c::Read for I2c<'_, T, Blocking>
 where
     T: Instance,
 {
@@ -431,7 +440,7 @@ where
     }
 }
 
-impl<T> embedded_hal_02::blocking::i2c::Write for I2c<'_, T, crate::Blocking>
+impl<T> embedded_hal_02::blocking::i2c::Write for I2c<'_, T, Blocking>
 where
     T: Instance,
 {
@@ -442,7 +451,7 @@ where
     }
 }
 
-impl<T> embedded_hal_02::blocking::i2c::WriteRead for I2c<'_, T, crate::Blocking>
+impl<T> embedded_hal_02::blocking::i2c::WriteRead for I2c<'_, T, Blocking>
 where
     T: Instance,
 {
@@ -458,11 +467,11 @@ where
     }
 }
 
-impl<T, DM: crate::Mode> embedded_hal::i2c::ErrorType for I2c<'_, T, DM> {
+impl<T, DM: Mode> embedded_hal::i2c::ErrorType for I2c<'_, T, DM> {
     type Error = Error;
 }
 
-impl<T> embedded_hal::i2c::I2c for I2c<'_, T, crate::Blocking>
+impl<T, DM: Mode> embedded_hal::i2c::I2c for I2c<'_, T, DM>
 where
     T: Instance,
 {
@@ -475,7 +484,7 @@ where
     }
 }
 
-impl<'d, T, DM: crate::Mode> I2c<'d, T, DM>
+impl<'d, T, DM: Mode> I2c<'d, T, DM>
 where
     T: Instance,
 {
@@ -548,7 +557,7 @@ where
     }
 }
 
-impl<'d, T> I2c<'d, T, crate::Blocking>
+impl<'d, T> I2c<'d, T, Blocking>
 where
     T: Instance,
 {
@@ -581,9 +590,9 @@ where
     }
 }
 
-impl<'d, T> crate::private::Sealed for I2c<'d, T, crate::Blocking> where T: Instance {}
+impl<'d, T> crate::private::Sealed for I2c<'d, T, Blocking> where T: Instance {}
 
-impl<'d, T> InterruptConfigurable for I2c<'d, T, crate::Blocking>
+impl<'d, T> InterruptConfigurable for I2c<'d, T, Blocking>
 where
     T: Instance,
 {
@@ -592,7 +601,7 @@ where
     }
 }
 
-impl<'d, T> I2c<'d, T, crate::Async>
+impl<'d, T> I2c<'d, T, Async>
 where
     T: Instance,
 {
@@ -779,7 +788,7 @@ mod asynch {
         }
     }
 
-    impl<T> I2c<'_, T, crate::Async>
+    impl<T> I2c<'_, T, Async>
     where
         T: Instance,
     {
@@ -1110,11 +1119,11 @@ mod asynch {
             address: u8,
             operations: impl IntoIterator<Item = &'a mut Operation<'a>>,
         ) -> Result<(), Error> {
-            self.transaction_impl(address, operations.into_iter().map(Operation::from))
+            self.transaction_impl_async(address, operations.into_iter().map(Operation::from))
                 .await
         }
 
-        async fn transaction_impl<'a>(
+        async fn transaction_impl_async<'a>(
             &mut self,
             address: u8,
             operations: impl Iterator<Item = Operation<'a>>,
@@ -1170,7 +1179,7 @@ mod asynch {
         }
     }
 
-    impl<'d, T> embedded_hal_async::i2c::I2c for I2c<'d, T, crate::Async>
+    impl<'d, T> embedded_hal_async::i2c::I2c for I2c<'d, T, Async>
     where
         T: Instance,
     {
@@ -1179,7 +1188,7 @@ mod asynch {
             address: u8,
             operations: &mut [EhalOperation<'_>],
         ) -> Result<(), Self::Error> {
-            self.transaction_impl(address, operations.iter_mut().map(Operation::from))
+            self.transaction_impl_async(address, operations.iter_mut().map(Operation::from))
                 .await
         }
     }

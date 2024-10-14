@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Restored blocking `embedded_hal` compatibility for async I2C driver (#2343)
+
 ### Removed
 
 ## [0.21.0]
