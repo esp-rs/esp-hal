@@ -135,7 +135,7 @@ const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 9;
 const I2S_LL_MCLK_DIVIDER_MAX: usize = (1 << I2S_LL_MCLK_DIVIDER_BIT_WIDTH) - 1;
 
 /// Data types that the I2S peripheral can work with.
-pub trait AcceptedWord {}
+pub trait AcceptedWord: crate::private::Sealed {}
 impl AcceptedWord for u8 {}
 impl AcceptedWord for u16 {}
 impl AcceptedWord for u32 {}
