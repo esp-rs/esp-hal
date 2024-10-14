@@ -11,7 +11,7 @@ use core::marker::PhantomData;
 
 pub use crate::peripherals::pcnt::unit::conf0::{CTRL_MODE as CtrlMode, EDGE_MODE as EdgeMode};
 use crate::{
-    gpio::{interconnect::InputConnection, InputSignal},
+    gpio::{interconnect::PeripheralInput, InputSignal},
     peripheral::Peripheral,
 };
 
@@ -66,10 +66,7 @@ impl<'d, const UNIT: usize, const NUM: usize> Channel<'d, UNIT, NUM> {
     }
 
     /// Set the control signal (pin/high/low) for this channel
-    pub fn set_ctrl_signal(
-        &self,
-        source: impl Peripheral<P = impl Into<InputConnection> + 'd>,
-    ) -> &Self {
+    pub fn set_ctrl_signal(&self, source: impl Peripheral<P = impl PeripheralInput>) -> &Self {
         let signal = match UNIT {
             0 => match NUM {
                 0 => InputSignal::PCNT0_CTRL_CH0,
@@ -128,10 +125,7 @@ impl<'d, const UNIT: usize, const NUM: usize> Channel<'d, UNIT, NUM> {
     }
 
     /// Set the edge signal (pin/high/low) for this channel
-    pub fn set_edge_signal(
-        &self,
-        source: impl Peripheral<P = impl Into<InputConnection> + 'd>,
-    ) -> &Self {
+    pub fn set_edge_signal(&self, source: impl Peripheral<P = impl PeripheralInput>) -> &Self {
         let signal = match UNIT {
             0 => match NUM {
                 0 => InputSignal::PCNT0_SIG_CH0,

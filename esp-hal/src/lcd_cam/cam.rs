@@ -76,7 +76,7 @@ use crate::{
     clock::Clocks,
     dma::{ChannelRx, DmaChannelConvert, DmaEligible, DmaError, DmaPeripheral, DmaRxBuffer, Rx},
     gpio::{
-        interconnect::{InputConnection, OutputConnection},
+        interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
         OutputSignal,
         Pull,
@@ -238,10 +238,7 @@ impl<'d> Camera<'d> {
     }
 
     /// Configures the master clock (MCLK) pin for the camera interface.
-    pub fn with_master_clock(
-        self,
-        mclk: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
-    ) -> Self {
+    pub fn with_master_clock(self, mclk: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_ref!(mclk);
         let mut mclk = mclk.map_into();
         mclk.set_to_push_pull_output(crate::private::Internal);
@@ -250,10 +247,7 @@ impl<'d> Camera<'d> {
     }
 
     /// Configures the pixel clock (PCLK) pin for the camera interface.
-    pub fn with_pixel_clock(
-        self,
-        pclk: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-    ) -> Self {
+    pub fn with_pixel_clock(self, pclk: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_ref!(pclk);
 
         let mut pclk = pclk.map_into();
@@ -267,8 +261,8 @@ impl<'d> Camera<'d> {
     /// HENABLE).
     pub fn with_ctrl_pins(
         self,
-        vsync: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        h_enable: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        vsync: impl Peripheral<P = impl PeripheralInput> + 'd,
+        h_enable: impl Peripheral<P = impl PeripheralInput> + 'd,
     ) -> Self {
         crate::into_ref!(vsync);
         crate::into_ref!(h_enable);
@@ -291,9 +285,9 @@ impl<'d> Camera<'d> {
     /// HENABLE) with DE (data enable).
     pub fn with_ctrl_pins_and_de(
         self,
-        vsync: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        hsync: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        h_enable: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        vsync: impl Peripheral<P = impl PeripheralInput> + 'd,
+        hsync: impl Peripheral<P = impl PeripheralInput> + 'd,
+        h_enable: impl Peripheral<P = impl PeripheralInput> + 'd,
     ) -> Self {
         crate::into_ref!(vsync);
         crate::into_ref!(hsync);
@@ -491,14 +485,14 @@ impl RxEightBits {
     /// Creates a new instance of `RxEightBits`, configuring the specified pins
     /// as the 8-bit data bus.
     pub fn new<'d>(
-        pin_0: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_1: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_2: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_3: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_4: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_5: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_6: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_7: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_0: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_1: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_2: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_3: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_4: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_5: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_6: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_7: impl Peripheral<P = impl PeripheralInput> + 'd,
     ) -> Self {
         crate::into_mapped_ref!(pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7);
 
@@ -538,22 +532,22 @@ impl RxSixteenBits {
     /// Creates a new instance of `RxSixteenBits`, configuring the specified
     /// pins as the 16-bit data bus.
     pub fn new<'d>(
-        pin_0: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_1: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_2: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_3: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_4: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_5: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_6: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_7: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_8: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_9: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_10: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_11: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_12: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_13: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_14: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        pin_15: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin_0: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_1: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_2: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_3: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_4: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_5: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_6: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_7: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_8: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_9: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_10: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_11: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_12: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_13: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_14: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_15: impl Peripheral<P = impl PeripheralInput> + 'd,
     ) -> Self {
         crate::into_mapped_ref!(
             pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7, pin_8, pin_9, pin_10, pin_11,

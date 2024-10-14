@@ -22,6 +22,25 @@ use crate::{
     private::{self, Sealed},
 };
 
+#[doc(hidden)]
+pub trait PeripheralInput: Into<InputConnection> + 'static {}
+#[doc(hidden)]
+pub trait PeripheralOutput: Into<OutputConnection> + 'static {}
+
+impl<P: InputPin> PeripheralInput for P {}
+impl<P: OutputPin> PeripheralOutput for P {}
+
+impl PeripheralInput for NoPin {}
+impl PeripheralOutput for NoPin {}
+
+impl PeripheralInput for Level {}
+impl PeripheralOutput for Level {}
+
+impl PeripheralInput for InputConnection {}
+
+impl PeripheralInput for OutputConnection {}
+impl PeripheralOutput for OutputConnection {}
+
 /// A configurable input signal between a peripheral and a GPIO pin.
 ///
 /// Obtained by calling [`super::GpioPin::peripheral_input()`],
@@ -51,6 +70,7 @@ impl Peripheral for InputSignal {
 }
 
 impl Sealed for InputSignal {}
+impl PeripheralInput for InputSignal {}
 
 impl InputSignal {
     pub(crate) fn new(pin: AnyPin) -> Self {
@@ -181,6 +201,8 @@ impl Peripheral for OutputSignal {
 }
 
 impl Sealed for OutputSignal {}
+impl PeripheralInput for OutputSignal {}
+impl PeripheralOutput for OutputSignal {}
 
 impl OutputSignal {
     pub(crate) fn new(pin: AnyPin) -> Self {
@@ -406,6 +428,12 @@ impl From<NoPin> for OutputConnection {
     }
 }
 
+impl From<Level> for OutputConnection {
+    fn from(_level: Level) -> Self {
+        Self(OutputConnectionInner::Dummy(NoPin))
+    }
+}
+
 impl<P> From<P> for OutputConnection
 where
     P: OutputPin,
@@ -524,6 +552,24 @@ where
         Self(InputConnectionInner::Input(
             input.degrade().peripheral_input(),
         ))
+    }
+}
+
+impl From<OutputSignal> for InputConnection {
+    fn from(output_signal: OutputSignal) -> Self {
+        Self(InputConnectionInner::Input(InputSignal {
+            pin: output_signal.pin,
+            is_inverted: output_signal.is_inverted,
+        }))
+    }
+}
+
+impl From<OutputConnection> for InputConnection {
+    fn from(conn: OutputConnection) -> Self {
+        match conn.0 {
+            OutputConnectionInner::Output(inner) => inner.into(),
+            OutputConnectionInner::Dummy(inner) => inner.into(),
+        }
     }
 }
 

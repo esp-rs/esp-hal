@@ -85,7 +85,7 @@ use core::marker::PhantomData;
 use fugit::HertzU32;
 
 use crate::{
-    gpio::interconnect::{InputConnection, OutputConnection},
+    gpio::interconnect::{PeripheralInput, PeripheralOutput},
     interrupt::InterruptHandler,
     peripheral::Peripheral,
     rmt::private::CreateInstance,
@@ -296,7 +296,7 @@ impl<'d> Rmt<'d, crate::Async> {
 }
 
 fn configure_rx_channel<'d, T: private::RxChannelInternal<M>, M: crate::Mode>(
-    pin: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+    pin: impl Peripheral<P = impl PeripheralInput> + 'd,
     config: RxChannelConfig,
 ) -> Result<T, Error> {
     if config.filter_threshold > 0b111_1111 {
@@ -334,7 +334,7 @@ fn configure_rx_channel<'d, T: private::RxChannelInternal<M>, M: crate::Mode>(
 }
 
 fn configure_tx_channel<'d, T: private::TxChannelInternal<M>, M: crate::Mode>(
-    pin: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+    pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
     config: TxChannelConfig,
 ) -> Result<T, Error> {
     crate::into_ref!(pin);
@@ -362,7 +362,7 @@ where
     /// Configure the TX channel
     fn configure(
         self,
-        pin: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
         config: TxChannelConfig,
     ) -> Result<T, Error>
     where
@@ -380,7 +380,7 @@ where
     /// Configure the TX channel
     fn configure(
         self,
-        pin: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
         config: TxChannelConfig,
     ) -> Result<T, Error>
     where
@@ -398,7 +398,7 @@ where
     /// Configure the RX channel
     fn configure(
         self,
-        pin: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin: impl Peripheral<P = impl PeripheralInput> + 'd,
         config: RxChannelConfig,
     ) -> Result<T, Error>
     where
@@ -416,7 +416,7 @@ where
     /// Configure the RX channel
     fn configure(
         self,
-        pin: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin: impl Peripheral<P = impl PeripheralInput> + 'd,
         config: RxChannelConfig,
     ) -> Result<T, Error>
     where
