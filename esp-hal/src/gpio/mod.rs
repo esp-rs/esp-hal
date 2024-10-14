@@ -448,7 +448,7 @@ pub trait PeripheralOutput: PeripheralSignal {
 }
 
 /// Trait implemented by pins which can be used as inputs.
-pub trait InputPin: Pin + PeripheralInput {
+pub trait InputPin: Pin + PeripheralInput + Into<AnyPin> + 'static {
     /// Listen for interrupts
     #[doc(hidden)]
     fn listen(&mut self, event: Event, _: private::Internal) {
@@ -519,7 +519,7 @@ pub trait InputPin: Pin + PeripheralInput {
 }
 
 /// Trait implemented by pins which can be used as outputs.
-pub trait OutputPin: Pin + PeripheralOutput {}
+pub trait OutputPin: Pin + PeripheralOutput + Into<AnyPin> + 'static {}
 
 /// Trait implemented by pins which can be used as analog pins
 pub trait AnalogPin: Pin {
@@ -1609,10 +1609,7 @@ impl<'d> Output<'d> {
     /// initial output-level and [Pull] configuration.
     #[inline]
     pub fn new(pin: impl Peripheral<P = impl OutputPin> + 'd, initial_output: Level) -> Self {
-        Self::new_typed(
-            pin.into_ref().degrade_pin(private::Internal),
-            initial_output,
-        )
+        Self::new_typed(pin.map_into(), initial_output)
     }
 }
 
@@ -1715,7 +1712,7 @@ impl<'d> Input<'d> {
     /// configuration.
     #[inline]
     pub fn new(pin: impl Peripheral<P = impl InputPin> + 'd, pull: Pull) -> Self {
-        Self::new_typed(pin.into_ref().degrade_pin(private::Internal), pull)
+        Self::new_typed(pin.map_into(), pull)
     }
 }
 
@@ -1817,11 +1814,7 @@ impl<'d> OutputOpenDrain<'d> {
         initial_output: Level,
         pull: Pull,
     ) -> Self {
-        Self::new_typed(
-            pin.into_ref().degrade_pin(private::Internal),
-            initial_output,
-            pull,
-        )
+        Self::new_typed(pin.map_into(), initial_output, pull)
     }
 }
 
@@ -1947,8 +1940,8 @@ impl<'d> Flex<'d> {
     /// Create flexible pin driver for a [Pin].
     /// No mode change happens.
     #[inline]
-    pub fn new(pin: impl Peripheral<P = impl Pin> + 'd) -> Self {
-        Self::new_typed(pin.into_ref().degrade_pin(private::Internal))
+    pub fn new(pin: impl Peripheral<P = impl Into<AnyPin>> + 'd) -> Self {
+        Self::new_typed(pin.map_into())
     }
 }
 
