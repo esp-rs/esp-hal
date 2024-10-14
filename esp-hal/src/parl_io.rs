@@ -49,7 +49,7 @@ use crate::{
         Tx,
         WriteBuffer,
     },
-    gpio::interconnect::{InputConnection, OutputConnection},
+    gpio::interconnect::{InputConnection, OutputConnection, PeripheralInput, PeripheralOutput},
     interrupt::InterruptHandler,
     peripheral::{self, Peripheral},
     peripherals::{self, PARL_IO},
@@ -282,7 +282,7 @@ pub struct ClkOutPin<'d> {
 }
 impl<'d> ClkOutPin<'d> {
     /// Create a ClkOutPin
-    pub fn new(pin: impl Peripheral<P = impl Into<OutputConnection>> + 'd) -> Self {
+    pub fn new(pin: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_mapped_ref!(pin);
         Self { pin }
     }
@@ -303,7 +303,7 @@ pub struct ClkInPin<'d> {
 }
 impl<'d> ClkInPin<'d> {
     /// Create a new ClkInPin
-    pub fn new(pin: impl Peripheral<P = impl Into<InputConnection>> + 'd) -> Self {
+    pub fn new(pin: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(pin);
         Self { pin }
     }
@@ -331,7 +331,7 @@ pub struct RxClkInPin<'d> {
 impl<'d> RxClkInPin<'d> {
     /// Create a new RxClkInPin
     pub fn new(
-        pin: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        pin: impl Peripheral<P = impl PeripheralInput> + 'd,
         sample_edge: SampleEdge,
     ) -> Self {
         crate::into_mapped_ref!(pin);
@@ -369,10 +369,7 @@ where
     P: NotContainsValidSignalPin + TxPins + ConfigurePins,
 {
     /// Create a [TxPinConfigWithValidPin]
-    pub fn new(
-        tx_pins: P,
-        valid_pin: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
-    ) -> Self {
+    pub fn new(tx_pins: P, valid_pin: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_mapped_ref!(valid_pin);
         Self { tx_pins, valid_pin }
     }
@@ -452,7 +449,7 @@ macro_rules! tx_pins {
                 #[allow(clippy::too_many_arguments)]
                 pub fn new(
                     $(
-                        [< pin_ $pin:lower >] : impl Peripheral<P = impl Into<OutputConnection> > + 'd,
+                        [< pin_ $pin:lower >] : impl Peripheral<P = impl PeripheralOutput > + 'd,
                     )+
                 ) -> Self {
                     crate::into_mapped_ref!($( [< pin_ $pin:lower >] ),+);
@@ -558,7 +555,7 @@ where
     /// Create a new [RxPinConfigWithValidPin]
     pub fn new(
         rx_pins: P,
-        valid_pin: impl Peripheral<P = impl Into<InputConnection>> + 'd,
+        valid_pin: impl Peripheral<P = impl PeripheralInput> + 'd,
         enable_mode: EnableMode,
         eof_mode: EofMode,
     ) -> Self {
@@ -672,7 +669,7 @@ macro_rules! rx_pins {
                 #[allow(clippy::too_many_arguments)]
                 pub fn new(
                     $(
-                        [< pin_ $pin:lower >] : impl Peripheral<P = impl Into<InputConnection> > + 'd,
+                        [< pin_ $pin:lower >] : impl Peripheral<P = impl PeripheralInput > + 'd,
                     )+
                 ) -> Self {
                     crate::into_mapped_ref!($( [< pin_ $pin:lower >] ),+);

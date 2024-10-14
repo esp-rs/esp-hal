@@ -58,7 +58,7 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    gpio::{interconnect::OutputConnection, InputSignal, OutputSignal, Pull},
+    gpio::{interconnect::PeripheralOutput, InputSignal, OutputSignal, Pull},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::i2c0::{RegisterBlock, COMD},
@@ -481,8 +481,8 @@ where
 {
     fn new_internal(
         i2c: impl Peripheral<P = T> + 'd,
-        sda: impl crate::peripheral::Peripheral<P = impl Into<OutputConnection>>,
-        scl: impl crate::peripheral::Peripheral<P = impl Into<OutputConnection>>,
+        sda: impl crate::peripheral::Peripheral<P = impl PeripheralOutput>,
+        scl: impl crate::peripheral::Peripheral<P = impl PeripheralOutput>,
         frequency: HertzU32,
         timeout: Option<u32>,
     ) -> Self {
@@ -557,8 +557,8 @@ where
     /// automatically disabled when this gets dropped.
     pub fn new(
         i2c: impl Peripheral<P = T> + 'd,
-        sda: impl crate::peripheral::Peripheral<P = impl Into<OutputConnection>>,
-        scl: impl crate::peripheral::Peripheral<P = impl Into<OutputConnection>>,
+        sda: impl crate::peripheral::Peripheral<P = impl PeripheralOutput>,
+        scl: impl crate::peripheral::Peripheral<P = impl PeripheralOutput>,
         frequency: HertzU32,
     ) -> Self {
         Self::new_with_timeout(i2c, sda, scl, frequency, None)
@@ -569,8 +569,8 @@ where
     /// automatically disabled when this gets dropped.
     pub fn new_with_timeout(
         i2c: impl Peripheral<P = T> + 'd,
-        sda: impl crate::peripheral::Peripheral<P = impl Into<OutputConnection>>,
-        scl: impl crate::peripheral::Peripheral<P = impl Into<OutputConnection>>,
+        sda: impl crate::peripheral::Peripheral<P = impl PeripheralOutput>,
+        scl: impl crate::peripheral::Peripheral<P = impl PeripheralOutput>,
         frequency: HertzU32,
         timeout: Option<u32>,
     ) -> Self {
@@ -598,8 +598,8 @@ where
     /// automatically disabled when this gets dropped.
     pub fn new_async(
         i2c: impl Peripheral<P = T> + 'd,
-        sda: impl crate::peripheral::Peripheral<P = impl Into<OutputConnection>>,
-        scl: impl crate::peripheral::Peripheral<P = impl Into<OutputConnection>>,
+        sda: impl crate::peripheral::Peripheral<P = impl PeripheralOutput>,
+        scl: impl crate::peripheral::Peripheral<P = impl PeripheralOutput>,
         frequency: HertzU32,
     ) -> Self {
         Self::new_with_timeout_async(i2c, sda, scl, frequency, None)
@@ -610,8 +610,8 @@ where
     /// automatically disabled when this gets dropped.
     pub fn new_with_timeout_async(
         i2c: impl Peripheral<P = T> + 'd,
-        sda: impl crate::peripheral::Peripheral<P = impl Into<OutputConnection>>,
-        scl: impl crate::peripheral::Peripheral<P = impl Into<OutputConnection>>,
+        sda: impl crate::peripheral::Peripheral<P = impl PeripheralOutput>,
+        scl: impl crate::peripheral::Peripheral<P = impl PeripheralOutput>,
         frequency: HertzU32,
         timeout: Option<u32>,
     ) -> Self {

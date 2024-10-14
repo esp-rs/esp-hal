@@ -130,7 +130,7 @@ use core::marker::PhantomData;
 use self::filter::{Filter, FilterType};
 use crate::{
     gpio::{
-        interconnect::{InputConnection, OutputConnection},
+        interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
         OutputSignal,
         Pull,
@@ -760,8 +760,8 @@ where
 {
     fn new_internal(
         _peripheral: impl Peripheral<P = T> + 'd,
-        rx_pin: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        tx_pin: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        rx_pin: impl Peripheral<P = impl PeripheralInput> + 'd,
+        tx_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
         baud_rate: BaudRate,
         no_transceiver: bool,
         mode: TwaiMode,
@@ -1029,8 +1029,8 @@ where
     /// You will need to use a transceiver to connect to the TWAI bus
     pub fn new(
         peripheral: impl Peripheral<P = T> + 'd,
-        rx_pin: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        tx_pin: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        rx_pin: impl Peripheral<P = impl PeripheralInput> + 'd,
+        tx_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
@@ -1044,8 +1044,8 @@ where
     /// `twai.rs` example
     pub fn new_no_transceiver(
         peripheral: impl Peripheral<P = T> + 'd,
-        rx_pin: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        tx_pin: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        rx_pin: impl Peripheral<P = impl PeripheralInput> + 'd,
+        tx_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
@@ -1073,8 +1073,8 @@ where
     /// You will need to use a transceiver to connect to the TWAI bus
     pub fn new_async(
         peripheral: impl Peripheral<P = T> + 'd,
-        rx_pin: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        tx_pin: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        rx_pin: impl Peripheral<P = impl PeripheralInput> + 'd,
+        tx_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
@@ -1090,8 +1090,8 @@ where
     /// `twai.rs` example
     pub fn new_async_no_transceiver(
         peripheral: impl Peripheral<P = T> + 'd,
-        rx_pin: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        tx_pin: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        rx_pin: impl Peripheral<P = impl PeripheralInput> + 'd,
+        tx_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {

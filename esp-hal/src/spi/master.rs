@@ -83,7 +83,7 @@ use crate::{
     clock::Clocks,
     dma::{DmaChannelConvert, DmaEligible, DmaRxBuffer, DmaTxBuffer, PeripheralMarker, Rx, Tx},
     gpio::{
-        interconnect::{InputConnection, OutputConnection},
+        interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
         NoPin,
         OutputSignal,
@@ -470,7 +470,7 @@ where
     ///
     /// Sets the specified pin to push-pull output and connects it to the SPI
     /// clock signal.
-    pub fn with_sck(self, sclk: impl Peripheral<P = impl Into<OutputConnection>> + 'd) -> Self {
+    pub fn with_sck(self, sclk: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_ref!(sclk);
         let mut sclk = sclk.map_into();
         sclk.set_to_push_pull_output(private::Internal);
@@ -483,7 +483,7 @@ where
     ///
     /// Sets the specified pin to push-pull output and connects it to the SPI CS
     /// signal.
-    pub fn with_cs(self, cs: impl Peripheral<P = impl Into<OutputConnection>> + 'd) -> Self {
+    pub fn with_cs(self, cs: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_ref!(cs);
         let mut cs = cs.map_into();
         cs.set_to_push_pull_output(private::Internal);
@@ -572,7 +572,7 @@ where
     ///
     /// Sets the specified pin to push-pull output and connects it to the SPI
     /// MOSI signal.
-    pub fn with_mosi(self, mosi: impl Peripheral<P = impl Into<OutputConnection>> + 'd) -> Self {
+    pub fn with_mosi(self, mosi: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_ref!(mosi);
         let mut mosi = mosi.map_into();
         mosi.set_to_push_pull_output(private::Internal);
@@ -584,7 +584,7 @@ where
     /// Assign the MISO (Master In Slave Out) pin for the SPI instance.
     ///
     /// Sets the specified pin to input and connects it to the SPI MISO signal.
-    pub fn with_miso(self, miso: impl Peripheral<P = impl Into<InputConnection>> + 'd) -> Self {
+    pub fn with_miso(self, miso: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_ref!(miso);
         let mut miso = miso.map_into();
         miso.init_input(crate::gpio::Pull::None, private::Internal);
@@ -607,10 +607,10 @@ where
     /// given pin.
     pub fn with_pins(
         self,
-        sck: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
-        mosi: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
-        miso: impl Peripheral<P = impl Into<InputConnection>> + 'd,
-        cs: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        sck: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        mosi: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        miso: impl Peripheral<P = impl PeripheralInput> + 'd,
+        cs: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Self {
         self.with_sck(sck)
             .with_mosi(mosi)
@@ -669,7 +669,7 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MOSI signal and SIO0 input signal.
-    pub fn with_mosi(self, mosi: impl Peripheral<P = impl Into<OutputConnection>> + 'd) -> Self {
+    pub fn with_mosi(self, mosi: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_ref!(mosi);
         let mut mosi = mosi.map_into();
         mosi.enable_input(true, private::Internal);
@@ -686,7 +686,7 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MISO signal and SIO1 input signal.
-    pub fn with_miso(self, miso: impl Peripheral<P = impl Into<OutputConnection>> + 'd) -> Self {
+    pub fn with_miso(self, miso: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_ref!(miso);
         let mut miso = miso.map_into();
         miso.enable_input(true, private::Internal);
@@ -702,7 +702,7 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the SIO2 output and input signals.
-    pub fn with_sio2(self, sio2: impl Peripheral<P = impl Into<OutputConnection>> + 'd) -> Self {
+    pub fn with_sio2(self, sio2: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_ref!(sio2);
         let mut sio2 = sio2.map_into();
         sio2.enable_input(true, private::Internal);
@@ -718,7 +718,7 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the SIO3 output and input signals.
-    pub fn with_sio3(self, sio3: impl Peripheral<P = impl Into<OutputConnection>> + 'd) -> Self {
+    pub fn with_sio3(self, sio3: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_ref!(sio3);
         let mut sio3 = sio3.map_into();
         sio3.enable_input(true, private::Internal);
@@ -736,12 +736,12 @@ where
     /// given pin.
     pub fn with_pins(
         self,
-        sck: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
-        mosi: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
-        miso: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
-        sio2: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
-        sio3: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
-        cs: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        sck: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        mosi: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        miso: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        sio2: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        sio3: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        cs: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Self {
         self.with_sck(sck)
             .with_mosi(mosi)

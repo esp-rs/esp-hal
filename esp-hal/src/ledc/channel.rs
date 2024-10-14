@@ -11,7 +11,10 @@
 
 use super::timer::{TimerIFace, TimerSpeed};
 use crate::{
-    gpio::{interconnect::OutputConnection, OutputSignal},
+    gpio::{
+        interconnect::{OutputConnection, PeripheralOutput},
+        OutputSignal,
+    },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::ledc::RegisterBlock,
 };
@@ -152,7 +155,7 @@ impl<'d, S: TimerSpeed> Channel<'d, S> {
     /// Return a new channel
     pub fn new(
         number: Number,
-        output_pin: impl Peripheral<P = impl Into<OutputConnection>> + 'd,
+        output_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Self {
         let ledc = unsafe { &*crate::peripherals::LEDC::ptr() };
         Channel {
