@@ -583,7 +583,11 @@ pub trait Instance: Signals + RegBlock {
         let r = Self::register_block();
 
         // clear all bits and enable lcd mode
-        r.conf2().write(|w| w.lcd_en().set_bit());
+        r.conf2().write(|w| {
+            // 8 bit mode needs this or it updates on half clocks!
+            w.lcd_tx_wrx2_en().bit(bits == 8);
+            w.lcd_en().set_bit()
+        });
 
         r.sample_rate_conf().write(|w| unsafe {
             w.rx_bits_mod().bits(bits);
