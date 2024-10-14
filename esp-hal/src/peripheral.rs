@@ -168,6 +168,19 @@ pub trait Peripheral: Sized + crate::private::Sealed {
     {
         PeripheralRef::new(unsafe { self.clone_unchecked() })
     }
+
+    /// Map the peripheral using `Into`.
+    ///
+    /// This converts from `Peripheral<P = T>` to `Peripheral<P = U>`,
+    /// using an `Into` impl to convert from `T` to `U`.
+    #[inline]
+    fn map_into<U>(self) -> U
+    where
+        Self::P: Into<U>,
+        U: Peripheral<P = U>,
+    {
+        unsafe { self.clone_unchecked().into() }
+    }
 }
 
 impl<T, P> Peripheral for &mut T
@@ -281,6 +294,17 @@ mod peripheral_macros {
             $(
                 #[allow(unused_mut)]
                 let mut $name = $name.into_ref();
+            )*
+        }
+    }
+
+    #[doc(hidden)]
+    #[macro_export]
+    macro_rules! into_mapped_ref {
+        ($($name:ident),*) => {
+            $(
+                #[allow(unused_mut)]
+                let mut $name = $name.map_into().into_ref();
             )*
         }
     }
