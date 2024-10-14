@@ -589,11 +589,12 @@ pub trait Instance: Signals + RegBlock {
             w.lcd_en().set_bit()
         });
 
+        let bck_div = if bits == 8 { 2 } else { 1 };
         r.sample_rate_conf().write(|w| unsafe {
             w.rx_bits_mod().bits(bits);
             w.tx_bits_mod().bits(bits);
-            w.rx_bck_div_num().bits(2); // I think this is the number of "bclocks" per "sample"
-            w.tx_bck_div_num().bits(2) // ??
+            w.rx_bck_div_num().bits(bck_div); // I think this is the number of "bclocks" per "sample"
+            w.tx_bck_div_num().bits(bck_div) // ??
         });
 
         r.clkm_conf().write(|w| unsafe {
