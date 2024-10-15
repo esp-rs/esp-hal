@@ -105,7 +105,7 @@ impl InputSignal {
     /// - invert: Configures whether or not to invert the input value
     /// - input: The GPIO number to connect to the input signal
     fn connect(&self, signal: usize, invert: bool, input: u8) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .func_in_sel_cfg(signal - FUNC_IN_SEL_OFFSET)
             .modify(|_, w| unsafe {
                 w.sel().set_bit();
@@ -158,7 +158,7 @@ impl InputSignal {
         self.pin
             .set_alternate_function(GPIO_FUNCTION, private::Internal);
 
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
             .modify(|_, w| w.sel().clear_bit());
     }
@@ -245,7 +245,7 @@ impl OutputSignal {
         enable_from_gpio: bool,
         output: u8,
     ) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .func_out_sel_cfg(output as usize)
             .modify(|_, w| unsafe {
                 w.out_sel().bits(signal);
@@ -259,7 +259,7 @@ impl OutputSignal {
     /// - invert: Configures whether or not to invert the input value
     /// - input: The GPIO number to connect to the input signal
     fn connect_input(&self, signal: usize, invert: bool, input: u8) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .func_in_sel_cfg(signal - FUNC_IN_SEL_OFFSET)
             .modify(|_, w| unsafe {
                 w.sel().set_bit();
@@ -312,7 +312,7 @@ impl OutputSignal {
         self.pin
             .set_alternate_function(GPIO_FUNCTION, private::Internal);
 
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
             .modify(|_, w| w.sel().clear_bit());
     }
@@ -365,7 +365,7 @@ impl OutputSignal {
         self.pin
             .set_alternate_function(GPIO_FUNCTION, private::Internal);
 
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
             .modify(|_, w| w.sel().clear_bit());
     }
