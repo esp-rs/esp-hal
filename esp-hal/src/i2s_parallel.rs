@@ -23,7 +23,7 @@ use core::{
 };
 
 use fugit::HertzU32;
-use private::TxPins;
+use private::{calculate_clock, I2sClockDividers, TxPins};
 
 use crate::{
     dma::{
@@ -475,12 +475,91 @@ where
 }
 
 mod private {
+    use fugit::HertzU32;
+
     use crate::peripheral::PeripheralRef;
 
     pub trait TxPins {
         fn bits(&self) -> u8;
         fn configure<I: super::Instance>(&mut self, instance: &PeripheralRef<'_, I>);
     }
+
+    #[derive(Debug)]
+    pub struct I2sClockDividers {
+        pub mclk_divider: u32,
+        pub bclk_divider: u32,
+        pub denominator: u32,
+        pub numerator: u32,
+    }
+
+    #[cfg(any(esp32, esp32s2))]
+    const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 6;
+
+    const I2S_LL_MCLK_DIVIDER_MAX: usize = (1 << I2S_LL_MCLK_DIVIDER_BIT_WIDTH) - 1;
+
+    pub fn calculate_clock(
+        sample_rate: impl Into<fugit::HertzU32>,
+        data_bits: u8,
+    ) -> I2sClockDividers {
+        // this loosely corresponds to `i2s_std_calculate_clock` and
+        // `i2s_ll_tx_set_mclk` in esp-idf
+        //
+        // main difference is we are using fixed-point arithmetic here
+        // plus adjusted for parallel interface clocking
+
+        let sclk = crate::soc::constants::I2S_SCLK; // for now it's fixed 160MHz and 96MHz (just H2)
+
+        let rate_hz: HertzU32 = sample_rate.into();
+        let rate = rate_hz.raw();
+
+        let mclk = rate * 2;
+        let bclk_divider: u32 = if data_bits == 8 { 2 } else { 1 };
+        let mut mclk_divider = sclk / mclk;
+
+        let mut ma: u32;
+        let mut mb: u32;
+        let mut denominator: u32 = 0;
+        let mut numerator: u32 = 0;
+
+        let freq_diff = sclk.abs_diff(mclk * mclk_divider);
+
+        if freq_diff != 0 {
+            let decimal = freq_diff as u64 * 10000 / mclk as u64;
+            // Carry bit if the decimal is greater than 1.0 - 1.0 / (63.0 * 2) = 125.0 /
+            // 126.0
+            if decimal > 1250000 / 126 {
+                mclk_divider += 1;
+            } else {
+                let mut min: u32 = !0;
+
+                for a in 2..=I2S_LL_MCLK_DIVIDER_MAX {
+                    let b = (a as u64) * (freq_diff as u64 * 10000u64 / mclk as u64) + 5000;
+                    ma = ((freq_diff as u64 * 10000u64 * a as u64) / 10000) as u32;
+                    mb = (mclk as u64 * (b / 10000)) as u32;
+
+                    if ma == mb {
+                        denominator = a as u32;
+                        numerator = (b / 10000) as u32;
+                        break;
+                    }
+
+                    if mb.abs_diff(ma) < min {
+                        denominator = a as u32;
+                        numerator = b as u32;
+                        min = mb.abs_diff(ma);
+                    }
+                }
+            }
+        }
+
+        I2sClockDividers {
+            mclk_divider,
+            bclk_divider,
+            denominator,
+            numerator,
+        }
+    }
+
 }
 
 #[allow(missing_docs)]
@@ -569,8 +648,37 @@ pub trait Instance: Signals + RegBlock {
         r.conf().modify(|_, w| w.tx_start().clear_bit());
     }
 
+    fn set_clock(clock_settings: I2sClockDividers) {
+        let r = Self::register_block();
+
+        r.clkm_conf().modify(|r, w| unsafe {
+            w.bits(r.bits() | (crate::soc::constants::I2S_DEFAULT_CLK_SRC << 21))
+            // select PLL_160M
+        });
+
+        #[cfg(esp32)]
+        r.clkm_conf().modify(|_, w| w.clka_ena().clear_bit());
+
+        r.clkm_conf().modify(|_, w| unsafe {
+            w.clk_en().set_bit();
+            w.clkm_div_num().bits(clock_settings.mclk_divider as u8)
+        });
+
+        r.clkm_conf().modify(|_, w| unsafe {
+            w.clkm_div_a().bits(clock_settings.denominator as u8);
+            w.clkm_div_b().bits(clock_settings.numerator as u8)
+        });
+
+        r.sample_rate_conf().modify(|_, w| unsafe {
+            w.tx_bck_div_num().bits(clock_settings.bclk_divider as u8);
+            w.rx_bck_div_num().bits(clock_settings.bclk_divider as u8)
+        });
+    }
+
     fn setup(frequency: impl Into<fugit::HertzU32>, bits: u8) {
         let frequency: HertzU32 = frequency.into();
+
+        Self::set_clock(calculate_clock(frequency, bits));
 
         // Initialize I2S dev
         Self::rx_reset();
@@ -589,23 +697,9 @@ pub trait Instance: Signals + RegBlock {
             w.lcd_en().set_bit()
         });
 
-        let bck_div = if bits == 8 { 2 } else { 1 };
-        r.sample_rate_conf().write(|w| unsafe {
+        r.sample_rate_conf().modify(|_, w| unsafe {
             w.rx_bits_mod().bits(bits);
-            w.tx_bits_mod().bits(bits);
-            w.rx_bck_div_num().bits(bck_div); // I think this is the number of "bclocks" per "sample"
-            w.tx_bck_div_num().bits(bck_div) // ??
-        });
-
-        r.clkm_conf().write(|w| unsafe {
-            w.clka_ena().clear_bit();
-            w.clkm_div_a().bits(63);
-            w.clkm_div_b().bits(63);
-            // We ignore the possibility for fractional division here, clkspeed_hz must
-            // round up for a fractional clock speed, must result in >= 2
-            // TODO: proper clock configuration!!!!
-            w.clkm_div_num()
-                .bits((80000000u32 / (frequency.to_Hz() + 1)) as u8)
+            w.tx_bits_mod().bits(bits)
         });
 
         r.fifo_conf().write(|w| unsafe {
