@@ -336,12 +336,8 @@ pub trait Pin: Sealed {
     /// Enable or disable the GPIO pin output buffer.
     #[doc(hidden)]
     fn enable_output(&mut self, enable: bool, _: private::Internal) {
-        let bank = self.gpio_bank(private::Internal);
-        if enable {
-            bank.write_out_en_set(self.mask())
-        } else {
-            bank.write_out_en_clear(self.mask())
-        }
+        self.gpio_bank(private::Internal)
+            .write_out_en(self.mask(), enable);
     }
 
     /// Enable input for the pin
@@ -451,12 +447,8 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
     /// Set the pin's level to high or low
     #[doc(hidden)]
     fn set_output_high(&mut self, high: bool, _: private::Internal) {
-        let bank = self.gpio_bank(private::Internal);
-        if high {
-            bank.write_output_set(self.mask());
-        } else {
-            bank.write_output_clear(self.mask());
-        }
+        self.gpio_bank(private::Internal)
+            .write_output(self.mask(), high);
     }
 
     /// Configure the [DriveStrength] of the pin
@@ -554,6 +546,14 @@ pub enum GpioRegisterAccess {
 }
 
 impl GpioRegisterAccess {
+    fn write_out_en(self, word: u32, enable: bool) {
+        if enable {
+            self.write_out_en_set(word);
+        } else {
+            self.write_out_en_clear(word);
+        }
+    }
+
     fn write_out_en_clear(self, word: u32) {
         match self {
             Self::Bank0 => Bank0GpioRegisterAccess::write_out_en_clear(word),
@@ -599,6 +599,14 @@ impl GpioRegisterAccess {
             Self::Bank0 => Bank0GpioRegisterAccess::write_interrupt_status_clear(word),
             #[cfg(any(esp32, esp32s2, esp32s3))]
             Self::Bank1 => Bank1GpioRegisterAccess::write_interrupt_status_clear(word),
+        }
+    }
+
+    fn write_output(self, word: u32, set: bool) {
+        if set {
+            self.write_output_set(word);
+        } else {
+            self.write_output_clear(word);
         }
     }
 
