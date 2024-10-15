@@ -65,6 +65,7 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
+use enumset::EnumSet;
 use fugit::HertzU32;
 
 use crate::{
@@ -72,26 +73,31 @@ use crate::{
     dma::{ChannelTx, DmaChannelConvert, DmaEligible, DmaError, DmaPeripheral, DmaTxBuffer, Tx},
     gpio::{OutputSignal, PeripheralOutput},
     lcd_cam::{
-        asynch::LCD_DONE_WAKER,
+        asynch::{interrupt_handler, WAKER},
         lcd::{i8080::private::TxPins, ClockMode, DelayMode, Phase, Polarity},
-        private::{calculate_clkm, Instance},
+        private::calculate_clkm,
         BitOrder,
+        BlockingWithInterrupts,
         ByteOrder,
+        InterruptControl,
         Lcd,
+        LcdCamInterrupt,
     },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
-    Mode,
+    Async,
+    InterruptConfigurable,
+    DEFAULT_INTERRUPT_HANDLER,
 };
 
 /// Represents the I8080 LCD interface.
-pub struct I8080<'d, DM: Mode> {
+pub struct I8080<'d, DM> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     tx_channel: ChannelTx<'d, <LCD_CAM as DmaEligible>::Dma>,
     _phantom: PhantomData<DM>,
 }
 
-impl<'d, DM: Mode> I8080<'d, DM> {
+impl<'d, DM> I8080<'d, DM> {
     /// Creates a new instance of the I8080 LCD interface.
     pub fn new<P, CH>(
         lcd: Lcd<'d, DM>,
@@ -212,7 +218,45 @@ impl<'d, DM: Mode> I8080<'d, DM> {
     }
 }
 
-impl<'d, DM: Mode> I8080<'d, DM> {
+impl<'d> I8080<'d, BlockingWithInterrupts> {
+    /// Convert this blocking driver into an async one.
+    pub fn into_async(self) -> I8080<'d, Async> {
+        let mut interrupts = unsafe { InterruptControl::steal() };
+
+        // Disable any active interrupts for safety.
+        interrupts.unlisten(EnumSet::all());
+
+        // Set the built-in interrupt handler.
+        interrupts.set_interrupt_handler(interrupt_handler);
+
+        I8080 {
+            lcd_cam: self.lcd_cam,
+            tx_channel: self.tx_channel,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'d> I8080<'d, Async> {
+    /// Convert this async driver into a blocking one.
+    pub fn into_blocking(self) -> I8080<'d, BlockingWithInterrupts> {
+        let mut interrupts = unsafe { InterruptControl::steal() };
+
+        // Disable any active interrupts for safety.
+        interrupts.unlisten(EnumSet::all());
+
+        // "Unset" interrupt handler.
+        interrupts.set_interrupt_handler(DEFAULT_INTERRUPT_HANDLER);
+
+        I8080 {
+            lcd_cam: self.lcd_cam,
+            tx_channel: self.tx_channel,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'d, DM> I8080<'d, DM> {
     /// Configures the byte order for data transmission.
     pub fn set_byte_order(&mut self, byte_order: ByteOrder) -> &mut Self {
         let is_inverted = byte_order != ByteOrder::default();
@@ -367,7 +411,7 @@ impl<'d, DM: Mode> I8080<'d, DM> {
     }
 }
 
-impl<'d, DM: Mode> core::fmt::Debug for I8080<'d, DM> {
+impl<'d, DM> core::fmt::Debug for I8080<'d, DM> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("I8080").finish()
     }
@@ -375,12 +419,12 @@ impl<'d, DM: Mode> core::fmt::Debug for I8080<'d, DM> {
 
 /// Represents an ongoing (or potentially finished) transfer using the I8080 LCD
 /// interface
-pub struct I8080Transfer<'d, BUF: DmaTxBuffer, DM: Mode> {
+pub struct I8080Transfer<'d, BUF: DmaTxBuffer, DM> {
     i8080: ManuallyDrop<I8080<'d, DM>>,
     buf_view: ManuallyDrop<BUF::View>,
 }
 
-impl<'d, BUF: DmaTxBuffer, DM: Mode> I8080Transfer<'d, BUF, DM> {
+impl<'d, BUF: DmaTxBuffer, DM> I8080Transfer<'d, BUF, DM> {
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
         self.i8080
@@ -441,7 +485,7 @@ impl<'d, BUF: DmaTxBuffer, DM: Mode> I8080Transfer<'d, BUF, DM> {
     }
 }
 
-impl<'d, BUF: DmaTxBuffer, DM: Mode> Deref for I8080Transfer<'d, BUF, DM> {
+impl<'d, BUF: DmaTxBuffer, DM> Deref for I8080Transfer<'d, BUF, DM> {
     type Target = BUF::View;
 
     fn deref(&self) -> &Self::Target {
@@ -449,13 +493,13 @@ impl<'d, BUF: DmaTxBuffer, DM: Mode> Deref for I8080Transfer<'d, BUF, DM> {
     }
 }
 
-impl<'d, BUF: DmaTxBuffer, DM: Mode> DerefMut for I8080Transfer<'d, BUF, DM> {
+impl<'d, BUF: DmaTxBuffer, DM> DerefMut for I8080Transfer<'d, BUF, DM> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.buf_view
     }
 }
 
-impl<'d, BUF: DmaTxBuffer> I8080Transfer<'d, BUF, crate::Async> {
+impl<'d, BUF: DmaTxBuffer> I8080Transfer<'d, BUF, Async> {
     /// Waits for [Self::is_done] to return true.
     pub async fn wait_for_done(&mut self) {
         use core::{
@@ -470,15 +514,17 @@ impl<'d, BUF: DmaTxBuffer> I8080Transfer<'d, BUF, crate::Async> {
             type Output = ();
 
             fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                LCD_DONE_WAKER.register(cx.waker());
-                if Instance::is_lcd_done_set() {
+                let interrupts = unsafe { InterruptControl::steal() };
+                WAKER.register(cx.waker());
+                if interrupts
+                    .pending_interrupts()
+                    .contains(LcdCamInterrupt::LcdTransDone)
+                {
                     // Interrupt bit will be cleared in Self::wait.
                     // This allows `wait_for_done` to be called more than once.
-                    //
-                    // Instance::clear_lcd_done();
                     Poll::Ready(())
                 } else {
-                    Instance::listen_lcd_done();
+                    interrupts.listen(LcdCamInterrupt::LcdTransDone);
                     Poll::Pending
                 }
             }
@@ -486,7 +532,8 @@ impl<'d, BUF: DmaTxBuffer> I8080Transfer<'d, BUF, crate::Async> {
 
         impl Drop for LcdDoneFuture {
             fn drop(&mut self) {
-                Instance::unlisten_lcd_done();
+                let interrupts = unsafe { InterruptControl::steal() };
+                interrupts.unlisten(LcdCamInterrupt::LcdTransDone);
             }
         }
 
@@ -494,7 +541,7 @@ impl<'d, BUF: DmaTxBuffer> I8080Transfer<'d, BUF, crate::Async> {
     }
 }
 
-impl<'d, BUF: DmaTxBuffer, DM: Mode> Drop for I8080Transfer<'d, BUF, DM> {
+impl<'d, BUF: DmaTxBuffer, DM> Drop for I8080Transfer<'d, BUF, DM> {
     fn drop(&mut self) {
         self.stop_peripherals();
 

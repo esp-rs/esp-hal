@@ -8,8 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Expose LCD_CAM interrupt bits (#2338)
 
 ### Changed
+- Async I8080 driver is now created with `into_async()` (#2338)
 
 ### Fixed
 
