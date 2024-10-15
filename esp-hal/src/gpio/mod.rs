@@ -301,6 +301,11 @@ pub trait Pin: Sealed {
     /// GPIO number
     fn number(&self) -> u8;
 
+    #[doc(hidden)]
+    fn mask(&self) -> u32 {
+        1 << (self.number() % 32)
+    }
+
     /// Type-erase (degrade) this pin into an AnyPin.
     ///
     /// This converts pin singletons (`GpioPin<0>`, …), which are all different
@@ -332,11 +337,10 @@ pub trait Pin: Sealed {
     #[doc(hidden)]
     fn enable_output(&mut self, enable: bool, _: private::Internal) {
         let bank = self.gpio_bank(private::Internal);
-        let mask = 1 << (self.number() % 32);
         if enable {
-            bank.write_out_en_set(mask);
+            bank.write_out_en_set(self.mask())
         } else {
-            bank.write_out_en_clear(mask);
+            bank.write_out_en_clear(self.mask())
         }
     }
 
@@ -397,7 +401,7 @@ pub trait InputPin: Pin + Into<AnyPin> + 'static {
     /// The current state of the input
     #[doc(hidden)]
     fn is_input_high(&self, _: private::Internal) -> bool {
-        self.gpio_bank(private::Internal).read_input() & (1 << (self.number() % 32)) != 0
+        self.gpio_bank(private::Internal).read_input() & self.mask() != 0
     }
 }
 
@@ -413,7 +417,7 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
     ) {
         self.enable_output(true, private::Internal);
 
-        let gpio = unsafe { &*GPIO::PTR };
+        let gpio = unsafe { GPIO::steal() };
 
         gpio.pin(self.number() as usize)
             .modify(|_, w| w.pad_driver().bit(open_drain));
@@ -448,11 +452,10 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
     #[doc(hidden)]
     fn set_output_high(&mut self, high: bool, _: private::Internal) {
         let bank = self.gpio_bank(private::Internal);
-        let mask = 1 << (self.number() % 32);
         if high {
-            bank.write_output_set(mask);
+            bank.write_output_set(self.mask());
         } else {
-            bank.write_output_clear(mask);
+            bank.write_output_clear(self.mask());
         }
     }
 
@@ -465,7 +468,7 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
     /// Enable/disable open-drain mode
     #[doc(hidden)]
     fn enable_open_drain(&mut self, on: bool, _: private::Internal) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .pin(self.number() as usize)
             .modify(|_, w| w.pad_driver().bit(on));
     }
@@ -491,7 +494,7 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
     /// Is the output set to high
     #[doc(hidden)]
     fn is_set_high(&self, _: private::Internal) -> bool {
-        self.gpio_bank(private::Internal).read_output() & (1 << (self.number() % 32)) != 0
+        self.gpio_bank(private::Internal).read_output() & self.mask() != 0
     }
 }
 
@@ -511,9 +514,9 @@ pub trait AnalogPin: Pin {
                     w.fun_wpd().clear_bit()
                 });
 
-                unsafe { &*GPIO::PTR }
+                unsafe { GPIO::steal() }
                     .enable_w1tc()
-                    .write(|w| unsafe { w.bits(1 << self.number()) });
+                    .write(|w| unsafe { w.bits(self.mask()) });
             }
         } else {
             /// Configure the pin for analog operation
@@ -620,43 +623,43 @@ struct Bank0GpioRegisterAccess;
 
 impl Bank0GpioRegisterAccess {
     fn write_out_en_clear(word: u32) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .enable_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_out_en_set(word: u32) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .enable_w1ts()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn read_input() -> u32 {
-        unsafe { &*GPIO::PTR }.in_().read().bits()
+        unsafe { GPIO::steal() }.in_().read().bits()
     }
 
     fn read_output() -> u32 {
-        unsafe { &*GPIO::PTR }.out().read().bits()
+        unsafe { GPIO::steal() }.out().read().bits()
     }
 
     fn read_interrupt_status() -> u32 {
-        unsafe { &*GPIO::PTR }.status().read().bits()
+        unsafe { GPIO::steal() }.status().read().bits()
     }
 
     fn write_interrupt_status_clear(word: u32) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .status_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_output_set(word: u32) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .out_w1ts()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_output_clear(word: u32) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .out_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
@@ -668,43 +671,43 @@ struct Bank1GpioRegisterAccess;
 #[cfg(any(esp32, esp32s2, esp32s3))]
 impl Bank1GpioRegisterAccess {
     fn write_out_en_clear(word: u32) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .enable1_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_out_en_set(word: u32) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .enable1_w1ts()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn read_input() -> u32 {
-        unsafe { &*GPIO::PTR }.in1().read().bits()
+        unsafe { GPIO::steal() }.in1().read().bits()
     }
 
     fn read_output() -> u32 {
-        unsafe { &*GPIO::PTR }.out1().read().bits()
+        unsafe { GPIO::steal() }.out1().read().bits()
     }
 
     fn read_interrupt_status() -> u32 {
-        unsafe { &*GPIO::PTR }.status1().read().bits()
+        unsafe { GPIO::steal() }.status1().read().bits()
     }
 
     fn write_interrupt_status_clear(word: u32) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .status1_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_output_set(word: u32) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .out1_w1ts()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_output_clear(word: u32) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .out1_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
@@ -755,7 +758,7 @@ fn disable_usb_pads(gpionum: u8) {
     }
 
     if pins.contains(&gpionum) {
-        unsafe { &*crate::peripherals::USB_DEVICE::PTR }
+        unsafe { crate::peripherals::USB_DEVICE::steal() }
             .conf0()
             .modify(|_, w| {
                 w.usb_pad_enable().clear_bit();
@@ -1135,7 +1138,7 @@ macro_rules! rtc_pins {
     ( $pin_num:expr ) => {
         impl $crate::gpio::RtcPin for GpioPin<$pin_num> {
             unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
-                let rtc_cntl = unsafe { &*$crate::peripherals::RTC_CNTL::ptr() };
+                let rtc_cntl = unsafe { $crate::peripherals::RTC_CNTL::steal() };
                 cfg_if::cfg_if! {
                     if #[cfg(esp32c2)] {
                         let gpio_wakeup = rtc_cntl.cntl_gpio_wakeup();
@@ -1151,7 +1154,7 @@ macro_rules! rtc_pins {
             }
 
             fn rtcio_pad_hold(&mut self, enable: bool) {
-                let rtc_cntl = unsafe { &*$crate::peripherals::RTC_CNTL::ptr() };
+                let rtc_cntl = unsafe { $crate::peripherals::RTC_CNTL::steal() };
                 paste::paste! {
                     rtc_cntl.pad_hold().modify(|_, w| w.[< gpio_pin $pin_num _hold >]().bit(enable));
                 }
@@ -1160,12 +1163,12 @@ macro_rules! rtc_pins {
 
         impl $crate::gpio::RtcPinWithResistors for GpioPin<$pin_num> {
             fn rtcio_pullup(&mut self, enable: bool) {
-                let io_mux = unsafe { &*$crate::peripherals::IO_MUX::ptr() };
+                let io_mux = unsafe { $crate::peripherals::IO_MUX::steal() };
                 io_mux.gpio($pin_num).modify(|_, w| w.fun_wpu().bit(enable));
             }
 
             fn rtcio_pulldown(&mut self, enable: bool) {
-                let io_mux = unsafe { &*$crate::peripherals::IO_MUX::ptr() };
+                let io_mux = unsafe { $crate::peripherals::IO_MUX::steal() };
                 io_mux.gpio($pin_num).modify(|_, w| w.fun_wpd().bit(enable));
             }
         }
@@ -1180,12 +1183,12 @@ macro_rules! rtc_pins {
 pub fn enable_iomux_clk_gate() {
     cfg_if::cfg_if! {
         if #[cfg(esp32s2)] {
-            let sensors = unsafe { &*crate::peripherals::SENS::ptr() };
+            let sensors = unsafe { crate::peripherals::SENS::steal() };
             sensors
                 .sar_io_mux_conf()
                 .modify(|_, w| w.iomux_clk_gate_en().set_bit());
         } else if #[cfg(esp32s3)] {
-            let sensors = unsafe { &*crate::peripherals::SENS::ptr() };
+            let sensors = unsafe { crate::peripherals::SENS::steal() };
             sensors
                 .sar_peri_clk_gate_conf()
                 .modify(|_,w| w.iomux_clk_en().set_bit());
@@ -1204,7 +1207,7 @@ macro_rules! rtcio_analog {
         impl GpioPin<$pin_num> {
             /// Configures the pin for analog mode.
             fn set_as_analog(&self, _: $crate::private::Internal) {
-                let rtcio = unsafe{ &*$crate::peripherals::RTC_IO::ptr() };
+                let rtcio = unsafe{ $crate::peripherals::RTC_IO::steal() };
 
                 #[cfg(esp32s2)]
                 $crate::gpio::enable_iomux_clk_gate();
@@ -1255,9 +1258,7 @@ macro_rules! rtcio_analog {
             /// Set the RTC properties of the pin. If `mux` is true then then pin is
             /// routed to RTC, when false it is routed to IO_MUX.
             fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
-                use $crate::peripherals::RTC_IO;
-
-                let rtcio = unsafe{ &*RTC_IO::ptr() };
+                let rtcio = unsafe{ $crate::peripherals::RTC_IO::steal() };
 
                 $crate::gpio::enable_iomux_clk_gate();
 
@@ -1272,7 +1273,7 @@ macro_rules! rtcio_analog {
             }
 
             fn rtcio_pad_hold(&mut self, enable: bool) {
-                let rtc_ctrl = unsafe { &*$crate::peripherals::LPWR::PTR };
+                let rtc_ctrl = unsafe { $crate::peripherals::LPWR::steal() };
 
                 cfg_if::cfg_if! {
                     if #[cfg(esp32)] {
@@ -1292,7 +1293,7 @@ macro_rules! rtcio_analog {
             impl $crate::gpio::RtcPinWithResistors for GpioPin<$pin_num>
             {
                 fn rtcio_pullup(&mut self, enable: bool) {
-                    let rtcio = unsafe { &*$crate::peripherals::RTC_IO::PTR };
+                    let rtcio = unsafe { $crate::peripherals::RTC_IO::steal() };
 
                     paste::paste! {
                         rtcio.$pin_reg.modify(|_, w| w.[< $prefix rue >]().bit(enable));
@@ -1300,7 +1301,7 @@ macro_rules! rtcio_analog {
                 }
 
                 fn rtcio_pulldown(&mut self, enable: bool) {
-                    let rtcio = unsafe { &*$crate::peripherals::RTC_IO::PTR };
+                    let rtcio = unsafe { $crate::peripherals::RTC_IO::steal() };
 
                     paste::paste! {
                         rtcio.$pin_reg.modify(|_, w| w.[< $prefix rde >]().bit(enable));
@@ -1345,7 +1346,7 @@ macro_rules! rtcio_analog {
 macro_rules! touch {
     (@pin_specific $touch_num:expr, true) => {
         paste::paste! {
-            unsafe { &*RTC_IO::ptr() }.[< touch_pad $touch_num >]().write(|w| unsafe {
+            unsafe { RTC_IO::steal() }.[< touch_pad $touch_num >]().write(|w| unsafe {
                 w.xpd().set_bit();
                 // clear input_enable
                 w.fun_ie().clear_bit();
@@ -1363,7 +1364,7 @@ macro_rules! touch {
 
     (@pin_specific $touch_num:expr, false) => {
         paste::paste! {
-            unsafe { &*RTC_IO::ptr() }.[< touch_pad $touch_num >]().write(|w| {
+            unsafe { RTC_IO::steal() }.[< touch_pad $touch_num >]().write(|w| {
                 w.xpd().set_bit();
                 w.tie_opt().clear_bit()
             });
@@ -1382,9 +1383,9 @@ macro_rules! touch {
             fn set_touch_impl(&self, _: $crate::private::Internal) {
                 use $crate::peripherals::{GPIO, RTC_IO, SENS};
 
-                let gpio = unsafe { &*GPIO::ptr() };
-                let rtcio = unsafe { &*RTC_IO::ptr() };
-                let sens = unsafe { &*SENS::ptr() };
+                let gpio = unsafe { GPIO::steal() };
+                let rtcio = unsafe { RTC_IO::steal() };
+                let sens = unsafe { SENS::steal() };
 
                 // Pad to normal mode (not open-drain)
                 gpio.pin($rtc_pin).write(|w| w.pad_driver().clear_bit());
@@ -1414,7 +1415,7 @@ macro_rules! touch {
 
             fn get_touch_measurement_impl(&self, _: $crate::private::Internal) -> u16 {
                 paste::paste! {
-                    unsafe { &* $crate::peripherals::SENS::ptr() }
+                    unsafe { $crate::peripherals::SENS::steal() }
                         . $touch_out_reg ()
                         .read()
                         . $meas_field ()
@@ -1428,7 +1429,7 @@ macro_rules! touch {
 
             fn set_threshold_impl(&self, threshold: u16, _: $crate::private::Internal) {
                 paste::paste! {
-                    unsafe { &* $crate::peripherals::SENS::ptr() }
+                    unsafe { $crate::peripherals::SENS::steal() }
                         . $touch_thres_reg ()
                         .write(|w| unsafe {
                             w. $touch_thres_field ().bits(threshold)
@@ -2187,7 +2188,7 @@ pub(crate) mod internal {
 }
 
 fn is_listening(pin_num: u8) -> bool {
-    let bits = unsafe { &*GPIO::PTR }
+    let bits = unsafe { GPIO::steal() }
         .pin(pin_num as usize)
         .read()
         .int_ena()
@@ -2196,7 +2197,7 @@ fn is_listening(pin_num: u8) -> bool {
 }
 
 fn set_int_enable(gpio_num: u8, int_ena: u8, int_type: u8, wake_up_from_light_sleep: bool) {
-    let gpio = unsafe { &*GPIO::PTR };
+    let gpio = unsafe { GPIO::steal() };
     gpio.pin(gpio_num as usize).modify(|_, w| unsafe {
         w.int_ena().bits(int_ena);
         w.int_type().bits(int_type);
