@@ -743,7 +743,7 @@ impl BaudRate {
 }
 
 /// An inactive TWAI peripheral in the "Reset"/configuration state.
-pub struct TwaiConfiguration<'d, DM: crate::Mode, T> {
+pub struct TwaiConfiguration<'d, DM: crate::Mode, T = AnyTwai> {
     twai: PeripheralRef<'d, T>,
     phantom: PhantomData<DM>,
     mode: TwaiMode,
@@ -1021,6 +1021,36 @@ where
     }
 }
 
+impl<'d> TwaiConfiguration<'d, crate::Blocking> {
+    /// Create a new instance of [TwaiConfiguration]
+    ///
+    /// You will need to use a transceiver to connect to the TWAI bus
+    pub fn new<RX: PeripheralInput, TX: PeripheralOutput>(
+        peripheral: impl Peripheral<P = impl Into<AnyTwai>> + 'd,
+        rx_pin: impl Peripheral<P = RX> + 'd,
+        tx_pin: impl Peripheral<P = TX> + 'd,
+        baud_rate: BaudRate,
+        mode: TwaiMode,
+    ) -> Self {
+        Self::new_typed(peripheral.map_into(), rx_pin, tx_pin, baud_rate, mode)
+    }
+
+    /// Create a new instance of [TwaiConfiguration] meant to connect two ESP32s
+    /// directly
+    ///
+    /// You don't need a transceiver by following the description in the
+    /// `twai.rs` example
+    pub fn new_no_transceiver<RX: PeripheralInput, TX: PeripheralOutput>(
+        peripheral: impl Peripheral<P = impl Into<AnyTwai>> + 'd,
+        rx_pin: impl Peripheral<P = RX> + 'd,
+        tx_pin: impl Peripheral<P = TX> + 'd,
+        baud_rate: BaudRate,
+        mode: TwaiMode,
+    ) -> Self {
+        Self::new_no_transceiver_typed(peripheral.map_into(), rx_pin, tx_pin, baud_rate, mode)
+    }
+}
+
 impl<'d, T> TwaiConfiguration<'d, crate::Blocking, T>
 where
     T: Instance,
@@ -1028,7 +1058,7 @@ where
     /// Create a new instance of [TwaiConfiguration]
     ///
     /// You will need to use a transceiver to connect to the TWAI bus
-    pub fn new<RX: PeripheralInput, TX: PeripheralOutput>(
+    pub fn new_typed<RX: PeripheralInput, TX: PeripheralOutput>(
         peripheral: impl Peripheral<P = T> + 'd,
         rx_pin: impl Peripheral<P = RX> + 'd,
         tx_pin: impl Peripheral<P = TX> + 'd,
@@ -1043,7 +1073,7 @@ where
     ///
     /// You don't need a transceiver by following the description in the
     /// `twai.rs` example
-    pub fn new_no_transceiver<RX: PeripheralInput, TX: PeripheralOutput>(
+    pub fn new_no_transceiver_typed<RX: PeripheralInput, TX: PeripheralOutput>(
         peripheral: impl Peripheral<P = T> + 'd,
         rx_pin: impl Peripheral<P = RX> + 'd,
         tx_pin: impl Peripheral<P = TX> + 'd,
@@ -1080,7 +1110,7 @@ where
 ///
 /// In this mode, the TWAI controller can transmit and receive messages
 /// including error signals (such as error and overload frames).
-pub struct Twai<'d, DM: crate::Mode, T> {
+pub struct Twai<'d, DM: crate::Mode, T = AnyTwai> {
     twai: PeripheralRef<'d, T>,
     tx: TwaiTx<'d, DM, T>,
     rx: TwaiRx<'d, DM, T>,
@@ -1198,7 +1228,7 @@ where
 }
 
 /// Interface to the TWAI transmitter part.
-pub struct TwaiTx<'d, DM: crate::Mode, T> {
+pub struct TwaiTx<'d, DM: crate::Mode, T = AnyTwai> {
     twai: PeripheralRef<'d, T>,
     phantom: PhantomData<DM>,
 }
@@ -1240,7 +1270,7 @@ where
 }
 
 /// Interface to the TWAI receiver part.
-pub struct TwaiRx<'d, DM: crate::Mode, T> {
+pub struct TwaiRx<'d, DM: crate::Mode, T = AnyTwai> {
     twai: PeripheralRef<'d, T>,
     phantom: PhantomData<DM>,
 }
@@ -1656,6 +1686,35 @@ impl Instance for crate::peripherals::TWAI1 {
     fn async_state(&self) -> &asynch::TwaiAsyncState {
         static STATE: asynch::TwaiAsyncState = asynch::TwaiAsyncState::new();
         &STATE
+    }
+}
+
+crate::any_peripheral! {
+    /// Any TWAI peripheral.
+    pub peripheral AnyTwai {
+        #[cfg(twai0)]
+        Twai0(crate::peripherals::TWAI0),
+        #[cfg(twai1)]
+        Twai1(crate::peripherals::TWAI1),
+    }
+}
+
+impl Instance for AnyTwai {
+    delegate::delegate! {
+        to match &self.0 {
+            #[cfg(twai0)]
+            AnyTwaiInner::Twai0(twai) => twai,
+            #[cfg(twai1)]
+            AnyTwaiInner::Twai1(twai) => twai,
+        } {
+            fn number(&self) -> usize;
+            fn input_signal(&self) -> InputSignal;
+            fn output_signal(&self) -> OutputSignal;
+            fn interrupt(&self) -> crate::peripherals::Interrupt;
+            fn async_handler(&self) -> InterruptHandler;
+            fn register_block(&self) -> &RegisterBlock;
+            fn async_state(&self) -> &asynch::TwaiAsyncState;
+        }
     }
 }
 

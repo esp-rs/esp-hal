@@ -49,6 +49,7 @@ You no longer have to specify the peripheral instance in the driver's type for t
 peripherals:
 
 - SPI (both master and slave)
+- TWAI
 
 ```diff
 -Spi<'static, SPI2, FullDuplexMode>
