@@ -558,12 +558,12 @@ crate::gpio! {
     (27, 0, [Input, Output, Analog, RtcIo, Touch] (5 => EMAC_RX_DV) ())
     (32, 1, [Input, Output, Analog, RtcIo, Touch])
     (33, 1, [Input, Output, Analog, RtcIo, Touch])
-    (34, 1, [Input, Analog, RtcIo])
-    (35, 1, [Input, Analog, RtcIo])
-    (36, 1, [Input, Analog, RtcIo])
-    (37, 1, [Input, Analog, RtcIo])
-    (38, 1, [Input, Analog, RtcIo])
-    (39, 1, [Input, Analog, RtcIo])
+    (34, 1, [Input, Analog, RtcIoInput])
+    (35, 1, [Input, Analog, RtcIoInput])
+    (36, 1, [Input, Analog, RtcIoInput])
+    (37, 1, [Input, Analog, RtcIoInput])
+    (38, 1, [Input, Analog, RtcIoInput])
+    (39, 1, [Input, Analog, RtcIoInput])
 }
 
 crate::rtcio_analog! {

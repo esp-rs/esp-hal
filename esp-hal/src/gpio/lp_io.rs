@@ -206,15 +206,15 @@ macro_rules! lp_gpio {
         $($gpionum:literal)+
     ) => {
         $(
-            impl $crate::gpio::RtcPin for GpioPin<$gpionum> {
-                unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
+            impl GpioPin<$gpionum> {
+                unsafe fn apply_wakeup_impl(&mut self, wakeup: bool, level: u8) {
                     let lp_io = $crate::peripherals::LP_IO::steal();
                     lp_io.pin($gpionum).modify(|_, w| {
                         w.wakeup_enable().bit(wakeup).int_type().bits(level)
                     });
                 }
 
-                fn rtcio_pad_hold(&mut self, enable: bool) {
+                fn rtcio_pad_hold_impl(&mut self, enable: bool) {
                     let mask = 1 << $gpionum;
                     unsafe {
                         let lp_aon = $crate::peripherals::LP_AON::steal();
@@ -231,7 +231,7 @@ macro_rules! lp_gpio {
 
                 /// Set the LP properties of the pin. If `mux` is true then then pin is
                 /// routed to LP_IO, when false it is routed to IO_MUX.
-                fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
+                fn rtc_set_config_impl(&mut self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
                     let mask = 1 << $gpionum;
                     unsafe {
                         // Select LP_IO
@@ -255,17 +255,18 @@ macro_rules! lp_gpio {
                         });
                     }
                 }
-            }
 
-            impl $crate::gpio::RtcPinWithResistors for GpioPin<$gpionum> {
-                fn rtcio_pullup(&mut self, enable: bool) {
+                fn rtcio_pulls(&mut self, up: Option<bool>, down: Option<bool>) {
                     let lp_io = unsafe { $crate::peripherals::LP_IO::steal() };
-                    lp_io.gpio($gpionum).modify(|_, w| w.fun_wpu().bit(enable));
-                }
-
-                fn rtcio_pulldown(&mut self, enable: bool) {
-                    let lp_io = unsafe { $crate::peripherals::LP_IO::steal() };
-                    lp_io.gpio($gpionum).modify(|_, w| w.fun_wpd().bit(enable));
+                    lp_io.gpio($gpionum).modify(|_, w| {
+                        if let Some(enable) = up {
+                            w.fun_wpu().bit(enable);
+                        }
+                        if let Some(enable) = down {
+                            w.fun_wpd().bit(enable);
+                        }
+                        w
+                    });
                 }
             }
         )+

@@ -945,7 +945,47 @@ macro_rules! io_type {
             }
         }
     };
-    (RtcIo, $gpionum:literal) => {};
+    (RtcIo, $gpionum:literal) => {
+        $crate::io_type!(RtcIoInput, $gpionum);
+
+        impl $crate::gpio::RtcPinWithResistors for GpioPin<$gpionum> {
+            fn rtcio_pullup(&mut self, enable: bool) {
+                self.rtcio_pulls(Some(enable), None)
+            }
+            fn rtcio_pulldown(&mut self, enable: bool) {
+                self.rtcio_pulls(None, Some(enable))
+            }
+        }
+    };
+    (RtcIoInput, $gpionum:literal) => {
+        impl $crate::gpio::RtcPin for GpioPin<$gpionum> {
+            #[cfg(xtensa)]
+            fn rtc_number(&self) -> u8 {
+                self.rtc_number_impl()
+            }
+
+            /// Set the RTC properties of the pin. If `mux` is true then then pin is
+            /// routed to RTC, when false it is routed to IO_MUX.
+            #[cfg(any(xtensa, esp32c6))]
+            fn rtc_set_config(
+                &mut self,
+                input_enable: bool,
+                mux: bool,
+                func: $crate::gpio::RtcFunction,
+            ) {
+                self.rtc_set_config_impl(input_enable, mux, func)
+            }
+
+            fn rtcio_pad_hold(&mut self, enable: bool) {
+                self.rtcio_pad_hold_impl(enable)
+            }
+
+            #[cfg(any(esp32c2, esp32c3, esp32c6))]
+            unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
+                self.apply_wakeup_impl(wakeup, level)
+            }
+        }
+    };
 }
 
 #[doc(hidden)]
@@ -1143,47 +1183,46 @@ macro_rules! gpio {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! rtc_pins {
-    ( $pin_num:expr ) => {
-        impl $crate::gpio::RtcPin for GpioPin<$pin_num> {
-            unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
-                let rtc_cntl = unsafe { $crate::peripherals::RTC_CNTL::steal() };
-                cfg_if::cfg_if! {
-                    if #[cfg(esp32c2)] {
-                        let gpio_wakeup = rtc_cntl.cntl_gpio_wakeup();
-                    } else {
-                        let gpio_wakeup = rtc_cntl.gpio_wakeup();
+    ( $( $pin_num:expr )+ ) => {
+        $(
+            impl GpioPin<$pin_num> {
+                unsafe fn apply_wakeup_impl(&mut self, wakeup: bool, level: u8) {
+                    let rtc_cntl = unsafe { $crate::peripherals::RTC_CNTL::steal() };
+                    cfg_if::cfg_if! {
+                        if #[cfg(esp32c2)] {
+                            let gpio_wakeup = rtc_cntl.cntl_gpio_wakeup();
+                        } else {
+                            let gpio_wakeup = rtc_cntl.gpio_wakeup();
+                        }
+                    }
+
+                    paste::paste! {
+                        gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _wakeup_enable >]().bit(wakeup));
+                        gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _int_type >]().bits(level));
                     }
                 }
 
-                paste::paste! {
-                    gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _wakeup_enable >]().bit(wakeup));
-                    gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _int_type >]().bits(level));
+                fn rtcio_pad_hold_impl(&mut self, enable: bool) {
+                    let rtc_cntl = unsafe { $crate::peripherals::RTC_CNTL::steal() };
+                    paste::paste! {
+                        rtc_cntl.pad_hold().modify(|_, w| w.[< gpio_pin $pin_num _hold >]().bit(enable));
+                    }
+                }
+
+                fn rtcio_pulls(&mut self, up: Option<bool>, down: Option<bool>) {
+                    let io_mux = unsafe { $crate::peripherals::IO_MUX::steal() };
+                    io_mux.gpio($pin_num).modify(|_, w| {
+                        if let Some(enable) = up {
+                            w.fun_wpu().bit(enable);
+                        }
+                        if let Some(enable) = down {
+                            w.fun_wpd().bit(enable);
+                        }
+                        w
+                    });
                 }
             }
-
-            fn rtcio_pad_hold(&mut self, enable: bool) {
-                let rtc_cntl = unsafe { $crate::peripherals::RTC_CNTL::steal() };
-                paste::paste! {
-                    rtc_cntl.pad_hold().modify(|_, w| w.[< gpio_pin $pin_num _hold >]().bit(enable));
-                }
-            }
-        }
-
-        impl $crate::gpio::RtcPinWithResistors for GpioPin<$pin_num> {
-            fn rtcio_pullup(&mut self, enable: bool) {
-                let io_mux = unsafe { $crate::peripherals::IO_MUX::steal() };
-                io_mux.gpio($pin_num).modify(|_, w| w.fun_wpu().bit(enable));
-            }
-
-            fn rtcio_pulldown(&mut self, enable: bool) {
-                let io_mux = unsafe { $crate::peripherals::IO_MUX::steal() };
-                io_mux.gpio($pin_num).modify(|_, w| w.fun_wpd().bit(enable));
-            }
-        }
-    };
-
-    ( $( $pin_num:expr )+ ) => {
-        $( $crate::rtc_pins!($pin_num); )+
+        )+
     };
 }
 
@@ -1257,15 +1296,15 @@ macro_rules! rtcio_analog {
     };
 
     (@rtcio_pin $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:literal)?) => {
-        impl $crate::gpio::RtcPin for GpioPin<$pin_num>
+        impl GpioPin<$pin_num>
         {
-            fn rtc_number(&self) -> u8 {
+            fn rtc_number_impl(&self) -> u8 {
                 $rtc_pin
             }
 
             /// Set the RTC properties of the pin. If `mux` is true then then pin is
             /// routed to RTC, when false it is routed to IO_MUX.
-            fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
+            fn rtc_set_config_impl(&mut self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
                 let rtcio = unsafe{ $crate::peripherals::RTC_IO::steal() };
 
                 $crate::gpio::enable_iomux_clk_gate();
@@ -1280,7 +1319,7 @@ macro_rules! rtcio_analog {
                 }
             }
 
-            fn rtcio_pad_hold(&mut self, enable: bool) {
+            fn rtcio_pad_hold_impl(&mut self, enable: bool) {
                 let rtc_ctrl = unsafe { $crate::peripherals::LPWR::steal() };
 
                 cfg_if::cfg_if! {
@@ -1293,30 +1332,27 @@ macro_rules! rtcio_analog {
 
                 pad_hold.modify(|_, w| w.$hold().bit(enable));
             }
+
+            $(
+                // FIXME: replace with $(ignore($rue)) once stable
+                $crate::rtcio_analog!(@ignore $rue);
+
+                fn rtcio_pulls(&mut self, up: Option<bool>, down: Option<bool>) {
+                    let rtcio = unsafe { $crate::peripherals::RTC_IO::steal() };
+                    paste::paste! {
+                        rtcio.$pin_reg.modify(|_, w| {
+                            if let Some(enable) = up {
+                                w.[< $prefix rue >]().bit(enable);
+                            }
+                            if let Some(enable) = down {
+                                w.[< $prefix rde >]().bit(enable);
+                            }
+                            w
+                        });
+                    }
+                }
+            )?
         }
-
-        $(
-            // FIXME: replace with $(ignore($rue)) once stable
-            $crate::rtcio_analog!(@ignore $rue);
-            impl $crate::gpio::RtcPinWithResistors for GpioPin<$pin_num>
-            {
-                fn rtcio_pullup(&mut self, enable: bool) {
-                    let rtcio = unsafe { $crate::peripherals::RTC_IO::steal() };
-
-                    paste::paste! {
-                        rtcio.$pin_reg.modify(|_, w| w.[< $prefix rue >]().bit(enable));
-                    }
-                }
-
-                fn rtcio_pulldown(&mut self, enable: bool) {
-                    let rtcio = unsafe { $crate::peripherals::RTC_IO::steal() };
-
-                    paste::paste! {
-                        rtcio.$pin_reg.modify(|_, w| w.[< $prefix rde >]().bit(enable));
-                    }
-                }
-            }
-        )?
     };
 
     (
