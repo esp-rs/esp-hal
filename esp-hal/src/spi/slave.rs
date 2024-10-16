@@ -203,7 +203,7 @@ pub mod dma {
         tx_chain: DescriptorChain,
     }
 
-    impl<'d, T, DmaMode> core::fmt::Debug for SpiDma<'d, T, DmaMode>
+    impl<T, DmaMode> core::fmt::Debug for SpiDma<'_, T, DmaMode>
     where
         T: InstanceDma,
         DmaMode: Mode,
@@ -213,7 +213,7 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, DmaMode> DmaSupport for SpiDma<'d, T, DmaMode>
+    impl<T, DmaMode> DmaSupport for SpiDma<'_, T, DmaMode>
     where
         T: InstanceDma,
         DmaMode: Mode,

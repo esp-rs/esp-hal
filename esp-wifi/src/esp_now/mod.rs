@@ -224,7 +224,7 @@ pub struct EspNowManager<'d> {
     _rc: EspNowRc<'d>,
 }
 
-impl<'d> EspNowManager<'d> {
+impl EspNowManager<'_> {
     /// Set the wifi protocol.
     ///
     /// This will set the wifi protocol to the desired protocol
@@ -423,7 +423,7 @@ pub struct EspNowSender<'d> {
     _rc: EspNowRc<'d>,
 }
 
-impl<'d> EspNowSender<'d> {
+impl EspNowSender<'_> {
     /// Send data to peer
     ///
     /// The peer needs to be added to the peer list first.
@@ -453,7 +453,7 @@ impl<'d> EspNowSender<'d> {
 #[must_use]
 pub struct SendWaiter<'s>(PhantomData<&'s mut EspNowSender<'s>>);
 
-impl<'s> SendWaiter<'s> {
+impl SendWaiter<'_> {
     /// Wait for the previous sending to complete, i.e. the send callback is
     /// invoked with status of the sending.
     pub fn wait(self) -> Result<(), EspNowError> {
@@ -470,7 +470,7 @@ impl<'s> SendWaiter<'s> {
     }
 }
 
-impl<'s> Drop for SendWaiter<'s> {
+impl Drop for SendWaiter<'_> {
     /// wait for the send to complete to prevent the lock on `EspNowSender` get
     /// unlocked before a callback is invoked.
     fn drop(&mut self) {
@@ -484,7 +484,7 @@ pub struct EspNowReceiver<'d> {
     _rc: EspNowRc<'d>,
 }
 
-impl<'d> EspNowReceiver<'d> {
+impl EspNowReceiver<'_> {
     pub fn receive(&self) -> Option<ReceivedData> {
         critical_section::with(|cs| {
             let mut queue = RECEIVE_QUEUE.borrow_ref_mut(cs);
@@ -500,7 +500,7 @@ struct EspNowRc<'d> {
     inner: PhantomData<EspNow<'d>>,
 }
 
-impl<'d> EspNowRc<'d> {
+impl EspNowRc<'_> {
     fn new() -> Result<Self, EspNowError> {
         static ESP_NOW_RC: AtomicU8 = AtomicU8::new(0);
         // The reference counter is not 0, which means there is another instance of
@@ -516,7 +516,7 @@ impl<'d> EspNowRc<'d> {
     }
 }
 
-impl<'d> Clone for EspNowRc<'d> {
+impl Clone for EspNowRc<'_> {
     fn clone(&self) -> Self {
         self.rc.fetch_add(1, Ordering::Release);
         Self {
@@ -526,7 +526,7 @@ impl<'d> Clone for EspNowRc<'d> {
     }
 }
 
-impl<'d> Drop for EspNowRc<'d> {
+impl Drop for EspNowRc<'_> {
     fn drop(&mut self) {
         if self.rc.fetch_sub(1, Ordering::AcqRel) == 1 {
             unsafe {
@@ -808,7 +808,7 @@ mod asynch {
     pub(super) static ESP_NOW_TX_WAKER: AtomicWaker = AtomicWaker::new();
     pub(super) static ESP_NOW_RX_WAKER: AtomicWaker = AtomicWaker::new();
 
-    impl<'d> EspNowReceiver<'d> {
+    impl EspNowReceiver<'_> {
         /// This function takes mutable reference to self because the
         /// implementation of `ReceiveFuture` is not logically thread
         /// safe.
@@ -817,7 +817,7 @@ mod asynch {
         }
     }
 
-    impl<'d> EspNowSender<'d> {
+    impl EspNowSender<'_> {
         pub fn send_async<'s, 'r>(
             &'s mut self,
             addr: &'r [u8; 6],
@@ -832,7 +832,7 @@ mod asynch {
         }
     }
 
-    impl<'d> EspNow<'d> {
+    impl EspNow<'_> {
         /// This function takes mutable reference to self because the
         /// implementation of `ReceiveFuture` is not logically thread
         /// safe.
@@ -859,7 +859,7 @@ mod asynch {
         sent: bool,
     }
 
-    impl<'s, 'r> core::future::Future for SendFuture<'s, 'r> {
+    impl core::future::Future for SendFuture<'_, '_> {
         type Output = Result<(), EspNowError>;
 
         fn poll(mut self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -892,7 +892,7 @@ mod asynch {
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct ReceiveFuture<'r>(PhantomData<&'r mut EspNowReceiver<'r>>);
 
-    impl<'r> core::future::Future for ReceiveFuture<'r> {
+    impl core::future::Future for ReceiveFuture<'_> {
         type Output = ReceivedData;
 
         fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

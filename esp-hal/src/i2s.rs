@@ -376,7 +376,7 @@ where
     }
 }
 
-impl<'d, I, DmaMode> I2s<'d, I, DmaMode>
+impl<I, DmaMode> I2s<'_, I, DmaMode>
 where
     I: RegisterAccess,
     DmaMode: Mode,
@@ -409,14 +409,14 @@ where
     }
 }
 
-impl<'d, I, DmaMode> crate::private::Sealed for I2s<'d, I, DmaMode>
+impl<I, DmaMode> crate::private::Sealed for I2s<'_, I, DmaMode>
 where
     I: RegisterAccess,
     DmaMode: Mode,
 {
 }
 
-impl<'d, I, DmaMode> InterruptConfigurable for I2s<'d, I, DmaMode>
+impl<I, DmaMode> InterruptConfigurable for I2s<'_, I, DmaMode>
 where
     I: RegisterAccess,
     DmaMode: Mode,
@@ -479,7 +479,7 @@ where
     phantom: PhantomData<DmaMode>,
 }
 
-impl<'d, T, DmaMode> core::fmt::Debug for I2sTx<'d, T, DmaMode>
+impl<T, DmaMode> core::fmt::Debug for I2sTx<'_, T, DmaMode>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -489,7 +489,7 @@ where
     }
 }
 
-impl<'d, T, DmaMode> DmaSupport for I2sTx<'d, T, DmaMode>
+impl<T, DmaMode> DmaSupport for I2sTx<'_, T, DmaMode>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -593,7 +593,7 @@ where
     }
 }
 
-impl<'d, T, W, DmaMode> I2sWrite<W> for I2sTx<'d, T, DmaMode>
+impl<T, W, DmaMode> I2sWrite<W> for I2sTx<'_, T, DmaMode>
 where
     T: RegisterAccess,
     W: AcceptedWord,
@@ -643,7 +643,7 @@ where
     phantom: PhantomData<DmaMode>,
 }
 
-impl<'d, T, DmaMode> core::fmt::Debug for I2sRx<'d, T, DmaMode>
+impl<T, DmaMode> core::fmt::Debug for I2sRx<'_, T, DmaMode>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -653,7 +653,7 @@ where
     }
 }
 
-impl<'d, T, DmaMode> DmaSupport for I2sRx<'d, T, DmaMode>
+impl<T, DmaMode> DmaSupport for I2sRx<'_, T, DmaMode>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -755,7 +755,7 @@ where
     }
 }
 
-impl<'d, W, T, DmaMode> I2sRead<W> for I2sRx<'d, T, DmaMode>
+impl<W, T, DmaMode> I2sRead<W> for I2sRx<'_, T, DmaMode>
 where
     T: RegisterAccess,
     W: AcceptedWord,

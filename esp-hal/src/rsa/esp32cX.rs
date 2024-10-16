@@ -10,7 +10,7 @@ use crate::rsa::{
     RsaMultiplication,
 };
 
-impl<'d, DM: crate::Mode> Rsa<'d, DM> {
+impl<DM: crate::Mode> Rsa<'_, DM> {
     /// After the RSA Accelerator is released from reset, the memory blocks
     /// needs to be initialized, only after that peripheral should be used.
     /// This function would return without an error if the memory is initialized
@@ -232,7 +232,7 @@ pub mod operand_sizes {
     );
 }
 
-impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularExponentiation<'a, 'd, T, DM>
+impl<'d, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularExponentiation<'_, 'd, T, DM>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
@@ -252,7 +252,7 @@ where
     }
 }
 
-impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularMultiplication<'a, 'd, T, DM>
+impl<'d, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularMultiplication<'_, 'd, T, DM>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
@@ -265,7 +265,7 @@ where
     }
 }
 
-impl<'a, 'd, T: RsaMode + Multi, DM: crate::Mode, const N: usize> RsaMultiplication<'a, 'd, T, DM>
+impl<'d, T: RsaMode + Multi, DM: crate::Mode, const N: usize> RsaMultiplication<'_, 'd, T, DM>
 where
     T: RsaMode<InputType = [u32; N]>,
 {

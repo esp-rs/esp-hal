@@ -3,7 +3,7 @@ use crate::{
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
 };
 
-impl<'d> Aes<'d> {
+impl Aes<'_> {
     pub(super) fn init(&mut self) {
         PeripheralClockControl::enable(PeripheralEnable::Aes);
         self.write_dma(false);

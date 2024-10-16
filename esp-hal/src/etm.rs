@@ -123,7 +123,7 @@ where
     _task: &'a T,
 }
 
-impl<'a, E, T, const C: u8> Drop for EtmConfiguredChannel<'a, E, T, C>
+impl<E, T, const C: u8> Drop for EtmConfiguredChannel<'_, E, T, C>
 where
     E: EtmEvent,
     T: EtmTask,

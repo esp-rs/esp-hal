@@ -157,7 +157,7 @@ impl WakeSource for TimerWakeupSource {
     }
 }
 
-impl<'a, 'b> RtcioWakeupSource<'a, 'b> {
+impl RtcioWakeupSource<'_, '_> {
     fn apply_pin(&self, pin: &mut dyn RtcPinWithResistors, level: WakeupLevel) {
         // The pullup/pulldown part is like in gpio_deep_sleep_wakeup_prepare
         let level = match level {

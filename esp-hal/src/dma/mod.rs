@@ -731,6 +731,7 @@ macro_rules! dma_tx_buffer {
 
 /// Convenience macro to create a [DmaRxStreamBuf] from buffer size and
 /// optional chunk size (uses max if unspecified).
+///
 /// The buffer and descriptors are statically allocated and
 /// used to create the [DmaRxStreamBuf].
 ///
@@ -1648,9 +1649,9 @@ where
     }
 }
 
-impl<'a, CH> crate::private::Sealed for ChannelRx<'a, CH> where CH: DmaChannel {}
+impl<CH> crate::private::Sealed for ChannelRx<'_, CH> where CH: DmaChannel {}
 
-impl<'a, CH> Rx for ChannelRx<'a, CH>
+impl<CH> Rx for ChannelRx<'_, CH>
 where
     CH: DmaChannel,
 {
@@ -1866,9 +1867,9 @@ where
     }
 }
 
-impl<'a, CH> crate::private::Sealed for ChannelTx<'a, CH> where CH: DmaChannel {}
+impl<CH> crate::private::Sealed for ChannelTx<'_, CH> where CH: DmaChannel {}
 
-impl<'a, CH> Tx for ChannelTx<'a, CH>
+impl<CH> Tx for ChannelTx<'_, CH>
 where
     CH: DmaChannel,
 {
@@ -2069,7 +2070,7 @@ where
     phantom: PhantomData<MODE>,
 }
 
-impl<'d, C> Channel<'d, C, crate::Blocking>
+impl<C> Channel<'_, C, crate::Blocking>
 where
     C: DmaChannel,
 {
@@ -2228,7 +2229,7 @@ where
     }
 }
 
-impl<'a, I> Drop for DmaTransferTx<'a, I>
+impl<I> Drop for DmaTransferTx<'_, I>
 where
     I: dma_private::DmaSupportTx,
 {
@@ -2281,7 +2282,7 @@ where
     }
 }
 
-impl<'a, I> Drop for DmaTransferRx<'a, I>
+impl<I> Drop for DmaTransferRx<'_, I>
 where
     I: dma_private::DmaSupportRx,
 {
@@ -2340,7 +2341,7 @@ where
     }
 }
 
-impl<'a, I> Drop for DmaTransferRxTx<'a, I>
+impl<I> Drop for DmaTransferRxTx<'_, I>
 where
     I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
 {
@@ -2413,7 +2414,7 @@ where
     }
 }
 
-impl<'a, I> Drop for DmaTransferTxCircular<'a, I>
+impl<I> Drop for DmaTransferTxCircular<'_, I>
 where
     I: dma_private::DmaSupportTx,
 {
@@ -2470,7 +2471,7 @@ where
     }
 }
 
-impl<'a, I> Drop for DmaTransferRxCircular<'a, I>
+impl<I> Drop for DmaTransferRxCircular<'_, I>
 where
     I: dma_private::DmaSupportRx,
 {
@@ -2501,7 +2502,7 @@ pub(crate) mod asynch {
         }
     }
 
-    impl<'a, TX> core::future::Future for DmaTxFuture<'a, TX>
+    impl<TX> core::future::Future for DmaTxFuture<'_, TX>
     where
         TX: Tx,
     {
@@ -2530,7 +2531,7 @@ pub(crate) mod asynch {
         }
     }
 
-    impl<'a, TX> Drop for DmaTxFuture<'a, TX>
+    impl<TX> Drop for DmaTxFuture<'_, TX>
     where
         TX: Tx,
     {
@@ -2557,7 +2558,7 @@ pub(crate) mod asynch {
         }
     }
 
-    impl<'a, RX> core::future::Future for DmaRxFuture<'a, RX>
+    impl<RX> core::future::Future for DmaRxFuture<'_, RX>
     where
         RX: Rx,
     {
@@ -2590,7 +2591,7 @@ pub(crate) mod asynch {
         }
     }
 
-    impl<'a, RX> Drop for DmaRxFuture<'a, RX>
+    impl<RX> Drop for DmaRxFuture<'_, RX>
     where
         RX: Rx,
     {
@@ -2623,7 +2624,7 @@ pub(crate) mod asynch {
     }
 
     #[cfg(any(i2s0, i2s1))]
-    impl<'a, TX> core::future::Future for DmaTxDoneChFuture<'a, TX>
+    impl<TX> core::future::Future for DmaTxDoneChFuture<'_, TX>
     where
         TX: Tx,
     {
@@ -2657,7 +2658,7 @@ pub(crate) mod asynch {
     }
 
     #[cfg(any(i2s0, i2s1))]
-    impl<'a, TX> Drop for DmaTxDoneChFuture<'a, TX>
+    impl<TX> Drop for DmaTxDoneChFuture<'_, TX>
     where
         TX: Tx,
     {
@@ -2687,7 +2688,7 @@ pub(crate) mod asynch {
     }
 
     #[cfg(any(i2s0, i2s1))]
-    impl<'a, RX> core::future::Future for DmaRxDoneChFuture<'a, RX>
+    impl<RX> core::future::Future for DmaRxDoneChFuture<'_, RX>
     where
         RX: Rx,
     {
@@ -2725,7 +2726,7 @@ pub(crate) mod asynch {
     }
 
     #[cfg(any(i2s0, i2s1))]
-    impl<'a, RX> Drop for DmaRxDoneChFuture<'a, RX>
+    impl<RX> Drop for DmaRxDoneChFuture<'_, RX>
     where
         RX: Rx,
     {

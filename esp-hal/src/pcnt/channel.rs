@@ -22,7 +22,7 @@ pub struct Channel<'d, const UNIT: usize, const NUM: usize> {
     _not_send: PhantomData<*const ()>,
 }
 
-impl<'d, const UNIT: usize, const NUM: usize> Channel<'d, UNIT, NUM> {
+impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
     /// return a new Channel
     pub(super) fn new() -> Self {
         Self {

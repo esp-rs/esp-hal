@@ -590,9 +590,9 @@ where
     }
 }
 
-impl<'d, T> crate::private::Sealed for I2c<'d, T, Blocking> where T: Instance {}
+impl<T> crate::private::Sealed for I2c<'_, T, Blocking> where T: Instance {}
 
-impl<'d, T> InterruptConfigurable for I2c<'d, T, Blocking>
+impl<T> InterruptConfigurable for I2c<'_, T, Blocking>
 where
     T: Instance,
 {
@@ -765,7 +765,7 @@ mod asynch {
     }
 
     #[cfg(not(esp32))]
-    impl<'a, T> core::future::Future for I2cFuture<'a, T>
+    impl<T> core::future::Future for I2cFuture<'_, T>
     where
         T: Instance,
     {

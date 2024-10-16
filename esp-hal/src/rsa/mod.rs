@@ -56,9 +56,9 @@ impl<'d> Rsa<'d, crate::Blocking> {
     }
 }
 
-impl<'d> crate::private::Sealed for Rsa<'d, crate::Blocking> {}
+impl crate::private::Sealed for Rsa<'_, crate::Blocking> {}
 
-impl<'d> InterruptConfigurable for Rsa<'d, crate::Blocking> {
+impl InterruptConfigurable for Rsa<'_, crate::Blocking> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.internal_set_interrupt_handler(handler);
     }

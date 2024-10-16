@@ -301,13 +301,13 @@ pub mod dma {
         }
     }
 
-    impl<'d> core::fmt::Debug for AesDma<'d> {
+    impl core::fmt::Debug for AesDma<'_> {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             f.debug_struct("AesDma").finish()
         }
     }
 
-    impl<'d> DmaSupport for AesDma<'d> {
+    impl DmaSupport for AesDma<'_> {
         fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
             while self.aes.aes.state().read().state().bits() != 2 // DMA status DONE == 2
             && !self.channel.tx.is_done()
@@ -347,7 +347,7 @@ pub mod dma {
         }
     }
 
-    impl<'d> AesDma<'d> {
+    impl AesDma<'_> {
         /// Writes the encryption key to the AES hardware, checking that its
         /// length matches expected constraints.
         pub fn write_key<K>(&mut self, key: K)

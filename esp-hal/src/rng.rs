@@ -164,7 +164,6 @@ impl rand_core::RngCore for Rng {
 /// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
 /// # }
 /// ```
-
 pub struct Trng<'d> {
     /// The hardware random number generator instance.
     pub rng: Rng,
@@ -211,7 +210,7 @@ impl<'d> Trng<'d> {
     }
 }
 
-impl<'d> Drop for Trng<'d> {
+impl Drop for Trng<'_> {
     fn drop(&mut self) {
         crate::soc::trng::revert_trng();
     }

@@ -306,7 +306,7 @@ mod ehal1 {
         }
     }
 
-    impl<'a, S: TimerSpeed, O: OutputPin> ErrorType for Channel<'a, S, O> {
+    impl<S: TimerSpeed, O: OutputPin> ErrorType for Channel<'_, S, O> {
         type Error = Error;
     }
 
@@ -337,7 +337,7 @@ mod ehal1 {
     }
 }
 
-impl<'a, O: PeripheralOutput, S: crate::ledc::timer::TimerSpeed> Channel<'a, S, O> {
+impl<O: PeripheralOutput, S: crate::ledc::timer::TimerSpeed> Channel<'_, S, O> {
     #[cfg(esp32)]
     fn set_channel(&mut self, timer_number: u8) {
         if S::IS_HS {
@@ -535,7 +535,7 @@ impl<'a, O: PeripheralOutput, S: crate::ledc::timer::TimerSpeed> Channel<'a, S, 
     }
 }
 
-impl<'a, O, S> ChannelHW<O> for Channel<'a, S, O>
+impl<O, S> ChannelHW<O> for Channel<'_, S, O>
 where
     O: PeripheralOutput,
     S: crate::ledc::timer::TimerSpeed,

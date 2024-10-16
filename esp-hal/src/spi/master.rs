@@ -508,7 +508,7 @@ where
     }
 }
 
-impl<'d, T> Spi<'d, T, FullDuplexMode>
+impl<T> Spi<'_, T, FullDuplexMode>
 where
     T: Instance,
 {
@@ -983,7 +983,7 @@ mod dma {
     {
     }
 
-    impl<'d, T, D, M> core::fmt::Debug for SpiDma<'d, T, D, M>
+    impl<T, D, M> core::fmt::Debug for SpiDma<'_, T, D, M>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -1206,7 +1206,7 @@ mod dma {
         }
     }
 
-    impl<'d, T, D, M> crate::private::Sealed for SpiDma<'d, T, D, M>
+    impl<T, D, M> crate::private::Sealed for SpiDma<'_, T, D, M>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -1214,7 +1214,7 @@ mod dma {
     {
     }
 
-    impl<'d, T, D, M> InterruptConfigurable for SpiDma<'d, T, D, M>
+    impl<T, D, M> InterruptConfigurable for SpiDma<'_, T, D, M>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -1310,7 +1310,7 @@ mod dma {
         }
     }
 
-    impl<'d, T, D, M, Buf> Drop for SpiDmaTransfer<'d, T, D, M, Buf>
+    impl<T, D, M, Buf> Drop for SpiDmaTransfer<'_, T, D, M, Buf>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -1668,7 +1668,7 @@ mod dma {
         }
     }
 
-    impl<'d, T, D, M> InterruptConfigurable for SpiDmaBus<'d, T, D, M>
+    impl<T, D, M> InterruptConfigurable for SpiDmaBus<'_, T, D, M>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -1680,7 +1680,7 @@ mod dma {
         }
     }
 
-    impl<'d, T, D, M> crate::private::Sealed for SpiDmaBus<'d, T, D, M>
+    impl<T, D, M> crate::private::Sealed for SpiDmaBus<'_, T, D, M>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -1688,7 +1688,7 @@ mod dma {
     {
     }
 
-    impl<'d, T, M> SpiDmaBus<'d, T, FullDuplexMode, M>
+    impl<T, M> SpiDmaBus<'_, T, FullDuplexMode, M>
     where
         T: InstanceDma,
         M: Mode,
@@ -1788,7 +1788,7 @@ mod dma {
         }
     }
 
-    impl<'d, T, M> HalfDuplexReadWrite for SpiDmaBus<'d, T, HalfDuplexMode, M>
+    impl<T, M> HalfDuplexReadWrite for SpiDmaBus<'_, T, HalfDuplexMode, M>
     where
         T: InstanceDma,
         M: Mode,
@@ -1859,8 +1859,8 @@ mod dma {
         }
     }
 
-    impl<'d, T> embedded_hal_02::blocking::spi::Transfer<u8>
-        for SpiDmaBus<'d, T, FullDuplexMode, crate::Blocking>
+    impl<T> embedded_hal_02::blocking::spi::Transfer<u8>
+        for SpiDmaBus<'_, T, FullDuplexMode, crate::Blocking>
     where
         T: InstanceDma,
     {
@@ -1872,8 +1872,8 @@ mod dma {
         }
     }
 
-    impl<'d, T> embedded_hal_02::blocking::spi::Write<u8>
-        for SpiDmaBus<'d, T, FullDuplexMode, crate::Blocking>
+    impl<T> embedded_hal_02::blocking::spi::Write<u8>
+        for SpiDmaBus<'_, T, FullDuplexMode, crate::Blocking>
     where
         T: InstanceDma,
     {
@@ -2078,7 +2078,7 @@ mod dma {
 
         use super::*;
 
-        impl<'d, T, M> ErrorType for SpiDmaBus<'d, T, FullDuplexMode, M>
+        impl<T, M> ErrorType for SpiDmaBus<'_, T, FullDuplexMode, M>
         where
             T: InstanceDma,
             M: Mode,
@@ -2086,7 +2086,7 @@ mod dma {
             type Error = Error;
         }
 
-        impl<'d, T, M> SpiBus for SpiDmaBus<'d, T, FullDuplexMode, M>
+        impl<T, M> SpiBus for SpiDmaBus<'_, T, FullDuplexMode, M>
         where
             T: InstanceDma,
             M: Mode,

@@ -1045,9 +1045,9 @@ where
     }
 }
 
-impl<'d, T> crate::private::Sealed for TwaiConfiguration<'d, T, crate::Blocking> where T: Instance {}
+impl<T> crate::private::Sealed for TwaiConfiguration<'_, T, crate::Blocking> where T: Instance {}
 
-impl<'d, T> InterruptConfigurable for TwaiConfiguration<'d, T, crate::Blocking>
+impl<T> InterruptConfigurable for TwaiConfiguration<'_, T, crate::Blocking>
 where
     T: Instance,
 {
@@ -1192,7 +1192,7 @@ pub struct TwaiTx<'d, T, DM: crate::Mode> {
     phantom: PhantomData<DM>,
 }
 
-impl<'d, T, DM> TwaiTx<'d, T, DM>
+impl<T, DM> TwaiTx<'_, T, DM>
 where
     T: Instance,
     DM: crate::Mode,
@@ -1234,7 +1234,7 @@ pub struct TwaiRx<'d, T, DM: crate::Mode> {
     phantom: PhantomData<DM>,
 }
 
-impl<'d, T, DM> TwaiRx<'d, T, DM>
+impl<T, DM> TwaiRx<'_, T, DM>
 where
     T: Instance,
     DM: crate::Mode,
@@ -1331,7 +1331,7 @@ unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
     }
 }
 
-impl<'d, T, DM> embedded_hal_02::can::Can for Twai<'d, T, DM>
+impl<T, DM> embedded_hal_02::can::Can for Twai<'_, T, DM>
 where
     T: Instance,
     DM: crate::Mode,
@@ -1355,7 +1355,7 @@ where
     }
 }
 
-impl<'d, T, DM> embedded_can::nb::Can for Twai<'d, T, DM>
+impl<T, DM> embedded_can::nb::Can for Twai<'_, T, DM>
 where
     T: Instance,
     DM: crate::Mode,

@@ -293,7 +293,7 @@ where
         Self { pin }
     }
 }
-impl<'d, P> TxClkPin for ClkOutPin<'d, P>
+impl<P> TxClkPin for ClkOutPin<'_, P>
 where
     P: PeripheralOutput,
 {
@@ -323,7 +323,7 @@ where
         Self { pin }
     }
 }
-impl<'d, P> TxClkPin for ClkInPin<'d, P>
+impl<P> TxClkPin for ClkInPin<'_, P>
 where
     P: PeripheralInput,
 {
@@ -359,7 +359,7 @@ where
         Self { pin, sample_edge }
     }
 }
-impl<'d, P> RxClkPin for RxClkInPin<'d, P>
+impl<P> RxClkPin for RxClkInPin<'_, P>
 where
     P: PeripheralInput,
 {
@@ -401,14 +401,14 @@ where
     }
 }
 
-impl<'d, P, VP> TxPins for TxPinConfigWithValidPin<'d, P, VP>
+impl<P, VP> TxPins for TxPinConfigWithValidPin<'_, P, VP>
 where
     P: NotContainsValidSignalPin + TxPins + ConfigurePins,
     VP: PeripheralOutput,
 {
 }
 
-impl<'d, P, VP> ConfigurePins for TxPinConfigWithValidPin<'d, P, VP>
+impl<P, VP> ConfigurePins for TxPinConfigWithValidPin<'_, P, VP>
 where
     P: NotContainsValidSignalPin + TxPins + ConfigurePins,
     VP: PeripheralOutput,
@@ -552,39 +552,38 @@ tx_pins!(
     P15 = PARL_TX_DATA15
 );
 
-impl<'d, P0> FullDuplex for TxOneBit<'d, P0> {}
+impl<P0> FullDuplex for TxOneBit<'_, P0> {}
 
-impl<'d, P0, P1> FullDuplex for TxTwoBits<'d, P0, P1> {}
+impl<P0, P1> FullDuplex for TxTwoBits<'_, P0, P1> {}
 
-impl<'d, P0, P1, P2, P3> FullDuplex for TxFourBits<'d, P0, P1, P2, P3> {}
+impl<P0, P1, P2, P3> FullDuplex for TxFourBits<'_, P0, P1, P2, P3> {}
 
-impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> FullDuplex
-    for TxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
+impl<P0, P1, P2, P3, P4, P5, P6, P7> FullDuplex
+    for TxEightBits<'_, P0, P1, P2, P3, P4, P5, P6, P7>
 {
 }
 
-impl<'d, P0> NotContainsValidSignalPin for TxOneBit<'d, P0> {}
+impl<P0> NotContainsValidSignalPin for TxOneBit<'_, P0> {}
 
-impl<'d, P0, P1> NotContainsValidSignalPin for TxTwoBits<'d, P0, P1> {}
+impl<P0, P1> NotContainsValidSignalPin for TxTwoBits<'_, P0, P1> {}
 
-impl<'d, P0, P1, P2, P3> NotContainsValidSignalPin for TxFourBits<'d, P0, P1, P2, P3> {}
+impl<P0, P1, P2, P3> NotContainsValidSignalPin for TxFourBits<'_, P0, P1, P2, P3> {}
 
 #[cfg(esp32c6)]
-impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> NotContainsValidSignalPin
-    for TxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
+impl<P0, P1, P2, P3, P4, P5, P6, P7> NotContainsValidSignalPin
+    for TxEightBits<'_, P0, P1, P2, P3, P4, P5, P6, P7>
 {
 }
 
 #[cfg(esp32h2)]
-impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> ContainsValidSignalPin
-    for TxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
+impl<P0, P1, P2, P3, P4, P5, P6, P7> ContainsValidSignalPin
+    for TxEightBits<'_, P0, P1, P2, P3, P4, P5, P6, P7>
 {
 }
 
 #[cfg(esp32c6)]
-impl<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
-    ContainsValidSignalPin
-    for TxSixteenBits<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
+impl<P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15> ContainsValidSignalPin
+    for TxSixteenBits<'_, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
 {
 }
 
@@ -622,14 +621,14 @@ where
     }
 }
 
-impl<'d, P, VP> RxPins for RxPinConfigWithValidPin<'d, P, VP>
+impl<P, VP> RxPins for RxPinConfigWithValidPin<'_, P, VP>
 where
     P: NotContainsValidSignalPin + RxPins + ConfigurePins,
     VP: PeripheralInput,
 {
 }
 
-impl<'d, P, VP> ConfigurePins for RxPinConfigWithValidPin<'d, P, VP>
+impl<P, VP> ConfigurePins for RxPinConfigWithValidPin<'_, P, VP>
 where
     P: NotContainsValidSignalPin + RxPins + ConfigurePins,
     VP: PeripheralInput,
@@ -799,39 +798,38 @@ rx_pins!(
     P15 = PARL_RX_DATA15
 );
 
-impl<'d, P0> FullDuplex for RxOneBit<'d, P0> {}
+impl<P0> FullDuplex for RxOneBit<'_, P0> {}
 
-impl<'d, P0, P1> FullDuplex for RxTwoBits<'d, P0, P1> {}
+impl<P0, P1> FullDuplex for RxTwoBits<'_, P0, P1> {}
 
-impl<'d, P0, P1, P2, P3> FullDuplex for RxFourBits<'d, P0, P1, P2, P3> {}
+impl<P0, P1, P2, P3> FullDuplex for RxFourBits<'_, P0, P1, P2, P3> {}
 
-impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> FullDuplex
-    for RxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
+impl<P0, P1, P2, P3, P4, P5, P6, P7> FullDuplex
+    for RxEightBits<'_, P0, P1, P2, P3, P4, P5, P6, P7>
 {
 }
 
-impl<'d, P0> NotContainsValidSignalPin for RxOneBit<'d, P0> {}
+impl<P0> NotContainsValidSignalPin for RxOneBit<'_, P0> {}
 
-impl<'d, P0, P1> NotContainsValidSignalPin for RxTwoBits<'d, P0, P1> {}
+impl<P0, P1> NotContainsValidSignalPin for RxTwoBits<'_, P0, P1> {}
 
-impl<'d, P0, P1, P2, P3> NotContainsValidSignalPin for RxFourBits<'d, P0, P1, P2, P3> {}
+impl<P0, P1, P2, P3> NotContainsValidSignalPin for RxFourBits<'_, P0, P1, P2, P3> {}
 
 #[cfg(esp32c6)]
-impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> NotContainsValidSignalPin
-    for RxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
+impl<P0, P1, P2, P3, P4, P5, P6, P7> NotContainsValidSignalPin
+    for RxEightBits<'_, P0, P1, P2, P3, P4, P5, P6, P7>
 {
 }
 
 #[cfg(esp32h2)]
-impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> ContainsValidSignalPin
-    for RxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
+impl<P0, P1, P2, P3, P4, P5, P6, P7> ContainsValidSignalPin
+    for RxEightBits<'_, P0, P1, P2, P3, P4, P5, P6, P7>
 {
 }
 
 #[cfg(esp32c6)]
-impl<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
-    ContainsValidSignalPin
-    for RxSixteenBits<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
+impl<P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15> ContainsValidSignalPin
+    for RxSixteenBits<'_, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
 {
 }
 
@@ -909,7 +907,7 @@ where
     phantom: PhantomData<DM>,
 }
 
-impl<'d, DM> core::fmt::Debug for ParlIoTx<'d, DM>
+impl<DM> core::fmt::Debug for ParlIoTx<'_, DM>
 where
     DM: Mode,
 {
@@ -988,7 +986,7 @@ where
     phantom: PhantomData<DM>,
 }
 
-impl<'d, DM> core::fmt::Debug for ParlIoRx<'d, DM>
+impl<DM> core::fmt::Debug for ParlIoRx<'_, DM>
 where
     DM: Mode,
 {
@@ -1117,7 +1115,7 @@ where
     }
 }
 
-impl<'d> ParlIoFullDuplex<'d, Blocking> {
+impl ParlIoFullDuplex<'_, Blocking> {
     /// Sets the interrupt handler, enables it with
     /// [crate::interrupt::Priority::min()]
     ///
@@ -1147,9 +1145,9 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
     }
 }
 
-impl<'d> crate::private::Sealed for ParlIoFullDuplex<'d, Blocking> {}
+impl crate::private::Sealed for ParlIoFullDuplex<'_, Blocking> {}
 
-impl<'d> InterruptConfigurable for ParlIoFullDuplex<'d, Blocking> {
+impl InterruptConfigurable for ParlIoFullDuplex<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoFullDuplex::set_interrupt_handler(self, handler);
     }
@@ -1192,7 +1190,7 @@ where
     }
 }
 
-impl<'d> ParlIoTxOnly<'d, Blocking> {
+impl ParlIoTxOnly<'_, Blocking> {
     /// Sets the interrupt handler, enables it with
     /// [crate::interrupt::Priority::min()]
     ///
@@ -1222,9 +1220,9 @@ impl<'d> ParlIoTxOnly<'d, Blocking> {
     }
 }
 
-impl<'d> crate::private::Sealed for ParlIoTxOnly<'d, Blocking> {}
+impl crate::private::Sealed for ParlIoTxOnly<'_, Blocking> {}
 
-impl<'d> InterruptConfigurable for ParlIoTxOnly<'d, Blocking> {
+impl InterruptConfigurable for ParlIoTxOnly<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoTxOnly::set_interrupt_handler(self, handler);
     }
@@ -1267,7 +1265,7 @@ where
     }
 }
 
-impl<'d> ParlIoRxOnly<'d, Blocking> {
+impl ParlIoRxOnly<'_, Blocking> {
     /// Sets the interrupt handler, enables it with
     /// [crate::interrupt::Priority::min()]
     ///
@@ -1297,9 +1295,9 @@ impl<'d> ParlIoRxOnly<'d, Blocking> {
     }
 }
 
-impl<'d> crate::private::Sealed for ParlIoRxOnly<'d, Blocking> {}
+impl crate::private::Sealed for ParlIoRxOnly<'_, Blocking> {}
 
-impl<'d> InterruptConfigurable for ParlIoRxOnly<'d, Blocking> {
+impl InterruptConfigurable for ParlIoRxOnly<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoRxOnly::set_interrupt_handler(self, handler);
     }
@@ -1338,7 +1336,7 @@ fn internal_init(frequency: HertzU32) -> Result<(), Error> {
     Ok(())
 }
 
-impl<'d, DM> ParlIoTx<'d, DM>
+impl<DM> ParlIoTx<'_, DM>
 where
     DM: Mode,
 {
@@ -1393,7 +1391,7 @@ where
     }
 }
 
-impl<'d, DM> DmaSupport for ParlIoTx<'d, DM>
+impl<DM> DmaSupport for ParlIoTx<'_, DM>
 where
     DM: Mode,
 {
@@ -1482,7 +1480,7 @@ where
     }
 }
 
-impl<'d, DM> DmaSupport for ParlIoRx<'d, DM>
+impl<DM> DmaSupport for ParlIoRx<'_, DM>
 where
     DM: Mode,
 {
