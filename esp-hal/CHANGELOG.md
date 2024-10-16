@@ -8,11 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Add burst transfer support to DMA buffers (#2236)
 
+- Add burst transfer support to DMA buffers (#2236)
 - `AnyPin` now implements `From<GpioPin<N>>`. (#2326)
 - Added `degrade` function for SPI instances (SPI2, SPI3) to obtain `AnySpi`. (#2334)
-
 - `Pins::steal()` to unsafely obtain GPIO. (#2335)
 
 ### Changed
