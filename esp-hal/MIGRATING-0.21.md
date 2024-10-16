@@ -39,7 +39,7 @@ peripherals:
 ```
 
 Note that you may still specify the instance if you need to. To do this, we provide `_typed`
-versions of the constructors (for example: `new_typed`, `new_half_duplkex_typed`). Please note that
+versions of the constructors (for example: `new_typed`, `new_half_duplex_typed`). Please note that
 the peripheral instance has been moved to the last generic parameter position.
 
 ```rust
