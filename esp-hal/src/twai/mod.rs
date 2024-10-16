@@ -129,11 +129,12 @@ use core::marker::PhantomData;
 
 use self::filter::{Filter, FilterType};
 use crate::{
+    dma::PeripheralMarker,
     gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::twai0::RegisterBlock,
-    system::{self, PeripheralClockControl},
+    system::PeripheralClockControl,
     InterruptConfigurable,
 };
 
@@ -754,7 +755,7 @@ where
     DM: crate::Mode,
 {
     fn new_internal<TX: PeripheralOutput, RX: PeripheralInput>(
-        _peripheral: impl Peripheral<P = T> + 'd,
+        peripheral: impl Peripheral<P = T> + 'd,
         rx_pin: impl Peripheral<P = RX> + 'd,
         tx_pin: impl Peripheral<P = TX> + 'd,
         baud_rate: BaudRate,
@@ -762,11 +763,11 @@ where
         mode: TwaiMode,
     ) -> Self {
         // Set up the GPIO pins.
-        crate::into_ref!(tx_pin, rx_pin);
+        crate::into_ref!(peripheral, tx_pin, rx_pin);
 
         // Enable the peripheral clock for the TWAI peripheral.
-        T::enable_peripheral();
-        T::reset_peripheral();
+        PeripheralClockControl::enable(peripheral.peripheral());
+        PeripheralClockControl::reset(peripheral.peripheral());
 
         // Set RESET bit to 1
         T::register_block()
@@ -1380,9 +1381,7 @@ where
 }
 
 /// TWAI peripheral instance.
-pub trait Instance: crate::private::Sealed {
-    /// The system peripheral associated with this TWAI instance.
-    const SYSTEM_PERIPHERAL: system::Peripheral;
+pub trait Instance: crate::private::Sealed + PeripheralMarker {
     /// The identifier number for this TWAI instance.
     const NUMBER: usize;
 
@@ -1399,14 +1398,30 @@ pub trait Instance: crate::private::Sealed {
     /// Returns a reference to the register block for TWAI instance.
     fn register_block() -> &'static RegisterBlock;
 
-    /// Enables the TWAI peripheral.
-    fn enable_peripheral();
-
-    /// Resets the TWAI peripheral.
-    fn reset_peripheral();
-
     /// Enables interrupts for the TWAI peripheral.
-    fn enable_interrupts();
+    fn enable_interrupts() {
+        let register_block = Self::register_block();
+
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
+                register_block.int_ena().modify(|_, w| {
+                    w.rx_int_ena().set_bit();
+                    w.tx_int_ena().set_bit();
+                    w.bus_err_int_ena().set_bit();
+                    w.arb_lost_int_ena().set_bit();
+                    w.err_passive_int_ena().set_bit()
+                });
+            } else {
+                register_block.interrupt_enable().modify(|_, w| {
+                    w.ext_receive_int_ena().set_bit();
+                    w.ext_transmit_int_ena().set_bit();
+                    w.bus_err_int_ena().set_bit();
+                    w.arbitration_lost_int_ena().set_bit();
+                    w.err_passive_int_ena().set_bit()
+                });
+            }
+        }
+    }
 
     /// Returns a reference to the asynchronous state for this TWAI instance.
     fn async_state() -> &'static asynch::TwaiAsyncState {
@@ -1554,7 +1569,6 @@ fn release_receive_fifo(register_block: &RegisterBlock) {
 }
 
 impl Instance for crate::peripherals::TWAI0 {
-    const SYSTEM_PERIPHERAL: system::Peripheral = system::Peripheral::Twai0;
     const NUMBER: usize = 0;
 
     cfg_if::cfg_if! {
@@ -1577,43 +1591,10 @@ impl Instance for crate::peripherals::TWAI0 {
     fn register_block() -> &'static RegisterBlock {
         unsafe { &*crate::peripherals::TWAI0::PTR }
     }
-
-    fn reset_peripheral() {
-        PeripheralClockControl::reset(crate::system::Peripheral::Twai0);
-    }
-
-    fn enable_peripheral() {
-        PeripheralClockControl::enable(crate::system::Peripheral::Twai0);
-    }
-
-    fn enable_interrupts() {
-        let register_block = Self::register_block();
-
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
-                register_block.int_ena().modify(|_, w| {
-                    w.rx_int_ena().set_bit();
-                    w.tx_int_ena().set_bit();
-                    w.bus_err_int_ena().set_bit();
-                    w.arb_lost_int_ena().set_bit();
-                    w.err_passive_int_ena().set_bit()
-                });
-            } else {
-                register_block.interrupt_enable().modify(|_, w| {
-                    w.ext_receive_int_ena().set_bit();
-                    w.ext_transmit_int_ena().set_bit();
-                    w.bus_err_int_ena().set_bit();
-                    w.arbitration_lost_int_ena().set_bit();
-                    w.err_passive_int_ena().set_bit()
-                });
-            }
-        }
-    }
 }
 
 #[cfg(twai1)]
 impl Instance for crate::peripherals::TWAI1 {
-    const SYSTEM_PERIPHERAL: system::Peripheral = system::Peripheral::Twai1;
     const NUMBER: usize = 1;
 
     const INPUT_SIGNAL: InputSignal = InputSignal::TWAI1_RX;
@@ -1628,25 +1609,6 @@ impl Instance for crate::peripherals::TWAI1 {
     #[inline(always)]
     fn register_block() -> &'static RegisterBlock {
         unsafe { &*crate::peripherals::TWAI1::PTR }
-    }
-
-    fn reset_peripheral() {
-        PeripheralClockControl::enable(crate::system::Peripheral::Twai1);
-    }
-
-    fn enable_peripheral() {
-        PeripheralClockControl::enable(crate::system::Peripheral::Twai1);
-    }
-
-    fn enable_interrupts() {
-        let register_block = Self::register_block();
-        register_block.interrupt_enable().modify(|_, w| {
-            w.ext_receive_int_ena().set_bit();
-            w.ext_transmit_int_ena().set_bit();
-            w.bus_err_int_ena().set_bit();
-            w.arbitration_lost_int_ena().set_bit();
-            w.err_passive_int_ena().set_bit()
-        });
     }
 }
 
