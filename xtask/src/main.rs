@@ -142,6 +142,10 @@ struct LintPackagesArgs {
     /// Lint for a specific chip
     #[arg(long, value_enum, default_values_t = Chip::iter())]
     chips: Vec<Chip>,
+
+    /// Automatically apply fixes
+    #[arg(long)]
+    fix: bool,
 }
 
 #[derive(Debug, Args)]
@@ -585,6 +589,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             &format!("--target={}", chip.target()),
                             &format!("--features={chip},defmt"),
                         ],
+                        args.fix,
                     )?;
                 }
 
@@ -613,6 +618,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             &format!("--target={}", chip.target()),
                             &features,
                         ],
+                        args.fix,
                     )?;
                 }
 
@@ -624,6 +630,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             &format!("--target={}", chip.target()),
                             &format!("--features={chip},executors,defmt,integrated-timers"),
                         ],
+                        args.fix,
                     )?;
                 }
 
@@ -637,6 +644,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                                 &format!("--target={}", chip.target()),
                                 &features,
                             ],
+                            args.fix,
                         )?;
                     }
                 }
@@ -649,6 +657,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                                 &format!("--target={}", chip.lp_target().unwrap()),
                                 &format!("--features={chip},embedded-io"),
                             ],
+                            args.fix,
                         )?;
                     }
                 }
@@ -661,6 +670,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             &format!("--target={}", chip.target()),
                             &format!("--features={chip},defmt-espflash"),
                         ],
+                        args.fix,
                     )?;
                 }
 
@@ -669,6 +679,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         lint_package(
                             &path,
                             &["-Zbuild-std=core", &format!("--target={}", chip.target())],
+                            args.fix,
                         )?;
                     }
                 }
@@ -681,6 +692,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             &format!("--target={}", chip.target()),
                             &format!("--features={chip},storage,nor-flash,low-level"),
                         ],
+                        args.fix,
                     )?;
                 }
 
@@ -705,6 +717,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             "--no-default-features",
                             &features,
                         ],
+                        args.fix,
                     )?;
                 }
 
@@ -717,6 +730,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                                 &format!("--target={}", chip.target()),
                                 &format!("--features={chip}"),
                             ],
+                            args.fix,
                         )?
                     }
                 }
@@ -726,7 +740,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 Package::Examples | Package::HilTest => {}
 
                 // By default, no `clippy` arguments are required:
-                _ => lint_package(&path, &[])?,
+                _ => lint_package(&path, &[], args.fix)?,
             }
         }
     }
@@ -734,7 +748,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
     Ok(())
 }
 
-fn lint_package(path: &Path, args: &[&str]) -> Result<()> {
+fn lint_package(path: &Path, args: &[&str], fix: bool) -> Result<()> {
     log::info!("Linting package: {}", path.display());
 
     let mut builder = CargoArgsBuilder::default().subcommand("clippy");
@@ -744,12 +758,14 @@ fn lint_package(path: &Path, args: &[&str]) -> Result<()> {
     }
 
     // build in release to reuse example artifacts
-    let cargo_args = builder
-        .arg("--release")
-        .arg("--")
-        .arg("-D")
-        .arg("warnings")
-        .build();
+    let cargo_args = builder.arg("--release");
+    let cargo_args = if fix {
+        cargo_args.arg("--fix").arg("--lib")
+    } else {
+        cargo_args.arg("--").arg("-D").arg("warnings")
+    };
+
+    let cargo_args = cargo_args.build();
 
     xtask::cargo::run(&cargo_args, path)
 }

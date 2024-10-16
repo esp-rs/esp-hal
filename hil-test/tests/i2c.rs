@@ -10,6 +10,7 @@ use esp_hal::{
     i2c::{I2c, Operation},
     peripherals::I2C0,
     prelude::*,
+    Async,
     Blocking,
 };
 use hil_test as _;
@@ -17,6 +18,15 @@ use hil_test as _;
 struct Context {
     i2c: I2c<'static, I2C0, Blocking>,
 }
+
+fn _async_driver_is_compatible_with_blocking_ehal() {
+    fn _with_driver(driver: I2c<'static, I2C0, Async>) {
+        _with_ehal(driver);
+    }
+
+    fn _with_ehal(_: impl embedded_hal::i2c::I2c) {}
+}
+
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
