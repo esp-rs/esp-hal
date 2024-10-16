@@ -73,7 +73,7 @@ crate::peripherals! {
     TIMG0 <= TIMG0,
     TIMG1 <= TIMG1,
     TRACE0 <= TRACE,
-    TWAI0 <= TWAI0,
+    [Twai0] TWAI0 <= TWAI0,
     UART0 <= UART0,
     UART1 <= UART1,
     UHCI0 <= UHCI0,
