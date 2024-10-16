@@ -376,7 +376,6 @@ impl<'d, I: Instance, DM: Mode> I2sParallel<'d, I, DM> {
     ) -> Result<I2sParallelTransfer<'d, I, BUF, DM>, (DmaError, Self, BUF)> {
         I::tx_reset();
         I::tx_fifo_reset();
-        I::tx_dma_reset();
         let result = unsafe {
             self.tx_channel
                 .prepare_transfer(I::get_dma_peripheral(), &mut data)
@@ -385,7 +384,6 @@ impl<'d, I: Instance, DM: Mode> I2sParallel<'d, I, DM> {
         if let Err(err) = result {
             return Err((err, self, data));
         }
-        I::tx_clear_interrupts();
         I::tx_start();
         Ok(I2sParallelTransfer {
             i2s: ManuallyDrop::new(self),
