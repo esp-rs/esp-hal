@@ -110,3 +110,10 @@ pub fn is_debugger_attached() -> bool {
 pub fn debug_break() {
     unsafe { asm!("break 1, 15", options(nostack)) };
 }
+
+/// Used to reexport items for use in macros. Do not use directly.
+/// Not covered by semver guarantees.
+#[doc(hidden)]
+pub mod _export {
+    pub use critical_section;
+}

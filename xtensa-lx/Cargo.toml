@@ -11,6 +11,7 @@ keywords     = ["lx", "peripheral", "register", "xtensa"]
 links        = "xtensa-lx"
 
 [dependencies]
+critical-section = "1.0.0"
 document-features = "0.2.10"
 
 [features]
