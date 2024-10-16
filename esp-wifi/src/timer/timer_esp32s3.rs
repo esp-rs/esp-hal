@@ -2,7 +2,7 @@
 #[allow(unused_imports)]
 use crate::hal::{interrupt, peripherals::Interrupt};
 
-pub fn setup_radio_isr() {
+pub(crate) fn setup_radio_isr() {
     // wifi enabled in set_isr
     #[cfg(feature = "ble")]
     {
@@ -17,7 +17,7 @@ pub fn setup_radio_isr() {
     }
 }
 
-pub fn shutdown_radio_isr() {
+pub(crate) fn shutdown_radio_isr() {
     #[cfg(feature = "ble")]
     {
         interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::BT_BB);

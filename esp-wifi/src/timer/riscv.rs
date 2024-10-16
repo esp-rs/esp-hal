@@ -23,7 +23,7 @@ pub const TICKS_PER_SECOND: u64 = 1_000_000;
 
 use super::TIMER;
 
-pub fn setup_timer(mut alarm0: TimeBase) -> Result<(), esp_hal::timer::Error> {
+pub(crate) fn setup_timer(mut alarm0: TimeBase) -> Result<(), esp_hal::timer::Error> {
     // make sure the scheduling won't start before everything is setup
     riscv::interrupt::disable();
 
@@ -38,7 +38,7 @@ pub fn setup_timer(mut alarm0: TimeBase) -> Result<(), esp_hal::timer::Error> {
     Ok(())
 }
 
-pub fn disable_timer() -> Result<(), esp_hal::timer::Error> {
+pub(crate) fn disable_timer() -> Result<(), esp_hal::timer::Error> {
     critical_section::with(|cs| {
         unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).enable_interrupt(false);
         unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).cancel().unwrap();
@@ -47,7 +47,7 @@ pub fn disable_timer() -> Result<(), esp_hal::timer::Error> {
     Ok(())
 }
 
-pub fn setup_multitasking() {
+pub(crate) fn setup_multitasking() {
     unwrap!(interrupt::enable(
         Interrupt::FROM_CPU_INTR3,
         interrupt::Priority::Priority1,
@@ -58,7 +58,7 @@ pub fn setup_multitasking() {
     }
 }
 
-pub fn disable_multitasking() {
+pub(crate) fn disable_multitasking() {
     interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::FROM_CPU_INTR3);
 }
 
@@ -89,7 +89,7 @@ extern "C" fn FROM_CPU_INTR3(trap_frame: &mut TrapFrame) {
     task_switch(trap_frame);
 }
 
-pub fn yield_task() {
+pub(crate) fn yield_task() {
     unsafe {
         (*SystemPeripheral::PTR)
             .cpu_intr_from_cpu_3()
@@ -99,12 +99,12 @@ pub fn yield_task() {
 
 /// Current systimer count value
 /// A tick is 1 / 1_000_000 seconds
-pub fn get_systimer_count() -> u64 {
+pub(crate) fn get_systimer_count() -> u64 {
     esp_hal::time::now().ticks()
 }
 
 // TODO: use an Instance type instead...
-pub fn time_diff(start: u64, end: u64) -> u64 {
+pub(crate) fn time_diff(start: u64, end: u64) -> u64 {
     // 52-bit wrapping sub
     end.wrapping_sub(start) & 0x000f_ffff_ffff_ffff
 }

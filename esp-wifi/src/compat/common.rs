@@ -108,7 +108,7 @@ unsafe extern "C" fn strnlen(chars: *const u8, maxlen: usize) -> usize {
     len as usize
 }
 
-pub fn sem_create(max: u32, init: u32) -> *mut c_void {
+pub(crate) fn sem_create(max: u32, init: u32) -> *mut c_void {
     unsafe {
         let ptr = malloc(4) as *mut u32;
         ptr.write_volatile(init);
@@ -118,7 +118,7 @@ pub fn sem_create(max: u32, init: u32) -> *mut c_void {
     }
 }
 
-pub fn sem_delete(semphr: *mut c_void) {
+pub(crate) fn sem_delete(semphr: *mut c_void) {
     trace!(">>> sem delete");
 
     unsafe {
@@ -126,7 +126,7 @@ pub fn sem_delete(semphr: *mut c_void) {
     }
 }
 
-pub fn sem_take(semphr: *mut c_void, tick: u32) -> i32 {
+pub(crate) fn sem_take(semphr: *mut c_void, tick: u32) -> i32 {
     trace!(">>>> semphr_take {:?} block_time_tick {}", semphr, tick);
 
     let forever = tick == OSI_FUNCS_TIME_BLOCKING;
@@ -163,7 +163,7 @@ pub fn sem_take(semphr: *mut c_void, tick: u32) -> i32 {
     0
 }
 
-pub fn sem_give(semphr: *mut c_void) -> i32 {
+pub(crate) fn sem_give(semphr: *mut c_void) -> i32 {
     trace!("semphr_give {:?}", semphr);
     let sem = semphr as *mut u32;
 
@@ -174,12 +174,12 @@ pub fn sem_give(semphr: *mut c_void) -> i32 {
     })
 }
 
-pub fn thread_sem_get() -> *mut c_void {
+pub(crate) fn thread_sem_get() -> *mut c_void {
     trace!("wifi_thread_semphr_get");
     unsafe { &mut ((*current_task()).thread_semaphore) as *mut _ as *mut c_void }
 }
 
-pub fn create_recursive_mutex() -> *mut c_void {
+pub(crate) fn create_recursive_mutex() -> *mut c_void {
     let mutex = Mutex {
         locking_pid: 0xffff_ffff,
         count: 0,
@@ -196,7 +196,7 @@ pub fn create_recursive_mutex() -> *mut c_void {
     ptr as *mut c_void
 }
 
-pub fn mutex_delete(mutex: *mut c_void) {
+pub(crate) fn mutex_delete(mutex: *mut c_void) {
     let ptr = mutex as *mut Mutex;
     unsafe {
         free(mutex.cast());
@@ -204,7 +204,7 @@ pub fn mutex_delete(mutex: *mut c_void) {
 }
 
 /// Lock a mutex. Block until successful.
-pub fn lock_mutex(mutex: *mut c_void) -> i32 {
+pub(crate) fn lock_mutex(mutex: *mut c_void) -> i32 {
     trace!("mutex_lock ptr = {:?}", mutex);
 
     let ptr = mutex as *mut Mutex;
@@ -233,7 +233,7 @@ pub fn lock_mutex(mutex: *mut c_void) -> i32 {
     }
 }
 
-pub fn unlock_mutex(mutex: *mut c_void) -> i32 {
+pub(crate) fn unlock_mutex(mutex: *mut c_void) -> i32 {
     trace!("mutex_unlock {:?}", mutex);
 
     let ptr = mutex as *mut Mutex;
@@ -248,7 +248,7 @@ pub fn unlock_mutex(mutex: *mut c_void) -> i32 {
     })
 }
 
-pub fn create_queue(queue_len: c_int, item_size: c_int) -> *mut c_void {
+pub(crate) fn create_queue(queue_len: c_int, item_size: c_int) -> *mut c_void {
     trace!("wifi_create_queue len={} size={}", queue_len, item_size,);
 
     let queue = RawQueue::new(queue_len as usize, item_size as usize);
@@ -262,7 +262,7 @@ pub fn create_queue(queue_len: c_int, item_size: c_int) -> *mut c_void {
     ptr.cast()
 }
 
-pub fn delete_queue(queue: *mut c_void) {
+pub(crate) fn delete_queue(queue: *mut c_void) {
     trace!("delete_queue {:?}", queue);
 
     let queue: *mut RawQueue = queue.cast();
@@ -272,7 +272,7 @@ pub fn delete_queue(queue: *mut c_void) {
     }
 }
 
-pub fn send_queued(queue: *mut c_void, item: *mut c_void, block_time_tick: u32) -> i32 {
+pub(crate) fn send_queued(queue: *mut c_void, item: *mut c_void, block_time_tick: u32) -> i32 {
     trace!(
         "queue_send queue {:?} item {:x} block_time_tick {}",
         queue,
@@ -284,7 +284,7 @@ pub fn send_queued(queue: *mut c_void, item: *mut c_void, block_time_tick: u32) 
     critical_section::with(|_| unsafe { (*queue).enqueue(item) })
 }
 
-pub fn receive_queued(queue: *mut c_void, item: *mut c_void, block_time_tick: u32) -> i32 {
+pub(crate) fn receive_queued(queue: *mut c_void, item: *mut c_void, block_time_tick: u32) -> i32 {
     trace!(
         "queue_recv {:?} item {:?} block_time_tick {}",
         queue,
@@ -313,7 +313,7 @@ pub fn receive_queued(queue: *mut c_void, item: *mut c_void, block_time_tick: u3
     }
 }
 
-pub fn number_of_messages_in_queue(queue: *const c_void) -> u32 {
+pub(crate) fn number_of_messages_in_queue(queue: *const c_void) -> u32 {
     trace!("queue_msg_waiting {:?}", queue);
 
     let queue: *const RawQueue = queue.cast();

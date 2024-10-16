@@ -12,7 +12,7 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Context {
             trap_frame: TrapFrame::default(),
             thread_semaphore: 0,
@@ -22,7 +22,7 @@ impl Context {
     }
 }
 
-pub fn task_create(
+pub(crate) fn task_create(
     task: extern "C" fn(*mut c_types::c_void),
     param: *mut c_types::c_void,
     task_stack_size: usize,
@@ -45,7 +45,7 @@ pub fn task_create(
     }
 }
 
-pub fn restore_task_context(ctx: *mut Context, trap_frame: &mut TrapFrame) {
+pub(crate) fn restore_task_context(ctx: *mut Context, trap_frame: &mut TrapFrame) {
     unsafe {
         trap_frame.ra = (*ctx).trap_frame.ra;
         trap_frame.sp = (*ctx).trap_frame.sp;
@@ -82,7 +82,7 @@ pub fn restore_task_context(ctx: *mut Context, trap_frame: &mut TrapFrame) {
     }
 }
 
-pub fn save_task_context(ctx: *mut Context, trap_frame: &TrapFrame) {
+pub(crate) fn save_task_context(ctx: *mut Context, trap_frame: &TrapFrame) {
     unsafe {
         (*ctx).trap_frame.ra = trap_frame.ra;
         (*ctx).trap_frame.sp = trap_frame.sp;

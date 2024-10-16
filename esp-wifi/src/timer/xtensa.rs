@@ -17,11 +17,11 @@ pub const TICKS_PER_SECOND: u64 = 1_000_000;
 
 /// This function must not be called in a critical section. Doing so may return
 /// an incorrect value.
-pub fn get_systimer_count() -> u64 {
+pub(crate) fn get_systimer_count() -> u64 {
     esp_hal::time::now().ticks()
 }
 
-pub fn setup_timer(mut timer1: TimeBase) -> Result<(), esp_hal::timer::Error> {
+pub(crate) fn setup_timer(mut timer1: TimeBase) -> Result<(), esp_hal::timer::Error> {
     timer1.set_interrupt_handler(InterruptHandler::new(
         unsafe { core::mem::transmute::<*const (), extern "C" fn()>(handler as *const ()) },
         interrupt::Priority::Priority2,
@@ -34,7 +34,7 @@ pub fn setup_timer(mut timer1: TimeBase) -> Result<(), esp_hal::timer::Error> {
     Ok(())
 }
 
-pub fn disable_timer() -> Result<(), esp_hal::timer::Error> {
+pub(crate) fn disable_timer() -> Result<(), esp_hal::timer::Error> {
     critical_section::with(|cs| {
         unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).enable_interrupt(false);
         unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).cancel().unwrap();
@@ -43,7 +43,7 @@ pub fn disable_timer() -> Result<(), esp_hal::timer::Error> {
     Ok(())
 }
 
-pub fn setup_multitasking() {
+pub(crate) fn setup_multitasking() {
     unsafe {
         let enabled = xtensa_lx::interrupt::disable();
         xtensa_lx::interrupt::enable_mask(
@@ -54,7 +54,7 @@ pub fn setup_multitasking() {
     }
 }
 
-pub fn disable_multitasking() {
+pub(crate) fn disable_multitasking() {
     xtensa_lx::interrupt::disable_mask(
         1 << 29, // Disable Software1
     );
@@ -85,7 +85,7 @@ fn Software1(_level: u32, context: &mut TrapFrame) {
     do_task_switch(context);
 }
 
-pub fn yield_task() {
+pub(crate) fn yield_task() {
     let intr = 1 << 29;
     unsafe {
         core::arch::asm!("wsr.intset  {0}", in(reg) intr, options(nostack));
@@ -93,6 +93,6 @@ pub fn yield_task() {
 }
 
 // TODO: use an Instance type instead...
-pub fn time_diff(start: u64, end: u64) -> u64 {
+pub(crate) fn time_diff(start: u64, end: u64) -> u64 {
     end.wrapping_sub(start)
 }

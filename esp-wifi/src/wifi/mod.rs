@@ -142,75 +142,141 @@ use crate::{
     compat::queue::SimpleQueue,
 };
 
+/// Supported Wi-Fi authentication methods.
 #[derive(EnumSetType, Debug, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Default)]
 pub enum AuthMethod {
+    /// No authentication (open network).
     None,
+
+    /// Wired Equivalent Privacy (WEP) authentication.
     WEP,
+
+    /// Wi-Fi Protected Access (WPA) authentication.
     WPA,
+
+    /// Wi-Fi Protected Access 2 (WPA2) Personal authentication (default).
     #[default]
     WPA2Personal,
+
+    /// WPA/WPA2 Personal authentication (supports both).
     WPAWPA2Personal,
+
+    /// WPA2 Enterprise authentication.
     WPA2Enterprise,
+
+    /// WPA3 Personal authentication.
     WPA3Personal,
+
+    /// WPA2/WPA3 Personal authentication (supports both).
     WPA2WPA3Personal,
+
+    /// WLAN Authentication and Privacy Infrastructure (WAPI).
     WAPIPersonal,
 }
 
+/// Supported Wi-Fi protocols.
 #[derive(EnumSetType, Debug, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Default)]
 pub enum Protocol {
+    /// 802.11b protocol.
     P802D11B,
+
+    /// 802.11b/g protocol.
     P802D11BG,
+
+    /// 802.11b/g/n protocol (default).
     #[default]
     P802D11BGN,
+
+    /// 802.11b/g/n long-range (LR) protocol.
     P802D11BGNLR,
+
+    /// 802.11 long-range (LR) protocol.
     P802D11LR,
+
+    /// 802.11b/g/n/ax protocol.
     P802D11BGNAX,
 }
 
+/// Secondary Wi-Fi channels.
 #[derive(EnumSetType, Debug, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Default)]
 pub enum SecondaryChannel {
     // TODO: Need to extend that for 5GHz
+    /// No secondary channel (default).
     #[default]
     None,
+
+    /// Secondary channel is above the primary channel.
     Above,
+
+    /// Secondary channel is below the primary channel.
     Below,
 }
 
+/// Information about a detected Wi-Fi access point.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct AccessPointInfo {
+    /// The SSID of the access point.
     pub ssid: heapless::String<32>,
+
+    /// The BSSID (MAC address) of the access point.
     pub bssid: [u8; 6],
+
+    /// The channel the access point is operating on.
     pub channel: u8,
+
+    /// The secondary channel configuration of the access point.
     pub secondary_channel: SecondaryChannel,
+
+    /// The signal strength of the access point (RSSI).
     pub signal_strength: i8,
+
+    /// The set of protocols supported by the access point.
     #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub protocols: EnumSet<Protocol>,
+
+    /// The authentication method used by the access point.
     pub auth_method: Option<AuthMethod>,
 }
 
+/// Configuration for a Wi-Fi access point.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct AccessPointConfiguration {
+    /// The SSID of the access point.
     pub ssid: heapless::String<32>,
+
+    /// Whether the SSID is hidden or visible.
     pub ssid_hidden: bool,
+
+    /// The channel the access point will operate on.
     pub channel: u8,
+
+    /// The secondary channel configuration.
     pub secondary_channel: Option<u8>,
+
+    /// The set of protocols supported by the access point.
     #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub protocols: EnumSet<Protocol>,
+
+    /// The authentication method to be used by the access point.
     pub auth_method: AuthMethod,
+
+    /// The password for securing the access point (if applicable).
     pub password: heapless::String<64>,
+
+    /// The maximum number of connections allowed on the access point.
     pub max_connections: u16,
 }
 
@@ -229,15 +295,25 @@ impl Default for AccessPointConfiguration {
     }
 }
 
+/// Client configuration for a Wi-Fi connection.
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct ClientConfiguration {
+    /// The SSID of the Wi-Fi network.
     pub ssid: heapless::String<32>,
+
+    /// The BSSID (MAC address) of the client.
     pub bssid: Option<[u8; 6]>,
+
     // pub protocol: Protocol,
+    /// The authentication method for the Wi-Fi connection.
     pub auth_method: AuthMethod,
+
+    /// The password for the Wi-Fi connection.
     pub password: heapless::String<64>,
+
+    /// The Wi-Fi channel to connect to.
     pub channel: Option<u8>,
 }
 
@@ -264,27 +340,42 @@ impl Default for ClientConfiguration {
     }
 }
 
+/// Configuration for EAP-FAST authentication protocol.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct EapFastConfig {
+    /// Specifies the provisioning mode for EAP-FAST.
     pub fast_provisioning: u8,
+    /// The maximum length of the PAC (Protected Access Credentials) list.
     pub fast_max_pac_list_len: u8,
+    /// Indicates whether the PAC file is in binary format.
     pub fast_pac_format_binary: bool,
 }
 
+/// Phase 2 authentication methods
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub enum TtlsPhase2Method {
+    /// EAP (Extensible Authentication Protocol).
     Eap,
+
+    /// MSCHAPv2 (Microsoft Challenge Handshake Authentication Protocol 2).
     Mschapv2,
+
+    /// MSCHAP (Microsoft Challenge Handshake Authentication Protocol).
     Mschap,
+
+    /// PAP (Password Authentication Protocol).
     Pap,
+
+    /// CHAP (Challenge Handshake Authentication Protocol).
     Chap,
 }
 
 impl TtlsPhase2Method {
+    /// Maps the phase 2 method to a raw `u32` representation.
     fn to_raw(&self) -> u32 {
         match self {
             TtlsPhase2Method::Eap => {
@@ -306,26 +397,58 @@ impl TtlsPhase2Method {
     }
 }
 
+/// Configuration for an EAP (Extensible Authentication Protocol) client.
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct EapClientConfiguration {
+    /// The SSID of the network the client is connecting to.
     pub ssid: heapless::String<32>,
+
+    /// The BSSID (MAC Address) of the specific access point.
     pub bssid: Option<[u8; 6]>,
+
     // pub protocol: Protocol,
+    /// The authentication method used for EAP.
     pub auth_method: AuthMethod,
+
+    /// The identity used during authentication.
     pub identity: Option<heapless::String<128>>,
+
+    /// The username used for inner authentication.
+    /// Some EAP methods require a username for authentication.
     pub username: Option<heapless::String<128>>,
+
+    /// The password used for inner authentication.
     pub password: Option<heapless::String<64>>,
+
+    /// A new password to be set during the authentication process.
+    /// Some methods support password changes during authentication.
     pub new_password: Option<heapless::String<64>>,
+
+    /// Configuration for EAP-FAST.
     pub eap_fast_config: Option<EapFastConfig>,
+
+    /// A PAC (Protected Access Credential) file for EAP-FAST.
     pub pac_file: Option<&'static [u8]>,
+
+    /// A boolean flag indicating whether time checking is enforced during
+    /// authentication.
     pub time_check: bool,
+
+    /// A CA (Certificate Authority) certificate for validating the
+    /// authentication server's certificate.
     pub ca_cert: Option<&'static [u8]>,
+
+    /// A tuple containing the client's certificate, private key, and an
+    /// intermediate certificate.
     #[allow(clippy::type_complexity)]
     pub certificate_and_key: Option<(&'static [u8], &'static [u8], Option<&'static [u8]>)>,
+
+    /// The Phase 2 authentication method used for EAP-TTLS.
     pub ttls_phase2_method: Option<TtlsPhase2Method>,
 
+    /// The specific Wi-Fi channel to use for the connection.
     pub channel: Option<u8>,
 }
 
@@ -372,31 +495,50 @@ impl Default for EapClientConfiguration {
     }
 }
 
+/// Introduces Wi-Fi configuration options.
 #[derive(EnumSetType, Debug, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub enum Capability {
+    /// The device operates as a client, connecting to an existing network.
     Client,
+
+    /// The device operates as an access point, allowing other devices to
+    /// connect to it.
     AccessPoint,
+
+    /// The device can operate in both client and access point modes
+    /// simultaneously.
     Mixed,
 }
 
+/// Configuration of Wi-Fi operation mode.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Default)]
 #[allow(clippy::large_enum_variant)]
 pub enum Configuration {
+    /// No configuration (default).
     #[default]
     None,
+
+    /// Client-only configuration.
     Client(ClientConfiguration),
+
+    /// Access point-only configuration.
     AccessPoint(AccessPointConfiguration),
+
+    /// Simultaneous client and access point configuration.
     Mixed(ClientConfiguration, AccessPointConfiguration),
+
+    /// EAP client configuration for enterprise Wi-Fi.
     #[cfg_attr(feature = "serde", serde(skip))]
     EapClient(EapClientConfiguration),
 }
 
 impl Configuration {
+    /// Returns a reference to the client configuration if available.
     pub fn as_client_conf_ref(&self) -> Option<&ClientConfiguration> {
         match self {
             Self::Client(client_conf) | Self::Mixed(client_conf, _) => Some(client_conf),
@@ -404,6 +546,7 @@ impl Configuration {
         }
     }
 
+    /// Returns a reference to the access point configuration if available.
     pub fn as_ap_conf_ref(&self) -> Option<&AccessPointConfiguration> {
         match self {
             Self::AccessPoint(ap_conf) | Self::Mixed(_, ap_conf) => Some(ap_conf),
@@ -411,6 +554,8 @@ impl Configuration {
         }
     }
 
+    /// Returns a mutable reference to the client configuration, creating it if
+    /// necessary.
     pub fn as_client_conf_mut(&mut self) -> &mut ClientConfiguration {
         match self {
             Self::Client(client_conf) => client_conf,
@@ -431,6 +576,8 @@ impl Configuration {
         }
     }
 
+    /// Returns a mutable reference to the access point configuration, creating
+    /// it if necessary.
     pub fn as_ap_conf_mut(&mut self) -> &mut AccessPointConfiguration {
         match self {
             Self::AccessPoint(ap_conf) => ap_conf,
@@ -451,6 +598,8 @@ impl Configuration {
         }
     }
 
+    /// Retrieves mutable references to both the `ClientConfiguration`
+    /// and `AccessPointConfiguration`.
     pub fn as_mixed_conf_mut(
         &mut self,
     ) -> (&mut ClientConfiguration, &mut AccessPointConfiguration) {
@@ -484,6 +633,7 @@ impl Configuration {
     }
 }
 
+/// IPv4 network configurations.
 pub mod ipv4 {
     pub use core::net::Ipv4Addr;
     use core::{fmt::Display, str::FromStr};
@@ -491,6 +641,7 @@ pub mod ipv4 {
     #[cfg(feature = "serde")]
     use serde::{Deserialize, Serialize};
 
+    /// Represents a subnet mask.
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -551,12 +702,15 @@ pub mod ipv4 {
         }
     }
 
+    /// Represents a subnet consisting of a gateway and a mask.
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
     pub struct Subnet {
+        /// The gateway IP address of the subnet.
         #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
         pub gateway: Ipv4Addr,
+        /// The subnet mask associated with the subnet.
         pub mask: Mask,
     }
 
@@ -587,15 +741,23 @@ pub mod ipv4 {
         }
     }
 
+    /// Settings for a client in an IPv4 network.
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
     pub struct ClientSettings {
+        /// The client's IPv4 address.
         #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
         pub ip: Ipv4Addr,
+
+        /// The subnet associated with the client's IP address.
         pub subnet: Subnet,
+
+        /// The primary DNS server for name resolution.
         #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
         pub dns: Option<Ipv4Addr>,
+
+        /// The secondary DNS server for name resolution.
         #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
         pub secondary_dns: Option<Ipv4Addr>,
     }
@@ -614,6 +776,10 @@ pub mod ipv4 {
         }
     }
 
+    /// Settings for the DHCP client.
+    ///
+    /// This struct contains the configuration for a DHCP client, including a
+    /// hostname that can be sent during DHCP negotiations.
     #[derive(Default, Clone, Debug, PartialEq, Eq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -621,15 +787,24 @@ pub mod ipv4 {
         pub hostname: Option<heapless::String<30>>,
     }
 
+    /// Configuration for the client in an IPv4 network.
+    ///
+    /// This enum defines how the client's IP settings are obtained: either
+    /// through DHCP, or as a fixed (static) configuration.
     #[derive(Clone, Debug, PartialEq, Eq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
     pub enum ClientConfiguration {
+        /// Use DHCP to obtain network settings.
         DHCP(DHCPClientSettings),
+
+        /// Use a fixed configuration for network settings.
         Fixed(ClientSettings),
     }
 
     impl ClientConfiguration {
+        /// Returns a reference to the fixed settings if the client is using a
+        /// static configuration, `None` otherwise.
         pub fn as_fixed_settings_ref(&self) -> Option<&ClientSettings> {
             match self {
                 Self::Fixed(client_settings) => Some(client_settings),
@@ -637,6 +812,8 @@ pub mod ipv4 {
             }
         }
 
+        /// Returns a mutable reference to the fixed settings, creating a
+        /// default fixed configuration if necessary.
         pub fn as_fixed_settings_mut(&mut self) -> &mut ClientSettings {
             match self {
                 Self::Fixed(client_settings) => client_settings,
@@ -654,14 +831,22 @@ pub mod ipv4 {
         }
     }
 
+    /// Router configuration in an IPv4 network.
     #[derive(Clone, Debug, Eq, PartialEq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
     pub struct RouterConfiguration {
+        /// The subnet the router is responsible for.
         pub subnet: Subnet,
+
+        /// Indicates whether DHCP is enabled on the router.
         pub dhcp_enabled: bool,
+
+        /// The primary DNS server for the router.
         #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
         pub dns: Option<Ipv4Addr>,
+
+        /// The secondary DNS server for the router.
         #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
         pub secondary_dns: Option<Ipv4Addr>,
     }
@@ -680,11 +865,19 @@ pub mod ipv4 {
         }
     }
 
+    /// Represents the network configuration for a device.
+    ///
+    /// Holds either a client configuration (for devices connecting to a
+    /// network) or a router configuration (for devices providing a network
+    /// to other clients).
     #[derive(Clone, Debug, Eq, PartialEq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
     pub enum Configuration {
+        /// Configuration for a device acting as a client in the network.
         Client(ClientConfiguration),
+
+        /// Configuration for a device acting as a router in the network.
         Router(RouterConfiguration),
     }
 
@@ -694,15 +887,23 @@ pub mod ipv4 {
         }
     }
 
+    /// Represents IPv4 information for a device.
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
     pub struct IpInfo {
+        /// The IPv4 address of the device.
         #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
         pub ip: Ipv4Addr,
+
+        /// The subnet mask associated with the device's IP address.
         pub subnet: Subnet,
+
+        /// The primary DNS server for the device.
         #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
         pub dns: Option<Ipv4Addr>,
+
+        /// The secondary DNS server for the device.
         #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
         pub secondary_dns: Option<Ipv4Addr>,
     }
@@ -749,8 +950,11 @@ impl AuthMethodExt for AuthMethod {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub enum WifiMode {
+    /// Station mode.
     Sta,
+    /// Access Point mode.
     Ap,
+    /// Both Station and Access Point modes.
     ApSta,
 }
 
@@ -782,6 +986,7 @@ impl WifiMode {
 impl TryFrom<&Configuration> for WifiMode {
     type Error = WifiError;
 
+    /// Based on the current `Configuration`, derives a `WifiMode` based on it.
     fn try_from(config: &Configuration) -> Result<Self, Self::Error> {
         let mode = match config {
             Configuration::None => return Err(WifiError::UnknownWifiMode),
@@ -798,6 +1003,7 @@ impl TryFrom<&Configuration> for WifiMode {
 impl TryFrom<wifi_mode_t> for WifiMode {
     type Error = WifiError;
 
+    /// Converts a `wifi_mode_t` C-type into a `WifiMode`.
     fn try_from(value: wifi_mode_t) -> Result<Self, Self::Error> {
         #[allow(non_upper_case_globals)]
         match value {
@@ -833,77 +1039,132 @@ pub(crate) static DATA_QUEUE_RX_STA: Mutex<
     RefCell<SimpleQueue<EspWifiPacketBuffer, RX_QUEUE_SIZE>>,
 > = Mutex::new(RefCell::new(SimpleQueue::new()));
 
-/// Common errors
+/// Common errors.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum WifiError {
+    /// Wi-Fi module is not initialized or not initialized for `Wi-Fi`
+    /// operations.
     NotInitialized,
+
+    /// Internal Wi-Fi error.
     InternalError(InternalWifiError),
+
+    /// The device disconnected from the network or failed to connect to it.
     Disconnected,
+
+    /// Unknown Wi-Fi mode (not Sta/Ap/ApSta).
     UnknownWifiMode,
+
+    /// Unsupported operation or mode.
     Unsupported,
 }
 
-/// Events generated by the WiFi driver
+/// Events generated by the WiFi driver.
 #[repr(i32)]
 #[derive(Debug, FromPrimitive, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum WifiEvent {
+    /// Wi-Fi is ready for operation.
     WifiReady = 0,
+    /// Scan operation has completed.
     ScanDone,
+    /// Station mode started.
     StaStart,
+    /// Station mode stopped.
     StaStop,
+    /// Station connected to a network.
     StaConnected,
+    /// Station disconnected from a network.
     StaDisconnected,
+    /// Station authentication mode changed.
     StaAuthmodeChange,
 
+    /// Station WPS succeeds in enrollee mode.
     StaWpsErSuccess,
+    /// Station WPS fails in enrollee mode.
     StaWpsErFailed,
+    /// Station WPS timeout in enrollee mode.
     StaWpsErTimeout,
+    /// Station WPS pin code in enrollee mode.
     StaWpsErPin,
+    /// Station WPS overlap in enrollee mode.
     StaWpsErPbcOverlap,
 
+    /// Soft-AP start.
     ApStart,
+    /// Soft-AP stop.
     ApStop,
+    /// A station connected to Soft-AP.
     ApStaconnected,
+    /// A station disconnected from Soft-AP.
     ApStadisconnected,
+    /// Received probe request packet in Soft-AP interface.
     ApProbereqrecved,
 
+    /// Received report of FTM procedure.
     FtmReport,
 
+    /// AP's RSSI crossed configured threshold.
     StaBssRssiLow,
+    /// Status indication of Action Tx operation.
     ActionTxStatus,
+    /// Remain-on-Channel operation complete.
     RocDone,
 
+    /// Station beacon timeout.
     StaBeaconTimeout,
 
-    ConnectionlessModuleWakeIntervalStart, // Connectionless module wake interval start
+    /// Connectionless module wake interval has started.
+    ConnectionlessModuleWakeIntervalStart,
 
-    ApWpsRgSuccess,    // Soft-AP wps succeeds in registrar mode
-    ApWpsRgFailed,     // Soft-AP wps fails in registrar mode
-    ApWpsRgTimeout,    // Soft-AP wps timeout in registrar mode
-    ApWpsRgPin,        // Soft-AP wps pin code in registrar mode
-    ApWpsRgPbcOverlap, // Soft-AP wps overlap in registrar mode
+    /// Soft-AP WPS succeeded in registrar mode.
+    ApWpsRgSuccess,
+    /// Soft-AP WPS failed in registrar mode.
+    ApWpsRgFailed,
+    /// Soft-AP WPS timed out in registrar mode.
+    ApWpsRgTimeout,
+    /// Soft-AP WPS pin code in registrar mode.
+    ApWpsRgPin,
+    /// Soft-AP WPS overlap in registrar mode.
+    ApWpsRgPbcOverlap,
 
-    ItwtSetup,    // iTWT setup
-    ItwtTeardown, // iTWT teardown
-    ItwtProbe,    // iTWT probe
-    ItwtSuspend,  // iTWT suspend
-    TwtWakeup,    // TWT wakeup
-    BtwtSetup,    // bTWT setup
-    BtwtTeardown, // bTWT teardown
+    /// iTWT setup.
+    ItwtSetup,
+    /// iTWT teardown.
+    ItwtTeardown,
+    /// iTWT probe.
+    ItwtProbe,
+    /// iTWT suspended.
+    ItwtSuspend,
+    /// TWT wakeup event.
+    TwtWakeup,
+    /// bTWT setup.
+    BtwtSetup,
+    /// bTWT teardown.
+    BtwtTeardown,
 
-    NanStarted,        // NAN Discovery has started
-    NanStopped,        // NAN Discovery has stopped
-    NanSvcMatch,       // NAN Service Discovery match found
-    NanReplied,        // Replied to a NAN peer with Service Discovery match
-    NanReceive,        // Received a Follow-up message
-    NdpIndication,     // Received NDP Request from a NAN Peer
-    NdpConfirm,        // NDP Confirm Indication
-    NdpTerminated,     // NAN Datapath terminated indication
-    HomeChannelChange, // WiFi home channel change，doesn't occur when scanning
+    /// NAN (Neighbor Awareness Networking) discovery has started.
+    NanStarted,
+    /// NAN discovery has stopped.
+    NanStopped,
+    /// NAN service discovery match found.
+    NanSvcMatch,
+    /// Replied to a NAN peer with service discovery match.
+    NanReplied,
+    /// Received a follow-up message in NAN.
+    NanReceive,
+    /// Received NDP (Neighbor Discovery Protocol) request from a NAN peer.
+    NdpIndication,
+    /// NDP confirm indication.
+    NdpConfirm,
+    /// NAN datapath terminated indication.
+    NdpTerminated,
+    /// Wi-Fi home channel change, doesn't occur when scanning.
+    HomeChannelChange,
 
-    StaNeighborRep, // Received Neighbor Report response
+    /// Received Neighbor Report response.
+    StaNeighborRep,
 }
 
 /// Error originating from the underlying drivers
@@ -1868,12 +2129,16 @@ mod sealed {
 
 use sealed::*;
 
+/// Provides methods for retrieving the Wi-Fi mode and MAC address.
 pub trait WifiDeviceMode: Sealed {
+    /// Returns the currently active Wi-Fi mode.
     fn mode(self) -> WifiMode;
 
+    /// Returns the MAC address of the Wi-Fi device.
     fn mac_address(self) -> [u8; 6];
 }
 
+/// Wi-Fi station device.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct WifiStaDevice;
@@ -1890,6 +2155,7 @@ impl WifiDeviceMode for WifiStaDevice {
     }
 }
 
+/// Wi-Fi Access Point (AP) device.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct WifiApDevice;
@@ -1920,15 +2186,20 @@ impl<'d, MODE: WifiDeviceMode> WifiDevice<'d, MODE> {
         Self { _device, mode }
     }
 
+    /// Retrieves the MAC address of the Wi-Fi device.
     pub fn mac_address(&self) -> [u8; 6] {
         self.mode.mac_address()
     }
 
+    /// Receives data from the Wi-Fi device (only when `smoltcp` feature is
+    /// disabled).
     #[cfg(not(feature = "smoltcp"))]
     pub fn receive(&mut self) -> Option<(WifiRxToken<MODE>, WifiTxToken<MODE>)> {
         self.mode.rx_token()
     }
 
+    /// Transmits data through the Wi-Fi device (only when `smoltcp` feature is
+    /// disabled).
     #[cfg(not(feature = "smoltcp"))]
     pub fn transmit(&mut self) -> Option<WifiTxToken<MODE>> {
         self.mode.tx_token()
@@ -1962,53 +2233,108 @@ fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
     }
 }
 
+/// The radio metadata header of the received packet, which is the common header
+/// at the beginning of all RX callback buffers in promiscuous mode.
 #[cfg(not(any(esp32c6)))]
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct RxControlInfo {
+    /// Received Signal Strength Indicator (RSSI) of the packet, in dBm.
     pub rssi: i32,
+    /// PHY rate encoding of the packet. Only valid for non-HT (802.11b/g)
+    /// packets.
     pub rate: u32,
+    /// Protocol of the received packet: 0 for non-HT (11bg), 1 for HT (11n), 3
+    /// for VHT (11ac).
     pub sig_mode: u32,
+    /// Modulation and Coding Scheme (MCS). Indicates modulation for HT (11n)
+    /// packets.
     pub mcs: u32,
+    /// Channel bandwidth of the packet: 0 for 20MHz, 1 for 40MHz.
     pub cwb: u32,
+    /// Channel estimate smoothing: 1 recommends smoothing; 0 recommends
+    /// per-carrier-independent estimate.
     pub smoothing: u32,
+    /// Sounding indicator: 0 for sounding PPDU (used for channel estimation); 1
+    /// for non-sounding PPDU.
     pub not_sounding: u32,
+    /// Aggregation status: 0 for MPDU packet, 1 for AMPDU packet.
     pub aggregation: u32,
+    /// Space-Time Block Coding (STBC) status: 0 for non-STBC packet, 1 for STBC
+    /// packet.
     pub stbc: u32,
+    /// Forward Error Correction (FEC) status: indicates if LDPC coding is used
+    /// for 11n packets.
     pub fec_coding: u32,
+    /// Short Guard Interval (SGI): 0 for long guard interval, 1 for short guard
+    /// interval.
     pub sgi: u32,
+    /// Number of subframes aggregated in an AMPDU packet.
     pub ampdu_cnt: u32,
+    /// Primary channel on which the packet is received.
     pub channel: u32,
+    /// Secondary channel on which the packet is received: 0 for none, 1 for
+    /// above, 2 for below.
     pub secondary_channel: u32,
+    /// Timestamp of when the packet is received, in microseconds. Precise only
+    /// if modem sleep or light sleep is not enabled.
     pub timestamp: u32,
+    /// Noise floor of the Radio Frequency module, in dBm.
     pub noise_floor: i32,
+    /// Antenna number from which the packet is received: 0 for antenna 0, 1 for
+    /// antenna 1.
     pub ant: u32,
+    /// Length of the packet including the Frame Check Sequence (FCS).
     pub sig_len: u32,
+    /// State of the packet: 0 for no error, other values indicate error codes.
     pub rx_state: u32,
 }
 
+/// The radio metadata header of the received packet, which is the common header
+/// at the beginning of all RX callback buffers in promiscuous mode.
 #[cfg(esp32c6)]
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct RxControlInfo {
+    /// Received Signal Strength Indicator (RSSI) of the packet, in dBm.
     pub rssi: i32,
+    /// PHY rate encoding of the packet. Only valid for non-HT (802.11b/g)
+    /// packets.
     pub rate: u32,
+    /// Length of the received packet including the Frame Check Sequence (FCS).
     pub sig_len: u32,
+    /// Reception state of the packet: 0 for no error, others indicate error
+    /// codes.
     pub rx_state: u32,
+    /// Length of the dump buffer.
     pub dump_len: u32,
+    /// Length of HE-SIG-B field (802.11ax).
     pub he_sigb_len: u32,
+    /// Indicates if this is a single MPDU.
     pub cur_single_mpdu: u32,
+    /// Current baseband format.
     pub cur_bb_format: u32,
+    /// Channel estimation validity.
     pub rx_channel_estimate_info_vld: u32,
+    /// Length of the channel estimation.
     pub rx_channel_estimate_len: u32,
+    /// Timing information in seconds.
     pub second: u32,
+    /// Primary channel on which the packet is received.
     pub channel: u32,
+    /// Noise floor of the Radio Frequency module, in dBm.
     pub noise_floor: i32,
+    /// Indicates if this is a group-addressed frame.
     pub is_group: u32,
+    /// End state of the packet reception.
     pub rxend_state: u32,
+    /// Indicate whether the reception frame is from interface 3.
     pub rxmatch3: u32,
+    /// Indicate whether the reception frame is from interface 2.
     pub rxmatch2: u32,
+    /// Indicate whether the reception frame is from interface 1.
     pub rxmatch1: u32,
+    /// Indicate whether the reception frame is from interface 0.
     pub rxmatch0: u32,
 }
 impl RxControlInfo {
@@ -2065,11 +2391,16 @@ impl RxControlInfo {
         rx_control_info
     }
 }
+/// Represents a Wi-Fi packet in promiscuous mode.
 #[cfg(feature = "sniffer")]
 pub struct PromiscuousPkt<'a> {
+    /// Control information related to packet reception.
     pub rx_cntl: RxControlInfo,
+    /// Frame type of the received packet.
     pub frame_type: wifi_promiscuous_pkt_type_t,
+    /// Length of the received packet.
     pub len: usize,
+    /// Data contained in the received packet.
     pub data: &'a [u8],
 }
 #[cfg(feature = "sniffer")]
@@ -2192,6 +2523,9 @@ impl<'d> WifiController<'d> {
         this.set_configuration(&config)?;
         Ok(this)
     }
+
+    /// Attempts to take the sniffer, returns `Some(Sniffer)` if successful,
+    /// otherwise `None`.
     #[cfg(feature = "sniffer")]
     pub fn take_sniffer(&self) -> Option<Sniffer> {
         if self
@@ -2261,10 +2595,12 @@ impl<'d> WifiController<'d> {
         Ok(())
     }
 
+    /// Checks if Wi-Fi is enabled as a station.
     pub fn is_sta_enabled(&self) -> Result<bool, WifiError> {
         WifiMode::try_from(&self.config).map(|m| m.is_sta())
     }
 
+    /// Checks if Wi-Fi is enabled as an access p.
     pub fn is_ap_enabled(&self) -> Result<bool, WifiError> {
         WifiMode::try_from(&self.config).map(|m| m.is_ap())
     }
@@ -2368,6 +2704,8 @@ pub struct WifiRxToken<MODE: Sealed> {
 }
 
 impl<MODE: Sealed> WifiRxToken<MODE> {
+    /// Consumes the RX token and applies the callback function to the received
+    /// data buffer.
     pub fn consume_token<R, F>(self, f: F) -> R
     where
         F: FnOnce(&mut [u8]) -> R,
@@ -2411,6 +2749,8 @@ pub struct WifiTxToken<MODE: Sealed> {
 }
 
 impl<MODE: Sealed> WifiTxToken<MODE> {
+    /// Consumes the TX token and applies the callback function to the received
+    /// data buffer.
     pub fn consume_token<R, F>(self, len: usize, f: F) -> R
     where
         F: FnOnce(&mut [u8]) -> R,
@@ -2760,6 +3100,10 @@ impl WifiController<'_> {
         esp_wifi_result!(unsafe { esp_wifi_disconnect() })
     }
 
+    /// Checks if the WiFi controller has started.
+    ///
+    /// This function should be called after the `start` method to verify if the
+    /// WiFi has started successfully.
     pub fn is_started(&self) -> Result<bool, WifiError> {
         if matches!(
             crate::wifi::get_sta_state(),
@@ -2773,6 +3117,10 @@ impl WifiController<'_> {
         Ok(false)
     }
 
+    /// Checks if the WiFi controller is connected to a configured network.
+    ///
+    /// This function should be called after the `connect` method to verify if
+    /// the connection was successful.
     pub fn is_connected(&self) -> Result<bool, WifiError> {
         match crate::wifi::get_sta_state() {
             crate::wifi::WifiState::StaConnected => Ok(true),
@@ -2792,18 +3140,22 @@ impl WifiController<'_> {
         self.scan_with_config_sync(Default::default())
     }
 
+    /// Starts the WiFi controller.
     pub fn start(&mut self) -> Result<(), WifiError> {
         crate::wifi::wifi_start()
     }
 
+    /// Stops the WiFi controller.
     pub fn stop(&mut self) -> Result<(), WifiError> {
         self.stop_impl()
     }
 
+    /// Connects the WiFi controller to a network.
     pub fn connect(&mut self) -> Result<(), WifiError> {
         self.connect_impl()
     }
 
+    /// Disconnects the WiFi controller from a network.
     pub fn disconnect(&mut self) -> Result<(), WifiError> {
         self.disconnect_impl()
     }
@@ -2930,6 +3282,7 @@ mod asynch {
             self.scan_with_config(Default::default()).await
         }
 
+        /// An async wifi network scan with caller-provided scanning options.
         pub async fn scan_with_config<const N: usize>(
             &mut self,
             config: ScanConfig<'_>,
@@ -3076,6 +3429,7 @@ mod asynch {
     }
 
     impl WifiEventFuture {
+        /// Creates a new `Future` for the specified WiFi event.
         pub fn new(event: WifiEvent) -> Self {
             Self { event }
         }
@@ -3103,6 +3457,7 @@ mod asynch {
     }
 
     impl MultiWifiEventFuture {
+        /// Creates a new `Future` for the specified set of WiFi events.
         pub fn new(event: EnumSet<WifiEvent>) -> Self {
             Self { event }
         }

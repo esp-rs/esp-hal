@@ -14,7 +14,7 @@ impl TimerCallback {
         Self { f, args }
     }
 
-    pub fn call(self) {
+    pub(crate) fn call(self) {
         unsafe { (self.f)(self.args) };
     }
 }
@@ -36,7 +36,7 @@ pub(crate) struct Timer {
 }
 
 impl Timer {
-    pub fn id(&self) -> usize {
+    pub(crate) fn id(&self) -> usize {
         self.ets_timer as usize
     }
 }
@@ -45,11 +45,11 @@ pub(crate) static mut TIMERS: heapless::Vec<Timer, 34> = heapless::Vec::new();
 #[cfg(not(coex))]
 pub(crate) static mut TIMERS: heapless::Vec<Timer, 20> = heapless::Vec::new();
 
-pub fn compat_timer_arm(ets_timer: *mut ets_timer, tmout: u32, repeat: bool) {
+pub(crate) fn compat_timer_arm(ets_timer: *mut ets_timer, tmout: u32, repeat: bool) {
     compat_timer_arm_us(ets_timer, tmout * 1000, repeat);
 }
 
-pub fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bool) {
+pub(crate) fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bool) {
     let systick = crate::timer::get_systimer_count();
     let ticks = crate::timer::micros_to_ticks(us as u64);
 
@@ -73,7 +73,7 @@ pub fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bool) {
     })
 }
 
-pub fn compat_timer_disarm(ets_timer: *mut ets_timer) {
+pub(crate) fn compat_timer_disarm(ets_timer: *mut ets_timer) {
     critical_section::with(|_| unsafe {
         if let Some(timer) = TIMERS.iter_mut().find(|t| t.ets_timer == ets_timer) {
             trace!("timer_disarm {:x}", timer.id());
@@ -84,7 +84,7 @@ pub fn compat_timer_disarm(ets_timer: *mut ets_timer) {
     })
 }
 
-pub fn compat_timer_done(ets_timer: *mut ets_timer) {
+pub(crate) fn compat_timer_done(ets_timer: *mut ets_timer) {
     critical_section::with(|_| unsafe {
         if let Some((idx, timer)) = TIMERS
             .iter_mut()
@@ -104,7 +104,7 @@ pub fn compat_timer_done(ets_timer: *mut ets_timer) {
     })
 }
 
-pub fn compat_timer_setfn(
+pub(crate) fn compat_timer_setfn(
     ets_timer: *mut ets_timer,
     pfunction: unsafe extern "C" fn(*mut c_types::c_void),
     parg: *mut c_types::c_void,

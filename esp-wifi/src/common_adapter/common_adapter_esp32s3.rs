@@ -76,7 +76,7 @@ pub(crate) unsafe fn phy_enable() {
                 #[cfg(feature = "phy-enable-usb")]
                 {
                     extern "C" {
-                        pub fn phy_bbpll_en_usb(param: bool);
+                        fn phy_bbpll_en_usb(param: bool);
                     }
 
                     phy_bbpll_en_usb(true);

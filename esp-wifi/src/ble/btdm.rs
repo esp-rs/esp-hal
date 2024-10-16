@@ -537,7 +537,7 @@ static mut BLE_HCI_READ_DATA_INDEX: usize = 0;
 static mut BLE_HCI_READ_DATA_LEN: usize = 0;
 
 #[cfg(feature = "async")]
-pub fn have_hci_read_data() -> bool {
+pub(crate) fn have_hci_read_data() -> bool {
     critical_section::with(|cs| {
         let queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
         !queue.is_empty()
@@ -561,7 +561,7 @@ pub(crate) fn read_next(data: &mut [u8]) -> usize {
     })
 }
 
-pub fn read_hci(data: &mut [u8]) -> usize {
+pub(crate) fn read_hci(data: &mut [u8]) -> usize {
     unsafe {
         if BLE_HCI_READ_DATA_LEN == 0 {
             critical_section::with(|cs| {
@@ -591,7 +591,7 @@ pub fn read_hci(data: &mut [u8]) -> usize {
     0
 }
 
-pub fn send_hci(data: &[u8]) {
+pub(crate) fn send_hci(data: &[u8]) {
     let hci_out = unsafe { &mut *HCI_OUT_COLLECTOR.as_mut_ptr() };
     hci_out.push(data);
 
