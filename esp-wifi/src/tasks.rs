@@ -5,6 +5,7 @@ use crate::{
     timer::{get_systimer_count, yield_task},
 };
 
+/// Initializes the `main` and `timer` tasks for the Wi-Fi driver.
 pub fn init_tasks() {
     // allocate the main task
     crate::preempt::allocate_main_task();
@@ -13,6 +14,8 @@ pub fn init_tasks() {
     task_create(timer_task, core::ptr::null_mut(), 8192);
 }
 
+/// Entry point for the timer task responsible for handling scheduled timer
+/// events.
 pub extern "C" fn timer_task(_param: *mut esp_wifi_sys::c_types::c_void) {
     loop {
         let mut to_run = SimpleQueue::<_, 20>::new();

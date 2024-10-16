@@ -49,18 +49,37 @@ macro_rules! check_error {
     };
 }
 
+/// Common errors that can occur with `ESP-NOW`.
 #[repr(u32)]
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
+    /// ESP-NOW is not initialized.
     NotInitialized  = 12389,
+
+    /// Invalid argument.
     InvalidArgument = 12390,
+
+    /// Indicates that there was insufficient memory to complete the operation.
     OutOfMemory     = 12391,
+
+    /// ESP-NOW peer list is full.
     PeerListFull    = 12392,
-    UnknownPeer     = 12393,
-    NotFound        = 12394,
+
+    /// ESP-NOW peer is not found.
+    NotFound        = 12393,
+
+    /// Internal error.
+    InternalError   = 12394,
+
+    /// ESP-NOW peer already exists.
     PeerExists      = 12395,
+
+    /// Interface error.
     InterfaceError  = 12396,
+
+    /// Represents any other error not covered by the above variants, with an
+    /// associated error code.
     Other(u32),
 }
 
@@ -83,19 +102,26 @@ impl Error {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EspNowError {
+    /// Internal Error.
     Error(Error),
+    /// Sending an ESP-NOW message failed.
     SendFailed,
-    /// Attempt to create EspNow instance twice
+    /// Attempt to create EspNow instance twice.
     DuplicateInstance,
 }
 
+/// Holds the count of peers in an ESP-NOW communication context.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PeerCount {
+    /// The total number of peers.
     pub total_count: i32,
+
+    /// The number of encrypted peers.
     pub encrypted_count: i32,
 }
 
+/// ESP-NOW rate of specified interface.
 #[repr(u32)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum WifiPhyRate {
@@ -169,33 +195,55 @@ pub enum WifiPhyRate {
     RateMax,
 }
 
+/// ESP-NOW peer information parameters.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PeerInfo {
+    /// ESP-NOW peer MAC address that is also the MAC address of station or
+    /// softap.
     pub peer_address: [u8; 6],
+
+    /// ESP-NOW peer local master key that is used to encrypt data.
     pub lmk: Option<[u8; 16]>,
+
+    /// Wi-Fi channel that peer uses to send/receive ESP-NOW data.
     pub channel: Option<u8>,
+
+    /// ESP-NOW data that this peer sends/receives is encrypted or not.
     pub encrypt: bool,
     // we always use STA for now
 }
 
+/// Information about a received packet.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ReceiveInfo {
+    /// The source address of the received packet.
     pub src_address: [u8; 6],
+
+    /// The destination address of the received packet.
     pub dst_address: [u8; 6],
+
+    /// Rx control info of ESP-NOW packet.
     pub rx_control: RxControlInfo,
 }
 
 #[derive(Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ReceivedData {
+    /// The length of the received data.
     pub len: u8,
+
+    /// The buffer containing the received data.
     pub data: [u8; 256],
+
+    /// Information about a received packet.
     pub info: ReceiveInfo,
 }
 
 impl ReceivedData {
+    /// Returns a slice of the received data, limited to the actual length of
+    /// the packet.
     pub fn get_data(&self) -> &[u8] {
         &self.data[..self.len as usize]
     }
@@ -210,16 +258,19 @@ impl Debug for ReceivedData {
     }
 }
 
+/// A token used to create an ESP-NOW instance while Wi-Fi is enabled.
 pub struct EspNowWithWifiCreateToken {
     _private: (),
 }
 
+/// Enables ESP-NOW while keeping Wi-Fi active.
 pub fn enable_esp_now_with_wifi(
     device: crate::hal::peripherals::WIFI,
 ) -> (crate::hal::peripherals::WIFI, EspNowWithWifiCreateToken) {
     (device, EspNowWithWifiCreateToken { _private: () })
 }
 
+/// Manages the ESP-NOW instance lifecycle while ensuring it remains active.
 pub struct EspNowManager<'d> {
     _rc: EspNowRc<'d>,
 }
@@ -270,20 +321,20 @@ impl<'d> EspNowManager<'d> {
         Ok(())
     }
 
-    /// Set primary WiFi channel
-    /// Should only be used when using ESP-NOW without AP or STA
+    /// Set primary WiFi channel.
+    /// Should only be used when using ESP-NOW without AP or STA.
     pub fn set_channel(&self, channel: u8) -> Result<(), EspNowError> {
         check_error!({ esp_wifi_set_channel(channel, 0) })
     }
 
-    /// Get the version of ESPNOW
+    /// Get the version of ESP-NOW.
     pub fn get_version(&self) -> Result<u32, EspNowError> {
         let mut version = 0u32;
         check_error!({ esp_now_get_version(&mut version as *mut u32) })?;
         Ok(version)
     }
 
-    /// Add a peer to the list of known peers
+    /// Add a peer to the list of known peers.
     pub fn add_peer(&self, peer: PeerInfo) -> Result<(), EspNowError> {
         let raw_peer = esp_now_peer_info_t {
             peer_addr: peer.peer_address,
@@ -296,12 +347,12 @@ impl<'d> EspNowManager<'d> {
         check_error!({ esp_now_add_peer(&raw_peer as *const _) })
     }
 
-    /// Remove the given peer
+    /// Remove the given peer.
     pub fn remove_peer(&self, peer_address: &[u8; 6]) -> Result<(), EspNowError> {
         check_error!({ esp_now_del_peer(peer_address.as_ptr()) })
     }
 
-    /// Modify a peer information
+    /// Modify a peer information.
     pub fn modify_peer(&self, peer: PeerInfo) -> Result<(), EspNowError> {
         let raw_peer = esp_now_peer_info_t {
             peer_addr: peer.peer_address,
@@ -314,7 +365,7 @@ impl<'d> EspNowManager<'d> {
         check_error!({ esp_now_mod_peer(&raw_peer as *const _) })
     }
 
-    /// Get peer by MAC address
+    /// Get peer by MAC address.
     pub fn get_peer(&self, peer_address: &[u8; 6]) -> Result<PeerInfo, EspNowError> {
         let mut raw_peer = esp_now_peer_info_t {
             peer_addr: [0u8; 6],
@@ -342,7 +393,7 @@ impl<'d> EspNowManager<'d> {
         })
     }
 
-    /// Fetch a peer from peer list
+    /// Fetch a peer from peer list.
     ///
     /// Only returns peers which address is unicast, for multicast/broadcast
     /// addresses, the function will skip the entry and find the next in the
@@ -374,12 +425,12 @@ impl<'d> EspNowManager<'d> {
         })
     }
 
-    /// Check is peer is known
+    /// Check is peer is known.
     pub fn peer_exists(&self, peer_address: &[u8; 6]) -> bool {
         unsafe { esp_now_is_peer_exist(peer_address.as_ptr()) }
     }
 
-    /// Get the number of peers
+    /// Get the number of peers.
     pub fn peer_count(&self) -> Result<PeerCount, EspNowError> {
         let mut peer_num = esp_now_peer_num_t {
             total_num: 0,
@@ -393,12 +444,12 @@ impl<'d> EspNowManager<'d> {
         })
     }
 
-    /// Set the primary master key
+    /// Set the primary master key.
     pub fn set_pmk(&self, pmk: &[u8; 16]) -> Result<(), EspNowError> {
         check_error!({ esp_now_set_pmk(pmk.as_ptr()) })
     }
 
-    /// Set wake window for esp_now to wake up in interval unit
+    /// Set wake window for esp_now to wake up in interval unit.
     ///
     /// Window is milliseconds the chip keep waked each interval, from 0 to
     /// 65535.
@@ -406,7 +457,7 @@ impl<'d> EspNowManager<'d> {
         check_error!({ esp_now_set_wake_window(wake_window) })
     }
 
-    /// Config ESPNOW rate
+    /// Config ESP-NOW rate.
     pub fn set_rate(&self, rate: WifiPhyRate) -> Result<(), EspNowError> {
         check_error!({ esp_wifi_config_espnow_rate(wifi_interface_t_WIFI_IF_STA, rate as u32,) })
     }
@@ -478,13 +529,14 @@ impl<'s> Drop for SendWaiter<'s> {
     }
 }
 
-/// This is the sender part of ESP-NOW. You can get this sender by splitting
+/// This is the receiver part of ESP-NOW. You can get this receiver by splitting
 /// a `EspNow` instance.
 pub struct EspNowReceiver<'d> {
     _rc: EspNowRc<'d>,
 }
 
 impl<'d> EspNowReceiver<'d> {
+    /// Receives data from the ESP-NOW queue.
     pub fn receive(&self) -> Option<ReceivedData> {
         critical_section::with(|cs| {
             let mut queue = RECEIVE_QUEUE.borrow_ref_mut(cs);
@@ -556,6 +608,7 @@ pub struct EspNow<'d> {
 }
 
 impl<'d> EspNow<'d> {
+    /// TODO
     pub fn new(
         inited: &EspWifiInitialization,
         device: impl Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
@@ -563,6 +616,7 @@ impl<'d> EspNow<'d> {
         EspNow::new_internal(inited, Some(device.into_ref()))
     }
 
+    /// TODO
     pub fn new_with_wifi(
         inited: &EspWifiInitialization,
         _token: EspNowWithWifiCreateToken,
@@ -630,6 +684,8 @@ impl<'d> EspNow<'d> {
         Ok(esp_now)
     }
 
+    /// Splits the ESP-NOW instance into its manager, sender, and receiver
+    /// components.
     pub fn split(self) -> (EspNowManager<'d>, EspNowSender<'d>, EspNowReceiver<'d>) {
         (self.manager, self.sender, self.receiver)
     }
@@ -645,38 +701,38 @@ impl<'d> EspNow<'d> {
         self.manager.set_protocol(protocols)
     }
 
-    /// Set primary WiFi channel
-    /// Should only be used when using ESP-NOW without AP or STA
+    /// Set primary WiFi channel.
+    /// Should only be used when using ESP-NOW without AP or STA.
     pub fn set_channel(&self, channel: u8) -> Result<(), EspNowError> {
         self.manager.set_channel(channel)
     }
 
-    /// Get the version of ESPNOW
+    /// Get the version of ESP-NOW.
     pub fn get_version(&self) -> Result<u32, EspNowError> {
         self.manager.get_version()
     }
 
-    /// Add a peer to the list of known peers
+    /// Add a peer to the list of known peers.
     pub fn add_peer(&self, peer: PeerInfo) -> Result<(), EspNowError> {
         self.manager.add_peer(peer)
     }
 
-    /// Remove the given peer
+    /// Remove the given peer.
     pub fn remove_peer(&self, peer_address: &[u8; 6]) -> Result<(), EspNowError> {
         self.manager.remove_peer(peer_address)
     }
 
-    /// Modify a peer information
+    /// Modify a peer information.
     pub fn modify_peer(&self, peer: PeerInfo) -> Result<(), EspNowError> {
         self.manager.modify_peer(peer)
     }
 
-    /// Get peer by MAC address
+    /// Get peer by MAC address.
     pub fn get_peer(&self, peer_address: &[u8; 6]) -> Result<PeerInfo, EspNowError> {
         self.manager.get_peer(peer_address)
     }
 
-    /// Fetch a peer from peer list
+    /// Fetch a peer from peer list.
     ///
     /// Only returns peers which address is unicast, for multicast/broadcast
     /// addresses, the function will skip the entry and find the next in the
@@ -685,22 +741,22 @@ impl<'d> EspNow<'d> {
         self.manager.fetch_peer(from_head)
     }
 
-    /// Check is peer is known
+    /// Check is peer is known.
     pub fn peer_exists(&self, peer_address: &[u8; 6]) -> bool {
         self.manager.peer_exists(peer_address)
     }
 
-    /// Get the number of peers
+    /// Get the number of peers.
     pub fn peer_count(&self) -> Result<PeerCount, EspNowError> {
         self.manager.peer_count()
     }
 
-    /// Set the primary master key
+    /// Set the primary master key.
     pub fn set_pmk(&self, pmk: &[u8; 16]) -> Result<(), EspNowError> {
         self.manager.set_pmk(pmk)
     }
 
-    /// Set wake window for esp_now to wake up in interval unit
+    /// Set wake window for esp_now to wake up in interval unit.
     ///
     /// Window is milliseconds the chip keep waked each interval, from 0 to
     /// 65535.
@@ -708,12 +764,12 @@ impl<'d> EspNow<'d> {
         self.manager.set_wake_window(wake_window)
     }
 
-    /// Config ESPNOW rate
+    /// Config ESP-NOW rate.
     pub fn set_rate(&self, rate: WifiPhyRate) -> Result<(), EspNowError> {
         self.manager.set_rate(rate)
     }
 
-    /// Send data to peer
+    /// Send data to peer.
     ///
     /// The peer needs to be added to the peer list first.
     pub fn send<'s>(
@@ -724,7 +780,7 @@ impl<'d> EspNow<'d> {
         self.sender.send(dst_addr, data)
     }
 
-    /// Receive data
+    /// Receive data.
     pub fn receive(&self) -> Option<ReceivedData> {
         self.receiver.receive()
     }
@@ -818,6 +874,7 @@ mod asynch {
     }
 
     impl<'d> EspNowSender<'d> {
+        /// Sends data asynchronously to a peer (using its MAC) using ESP-NOW.
         pub fn send_async<'s, 'r>(
             &'s mut self,
             addr: &'r [u8; 6],
@@ -851,6 +908,8 @@ mod asynch {
         }
     }
 
+    /// A `future` representing the result of an asynchronous ESP-NOW send
+    /// operation.
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct SendFuture<'s, 'r> {
         _sender: PhantomData<&'s mut EspNowSender<'s>>,
