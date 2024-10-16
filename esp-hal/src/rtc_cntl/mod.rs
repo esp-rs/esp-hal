@@ -837,7 +837,7 @@ impl Rwdt {
     }
 
     /// Enable the watchdog timer instance.
-    /// Watchdog starts with default settings (`stage 0`` resets the system, the
+    /// Watchdog starts with default settings (`stage 0` resets the system, the
     /// others are deactivated)
     pub fn enable(&mut self) {
         self.set_enabled(true);
