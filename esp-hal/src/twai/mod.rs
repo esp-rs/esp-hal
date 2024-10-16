@@ -1165,7 +1165,7 @@ where
     /// error states.
     pub fn clear_receive_fifo(&self) {
         while self.num_available_messages() > 0 {
-            T::release_receive_fifo();
+            release_receive_fifo(T::register_block());
         }
     }
 
@@ -1261,7 +1261,7 @@ where
             )));
         }
 
-        Ok(T::read_frame()?)
+        Ok(read_frame(register_block)?)
     }
 }
 
@@ -1413,15 +1413,6 @@ pub trait Instance: crate::private::Sealed {
         &asynch::TWAI_STATE[Self::NUMBER]
     }
 
-    /// Release the message in the buffer. This will decrement the received
-    /// message counter and prepare the next message in the FIFO for
-    /// reading.
-    fn release_receive_fifo() {
-        Self::register_block()
-            .cmd()
-            .write(|w| w.release_buf().set_bit());
-    }
-
     /// Write a frame to the peripheral.
     fn write_frame(frame: &EspTwaiFrame) {
         // Assemble the frame information into the data_0 byte.
@@ -1494,67 +1485,72 @@ pub trait Instance: crate::private::Sealed {
             register_block.cmd().write(|w| w.tx_req().set_bit());
         }
     }
+}
 
-    /// Read a frame from the peripheral.
-    fn read_frame() -> Result<EspTwaiFrame, EspTwaiError> {
-        let register_block = Self::register_block();
+/// Read a frame from the peripheral.
+fn read_frame(register_block: &RegisterBlock) -> Result<EspTwaiFrame, EspTwaiError> {
+    // Read the frame information and extract the frame id format and dlc.
+    let data_0 = register_block.data_0().read().tx_byte_0().bits();
 
-        // Read the frame information and extract the frame id format and dlc.
-        let data_0 = register_block.data_0().read().tx_byte_0().bits();
+    let is_standard_format = data_0 & 0b1 << 7 == 0;
+    let is_data_frame = data_0 & 0b1 << 6 == 0;
+    let self_reception = data_0 & 0b1 << 4 != 0;
+    let dlc = data_0 & 0b1111;
 
-        let is_standard_format = data_0 & 0b1 << 7 == 0;
-        let is_data_frame = data_0 & 0b1 << 6 == 0;
-        let self_reception = data_0 & 0b1 << 4 != 0;
-        let dlc = data_0 & 0b1111;
-
-        if dlc > 8 {
-            // Release the packet we read from the FIFO, allowing the peripheral to prepare
-            // the next packet.
-            Self::release_receive_fifo();
-
-            return Err(EspTwaiError::NonCompliantDlc(dlc));
-        }
-        let dlc = dlc as usize;
-
-        // Read the payload from the packet and construct a frame.
-        let (id, data_ptr) = if is_standard_format {
-            // Frame uses standard 11 bit id.
-            let data_1 = register_block.data_1().read().tx_byte_1().bits();
-            let data_2 = register_block.data_2().read().tx_byte_2().bits();
-
-            let raw_id: u16 = ((data_1 as u16) << 3) | ((data_2 as u16) >> 5);
-
-            let id = Id::from(StandardId::new(raw_id).unwrap());
-            (id, register_block.data_3().as_ptr())
-        } else {
-            // Frame uses extended 29 bit id.
-            let data_1 = register_block.data_1().read().tx_byte_1().bits();
-            let data_2 = register_block.data_2().read().tx_byte_2().bits();
-            let data_3 = register_block.data_3().read().tx_byte_3().bits();
-            let data_4 = register_block.data_4().read().tx_byte_4().bits();
-
-            let raw_id: u32 = (data_1 as u32) << 21
-                | (data_2 as u32) << 13
-                | (data_3 as u32) << 5
-                | (data_4 as u32) >> 3;
-
-            let id = Id::from(ExtendedId::new(raw_id).unwrap());
-            (id, register_block.data_5().as_ptr())
-        };
-
-        let mut frame = if is_data_frame {
-            unsafe { EspTwaiFrame::new_from_data_registers(id, data_ptr, dlc) }
-        } else {
-            EspTwaiFrame::new_remote(id, dlc).unwrap()
-        };
-        frame.self_reception = self_reception;
-
+    if dlc > 8 {
         // Release the packet we read from the FIFO, allowing the peripheral to prepare
         // the next packet.
-        Self::release_receive_fifo();
+        release_receive_fifo(register_block);
 
-        Ok(frame)
+        return Err(EspTwaiError::NonCompliantDlc(dlc));
     }
+    let dlc = dlc as usize;
+
+    // Read the payload from the packet and construct a frame.
+    let (id, data_ptr) = if is_standard_format {
+        // Frame uses standard 11 bit id.
+        let data_1 = register_block.data_1().read().tx_byte_1().bits();
+        let data_2 = register_block.data_2().read().tx_byte_2().bits();
+
+        let raw_id: u16 = ((data_1 as u16) << 3) | ((data_2 as u16) >> 5);
+
+        let id = Id::from(StandardId::new(raw_id).unwrap());
+        (id, register_block.data_3().as_ptr())
+    } else {
+        // Frame uses extended 29 bit id.
+        let data_1 = register_block.data_1().read().tx_byte_1().bits();
+        let data_2 = register_block.data_2().read().tx_byte_2().bits();
+        let data_3 = register_block.data_3().read().tx_byte_3().bits();
+        let data_4 = register_block.data_4().read().tx_byte_4().bits();
+
+        let raw_id: u32 = (data_1 as u32) << 21
+            | (data_2 as u32) << 13
+            | (data_3 as u32) << 5
+            | (data_4 as u32) >> 3;
+
+        let id = Id::from(ExtendedId::new(raw_id).unwrap());
+        (id, register_block.data_5().as_ptr())
+    };
+
+    let mut frame = if is_data_frame {
+        unsafe { EspTwaiFrame::new_from_data_registers(id, data_ptr, dlc) }
+    } else {
+        EspTwaiFrame::new_remote(id, dlc).unwrap()
+    };
+    frame.self_reception = self_reception;
+
+    // Release the packet we read from the FIFO, allowing the peripheral to prepare
+    // the next packet.
+    release_receive_fifo(register_block);
+
+    Ok(frame)
+}
+
+/// Release the message in the buffer. This will decrement the received
+/// message counter and prepare the next message in the FIFO for
+/// reading.
+fn release_receive_fifo(register_block: &RegisterBlock) {
+    register_block.cmd().write(|w| w.release_buf().set_bit());
 }
 
 impl Instance for crate::peripherals::TWAI0 {
@@ -1772,8 +1768,7 @@ mod asynch {
         }
     }
 
-    fn handle_interrupt<T: Instance>() {
-        let register_block = T::register_block();
+    fn handle_interrupt(register_block: &RegisterBlock, async_state: &TwaiAsyncState) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
                 let intr_enable = register_block.int_ena().read();
@@ -1794,8 +1789,6 @@ mod asynch {
             }
         }
 
-        let async_state = T::async_state();
-
         if tx_int_status.bit_is_set() {
             async_state.tx_waker.wake();
         }
@@ -1813,7 +1806,7 @@ mod asynch {
                 let _ = rx_queue.try_send(Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun)));
             }
 
-            match T::read_frame() {
+            match read_frame(register_block) {
                 Ok(frame) => {
                     let _ = rx_queue.try_send(Ok(frame));
                 }
@@ -1833,12 +1826,16 @@ mod asynch {
 
     #[handler]
     pub(super) fn twai0() {
-        handle_interrupt::<TWAI0>();
+        let register_block = TWAI0::register_block();
+        let async_state = TWAI0::async_state();
+        handle_interrupt(register_block, async_state);
     }
 
     #[cfg(twai1)]
     #[handler]
     pub(super) fn twai1() {
-        handle_interrupt::<TWAI1>();
+        let register_block = TWAI1::register_block();
+        let async_state = TWAI1::async_state();
+        handle_interrupt(register_block, async_state);
     }
 }
