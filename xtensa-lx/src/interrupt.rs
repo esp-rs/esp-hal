@@ -2,8 +2,6 @@
 
 use core::arch::asm;
 
-pub use bare_metal::CriticalSection;
-
 /// Trait for enums of external interrupt numbers.
 ///
 /// This trait should be implemented by a peripheral access crate (PAC)
@@ -158,17 +156,15 @@ pub fn get_level() -> u32 {
 #[inline]
 pub fn free<F, R>(f: F) -> R
 where
-    F: FnOnce(&CriticalSection) -> R,
+    F: FnOnce() -> R,
 {
     // disable interrupts and store old mask
     let old_mask = disable();
 
-    let r = f(unsafe { &CriticalSection::new() });
+    let r = f();
 
-    // enable previously disable interrupts
-    unsafe {
-        enable_mask(old_mask);
-    }
+    // enable previously disabled interrupts
+    unsafe { enable_mask(old_mask) };
 
     r
 }
