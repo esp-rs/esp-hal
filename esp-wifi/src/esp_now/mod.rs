@@ -459,7 +459,7 @@ impl<'d> EspNowManager<'d> {
         check_error!({ esp_now_set_wake_window(wake_window) })
     }
 
-    /// Config ESP-NOW rate.
+    /// Configure ESP-NOW rate.
     pub fn set_rate(&self, rate: WifiPhyRate) -> Result<(), EspNowError> {
         check_error!({ esp_wifi_config_espnow_rate(wifi_interface_t_WIFI_IF_STA, rate as u32,) })
     }
@@ -766,7 +766,7 @@ impl<'d> EspNow<'d> {
         self.manager.set_wake_window(wake_window)
     }
 
-    /// Config ESP-NOW rate.
+    /// Configure ESP-NOW rate.
     pub fn set_rate(&self, rate: WifiPhyRate) -> Result<(), EspNowError> {
         self.manager.set_rate(rate)
     }
