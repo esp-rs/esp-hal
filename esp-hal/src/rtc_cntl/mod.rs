@@ -90,7 +90,7 @@ use crate::{
     Cpu,
     InterruptConfigurable,
 };
-// only include sleep where its been implemented
+// only include sleep where it's been implemented
 #[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
 pub mod sleep;
 
@@ -104,7 +104,34 @@ pub mod sleep;
 pub(crate) mod rtc;
 
 #[cfg(any(esp32c6, esp32h2))]
-pub use rtc::RtcClock;
+unsafe fn lp_aon<'a>() -> &'a <LP_AON as core::ops::Deref>::Target {
+    &*LP_AON::PTR
+}
+
+#[cfg(not(any(esp32c6, esp32h2)))]
+unsafe fn lp_aon<'a>() -> &'a <LPWR as core::ops::Deref>::Target {
+    &*LPWR::PTR
+}
+
+#[cfg(any(esp32c6, esp32h2))]
+unsafe fn lp_timer<'a>() -> &'a <LP_TIMER as core::ops::Deref>::Target {
+    &*LP_TIMER::PTR
+}
+
+#[cfg(not(any(esp32c6, esp32h2)))]
+unsafe fn lp_timer<'a>() -> &'a <LPWR as core::ops::Deref>::Target {
+    &*LPWR::PTR
+}
+
+#[cfg(any(esp32c6, esp32h2))]
+unsafe fn lp_wdt<'a>() -> &'a <LP_WDT as core::ops::Deref>::Target {
+    &*LP_WDT::PTR
+}
+
+#[cfg(not(any(esp32c6, esp32h2)))]
+unsafe fn lp_wdt<'a>() -> &'a <LPWR as core::ops::Deref>::Target {
+    &*LPWR::PTR
+}
 
 #[cfg(not(any(esp32c6, esp32h2)))]
 #[allow(unused)]
@@ -216,10 +243,7 @@ impl<'d> Rtc<'d> {
 
     /// Get the time since boot in the raw register units.
     fn time_since_boot_raw(&self) -> u64 {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::ptr() };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_TIMER::ptr() };
+        let rtc_cntl = unsafe { lp_timer() };
 
         #[cfg(esp32)]
         let (l, h) = {
@@ -278,10 +302,7 @@ impl<'d> Rtc<'d> {
 
         // For registers and peripherals used in esp-idf, see https://github.com/search?q=repo%3Aespressif%2Fesp-idf+RTC_BOOT_TIME_LOW_REG+RTC_BOOT_TIME_HIGH_REG+path%3A**%2Frtc.h&type=code
 
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::ptr() };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_AON::ptr() };
+        let rtc_cntl = unsafe { lp_aon() };
 
         let (l, h) = (rtc_cntl.store2(), rtc_cntl.store3());
 
@@ -297,10 +318,7 @@ impl<'d> Rtc<'d> {
         // Please see `boot_time_us` for documentation on registers and peripherals
         // used for certain SOCs.
 
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::ptr() };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_AON::ptr() };
+        let rtc_cntl = unsafe { lp_aon() };
 
         let (l, h) = (rtc_cntl.store2(), rtc_cntl.store3());
 
@@ -402,10 +420,7 @@ impl<'d> Rtc<'d> {
         // ESP32-S3: TRM v1.5 chapter 8.3
         // ESP32-H2: TRM v0.5 chapter 8.2.3
 
-        #[cfg(esp32s3)]
-        let rtc_cntl = unsafe { &*LPWR::ptr() };
-        #[cfg(esp32h2)]
-        let rtc_cntl = unsafe { &*LP_AON::ptr() };
+        let rtc_cntl = unsafe { lp_aon() };
         rtc_cntl
             .store4()
             .modify(|r, w| unsafe { w.bits(r.bits() | 1) });
@@ -435,11 +450,9 @@ impl<'d> InterruptConfigurable for Rtc<'d> {
     }
 }
 
-#[cfg(not(any(esp32c6, esp32h2)))]
 /// RTC Watchdog Timer.
 pub struct RtcClock;
 
-#[cfg(not(any(esp32c6, esp32h2)))]
 /// RTC Watchdog Timer driver.
 impl RtcClock {
     const CAL_FRACT: u32 = 19;
@@ -484,31 +497,32 @@ impl RtcClock {
         }
     }
 
+    pub(crate) fn read_xtal_freq_mhz() -> Option<u32> {
+        let xtal_freq_reg = unsafe { lp_aon() }.store4().read().bits();
+
+        // RTC_XTAL_FREQ is stored as two copies in lower and upper 16-bit halves
+        let xtal_freq = xtal_freq_reg as u16;
+        let xtal_freq_copy = (xtal_freq_reg >> 16) as u16;
+
+        if xtal_freq == xtal_freq_copy && xtal_freq != 0 && xtal_freq != u16::MAX {
+            Some(xtal_freq as u32)
+        } else {
+            None
+        }
+    }
+
     /// Get main XTAL frequency.
     /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the
     /// bootloader, as passed to rtc_clk_init function.
+    #[cfg(not(any(esp32c6, esp32h2)))]
     pub fn get_xtal_freq() -> XtalClock {
-        let xtal_freq_reg = unsafe { &*LPWR::PTR }.store4().read().bits();
-
-        // Values of RTC_XTAL_FREQ_REG and RTC_APB_FREQ_REG are stored as two copies in
-        // lower and upper 16-bit halves. These are the routines to work with such a
-        // representation.
-        let clk_val_is_valid = |val| {
-            (val & 0xffffu32) == ((val >> 16u32) & 0xffffu32) && val != 0u32 && val != u32::MAX
-        };
-        let reg_val_to_clk_val = |val| val & u16::MAX as u32;
-
-        if !clk_val_is_valid(xtal_freq_reg) {
-            return XtalClock::RtcXtalFreq40M;
-        }
-
-        match reg_val_to_clk_val(xtal_freq_reg) {
-            40 => XtalClock::RtcXtalFreq40M,
+        match Self::read_xtal_freq_mhz() {
+            None | Some(40) => XtalClock::RtcXtalFreq40M,
             #[cfg(any(esp32c3, esp32s3))]
-            32 => XtalClock::RtcXtalFreq32M,
+            Some(32) => XtalClock::RtcXtalFreq32M,
             #[cfg(any(esp32, esp32c2))]
-            26 => XtalClock::RtcXtalFreq26M,
-            other => XtalClock::RtcXtalFreqOther(other),
+            Some(26) => XtalClock::RtcXtalFreq26M,
+            Some(other) => XtalClock::RtcXtalFreqOther(other),
         }
     }
 
@@ -709,6 +723,7 @@ impl RtcClock {
     }
 
     /// Measure ratio between XTAL frequency and RTC slow clock frequency.
+    #[cfg(not(any(esp32c6, esp32h2)))]
     fn get_calibration_ratio(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
         let xtal_cycles = RtcClock::calibrate_internal(cal_clk, slowclk_cycles) as u64;
         let ratio = (xtal_cycles << RtcClock::CAL_FRACT) / slowclk_cycles as u64;
@@ -723,6 +738,7 @@ impl RtcClock {
     /// may happen if 32k XTAL is being calibrated, but the oscillator has
     /// not started up (due to incorrect loading capacitance, board design
     /// issue, or lack of 32 XTAL on board).
+    #[cfg(not(any(esp32c6, esp32h2)))]
     fn calibrate(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
         let xtal_freq = RtcClock::get_xtal_freq();
         let xtal_cycles = RtcClock::calibrate_internal(cal_clk, slowclk_cycles) as u64;
@@ -733,6 +749,7 @@ impl RtcClock {
     }
 
     /// Calculate the necessary RTC_SLOW_CLK cycles to complete 1 millisecond.
+    #[cfg(not(any(esp32c6, esp32h2)))]
     fn cycles_to_1ms() -> u16 {
         let period_13q19 = RtcClock::calibrate(
             match RtcClock::get_slow_freq() {
@@ -819,10 +836,7 @@ impl Rwdt {
 
     /// Listen for interrupts.
     pub fn listen(&mut self) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
+        let rtc_cntl = unsafe { lp_wdt() };
 
         self.stg0_action = RwdtStageAction::Interrupt;
 
@@ -840,10 +854,7 @@ impl Rwdt {
 
     /// Stop listening for interrupts.
     pub fn unlisten(&mut self) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
+        let rtc_cntl = unsafe { lp_wdt() };
 
         self.stg0_action = RwdtStageAction::ResetRtc;
 
@@ -861,10 +872,7 @@ impl Rwdt {
 
     /// Clear interrupt.
     pub fn clear_interrupt(&mut self) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
+        let rtc_cntl = unsafe { lp_wdt() };
 
         self.set_write_protection(false);
 
@@ -875,20 +883,14 @@ impl Rwdt {
 
     /// Check if the interrupt is set.
     pub fn is_interrupt_set(&self) -> bool {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
+        let rtc_cntl = unsafe { lp_wdt() };
 
         rtc_cntl.int_st().read().wdt().bit_is_set()
     }
 
     /// Feed the watchdog timer.
     pub fn feed(&mut self) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
+        let rtc_cntl = unsafe { lp_wdt() };
 
         self.set_write_protection(false);
         rtc_cntl.wdtfeed().write(|w| w.wdt_feed().set_bit());
@@ -896,10 +898,7 @@ impl Rwdt {
     }
 
     fn set_write_protection(&mut self, enable: bool) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
+        let rtc_cntl = unsafe { lp_wdt() };
 
         let wkey = if enable { 0u32 } else { 0x50D8_3AA1 };
 
@@ -907,10 +906,7 @@ impl Rwdt {
     }
 
     fn set_enabled(&mut self, enable: bool) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
+        let rtc_cntl = unsafe { lp_wdt() };
 
         self.set_write_protection(false);
 
@@ -923,10 +919,7 @@ impl Rwdt {
 
     /// Configure timeout value in ms.
     pub fn set_timeout(&mut self, timeout: MicrosDurationU64) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
+        let rtc_cntl = unsafe { lp_wdt() };
 
         let timeout_raw = (timeout.to_millis() * (RtcClock::cycles_to_1ms() as u64)) as u32;
         self.set_write_protection(false);
@@ -1018,10 +1011,7 @@ impl Swd {
 
     /// Enable/disable write protection for WDT registers
     fn set_write_protection(&mut self, enable: bool) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
+        let rtc_cntl = unsafe { lp_wdt() };
 
         #[cfg(not(any(esp32c6, esp32h2)))]
         let wkey = if enable { 0u32 } else { 0x8F1D_312A };
@@ -1034,10 +1024,7 @@ impl Swd {
     }
 
     fn set_enabled(&mut self, enable: bool) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
+        let rtc_cntl = unsafe { lp_wdt() };
 
         self.set_write_protection(false);
         rtc_cntl
