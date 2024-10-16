@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `AnyPin` now implements `From<GpioPin<N>>`. (#2326)
 - Added `degrade` function for SPI instances (SPI2, SPI3) to obtain `AnySpi`. (#2334)
+- Added `degrade` function for TWAI instances (TWAI0, TWAI1) to obtain `AnyTwai`. (#?)
 
 - `Pins::steal()` to unsafely obtain GPIO. (#2335)
 - `TwaiConfiguration::into_async` (#?)
@@ -19,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Peripheral type erasure for SPI (#2334)
+- Peripheral type erasure for TWAI (#?)
 
 ### Fixed
 

@@ -37,7 +37,6 @@ use esp_backtrace as _;
 use esp_hal::{
     gpio::Io,
     interrupt,
-    peripherals::{self, TWAI0},
     timer::timg::TimerGroup,
     twai::{self, EspTwaiFrame, StandardId, TwaiMode, TwaiRx, TwaiTx},
 };
@@ -47,10 +46,7 @@ use static_cell::StaticCell;
 type TwaiOutbox = Channel<NoopRawMutex, EspTwaiFrame, 16>;
 
 #[embassy_executor::task]
-async fn receiver(
-    mut rx: TwaiRx<'static, esp_hal::Async, TWAI0>,
-    channel: &'static TwaiOutbox,
-) -> ! {
+async fn receiver(mut rx: TwaiRx<'static, esp_hal::Async>, channel: &'static TwaiOutbox) -> ! {
     loop {
         let frame = rx.receive_async().await;
 
@@ -72,10 +68,7 @@ async fn receiver(
 }
 
 #[embassy_executor::task]
-async fn transmitter(
-    mut tx: TwaiTx<'static, TWAI0, esp_hal::Async>,
-    channel: &'static TwaiOutbox,
-) -> ! {
+async fn transmitter(mut tx: TwaiTx<'static, esp_hal::Async>, channel: &'static TwaiOutbox) -> ! {
     loop {
         let frame = channel.receive().await;
         let result = tx.transmit_async(&frame).await;
@@ -141,12 +134,6 @@ async fn main(spawner: Spawner) {
 
     // Get separate transmit and receive halves of the peripheral.
     let (rx, tx) = twai.split();
-
-    interrupt::enable(
-        peripherals::Interrupt::TWAI0,
-        interrupt::Priority::Priority1,
-    )
-    .unwrap();
 
     static CHANNEL: StaticCell<TwaiOutbox> = StaticCell::new();
     let channel = &*CHANNEL.init(Channel::new());
