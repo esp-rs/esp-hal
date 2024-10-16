@@ -2624,7 +2624,7 @@ pub(crate) mod asynch {
     }
 
     #[cfg(any(i2s0, i2s1))]
-    impl<'a, TX> core::future::Future for DmaTxDoneChFuture<'a, TX>
+    impl<TX> core::future::Future for DmaTxDoneChFuture<'_, TX>
     where
         TX: Tx,
     {
@@ -2658,7 +2658,7 @@ pub(crate) mod asynch {
     }
 
     #[cfg(any(i2s0, i2s1))]
-    impl<'a, TX> Drop for DmaTxDoneChFuture<'a, TX>
+    impl<TX> Drop for DmaTxDoneChFuture<'_, TX>
     where
         TX: Tx,
     {
@@ -2688,7 +2688,7 @@ pub(crate) mod asynch {
     }
 
     #[cfg(any(i2s0, i2s1))]
-    impl<'a, RX> core::future::Future for DmaRxDoneChFuture<'a, RX>
+    impl<RX> core::future::Future for DmaRxDoneChFuture<'_, RX>
     where
         RX: Rx,
     {
@@ -2726,7 +2726,7 @@ pub(crate) mod asynch {
     }
 
     #[cfg(any(i2s0, i2s1))]
-    impl<'a, RX> Drop for DmaRxDoneChFuture<'a, RX>
+    impl<RX> Drop for DmaRxDoneChFuture<'_, RX>
     where
         RX: Rx,
     {
