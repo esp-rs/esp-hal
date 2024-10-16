@@ -1706,6 +1706,10 @@ where
         self.rx_impl
             .set_burst_mode(self.burst_mode && preparation.is_burstable);
 
+        if let Some(check_owner) = preparation.check_owner {
+            self.rx_impl.set_check_owner(check_owner);
+        }
+
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
         self.rx_impl.clear_all();
@@ -1924,6 +1928,10 @@ where
         self.tx_impl
             .set_burst_mode(self.burst_mode && preparation.is_burstable);
 
+        if let Some(check_owner) = preparation.check_owner {
+            self.tx_impl.set_check_owner(check_owner);
+        }
+
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
         self.tx_impl.clear_all();
@@ -2016,6 +2024,10 @@ pub trait RegisterAccess: crate::private::Sealed {
 
     /// Mount a new descriptor.
     fn restart(&self);
+
+    /// Configure the bit to enable checking the owner attribute of the
+    /// descriptor.
+    fn set_check_owner(&self, check_owner: bool);
 
     #[cfg(esp32s3)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
