@@ -78,6 +78,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
     private,
+    spi::AnySpi,
     system::PeripheralClockControl,
 };
 
@@ -86,17 +87,14 @@ const MAX_DMA_SIZE: usize = 32768 - 32;
 /// SPI peripheral driver.
 ///
 /// See the [module-level documentation][self] for more details.
-pub struct Spi<'d, T, M> {
+pub struct Spi<'d, M, T = AnySpi> {
     spi: PeripheralRef<'d, T>,
     #[allow(dead_code)]
     data_mode: SpiMode,
     _mode: PhantomData<M>,
 }
 
-impl<'d, T> Spi<'d, T, FullDuplexMode>
-where
-    T: Instance,
-{
+impl<'d> Spi<'d, FullDuplexMode> {
     /// Constructs an SPI instance in 8bit dataframe mode.
     pub fn new<
         SCK: PeripheralInput,
@@ -104,42 +102,68 @@ where
         MISO: PeripheralOutput,
         CS: PeripheralInput,
     >(
-        spi: impl Peripheral<P = T> + 'd,
+        spi: impl Peripheral<P = impl Into<AnySpi> + 'd> + 'd,
         sclk: impl Peripheral<P = SCK> + 'd,
         mosi: impl Peripheral<P = MOSI> + 'd,
         miso: impl Peripheral<P = MISO> + 'd,
         cs: impl Peripheral<P = CS> + 'd,
         mode: SpiMode,
-    ) -> Spi<'d, T, FullDuplexMode> {
-        crate::into_ref!(spi, sclk, mosi, miso, cs);
+    ) -> Spi<'d, FullDuplexMode> {
+        Self::new_typed(spi, sclk, mosi, miso, cs, mode)
+    }
+}
 
+impl<'d, T> Spi<'d, FullDuplexMode, T>
+where
+    T: Instance,
+{
+    /// Constructs an SPI instance in 8bit dataframe mode.
+    pub fn new_typed<
+        SCK: PeripheralInput,
+        MOSI: PeripheralInput,
+        MISO: PeripheralOutput,
+        CS: PeripheralInput,
+    >(
+        spi: impl Peripheral<P = impl Into<T> + 'd> + 'd,
+        sclk: impl Peripheral<P = SCK> + 'd,
+        mosi: impl Peripheral<P = MOSI> + 'd,
+        miso: impl Peripheral<P = MISO> + 'd,
+        cs: impl Peripheral<P = CS> + 'd,
+        mode: SpiMode,
+    ) -> Spi<'d, FullDuplexMode, T> {
+        crate::into_ref!(sclk, mosi, miso, cs);
+
+        let this = Self::new_internal(spi, mode);
+
+        // TODO: with_pins et. al.
         sclk.enable_input(true, private::Internal);
-        sclk.connect_input_to_peripheral(spi.sclk_signal(), private::Internal);
+        sclk.connect_input_to_peripheral(this.spi.sclk_signal(), private::Internal);
 
         mosi.enable_input(true, private::Internal);
-        mosi.connect_input_to_peripheral(spi.mosi_signal(), private::Internal);
+        mosi.connect_input_to_peripheral(this.spi.mosi_signal(), private::Internal);
 
         miso.set_to_push_pull_output(private::Internal);
-        miso.connect_peripheral_to_output(spi.miso_signal(), private::Internal);
+        miso.connect_peripheral_to_output(this.spi.miso_signal(), private::Internal);
 
         cs.enable_input(true, private::Internal);
-        cs.connect_input_to_peripheral(spi.cs_signal(), private::Internal);
+        cs.connect_input_to_peripheral(this.spi.cs_signal(), private::Internal);
 
-        Self::new_internal(spi, mode)
+        this
     }
 
     pub(crate) fn new_internal(
-        spi: PeripheralRef<'d, T>,
+        spi: impl Peripheral<P = impl Into<T> + 'd> + 'd,
         mode: SpiMode,
-    ) -> Spi<'d, T, FullDuplexMode> {
-        spi.reset_peripheral();
-        spi.enable_peripheral();
+    ) -> Spi<'d, FullDuplexMode, T> {
+        crate::into_ref!(spi);
 
         let mut spi = Spi {
-            spi,
+            spi: spi.map_into(),
             data_mode: mode,
             _mode: PhantomData,
         };
+        spi.spi.reset_peripheral();
+        spi.spi.enable_peripheral();
         spi.spi.init();
         spi.spi.set_data_mode(mode, false);
 
@@ -169,7 +193,7 @@ pub mod dma {
         Mode,
     };
 
-    impl<'d, T> Spi<'d, T, FullDuplexMode>
+    impl<'d, T> Spi<'d, FullDuplexMode, T>
     where
         T: InstanceDma,
     {
@@ -181,7 +205,7 @@ pub mod dma {
             channel: Channel<'d, CH, DmaMode>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> SpiDma<'d, T, DmaMode>
+        ) -> SpiDma<'d, DmaMode, T>
         where
             CH: DmaChannelConvert<T::Dma>,
             DmaMode: Mode,
@@ -192,7 +216,7 @@ pub mod dma {
     }
 
     /// A DMA capable SPI instance.
-    pub struct SpiDma<'d, T, DmaMode>
+    pub struct SpiDma<'d, DmaMode, T = AnySpi>
     where
         T: InstanceDma,
         DmaMode: Mode,
@@ -203,7 +227,7 @@ pub mod dma {
         tx_chain: DescriptorChain,
     }
 
-    impl<'d, T, DmaMode> core::fmt::Debug for SpiDma<'d, T, DmaMode>
+    impl<'d, DmaMode, T> core::fmt::Debug for SpiDma<'d, DmaMode, T>
     where
         T: InstanceDma,
         DmaMode: Mode,
@@ -213,7 +237,7 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, DmaMode> DmaSupport for SpiDma<'d, T, DmaMode>
+    impl<'d, DmaMode, T> DmaSupport for SpiDma<'d, DmaMode, T>
     where
         T: InstanceDma,
         DmaMode: Mode,
@@ -232,7 +256,7 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, DmaMode> DmaSupportTx for SpiDma<'d, T, DmaMode>
+    impl<'d, DmaMode, T> DmaSupportTx for SpiDma<'d, DmaMode, T>
     where
         T: InstanceDma,
         DmaMode: Mode,
@@ -248,7 +272,7 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, DmaMode> DmaSupportRx for SpiDma<'d, T, DmaMode>
+    impl<'d, DmaMode, T> DmaSupportRx for SpiDma<'d, DmaMode, T>
     where
         T: InstanceDma,
         DmaMode: Mode,
@@ -264,7 +288,7 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, DmaMode> SpiDma<'d, T, DmaMode>
+    impl<'d, DmaMode, T> SpiDma<'d, DmaMode, T>
     where
         T: InstanceDma,
         DmaMode: Mode,
@@ -566,8 +590,6 @@ pub trait Instance: private::Sealed + PeripheralMarker {
         PeripheralClockControl::enable(self.peripheral());
     }
 
-    fn spi_num(&self) -> u8;
-
     #[cfg(esp32)]
     fn prepare_length_and_lines(&self, rx_len: usize, tx_len: usize) {
         let reg_block = self.register_block();
@@ -729,11 +751,6 @@ impl Instance for crate::peripherals::SPI2 {
     }
 
     #[inline(always)]
-    fn spi_num(&self) -> u8 {
-        2
-    }
-
-    #[inline(always)]
     fn sclk_signal(&self) -> InputSignal {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
@@ -786,11 +803,6 @@ impl Instance for crate::peripherals::SPI3 {
     }
 
     #[inline(always)]
-    fn spi_num(&self) -> u8 {
-        3
-    }
-
-    #[inline(always)]
     fn sclk_signal(&self) -> InputSignal {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
@@ -834,3 +846,21 @@ impl Instance for crate::peripherals::SPI3 {
         }
     }
 }
+
+impl Instance for super::AnySpi {
+    delegate::delegate! {
+        to match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi,
+            #[cfg(spi3)]
+            super::AnySpiInner::Spi3(spi) => spi,
+        } {
+            fn register_block(&self) -> &RegisterBlock;
+            fn sclk_signal(&self) -> InputSignal;
+            fn mosi_signal(&self) -> InputSignal;
+            fn miso_signal(&self) -> OutputSignal;
+            fn cs_signal(&self) -> InputSignal;
+        }
+    }
+}
+
+impl InstanceDma for super::AnySpi {}
