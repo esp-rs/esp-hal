@@ -49,7 +49,7 @@ macro_rules! check_error {
     };
 }
 
-/// Common errors that can occur with `ESP-NOW`.
+/// Internal errors that can occur with ESP-NOW.
 #[repr(u32)]
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -90,8 +90,8 @@ impl Error {
             12390 => Error::InvalidArgument,
             12391 => Error::OutOfMemory,
             12392 => Error::PeerListFull,
-            12393 => Error::UnknownPeer,
-            12394 => Error::NotFound,
+            12393 => Error::NotFound,
+            12394 => Error::InternalError,
             12395 => Error::PeerExists,
             12396 => Error::InterfaceError,
             _ => Error::Other(code),
@@ -99,6 +99,7 @@ impl Error {
     }
 }
 
+/// Common errors that can occur while using ESP-NOW driver.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EspNowError {
@@ -228,6 +229,8 @@ pub struct ReceiveInfo {
     pub rx_control: RxControlInfo,
 }
 
+/// Stores information about the received data, including the packet content and
+/// associated information.
 #[derive(Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ReceivedData {
@@ -608,7 +611,7 @@ pub struct EspNow<'d> {
 }
 
 impl<'d> EspNow<'d> {
-    /// TODO
+    /// Creates an `EspNow` instance.
     pub fn new(
         inited: &EspWifiInitialization,
         device: impl Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
@@ -616,7 +619,7 @@ impl<'d> EspNow<'d> {
         EspNow::new_internal(inited, Some(device.into_ref()))
     }
 
-    /// TODO
+    /// Creates an `EspNow` instance with support for Wi-Fi coexistence.
     pub fn new_with_wifi(
         inited: &EspWifiInitialization,
         _token: EspNowWithWifiCreateToken,

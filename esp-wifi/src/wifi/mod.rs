@@ -633,6 +633,7 @@ impl Configuration {
     }
 }
 
+/// IPv4 network configurations.
 pub mod ipv4 {
     pub use core::net::Ipv4Addr;
     use core::{fmt::Display, str::FromStr};
@@ -2135,9 +2136,12 @@ mod sealed {
 
 use sealed::*;
 
+/// Provides methods for retrieving the Wi-Fi mode and MAC address.
 pub trait WifiDeviceMode: Sealed {
+    /// Returns the Wi-Fi mode (e.g., Station, Access Point).
     fn mode(self) -> WifiMode;
 
+    /// Returns the MAC address of the Wi-Fi device.
     fn mac_address(self) -> [u8; 6];
 }
 
