@@ -1052,6 +1052,17 @@ where
     ) -> Self {
         Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, true, mode)
     }
+
+    /// Convert the configuration into an async configuration.
+    pub fn into_async(self) -> TwaiConfiguration<'d, crate::Async, T> {
+        let mut this = TwaiConfiguration {
+            twai: self.twai,
+            phantom: PhantomData,
+            mode: self.mode,
+        };
+        this.internal_set_interrupt_handler(this.twai.async_handler());
+        this
+    }
 }
 
 impl<T> crate::private::Sealed for TwaiConfiguration<'_, crate::Blocking, T> where T: Instance {}
@@ -1062,43 +1073,6 @@ where
 {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         self.internal_set_interrupt_handler(handler);
-    }
-}
-
-impl<'d, T> TwaiConfiguration<'d, crate::Async, T>
-where
-    T: Instance,
-{
-    /// Create a new instance of [TwaiConfiguration] in async mode
-    ///
-    /// You will need to use a transceiver to connect to the TWAI bus
-    pub fn new_async<RX: PeripheralInput, TX: PeripheralOutput>(
-        peripheral: impl Peripheral<P = T> + 'd,
-        rx_pin: impl Peripheral<P = RX> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
-        baud_rate: BaudRate,
-        mode: TwaiMode,
-    ) -> Self {
-        let mut this = Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, false, mode);
-        this.internal_set_interrupt_handler(this.twai.async_handler());
-        this
-    }
-
-    /// Create a new instance of [TwaiConfiguration] meant to connect two ESP32s
-    /// directly in async mode
-    ///
-    /// You don't need a transceiver by following the description in the
-    /// `twai.rs` example
-    pub fn new_async_no_transceiver<RX: PeripheralInput, TX: PeripheralOutput>(
-        peripheral: impl Peripheral<P = T> + 'd,
-        rx_pin: impl Peripheral<P = RX> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
-        baud_rate: BaudRate,
-        mode: TwaiMode,
-    ) -> Self {
-        let mut this = Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, true, mode);
-        this.internal_set_interrupt_handler(this.twai.async_handler());
-        this
     }
 }
 
