@@ -138,7 +138,7 @@ impl<const NUM: u8> crate::peripheral::Peripheral for SoftwareInterrupt<NUM> {
     type P = SoftwareInterrupt<NUM>;
 
     #[inline]
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
+    unsafe fn clone_unchecked(&self) -> Self::P {
         Self::steal()
     }
 }
