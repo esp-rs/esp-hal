@@ -1545,12 +1545,6 @@ mod private {
         }
     }
 
-    impl PeripheralMarker for I2S0 {
-        fn peripheral(&self) -> crate::system::Peripheral {
-            crate::system::Peripheral::I2s0
-        }
-    }
-
     impl RegBlock for I2S0 {
         fn register_block(&self) -> &RegisterBlock {
             unsafe { &*I2S0::PTR.cast::<RegisterBlock>() }
@@ -1647,13 +1641,6 @@ mod private {
                     InputSignal::I2SI_SD
                 }
             }
-        }
-    }
-
-    #[cfg(i2s1)]
-    impl PeripheralMarker for I2S1 {
-        fn peripheral(&self) -> crate::system::Peripheral {
-            crate::system::Peripheral::I2s1
         }
     }
 
