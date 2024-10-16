@@ -1382,7 +1382,7 @@ macro_rules! touch {
     (
         $(
             (
-                $touch_num:literal, $pin_num:literal, $rtc_pin:literal, $touch_out_reg:expr, $meas_field: expr, $touch_thres_reg:expr, $touch_thres_field:expr, $normal_pin:literal
+                $touch_num:literal, $pin_num:literal, $rtc_pin:literal, $touch_out_reg:ident, $meas_field:ident, $touch_thres_reg:ident, $touch_thres_field:ident, $normal_pin:tt
             )
         )+
     ) => {
@@ -1402,33 +1402,30 @@ macro_rules! touch {
                 rtcio
                     .enable_w1tc()
                     .write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
-                paste::paste! {
-                    sens . $touch_thres_reg ()
-                        .write(|w| unsafe {
-                            w. $touch_thres_field ().bits(
-                                0b0 // Default: 0 for esp32 gets overridden later anyway.
-                            )
-                        });
 
-                    $crate::touch!( @pin_specific $touch_num, $normal_pin );
-
-                    // enable the pin
-                    sens.sar_touch_enable().modify(|r, w| unsafe {
-                        w.touch_pad_worken().bits(
-                            r.touch_pad_worken().bits() | ( 1 << [< $touch_num >] )
+                sens . $touch_thres_reg ()
+                    .write(|w| unsafe {
+                        w. $touch_thres_field ().bits(
+                            0b0 // Default: 0 for esp32 gets overridden later anyway.
                         )
                     });
-                }
+
+                $crate::touch!( @pin_specific $touch_num, $normal_pin );
+
+                // enable the pin
+                sens.sar_touch_enable().modify(|r, w| unsafe {
+                    w.touch_pad_worken().bits(
+                        r.touch_pad_worken().bits() | ( 1 << $touch_num )
+                    )
+                });
             }
 
             fn get_touch_measurement_impl(&self, _: $crate::private::Internal) -> u16 {
-                paste::paste! {
-                    unsafe { $crate::peripherals::SENS::steal() }
-                        . $touch_out_reg ()
-                        .read()
-                        . $meas_field ()
-                        .bits()
-                }
+                unsafe { $crate::peripherals::SENS::steal() }
+                    . $touch_out_reg ()
+                    .read()
+                    . $meas_field ()
+                    .bits()
             }
 
             fn get_touch_nr_impl(&self, _: $crate::private::Internal) -> u8 {
@@ -1436,13 +1433,11 @@ macro_rules! touch {
             }
 
             fn set_threshold_impl(&self, threshold: u16, _: $crate::private::Internal) {
-                paste::paste! {
-                    unsafe { $crate::peripherals::SENS::steal() }
-                        . $touch_thres_reg ()
-                        .write(|w| unsafe {
-                            w. $touch_thres_field ().bits(threshold)
-                        });
-                }
+                unsafe { $crate::peripherals::SENS::steal() }
+                    . $touch_thres_reg ()
+                    .write(|w| unsafe {
+                        w. $touch_thres_field ().bits(threshold)
+                    });
             }
         })+
     };
