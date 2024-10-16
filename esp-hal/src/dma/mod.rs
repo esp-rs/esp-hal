@@ -1703,10 +1703,8 @@ where
     ) -> Result<(), DmaError> {
         let preparation = buffer.prepare();
 
-        // TODO: Get burst mode from DmaBuf.
-        if self.burst_mode {
-            return Err(DmaError::InvalidAlignment);
-        }
+        self.rx_impl
+            .set_burst_mode(self.burst_mode && preparation.is_burstable);
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
@@ -1916,13 +1914,15 @@ where
                     self.set_ext_mem_block_size(block_size.into());
                 }
             } else {
-                // we insure that block_size is some only for PSRAM addresses
+                // we ensure that block_size is some only for PSRAM addresses
                 if preparation.block_size.is_some() {
                     return Err(DmaError::UnsupportedMemoryRegion);
                 }
             }
         );
-        // TODO: Get burst mode from DmaBuf.
+
+        self.tx_impl
+            .set_burst_mode(self.burst_mode && preparation.is_burstable);
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
