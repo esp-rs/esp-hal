@@ -271,7 +271,8 @@ pub trait RtcPin: Pin {
     #[cfg(xtensa)]
     fn rtc_number(&self) -> u8;
 
-    /// Configure the pin
+    /// Set the RTC properties of the pin. If `mux` is true then then pin is
+    /// routed to RTC, when false it is routed to IO_MUX.
     #[cfg(any(xtensa, esp32c6))]
     fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: RtcFunction);
 
@@ -964,8 +965,6 @@ macro_rules! io_type {
                 self.rtc_number_impl()
             }
 
-            /// Set the RTC properties of the pin. If `mux` is true then then pin is
-            /// routed to RTC, when false it is routed to IO_MUX.
             #[cfg(any(xtensa, esp32c6))]
             fn rtc_set_config(
                 &mut self,
