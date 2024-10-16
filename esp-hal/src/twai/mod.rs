@@ -1769,23 +1769,23 @@ mod asynch {
                 self.twai.async_state().err_waker.register(cx.waker());
 
                 if let Poll::Ready(result) = self.twai.async_state().rx_queue.poll_receive(cx) {
-                    Poll::Ready(result)
-                } else {
-                    let register_block = self.twai.register_block();
-                    let status = register_block.status().read();
-
-                    // Check that the peripheral is not in a bus off state.
-                    if status.bus_off_st().bit_is_set() {
-                        return Poll::Ready(Err(EspTwaiError::BusOff));
-                    }
-
-                    // Check if the packet in the receive buffer is valid or overrun.
-                    if status.miss_st().bit_is_set() {
-                        return Poll::Ready(Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun)));
-                    }
-
-                    Poll::Pending
+                    return Poll::Ready(result);
                 }
+
+                let register_block = self.twai.register_block();
+                let status = register_block.status().read();
+
+                // Check that the peripheral is not in a bus off state.
+                if status.bus_off_st().bit_is_set() {
+                    return Poll::Ready(Err(EspTwaiError::BusOff));
+                }
+
+                // Check if the packet in the receive buffer is valid or overrun.
+                if status.miss_st().bit_is_set() {
+                    return Poll::Ready(Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun)));
+                }
+
+                Poll::Pending
             })
             .await
         }
