@@ -410,6 +410,8 @@ impl<'d> Rtc<'d> {
         config.finish_sleep();
     }
 
+    const RTC_DISABLE_ROM_LOG: u32 = 1;
+
     /// Temporarily disable log messages of the ROM bootloader.
     ///
     /// If you need to permanently disable the ROM bootloader messages, you'll
@@ -423,7 +425,7 @@ impl<'d> Rtc<'d> {
         let rtc_cntl = unsafe { lp_aon() };
         rtc_cntl
             .store4()
-            .modify(|r, w| unsafe { w.bits(r.bits() | 1) });
+            .modify(|r, w| unsafe { w.bits(r.bits() | Self::RTC_DISABLE_ROM_LOG) });
     }
 }
 impl<'d> crate::private::Sealed for Rtc<'d> {}
@@ -501,7 +503,9 @@ impl RtcClock {
         let xtal_freq_reg = unsafe { lp_aon() }.store4().read().bits();
 
         // RTC_XTAL_FREQ is stored as two copies in lower and upper 16-bit halves
-        let xtal_freq = xtal_freq_reg as u16;
+        // need to mask out the RTC_DISABLE_ROM_LOG bit which is also stored in the same
+        // register
+        let xtal_freq = (xtal_freq_reg & !Rtc::RTC_DISABLE_ROM_LOG) as u16;
         let xtal_freq_copy = (xtal_freq_reg >> 16) as u16;
 
         if xtal_freq == xtal_freq_copy && xtal_freq != 0 && xtal_freq != u16::MAX {
