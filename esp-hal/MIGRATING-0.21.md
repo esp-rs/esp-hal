@@ -23,6 +23,26 @@ For example:
  }
 ```
 
+## Removed `async`-specific constructors
+
+The following async-specific constuctors have been removed:
+
+- `TwaiConfiguration::new_async` and `TwaiConfiguration::new_async_no_transceiver`
+
+You can use the blocking counterparts, then call `into_async` on the returned peripheral instead.
+
+```diff
+-let mut config = twai::TwaiConfiguration::new_async(
++let mut config = twai::TwaiConfiguration::new(
+     peripherals.TWAI0,
+     loopback_pin.peripheral_input(),
+     loopback_pin,
+     twai::BaudRate::B1000K,
+     TwaiMode::SelfTest,
+-);
++).into_async();
+```
+
 ## Peripheral types are now optional
 
 You no longer have to specify the peripheral instance in the driver's type for the following
