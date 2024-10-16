@@ -24,6 +24,8 @@ pub struct Preparation {
     /// sizes that are a multiple of 4 (word aligned).
     pub(super) is_burstable: bool,
 
+    /// Configures the "check owner" feature of the DMA channel.
+    ///
     /// Most DMA channels allow software to configure whether the hardware
     /// checks that [DmaDescriptor::owner] is set to [Owner::Dma] before
     /// consuming the descriptor. If this check fails, the channel stops
@@ -31,6 +33,9 @@ pub struct Preparation {
     /// [DmaRxInterrupt::DescriptorError]/[DmaTxInterrupt::DescriptorError].
     ///
     /// This field allows buffer implementation to configure this behaviour.
+    /// - `Some(true)`: DMA channel must check the owner bit.
+    /// - `Some(false)`: DMA channel must NOT check the owner bit.
+    /// - `None`: DMA channel can operate in any mode it supports.
     ///
     /// Some buffer implementations may require that the DMA channel performs
     /// this check before consuming the descriptor to ensure correct
@@ -46,7 +51,6 @@ pub struct Preparation {
     /// Note: If the DMA channel doesn't support the provided option,
     /// preparation will fail.
     pub(super) check_owner: Option<bool>,
-    // burst_mode, alignment, etc.
 }
 
 /// [DmaTxBuffer] is a DMA descriptor + memory combo that can be used for
