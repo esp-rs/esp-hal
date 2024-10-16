@@ -131,7 +131,12 @@ use core::marker::PhantomData;
 use self::config::Config;
 use crate::{
     clock::Clocks,
-    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
+    gpio::{
+        interconnect::{PeripheralInput, PeripheralOutput},
+        InputSignal,
+        OutputSignal,
+        Pull,
+    },
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{uart0::RegisterBlock, Interrupt},
@@ -451,16 +456,18 @@ where
         }
     }
 
-    fn with_rx<RX: PeripheralInput>(self, rx: impl Peripheral<P = RX> + 'd) -> Self {
+    fn with_rx(self, rx: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_ref!(rx);
+        let mut rx = rx.map_into();
         rx.init_input(Pull::Up, Internal);
         rx.connect_input_to_peripheral(T::rx_signal(), Internal);
 
         self
     }
 
-    fn with_tx<TX: PeripheralOutput>(self, tx: impl Peripheral<P = TX> + 'd) -> Self {
+    fn with_tx(self, tx: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_ref!(tx);
+        let mut tx = tx.map_into();
         // Make sure we don't cause an unexpected low pulse on the pin.
         tx.set_output_high(true, Internal);
         tx.set_to_push_pull_output(Internal);
@@ -538,8 +545,9 @@ where
     }
 
     /// Configure RTS pin
-    pub fn with_rts<RTS: PeripheralOutput>(self, rts: impl Peripheral<P = RTS> + 'd) -> Self {
+    pub fn with_rts(self, rts: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_ref!(rts);
+        let mut rts = rts.map_into();
         rts.set_to_push_pull_output(Internal);
         rts.connect_peripheral_to_output(T::rts_signal(), Internal);
 
@@ -583,19 +591,19 @@ where
     T: Instance + 'd,
 {
     /// Create a new UART TX instance in [`Blocking`] mode.
-    pub fn new<TX: PeripheralOutput>(
+    pub fn new(
         uart: impl Peripheral<P = T> + 'd,
-        tx: impl Peripheral<P = TX> + 'd,
+        tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Result<Self, Error> {
         Self::new_with_config(uart, Default::default(), tx)
     }
 
     /// Create a new UART TX instance with configuration options in
     /// [`Blocking`] mode.
-    pub fn new_with_config<TX: PeripheralOutput>(
+    pub fn new_with_config(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        tx: impl Peripheral<P = TX> + 'd,
+        tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Result<Self, Error> {
         let (_, uart_tx) = UartBuilder::<'d, T, Blocking>::new(uart)
             .with_tx(tx)
@@ -622,8 +630,9 @@ where
     }
 
     /// Configure CTS pin
-    pub fn with_cts<CTS: PeripheralInput>(self, cts: impl Peripheral<P = CTS> + 'd) -> Self {
+    pub fn with_cts(self, cts: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_ref!(cts);
+        let mut cts = cts.map_into();
         cts.init_input(Pull::None, Internal);
         cts.connect_input_to_peripheral(T::cts_signal(), Internal);
 
@@ -796,19 +805,19 @@ where
     T: Instance + 'd,
 {
     /// Create a new UART RX instance in [`Blocking`] mode.
-    pub fn new<RX: PeripheralInput>(
+    pub fn new(
         uart: impl Peripheral<P = T> + 'd,
-        rx: impl Peripheral<P = RX> + 'd,
+        rx: impl Peripheral<P = impl PeripheralInput> + 'd,
     ) -> Result<Self, Error> {
         Self::new_with_config(uart, Default::default(), rx)
     }
 
     /// Create a new UART RX instance with configuration options in
     /// [`Blocking`] mode.
-    pub fn new_with_config<RX: PeripheralInput>(
+    pub fn new_with_config(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        rx: impl Peripheral<P = RX> + 'd,
+        rx: impl Peripheral<P = impl PeripheralInput> + 'd,
     ) -> Result<Self, Error> {
         let (uart_rx, _) = UartBuilder::new(uart).with_rx(rx).init(config)?.split();
 
@@ -822,11 +831,11 @@ where
 {
     /// Create a new UART instance with configuration options in [`Blocking`]
     /// mode.
-    pub fn new_with_config<TX: PeripheralOutput, RX: PeripheralInput>(
+    pub fn new_with_config(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        rx: impl Peripheral<P = RX> + 'd,
-        tx: impl Peripheral<P = TX> + 'd,
+        rx: impl Peripheral<P = impl PeripheralInput> + 'd,
+        tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Result<Self, Error> {
         let this = UartBuilder::new(uart)
             .with_tx(tx)
@@ -837,10 +846,10 @@ where
     }
 
     /// Create a new UART instance with defaults in [`Blocking`] mode.
-    pub fn new<TX: PeripheralOutput, RX: PeripheralInput>(
+    pub fn new(
         uart: impl Peripheral<P = T> + 'd,
-        rx: impl Peripheral<P = RX> + 'd,
-        tx: impl Peripheral<P = TX> + 'd,
+        rx: impl Peripheral<P = impl PeripheralInput> + 'd,
+        tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Result<Self, Error> {
         Self::new_with_config(uart, Default::default(), rx, tx)
     }
@@ -859,8 +868,9 @@ where
     }
 
     /// Configure CTS pin
-    pub fn with_cts<CTS: PeripheralInput>(self, cts: impl Peripheral<P = CTS> + 'd) -> Self {
+    pub fn with_cts(self, cts: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_ref!(cts);
+        let mut cts = cts.map_into();
         cts.init_input(Pull::None, Internal);
         cts.connect_input_to_peripheral(T::cts_signal(), Internal);
 
@@ -868,8 +878,9 @@ where
     }
 
     /// Configure RTS pin
-    pub fn with_rts<RTS: PeripheralOutput>(self, rts: impl Peripheral<P = RTS> + 'd) -> Self {
+    pub fn with_rts(self, rts: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_ref!(rts);
+        let mut rts = rts.map_into();
         rts.set_to_push_pull_output(Internal);
         rts.connect_peripheral_to_output(T::rts_signal(), Internal);
 
@@ -2056,11 +2067,11 @@ mod asynch {
     {
         /// Create a new UART instance with configuration options in [`Async`]
         /// mode.
-        pub fn new_async_with_config<RX: PeripheralInput, TX: PeripheralOutput>(
+        pub fn new_async_with_config(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
-            rx: impl Peripheral<P = RX> + 'd,
-            tx: impl Peripheral<P = TX> + 'd,
+            rx: impl Peripheral<P = impl PeripheralInput> + 'd,
+            tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
         ) -> Result<Self, Error> {
             // FIXME: at the time of writing, the order of the pin assignments matters:
             // first binding RX, then TX makes tests fail. This is bad and needs to be
@@ -2084,10 +2095,10 @@ mod asynch {
         }
 
         /// Create a new UART instance with defaults in [`Async`] mode.
-        pub fn new_async<RX: PeripheralInput, TX: PeripheralOutput>(
+        pub fn new_async(
             uart: impl Peripheral<P = T> + 'd,
-            rx: impl Peripheral<P = RX> + 'd,
-            tx: impl Peripheral<P = TX> + 'd,
+            rx: impl Peripheral<P = impl PeripheralInput> + 'd,
+            tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
         ) -> Result<Self, Error> {
             Self::new_async_with_config(uart, Default::default(), rx, tx)
         }
@@ -2119,19 +2130,19 @@ mod asynch {
         T: Instance + 'd,
     {
         /// Create a new UART TX instance in [`Async`] mode.
-        pub fn new_async<TX: PeripheralOutput>(
+        pub fn new_async(
             uart: impl Peripheral<P = T> + 'd,
-            tx: impl Peripheral<P = TX> + 'd,
+            tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
         ) -> Result<Self, Error> {
             Self::new_async_with_config(uart, Default::default(), tx)
         }
 
         /// Create a new UART TX instance with configuration options in
         /// [`Async`] mode.
-        pub fn new_async_with_config<TX: PeripheralOutput>(
+        pub fn new_async_with_config(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
-            tx: impl Peripheral<P = TX> + 'd,
+            tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
         ) -> Result<Self, Error> {
             let mut uart = UartBuilder::new(uart).with_tx(tx).init(config)?;
 
@@ -2200,19 +2211,19 @@ mod asynch {
         T: Instance + 'd,
     {
         /// Create a new UART RX instance in [`Async`] mode.
-        pub fn new_async<RX: PeripheralInput>(
+        pub fn new_async(
             uart: impl Peripheral<P = T> + 'd,
-            rx: impl Peripheral<P = RX> + 'd,
+            rx: impl Peripheral<P = impl PeripheralInput> + 'd,
         ) -> Result<Self, Error> {
             Self::new_async_with_config(uart, Default::default(), rx)
         }
 
         /// Create a new UART RX instance with configuration options in
         /// [`Async`] mode.
-        pub fn new_async_with_config<RX: PeripheralInput>(
+        pub fn new_async_with_config(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
-            rx: impl Peripheral<P = RX> + 'd,
+            rx: impl Peripheral<P = impl PeripheralInput> + 'd,
         ) -> Result<Self, Error> {
             let mut uart = UartBuilder::new(uart).with_rx(rx).init(config)?;
 
@@ -2436,6 +2447,7 @@ pub mod lp_uart {
             let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
             let lp_aon = unsafe { &*crate::peripherals::LP_AON::PTR };
 
+            // FIXME: use GPIO APIs to configure pins
             lp_aon
                 .gpio_mux()
                 .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | 1 << 4) });
@@ -2443,8 +2455,8 @@ pub mod lp_uart {
                 .gpio_mux()
                 .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | 1 << 5) });
 
-            lp_io.gpio4().modify(|_, w| unsafe { w.mcu_sel().bits(1) });
-            lp_io.gpio5().modify(|_, w| unsafe { w.mcu_sel().bits(1) });
+            lp_io.gpio(4).modify(|_, w| unsafe { w.mcu_sel().bits(1) });
+            lp_io.gpio(5).modify(|_, w| unsafe { w.mcu_sel().bits(1) });
 
             Self::new_with_config(uart, Config::default())
         }

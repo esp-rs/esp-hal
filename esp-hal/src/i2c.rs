@@ -58,7 +58,7 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
+    gpio::{interconnect::PeripheralOutput, InputSignal, OutputSignal, Pull},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::i2c0::{RegisterBlock, COMD},
@@ -488,17 +488,17 @@ impl<'d, T, DM: Mode> I2c<'d, T, DM>
 where
     T: Instance,
 {
-    fn new_internal<
-        SDA: PeripheralOutput + PeripheralInput,
-        SCL: PeripheralOutput + PeripheralInput,
-    >(
+    fn new_internal(
         i2c: impl Peripheral<P = T> + 'd,
-        sda: impl Peripheral<P = SDA> + 'd,
-        scl: impl Peripheral<P = SCL> + 'd,
+        sda: impl crate::peripheral::Peripheral<P = impl PeripheralOutput>,
+        scl: impl crate::peripheral::Peripheral<P = impl PeripheralOutput>,
         frequency: HertzU32,
         timeout: Option<u32>,
     ) -> Self {
         crate::into_ref!(i2c, sda, scl);
+
+        let mut sda = sda.map_into();
+        let mut scl = scl.map_into();
 
         PeripheralClockControl::reset(T::peripheral());
         PeripheralClockControl::enable(T::peripheral());
@@ -564,10 +564,10 @@ where
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new<SDA: PeripheralOutput + PeripheralInput, SCL: PeripheralOutput + PeripheralInput>(
+    pub fn new(
         i2c: impl Peripheral<P = T> + 'd,
-        sda: impl Peripheral<P = SDA> + 'd,
-        scl: impl Peripheral<P = SCL> + 'd,
+        sda: impl crate::peripheral::Peripheral<P = impl PeripheralOutput>,
+        scl: impl crate::peripheral::Peripheral<P = impl PeripheralOutput>,
         frequency: HertzU32,
     ) -> Self {
         Self::new_with_timeout(i2c, sda, scl, frequency, None)
@@ -576,13 +576,10 @@ where
     /// Create a new I2C instance with a custom timeout value.
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new_with_timeout<
-        SDA: PeripheralOutput + PeripheralInput,
-        SCL: PeripheralOutput + PeripheralInput,
-    >(
+    pub fn new_with_timeout(
         i2c: impl Peripheral<P = T> + 'd,
-        sda: impl Peripheral<P = SDA> + 'd,
-        scl: impl Peripheral<P = SCL> + 'd,
+        sda: impl crate::peripheral::Peripheral<P = impl PeripheralOutput>,
+        scl: impl crate::peripheral::Peripheral<P = impl PeripheralOutput>,
         frequency: HertzU32,
         timeout: Option<u32>,
     ) -> Self {
@@ -608,13 +605,10 @@ where
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new_async<
-        SDA: PeripheralOutput + PeripheralInput,
-        SCL: PeripheralOutput + PeripheralInput,
-    >(
+    pub fn new_async(
         i2c: impl Peripheral<P = T> + 'd,
-        sda: impl Peripheral<P = SDA> + 'd,
-        scl: impl Peripheral<P = SCL> + 'd,
+        sda: impl crate::peripheral::Peripheral<P = impl PeripheralOutput>,
+        scl: impl crate::peripheral::Peripheral<P = impl PeripheralOutput>,
         frequency: HertzU32,
     ) -> Self {
         Self::new_with_timeout_async(i2c, sda, scl, frequency, None)
@@ -623,13 +617,10 @@ where
     /// Create a new I2C instance with a custom timeout value.
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new_with_timeout_async<
-        SDA: PeripheralOutput + PeripheralInput,
-        SCL: PeripheralOutput + PeripheralInput,
-    >(
+    pub fn new_with_timeout_async(
         i2c: impl Peripheral<P = T> + 'd,
-        sda: impl Peripheral<P = SDA> + 'd,
-        scl: impl Peripheral<P = SCL> + 'd,
+        sda: impl crate::peripheral::Peripheral<P = impl PeripheralOutput>,
+        scl: impl crate::peripheral::Peripheral<P = impl PeripheralOutput>,
         frequency: HertzU32,
         timeout: Option<u32>,
     ) -> Self {
@@ -2517,48 +2508,49 @@ pub mod lp_i2c {
             let lp_peri = unsafe { &*crate::peripherals::LP_PERI::PTR };
 
             unsafe {
+                // FIXME: use GPIO APIs to configure pins
                 lp_aon
                     .gpio_mux()
                     .modify(|r, w| w.sel().bits(r.sel().bits() | (1 << 6)));
                 lp_aon
                     .gpio_mux()
                     .modify(|r, w| w.sel().bits(r.sel().bits() | (1 << 7)));
-                lp_io.gpio6().modify(|_, w| w.mcu_sel().bits(1)); // TODO
+                lp_io.gpio(6).modify(|_, w| w.mcu_sel().bits(1)); // TODO
 
-                lp_io.gpio7().modify(|_, w| w.mcu_sel().bits(1));
+                lp_io.gpio(7).modify(|_, w| w.mcu_sel().bits(1));
 
                 // Set output mode to Normal
-                lp_io.pin6().modify(|_, w| w.pad_driver().set_bit());
+                lp_io.pin(6).modify(|_, w| w.pad_driver().set_bit());
                 // Enable output (writing to write-1-to-set register, then internally the
                 // `GPIO_OUT_REG` will be set)
                 lp_io
                     .out_enable_w1ts()
                     .write(|w| w.enable_w1ts().bits(1 << 6));
                 // Enable input
-                lp_io.gpio6().modify(|_, w| w.fun_ie().set_bit());
+                lp_io.gpio(6).modify(|_, w| w.fun_ie().set_bit());
 
                 // Disable pulldown (enable internal weak pull-down)
-                lp_io.gpio6().modify(|_, w| w.fun_wpd().clear_bit());
+                lp_io.gpio(6).modify(|_, w| w.fun_wpd().clear_bit());
                 // Enable pullup
-                lp_io.gpio6().modify(|_, w| w.fun_wpu().set_bit());
+                lp_io.gpio(6).modify(|_, w| w.fun_wpu().set_bit());
 
                 // Same process for SCL pin
-                lp_io.pin7().modify(|_, w| w.pad_driver().set_bit());
+                lp_io.pin(7).modify(|_, w| w.pad_driver().set_bit());
                 // Enable output (writing to write-1-to-set register, then internally the
                 // `GPIO_OUT_REG` will be set)
                 lp_io
                     .out_enable_w1ts()
                     .write(|w| w.enable_w1ts().bits(1 << 7));
                 // Enable input
-                lp_io.gpio7().modify(|_, w| w.fun_ie().set_bit());
+                lp_io.gpio(7).modify(|_, w| w.fun_ie().set_bit());
                 // Disable pulldown (enable internal weak pull-down)
-                lp_io.gpio7().modify(|_, w| w.fun_wpd().clear_bit());
+                lp_io.gpio(7).modify(|_, w| w.fun_wpd().clear_bit());
                 // Enable pullup
-                lp_io.gpio7().modify(|_, w| w.fun_wpu().set_bit());
+                lp_io.gpio(7).modify(|_, w| w.fun_wpu().set_bit());
 
                 // Select LP I2C function for the SDA and SCL pins
-                lp_io.gpio6().modify(|_, w| w.mcu_sel().bits(1));
-                lp_io.gpio7().modify(|_, w| w.mcu_sel().bits(1));
+                lp_io.gpio(6).modify(|_, w| w.mcu_sel().bits(1));
+                lp_io.gpio(7).modify(|_, w| w.mcu_sel().bits(1));
             }
 
             // Initialize LP I2C HAL */
@@ -2584,23 +2576,21 @@ pub mod lp_i2c {
             // Initialize LP I2C Master mode
             me.i2c.ctr().modify(|_, w| unsafe {
                 // Clear register
-                w.bits(0)
-                    // Use open drain output for SDA and SCL
-                    .sda_force_out()
-                    .set_bit()
-                    .scl_force_out()
-                    .set_bit()
-                    // Ensure that clock is enabled
-                    .clk_en()
-                    .set_bit()
+                w.bits(0);
+                // Use open drain output for SDA and SCL
+                w.sda_force_out().set_bit();
+                w.scl_force_out().set_bit();
+                // Ensure that clock is enabled
+                w.clk_en().set_bit()
             });
 
             // First, reset the fifo buffers
             me.i2c.fifo_conf().modify(|_, w| w.nonfifo_en().clear_bit());
 
-            me.i2c
-                .ctr()
-                .modify(|_, w| w.tx_lsb_first().clear_bit().rx_lsb_first().clear_bit());
+            me.i2c.ctr().modify(|_, w| {
+                w.tx_lsb_first().clear_bit();
+                w.rx_lsb_first().clear_bit()
+            });
 
             me.reset_fifo();
 
@@ -2664,10 +2654,8 @@ pub mod lp_i2c {
             // Write data to registers
             unsafe {
                 me.i2c.clk_conf().modify(|_, w| {
-                    w.sclk_sel()
-                        .clear_bit()
-                        .sclk_div_num()
-                        .bits((clkm_div - 1) as u8)
+                    w.sclk_sel().clear_bit();
+                    w.sclk_div_num().bits((clkm_div - 1) as u8)
                 });
 
                 // scl period
@@ -2676,10 +2664,8 @@ pub mod lp_i2c {
                     .write(|w| w.scl_low_period().bits(scl_low_period as u16));
 
                 me.i2c.scl_high_period().write(|w| {
-                    w.scl_high_period()
-                        .bits(scl_high_period as u16)
-                        .scl_wait_high_period()
-                        .bits(scl_wait_high_period as u8)
+                    w.scl_high_period().bits(scl_high_period as u16);
+                    w.scl_wait_high_period().bits(scl_wait_high_period as u8)
                 });
                 // sda sample
                 me.i2c
@@ -2706,10 +2692,8 @@ pub mod lp_i2c {
                     .write(|w| w.time().bits(scl_stop_hold_time as u16));
 
                 me.i2c.to().write(|w| {
-                    w.time_out_en()
-                        .bit(time_out_en)
-                        .time_out_value()
-                        .bits(time_out_value.try_into().unwrap())
+                    w.time_out_en().bit(time_out_en);
+                    w.time_out_value().bits(time_out_value.try_into().unwrap())
                 });
             }
 
