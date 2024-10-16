@@ -70,3 +70,6 @@ incremental      = false
 opt-level        = 3
 lto = 'fat'
 overflow-checks  = false
+
+[lints.rust]
+static_mut_refs = "allow"
