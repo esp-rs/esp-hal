@@ -105,9 +105,9 @@ impl Error {
 pub enum EspNowError {
     /// Internal Error.
     Error(Error),
-    /// Sending an ESP-NOW message failed.
+    /// Failed to send an ESP-NOW message.
     SendFailed,
-    /// Attempt to create EspNow instance twice.
+    /// Attempt to create `EspNow` instance twice.
     DuplicateInstance,
 }
 
@@ -210,7 +210,7 @@ pub struct PeerInfo {
     /// Wi-Fi channel that peer uses to send/receive ESP-NOW data.
     pub channel: Option<u8>,
 
-    /// ESP-NOW data that this peer sends/receives is encrypted or not.
+    /// Whether the data sent/received by this peer is encrypted.
     pub encrypt: bool,
     // we always use STA for now
 }
@@ -245,8 +245,7 @@ pub struct ReceivedData {
 }
 
 impl ReceivedData {
-    /// Returns a slice of the received data, limited to the actual length of
-    /// the packet.
+    /// Returns the received payload.
     pub fn get_data(&self) -> &[u8] {
         &self.data[..self.len as usize]
     }
@@ -261,7 +260,7 @@ impl Debug for ReceivedData {
     }
 }
 
-/// A token used to create an ESP-NOW instance while Wi-Fi is enabled.
+/// A token used to create an `EspNow` instance while Wi-Fi is enabled.
 pub struct EspNowWithWifiCreateToken {
     _private: (),
 }
@@ -273,7 +272,7 @@ pub fn enable_esp_now_with_wifi(
     (device, EspNowWithWifiCreateToken { _private: () })
 }
 
-/// Manages the ESP-NOW instance lifecycle while ensuring it remains active.
+/// Manages the `EspNow` instance lifecycle while ensuring it remains active.
 pub struct EspNowManager<'d> {
     _rc: EspNowRc<'d>,
 }
@@ -533,7 +532,7 @@ impl<'s> Drop for SendWaiter<'s> {
 }
 
 /// This is the receiver part of ESP-NOW. You can get this receiver by splitting
-/// a `EspNow` instance.
+/// an `EspNow` instance.
 pub struct EspNowReceiver<'d> {
     _rc: EspNowRc<'d>,
 }
@@ -687,7 +686,7 @@ impl<'d> EspNow<'d> {
         Ok(esp_now)
     }
 
-    /// Splits the ESP-NOW instance into its manager, sender, and receiver
+    /// Splits the `EspNow` instance into its manager, sender, and receiver
     /// components.
     pub fn split(self) -> (EspNowManager<'d>, EspNowSender<'d>, EspNowReceiver<'d>) {
         (self.manager, self.sender, self.receiver)

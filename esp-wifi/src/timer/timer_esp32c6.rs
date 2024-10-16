@@ -6,7 +6,7 @@ use crate::{
     hal::{interrupt, peripherals::Interrupt},
 };
 
-pub fn setup_radio_isr() {
+pub(crate) fn setup_radio_isr() {
     // wifi enabled in set_isr
 
     // make sure to disable WIFI_BB/MODEM_PERI_TIMEOUT by mapping it to CPU
@@ -33,7 +33,7 @@ pub fn setup_radio_isr() {
     }
 }
 
-pub fn shutdown_radio_isr() {
+pub(crate) fn shutdown_radio_isr() {
     #[cfg(feature = "ble")]
     {
         interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::LP_TIMER);

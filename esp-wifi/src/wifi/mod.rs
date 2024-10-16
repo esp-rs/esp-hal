@@ -142,7 +142,7 @@ use crate::{
     compat::queue::SimpleQueue,
 };
 
-/// Enumeration of supported Wi-Fi authentication methods.
+/// Supported Wi-Fi authentication methods.
 #[derive(EnumSetType, Debug, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -177,7 +177,7 @@ pub enum AuthMethod {
     WAPIPersonal,
 }
 
-/// Enumeration of supported Wi-Fi protocols.
+/// Supported Wi-Fi protocols.
 #[derive(EnumSetType, Debug, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -203,7 +203,7 @@ pub enum Protocol {
     P802D11BGNAX,
 }
 
-/// Enumeration of secondary Wi-Fi channels.
+/// Secondary Wi-Fi channels.
 #[derive(EnumSetType, Debug, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -599,7 +599,7 @@ impl Configuration {
     }
 
     /// Retrieves mutable references to both the `ClientConfiguration`
-    /// and `AccessPointConfiguration` contained within a `Configuration`.
+    /// and `AccessPointConfiguration`.
     pub fn as_mixed_conf_mut(
         &mut self,
     ) -> (&mut ClientConfiguration, &mut AccessPointConfiguration) {
@@ -650,7 +650,6 @@ pub mod ipv4 {
     impl FromStr for Mask {
         type Err = &'static str;
 
-        /// Parses a string to create a `Mask`.
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             s.parse::<u8>()
                 .map_err(|_| "Invalid subnet mask")
@@ -673,7 +672,6 @@ pub mod ipv4 {
     impl TryFrom<Ipv4Addr> for Mask {
         type Error = ();
 
-        /// Gets a `Mask` from an `Ipv4Addr`.
         fn try_from(ip: Ipv4Addr) -> Result<Self, Self::Error> {
             let octets = ip.octets();
             let addr: u32 = ((octets[0] as u32 & 0xff) << 24)
@@ -690,7 +688,6 @@ pub mod ipv4 {
     }
 
     impl From<Mask> for Ipv4Addr {
-        /// Converts a `Mask` back to an `Ipv4Addr`.
         fn from(mask: Mask) -> Self {
             let addr: u32 = ((1 << (32 - mask.0)) - 1) ^ 0xffffffffu32;
 
@@ -718,7 +715,6 @@ pub mod ipv4 {
     }
 
     impl Display for Subnet {
-        /// Formats the subnet as `<gateway-ip>/<mask>`.
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             write!(f, "{}/{}", self.gateway, self.mask)
         }
@@ -727,8 +723,6 @@ pub mod ipv4 {
     impl FromStr for Subnet {
         type Err = &'static str;
 
-        /// Parses a string in the format `<gateway-ip>/<mask>` to create a
-        /// `Subnet`.
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             let mut split = s.split('/');
             if let Some(gateway_str) = split.next() {
@@ -1022,7 +1016,6 @@ impl TryFrom<wifi_mode_t> for WifiMode {
 }
 
 impl From<WifiMode> for wifi_mode_t {
-    /// Converts a `WifiMode` into a `wifi_mode_t` C-type.
     fn from(val: WifiMode) -> Self {
         #[allow(non_upper_case_globals)]
         match val {
@@ -2138,7 +2131,7 @@ use sealed::*;
 
 /// Provides methods for retrieving the Wi-Fi mode and MAC address.
 pub trait WifiDeviceMode: Sealed {
-    /// Returns the Wi-Fi mode (e.g., Station, Access Point).
+    /// Returns the currently active Wi-Fi mode.
     fn mode(self) -> WifiMode;
 
     /// Returns the MAC address of the Wi-Fi device.
@@ -2151,12 +2144,10 @@ pub trait WifiDeviceMode: Sealed {
 pub struct WifiStaDevice;
 
 impl WifiDeviceMode for WifiStaDevice {
-    /// Returns the mode of the Wi-Fi device as `Sta` (Station).
     fn mode(self) -> WifiMode {
         WifiMode::Sta
     }
 
-    /// Retrieves the MAC address of the station device.
     fn mac_address(self) -> [u8; 6] {
         let mut mac = [0; 6];
         get_sta_mac(&mut mac);
@@ -2170,12 +2161,10 @@ impl WifiDeviceMode for WifiStaDevice {
 pub struct WifiApDevice;
 
 impl WifiDeviceMode for WifiApDevice {
-    /// Returns the mode of the Wi-Fi device as `Ap` (Access Point).
     fn mode(self) -> WifiMode {
         WifiMode::Ap
     }
 
-    /// Retrieves the MAC address of the access point device.
     fn mac_address(self) -> [u8; 6] {
         let mut mac = [0; 6];
         get_ap_mac(&mut mac);
