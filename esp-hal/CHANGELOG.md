@@ -13,9 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Restored blocking `embedded_hal` compatibility for async I2C driver (#2343)
-
 ### Removed
+
+## [0.21.1]
+
+### Fixed
+
+- Restored blocking `embedded_hal` compatibility for async I2C driver (#2343)
 
 ## [0.21.0]
 
@@ -814,7 +818,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.21.1...HEAD
+[0.21.1]: https://github.com/esp-rs/esp-hal/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/esp-rs/esp-hal/compare/v0.20.1...v0.21.0
 [0.20.1]: https://github.com/esp-rs/esp-hal/compare/v0.20.0...v0.20.1
 [0.20.0]: https://github.com/esp-rs/esp-hal/compare/v0.19.0...v0.20.0
