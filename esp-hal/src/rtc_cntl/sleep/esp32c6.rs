@@ -4,7 +4,6 @@ use crate::{
     clock::Clock,
     efuse::Efuse,
     gpio::{Pins, RtcFunction},
-    peripherals::Peripherals,
     rtc_cntl::{
         rtc::{
             rtc_clk_cpu_freq_set_xtal,
@@ -900,13 +899,12 @@ impl RtcSleepConfig {
     fn wake_io_reset() {
         // loosely based on esp_deep_sleep_wakeup_io_reset
 
-        let peripherals = unsafe {
-            // We're stealing peripherals to do some uninitialization after waking up from
+        let mut pins = unsafe {
+            // We're stealing pins to do some uninitialization after waking up from
             // deep sleep. We have to be careful to only touch settings that were enabled
             // by deep sleep setup.
-            Peripherals::steal()
+            Pins::steal()
         };
-        let mut pins = peripherals.GPIO.pins();
 
         Ext1WakeupSource::wake_io_reset(&mut pins);
     }
