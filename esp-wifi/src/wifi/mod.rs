@@ -55,6 +55,8 @@ pub(crate) use os_adapter::*;
 #[cfg(feature = "sniffer")]
 use portable_atomic::AtomicBool;
 use portable_atomic::{AtomicUsize, Ordering};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "smoltcp")]
 use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
 pub use state::*;
@@ -142,6 +144,7 @@ use crate::{
 
 #[derive(EnumSetType, Debug, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Default)]
 pub enum AuthMethod {
     None,
@@ -158,6 +161,7 @@ pub enum AuthMethod {
 
 #[derive(EnumSetType, Debug, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Default)]
 pub enum Protocol {
     P802D11B,
@@ -171,6 +175,7 @@ pub enum Protocol {
 
 #[derive(EnumSetType, Debug, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Default)]
 pub enum SecondaryChannel {
     // TODO: Need to extend that for 5GHz
@@ -182,6 +187,7 @@ pub enum SecondaryChannel {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct AccessPointInfo {
     pub ssid: heapless::String<32>,
     pub bssid: [u8; 6],
@@ -195,6 +201,7 @@ pub struct AccessPointInfo {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct AccessPointConfiguration {
     pub ssid: heapless::String<32>,
     pub ssid_hidden: bool,
@@ -224,6 +231,7 @@ impl Default for AccessPointConfiguration {
 
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct ClientConfiguration {
     pub ssid: heapless::String<32>,
     pub bssid: Option<[u8; 6]>,
@@ -258,6 +266,7 @@ impl Default for ClientConfiguration {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct EapFastConfig {
     pub fast_provisioning: u8,
     pub fast_max_pac_list_len: u8,
@@ -266,6 +275,7 @@ pub struct EapFastConfig {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub enum TtlsPhase2Method {
     Eap,
     Mschapv2,
@@ -298,6 +308,7 @@ impl TtlsPhase2Method {
 
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct EapClientConfiguration {
     pub ssid: heapless::String<32>,
     pub bssid: Option<[u8; 6]>,
@@ -363,6 +374,7 @@ impl Default for EapClientConfiguration {
 
 #[derive(EnumSetType, Debug, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub enum Capability {
     Client,
     AccessPoint,
@@ -371,6 +383,7 @@ pub enum Capability {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Default)]
 #[allow(clippy::large_enum_variant)]
 pub enum Configuration {
@@ -379,6 +392,7 @@ pub enum Configuration {
     Client(ClientConfiguration),
     AccessPoint(AccessPointConfiguration),
     Mixed(ClientConfiguration, AccessPointConfiguration),
+    #[cfg_attr(feature = "serde", serde(skip))]
     EapClient(EapClientConfiguration),
 }
 
@@ -471,12 +485,15 @@ impl Configuration {
 }
 
 pub mod ipv4 {
+    pub use core::net::Ipv4Addr;
     use core::{fmt::Display, str::FromStr};
 
-    pub use no_std_net::*;
+    #[cfg(feature = "serde")]
+    use serde::{Deserialize, Serialize};
 
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
     pub struct Mask(pub u8);
 
     impl FromStr for Mask {
@@ -536,6 +553,7 @@ pub mod ipv4 {
 
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
     pub struct Subnet {
         #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
         pub gateway: Ipv4Addr,
@@ -571,6 +589,7 @@ pub mod ipv4 {
 
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
     pub struct ClientSettings {
         #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
         pub ip: Ipv4Addr,
@@ -597,12 +616,14 @@ pub mod ipv4 {
 
     #[derive(Default, Clone, Debug, PartialEq, Eq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
     pub struct DHCPClientSettings {
         pub hostname: Option<heapless::String<30>>,
     }
 
     #[derive(Clone, Debug, PartialEq, Eq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
     pub enum ClientConfiguration {
         DHCP(DHCPClientSettings),
         Fixed(ClientSettings),
@@ -635,6 +656,7 @@ pub mod ipv4 {
 
     #[derive(Clone, Debug, Eq, PartialEq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
     pub struct RouterConfiguration {
         pub subnet: Subnet,
         pub dhcp_enabled: bool,
@@ -660,6 +682,7 @@ pub mod ipv4 {
 
     #[derive(Clone, Debug, Eq, PartialEq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
     pub enum Configuration {
         Client(ClientConfiguration),
         Router(RouterConfiguration),
@@ -673,6 +696,7 @@ pub mod ipv4 {
 
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
     pub struct IpInfo {
         #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
         pub ip: Ipv4Addr,
@@ -723,6 +747,7 @@ impl AuthMethodExt for AuthMethod {
 /// Wifi Mode (Sta and/or Ap)
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub enum WifiMode {
     Sta,
     Ap,
