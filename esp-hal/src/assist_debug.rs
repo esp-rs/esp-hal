@@ -47,9 +47,9 @@ impl<'d> DebugAssist<'d> {
     }
 }
 
-impl<'d> crate::private::Sealed for DebugAssist<'d> {}
+impl crate::private::Sealed for DebugAssist<'_> {}
 
-impl<'d> InterruptConfigurable for DebugAssist<'d> {
+impl InterruptConfigurable for DebugAssist<'_> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         unsafe {
             crate::interrupt::bind_interrupt(
@@ -66,7 +66,7 @@ impl<'d> InterruptConfigurable for DebugAssist<'d> {
 }
 
 #[cfg(assist_debug_sp_monitor)]
-impl<'d> DebugAssist<'d> {
+impl DebugAssist<'_> {
     /// Enable SP monitoring on main core. When the SP exceeds the
     /// `lower_bound` or `upper_bound` threshold, the module will record the PC
     /// pointer and generate an interrupt.

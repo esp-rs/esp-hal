@@ -411,9 +411,9 @@ impl<'d> Rtc<'d> {
             .modify(|r, w| unsafe { w.bits(r.bits() | 1) });
     }
 }
-impl<'d> crate::private::Sealed for Rtc<'d> {}
+impl crate::private::Sealed for Rtc<'_> {}
 
-impl<'d> InterruptConfigurable for Rtc<'d> {
+impl InterruptConfigurable for Rtc<'_> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         unsafe {
             interrupt::bind_interrupt(

@@ -248,7 +248,7 @@ pub(crate) fn lock<T>(lock: &Lock, f: impl FnOnce() -> T) -> T {
         }
     }
 
-    impl<'a> Drop for LockGuard<'a> {
+    impl Drop for LockGuard<'_> {
         fn drop(&mut self) {
             unsafe { self.lock.release(self.token) };
         }

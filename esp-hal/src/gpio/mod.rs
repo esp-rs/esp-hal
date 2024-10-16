@@ -90,7 +90,6 @@ pub mod lp_io;
 pub mod rtc_io;
 
 /// Convenience constant for `Option::None` pin
-
 static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
 
 struct CFnPtr(AtomicPtr<()>);
@@ -1596,7 +1595,7 @@ pub struct Output<'d, P = AnyPin> {
 
 impl<P> private::Sealed for Output<'_, P> {}
 
-impl<'d, P> Peripheral for Output<'d, P> {
+impl<P> Peripheral for Output<'_, P> {
     type P = P;
     unsafe fn clone_unchecked(&mut self) -> P {
         self.pin.clone_unchecked()
@@ -1700,7 +1699,7 @@ pub struct Input<'d, P = AnyPin> {
 
 impl<P> private::Sealed for Input<'_, P> {}
 
-impl<'d, P> Peripheral for Input<'d, P> {
+impl<P> Peripheral for Input<'_, P> {
     type P = P;
     unsafe fn clone_unchecked(&mut self) -> P {
         self.pin.clone_unchecked()
@@ -1804,7 +1803,7 @@ pub struct OutputOpenDrain<'d, P = AnyPin> {
 
 impl<P> private::Sealed for OutputOpenDrain<'_, P> {}
 
-impl<'d, P> Peripheral for OutputOpenDrain<'d, P> {
+impl<P> Peripheral for OutputOpenDrain<'_, P> {
     type P = P;
     unsafe fn clone_unchecked(&mut self) -> P {
         self.pin.clone_unchecked()
@@ -1943,7 +1942,7 @@ pub struct Flex<'d, P = AnyPin> {
 
 impl<P> private::Sealed for Flex<'_, P> {}
 
-impl<'d, P> Peripheral for Flex<'d, P> {
+impl<P> Peripheral for Flex<'_, P> {
     type P = P;
     unsafe fn clone_unchecked(&mut self) -> P {
         core::ptr::read(&*self.pin as *const _)
@@ -1974,7 +1973,7 @@ where
     }
 }
 
-impl<'d, P> Flex<'d, P>
+impl<P> Flex<'_, P>
 where
     P: InputPin,
 {
@@ -2043,7 +2042,7 @@ where
     }
 }
 
-impl<'d, P> Flex<'d, P>
+impl<P> Flex<'_, P>
 where
     P: OutputPin,
 {
@@ -2112,7 +2111,7 @@ where
     }
 }
 
-impl<'d, P> Flex<'d, P>
+impl<P> Flex<'_, P>
 where
     P: InputPin + OutputPin,
 {
@@ -2580,7 +2579,7 @@ mod embedded_hal_02_impls {
 
     use super::*;
 
-    impl<'d, P> digital::InputPin for Input<'d, P>
+    impl<P> digital::InputPin for Input<'_, P>
     where
         P: InputPin,
     {
@@ -2594,7 +2593,7 @@ mod embedded_hal_02_impls {
         }
     }
 
-    impl<'d, P> digital::OutputPin for Output<'d, P>
+    impl<P> digital::OutputPin for Output<'_, P>
     where
         P: OutputPin,
     {
@@ -2610,7 +2609,7 @@ mod embedded_hal_02_impls {
         }
     }
 
-    impl<'d, P> digital::StatefulOutputPin for Output<'d, P>
+    impl<P> digital::StatefulOutputPin for Output<'_, P>
     where
         P: OutputPin,
     {
@@ -2622,7 +2621,7 @@ mod embedded_hal_02_impls {
         }
     }
 
-    impl<'d, P> digital::ToggleableOutputPin for Output<'d, P>
+    impl<P> digital::ToggleableOutputPin for Output<'_, P>
     where
         P: OutputPin,
     {
@@ -2634,7 +2633,7 @@ mod embedded_hal_02_impls {
         }
     }
 
-    impl<'d, P> digital::InputPin for OutputOpenDrain<'d, P>
+    impl<P> digital::InputPin for OutputOpenDrain<'_, P>
     where
         P: InputPin + OutputPin,
     {
@@ -2648,7 +2647,7 @@ mod embedded_hal_02_impls {
         }
     }
 
-    impl<'d, P> digital::OutputPin for OutputOpenDrain<'d, P>
+    impl<P> digital::OutputPin for OutputOpenDrain<'_, P>
     where
         P: InputPin + OutputPin,
     {
@@ -2665,7 +2664,7 @@ mod embedded_hal_02_impls {
         }
     }
 
-    impl<'d, P> digital::StatefulOutputPin for OutputOpenDrain<'d, P>
+    impl<P> digital::StatefulOutputPin for OutputOpenDrain<'_, P>
     where
         P: InputPin + OutputPin,
     {
@@ -2677,7 +2676,7 @@ mod embedded_hal_02_impls {
         }
     }
 
-    impl<'d, P> digital::ToggleableOutputPin for OutputOpenDrain<'d, P>
+    impl<P> digital::ToggleableOutputPin for OutputOpenDrain<'_, P>
     where
         P: InputPin + OutputPin,
     {
@@ -2689,7 +2688,7 @@ mod embedded_hal_02_impls {
         }
     }
 
-    impl<'d, P> digital::InputPin for Flex<'d, P>
+    impl<P> digital::InputPin for Flex<'_, P>
     where
         P: InputPin + OutputPin,
     {
@@ -2703,7 +2702,7 @@ mod embedded_hal_02_impls {
         }
     }
 
-    impl<'d, P> digital::OutputPin for Flex<'d, P>
+    impl<P> digital::OutputPin for Flex<'_, P>
     where
         P: InputPin + OutputPin,
     {
@@ -2719,7 +2718,7 @@ mod embedded_hal_02_impls {
         }
     }
 
-    impl<'d, P> digital::StatefulOutputPin for Flex<'d, P>
+    impl<P> digital::StatefulOutputPin for Flex<'_, P>
     where
         P: InputPin + OutputPin,
     {
@@ -2731,7 +2730,7 @@ mod embedded_hal_02_impls {
         }
     }
 
-    impl<'d, P> digital::ToggleableOutputPin for Flex<'d, P>
+    impl<P> digital::ToggleableOutputPin for Flex<'_, P>
     where
         P: InputPin + OutputPin,
     {
@@ -2749,14 +2748,14 @@ mod embedded_hal_impls {
 
     use super::*;
 
-    impl<'d, P> digital::ErrorType for Input<'d, P>
+    impl<P> digital::ErrorType for Input<'_, P>
     where
         P: InputPin,
     {
         type Error = core::convert::Infallible;
     }
 
-    impl<'d, P> digital::InputPin for Input<'d, P>
+    impl<P> digital::InputPin for Input<'_, P>
     where
         P: InputPin,
     {
@@ -2769,14 +2768,14 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<'d, P> digital::ErrorType for Output<'d, P>
+    impl<P> digital::ErrorType for Output<'_, P>
     where
         P: OutputPin,
     {
         type Error = core::convert::Infallible;
     }
 
-    impl<'d, P> digital::OutputPin for Output<'d, P>
+    impl<P> digital::OutputPin for Output<'_, P>
     where
         P: OutputPin,
     {
@@ -2791,7 +2790,7 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<'d, P> digital::StatefulOutputPin for Output<'d, P>
+    impl<P> digital::StatefulOutputPin for Output<'_, P>
     where
         P: OutputPin,
     {
@@ -2804,7 +2803,7 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<'d, P> digital::InputPin for OutputOpenDrain<'d, P>
+    impl<P> digital::InputPin for OutputOpenDrain<'_, P>
     where
         P: InputPin + OutputPin,
     {
@@ -2817,14 +2816,14 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<'d, P> digital::ErrorType for OutputOpenDrain<'d, P>
+    impl<P> digital::ErrorType for OutputOpenDrain<'_, P>
     where
         P: InputPin + OutputPin,
     {
         type Error = core::convert::Infallible;
     }
 
-    impl<'d, P> digital::OutputPin for OutputOpenDrain<'d, P>
+    impl<P> digital::OutputPin for OutputOpenDrain<'_, P>
     where
         P: InputPin + OutputPin,
     {
@@ -2839,7 +2838,7 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<'d, P> digital::StatefulOutputPin for OutputOpenDrain<'d, P>
+    impl<P> digital::StatefulOutputPin for OutputOpenDrain<'_, P>
     where
         P: InputPin + OutputPin,
     {
@@ -2852,7 +2851,7 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<'d, P> digital::InputPin for Flex<'d, P>
+    impl<P> digital::InputPin for Flex<'_, P>
     where
         P: InputPin,
     {
@@ -2865,11 +2864,11 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<'d, P> digital::ErrorType for Flex<'d, P> {
+    impl<P> digital::ErrorType for Flex<'_, P> {
         type Error = core::convert::Infallible;
     }
 
-    impl<'d, P> digital::OutputPin for Flex<'d, P>
+    impl<P> digital::OutputPin for Flex<'_, P>
     where
         P: OutputPin,
     {
@@ -2884,7 +2883,7 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<'d, P> digital::StatefulOutputPin for Flex<'d, P>
+    impl<P> digital::StatefulOutputPin for Flex<'_, P>
     where
         P: OutputPin,
     {

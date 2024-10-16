@@ -1104,7 +1104,7 @@ where
         }
 
         let max_div = 0b1111_1111_1111 - 1;
-        let clk_div = ((clk) + (max_div * baudrate) - 1) / (max_div * baudrate);
+        let clk_div = (clk).div_ceil(max_div * baudrate);
         T::register_block().clk_conf().write(|w| unsafe {
             w.sclk_sel()
                 .bits(match clock_source {
@@ -1897,7 +1897,7 @@ mod asynch {
         registered: bool,
     }
 
-    impl<'d, T: Instance> UartRxFuture<'d, T> {
+    impl<T: Instance> UartRxFuture<'_, T> {
         pub fn new(events: EnumSet<RxEvent>) -> Self {
             Self {
                 events,
@@ -1928,7 +1928,7 @@ mod asynch {
         }
     }
 
-    impl<'d, T: Instance> core::future::Future for UartRxFuture<'d, T> {
+    impl<T: Instance> core::future::Future for UartRxFuture<'_, T> {
         type Output = EnumSet<RxEvent>;
 
         fn poll(
@@ -1962,7 +1962,7 @@ mod asynch {
         }
     }
 
-    impl<'d, T: Instance> Drop for UartRxFuture<'d, T> {
+    impl<T: Instance> Drop for UartRxFuture<'_, T> {
         fn drop(&mut self) {
             // Although the isr disables the interrupt that occurred directly, we need to
             // disable the other interrupts (= the ones that did not occur), as
@@ -1984,7 +1984,7 @@ mod asynch {
         }
     }
 
-    impl<'d, T: Instance> UartTxFuture<'d, T> {
+    impl<T: Instance> UartTxFuture<'_, T> {
         pub fn new(events: EnumSet<TxEvent>) -> Self {
             Self {
                 events,
@@ -2006,7 +2006,7 @@ mod asynch {
         }
     }
 
-    impl<'d, T: Instance> core::future::Future for UartTxFuture<'d, T> {
+    impl<T: Instance> core::future::Future for UartTxFuture<'_, T> {
         type Output = ();
 
         fn poll(
@@ -2035,7 +2035,7 @@ mod asynch {
         }
     }
 
-    impl<'d, T: Instance> Drop for UartTxFuture<'d, T> {
+    impl<T: Instance> Drop for UartTxFuture<'_, T> {
         fn drop(&mut self) {
             // Although the isr disables the interrupt that occurred directly, we need to
             // disable the other interrupts (= the ones that did not occur), as

@@ -530,8 +530,8 @@ impl super::AdcCalEfuse for crate::peripherals::ADC2 {
     }
 }
 
-impl<'d, ADCI, PIN, CS> embedded_hal_02::adc::OneShot<ADCI, u16, super::AdcPin<PIN, ADCI, CS>>
-    for Adc<'d, ADCI>
+impl<ADCI, PIN, CS> embedded_hal_02::adc::OneShot<ADCI, u16, super::AdcPin<PIN, ADCI, CS>>
+    for Adc<'_, ADCI>
 where
     PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8> + super::AdcChannel,
     ADCI: RegisterAccess,

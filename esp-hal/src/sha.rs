@@ -98,10 +98,10 @@ impl<'d> Sha<'d> {
     }
 }
 
-impl<'d> crate::private::Sealed for Sha<'d> {}
+impl crate::private::Sealed for Sha<'_> {}
 
 #[cfg(not(esp32))]
-impl<'d> crate::InterruptConfigurable for Sha<'d> {
+impl crate::InterruptConfigurable for Sha<'_> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         unsafe {
             crate::interrupt::bind_interrupt(crate::peripherals::Interrupt::SHA, handler.handler());

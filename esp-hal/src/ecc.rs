@@ -113,9 +113,9 @@ impl<'d> Ecc<'d, crate::Blocking> {
     }
 }
 
-impl<'d> crate::private::Sealed for Ecc<'d, crate::Blocking> {}
+impl crate::private::Sealed for Ecc<'_, crate::Blocking> {}
 
-impl<'d> InterruptConfigurable for Ecc<'d, crate::Blocking> {
+impl InterruptConfigurable for Ecc<'_, crate::Blocking> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         unsafe {
             crate::interrupt::bind_interrupt(crate::peripherals::Interrupt::ECC, handler.handler());
@@ -125,7 +125,7 @@ impl<'d> InterruptConfigurable for Ecc<'d, crate::Blocking> {
     }
 }
 
-impl<'d, DM: crate::Mode> Ecc<'d, DM> {
+impl<DM: crate::Mode> Ecc<'_, DM> {
     /// Resets the ECC peripheral.
     pub fn reset(&mut self) {
         self.ecc.mult_conf().reset()
