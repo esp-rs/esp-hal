@@ -23,20 +23,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added board-specific consts for c6 and h2 when caluclating transmit power conversion
+- Added board-specific consts for c6 and h2 when caluclating transmit power conversion (#2114)
 - Added `defmt` and `log` features (#2183)
+- Make RX queue size configurable using esp-config (#2324)
 
 ### Changed
 
-- Modified CCA threshold value to default of -60
+- Modified CCA threshold value to default of -60 (#2114)
 - The driver now take `RADIO_CLK` by value to avoid a collision with esp-wifi's usage (#2183)
 - `binary-logs` feature renamed to `sys-logs` (#2183)
 - Updated PHY driver to v5.3.1 (#2239)
 
 ### Fixed
 
-- Fixed possible integer underflow in array access
-- Fixed compile error when building sys-logs feature
+- Fixed possible integer underflow in array access (#2114)
+- Fixed compile error when building sys-logs feature (#2114)
 
 ## 0.2.0 - 2024-08-29
 
