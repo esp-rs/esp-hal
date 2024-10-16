@@ -1,5 +1,3 @@
-
-
 SECTIONS {
   .rwtext : ALIGN(4)
   {
