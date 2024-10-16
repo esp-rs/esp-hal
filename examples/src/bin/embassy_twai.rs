@@ -48,7 +48,7 @@ type TwaiOutbox = Channel<NoopRawMutex, EspTwaiFrame, 16>;
 
 #[embassy_executor::task]
 async fn receiver(
-    mut rx: TwaiRx<'static, TWAI0, esp_hal::Async>,
+    mut rx: TwaiRx<'static, esp_hal::Async, TWAI0>,
     channel: &'static TwaiOutbox,
 ) -> ! {
     loop {

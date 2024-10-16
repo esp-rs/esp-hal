@@ -742,13 +742,13 @@ impl BaudRate {
 }
 
 /// An inactive TWAI peripheral in the "Reset"/configuration state.
-pub struct TwaiConfiguration<'d, T, DM: crate::Mode> {
+pub struct TwaiConfiguration<'d, DM: crate::Mode, T> {
     peripheral: PhantomData<&'d PeripheralRef<'d, T>>,
     phantom: PhantomData<DM>,
     mode: TwaiMode,
 }
 
-impl<'d, T, DM> TwaiConfiguration<'d, T, DM>
+impl<'d, DM, T> TwaiConfiguration<'d, DM, T>
 where
     T: Instance,
     DM: crate::Mode,
@@ -961,7 +961,7 @@ where
 
     /// Put the peripheral into Operation Mode, allowing the transmission and
     /// reception of packets using the new object.
-    pub fn start(self) -> Twai<'d, T, DM> {
+    pub fn start(self) -> Twai<'d, DM, T> {
         Self::set_mode(self.mode);
 
         // Clear the TEC and REC
@@ -1012,7 +1012,7 @@ where
     }
 }
 
-impl<'d, T> TwaiConfiguration<'d, T, crate::Blocking>
+impl<'d, T> TwaiConfiguration<'d, crate::Blocking, T>
 where
     T: Instance,
 {
@@ -1045,9 +1045,9 @@ where
     }
 }
 
-impl<'d, T> crate::private::Sealed for TwaiConfiguration<'d, T, crate::Blocking> where T: Instance {}
+impl<T> crate::private::Sealed for TwaiConfiguration<'_, crate::Blocking, T> where T: Instance {}
 
-impl<'d, T> InterruptConfigurable for TwaiConfiguration<'d, T, crate::Blocking>
+impl<T> InterruptConfigurable for TwaiConfiguration<'_, crate::Blocking, T>
 where
     T: Instance,
 {
@@ -1056,7 +1056,7 @@ where
     }
 }
 
-impl<'d, T> TwaiConfiguration<'d, T, crate::Async>
+impl<'d, T> TwaiConfiguration<'d, crate::Async, T>
 where
     T: Instance,
 {
@@ -1097,20 +1097,20 @@ where
 ///
 /// In this mode, the TWAI controller can transmit and receive messages
 /// including error signals (such as error and overload frames).
-pub struct Twai<'d, T, DM: crate::Mode> {
-    tx: TwaiTx<'d, T, DM>,
-    rx: TwaiRx<'d, T, DM>,
+pub struct Twai<'d, DM: crate::Mode, T> {
+    tx: TwaiTx<'d, DM, T>,
+    rx: TwaiRx<'d, DM, T>,
     phantom: PhantomData<DM>,
 }
 
-impl<'d, T, DM> Twai<'d, T, DM>
+impl<'d, T, DM> Twai<'d, DM, T>
 where
     T: Instance,
     DM: crate::Mode,
 {
     /// Stop the peripheral, putting it into reset mode and enabling
     /// reconfiguration.
-    pub fn stop(self) -> TwaiConfiguration<'d, T, DM> {
+    pub fn stop(self) -> TwaiConfiguration<'d, DM, T> {
         // Put the peripheral into reset/configuration mode by setting the reset mode
         // bit.
         T::register_block()
@@ -1120,7 +1120,7 @@ where
         TwaiConfiguration {
             peripheral: PhantomData,
             phantom: PhantomData,
-            mode: TwaiConfiguration::<T, DM>::mode(),
+            mode: TwaiConfiguration::<DM, T>::mode(),
         }
     }
 
@@ -1181,18 +1181,18 @@ where
 
     /// Consumes this `Twai` instance and splits it into transmitting and
     /// receiving halves.
-    pub fn split(self) -> (TwaiRx<'d, T, DM>, TwaiTx<'d, T, DM>) {
+    pub fn split(self) -> (TwaiRx<'d, DM, T>, TwaiTx<'d, DM, T>) {
         (self.rx, self.tx)
     }
 }
 
 /// Interface to the TWAI transmitter part.
-pub struct TwaiTx<'d, T, DM: crate::Mode> {
+pub struct TwaiTx<'d, DM: crate::Mode, T> {
     _peripheral: PhantomData<&'d T>,
     phantom: PhantomData<DM>,
 }
 
-impl<'d, T, DM> TwaiTx<'d, T, DM>
+impl<DM, T> TwaiTx<'_, DM, T>
 where
     T: Instance,
     DM: crate::Mode,
@@ -1229,12 +1229,12 @@ where
 }
 
 /// Interface to the TWAI receiver part.
-pub struct TwaiRx<'d, T, DM: crate::Mode> {
+pub struct TwaiRx<'d, DM: crate::Mode, T> {
     _peripheral: PhantomData<&'d T>,
     phantom: PhantomData<DM>,
 }
 
-impl<'d, T, DM> TwaiRx<'d, T, DM>
+impl<DM, T> TwaiRx<'_, DM, T>
 where
     T: Instance,
     DM: crate::Mode,
@@ -1331,7 +1331,7 @@ unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
     }
 }
 
-impl<'d, T, DM> embedded_hal_02::can::Can for Twai<'d, T, DM>
+impl<'d, DM, T> embedded_hal_02::can::Can for Twai<'d, DM, T>
 where
     T: Instance,
     DM: crate::Mode,
@@ -1355,7 +1355,7 @@ where
     }
 }
 
-impl<'d, T, DM> embedded_can::nb::Can for Twai<'d, T, DM>
+impl<'d, DM, T> embedded_can::nb::Can for Twai<'d, DM, T>
 where
     T: Instance,
     DM: crate::Mode,
@@ -1695,7 +1695,7 @@ mod asynch {
     pub(crate) static TWAI_STATE: [TwaiAsyncState; NUM_TWAI] =
         [const { TwaiAsyncState::new() }; NUM_TWAI];
 
-    impl<T> Twai<'_, T, crate::Async>
+    impl<T> Twai<'_, crate::Async, T>
     where
         T: Instance,
     {
@@ -1709,7 +1709,7 @@ mod asynch {
         }
     }
 
-    impl<'d, T> TwaiTx<'d, T, crate::Async>
+    impl<T> TwaiTx<'_, crate::Async, T>
     where
         T: Instance,
     {
@@ -1739,7 +1739,7 @@ mod asynch {
         }
     }
 
-    impl<'d, T> TwaiRx<'d, T, crate::Async>
+    impl<T> TwaiRx<'_, crate::Async, T>
     where
         T: Instance,
     {

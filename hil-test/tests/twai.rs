@@ -17,7 +17,7 @@ use hil_test as _;
 use nb::block;
 
 struct Context {
-    twai: twai::Twai<'static, TWAI0, Blocking>,
+    twai: twai::Twai<'static, Blocking, TWAI0>,
 }
 
 #[cfg(test)]
