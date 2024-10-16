@@ -12,7 +12,6 @@ use esp_hal::{
     dma_descriptors_chunk_size,
     gpio::{interconnect::InputSignal, Io},
     pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
-    peripherals::SPI2,
     prelude::*,
     spi::{
         master::{Address, Command, HalfDuplexReadWrite, Spi, SpiDma},
@@ -40,7 +39,7 @@ macro_rules! dma_alloc_buffer {
 }
 
 struct Context {
-    spi: SpiDma<'static, SPI2, HalfDuplexMode, Blocking>,
+    spi: SpiDma<'static, HalfDuplexMode, Blocking>,
     pcnt_unit: Unit<'static, 0>,
     pcnt_source: InputSignal,
 }
