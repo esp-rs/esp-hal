@@ -595,7 +595,7 @@ pub trait Instance: Signals + RegBlock {
     fn tx_reset() {
         let r = Self::register_block();
         r.conf().modify(|_, w| w.tx_reset().set_bit());
-        crate::rom::ets_delay_us(1);
+        xtensa_lx::timer::delay(20);
         r.conf().modify(|_, w| w.tx_reset().clear_bit());
     }
 
