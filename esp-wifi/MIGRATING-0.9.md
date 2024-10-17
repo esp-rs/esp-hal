@@ -12,7 +12,7 @@ You no longer have to set up clocks and pass them to `esp_wifi::init` and the `e
 -    system::SystemControl,
  };
  use esp_wifi::{
-     initialize,
+-     initialize,
      // ...
  };
 
@@ -26,7 +26,7 @@ You no longer have to set up clocks and pass them to `esp_wifi::init` and the `e
      let timg0 = TimerGroup::new(peripherals.TIMG0);
 
 -     let init = initialize(
-+     let init = init(
++     let init = esp_wifi::init(
          EspWifiInitFor::Wifi,
          timg0.timer0,
          Rng::new(peripherals.RNG),
