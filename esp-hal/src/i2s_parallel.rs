@@ -557,7 +557,6 @@ mod private {
             numerator,
         }
     }
-
 }
 
 #[allow(missing_docs)]
@@ -596,6 +595,7 @@ pub trait Instance: Signals + RegBlock {
     fn tx_reset() {
         let r = Self::register_block();
         r.conf().modify(|_, w| w.tx_reset().set_bit());
+        crate::rom::ets_delay_us(1);
         r.conf().modify(|_, w| w.tx_reset().clear_bit());
     }
 
@@ -644,6 +644,10 @@ pub trait Instance: Signals + RegBlock {
         }
 
         r.conf().modify(|_, w| w.tx_start().clear_bit());
+        r.int_clr().write(|w| {
+            w.out_done().clear_bit_by_one();
+            w.out_total_eof().clear_bit_by_one()
+        });
     }
 
     fn set_clock(clock_settings: I2sClockDividers) {
@@ -681,10 +685,10 @@ pub trait Instance: Signals + RegBlock {
         // Initialize I2S dev
         Self::rx_reset();
         Self::tx_reset();
-        Self::rx_dma_reset();
-        Self::tx_dma_reset();
         Self::rx_fifo_reset();
         Self::tx_fifo_reset();
+        Self::rx_dma_reset();
+        Self::tx_dma_reset();
 
         let r = Self::register_block();
 
@@ -743,13 +747,13 @@ pub trait Instance: Signals + RegBlock {
         info!("conf1: {:#?}", r.conf1().read());
         info!("conf2: {:#?}", r.conf2().read());
         info!("conf_chan: {:#?}", r.conf_chan().read());
-        info!("timing: {:#?}", r.timing().read());
+        // info!("timing: {:#?}", r.timing().read());
         info!("sample_rate_conf: {:#?}", r.sample_rate_conf().read());
         info!("fifo_conf: {:#?}", r.fifo_conf().read());
         info!("lc_conf: {:#?}", r.lc_conf().read());
         info!("int_raw: {:#?}", r.int_raw().read());
-        info!("int_st: {:#?}", r.int_st().read());
-        info!("int_ena: {:#?}", r.int_ena().read());
+        // info!("int_st: {:#?}", r.int_st().read());
+        // info!("int_ena: {:#?}", r.int_ena().read());
         info!("state: {:#?}", r.state().read());
     }
 }
