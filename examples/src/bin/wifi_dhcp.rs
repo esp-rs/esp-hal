@@ -4,6 +4,7 @@
 //! Set SSID and PASSWORD env variable before running this example.
 //!
 //! This gets an ip address via DHCP then performs an HTTP get request to some "random" server
+//! When using USB-SERIAL-JTAG you may have to activate the feature `phy-enable-usb` in the esp-wifi crate.
 
 //% FEATURES: esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
