@@ -15,7 +15,6 @@ use esp_hal::{
     dma::{Dma, DmaDescriptor, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{Io, Level, NoPin},
-    peripherals::SPI2,
     prelude::*,
     spi::{master::Spi, FullDuplexMode, SpiMode},
 };
@@ -35,7 +34,7 @@ cfg_if::cfg_if! {
 }
 
 struct Context {
-    spi: Spi<'static, SPI2, FullDuplexMode>,
+    spi: Spi<'static, FullDuplexMode>,
     dma_channel: DmaChannelCreator,
     // Reuse the really large buffer so we don't run out of DRAM with many tests
     rx_buffer: &'static mut [u8],
