@@ -4,6 +4,7 @@ use strum::FromRepr;
 use crate::{
     clock::{clocks_ll::regi2c_write_mask, Clock, XtalClock},
     peripherals::{LPWR, LP_AON, PCR, PMU, TIMG0},
+    rtc_cntl::RtcClock,
 };
 
 const I2C_PMU: u8 = 0x6d;
@@ -264,34 +265,15 @@ pub(crate) enum RtcCaliClkSel {
     CaliClk32k    = 2,
 }
 
-/// RTC Watchdog Timer
-pub struct RtcClock;
-
 /// RTC Watchdog Timer driver
 impl RtcClock {
-    const CAL_FRACT: u32 = 19;
-
     /// Get main XTAL frequency.
     /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the
     /// bootloader, as passed to rtc_clk_init function.
     pub fn get_xtal_freq() -> XtalClock {
-        let xtal_freq_reg = unsafe { &*LP_AON::PTR }.store4().read().bits();
-
-        // Values of RTC_XTAL_FREQ_REG and RTC_APB_FREQ_REG are stored as two copies in
-        // lower and upper 16-bit halves. These are the routines to work with such a
-        // representation.
-        let clk_val_is_valid = |val| {
-            (val & 0xffffu32) == ((val >> 16u32) & 0xffffu32) && val != 0u32 && val != u32::MAX
-        };
-        let reg_val_to_clk_val = |val| val & u16::MAX as u32;
-
-        if !clk_val_is_valid(xtal_freq_reg) {
-            return XtalClock::RtcXtalFreq32M;
-        }
-
-        match reg_val_to_clk_val(xtal_freq_reg) {
-            32 => XtalClock::RtcXtalFreq32M,
-            other => XtalClock::RtcXtalFreqOther(other),
+        match Self::read_xtal_freq_mhz() {
+            None | Some(32) => XtalClock::RtcXtalFreq32M,
+            Some(other) => XtalClock::RtcXtalFreqOther(other),
         }
     }
 
