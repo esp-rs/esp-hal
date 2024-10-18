@@ -74,7 +74,11 @@ use core::marker::PhantomData;
 use super::{Error, FullDuplexMode, SpiMode};
 use crate::{
     dma::{DescriptorChain, DmaChannelConvert, DmaEligible, PeripheralMarker, Rx, Tx},
-    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
+    gpio::{
+        interconnect::{PeripheralInput, PeripheralOutput},
+        InputSignal,
+        OutputSignal,
+    },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
     private,
@@ -98,20 +102,20 @@ where
     T: Instance,
 {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new<
-        SCK: PeripheralInput,
-        MOSI: PeripheralInput,
-        MISO: PeripheralOutput,
-        CS: PeripheralInput,
-    >(
+    pub fn new(
         spi: impl Peripheral<P = T> + 'd,
-        sclk: impl Peripheral<P = SCK> + 'd,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-        miso: impl Peripheral<P = MISO> + 'd,
-        cs: impl Peripheral<P = CS> + 'd,
+        sclk: impl Peripheral<P = impl PeripheralInput> + 'd,
+        mosi: impl Peripheral<P = impl PeripheralInput> + 'd,
+        miso: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        cs: impl Peripheral<P = impl PeripheralInput> + 'd,
         mode: SpiMode,
     ) -> Spi<'d, T, FullDuplexMode> {
         crate::into_ref!(spi, sclk, mosi, miso, cs);
+
+        let mut sclk = sclk.map_into();
+        let mut mosi = mosi.map_into();
+        let mut miso = miso.map_into();
+        let mut cs = cs.map_into();
 
         sclk.enable_input(true, private::Internal);
         sclk.connect_input_to_peripheral(spi.sclk_signal(), private::Internal);
