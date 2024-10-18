@@ -47,6 +47,10 @@ pub struct WifiStack<'a, MODE: WifiDeviceMode> {
 }
 
 impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
+    /// Creates new `WifiStack` instance.
+    ///
+    /// Handles optional DHCP/DNS features and sets up the
+    /// configuration for the network interface.
     pub fn new(
         network_interface: Interface,
         device: WifiDevice<'a, MODE>,
@@ -493,14 +497,27 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
 #[derive(Debug, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum WifiStackError {
+    /// An unknown error occurred, with the associated error code.
     Unknown(i32),
+
+    /// An error occurred during Wi-Fi stack initialization.
     InitializationError(crate::InitializationError),
+
+    /// A common Wi-Fi error occured.
     DeviceError(crate::wifi::WifiError),
+
+    /// Couldn't get the device's IP.
     MissingIp,
+
+    /// DNS is not configured.
     #[cfg(feature = "dns")]
     DnsNotConfigured,
+
+    /// An error occurred when starting a DNS query.
     #[cfg(feature = "dns")]
     DnsQueryError(smoltcp::socket::dns::StartQueryError),
+
+    /// Cannot get result from a DNS query.
     #[cfg(feature = "dns")]
     DnsQueryFailed,
 }
@@ -512,10 +529,13 @@ impl Display for WifiStackError {
 }
 
 impl<MODE: WifiDeviceMode> WifiStack<'_, MODE> {
+    /// Retrieves the current interface configuration.
     pub fn get_iface_configuration(&self) -> Result<ipv4::Configuration, WifiStackError> {
         Ok(self.network_config.borrow().clone())
     }
 
+    /// Sets a new interface configuration using the provided IPv4
+    /// configuration.
     pub fn set_iface_configuration(
         &mut self,
         conf: &ipv4::Configuration,
@@ -523,10 +543,12 @@ impl<MODE: WifiDeviceMode> WifiStack<'_, MODE> {
         self.update_iface_configuration(conf)
     }
 
+    /// Checks if the interface is up (has IP information).
     pub fn is_iface_up(&self) -> bool {
         self.ip_info.borrow().is_some()
     }
 
+    /// Retrieves the current IP information (IP address, subnet info).
     pub fn get_ip_info(&self) -> Result<ipv4::IpInfo, WifiStackError> {
         self.ip_info.borrow().ok_or(WifiStackError::MissingIp)
     }
