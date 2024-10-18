@@ -40,7 +40,7 @@ crate::peripherals! {
     SHA <= SHA,
     SPI0 <= SPI0,
     SPI1 <= SPI1,
-    SPI2 <= SPI2 (SPI2),
+    [Spi2] SPI2 <= SPI2 (SPI2),
     SYSTEM <= SYSTEM,
     SYSTIMER <= SYSTIMER,
     SW_INTERRUPT <= virtual,
