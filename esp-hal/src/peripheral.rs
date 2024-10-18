@@ -44,7 +44,7 @@ impl<'a, T> PeripheralRef<'a, T> {
     /// You should strongly prefer using `reborrow()` instead. It returns a
     /// `PeripheralRef` that borrows `self`, which allows the borrow checker
     /// to enforce this at compile time.
-    pub unsafe fn clone_unchecked(&mut self) -> PeripheralRef<'a, T>
+    pub unsafe fn clone_unchecked(&self) -> PeripheralRef<'a, T>
     where
         T: Peripheral<P = T>,
     {
@@ -61,6 +61,24 @@ impl<'a, T> PeripheralRef<'a, T> {
         // safety: we're returning the clone inside a new PeripheralRef that borrows
         // self, so user code can't use both at the same time.
         PeripheralRef::new(unsafe { self.inner.clone_unchecked() })
+    }
+
+    /// Map the inner peripheral using `Into`.
+    ///
+    /// This converts from `PeripheralRef<'a, T>` to `PeripheralRef<'a, U>`,
+    /// using an `Into` impl to convert from `T` to `U`.
+    ///
+    /// For example, this can be useful to degrade GPIO pins: converting from
+    /// PeripheralRef<'a, GpioPin<11>>` to `PeripheralRef<'a, AnyPin>`.
+    #[inline]
+    pub fn map_into<U>(self) -> PeripheralRef<'a, U>
+    where
+        T: Into<U>,
+    {
+        PeripheralRef {
+            inner: self.inner.into(),
+            _lifetime: PhantomData,
+        }
     }
 }
 
@@ -137,18 +155,31 @@ pub trait Peripheral: Sized + crate::private::Sealed {
     /// You should strongly prefer using `into_ref()` instead. It returns a
     /// `PeripheralRef`, which allows the borrow checker to enforce this at
     /// compile time.
-    unsafe fn clone_unchecked(&mut self) -> Self::P;
+    unsafe fn clone_unchecked(&self) -> Self::P;
 
     /// Convert a value into a `PeripheralRef`.
     ///
     /// When called on an owned `T`, yields a `PeripheralRef<'static, T>`.
     /// When called on an `&'a mut T`, yields a `PeripheralRef<'a, T>`.
     #[inline]
-    fn into_ref<'a>(mut self) -> PeripheralRef<'a, Self::P>
+    fn into_ref<'a>(self) -> PeripheralRef<'a, Self::P>
     where
         Self: 'a,
     {
         PeripheralRef::new(unsafe { self.clone_unchecked() })
+    }
+
+    /// Map the peripheral using `Into`.
+    ///
+    /// This converts from `Peripheral<P = T>` to `Peripheral<P = U>`,
+    /// using an `Into` impl to convert from `T` to `U`.
+    #[inline]
+    fn map_into<U>(self) -> U
+    where
+        Self::P: Into<U>,
+        U: Peripheral<P = U>,
+    {
+        unsafe { self.clone_unchecked().into() }
     }
 }
 
@@ -158,12 +189,22 @@ where
 {
     type P = P;
 
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
+    unsafe fn clone_unchecked(&self) -> Self::P {
         T::clone_unchecked(self)
     }
 }
 
 impl<T> crate::private::Sealed for &mut T where T: crate::private::Sealed {}
+impl<T> crate::private::Sealed for PeripheralRef<'_, T> where T: crate::private::Sealed {}
+
+impl<T: Peripheral> Peripheral for PeripheralRef<'_, T> {
+    type P = T::P;
+
+    #[inline]
+    unsafe fn clone_unchecked(&self) -> Self::P {
+        T::clone_unchecked(self)
+    }
+}
 
 mod peripheral_macros {
     #[doc(hidden)]
@@ -259,6 +300,17 @@ mod peripheral_macros {
 
     #[doc(hidden)]
     #[macro_export]
+    macro_rules! into_mapped_ref {
+        ($($name:ident),*) => {
+            $(
+                #[allow(unused_mut)]
+                let mut $name = $name.map_into().into_ref();
+            )*
+        }
+    }
+
+    #[doc(hidden)]
+    #[macro_export]
     /// Macro to create a peripheral structure.
     macro_rules! create_peripheral {
         ($(#[$cfg:meta])? $name:ident <= virtual) => {
@@ -288,7 +340,7 @@ mod peripheral_macros {
                 type P = $name;
 
                 #[inline]
-                unsafe fn clone_unchecked(&mut self) -> Self::P {
+                unsafe fn clone_unchecked(&self) -> Self::P {
                     Self::steal()
                 }
             }
@@ -346,7 +398,7 @@ mod peripheral_macros {
                 type P = $name;
 
                 #[inline]
-                unsafe fn clone_unchecked(&mut self) -> Self::P {
+                unsafe fn clone_unchecked(&self) -> Self::P {
                     Self::steal()
                 }
             }

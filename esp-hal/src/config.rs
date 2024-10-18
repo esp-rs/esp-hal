@@ -1,15 +1,15 @@
 //! # Configuration
 //!
 //! ## Overview
-//! This module contains the initial configuation for the system.
+//! This module contains the initial configuration for the system.
 //!
 //! ## Configuration
-//! In the esp_hal::init method, we can configure different parameters for the
-//! system:
+//! In the [`esp_hal::init()`][crate::init] method, we can configure different
+//! parameters for the system:
 //! - CPU clock configuration.
 //! - Watchdog configuration.
 //!
-//! ## Example
+//! ## Examples
 //!
 //! ### Default initialization
 //!
@@ -40,20 +40,21 @@ pub enum WatchdogStatus {
     Disabled,
 }
 
-/// Watchdogs configuration.
+/// Watchdog configuration.
 #[non_exhaustive]
 #[derive(Default)]
 pub struct WatchdogConfig {
     #[cfg(not(any(esp32, esp32s2)))]
-    /// Enable the super watchdog timer, which is slightly less than one second.
+    /// Enable the super watchdog timer, which has a trigger time of slightly
+    /// less than one second.
     pub swd: bool,
     /// Configures the reset watchdog timer.
     pub rwdt: WatchdogStatus,
-    /// Configures the timg0 watchdog timer.
+    /// Configures the `timg0` watchdog timer.
     pub timg0: WatchdogStatus,
     #[cfg(timg1)]
-    /// Configures the timg1 watchdog timer.
+    /// Configures the `timg1` watchdog timer.
     ///
-    /// By default, the bootloader does not enables this watchdog timer.
+    /// By default, the bootloader does not enable this watchdog timer.
     pub timg1: WatchdogStatus,
 }

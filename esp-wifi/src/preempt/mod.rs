@@ -14,7 +14,7 @@ static mut CTX_NOW: Mutex<RefCell<*mut Context>> = Mutex::new(RefCell::new(core:
 
 static mut SCHEDULED_TASK_TO_DELETE: *mut Context = core::ptr::null_mut();
 
-pub fn allocate_main_task() -> *mut Context {
+pub(crate) fn allocate_main_task() -> *mut Context {
     critical_section::with(|cs| unsafe {
         let mut ctx_now = CTX_NOW.borrow_ref_mut(cs);
         if !(*ctx_now).is_null() {
@@ -108,11 +108,11 @@ pub(crate) fn delete_all_tasks() {
     });
 }
 
-pub fn current_task() -> *mut Context {
+pub(crate) fn current_task() -> *mut Context {
     critical_section::with(|cs| unsafe { *CTX_NOW.borrow_ref(cs) })
 }
 
-pub fn schedule_task_deletion(task: *mut Context) {
+pub(crate) fn schedule_task_deletion(task: *mut Context) {
     use crate::timer::yield_task;
 
     unsafe {
@@ -126,7 +126,7 @@ pub fn schedule_task_deletion(task: *mut Context) {
     }
 }
 
-pub fn task_switch(trap_frame: &mut TrapFrame) {
+pub(crate) fn task_switch(trap_frame: &mut TrapFrame) {
     save_task_context(current_task(), trap_frame);
 
     unsafe {

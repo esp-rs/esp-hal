@@ -1142,7 +1142,7 @@ where
         };
 
         let max_div = 0b1111_1111_1111 - 1;
-        let clk_div = ((clk) + (max_div * baudrate) - 1) / (max_div * baudrate);
+        let clk_div = clk.div_ceil(max_div * baudrate);
 
         // UART clocks are configured via PCR
         let pcr = unsafe { &*crate::peripherals::PCR::PTR };
@@ -2531,9 +2531,9 @@ pub mod lp_uart {
 
         fn change_baud_internal(&mut self, baudrate: u32, clock_source: super::ClockSource) {
             // TODO: Currently it's not possible to use XtalD2Clk
-            let clk = 16_000_000;
+            let clk = 16_000_000_u32;
             let max_div = 0b1111_1111_1111 - 1;
-            let clk_div = ((clk) + (max_div * baudrate) - 1) / (max_div * baudrate);
+            let clk_div = clk.div_ceil(max_div * baudrate);
 
             self.uart.clk_conf().modify(|_, w| unsafe {
                 w.sclk_div_a()
