@@ -21,7 +21,7 @@ fn main() -> ! {
     let timg0 = TimerGroup::new_async(peripherals.TIMG0);
     let mut wdt0 = timg0.wdt;
     wdt0.enable();
-    wdt0.set_timeout(2u64.secs());
+    wdt0.set_timeout(0, 2u64.secs()).unwrap();
 
     loop {
         wdt0.feed();
