@@ -9,7 +9,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{Dma, DmaPriority, Mem2Mem},
+    dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf, Mem2Mem},
     dma_buffers,
     prelude::*,
 };
@@ -25,7 +25,9 @@ fn main() -> ! {
 
     let delay = Delay::new();
 
-    let (mut rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DATA_SIZE);
+    let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DATA_SIZE);
+    let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+    let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0.configure(false, DmaPriority::Priority0);
@@ -34,40 +36,48 @@ fn main() -> ! {
     #[cfg(not(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3")))]
     let dma_peripheral = peripherals.MEM2MEM1;
 
-    let mut mem2mem =
-        Mem2Mem::new(channel, dma_peripheral, rx_descriptors, tx_descriptors).unwrap();
+    let mem2mem = Mem2Mem::new(channel, dma_peripheral);
 
-    for i in 0..core::mem::size_of_val(tx_buffer) {
-        tx_buffer[i] = (i % 256) as u8;
+    for (i, b) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
+        *b = (i % 256) as u8;
     }
 
     info!("Starting transfer of {} bytes", DATA_SIZE);
-    let result = mem2mem.start_transfer(&mut rx_buffer, tx_buffer);
-    match result {
-        Ok(dma_wait) => {
-            info!("Transfer started");
-            dma_wait.wait().unwrap();
-            info!("Transfer completed, comparing buffer");
-            let mut error = false;
-            for i in 0..core::mem::size_of_val(tx_buffer) {
-                if rx_buffer[i] != tx_buffer[i] {
-                    error!(
-                        "Error: tx_buffer[{}] = {}, rx_buffer[{}] = {}",
-                        i, tx_buffer[i], i, rx_buffer[i]
-                    );
-                    error = true;
-                    break;
-                }
-            }
-            if !error {
-                info!("Buffers are equal");
-            }
-            info!("Done");
-        }
-        Err(e) => {
-            error!("start_transfer: Error: {:?}", e);
+
+    let tx_transfer = mem2mem.tx.send(dma_tx_buf, true).map_err(|e| e.0).unwrap();
+    let rx_transfer = mem2mem
+        .rx
+        .receive(dma_rx_buf, true)
+        .map_err(|e| e.0)
+        .unwrap();
+
+    info!("Transfer started");
+
+    (_, _, dma_tx_buf) = tx_transfer.wait();
+    (_, dma_rx_buf) = rx_transfer.stop();
+
+    info!("Transfer completed, comparing buffer");
+
+    let mut error = false;
+    for (i, (rx, tx)) in dma_rx_buf
+        .as_slice()
+        .iter()
+        .zip(dma_tx_buf.as_slice())
+        .enumerate()
+    {
+        if rx != tx {
+            error!(
+                "Error: tx_buffer[{}] = {}, rx_buffer[{}] = {}",
+                i, tx, i, rx
+            );
+            error = true;
+            break;
         }
     }
+    if !error {
+        info!("Buffers are equal");
+    }
+    info!("Done");
 
     loop {
         delay.delay(2.secs());

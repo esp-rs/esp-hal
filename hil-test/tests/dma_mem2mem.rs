@@ -6,10 +6,8 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{AnyGdmaChannel, Channel, Dma, DmaError, DmaPriority, Mem2Mem},
+    dma::{AnyGdmaChannel, Channel, Dma, DmaPriority, DmaRxBuf, DmaTxBuf, Mem2Mem},
     dma_buffers,
-    dma_buffers_chunk_size,
-    dma_descriptors,
     Blocking,
 };
 use hil_test as _;
@@ -58,114 +56,93 @@ mod tests {
     }
 
     #[test]
-    fn test_internal_mem2mem(ctx: Context) {
-        let (mut rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DATA_SIZE);
+    fn test_mem2mem_rx_receives_tx(ctx: Context) {
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DATA_SIZE);
+        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        let mut mem2mem = Mem2Mem::new(
-            ctx.channel,
-            ctx.dma_peripheral,
-            rx_descriptors,
-            tx_descriptors,
-        )
-        .unwrap();
+        let mem2mem = Mem2Mem::new(ctx.channel, ctx.dma_peripheral);
 
-        for i in 0..core::mem::size_of_val(tx_buffer) {
-            tx_buffer[i] = (i % 256) as u8;
+        for (i, b) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
+            *b = (i % 256) as u8;
         }
-        let dma_wait = mem2mem.start_transfer(&mut rx_buffer, &tx_buffer).unwrap();
-        dma_wait.wait().unwrap();
-        for i in 0..core::mem::size_of_val(tx_buffer) {
-            assert_eq!(rx_buffer[i], tx_buffer[i]);
-        }
+
+        let rx_transfer = mem2mem
+            .rx
+            .receive(dma_rx_buf, true)
+            .map_err(|e| e.0)
+            .unwrap();
+        let tx_transfer = mem2mem.tx.send(dma_tx_buf, true).map_err(|e| e.0).unwrap();
+
+        let (_, _, dma_tx_buf) = tx_transfer.wait();
+        let (_, dma_rx_buf) = rx_transfer.stop();
+
+        assert_eq!(dma_rx_buf.as_slice(), dma_tx_buf.as_slice());
     }
 
     #[test]
-    fn test_internal_mem2mem_chunk_size(ctx: Context) {
-        const CHUNK_SIZE: usize = 2048;
+    fn test_mem2mem_rx_receives_multiple_tx(ctx: Context) {
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DATA_SIZE);
+        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        let (tx_buffer, tx_descriptors, mut rx_buffer, rx_descriptors) =
-            dma_buffers_chunk_size!(DATA_SIZE, CHUNK_SIZE);
+        let mem2mem = Mem2Mem::new(ctx.channel, ctx.dma_peripheral);
 
-        let mut mem2mem = Mem2Mem::new_with_chunk_size(
-            ctx.channel,
-            ctx.dma_peripheral,
-            rx_descriptors,
-            tx_descriptors,
-            CHUNK_SIZE,
-        )
-        .unwrap();
+        let data_to_send: &[_; 100] = &core::array::from_fn(|i| (i % 256) as _);
+        dma_tx_buf.fill(data_to_send);
 
-        for i in 0..core::mem::size_of_val(tx_buffer) {
-            tx_buffer[i] = (i % 256) as u8;
+        let rx_transfer = mem2mem
+            .rx
+            .receive(dma_rx_buf, true)
+            .map_err(|e| e.0)
+            .unwrap();
+
+        let mut tx_transfer = mem2mem.tx.send(dma_tx_buf, true).map_err(|e| e.0).unwrap();
+        for _ in 0..2 {
+            let (_, tx, dma_tx_buf) = tx_transfer.wait();
+            tx_transfer = tx.send(dma_tx_buf, true).map_err(|e| e.0).unwrap();
         }
-        let dma_wait = mem2mem.start_transfer(&mut rx_buffer, &tx_buffer).unwrap();
-        dma_wait.wait().unwrap();
-        for i in 0..core::mem::size_of_val(tx_buffer) {
-            assert_eq!(rx_buffer[i], tx_buffer[i]);
-        }
+        let (_, _, _) = tx_transfer.wait();
+
+        let (_, dma_rx_buf) = rx_transfer.stop();
+
+        let mut packets = dma_rx_buf.received_data();
+
+        assert_eq!(data_to_send, packets.next().unwrap());
+        assert_eq!(data_to_send, packets.next().unwrap());
+        assert_eq!(data_to_send, packets.next().unwrap());
+        assert!(packets.next().is_none());
     }
 
     #[test]
-    fn test_mem2mem_errors_zero_tx(ctx: Context) {
-        use esp_hal::dma::CHUNK_SIZE;
+    fn test_mem2mem_multiple_rx_receives_tx(ctx: Context) {
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DATA_SIZE);
+        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        let (rx_descriptors, tx_descriptors) = dma_descriptors!(1024, 0);
-        match Mem2Mem::new_with_chunk_size(
-            ctx.channel,
-            ctx.dma_peripheral,
-            rx_descriptors,
-            tx_descriptors,
-            CHUNK_SIZE,
-        ) {
-            Err(DmaError::OutOfDescriptors) => (),
-            _ => panic!("Expected OutOfDescriptors"),
+        let mem2mem = Mem2Mem::new(ctx.channel, ctx.dma_peripheral);
+
+        for (i, b) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
+            *b = (i % 256) as u8;
         }
-    }
 
-    #[test]
-    fn test_mem2mem_errors_zero_rx(ctx: Context) {
-        use esp_hal::dma::CHUNK_SIZE;
+        dma_rx_buf.set_length(10);
 
-        let (rx_descriptors, tx_descriptors) = dma_descriptors!(0, 1024);
-        match Mem2Mem::new_with_chunk_size(
-            ctx.channel,
-            ctx.dma_peripheral,
-            rx_descriptors,
-            tx_descriptors,
-            CHUNK_SIZE,
-        ) {
-            Err(DmaError::OutOfDescriptors) => (),
-            _ => panic!("Expected OutOfDescriptors"),
+        let tx_transfer = mem2mem.tx.send(dma_tx_buf, true).map_err(|e| e.0).unwrap();
+
+        let mut bytes = (0..).into_iter();
+        let mut rx = mem2mem.rx;
+        for _ in 0..10 {
+            let rx_transfer = rx.receive(dma_rx_buf, false).map_err(|e| e.0).unwrap();
+            (_, rx, dma_rx_buf) = rx_transfer.wait();
+
+            let received = dma_rx_buf.received_data().next().unwrap();
+            assert_eq!(received.len(), 10);
+            for b in received {
+                assert_eq!(*b, bytes.next().unwrap());
+            }
         }
-    }
 
-    #[test]
-    fn test_mem2mem_errors_chunk_size_too_small(ctx: Context) {
-        let (rx_descriptors, tx_descriptors) = dma_descriptors!(1024, 1024);
-        match Mem2Mem::new_with_chunk_size(
-            ctx.channel,
-            ctx.dma_peripheral,
-            rx_descriptors,
-            tx_descriptors,
-            0,
-        ) {
-            Err(DmaError::InvalidChunkSize) => (),
-            _ => panic!("Expected InvalidChunkSize"),
-        }
-    }
-
-    #[test]
-    fn test_mem2mem_errors_chunk_size_too_big(ctx: Context) {
-        let (rx_descriptors, tx_descriptors) = dma_descriptors!(1024, 1024);
-        match Mem2Mem::new_with_chunk_size(
-            ctx.channel,
-            ctx.dma_peripheral,
-            rx_descriptors,
-            tx_descriptors,
-            4093,
-        ) {
-            Err(DmaError::InvalidChunkSize) => (),
-            _ => panic!("Expected InvalidChunkSize"),
-        }
+        tx_transfer.stop();
     }
 }
