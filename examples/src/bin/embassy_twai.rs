@@ -37,7 +37,6 @@ use esp_backtrace as _;
 use esp_hal::{
     gpio::Io,
     interrupt,
-    peripherals::{self, TWAI0},
     timer::timg::TimerGroup,
     twai::{self, EspTwaiFrame, StandardId, TwaiMode, TwaiRx, TwaiTx},
 };
@@ -47,10 +46,7 @@ use static_cell::StaticCell;
 type TwaiOutbox = Channel<NoopRawMutex, EspTwaiFrame, 16>;
 
 #[embassy_executor::task]
-async fn receiver(
-    mut rx: TwaiRx<'static, TWAI0, esp_hal::Async>,
-    channel: &'static TwaiOutbox,
-) -> ! {
+async fn receiver(mut rx: TwaiRx<'static, esp_hal::Async>, channel: &'static TwaiOutbox) -> ! {
     loop {
         let frame = rx.receive_async().await;
 
@@ -72,10 +68,7 @@ async fn receiver(
 }
 
 #[embassy_executor::task]
-async fn transmitter(
-    mut tx: TwaiTx<'static, TWAI0, esp_hal::Async>,
-    channel: &'static TwaiOutbox,
-) -> ! {
+async fn transmitter(mut tx: TwaiTx<'static, esp_hal::Async>, channel: &'static TwaiOutbox) -> ! {
     loop {
         let frame = channel.receive().await;
         let result = tx.transmit_async(&frame).await;
@@ -111,17 +104,18 @@ async fn main(spawner: Spawner) {
     // The speed of the bus.
     const TWAI_BAUDRATE: twai::BaudRate = twai::BaudRate::B125K;
 
-    // !!! Use `new_async` when using a transceiver. `new_async_no_transceiver` sets TX to open-drain
+    // !!! Use `new` when using a transceiver. `new_no_transceiver` sets TX to open-drain
 
     // Begin configuring the TWAI peripheral. The peripheral is in a reset like
     // state that prevents transmission but allows configuration.
-    let mut twai_config = twai::TwaiConfiguration::new_async_no_transceiver(
+    let mut twai_config = twai::TwaiConfiguration::new_no_transceiver(
         peripherals.TWAI0,
         rx_pin,
         tx_pin,
         TWAI_BAUDRATE,
         TwaiMode::Normal,
-    );
+    )
+    .into_async();
 
     // Partially filter the incoming messages to reduce overhead of receiving
     // undesired messages. Note that due to how the hardware filters messages,
@@ -140,12 +134,6 @@ async fn main(spawner: Spawner) {
 
     // Get separate transmit and receive halves of the peripheral.
     let (rx, tx) = twai.split();
-
-    interrupt::enable(
-        peripherals::Interrupt::TWAI0,
-        interrupt::Priority::Priority1,
-    )
-    .unwrap();
 
     static CHANNEL: StaticCell<TwaiOutbox> = StaticCell::new();
     let channel = &*CHANNEL.init(Channel::new());

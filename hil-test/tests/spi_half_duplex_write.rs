@@ -10,7 +10,6 @@ use esp_hal::{
     dma_buffers,
     gpio::{interconnect::InputSignal, Io},
     pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
-    peripherals::SPI2,
     prelude::*,
     spi::{
         master::{Address, Command, HalfDuplexReadWrite, Spi, SpiDma},
@@ -23,7 +22,7 @@ use esp_hal::{
 use hil_test as _;
 
 struct Context {
-    spi: SpiDma<'static, SPI2, HalfDuplexMode, Blocking>,
+    spi: SpiDma<'static, HalfDuplexMode, Blocking>,
     pcnt_unit: Unit<'static, 0>,
     pcnt_source: InputSignal,
 }
