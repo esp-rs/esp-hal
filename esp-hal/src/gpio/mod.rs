@@ -2459,6 +2459,7 @@ mod asynch {
 
     use super::*;
 
+    #[ram]
     pub(super) static PIN_WAKERS: [AtomicWaker; NUM_PINS] =
         [const { AtomicWaker::new() }; NUM_PINS];
 
