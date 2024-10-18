@@ -104,7 +104,7 @@ log = ["dep:log"]
 
 # Chip Support Feature Flags
 # Target the ESP32.
-esp32   = ["dep:esp32",   "xtensa", "xtensa-lx/spin", "xtensa-lx-rt/esp32"]
+esp32   = ["dep:esp32",   "xtensa", "xtensa-lx-rt/esp32"]
 # Target the ESP32-C2.
 esp32c2 = ["dep:esp32c2", "riscv",  "portable-atomic/unsafe-assume-single-core"]
 # Target the ESP32-C3.
@@ -116,7 +116,7 @@ esp32h2 = ["dep:esp32h2", "riscv", "esp-riscv-rt/rtc-ram"]
 # Target the ESP32-S2.
 esp32s2 = ["dep:esp32s2", "xtensa", "portable-atomic/critical-section", "procmacros/has-ulp-core", "xtensa-lx-rt/esp32s2", "usb-otg"]
 # Target the ESP32-S3.
-esp32s3 = ["dep:esp32s3", "xtensa", "procmacros/has-ulp-core", "xtensa-lx/spin", "xtensa-lx-rt/esp32s3", "usb-otg"]
+esp32s3 = ["dep:esp32s3", "xtensa", "procmacros/has-ulp-core", "xtensa-lx-rt/esp32s3", "usb-otg"]
 
 #! ### RISC-V Exclusive Feature Flags
 ## Move the stack to start of RAM to get zero-cost stack overflow protection

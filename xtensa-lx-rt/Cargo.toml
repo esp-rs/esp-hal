@@ -13,7 +13,6 @@ categories   = ["embedded", "hardware-support", "no-std"]
 features = ["esp32"]
 
 [dependencies]
-bare-metal        = "1.0.0"
 document-features = "0.2.10"
 macros            = { version = "0.2.2", package = "xtensa-lx-rt-proc-macros", path = "./procmacros" }
 r0                = "1.0.0"
