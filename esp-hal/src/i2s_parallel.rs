@@ -384,6 +384,7 @@ impl<'d, I: Instance, DM: Mode> I2sParallel<'d, I, DM> {
         if let Err(err) = result {
             return Err((err, self, data));
         }
+        crate::rom::ets_delay_us(1);
         I::tx_start();
         Ok(I2sParallelTransfer {
             i2s: ManuallyDrop::new(self),
