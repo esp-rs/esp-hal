@@ -9,7 +9,6 @@ use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{Io, Level, Output},
-    peripherals::SPI2,
     prelude::*,
     spi::{
         master::{Address, Command, HalfDuplexReadWrite, Spi, SpiDma},
@@ -22,7 +21,7 @@ use esp_hal::{
 use hil_test as _;
 
 struct Context {
-    spi: SpiDma<'static, SPI2, HalfDuplexMode, Blocking>,
+    spi: SpiDma<'static, HalfDuplexMode, Blocking>,
     miso_mirror: Output<'static>,
 }
 
