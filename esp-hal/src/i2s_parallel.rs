@@ -399,12 +399,6 @@ impl<'d, I: Instance, DM: Mode> I2sParallel<'d, I, DM> {
             buf_view: ManuallyDrop::new(data.into_view()),
         })
     }
-
-    #[cfg(all(feature = "debug", feature = "log"))]
-    /// Dump the I2S peripheral configuration
-    pub fn dump(&self) {
-        I::dump();
-    }
 }
 
 /// Represents an ongoing (or potentially finished) transfer using the i2s
@@ -436,12 +430,6 @@ where
         let i2s = unsafe { ManuallyDrop::take(&mut self.i2s) };
         let view = unsafe { ManuallyDrop::take(&mut self.buf_view) };
         (i2s, BUF::from_view(view))
-    }
-
-    #[cfg(all(feature = "debug", feature = "log"))]
-    /// Dump the I2S peripheral configuration
-    pub fn dump(&self) {
-        I::dump();
     }
 }
 
@@ -746,24 +734,6 @@ pub trait Instance: Signals + RegBlock {
             w.fifo_force_pu().set_bit();
             w.fifo_force_pd().clear_bit()
         });
-    }
-
-    #[cfg(all(feature = "debug", feature = "log"))]
-    /// Dump the I2S peripheral configuration
-    fn dump() {
-        let r = Self::register_block();
-        info!("conf: {:#?}", r.conf().read());
-        info!("conf1: {:#?}", r.conf1().read());
-        info!("conf2: {:#?}", r.conf2().read());
-        info!("conf_chan: {:#?}", r.conf_chan().read());
-        // info!("timing: {:#?}", r.timing().read());
-        info!("sample_rate_conf: {:#?}", r.sample_rate_conf().read());
-        info!("fifo_conf: {:#?}", r.fifo_conf().read());
-        info!("lc_conf: {:#?}", r.lc_conf().read());
-        info!("int_raw: {:#?}", r.int_raw().read());
-        // info!("int_st: {:#?}", r.int_st().read());
-        // info!("int_ena: {:#?}", r.int_ena().read());
-        info!("state: {:#?}", r.state().read());
     }
 }
 
