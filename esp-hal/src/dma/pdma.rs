@@ -366,11 +366,11 @@ macro_rules! ImplSpiChannel {
                 }
             }
 
-            impl DmaChannelConvert<AnyPdmaSpiChannel> for [<Spi $num DmaChannel>] {
-                fn degrade_rx(rx: SpiDmaRxChannelImpl<Self>) -> SpiDmaRxChannelImpl<AnySpiDmaChannel> {
+            impl DmaChannelConvert<AnySpiDmaChannel> for [<Spi $num DmaChannel>] {
+                fn degrade_rx(rx: SpiDmaRxChannelImpl<Self>) -> SpiDmaRxChannelImpl<AnySpiDmaChannelInner> {
                     SpiDmaRxChannelImpl(rx.0.into())
                 }
-                fn degrade_tx(tx: SpiDmaTxChannelImpl<Self>) -> SpiDmaTxChannelImpl<AnySpiDmaChannel> {
+                fn degrade_tx(tx: SpiDmaTxChannelImpl<Self>) -> SpiDmaTxChannelImpl<AnySpiDmaChannelInner> {
                     SpiDmaTxChannelImpl(tx.0.into())
                 }
             }
@@ -908,32 +908,32 @@ where
 }
 
 /// A marker for SPI-compatible type-erased DMA channels.
-pub struct AnyPdmaSpiChannel;
+pub struct AnySpiDmaChannel;
 
-impl crate::private::Sealed for AnyPdmaSpiChannel {}
+impl crate::private::Sealed for AnySpiDmaChannel {}
 
-impl DmaChannel for AnyPdmaSpiChannel {
-    type Rx = SpiDmaRxChannelImpl<AnySpiDmaChannel>;
-    type Tx = SpiDmaTxChannelImpl<AnySpiDmaChannel>;
+impl DmaChannel for AnySpiDmaChannel {
+    type Rx = SpiDmaRxChannelImpl<AnySpiDmaChannelInner>;
+    type Tx = SpiDmaTxChannelImpl<AnySpiDmaChannelInner>;
 }
 
 crate::any_enum! {
     #[doc(hidden)]
-    pub enum AnySpiDmaChannel {
+    pub enum AnySpiDmaChannelInner {
         Spi2(Spi2DmaChannel),
         Spi3(Spi3DmaChannel),
     }
 }
 
-impl crate::private::Sealed for AnySpiDmaChannel {}
+impl crate::private::Sealed for AnySpiDmaChannelInner {}
 
-impl PdmaChannel for AnySpiDmaChannel {
+impl PdmaChannel for AnySpiDmaChannelInner {
     type RegisterBlock = SpiRegisterBlock;
 
     delegate::delegate! {
         to match self {
-            AnySpiDmaChannel::Spi2(channel) => channel,
-            AnySpiDmaChannel::Spi3(channel) => channel,
+            AnySpiDmaChannelInner::Spi2(channel) => channel,
+            AnySpiDmaChannelInner::Spi3(channel) => channel,
         } {
             fn register_block(&self) -> &SpiRegisterBlock;
             fn tx_waker(&self) -> &'static AtomicWaker;
