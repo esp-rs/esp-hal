@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Pins::steal()` to unsafely obtain GPIO. (#2335)
 - `I2c::with_timeout` (#2361)
 - `Spi::half_duplex_read` and `Spi::half_duplex_write` (#2373)
+- I2S Parallel output driver for esp32. (#2348)
 
 ### Changed
 
