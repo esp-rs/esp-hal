@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Spi::half_duplex_read` and `Spi::half_duplex_write` (#2373)
 - `Cpu::COUNT` and `Cpu::current()` (#2411)
 - `UartInterrupt` and related functions (#2406)
+- `Cpu::COUNT` and `Cpu::current()` (#?)
+- I2S Parallel output driver for esp32. (#2348)
 
 ### Changed
 

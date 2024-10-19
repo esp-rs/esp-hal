@@ -1,11 +1,19 @@
-//! # Parallel Interface
+//! # Parallel Interface (via I2S)
 //!
 //! ## Overview
+//! The I2S parallel interface allows for high-speed data transfer between the
+//! ESP32 and external devices. It is commonly used to external devices such as
+//! LED matrix, LCD display, and Printer. Only TX is implemented. Each
+//! unit can have up to 8 or 16 data signals (depending on your target hardware)
+//! plus 1 clock signal.
 //!
 //! ## Notes
 //!
-//! - In 16 bit mode the buffer needs to be interleaved and is expected to have
-//!   a length thats a multiple of 32 bits
+//! Data output is interleaved:
+//! - 8bit: [A, B, C, D] is output as [C, D, A, B]  (i.e., swapped as 16bit
+//!   words)
+//! - 16bit: [A, B, C, D] is output as [B, A, D, C] (i.e., 16bit words are
+//!   swapped)
 //!
 //! ## Configuration
 //!
