@@ -69,9 +69,8 @@
 //! `is_done()`.
 //!
 //! See [tracking issue](https://github.com/esp-rs/esp-hal/issues/469) for more information.
-use core::marker::PhantomData;
 
-use super::{Error, FullDuplexMode, SpiMode};
+use super::{Error, SpiMode};
 use crate::{
     dma::{DescriptorChain, DmaChannelConvert, DmaEligible, PeripheralMarker, Rx, Tx},
     gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
@@ -87,14 +86,13 @@ const MAX_DMA_SIZE: usize = 32768 - 32;
 /// SPI peripheral driver.
 ///
 /// See the [module-level documentation][self] for more details.
-pub struct Spi<'d, M, T = AnySpi> {
+pub struct Spi<'d, T = AnySpi> {
     spi: PeripheralRef<'d, T>,
     #[allow(dead_code)]
     data_mode: SpiMode,
-    _mode: PhantomData<M>,
 }
 
-impl<'d> Spi<'d, FullDuplexMode> {
+impl<'d> Spi<'d> {
     /// Constructs an SPI instance in 8bit dataframe mode.
     pub fn new<
         SCK: PeripheralInput,
@@ -108,12 +106,12 @@ impl<'d> Spi<'d, FullDuplexMode> {
         miso: impl Peripheral<P = MISO> + 'd,
         cs: impl Peripheral<P = CS> + 'd,
         mode: SpiMode,
-    ) -> Spi<'d, FullDuplexMode> {
+    ) -> Spi<'d> {
         Self::new_typed(spi, sclk, mosi, miso, cs, mode)
     }
 }
 
-impl<'d, T> Spi<'d, FullDuplexMode, T>
+impl<'d, T> Spi<'d, T>
 where
     T: Instance,
 {
@@ -130,7 +128,7 @@ where
         miso: impl Peripheral<P = MISO> + 'd,
         cs: impl Peripheral<P = CS> + 'd,
         mode: SpiMode,
-    ) -> Spi<'d, FullDuplexMode, T> {
+    ) -> Spi<'d, T> {
         crate::into_ref!(sclk, mosi, miso, cs);
 
         let this = Self::new_internal(spi, mode);
@@ -154,13 +152,12 @@ where
     pub(crate) fn new_internal(
         spi: impl Peripheral<P = impl Into<T> + 'd> + 'd,
         mode: SpiMode,
-    ) -> Spi<'d, FullDuplexMode, T> {
+    ) -> Spi<'d, T> {
         crate::into_ref!(spi);
 
         let mut spi = Spi {
             spi: spi.map_into(),
             data_mode: mode,
-            _mode: PhantomData,
         };
         spi.spi.reset_peripheral();
         spi.spi.enable_peripheral();
@@ -193,7 +190,7 @@ pub mod dma {
         Mode,
     };
 
-    impl<'d, T> Spi<'d, FullDuplexMode, T>
+    impl<'d, T> Spi<'d, T>
     where
         T: InstanceDma,
     {

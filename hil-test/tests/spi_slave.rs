@@ -12,7 +12,7 @@ use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::{interconnect::InputSignal, Io, Level, Output, PeripheralInput},
-    spi::{slave::Spi, FullDuplexMode, SpiMode},
+    spi::{slave::Spi, SpiMode},
 };
 use hil_test as _;
 
@@ -25,7 +25,7 @@ cfg_if::cfg_if! {
 }
 
 struct Context {
-    spi: Spi<'static, FullDuplexMode>,
+    spi: Spi<'static>,
     dma_channel: DmaChannelCreator,
     bitbang_spi: BitbangSpi,
 }

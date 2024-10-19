@@ -11,8 +11,7 @@ use esp_hal::{
     gpio::{Io, Level, Output},
     prelude::*,
     spi::{
-        master::{Address, Command, HalfDuplexReadWrite, Spi, SpiDma},
-        HalfDuplexMode,
+        master::{Address, Command, Spi, SpiDma},
         SpiDataMode,
         SpiMode,
     },
@@ -21,7 +20,7 @@ use esp_hal::{
 use hil_test as _;
 
 struct Context {
-    spi: SpiDma<'static, HalfDuplexMode, Blocking>,
+    spi: SpiDma<'static, Blocking>,
     miso_mirror: Output<'static>,
 }
 
@@ -50,7 +49,7 @@ mod tests {
             }
         }
 
-        let spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
+        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
             .with_sck(sclk)
             .with_miso(miso)
             .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
@@ -72,7 +71,7 @@ mod tests {
         let mut spi = ctx.spi;
 
         let transfer = spi
-            .read(
+            .half_duplex_read(
                 SpiDataMode::Single,
                 Command::None,
                 Address::None,
@@ -89,7 +88,7 @@ mod tests {
         ctx.miso_mirror.set_high();
 
         let transfer = spi
-            .read(
+            .half_duplex_read(
                 SpiDataMode::Single,
                 Command::None,
                 Address::None,
@@ -120,7 +119,7 @@ mod tests {
         ctx.miso_mirror.set_low();
 
         let mut buffer = [0xAA; DMA_BUFFER_SIZE];
-        spi.read(
+        spi.half_duplex_read(
             SpiDataMode::Single,
             Command::None,
             Address::None,
@@ -134,7 +133,7 @@ mod tests {
         // SPI should read '1's from the MISO pin
         ctx.miso_mirror.set_high();
 
-        spi.read(
+        spi.half_duplex_read(
             SpiDataMode::Single,
             Command::None,
             Address::None,

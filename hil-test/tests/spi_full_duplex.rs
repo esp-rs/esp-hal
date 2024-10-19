@@ -15,8 +15,9 @@ use esp_hal::{
     dma::{Dma, DmaDescriptor, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{Io, Level, NoPin},
+    peripheral::Peripheral,
     prelude::*,
-    spi::{master::Spi, FullDuplexMode, SpiMode},
+    spi::{master::Spi, SpiMode},
 };
 #[cfg(pcnt)]
 use esp_hal::{
@@ -34,7 +35,7 @@ cfg_if::cfg_if! {
 }
 
 struct Context {
-    spi: Spi<'static, FullDuplexMode>,
+    spi: Spi<'static>,
     dma_channel: DmaChannelCreator,
     // Reuse the really large buffer so we don't run out of DRAM with many tests
     rx_buffer: &'static mut [u8],
@@ -72,11 +73,12 @@ mod tests {
 
         #[cfg(pcnt)]
         let mosi_loopback_pcnt = mosi.peripheral_input();
-        let mosi_loopback = mosi.peripheral_input();
+        // Need to set miso first so that mosi can overwrite the
+        // output connection (because we are using the same pin to loop back)
         let spi = Spi::new(peripherals.SPI2, 10000.kHz(), SpiMode::Mode0)
             .with_sck(sclk)
-            .with_mosi(mosi)
-            .with_miso(mosi_loopback);
+            .with_miso(unsafe { mosi.clone_unchecked() })
+            .with_mosi(mosi);
 
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
 

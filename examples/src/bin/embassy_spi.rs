@@ -59,7 +59,10 @@ async fn main(_spawner: Spawner) {
     let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
     let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-        .with_pins(sclk, mosi, miso, cs)
+        .with_sck(sclk)
+        .with_mosi(mosi)
+        .with_miso(miso)
+        .with_cs(cs)
         .with_dma(dma_channel.configure_for_async(false, DmaPriority::Priority0))
         .with_buffers(dma_rx_buf, dma_tx_buf);
 

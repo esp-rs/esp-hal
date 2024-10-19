@@ -76,9 +76,6 @@ pub enum SpiBitOrder {
     LSBFirst,
 }
 
-/// Trait marker for defining SPI duplex modes.
-pub trait DuplexMode: crate::private::Sealed {}
-
 /// SPI data mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -90,16 +87,6 @@ pub enum SpiDataMode {
     /// `Quad` Data Mode - 4 bit, 4 wires
     Quad,
 }
-
-/// Full-duplex operation
-pub struct FullDuplexMode {}
-impl DuplexMode for FullDuplexMode {}
-impl crate::private::Sealed for FullDuplexMode {}
-
-/// Half-duplex operation
-pub struct HalfDuplexMode {}
-impl DuplexMode for HalfDuplexMode {}
-impl crate::private::Sealed for HalfDuplexMode {}
 
 crate::any_peripheral! {
     /// Any SPI peripheral.

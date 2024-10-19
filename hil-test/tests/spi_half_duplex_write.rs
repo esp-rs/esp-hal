@@ -12,8 +12,7 @@ use esp_hal::{
     pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
     prelude::*,
     spi::{
-        master::{Address, Command, HalfDuplexReadWrite, Spi, SpiDma},
-        HalfDuplexMode,
+        master::{Address, Command, Spi, SpiDma},
         SpiDataMode,
         SpiMode,
     },
@@ -22,7 +21,7 @@ use esp_hal::{
 use hil_test as _;
 
 struct Context {
-    spi: SpiDma<'static, HalfDuplexMode, Blocking>,
+    spi: SpiDma<'static, Blocking>,
     pcnt_unit: Unit<'static, 0>,
     pcnt_source: InputSignal,
 }
@@ -53,7 +52,7 @@ mod tests {
 
         let mosi_loopback = mosi.peripheral_input();
 
-        let spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
+        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
             .with_sck(sclk)
             .with_mosi(mosi)
             .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
@@ -84,7 +83,7 @@ mod tests {
         dma_tx_buf.fill(&[0b0110_1010; DMA_BUFFER_SIZE]);
 
         let transfer = spi
-            .write(
+            .half_duplex_write(
                 SpiDataMode::Single,
                 Command::None,
                 Address::None,
@@ -98,7 +97,7 @@ mod tests {
         assert_eq!(unit.get_value(), (3 * DMA_BUFFER_SIZE) as _);
 
         let transfer = spi
-            .write(
+            .half_duplex_write(
                 SpiDataMode::Single,
                 Command::None,
                 Address::None,
@@ -130,7 +129,7 @@ mod tests {
 
         let buffer = [0b0110_1010; DMA_BUFFER_SIZE];
         // Write the buffer where each byte has 3 pos edges.
-        spi.write(
+        spi.half_duplex_write(
             SpiDataMode::Single,
             Command::None,
             Address::None,
@@ -141,7 +140,7 @@ mod tests {
 
         assert_eq!(unit.get_value(), (3 * DMA_BUFFER_SIZE) as _);
 
-        spi.write(
+        spi.half_duplex_write(
             SpiDataMode::Single,
             Command::None,
             Address::None,
