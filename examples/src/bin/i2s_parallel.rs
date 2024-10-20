@@ -75,22 +75,18 @@ fn main() -> ! {
         core::slice::from_raw_parts_mut(ptr as *mut u8, len)
     };
 
-    let mut tx_buf = Some(DmaTxBuf::new(tx_descriptors, tx_buffer).expect("DmaTxBuf::new failed"));
+    let mut tx_buf: DmaTxBuf = DmaTxBuf::new(tx_descriptors, tx_buffer).expect("DmaTxBuf::new failed");
 
-    // parallel.dump();
-    let mut parallel = Some(parallel);
+    let mut parallel = parallel;
     info!("Sending {} bytes!", BUFFER_SIZE);
     loop {
-        let p = parallel.take().unwrap();
-        let xfer = match p.send(tx_buf.take().unwrap()) {
+        let xfer = match parallel.send(tx_buf) {
             Ok(xfer) => xfer,
             Err(_) => {
                 panic!("Failed to send buffer");
             }
         };
-        let (p, b) = xfer.wait();
-        parallel = Some(p);
-        tx_buf = Some(b);
+        (parallel, tx_buf) = xfer.wait();
         delay.delay_millis(10);
     }
 }
