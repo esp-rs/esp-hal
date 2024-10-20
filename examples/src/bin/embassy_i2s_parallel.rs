@@ -2,7 +2,8 @@
 //! rate with a delay of 10ms between each transfer.
 //!
 //! The following wiring is assumed:
-//! - Data pins => GPIO16, GPIO4, GPIO17, GPIO18, GPIO5, GPIO19, GPIO12, and GPIO14
+//! - Data pins => GPIO16, GPIO4, GPIO17, GPIO18, GPIO5, GPIO19, GPIO12, and
+//!   GPIO14
 //! - Clock output pin => GPIO25
 //!
 //! You can use a logic analyzer to see how the pins are used.
@@ -57,9 +58,9 @@ async fn main(_spawner: Spawner) {
     );
 
     let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, BUFFER_SIZE);
-    let parallel = I2sParallel::new(
+    let mut parallel = I2sParallel::new(
         i2s,
-        dma_channel.configure(false, DmaPriority::Priority0),
+        dma_channel.configure_for_async(false, DmaPriority::Priority0),
         1.MHz(),
         pins,
         clock,
@@ -81,22 +82,18 @@ async fn main(_spawner: Spawner) {
         core::slice::from_raw_parts_mut(ptr as *mut u8, len)
     };
 
-    let mut tx_buf = Some(DmaTxBuf::new(tx_descriptors, tx_buffer).expect("DmaTxBuf::new failed"));
+    let mut tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).expect("DmaTxBuf::new failed");
 
-    // parallel.dump();
-    let mut parallel = Some(parallel);
     info!("Sending {} bytes!", BUFFER_SIZE);
     loop {
-        let p = parallel.take().unwrap();
-        let xfer = match p.send(tx_buf.take().unwrap()) {
+        let mut xfer = match parallel.send(tx_buf) {
             Ok(xfer) => xfer,
             Err(_) => {
                 panic!("Failed to send buffer");
             }
         };
-        let (p, b) = xfer.wait();
-        parallel = Some(p);
-        tx_buf = Some(b);
+        xfer.wait_for_done().await.expect("Failed to send buffer");
+        (parallel, tx_buf) = xfer.wait();
         Timer::after_millis(10).await;
     }
 }

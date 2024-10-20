@@ -51,7 +51,7 @@ fn main() -> ! {
     );
 
     let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, BUFFER_SIZE);
-    let parallel = I2sParallel::new(
+    let mut parallel = I2sParallel::new(
         i2s,
         dma_channel.configure(false, DmaPriority::Priority0),
         1.MHz(),
@@ -75,9 +75,9 @@ fn main() -> ! {
         core::slice::from_raw_parts_mut(ptr as *mut u8, len)
     };
 
-    let mut tx_buf: DmaTxBuf = DmaTxBuf::new(tx_descriptors, tx_buffer).expect("DmaTxBuf::new failed");
+    let mut tx_buf: DmaTxBuf =
+        DmaTxBuf::new(tx_descriptors, tx_buffer).expect("DmaTxBuf::new failed");
 
-    let mut parallel = parallel;
     info!("Sending {} bytes!", BUFFER_SIZE);
     loop {
         let xfer = match parallel.send(tx_buf) {
