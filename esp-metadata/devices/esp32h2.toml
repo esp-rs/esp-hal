@@ -44,6 +44,7 @@ peripherals = [
     "rmt",
     "rng",
     "rsa",
+    "sdm",
     "sha",
     "soc_etm",
     "spi0",

@@ -50,6 +50,7 @@ peripherals = [
     "rmt",
     "rng",
     "rsa",
+    "sdm",
     "sha",
     "slchost",
     "soc_etm",

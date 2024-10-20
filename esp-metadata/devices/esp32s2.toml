@@ -29,6 +29,7 @@ peripherals = [
     "rtc_i2c",
     "rtc_io",
     "sens",
+    "sdm",
     "sha",
     "spi0",
     "spi1",

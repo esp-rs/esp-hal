@@ -216,6 +216,8 @@ pub mod rom;
 pub mod rsa;
 #[cfg(any(lp_clkrst, rtc_cntl))]
 pub mod rtc_cntl;
+#[cfg(sdm)]
+pub mod sdm;
 #[cfg(sha)]
 pub mod sha;
 #[cfg(any(spi0, spi1, spi2, spi3))]

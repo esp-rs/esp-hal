@@ -71,6 +71,7 @@ peripherals = [
     # "rmt",
     # "rsa",
     # "sdhost",
+    # "sdm",
     # "sha",
     # "soc_etm",
     # "spi0",

@@ -37,6 +37,7 @@ peripherals = [
     "rtc_io",
     "sens",
     "sensitive",
+    "sdm",
     "sha",
     "spi0",
     "spi1",

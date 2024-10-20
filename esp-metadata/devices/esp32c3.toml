@@ -26,6 +26,7 @@ peripherals = [
     "rsa",
     "rtc_cntl",
     "sensitive",
+    "sdm",
     "sha",
     "spi0",
     "spi1",
