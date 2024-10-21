@@ -2256,7 +2256,7 @@ pub trait InstanceDma: Instance + DmaEligible {
         self.enable_dma();
 
         if rx_len > 0 {
-            rx.prepare_transfer(self.dma_peripheral(), rx_buffer)
+            rx.prepare_transfer(self.dma_peripheral(), rx_buffer, false)
                 .and_then(|_| rx.start_transfer())?;
         } else {
             #[cfg(esp32)]
@@ -2274,7 +2274,7 @@ pub trait InstanceDma: Instance + DmaEligible {
             }
         }
         if tx_len > 0 {
-            tx.prepare_transfer(self.dma_peripheral(), tx_buffer)
+            tx.prepare_transfer(self.dma_peripheral(), tx_buffer, false)
                 .and_then(|_| tx.start_transfer())?;
         }
 

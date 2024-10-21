@@ -23,6 +23,20 @@ For example:
  }
 ```
 
+## Refactored `Mem2Mem` driver
+
+The `Mem2Mem` driver has been split into an RX and TX half, allowing usage is separate tasks.
+Support for `Dma(Tx|Rx)Buffer`s has also been added
+
+```diff
+- let mem2mem = Mem2Mem::new(channel, dma_peripheral, rx_descriptors, tx_descriptors).unwrap();
++ let mem2mem = Mem2Mem::new(channel, dma_peripheral);
+
+- let transfer = mem2mem.start_transfer(&mut rx_buffer, tx_buffer).unwrap();
++ let tx_transfer = mem2mem.tx.send(dma_tx_buf, true).map_err(|e| e.0).unwrap();
++ let rx_transfer = mem2mem.rx.receive(dma_rx_buf, true).map_err(|e| e.0).unwrap();
+```
+
 ## Peripheral types are now optional
 
 You no longer have to specify the peripheral instance in the driver's type for the following

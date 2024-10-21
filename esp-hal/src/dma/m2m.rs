@@ -1,22 +1,25 @@
-#[cfg(esp32s3)]
-use crate::dma::DmaExtMemBKSize;
+use core::{
+    marker::PhantomData,
+    mem::ManuallyDrop,
+    ops::{Deref, DerefMut},
+};
+
 use crate::{
     dma::{
-        dma_private::{DmaSupport, DmaSupportRx},
         AnyGdmaChannel,
         Channel,
         ChannelRx,
-        DescriptorChain,
+        ChannelTx,
         DmaChannelConvert,
-        DmaDescriptor,
         DmaEligible,
         DmaError,
         DmaPeripheral,
-        DmaTransferRx,
-        ReadBuffer,
+        DmaRxBuffer,
+        DmaRxInterrupt,
+        DmaTxBuffer,
+        DmaTxInterrupt,
         Rx,
         Tx,
-        WriteBuffer,
     },
     Mode,
 };
@@ -30,10 +33,10 @@ pub struct Mem2Mem<'d, M>
 where
     M: Mode,
 {
-    channel: Channel<'d, AnyGdmaChannel, M>,
-    rx_chain: DescriptorChain,
-    tx_chain: DescriptorChain,
-    peripheral: DmaPeripheral,
+    /// RX Half
+    pub rx: Mem2MemRx<'d, M>,
+    /// TX Half
+    pub tx: Mem2MemTx<'d, M>,
 }
 
 impl<'d, M> Mem2Mem<'d, M>
@@ -41,146 +44,288 @@ where
     M: Mode,
 {
     /// Create a new Mem2Mem instance.
-    pub fn new<CH>(
-        channel: Channel<'d, CH, M>,
-        peripheral: impl DmaEligible,
-        rx_descriptors: &'static mut [DmaDescriptor],
-        tx_descriptors: &'static mut [DmaDescriptor],
-    ) -> Result<Self, DmaError>
+    pub fn new<CH>(channel: Channel<'d, CH, M>, peripheral: impl DmaEligible) -> Self
     where
         CH: DmaChannelConvert<AnyGdmaChannel>,
     {
-        unsafe {
-            Self::new_unsafe(
-                channel,
-                peripheral.dma_peripheral(),
-                rx_descriptors,
-                tx_descriptors,
-                crate::dma::CHUNK_SIZE,
-            )
-        }
-    }
-
-    /// Create a new Mem2Mem instance with specific chunk size.
-    pub fn new_with_chunk_size<CH>(
-        channel: Channel<'d, CH, M>,
-        peripheral: impl DmaEligible,
-        rx_descriptors: &'static mut [DmaDescriptor],
-        tx_descriptors: &'static mut [DmaDescriptor],
-        chunk_size: usize,
-    ) -> Result<Self, DmaError>
-    where
-        CH: DmaChannelConvert<AnyGdmaChannel>,
-    {
-        unsafe {
-            Self::new_unsafe(
-                channel,
-                peripheral.dma_peripheral(),
-                rx_descriptors,
-                tx_descriptors,
-                chunk_size,
-            )
-        }
+        unsafe { Self::new_unsafe(channel, peripheral.dma_peripheral()) }
     }
 
     /// Create a new Mem2Mem instance.
     ///
     /// # Safety
     ///
-    /// You must ensure that your not using DMA for the same peripheral and
-    /// that your the only one using the DmaPeripheral.
-    pub unsafe fn new_unsafe<CH>(
-        channel: Channel<'d, CH, M>,
-        peripheral: DmaPeripheral,
-        rx_descriptors: &'static mut [DmaDescriptor],
-        tx_descriptors: &'static mut [DmaDescriptor],
-        chunk_size: usize,
-    ) -> Result<Self, DmaError>
+    /// You must ensure that you're not using DMA for the same peripheral and
+    /// that you're the only one using the DmaPeripheral.
+    pub unsafe fn new_unsafe<CH>(channel: Channel<'d, CH, M>, peripheral: DmaPeripheral) -> Self
     where
         CH: DmaChannelConvert<AnyGdmaChannel>,
     {
-        if !(1..=4092).contains(&chunk_size) {
-            return Err(DmaError::InvalidChunkSize);
+        let mut channel = channel.degrade();
+
+        channel.rx.set_mem2mem_mode(true);
+
+        Mem2Mem {
+            rx: Mem2MemRx {
+                channel: channel.rx,
+                peripheral,
+                _mode: PhantomData,
+            },
+            tx: Mem2MemTx {
+                channel: channel.tx,
+                peripheral,
+                _mode: PhantomData,
+            },
         }
-        if tx_descriptors.is_empty() || rx_descriptors.is_empty() {
-            return Err(DmaError::OutOfDescriptors);
+    }
+}
+
+/// The RX half of [Mem2Mem].
+pub struct Mem2MemRx<'d, M: Mode> {
+    channel: ChannelRx<'d, AnyGdmaChannel>,
+    peripheral: DmaPeripheral,
+    _mode: PhantomData<M>,
+}
+
+impl<'d, M: Mode> Mem2MemRx<'d, M> {
+    /// Start the RX half of a memory to memory transfer.
+    ///
+    /// If `reset` is true, the DMA channel's state machine is reset before
+    /// starting the transfer. (Which is what all other drivers do)
+    /// Keeping it false allows you to gradually receive data in smaller chunks,
+    /// rather than all at once.
+    ///
+    /// Note: You must set `reset` to true if a
+    /// [DmaRxInterrupt::DescriptorError] occurred.
+    pub fn receive<BUF>(
+        mut self,
+        mut buf: BUF,
+        reset: bool,
+    ) -> Result<Mem2MemRxTransfer<'d, M, BUF>, (DmaError, Self, BUF)>
+    where
+        BUF: DmaRxBuffer,
+    {
+        let result = unsafe {
+            self.channel
+                .prepare_transfer(self.peripheral, &mut buf, !reset)
+                .and_then(|_| self.channel.start_transfer())
+        };
+
+        if let Err(e) = result {
+            return Err((e, self, buf));
         }
-        Ok(Mem2Mem {
-            channel: channel.degrade(),
-            peripheral,
-            rx_chain: DescriptorChain::new_with_chunk_size(rx_descriptors, chunk_size),
-            tx_chain: DescriptorChain::new_with_chunk_size(tx_descriptors, chunk_size),
+
+        Ok(Mem2MemRxTransfer {
+            m2m: ManuallyDrop::new(self),
+            buf_view: ManuallyDrop::new(buf.into_view()),
         })
     }
+}
 
-    /// Start a memory to memory transfer.
-    pub fn start_transfer<'t, TXBUF, RXBUF>(
-        &mut self,
-        rx_buffer: &'t mut RXBUF,
-        tx_buffer: &'t TXBUF,
-    ) -> Result<DmaTransferRx<'_, Self>, DmaError>
+/// Represents an ongoing (or potentially finished) DMA Memory-to-Memory RX
+/// transfer.
+pub struct Mem2MemRxTransfer<'d, M: Mode, BUF: DmaRxBuffer> {
+    m2m: ManuallyDrop<Mem2MemRx<'d, M>>,
+    buf_view: ManuallyDrop<BUF::View>,
+}
+
+impl<'d, M: Mode, BUF: DmaRxBuffer> Mem2MemRxTransfer<'d, M, BUF> {
+    /// Returns true when [Self::wait] will not block.
+    pub fn is_done(&self) -> bool {
+        let done_interrupts = DmaRxInterrupt::DescriptorError | DmaRxInterrupt::DescriptorEmpty;
+        !self
+            .m2m
+            .channel
+            .pending_in_interrupts()
+            .is_disjoint(done_interrupts)
+    }
+
+    /// Waits for the transfer to stop and returns the peripheral and buffer.
+    pub fn wait(self) -> (Result<(), DmaError>, Mem2MemRx<'d, M>, BUF) {
+        while !self.is_done() {}
+
+        let (m2m, view) = self.release();
+
+        let result = if m2m.channel.has_error() {
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok(())
+        };
+
+        (result, m2m, BUF::from_view(view))
+    }
+
+    /// Stops this transfer on the spot and returns the peripheral and buffer.
+    pub fn stop(self) -> (Mem2MemRx<'d, M>, BUF) {
+        let (mut m2m, view) = self.release();
+
+        m2m.channel.stop_transfer();
+
+        (m2m, BUF::from_view(view))
+    }
+
+    fn release(mut self) -> (Mem2MemRx<'d, M>, BUF::View) {
+        // SAFETY: Since forget is called on self, we know that self.m2m and
+        // self.buf_view won't be touched again.
+        let result = unsafe {
+            let m2m = ManuallyDrop::take(&mut self.m2m);
+            let view = ManuallyDrop::take(&mut self.buf_view);
+            (m2m, view)
+        };
+        core::mem::forget(self);
+        result
+    }
+}
+
+impl<'d, M: Mode, BUF: DmaRxBuffer> Deref for Mem2MemRxTransfer<'d, M, BUF> {
+    type Target = BUF::View;
+
+    fn deref(&self) -> &Self::Target {
+        &self.buf_view
+    }
+}
+
+impl<'d, M: Mode, BUF: DmaRxBuffer> DerefMut for Mem2MemRxTransfer<'d, M, BUF> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buf_view
+    }
+}
+
+impl<'d, M: Mode, BUF: DmaRxBuffer> Drop for Mem2MemRxTransfer<'d, M, BUF> {
+    fn drop(&mut self) {
+        self.m2m.channel.stop_transfer();
+
+        // SAFETY: This is Drop, we know that self.m2m and self.buf_view
+        // won't be touched again.
+        let view = unsafe {
+            ManuallyDrop::drop(&mut self.m2m);
+            ManuallyDrop::take(&mut self.buf_view)
+        };
+        let _ = BUF::from_view(view);
+    }
+}
+
+/// The TX half of [Mem2Mem].
+pub struct Mem2MemTx<'d, M: Mode> {
+    channel: ChannelTx<'d, AnyGdmaChannel>,
+    peripheral: DmaPeripheral,
+    _mode: PhantomData<M>,
+}
+
+impl<'d, M: Mode> Mem2MemTx<'d, M> {
+    /// Start the TX half of a memory to memory transfer.
+    ///
+    /// If `reset` is true, the DMA channel's state machine is reset before
+    /// starting the transfer. (Which is what all other drivers do)
+    /// Keeping it false allows you to gradually send data in smaller chunks,
+    /// rather than all at once.
+    ///
+    /// Note: You must set `reset` to true if a
+    /// [DmaTxInterrupt::DescriptorError] occurred.
+    pub fn send<BUF>(
+        mut self,
+        mut buf: BUF,
+        reset: bool,
+    ) -> Result<Mem2MemTxTransfer<'d, M, BUF>, (DmaError, Self, BUF)>
     where
-        TXBUF: ReadBuffer,
-        RXBUF: WriteBuffer,
+        BUF: DmaTxBuffer,
     {
-        let (tx_ptr, tx_len) = unsafe { tx_buffer.read_buffer() };
-        let (rx_ptr, rx_len) = unsafe { rx_buffer.write_buffer() };
-        self.tx_chain.fill_for_tx(false, tx_ptr, tx_len)?;
-        self.rx_chain.fill_for_rx(false, rx_ptr, rx_len)?;
-        unsafe {
+        let result = unsafe {
             self.channel
-                .tx
-                .prepare_transfer_without_start(self.peripheral, &self.tx_chain)?;
-            self.channel
-                .rx
-                .prepare_transfer_without_start(self.peripheral, &self.rx_chain)?;
-            self.channel.rx.set_mem2mem_mode(true);
+                .prepare_transfer(self.peripheral, &mut buf, !reset)
+                .and_then(|_| self.channel.start_transfer())
+        };
+
+        if let Err(e) = result {
+            return Err((e, self, buf));
         }
-        #[cfg(esp32s3)]
-        {
-            let align = match unsafe { crate::soc::cache_get_dcache_line_size() } {
-                16 => DmaExtMemBKSize::Size16,
-                32 => DmaExtMemBKSize::Size32,
-                64 => DmaExtMemBKSize::Size64,
-                _ => panic!("unsupported cache line size"),
-            };
-            if crate::soc::is_valid_psram_address(tx_ptr as usize) {
-                self.channel.tx.set_ext_mem_block_size(align);
-            }
-            if crate::soc::is_valid_psram_address(rx_ptr as usize) {
-                self.channel.rx.set_ext_mem_block_size(align);
-            }
-        }
-        self.channel.tx.start_transfer()?;
-        self.channel.rx.start_transfer()?;
-        Ok(DmaTransferRx::new(self))
+
+        Ok(Mem2MemTxTransfer {
+            m2m: ManuallyDrop::new(self),
+            buf_view: ManuallyDrop::new(buf.into_view()),
+        })
     }
 }
 
-impl<'d, MODE> DmaSupport for Mem2Mem<'d, MODE>
-where
-    MODE: Mode,
-{
-    fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
-        while !self.channel.rx.is_done() {}
+/// Represents an ongoing (or potentially finished) DMA Memory-to-Memory TX
+/// transfer.
+pub struct Mem2MemTxTransfer<'d, M: Mode, BUF: DmaTxBuffer> {
+    m2m: ManuallyDrop<Mem2MemTx<'d, M>>,
+    buf_view: ManuallyDrop<BUF::View>,
+}
+
+impl<'d, M: Mode, BUF: DmaTxBuffer> Mem2MemTxTransfer<'d, M, BUF> {
+    /// Returns true when [Self::wait] will not block.
+    pub fn is_done(&self) -> bool {
+        let done_interrupts = DmaTxInterrupt::DescriptorError | DmaTxInterrupt::TotalEof;
+        !self
+            .m2m
+            .channel
+            .pending_out_interrupts()
+            .is_disjoint(done_interrupts)
     }
 
-    fn peripheral_dma_stop(&mut self) {
-        unreachable!("unsupported")
+    /// Waits for the transfer to stop and returns the peripheral and buffer.
+    pub fn wait(self) -> (Result<(), DmaError>, Mem2MemTx<'d, M>, BUF) {
+        while !self.is_done() {}
+
+        let (m2m, view) = self.release();
+
+        let result = if m2m.channel.has_error() {
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok(())
+        };
+
+        (result, m2m, BUF::from_view(view))
+    }
+
+    /// Stops this transfer on the spot and returns the peripheral and buffer.
+    pub fn stop(self) -> (Mem2MemTx<'d, M>, BUF) {
+        let (mut m2m, view) = self.release();
+
+        m2m.channel.stop_transfer();
+
+        (m2m, BUF::from_view(view))
+    }
+
+    fn release(mut self) -> (Mem2MemTx<'d, M>, BUF::View) {
+        // SAFETY: Since forget is called on self, we know that self.m2m and
+        // self.buf_view won't be touched again.
+        let result = unsafe {
+            let m2m = ManuallyDrop::take(&mut self.m2m);
+            let view = ManuallyDrop::take(&mut self.buf_view);
+            (m2m, view)
+        };
+        core::mem::forget(self);
+        result
     }
 }
 
-impl<'d, MODE> DmaSupportRx for Mem2Mem<'d, MODE>
-where
-    MODE: Mode,
-{
-    type RX = ChannelRx<'d, AnyGdmaChannel>;
+impl<'d, M: Mode, BUF: DmaTxBuffer> Deref for Mem2MemTxTransfer<'d, M, BUF> {
+    type Target = BUF::View;
 
-    fn rx(&mut self) -> &mut Self::RX {
-        &mut self.channel.rx
+    fn deref(&self) -> &Self::Target {
+        &self.buf_view
     }
+}
 
-    fn chain(&mut self) -> &mut DescriptorChain {
-        &mut self.tx_chain
+impl<'d, M: Mode, BUF: DmaTxBuffer> DerefMut for Mem2MemTxTransfer<'d, M, BUF> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buf_view
+    }
+}
+
+impl<'d, M: Mode, BUF: DmaTxBuffer> Drop for Mem2MemTxTransfer<'d, M, BUF> {
+    fn drop(&mut self) {
+        self.m2m.channel.stop_transfer();
+
+        // SAFETY: This is Drop, we know that self.m2m and self.buf_view
+        // won't be touched again.
+        let view = unsafe {
+            ManuallyDrop::drop(&mut self.m2m);
+            ManuallyDrop::take(&mut self.buf_view)
+        };
+        let _ = BUF::from_view(view);
     }
 }

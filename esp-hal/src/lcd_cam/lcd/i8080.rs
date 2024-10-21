@@ -339,7 +339,7 @@ impl<'d, DM: Mode> I8080<'d, DM> {
 
         let result = unsafe {
             self.tx_channel
-                .prepare_transfer(DmaPeripheral::LcdCam, &mut data)
+                .prepare_transfer(DmaPeripheral::LcdCam, &mut data, false)
         }
         .and_then(|_| self.tx_channel.start_transfer());
         if let Err(err) = result {

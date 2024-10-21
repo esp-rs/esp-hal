@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Peripheral type erasure for SPI (#2334)
+- Add support for DMA buffer traits in `Mem2Mem` driver (#2379)
+- Split `Mem2Mem` driver into an RX half and TX half (#2379)
 
 ### Fixed
 

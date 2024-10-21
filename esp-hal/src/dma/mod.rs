@@ -1566,6 +1566,7 @@ pub trait Rx: crate::private::Sealed {
         &mut self,
         peri: DmaPeripheral,
         buffer: &mut BUF,
+        skip_reset: bool,
     ) -> Result<(), DmaError>;
 
     fn start_transfer(&mut self) -> Result<(), DmaError>;
@@ -1700,6 +1701,7 @@ where
         &mut self,
         peri: DmaPeripheral,
         buffer: &mut BUF,
+        skip_reset: bool,
     ) -> Result<(), DmaError> {
         let preparation = buffer.prepare();
 
@@ -1709,7 +1711,9 @@ where
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
         self.rx_impl.clear_all();
-        self.rx_impl.reset();
+        if !skip_reset {
+            self.rx_impl.reset();
+        }
         self.rx_impl.set_link_addr(preparation.start as u32);
         self.rx_impl.set_peripheral(peri as u8);
 
@@ -1790,6 +1794,7 @@ pub trait Tx: crate::private::Sealed {
         &mut self,
         peri: DmaPeripheral,
         buffer: &mut BUF,
+        skip_reset: bool,
     ) -> Result<(), DmaError>;
 
     fn listen_out(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>);
@@ -1906,6 +1911,7 @@ where
         &mut self,
         peri: DmaPeripheral,
         buffer: &mut BUF,
+        skip_reset: bool,
     ) -> Result<(), DmaError> {
         let preparation = buffer.prepare();
         cfg_if::cfg_if!(
@@ -1927,7 +1933,9 @@ where
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
         self.tx_impl.clear_all();
-        self.tx_impl.reset();
+        if !skip_reset {
+            self.tx_impl.reset();
+        }
         self.tx_impl.set_link_addr(preparation.start as u32);
         self.tx_impl.set_peripheral(peri as u8);
 
