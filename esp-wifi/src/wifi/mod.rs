@@ -104,6 +104,9 @@ use crate::binary::{
         esp_wifi_scan_start,
         esp_wifi_set_config,
         esp_wifi_set_country,
+        esp_wifi_set_csi,
+        esp_wifi_set_csi_config,
+        esp_wifi_set_csi_rx_cb,
         esp_wifi_set_mode,
         esp_wifi_set_protocol,
         esp_wifi_set_tx_done_cb,
@@ -117,6 +120,7 @@ use crate::binary::{
         wifi_config_t,
         wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
         wifi_country_t,
+        wifi_csi_cb_t,
         wifi_init_config_t,
         wifi_interface_t,
         wifi_interface_t_WIFI_IF_AP,
@@ -296,6 +300,163 @@ impl Default for AccessPointConfiguration {
 }
 
 /// Client configuration for a Wi-Fi connection.
+#[derive(Clone, PartialEq, Eq)]
+// https://github.com/esp-rs/esp-wifi-sys/blob/main/esp-wifi-sys/headers/local/esp_wifi_types_native.h#L94
+/// Channel state information(CSI) configuration
+#[cfg(not(esp32c6))]
+pub struct CsiConfiguration {
+    /// Enable to receive legacy long training field(lltf) data.
+    pub lltf_en: bool,
+    /// Enable to receive HT long training field(htltf) data.
+    pub htltf_en: bool,
+    /// Enable to receive space time block code HT long training
+    /// field(stbc-htltf2) data.
+    pub stbc_htltf2_en: bool,
+    /// Enable to generate htlft data by averaging lltf and ht_ltf data when
+    /// receiving HT packet. Otherwise, use ht_ltf data directly.
+    pub ltf_merge_en: bool,
+    /// Enable to turn on channel filter to smooth adjacent sub-carrier. Disable
+    /// it to keep independence of adjacent sub-carrier.
+    pub channel_filter_en: bool,
+    /// Manually scale the CSI data by left shifting or automatically scale the
+    /// CSI data. If set true, please set the shift bits. false: automatically.
+    /// true: manually.
+    pub manu_scale: bool,
+    /// Manually left shift bits of the scale of the CSI data. The range of the
+    /// left shift bits is 0~15.
+    pub shift: u8,
+    /// Enable to dump 802.11 ACK frame.
+    pub dump_ack_en: bool,
+}
+#[cfg(esp32c6)]
+// See https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/src/include/esp32c6.rs#L5702-L5705
+pub struct CsiConfiguration {
+    pub _bitfield_align_1: [u32; 0],
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize]>,
+}
+
+impl Default for CsiConfiguration {
+    #[cfg(not(esp32c6))]
+    fn default() -> Self {
+        Self {
+            lltf_en: true,
+            htltf_en: true,
+            stbc_htltf2_en: true,
+            ltf_merge_en: true,
+            channel_filter_en: true,
+            manu_scale: false,
+            shift: 0,
+            dump_ack_en: false,
+        }
+    }
+
+    #[cfg(esp32c6)]
+    fn default() -> Self {
+        // https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/headers/esp_wifi_he_types.h#L67-L82
+        let enable: u32 = 1;
+        let acquire_csi_legacy: u32 = 1;
+        let acquire_csi_ht20: u32 = 1;
+        let acquire_csi_ht40: u32 = 1;
+        let acquire_csi_su: u32 = 1;
+        let acquire_csi_mu: u32 = 1;
+        let acquire_csi_dcm: u32 = 1;
+        let acquire_csi_beamformed: u32 = 1;
+        let acquire_csi_he_stbc: u32 = 2;
+        let val_scale_cfg: u32 = 2;
+        let dump_ack_en: u32 = 1;
+        let reserved: u32 = 19;
+        let _bitfield_1 = include::wifi_csi_acquire_config_t::new_bitfield_1(
+            enable,
+            acquire_csi_legacy,
+            acquire_csi_ht20,
+            acquire_csi_ht40,
+            acquire_csi_su,
+            acquire_csi_mu,
+            acquire_csi_dcm,
+            acquire_csi_beamformed,
+            acquire_csi_he_stbc,
+            val_scale_cfg,
+            dump_ack_en,
+            reserved,
+        );
+        Self {
+            _bitfield_align_1: [0; 0],
+            _bitfield_1,
+        }
+    }
+}
+
+#[allow(clippy::type_complexity)]
+static CSI_CB: Mutex<RefCell<Option<fn(crate::binary::include::wifi_csi_info_t)>>> =
+    Mutex::new(RefCell::new(None));
+
+impl CsiConfiguration {
+    /// Set CSI data configuration
+    pub fn set_config(&self) -> Result<(), WifiError> {
+        #[cfg(not(esp32c6))]
+        let conf = crate::include::wifi_csi_config_t {
+            lltf_en: self.lltf_en,
+            htltf_en: self.htltf_en,
+            stbc_htltf2_en: self.stbc_htltf2_en,
+            ltf_merge_en: self.ltf_merge_en,
+            channel_filter_en: self.channel_filter_en,
+            manu_scale: self.manu_scale,
+            shift: self.shift,
+            dump_ack_en: self.dump_ack_en,
+        };
+        #[cfg(esp32c6)]
+        let conf = include::wifi_csi_acquire_config_t {
+            _bitfield_align_1: self._bitfield_align_1,
+            _bitfield_1: self._bitfield_1,
+        };
+        unsafe {
+            // esp_wifi_result!(esp_wifi_set_csi_config(&conf))?;
+            esp_wifi_set_csi_config(&conf);
+        }
+        Ok(())
+    }
+
+    /// Register the RX callback function of CSI data. Each time a CSI data is
+    /// received, the callback function will be called.
+    pub fn set_rx_cb(&self) -> Result<(), WifiError> {
+        // TODO: Something like set_receive_cb in sniffer, see wifi_sniffer.rs::63
+        // https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/headers/esp_wifi.h#L1202C1-L1203C1
+        unsafe {
+            esp_wifi_result!(esp_wifi_set_csi_rx_cb(
+                Some(csi_rx_cb),
+                core::ptr::null_mut()
+            ))?;
+        }
+        Ok(())
+    }
+
+    pub fn set_receive_cb(&mut self, cb: fn(crate::binary::include::wifi_csi_info_t)) {
+        critical_section::with(|cs| {
+            *CSI_CB.borrow_ref_mut(cs) = Some(cb);
+        });
+    }
+
+    /// Enable or disable CSI
+    pub fn set_csi(&self, enable: bool) -> Result<(), WifiError> {
+        // https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/headers/esp_wifi.h#L1241
+        unsafe {
+            // esp_wifi_result!(esp_wifi_set_csi(enable))?;
+            esp_wifi_set_csi(enable);
+        }
+        Ok(())
+    }
+}
+
+unsafe extern "C" fn csi_rx_cb(
+    ctx: *mut crate::wifi::c_types::c_void,
+    data: *mut crate::binary::include::wifi_csi_info_t,
+) {
+    critical_section::with(|cs| {
+        let rx_ctrl: crate::binary::include::wifi_pkt_rx_ctrl_t = (*data).rx_ctrl;
+        // log::info!("CSI RX Callback: {:?}", rx_ctrl.rssi());
+    });
+}
+
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
