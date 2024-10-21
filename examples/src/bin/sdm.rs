@@ -1,4 +1,4 @@
-//! Connect an oscilloscope to an IO pin and see the modulation sine wave.
+//! Connect an oscilloscope to an IO pin and see the modulation sawtooth wave.
 //!
 //! Also you may connect low-pass filter to SDM output.
 //!
@@ -33,15 +33,17 @@ fn main() -> ! {
         }
     }
 
-    let mut sdm = Sdm::new(peripherals.GPIO_SD);
-    let mut sdm_ch = sdm.enable_pin(modulation_pin, 100.kHz()).unwrap();
+    let sdm = Sdm::new(peripherals.GPIO_SD);
+    let sdm_ch = sdm.channel0.connect(modulation_pin, 100.kHz()).unwrap();
 
     let delay = Delay::new();
 
     println!("Sigma-delta modulation is on");
 
     loop {
-        sdm_ch.set_pulse_density(0);
-        delay.delay_millis(1500);
+        for density in -90..90 {
+            sdm_ch.set_pulse_density(density);
+            delay.delay_millis(1);
+        }
     }
 }
