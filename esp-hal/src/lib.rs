@@ -142,7 +142,6 @@ mod fmt;
 
 #[cfg(riscv)]
 pub use esp_riscv_rt::{self, entry, riscv};
-pub use procmacros as macros;
 #[cfg(xtensa)]
 pub use xtensa_lx;
 #[cfg(xtensa)]
@@ -241,7 +240,7 @@ pub mod debugger;
 #[doc(hidden)]
 pub mod sync;
 
-mod utils;
+pub mod macros;
 
 /// State of the CPU saved when entering exception or interrupt
 pub mod trapframe {
