@@ -93,24 +93,21 @@ impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
     }
 
     fn input_enable(&self, enable: bool) {
-        let lp_io = unsafe { LP_IO::steal() };
-        lp_io
+        unsafe { LP_IO::steal() }
             .gpio(PIN as usize)
             .modify(|_, w| w.fun_ie().bit(enable));
     }
 
     /// Sets pull-up enable for the pin
     pub fn pullup_enable(&self, enable: bool) {
-        let lp_io = unsafe { LP_IO::steal() };
-        lp_io
+        unsafe { LP_IO::steal() }
             .gpio(PIN as usize)
             .modify(|_, w| w.fun_wpu().bit(enable));
     }
 
     /// Sets pull-down enable for the pin
     pub fn pulldown_enable(&self, enable: bool) {
-        let lp_io = unsafe { LP_IO::steal() };
-        lp_io
+        unsafe { LP_IO::steal() }
             .gpio(PIN as usize)
             .modify(|_, w| w.fun_wpd().bit(enable));
     }
@@ -156,45 +153,38 @@ impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     }
 
     fn input_enable(&self, enable: bool) {
-        let lp_io = unsafe { LP_IO::steal() };
-        lp_io
+        unsafe { LP_IO::steal() }
             .gpio(PIN as usize)
             .modify(|_, w| w.fun_ie().bit(enable));
     }
 
     /// Sets pull-up enable for the pin
     pub fn pullup_enable(&self, enable: bool) {
-        let lp_io = unsafe { LP_IO::steal() };
-        lp_io
+        unsafe { LP_IO::steal() }
             .gpio(PIN as usize)
             .modify(|_, w| w.fun_wpu().bit(enable));
     }
 
     /// Sets pull-down enable for the pin
     pub fn pulldown_enable(&self, enable: bool) {
-        let lp_io = unsafe { LP_IO::steal() };
-        lp_io
+        unsafe { LP_IO::steal() }
             .gpio(PIN as usize)
             .modify(|_, w| w.fun_wpd().bit(enable));
     }
 
     fn set_open_drain_output(&self, enable: bool) {
-        let gpio = unsafe { GPIO::steal() };
-
-        gpio.pin(PIN as usize)
+        unsafe { GPIO::steal() }
+            .pin(PIN as usize)
             .modify(|_, w| w.pad_driver().bit(enable));
     }
 }
 
 pub(crate) fn init_low_power_pin(pin: u8) {
-    let lp_aon = unsafe { LP_AON::steal() };
-
-    lp_aon
+    unsafe { LP_AON::steal() }
         .gpio_mux()
         .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | 1 << pin) });
 
-    let lp_io = unsafe { LP_IO::steal() };
-    lp_io
+    unsafe { LP_IO::steal() }
         .gpio(pin as usize)
         .modify(|_, w| unsafe { w.mcu_sel().bits(0) });
 }
