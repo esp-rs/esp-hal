@@ -2,7 +2,8 @@
 //! rate with a delay of 10ms between each transfer.
 //!
 //! The following wiring is assumed:
-//! - Data pins => GPIO16, GPIO4, GPIO17, GPIO18, GPIO5, GPIO19, GPIO12, and GPIO14
+//! - Data pins => GPIO16, GPIO4, GPIO17, GPIO18, GPIO5, GPIO19, GPIO12, and
+//!   GPIO14
 //! - Clock output pin => GPIO25
 //!
 //! You can use a logic analyzer to see how the pins are used.
@@ -67,13 +68,6 @@ fn main() -> ! {
         data[2] = offset as u8;
         data[3] = (offset + 1) as u8;
     }
-
-    let tx_buffer = unsafe {
-        use esp_hal::dma::ReadBuffer;
-        let (ptr, len) = tx_buffer.read_buffer();
-        // SAFETY: tx_buffer is left inside of the TxBuf
-        core::slice::from_raw_parts_mut(ptr as *mut u8, len)
-    };
 
     let mut tx_buf: DmaTxBuf =
         DmaTxBuf::new(tx_descriptors, tx_buffer).expect("DmaTxBuf::new failed");
