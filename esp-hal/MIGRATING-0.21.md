@@ -49,3 +49,14 @@ the peripheral instance has been moved to the last generic parameter position.
 ```rust
 let spi: Spi<'static, FullDuplexMode, SPI2> = Spi::new_typed(peripherals.SPI2, 1.MHz(), SpiMode::Mode0);
 ```
+
+## No need to include `rom_functions.x` manually
+
+Don't include `rom_functions.x` from esp-wifi
+
+```diff
+rustflags = [
+    "-C", "link-arg=-Tlinkall.x",
+-    "-C", "link-arg=-Trom_functions.x",
+]
+```

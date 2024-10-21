@@ -95,10 +95,10 @@ pub(crate) fn ets_delay_us(us: u32) {
 #[inline(always)]
 pub(crate) fn ets_update_cpu_frequency_rom(ticks_per_us: u32) {
     extern "C" {
-        fn ets_update_cpu_frequency_rom(ticks_per_us: u32);
+        fn ets_update_cpu_frequency(ticks_per_us: u32);
     }
 
-    unsafe { ets_update_cpu_frequency_rom(ticks_per_us) };
+    unsafe { ets_update_cpu_frequency(ticks_per_us) };
 }
 
 #[inline(always)]
