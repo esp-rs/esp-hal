@@ -8,3 +8,5 @@ strncpy = 0x40000368;
 strcpy = 0x40000364;
 
 abs = 0x40000424;
+
+PROVIDE(cache_dbus_mmu_set = 0x40000564);
