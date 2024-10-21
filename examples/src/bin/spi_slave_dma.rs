@@ -107,11 +107,9 @@ fn main() -> ! {
 
         println!("Iteration {i}");
 
-        println!("Do `dma_transfer`");
+        println!("Do `transfer`");
 
-        let transfer = spi
-            .dma_transfer(&mut slave_receive, &mut slave_send)
-            .unwrap();
+        let transfer = spi.transfer(&mut slave_receive, &mut slave_send).unwrap();
 
         bitbang_master(
             master_send,
@@ -133,9 +131,9 @@ fn main() -> ! {
 
         delay.delay_millis(250);
 
-        println!("Do `dma_read`");
+        println!("Do `read`");
         slave_receive.fill(0xff);
-        let transfer = spi.dma_read(&mut slave_receive).unwrap();
+        let transfer = spi.read(&mut slave_receive).unwrap();
 
         bitbang_master(
             master_send,
@@ -155,8 +153,8 @@ fn main() -> ! {
 
         delay.delay_millis(250);
 
-        println!("Do `dma_write`");
-        let transfer = spi.dma_write(&mut slave_send).unwrap();
+        println!("Do `write`");
+        let transfer = spi.write(&mut slave_send).unwrap();
 
         master_receive.fill(0);
 

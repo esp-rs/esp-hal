@@ -48,7 +48,7 @@
 //! let mut send = tx_buffer;
 //!
 //! let transfer = spi
-//!     .dma_transfer(&mut receive, &mut send)
+//!     .transfer(&mut receive, &mut send)
 //!     .unwrap();
 //!
 //! transfer.wait().unwrap();
@@ -313,7 +313,7 @@ pub mod dma {
         /// sent is 32736 bytes.
         ///
         /// The write is driven by the SPI master's sclk signal and cs line.
-        pub fn dma_write<'t, TXBUF>(
+        pub fn write<'t, TXBUF>(
             &'t mut self,
             words: &'t TXBUF,
         ) -> Result<DmaTransferTx<'t, Self>, Error>
@@ -348,7 +348,7 @@ pub mod dma {
         /// received is 32736 bytes.
         ///
         /// The read is driven by the SPI master's sclk signal and cs line.
-        pub fn dma_read<'t, RXBUF>(
+        pub fn read<'t, RXBUF>(
             &'t mut self,
             words: &'t mut RXBUF,
         ) -> Result<DmaTransferRx<'t, Self>, Error>
@@ -384,7 +384,7 @@ pub mod dma {
         ///
         /// The data transfer is driven by the SPI master's sclk signal and cs
         /// line.
-        pub fn dma_transfer<'t, RXBUF, TXBUF>(
+        pub fn transfer<'t, RXBUF, TXBUF>(
             &'t mut self,
             read_buffer: &'t mut RXBUF,
             words: &'t TXBUF,

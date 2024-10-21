@@ -170,7 +170,7 @@ mod tests {
         }
         slave_receive.fill(0xFF);
 
-        let transfer = spi.dma_transfer(slave_receive, &slave_send).unwrap();
+        let transfer = spi.transfer(slave_receive, &slave_send).unwrap();
 
         ctx.bitbang_spi.transfer_buf(master_receive, master_send);
 

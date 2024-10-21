@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Peripheral type erasure for I2C (#2361)
 - Peripheral type erasure for TWAI (#2359)
 - The SPI driver has been rewritten to allow using half-duplex and full-duplex functionality on the same bus. See the migration guide for details. (#2373)
+- Renamed `SpiDma` functions: `dma_transfer` to `transfer`, `dma_write` to `write`, `dma_read` to `read`. (#2373)
 
 ### Fixed
 
