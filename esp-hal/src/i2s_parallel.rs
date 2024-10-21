@@ -780,7 +780,7 @@ impl Signals for I2S0 {
         OutputSignal::I2S0O_WS
     }
     fn data_out_signal(i: usize, bits: u8) -> OutputSignal {
-        // Because of... reasons... the 16-bit values for i2s1 appear on d8...d23
+        // signals for 8bit and 16bit both start at an offset of 8 for I2S0
         let offset = match bits {
             8 => 8,
             16 => 8,
