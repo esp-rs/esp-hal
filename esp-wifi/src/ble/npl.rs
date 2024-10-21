@@ -53,13 +53,10 @@ static mut CALLOUTS: [Option<Callout>; 18] = [None; 18];
 
 #[derive(Copy, Clone)]
 struct Event {
-    event: *const ble_npl_event,
     event_fn_ptr: *const ble_npl_event_fn,
     ev_arg_ptr: *const c_void,
     queued: bool,
 }
-
-static mut EVENTS: [Option<Event>; 95] = [None; 95];
 
 static mut EVENT_QUEUE: SimpleQueue<usize, 16> = SimpleQueue::new();
 
@@ -775,20 +772,24 @@ unsafe extern "C" fn ble_npl_mutex_deinit(_mutex: *const ble_npl_mutex) -> ble_n
 
 unsafe extern "C" fn ble_npl_event_set_arg(event: *const ble_npl_event, arg: *const c_void) {
     trace!("ble_npl_event_set_arg {:?} {:?}", event, arg);
-    if (*event).dummy == 0 {
+
+    let evt = (*event).dummy as *mut Event;
+    if evt.is_null() {
         panic!("Call set_arg on uninitialized event");
     }
 
-    unwrap!(EVENTS[((*event).dummy - 1) as usize].as_mut()).ev_arg_ptr = arg;
+    (*evt).ev_arg_ptr = arg;
 }
 
 unsafe extern "C" fn ble_npl_event_get_arg(event: *const ble_npl_event) -> *const c_void {
     trace!("ble_npl_event_get_arg {:?}", event);
-    if (*event).dummy == 0 {
+
+    let evt = (*event).dummy as *mut Event;
+    if evt.is_null() {
         panic!("Call get_arg on uninitialized event");
     }
 
-    let arg_ptr = unwrap!(EVENTS[((*event).dummy - 1) as usize].as_mut()).ev_arg_ptr;
+    let arg_ptr = (*evt).ev_arg_ptr;
 
     trace!("returning arg {:x}", arg_ptr as usize);
 
@@ -797,34 +798,35 @@ unsafe extern "C" fn ble_npl_event_get_arg(event: *const ble_npl_event) -> *cons
 
 unsafe extern "C" fn ble_npl_event_is_queued(event: *const ble_npl_event) -> bool {
     trace!("ble_npl_event_is_queued {:?}", event);
-    if (*event).dummy == 0 {
+
+    let evt = (*event).dummy as *mut Event;
+    if evt.is_null() {
         panic!("Call is_queued on uninitialized event");
     }
 
-    unwrap!(EVENTS[((*event).dummy - 1) as usize].as_mut()).queued
+    (*evt).queued
 }
 
 unsafe extern "C" fn ble_npl_event_reset(event: *const ble_npl_event) {
     trace!("ble_npl_event_reset {:?}", event);
 
-    let event = event as *mut ble_npl_event;
-    if (*event).dummy == 0 {
+    let evt = (*event).dummy as *mut Event;
+    if evt.is_null() {
         panic!("Trying to reset an uninitialized event");
     } else {
-        unwrap!(EVENTS[((*event).dummy - 1) as usize].as_mut()).queued = false;
+        (*evt).queued = false
     }
 }
 
 unsafe extern "C" fn ble_npl_event_deinit(event: *const ble_npl_event) {
     trace!("ble_npl_event_deinit {:?}", event);
 
-    let event = event.cast_mut();
-
-    if (*event).dummy == 0 {
+    let event = event as *mut ble_npl_event;
+    let evt = (*event).dummy as *mut Event;
+    if evt.is_null() {
         panic!("Trying to deinitialize an uninitialized event");
     } else {
-        let idx = ((*event).dummy - 1) as usize;
-        EVENTS[idx] = None;
+        crate::compat::malloc::free(evt.cast());
         (*event).dummy = 0;
     }
 }
@@ -837,16 +839,14 @@ unsafe extern "C" fn ble_npl_event_init(
     trace!("ble_npl_event_init {:?} {:?} {:?}", event, func, arg);
 
     if (*event).dummy == 0 {
-        let idx = unwrap!(EVENTS.iter().position(|item| item.is_none()));
-        EVENTS[idx] = Some(Event {
-            event,
-            event_fn_ptr: func,
-            ev_arg_ptr: arg,
-            queued: false,
-        });
+        let evt = crate::compat::malloc::calloc(1, core::mem::size_of::<Event>()) as *mut Event;
+
+        (*evt).event_fn_ptr = func;
+        (*evt).ev_arg_ptr = arg;
+        (*evt).queued = false;
 
         let event = event.cast_mut();
-        (*event).dummy = (idx + 1) as i32;
+        (*event).dummy = evt as i32;
     }
 }
 
@@ -863,13 +863,12 @@ unsafe extern "C" fn ble_npl_eventq_is_empty(queue: *const ble_npl_eventq) -> bo
 unsafe extern "C" fn ble_npl_event_run(event: *const ble_npl_event) {
     trace!("ble_npl_event_run {:?}", event);
 
-    let event = event as *mut ble_npl_event;
-    if (*event).dummy == 0 {
+    let evt = (*event).dummy as *mut Event;
+    if evt.is_null() {
         panic!("Trying to run an uninitialized event");
     } else {
-        let ev = unwrap!(EVENTS[((*event).dummy - 1) as usize].as_mut());
-        trace!("info {:?} with arg {:x}", ev.event_fn_ptr, event as u32);
-        let func: unsafe extern "C" fn(u32) = core::mem::transmute(ev.event_fn_ptr);
+        trace!("info {:?} with arg {:x}", (*evt).event_fn_ptr, event as u32);
+        let func: unsafe extern "C" fn(u32) = core::mem::transmute((*evt).event_fn_ptr);
         func(event as u32);
     }
 
@@ -891,7 +890,10 @@ unsafe extern "C" fn ble_npl_eventq_remove(
     }
 
     critical_section::with(|_| {
-        unwrap!(EVENTS[((*event).dummy - 1) as usize].as_mut()).queued = false;
+        let evt = (*event).dummy as *mut Event;
+
+        // TODO actually remove from queue!!!!
+        (*evt).queued = false;
     });
 }
 
@@ -907,8 +909,10 @@ unsafe extern "C" fn ble_npl_eventq_put(queue: *const ble_npl_eventq, event: *co
     }
 
     critical_section::with(|_| {
-        unwrap!(EVENTS[((*event).dummy - 1) as usize].as_mut()).queued = true;
-        unwrap!(EVENT_QUEUE.enqueue((*event).dummy as usize));
+        let evt = (*event).dummy as *mut Event;
+        (*evt).queued = true;
+
+        unwrap!(EVENT_QUEUE.enqueue(event as usize));
     });
 }
 
@@ -922,12 +926,13 @@ unsafe extern "C" fn ble_npl_eventq_get(
         loop {
             let dequeued = critical_section::with(|_| EVENT_QUEUE.dequeue());
 
-            if let Some(event_idx) = dequeued {
-                let evt = unwrap!(EVENTS[event_idx - 1].as_mut());
-                if evt.queued {
-                    trace!("got {:x}", evt.event as usize);
-                    evt.queued = false;
-                    return evt.event;
+            if let Some(event) = dequeued {
+                let event = event as *mut ble_npl_event;
+                let evt = (*event).dummy as *mut Event;
+                if (*evt).queued {
+                    trace!("got {:x}", evt as usize);
+                    (*evt).queued = false;
+                    return event as *const ble_npl_event;
                 }
             }
 
@@ -946,10 +951,9 @@ unsafe extern "C" fn ble_npl_eventq_deinit(queue: *const ble_npl_eventq) {
         panic!("Trying to deinitialize an uninitialized queue");
     } else {
         critical_section::with(|_| {
-            while let Some(event_idx) = EVENT_QUEUE.dequeue() {
-                if let Some(event) = EVENTS[event_idx - 1].as_mut() {
-                    event.queued = false;
-                }
+            while let Some(event) = EVENT_QUEUE.dequeue() {
+                let evt = (*(event as *const ble_npl_eventq)).dummy as *mut Event;
+                (*evt).queued = false;
             }
         });
 
