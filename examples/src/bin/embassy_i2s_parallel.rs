@@ -75,13 +75,6 @@ async fn main(_spawner: Spawner) {
         data[3] = (offset + 1) as u8;
     }
 
-    let tx_buffer = unsafe {
-        use esp_hal::dma::ReadBuffer;
-        let (ptr, len) = tx_buffer.read_buffer();
-        // SAFETY: tx_buffer is left inside of the TxBuf
-        core::slice::from_raw_parts_mut(ptr as *mut u8, len)
-    };
-
     let mut tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).expect("DmaTxBuf::new failed");
 
     info!("Sending {} bytes!", BUFFER_SIZE);
