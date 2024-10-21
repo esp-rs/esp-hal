@@ -5,9 +5,7 @@ use core::marker::PhantomData;
 use embassy_executor::{raw, Spawner};
 use esp_hal::get_core;
 #[cfg(multi_core)]
-use esp_hal::macros::handler;
-#[cfg(multi_core)]
-use esp_hal::peripherals::SYSTEM;
+use esp_hal::{interrupt::software::SoftwareInterrupt, macros::handler};
 use portable_atomic::{AtomicBool, Ordering};
 
 pub(crate) const THREAD_MODE_CONTEXT: u8 = 16;
@@ -26,10 +24,7 @@ fn software3_interrupt() {
     // woken. It doesn't matter which core handles this interrupt first, the
     // point is just to wake up the core that is currently executing
     // `waiti`.
-    let system = unsafe { &*SYSTEM::PTR };
-    system
-        .cpu_intr_from_cpu_3()
-        .write(|w| w.cpu_intr_from_cpu_3().bit(false));
+    unsafe { SoftwareInterrupt::<3>::steal().reset() };
 }
 
 pub(crate) fn pend_thread_mode(core: usize) {
@@ -43,11 +38,7 @@ pub(crate) fn pend_thread_mode(core: usize) {
         // We need to clear the interrupt from software. We don't actually
         // need it to trigger and run the interrupt handler, we just need to
         // kick waiti to return.
-
-        let system = unsafe { &*SYSTEM::PTR };
-        system
-            .cpu_intr_from_cpu_3()
-            .write(|w| w.cpu_intr_from_cpu_3().bit(true));
+        unsafe { SoftwareInterrupt::<3>::steal().raise() };
     }
 }
 
@@ -77,8 +68,7 @@ This will use software-interrupt 3 which isn't available for anything else to wa
     pub fn new() -> Self {
         #[cfg(multi_core)]
         unsafe {
-            esp_hal::interrupt::software::SoftwareInterrupt::<3>::steal()
-                .set_interrupt_handler(software3_interrupt)
+            SoftwareInterrupt::<3>::steal().set_interrupt_handler(software3_interrupt);
         }
 
         Self {
@@ -149,12 +139,11 @@ This will use software-interrupt 3 which isn't available for anything else to wa
                 );
             }
         } else {
-            // waiti sets the PS.INTLEVEL when slipping into sleep
-            // because critical sections in Xtensa are implemented via increasing
-            // PS.INTLEVEL the critical section ends here
-            // take care not add code after `waiti` if it needs to be inside the CS
-            unsafe { core::arch::asm!("waiti 0") }; // critical section ends
-                                                    // here
+            // `waiti` sets the `PS.INTLEVEL` when slipping into sleep because critical
+            // sections in Xtensa are implemented via increasing `PS.INTLEVEL`.
+            // The critical section ends here. Take care not add code after
+            // `waiti` if it needs to be inside the CS.
+            unsafe { core::arch::asm!("waiti 0") };
         }
     }
 
