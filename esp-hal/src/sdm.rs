@@ -1,19 +1,72 @@
-//! Sigma-Delta modulation peripheral driver.
+//! # Sigma-Delta modulation (SDM)
+//!
+//! ## Overview
+//!
+//! Almost all ESP SoCs has a second-order sigma-delta modulator, which
+//! can generate independent PDM pulses to multiple channels. Please refer
+//! to the TRM to check how many hardware channels are available.
+//!
+//! Delta-sigma modulation converts an analog voltage signal into a pulse
+//! frequency, or pulse density, which can be understood as pulse-density
+//! modulation (PDM) (refer to [Delta-sigma modulation on Wikipedia](https://en.wikipedia.org/wiki/Delta-sigma_modulation)).
+//!
+//! Typically, a Sigma-Delta modulated channel can be used in scenarios like:
+//!
+//! - LED dimming
+//! - Simple DAC (8-bit), with the help of an active RC low-pass filter
+//! - Class D amplifier, with the help of a half-bridge or full-bridge circuit
+//!   plus an LC low-pass filter
+//!
+//! ## Configuration
+//!
+//! After creating [`Sdm`] instance you should connect individual channels to
+//! GPIO outputs. Also you need set modulation frequency.
+//!
+//! ## Usage
+//!
+//! Connected channels accepts pulse density in range -128..127.
+
+use core::marker::PhantomData;
 
 use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    gpio::{OutputSignal, PeripheralOutput},
+    gpio::{OutputPin, OutputSignal},
     peripheral::{Peripheral, PeripheralRef},
-    peripherals,
+    peripherals::GPIO_SD,
     private,
 };
 
 /// Sigma-Delta modulation peripheral driver.
-pub struct Sdm<'d, SD> {
-    _sd: PeripheralRef<'d, SD>,
-    channels_usage: u8,
+pub struct Sdm<'d> {
+    /// Channel 0
+    pub channel0: ChannelRef<'d, 0>,
+
+    /// Channel 1
+    pub channel1: ChannelRef<'d, 1>,
+
+    /// Channel 2
+    pub channel2: ChannelRef<'d, 2>,
+
+    /// Channel 3
+    pub channel3: ChannelRef<'d, 3>,
+
+    #[cfg(any(esp32, esp32s2, esp32s3))]
+    /// Channel 4
+    pub channel4: ChannelRef<'d, 4>,
+
+    #[cfg(any(esp32, esp32s2, esp32s3))]
+    /// Channel 5
+    pub channel5: ChannelRef<'d, 5>,
+
+    #[cfg(any(esp32, esp32s2, esp32s3))]
+    /// Channel 6
+    pub channel6: ChannelRef<'d, 6>,
+
+    #[cfg(any(esp32, esp32s2, esp32s3))]
+    /// Channel 7
+    pub channel7: ChannelRef<'d, 7>,
 }
 
 /// Channel errors
@@ -22,108 +75,95 @@ pub struct Sdm<'d, SD> {
 pub enum Error {
     /// Prescale out of range
     PrescaleRange,
-    /// No free channels to use
-    NoChannels,
 }
 
-impl<'d, SD> Sdm<'d, SD>
-where
-    SD: RegisterAccess,
-{
+impl<'d> Drop for Sdm<'d> {
+    fn drop(&mut self) {
+        GPIO_SD::enable_clock(false);
+    }
+}
+
+impl<'d> Sdm<'d> {
     /// Initialize driver using a given SD instance.
-    pub fn new(sd_instance: impl crate::peripheral::Peripheral<P = SD> + 'd) -> Self {
+    pub fn new(_sd: impl crate::peripheral::Peripheral<P = GPIO_SD> + 'd) -> Self {
+        GPIO_SD::enable_clock(true);
+
         Self {
-            _sd: sd_instance.into_ref(),
-            channels_usage: 0,
+            channel0: ChannelRef::new(),
+            channel1: ChannelRef::new(),
+            channel2: ChannelRef::new(),
+            channel3: ChannelRef::new(),
+
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            channel4: ChannelRef::new(),
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            channel5: ChannelRef::new(),
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            channel6: ChannelRef::new(),
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            channel7: ChannelRef::new(),
+        }
+    }
+}
+
+/// Sigma-Delta modulation channel reference.
+pub struct ChannelRef<'d, const N: u8> {
+    _phantom: PhantomData<&'d ()>,
+}
+
+impl<'d, const N: u8> ChannelRef<'d, N> {
+    fn new() -> Self {
+        Self {
+            _phantom: PhantomData,
         }
     }
 
-    /// Configure and acquire channel.
-    pub fn enable_pin<PIN: PeripheralOutput>(
-        &mut self,
-        pin: impl Peripheral<P = PIN> + 'd,
+    /// Configure and connect sigma-delta channel to output
+    pub fn connect<O: OutputPin>(
+        &'d self,
+        output: impl Peripheral<P = O> + 'd,
         frequency: HertzU32,
-    ) -> Result<Channel<'_, SD, PIN>, Error> {
-        crate::into_ref!(pin);
+    ) -> Result<Channel<'d, N, O>, Error> {
+        crate::into_ref!(output);
 
-        let chs = self.channels_usage;
-        let chidx = self.alloc_channel()?;
-        let signal = CHANNELS[chidx as usize];
+        let signal = CHANNELS[N as usize];
 
-        if chs == 0 {
-            SD::enable_clock(true);
-        }
+        output.connect_peripheral_to_output(signal, private::Internal);
 
-        pin.connect_peripheral_to_output(signal, private::Internal);
-
-        let mut channel = Channel {
-            _sdm: self,
-            pin,
-            chidx,
-        };
+        let channel = Channel { _ref: self, output };
 
         channel.set_frequency(frequency)?;
 
         Ok(channel)
     }
-
-    /// Deconfigure and release channel.
-    pub fn disable_pin<PIN: PeripheralOutput>(&mut self, channel: Channel<'d, SD, PIN>) {
-        let Channel { mut pin, chidx, .. } = channel;
-
-        let signal = CHANNELS[chidx as usize];
-
-        pin.disconnect_from_peripheral_output(signal, private::Internal);
-
-        self.dealloc_channel(chidx);
-
-        if self.channels_usage == 0 {
-            SD::enable_clock(false);
-        }
-    }
-
-    fn alloc_channel(&mut self) -> Result<u8, Error> {
-        let mut usage = self.channels_usage;
-        let mut chidx: u8 = 0;
-        while usage & 1 != 0 && chidx < CHANNELS.len() as u8 {
-            usage >>= 1;
-            chidx += 1;
-        }
-        if chidx < CHANNELS.len() as u8 {
-            self.channels_usage |= 1 << chidx;
-            Ok(chidx)
-        } else {
-            Err(Error::NoChannels)
-        }
-    }
-
-    fn dealloc_channel(&mut self, chidx: u8) {
-        self.channels_usage &= !(1 << chidx);
-    }
 }
 
 /// Sigma-Delta modulation channel handle.
-pub struct Channel<'d, SD, PIN> {
-    _sdm: &'d Sdm<'d, SD>,
-    pin: PeripheralRef<'d, PIN>,
-    chidx: u8,
+pub struct Channel<'d, const N: u8, O: OutputPin> {
+    _ref: &'d ChannelRef<'d, N>,
+    output: PeripheralRef<'d, O>,
 }
 
-impl<'d, SD, PIN> Channel<'d, SD, PIN>
-where
-    SD: RegisterAccess,
-{
+impl<'d, const N: u8, O: OutputPin> Drop for Channel<'d, N, O> {
+    fn drop(&mut self) {
+        let signal = CHANNELS[N as usize];
+        self.output
+            .disconnect_from_peripheral_output(signal, private::Internal);
+    }
+}
+
+impl<'d, const N: u8, O: OutputPin> Channel<'d, N, O> {
     /// Set raw pulse density
     ///
     /// Sigma-delta quantized density of one channel, the value ranges from -128
     /// to 127, recommended range is -90 ~ 90. The waveform is more like a
     /// random one in this range.
-    pub fn set_pulse_density(&mut self, density: i8) {
-        SD::set_pulse_density(self.chidx, density);
+    pub fn set_pulse_density(&self, density: i8) {
+        GPIO_SD::set_pulse_density(N, density);
     }
 
     /// Set duty cycle
-    pub fn set_duty(&mut self, duty: u8) {
+    pub fn set_duty(&self, duty: u8) {
         let density = duty as i16 - 128;
         self.set_pulse_density(density as i8)
     }
@@ -131,9 +171,9 @@ where
     /// Set raw prescale
     ///
     /// The divider of source clock, ranges from 1 to 256
-    pub fn set_prescale(&mut self, prescale: u16) -> Result<(), Error> {
+    pub fn set_prescale(&self, prescale: u16) -> Result<(), Error> {
         if (1..=256).contains(&prescale) {
-            SD::set_prescale(self.chidx, prescale);
+            GPIO_SD::set_prescale(N, prescale);
             Ok(())
         } else {
             Err(Error::PrescaleRange)
@@ -141,7 +181,7 @@ where
     }
 
     /// Set prescale using frequency
-    pub fn set_frequency(&mut self, frequency: HertzU32) -> Result<(), Error> {
+    pub fn set_frequency(&self, frequency: HertzU32) -> Result<(), Error> {
         let clocks = Clocks::get();
         let clock_frequency = clocks.apb_clock.to_Hz();
         let frequency = frequency.to_Hz();
@@ -155,8 +195,7 @@ where
 mod ehal1 {
     use embedded_hal::pwm::{Error as PwmError, ErrorKind, ErrorType, SetDutyCycle};
 
-    use super::{Channel, Error, RegisterAccess};
-    use crate::gpio::OutputPin;
+    use super::{Channel, Error, OutputPin};
 
     impl PwmError for Error {
         fn kind(&self) -> ErrorKind {
@@ -164,11 +203,11 @@ mod ehal1 {
         }
     }
 
-    impl<'d, SD: RegisterAccess, PIN: OutputPin> ErrorType for Channel<'d, SD, PIN> {
+    impl<'d, const N: u8, O: OutputPin> ErrorType for Channel<'d, N, O> {
         type Error = Error;
     }
 
-    impl<'d, SD: RegisterAccess, PIN: OutputPin> SetDutyCycle for Channel<'d, SD, PIN> {
+    impl<'d, const N: u8, O: OutputPin> SetDutyCycle for Channel<'d, N, O> {
         fn max_duty_cycle(&self) -> u16 {
             255
         }
@@ -214,7 +253,7 @@ pub trait RegisterAccess {
     fn set_prescale(ch: u8, prescale: u16);
 }
 
-impl RegisterAccess for peripherals::GPIO_SD {
+impl RegisterAccess for GPIO_SD {
     fn enable_clock(_en: bool) {
         // The clk enable register does not exist on ESP32.
         #[cfg(not(esp32))]
