@@ -431,6 +431,11 @@ where
         let view = unsafe { ManuallyDrop::take(&mut self.buf_view) };
         (i2s, BUF::from_view(view))
     }
+
+    fn stop_peripherals(&mut self) {
+        I::tx_stop();
+        self.i2s.tx_channel.stop_transfer();
+    }
 }
 
 impl<'d, I, BUF> I2sParallelTransfer<'d, I, BUF, crate::Async>
@@ -466,6 +471,25 @@ where
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.buf_view
+    }
+}
+
+impl<'d, I, BUF, DM> Drop for I2sParallelTransfer<'d, I, BUF, DM>
+where
+    I: Instance,
+    BUF: DmaTxBuffer,
+    DM: Mode,
+{
+    fn drop(&mut self) {
+        self.stop_peripherals();
+
+        // SAFETY: This is Drop, we know that self.i2s and self.buf_view
+        // won't be touched again.
+        let view = unsafe {
+            ManuallyDrop::drop(&mut self.i2s);
+            ManuallyDrop::take(&mut self.buf_view)
+        };
+        let _ = BUF::from_view(view);
     }
 }
 
