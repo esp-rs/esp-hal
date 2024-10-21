@@ -15,6 +15,10 @@
 //! - 16bit: [A, B, C, D] is output as [B, A, D, C] (i.e., 16bit words are
 //!   swapped)
 //!
+//! I2S0 does not support true 8bit parallel output, so if you want to do 8bit
+//! you should use I2S1.  If you have to use I2S0, it will only output the even
+//! bytes! so [A, B, C, D] will be output as [A, C]!!!!
+//! 
 //! ## Configuration
 //!
 //! The driver uses DMA (Direct Memory Access) for efficient data transfer and
