@@ -983,18 +983,18 @@ where
         if !enabled {
             reg_block.wdtconfig0().write(|w| unsafe { w.bits(0) });
         } else {
+            reg_block.wdtconfig0().write(|w| w.wdt_en().bit(true));
+
             reg_block
                 .wdtconfig0()
                 .write(|w| w.wdt_flashboot_mod_en().bit(false));
-
-            reg_block.wdtconfig0().write(|w| w.wdt_en().bit(true));
 
             #[cfg_attr(esp32, allow(unused_unsafe))]
             reg_block.wdtconfig0().write(|w| unsafe {
                 w.wdt_en()
                     .bit(true)
                     .wdt_stg0()
-                    .bits(MwdtStageAction::Off as u8)
+                    .bits(MwdtStageAction::ResetSystem as u8)
                     .wdt_cpu_reset_length()
                     .bits(7)
                     .wdt_sys_reset_length()
