@@ -376,8 +376,8 @@ where
     /// Construct a new I2S peripheral driver instance for the first I2S
     /// peripheral
     #[allow(clippy::too_many_arguments)]
-    pub fn new<CH, T>(
-        i2s: impl Peripheral<P = T> + 'd,
+    pub fn new<CH>(
+        i2s: impl Peripheral<P = impl RegisterAccess> + 'd,
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
@@ -386,12 +386,10 @@ where
         tx_descriptors: &'static mut [DmaDescriptor],
     ) -> Self
     where
-        T: Into<AnyI2s> + 'd + RegisterAccess,
         CH: DmaChannelConvert<<AnyI2s as DmaEligible>::Dma>,
-        DmaMode: Mode,
     {
         Self::new_typed(
-            i2s,
+            i2s.map_into(),
             standard,
             data_format,
             sample_rate,
@@ -411,7 +409,7 @@ where
     /// peripheral
     #[allow(clippy::too_many_arguments)]
     pub fn new_typed<CH>(
-        i2s: impl Peripheral<P = impl Into<T> + 'd> + 'd,
+        i2s: impl Peripheral<P = T> + 'd,
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
@@ -421,11 +419,10 @@ where
     ) -> Self
     where
         CH: DmaChannelConvert<T::Dma>,
-        DmaMode: Mode,
     {
         crate::into_ref!(i2s);
         Self::new_internal(
-            i2s.map_into(),
+            i2s,
             standard,
             data_format,
             sample_rate,
@@ -881,7 +878,11 @@ mod private {
     }
 
     pub trait RegBlock:
-        crate::peripheral::Peripheral<P = Self> + PeripheralMarker + DmaEligible
+        crate::peripheral::Peripheral<P = Self>
+        + PeripheralMarker
+        + DmaEligible
+        + Into<super::AnyI2s>
+        + 'static
     {
         fn register_block(&self) -> &RegisterBlock;
     }
