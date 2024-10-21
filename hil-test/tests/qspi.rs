@@ -38,7 +38,7 @@ cfg_if::cfg_if! {
     }
 }
 
-type SpiUnderTest = SpiDma<'static, esp_hal::peripherals::SPI2, HalfDuplexMode, Blocking>;
+type SpiUnderTest = SpiDma<'static, HalfDuplexMode, Blocking>;
 
 struct Context {
     spi: esp_hal::peripherals::SPI2,

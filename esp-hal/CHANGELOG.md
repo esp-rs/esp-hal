@@ -13,9 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A new config option `PLACE_ANON_IN_RAM` to improve performance (especially for interrupts) at the cost of RAM usage (#2331)
 - Add burst transfer support to DMA buffers (#2336)
 - `AnyPin` now implements `From<GpioPin<N>>`. (#2326)
+- Added `AnySpi` and `AnySpiDmaChannel`. (#2334)
 - `Pins::steal()` to unsafely obtain GPIO. (#2335)
 
 ### Changed
+
+- Peripheral type erasure for SPI (#2334)
 
 ### Fixed
 

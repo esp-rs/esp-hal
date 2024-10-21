@@ -142,7 +142,6 @@ mod fmt;
 
 #[cfg(riscv)]
 pub use esp_riscv_rt::{self, entry, riscv};
-pub use procmacros as macros;
 #[cfg(xtensa)]
 pub use xtensa_lx;
 #[cfg(xtensa)]
@@ -240,6 +239,8 @@ pub mod debugger;
 
 #[doc(hidden)]
 pub mod sync;
+
+pub mod macros;
 
 /// State of the CPU saved when entering exception or interrupt
 pub mod trapframe {
@@ -447,26 +448,6 @@ fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
 #[export_name = "__stack_chk_fail"]
 unsafe extern "C" fn stack_chk_fail() {
     panic!("Stack corruption detected");
-}
-
-#[doc(hidden)]
-/// Helper macro for checking doctest code snippets
-#[macro_export]
-macro_rules! before_snippet {
-    () => {
-        r#"
-# #![no_std]
-# use esp_hal::prelude::*;
-# use procmacros::handler;
-# use esp_hal::interrupt;
-# #[panic_handler]
-# fn panic(_ : &core::panic::PanicInfo) -> ! {
-#     loop {}
-# }
-# fn main() {
-#     let mut peripherals = esp_hal::init(esp_hal::Config::default());
-"#
-    };
 }
 
 use crate::{
