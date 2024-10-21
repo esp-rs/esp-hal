@@ -525,8 +525,6 @@ pub fn init(config: Config) -> Peripherals {
 
     Clocks::init(config.cpu_clock);
 
-    #[cfg(xtensa)]
-    crate::interrupt::setup_interrupts();
     #[cfg(esp32)]
     crate::time::time_init();
 
