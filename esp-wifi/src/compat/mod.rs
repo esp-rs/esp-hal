@@ -3,10 +3,6 @@ pub mod malloc;
 pub mod misc;
 pub mod timer_compat;
 
-pub mod queue {
-    pub use heapless::spsc::Queue as SimpleQueue;
-}
-
 #[no_mangle]
 unsafe extern "C" fn _putchar(c: u8) {
     static mut BUFFER: [u8; 256] = [0u8; 256];

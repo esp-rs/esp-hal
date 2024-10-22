@@ -12,7 +12,7 @@ use crate::{
         HciOutCollector,
         HCI_OUT_COLLECTOR,
     },
-    compat::{common::str_from_c, queue::SimpleQueue},
+    compat::common::{str_from_c, RawQueue},
     hal::macros::ram,
     memory_fence::memory_fence,
     timer::yield_task,
@@ -26,13 +26,10 @@ pub(crate) mod ble_os_adapter_chip_specific;
 pub(super) static BT_RECEIVE_QUEUE: Mutex<RefCell<Vec<ReceivedPacket>>> =
     Mutex::new(RefCell::new(Vec::new()));
 
-static BT_INTERNAL_QUEUE: Mutex<RefCell<SimpleQueue<[u8; 8], 10>>> =
-    Mutex::new(RefCell::new(SimpleQueue::new()));
-
 static PACKET_SENT: AtomicBool = AtomicBool::new(true);
 
 #[repr(C)]
-struct vhci_host_callback_s {
+struct VhciHostCallbacks {
     notify_host_send_available: extern "C" fn(), /* callback used to notify that the host can
                                                   * send packet to controller */
     notify_host_recv: extern "C" fn(*mut u8, u16) -> i32, /* callback used to notify that the
@@ -57,10 +54,10 @@ extern "C" {
 
     fn API_vhci_host_check_send_available() -> bool;
     fn API_vhci_host_send_packet(data: *const u8, len: u16);
-    fn API_vhci_host_register_callback(vhci_host_callbac: *const vhci_host_callback_s) -> i32;
+    fn API_vhci_host_register_callback(vhci_host_callbac: *const VhciHostCallbacks) -> i32;
 }
 
-static VHCI_HOST_CALLBACK: vhci_host_callback_s = vhci_host_callback_s {
+static VHCI_HOST_CALLBACK: VhciHostCallbacks = VhciHostCallbacks {
     notify_host_send_available,
     notify_host_recv,
 };
@@ -169,10 +166,13 @@ unsafe extern "C" fn mutex_unlock(_mutex: *const ()) -> i32 {
 }
 
 unsafe extern "C" fn queue_create(len: u32, item_size: u32) -> *const () {
-    if len != 5 && item_size != 8 {
-        panic!("Unexpected queue spec {} {}", len, item_size);
+    let raw_queue = RawQueue::new(len as usize, item_size as usize);
+    let ptr = unsafe { crate::compat::malloc::malloc(size_of_val(&raw_queue)) as *mut RawQueue };
+    unsafe {
+        ptr.write(raw_queue);
     }
-    &BT_INTERNAL_QUEUE as *const _ as *const ()
+
+    ptr.cast()
 }
 
 unsafe extern "C" fn queue_delete(queue: *const ()) {
@@ -181,26 +181,16 @@ unsafe extern "C" fn queue_delete(queue: *const ()) {
 
 #[ram]
 unsafe extern "C" fn queue_send(queue: *const (), item: *const (), _block_time_ms: u32) -> i32 {
-    if queue == &BT_INTERNAL_QUEUE as *const _ as *const () {
-        critical_section::with(|_| {
-            // assume the size is 8 - shouldn't rely on that
-            let message = item as *const u8;
-            let mut data = [0u8; 8];
-            for (i, data) in data.iter_mut().enumerate() {
-                *data = *message.add(i);
-            }
-            trace!("queue posting {:?}", data);
-
-            critical_section::with(|cs| {
-                let mut queue = BT_INTERNAL_QUEUE.borrow_ref_mut(cs);
-                unwrap!(queue.enqueue(data));
-            });
-            memory_fence();
-        });
-    } else {
-        panic!("Unknown queue");
-    }
-    1
+    trace!(
+        "queue_send {:x} {:x} {}",
+        queue as u32,
+        item as u32,
+        _block_time_ms
+    );
+    critical_section::with(|_| {
+        let queue = queue as *mut RawQueue;
+        (*queue).enqueue(item as *mut _)
+    })
 }
 
 #[ram]
@@ -227,41 +217,34 @@ unsafe extern "C" fn queue_recv(queue: *const (), item: *const (), block_time_ms
     let start = crate::timer::get_systimer_count();
     let block_ticks = crate::timer::millis_to_ticks(block_time_ms as u64);
 
-    // handle the BT_QUEUE
-    if queue == &BT_INTERNAL_QUEUE as *const _ as *const () {
-        loop {
-            let res = critical_section::with(|_| {
-                memory_fence();
+    let item = item as *mut _;
 
-                critical_section::with(|cs| {
-                    let mut queue = BT_INTERNAL_QUEUE.borrow_ref_mut(cs);
-                    if let Some(message) = queue.dequeue() {
-                        let item = item as *mut u8;
-                        for i in 0..8 {
-                            item.offset(i).write_volatile(message[i as usize]);
-                        }
-                        trace!("received {:?}", message);
-                        1
-                    } else {
-                        0
-                    }
-                })
-            });
+    loop {
+        let res = critical_section::with(|_| {
+            memory_fence();
 
-            if res == 1 {
-                trace!("queue_recv returns");
-                return res;
-            }
+            critical_section::with(|_cs| {
+                let queue = queue as *mut RawQueue;
+                if (*queue).try_dequeue(item) {
+                    trace!("received from queue");
+                    1
+                } else {
+                    0
+                }
+            })
+        });
 
-            if !forever && crate::timer::elapsed_time_since(start) > block_ticks {
-                trace!("queue_recv returns with timeout");
-                return -1;
-            }
-
-            yield_task();
+        if res == 1 {
+            trace!("queue_recv returns");
+            return res;
         }
-    } else {
-        panic!("Unknown queue to handle in queue_recv");
+
+        if !forever && crate::timer::elapsed_time_since(start) > block_ticks {
+            trace!("queue_recv returns with timeout");
+            return -1;
+        }
+
+        yield_task();
     }
 }
 
