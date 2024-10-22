@@ -35,7 +35,7 @@ pub struct Preparation {
     /// This field allows buffer implementation to configure this behaviour.
     /// - `Some(true)`: DMA channel must check the owner bit.
     /// - `Some(false)`: DMA channel must NOT check the owner bit.
-    /// - `None`: DMA channel can operate in any mode it supports.
+    /// - `None`: DMA channel should check the owner bit if it is supported.
     ///
     /// Some buffer implementations may require that the DMA channel performs
     /// this check before consuming the descriptor to ensure correct
