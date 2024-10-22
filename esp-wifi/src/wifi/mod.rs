@@ -281,7 +281,7 @@ pub struct AccessPointConfiguration {
 impl Default for AccessPointConfiguration {
     fn default() -> Self {
         Self {
-            ssid: "iot-device".try_into().unwrap(),
+            ssid: unwrap!("iot-device".try_into()),
             ssid_hidden: false,
             channel: 1,
             secondary_channel: None,
@@ -1662,11 +1662,11 @@ unsafe extern "C" fn recv_cb_ap(
 pub(crate) static WIFI_TX_INFLIGHT: AtomicUsize = AtomicUsize::new(0);
 
 fn decrement_inflight_counter() {
-    WIFI_TX_INFLIGHT
-        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
+    unwrap!(
+        WIFI_TX_INFLIGHT.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
             Some(x.saturating_sub(1))
         })
-        .unwrap();
+    );
 }
 
 #[ram]
@@ -2456,8 +2456,9 @@ impl Sniffer {
     pub(crate) fn new() -> Self {
         // This shouldn't fail, since the way this is created, means that wifi will
         // always be initialized.
-        esp_wifi_result!(unsafe { esp_wifi_set_promiscuous_rx_cb(Some(promiscuous_rx_cb)) })
-            .unwrap();
+        unwrap!(esp_wifi_result!(unsafe {
+            esp_wifi_set_promiscuous_rx_cb(Some(promiscuous_rx_cb))
+        }));
         Self {
             promiscuous_mode_enabled: AtomicBool::new(false),
         }
