@@ -785,7 +785,7 @@ where
 
 impl<const GPIONUM: u8> PeripheralOutput for GpioPin<GPIONUM>
 where
-    Self: OutputPin + Pin,
+    Self: OutputPin,
 {
     fn set_to_open_drain_output(&mut self, _: private::Internal) {
         self.init_output(GPIO_FUNCTION, true);
