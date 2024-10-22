@@ -122,10 +122,9 @@ impl PeripheralInput for InputSignal {
             GPIO_FUNCTION
         } else {
             self.input_signals(private::Internal)
-                .into_iter()
-                .position(|s| s == Some(signal))
-                .ok_or(())
-                .and_then(AlternateFunction::try_from)
+                .iter()
+                .find(|(_af, s)| *s == signal)
+                .map(|(af, _)| *af)
                 .unwrap_or(GPIO_FUNCTION)
         };
 
@@ -158,7 +157,7 @@ impl PeripheralInput for InputSignal {
             .modify(|_, w| w.sel().clear_bit());
     }
 
-    fn input_signals(&self, _: private::Internal) -> [Option<gpio::InputSignal>; 6] {
+    fn input_signals(&self, _: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)] {
         PeripheralInput::input_signals(&self.pin, private::Internal)
     }
 
@@ -269,10 +268,9 @@ impl PeripheralOutput for OutputSignal {
             GPIO_FUNCTION
         } else {
             self.output_signals(private::Internal)
-                .into_iter()
-                .position(|s| s == Some(signal))
-                .ok_or(())
-                .and_then(AlternateFunction::try_from)
+                .iter()
+                .find(|(_af, s)| *s == signal)
+                .map(|(af, _)| *af)
                 .unwrap_or(GPIO_FUNCTION)
         };
 
@@ -311,7 +309,7 @@ impl PeripheralOutput for OutputSignal {
             .modify(|_, w| w.sel().clear_bit());
     }
 
-    fn output_signals(&self, _: private::Internal) -> [Option<gpio::OutputSignal>; 6] {
+    fn output_signals(&self, _: private::Internal) -> &[(AlternateFunction, gpio::OutputSignal)] {
         PeripheralOutput::output_signals(&self.pin, private::Internal)
     }
 
@@ -405,7 +403,7 @@ impl PeripheralInput for AnyInputSignal {
         } {
             fn init_input(&self, pull: Pull, _internal: private::Internal);
             fn is_input_high(&self, _internal: private::Internal) -> bool;
-            fn input_signals(&self, _internal: private::Internal) -> [Option<gpio::InputSignal>; 6];
+            fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)];
         }
 
         to match &mut self.0 {

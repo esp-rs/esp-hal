@@ -208,6 +208,8 @@ pub enum Pull {
 }
 
 /// Drive strength (values are approximates)
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DriveStrength {
     /// Drive strength of approximately 5mA.
     I5mA  = 0,
@@ -226,7 +228,8 @@ pub enum DriveStrength {
 /// The `AlternateFunction` enum allows to select one of several functions that
 /// a pin can perform, rather than using it as a general-purpose input or
 /// output.
-#[derive(PartialEq)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum AlternateFunction {
     /// Alternate function 0.
     Function0 = 0,
@@ -259,7 +262,8 @@ impl TryFrom<usize> for AlternateFunction {
 }
 
 /// RTC function
-#[derive(PartialEq)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum RtcFunction {
     /// RTC mode.
     Rtc     = 0,
@@ -342,10 +346,10 @@ pub trait Pin: Sealed {
     }
 
     #[doc(hidden)]
-    fn output_signals(&self, _: private::Internal) -> [Option<OutputSignal>; 6];
+    fn output_signals(&self, _: private::Internal) -> &[(AlternateFunction, OutputSignal)];
 
     #[doc(hidden)]
-    fn input_signals(&self, _: private::Internal) -> [Option<InputSignal>; 6];
+    fn input_signals(&self, _: private::Internal) -> &[(AlternateFunction, InputSignal)];
 
     #[doc(hidden)]
     fn gpio_bank(&self, _: private::Internal) -> GpioRegisterAccess;
@@ -380,7 +384,7 @@ pub trait PeripheralInput: PeripheralSignal {
     /// Returns the list of input signals that can be connected to this pin
     /// using IO_MUX.
     #[doc(hidden)]
-    fn input_signals(&self, _: private::Internal) -> [Option<InputSignal>; 6];
+    fn input_signals(&self, _: private::Internal) -> &[(AlternateFunction, InputSignal)];
 
     /// Connect the pin to a peripheral.
     #[doc(hidden)]
@@ -436,7 +440,7 @@ pub trait PeripheralOutput: PeripheralSignal {
     /// Returns the list of output signals that can be connected to this pin
     /// using IO_MUX.
     #[doc(hidden)]
-    fn output_signals(&self, _: private::Internal) -> [Option<OutputSignal>; 6];
+    fn output_signals(&self, _: private::Internal) -> &[(AlternateFunction, OutputSignal)];
 
     /// Connect the pin to a peripheral.
     #[doc(hidden)]
@@ -764,7 +768,7 @@ where
         self.gpio_bank(private::Internal).read_input() & (1 << (GPIONUM % 32)) != 0
     }
 
-    fn input_signals(&self, _: private::Internal) -> [Option<InputSignal>; 6] {
+    fn input_signals(&self, _: private::Internal) -> &[(AlternateFunction, InputSignal)] {
         <Self as Pin>::input_signals(self, private::Internal)
     }
 
@@ -831,7 +835,7 @@ where
         self.gpio_bank(private::Internal).read_output() & (1 << (GPIONUM % 32)) != 0
     }
 
-    fn output_signals(&self, _: private::Internal) -> [Option<OutputSignal>; 6] {
+    fn output_signals(&self, _: private::Internal) -> &[(AlternateFunction, OutputSignal)] {
         <Self as Pin>::output_signals(self, private::Internal)
     }
 
@@ -1045,29 +1049,24 @@ macro_rules! gpio {
                         $crate::gpio::GpioRegisterAccess::[<Bank $bank >]
                     }
 
-                    fn output_signals(&self, _: $crate::private::Internal) -> [Option<OutputSignal>; 6]{
-                        #[allow(unused_mut)]
-                        let mut output_signals = [None; 6];
-
-                        $(
+                    fn output_signals(&self, _: $crate::private::Internal) -> &[(AlternateFunction, OutputSignal)] {
+                        &[
                             $(
-                                output_signals[ $af_output_num ] = Some( OutputSignal::$af_output_signal );
-                            )*
-                        )?
-
-                        output_signals
+                                $(
+                                    (AlternateFunction::[< Function $af_output_num >], OutputSignal::$af_output_signal ),
+                                )*
+                            )?
+                        ]
                     }
-                    fn input_signals(&self, _: $crate::private::Internal) -> [Option<InputSignal>; 6] {
-                        #[allow(unused_mut)]
-                        let mut input_signals = [None; 6];
 
-                        $(
+                    fn input_signals(&self, _: $crate::private::Internal) -> &[(AlternateFunction, InputSignal)] {
+                        &[
                             $(
-                                input_signals[ $af_input_num ] = Some( InputSignal::$af_input_signal );
-                            )*
-                        )?
-
-                        input_signals
+                                $(
+                                    (AlternateFunction::[< Function $af_input_num >], InputSignal::$af_input_signal ),
+                                )*
+                            )?
+                        ]
                     }
                 }
 
@@ -2147,13 +2146,13 @@ pub(crate) mod internal {
             })
         }
 
-        fn output_signals(&self, _: private::Internal) -> [Option<OutputSignal>; 6] {
+        fn output_signals(&self, _: private::Internal) -> &[(AlternateFunction, OutputSignal)] {
             handle_gpio_input!(&self.0, target, {
                 Pin::output_signals(target, private::Internal)
             })
         }
 
-        fn input_signals(&self, _: private::Internal) -> [Option<InputSignal>; 6] {
+        fn input_signals(&self, _: private::Internal) -> &[(AlternateFunction, InputSignal)] {
             handle_gpio_input!(&self.0, target, {
                 Pin::input_signals(target, private::Internal)
             })
@@ -2199,7 +2198,7 @@ pub(crate) mod internal {
             })
         }
 
-        fn input_signals(&self, _: private::Internal) -> [Option<InputSignal>; 6] {
+        fn input_signals(&self, _: private::Internal) -> &[(AlternateFunction, InputSignal)] {
             handle_gpio_input!(&self.0, target, {
                 PeripheralInput::input_signals(target, private::Internal)
             })
@@ -2279,7 +2278,7 @@ pub(crate) mod internal {
             })
         }
 
-        fn output_signals(&self, _: private::Internal) -> [Option<OutputSignal>; 6] {
+        fn output_signals(&self, _: private::Internal) -> &[(AlternateFunction, OutputSignal)] {
             handle_gpio_output!(&self.0, target, {
                 PeripheralOutput::output_signals(target, private::Internal)
             })
