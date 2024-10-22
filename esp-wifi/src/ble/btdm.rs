@@ -1,8 +1,10 @@
+use alloc::vec::Vec;
 use core::{cell::RefCell, ptr::addr_of};
 
 use critical_section::Mutex;
 use portable_atomic::{AtomicBool, Ordering};
 
+use super::ReceivedPacket;
 use crate::{
     binary::include::*,
     ble::{
@@ -21,15 +23,8 @@ use crate::{
 #[cfg_attr(esp32, path = "os_adapter_esp32.rs")]
 pub(crate) mod ble_os_adapter_chip_specific;
 
-static BT_RECEIVE_QUEUE: Mutex<RefCell<SimpleQueue<ReceivedPacket, 10>>> =
-    Mutex::new(RefCell::new(SimpleQueue::new()));
-
-#[derive(Debug, Clone, Copy)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct ReceivedPacket {
-    pub len: u8,
-    pub data: [u8; 256],
-}
+pub(super) static BT_RECEIVE_QUEUE: Mutex<RefCell<Vec<ReceivedPacket>>> =
+    Mutex::new(RefCell::new(Vec::new()));
 
 static BT_INTERNAL_QUEUE: Mutex<RefCell<SimpleQueue<[u8; 8], 10>>> =
     Mutex::new(RefCell::new(SimpleQueue::new()));
@@ -80,22 +75,18 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
     trace!("notify_host_recv {:?} {}", data, len);
 
     unsafe {
-        let mut buf = [0u8; 256];
-        buf[..len as usize].copy_from_slice(core::slice::from_raw_parts(data, len as usize));
+        let data = core::slice::from_raw_parts(data, len as usize);
 
         let packet = ReceivedPacket {
-            len: len as u8,
-            data: buf,
+            data: Vec::from(data),
         };
 
         critical_section::with(|cs| {
             let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
-            if queue.enqueue(packet).is_err() {
-                warn!("Dropping BLE packet");
-            }
+            queue.push(packet);
         });
 
-        dump_packet_info(core::slice::from_raw_parts(data as *const u8, len as usize));
+        dump_packet_info(data);
 
         #[cfg(feature = "async")]
         crate::ble::controller::asynch::hci_read_data_available();
@@ -532,65 +523,6 @@ pub(crate) fn ble_deinit() {
     }
 }
 
-static mut BLE_HCI_READ_DATA: [u8; 256] = [0u8; 256];
-static mut BLE_HCI_READ_DATA_INDEX: usize = 0;
-static mut BLE_HCI_READ_DATA_LEN: usize = 0;
-
-#[cfg(feature = "async")]
-pub(crate) fn have_hci_read_data() -> bool {
-    critical_section::with(|cs| {
-        let queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
-        !queue.is_empty()
-            || unsafe {
-                BLE_HCI_READ_DATA_LEN > 0 && (BLE_HCI_READ_DATA_LEN >= BLE_HCI_READ_DATA_INDEX)
-            }
-    })
-}
-
-pub(crate) fn read_next(data: &mut [u8]) -> usize {
-    critical_section::with(|cs| {
-        let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
-
-        match queue.dequeue() {
-            Some(packet) => {
-                data[..packet.len as usize].copy_from_slice(&packet.data[..packet.len as usize]);
-                packet.len as usize
-            }
-            None => 0,
-        }
-    })
-}
-
-pub(crate) fn read_hci(data: &mut [u8]) -> usize {
-    unsafe {
-        if BLE_HCI_READ_DATA_LEN == 0 {
-            critical_section::with(|cs| {
-                let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
-
-                if let Some(packet) = queue.dequeue() {
-                    BLE_HCI_READ_DATA[..packet.len as usize]
-                        .copy_from_slice(&packet.data[..packet.len as usize]);
-                    BLE_HCI_READ_DATA_LEN = packet.len as usize;
-                    BLE_HCI_READ_DATA_INDEX = 0;
-                }
-            });
-        }
-
-        if BLE_HCI_READ_DATA_LEN > 0 {
-            data[0] = BLE_HCI_READ_DATA[BLE_HCI_READ_DATA_INDEX];
-            BLE_HCI_READ_DATA_INDEX += 1;
-
-            if BLE_HCI_READ_DATA_INDEX >= BLE_HCI_READ_DATA_LEN {
-                BLE_HCI_READ_DATA_LEN = 0;
-                BLE_HCI_READ_DATA_INDEX = 0;
-            }
-            return 1;
-        }
-    }
-
-    0
-}
-
 pub(crate) fn send_hci(data: &[u8]) {
     let hci_out = unsafe { &mut *HCI_OUT_COLLECTOR.as_mut_ptr() };
     hci_out.push(data);
@@ -611,7 +543,7 @@ pub(crate) fn send_hci(data: &[u8]) {
                 API_vhci_host_send_packet(packet.as_ptr(), packet.len() as u16);
                 trace!("sent vhci host packet");
 
-                dump_packet_info(packet);
+                super::dump_packet_info(packet);
 
                 break;
             }
@@ -622,14 +554,4 @@ pub(crate) fn send_hci(data: &[u8]) {
 
         hci_out.reset();
     }
-}
-
-#[allow(unreachable_code, unused_variables)]
-fn dump_packet_info(buffer: &[u8]) {
-    #[cfg(not(feature = "dump-packets"))]
-    return;
-
-    critical_section::with(|cs| {
-        info!("@HCIFRAME {:?}", buffer);
-    });
 }
