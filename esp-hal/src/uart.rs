@@ -2436,6 +2436,7 @@ pub mod lp_uart {
             let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
             let lp_aon = unsafe { &*crate::peripherals::LP_AON::PTR };
 
+            // FIXME: use GPIO APIs to configure pins
             lp_aon
                 .gpio_mux()
                 .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | 1 << 4) });
@@ -2443,8 +2444,8 @@ pub mod lp_uart {
                 .gpio_mux()
                 .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | 1 << 5) });
 
-            lp_io.gpio4().modify(|_, w| unsafe { w.mcu_sel().bits(1) });
-            lp_io.gpio5().modify(|_, w| unsafe { w.mcu_sel().bits(1) });
+            lp_io.gpio(4).modify(|_, w| unsafe { w.mcu_sel().bits(1) });
+            lp_io.gpio(5).modify(|_, w| unsafe { w.mcu_sel().bits(1) });
 
             Self::new_with_config(uart, Config::default())
         }
