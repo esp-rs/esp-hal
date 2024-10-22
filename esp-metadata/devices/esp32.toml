@@ -33,6 +33,7 @@ peripherals = [
     "rtc_io",
     "sdhost",
     "sens",
+    "sdm",
     "sha",
     "slc",
     "slchost",

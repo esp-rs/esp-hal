@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `AnySpi` and `AnySpiDmaChannel`. (#2334)
 - Added `AnyI2s` and `AnyI2sDmaChannel`. (#2367)
 - `Pins::steal()` to unsafely obtain GPIO. (#2335)
+- Added `esp_hal::sdm` Sigma-Delta modulation driver (#2370)
 
 ### Changed
 
