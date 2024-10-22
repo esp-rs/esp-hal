@@ -73,5 +73,5 @@ crate::peripherals! {
     UART2 <= UART2,
     UHCI0 <= UHCI0,
     UHCI1 <= UHCI1,
-    WIFI <= virtual,
+    WIFI <= WIFI,
 }
