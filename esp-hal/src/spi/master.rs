@@ -74,7 +74,12 @@ use super::{DmaError, Error, SpiBitOrder, SpiDataMode, SpiMode};
 use crate::{
     clock::Clocks,
     dma::{DmaChannelConvert, DmaEligible, DmaRxBuffer, DmaTxBuffer, PeripheralMarker, Rx, Tx},
-    gpio::{InputSignal, NoPin, OutputSignal, PeripheralInput, PeripheralOutput},
+    gpio::{
+        interconnect::{OutputConnection, PeripheralOutput},
+        InputSignal,
+        NoPin,
+        OutputSignal,
+    },
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
@@ -517,19 +522,21 @@ where
 
         let is_qspi = spi.spi.sio2_input_signal().is_some();
         if is_qspi {
-            NoPin.connect_input_to_peripheral(
+            let mut signal = OutputConnection::from(NoPin);
+
+            signal.connect_input_to_peripheral(
                 unwrap!(spi.spi.sio2_input_signal()),
                 private::Internal,
             );
-            NoPin.connect_peripheral_to_output(
+            signal.connect_peripheral_to_output(
                 unwrap!(spi.spi.sio2_output_signal()),
                 private::Internal,
             );
-            NoPin.connect_input_to_peripheral(
+            signal.connect_input_to_peripheral(
                 unwrap!(spi.spi.sio3_input_signal()),
                 private::Internal,
             );
-            NoPin.connect_peripheral_to_output(
+            signal.connect_peripheral_to_output(
                 unwrap!(spi.spi.sio3_output_signal()),
                 private::Internal,
             );
@@ -543,8 +550,7 @@ where
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MOSI signal and SIO0 input signal.
     pub fn with_mosi<MOSI: PeripheralOutput>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
-        crate::into_ref!(mosi);
-
+        crate::into_mapped_ref!(mosi);
         mosi.enable_output(true, private::Internal);
         mosi.connect_peripheral_to_output(self.spi.mosi_signal(), private::Internal);
 
@@ -559,8 +565,7 @@ where
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MISO signal and SIO1 input signal.
     pub fn with_miso<MISO: PeripheralOutput>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
-        crate::into_ref!(miso);
-
+        crate::into_mapped_ref!(miso);
         miso.enable_input(true, private::Internal);
         miso.connect_input_to_peripheral(self.spi.miso_signal(), private::Internal);
 
@@ -575,7 +580,7 @@ where
     /// Sets the specified pin to push-pull output and connects it to the SPI
     /// clock signal.
     pub fn with_sck<SCK: PeripheralOutput>(self, sclk: impl Peripheral<P = SCK> + 'd) -> Self {
-        crate::into_ref!(sclk);
+        crate::into_mapped_ref!(sclk);
         sclk.set_to_push_pull_output(private::Internal);
         sclk.connect_peripheral_to_output(self.spi.sclk_signal(), private::Internal);
 
@@ -587,7 +592,7 @@ where
     /// Sets the specified pin to push-pull output and connects it to the SPI CS
     /// signal.
     pub fn with_cs<CS: PeripheralOutput>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
-        crate::into_ref!(cs);
+        crate::into_mapped_ref!(cs);
         cs.set_to_push_pull_output(private::Internal);
         cs.connect_peripheral_to_output(self.spi.cs_signal(), private::Internal);
 
@@ -623,7 +628,7 @@ where
     where
         T: QspiInstance,
     {
-        crate::into_ref!(sio2);
+        crate::into_mapped_ref!(sio2);
         sio2.enable_input(true, private::Internal);
         sio2.enable_output(true, private::Internal);
 
@@ -644,7 +649,7 @@ where
     where
         T: QspiInstance,
     {
-        crate::into_ref!(sio3);
+        crate::into_mapped_ref!(sio3);
         sio3.enable_input(true, private::Internal);
         sio3.enable_output(true, private::Internal);
 

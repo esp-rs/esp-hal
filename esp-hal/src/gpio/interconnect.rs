@@ -5,15 +5,11 @@ use crate::{
         self,
         AlternateFunction,
         AnyPin,
-        GpioPin,
         InputPin,
         Level,
         NoPin,
         OutputPin,
         OutputSignalType,
-        PeripheralInput,
-        PeripheralOutput,
-        PeripheralSignal,
         Pin,
         Pull,
         FUNC_IN_SEL_OFFSET,
@@ -26,9 +22,41 @@ use crate::{
     private::{self, Sealed},
 };
 
+/// A signal that can be connected to a peripheral input.
+///
+/// Peripheral drivers are encouraged to accept types that implement this and
+/// [`PeripheralOutput`] as arguments instead of pin types.
+#[doc(hidden)]
+pub trait PeripheralInput: Into<InputConnection> + 'static {}
+
+/// A signal that can be connected to a peripheral input and/or output.
+///
+/// Peripheral drivers are encouraged to accept types that implement this and
+/// [`PeripheralInput`] as arguments instead of pin types.
+#[doc(hidden)]
+pub trait PeripheralOutput: Into<OutputConnection> + 'static {}
+
+impl<P: InputPin> PeripheralInput for P {}
+impl<P: OutputPin> PeripheralOutput for P {}
+
+impl PeripheralInput for InputSignal {}
+impl PeripheralInput for OutputSignal {}
+impl PeripheralOutput for OutputSignal {}
+
+impl PeripheralInput for NoPin {}
+impl PeripheralOutput for NoPin {}
+
+impl PeripheralInput for Level {}
+impl PeripheralOutput for Level {}
+
+impl PeripheralInput for InputConnection {}
+
+impl PeripheralInput for OutputConnection {}
+impl PeripheralOutput for OutputConnection {}
+
 /// A configurable input signal between a peripheral and a GPIO pin.
 ///
-/// Obtained by calling [`GpioPin::peripheral_input()`],
+/// Obtained by calling [`super::GpioPin::peripheral_input()`],
 /// [`super::Flex::peripheral_input()`] or [`super::Input::peripheral_input()`].
 ///
 /// Multiple input signals can be connected to one pin.
@@ -99,15 +127,7 @@ impl InputSignal {
     }
 }
 
-impl PeripheralSignal for InputSignal {
-    delegate::delegate! {
-        to self.pin {
-            fn pull_direction(&self, pull: Pull, _internal: private::Internal);
-        }
-    }
-}
-
-impl PeripheralInput for InputSignal {
+impl InputSignal {
     /// Connect the pin to a peripheral input signal.
     ///
     /// Since there can only be one input signal connected to a peripheral at a
@@ -155,23 +175,22 @@ impl PeripheralInput for InputSignal {
             .modify(|_, w| w.sel().clear_bit());
     }
 
-    fn input_signals(&self, _: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)] {
-        PeripheralInput::input_signals(&self.pin, private::Internal)
-    }
-
     delegate::delegate! {
+        #[doc(hidden)]
         to self.pin {
-            fn init_input(&self, pull: Pull, _internal: private::Internal);
-            fn is_input_high(&self, _internal: private::Internal) -> bool;
-            fn enable_input(&mut self, on: bool, _internal: private::Internal);
-            fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
+            pub fn pull_direction(&self, pull: Pull, _internal: private::Internal);
+            pub fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)];
+            pub fn init_input(&self, pull: Pull, _internal: private::Internal);
+            pub fn is_input_high(&self, _internal: private::Internal) -> bool;
+            pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
+            pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
         }
     }
 }
 
 /// A configurable output signal between a peripheral and a GPIO pin.
 ///
-/// Obtained by calling [`GpioPin::into_peripheral_output()`],
+/// Obtained by calling [`super::GpioPin::into_peripheral_output()`],
 /// [`super::Flex::into_peripheral_output()`] or
 /// [`super::Output::into_peripheral_output()`].
 ///
@@ -260,15 +279,7 @@ impl OutputSignal {
     }
 }
 
-impl PeripheralSignal for OutputSignal {
-    delegate::delegate! {
-        to self.pin {
-            fn pull_direction(&self, pull: Pull, _internal: private::Internal);
-        }
-    }
-}
-
-impl PeripheralInput for OutputSignal {
+impl OutputSignal {
     /// Connect the pin to a peripheral input signal.
     ///
     /// Since there can only be one input signal connected to a peripheral at a
@@ -316,21 +327,6 @@ impl PeripheralInput for OutputSignal {
             .modify(|_, w| w.sel().clear_bit());
     }
 
-    fn input_signals(&self, _: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)] {
-        PeripheralInput::input_signals(&self.pin, private::Internal)
-    }
-
-    delegate::delegate! {
-        to self.pin {
-            fn init_input(&self, pull: Pull, _internal: private::Internal);
-            fn is_input_high(&self, _internal: private::Internal) -> bool;
-            fn enable_input(&mut self, on: bool, _internal: private::Internal);
-            fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
-        }
-    }
-}
-
-impl PeripheralOutput for OutputSignal {
     /// Connect the pin to a peripheral output signal.
     fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal, _: private::Internal) {
         let af = if self.is_inverted {
@@ -378,35 +374,43 @@ impl PeripheralOutput for OutputSignal {
             .modify(|_, w| w.sel().clear_bit());
     }
 
-    fn output_signals(&self, _: private::Internal) -> &[(AlternateFunction, gpio::OutputSignal)] {
-        PeripheralOutput::output_signals(&self.pin, private::Internal)
-    }
-
     delegate::delegate! {
+        #[doc(hidden)]
         to self.pin {
-            fn set_to_open_drain_output(&mut self, _internal: private::Internal);
-            fn set_to_push_pull_output(&mut self, _internal: private::Internal);
-            fn enable_output(&mut self, on: bool, _internal: private::Internal);
-            fn set_output_high(&mut self, on: bool, _internal: private::Internal);
-            fn set_drive_strength(&mut self, strength: gpio::DriveStrength, _internal: private::Internal);
-            fn enable_open_drain(&mut self, on: bool, _internal: private::Internal);
-            fn enable_output_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
-            fn internal_pull_up_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
-            fn internal_pull_down_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
-            fn is_set_high(&self, _internal: private::Internal) -> bool;
+            pub fn pull_direction(&self, pull: Pull, _internal: private::Internal);
+            pub fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)];
+            pub fn init_input(&self, pull: Pull, _internal: private::Internal);
+            pub fn is_input_high(&self, _internal: private::Internal) -> bool;
+            pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
+            pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
+
+            pub fn output_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::OutputSignal)];
+            pub fn set_to_open_drain_output(&mut self, _internal: private::Internal);
+            pub fn set_to_push_pull_output(&mut self, _internal: private::Internal);
+            pub fn enable_output(&mut self, on: bool, _internal: private::Internal);
+            pub fn set_output_high(&mut self, on: bool, _internal: private::Internal);
+            pub fn set_drive_strength(&mut self, strength: gpio::DriveStrength, _internal: private::Internal);
+            pub fn enable_open_drain(&mut self, on: bool, _internal: private::Internal);
+            pub fn enable_output_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
+            pub fn internal_pull_up_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
+            pub fn internal_pull_down_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
+            pub fn is_set_high(&self, _internal: private::Internal) -> bool;
         }
     }
 }
 
 #[derive(Clone)]
-enum AnyInputSignalInner {
+enum InputConnectionInner {
     Input(InputSignal),
     Constant(Level),
 }
 
-/// A type-erased input signal.
+/// A type-erased peripheral input signal connection.
+///
+/// This is mainly intended for internal use, but it can be used to connect
+/// peripherals within the MCU without external hardware.
 #[derive(Clone)]
-pub struct InputConnection(AnyInputSignalInner);
+pub struct InputConnection(InputConnectionInner);
 
 impl Peripheral for InputConnection {
     type P = Self;
@@ -418,81 +422,88 @@ impl Peripheral for InputConnection {
 
 impl From<InputSignal> for InputConnection {
     fn from(input: InputSignal) -> Self {
-        Self(AnyInputSignalInner::Input(input))
+        Self(InputConnectionInner::Input(input))
     }
 }
 
 impl From<Level> for InputConnection {
     fn from(level: Level) -> Self {
-        Self(AnyInputSignalInner::Constant(level))
+        Self(InputConnectionInner::Constant(level))
     }
 }
 
 impl From<NoPin> for InputConnection {
     fn from(_pin: NoPin) -> Self {
-        Self(AnyInputSignalInner::Constant(Level::Low))
+        Self(InputConnectionInner::Constant(Level::Low))
     }
 }
 
-impl From<AnyPin> for InputConnection {
-    fn from(input: AnyPin) -> Self {
-        Self(AnyInputSignalInner::Input(input.peripheral_input()))
-    }
-}
-
-impl<const GPIONUM: u8> From<GpioPin<GPIONUM>> for InputConnection
+impl<P> From<P> for InputConnection
 where
-    GpioPin<GPIONUM>: InputPin,
+    P: InputPin,
 {
-    fn from(pin: GpioPin<GPIONUM>) -> Self {
-        Self(AnyInputSignalInner::Input(pin.peripheral_input()))
+    fn from(input: P) -> Self {
+        Self(InputConnectionInner::Input(
+            input.degrade().peripheral_input(),
+        ))
+    }
+}
+
+impl From<OutputSignal> for InputConnection {
+    fn from(output_signal: OutputSignal) -> Self {
+        Self(InputConnectionInner::Input(InputSignal {
+            pin: output_signal.pin,
+            is_inverted: output_signal.is_inverted,
+        }))
+    }
+}
+
+impl From<OutputConnection> for InputConnection {
+    fn from(conn: OutputConnection) -> Self {
+        match conn.0 {
+            OutputConnectionInner::Output(inner) => inner.into(),
+            OutputConnectionInner::Constant(inner) => inner.into(),
+        }
     }
 }
 
 impl Sealed for InputConnection {}
-impl PeripheralSignal for InputConnection {
-    delegate::delegate! {
-        to match &self.0 {
-            AnyInputSignalInner::Input(pin) => pin,
-            AnyInputSignalInner::Constant(level) => level,
-        } {
-            fn pull_direction(&self, pull: Pull, _internal: private::Internal);
-        }
-    }
-}
 
-impl PeripheralInput for InputConnection {
+impl InputConnection {
     delegate::delegate! {
+        #[doc(hidden)]
         to match &self.0 {
-            AnyInputSignalInner::Input(pin) => pin,
-            AnyInputSignalInner::Constant(level) => level,
+            InputConnectionInner::Input(pin) => pin,
+            InputConnectionInner::Constant(level) => level,
         } {
-            fn init_input(&self, pull: Pull, _internal: private::Internal);
-            fn is_input_high(&self, _internal: private::Internal) -> bool;
-            fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)];
+            pub fn pull_direction(&self, pull: Pull, _internal: private::Internal);
+            pub fn init_input(&self, pull: Pull, _internal: private::Internal);
+            pub fn is_input_high(&self, _internal: private::Internal) -> bool;
+            pub fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)];
         }
 
+        #[doc(hidden)]
         to match &mut self.0 {
-            AnyInputSignalInner::Input(pin) => pin,
-            AnyInputSignalInner::Constant(level) => level,
+            InputConnectionInner::Input(pin) => pin,
+            InputConnectionInner::Constant(level) => level,
         } {
-            fn enable_input(&mut self, on: bool, _internal: private::Internal);
-            fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
-            fn connect_input_to_peripheral(&mut self, signal: crate::gpio::InputSignal, _internal: private::Internal);
-            fn disconnect_input_from_peripheral(&mut self, signal: crate::gpio::InputSignal, _internal: private::Internal);
+            pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
+            pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
+            pub fn connect_input_to_peripheral(&mut self, signal: crate::gpio::InputSignal, _internal: private::Internal);
+            pub fn disconnect_input_from_peripheral(&mut self, signal: crate::gpio::InputSignal, _internal: private::Internal);
         }
     }
 }
 
 enum OutputConnectionInner {
     Output(OutputSignal),
-    Dummy(NoPin),
+    Constant(Level),
 }
 
-/// A type-erased (input and) output signal, intended for internal use.
+/// A type-erased peripheral (input and) output signal connection.
 ///
-/// Peripheral drivers are supposed to take this and [`InputConnection`] as
-/// arguments instead of pin types.
+/// This is mainly intended for internal use, but it can be used to connect
+/// peripherals within the MCU without external hardware.
 pub struct OutputConnection(OutputConnectionInner);
 
 impl Sealed for OutputConnection {}
@@ -503,20 +514,20 @@ impl Peripheral for OutputConnection {
     unsafe fn clone_unchecked(&self) -> Self::P {
         match self {
             Self(OutputConnectionInner::Output(signal)) => Self::from(signal.clone_unchecked()),
-            Self(OutputConnectionInner::Dummy(pin)) => Self::from(*pin),
+            Self(OutputConnectionInner::Constant(level)) => Self::from(*level),
         }
     }
 }
 
 impl From<NoPin> for OutputConnection {
-    fn from(pin: NoPin) -> Self {
-        Self(OutputConnectionInner::Dummy(pin))
+    fn from(_pin: NoPin) -> Self {
+        Self(OutputConnectionInner::Constant(Level::Low))
     }
 }
 
 impl From<Level> for OutputConnection {
-    fn from(_level: Level) -> Self {
-        Self(OutputConnectionInner::Dummy(NoPin))
+    fn from(level: Level) -> Self {
+        Self(OutputConnectionInner::Constant(level))
     }
 }
 
@@ -542,7 +553,7 @@ impl OutputConnection {
         #[doc(hidden)]
         to match &self.0 {
             OutputConnectionInner::Output(pin) => pin,
-            OutputConnectionInner::Dummy(_) => Level::Low,
+            OutputConnectionInner::Constant(level) => level,
         } {
             pub fn is_input_high(&self, _internal: private::Internal) -> bool;
             pub fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)];
@@ -550,7 +561,7 @@ impl OutputConnection {
         #[doc(hidden)]
         to match &mut self.0 {
             OutputConnectionInner::Output(pin) => pin,
-            OutputConnectionInner::Dummy(_) => Level::Low,
+            OutputConnectionInner::Constant(level) => level,
         } {
             pub fn pull_direction(&mut self, pull: Pull, _internal: private::Internal);
             pub fn init_input(&mut self, pull: Pull, _internal: private::Internal);
@@ -563,7 +574,7 @@ impl OutputConnection {
         #[doc(hidden)]
         to match &self.0 {
             OutputConnectionInner::Output(pin) => pin,
-            OutputConnectionInner::Dummy(pin) => pin,
+            OutputConnectionInner::Constant(level) => level,
         } {
             pub fn is_set_high(&self, _internal: private::Internal) -> bool;
             pub fn output_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::OutputSignal)];
@@ -572,7 +583,7 @@ impl OutputConnection {
         #[doc(hidden)]
         to match &mut self.0 {
             OutputConnectionInner::Output(pin) => pin,
-            OutputConnectionInner::Dummy(pin) => pin,
+            OutputConnectionInner::Constant(level) => level,
         } {
             pub fn set_to_open_drain_output(&mut self, _internal: private::Internal);
             pub fn set_to_push_pull_output(&mut self, _internal: private::Internal);

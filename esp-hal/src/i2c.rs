@@ -59,7 +59,7 @@ use fugit::HertzU32;
 use crate::{
     clock::Clocks,
     dma::PeripheralMarker,
-    gpio::{InputSignal, OutputSignal, PeripheralOutput, Pull},
+    gpio::{interconnect::PeripheralOutput, InputSignal, OutputSignal, Pull},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::i2c0::{RegisterBlock, COMD},
@@ -495,7 +495,8 @@ where
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
     ) -> Self {
-        crate::into_ref!(i2c, sda, scl);
+        crate::into_ref!(i2c);
+        crate::into_mapped_ref!(sda, scl);
 
         let i2c = I2c {
             i2c,

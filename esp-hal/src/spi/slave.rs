@@ -73,7 +73,11 @@
 use super::{Error, SpiMode};
 use crate::{
     dma::{DescriptorChain, DmaChannelConvert, DmaEligible, PeripheralMarker, Rx, Tx},
-    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
+    gpio::{
+        interconnect::{PeripheralInput, PeripheralOutput},
+        InputSignal,
+        OutputSignal,
+    },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
     private,
@@ -129,7 +133,7 @@ where
         cs: impl Peripheral<P = CS> + 'd,
         mode: SpiMode,
     ) -> Spi<'d, T> {
-        crate::into_ref!(sclk, mosi, miso, cs);
+        crate::into_mapped_ref!(sclk, mosi, miso, cs);
 
         let this = Self::new_internal(spi, mode);
 

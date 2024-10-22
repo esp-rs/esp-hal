@@ -75,7 +75,12 @@ use fugit::HertzU32;
 use crate::{
     clock::Clocks,
     dma::{ChannelRx, DmaChannelConvert, DmaEligible, DmaError, DmaPeripheral, DmaRxBuffer, Rx},
-    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
+    gpio::{
+        interconnect::{PeripheralInput, PeripheralOutput},
+        InputSignal,
+        OutputSignal,
+        Pull,
+    },
     lcd_cam::{cam::private::RxPins, private::calculate_clkm, BitOrder, ByteOrder},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
@@ -237,7 +242,7 @@ impl<'d> Camera<'d> {
         self,
         mclk: impl Peripheral<P = MCLK> + 'd,
     ) -> Self {
-        crate::into_ref!(mclk);
+        crate::into_mapped_ref!(mclk);
         mclk.set_to_push_pull_output(crate::private::Internal);
         mclk.connect_peripheral_to_output(OutputSignal::CAM_CLK, crate::private::Internal);
         self
@@ -248,7 +253,7 @@ impl<'d> Camera<'d> {
         self,
         pclk: impl Peripheral<P = PCLK> + 'd,
     ) -> Self {
-        crate::into_ref!(pclk);
+        crate::into_mapped_ref!(pclk);
 
         pclk.init_input(Pull::None, crate::private::Internal);
         pclk.connect_input_to_peripheral(InputSignal::CAM_PCLK, crate::private::Internal);
@@ -263,8 +268,7 @@ impl<'d> Camera<'d> {
         vsync: impl Peripheral<P = VSYNC> + 'd,
         h_enable: impl Peripheral<P = HENABLE> + 'd,
     ) -> Self {
-        crate::into_ref!(vsync);
-        crate::into_ref!(h_enable);
+        crate::into_mapped_ref!(vsync, h_enable);
 
         vsync.init_input(Pull::None, crate::private::Internal);
         vsync.connect_input_to_peripheral(InputSignal::CAM_V_SYNC, crate::private::Internal);
@@ -290,9 +294,7 @@ impl<'d> Camera<'d> {
         hsync: impl Peripheral<P = HSYNC> + 'd,
         h_enable: impl Peripheral<P = HENABLE> + 'd,
     ) -> Self {
-        crate::into_ref!(vsync);
-        crate::into_ref!(hsync);
-        crate::into_ref!(h_enable);
+        crate::into_mapped_ref!(vsync, hsync, h_enable);
 
         vsync.init_input(Pull::None, crate::private::Internal);
         vsync.connect_input_to_peripheral(InputSignal::CAM_V_SYNC, crate::private::Internal);
@@ -502,14 +504,14 @@ impl RxEightBits {
         P6: PeripheralInput,
         P7: PeripheralInput,
     {
-        crate::into_ref!(pin_0);
-        crate::into_ref!(pin_1);
-        crate::into_ref!(pin_2);
-        crate::into_ref!(pin_3);
-        crate::into_ref!(pin_4);
-        crate::into_ref!(pin_5);
-        crate::into_ref!(pin_6);
-        crate::into_ref!(pin_7);
+        crate::into_mapped_ref!(pin_0);
+        crate::into_mapped_ref!(pin_1);
+        crate::into_mapped_ref!(pin_2);
+        crate::into_mapped_ref!(pin_3);
+        crate::into_mapped_ref!(pin_4);
+        crate::into_mapped_ref!(pin_5);
+        crate::into_mapped_ref!(pin_6);
+        crate::into_mapped_ref!(pin_7);
 
         pin_0.init_input(Pull::None, crate::private::Internal);
         pin_0.connect_input_to_peripheral(InputSignal::CAM_DATA_0, crate::private::Internal);
@@ -582,22 +584,22 @@ impl RxSixteenBits {
         P14: PeripheralInput,
         P15: PeripheralInput,
     {
-        crate::into_ref!(pin_0);
-        crate::into_ref!(pin_1);
-        crate::into_ref!(pin_2);
-        crate::into_ref!(pin_3);
-        crate::into_ref!(pin_4);
-        crate::into_ref!(pin_5);
-        crate::into_ref!(pin_6);
-        crate::into_ref!(pin_7);
-        crate::into_ref!(pin_8);
-        crate::into_ref!(pin_9);
-        crate::into_ref!(pin_10);
-        crate::into_ref!(pin_11);
-        crate::into_ref!(pin_12);
-        crate::into_ref!(pin_13);
-        crate::into_ref!(pin_14);
-        crate::into_ref!(pin_15);
+        crate::into_mapped_ref!(pin_0);
+        crate::into_mapped_ref!(pin_1);
+        crate::into_mapped_ref!(pin_2);
+        crate::into_mapped_ref!(pin_3);
+        crate::into_mapped_ref!(pin_4);
+        crate::into_mapped_ref!(pin_5);
+        crate::into_mapped_ref!(pin_6);
+        crate::into_mapped_ref!(pin_7);
+        crate::into_mapped_ref!(pin_8);
+        crate::into_mapped_ref!(pin_9);
+        crate::into_mapped_ref!(pin_10);
+        crate::into_mapped_ref!(pin_11);
+        crate::into_mapped_ref!(pin_12);
+        crate::into_mapped_ref!(pin_13);
+        crate::into_mapped_ref!(pin_14);
+        crate::into_mapped_ref!(pin_15);
 
         pin_0.init_input(Pull::None, crate::private::Internal);
         pin_0.connect_input_to_peripheral(InputSignal::CAM_DATA_0, crate::private::Internal);
