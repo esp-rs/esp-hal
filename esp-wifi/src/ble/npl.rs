@@ -41,16 +41,15 @@ const BLE_HCI_TRANS_BUF_CMD: i32 = 3;
 // ACL_DATA_MBUF_LEADINGSPCAE: The leadingspace in user info header for ACL data
 const ACL_DATA_MBUF_LEADINGSPACE: usize = 4;
 
+#[repr(C)]
 #[derive(Copy, Clone)]
 struct Callout {
-    _callout: *const ble_npl_callout,
     eventq: *const ble_npl_eventq,
     timer_handle: ets_timer,
     events: ble_npl_event,
 }
 
-static mut CALLOUTS: [Option<Callout>; 18] = [None; 18];
-
+#[repr(C)]
 #[derive(Copy, Clone)]
 struct Event {
     event_fn_ptr: *const ble_npl_event_fn,
@@ -712,10 +711,10 @@ unsafe extern "C" fn ble_npl_callout_stop(callout: *const ble_npl_callout) {
         panic!("Trying to stop an uninitialzed callout");
     }
 
-    let co = unwrap!(CALLOUTS[((*callout).dummy - 1) as usize].as_mut());
+    let co = (*callout).dummy as *mut Callout;
 
     // stop timer
-    compat::timer_compat::compat_timer_disarm(addr_of_mut!(co.timer_handle));
+    compat::timer_compat::compat_timer_disarm(addr_of_mut!((*co).timer_handle));
 }
 
 unsafe extern "C" fn ble_npl_callout_reset(
@@ -724,10 +723,10 @@ unsafe extern "C" fn ble_npl_callout_reset(
 ) -> ble_npl_error_t {
     trace!("ble_npl_callout_reset {:?} {}", callout, time);
 
-    let co = unwrap!(CALLOUTS[((*callout).dummy - 1) as usize].as_mut());
+    let co = (*callout).dummy as *mut Callout;
 
     // start timer
-    compat::timer_compat::compat_timer_arm(addr_of_mut!(co.timer_handle), time, false);
+    compat::timer_compat::compat_timer_arm(addr_of_mut!((*co).timer_handle), time, false);
 
     0
 }
@@ -977,30 +976,17 @@ unsafe extern "C" fn ble_npl_callout_init(
 
     if (*callout).dummy == 0 {
         let callout = callout.cast_mut();
-        let idx = unwrap!(CALLOUTS.iter().position(|item| item.is_none()));
 
-        let new_callout = CALLOUTS[idx].insert(Callout {
-            _callout: callout,
-            eventq,
-            timer_handle: ets_timer {
-                next: core::ptr::null_mut(),
-                expire: 0,
-                period: 0,
-                func: None,
-                priv_: core::ptr::null_mut(),
-            },
-            events: ble_npl_event { dummy: 0 },
-        });
-
-        ble_npl_event_init(addr_of_mut!(new_callout.events), func, args);
+        let new_callout = crate::compat::malloc::calloc(1, core::mem::size_of::<Callout>()) as *mut Callout;
+        ble_npl_event_init(addr_of_mut!((*new_callout).events), func, args);
 
         crate::compat::timer_compat::compat_timer_setfn(
-            addr_of_mut!(new_callout.timer_handle),
+            addr_of_mut!((*new_callout).timer_handle),
             callout_timer_callback_wrapper,
-            idx as *mut c_void,
+            new_callout as *mut c_void,
         );
 
-        (*callout).dummy = (idx + 1) as i32;
+        (*callout).dummy = new_callout as i32;
     }
 
     0
@@ -1008,12 +994,12 @@ unsafe extern "C" fn ble_npl_callout_init(
 
 unsafe extern "C" fn callout_timer_callback_wrapper(arg: *mut c_void) {
     info!("callout_timer_callback_wrapper {:?}", arg);
-    let co = unwrap!(CALLOUTS[arg as usize].as_mut());
+    let co = (*(arg as *mut ble_npl_callout)).dummy as *mut Callout;
 
-    if co.eventq.is_null() {
-        ble_npl_eventq_put(addr_of!(co.events).cast(), addr_of!(co.events));
+    if (*co).eventq.is_null() {
+        ble_npl_eventq_put(addr_of!((*co).events).cast(), addr_of!((*co).events));
     } else {
-        ble_npl_event_run(addr_of!(co.events));
+        ble_npl_event_run(addr_of!((*co).events));
     }
 }
 
@@ -1251,10 +1237,6 @@ pub(crate) fn ble_deinit() {
         npl::esp_unregister_ext_funcs();
 
         crate::common_adapter::chip_specific::phy_disable();
-
-        CALLOUTS.iter_mut().for_each(|item| {
-            item.take();
-        });
     }
 }
 
