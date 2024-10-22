@@ -3,6 +3,7 @@
 pub(crate) mod os_adapter;
 pub(crate) mod state;
 
+use alloc::vec::Vec;
 use core::{
     cell::{RefCell, RefMut},
     fmt::Debug,
@@ -81,65 +82,62 @@ pub mod utils;
 #[cfg(coex)]
 use include::{coex_adapter_funcs_t, coex_pre_init, esp_coex_adapter_register};
 
-use crate::{
-    binary::{
-        c_types,
-        include::{
-            self,
-            __BindgenBitfieldUnit,
-            esp_err_t,
-            esp_interface_t_ESP_IF_WIFI_AP,
-            esp_interface_t_ESP_IF_WIFI_STA,
-            esp_supplicant_init,
-            esp_wifi_connect,
-            esp_wifi_disconnect,
-            esp_wifi_get_mode,
-            esp_wifi_init_internal,
-            esp_wifi_internal_free_rx_buffer,
-            esp_wifi_internal_reg_rxcb,
-            esp_wifi_internal_tx,
-            esp_wifi_scan_start,
-            esp_wifi_set_config,
-            esp_wifi_set_country,
-            esp_wifi_set_mode,
-            esp_wifi_set_protocol,
-            esp_wifi_set_ps,
-            esp_wifi_set_tx_done_cb,
-            esp_wifi_start,
-            esp_wifi_stop,
-            g_wifi_default_wpa_crypto_funcs,
-            wifi_active_scan_time_t,
-            wifi_ap_config_t,
-            wifi_auth_mode_t,
-            wifi_cipher_type_t_WIFI_CIPHER_TYPE_CCMP,
-            wifi_config_t,
-            wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
-            wifi_country_t,
-            wifi_init_config_t,
-            wifi_interface_t,
-            wifi_interface_t_WIFI_IF_AP,
-            wifi_interface_t_WIFI_IF_STA,
-            wifi_mode_t,
-            wifi_mode_t_WIFI_MODE_AP,
-            wifi_mode_t_WIFI_MODE_APSTA,
-            wifi_mode_t_WIFI_MODE_NULL,
-            wifi_mode_t_WIFI_MODE_STA,
-            wifi_osi_funcs_t,
-            wifi_pmf_config_t,
-            wifi_scan_config_t,
-            wifi_scan_threshold_t,
-            wifi_scan_time_t,
-            wifi_scan_type_t_WIFI_SCAN_TYPE_ACTIVE,
-            wifi_scan_type_t_WIFI_SCAN_TYPE_PASSIVE,
-            wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
-            wifi_sta_config_t,
-            wpa_crypto_funcs_t,
-            ESP_WIFI_OS_ADAPTER_MAGIC,
-            ESP_WIFI_OS_ADAPTER_VERSION,
-            WIFI_INIT_CONFIG_MAGIC,
-        },
+use crate::binary::{
+    c_types,
+    include::{
+        self,
+        __BindgenBitfieldUnit,
+        esp_err_t,
+        esp_interface_t_ESP_IF_WIFI_AP,
+        esp_interface_t_ESP_IF_WIFI_STA,
+        esp_supplicant_init,
+        esp_wifi_connect,
+        esp_wifi_disconnect,
+        esp_wifi_get_mode,
+        esp_wifi_init_internal,
+        esp_wifi_internal_free_rx_buffer,
+        esp_wifi_internal_reg_rxcb,
+        esp_wifi_internal_tx,
+        esp_wifi_scan_start,
+        esp_wifi_set_config,
+        esp_wifi_set_country,
+        esp_wifi_set_mode,
+        esp_wifi_set_protocol,
+        esp_wifi_set_ps,
+        esp_wifi_set_tx_done_cb,
+        esp_wifi_start,
+        esp_wifi_stop,
+        g_wifi_default_wpa_crypto_funcs,
+        wifi_active_scan_time_t,
+        wifi_ap_config_t,
+        wifi_auth_mode_t,
+        wifi_cipher_type_t_WIFI_CIPHER_TYPE_CCMP,
+        wifi_config_t,
+        wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
+        wifi_country_t,
+        wifi_init_config_t,
+        wifi_interface_t,
+        wifi_interface_t_WIFI_IF_AP,
+        wifi_interface_t_WIFI_IF_STA,
+        wifi_mode_t,
+        wifi_mode_t_WIFI_MODE_AP,
+        wifi_mode_t_WIFI_MODE_APSTA,
+        wifi_mode_t_WIFI_MODE_NULL,
+        wifi_mode_t_WIFI_MODE_STA,
+        wifi_osi_funcs_t,
+        wifi_pmf_config_t,
+        wifi_scan_config_t,
+        wifi_scan_threshold_t,
+        wifi_scan_time_t,
+        wifi_scan_type_t_WIFI_SCAN_TYPE_ACTIVE,
+        wifi_scan_type_t_WIFI_SCAN_TYPE_PASSIVE,
+        wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
+        wifi_sta_config_t,
+        wpa_crypto_funcs_t,
+        ESP_WIFI_OS_ADAPTER_MAGIC,
+        ESP_WIFI_OS_ADAPTER_VERSION,
+        WIFI_INIT_CONFIG_MAGIC,
     },
-    compat::queue::SimpleQueue,
 };
 
 /// Supported Wi-Fi authentication methods.
@@ -1031,13 +1029,11 @@ const DATA_FRAME_SIZE: usize = MTU + ETHERNET_FRAME_HEADER_SIZE;
 const RX_QUEUE_SIZE: usize = crate::CONFIG.rx_queue_size;
 const TX_QUEUE_SIZE: usize = crate::CONFIG.tx_queue_size;
 
-pub(crate) static DATA_QUEUE_RX_AP: Mutex<
-    RefCell<SimpleQueue<EspWifiPacketBuffer, RX_QUEUE_SIZE>>,
-> = Mutex::new(RefCell::new(SimpleQueue::new()));
+pub(crate) static DATA_QUEUE_RX_AP: Mutex<RefCell<Vec<EspWifiPacketBuffer>>> =
+    Mutex::new(RefCell::new(Vec::new()));
 
-pub(crate) static DATA_QUEUE_RX_STA: Mutex<
-    RefCell<SimpleQueue<EspWifiPacketBuffer, RX_QUEUE_SIZE>>,
-> = Mutex::new(RefCell::new(SimpleQueue::new()));
+pub(crate) static DATA_QUEUE_RX_STA: Mutex<RefCell<Vec<EspWifiPacketBuffer>>> =
+    Mutex::new(RefCell::new(Vec::new()));
 
 /// Common errors.
 #[derive(Debug, Clone, Copy)]
@@ -1607,16 +1603,15 @@ unsafe extern "C" fn recv_cb_sta(
     // which will try to lock an internal mutex. If the mutex is already taken,
     // the function will try to trigger a context switch, which will fail if we
     // are in a critical section.
-    match critical_section::with(|cs| DATA_QUEUE_RX_STA.borrow_ref_mut(cs).enqueue(packet)) {
-        Ok(_) => {
+    match critical_section::with(|cs| DATA_QUEUE_RX_STA.borrow_ref_mut(cs).push(packet)) {
+        () => {
             #[cfg(feature = "embassy-net")]
             embassy::STA_RECEIVE_WAKER.wake();
             include::ESP_OK as esp_err_t
-        }
-        Err(_) => {
-            debug!("RX QUEUE FULL");
-            include::ESP_ERR_NO_MEM as esp_err_t
-        }
+        } /* Err(_) => {
+           *     debug!("RX QUEUE FULL");
+           *     include::ESP_ERR_NO_MEM as esp_err_t
+           * } */
     }
 }
 
@@ -1632,16 +1627,21 @@ unsafe extern "C" fn recv_cb_ap(
     // which will try to lock an internal mutex. If the mutex is already taken,
     // the function will try to trigger a context switch, which will fail if we
     // are in a critical section.
-    match critical_section::with(|cs| DATA_QUEUE_RX_AP.borrow_ref_mut(cs).enqueue(packet)) {
-        Ok(_) => {
-            #[cfg(feature = "embassy-net")]
-            embassy::AP_RECEIVE_WAKER.wake();
-            include::ESP_OK as esp_err_t
+    if critical_section::with(|cs| {
+        let mut queue = DATA_QUEUE_RX_AP.borrow_ref_mut(cs);
+        if queue.len() < RX_QUEUE_SIZE {
+            queue.push(packet);
+            true
+        } else {
+            false
         }
-        Err(_) => {
-            debug!("RX QUEUE FULL");
-            include::ESP_ERR_NO_MEM as esp_err_t
-        }
+    }) {
+        #[cfg(feature = "embassy-net")]
+        embassy::AP_RECEIVE_WAKER.wake();
+        include::ESP_OK as esp_err_t
+    } else {
+        debug!("RX QUEUE FULL");
+        include::ESP_ERR_NO_MEM as esp_err_t
     }
 }
 
@@ -1984,10 +1984,7 @@ mod sealed {
 
         fn wrap_config(config: Self::Config) -> Configuration;
 
-        fn data_queue_rx(
-            self,
-            cs: CriticalSection,
-        ) -> RefMut<'_, SimpleQueue<EspWifiPacketBuffer, RX_QUEUE_SIZE>>;
+        fn data_queue_rx(self, cs: CriticalSection) -> RefMut<'_, Vec<EspWifiPacketBuffer>>;
 
         fn can_send(self) -> bool {
             WIFI_TX_INFLIGHT.load(Ordering::SeqCst) < TX_QUEUE_SIZE
@@ -2053,10 +2050,7 @@ mod sealed {
             Configuration::Client(config)
         }
 
-        fn data_queue_rx(
-            self,
-            cs: CriticalSection,
-        ) -> RefMut<'_, SimpleQueue<EspWifiPacketBuffer, RX_QUEUE_SIZE>> {
+        fn data_queue_rx(self, cs: CriticalSection) -> RefMut<'_, Vec<EspWifiPacketBuffer>> {
             DATA_QUEUE_RX_STA.borrow_ref_mut(cs)
         }
 
@@ -2095,10 +2089,7 @@ mod sealed {
             Configuration::AccessPoint(config)
         }
 
-        fn data_queue_rx(
-            self,
-            cs: CriticalSection,
-        ) -> RefMut<'_, SimpleQueue<EspWifiPacketBuffer, RX_QUEUE_SIZE>> {
+        fn data_queue_rx(self, cs: CriticalSection) -> RefMut<'_, Vec<EspWifiPacketBuffer>> {
             DATA_QUEUE_RX_AP.borrow_ref_mut(cs)
         }
 
@@ -2714,7 +2705,7 @@ impl<MODE: Sealed> WifiRxToken<MODE> {
             let mut queue = self.mode.data_queue_rx(cs);
 
             unwrap!(
-                queue.dequeue(),
+                queue.pop(),
                 "unreachable: transmit()/receive() ensures there is a packet to process"
             )
         });

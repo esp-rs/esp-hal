@@ -6,9 +6,9 @@ pub(crate) mod btdm;
 #[cfg(any(esp32c2, esp32c6, esp32h2))]
 pub(crate) mod npl;
 
+use alloc::vec::Vec;
 use core::{cell::RefCell, mem::MaybeUninit};
 
-use alloc::vec::Vec;
 pub(crate) use ble::{ble_init, send_hci};
 use critical_section::Mutex;
 
@@ -100,7 +100,6 @@ impl HciOutCollector {
 }
 
 static BLE_HCI_READ_DATA: Mutex<RefCell<Vec<u8>>> = Mutex::new(RefCell::new(Vec::new()));
-
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]

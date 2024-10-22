@@ -62,7 +62,8 @@ struct Event {
     queued: bool,
 }
 
-pub(super) static BT_RECEIVE_QUEUE: Mutex<RefCell<Vec<ReceivedPacket>>> = Mutex::new(RefCell::new(Vec::new()));
+pub(super) static BT_RECEIVE_QUEUE: Mutex<RefCell<Vec<ReceivedPacket>>> =
+    Mutex::new(RefCell::new(Vec::new()));
 
 #[cfg(esp32c2)]
 type OsMembufT = u32;
@@ -1410,4 +1411,3 @@ pub fn send_hci(data: &[u8]) {
         hci_out.reset();
     }
 }
-

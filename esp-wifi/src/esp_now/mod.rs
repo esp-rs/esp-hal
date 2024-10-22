@@ -9,6 +9,7 @@
 //!
 //! For more information see https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html
 
+use alloc::vec::Vec;
 use core::{cell::RefCell, fmt::Debug, marker::PhantomData};
 
 use critical_section::Mutex;
@@ -17,11 +18,12 @@ use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
 use crate::{
     binary::include::*,
-    compat::queue::SimpleQueue,
     hal::peripheral::{Peripheral, PeripheralRef},
     wifi::{Protocol, RxControlInfo},
     EspWifiInitialization,
 };
+
+const RECEIVE_QUEUE_SIZE: usize = 10;
 
 /// Maximum payload length
 pub const ESP_NOW_MAX_DATA_LEN: usize = 250;
@@ -29,8 +31,7 @@ pub const ESP_NOW_MAX_DATA_LEN: usize = 250;
 /// Broadcast address
 pub const BROADCAST_ADDRESS: [u8; 6] = [0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8];
 
-static RECEIVE_QUEUE: Mutex<RefCell<SimpleQueue<ReceivedData, 10>>> =
-    Mutex::new(RefCell::new(SimpleQueue::new()));
+static RECEIVE_QUEUE: Mutex<RefCell<Vec<ReceivedData>>> = Mutex::new(RefCell::new(Vec::new()));
 /// This atomic behaves like a guard, so we need strict memory ordering when
 /// operating it.
 ///
@@ -231,23 +232,17 @@ pub struct ReceiveInfo {
 
 /// Stores information about the received data, including the packet content and
 /// associated information.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ReceivedData {
-    /// The length of the received data.
-    pub len: u8,
-
-    /// The buffer containing the received data.
-    pub data: [u8; 256],
-
-    /// Information about a received packet.
+    pub data: Vec<u8>,
     pub info: ReceiveInfo,
 }
 
 impl ReceivedData {
     /// Returns the received payload.
     pub fn get_data(&self) -> &[u8] {
-        &self.data[..self.len as usize]
+        &self.data
     }
 }
 
@@ -542,7 +537,7 @@ impl<'d> EspNowReceiver<'d> {
     pub fn receive(&self) -> Option<ReceivedData> {
         critical_section::with(|cs| {
             let mut queue = RECEIVE_QUEUE.borrow_ref_mut(cs);
-            queue.dequeue()
+            queue.pop()
         })
     }
 }
@@ -834,18 +829,13 @@ unsafe extern "C" fn rcv_cb(
     let slice = core::slice::from_raw_parts(data, data_len as usize);
     critical_section::with(|cs| {
         let mut queue = RECEIVE_QUEUE.borrow_ref_mut(cs);
-        let mut data = [0u8; 256];
-        data[..slice.len()].copy_from_slice(slice);
+        let data = Vec::from(slice);
 
-        if queue.is_full() {
-            queue.dequeue();
+        if queue.len() >= RECEIVE_QUEUE_SIZE {
+            queue.pop();
         }
 
-        unwrap!(queue.enqueue(ReceivedData {
-            len: slice.len() as u8,
-            data,
-            info,
-        }));
+        queue.push(ReceivedData { data, info });
 
         #[cfg(feature = "async")]
         asynch::ESP_NOW_RX_WAKER.wake();
@@ -961,7 +951,7 @@ mod asynch {
 
             if let Some(data) = critical_section::with(|cs| {
                 let mut queue = RECEIVE_QUEUE.borrow_ref_mut(cs);
-                queue.dequeue()
+                queue.pop()
             }) {
                 Poll::Ready(data)
             } else {
