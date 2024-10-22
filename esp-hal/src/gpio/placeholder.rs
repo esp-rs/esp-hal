@@ -40,7 +40,7 @@ impl PeripheralInput for Level {
             Level::Low => ZERO_INPUT,
         };
 
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
             .modify(|_, w| unsafe {
                 w.sel()

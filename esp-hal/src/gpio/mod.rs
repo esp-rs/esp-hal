@@ -561,43 +561,43 @@ struct Bank0GpioRegisterAccess;
 
 impl Bank0GpioRegisterAccess {
     fn write_out_en_clear(word: u32) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .enable_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_out_en_set(word: u32) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .enable_w1ts()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn read_input() -> u32 {
-        unsafe { &*GPIO::PTR }.in_().read().bits()
+        unsafe { GPIO::steal() }.in_().read().bits()
     }
 
     fn read_output() -> u32 {
-        unsafe { &*GPIO::PTR }.out().read().bits()
+        unsafe { GPIO::steal() }.out().read().bits()
     }
 
     fn read_interrupt_status() -> u32 {
-        unsafe { &*GPIO::PTR }.status().read().bits()
+        unsafe { GPIO::steal() }.status().read().bits()
     }
 
     fn write_interrupt_status_clear(word: u32) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .status_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_output_set(word: u32) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .out_w1ts()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_output_clear(word: u32) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .out_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
@@ -609,43 +609,43 @@ struct Bank1GpioRegisterAccess;
 #[cfg(any(esp32, esp32s2, esp32s3))]
 impl Bank1GpioRegisterAccess {
     fn write_out_en_clear(word: u32) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .enable1_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_out_en_set(word: u32) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .enable1_w1ts()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn read_input() -> u32 {
-        unsafe { &*GPIO::PTR }.in1().read().bits()
+        unsafe { GPIO::steal() }.in1().read().bits()
     }
 
     fn read_output() -> u32 {
-        unsafe { &*GPIO::PTR }.out1().read().bits()
+        unsafe { GPIO::steal() }.out1().read().bits()
     }
 
     fn read_interrupt_status() -> u32 {
-        unsafe { &*GPIO::PTR }.status1().read().bits()
+        unsafe { GPIO::steal() }.status1().read().bits()
     }
 
     fn write_interrupt_status_clear(word: u32) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .status1_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_output_set(word: u32) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .out1_w1ts()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_output_clear(word: u32) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .out1_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
@@ -696,7 +696,7 @@ fn disable_usb_pads(gpionum: u8) {
     }
 
     if pins.contains(&gpionum) {
-        unsafe { &*crate::peripherals::USB_DEVICE::PTR }
+        unsafe { crate::peripherals::USB_DEVICE::steal() }
             .conf0()
             .modify(|_, w| {
                 w.usb_pad_enable().clear_bit();
@@ -814,7 +814,7 @@ where
     }
 
     fn enable_open_drain(&mut self, on: bool, _: private::Internal) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .pin(GPIONUM as usize)
             .modify(|_, w| w.pad_driver().bit(on));
     }
@@ -857,7 +857,7 @@ where
     fn init_output(&self, alternate: AlternateFunction, open_drain: bool) {
         self.output_enable(true, private::Internal);
 
-        let gpio = unsafe { &*GPIO::PTR };
+        let gpio = unsafe { GPIO::steal() };
 
         gpio.pin(GPIONUM as usize)
             .modify(|_, w| w.pad_driver().bit(open_drain));
@@ -1170,7 +1170,7 @@ macro_rules! rtc_pins {
             }
 
             fn rtcio_pad_hold(&mut self, enable: bool) {
-                let rtc_ctrl = unsafe { &*$crate::peripherals::LPWR::PTR };
+                let rtc_ctrl = unsafe { $crate::peripherals::LPWR::steal() };
 
                 cfg_if::cfg_if! {
                     if #[cfg(esp32)] {
@@ -1190,7 +1190,7 @@ macro_rules! rtc_pins {
             impl $crate::gpio::RtcPinWithResistors for GpioPin<$pin_num>
             {
                 fn rtcio_pullup(&mut self, enable: bool) {
-                    let rtcio = unsafe { &*$crate::peripherals::RTC_IO::PTR };
+                    let rtcio = unsafe { $crate::peripherals::RTC_IO::steal() };
 
                     paste::paste! {
                         rtcio.$pin_reg.modify(|_, w| w.[< $prefix rue >]().bit(enable));
@@ -1198,7 +1198,7 @@ macro_rules! rtc_pins {
                 }
 
                 fn rtcio_pulldown(&mut self, enable: bool) {
-                    let rtcio = unsafe { &*$crate::peripherals::RTC_IO::PTR };
+                    let rtcio = unsafe { $crate::peripherals::RTC_IO::steal() };
 
                     paste::paste! {
                         rtcio.$pin_reg.modify(|_, w| w.[< $prefix rde >]().bit(enable));
@@ -1438,7 +1438,7 @@ macro_rules! analog {
                         w.fun_wpd().clear_bit()
                     });
 
-                    unsafe{ &*GPIO::PTR }.enable_w1tc().write(|w| unsafe { w.bits(1 << $pin_num) });
+                    unsafe{ GPIO::steal() }.enable_w1tc().write(|w| unsafe { w.bits(1 << $pin_num) });
                 }
             }
         )+
@@ -2347,7 +2347,7 @@ pub(crate) mod internal {
 }
 
 fn is_listening(pin_num: u8) -> bool {
-    let bits = unsafe { &*GPIO::PTR }
+    let bits = unsafe { GPIO::steal() }
         .pin(pin_num as usize)
         .read()
         .int_ena()
@@ -2356,7 +2356,7 @@ fn is_listening(pin_num: u8) -> bool {
 }
 
 fn set_int_enable(gpio_num: u8, int_ena: u8, int_type: u8, wake_up_from_light_sleep: bool) {
-    let gpio = unsafe { &*GPIO::PTR };
+    let gpio = unsafe { GPIO::steal() };
     gpio.pin(gpio_num as usize).modify(|_, w| unsafe {
         w.int_ena().bits(int_ena);
         w.int_type().bits(int_type);

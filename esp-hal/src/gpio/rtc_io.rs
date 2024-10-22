@@ -35,7 +35,7 @@ use core::marker::PhantomData;
 #[cfg(esp32c6)]
 use super::OpenDrain;
 use super::RtcPin;
-use crate::into_ref;
+use crate::{into_ref, peripherals::GPIO};
 
 /// A GPIO output pin configured for low power operation
 pub struct LowPowerOutput<'d, const PIN: u8> {
@@ -169,10 +169,8 @@ impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     }
 
     fn set_open_drain_output(&self, enable: bool) {
-        use crate::peripherals::GPIO;
-        let gpio = unsafe { &*GPIO::PTR };
-
-        gpio.pin(PIN as usize)
+        unsafe { GPIO::steal() }
+            .pin(PIN as usize)
             .modify(|_, w| w.pad_driver().bit(enable));
     }
 }
