@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use core::{
     cell::RefCell,
     ptr::{addr_of, addr_of_mut},
@@ -14,7 +15,6 @@ use crate::{
     compat::{
         self,
         common::{str_from_c, RawQueue},
-        queue::SimpleQueue,
     },
     timer::yield_task,
 };
@@ -62,17 +62,15 @@ struct Event {
     queued: bool,
 }
 
-static BT_RECEIVE_QUEUE: Mutex<RefCell<SimpleQueue<ReceivedPacket, 10>>> =
-    Mutex::new(RefCell::new(SimpleQueue::new()));
+static BT_RECEIVE_QUEUE: Mutex<RefCell<Vec<ReceivedPacket>>> = Mutex::new(RefCell::new(Vec::new()));
 
 #[cfg(esp32c2)]
 type OsMembufT = u32;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ReceivedPacket {
-    pub len: u8,
-    pub data: [u8; 256],
+    pub data: Vec<u8>,
 }
 
 /// Memory pool
@@ -1319,15 +1317,9 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i3
         data[2] = len as u8;
         data[3..][..len].copy_from_slice(payload);
 
-        if queue
-            .enqueue(ReceivedPacket {
-                len: (len + 3) as u8,
-                data,
-            })
-            .is_err()
-        {
-            warn!("Dropping BLE packet");
-        }
+        queue.push(ReceivedPacket {
+            data: Vec::from(&data[..len + 3]),
+        });
 
         dump_packet_info(&data[..(len + 3)]);
     });
@@ -1354,15 +1346,9 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
         data[0] = 0x02; // ACL
         data[1..][..data_slice.len()].copy_from_slice(data_slice);
 
-        if queue
-            .enqueue(ReceivedPacket {
-                len: (len + 1) as u8,
-                data,
-            })
-            .is_err()
-        {
-            warn!("Dropping BLE packet");
-        }
+        queue.push(ReceivedPacket {
+            data: Vec::from(&data[..data_slice.len() + 1]),
+        });
 
         dump_packet_info(&data[..(len + 1) as usize]);
     });
@@ -1394,10 +1380,10 @@ pub(crate) fn read_next(data: &mut [u8]) -> usize {
     critical_section::with(|cs| {
         let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
 
-        match queue.dequeue() {
+        match queue.pop() {
             Some(packet) => {
-                data[..packet.len as usize].copy_from_slice(&packet.data[..packet.len as usize]);
-                packet.len as usize
+                data[..packet.data.len() as usize].copy_from_slice(&packet.data[..packet.data.len() as usize]);
+                packet.data.len() as usize
             }
             None => 0,
         }
@@ -1410,10 +1396,10 @@ pub fn read_hci(data: &mut [u8]) -> usize {
             critical_section::with(|cs| {
                 let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
 
-                if let Some(packet) = queue.dequeue() {
-                    BLE_HCI_READ_DATA[..packet.len as usize]
-                        .copy_from_slice(&packet.data[..packet.len as usize]);
-                    BLE_HCI_READ_DATA_LEN = packet.len as usize;
+                if let Some(packet) = queue.pop() {
+                    BLE_HCI_READ_DATA[..packet.data.len() as usize]
+                        .copy_from_slice(&packet.data[..packet.data.len() as usize]);
+                    BLE_HCI_READ_DATA_LEN = packet.data.len() as usize;
                     BLE_HCI_READ_DATA_INDEX = 0;
                 }
             });
