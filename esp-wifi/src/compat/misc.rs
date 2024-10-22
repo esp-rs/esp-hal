@@ -163,12 +163,12 @@ unsafe extern "C" fn atoi(str: *const i8) -> i32 {
     let mut idx = 0;
 
     // skip leading spaces
-    while str.add(idx).read_volatile() as u8 == b' ' {
+    while str.add(idx).read() as u8 == b' ' {
         idx += 1;
     }
 
     // check sign
-    let c = str.add(idx).read_volatile() as u8;
+    let c = str.add(idx).read() as u8;
     if c == b'-' || c == b'+' {
         if c == b'-' {
             sign = -1;
@@ -178,7 +178,7 @@ unsafe extern "C" fn atoi(str: *const i8) -> i32 {
 
     // parse number digit by digit
     loop {
-        let c = str.add(idx).read_volatile() as u8;
+        let c = str.add(idx).read() as u8;
 
         if !c.is_ascii_digit() {
             break;
