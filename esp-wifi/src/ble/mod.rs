@@ -6,9 +6,11 @@ pub(crate) mod btdm;
 #[cfg(any(esp32c2, esp32c6, esp32h2))]
 pub(crate) mod npl;
 
-use core::mem::MaybeUninit;
+use core::{cell::RefCell, mem::MaybeUninit};
 
-pub(crate) use ble::{ble_init, read_hci, read_next, send_hci};
+use alloc::vec::Vec;
+pub(crate) use ble::{ble_init, send_hci};
+use critical_section::Mutex;
 
 #[cfg(any(esp32, esp32c3, esp32s3))]
 use self::btdm as ble;
@@ -95,4 +97,69 @@ impl HciOutCollector {
     fn packet(&self) -> &[u8] {
         &self.data[0..self.index]
     }
+}
+
+static BLE_HCI_READ_DATA: Mutex<RefCell<Vec<u8>>> = Mutex::new(RefCell::new(Vec::new()));
+
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct ReceivedPacket {
+    pub data: Vec<u8>,
+}
+
+#[cfg(feature = "async")]
+pub fn have_hci_read_data() -> bool {
+    critical_section::with(|cs| {
+        let queue = ble::BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
+        !queue.is_empty() || BLE_HCI_READ_DATA.borrow_ref(cs).len() > 0
+    })
+}
+
+pub(crate) fn read_next(data: &mut [u8]) -> usize {
+    critical_section::with(|cs| {
+        let mut queue = ble::BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
+
+        match queue.pop() {
+            Some(packet) => {
+                data[..packet.data.len() as usize]
+                    .copy_from_slice(&packet.data[..packet.data.len() as usize]);
+                packet.data.len() as usize
+            }
+            None => 0,
+        }
+    })
+}
+
+pub fn read_hci(data: &mut [u8]) -> usize {
+    critical_section::with(|cs| {
+        let mut hci_read_data = BLE_HCI_READ_DATA.borrow_ref_mut(cs);
+
+        if hci_read_data.len() == 0 {
+            let mut queue = ble::BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
+
+            if let Some(packet) = queue.pop() {
+                hci_read_data.extend(packet.data);
+            }
+        }
+
+        let l = usize::min(hci_read_data.len(), data.len());
+        if l > 0 {
+            data[..l].copy_from_slice(&hci_read_data[..l]);
+            hci_read_data.drain(..l);
+            l
+        } else {
+            0
+        }
+    })
+}
+
+#[allow(unreachable_code, unused_variables)]
+fn dump_packet_info(buffer: &[u8]) {
+    #[cfg(not(feature = "dump-packets"))]
+    return;
+
+    critical_section::with(|cs| {
+        info!("@HCIFRAME {:?}", buffer);
+    });
 }
