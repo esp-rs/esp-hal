@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Expose LCD_CAM interrupt bits (#2338)
 
 - A new config option `PLACE_SWITCH_TABLES_IN_RAM` to improve performance (especially for interrupts) at the cost of slightly more RAM usage (#2331)
 - A new config option `PLACE_ANON_IN_RAM` to improve performance (especially for interrupts) at the cost of RAM usage (#2331)
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Pins::steal()` to unsafely obtain GPIO. (#2335)
 
 ### Changed
+- Async I8080 driver is now created with `into_async()` (#2338)
 
 - Peripheral type erasure for SPI (#2334)
 - Peripheral type erasure for I2S (#2367)

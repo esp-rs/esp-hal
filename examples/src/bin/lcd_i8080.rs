@@ -30,10 +30,10 @@ use esp_hal::{
     gpio::{Input, Io, Level, Output, Pull},
     lcd_cam::{
         lcd::i8080::{Config, TxEightBits, I8080},
+        BlockingWithInterrupts,
         LcdCam,
     },
     prelude::*,
-    Blocking,
 };
 use esp_println::println;
 
@@ -87,20 +87,22 @@ fn main() -> ! {
     // considerations, like how to manage the CS pin, the CD pin, cancellation semantics,
     // 8 vs 16 bit, non-native primitives like Rgb565, Rgb888, etc. This Bus is just provided as
     // an example of how to implement your own.
-    struct Bus<'d> {
-        resources: Option<(I8080<'d, Blocking>, DmaTxBuf)>,
+    struct Bus<'d, M> {
+        resources: Option<(I8080<'d, M>, DmaTxBuf)>,
     }
-    impl<'d> Bus<'d> {
+    impl<'d, M> Bus<'d, M> {
         fn use_resources<T>(
             &mut self,
-            func: impl FnOnce(I8080<'d, Blocking>, DmaTxBuf) -> (T, I8080<'d, Blocking>, DmaTxBuf),
+            func: impl FnOnce(I8080<'d, M>, DmaTxBuf) -> (T, I8080<'d, M>, DmaTxBuf),
         ) -> T {
             let (i8080, buf) = self.resources.take().unwrap();
             let (result, i8080, buf) = func(i8080, buf);
             self.resources = Some((i8080, buf));
             result
         }
+    }
 
+    impl<'d> Bus<'d, BlockingWithInterrupts> {
         pub fn send(&mut self, cmd: u8, data: &[u8]) {
             self.use_resources(|i8080, mut buf| {
                 buf.fill(data);
