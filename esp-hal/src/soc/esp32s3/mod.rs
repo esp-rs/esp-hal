@@ -151,8 +151,10 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
         stack_chk_guard.write_volatile(0xdeadbabe);
     }
 
+    crate::interrupt::setup_interrupts();
+
     // continue with default reset handler
-    xtensa_lx_rt::Reset();
+    xtensa_lx_rt::Reset()
 }
 
 /// The ESP32 has a first stage bootloader that handles loading program data
