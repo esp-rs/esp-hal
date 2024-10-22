@@ -26,10 +26,7 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
     /// When enabled rsa peripheral would generate an interrupt when a operation
     /// is finished.
     pub fn enable_disable_interrupt(&mut self, enable: bool) {
-        match enable {
-            true => self.rsa.int_ena().write(|w| w.int_ena().set_bit()),
-            false => self.rsa.int_ena().write(|w| w.int_ena().clear_bit()),
-        }
+        self.rsa.int_ena().write(|w| w.int_ena().bit(enable))
     }
 
     fn write_mode(&mut self, mode: u32) {
