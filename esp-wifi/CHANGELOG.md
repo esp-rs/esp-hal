@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed a possible crash when parsing results from a radius server (#2380)
+
 ### Removed
 
 ## 0.10.1 - 2024-10-10

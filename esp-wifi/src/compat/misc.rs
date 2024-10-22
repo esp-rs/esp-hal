@@ -162,10 +162,12 @@ unsafe extern "C" fn atoi(str: *const i8) -> i32 {
     let mut res: i32 = 0;
     let mut idx = 0;
 
+    // skip leading spaces
     while str.add(idx).read_volatile() as u8 == b' ' {
         idx += 1;
     }
 
+    // check sign
     let c = str.add(idx).read_volatile() as u8;
     if c == b'-' || c == b'+' {
         if c == b'-' {
@@ -174,6 +176,7 @@ unsafe extern "C" fn atoi(str: *const i8) -> i32 {
         idx += 1;
     }
 
+    // parse number digit by digit
     loop {
         let c = str.add(idx).read_volatile() as u8;
 
@@ -181,6 +184,7 @@ unsafe extern "C" fn atoi(str: *const i8) -> i32 {
             break;
         }
 
+        // if the result would exceed the bounds - return max-value
         if res > i32::MAX / 10 || (res == i32::MAX / 10 && c - b'0' > 7) {
             return if sign == 1 { i32::MAX } else { i32::MIN };
         }
