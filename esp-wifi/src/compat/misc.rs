@@ -180,7 +180,7 @@ unsafe extern "C" fn atoi(str: *const i8) -> i32 {
     loop {
         let c = str.add(idx).read_volatile() as u8;
 
-        if c < b'0' || c > b'9' {
+        if !(b'0'..=b'9').contains(&c) {
             break;
         }
 
@@ -192,7 +192,7 @@ unsafe extern "C" fn atoi(str: *const i8) -> i32 {
         res = 10 * res + (c - b'0') as i32;
         idx += 1;
     }
-    return res * sign;
+    res * sign
 }
 
 #[derive(Debug, Copy, Clone)]
