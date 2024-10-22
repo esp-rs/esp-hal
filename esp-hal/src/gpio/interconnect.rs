@@ -91,12 +91,9 @@ impl InputSignal {
         unsafe { GPIO::steal() }
             .func_in_sel_cfg(signal - FUNC_IN_SEL_OFFSET)
             .modify(|_, w| unsafe {
-                w.sel()
-                    .set_bit()
-                    .in_inv_sel()
-                    .bit(invert)
-                    .in_sel()
-                    .bits(input)
+                w.sel().set_bit();
+                w.in_inv_sel().bit(invert);
+                w.in_sel().bits(input)
             });
     }
 }
@@ -241,14 +238,10 @@ impl OutputSignal {
         unsafe { GPIO::steal() }
             .func_out_sel_cfg(output as usize)
             .modify(|_, w| unsafe {
-                w.out_sel()
-                    .bits(signal)
-                    .inv_sel()
-                    .bit(invert)
-                    .oen_sel()
-                    .bit(enable_from_gpio)
-                    .oen_inv_sel()
-                    .bit(invert_enable)
+                w.out_sel().bits(signal);
+                w.inv_sel().bit(invert);
+                w.oen_sel().bit(enable_from_gpio);
+                w.oen_inv_sel().bit(invert_enable)
             });
     }
 }
@@ -333,7 +326,6 @@ impl PeripheralOutput for OutputSignal {
 enum AnyInputSignalInner {
     Input(InputSignal),
     Constant(Level),
-    Dummy(NoPin),
 }
 
 /// A type-erased input signal.
@@ -361,8 +353,8 @@ impl From<Level> for AnyInputSignal {
 }
 
 impl From<NoPin> for AnyInputSignal {
-    fn from(pin: NoPin) -> Self {
-        Self(AnyInputSignalInner::Dummy(pin))
+    fn from(_pin: NoPin) -> Self {
+        Self(AnyInputSignalInner::Constant(Level::Low))
     }
 }
 
@@ -387,7 +379,6 @@ impl PeripheralSignal for AnyInputSignal {
         to match &self.0 {
             AnyInputSignalInner::Input(pin) => pin,
             AnyInputSignalInner::Constant(level) => level,
-            AnyInputSignalInner::Dummy(pin) => pin,
         } {
             fn pull_direction(&self, pull: Pull, _internal: private::Internal);
         }
@@ -399,7 +390,6 @@ impl PeripheralInput for AnyInputSignal {
         to match &self.0 {
             AnyInputSignalInner::Input(pin) => pin,
             AnyInputSignalInner::Constant(level) => level,
-            AnyInputSignalInner::Dummy(pin) => pin,
         } {
             fn init_input(&self, pull: Pull, _internal: private::Internal);
             fn is_input_high(&self, _internal: private::Internal) -> bool;
@@ -409,7 +399,6 @@ impl PeripheralInput for AnyInputSignal {
         to match &mut self.0 {
             AnyInputSignalInner::Input(pin) => pin,
             AnyInputSignalInner::Constant(level) => level,
-            AnyInputSignalInner::Dummy(pin) => pin,
         } {
             fn enable_input(&mut self, on: bool, _internal: private::Internal);
             fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
