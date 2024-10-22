@@ -30,6 +30,7 @@ peripherals:
 
 - SPI (both master and slave)
 - I2S
+- I2C
 
 ```diff
 -Spi<'static, SPI2, FullDuplexMode>

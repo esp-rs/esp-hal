@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Peripheral type erasure for SPI (#2334)
 - Peripheral type erasure for I2S (#2367)
+- Peripheral type erasure for I2C (#2361)
 
 ### Fixed
 
