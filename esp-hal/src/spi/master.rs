@@ -463,14 +463,14 @@ where
     T: Instance,
 {
     fn new_internal(
-        spi: impl Peripheral<P = impl Into<T> + 'd> + 'd,
+        spi: impl Peripheral<P = T> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
     ) -> Spi<'d, M, T> {
         crate::into_ref!(spi);
 
         let mut spi = Spi {
-            spi: spi.map_into(),
+            spi,
             _mode: PhantomData,
         };
         spi.spi.reset_peripheral();
@@ -571,11 +571,11 @@ impl<'d> Spi<'d, FullDuplexMode> {
     /// All pins are optional. Setup these pins using
     /// [with_pins](Self::with_pins) or individual methods for each pin.
     pub fn new(
-        spi: impl Peripheral<P = impl Into<AnySpi> + 'd> + 'd,
+        spi: impl Peripheral<P = impl Instance> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
     ) -> Spi<'d, FullDuplexMode> {
-        Self::new_typed(spi, frequency, mode)
+        Self::new_typed(spi.map_into(), frequency, mode)
     }
 }
 
@@ -588,7 +588,7 @@ where
     /// All pins are optional. Setup these pins using
     /// [with_pins](Self::with_pins) or individual methods for each pin.
     pub fn new_typed(
-        spi: impl Peripheral<P = impl Into<T> + 'd> + 'd,
+        spi: impl Peripheral<P = T> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
     ) -> Spi<'d, FullDuplexMode, T> {
@@ -666,11 +666,11 @@ impl<'d> Spi<'d, HalfDuplexMode> {
     /// All pins are optional. Setup these pins using
     /// [with_pins](Self::with_pins) or individual methods for each pin.
     pub fn new_half_duplex(
-        spi: impl Peripheral<P = impl Into<AnySpi> + 'd> + 'd,
+        spi: impl Peripheral<P = impl Instance> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
     ) -> Spi<'d, HalfDuplexMode> {
-        Self::new_half_duplex_typed(spi, frequency, mode)
+        Self::new_half_duplex_typed(spi.map_into(), frequency, mode)
     }
 }
 
@@ -683,7 +683,7 @@ where
     /// All pins are optional. Setup these pins using
     /// [with_pins](Self::with_pins) or individual methods for each pin.
     pub fn new_half_duplex_typed(
-        spi: impl Peripheral<P = impl Into<T> + 'd> + 'd,
+        spi: impl Peripheral<P = T> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
     ) -> Spi<'d, HalfDuplexMode, T> {
@@ -2372,7 +2372,7 @@ pub trait ExtendedInstance: Instance {
 }
 
 #[doc(hidden)]
-pub trait Instance: private::Sealed + PeripheralMarker {
+pub trait Instance: private::Sealed + PeripheralMarker + Into<AnySpi> + 'static {
     fn register_block(&self) -> &RegisterBlock;
 
     fn sclk_signal(&self) -> OutputSignal;
