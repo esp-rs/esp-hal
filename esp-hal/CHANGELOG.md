@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - The `i2s::{I2sWrite, I2sWriteDma, I2sRead, I2sReadDma, I2sWriteDmaAsync, I2sReadDmaAsync}` traits have been removed. (#2316)
+- The `ledc::ChannelHW` trait is no longer generic. (#2387)
 
 ## [0.21.1]
 
