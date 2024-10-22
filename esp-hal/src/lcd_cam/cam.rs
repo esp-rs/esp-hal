@@ -484,26 +484,16 @@ impl RxEightBits {
     #[allow(clippy::too_many_arguments)]
     /// Creates a new instance of `RxEightBits`, configuring the specified pins
     /// as the 8-bit data bus.
-    pub fn new<'d, P0, P1, P2, P3, P4, P5, P6, P7>(
-        pin_0: impl Peripheral<P = P0> + 'd,
-        pin_1: impl Peripheral<P = P1> + 'd,
-        pin_2: impl Peripheral<P = P2> + 'd,
-        pin_3: impl Peripheral<P = P3> + 'd,
-        pin_4: impl Peripheral<P = P4> + 'd,
-        pin_5: impl Peripheral<P = P5> + 'd,
-        pin_6: impl Peripheral<P = P6> + 'd,
-        pin_7: impl Peripheral<P = P7> + 'd,
-    ) -> Self
-    where
-        P0: PeripheralInput,
-        P1: PeripheralInput,
-        P2: PeripheralInput,
-        P3: PeripheralInput,
-        P4: PeripheralInput,
-        P5: PeripheralInput,
-        P6: PeripheralInput,
-        P7: PeripheralInput,
-    {
+    pub fn new<'d>(
+        pin_0: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_1: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_2: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_3: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_4: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_5: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_6: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_7: impl Peripheral<P = impl PeripheralInput> + 'd,
+    ) -> Self {
         crate::into_mapped_ref!(pin_0);
         crate::into_mapped_ref!(pin_1);
         crate::into_mapped_ref!(pin_2);
@@ -513,22 +503,21 @@ impl RxEightBits {
         crate::into_mapped_ref!(pin_6);
         crate::into_mapped_ref!(pin_7);
 
-        pin_0.init_input(Pull::None, crate::private::Internal);
-        pin_0.connect_input_to_peripheral(InputSignal::CAM_DATA_0, crate::private::Internal);
-        pin_1.init_input(Pull::None, crate::private::Internal);
-        pin_1.connect_input_to_peripheral(InputSignal::CAM_DATA_1, crate::private::Internal);
-        pin_2.init_input(Pull::None, crate::private::Internal);
-        pin_2.connect_input_to_peripheral(InputSignal::CAM_DATA_2, crate::private::Internal);
-        pin_3.init_input(Pull::None, crate::private::Internal);
-        pin_3.connect_input_to_peripheral(InputSignal::CAM_DATA_3, crate::private::Internal);
-        pin_4.init_input(Pull::None, crate::private::Internal);
-        pin_4.connect_input_to_peripheral(InputSignal::CAM_DATA_4, crate::private::Internal);
-        pin_5.init_input(Pull::None, crate::private::Internal);
-        pin_5.connect_input_to_peripheral(InputSignal::CAM_DATA_5, crate::private::Internal);
-        pin_6.init_input(Pull::None, crate::private::Internal);
-        pin_6.connect_input_to_peripheral(InputSignal::CAM_DATA_6, crate::private::Internal);
-        pin_7.init_input(Pull::None, crate::private::Internal);
-        pin_7.connect_input_to_peripheral(InputSignal::CAM_DATA_7, crate::private::Internal);
+        let pairs = [
+            (pin_0, InputSignal::CAM_DATA_0),
+            (pin_1, InputSignal::CAM_DATA_1),
+            (pin_2, InputSignal::CAM_DATA_2),
+            (pin_3, InputSignal::CAM_DATA_3),
+            (pin_4, InputSignal::CAM_DATA_4),
+            (pin_5, InputSignal::CAM_DATA_5),
+            (pin_6, InputSignal::CAM_DATA_6),
+            (pin_7, InputSignal::CAM_DATA_7),
+        ];
+
+        for (mut pin, signal) in pairs.into_iter() {
+            pin.init_input(Pull::None, crate::private::Internal);
+            pin.connect_input_to_peripheral(signal, crate::private::Internal);
+        }
 
         Self { _pins: () }
     }
@@ -548,42 +537,24 @@ impl RxSixteenBits {
     #[allow(clippy::too_many_arguments)]
     /// Creates a new instance of `RxSixteenBits`, configuring the specified
     /// pins as the 16-bit data bus.
-    pub fn new<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>(
-        pin_0: impl Peripheral<P = P0> + 'd,
-        pin_1: impl Peripheral<P = P1> + 'd,
-        pin_2: impl Peripheral<P = P2> + 'd,
-        pin_3: impl Peripheral<P = P3> + 'd,
-        pin_4: impl Peripheral<P = P4> + 'd,
-        pin_5: impl Peripheral<P = P5> + 'd,
-        pin_6: impl Peripheral<P = P6> + 'd,
-        pin_7: impl Peripheral<P = P7> + 'd,
-        pin_8: impl Peripheral<P = P8> + 'd,
-        pin_9: impl Peripheral<P = P9> + 'd,
-        pin_10: impl Peripheral<P = P10> + 'd,
-        pin_11: impl Peripheral<P = P11> + 'd,
-        pin_12: impl Peripheral<P = P12> + 'd,
-        pin_13: impl Peripheral<P = P13> + 'd,
-        pin_14: impl Peripheral<P = P14> + 'd,
-        pin_15: impl Peripheral<P = P15> + 'd,
-    ) -> Self
-    where
-        P0: PeripheralInput,
-        P1: PeripheralInput,
-        P2: PeripheralInput,
-        P3: PeripheralInput,
-        P4: PeripheralInput,
-        P5: PeripheralInput,
-        P6: PeripheralInput,
-        P7: PeripheralInput,
-        P8: PeripheralInput,
-        P9: PeripheralInput,
-        P10: PeripheralInput,
-        P11: PeripheralInput,
-        P12: PeripheralInput,
-        P13: PeripheralInput,
-        P14: PeripheralInput,
-        P15: PeripheralInput,
-    {
+    pub fn new<'d>(
+        pin_0: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_1: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_2: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_3: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_4: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_5: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_6: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_7: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_8: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_9: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_10: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_11: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_12: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_13: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_14: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_15: impl Peripheral<P = impl PeripheralInput> + 'd,
+    ) -> Self {
         crate::into_mapped_ref!(pin_0);
         crate::into_mapped_ref!(pin_1);
         crate::into_mapped_ref!(pin_2);
@@ -601,38 +572,29 @@ impl RxSixteenBits {
         crate::into_mapped_ref!(pin_14);
         crate::into_mapped_ref!(pin_15);
 
-        pin_0.init_input(Pull::None, crate::private::Internal);
-        pin_0.connect_input_to_peripheral(InputSignal::CAM_DATA_0, crate::private::Internal);
-        pin_1.init_input(Pull::None, crate::private::Internal);
-        pin_1.connect_input_to_peripheral(InputSignal::CAM_DATA_1, crate::private::Internal);
-        pin_2.init_input(Pull::None, crate::private::Internal);
-        pin_2.connect_input_to_peripheral(InputSignal::CAM_DATA_2, crate::private::Internal);
-        pin_3.init_input(Pull::None, crate::private::Internal);
-        pin_3.connect_input_to_peripheral(InputSignal::CAM_DATA_3, crate::private::Internal);
-        pin_4.init_input(Pull::None, crate::private::Internal);
-        pin_4.connect_input_to_peripheral(InputSignal::CAM_DATA_4, crate::private::Internal);
-        pin_5.init_input(Pull::None, crate::private::Internal);
-        pin_5.connect_input_to_peripheral(InputSignal::CAM_DATA_5, crate::private::Internal);
-        pin_6.init_input(Pull::None, crate::private::Internal);
-        pin_6.connect_input_to_peripheral(InputSignal::CAM_DATA_6, crate::private::Internal);
-        pin_7.init_input(Pull::None, crate::private::Internal);
-        pin_7.connect_input_to_peripheral(InputSignal::CAM_DATA_7, crate::private::Internal);
-        pin_8.init_input(Pull::None, crate::private::Internal);
-        pin_8.connect_input_to_peripheral(InputSignal::CAM_DATA_8, crate::private::Internal);
-        pin_9.init_input(Pull::None, crate::private::Internal);
-        pin_9.connect_input_to_peripheral(InputSignal::CAM_DATA_9, crate::private::Internal);
-        pin_10.init_input(Pull::None, crate::private::Internal);
-        pin_10.connect_input_to_peripheral(InputSignal::CAM_DATA_10, crate::private::Internal);
-        pin_11.init_input(Pull::None, crate::private::Internal);
-        pin_11.connect_input_to_peripheral(InputSignal::CAM_DATA_11, crate::private::Internal);
-        pin_12.init_input(Pull::None, crate::private::Internal);
-        pin_12.connect_input_to_peripheral(InputSignal::CAM_DATA_12, crate::private::Internal);
-        pin_13.init_input(Pull::None, crate::private::Internal);
-        pin_13.connect_input_to_peripheral(InputSignal::CAM_DATA_13, crate::private::Internal);
-        pin_14.init_input(Pull::None, crate::private::Internal);
-        pin_14.connect_input_to_peripheral(InputSignal::CAM_DATA_14, crate::private::Internal);
-        pin_15.init_input(Pull::None, crate::private::Internal);
-        pin_15.connect_input_to_peripheral(InputSignal::CAM_DATA_15, crate::private::Internal);
+        let pairs = [
+            (pin_0, InputSignal::CAM_DATA_0),
+            (pin_1, InputSignal::CAM_DATA_1),
+            (pin_2, InputSignal::CAM_DATA_2),
+            (pin_3, InputSignal::CAM_DATA_3),
+            (pin_4, InputSignal::CAM_DATA_4),
+            (pin_5, InputSignal::CAM_DATA_5),
+            (pin_6, InputSignal::CAM_DATA_6),
+            (pin_7, InputSignal::CAM_DATA_7),
+            (pin_8, InputSignal::CAM_DATA_8),
+            (pin_9, InputSignal::CAM_DATA_9),
+            (pin_10, InputSignal::CAM_DATA_10),
+            (pin_11, InputSignal::CAM_DATA_11),
+            (pin_12, InputSignal::CAM_DATA_12),
+            (pin_13, InputSignal::CAM_DATA_13),
+            (pin_14, InputSignal::CAM_DATA_14),
+            (pin_15, InputSignal::CAM_DATA_15),
+        ];
+
+        for (mut pin, signal) in pairs.into_iter() {
+            pin.init_input(Pull::None, crate::private::Internal);
+            pin.connect_input_to_peripheral(signal, crate::private::Internal);
+        }
 
         Self { _pins: () }
     }

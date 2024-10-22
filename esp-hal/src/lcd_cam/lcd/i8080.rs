@@ -583,14 +583,7 @@ impl From<u16> for Command<u16> {
 /// Represents a group of 8 output pins configured for 8-bit parallel data
 /// transmission.
 pub struct TxEightBits<'d> {
-    pin_0: PeripheralRef<'d, OutputConnection>,
-    pin_1: PeripheralRef<'d, OutputConnection>,
-    pin_2: PeripheralRef<'d, OutputConnection>,
-    pin_3: PeripheralRef<'d, OutputConnection>,
-    pin_4: PeripheralRef<'d, OutputConnection>,
-    pin_5: PeripheralRef<'d, OutputConnection>,
-    pin_6: PeripheralRef<'d, OutputConnection>,
-    pin_7: PeripheralRef<'d, OutputConnection>,
+    pins: [PeripheralRef<'d, OutputConnection>; 8],
 }
 
 impl<'d> TxEightBits<'d> {
@@ -616,66 +609,35 @@ impl<'d> TxEightBits<'d> {
         crate::into_mapped_ref!(pin_7);
 
         Self {
-            pin_0,
-            pin_1,
-            pin_2,
-            pin_3,
-            pin_4,
-            pin_5,
-            pin_6,
-            pin_7,
+            pins: [pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7],
         }
     }
 }
 
 impl<'d> TxPins for TxEightBits<'d> {
     fn configure(&mut self) {
-        self.pin_0.set_to_push_pull_output(crate::private::Internal);
-        self.pin_0
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_0, crate::private::Internal);
-        self.pin_1.set_to_push_pull_output(crate::private::Internal);
-        self.pin_1
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_1, crate::private::Internal);
-        self.pin_2.set_to_push_pull_output(crate::private::Internal);
-        self.pin_2
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_2, crate::private::Internal);
-        self.pin_3.set_to_push_pull_output(crate::private::Internal);
-        self.pin_3
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_3, crate::private::Internal);
-        self.pin_4.set_to_push_pull_output(crate::private::Internal);
-        self.pin_4
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_4, crate::private::Internal);
-        self.pin_5.set_to_push_pull_output(crate::private::Internal);
-        self.pin_5
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_5, crate::private::Internal);
-        self.pin_6.set_to_push_pull_output(crate::private::Internal);
-        self.pin_6
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_6, crate::private::Internal);
-        self.pin_7.set_to_push_pull_output(crate::private::Internal);
-        self.pin_7
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_7, crate::private::Internal);
+        const SIGNALS: [OutputSignal; 8] = [
+            OutputSignal::LCD_DATA_0,
+            OutputSignal::LCD_DATA_1,
+            OutputSignal::LCD_DATA_2,
+            OutputSignal::LCD_DATA_3,
+            OutputSignal::LCD_DATA_4,
+            OutputSignal::LCD_DATA_5,
+            OutputSignal::LCD_DATA_6,
+            OutputSignal::LCD_DATA_7,
+        ];
+
+        for (pin, signal) in self.pins.iter_mut().zip(SIGNALS.iter()) {
+            pin.set_to_push_pull_output(crate::private::Internal);
+            pin.connect_peripheral_to_output(*signal, crate::private::Internal);
+        }
     }
 }
 
 /// Represents a group of 16 output pins configured for 16-bit parallel data
 /// transmission.
 pub struct TxSixteenBits<'d> {
-    pin_0: PeripheralRef<'d, OutputConnection>,
-    pin_1: PeripheralRef<'d, OutputConnection>,
-    pin_2: PeripheralRef<'d, OutputConnection>,
-    pin_3: PeripheralRef<'d, OutputConnection>,
-    pin_4: PeripheralRef<'d, OutputConnection>,
-    pin_5: PeripheralRef<'d, OutputConnection>,
-    pin_6: PeripheralRef<'d, OutputConnection>,
-    pin_7: PeripheralRef<'d, OutputConnection>,
-    pin_8: PeripheralRef<'d, OutputConnection>,
-    pin_9: PeripheralRef<'d, OutputConnection>,
-    pin_10: PeripheralRef<'d, OutputConnection>,
-    pin_11: PeripheralRef<'d, OutputConnection>,
-    pin_12: PeripheralRef<'d, OutputConnection>,
-    pin_13: PeripheralRef<'d, OutputConnection>,
-    pin_14: PeripheralRef<'d, OutputConnection>,
-    pin_15: PeripheralRef<'d, OutputConnection>,
+    pins: [PeripheralRef<'d, OutputConnection>; 16],
 }
 
 impl<'d> TxSixteenBits<'d> {
@@ -699,100 +661,45 @@ impl<'d> TxSixteenBits<'d> {
         pin_14: impl Peripheral<P = impl PeripheralOutput> + 'd,
         pin_15: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Self {
-        crate::into_mapped_ref!(pin_0);
-        crate::into_mapped_ref!(pin_1);
-        crate::into_mapped_ref!(pin_2);
-        crate::into_mapped_ref!(pin_3);
-        crate::into_mapped_ref!(pin_4);
-        crate::into_mapped_ref!(pin_5);
-        crate::into_mapped_ref!(pin_6);
-        crate::into_mapped_ref!(pin_7);
-        crate::into_mapped_ref!(pin_8);
-        crate::into_mapped_ref!(pin_9);
-        crate::into_mapped_ref!(pin_10);
-        crate::into_mapped_ref!(pin_11);
-        crate::into_mapped_ref!(pin_12);
-        crate::into_mapped_ref!(pin_13);
-        crate::into_mapped_ref!(pin_14);
-        crate::into_mapped_ref!(pin_15);
+        crate::into_mapped_ref!(
+            pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7, pin_8, pin_9, pin_10, pin_11,
+            pin_12, pin_13, pin_14, pin_15
+        );
 
         Self {
-            pin_0,
-            pin_1,
-            pin_2,
-            pin_3,
-            pin_4,
-            pin_5,
-            pin_6,
-            pin_7,
-            pin_8,
-            pin_9,
-            pin_10,
-            pin_11,
-            pin_12,
-            pin_13,
-            pin_14,
-            pin_15,
+            pins: [
+                pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7, pin_8, pin_9, pin_10,
+                pin_11, pin_12, pin_13, pin_14, pin_15,
+            ],
         }
     }
 }
 
 impl<'d> TxPins for TxSixteenBits<'d> {
     fn configure(&mut self) {
-        self.pin_0.set_to_push_pull_output(crate::private::Internal);
-        self.pin_0
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_0, crate::private::Internal);
-        self.pin_1.set_to_push_pull_output(crate::private::Internal);
-        self.pin_1
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_1, crate::private::Internal);
-        self.pin_2.set_to_push_pull_output(crate::private::Internal);
-        self.pin_2
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_2, crate::private::Internal);
-        self.pin_3.set_to_push_pull_output(crate::private::Internal);
-        self.pin_3
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_3, crate::private::Internal);
-        self.pin_4.set_to_push_pull_output(crate::private::Internal);
-        self.pin_4
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_4, crate::private::Internal);
-        self.pin_5.set_to_push_pull_output(crate::private::Internal);
-        self.pin_5
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_5, crate::private::Internal);
-        self.pin_6.set_to_push_pull_output(crate::private::Internal);
-        self.pin_6
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_6, crate::private::Internal);
-        self.pin_7.set_to_push_pull_output(crate::private::Internal);
-        self.pin_7
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_7, crate::private::Internal);
-        self.pin_8.set_to_push_pull_output(crate::private::Internal);
-        self.pin_8
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_8, crate::private::Internal);
-        self.pin_9.set_to_push_pull_output(crate::private::Internal);
-        self.pin_9
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_9, crate::private::Internal);
-        self.pin_10
-            .set_to_push_pull_output(crate::private::Internal);
-        self.pin_10
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_10, crate::private::Internal);
-        self.pin_11
-            .set_to_push_pull_output(crate::private::Internal);
-        self.pin_11
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_11, crate::private::Internal);
-        self.pin_12
-            .set_to_push_pull_output(crate::private::Internal);
-        self.pin_12
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_12, crate::private::Internal);
-        self.pin_13
-            .set_to_push_pull_output(crate::private::Internal);
-        self.pin_13
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_13, crate::private::Internal);
-        self.pin_14
-            .set_to_push_pull_output(crate::private::Internal);
-        self.pin_14
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_14, crate::private::Internal);
-        self.pin_15
-            .set_to_push_pull_output(crate::private::Internal);
-        self.pin_15
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_15, crate::private::Internal);
+        const SIGNALS: [OutputSignal; 16] = [
+            OutputSignal::LCD_DATA_0,
+            OutputSignal::LCD_DATA_1,
+            OutputSignal::LCD_DATA_2,
+            OutputSignal::LCD_DATA_3,
+            OutputSignal::LCD_DATA_4,
+            OutputSignal::LCD_DATA_5,
+            OutputSignal::LCD_DATA_6,
+            OutputSignal::LCD_DATA_7,
+            OutputSignal::LCD_DATA_8,
+            OutputSignal::LCD_DATA_9,
+            OutputSignal::LCD_DATA_10,
+            OutputSignal::LCD_DATA_11,
+            OutputSignal::LCD_DATA_12,
+            OutputSignal::LCD_DATA_13,
+            OutputSignal::LCD_DATA_14,
+            OutputSignal::LCD_DATA_15,
+        ];
+
+        for (pin, signal) in self.pins.iter_mut().zip(SIGNALS.iter()) {
+            pin.set_to_push_pull_output(crate::private::Internal);
+            pin.connect_peripheral_to_output(*signal, crate::private::Internal);
+        }
     }
 }
 
