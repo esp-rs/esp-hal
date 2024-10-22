@@ -158,11 +158,41 @@ unsafe extern "C" fn strdup(str: *const i8) -> *const u8 {
 unsafe extern "C" fn atoi(str: *const i8) -> i32 {
     trace!("atoi {:?}", str);
 
-    unsafe {
-        let s = core::ffi::CStr::from_ptr(str);
-        let r = s.to_str().unwrap().parse().unwrap();
-        r
+    let mut sign: i32 = 1;
+    let mut res: i32 = 0;
+    let mut idx = 0;
+
+    // skip leading spaces
+    while str.add(idx).read() as u8 == b' ' {
+        idx += 1;
     }
+
+    // check sign
+    let c = str.add(idx).read() as u8;
+    if c == b'-' || c == b'+' {
+        if c == b'-' {
+            sign = -1;
+        }
+        idx += 1;
+    }
+
+    // parse number digit by digit
+    loop {
+        let c = str.add(idx).read() as u8;
+
+        if !c.is_ascii_digit() {
+            break;
+        }
+
+        // if the result would exceed the bounds - return max-value
+        if res > i32::MAX / 10 || (res == i32::MAX / 10 && c - b'0' > 7) {
+            return if sign == 1 { i32::MAX } else { i32::MIN };
+        }
+
+        res = 10 * res + (c - b'0') as i32;
+        idx += 1;
+    }
+    res * sign
 }
 
 #[derive(Debug, Copy, Clone)]
