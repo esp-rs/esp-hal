@@ -28,14 +28,8 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
     /// is finished.
     pub fn enable_disable_interrupt(&mut self, enable: bool) {
         match enable {
-            true => self
-                .rsa
-                .interrupt_ena()
-                .write(|w| w.interrupt_ena().set_bit()),
-            false => self
-                .rsa
-                .interrupt_ena()
-                .write(|w| w.interrupt_ena().clear_bit()),
+            true => self.rsa.int_ena().write(|w| w.int_ena().set_bit()),
+            false => self.rsa.int_ena().write(|w| w.int_ena().clear_bit()),
         }
     }
 
@@ -121,9 +115,7 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
 
     /// Clears the RSA interrupt flag.
     pub(super) fn clear_interrupt(&mut self) {
-        self.rsa
-            .clear_interrupt()
-            .write(|w| w.clear_interrupt().set_bit());
+        self.rsa.int_clr().write(|w| w.int_clr().set_bit());
     }
 
     /// Checks if the RSA peripheral is idle.
