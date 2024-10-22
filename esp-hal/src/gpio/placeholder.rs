@@ -20,8 +20,8 @@ impl PeripheralSignal for Level {
 }
 
 impl PeripheralInput for Level {
-    fn input_signals(&self, _: private::Internal) -> [Option<InputSignal>; 6] {
-        [None; 6]
+    fn input_signals(&self, _: private::Internal) -> &[(AlternateFunction, InputSignal)] {
+        &[]
     }
 
     fn init_input(&self, _pull: Pull, _: private::Internal) {}
@@ -40,7 +40,7 @@ impl PeripheralInput for Level {
             Level::Low => ZERO_INPUT,
         };
 
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
             .modify(|_, w| unsafe {
                 w.sel()
@@ -78,8 +78,8 @@ impl PeripheralOutput for Level {
         false
     }
 
-    fn output_signals(&self, _: private::Internal) -> [Option<OutputSignal>; 6] {
-        [None; 6]
+    fn output_signals(&self, _: private::Internal) -> &[(AlternateFunction, OutputSignal)] {
+        &[]
     }
 
     fn connect_peripheral_to_output(&mut self, _signal: OutputSignal, _: private::Internal) {}
@@ -116,7 +116,7 @@ impl PeripheralInput for NoPin {
             fn is_input_high(&self, _internal: private::Internal) -> bool;
             fn connect_input_to_peripheral(&mut self, _signal: InputSignal, _internal: private::Internal);
             fn disconnect_input_from_peripheral(&mut self, _signal: InputSignal, _internal: private::Internal);
-            fn input_signals(&self, _internal: private::Internal) -> [Option<InputSignal>; 6];
+            fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, InputSignal)];
         }
     }
 }
@@ -134,7 +134,7 @@ impl PeripheralOutput for NoPin {
             fn internal_pull_up_in_sleep_mode(&mut self, _on: bool, _internal: private::Internal);
             fn internal_pull_down_in_sleep_mode(&mut self, _on: bool, _internal: private::Internal);
             fn is_set_high(&self, _internal: private::Internal) -> bool;
-            fn output_signals(&self, _internal: private::Internal) -> [Option<OutputSignal>; 6];
+            fn output_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, OutputSignal)];
             fn connect_peripheral_to_output(&mut self, _signal: OutputSignal, _internal: private::Internal);
             fn disconnect_from_peripheral_output(&mut self, _signal: OutputSignal, _internal: private::Internal);
         }
