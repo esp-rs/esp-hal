@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `AnySpi` and `AnySpiDmaChannel`. (#2334)
 - Added `AnyI2s` and `AnyI2sDmaChannel`. (#2367)
 - `Pins::steal()` to unsafely obtain GPIO. (#2335)
+- `I2c::with_timeout` (#2361)
 
 ### Changed
 
@@ -32,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `i2s::{I2sWrite, I2sWriteDma, I2sRead, I2sReadDma, I2sWriteDmaAsync, I2sReadDmaAsync}` traits have been removed. (#2316)
 - The `ledc::ChannelHW` trait is no longer generic. (#2387)
+- The `I2c::new_with_timeout` constructors have been removed (#2361)
 
 ## [0.21.1]
 

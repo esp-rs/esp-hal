@@ -497,7 +497,6 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        timeout: Option<u32>,
     ) -> Self {
         crate::into_ref!(i2c, sda, scl);
 
@@ -505,7 +504,7 @@ where
             i2c,
             phantom: PhantomData,
             frequency,
-            timeout,
+            timeout: None,
         };
 
         PeripheralClockControl::reset(i2c.i2c.peripheral());
@@ -530,7 +529,7 @@ where
         sda.connect_input_to_peripheral(i2c.i2c.sda_input_signal(), crate::private::Internal);
         sda.connect_peripheral_to_output(i2c.i2c.sda_output_signal(), crate::private::Internal);
 
-        i2c.i2c.setup(frequency, timeout);
+        i2c.i2c.setup(frequency, None);
         i2c
     }
 
@@ -548,6 +547,15 @@ where
 
         self.i2c.setup(self.frequency, self.timeout);
     }
+
+    /// Set the I2C timeout.
+    // TODO: explain this function better - what's the unit, what happens on
+    // timeout, and just what exactly is a timeout in this context?
+    pub fn with_timeout(mut self, timeout: Option<u32>) -> Self {
+        self.timeout = timeout;
+        self.i2c.setup(self.frequency, self.timeout);
+        self
+    }
 }
 
 impl<'d> I2c<'d, Blocking> {
@@ -555,28 +563,12 @@ impl<'d> I2c<'d, Blocking> {
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
     pub fn new<SDA: PeripheralOutput + PeripheralInput, SCL: PeripheralOutput + PeripheralInput>(
-        i2c: impl Peripheral<P = impl Into<AnyI2c>> + 'd,
+        i2c: impl Peripheral<P = impl Instance> + 'd,
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
     ) -> Self {
-        Self::new_with_timeout(i2c, sda, scl, frequency, None)
-    }
-
-    /// Create a new I2C instance with a custom timeout value.
-    /// This will enable the peripheral but the peripheral won't get
-    /// automatically disabled when this gets dropped.
-    pub fn new_with_timeout<
-        SDA: PeripheralOutput + PeripheralInput,
-        SCL: PeripheralOutput + PeripheralInput,
-    >(
-        i2c: impl Peripheral<P = impl Into<AnyI2c>> + 'd,
-        sda: impl Peripheral<P = SDA> + 'd,
-        scl: impl Peripheral<P = SCL> + 'd,
-        frequency: HertzU32,
-        timeout: Option<u32>,
-    ) -> Self {
-        Self::new_with_timeout_typed(i2c.map_into(), sda, scl, frequency, timeout)
+        Self::new_typed(i2c.map_into(), sda, scl, frequency)
     }
 }
 
@@ -596,23 +588,7 @@ where
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
     ) -> Self {
-        Self::new_with_timeout_typed(i2c, sda, scl, frequency, None)
-    }
-
-    /// Create a new I2C instance with a custom timeout value.
-    /// This will enable the peripheral but the peripheral won't get
-    /// automatically disabled when this gets dropped.
-    pub fn new_with_timeout_typed<
-        SDA: PeripheralOutput + PeripheralInput,
-        SCL: PeripheralOutput + PeripheralInput,
-    >(
-        i2c: impl Peripheral<P = T> + 'd,
-        sda: impl Peripheral<P = SDA> + 'd,
-        scl: impl Peripheral<P = SCL> + 'd,
-        frequency: HertzU32,
-        timeout: Option<u32>,
-    ) -> Self {
-        Self::new_internal(i2c, sda, scl, frequency, timeout)
+        Self::new_internal(i2c, sda, scl, frequency)
     }
 }
 
@@ -627,10 +603,7 @@ where
     }
 }
 
-impl<'d, T> I2c<'d, Async, T>
-where
-    T: Instance,
-{
+impl<'d> I2c<'d, Async> {
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
@@ -638,18 +611,23 @@ where
         SDA: PeripheralOutput + PeripheralInput,
         SCL: PeripheralOutput + PeripheralInput,
     >(
-        i2c: impl Peripheral<P = T> + 'd,
+        i2c: impl Peripheral<P = impl Instance> + 'd,
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
     ) -> Self {
-        Self::new_with_timeout_async(i2c, sda, scl, frequency, None)
+        Self::new_async_typed(i2c.map_into(), sda, scl, frequency)
     }
+}
 
-    /// Create a new I2C instance with a custom timeout value.
+impl<'d, T> I2c<'d, Async, T>
+where
+    T: Instance,
+{
+    /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new_with_timeout_async<
+    pub fn new_async_typed<
         SDA: PeripheralOutput + PeripheralInput,
         SCL: PeripheralOutput + PeripheralInput,
     >(
@@ -657,9 +635,8 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        timeout: Option<u32>,
     ) -> Self {
-        let mut this = Self::new_internal(i2c, sda, scl, frequency, timeout);
+        let mut this = Self::new_internal(i2c, sda, scl, frequency);
 
         this.internal_set_interrupt_handler(this.i2c.async_handler());
 
