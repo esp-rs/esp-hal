@@ -169,13 +169,13 @@ pub extern "Rust" fn __init_data() -> bool {
 #[link_section = ".rwtext"]
 pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
     extern "C" {
-        fn Cache_WriteBack_Addr(addr: u32, size: u32);
+        fn rom_Cache_WriteBack_Addr(addr: u32, size: u32);
         fn Cache_Suspend_DCache_Autoload() -> u32;
         fn Cache_Resume_DCache_Autoload(value: u32);
     }
     // suspend autoload, avoid load cachelines being written back
     let autoload = Cache_Suspend_DCache_Autoload();
-    Cache_WriteBack_Addr(addr, size);
+    rom_Cache_WriteBack_Addr(addr, size);
     Cache_Resume_DCache_Autoload(autoload);
 }
 
