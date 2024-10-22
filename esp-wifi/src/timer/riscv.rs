@@ -29,7 +29,7 @@ pub(crate) fn setup_timer(mut alarm0: TimeBase) {
 
     let cb: extern "C" fn() = unsafe { core::mem::transmute(handler as *const ()) };
     alarm0.set_interrupt_handler(InterruptHandler::new(cb, interrupt::Priority::Priority1));
-    alarm0.start(TIMESLICE_FREQUENCY.into_duration()).unwrap();
+    unwrap!(alarm0.start(TIMESLICE_FREQUENCY.into_duration()));
     critical_section::with(|cs| {
         alarm0.enable_interrupt(true);
         TIMER.borrow_ref_mut(cs).replace(alarm0);
@@ -39,7 +39,7 @@ pub(crate) fn setup_timer(mut alarm0: TimeBase) {
 pub(crate) fn disable_timer() {
     critical_section::with(|cs| {
         unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).enable_interrupt(false);
-        unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).cancel().unwrap();
+        unwrap!(unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).cancel());
     });
 }
 
