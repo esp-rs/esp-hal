@@ -86,7 +86,7 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
             queue.push(packet);
         });
 
-        dump_packet_info(data);
+        super::dump_packet_info(data);
 
         #[cfg(feature = "async")]
         crate::ble::controller::asynch::hci_read_data_available();
