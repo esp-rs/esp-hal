@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reduce memory footprint by 4 bytes on multi-core MCUs.
+
 ### Fixed
 
 ### Removed

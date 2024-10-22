@@ -87,6 +87,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
     private,
+    spi::AnySpi,
     system::PeripheralClockControl,
     Mode,
 };
@@ -452,15 +453,35 @@ pub trait HalfDuplexReadWrite {
 }
 
 /// SPI peripheral driver
-pub struct Spi<'d, T, M> {
+pub struct Spi<'d, M, T = AnySpi> {
     spi: PeripheralRef<'d, T>,
     _mode: PhantomData<M>,
 }
 
-impl<'d, T, M> Spi<'d, T, M>
+impl<'d, M, T> Spi<'d, M, T>
 where
     T: Instance,
 {
+    fn new_internal(
+        spi: impl Peripheral<P = T> + 'd,
+        frequency: HertzU32,
+        mode: SpiMode,
+    ) -> Spi<'d, M, T> {
+        crate::into_ref!(spi);
+
+        let mut spi = Spi {
+            spi,
+            _mode: PhantomData,
+        };
+        spi.spi.reset_peripheral();
+        spi.spi.enable_peripheral();
+        spi.spi.setup(frequency);
+        spi.spi.init();
+        spi.spi.set_data_mode(mode);
+
+        spi
+    }
+
     /// Assign the SCK (Serial Clock) pin for the SPI instance.
     ///
     /// Sets the specified pin to push-pull output and connects it to the SPI
@@ -486,7 +507,7 @@ where
     }
 }
 
-impl<'d, T, M> Spi<'d, T, M>
+impl<'d, M, T> Spi<'d, M, T>
 where
     T: InstanceDma,
     M: DuplexMode,
@@ -499,7 +520,7 @@ where
     pub fn with_dma<CH, DmaMode>(
         self,
         channel: crate::dma::Channel<'d, CH, DmaMode>,
-    ) -> SpiDma<'d, T, M, DmaMode>
+    ) -> SpiDma<'d, M, DmaMode, T>
     where
         CH: DmaChannelConvert<T::Dma>,
         DmaMode: Mode,
@@ -508,7 +529,7 @@ where
     }
 }
 
-impl<'d, T> Spi<'d, T, FullDuplexMode>
+impl<'d, T> Spi<'d, FullDuplexMode, T>
 where
     T: Instance,
 {
@@ -544,7 +565,21 @@ where
     }
 }
 
-impl<'d, T> Spi<'d, T, FullDuplexMode>
+impl<'d> Spi<'d, FullDuplexMode> {
+    /// Constructs an SPI instance in 8bit dataframe mode.
+    ///
+    /// All pins are optional. Setup these pins using
+    /// [with_pins](Self::with_pins) or individual methods for each pin.
+    pub fn new(
+        spi: impl Peripheral<P = impl Instance> + 'd,
+        frequency: HertzU32,
+        mode: SpiMode,
+    ) -> Spi<'d, FullDuplexMode> {
+        Self::new_typed(spi.map_into(), frequency, mode)
+    }
+}
+
+impl<'d, T> Spi<'d, FullDuplexMode, T>
 where
     T: Instance,
 {
@@ -552,13 +587,15 @@ where
     ///
     /// All pins are optional. Setup these pins using
     /// [with_pins](Self::with_pins) or individual methods for each pin.
-    pub fn new(
+    pub fn new_typed(
         spi: impl Peripheral<P = T> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
-    ) -> Spi<'d, T, FullDuplexMode> {
-        crate::into_ref!(spi);
-        Self::new_internal(spi, frequency, mode)
+    ) -> Spi<'d, FullDuplexMode, T> {
+        let spi = Spi::<FullDuplexMode, T>::new_internal(spi, frequency, mode);
+
+        // Disconnect any lingering connections
+        spi.with_pins(NoPin, NoPin, NoPin, NoPin)
     }
 
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
@@ -614,26 +651,6 @@ where
             .with_cs(cs)
     }
 
-    pub(crate) fn new_internal(
-        spi: PeripheralRef<'d, T>,
-        frequency: HertzU32,
-        mode: SpiMode,
-    ) -> Spi<'d, T, FullDuplexMode> {
-        spi.reset_peripheral();
-        spi.enable_peripheral();
-
-        let mut spi = Spi {
-            spi,
-            _mode: PhantomData,
-        };
-        spi.spi.setup(frequency);
-        spi.spi.init();
-        spi.spi.set_data_mode(mode);
-
-        // Disconnect any lingering connections
-        spi.with_pins(NoPin, NoPin, NoPin, NoPin)
-    }
-
     /// Change the bus frequency of the SPI instance.
     ///
     /// This method allows user to update the bus frequency for the SPI
@@ -643,7 +660,21 @@ where
     }
 }
 
-impl<'d, T> Spi<'d, T, HalfDuplexMode>
+impl<'d> Spi<'d, HalfDuplexMode> {
+    /// Constructs an SPI instance in half-duplex mode.
+    ///
+    /// All pins are optional. Setup these pins using
+    /// [with_pins](Self::with_pins) or individual methods for each pin.
+    pub fn new_half_duplex(
+        spi: impl Peripheral<P = impl Instance> + 'd,
+        frequency: HertzU32,
+        mode: SpiMode,
+    ) -> Spi<'d, HalfDuplexMode> {
+        Self::new_half_duplex_typed(spi.map_into(), frequency, mode)
+    }
+}
+
+impl<'d, T> Spi<'d, HalfDuplexMode, T>
 where
     T: ExtendedInstance,
 {
@@ -651,13 +682,15 @@ where
     ///
     /// All pins are optional. Setup these pins using
     /// [with_pins](Self::with_pins) or individual methods for each pin.
-    pub fn new_half_duplex(
+    pub fn new_half_duplex_typed(
         spi: impl Peripheral<P = T> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
-    ) -> Spi<'d, T, HalfDuplexMode> {
-        crate::into_ref!(spi);
-        Self::new_internal(spi, frequency, mode)
+    ) -> Spi<'d, HalfDuplexMode, T> {
+        let spi = Spi::<HalfDuplexMode, T>::new_internal(spi, frequency, mode);
+
+        // Disconnect any lingering connections
+        spi.with_pins(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin)
     }
 
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance in
@@ -761,27 +794,6 @@ where
             .with_sio3(sio3)
             .with_cs(cs)
     }
-
-    pub(crate) fn new_internal(
-        spi: PeripheralRef<'d, T>,
-        frequency: HertzU32,
-        mode: SpiMode,
-    ) -> Spi<'d, T, HalfDuplexMode> {
-        spi.reset_peripheral();
-        spi.enable_peripheral();
-
-        let mut spi = Spi {
-            spi,
-            _mode: PhantomData::<HalfDuplexMode>,
-        };
-        spi.spi.setup(frequency);
-        spi.spi.init();
-        spi.spi.set_data_mode(mode);
-
-        // Disconnect any lingering connections
-        spi.with_pins(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin)
-    }
-
     /// Change the bus frequency of the SPI instance in half-duplex mode.
     ///
     /// This method allows you to update the bus frequency for the SPI
@@ -799,7 +811,7 @@ where
     }
 }
 
-impl<T> HalfDuplexReadWrite for Spi<'_, T, HalfDuplexMode>
+impl<T> HalfDuplexReadWrite for Spi<'_, HalfDuplexMode, T>
 where
     T: Instance,
 {
@@ -890,7 +902,7 @@ where
     }
 }
 
-impl<T> embedded_hal_02::spi::FullDuplex<u8> for Spi<'_, T, FullDuplexMode>
+impl<T> embedded_hal_02::spi::FullDuplex<u8> for Spi<'_, FullDuplexMode, T>
 where
     T: Instance,
 {
@@ -905,7 +917,7 @@ where
     }
 }
 
-impl<T> embedded_hal_02::blocking::spi::Transfer<u8> for Spi<'_, T, FullDuplexMode>
+impl<T> embedded_hal_02::blocking::spi::Transfer<u8> for Spi<'_, FullDuplexMode, T>
 where
     T: Instance,
 {
@@ -916,7 +928,7 @@ where
     }
 }
 
-impl<T> embedded_hal_02::blocking::spi::Write<u8> for Spi<'_, T, FullDuplexMode>
+impl<T> embedded_hal_02::blocking::spi::Write<u8> for Spi<'_, FullDuplexMode, T>
 where
     T: Instance,
 {
@@ -959,7 +971,7 @@ mod dma {
     /// [`SpiDmaBus`] via `with_buffers` to get access
     /// to a DMA capable SPI bus that implements the
     /// embedded-hal traits.
-    pub struct SpiDma<'d, T, D, M>
+    pub struct SpiDma<'d, D, M, T = AnySpi>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -975,7 +987,7 @@ mod dma {
     }
 
     #[cfg(all(esp32, spi_address_workaround))]
-    unsafe impl<'d, T, D, M> Send for SpiDma<'d, T, D, M>
+    unsafe impl<'d, D, M, T> Send for SpiDma<'d, D, M, T>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -983,7 +995,7 @@ mod dma {
     {
     }
 
-    impl<'d, T, D, M> core::fmt::Debug for SpiDma<'d, T, D, M>
+    impl<'d, D, M, T> core::fmt::Debug for SpiDma<'d, D, M, T>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -998,7 +1010,7 @@ mod dma {
         }
     }
 
-    impl<'d, T, D, M> SpiDma<'d, T, D, M>
+    impl<'d, D, M, T> SpiDma<'d, D, M, T>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -1206,7 +1218,7 @@ mod dma {
         }
     }
 
-    impl<'d, T, D, M> crate::private::Sealed for SpiDma<'d, T, D, M>
+    impl<'d, D, M, T> crate::private::Sealed for SpiDma<'d, D, M, T>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -1214,7 +1226,7 @@ mod dma {
     {
     }
 
-    impl<'d, T, D, M> InterruptConfigurable for SpiDma<'d, T, D, M>
+    impl<'d, D, M, T> InterruptConfigurable for SpiDma<'d, D, M, T>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -1226,7 +1238,7 @@ mod dma {
         }
     }
 
-    impl<'d, T, D, M> SpiDma<'d, T, D, M>
+    impl<'d, D, M, T> SpiDma<'d, D, M, T>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -1246,7 +1258,7 @@ mod dma {
             self,
             dma_rx_buf: DmaRxBuf,
             dma_tx_buf: DmaTxBuf,
-        ) -> SpiDmaBus<'d, T, D, M> {
+        ) -> SpiDmaBus<'d, D, M, T> {
             SpiDmaBus::new(self, dma_rx_buf, dma_tx_buf)
         }
     }
@@ -1255,23 +1267,23 @@ mod dma {
     ///
     /// This structure holds references to the SPI instance, DMA buffers, and
     /// transfer status.
-    pub struct SpiDmaTransfer<'d, T, D, M, Buf>
+    pub struct SpiDmaTransfer<'d, D, M, Buf, T = AnySpi>
     where
         T: InstanceDma,
         D: DuplexMode,
         M: Mode,
     {
-        spi_dma: ManuallyDrop<SpiDma<'d, T, D, M>>,
+        spi_dma: ManuallyDrop<SpiDma<'d, D, M, T>>,
         dma_buf: ManuallyDrop<Buf>,
     }
 
-    impl<'d, T, D, M, Buf> SpiDmaTransfer<'d, T, D, M, Buf>
+    impl<'d, D, M, T, Buf> SpiDmaTransfer<'d, D, M, Buf, T>
     where
         T: InstanceDma,
         D: DuplexMode,
         M: Mode,
     {
-        fn new(spi_dma: SpiDma<'d, T, D, M>, dma_buf: Buf) -> Self {
+        fn new(spi_dma: SpiDma<'d, D, M, T>, dma_buf: Buf) -> Self {
             Self {
                 spi_dma: ManuallyDrop::new(spi_dma),
                 dma_buf: ManuallyDrop::new(dma_buf),
@@ -1290,7 +1302,7 @@ mod dma {
         ///
         /// This method blocks until the transfer is finished and returns the
         /// `SpiDma` instance and the associated buffer.
-        pub fn wait(mut self) -> (SpiDma<'d, T, D, M>, Buf) {
+        pub fn wait(mut self) -> (SpiDma<'d, D, M, T>, Buf) {
             self.spi_dma.wait_for_idle();
             let retval = unsafe {
                 (
@@ -1310,7 +1322,7 @@ mod dma {
         }
     }
 
-    impl<'d, T, D, M, Buf> Drop for SpiDmaTransfer<'d, T, D, M, Buf>
+    impl<'d, D, M, T, Buf> Drop for SpiDmaTransfer<'d, D, M, Buf, T>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -1329,7 +1341,7 @@ mod dma {
         }
     }
 
-    impl<'d, T, D, Buf> SpiDmaTransfer<'d, T, D, crate::Async, Buf>
+    impl<'d, T, D, Buf> SpiDmaTransfer<'d, D, crate::Async, Buf, T>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -1342,7 +1354,7 @@ mod dma {
         }
     }
 
-    impl<'d, T, M> SpiDma<'d, T, FullDuplexMode, M>
+    impl<'d, M, T> SpiDma<'d, FullDuplexMode, M, T>
     where
         T: InstanceDma,
         M: Mode,
@@ -1377,7 +1389,7 @@ mod dma {
         pub fn dma_write<TX: DmaTxBuffer>(
             mut self,
             mut buffer: TX,
-        ) -> Result<SpiDmaTransfer<'d, T, FullDuplexMode, M, TX>, (Error, Self, TX)> {
+        ) -> Result<SpiDmaTransfer<'d, FullDuplexMode, M, TX, T>, (Error, Self, TX)> {
             self.wait_for_idle();
 
             match unsafe { self.start_dma_write(&mut buffer) } {
@@ -1416,7 +1428,7 @@ mod dma {
         pub fn dma_read<RX: DmaRxBuffer>(
             mut self,
             mut buffer: RX,
-        ) -> Result<SpiDmaTransfer<'d, T, FullDuplexMode, M, RX>, (Error, Self, RX)> {
+        ) -> Result<SpiDmaTransfer<'d, FullDuplexMode, M, RX, T>, (Error, Self, RX)> {
             self.wait_for_idle();
             match unsafe { self.start_dma_read(&mut buffer) } {
                 Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
@@ -1455,7 +1467,7 @@ mod dma {
             mut self,
             mut rx_buffer: RX,
             mut tx_buffer: TX,
-        ) -> Result<SpiDmaTransfer<'d, T, FullDuplexMode, M, (RX, TX)>, (Error, Self, RX, TX)>
+        ) -> Result<SpiDmaTransfer<'d, FullDuplexMode, M, (RX, TX), T>, (Error, Self, RX, TX)>
         {
             self.wait_for_idle();
             match unsafe { self.start_dma_transfer(&mut rx_buffer, &mut tx_buffer) } {
@@ -1465,7 +1477,7 @@ mod dma {
         }
     }
 
-    impl<'d, T, M> SpiDma<'d, T, HalfDuplexMode, M>
+    impl<'d, M, T> SpiDma<'d, HalfDuplexMode, M, T>
     where
         T: InstanceDma,
         M: Mode,
@@ -1517,7 +1529,7 @@ mod dma {
             address: Address,
             dummy: u8,
             mut buffer: RX,
-        ) -> Result<SpiDmaTransfer<'d, T, HalfDuplexMode, M, RX>, (Error, Self, RX)> {
+        ) -> Result<SpiDmaTransfer<'d, HalfDuplexMode, M, RX, T>, (Error, Self, RX)> {
             self.wait_for_idle();
 
             match unsafe {
@@ -1584,7 +1596,7 @@ mod dma {
             address: Address,
             dummy: u8,
             mut buffer: TX,
-        ) -> Result<SpiDmaTransfer<'d, T, HalfDuplexMode, M, TX>, (Error, Self, TX)> {
+        ) -> Result<SpiDmaTransfer<'d, HalfDuplexMode, M, TX, T>, (Error, Self, TX)> {
             self.wait_for_idle();
 
             match unsafe {
@@ -1600,18 +1612,18 @@ mod dma {
     ///
     /// This structure is responsible for managing SPI transfers using DMA
     /// buffers.
-    pub struct SpiDmaBus<'d, T, D, M>
+    pub struct SpiDmaBus<'d, D, M, T = AnySpi>
     where
         T: InstanceDma,
         D: DuplexMode,
         M: Mode,
     {
-        spi_dma: SpiDma<'d, T, D, M>,
+        spi_dma: SpiDma<'d, D, M, T>,
         rx_buf: DmaRxBuf,
         tx_buf: DmaTxBuf,
     }
 
-    impl<'d, T, D, M> SpiDmaBus<'d, T, D, M>
+    impl<'d, D, M, T> SpiDmaBus<'d, D, M, T>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -1619,7 +1631,7 @@ mod dma {
     {
         /// Creates a new `SpiDmaBus` with the specified SPI instance and DMA
         /// buffers.
-        pub fn new(spi_dma: SpiDma<'d, T, D, M>, rx_buf: DmaRxBuf, tx_buf: DmaTxBuf) -> Self {
+        pub fn new(spi_dma: SpiDma<'d, D, M, T>, rx_buf: DmaRxBuf, tx_buf: DmaTxBuf) -> Self {
             Self {
                 spi_dma,
                 rx_buf,
@@ -1668,7 +1680,7 @@ mod dma {
         }
     }
 
-    impl<'d, T, D, M> InterruptConfigurable for SpiDmaBus<'d, T, D, M>
+    impl<'d, D, M, T> InterruptConfigurable for SpiDmaBus<'d, D, M, T>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -1680,7 +1692,7 @@ mod dma {
         }
     }
 
-    impl<'d, T, D, M> crate::private::Sealed for SpiDmaBus<'d, T, D, M>
+    impl<'d, D, M, T> crate::private::Sealed for SpiDmaBus<'d, D, M, T>
     where
         T: InstanceDma,
         D: DuplexMode,
@@ -1688,7 +1700,7 @@ mod dma {
     {
     }
 
-    impl<'d, T, M> SpiDmaBus<'d, T, FullDuplexMode, M>
+    impl<'d, M, T> SpiDmaBus<'d, FullDuplexMode, M, T>
     where
         T: InstanceDma,
         M: Mode,
@@ -1788,7 +1800,7 @@ mod dma {
         }
     }
 
-    impl<'d, T, M> HalfDuplexReadWrite for SpiDmaBus<'d, T, HalfDuplexMode, M>
+    impl<'d, M, T> HalfDuplexReadWrite for SpiDmaBus<'d, HalfDuplexMode, M, T>
     where
         T: InstanceDma,
         M: Mode,
@@ -1860,7 +1872,7 @@ mod dma {
     }
 
     impl<'d, T> embedded_hal_02::blocking::spi::Transfer<u8>
-        for SpiDmaBus<'d, T, FullDuplexMode, crate::Blocking>
+        for SpiDmaBus<'d, FullDuplexMode, crate::Blocking, T>
     where
         T: InstanceDma,
     {
@@ -1873,7 +1885,7 @@ mod dma {
     }
 
     impl<'d, T> embedded_hal_02::blocking::spi::Write<u8>
-        for SpiDmaBus<'d, T, FullDuplexMode, crate::Blocking>
+        for SpiDmaBus<'d, FullDuplexMode, crate::Blocking, T>
     where
         T: InstanceDma,
     {
@@ -1932,7 +1944,7 @@ mod dma {
             }
         }
 
-        impl<'d, T> SpiDmaBus<'d, T, FullDuplexMode, crate::Async>
+        impl<'d, T> SpiDmaBus<'d, FullDuplexMode, crate::Async, T>
         where
             T: InstanceDma,
         {
@@ -2046,7 +2058,7 @@ mod dma {
             }
         }
 
-        impl<'d, T> embedded_hal_async::spi::SpiBus for SpiDmaBus<'d, T, FullDuplexMode, crate::Async>
+        impl<'d, T> embedded_hal_async::spi::SpiBus for SpiDmaBus<'d, FullDuplexMode, crate::Async, T>
         where
             T: InstanceDma,
         {
@@ -2078,7 +2090,7 @@ mod dma {
 
         use super::*;
 
-        impl<'d, T, M> ErrorType for SpiDmaBus<'d, T, FullDuplexMode, M>
+        impl<'d, M, T> ErrorType for SpiDmaBus<'d, FullDuplexMode, M, T>
         where
             T: InstanceDma,
             M: Mode,
@@ -2086,7 +2098,7 @@ mod dma {
             type Error = Error;
         }
 
-        impl<'d, T, M> SpiBus for SpiDmaBus<'d, T, FullDuplexMode, M>
+        impl<'d, M, T> SpiBus for SpiDmaBus<'d, FullDuplexMode, M, T>
         where
             T: InstanceDma,
             M: Mode,
@@ -2121,11 +2133,11 @@ mod ehal1 {
 
     use super::*;
 
-    impl<T, M> embedded_hal::spi::ErrorType for Spi<'_, T, M> {
+    impl<T, M> embedded_hal::spi::ErrorType for Spi<'_, M, T> {
         type Error = Error;
     }
 
-    impl<T> FullDuplex for Spi<'_, T, FullDuplexMode>
+    impl<T> FullDuplex for Spi<'_, FullDuplexMode, T>
     where
         T: Instance,
     {
@@ -2138,7 +2150,7 @@ mod ehal1 {
         }
     }
 
-    impl<T> SpiBus for Spi<'_, T, FullDuplexMode>
+    impl<T> SpiBus for Spi<'_, FullDuplexMode, T>
     where
         T: Instance,
     {
@@ -2360,7 +2372,7 @@ pub trait ExtendedInstance: Instance {
 }
 
 #[doc(hidden)]
-pub trait Instance: private::Sealed + PeripheralMarker {
+pub trait Instance: private::Sealed + PeripheralMarker + Into<AnySpi> + 'static {
     fn register_block(&self) -> &RegisterBlock;
 
     fn sclk_signal(&self) -> OutputSignal;
@@ -2680,24 +2692,21 @@ pub trait Instance: private::Sealed + PeripheralMarker {
     }
 
     fn ch_bus_freq(&mut self, frequency: HertzU32) {
-        // Disable clock source
-        #[cfg(gdma)]
-        self.register_block().clk_gate().modify(|_, w| {
-            w.clk_en().clear_bit();
-            w.mst_clk_active().clear_bit();
-            w.mst_clk_sel().clear_bit()
-        });
+        fn enable_clocks(_reg_block: &RegisterBlock, _enable: bool) {
+            #[cfg(gdma)]
+            _reg_block.clk_gate().modify(|_, w| {
+                w.clk_en().bit(_enable);
+                w.mst_clk_active().bit(_enable);
+                w.mst_clk_sel().bit(_enable)
+            });
+        }
+
+        enable_clocks(self.register_block(), false);
 
         // Change clock frequency
         self.setup(frequency);
 
-        // Enable clock source
-        #[cfg(gdma)]
-        self.register_block().clk_gate().modify(|_, w| {
-            w.clk_en().set_bit();
-            w.mst_clk_active().set_bit();
-            w.mst_clk_sel().set_bit()
-        });
+        enable_clocks(self.register_block(), true);
     }
 
     #[cfg(not(any(esp32, esp32c3, esp32s2)))]
@@ -3293,6 +3302,118 @@ impl ExtendedInstance for crate::peripherals::SPI3 {
             } else {
                 InputSignal::SPI3_HD
             }
+        }
+    }
+}
+
+impl Instance for super::AnySpi {
+    delegate::delegate! {
+        to match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi,
+            #[cfg(spi3)]
+            super::AnySpiInner::Spi3(spi) => spi,
+        } {
+            fn register_block(&self) -> &RegisterBlock;
+            fn spi_num(&self) -> u8;
+            fn sclk_signal(&self) -> OutputSignal;
+            fn mosi_signal(&self) -> OutputSignal;
+            fn miso_signal(&self) -> InputSignal;
+            fn cs_signal(&self) -> OutputSignal;
+        }
+    }
+    delegate::delegate! {
+        to match &mut self.0 {
+            super::AnySpiInner::Spi2(spi) => spi,
+            #[cfg(spi3)]
+            super::AnySpiInner::Spi3(spi) => spi,
+        } {
+            fn set_interrupt_handler(&mut self, handler: InterruptHandler);
+        }
+    }
+}
+
+impl ExtendedInstance for super::AnySpi {
+    fn sio0_input_signal(&self) -> InputSignal {
+        match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi.sio0_input_signal(),
+
+            #[cfg(all(spi3, any(esp32, esp32s3)))]
+            super::AnySpiInner::Spi3(spi) => spi.sio0_input_signal(),
+
+            #[cfg(all(spi3, not(any(esp32, esp32s3))))]
+            super::AnySpiInner::Spi3(_) => unimplemented!("SPI3 is does not support QSPI"),
+        }
+    }
+
+    fn sio1_output_signal(&self) -> OutputSignal {
+        match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi.sio1_output_signal(),
+
+            #[cfg(all(spi3, any(esp32, esp32s3)))]
+            super::AnySpiInner::Spi3(spi) => spi.sio1_output_signal(),
+
+            #[cfg(all(spi3, not(any(esp32, esp32s3))))]
+            super::AnySpiInner::Spi3(_) => unimplemented!("SPI3 is does not support QSPI"),
+        }
+    }
+
+    fn sio2_output_signal(&self) -> OutputSignal {
+        match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi.sio2_output_signal(),
+
+            #[cfg(all(spi3, any(esp32, esp32s3)))]
+            super::AnySpiInner::Spi3(spi) => spi.sio2_output_signal(),
+
+            #[cfg(all(spi3, not(any(esp32, esp32s3))))]
+            super::AnySpiInner::Spi3(_) => unimplemented!("SPI3 is does not support QSPI"),
+        }
+    }
+
+    fn sio2_input_signal(&self) -> InputSignal {
+        match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi.sio2_input_signal(),
+
+            #[cfg(all(spi3, any(esp32, esp32s3)))]
+            super::AnySpiInner::Spi3(spi) => spi.sio2_input_signal(),
+
+            #[cfg(all(spi3, not(any(esp32, esp32s3))))]
+            super::AnySpiInner::Spi3(_) => unimplemented!("SPI3 is does not support QSPI"),
+        }
+    }
+
+    fn sio3_output_signal(&self) -> OutputSignal {
+        match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi.sio3_output_signal(),
+
+            #[cfg(all(spi3, any(esp32, esp32s3)))]
+            super::AnySpiInner::Spi3(spi) => spi.sio3_output_signal(),
+
+            #[cfg(all(spi3, not(any(esp32, esp32s3))))]
+            super::AnySpiInner::Spi3(_) => unimplemented!("SPI3 is does not support QSPI"),
+        }
+    }
+
+    fn sio3_input_signal(&self) -> InputSignal {
+        match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi.sio3_input_signal(),
+
+            #[cfg(all(spi3, any(esp32, esp32s3)))]
+            super::AnySpiInner::Spi3(spi) => spi.sio3_input_signal(),
+
+            #[cfg(all(spi3, not(any(esp32, esp32s3))))]
+            super::AnySpiInner::Spi3(_) => unimplemented!("SPI3 is does not support QSPI"),
+        }
+    }
+}
+
+impl InstanceDma for super::AnySpi {
+    delegate::delegate! {
+        to match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi,
+            #[cfg(spi3)]
+            super::AnySpiInner::Spi3(spi) => spi,
+        } {
+            fn clear_dma_interrupts(&self);
         }
     }
 }

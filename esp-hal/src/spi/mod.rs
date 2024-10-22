@@ -9,7 +9,7 @@
 //! more information on these modes, please refer to the documentation in their
 //! respective modules.
 
-use crate::dma::{DmaError, PeripheralMarker};
+use crate::dma::{DmaEligible, DmaError};
 
 pub mod master;
 pub mod slave;
@@ -101,18 +101,28 @@ pub struct HalfDuplexMode {}
 impl DuplexMode for HalfDuplexMode {}
 impl crate::private::Sealed for HalfDuplexMode {}
 
-#[cfg(spi2)]
-impl PeripheralMarker for crate::peripherals::SPI2 {
-    #[inline(always)]
-    fn peripheral(&self) -> crate::system::Peripheral {
-        crate::system::Peripheral::Spi2
+crate::any_peripheral! {
+    /// Any SPI peripheral.
+    pub peripheral AnySpi {
+        #[cfg(spi2)]
+        Spi2(crate::peripherals::SPI2),
+        #[cfg(spi3)]
+        Spi3(crate::peripherals::SPI3),
     }
 }
 
-#[cfg(spi3)]
-impl PeripheralMarker for crate::peripherals::SPI3 {
-    #[inline(always)]
-    fn peripheral(&self) -> crate::system::Peripheral {
-        crate::system::Peripheral::Spi3
+impl DmaEligible for AnySpi {
+    #[cfg(gdma)]
+    type Dma = crate::dma::AnyGdmaChannel;
+    #[cfg(pdma)]
+    type Dma = crate::dma::AnySpiDmaChannel;
+
+    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
+        match &self.0 {
+            #[cfg(spi2)]
+            AnySpiInner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
+            #[cfg(spi3)]
+            AnySpiInner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
+        }
     }
 }

@@ -378,6 +378,15 @@ macro_rules! ImplSpiChannel {
                 }
             }
 
+            impl DmaChannelConvert<AnySpiDmaChannel> for [<Spi $num DmaChannel>] {
+                fn degrade_rx(rx: SpiDmaRxChannelImpl<Self>) -> SpiDmaRxChannelImpl<AnySpiDmaChannelInner> {
+                    SpiDmaRxChannelImpl(rx.0.into())
+                }
+                fn degrade_tx(tx: SpiDmaTxChannelImpl<Self>) -> SpiDmaTxChannelImpl<AnySpiDmaChannelInner> {
+                    SpiDmaTxChannelImpl(tx.0.into())
+                }
+            }
+
             impl $crate::private::Sealed for [<Spi $num DmaChannel>] {}
 
             #[doc = concat!("Creates a channel for SPI", $num)]
@@ -804,6 +813,15 @@ macro_rules! ImplI2sChannel {
                 }
             }
 
+            impl DmaChannelConvert<AnyI2sDmaChannel> for [<I2s $num DmaChannel>] {
+                fn degrade_rx(rx: I2sDmaRxChannelImpl<Self>) -> I2sDmaRxChannelImpl<AnyI2sDmaChannelInner> {
+                    I2sDmaRxChannelImpl(rx.0.into())
+                }
+                fn degrade_tx(tx: I2sDmaTxChannelImpl<Self>) -> I2sDmaTxChannelImpl<AnyI2sDmaChannelInner> {
+                    I2sDmaTxChannelImpl(tx.0.into())
+                }
+            }
+
             #[doc = concat!("Creates a channel for I2S", $num)]
             pub struct [<I2s $num DmaChannelCreator>] {}
 
@@ -921,5 +939,79 @@ where
             "This DMA channel is not compatible with {:?}",
             peripheral.peripheral()
         );
+    }
+}
+
+/// A marker for SPI-compatible type-erased DMA channels.
+pub struct AnySpiDmaChannel;
+
+impl crate::private::Sealed for AnySpiDmaChannel {}
+
+impl DmaChannel for AnySpiDmaChannel {
+    type Rx = SpiDmaRxChannelImpl<AnySpiDmaChannelInner>;
+    type Tx = SpiDmaTxChannelImpl<AnySpiDmaChannelInner>;
+}
+
+crate::any_enum! {
+    #[doc(hidden)]
+    pub enum AnySpiDmaChannelInner {
+        Spi2(Spi2DmaChannel),
+        Spi3(Spi3DmaChannel),
+    }
+}
+
+impl crate::private::Sealed for AnySpiDmaChannelInner {}
+
+impl PdmaChannel for AnySpiDmaChannelInner {
+    type RegisterBlock = SpiRegisterBlock;
+
+    delegate::delegate! {
+        to match self {
+            AnySpiDmaChannelInner::Spi2(channel) => channel,
+            AnySpiDmaChannelInner::Spi3(channel) => channel,
+        } {
+            fn register_block(&self) -> &SpiRegisterBlock;
+            fn tx_waker(&self) -> &'static AtomicWaker;
+            fn rx_waker(&self) -> &'static AtomicWaker;
+            fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool;
+        }
+    }
+}
+
+/// A marker for I2S-compatible type-erased DMA channels.
+pub struct AnyI2sDmaChannel;
+
+impl crate::private::Sealed for AnyI2sDmaChannel {}
+
+impl DmaChannel for AnyI2sDmaChannel {
+    type Rx = I2sDmaRxChannelImpl<AnyI2sDmaChannelInner>;
+    type Tx = I2sDmaTxChannelImpl<AnyI2sDmaChannelInner>;
+}
+
+crate::any_enum! {
+    #[doc(hidden)]
+    pub enum AnyI2sDmaChannelInner {
+        I2s0(I2s0DmaChannel),
+        #[cfg(i2s1)]
+        I2s1(I2s1DmaChannel),
+    }
+}
+
+impl crate::private::Sealed for AnyI2sDmaChannelInner {}
+
+impl PdmaChannel for AnyI2sDmaChannelInner {
+    type RegisterBlock = I2sRegisterBlock;
+
+    delegate::delegate! {
+        to match self {
+            AnyI2sDmaChannelInner::I2s0(channel) => channel,
+            #[cfg(i2s1)]
+            AnyI2sDmaChannelInner::I2s1(channel) => channel,
+        } {
+            fn register_block(&self) -> &I2sRegisterBlock;
+            fn tx_waker(&self) -> &'static AtomicWaker;
+            fn rx_waker(&self) -> &'static AtomicWaker;
+            fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool;
+        }
     }
 }

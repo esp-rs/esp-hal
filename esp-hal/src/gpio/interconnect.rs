@@ -88,7 +88,7 @@ impl InputSignal {
     /// - invert: Configures whether or not to invert the input value
     /// - input: The GPIO number to connect to the input signal
     fn connect(&self, signal: usize, invert: bool, input: u8) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .func_in_sel_cfg(signal - FUNC_IN_SEL_OFFSET)
             .modify(|_, w| unsafe {
                 w.sel()
@@ -122,10 +122,9 @@ impl PeripheralInput for InputSignal {
             GPIO_FUNCTION
         } else {
             self.input_signals(private::Internal)
-                .into_iter()
-                .position(|s| s == Some(signal))
-                .ok_or(())
-                .and_then(AlternateFunction::try_from)
+                .iter()
+                .find(|(_af, s)| *s == signal)
+                .map(|(af, _)| *af)
                 .unwrap_or(GPIO_FUNCTION)
         };
 
@@ -153,12 +152,12 @@ impl PeripheralInput for InputSignal {
         self.pin
             .set_alternate_function(GPIO_FUNCTION, private::Internal);
 
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
             .modify(|_, w| w.sel().clear_bit());
     }
 
-    fn input_signals(&self, _: private::Internal) -> [Option<gpio::InputSignal>; 6] {
+    fn input_signals(&self, _: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)] {
         PeripheralInput::input_signals(&self.pin, private::Internal)
     }
 
@@ -239,7 +238,7 @@ impl OutputSignal {
         enable_from_gpio: bool,
         output: u8,
     ) {
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .func_out_sel_cfg(output as usize)
             .modify(|_, w| unsafe {
                 w.out_sel()
@@ -269,10 +268,9 @@ impl PeripheralOutput for OutputSignal {
             GPIO_FUNCTION
         } else {
             self.output_signals(private::Internal)
-                .into_iter()
-                .position(|s| s == Some(signal))
-                .ok_or(())
-                .and_then(AlternateFunction::try_from)
+                .iter()
+                .find(|(_af, s)| *s == signal)
+                .map(|(af, _)| *af)
                 .unwrap_or(GPIO_FUNCTION)
         };
 
@@ -306,12 +304,12 @@ impl PeripheralOutput for OutputSignal {
         self.pin
             .set_alternate_function(GPIO_FUNCTION, private::Internal);
 
-        unsafe { &*GPIO::PTR }
+        unsafe { GPIO::steal() }
             .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
             .modify(|_, w| w.sel().clear_bit());
     }
 
-    fn output_signals(&self, _: private::Internal) -> [Option<gpio::OutputSignal>; 6] {
+    fn output_signals(&self, _: private::Internal) -> &[(AlternateFunction, gpio::OutputSignal)] {
         PeripheralOutput::output_signals(&self.pin, private::Internal)
     }
 
@@ -405,7 +403,7 @@ impl PeripheralInput for AnyInputSignal {
         } {
             fn init_input(&self, pull: Pull, _internal: private::Internal);
             fn is_input_high(&self, _internal: private::Internal) -> bool;
-            fn input_signals(&self, _internal: private::Internal) -> [Option<gpio::InputSignal>; 6];
+            fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)];
         }
 
         to match &mut self.0 {

@@ -398,14 +398,8 @@ pub(crate) mod asynch {
         fn new(instance: &'a Rsa<'d, Async>) -> Self {
             SIGNALED.store(false, Ordering::Relaxed);
 
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
-                } else if #[cfg(any(esp32s2, esp32s3))] {
-                    instance.rsa.interrupt_ena().write(|w| w.interrupt_ena().set_bit());
-                } else {
-                    instance.rsa.int_ena().write(|w| w.int_ena().set_bit());
-                }
-            }
+            #[cfg(not(esp32))]
+            instance.rsa.int_ena().write(|w| w.int_ena().set_bit());
 
             Self { instance }
         }
@@ -417,14 +411,11 @@ pub(crate) mod asynch {
 
     impl Drop for RsaFuture<'_, '_> {
         fn drop(&mut self) {
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
-                } else if #[cfg(any(esp32s2, esp32s3))] {
-                    self.instance.rsa.interrupt_ena().write(|w| w.interrupt_ena().clear_bit());
-                } else {
-                    self.instance.rsa.int_ena().write(|w| w.int_ena().clear_bit());
-                }
-            }
+            #[cfg(not(esp32))]
+            self.instance
+                .rsa
+                .int_ena()
+                .write(|w| w.int_ena().clear_bit());
         }
     }
 
@@ -520,10 +511,8 @@ pub(crate) mod asynch {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
                 rsa.interrupt().write(|w| w.interrupt().set_bit());
-            } else if #[cfg(any(esp32s2, esp32s3))] {
-                rsa.clear_interrupt().write(|w| w.clear_interrupt().set_bit());
             } else  {
-                rsa.int_clr().write(|w| w.clear_interrupt().set_bit());
+                rsa.int_clr().write(|w| w.int_clr().set_bit());
             }
         }
 

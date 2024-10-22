@@ -32,10 +32,13 @@
 
 use core::marker::PhantomData;
 
-#[cfg(esp32c6)]
-use super::OpenDrain;
-use super::RtcPin;
-use crate::into_ref;
+use super::{InputPin, OutputPin, RtcPin};
+use crate::{
+    gpio::RtcFunction,
+    into_ref,
+    peripheral::Peripheral,
+    peripherals::{GPIO, RTC_IO},
+};
 
 /// A GPIO output pin configured for low power operation
 pub struct LowPowerOutput<'d, const PIN: u8> {
@@ -44,12 +47,12 @@ pub struct LowPowerOutput<'d, const PIN: u8> {
 
 impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
     /// Create a new output pin for use by the low-power core
-    pub fn new<P>(pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
+    pub fn new<P>(pin: impl Peripheral<P = P> + 'd) -> Self
     where
-        P: super::OutputPin + RtcPin,
+        P: OutputPin + RtcPin,
     {
         into_ref!(pin);
-        pin.rtc_set_config(false, true, crate::gpio::RtcFunction::Rtc);
+        pin.rtc_set_config(false, true, RtcFunction::Rtc);
 
         let this = Self {
             phantom: PhantomData,
@@ -60,7 +63,7 @@ impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
     }
 
     fn output_enable(&self, enable: bool) {
-        let rtc_io = unsafe { crate::peripherals::RTC_IO::steal() };
+        let rtc_io = unsafe { RTC_IO::steal() };
 
         if enable {
             rtc_io
@@ -81,12 +84,12 @@ pub struct LowPowerInput<'d, const PIN: u8> {
 
 impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
     /// Create a new input pin for use by the low-power core
-    pub fn new<P>(pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
+    pub fn new<P>(pin: impl Peripheral<P = P> + 'd) -> Self
     where
-        P: super::InputPin + RtcPin,
+        P: InputPin + RtcPin,
     {
         into_ref!(pin);
-        pin.rtc_set_config(true, true, crate::gpio::RtcFunction::Rtc);
+        pin.rtc_set_config(true, true, RtcFunction::Rtc);
 
         let this = Self {
             phantom: PhantomData,
@@ -99,17 +102,23 @@ impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
     }
 
     fn input_enable(&self, enable: bool) {
-        get_pin_reg(PIN).modify(|_, w| w.fun_ie().bit(enable));
+        unsafe { RTC_IO::steal() }
+            .touch_pad(PIN as usize)
+            .modify(|_, w| w.fun_ie().bit(enable));
     }
 
     /// Sets pull-up enable for the pin
     pub fn pullup_enable(&self, enable: bool) {
-        get_pin_reg(PIN).modify(|_, w| w.rue().bit(enable));
+        unsafe { RTC_IO::steal() }
+            .touch_pad(PIN as usize)
+            .modify(|_, w| w.rue().bit(enable));
     }
 
     /// Sets pull-down enable for the pin
     pub fn pulldown_enable(&self, enable: bool) {
-        get_pin_reg(PIN).modify(|_, w| w.rde().bit(enable));
+        unsafe { RTC_IO::steal() }
+            .touch_pad(PIN as usize)
+            .modify(|_, w| w.rde().bit(enable));
     }
 }
 
@@ -120,12 +129,12 @@ pub struct LowPowerOutputOpenDrain<'d, const PIN: u8> {
 
 impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     /// Create a new output pin for use by the low-power core
-    pub fn new<P>(pin: impl crate::peripheral::Peripheral<P = P> + 'd) -> Self
+    pub fn new<P>(pin: impl Peripheral<P = P> + 'd) -> Self
     where
-        P: super::InputPin + super::OutputPin + RtcPin,
+        P: InputPin + OutputPin + RtcPin,
     {
         into_ref!(pin);
-        pin.rtc_set_config(true, true, crate::gpio::RtcFunction::Rtc);
+        pin.rtc_set_config(true, true, RtcFunction::Rtc);
 
         let this = Self {
             phantom: PhantomData,
@@ -141,7 +150,7 @@ impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     }
 
     fn output_enable(&self, enable: bool) {
-        let rtc_io = unsafe { crate::peripherals::RTC_IO::steal() };
+        let rtc_io = unsafe { RTC_IO::steal() };
 
         if enable {
             rtc_io
@@ -155,35 +164,28 @@ impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     }
 
     fn input_enable(&self, enable: bool) {
-        get_pin_reg(PIN).modify(|_, w| w.fun_ie().bit(enable));
+        unsafe { RTC_IO::steal() }
+            .touch_pad(PIN as usize)
+            .modify(|_, w| w.fun_ie().bit(enable));
     }
 
     /// Sets pull-up enable for the pin
     pub fn pullup_enable(&self, enable: bool) {
-        get_pin_reg(PIN).modify(|_, w| w.rue().bit(enable));
+        unsafe { RTC_IO::steal() }
+            .touch_pad(PIN as usize)
+            .modify(|_, w| w.rue().bit(enable));
     }
 
     /// Sets pull-down enable for the pin
     pub fn pulldown_enable(&self, enable: bool) {
-        get_pin_reg(PIN).modify(|_, w| w.rde().bit(enable));
+        unsafe { RTC_IO::steal() }
+            .touch_pad(PIN as usize)
+            .modify(|_, w| w.rde().bit(enable));
     }
 
     fn set_open_drain_output(&self, enable: bool) {
-        use crate::peripherals::GPIO;
-        let gpio = unsafe { &*GPIO::PTR };
-
-        gpio.pin(PIN as usize)
+        unsafe { GPIO::steal() }
+            .pin(PIN as usize)
             .modify(|_, w| w.pad_driver().bit(enable));
-    }
-}
-
-#[cfg(any(esp32s2, esp32s3))]
-#[inline(always)]
-fn get_pin_reg(pin: u8) -> &'static crate::peripherals::rtc_io::TOUCH_PAD {
-    unsafe {
-        let rtc_io = &*crate::peripherals::RTC_IO::PTR;
-        let pin_ptr = (rtc_io.touch_pad(0).as_ptr()).add(pin as usize);
-
-        &*(pin_ptr as *const crate::peripherals::rtc_io::TOUCH_PAD)
     }
 }

@@ -112,6 +112,8 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
         stack_chk_guard.write_volatile(0xdeadbabe);
     }
 
+    crate::interrupt::setup_interrupts();
+
     // continue with default reset handler
     xtensa_lx_rt::Reset()
 }

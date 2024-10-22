@@ -13,7 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- No need to add `rom_functions.x` manually anymore (#2374)
+
 ### Fixed
+
+- Fixed a possible crash when parsing results from a radius server (#2380)
 
 ### Removed
 

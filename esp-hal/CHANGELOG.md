@@ -8,17 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Add burst transfer support to DMA buffers (#2236)
 
+- A new config option `PLACE_SWITCH_TABLES_IN_RAM` to improve performance (especially for interrupts) at the cost of slightly more RAM usage (#2331)
+- A new config option `PLACE_ANON_IN_RAM` to improve performance (especially for interrupts) at the cost of RAM usage (#2331)
+- Add burst transfer support to DMA buffers (#2336)
 - `AnyPin` now implements `From<GpioPin<N>>`. (#2326)
+- Added `AnySpi` and `AnySpiDmaChannel`. (#2334)
+- Added `AnyI2s` and `AnyI2sDmaChannel`. (#2367)
+- `Pins::steal()` to unsafely obtain GPIO. (#2335)
 
 ### Changed
 
+- Peripheral type erasure for SPI (#2334)
+- Peripheral type erasure for I2S (#2367)
+
 ### Fixed
+
+- Fix conflict between `RtcClock::get_xtal_freq` and `Rtc::disable_rom_message_printing` (#2360)
+- Fixed an issue where interrupts enabled before `esp_hal::init` were disabled. This issue caused the executor created by `#[esp_hal_embassy::main]` to behave incorrectly in multi-core applications. (#2377)
 
 ### Removed
 
 - The `i2s::{I2sWrite, I2sWriteDma, I2sRead, I2sReadDma, I2sWriteDmaAsync, I2sReadDmaAsync}` traits have been removed. (#2316)
+- The `ledc::ChannelHW` trait is no longer generic. (#2387)
 
 ## [0.21.1]
 

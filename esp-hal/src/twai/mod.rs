@@ -778,7 +778,7 @@ where
             // Enable extended register layout
             T::register_block()
                 .clock_divider()
-                .modify(|r, w| unsafe { w.bits(r.bits() | 0x80) });
+                .modify(|_, w| w.ext_mode().set_bit());
         }
 
         let rx_pull = if no_transceiver {
@@ -863,13 +863,13 @@ where
                 // ESP32 Revision 2 or later. Reserved otherwise.
                 T::register_block()
                     .int_ena()
-                    .modify(|r, w| unsafe { w.bits(r.bits() | 0x10) });
+                    .modify(|_, w| w.brp_div().set_bit());
                 prescaler = timing.baud_rate_prescaler / 2;
             } else {
                 // Disable /2 baudrate divider by clearing brp_div.
                 T::register_block()
                     .int_ena()
-                    .modify(|r, w| unsafe { w.bits(r.bits() & !0x10) });
+                    .modify(|_, w| w.brp_div().clear_bit());
             }
         }
 
@@ -1487,15 +1487,7 @@ pub trait Instance: crate::private::Sealed {
 
         // Trigger the appropriate transmission request based on self_reception flag
         if frame.self_reception {
-            cfg_if::cfg_if! {
-                if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
-                    register_block.cmd().write(|w| w.self_rx_req().set_bit());
-                } else {
-                    register_block
-                        .cmd()
-                        .write(|w| w.self_rx_request().set_bit());
-                }
-            }
+            register_block.cmd().write(|w| w.self_rx_req().set_bit());
         } else {
             // Set the transmit request command, this will lock the transmit buffer until
             // the transmission is complete or aborted.
