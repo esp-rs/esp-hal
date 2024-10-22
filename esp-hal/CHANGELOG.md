@@ -43,6 +43,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `Spi::with_pins` methods have been removed. (#2373)
 - The `Spi::new_half_duplex` constructor have been removed. (#2373)
 - The `HalfDuplexMode` and `FullDuplexMode` parameters have been removed from `Spi`. (#2373)
+- Removed the output pin type parameter from `ledc::{Channel, ChannelIFace}` (#2388)
+- Removed the output pin type parameter from `mcpwm::operator::{PwmPin, LinkedPins}` (#2388)
+- Removed the output pin type parameter from `parl_io::{ClkOutPin, ClkInPin, RxClkInPin}` (#2388)
+- Removed the valid pin type parameter from `parl_io::{TxPinConfigWithValidPin, RxPinConfigWithValidPin}` (#2388)
+- Removed the pin type parameters from `parl_io::{TxOneBit, TxTwoBits, TxFourBits, TxEightBits, TxSixteenBits}` (#2388)
+- Removed the pin type parameters from `parl_io::{RxOneBit, RxTwoBits, RxFourBits, RxEightBits, RxSixteenBits}` (#2388)
+- Removed the pin type parameters from `lcd_cam::lcd::i8080::{TxEightBits, TxSixteenBits}` (#2388)
+- Removed the pin type parameters from `lcd_cam::lcd::cam::{RxEightBits, RxSixteenBits}` (#2388)
 
 ## [0.21.1]
 
