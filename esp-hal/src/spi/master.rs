@@ -542,10 +542,7 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MOSI signal and SIO0 input signal.
-    pub fn with_mosi<MOSI: PeripheralOutput + PeripheralInput>(
-        self,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-    ) -> Self {
+    pub fn with_mosi<MOSI: PeripheralOutput>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
         crate::into_ref!(mosi);
 
         mosi.enable_output(true, private::Internal);
@@ -561,10 +558,7 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MISO signal and SIO1 input signal.
-    pub fn with_miso<MISO: PeripheralOutput + PeripheralInput>(
-        self,
-        miso: impl Peripheral<P = MISO> + 'd,
-    ) -> Self {
+    pub fn with_miso<MISO: PeripheralOutput>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
         crate::into_ref!(miso);
 
         miso.enable_input(true, private::Internal);
@@ -625,10 +619,7 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the SIO2 output and input signals.
-    pub fn with_sio2<SIO2: PeripheralOutput + PeripheralInput>(
-        self,
-        sio2: impl Peripheral<P = SIO2> + 'd,
-    ) -> Self
+    pub fn with_sio2<SIO2: PeripheralOutput>(self, sio2: impl Peripheral<P = SIO2> + 'd) -> Self
     where
         T: QspiInstance,
     {
@@ -649,10 +640,7 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the SIO3 output and input signals.
-    pub fn with_sio3<SIO3: PeripheralOutput + PeripheralInput>(
-        self,
-        sio3: impl Peripheral<P = SIO3> + 'd,
-    ) -> Self
+    pub fn with_sio3<SIO3: PeripheralOutput>(self, sio3: impl Peripheral<P = SIO3> + 'd) -> Self
     where
         T: QspiInstance,
     {

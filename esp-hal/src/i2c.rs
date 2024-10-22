@@ -59,7 +59,7 @@ use fugit::HertzU32;
 use crate::{
     clock::Clocks,
     dma::PeripheralMarker,
-    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
+    gpio::{InputSignal, OutputSignal, PeripheralOutput, Pull},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::i2c0::{RegisterBlock, COMD},
@@ -489,10 +489,7 @@ impl<'d, T, DM: Mode> I2c<'d, DM, T>
 where
     T: Instance,
 {
-    fn new_internal<
-        SDA: PeripheralOutput + PeripheralInput,
-        SCL: PeripheralOutput + PeripheralInput,
-    >(
+    fn new_internal<SDA: PeripheralOutput, SCL: PeripheralOutput>(
         i2c: impl Peripheral<P = T> + 'd,
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
@@ -562,7 +559,7 @@ impl<'d> I2c<'d, Blocking> {
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new<SDA: PeripheralOutput + PeripheralInput, SCL: PeripheralOutput + PeripheralInput>(
+    pub fn new<SDA: PeripheralOutput, SCL: PeripheralOutput>(
         i2c: impl Peripheral<P = impl Instance> + 'd,
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
@@ -579,10 +576,7 @@ where
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new_typed<
-        SDA: PeripheralOutput + PeripheralInput,
-        SCL: PeripheralOutput + PeripheralInput,
-    >(
+    pub fn new_typed<SDA: PeripheralOutput, SCL: PeripheralOutput>(
         i2c: impl Peripheral<P = T> + 'd,
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
@@ -607,10 +601,7 @@ impl<'d> I2c<'d, Async> {
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new_async<
-        SDA: PeripheralOutput + PeripheralInput,
-        SCL: PeripheralOutput + PeripheralInput,
-    >(
+    pub fn new_async<SDA: PeripheralOutput, SCL: PeripheralOutput>(
         i2c: impl Peripheral<P = impl Instance> + 'd,
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
@@ -627,10 +618,7 @@ where
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new_async_typed<
-        SDA: PeripheralOutput + PeripheralInput,
-        SCL: PeripheralOutput + PeripheralInput,
-    >(
+    pub fn new_async_typed<SDA: PeripheralOutput, SCL: PeripheralOutput>(
         i2c: impl Peripheral<P = T> + 'd,
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,

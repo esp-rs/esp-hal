@@ -396,7 +396,7 @@ pub trait PeripheralInput: PeripheralSignal {
 }
 
 /// Trait implemented by pins which can be used as peripheral outputs.
-pub trait PeripheralOutput: PeripheralSignal {
+pub trait PeripheralOutput: PeripheralInput {
     /// Configure open-drain mode
     #[doc(hidden)]
     fn set_to_open_drain_output(&mut self, _: private::Internal);
