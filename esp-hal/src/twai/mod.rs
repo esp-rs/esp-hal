@@ -1487,15 +1487,7 @@ pub trait Instance: crate::private::Sealed {
 
         // Trigger the appropriate transmission request based on self_reception flag
         if frame.self_reception {
-            cfg_if::cfg_if! {
-                if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
-                    register_block.cmd().write(|w| w.self_rx_req().set_bit());
-                } else {
-                    register_block
-                        .cmd()
-                        .write(|w| w.self_rx_request().set_bit());
-                }
-            }
+            register_block.cmd().write(|w| w.self_rx_req().set_bit());
         } else {
             // Set the transmit request command, this will lock the transmit buffer until
             // the transmission is complete or aborted.
