@@ -27,7 +27,7 @@ struct Mutex {
 
 /// A naive and pretty much unsafe queue to back the queues used in drivers and
 /// supplicant code
-struct RawQueue {
+pub(crate) struct RawQueue {
     count: usize,
     item_size: usize,
     current_read: usize,
@@ -36,7 +36,7 @@ struct RawQueue {
 }
 
 impl RawQueue {
-    fn new(count: usize, item_size: usize) -> Self {
+    pub(crate) fn new(count: usize, item_size: usize) -> Self {
         let storage = unsafe { malloc((count * item_size) as u32) as *mut u8 };
         Self {
             count,
@@ -47,14 +47,14 @@ impl RawQueue {
         }
     }
 
-    fn free_storage(&mut self) {
+    pub(crate) fn free_storage(&mut self) {
         unsafe {
             free(self.storage);
         }
         self.storage = core::ptr::null_mut();
     }
 
-    fn enqueue(&mut self, item: *mut c_void) -> i32 {
+    pub(crate) fn enqueue(&mut self, item: *mut c_void) -> i32 {
         if self.count() < self.count {
             unsafe {
                 let p = self.storage.byte_add(self.item_size * self.current_write);
@@ -68,7 +68,7 @@ impl RawQueue {
         }
     }
 
-    fn try_dequeue(&mut self, item: *mut c_void) -> bool {
+    pub(crate) fn try_dequeue(&mut self, item: *mut c_void) -> bool {
         if self.count() > 0 {
             unsafe {
                 let p = self.storage.byte_add(self.item_size * self.current_read) as *const c_void;
@@ -81,7 +81,7 @@ impl RawQueue {
         }
     }
 
-    fn count(&self) -> usize {
+    pub(crate) fn count(&self) -> usize {
         if self.current_write >= self.current_read {
             self.current_write - self.current_read
         } else {
