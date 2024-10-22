@@ -1361,18 +1361,13 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
     0
 }
 
-static mut BLE_HCI_READ_DATA: [u8; 256] = [0u8; 256];
-static mut BLE_HCI_READ_DATA_INDEX: usize = 0;
-static mut BLE_HCI_READ_DATA_LEN: usize = 0;
+static BLE_HCI_READ_DATA: Mutex<RefCell<Vec<u8>>> = Mutex::new(RefCell::new(Vec::new()));
 
 #[cfg(feature = "async")]
 pub fn have_hci_read_data() -> bool {
     critical_section::with(|cs| {
         let queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
-        !queue.is_empty()
-            || unsafe {
-                BLE_HCI_READ_DATA_LEN > 0 && (BLE_HCI_READ_DATA_LEN >= BLE_HCI_READ_DATA_INDEX)
-            }
+        !queue.is_empty() || BLE_HCI_READ_DATA.borrow_ref(cs).len() > 0
     })
 }
 
@@ -1382,7 +1377,8 @@ pub(crate) fn read_next(data: &mut [u8]) -> usize {
 
         match queue.pop() {
             Some(packet) => {
-                data[..packet.data.len() as usize].copy_from_slice(&packet.data[..packet.data.len() as usize]);
+                data[..packet.data.len() as usize]
+                    .copy_from_slice(&packet.data[..packet.data.len() as usize]);
                 packet.data.len() as usize
             }
             None => 0,
@@ -1391,33 +1387,26 @@ pub(crate) fn read_next(data: &mut [u8]) -> usize {
 }
 
 pub fn read_hci(data: &mut [u8]) -> usize {
-    unsafe {
-        if BLE_HCI_READ_DATA_LEN == 0 {
-            critical_section::with(|cs| {
-                let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
+    critical_section::with(|cs| {
+        let mut hci_read_data = BLE_HCI_READ_DATA.borrow_ref_mut(cs);
 
-                if let Some(packet) = queue.pop() {
-                    BLE_HCI_READ_DATA[..packet.data.len() as usize]
-                        .copy_from_slice(&packet.data[..packet.data.len() as usize]);
-                    BLE_HCI_READ_DATA_LEN = packet.data.len() as usize;
-                    BLE_HCI_READ_DATA_INDEX = 0;
-                }
-            });
-        }
+        if hci_read_data.len() == 0 {
+            let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
 
-        if BLE_HCI_READ_DATA_LEN > 0 {
-            data[0] = BLE_HCI_READ_DATA[BLE_HCI_READ_DATA_INDEX];
-            BLE_HCI_READ_DATA_INDEX += 1;
-
-            if BLE_HCI_READ_DATA_INDEX >= BLE_HCI_READ_DATA_LEN {
-                BLE_HCI_READ_DATA_LEN = 0;
-                BLE_HCI_READ_DATA_INDEX = 0;
+            if let Some(packet) = queue.pop() {
+                hci_read_data.extend(packet.data);
             }
-            return 1;
         }
-    }
 
-    0
+        let l = usize::min(hci_read_data.len(), data.len());
+        if l > 0 {
+            data[..l].copy_from_slice(&hci_read_data[..l]);
+            hci_read_data.drain(..l);
+            l
+        } else {
+            0
+        }
+    })
 }
 
 pub fn send_hci(data: &[u8]) {
