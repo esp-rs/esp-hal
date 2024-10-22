@@ -180,7 +180,7 @@ unsafe extern "C" fn atoi(str: *const i8) -> i32 {
     loop {
         let c = str.add(idx).read_volatile() as u8;
 
-        if !(b'0'..=b'9').contains(&c) {
+        if !c.is_ascii_digit() {
             break;
         }
 
