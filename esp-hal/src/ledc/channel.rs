@@ -97,7 +97,7 @@ pub mod config {
 /// Channel interface
 pub trait ChannelIFace<'a, S: TimerSpeed + 'a, O: PeripheralOutput + 'a>
 where
-    Channel<'a, S, O>: ChannelHW<O>,
+    Channel<'a, S, O>: ChannelHW,
 {
     /// Configure channel
     fn configure(&mut self, config: config::Config<'a, S>) -> Result<(), Error>;
@@ -118,7 +118,7 @@ where
 }
 
 /// Channel HW interface
-pub trait ChannelHW<O: PeripheralOutput> {
+pub trait ChannelHW {
     /// Configure Channel HW except for the duty which is set via
     /// [`Self::set_duty_hw`].
     fn configure_hw(&mut self) -> Result<(), Error>;
@@ -167,7 +167,7 @@ impl<'a, S: TimerSpeed, O: PeripheralOutput> Channel<'a, S, O> {
 
 impl<'a, S: TimerSpeed, O: PeripheralOutput> ChannelIFace<'a, S, O> for Channel<'a, S, O>
 where
-    Channel<'a, S, O>: ChannelHW<O>,
+    Channel<'a, S, O>: ChannelHW,
 {
     /// Configure channel
     fn configure(&mut self, config: config::Config<'a, S>) -> Result<(), Error> {
@@ -312,7 +312,7 @@ mod ehal1 {
 
     impl<'a, S: TimerSpeed, O: OutputPin> SetDutyCycle for Channel<'a, S, O>
     where
-        Channel<'a, S, O>: ChannelHW<O>,
+        Channel<'a, S, O>: ChannelHW,
     {
         fn max_duty_cycle(&self) -> u16 {
             let duty_exp;
@@ -535,7 +535,7 @@ impl<'a, O: PeripheralOutput, S: crate::ledc::timer::TimerSpeed> Channel<'a, S, 
     }
 }
 
-impl<'a, O, S> ChannelHW<O> for Channel<'a, S, O>
+impl<'a, O, S> ChannelHW for Channel<'a, S, O>
 where
     O: PeripheralOutput,
     S: crate::ledc::timer::TimerSpeed,
