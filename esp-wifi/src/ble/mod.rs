@@ -102,9 +102,15 @@ impl HciOutCollector {
 static BLE_HCI_READ_DATA: Mutex<RefCell<Vec<u8>>> = Mutex::new(RefCell::new(Vec::new()));
 
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ReceivedPacket {
     pub data: Vec<u8>,
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for ReceivedPacket {
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "ReceivedPacket {}", &self.data[..],)
+    }
 }
 
 #[cfg(feature = "async")]
@@ -121,9 +127,8 @@ pub(crate) fn read_next(data: &mut [u8]) -> usize {
 
         match queue.pop() {
             Some(packet) => {
-                data[..packet.data.len() as usize]
-                    .copy_from_slice(&packet.data[..packet.data.len() as usize]);
-                packet.data.len() as usize
+                data[..packet.data.len()].copy_from_slice(&packet.data[..packet.data.len()]);
+                packet.data.len()
             }
             None => 0,
         }

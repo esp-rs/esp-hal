@@ -314,14 +314,11 @@ pub unsafe extern "C" fn esp_fill_random(dst: *mut u8, len: u32) {
 
     critical_section::with(|cs| {
         let mut rng = RANDOM_GENERATOR.borrow_ref_mut(cs);
-        match rng.as_mut() {
-            Some(rng) => {
-                for chunk in dst.chunks_mut(4) {
-                    let bytes = rng.random().to_le_bytes();
-                    chunk.copy_from_slice(&bytes[..chunk.len()]);
-                }
+        if let Some(rng) = rng.as_mut() {
+            for chunk in dst.chunks_mut(4) {
+                let bytes = rng.random().to_le_bytes();
+                chunk.copy_from_slice(&bytes[..chunk.len()]);
             }
-            None => (),
         }
     })
 }

@@ -62,7 +62,7 @@ pub(crate) fn enable_wifi_power_domain() {
 }
 
 pub(crate) unsafe fn phy_enable() {
-    let count = (&mut *core::ptr::addr_of_mut!(PHY_ACCESS_REF)).fetch_add(1, Ordering::SeqCst);
+    let count = (*core::ptr::addr_of_mut!(PHY_ACCESS_REF)).fetch_add(1, Ordering::SeqCst);
     if count == 0 {
         critical_section::with(|_| {
             phy_enable_clock();
@@ -110,7 +110,7 @@ pub(crate) unsafe fn phy_enable() {
 
 #[allow(unused)]
 pub(crate) unsafe fn phy_disable() {
-    let count = (&mut *core::ptr::addr_of_mut!(PHY_ACCESS_REF)).fetch_sub(1, Ordering::SeqCst);
+    let count = (*core::ptr::addr_of_mut!(PHY_ACCESS_REF)).fetch_sub(1, Ordering::SeqCst);
     if count == 1 {
         critical_section::with(|_| {
             phy_digital_regs_store();
