@@ -3368,6 +3368,7 @@ mod asynch {
         pub async fn disconnect(&mut self) -> Result<(), WifiError> {
             // If not connected, this will do nothing.
             // It will also wait forever for a `StaDisconnected` event that will never come.
+            // Return early instead of hanging.
             if !matches!(self.is_connected(), Ok(true)) {
                 return Ok(());
             }
