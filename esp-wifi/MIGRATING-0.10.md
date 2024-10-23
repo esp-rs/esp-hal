@@ -10,3 +10,9 @@ rustflags = [
 -    "-C", "link-arg=-Trom_functions.x",
 ]
 ```
+
+## ESP-NOW: Use `get_data` to access the received payload
+
+Previously `data` and `len` were public - use the previously already existing `get_data` function.
+
+Accessing `data` or `len` was never encouraged.
