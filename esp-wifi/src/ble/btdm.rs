@@ -191,10 +191,9 @@ unsafe extern "C" fn queue_send(queue: *const (), item: *const (), _block_time_m
         item as u32,
         _block_time_ms
     );
-    critical_section::with(|_| {
-        let queue = queue as *mut RawQueue;
-        (*queue).enqueue(item as *mut _)
-    })
+
+    let queue = queue as *mut RawQueue;
+    (*queue).enqueue(item as *mut _)
 }
 
 #[ram]
@@ -224,19 +223,15 @@ unsafe extern "C" fn queue_recv(queue: *const (), item: *const (), block_time_ms
     let item = item as *mut _;
 
     loop {
-        let res = critical_section::with(|_| {
-            memory_fence();
-
-            critical_section::with(|_cs| {
-                let queue = queue as *mut RawQueue;
-                if (*queue).try_dequeue(item) {
-                    trace!("received from queue");
-                    1
-                } else {
-                    0
-                }
-            })
-        });
+        let res = {
+            let queue = queue as *mut RawQueue;
+            if (*queue).try_dequeue(item) {
+                trace!("received from queue");
+                1
+            } else {
+                0
+            }
+        };
 
         if res == 1 {
             trace!("queue_recv returns");
