@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
 use core::{
     cell::RefCell,
+    mem::size_of_val,
     ptr::{addr_of, addr_of_mut},
 };
 
