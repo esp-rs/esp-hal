@@ -2187,32 +2187,29 @@ where
 {
     let cmd = cmd_iterator.next().ok_or(Error::CommandNrExceeded)?;
 
-    match command {
-        Command::Start => cmd.write(|w| w.opcode().rstart()),
-        Command::Stop => cmd.write(|w| w.opcode().stop()),
-        Command::End => cmd.write(|w| w.opcode().end()),
+    cmd.write(|w| match command {
+        Command::Start => w.opcode().rstart(),
+        Command::Stop => w.opcode().stop(),
+        Command::End => w.opcode().end(),
         Command::Write {
             ack_exp,
             ack_check_en,
             length,
-        } => {
-            cmd.write(|w| unsafe {
-                w.opcode().write();
-                w.ack_exp().bit(ack_exp == Ack::Nack);
-                w.ack_check_en().bit(ack_check_en);
-                w.byte_num().bits(length);
-                w
-            });
-        }
-        Command::Read { ack_value, length } => {
-            cmd.write(|w| unsafe {
-                w.opcode().read();
-                w.ack_value().bit(ack_value == Ack::Nack);
-                w.byte_num().bits(length);
-                w
-            });
-        }
-    }
+        } => unsafe {
+            w.opcode().write();
+            w.ack_exp().bit(ack_exp == Ack::Nack);
+            w.ack_check_en().bit(ack_check_en);
+            w.byte_num().bits(length);
+            w
+        },
+        Command::Read { ack_value, length } => unsafe {
+            w.opcode().read();
+            w.ack_value().bit(ack_value == Ack::Nack);
+            w.byte_num().bits(length);
+            w
+        },
+    });
+
     Ok(())
 }
 
