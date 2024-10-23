@@ -95,7 +95,7 @@ pub mod asynch {
 
     use super::{read_hci, send_hci, BleConnectorError};
     use crate::{
-        ble::ble::have_hci_read_data,
+        ble::have_hci_read_data,
         hal::peripheral::{Peripheral, PeripheralRef},
         EspWifiInitialization,
     };

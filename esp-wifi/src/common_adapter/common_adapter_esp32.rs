@@ -35,12 +35,12 @@ pub(crate) fn enable_wifi_power_domain() {
 
 pub(crate) fn phy_mem_init() {
     unsafe {
-        G_PHY_DIGITAL_REGS_MEM = SOC_PHY_DIG_REGS_MEM.as_ptr() as *mut u32;
+        G_PHY_DIGITAL_REGS_MEM = core::ptr::addr_of_mut!(SOC_PHY_DIG_REGS_MEM).cast();
     }
 }
 
 pub(crate) unsafe fn phy_enable() {
-    let count = PHY_ACCESS_REF.fetch_add(1, Ordering::SeqCst);
+    let count = (&mut *core::ptr::addr_of_mut!(PHY_ACCESS_REF)).fetch_add(1, Ordering::SeqCst);
     if count == 0 {
         critical_section::with(|_| {
             // #if CONFIG_IDF_TARGET_ESP32
@@ -81,7 +81,7 @@ pub(crate) unsafe fn phy_enable() {
 
 #[allow(unused)]
 pub(crate) unsafe fn phy_disable() {
-    let count = PHY_ACCESS_REF.fetch_sub(1, Ordering::SeqCst);
+    let count = (&mut *core::ptr::addr_of_mut!(PHY_ACCESS_REF)).fetch_sub(1, Ordering::SeqCst);
     if count == 1 {
         critical_section::with(|_| {
             phy_digital_regs_store();
@@ -123,8 +123,8 @@ pub(crate) unsafe fn phy_enable_clock() {
 
     let count = PHY_CLOCK_ENABLE_REF.fetch_add(1, Ordering::SeqCst);
     if count == 0 {
-        critical_section::with(|_| {
-            unwrap!(RADIO_CLOCKS.as_mut()).enable(RadioPeripherals::Phy);
+        critical_section::with(|cs| {
+            unwrap!(RADIO_CLOCKS.borrow_ref_mut(cs).as_mut()).enable(RadioPeripherals::Phy)
         });
     }
 }
@@ -136,7 +136,9 @@ pub(crate) unsafe fn phy_disable_clock() {
     let count = PHY_CLOCK_ENABLE_REF.fetch_sub(1, Ordering::SeqCst);
     if count == 1 {
         critical_section::with(|_| {
-            unwrap!(RADIO_CLOCKS.as_mut()).disable(RadioPeripherals::Phy);
+            critical_section::with(|cs| {
+                unwrap!(RADIO_CLOCKS.borrow_ref_mut(cs).as_mut()).disable(RadioPeripherals::Phy)
+            });
         });
     }
 }

@@ -1040,7 +1040,7 @@ pub unsafe extern "C" fn phy_update_country_info(
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_reset_mac() {
     trace!("wifi_reset_mac");
-    unwrap!(RADIO_CLOCKS.as_mut()).reset_mac();
+    critical_section::with(|cs| unwrap!(RADIO_CLOCKS.borrow_ref_mut(cs).as_mut()).reset_mac());
 }
 
 /// **************************************************************************
@@ -1058,7 +1058,9 @@ pub unsafe extern "C" fn wifi_reset_mac() {
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_clock_enable() {
     trace!("wifi_clock_enable");
-    unwrap!(RADIO_CLOCKS.as_mut()).enable(RadioPeripherals::Wifi);
+    critical_section::with(|cs| {
+        unwrap!(RADIO_CLOCKS.borrow_ref_mut(cs).as_mut()).enable(RadioPeripherals::Wifi)
+    });
 }
 
 /// **************************************************************************
@@ -1076,7 +1078,9 @@ pub unsafe extern "C" fn wifi_clock_enable() {
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_clock_disable() {
     trace!("wifi_clock_disable");
-    unwrap!(RADIO_CLOCKS.as_mut()).disable(RadioPeripherals::Wifi);
+    critical_section::with(|cs| {
+        unwrap!(RADIO_CLOCKS.borrow_ref_mut(cs).as_mut()).disable(RadioPeripherals::Wifi)
+    });
 }
 
 /// **************************************************************************
@@ -1394,18 +1398,8 @@ pub unsafe extern "C" fn nvs_erase_key(
 /// *************************************************************************
 pub unsafe extern "C" fn get_random(buf: *mut u8, len: usize) -> crate::binary::c_types::c_int {
     trace!("get_random");
-    if let Some(ref mut rng) = crate::common_adapter::RANDOM_GENERATOR {
-        let buffer = unsafe { core::slice::from_raw_parts_mut(buf, len) };
-
-        for chunk in buffer.chunks_mut(4) {
-            let bytes = rng.random().to_le_bytes();
-            chunk.copy_from_slice(&bytes[..chunk.len()]);
-        }
-
-        0
-    } else {
-        -1
-    }
+    crate::common_adapter::esp_fill_random(buf, len as u32);
+    0
 }
 
 /// **************************************************************************

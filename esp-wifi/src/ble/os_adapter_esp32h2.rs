@@ -66,9 +66,9 @@ pub(crate) static BLE_CONFIG: esp_bt_controller_config_t = esp_bt_controller_con
 };
 
 pub(crate) fn bt_periph_module_enable() {
-    unsafe {
-        unwrap!(RADIO_CLOCKS.as_mut()).enable(RadioPeripherals::Bt);
-    }
+    critical_section::with(|cs| {
+        unwrap!(RADIO_CLOCKS.borrow_ref_mut(cs).as_mut()).enable(RadioPeripherals::Bt)
+    });
 }
 
 pub(crate) fn disable_sleep_mode() {
@@ -101,16 +101,14 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
 }
 
 pub(super) fn ble_rtc_clk_init() {
-    unsafe {
-        unwrap!(RADIO_CLOCKS.as_mut()).ble_rtc_clk_init();
-    }
+    critical_section::with(|cs| {
+        unwrap!(RADIO_CLOCKS.borrow_ref_mut(cs).as_mut()).ble_rtc_clk_init()
+    });
 }
 
 pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
     trace!("esp_reset_rpa_moudle");
-    unsafe {
-        unwrap!(RADIO_CLOCKS.as_mut()).reset_rpa();
-    }
+    critical_section::with(|cs| unwrap!(RADIO_CLOCKS.borrow_ref_mut(cs).as_mut()).reset_rpa());
 }
 
 #[allow(improper_ctypes_definitions)]
