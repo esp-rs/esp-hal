@@ -235,7 +235,7 @@ pub struct ReceiveInfo {
 #[derive(Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ReceivedData {
-    pub data: Vec<u8>,
+    data: Vec<u8>,
     pub info: ReceiveInfo,
 }
 
