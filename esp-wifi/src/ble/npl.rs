@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
 use core::{
     cell::RefCell,
+    mem::size_of_val,
     ptr::{addr_of, addr_of_mut},
 };
 
@@ -985,9 +986,8 @@ unsafe extern "C" fn ble_npl_callout_init(
 }
 
 unsafe extern "C" fn callout_timer_callback_wrapper(arg: *mut c_void) {
-    info!("callout_timer_callback_wrapper {:?}", arg);
+    trace!("callout_timer_callback_wrapper {:?}", arg);
     let co = (*(arg as *mut ble_npl_callout)).dummy as *mut Callout;
-    info!("co={:p}", co);
 
     if !(*co).eventq.is_null() {
         ble_npl_eventq_put(addr_of!((*co).eventq).cast(), addr_of!((*co).events));
@@ -1357,7 +1357,7 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
 }
 
 pub fn send_hci(data: &[u8]) {
-    let hci_out = unsafe { (*(addr_of_mut!(HCI_OUT_COLLECTOR))).assume_init_mut() };
+    let hci_out = unsafe { (*addr_of_mut!(HCI_OUT_COLLECTOR)).assume_init_mut() };
     hci_out.push(data);
 
     if hci_out.is_ready() {

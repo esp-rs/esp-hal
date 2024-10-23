@@ -510,7 +510,7 @@ pub(crate) fn ble_deinit() {
 }
 
 pub fn send_hci(data: &[u8]) {
-    let hci_out = unsafe { (*(addr_of_mut!(HCI_OUT_COLLECTOR))).assume_init_mut() };
+    let hci_out = unsafe { (*addr_of_mut!(HCI_OUT_COLLECTOR)).assume_init_mut() };
     hci_out.push(data);
 
     if hci_out.is_ready() {

@@ -23,14 +23,14 @@ static mut SCHEDULED_TASK_TO_DELETE: *mut Context = core::ptr::null_mut();
 pub(crate) fn allocate_main_task() -> *mut Context {
     critical_section::with(|cs| unsafe {
         let mut ctx_now = CTX_NOW.borrow_ref_mut(cs);
-        if !(*ctx_now).0.is_null() {
+        if !ctx_now.0.is_null() {
             panic!("Tried to allocate main task multiple times");
         }
 
         let ptr = malloc(size_of::<Context>() as u32) as *mut Context;
         core::ptr::write(ptr, Context::new());
         (*ptr).next = ptr;
-        (*ctx_now).0 = ptr;
+        ctx_now.0 = ptr;
         ptr
     })
 }
@@ -38,14 +38,14 @@ pub(crate) fn allocate_main_task() -> *mut Context {
 fn allocate_task() -> *mut Context {
     critical_section::with(|cs| unsafe {
         let mut ctx_now = CTX_NOW.borrow_ref_mut(cs);
-        if (*ctx_now).0.is_null() {
+        if ctx_now.0.is_null() {
             panic!("Called `allocate_task` before allocating main task");
         }
 
         let ptr = malloc(size_of::<Context>() as u32) as *mut Context;
         core::ptr::write(ptr, Context::new());
-        (*ptr).next = (*(*ctx_now).0).next;
-        (*(*ctx_now).0).next = ptr;
+        (*ptr).next = (*ctx_now.0).next;
+        (*ctx_now.0).next = ptr;
         ptr
     })
 }
@@ -53,7 +53,7 @@ fn allocate_task() -> *mut Context {
 fn next_task() {
     critical_section::with(|cs| unsafe {
         let mut ctx_now = CTX_NOW.borrow_ref_mut(cs);
-        (*ctx_now).0 = (*(*ctx_now).0).next;
+        ctx_now.0 = (*ctx_now.0).next;
     });
 }
 
