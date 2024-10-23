@@ -201,7 +201,7 @@ jobs:
               sudo uhubctl -a off -l $hub
             done
 
-            sleep 0.5
+            sleep 5
 
             # Enable all used hubs
             for hub in ${{ matrix.target.hubs }}; do
