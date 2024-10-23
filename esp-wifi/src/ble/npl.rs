@@ -947,7 +947,7 @@ unsafe extern "C" fn ble_npl_eventq_deinit(queue: *const ble_npl_eventq) {
         panic!("Trying to deinitialize an uninitialized queue");
     } else {
         let raw_queue = (*queue).dummy as *mut RawQueue;
-        (*raw_queue).free_storage();
+        (*raw_queue).release_storage();
         crate::compat::malloc::free(raw_queue.cast());
         (*queue).dummy = 0;
     }
