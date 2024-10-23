@@ -3366,6 +3366,12 @@ mod asynch {
         /// Async version of [`crate::wifi::WifiController`]'s `Disconnect`
         /// method
         pub async fn disconnect(&mut self) -> Result<(), WifiError> {
+            // If not connected, this will do nothing.
+            // It will also wait forever for a `StaDisconnected` event that will never come.
+            if !matches!(self.is_connected(), Ok(true)) {
+                return Ok(());
+            }
+
             Self::clear_events(WifiEvent::StaDisconnected);
             crate::wifi::WifiController::disconnect_impl(self)?;
             WifiEventFuture::new(WifiEvent::StaDisconnected).await;
