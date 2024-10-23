@@ -972,14 +972,14 @@ unsafe extern "C" fn ble_npl_callout_init(
         let new_callout =
             crate::compat::malloc::calloc(1, core::mem::size_of::<Callout>()) as *mut Callout;
         ble_npl_event_init(addr_of_mut!((*new_callout).events), func, args);
+        (*callout).dummy = new_callout as i32;
 
         crate::compat::timer_compat::compat_timer_setfn(
             addr_of_mut!((*new_callout).timer_handle),
             callout_timer_callback_wrapper,
-            new_callout as *mut c_void,
+            callout as *mut c_void,
         );
 
-        (*callout).dummy = new_callout as i32;
     }
 
     0
@@ -988,9 +988,10 @@ unsafe extern "C" fn ble_npl_callout_init(
 unsafe extern "C" fn callout_timer_callback_wrapper(arg: *mut c_void) {
     info!("callout_timer_callback_wrapper {:?}", arg);
     let co = (*(arg as *mut ble_npl_callout)).dummy as *mut Callout;
+    info!("co={:p}", co);
 
-    if (*co).eventq.is_null() {
-        ble_npl_eventq_put(addr_of!((*co).events).cast(), addr_of!((*co).events));
+    if !(*co).eventq.is_null() {
+        ble_npl_eventq_put(addr_of!((*co).eventq).cast(), addr_of!((*co).events));
     } else {
         ble_npl_event_run(addr_of!((*co).events));
     }
