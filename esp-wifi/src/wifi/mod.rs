@@ -1603,15 +1603,21 @@ unsafe extern "C" fn recv_cb_sta(
     // which will try to lock an internal mutex. If the mutex is already taken,
     // the function will try to trigger a context switch, which will fail if we
     // are in a critical section.
-    match critical_section::with(|cs| DATA_QUEUE_RX_STA.borrow_ref_mut(cs).push(packet)) {
-        () => {
-            #[cfg(feature = "embassy-net")]
-            embassy::STA_RECEIVE_WAKER.wake();
-            include::ESP_OK as esp_err_t
-        } /* Err(_) => {
-           *     debug!("RX QUEUE FULL");
-           *     include::ESP_ERR_NO_MEM as esp_err_t
-           * } */
+    if critical_section::with(|cs| {
+        let mut queue = DATA_QUEUE_RX_STA.borrow_ref_mut(cs);
+        if queue.len() < RX_QUEUE_SIZE {
+            queue.push(packet);
+            true
+        } else {
+            false
+        }
+    }) {
+        #[cfg(feature = "embassy-net")]
+        embassy::STA_RECEIVE_WAKER.wake();
+        include::ESP_OK as esp_err_t
+    } else {
+        debug!("RX QUEUE FULL");
+        include::ESP_ERR_NO_MEM as esp_err_t
     }
 }
 
