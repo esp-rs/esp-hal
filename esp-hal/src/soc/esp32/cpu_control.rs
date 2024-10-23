@@ -23,8 +23,10 @@
 //!     cpu1_task(&delay, &counter);
 //! };
 //! let _guard = cpu_control
-//!    .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) },
-//! cpu1_fnctn)     .unwrap();
+//!     .start_app_core(
+//!         unsafe { &mut *addr_of_mut!(APP_CORE_STACK) },
+//!         cpu1_fnctn
+//!     ).unwrap();
 //!
 //! loop {
 //!     delay.delay(1.secs());
@@ -333,9 +335,10 @@ impl<'d> CpuControl<'d> {
         }
     }
 
-    /// Start the APP (second) core
+    /// Start the APP (second) core.
     ///
-    /// The second core will start running the closure `entry`.
+    /// The second core will start running the closure `entry`. Note that if the
+    /// closure exits, the core will be parked.
     ///
     /// Dropping the returned guard will park the core.
     pub fn start_app_core<'a, const SIZE: usize, F>(
