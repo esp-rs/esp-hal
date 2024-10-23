@@ -103,14 +103,12 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
 }
 
 pub(super) fn ble_rtc_clk_init() {
-    unsafe {
-        unwrap!(RADIO_CLOCKS.as_mut()).ble_rtc_clk_init();
-    }
+    critical_section::with(|cs| {
+        unwrap!(RADIO_CLOCKS.borrow_ref_mut(cs).as_mut()).ble_rtc_clk_init()
+    });
 }
 
 pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
     trace!("esp_reset_rpa_moudle");
-    unsafe {
-        unwrap!(RADIO_CLOCKS.as_mut()).reset_rpa();
-    }
+    critical_section::with(|cs| unwrap!(RADIO_CLOCKS.borrow_ref_mut(cs).as_mut()).reset_rpa());
 }

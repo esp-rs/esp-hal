@@ -1,5 +1,8 @@
 use alloc::vec::Vec;
-use core::{cell::RefCell, ptr::addr_of};
+use core::{
+    cell::RefCell,
+    ptr::{addr_of, addr_of_mut},
+};
 
 use critical_section::Mutex;
 use portable_atomic::{AtomicBool, Ordering};
@@ -418,7 +421,7 @@ unsafe extern "C" fn custom_queue_create(
 
 pub(crate) fn ble_init() {
     unsafe {
-        *(HCI_OUT_COLLECTOR.as_mut_ptr()) = HciOutCollector::new();
+        (*addr_of_mut!(HCI_OUT_COLLECTOR)).write(HciOutCollector::new());
         // turn on logging
         #[cfg(feature = "sys-logs")]
         {
@@ -506,8 +509,8 @@ pub(crate) fn ble_deinit() {
     }
 }
 
-pub(crate) fn send_hci(data: &[u8]) {
-    let hci_out = unsafe { &mut *HCI_OUT_COLLECTOR.as_mut_ptr() };
+pub fn send_hci(data: &[u8]) {
+    let hci_out = unsafe { (*(addr_of_mut!(HCI_OUT_COLLECTOR))).assume_init_mut() };
     hci_out.push(data);
 
     if hci_out.is_ready() {

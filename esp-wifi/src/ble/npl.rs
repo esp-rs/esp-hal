@@ -979,7 +979,6 @@ unsafe extern "C" fn ble_npl_callout_init(
             callout_timer_callback_wrapper,
             callout as *mut c_void,
         );
-
     }
 
     0
@@ -1034,7 +1033,7 @@ pub struct BleNplCountInfoT {
 
 pub(crate) fn ble_init() {
     unsafe {
-        *(HCI_OUT_COLLECTOR.as_mut_ptr()) = HciOutCollector::new();
+        (*addr_of_mut!(HCI_OUT_COLLECTOR)).write(HciOutCollector::new());
 
         // turn on logging
         #[cfg(all(feature = "sys-logs", esp32c2))]
@@ -1358,7 +1357,7 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
 }
 
 pub fn send_hci(data: &[u8]) {
-    let hci_out = unsafe { &mut *HCI_OUT_COLLECTOR.as_mut_ptr() };
+    let hci_out = unsafe { (*(addr_of_mut!(HCI_OUT_COLLECTOR))).assume_init_mut() };
     hci_out.push(data);
 
     if hci_out.is_ready() {

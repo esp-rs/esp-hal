@@ -131,8 +131,9 @@ impl TimerQueue {
     }
 }
 
-pub(crate) static mut TIMERS: Mutex<RefCell<TimerQueue>> =
-    Mutex::new(RefCell::new(TimerQueue::new()));
+unsafe impl Send for TimerQueue {}
+
+pub(crate) static TIMERS: Mutex<RefCell<TimerQueue>> = Mutex::new(RefCell::new(TimerQueue::new()));
 
 pub(crate) fn compat_timer_arm(ets_timer: *mut ets_timer, tmout: u32, repeat: bool) {
     compat_timer_arm_us(ets_timer, tmout * 1000, repeat);
@@ -150,7 +151,7 @@ pub(crate) fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bo
         repeat
     );
 
-    critical_section::with(|cs| unsafe {
+    critical_section::with(|cs| {
         if let Some(timer) = TIMERS.borrow_ref_mut(cs).find(ets_timer) {
             timer.started = systick;
             timer.timeout = ticks;
@@ -163,7 +164,7 @@ pub(crate) fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bo
 }
 
 pub fn compat_timer_disarm(ets_timer: *mut ets_timer) {
-    critical_section::with(|cs| unsafe {
+    critical_section::with(|cs| {
         if let Some(timer) = TIMERS.borrow_ref_mut(cs).find(ets_timer) {
             trace!("timer_disarm {:x}", timer.id());
             timer.active = false;
@@ -174,14 +175,16 @@ pub fn compat_timer_disarm(ets_timer: *mut ets_timer) {
 }
 
 pub fn compat_timer_done(ets_timer: *mut ets_timer) {
-    critical_section::with(|cs| unsafe {
+    critical_section::with(|cs| {
         let mut timers = TIMERS.borrow_ref_mut(cs);
         if let Some(timer) = timers.find(ets_timer) {
             trace!("timer_done {:x}", timer.id());
             timer.active = false;
 
-            (*ets_timer).priv_ = core::ptr::null_mut();
-            (*ets_timer).expire = 0;
+            unsafe {
+                (*ets_timer).priv_ = core::ptr::null_mut();
+                (*ets_timer).expire = 0;
+            }
 
             timers.remove(ets_timer);
         } else {
