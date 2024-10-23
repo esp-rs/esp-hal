@@ -8,7 +8,6 @@
 use esp_hal::{
     gpio::Io,
     i2c::{I2c, Operation},
-    peripherals::I2C0,
     prelude::*,
     Async,
     Blocking,
@@ -16,11 +15,11 @@ use esp_hal::{
 use hil_test as _;
 
 struct Context {
-    i2c: I2c<'static, I2C0, Blocking>,
+    i2c: I2c<'static, Blocking>,
 }
 
 fn _async_driver_is_compatible_with_blocking_ehal() {
-    fn _with_driver(driver: I2c<'static, I2C0, Async>) {
+    fn _with_driver(driver: I2c<'static, Async>) {
         _with_ehal(driver);
     }
 

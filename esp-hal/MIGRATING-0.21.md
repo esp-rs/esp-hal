@@ -30,6 +30,7 @@ peripherals:
 
 - SPI (both master and slave)
 - I2S
+- I2C
 
 ```diff
 -Spi<'static, SPI2, FullDuplexMode>
@@ -48,4 +49,13 @@ the peripheral instance has been moved to the last generic parameter position.
 
 ```rust
 let spi: Spi<'static, FullDuplexMode, SPI2> = Spi::new_typed(peripherals.SPI2, 1.MHz(), SpiMode::Mode0);
+```
+
+## I2C constructor changes
+
+The `with_timeout` constructors have been removed in favour of `set_timeout` or `with_timeout`.
+
+```diff
+-let i2c = I2c::new_with_timeout(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, 100.kHz(), timeout);
++let i2c = I2c::new(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, 100.kHz()).with_timeout(timeout);
 ```
