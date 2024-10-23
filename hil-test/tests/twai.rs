@@ -8,7 +8,6 @@
 use embedded_hal_02::can::Frame;
 use esp_hal::{
     gpio::Io,
-    peripherals::TWAI0,
     prelude::*,
     twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId, TwaiMode},
     Blocking,
@@ -17,7 +16,7 @@ use hil_test as _;
 use nb::block;
 
 struct Context {
-    twai: twai::Twai<'static, Blocking, TWAI0>,
+    twai: twai::Twai<'static, Blocking>,
 }
 
 #[cfg(test)]

@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AnyPin` now implements `From<GpioPin<N>>`. (#2326)
 - Added `AnySpi` and `AnySpiDmaChannel`. (#2334)
 - Added `AnyI2s` and `AnyI2sDmaChannel`. (#2367)
+- Added `AnyTwai`. (#2359)
 - `Pins::steal()` to unsafely obtain GPIO. (#2335)
 - `I2c::with_timeout` (#2361)
 
@@ -23,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Peripheral type erasure for SPI (#2334)
 - Peripheral type erasure for I2S (#2367)
 - Peripheral type erasure for I2C (#2361)
+- Peripheral type erasure for TWAI (#2359)
 
 ### Fixed
 
