@@ -18,7 +18,6 @@ use crate::{
     },
     compat::common::{str_from_c, RawQueue},
     hal::macros::ram,
-    memory_fence::memory_fence,
     timer::yield_task,
 };
 
