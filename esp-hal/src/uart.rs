@@ -661,17 +661,20 @@ where
 
     /// Read a byte from the UART
     pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
-        // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
-        let offset = if cfg!(esp32s2) { 0x20C00000 } else { 0 };
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s2)] {
+                // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
+                let fifo = unsafe {
+                    &*((self.uart.register_block().fifo().as_ptr() as *mut u8).add(0x20C00000)
+                        as *mut crate::peripherals::uart0::FIFO)
+                };
+            } else {
+                let fifo = self.uart.register_block().fifo();
+            }
+        }
 
         if self.uart.get_rx_fifo_count() > 0 {
-            let value = unsafe {
-                let fifo = (self.uart.register_block().fifo().as_ptr() as *mut u8).offset(offset)
-                    as *mut crate::peripherals::uart0::FIFO;
-                (*fifo).read().rxfifo_rd_byte().bits()
-            };
-
-            Ok(value)
+            Ok(fifo.read().rxfifo_rd_byte().bits())
         } else {
             Err(nb::Error::WouldBlock)
         }
@@ -680,17 +683,21 @@ where
     /// Read all available bytes from the RX FIFO into the provided buffer and
     /// returns the number of read bytes. Never blocks
     pub fn drain_fifo(&mut self, buf: &mut [u8]) -> usize {
-        // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
-        let offset = if cfg!(esp32s2) { 0x20C00000 } else { 0 };
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s2)] {
+                // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
+                let fifo = unsafe {
+                    &*((self.uart.register_block().fifo().as_ptr() as *mut u8).add(0x20C00000)
+                        as *mut crate::peripherals::uart0::FIFO)
+                };
+            } else {
+                let fifo = self.uart.register_block().fifo();
+            }
+        }
 
         let mut count = 0;
         while self.uart.get_rx_fifo_count() > 0 && count < buf.len() {
-            let value = unsafe {
-                let fifo = (self.uart.register_block().fifo().as_ptr() as *mut u8).offset(offset)
-                    as *mut crate::peripherals::uart0::FIFO;
-                (*fifo).read().rxfifo_rd_byte().bits()
-            };
-            buf[count] = value;
+            buf[count] = fifo.read().rxfifo_rd_byte().bits();
             count += 1;
         }
         count
@@ -1423,14 +1430,6 @@ pub trait Instance: Peripheral<P = Self> + PeripheralMarker + 'static {
     /// instance.
     #[allow(clippy::useless_conversion)]
     fn get_rx_fifo_count(&self) -> u16 {
-        let fifo_cnt: u16 = self
-            .register_block()
-            .status()
-            .read()
-            .rxfifo_cnt()
-            .bits()
-            .into();
-
         // Calculate the real count based on the FIFO read and write offset address:
         // https://www.espressif.com/sites/default/files/documentation/esp32_errata_en.pdf
         // section 3.17
@@ -1461,7 +1460,12 @@ pub trait Instance: Peripheral<P = Self> + PeripheralMarker + 'static {
         }
 
         #[cfg(not(esp32))]
-        fifo_cnt
+        self.register_block()
+            .status()
+            .read()
+            .rxfifo_cnt()
+            .bits()
+            .into()
     }
 
     /// Checks if the TX line is idle for this UART instance.
