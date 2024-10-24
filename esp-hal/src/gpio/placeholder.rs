@@ -49,12 +49,9 @@ impl Level {
         unsafe { GPIO::steal() }
             .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
             .modify(|_, w| unsafe {
-                w.sel()
-                    .set_bit()
-                    .in_inv_sel()
-                    .bit(false)
-                    .in_sel()
-                    .bits(value)
+                w.sel().set_bit();
+                w.in_inv_sel().bit(false);
+                w.in_sel().bits(value)
             });
     }
 
