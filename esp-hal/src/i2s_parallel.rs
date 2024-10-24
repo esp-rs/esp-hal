@@ -185,62 +185,62 @@ where
         16
     }
 
-    fn configure<I: Instance>(&mut self, _instance: &PeripheralRef<'_, I>) {
+    fn configure<I: Instance>(&mut self, instance: &PeripheralRef<'_, I>) {
         let bits: u8 = self.bits();
         self.pin_0.set_to_push_pull_output(crate::private::Internal);
         self.pin_0
-            .connect_peripheral_to_output(I::data_out_signal(0, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(0, bits), crate::private::Internal);
         self.pin_1.set_to_push_pull_output(crate::private::Internal);
         self.pin_1
-            .connect_peripheral_to_output(I::data_out_signal(1, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(1, bits), crate::private::Internal);
         self.pin_2.set_to_push_pull_output(crate::private::Internal);
         self.pin_2
-            .connect_peripheral_to_output(I::data_out_signal(2, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(2, bits), crate::private::Internal);
         self.pin_3.set_to_push_pull_output(crate::private::Internal);
         self.pin_3
-            .connect_peripheral_to_output(I::data_out_signal(3, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(3, bits), crate::private::Internal);
         self.pin_4.set_to_push_pull_output(crate::private::Internal);
         self.pin_4
-            .connect_peripheral_to_output(I::data_out_signal(4, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(4, bits), crate::private::Internal);
         self.pin_5.set_to_push_pull_output(crate::private::Internal);
         self.pin_5
-            .connect_peripheral_to_output(I::data_out_signal(5, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(5, bits), crate::private::Internal);
         self.pin_6.set_to_push_pull_output(crate::private::Internal);
         self.pin_6
-            .connect_peripheral_to_output(I::data_out_signal(6, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(6, bits), crate::private::Internal);
         self.pin_7.set_to_push_pull_output(crate::private::Internal);
         self.pin_7
-            .connect_peripheral_to_output(I::data_out_signal(7, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(7, bits), crate::private::Internal);
         self.pin_8.set_to_push_pull_output(crate::private::Internal);
         self.pin_8
-            .connect_peripheral_to_output(I::data_out_signal(8, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(8, bits), crate::private::Internal);
         self.pin_9.set_to_push_pull_output(crate::private::Internal);
         self.pin_9
-            .connect_peripheral_to_output(I::data_out_signal(9, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(9, bits), crate::private::Internal);
         self.pin_10
             .set_to_push_pull_output(crate::private::Internal);
         self.pin_10
-            .connect_peripheral_to_output(I::data_out_signal(10, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(10, bits), crate::private::Internal);
         self.pin_11
             .set_to_push_pull_output(crate::private::Internal);
         self.pin_11
-            .connect_peripheral_to_output(I::data_out_signal(11, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(11, bits), crate::private::Internal);
         self.pin_12
             .set_to_push_pull_output(crate::private::Internal);
         self.pin_12
-            .connect_peripheral_to_output(I::data_out_signal(12, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(12, bits), crate::private::Internal);
         self.pin_13
             .set_to_push_pull_output(crate::private::Internal);
         self.pin_13
-            .connect_peripheral_to_output(I::data_out_signal(13, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(13, bits), crate::private::Internal);
         self.pin_14
             .set_to_push_pull_output(crate::private::Internal);
         self.pin_14
-            .connect_peripheral_to_output(I::data_out_signal(14, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(14, bits), crate::private::Internal);
         self.pin_15
             .set_to_push_pull_output(crate::private::Internal);
         self.pin_15
-            .connect_peripheral_to_output(I::data_out_signal(15, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(15, bits), crate::private::Internal);
     }
 }
 
@@ -317,46 +317,46 @@ where
         8
     }
 
-    fn configure<I: Instance>(&mut self, _instance: &PeripheralRef<'_, I>) {
+    fn configure<I: Instance>(&mut self, instance: &PeripheralRef<'_, I>) {
         let bits: u8 = self.bits();
         self.pin_0.set_to_push_pull_output(crate::private::Internal);
         self.pin_0
-            .connect_peripheral_to_output(I::data_out_signal(0, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(0, bits), crate::private::Internal);
         self.pin_1.set_to_push_pull_output(crate::private::Internal);
         self.pin_1
-            .connect_peripheral_to_output(I::data_out_signal(1, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(1, bits), crate::private::Internal);
         self.pin_2.set_to_push_pull_output(crate::private::Internal);
         self.pin_2
-            .connect_peripheral_to_output(I::data_out_signal(2, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(2, bits), crate::private::Internal);
         self.pin_3.set_to_push_pull_output(crate::private::Internal);
         self.pin_3
-            .connect_peripheral_to_output(I::data_out_signal(3, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(3, bits), crate::private::Internal);
         self.pin_4.set_to_push_pull_output(crate::private::Internal);
         self.pin_4
-            .connect_peripheral_to_output(I::data_out_signal(4, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(4, bits), crate::private::Internal);
         self.pin_5.set_to_push_pull_output(crate::private::Internal);
         self.pin_5
-            .connect_peripheral_to_output(I::data_out_signal(5, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(5, bits), crate::private::Internal);
         self.pin_6.set_to_push_pull_output(crate::private::Internal);
         self.pin_6
-            .connect_peripheral_to_output(I::data_out_signal(6, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(6, bits), crate::private::Internal);
         self.pin_7.set_to_push_pull_output(crate::private::Internal);
         self.pin_7
-            .connect_peripheral_to_output(I::data_out_signal(7, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(7, bits), crate::private::Internal);
     }
 }
 
 /// I2S Parallel Interface
 pub struct I2sParallel<'d, I: Instance, DM: Mode> {
+    instance: PeripheralRef<'d, I>,
     tx_channel: ChannelTx<'d, <I as DmaEligible>::Dma>,
-    instance: PhantomData<I>,
     mode: PhantomData<DM>,
 }
 
 impl<'d, I: Instance, DM: Mode> I2sParallel<'d, I, DM> {
     /// Create a new I2S Parallel Interface
     pub fn new<P, CH, CLK>(
-        i2s: impl Peripheral<P = I>,
+        i2s: impl Peripheral<P = I> + 'd,
         channel: Channel<'d, CH, DM>,
         frequency: impl Into<fugit::HertzU32>,
         mut pins: P,
@@ -371,18 +371,18 @@ impl<'d, I: Instance, DM: Mode> I2sParallel<'d, I, DM> {
         channel.runtime_ensure_compatible(&i2s);
         let channel = channel.degrade();
 
-        PeripheralClockControl::reset(I::get_peripheral());
-        PeripheralClockControl::enable(I::get_peripheral());
+        PeripheralClockControl::reset(i2s.get_peripheral());
+        PeripheralClockControl::enable(i2s.get_peripheral());
         // configure the I2S peripheral for parallel mode
-        I::setup(frequency, pins.bits());
+        i2s.setup(frequency, pins.bits());
         // setup the clock pin
         clock_pin.set_to_push_pull_output(crate::private::Internal);
-        clock_pin.connect_peripheral_to_output(I::ws_signal(), crate::private::Internal);
+        clock_pin.connect_peripheral_to_output(i2s.ws_signal(), crate::private::Internal);
 
         pins.configure(&i2s);
         Self {
+            instance: i2s,
             tx_channel: channel.tx,
-            instance: PhantomData,
             mode: PhantomData,
         }
     }
@@ -392,18 +392,18 @@ impl<'d, I: Instance, DM: Mode> I2sParallel<'d, I, DM> {
         mut self,
         mut data: BUF,
     ) -> Result<I2sParallelTransfer<'d, I, BUF, DM>, (DmaError, Self, BUF)> {
-        I::tx_reset();
-        I::tx_fifo_reset();
+        self.instance.tx_reset();
+        self.instance.tx_fifo_reset();
         let result = unsafe {
             self.tx_channel
-                .prepare_transfer(I::get_dma_peripheral(), &mut data)
+                .prepare_transfer(self.instance.get_dma_peripheral(), &mut data)
         }
         .and_then(|_| self.tx_channel.start_transfer());
         if let Err(err) = result {
             return Err((err, self, data));
         }
         crate::rom::ets_delay_us(1);
-        I::tx_start();
+        self.instance.tx_start();
         Ok(I2sParallelTransfer {
             i2s: ManuallyDrop::new(self),
             buf_view: ManuallyDrop::new(data.into_view()),
@@ -431,19 +431,19 @@ where
 {
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
-        I::is_tx_done()
+        self.i2s.instance.is_tx_done()
     }
 
     /// Wait for the transfer to finish
     pub fn wait(mut self) -> (I2sParallel<'d, I, DM>, BUF) {
-        I::tx_wait_done();
+        self.i2s.instance.tx_wait_done();
         let i2s = unsafe { ManuallyDrop::take(&mut self.i2s) };
         let view = unsafe { ManuallyDrop::take(&mut self.buf_view) };
         (i2s, BUF::from_view(view))
     }
 
     fn stop_peripherals(&mut self) {
-        I::tx_stop();
+        self.i2s.instance.tx_stop();
         self.i2s.tx_channel.stop_transfer();
     }
 }
@@ -592,66 +592,66 @@ mod private {
 
 #[allow(missing_docs)]
 pub trait RegBlock: PeripheralMarker + DmaEligible {
-    fn register_block() -> &'static RegisterBlock;
+    fn register_block(&self) -> &'static RegisterBlock;
 }
 
 #[allow(missing_docs)]
 pub trait Signals {
-    fn get_peripheral() -> crate::system::Peripheral;
-    fn get_dma_peripheral() -> crate::dma::DmaPeripheral;
-    fn ws_signal() -> OutputSignal;
-    fn data_out_signal(i: usize, bits: u8) -> OutputSignal;
+    fn get_peripheral(&self) -> crate::system::Peripheral;
+    fn get_dma_peripheral(&self) -> crate::dma::DmaPeripheral;
+    fn ws_signal(&self) -> OutputSignal;
+    fn data_out_signal(&self, i: usize, bits: u8) -> OutputSignal;
 }
 
 #[allow(missing_docs)]
 pub trait Instance: Signals + RegBlock {
-    fn rx_reset() {
-        let r = Self::register_block();
+    fn rx_reset(&self) {
+        let r = self.register_block();
         r.conf().modify(|_, w| w.rx_reset().set_bit());
         r.conf().modify(|_, w| w.rx_reset().clear_bit());
     }
 
-    fn rx_dma_reset() {
-        let r = Self::register_block();
+    fn rx_dma_reset(&self) {
+        let r = self.register_block();
         r.lc_conf().modify(|_, w| w.in_rst().set_bit());
         r.lc_conf().modify(|_, w| w.in_rst().clear_bit());
     }
 
-    fn rx_fifo_reset() {
-        let r = Self::register_block();
+    fn rx_fifo_reset(&self) {
+        let r = self.register_block();
         r.conf().modify(|_, w| w.rx_fifo_reset().set_bit());
         r.conf().modify(|_, w| w.rx_fifo_reset().clear_bit());
     }
 
-    fn tx_reset() {
-        let r = Self::register_block();
+    fn tx_reset(&self) {
+        let r = self.register_block();
         r.conf().modify(|_, w| w.tx_reset().set_bit());
         xtensa_lx::timer::delay(20);
         r.conf().modify(|_, w| w.tx_reset().clear_bit());
     }
 
-    fn tx_dma_reset() {
-        let r = Self::register_block();
+    fn tx_dma_reset(&self) {
+        let r = self.register_block();
         r.lc_conf().modify(|_, w| w.out_rst().set_bit());
         r.lc_conf().modify(|_, w| w.out_rst().clear_bit());
     }
 
-    fn tx_fifo_reset() {
-        let r = Self::register_block();
+    fn tx_fifo_reset(&self) {
+        let r = self.register_block();
         r.conf().modify(|_, w| w.tx_fifo_reset().set_bit());
         r.conf().modify(|_, w| w.tx_fifo_reset().clear_bit());
     }
 
-    fn tx_clear_interrupts() {
-        let r = Self::register_block();
+    fn tx_clear_interrupts(&self) {
+        let r = self.register_block();
         r.int_clr().write(|w| {
             w.out_done().clear_bit_by_one();
             w.out_total_eof().clear_bit_by_one()
         });
     }
 
-    fn tx_start() {
-        let r = Self::register_block();
+    fn tx_start(&self) {
+        let r = self.register_block();
         r.conf().modify(|_, w| w.tx_start().set_bit());
 
         while r.state().read().tx_idle().bit_is_set() {
@@ -659,17 +659,17 @@ pub trait Instance: Signals + RegBlock {
         }
     }
 
-    fn tx_stop() {
-        let r = Self::register_block();
+    fn tx_stop(&self) {
+        let r = self.register_block();
         r.conf().modify(|_, w| w.tx_start().clear_bit());
     }
 
-    fn is_tx_done() -> bool {
-        Self::register_block().state().read().tx_idle().bit_is_set()
+    fn is_tx_done(&self) -> bool {
+        self.register_block().state().read().tx_idle().bit_is_set()
     }
 
-    fn tx_wait_done() {
-        let r = Self::register_block();
+    fn tx_wait_done(&self) {
+        let r = self.register_block();
         while r.state().read().tx_idle().bit_is_clear() {
             // wait
         }
@@ -681,8 +681,8 @@ pub trait Instance: Signals + RegBlock {
         });
     }
 
-    fn set_clock(clock_settings: I2sClockDividers) {
-        let r = Self::register_block();
+    fn set_clock(&self, clock_settings: I2sClockDividers) {
+        let r = self.register_block();
 
         r.clkm_conf().modify(|r, w| unsafe {
             w.bits(r.bits() | (crate::soc::constants::I2S_DEFAULT_CLK_SRC << 21))
@@ -708,20 +708,20 @@ pub trait Instance: Signals + RegBlock {
         });
     }
 
-    fn setup(frequency: impl Into<fugit::HertzU32>, bits: u8) {
+    fn setup(&self, frequency: impl Into<fugit::HertzU32>, bits: u8) {
         let frequency: HertzU32 = frequency.into();
 
-        Self::set_clock(calculate_clock(frequency, bits));
+        self.set_clock(calculate_clock(frequency, bits));
 
         // Initialize I2S dev
-        Self::rx_reset();
-        Self::tx_reset();
-        Self::rx_fifo_reset();
-        Self::tx_fifo_reset();
-        Self::rx_dma_reset();
-        Self::tx_dma_reset();
+        self.rx_reset();
+        self.tx_reset();
+        self.rx_fifo_reset();
+        self.tx_fifo_reset();
+        self.rx_dma_reset();
+        self.tx_dma_reset();
 
-        let r = Self::register_block();
+        let r = self.register_block();
 
         // clear all bits and enable lcd mode
         r.conf2().write(|w| {
@@ -772,24 +772,24 @@ pub trait Instance: Signals + RegBlock {
 }
 
 impl RegBlock for I2S0 {
-    fn register_block() -> &'static RegisterBlock {
+    fn register_block(&self) -> &'static RegisterBlock {
         unsafe { &*I2S0::PTR.cast::<RegisterBlock>() }
     }
 }
 
 impl Signals for I2S0 {
-    fn get_peripheral() -> crate::system::Peripheral {
+    fn get_peripheral(&self) -> crate::system::Peripheral {
         crate::system::Peripheral::I2s0
     }
 
-    fn get_dma_peripheral() -> crate::dma::DmaPeripheral {
+    fn get_dma_peripheral(&self) -> crate::dma::DmaPeripheral {
         crate::dma::DmaPeripheral::I2s0
     }
 
-    fn ws_signal() -> OutputSignal {
+    fn ws_signal(&self) -> OutputSignal {
         OutputSignal::I2S0O_WS
     }
-    fn data_out_signal(i: usize, bits: u8) -> OutputSignal {
+    fn data_out_signal(&self, i: usize, bits: u8) -> OutputSignal {
         // signals for 8bit and 16bit both start at an offset of 8 for I2S0
         let offset = match bits {
             8 => 8,
@@ -828,22 +828,22 @@ impl Signals for I2S0 {
 impl Instance for I2S0 {}
 
 impl RegBlock for I2S1 {
-    fn register_block() -> &'static RegisterBlock {
+    fn register_block(&self) -> &'static RegisterBlock {
         unsafe { &*I2S1::PTR.cast::<RegisterBlock>() }
     }
 }
 impl Signals for I2S1 {
-    fn get_peripheral() -> crate::system::Peripheral {
+    fn get_peripheral(&self) -> crate::system::Peripheral {
         crate::system::Peripheral::I2s1
     }
-    fn get_dma_peripheral() -> crate::dma::DmaPeripheral {
+    fn get_dma_peripheral(&self) -> crate::dma::DmaPeripheral {
         crate::dma::DmaPeripheral::I2s1
     }
 
-    fn ws_signal() -> OutputSignal {
+    fn ws_signal(&self) -> OutputSignal {
         OutputSignal::I2S1O_WS
     }
-    fn data_out_signal(i: usize, bits: u8) -> OutputSignal {
+    fn data_out_signal(&self, i: usize, bits: u8) -> OutputSignal {
         // Because of... reasons... the 16-bit values for i2s1 appear on d8...d23
         let offset = if bits == 16 { 8 } else { 0 };
         match i + offset {
