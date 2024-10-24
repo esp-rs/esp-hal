@@ -221,27 +221,14 @@ unsafe extern "C" fn queue_recv(queue: *const (), item: *const (), block_time_ms
 
     let item = item as *mut _;
 
+    let queue = queue as *mut RawQueue;
     loop {
-        let res = {
-            let queue = queue as *mut RawQueue;
-            if (*queue).try_dequeue(item) {
-                trace!("received from queue");
-                1
-            } else {
-                0
-            }
-        };
-
-        if res == 1 {
-            trace!("queue_recv returns");
-            return res;
+        if (*queue).try_dequeue(item) {
+            trace!("received from queue - return");
+            return 1;
+        } else if !forever && crate::timer::elapsed_time_since(start) > block_ticks {
+            return 0;
         }
-
-        if !forever && crate::timer::elapsed_time_since(start) > block_ticks {
-            trace!("queue_recv returns with timeout");
-            return -1;
-        }
-
         yield_task();
     }
 }
