@@ -35,7 +35,6 @@ use esp_wifi::{
         WifiStaDevice,
     },
     wifi_interface::WifiStack,
-    EspWifiInitFor,
 };
 use smoltcp::{
     iface::SocketStorage,
@@ -59,7 +58,6 @@ fn main() -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
     let init = init(
-        EspWifiInitFor::Wifi,
         timg0.timer0,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,

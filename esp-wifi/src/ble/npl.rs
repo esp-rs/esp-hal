@@ -2,6 +2,7 @@ use alloc::boxed::Box;
 use core::{
     mem::size_of_val,
     ptr::{addr_of, addr_of_mut},
+    sync::atomic::Ordering,
 };
 
 use super::*;

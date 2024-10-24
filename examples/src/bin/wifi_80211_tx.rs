@@ -13,13 +13,8 @@ use core::marker::PhantomData;
 
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{
-    delay::Delay,
-    prelude::*,
-    rng::Rng,
-    timer::{timg::TimerGroup, AnyTimer, PeriodicTimer},
-};
-use esp_wifi::{init, wifi, EspWifiInitFor};
+use esp_hal::{delay::Delay, prelude::*, rng::Rng, timer::timg::TimerGroup};
+use esp_wifi::{init, wifi};
 use ieee80211::{
     common::{CapabilitiesInformation, FCFFlags},
     element_chain,
@@ -47,12 +42,9 @@ fn main() -> ! {
     let delay = Delay::new();
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let timer0: AnyTimer = timg0.timer0.into();
-    let timer = PeriodicTimer::new(timer0);
 
     let init = init(
-        EspWifiInitFor::Wifi,
-        timer,
+        timg0.timer0,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
     )

@@ -1587,6 +1587,8 @@ pub(crate) fn wifi_init() -> Result<(), WifiError> {
             chip_specific::g_misc_nvs = addr_of!(NVS_STRUCT) as u32;
         }
 
+        crate::flags::WIFI.fetch_add(1, Ordering::SeqCst);
+
         Ok(())
     }
 }
@@ -1595,7 +1597,6 @@ pub(crate) fn wifi_deinit() -> Result<(), crate::InitializationError> {
     esp_wifi_result!(unsafe { esp_wifi_stop() })?;
     esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
     esp_wifi_result!(unsafe { esp_supplicant_deinit() })?;
-    crate::flags::WIFI.store(false, Ordering::Release);
     Ok(())
 }
 
@@ -1905,7 +1906,7 @@ pub fn new_with_config<'d, MODE: WifiDeviceMode>(
 /// If you want to use AP-STA mode, use `[new_ap_sta]`.
 pub fn new_with_mode<'d, MODE: WifiDeviceMode>(
     inited: &'d EspWifiController<'d>,
-    device: impl crate::hal::peripheral::Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
+    device: impl Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
     _mode: MODE,
 ) -> Result<(WifiDevice<'d, MODE>, WifiController<'d>), WifiError> {
     new_with_config(inited, device, <MODE as Sealed>::Config::default())
@@ -2504,19 +2505,28 @@ pub struct WifiController<'d> {
 
 impl<'d> Drop for WifiController<'d> {
     fn drop(&mut self) {
-        if let Err(e) = crate::wifi::wifi_deinit() {
-            warn!("Failed to cleanly deinit wifi: {:?}", e);
+        if unwrap!(
+            crate::flags::WIFI.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
+                Some(x.saturating_sub(1))
+            })
+        ) == 0
+        {
+            if let Err(e) = crate::wifi::wifi_deinit() {
+                warn!("Failed to cleanly deinit wifi: {:?}", e);
+            }
         }
     }
 }
 
 impl<'d> WifiController<'d> {
     pub(crate) fn new_with_config(
-        _inited: &'d EspWifiController<'d>,
+        inited: &'d EspWifiController<'d>,
         _device: PeripheralRef<'d, crate::hal::peripherals::WIFI>,
         config: Configuration,
     ) -> Result<Self, WifiError> {
-        wifi_init()?;
+        if !inited.wifi() {
+            crate::wifi::wifi_init()?;
+        }
 
         // We set up the controller with the default config because we need to call
         // `set_configuration` to apply the actual configuration, and it will update the
