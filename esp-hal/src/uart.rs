@@ -752,19 +752,19 @@ where
 
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
-                let reg_thrhd = &T::register_block().conf1();
+                let reg_thrhd = T::register_block().conf1();
             } else if #[cfg(any(esp32c6, esp32h2))] {
-                let reg_thrhd = &T::register_block().tout_conf();
+                let reg_thrhd = T::register_block().tout_conf();
             } else {
-                let reg_thrhd = &T::register_block().mem_conf();
+                let reg_thrhd = T::register_block().mem_conf();
             }
         }
 
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c6, esp32h2))] {
-                let reg_en = &T::register_block().tout_conf();
+                let reg_en = T::register_block().tout_conf();
             } else {
-                let reg_en = &T::register_block().conf1();
+                let reg_en = T::register_block().conf1();
             }
         }
 
@@ -1972,7 +1972,7 @@ mod asynch {
             // Although the isr disables the interrupt that occurred directly, we need to
             // disable the other interrupts (= the ones that did not occur), as
             // soon as this future goes out of scope.
-            let int_ena = &T::register_block().int_ena();
+            let int_ena = T::register_block().int_ena();
             for event in self.events {
                 match event {
                     RxEvent::FifoFull => int_ena.modify(|_, w| w.rxfifo_full().clear_bit()),
@@ -2045,7 +2045,7 @@ mod asynch {
             // Although the isr disables the interrupt that occurred directly, we need to
             // disable the other interrupts (= the ones that did not occur), as
             // soon as this future goes out of scope.
-            let int_ena = &T::register_block().int_ena();
+            let int_ena = T::register_block().int_ena();
             for event in self.events {
                 match event {
                     TxEvent::TxDone => int_ena.modify(|_, w| w.tx_done().clear_bit()),
