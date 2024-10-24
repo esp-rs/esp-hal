@@ -131,6 +131,7 @@ use core::marker::PhantomData;
 use self::config::Config;
 use crate::{
     clock::Clocks,
+    dma::PeripheralMarker,
     gpio::{
         interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
@@ -1240,7 +1241,7 @@ where
             }
         };
 
-        T::enable_peripheral();
+        PeripheralClockControl::enable(T::peripheral_inst());
         Self::uart_peripheral_reset();
         T::disable_rx_interrupts();
         T::disable_tx_interrupts();
@@ -1265,7 +1266,7 @@ where
                 .modify(|_, w| w.rst_core().set_bit());
 
             // reset peripheral
-            T::reset_peripheral();
+            PeripheralClockControl::reset(T::peripheral_inst());
 
             #[cfg(not(any(esp32, esp32s2)))]
             T::register_block()
@@ -1331,7 +1332,7 @@ where
 }
 
 /// UART Peripheral Instance
-pub trait Instance: crate::private::Sealed {
+pub trait Instance: crate::private::Sealed + PeripheralMarker {
     /// Returns a reference to the UART register block for the specific
     /// instance.
     ///
@@ -1496,11 +1497,8 @@ pub trait Instance: crate::private::Sealed {
     /// of this UART instance.
     fn rts_signal() -> OutputSignal;
 
-    /// Enables the clock for this UART peripheral instance.
-    fn enable_peripheral();
-
-    /// Resets the UART peripheral instance.
-    fn reset_peripheral();
+    /// Returns the peripheral marker associated with this UART instance.
+    fn peripheral_inst() -> crate::system::Peripheral;
 }
 
 macro_rules! impl_instance {
@@ -1537,12 +1535,8 @@ macro_rules! impl_instance {
                 OutputSignal::$rts
             }
 
-            fn enable_peripheral() {
-                PeripheralClockControl::enable(crate::system::Peripheral::$peri);
-            }
-
-            fn reset_peripheral() {
-                PeripheralClockControl::reset(crate::system::Peripheral::$peri);
+            fn peripheral_inst() -> crate::system::Peripheral {
+                crate::system::Peripheral::$peri
             }
         }
     };
