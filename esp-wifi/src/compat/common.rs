@@ -86,6 +86,32 @@ impl RawQueue {
         })
     }
 
+    pub(crate) fn remove(&mut self, item: *mut c_void) {
+        // do what the ESP-IDF implementations does ...
+        // just remove all elements and add them back except the one we need to remove -
+        // good enough for now
+        critical_section::with(|_| unsafe {
+            let item_slice = core::slice::from_raw_parts_mut(item as *mut u8, self.item_size);
+            let count = self.count();
+            let tmp_item = crate::compat::malloc::malloc(self.item_size);
+
+            if tmp_item.is_null() {
+                panic!("Out of memory");
+            }
+
+            for _ in 0..count {
+                if self.try_dequeue(tmp_item as *mut c_void) {
+                    let tmp_slice = core::slice::from_raw_parts_mut(tmp_item, self.item_size);
+                    if tmp_slice != item_slice {
+                        self.enqueue(tmp_item as *mut c_void);
+                    } else {
+                    }
+                }
+            }
+            crate::compat::malloc::free(tmp_item);
+        })
+    }
+
     pub(crate) fn count(&self) -> usize {
         critical_section::with(|_| {
             if self.current_write >= self.current_read {
