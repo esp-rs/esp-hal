@@ -1413,23 +1413,16 @@ pub trait Instance: Peripheral<P = Self> + PeripheralMarker + 'static {
     /// instance.
     #[allow(clippy::useless_conversion)]
     fn get_rx_fifo_count(&self) -> u16 {
+        let register_block = self.register_block();
+        let fifo_cnt: u16 = register_block.status().read().rxfifo_cnt().bits().into();
         // Calculate the real count based on the FIFO read and write offset address:
         // https://www.espressif.com/sites/default/files/documentation/esp32_errata_en.pdf
         // section 3.17
         #[cfg(esp32)]
         {
-            let rd_addr = self
-                .register_block()
-                .mem_rx_status()
-                .read()
-                .mem_rx_rd_addr()
-                .bits();
-            let wr_addr = self
-                .register_block()
-                .mem_rx_status()
-                .read()
-                .mem_rx_wr_addr()
-                .bits();
+            let status = register_block.mem_rx_status().read();
+            let rd_addr = status.mem_rx_rd_addr().bits();
+            let wr_addr = status.mem_rx_wr_addr().bits();
 
             if wr_addr > rd_addr {
                 wr_addr - rd_addr
@@ -1443,12 +1436,7 @@ pub trait Instance: Peripheral<P = Self> + PeripheralMarker + 'static {
         }
 
         #[cfg(not(esp32))]
-        self.register_block()
-            .status()
-            .read()
-            .rxfifo_cnt()
-            .bits()
-            .into()
+        fifo_cnt
     }
 
     /// Checks if the TX line is idle for this UART instance.
