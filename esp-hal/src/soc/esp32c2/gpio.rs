@@ -172,20 +172,20 @@ pub enum OutputSignal {
 }
 
 crate::gpio::gpio! {
-    (0, 0, InputOutputAnalog)
-    (1, 0, InputOutputAnalog)
-    (2, 0, InputOutputAnalog (2 => FSPIQ) (2 => FSPIQ))
-    (3, 0, InputOutputAnalog)
-    (4, 0, InputOutputAnalog (2 => FSPIHD) (2 => FSPIHD))
-    (5, 0, InputOutput (2 => FSPIWP) (2 => FSPIWP))
-    (6, 0, InputOutput (2 => FSPICLK) (2 => FSPICLK_MUX))
-    (7, 0, InputOutput (2 => FSPID) (2 => FSPID))
-    (8, 0, InputOutput)
-    (9, 0, InputOutput)
-    (10, 0, InputOutput (2 => FSPICS0) (2 => FSPICS0))
-    (18, 0, InputOutput)
-    (19, 0, InputOutput)
-    (20, 0, InputOutput (0 => U0RXD) ())
+    (0, 0, [Input, Output, Analog, RtcIo])
+    (1, 0, [Input, Output, Analog, RtcIo])
+    (2, 0, [Input, Output, Analog, RtcIo] (2 => FSPIQ) (2 => FSPIQ))
+    (3, 0, [Input, Output, Analog, RtcIo])
+    (4, 0, [Input, Output, Analog, RtcIo] (2 => FSPIHD) (2 => FSPIHD))
+    (5, 0, [Input, Output, Analog, RtcIo] (2 => FSPIWP) (2 => FSPIWP))
+    (6, 0, [Input, Output] (2 => FSPICLK) (2 => FSPICLK_MUX))
+    (7, 0, [Input, Output] (2 => FSPID) (2 => FSPID))
+    (8, 0, [Input, Output])
+    (9, 0, [Input, Output])
+    (10, 0, [Input, Output] (2 => FSPICS0) (2 => FSPICS0))
+    (18, 0, [Input, Output])
+    (19, 0, [Input, Output])
+    (20, 0, [Input, Output] (0 => U0RXD) ())
 }
 
 crate::gpio::rtc_pins! {
