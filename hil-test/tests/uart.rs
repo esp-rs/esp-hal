@@ -8,7 +8,6 @@
 use embedded_hal_02::serial::{Read, Write};
 use esp_hal::{
     gpio::Io,
-    peripherals::UART1,
     prelude::*,
     uart::{ClockSource, Uart},
     Blocking,
@@ -17,7 +16,7 @@ use hil_test as _;
 use nb::block;
 
 struct Context {
-    uart: Uart<'static, UART1, Blocking>,
+    uart: Uart<'static, Blocking>,
 }
 
 #[cfg(test)]

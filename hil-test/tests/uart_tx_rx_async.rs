@@ -8,15 +8,14 @@
 
 use esp_hal::{
     gpio::Io,
-    peripherals::{UART0, UART1},
     uart::{UartRx, UartTx},
     Async,
 };
 use hil_test as _;
 
 struct Context {
-    rx: UartRx<'static, UART1, Async>,
-    tx: UartTx<'static, UART0, Async>,
+    rx: UartRx<'static, Async>,
+    tx: UartTx<'static, Async>,
 }
 
 #[cfg(test)]
