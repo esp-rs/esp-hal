@@ -34,7 +34,7 @@ mod tests {
     #[test]
     #[timeout(3)]
     async fn test_send_receive(mut ctx: Context) {
-        const SEND: &[u8] = &*b"Hello ESP32";
+        const SEND: &[u8] = b"Hello ESP32";
         let mut buf = [0u8; SEND.len()];
 
         ctx.uart.flush_async().await.unwrap();
