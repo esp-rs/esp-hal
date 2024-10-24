@@ -18,18 +18,13 @@
 //! # use esp_hal::gpio::Io;
 //! # use esp_hal::lcd_cam::{LcdCam, lcd::i8080::{Config, I8080, TxEightBits}};
 //! # use esp_hal::dma_tx_buffer;
-//! # use esp_hal::dma::{Dma, DmaPriority, DmaTxBuf};
+//! # use esp_hal::dma::{Dma, DmaTxBuf};
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
 //! # let dma = Dma::new(peripherals.DMA);
 //! # let channel = dma.channel0;
 //!
 //! # let mut dma_buf = dma_tx_buffer!(32678).unwrap();
-//!
-//! # let channel = channel.configure(
-//! #     false,
-//! #     DmaPriority::Priority0,
-//! # );
 //!
 //! let tx_pins = TxEightBits::new(
 //!     io.pins.gpio9,

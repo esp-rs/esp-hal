@@ -14,7 +14,7 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    dma::{Dma, DmaPriority},
+    dma::Dma,
     dma_buffers,
     gpio::Io,
     parl_io::{no_clk_pin, BitPackOrder, ParlIoRxOnly, RxFourBits},
@@ -36,13 +36,12 @@ async fn main(_spawner: Spawner) {
     let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(32000, 0);
 
     let dma = Dma::new(peripherals.DMA);
-    let dma_channel = dma.channel0;
 
     let mut rx_pins = RxFourBits::new(io.pins.gpio1, io.pins.gpio2, io.pins.gpio3, io.pins.gpio4);
 
     let parl_io = ParlIoRxOnly::new(
         peripherals.PARL_IO,
-        dma_channel.configure_for_async(false, DmaPriority::Priority0),
+        dma.channel0.into_async(),
         rx_descriptors,
         1.MHz(),
     )

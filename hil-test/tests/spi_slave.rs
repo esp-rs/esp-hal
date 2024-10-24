@@ -9,24 +9,25 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{Dma, DmaPriority},
+    dma::{Channel, Dma},
     dma_buffers,
     gpio::{interconnect::InputSignal, Io, Level, Output, PeripheralInput},
     spi::{slave::Spi, SpiMode},
+    Blocking,
 };
 use hil_test as _;
 
 cfg_if::cfg_if! {
     if #[cfg(any(esp32, esp32s2))] {
-        type DmaChannelCreator = esp_hal::dma::Spi2DmaChannelCreator;
+        type DmaChannel = esp_hal::dma::Spi2DmaChannel;
     } else {
-        type DmaChannelCreator = esp_hal::dma::ChannelCreator<0>;
+        type DmaChannel = esp_hal::dma::DmaChannel0;
     }
 }
 
 struct Context {
-    spi: Spi<'static>,
-    dma_channel: DmaChannelCreator,
+    spi: Spi<'static, Blocking>,
+    dma_channel: Channel<'static, DmaChannel, Blocking>,
     bitbang_spi: BitbangSpi,
 }
 
@@ -149,11 +150,9 @@ mod tests {
     fn test_basic(mut ctx: Context) {
         const DMA_SIZE: usize = 32;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DMA_SIZE);
-        let mut spi = ctx.spi.with_dma(
-            ctx.dma_channel.configure(false, DmaPriority::Priority0),
-            rx_descriptors,
-            tx_descriptors,
-        );
+        let mut spi = ctx
+            .spi
+            .with_dma(ctx.dma_channel, rx_descriptors, tx_descriptors);
         let slave_send = tx_buffer;
         let slave_receive = rx_buffer;
 

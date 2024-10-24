@@ -34,7 +34,7 @@
 use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
-    dma::{Dma, DmaPriority},
+    dma::Dma,
     dma_buffers,
     gpio::Io,
     i2s::{DataFormat, I2s, Standard},
@@ -74,10 +74,11 @@ async fn main(_spawner: Spawner) {
         Standard::Philips,
         DataFormat::Data16Channel16,
         44100u32.Hz(),
-        dma_channel.configure_for_async(false, DmaPriority::Priority0),
+        dma_channel,
         rx_descriptors,
         tx_descriptors,
-    );
+    )
+    .into_async();
 
     let i2s_tx = i2s
         .i2s_tx
