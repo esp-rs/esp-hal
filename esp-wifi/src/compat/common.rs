@@ -104,7 +104,6 @@ impl RawQueue {
                     let tmp_slice = core::slice::from_raw_parts_mut(tmp_item, self.item_size);
                     if tmp_slice != item_slice {
                         self.enqueue(tmp_item as *mut c_void);
-                    } else {
                     }
                 }
             }
