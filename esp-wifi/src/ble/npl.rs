@@ -887,7 +887,7 @@ unsafe extern "C" fn ble_npl_eventq_remove(
     }
 
     let evt = (*event).dummy as *mut Event;
-    if (*evt).queued == false {
+    if !(*evt).queued {
         return;
     }
 
