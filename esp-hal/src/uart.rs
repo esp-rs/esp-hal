@@ -1440,17 +1440,11 @@ pub trait Instance: Peripheral<P = Self> + PeripheralMarker + 'static {
     /// currently being transmitted.
     fn is_tx_idle(&self) -> bool {
         #[cfg(esp32)]
-        let idle = self.register_block().status().read().st_utx_out().bits() == 0x0u8;
+        let status = self.register_block().status();
         #[cfg(not(esp32))]
-        let idle = self
-            .register_block()
-            .fsm_status()
-            .read()
-            .st_utx_out()
-            .bits()
-            == 0x0u8;
+        let status = self.register_block().fsm_status();
 
-        idle
+        status.read().st_utx_out().bits() == 0x0
     }
 
     /// Checks if the RX line is idle for this UART instance.
@@ -1459,17 +1453,11 @@ pub trait Instance: Peripheral<P = Self> + PeripheralMarker + 'static {
     /// being received.
     fn is_rx_idle(&self) -> bool {
         #[cfg(esp32)]
-        let idle = self.register_block().status().read().st_urx_out().bits() == 0x0u8;
+        let status = self.register_block().status();
         #[cfg(not(esp32))]
-        let idle = self
-            .register_block()
-            .fsm_status()
-            .read()
-            .st_urx_out()
-            .bits()
-            == 0x0u8;
+        let status = self.register_block().fsm_status();
 
-        idle
+        status.read().st_urx_out().bits() == 0x0
     }
 
     /// Returns the output signal identifier for the TX pin of this UART
