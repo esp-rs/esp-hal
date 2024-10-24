@@ -11,7 +11,7 @@
 use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::{interconnect::InputSignal, Io, Level, Output, PeripheralInput},
+    gpio::{interconnect::InputSignal, Io, Level, Output},
     spi::{slave::Spi, SpiMode},
 };
 use hil_test as _;

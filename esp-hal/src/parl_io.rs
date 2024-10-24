@@ -49,7 +49,7 @@ use crate::{
         Tx,
         WriteBuffer,
     },
-    gpio::{PeripheralInput, PeripheralOutput},
+    gpio::interconnect::{InputConnection, OutputConnection, PeripheralInput, PeripheralOutput},
     interrupt::InterruptHandler,
     peripheral::{self, Peripheral},
     peripherals::{self, PARL_IO},
@@ -277,26 +277,17 @@ pub fn no_clk_pin() -> &'static mut NoClkPin {
 }
 
 /// Wraps a GPIO pin which will be used as the clock output signal
-pub struct ClkOutPin<'d, P>
-where
-    P: PeripheralOutput,
-{
-    pin: PeripheralRef<'d, P>,
+pub struct ClkOutPin<'d> {
+    pin: PeripheralRef<'d, OutputConnection>,
 }
-impl<'d, P> ClkOutPin<'d, P>
-where
-    P: PeripheralOutput,
-{
+impl<'d> ClkOutPin<'d> {
     /// Create a ClkOutPin
-    pub fn new(pin: impl Peripheral<P = P> + 'd) -> Self {
-        crate::into_ref!(pin);
+    pub fn new(pin: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+        crate::into_mapped_ref!(pin);
         Self { pin }
     }
 }
-impl<'d, P> TxClkPin for ClkOutPin<'d, P>
-where
-    P: PeripheralOutput,
-{
+impl TxClkPin for ClkOutPin<'_> {
     fn configure(&mut self) {
         self.pin.set_to_push_pull_output(crate::private::Internal);
         self.pin.connect_peripheral_to_output(
@@ -307,26 +298,17 @@ where
 }
 
 /// Wraps a GPIO pin which will be used as the TX clock input signal
-pub struct ClkInPin<'d, P>
-where
-    P: PeripheralInput,
-{
-    pin: PeripheralRef<'d, P>,
+pub struct ClkInPin<'d> {
+    pin: PeripheralRef<'d, InputConnection>,
 }
-impl<'d, P> ClkInPin<'d, P>
-where
-    P: PeripheralInput,
-{
+impl<'d> ClkInPin<'d> {
     /// Create a new ClkInPin
-    pub fn new(pin: impl Peripheral<P = P> + 'd) -> Self {
-        crate::into_ref!(pin);
+    pub fn new(pin: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
+        crate::into_mapped_ref!(pin);
         Self { pin }
     }
 }
-impl<'d, P> TxClkPin for ClkInPin<'d, P>
-where
-    P: PeripheralInput,
-{
+impl TxClkPin for ClkInPin<'_> {
     fn configure(&mut self) {
         let pcr = unsafe { &*crate::peripherals::PCR::PTR };
         pcr.parl_clk_tx_conf()
@@ -342,27 +324,21 @@ where
 }
 
 /// Wraps a GPIO pin which will be used as the RX clock input signal
-pub struct RxClkInPin<'d, P>
-where
-    P: PeripheralInput,
-{
-    pin: PeripheralRef<'d, P>,
+pub struct RxClkInPin<'d> {
+    pin: PeripheralRef<'d, InputConnection>,
     sample_edge: SampleEdge,
 }
-impl<'d, P> RxClkInPin<'d, P>
-where
-    P: PeripheralInput,
-{
+impl<'d> RxClkInPin<'d> {
     /// Create a new RxClkInPin
-    pub fn new(pin: impl Peripheral<P = P> + 'd, sample_edge: SampleEdge) -> Self {
-        crate::into_ref!(pin);
+    pub fn new(
+        pin: impl Peripheral<P = impl PeripheralInput> + 'd,
+        sample_edge: SampleEdge,
+    ) -> Self {
+        crate::into_mapped_ref!(pin);
         Self { pin, sample_edge }
     }
 }
-impl<'d, P> RxClkPin for RxClkInPin<'d, P>
-where
-    P: PeripheralInput,
-{
+impl<'d> RxClkPin for RxClkInPin<'d> {
     fn configure(&mut self) {
         let pcr = unsafe { &*crate::peripherals::PCR::PTR };
         pcr.parl_clk_rx_conf()
@@ -380,38 +356,33 @@ where
 }
 
 /// Pin configuration with an additional pin for the valid signal.
-pub struct TxPinConfigWithValidPin<'d, P, VP>
+pub struct TxPinConfigWithValidPin<'d, P>
 where
     P: NotContainsValidSignalPin + TxPins + ConfigurePins,
-    VP: PeripheralOutput,
 {
     tx_pins: P,
-    valid_pin: PeripheralRef<'d, VP>,
+    valid_pin: PeripheralRef<'d, OutputConnection>,
 }
 
-impl<'d, P, VP> TxPinConfigWithValidPin<'d, P, VP>
+impl<'d, P> TxPinConfigWithValidPin<'d, P>
 where
     P: NotContainsValidSignalPin + TxPins + ConfigurePins,
-    VP: PeripheralOutput,
 {
     /// Create a [TxPinConfigWithValidPin]
-    pub fn new(tx_pins: P, valid_pin: impl Peripheral<P = VP> + 'd) -> Self {
-        crate::into_ref!(valid_pin);
+    pub fn new(tx_pins: P, valid_pin: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+        crate::into_mapped_ref!(valid_pin);
         Self { tx_pins, valid_pin }
     }
 }
 
-impl<'d, P, VP> TxPins for TxPinConfigWithValidPin<'d, P, VP>
-where
-    P: NotContainsValidSignalPin + TxPins + ConfigurePins,
-    VP: PeripheralOutput,
+impl<'d, P> TxPins for TxPinConfigWithValidPin<'d, P> where
+    P: NotContainsValidSignalPin + TxPins + ConfigurePins
 {
 }
 
-impl<'d, P, VP> ConfigurePins for TxPinConfigWithValidPin<'d, P, VP>
+impl<'d, P> ConfigurePins for TxPinConfigWithValidPin<'d, P>
 where
     P: NotContainsValidSignalPin + TxPins + ConfigurePins,
-    VP: PeripheralOutput,
 {
     fn configure(&mut self) -> Result<(), Error> {
         self.tx_pins.configure()?;
@@ -466,31 +437,27 @@ macro_rules! tx_pins {
             #[doc = "Data pin configuration for "]
             #[doc = stringify!($width)]
             #[doc = "bit output mode"]
-            pub struct $name<'d, $($pin),+> {
+            pub struct $name<'d> {
                 $(
-                    [< pin_ $pin:lower >] : PeripheralRef<'d, $pin>,
+                    [< pin_ $pin:lower >] : PeripheralRef<'d, OutputConnection>,
                 )+
             }
 
-            impl<'d, $($pin),+> $name<'d, $($pin),+>
-            where
-                $($pin: PeripheralOutput),+
+            impl<'d> $name<'d>
             {
                 /// Create a new TX pin
                 #[allow(clippy::too_many_arguments)]
                 pub fn new(
                     $(
-                        [< pin_ $pin:lower >] : impl Peripheral<P = $pin> + 'd,
+                        [< pin_ $pin:lower >] : impl Peripheral<P = impl PeripheralOutput > + 'd,
                     )+
                 ) -> Self {
-                    crate::into_ref!($( [< pin_ $pin:lower >] ),+);
+                    crate::into_mapped_ref!($( [< pin_ $pin:lower >] ),+);
                     Self { $( [< pin_ $pin:lower >] ),+ }
                 }
             }
 
-            impl<'d, $($pin),+> ConfigurePins for $name<'d, $($pin),+>
-            where
-                $($pin: PeripheralOutput),+
+            impl ConfigurePins for $name<'_>
             {
                 fn configure(&mut self) -> Result<(), Error>{
                     $(
@@ -503,7 +470,7 @@ macro_rules! tx_pins {
                 }
             }
 
-            impl<'d, $($pin),+> TxPins for $name<'d, $($pin),+> {}
+            impl TxPins for $name<'_> {}
         }
     };
 }
@@ -552,67 +519,47 @@ tx_pins!(
     P15 = PARL_TX_DATA15
 );
 
-impl<'d, P0> FullDuplex for TxOneBit<'d, P0> {}
+impl FullDuplex for TxOneBit<'_> {}
+impl FullDuplex for TxTwoBits<'_> {}
+impl FullDuplex for TxFourBits<'_> {}
+impl FullDuplex for TxEightBits<'_> {}
 
-impl<'d, P0, P1> FullDuplex for TxTwoBits<'d, P0, P1> {}
-
-impl<'d, P0, P1, P2, P3> FullDuplex for TxFourBits<'d, P0, P1, P2, P3> {}
-
-impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> FullDuplex
-    for TxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
-{
-}
-
-impl<'d, P0> NotContainsValidSignalPin for TxOneBit<'d, P0> {}
-
-impl<'d, P0, P1> NotContainsValidSignalPin for TxTwoBits<'d, P0, P1> {}
-
-impl<'d, P0, P1, P2, P3> NotContainsValidSignalPin for TxFourBits<'d, P0, P1, P2, P3> {}
+impl NotContainsValidSignalPin for TxOneBit<'_> {}
+impl NotContainsValidSignalPin for TxTwoBits<'_> {}
+impl NotContainsValidSignalPin for TxFourBits<'_> {}
 
 #[cfg(esp32c6)]
-impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> NotContainsValidSignalPin
-    for TxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
-{
-}
+impl NotContainsValidSignalPin for TxEightBits<'_> {}
 
 #[cfg(esp32h2)]
-impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> ContainsValidSignalPin
-    for TxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
-{
-}
+impl ContainsValidSignalPin for TxEightBits<'_> {}
 
 #[cfg(esp32c6)]
-impl<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
-    ContainsValidSignalPin
-    for TxSixteenBits<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
-{
-}
+impl ContainsValidSignalPin for TxSixteenBits<'_> {}
 
 /// Pin configuration with an additional pin for the valid signal.
-pub struct RxPinConfigWithValidPin<'d, P, VP>
+pub struct RxPinConfigWithValidPin<'d, P>
 where
     P: NotContainsValidSignalPin + RxPins + ConfigurePins,
-    VP: PeripheralInput,
 {
     rx_pins: P,
-    valid_pin: PeripheralRef<'d, VP>,
+    valid_pin: PeripheralRef<'d, InputConnection>,
     enable_mode: EnableMode,
     eof_mode: EofMode,
 }
 
-impl<'d, P, VP> RxPinConfigWithValidPin<'d, P, VP>
+impl<'d, P> RxPinConfigWithValidPin<'d, P>
 where
     P: NotContainsValidSignalPin + RxPins + ConfigurePins,
-    VP: PeripheralInput,
 {
     /// Create a new [RxPinConfigWithValidPin]
     pub fn new(
         rx_pins: P,
-        valid_pin: impl Peripheral<P = VP> + 'd,
+        valid_pin: impl Peripheral<P = impl PeripheralInput> + 'd,
         enable_mode: EnableMode,
         eof_mode: EofMode,
     ) -> Self {
-        crate::into_ref!(valid_pin);
+        crate::into_mapped_ref!(valid_pin);
         Self {
             rx_pins,
             valid_pin,
@@ -622,17 +569,14 @@ where
     }
 }
 
-impl<'d, P, VP> RxPins for RxPinConfigWithValidPin<'d, P, VP>
-where
-    P: NotContainsValidSignalPin + RxPins + ConfigurePins,
-    VP: PeripheralInput,
+impl<'d, P> RxPins for RxPinConfigWithValidPin<'d, P> where
+    P: NotContainsValidSignalPin + RxPins + ConfigurePins
 {
 }
 
-impl<'d, P, VP> ConfigurePins for RxPinConfigWithValidPin<'d, P, VP>
+impl<'d, P> ConfigurePins for RxPinConfigWithValidPin<'d, P>
 where
     P: NotContainsValidSignalPin + RxPins + ConfigurePins,
-    VP: PeripheralInput,
 {
     fn configure(&mut self) -> Result<(), Error> {
         self.rx_pins.configure()?;
@@ -713,31 +657,27 @@ macro_rules! rx_pins {
             #[doc = "Data pin configuration for "]
             #[doc = stringify!($width)]
             #[doc = "bit input mode"]
-            pub struct $name<'d, $($pin),+> {
+            pub struct $name<'d> {
                 $(
-                    [< pin_ $pin:lower >] : PeripheralRef<'d, $pin>,
+                    [< pin_ $pin:lower >] : PeripheralRef<'d, InputConnection>,
                 )+
             }
 
-            impl<'d, $($pin),+> $name<'d, $($pin),+>
-            where
-                $($pin: PeripheralInput),+
+            impl<'d> $name<'d>
             {
                 /// Create a new RX pin
                 #[allow(clippy::too_many_arguments)]
                 pub fn new(
                     $(
-                        [< pin_ $pin:lower >] : impl Peripheral<P = $pin> + 'd,
+                        [< pin_ $pin:lower >] : impl Peripheral<P = impl PeripheralInput > + 'd,
                     )+
                 ) -> Self {
-                    crate::into_ref!($( [< pin_ $pin:lower >] ),+);
+                    crate::into_mapped_ref!($( [< pin_ $pin:lower >] ),+);
                     Self { $( [< pin_ $pin:lower >] ),+ }
                 }
             }
 
-            impl<'d, $($pin),+> ConfigurePins for $name<'d, $($pin),+>
-            where
-                $($pin: PeripheralInput),+
+            impl ConfigurePins for $name<'_>
             {
                 fn configure(&mut self)  -> Result<(), Error> {
                     $(
@@ -750,7 +690,7 @@ macro_rules! rx_pins {
                 }
             }
 
-            impl<'d, $($pin),+> RxPins for $name<'d, $($pin),+> {}
+            impl RxPins for $name<'_> {}
         }
     };
 }
@@ -799,41 +739,23 @@ rx_pins!(
     P15 = PARL_RX_DATA15
 );
 
-impl<'d, P0> FullDuplex for RxOneBit<'d, P0> {}
+impl FullDuplex for RxOneBit<'_> {}
+impl FullDuplex for RxTwoBits<'_> {}
+impl FullDuplex for RxFourBits<'_> {}
+impl FullDuplex for RxEightBits<'_> {}
 
-impl<'d, P0, P1> FullDuplex for RxTwoBits<'d, P0, P1> {}
-
-impl<'d, P0, P1, P2, P3> FullDuplex for RxFourBits<'d, P0, P1, P2, P3> {}
-
-impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> FullDuplex
-    for RxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
-{
-}
-
-impl<'d, P0> NotContainsValidSignalPin for RxOneBit<'d, P0> {}
-
-impl<'d, P0, P1> NotContainsValidSignalPin for RxTwoBits<'d, P0, P1> {}
-
-impl<'d, P0, P1, P2, P3> NotContainsValidSignalPin for RxFourBits<'d, P0, P1, P2, P3> {}
+impl NotContainsValidSignalPin for RxOneBit<'_> {}
+impl NotContainsValidSignalPin for RxTwoBits<'_> {}
+impl NotContainsValidSignalPin for RxFourBits<'_> {}
 
 #[cfg(esp32c6)]
-impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> NotContainsValidSignalPin
-    for RxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
-{
-}
+impl NotContainsValidSignalPin for RxEightBits<'_> {}
 
 #[cfg(esp32h2)]
-impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> ContainsValidSignalPin
-    for RxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
-{
-}
+impl ContainsValidSignalPin for RxEightBits<'_> {}
 
 #[cfg(esp32c6)]
-impl<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
-    ContainsValidSignalPin
-    for RxSixteenBits<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
-{
-}
+impl ContainsValidSignalPin for RxSixteenBits<'_> {}
 
 impl<'d, DM> TxCreatorFullDuplex<'d, DM>
 where

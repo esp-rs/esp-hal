@@ -83,16 +83,11 @@ impl<'d> Usb<'d> {
         unsafe {
             let usb_wrap = &*peripherals::USB_WRAP::PTR;
             usb_wrap.otg_conf().modify(|_, w| {
-                w.usb_pad_enable()
-                    .set_bit()
-                    .phy_sel()
-                    .clear_bit()
-                    .clk_en()
-                    .set_bit()
-                    .ahb_clk_force_on()
-                    .set_bit()
-                    .phy_clk_force_on()
-                    .set_bit()
+                w.usb_pad_enable().set_bit();
+                w.phy_sel().clear_bit();
+                w.clk_en().set_bit();
+                w.ahb_clk_force_on().set_bit();
+                w.phy_clk_force_on().set_bit()
             });
 
             #[cfg(esp32s3)]
@@ -102,7 +97,7 @@ impl<'d> Usb<'d> {
                     .modify(|_, w| w.sw_hw_usb_phy_sel().set_bit().sw_usb_phy_sel().set_bit());
             }
 
-            use crate::gpio::{Level, PeripheralInput};
+            use crate::gpio::Level;
 
             Level::High.connect_input_to_peripheral(InputSignal::USB_OTG_IDDIG, Internal); // connected connector is mini-B side
             Level::High.connect_input_to_peripheral(InputSignal::USB_SRP_BVALID, Internal); // HIGH to force USB device mode

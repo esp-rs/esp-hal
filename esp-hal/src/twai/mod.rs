@@ -130,7 +130,12 @@ use core::marker::PhantomData;
 use self::filter::{Filter, FilterType};
 use crate::{
     dma::PeripheralMarker,
-    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
+    gpio::{
+        interconnect::{PeripheralInput, PeripheralOutput},
+        InputSignal,
+        OutputSignal,
+        Pull,
+    },
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::twai0::RegisterBlock,
@@ -764,8 +769,8 @@ where
         no_transceiver: bool,
         mode: TwaiMode,
     ) -> Self {
-        // Set up the GPIO pins.
-        crate::into_ref!(twai, tx_pin, rx_pin);
+        crate::into_ref!(twai);
+        crate::into_mapped_ref!(tx_pin, rx_pin);
 
         // Enable the peripheral clock for the TWAI peripheral.
         PeripheralClockControl::enable(twai.peripheral());
@@ -792,6 +797,7 @@ where
                 .modify(|_, w| w.ext_mode().set_bit());
         }
 
+        // Set up the GPIO pins.
         let rx_pull = if no_transceiver {
             tx_pin.set_to_open_drain_output(crate::private::Internal);
             tx_pin.pull_direction(Pull::Up, crate::private::Internal);
