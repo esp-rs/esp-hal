@@ -1505,18 +1505,22 @@ macro_rules! impl_instance {
                 Interrupt::$inst
             }
 
+            #[inline(always)]
             fn tx_signal(&self) -> OutputSignal {
                 OutputSignal::$txd
             }
 
+            #[inline(always)]
             fn rx_signal(&self) -> InputSignal {
                 InputSignal::$rxd
             }
 
+            #[inline(always)]
             fn cts_signal(&self) -> InputSignal {
                 InputSignal::$cts
             }
 
+            #[inline(always)]
             fn rts_signal(&self) -> OutputSignal {
                 OutputSignal::$rts
             }
