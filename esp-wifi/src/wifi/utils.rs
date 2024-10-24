@@ -8,7 +8,7 @@ use smoltcp::{
 };
 
 use super::{WifiApDevice, WifiController, WifiDevice, WifiDeviceMode, WifiError, WifiStaDevice};
-use crate::{timestamp, EspWifiInitialization};
+use crate::{current_millis, EspWifiController};
 
 fn setup_iface<'a, MODE: WifiDeviceMode>(
     device: &mut WifiDevice<'_, MODE>,
@@ -38,7 +38,7 @@ fn setup_iface<'a, MODE: WifiDeviceMode>(
 /// You can use the provided macros to create and pass a suitable backing
 /// storage.
 pub fn create_network_interface<'a, 'd, MODE: WifiDeviceMode>(
-    inited: &EspWifiInitialization,
+    inited: &'d EspWifiController<'d>,
     device: impl crate::hal::peripheral::Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
     mode: MODE,
     storage: &'a mut [SocketStorage<'a>],
@@ -69,7 +69,7 @@ pub struct ApStaInterface<'a, 'd> {
 }
 
 pub fn create_ap_sta_network_interface<'a, 'd>(
-    inited: &EspWifiInitialization,
+    inited: &'d EspWifiController<'d>,
     device: impl crate::hal::peripheral::Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
     ap_storage: &'a mut [SocketStorage<'a>],
     sta_storage: &'a mut [SocketStorage<'a>],

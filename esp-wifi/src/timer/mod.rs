@@ -22,24 +22,22 @@ use crate::TimeBase;
 
 pub(crate) static TIMER: Mutex<RefCell<Option<TimeBase>>> = Mutex::new(RefCell::new(None));
 
-pub(crate) fn setup_timer_isr(timebase: TimeBase) -> Result<(), esp_hal::timer::Error> {
+pub(crate) fn setup_timer_isr(timebase: TimeBase) {
     setup_radio_isr();
 
-    setup_timer(timebase)?;
+    setup_timer(timebase);
 
     setup_multitasking();
 
     yield_task();
-    Ok(())
 }
 
-pub(crate) fn shutdown_timer_isr() -> Result<(), esp_hal::timer::Error> {
+pub(crate) fn shutdown_timer_isr() {
     shutdown_radio_isr();
 
-    disable_timer()?;
+    disable_timer();
 
     disable_multitasking();
-    Ok(())
 }
 
 #[allow(unused)]
