@@ -186,61 +186,56 @@ where
     }
 
     fn configure<I: Instance>(&mut self, instance: &PeripheralRef<'_, I>) {
+        use crate::private::Internal;
         let bits: u8 = self.bits();
-        self.pin_0.set_to_push_pull_output(crate::private::Internal);
+        self.pin_0.set_to_push_pull_output(Internal);
         self.pin_0
-            .connect_peripheral_to_output(instance.data_out_signal(0, bits), crate::private::Internal);
-        self.pin_1.set_to_push_pull_output(crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(0, bits), Internal);
+        self.pin_1.set_to_push_pull_output(Internal);
         self.pin_1
-            .connect_peripheral_to_output(instance.data_out_signal(1, bits), crate::private::Internal);
-        self.pin_2.set_to_push_pull_output(crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(1, bits), Internal);
+        self.pin_2.set_to_push_pull_output(Internal);
         self.pin_2
-            .connect_peripheral_to_output(instance.data_out_signal(2, bits), crate::private::Internal);
-        self.pin_3.set_to_push_pull_output(crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(2, bits), Internal);
+        self.pin_3.set_to_push_pull_output(Internal);
         self.pin_3
-            .connect_peripheral_to_output(instance.data_out_signal(3, bits), crate::private::Internal);
-        self.pin_4.set_to_push_pull_output(crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(3, bits), Internal);
+        self.pin_4.set_to_push_pull_output(Internal);
         self.pin_4
-            .connect_peripheral_to_output(instance.data_out_signal(4, bits), crate::private::Internal);
-        self.pin_5.set_to_push_pull_output(crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(4, bits), Internal);
+        self.pin_5.set_to_push_pull_output(Internal);
         self.pin_5
-            .connect_peripheral_to_output(instance.data_out_signal(5, bits), crate::private::Internal);
-        self.pin_6.set_to_push_pull_output(crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(5, bits), Internal);
+        self.pin_6.set_to_push_pull_output(Internal);
         self.pin_6
-            .connect_peripheral_to_output(instance.data_out_signal(6, bits), crate::private::Internal);
-        self.pin_7.set_to_push_pull_output(crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(6, bits), Internal);
+        self.pin_7.set_to_push_pull_output(Internal);
         self.pin_7
-            .connect_peripheral_to_output(instance.data_out_signal(7, bits), crate::private::Internal);
-        self.pin_8.set_to_push_pull_output(crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(7, bits), Internal);
+        self.pin_8.set_to_push_pull_output(Internal);
         self.pin_8
-            .connect_peripheral_to_output(instance.data_out_signal(8, bits), crate::private::Internal);
-        self.pin_9.set_to_push_pull_output(crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(8, bits), Internal);
+        self.pin_9.set_to_push_pull_output(Internal);
         self.pin_9
-            .connect_peripheral_to_output(instance.data_out_signal(9, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(9, bits), Internal);
+        self.pin_10.set_to_push_pull_output(Internal);
         self.pin_10
-            .set_to_push_pull_output(crate::private::Internal);
-        self.pin_10
-            .connect_peripheral_to_output(instance.data_out_signal(10, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(10, bits), Internal);
+        self.pin_11.set_to_push_pull_output(Internal);
         self.pin_11
-            .set_to_push_pull_output(crate::private::Internal);
-        self.pin_11
-            .connect_peripheral_to_output(instance.data_out_signal(11, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(11, bits), Internal);
+        self.pin_12.set_to_push_pull_output(Internal);
         self.pin_12
-            .set_to_push_pull_output(crate::private::Internal);
-        self.pin_12
-            .connect_peripheral_to_output(instance.data_out_signal(12, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(12, bits), Internal);
+        self.pin_13.set_to_push_pull_output(Internal);
         self.pin_13
-            .set_to_push_pull_output(crate::private::Internal);
-        self.pin_13
-            .connect_peripheral_to_output(instance.data_out_signal(13, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(13, bits), Internal);
+        self.pin_14.set_to_push_pull_output(Internal);
         self.pin_14
-            .set_to_push_pull_output(crate::private::Internal);
-        self.pin_14
-            .connect_peripheral_to_output(instance.data_out_signal(14, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(14, bits), Internal);
+        self.pin_15.set_to_push_pull_output(Internal);
         self.pin_15
-            .set_to_push_pull_output(crate::private::Internal);
-        self.pin_15
-            .connect_peripheral_to_output(instance.data_out_signal(15, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(15, bits), Internal);
     }
 }
 
@@ -318,31 +313,32 @@ where
     }
 
     fn configure<I: Instance>(&mut self, instance: &PeripheralRef<'_, I>) {
+        use crate::private::Internal;
         let bits: u8 = self.bits();
-        self.pin_0.set_to_push_pull_output(crate::private::Internal);
+        self.pin_0.set_to_push_pull_output(Internal);
         self.pin_0
-            .connect_peripheral_to_output(instance.data_out_signal(0, bits), crate::private::Internal);
-        self.pin_1.set_to_push_pull_output(crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(0, bits), Internal);
+        self.pin_1.set_to_push_pull_output(Internal);
         self.pin_1
-            .connect_peripheral_to_output(instance.data_out_signal(1, bits), crate::private::Internal);
-        self.pin_2.set_to_push_pull_output(crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(1, bits), Internal);
+        self.pin_2.set_to_push_pull_output(Internal);
         self.pin_2
-            .connect_peripheral_to_output(instance.data_out_signal(2, bits), crate::private::Internal);
-        self.pin_3.set_to_push_pull_output(crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(2, bits), Internal);
+        self.pin_3.set_to_push_pull_output(Internal);
         self.pin_3
-            .connect_peripheral_to_output(instance.data_out_signal(3, bits), crate::private::Internal);
-        self.pin_4.set_to_push_pull_output(crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(3, bits), Internal);
+        self.pin_4.set_to_push_pull_output(Internal);
         self.pin_4
-            .connect_peripheral_to_output(instance.data_out_signal(4, bits), crate::private::Internal);
-        self.pin_5.set_to_push_pull_output(crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(4, bits), Internal);
+        self.pin_5.set_to_push_pull_output(Internal);
         self.pin_5
-            .connect_peripheral_to_output(instance.data_out_signal(5, bits), crate::private::Internal);
-        self.pin_6.set_to_push_pull_output(crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(5, bits), Internal);
+        self.pin_6.set_to_push_pull_output(Internal);
         self.pin_6
-            .connect_peripheral_to_output(instance.data_out_signal(6, bits), crate::private::Internal);
-        self.pin_7.set_to_push_pull_output(crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(6, bits), Internal);
+        self.pin_7.set_to_push_pull_output(Internal);
         self.pin_7
-            .connect_peripheral_to_output(instance.data_out_signal(7, bits), crate::private::Internal);
+            .connect_peripheral_to_output(instance.data_out_signal(7, bits), Internal);
     }
 }
 
