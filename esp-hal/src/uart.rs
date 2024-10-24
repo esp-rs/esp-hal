@@ -1111,22 +1111,16 @@ where
         let max_div = 0b1111_1111_1111 - 1;
         let clk_div = ((clk) + (max_div * baudrate) - 1) / (max_div * baudrate);
         T::register_block().clk_conf().write(|w| unsafe {
-            w.sclk_sel()
-                .bits(match clock_source {
-                    ClockSource::Apb => 1,
-                    ClockSource::RcFast => 2,
-                    ClockSource::Xtal => 3,
-                })
-                .sclk_div_a()
-                .bits(0)
-                .sclk_div_b()
-                .bits(0)
-                .sclk_div_num()
-                .bits(clk_div as u8 - 1)
-                .rx_sclk_en()
-                .bit(true)
-                .tx_sclk_en()
-                .bit(true)
+            w.sclk_sel().bits(match clock_source {
+                ClockSource::Apb => 1,
+                ClockSource::RcFast => 2,
+                ClockSource::Xtal => 3,
+            });
+            w.sclk_div_a().bits(0);
+            w.sclk_div_b().bits(0);
+            w.sclk_div_num().bits(clk_div as u8 - 1);
+            w.rx_sclk_en().bit(true);
+            w.tx_sclk_en().bit(true)
         });
 
         let divider = (clk << 4) / (baudrate * clk_div);
@@ -1158,20 +1152,15 @@ where
                     .modify(|_, w| w.uart0_rst_en().clear_bit().uart0_clk_en().set_bit());
 
                 pcr.uart0_sclk_conf().modify(|_, w| unsafe {
-                    w.uart0_sclk_div_a()
-                        .bits(0)
-                        .uart0_sclk_div_b()
-                        .bits(0)
-                        .uart0_sclk_div_num()
-                        .bits(clk_div as u8 - 1)
-                        .uart0_sclk_sel()
-                        .bits(match clock_source {
-                            ClockSource::Apb => 1,
-                            ClockSource::RcFast => 2,
-                            ClockSource::Xtal => 3,
-                        })
-                        .uart0_sclk_en()
-                        .set_bit()
+                    w.uart0_sclk_div_a().bits(0);
+                    w.uart0_sclk_div_b().bits(0);
+                    w.uart0_sclk_div_num().bits(clk_div as u8 - 1);
+                    w.uart0_sclk_sel().bits(match clock_source {
+                        ClockSource::Apb => 1,
+                        ClockSource::RcFast => 2,
+                        ClockSource::Xtal => 3,
+                    });
+                    w.uart0_sclk_en().set_bit()
                 });
             }
             1 => {
@@ -1179,20 +1168,15 @@ where
                     .modify(|_, w| w.uart1_rst_en().clear_bit().uart1_clk_en().set_bit());
 
                 pcr.uart1_sclk_conf().modify(|_, w| unsafe {
-                    w.uart1_sclk_div_a()
-                        .bits(0)
-                        .uart1_sclk_div_b()
-                        .bits(0)
-                        .uart1_sclk_div_num()
-                        .bits(clk_div as u8 - 1)
-                        .uart1_sclk_sel()
-                        .bits(match clock_source {
-                            ClockSource::Apb => 1,
-                            ClockSource::RcFast => 2,
-                            ClockSource::Xtal => 3,
-                        })
-                        .uart1_sclk_en()
-                        .set_bit()
+                    w.uart1_sclk_div_a().bits(0);
+                    w.uart1_sclk_div_b().bits(0);
+                    w.uart1_sclk_div_num().bits(clk_div as u8 - 1);
+                    w.uart1_sclk_sel().bits(match clock_source {
+                        ClockSource::Apb => 1,
+                        ClockSource::RcFast => 2,
+                        ClockSource::Xtal => 3,
+                    });
+                    w.uart1_sclk_en().set_bit()
                 });
             }
             _ => unreachable!(), // ESP32-C6 only has 2 UART instances
@@ -1371,25 +1355,17 @@ pub trait Instance: crate::private::Sealed {
     /// interrupts.
     fn disable_tx_interrupts() {
         Self::register_block().int_clr().write(|w| {
-            w.txfifo_empty()
-                .clear_bit_by_one()
-                .tx_brk_done()
-                .clear_bit_by_one()
-                .tx_brk_idle_done()
-                .clear_bit_by_one()
-                .tx_done()
-                .clear_bit_by_one()
+            w.txfifo_empty().clear_bit_by_one();
+            w.tx_brk_done().clear_bit_by_one();
+            w.tx_brk_idle_done().clear_bit_by_one();
+            w.tx_done().clear_bit_by_one()
         });
 
         Self::register_block().int_ena().write(|w| {
-            w.txfifo_empty()
-                .clear_bit()
-                .tx_brk_done()
-                .clear_bit()
-                .tx_brk_idle_done()
-                .clear_bit()
-                .tx_done()
-                .clear_bit()
+            w.txfifo_empty().clear_bit();
+            w.tx_brk_done().clear_bit();
+            w.tx_brk_idle_done().clear_bit();
+            w.tx_done().clear_bit()
         });
     }
 
@@ -1400,25 +1376,17 @@ pub trait Instance: crate::private::Sealed {
     /// character detection` interrupts.
     fn disable_rx_interrupts() {
         Self::register_block().int_clr().write(|w| {
-            w.rxfifo_full()
-                .clear_bit_by_one()
-                .rxfifo_ovf()
-                .clear_bit_by_one()
-                .rxfifo_tout()
-                .clear_bit_by_one()
-                .at_cmd_char_det()
-                .clear_bit_by_one()
+            w.rxfifo_full().clear_bit_by_one();
+            w.rxfifo_ovf().clear_bit_by_one();
+            w.rxfifo_tout().clear_bit_by_one();
+            w.at_cmd_char_det().clear_bit_by_one()
         });
 
         Self::register_block().int_ena().write(|w| {
-            w.rxfifo_full()
-                .clear_bit()
-                .rxfifo_ovf()
-                .clear_bit()
-                .rxfifo_tout()
-                .clear_bit()
-                .at_cmd_char_det()
-                .clear_bit()
+            w.rxfifo_full().clear_bit();
+            w.rxfifo_ovf().clear_bit();
+            w.rxfifo_tout().clear_bit();
+            w.at_cmd_char_det().clear_bit()
         });
     }
 
@@ -2465,14 +2433,10 @@ pub mod lp_uart {
             // 8-bit world
             // 1-bit stop bit
             me.uart.conf0().modify(|_, w| unsafe {
-                w.parity()
-                    .clear_bit()
-                    .parity_en()
-                    .clear_bit()
-                    .bit_num()
-                    .bits(0x3)
-                    .stop_bit_num()
-                    .bits(0x1)
+                w.parity().clear_bit();
+                w.parity_en().clear_bit();
+                w.bit_num().bits(0x3);
+                w.stop_bit_num().bits(0x1)
             });
             // Set tx idle
             me.uart
@@ -2542,20 +2506,15 @@ pub mod lp_uart {
             let clk_div = clk.div_ceil(max_div * baudrate);
 
             self.uart.clk_conf().modify(|_, w| unsafe {
-                w.sclk_div_a()
-                    .bits(0)
-                    .sclk_div_b()
-                    .bits(0)
-                    .sclk_div_num()
-                    .bits(clk_div as u8 - 1)
-                    .sclk_sel()
-                    .bits(match clock_source {
-                        super::ClockSource::Xtal => 3,
-                        super::ClockSource::RcFast => 2,
-                        super::ClockSource::Apb => panic!("Wrong clock source for LP_UART"),
-                    })
-                    .sclk_en()
-                    .set_bit()
+                w.sclk_div_a().bits(0);
+                w.sclk_div_b().bits(0);
+                w.sclk_div_num().bits(clk_div as u8 - 1);
+                w.sclk_sel().bits(match clock_source {
+                    super::ClockSource::Xtal => 3,
+                    super::ClockSource::RcFast => 2,
+                    super::ClockSource::Apb => panic!("Wrong clock source for LP_UART"),
+                });
+                w.sclk_en().set_bit()
             });
 
             let clk = clk / clk_div;
