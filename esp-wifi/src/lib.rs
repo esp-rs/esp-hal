@@ -548,7 +548,5 @@ pub fn wifi_set_log_verbose() {
 }
 
 fn init_clocks() {
-    unsafe {
-        unwrap!(RADIO_CLOCKS.as_mut()).init_clocks();
-    }
+    critical_section::with(|cs| unwrap!(RADIO_CLOCKS.borrow_ref_mut(cs).as_mut()).init_clocks());
 }

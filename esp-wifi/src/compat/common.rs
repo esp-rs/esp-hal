@@ -27,7 +27,7 @@ struct Mutex {
 
 /// A naive and pretty much unsafe queue to back the queues used in drivers and
 /// supplicant code
-struct RawQueue {
+pub(crate) struct RawQueue {
     count: usize,
     item_size: usize,
     current_read: usize,
@@ -36,7 +36,7 @@ struct RawQueue {
 }
 
 impl RawQueue {
-    fn new(count: usize, item_size: usize) -> Self {
+    pub(crate) fn new(count: usize, item_size: usize) -> Self {
         let storage = unsafe { malloc((count * item_size) as u32) as *mut u8 };
         Self {
             count,
@@ -47,46 +47,78 @@ impl RawQueue {
         }
     }
 
-    fn free_storage(&mut self) {
+    pub(crate) fn release_storage(&mut self) {
         unsafe {
             free(self.storage);
         }
         self.storage = core::ptr::null_mut();
     }
 
-    fn enqueue(&mut self, item: *mut c_void) -> i32 {
-        if self.count() < self.count {
-            unsafe {
-                let p = self.storage.byte_add(self.item_size * self.current_write);
-                p.copy_from(item as *mut u8, self.item_size);
-                self.current_write = (self.current_write + 1) % self.count;
-            }
+    pub(crate) fn enqueue(&mut self, item: *mut c_void) -> i32 {
+        critical_section::with(|_| {
+            if self.count() < self.count {
+                unsafe {
+                    let p = self.storage.byte_add(self.item_size * self.current_write);
+                    p.copy_from(item as *mut u8, self.item_size);
+                    self.current_write = (self.current_write + 1) % self.count;
+                }
 
-            1
-        } else {
-            0
-        }
+                1
+            } else {
+                0
+            }
+        })
     }
 
-    fn try_dequeue(&mut self, item: *mut c_void) -> bool {
-        if self.count() > 0 {
-            unsafe {
-                let p = self.storage.byte_add(self.item_size * self.current_read) as *const c_void;
-                item.copy_from(p, self.item_size);
-                self.current_read = (self.current_read + 1) % self.count;
+    pub(crate) fn try_dequeue(&mut self, item: *mut c_void) -> bool {
+        critical_section::with(|_| {
+            if self.count() > 0 {
+                unsafe {
+                    let p =
+                        self.storage.byte_add(self.item_size * self.current_read) as *const c_void;
+                    item.copy_from(p, self.item_size);
+                    self.current_read = (self.current_read + 1) % self.count;
+                }
+                true
+            } else {
+                false
             }
-            true
-        } else {
-            false
-        }
+        })
     }
 
-    fn count(&self) -> usize {
-        if self.current_write >= self.current_read {
-            self.current_write - self.current_read
-        } else {
-            self.count - self.current_read + self.current_write
-        }
+    pub(crate) fn remove(&mut self, item: *mut c_void) {
+        // do what the ESP-IDF implementations does ...
+        // just remove all elements and add them back except the one we need to remove -
+        // good enough for now
+        critical_section::with(|_| unsafe {
+            let item_slice = core::slice::from_raw_parts_mut(item as *mut u8, self.item_size);
+            let count = self.count();
+            let tmp_item = crate::compat::malloc::malloc(self.item_size);
+
+            if tmp_item.is_null() {
+                panic!("Out of memory");
+            }
+
+            for _ in 0..count {
+                if self.try_dequeue(tmp_item as *mut c_void) {
+                    let tmp_slice = core::slice::from_raw_parts_mut(tmp_item, self.item_size);
+                    if tmp_slice != item_slice {
+                        self.enqueue(tmp_item as *mut c_void);
+                    }
+                }
+            }
+            crate::compat::malloc::free(tmp_item);
+        })
+    }
+
+    pub(crate) fn count(&self) -> usize {
+        critical_section::with(|_| {
+            if self.current_write >= self.current_read {
+                self.current_write - self.current_read
+            } else {
+                self.count - self.current_read + self.current_write
+            }
+        })
     }
 }
 
@@ -267,7 +299,7 @@ pub(crate) fn delete_queue(queue: *mut c_void) {
 
     let queue: *mut RawQueue = queue.cast();
     unsafe {
-        (*queue).free_storage();
+        (*queue).release_storage();
         free(queue.cast());
     }
 }
@@ -281,7 +313,7 @@ pub(crate) fn send_queued(queue: *mut c_void, item: *mut c_void, block_time_tick
     );
 
     let queue: *mut RawQueue = queue.cast();
-    critical_section::with(|_| unsafe { (*queue).enqueue(item) })
+    unsafe { (*queue).enqueue(item) }
 }
 
 pub(crate) fn receive_queued(queue: *mut c_void, item: *mut c_void, block_time_tick: u32) -> i32 {
@@ -299,7 +331,7 @@ pub(crate) fn receive_queued(queue: *mut c_void, item: *mut c_void, block_time_t
     let queue: *mut RawQueue = queue.cast();
 
     loop {
-        if critical_section::with(|_| unsafe { (*queue).try_dequeue(item) }) {
+        if unsafe { (*queue).try_dequeue(item) } {
             trace!("received");
             return 1;
         }
@@ -317,7 +349,7 @@ pub(crate) fn number_of_messages_in_queue(queue: *const c_void) -> u32 {
     trace!("queue_msg_waiting {:?}", queue);
 
     let queue: *const RawQueue = queue.cast();
-    critical_section::with(|_| unsafe { (*queue).count() as u32 })
+    unsafe { (*queue).count() as u32 }
 }
 
 /// Implementation of sleep() from newlib in esp-idf.
