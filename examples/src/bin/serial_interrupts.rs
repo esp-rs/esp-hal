@@ -14,7 +14,6 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     gpio::Io,
-    peripherals::UART0,
     prelude::*,
     uart::{
         config::{AtCmdConfig, Config},
@@ -23,7 +22,7 @@ use esp_hal::{
     Blocking,
 };
 
-static SERIAL: Mutex<RefCell<Option<Uart<UART0, Blocking>>>> = Mutex::new(RefCell::new(None));
+static SERIAL: Mutex<RefCell<Option<Uart<Blocking>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {

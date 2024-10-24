@@ -32,6 +32,7 @@ peripherals:
 - I2S
 - I2C
 - TWAI
+- UART
 
 ```diff
 -Spi<'static, SPI2, FullDuplexMode>

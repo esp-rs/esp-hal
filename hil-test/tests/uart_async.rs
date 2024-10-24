@@ -6,11 +6,11 @@
 #![no_std]
 #![no_main]
 
-use esp_hal::{gpio::Io, peripherals::UART0, uart::Uart, Async};
+use esp_hal::{gpio::Io, uart::Uart, Async};
 use hil_test as _;
 
 struct Context {
-    uart: Uart<'static, UART0, Async>,
+    uart: Uart<'static, Async>,
 }
 
 #[cfg(test)]
