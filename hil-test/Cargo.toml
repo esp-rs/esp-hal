@@ -310,5 +310,5 @@ debug            = 2
 debug-assertions = false
 incremental      = false
 opt-level        = 3
-lto              = "fat"
+lto              = false # LTO (thin or fat) miscompiles some tests on RISC-V
 overflow-checks  = false

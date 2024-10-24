@@ -320,9 +320,7 @@ pub fn execute_app(
         .features(&features)
         .arg(bin);
 
-    if !debug && app.name() != "ecc" {
-        // FIXME, HACK: The `ecc` tests are currently miscompiled with `lto="thin"` or
-        // stronger. This is a temporary workaround until the issue is resolved.
+    if !debug {
         builder.add_arg("--release");
     }
 
