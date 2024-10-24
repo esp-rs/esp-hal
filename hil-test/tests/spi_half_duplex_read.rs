@@ -6,7 +6,7 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma::{Dma, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{Level, Output},
     prelude::*,
@@ -58,7 +58,7 @@ mod tests {
         )
         .with_sck(sclk)
         .with_miso(miso)
-        .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
+        .with_dma(dma_channel);
 
         Context { spi, miso_mirror }
     }

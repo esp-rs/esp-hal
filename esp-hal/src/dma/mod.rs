@@ -19,7 +19,7 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::spi::{master::{Config, Spi}, SpiMode};
-//! # use esp_hal::dma::{Dma, DmaPriority};
+//! # use esp_hal::dma::Dma;
 //! let dma = Dma::new(peripherals.DMA);
 #![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.spi2channel;")]
 #![cfg_attr(not(any(esp32, esp32s2)), doc = "let dma_channel = dma.channel0;")]
@@ -40,10 +40,7 @@
 //! .with_mosi(mosi)
 //! .with_miso(miso)
 //! .with_cs(cs)
-//! .with_dma(dma_channel.configure(
-//!     false,
-//!     DmaPriority::Priority0,
-//! ));
+//! .with_dma(dma_channel);
 //! # }
 //! ```
 //! 
@@ -1688,7 +1685,6 @@ pub struct ChannelRx<'a, M, CH>
 where
     CH: DmaChannel,
 {
-    pub(crate) burst_mode: bool,
     pub(crate) rx_impl: CH::Rx,
     pub(crate) _phantom: PhantomData<(&'a (), CH, M)>,
 }
@@ -1711,7 +1707,6 @@ where
         rx_impl.set_async(false);
 
         Self {
-            burst_mode: false,
             rx_impl,
             _phantom: PhantomData,
         }
@@ -1724,7 +1719,6 @@ where
         }
         self.rx_impl.set_async(true);
         ChannelRx {
-            burst_mode: self.burst_mode,
             rx_impl: self.rx_impl,
             _phantom: PhantomData,
         }
@@ -1758,7 +1752,6 @@ where
         }
         self.rx_impl.set_async(false);
         ChannelRx {
-            burst_mode: self.burst_mode,
             rx_impl: self.rx_impl,
             _phantom: PhantomData,
         }
@@ -1777,16 +1770,15 @@ where
         CH: DmaChannelConvert<DEG>,
     {
         ChannelRx {
-            burst_mode: self.burst_mode,
             rx_impl: CH::degrade_rx(self.rx_impl),
             _phantom: PhantomData,
         }
     }
 
     /// Configure the channel.
-    pub fn configure(&mut self, burst_mode: bool, priority: DmaPriority) {
-        self.burst_mode = burst_mode;
-        self.rx_impl.configure(burst_mode, priority);
+    #[cfg(gdma)]
+    pub fn set_priority(&mut self, priority: DmaPriority) {
+        self.rx_impl.set_priority(priority);
     }
 }
 
@@ -1807,14 +1799,14 @@ where
         peri: DmaPeripheral,
         chain: &DescriptorChain,
     ) -> Result<(), DmaError> {
-        if self.burst_mode
-            && chain
-                .descriptors
-                .iter()
-                .any(|d| d.len() % 4 != 0 || d.buffer as u32 % 4 != 0)
-        {
-            return Err(DmaError::InvalidAlignment);
-        }
+        // if self.burst_mode
+        //    && chain
+        //        .descriptors
+        //        .iter()
+        //        .any(|d| d.len() % 4 != 0 || d.buffer as u32 % 4 != 0)
+        //{
+        //    return Err(DmaError::InvalidAlignment);
+        //}
 
         // for esp32s3 we check each descriptor buffer that points to psram for
         // alignment and invalidate the cache for that buffer
@@ -1851,9 +1843,7 @@ where
     ) -> Result<(), DmaError> {
         let preparation = buffer.prepare();
 
-        self.rx_impl
-            .set_burst_mode(self.burst_mode && preparation.is_burstable);
-
+        self.rx_impl.set_burst_mode(false);
         self.rx_impl.set_check_owner(preparation.check_owner);
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
@@ -1982,8 +1972,6 @@ pub struct ChannelTx<'a, M, CH>
 where
     CH: DmaChannel,
 {
-    #[allow(unused)]
-    pub(crate) burst_mode: bool,
     pub(crate) tx_impl: CH::Tx,
     pub(crate) _phantom: PhantomData<(&'a (), CH, M)>,
 }
@@ -2001,7 +1989,6 @@ where
         tx_impl.set_async(false);
 
         Self {
-            burst_mode: false,
             tx_impl,
             _phantom: PhantomData,
         }
@@ -2014,7 +2001,6 @@ where
         }
         self.tx_impl.set_async(true);
         ChannelTx {
-            burst_mode: self.burst_mode,
             tx_impl: self.tx_impl,
             _phantom: PhantomData,
         }
@@ -2048,7 +2034,6 @@ where
         }
         self.tx_impl.set_async(false);
         ChannelTx {
-            burst_mode: self.burst_mode,
             tx_impl: self.tx_impl,
             _phantom: PhantomData,
         }
@@ -2067,16 +2052,15 @@ where
         CH: DmaChannelConvert<DEG>,
     {
         ChannelTx {
-            burst_mode: self.burst_mode,
             tx_impl: CH::degrade_tx(self.tx_impl),
             _phantom: PhantomData,
         }
     }
 
-    /// Configure the channel.
-    pub fn configure(&mut self, burst_mode: bool, priority: DmaPriority) {
-        self.burst_mode = burst_mode;
-        self.tx_impl.configure(burst_mode, priority);
+    /// Configure the channel priority.
+    #[cfg(gdma)]
+    pub fn set_priority(&mut self, priority: DmaPriority) {
+        self.tx_impl.set_priority(priority);
     }
 }
 
@@ -2147,9 +2131,7 @@ where
             }
         );
 
-        self.tx_impl
-            .set_burst_mode(self.burst_mode && preparation.is_burstable);
-
+        self.tx_impl.set_burst_mode(false);
         self.tx_impl.set_check_owner(preparation.check_owner);
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
@@ -2228,6 +2210,7 @@ pub trait RegisterAccess: crate::private::Sealed {
 
     /// The priority of the channel. The larger the value, the higher the
     /// priority.
+    #[cfg(gdma)]
     fn set_priority(&self, priority: DmaPriority);
 
     /// Select a peripheral for the channel.
@@ -2254,12 +2237,6 @@ pub trait RegisterAccess: crate::private::Sealed {
 
     #[cfg(pdma)]
     fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool;
-
-    /// Configure the channel.
-    fn configure(&self, burst_mode: bool, priority: DmaPriority) {
-        self.set_burst_mode(burst_mode);
-        self.set_priority(priority);
-    }
 }
 
 #[doc(hidden)]
@@ -2375,10 +2352,11 @@ where
         }
     }
 
-    /// Configure the channel.
-    pub fn configure(&mut self, burst_mode: bool, priority: DmaPriority) {
-        self.rx.configure(burst_mode, priority);
-        self.tx.configure(burst_mode, priority);
+    /// Configure the channel priorities.
+    #[cfg(gdma)]
+    pub fn set_priority(&mut self, priority: DmaPriority) {
+        self.tx.set_priority(priority);
+        self.rx.set_priority(priority);
     }
 
     /// Converts a blocking channel to an async channel.

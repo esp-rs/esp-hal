@@ -9,7 +9,7 @@
 
 use embassy_time::{Duration, Instant, Ticker};
 use esp_hal::{
-    dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma::{Dma, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     interrupt::{software::SoftwareInterruptControl, Priority},
     peripheral::Peripheral,
@@ -129,7 +129,7 @@ mod test {
         )
         .with_miso(unsafe { mosi.clone_unchecked() })
         .with_mosi(mosi)
-        .with_dma(dma_channel1.configure(false, DmaPriority::Priority0))
+        .with_dma(dma_channel1)
         .with_buffers(dma_rx_buf, dma_tx_buf)
         .into_async();
 
@@ -142,7 +142,7 @@ mod test {
                 ..Config::default()
             },
         )
-        .with_dma(dma_channel2.configure(false, DmaPriority::Priority0))
+        .with_dma(dma_channel2)
         .into_async();
 
         #[cfg(not(any(esp32, esp32s2, esp32s3)))]
@@ -154,7 +154,7 @@ mod test {
                 esp_hal::i2s::master::Standard::Philips,
                 esp_hal::i2s::master::DataFormat::Data8Channel8,
                 8u32.kHz(),
-                dma_channel2.configure(false, DmaPriority::Priority0),
+                dma_channel2,
                 rx_descriptors,
                 tx_descriptors,
             )
@@ -205,14 +205,14 @@ mod test {
     #[timeout(3)]
     async fn dma_does_not_lock_up_on_core_1() {
         use embassy_time::Timer;
-        use esp_hal::peripherals::SPI2;
+        use esp_hal::{dma::Channel, peripherals::SPI2, Blocking};
         use portable_atomic::{AtomicU32, Ordering};
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
-                use esp_hal::dma::Spi2DmaChannelCreator as DmaChannelCreator;
+                use esp_hal::dma::Spi2DmaChannel as DmaChannel;
             } else {
-                type DmaChannelCreator = esp_hal::dma::ChannelCreator<0>;
+                type DmaChannel = esp_hal::dma::DmaChannel0;
             }
         }
 
@@ -221,7 +221,7 @@ mod test {
 
         pub struct SpiPeripherals {
             pub spi: SPI2,
-            pub dma_channel: DmaChannelCreator,
+            pub dma_channel: Channel<'static, Blocking, DmaChannel>,
         }
 
         #[embassy_executor::task]
@@ -238,11 +238,7 @@ mod test {
                     ..Config::default()
                 },
             )
-            .with_dma(
-                peripherals
-                    .dma_channel
-                    .configure(false, DmaPriority::Priority0),
-            )
+            .with_dma(peripherals.dma_channel)
             .with_buffers(dma_rx_buf, dma_tx_buf)
             .into_async();
 

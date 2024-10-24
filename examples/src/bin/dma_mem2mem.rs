@@ -9,7 +9,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{Dma, DmaPriority, Mem2Mem},
+    dma::{Dma, Mem2Mem},
     dma_buffers,
     prelude::*,
 };
@@ -28,14 +28,13 @@ fn main() -> ! {
     let (mut rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DATA_SIZE);
 
     let dma = Dma::new(peripherals.DMA);
-    let channel = dma.channel0.configure(false, DmaPriority::Priority0);
     #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))]
     let dma_peripheral = peripherals.SPI2;
     #[cfg(not(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3")))]
     let dma_peripheral = peripherals.MEM2MEM1;
 
     let mut mem2mem =
-        Mem2Mem::new(channel, dma_peripheral, rx_descriptors, tx_descriptors).unwrap();
+        Mem2Mem::new(dma.channel0, dma_peripheral, rx_descriptors, tx_descriptors).unwrap();
 
     for i in 0..core::mem::size_of_val(tx_buffer) {
         tx_buffer[i] = (i % 256) as u8;

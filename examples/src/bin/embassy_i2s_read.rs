@@ -20,7 +20,7 @@
 use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
-    dma::{Dma, DmaPriority},
+    dma::Dma,
     dma_buffers,
     i2s::master::{DataFormat, I2s, Standard},
     prelude::*,
@@ -49,7 +49,7 @@ async fn main(_spawner: Spawner) {
         Standard::Philips,
         DataFormat::Data16Channel16,
         44100u32.Hz(),
-        dma_channel.configure(false, DmaPriority::Priority0),
+        dma_channel,
         rx_descriptors,
         tx_descriptors,
     )

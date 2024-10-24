@@ -25,7 +25,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{Dma, DmaPriority, DmaTxBuf},
+    dma::{Dma, DmaTxBuf},
     dma_tx_buffer,
     gpio::{Input, Level, Output, Pull},
     lcd_cam::{
@@ -48,11 +48,8 @@ fn main() -> ! {
     let lcd_te = peripherals.GPIO48; // Frame sync
 
     let dma = Dma::new(peripherals.DMA);
-    let channel = dma.channel0;
 
     let dma_tx_buf = dma_tx_buffer!(4000).unwrap();
-
-    let channel = channel.configure(false, DmaPriority::Priority0);
 
     let delay = Delay::new();
 
@@ -74,7 +71,7 @@ fn main() -> ! {
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
     let i8080 = I8080::new(
         lcd_cam.lcd,
-        channel.tx,
+        dma.channel0.tx,
         tx_pins,
         20.MHz(),
         Config::default(),

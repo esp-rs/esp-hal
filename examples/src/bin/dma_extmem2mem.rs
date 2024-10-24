@@ -11,7 +11,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{Dma, DmaPriority, Mem2Mem},
+    dma::{Dma, Mem2Mem},
     dma_descriptors_chunk_size,
     prelude::*,
 };
@@ -68,11 +68,10 @@ fn main() -> ! {
     let (rx_descriptors, tx_descriptors) = dma_descriptors_chunk_size!(DATA_SIZE, CHUNK_SIZE);
 
     let dma = Dma::new(peripherals.DMA);
-    let channel = dma.channel0.configure(false, DmaPriority::Priority0);
     let dma_peripheral = peripherals.SPI2;
 
     let mut mem2mem = Mem2Mem::new_with_chunk_size(
-        channel,
+        dma.channel0,
         dma_peripheral,
         rx_descriptors,
         tx_descriptors,

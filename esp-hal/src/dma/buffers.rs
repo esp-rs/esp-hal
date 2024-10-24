@@ -17,15 +17,15 @@ pub struct Preparation {
     #[cfg_attr(not(esp32s3), allow(dead_code))]
     pub block_size: Option<DmaBufBlkSize>,
 
-    /// Specifies whether descriptor linked list specified in `start` conforms
-    /// to the alignment requirements required to enable burst transfers.
+    /// Specifies whether the data should be transferred in burst mode.
     ///
-    /// Note: This only applies to burst transfer of the buffer data, not the
-    /// descriptors themselves.
+    /// The implementation of the buffer must ensure that burst mode is only
+    /// enabled when alignment requirements are met.
     ///
     /// There are no additional alignment requirements for TX burst transfers,
     /// but RX transfers require all descriptors to have buffer pointers and
     /// sizes that are a multiple of 4 (word aligned).
+    // TODO: currently unused, buffers should not hardcode their preference.
     pub is_burstable: bool,
 
     /// Configures the "check owner" feature of the DMA channel.

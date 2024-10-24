@@ -9,7 +9,7 @@
 #[cfg(esp32c6)]
 use esp_hal::parl_io::{TxPinConfigWithValidPin, TxSixteenBits};
 use esp_hal::{
-    dma::{ChannelCreator, Dma, DmaPriority},
+    dma::{Channel, Dma, DmaChannel0},
     gpio::{
         interconnect::{InputSignal, OutputSignal},
         NoPin,
@@ -29,12 +29,13 @@ use esp_hal::{
     },
     peripherals::PARL_IO,
     prelude::*,
+    Async,
 };
 use hil_test as _;
 
 struct Context {
     parl_io: PARL_IO,
-    dma_channel: ChannelCreator<0>,
+    dma_channel: Channel<'static, Async, DmaChannel0>,
     clock: OutputSignal,
     valid: OutputSignal,
     clock_loopback: InputSignal,
@@ -60,7 +61,7 @@ mod tests {
         let pcnt = Pcnt::new(peripherals.PCNT);
         let pcnt_unit = pcnt.unit0;
         let dma = Dma::new(peripherals.DMA);
-        let dma_channel = dma.channel0;
+        let dma_channel = dma.channel0.into_async();
 
         let parl_io = peripherals.PARL_IO;
 
@@ -90,15 +91,8 @@ mod tests {
         let mut pins = TxPinConfigIncludingValidPin::new(pins);
         let mut clock_pin = ClkOutPin::new(ctx.clock);
 
-        let pio = ParlIoTxOnly::new(
-            ctx.parl_io,
-            ctx.dma_channel
-                .configure(false, DmaPriority::Priority0)
-                .into_async(),
-            tx_descriptors,
-            10.MHz(),
-        )
-        .unwrap();
+        let pio =
+            ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, tx_descriptors, 10.MHz()).unwrap();
 
         let mut pio = pio
             .tx
@@ -158,15 +152,8 @@ mod tests {
 
         let mut clock_pin = ClkOutPin::new(ctx.clock);
 
-        let pio = ParlIoTxOnly::new(
-            ctx.parl_io,
-            ctx.dma_channel
-                .configure(false, DmaPriority::Priority0)
-                .into_async(),
-            tx_descriptors,
-            10.MHz(),
-        )
-        .unwrap();
+        let pio =
+            ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, tx_descriptors, 10.MHz()).unwrap();
 
         let mut pio = pio
             .tx
