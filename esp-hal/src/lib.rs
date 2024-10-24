@@ -73,7 +73,12 @@
 //!
 //! #[entry]
 //! fn main() -> ! {
-//!     let peripherals = esp_hal::init(esp_hal::Config::default());
+//!     let peripherals = esp_hal::init({
+//!         let mut config = esp_hal::Config::default());
+//!         // Configure the CPU to run at the maximum frequency.
+//!         config.cpu_clock = CpuClock::max();
+//!         config
+//!     });
 //!
 //!     // Set GPIO0 as an output, and set its state high initially.
 //!     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
