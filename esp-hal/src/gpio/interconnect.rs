@@ -26,14 +26,12 @@ use crate::{
 ///
 /// Peripheral drivers are encouraged to accept types that implement this and
 /// [`PeripheralOutput`] as arguments instead of pin types.
-#[doc(hidden)]
 pub trait PeripheralInput: Into<InputConnection> + 'static {}
 
 /// A signal that can be connected to a peripheral input and/or output.
 ///
 /// Peripheral drivers are encouraged to accept types that implement this and
 /// [`PeripheralInput`] as arguments instead of pin types.
-#[doc(hidden)]
 pub trait PeripheralOutput: Into<OutputConnection> + 'static {}
 
 impl<P: InputPin> PeripheralInput for P {}
@@ -282,7 +280,7 @@ impl OutputSignal {
 impl OutputSignal {
     /// Connect the pin to a peripheral input signal.
     ///
-    /// Since there can only be one input signal connected to a peripheral at a
+    /// Since there can only be one signal connected to a peripheral input at a
     /// time, this function will disconnect any previously connected input
     /// signals.
     fn connect_input_to_peripheral(&mut self, signal: gpio::InputSignal, _: private::Internal) {

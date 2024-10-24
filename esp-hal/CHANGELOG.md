@@ -50,7 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the pin type parameters from `parl_io::{TxOneBit, TxTwoBits, TxFourBits, TxEightBits, TxSixteenBits}` (#2388)
 - Removed the pin type parameters from `parl_io::{RxOneBit, RxTwoBits, RxFourBits, RxEightBits, RxSixteenBits}` (#2388)
 - Removed the pin type parameters from `lcd_cam::lcd::i8080::{TxEightBits, TxSixteenBits}` (#2388)
-- Removed the pin type parameters from `lcd_cam::lcd::cam::{RxEightBits, RxSixteenBits}` (#2388)
+- Removed the pin type parameters from `lcd_cam::cam::{RxEightBits, RxSixteenBits}` (#2388)
 
 ## [0.21.1]
 
