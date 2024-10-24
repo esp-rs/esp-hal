@@ -637,25 +637,16 @@ where
 
     /// Fill a buffer with received bytes
     pub fn read_bytes(&mut self, mut buf: &mut [u8]) -> Result<(), Error> {
-        if buf.is_empty() {
-            return Ok(());
-        }
-        let cap = buf.len();
-        let mut total = 0;
-        loop {
+        while !buf.is_empty() {
             while self.uart.get_rx_fifo_count() == 0 {
                 // Block until we received at least one byte
             }
             let read = self.drain_fifo(buf);
-            total += read;
-            // drain_fifo only drains bytes that will fit in buf,
-            // so we will always have an exact total
-            if total == cap {
-                break;
-            }
+
             // update the buffer position based on the bytes read
             buf = &mut buf[read..];
         }
+
         Ok(())
     }
 
