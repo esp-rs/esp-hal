@@ -16,6 +16,7 @@ use embassy_sync::waitqueue::AtomicWaker;
 use crate::{
     dma::*,
     peripheral::PeripheralRef,
+    peripherals::Interrupt,
     system::{Peripheral, PeripheralClockControl},
 };
 
@@ -324,9 +325,27 @@ macro_rules! ImplSpiChannel {
             #[non_exhaustive]
             pub struct [<Spi $num DmaChannel>] {}
 
+            impl [<Spi $num DmaChannel>] {
+                fn handler() -> InterruptHandler {
+                    super::asynch::interrupt::[< interrupt_handler_spi $num _dma >]
+                }
+
+                fn isrs() -> &'static [Interrupt] {
+                    &[Interrupt::[< SPI $num _DMA >]]
+                }
+            }
+
             impl DmaChannel for [<Spi $num DmaChannel>] {
                 type Rx = SpiDmaRxChannelImpl<Self>;
                 type Tx = SpiDmaTxChannelImpl<Self>;
+
+                fn async_handler<M: Mode>(_ch: &Channel<'_, Self, M>) -> InterruptHandler {
+                    Self::handler()
+                }
+
+                fn interrupts<M: Mode>(_ch: &Channel<'_, Self, M>) -> &'static [Interrupt] {
+                    Self::isrs()
+                }
             }
 
             impl DmaChannelExt for [<Spi $num DmaChannel>] {
@@ -335,14 +354,6 @@ macro_rules! ImplSpiChannel {
                 }
                 fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
                     SpiDmaTxChannelImpl(Self {})
-                }
-
-                fn set_isr(handler: InterruptHandler) {
-                    let interrupt = $crate::peripherals::Interrupt::[< SPI $num _DMA >];
-                    unsafe {
-                        crate::interrupt::bind_interrupt(interrupt, handler.handler());
-                    }
-                    crate::interrupt::enable(interrupt, handler.priority()).unwrap();
                 }
             }
 
@@ -377,64 +388,23 @@ macro_rules! ImplSpiChannel {
 
             impl $crate::private::Sealed for [<Spi $num DmaChannel>] {}
 
-            #[doc = concat!("Creates a channel for SPI", $num)]
-            #[non_exhaustive]
-            pub struct [<Spi $num DmaChannelCreator>] {}
+            impl [<Spi $num DmaChannel>] {
+                /// Unsafely constructs a new DMA channel.
+                ///
+                /// # Safety
+                ///
+                /// The caller must ensure that only a single instance is used.
+                pub unsafe fn steal<'a>() -> Channel<'a, Self, Blocking> {
+                    let tx_impl = SpiDmaTxChannelImpl(Self {});
+                    let rx_impl = SpiDmaRxChannelImpl(Self {});
 
-            impl [<Spi $num DmaChannelCreator>] {
-                fn do_configure<'a, M: $crate::Mode>(
-                    self,
-                    burst_mode: bool,
-                    priority: DmaPriority,
-                ) -> Channel<'a, [<Spi $num DmaChannel>], M> {
-                    #[cfg(esp32)]
-                    {
-                        // (only) on ESP32 we need to configure DPORT for the SPI DMA channels
-                        let dport = unsafe { &*crate::peripherals::DPORT::PTR };
-                        dport
-                            .spi_dma_chan_sel()
-                            .modify(|_, w| unsafe { w.[< spi $num _dma_chan_sel>]().bits($num - 1) });
-                    }
-
-                    let tx_impl = SpiDmaTxChannelImpl([<Spi $num DmaChannel>] {});
-                    tx_impl.set_burst_mode(burst_mode);
-                    tx_impl.set_priority(priority);
-
-                    let rx_impl = SpiDmaRxChannelImpl([<Spi $num DmaChannel>] {});
-                    rx_impl.set_burst_mode(burst_mode);
-                    rx_impl.set_priority(priority);
-
-                    Channel {
-                        tx: ChannelTx::new(tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_impl, burst_mode),
+                    let mut this = Channel {
+                        tx: ChannelTx::new(tx_impl),
+                        rx: ChannelRx::new(rx_impl),
                         phantom: PhantomData,
-                    }
-                }
+                    };
 
-                /// Configure the channel for use with blocking APIs
-                ///
-                /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
-                /// transfer buffers of size `1..=4092`, you need 1 descriptor.
-                pub fn configure<'a>(
-                    self,
-                    burst_mode: bool,
-                    priority: DmaPriority,
-                ) -> Channel<'a, [<Spi $num DmaChannel>], $crate::Blocking> {
-                    Self::do_configure(self, burst_mode, priority)
-                }
-
-                /// Configure the channel for use with async APIs
-                ///
-                /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
-                /// transfer buffers of size `1..=4092`, you need 1 descriptor.
-                pub fn configure_for_async<'a>(
-                    self,
-                    burst_mode: bool,
-                    priority: DmaPriority,
-                ) -> Channel<'a, [<Spi $num DmaChannel>], $crate::Async> {
-                    let this = Self::do_configure(self, burst_mode, priority);
-
-                    [<Spi $num DmaChannel>]::set_isr(super::asynch::interrupt::[< interrupt_handler_spi $num _dma >]);
+                    this.configure(false, DmaPriority::Priority0);
 
                     this
                 }
@@ -746,9 +716,27 @@ macro_rules! ImplI2sChannel {
 
             impl $crate::private::Sealed for [<I2s $num DmaChannel>] {}
 
+            impl [<I2s $num DmaChannel>] {
+                fn handler() -> InterruptHandler {
+                    super::asynch::interrupt::[< interrupt_handler_i2s $num _dma >]
+                }
+
+                fn isrs() -> &'static [Interrupt] {
+                    &[Interrupt::[< I2S $num >]]
+                }
+            }
+
             impl DmaChannel for [<I2s $num DmaChannel>] {
                 type Rx = I2sDmaRxChannelImpl<Self>;
                 type Tx = I2sDmaTxChannelImpl<Self>;
+
+                fn async_handler<M: Mode>(_ch: &Channel<'_, Self, M>) -> InterruptHandler {
+                    Self::handler()
+                }
+
+                fn interrupts<M: Mode>(_ch: &Channel<'_, Self, M>) -> &'static [Interrupt] {
+                    Self::isrs()
+                }
             }
 
             impl DmaChannelExt for [<I2s $num DmaChannel>] {
@@ -757,14 +745,6 @@ macro_rules! ImplI2sChannel {
                 }
                 fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
                     I2sDmaTxChannelImpl(Self {})
-                }
-
-                fn set_isr(handler: InterruptHandler) {
-                    let interrupt = $crate::peripherals::Interrupt::[< I2S $num >];
-                    unsafe {
-                        crate::interrupt::bind_interrupt(interrupt, handler.handler());
-                    }
-                    crate::interrupt::enable(interrupt, handler.priority()).unwrap();
                 }
             }
 
@@ -796,54 +776,23 @@ macro_rules! ImplI2sChannel {
                 }
             }
 
-            #[doc = concat!("Creates a channel for I2S", $num)]
-            pub struct [<I2s $num DmaChannelCreator>] {}
+            impl [<I2s $num DmaChannel>] {
+                /// Unsafely constructs a new DMA channel.
+                ///
+                /// # Safety
+                ///
+                /// The caller must ensure that only a single instance is used.
+                pub unsafe fn steal<'a>() -> Channel<'a, Self, Blocking> {
+                    let tx_impl = I2sDmaTxChannelImpl(Self {});
+                    let rx_impl = I2sDmaRxChannelImpl(Self {});
 
-            impl [<I2s $num DmaChannelCreator>] {
-                fn do_configure<'a, M: $crate::Mode>(
-                    self,
-                    burst_mode: bool,
-                    priority: DmaPriority,
-                ) -> Channel<'a, [<I2s $num DmaChannel>], M> {
-                    let tx_impl = I2sDmaTxChannelImpl([<I2s $num DmaChannel>] {});
-                    tx_impl.set_burst_mode(burst_mode);
-                    tx_impl.set_priority(priority);
-
-                    let rx_impl = I2sDmaRxChannelImpl([<I2s $num DmaChannel>] {});
-                    rx_impl.set_burst_mode(burst_mode);
-                    rx_impl.set_priority(priority);
-
-                    Channel {
-                        tx: ChannelTx::new(tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_impl, burst_mode),
+                    let mut this = Channel {
+                        tx: ChannelTx::new(tx_impl),
+                        rx: ChannelRx::new(rx_impl),
                         phantom: PhantomData,
-                    }
-                }
+                    };
 
-                /// Configure the channel for use with blocking APIs
-                ///
-                /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
-                /// transfer buffers of size `1..=4092`, you need 1 descriptor.
-                pub fn configure<'a>(
-                    self,
-                    burst_mode: bool,
-                    priority: DmaPriority,
-                ) -> Channel<'a, [<I2s $num DmaChannel>], $crate::Blocking> {
-                    Self::do_configure(self, burst_mode, priority)
-                }
-
-                /// Configure the channel for use with async APIs
-                ///
-                /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
-                /// transfer buffers of size `1..=4092`, you need 1 descriptor.
-                pub fn configure_for_async<'a>(
-                    self,
-                    burst_mode: bool,
-                    priority: DmaPriority,
-                ) -> Channel<'a, [<I2s $num DmaChannel>], $crate::Async> {
-                    let this = Self::do_configure(self, burst_mode, priority);
-
-                    [<I2s $num DmaChannel>]::set_isr(super::asynch::interrupt::[< interrupt_handler_i2s $num >]);
+                    this.configure(false, DmaPriority::Priority0);
 
                     this
                 }
@@ -874,14 +823,14 @@ crate::impl_dma_eligible!([I2s1DmaChannel] I2S1 => I2s1);
 pub struct Dma<'d> {
     _inner: PeripheralRef<'d, crate::peripherals::DMA>,
     /// DMA channel for SPI2
-    pub spi2channel: Spi2DmaChannelCreator,
+    pub spi2channel: Channel<'d, Spi2DmaChannel, Blocking>,
     /// DMA channel for SPI3
-    pub spi3channel: Spi3DmaChannelCreator,
+    pub spi3channel: Channel<'d, Spi3DmaChannel, Blocking>,
     /// DMA channel for I2S0
-    pub i2s0channel: I2s0DmaChannelCreator,
+    pub i2s0channel: Channel<'d, I2s0DmaChannel, Blocking>,
     /// DMA channel for I2S1
     #[cfg(i2s1)]
-    pub i2s1channel: I2s1DmaChannelCreator,
+    pub i2s1channel: Channel<'d, I2s1DmaChannel, Blocking>,
 }
 
 impl<'d> Dma<'d> {
@@ -891,13 +840,15 @@ impl<'d> Dma<'d> {
     ) -> Dma<'d> {
         PeripheralClockControl::enable(Peripheral::Dma);
 
-        Dma {
-            _inner: dma.into_ref(),
-            spi2channel: Spi2DmaChannelCreator {},
-            spi3channel: Spi3DmaChannelCreator {},
-            i2s0channel: I2s0DmaChannelCreator {},
-            #[cfg(i2s1)]
-            i2s1channel: I2s1DmaChannelCreator {},
+        unsafe {
+            Dma {
+                _inner: dma.into_ref(),
+                spi2channel: Spi2DmaChannel::steal(),
+                spi3channel: Spi3DmaChannel::steal(),
+                i2s0channel: I2s0DmaChannel::steal(),
+                #[cfg(i2s1)]
+                i2s1channel: I2s1DmaChannel::steal(),
+            }
         }
     }
 }
@@ -924,6 +875,20 @@ impl crate::private::Sealed for AnySpiDmaChannel {}
 impl DmaChannel for AnySpiDmaChannel {
     type Rx = SpiDmaRxChannelImpl<AnySpiDmaChannelInner>;
     type Tx = SpiDmaTxChannelImpl<AnySpiDmaChannelInner>;
+
+    fn async_handler<M: Mode>(ch: &Channel<'_, Self, M>) -> InterruptHandler {
+        match &ch.tx.tx_impl.0 {
+            AnySpiDmaChannelInner::Spi2(_) => Spi2DmaChannel::handler(),
+            AnySpiDmaChannelInner::Spi3(_) => Spi3DmaChannel::handler(),
+        }
+    }
+
+    fn interrupts<M: Mode>(ch: &Channel<'_, Self, M>) -> &'static [Interrupt] {
+        match &ch.tx.tx_impl.0 {
+            AnySpiDmaChannelInner::Spi2(_) => Spi2DmaChannel::isrs(),
+            AnySpiDmaChannelInner::Spi3(_) => Spi3DmaChannel::isrs(),
+        }
+    }
 }
 
 crate::any_enum! {
@@ -960,6 +925,22 @@ impl crate::private::Sealed for AnyI2sDmaChannel {}
 impl DmaChannel for AnyI2sDmaChannel {
     type Rx = I2sDmaRxChannelImpl<AnyI2sDmaChannelInner>;
     type Tx = I2sDmaTxChannelImpl<AnyI2sDmaChannelInner>;
+
+    fn async_handler<M: Mode>(ch: &Channel<'_, Self, M>) -> InterruptHandler {
+        match &ch.tx.tx_impl.0 {
+            AnyI2sDmaChannelInner::I2s0(_) => I2s0DmaChannel::handler(),
+            #[cfg(i2s1)]
+            AnyI2sDmaChannelInner::I2s1(_) => I2s1DmaChannel::handler(),
+        }
+    }
+
+    fn interrupts<M: Mode>(ch: &Channel<'_, Self, M>) -> &'static [Interrupt] {
+        match &ch.tx.tx_impl.0 {
+            AnyI2sDmaChannelInner::I2s0(_) => I2s0DmaChannel::isrs(),
+            #[cfg(i2s1)]
+            AnyI2sDmaChannelInner::I2s1(_) => I2s1DmaChannel::isrs(),
+        }
+    }
 }
 
 crate::any_enum! {

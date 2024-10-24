@@ -250,6 +250,7 @@ pub mod dma {
             WriteBuffer,
         },
         peripherals::AES,
+        Blocking,
     };
 
     const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
@@ -275,7 +276,7 @@ pub mod dma {
         /// The underlying [`Aes`](super::Aes) driver
         pub aes: super::Aes<'d>,
 
-        channel: Channel<'d, <AES as DmaEligible>::Dma, crate::Blocking>,
+        channel: Channel<'d, <AES as DmaEligible>::Dma, Blocking>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
     }
@@ -284,12 +285,11 @@ pub mod dma {
         /// Enable DMA for the current instance of the AES driver
         pub fn with_dma<C>(
             self,
-            channel: Channel<'d, C, crate::Blocking>,
+            channel: Channel<'d, C, Blocking>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> AesDma<'d>
         where
-            Self: Sized,
             C: DmaChannelConvert<<AES as DmaEligible>::Dma>,
         {
             AesDma {

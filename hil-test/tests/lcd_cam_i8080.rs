@@ -6,7 +6,7 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{Dma, DmaPriority, DmaTxBuf},
+    dma::{Dma, DmaTxBuf},
     dma_buffers,
     gpio::{Io, NoPin},
     lcd_cam::{
@@ -19,13 +19,14 @@ use esp_hal::{
         Pcnt,
     },
     prelude::*,
+    Blocking,
 };
 use hil_test as _;
 
 const DATA_SIZE: usize = 1024 * 10;
 
 struct Context<'d> {
-    lcd_cam: LcdCam<'d, esp_hal::Blocking>,
+    lcd_cam: LcdCam<'d, Blocking>,
     pcnt: Pcnt<'d>,
     io: Io,
     dma: Dma<'d>,
@@ -58,13 +59,11 @@ mod tests {
 
     #[test]
     fn test_i8080_8bit(ctx: Context<'static>) {
-        let channel = ctx.dma.channel0.configure(false, DmaPriority::Priority0);
-
         let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
 
         let i8080 = I8080::new(
             ctx.lcd_cam.lcd,
-            channel.tx,
+            ctx.dma.channel0.tx,
             pins,
             20.MHz(),
             Config::default(),
@@ -76,15 +75,11 @@ mod tests {
 
     #[test]
     fn test_i8080_8bit_async_channel(ctx: Context<'static>) {
-        let channel = ctx
-            .dma
-            .channel0
-            .configure_for_async(false, DmaPriority::Priority0);
         let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
 
         let i8080 = I8080::new(
             ctx.lcd_cam.lcd,
-            channel.tx,
+            ctx.dma.channel0.tx,
             pins,
             20.MHz(),
             Config::default(),
@@ -140,7 +135,6 @@ mod tests {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let channel = ctx.dma.channel0.configure(false, DmaPriority::Priority0);
         let pins = TxEightBits::new(
             unit0_signal,
             unit1_signal,
@@ -154,7 +148,7 @@ mod tests {
 
         let mut i8080 = I8080::new(
             ctx.lcd_cam.lcd,
-            channel.tx,
+            ctx.dma.channel0.tx,
             pins,
             20.MHz(),
             Config::default(),
@@ -257,7 +251,7 @@ mod tests {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let channel = ctx.dma.channel0.configure(false, DmaPriority::Priority0);
+        let channel = ctx.dma.channel0;
         let pins = TxSixteenBits::new(
             NoPin,
             NoPin,

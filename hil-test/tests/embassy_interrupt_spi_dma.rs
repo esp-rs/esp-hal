@@ -9,7 +9,7 @@
 
 use embassy_time::{Duration, Instant, Ticker};
 use esp_hal::{
-    dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma::{Channel, Dma, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     interrupt::{software::SoftwareInterruptControl, Priority},
     prelude::*,
@@ -19,6 +19,7 @@ use esp_hal::{
     },
     timer::{timg::TimerGroup, AnyTimer},
     Async,
+    Blocking,
 };
 use esp_hal_embassy::InterruptExecutor;
 use hil_test as _;
@@ -81,11 +82,13 @@ mod test {
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
         let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-            .with_dma(dma_channel1.configure_for_async(false, DmaPriority::Priority0))
-            .with_buffers(dma_rx_buf, dma_tx_buf);
+            .with_dma(dma_channel1)
+            .with_buffers(dma_rx_buf, dma_tx_buf)
+            .into_async();
 
         let spi2 = Spi::new(peripherals.SPI3, 100.kHz(), SpiMode::Mode0)
-            .with_dma(dma_channel2.configure_for_async(false, DmaPriority::Priority0));
+            .with_dma(dma_channel2)
+            .into_async();
 
         let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
@@ -120,9 +123,9 @@ mod test {
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
-                use esp_hal::dma::Spi2DmaChannelCreator as DmaChannelCreator;
+                use esp_hal::dma::Spi2DmaChannel as DmaChannel;
             } else {
-                type DmaChannelCreator = esp_hal::dma::ChannelCreator<0>;
+                type DmaChannel = esp_hal::dma::DmaChannel0;
             }
         }
 
@@ -131,7 +134,7 @@ mod test {
 
         pub struct SpiPeripherals {
             pub spi: SPI2,
-            pub dma_channel: DmaChannelCreator,
+            pub dma_channel: Channel<'static, DmaChannel, Blocking>,
         }
 
         #[embassy_executor::task]
@@ -141,12 +144,9 @@ mod test {
             let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
             let mut spi = Spi::new(peripherals.spi, 100.kHz(), SpiMode::Mode0)
-                .with_dma(
-                    peripherals
-                        .dma_channel
-                        .configure_for_async(false, DmaPriority::Priority0),
-                )
-                .with_buffers(dma_rx_buf, dma_tx_buf);
+                .with_dma(peripherals.dma_channel)
+                .with_buffers(dma_rx_buf, dma_tx_buf)
+                .into_async();
 
             let send_buffer = mk_static!([u8; BUFFER_SIZE], [0u8; BUFFER_SIZE]);
             loop {

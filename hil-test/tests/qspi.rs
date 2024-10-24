@@ -8,7 +8,7 @@
 #[cfg(pcnt)]
 use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
 use esp_hal::{
-    dma::{Channel, Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma::{Channel, Dma, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{AnyPin, Input, Io, Level, Output, Pull},
     prelude::*,
@@ -203,8 +203,6 @@ mod tests {
                 let dma_channel = dma.channel0;
             }
         }
-
-        let dma_channel = dma_channel.configure(false, DmaPriority::Priority0);
 
         Context {
             spi: peripherals.SPI2,

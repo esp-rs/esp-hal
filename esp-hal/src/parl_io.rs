@@ -54,6 +54,7 @@ use crate::{
     peripheral::{self, Peripheral},
     peripherals::{self, PARL_IO},
     system::PeripheralClockControl,
+    Async,
     Blocking,
     InterruptConfigurable,
     Mode,
@@ -1118,6 +1119,28 @@ where
 }
 
 impl<'d> ParlIoFullDuplex<'d, Blocking> {
+    /// Convert to an async version.
+    pub fn into_async(self) -> ParlIoFullDuplex<'d, Async> {
+        let channel = Channel {
+            tx: self.tx.tx_channel,
+            rx: self.rx.rx_channel,
+            phantom: PhantomData::<Blocking>,
+        };
+        let channel = channel.into_async();
+        ParlIoFullDuplex {
+            tx: TxCreatorFullDuplex {
+                tx_channel: channel.tx,
+                descriptors: self.tx.descriptors,
+                phantom: PhantomData,
+            },
+            rx: RxCreatorFullDuplex {
+                rx_channel: channel.rx,
+                descriptors: self.rx.descriptors,
+                phantom: PhantomData,
+            },
+        }
+    }
+
     /// Sets the interrupt handler, enables it with
     /// [crate::interrupt::Priority::min()]
     ///
@@ -1147,11 +1170,35 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
     }
 }
 
-impl<'d> crate::private::Sealed for ParlIoFullDuplex<'d, Blocking> {}
+impl crate::private::Sealed for ParlIoFullDuplex<'_, Blocking> {}
 
-impl<'d> InterruptConfigurable for ParlIoFullDuplex<'d, Blocking> {
+impl InterruptConfigurable for ParlIoFullDuplex<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoFullDuplex::set_interrupt_handler(self, handler);
+    }
+}
+
+impl<'d> ParlIoFullDuplex<'d, Async> {
+    /// Convert to a blocking version.
+    pub fn into_blocking(self) -> ParlIoFullDuplex<'d, Blocking> {
+        let channel = Channel {
+            tx: self.tx.tx_channel,
+            rx: self.rx.rx_channel,
+            phantom: PhantomData::<Async>,
+        };
+        let channel = channel.into_blocking();
+        ParlIoFullDuplex {
+            tx: TxCreatorFullDuplex {
+                tx_channel: channel.tx,
+                descriptors: self.tx.descriptors,
+                phantom: PhantomData,
+            },
+            rx: RxCreatorFullDuplex {
+                rx_channel: channel.rx,
+                descriptors: self.rx.descriptors,
+                phantom: PhantomData,
+            },
+        }
     }
 }
 

@@ -12,7 +12,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{Dma, DmaPriority},
+    dma::Dma,
     dma_buffers,
     gpio::Io,
     parl_io::{no_clk_pin, BitPackOrder, ParlIoRxOnly, RxFourBits},
@@ -33,13 +33,8 @@ fn main() -> ! {
 
     let mut rx_pins = RxFourBits::new(io.pins.gpio1, io.pins.gpio2, io.pins.gpio3, io.pins.gpio4);
 
-    let parl_io = ParlIoRxOnly::new(
-        peripherals.PARL_IO,
-        dma_channel.configure(false, DmaPriority::Priority0),
-        rx_descriptors,
-        1.MHz(),
-    )
-    .unwrap();
+    let parl_io =
+        ParlIoRxOnly::new(peripherals.PARL_IO, dma_channel, rx_descriptors, 1.MHz()).unwrap();
 
     let mut parl_io_rx = parl_io
         .rx

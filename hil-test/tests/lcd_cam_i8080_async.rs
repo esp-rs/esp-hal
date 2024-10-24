@@ -7,7 +7,7 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{Dma, DmaPriority, DmaTxBuf},
+    dma::{Dma, DmaTxBuf},
     dma_buffers,
     gpio::NoPin,
     lcd_cam::{
@@ -15,13 +15,14 @@ use esp_hal::{
         LcdCam,
     },
     prelude::*,
+    Async,
 };
 use hil_test as _;
 
 const DATA_SIZE: usize = 1024 * 10;
 
 struct Context<'d> {
-    lcd_cam: LcdCam<'d, esp_hal::Async>,
+    lcd_cam: LcdCam<'d, Async>,
     dma: Dma<'d>,
     dma_buf: DmaTxBuf,
 }
@@ -49,12 +50,11 @@ mod tests {
 
     #[test]
     async fn test_i8080_8bit(ctx: Context<'static>) {
-        let channel = ctx.dma.channel0.configure(false, DmaPriority::Priority0);
         let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
 
         let i8080 = I8080::new(
             ctx.lcd_cam.lcd,
-            channel.tx,
+            ctx.dma.channel0.tx,
             pins,
             20.MHz(),
             Config::default(),
@@ -72,15 +72,11 @@ mod tests {
 
     #[test]
     async fn test_i8080_8bit_async_channel(ctx: Context<'static>) {
-        let channel = ctx
-            .dma
-            .channel0
-            .configure_for_async(false, DmaPriority::Priority0);
         let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
 
         let i8080 = I8080::new(
             ctx.lcd_cam.lcd,
-            channel.tx,
+            ctx.dma.channel0.tx,
             pins,
             20.MHz(),
             Config::default(),

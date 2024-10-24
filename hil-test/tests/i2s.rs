@@ -11,21 +11,22 @@
 
 use esp_hal::{
     delay::Delay,
-    dma::{Dma, DmaPriority},
+    dma::{Channel, Dma},
     dma_buffers,
     gpio::{Io, NoPin},
     i2s::{DataFormat, I2s, I2sTx, Standard},
     peripherals::I2S0,
     prelude::*,
     Async,
+    Blocking,
 };
 use hil_test as _;
 
 cfg_if::cfg_if! {
     if #[cfg(any(esp32, esp32s2))] {
-        type DmaChannel0Creator = esp_hal::dma::I2s0DmaChannelCreator;
+        type DmaChannel0 = esp_hal::dma::I2s0DmaChannel;
     } else {
-        type DmaChannel0Creator = esp_hal::dma::ChannelCreator<0>;
+        type DmaChannel0 = esp_hal::dma::DmaChannel0;
     }
 }
 
@@ -103,7 +104,7 @@ mod tests {
 
     struct Context {
         io: Io,
-        dma_channel: DmaChannel0Creator,
+        dma_channel: Channel<'static, DmaChannel0, Blocking>,
         i2s: I2S0,
     }
 
@@ -142,11 +143,11 @@ mod tests {
             Standard::Philips,
             DataFormat::Data16Channel16,
             16000.Hz(),
-            ctx.dma_channel
-                .configure_for_async(false, DmaPriority::Priority0),
+            ctx.dma_channel,
             rx_descriptors,
             tx_descriptors,
-        );
+        )
+        .into_async();
 
         let (_, dout) = hil_test::common_test_pins!(ctx.io);
 
@@ -197,7 +198,7 @@ mod tests {
             Standard::Philips,
             DataFormat::Data16Channel16,
             16000.Hz(),
-            ctx.dma_channel.configure(false, DmaPriority::Priority0),
+            ctx.dma_channel,
             rx_descriptors,
             tx_descriptors,
         );

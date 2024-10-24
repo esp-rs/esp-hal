@@ -18,7 +18,7 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    dma::{Dma, DmaPriority},
+    dma::Dma,
     dma_buffers,
     gpio::Io,
     i2s::{DataFormat, I2s, Standard},
@@ -49,7 +49,7 @@ fn main() -> ! {
         Standard::Philips,
         DataFormat::Data16Channel16,
         44100.Hz(),
-        dma_channel.configure(false, DmaPriority::Priority0),
+        dma_channel,
         rx_descriptors,
         tx_descriptors,
     );
