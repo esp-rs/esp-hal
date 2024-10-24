@@ -54,7 +54,10 @@ fn main() -> ! {
     let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
     let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-        .with_pins(sclk, mosi, miso, cs)
+        .with_sck(sclk)
+        .with_mosi(mosi)
+        .with_miso(miso)
+        .with_cs(cs)
         .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
     let delay = Delay::new();
@@ -71,7 +74,7 @@ fn main() -> ! {
         i = i.wrapping_add(1);
 
         let transfer = spi
-            .dma_transfer(dma_rx_buf, dma_tx_buf)
+            .transfer(dma_rx_buf, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
         // here we could do something else while DMA transfer is in progress

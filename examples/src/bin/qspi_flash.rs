@@ -79,8 +79,13 @@ fn main() -> ! {
     let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-    let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-        .with_pins(sclk, mosi, miso, sio2, sio3, cs)
+    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
+        .with_sck(sclk)
+        .with_mosi(mosi)
+        .with_miso(miso)
+        .with_sio2(sio2)
+        .with_sio3(sio3)
+        .with_cs(cs)
         .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
     let delay = Delay::new();
@@ -88,7 +93,7 @@ fn main() -> ! {
     // write enable
     dma_tx_buf.set_length(0);
     let transfer = spi
-        .write(
+        .half_duplex_write(
             SpiDataMode::Single,
             Command::Command8(0x06, SpiDataMode::Single),
             Address::None,
@@ -102,7 +107,7 @@ fn main() -> ! {
 
     // erase sector
     let transfer = spi
-        .write(
+        .half_duplex_write(
             SpiDataMode::Single,
             Command::Command8(0x20, SpiDataMode::Single),
             Address::Address24(0x000000, SpiDataMode::Single),
@@ -116,7 +121,7 @@ fn main() -> ! {
 
     // write enable
     let transfer = spi
-        .write(
+        .half_duplex_write(
             SpiDataMode::Single,
             Command::Command8(0x06, SpiDataMode::Single),
             Address::None,
@@ -133,7 +138,7 @@ fn main() -> ! {
     dma_tx_buf.as_mut_slice().fill(b'!');
     dma_tx_buf.as_mut_slice()[0..][..5].copy_from_slice(&b"Hello"[..]);
     let transfer = spi
-        .write(
+        .half_duplex_write(
             SpiDataMode::Quad,
             Command::Command8(0x32, SpiDataMode::Single),
             Address::Address24(0x000000, SpiDataMode::Single),
@@ -148,7 +153,7 @@ fn main() -> ! {
     loop {
         // quad fast read
         let transfer = spi
-            .read(
+            .half_duplex_read(
                 SpiDataMode::Quad,
                 Command::Command8(0xeb, SpiDataMode::Single),
                 Address::Address32(0x000000 << 8, SpiDataMode::Quad),

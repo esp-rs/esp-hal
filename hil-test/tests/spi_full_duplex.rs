@@ -15,8 +15,9 @@ use esp_hal::{
     dma::{Dma, DmaDescriptor, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{Io, Level, NoPin},
+    peripheral::Peripheral,
     prelude::*,
-    spi::{master::Spi, FullDuplexMode, SpiMode},
+    spi::{master::Spi, SpiMode},
 };
 #[cfg(pcnt)]
 use esp_hal::{
@@ -34,7 +35,7 @@ cfg_if::cfg_if! {
 }
 
 struct Context {
-    spi: Spi<'static, FullDuplexMode>,
+    spi: Spi<'static>,
     dma_channel: DmaChannelCreator,
     // Reuse the really large buffer so we don't run out of DRAM with many tests
     rx_buffer: &'static mut [u8],
@@ -72,11 +73,12 @@ mod tests {
 
         #[cfg(pcnt)]
         let mosi_loopback_pcnt = mosi.peripheral_input();
-        let mosi_loopback = mosi.peripheral_input();
+        // Need to set miso first so that mosi can overwrite the
+        // output connection (because we are using the same pin to loop back)
         let spi = Spi::new(peripherals.SPI2, 10000.kHz(), SpiMode::Mode0)
             .with_sck(sclk)
-            .with_mosi(mosi)
-            .with_miso(mosi_loopback);
+            .with_miso(unsafe { mosi.clone_unchecked() })
+            .with_mosi(mosi);
 
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
 
@@ -209,11 +211,11 @@ mod tests {
 
         for i in 1..4 {
             dma_rx_buf.as_mut_slice().copy_from_slice(&[5, 5, 5, 5, 5]);
-            let transfer = spi.dma_read(dma_rx_buf).map_err(|e| e.0).unwrap();
+            let transfer = spi.read(dma_rx_buf).map_err(|e| e.0).unwrap();
             (spi, dma_rx_buf) = transfer.wait();
             assert_eq!(dma_rx_buf.as_slice(), &[0, 0, 0, 0, 0]);
 
-            let transfer = spi.dma_write(dma_tx_buf).map_err(|e| e.0).unwrap();
+            let transfer = spi.write(dma_tx_buf).map_err(|e| e.0).unwrap();
             (spi, dma_tx_buf) = transfer.wait();
             assert_eq!(unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
         }
@@ -242,12 +244,12 @@ mod tests {
 
         for i in 1..4 {
             dma_rx_buf.as_mut_slice().copy_from_slice(&[5, 5, 5, 5, 5]);
-            let transfer = spi.dma_read(dma_rx_buf).map_err(|e| e.0).unwrap();
+            let transfer = spi.read(dma_rx_buf).map_err(|e| e.0).unwrap();
             (spi, dma_rx_buf) = transfer.wait();
             assert_eq!(dma_rx_buf.as_slice(), &[0, 0, 0, 0, 0]);
 
             let transfer = spi
-                .dma_transfer(dma_rx_buf, dma_tx_buf)
+                .transfer(dma_rx_buf, dma_tx_buf)
                 .map_err(|e| e.0)
                 .unwrap();
             (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
@@ -274,7 +276,7 @@ mod tests {
             dma_tx_buf.as_mut_slice()[0] = i as u8;
             *dma_tx_buf.as_mut_slice().last_mut().unwrap() = i as u8;
             let transfer = spi
-                .dma_transfer(dma_rx_buf, dma_tx_buf)
+                .transfer(dma_rx_buf, dma_tx_buf)
                 .map_err(|e| e.0)
                 .unwrap();
 
@@ -300,7 +302,7 @@ mod tests {
             .spi
             .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0));
         let transfer = spi
-            .dma_transfer(dma_rx_buf, dma_tx_buf)
+            .transfer(dma_rx_buf, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
         let (spi, (dma_rx_buf, mut dma_tx_buf)) = transfer.wait();
@@ -311,7 +313,7 @@ mod tests {
         dma_tx_buf.fill(&[0xaa, 0xdd, 0xef, 0xbe]);
 
         let transfer = spi
-            .dma_transfer(dma_rx_buf, dma_tx_buf)
+            .transfer(dma_rx_buf, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
         let (_, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
@@ -469,18 +471,18 @@ mod tests {
 
         dma_tx_buf.fill(&[0xde, 0xad, 0xbe, 0xef]);
 
-        let transfer = spi.dma_write(dma_tx_buf).map_err(|e| e.0).unwrap();
+        let transfer = spi.write(dma_tx_buf).map_err(|e| e.0).unwrap();
         let (spi, dma_tx_buf) = transfer.wait();
 
         dma_rx_buf.as_mut_slice().fill(0);
-        let transfer = spi.dma_read(dma_rx_buf).map_err(|e| e.0).unwrap();
+        let transfer = spi.read(dma_rx_buf).map_err(|e| e.0).unwrap();
         let (spi, mut dma_rx_buf) = transfer.wait();
 
-        let transfer = spi.dma_write(dma_tx_buf).map_err(|e| e.0).unwrap();
+        let transfer = spi.write(dma_tx_buf).map_err(|e| e.0).unwrap();
         let (spi, _dma_tx_buf) = transfer.wait();
 
         dma_rx_buf.as_mut_slice().fill(0);
-        let transfer = spi.dma_read(dma_rx_buf).map_err(|e| e.0).unwrap();
+        let transfer = spi.read(dma_rx_buf).map_err(|e| e.0).unwrap();
         let (_, dma_rx_buf) = transfer.wait();
 
         assert_eq!(&[0xff, 0xff, 0xff, 0xff], dma_rx_buf.as_slice());
@@ -503,7 +505,7 @@ mod tests {
             .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0));
 
         let mut transfer = spi
-            .dma_transfer(dma_rx_buf, dma_tx_buf)
+            .transfer(dma_rx_buf, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
 
@@ -526,7 +528,7 @@ mod tests {
             .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0));
 
         let mut transfer = spi
-            .dma_transfer(dma_rx_buf, dma_tx_buf)
+            .transfer(dma_rx_buf, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
 
@@ -536,7 +538,7 @@ mod tests {
         spi.change_bus_frequency(10000.kHz());
 
         let transfer = spi
-            .dma_transfer(dma_rx_buf, dma_tx_buf)
+            .transfer(dma_rx_buf, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
 
@@ -561,7 +563,7 @@ mod tests {
         );
 
         let mut transfer = spi
-            .dma_transfer(dma_rx_buf, dma_tx_buf)
+            .transfer(dma_rx_buf, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
 

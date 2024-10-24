@@ -15,7 +15,6 @@ use esp_hal::{
     prelude::*,
     spi::{
         master::{Spi, SpiDma},
-        FullDuplexMode,
         SpiMode,
     },
     timer::{timg::TimerGroup, AnyTimer},
@@ -34,7 +33,7 @@ macro_rules! mk_static {
 }
 
 #[embassy_executor::task]
-async fn interrupt_driven_task(spi: SpiDma<'static, FullDuplexMode, Async>) {
+async fn interrupt_driven_task(spi: SpiDma<'static, Async>) {
     let mut ticker = Ticker::every(Duration::from_millis(1));
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(128);

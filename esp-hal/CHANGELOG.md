@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `AnyTwai`. (#2359)
 - `Pins::steal()` to unsafely obtain GPIO. (#2335)
 - `I2c::with_timeout` (#2361)
+- `Spi::half_duplex_read` and `Spi::half_duplex_write` (#2373)
 
 ### Changed
 
@@ -25,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Peripheral type erasure for I2S (#2367)
 - Peripheral type erasure for I2C (#2361)
 - Peripheral type erasure for TWAI (#2359)
+- The SPI driver has been rewritten to allow using half-duplex and full-duplex functionality on the same bus. See the migration guide for details. (#2373)
+- Renamed `SpiDma` functions: `dma_transfer` to `transfer`, `dma_write` to `write`, `dma_read` to `read`. (#2373)
 
 ### Fixed
 
@@ -36,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `i2s::{I2sWrite, I2sWriteDma, I2sRead, I2sReadDma, I2sWriteDmaAsync, I2sReadDmaAsync}` traits have been removed. (#2316)
 - The `ledc::ChannelHW` trait is no longer generic. (#2387)
 - The `I2c::new_with_timeout` constructors have been removed (#2361)
+- The `spi::master::HalfDuplexReadWrite` trait has been removed. (#2373)
+- The `Spi::with_pins` methods have been removed. (#2373)
+- The `Spi::new_half_duplex` constructor have been removed. (#2373)
+- The `HalfDuplexMode` and `FullDuplexMode` parameters have been removed from `Spi`. (#2373)
 
 ## [0.21.1]
 

@@ -2,7 +2,7 @@
 //!
 //! The following wiring is assumed:
 //! - SCLK => GPIO42
-//! - MISO => (loopback to MOSI via peripheral_input())
+//! - MISO => (looped back to MOSI via the GPIO MUX)
 //! - MOSI => GPIO48
 //! - CS   => GPIO38
 //!
@@ -27,6 +27,7 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaBufBlkSize, DmaPriority, DmaRxBuf, DmaTxBuf},
     gpio::Io,
+    peripheral::Peripheral,
     prelude::*,
     spi::{master::Spi, SpiMode},
 };
@@ -62,7 +63,7 @@ fn main() -> ! {
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let sclk = io.pins.gpio42;
     let mosi = io.pins.gpio48;
-    let miso = mosi.peripheral_input();
+    let miso = unsafe { mosi.clone_unchecked() };
     let cs = io.pins.gpio38;
 
     let dma = Dma::new(peripherals.DMA);
@@ -87,8 +88,13 @@ fn main() -> ! {
         rx_descriptors.len()
     );
     let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+    // Need to set miso first so that mosi can overwrite the
+    // output connection (because we are using the same pin to loop back)
     let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-        .with_pins(sclk, mosi, miso, cs)
+        .with_sck(sclk)
+        .with_miso(miso)
+        .with_mosi(mosi)
+        .with_cs(cs)
         .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
     delay.delay_millis(100); // delay to let the above messages display
@@ -105,7 +111,7 @@ fn main() -> ! {
         i = i.wrapping_add(1);
 
         let transfer = spi
-            .dma_transfer(dma_rx_buf, dma_tx_buf)
+            .transfer(dma_rx_buf, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
 

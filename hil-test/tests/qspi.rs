@@ -10,11 +10,10 @@ use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
 use esp_hal::{
     dma::{Channel, Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{AnyPin, Input, Io, Level, NoPin, Output, Pull},
+    gpio::{AnyPin, Input, Io, Level, Output, Pull},
     prelude::*,
     spi::{
         master::{Address, Command, Spi, SpiDma},
-        HalfDuplexMode,
         SpiDataMode,
         SpiMode,
     },
@@ -38,7 +37,7 @@ cfg_if::cfg_if! {
     }
 }
 
-type SpiUnderTest = SpiDma<'static, HalfDuplexMode, Blocking>;
+type SpiUnderTest = SpiDma<'static, Blocking>;
 
 struct Context {
     spi: esp_hal::peripherals::SPI2,
@@ -54,7 +53,7 @@ fn transfer_read(
     command: Command,
 ) -> (SpiUnderTest, DmaRxBuf) {
     let transfer = spi
-        .read(SpiDataMode::Quad, command, Address::None, 0, dma_rx_buf)
+        .half_duplex_read(SpiDataMode::Quad, command, Address::None, 0, dma_rx_buf)
         .map_err(|e| e.0)
         .unwrap();
     transfer.wait()
@@ -67,7 +66,7 @@ fn transfer_write(
     command_data_mode: SpiDataMode,
 ) -> (SpiUnderTest, DmaTxBuf) {
     let transfer = spi
-        .write(
+        .half_duplex_write(
             SpiDataMode::Quad,
             Command::Command8(write as u16, command_data_mode),
             Address::Address24(
@@ -226,8 +225,8 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(NoPin, pin, NoPin, NoPin, NoPin, NoPin)
+        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
+            .with_mosi(pin)
             .with_dma(ctx.dma_channel);
 
         super::execute_read(spi, pin_mirror, 0b0001_0001);
@@ -239,8 +238,8 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(NoPin, NoPin, pin, NoPin, NoPin, NoPin)
+        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
+            .with_miso(pin)
             .with_dma(ctx.dma_channel);
 
         super::execute_read(spi, pin_mirror, 0b0010_0010);
@@ -252,8 +251,8 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(NoPin, NoPin, NoPin, pin, NoPin, NoPin)
+        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
+            .with_sio2(pin)
             .with_dma(ctx.dma_channel);
 
         super::execute_read(spi, pin_mirror, 0b0100_0100);
@@ -265,8 +264,8 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(NoPin, NoPin, NoPin, NoPin, pin, NoPin)
+        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
+            .with_sio3(pin)
             .with_dma(ctx.dma_channel);
 
         super::execute_read(spi, pin_mirror, 0b1000_1000);
@@ -278,8 +277,8 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(NoPin, pin, NoPin, NoPin, NoPin, NoPin)
+        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
+            .with_mosi(pin)
             .with_dma(ctx.dma_channel);
 
         super::execute_write_read(spi, pin_mirror, 0b0001_0001);
@@ -291,8 +290,8 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(NoPin, NoPin, pin, NoPin, NoPin, NoPin)
+        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
+            .with_miso(pin)
             .with_dma(ctx.dma_channel);
 
         super::execute_write_read(spi, pin_mirror, 0b0010_0010);
@@ -304,8 +303,8 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(NoPin, NoPin, NoPin, pin, NoPin, NoPin)
+        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
+            .with_sio2(pin)
             .with_dma(ctx.dma_channel);
 
         super::execute_write_read(spi, pin_mirror, 0b0100_0100);
@@ -317,8 +316,8 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(NoPin, NoPin, NoPin, NoPin, pin, NoPin)
+        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
+            .with_sio3(pin)
             .with_dma(ctx.dma_channel);
 
         super::execute_write_read(spi, pin_mirror, 0b1000_1000);
@@ -341,8 +340,8 @@ mod tests {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(NoPin, mosi, NoPin, NoPin, NoPin, NoPin)
+        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
+            .with_mosi(mosi)
             .with_dma(ctx.dma_channel);
 
         super::execute_write(unit0, unit1, spi, 0b0000_0001, false);
@@ -370,8 +369,9 @@ mod tests {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(NoPin, mosi, gpio, NoPin, NoPin, NoPin)
+        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
+            .with_mosi(mosi)
+            .with_miso(gpio)
             .with_dma(ctx.dma_channel);
 
         super::execute_write(unit0, unit1, spi, 0b0000_0010, true);
@@ -399,8 +399,9 @@ mod tests {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(NoPin, mosi, NoPin, gpio, NoPin, NoPin)
+        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
+            .with_mosi(mosi)
+            .with_sio2(gpio)
             .with_dma(ctx.dma_channel);
 
         super::execute_write(unit0, unit1, spi, 0b0000_0100, true);
@@ -428,8 +429,9 @@ mod tests {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let spi = Spi::new_half_duplex(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_pins(NoPin, mosi, NoPin, NoPin, gpio, NoPin)
+        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
+            .with_mosi(mosi)
+            .with_sio3(gpio)
             .with_dma(ctx.dma_channel);
 
         super::execute_write(unit0, unit1, spi, 0b0000_1000, true);
