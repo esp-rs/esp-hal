@@ -20,7 +20,7 @@ use crate::{
     compat::queue::SimpleQueue,
     hal::peripheral::{Peripheral, PeripheralRef},
     wifi::{Protocol, RxControlInfo},
-    EspWifiInitialization,
+    EspWifiController,
 };
 
 /// Maximum payload length
@@ -465,6 +465,21 @@ impl<'d> EspNowManager<'d> {
     }
 }
 
+impl<'d> Drop for EspNowManager<'d> {
+    fn drop(&mut self) {
+        if unwrap!(
+            crate::flags::WIFI.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
+                Some(x.saturating_sub(1))
+            })
+        ) == 0
+        {
+            if let Err(e) = crate::wifi::wifi_deinit() {
+                warn!("Failed to cleanly deinit wifi: {:?}", e);
+            }
+        }
+    }
+}
+
 /// This is the sender part of ESP-NOW. You can get this sender by splitting
 /// a `EspNow` instance.
 ///
@@ -603,10 +618,10 @@ impl<'d> Drop for EspNowRc<'d> {
 /// Currently this implementation (when used together with traditional Wi-Fi)
 /// ONLY support STA mode.
 pub struct EspNow<'d> {
-    _device: Option<PeripheralRef<'d, crate::hal::peripherals::WIFI>>,
     manager: EspNowManager<'d>,
     sender: EspNowSender<'d>,
     receiver: EspNowReceiver<'d>,
+    _phantom: PhantomData<&'d ()>,
 }
 
 impl<'d> EspNow<'d> {
@@ -633,13 +648,15 @@ impl<'d> EspNow<'d> {
         inited: &'d EspWifiController<'d>,
         device: Option<PeripheralRef<'d, crate::hal::peripherals::WIFI>>,
     ) -> Result<EspNow<'d>, EspNowError> {
-        if !inited.is_wifi() {
-            return Err(EspNowError::Error(Error::NotInitialized));
+        if !inited.wifi() {
+            // if wifi isn't already enabled, and we try to coexist - panic
+            assert!(device.is_some());
+            unwrap!(crate::wifi::wifi_init()); // TODO should we return an error
+                                               // here?
         }
 
         let espnow_rc = EspNowRc::new()?;
         let esp_now = EspNow {
-            _device: device,
             manager: EspNowManager {
                 _rc: espnow_rc.clone(),
             },
@@ -647,6 +664,7 @@ impl<'d> EspNow<'d> {
                 _rc: espnow_rc.clone(),
             },
             receiver: EspNowReceiver { _rc: espnow_rc },
+            _phantom: PhantomData,
         };
         check_error!({ esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_STA) })?;
         check_error!({ esp_wifi_start() })?;

@@ -8,7 +8,7 @@ use smoltcp::{
 };
 
 use super::{WifiApDevice, WifiController, WifiDevice, WifiDeviceMode, WifiError, WifiStaDevice};
-use crate::{current_millis, EspWifiController};
+use crate::{timestamp, EspWifiController};
 
 fn setup_iface<'a, MODE: WifiDeviceMode>(
     device: &mut WifiDevice<'_, MODE>,

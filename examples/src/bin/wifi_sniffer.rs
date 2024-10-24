@@ -19,13 +19,9 @@ use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_backtrace as _;
-use esp_hal::{
-    prelude::*,
-    rng::Rng,
-    timer::{timg::TimerGroup, AnyTimer, PeriodicTimer},
-};
+use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
-use esp_wifi::{init, wifi, EspWifiInitFor};
+use esp_wifi::{init, wifi};
 use ieee80211::{match_frames, mgmt_frame::BeaconFrame};
 
 static KNOWN_SSIDS: Mutex<RefCell<BTreeSet<String>>> = Mutex::new(RefCell::new(BTreeSet::new()));
@@ -42,12 +38,8 @@ fn main() -> ! {
     esp_alloc::heap_allocator!(72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let timer0: AnyTimer = timg0.timer0.into();
-    let timer = PeriodicTimer::new(timer0);
-
     let init = init(
-        EspWifiInitFor::Wifi,
-        timer,
+        timg0.timer0,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
     )

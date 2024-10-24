@@ -1,6 +1,7 @@
 use core::{
     cell::RefCell,
     ptr::{addr_of, addr_of_mut},
+    sync::atomic::Ordering,
 };
 
 use critical_section::Mutex;

@@ -18,8 +18,8 @@ use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_time::{Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{prelude::*, timer::timg::TimerGroup};
-use esp_wifi::ble::controller::asynch::BleConnector;
+use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
+use esp_wifi::{ble::controller::BleConnector, init, EspWifiController};
 use log::*;
 use static_cell::StaticCell;
 use trouble_host::{
@@ -30,6 +30,16 @@ use trouble_host::{
     BleHostResources,
     PacketQos,
 };
+
+// When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
+macro_rules! mk_static {
+    ($t:ty,$val:expr) => {{
+        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
+        #[deny(unused_attributes)]
+        let x = STATIC_CELL.uninit().write(($val));
+        x
+    }};
+}
 
 #[esp_hal_embassy::main]
 async fn main(_s: Spawner) {
@@ -44,13 +54,15 @@ async fn main(_s: Spawner) {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let init = esp_wifi::init(
-        esp_wifi::EspWifiInitFor::Ble,
-        timg0.timer0,
-        esp_hal::rng::Rng::new(peripherals.RNG),
-        peripherals.RADIO_CLK,
-    )
-    .unwrap();
+    let init = &*mk_static!(
+        EspWifiController<'static>,
+        init(
+            timg0.timer0,
+            Rng::new(peripherals.RNG),
+            peripherals.RADIO_CLK,
+        )
+        .unwrap()
+    );
 
     #[cfg(feature = "esp32")]
     {

@@ -239,10 +239,10 @@ const _: () = {
 type TimeBase = PeriodicTimer<'static, AnyTimer>;
 
 pub(crate) mod flags {
-    use portable_atomic::AtomicBool;
+    use portable_atomic::{AtomicBool, AtomicUsize};
 
     pub(crate) static INITD: AtomicBool = AtomicBool::new(false);
-    pub(crate) static WIFI: AtomicBool = AtomicBool::new(false);
+    pub(crate) static WIFI: AtomicUsize = AtomicUsize::new(0);
     pub(crate) static BLE: AtomicBool = AtomicBool::new(false);
 }
 
@@ -255,7 +255,7 @@ pub struct EspWifiController<'d> {
 impl<'d> EspWifiController<'d> {
     /// Is the WiFi part of the radio running
     pub fn wifi(&self) -> bool {
-        crate::flags::WIFI.load(Ordering::Acquire)
+        crate::flags::WIFI.load(Ordering::Acquire) > 0
     }
 
     /// Is the BLE part of the radio running
@@ -360,7 +360,7 @@ impl EspWifiTimerSource for TimeBase {
 /// # }
 /// ```
 pub fn init<'d, T: EspWifiTimerSource>(
-    mut timer: impl Peripheral<P = T> + 'd,
+    timer: impl Peripheral<P = T> + 'd,
     rng: hal::rng::Rng,
     _radio_clocks: impl Peripheral<P = hal::peripherals::RADIO_CLK> + 'd,
 ) -> Result<EspWifiController<'d>, InitializationError> {
