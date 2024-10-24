@@ -2,7 +2,7 @@
 
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
-use std::{io::Write as _, process};
+use std::io::Write as _;
 
 use proc_macro::TokenStream;
 use quote::ToTokens;
@@ -26,7 +26,7 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 #[proc_macro]
 pub fn error(input: TokenStream) -> TokenStream {
     do_alert(Color::Red, input);
-    process::exit(1);
+    panic!("Build failed");
 }
 
 /// Print a build warning.
