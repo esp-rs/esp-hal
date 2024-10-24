@@ -876,7 +876,7 @@ unsafe extern "C" fn ble_npl_eventq_remove(
     queue: *const ble_npl_eventq,
     event: *const ble_npl_event,
 ) {
-    trace!("ble_npl_eventq_remove {:?} {:?}", queue, event);
+    info!("ble_npl_eventq_remove {:?} {:?}", queue, event);
 
     if (*queue).dummy == 0 {
         panic!("Try to use uninitialized queue");
@@ -887,8 +887,13 @@ unsafe extern "C" fn ble_npl_eventq_remove(
     }
 
     let evt = (*event).dummy as *mut Event;
+    if (*evt).queued == false {
+        return;
+    }
 
-    // TODO actually remove from queue!!!!
+    let queue = (*queue).dummy as *mut RawQueue;
+    (*queue).remove(addr_of!(event) as *mut _);
+
     (*evt).queued = false;
 }
 
