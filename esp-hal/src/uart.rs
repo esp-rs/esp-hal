@@ -683,22 +683,14 @@ where
     /// Read all available bytes from the RX FIFO into the provided buffer and
     /// returns the number of read bytes. Never blocks
     pub fn drain_fifo(&mut self, buf: &mut [u8]) -> usize {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s2)] {
-                // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
-                let fifo = unsafe {
-                    &*((self.uart.register_block().fifo().as_ptr() as *mut u8).add(0x20C00000)
-                        as *mut crate::peripherals::uart0::FIFO)
-                };
-            } else {
-                let fifo = self.uart.register_block().fifo();
-            }
-        }
-
         let mut count = 0;
-        while self.uart.get_rx_fifo_count() > 0 && count < buf.len() {
-            buf[count] = fifo.read().rxfifo_rd_byte().bits();
-            count += 1;
+        while count < buf.len() {
+            if let Ok(byte) = self.read_byte() {
+                buf[count] = byte;
+                count += 1;
+            } else {
+                break;
+            }
         }
         count
     }
