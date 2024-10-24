@@ -74,7 +74,7 @@
 //! #[entry]
 //! fn main() -> ! {
 //!     let peripherals = esp_hal::init({
-//!         let mut config = esp_hal::Config::default());
+//!         let mut config = esp_hal::Config::default();
 //!         // Configure the CPU to run at the maximum frequency.
 //!         config.cpu_clock = CpuClock::max();
 //!         config
