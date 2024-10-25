@@ -92,7 +92,7 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDma
 impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> TxRegisterAccess for SpiDmaTxChannelImpl<C> {
     fn set_auto_write_back(&self, enable: bool) {
         // there is no `auto_wrback` for SPI
-        core::assert!(enable);
+        core::assert!(!enable);
     }
 
     fn last_dscr_address(&self) -> usize {
