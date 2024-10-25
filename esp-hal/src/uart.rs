@@ -151,7 +151,6 @@ use crate::{
     Mode,
 };
 
-const CONSOLE_UART_NUM: usize = 0;
 const UART_FIFO_SIZE: u16 = 128;
 
 #[cfg(not(any(esp32, esp32s2)))]
@@ -1495,6 +1494,7 @@ where
 
 /// UART Peripheral Instance
 pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyUart> + 'static {
+    /// Returns the peripheral data describing this UART instance.
     fn peripheral_data(&self) -> &UartPeripheral;
 }
 
@@ -1538,13 +1538,18 @@ impl PartialEq for UartPeripheral {
 unsafe impl Sync for UartPeripheral {}
 
 macro_rules! impl_instance {
-    ($inst:ident, $txd:ident, $rxd:ident, $cts:ident, $rts:ident, $async_handler:path) => {
+    ($inst:ident, $txd:ident, $rxd:ident, $cts:ident, $rts:ident) => {
         impl Instance for crate::peripherals::$inst {
             #[inline(always)]
             fn peripheral_data(&self) -> &UartPeripheral {
+                #[crate::macros::handler]
+                pub(super) fn irq_handler() {
+                    asynch::intr_handler(&PERIPHERAL);
+                }
+
                 static PERIPHERAL: UartPeripheral = UartPeripheral {
                     register_block: crate::peripherals::$inst::ptr(),
-                    async_handler: $async_handler,
+                    async_handler: irq_handler,
                     tx_waker: AtomicWaker::new(),
                     rx_waker: AtomicWaker::new(),
                     interrupt: Interrupt::$inst,
@@ -1561,10 +1566,10 @@ macro_rules! impl_instance {
     };
 }
 
-impl_instance!(UART0, U0TXD, U0RXD, U0CTS, U0RTS, asynch::uart0);
-impl_instance!(UART1, U1TXD, U1RXD, U1CTS, U1RTS, asynch::uart1);
+impl_instance!(UART0, U0TXD, U0RXD, U0CTS, U0RTS);
+impl_instance!(UART1, U1TXD, U1RXD, U1CTS, U1RTS);
 #[cfg(uart2)]
-impl_instance!(UART2, U2TXD, U2RXD, U2CTS, U2RTS, asynch::uart2);
+impl_instance!(UART2, U2TXD, U2RXD, U2CTS, U2RTS);
 
 impl<T, M> ufmt_write::uWrite for Uart<'_, M, T>
 where
@@ -1838,7 +1843,6 @@ mod asynch {
     use core::task::Poll;
 
     use enumset::{EnumSet, EnumSetType};
-    use procmacros::handler;
 
     use super::*;
     use crate::Async;
@@ -2386,7 +2390,7 @@ mod asynch {
     /// Clears and disables interrupts that have occurred and have their enable
     /// bit set. The fact that an interrupt has been disabled is used by the
     /// futures to detect that they should indeed resolve after being woken up
-    fn intr_handler(uart: &UartPeripheral) {
+    pub(super) fn intr_handler(uart: &UartPeripheral) {
         let interrupts = uart.register_block().int_st().read();
         let interrupt_bits = interrupts.bits(); // = int_raw & int_ena
         let rx_wake = interrupts.rxfifo_full().bit_is_set()
@@ -2410,27 +2414,6 @@ mod asynch {
         if rx_wake {
             uart.rx_waker.wake();
         }
-    }
-
-    #[cfg(uart0)]
-    #[handler]
-    pub(super) fn uart0() {
-        let uart = unsafe { crate::peripherals::UART0::steal() };
-        intr_handler(uart.peripheral_data());
-    }
-
-    #[cfg(uart1)]
-    #[handler]
-    pub(super) fn uart1() {
-        let uart = unsafe { crate::peripherals::UART1::steal() };
-        intr_handler(uart.peripheral_data());
-    }
-
-    #[cfg(uart2)]
-    #[handler]
-    pub(super) fn uart2() {
-        let uart = unsafe { crate::peripherals::UART2::steal() };
-        intr_handler(uart.peripheral_data());
     }
 }
 
