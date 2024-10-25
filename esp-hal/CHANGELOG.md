@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `AnySpi` and `AnySpiDmaChannel`. (#2334)
 - Added `AnyI2s` and `AnyI2sDmaChannel`. (#2367)
 - Added `AnyTwai`. (#2359)
+- Added `AnyUart`. (#2381)
 - `Pins::steal()` to unsafely obtain GPIO. (#2335)
 - `I2c::with_timeout` (#2361)
 - `Spi::half_duplex_read` and `Spi::half_duplex_write` (#2373)
@@ -28,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Peripheral type erasure for TWAI (#2359)
 - The SPI driver has been rewritten to allow using half-duplex and full-duplex functionality on the same bus. See the migration guide for details. (#2373)
 - Renamed `SpiDma` functions: `dma_transfer` to `transfer`, `dma_write` to `write`, `dma_read` to `read`. (#2373)
+- Peripheral type erasure for UART (#2381)
 
 ### Fixed
 

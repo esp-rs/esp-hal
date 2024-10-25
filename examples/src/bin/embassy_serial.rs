@@ -14,7 +14,6 @@ use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::Io,
-    peripherals::UART0,
     timer::timg::TimerGroup,
     uart::{
         config::{AtCmdConfig, Config},
@@ -32,10 +31,7 @@ const READ_BUF_SIZE: usize = 64;
 const AT_CMD: u8 = 0x04;
 
 #[embassy_executor::task]
-async fn writer(
-    mut tx: UartTx<'static, UART0, Async>,
-    signal: &'static Signal<NoopRawMutex, usize>,
-) {
+async fn writer(mut tx: UartTx<'static, Async>, signal: &'static Signal<NoopRawMutex, usize>) {
     use core::fmt::Write;
     embedded_io_async::Write::write(
         &mut tx,
@@ -53,10 +49,7 @@ async fn writer(
 }
 
 #[embassy_executor::task]
-async fn reader(
-    mut rx: UartRx<'static, UART0, Async>,
-    signal: &'static Signal<NoopRawMutex, usize>,
-) {
+async fn reader(mut rx: UartRx<'static, Async>, signal: &'static Signal<NoopRawMutex, usize>) {
     const MAX_BUFFER_SIZE: usize = 10 * READ_BUF_SIZE + 16;
 
     let mut rbuf: [u8; MAX_BUFFER_SIZE] = [0u8; MAX_BUFFER_SIZE];
