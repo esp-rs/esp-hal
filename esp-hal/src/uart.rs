@@ -462,7 +462,7 @@ where
     fn with_rx<RX: PeripheralInput>(self, rx: impl Peripheral<P = RX> + 'd) -> Self {
         crate::into_mapped_ref!(rx);
         rx.init_input(Pull::Up, Internal);
-        rx.connect_input_to_peripheral(self.uart.rx_signal(), Internal);
+        rx.connect_input_to_peripheral(self.uart.signals().rx, Internal);
 
         self
     }
@@ -472,7 +472,7 @@ where
         // Make sure we don't cause an unexpected low pulse on the pin.
         tx.set_output_high(true, Internal);
         tx.set_to_push_pull_output(Internal);
-        tx.connect_peripheral_to_output(self.uart.tx_signal(), Internal);
+        tx.connect_peripheral_to_output(self.uart.signals().tx, Internal);
 
         self
     }
@@ -529,7 +529,7 @@ where
     pub fn with_rts<RTS: PeripheralOutput>(self, rts: impl Peripheral<P = RTS> + 'd) -> Self {
         crate::into_mapped_ref!(rts);
         rts.set_to_push_pull_output(Internal);
-        rts.connect_peripheral_to_output(self.uart.rts_signal(), Internal);
+        rts.connect_peripheral_to_output(self.uart.signals().rts, Internal);
 
         self
     }
@@ -714,7 +714,7 @@ where
     pub fn with_cts<CTS: PeripheralInput>(self, cts: impl Peripheral<P = CTS> + 'd) -> Self {
         crate::into_mapped_ref!(cts);
         cts.init_input(Pull::None, Internal);
-        cts.connect_input_to_peripheral(self.uart.cts_signal(), Internal);
+        cts.connect_input_to_peripheral(self.uart.signals().cts, Internal);
 
         self
     }
@@ -1430,6 +1430,9 @@ pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyUart> + 's
     /// Returns the interrupt associated with this UART instance.
     fn interrupt(&self) -> Interrupt;
 
+    /// Returns the signal assignments of this UART instance.
+    fn signals(&self) -> UartSignals;
+
     #[doc(hidden)]
     #[inline(always)]
     fn sync_regs(&self) {
@@ -1518,22 +1521,21 @@ pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyUart> + 's
 
         status.read().st_urx_out().bits() == 0x0
     }
+}
 
-    /// Returns the output signal identifier for the TX pin of this UART
-    /// instance.
-    fn tx_signal(&self) -> OutputSignal;
+/// Peripheral signals associated with a particular UART instance.
+pub struct UartSignals {
+    /// TX pin
+    pub tx: OutputSignal,
 
-    /// Returns the input signal identifier for the RX pin of this UART
-    /// instance.
-    fn rx_signal(&self) -> InputSignal;
+    /// RX pin
+    pub rx: InputSignal,
 
-    /// Returns the input signal identifier for the CTS (Clear to Send) pin of
-    /// this UART instance.
-    fn cts_signal(&self) -> InputSignal;
+    /// CTS (Clear to Send) pin
+    pub cts: InputSignal,
 
-    /// Returns the output signal identifier for the RTS (Request to Send) pin
-    /// of this UART instance.
-    fn rts_signal(&self) -> OutputSignal;
+    /// RTS (Request to Send) pin
+    pub rts: OutputSignal,
 }
 
 macro_rules! impl_instance {
@@ -1560,23 +1562,13 @@ macro_rules! impl_instance {
             }
 
             #[inline(always)]
-            fn tx_signal(&self) -> OutputSignal {
-                OutputSignal::$txd
-            }
-
-            #[inline(always)]
-            fn rx_signal(&self) -> InputSignal {
-                InputSignal::$rxd
-            }
-
-            #[inline(always)]
-            fn cts_signal(&self) -> InputSignal {
-                InputSignal::$cts
-            }
-
-            #[inline(always)]
-            fn rts_signal(&self) -> OutputSignal {
-                OutputSignal::$rts
+            fn signals(&self) -> UartSignals {
+                UartSignals {
+                    tx: OutputSignal::$txd,
+                    rx: InputSignal::$rxd,
+                    cts: InputSignal::$cts,
+                    rts: OutputSignal::$rts,
+                }
             }
         }
     };
@@ -2677,10 +2669,7 @@ impl Instance for AnyUart {
             fn uart_number(&self) -> usize;
             fn async_handler(&self) -> InterruptHandler;
             fn interrupt(&self) -> Interrupt;
-            fn tx_signal(&self) -> OutputSignal;
-            fn rx_signal(&self) -> InputSignal;
-            fn cts_signal(&self) -> InputSignal;
-            fn rts_signal(&self) -> OutputSignal;
+            fn signals(&self) -> UartSignals;
         }
     }
 }
