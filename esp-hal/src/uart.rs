@@ -153,11 +153,6 @@ use crate::{
 
 const UART_FIFO_SIZE: u16 = 128;
 
-#[cfg(not(any(esp32, esp32s2)))]
-use crate::soc::constants::RC_FAST_CLK;
-#[cfg(any(esp32, esp32s2))]
-use crate::soc::constants::REF_TICK;
-
 /// UART Error
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -390,10 +385,15 @@ pub mod config {
                 data_bits: DataBits::DataBits8,
                 parity: Parity::ParityNone,
                 stop_bits: StopBits::STOP1,
-                #[cfg(any(esp32c6, esp32h2, lp_uart))]
-                clock_source: super::ClockSource::Xtal,
-                #[cfg(not(any(esp32c6, esp32h2, lp_uart)))]
-                clock_source: super::ClockSource::Apb,
+                clock_source: {
+                    cfg_if::cfg_if! {
+                        if #[cfg(any(esp32c6, esp32h2, lp_uart))] {
+                            super::ClockSource::Xtal
+                        } else {
+                            super::ClockSource::Apb
+                        }
+                    }
+                },
                 rx_fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
                 rx_timeout: Some(UART_TOUT_THRESH_DEFAULT),
             }
@@ -459,20 +459,20 @@ where
         }
     }
 
-    fn with_rx<RX: PeripheralInput>(self, rx: impl Peripheral<P = RX> + 'd) -> Self {
+    fn with_rx(self, rx: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(rx);
         rx.init_input(Pull::Up, Internal);
-        rx.connect_input_to_peripheral(self.uart.peripheral_data().signals.rx, Internal);
+        rx.connect_input_to_peripheral(self.uart.peripheral_data().rx_signal, Internal);
 
         self
     }
 
-    fn with_tx<TX: PeripheralOutput>(self, tx: impl Peripheral<P = TX> + 'd) -> Self {
+    fn with_tx(self, tx: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_mapped_ref!(tx);
         // Make sure we don't cause an unexpected low pulse on the pin.
         tx.set_output_high(true, Internal);
         tx.set_to_push_pull_output(Internal);
-        tx.connect_peripheral_to_output(self.uart.peripheral_data().signals.tx, Internal);
+        tx.connect_peripheral_to_output(self.uart.peripheral_data().tx_signal, Internal);
 
         self
     }
@@ -526,10 +526,10 @@ where
     M: Mode,
 {
     /// Configure RTS pin
-    pub fn with_rts<RTS: PeripheralOutput>(self, rts: impl Peripheral<P = RTS> + 'd) -> Self {
+    pub fn with_rts(self, rts: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_mapped_ref!(rts);
         rts.set_to_push_pull_output(Internal);
-        rts.connect_peripheral_to_output(self.uart.peripheral_data().signals.rts, Internal);
+        rts.connect_peripheral_to_output(self.uart.peripheral_data().rts_signal, Internal);
 
         self
     }
@@ -545,9 +545,8 @@ where
     }
 
     fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
-        let register_block = self.register_block();
-        if get_tx_fifo_count(register_block) < UART_FIFO_SIZE {
-            register_block
+        if self.tx_fifo_count() < UART_FIFO_SIZE {
+            self.register_block()
                 .fifo()
                 .write(|w| unsafe { w.rxfifo_rd_byte().bits(word) });
 
@@ -555,6 +554,18 @@ where
         } else {
             Err(nb::Error::WouldBlock)
         }
+    }
+
+    #[allow(clippy::useless_conversion)]
+    /// Returns the number of bytes currently in the TX FIFO for this UART
+    /// instance.
+    fn tx_fifo_count(&self) -> u16 {
+        self.register_block()
+            .status()
+            .read()
+            .txfifo_cnt()
+            .bits()
+            .into()
     }
 
     /// Flush the transmit buffer of the UART
@@ -607,19 +618,19 @@ where
 
 impl<'d> UartTx<'d, Blocking> {
     /// Create a new UART TX instance in [`Blocking`] mode.
-    pub fn new<TX: PeripheralOutput>(
+    pub fn new(
         uart: impl Peripheral<P = impl Instance> + 'd,
-        tx: impl Peripheral<P = TX> + 'd,
+        tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Result<Self, Error> {
         Self::new_typed(uart.map_into(), tx)
     }
 
     /// Create a new UART TX instance with configuration options in
     /// [`Blocking`] mode.
-    pub fn new_with_config<TX: PeripheralOutput>(
+    pub fn new_with_config(
         uart: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
-        tx: impl Peripheral<P = TX> + 'd,
+        tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Result<Self, Error> {
         Self::new_with_config_typed(uart.map_into(), config, tx)
     }
@@ -630,19 +641,19 @@ where
     T: Instance,
 {
     /// Create a new UART TX instance in [`Blocking`] mode.
-    pub fn new_typed<TX: PeripheralOutput>(
+    pub fn new_typed(
         uart: impl Peripheral<P = T> + 'd,
-        tx: impl Peripheral<P = TX> + 'd,
+        tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Result<Self, Error> {
         Self::new_with_config_typed(uart, Config::default(), tx)
     }
 
     /// Create a new UART TX instance with configuration options in
     /// [`Blocking`] mode.
-    pub fn new_with_config_typed<TX: PeripheralOutput>(
+    pub fn new_with_config_typed(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        tx: impl Peripheral<P = TX> + 'd,
+        tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Result<Self, Error> {
         let (_, uart_tx) = UartBuilder::<'d, Blocking, T>::new(uart)
             .with_tx(tx)
@@ -651,96 +662,6 @@ where
 
         Ok(uart_tx)
     }
-}
-
-#[allow(clippy::useless_conversion)]
-/// Returns the number of bytes currently in the TX FIFO for this UART
-/// instance.
-fn get_tx_fifo_count(register_block: &RegisterBlock) -> u16 {
-    register_block.status().read().txfifo_cnt().bits().into()
-}
-
-#[allow(clippy::useless_conversion)]
-fn get_rx_fifo_count(register_block: &RegisterBlock) -> u16 {
-    let fifo_cnt: u16 = register_block.status().read().rxfifo_cnt().bits().into();
-    // Calculate the real count based on the FIFO read and write offset address:
-    // https://www.espressif.com/sites/default/files/documentation/esp32_errata_en.pdf
-    // section 3.17
-    #[cfg(esp32)]
-    {
-        let status = register_block.mem_rx_status().read();
-        let rd_addr = status.mem_rx_rd_addr().bits();
-        let wr_addr = status.mem_rx_wr_addr().bits();
-
-        if wr_addr > rd_addr {
-            wr_addr - rd_addr
-        } else if wr_addr < rd_addr {
-            (wr_addr + UART_FIFO_SIZE) - rd_addr
-        } else if fifo_cnt > 0 {
-            UART_FIFO_SIZE
-        } else {
-            0
-        }
-    }
-
-    #[cfg(not(esp32))]
-    fifo_cnt
-}
-
-fn read_bytes(register_block: &RegisterBlock, buf: &mut [u8]) -> Result<(), Error> {
-    cfg_if::cfg_if! {
-        if #[cfg(esp32s2)] {
-            // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
-            let fifo = unsafe {
-                &*((register_block.fifo().as_ptr() as *mut u8).add(0x20C00000)
-                    as *mut crate::peripherals::uart0::FIFO)
-            };
-        } else {
-            let fifo = register_block.fifo();
-        }
-    }
-
-    for byte in buf.iter_mut() {
-        while get_rx_fifo_count(register_block) == 0 {
-            // Block until we received at least one byte
-        }
-        *byte = fifo.read().rxfifo_rd_byte().bits();
-    }
-
-    Ok(())
-}
-
-fn read_byte(register_block: &RegisterBlock) -> nb::Result<u8, Error> {
-    cfg_if::cfg_if! {
-        if #[cfg(esp32s2)] {
-            // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
-            let fifo = unsafe {
-                &*((register_block.fifo().as_ptr() as *mut u8).add(0x20C00000)
-                    as *mut crate::peripherals::uart0::FIFO)
-            };
-        } else {
-            let fifo = register_block.fifo();
-        }
-    }
-
-    if get_rx_fifo_count(register_block) > 0 {
-        Ok(fifo.read().rxfifo_rd_byte().bits())
-    } else {
-        Err(nb::Error::WouldBlock)
-    }
-}
-
-fn drain_fifo(register_block: &RegisterBlock, buf: &mut [u8]) -> usize {
-    let mut count = 0;
-    while count < buf.len() {
-        if let Ok(byte) = read_byte(register_block) {
-            buf[count] = byte;
-            count += 1;
-        } else {
-            break;
-        }
-    }
-    count
 }
 
 #[inline(always)]
@@ -769,28 +690,106 @@ where
     M: Mode,
 {
     /// Configure CTS pin
-    pub fn with_cts<CTS: PeripheralInput>(self, cts: impl Peripheral<P = CTS> + 'd) -> Self {
+    pub fn with_cts(self, cts: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(cts);
         cts.init_input(Pull::None, Internal);
-        cts.connect_input_to_peripheral(self.uart.peripheral_data().signals.cts, Internal);
+        cts.connect_input_to_peripheral(self.uart.peripheral_data().cts_signal, Internal);
 
         self
     }
 
     /// Fill a buffer with received bytes
     pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<(), Error> {
-        read_bytes(self.register_block(), buf)
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s2)] {
+                // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
+                let fifo = unsafe {
+                    &*((self.register_block().fifo().as_ptr() as *mut u8).add(0x20C00000)
+                        as *mut crate::peripherals::uart0::FIFO)
+                };
+            } else {
+                let fifo = self.register_block().fifo();
+            }
+        }
+
+        for byte in buf.iter_mut() {
+            while self.rx_fifo_count() == 0 {
+                // Block until we received at least one byte
+            }
+            *byte = fifo.read().rxfifo_rd_byte().bits();
+        }
+
+        Ok(())
     }
 
     /// Read a byte from the UART
     pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
-        read_byte(self.register_block())
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s2)] {
+                // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
+                let fifo = unsafe {
+                    &*((self.register_block().fifo().as_ptr() as *mut u8).add(0x20C00000)
+                        as *mut crate::peripherals::uart0::FIFO)
+                };
+            } else {
+                let fifo = self.register_block().fifo();
+            }
+        }
+
+        if self.rx_fifo_count() > 0 {
+            Ok(fifo.read().rxfifo_rd_byte().bits())
+        } else {
+            Err(nb::Error::WouldBlock)
+        }
     }
 
     /// Read all available bytes from the RX FIFO into the provided buffer and
     /// returns the number of read bytes. Never blocks
     pub fn drain_fifo(&mut self, buf: &mut [u8]) -> usize {
-        drain_fifo(self.register_block(), buf)
+        let mut count = 0;
+        while count < buf.len() {
+            if let Ok(byte) = self.read_byte() {
+                buf[count] = byte;
+                count += 1;
+            } else {
+                break;
+            }
+        }
+        count
+    }
+
+    #[allow(clippy::useless_conversion)]
+    fn rx_fifo_count(&self) -> u16 {
+        let fifo_cnt: u16 = self
+            .register_block()
+            .status()
+            .read()
+            .rxfifo_cnt()
+            .bits()
+            .into();
+
+        // Calculate the real count based on the FIFO read and write offset address:
+        // https://www.espressif.com/sites/default/files/documentation/esp32_errata_en.pdf
+        // section 3.17
+        #[cfg(esp32)]
+        {
+            let status = self.register_block().mem_rx_status().read();
+            let rd_addr = status.mem_rx_rd_addr().bits();
+            let wr_addr = status.mem_rx_wr_addr().bits();
+
+            if wr_addr > rd_addr {
+                wr_addr - rd_addr
+            } else if wr_addr < rd_addr {
+                (wr_addr + UART_FIFO_SIZE) - rd_addr
+            } else if fifo_cnt > 0 {
+                UART_FIFO_SIZE
+            } else {
+                0
+            }
+        }
+
+        #[cfg(not(esp32))]
+        fifo_cnt
     }
 
     /// Configures the RX-FIFO threshold
@@ -845,14 +844,29 @@ where
         }
 
         let register_block = self.register_block();
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                let reg_thrhd = register_block.conf1();
-            } else if #[cfg(any(esp32c6, esp32h2))] {
-                let reg_thrhd = register_block.tout_conf();
-            } else {
-                let reg_thrhd = register_block.mem_conf();
+
+        if let Some(timeout) = timeout {
+            // the esp32 counts directly in number of symbols (symbol len fixed to 8)
+            #[cfg(esp32)]
+            let timeout_reg = timeout;
+            // all other count in bits, so we need to multiply by the symbol len.
+            #[cfg(not(esp32))]
+            let timeout_reg = timeout as u16 * self.symbol_len as u16;
+
+            if timeout_reg > MAX_THRHD {
+                return Err(Error::InvalidArgument);
             }
+
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    let reg_thrhd = register_block.conf1();
+                } else if #[cfg(any(esp32c6, esp32h2))] {
+                    let reg_thrhd = register_block.tout_conf();
+                } else {
+                    let reg_thrhd = register_block.mem_conf();
+                }
+            }
+            reg_thrhd.modify(|_, w| unsafe { w.rx_tout_thrhd().bits(timeout_reg) });
         }
 
         cfg_if::cfg_if! {
@@ -862,27 +876,7 @@ where
                 let reg_en = register_block.conf1();
             }
         }
-
-        match timeout {
-            None => {
-                reg_en.modify(|_, w| w.rx_tout_en().clear_bit());
-            }
-            Some(timeout) => {
-                // the esp32 counts directly in number of symbols (symbol len fixed to 8)
-                #[cfg(esp32)]
-                let timeout_reg = timeout;
-                // all other count in bits, so we need to multiply by the symbol len.
-                #[cfg(not(esp32))]
-                let timeout_reg = timeout as u16 * self.symbol_len as u16;
-
-                if timeout_reg > MAX_THRHD {
-                    return Err(Error::InvalidArgument);
-                }
-
-                reg_thrhd.modify(|_, w| unsafe { w.rx_tout_thrhd().bits(timeout_reg) });
-                reg_en.modify(|_, w| w.rx_tout_en().set_bit());
-            }
-        }
+        reg_en.modify(|_, w| w.rx_tout_en().bit(timeout.is_some()));
 
         sync_regs(register_block);
         self.rx_timeout_config = timeout;
@@ -918,19 +912,19 @@ where
 
 impl<'d> UartRx<'d, Blocking> {
     /// Create a new UART RX instance in [`Blocking`] mode.
-    pub fn new<RX: PeripheralInput>(
+    pub fn new(
         uart: impl Peripheral<P = impl Instance> + 'd,
-        rx: impl Peripheral<P = RX> + 'd,
+        rx: impl Peripheral<P = impl PeripheralInput> + 'd,
     ) -> Result<Self, Error> {
         UartRx::new_typed(uart.map_into(), rx)
     }
 
     /// Create a new UART RX instance with configuration options in
     /// [`Blocking`] mode.
-    pub fn new_with_config<RX: PeripheralInput>(
+    pub fn new_with_config(
         uart: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
-        rx: impl Peripheral<P = RX> + 'd,
+        rx: impl Peripheral<P = impl PeripheralInput> + 'd,
     ) -> Result<Self, Error> {
         UartRx::new_with_config_typed(uart.map_into(), config, rx)
     }
@@ -941,19 +935,19 @@ where
     T: Instance,
 {
     /// Create a new UART RX instance in [`Blocking`] mode.
-    pub fn new_typed<RX: PeripheralInput>(
+    pub fn new_typed(
         uart: impl Peripheral<P = T> + 'd,
-        rx: impl Peripheral<P = RX> + 'd,
+        rx: impl Peripheral<P = impl PeripheralInput> + 'd,
     ) -> Result<Self, Error> {
         Self::new_with_config_typed(uart, Config::default(), rx)
     }
 
     /// Create a new UART RX instance with configuration options in
     /// [`Blocking`] mode.
-    pub fn new_with_config_typed<RX: PeripheralInput>(
+    pub fn new_with_config_typed(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        rx: impl Peripheral<P = RX> + 'd,
+        rx: impl Peripheral<P = impl PeripheralInput> + 'd,
     ) -> Result<Self, Error> {
         let (uart_rx, _) = UartBuilder::new(uart).with_rx(rx).init(config)?.split();
 
@@ -963,21 +957,21 @@ where
 
 impl<'d> Uart<'d, Blocking> {
     /// Create a new UART instance in [`Blocking`] mode.
-    pub fn new<RX: PeripheralInput, TX: PeripheralOutput>(
+    pub fn new(
         uart: impl Peripheral<P = impl Instance> + 'd,
-        rx: impl Peripheral<P = RX> + 'd,
-        tx: impl Peripheral<P = TX> + 'd,
+        rx: impl Peripheral<P = impl PeripheralInput> + 'd,
+        tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Result<Self, Error> {
         Self::new_typed(uart.map_into(), rx, tx)
     }
 
     /// Create a new UART instance with configuration options in
     /// [`Blocking`] mode.
-    pub fn new_with_config<RX: PeripheralInput, TX: PeripheralOutput>(
+    pub fn new_with_config(
         uart: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
-        rx: impl Peripheral<P = RX> + 'd,
-        tx: impl Peripheral<P = TX> + 'd,
+        rx: impl Peripheral<P = impl PeripheralInput> + 'd,
+        tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Result<Self, Error> {
         Self::new_with_config_typed(uart.map_into(), config, rx, tx)
     }
@@ -988,21 +982,21 @@ where
     T: Instance,
 {
     /// Create a new UART instance in [`Blocking`] mode.
-    pub fn new_typed<RX: PeripheralInput, TX: PeripheralOutput>(
+    pub fn new_typed(
         uart: impl Peripheral<P = T> + 'd,
-        rx: impl Peripheral<P = RX> + 'd,
-        tx: impl Peripheral<P = TX> + 'd,
+        rx: impl Peripheral<P = impl PeripheralInput> + 'd,
+        tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Result<Self, Error> {
         Self::new_with_config_typed(uart, Config::default(), rx, tx)
     }
 
     /// Create a new UART instance with configuration options in
     /// [`Blocking`] mode.
-    pub fn new_with_config_typed<RX: PeripheralInput, TX: PeripheralOutput>(
+    pub fn new_with_config_typed(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        rx: impl Peripheral<P = RX> + 'd,
-        tx: impl Peripheral<P = TX> + 'd,
+        rx: impl Peripheral<P = impl PeripheralInput> + 'd,
+        tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Result<Self, Error> {
         UartBuilder::new(uart).with_tx(tx).with_rx(rx).init(config)
     }
@@ -1039,13 +1033,13 @@ where
     }
 
     /// Configure CTS pin
-    pub fn with_cts<CTS: PeripheralInput>(mut self, cts: impl Peripheral<P = CTS> + 'd) -> Self {
+    pub fn with_cts(mut self, cts: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         self.rx = self.rx.with_cts(cts);
         self
     }
 
     /// Configure RTS pin
-    pub fn with_rts<RTS: PeripheralOutput>(mut self, rts: impl Peripheral<P = RTS> + 'd) -> Self {
+    pub fn with_rts(mut self, rts: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         self.tx = self.tx.with_rts(rts);
         self
     }
@@ -1198,24 +1192,22 @@ where
 
     /// Change the number of stop bits
     pub fn change_stop_bits(&mut self, stop_bits: config::StopBits) -> &mut Self {
-        // workaround for hardware issue, when UART stop bit set as 2-bit mode.
         #[cfg(esp32)]
-        if stop_bits == config::StopBits::STOP2 {
-            self.register_block()
-                .rs485_conf()
-                .modify(|_, w| w.dl1_en().bit(true));
+        {
+            // workaround for hardware issue, when UART stop bit set as 2-bit mode.
+            if stop_bits == config::StopBits::STOP2 {
+                self.register_block()
+                    .rs485_conf()
+                    .modify(|_, w| w.dl1_en().bit(stop_bits == config::StopBits::STOP2));
 
-            self.register_block()
-                .conf0()
-                .modify(|_, w| unsafe { w.stop_bit_num().bits(1) });
-        } else {
-            self.register_block()
-                .rs485_conf()
-                .modify(|_, w| w.dl1_en().bit(false));
-
-            self.register_block()
-                .conf0()
-                .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8) });
+                self.register_block().conf0().modify(|_, w| {
+                    if stop_bits == config::StopBits::STOP2 {
+                        unsafe { w.stop_bit_num().bits(1) }
+                    } else {
+                        unsafe { w.stop_bit_num().bits(stop_bits as u8) }
+                    }
+                });
+            }
         }
 
         #[cfg(not(esp32))]
@@ -1250,12 +1242,11 @@ where
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
-            ClockSource::RcFast => RC_FAST_CLK.to_Hz(),
+            ClockSource::RcFast => crate::soc::constants::RC_FAST_CLK.to_Hz(),
         };
 
         if clock_source == ClockSource::RcFast {
-            let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
-            rtc_cntl
+            unsafe { crate::peripherals::RTC_CNTL::steal() }
                 .clk_conf()
                 .modify(|_, w| w.dig_clk8m_en().variant(true));
             // esp_rom_delay_us(SOC_DELAY_RC_FAST_DIGI_SWITCH);
@@ -1263,7 +1254,7 @@ where
         }
 
         let max_div = 0b1111_1111_1111 - 1;
-        let clk_div = ((clk) + (max_div * baudrate) - 1) / (max_div * baudrate);
+        let clk_div = clk.div_ceil(max_div * baudrate);
         self.register_block().clk_conf().write(|w| unsafe {
             w.sclk_sel().bits(match clock_source {
                 ClockSource::Apb => 1,
@@ -1291,7 +1282,7 @@ where
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
-            ClockSource::RcFast => RC_FAST_CLK.to_Hz(),
+            ClockSource::RcFast => crate::soc::constants::RC_FAST_CLK.to_Hz(),
         };
 
         let max_div = 0b1111_1111_1111 - 1;
@@ -1345,19 +1336,15 @@ where
 
     #[cfg(any(esp32, esp32s2))]
     fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource) {
-        let clocks = Clocks::get();
         let clk = match clock_source {
-            ClockSource::Apb => clocks.apb_clock.to_Hz(),
-            ClockSource::RefTick => REF_TICK.to_Hz(), /* ESP32(/-S2) TRM, section 3.2.4.2
-                                                       * (6.2.4.2 for S2) */
+            ClockSource::Apb => Clocks::get().apb_clock.to_Hz(),
+            // ESP32(/-S2) TRM, section 3.2.4.2 (6.2.4.2 for S2)
+            ClockSource::RefTick => crate::soc::constants::REF_TICK.to_Hz(),
         };
 
-        self.register_block().conf0().modify(|_, w| {
-            w.tick_ref_always_on().bit(match clock_source {
-                ClockSource::Apb => true,
-                ClockSource::RefTick => false,
-            })
-        });
+        self.register_block()
+            .conf0()
+            .modify(|_, w| w.tick_ref_always_on().bit(clock_source == ClockSource::Apb));
 
         let divider = clk / baudrate;
 
@@ -1379,8 +1366,7 @@ where
             if #[cfg(any(esp32, esp32s2))] {
                 // Nothing to do
             } else if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
-                let system = unsafe { crate::peripherals::SYSTEM::steal() };
-                system
+                unsafe { crate::peripherals::SYSTEM::steal() }
                     .perip_clk_en0()
                     .modify(|_, w| w.uart_mem_clk_en().set_bit());
             } else {
@@ -1443,41 +1429,36 @@ where
             return;
         }
 
-        #[cfg(not(any(esp32, esp32s2)))]
-        self.register_block()
-            .clk_conf()
-            .modify(|_, w| w.rst_core().set_bit());
+        fn rst_core(_reg_block: &RegisterBlock, _enable: bool) {
+            #[cfg(not(any(esp32, esp32s2)))]
+            _reg_block
+                .clk_conf()
+                .modify(|_, w| w.rst_core().bit(_enable));
+        }
 
+        rst_core(self.register_block(), true);
         PeripheralClockControl::reset(self.tx.uart.peripheral());
-
-        #[cfg(not(any(esp32, esp32s2)))]
-        self.register_block()
-            .clk_conf()
-            .modify(|_, w| w.rst_core().clear_bit());
+        rst_core(self.register_block(), false);
     }
 
     fn rxfifo_reset(&mut self) {
-        self.register_block()
-            .conf0()
-            .modify(|_, w| w.rxfifo_rst().set_bit());
-        self.sync_regs();
+        fn rxfifo_rst(reg_block: &RegisterBlock, enable: bool) {
+            reg_block.conf0().modify(|_, w| w.rxfifo_rst().bit(enable));
+            sync_regs(reg_block);
+        }
 
-        self.register_block()
-            .conf0()
-            .modify(|_, w| w.rxfifo_rst().clear_bit());
-        self.sync_regs();
+        rxfifo_rst(self.register_block(), true);
+        rxfifo_rst(self.register_block(), false);
     }
 
     fn txfifo_reset(&mut self) {
-        self.register_block()
-            .conf0()
-            .modify(|_, w| w.txfifo_rst().set_bit());
-        self.sync_regs();
+        fn txfifo_rst(reg_block: &RegisterBlock, enable: bool) {
+            reg_block.conf0().modify(|_, w| w.txfifo_rst().bit(enable));
+            sync_regs(reg_block);
+        }
 
-        self.register_block()
-            .conf0()
-            .modify(|_, w| w.txfifo_rst().clear_bit());
-        self.sync_regs();
+        txfifo_rst(self.register_block(), true);
+        txfifo_rst(self.register_block(), false);
     }
 }
 
@@ -1491,85 +1472,6 @@ where
         self.inner_set_interrupt_handler(handler);
     }
 }
-
-/// UART Peripheral Instance
-pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyUart> + 'static {
-    /// Returns the peripheral data describing this UART instance.
-    fn peripheral_data(&self) -> &UartPeripheral;
-}
-
-/// Peripheral signals associated with a particular UART instance.
-pub struct UartSignals {
-    /// TX pin
-    pub tx: OutputSignal,
-
-    /// RX pin
-    pub rx: InputSignal,
-
-    /// CTS (Clear to Send) pin
-    pub cts: InputSignal,
-
-    /// RTS (Request to Send) pin
-    pub rts: OutputSignal,
-}
-
-/// Peripheral data describing a particular UART instance.
-pub struct UartPeripheral {
-    register_block: *const RegisterBlock,
-    async_handler: InterruptHandler,
-    rx_waker: AtomicWaker,
-    tx_waker: AtomicWaker,
-    interrupt: Interrupt,
-    signals: UartSignals,
-}
-
-impl UartPeripheral {
-    fn register_block(&self) -> &RegisterBlock {
-        unsafe { &*self.register_block }
-    }
-}
-
-impl PartialEq for UartPeripheral {
-    fn eq(&self, other: &Self) -> bool {
-        self.register_block == other.register_block
-    }
-}
-
-unsafe impl Sync for UartPeripheral {}
-
-macro_rules! impl_instance {
-    ($inst:ident, $txd:ident, $rxd:ident, $cts:ident, $rts:ident) => {
-        impl Instance for crate::peripherals::$inst {
-            #[inline(always)]
-            fn peripheral_data(&self) -> &UartPeripheral {
-                #[crate::macros::handler]
-                pub(super) fn irq_handler() {
-                    asynch::intr_handler(&PERIPHERAL);
-                }
-
-                static PERIPHERAL: UartPeripheral = UartPeripheral {
-                    register_block: crate::peripherals::$inst::ptr(),
-                    async_handler: irq_handler,
-                    tx_waker: AtomicWaker::new(),
-                    rx_waker: AtomicWaker::new(),
-                    interrupt: Interrupt::$inst,
-                    signals: UartSignals {
-                        tx: OutputSignal::$txd,
-                        rx: InputSignal::$rxd,
-                        cts: InputSignal::$cts,
-                        rts: OutputSignal::$rts,
-                    },
-                };
-                &PERIPHERAL
-            }
-        }
-    };
-}
-
-impl_instance!(UART0, U0TXD, U0RXD, U0CTS, U0RTS);
-impl_instance!(UART1, U1TXD, U1RXD, U1CTS, U1RTS);
-#[cfg(uart2)]
-impl_instance!(UART2, U2TXD, U2RXD, U2CTS, U2RTS);
 
 impl<T, M> ufmt_write::uWrite for Uart<'_, M, T>
 where
@@ -1775,7 +1677,7 @@ where
             return Ok(0);
         }
 
-        while get_rx_fifo_count(self.register_block()) == 0 {
+        while self.rx_fifo_count() == 0 {
             // Block until we received at least one byte
         }
 
@@ -1799,7 +1701,7 @@ where
     M: Mode,
 {
     fn read_ready(&mut self) -> Result<bool, Self::Error> {
-        Ok(get_rx_fifo_count(self.register_block()) > 0)
+        Ok(self.rx_fifo_count() > 0)
     }
 }
 
@@ -1869,26 +1771,14 @@ mod asynch {
     /// is dropped it disables the interrupt again. The future returns the event
     /// that was initially passed, when it resolves.
     #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub(crate) struct UartRxFuture<'d, T>
-    where
-        T: Instance,
-    {
+    struct UartRxFuture<'d> {
         events: EnumSet<RxEvent>,
-        uart: &'d mut T,
-        registered: bool,
-    }
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub(crate) struct UartTxFuture<'d, T>
-    where
-        T: Instance,
-    {
-        events: EnumSet<TxEvent>,
-        uart: &'d mut T,
+        uart: &'d UartPeripheral,
         registered: bool,
     }
 
-    impl<'d, T: Instance> UartRxFuture<'d, T> {
-        pub fn new(uart: &'d mut T, events: impl Into<EnumSet<RxEvent>>) -> Self {
+    impl<'d> UartRxFuture<'d> {
+        pub fn new(uart: &'d UartPeripheral, events: impl Into<EnumSet<RxEvent>>) -> Self {
             Self {
                 events: events.into(),
                 uart,
@@ -1896,13 +1786,8 @@ mod asynch {
             }
         }
 
-        fn get_triggered_events(&self) -> EnumSet<RxEvent> {
-            let interrupts_enabled = self
-                .uart
-                .peripheral_data()
-                .register_block()
-                .int_ena()
-                .read();
+        fn triggered_events(&self) -> EnumSet<RxEvent> {
+            let interrupts_enabled = self.uart.register_block().int_ena().read();
             let mut events_triggered = EnumSet::new();
             for event in self.events {
                 let event_triggered = match event {
@@ -1923,28 +1808,24 @@ mod asynch {
         }
 
         fn enable_listen(&self, enable: bool) {
-            self.uart
-                .peripheral_data()
-                .register_block()
-                .int_ena()
-                .modify(|_, w| {
-                    for event in self.events {
-                        match event {
-                            RxEvent::FifoFull => w.rxfifo_full().bit(enable),
-                            RxEvent::CmdCharDetected => w.at_cmd_char_det().bit(enable),
-                            RxEvent::FifoOvf => w.rxfifo_ovf().bit(enable),
-                            RxEvent::FifoTout => w.rxfifo_tout().bit(enable),
-                            RxEvent::GlitchDetected => w.glitch_det().bit(enable),
-                            RxEvent::FrameError => w.frm_err().bit(enable),
-                            RxEvent::ParityError => w.parity_err().bit(enable),
-                        };
-                    }
-                    w
-                });
+            self.uart.register_block().int_ena().modify(|_, w| {
+                for event in self.events {
+                    match event {
+                        RxEvent::FifoFull => w.rxfifo_full().bit(enable),
+                        RxEvent::CmdCharDetected => w.at_cmd_char_det().bit(enable),
+                        RxEvent::FifoOvf => w.rxfifo_ovf().bit(enable),
+                        RxEvent::FifoTout => w.rxfifo_tout().bit(enable),
+                        RxEvent::GlitchDetected => w.glitch_det().bit(enable),
+                        RxEvent::FrameError => w.frm_err().bit(enable),
+                        RxEvent::ParityError => w.parity_err().bit(enable),
+                    };
+                }
+                w
+            });
         }
     }
 
-    impl<'d, T: Instance> core::future::Future for UartRxFuture<'d, T> {
+    impl core::future::Future for UartRxFuture<'_> {
         type Output = EnumSet<RxEvent>;
 
         fn poll(
@@ -1952,11 +1833,11 @@ mod asynch {
             cx: &mut core::task::Context<'_>,
         ) -> core::task::Poll<Self::Output> {
             if !self.registered {
-                self.uart.peripheral_data().rx_waker.register(cx.waker());
+                self.uart.rx_waker.register(cx.waker());
                 self.enable_listen(true);
                 self.registered = true;
             }
-            let events = self.get_triggered_events();
+            let events = self.triggered_events();
             if !events.is_empty() {
                 Poll::Ready(events)
             } else {
@@ -1965,7 +1846,7 @@ mod asynch {
         }
     }
 
-    impl<'d, T: Instance> Drop for UartRxFuture<'d, T> {
+    impl Drop for UartRxFuture<'_> {
         fn drop(&mut self) {
             // Although the isr disables the interrupt that occurred directly, we need to
             // disable the other interrupts (= the ones that did not occur), as
@@ -1974,8 +1855,14 @@ mod asynch {
         }
     }
 
-    impl<'d, T: Instance> UartTxFuture<'d, T> {
-        pub fn new(uart: &'d mut T, events: impl Into<EnumSet<TxEvent>>) -> Self {
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
+    struct UartTxFuture<'d> {
+        events: EnumSet<TxEvent>,
+        uart: &'d UartPeripheral,
+        registered: bool,
+    }
+    impl<'d> UartTxFuture<'d> {
+        pub fn new(uart: &'d UartPeripheral, events: impl Into<EnumSet<TxEvent>>) -> Self {
             Self {
                 events: events.into(),
                 uart,
@@ -1983,13 +1870,8 @@ mod asynch {
             }
         }
 
-        fn get_triggered_events(&self) -> bool {
-            let interrupts_enabled = self
-                .uart
-                .peripheral_data()
-                .register_block()
-                .int_ena()
-                .read();
+        fn triggered_events(&self) -> bool {
+            let interrupts_enabled = self.uart.register_block().int_ena().read();
             let mut event_triggered = false;
             for event in self.events {
                 event_triggered |= match event {
@@ -2001,23 +1883,19 @@ mod asynch {
         }
 
         fn enable_listen(&self, enable: bool) {
-            self.uart
-                .peripheral_data()
-                .register_block()
-                .int_ena()
-                .modify(|_, w| {
-                    for event in self.events {
-                        match event {
-                            TxEvent::TxDone => w.tx_done().bit(enable),
-                            TxEvent::TxFiFoEmpty => w.txfifo_empty().bit(enable),
-                        };
-                    }
-                    w
-                });
+            self.uart.register_block().int_ena().modify(|_, w| {
+                for event in self.events {
+                    match event {
+                        TxEvent::TxDone => w.tx_done().bit(enable),
+                        TxEvent::TxFiFoEmpty => w.txfifo_empty().bit(enable),
+                    };
+                }
+                w
+            });
         }
     }
 
-    impl<'d, T: Instance> core::future::Future for UartTxFuture<'d, T> {
+    impl core::future::Future for UartTxFuture<'_> {
         type Output = ();
 
         fn poll(
@@ -2025,12 +1903,12 @@ mod asynch {
             cx: &mut core::task::Context<'_>,
         ) -> core::task::Poll<Self::Output> {
             if !self.registered {
-                self.uart.peripheral_data().tx_waker.register(cx.waker());
+                self.uart.tx_waker.register(cx.waker());
                 self.enable_listen(true);
                 self.registered = true;
             }
 
-            if self.get_triggered_events() {
+            if self.triggered_events() {
                 Poll::Ready(())
             } else {
                 Poll::Pending
@@ -2038,7 +1916,7 @@ mod asynch {
         }
     }
 
-    impl<'d, T: Instance> Drop for UartTxFuture<'d, T> {
+    impl Drop for UartTxFuture<'_> {
         fn drop(&mut self) {
             // Although the isr disables the interrupt that occurred directly, we need to
             // disable the other interrupts (= the ones that did not occur), as
@@ -2182,9 +2060,7 @@ mod asynch {
             let mut count = 0;
             let mut offset: usize = 0;
             loop {
-                let register_block = self.register_block();
-                let mut next_offset =
-                    offset + (UART_FIFO_SIZE - get_tx_fifo_count(register_block)) as usize;
+                let mut next_offset = offset + (UART_FIFO_SIZE - self.tx_fifo_count()) as usize;
                 if next_offset > words.len() {
                     next_offset = words.len();
                 }
@@ -2199,7 +2075,7 @@ mod asynch {
                 }
 
                 offset = next_offset;
-                UartTxFuture::<T>::new(&mut *self.uart, TxEvent::TxFiFoEmpty).await;
+                UartTxFuture::new(self.uart.peripheral_data(), TxEvent::TxFiFoEmpty).await;
             }
 
             Ok(count)
@@ -2211,9 +2087,9 @@ mod asynch {
         /// been sent over the UART. If the FIFO contains data, it waits
         /// for the transmission to complete before returning.
         pub async fn flush_async(&mut self) -> Result<(), Error> {
-            let count = get_tx_fifo_count(self.register_block());
+            let count = self.tx_fifo_count();
             if count > 0 {
-                UartTxFuture::<T>::new(&mut *self.uart, TxEvent::TxDone).await;
+                UartTxFuture::new(self.uart.peripheral_data(), TxEvent::TxDone).await;
             }
 
             Ok(())
@@ -2245,19 +2121,19 @@ mod asynch {
         T: Instance,
     {
         /// Create a new UART RX instance in [`Async`] mode.
-        pub fn new_async_typed<RX: PeripheralInput>(
+        pub fn new_async_typed(
             uart: impl Peripheral<P = T> + 'd,
-            rx: impl Peripheral<P = RX> + 'd,
+            rx: impl Peripheral<P = impl PeripheralInput> + 'd,
         ) -> Result<Self, Error> {
             Self::new_async_with_config_typed(uart, Config::default(), rx)
         }
 
         /// Create a new UART RX instance with configuration options in
         /// [`Async`] mode.
-        pub fn new_async_with_config_typed<RX: PeripheralInput>(
+        pub fn new_async_with_config_typed(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
-            rx: impl Peripheral<P = RX> + 'd,
+            rx: impl Peripheral<P = impl PeripheralInput> + 'd,
         ) -> Result<Self, Error> {
             let mut this = UartBuilder::new(uart).with_rx(rx).init(config)?;
 
@@ -2306,7 +2182,7 @@ mod asynch {
                     events |= RxEvent::FifoTout;
                 }
 
-                let events_happened = UartRxFuture::<T>::new(&mut self.uart, events).await;
+                let events_happened = UartRxFuture::new(self.uart.peripheral_data(), events).await;
                 // always drain the fifo, if an error has occurred the data is lost
                 let read_bytes = self.drain_fifo(buf);
                 // check error events
@@ -2610,6 +2486,91 @@ pub mod lp_uart {
         }
     }
 }
+
+/// UART Peripheral Instance
+pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyUart> + 'static {
+    /// Returns the peripheral data describing this UART instance.
+    fn peripheral_data(&self) -> &UartPeripheral;
+}
+
+/// Peripheral data describing a particular UART instance.
+pub struct UartPeripheral {
+    /// Pointer to the register block for this UART instance.
+    ///
+    /// Use [Self::register_block] to access the register block.
+    pub register_block: *const RegisterBlock,
+
+    /// Interrupt handler for the asynchronous operations of this UART instance.
+    pub async_handler: InterruptHandler,
+
+    /// Waker for the asynchronous RX operations.
+    pub rx_waker: AtomicWaker,
+
+    /// Waker for the asynchronous TX operations.
+    pub tx_waker: AtomicWaker,
+
+    /// Interrupt for this UART instance.
+    pub interrupt: Interrupt,
+
+    /// TX pin
+    pub tx_signal: OutputSignal,
+
+    /// RX pin
+    pub rx_signal: InputSignal,
+
+    /// CTS (Clear to Send) pin
+    pub cts_signal: InputSignal,
+
+    /// RTS (Request to Send) pin
+    pub rts_signal: OutputSignal,
+}
+
+impl UartPeripheral {
+    /// Returns the register block for this UART instance.
+    pub fn register_block(&self) -> &RegisterBlock {
+        unsafe { &*self.register_block }
+    }
+}
+
+impl PartialEq for UartPeripheral {
+    fn eq(&self, other: &Self) -> bool {
+        self.register_block == other.register_block
+    }
+}
+
+unsafe impl Sync for UartPeripheral {}
+
+macro_rules! impl_instance {
+    ($inst:ident, $txd:ident, $rxd:ident, $cts:ident, $rts:ident) => {
+        impl Instance for crate::peripherals::$inst {
+            #[inline(always)]
+            fn peripheral_data(&self) -> &UartPeripheral {
+                #[crate::macros::handler]
+                pub(super) fn irq_handler() {
+                    asynch::intr_handler(&PERIPHERAL);
+                }
+
+                static PERIPHERAL: UartPeripheral = UartPeripheral {
+                    register_block: crate::peripherals::$inst::ptr(),
+                    async_handler: irq_handler,
+                    tx_waker: AtomicWaker::new(),
+                    rx_waker: AtomicWaker::new(),
+                    interrupt: Interrupt::$inst,
+                    tx_signal: OutputSignal::$txd,
+                    rx_signal: InputSignal::$rxd,
+                    cts_signal: InputSignal::$cts,
+                    rts_signal: OutputSignal::$rts,
+                };
+                &PERIPHERAL
+            }
+        }
+    };
+}
+
+impl_instance!(UART0, U0TXD, U0RXD, U0CTS, U0RTS);
+impl_instance!(UART1, U1TXD, U1RXD, U1CTS, U1RTS);
+#[cfg(uart2)]
+impl_instance!(UART2, U2TXD, U2RXD, U2CTS, U2RTS);
 
 crate::any_peripheral! {
     /// Any UART peripheral.
