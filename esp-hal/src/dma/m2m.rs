@@ -128,9 +128,11 @@ where
         self.tx_chain.fill_for_tx(false, tx_ptr, tx_len)?;
         self.rx_chain.fill_for_rx(false, rx_ptr, rx_len)?;
         unsafe {
-            self.channel
-                .tx
-                .prepare_transfer_without_start(self.peripheral, &self.tx_chain)?;
+            self.channel.tx.prepare_transfer_without_start(
+                self.peripheral,
+                &self.tx_chain,
+                false,
+            )?;
             self.channel
                 .rx
                 .prepare_transfer_without_start(self.peripheral, &self.rx_chain)?;

@@ -1313,7 +1313,7 @@ impl TxCircularState {
         }
     }
 
-    pub(crate) fn update<T>(&mut self, channel: &T)
+    pub(crate) fn update<T>(&mut self, channel: &T) -> Result<(), DmaError>
     where
         T: Tx,
     {
@@ -1322,6 +1322,23 @@ impl TxCircularState {
             .contains(DmaTxInterrupt::Eof)
         {
             channel.clear_out(DmaTxInterrupt::Eof);
+
+            // check if all descriptors are owned by CPU - this indicates we failed to push
+            // data fast enough in future we can enable `check_owner` and check
+            // the interrupt instead
+            let mut current = self.last_seen_handled_descriptor_ptr;
+            loop {
+                let descr = unsafe { current.read_volatile() };
+                if descr.owner() == Owner::Cpu {
+                    current = descr.next;
+                } else {
+                    break;
+                }
+
+                if current == self.last_seen_handled_descriptor_ptr {
+                    return Err(DmaError::Overflow);
+                }
+            }
 
             let descr_address = channel.last_out_dscr_address() as *mut DmaDescriptor;
 
@@ -1376,6 +1393,8 @@ impl TxCircularState {
 
             self.last_seen_handled_descriptor_ptr = descr_address;
         }
+
+        Ok(())
     }
 
     pub(crate) fn push(&mut self, data: &[u8]) -> Result<usize, DmaError> {
@@ -1404,6 +1423,8 @@ impl TxCircularState {
         &mut self,
         f: impl FnOnce(&mut [u8]) -> usize,
     ) -> Result<usize, DmaError> {
+        // this might write less than available in case of a wrap around
+        // caller needs to check and write the remaining part
         let written = unsafe {
             let dst = self.buffer_start.add(self.write_offset).cast_mut();
             let block_size = usize::min(self.available, self.buffer_len - self.write_offset);
@@ -1414,12 +1435,15 @@ impl TxCircularState {
         let mut forward = written;
         loop {
             unsafe {
-                let dw0 = self.write_descr_ptr.read_volatile();
-                let segment_len = dw0.len();
-                self.write_descr_ptr = if dw0.next.is_null() {
+                let mut descr = self.write_descr_ptr.read_volatile();
+                descr.set_owner(Owner::Dma);
+                self.write_descr_ptr.write_volatile(descr);
+
+                let segment_len = descr.len();
+                self.write_descr_ptr = if descr.next.is_null() {
                     self.first_desc_ptr
                 } else {
-                    dw0.next
+                    descr.next
                 };
 
                 if forward <= segment_len {
@@ -1787,6 +1811,7 @@ pub trait Tx: crate::private::Sealed {
         &mut self,
         peri: DmaPeripheral,
         chain: &DescriptorChain,
+        enable_wrback: bool,
     ) -> Result<(), DmaError>;
 
     unsafe fn prepare_transfer<BUF: DmaTxBuffer>(
@@ -1877,6 +1902,7 @@ where
         &mut self,
         peri: DmaPeripheral,
         chain: &DescriptorChain,
+        enable_wrback: bool,
     ) -> Result<(), DmaError> {
         // TODO: based on the ESP32-S3 TRM the alignment check is not needed for TX!
         // for esp32s3 we check each descriptor buffer that points to psram for
@@ -1901,6 +1927,7 @@ where
         self.tx_impl.reset();
         self.tx_impl.set_link_addr(chain.first() as u32);
         self.tx_impl.set_peripheral(peri as u8);
+        self.tx_impl.set_auto_wrback(enable_wrback);
 
         Ok(())
     }
@@ -2010,6 +2037,9 @@ pub trait RegisterAccess: crate::private::Sealed {
 
     /// Set the address of the first descriptor.
     fn set_link_addr(&self, address: u32);
+
+    /// Enable/disable outlink-writeback
+    fn set_auto_wrback(&self, enable: bool);
 
     /// Enable the channel for data transfer.
     fn start(&self);
@@ -2378,14 +2408,14 @@ where
     }
 
     /// Amount of bytes which can be pushed.
-    pub fn available(&mut self) -> usize {
-        self.state.update(self.instance.tx());
-        self.state.available
+    pub fn available(&mut self) -> Result<usize, DmaError> {
+        self.state.update(self.instance.tx())?;
+        Ok(self.state.available)
     }
 
     /// Push bytes into the DMA buffer.
     pub fn push(&mut self, data: &[u8]) -> Result<usize, DmaError> {
-        self.state.update(self.instance.tx());
+        self.state.update(self.instance.tx())?;
         self.state.push(data)
     }
 
@@ -2394,7 +2424,7 @@ where
     /// The closure *might* get called with a slice which is smaller than the
     /// total available buffer.
     pub fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> Result<usize, DmaError> {
-        self.state.update(self.instance.tx());
+        self.state.update(self.instance.tx())?;
         self.state.push_with(f)
     }
 

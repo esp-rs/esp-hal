@@ -527,7 +527,7 @@ where
         unsafe {
             self.tx_chain.fill_for_tx(circular, ptr, len)?;
             self.tx_channel
-                .prepare_transfer_without_start(self.i2s.dma_peripheral(), &self.tx_chain)
+                .prepare_transfer_without_start(self.i2s.dma_peripheral(), &self.tx_chain, true)
                 .and_then(|_| self.tx_channel.start_transfer())?;
         }
 
@@ -1892,7 +1892,7 @@ pub mod asynch {
                 self.tx_chain.fill_for_tx(false, ptr, len)?;
                 future
                     .tx
-                    .prepare_transfer_without_start(self.i2s.dma_peripheral(), &self.tx_chain)
+                    .prepare_transfer_without_start(self.i2s.dma_peripheral(), &self.tx_chain, true)
                     .and_then(|_| future.tx.start_transfer())?;
             }
 
@@ -1918,7 +1918,7 @@ pub mod asynch {
             unsafe {
                 self.tx_chain.fill_for_tx(true, ptr, len)?;
                 self.tx_channel
-                    .prepare_transfer_without_start(self.i2s.dma_peripheral(), &self.tx_chain)
+                    .prepare_transfer_without_start(self.i2s.dma_peripheral(), &self.tx_chain, true)
                     .and_then(|_| self.tx_channel.start_transfer())?;
             }
 
@@ -1954,7 +1954,7 @@ pub mod asynch {
         /// Will wait for more than 0 bytes available.
         pub async fn available(&mut self) -> Result<usize, Error> {
             loop {
-                self.state.update(&self.i2s_tx.tx_channel);
+                self.state.update(&self.i2s_tx.tx_channel)?;
                 let res = self.state.available;
 
                 if res != 0 {

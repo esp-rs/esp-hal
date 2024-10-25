@@ -67,6 +67,11 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDma
             .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
     }
 
+    fn set_auto_wrback(&self, enable: bool) {
+        // not available
+        core::assert!(!enable);
+    }
+
     fn start(&self) {
         let spi = self.0.register_block();
         spi.dma_out_link()
@@ -199,6 +204,10 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDma
         let spi = self.0.register_block();
         spi.dma_in_link()
             .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
+    }
+
+    fn set_auto_wrback(&self, _enable: bool) {
+        // not available / no-op for RX
     }
 
     fn start(&self) {
@@ -480,6 +489,13 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDma
         // no-op
     }
 
+    fn set_auto_wrback(&self, enable: bool) {
+        let reg_block = self.0.register_block();
+        reg_block
+            .lc_conf()
+            .modify(|_, w| w.out_auto_wrback().bit(enable));
+    }
+
     fn start(&self) {
         let reg_block = self.0.register_block();
         reg_block
@@ -622,6 +638,10 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDma
 
     fn set_peripheral(&self, _peripheral: u8) {
         // no-op
+    }
+
+    fn set_auto_wrback(&self, _enable: bool) {
+        // not available / no-op for RX
     }
 
     fn start(&self) {
