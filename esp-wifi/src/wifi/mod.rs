@@ -409,9 +409,18 @@ impl CsiConfiguration {
             _bitfield_align_1: self._bitfield_align_1,
             _bitfield_1: self._bitfield_1,
         };
+
+        extern "C" {
+            static mut g_wifi_menuconfig: u8;
+        }
+
         unsafe {
-            // esp_wifi_result!(esp_wifi_set_csi_config(&conf))?;
-            esp_wifi_set_csi_config(&conf);
+            // Set G_CONFIG.csi_enable to 1
+            // https://github.com/esp-rs/esp-hal/blob/19b08efc1d21a7b92a796d6800c47162b80a5629/esp-wifi/src/wifi/mod.rs#L1529
+            let ptr = core::ptr::addr_of_mut!(g_wifi_menuconfig).add(24);
+            ptr.write_volatile(1);
+
+            esp_wifi_result!(esp_wifi_set_csi_config(&conf))?;
         }
         Ok(())
     }
@@ -440,8 +449,7 @@ impl CsiConfiguration {
     pub fn set_csi(&self, enable: bool) -> Result<(), WifiError> {
         // https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/headers/esp_wifi.h#L1241
         unsafe {
-            // esp_wifi_result!(esp_wifi_set_csi(enable))?;
-            esp_wifi_set_csi(enable);
+            esp_wifi_result!(esp_wifi_set_csi(enable))?;
         }
         Ok(())
     }
@@ -451,9 +459,10 @@ unsafe extern "C" fn csi_rx_cb(
     ctx: *mut crate::wifi::c_types::c_void,
     data: *mut crate::binary::include::wifi_csi_info_t,
 ) {
+    info!("CSI Callback!");
     critical_section::with(|cs| {
         let rx_ctrl: crate::binary::include::wifi_pkt_rx_ctrl_t = (*data).rx_ctrl;
-        // log::info!("CSI RX Callback: {:?}", rx_ctrl.rssi());
+        info!("CSI RX Callback: {:?}", rx_ctrl.rssi());
     });
 }
 

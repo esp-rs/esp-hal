@@ -1,11 +1,10 @@
-//! DHCP Example
+//! CSI Example
 //!
 //!
 //! Set SSID and PASSWORD env variable before running this example.
 //!
-//! This gets an ip address via DHCP then performs an HTTP get request to some "random" server
 
-//% FEATURES: esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils esp-wifi/esp-now
+//% FEATURES: esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils esp-wifi/log
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -15,12 +14,16 @@ extern crate alloc;
 
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{delay::Delay, prelude::*, rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{
+    prelude::*,
+    rng::Rng,
+    time::{self},
+    timer::timg::TimerGroup,
+};
 use esp_println::println;
 use esp_wifi::{
     init,
     wifi::{
-        new_with_mode,
         utils::create_network_interface,
         AccessPointInfo,
         ClientConfiguration,
@@ -32,6 +35,7 @@ use esp_wifi::{
     wifi_interface::WifiStack,
     EspWifiInitFor,
 };
+use smoltcp::iface::SocketStorage;
 
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
@@ -49,8 +53,6 @@ fn main() -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let delay = Delay::new();
-
     let init = init(
         EspWifiInitFor::Wifi,
         timg0.timer0,
@@ -60,16 +62,26 @@ fn main() -> ! {
     .unwrap();
 
     let mut wifi = peripherals.WIFI;
-    // ESP-NOW
-    let mut esp_now = esp_wifi::esp_now::EspNow::new(&init, wifi).unwrap();
-    println!("esp-now version {}", esp_now.get_version().unwrap());
-    esp_now.set_rate(esp_wifi::esp_now::WifiPhyRate::RateMcs0Sgi);
-    esp_now.set_channel(11).unwrap();
+    let mut socket_set_entries: [SocketStorage; 3] = Default::default();
+    let (iface, device, mut controller, sockets) =
+        create_network_interface(&init, &mut wifi, WifiStaDevice, &mut socket_set_entries).unwrap();
+    let now = || time::now().duration_since_epoch().to_millis();
+    let wifi_stack = WifiStack::new(iface, device, sockets, now);
 
-    delay.delay(4.secs());
+    let client_config = Configuration::Client(ClientConfiguration {
+        ssid: SSID.try_into().unwrap(),
+        password: PASSWORD.try_into().unwrap(),
+        ..Default::default()
+    });
+    let res = controller.set_configuration(&client_config);
+    println!("wifi_set_configuration returned {:?}", res);
+
+    controller.start().unwrap();
+    println!("is wifi started: {:?}", controller.is_started());
+
     let mut csi = CsiConfiguration::default();
     csi.set_config();
-    // csi.set_rx_cb();
+    csi.set_rx_cb();
     println!("Waiting for CSI data...");
     csi.set_receive_cb(|data| {
         let rx_ctrl = data.rx_ctrl;
@@ -78,7 +90,42 @@ fn main() -> ! {
 
     csi.set_csi(true);
 
-    loop {
-        delay.delay(4.secs());
+    println!("Start Wifi Scan");
+    let res: Result<(heapless::Vec<AccessPointInfo, 10>, usize), WifiError> = controller.scan_n();
+    if let Ok((res, _count)) = res {
+        for ap in res {
+            println!("{:?}", ap);
+        }
     }
+
+    println!("{:?}", controller.get_capabilities());
+    println!("wifi_connect {:?}", controller.connect());
+
+    // // wait to get connected
+    println!("Wait to get connected");
+    loop {
+        match controller.is_connected() {
+            Ok(true) => break,
+            Ok(false) => {}
+            Err(err) => {
+                println!("{:?}", err);
+                loop {}
+            }
+        }
+    }
+    println!("{:?}", controller.is_connected());
+
+    // wait for getting an ip address
+    println!("Wait to get an ip address");
+    loop {
+        wifi_stack.work();
+
+        if wifi_stack.is_iface_up() {
+            println!("got ip {:?}", wifi_stack.get_ip_info());
+            break;
+        }
+    }
+
+    println!("Start busy loop on main");
+    loop {}
 }
