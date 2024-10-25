@@ -81,15 +81,14 @@ fn main() -> ! {
 
     let mut csi = CsiConfiguration::default();
     csi.set_config();
-    csi.set_rx_cb();
-    println!("Waiting for CSI data...");
     csi.set_receive_cb(|data| {
         let rx_ctrl = data.rx_ctrl;
-        println!("CSI data: {:?}", rx_ctrl.rssi());
+        println!("rssi: {:?} rate: {}", rx_ctrl.rssi(), rx_ctrl.rate());
     });
 
     csi.set_csi(true);
 
+    println!("Waiting for CSI data...");
     println!("Start Wifi Scan");
     let res: Result<(heapless::Vec<AccessPointInfo, 10>, usize), WifiError> = controller.scan_n();
     if let Ok((res, _count)) = res {

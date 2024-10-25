@@ -301,6 +301,56 @@ impl Default for AccessPointConfiguration {
 
 /// Client configuration for a Wi-Fi connection.
 #[derive(Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct ClientConfiguration {
+    pub ssid: heapless::String<32>,
+    pub bssid: Option<[u8; 6]>,
+    // pub protocol: Protocol,
+    pub auth_method: AuthMethod,
+    pub password: heapless::String<64>,
+    pub channel: Option<u8>,
+}
+
+impl Debug for ClientConfiguration {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("ClientConfiguration")
+            .field("ssid", &self.ssid)
+            .field("bssid", &self.bssid)
+            .field("auth_method", &self.auth_method)
+            .field("channel", &self.channel)
+            .finish()
+    }
+}
+
+impl Default for ClientConfiguration {
+    fn default() -> Self {
+        ClientConfiguration {
+            ssid: heapless::String::new(),
+            bssid: None,
+            auth_method: Default::default(),
+            password: heapless::String::new(),
+            channel: None,
+        }
+    }
+}
+
+#[allow(clippy::type_complexity)]
+static CSI_CB: Mutex<RefCell<Option<fn(crate::binary::include::wifi_csi_info_t)>>> =
+    Mutex::new(RefCell::new(None));
+
+unsafe extern "C" fn promiscuous_csi_rx_cb(
+    ctx: *mut crate::wifi::c_types::c_void,
+    data: *mut crate::binary::include::wifi_csi_info_t,
+) {
+    critical_section::with(|cs| {
+        let Some(csi_callback) = *CSI_CB.borrow_ref(cs) else {
+            return;
+        };
+        csi_callback(*data);
+    });
+}
+
+#[derive(Clone, PartialEq, Eq)]
 // https://github.com/esp-rs/esp-wifi-sys/blob/main/esp-wifi-sys/headers/local/esp_wifi_types_native.h#L94
 /// Channel state information(CSI) configuration
 #[cfg(not(esp32c6))]
@@ -386,10 +436,6 @@ impl Default for CsiConfiguration {
     }
 }
 
-#[allow(clippy::type_complexity)]
-static CSI_CB: Mutex<RefCell<Option<fn(crate::binary::include::wifi_csi_info_t)>>> =
-    Mutex::new(RefCell::new(None));
-
 impl CsiConfiguration {
     /// Set CSI data configuration
     pub fn set_config(&self) -> Result<(), WifiError> {
@@ -427,19 +473,13 @@ impl CsiConfiguration {
 
     /// Register the RX callback function of CSI data. Each time a CSI data is
     /// received, the callback function will be called.
-    pub fn set_rx_cb(&self) -> Result<(), WifiError> {
-        // TODO: Something like set_receive_cb in sniffer, see wifi_sniffer.rs::63
-        // https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/headers/esp_wifi.h#L1202C1-L1203C1
+    pub fn set_receive_cb(&mut self, cb: fn(crate::binary::include::wifi_csi_info_t)) {
         unsafe {
             esp_wifi_result!(esp_wifi_set_csi_rx_cb(
-                Some(csi_rx_cb),
+                Some(promiscuous_csi_rx_cb),
                 core::ptr::null_mut()
-            ))?;
+            ));
         }
-        Ok(())
-    }
-
-    pub fn set_receive_cb(&mut self, cb: fn(crate::binary::include::wifi_csi_info_t)) {
         critical_section::with(|cs| {
             *CSI_CB.borrow_ref_mut(cs) = Some(cb);
         });
@@ -455,62 +495,6 @@ impl CsiConfiguration {
     }
 }
 
-unsafe extern "C" fn csi_rx_cb(
-    ctx: *mut crate::wifi::c_types::c_void,
-    data: *mut crate::binary::include::wifi_csi_info_t,
-) {
-    info!("CSI Callback!");
-    critical_section::with(|cs| {
-        let rx_ctrl: crate::binary::include::wifi_pkt_rx_ctrl_t = (*data).rx_ctrl;
-        info!("CSI RX Callback: {:?}", rx_ctrl.rssi());
-    });
-}
-
-#[derive(Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-pub struct ClientConfiguration {
-    /// The SSID of the Wi-Fi network.
-    pub ssid: heapless::String<32>,
-
-    /// The BSSID (MAC address) of the client.
-    pub bssid: Option<[u8; 6]>,
-
-    // pub protocol: Protocol,
-    /// The authentication method for the Wi-Fi connection.
-    pub auth_method: AuthMethod,
-
-    /// The password for the Wi-Fi connection.
-    pub password: heapless::String<64>,
-
-    /// The Wi-Fi channel to connect to.
-    pub channel: Option<u8>,
-}
-
-impl Debug for ClientConfiguration {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("ClientConfiguration")
-            .field("ssid", &self.ssid)
-            .field("bssid", &self.bssid)
-            .field("auth_method", &self.auth_method)
-            .field("channel", &self.channel)
-            .finish()
-    }
-}
-
-impl Default for ClientConfiguration {
-    fn default() -> Self {
-        ClientConfiguration {
-            ssid: heapless::String::new(),
-            bssid: None,
-            auth_method: Default::default(),
-            password: heapless::String::new(),
-            channel: None,
-        }
-    }
-}
-
-/// Configuration for EAP-FAST authentication protocol.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
