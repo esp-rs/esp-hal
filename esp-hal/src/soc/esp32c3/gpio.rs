@@ -198,7 +198,7 @@ pub enum OutputSignal {
     GPIO             = 128,
 }
 
-crate::gpio::gpio! {
+crate::gpio! {
     (0, 0, [Input, Output, Analog, RtcIo])
     (1, 0, [Input, Output, Analog, RtcIo])
     (2, 0, [Input, Output, Analog, RtcIo] (2 => FSPIQ) (2 => FSPIQ))

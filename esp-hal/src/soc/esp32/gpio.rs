@@ -527,7 +527,7 @@ pub enum OutputSignal {
     MTDO,
 }
 
-crate::gpio::gpio! {
+crate::gpio! {
     (0, 0, [Input, Output, Analog, RtcIo, Touch] (5 => EMAC_TX_CLK) (1 => CLK_OUT1))
     (1, 0, [Input, Output] (5 => EMAC_RXD2) (0 => U0TXD 1 => CLK_OUT3))
     (2, 0, [Input, Output, Analog, RtcIo, Touch] (1 => HSPIWP 3 => HS2_DATA0 4 => SD_DATA0) (3 => HS2_DATA0 4 => SD_DATA0))

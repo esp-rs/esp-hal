@@ -61,7 +61,6 @@
 use portable_atomic::{AtomicPtr, Ordering};
 use procmacros::ram;
 
-pub(crate) use crate::gpio;
 pub use crate::soc::gpio::*;
 use crate::{
     interrupt::InterruptHandler,
