@@ -94,7 +94,6 @@ use crate::binary::{
         esp_supplicant_deinit,
         esp_supplicant_init,
         esp_wifi_connect,
-        esp_wifi_deinit_internal,
         esp_wifi_disconnect,
         esp_wifi_get_mode,
         esp_wifi_init_internal,
@@ -120,7 +119,6 @@ use crate::binary::{
         wifi_config_t,
         wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
         wifi_country_t,
-        wifi_csi_cb_t,
         wifi_init_config_t,
         wifi_interface_t,
         wifi_interface_t_WIFI_IF_AP,
@@ -339,7 +337,7 @@ static CSI_CB: Mutex<RefCell<Option<fn(crate::binary::include::wifi_csi_info_t)>
     Mutex::new(RefCell::new(None));
 
 unsafe extern "C" fn promiscuous_csi_rx_cb(
-    ctx: *mut crate::wifi::c_types::c_void,
+    _ctx: *mut crate::wifi::c_types::c_void,
     data: *mut crate::binary::include::wifi_csi_info_t,
 ) {
     critical_section::with(|cs| {
@@ -473,16 +471,20 @@ impl CsiConfiguration {
 
     /// Register the RX callback function of CSI data. Each time a CSI data is
     /// received, the callback function will be called.
-    pub fn set_receive_cb(&mut self, cb: fn(crate::binary::include::wifi_csi_info_t)) {
+    pub fn set_receive_cb(
+        &mut self,
+        cb: fn(crate::binary::include::wifi_csi_info_t),
+    ) -> Result<(), WifiError> {
         unsafe {
             esp_wifi_result!(esp_wifi_set_csi_rx_cb(
                 Some(promiscuous_csi_rx_cb),
                 core::ptr::null_mut()
-            ));
+            ))?;
         }
         critical_section::with(|cs| {
             *CSI_CB.borrow_ref_mut(cs) = Some(cb);
         });
+        Ok(())
     }
 
     /// Enable or disable CSI
