@@ -484,6 +484,17 @@ pub enum GpioRegisterAccess {
     Bank1,
 }
 
+impl From<usize> for GpioRegisterAccess {
+    fn from(_gpio_num: usize) -> Self {
+        #[cfg(any(esp32, esp32s2, esp32s3))]
+        if _gpio_num >= 32 {
+            return GpioRegisterAccess::Bank1;
+        }
+
+        GpioRegisterAccess::Bank0
+    }
+}
+
 impl GpioRegisterAccess {
     fn write_out_en_clear(self, word: u32) {
         match self {
@@ -1027,7 +1038,7 @@ macro_rules! io_type {
 macro_rules! gpio {
     (
         $(
-            ($gpionum:literal, $bank:literal, [$($type:tt),*]
+            ($gpionum:literal, [$($type:tt),*]
                 $(
                     ( $( $af_input_num:literal => $af_input_signal:ident )* )
                     ( $( $af_output_num:literal => $af_output_signal:ident )* )
@@ -1074,7 +1085,7 @@ macro_rules! gpio {
                     }
 
                     fn gpio_bank(&self, _: $crate::private::Internal) -> $crate::gpio::GpioRegisterAccess {
-                        $crate::gpio::GpioRegisterAccess::[<Bank $bank >]
+                        $crate::gpio::GpioRegisterAccess::from($gpionum)
                     }
 
                     fn output_signals(&self, _: $crate::private::Internal) -> &[(AlternateFunction, OutputSignal)] {
