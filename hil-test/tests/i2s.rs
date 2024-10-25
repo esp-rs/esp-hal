@@ -243,7 +243,7 @@ mod tests {
         let mut sample_idx = 0;
         let mut check_samples = SampleSource::new();
         loop {
-            let tx_avail = tx_transfer.available();
+            let tx_avail = tx_transfer.available().unwrap();
 
             // make sure there are more than one descriptor buffers ready to push
             if tx_avail > 5000 {
@@ -297,5 +297,36 @@ mod tests {
                 break;
             }
         }
+    }
+
+    #[test]
+    fn test_i2s_push_too_late(ctx: Context) {
+        let (_, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(0, 16000);
+
+        let i2s = I2s::new(
+            ctx.i2s,
+            Standard::Philips,
+            DataFormat::Data16Channel16,
+            16000.Hz(),
+            ctx.dma_channel.configure(false, DmaPriority::Priority0),
+            rx_descriptors,
+            tx_descriptors,
+        );
+
+        let (_, dout) = hil_test::common_test_pins!(ctx.io);
+
+        let mut i2s_tx = i2s
+            .i2s_tx
+            .with_bclk(NoPin)
+            .with_ws(NoPin)
+            .with_dout(dout)
+            .build();
+
+        let mut tx_transfer = i2s_tx.write_dma_circular(tx_buffer).unwrap();
+
+        let delay = esp_hal::delay::Delay::new();
+        delay.delay_millis(300);
+
+        assert!(matches!(tx_transfer.push(&[0; 128]), Err(_)));
     }
 }
