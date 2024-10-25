@@ -300,12 +300,22 @@ impl Default for AccessPointConfiguration {
 /// Client configuration for a Wi-Fi connection.
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct ClientConfiguration {
+    /// The SSID of the Wi-Fi network.
     pub ssid: heapless::String<32>,
+
+    /// The BSSID (MAC address) of the client.
     pub bssid: Option<[u8; 6]>,
+
     // pub protocol: Protocol,
+    /// The authentication method for the Wi-Fi connection.
     pub auth_method: AuthMethod,
+
+    /// The password for the Wi-Fi connection.
     pub password: heapless::String<64>,
+
+    /// The Wi-Fi channel to connect to.
     pub channel: Option<u8>,
 }
 
@@ -497,6 +507,7 @@ impl CsiConfiguration {
     }
 }
 
+/// Configuration for EAP-FAST authentication protocol.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
