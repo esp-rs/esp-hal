@@ -781,6 +781,8 @@ pub enum DmaError {
     UnsupportedMemoryRegion,
     /// Invalid DMA chunk size
     InvalidChunkSize,
+    /// Indicates writing to or reading from a circular DMA transaction is done too late and the DMA buffers already overrun / underrun.
+    Late,
 }
 
 impl From<DmaBufError> for DmaError {
@@ -1336,7 +1338,7 @@ impl TxCircularState {
                 }
 
                 if current == self.last_seen_handled_descriptor_ptr {
-                    return Err(DmaError::Overflow);
+                    return Err(DmaError::Late);
                 }
             }
 
@@ -1499,7 +1501,7 @@ impl RxCircularState {
             current_in_descr = unsafe { current_in_descr_ptr.read_volatile() };
 
             if current_in_descr_ptr == last_seen_ptr {
-                return Err(DmaError::Overflow);
+                return Err(DmaError::Late);
             }
         }
 
