@@ -104,14 +104,14 @@ impl<'d> Spi<'d> {
         MISO: PeripheralOutput,
         CS: PeripheralInput,
     >(
-        spi: impl Peripheral<P = impl Into<AnySpi> + 'd> + 'd,
+        spi: impl Peripheral<P = impl Instance> + 'd,
         sclk: impl Peripheral<P = SCK> + 'd,
         mosi: impl Peripheral<P = MOSI> + 'd,
         miso: impl Peripheral<P = MISO> + 'd,
         cs: impl Peripheral<P = CS> + 'd,
         mode: SpiMode,
     ) -> Spi<'d> {
-        Self::new_typed(spi, sclk, mosi, miso, cs, mode)
+        Self::new_typed(spi.map_into(), sclk, mosi, miso, cs, mode)
     }
 }
 
@@ -126,7 +126,7 @@ where
         MISO: PeripheralOutput,
         CS: PeripheralInput,
     >(
-        spi: impl Peripheral<P = impl Into<T> + 'd> + 'd,
+        spi: impl Peripheral<P = T> + 'd,
         sclk: impl Peripheral<P = SCK> + 'd,
         mosi: impl Peripheral<P = MOSI> + 'd,
         miso: impl Peripheral<P = MISO> + 'd,
@@ -153,18 +153,17 @@ where
         this
     }
 
-    pub(crate) fn new_internal(
-        spi: impl Peripheral<P = impl Into<T> + 'd> + 'd,
-        mode: SpiMode,
-    ) -> Spi<'d, T> {
+    pub(crate) fn new_internal(spi: impl Peripheral<P = T> + 'd, mode: SpiMode) -> Spi<'d, T> {
         crate::into_ref!(spi);
 
         let mut spi = Spi {
-            spi: spi.map_into(),
+            spi,
             data_mode: mode,
         };
-        spi.spi.reset_peripheral();
-        spi.spi.enable_peripheral();
+
+        PeripheralClockControl::reset(spi.spi.peripheral());
+        PeripheralClockControl::enable(spi.spi.peripheral());
+
         spi.spi.init();
         spi.spi.set_data_mode(mode, false);
 
@@ -570,26 +569,13 @@ impl InstanceDma for crate::peripherals::SPI2 {}
 impl InstanceDma for crate::peripherals::SPI3 {}
 
 #[doc(hidden)]
-pub trait Instance: private::Sealed + PeripheralMarker {
+pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'static {
     fn register_block(&self) -> &RegisterBlock;
 
     fn sclk_signal(&self) -> InputSignal;
-
     fn mosi_signal(&self) -> InputSignal;
-
     fn miso_signal(&self) -> OutputSignal;
-
     fn cs_signal(&self) -> InputSignal;
-
-    #[inline(always)]
-    fn reset_peripheral(&self) {
-        PeripheralClockControl::reset(self.peripheral());
-    }
-
-    #[inline(always)]
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(self.peripheral());
-    }
 
     #[cfg(esp32)]
     fn prepare_length_and_lines(&self, rx_len: usize, tx_len: usize) {
