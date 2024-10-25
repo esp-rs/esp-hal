@@ -118,3 +118,45 @@ The `Spi<'_, SPI, HalfDuplexMode>::read` and `Spi<'_, SPI, HalfDuplexMode>::writ
      )
      .unwrap();
 ```
+
+## UART event listening
+
+The following functions have been removed:
+
+- `listen_at_cmd`
+- `unlisten_at_cmd`
+- `listen_tx_done`
+- `unlisten_tx_done`
+- `listen_rx_fifo_full`
+- `unlisten_rx_fifo_full`
+- `at_cmd_interrupt_set`
+- `tx_done_interrupt_set`
+- `rx_fifo_full_interrupt_set`
+- `reset_at_cmd_interrupt`
+- `reset_tx_done_interrupt`
+- `reset_rx_fifo_full_interrupt`
+
+You can now use the `UartInterrupt` enum and the corresponding `listen`, `unlisten`, `interrupts` and `clear_interrupts` functions.
+
+Use `interrupts` in place of `<INTERRUPT>_interrupt_set` and `clear_interrupts` in place of the old `reset_` functions.
+
+`UartInterrupt`:
+- `AtCmd`
+- `TxDone`
+- `RxFifoFull`
+
+Checking interrupt bits is now done using APIs provided by [enumset](https://docs.rs/enumset/1.1.5/enumset/index.html). For example, to see if
+a particular interrupt bit is set, use `contains`:
+
+```diff
+-serial.at_cmd_interrupt_set()
++serial.interupts().contains(UartInterrupt::AtCmd)
+```
+
+You can now listen/unlisten multiple interrupt bits at once:
+
+```diff
+-uart0.listen_at_cmd();
+-uart0.listen_rx_fifo_full();
++uart0.listen(UartInterrupt::AtCmd | UartConterrupt::RxFifoFull);
+```˛
