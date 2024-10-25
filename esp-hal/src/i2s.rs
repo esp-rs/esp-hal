@@ -2077,7 +2077,7 @@ pub mod asynch {
         /// Will wait for more than 0 bytes available.
         pub async fn available(&mut self) -> Result<usize, Error> {
             loop {
-                self.state.update();
+                self.state.update()?;
 
                 let res = self.state.available;
 

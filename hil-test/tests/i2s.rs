@@ -235,7 +235,7 @@ mod tests {
         assert_eq!(0, rx_transfer.pop(&mut rcv[..100]).unwrap());
 
         // no data available yet
-        assert_eq!(0, rx_transfer.available());
+        assert_eq!(0, rx_transfer.available().unwrap());
 
         let mut tx_transfer = i2s_tx.write_dma_circular(tx_buffer).unwrap();
 
@@ -254,13 +254,13 @@ mod tests {
             }
 
             // test calling available multiple times doesn't break anything
-            rx_transfer.available();
-            rx_transfer.available();
-            rx_transfer.available();
-            rx_transfer.available();
-            rx_transfer.available();
-            rx_transfer.available();
-            let rx_avail = rx_transfer.available();
+            rx_transfer.available().unwrap();
+            rx_transfer.available().unwrap();
+            rx_transfer.available().unwrap();
+            rx_transfer.available().unwrap();
+            rx_transfer.available().unwrap();
+            rx_transfer.available().unwrap();
+            let rx_avail = rx_transfer.available().unwrap();
 
             // make sure there are more than one descriptor buffers ready to pop
             if rx_avail > 0 {
@@ -328,5 +328,39 @@ mod tests {
         delay.delay_millis(300);
 
         assert!(matches!(tx_transfer.push(&[0; 128]), Err(_)));
+    }
+
+    #[test]
+    #[timeout(1)]
+    fn test_i2s_read_too_late(ctx: Context) {
+        let (rx_buffer, rx_descriptors, _, tx_descriptors) = dma_buffers!(16000, 0);
+
+        let i2s = I2s::new(
+            ctx.i2s,
+            Standard::Philips,
+            DataFormat::Data16Channel16,
+            16000.Hz(),
+            ctx.dma_channel.configure(false, DmaPriority::Priority0),
+            rx_descriptors,
+            tx_descriptors,
+        );
+
+        let (_, dout) = hil_test::common_test_pins!(ctx.io);
+        let din = dout.peripheral_input();
+
+        let mut i2s_rx = i2s
+            .i2s_rx
+            .with_bclk(NoPin)
+            .with_ws(NoPin)
+            .with_din(din)
+            .build();
+
+        let mut buffer = [0u8; 1024];
+        let mut rx_transfer = i2s_rx.read_dma_circular(rx_buffer).unwrap();
+
+        let delay = esp_hal::delay::Delay::new();
+        delay.delay_millis(300);
+
+        assert!(matches!(rx_transfer.pop(&mut buffer), Err(_)));
     }
 }

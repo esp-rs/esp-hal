@@ -1478,7 +1478,7 @@ impl RxCircularState {
         }
     }
 
-    pub(crate) fn update(&mut self) {
+    pub(crate) fn update(&mut self) -> Result<(), DmaError> {
         if self.last_seen_handled_descriptor_ptr.is_null() {
             // initially start at last descriptor (so that next will be the first
             // descriptor)
@@ -1489,6 +1489,7 @@ impl RxCircularState {
             unsafe { self.last_seen_handled_descriptor_ptr.read_volatile() }.next;
         let mut current_in_descr = unsafe { current_in_descr_ptr.read_volatile() };
 
+        let last_seen_ptr = self.last_seen_handled_descriptor_ptr;
         while current_in_descr.owner() == Owner::Cpu {
             self.available += current_in_descr.len();
             self.last_seen_handled_descriptor_ptr = current_in_descr_ptr;
@@ -1496,7 +1497,13 @@ impl RxCircularState {
             current_in_descr_ptr =
                 unsafe { self.last_seen_handled_descriptor_ptr.read_volatile() }.next;
             current_in_descr = unsafe { current_in_descr_ptr.read_volatile() };
+
+            if current_in_descr_ptr == last_seen_ptr {
+                return Err(DmaError::Overflow);
+            }
         }
+
+        Ok(())
     }
 
     pub(crate) fn pop(&mut self, data: &mut [u8]) -> Result<usize, DmaError> {
@@ -2484,9 +2491,9 @@ where
     ///
     /// It's expected to call this before trying to [DmaTransferRxCircular::pop]
     /// data.
-    pub fn available(&mut self) -> usize {
-        self.state.update();
-        self.state.available
+    pub fn available(&mut self) -> Result<usize, DmaError> {
+        self.state.update()?;
+        Ok(self.state.available)
     }
 
     /// Get available data.
@@ -2498,7 +2505,7 @@ where
     /// Fails with [DmaError::BufferTooSmall] if the given buffer is too small
     /// to hold all available data
     pub fn pop(&mut self, data: &mut [u8]) -> Result<usize, DmaError> {
-        self.state.update();
+        self.state.update()?;
         self.state.pop(data)
     }
 }
