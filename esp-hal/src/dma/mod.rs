@@ -781,7 +781,8 @@ pub enum DmaError {
     UnsupportedMemoryRegion,
     /// Invalid DMA chunk size
     InvalidChunkSize,
-    /// Indicates writing to or reading from a circular DMA transaction is done too late and the DMA buffers already overrun / underrun.
+    /// Indicates writing to or reading from a circular DMA transaction is done
+    /// too late and the DMA buffers already overrun / underrun.
     Late,
 }
 

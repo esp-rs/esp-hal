@@ -64,7 +64,7 @@
 //! let mut transfer = i2s_rx.read_dma_circular(&mut rx_buffer).unwrap();
 //!
 //! loop {
-//!     let avail = transfer.available();
+//!     let avail = transfer.available().unwrap();
 //!
 //!     if avail > 0 {
 //!         let mut rcv = [0u8; 5000];
