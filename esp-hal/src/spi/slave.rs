@@ -452,7 +452,7 @@ pub trait InstanceDma: Instance + DmaEligible {
 
         if write_buffer_len > 0 {
             tx_chain.fill_for_tx(false, write_buffer_ptr, write_buffer_len)?;
-            tx.prepare_transfer_without_start(self.dma_peripheral(), tx_chain, false)?;
+            tx.prepare_transfer_without_start(self.dma_peripheral(), tx_chain)?;
         }
 
         #[cfg(esp32)]

@@ -527,7 +527,7 @@ where
         unsafe {
             self.tx_chain.fill_for_tx(circular, ptr, len)?;
             self.tx_channel
-                .prepare_transfer_without_start(self.i2s.dma_peripheral(), &self.tx_chain, true)
+                .prepare_transfer_without_start(self.i2s.dma_peripheral(), &self.tx_chain)
                 .and_then(|_| self.tx_channel.start_transfer())?;
         }
 
@@ -1895,7 +1895,7 @@ pub mod asynch {
                 self.tx_chain.fill_for_tx(false, ptr, len)?;
                 future
                     .tx
-                    .prepare_transfer_without_start(self.i2s.dma_peripheral(), &self.tx_chain, true)
+                    .prepare_transfer_without_start(self.i2s.dma_peripheral(), &self.tx_chain)
                     .and_then(|_| future.tx.start_transfer())?;
             }
 
@@ -1921,7 +1921,7 @@ pub mod asynch {
             unsafe {
                 self.tx_chain.fill_for_tx(true, ptr, len)?;
                 self.tx_channel
-                    .prepare_transfer_without_start(self.i2s.dma_peripheral(), &self.tx_chain, true)
+                    .prepare_transfer_without_start(self.i2s.dma_peripheral(), &self.tx_chain)
                     .and_then(|_| self.tx_channel.start_transfer())?;
             }
 

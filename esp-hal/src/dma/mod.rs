@@ -1821,7 +1821,6 @@ pub trait Tx: crate::private::Sealed {
         &mut self,
         peri: DmaPeripheral,
         chain: &DescriptorChain,
-        enable_wrback: bool,
     ) -> Result<(), DmaError>;
 
     unsafe fn prepare_transfer<BUF: DmaTxBuffer>(
@@ -1912,7 +1911,6 @@ where
         &mut self,
         peri: DmaPeripheral,
         chain: &DescriptorChain,
-        enable_wrback: bool,
     ) -> Result<(), DmaError> {
         // TODO: based on the ESP32-S3 TRM the alignment check is not needed for TX!
         // for esp32s3 we check each descriptor buffer that points to psram for
@@ -1937,7 +1935,10 @@ where
         self.tx_impl.reset();
         self.tx_impl.set_link_addr(chain.first() as u32);
         self.tx_impl.set_peripheral(peri as u8);
-        self.tx_impl.set_auto_wrback(enable_wrback);
+
+        // enable descriptor write back in circular mode
+        self.tx_impl
+            .set_auto_write_back(!(*chain.last()).next.is_null());
 
         Ok(())
     }
@@ -2048,9 +2049,6 @@ pub trait RegisterAccess: crate::private::Sealed {
     /// Set the address of the first descriptor.
     fn set_link_addr(&self, address: u32);
 
-    /// Enable/disable outlink-writeback
-    fn set_auto_wrback(&self, enable: bool);
-
     /// Enable the channel for data transfer.
     fn start(&self);
 
@@ -2075,6 +2073,9 @@ pub trait RxRegisterAccess: RegisterAccess {
 
 #[doc(hidden)]
 pub trait TxRegisterAccess: RegisterAccess {
+    /// Enable/disable outlink-writeback
+    fn set_auto_write_back(&self, enable: bool);
+
     /// Outlink descriptor address when EOF occurs of Tx channel.
     fn last_dscr_address(&self) -> usize;
 }

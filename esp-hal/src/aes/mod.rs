@@ -425,7 +425,7 @@ pub mod dma {
                     .fill_for_tx(false, write_buffer_ptr, write_buffer_len)?;
                 self.channel
                     .tx
-                    .prepare_transfer_without_start(self.dma_peripheral(), &self.tx_chain, false)
+                    .prepare_transfer_without_start(self.dma_peripheral(), &self.tx_chain)
                     .and_then(|_| self.channel.tx.start_transfer())?;
 
                 self.rx_chain

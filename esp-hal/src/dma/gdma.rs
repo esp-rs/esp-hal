@@ -124,12 +124,6 @@ impl<C: GdmaChannel> RegisterAccess for ChannelTxImpl<C> {
             .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
     }
 
-    fn set_auto_wrback(&self, enable: bool) {
-        self.ch()
-            .out_conf0()
-            .modify(|_, w| w.out_auto_wrback().bit(enable));
-    }
-
     fn start(&self) {
         self.ch()
             .out_link()
@@ -157,6 +151,12 @@ impl<C: GdmaChannel> RegisterAccess for ChannelTxImpl<C> {
 }
 
 impl<C: GdmaChannel> TxRegisterAccess for ChannelTxImpl<C> {
+    fn set_auto_write_back(&self, enable: bool) {
+        self.ch()
+            .out_conf0()
+            .modify(|_, w| w.out_auto_wrback().bit(enable));
+    }
+
     fn last_dscr_address(&self) -> usize {
         self.ch()
             .out_eof_des_addr()
@@ -309,10 +309,6 @@ impl<C: GdmaChannel> RegisterAccess for ChannelRxImpl<C> {
         self.ch()
             .in_link()
             .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
-    }
-
-    fn set_auto_wrback(&self, _enable: bool) {
-        // not available / no-op for RX
     }
 
     fn start(&self) {

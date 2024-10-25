@@ -1301,7 +1301,7 @@ where
         unsafe {
             self.tx_chain.fill_for_tx(false, ptr, len)?;
             self.tx_channel
-                .prepare_transfer_without_start(DmaPeripheral::ParlIo, &self.tx_chain, false)
+                .prepare_transfer_without_start(DmaPeripheral::ParlIo, &self.tx_chain)
                 .and_then(|_| self.tx_channel.start_transfer())?;
         }
 
