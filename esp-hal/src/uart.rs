@@ -1027,7 +1027,10 @@ where
         // `self.tx.uart` and `self.rx.uart` are the same
         unsafe {
             crate::interrupt::bind_interrupt(self.tx.uart.interrupt(), handler.handler());
-            crate::interrupt::enable(self.tx.uart.interrupt(), handler.priority()).unwrap();
+            unwrap!(crate::interrupt::enable(
+                self.tx.uart.interrupt(),
+                handler.priority()
+            ));
         }
     }
 
