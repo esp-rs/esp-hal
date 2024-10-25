@@ -160,3 +160,19 @@ You can now listen/unlisten multiple interrupt bits at once:
 -uart0.listen_rx_fifo_full();
 +uart0.listen(UartInterrupt::AtCmd | UartConterrupt::RxFifoFull);
 ```˛
+## Circular DMA transfer's `available` returns `Result<usize, DmaError>` now
+
+In case of any error you should drop the transfer and re-create it.
+
+```diff
+     loop {
+-        let avail = transfer.available().unwrap();
++        let avail = match transfer.available() {
++            Ok(avail) => avail,
++            Err(_) => {
++                core::mem::drop(transfer);
++                transfer = i2s_tx.write_dma_circular(&tx_buffer).unwrap();
++                continue;
++            },
++        };
+```
