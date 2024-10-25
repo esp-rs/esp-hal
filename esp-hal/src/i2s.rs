@@ -1545,6 +1545,9 @@ mod private {
 
         fn reset_rx(&self) {
             let i2s = self.register_block();
+
+            i2s.rx_conf().modify(|_, w| w.rx_start().clear_bit());
+
             i2s.rx_conf().modify(|_, w| {
                 w.rx_reset().set_bit();
                 w.rx_fifo_reset().set_bit()
