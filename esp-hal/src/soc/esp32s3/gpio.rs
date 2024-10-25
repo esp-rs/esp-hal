@@ -345,7 +345,7 @@ pub enum OutputSignal {
     GPIO            = 256,
 }
 
-crate::gpio::gpio! {
+crate::gpio! {
     (0, 0, [Input, Output, Analog, RtcIo])
     (1, 0, [Input, Output, Analog, RtcIo])
     (2, 0, [Input, Output, Analog, RtcIo])
@@ -393,32 +393,7 @@ crate::gpio::gpio! {
     (48, 1, [Input, Output])
 }
 
-crate::gpio::analog! {
-    ( 0,  0,  touch_pad(0),     "",       true)
-    ( 1,  1,  touch_pad(1),     "",       true)
-    ( 2,  2,  touch_pad(2),     "",       true)
-    ( 3,  3,  touch_pad(3),     "",       true)
-    ( 4,  4,  touch_pad(4),     "",       true)
-    ( 5,  5,  touch_pad(5),     "",       true)
-    ( 6,  6,  touch_pad(6),     "",       true)
-    ( 7,  7,  touch_pad(7),     "",       true)
-    ( 8,  8,  touch_pad(8),     "",       true)
-    ( 9,  9,  touch_pad(9),     "",       true)
-    (10, 10,  touch_pad(10),    "",       true)
-    (11, 11,  touch_pad(11),    "",       true)
-    (12, 12,  touch_pad(12),    "",       true)
-    (13, 13,  touch_pad(13),    "",       true)
-    (14, 14,  touch_pad(14),    "",       true)
-    (15, 15,  xtal_32p_pad(),   "x32p_",  true)
-    (16, 16,  xtal_32n_pad(),   "x32n_",  true)
-    (17, 17,  pad_dac1(),       "pdac1_", true)
-    (18, 18,  pad_dac2(),       "pdac2_", true)
-    (19, 19,  rtc_pad19(),      "",       true)
-    (20, 20,  rtc_pad20(),      "",       true)
-    (21, 21,  rtc_pad21(),      "",       true)
-}
-
-crate::gpio::rtc_pins! {
+crate::rtcio_analog! {
     ( 0,  0,  touch_pad(0),   "",     touch_pad0_hold,  true)
     ( 1,  1,  touch_pad(1),   "",     touch_pad1_hold,  true)
     ( 2,  2,  touch_pad(2),   "",     touch_pad2_hold,  true)

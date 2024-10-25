@@ -224,16 +224,7 @@ crate::gpio::gpio! {
 }
 
 // RTC pins 0 through 5 (inclusive) support GPIO wakeup
-crate::gpio::rtc_pins! {
-    0
-    1
-    2
-    3
-    4
-    5
-}
-
-crate::gpio::analog! {
+crate::rtc_pins! {
     0
     1
     2
