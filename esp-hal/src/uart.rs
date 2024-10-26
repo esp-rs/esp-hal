@@ -926,7 +926,7 @@ where
 }
 
 /// List of exposed UART events.
-#[derive(EnumSetType)]
+#[derive(Debug, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum UartInterrupt {
     /// Indicates that the received has detected the configured
