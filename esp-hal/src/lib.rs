@@ -363,6 +363,17 @@ pub enum Cpu {
     AppCpu = 1,
 }
 
+impl Cpu {
+    /// The number of available cores.
+    pub const COUNT: usize = 1 + cfg!(multi_core) as usize;
+
+    /// Returns the core the application is currently executing on
+    #[inline(always)]
+    pub fn current() -> Self {
+        get_core()
+    }
+}
+
 /// Which core the application is currently executing on
 #[inline(always)]
 pub fn get_core() -> Cpu {
