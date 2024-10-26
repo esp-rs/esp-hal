@@ -115,6 +115,7 @@ jobs:
         with:
           buildtargets: ${{ matrix.target.soc }}
           default: true
+          version: 1.82.0.1
           ldproxy: false
 
       - name: Build tests
