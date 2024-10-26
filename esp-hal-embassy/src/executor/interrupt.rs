@@ -99,7 +99,7 @@ impl<const SWI: u8> InterruptExecutor<SWI> {
         unsafe {
             (*self.executor.get())
                 .as_mut_ptr()
-                .write(raw::Executor::new(SWI as *mut ()));
+                .write(raw::Executor::new((SWI as usize) as *mut ()));
 
             EXECUTORS[SWI as usize].set((*self.executor.get()).as_mut_ptr());
         }
