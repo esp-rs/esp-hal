@@ -451,8 +451,7 @@ where
 {
     /// Wait for the transfer to finish
     pub async fn wait_for_done(&mut self) -> Result<(), DmaError> {
-        let future = DmaTxFuture::new(&mut self.i2s.tx_channel);
-        future.await
+        DmaTxFuture::new(&mut self.i2s.tx_channel).await
     }
 }
 
@@ -622,6 +621,9 @@ pub trait Instance: Signals + RegBlock {
     fn tx_reset(&self) {
         let r = self.register_block();
         r.conf().modify(|_, w| w.tx_reset().set_bit());
+        // without this delay starting a subsequent transfer will hang waiting
+        // for tx_idle to clear (the transfer does not start).
+        // While 20 clocks works for 80MHz cpu but 100 is needed for 240MHz!
         xtensa_lx::timer::delay(100);
         r.conf().modify(|_, w| w.tx_reset().clear_bit());
     }
@@ -648,6 +650,15 @@ pub trait Instance: Signals + RegBlock {
 
     fn tx_start(&self) {
         let r = self.register_block();
+
+        // wait for data to show up in the fifo
+        while r.int_raw().read().tx_rempty().bit_is_clear() {
+            // wait
+        }
+
+        // without this transfers are not reliable!
+        xtensa_lx::timer::delay(1);
+
         r.conf().modify(|_, w| w.tx_start().set_bit());
 
         while r.state().read().tx_idle().bit_is_set() {
