@@ -55,7 +55,10 @@ use crate::{
         PeripheralMarker,
         Tx,
     },
-    gpio::{interconnect::{OutputConnection, PeripheralOutput}, OutputSignal},
+    gpio::{
+        interconnect::{OutputConnection, PeripheralOutput},
+        OutputSignal,
+    },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{i2s0::RegisterBlock, I2S0, I2S1},
     system::PeripheralClockControl,
@@ -64,13 +67,11 @@ use crate::{
 
 /// Represents a group of 16 output pins configured for 16-bit parallel data
 /// transmission.
-pub struct TxSixteenBits<'d,> {
+pub struct TxSixteenBits<'d> {
     pins: [PeripheralRef<'d, OutputConnection>; 16],
 }
 
-impl<'d>
-    TxSixteenBits<'d>
-{
+impl<'d> TxSixteenBits<'d> {
     #[allow(clippy::too_many_arguments)]
     /// Creates a new `TxSixteenBits` instance with the provided output pins.
     pub fn new(
@@ -90,24 +91,22 @@ impl<'d>
         pin_13: impl Peripheral<P = impl PeripheralOutput> + 'd,
         pin_14: impl Peripheral<P = impl PeripheralOutput> + 'd,
         pin_15: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        ) -> Self {
-            crate::into_mapped_ref!(
-                pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7, pin_8, pin_9, pin_10, pin_11,
-                pin_12, pin_13, pin_14, pin_15
-            );
-    
-            Self {
-                pins: [
-                    pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7, pin_8, pin_9, pin_10,
-                    pin_11, pin_12, pin_13, pin_14, pin_15,
-                ],
-            }
+    ) -> Self {
+        crate::into_mapped_ref!(
+            pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7, pin_8, pin_9, pin_10, pin_11,
+            pin_12, pin_13, pin_14, pin_15
+        );
+
+        Self {
+            pins: [
+                pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7, pin_8, pin_9, pin_10,
+                pin_11, pin_12, pin_13, pin_14, pin_15,
+            ],
         }
+    }
 }
 
-impl<'d> TxPins
-    for TxSixteenBits<'d>
-{
+impl<'d> TxPins for TxSixteenBits<'d> {
     fn bits(&self) -> u8 {
         16
     }
@@ -128,8 +127,7 @@ pub struct TxEightBits<'d> {
     pins: [PeripheralRef<'d, OutputConnection>; 8],
 }
 
-impl<'d> TxEightBits<'d>
-{
+impl<'d> TxEightBits<'d> {
     #[allow(clippy::too_many_arguments)]
     /// Creates a new `TxSEightBits` instance with the provided output pins.
     pub fn new(
@@ -157,8 +155,7 @@ impl<'d> TxEightBits<'d>
     }
 }
 
-impl<'d> TxPins for TxEightBits<'d>
-{
+impl<'d> TxPins for TxEightBits<'d> {
     fn bits(&self) -> u8 {
         8
     }
