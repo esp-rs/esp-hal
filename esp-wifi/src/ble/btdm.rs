@@ -1,11 +1,9 @@
-use alloc::{boxed::Box, vec::Vec};
+use alloc::boxed::Box;
 use core::{
-    cell::RefCell,
     mem::size_of_val,
     ptr::{addr_of, addr_of_mut},
 };
 
-use critical_section::Mutex;
 use portable_atomic::{AtomicBool, Ordering};
 
 use super::ReceivedPacket;
@@ -25,9 +23,6 @@ use crate::{
 #[cfg_attr(esp32s3, path = "os_adapter_esp32s3.rs")]
 #[cfg_attr(esp32, path = "os_adapter_esp32.rs")]
 pub(crate) mod ble_os_adapter_chip_specific;
-
-pub(super) static BT_RECEIVE_QUEUE: Mutex<RefCell<Vec<ReceivedPacket>>> =
-    Mutex::new(RefCell::new(Vec::new()));
 
 static PACKET_SENT: AtomicBool = AtomicBool::new(true);
 
@@ -81,7 +76,7 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
     };
 
     critical_section::with(|cs| {
-        let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
+        let mut queue = super::BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
         queue.push(packet);
     });
 

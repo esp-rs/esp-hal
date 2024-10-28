@@ -9,7 +9,7 @@
 //!
 //! For more information see https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html
 
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 use core::{cell::RefCell, fmt::Debug, marker::PhantomData};
 
 use critical_section::Mutex;
@@ -31,7 +31,9 @@ pub const ESP_NOW_MAX_DATA_LEN: usize = 250;
 /// Broadcast address
 pub const BROADCAST_ADDRESS: [u8; 6] = [0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8];
 
+// Stores received packets until dequeued by the user
 static RECEIVE_QUEUE: Mutex<RefCell<Vec<ReceivedData>>> = Mutex::new(RefCell::new(Vec::new()));
+
 /// This atomic behaves like a guard, so we need strict memory ordering when
 /// operating it.
 ///
@@ -234,7 +236,7 @@ pub struct ReceiveInfo {
 /// associated information.
 #[derive(Clone)]
 pub struct ReceivedData {
-    data: Vec<u8>,
+    data: Box<[u8]>,
     pub info: ReceiveInfo,
 }
 
@@ -835,7 +837,7 @@ unsafe extern "C" fn rcv_cb(
     let slice = core::slice::from_raw_parts(data, data_len as usize);
     critical_section::with(|cs| {
         let mut queue = RECEIVE_QUEUE.borrow_ref_mut(cs);
-        let data = Vec::from(slice);
+        let data = Box::from(slice);
 
         if queue.len() >= RECEIVE_QUEUE_SIZE {
             queue.pop();

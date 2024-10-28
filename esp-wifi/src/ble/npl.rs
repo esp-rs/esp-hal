@@ -1,11 +1,8 @@
-use alloc::{boxed::Box, vec::Vec};
+use alloc::boxed::Box;
 use core::{
-    cell::RefCell,
     mem::size_of_val,
     ptr::{addr_of, addr_of_mut},
 };
-
-use critical_section::Mutex;
 
 use super::*;
 use crate::{
@@ -62,9 +59,6 @@ struct Event {
     ev_arg_ptr: *const c_void,
     queued: bool,
 }
-
-pub(super) static BT_RECEIVE_QUEUE: Mutex<RefCell<Vec<ReceivedPacket>>> =
-    Mutex::new(RefCell::new(Vec::new()));
 
 #[cfg(esp32c2)]
 type OsMembufT = u32;
@@ -1282,7 +1276,7 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i3
     trace!("$ pld = {:?}", payload);
 
     critical_section::with(|cs| {
-        let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
+        let mut queue = super::BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
         let mut data = [0u8; 256];
 
         data[0] = 0x04; // this is an event
@@ -1313,7 +1307,7 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
     let data_slice = core::slice::from_raw_parts(data_ptr, len as usize);
 
     critical_section::with(|cs| {
-        let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
+        let mut queue = super::BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
         let mut data = [0u8; 256];
 
         data[0] = 0x02; // ACL

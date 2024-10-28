@@ -32,6 +32,9 @@ pub(crate) unsafe extern "C" fn free(ptr: *mut crate::binary::c_types::c_void) {
     crate::compat::malloc::free(ptr.cast())
 }
 
+// Stores received packets until the the BLE stack dequeues them
+static BT_RECEIVE_QUEUE: Mutex<RefCell<Vec<ReceivedPacket>>> = Mutex::new(RefCell::new(Vec::new()));
+
 static mut HCI_OUT_COLLECTOR: MaybeUninit<HciOutCollector> = MaybeUninit::uninit();
 
 #[derive(PartialEq, Debug)]
@@ -116,14 +119,14 @@ impl defmt::Format for ReceivedPacket {
 #[cfg(feature = "async")]
 pub fn have_hci_read_data() -> bool {
     critical_section::with(|cs| {
-        let queue = ble::BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
+        let queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
         !queue.is_empty() || BLE_HCI_READ_DATA.borrow_ref(cs).len() > 0
     })
 }
 
 pub(crate) fn read_next(data: &mut [u8]) -> usize {
     critical_section::with(|cs| {
-        let mut queue = ble::BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
+        let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
 
         match queue.pop() {
             Some(packet) => {
@@ -140,7 +143,7 @@ pub fn read_hci(data: &mut [u8]) -> usize {
         let mut hci_read_data = BLE_HCI_READ_DATA.borrow_ref_mut(cs);
 
         if hci_read_data.is_empty() {
-            let mut queue = ble::BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
+            let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
 
             if let Some(packet) = queue.pop() {
                 hci_read_data.extend(packet.data);
