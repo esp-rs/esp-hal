@@ -151,7 +151,7 @@ mod tests {
 
         let (_, dout) = hil_test::common_test_pins!(ctx.io);
 
-        let din = dout.peripheral_input();
+        let (din, dout) = dout.split();
 
         let i2s_tx = i2s
             .i2s_tx
@@ -205,7 +205,7 @@ mod tests {
 
         let (_, dout) = hil_test::common_test_pins!(ctx.io);
 
-        let din = dout.peripheral_input();
+        let (din, dout) = dout.split();
 
         let mut i2s_tx = i2s
             .i2s_tx
@@ -347,7 +347,8 @@ mod tests {
         );
 
         let (_, dout) = hil_test::common_test_pins!(ctx.io);
-        let din = dout.peripheral_input();
+
+        let (din, dout) = dout.split();
 
         let mut i2s_rx = i2s
             .i2s_rx

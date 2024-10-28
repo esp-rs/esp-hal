@@ -335,7 +335,9 @@ mod tests {
         let unit0 = pcnt.unit0;
         let unit1 = pcnt.unit1;
 
-        unit0.channel0.set_edge_signal(mosi.peripheral_input());
+        let (mosi_loopback, mosi) = mosi.split();
+
+        unit0.channel0.set_edge_signal(mosi_loopback);
         unit0
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
@@ -359,12 +361,15 @@ mod tests {
         let unit0 = pcnt.unit0;
         let unit1 = pcnt.unit1;
 
-        unit0.channel0.set_edge_signal(mosi.peripheral_input());
+        let (mosi_loopback, mosi) = mosi.split();
+        let (gpio_loopback, gpio) = gpio.split();
+
+        unit0.channel0.set_edge_signal(mosi_loopback);
         unit0
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        unit1.channel0.set_edge_signal(gpio.peripheral_input());
+        unit1.channel0.set_edge_signal(gpio_loopback);
         unit1
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
@@ -389,12 +394,15 @@ mod tests {
         let unit0 = pcnt.unit0;
         let unit1 = pcnt.unit1;
 
-        unit0.channel0.set_edge_signal(mosi.peripheral_input());
+        let (mosi_loopback, mosi) = mosi.split();
+        let (gpio_loopback, gpio) = gpio.split();
+
+        unit0.channel0.set_edge_signal(mosi_loopback);
         unit0
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        unit1.channel0.set_edge_signal(gpio.peripheral_input());
+        unit1.channel0.set_edge_signal(gpio_loopback);
         unit1
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
@@ -419,12 +427,15 @@ mod tests {
         let unit0 = pcnt.unit0;
         let unit1 = pcnt.unit1;
 
-        unit0.channel0.set_edge_signal(mosi.peripheral_input());
+        let (mosi_loopback, mosi) = mosi.split();
+        let (gpio_loopback, gpio) = gpio.split();
+
+        unit0.channel0.set_edge_signal(mosi_loopback);
         unit0
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        unit1.channel0.set_edge_signal(gpio.peripheral_input());
+        unit1.channel0.set_edge_signal(gpio_loopback);
         unit1
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);

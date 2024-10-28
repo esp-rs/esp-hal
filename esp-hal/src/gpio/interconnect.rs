@@ -54,9 +54,6 @@ impl PeripheralOutput for OutputConnection {}
 
 /// A configurable input signal between a peripheral and a GPIO pin.
 ///
-/// Obtained by calling [`super::GpioPin::peripheral_input()`],
-/// [`super::Flex::peripheral_input()`] or [`super::Input::peripheral_input()`].
-///
 /// Multiple input signals can be connected to one pin.
 pub struct InputSignal {
     pin: AnyPin,
@@ -187,10 +184,6 @@ impl InputSignal {
 }
 
 /// A configurable output signal between a peripheral and a GPIO pin.
-///
-/// Obtained by calling [`super::GpioPin::into_peripheral_output()`],
-/// [`super::Flex::into_peripheral_output()`] or
-/// [`super::Output::into_peripheral_output()`].
 ///
 /// Multiple pins can be connected to one output signal.
 pub struct OutputSignal {
@@ -441,9 +434,9 @@ where
     P: InputPin,
 {
     fn from(input: P) -> Self {
-        Self(InputConnectionInner::Input(
-            input.degrade().peripheral_input(),
-        ))
+        Self(InputConnectionInner::Input(InputSignal::new(
+            input.degrade(),
+        )))
     }
 }
 
@@ -534,9 +527,9 @@ where
     P: OutputPin,
 {
     fn from(input: P) -> Self {
-        Self(OutputConnectionInner::Output(
-            input.degrade().into_peripheral_output(),
-        ))
+        Self(OutputConnectionInner::Output(OutputSignal::new(
+            input.degrade(),
+        )))
     }
 }
 

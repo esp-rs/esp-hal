@@ -194,7 +194,8 @@ You can now listen/unlisten multiple interrupt bits at once:
 -uart0.listen_at_cmd();
 -uart0.listen_rx_fifo_full();
 +uart0.listen(UartInterrupt::AtCmd | UartConterrupt::RxFifoFull);
-```˛
+```
+
 ## Circular DMA transfer's `available` returns `Result<usize, DmaError>` now
 
 In case of any error you should drop the transfer and restart it.
@@ -210,4 +211,19 @@ In case of any error you should drop the transfer and restart it.
 +                continue;
 +            },
 +        };
+```
+
+## Removed `peripheral_input` and `into_peripheral_output` from GPIO pin types
+
+Creating peripheral interconnect signals now consume the GPIO pin used for the connection.
+
+The previous signal function have been replaced by `split`. This change affects the following APIs:
+
+- `GpioPin`
+- `AnyPin`
+
+```diff
+-let input_signal = gpioN.peripheral_input();
+-let output_signal = gpioN.into_peripheral_output();
++let (input_signal, output_signal) = gpioN.split();
 ```

@@ -32,12 +32,9 @@ mod tests {
 
         let (_, pin) = hil_test::common_test_pins!(io);
 
-        let uart = Uart::new(
-            peripherals.UART1,
-            pin.peripheral_input(),
-            pin.into_peripheral_output(),
-        )
-        .unwrap();
+        let (rx, tx) = pin.split();
+
+        let uart = Uart::new(peripherals.UART1, rx, tx).unwrap();
 
         Context { uart }
     }

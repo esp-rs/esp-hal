@@ -723,13 +723,15 @@ where
         Self
     }
 
-    /// Returns a peripheral [input][interconnect::InputSignal] connected to
-    /// this pin.
+    /// Split the pin into an input and output signal.
     ///
-    /// The input signal can be passed to peripherals in place of an input pin.
-    #[inline]
-    pub fn peripheral_input(&self) -> interconnect::InputSignal {
-        interconnect::InputSignal::new(self.degrade_pin(private::Internal))
+    /// Peripheral signals allow connecting peripherals together without using
+    /// external hardware.
+    pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
+        (
+            interconnect::InputSignal::new(self.degrade_pin(private::Internal)),
+            interconnect::OutputSignal::new(self.degrade_pin(private::Internal)),
+        )
     }
 }
 
@@ -776,21 +778,6 @@ where
 }
 
 impl<const GPIONUM: u8> private::Sealed for GpioPin<GPIONUM> {}
-
-impl<const GPIONUM: u8> GpioPin<GPIONUM>
-where
-    Self: OutputPin,
-{
-    /// Turns the pin object into a peripheral
-    /// [output][interconnect::OutputSignal].
-    ///
-    /// The output signal can be passed to peripherals in place of an output
-    /// pin.
-    #[inline]
-    pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
-        interconnect::OutputSignal::new(self.degrade_pin(private::Internal))
-    }
-}
 
 /// General Purpose Input/Output driver
 pub struct Io {
@@ -1151,18 +1138,39 @@ where
     /// Create GPIO output driver for a [GpioPin] with the provided level
     #[inline]
     pub fn new_typed(pin: impl Peripheral<P = P> + 'd, initial_output: Level) -> Self {
-        let pin = Flex::new_typed(pin);
+        let mut pin = Flex::new_typed(pin);
 
-        Self::new_inner(pin, initial_output)
-    }
-
-    fn new_inner(mut pin: Flex<'d, P>, initial_output: Level) -> Self {
-        pin.pin
-            .set_output_high(initial_output.into(), private::Internal);
-
+        pin.set_level(initial_output);
         pin.set_as_output();
 
         Self { pin }
+    }
+
+    /// Split the pin into an input and output signal.
+    ///
+    /// Peripheral signals allow connecting peripherals together without using
+    /// external hardware.
+    pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
+        self.pin.split()
+    }
+
+    /// Returns a peripheral [input][interconnect::InputSignal] connected to
+    /// this pin.
+    ///
+    /// The input signal can be passed to peripherals in place of an input pin.
+    #[inline]
+    pub fn peripheral_input(&self) -> interconnect::InputSignal {
+        self.pin.peripheral_input()
+    }
+
+    /// Turns the pin object into a peripheral
+    /// [output][interconnect::OutputSignal].
+    ///
+    /// The output signal can be passed to peripherals in place of an output
+    /// pin.
+    #[inline]
+    pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
+        self.pin.into_peripheral_output()
     }
 
     /// Set the output as high.
@@ -1212,16 +1220,6 @@ where
     pub fn set_drive_strength(&mut self, strength: DriveStrength) {
         self.pin.set_drive_strength(strength);
     }
-
-    /// Turns the pin object into a peripheral
-    /// [output][interconnect::OutputSignal].
-    ///
-    /// The output signal can be passed to peripherals in place of an output
-    /// pin.
-    #[inline]
-    pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
-        self.pin.into_peripheral_output()
-    }
 }
 
 /// GPIO input driver.
@@ -1260,6 +1258,15 @@ where
         pin.set_as_input(pull);
 
         Self { pin }
+    }
+
+    /// Returns a peripheral [input][interconnect::InputSignal] connected to
+    /// this pin.
+    ///
+    /// The input signal can be passed to peripherals in place of an input pin.
+    #[inline]
+    pub fn peripheral_input(&self) -> interconnect::InputSignal {
+        self.pin.peripheral_input()
     }
 
     /// Get whether the pin input level is high.
@@ -1311,14 +1318,28 @@ where
     pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
         self.pin.wakeup_enable(enable, event);
     }
+}
 
-    /// Returns a peripheral [input][interconnect::InputSignal] connected to
-    /// this pin.
+impl<P> Input<'_, P>
+where
+    P: InputPin + OutputPin,
+{
+    /// Split the pin into an input and output signal.
     ///
-    /// The input signal can be passed to peripherals in place of an input pin.
+    /// Peripheral signals allow connecting peripherals together without using
+    /// external hardware.
+    pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
+        self.pin.split()
+    }
+
+    /// Turns the pin object into a peripheral
+    /// [output][interconnect::OutputSignal].
+    ///
+    /// The output signal can be passed to peripherals in place of an output
+    /// pin.
     #[inline]
-    pub fn peripheral_input(&self) -> interconnect::InputSignal {
-        self.pin.peripheral_input()
+    pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
+        self.pin.into_peripheral_output()
     }
 }
 
@@ -1363,6 +1384,33 @@ where
         pin.set_as_open_drain(pull);
 
         Self { pin }
+    }
+
+    /// Split the pin into an input and output signal.
+    ///
+    /// Peripheral signals allow connecting peripherals together without using
+    /// external hardware.
+    pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
+        self.pin.split()
+    }
+
+    /// Returns a peripheral [input][interconnect::InputSignal] connected to
+    /// this pin.
+    ///
+    /// The input signal can be passed to peripherals in place of an input pin.
+    #[inline]
+    pub fn peripheral_input(&self) -> interconnect::InputSignal {
+        self.pin.peripheral_input()
+    }
+
+    /// Turns the pin object into a peripheral
+    /// [output][interconnect::OutputSignal].
+    ///
+    /// The output signal can be passed to peripherals in place of an output
+    /// pin.
+    #[inline]
+    pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
+        self.pin.into_peripheral_output()
     }
 
     /// Get whether the pin input level is high.
@@ -1441,16 +1489,6 @@ where
     pub fn set_drive_strength(&mut self, strength: DriveStrength) {
         self.pin.set_drive_strength(strength);
     }
-
-    /// Turns the pin object into a peripheral
-    /// [output][interconnect::OutputSignal].
-    ///
-    /// The output signal can be passed to peripherals in place of an output
-    /// pin.
-    #[inline]
-    pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
-        self.pin.into_peripheral_output()
-    }
 }
 
 /// Flexible pin driver.
@@ -1486,6 +1524,33 @@ where
     pub fn new_typed(pin: impl Peripheral<P = P> + 'd) -> Self {
         crate::into_ref!(pin);
         Self { pin }
+    }
+
+    /// Split the pin into an input and output signal.
+    ///
+    /// Peripheral signals allow connecting peripherals together without using
+    /// external hardware.
+    pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
+        self.pin.degrade_pin(private::Internal).split()
+    }
+
+    /// Returns a peripheral [input][interconnect::InputSignal] connected to
+    /// this pin.
+    ///
+    /// The input signal can be passed to peripherals in place of an input pin.
+    #[inline]
+    pub fn peripheral_input(&self) -> interconnect::InputSignal {
+        self.pin.degrade_pin(private::Internal).split().0
+    }
+
+    /// Turns the pin object into a peripheral
+    /// [output][interconnect::OutputSignal].
+    ///
+    /// The output signal can be passed to peripherals in place of an output
+    /// pin.
+    #[inline]
+    pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
+        self.split().1
     }
 }
 
@@ -1577,15 +1642,6 @@ where
     pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
         self.listen_with_options(event.into(), false, false, enable);
     }
-
-    /// Returns a peripheral [input][interconnect::InputSignal] connected to
-    /// this pin.
-    ///
-    /// The input signal can be passed to peripherals in place of an input pin.
-    #[inline]
-    pub fn peripheral_input(&self) -> interconnect::InputSignal {
-        interconnect::InputSignal::new(self.pin.degrade_pin(private::Internal))
-    }
 }
 
 impl<P> Flex<'_, P>
@@ -1645,16 +1701,6 @@ where
     pub fn set_drive_strength(&mut self, strength: DriveStrength) {
         self.pin.set_drive_strength(strength, private::Internal);
     }
-
-    /// Turns the pin object into a peripheral
-    /// [output][interconnect::OutputSignal].
-    ///
-    /// The output signal can be passed to peripherals in place of an output
-    /// pin.
-    #[inline]
-    pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
-        interconnect::OutputSignal::new(self.pin.degrade_pin(private::Internal))
-    }
 }
 
 impl<P> Flex<'_, P>
@@ -1674,24 +1720,13 @@ pub(crate) mod internal {
     impl private::Sealed for AnyPin {}
 
     impl AnyPin {
-        /// Returns a peripheral [input][interconnect::InputSignal] connected to
-        /// this pin.
+        /// Split the pin into an input and output signal.
         ///
-        /// The input signal can be passed to peripherals in place of an input
-        /// pin.
+        /// Peripheral signals allow connecting peripherals together without
+        /// using external hardware.
         #[inline]
-        pub fn peripheral_input(&self) -> interconnect::InputSignal {
-            handle_gpio_input!(&self.0, target, { target.peripheral_input() })
-        }
-
-        /// Turns the pin object into a peripheral
-        /// [output][interconnect::OutputSignal].
-        ///
-        /// The output signal can be passed to peripherals in place of an output
-        /// pin.
-        #[inline]
-        pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
-            handle_gpio_output!(self.0, target, { target.into_peripheral_output() })
+        pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
+            handle_gpio_input!(self.0, target, { target.split() })
         }
     }
 
@@ -1717,7 +1752,7 @@ pub(crate) mod internal {
         }
 
         fn output_signals(&self, _: private::Internal) -> &[(AlternateFunction, OutputSignal)] {
-            handle_gpio_input!(&self.0, target, {
+            handle_gpio_output!(&self.0, target, {
                 Pin::output_signals(target, private::Internal)
             })
         }
@@ -1736,7 +1771,74 @@ pub(crate) mod internal {
     }
 
     impl InputPin for AnyPin {}
-    impl OutputPin for AnyPin {}
+
+    // Need to forward these one by one because not all pins support all functions.
+    impl OutputPin for AnyPin {
+        fn init_output(
+            &mut self,
+            alternate: AlternateFunction,
+            open_drain: bool,
+            _: private::Internal,
+        ) {
+            handle_gpio_output!(&mut self.0, target, {
+                OutputPin::init_output(target, alternate, open_drain, private::Internal)
+            })
+        }
+
+        fn set_to_open_drain_output(&mut self, _: private::Internal) {
+            handle_gpio_output!(&mut self.0, target, {
+                OutputPin::set_to_open_drain_output(target, private::Internal)
+            })
+        }
+
+        fn set_to_push_pull_output(&mut self, _: private::Internal) {
+            handle_gpio_output!(&mut self.0, target, {
+                OutputPin::set_to_push_pull_output(target, private::Internal)
+            })
+        }
+
+        fn set_output_high(&mut self, high: bool, _: private::Internal) {
+            handle_gpio_output!(&mut self.0, target, {
+                OutputPin::set_output_high(target, high, private::Internal)
+            })
+        }
+
+        fn set_drive_strength(&mut self, strength: DriveStrength, _: private::Internal) {
+            handle_gpio_output!(&mut self.0, target, {
+                OutputPin::set_drive_strength(target, strength, private::Internal)
+            })
+        }
+
+        fn enable_open_drain(&mut self, on: bool, _: private::Internal) {
+            handle_gpio_output!(&mut self.0, target, {
+                OutputPin::enable_open_drain(target, on, private::Internal)
+            })
+        }
+
+        fn enable_output_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
+            handle_gpio_output!(&mut self.0, target, {
+                OutputPin::enable_output_in_sleep_mode(target, on, private::Internal)
+            })
+        }
+
+        fn internal_pull_up_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
+            handle_gpio_output!(&mut self.0, target, {
+                OutputPin::internal_pull_up_in_sleep_mode(target, on, private::Internal)
+            })
+        }
+
+        fn internal_pull_down_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
+            handle_gpio_output!(&mut self.0, target, {
+                OutputPin::internal_pull_down_in_sleep_mode(target, on, private::Internal)
+            })
+        }
+
+        fn is_set_high(&self, _: private::Internal) -> bool {
+            handle_gpio_output!(&self.0, target, {
+                OutputPin::is_set_high(target, private::Internal)
+            })
+        }
+    }
 
     #[cfg(any(xtensa, esp32c2, esp32c3, esp32c6))]
     impl RtcPin for AnyPin {

@@ -102,19 +102,13 @@ mod tests {
         // issue with configuring pins as outputs after inputs have been sorted
         // out. See https://github.com/esp-rs/esp-hal/pull/2173#issue-2529323702
 
-        let cs_signal = ctx.io.pins.gpio8;
-        let unit0_signal = ctx.io.pins.gpio11;
-        let unit1_signal = ctx.io.pins.gpio12;
-        let unit2_signal = ctx.io.pins.gpio16;
-        let unit3_signal = ctx.io.pins.gpio17;
+        let (unit_ctrl, cs_signal) = ctx.io.pins.gpio8.split();
+        let (unit0_input, unit0_signal) = ctx.io.pins.gpio11.split();
+        let (unit1_input, unit1_signal) = ctx.io.pins.gpio12.split();
+        let (unit2_input, unit2_signal) = ctx.io.pins.gpio16.split();
+        let (unit3_input, unit3_signal) = ctx.io.pins.gpio17.split();
 
         let pcnt = ctx.pcnt;
-
-        let unit_ctrl = cs_signal.peripheral_input();
-        let unit0_input = unit0_signal.peripheral_input();
-        let unit1_input = unit1_signal.peripheral_input();
-        let unit2_input = unit2_signal.peripheral_input();
-        let unit3_input = unit3_signal.peripheral_input();
 
         pcnt.unit0
             .channel0
@@ -219,19 +213,13 @@ mod tests {
         // issue with configuring pins as outputs after inputs have been sorted
         // out. See https://github.com/esp-rs/esp-hal/pull/2173#issue-2529323702
 
-        let cs_signal = ctx.io.pins.gpio8;
-        let unit0_signal = ctx.io.pins.gpio11;
-        let unit1_signal = ctx.io.pins.gpio12;
-        let unit2_signal = ctx.io.pins.gpio16;
-        let unit3_signal = ctx.io.pins.gpio17;
+        let (unit_ctrl, cs_signal) = ctx.io.pins.gpio8.split();
+        let (unit0_input, unit0_signal) = ctx.io.pins.gpio11.split();
+        let (unit1_input, unit1_signal) = ctx.io.pins.gpio12.split();
+        let (unit2_input, unit2_signal) = ctx.io.pins.gpio16.split();
+        let (unit3_input, unit3_signal) = ctx.io.pins.gpio17.split();
 
         let pcnt = ctx.pcnt;
-
-        let unit_ctrl = cs_signal.peripheral_input();
-        let unit0_input = unit0_signal.peripheral_input();
-        let unit1_input = unit1_signal.peripheral_input();
-        let unit2_input = unit2_signal.peripheral_input();
-        let unit3_input = unit3_signal.peripheral_input();
 
         pcnt.unit0
             .channel0

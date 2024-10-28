@@ -8,7 +8,11 @@
 use esp_hal::parl_io::{TxPinConfigWithValidPin, TxSixteenBits};
 use esp_hal::{
     dma::{ChannelCreator, Dma, DmaPriority},
-    gpio::{interconnect::InputSignal, AnyPin, Io, NoPin},
+    gpio::{
+        interconnect::{InputSignal, OutputSignal},
+        Io,
+        NoPin,
+    },
     parl_io::{
         BitPackOrder,
         ClkOutPin,
@@ -30,8 +34,8 @@ use hil_test as _;
 struct Context {
     parl_io: PARL_IO,
     dma_channel: ChannelCreator<0>,
-    clock: AnyPin,
-    valid: AnyPin,
+    clock: OutputSignal,
+    valid: OutputSignal,
     clock_loopback: InputSignal,
     valid_loopback: InputSignal,
     pcnt_unit: Unit<'static, 0>,
@@ -50,10 +54,9 @@ mod tests {
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
         let (clock, _) = hil_test::common_test_pins!(io);
-        let valid = io.pins.gpio0.degrade();
-        let clock_loopback = clock.peripheral_input();
-        let valid_loopback = valid.peripheral_input();
-        let clock = clock.degrade();
+        let valid = hil_test::unconnected_pin!(io);
+        let (clock_loopback, clock) = clock.split();
+        let (valid_loopback, valid) = valid.split();
         let pcnt = Pcnt::new(peripherals.PCNT);
         let pcnt_unit = pcnt.unit0;
         let dma = Dma::new(peripherals.DMA);

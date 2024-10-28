@@ -32,10 +32,12 @@ mod tests {
 
         let (loopback_pin, _) = hil_test::common_test_pins!(io);
 
+        let (rx, tx) = loopback_pin.split();
+
         let mut config = twai::TwaiConfiguration::new(
             peripherals.TWAI0,
-            loopback_pin.peripheral_input(),
-            loopback_pin,
+            rx,
+            tx,
             twai::BaudRate::B1000K,
             TwaiMode::SelfTest,
         );

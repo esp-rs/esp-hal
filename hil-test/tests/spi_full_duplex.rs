@@ -73,7 +73,7 @@ mod tests {
         }
 
         #[cfg(pcnt)]
-        let mosi_loopback_pcnt = mosi.peripheral_input();
+        let (mosi_loopback_pcnt, mosi) = mosi.split();
         // Need to set miso first so that mosi can overwrite the
         // output connection (because we are using the same pin to loop back)
         let spi = Spi::new(peripherals.SPI2, 10000.kHz(), SpiMode::Mode0)
