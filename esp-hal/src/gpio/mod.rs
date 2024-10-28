@@ -384,12 +384,6 @@ pub trait InputPin: Pin + Into<AnyPin> + 'static {
         });
     }
 
-    /// Enable input in sleep mode for the pin
-    #[doc(hidden)]
-    fn enable_input_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
-        get_io_mux_reg(self.number()).modify(|_, w| w.mcu_ie().bit(on));
-    }
-
     /// The current state of the input
     #[doc(hidden)]
     fn is_input_high(&self, _: private::Internal) -> bool {
@@ -459,12 +453,6 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
         unsafe { GPIO::steal() }
             .pin(self.number() as usize)
             .modify(|_, w| w.pad_driver().bit(on));
-    }
-
-    /// Enable/disable output in sleep mode
-    #[doc(hidden)]
-    fn enable_output_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
-        get_io_mux_reg(self.number()).modify(|_, w| w.mcu_oe().bit(on));
     }
 
     /// Configure internal pull-up resistor in sleep mode
@@ -1845,12 +1833,6 @@ pub(crate) mod internal {
         fn enable_open_drain(&mut self, on: bool, _: private::Internal) {
             handle_gpio_output!(&mut self.0, target, {
                 OutputPin::enable_open_drain(target, on, private::Internal)
-            })
-        }
-
-        fn enable_output_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
-            handle_gpio_output!(&mut self.0, target, {
-                OutputPin::enable_output_in_sleep_mode(target, on, private::Internal)
             })
         }
 

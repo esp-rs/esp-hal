@@ -30,8 +30,6 @@ impl Level {
 
     pub(crate) fn enable_input(&mut self, _on: bool, _: private::Internal) {}
 
-    pub(crate) fn enable_input_in_sleep_mode(&mut self, _on: bool, _: private::Internal) {}
-
     pub(crate) fn is_input_high(&self, _: private::Internal) -> bool {
         *self == Level::High
     }
@@ -52,7 +50,6 @@ impl Level {
     pub(crate) fn set_output_high(&mut self, _on: bool, _: private::Internal) {}
     pub(crate) fn set_drive_strength(&mut self, _strength: DriveStrength, _: private::Internal) {}
     pub(crate) fn enable_open_drain(&mut self, _on: bool, _: private::Internal) {}
-    pub(crate) fn enable_output_in_sleep_mode(&mut self, _on: bool, _: private::Internal) {}
     pub(crate) fn internal_pull_up_in_sleep_mode(&mut self, _on: bool, _: private::Internal) {}
     pub(crate) fn internal_pull_down_in_sleep_mode(&mut self, _on: bool, _: private::Internal) {}
 

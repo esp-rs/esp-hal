@@ -296,7 +296,6 @@ impl InputSignal {
             pub fn init_input(&self, pull: Pull, _internal: private::Internal);
             pub fn is_input_high(&self, _internal: private::Internal) -> bool;
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
-            pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
         }
     }
 }
@@ -382,7 +381,6 @@ impl OutputSignal {
             pub fn init_input(&self, pull: Pull, _internal: private::Internal);
             pub fn is_input_high(&self, _internal: private::Internal) -> bool;
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
-            pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
 
             pub fn output_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::OutputSignal)];
             pub fn set_to_open_drain_output(&mut self, _internal: private::Internal);
@@ -391,7 +389,6 @@ impl OutputSignal {
             pub fn set_output_high(&mut self, on: bool, _internal: private::Internal);
             pub fn set_drive_strength(&mut self, strength: gpio::DriveStrength, _internal: private::Internal);
             pub fn enable_open_drain(&mut self, on: bool, _internal: private::Internal);
-            pub fn enable_output_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             pub fn internal_pull_up_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             pub fn internal_pull_down_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             pub fn is_set_high(&self, _internal: private::Internal) -> bool;
@@ -495,7 +492,6 @@ impl InputConnection {
             InputConnectionInner::Constant(level) => level,
         } {
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
-            pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             fn connect_input_to_peripheral(&mut self, signal: gpio::InputSignal);
         }
     }
@@ -582,7 +578,6 @@ impl OutputConnection {
             pub fn pull_direction(&mut self, pull: Pull, _internal: private::Internal);
             pub fn init_input(&mut self, pull: Pull, _internal: private::Internal);
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
-            pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
 
             pub fn set_to_open_drain_output(&mut self, _internal: private::Internal);
             pub fn set_to_push_pull_output(&mut self, _internal: private::Internal);
@@ -590,7 +585,6 @@ impl OutputConnection {
             pub fn set_output_high(&mut self, on: bool, _internal: private::Internal);
             pub fn set_drive_strength(&mut self, strength: gpio::DriveStrength, _internal: private::Internal);
             pub fn enable_open_drain(&mut self, on: bool, _internal: private::Internal);
-            pub fn enable_output_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             pub fn internal_pull_up_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             pub fn internal_pull_down_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal);
