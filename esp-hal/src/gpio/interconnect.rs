@@ -78,7 +78,7 @@ impl gpio::InputSignal {
     pub fn connect_to(self, pin: impl Peripheral<P = impl PeripheralInput>) {
         crate::into_mapped_ref!(pin);
 
-        pin.connect_input_to_peripheral(self, private::Internal);
+        pin.connect_input_to_peripheral(self);
     }
 }
 
@@ -98,7 +98,7 @@ impl gpio::OutputSignal {
     pub fn connect_to(self, pin: impl Peripheral<P = impl PeripheralOutput>) {
         crate::into_mapped_ref!(pin);
 
-        pin.connect_peripheral_to_output(self, private::Internal);
+        pin.connect_peripheral_to_output(self);
     }
 
     /// Disconnects a peripheral output signal from a GPIO.
@@ -106,7 +106,7 @@ impl gpio::OutputSignal {
     pub fn disconnect_from(self, pin: impl Peripheral<P = impl PeripheralOutput>) {
         crate::into_mapped_ref!(pin);
 
-        pin.disconnect_from_peripheral_output(self, private::Internal);
+        pin.disconnect_from_peripheral_output(self);
     }
 }
 
@@ -118,7 +118,12 @@ impl gpio::OutputSignal {
 ///   signal.
 /// - `invert`: Configures whether or not to invert the input value
 /// - `use_gpio_matrix`: true to route through the GPIO matrix
-fn connect_via_matrix(signal: gpio::InputSignal, input: u8, invert: bool, use_gpio_matrix: bool) {
+pub(crate) fn connect_input_signal(
+    signal: gpio::InputSignal,
+    input: u8,
+    invert: bool,
+    use_gpio_matrix: bool,
+) {
     assert!(
         signal.can_use_gpio_matrix() || !use_gpio_matrix,
         "{:?} cannot be routed through the GPIO matrix",
@@ -151,7 +156,7 @@ fn connect_pin_to_input_signal(
 
     pin.set_alternate_function(af, private::Internal);
 
-    connect_via_matrix(signal, pin.number(), is_inverted, af == GPIO_FUNCTION);
+    connect_input_signal(signal, pin.number(), is_inverted, af == GPIO_FUNCTION);
 }
 
 fn connect_peripheral_to_output(
@@ -279,7 +284,7 @@ impl InputSignal {
     /// Since there can only be one input signal connected to a peripheral at a
     /// time, this function will disconnect any previously connected input
     /// signals.
-    fn connect_input_to_peripheral(&mut self, signal: gpio::InputSignal, _: private::Internal) {
+    fn connect_input_to_peripheral(&mut self, signal: gpio::InputSignal) {
         connect_pin_to_input_signal(&mut self.pin, signal, self.is_inverted, false);
     }
 
@@ -355,17 +360,8 @@ impl OutputSignal {
         self
     }
 
-    /// Connect the pin to a peripheral input signal.
-    ///
-    /// Since there can only be one signal connected to a peripheral input at a
-    /// time, this function will disconnect any previously connected input
-    /// signals.
-    fn connect_input_to_peripheral(&mut self, signal: gpio::InputSignal, _: private::Internal) {
-        connect_pin_to_input_signal(&mut self.pin, signal, self.is_inverted, false);
-    }
-
     /// Connect the pin to a peripheral output signal.
-    fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal, _: private::Internal) {
+    fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal) {
         connect_peripheral_to_output(&mut self.pin, signal, self.is_inverted, false, true, false);
     }
 
@@ -374,11 +370,7 @@ impl OutputSignal {
     /// Clears the entry in the GPIO matrix / Io mux that associates this output
     /// pin with a previously connected [signal](`OutputSignal`). Any other
     /// outputs connected to the peripheral remain intact.
-    fn disconnect_from_peripheral_output(
-        &mut self,
-        signal: gpio::OutputSignal,
-        _: private::Internal,
-    ) {
+    fn disconnect_from_peripheral_output(&mut self, signal: gpio::OutputSignal) {
         disconnect_peripheral_output_from_pin(&mut self.pin, signal);
     }
 
@@ -504,7 +496,7 @@ impl InputConnection {
         } {
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
             pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
-            pub fn connect_input_to_peripheral(&mut self, signal: crate::gpio::InputSignal, _internal: private::Internal);
+            fn connect_input_to_peripheral(&mut self, signal: gpio::InputSignal);
         }
     }
 }
@@ -578,6 +570,9 @@ impl OutputConnection {
         } {
             pub fn is_input_high(&self, _internal: private::Internal) -> bool;
             pub fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)];
+
+            pub fn is_set_high(&self, _internal: private::Internal) -> bool;
+            pub fn output_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::OutputSignal)];
         }
         #[doc(hidden)]
         to match &mut self.0 {
@@ -588,23 +583,7 @@ impl OutputConnection {
             pub fn init_input(&mut self, pull: Pull, _internal: private::Internal);
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
             pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
-            pub fn connect_input_to_peripheral(&mut self, signal: crate::gpio::InputSignal, _internal: private::Internal);
-        }
 
-        #[doc(hidden)]
-        to match &self.0 {
-            OutputConnectionInner::Output(pin) => pin,
-            OutputConnectionInner::Constant(level) => level,
-        } {
-            pub fn is_set_high(&self, _internal: private::Internal) -> bool;
-            pub fn output_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::OutputSignal)];
-        }
-
-        #[doc(hidden)]
-        to match &mut self.0 {
-            OutputConnectionInner::Output(pin) => pin,
-            OutputConnectionInner::Constant(level) => level,
-        } {
             pub fn set_to_open_drain_output(&mut self, _internal: private::Internal);
             pub fn set_to_push_pull_output(&mut self, _internal: private::Internal);
             pub fn enable_output(&mut self, on: bool, _internal: private::Internal);
@@ -614,8 +593,8 @@ impl OutputConnection {
             pub fn enable_output_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             pub fn internal_pull_up_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             pub fn internal_pull_down_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
-            pub fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal, _internal: private::Internal);
-            pub fn disconnect_from_peripheral_output(&mut self, signal: gpio::OutputSignal, _internal: private::Internal);
+            fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal);
+            fn disconnect_from_peripheral_output(&mut self, signal: gpio::OutputSignal);
         }
     }
 }

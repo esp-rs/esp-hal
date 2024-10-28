@@ -239,7 +239,7 @@ impl<'d, DM: Mode> I8080<'d, DM> {
     pub fn with_cs<CS: PeripheralOutput>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_mapped_ref!(cs);
         cs.set_to_push_pull_output(crate::private::Internal);
-        cs.connect_peripheral_to_output(OutputSignal::LCD_CS, crate::private::Internal);
+        OutputSignal::LCD_CS.connect_to(cs);
 
         self
     }
@@ -253,10 +253,10 @@ impl<'d, DM: Mode> I8080<'d, DM> {
         crate::into_mapped_ref!(dc, wrx);
 
         dc.set_to_push_pull_output(crate::private::Internal);
-        dc.connect_peripheral_to_output(OutputSignal::LCD_DC, crate::private::Internal);
+        OutputSignal::LCD_DC.connect_to(dc);
 
         wrx.set_to_push_pull_output(crate::private::Internal);
-        wrx.connect_peripheral_to_output(OutputSignal::LCD_PCLK, crate::private::Internal);
+        OutputSignal::LCD_PCLK.connect_to(wrx);
 
         self
     }
@@ -628,9 +628,9 @@ impl<'d> TxPins for TxEightBits<'d> {
             OutputSignal::LCD_DATA_7,
         ];
 
-        for (pin, signal) in self.pins.iter_mut().zip(SIGNALS.iter()) {
+        for (pin, signal) in self.pins.iter_mut().zip(SIGNALS.into_iter()) {
             pin.set_to_push_pull_output(crate::private::Internal);
-            pin.connect_peripheral_to_output(*signal, crate::private::Internal);
+            signal.connect_to(pin);
         }
     }
 }
@@ -697,9 +697,9 @@ impl<'d> TxPins for TxSixteenBits<'d> {
             OutputSignal::LCD_DATA_15,
         ];
 
-        for (pin, signal) in self.pins.iter_mut().zip(SIGNALS.iter()) {
+        for (pin, signal) in self.pins.iter_mut().zip(SIGNALS.into_iter()) {
             pin.set_to_push_pull_output(crate::private::Internal);
-            pin.connect_peripheral_to_output(*signal, crate::private::Internal);
+            signal.connect_to(pin);
         }
     }
 }

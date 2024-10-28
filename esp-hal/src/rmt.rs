@@ -333,8 +333,8 @@ fn configure_tx_channel<'d, P: PeripheralOutput, T: TxChannelInternal<M>, M: cra
     config: TxChannelConfig,
 ) -> Result<T, Error> {
     crate::into_mapped_ref!(pin);
-    pin.set_to_push_pull_output(crate::Internal);
-    pin.connect_peripheral_to_output(T::output_signal(), crate::Internal);
+    pin.set_to_push_pull_output(crate::private::Internal);
+    T::output_signal().connect_to(pin);
 
     T::set_divider(config.clk_divider);
     T::set_carrier(

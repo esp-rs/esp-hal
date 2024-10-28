@@ -298,9 +298,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
         pin.set_actions(config.actions);
         pin.set_update_method(config.update_method);
 
-        let output_signal = PWM::output_signal::<OP, IS_A>();
-        pin.pin
-            .connect_peripheral_to_output(output_signal, private::Internal);
+        PWM::output_signal::<OP, IS_A>().connect_to(&mut pin.pin);
         pin.pin.enable_output(true, private::Internal);
 
         pin

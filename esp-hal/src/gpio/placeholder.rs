@@ -6,6 +6,7 @@
 // polluting the main module.
 
 use super::*;
+use crate::gpio::interconnect::connect_input_signal;
 
 impl crate::peripheral::Peripheral for Level {
     type P = Self;
@@ -36,23 +37,13 @@ impl Level {
     }
 
     #[doc(hidden)]
-    pub(crate) fn connect_input_to_peripheral(
-        &mut self,
-        signal: InputSignal,
-        _: private::Internal,
-    ) {
+    pub(crate) fn connect_input_to_peripheral(&mut self, signal: InputSignal) {
         let value = match self {
             Level::High => ONE_INPUT,
             Level::Low => ZERO_INPUT,
         };
 
-        unsafe { GPIO::steal() }
-            .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
-            .modify(|_, w| unsafe {
-                w.sel().set_bit();
-                w.in_inv_sel().bit(false);
-                w.in_sel().bits(value)
-            });
+        connect_input_signal(signal, value, false, true);
     }
 
     pub(crate) fn set_to_open_drain_output(&mut self, _: private::Internal) {}
@@ -76,19 +67,9 @@ impl Level {
         &[]
     }
 
-    pub(crate) fn connect_peripheral_to_output(
-        &mut self,
-        _signal: OutputSignal,
-        _: private::Internal,
-    ) {
-    }
+    pub(crate) fn connect_peripheral_to_output(&mut self, _signal: OutputSignal) {}
 
-    pub(crate) fn disconnect_from_peripheral_output(
-        &mut self,
-        _signal: OutputSignal,
-        _: private::Internal,
-    ) {
-    }
+    pub(crate) fn disconnect_from_peripheral_output(&mut self, _signal: OutputSignal) {}
 }
 
 /// Placeholder pin, used when no pin is required when using a peripheral.
