@@ -28,15 +28,14 @@ The following paragraphs contain additional recommendations.
 
 ## API Surface
 
-- Add `#[deny(missing_docs)]` to new modules or when reworking a larger part of a module. In the end we will require this for whole crates.
-- API documentation shouldn't be an afterthought
+- API documentation shouldn't be an afterthought.
 - Private details shouldn't leak into the public API, and should be made private where technically possible.
-- Implementation details that _need_ to be public should be marked with `#[doc(hidden)]` and a comment as to why it needs to be public.
-- Functions which technically need to be public but shouldn't be callable by the user need to be sealed.
+  - Implementation details that _need_ to be public should be marked with `#[doc(hidden)]` and a comment as to why it needs to be public.
+  - Functions which technically need to be public but shouldn't be callable by the user need to be sealed.
     - see [this example in Rust's core library](https://github.com/rust-lang/rust/blob/044a28a4091f2e1a5883f7fa990223f8b200a2cd/library/core/src/error.rs#L89-L100)
-- Any public traits, that **must not** be implemented downstream need to be `Sealed`
+- Any public traits, that **must not** be implemented downstream need to be `Sealed`.
 - Prefer compile-time checks over runtime checks where possible, prefer a fallible API over panics.
-- Follow naming conventions in order to be consistent across drivers - take inspiration from existing drivers
+- Follow naming conventions in order to be consistent across drivers - take inspiration from existing drivers.
 - Design APIs in a way that they are easy to use.
 - Driver API decisions should be assessed individually, don't _not_ just follow embedded-hal or other ecosystem trait crates. Expose the capabilities of the hardware. (Ecosystem traits are implemented on top of the inherent API)
 - Avoid type states and extraneous generics whenever possible
@@ -45,6 +44,7 @@ The following paragraphs contain additional recommendations.
 - Avoiding `&mut self` when `&self` is safe to use. `&self` is generally easier to use as an API. Typical applications of this are where the methods just do writes to registers which don't have side effects.
     - For example starting a timer is fine for `&self`, worst case a timer will be started twice if two parts of the program call it. You can see a real example of this [here](https://github.com/esp-rs/esp-hal/pull/1500#pullrequestreview-2015911974)
 - Maintain order consistency in the API, such as in the case of pairs like RX/TX.
+- If your driver provides a way to listen for interrupts, the interrupts should be listed in a `derive(EnumSetType)` enum as opposed to one function per interrupt flag.
 
 ## Maintainability
 
