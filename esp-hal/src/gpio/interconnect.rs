@@ -270,7 +270,7 @@ impl InputSignal {
         self.is_inverted = !self.is_inverted;
     }
 
-    /// Consumed the signal and returns a new one that inverts the peripheral's
+    /// Consumes the signal and returns a new one that inverts the peripheral's
     /// input signal.
     ///
     /// Calling this function multiple times toggles the setting.
@@ -351,7 +351,7 @@ impl OutputSignal {
         self.is_inverted = !self.is_inverted;
     }
 
-    /// Consumed the signal and returns a new one that inverts the peripheral's
+    /// Consumes the signal and returns a new one that inverts the peripheral's
     /// output signal.
     ///
     /// Calling this function multiple times toggles the setting.
@@ -365,11 +365,11 @@ impl OutputSignal {
         connect_peripheral_to_output(&mut self.pin, signal, self.is_inverted, false, true, false);
     }
 
-    /// Remove this output pin from a connected [signal](`OutputSignal`).
+    /// Remove this output pin from a connected [signal](`gpio::OutputSignal`).
     ///
     /// Clears the entry in the GPIO matrix / Io mux that associates this output
-    /// pin with a previously connected [signal](`OutputSignal`). Any other
-    /// outputs connected to the peripheral remain intact.
+    /// pin with a previously connected [signal](`gpio::OutputSignal`). Any
+    /// other outputs connected to the peripheral remain intact.
     fn disconnect_from_peripheral_output(&mut self, signal: gpio::OutputSignal) {
         disconnect_peripheral_output_from_pin(&mut self.pin, signal);
     }
