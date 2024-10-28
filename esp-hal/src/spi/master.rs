@@ -91,7 +91,7 @@ use crate::{
 
 /// Enumeration of possible SPI interrupt events.
 #[cfg(gdma)]
-#[derive(EnumSetType)]
+#[derive(Debug, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SpiInterrupt {
     /// Indicates that the SPI transaction has completed successfully.

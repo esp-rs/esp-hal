@@ -128,6 +128,8 @@
 
 use core::marker::PhantomData;
 
+use enumset::{EnumSet, EnumSetType};
+
 use self::config::Config;
 use crate::{
     clock::Clocks,
@@ -490,35 +492,7 @@ where
                 phantom: PhantomData,
             },
         };
-        serial.init();
-
-        serial
-            .rx
-            .set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)?;
-        serial.rx.set_rx_timeout(config.rx_timeout)?;
-        serial.change_baud_internal(config.baudrate, config.clock_source);
-        serial.change_data_bits(config.data_bits);
-        serial.change_parity(config.parity);
-        serial.change_stop_bits(config.stop_bits);
-
-        // Setting err_wr_mask stops uart from storing data when data is wrong according
-        // to reference manual
-        serial
-            .register_block()
-            .conf0()
-            .modify(|_, w| w.err_wr_mask().set_bit());
-
-        // Reset Tx/Rx FIFOs
-        serial.rxfifo_reset();
-        serial.txfifo_reset();
-        crate::rom::ets_delay_us(15);
-
-        // Make sure we are starting in a "clean state" - previous operations might have
-        // run into error conditions
-        serial
-            .register_block()
-            .int_clr()
-            .write(|w| unsafe { w.bits(u32::MAX) });
+        serial.init(config)?;
 
         Ok(serial)
     }
@@ -784,13 +758,10 @@ where
             return Err(Error::InvalidArgument);
         }
 
-        #[cfg(any(esp32, esp32c6, esp32h2))]
-        let threshold: u8 = threshold as u8;
-
         self.uart
             .register_block()
             .conf1()
-            .modify(|_, w| unsafe { w.rxfifo_full_thrhd().bits(threshold) });
+            .modify(|_, w| unsafe { w.rxfifo_full_thrhd().bits(threshold as _) });
 
         Ok(())
     }
@@ -954,6 +925,22 @@ where
     }
 }
 
+/// List of exposed UART events.
+#[derive(Debug, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum UartInterrupt {
+    /// Indicates that the received has detected the configured
+    /// [`Uart::set_at_cmd`] character.
+    AtCmd,
+
+    /// The transmitter has finished sending out all data from the FIFO.
+    TxDone,
+
+    /// The receiver has received more data than what
+    /// [`Config::rx_fifo_full_threshold`] specifies.
+    RxFifoFull,
+}
+
 impl<'d, M, T> Uart<'d, M, T>
 where
     T: Instance,
@@ -968,22 +955,14 @@ where
     }
 
     /// Configure CTS pin
-    pub fn with_cts<CTS: PeripheralInput>(self, cts: impl Peripheral<P = CTS> + 'd) -> Self {
-        // `self.tx.uart` and `self.rx.uart` are the same
-        crate::into_mapped_ref!(cts);
-        cts.init_input(Pull::None, Internal);
-        cts.connect_input_to_peripheral(self.tx.uart.cts_signal(), Internal);
-
+    pub fn with_cts<CTS: PeripheralInput>(mut self, cts: impl Peripheral<P = CTS> + 'd) -> Self {
+        self.rx = self.rx.with_cts(cts);
         self
     }
 
     /// Configure RTS pin
-    pub fn with_rts<RTS: PeripheralOutput>(self, rts: impl Peripheral<P = RTS> + 'd) -> Self {
-        // `self.tx.uart` and `self.rx.uart` are the same
-        crate::into_mapped_ref!(rts);
-        rts.set_to_push_pull_output(Internal);
-        rts.connect_peripheral_to_output(self.tx.uart.rts_signal(), Internal);
-
+    pub fn with_rts<RTS: PeripheralOutput>(mut self, rts: impl Peripheral<P = RTS> + 'd) -> Self {
+        self.tx = self.tx.with_rts(rts);
         self
     }
 
@@ -1016,40 +995,39 @@ where
     }
 
     /// Configures the AT-CMD detection settings
-    #[allow(clippy::useless_conversion)]
     pub fn set_at_cmd(&mut self, config: config::AtCmdConfig) {
+        let register_block = self.register_block();
+
         #[cfg(not(any(esp32, esp32s2)))]
-        self.register_block()
+        register_block
             .clk_conf()
             .modify(|_, w| w.sclk_en().clear_bit());
 
-        self.register_block().at_cmd_char().write(|w| unsafe {
-            w.at_cmd_char()
-                .bits(config.cmd_char)
-                .char_num()
-                .bits(config.char_num.unwrap_or(1))
+        register_block.at_cmd_char().write(|w| unsafe {
+            w.at_cmd_char().bits(config.cmd_char);
+            w.char_num().bits(config.char_num.unwrap_or(1))
         });
 
         if let Some(pre_idle_count) = config.pre_idle_count {
-            self.register_block()
+            register_block
                 .at_cmd_precnt()
-                .write(|w| unsafe { w.pre_idle_num().bits(pre_idle_count.into()) });
+                .write(|w| unsafe { w.pre_idle_num().bits(pre_idle_count as _) });
         }
 
         if let Some(post_idle_count) = config.post_idle_count {
-            self.register_block()
+            register_block
                 .at_cmd_postcnt()
-                .write(|w| unsafe { w.post_idle_num().bits(post_idle_count.into()) });
+                .write(|w| unsafe { w.post_idle_num().bits(post_idle_count as _) });
         }
 
         if let Some(gap_timeout) = config.gap_timeout {
-            self.register_block()
+            register_block
                 .at_cmd_gaptout()
-                .write(|w| unsafe { w.rx_gap_tout().bits(gap_timeout.into()) });
+                .write(|w| unsafe { w.rx_gap_tout().bits(gap_timeout as _) });
         }
 
         #[cfg(not(any(esp32, esp32s2)))]
-        self.register_block()
+        register_block
             .clk_conf()
             .modify(|_, w| w.sclk_en().set_bit());
 
@@ -1058,94 +1036,66 @@ where
         self.rx.at_cmd_config = Some(config);
     }
 
-    /// Listen for AT-CMD interrupts
-    pub fn listen_at_cmd(&mut self) {
-        self.register_block()
-            .int_ena()
-            .modify(|_, w| w.at_cmd_char_det().set_bit());
+    /// Listen for the given interrupts
+    fn enable_listen(&mut self, interrupts: EnumSet<UartInterrupt>, enable: bool) {
+        let reg_block = self.register_block();
+
+        reg_block.int_ena().modify(|_, w| {
+            for interrupt in interrupts {
+                match interrupt {
+                    UartInterrupt::AtCmd => w.at_cmd_char_det().bit(enable),
+                    UartInterrupt::TxDone => w.tx_done().bit(enable),
+                    UartInterrupt::RxFifoFull => w.rxfifo_full().bit(enable),
+                };
+            }
+            w
+        });
     }
 
-    /// Stop listening for AT-CMD interrupts
-    pub fn unlisten_at_cmd(&mut self) {
-        self.register_block()
-            .int_ena()
-            .modify(|_, w| w.at_cmd_char_det().clear_bit());
+    /// Listen for the given interrupts
+    pub fn listen(&mut self, interrupts: impl Into<EnumSet<UartInterrupt>>) {
+        self.enable_listen(interrupts.into(), true);
     }
 
-    /// Listen for TX-DONE interrupts
-    pub fn listen_tx_done(&mut self) {
-        self.register_block()
-            .int_ena()
-            .modify(|_, w| w.tx_done().set_bit());
+    /// Unlisten the given interrupts
+    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<UartInterrupt>>) {
+        self.enable_listen(interrupts.into(), false);
     }
 
-    /// Stop listening for TX-DONE interrupts
-    pub fn unlisten_tx_done(&mut self) {
-        self.register_block()
-            .int_ena()
-            .modify(|_, w| w.tx_done().clear_bit());
+    /// Gets asserted interrupts
+    pub fn interrupts(&mut self) -> EnumSet<UartInterrupt> {
+        let mut res = EnumSet::new();
+        let reg_block = self.register_block();
+
+        let ints = reg_block.int_raw().read();
+
+        if ints.at_cmd_char_det().bit_is_set() {
+            res.insert(UartInterrupt::AtCmd);
+        }
+        if ints.tx_done().bit_is_set() {
+            res.insert(UartInterrupt::TxDone);
+        }
+        if ints.rxfifo_full().bit_is_set() {
+            res.insert(UartInterrupt::RxFifoFull);
+        }
+
+        res
     }
 
-    /// Listen for RX-FIFO-FULL interrupts
-    pub fn listen_rx_fifo_full(&mut self) {
-        self.register_block()
-            .int_ena()
-            .modify(|_, w| w.rxfifo_full().set_bit());
-    }
+    /// Resets asserted interrupts
+    pub fn clear_interrupts(&mut self, interrupts: EnumSet<UartInterrupt>) {
+        let reg_block = self.register_block();
 
-    /// Stop listening for RX-FIFO-FULL interrupts
-    pub fn unlisten_rx_fifo_full(&mut self) {
-        self.register_block()
-            .int_ena()
-            .modify(|_, w| w.rxfifo_full().clear_bit());
-    }
-
-    /// Checks if AT-CMD interrupt is set
-    pub fn at_cmd_interrupt_set(&self) -> bool {
-        self.register_block()
-            .int_raw()
-            .read()
-            .at_cmd_char_det()
-            .bit_is_set()
-    }
-
-    /// Checks if TX-DONE interrupt is set
-    pub fn tx_done_interrupt_set(&self) -> bool {
-        self.register_block()
-            .int_raw()
-            .read()
-            .tx_done()
-            .bit_is_set()
-    }
-
-    /// Checks if RX-FIFO-FULL interrupt is set
-    pub fn rx_fifo_full_interrupt_set(&self) -> bool {
-        self.register_block()
-            .int_raw()
-            .read()
-            .rxfifo_full()
-            .bit_is_set()
-    }
-
-    /// Reset AT-CMD interrupt
-    pub fn reset_at_cmd_interrupt(&self) {
-        self.register_block()
-            .int_clr()
-            .write(|w| w.at_cmd_char_det().clear_bit_by_one());
-    }
-
-    /// Reset TX-DONE interrupt
-    pub fn reset_tx_done_interrupt(&self) {
-        self.register_block()
-            .int_clr()
-            .write(|w| w.tx_done().clear_bit_by_one());
-    }
-
-    /// Reset RX-FIFO-FULL interrupt
-    pub fn reset_rx_fifo_full_interrupt(&self) {
-        self.register_block()
-            .int_clr()
-            .write(|w| w.rxfifo_full().clear_bit_by_one());
+        reg_block.int_clr().write(|w| {
+            for interrupt in interrupts {
+                match interrupt {
+                    UartInterrupt::AtCmd => w.at_cmd_char_det().clear_bit_by_one(),
+                    UartInterrupt::TxDone => w.tx_done().clear_bit_by_one(),
+                    UartInterrupt::RxFifoFull => w.rxfifo_full().clear_bit_by_one(),
+                };
+            }
+            w
+        });
     }
 
     /// Write a byte out over the UART
@@ -1345,7 +1295,7 @@ where
     }
 
     #[inline(always)]
-    fn init(&self) {
+    fn init(&mut self, config: Config) -> Result<(), Error> {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32s2))] {
                 // Nothing to do
@@ -1365,6 +1315,33 @@ where
         self.uart_peripheral_reset();
         self.tx.uart.disable_rx_interrupts();
         self.tx.uart.disable_tx_interrupts();
+
+        self.rx
+            .set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)?;
+        self.rx.set_rx_timeout(config.rx_timeout)?;
+        self.change_baud_internal(config.baudrate, config.clock_source);
+        self.change_data_bits(config.data_bits);
+        self.change_parity(config.parity);
+        self.change_stop_bits(config.stop_bits);
+
+        // Setting err_wr_mask stops uart from storing data when data is wrong according
+        // to reference manual
+        self.register_block()
+            .conf0()
+            .modify(|_, w| w.err_wr_mask().set_bit());
+
+        // Reset Tx/Rx FIFOs
+        self.rxfifo_reset();
+        self.txfifo_reset();
+        crate::rom::ets_delay_us(15);
+
+        // Make sure we are starting in a "clean state" - previous operations might have
+        // run into error conditions
+        self.register_block()
+            .int_clr()
+            .write(|w| unsafe { w.bits(u32::MAX) });
+
+        Ok(())
     }
 
     #[inline(always)]
@@ -1379,19 +1356,21 @@ where
         //
         // Ideally this should be configurable once we have a solution for https://github.com/esp-rs/esp-hal/issues/1111
         // see https://github.com/espressif/esp-idf/blob/5f4249357372f209fdd57288265741aaba21a2b1/components/esp_driver_uart/src/uart.c#L179
-        if self.tx.uart.uart_number() != CONSOLE_UART_NUM {
-            #[cfg(not(any(esp32, esp32s2)))]
-            self.register_block()
-                .clk_conf()
-                .modify(|_, w| w.rst_core().set_bit());
-
-            PeripheralClockControl::reset(self.tx.uart.peripheral());
-
-            #[cfg(not(any(esp32, esp32s2)))]
-            self.register_block()
-                .clk_conf()
-                .modify(|_, w| w.rst_core().clear_bit());
+        if self.tx.uart.uart_number() == CONSOLE_UART_NUM {
+            return;
         }
+
+        #[cfg(not(any(esp32, esp32s2)))]
+        self.register_block()
+            .clk_conf()
+            .modify(|_, w| w.rst_core().set_bit());
+
+        PeripheralClockControl::reset(self.tx.uart.peripheral());
+
+        #[cfg(not(any(esp32, esp32s2)))]
+        self.register_block()
+            .clk_conf()
+            .modify(|_, w| w.rst_core().clear_bit());
     }
 
     fn rxfifo_reset(&mut self) {

@@ -111,7 +111,8 @@ use crate::{
     Mode,
 };
 
-#[derive(EnumSetType)]
+#[derive(Debug, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Represents the various interrupt types for the I2S peripheral.
 pub enum I2sInterrupt {
     /// Receive buffer hung, indicating a stall in data reception.
