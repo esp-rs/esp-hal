@@ -15,7 +15,7 @@ use crate::{
     },
     compat::{
         self,
-        common::{str_from_c, RawQueue},
+        common::{str_from_c, ConcurrentQueue},
     },
     timer::yield_task,
 };
@@ -837,7 +837,7 @@ unsafe extern "C" fn ble_npl_event_init(
 unsafe extern "C" fn ble_npl_eventq_is_empty(queue: *const ble_npl_eventq) -> bool {
     trace!("ble_npl_eventq_is_empty {:?}", queue);
 
-    let queue = (*queue).dummy as *mut RawQueue;
+    let queue = (*queue).dummy as *mut ConcurrentQueue;
     core::assert!(!queue.is_null());
     (*queue).count() == 0
 }
@@ -869,7 +869,7 @@ unsafe extern "C" fn ble_npl_eventq_remove(
         return;
     }
 
-    let queue = (*queue).dummy as *mut RawQueue;
+    let queue = (*queue).dummy as *mut ConcurrentQueue;
     (*queue).remove(addr_of!(event) as *mut _);
 
     (*evt).queued = false;
@@ -885,7 +885,7 @@ unsafe extern "C" fn ble_npl_eventq_put(queue: *const ble_npl_eventq, event: *co
 
     (*evt).queued = true;
 
-    let queue = (*queue).dummy as *mut RawQueue;
+    let queue = (*queue).dummy as *mut ConcurrentQueue;
     let mut event = event as usize;
     (*queue).enqueue(addr_of_mut!(event).cast());
 }
@@ -896,7 +896,7 @@ unsafe extern "C" fn ble_npl_eventq_get(
 ) -> *const ble_npl_event {
     trace!("ble_npl_eventq_get {:?} {}", queue, time);
 
-    let queue = (*queue).dummy as *mut RawQueue;
+    let queue = (*queue).dummy as *mut ConcurrentQueue;
 
     let mut event: usize = 0;
     if time == TIME_FOREVER {
@@ -924,7 +924,7 @@ unsafe extern "C" fn ble_npl_eventq_deinit(queue: *const ble_npl_eventq) {
     let queue = queue.cast_mut();
     core::assert!((*queue).dummy != 0);
 
-    let raw_queue = (*queue).dummy as *mut RawQueue;
+    let raw_queue = (*queue).dummy as *mut ConcurrentQueue;
     (*raw_queue).release_storage();
     crate::compat::malloc::free(raw_queue.cast());
     (*queue).dummy = 0;
@@ -978,8 +978,9 @@ unsafe extern "C" fn ble_npl_eventq_init(queue: *const ble_npl_eventq) {
 
     let queue = queue as *mut ble_npl_eventq;
 
-    let raw_queue = RawQueue::new(EVENT_QUEUE_SIZE, 4);
-    let ptr = unsafe { crate::compat::malloc::malloc(size_of_val(&raw_queue)) as *mut RawQueue };
+    let raw_queue = ConcurrentQueue::new(EVENT_QUEUE_SIZE, 4);
+    let ptr =
+        unsafe { crate::compat::malloc::malloc(size_of_val(&raw_queue)) as *mut ConcurrentQueue };
     unsafe {
         ptr.write(raw_queue);
     }

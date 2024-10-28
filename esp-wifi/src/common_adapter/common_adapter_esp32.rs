@@ -135,7 +135,7 @@ pub(crate) unsafe fn phy_disable_clock() {
 
     let count = PHY_CLOCK_ENABLE_REF.fetch_sub(1, Ordering::SeqCst);
     if count == 1 {
-        critical_section::with(|_| {
+        critical_section::with(|cs| {
             unwrap!(RADIO_CLOCKS.borrow_ref_mut(cs).as_mut()).disable(RadioPeripherals::Phy)
         });
     }

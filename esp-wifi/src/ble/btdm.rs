@@ -16,7 +16,7 @@ use crate::{
         HciOutCollector,
         HCI_OUT_COLLECTOR,
     },
-    compat::common::{str_from_c, RawQueue},
+    compat::common::{str_from_c, ConcurrentQueue},
     hal::macros::ram,
     timer::yield_task,
 };
@@ -168,8 +168,9 @@ unsafe extern "C" fn mutex_unlock(_mutex: *const ()) -> i32 {
 
 unsafe extern "C" fn queue_create(len: u32, item_size: u32) -> *const () {
     trace!("queue create {} {}", len, item_size);
-    let raw_queue = RawQueue::new(len as usize, item_size as usize);
-    let ptr = unsafe { crate::compat::malloc::malloc(size_of_val(&raw_queue)) as *mut RawQueue };
+    let raw_queue = ConcurrentQueue::new(len as usize, item_size as usize);
+    let ptr =
+        unsafe { crate::compat::malloc::malloc(size_of_val(&raw_queue)) as *mut ConcurrentQueue };
     unsafe {
         ptr.write(raw_queue);
     }
@@ -180,7 +181,7 @@ unsafe extern "C" fn queue_create(len: u32, item_size: u32) -> *const () {
 unsafe extern "C" fn queue_delete(queue: *const ()) {
     trace!("queue_delete {:?}", queue);
 
-    let queue = queue as *mut RawQueue;
+    let queue = queue as *mut ConcurrentQueue;
     (&mut *queue).release_storage();
     unsafe {
         crate::compat::malloc::free(queue.cast());
@@ -196,7 +197,7 @@ unsafe extern "C" fn queue_send(queue: *const (), item: *const (), _block_time_m
         _block_time_ms
     );
 
-    let queue = queue as *mut RawQueue;
+    let queue = queue as *mut ConcurrentQueue;
     (*queue).enqueue(item as *mut _)
 }
 
@@ -226,7 +227,7 @@ unsafe extern "C" fn queue_recv(queue: *const (), item: *const (), block_time_ms
 
     let item = item as *mut _;
 
-    let queue = queue as *mut RawQueue;
+    let queue = queue as *mut ConcurrentQueue;
     loop {
         if (*queue).try_dequeue(item) {
             trace!("received from queue - return");
