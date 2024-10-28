@@ -21,8 +21,8 @@ use crate::config::PowerSaveMode;
 use crate::{
     binary::include::*,
     hal::peripheral::{Peripheral, PeripheralRef},
-    wifi::{Protocol, RxControlInfo, WifiError},
-    EspWifiController,
+    wifi::{CsiConfiguration, Protocol, RxControlInfo, WifiError},
+    EspWifiInitialization,
 };
 
 const RECEIVE_QUEUE_SIZE: usize = 10;
@@ -367,6 +367,19 @@ impl EspNowManager<'_> {
             priv_: core::ptr::null_mut(),
         };
         check_error!({ esp_now_add_peer(&raw_peer as *const _) })
+    }
+
+    /// Set CSI configuration and registers the receiving callback.
+    pub fn set_csi(
+        &mut self,
+        mut csi: CsiConfiguration,
+        cb: fn(crate::binary::include::wifi_csi_info_t),
+    ) -> Result<(), EspNowError> {
+        csi.apply_config().unwrap();
+        csi.set_receive_cb(cb).unwrap();
+        csi.set_csi(true).unwrap();
+
+        Ok(())
     }
 
     /// Remove the given peer.

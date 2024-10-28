@@ -440,7 +440,7 @@ impl Default for CsiConfiguration {
 
 impl CsiConfiguration {
     /// Set CSI data configuration
-    pub fn apply_config(&self) -> Result<(), WifiError> {
+    pub(crate) fn apply_config(&self) -> Result<(), WifiError> {
         #[cfg(not(esp32c6))]
         let conf = crate::include::wifi_csi_config_t {
             lltf_en: self.lltf_en,
@@ -479,7 +479,7 @@ impl CsiConfiguration {
 
     /// Register the RX callback function of CSI data. Each time a CSI data is
     /// received, the callback function will be called.
-    pub fn set_receive_cb(
+    pub(crate) fn set_receive_cb(
         &mut self,
         cb: fn(crate::binary::include::wifi_csi_info_t),
     ) -> Result<(), WifiError> {
@@ -496,7 +496,7 @@ impl CsiConfiguration {
     }
 
     /// Enable or disable CSI
-    pub fn set_csi(&self, enable: bool) -> Result<(), WifiError> {
+    pub(crate) fn set_csi(&self, enable: bool) -> Result<(), WifiError> {
         // https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/headers/esp_wifi.h#L1241
         unsafe {
             esp_wifi_result!(esp_wifi_set_csi(enable))?;
@@ -2699,6 +2699,19 @@ impl<'d> WifiController<'d> {
         } else {
             None
         }
+    }
+
+    /// Set CSI configuration and registers the receiving callback.
+    pub fn set_csi(
+        &mut self,
+        mut csi: CsiConfiguration,
+        cb: fn(crate::binary::include::wifi_csi_info_t),
+    ) -> Result<(), WifiError> {
+        csi.apply_config().unwrap();
+        csi.set_receive_cb(cb).unwrap();
+        csi.set_csi(true).unwrap();
+
+        Ok(())
     }
 
     /// Set the wifi protocol.
