@@ -146,7 +146,7 @@ pub fn read_hci(data: &mut [u8]) -> usize {
             let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
 
             if let Some(packet) = queue.pop() {
-                hci_read_data.extend(packet.data);
+                hci_read_data.extend_from_slice(&packet.data);
             }
         }
 
@@ -159,7 +159,7 @@ pub fn read_hci(data: &mut [u8]) -> usize {
 
 fn dump_packet_info(_buffer: &[u8]) {
     #[cfg(feature = "dump-packets")]
-    critical_section::with(|cs| {
+    critical_section::with(|_cs| {
         info!("@HCIFRAME {:?}", _buffer);
     });
 }
