@@ -53,6 +53,7 @@ pub const NUM_PINS: usize = 40;
 
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
 
+pub(crate) type InputSignalType = u16;
 pub(crate) type OutputSignalType = u16;
 pub(crate) const OUTPUT_SIGNAL_MAX: u16 = 548;
 pub(crate) const INPUT_SIGNAL_MAX: u16 = 539;
@@ -119,7 +120,8 @@ pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
 
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum InputSignal {
     SPICLK                = 0,
@@ -310,7 +312,8 @@ pub enum InputSignal {
 
 /// Peripheral output signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum OutputSignal {
     SPICLK                   = 0,

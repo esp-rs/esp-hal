@@ -55,12 +55,6 @@ impl Level {
             });
     }
 
-    pub(crate) fn disconnect_input_from_peripheral(
-        &mut self,
-        _signal: InputSignal,
-        _: private::Internal,
-    ) {
-    }
     pub(crate) fn set_to_open_drain_output(&mut self, _: private::Internal) {}
     pub(crate) fn set_to_push_pull_output(&mut self, _: private::Internal) {}
     pub(crate) fn enable_output(&mut self, _on: bool, _: private::Internal) {}
