@@ -164,6 +164,34 @@ const _: () = {
     };
 };
 
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+/// Tunable parameters for the WiFi driver
+#[allow(unused)] // currently there are no ble tunables
+struct Config {
+    rx_queue_size: usize,
+    tx_queue_size: usize,
+    static_rx_buf_num: usize,
+    dynamic_rx_buf_num: usize,
+    static_tx_buf_num: usize,
+    dynamic_tx_buf_num: usize,
+    csi_enable: bool,
+    ampdu_rx_enable: bool,
+    ampdu_tx_enable: bool,
+    amsdu_tx_enable: bool,
+    rx_ba_win: usize,
+    max_burst_size: usize,
+    country_code: &'static str,
+    country_code_operating_class: u8,
+    mtu: usize,
+    tick_rate_hz: u32,
+    listen_interval: u16,
+    beacon_timeout: u16,
+    ap_beacon_timeout: u16,
+    failure_retry_cnt: u8,
+    scan_method: u32,
+}
+
 pub(crate) const CONFIG: config::EspWifiConfig = config::EspWifiConfig {
     rx_queue_size: esp_config_int!(usize, "ESP_WIFI_RX_QUEUE_SIZE"),
     tx_queue_size: esp_config_int!(usize, "ESP_WIFI_TX_QUEUE_SIZE"),
@@ -171,6 +199,7 @@ pub(crate) const CONFIG: config::EspWifiConfig = config::EspWifiConfig {
     dynamic_rx_buf_num: esp_config_int!(usize, "ESP_WIFI_DYNAMIC_RX_BUF_NUM"),
     static_tx_buf_num: esp_config_int!(usize, "ESP_WIFI_STATIC_TX_BUF_NUM"),
     dynamic_tx_buf_num: esp_config_int!(usize, "ESP_WIFI_DYNAMIC_TX_BUF_NUM"),
+    csi_enable: esp_config_bool!("ESP_WIFI_CSI_ENABLE"),
     ampdu_rx_enable: esp_config_bool!("ESP_WIFI_AMPDU_RX_ENABLE"),
     ampdu_tx_enable: esp_config_bool!("ESP_WIFI_AMPDU_TX_ENABLE"),
     amsdu_tx_enable: esp_config_bool!("ESP_WIFI_AMSDU_TX_ENABLE"),

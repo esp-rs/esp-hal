@@ -446,7 +446,7 @@ impl Default for CsiConfiguration {
 
 impl CsiConfiguration {
     /// Set CSI data configuration
-    pub fn set_config(&self) -> Result<(), WifiError> {
+    pub fn apply_config(&self) -> Result<(), WifiError> {
         #[cfg(not(esp32c6))]
         let conf = crate::include::wifi_csi_config_t {
             lltf_en: self.lltf_en,
@@ -464,16 +464,7 @@ impl CsiConfiguration {
             _bitfield_1: self._bitfield_1,
         };
 
-        extern "C" {
-            static mut g_wifi_menuconfig: u8;
-        }
-
         unsafe {
-            // Set G_CONFIG.csi_enable to 1
-            // https://github.com/esp-rs/esp-hal/blob/19b08efc1d21a7b92a796d6800c47162b80a5629/esp-wifi/src/wifi/mod.rs#L1529
-            let ptr = core::ptr::addr_of_mut!(g_wifi_menuconfig).add(24);
-            ptr.write_volatile(1);
-
             esp_wifi_result!(esp_wifi_set_csi_config(&conf))?;
         }
         Ok(())
@@ -1691,7 +1682,7 @@ static mut G_CONFIG: wifi_init_config_t = wifi_init_config_t {
     rx_mgmt_buf_type: esp_wifi_sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_MGMT_BUF as i32,
     rx_mgmt_buf_num: esp_wifi_sys::include::CONFIG_ESP_WIFI_RX_MGMT_BUF_NUM_DEF as i32,
     cache_tx_buf_num: esp_wifi_sys::include::WIFI_CACHE_TX_BUFFER_NUM as i32,
-    csi_enable: esp_wifi_sys::include::WIFI_CSI_ENABLED as i32,
+    csi_enable: crate::CONFIG.csi_enable as i32,
     ampdu_rx_enable: crate::CONFIG.ampdu_rx_enable as i32,
     ampdu_tx_enable: crate::CONFIG.ampdu_tx_enable as i32,
     amsdu_tx_enable: crate::CONFIG.amsdu_tx_enable as i32,

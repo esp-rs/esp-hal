@@ -80,7 +80,7 @@ fn main() -> ! {
     println!("is wifi started: {:?}", controller.is_started());
 
     let mut csi = CsiConfiguration::default();
-    csi.set_config().unwrap();
+    csi.apply_config().unwrap();
     csi.set_receive_cb(|data| {
         let rx_ctrl = data.rx_ctrl;
         println!("rssi: {:?} rate: {}", rx_ctrl.rssi(), rx_ctrl.rate());
