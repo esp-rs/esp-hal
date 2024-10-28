@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - No need to add `rom_functions.x` manually anymore (#2374)
-- esp-now: Data is now private in `ReceivedData` - use `get_data`(#2396)
+- esp-now: Data is now private in `ReceivedData` - use `data()`(#2396)
 
 ### Fixed
 

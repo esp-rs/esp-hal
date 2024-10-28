@@ -240,7 +240,7 @@ pub struct ReceivedData {
 
 impl ReceivedData {
     /// Returns the received payload.
-    pub fn get_data(&self) -> &[u8] {
+    pub fn data(&self) -> &[u8] {
         &self.data
     }
 }
@@ -255,7 +255,7 @@ impl defmt::Format for ReceivedData {
 impl Debug for ReceivedData {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("ReceivedData")
-            .field("data", &self.get_data())
+            .field("data", &self.data())
             .field("info", &self.info)
             .finish()
     }
