@@ -389,8 +389,18 @@ pub struct CsiConfiguration {
 #[cfg(esp32c6)]
 // See https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/src/include/esp32c6.rs#L5702-L5705
 pub struct CsiConfiguration {
-    pub _bitfield_align_1: [u32; 0],
-    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize]>,
+    pub enable: u32,
+    pub acquire_csi_legacy: u32,
+    pub acquire_csi_ht20: u32,
+    pub acquire_csi_ht40: u32,
+    pub acquire_csi_su: u32,
+    pub acquire_csi_mu: u32,
+    pub acquire_csi_dcm: u32,
+    pub acquire_csi_beamformed: u32,
+    pub acquire_csi_he_stbc: u32,
+    pub val_scale_cfg: u32,
+    pub dump_ack_en: u32,
+    pub reserved: u32,
 }
 
 impl Default for CsiConfiguration {
@@ -411,35 +421,19 @@ impl Default for CsiConfiguration {
     #[cfg(esp32c6)]
     fn default() -> Self {
         // https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/headers/esp_wifi_he_types.h#L67-L82
-        let enable: u32 = 1;
-        let acquire_csi_legacy: u32 = 1;
-        let acquire_csi_ht20: u32 = 1;
-        let acquire_csi_ht40: u32 = 1;
-        let acquire_csi_su: u32 = 1;
-        let acquire_csi_mu: u32 = 1;
-        let acquire_csi_dcm: u32 = 1;
-        let acquire_csi_beamformed: u32 = 1;
-        let acquire_csi_he_stbc: u32 = 2;
-        let val_scale_cfg: u32 = 2;
-        let dump_ack_en: u32 = 1;
-        let reserved: u32 = 19;
-        let _bitfield_1 = include::wifi_csi_acquire_config_t::new_bitfield_1(
-            enable,
-            acquire_csi_legacy,
-            acquire_csi_ht20,
-            acquire_csi_ht40,
-            acquire_csi_su,
-            acquire_csi_mu,
-            acquire_csi_dcm,
-            acquire_csi_beamformed,
-            acquire_csi_he_stbc,
-            val_scale_cfg,
-            dump_ack_en,
-            reserved,
-        );
         Self {
-            _bitfield_align_1: [0; 0],
-            _bitfield_1,
+            enable: 1,
+            acquire_csi_legacy: 1,
+            acquire_csi_ht20: 1,
+            acquire_csi_ht40: 1,
+            acquire_csi_su: 1,
+            acquire_csi_mu: 1,
+            acquire_csi_dcm: 1,
+            acquire_csi_beamformed: 1,
+            acquire_csi_he_stbc: 2,
+            val_scale_cfg: 2,
+            dump_ack_en: 1,
+            reserved: 19,
         }
     }
 }
@@ -460,8 +454,21 @@ impl CsiConfiguration {
         };
         #[cfg(esp32c6)]
         let conf = include::wifi_csi_acquire_config_t {
-            _bitfield_align_1: self._bitfield_align_1,
-            _bitfield_1: self._bitfield_1,
+            _bitfield_align_1: [0; 0],
+            _bitfield_1: include::wifi_csi_acquire_config_t::new_bitfield_1(
+                self.enable,
+                self.acquire_csi_legacy,
+                self.acquire_csi_ht20,
+                self.acquire_csi_ht40,
+                self.acquire_csi_su,
+                self.acquire_csi_mu,
+                self.acquire_csi_dcm,
+                self.acquire_csi_beamformed,
+                self.acquire_csi_he_stbc,
+                self.val_scale_cfg,
+                self.dump_ack_en,
+                self.reserved,
+            ),
         };
 
         unsafe {
