@@ -63,7 +63,7 @@ impl ConcurrentQueue {
 /// A naive and pretty much unsafe queue to back the queues used in drivers and
 /// supplicant code
 pub struct RawQueue {
-    count: usize,
+    capacity: usize,
     item_size: usize,
     current_read: usize,
     current_write: usize,
@@ -71,12 +71,12 @@ pub struct RawQueue {
 }
 
 impl RawQueue {
-    pub fn new(count: usize, item_size: usize) -> Self {
-        let storage = unsafe { malloc((count * item_size) as u32) as *mut u8 };
+    pub fn new(capacity: usize, item_size: usize) -> Self {
+        let storage = unsafe { malloc((capacity * item_size) as u32) as *mut u8 };
         core::assert!(!storage.is_null());
 
         Self {
-            count,
+            capacity,
             item_size,
             current_read: 0,
             current_write: 0,
@@ -92,11 +92,11 @@ impl RawQueue {
     }
 
     unsafe fn enqueue(&mut self, item: *mut c_void) -> i32 {
-        if self.count() < self.count {
+        if self.count() < self.capacity {
             unsafe {
                 let p = self.storage.byte_add(self.item_size * self.current_write);
                 p.copy_from(item as *mut u8, self.item_size);
-                self.current_write = (self.current_write + 1) % self.count;
+                self.current_write = (self.current_write + 1) % self.capacity;
             }
 
             1
@@ -110,7 +110,7 @@ impl RawQueue {
             unsafe {
                 let p = self.storage.byte_add(self.item_size * self.current_read) as *const c_void;
                 item.copy_from(p, self.item_size);
-                self.current_read = (self.current_read + 1) % self.count;
+                self.current_read = (self.current_read + 1) % self.capacity;
             }
             true
         } else {
@@ -151,7 +151,7 @@ impl RawQueue {
         if self.current_write >= self.current_read {
             self.current_write - self.current_read
         } else {
-            self.count - self.current_read + self.current_write
+            self.capacity - self.current_read + self.current_write
         }
     }
 }
