@@ -19,22 +19,27 @@ pub(crate) extern "C" fn timer_task(_param: *mut esp_wifi_sys::c_types::c_void) 
     loop {
         let current_timestamp = get_systimer_count();
         let to_run = critical_section::with(|cs| unsafe {
-            TIMERS.borrow_ref_mut(cs).find_next_due(current_timestamp)
+            let mut timers = TIMERS.borrow_ref_mut(cs);
+            let to_run = timers.find_next_due(current_timestamp);
+
+            if let Some(to_run) = to_run {
+                to_run.active = to_run.periodic;
+
+                if to_run.periodic {
+                    to_run.started = current_timestamp;
+                }
+
+                Some(to_run.callback)
+            } else {
+                None
+            }
         });
 
         // run the due timer callback NOT in an interrupt free context
         if let Some(to_run) = to_run {
-            unsafe {
-                (*to_run).active = (*to_run).periodic;
-
-                if (*to_run).periodic {
-                    (*to_run).started = current_timestamp;
-                }
-
-                trace!("trigger timer....");
-                (*to_run).callback.call();
-                trace!("timer callback called");
-            }
+            trace!("trigger timer....");
+            to_run.call();
+            trace!("timer callback called");
         } else {
             yield_task();
         }
