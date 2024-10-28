@@ -6,7 +6,7 @@ pub(crate) mod btdm;
 #[cfg(any(esp32c2, esp32c6, esp32h2))]
 pub(crate) mod npl;
 
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 use core::{cell::RefCell, mem::MaybeUninit};
 
 pub(crate) use ble::{ble_init, send_hci};
@@ -103,13 +103,13 @@ static BLE_HCI_READ_DATA: Mutex<RefCell<Vec<u8>>> = Mutex::new(RefCell::new(Vec:
 
 #[derive(Debug, Clone)]
 pub struct ReceivedPacket {
-    pub data: Vec<u8>,
+    pub data: Box<[u8]>,
 }
 
 #[cfg(feature = "defmt")]
 impl defmt::Format for ReceivedPacket {
     fn format(&self, fmt: defmt::Formatter) {
-        defmt::write!(fmt, "ReceivedPacket {}", &self.data[..],)
+        defmt::write!(fmt, "ReceivedPacket {}", &self.data[..])
     }
 }
 
@@ -139,7 +139,7 @@ pub fn read_hci(data: &mut [u8]) -> usize {
     critical_section::with(|cs| {
         let mut hci_read_data = BLE_HCI_READ_DATA.borrow_ref_mut(cs);
 
-        if hci_read_data.len() == 0 {
+        if hci_read_data.is_empty() {
             let mut queue = ble::BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
 
             if let Some(packet) = queue.pop() {
@@ -148,22 +148,15 @@ pub fn read_hci(data: &mut [u8]) -> usize {
         }
 
         let l = usize::min(hci_read_data.len(), data.len());
-        if l > 0 {
-            data[..l].copy_from_slice(&hci_read_data[..l]);
-            hci_read_data.drain(..l);
-            l
-        } else {
-            0
-        }
+        data[..l].copy_from_slice(&hci_read_data[..l]);
+        hci_read_data.drain(..l);
+        l
     })
 }
 
-#[allow(unreachable_code, unused_variables)]
-fn dump_packet_info(buffer: &[u8]) {
-    #[cfg(not(feature = "dump-packets"))]
-    return;
-
+fn dump_packet_info(_buffer: &[u8]) {
+    #[cfg(feature = "dump-packets")]
     critical_section::with(|cs| {
-        info!("@HCIFRAME {:?}", buffer);
+        info!("@HCIFRAME {:?}", _buffer);
     });
 }

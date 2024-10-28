@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 use core::{
     cell::RefCell,
     mem::size_of_val,
@@ -74,23 +74,21 @@ extern "C" fn notify_host_send_available() {
 extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
     trace!("notify_host_recv {:?} {}", data, len);
 
-    unsafe {
-        let data = core::slice::from_raw_parts(data, len as usize);
+    let data = unsafe { core::slice::from_raw_parts(data, len as usize) };
 
-        let packet = ReceivedPacket {
-            data: Vec::from(data),
-        };
+    let packet = ReceivedPacket {
+        data: Box::from(data),
+    };
 
-        critical_section::with(|cs| {
-            let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
-            queue.push(packet);
-        });
+    critical_section::with(|cs| {
+        let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
+        queue.push(packet);
+    });
 
-        super::dump_packet_info(data);
+    super::dump_packet_info(data);
 
-        #[cfg(feature = "async")]
-        crate::ble::controller::asynch::hci_read_data_available();
-    }
+    #[cfg(feature = "async")]
+    crate::ble::controller::asynch::hci_read_data_available();
 
     0
 }
@@ -169,6 +167,7 @@ unsafe extern "C" fn mutex_unlock(_mutex: *const ()) -> i32 {
 }
 
 unsafe extern "C" fn queue_create(len: u32, item_size: u32) -> *const () {
+    trace!("queue create {} {}", len, item_size);
     let raw_queue = RawQueue::new(len as usize, item_size as usize);
     let ptr = unsafe { crate::compat::malloc::malloc(size_of_val(&raw_queue)) as *mut RawQueue };
     unsafe {
@@ -179,7 +178,13 @@ unsafe extern "C" fn queue_create(len: u32, item_size: u32) -> *const () {
 }
 
 unsafe extern "C" fn queue_delete(queue: *const ()) {
-    trace!("Unimplemented queue_delete {:?}", queue);
+    trace!("queue_delete {:?}", queue);
+
+    let queue = queue as *mut RawQueue;
+    (&mut *queue).release_storage();
+    unsafe {
+        crate::compat::malloc::free(queue.cast());
+    }
 }
 
 #[ram]

@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 use core::{
     cell::RefCell,
     mem::size_of_val,
@@ -704,9 +704,7 @@ unsafe extern "C" fn ble_npl_callout_deinit(callout: *const ble_npl_callout) {
 unsafe extern "C" fn ble_npl_callout_stop(callout: *const ble_npl_callout) {
     trace!("ble_npl_callout_stop {:?}", callout);
 
-    if (*callout).dummy == 0 {
-        panic!("Trying to stop an uninitialzed callout");
-    }
+    core::assert!((*callout).dummy != 0);
 
     let co = (*callout).dummy as *mut Callout;
 
@@ -770,9 +768,7 @@ unsafe extern "C" fn ble_npl_event_set_arg(event: *const ble_npl_event, arg: *co
     trace!("ble_npl_event_set_arg {:?} {:?}", event, arg);
 
     let evt = (*event).dummy as *mut Event;
-    if evt.is_null() {
-        panic!("Call set_arg on uninitialized event");
-    }
+    core::assert!(!evt.is_null());
 
     (*evt).ev_arg_ptr = arg;
 }
@@ -781,9 +777,7 @@ unsafe extern "C" fn ble_npl_event_get_arg(event: *const ble_npl_event) -> *cons
     trace!("ble_npl_event_get_arg {:?}", event);
 
     let evt = (*event).dummy as *mut Event;
-    if evt.is_null() {
-        panic!("Call get_arg on uninitialized event");
-    }
+    core::assert!(!evt.is_null());
 
     let arg_ptr = (*evt).ev_arg_ptr;
 
@@ -796,9 +790,7 @@ unsafe extern "C" fn ble_npl_event_is_queued(event: *const ble_npl_event) -> boo
     trace!("ble_npl_event_is_queued {:?}", event);
 
     let evt = (*event).dummy as *mut Event;
-    if evt.is_null() {
-        panic!("Call is_queued on uninitialized event");
-    }
+    core::assert!(!evt.is_null());
 
     (*evt).queued
 }
@@ -807,11 +799,9 @@ unsafe extern "C" fn ble_npl_event_reset(event: *const ble_npl_event) {
     trace!("ble_npl_event_reset {:?}", event);
 
     let evt = (*event).dummy as *mut Event;
-    if evt.is_null() {
-        panic!("Trying to reset an uninitialized event");
-    } else {
-        (*evt).queued = false
-    }
+    core::assert!(!evt.is_null());
+
+    (*evt).queued = false
 }
 
 unsafe extern "C" fn ble_npl_event_deinit(event: *const ble_npl_event) {
@@ -819,12 +809,10 @@ unsafe extern "C" fn ble_npl_event_deinit(event: *const ble_npl_event) {
 
     let event = event as *mut ble_npl_event;
     let evt = (*event).dummy as *mut Event;
-    if evt.is_null() {
-        panic!("Trying to deinitialize an uninitialized event");
-    } else {
-        crate::compat::malloc::free(evt.cast());
-        (*event).dummy = 0;
-    }
+    core::assert!(!evt.is_null());
+
+    crate::compat::malloc::free(evt.cast());
+    (*event).dummy = 0;
 }
 
 unsafe extern "C" fn ble_npl_event_init(
@@ -849,11 +837,8 @@ unsafe extern "C" fn ble_npl_event_init(
 unsafe extern "C" fn ble_npl_eventq_is_empty(queue: *const ble_npl_eventq) -> bool {
     trace!("ble_npl_eventq_is_empty {:?}", queue);
 
-    if (*queue).dummy == 0 {
-        panic!("Try to use uninitialized queue");
-    }
-
     let queue = (*queue).dummy as *mut RawQueue;
+    core::assert!(!queue.is_null());
     (*queue).count() == 0
 }
 
@@ -861,13 +846,11 @@ unsafe extern "C" fn ble_npl_event_run(event: *const ble_npl_event) {
     trace!("ble_npl_event_run {:?}", event);
 
     let evt = (*event).dummy as *mut Event;
-    if evt.is_null() {
-        panic!("Trying to run an uninitialized event");
-    } else {
-        trace!("info {:?} with arg {:x}", (*evt).event_fn_ptr, event as u32);
-        let func: unsafe extern "C" fn(u32) = core::mem::transmute((*evt).event_fn_ptr);
-        func(event as u32);
-    }
+    core::assert!(!evt.is_null());
+
+    trace!("info {:?} with arg {:x}", (*evt).event_fn_ptr, event as u32);
+    let func: unsafe extern "C" fn(u32) = core::mem::transmute((*evt).event_fn_ptr);
+    func(event as u32);
 
     trace!("ble_npl_event_run done");
 }
@@ -878,15 +861,10 @@ unsafe extern "C" fn ble_npl_eventq_remove(
 ) {
     info!("ble_npl_eventq_remove {:?} {:?}", queue, event);
 
-    if (*queue).dummy == 0 {
-        panic!("Try to use uninitialized queue");
-    }
-
-    if (*event).dummy == 0 {
-        panic!("Try to use uninitialized event");
-    }
-
+    core::assert!((*queue).dummy != 0);
     let evt = (*event).dummy as *mut Event;
+    core::assert!(!evt.is_null());
+
     if !(*evt).queued {
         return;
     }
@@ -900,15 +878,11 @@ unsafe extern "C" fn ble_npl_eventq_remove(
 unsafe extern "C" fn ble_npl_eventq_put(queue: *const ble_npl_eventq, event: *const ble_npl_event) {
     trace!("ble_npl_eventq_put {:?} {:?}", queue, event);
 
-    if (*queue).dummy == 0 {
-        panic!("Try to use uninitialized queue");
-    }
-
-    if (*event).dummy == 0 {
-        panic!("Try to use uninitialized event");
-    }
+    core::assert!((*queue).dummy != 0);
 
     let evt = (*event).dummy as *mut Event;
+    core::assert!(!evt.is_null());
+
     (*evt).queued = true;
 
     let queue = (*queue).dummy as *mut RawQueue;
@@ -948,14 +922,12 @@ unsafe extern "C" fn ble_npl_eventq_deinit(queue: *const ble_npl_eventq) {
     trace!("ble_npl_eventq_deinit {:?}", queue);
 
     let queue = queue.cast_mut();
-    if (*queue).dummy == 0 {
-        panic!("Trying to deinitialize an uninitialized queue");
-    } else {
-        let raw_queue = (*queue).dummy as *mut RawQueue;
-        (*raw_queue).release_storage();
-        crate::compat::malloc::free(raw_queue.cast());
-        (*queue).dummy = 0;
-    }
+    core::assert!((*queue).dummy != 0);
+
+    let raw_queue = (*queue).dummy as *mut RawQueue;
+    (*raw_queue).release_storage();
+    crate::compat::malloc::free(raw_queue.cast());
+    (*queue).dummy = 0;
 }
 
 unsafe extern "C" fn ble_npl_callout_init(
@@ -1318,7 +1290,7 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i3
         data[3..][..len].copy_from_slice(payload);
 
         queue.push(ReceivedPacket {
-            data: Vec::from(&data[..len + 3]),
+            data: Box::from(&data[..len + 3]),
         });
 
         dump_packet_info(&data[..(len + 3)]);
@@ -1347,7 +1319,7 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
         data[1..][..data_slice.len()].copy_from_slice(data_slice);
 
         queue.push(ReceivedPacket {
-            data: Vec::from(&data[..data_slice.len() + 1]),
+            data: Box::from(&data[..data_slice.len() + 1]),
         });
 
         super::dump_packet_info(&data[..(len + 1) as usize]);
