@@ -416,7 +416,9 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
 
         get_io_mux_reg(self.number()).modify(|_, w| unsafe {
             w.mcu_sel().bits(alternate as u8);
-            w.fun_ie().bit(open_drain);
+            if open_drain {
+                w.fun_ie().set_bit();
+            }
             w.fun_drv().bits(DriveStrength::I20mA as u8);
             w.slp_sel().clear_bit()
         });
