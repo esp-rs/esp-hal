@@ -336,15 +336,15 @@ where
         scl.enable_input(true, crate::private::Internal);
         scl.pull_direction(Pull::Up, crate::private::Internal);
 
-        scl.connect_input_to_peripheral(i2c.i2c.scl_input_signal(), crate::private::Internal);
-        scl.connect_peripheral_to_output(i2c.i2c.scl_output_signal(), crate::private::Internal);
+        i2c.i2c.scl_input_signal().connect_to(&mut scl);
+        i2c.i2c.scl_output_signal().connect_to(&mut scl);
 
         sda.set_to_open_drain_output(crate::private::Internal);
         sda.enable_input(true, crate::private::Internal);
         sda.pull_direction(Pull::Up, crate::private::Internal);
 
-        sda.connect_input_to_peripheral(i2c.i2c.sda_input_signal(), crate::private::Internal);
-        sda.connect_peripheral_to_output(i2c.i2c.sda_output_signal(), crate::private::Internal);
+        i2c.i2c.sda_input_signal().connect_to(&mut sda);
+        i2c.i2c.sda_output_signal().connect_to(&mut sda);
 
         i2c.i2c.setup(frequency, None);
         i2c

@@ -144,16 +144,16 @@ where
 
         // TODO: with_pins et. al.
         sclk.enable_input(true, private::Internal);
-        sclk.connect_input_to_peripheral(this.spi.sclk_signal(), private::Internal);
+        this.spi.sclk_signal().connect_to(sclk);
 
         mosi.enable_input(true, private::Internal);
-        mosi.connect_input_to_peripheral(this.spi.mosi_signal(), private::Internal);
+        this.spi.mosi_signal().connect_to(mosi);
 
         miso.set_to_push_pull_output(private::Internal);
-        miso.connect_peripheral_to_output(this.spi.miso_signal(), private::Internal);
+        this.spi.miso_signal().connect_to(miso);
 
         cs.enable_input(true, private::Internal);
-        cs.connect_input_to_peripheral(this.spi.cs_signal(), private::Internal);
+        this.spi.cs_signal().connect_to(cs);
 
         this
     }

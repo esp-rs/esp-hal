@@ -61,7 +61,7 @@ use crate::{
     },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{i2s0::RegisterBlock, I2S0, I2S1},
-    private,
+    private::Internal,
     system::PeripheralClockControl,
     Async,
     Mode,
@@ -123,8 +123,8 @@ impl<'d> TxPins<'d> for TxSixteenBits<'d> {
         crate::into_ref!(instance);
         let bits = self.bus_width();
         for (i, pin) in self.pins.iter_mut().enumerate() {
-            pin.set_to_push_pull_output(private::Internal);
-            pin.connect_peripheral_to_output(instance.data_out_signal(i, bits), private::Internal);
+            pin.set_to_push_pull_output(Internal);
+            instance.data_out_signal(i, bits).connect_to(pin);
         }
     }
 }
@@ -165,8 +165,8 @@ impl<'d> TxPins<'d> for TxEightBits<'d> {
         crate::into_ref!(instance);
         let bits = self.bus_width();
         for (i, pin) in self.pins.iter_mut().enumerate() {
-            pin.set_to_push_pull_output(private::Internal);
-            pin.connect_peripheral_to_output(instance.data_out_signal(i, bits), private::Internal);
+            pin.set_to_push_pull_output(Internal);
+            instance.data_out_signal(i, bits).connect_to(pin);
         }
     }
 }
@@ -228,8 +228,8 @@ where
         // configure the I2S peripheral for parallel mode
         i2s.setup(frequency, pins.bus_width());
         // setup the clock pin
-        clock_pin.set_to_push_pull_output(private::Internal);
-        clock_pin.connect_peripheral_to_output(i2s.ws_signal(), private::Internal);
+        clock_pin.set_to_push_pull_output(Internal);
+        i2s.ws_signal().connect_to(clock_pin);
 
         pins.configure(i2s.reborrow());
         Self {

@@ -62,14 +62,51 @@ impl PeripheralInput for OutputConnection {}
 impl PeripheralOutput for OutputConnection {}
 
 impl gpio::InputSignal {
-    fn can_use_gpio_matrix(&self) -> bool {
-        *self as InputSignalType <= INPUT_SIGNAL_MAX
+    fn can_use_gpio_matrix(self) -> bool {
+        self as InputSignalType <= INPUT_SIGNAL_MAX
+    }
+
+    /// Connects a peripheral input signal to a GPIO or a constant level.
+    ///
+    /// Note that connecting multiple GPIOs to a single peripheral input is not
+    /// possible and the previous connection will be replaced.
+    ///
+    /// Also note that a peripheral input must always be connected to something,
+    /// so if you want to disconnect it from GPIOs, you should connect it to a
+    /// constant level.
+    #[inline]
+    pub fn connect_to(self, pin: impl Peripheral<P = impl PeripheralInput>) {
+        crate::into_mapped_ref!(pin);
+
+        pin.connect_input_to_peripheral(self, private::Internal);
     }
 }
 
 impl gpio::OutputSignal {
-    fn can_use_gpio_matrix(&self) -> bool {
-        *self as OutputSignalType <= OUTPUT_SIGNAL_MAX
+    fn can_use_gpio_matrix(self) -> bool {
+        self as OutputSignalType <= OUTPUT_SIGNAL_MAX
+    }
+
+    /// Connects a peripheral output signal to a GPIO.
+    ///
+    /// Note that connecting multiple output signals to a single GPIO is not
+    /// possible and the previous connection will be replaced.
+    ///
+    /// Also note that it is possible to connect a peripheral output signal to
+    /// multiple GPIOs, and old connections will not be cleared automatically.
+    #[inline]
+    pub fn connect_to(self, pin: impl Peripheral<P = impl PeripheralOutput>) {
+        crate::into_mapped_ref!(pin);
+
+        pin.connect_peripheral_to_output(self, private::Internal);
+    }
+
+    /// Disconnects a peripheral output signal from a GPIO.
+    #[inline]
+    pub fn disconnect_from(self, pin: impl Peripheral<P = impl PeripheralOutput>) {
+        crate::into_mapped_ref!(pin);
+
+        pin.disconnect_from_peripheral_output(self, private::Internal);
     }
 }
 

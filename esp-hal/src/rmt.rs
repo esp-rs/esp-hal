@@ -312,8 +312,8 @@ fn configure_rx_channel<'d, P: PeripheralInput, T: RxChannelInternal<M>, M: crat
     }
 
     crate::into_mapped_ref!(pin);
-    pin.init_input(crate::gpio::Pull::None, crate::Internal);
-    pin.connect_input_to_peripheral(T::input_signal(), crate::Internal);
+    pin.init_input(crate::gpio::Pull::None, crate::private::Internal);
+    T::input_signal().connect_to(pin);
 
     T::set_divider(config.clk_divider);
     T::set_carrier(

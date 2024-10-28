@@ -243,8 +243,10 @@ impl<'d> Camera<'d> {
         mclk: impl Peripheral<P = MCLK> + 'd,
     ) -> Self {
         crate::into_mapped_ref!(mclk);
+
         mclk.set_to_push_pull_output(crate::private::Internal);
-        mclk.connect_peripheral_to_output(OutputSignal::CAM_CLK, crate::private::Internal);
+        OutputSignal::CAM_CLK.connect_to(mclk);
+
         self
     }
 
@@ -256,7 +258,7 @@ impl<'d> Camera<'d> {
         crate::into_mapped_ref!(pclk);
 
         pclk.init_input(Pull::None, crate::private::Internal);
-        pclk.connect_input_to_peripheral(InputSignal::CAM_PCLK, crate::private::Internal);
+        InputSignal::CAM_PCLK.connect_to(pclk);
 
         self
     }
@@ -271,9 +273,9 @@ impl<'d> Camera<'d> {
         crate::into_mapped_ref!(vsync, h_enable);
 
         vsync.init_input(Pull::None, crate::private::Internal);
-        vsync.connect_input_to_peripheral(InputSignal::CAM_V_SYNC, crate::private::Internal);
+        InputSignal::CAM_V_SYNC.connect_to(vsync);
         h_enable.init_input(Pull::None, crate::private::Internal);
-        h_enable.connect_input_to_peripheral(InputSignal::CAM_H_ENABLE, crate::private::Internal);
+        InputSignal::CAM_H_ENABLE.connect_to(h_enable);
 
         self.lcd_cam
             .cam_ctrl1()
@@ -297,11 +299,11 @@ impl<'d> Camera<'d> {
         crate::into_mapped_ref!(vsync, hsync, h_enable);
 
         vsync.init_input(Pull::None, crate::private::Internal);
-        vsync.connect_input_to_peripheral(InputSignal::CAM_V_SYNC, crate::private::Internal);
+        InputSignal::CAM_V_SYNC.connect_to(vsync);
         hsync.init_input(Pull::None, crate::private::Internal);
-        hsync.connect_input_to_peripheral(InputSignal::CAM_H_SYNC, crate::private::Internal);
+        InputSignal::CAM_H_SYNC.connect_to(hsync);
         h_enable.init_input(Pull::None, crate::private::Internal);
-        h_enable.connect_input_to_peripheral(InputSignal::CAM_H_ENABLE, crate::private::Internal);
+        InputSignal::CAM_H_ENABLE.connect_to(h_enable);
 
         self.lcd_cam
             .cam_ctrl1()
@@ -514,9 +516,9 @@ impl RxEightBits {
             (pin_7, InputSignal::CAM_DATA_7),
         ];
 
-        for (mut pin, signal) in pairs.into_iter() {
+        for (pin, signal) in pairs.into_iter() {
             pin.init_input(Pull::None, crate::private::Internal);
-            pin.connect_input_to_peripheral(signal, crate::private::Internal);
+            signal.connect_to(pin);
         }
 
         Self { _pins: () }
@@ -591,9 +593,9 @@ impl RxSixteenBits {
             (pin_15, InputSignal::CAM_DATA_15),
         ];
 
-        for (mut pin, signal) in pairs.into_iter() {
+        for (pin, signal) in pairs.into_iter() {
             pin.init_input(Pull::None, crate::private::Internal);
-            pin.connect_input_to_peripheral(signal, crate::private::Internal);
+            signal.connect_to(pin);
         }
 
         Self { _pins: () }

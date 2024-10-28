@@ -207,7 +207,8 @@ pub enum InputSignal {
 #[allow(non_camel_case_types)]
 #[derive(Debug, PartialEq, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[doc(hidden)]
+#[doc(hidden)] // TODO connection operations are now public on these, we might want to publish
+               // them
 pub enum OutputSignal {
     SPIQ            = 0,
     SPID            = 1,

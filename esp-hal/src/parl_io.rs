@@ -292,10 +292,7 @@ impl<'d> ClkOutPin<'d> {
 impl TxClkPin for ClkOutPin<'_> {
     fn configure(&mut self) {
         self.pin.set_to_push_pull_output(crate::private::Internal);
-        self.pin.connect_peripheral_to_output(
-            crate::gpio::OutputSignal::PARL_TX_CLK,
-            crate::private::Internal,
-        );
+        crate::gpio::OutputSignal::PARL_TX_CLK.connect_to(&mut self.pin);
     }
 }
 
@@ -318,10 +315,7 @@ impl TxClkPin for ClkInPin<'_> {
 
         self.pin
             .init_input(crate::gpio::Pull::None, crate::private::Internal);
-        self.pin.connect_input_to_peripheral(
-            crate::gpio::InputSignal::PARL_TX_CLK,
-            crate::private::Internal,
-        );
+        crate::gpio::InputSignal::PARL_TX_CLK.connect_to(&mut self.pin);
     }
 }
 
@@ -348,10 +342,7 @@ impl RxClkPin for RxClkInPin<'_> {
 
         self.pin
             .init_input(crate::gpio::Pull::None, crate::private::Internal);
-        self.pin.connect_input_to_peripheral(
-            crate::gpio::InputSignal::PARL_RX_CLK,
-            crate::private::Internal,
-        );
+        crate::gpio::InputSignal::PARL_RX_CLK.connect_to(&mut self.pin);
 
         Instance::set_rx_clk_edge_sel(self.sample_edge);
     }
@@ -390,10 +381,7 @@ where
         self.tx_pins.configure()?;
         self.valid_pin
             .set_to_push_pull_output(crate::private::Internal);
-        self.valid_pin.connect_peripheral_to_output(
-            Instance::tx_valid_pin_signal(),
-            crate::private::Internal,
-        );
+        Instance::tx_valid_pin_signal().connect_to(&mut self.valid_pin);
         Instance::set_tx_hw_valid_en(true);
         Ok(())
     }
@@ -464,7 +452,7 @@ macro_rules! tx_pins {
                 fn configure(&mut self) -> Result<(), Error>{
                     $(
                         self.[< pin_ $pin:lower >].set_to_push_pull_output(crate::private::Internal);
-                        self.[< pin_ $pin:lower >].connect_peripheral_to_output(crate::gpio::OutputSignal::$signal, crate::private::Internal);
+                        crate::gpio::OutputSignal::$signal.connect_to(&mut self.[< pin_ $pin:lower >]);
                     )+
 
                     private::Instance::set_tx_bit_width( private::WidSel::[< Bits $width >]);
@@ -584,8 +572,7 @@ where
         self.rx_pins.configure()?;
         self.valid_pin
             .init_input(crate::gpio::Pull::None, crate::private::Internal);
-        self.valid_pin
-            .connect_input_to_peripheral(Instance::rx_valid_pin_signal(), crate::private::Internal);
+        Instance::rx_valid_pin_signal().connect_to(&mut self.valid_pin);
         Instance::set_rx_sw_en(false);
         if let Some(sel) = self.enable_mode.pulse_submode_sel() {
             Instance::set_rx_pulse_submode_sel(sel);
@@ -684,7 +671,7 @@ macro_rules! rx_pins {
                 fn configure(&mut self)  -> Result<(), Error> {
                     $(
                         self.[< pin_ $pin:lower >].init_input(crate::gpio::Pull::None, crate::private::Internal);
-                        self.[< pin_ $pin:lower >].connect_input_to_peripheral(crate::gpio::InputSignal::$signal, crate::private::Internal);
+                        crate::gpio::InputSignal::$signal.connect_to(&mut self.[< pin_ $pin:lower >]);
                     )+
 
                     private::Instance::set_rx_bit_width( private::WidSel::[< Bits $width >]);
