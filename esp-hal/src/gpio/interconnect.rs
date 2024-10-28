@@ -226,6 +226,15 @@ where
     }
 }
 
+impl<P> From<Flex<'_, P>> for InputSignal
+where
+    P: InputPin,
+{
+    fn from(input: Flex<'_, P>) -> Self {
+        Self::new(input.degrade())
+    }
+}
+
 impl Clone for InputSignal {
     fn clone(&self) -> Self {
         Self {
@@ -285,7 +294,7 @@ impl InputSignal {
     /// time, this function will disconnect any previously connected input
     /// signals.
     fn connect_input_to_peripheral(&mut self, signal: gpio::InputSignal) {
-        connect_pin_to_input_signal(&mut self.pin, signal, self.is_inverted, false);
+        connect_pin_to_input_signal(&mut self.pin, signal, self.is_inverted, true);
     }
 
     delegate::delegate! {
@@ -296,6 +305,41 @@ impl InputSignal {
             pub fn init_input(&self, pull: Pull, _internal: private::Internal);
             pub fn is_input_high(&self, _internal: private::Internal) -> bool;
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
+        }
+    }
+}
+
+struct DirectInputSignal {
+    pin: AnyPin,
+}
+
+impl Clone for DirectInputSignal {
+    fn clone(&self) -> Self {
+        Self::new(unsafe { self.pin.clone_unchecked() })
+    }
+}
+
+impl DirectInputSignal {
+    pub(crate) fn new(pin: AnyPin) -> Self {
+        Self { pin }
+    }
+
+    /// Connect the pin to a peripheral input signal.
+    ///
+    /// Since there can only be one input signal connected to a peripheral at a
+    /// time, this function will disconnect any previously connected input
+    /// signals.
+    fn connect_input_to_peripheral(&mut self, signal: gpio::InputSignal) {
+        connect_pin_to_input_signal(&mut self.pin, signal, false, false);
+    }
+
+    delegate::delegate! {
+        to self.pin {
+            fn pull_direction(&self, pull: Pull, _internal: private::Internal);
+            fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)];
+            fn init_input(&self, pull: Pull, _internal: private::Internal);
+            fn is_input_high(&self, _internal: private::Internal) -> bool;
+            fn enable_input(&mut self, on: bool, _internal: private::Internal);
         }
     }
 }
@@ -313,6 +357,15 @@ where
     P: OutputPin,
 {
     fn from(input: P) -> Self {
+        Self::new(input.degrade())
+    }
+}
+
+impl<P> From<Flex<'_, P>> for OutputSignal
+where
+    P: OutputPin,
+{
+    fn from(input: Flex<'_, P>) -> Self {
         Self::new(input.degrade())
     }
 }
@@ -361,7 +414,7 @@ impl OutputSignal {
 
     /// Connect the pin to a peripheral output signal.
     fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal) {
-        connect_peripheral_to_output(&mut self.pin, signal, self.is_inverted, false, true, false);
+        connect_peripheral_to_output(&mut self.pin, signal, self.is_inverted, true, true, false);
     }
 
     /// Remove this output pin from a connected [signal](`gpio::OutputSignal`).
@@ -396,9 +449,55 @@ impl OutputSignal {
     }
 }
 
+struct DirectOutputSignal {
+    pin: AnyPin,
+}
+
+impl DirectOutputSignal {
+    pub(crate) fn new(pin: AnyPin) -> Self {
+        Self { pin }
+    }
+
+    /// Connect the pin to a peripheral output signal.
+    fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal) {
+        connect_peripheral_to_output(&mut self.pin, signal, false, false, true, false);
+    }
+
+    /// Remove this output pin from a connected [signal](`gpio::OutputSignal`).
+    ///
+    /// Clears the entry in the GPIO matrix / Io mux that associates this output
+    /// pin with a previously connected [signal](`gpio::OutputSignal`). Any
+    /// other outputs connected to the peripheral remain intact.
+    fn disconnect_from_peripheral_output(&mut self, signal: gpio::OutputSignal) {
+        disconnect_peripheral_output_from_pin(&mut self.pin, signal);
+    }
+
+    delegate::delegate! {
+        to self.pin {
+            fn pull_direction(&self, pull: Pull, _internal: private::Internal);
+            fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)];
+            fn init_input(&self, pull: Pull, _internal: private::Internal);
+            fn is_input_high(&self, _internal: private::Internal) -> bool;
+            fn enable_input(&mut self, on: bool, _internal: private::Internal);
+
+            fn output_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::OutputSignal)];
+            fn set_to_open_drain_output(&mut self, _internal: private::Internal);
+            fn set_to_push_pull_output(&mut self, _internal: private::Internal);
+            fn enable_output(&mut self, on: bool, _internal: private::Internal);
+            fn set_output_high(&mut self, on: bool, _internal: private::Internal);
+            fn set_drive_strength(&mut self, strength: gpio::DriveStrength, _internal: private::Internal);
+            fn enable_open_drain(&mut self, on: bool, _internal: private::Internal);
+            fn internal_pull_up_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
+            fn internal_pull_down_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
+            fn is_set_high(&self, _internal: private::Internal) -> bool;
+        }
+    }
+}
+
 #[derive(Clone)]
 enum InputConnectionInner {
     Input(InputSignal),
+    DirectInput(DirectInputSignal),
     Constant(Level),
 }
 
@@ -453,10 +552,19 @@ impl From<OutputSignal> for InputConnection {
     }
 }
 
+impl From<DirectOutputSignal> for InputConnection {
+    fn from(output_signal: DirectOutputSignal) -> Self {
+        Self(InputConnectionInner::DirectInput(DirectInputSignal::new(
+            output_signal.pin,
+        )))
+    }
+}
+
 impl From<OutputConnection> for InputConnection {
     fn from(conn: OutputConnection) -> Self {
         match conn.0 {
             OutputConnectionInner::Output(inner) => inner.into(),
+            OutputConnectionInner::DirectOutput(inner) => inner.into(),
             OutputConnectionInner::Constant(inner) => inner.into(),
         }
     }
@@ -478,6 +586,7 @@ impl InputConnection {
         #[doc(hidden)]
         to match &self.0 {
             InputConnectionInner::Input(pin) => pin,
+            InputConnectionInner::DirectInput(pin) => pin,
             InputConnectionInner::Constant(level) => level,
         } {
             pub fn pull_direction(&self, pull: Pull, _internal: private::Internal);
@@ -489,6 +598,7 @@ impl InputConnection {
         #[doc(hidden)]
         to match &mut self.0 {
             InputConnectionInner::Input(pin) => pin,
+            InputConnectionInner::DirectInput(pin) => pin,
             InputConnectionInner::Constant(level) => level,
         } {
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
@@ -499,6 +609,7 @@ impl InputConnection {
 
 enum OutputConnectionInner {
     Output(OutputSignal),
+    DirectOutput(DirectOutputSignal),
     Constant(Level),
 }
 
@@ -516,6 +627,9 @@ impl Peripheral for OutputConnection {
     unsafe fn clone_unchecked(&self) -> Self::P {
         match self {
             Self(OutputConnectionInner::Output(signal)) => Self::from(signal.clone_unchecked()),
+            Self(OutputConnectionInner::DirectOutput(signal)) => {
+                Self::from(DirectOutputSignal::new(signal.pin.clone_unchecked()))
+            }
             Self(OutputConnectionInner::Constant(level)) => Self::from(*level),
         }
     }
@@ -557,11 +671,18 @@ where
     }
 }
 
+impl From<DirectOutputSignal> for OutputConnection {
+    fn from(signal: DirectOutputSignal) -> Self {
+        Self(OutputConnectionInner::DirectOutput(signal))
+    }
+}
+
 impl OutputConnection {
     delegate::delegate! {
         #[doc(hidden)]
         to match &self.0 {
             OutputConnectionInner::Output(pin) => pin,
+            OutputConnectionInner::DirectOutput(pin) => pin,
             OutputConnectionInner::Constant(level) => level,
         } {
             pub fn is_input_high(&self, _internal: private::Internal) -> bool;
@@ -573,6 +694,7 @@ impl OutputConnection {
         #[doc(hidden)]
         to match &mut self.0 {
             OutputConnectionInner::Output(pin) => pin,
+            OutputConnectionInner::DirectOutput(pin) => pin,
             OutputConnectionInner::Constant(level) => level,
         } {
             pub fn pull_direction(&mut self, pull: Pull, _internal: private::Internal);
