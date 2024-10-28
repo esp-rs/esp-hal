@@ -14,7 +14,6 @@ use enumset::EnumSet;
 
 use super::WifiEvent;
 use crate::{
-    common_adapter::RADIO_CLOCKS,
     compat::{
         common::{
             create_queue,
@@ -1040,7 +1039,8 @@ pub unsafe extern "C" fn phy_update_country_info(
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_reset_mac() {
     trace!("wifi_reset_mac");
-    critical_section::with(|cs| unwrap!(RADIO_CLOCKS.borrow_ref_mut(cs).as_mut()).reset_mac());
+    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
+    radio_clocks.reset_mac();
 }
 
 /// **************************************************************************
@@ -1058,9 +1058,8 @@ pub unsafe extern "C" fn wifi_reset_mac() {
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_clock_enable() {
     trace!("wifi_clock_enable");
-    critical_section::with(|cs| {
-        unwrap!(RADIO_CLOCKS.borrow_ref_mut(cs).as_mut()).enable(RadioPeripherals::Wifi)
-    });
+    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
+    radio_clocks.enable(RadioPeripherals::Wifi);
 }
 
 /// **************************************************************************
@@ -1078,9 +1077,8 @@ pub unsafe extern "C" fn wifi_clock_enable() {
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_clock_disable() {
     trace!("wifi_clock_disable");
-    critical_section::with(|cs| {
-        unwrap!(RADIO_CLOCKS.borrow_ref_mut(cs).as_mut()).disable(RadioPeripherals::Wifi)
-    });
+    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
+    radio_clocks.disable(RadioPeripherals::Wifi);
 }
 
 /// **************************************************************************

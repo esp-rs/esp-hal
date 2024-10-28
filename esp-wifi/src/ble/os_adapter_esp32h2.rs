@@ -1,6 +1,5 @@
 use crate::{
     binary::include::esp_bt_controller_config_t,
-    common_adapter::RADIO_CLOCKS,
     hal::system::{RadioClockController, RadioPeripherals},
 };
 
@@ -66,9 +65,8 @@ pub(crate) static BLE_CONFIG: esp_bt_controller_config_t = esp_bt_controller_con
 };
 
 pub(crate) fn bt_periph_module_enable() {
-    critical_section::with(|cs| {
-        unwrap!(RADIO_CLOCKS.borrow_ref_mut(cs).as_mut()).enable(RadioPeripherals::Bt)
-    });
+    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
+    radio_clocks.enable(RadioPeripherals::Bt);
 }
 
 pub(crate) fn disable_sleep_mode() {
@@ -101,14 +99,14 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
 }
 
 pub(super) fn ble_rtc_clk_init() {
-    critical_section::with(|cs| {
-        unwrap!(RADIO_CLOCKS.borrow_ref_mut(cs).as_mut()).ble_rtc_clk_init()
-    });
+    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
+    radio_clocks.ble_rtc_clk_init();
 }
 
 pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
     trace!("esp_reset_rpa_moudle");
-    critical_section::with(|cs| unwrap!(RADIO_CLOCKS.borrow_ref_mut(cs).as_mut()).reset_rpa());
+    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
+    radio_clocks.reset_rpa();
 }
 
 #[allow(improper_ctypes_definitions)]

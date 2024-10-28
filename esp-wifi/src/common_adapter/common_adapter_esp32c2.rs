@@ -3,7 +3,6 @@ use portable_atomic::{AtomicU32, Ordering};
 use super::phy_init_data::PHY_INIT_DATA_DEFAULT;
 use crate::{
     binary::include::*,
-    common_adapter::RADIO_CLOCKS,
     compat::common::str_from_c,
     hal::system::{RadioClockController, RadioPeripherals},
 };
@@ -114,9 +113,8 @@ fn phy_digital_regs_store() {
 
 pub(crate) unsafe fn phy_enable_clock() {
     trace!("phy_enable_clock");
-    critical_section::with(|cs| {
-        unwrap!(RADIO_CLOCKS.borrow_ref_mut(cs).as_mut()).enable(RadioPeripherals::Phy)
-    });
+    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
+    radio_clocks.enable(RadioPeripherals::Phy);
 
     trace!("phy_enable_clock done!");
 }
@@ -124,9 +122,8 @@ pub(crate) unsafe fn phy_enable_clock() {
 #[allow(unused)]
 pub(crate) unsafe fn phy_disable_clock() {
     trace!("phy_disable_clock");
-    critical_section::with(|cs| {
-        unwrap!(RADIO_CLOCKS.borrow_ref_mut(cs).as_mut()).disable(RadioPeripherals::Phy)
-    });
+    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
+    radio_clocks.disable(RadioPeripherals::Phy);
 
     trace!("phy_disable_clock done!");
 }
