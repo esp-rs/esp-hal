@@ -296,7 +296,7 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
 pub(crate) unsafe extern "C" fn interrupt_on(intr_num: i32) -> i32 {
     trace!("interrupt_on {}", intr_num);
     unwrap!(interrupt::enable(
-        unwrap!(Interrupt::try_from(intr_num as u16)),
+        Interrupt::try_from(intr_num as u16).unwrap(),
         interrupt::Priority::Priority1,
     ));
 
@@ -307,7 +307,7 @@ pub(crate) unsafe extern "C" fn interrupt_off(intr_num: i32) -> i32 {
     trace!("interrupt_off {}", intr_num);
     interrupt::disable(
         crate::hal::Cpu::ProCpu,
-        unwrap!(Interrupt::try_from(intr_num as u16)),
+        Interrupt::try_from(intr_num as u16).unwrap(),
     );
 
     0

@@ -20,7 +20,6 @@ use esp_println::println;
 use esp_wifi::{
     esp_now::{PeerInfo, BROADCAST_ADDRESS},
     init,
-    EspWifiController,
 };
 
 #[entry]
