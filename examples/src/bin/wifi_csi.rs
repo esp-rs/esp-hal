@@ -99,7 +99,7 @@ fn main() -> ! {
     println!("{:?}", controller.get_capabilities());
     println!("wifi_connect {:?}", controller.connect());
 
-    // // wait to get connected
+    // wait to get connected
     println!("Wait to get connected");
     loop {
         match controller.is_connected() {
