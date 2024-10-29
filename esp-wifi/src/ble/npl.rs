@@ -918,9 +918,10 @@ unsafe extern "C" fn ble_npl_eventq_deinit(queue: *const ble_npl_eventq) {
     let queue = queue.cast_mut();
     core::assert!((*queue).dummy != 0);
 
-    let raw_queue = (*queue).dummy as *mut ConcurrentQueue;
-    (*raw_queue).release_storage();
-    crate::compat::malloc::free(raw_queue.cast());
+    let real_queue = (*queue).dummy as *mut ConcurrentQueue;
+    unsafe {
+        core::ptr::drop_in_place(real_queue);
+    }
     (*queue).dummy = 0;
 }
 

@@ -177,9 +177,8 @@ unsafe extern "C" fn queue_delete(queue: *const ()) {
     trace!("queue_delete {:?}", queue);
 
     let queue = queue as *mut ConcurrentQueue;
-    (*queue).release_storage();
     unsafe {
-        crate::compat::malloc::free(queue.cast());
+        core::ptr::drop_in_place(queue);
     }
 }
 

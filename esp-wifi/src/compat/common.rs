@@ -4,7 +4,7 @@ use core::{
     cell::RefCell,
     fmt::Write,
     mem::size_of_val,
-    ptr::{addr_of, addr_of_mut},
+    ptr::{self, addr_of, addr_of_mut},
 };
 
 use esp_wifi_sys::include::malloc;
@@ -37,7 +37,7 @@ impl ConcurrentQueue {
         }
     }
 
-    pub(crate) fn release_storage(&mut self) {
+    fn release_storage(&mut self) {
         critical_section::with(|cs| unsafe {
             self.raw_queue.borrow_ref_mut(cs).release_storage();
         })
@@ -60,8 +60,16 @@ impl ConcurrentQueue {
     }
 }
 
+impl Drop for ConcurrentQueue {
+    fn drop(&mut self) {
+        self.release_storage();
+    }
+}
+
 /// A naive and pretty much unsafe queue to back the queues used in drivers and
-/// supplicant code
+/// supplicant code.
+///
+/// The [ConcurrentQueue] wrapper should be used.
 pub struct RawQueue {
     capacity: usize,
     item_size: usize,
@@ -71,6 +79,7 @@ pub struct RawQueue {
 }
 
 impl RawQueue {
+    /// This allocates underlying storage. See [release_storage]
     pub fn new(capacity: usize, item_size: usize) -> Self {
         let storage = unsafe { malloc((capacity * item_size) as u32) as *mut u8 };
         core::assert!(!storage.is_null());
@@ -84,6 +93,7 @@ impl RawQueue {
         }
     }
 
+    /// Call `release_storage` to deallocate the underlying storage
     unsafe fn release_storage(&mut self) {
         unsafe {
             free(self.storage);
@@ -333,8 +343,7 @@ pub(crate) fn delete_queue(queue: *mut c_void) {
 
     let queue: *mut ConcurrentQueue = queue.cast();
     unsafe {
-        (*queue).release_storage();
-        free(queue.cast());
+        ptr::drop_in_place(queue);
     }
 }
 
