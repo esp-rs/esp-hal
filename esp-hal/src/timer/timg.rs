@@ -1082,6 +1082,11 @@ where
     }
 
     /// Set the stage action of the MWDT for a specific stage.
+    ///
+    /// This function modifies MWDT behavior only if a custom bootloader with
+    /// the following modifications is used:
+    /// - `ESP_TASK_WDT_EN` parameter **disabled**
+    /// - `ESP_INT_WDT` parameter **disabled**
     pub fn set_stage_action(
         &mut self,
         stage: usize,

@@ -915,14 +915,12 @@ impl Rwdt {
         rtc_cntl.wdtwprotect().write(|w| unsafe { w.bits(wkey) });
     }
 
-        let rtc_cntl = unsafe { lpwr() };
-        let rtc_cntl = unsafe { lp_wdt() };
     fn set_enabled(&mut self, enable: bool) {
         let rtc_cntl = unsafe { lp_wdt() };
 
         self.set_write_protection(false);
 
-        if !enabled {
+        if !enable {
             rtc_cntl.wdtconfig0().modify(|_, w| unsafe { w.bits(0) });
         } else {
             rtc_cntl
@@ -931,7 +929,7 @@ impl Rwdt {
 
             rtc_cntl
                 .wdtconfig0()
-                .modify(|_, w| w.wdt_en().bit(enabled).wdt_pause_in_slp().bit(enabled));
+                .modify(|_, w| w.wdt_en().bit(enable).wdt_pause_in_slp().bit(enable));
 
             // Apply default settings for WDT
             unsafe {
