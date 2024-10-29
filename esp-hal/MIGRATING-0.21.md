@@ -162,7 +162,7 @@ You can now listen/unlisten multiple interrupt bits at once:
 ```˛
 ## Circular DMA transfer's `available` returns `Result<usize, DmaError>` now
 
-In case of any error you should drop the transfer and re-create it.
+In case of any error you should drop the transfer and restart it.
 
 ```diff
      loop {
