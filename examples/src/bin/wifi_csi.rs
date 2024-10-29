@@ -28,7 +28,7 @@ use esp_wifi::{
         AccessPointInfo,
         ClientConfiguration,
         Configuration,
-        CsiConfiguration,
+        CsiConfig,
         WifiError,
         WifiStaDevice,
     },
@@ -79,7 +79,7 @@ fn main() -> ! {
     controller.start().unwrap();
     println!("is wifi started: {:?}", controller.is_started());
 
-    let csi = CsiConfiguration::default();
+    let csi = CsiConfig::default();
     controller
         .set_csi(csi, |data| {
             let rx_ctrl = data.rx_ctrl;

@@ -362,7 +362,7 @@ unsafe extern "C" fn promiscuous_csi_rx_cb(
 // https://github.com/esp-rs/esp-wifi-sys/blob/main/esp-wifi-sys/headers/local/esp_wifi_types_native.h#L94
 /// Channel state information(CSI) configuration
 #[cfg(not(esp32c6))]
-pub struct CsiConfiguration {
+pub struct CsiConfig {
     /// Enable to receive legacy long training field(lltf) data.
     pub lltf_en: bool,
     /// Enable to receive HT long training field(htltf) data.
@@ -388,7 +388,7 @@ pub struct CsiConfiguration {
 }
 #[cfg(esp32c6)]
 // See https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/src/include/esp32c6.rs#L5702-L5705
-pub struct CsiConfiguration {
+pub struct CsiConfig {
     pub enable: u32,
     pub acquire_csi_legacy: u32,
     pub acquire_csi_ht20: u32,
@@ -403,7 +403,7 @@ pub struct CsiConfiguration {
     pub reserved: u32,
 }
 
-impl Default for CsiConfiguration {
+impl Default for CsiConfig {
     #[cfg(not(esp32c6))]
     fn default() -> Self {
         Self {
@@ -438,7 +438,7 @@ impl Default for CsiConfiguration {
     }
 }
 
-impl CsiConfiguration {
+impl CsiConfig {
     /// Set CSI data configuration
     pub(crate) fn apply_config(&self) -> Result<(), WifiError> {
         #[cfg(not(esp32c6))]
@@ -2704,7 +2704,7 @@ impl<'d> WifiController<'d> {
     /// Set CSI configuration and registers the receiving callback.
     pub fn set_csi(
         &mut self,
-        mut csi: CsiConfiguration,
+        mut csi: CsiConfig,
         cb: fn(crate::binary::include::wifi_csi_info_t),
     ) -> Result<(), WifiError> {
         csi.apply_config().unwrap();

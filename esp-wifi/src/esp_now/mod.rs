@@ -21,7 +21,7 @@ use crate::config::PowerSaveMode;
 use crate::{
     binary::include::*,
     hal::peripheral::{Peripheral, PeripheralRef},
-    wifi::{CsiConfiguration, Protocol, RxControlInfo, WifiError},
+    wifi::{CsiConfig, Protocol, RxControlInfo, WifiError},
     EspWifiInitialization,
 };
 
@@ -372,7 +372,7 @@ impl EspNowManager<'_> {
     /// Set CSI configuration and registers the receiving callback.
     pub fn set_csi(
         &mut self,
-        mut csi: CsiConfiguration,
+        mut csi: CsiConfig,
         cb: fn(crate::binary::include::wifi_csi_info_t),
     ) -> Result<(), EspNowError> {
         csi.apply_config().unwrap();
