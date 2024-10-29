@@ -231,7 +231,7 @@ The previous signal function have been replaced by `split`. This change affects 
 `into_peripheral_output`, `split` (for output pins only) and `peripheral_input` have been added to
 the GPIO drivers (`Input`, `Output`, `OutputOpenDrain` and `Flex`) instead.
 
-# ETM simplifications
+## ETM changes
 
 - The types are no longer prefixed with `GpioEtm`, `TimerEtm` or `SysTimerEtm`. You can still use
   import aliasses in case you need to differentiate due to name collisions
