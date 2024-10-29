@@ -1,9 +1,7 @@
 use alloc::boxed::Box;
-use core::{
-    mem::size_of_val,
-    ptr::{addr_of, addr_of_mut},
-};
+use core::ptr::{addr_of, addr_of_mut};
 
+use esp_wifi_sys::c_types::c_void;
 use portable_atomic::{AtomicBool, Ordering};
 
 use super::ReceivedPacket;
@@ -14,9 +12,8 @@ use crate::{
         HciOutCollector,
         HCI_OUT_COLLECTOR,
     },
-    compat::common::{str_from_c, ConcurrentQueue},
+    compat::common::str_from_c,
     hal::macros::ram,
-    timer::yield_task,
 };
 
 #[cfg_attr(esp32c3, path = "os_adapter_esp32c3.rs")]
@@ -162,37 +159,17 @@ unsafe extern "C" fn mutex_unlock(_mutex: *const ()) -> i32 {
 }
 
 unsafe extern "C" fn queue_create(len: u32, item_size: u32) -> *const () {
-    trace!("queue create {} {}", len, item_size);
-    let raw_queue = ConcurrentQueue::new(len as usize, item_size as usize);
-    let ptr =
-        unsafe { crate::compat::malloc::malloc(size_of_val(&raw_queue)) as *mut ConcurrentQueue };
-    unsafe {
-        ptr.write(raw_queue);
-    }
-
+    let ptr = crate::compat::common::create_queue(len as i32, item_size as i32);
     ptr.cast()
 }
 
 unsafe extern "C" fn queue_delete(queue: *const ()) {
-    trace!("queue_delete {:?}", queue);
-
-    let queue = queue as *mut ConcurrentQueue;
-    unsafe {
-        core::ptr::drop_in_place(queue);
-    }
+    crate::compat::common::delete_queue(queue as *mut c_void)
 }
 
 #[ram]
-unsafe extern "C" fn queue_send(queue: *const (), item: *const (), _block_time_ms: u32) -> i32 {
-    trace!(
-        "queue_send {:x} {:x} {}",
-        queue as u32,
-        item as u32,
-        _block_time_ms
-    );
-
-    let queue = queue as *mut ConcurrentQueue;
-    (*queue).enqueue(item as *mut _)
+unsafe extern "C" fn queue_send(queue: *const (), item: *const (), block_time_ms: u32) -> i32 {
+    crate::compat::common::send_queued(queue as *mut c_void, item as *mut c_void, block_time_ms)
 }
 
 #[ram]
@@ -208,29 +185,7 @@ unsafe extern "C" fn queue_send_from_isr(
 }
 
 unsafe extern "C" fn queue_recv(queue: *const (), item: *const (), block_time_ms: u32) -> i32 {
-    trace!(
-        "queue_recv {:?} item {:?} block_time_tick {}",
-        queue,
-        item,
-        block_time_ms
-    );
-
-    let forever = block_time_ms == crate::compat::common::OSI_FUNCS_TIME_BLOCKING;
-    let start = crate::timer::get_systimer_count();
-    let block_ticks = crate::timer::millis_to_ticks(block_time_ms as u64);
-
-    let item = item as *mut _;
-
-    let queue = queue as *mut ConcurrentQueue;
-    loop {
-        if (*queue).try_dequeue(item) {
-            trace!("received from queue - return");
-            return 1;
-        } else if !forever && crate::timer::elapsed_time_since(start) > block_ticks {
-            return 0;
-        }
-        yield_task();
-    }
+    crate::compat::common::receive_queued(queue as *mut c_void, item as *mut c_void, block_time_ms)
 }
 
 #[ram]

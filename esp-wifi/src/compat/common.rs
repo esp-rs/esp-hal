@@ -344,6 +344,7 @@ pub(crate) fn delete_queue(queue: *mut c_void) {
     let queue: *mut ConcurrentQueue = queue.cast();
     unsafe {
         ptr::drop_in_place(queue);
+        crate::compat::malloc::free(queue.cast());
     }
 }
 
