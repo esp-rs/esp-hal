@@ -374,7 +374,7 @@ impl EspNowManager<'_> {
         &mut self,
         mut csi: CsiConfig,
         cb: fn(crate::binary::include::wifi_csi_info_t),
-    ) -> Result<(), EspNowError> {
+    ) -> Result<(), WifiError> {
         csi.apply_config()?;
         csi.set_receive_cb(cb)?;
         csi.set_csi(true)?;
