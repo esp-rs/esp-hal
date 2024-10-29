@@ -1957,9 +1957,7 @@ mod asynch {
             // If the error comes from Tx and Tx request is pending
             if !ecc_direction && !status.tx_buf_st().bit_is_set() {
                 // Cancel a pending transmission request
-                register_block.cmd().write(|w| {
-                    w.abort_tx().set_bit()
-                });
+                register_block.cmd().write(|w| w.abort_tx().set_bit());
             }
             async_state.err_waker.wake();
         }
