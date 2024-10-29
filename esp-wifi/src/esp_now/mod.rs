@@ -61,28 +61,28 @@ macro_rules! check_error {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     /// ESP-NOW is not initialized.
-    NotInitialized = 12389,
+    NotInitialized  = 12389,
 
     /// Invalid argument.
     InvalidArgument = 12390,
 
     /// Indicates that there was insufficient memory to complete the operation.
-    OutOfMemory = 12391,
+    OutOfMemory     = 12391,
 
     /// ESP-NOW peer list is full.
-    PeerListFull = 12392,
+    PeerListFull    = 12392,
 
     /// ESP-NOW peer is not found.
-    NotFound = 12393,
+    NotFound        = 12393,
 
     /// Internal error.
-    InternalError = 12394,
+    InternalError   = 12394,
 
     /// ESP-NOW peer already exists.
-    PeerExists = 12395,
+    PeerExists      = 12395,
 
     /// Interface error.
-    InterfaceError = 12396,
+    InterfaceError  = 12396,
 
     /// Represents any other error not covered by the above variants, with an
     /// associated error code.
