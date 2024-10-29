@@ -18,7 +18,7 @@ use esp_hal::{
         Pull,
     },
     prelude::*,
-    timer::systimer::{etm::SysTimerEtmEvent, Periodic, SystemTimer},
+    timer::systimer::{etm::Event, Periodic, SystemTimer},
 };
 use fugit::ExtU32;
 
@@ -45,7 +45,7 @@ fn main() -> ! {
         },
     );
 
-    let timer_event = SysTimerEtmEvent::new(&mut alarm0);
+    let timer_event = Event::new(&mut alarm0);
 
     let etm = Etm::new(peripherals.SOC_ETM);
     let channel0 = etm.channel0;

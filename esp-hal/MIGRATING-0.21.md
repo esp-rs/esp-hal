@@ -231,6 +231,14 @@ The previous signal function have been replaced by `split`. This change affects 
 `into_peripheral_output`, `split` (for output pins only) and `peripheral_input` have been added to
 the GPIO drivers (`Input`, `Output`, `OutputOpenDrain` and `Flex`) instead.
 
+# ETM simplifications
+
+- The types are no longer prefixed with `GpioEtm`, `TimerEtm` or `SysTimerEtm`. You can still use
+  import aliasses in case you need to differentiate due to name collisions
+  (e.g. `use esp_hal::gpio::etm::Event as GpioEtmEvent`).
+- The old task and event types have been replaced by `Task` and `Event`.
+- GPIO tasks and events are no longer generic.
+
 ## Changes to peripheral configuration
 
 ### The `uart::config` module has been removed
