@@ -11,7 +11,8 @@
 use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::{interconnect::InputSignal, Input, Io, Level, Output, Pull},
+    gpio::{Input, Io, Level, Output, Pull},
+    peripheral::Peripheral,
     spi::{slave::Spi, SpiMode},
     Blocking,
 };
@@ -34,7 +35,7 @@ struct Context {
 struct BitbangSpi {
     sclk: Output<'static>,
     mosi: Output<'static>,
-    miso: InputSignal,
+    miso: Input<'static>,
     cs: Output<'static>,
 }
 
@@ -42,13 +43,9 @@ impl BitbangSpi {
     fn new(
         sclk: Output<'static>,
         mosi: Output<'static>,
-        mut miso: InputSignal, // TODO use Input<'static>
+        miso: Input<'static>,
         cs: Output<'static>,
     ) -> Self {
-        // TODO remove this (#2273)
-        // FIXME: devise a public API for signals
-        miso.enable_input(true, unsafe { esp_hal::Internal::conjure() });
-
         Self {
             sclk,
             mosi,
@@ -130,8 +127,7 @@ mod tests {
         let cs = cs_gpio.peripheral_input();
         let sclk = sclk_gpio.peripheral_input();
         let mosi = mosi_gpio.peripheral_input();
-        // let miso = unsafe { miso_gpio.clone_unchecked() }.into_peripheral_output();
-        let (miso_gpio, miso) = miso_gpio.split();
+        let miso = unsafe { miso_gpio.clone_unchecked() }.into_peripheral_output();
 
         Context {
             spi: Spi::new(peripherals.SPI2, sclk, mosi, miso, cs, SpiMode::Mode1),
