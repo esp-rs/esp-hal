@@ -386,6 +386,8 @@ pub struct CsiConfig {
     /// Enable to dump 802.11 ACK frame.
     pub dump_ack_en: bool,
 }
+
+#[derive(Clone, PartialEq, Eq)]
 #[cfg(esp32c6)]
 // See https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/src/include/esp32c6.rs#L5702-L5705
 pub struct CsiConfig {
@@ -450,38 +452,49 @@ impl Default for CsiConfig {
     }
 }
 
+impl From<CsiConfig> for crate::include::wifi_csi_config_t {
+    fn from(config: CsiConfig) -> Self {
+        #[cfg(not(esp32c6))]
+        {
+            crate::include::wifi_csi_config_t {
+                lltf_en: config.lltf_en,
+                htltf_en: config.htltf_en,
+                stbc_htltf2_en: config.stbc_htltf2_en,
+                ltf_merge_en: config.ltf_merge_en,
+                channel_filter_en: config.channel_filter_en,
+                manu_scale: config.manu_scale,
+                shift: config.shift,
+                dump_ack_en: config.dump_ack_en,
+            }
+        }
+        #[cfg(esp32c6)]
+        {
+            crate::include::wifi_csi_acquire_config_t {
+                _bitfield_align_1: [0; 0],
+                _bitfield_1: crate::include::wifi_csi_acquire_config_t::new_bitfield_1(
+                    config.enable,
+                    config.acquire_csi_legacy,
+                    config.acquire_csi_ht20,
+                    config.acquire_csi_ht40,
+                    config.acquire_csi_su,
+                    config.acquire_csi_mu,
+                    config.acquire_csi_dcm,
+                    config.acquire_csi_beamformed,
+                    config.acquire_csi_he_stbc,
+                    config.val_scale_cfg,
+                    config.dump_ack_en,
+                    config.reserved,
+                ),
+            }
+        }
+    }
+}
+
 impl CsiConfig {
     /// Set CSI data configuration
     pub(crate) fn apply_config(&self) -> Result<(), WifiError> {
-        #[cfg(not(esp32c6))]
-        let conf = crate::include::wifi_csi_config_t {
-            lltf_en: self.lltf_en,
-            htltf_en: self.htltf_en,
-            stbc_htltf2_en: self.stbc_htltf2_en,
-            ltf_merge_en: self.ltf_merge_en,
-            channel_filter_en: self.channel_filter_en,
-            manu_scale: self.manu_scale,
-            shift: self.shift,
-            dump_ack_en: self.dump_ack_en,
-        };
-        #[cfg(esp32c6)]
-        let conf = include::wifi_csi_acquire_config_t {
-            _bitfield_align_1: [0; 0],
-            _bitfield_1: include::wifi_csi_acquire_config_t::new_bitfield_1(
-                self.enable,
-                self.acquire_csi_legacy,
-                self.acquire_csi_ht20,
-                self.acquire_csi_ht40,
-                self.acquire_csi_su,
-                self.acquire_csi_mu,
-                self.acquire_csi_dcm,
-                self.acquire_csi_beamformed,
-                self.acquire_csi_he_stbc,
-                self.val_scale_cfg,
-                self.dump_ack_en,
-                self.reserved,
-            ),
-        };
+        // let conf = self.clone().into();
+        let conf: crate::include::wifi_csi_config_t = self.clone().into();
 
         unsafe {
             esp_wifi_result!(esp_wifi_set_csi_config(&conf))?;
