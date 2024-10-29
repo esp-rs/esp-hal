@@ -91,7 +91,6 @@ use crate::binary::{
         esp_err_t,
         esp_interface_t_ESP_IF_WIFI_AP,
         esp_interface_t_ESP_IF_WIFI_STA,
-        esp_supplicant_deinit,
         esp_supplicant_init,
         esp_wifi_connect,
         esp_wifi_disconnect,
@@ -407,7 +406,9 @@ pub struct CsiConfig {
     pub acquire_csi_dcm: u32,
     /// Enable to acquire HE-LTF when receiving an HE20 Beamformed applied PPDU.
     pub acquire_csi_beamformed: u32,
-    /// Wwhen receiving an STBC applied HE PPDU, 0- acquire the complete HE-LTF1,  1- acquire the complete HE-LTF2, 2- sample evenly among the HE-LTF1 and HE-LTF2.
+    /// Wwhen receiving an STBC applied HE PPDU, 0- acquire the complete
+    /// HE-LTF1,  1- acquire the complete HE-LTF2, 2- sample evenly among the
+    /// HE-LTF1 and HE-LTF2.
     pub acquire_csi_he_stbc: u32,
     /// Vvalue 0-3.
     pub val_scale_cfg: u32,
