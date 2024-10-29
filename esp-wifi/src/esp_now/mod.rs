@@ -369,7 +369,7 @@ impl EspNowManager<'_> {
         check_error!({ esp_now_add_peer(&raw_peer as *const _) })
     }
 
-    /// Set CSI configuration and registers the receiving callback.
+    /// Set CSI configuration and register the receiving callback.
     pub fn set_csi(
         &mut self,
         mut csi: CsiConfig,
