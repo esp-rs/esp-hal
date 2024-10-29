@@ -5,6 +5,7 @@ use crate::{
         self,
         AlternateFunction,
         AnyPin,
+        Flex,
         InputPin,
         Level,
         NoPin,
@@ -34,21 +35,28 @@ pub trait PeripheralInput: Into<InputConnection> + 'static {}
 /// [`PeripheralInput`] as arguments instead of pin types.
 pub trait PeripheralOutput: Into<OutputConnection> + 'static {}
 
+// Pins
 impl<P: InputPin> PeripheralInput for P {}
 impl<P: OutputPin> PeripheralOutput for P {}
 
-impl PeripheralInput for InputSignal {}
-impl PeripheralInput for OutputSignal {}
-impl PeripheralOutput for OutputSignal {}
+// Pin drivers
+impl<P: InputPin> PeripheralInput for Flex<'static, P> {}
+impl<P: OutputPin> PeripheralOutput for Flex<'static, P> {}
 
+// Placeholders
 impl PeripheralInput for NoPin {}
 impl PeripheralOutput for NoPin {}
 
 impl PeripheralInput for Level {}
 impl PeripheralOutput for Level {}
 
-impl PeripheralInput for InputConnection {}
+// Split signals
+impl PeripheralInput for InputSignal {}
+impl PeripheralInput for OutputSignal {}
+impl PeripheralOutput for OutputSignal {}
 
+// Type-erased signals
+impl PeripheralInput for InputConnection {}
 impl PeripheralInput for OutputConnection {}
 impl PeripheralOutput for OutputConnection {}
 
@@ -480,6 +488,15 @@ impl From<OutputConnection> for InputConnection {
     }
 }
 
+impl<P> From<Flex<'static, P>> for InputConnection
+where
+    P: InputPin,
+{
+    fn from(pin: Flex<'static, P>) -> Self {
+        pin.peripheral_input().into()
+    }
+}
+
 impl Sealed for InputConnection {}
 
 impl InputConnection {
@@ -556,6 +573,15 @@ where
 impl From<OutputSignal> for OutputConnection {
     fn from(signal: OutputSignal) -> Self {
         Self(OutputConnectionInner::Output(signal))
+    }
+}
+
+impl<P> From<Flex<'static, P>> for OutputConnection
+where
+    P: OutputPin,
+{
+    fn from(pin: Flex<'static, P>) -> Self {
+        pin.into_peripheral_output().into()
     }
 }
 

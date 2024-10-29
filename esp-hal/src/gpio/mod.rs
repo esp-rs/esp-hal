@@ -1115,9 +1115,9 @@ pub struct Output<'d, P = AnyPin> {
 
 impl<P> private::Sealed for Output<'_, P> {}
 
-impl<P> Peripheral for Output<'_, P> {
-    type P = P;
-    unsafe fn clone_unchecked(&self) -> P {
+impl<'d, P> Peripheral for Output<'d, P> {
+    type P = Flex<'d, P>;
+    unsafe fn clone_unchecked(&self) -> Self::P {
         self.pin.clone_unchecked()
     }
 }
@@ -1229,9 +1229,9 @@ pub struct Input<'d, P = AnyPin> {
 
 impl<P> private::Sealed for Input<'_, P> {}
 
-impl<P> Peripheral for Input<'_, P> {
-    type P = P;
-    unsafe fn clone_unchecked(&self) -> P {
+impl<'d, P> Peripheral for Input<'d, P> {
+    type P = Flex<'d, P>;
+    unsafe fn clone_unchecked(&self) -> Self::P {
         self.pin.clone_unchecked()
     }
 }
@@ -1350,9 +1350,9 @@ pub struct OutputOpenDrain<'d, P = AnyPin> {
 
 impl<P> private::Sealed for OutputOpenDrain<'_, P> {}
 
-impl<P> Peripheral for OutputOpenDrain<'_, P> {
-    type P = P;
-    unsafe fn clone_unchecked(&self) -> P {
+impl<'d, P> Peripheral for OutputOpenDrain<'d, P> {
+    type P = Flex<'d, P>;
+    unsafe fn clone_unchecked(&self) -> Self::P {
         self.pin.clone_unchecked()
     }
 }
@@ -1498,10 +1498,12 @@ pub struct Flex<'d, P = AnyPin> {
 
 impl<P> private::Sealed for Flex<'_, P> {}
 
-impl<P> Peripheral for Flex<'_, P> {
-    type P = P;
-    unsafe fn clone_unchecked(&self) -> P {
-        core::ptr::read(&*self.pin as *const _)
+impl<'d, P> Peripheral for Flex<'d, P> {
+    type P = Self;
+    unsafe fn clone_unchecked(&self) -> Self::P {
+        Self {
+            pin: PeripheralRef::new(core::ptr::read(&*self.pin as *const P)),
+        }
     }
 }
 
@@ -1706,6 +1708,42 @@ where
     #[inline]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
         self.split().1
+    }
+}
+
+// Unfortunate implementation details responsible for:
+// - making pin drivers work with the peripheral signal system
+// - making the pin drivers work with the sleep API
+impl<P: Pin> Pin for Flex<'_, P> {
+    delegate::delegate! {
+        to self.pin {
+            fn number(&self) -> u8;
+            fn degrade_pin(&self, _internal: private::Internal) -> AnyPin;
+            fn output_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, OutputSignal)];
+            fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, InputSignal)];
+            fn gpio_bank(&self, _internal: private::Internal) -> GpioRegisterAccess;
+        }
+    }
+}
+impl<P: RtcPin> RtcPin for Flex<'_, P> {
+    delegate::delegate! {
+        to self.pin {
+            #[cfg(xtensa)]
+            fn rtc_number(&self) -> u8;
+            #[cfg(any(xtensa, esp32c6))]
+            fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: RtcFunction);
+            fn rtcio_pad_hold(&mut self, enable: bool);
+            #[cfg(any(esp32c3, esp32c2, esp32c6))]
+            unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8);
+        }
+    }
+}
+impl<P: RtcPinWithResistors> RtcPinWithResistors for Flex<'_, P> {
+    delegate::delegate! {
+        to self.pin {
+            fn rtcio_pullup(&mut self, enable: bool);
+            fn rtcio_pulldown(&mut self, enable: bool);
+        }
     }
 }
 

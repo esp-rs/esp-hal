@@ -34,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GPIO ETM tasks and events now accept `InputSignal` and `OutputSignal` (#2427)
 - `spi::master::Config` and `{Spi, SpiDma, SpiDmaBus}::apply_config` (#2448)
 - `embassy_embedded_hal::SetConfig` is now implemented for `{Spi, SpiDma, SpiDmaBus}` (#2448)
+- `gpio::{GpioPin, AnyPin, Flex, Input, Output, OutputOpenDrain}::split()` to obtain peripheral interconnect signals. (#2418)
+- `gpio::{GpioPin, AnyPin, Flex, Output, OutputOpenDrain}::split()` to obtain peripheral interconnect signals. (#2418)
+- `gpio::Input::{split, into_peripheral_ouptut}` when the underlying pin is an output. (#2418)
+- Added missing `gpio::Output::input_signal()`. (#2418)
 
 ### Changed
 
