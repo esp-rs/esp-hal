@@ -15,12 +15,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AnyPin` now implements `From<GpioPin<N>>`. (#2326)
 - Added `AnySpi` and `AnySpiDmaChannel`. (#2334)
 - Added `AnyI2s` and `AnyI2sDmaChannel`. (#2367)
+- Added `AnyTwai`. (#2359)
+- Added `AnyUart`. (#2381)
 - `Pins::steal()` to unsafely obtain GPIO. (#2335)
+- `I2c::with_timeout` (#2361)
+- `Spi::half_duplex_read` and `Spi::half_duplex_write` (#2373)
+- `Cpu::COUNT` and `Cpu::current()` (#2411)
+- `UartInterrupt` and related functions (#2406)
 
 ### Changed
 
 - Peripheral type erasure for SPI (#2334)
 - Peripheral type erasure for I2S (#2367)
+- Peripheral type erasure for I2C (#2361)
+- Peripheral type erasure for TWAI (#2359)
+- The SPI driver has been rewritten to allow using half-duplex and full-duplex functionality on the same bus. See the migration guide for details. (#2373)
+- Renamed `SpiDma` functions: `dma_transfer` to `transfer`, `dma_write` to `write`, `dma_read` to `read`. (#2373)
+- Peripheral type erasure for UART (#2381)
+- Changed listening for UART events (#2406)
 
 ### Fixed
 
@@ -31,6 +43,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `i2s::{I2sWrite, I2sWriteDma, I2sRead, I2sReadDma, I2sWriteDmaAsync, I2sReadDmaAsync}` traits have been removed. (#2316)
 - The `ledc::ChannelHW` trait is no longer generic. (#2387)
+- The `I2c::new_with_timeout` constructors have been removed (#2361)
+- The `spi::master::HalfDuplexReadWrite` trait has been removed. (#2373)
+- The `Spi::with_pins` methods have been removed. (#2373)
+- The `Spi::new_half_duplex` constructor have been removed. (#2373)
+- The `HalfDuplexMode` and `FullDuplexMode` parameters have been removed from `Spi`. (#2373)
+- Removed the output pin type parameter from `ledc::{Channel, ChannelIFace}` (#2388)
+- Removed the output pin type parameter from `mcpwm::operator::{PwmPin, LinkedPins}` (#2388)
+- Removed the output pin type parameter from `parl_io::{ClkOutPin, ClkInPin, RxClkInPin}` (#2388)
+- Removed the valid pin type parameter from `parl_io::{TxPinConfigWithValidPin, RxPinConfigWithValidPin}` (#2388)
+- Removed the pin type parameters from `parl_io::{TxOneBit, TxTwoBits, TxFourBits, TxEightBits, TxSixteenBits}` (#2388)
+- Removed the pin type parameters from `parl_io::{RxOneBit, RxTwoBits, RxFourBits, RxEightBits, RxSixteenBits}` (#2388)
+- Removed the pin type parameters from `lcd_cam::lcd::i8080::{TxEightBits, TxSixteenBits}` (#2388)
+- Removed the pin type parameters from `lcd_cam::cam::{RxEightBits, RxSixteenBits}` (#2388)
 
 ## [0.21.1]
 

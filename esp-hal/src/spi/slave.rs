@@ -48,7 +48,7 @@
 //! let mut send = tx_buffer;
 //!
 //! let transfer = spi
-//!     .dma_transfer(&mut receive, &mut send)
+//!     .transfer(&mut receive, &mut send)
 //!     .unwrap();
 //!
 //! transfer.wait().unwrap();
@@ -69,12 +69,15 @@
 //! `is_done()`.
 //!
 //! See [tracking issue](https://github.com/esp-rs/esp-hal/issues/469) for more information.
-use core::marker::PhantomData;
 
-use super::{Error, FullDuplexMode, SpiMode};
+use super::{Error, SpiMode};
 use crate::{
     dma::{DescriptorChain, DmaChannelConvert, DmaEligible, PeripheralMarker, Rx, Tx},
-    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput},
+    gpio::{
+        interconnect::{PeripheralInput, PeripheralOutput},
+        InputSignal,
+        OutputSignal,
+    },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
     private,
@@ -87,14 +90,13 @@ const MAX_DMA_SIZE: usize = 32768 - 32;
 /// SPI peripheral driver.
 ///
 /// See the [module-level documentation][self] for more details.
-pub struct Spi<'d, M, T = AnySpi> {
+pub struct Spi<'d, T = AnySpi> {
     spi: PeripheralRef<'d, T>,
     #[allow(dead_code)]
     data_mode: SpiMode,
-    _mode: PhantomData<M>,
 }
 
-impl<'d> Spi<'d, FullDuplexMode> {
+impl<'d> Spi<'d> {
     /// Constructs an SPI instance in 8bit dataframe mode.
     pub fn new<
         SCK: PeripheralInput,
@@ -102,18 +104,18 @@ impl<'d> Spi<'d, FullDuplexMode> {
         MISO: PeripheralOutput,
         CS: PeripheralInput,
     >(
-        spi: impl Peripheral<P = impl Into<AnySpi> + 'd> + 'd,
+        spi: impl Peripheral<P = impl Instance> + 'd,
         sclk: impl Peripheral<P = SCK> + 'd,
         mosi: impl Peripheral<P = MOSI> + 'd,
         miso: impl Peripheral<P = MISO> + 'd,
         cs: impl Peripheral<P = CS> + 'd,
         mode: SpiMode,
-    ) -> Spi<'d, FullDuplexMode> {
-        Self::new_typed(spi, sclk, mosi, miso, cs, mode)
+    ) -> Spi<'d> {
+        Self::new_typed(spi.map_into(), sclk, mosi, miso, cs, mode)
     }
 }
 
-impl<'d, T> Spi<'d, FullDuplexMode, T>
+impl<'d, T> Spi<'d, T>
 where
     T: Instance,
 {
@@ -124,14 +126,14 @@ where
         MISO: PeripheralOutput,
         CS: PeripheralInput,
     >(
-        spi: impl Peripheral<P = impl Into<T> + 'd> + 'd,
+        spi: impl Peripheral<P = T> + 'd,
         sclk: impl Peripheral<P = SCK> + 'd,
         mosi: impl Peripheral<P = MOSI> + 'd,
         miso: impl Peripheral<P = MISO> + 'd,
         cs: impl Peripheral<P = CS> + 'd,
         mode: SpiMode,
-    ) -> Spi<'d, FullDuplexMode, T> {
-        crate::into_ref!(sclk, mosi, miso, cs);
+    ) -> Spi<'d, T> {
+        crate::into_mapped_ref!(sclk, mosi, miso, cs);
 
         let this = Self::new_internal(spi, mode);
 
@@ -151,19 +153,17 @@ where
         this
     }
 
-    pub(crate) fn new_internal(
-        spi: impl Peripheral<P = impl Into<T> + 'd> + 'd,
-        mode: SpiMode,
-    ) -> Spi<'d, FullDuplexMode, T> {
+    pub(crate) fn new_internal(spi: impl Peripheral<P = T> + 'd, mode: SpiMode) -> Spi<'d, T> {
         crate::into_ref!(spi);
 
         let mut spi = Spi {
-            spi: spi.map_into(),
+            spi,
             data_mode: mode,
-            _mode: PhantomData,
         };
-        spi.spi.reset_peripheral();
-        spi.spi.enable_peripheral();
+
+        PeripheralClockControl::reset(spi.spi.peripheral());
+        PeripheralClockControl::enable(spi.spi.peripheral());
+
         spi.spi.init();
         spi.spi.set_data_mode(mode, false);
 
@@ -193,7 +193,7 @@ pub mod dma {
         Mode,
     };
 
-    impl<'d, T> Spi<'d, FullDuplexMode, T>
+    impl<'d, T> Spi<'d, T>
     where
         T: InstanceDma,
     {
@@ -316,7 +316,7 @@ pub mod dma {
         /// sent is 32736 bytes.
         ///
         /// The write is driven by the SPI master's sclk signal and cs line.
-        pub fn dma_write<'t, TXBUF>(
+        pub fn write<'t, TXBUF>(
             &'t mut self,
             words: &'t TXBUF,
         ) -> Result<DmaTransferTx<'t, Self>, Error>
@@ -351,7 +351,7 @@ pub mod dma {
         /// received is 32736 bytes.
         ///
         /// The read is driven by the SPI master's sclk signal and cs line.
-        pub fn dma_read<'t, RXBUF>(
+        pub fn read<'t, RXBUF>(
             &'t mut self,
             words: &'t mut RXBUF,
         ) -> Result<DmaTransferRx<'t, Self>, Error>
@@ -387,7 +387,7 @@ pub mod dma {
         ///
         /// The data transfer is driven by the SPI master's sclk signal and cs
         /// line.
-        pub fn dma_transfer<'t, RXBUF, TXBUF>(
+        pub fn transfer<'t, RXBUF, TXBUF>(
             &'t mut self,
             read_buffer: &'t mut RXBUF,
             words: &'t TXBUF,
@@ -569,26 +569,13 @@ impl InstanceDma for crate::peripherals::SPI2 {}
 impl InstanceDma for crate::peripherals::SPI3 {}
 
 #[doc(hidden)]
-pub trait Instance: private::Sealed + PeripheralMarker {
+pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'static {
     fn register_block(&self) -> &RegisterBlock;
 
     fn sclk_signal(&self) -> InputSignal;
-
     fn mosi_signal(&self) -> InputSignal;
-
     fn miso_signal(&self) -> OutputSignal;
-
     fn cs_signal(&self) -> InputSignal;
-
-    #[inline(always)]
-    fn reset_peripheral(&self) {
-        PeripheralClockControl::reset(self.peripheral());
-    }
-
-    #[inline(always)]
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(self.peripheral());
-    }
 
     #[cfg(esp32)]
     fn prepare_length_and_lines(&self, rx_len: usize, tx_len: usize) {

@@ -249,43 +249,35 @@ pub enum OutputSignal {
     GPIO             = 128,
 }
 
-crate::gpio::gpio! {
-    (0, 0, InputOutputAnalog (2 => FSPIQ) (2 => FSPIQ))
-    (1, 0, InputOutputAnalog (2 => FSPICS0) (2 => FSPICS0))
-    (2, 0, InputOutputAnalog (2 => FSPIWP) (2 => FSPIWP))
-    (3, 0, InputOutputAnalog (2 => FSPIHD) (2 => FSPIHD))
-    (4, 0, InputOutputAnalog (2 => FSPICLK) (2 => FSPICLK_MUX))
-    (5, 0, InputOutputAnalog (2 => FSPID) (2 => FSPID))
-    (6, 0, InputOutput)
-    (7, 0, InputOutput)
-    (8, 0, InputOutput)
-    (9, 0, InputOutput)
-    (10, 0, InputOutput)
-    (11, 0, InputOutput)
-    (12, 0, InputOutput)
-    (13, 0, InputOutput)
-    (14, 0, InputOutput)
-    (15, 0, InputOutput () (0 => SPICS0))
-    (16, 0, InputOutput (0 => SPIQ) (0 => SPIQ))
-    (17, 0, InputOutput (0 => SPIWP) (0 => SPIWP))
-    (18, 0, InputOutput (0 => SPIHD) (0 => SPIHD))
-    (19, 0, InputOutput () (0 => SPICLK))
-    (20, 0, InputOutput (0 => SPID) (0 => SPID))
-    (21, 0, InputOutput)
-    (22, 0, InputOutput)
-    (23, 0, InputOutput () (2 => FSPICS1))
-    (24, 0, InputOutput () (2 => FSPICS2))
-    (25, 0, InputOutput () (2 => FSPICS3))
-    (26, 0, InputOutput () (2 => FSPICS4))
-    (27, 0, InputOutput () (2 => FSPICS5))
-}
-
-crate::gpio::analog! {
-    1
-    2
-    3
-    4
-    5
+crate::gpio! {
+    (0, [Input, Output, Analog] (2 => FSPIQ) (2 => FSPIQ))
+    (1, [Input, Output, Analog] (2 => FSPICS0) (2 => FSPICS0))
+    (2, [Input, Output, Analog] (2 => FSPIWP) (2 => FSPIWP))
+    (3, [Input, Output, Analog] (2 => FSPIHD) (2 => FSPIHD))
+    (4, [Input, Output, Analog] (2 => FSPICLK) (2 => FSPICLK_MUX))
+    (5, [Input, Output, Analog] (2 => FSPID) (2 => FSPID))
+    (6, [Input, Output])
+    (7, [Input, Output])
+    (8, [Input, Output])
+    (9, [Input, Output])
+    (10, [Input, Output])
+    (11, [Input, Output])
+    (12, [Input, Output])
+    (13, [Input, Output])
+    (14, [Input, Output])
+    (15, [Input, Output] () (0 => SPICS0))
+    (16, [Input, Output] (0 => SPIQ) (0 => SPIQ))
+    (17, [Input, Output] (0 => SPIWP) (0 => SPIWP))
+    (18, [Input, Output] (0 => SPIHD) (0 => SPIHD))
+    (19, [Input, Output] () (0 => SPICLK))
+    (20, [Input, Output] (0 => SPID) (0 => SPID))
+    (21, [Input, Output])
+    (22, [Input, Output])
+    (23, [Input, Output] () (2 => FSPICS1))
+    (24, [Input, Output] () (2 => FSPICS2))
+    (25, [Input, Output] () (2 => FSPICS3))
+    (26, [Input, Output] () (2 => FSPICS4))
+    (27, [Input, Output] () (2 => FSPICS5))
 }
 
 #[derive(Clone, Copy)]

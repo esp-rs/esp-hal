@@ -73,7 +73,12 @@
 //!
 //! #[entry]
 //! fn main() -> ! {
-//!     let peripherals = esp_hal::init(esp_hal::Config::default());
+//!     let peripherals = esp_hal::init({
+//!         let mut config = esp_hal::Config::default();
+//!         // Configure the CPU to run at the maximum frequency.
+//!         config.cpu_clock = CpuClock::max();
+//!         config
+//!     });
 //!
 //!     // Set GPIO0 as an output, and set its state high initially.
 //!     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -356,6 +361,17 @@ pub enum Cpu {
     /// The second core
     #[cfg(multi_core)]
     AppCpu = 1,
+}
+
+impl Cpu {
+    /// The number of available cores.
+    pub const COUNT: usize = 1 + cfg!(multi_core) as usize;
+
+    /// Returns the core the application is currently executing on
+    #[inline(always)]
+    pub fn current() -> Self {
+        get_core()
+    }
 }
 
 /// Which core the application is currently executing on

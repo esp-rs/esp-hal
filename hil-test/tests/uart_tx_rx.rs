@@ -7,7 +7,6 @@
 
 use esp_hal::{
     gpio::Io,
-    peripherals::{UART0, UART1},
     prelude::*,
     uart::{UartRx, UartTx},
     Blocking,
@@ -16,8 +15,8 @@ use hil_test as _;
 use nb::block;
 
 struct Context {
-    rx: UartRx<'static, UART1, Blocking>,
-    tx: UartTx<'static, UART0, Blocking>,
+    rx: UartRx<'static, Blocking>,
+    tx: UartTx<'static, Blocking>,
 }
 
 #[cfg(test)]

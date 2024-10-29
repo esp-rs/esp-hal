@@ -14,16 +14,16 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     gpio::Io,
-    peripherals::UART0,
     prelude::*,
     uart::{
         config::{AtCmdConfig, Config},
         Uart,
+        UartInterrupt,
     },
     Blocking,
 };
 
-static SERIAL: Mutex<RefCell<Option<Uart<UART0, Blocking>>>> = Mutex::new(RefCell::new(None));
+static SERIAL: Mutex<RefCell<Option<Uart<Blocking>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -56,8 +56,7 @@ fn main() -> ! {
 
     critical_section::with(|cs| {
         uart0.set_at_cmd(AtCmdConfig::new(None, None, None, b'#', None));
-        uart0.listen_at_cmd();
-        uart0.listen_rx_fifo_full();
+        uart0.listen(UartInterrupt::AtCmd | UartInterrupt::RxFifoFull);
 
         SERIAL.borrow_ref_mut(cs).replace(uart0);
     });
@@ -85,15 +84,15 @@ fn interrupt_handler() {
         }
         writeln!(serial, "Read {} bytes", cnt,).ok();
 
+        let pending_interrupts = serial.interrupts();
         writeln!(
             serial,
             "Interrupt AT-CMD: {} RX-FIFO-FULL: {}",
-            serial.at_cmd_interrupt_set(),
-            serial.rx_fifo_full_interrupt_set(),
+            pending_interrupts.contains(UartInterrupt::AtCmd),
+            pending_interrupts.contains(UartInterrupt::RxFifoFull),
         )
         .ok();
 
-        serial.reset_at_cmd_interrupt();
-        serial.reset_rx_fifo_full_interrupt();
+        serial.clear_interrupts(UartInterrupt::AtCmd | UartInterrupt::RxFifoFull);
     });
 }

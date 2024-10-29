@@ -33,7 +33,7 @@ use esp_hal::{
     gpio::Io,
     prelude::*,
     spi::{
-        master::{Address, Command, HalfDuplexReadWrite, Spi},
+        master::{Address, Command, Spi},
         SpiDataMode,
         SpiMode,
     },
@@ -63,15 +63,20 @@ fn main() -> ! {
         }
     }
 
-    let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-        .with_pins(sclk, mosi, miso, sio2, sio3, cs);
+    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
+        .with_sck(sclk)
+        .with_mosi(mosi)
+        .with_miso(miso)
+        .with_sio2(sio2)
+        .with_sio3(sio3)
+        .with_cs(cs);
 
     let delay = Delay::new();
 
     loop {
         // READ MANUFACTURER ID FROM FLASH CHIP
         let mut data = [0u8; 2];
-        spi.read(
+        spi.half_duplex_read(
             SpiDataMode::Single,
             Command::Command8(0x90, SpiDataMode::Single),
             Address::Address24(0x000000, SpiDataMode::Single),
@@ -84,7 +89,7 @@ fn main() -> ! {
 
         // READ MANUFACTURER ID FROM FLASH CHIP
         let mut data = [0u8; 2];
-        spi.read(
+        spi.half_duplex_read(
             SpiDataMode::Dual,
             Command::Command8(0x92, SpiDataMode::Single),
             Address::Address32(0x000000_00, SpiDataMode::Dual),
@@ -97,7 +102,7 @@ fn main() -> ! {
 
         // READ MANUFACTURER ID FROM FLASH CHIP
         let mut data = [0u8; 2];
-        spi.read(
+        spi.half_duplex_read(
             SpiDataMode::Quad,
             Command::Command8(0x94, SpiDataMode::Single),
             Address::Address32(0x000000_00, SpiDataMode::Quad),

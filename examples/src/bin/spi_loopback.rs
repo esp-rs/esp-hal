@@ -19,6 +19,7 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     gpio::Io,
+    peripheral::Peripheral,
     prelude::*,
     spi::{master::Spi, SpiMode},
 };
@@ -33,11 +34,13 @@ fn main() -> ! {
     let miso_mosi = io.pins.gpio2;
     let cs = io.pins.gpio5;
 
-    let miso = miso_mosi.peripheral_input();
-    let mosi = miso_mosi.into_peripheral_output();
+    let miso = unsafe { miso_mosi.clone_unchecked() };
 
-    let mut spi =
-        Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0).with_pins(sclk, mosi, miso, cs);
+    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
+        .with_sck(sclk)
+        .with_mosi(miso_mosi)
+        .with_miso(miso)
+        .with_cs(cs);
 
     let delay = Delay::new();
 

@@ -85,7 +85,7 @@ use core::marker::PhantomData;
 use fugit::HertzU32;
 
 use crate::{
-    gpio::{PeripheralInput, PeripheralOutput},
+    gpio::interconnect::{PeripheralInput, PeripheralOutput},
     interrupt::InterruptHandler,
     peripheral::Peripheral,
     rmt::private::CreateInstance,
@@ -320,7 +320,7 @@ fn configure_rx_channel<
         return Err(Error::InvalidArgument);
     }
 
-    crate::into_ref!(pin);
+    crate::into_mapped_ref!(pin);
     pin.init_input(crate::gpio::Pull::None, crate::private::Internal);
     pin.connect_input_to_peripheral(T::input_signal(), crate::private::Internal);
 
@@ -346,7 +346,7 @@ fn configure_tx_channel<
     pin: impl Peripheral<P = P> + 'd,
     config: TxChannelConfig,
 ) -> Result<T, Error> {
-    crate::into_ref!(pin);
+    crate::into_mapped_ref!(pin);
     pin.set_to_push_pull_output(crate::private::Internal);
     pin.connect_peripheral_to_output(T::output_signal(), crate::private::Internal);
 
@@ -571,7 +571,7 @@ macro_rules! impl_tx_channel_creator {
         impl<'d, P> $crate::rmt::TxChannelCreator<'d, $crate::rmt::Channel<$crate::Blocking, $channel>, P>
             for ChannelCreator<$crate::Blocking, $channel>
         where
-            P: $crate::gpio::PeripheralOutput,
+            P: $crate::gpio::interconnect::PeripheralOutput,
         {
         }
 
@@ -580,7 +580,7 @@ macro_rules! impl_tx_channel_creator {
         impl<'d, P> $crate::rmt::TxChannelCreatorAsync<'d, $crate::rmt::Channel<$crate::Async, $channel>, P>
             for ChannelCreator<$crate::Async, $channel>
         where
-            P: $crate::gpio::PeripheralOutput,
+            P: $crate::gpio::interconnect::PeripheralOutput,
         {
         }
 
@@ -593,7 +593,7 @@ macro_rules! impl_rx_channel_creator {
         impl<'d, P> $crate::rmt::RxChannelCreator<'d, $crate::rmt::Channel<$crate::Blocking, $channel>, P>
             for ChannelCreator<$crate::Blocking, $channel>
         where
-            P: $crate::gpio::PeripheralInput,
+            P: $crate::gpio::interconnect::PeripheralInput,
         {
         }
 
@@ -602,7 +602,7 @@ macro_rules! impl_rx_channel_creator {
         impl<'d, P> $crate::rmt::RxChannelCreatorAsync<'d, $crate::rmt::Channel<$crate::Async, $channel>, P>
         for ChannelCreator<$crate::Async, $channel>
         where
-            P: $crate::gpio::PeripheralInput,
+            P: $crate::gpio::interconnect::PeripheralInput,
         {
         }
 

@@ -6,11 +6,11 @@
 #![no_std]
 #![no_main]
 
-use esp_hal::{gpio::Io, peripherals::UART0, uart::Uart, Async};
+use esp_hal::{gpio::Io, uart::Uart, Async};
 use hil_test as _;
 
 struct Context {
-    uart: Uart<'static, UART0, Async>,
+    uart: Uart<'static, Async>,
 }
 
 #[cfg(test)]
@@ -34,7 +34,7 @@ mod tests {
     #[test]
     #[timeout(3)]
     async fn test_send_receive(mut ctx: Context) {
-        const SEND: &[u8] = &*b"Hello ESP32";
+        const SEND: &[u8] = b"Hello ESP32";
         let mut buf = [0u8; SEND.len()];
 
         ctx.uart.flush_async().await.unwrap();

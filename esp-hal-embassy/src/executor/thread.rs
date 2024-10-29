@@ -3,19 +3,17 @@
 use core::marker::PhantomData;
 
 use embassy_executor::{raw, Spawner};
-use esp_hal::get_core;
+use esp_hal::{get_core, Cpu};
 #[cfg(multi_core)]
 use esp_hal::{interrupt::software::SoftwareInterrupt, macros::handler};
 use portable_atomic::{AtomicBool, Ordering};
 
-pub(crate) const THREAD_MODE_CONTEXT: u8 = 16;
+pub(crate) const THREAD_MODE_CONTEXT: usize = 16;
 
 /// global atomic used to keep track of whether there is work to do since sev()
 /// is not available on either Xtensa or RISC-V
-#[cfg(not(multi_core))]
-static SIGNAL_WORK_THREAD_MODE: [AtomicBool; 1] = [AtomicBool::new(false)];
-#[cfg(multi_core)]
-static SIGNAL_WORK_THREAD_MODE: [AtomicBool; 2] = [AtomicBool::new(false), AtomicBool::new(false)];
+static SIGNAL_WORK_THREAD_MODE: [AtomicBool; Cpu::COUNT] =
+    [const { AtomicBool::new(false) }; Cpu::COUNT];
 
 #[cfg(multi_core)]
 #[handler]
@@ -72,12 +70,7 @@ This will use software-interrupt 3 which isn't available for anything else to wa
         }
 
         Self {
-            inner: raw::Executor::new(usize::from_le_bytes([
-                THREAD_MODE_CONTEXT,
-                get_core() as u8,
-                0,
-                0,
-            ]) as *mut ()),
+            inner: raw::Executor::new((THREAD_MODE_CONTEXT + get_core() as usize) as *mut ()),
             not_send: PhantomData,
         }
     }

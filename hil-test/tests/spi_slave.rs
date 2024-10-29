@@ -11,8 +11,8 @@
 use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::{interconnect::InputSignal, Io, Level, Output, PeripheralInput},
-    spi::{slave::Spi, FullDuplexMode, SpiMode},
+    gpio::{interconnect::InputSignal, Io, Level, Output},
+    spi::{slave::Spi, SpiMode},
 };
 use hil_test as _;
 
@@ -25,7 +25,7 @@ cfg_if::cfg_if! {
 }
 
 struct Context {
-    spi: Spi<'static, FullDuplexMode>,
+    spi: Spi<'static>,
     dma_channel: DmaChannelCreator,
     bitbang_spi: BitbangSpi,
 }
@@ -170,7 +170,7 @@ mod tests {
         }
         slave_receive.fill(0xFF);
 
-        let transfer = spi.dma_transfer(slave_receive, &slave_send).unwrap();
+        let transfer = spi.transfer(slave_receive, &slave_send).unwrap();
 
         ctx.bitbang_spi.transfer_buf(master_receive, master_send);
 
