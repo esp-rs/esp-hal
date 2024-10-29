@@ -389,17 +389,29 @@ pub struct CsiConfig {
 #[cfg(esp32c6)]
 // See https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/src/include/esp32c6.rs#L5702-L5705
 pub struct CsiConfig {
+    /// Enable to acquire CSI.
     pub enable: u32,
+    /// Enable to acquire L-LTF when receiving a 11g PPDU.
     pub acquire_csi_legacy: u32,
+    /// Enable to acquire HT-LTF when receiving an HT20 PPDU.
     pub acquire_csi_ht20: u32,
+    /// Enable to acquire HT-LTF when receiving an HT40 PPDU.
     pub acquire_csi_ht40: u32,
+    /// Enable to acquire HE-LTF when receiving an HE20 SU PPDU.
     pub acquire_csi_su: u32,
+    /// Enable to acquire HE-LTF when receiving an HE20 MU PPDU.
     pub acquire_csi_mu: u32,
+    /// Enable to acquire HE-LTF when receiving an HE20 DCM applied PPDU.
     pub acquire_csi_dcm: u32,
+    /// Enable to acquire HE-LTF when receiving an HE20 Beamformed applied PPDU.
     pub acquire_csi_beamformed: u32,
+    /// Wwhen receiving an STBC applied HE PPDU, 0- acquire the complete HE-LTF1,  1- acquire the complete HE-LTF2, 2- sample evenly among the HE-LTF1 and HE-LTF2.
     pub acquire_csi_he_stbc: u32,
+    /// Vvalue 0-3.
     pub val_scale_cfg: u32,
+    /// Enable to dump 802.11 ACK frame, default disabled.
     pub dump_ack_en: u32,
+    /// Reserved.
     pub reserved: u32,
 }
 
