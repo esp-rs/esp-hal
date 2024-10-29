@@ -2727,15 +2727,15 @@ impl<'d> WifiController<'d> {
         }
     }
 
-    /// Set CSI configuration and registers the receiving callback.
+    /// Set CSI configuration and register the receiving callback.
     pub fn set_csi(
         &mut self,
         mut csi: CsiConfig,
         cb: fn(crate::binary::include::wifi_csi_info_t),
     ) -> Result<(), WifiError> {
-        csi.apply_config().unwrap();
-        csi.set_receive_cb(cb).unwrap();
-        csi.set_csi(true).unwrap();
+        csi.apply_config()?;
+        csi.set_receive_cb(cb)?;
+        csi.set_csi(true)?;
 
         Ok(())
     }
