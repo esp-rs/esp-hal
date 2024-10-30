@@ -50,11 +50,12 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::timg::TimerGroup;
+//! # use esp_hal::timer::timg::MwdtStage;
 //!
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! let mut wdt = timg0.wdt;
 //!
-//! wdt.set_timeout(5_000.millis());
+//! wdt.set_timeout(MwdtStage::Stage0, 5_000.millis());
 //! wdt.enable();
 //!
 //! loop {
@@ -911,6 +912,36 @@ where
 {
 }
 
+/// Behavior of the MWDT stage if it times out.
+#[allow(unused)]
+#[derive(Debug, Clone, Copy)]
+pub enum MwdtStageAction {
+    /// No effect on the system.
+    Off         = 0,
+    /// Trigger an interrupt.
+    Interrupt   = 1,
+    /// Reset the CPU core.
+    ResetCpu    = 2,
+    /// Reset the main system, power management unit and RTC peripherals.
+    ResetSystem = 3,
+}
+
+/// MWDT stages.
+///
+/// Timer stages allow for a timer to have a series of different timeout values
+/// and corresponding expiry action.
+#[derive(Debug, Clone, Copy)]
+pub enum MwdtStage {
+    /// MWDT stage 0.
+    Stage0,
+    /// MWDT stage 1.
+    Stage1,
+    /// MWDT stage 2.
+    Stage2,
+    /// MWDT stage 3.
+    Stage3,
+}
+
 /// Watchdog timer
 pub struct Wdt<TG> {
     phantom: PhantomData<TG>,
@@ -937,14 +968,14 @@ where
     pub fn enable(&mut self) {
         // SAFETY: The `TG` instance being modified is owned by `self`, which is behind
         //         a mutable reference.
-        unsafe { Self::set_wdt_enabled(true) };
+        unsafe { self.set_wdt_enabled(true) };
     }
 
     /// Disable the watchdog timer instance
     pub fn disable(&mut self) {
         // SAFETY: The `TG` instance being modified is owned by `self`, which is behind
         //         a mutable reference.
-        unsafe { Self::set_wdt_enabled(false) };
+        unsafe { self.set_wdt_enabled(false) };
     }
 
     /// Forcibly enable or disable the watchdog timer
@@ -954,83 +985,140 @@ where
     /// This bypasses the usual ownership rules for the peripheral, so users
     /// must take care to ensure that no driver instance is active for the
     /// timer.
-    pub unsafe fn set_wdt_enabled(enabled: bool) {
+    pub unsafe fn set_wdt_enabled(&mut self, enabled: bool) {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block
-            .wdtwprotect()
-            .write(|w| unsafe { w.wdt_wkey().bits(0x50D8_3AA1u32) });
+        self.set_write_protection(false);
 
         if !enabled {
             reg_block.wdtconfig0().write(|w| unsafe { w.bits(0) });
         } else {
             reg_block.wdtconfig0().write(|w| w.wdt_en().bit(true));
+
+            reg_block
+                .wdtconfig0()
+                .write(|w| w.wdt_flashboot_mod_en().bit(false));
+
+            #[cfg_attr(esp32, allow(unused_unsafe))]
+            reg_block.wdtconfig0().write(|w| unsafe {
+                w.wdt_en()
+                    .bit(true)
+                    .wdt_stg0()
+                    .bits(MwdtStageAction::ResetSystem as u8)
+                    .wdt_cpu_reset_length()
+                    .bits(7)
+                    .wdt_sys_reset_length()
+                    .bits(7)
+                    .wdt_stg1()
+                    .bits(MwdtStageAction::Off as u8)
+                    .wdt_stg2()
+                    .bits(MwdtStageAction::Off as u8)
+                    .wdt_stg3()
+                    .bits(MwdtStageAction::Off as u8)
+            });
+
+            #[cfg(any(esp32c2, esp32c3, esp32c6))]
+            reg_block
+                .wdtconfig0()
+                .modify(|_, w| w.wdt_conf_update_en().set_bit());
         }
 
-        reg_block
-            .wdtwprotect()
-            .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
+        self.set_write_protection(true);
     }
 
     /// Feed the watchdog timer
     pub fn feed(&mut self) {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block
-            .wdtwprotect()
-            .write(|w| unsafe { w.wdt_wkey().bits(0x50D8_3AA1u32) });
+        self.set_write_protection(false);
 
         reg_block.wdtfeed().write(|w| unsafe { w.bits(1) });
 
+        self.set_write_protection(true);
+    }
+
+    fn set_write_protection(&mut self, enable: bool) {
+        let reg_block = unsafe { &*TG::register_block() };
+
+        let wkey = if enable { 0u32 } else { 0x50D8_3AA1u32 };
+
         reg_block
             .wdtwprotect()
-            .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
+            .write(|w| unsafe { w.wdt_wkey().bits(wkey) });
     }
 
     /// Set the timeout, in microseconds, of the watchdog timer
-    pub fn set_timeout(&mut self, timeout: MicrosDurationU64) {
+    pub fn set_timeout(&mut self, stage: MwdtStage, timeout: MicrosDurationU64) {
         let timeout_raw = (timeout.to_nanos() * 10 / 125) as u32;
 
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block
-            .wdtwprotect()
-            .write(|w| unsafe { w.wdt_wkey().bits(0x50D8_3AA1u32) });
+        self.set_write_protection(false);
 
         reg_block
             .wdtconfig1()
             .write(|w| unsafe { w.wdt_clk_prescale().bits(1) });
 
-        reg_block
-            .wdtconfig2()
-            .write(|w| unsafe { w.wdt_stg0_hold().bits(timeout_raw) });
-
-        #[cfg_attr(esp32, allow(unused_unsafe))]
-        reg_block.wdtconfig0().write(|w| unsafe {
-            w.wdt_en()
-                .bit(true)
-                .wdt_stg0()
-                .bits(3)
-                .wdt_cpu_reset_length()
-                .bits(1)
-                .wdt_sys_reset_length()
-                .bits(1)
-                .wdt_stg1()
-                .bits(0)
-                .wdt_stg2()
-                .bits(0)
-                .wdt_stg3()
-                .bits(0)
-        });
+        unsafe {
+            match stage {
+                MwdtStage::Stage0 => reg_block
+                    .wdtconfig2()
+                    .write(|w| w.wdt_stg0_hold().bits(timeout_raw)),
+                MwdtStage::Stage1 => reg_block
+                    .wdtconfig3()
+                    .write(|w| w.wdt_stg1_hold().bits(timeout_raw)),
+                MwdtStage::Stage2 => reg_block
+                    .wdtconfig4()
+                    .write(|w| w.wdt_stg2_hold().bits(timeout_raw)),
+                MwdtStage::Stage3 => reg_block
+                    .wdtconfig5()
+                    .write(|w| w.wdt_stg3_hold().bits(timeout_raw)),
+            }
+        }
 
         #[cfg(any(esp32c2, esp32c3, esp32c6))]
         reg_block
             .wdtconfig0()
             .modify(|_, w| w.wdt_conf_update_en().set_bit());
 
-        reg_block
-            .wdtwprotect()
-            .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
+        self.set_write_protection(true);
+    }
+
+    /// Set the stage action of the MWDT for a specific stage.
+    ///
+    /// This function modifies MWDT behavior only if a custom bootloader with
+    /// the following modifications is used:
+    /// - `ESP_TASK_WDT_EN` parameter **disabled**
+    /// - `ESP_INT_WDT` parameter **disabled**
+    pub fn set_stage_action(&mut self, stage: MwdtStage, action: MwdtStageAction) {
+        let reg_block = unsafe { &*TG::register_block() };
+
+        self.set_write_protection(false);
+
+        match stage {
+            MwdtStage::Stage0 => {
+                reg_block
+                    .wdtconfig0()
+                    .modify(|_, w| unsafe { w.wdt_stg0().bits(action as u8) });
+            }
+            MwdtStage::Stage1 => {
+                reg_block
+                    .wdtconfig0()
+                    .modify(|_, w| unsafe { w.wdt_stg1().bits(action as u8) });
+            }
+            MwdtStage::Stage2 => {
+                reg_block
+                    .wdtconfig0()
+                    .modify(|_, w| unsafe { w.wdt_stg2().bits(action as u8) });
+            }
+            MwdtStage::Stage3 => {
+                reg_block
+                    .wdtconfig0()
+                    .modify(|_, w| unsafe { w.wdt_stg3().bits(action as u8) });
+            }
+        }
+
+        self.set_write_protection(true);
     }
 }
 
@@ -1078,7 +1166,7 @@ where
         T: Into<Self::Time>,
     {
         self.enable();
-        self.set_timeout(period.into());
+        self.set_timeout(MwdtStage::Stage0, period.into());
     }
 }
 
