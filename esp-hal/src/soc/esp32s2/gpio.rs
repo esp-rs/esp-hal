@@ -351,18 +351,16 @@ macro_rules! rtcio_analog {
         impl $crate::gpio::RtcPinWithResistors for GpioPin<$pin_num>
         {
             fn rtcio_pullup(&mut self, enable: bool) {
-                let rtcio = unsafe { $crate::peripherals::RTC_IO::steal() };
-
                 paste::paste! {
-                    rtcio.$pin_reg.modify(|_, w| w.[< $prefix rue >]().bit(enable));
+                    unsafe { $crate::peripherals::RTC_IO::steal() }
+                        .$pin_reg.modify(|_, w| w.[< $prefix rue >]().bit(enable));
                 }
             }
 
             fn rtcio_pulldown(&mut self, enable: bool) {
-                let rtcio = unsafe { $crate::peripherals::RTC_IO::steal() };
-
                 paste::paste! {
-                    rtcio.$pin_reg.modify(|_, w| w.[< $prefix rde >]().bit(enable));
+                    unsafe { $crate::peripherals::RTC_IO::steal() }
+                        .$pin_reg.modify(|_, w| w.[< $prefix rde >]().bit(enable));
                 }
             }
         }
