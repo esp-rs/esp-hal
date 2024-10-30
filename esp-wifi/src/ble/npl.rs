@@ -698,7 +698,7 @@ unsafe extern "C" fn ble_npl_callout_deinit(callout: *const ble_npl_callout) {
 unsafe extern "C" fn ble_npl_callout_stop(callout: *const ble_npl_callout) {
     trace!("ble_npl_callout_stop {:?}", callout);
 
-    core::assert!((*callout).dummy != 0);
+    assert!((*callout).dummy != 0);
 
     let co = (*callout).dummy as *mut Callout;
 
@@ -762,7 +762,7 @@ unsafe extern "C" fn ble_npl_event_set_arg(event: *const ble_npl_event, arg: *co
     trace!("ble_npl_event_set_arg {:?} {:?}", event, arg);
 
     let evt = (*event).dummy as *mut Event;
-    core::assert!(!evt.is_null());
+    assert!(!evt.is_null());
 
     (*evt).ev_arg_ptr = arg;
 }
@@ -771,7 +771,7 @@ unsafe extern "C" fn ble_npl_event_get_arg(event: *const ble_npl_event) -> *cons
     trace!("ble_npl_event_get_arg {:?}", event);
 
     let evt = (*event).dummy as *mut Event;
-    core::assert!(!evt.is_null());
+    assert!(!evt.is_null());
 
     let arg_ptr = (*evt).ev_arg_ptr;
 
@@ -784,7 +784,7 @@ unsafe extern "C" fn ble_npl_event_is_queued(event: *const ble_npl_event) -> boo
     trace!("ble_npl_event_is_queued {:?}", event);
 
     let evt = (*event).dummy as *mut Event;
-    core::assert!(!evt.is_null());
+    assert!(!evt.is_null());
 
     (*evt).queued
 }
@@ -793,7 +793,7 @@ unsafe extern "C" fn ble_npl_event_reset(event: *const ble_npl_event) {
     trace!("ble_npl_event_reset {:?}", event);
 
     let evt = (*event).dummy as *mut Event;
-    core::assert!(!evt.is_null());
+    assert!(!evt.is_null());
 
     (*evt).queued = false
 }
@@ -803,7 +803,7 @@ unsafe extern "C" fn ble_npl_event_deinit(event: *const ble_npl_event) {
 
     let event = event as *mut ble_npl_event;
     let evt = (*event).dummy as *mut Event;
-    core::assert!(!evt.is_null());
+    assert!(!evt.is_null());
 
     crate::compat::malloc::free(evt.cast());
     (*event).dummy = 0;
@@ -832,7 +832,7 @@ unsafe extern "C" fn ble_npl_eventq_is_empty(queue: *const ble_npl_eventq) -> bo
     trace!("ble_npl_eventq_is_empty {:?}", queue);
 
     let queue = (*queue).dummy as *mut ConcurrentQueue;
-    core::assert!(!queue.is_null());
+    assert!(!queue.is_null());
     (*queue).count() == 0
 }
 
@@ -840,7 +840,7 @@ unsafe extern "C" fn ble_npl_event_run(event: *const ble_npl_event) {
     trace!("ble_npl_event_run {:?}", event);
 
     let evt = (*event).dummy as *mut Event;
-    core::assert!(!evt.is_null());
+    assert!(!evt.is_null());
 
     trace!("info {:?} with arg {:x}", (*evt).event_fn_ptr, event as u32);
     let func: unsafe extern "C" fn(u32) = core::mem::transmute((*evt).event_fn_ptr);
@@ -855,9 +855,9 @@ unsafe extern "C" fn ble_npl_eventq_remove(
 ) {
     info!("ble_npl_eventq_remove {:?} {:?}", queue, event);
 
-    core::assert!((*queue).dummy != 0);
+    assert!((*queue).dummy != 0);
     let evt = (*event).dummy as *mut Event;
-    core::assert!(!evt.is_null());
+    assert!(!evt.is_null());
 
     if !(*evt).queued {
         return;
@@ -872,10 +872,10 @@ unsafe extern "C" fn ble_npl_eventq_remove(
 unsafe extern "C" fn ble_npl_eventq_put(queue: *const ble_npl_eventq, event: *const ble_npl_event) {
     trace!("ble_npl_eventq_put {:?} {:?}", queue, event);
 
-    core::assert!((*queue).dummy != 0);
+    assert!((*queue).dummy != 0);
 
     let evt = (*event).dummy as *mut Event;
-    core::assert!(!evt.is_null());
+    assert!(!evt.is_null());
 
     (*evt).queued = true;
 
@@ -916,7 +916,7 @@ unsafe extern "C" fn ble_npl_eventq_deinit(queue: *const ble_npl_eventq) {
     trace!("ble_npl_eventq_deinit {:?}", queue);
 
     let queue = queue.cast_mut();
-    core::assert!((*queue).dummy != 0);
+    assert!((*queue).dummy != 0);
 
     let real_queue = (*queue).dummy as *mut ConcurrentQueue;
     unsafe {

@@ -82,7 +82,7 @@ impl RawQueue {
     /// This allocates underlying storage. See [release_storage]
     pub fn new(capacity: usize, item_size: usize) -> Self {
         let storage = unsafe { malloc((capacity * item_size) as u32) as *mut u8 };
-        core::assert!(!storage.is_null());
+        assert!(!storage.is_null());
 
         Self {
             capacity,
