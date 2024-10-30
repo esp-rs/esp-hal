@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix conflict between `RtcClock::get_xtal_freq` and `Rtc::disable_rom_message_printing` (#2360)
 - Fixed an issue where interrupts enabled before `esp_hal::init` were disabled. This issue caused the executor created by `#[esp_hal_embassy::main]` to behave incorrectly in multi-core applications. (#2377)
+- Fixed `TWAI::transmit_async`: bus-off state is not reached when CANH and CANL are shorted. (#2421)
 
 ### Removed
 

@@ -1943,6 +1943,22 @@ mod asynch {
         }
 
         if intr_status.bits() & 0b11111100 > 0 {
+            let err_capture = register_block.err_code_cap().read();
+            let status = register_block.status().read();
+
+            // Read error code direction (transmitting or receiving)
+            cfg_if::cfg_if! {
+                if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
+                    let ecc_direction = err_capture.ecc_direction().bit_is_set();
+                } else {
+                    let ecc_direction = err_capture.err_capture_code_direction().bit_is_set();
+                }
+            }
+            // If the error comes from Tx and Tx request is pending
+            if !ecc_direction && !status.tx_buf_st().bit_is_set() {
+                // Cancel a pending transmission request
+                register_block.cmd().write(|w| w.abort_tx().set_bit());
+            }
             async_state.err_waker.wake();
         }
 
