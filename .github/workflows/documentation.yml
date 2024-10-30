@@ -36,6 +36,7 @@ jobs:
         with:
           default: true
           ldproxy: false
+          version: 1.82.0.2
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -67,7 +68,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: "docs/"
-      
+
       - name: Create index.html
         run: "cargo xtask build-documentation-index --packages=$(echo '${{ needs.setup.outputs.packages }}' | jq -r '[.[].name] | join(\",\")')"
 

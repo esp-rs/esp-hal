@@ -116,6 +116,7 @@ jobs:
           buildtargets: ${{ matrix.target.soc }}
           default: true
           ldproxy: false
+          version: 1.82.0.2
 
       - name: Build tests
         run: cargo xtask build-tests ${{ matrix.target.soc }}
