@@ -6,6 +6,7 @@ use embassy_executor::{raw, Spawner};
 use esp_hal::{get_core, Cpu};
 #[cfg(multi_core)]
 use esp_hal::{interrupt::software::SoftwareInterrupt, macros::handler};
+#[cfg(low_power_wait)]
 use portable_atomic::{AtomicBool, Ordering};
 
 pub(crate) const THREAD_MODE_CONTEXT: usize = 16;
@@ -15,7 +16,7 @@ pub(crate) const THREAD_MODE_CONTEXT: usize = 16;
 static SIGNAL_WORK_THREAD_MODE: [AtomicBool; Cpu::COUNT] =
     [const { AtomicBool::new(false) }; Cpu::COUNT];
 
-#[cfg(multi_core)]
+#[cfg(all(multi_core, low_power_wait))]
 #[handler]
 fn software3_interrupt() {
     // This interrupt is fired when the thread-mode executor's core needs to be
@@ -25,30 +26,33 @@ fn software3_interrupt() {
     unsafe { SoftwareInterrupt::<3>::steal().reset() };
 }
 
-pub(crate) fn pend_thread_mode(core: usize) {
-    // Signal that there is work to be done.
-    SIGNAL_WORK_THREAD_MODE[core].store(true, Ordering::SeqCst);
+pub(crate) fn pend_thread_mode(_core: usize) {
+    #[cfg(low_power_wait)]
+    {
+        // Signal that there is work to be done.
+        SIGNAL_WORK_THREAD_MODE[_core].store(true, Ordering::SeqCst);
 
-    // If we are pending a task on the current core, we're done. Otherwise, we
-    // need to make sure the other core wakes up.
-    #[cfg(multi_core)]
-    if core != get_core() as usize {
-        // We need to clear the interrupt from software. We don't actually
-        // need it to trigger and run the interrupt handler, we just need to
-        // kick waiti to return.
-        unsafe { SoftwareInterrupt::<3>::steal().raise() };
+        // If we are pending a task on the current core, we're done. Otherwise, we
+        // need to make sure the other core wakes up.
+        #[cfg(multi_core)]
+        if _core != get_core() as usize {
+            // We need to clear the interrupt from software. We don't actually
+            // need it to trigger and run the interrupt handler, we just need to
+            // kick waiti to return.
+            unsafe { SoftwareInterrupt::<3>::steal().raise() };
+        }
     }
 }
 
-/// A thread aware Executor
+/// Thread mode executor.
+///
+/// This is the simplest and most common kind of executor. It runs on thread
+/// mode (at the lowest priority level).
+#[cfg_attr(multi_core, doc = "")]
 #[cfg_attr(
     multi_core,
-    doc = r#"
-This executor is capable of waking an
-executor running on another core if work
-needs to be completed there for a task to
-progress on this core.
-"#
+    doc = "This executor is safe to use on multiple cores. You need to
+create one instance per core. The executors don't steal tasks from each other."
 )]
 pub struct Executor {
     inner: raw::Executor,
@@ -64,7 +68,7 @@ impl Executor {
 This will use software-interrupt 3 which isn't available for anything else to wake the other core(s)."#
     )]
     pub fn new() -> Self {
-        #[cfg(multi_core)]
+        #[cfg(all(multi_core, low_power_wait))]
         unsafe {
             SoftwareInterrupt::<3>::steal().set_interrupt_handler(software3_interrupt);
         }
@@ -90,7 +94,7 @@ This will use software-interrupt 3 which isn't available for anything else to wa
     /// you mutable access. There's a few ways to do this:
     ///
     /// - a [StaticCell](https://docs.rs/static_cell/latest/static_cell/) (safe)
-    /// - a `static mut` (unsafe)
+    /// - a `static mut` (unsafe, not recommended)
     /// - a local variable in a function you know never returns (like `fn main()
     ///   -> !`), upgrading its lifetime with `transmute`. (unsafe)
     ///
@@ -98,20 +102,19 @@ This will use software-interrupt 3 which isn't available for anything else to wa
     pub fn run(&'static mut self, init: impl FnOnce(Spawner)) -> ! {
         init(self.inner.spawner());
 
+        #[cfg(low_power_wait)]
         let cpu = get_core() as usize;
 
         loop {
-            unsafe {
-                self.inner.poll();
+            unsafe { self.inner.poll() };
 
-                Self::wait_impl(cpu);
-            }
+            #[cfg(low_power_wait)]
+            Self::wait_impl(cpu);
         }
     }
 
-    #[doc(hidden)]
-    #[cfg(xtensa)]
-    pub fn wait_impl(cpu: usize) {
+    #[cfg(all(xtensa, low_power_wait))]
+    fn wait_impl(cpu: usize) {
         // Manual critical section implementation that only masks interrupts handlers.
         // We must not acquire the cross-core on dual-core systems because that would
         // prevent the other core from doing useful work while this core is sleeping.
@@ -140,9 +143,8 @@ This will use software-interrupt 3 which isn't available for anything else to wa
         }
     }
 
-    #[doc(hidden)]
-    #[cfg(riscv)]
-    pub fn wait_impl(cpu: usize) {
+    #[cfg(all(riscv, low_power_wait))]
+    fn wait_impl(cpu: usize) {
         // we do not care about race conditions between the load and store operations,
         // interrupts will only set this value to true.
         critical_section::with(|_| {
