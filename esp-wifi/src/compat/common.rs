@@ -324,7 +324,7 @@ pub(crate) fn unlock_mutex(mutex: *mut c_void) -> i32 {
     })
 }
 
-pub(crate) fn create_queue(queue_len: c_int, item_size: c_int) -> *mut c_void {
+pub(crate) fn create_queue(queue_len: c_int, item_size: c_int) -> *mut ConcurrentQueue {
     trace!("wifi_create_queue len={} size={}", queue_len, item_size,);
 
     let queue = ConcurrentQueue::new(queue_len as usize, item_size as usize);
@@ -335,20 +335,23 @@ pub(crate) fn create_queue(queue_len: c_int, item_size: c_int) -> *mut c_void {
 
     trace!("created queue @{:?}", ptr);
 
-    ptr.cast()
+    ptr
 }
 
-pub(crate) fn delete_queue(queue: *mut c_void) {
+pub(crate) fn delete_queue(queue: *mut ConcurrentQueue) {
     trace!("delete_queue {:?}", queue);
 
-    let queue: *mut ConcurrentQueue = queue.cast();
     unsafe {
         ptr::drop_in_place(queue);
         crate::compat::malloc::free(queue.cast());
     }
 }
 
-pub(crate) fn send_queued(queue: *mut c_void, item: *mut c_void, block_time_tick: u32) -> i32 {
+pub(crate) fn send_queued(
+    queue: *mut ConcurrentQueue,
+    item: *mut c_void,
+    block_time_tick: u32,
+) -> i32 {
     trace!(
         "queue_send queue {:?} item {:x} block_time_tick {}",
         queue,
@@ -360,7 +363,11 @@ pub(crate) fn send_queued(queue: *mut c_void, item: *mut c_void, block_time_tick
     unsafe { (*queue).enqueue(item) }
 }
 
-pub(crate) fn receive_queued(queue: *mut c_void, item: *mut c_void, block_time_tick: u32) -> i32 {
+pub(crate) fn receive_queued(
+    queue: *mut ConcurrentQueue,
+    item: *mut c_void,
+    block_time_tick: u32,
+) -> i32 {
     trace!(
         "queue_recv {:?} item {:?} block_time_tick {}",
         queue,
@@ -371,8 +378,6 @@ pub(crate) fn receive_queued(queue: *mut c_void, item: *mut c_void, block_time_t
     let forever = block_time_tick == OSI_FUNCS_TIME_BLOCKING;
     let timeout = block_time_tick as u64;
     let start = crate::timer::get_systimer_count();
-
-    let queue: *mut ConcurrentQueue = queue.cast();
 
     loop {
         if unsafe { (*queue).try_dequeue(item) } {
@@ -389,7 +394,7 @@ pub(crate) fn receive_queued(queue: *mut c_void, item: *mut c_void, block_time_t
     }
 }
 
-pub(crate) fn number_of_messages_in_queue(queue: *const c_void) -> u32 {
+pub(crate) fn number_of_messages_in_queue(queue: *const ConcurrentQueue) -> u32 {
     trace!("queue_msg_waiting {:?}", queue);
 
     let queue: *const ConcurrentQueue = queue.cast();

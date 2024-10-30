@@ -12,7 +12,7 @@ use crate::{
         HciOutCollector,
         HCI_OUT_COLLECTOR,
     },
-    compat::common::str_from_c,
+    compat::common::{self, str_from_c, ConcurrentQueue},
     hal::macros::ram,
 };
 
@@ -159,17 +159,21 @@ unsafe extern "C" fn mutex_unlock(_mutex: *const ()) -> i32 {
 }
 
 unsafe extern "C" fn queue_create(len: u32, item_size: u32) -> *const () {
-    let ptr = crate::compat::common::create_queue(len as i32, item_size as i32);
+    let ptr = common::create_queue(len as i32, item_size as i32);
     ptr.cast()
 }
 
 unsafe extern "C" fn queue_delete(queue: *const ()) {
-    crate::compat::common::delete_queue(queue as *mut c_void)
+    common::delete_queue(queue as *mut ConcurrentQueue)
 }
 
 #[ram]
 unsafe extern "C" fn queue_send(queue: *const (), item: *const (), block_time_ms: u32) -> i32 {
-    crate::compat::common::send_queued(queue as *mut c_void, item as *mut c_void, block_time_ms)
+    common::send_queued(
+        queue as *mut ConcurrentQueue,
+        item as *mut c_void,
+        block_time_ms,
+    )
 }
 
 #[ram]
@@ -185,7 +189,11 @@ unsafe extern "C" fn queue_send_from_isr(
 }
 
 unsafe extern "C" fn queue_recv(queue: *const (), item: *const (), block_time_ms: u32) -> i32 {
-    crate::compat::common::receive_queued(queue as *mut c_void, item as *mut c_void, block_time_ms)
+    common::receive_queued(
+        queue as *mut ConcurrentQueue,
+        item as *mut c_void,
+        block_time_ms,
+    )
 }
 
 #[ram]

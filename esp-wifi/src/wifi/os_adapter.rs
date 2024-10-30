@@ -26,6 +26,7 @@ use crate::{
             str_from_c,
             thread_sem_get,
             unlock_mutex,
+            ConcurrentQueue,
         },
         malloc::calloc,
     },
@@ -34,7 +35,7 @@ use crate::{
     timer::yield_task,
 };
 
-static mut QUEUE_HANDLE: *mut crate::binary::c_types::c_void = core::ptr::null_mut();
+static mut QUEUE_HANDLE: *mut ConcurrentQueue = core::ptr::null_mut();
 
 // useful for waiting for events - clear and wait for the event bit to be set
 // again
@@ -390,7 +391,7 @@ pub unsafe extern "C" fn queue_create(
         (3, 8)
     };
 
-    create_queue(queue_len as i32, item_size as i32)
+    create_queue(queue_len as i32, item_size as i32).cast()
 }
 
 /// **************************************************************************
@@ -407,7 +408,7 @@ pub unsafe extern "C" fn queue_create(
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn queue_delete(queue: *mut crate::binary::c_types::c_void) {
-    delete_queue(queue);
+    delete_queue(queue.cast());
 }
 
 /// **************************************************************************
@@ -430,7 +431,7 @@ pub unsafe extern "C" fn queue_send(
     item: *mut crate::binary::c_types::c_void,
     block_time_tick: u32,
 ) -> i32 {
-    send_queued(queue, item, block_time_tick)
+    send_queued(queue.cast(), item, block_time_tick)
 }
 
 /// **************************************************************************
@@ -525,7 +526,7 @@ pub unsafe extern "C" fn queue_recv(
     item: *mut crate::binary::c_types::c_void,
     block_time_tick: u32,
 ) -> i32 {
-    receive_queued(queue, item, block_time_tick)
+    receive_queued(queue.cast(), item, block_time_tick)
 }
 
 /// **************************************************************************
@@ -542,7 +543,7 @@ pub unsafe extern "C" fn queue_recv(
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn queue_msg_waiting(queue: *mut crate::binary::c_types::c_void) -> u32 {
-    number_of_messages_in_queue(queue)
+    number_of_messages_in_queue(queue.cast())
 }
 
 /// **************************************************************************
