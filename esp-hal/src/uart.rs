@@ -462,7 +462,7 @@ where
     fn with_rx(self, rx: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(rx);
         rx.init_input(Pull::Up, Internal);
-        rx.connect_input_to_peripheral(self.uart.peripheral_data().rx_signal, Internal);
+        rx.connect_input_to_peripheral(self.uart.info().rx_signal, Internal);
 
         self
     }
@@ -472,7 +472,7 @@ where
         // Make sure we don't cause an unexpected low pulse on the pin.
         tx.set_output_high(true, Internal);
         tx.set_to_push_pull_output(Internal);
-        tx.connect_peripheral_to_output(self.uart.peripheral_data().tx_signal, Internal);
+        tx.connect_peripheral_to_output(self.uart.info().tx_signal, Internal);
 
         self
     }
@@ -529,7 +529,7 @@ where
     pub fn with_rts(self, rts: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_mapped_ref!(rts);
         rts.set_to_push_pull_output(Internal);
-        rts.connect_peripheral_to_output(self.uart.peripheral_data().rts_signal, Internal);
+        rts.connect_peripheral_to_output(self.uart.info().rts_signal, Internal);
 
         self
     }
@@ -612,7 +612,7 @@ where
     }
 
     fn register_block(&self) -> &RegisterBlock {
-        self.uart.peripheral_data().register_block()
+        self.uart.info().register_block()
     }
 }
 
@@ -693,7 +693,7 @@ where
     pub fn with_cts(self, cts: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(cts);
         cts.init_input(Pull::None, Internal);
-        cts.connect_input_to_peripheral(self.uart.peripheral_data().cts_signal, Internal);
+        cts.connect_input_to_peripheral(self.uart.info().cts_signal, Internal);
 
         self
     }
@@ -906,7 +906,7 @@ where
     }
 
     fn register_block(&self) -> &RegisterBlock {
-        self.uart.peripheral_data().register_block()
+        self.uart.info().register_block()
     }
 }
 
@@ -1025,7 +1025,7 @@ where
 {
     fn inner_set_interrupt_handler(&mut self, handler: InterruptHandler) {
         // `self.tx.uart` and `self.rx.uart` are the same
-        let interrupt = self.tx.uart.peripheral_data().interrupt;
+        let interrupt = self.tx.uart.info().interrupt;
         unsafe {
             crate::interrupt::bind_interrupt(interrupt, handler.handler());
             unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
@@ -1046,7 +1046,7 @@ where
 
     fn register_block(&self) -> &RegisterBlock {
         // `self.tx.uart` and `self.rx.uart` are the same
-        self.tx.uart.peripheral_data().register_block()
+        self.tx.uart.info().register_block()
     }
 
     fn sync_regs(&self) {
@@ -1410,7 +1410,7 @@ where
     }
 
     fn is_instance(&self, other: impl Instance) -> bool {
-        self.tx.uart.peripheral_data() == other.peripheral_data()
+        self.tx.uart.info() == other.info()
     }
 
     #[inline(always)]
@@ -1773,12 +1773,12 @@ mod asynch {
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     struct UartRxFuture<'d> {
         events: EnumSet<RxEvent>,
-        uart: &'d UartPeripheral,
+        uart: &'d Info,
         registered: bool,
     }
 
     impl<'d> UartRxFuture<'d> {
-        pub fn new(uart: &'d UartPeripheral, events: impl Into<EnumSet<RxEvent>>) -> Self {
+        pub fn new(uart: &'d Info, events: impl Into<EnumSet<RxEvent>>) -> Self {
             Self {
                 events: events.into(),
                 uart,
@@ -1858,11 +1858,11 @@ mod asynch {
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     struct UartTxFuture<'d> {
         events: EnumSet<TxEvent>,
-        uart: &'d UartPeripheral,
+        uart: &'d Info,
         registered: bool,
     }
     impl<'d> UartTxFuture<'d> {
-        pub fn new(uart: &'d UartPeripheral, events: impl Into<EnumSet<TxEvent>>) -> Self {
+        pub fn new(uart: &'d Info, events: impl Into<EnumSet<TxEvent>>) -> Self {
             Self {
                 events: events.into(),
                 uart,
@@ -1976,7 +1976,7 @@ mod asynch {
                 .with_rx(rx)
                 .init(config)?;
 
-            this.inner_set_interrupt_handler(this.tx.uart.peripheral_data().async_handler);
+            this.inner_set_interrupt_handler(this.tx.uart.info().async_handler);
 
             Ok(this)
         }
@@ -2044,7 +2044,7 @@ mod asynch {
         ) -> Result<Self, Error> {
             let mut this = UartBuilder::new(uart).with_tx(tx).init(config)?;
 
-            this.inner_set_interrupt_handler(this.tx.uart.peripheral_data().async_handler);
+            this.inner_set_interrupt_handler(this.tx.uart.info().async_handler);
 
             let (_, uart_tx) = this.split();
             Ok(uart_tx)
@@ -2075,7 +2075,7 @@ mod asynch {
                 }
 
                 offset = next_offset;
-                UartTxFuture::new(self.uart.peripheral_data(), TxEvent::TxFiFoEmpty).await;
+                UartTxFuture::new(self.uart.info(), TxEvent::TxFiFoEmpty).await;
             }
 
             Ok(count)
@@ -2089,7 +2089,7 @@ mod asynch {
         pub async fn flush_async(&mut self) -> Result<(), Error> {
             let count = self.tx_fifo_count();
             if count > 0 {
-                UartTxFuture::new(self.uart.peripheral_data(), TxEvent::TxDone).await;
+                UartTxFuture::new(self.uart.info(), TxEvent::TxDone).await;
             }
 
             Ok(())
@@ -2137,7 +2137,7 @@ mod asynch {
         ) -> Result<Self, Error> {
             let mut this = UartBuilder::new(uart).with_rx(rx).init(config)?;
 
-            this.inner_set_interrupt_handler(this.tx.uart.peripheral_data().async_handler);
+            this.inner_set_interrupt_handler(this.tx.uart.info().async_handler);
 
             let (uart_rx, _) = this.split();
             Ok(uart_rx)
@@ -2182,7 +2182,7 @@ mod asynch {
                     events |= RxEvent::FifoTout;
                 }
 
-                let events_happened = UartRxFuture::new(self.uart.peripheral_data(), events).await;
+                let events_happened = UartRxFuture::new(self.uart.info(), events).await;
                 // always drain the fifo, if an error has occurred the data is lost
                 let read_bytes = self.drain_fifo(buf);
                 // check error events
@@ -2266,7 +2266,7 @@ mod asynch {
     /// Clears and disables interrupts that have occurred and have their enable
     /// bit set. The fact that an interrupt has been disabled is used by the
     /// futures to detect that they should indeed resolve after being woken up
-    pub(super) fn intr_handler(uart: &UartPeripheral) {
+    pub(super) fn intr_handler(uart: &Info) {
         let interrupts = uart.register_block().int_st().read();
         let interrupt_bits = interrupts.bits(); // = int_raw & int_ena
         let rx_wake = interrupts.rxfifo_full().bit_is_set()
@@ -2490,11 +2490,11 @@ pub mod lp_uart {
 /// UART Peripheral Instance
 pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyUart> + 'static {
     /// Returns the peripheral data describing this UART instance.
-    fn peripheral_data(&self) -> &UartPeripheral;
+    fn info(&self) -> &Info;
 }
 
 /// Peripheral data describing a particular UART instance.
-pub struct UartPeripheral {
+pub struct Info {
     /// Pointer to the register block for this UART instance.
     ///
     /// Use [Self::register_block] to access the register block.
@@ -2525,32 +2525,32 @@ pub struct UartPeripheral {
     pub rts_signal: OutputSignal,
 }
 
-impl UartPeripheral {
+impl Info {
     /// Returns the register block for this UART instance.
     pub fn register_block(&self) -> &RegisterBlock {
         unsafe { &*self.register_block }
     }
 }
 
-impl PartialEq for UartPeripheral {
+impl PartialEq for Info {
     fn eq(&self, other: &Self) -> bool {
         self.register_block == other.register_block
     }
 }
 
-unsafe impl Sync for UartPeripheral {}
+unsafe impl Sync for Info {}
 
 macro_rules! impl_instance {
     ($inst:ident, $txd:ident, $rxd:ident, $cts:ident, $rts:ident) => {
         impl Instance for crate::peripherals::$inst {
             #[inline(always)]
-            fn peripheral_data(&self) -> &UartPeripheral {
+            fn info(&self) -> &Info {
                 #[crate::macros::handler]
                 pub(super) fn irq_handler() {
                     asynch::intr_handler(&PERIPHERAL);
                 }
 
-                static PERIPHERAL: UartPeripheral = UartPeripheral {
+                static PERIPHERAL: Info = Info {
                     register_block: crate::peripherals::$inst::ptr(),
                     async_handler: irq_handler,
                     tx_waker: AtomicWaker::new(),
@@ -2586,14 +2586,14 @@ crate::any_peripheral! {
 
 impl Instance for AnyUart {
     #[inline]
-    fn peripheral_data(&self) -> &UartPeripheral {
+    fn info(&self) -> &Info {
         match &self.0 {
             #[cfg(uart0)]
-            AnyUartInner::Uart0(uart) => uart.peripheral_data(),
+            AnyUartInner::Uart0(uart) => uart.info(),
             #[cfg(uart1)]
-            AnyUartInner::Uart1(uart) => uart.peripheral_data(),
+            AnyUartInner::Uart1(uart) => uart.info(),
             #[cfg(uart2)]
-            AnyUartInner::Uart2(uart) => uart.peripheral_data(),
+            AnyUartInner::Uart2(uart) => uart.info(),
         }
     }
 }
