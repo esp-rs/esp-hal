@@ -960,7 +960,7 @@ mod asynch {
 
             if let Some(data) = critical_section::with(|cs| {
                 let mut queue = RECEIVE_QUEUE.borrow_ref_mut(cs);
-                queue.pop()
+                queue.pop_front()
             }) {
                 Poll::Ready(data)
             } else {
