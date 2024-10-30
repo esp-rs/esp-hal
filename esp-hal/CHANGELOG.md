@@ -8,8 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-Add an option to configure `WDT` action (#2330)
-
 - A new config option `PLACE_SWITCH_TABLES_IN_RAM` to improve performance (especially for interrupts) at the cost of slightly more RAM usage (#2331)
 - A new config option `PLACE_ANON_IN_RAM` to improve performance (especially for interrupts) at the cost of RAM usage (#2331)
 - Add burst transfer support to DMA buffers (#2336)
@@ -23,6 +21,7 @@ Add an option to configure `WDT` action (#2330)
 - `Spi::half_duplex_read` and `Spi::half_duplex_write` (#2373)
 - `Cpu::COUNT` and `Cpu::current()` (#2411)
 - `UartInterrupt` and related functions (#2406)
+- Add an option to configure `WDT` action (#2330)
 
 ### Changed
 

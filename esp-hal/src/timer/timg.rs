@@ -925,11 +925,20 @@ pub enum MwdtStageAction {
     ResetSystem = 3,
 }
 
-/// MWDT related errors.
-#[derive(Debug)]
-pub enum MwdtError {
-    /// Trying to configure the wrong stage.
-    InvalidStage,
+/// MWDT stages.
+///
+/// Timer stages allow for a timer to have a series of different timeout values
+/// and corresponding expiry action.
+#[derive(Debug, Clone, Copy)]
+pub enum MwdtStage {
+    /// MWDT stage 0.
+    Stage0,
+    /// MWDT stage 1.
+    Stage1,
+    /// MWDT stage 2.
+    Stage2,
+    /// MWDT stage 3.
+    Stage3,
 }
 
 /// Watchdog timer
@@ -1038,11 +1047,7 @@ where
     }
 
     /// Set the timeout, in microseconds, of the watchdog timer
-    pub fn set_timeout(
-        &mut self,
-        stage: usize,
-        timeout: MicrosDurationU64,
-    ) -> Result<(), MwdtError> {
+    pub fn set_timeout(&mut self, stage: MwdtStage, timeout: MicrosDurationU64) {
         let timeout_raw = (timeout.to_nanos() * 10 / 125) as u32;
 
         let reg_block = unsafe { &*TG::register_block() };
@@ -1055,19 +1060,18 @@ where
 
         unsafe {
             match stage {
-                0 => reg_block
+                MwdtStage::Stage0 => reg_block
                     .wdtconfig2()
                     .write(|w| w.wdt_stg0_hold().bits(timeout_raw)),
-                1 => reg_block
+                MwdtStage::Stage1 => reg_block
                     .wdtconfig3()
                     .write(|w| w.wdt_stg1_hold().bits(timeout_raw)),
-                2 => reg_block
+                MwdtStage::Stage2 => reg_block
                     .wdtconfig4()
                     .write(|w| w.wdt_stg2_hold().bits(timeout_raw)),
-                3 => reg_block
+                MwdtStage::Stage3 => reg_block
                     .wdtconfig5()
                     .write(|w| w.wdt_stg3_hold().bits(timeout_raw)),
-                _ => return Err(MwdtError::InvalidStage),
             }
         }
 
@@ -1077,8 +1081,6 @@ where
             .modify(|_, w| w.wdt_conf_update_en().set_bit());
 
         self.set_write_protection(true);
-
-        Ok(())
     }
 
     /// Set the stage action of the MWDT for a specific stage.
@@ -1087,43 +1089,35 @@ where
     /// the following modifications is used:
     /// - `ESP_TASK_WDT_EN` parameter **disabled**
     /// - `ESP_INT_WDT` parameter **disabled**
-    pub fn set_stage_action(
-        &mut self,
-        stage: usize,
-        action: MwdtStageAction,
-    ) -> Result<(), MwdtError> {
-        info!("here!");
+    pub fn set_stage_action(&mut self, stage: MwdtStage, action: MwdtStageAction) {
         let reg_block = unsafe { &*TG::register_block() };
 
         self.set_write_protection(false);
 
         match stage {
-            0 => {
+            MwdtStage::Stage0 => {
                 reg_block
                     .wdtconfig0()
                     .modify(|_, w| unsafe { w.wdt_stg0().bits(action as u8) });
             }
-            1 => {
+            MwdtStage::Stage1 => {
                 reg_block
                     .wdtconfig0()
                     .modify(|_, w| unsafe { w.wdt_stg1().bits(action as u8) });
             }
-            2 => {
+            MwdtStage::Stage2 => {
                 reg_block
                     .wdtconfig0()
                     .modify(|_, w| unsafe { w.wdt_stg2().bits(action as u8) });
             }
-            3 => {
+            MwdtStage::Stage3 => {
                 reg_block
                     .wdtconfig0()
                     .modify(|_, w| unsafe { w.wdt_stg3().bits(action as u8) });
             }
-            _ => return Err(MwdtError::InvalidStage),
         }
 
         self.set_write_protection(true);
-
-        Ok(())
     }
 }
 
@@ -1171,7 +1165,7 @@ where
         T: Into<Self::Time>,
     {
         self.enable();
-        self.set_timeout(0, period.into()).unwrap();
+        self.set_timeout(MwdtStage::Stage0, period.into());
     }
 }
 

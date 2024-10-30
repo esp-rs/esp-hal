@@ -16,7 +16,7 @@ use esp_backtrace as _;
 use esp_hal::{
     interrupt::Priority,
     prelude::*,
-    rtc_cntl::{Rtc, Rwdt},
+    rtc_cntl::{Rtc, Rwdt, RwdtStage},
 };
 use esp_println::println;
 
@@ -30,7 +30,7 @@ fn main() -> ! {
     rtc.set_interrupt_handler(interrupt_handler);
 
     rtc.rwdt.enable();
-    rtc.rwdt.set_timeout(0, 2.secs()).unwrap();
+    rtc.rwdt.set_timeout(RwdtStage::Stage0, 2.secs());
     rtc.rwdt.listen();
 
     critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
@@ -49,7 +49,7 @@ fn interrupt_handler() {
 
         println!("Restarting in 5 seconds...");
 
-        rwdt.set_timeout(0, 5.secs()).unwrap();
+        rwdt.set_timeout(RwdtStage::Stage0, 5.secs());
         rwdt.unlisten();
     });
 }
