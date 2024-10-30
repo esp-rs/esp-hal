@@ -52,10 +52,11 @@ async fn main(_spawner: Spawner) {
         Standard::Philips,
         DataFormat::Data16Channel16,
         44100u32.Hz(),
-        dma_channel.configure_for_async(false, DmaPriority::Priority0),
+        dma_channel.configure(false, DmaPriority::Priority0),
         rx_descriptors,
         tx_descriptors,
-    );
+    )
+    .into_async();
 
     #[cfg(not(feature = "esp32"))]
     let i2s = i2s.with_mclk(io.pins.gpio0);

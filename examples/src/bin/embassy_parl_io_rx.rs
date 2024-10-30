@@ -42,7 +42,9 @@ async fn main(_spawner: Spawner) {
 
     let parl_io = ParlIoRxOnly::new(
         peripherals.PARL_IO,
-        dma_channel.configure_for_async(false, DmaPriority::Priority0),
+        dma_channel
+            .configure(false, DmaPriority::Priority0)
+            .into_async(),
         rx_descriptors,
         1.MHz(),
     )

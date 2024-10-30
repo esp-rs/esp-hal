@@ -143,11 +143,11 @@ mod tests {
             Standard::Philips,
             DataFormat::Data16Channel16,
             16000.Hz(),
-            ctx.dma_channel
-                .configure_for_async(false, DmaPriority::Priority0),
+            ctx.dma_channel.configure(false, DmaPriority::Priority0),
             rx_descriptors,
             tx_descriptors,
-        );
+        )
+        .into_async();
 
         let (_, dout) = hil_test::common_test_pins!(ctx.io);
 
