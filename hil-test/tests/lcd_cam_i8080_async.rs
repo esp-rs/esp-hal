@@ -37,7 +37,7 @@ mod tests {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let dma = Dma::new(peripherals.DMA);
-        let lcd_cam = LcdCam::new_async(peripherals.LCD_CAM);
+        let lcd_cam = LcdCam::new(peripherals.LCD_CAM).into_async();
         let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, DATA_SIZE);
         let dma_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 

@@ -81,7 +81,7 @@ use crate::{
         OutputSignal,
         Pull,
     },
-    lcd_cam::{cam::private::RxPins, private::calculate_clkm, BitOrder, ByteOrder},
+    lcd_cam::{calculate_clkm, BitOrder, ByteOrder},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
 };
@@ -604,8 +604,7 @@ impl RxPins for RxSixteenBits {
     const BUS_WIDTH: usize = 2;
 }
 
-mod private {
-    pub trait RxPins {
-        const BUS_WIDTH: usize;
-    }
+#[doc(hidden)]
+pub trait RxPins {
+    const BUS_WIDTH: usize;
 }

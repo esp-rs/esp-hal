@@ -75,12 +75,13 @@ use crate::{
         OutputSignal,
     },
     lcd_cam::{
-        asynch::LCD_DONE_WAKER,
-        lcd::{i8080::private::TxPins, ClockMode, DelayMode, Phase, Polarity},
-        private::{calculate_clkm, Instance},
+        calculate_clkm,
+        lcd::{ClockMode, DelayMode, Phase, Polarity},
         BitOrder,
         ByteOrder,
+        Instance,
         Lcd,
+        LCD_DONE_WAKER,
     },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
@@ -703,8 +704,7 @@ impl<'d> TxPins for TxSixteenBits<'d> {
     }
 }
 
-mod private {
-    pub trait TxPins {
-        fn configure(&mut self);
-    }
+#[doc(hidden)]
+pub trait TxPins {
+    fn configure(&mut self);
 }
