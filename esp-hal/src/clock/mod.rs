@@ -532,12 +532,22 @@ impl Clocks {
 #[cfg(esp32p4)]
 impl Clocks {
     fn measure_xtal_frequency() -> XtalClock {
-        todo!()
+        XtalClock::RtcXtalFreq40M
     }
 
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        todo!()
+        // let xtal_freq = Self::measure_xtal_frequency();
+
+        if cpu_clock_speed != CpuClock::default() {
+            // clocks_ll::set_cpu_clock(cpu_clock_speed);
+        }
+
+        Self {
+            cpu_clock: cpu_clock_speed.frequency(),
+            apb_clock: HertzU32::MHz(80),
+            xtal_clock: XtalClock::RtcXtalFreq40M.frequency(),
+        }
     }
 }
 

@@ -23,7 +23,7 @@ pub use chip;
 #[allow(unused)]
 pub(crate) mod registers {
     pub const INTERRUPT_MAP_BASE: u32 = 0x500D_6000;
-    pub const INTERRUPT_MAP_BASE_APP_CPU: u32 = 0x0; // FIXME
+    pub const INTERRUPT_MAP_BASE_APP_CPU: u32 = 0x500D_6800;
 }
 
 pub(crate) mod constants {

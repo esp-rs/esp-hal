@@ -140,27 +140,41 @@ pub enum Priority {
     /// Priority level 7.
     Priority7,
     /// Priority level 8.
+    #[cfg(not(clic))]
     Priority8,
     /// Priority level 9.
+    #[cfg(not(clic))]
     Priority9,
     /// Priority level 10.
+    #[cfg(not(clic))]
     Priority10,
     /// Priority level 11.
+    #[cfg(not(clic))]
     Priority11,
     /// Priority level 12.
+    #[cfg(not(clic))]
     Priority12,
     /// Priority level 13.
+    #[cfg(not(clic))]
     Priority13,
     /// Priority level 14.
+    #[cfg(not(clic))]
     Priority14,
     /// Priority level 15.
+    #[cfg(not(clic))]
     Priority15,
 }
 
 impl Priority {
     /// Maximum interrupt priority
     pub const fn max() -> Priority {
-        Priority::Priority15
+        cfg_if::cfg_if! {
+            if #[cfg(not(clic))] {
+                Priority::Priority15
+            } else {
+                Priority::Priority7
+            }
+        }
     }
 
     /// Minimum interrupt priority
@@ -685,72 +699,148 @@ mod classic {
     }
 }
 
-// TODO: Actually implement the functions in this module :)
 #[cfg(clic)]
 mod clic {
     use super::{CpuInterrupt, InterruptKind, Priority};
     use crate::Cpu;
 
-    pub(super) const DISABLED_CPU_INTERRUPT: u32 = 31;
+    pub(super) const DISABLED_CPU_INTERRUPT: u32 = 0;
 
-    pub(super) const EXTERNAL_INTERRUPT_OFFSET: u32 = 0;
+    pub(super) const EXTERNAL_INTERRUPT_OFFSET: u32 = 16;
 
-    // don't use interrupts reserved for CLIC (0,3,4,7)
-    // for some reason also CPU interrupt 8 doesn't work by default since it's
-    // disabled after reset - so don't use that, too
-    pub(super) const PRIORITY_TO_INTERRUPT: &[usize] = &[];
+    pub(super) const PRIORITY_TO_INTERRUPT: &[usize] =
+        &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
-    pub(super) const INTERRUPT_TO_PRIORITY: &[usize] = &[];
+    pub(super) const INTERRUPT_TO_PRIORITY: &[usize] =
+        &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
-    /// Enable a CPU interrupt
-    ///
-    /// # Safety
-    ///
-    /// Make sure there is an interrupt handler registered.
-    pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {}
+    // The memory map for interrupt registers is on a per-core basis,
+    // base points to the current core interrupt register,
+    // whereas base + DUALCORE_CLIC_CTRL_OFF points to the other
+    // core registers, regardless of the core we are currently running on.
+
+    const DR_REG_CLIC_CTRL_BASE: u32 = 0x2080_1000;
+    const DUALCORE_CLIC_CTRL_OFF: u32 = 0x1_0000;
+
+    const CLIC_EXT_INTR_NUM_OFFSET: usize = 16;
+
+    bitfield::bitfield! {
+        /// TODO: Document me!
+        #[derive(Clone, Copy, Default)]
+        pub struct InterruptControl(u32);
+
+        bool,pending, set_pending: 0;
+        bool,enabled, set_enabled: 8;
+        bool,vectored, set_vectored: 16;
+        u8,trigger, set_trigger: 18, 17;
+        u8,mode, _: 23, 22;
+        u8,priority, set_priority: 31, 29;
+    }
+
+    /// Get pointer to interrupt control register for the given core and CPU
+    /// interrupt number
+    fn intr_cntrl(core: Cpu, cpu_interrupt_number: usize) -> *mut u32 {
+        let offset = if core == crate::get_core() {
+            0
+        } else {
+            DUALCORE_CLIC_CTRL_OFF
+        };
+
+        unsafe {
+            ((DR_REG_CLIC_CTRL_BASE + offset) as *mut u32)
+                .add(CLIC_EXT_INTR_NUM_OFFSET + cpu_interrupt_number)
+        }
+    }
+
+    /// Enable a CPU interrupt on current core
+    pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
+        let cpu_interrupt_number = which as usize;
+        let intr_cntrl = intr_cntrl(crate::get_core(), cpu_interrupt_number);
+
+        unsafe {
+            let mut val = InterruptControl(intr_cntrl.read_volatile());
+            val.set_enabled(true);
+            intr_cntrl.write_volatile(val.0);
+        }
+    }
 
     /// Set the interrupt kind (i.e. level or edge) of an CPU interrupt
     ///
-    /// The vectored interrupt handler will take care of clearing edge interrupt
+    /// This is safe to call when the `vectored` feature is enabled. The
+    /// vectored interrupt handler will take care of clearing edge interrupt
     /// bits.
-    pub fn set_kind(_core: Cpu, which: CpuInterrupt, kind: InterruptKind) {}
+    pub fn set_kind(core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
+        let cpu_interrupt_number = which as usize;
+        unsafe {
+            let intr_cntrl = intr_cntrl(core, cpu_interrupt_number);
+            let mut val = InterruptControl(intr_cntrl.read_volatile());
+            val.set_trigger(match kind {
+                InterruptKind::Level => 0b00,
+                InterruptKind::Edge => 0b10,
+            });
+            intr_cntrl.write_volatile(val.0);
+        }
+    }
 
     /// Set the priority level of an CPU interrupt
     ///
-    /// # Safety
-    ///
-    /// Great care must be taken when using this function; avoid changing the
-    /// priority of interrupts 1 - 15.
-    pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {}
+    /// Great care must be taken when using the `vectored` feature (enabled by
+    /// default). Avoid changing the priority of interrupts 1 - 15 when
+    /// interrupt vectoring is enabled.
+    pub unsafe fn set_priority(core: Cpu, which: CpuInterrupt, priority: Priority) {
+        let cpu_interrupt_number = which as usize;
+        let intr_cntrl = intr_cntrl(core, cpu_interrupt_number);
+
+        unsafe {
+            let mut val = InterruptControl(intr_cntrl.read_volatile());
+            val.set_priority(priority as u8);
+            intr_cntrl.write_volatile(val.0);
+        }
+    }
 
     /// Clear a CPU interrupt
     #[inline]
-    pub fn clear(_core: Cpu, which: CpuInterrupt) {}
+    pub fn clear(core: Cpu, which: CpuInterrupt) {
+        let cpu_interrupt_number = which as usize;
+
+        unsafe {
+            let intr_cntrl = intr_cntrl(core, cpu_interrupt_number);
+            let mut val = InterruptControl(intr_cntrl.read_volatile());
+            val.set_pending(false);
+            intr_cntrl.write_volatile(val.0);
+        }
+    }
 
     /// Get interrupt priority
     #[inline]
-    pub(super) unsafe extern "C" fn get_priority_by_core(
-        _core: Cpu,
-        cpu_interrupt: CpuInterrupt,
-    ) -> Priority {
-        Priority::None
+    pub(super) fn get_priority_by_core(core: Cpu, cpu_interrupt: CpuInterrupt) -> Priority {
+        let cpu_interrupt_number = cpu_interrupt as usize;
+
+        unsafe {
+            let intr_cntrl = intr_cntrl(core, cpu_interrupt_number);
+            let val = InterruptControl(intr_cntrl.read_volatile());
+
+            core::mem::transmute(val.priority())
+        }
     }
 
     /// Get interrupt priority - called by assembly code
     #[inline]
     pub(super) unsafe extern "C" fn get_priority(cpu_interrupt: CpuInterrupt) -> Priority {
-        Priority::None
+        todo!()
     }
 
     #[no_mangle]
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
-        Priority::None as u32
+        todo!()
     }
 
     #[no_mangle]
     #[link_section = ".trap"]
-    pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {}
+    pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {
+        todo!()
+    }
 }
 
 #[cfg(plic)]
@@ -857,8 +947,10 @@ mod plic {
             .read()
             .cpu_mxint_pri()
             .bits();
+
         core::mem::transmute::<u8, Priority>(prio)
     }
+
     #[no_mangle]
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
@@ -877,14 +969,17 @@ mod plic {
                 riscv::interrupt::enable();
             }
         }
+
         prev_interrupt_priority as u32
     }
+
     #[no_mangle]
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {
         riscv::interrupt::disable();
-        let plic = &*crate::peripherals::PLIC_MX::PTR;
-        plic.mxint_thresh()
+
+        (&*crate::peripherals::PLIC_MX::PTR)
+            .mxint_thresh()
             .write(|w| w.cpu_mxint_thresh().bits(stored_prio as u8));
     }
 }

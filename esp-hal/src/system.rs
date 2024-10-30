@@ -97,6 +97,12 @@ pub enum Peripheral {
     /// UART2 peripheral.
     #[cfg(uart2)]
     Uart2,
+    /// UART2 peripheral.
+    #[cfg(uart3)]
+    Uart3,
+    /// UART2 peripheral.
+    #[cfg(uart4)]
+    Uart4,
     /// RSA peripheral (Rivest-Shamir-Adleman encryption).
     #[cfg(rsa)]
     Rsa,
