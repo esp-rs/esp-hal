@@ -121,7 +121,8 @@ impl defmt::Format for ReceivedPacket {
 pub fn have_hci_read_data() -> bool {
     critical_section::with(|cs| {
         let queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
-        !queue.is_empty() || BLE_HCI_READ_DATA.borrow_ref(cs).len() > 0
+        let hci_read_data = BLE_HCI_READ_DATA.borrow_ref(cs);
+        !queue.is_empty() || !hci_read_data.is_empty()
     })
 }
 
