@@ -96,7 +96,7 @@ fn main() -> ! {
     let mut transfer = i2s_tx.write_dma_circular(&tx_buffer).unwrap();
 
     loop {
-        let avail = transfer.available();
+        let avail = transfer.available().unwrap();
         if avail > 0 {
             let avail = usize::min(10000, avail);
             for bidx in 0..avail {

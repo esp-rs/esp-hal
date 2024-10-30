@@ -61,14 +61,7 @@
 use portable_atomic::{AtomicPtr, Ordering};
 use procmacros::ram;
 
-#[cfg(any(adc, dac))]
-pub(crate) use crate::analog;
-pub(crate) use crate::gpio;
-#[cfg(any(xtensa, esp32c3, esp32c2))]
-pub(crate) use crate::rtc_pins;
 pub use crate::soc::gpio::*;
-#[cfg(touch)]
-pub(crate) use crate::touch;
 use crate::{
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
@@ -528,6 +521,17 @@ pub enum GpioRegisterAccess {
     Bank1,
 }
 
+impl From<usize> for GpioRegisterAccess {
+    fn from(_gpio_num: usize) -> Self {
+        #[cfg(any(esp32, esp32s2, esp32s3))]
+        if _gpio_num >= 32 {
+            return GpioRegisterAccess::Bank1;
+        }
+
+        GpioRegisterAccess::Bank0
+    }
+}
+
 impl GpioRegisterAccess {
     fn write_out_en(self, word: u32, enable: bool) {
         if enable {
@@ -882,12 +886,49 @@ macro_rules! if_output_pin {
 
 #[doc(hidden)]
 #[macro_export]
+macro_rules! if_rtcio_pin {
+    // Base case: not an RtcIo pin, substitute the else branch
+    ({ $($then:tt)* } else { $($else:tt)* }) => { $($else)* };
+
+    // First is an RtcIo pin, skip checking and substitute the then branch
+    (RtcIo $(, $other:ident)* { $($then:tt)* } else { $($else:tt)* }) => { $($then)* };
+    (RtcIoInput $(, $other:ident)* { $($then:tt)* } else { $($else:tt)* }) => { $($then)* };
+
+    // First is not an RtcIo pin, check the rest
+    ($not:ident $(, $other:ident)* { $($then:tt)* } else { $($else:tt)* }) => {
+        $crate::if_rtcio_pin!($($other),* { $($then)* } else { $($else)* })
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
 macro_rules! io_type {
     (Input, $gpionum:literal) => {
         impl $crate::gpio::InputPin for GpioPin<$gpionum> {}
     };
     (Output, $gpionum:literal) => {
         impl $crate::gpio::OutputPin for GpioPin<$gpionum> {}
+    };
+    (Analog, $gpionum:literal) => {
+        // FIXME: the implementation shouldn't be in the GPIO module
+        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
+        impl $crate::gpio::AnalogPin for GpioPin<$gpionum> {
+            /// Configures the pin for analog mode.
+            fn set_analog(&self, _: $crate::private::Internal) {
+                use $crate::peripherals::GPIO;
+
+                get_io_mux_reg($gpionum).modify(|_, w| unsafe {
+                    w.mcu_sel().bits(1);
+                    w.fun_ie().clear_bit();
+                    w.fun_wpu().clear_bit();
+                    w.fun_wpd().clear_bit()
+                });
+
+                unsafe { GPIO::steal() }
+                    .enable_w1tc()
+                    .write(|w| unsafe { w.bits(1 << $gpionum) });
+            }
+        }
     };
     ($other:ident, $gpionum:literal) => {
         // TODO
@@ -899,7 +940,7 @@ macro_rules! io_type {
 macro_rules! gpio {
     (
         $(
-            ($gpionum:literal, $bank:literal, [$($type:tt),*]
+            ($gpionum:literal, [$($type:tt),*]
                 $(
                     ( $( $af_input_num:literal => $af_input_signal:ident )* )
                     ( $( $af_output_num:literal => $af_output_signal:ident )* )
@@ -946,7 +987,7 @@ macro_rules! gpio {
                     }
 
                     fn gpio_bank(&self, _: $crate::private::Internal) -> $crate::gpio::GpioRegisterAccess {
-                        $crate::gpio::GpioRegisterAccess::[<Bank $bank >]
+                        $crate::gpio::GpioRegisterAccess::from($gpionum)
                     }
 
                     fn output_signals(&self, _: $crate::private::Internal) -> &[(AlternateFunction, OutputSignal)] {
@@ -1031,417 +1072,53 @@ macro_rules! gpio {
 
             pub(crate) use handle_gpio_output;
             pub(crate) use handle_gpio_input;
-        }
-    };
-}
 
-#[cfg(xtensa)]
-#[doc(hidden)]
-#[macro_export]
-macro_rules! rtc_pins {
-    ( @ignore $rue:literal ) => {};
-
-    (
-        $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:literal)?
-    ) => {
-        impl $crate::gpio::RtcPin for GpioPin<$pin_num>
-        {
-            fn rtc_number(&self) -> u8 {
-                $rtc_pin
-            }
-
-            /// Set the RTC properties of the pin. If `mux` is true then then pin is
-            /// routed to RTC, when false it is routed to IO_MUX.
-            fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
-                use $crate::peripherals::RTC_IO;
-
-                let rtcio = unsafe{ &*RTC_IO::ptr() };
-
-                $crate::gpio::enable_iomux_clk_gate();
-
-                // disable input
-                paste::paste!{
-                    rtcio.$pin_reg.modify(|_,w| unsafe {
-                        w.[<$prefix fun_ie>]().bit(input_enable);
-                        w.[<$prefix mux_sel>]().bit(mux);
-                        w.[<$prefix fun_sel>]().bits(func as u8)
-                    });
-                }
-            }
-
-            fn rtcio_pad_hold(&mut self, enable: bool) {
-                let rtc_ctrl = unsafe { $crate::peripherals::LPWR::steal() };
-
-                cfg_if::cfg_if! {
-                    if #[cfg(esp32)] {
-                        let pad_hold = rtc_ctrl.hold_force();
-                    } else {
-                        let pad_hold = rtc_ctrl.pad_hold();
+            cfg_if::cfg_if! {
+                if #[cfg(any(lp_io, rtc_cntl))] {
+                    #[doc(hidden)]
+                    #[macro_export]
+                    macro_rules! handle_rtcio {
+                        ($this:expr, $inner:ident, $code:tt) => {
+                            match $this {
+                                $(
+                                    AnyPinInner::[<Gpio $gpionum >]($inner) => $crate::if_rtcio_pin!($($type),* {
+                                        $code
+                                    } else {{
+                                        let _ = $inner;
+                                        panic!("Unsupported")
+                                    }}),
+                                )+
+                            }
+                        }
                     }
-                };
 
-                pad_hold.modify(|_, w| w.$hold().bit(enable));
-            }
-        }
-
-        $(
-            // FIXME: replace with $(ignore($rue)) once stable
-            $crate::rtc_pins!(@ignore $rue);
-            impl $crate::gpio::RtcPinWithResistors for GpioPin<$pin_num>
-            {
-                fn rtcio_pullup(&mut self, enable: bool) {
-                    let rtcio = unsafe { $crate::peripherals::RTC_IO::steal() };
-
-                    paste::paste! {
-                        rtcio.$pin_reg.modify(|_, w| w.[< $prefix rue >]().bit(enable));
+                    #[doc(hidden)]
+                    #[macro_export]
+                    macro_rules! handle_rtcio_with_resistors {
+                        ($this:expr, $inner:ident, $code:tt) => {
+                            match $this {
+                                $(
+                                    AnyPinInner::[<Gpio $gpionum >]($inner) => $crate::if_rtcio_pin!($($type),* {
+                                        $crate::if_output_pin!($($type),* {
+                                            $code
+                                        } else {{
+                                            let _ = $inner;
+                                            panic!("Unsupported")
+                                        }})
+                                    } else {{
+                                        let _ = $inner;
+                                        panic!("Unsupported")
+                                    }}),
+                                )+
+                            }
+                        }
                     }
-                }
 
-                fn rtcio_pulldown(&mut self, enable: bool) {
-                    let rtcio = unsafe { $crate::peripherals::RTC_IO::steal() };
-
-                    paste::paste! {
-                        rtcio.$pin_reg.modify(|_, w| w.[< $prefix rde >]().bit(enable));
-                    }
-                }
-            }
-        )?
-    };
-
-    (
-        $( ( $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:literal )? ) )+
-    ) => {
-        $(
-            $crate::gpio::rtc_pins!($pin_num, $rtc_pin, $pin_reg, $prefix, $hold $(, $rue )?);
-        )+
-
-        #[cfg(esp32)]
-        pub(crate) fn errata36(mut pin: AnyPin, pull_up: bool, pull_down: bool) {
-            use $crate::gpio::{Pin, RtcPinWithResistors};
-
-            let has_pullups = match pin.number() {
-                $(
-                    $( $pin_num => $rue, )?
-                )+
-                _ => false,
-            };
-
-            if has_pullups {
-                pin.rtcio_pullup(pull_up);
-                pin.rtcio_pulldown(pull_down);
-            }
-        }
-
-        #[doc(hidden)]
-        #[macro_export]
-        macro_rules! handle_rtcio {
-            ($this:expr, $inner:ident, $code:tt) => {
-                match $this {
-                    $(
-                        paste::paste! { AnyPinInner::[<Gpio $pin_num >]($inner) } => {
-                            $code
-                        },
-                    )+
-
-                    _ => panic!("Unsupported")
+                    pub(crate) use handle_rtcio;
+                    pub(crate) use handle_rtcio_with_resistors;
                 }
             }
         }
-
-        #[doc(hidden)]
-        #[macro_export]
-        macro_rules! handle_rtcio_with_resistors {
-            (@ignore $a:tt) => {};
-            ($this:expr, $inner:ident, $code:tt) => {
-                match $this {
-                    $(
-                        $(
-                            paste::paste! { AnyPinInner::[<Gpio $pin_num >]($inner) } => {
-                                // FIXME: replace with $(ignore($rue)) once stable
-                                handle_rtcio_with_resistors!(@ignore $rue);
-                                $code
-                            },
-                        )?
-                    )+
-
-                    _ => panic!("Unsupported")
-                }
-            }
-        }
-        pub(crate) use handle_rtcio;
-        pub(crate) use handle_rtcio_with_resistors;
-    };
-}
-
-#[cfg(any(esp32c2, esp32c3))]
-#[doc(hidden)]
-#[macro_export]
-macro_rules! rtc_pins {
-    ( $pin_num:expr ) => {
-        impl $crate::gpio::RtcPin for GpioPin<$pin_num> {
-            unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
-                let rtc_cntl = unsafe { &*$crate::peripherals::RTC_CNTL::ptr() };
-                cfg_if::cfg_if! {
-                    if #[cfg(esp32c2)] {
-                        let gpio_wakeup = rtc_cntl.cntl_gpio_wakeup();
-                    } else {
-                        let gpio_wakeup = rtc_cntl.gpio_wakeup();
-                    }
-                }
-
-                paste::paste! {
-                    gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _wakeup_enable >]().bit(wakeup));
-                    gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _int_type >]().bits(level));
-                }
-            }
-
-            fn rtcio_pad_hold(&mut self, enable: bool) {
-                let rtc_cntl = unsafe { &*$crate::peripherals::RTC_CNTL::ptr() };
-                paste::paste! {
-                    rtc_cntl.pad_hold().modify(|_, w| w.[< gpio_pin $pin_num _hold >]().bit(enable));
-                }
-            }
-        }
-
-        impl $crate::gpio::RtcPinWithResistors for GpioPin<$pin_num> {
-            fn rtcio_pullup(&mut self, enable: bool) {
-                let io_mux = unsafe { &*$crate::peripherals::IO_MUX::ptr() };
-                io_mux.gpio($pin_num).modify(|_, w| w.fun_wpu().bit(enable));
-            }
-
-            fn rtcio_pulldown(&mut self, enable: bool) {
-                let io_mux = unsafe { &*$crate::peripherals::IO_MUX::ptr() };
-                io_mux.gpio($pin_num).modify(|_, w| w.fun_wpd().bit(enable));
-            }
-        }
-    };
-
-    ( $( $pin_num:expr )+ ) => {
-        $( $crate::gpio::rtc_pins!($pin_num); )+
-
-        #[doc(hidden)]
-        #[macro_export]
-        macro_rules! handle_rtcio {
-            ($this:expr, $inner:ident, $code:tt) => {
-                match $this {
-                    $(
-                        paste::paste! { AnyPinInner::[<Gpio $pin_num >]($inner) } => {
-                            $code
-                        },
-                    )+
-
-                    _ => panic!("Unsupported")
-                }
-            }
-        }
-
-        pub(crate) use handle_rtcio;
-        pub(crate) use handle_rtcio as handle_rtcio_with_resistors;
-    };
-}
-
-#[doc(hidden)]
-pub fn enable_iomux_clk_gate() {
-    cfg_if::cfg_if! {
-        if #[cfg(esp32s2)] {
-            let sensors = unsafe { &*crate::peripherals::SENS::ptr() };
-            sensors
-                .sar_io_mux_conf()
-                .modify(|_, w| w.iomux_clk_gate_en().set_bit());
-        } else if #[cfg(esp32s3)] {
-            let sensors = unsafe { &*crate::peripherals::SENS::ptr() };
-            sensors
-                .sar_peri_clk_gate_conf()
-                .modify(|_,w| w.iomux_clk_en().set_bit());
-        }
-    }
-}
-
-#[cfg(any(esp32, esp32s2, esp32s3))]
-#[doc(hidden)]
-#[macro_export]
-macro_rules! analog {
-    (@ignore $rue:literal) => {};
-    (
-        $(
-            (
-                $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat $(, $rue:literal)?
-            )
-        )+
-    ) => {
-        $(
-            #[cfg(any(adc, dac))]
-            impl $crate::gpio::AnalogPin for GpioPin<$pin_num> {
-                /// Configures the pin for analog mode.
-                fn set_analog(&self, _: $crate::private::Internal) {
-                    let rtcio = unsafe{ &*$crate::peripherals::RTC_IO::ptr() };
-
-                    #[cfg(esp32s2)]
-                    $crate::gpio::enable_iomux_clk_gate();
-
-                    // We need `paste` (and a [< >] in it) to rewrite the token stream to
-                    // handle indexed pins.
-                    paste::paste! {
-                        // disable input
-                        rtcio.$pin_reg.modify(|_,w| w.[<$prefix fun_ie>]().bit(false));
-
-                        // disable output
-                        rtcio.enable_w1tc().write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
-
-                        // disable open drain
-                        rtcio.pin($rtc_pin).modify(|_,w| w.pad_driver().bit(false));
-
-                        rtcio.$pin_reg.modify(|_,w| {
-                            w.[<$prefix fun_ie>]().clear_bit();
-
-                            // Connect pin to analog / RTC module instead of standard GPIO
-                            w.[<$prefix mux_sel>]().set_bit();
-
-                            // Select function "RTC function 1" (GPIO) for analog use
-                            unsafe { w.[<$prefix fun_sel>]().bits(0b00) };
-
-                            // Disable pull-up and pull-down resistors on the pin, if it has them
-                            $(
-                                // FIXME: replace with $(ignore($rue)) once stable
-                                $crate::analog!( @ignore $rue );
-                                w.[<$prefix rue>]().bit(false);
-                                w.[<$prefix rde>]().bit(false);
-                            )?
-
-                            w
-                        });
-                    }
-                }
-            }
-        )+
-    }
-}
-
-#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
-#[doc(hidden)]
-#[macro_export]
-macro_rules! analog {
-    (
-        $($pin_num:literal)+
-    ) => {
-        $(
-            #[cfg(any(adc, dac))]
-            impl $crate::gpio::AnalogPin for GpioPin<$pin_num> {
-                /// Configures the pin for analog mode.
-                fn set_analog(&self, _: $crate::private::Internal) {
-                    use $crate::peripherals::GPIO;
-
-                    get_io_mux_reg($pin_num).modify(|_,w| unsafe {
-                        w.mcu_sel().bits(1);
-                        w.fun_ie().clear_bit();
-                        w.fun_wpu().clear_bit();
-                        w.fun_wpd().clear_bit()
-                    });
-
-                    unsafe{ GPIO::steal() }.enable_w1tc().write(|w| unsafe { w.bits(1 << $pin_num) });
-                }
-            }
-        )+
-    }
-}
-
-/// Common functionality for all touch pads
-#[doc(hidden)]
-#[macro_export]
-macro_rules! touch {
-    (@pin_specific $touch_num:expr, true) => {
-        paste::paste! {
-            unsafe { &*RTC_IO::ptr() }.[< touch_pad $touch_num >]().write(|w| unsafe {
-                w.xpd().set_bit();
-                // clear input_enable
-                w.fun_ie().clear_bit();
-                // Connect pin to analog / RTC module instead of standard GPIO
-                w.mux_sel().set_bit();
-                // Disable pull-up and pull-down resistors on the pin
-                w.rue().clear_bit();
-                w.rde().clear_bit();
-                w.tie_opt().clear_bit();
-                // Select function "RTC function 1" (GPIO) for analog use
-                w.fun_sel().bits(0b00)
-            });
-        }
-    };
-
-    (@pin_specific $touch_num:expr, false) => {
-        paste::paste! {
-            unsafe { &*RTC_IO::ptr() }.[< touch_pad $touch_num >]().write(|w| {
-                w.xpd().set_bit();
-                w.tie_opt().clear_bit()
-            });
-        }
-    };
-
-    (
-        $(
-            (
-                $touch_num:literal, $pin_num:literal, $rtc_pin:literal, $touch_out_reg:expr, $meas_field: expr, $touch_thres_reg:expr, $touch_thres_field:expr, $normal_pin:literal
-            )
-        )+
-    ) => {
-        $(
-        impl $crate::gpio::TouchPin for GpioPin<$pin_num> {
-            fn set_touch(&self, _: $crate::private::Internal) {
-                use $crate::peripherals::{GPIO, RTC_IO, SENS};
-
-                let gpio = unsafe { &*GPIO::ptr() };
-                let rtcio = unsafe { &*RTC_IO::ptr() };
-                let sens = unsafe { &*SENS::ptr() };
-
-                // Pad to normal mode (not open-drain)
-                gpio.pin($rtc_pin).write(|w| w.pad_driver().clear_bit());
-
-                // clear output
-                rtcio
-                    .enable_w1tc()
-                    .write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
-                paste::paste! {
-                    sens . $touch_thres_reg ()
-                        .write(|w| unsafe {
-                            w. $touch_thres_field ().bits(
-                                0b0 // Default: 0 for esp32 gets overridden later anyway.
-                            )
-                        });
-
-                    $crate::touch!( @pin_specific $touch_num, $normal_pin );
-
-                    // enable the pin
-                    sens.sar_touch_enable().modify(|r, w| unsafe {
-                        w.touch_pad_worken().bits(
-                            r.touch_pad_worken().bits() | ( 1 << [< $touch_num >] )
-                        )
-                    });
-                }
-            }
-
-            fn get_touch_measurement(&self, _: $crate::private::Internal) -> u16 {
-                paste::paste! {
-                    unsafe { &* $crate::peripherals::SENS::ptr() }
-                        . $touch_out_reg ()
-                        .read()
-                        . $meas_field ()
-                        .bits()
-                }
-            }
-
-            fn get_touch_nr(&self, _: $crate::private::Internal) -> u8 {
-                $touch_num
-            }
-
-            fn set_threshold(&self, threshold: u16, _: $crate::private::Internal) {
-                paste::paste! {
-                    unsafe { &* $crate::peripherals::SENS::ptr() }
-                        . $touch_thres_reg ()
-                        .write(|w| unsafe {
-                            w. $touch_thres_field ().bits(threshold)
-                        });
-                }
-            }
-        })+
     };
 }
 
@@ -2117,12 +1794,13 @@ fn is_listening(pin_num: u8) -> bool {
 }
 
 fn set_int_enable(gpio_num: u8, int_ena: u8, int_type: u8, wake_up_from_light_sleep: bool) {
-    let gpio = unsafe { GPIO::steal() };
-    gpio.pin(gpio_num as usize).modify(|_, w| unsafe {
-        w.int_ena().bits(int_ena);
-        w.int_type().bits(int_type);
-        w.wakeup_enable().bit(wake_up_from_light_sleep)
-    });
+    unsafe { GPIO::steal() }
+        .pin(gpio_num as usize)
+        .modify(|_, w| unsafe {
+            w.int_ena().bits(int_ena);
+            w.int_type().bits(int_type);
+            w.wakeup_enable().bit(wake_up_from_light_sleep)
+        });
 }
 
 #[ram]

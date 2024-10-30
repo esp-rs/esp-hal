@@ -198,42 +198,75 @@ pub enum OutputSignal {
     GPIO             = 128,
 }
 
-crate::gpio::gpio! {
-    (0, 0, [Input, Output, Analog, RtcIo])
-    (1, 0, [Input, Output, Analog, RtcIo])
-    (2, 0, [Input, Output, Analog, RtcIo] (2 => FSPIQ) (2 => FSPIQ))
-    (3, 0, [Input, Output, Analog, RtcIo])
-    (4, 0, [Input, Output, Analog, RtcIo] (2 => FSPIHD) (0 => USB_JTAG_TMS 2 => FSPIHD))
-    (5, 0, [Input, Output, Analog, RtcIo] (2 => FSPIWP) (0 => USB_JTAG_TDI 2 => FSPIWP))
-    (6, 0, [Input, Output] (2 => FSPICLK) (0 => USB_JTAG_TCK 2 => FSPICLK_MUX))
-    (7, 0, [Input, Output] (2 => FSPID) (0 => USB_JTAG_TDO 2 => FSPID))
-    (8, 0, [Input, Output])
-    (9, 0, [Input, Output])
-    (10, 0, [Input, Output] (2 => FSPICS0) (2 => FSPICS0))
-    (11, 0, [Input, Output])
-    (12, 0, [Input, Output] (0 => SPIHD) (0 => SPIHD))
-    (13, 0, [Input, Output] (0 => SPIWP) (0 => SPIWP))
-    (14, 0, [Input, Output] () (0 => SPICS0))
-    (15, 0, [Input, Output] () (0 => SPICLK_MUX))
-    (16, 0, [Input, Output] (0 => SPID) (0 => SPID))
-    (17, 0, [Input, Output] (0 => SPIQ) (0 => SPIQ))
-    (18, 0, [Input, Output])
-    (19, 0, [Input, Output])
-    (20, 0, [Input, Output] (0 => U0RXD) ())
-    (21, 0, [Input, Output] () (0 => U0TXD))
+macro_rules! rtc_pins {
+    ( $( $pin_num:expr )+ ) => {
+        $(
+            impl $crate::gpio::RtcPin for GpioPin<$pin_num> {
+                unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
+                    let rtc_cntl = unsafe { $crate::peripherals::RTC_CNTL::steal() };
+                    let gpio_wakeup = rtc_cntl.gpio_wakeup();
+
+                    paste::paste! {
+                        gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _wakeup_enable >]().bit(wakeup));
+                        gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _int_type >]().bits(level));
+                    }
+                }
+
+                fn rtcio_pad_hold(&mut self, enable: bool) {
+                    paste::paste! {
+                        unsafe { $crate::peripherals::RTC_CNTL::steal() }
+                            .pad_hold().modify(|_, w| w.[< gpio_pin $pin_num _hold >]().bit(enable));
+                    }
+                }
+            }
+        )+
+    };
+}
+
+impl<const N: u8> crate::gpio::RtcPinWithResistors for GpioPin<N>
+where
+    Self: crate::gpio::RtcPin,
+{
+    fn rtcio_pullup(&mut self, enable: bool) {
+        unsafe { crate::peripherals::IO_MUX::steal() }
+            .gpio(N as usize)
+            .modify(|_, w| w.fun_wpu().bit(enable));
+    }
+
+    fn rtcio_pulldown(&mut self, enable: bool) {
+        unsafe { crate::peripherals::IO_MUX::steal() }
+            .gpio(N as usize)
+            .modify(|_, w| w.fun_wpd().bit(enable));
+    }
+}
+
+crate::gpio! {
+    (0, [Input, Output, Analog, RtcIo])
+    (1, [Input, Output, Analog, RtcIo])
+    (2, [Input, Output, Analog, RtcIo] (2 => FSPIQ) (2 => FSPIQ))
+    (3, [Input, Output, Analog, RtcIo])
+    (4, [Input, Output, Analog, RtcIo] (2 => FSPIHD) (0 => USB_JTAG_TMS 2 => FSPIHD))
+    (5, [Input, Output, Analog, RtcIo] (2 => FSPIWP) (0 => USB_JTAG_TDI 2 => FSPIWP))
+    (6, [Input, Output] (2 => FSPICLK) (0 => USB_JTAG_TCK 2 => FSPICLK_MUX))
+    (7, [Input, Output] (2 => FSPID) (0 => USB_JTAG_TDO 2 => FSPID))
+    (8, [Input, Output])
+    (9, [Input, Output])
+    (10, [Input, Output] (2 => FSPICS0) (2 => FSPICS0))
+    (11, [Input, Output])
+    (12, [Input, Output] (0 => SPIHD) (0 => SPIHD))
+    (13, [Input, Output] (0 => SPIWP) (0 => SPIWP))
+    (14, [Input, Output] () (0 => SPICS0))
+    (15, [Input, Output] () (0 => SPICLK_MUX))
+    (16, [Input, Output] (0 => SPID) (0 => SPID))
+    (17, [Input, Output] (0 => SPIQ) (0 => SPIQ))
+    (18, [Input, Output])
+    (19, [Input, Output])
+    (20, [Input, Output] (0 => U0RXD) ())
+    (21, [Input, Output] () (0 => U0TXD))
 }
 
 // RTC pins 0 through 5 (inclusive) support GPIO wakeup
-crate::gpio::rtc_pins! {
-    0
-    1
-    2
-    3
-    4
-    5
-}
-
-crate::gpio::analog! {
+rtc_pins! {
     0
     1
     2

@@ -191,6 +191,8 @@ pub mod hmac;
 pub mod i2c;
 #[cfg(any(i2s0, i2s1))]
 pub mod i2s;
+#[cfg(all(esp32, any(i2s0, i2s1)))]
+pub mod i2s_parallel;
 #[cfg(any(dport, interrupt_core0, interrupt_core1))]
 pub mod interrupt;
 #[cfg(lcd_cam)]
@@ -509,7 +511,8 @@ pub fn init(config: Config) -> Peripherals {
     match config.watchdog.rwdt {
         WatchdogStatus::Enabled(duration) => {
             rtc.rwdt.enable();
-            rtc.rwdt.set_timeout(duration);
+            rtc.rwdt
+                .set_timeout(crate::rtc_cntl::RwdtStage::Stage0, duration);
         }
         WatchdogStatus::Disabled => {
             rtc.rwdt.disable();
@@ -520,7 +523,7 @@ pub fn init(config: Config) -> Peripherals {
         WatchdogStatus::Enabled(duration) => {
             let mut timg0_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new();
             timg0_wd.enable();
-            timg0_wd.set_timeout(duration);
+            timg0_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
         }
         WatchdogStatus::Disabled => {
             crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new().disable();
@@ -532,7 +535,7 @@ pub fn init(config: Config) -> Peripherals {
         WatchdogStatus::Enabled(duration) => {
             let mut timg1_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG1>::new();
             timg1_wd.enable();
-            timg1_wd.set_timeout(duration);
+            timg1_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
         }
         WatchdogStatus::Disabled => {
             crate::timer::timg::Wdt::<self::peripherals::TIMG1>::new().disable();

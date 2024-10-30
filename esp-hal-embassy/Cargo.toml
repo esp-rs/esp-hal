@@ -25,6 +25,7 @@ static_cell         = "2.1.0"
 
 [build-dependencies]
 esp-build    = { version = "0.1.0", path = "../esp-build" }
+esp-config   = { version = "0.1.0", path = "../esp-config", features = ["build"] }
 esp-metadata = { version = "0.4.0", path = "../esp-metadata" }
 
 [features]
