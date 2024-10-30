@@ -171,6 +171,47 @@ pub enum OutputSignal {
     GPIO          = 128,
 }
 
+macro_rules! rtc_pins {
+    ( $( $pin_num:expr )+ ) => {
+        $(
+            impl $crate::gpio::RtcPin for GpioPin<$pin_num> {
+                unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
+                    let rtc_cntl = unsafe { $crate::peripherals::RTC_CNTL::steal() };
+                    let gpio_wakeup = rtc_cntl.cntl_gpio_wakeup();
+                    paste::paste! {
+                        gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _wakeup_enable >]().bit(wakeup));
+                        gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _int_type >]().bits(level));
+                    }
+                }
+
+                fn rtcio_pad_hold(&mut self, enable: bool) {
+                    paste::paste! {
+                        unsafe { $crate::peripherals::RTC_CNTL::steal() }
+                            .pad_hold().modify(|_, w| w.[< gpio_pin $pin_num _hold >]().bit(enable));
+                    }
+                }
+            }
+        )+
+    };
+}
+
+impl<const N: u8> crate::gpio::RtcPinWithResistors for GpioPin<N>
+where
+    Self: crate::gpio::RtcPin,
+{
+    fn rtcio_pullup(&mut self, enable: bool) {
+        unsafe { crate::peripherals::IO_MUX::steal() }
+            .gpio(N as usize)
+            .modify(|_, w| w.fun_wpu().bit(enable));
+    }
+
+    fn rtcio_pulldown(&mut self, enable: bool) {
+        unsafe { crate::peripherals::IO_MUX::steal() }
+            .gpio(N as usize)
+            .modify(|_, w| w.fun_wpd().bit(enable));
+    }
+}
+
 crate::gpio! {
     (0, [Input, Output, Analog, RtcIo])
     (1, [Input, Output, Analog, RtcIo])
@@ -188,7 +229,7 @@ crate::gpio! {
     (20, [Input, Output] (0 => U0RXD) ())
 }
 
-crate::rtc_pins! {
+rtc_pins! {
     0
     1
     2
