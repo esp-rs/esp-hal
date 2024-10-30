@@ -1774,14 +1774,16 @@ mod asynch {
     struct UartRxFuture<'d> {
         events: EnumSet<RxEvent>,
         uart: &'d Info,
+        state: &'d State,
         registered: bool,
     }
 
     impl<'d> UartRxFuture<'d> {
-        pub fn new(uart: &'d Info, events: impl Into<EnumSet<RxEvent>>) -> Self {
+        pub fn new(uart: &'d Info, state: &'d State, events: impl Into<EnumSet<RxEvent>>) -> Self {
             Self {
                 events: events.into(),
                 uart,
+                state,
                 registered: false,
             }
         }
@@ -1833,7 +1835,7 @@ mod asynch {
             cx: &mut core::task::Context<'_>,
         ) -> core::task::Poll<Self::Output> {
             if !self.registered {
-                self.uart.rx_waker.register(cx.waker());
+                self.state.rx_waker.register(cx.waker());
                 self.enable_listen(true);
                 self.registered = true;
             }
@@ -1859,13 +1861,15 @@ mod asynch {
     struct UartTxFuture<'d> {
         events: EnumSet<TxEvent>,
         uart: &'d Info,
+        state: &'d State,
         registered: bool,
     }
     impl<'d> UartTxFuture<'d> {
-        pub fn new(uart: &'d Info, events: impl Into<EnumSet<TxEvent>>) -> Self {
+        pub fn new(uart: &'d Info, state: &'d State, events: impl Into<EnumSet<TxEvent>>) -> Self {
             Self {
                 events: events.into(),
                 uart,
+                state,
                 registered: false,
             }
         }
@@ -1903,7 +1907,7 @@ mod asynch {
             cx: &mut core::task::Context<'_>,
         ) -> core::task::Poll<Self::Output> {
             if !self.registered {
-                self.uart.tx_waker.register(cx.waker());
+                self.state.tx_waker.register(cx.waker());
                 self.enable_listen(true);
                 self.registered = true;
             }
@@ -2075,7 +2079,7 @@ mod asynch {
                 }
 
                 offset = next_offset;
-                UartTxFuture::new(self.uart.info(), TxEvent::TxFiFoEmpty).await;
+                UartTxFuture::new(self.uart.info(), self.uart.state(), TxEvent::TxFiFoEmpty).await;
             }
 
             Ok(count)
@@ -2089,7 +2093,7 @@ mod asynch {
         pub async fn flush_async(&mut self) -> Result<(), Error> {
             let count = self.tx_fifo_count();
             if count > 0 {
-                UartTxFuture::new(self.uart.info(), TxEvent::TxDone).await;
+                UartTxFuture::new(self.uart.info(), self.uart.state(), TxEvent::TxDone).await;
             }
 
             Ok(())
@@ -2182,7 +2186,8 @@ mod asynch {
                     events |= RxEvent::FifoTout;
                 }
 
-                let events_happened = UartRxFuture::new(self.uart.info(), events).await;
+                let events_happened =
+                    UartRxFuture::new(self.uart.info(), self.uart.state(), events).await;
                 // always drain the fifo, if an error has occurred the data is lost
                 let read_bytes = self.drain_fifo(buf);
                 // check error events
@@ -2266,7 +2271,7 @@ mod asynch {
     /// Clears and disables interrupts that have occurred and have their enable
     /// bit set. The fact that an interrupt has been disabled is used by the
     /// futures to detect that they should indeed resolve after being woken up
-    pub(super) fn intr_handler(uart: &Info) {
+    pub(super) fn intr_handler(uart: &Info, state: &State) {
         let interrupts = uart.register_block().int_st().read();
         let interrupt_bits = interrupts.bits(); // = int_raw & int_ena
         let rx_wake = interrupts.rxfifo_full().bit_is_set()
@@ -2285,10 +2290,10 @@ mod asynch {
             .modify(|r, w| unsafe { w.bits(r.bits() & !interrupt_bits) });
 
         if tx_wake {
-            uart.tx_waker.wake();
+            state.tx_waker.wake();
         }
         if rx_wake {
-            uart.rx_waker.wake();
+            state.rx_waker.wake();
         }
     }
 }
@@ -2489,8 +2494,20 @@ pub mod lp_uart {
 
 /// UART Peripheral Instance
 pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyUart> + 'static {
+    /// Returns the peripheral data and state describing this UART instance.
+    fn parts(&self) -> (&Info, &State);
+
     /// Returns the peripheral data describing this UART instance.
-    fn info(&self) -> &Info;
+    #[inline(always)]
+    fn info(&self) -> &Info {
+        self.parts().0
+    }
+
+    /// Returns the peripheral state for this UART instance.
+    #[inline(always)]
+    fn state(&self) -> &State {
+        self.parts().1
+    }
 }
 
 /// Peripheral data describing a particular UART instance.
@@ -2502,12 +2519,6 @@ pub struct Info {
 
     /// Interrupt handler for the asynchronous operations of this UART instance.
     pub async_handler: InterruptHandler,
-
-    /// Waker for the asynchronous RX operations.
-    pub rx_waker: AtomicWaker,
-
-    /// Waker for the asynchronous TX operations.
-    pub tx_waker: AtomicWaker,
 
     /// Interrupt for this UART instance.
     pub interrupt: Interrupt,
@@ -2523,6 +2534,15 @@ pub struct Info {
 
     /// RTS (Request to Send) pin
     pub rts_signal: OutputSignal,
+}
+
+/// Peripheral state for a UART instance.
+pub struct State {
+    /// Waker for the asynchronous RX operations.
+    pub rx_waker: AtomicWaker,
+
+    /// Waker for the asynchronous TX operations.
+    pub tx_waker: AtomicWaker,
 }
 
 impl Info {
@@ -2543,25 +2563,27 @@ unsafe impl Sync for Info {}
 macro_rules! impl_instance {
     ($inst:ident, $txd:ident, $rxd:ident, $cts:ident, $rts:ident) => {
         impl Instance for crate::peripherals::$inst {
-            #[inline(always)]
-            fn info(&self) -> &Info {
+            fn parts(&self) -> (&Info, &State) {
                 #[crate::macros::handler]
                 pub(super) fn irq_handler() {
-                    asynch::intr_handler(&PERIPHERAL);
+                    asynch::intr_handler(&PERIPHERAL, &STATE);
                 }
+
+                static STATE: State = State {
+                    tx_waker: AtomicWaker::new(),
+                    rx_waker: AtomicWaker::new(),
+                };
 
                 static PERIPHERAL: Info = Info {
                     register_block: crate::peripherals::$inst::ptr(),
                     async_handler: irq_handler,
-                    tx_waker: AtomicWaker::new(),
-                    rx_waker: AtomicWaker::new(),
                     interrupt: Interrupt::$inst,
                     tx_signal: OutputSignal::$txd,
                     rx_signal: InputSignal::$rxd,
                     cts_signal: InputSignal::$cts,
                     rts_signal: OutputSignal::$rts,
                 };
-                &PERIPHERAL
+                (&PERIPHERAL, &STATE)
             }
         }
     };
@@ -2586,14 +2608,14 @@ crate::any_peripheral! {
 
 impl Instance for AnyUart {
     #[inline]
-    fn info(&self) -> &Info {
+    fn parts(&self) -> (&Info, &State) {
         match &self.0 {
             #[cfg(uart0)]
-            AnyUartInner::Uart0(uart) => uart.info(),
+            AnyUartInner::Uart0(uart) => uart.parts(),
             #[cfg(uart1)]
-            AnyUartInner::Uart1(uart) => uart.info(),
+            AnyUartInner::Uart1(uart) => uart.parts(),
             #[cfg(uart2)]
-            AnyUartInner::Uart2(uart) => uart.info(),
+            AnyUartInner::Uart2(uart) => uart.parts(),
         }
     }
 }
