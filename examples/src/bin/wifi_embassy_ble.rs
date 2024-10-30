@@ -4,7 +4,7 @@
 //! - offers one service with three characteristics (one is read/write, one is write only, one is read/write/notify)
 //! - pressing the boot-button on a dev-board will send a notification if it is subscribed
 
-//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/async esp-wifi/ble esp-wifi/log
+//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/async esp-wifi/ble
 //% CHIPS: esp32 esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
 
 #![no_std]
